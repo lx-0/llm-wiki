@@ -305,8 +305,9 @@ Run `./.wiki/wiki config keys` for the live, full list.
 | cursor | `.cursor/hooks.json` | ✓ | ✓ | ✓ |
 
 Install scope:
-- **project** (default) — `<repo>/<.agent>/...` — only when CWD is this repo
-- **user** — `~/<.agent>/...` — always
+
+- **user** (recommended, wizard default) — `~/<.agent>/...` — hooks fire for every agent session regardless of CWD. This is the right scope for llm-wiki's purpose: capture sessions from every project the operator works in, not only sessions launched with CWD = vault root. Generated commands use absolute paths so they resolve correctly from any working directory.
+- **project** — `<repo>/<.agent>/...` — hooks fire only when the agent CLI launches with CWD = vault root. Useful if you intentionally want to capture only in-vault work.
 
 Not supported: **pi** (TS-only modules), **opencode** (no native hooks yet, [issue #5409](https://github.com/sst/opencode/issues/5409)).
 

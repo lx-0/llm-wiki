@@ -15,10 +15,15 @@ HOOKS_DIR="$WIKI_DIR/hooks"
 CONFIG_FILE="$WIKI_DIR/config.yaml"
 WIKI_CONFIG_PY="$SCRIPTS_DIR/wiki_config.py"
 
-# Hook-script paths used inside generated agent configs (relative to ROOT_DIR).
+# Hook-script paths used inside generated agent configs.
+# Relative paths (project-scope-only — assume CWD = vault root):
 HOOK_SESSION_START_REL=".wiki/hooks/session-start.py"
 HOOK_SESSION_END_REL=".wiki/hooks/session-end.py"
 HOOK_PRE_COMPACT_REL=".wiki/hooks/pre-compact.py"
+# Absolute paths (work for both user and project scope):
+HOOK_SESSION_START_ABS="$WIKI_DIR/hooks/session-start.py"
+HOOK_SESSION_END_ABS="$WIKI_DIR/hooks/session-end.py"
+HOOK_PRE_COMPACT_ABS="$WIKI_DIR/hooks/pre-compact.py"
 
 # ── Colors / output ──────────────────────────────────────────────────
 if [[ -t 1 ]]; then

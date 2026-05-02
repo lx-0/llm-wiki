@@ -71,11 +71,18 @@ hooks_installed() {
 # Each writes a JSON object to stdout with the wiki-managed hooks block.
 # Generators omit events the agent doesn't support (e.g. Codex has no PreCompact).
 
+# All payload generators emit ABSOLUTE paths so the hook works under both
+# user and project scope. Relative paths would only resolve when the agent
+# CLI happens to launch with CWD = vault root (i.e. project scope) — for
+# user scope, every other CWD silently breaks the hook. The single quotes
+# survive into the JSON string and protect paths that contain spaces
+# (e.g. "Mobile Documents/iCloud~md~obsidian").
+
 claude_hooks_payload() {
   jq -n \
-    --arg start "uv run --project .wiki python $HOOK_SESSION_START_REL" \
-    --arg end "uv run --project .wiki python $HOOK_SESSION_END_REL" \
-    --arg compact "uv run --project .wiki python $HOOK_PRE_COMPACT_REL" \
+    --arg start "uv run --project '$WIKI_DIR' python '$HOOK_SESSION_START_ABS'" \
+    --arg end "uv run --project '$WIKI_DIR' python '$HOOK_SESSION_END_ABS'" \
+    --arg compact "uv run --project '$WIKI_DIR' python '$HOOK_PRE_COMPACT_ABS'" \
     '{
       hooks: {
         SessionStart: [{matcher:"", hooks:[{type:"command", command:$start, timeout:15}]}],
@@ -87,8 +94,8 @@ claude_hooks_payload() {
 
 codex_hooks_payload() {
   jq -n \
-    --arg start "uv run --project .wiki python $HOOK_SESSION_START_REL" \
-    --arg end "uv run --project .wiki python $HOOK_SESSION_END_REL" \
+    --arg start "uv run --project '$WIKI_DIR' python '$HOOK_SESSION_START_ABS'" \
+    --arg end "uv run --project '$WIKI_DIR' python '$HOOK_SESSION_END_ABS'" \
     '{
       hooks: {
         SessionStart: [{matcher:"", hooks:[{type:"command", command:$start, timeout:15}]}],
@@ -100,9 +107,9 @@ codex_hooks_payload() {
 gemini_hooks_payload() {
   # Gemini timeouts are in milliseconds.
   jq -n \
-    --arg start "uv run --project .wiki python $HOOK_SESSION_START_REL" \
-    --arg end "uv run --project .wiki python $HOOK_SESSION_END_REL" \
-    --arg compact "uv run --project .wiki python $HOOK_PRE_COMPACT_REL" \
+    --arg start "uv run --project '$WIKI_DIR' python '$HOOK_SESSION_START_ABS'" \
+    --arg end "uv run --project '$WIKI_DIR' python '$HOOK_SESSION_END_ABS'" \
+    --arg compact "uv run --project '$WIKI_DIR' python '$HOOK_PRE_COMPACT_ABS'" \
     '{
       hooks: {
         SessionStart: [{matcher:"", hooks:[{type:"command", command:$start, timeout:15000}]}],
@@ -118,9 +125,9 @@ cursor_hooks_payload() {
   # version=1, hooks dict with arrays per event, no `matcher` wrapper —
   # commands attach directly to the event array).
   jq -n \
-    --arg start "uv run --project .wiki python $HOOK_SESSION_START_REL" \
-    --arg end "uv run --project .wiki python $HOOK_SESSION_END_REL" \
-    --arg compact "uv run --project .wiki python $HOOK_PRE_COMPACT_REL" \
+    --arg start "uv run --project '$WIKI_DIR' python '$HOOK_SESSION_START_ABS'" \
+    --arg end "uv run --project '$WIKI_DIR' python '$HOOK_SESSION_END_ABS'" \
+    --arg compact "uv run --project '$WIKI_DIR' python '$HOOK_PRE_COMPACT_ABS'" \
     '{
       version: 1,
       hooks: {
