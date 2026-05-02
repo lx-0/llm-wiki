@@ -1,24 +1,68 @@
+<p align="center">
+  <img src="docs/banner.svg" alt="llm-wiki — self-cartography engine" width="100%">
+</p>
+
 # llm-wiki
 
-An implementation of [Andrej Karpathy's LLM Wiki pattern](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) — a personal knowledge base where:
+> **Self-cartography engine.** AI memories + daily logs + clippings → an LLM-compiled Obsidian wiki you and your agents read from daily.
 
-- **`raw/`** holds immutable sources (memories, emails, notes, screenshots, transcripts)
-- **`knowledge/`** holds LLM-compiled wiki articles (concepts, connections, people, projects, qa)
-- **`.wiki/`** is this tooling layer: CLI, hooks, scripts, prompts, config
+Personal knowledge lives in too many partial substrates: daily notes capture what happened, AI-agent memories capture working thought, clippings capture curiosity, screenshots and calendars capture everything else. Each is queryable in isolation but not as a whole, and most are illegible even to the person who produced them.
 
-Compile-once, query-fast. No retrieval at every query — knowledge is distilled into Markdown wikilinks during compile.
+llm-wiki is the **compilation layer** between those raw substrates and active reading — by you, and by the agents you work with every day.
 
-## What's inside
+![Architecture](docs/architecture.png)
 
-- `wiki` — single-entry CLI (interactive + scriptable). `wiki setup`, `wiki config`, `wiki hooks`, `wiki status`, `wiki update`.
-- `scripts/` — Python tools: `compile.py`, `flush.py`, `lint.py`, `query.py`, `scan-{email,calendar,browser,screenshots}.py`, `process-inbox.py`, `optimize-claude-md.py`, `review-wiki.py`, `retry-failed-flushes.py`, `sync-memories.py`.
-- `hooks/` — session lifecycle hooks (Claude Code / Codex / Gemini / Cursor).
-- `prompts/` — LLM prompt templates as standalone `.md` files (one per use case).
-- `lib/` — bash modules that compose the CLI.
-- `config.example.yaml` — copy to `config.yaml` to override defaults.
-- `docs/` — design concept, architecture diagram (Excalidraw), implementation plans.
+## How it works
 
-> **Documentation language.** Most repo docs are English (`README.md`, `AGENTS.md`, `CONTRIBUTING.md`, `SECURITY.md`, `docs/concept.md`, `docs/naming.md`, `.ytstack/*`). **`docs/PROCESS.md` is in German** — it's the live documentation of every data flow inside the engine. Pull requests that touch a flow should keep the existing prose language; bilingual is fine, and Mermaid labels / table headers in English are encouraged so the diagrams remain accessible to non-German readers.
+```text
+Collectors (scan-email, scan-calendar, scan-browser,
+            scan-screenshots, scan-tabs, sync-memories,
+            clippings, ingest-html, …)
+                        │
+                        ▼
+                 ┌─────────────┐
+                 │    raw/     │   immutable; LLM reads, never writes
+                 └─────────────┘
+                        │
+                        ▼
+                 ┌─────────────┐
+                 │ compile.py  │   Claude Agent SDK — sees all sources,
+                 │             │   distils into atomic articles + cross-links
+                 └─────────────┘
+                        │
+                        ▼
+                 ┌─────────────┐
+                 │ knowledge/  │   LLM owns; you and your agents read
+                 │  concepts/  │
+                 │  connections/  ← cross-source links
+                 │  projects/  │
+                 │  people/    │
+                 │  qa/        │
+                 │  index.md   │   master catalogue (loaded into agent context)
+                 └─────────────┘
+```
+
+**The defining choice: compile once, query fast.** Knowledge is distilled into Markdown wikilinks at compile time — no embedding step, no retrieval at every query.
+
+| Approach | Cost per query | Latency | Cross-doc reasoning |
+|---|---|---|---|
+| RAG | re-embed + retrieve every time | seconds | weak — chunks are isolated |
+| llm-wiki | one-time compile per source | ms — it's already markdown | strong — LLM saw all sources during compile |
+
+The vault is a **cockpit, not a warehouse.** Files stay where they are; the vault stores knowledge *about* files: context, meaning, links.
+
+Inspired by [Andrej Karpathy's LLM Wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) and [Cole Medin's claude-memory-compiler](https://github.com/coleam00/claude-memory-compiler). See [docs/concept.md](docs/concept.md) for the full design rationale.
+
+## What's in the box
+
+- **`wiki`** — single-entry CLI (interactive + scriptable). `wiki setup`, `wiki config`, `wiki hooks`, `wiki status`, `wiki update`.
+- **Collectors** (`scripts/scan-*.py`, `sync-memories.py`, `clippings_sweep.py`, `ingest-html.py`) — pull metadata from email, calendar, browser, screenshots, tabs, agent-memory stores, and HTML clippings into `raw/`.
+- **`compile.py`** — Claude Agent SDK loop that turns `raw/` into `knowledge/` articles with wikilinks.
+- **Curiosity loop** — after each compile, a small local Ollama model spots gaps in the new article and queues deep-scan requests for the next cycle.
+- **Optimization suggestions** — the compiler can also propose repeatable automations (e.g. mail filters); each one is a YAML in `raw/suggestions/`, executed only after explicit approval.
+- **Self-healing** — `lint.py` detects orphans, stale frontmatter, broken links, contradictions.
+- **Agent hooks** — Claude Code, Codex, Gemini, Cursor session-start / session-end / pre-compact hooks installed by `wiki hooks install`.
+- **Engine vs. vault split** — engine code, prompts, hooks, and config live under `<vault>/.wiki/`; everything Obsidian sees (`raw/`, `daily/`, `knowledge/`, `inbox/`, `reports/`) is yours.
 
 ## Install
 
@@ -30,14 +74,14 @@ curl -fsSL https://raw.githubusercontent.com/lx-0/llm-wiki/main/install.sh | bas
 
 The installer clones into `<target>/.wiki/`, seeds `config.yaml` from `config.example.yaml`, and runs `uv sync` so the venv lives at `<target>/.wiki/.venv/`. Everything engine-related stays inside `.wiki/` — the vault root stays clean.
 
-**Prerequisites:** `bash` ≥ 4, `git`, `jq`, `uv` (Python package manager).
+**Prerequisites:** `bash` ≥ 4, `git`, `jq`, `uv` (Python package manager). Optional: a local [Ollama](https://ollama.com) for the curiosity / vision / classify loops.
 
 After install:
 
 ```bash
 cd ~/path/to/vault
 ./.wiki/wiki setup        # 5-question config wizard + agent hook install
-./.wiki/wiki status       # verify
+./.wiki/wiki status       # verify config + hooks + Ollama probe
 ```
 
 ## Update
@@ -61,6 +105,20 @@ uv run --project ~/path/to/vault/.wiki python ~/path/to/vault/.wiki/scripts/comp
 
 Hooks always use Option B (the project flag is hardcoded into the agent config).
 
+## Documentation map
+
+| Doc | What's inside |
+|---|---|
+| [docs/concept.md](docs/concept.md) | Three-layer architecture, compile-vs-RAG, cognitive-function mapping, curiosity loop |
+| [docs/PROCESS.md](docs/PROCESS.md) | Live documentation of every data flow inside the engine (German prose, English diagrams) |
+| [docs/naming.md](docs/naming.md) | Naming conventions for raw sources and knowledge articles |
+| [docs/architecture.png](docs/architecture.png) | Full Excalidraw render of the cognitive architecture |
+| [AGENTS.md](AGENTS.md) | Conventions for AI agents working in this repo (tool-agnostic) |
+| [.ytstack/KNOWLEDGE.md](.ytstack/KNOWLEDGE.md) | Hard-won engine learnings: Ollama gotchas, rate-limit debugging, anti-patterns |
+| [.ytstack/DECISIONS.md](.ytstack/DECISIONS.md) | Locked architectural choices (engine/vault split, compile-don't-retrieve, …) |
+
+> **Documentation language.** Most docs are English. **`docs/PROCESS.md` is in German** — pull requests that touch a flow should keep the existing prose language; bilingual is fine, and Mermaid labels / table headers in English are encouraged so diagrams remain accessible.
+
 ## Security
 
 Secrets-leak prevention runs on two layers:
@@ -78,7 +136,7 @@ If you find a leak in history, rotate the secret immediately, then file an issue
 
 ---
 
-## CLI Reference
+# CLI Reference
 
 Operational layer for an LLM Wiki vault. Hidden from Obsidian's file tree.
 
