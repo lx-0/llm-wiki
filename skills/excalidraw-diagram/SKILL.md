@@ -367,6 +367,19 @@ Settings: `fontSize: 16`, `fontFamily: 3`, `textAlign: "center"`, `verticalAlign
 
 See `references/element-templates.md` for copy-paste JSON templates for each element type (text, line, dot, rectangle, arrow). Pull colors from `references/color-palette.md` based on each element's semantic purpose.
 
+## Pre-bundled Libraries
+
+`references/libraries/` ships four curated `.excalidrawlib` shape vocabularies covering the full architecture-diagramming spectrum:
+
+- **`lo-fi-wireframing-kit`** — UI mockups (buttons, forms, alerts, cards, page frames, phone/desktop/tablet)
+- **`system-design`** — generic architecture shapes (DB types, server, cache, LB, message queue, pipeline, CDN)
+- **`technology-logos`** — concrete tech-stack logos (K8s, Docker, Terraform, Kafka, Redis, Spring, Kotlin, Neo4j, …)
+- **`cloud-design-patterns`** — distributed-system patterns as full mini-diagrams (retry, circuit breaker, sharding, throttling, queue-based load leveling)
+
+Read `references/libraries/README.md` for the decision matrix and per-library preview PNGs. When a diagram needs a recognizable shape that fits one of these vocabularies, lift the relevant `libraryItems[*].elements` array into your diagram instead of redrawing from scratch — re-seed `id`/`seed`/`versionNonce` to avoid collisions, and translate coordinates to your target position.
+
+The skill's "shape = meaning" mandate still applies: pick libraries that *encode meaning* (system-design = "this is a DB", technology-logos = "this is Postgres specifically"), not libraries that decorate.
+
 ---
 
 ## Render & Validate (MANDATORY)
