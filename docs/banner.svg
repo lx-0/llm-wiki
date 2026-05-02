@@ -46,7 +46,7 @@
 
   <!-- Footer chips -->
   <g font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13" fill="#64748b">
-    <text x="64" y="294">compile-once · query-fast · cockpit-not-warehouse</text>
+    <text x="64" y="294">compile-once · query-fast · humans-and-agents</text>
   </g>
 
   <!-- Pipeline glyph -->

@@ -76,6 +76,7 @@ def render(
     max_width: int = 1920,
     module_timeout_ms: int = 90_000,
     render_timeout_ms: int = 60_000,
+    theme: str = "dark",
 ) -> Path:
     """Render an .excalidraw file to PNG. Returns the output PNG path.
 
@@ -153,7 +154,8 @@ def render(
 
         # Inject the diagram data and render
         json_str = json.dumps(data)
-        result = page.evaluate(f"window.renderDiagram({json_str})")
+        opts_str = json.dumps({"theme": theme})
+        result = page.evaluate(f"window.renderDiagram({json_str}, {opts_str})")
 
         if not result or not result.get("success"):
             error_msg = result.get("error", "Unknown render error") if result else "renderDiagram returned null"
@@ -257,6 +259,8 @@ def main() -> None:
     parser.add_argument("--render-timeout", type=int, default=60_000,
                         help="Render-completion timeout in ms (default: 60000). "
                              "Bump for very large diagrams (~150+ elements).")
+    parser.add_argument("--theme", choices=["dark", "light"], default="dark",
+                        help="Color theme (default: dark). Sets background + Excalidraw dark-mode export.")
     args = parser.parse_args()
 
     if not args.input.exists():
@@ -267,6 +271,7 @@ def main() -> None:
         args.input, args.output, args.scale, args.width,
         module_timeout_ms=args.module_timeout,
         render_timeout_ms=args.render_timeout,
+        theme=args.theme,
     )
     print(str(png_path))
 
