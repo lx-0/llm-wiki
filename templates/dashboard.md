@@ -10,53 +10,7 @@ cssclasses: [wiki-dashboard]
 
 ## ➕ Capture
 
-```meta-bind-button
-label: 📝 Notiz
-hidden: false
-class: ""
-tooltip: "Neue Notiz in inbox/"
-id: btn-note
-style: primary
-actions:
-  - type: command
-    command: "QuickAdd: Neue Notiz"
-```
-
-```meta-bind-button
-label: 💡 Idee
-hidden: false
-class: ""
-tooltip: "Neue Idee in inbox/"
-id: btn-idea
-style: default
-actions:
-  - type: command
-    command: "QuickAdd: Neue Idee"
-```
-
-```meta-bind-button
-label: ❓ Frage
-hidden: false
-class: ""
-tooltip: "Neue Frage (für Curiosity Loop) in inbox/"
-id: btn-question
-style: default
-actions:
-  - type: command
-    command: "QuickAdd: Neue Frage"
-```
-
-```meta-bind-button
-label: 🤝 Meeting
-hidden: false
-class: ""
-tooltip: "Neue Meeting-Notiz in inbox/"
-id: btn-meeting
-style: default
-actions:
-  - type: command
-    command: "QuickAdd: Neues Meeting"
-```
+`BUTTON[btn-note]` `BUTTON[btn-idea]` `BUTTON[btn-question]` `BUTTON[btn-meeting]`
 
 ---
 
@@ -68,53 +22,7 @@ actions:
 
 > One-click ops. Each button executes a `wiki <subcommand>` via the **Shell commands** plugin. Output appears as a notification.
 
-```meta-bind-button
-label: ▶️ Compile changed
-hidden: false
-class: ""
-tooltip: "Run `wiki compile` — process raw/ + daily/ files whose hash changed since last run."
-id: btn-compile
-style: primary
-actions:
-  - type: command
-    command: "Shell commands: Wiki: compile (changed sources)"
-```
-
-```meta-bind-button
-label: 🔁 Compile all
-hidden: false
-class: ""
-tooltip: "Run `wiki compile --all` — force-recompile every source. Ask for confirmation."
-id: btn-compile-all
-style: destructive
-actions:
-  - type: command
-    command: "Shell commands: Wiki: compile (all sources, force)"
-```
-
-```meta-bind-button
-label: 🛡 Lint
-hidden: false
-class: ""
-tooltip: "Run `wiki lint --structural-only` — orphan / broken-link / type-mismatch checks (no LLM)."
-id: btn-lint
-style: default
-actions:
-  - type: command
-    command: "Shell commands: Wiki: lint (structural)"
-```
-
-```meta-bind-button
-label: 🔄 Refresh stats
-hidden: false
-class: ""
-tooltip: "Re-run dashboard_stats.py — recompute pending counts, lint warnings, total cost."
-id: btn-refresh-stats
-style: default
-actions:
-  - type: command
-    command: "Shell commands: Wiki: refresh dashboard stats"
-```
+`BUTTON[btn-compile]` `BUTTON[btn-compile-all]` `BUTTON[btn-lint]` `BUTTON[btn-refresh-stats]`
 
 ## 🔗 Quick access
 
@@ -473,3 +381,106 @@ LIMIT 30
 > - **Inbox / Pending review / Tasks** are live Dataview queries — they update as soon as files change.
 > - The lower table block is the same data the agent sees through `knowledge/index.md`, but rendered for human navigation.
 > - Triage queues, charts (Dataview Charts plugin), and topic MOCs land in M003 slices S02–S04.
+
+---
+
+%% === Button definitions (rendered via inline `BUTTON[id]` references above) ===
+   Defined at the end with hidden: true so they don't take their own block-level
+   row in the layout. Inline references put them side-by-side in a flex row.
+   This is the documented Meta Bind pattern for button rows / dashboards. %%
+
+```meta-bind-button
+label: 📝 Notiz
+hidden: true
+class: ""
+tooltip: "Neue Notiz in inbox/"
+id: btn-note
+style: primary
+actions:
+  - type: command
+    command: "QuickAdd: Neue Notiz"
+```
+
+```meta-bind-button
+label: 💡 Idee
+hidden: true
+class: ""
+tooltip: "Neue Idee in inbox/"
+id: btn-idea
+style: default
+actions:
+  - type: command
+    command: "QuickAdd: Neue Idee"
+```
+
+```meta-bind-button
+label: ❓ Frage
+hidden: true
+class: ""
+tooltip: "Neue Frage (für Curiosity Loop) in inbox/"
+id: btn-question
+style: default
+actions:
+  - type: command
+    command: "QuickAdd: Neue Frage"
+```
+
+```meta-bind-button
+label: 🤝 Meeting
+hidden: true
+class: ""
+tooltip: "Neue Meeting-Notiz in inbox/"
+id: btn-meeting
+style: default
+actions:
+  - type: command
+    command: "QuickAdd: Neues Meeting"
+```
+
+```meta-bind-button
+label: ▶️ Compile changed
+hidden: true
+class: ""
+tooltip: "Run `wiki compile` — process raw/ + daily/ files whose hash changed since last run."
+id: btn-compile
+style: primary
+actions:
+  - type: command
+    command: "Shell commands: Wiki: compile (changed sources)"
+```
+
+```meta-bind-button
+label: 🔁 Compile all
+hidden: true
+class: ""
+tooltip: "Run `wiki compile --all` — force-recompile every source. Ask for confirmation."
+id: btn-compile-all
+style: destructive
+actions:
+  - type: command
+    command: "Shell commands: Wiki: compile (all sources, force)"
+```
+
+```meta-bind-button
+label: 🛡 Lint
+hidden: true
+class: ""
+tooltip: "Run `wiki lint --structural-only` — orphan / broken-link / type-mismatch checks (no LLM)."
+id: btn-lint
+style: default
+actions:
+  - type: command
+    command: "Shell commands: Wiki: lint (structural)"
+```
+
+```meta-bind-button
+label: 🔄 Refresh stats
+hidden: true
+class: ""
+tooltip: "Re-run dashboard_stats.py — recompute pending counts, lint warnings, total cost."
+id: btn-refresh-stats
+style: default
+actions:
+  - type: command
+    command: "Shell commands: Wiki: refresh dashboard stats"
+```
