@@ -1,12 +1,13 @@
 ---
 name: vault-health-check
-version: 1.0.0
+version: 1.1.0
 description: |
-  Snapshot the operational state of an LLM-wiki vault: knowledge counts, raw-source
-  inventory, compile backlog, last review/lint cadence, piggyback task health,
-  recent flush-log activity. Diagnoses whether sparseness is data-foundation or
-  linking-strategy by computing the link-density ratio against a reference range.
-  Read-only; produces a markdown status report, never mutates state.
+  Snapshot the operational state of an LLM-wiki vault as a colored ASCII
+  dashboard: knowledge composition (stacked bar), raw-source distribution,
+  compile backlog progress, active compile run progress, graph density
+  (inline-links/concept against reference range, orphan count, c:cn ratio),
+  pipeline cadence (compile gate, latest daily, latest review, 14-day daily
+  sparkline). Read-only; never mutates state.
   Use when: user says "wiki status", "vault status", "wie geht's der wiki",
   "compile backlog", "is the pipeline healthy", "health check".
 allowed-tools:
@@ -18,9 +19,26 @@ allowed-tools:
 
 # Vault Health Check
 
-Read-only snapshot of an LLM-wiki vault's pipeline + knowledge state. The output
-is a single tight status report — what's there, what's pending, what looks off.
-No mutations, no fixes. The user decides what to act on.
+Read-only snapshot of an LLM-wiki vault's pipeline + knowledge state, rendered
+as a colored ASCII dashboard. No mutations, no fixes. The operator decides
+what to act on.
+
+## Fast path
+
+The skill ships a renderer at `.wiki/scripts/health.py`. Run it from the
+vault root:
+
+```sh
+uv run --project .wiki python .wiki/scripts/health.py --vault .
+```
+
+Surface the script's stdout verbatim, then add **one** sentence of
+plain-language diagnosis at the bottom (e.g. "Healthy ingestion, sparse
+graph, run nearly done."). Don't paraphrase the dashboard — it's already
+formatted.
+
+If the script fails (missing engine, ANSI-unsafe terminal, broken state file),
+fall through to the manual flow below.
 
 ## Overview
 
@@ -161,7 +179,57 @@ green.
 - **Be tight.** A health-check report longer than ~40 lines is a bug. Tables
   beat paragraphs. The operator is glancing, not reading.
 
-## Example output shape
+## Example output (graphical)
+
+```text
+╔════════════════════════════════════════════════════════════╗
+║  WIKI HEALTH  ·  2026-05-02 13:34                          ║
+╚════════════════════════════════════════════════════════════╝
+
+╭─ KNOWLEDGE ────────────────────────────────── 400 articles  ╮
+│ concepts     ████████████████████████   314                │
+│ connections  ████░░░░░░░░░░░░░░░░░░░░    48                │
+│ projects     ██░░░░░░░░░░░░░░░░░░░░░░    29                │
+│ people       █░░░░░░░░░░░░░░░░░░░░░░░     9                │
+╰────────────────────────────────────────────────────────────╯
+
+╭─ RAW SOURCES ─────────────────────────────────── 441 total  ╮
+│ memories     ████████████████████████   386  87.5%         │
+│ notes        ██░░░░░░░░░░░░░░░░░░░░░░    33   7.5%         │
+│ articles     ░░░░░░░░░░░░░░░░░░░░░░░░     1   0.2%         │
+│ daily        █░░░░░░░░░░░░░░░░░░░░░░░    19   4.3%         │
+│ inbox        ░░░░░░░░░░░░░░░░░░░░░░░░     1   0.2%         │
+│ Clippings    ░░░░░░░░░░░░░░░░░░░░░░░░     1   0.2%         │
+╰────────────────────────────────────────────────────────────╯
+
+╭─ COMPILE BACKLOG ───────────────────────────────────────────╮
+│ ingested  ███████░░░░░░░░░░░░░░░░░░░  26.3%   116/441      │
+│ backlog: 325 files open · cost $5.52 cumulative            │
+╰────────────────────────────────────────────────────────────╯
+
+╭─ ACTIVE COMPILE RUN ────────────────────────────── cap=100  ╮
+│ progress  ███████████████████░░░░░░░  73.0%   73/100       │
+╰────────────────────────────────────────────────────────────╯
+
+╭─ GRAPH DENSITY ─────────────────────────────────────────────╮
+│ links/concept  █████░░░░░░░░░░░░░   7.5  target 15-25      │
+│ orphans        ✓ 0 concepts without [[wikilinks]]          │
+│ c:cn ratio      6.5 : 1  (314c / 48cn)                     │
+╰────────────────────────────────────────────────────────────╯
+
+╭─ PIPELINE CADENCE ──────────────────────────────────────────╮
+│ compile gate     ● gated (hour=13<18)                      │
+│ latest daily     2026-05-02.md                             │
+│ latest review    wiki-review-2026-05-02.md                 │
+│ daily activity   █████████▁████  (last 14d)                │
+╰────────────────────────────────────────────────────────────╯
+```
+
+(In a TTY the bars are colored: green = healthy, yellow = warn, red =
+problem, cyan = neutral progress, gray = empty. ANSI is auto-stripped on
+non-TTY output.)
+
+## Example output (manual fallback)
 
 ```markdown
 ## Wiki status (2026-05-02)
