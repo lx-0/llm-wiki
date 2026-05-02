@@ -385,3 +385,45 @@ The chart grid uses pattern (2): `templates/dashboard.md` consolidates four form
 Reading the rendered DOM directly is the only reliable signal. From a running Obsidian session: DevTools → Inspect the dashboard's stats section → confirm whether `.wiki-chart-grid` actually contains the chart elements as descendants or only sits as an empty sibling. CSS-Grid not applying isn't a styling bug; it's a DOM-shape bug.
 
 **Verified:** after the fix, four charts render in a responsive 2-column grid (laptop) / 4-column grid (wide monitor), title + chart per cell, `auto-fit` driven, no snippet required for the grid layout itself.
+
+#### Follow-up — three more gotchas surfaced after the first round
+
+Reload of the live vault revealed the grid still rendered single-column and Meta Bind buttons still stacked. Three additional layers were biting:
+
+**Readable Line Length caps the dashboard width.** Obsidian's "Readable line length" setting (default ON in reading + live preview) sets `--file-line-width: 700px` on the markdown sizer. With `auto-fit minmax(380px, 1fr)`, that container fits at most 1 column once a sidebar is open. Best practice (sourced from `forum.obsidian.md` Dashboard++ + readable-line-length threads): override the variable AND force the sizer wide:
+
+```css
+.wiki-dashboard {
+  --file-line-width: 100%;
+  --max-width: 100%;
+}
+.wiki-dashboard .markdown-preview-sizer,
+.wiki-dashboard .cm-sizer,
+.wiki-dashboard .cm-contentContainer {
+  max-width: 100% !important;
+  width: 100% !important;
+}
+```
+
+Minimal Theme ships ready-made `max` / `wide` cssclasses that do this. Default theme doesn't — we do it ourselves under the dashboard's own `.wiki-dashboard` scope so it never affects regular notes.
+
+**Meta Bind buttons stack because their `.el-pre` wrapper is block-level.** Obsidian wraps every code-fence in a `.el-pre` with `display: block`. Setting the BUTTON to `display: inline-block` doesn't help — the wrapper still breaks the line. Fix targets the wrapper via `:has()`:
+
+```css
+.wiki-dashboard .el-pre:has(.block-language-meta-bind-button) {
+  display: inline-block;
+  margin: 0 0.5rem 0.5rem 0;
+  vertical-align: top;
+}
+```
+
+`:has()` is supported by Electron's Chromium in Obsidian ≥ 1.4 (we ship for current Obsidian).
+
+**Grid `minmax` was too wide.** `minmax(380px, 1fr)` only fits 2 columns at ≥ 760px container width. Lowered to `minmax(280px, 1fr)` so we get a smooth 1 → 2 → 3 → 4 column flow as the window widens with sidebar open / closed.
+
+**Net pattern for Obsidian dashboards (LLM-wiki convention):**
+1. Build the grid in JS (avoid raw-HTML wrappers — gotcha #3).
+2. Add a `cssclasses` scope (`wiki-dashboard`) and a snippet that enables it.
+3. In the snippet, **always** override `--file-line-width` + sizer `max-width` for the scope (Reading Line Length is on by default).
+4. For inline button rows, target `.el-pre:has(.block-language-meta-bind-button)` not the button itself.
+5. Auto-enable the snippet via `.obsidian/appearance.json` (additive merge in `lib/seed.sh`).

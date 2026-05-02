@@ -162,11 +162,15 @@ if (typeof window.renderChart !== "function") {
   return;
 }
 
-// Grid container — styles inlined so it works without the CSS snippet.
+// Grid container — styles inlined so the layout doesn't depend on the
+// CSS snippet being enabled. minmax(280px, 1fr) gives a smooth 1→2→3→4
+// column flow as the window widens; the `wiki-dashboard.css` snippet
+// handles disabling Obsidian's Readable Line Length so this grid actually
+// gets a wide container to lay out into.
 const grid = this.container.createDiv({cls: "wiki-chart-grid"});
 Object.assign(grid.style, {
   display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(380px, 1fr))",
+  gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
   gap: "1rem",
   alignItems: "start",
   margin: "0.5rem 0 1.5rem 0",

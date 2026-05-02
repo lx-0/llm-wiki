@@ -1,45 +1,74 @@
-/* wiki-dashboard.css — layout helpers for the LLM-wiki Dashboard.
+/* wiki-dashboard.css — layout for the LLM-wiki Dashboard.
  *
  * Auto-enabled by `wiki seed` via .obsidian/appearance.json's enabledCssSnippets.
  * The dashboard note declares `cssclasses: [wiki-dashboard]` in its frontmatter,
  * which scopes these rules to the dashboard only.
  *
- * GOTCHA: Obsidian wraps every top-level markdown block in its own `.el-X`
- * container in reading mode. Raw-HTML wrappers like `<div class="grid">…</div>`
- * spanning multiple blocks do NOT form a real DOM hierarchy with their children
- * — opening and closing tags become independent empty elements as siblings to
- * the markdown content they were meant to contain. Same gotcha hit Meta Bind
- * buttons. Layout therefore must be either:
- *   (a) CSS rules targeting `.block-language-X` directly via `cssclasses`, or
- *   (b) DOM built in JS inside a single dataviewjs block (chart grid uses this).
+ * GOTCHA #1 — Readable Line Length squeezes the dashboard to 1 column.
+ * Obsidian's "Readable line length" caps `.markdown-preview-sizer` at
+ * `--file-line-width` (default 700px). Even with `display: grid` and
+ * `auto-fit minmax(280px, 1fr)`, that 700px container only fits 2 columns
+ * tops, and on screens with sidebars open often just 1 — charts stack.
+ * Override `--file-line-width` and force the sizer to 100 % for the dashboard.
+ *
+ * GOTCHA #2 — Meta Bind buttons stack vertically.
+ * Obsidian reading mode wraps every code-fence in its own block-level
+ * `.el-pre`. Making the BUTTON `display: inline-block` doesn't help — the
+ * `.el-pre` wrapper still breaks the line. Target the wrapper itself via
+ * `:has()` (supported in Electron's Chromium, Obsidian ≥ 1.4).
+ *
+ * GOTCHA #3 — Raw-HTML wrappers don't form a DOM hierarchy.
+ * Obsidian wraps every top-level markdown block in its own `.el-X`. Raw-HTML
+ * `<div>` openers/closers separated by blank lines (CommonMark Type-6) end
+ * up as independent empty siblings. The chart grid is therefore built in
+ * JS inside a single dataviewjs block (see `templates/dashboard.md`), not
+ * via a markdown-level wrapper.
  */
 
-/* ── Capture / Run buttons ─────────────────────────────────────────── */
+/* ── Disable readable-line-length for the dashboard ─────────────────── */
 
-/* Each consecutive Meta Bind button on the dashboard renders inline.
- * The browser wraps onto a new line when there's not enough horizontal space. */
-.wiki-dashboard .block-language-meta-bind-button {
+/* Set the Obsidian core variable (preview + edit + live-preview). */
+.wiki-dashboard,
+body .wiki-dashboard {
+  --file-line-width: 100%;
+  --max-width: 100%;
+}
+
+/* Belt-and-suspenders for themes that don't read --file-line-width: force the
+ * sizers to span their container in every view mode. */
+.markdown-preview-view.wiki-dashboard .markdown-preview-sizer,
+.wiki-dashboard .markdown-preview-sizer,
+.wiki-dashboard.markdown-source-view .cm-sizer,
+.wiki-dashboard.markdown-source-view .cm-contentContainer,
+.markdown-source-view.wiki-dashboard .cm-sizer,
+.markdown-source-view.wiki-dashboard .cm-contentContainer {
+  max-width: 100% !important;
+  width: 100% !important;
+}
+
+/* ── Capture / Run buttons (inline row) ─────────────────────────────── */
+
+/* Make the .el-pre wrapper around each Meta Bind button inline-block so
+ * consecutive buttons flow on one line and wrap naturally. */
+.wiki-dashboard .el-pre:has(.block-language-meta-bind-button) {
   display: inline-block;
   margin: 0 0.5rem 0.5rem 0;
   vertical-align: top;
 }
 
-/* Make sure the button's <p> wrapper (added by Markdown→HTML) doesn't break the row */
+/* Suppress the empty <p> wrapper Markdown sometimes emits between buttons. */
 .wiki-dashboard .block-language-meta-bind-button + p:empty {
   display: none;
 }
 
-/* ── Chart grid (built in JS by templates/dashboard.md) ───────────── */
+/* ── Chart cell typography ──────────────────────────────────────────── */
 
-/* The grid container itself is created with inline styles (display: grid,
- * grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)), etc.) so the
- * dashboard layout works without this snippet. Rules here are tweak-friendly
- * overrides only. */
 .wiki-dashboard .wiki-chart-cell h3 {
   font-size: 1rem;
+  margin: 0 0 0.25rem 0;
 }
 
-/* Heatmap (separate plugin) — full width below the chart grid */
+/* Heatmap (separate plugin) — full width below the chart grid. */
 .wiki-dashboard .heatmap-calendar-graph {
   margin: 0.5rem 0;
 }
