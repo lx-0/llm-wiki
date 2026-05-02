@@ -46,13 +46,18 @@ _agent_has_wiki_hooks() {
 }
 
 # Prompt user to pick scope. Echoes one or both of: "user" "project".
+# Default = user-scope, because llm-wiki's whole purpose is capturing
+# sessions from EVERY project the operator works in (cross-project memory),
+# not only sessions launched with CWD == vault root. Project-scope is
+# correct only for installs that intentionally limit capture to in-vault
+# work; that's the niche case.
 _prompt_scope() {
   echo
   local choice
-  choice="$(select_one "Install scope" "project only|user only|both" 1)"
+  choice="$(select_one "Install scope" "user only (recommended)|project only|both" 1)"
   case "$choice" in
+    "user only (recommended)") echo "user" ;;
     "project only") echo "project" ;;
-    "user only") echo "user" ;;
     "both") echo "project user" ;;
   esac
 }
