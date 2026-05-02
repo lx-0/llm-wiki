@@ -81,7 +81,7 @@ SORT file.mtime DESC
 
 ## ⏳ Pending review
 
-> Articles with `status: review` — typically agent output waiting for human approval, revise, or reject.
+> Notes with `status: review` — typically agent output waiting for human approval, revise, or reject. Engine-managed folders (`raw/`, `daily/`, `knowledge/`) are excluded; they're not edit-targets.
 
 ```dataview
 TABLE WITHOUT ID
@@ -89,7 +89,7 @@ TABLE WITHOUT ID
   type AS "Type",
   agent AS "Agent",
   dateformat(file.mtime, "yyyy-MM-dd HH:mm") AS "Modified"
-FROM ""
+FROM "" AND -"raw" AND -"daily" AND -"knowledge" AND -"Templates"
 WHERE status = "review"
 SORT file.mtime DESC
 LIMIT 30
@@ -97,10 +97,14 @@ LIMIT 30
 
 ## ✅ Open tasks
 
-> Aggregated checkboxes from anywhere in the vault. Click to navigate.
+> Aggregated checkboxes from working files only. Engine-managed substrates (`raw/` is immutable ground-truth, `daily/` is the session audit log, `knowledge/` is LLM output) are excluded — checkboxes there aren't yours to act on.
 
 ```tasks
 not done
+path does not include raw/
+path does not include daily/
+path does not include knowledge/
+path does not include Templates/
 group by folder
 limit 25
 short mode
@@ -165,7 +169,7 @@ LIMIT 10
 
 ## 🏝️ Orphan notes
 
-> Files with no inbound links. Either link them from a relevant article, archive, or delete.
+> Working files with no inbound links. Either link them from a relevant article, archive, or delete. Engine-managed folders (`raw/` ground-truth, `daily/` audit log, `knowledge/` LLM output) are excluded — orphans there are expected, not actionable.
 
 ```dataview
 LIST
@@ -174,6 +178,8 @@ WHERE length(file.inlinks) = 0
   AND !contains(file.folder, ".obsidian")
   AND !contains(file.folder, "Templates")
   AND !contains(file.folder, "knowledge")
+  AND !contains(file.folder, "raw")
+  AND !contains(file.folder, "daily")
   AND !startswith(file.name, "_dashboard-stats")
   AND file.name != "dashboard"
   AND file.name != "AGENTS"
