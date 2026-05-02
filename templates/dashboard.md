@@ -18,6 +18,28 @@ cssclasses: [wiki-dashboard]
 
 ![[_dashboard-stats]]
 
+## 🛡 Lint triage
+
+> Four queues from `lint.py`. Counts pulled from `_dashboard-lint.md` frontmatter (refreshed on every flush). Click a wikilink in the expanded callout to jump to the offending file.
+
+```dataviewjs
+const lint = dv.page("_dashboard-lint");
+const queues = [
+  { key: "orphans_count", title: "Orphans", section: "Orphans" },
+  { key: "stale_count", title: "Stale", section: "Stale" },
+  { key: "missing_backlinks_count", title: "Missing backlinks", section: "Missing backlinks" },
+  { key: "failed_flushes_count", title: "Failed flushes", section: "Failed flushes" },
+];
+for (const q of queues) {
+  const n = lint?.[q.key] ?? 0;
+  if (n === 0) {
+    dv.paragraph(`> [!success] ${q.title} (0)`);
+  } else {
+    dv.paragraph(`> [!warning]- ${q.title} (${n})\n> ![[_dashboard-lint#${q.section}]]`);
+  }
+}
+```
+
 ## 🔧 Run
 
 > One-click ops. Each button executes a `wiki <subcommand>` via the **Shell commands** plugin. Output appears as a notification.
