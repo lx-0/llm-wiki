@@ -251,6 +251,10 @@ _refresh_dashboard_stats() {
   uv run --quiet --project "$WIKI_DIR" python "$WIKI_DIR/scripts/dashboard_stats.py" 2>/dev/null || true
 }
 
+_refresh_dashboard_lint() {
+  uv run --quiet --project "$WIKI_DIR" python "$WIKI_DIR/scripts/dashboard_lint.py" 2>/dev/null || true
+}
+
 cmd_compile() {
   case "${1:-}" in
     -h|--help|help)
@@ -272,6 +276,7 @@ EOF
   _run_script compile.py "$@"
   local rc=$?
   _refresh_dashboard_stats
+  _refresh_dashboard_lint
   return $rc
 }
 
@@ -296,6 +301,7 @@ EOF
   _run_script flush.py "$@"
   local rc=$?
   _refresh_dashboard_stats
+  _refresh_dashboard_lint
   return $rc
 }
 
@@ -320,6 +326,7 @@ EOF
   _run_script lint.py "$@"
   local rc=$?
   _refresh_dashboard_stats
+  _refresh_dashboard_lint
   return $rc
 }
 
@@ -413,12 +420,14 @@ EOF
     _run_script correct_apply.py "$@"
     local rc=$?
     _refresh_dashboard_stats
+    _refresh_dashboard_lint
     return $rc
   fi
   banner "wiki correct"
   _run_script correct.py "$@"
   local rc=$?
   _refresh_dashboard_stats
+  _refresh_dashboard_lint
   return $rc
 }
 
@@ -473,6 +482,10 @@ EOF
   done
   banner "wiki seed" "$( (( force == 1 )) && echo 'overwrite mode' || echo 'additive mode' )"
   seed_vault_templates "$ROOT_DIR" "$WIKI_DIR" "$force"
+  # Populate caches so a fresh-install vault has a usable Dashboard immediately,
+  # without needing to run `wiki flush` first.
+  _refresh_dashboard_stats
+  _refresh_dashboard_lint
 }
 
 
