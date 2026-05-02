@@ -72,6 +72,22 @@ actions:
 ### Source-type distribution
 
 ```dataviewjs
+// Theme-aware palette — pulled from Obsidian CSS vars so it tracks dark / light mode.
+const cs = getComputedStyle(document.body);
+const _v = (name, fallback) => (cs.getPropertyValue(name) || fallback).trim();
+const textColor = _v("--text-normal", "#ddd");
+const gridColor = _v("--background-modifier-border", "#444");
+const palette = [
+  _v("--color-blue", "#5b8def"),
+  _v("--color-orange", "#e89954"),
+  _v("--color-green", "#5fb364"),
+  _v("--color-purple", "#9b6dc7"),
+  _v("--color-cyan", "#4ec5d4"),
+  _v("--color-red", "#d65b5b"),
+  _v("--color-yellow", "#d6b85b"),
+  _v("--color-pink", "#d36fb8"),
+];
+
 const pages = dv.pages('"knowledge"').filter(p => p.file.name !== "index" && p.file.name !== "log");
 const counts = {};
 for (const p of pages) {
@@ -87,8 +103,21 @@ if (labels.length === 0) {
 } else {
   window.renderChart({
     type: "doughnut",
-    data: { labels, datasets: [{ label: "Articles", data }] },
-    options: { plugins: { legend: { position: "right" } } }
+    data: {
+      labels,
+      datasets: [{
+        label: "Articles",
+        data,
+        backgroundColor: labels.map((_, i) => palette[i % palette.length]),
+        borderColor: gridColor,
+        borderWidth: 1
+      }]
+    },
+    options: {
+      plugins: {
+        legend: { position: "right", labels: { color: textColor } }
+      }
+    }
   }, this.container);
 }
 ```
@@ -96,6 +125,12 @@ if (labels.length === 0) {
 ### Top 15 tags
 
 ```dataviewjs
+const cs = getComputedStyle(document.body);
+const _v = (name, fallback) => (cs.getPropertyValue(name) || fallback).trim();
+const textColor = _v("--text-normal", "#ddd");
+const gridColor = _v("--background-modifier-border", "#444");
+const accent = _v("--color-accent", "#7c8cff");
+
 const pages = dv.pages('"knowledge"').filter(p => p.file.name !== "index" && p.file.name !== "log");
 const tagCounts = {};
 for (const p of pages) {
@@ -117,9 +152,22 @@ if (sorted.length === 0) {
     type: "bar",
     data: {
       labels: sorted.map(([k]) => k),
-      datasets: [{ label: "Articles", data: sorted.map(([, v]) => v) }]
+      datasets: [{
+        label: "Articles",
+        data: sorted.map(([, v]) => v),
+        backgroundColor: accent,
+        borderColor: accent,
+        borderWidth: 1
+      }]
     },
-    options: { indexAxis: "y", plugins: { legend: { display: false } } }
+    options: {
+      indexAxis: "y",
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: textColor }, grid: { color: gridColor } },
+        y: { ticks: { color: textColor }, grid: { color: gridColor } }
+      }
+    }
   }, this.container);
 }
 ```
@@ -127,6 +175,12 @@ if (sorted.length === 0) {
 ### Articles per folder
 
 ```dataviewjs
+const cs = getComputedStyle(document.body);
+const _v = (name, fallback) => (cs.getPropertyValue(name) || fallback).trim();
+const textColor = _v("--text-normal", "#ddd");
+const gridColor = _v("--background-modifier-border", "#444");
+const accent = _v("--color-green", "#5fb364");
+
 const pages = dv.pages('"knowledge"').filter(p => p.file.name !== "index" && p.file.name !== "log");
 const counts = {};
 for (const p of pages) {
@@ -143,9 +197,21 @@ if (sorted.length === 0) {
     type: "bar",
     data: {
       labels: sorted.map(([k]) => k),
-      datasets: [{ label: "Articles", data: sorted.map(([, v]) => v) }]
+      datasets: [{
+        label: "Articles",
+        data: sorted.map(([, v]) => v),
+        backgroundColor: accent,
+        borderColor: accent,
+        borderWidth: 1
+      }]
     },
-    options: { plugins: { legend: { display: false } } }
+    options: {
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: textColor }, grid: { color: gridColor } },
+        y: { ticks: { color: textColor }, grid: { color: gridColor } }
+      }
+    }
   }, this.container);
 }
 ```
@@ -155,6 +221,14 @@ if (sorted.length === 0) {
 > How well-connected is the graph? A healthy LLM-wiki has most articles in the 1–10 inlinks range. Many zeros = orphan problem.
 
 ```dataviewjs
+const cs = getComputedStyle(document.body);
+const _v = (name, fallback) => (cs.getPropertyValue(name) || fallback).trim();
+const textColor = _v("--text-normal", "#ddd");
+const gridColor = _v("--background-modifier-border", "#444");
+const danger = _v("--color-red", "#d65b5b");
+const ok = _v("--color-green", "#5fb364");
+const warn = _v("--color-yellow", "#d6b85b");
+
 const pages = dv.pages('"knowledge"').filter(p => p.file.name !== "index" && p.file.name !== "log");
 const buckets = { "0": 0, "1–2": 0, "3–5": 0, "6–10": 0, "11+": 0 };
 for (const p of pages) {
@@ -165,6 +239,7 @@ for (const p of pages) {
   else if (n <= 10) buckets["6–10"]++;
   else buckets["11+"]++;
 }
+const colors = [danger, warn, ok, ok, ok];
 if (pages.length === 0) {
   dv.paragraph("_No articles yet._");
 } else if (typeof window.renderChart !== "function") {
@@ -174,9 +249,21 @@ if (pages.length === 0) {
     type: "bar",
     data: {
       labels: Object.keys(buckets),
-      datasets: [{ label: "Articles", data: Object.values(buckets) }]
+      datasets: [{
+        label: "Articles",
+        data: Object.values(buckets),
+        backgroundColor: colors,
+        borderColor: gridColor,
+        borderWidth: 1
+      }]
     },
-    options: { plugins: { legend: { display: false } } }
+    options: {
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: textColor }, grid: { color: gridColor } },
+        y: { ticks: { color: textColor }, grid: { color: gridColor } }
+      }
+    }
   }, this.container);
 }
 ```
