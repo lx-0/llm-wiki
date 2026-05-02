@@ -38,3 +38,21 @@ Format for each entry:
 **Chose:** A.
 **Reason:** Engine repo already commits engine-tier documentation. Survives repo clone, visible to other agents and contributors, no machine-loss risk. User-level only correct for secret side-projects, which this is not.
 **Supersedes:** —
+
+## 2026-05-02: Naming vocabulary — "LLM Wiki" (pattern) / "wiki" (code) / user-branded (vault)
+
+**Context:** Karpathy's gist used both "LLM Knowledge Bases" and `llm-wiki`. Of the top 10 GitHub implementations within four weeks of his post, nine use "LLM Wiki" in repo name or description. We needed a single locked vocabulary so engine code, prompts, and public docs stop drifting between "Brain", "Knowledge Base", "Memory Compiler", etc.
+**Options considered:** (A) "LLM Wiki" (Karpathy + community standard); (B) "Knowledge Compiler" / "Memory Compiler" (describes engine, not artefact); (C) "Brain" / "Exobrain" / "Second Brain" (Forte's broader PKM concept, semantically wider than what we do).
+**Chose:** A.
+**Reason:** Community gravity — nine of the top ten implementations use it within the first four weeks; matches the gist's filename and avoids overlap with RAG/vector-DB usage of "Knowledge Base". Three layers locked: pattern descriptor "LLM Wiki", code/paths/vars `wiki` / `.wiki/` / `WIKI_DIR` / `WikiConfig`, user-branding free choice (the tooling does not impose a name on the user's vault).
+**Supersedes:** —
+**Linked artifacts:** `docs/naming.md` carries the full vocabulary table and the explicit non-names ("Brain", "Knowledge Compiler", "Knowledge Base").
+
+## 2026-05-02: Engine `.venv/` location is `.wiki/.venv/` only — never vault root
+
+**Context:** `install.sh` originally allowed `uv sync` from any CWD; an early version of the docs implied the venv could live wherever convenient. KNOWLEDGE.md captures a 2026-05-02 incident where an agent placed `.venv/` at the vault root, breaking `wiki update` and leaking engine internals into the data layer.
+**Options considered:** (A) vault-root `.venv/` (matches naive `uv` defaults, simpler to remember); (B) `.wiki/.venv/` only (engine self-contained, vault root stays clean); (C) configurable.
+**Chose:** B.
+**Reason:** Vault-Engine split is the load-bearing architectural invariant — `.venv/` is engine state, not vault data. Configurable would re-open the same drift. `install.sh` enforces by always passing `--project <DEST>` where DEST = `<vault>/.wiki/`.
+**Supersedes:** —
+**Linked artifacts:** `docs/engine-layout.md` (Hard rule); `KNOWLEDGE.md` 2026-05-02 entry.
