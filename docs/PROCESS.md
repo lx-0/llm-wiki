@@ -17,7 +17,7 @@ Zwei fundamental getrennte Ingest-Pfade konvergieren bei `compile.py`:
 - **Path A** — Automatische Session-Capture (Hooks → daily/ → compile)
 - **Path B** — Kuratierte Quellen (Scanners/Manual/Inbox → raw/ → compile)
 
-## Übersicht — die 11 Prozesse
+## Übersicht — die 12 Prozesse
 
 | # | Process | Was passiert | Trigger |
 |---|---|---|---|
@@ -32,6 +32,7 @@ Zwei fundamental getrennte Ingest-Pfade konvergieren bei `compile.py`:
 | [9](#9-optimization-suggestions-email) | Optimization Suggestions | YAML-Proposals (z.B. Mail-Filter) → per-action approval | nach Compile |
 | [10](#10-claudemd-optimizer) | CLAUDE.md Optimizer | Cross-Project-Pattern → `~/.claude/CLAUDE.md` Edits | piggyback |
 | [11](#11-screenshot-scanner) | Screenshot Scanner | `~/Screenshots/` → Vision-LLM → `raw/notes/` | piggyback (lokal-only) |
+| [12](#12-vault-ux-layer-dashboard--mocs) | Vault UX Layer | Dashboard.md (Auto-Open) + `_dashboard-stats.md` Refresh + MOCs (in Arbeit) | nach jedem Flush (synchron) |
 
 ---
 
@@ -216,6 +217,7 @@ flowchart TD
 | CLAUDE.md Optimizer | `optimize-claude-md.py` | 24h | $ (Claude API) |
 | Memory Sync | `sync-memories.py` | 24h | $0 (kein LLM) |
 | Retry Failed Flushes | `retry-failed-flushes.py --limit N` | 24h | $ (Claude API) |
+| Dashboard Stats Refresh | `dashboard_stats.py` (synchron, kein Piggyback) | nach jedem Flush | $0 (kein LLM) |
 
 Tasks werden als detached Background-Prozesse gespawnt (gleiche Mechanik wie compile.py). Sie laufen unabhängig voneinander und vom Compile. Der Piggyback läuft nur nach erfolgreichem Flush — bei Dedup, Empty oder Fail wird er übersprungen.
 
@@ -740,3 +742,52 @@ uv run python scripts/scan-screenshots.py --backfill 7       # letzte 7 Tage nac
 - **Sehr große Screenshots:** Gemma4 Vision handled beliebige PNG-Größen.
 - **Erster Lauf / Backfill:** `--backfill N` scannt die letzten N Tage rückwirkend. Ohne Flag nur neue (seit letztem Lauf).
 - **Leerer Screenshot-Ordner:** Script exited sauber, kein Report.
+
+---
+
+## 12. Vault UX Layer (Dashboard + MOCs)
+
+> Eingeführt mit M003. Aufteilung des Vaults in einen **Agent-Layer** (`knowledge/index.md`, vom Compiler gepflegt) und einen **Human-Layer** (`dashboard.md` + `knowledge/MOCs/`, für den Leser kuratiert). Der Engine-Code bleibt für beide Layer dieselbe Quelle.
+
+### Drei-Layer-Split
+
+| Layer | Datei(en) | Zielgruppe | Pflege |
+|-------|-----------|------------|--------|
+| Agent-Index | `knowledge/index.md` | LLM-Compile + Query | automatisch via `compile.py` |
+| Human-Dashboard | `dashboard.md` (Vault-Root) | Mensch beim Vault-Open | manuell editierbar; live Dataview-Queries |
+| Topic-Hubs (MOCs) | `knowledge/MOCs/<topic>.md` | Mensch zur Themen-Navigation | manuell kuratiert (M003-S04) |
+
+### Dashboard Auto-Open
+
+`templates/.obsidian/community-plugins.json` aktiviert das **Homepage**-Plugin; die Default-Konfiguration (`templates/.obsidian/plugins/homepage/data.json`) zeigt auf `dashboard`. Beim ersten Vault-Öffnen wird der Operator gefragt, das Plugin zu installieren.
+
+### Dashboard-Stats-Refresh
+
+`dashboard.md` zeigt einen Engine-Status-Callout (pending compiles, failed flushes, lint warnings, total cost) per Transklusion `![[_dashboard-stats]]`. Die Werte stehen als Frontmatter + gerenderter Callout in `_dashboard-stats.md` am Vault-Root.
+
+`scripts/dashboard_stats.py` regeneriert die Datei. Der Refresh ist **synchron post-flush** (kein Piggyback) — `flush.py:refresh_dashboard_stats()` ruft das Script direkt nach `maybe_trigger_compile` auf, sodass die Counts immer den letzten Flush widerspiegeln. Best-effort: ein Crash blockiert den Flush nicht.
+
+Der Inhalt der Frontmatter:
+
+| Feld | Quelle |
+|------|--------|
+| `pending_compiles` | `list_raw_files()` ∖ `state.ingested` (Hash-Vergleich) |
+| `failed_flushes` | Anzahl `*.md` in `.wiki/sessions/failed-flushes/` |
+| `lint_warnings` | Summe aus den 5 strukturellen Lint-Checks (kein LLM) |
+| `total_cost_lifetime` | `state.json:total_cost` |
+| `articles_total` | `len(list_wiki_articles())` |
+| `daily_logs_total` | Anzahl `daily/*.md` |
+| `last_compile_ts` | mtime des neuesten Artikels in `knowledge/` |
+
+### Script
+
+```bash
+uv run python scripts/dashboard_stats.py             # Refresh
+uv run python scripts/dashboard_stats.py --dry-run   # Stats als JSON ausgeben, nichts schreiben
+```
+
+### Edge Cases
+
+- **Erstinstallation, noch kein Flush gelaufen:** `install.sh` seedet `_dashboard-stats.md` als Placeholder mit Nullen, sodass die Transklusion in `dashboard.md` nicht broken aussieht.
+- **`dashboard_stats.py` crasht:** Der Aufruf in `flush.py` ist `check=False` mit 30s Timeout; ein Fehler wird geloggt, der Flush-Pfad läuft normal weiter.
+- **MOCs-Ordner fehlt noch (vor S04):** `knowledge/MOCs/` ist leer — das Dashboard zeigt keinen MOC-Block. Wird nachgereicht in M003-S04.

@@ -40,6 +40,7 @@ LOGS_DIR.mkdir(parents=True, exist_ok=True)
 LOG_FILE = LOGS_DIR / "flush.log"
 LAST_FLUSH_FILE = STATE_DIR / "last-flush.json"
 COMPILE_SCRIPT = SCRIPTS_DIR / "compile.py"
+DASHBOARD_STATS_SCRIPT = SCRIPTS_DIR / "dashboard_stats.py"
 TIMEZONE = CONFIG.scheduling.timezone
 COMPILE_AFTER_HOUR = CONFIG.scheduling.compile_after_hour
 DEDUP_WINDOW_SECONDS = CONFIG.scheduling.dedup_window_seconds
@@ -266,6 +267,25 @@ def maybe_trigger_compile(daily_file: Path) -> None:
         log.exception("Failed to spawn compile.py")
 
 
+# ── Dashboard refresh ───────────────────────────────────────────────
+
+def refresh_dashboard_stats() -> None:
+    """Regenerate `_dashboard-stats.md` so the vault Dashboard reflects the
+    counts after this flush. Synchronous and best-effort: failures are logged
+    but never block the flush itself."""
+    try:
+        subprocess.run(
+            [sys.executable, str(DASHBOARD_STATS_SCRIPT)],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            stdin=subprocess.DEVNULL,
+            check=False,
+            timeout=30,
+        )
+    except Exception:
+        log.exception("Failed to refresh dashboard stats")
+
+
 # ── Piggyback tasks ─────────────────────────────────────────────────
 
 def _load_piggyback_state() -> dict:
@@ -406,6 +426,9 @@ async def main() -> None:
 
     # Maybe trigger compilation
     maybe_trigger_compile(daily_file)
+
+    # Refresh `_dashboard-stats.md` so the vault Dashboard reflects this flush.
+    refresh_dashboard_stats()
 
     # Maybe run piggyback tasks (email scan, lint, review)
     maybe_run_piggyback_tasks()
