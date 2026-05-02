@@ -30,6 +30,7 @@ from config import (
     AGENTS_FILE,
     KNOWLEDGE_DIR,
     LOG_FILE,
+    LOGS_DIR,
     RAW_SUGGESTIONS_DIR,
     ROOT_DIR,
     STATE_FILE,
@@ -47,12 +48,22 @@ from utils import (
 )
 
 # ── Logging ──────────────────────────────────────────────────────────
+_LOG_FORMAT = "%(asctime)s  %(levelname)s  %(message)s"
+_LOG_DATEFMT = "%Y-%m-%dT%H:%M:%S"
+
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s  %(levelname)s  %(message)s",
-    datefmt="%Y-%m-%dT%H:%M:%S",
+    format=_LOG_FORMAT,
+    datefmt=_LOG_DATEFMT,
 )
 log = logging.getLogger("compile")
+
+LOGS_DIR.mkdir(parents=True, exist_ok=True)
+_compile_log_file = LOGS_DIR / "compile.log"
+_file_handler = logging.FileHandler(_compile_log_file, encoding="utf-8")
+_file_handler.setFormatter(logging.Formatter(_LOG_FORMAT, datefmt=_LOG_DATEFMT))
+_file_handler.setLevel(logging.INFO)
+logging.getLogger().addHandler(_file_handler)
 
 from wiki_config import CONFIG  # noqa: E402
 from prompts import render  # noqa: E402
@@ -351,6 +362,14 @@ async def maybe_generate_curiosity_requests(source: Path) -> None:
             return
         if not gaps:
             log.info("  Curiosity: no gaps found")
+            return
+
+        non_dict = [g for g in gaps if not isinstance(g, dict)]
+        if non_dict:
+            log.warning("  Curiosity: dropping %d non-dict gap(s); sample=%r",
+                        len(non_dict), non_dict[0])
+        gaps = [g for g in gaps if isinstance(g, dict)]
+        if not gaps:
             return
 
         # Write request files

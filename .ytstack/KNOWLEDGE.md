@@ -128,8 +128,11 @@ Stays under the 10s hook timeout but preserves massive signal.
 - `enum` works (forces a string into a value list).
 - `minLength` is **ignored** (empty strings get through).
 - `required` ensures field presence, not content.
+- **Item-level `type: object` is not always honored.** Observed in production: `compile.py`'s curiosity schema declared `gaps[].type = object` with `required: [topic, folder, account, rationale]`, but Ollama (gemma4:e4b) still returned `{"gaps": ["str", "str"]}` on at least one input — strings instead of objects. Consequence: `gap.get(...)` raised `AttributeError` and killed the whole curiosity pass. Fix: validate every parsed item with `isinstance(g, dict)` before treating it as one; log + drop non-conforming items.
 
 **Workaround for non-empty fields:** define an `enum` covering all expected values.
+
+**Defensive read pattern after `chat_schema`:** never assume the parsed structure matches the declared schema. Always shape-guard at the boundary — same principle as the `state.ingested[rel]` string-vs-dict gotcha further down. Constrained decoding is best-effort, not a contract.
 
 #### Cache-buster needed at `temperature: 0`
 

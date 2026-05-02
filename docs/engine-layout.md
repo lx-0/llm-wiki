@@ -72,7 +72,7 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 └── (gitignored runtime)
     ├── .venv/                 ← uv-managed Python environment
     ├── state/                 ← *.json hash trackers, dedup, cooldowns
-    ├── logs/                  ← *.log files
+    ├── logs/                  ← flush.log, compile.log (stderr-mirror, append-only)
     ├── sessions/              ← session-flush staging + failed-flushes/
     └── reports/               ← lint + review-wiki output
 ```

@@ -553,6 +553,7 @@ Dateiname: `raw/requests/request-{slug}-{date}.json`
 - **Nur kurze Sources:** Sources <500 Zeichen generieren keine Requests.
 - **Doppelte Requests:** Gleicher Ordner + Thema kann theoretisch mehrfach requested werden. Der Deep-Scanner liefert trotzdem neue Daten (neue Mails seit letztem Scan).
 - **Request ohne passenden Scanner:** Aktuell nur `email-deep-scan` implementiert. Andere Typen bleiben pending.
+- **Schema-Bypass durch Modell:** Wenn Ollama trotz constrained decoding `gaps` als Liste von Strings statt Objekten zurückgibt, werden Nicht-Dict-Items mit `WARNING` (samt Sample) verworfen statt die Pipeline abzureißen. Tracebacks landen in `<vault>/.wiki/logs/compile.log`.
 
 ---
 
