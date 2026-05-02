@@ -2,13 +2,59 @@
   <img src="docs/banner.svg" alt="llm-wiki — self-cartography engine" width="100%">
 </p>
 
-# llm-wiki
+<p align="center">
+  <em>An LLM-compiled wiki for solo knowledge workers — and the AI agents you work with every day.</em>
+</p>
 
-> **Self-cartography engine.** AI memories + daily logs + clippings → an LLM-compiled Obsidian wiki you and your agents read from daily.
+<p align="center">
+  <a href="./LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MIT-blue"></a>
+  <img alt="Python" src="https://img.shields.io/badge/python-uv-3776ab">
+  <img alt="Claude Agent SDK" src="https://img.shields.io/badge/Claude-Agent%20SDK-d97757">
+  <img alt="Ollama" src="https://img.shields.io/badge/Ollama-optional-1f2937">
+  <img alt="Obsidian" src="https://img.shields.io/badge/Obsidian-vault-7c3aed">
+</p>
+
+<table align="center">
+  <tr>
+    <td align="center"><strong>9</strong><br/>collectors</td>
+    <td align="center"><strong>4</strong><br/>agents wired</td>
+    <td align="center"><strong>0</strong><br/>vector indexes</td>
+    <td align="center"><strong>MIT</strong><br/>open source</td>
+  </tr>
+</table>
+
+> Yesterday's Claude Code session is already a daily-log entry. This week's screenshots already have a summary article. Open a fresh agent session and the wiki index loads before you type. **You read what the agent wrote. The agent reads what you wrote. Both refine the same surface.**
+
+## What is this
+
+An opinionated **knowledge-compilation engine** for personal substrates. Drop raw materials in — daily session logs, AI-agent memories, web clippings, screenshots, emails, calendars, browser history, HTML files — and a Claude Agent SDK loop compiles them into atomic Markdown articles with wikilinks. Renders as a navigable wiki inside [Obsidian](https://obsidian.md). The same wiki gets injected into every AI-agent session as context, so the loop closes: you read what you wrote, the agent reads what it wrote, both refine the same surface.
+
+The vault holds **data**. The `.wiki/` directory holds the **engine**. They never mix on disk.
+
+## Why it exists
 
 A solo knowledge worker's thinking lives in too many partial substrates: daily notes capture *what happened*, AI-agent memories capture *working thought*, clippings capture *curiosity*, screenshots and calendars capture *everything else*. Each is queryable in isolation, but not as a whole — and most are illegible even to the person who produced them.
 
-**llm-wiki is the compilation layer between those substrates and active reading** — by you, and by the agents you work with every day. It is not an archive to be left behind; it is a working surface that gets refined by being used.
+Existing tools either solve a slice or solve a different problem:
+
+- **[Karpathy's LLM Wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f)** — the `raw/` → `knowledge/` shape and the compile-don't-retrieve choice; a sketch, not a working pipeline.
+- **[claude-memory-compiler](https://github.com/coleam00/claude-memory-compiler)** (Cole Medin) — the session-capture pattern; only handles AI-agent memories, doesn't ingest other substrates.
+- **Obsidian** — manual curation, no compilation.
+- **Notion** — team docs, not personal cartography.
+- **RAG systems** — retrieval, not compilation; weak cross-doc reasoning.
+
+llm-wiki is the **compilation layer** between raw substrates and active consumption — by humans reading and by agents prompting. It is not an archive to be left behind; it is a working surface that gets refined by being used.
+
+## What you get
+
+- **Two-path ingest** — automatic session capture (hooks → `daily/`) and curated sources (9 collectors → `raw/`) converge at one compiler.
+- **Compile once, query fast** — knowledge is distilled into Markdown wikilinks at compile time. No embedding step, no retrieval per query.
+- **Multi-agent hooks** — `session-start` / `session-end` / `pre-compact` wired into Claude Code, Codex, Gemini, and Cursor. Every session ends as a structured daily-log entry.
+- **Curiosity loop** — a small local Ollama model spots gaps after each compile and queues deep-scan requests for the next cycle.
+- **Optimization suggestions** — the compiler proposes YAML automations (e.g. mail-filter rules) with per-action approval before execution.
+- **Self-healing wiki** — `lint.py` runs 6 structural checks plus an LLM contradiction scan, so the wiki stays consistent as it grows.
+- **Engine / vault split** — engine code, prompts, hooks, runtime state, and venv all live under `<vault>/.wiki/`. The vault root stays clean.
+- **One install, one CLI, one venv** — `wiki setup` + `wiki update` + `wiki status` cover the full lifecycle.
 
 ![Architecture](docs/architecture.png)
 
