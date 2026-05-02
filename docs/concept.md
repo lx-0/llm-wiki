@@ -20,12 +20,14 @@ Three failure modes follow:
 
 ## Core idea
 
-**The vault is a cockpit, not a warehouse.**
+**Compile once. Read every day.**
 
-Files stay where they are. The vault stores **knowledge about files** — context, meaning, links. Agents work over a compiled wiki that makes everything searchable.
+Personal knowledge that stays scattered is illegible. Personal knowledge that gets aggressively centralised is unmaintainable. llm-wiki splits the difference: a small, opinionated set of substrates feeds a Claude-Agent-SDK compile pass that turns them into atomic, cross-linked Markdown articles. The compiled wiki is the working surface — read by you and by every agent that touches your vault. The substrates underneath are immutable; only the compile output is allowed to evolve.
+
+Mixed reality on the storage side: some sources are referenced (mailbox, calendar, browser data live in their canonical apps; collectors only write metadata into `raw/notes/`); others are owned (web clippings, audio recordings, agent-memory snapshots, PDFs — copies live in `raw/articles/`, `raw/audio/`, `raw/memories/`, `raw/papers/` because their canonical home is unstable or non-existent). The wiki layer (`knowledge/`) is purely derivative — wikilinks and prose, never originals.
 
 ```text
-Working memory   = vault (lx/)              you read & edit here
+Working memory   = vault (Obsidian root)    you read & edit here
 Knowledge        = compiled wiki (knowledge/)  LLM writes here
 Long-term recall = optional vector RAG (L2)    deep semantic search
 Senses           = collectors (email, calendar, browser, screenshots, NAS, …)
@@ -43,11 +45,12 @@ Two vaults, two purposes:
 
 The compiler reads `raw/` (memories, mail metadata, calendar events, browser history, screenshots, …) and compiles to `knowledge/` (concepts, connections, projects, people, qa). The LLM decides what's worth knowing and surfaces cross-source links.
 
-**Rules:**
+**Storage rules** (the project's actual stance, not Karpathy's stricter version):
 
-- No binaries in L1. Reference notes only (`→ see ~/Code/<repo>`).
-- Keep each vault under 100 MB.
-- Files >1 MB don't belong in L1 — replace with a reference note.
+- **Code repos and OS-managed media never enter L1.** Code stays in `~/Code/`, screenshots stay in `~/Screenshots/`, browser data stays in profile dirs. Reference notes only (`→ see ~/Code/<repo>`).
+- **Mailbox / calendar bodies never enter L1** — collectors write metadata to `raw/notes/` only.
+- **Things without a stable canonical home DO enter L1.** Web clippings (`raw/articles/*.html`), audio you record (`raw/audio/`), papers (`raw/papers/`), agent-memory snapshots (`raw/memories/`), Whisper transcripts (`raw/transcripts/`). The compromise is deliberate: these substrates need ownership, and storing the original is what guarantees the compile pass is reproducible.
+- **Vault size budget is loose.** Karpathy's gist suggests <100 MB; in practice this engine handles a few GB across `raw/audio/` + `raw/papers/` without trouble. The hard bound is "Obsidian still indexes responsively."
 
 ### L2 — Optional Vector RAG (deep search)
 

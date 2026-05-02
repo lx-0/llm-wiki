@@ -6,63 +6,102 @@
 
 > **Self-cartography engine.** AI memories + daily logs + clippings → an LLM-compiled Obsidian wiki you and your agents read from daily.
 
-Personal knowledge lives in too many partial substrates: daily notes capture what happened, AI-agent memories capture working thought, clippings capture curiosity, screenshots and calendars capture everything else. Each is queryable in isolation but not as a whole, and most are illegible even to the person who produced them.
+A solo knowledge worker's thinking lives in too many partial substrates: daily notes capture *what happened*, AI-agent memories capture *working thought*, clippings capture *curiosity*, screenshots and calendars capture *everything else*. Each is queryable in isolation, but not as a whole — and most are illegible even to the person who produced them.
 
-llm-wiki is the **compilation layer** between those raw substrates and active reading — by you, and by the agents you work with every day.
+**llm-wiki is the compilation layer between those substrates and active reading** — by you, and by the agents you work with every day. It is not an archive to be left behind; it is a working surface that gets refined by being used.
 
 ![Architecture](docs/architecture.png)
 
-## How it works
+## Two ingest paths converge at compile
 
 ```text
-Collectors (scan-email, scan-calendar, scan-browser,
-            scan-screenshots, scan-tabs, sync-memories,
-            clippings, ingest-html, …)
-                        │
-                        ▼
-                 ┌─────────────┐
-                 │    raw/     │   immutable; LLM reads, never writes
-                 └─────────────┘
-                        │
-                        ▼
-                 ┌─────────────┐
-                 │ compile.py  │   Claude Agent SDK — sees all sources,
-                 │             │   distils into atomic articles + cross-links
-                 └─────────────┘
-                        │
-                        ▼
-                 ┌─────────────┐
-                 │ knowledge/  │   LLM owns; you and your agents read
-                 │  concepts/  │
-                 │  connections/  ← cross-source links
-                 │  projects/  │
-                 │  people/    │
-                 │  qa/        │
-                 │  index.md   │   master catalogue (loaded into agent context)
-                 └─────────────┘
+PATH A — Automatic capture                PATH B — Curated sources
+─────────────────────────────             ──────────────────────────────────
+session-start / session-end /             Scanners + manual drops + clipper:
+pre-compact hooks attach to every         · scan-email      (Thunderbird)
+Claude Code / Codex / Gemini /            · scan-calendar   (Thunderbird CalDAV)
+Cursor session.  flush.py extracts        · scan-browser    (Firefox + Chrome)
+the conversation transcript and           · scan-screenshots (Vision LLM)
+appends a structured entry to             · scan-tabs       (Firefox STG)
+daily/YYYY-MM-DD.md.                      · sync-memories   (Claude Code memory)
+                                          · clippings-sweep (Obsidian Web Clipper)
+                                          · ingest-html     (file or URL)
+            │                             · process-inbox   (LLM-classified drop)
+            ▼                                          │
+     daily/YYYY-MM-DD.md                               ▼
+                                          raw/{articles,papers,notes,transcripts,
+                                              audio,memories,requests,suggestions}/
+            │                                          │
+            └──────────────┐    ┌──────────────────────┘
+                           ▼    ▼
+                  ┌────────────────────┐
+                  │     compile.py     │   Claude Agent SDK loop.
+                  │                    │   Reads index.md + AGENTS.md (vault),
+                  │                    │   walks raw/ + daily/, distils into
+                  │                    │   atomic articles + cross-links.
+                  └────────────────────┘
+                           │
+                           ▼
+                  ┌────────────────────┐
+                  │     knowledge/     │   LLM owns; you and your agents read.
+                  │  concepts/         │
+                  │  connections/      │   ← cross-source links
+                  │  projects/         │
+                  │  people/           │
+                  │  qa/               │
+                  │  index.md          │   ← master catalogue
+                  └────────────────────┘
 ```
 
-**The defining choice: compile once, query fast.** Knowledge is distilled into Markdown wikilinks at compile time — no embedding step, no retrieval at every query.
+After every compile, two side loops run on the new article:
+
+- **Curiosity loop** — a small local Ollama model spots gaps and writes JSON deep-scan requests to `raw/requests/`. The next compile cycle picks one up and fills the gap.
+- **Optimization suggestions** — the compiler emits YAML proposals to `raw/suggestions/` for repeatable manual actions (e.g. mail filter rules). `execute-suggestions.py` applies them only after explicit per-action approval.
+
+`lint.py` watches the wiki itself: 6 structural checks (broken links, orphan pages, orphan sources, stale articles, missing backlinks, sparse articles) plus one LLM-driven contradiction scan.
+
+## The defining choice: compile once, query fast
+
+Knowledge is distilled into Markdown wikilinks at compile time — no embedding step, no retrieval at every query.
 
 | Approach | Cost per query | Latency | Cross-doc reasoning |
 |---|---|---|---|
 | RAG | re-embed + retrieve every time | seconds | weak — chunks are isolated |
 | llm-wiki | one-time compile per source | ms — it's already markdown | strong — LLM saw all sources during compile |
 
-The vault is a **cockpit, not a warehouse.** Files stay where they are; the vault stores knowledge *about* files: context, meaning, links.
+**Speed compounds.** Every query is a Markdown read, so the wiki ends up read more often than it's written — by you, and by every agent you give vault access to. That inversion (output → input ratio greater than 1) is the point.
 
-Inspired by [Andrej Karpathy's LLM Wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) and [Cole Medin's claude-memory-compiler](https://github.com/coleam00/claude-memory-compiler). See [docs/concept.md](docs/concept.md) for the full design rationale.
+Inspired by [Andrej Karpathy's LLM Wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) (the `raw/` + `knowledge/` shape, the compile-don't-retrieve choice) and [Cole Medin's claude-memory-compiler](https://github.com/coleam00/claude-memory-compiler) (the session-capture pattern). The architecture wrapped around them — collectors, two-path ingest, curiosity loop, suggestions, lint, hooks across multiple agents, the engine/vault split — is the work of this project. Full design rationale in [docs/concept.md](docs/concept.md); hard-won engine learnings (Ollama gotchas, rate-limit debugging, anti-patterns) in [.ytstack/KNOWLEDGE.md](.ytstack/KNOWLEDGE.md).
 
-## What's in the box
+## Engine vs. vault split
 
-- **`wiki`** — single-entry CLI (interactive + scriptable). `wiki setup`, `wiki config`, `wiki hooks`, `wiki status`, `wiki update`.
-- **Collectors** (`scripts/scan-*.py`, `sync-memories.py`, `clippings_sweep.py`, `ingest-html.py`) — pull metadata from email, calendar, browser, screenshots, tabs, agent-memory stores, and HTML clippings into `raw/`. `clippings_sweep` runs automatically before every `compile.py` to lift Obsidian Web Clipper output from `<vault>/Clippings/` into `raw/articles/`; toggle off via `features.clippings_sweep` in `config.yaml`.
-- **`compile.py`** — Claude Agent SDK loop that turns `raw/` into `knowledge/` articles with wikilinks.
-- **Curiosity loop** — after each compile, a small local Ollama model spots gaps in the new article and queues deep-scan requests for the next cycle.
-- **Optimization suggestions** — the compiler can also propose repeatable automations (e.g. mail filters); each one is a YAML in `raw/suggestions/`, executed only after explicit approval.
-- **Self-healing** — `lint.py` detects orphans, stale frontmatter, broken links, contradictions.
-- **Agent hooks** — Claude Code, Codex, Gemini, Cursor session-start / session-end / pre-compact hooks installed by `wiki hooks install`.
-- **Engine vs. vault split** — engine code, prompts, hooks, and config live under `<vault>/.wiki/`; everything Obsidian sees (`raw/`, `daily/`, `knowledge/`, `inbox/`, `reports/`) is yours.
+```text
+<vault>/
+├── AGENTS.md              ← article-schema spec (seeded from templates/, then yours)
+├── dashboard.md           ← Dataview home page (seeded from templates/, then yours)
+├── raw/                   ← immutable curated sources (LLM reads, never writes)
+├── daily/                 ← session transcripts (one file per day, append-only)
+├── knowledge/             ← LLM-compiled wiki (LLM owns, you and agents read)
+├── inbox/                 ← transient — process-inbox.py classifies + moves to raw/
+├── Clippings/             ← optional — Obsidian Web Clipper drop point
+├── .obsidian/             ← Obsidian config (community-plugins, core-plugins seeded)
+├── .claude/skills/        ← symlinks to .wiki/skills/<name> (auto-discovered)
+└── .wiki/                 ← engine — hidden from Obsidian, never modified by hand
+    ├── wiki                 (CLI entry, bash)
+    ├── install.sh
+    ├── lib/*.sh             (UI, agent registry, hook flows, config wrapper)
+    ├── scripts/*.py         (compile, flush, lint, query, scan-*, …)
+    ├── hooks/*.py           (session-start, session-end, pre-compact, _transcript)
+    ├── prompts/*.md         (LLM templates, ${var} substitution)
+    ├── templates/           (AGENTS.example.md, dashboard.md, .obsidian/*.json)
+    ├── skills/<name>/       (engine-pr, excalidraw-diagram, ingest-audio,
+    │                         vault-health-check, vault-triage)
+    ├── config.example.yaml  (tracked)  + config.yaml (gitignored)
+    ├── pyproject.toml + uv.lock
+    └── runtime (gitignored): state/  logs/  sessions/  reports/  .venv/
+```
+
+The vault holds the **data**. `.wiki/` holds the **engine**. The two never mix on disk.
 
 ## Install
 
@@ -72,39 +111,36 @@ curl -fsSL https://raw.githubusercontent.com/lx-0/llm-wiki/main/install.sh | bas
 curl -fsSL https://raw.githubusercontent.com/lx-0/llm-wiki/main/install.sh | bash -s -- ~/path/to/vault
 ```
 
-The installer clones into `<target>/.wiki/`, seeds `config.yaml` from `config.example.yaml`, and runs `uv sync` so the venv lives at `<target>/.wiki/.venv/`. Everything engine-related stays inside `.wiki/` — the vault root stays clean.
+The installer clones into `<target>/.wiki/`, seeds `config.yaml` from `config.example.yaml`, runs `uv sync` so the venv lives at `<target>/.wiki/.venv/`, and seeds the vault root from `.wiki/templates/` — but **only when each target file is absent**, never overwriting existing work.
 
-**What `install.sh` puts in your vault** (only when each is absent — never overwrites):
-
-| Created path | What it is | Edit it? |
+| Created path | Source | Purpose |
 |---|---|---|
-| `<vault>/AGENTS.md` | Article-schema spec from `templates/AGENTS.example.md`; consumed by every compile. | Yes — fill in the "Vault Owner" + "Language" sections. |
-| `<vault>/dashboard.md` | Obsidian Dataview home page (recently-compiled / wiki stats / recent daily logs). | Yes — extend with your own queries. |
-| `<vault>/.obsidian/community-plugins.json` | Suggests Dataview + Excalidraw for first-launch approval. | Approve in Obsidian; otherwise edit. |
-| `<vault>/.obsidian/core-plugins.json` | Sensible Obsidian defaults (daily-notes, templates, properties on; sync/publish off). | Edit anytime. |
-| `<vault>/.claude/skills/<name>` | Symlinks to `.wiki/skills/<name>` so Claude Code auto-discovers engine skills (`vault-triage`, `excalidraw-diagram`, `engine-pr`, …). New skills shipped via `wiki update` are picked up automatically. | Don't — they're managed. |
+| `<vault>/AGENTS.md` | `templates/AGENTS.example.md` | Article-schema spec read by every compile prompt. Edit the *Vault Owner* + *Language* sections. |
+| `<vault>/dashboard.md` | `templates/dashboard.md` | Obsidian Dataview home (recently-compiled / wiki stats / recent daily logs). |
+| `<vault>/.obsidian/community-plugins.json` | `templates/.obsidian/` | Lists `dataview` + `obsidian-excalidraw-plugin` for first-launch approval. |
+| `<vault>/.obsidian/core-plugins.json` | `templates/.obsidian/` | Sensible defaults (daily-notes, properties, graph on; sync/publish off). |
+| `<vault>/.claude/skills/<name>` | symlink to `.wiki/skills/<name>` | Claude Code auto-discovers engine skills (`engine-pr`, `excalidraw-diagram`, `ingest-audio`, `vault-health-check`, `vault-triage`). New skills shipped via `wiki update` are picked up automatically. |
 
-The engine's runtime state lives entirely under `.wiki/`: `.wiki/state/` (JSON hash trackers), `.wiki/logs/` (flush + compile logs), `.wiki/sessions/` (session-flush staging), `.wiki/reports/` (lint + review-wiki output). All gitignored.
-
-**Prerequisites:** `bash` ≥ 4, `git`, `jq`, `uv` (Python package manager). Optional: a local [Ollama](https://ollama.com) for the curiosity / vision / classify loops.
+**Prerequisites:** `bash` ≥ 4, `git`, `jq`, `uv` (Python package manager). Optional but recommended: a local [Ollama](https://ollama.com) — the curiosity loop, screenshot vision, inbox classification, HTML visual analysis, and per-article review all run on local models. The Claude paths (compile, query, lint contradiction check, flush) work without it.
 
 After install:
 
 ```bash
 cd ~/path/to/vault
-./.wiki/wiki setup        # 5-question config wizard + agent hook install
-./.wiki/wiki status       # verify config + hooks + Ollama probe
+./.wiki/wiki setup        # 5-question wizard: Ollama URL, compile model,
+                          #   compile-after hour, procmail execution, local-LLM bundle
+./.wiki/wiki status       # config + hook install table + Ollama probe
 ```
 
 ## Update
 
 ```bash
-./.wiki/wiki update       # pulls latest from the repo, preserves config.yaml + venv
+./.wiki/wiki update       # pulls latest from main, preserves config.yaml + .venv/
 ```
 
 ## Running scripts manually
 
-The venv lives inside `.wiki/`. Two equivalent ways to invoke any script:
+The venv lives inside `.wiki/`. Two equivalent invocations:
 
 ```bash
 # Option A — cd into .wiki first (matches script docstrings)
@@ -115,34 +151,35 @@ uv run python scripts/compile.py
 uv run --project ~/path/to/vault/.wiki python ~/path/to/vault/.wiki/scripts/compile.py
 ```
 
-Hooks always use Option B (the project flag is hardcoded into the agent config).
+Hooks always use Option B (the `--project` flag is hardcoded into the agent config).
 
 ## Documentation map
 
 | Doc | What's inside |
 |---|---|
 | [docs/concept.md](docs/concept.md) | Three-layer architecture, compile-vs-RAG, cognitive-function mapping, curiosity loop |
-| [docs/PROCESS.md](docs/PROCESS.md) | Live documentation of every data flow inside the engine (German prose, English diagrams) |
+| [docs/PROCESS.md](docs/PROCESS.md) | Live documentation of every data flow inside the engine — 11 numbered processes (German prose, English diagrams) |
 | [docs/naming.md](docs/naming.md) | Naming conventions for raw sources and knowledge articles |
 | [docs/architecture.png](docs/architecture.png) | Full Excalidraw render of the cognitive architecture |
-| [AGENTS.md](AGENTS.md) | Conventions for AI agents working in this repo (tool-agnostic) |
-| [.ytstack/KNOWLEDGE.md](.ytstack/KNOWLEDGE.md) | Hard-won engine learnings: Ollama gotchas, rate-limit debugging, anti-patterns |
-| [.ytstack/DECISIONS.md](.ytstack/DECISIONS.md) | Locked architectural choices (engine/vault split, compile-don't-retrieve, …) |
+| [AGENTS.md](AGENTS.md) | Conventions for AI agents working on **this codebase** (separate from the vault's own AGENTS.md) |
+| [.ytstack/PROJECT.md](.ytstack/PROJECT.md) | Project framing, success criteria, current status |
+| [.ytstack/DECISIONS.md](.ytstack/DECISIONS.md) | Locked architectural choices |
+| [.ytstack/KNOWLEDGE.md](.ytstack/KNOWLEDGE.md) | Hard-won engine learnings (Ollama, rate limits, anti-patterns) |
 
-> **Documentation language.** Most docs are English. **`docs/PROCESS.md` is in German** — pull requests that touch a flow should keep the existing prose language; bilingual is fine, and Mermaid labels / table headers in English are encouraged so diagrams remain accessible.
+> **Documentation language.** Most docs are English. **`docs/PROCESS.md` is in German** — pull requests that touch a flow keep the existing prose language; bilingual is fine, and Mermaid labels / table headers in English keep diagrams accessible.
 
 ## Security
 
 Secrets-leak prevention runs on two layers:
 
-- **CI** ([.github/workflows/secrets-scan.yml](.github/workflows/secrets-scan.yml)) — gitleaks scans every push + PR + nightly cron. Blocks merge if leaks are found.
-- **Pre-commit** ([.pre-commit-config.yaml](.pre-commit-config.yaml)) — local hooks block leaks before they reach git. Install once:
+- **CI** ([.github/workflows/secrets-scan.yml](.github/workflows/secrets-scan.yml)) — gitleaks scans every push + PR + nightly cron. Blocks merge on leaks.
+- **Pre-commit** ([.pre-commit-config.yaml](.pre-commit-config.yaml)) — local hooks block leaks before they reach git:
 
   ```bash
   pip install pre-commit && pre-commit install
   ```
 
-Gitleaks rules + allowlist live in [.gitleaks.toml](.gitleaks.toml). Run a manual scan: `gitleaks detect --no-banner -v`.
+Gitleaks rules + allowlist live in [.gitleaks.toml](.gitleaks.toml). Manual scan: `gitleaks detect --no-banner -v`.
 
 If you find a leak in history, rotate the secret immediately, then file an issue (don't post the leaked value).
 
@@ -150,17 +187,18 @@ If you find a leak in history, rotate the secret immediately, then file an issue
 
 # CLI Reference
 
-Operational layer for an LLM Wiki vault. Hidden from Obsidian's file tree.
+Operational layer for an LLM Wiki vault. The `.wiki/` directory is hidden from Obsidian's file tree by default (Obsidian ignores `.`-prefixed dirs).
 
 ## Quick start
 
 ```bash
 ./.wiki/wiki                  # interactive top-level menu
 ./.wiki/wiki setup            # first-time: config wizard + hooks install
-./.wiki/wiki status           # full system status (config + hooks + Ollama probe)
+./.wiki/wiki status           # config + hooks + Ollama probe
 ./.wiki/wiki help             # top-level usage
 ./.wiki/wiki config --help    # config subcommands
 ./.wiki/wiki hooks --help     # hooks subcommands
+./.wiki/wiki update           # git pull + uv sync, preserves config.yaml
 ```
 
 ## Subcommand cheat sheet
@@ -168,18 +206,31 @@ Operational layer for an LLM Wiki vault. Hidden from Obsidian's file tree.
 | Command | What it does |
 |---|---|
 | `wiki` | interactive top-level menu |
-| `wiki setup [--help]` | first-time wizard: config + hook install |
+| `wiki setup [--help]` | first-time wizard (5 questions) + hook install |
 | `wiki status` | config summary, hook install table, Ollama probe |
-| `wiki config` | interactive editor — pick section → pick key → enter value |
+| `wiki update` | `git pull` engine + `uv sync`; never touches `config.yaml` or `.venv/` content |
+| `wiki config` | interactive editor — pick section → key → value |
 | `wiki config get KEY` | print one value |
-| `wiki config set KEY VALUE` | set + write back to `config.yaml` |
-| `wiki config keys` | list all settable keys (dot-notation) |
+| `wiki config set KEY VALUE` | write back to `config.yaml` |
+| `wiki config keys` | list every settable key (dot-notation) |
 | `wiki config path` | absolute path to `config.yaml` |
 | `wiki config wizard` | re-run the 5-question wizard |
 | `wiki config status` | summary table |
 | `wiki hooks install` | install into selected agents (claude / codex / gemini / cursor) |
 | `wiki hooks uninstall` | remove wiki-managed hooks |
 | `wiki hooks status` | install table per agent / scope |
+
+## Setup wizard — what's asked
+
+The 5 questions, in order:
+
+1. **Ollama base URL** — probed live; if unreachable the next question gets a warning.
+2. **Compile model** — `claude-opus-4-7` / `claude-sonnet-4-6` / `claude-haiku-4-5`. Used by `compile.py` and `retry-failed-flushes.py`.
+3. **Auto-compile starts at hour** (`0`–`23`, local time) — `scheduling.compile_after_hour`.
+4. **Procmail execution** (default OFF) — only enable if `execute-suggestions.py` should call a webmail-procmail provider API.
+5. **Local-LLM features** (curiosity loop + vision screenshots, bundled) — only offered when Ollama probed successfully.
+
+Re-run anytime via `./.wiki/wiki config wizard`.
 
 ## Config keys
 
@@ -197,7 +248,8 @@ models.classify_model                  e.g. gemma4:e4b
 
 features.curiosity_loop                bool — gap detection after compile
 features.vision_screenshots            bool — local vision OCR for screenshots
-features.procmail_execution            bool — All-Inkl Webmail Procmail API calls (default OFF)
+features.procmail_execution            bool — webmail Procmail API calls (default OFF)
+features.clippings_sweep               bool — pre-compile lift of <vault>/Clippings/
 
 limits.compile_max_files               int — per-run cap (rate-limit guard)
 limits.compile_max_consecutive_failures int — abort after N back-to-back failures
@@ -209,9 +261,15 @@ limits.curiosity_max_gaps              int — max requests per compile
 limits.curiosity_min_source_chars      int — skip curiosity for tiny sources
 limits.sparse_threshold_words          int — lint warns under this word count
 
-piggybacks.<task>.enabled              bool — disable to never spawn
-piggybacks.<task>.cooldown_hours       int — 24 = daily, 168 = weekly
-piggybacks.<task>.max_per_run          int (where applicable)
+# Recurring tasks spawned at session-end after flush.
+piggybacks.email_incremental.{enabled, cooldown_hours}
+piggybacks.lint_structural.{enabled, cooldown_hours}
+piggybacks.review_wiki.{enabled, cooldown_hours}
+piggybacks.optimize_claude_md.{enabled, cooldown_hours}
+piggybacks.scan_screenshots.{enabled, cooldown_hours}
+piggybacks.follow_requests.{enabled, cooldown_hours, max_per_run}
+piggybacks.sync_memories.{enabled, cooldown_hours}
+piggybacks.retry_failed_flushes.{enabled, cooldown_hours, max_per_run}
 
 graph_view.mode                        knowledge-only | full-vault | sources-only | custom
 graph_view.custom_search               obsidian search string (when mode=custom)
@@ -221,6 +279,7 @@ graph_view.custom_search               obsidian search string (when mode=custom)
 # config.example.yaml ships empty defaults.
 personal.primary_account               account-id used as default in prompts + fallback in compile.py
 personal.thunderbird_profile           absolute path; empty disables scan-email + thunderbird-rules
+personal.stg_backup_dir                Firefox Simple Tab Groups backup dir (drives scan-tabs)
 personal.accounts.<id>.email           full address (used in prompts + Webmail login)
 personal.accounts.<id>.label           display label for scan-email reports
 personal.accounts.<id>.mbox_paths      list of paths under thunderbird_profile (scan-email)
@@ -251,49 +310,97 @@ Install scope:
 
 Not supported: **pi** (TS-only modules), **opencode** (no native hooks yet, [issue #5409](https://github.com/sst/opencode/issues/5409)).
 
-## Files
+## Engine layout (`.wiki/`)
 
 ```text
 .wiki/
-├── wiki                  ← entry point — sources lib/*.sh, dispatches subcommands
-├── config.yaml           ← single source of truth (see "Config keys" above)
-├── README.md             ← this file
+├── wiki                       ← entry point — sources lib/*.sh, dispatches subcommands
+├── install.sh                 ← one-liner installer (also re-runnable from a checkout)
+├── config.example.yaml        ← tracked  ── │ copy at install time
+├── config.yaml                ← gitignored ─┘
+├── pyproject.toml + uv.lock
 ├── lib/
-│   ├── common.sh         ← paths, colors, logging, deps, backup
-│   ├── ui.sh             ← interactive prompts (confirm / ask / select_one / select_many)
-│   ├── agents.sh         ← agent registry, detection, payload generators, install/uninstall
-│   ├── hooks.sh          ← interactive flows for `wiki hooks {install,uninstall,status}`
-│   └── config.sh         ← wraps Python config CLI + setup wizard + interactive editor
+│   ├── common.sh              ← paths, colors, logging, deps, backup
+│   ├── ui.sh                  ← interactive prompts (confirm / ask / select_one / select_many)
+│   ├── agents.sh              ← agent registry, detection, payload generators, install/uninstall
+│   ├── hooks.sh               ← interactive flows for `wiki hooks {install,uninstall,status}`
+│   └── config.sh              ← Python config CLI wrapper + setup wizard + interactive editor
 ├── scripts/
-│   ├── wiki_config.py    ← config loader + CLI (get/set/keys/path)
-│   ├── prompts.py        ← prompt loader (renders .md templates with ${var} subst)
-│   └── ...               ← compile.py, flush.py, lint.py, scan-*.py, query.py, etc.
-├── hooks/                ← agent session hooks (Python)
-│   ├── session-start.py
-│   ├── session-end.py
-│   └── pre-compact.py
-├── prompts/              ← LLM prompts as standalone .md files
-└── reports/              ← lint + review-wiki output (gitignored)
+│   ├── wiki_config.py         ← config dataclass + get/set/keys CLI (incl. Personal block)
+│   ├── config.py              ← path constants (single source of truth for *_DIR)
+│   ├── prompts.py             ← prompt template loader (${var} substitution)
+│   ├── ollama_client.py       ← single Ollama transport (chat / chat_schema / chat_vision)
+│   ├── flush_pipeline.py      ← staged-flush state machine (stage / commit / archive / pending)
+│   ├── compile.py             ← Claude Agent SDK compiler (raw/ + daily/ → knowledge/)
+│   ├── flush.py               ← session-end → daily/ append + piggyback spawner
+│   ├── lint.py                ← 6 structural checks + 1 LLM contradiction check
+│   ├── query.py               ← Claude Agent SDK natural-language query (read-only / file-back)
+│   ├── scan-email.py          ← Thunderbird mboxes (full / incremental / deep)
+│   ├── scan-calendar.py       ← Thunderbird CalDAV cache → timeline overview
+│   ├── scan-browser.py        ← Firefox + Chrome bookmarks/history/tab-groups
+│   ├── scan-screenshots.py    ← ~/Screenshots/ + Vision LLM (Ollama gemma4)
+│   ├── scan-tabs.py           ← Firefox Simple Tab Groups backups
+│   ├── sync-memories.py       ← Claude Code project memories → raw/memories/ (file-per-memory)
+│   ├── clippings_sweep.py     ← <vault>/Clippings/ → raw/articles/ (pre-compile lift)
+│   ├── ingest-html.py         ← HTML file or URL → text + visual (Playwright + Vision LLM)
+│   ├── process-inbox.py       ← <vault>/inbox/ → classify + move to raw/ subfolder
+│   ├── execute-suggestions.py ← per-action approval for raw/suggestions/*.yaml
+│   ├── thunderbird-rules.py   ← parse/list/create/export/execute TB filter rules
+│   ├── review-wiki.py         ← per-article quality scoring via local LLM
+│   ├── optimize-claude-md.py  ← cross-project pattern → ~/.claude/CLAUDE.md edits
+│   ├── retry-failed-flushes.py ← reprocess archived flush contexts
+│   ├── seed.py                ← initial bulk import from ~/.claude/projects/*/memory/
+│   └── health.py              ← read-only colored ASCII vault dashboard
+├── hooks/
+│   ├── _transcript.py         ← shared transcript walker + tool summarizer
+│   ├── session-start.py       ← inject index.md into next session's context
+│   ├── session-end.py         ← spawn flush.py with the conversation transcript
+│   └── pre-compact.py         ← safety-net flush before context compaction
+├── prompts/                   ← LLM prompts as standalone .md files
+├── templates/                 ← seeded into <vault>/ on install (never overwritten)
+│   ├── AGENTS.example.md
+│   ├── dashboard.md
+│   └── .obsidian/{community,core}-plugins.json
+├── skills/                    ← engine skills (symlinked into <vault>/.claude/skills/)
+│   ├── engine-pr/SKILL.md
+│   ├── excalidraw-diagram/SKILL.md
+│   ├── ingest-audio/SKILL.md
+│   ├── vault-health-check/SKILL.md
+│   └── vault-triage/SKILL.md
+└── (gitignored runtime)
+    ├── .venv/                 ← uv-managed Python environment
+    ├── state/                 ← *.json hash trackers, dedup, cooldowns
+    ├── logs/                  ← *.log files
+    ├── sessions/              ← session-flush staging + failed-flushes/
+    └── reports/               ← lint + review-wiki output
 ```
 
 ## Adding a new agent target
 
 1. Add a tuple to `WIKI_AGENTS` in [lib/agents.sh](lib/agents.sh): `name|detection-dir|config-file`.
-2. Add a payload generator function `<name>_hooks_payload` that emits JSON for that agent's schema.
+2. Add a payload generator function `<name>_hooks_payload` that emits JSON for that agent's hook schema.
 3. Wire it into `agent_payload()`'s case statement.
-4. Done. The status table, install/uninstall flows, and detection logic pick it up automatically.
+4. The status table, install/uninstall flows, and detection logic pick it up automatically.
 
-## Adding a new config key
+## Adding a new tunable
 
 1. Extend the matching dataclass in [scripts/wiki_config.py](scripts/wiki_config.py).
-2. Document the default in `config.yaml` with a comment.
+2. Document the default in `config.example.yaml` with a comment.
 3. Replace the hardcoded constant in the script with `CONFIG.<section>.<field>`.
 4. The Python `keys` CLI auto-discovers it; `wiki config get/set` works without further changes.
 
-## Why bash + python?
+For per-instance / personal data (emails, hostnames, mbox paths, project names mentioned in prompts), use the `Personal` dataclass — `config.example.yaml` ships empty defaults, the actual value goes in the user's local `config.yaml` (gitignored), and consumers handle the empty case gracefully.
 
-- bash for **UI and orchestration** — selection menus, scope choice, multi-target install.
-- python for **YAML parsing and config invariants** — dataclass-backed, type-coerced, validated.
-- jq for **JSON merge** of agent configs — preserves user's existing hooks.
+## Adding a prompt
+
+1. Drop `<name>.md` into `prompts/`.
+2. Use `${var}` for placeholders (not Python's `{var}` — JSON/YAML examples in prompts have literal braces).
+3. `from prompts import render` and `prompt = render("name", var=value)`.
+
+## Why bash + python + jq?
+
+- **bash** for UI and orchestration — selection menus, scope choice, multi-target install.
+- **python** for YAML parsing and config invariants — dataclass-backed, type-coerced, validated.
+- **jq** for JSON merge of agent configs — preserves the user's existing hooks instead of clobbering them.
 
 No yaml-in-bash, no json-in-python. Each tool does what it's good at.
