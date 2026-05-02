@@ -12,17 +12,20 @@
 
 <p align="center">
   <a href="./LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MIT-blue"></a>
+  <img alt="Status" src="https://img.shields.io/badge/status-prototype-orange">
   <img alt="Python" src="https://img.shields.io/badge/python-uv-3776ab">
   <img alt="Claude Agent SDK" src="https://img.shields.io/badge/Claude-Agent%20SDK-d97757">
   <img alt="Ollama" src="https://img.shields.io/badge/Ollama-optional-1f2937">
   <img alt="Obsidian" src="https://img.shields.io/badge/Obsidian-vault-7c3aed">
 </p>
 
+> [!WARNING]
+> **Heavy prototype development.** This is a single-author scratch space, not a stable tool. Architecture, CLI surface, file layout, and config schema can break at any time without notice or migration path. No semver, no deprecation cycle, no compatibility promises. If you install it, expect to read commits before pulling.
+
 <table align="center">
   <tr>
-    <td align="center"><strong>9</strong><br/>collectors</td>
-    <td align="center"><strong>4</strong><br/>agents wired</td>
-    <td align="center"><strong>0</strong><br/>vector indexes</td>
+    <td align="center"><strong>8</strong><br/>collectors</td>
+    <td align="center"><strong>5</strong><br/>skills bundled</td>
     <td align="center"><strong>MIT</strong><br/>open source</td>
   </tr>
 </table>
@@ -51,7 +54,7 @@ llm-wiki is the **compilation layer** between raw substrates and active consumpt
 
 ## What you get
 
-- **Two-path ingest** — automatic session capture (hooks → `daily/`) and curated sources (9 collectors → `raw/`) converge at one compiler.
+- **Two-path ingest** — automatic session capture (hooks → `daily/`) and curated sources (8 collectors → `raw/`) converge at one compiler.
 - **Compile once, query fast** — knowledge is distilled into Markdown wikilinks at compile time. No embedding step, no retrieval per query.
 - **Multi-agent hooks** — `session-start` / `session-end` / `pre-compact` wired into Claude Code, Codex, Gemini, and Cursor. Every session ends as a structured daily-log entry.
 - **Curiosity loop** — a small local Ollama model spots gaps after each compile and queues deep-scan requests for the next cycle.
