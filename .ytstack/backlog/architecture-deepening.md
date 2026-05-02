@@ -160,12 +160,117 @@ Each script imports one StateStore per state-file-kind; schema is documented at 
 
 ---
 
+## #9 — Logging configuration + structured fields (MEDIUM)
+
+**Files:** `scripts/lint.py` (326), `scripts/review-wiki.py` (226), `scripts/optimize-claude-md.py` (149). Plus scattered `logging.basicConfig()` calls in scan-* and compile.py.
+
+**Problem:** Three distinct logging-format strings across the linter trio (`[%(levelname)s] %(name)s: %(message)s` vs. `%(asctime)s  %(levelname)s  %(message)s` vs. raw markdown writes to `KNOWLEDGE_DIR / "log.md"` in `optimize-claude-md.py`). Mix of `log.info()`, `log.exception()`, `print()` for final output. No structured fields (request-id, async-task-id, module). If we ever want OTLP-shipping, log-level filtering, or correlation IDs, we touch every script.
+
+**Shape after deepening:** A `scripts/logging.py` module with `configure_logger(name: str, log_file: Path | None = None, structured: bool = False) → Logger`. Standard format. Optional structured-JSON output. All scripts call it on import. Deletion test passes: today, "add a correlation-id field" requires editing N scripts; with the seam, one line.
+
+**Why MEDIUM:** the friction is real but cheap-to-fix individually; the real value lands when *any* observability requirement arrives (currently none). Worth doing alongside the Linter-seam (Backlog #4) — both consolidate the same three scripts.
+
+**Verification:** all scripts emit the same format; `tests/test_logging_config.py` asserts structured mode produces parseable JSON.
+
+---
+
+## #10 — Async / sync LLM boundary in `compile.py` (MEDIUM, latent hotspot)
+
+**Files:** `scripts/compile.py` (511), `scripts/ollama_client.py` (160).
+
+**Problem:** `compile.py` has four `async def` functions (`compile_file`, `maybe_generate_suggestions`, `maybe_generate_curiosity_requests`, `main`) that internally call **sync** `ollama_client.chat()` and `query()` (Claude SDK is async; ollama_client is sync `httpx` calls). The `async` shape buys concurrency *between* files; per-file LLM calls block the event loop. At scale (100+ raw files in one compile run, especially on the curiosity / suggestion post-passes that fan out further), one slow Ollama response stalls the batch.
+
+**Shape after deepening:** Either:
+- `scripts/async_ollama.py` wrapping `ollama_client.chat()` via `asyncio.to_thread()` for thread-pool offload, OR
+- A true async HTTP client inside `ollama_client` (e.g., `httpx.AsyncClient`).
+
+Then suggestion + curiosity passes use `asyncio.gather()` for fan-out instead of serial awaits.
+
+**Why MEDIUM:** only one consumer today (`compile.py`), so technically not a real seam yet (one adapter = hypothetical seam). But it's a latent hotspot — the moment compile-throughput becomes a problem, the refactor is forced. **Couples to Backlog #3 (Model seam):** if we build the Model seam, build it async-first from day 1 instead of paying the conversion later.
+
+**Verification:** benchmark `wiki compile` on a fixture vault with 50+ files; assert post-deepening wall-time drops by N% with concurrent LLM calls.
+
+---
+
+## #11 — Markdown rendering helper (MEDIUM)
+
+**Files:** `scripts/scan-calendar.py`, `scripts/scan-browser.py`, `scripts/scan-tabs.py`, `scripts/scan-screenshots.py`, `scripts/lint.py`, `scripts/review-wiki.py`, `scripts/optimize-claude-md.py`. Plus `scripts/collectors/email.py:_render_report`.
+
+**Problem:** ~7 scripts hand-assemble Markdown reports: `lines = [f"# Title — {today_iso()}", "", "| Col | Col |", "|---|---|", *rows]; output_path.write_text("\n".join(lines))`. Frontmatter assembly, table generation, code-fence formatting, list wrapping — each script does its own thing. There's no shared "write a report with title + table + sections" helper.
+
+**Shape after deepening:** `scripts/markdown.py` with:
+- `Report` dataclass (`title`, `frontmatter: dict`, `sections: list[Section]`)
+- `Section` dataclass (`heading`, optional `paragraphs: list[str]`, optional `table: Table`, optional `bullets: list[str]`)
+- `Table` dataclass (`headers`, `rows`)
+- `render_report(report) → str` — handles frontmatter YAML, GFM tables, escape-pipe-in-cells, indent-blocks for nested bullets
+
+**Why MEDIUM:** the abstraction is real (7 callers) but each caller's needs are ~80% overlapping, ~20% custom. Risk of forcing a fake unified shape. Pre-work: read all 7 report-rendering paths, list which features each needs, decide if the union covers them or if a `RawSection(content: str)` escape-hatch is needed.
+
+**Coupling:** if Backlog #1 (scan → Collector) lands first, the migration into Collector subclasses is the natural moment to swap in the markdown helper. Bundle accordingly.
+
+**Verification:** new tests render `Report` fixtures to expected strings; existing scan-* output matches byte-identical (or close, modulo whitespace) post-migration.
+
+---
+
+## #12 — Exception-handling pattern consistency (MEDIUM)
+
+**Files:** ~51 `except Exception:` / `except BaseException:` blocks across `scripts/compile.py`, `scripts/ollama_client.py`, `scripts/scan-calendar.py`, `scripts/scan-browser.py`, `scripts/scan-screenshots.py`, `scripts/lint.py`, `scripts/review-wiki.py`, `scripts/optimize-claude-md.py`, and others.
+
+**Problem:** Four distinct patterns coexist with no documented intent:
+1. Catch + `log.exception()` + `return None` (graceful-agnostic intent)
+2. Catch + `log.exception()` + `continue` (swallow + resume next iteration)
+3. Catch + `pass` (silent swallow — debugging nightmare)
+4. Catch + `log.exception()` + fall-through (probably-unintended; control flow ambiguous)
+
+Silent swallows hide root-cause information; inconsistent recovery semantics make it hard to know whether a script "succeeded with caveats" vs. "failed silently."
+
+**Shape after deepening:** A small `scripts/errors.py` with:
+- `swallow(name: str)` — context-manager that logs the exception with name + classification (transient / fatal) and re-raises iff classified fatal.
+- `Result[T]` lightweight wrapper (`Ok(value)` / `Err(error)`) for functions that should never throw to caller.
+
+Replace all 51 sites with explicit choice: `with swallow("classify_email"): ...` or `result = try_classify(); if isinstance(result, Err): ...`. Pattern becomes greppable and reviewable.
+
+**Why MEDIUM:** the inconsistency is real, but a 51-site refactor is touch-heavy and most sites are correct-as-is. Best done incrementally during other deepenings (touch a script for a different reason → also normalize its exception handling). Could become a HIGH if a silent-swallow incident lands in `KNOWLEDGE.md`.
+
+**Coupling:** belongs in the same PR as Backlog #5 (compile orchestration) — that refactor will already touch `compile.py`'s exception sites.
+
+---
+
+## #13 — Datetime / timezone consistency (MEDIUM, latent tz-bugs)
+
+**Files:** `scripts/scan-calendar.py`, `scripts/scan-browser.py`, `scripts/scan-screenshots.py`, `scripts/health.py`, `scripts/optimize-claude-md.py`. Plus the recently-fixed `scripts/adapters/mailbox/thunderbird.py:_parse_date`.
+
+**Problem:** Mixed datetime intent across scripts:
+- `datetime.now()` (naive local, no tz) — `health.py`, `optimize-claude-md.py`
+- `datetime.now().strftime("%Y-%m-%dT%H%M")` (local slug, ambiguous) — `scan-screenshots.py`
+- `today_iso()` from `config.py` (tz-aware, UTC) — `compile.py`, `lint.py`, scan adapters
+- `datetime.utcnow()` (naive UTC, deprecated in Python 3.12) — random places
+
+The M002-finalize tz-aware fix (normalize all incoming dates to UTC in `thunderbird.py:_parse_date`) didn't propagate to these scripts. Latent bugs: comparing naive-local vs. tz-aware datetimes raises `TypeError`; comparing two naive-but-different-meaning datetimes silently returns wrong order.
+
+**Shape after deepening:** A `scripts/time.py` (or fold into `scripts/utils.py`) with:
+- `utc_now() → datetime` — tz-aware UTC, the default for all metadata / state / comparisons.
+- `local_now() → datetime` — tz-aware *local* (uses `CONFIG.scheduling.timezone`). For user-facing output only (filenames, log timestamps).
+- `parse_to_utc(raw: str) → datetime | None` — generalize `thunderbird.py:_parse_date`'s normalization.
+- `slugify_ts(dt: datetime) → str` — single canonical filename slug.
+
+Audit all `datetime.*` callsites and migrate. Intent becomes explicit at the type level.
+
+**Why MEDIUM (close to HIGH):** any single tz-mix bug in production manifests as a hard crash (the offset-naive-vs-aware `TypeError`) or worse, silently-wrong sort order. Easy to write, hard to detect. Already cost us one debug round in M002-finalize.
+
+**Verification:** `tests/test_time_helpers.py` asserts tz-aware return types; grep `datetime.now()\|datetime.utcnow()` in scripts/ returns 0 matches post-migration.
+
+---
+
 ## Skipped (false positives, recorded so future walks don't re-suggest)
 
 - **`flush.py` + `flush_pipeline.py` boundary smear.** Re-export-pattern is a polish, not a deepening. Deletion test fails: removing the re-export just moves the import.
 - **`prompts.py` (49 lines).** Looks trivial but earns its keep as *a place* — 10 importers means single point of customization. Locality, not depth.
 - **`execute-suggestions.py` approval flow.** One client, no seam yet. Deepen when a second approval workflow appears.
 - **`utils.py` cohesion split.** Real but LOW-priority polish — three logical groups (state I/O, wiki content, text utils) that don't yet justify a split. Fold into the config-split PR's import-header cleanup or defer.
+- **CLI dispatch (`wiki` bash → Python argparse).** Today only `wiki collect` delegates to a Python dispatcher (`cli_collect.py`). One delegating subcommand isn't a seam. Revisit when 3+ subcommands need shared dispatch (post Backlog #1 + #6).
+- **Environment-variable schema.** Only 2-3 env-var lookups exist (`CLAUDE_INVOKED_BY` recursion guard, `IMAP_*_USER/PASS` for mail). Pattern hasn't emerged yet. Defer until a third use case lands.
+- **Test coverage as a standalone backlog item.** ~700 test lines for ~6300 code lines is a *symptom* of the deepening opportunities above (untestable interfaces), not a separate item. Coverage rises naturally as #1, #5, #6, etc. land — each refactor's RED-GREEN-REFACTOR cycle adds tests for the new shape. Backfilling tests against tangled legacy interfaces is busywork that locks the bad shape in place.
 
 ---
 
@@ -180,5 +285,7 @@ Each script imports one StateStore per state-file-kind; schema is documented at 
 **Option M003-D — "Pre-compile cleanup."** S01 = #2 (config split), S02 = #6 (Preprocessor seam). Hits both shallow-import friction and pre-compile inconsistency in one milestone before touching the Collector epic.
 
 **Option M003-E — "Engine core."** Only #5 (compile.py orchestration). Highest-leverage module gets the cleanest cut. Risky because it touches the engine's hottest path; requires a regression-fixture vault to verify byte-identical wiki output.
+
+**Option M003-F — "Hygiene pass."** S01 = #13 (datetime helpers, prevent latent tz-bugs), S02 = #9 (logging config consolidation), S03 = #11 (markdown helper). Three cross-cutting MEDIUMs that each shrink the surface area for future bugs without touching core engine logic. Low-risk foundation milestone before engine refactors.
 
 Pick at the next `ytstack:plan-milestone` invocation.
