@@ -69,6 +69,11 @@ class Features:
     curiosity_loop: bool = True
     vision_screenshots: bool = True
     procmail_execution: bool = True
+    # Pre-compile sweep of <vault>/Clippings/*.md into <vault>/raw/articles/
+    # so Obsidian Web Clipper output reaches the source-glob. Cheap no-op when
+    # Clippings/ is empty or absent. Set false if you reconfigure the Web
+    # Clipper extension to drop directly into raw/articles/.
+    clippings_sweep: bool = True
 
 
 @dataclass

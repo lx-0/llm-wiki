@@ -178,7 +178,7 @@ flowchart TD
 
 **SessionEnd/PreCompact** lesen das JSONL-Transcript, extrahieren die letzten 30 Turns (max 15K Zeichen), staging das Temp-File via `flush_pipeline.stage(kind, session_id, content)`, und spawnen `flush.py` als detached Background-Prozess. Beide Hooks teilen `hooks/_transcript.py` für Transcript-Walk + Tool-Summarization (Edit/Write/Bash/Read mit Detail) — pre-compact hatte historisch eine lossy Variante (`[tool: X]` / `[tool result]`), das ist jetzt eliminiert.
 
-**flush.py** nutzt den Claude Agent SDK mit `allowed_tools=[]` (nur Text rein/raus, keine Dateioperationen). Extrahiert: Context, Key Exchanges, Decisions, Lessons Learned, Action Items. Bei Erfolg → `flush_pipeline.append_to_daily(content, session_id)` + `mark_complete(staged)`. Bei Failure → `flush_pipeline.archive_failure(staged)` (nach `scripts/sessions/failed-flushes/`); ein Piggyback-Task retried das später.
+**flush.py** nutzt den Claude Agent SDK mit `allowed_tools=[]` (nur Text rein/raus, keine Dateioperationen). Extrahiert: Context, Key Exchanges, Decisions, Lessons Learned, Action Items. Bei Erfolg → `flush_pipeline.append_to_daily(content, session_id)` + `mark_complete(staged)`. Bei Failure → `flush_pipeline.archive_failure(staged)` (nach `.wiki/sessions/failed-flushes/`); ein Piggyback-Task retried das später.
 
 **State-Machine in einem Modul.** Die ganze Lifecycle (Capture → Stage → Commit / Archive → Retry) lebt in `scripts/flush_pipeline.py`. Hooks, `flush.py` und `retry-failed-flushes.py` gehen alle durch dieselbe API. Die Invariante "no gap between capture and persist" hat damit ein Code-Home, nicht nur Prosa in `.ytstack/KNOWLEDGE.md`.
 
@@ -188,7 +188,7 @@ flowchart TD
 
 **Retry bei Rate Limits:** 3 Versuche mit 30 Sekunden Pause. Nach 3 Fehlern: Temp-File wird trotzdem gelöscht, Warning geloggt.
 
-**Piggyback-Scheduler:** Nach erfolgreichem Flush (und ggf. Compile) prüft `flush.py` ob konfigurierte Hintergrund-Tasks gestartet werden sollen. Bedingungen: nach 18:00 UND konfigurierbarer Cooldown abgelaufen. State in `scripts/state/piggyback-state.json`. Task-Liste lebt in `flush.py:_PIGGYBACK_COMMANDS`; pro Task ist `enabled` und `cooldown_hours` über `CONFIG.piggybacks.<name>` einstellbar.
+**Piggyback-Scheduler:** Nach erfolgreichem Flush (und ggf. Compile) prüft `flush.py` ob konfigurierte Hintergrund-Tasks gestartet werden sollen. Bedingungen: nach 18:00 UND konfigurierbarer Cooldown abgelaufen. State in `.wiki/state/piggyback-state.json`. Task-Liste lebt in `flush.py:_PIGGYBACK_COMMANDS`; pro Task ist `enabled` und `cooldown_hours` über `CONFIG.piggybacks.<name>` einstellbar.
 
 | Task | Script | Cooldown | Kosten |
 |------|--------|----------|--------|
@@ -203,7 +203,7 @@ flowchart TD
 
 Tasks werden als detached Background-Prozesse gespawnt (gleiche Mechanik wie compile.py). Sie laufen unabhängig voneinander und vom Compile. Der Piggyback läuft nur nach erfolgreichem Flush — bei Dedup, Empty oder Fail wird er übersprungen.
 
-`retry-failed-flushes` greift sich Files aus `scripts/sessions/failed-flushes/` (über `flush_pipeline.pending(limit=N)`), retried die Extraction, schreibt bei Erfolg ins daily Log + cleared das Staging-File. So gibt's keine Lücke in der Capture→Persist-Kette.
+`retry-failed-flushes` greift sich Files aus `.wiki/sessions/failed-flushes/` (über `flush_pipeline.pending(limit=N)`), retried die Extraction, schreibt bei Erfolg ins daily Log + cleared das Staging-File. So gibt's keine Lücke in der Capture→Persist-Kette.
 
 ### Edge Cases
 
@@ -262,7 +262,7 @@ flowchart TD
 
 **Kosten:** ~$0.02-0.15 pro Source (abhängig von Größe und Anzahl bestehender Artikel). 1 Source updated typisch 5-15 Artikel, was den Per-Source-Preis vs. Per-Artikel-Wert sehr günstig macht.
 
-**Inkrementell:** Nur Sources deren SHA-256 Hash sich seit dem letzten Compile geändert hat werden verarbeitet. `scripts/state/state.json` trackt Hashes, Timestamps und Kosten pro Datei.
+**Inkrementell:** Nur Sources deren SHA-256 Hash sich seit dem letzten Compile geändert hat werden verarbeitet. `.wiki/state/state.json` trackt Hashes, Timestamps und Kosten pro Datei.
 
 ### Script
 
@@ -473,7 +473,7 @@ uv run python scripts/review-wiki.py --model gemma3:4b  # schnelleres Modell
 uv run python scripts/review-wiki.py --limit 10         # nur 10 Artikel
 ```
 
-Report in `reports/wiki-review-YYYY-MM-DD.md`.
+Report in `.wiki/reports/wiki-review-YYYY-MM-DD.md`.
 
 ---
 

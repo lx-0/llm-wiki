@@ -76,6 +76,10 @@ features:
   curiosity_loop: true
   vision_screenshots: true
   procmail_execution: true
+  # Pre-compile sweep of <vault>/Clippings/*.md into <vault>/raw/articles/.
+  # Set to false if you've reconfigured the Obsidian Web Clipper extension
+  # to drop clippings directly into raw/articles/.
+  clippings_sweep: true
 
 graph_view:
   # Mode: knowledge-only | full-vault | sources-only | custom

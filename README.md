@@ -56,7 +56,7 @@ Inspired by [Andrej Karpathy's LLM Wiki](https://gist.github.com/karpathy/442a6b
 ## What's in the box
 
 - **`wiki`** — single-entry CLI (interactive + scriptable). `wiki setup`, `wiki config`, `wiki hooks`, `wiki status`, `wiki update`.
-- **Collectors** (`scripts/scan-*.py`, `sync-memories.py`, `clippings_sweep.py`, `ingest-html.py`) — pull metadata from email, calendar, browser, screenshots, tabs, agent-memory stores, and HTML clippings into `raw/`.
+- **Collectors** (`scripts/scan-*.py`, `sync-memories.py`, `clippings_sweep.py`, `ingest-html.py`) — pull metadata from email, calendar, browser, screenshots, tabs, agent-memory stores, and HTML clippings into `raw/`. `clippings_sweep` runs automatically before every `compile.py` to lift Obsidian Web Clipper output from `<vault>/Clippings/` into `raw/articles/`; toggle off via `features.clippings_sweep` in `config.yaml`.
 - **`compile.py`** — Claude Agent SDK loop that turns `raw/` into `knowledge/` articles with wikilinks.
 - **Curiosity loop** — after each compile, a small local Ollama model spots gaps in the new article and queues deep-scan requests for the next cycle.
 - **Optimization suggestions** — the compiler can also propose repeatable automations (e.g. mail filters); each one is a YAML in `raw/suggestions/`, executed only after explicit approval.
@@ -73,6 +73,18 @@ curl -fsSL https://raw.githubusercontent.com/lx-0/llm-wiki/main/install.sh | bas
 ```
 
 The installer clones into `<target>/.wiki/`, seeds `config.yaml` from `config.example.yaml`, and runs `uv sync` so the venv lives at `<target>/.wiki/.venv/`. Everything engine-related stays inside `.wiki/` — the vault root stays clean.
+
+**What `install.sh` puts in your vault** (only when each is absent — never overwrites):
+
+| Created path | What it is | Edit it? |
+|---|---|---|
+| `<vault>/AGENTS.md` | Article-schema spec from `templates/AGENTS.example.md`; consumed by every compile. | Yes — fill in the "Vault Owner" + "Language" sections. |
+| `<vault>/dashboard.md` | Obsidian Dataview home page (recently-compiled / wiki stats / recent daily logs). | Yes — extend with your own queries. |
+| `<vault>/.obsidian/community-plugins.json` | Suggests Dataview + Excalidraw for first-launch approval. | Approve in Obsidian; otherwise edit. |
+| `<vault>/.obsidian/core-plugins.json` | Sensible Obsidian defaults (daily-notes, templates, properties on; sync/publish off). | Edit anytime. |
+| `<vault>/.claude/skills/<name>` | Symlinks to `.wiki/skills/<name>` so Claude Code auto-discovers engine skills (`vault-triage`, `excalidraw-diagram`, `engine-pr`, …). New skills shipped via `wiki update` are picked up automatically. | Don't — they're managed. |
+
+The engine's runtime state lives entirely under `.wiki/`: `.wiki/state/` (JSON hash trackers), `.wiki/logs/` (flush + compile logs), `.wiki/sessions/` (session-flush staging), `.wiki/reports/` (lint + review-wiki output). All gitignored.
 
 **Prerequisites:** `bash` ≥ 4, `git`, `jq`, `uv` (Python package manager). Optional: a local [Ollama](https://ollama.com) for the curiosity / vision / classify loops.
 

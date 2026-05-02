@@ -415,14 +415,17 @@ async def main() -> None:
 
     # Pre-compile sweep: move <vault>/Clippings/*.md into raw/articles/
     # so Obsidian Web Clipper output is visible to the source-glob below.
-    # Cheap no-op if Clippings/ is empty or absent.
-    try:
-        import clippings_sweep
-        n_swept = clippings_sweep.sweep()
-        if n_swept > 0:
-            log.info("Pre-compile: swept %d file(s) from Clippings/ into raw/articles/", n_swept)
-    except Exception as e:  # noqa: BLE001 — never let sweep failures abort compile
-        log.warning("Pre-compile clippings sweep failed (continuing): %s", e)
+    # Cheap no-op if Clippings/ is empty or absent. Disable via
+    # CONFIG.features.clippings_sweep = false if the Web Clipper extension
+    # is reconfigured to drop directly into raw/articles/.
+    if CONFIG.features.clippings_sweep:
+        try:
+            import clippings_sweep
+            n_swept = clippings_sweep.sweep()
+            if n_swept > 0:
+                log.info("Pre-compile: swept %d file(s) from Clippings/ into raw/articles/", n_swept)
+        except Exception as e:  # noqa: BLE001 — never let sweep failures abort compile
+            log.warning("Pre-compile clippings sweep failed (continuing): %s", e)
 
     files = select_files(args)
     if not files:
