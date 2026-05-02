@@ -17,7 +17,7 @@ Zwei fundamental getrennte Ingest-Pfade konvergieren bei `compile.py`:
 - **Path A** — Automatische Session-Capture (Hooks → daily/ → compile)
 - **Path B** — Kuratierte Quellen (Scanners/Manual/Inbox → raw/ → compile)
 
-## Übersicht — die 13 Prozesse
+## Übersicht — die 14 Prozesse
 
 | # | Process | Was passiert | Trigger |
 |---|---|---|---|
@@ -34,6 +34,7 @@ Zwei fundamental getrennte Ingest-Pfade konvergieren bei `compile.py`:
 | [11](#11-screenshot-scanner) | Screenshot Scanner | `~/Screenshots/` → Vision-LLM → `raw/notes/` | piggyback (lokal-only) |
 | [12](#12-vault-ux-layer-dashboard--mocs) | Vault UX Layer | Dashboard.md (Auto-Open) + `_dashboard-stats.md` Refresh + MOCs (in Arbeit) | nach jedem Flush (synchron) |
 | [13](#13-hard-facts-corrections) | Hard Facts (Corrections) | `wiki correct` schreibt `knowledge/facts/<slug>.md` → injected in compile/query/lint; `apply` propagiert agentisch über `knowledge/`+`daily/` | manuell (`wiki correct add` / `wiki correct apply`) |
+| [14](#14-agent-tasks) | Agent Tasks | `prompts/agent_<id>.md` declares Claude Agent SDK config (model + tools + permission + button) per task. `wiki agent <id>` runs it. Dashboard buttons auto-wired via `wiki seed`. | manuell oder per Dashboard-Button |
 
 ---
 
@@ -880,4 +881,92 @@ Was passiert:
 - **`applied: false` für ewig:** Akzeptiert. Apply ist optional. Lint surface-t Drift auch ohne Apply.
 - **Apply schlägt mid-run fehl:** Vault-State ist möglicherweise teil-aktualisiert. Git-Working-Tree zeigt Diff; User entscheidet ob commit, revert, retry. Kein automatischer Rollback in v1.
 - **Fact wird gelöscht:** `wiki correct remove <slug>` legt ein `.bak.<ts>` an, dann unlink. Kein Cascade-Cleanup über Knowledge-Articles, die in der Zwischenzeit auf den Fact reagiert haben — Annahme: ein gelöschter Fact ist eine widerrufene Korrektur, kein "wieder behauptbarer" Claim.
+
+---
+
+## 14. Agent Tasks
+
+> Eingeführt mit M004. Generischer Runner für agentic Tasks (Claude SDK), die per Markdown-Datei deklariert werden — kein Engine-Code-Change nötig um eine neue Task hinzuzufügen.
+
+### Flow
+
+```mermaid
+flowchart TD
+    DROP["📝 prompts/agent_<id>.md\n(YAML frontmatter + prompt body)"]
+    DROP --> SEED["wiki seed"]
+    SEED --> SC["additive merge in\n.obsidian/plugins/\nobsidian-shellcommands/data.json"]
+    SEED --> DASH["rewrite agent-buttons\nregions in dashboard.md\n(marker-based, idempotent)"]
+    SEED --> READY["Dashboard reload\n→ Button erscheint"]
+
+    READY --> CLICK["Button-Click\noder wiki agent <id>"]
+    CLICK --> RUNNER["scripts/agent_task.py\nliest Spec, render body,\nspawn Claude Agent SDK"]
+    RUNNER --> EXEC["Agent läuft mit\ndeklariertem Model + Tools\n+ Permission + cwd"]
+    EXEC --> LOG[".wiki/logs/\nagent-<id>-<ts>.log"]
+    EXEC --> FRONT["frontmatter.last_run\n= <iso-ts>"]
+
+    style DROP fill:#FFECB9,stroke:#92610F
+    style RUNNER fill:#FFD8CB,stroke:#FC4E14,stroke-width:3px
+    style EXEC fill:#EFF6FF,stroke:#2563EB
+```
+
+### Anatomie einer Task-Definition
+
+`prompts/agent_<id>.md`:
+
+```yaml
+---
+id: summarize-day                    # required, matches filename
+title: "Summarize today's daily log" # required, shown in --list
+description: "..."                   # optional
+model: claude-haiku-4-5              # optional, defaults to CONFIG.models.compile_model
+allowed_tools: [Read, Edit, Write]   # required, non-empty subset of valid SDK tools
+permission_mode: acceptEdits         # default | acceptEdits | plan | bypassPermissions
+max_turns: 8                         # 1..100
+cwd: vault                           # vault | wiki
+button:                              # optional — drop to omit Dashboard wiring
+  label: "📅 Summarize day"
+  style: primary                     # primary | default | destructive | plain
+  tooltip: "..."
+  shell_command_id: agent-summarize-day  # optional, defaults to agent-<id>
+last_run: false                      # written back by runner; do not author
+---
+
+You are a daily-log summarizer. Read `daily/${today}.md`. ...
+```
+
+### Substitution-Variablen
+
+Built-in (immer verfügbar):
+- `${today}` — `YYYY-MM-DD`
+- `${now}` — ISO-Zeitstempel mit Timezone
+
+Operator-bereitgestellt via `wiki agent <id> --var key=value` (repeatable).
+
+### CLI
+
+| Befehl | Wirkung |
+|--------|---------|
+| `wiki agent <id>` | Task ausführen, Log + last_run schreiben |
+| `wiki agent <id> --dry-run` | Resolved Spec ausgeben, kein SDK-Aufruf |
+| `wiki agent <id> --var k=v --var k2=v2` | Body-Substitution |
+| `wiki agent --list` | Alle Tasks mit Title + Button-Marker + last_run |
+
+### Auto-Wiring durch `wiki seed`
+
+`scripts/agent_buttons.py` discovered alle `prompts/agent_*.md` mit `button:` Frontmatter. `lib/seed.sh` ruft das auf zwei Pfaden:
+
+1. **Shell-Commands additiver Merge:** `_merge_agent_shell_commands()` jq-merged neue `agent-<id>` Einträge in `.obsidian/plugins/obsidian-shellcommands/data.json`. Bestehende User-Einträge bleiben.
+2. **Dashboard Region-Replace:** `_rewrite_dashboard_agent_buttons()` ersetzt zwei marker-begrenzte Bereiche in `dashboard.md`:
+   - `<!-- agent-buttons:begin -->` ... `<!-- agent-buttons:end -->` — inline `` `BUTTON[id]` `` Referenzen
+   - `<!-- agent-button-defs:begin -->` ... `<!-- agent-button-defs:end -->` — hidden Meta-Bind Definitionen
+
+Idempotent — zweiter Lauf produziert keinen Diff.
+
+### Edge Cases
+
+- **Spec ohne `button:`** — Task ist via `wiki agent <id>` aufrufbar, erscheint aber nicht im Dashboard.
+- **Spec invalide** (fehlende Felder, unbekannte Tools) — `parse_spec` raised `SpecError` mit klarer Message; `wiki agent --list` skippt invalide Specs aber zeigt sie als Fehler unten in der Liste.
+- **`hidden: true`** auf Meta-Bind Defs — Block-Definition existiert, rendert aber nichts. Inline `` `BUTTON[id]` `` Referenzen nutzen die versteckte Def und rendern den Button an der Inline-Position.
+- **Marker fehlen in dashboard.md** — `update_dashboard()` warned und skippt; safe für custom-edited dashboards.
+- **Operator löscht Spec-File** — Auto-pruning ist NICHT Default. Buttons bleiben in shell-commands data.json + dashboard.md zurück, bis manuell entfernt. `--prune-agent-buttons` Flag deferred ins Backlog.
 

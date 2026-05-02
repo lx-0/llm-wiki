@@ -28,6 +28,8 @@
 #   wiki lint                  run lint.py — structural + LLM contradiction checks
 #   wiki lint --structural-only  cheap, no-LLM lint (used by piggyback)
 #   wiki query "QUESTION"      ask the knowledge base via the configured model
+#   wiki agent <id>            run an agentic task (Claude SDK driven by prompts/agent_<id>.md)
+#   wiki agent --list          list registered agent tasks
 #   wiki correct add "TITLE" "TRUTH" [--status S] [--term T ...]
 #                              record a hard fact that overrides any source
 #   wiki correct list          list all hard facts
@@ -340,6 +342,35 @@ EOF
   _run_script query.py "$@"
 }
 
+cmd_agent() {
+  case "${1:-}" in
+    -h|--help|help)
+      cat <<EOF
+${C_BOLD}wiki agent${C_RESET} — run an agentic task
+
+${C_BOLD}USAGE${C_RESET}
+  wiki agent <id>                          run task defined in prompts/agent_<id>.md
+  wiki agent <id> --dry-run                resolve + print spec without spawning
+  wiki agent <id> --var key=value          substitute \${key} in the prompt body
+  wiki agent --list                        list registered tasks
+
+${C_BOLD}EXAMPLES${C_RESET}
+  wiki agent summarize-day                 # cheap Haiku run on today's daily/
+  wiki agent summarize-day --dry-run
+  wiki agent --list
+
+${C_BOLD}NOTES${C_RESET}
+  Wraps \`scripts/agent_task.py\`. Spawns Claude Agent SDK with the model,
+  allowed_tools, permission_mode, max_turns, and cwd declared in the task's
+  frontmatter. Result text logged to \`.wiki/logs/agent-<id>-<ts>.log\`.
+  On success the task's frontmatter gets \`last_run: <iso-ts>\` written back.
+EOF
+      return 0 ;;
+  esac
+  banner "wiki agent"
+  _run_script agent_task.py "$@"
+}
+
 cmd_correct() {
   case "${1:-}" in
     ""|-h|--help|help)
@@ -595,6 +626,7 @@ case "${1:-}" in
   flush)            shift; cmd_flush "$@" ;;
   lint)             shift; cmd_lint "$@" ;;
   query)            shift; cmd_query "$@" ;;
+  agent)            shift; cmd_agent "$@" ;;
   correct)          shift; cmd_correct "$@" ;;
   review-wiki)      shift; cmd_review_wiki "$@" ;;
   version)          shift; cmd_version "$@" ;;

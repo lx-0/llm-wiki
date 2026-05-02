@@ -427,3 +427,20 @@ Minimal Theme ships ready-made `max` / `wide` cssclasses that do this. Default t
 3. In the snippet, **always** override `--file-line-width` + sizer `max-width` for the scope (Reading Line Length is on by default).
 4. For inline button rows, target `.el-pre:has(.block-language-meta-bind-button)` not the button itself.
 5. Auto-enable the snippet via `.obsidian/appearance.json` (additive merge in `lib/seed.sh`).
+
+### Agent-task framework — prompt-as-config + region-marker auto-wiring
+
+Three engine scripts (`compile.py`, `query.py`, `correct_apply.py`) each wrap one Claude Agent SDK call with a hard-coded prompt and CLI shape. M004 introduced a fourth pattern: **the task spec itself is data** (`prompts/agent_<id>.md` with YAML frontmatter declaring model + tools + permission + button + cwd), and a single generic runner (`scripts/agent_task.py`) reads it. New tasks ship as one markdown file — no engine code changes.
+
+The frontmatter is parsed by `scripts/agent_spec.py:parse_spec()` into an `AgentSpec` dataclass. Required fields (`id`, `title`, `allowed_tools`) raise `SpecError` if missing. Tool names validated against the SDK's allowlist. `${today}` and `${now}` substitution baked in; operator can add more via `wiki agent <id> --var k=v`.
+
+**Auto-wiring through `wiki seed`** combines two patterns we already had:
+
+1. **jq additive merge** (same shape as `community-plugins.json` and `appearance.json`): every spec with a `button:` block contributes an entry under `shell_commands.agent-<id>` in `.obsidian/plugins/obsidian-shellcommands/data.json`. User's other shell commands stay untouched.
+2. **Marker-based region replacement** (new pattern, lives in `scripts/agent_buttons.py:update_dashboard`): `<!-- agent-buttons:begin --> … <!-- agent-buttons:end -->` and `<!-- agent-button-defs:begin --> … <!-- agent-button-defs:end -->` define rewriteable regions in `templates/dashboard.md`. The seed regenerates contents from spec discovery; nothing outside the markers is touched. Idempotent.
+
+This keeps the operator's editing surface a single `.md` file per task, while the engine stays untouched. The same pattern can be lifted to other auto-wired surfaces (e.g. piggyback registration, hook generators) if needed later.
+
+**Why not bespoke per-task scripts** (rejected): we already had `correct_apply.py`, `compile.py`, `query.py`, and a per-feature trajectory ahead (`summarize-day`, `review-mocs`, `weekly-digest`, `extract-todos`, `cluster-orphans`). One more script per feature → script explosion. Pulling the SDK-spawn into one runner + spec files keeps engine code stable as the task catalogue grows.
+
+**Why not pure plumbing without a concrete task** (rejected): empty framework with no users invites drift between spec format intent and actual usage. Shipping `summarize-day` alongside the framework forces the spec to handle a real case (Haiku model for cost, append-vs-replace logic in the prompt body, button auto-wiring) before the abstraction calcifies.

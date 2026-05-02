@@ -109,6 +109,66 @@ _merge_appearance_json() {
 }
 
 
+# ── Internal: merge agent-task buttons into shell-commands data.json ──
+# For every prompts/agent_*.md declaring a `button:` block, ensure a matching
+# entry exists in <vault>/.obsidian/plugins/obsidian-shellcommands/data.json
+# under the spec's shell_command_id. Additive merge — operator's other shell
+# commands are preserved, never modified. Idempotent.
+_merge_agent_shell_commands() {
+  local target="$1" wiki_dir="$2"
+  local data="$target/.obsidian/plugins/obsidian-shellcommands/data.json"
+  if [[ ! -f "$data" ]]; then
+    return 0  # base seed didn't run yet; nothing to merge into
+  fi
+  if ! command -v jq >/dev/null 2>&1; then
+    warn "jq not available — skipping agent shell-commands merge"
+    return 0
+  fi
+  local entries
+  entries="$(uv run --quiet --project "$wiki_dir" python "$wiki_dir/scripts/agent_buttons.py" shell-commands 2>/dev/null || echo '{}')"
+  if [[ -z "$entries" ]] || [[ "$entries" == "{}" ]]; then
+    return 0
+  fi
+  local before after merged
+  before="$(jq -r '.shell_commands | keys | length' "$data" 2>/dev/null || echo 0)"
+  merged="$(jq --argjson agents "$entries" '
+    .shell_commands = (.shell_commands + ($agents | with_entries(select(.key as $k | (input_filename | "ignored") and ($k | tostring)))))
+    | .shell_commands = (.shell_commands + $agents)
+  ' "$data" 2>/dev/null || echo '')"
+  if [[ -z "$merged" ]]; then
+    warn "agent shell-commands merge failed"
+    return 0
+  fi
+  printf '%s\n' "$merged" > "$data.tmp" && mv "$data.tmp" "$data"
+  after="$(jq -r '.shell_commands | keys | length' "$data")"
+  if [[ "$before" != "$after" ]]; then
+    ok "agent shell-commands — $before → $after entries"
+  else
+    info "agent shell-commands — already up to date"
+  fi
+}
+
+
+# ── Internal: rewrite the agent-buttons regions in dashboard.md ────────
+# Replaces the inline-refs region and the hidden-defs region from the
+# discovered agent specs. Marker-based, idempotent, surgical (nothing
+# outside the markers is touched).
+_rewrite_dashboard_agent_buttons() {
+  local target="$1" wiki_dir="$2"
+  local dashboard="$target/dashboard.md"
+  if [[ ! -f "$dashboard" ]]; then
+    return 0
+  fi
+  local result
+  result="$(uv run --quiet --project "$wiki_dir" python "$wiki_dir/scripts/agent_buttons.py" update-dashboard "$dashboard" 2>&1 || echo unchanged)"
+  if [[ "$result" == "changed" ]]; then
+    ok "dashboard.md — agent-buttons regions refreshed"
+  else
+    info "dashboard.md — agent-buttons already up to date"
+  fi
+}
+
+
 # ── Public: seed all vault templates ───────────────────────────────
 # Args: <target-vault-root> <wiki-dir> [force=0|1]
 seed_vault_templates() {
@@ -178,4 +238,8 @@ seed_vault_templates() {
       done < <(find "$templates_dir/.obsidian/plugins" -type f -name '*.json')
     fi
   fi
+
+  # 8. Agent-task auto-wiring — discovered from prompts/agent_*.md `button:` frontmatter.
+  _merge_agent_shell_commands "$target" "$wiki_dir"
+  _rewrite_dashboard_agent_buttons "$target" "$wiki_dir"
 }

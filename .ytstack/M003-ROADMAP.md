@@ -4,7 +4,7 @@ project: llm-wiki
 size: L
 created: 2026-05-02T16:58:33Z
 status: planned
-total_slices: 6
+total_slices: 7
 completed_slices: 1
 ---
 
@@ -34,12 +34,13 @@ Slice detail lives in per-slice `M003-S##-PLAN.md` files, created by `ytstack:sl
 - [ ] S04 — MOC layer (knowledge/MOCs/ directory, AGENTS.md schema for `type: moc`, seed 2-3 hand-written MOCs, Dashboard MOC section)
 - [ ] S05 — state.history.jsonl + P2 charts (append-only history layer in utils.py, wire compile.py + flush.py, install obsidian-tracker, add 3 time-series charts)
 - [ ] S06 — Bases knowledge browser (native filterable card/table view of knowledge/ with type/tag/status facets)
+- [ ] S07 — Dashboard cache robustness (stop `wiki seed --force` from clobbering `_dashboard-*.md`; surface silent refresh failures from `flush.py` + `wiki` shell wrapper) — see `M003-S07-PLAN.md`
 
 ## Run order
 
 Slices execute sequentially. After each slice, `ytstack:reassess-roadmap` checks if the plan still fits reality.
 
-S01 → S02 → S03 → S04 → S05 → S06.
+S01 → S02 → S03 → S04 → S05 → S06 → S07. (S07 was inserted post-S01 after a real lxw bug — could be pulled forward in front of S04-S06 if dashboard reliability matters more than new dashboard surface area.)
 
 Inter-slice dependencies:
 - S02 depends on S01 (Dashboard exists to add callouts to).

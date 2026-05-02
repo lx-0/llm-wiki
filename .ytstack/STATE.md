@@ -1,8 +1,8 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-05-02T18:30:49Z
-current_milestone: M003
+last_updated: 2026-05-02T22:00:00Z
+current_milestone: M004
 active_slice: none
 active_task: none
 ---
@@ -35,15 +35,13 @@ active_task: none
 
 Carried-forward candidates from M002 (deferred to M004+): Collector-rollout to other substrates, multi-vault ingest, source-onboarding cadence.
 
+**M004 done (2026-05-02):** Agent-Task framework shipped. `scripts/agent_spec.py` (parser, 8 validation cases), `scripts/agent_task.py` (SDK runner with `--list / --dry-run / --var`), `scripts/agent_buttons.py` (discovery + dashboard region-rewrite), `wiki agent <id>` CLI. First concrete task: `prompts/agent_summarize-day.md` (Haiku, Read/Edit/Write, primary button). Auto-wiring via `wiki seed`: jq-merge into shell-commands data.json + marker-based region replace in dashboard.md. 20 pytest tests green (17 spec + 3 summarize-day smoke). PROCESS.md §14 + KNOWLEDGE.md learning + DECISIONS.md two entries (framework + region-marker pattern). Live vault patched, button visible in Run row after reload.
+
 ## Next action
 
-S01 closed. Operator verified Dashboard renders, charts theme-aware, buttons clickable, run-buttons execute. 8 commits on main since session start (d22b539 → d5dc3e4). No push yet.
-
-Suggested next steps in priority order:
-1. **Run `ytstack:reassess-roadmap`** — S01 absorbed parts of S03 (P1 charts) and grew well beyond original scope. Decide whether S02–S06 still fit as planned, or re-scope.
-2. **Slice + execute S02** (Lint-triage queues — surface lint.py warnings as collapsible callouts on Dashboard with click-through fix actions). Most adjacent to current work.
-3. **Hard-facts feature integration test** — verify compile picks up `knowledge/facts/*.md` content as override during a real compile run on lxw vault.
-4. **Distribution-strip backlog item** (`backlog/distribution-strip.md`) — strip `.ytstack/`, `tests/`, etc. from `wiki update` so vaults don't carry engine dev-state.
+M004 closed. Two paths:
+- **Reassess roadmap** — does the catalogue need more agent tasks now (review-mocs, weekly-digest, extract-todos)? Or move to a different milestone.
+- **Carry-forward**: Auto-pruning of removed agent buttons (currently additive only), `--prune-agent-buttons` flag, per-task scheduling/piggyback integration. All deferred to backlog.
 
 ## Open decisions
 

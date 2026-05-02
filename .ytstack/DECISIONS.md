@@ -116,3 +116,19 @@ Format for each entry:
 **Chose:** B.
 **Reason:** Obsidian (CommonMark) treats fenced code blocks inside raw-HTML blocks as raw-HTML context. Meta Bind's markdown post-processor only runs in markdown context → buttons fall through as plain code. `cssclasses` keeps everything in markdown context. Dataviewjs is unaffected (different post-processor pathway), so chart-grid `<div class="wiki-chart-grid">` still works.
 **Linked artifacts:** `templates/dashboard.md` (frontmatter), `templates/.obsidian/snippets/wiki-dashboard.css`.
+
+## 2026-05-02: Agent-task framework — prompt-as-config + auto-wiring (M004)
+
+**Context:** Engine has three SDK-spawning scripts (`compile.py`, `query.py`, `correct_apply.py`) each with hard-coded prompts and CLI shapes. Need to grow the catalogue (`summarize-day`, `review-mocs`, `weekly-digest`, …) without per-task Python files.
+**Options considered:** (A) one Python script per task, (B) generic runner with prompt-as-config (`prompts/agent_<id>.md` declares model + tools + permission + button), (C) build into a heavier "agent definition" YAML separate from prompts/.
+**Chose:** B.
+**Reason:** Single editing surface per task — operator drops a markdown file with frontmatter + body. Reuses the existing `prompts/` directory pattern. No engine code change to add a task. Auto-wiring via `wiki seed` (jq additive merge for shell-commands, marker-based region rewrite for dashboard.md) keeps button registration data-driven too.
+**Linked artifacts:** `scripts/agent_spec.py`, `scripts/agent_task.py`, `scripts/agent_buttons.py`, `prompts/agent_summarize-day.md`, `lib/seed.sh:_merge_agent_shell_commands`, `lib/seed.sh:_rewrite_dashboard_agent_buttons`, `wiki agent` subcommand.
+
+## 2026-05-02: Marker-based region replace as the "rewriteable section" pattern
+
+**Context:** M004 needed to inject auto-generated content into `templates/dashboard.md` (button rows + hidden defs) while preserving operator edits elsewhere in the file. `_seed_file` is all-or-nothing; jq merge is JSON-only.
+**Options considered:** (A) full file overwrite (loses operator customisation), (B) generate dashboard.md entirely (operator can never customise), (C) marker-based region replace — `<!-- name:begin -->` + `<!-- name:end -->` defines a managed region; everything else is operator-owned and untouched.
+**Chose:** C.
+**Reason:** Lets the operator customise everything outside markers (re-order sections, change copy, add custom buttons, tweak callouts). Marker pairs are explicit — operator removing them opts out cleanly. Idempotent re-runs. Works for any markdown file, generalises beyond dashboard.
+**Linked artifacts:** `scripts/agent_buttons.py:update_dashboard()`, `lib/seed.sh:_rewrite_dashboard_agent_buttons()`, `templates/dashboard.md` (markers in Run section + at end-of-file).
