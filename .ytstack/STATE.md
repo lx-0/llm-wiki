@@ -1,7 +1,7 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-05-02T18:00:00Z
+last_updated: 2026-05-02T19:00:00Z
 current_milestone: none
 active_slice: none
 active_task: none
@@ -10,6 +10,8 @@ active_task: none
 # State
 
 **Status:** M002 **done** (2026-05-02; 25 pytest tests green; commits `15b4916` S01, `14bf844` S02, `4e52520` S03, `b884bf1` finalize). Reader/Filter adapter seam landed for Thunderbird-mbox, All-Inkl-Procmail, and Gmail-API; legacy `scripts/scan-email.py` + `scripts/thunderbird-rules.py` deleted; `wiki_config.py` enforces nested `reader:`/`filter:` schema; round-robin config backup wired into every `wiki config set`. **Live Gmail smoke deferred** as operator-side action (drop `client_secret.json` → `wiki gmail-auth <id>` → `wiki collect email --account <id>`) — does not block M003.
+
+**Doc restructure (2026-05-02 PM, commits `22900dc` + `59a5175`):** README went 460 → 311 lines via 9-repo audit (basic-memory, mem0, ollama, simonw/llm, nanoGPT, OpenHands, fabric, claude-memory-compiler, karpathy/nanoGPT) plus consistency pass against `.ytstack/`. Auxiliary docs created: `docs/cli.md` (CLI reference), `docs/engine-layout.md` (engine internals), `docs/vault-tour.png` (Obsidian-mockup infographic via lo-fi-wireframing-kit). All linked docs got TOCs. Two backfill DECISIONS.md entries: naming vocabulary lock + `.venv/` location hard-rule. README "8 collectors" claim corrected to "9 substrate sources" (only `scan-email` is on the formal Collector pattern post-M002). Deferred follow-ups in `backlog/readme-polish.md`.
 
 ## Next action
 
