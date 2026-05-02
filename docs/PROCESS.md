@@ -17,6 +17,22 @@ Zwei fundamental getrennte Ingest-Pfade konvergieren bei `compile.py`:
 - **Path A** — Automatische Session-Capture (Hooks → daily/ → compile)
 - **Path B** — Kuratierte Quellen (Scanners/Manual/Inbox → raw/ → compile)
 
+## Übersicht — die 11 Prozesse
+
+| # | Process | Was passiert | Trigger |
+|---|---|---|---|
+| [1](#1-inbox-processing) | Inbox Processing | Klassifiziert Drops in `inbox/`, verschiebt in `raw/<typ>/` | Manueller Drop |
+| [2](#2-automatic-session-capture-hooks) | Automatic Session Capture | Hooks → `daily/YYYY-MM-DD.md` | session-start / session-end / pre-compact |
+| [3](#3-compilation) | Compilation | Claude Agent SDK liest `raw/` + `daily/`, schreibt Articles in `knowledge/` | manuell oder cron-after-hour |
+| [4](#4-scanners) | Scanners | Email · Calendar · Browser · Screenshots · Tabs → `raw/notes/` | per-Scanner Cron oder piggyback |
+| [5](#5-seed-einmalig) | Seed (einmalig) | Bulk-Import aus `~/.claude/projects/*/memory/` | One-shot bei Onboarding |
+| [6](#6-query--lint) | Query + Lint | NL-Query gegen Wiki · 6 strukturelle Checks · 1 LLM-Contradiction-Scan | manuell |
+| [7](#7-wiki-review-lokal-kostenlos) | Wiki Review | Per-Article Quality-Score via lokales LLM | piggyback |
+| [8](#8-curiosity-loop) | Curiosity Loop | Gap-Detection → JSON-Requests in `raw/requests/` | nach jedem Compile |
+| [9](#9-optimization-suggestions-email) | Optimization Suggestions | YAML-Proposals (z.B. Mail-Filter) → per-action approval | nach Compile |
+| [10](#10-claudemd-optimizer) | CLAUDE.md Optimizer | Cross-Project-Pattern → `~/.claude/CLAUDE.md` Edits | piggyback |
+| [11](#11-screenshot-scanner) | Screenshot Scanner | `~/Screenshots/` → Vision-LLM → `raw/notes/` | piggyback (lokal-only) |
+
 ---
 
 ## 1. Inbox Processing

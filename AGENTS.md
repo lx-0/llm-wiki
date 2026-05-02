@@ -2,6 +2,14 @@
 
 Conventions for AI coding agents and human contributors working on this repo.
 
+## Contents
+
+- [What this repo is](#what-this-repo-is) — engine vs vault, three vault layers
+- [Repo layout](#repo-layout) — top-level tree
+- [Conventions](#conventions) — [tunable](#adding-a-tunable) · [personal data](#adding-per-instance--personal-data) · [prompt](#adding-a-prompt) · [agent target](#adding-an-agent-target-for-hook-install) · [path handling](#path-handling) · [Python env](#python-environment) · [YAML & JSON](#yaml--json) · [side effects](#side-effects)
+- [Style](#style) — bash, python, logging, commits
+- [When in doubt](#when-in-doubt) — pointers to concept + architecture
+
 ## What this repo is
 
 The **tooling** for an LLM Wiki — a Karpathy-pattern personal knowledge base. The repo is not a vault; it's the code that runs inside one.

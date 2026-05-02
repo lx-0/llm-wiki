@@ -4,6 +4,12 @@ This project implements [Andrej Karpathy's LLM Wiki pattern](https://gist.github
 
 **"LLM Wiki"** is the de-facto community term for the pattern. Karpathy used both "LLM Knowledge Bases" (Tweet, 2026-04-03) and `llm-wiki` (his own gist filename). Of the top 10 GitHub implementations within four weeks of his post, nine use "LLM Wiki" in repo name or description. We follow that convention.
 
+## Contents
+
+- [Three naming layers](#three-naming-layers) — pattern · code · user-branding
+- [What we explicitly do **not** call this](#what-we-explicitly-do-not-call-this) — and why
+- [When you mean "the wiki"](#when-you-mean-the-wiki) — disambiguating output vs tooling vs system
+
 ## Three naming layers
 
 | Layer | Term | Rationale |

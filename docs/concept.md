@@ -2,6 +2,18 @@
 
 An LLM Wiki implementation that turns scattered personal data into a compiled, queryable knowledge base. Inspired by [Andrej Karpathy's LLM Wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) and [Cole Medin's claude-memory-compiler](https://github.com/coleam00/claude-memory-compiler).
 
+## Contents
+
+- [The problem](#the-problem) — what scattering looks like and why naive ingest fails
+- [Core idea](#core-idea) — compile once, read every day
+- [Architecture: three layers](#architecture-three-layers) — Working Memory · optional Vector RAG · Sources of Truth
+- [Data flow](#data-flow) — substrates → compile → wiki
+- [Compile — not retrieve](#compile--not-retrieve) — why this isn't RAG
+- [Cognitive functions](#cognitive-functions) — perception, memory, attention as system roles
+- [Curiosity loop](#curiosity-loop) — gap detection that queues the next compile
+- [Optimization suggestions](#optimization-suggestions) — YAML proposals with per-action approval
+- [Design rationale](#design-rationale) — the hard trade-offs
+
 ## The problem
 
 Personal knowledge ends up scattered across:
