@@ -275,14 +275,20 @@ def refresh_dashboard_stats() -> None:
     counts after this flush. Synchronous and best-effort: failures are logged
     but never block the flush itself."""
     try:
-        subprocess.run(
+        result = subprocess.run(
             [sys.executable, str(DASHBOARD_STATS_SCRIPT)],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             stdin=subprocess.DEVNULL,
             check=False,
             timeout=30,
         )
+        if result.returncode != 0:
+            log.warning(
+                "dashboard_stats refresh failed (exit=%d): %s",
+                result.returncode,
+                result.stderr.decode("utf-8", errors="replace")[:500],
+            )
     except Exception:
         log.exception("Failed to refresh dashboard stats")
 
