@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-05-02T22:00:00Z
-current_milestone: M004
-active_slice: none
-active_task: none
+last_updated: 2026-05-02T22:40:00Z
+current_milestone: M003
+active_slice: S02
+active_task: T01
 ---
 
 # State

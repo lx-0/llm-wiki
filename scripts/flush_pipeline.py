@@ -94,8 +94,31 @@ def stage(kind: str, session_id: str, content: str) -> StagedFlush:
     return StagedFlush(path=path, session_id=session_id, kind=kind, created=ts)
 
 
+_DAILY_BUTTON_BLOCK = """\
+<!-- summarize-button:begin -->
+```meta-bind-button
+label: 📅 Summarize this day
+hidden: false
+class: ""
+tooltip: "Run summarize-day agent against this day's log."
+id: btn-summarize-here
+style: primary
+actions:
+  - type: command
+    command: "Shell commands: Wiki: agent summarize this day"
+```
+<!-- summarize-button:end -->
+"""
+
+
 def append_to_daily(content: str, session_id: str) -> Path:
-    """Append extracted content to today's daily log file. Returns the file path."""
+    """Append extracted content to today's daily log file. Returns the file path.
+
+    On first creation of a daily file, also writes the per-day Summarize
+    button block right after the H1 — clicking it from inside that file
+    fires `agent-summarize-day-here`, which runs `wiki agent summarize-day
+    --var date={{file_basename}}` so the summary targets THAT day, not today.
+    """
     DAILY_DIR.mkdir(parents=True, exist_ok=True)
 
     now = datetime.now(ZoneInfo(TIMEZONE))
@@ -107,7 +130,8 @@ def append_to_daily(content: str, session_id: str) -> Path:
     is_new = not daily_file.exists()
     with open(daily_file, "a", encoding="utf-8") as f:
         if is_new:
-            f.write(f"# Daily Log — {date_str}\n")
+            f.write(f"# Daily Log — {date_str}\n\n")
+            f.write(_DAILY_BUTTON_BLOCK)
         f.write(header)
         f.write(content)
         f.write("\n")
