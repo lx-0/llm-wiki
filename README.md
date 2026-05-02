@@ -72,9 +72,9 @@ llm-wiki is the **compilation layer** between raw substrates and active consumpt
 - **Engine / vault split** — engine code, prompts, hooks, runtime state, and venv all live under `<vault>/.wiki/`. The vault root stays clean.
 - **One install, one CLI, one venv** — `wiki setup` + `wiki update` + `wiki status` cover the full lifecycle.
 
-![Architecture](docs/architecture.png)
+![Overview](docs/overview.png)
 
-<sub>Rendered from [`docs/architecture.excalidraw`](docs/architecture.excalidraw) — edit in [excalidraw.com](https://excalidraw.com) or Obsidian's Excalidraw plugin.</sub>
+<sub>High-level dashboard. For the full cognitive-architecture diagram see [`docs/architecture.png`](docs/architecture.png). Both rendered from `.excalidraw` files in [`docs/`](docs/).</sub>
 
 ## What it looks like in Obsidian
 
@@ -119,6 +119,7 @@ daily/YYYY-MM-DD.md.                      · sync-memories   (Claude Code memory
                   │  projects/         │
                   │  people/           │
                   │  qa/               │
+                  │  facts/            │   ← human-owned hard facts (override sources)
                   │  index.md          │   ← master catalogue
                   └────────────────────┘
 ```
@@ -128,7 +129,9 @@ After every compile, two side loops run on the new article:
 - **Curiosity loop** — a small local Ollama model spots gaps and writes JSON deep-scan requests to `raw/requests/`. The next compile cycle picks one up and fills the gap.
 - **Optimization suggestions** — the compiler emits YAML proposals to `raw/suggestions/` for repeatable manual actions (e.g. mail filter rules). `execute-suggestions.py` applies them only after explicit per-action approval.
 
-`lint.py` watches the wiki itself: 6 structural checks (broken links, orphan pages, orphan sources, stale articles, missing backlinks, sparse articles) plus one LLM-driven contradiction scan.
+`lint.py` watches the wiki itself: 7 structural checks (broken links, orphan pages, orphan sources, stale articles, missing backlinks, sparse articles, fact violations) plus one LLM-driven contradiction scan.
+
+When raw sources contradict reality — a Slack thread that calls a project by its old name, an old memo that claims a never-won award — `wiki correct` lets you write a **hard fact** to `knowledge/facts/<slug>.md`. Hard facts inject into compile + query prompts at the highest authority, so future compilations honour them automatically. `wiki correct apply <slug>` then spawns an agent that walks the existing wiki, strikes contaminated claims, fixes wikilinks, and — for disambiguation facts — renames files. Raw sources stay immutable; only `knowledge/` (and minimal correction notes in `daily/`) are touched.
 
 ## What a compiled article looks like
 

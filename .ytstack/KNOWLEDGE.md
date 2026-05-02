@@ -266,3 +266,83 @@ The All-Inkl `kasserver` Webmail Procmail API endpoint is destructive when calle
 Workaround: never call the save endpoint during exploration. Always read first, mutate the read result, then save. Keep a local backup before every save (`get_procmail_config()` → file with timestamp suffix).
 
 Same principle generalizes: any API endpoint named `*save*`, `*write*`, `*set*`, `*update*` is a write surface. Treat it as destructive until proven idempotent.
+
+---
+
+## Obsidian + plugins gotchas (added during M003-S01)
+
+### Fenced code blocks inside `<div>` HTML lose plugin post-processing
+
+Obsidian (CommonMark spec) treats fenced code blocks inside raw `<div>` HTML wrappers as **raw-HTML context**. Markdown post-processors that target code-fence languages (Meta Bind for ` ```meta-bind-button`) DO NOT run there — the block falls through as plain `<code>` text.
+
+**Asymmetric impact:** Dataviewjs uses a different post-processor pathway and IS unaffected. Charts inside `<div class="wiki-chart-grid">` work fine; Meta Bind buttons inside `<div class="wiki-button-row">` do not.
+
+**Fix:** layout via `cssclasses: [wiki-dashboard]` frontmatter + scoped CSS. Never wrap meta-bind blocks in inline HTML.
+
+### Dataview JS queries default off
+
+Dataview ships with `enableDataviewJs: false` for security. Charts using `dataviewjs` blocks won't render until the operator toggles "Enable JavaScript Queries" in Dataview settings — or until you seed `templates/.obsidian/plugins/dataview/data.json` with `enableDataviewJs: true`.
+
+### Chart.js defaults break on dark themes
+
+Default Chart.js text/grid colors are dark gray → invisible on Obsidian's dark theme. Read Obsidian CSS vars (`--text-normal`, `--background-modifier-border`, `--color-blue/red/green/...`) at chart-creation time and pass to Chart.js options. Defaults in case a var is missing.
+
+### `state.ingested[rel]` is a string, not a dict
+
+`compile.py` writes `state["ingested"][rel] = file_hash(source)` — a string. Older code paths (e.g. `lint.py:check_stale_articles` pre-fix) read it as `.get("hash", "")` expecting a dict. Result: `AttributeError` that aborts the entire lint run unless wrapped.
+
+**Defensive pattern:** `isinstance(stored, dict)` branch handles both shapes. **Plus:** wrap each lint check in `try/except` in the main loop so one crash doesn't kill the rest.
+
+### Wiki seed must be additive on `community-plugins.json`
+
+The plugin list might contain operator-added plugins the engine doesn't know about. Default seed mode does **jq union merge** (`jq -s '.[0] + .[1] | unique'`) — never drops entries. Other files (dashboard.md, AGENTS.md) skip-if-exists with `--force` to overwrite.
+
+### `homepage` plugin needs binary install + config seed
+
+Seeding `.obsidian/plugins/homepage/data.json` with `value: "dashboard"` and `openOnStartup: true` is necessary but not sufficient. The plugin **binary** must be installed via Settings → Community Plugins → Browse. Once binary lands, it reads our seeded config. Same for `obsidian-charts`, `obsidian-meta-bind-plugin`, `obsidian-tasks-plugin`, `obsidian-shellcommands`, `quickadd`, `heatmap-calendar`.
+
+### macOS HFS+/APFS is case-insensitive
+
+`Dashboard.md` and `dashboard.md` resolve to the same file on default macOS. Don't rename for casing — pick one (we use lowercase to match `install.sh`'s historic guard).
+
+## Compiler / wiki-engine semantics (added during M003-S01)
+
+### Folder = type, but `type:` frontmatter is also required
+
+Knowledge articles live under `knowledge/<folder>/`. Pre-fix the folder was the ONLY signal of substrate-type; articles had no `type:` frontmatter. Now both must agree:
+
+- `knowledge/concepts/`    → `type: concept`
+- `knowledge/connections/` → `type: connection`
+- `knowledge/qa/`          → `type: qa`
+- `knowledge/people/`      → `type: person`
+- `knowledge/projects/`    → `type: project`
+- `knowledge/MOCs/`        → `type: moc`     (S04 — manual curation)
+- `knowledge/facts/`       → `type: fact`    (hard-facts override system)
+
+The compile prompt sets the field per folder; `lint.py:check_article_type` flags drift; `scripts/migrate_add_type.py` backfills legacy articles (cheap, no LLM).
+
+### Hard-facts beat source claims (authority hierarchy in compile context)
+
+The LLM compiler treats every source equally — a stale memo and a current decision both feed the same prompt. Without an authority layer, low-quality sources contaminate the wiki and stay there. Hard facts solve this by injecting an **operator-authored** override layer above sources.
+
+`knowledge/facts/<slug>.md` carries `type: fact`. The compile + query prompts open with a "Hard facts (override anything in the source material)" block right after the system prompt — explicitly higher authority than `${agents_md}`, `${index_md}`, or any source. The Compile prompt instructs: "do NOT write contradicting claims; correct existing articles that contradict a fact."
+
+Three orthogonal layers handle the lifecycle:
+
+1. **Prevention** — `read_hard_facts()` in `scripts/utils.py` builds the prompt block; `compile.py` and `query.py` pass it as `${facts_md}`. New compiles honor every recorded fact.
+2. **Detection** — `lint.py:check_facts_violations()` greps each fact's `negation_terms:` list (case-insensitive) across all non-facts knowledge files. The list is the lint signal, **not** the compile signal — the compiler reads the fact body verbatim and matches semantically; lint is the cheap structural backstop.
+3. **Propagation** — `wiki correct apply <slug>` spawns Claude Agent SDK with `cwd=<vault-root>`, `acceptEdits`, full Read/Write/Edit/Glob/Grep/Bash tools. The agent walks `knowledge/` (edits + renames + wikilink fixes), prepends correction notes to `daily/`, and treats `raw/` as immutable. After success, `applied:` flips from `false` to an ISO timestamp. Per-fact `.bak.<ts>` snapshots before and after.
+
+Statuses are policy hints, not enforcement: `negation` (false claim — strike), `disambiguation` (name conflict — rename + relink), `clarification` (factual fix — edit). Lint only acts on `negation_terms`; the agentic apply step honors all three because it reads the fact body as instructions.
+
+`wiki correct add/list/remove/edit/path/apply` is the operator interface. Backups land next to the fact file as `.bak.YYYYMMDD-HHMMSS` on every write.
+
+### Dashboard counts come from `_dashboard-stats.md`, not Dataview-on-state.json
+
+`scripts/dashboard_stats.py` reads `state.json` + filesystem + cheap structural lint checks, then writes `<vault>/_dashboard-stats.md` with frontmatter (numerical counts) and a rendered Markdown callout (transcluded by Dashboard via `![[_dashboard-stats]]`).
+
+`state.json` lives at `.wiki/state/state.json` — Obsidian/Dataview can't read it directly (dot-folder excluded). The cache file is the bridge. Refreshed synchronously after every `wiki flush`, plus manually via the Run > Refresh-stats button on the dashboard.
+
+### Lint check_stale_articles fix preserves both schema shapes
+
+`isinstance(stored, dict)` branch handles old `{hash: ..., compiled_at: ...}` dict shape and current bare-string. No migration needed for state.json — defensive read.

@@ -40,6 +40,10 @@ Operational layer for an LLM Wiki vault. The `.wiki/` directory is hidden from O
 | `wiki hooks install` | install into selected agents (claude / codex / gemini / cursor) |
 | `wiki hooks uninstall` | remove wiki-managed hooks |
 | `wiki hooks status` | install table per agent / scope |
+| `wiki correct add "TITLE" "TRUTH" [--status …] [--term …]` | record a hard fact at `knowledge/facts/<slug>.md` (overrides sources at compile + query) |
+| `wiki correct list` | list recorded hard facts |
+| `wiki correct remove SLUG` / `edit SLUG` / `path SLUG` | manage individual facts |
+| `wiki correct apply SLUG [--dry-run]` | spawn Claude Agent SDK over the vault to propagate the correction (edits `knowledge/`, annotates `daily/`, leaves `raw/` immutable) |
 
 ## Setup wizard — what's asked
 

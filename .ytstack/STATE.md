@@ -1,7 +1,7 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-05-02T17:58:23Z
+last_updated: 2026-05-02T18:30:49Z
 current_milestone: M003
 active_slice: none
 active_task: none
@@ -13,7 +13,23 @@ active_task: none
 
 **Doc restructure (2026-05-02 PM, commits `22900dc` + `59a5175`):** README went 460 → 311 lines via 9-repo audit (basic-memory, mem0, ollama, simonw/llm, nanoGPT, OpenHands, fabric, claude-memory-compiler, karpathy/nanoGPT) plus consistency pass against `.ytstack/`. Auxiliary docs created: `docs/cli.md` (CLI reference), `docs/engine-layout.md` (engine internals), `docs/vault-tour.png` (Obsidian-mockup infographic via lo-fi-wireframing-kit). All linked docs got TOCs. Two backfill DECISIONS.md entries: naming vocabulary lock + `.venv/` location hard-rule. README "8 collectors" claim corrected to "9 substrate sources" (only `scan-email` is on the formal Collector pattern post-M002). Deferred follow-ups in `backlog/readme-polish.md`.
 
-**Status:** M003 in progress (1/6 slices done). S01 — Dashboard scaffold + homepage plugin landed. 5 tasks completed, 4 new pytest tests green, install.sh + dashboard.md template + scripts/dashboard_stats.py + flush.py post-flush refresh wired up. docs/PROCESS.md gained section 12 "Vault UX Layer".
+**Status:** M003 in progress (1/6 slices done — S01 grew from 5 → 8 tasks during execution). S01 closed with rich interactive Dashboard: capture buttons (Meta Bind + QuickAdd), live engine-status callout with pending-list, 5 graphical charts (Source-type doughnut, Top-15 tags bar, Article freshness, Inbound-link histogram, Daily activity heatmap), Inbox/Pending-review/Tasks triage, Run-buttons (compile / lint / refresh-stats via Shell commands plugin), Orphan list. Theme-aware Chart.js colors via Obsidian CSS vars, responsive grid via cssclasses + CSS snippet.
+
+**Wiki CLI massive expansion** — gained `compile / flush / lint / query / review-wiki / seed / correct` subcommands; was lifecycle-only before. `_run_script` + `_refresh_dashboard_stats` helpers dedupe wrappers.
+
+**Hard-facts subsystem (user-led, parallel to S01)** — new `knowledge/facts/<slug>.md` with `type: fact` frontmatter. `wiki correct add/list/remove/edit/path` CLI in `scripts/correct.py`. `prompts/compile_main.md` injects facts as authoritative override over source material. Lint check_article_type knows about `facts/ → fact`. Migration script + tests adjusted accordingly.
+
+**Root-cause fixes that landed:**
+- `compile_main.md` now sets `type:` per folder; `AGENTS.example.md` documents knowledge/ frontmatter schema; lint flags missing_type / type_mismatch (auto-fixable); `scripts/migrate_add_type.py` backfills legacy articles. Replaces earlier symptom-fix where dashboard chart fell back to folder name.
+- `lint.py:check_stale_articles` defensive isinstance handling for `state.ingested[rel]` (string in current schema, dict in legacy). Per-check try/except in main loop so one crash doesn't kill the run.
+- `templates/.obsidian/plugins/dataview/data.json` seeds `enableDataviewJs: true` so charts render without manual toggle.
+- Meta Bind buttons: `cssclasses: [wiki-dashboard]` instead of inline `<div>` wrappers — Meta Bind post-processor doesn't run inside raw-HTML context.
+
+**`wiki seed` command** — additive in-place re-application of templates to installed vaults (community-plugins.json merged via jq, never destructive). `wiki seed --force` overwrites existing files. `lib/seed.sh` is the shared logic, used by both `install.sh` and the CLI.
+
+**Plugins shipped** (8 community + Obsidian-builtin): dataview, homepage, obsidian-charts, heatmap-calendar, obsidian-meta-bind-plugin, obsidian-tasks-plugin, obsidian-shellcommands, quickadd, plus existing obsidian-excalidraw-plugin. Plus CSS snippet `wiki-dashboard.css`.
+
+**Tests:** 37 pytest tests green (was 25 pre-M003).
 
 **M003 — Human Vault UX:** Dashboard.md (auto-opens via homepage plugin) with engine-status callout, lint-triage queues, P1+P2 charts (5+3, single-snapshot + time-series), MOC layer (≥3 manually curated), state.history.jsonl append-only history, Bases knowledge browser. Six slices S01–S06. Source design in `backlog/vault-dashboard.md`; locked decisions + exit criteria in `M003-CONTEXT.md`.
 
@@ -21,11 +37,13 @@ Carried-forward candidates from M002 (deferred to M004+): Collector-rollout to o
 
 ## Next action
 
-S01 complete. Two paths:
-- **Commit S01** before moving on (recommended — clean checkpoint).
-- **Slice + execute S02** (Lint-triage queues — surface lint.py warnings as collapsible callouts on Dashboard).
+S01 closed. Operator verified Dashboard renders, charts theme-aware, buttons clickable, run-buttons execute. 8 commits on main since session start (d22b539 → d5dc3e4). No push yet.
 
-Run `ytstack:reassess-roadmap` if S01 surfaced anything that should change S02–S06 scope. Otherwise next slice can be planned via `ytstack:slice-milestone` (or directly written like S01 was).
+Suggested next steps in priority order:
+1. **Run `ytstack:reassess-roadmap`** — S01 absorbed parts of S03 (P1 charts) and grew well beyond original scope. Decide whether S02–S06 still fit as planned, or re-scope.
+2. **Slice + execute S02** (Lint-triage queues — surface lint.py warnings as collapsible callouts on Dashboard with click-through fix actions). Most adjacent to current work.
+3. **Hard-facts feature integration test** — verify compile picks up `knowledge/facts/*.md` content as override during a real compile run on lxw vault.
+4. **Distribution-strip backlog item** (`backlog/distribution-strip.md`) — strip `.ytstack/`, `tests/`, etc. from `wiki update` so vaults don't carry engine dev-state.
 
 ## Open decisions
 

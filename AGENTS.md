@@ -18,7 +18,7 @@ A vault that uses this tooling has three layers:
 
 1. **`raw/`** — immutable curated sources (LLM reads, never writes). Top-level subfolders: `articles/`, `papers/`, `notes/`, `transcripts/`, `audio/`, `memories/`, `requests/`, `suggestions/`. Scanner output lives in nested per-scanner folders: `raw/notes/email/<account>-<date>.md` (scan-email), `raw/notes/calendar/`, `raw/notes/browser/`, `raw/notes/screenshots/`, `raw/notes/tabs/`.
 2. **`daily/`** — auto-captured Claude Code session logs (immutable).
-3. **`knowledge/`** — LLM-compiled wiki articles (LLM owns, human reads). Subfolders: `concepts/`, `connections/`, `people/`, `projects/`, `qa/`.
+3. **`knowledge/`** — LLM-compiled wiki articles (LLM owns, human reads). Subfolders: `concepts/`, `connections/`, `people/`, `projects/`, `qa/`, `facts/` (the last is human-owned via `wiki correct` — hard facts that override anything in raw/daily sources).
 
 The vault holds the **data**. This repo holds the **engine** (compile, flush, lint, query, hooks, prompts).
 

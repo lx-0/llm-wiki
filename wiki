@@ -28,6 +28,12 @@
 #   wiki lint                  run lint.py — structural + LLM contradiction checks
 #   wiki lint --structural-only  cheap, no-LLM lint (used by piggyback)
 #   wiki query "QUESTION"      ask the knowledge base via the configured model
+#   wiki correct add "TITLE" "TRUTH" [--status S] [--term T ...]
+#                              record a hard fact that overrides any source
+#   wiki correct list          list all hard facts
+#   wiki correct remove SLUG   delete a hard fact
+#   wiki correct edit SLUG     open a hard fact in $EDITOR
+#   wiki correct apply SLUG    propagate a fact across knowledge/, daily/, raw/ (agentic, $$$)
 #   wiki review-wiki           per-article quality-score sweep (local LLM, free)
 #   wiki version               print installed git revision
 #   wiki help                  this message
@@ -334,6 +340,57 @@ EOF
   _run_script query.py "$@"
 }
 
+cmd_correct() {
+  case "${1:-}" in
+    ""|-h|--help|help)
+      cat <<EOF
+${C_BOLD}wiki correct${C_RESET} — record hard facts that override LLM-compiled wiki content
+
+${C_BOLD}USAGE${C_RESET}
+  wiki correct add "TITLE" "TRUTH"           add a hard fact (default --status=negation)
+      [--status negation|disambiguation|clarification]
+      [--term "exact substring" ...]         lint will grep these across knowledge/
+      [--slug SLUG]                          override auto-derived slug
+      [--force]                              overwrite if it already exists
+  wiki correct list                          list all hard facts
+  wiki correct remove SLUG                   delete a hard fact (.bak.<ts> kept)
+  wiki correct edit SLUG                     open in \$EDITOR (.bak.<ts> kept first)
+  wiki correct apply SLUG [--dry-run]        agentic propagation across vault (\$\$\$ — Claude SDK)
+  wiki correct path SLUG                     print absolute path
+
+${C_BOLD}EXAMPLES${C_RESET}
+  wiki correct add "Senkrechtstarter award (NOT won)" \\
+      "We did NOT win the Senkrechtstarter award. Strike any article asserting otherwise." \\
+      --status negation \\
+      --term "senkrechtstarter award" --term "won the senkrechtstarter"
+
+  wiki correct add "Township project = Fleet" \\
+      "The active 'township' project is named Fleet. There is also an older project under the township-* namespace — never conflate them." \\
+      --status disambiguation
+
+${C_BOLD}NOTES${C_RESET}
+  Wraps \`scripts/correct.py\`. Facts live in \`knowledge/facts/<slug>.md\` with
+  \`type: fact\` frontmatter. Compile + query inject them as a Hard-facts block at
+  highest authority. Lint surfaces violations of any \`negation_terms\`.
+EOF
+      [[ "${1:-}" == "" ]] && return 1 || return 0
+      ;;
+  esac
+  if [[ "${1:-}" == "apply" ]]; then
+    shift
+    banner "wiki correct apply" "Agentic propagation — Claude Agent SDK over vault root."
+    _run_script correct_apply.py "$@"
+    local rc=$?
+    _refresh_dashboard_stats
+    return $rc
+  fi
+  banner "wiki correct"
+  _run_script correct.py "$@"
+  local rc=$?
+  _refresh_dashboard_stats
+  return $rc
+}
+
 cmd_review_wiki() {
   case "${1:-}" in
     -h|--help|help)
@@ -538,6 +595,7 @@ case "${1:-}" in
   flush)            shift; cmd_flush "$@" ;;
   lint)             shift; cmd_lint "$@" ;;
   query)            shift; cmd_query "$@" ;;
+  correct)          shift; cmd_correct "$@" ;;
   review-wiki)      shift; cmd_review_wiki "$@" ;;
   version)          shift; cmd_version "$@" ;;
   help|-h|--help)   cmd_help ;;

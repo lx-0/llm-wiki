@@ -17,7 +17,7 @@ Zwei fundamental getrennte Ingest-Pfade konvergieren bei `compile.py`:
 - **Path A** — Automatische Session-Capture (Hooks → daily/ → compile)
 - **Path B** — Kuratierte Quellen (Scanners/Manual/Inbox → raw/ → compile)
 
-## Übersicht — die 12 Prozesse
+## Übersicht — die 13 Prozesse
 
 | # | Process | Was passiert | Trigger |
 |---|---|---|---|
@@ -33,6 +33,7 @@ Zwei fundamental getrennte Ingest-Pfade konvergieren bei `compile.py`:
 | [10](#10-claudemd-optimizer) | CLAUDE.md Optimizer | Cross-Project-Pattern → `~/.claude/CLAUDE.md` Edits | piggyback |
 | [11](#11-screenshot-scanner) | Screenshot Scanner | `~/Screenshots/` → Vision-LLM → `raw/notes/` | piggyback (lokal-only) |
 | [12](#12-vault-ux-layer-dashboard--mocs) | Vault UX Layer | Dashboard.md (Auto-Open) + `_dashboard-stats.md` Refresh + MOCs (in Arbeit) | nach jedem Flush (synchron) |
+| [13](#13-hard-facts-corrections) | Hard Facts (Corrections) | `wiki correct` schreibt `knowledge/facts/<slug>.md` → injected in compile/query/lint; `apply` propagiert agentisch über `knowledge/`+`daily/` | manuell (`wiki correct add` / `wiki correct apply`) |
 
 ---
 
@@ -462,6 +463,7 @@ uv run python scripts/query.py "Wie funktioniert der Compile-Prozess?" --file-ba
 | Stale Articles | warning | nein | Source hat sich seit letztem Compile geändert |
 | Missing Backlinks | suggestion | ja | A → B aber B → A fehlt |
 | Sparse Articles | suggestion | nein | Unter 200 Wörter |
+| Facts Violations | warning | nein | Artikel enthält `negation_terms` aus einem Hard Fact (siehe §13) |
 | Contradictions | warning | nein | Widersprüche zwischen Artikeln (LLM-Check) |
 
 ```bash
@@ -791,3 +793,90 @@ uv run python scripts/dashboard_stats.py --dry-run   # Stats als JSON ausgeben, 
 - **Erstinstallation, noch kein Flush gelaufen:** `install.sh` seedet `_dashboard-stats.md` als Placeholder mit Nullen, sodass die Transklusion in `dashboard.md` nicht broken aussieht.
 - **`dashboard_stats.py` crasht:** Der Aufruf in `flush.py` ist `check=False` mit 30s Timeout; ein Fehler wird geloggt, der Flush-Pfad läuft normal weiter.
 - **MOCs-Ordner fehlt noch (vor S04):** `knowledge/MOCs/` ist leer — das Dashboard zeigt keinen MOC-Block. Wird nachgereicht in M003-S04.
+
+---
+
+## 13. Hard Facts (Corrections)
+
+> Authority-Layer **über** allen Sources. LLM-Compiler und Sources sind drift-anfällig: einzelne Mails, Memos oder veraltete Quellen kontaminieren das Wiki, weil der Compiler keine Hierarchie zwischen Sources hat. Hard Facts sind ein Mensch-geschriebener Override-Layer, der bei Compile + Query stärker gewichtet wird als jede Source.
+
+### Flow
+
+```mermaid
+flowchart TD
+    USER["wiki correct add ..."]
+    USER --> WRITE["scripts/correct.py\nschreibt knowledge/facts/<slug>.md\ntype: fact, applied: false"]
+    WRITE --> INJECT["Bei nächstem compile/query:\n${facts_md} Block top-of-prompt\n→ höchste Autorität"]
+    INJECT --> LINTHIT["wiki lint\ncheck_facts_violations()\ngrept negation_terms ueber knowledge/"]
+    LINTHIT --> APPLY{"Drift gefunden?"}
+    APPLY -->|Ja| AGENTIC["wiki correct apply <slug>\nscripts/correct_apply.py\nClaude Agent SDK ueber Vault-Root"]
+    AGENTIC --> EDIT["Edit/Rename in knowledge/\nAnnotate in daily/\nraw/ unangetastet (immutable)"]
+    EDIT --> MARK["Fact frontmatter\napplied: <iso-ts>"]
+    APPLY -->|Nein| DONE["nichts zu tun"]
+
+    style USER fill:#FFD8CB,stroke:#FC4E14,stroke-width:3px
+    style WRITE fill:#EFF6FF,stroke:#2563EB
+    style INJECT fill:#EFF6FF,stroke:#2563EB
+    style LINTHIT fill:#FCEAE7,stroke:#C43D2E
+    style AGENTIC fill:#FFD8CB,stroke:#FC4E14,stroke-width:3px
+```
+
+### Anatomie eines Fact-Files
+
+`knowledge/facts/<slug>.md`:
+
+```yaml
+---
+title: "Senkrechtstarter award (NOT won)"
+type: fact
+status: negation              # negation | disambiguation | clarification
+created: 2026-05-02
+updated: 2026-05-02
+applied: false                # oder ISO-Zeitstempel nach apply
+negation_terms:
+  - "senkrechtstarter award"
+  - "won the senkrechtstarter"
+---
+
+We did NOT win the Senkrechtstarter award. Strike any article asserting otherwise.
+```
+
+### Status-Tabelle
+
+| Status | Wofür | Lint-Verhalten |
+|--------|-------|---------------|
+| `negation` | Falsche Behauptung streichen ("X gewinnt Award" wenn nicht passiert) | grep `negation_terms` über alle Non-Facts → warning pro Hit |
+| `disambiguation` | Namen-Konflikt klären ("township" → Fleet, nicht Township-X) | structural lint überspringt; der `apply`-Schritt erledigt File-Renames + Wikilink-Fixes |
+| `clarification` | Faktische Korrektur ohne Negation/Renaming | structural lint überspringt; Compile/Query nutzen den Fact als Kontext |
+
+### Integration mit anderen Prozessen
+
+- **Compile (§3):** `prompts/compile_main.md` öffnet mit `## Hard facts (override anything in the source material)`. Der Compiler sieht die Facts vor jedem Source und ist instruiert, widersprechende Claims weder zu schreiben noch in bestehenden Articles zu belassen.
+- **Query (§6):** Identisch — `prompts/query_main.md` und `prompts/query_file_back.md` haben den `${facts_md}` Block direkt nach dem System-Prompt.
+- **Lint (§6):** `check_facts_violations()` greppt jeden `negation_terms` Eintrag (case-insensitive) über alle Non-Facts Knowledge-Files; Hits → `warning`-Issue mit Hint auf `wiki correct apply <slug>`.
+- **Article-Type-Lint:** `FOLDER_TO_TYPE["facts"] = "fact"` — Facts werden gegen ihren Typ gecheckt wie jede andere Substrate.
+
+### Apply-Pfad (Agentic Propagator)
+
+Falls Drift bereits ins Wiki gelangt ist (z.B. die `negation_terms` matchen oder eine Disambiguation viele Files betrifft), erledigt `wiki correct apply <slug>` die Propagierung:
+
+```bash
+wiki correct apply senkrechtstarter-award-not-won           # full agent run
+wiki correct apply township-project-fleet --dry-run         # plan only
+```
+
+Was passiert:
+
+1. `scripts/correct_apply.py` liest das Fact-File und rendert `prompts/correct_apply.md`.
+2. Spawned Claude Agent SDK mit `cwd=<vault-root>`, `permission_mode=acceptEdits`, allowed_tools = `Read, Write, Edit, Glob, Grep, Bash`. Model = `CONFIG.models.compile_model` (Opus by default — Apply ist selten und teuer).
+3. Der Agent grept den ganzen Vault, editiert/strikes Claims in `knowledge/`, prepended Correction-Notes in `daily/`, lässt `raw/` unangetastet (Layer-Konvention: raw ist immutable). Bei Disambiguation darf er via `git mv` umbenennen und Wikilinks sweepen.
+4. Nach Erfolg setzt `correct_apply.py` das Fact-Frontmatter auf `applied: <iso-ts>` (mit `.bak.<ts>` Backup).
+
+### Edge Cases
+
+- **Fact-File fehlt** beim Compile/Query: `read_hard_facts()` returned `(no hard facts recorded)` als Placeholder — Prompt bleibt syntaktisch valide, kein Crash.
+- **`negation_terms` leer oder fehlt:** Lint überspringt das Fact in `check_facts_violations()`, der Prompt-Block bleibt aber aktiv (LLM-Override).
+- **`applied: false` für ewig:** Akzeptiert. Apply ist optional. Lint surface-t Drift auch ohne Apply.
+- **Apply schlägt mid-run fehl:** Vault-State ist möglicherweise teil-aktualisiert. Git-Working-Tree zeigt Diff; User entscheidet ob commit, revert, retry. Kein automatischer Rollback in v1.
+- **Fact wird gelöscht:** `wiki correct remove <slug>` legt ein `.bak.<ts>` an, dann unlink. Kein Cascade-Cleanup über Knowledge-Articles, die in der Zwischenzeit auf den Fact reagiert haben — Annahme: ein gelöschter Fact ist eine widerrufene Korrektur, kein "wieder behauptbarer" Claim.
+

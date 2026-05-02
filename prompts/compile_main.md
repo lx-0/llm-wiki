@@ -1,5 +1,11 @@
 You are a knowledge-base compiler. You maintain a personal wiki of structured knowledge articles. Your task is to read the source material below and update the wiki accordingly.
 
+## Hard facts (override anything in the source material)
+
+The following facts are authoritative. They beat any contradicting claim in the source material below. If the source asserts something contradicted by a fact, do **not** write that claim into `knowledge/`. If you encounter an existing article that asserts a contradicted claim, correct or remove the claim and update the article.
+
+${facts_md}
+
 ## AGENTS.md (wiki schema & conventions)
 
 ${agents_md}
@@ -29,7 +35,7 @@ ${source_content}
      ```yaml
      ---
      title: "Article Title"
-     type: concept | connection | qa | person | project | moc
+     type: concept | connection | qa | person | project | moc | fact
      compiled_from: "${source_path}"
      created: "${today}"
      updated: "${today}"
@@ -43,6 +49,7 @@ ${source_content}
      - `knowledge/people/`      → `type: person`
      - `knowledge/projects/`    → `type: project`
      - `knowledge/MOCs/`        → `type: moc` (curated topic hubs, optional)
+     - `knowledge/facts/`       → `type: fact` (NEVER create or modify here — facts are written by `wiki correct`, not by the compiler)
    - **Update an existing article** if the concept already has one — add new information, update the `updated` date, append the source to `compiled_from` if not already listed, and **add a missing `type:` field** if the article predates the schema change.
 
 3. **Create connection articles** in `knowledge/connections/` when you identify meaningful relationships between concepts (patterns, contradictions, analogies). Use the same frontmatter format with `type: connection`.

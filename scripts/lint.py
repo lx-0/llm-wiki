@@ -84,12 +84,23 @@ def check_broken_links() -> list[dict]:
     return issues
 
 
+def _is_fact(article: Path) -> bool:
+    """True if the article lives under knowledge/facts/."""
+    try:
+        rel = article.relative_to(KNOWLEDGE_DIR)
+    except ValueError:
+        return False
+    return rel.parts and rel.parts[0] == "facts"
+
+
 def check_orphan_pages() -> list[dict]:
     """Find wiki articles that no other article links to."""
     issues = []
     index_content = read_wiki_index()
 
     for article in list_wiki_articles():
+        if _is_fact(article):
+            continue  # facts are authoritative; orphan-by-design
         rel = str(article.relative_to(KNOWLEDGE_DIR))
         name = rel.replace(".md", "")
         inbound = count_inbound_links(name, exclude_file=article)
@@ -149,6 +160,8 @@ def check_missing_backlinks() -> list[dict]:
     """Find articles that link to X but X doesn't link back."""
     issues = []
     for article in list_wiki_articles():
+        if _is_fact(article):
+            continue  # facts override; reciprocity not expected
         content = article.read_text(encoding="utf-8")
         rel = str(article.relative_to(KNOWLEDGE_DIR))
         source_link = rel.replace(".md", "").replace("\\", "/")
@@ -175,6 +188,7 @@ FOLDER_TO_TYPE = {
     "people": "person",
     "projects": "project",
     "MOCs": "moc",
+    "facts": "fact",
 }
 
 
@@ -235,6 +249,8 @@ def check_sparse_articles() -> list[dict]:
     """Find articles with fewer than SPARSE_THRESHOLD words."""
     issues = []
     for article in list_wiki_articles():
+        if _is_fact(article):
+            continue  # facts may legitimately be terse
         word_count = get_article_word_count(article)
         if word_count < SPARSE_THRESHOLD:
             rel = str(article.relative_to(KNOWLEDGE_DIR))
@@ -242,6 +258,70 @@ def check_sparse_articles() -> list[dict]:
                 "suggestion", "sparse_article", rel,
                 f"Sparse article: {word_count} words (minimum recommended: {SPARSE_THRESHOLD})",
             ))
+    return issues
+
+
+def _read_yaml_frontmatter(path: Path) -> dict:
+    """Full YAML frontmatter parse (supports lists). Returns {} on no/invalid frontmatter."""
+    import yaml
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return {}
+    if not text.startswith("---"):
+        return {}
+    end = text.find("\n---", 3)
+    if end == -1:
+        return {}
+    block = text[3:end]
+    try:
+        data = yaml.safe_load(block)
+    except yaml.YAMLError:
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def check_facts_violations() -> list[dict]:
+    """For each hard fact with negation_terms, grep all non-facts knowledge files for hits.
+
+    Each hit is a `warning` issue: an article asserts something a hard fact negates.
+    Disambiguation/clarification facts contribute no structural lint hits — those drift
+    cases need the LLM contradiction check (or the agentic correct-apply processor).
+    """
+    issues: list[dict] = []
+    if not (KNOWLEDGE_DIR / "facts").exists():
+        return issues
+
+    facts_with_terms: list[tuple[str, str, list[str]]] = []  # (slug, status, terms)
+    for fact in sorted((KNOWLEDGE_DIR / "facts").glob("*.md")):
+        fm = _read_yaml_frontmatter(fact)
+        terms = fm.get("negation_terms") or []
+        if not isinstance(terms, list):
+            continue
+        terms = [t for t in terms if isinstance(t, str) and t.strip()]
+        if not terms:
+            continue
+        status = str(fm.get("status", "negation"))
+        facts_with_terms.append((fact.stem, status, terms))
+
+    if not facts_with_terms:
+        return issues
+
+    for article in list_wiki_articles():
+        if _is_fact(article):
+            continue
+        rel = str(article.relative_to(KNOWLEDGE_DIR))
+        try:
+            content_lower = article.read_text(encoding="utf-8").lower()
+        except OSError:
+            continue
+        for slug, status, terms in facts_with_terms:
+            for term in terms:
+                if term.lower() in content_lower:
+                    issues.append(issue(
+                        "warning", "fact_violation", rel,
+                        f"Article contains negation term {term!r} from hard fact `facts/{slug}` (status: {status}). Reconcile manually or via `wiki correct apply {slug}`.",
+                    ))
     return issues
 
 
@@ -354,6 +434,7 @@ async def main() -> None:
         ("Missing backlinks", check_missing_backlinks),
         ("Article type", check_article_type),
         ("Sparse articles", check_sparse_articles),
+        ("Facts violations", check_facts_violations),
     ]
 
     for name, check_fn in checks:

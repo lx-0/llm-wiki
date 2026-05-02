@@ -9,6 +9,7 @@ from config import (
     CONCEPTS_DIR,
     CONNECTIONS_DIR,
     DAILY_DIR,
+    FACTS_DIR,
     INDEX_FILE,
     KNOWLEDGE_DIR,
     LOG_FILE,
@@ -81,7 +82,7 @@ def wiki_article_exists(link: str) -> bool:
 
 # ── Wiki content helpers ──────────────────────────────────────────────
 
-WIKI_SUBDIRS = [CONCEPTS_DIR, CONNECTIONS_DIR, QA_DIR, PEOPLE_DIR, PROJECTS_DIR]
+WIKI_SUBDIRS = [CONCEPTS_DIR, CONNECTIONS_DIR, QA_DIR, PEOPLE_DIR, PROJECTS_DIR, FACTS_DIR]
 
 
 def read_wiki_index() -> str:
@@ -108,6 +109,24 @@ def read_all_wiki_content() -> str:
             parts.append(f"## {rel}\n\n{content}")
 
     return "\n\n---\n\n".join(parts)
+
+
+def read_hard_facts() -> str:
+    """Read all knowledge/facts/*.md and join them into one prompt-ready block.
+
+    Returns an empty placeholder when no facts exist, so prompts that
+    inject `${facts_md}` always get a non-empty string.
+    """
+    if not FACTS_DIR.exists():
+        return "(no hard facts recorded)"
+    parts = []
+    for md_file in sorted(FACTS_DIR.glob("*.md")):
+        rel = md_file.relative_to(KNOWLEDGE_DIR)
+        content = md_file.read_text(encoding="utf-8")
+        parts.append(f"### {rel}\n\n{content}")
+    if not parts:
+        return "(no hard facts recorded)"
+    return "\n\n".join(parts)
 
 
 def list_wiki_articles() -> list[Path]:

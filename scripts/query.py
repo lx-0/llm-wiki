@@ -24,6 +24,7 @@ from config import KNOWLEDGE_DIR, QA_DIR, ROOT_DIR, now_iso, today_iso
 from utils import (
     load_state,
     read_all_wiki_content,
+    read_hard_facts,
     save_state,
     slugify,
 )
@@ -59,12 +60,14 @@ async def main() -> None:
 
     # Load entire wiki content for context
     wiki_content = read_all_wiki_content()
+    facts_md = read_hard_facts()
 
     if file_back:
         QA_DIR.mkdir(parents=True, exist_ok=True)
         prompt = render(
             "query_file_back",
             wiki_content=wiki_content,
+            facts_md=facts_md,
             question=question,
             today=today_iso(),
             now=now_iso(),
@@ -74,6 +77,7 @@ async def main() -> None:
         prompt = render(
             "query_main",
             wiki_content=wiki_content,
+            facts_md=facts_md,
             question=question,
         )
         allowed_tools = ["Read", "Glob", "Grep"]

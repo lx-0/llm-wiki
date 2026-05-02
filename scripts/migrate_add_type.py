@@ -41,6 +41,7 @@ FOLDER_TO_TYPE = {
     "people": "person",
     "projects": "project",
     "MOCs": "moc",
+    "facts": "fact",
 }
 
 _FRONTMATTER_RE = re.compile(r"^---\n(.*?)\n---\n", re.DOTALL)

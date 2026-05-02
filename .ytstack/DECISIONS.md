@@ -56,3 +56,63 @@ Format for each entry:
 **Reason:** Vault-Engine split is the load-bearing architectural invariant — `.venv/` is engine state, not vault data. Configurable would re-open the same drift. `install.sh` enforces by always passing `--project <DEST>` where DEST = `<vault>/.wiki/`.
 **Supersedes:** —
 **Linked artifacts:** `docs/engine-layout.md` (Hard rule); `KNOWLEDGE.md` 2026-05-02 entry.
+
+---
+
+## 2026-05-02: Three-layer vault UX — Dashboard.md / index.md / MOCs/
+
+**Context:** `knowledge/index.md` is agent-facing (compile-target for LLM consumption). `templates/dashboard.md` was thin (4 dataview tables). Vault was machine-readable but human-thin. lx vault (`Documents/lx/`) showed a richer pattern (PARA, QuickAdd, Pending Review queues).
+**Options considered:** (A) thicken `knowledge/index.md` for both audiences; (B) replace `index.md` with a richer human view; (C) three-layer split — `knowledge/index.md` stays agent-only, `dashboard.md` becomes rich Homepage, `knowledge/MOCs/` for human-curated topic hubs.
+**Chose:** C.
+**Reason:** Audience separation. Compiler writes index.md flat; user reads dashboard + MOCs. Plugin stack (Homepage, Dataview, Charts, Meta Bind, QuickAdd, Tasks, Heatmap Calendar, Shell commands) anchors at dashboard.md. MOCs land in S04.
+**Linked artifacts:** `backlog/vault-dashboard.md`, `M003-CONTEXT.md`, `templates/dashboard.md`, `docs/PROCESS.md` §12.
+
+## 2026-05-02: knowledge/ articles MUST carry `type:` frontmatter
+
+**Context:** Pre-fix compiler wrote frontmatter without `type:`. Substrate-type was implied by folder (`concepts/` → concept etc) but never written. Dataview / lint / dashboard charts had to parse folder strings. AGENTS.example.md only documented `type:` for `raw/`, leaving `knowledge/` schema implicit.
+**Options considered:** (A) keep folder-as-type, document the convention; (B) require explicit `type:` field, lint enforces, migrate legacy.
+**Chose:** B.
+**Reason:** Single source of truth. Folder + `type:` agreement is now invariant; lint flags drift. Dataview + chart queries read one field. MOCs (S04) and facts (user-led) extend the type vocabulary cleanly. Migration cost is one cheap script (no LLM).
+**Linked artifacts:** `prompts/compile_main.md`, `templates/AGENTS.example.md`, `scripts/lint.py:FOLDER_TO_TYPE`, `scripts/migrate_add_type.py`.
+
+## 2026-05-02: Hard-facts subsystem — `wiki correct` overrides LLM compilation
+
+**Context:** Compiled wiki articles are LLM output and can hallucinate or repeat false claims from sources. Operator needs a way to assert "this is wrong, the truth is X" without manually editing every article.
+**Options considered:** (A) edit articles by hand and trust they don't get re-compiled out; (B) prompt-engineer the compiler to be more cautious; (C) dedicated `knowledge/facts/<slug>.md` with `type: fact` frontmatter, injected as authoritative block at top of compile prompt — facts beat any contradicting claim.
+**Chose:** C.
+**Reason:** Layer separation — facts are operator-authored, articles are LLM-authored. Compile prompt's "Hard facts" section makes the override explicit. `wiki correct` CLI (`scripts/correct.py`) keeps facts edit-friendly. Negation / disambiguation / clarification statuses cover the common cases.
+**Linked artifacts:** `scripts/correct.py`, `prompts/compile_main.md` (Hard facts section), `lint.py:FOLDER_TO_TYPE` (`facts → fact`), `wiki correct` subcommand.
+
+**Addendum (2026-05-02 PM):** Hard-facts gained an agentic propagator — `wiki correct apply <slug>` (`scripts/correct_apply.py` + `prompts/correct_apply.md`). Spawns Claude Agent SDK with `cwd=<vault-root>`, `permission_mode=acceptEdits`, full Read/Write/Edit/Glob/Grep/Bash. Walks `knowledge/` (edits + renames + wikilink fixes), prepends correction notes to `daily/`, leaves `raw/` immutable per substrate-layer convention. Adds `applied: false | <iso-ts>` to fact frontmatter for tracking. Lint gained `check_facts_violations()` grepping `negation_terms` across non-facts knowledge files (structural, $0 cost) — cheap detection backstop independent of the Apply step. Query prompts gained the same `${facts_md}` block. Backlog entry: `.ytstack/backlog/wiki-correct-deferred.md` (LLM paraphrase detection, severity levels, auto-apply on add, raw/ contamination strategy).
+
+## 2026-05-02: Wiki CLI surface expansion — engine ops, not just lifecycle
+
+**Context:** Pre-S01 `wiki` CLI covered setup / config / hooks / skills / update / collect / gmail-auth / version. Core engine operations (compile, flush, lint, query, review-wiki) required `uv run --project .wiki python .wiki/scripts/X.py`. Barrier for operators; broke "manual compile button" UX where Meta Bind / Shell commands need a stable invocation target.
+**Options considered:** (A) status quo, document the Python invocations; (B) wrap each script as a thin `wiki <name>` subcommand; (C) fold scripts into the wiki bash entry-point as functions.
+**Chose:** B.
+**Reason:** Thin wrappers preserve the script-as-truth pattern (scripts are testable Python; wiki is bash dispatch). `_run_script` + `_refresh_dashboard_stats` helpers dedupe the wrapper boilerplate. Compile / flush / lint auto-refresh dashboard stats post-run as the operator-visible side effect.
+**Linked artifacts:** `wiki` CLI, `scripts/correct.py`, M003-S01-T08.
+
+## 2026-05-02: Meta Bind > deprecated Buttons plugin (research-driven)
+
+**Context:** lx vault uses `Buttons` plugin for dashboard. Initial plan was to copy that. Research (2026 plugin landscape: dsebastien.net, obsidianstats.com) showed `Buttons` is deprecated; `Meta Bind` is the modern stack — buttons + inline input fields + live frontmatter bindings + view-fields, single plugin.
+**Options considered:** (A) Buttons plugin (matches lx exactly); (B) Meta Bind (newer, broader); (C) Dataloom / Datacore (WIP, not stable).
+**Chose:** B.
+**Reason:** Future-proofs: Meta Bind handles button + input + view in one plugin; supports live frontmatter editing for later slices (e.g. inline status toggle on Pending Review entries). Datacore deferred to M004+ when stable.
+**Linked artifacts:** `templates/.obsidian/community-plugins.json`, `templates/dashboard.md`.
+
+## 2026-05-02: `wiki seed` for in-place template re-application
+
+**Context:** `install.sh` template-seeding only ran on fresh installs (`! -f` guards). `wiki update` only did `git pull`. After every engine template change (new dashboard, plugins added), installed vaults stayed stuck — operators had to manually copy files.
+**Options considered:** (A) document manual `cp` steps; (B) make install.sh idempotent (overwrite-with-merge); (C) extract template-seeding into `lib/seed.sh`, expose as `wiki seed` (additive default, `--force` overwrite, jq-merge for community-plugins.json).
+**Chose:** C.
+**Reason:** Operator chooses semantics per-run. Additive default is safe (never overwrites existing files); `--force` for explicit overwrite of dashboard / templates. `community-plugins.json` always merges (additive union via jq) — engine adds plugins without dropping operator's own additions.
+**Linked artifacts:** `lib/seed.sh`, `wiki seed` subcommand, `install.sh` (refactored to source seed.sh).
+
+## 2026-05-02: Layout via `cssclasses` frontmatter, not inline `<div>` (for Meta Bind)
+
+**Context:** First dashboard rebuild wrapped Meta Bind buttons in `<div class="wiki-button-row">` to get a horizontal flex row. Buttons rendered as plain code text instead of clickable buttons.
+**Options considered:** (A) keep `<div>` and force re-process; (B) `cssclasses` frontmatter + scoped CSS (`.wiki-dashboard .block-language-meta-bind-button { display: inline-block }`); (C) drop the layout, accept stacked buttons.
+**Chose:** B.
+**Reason:** Obsidian (CommonMark) treats fenced code blocks inside raw-HTML blocks as raw-HTML context. Meta Bind's markdown post-processor only runs in markdown context → buttons fall through as plain code. `cssclasses` keeps everything in markdown context. Dataviewjs is unaffected (different post-processor pathway), so chart-grid `<div class="wiki-chart-grid">` still works.
+**Linked artifacts:** `templates/dashboard.md` (frontmatter), `templates/.obsidian/snippets/wiki-dashboard.css`.

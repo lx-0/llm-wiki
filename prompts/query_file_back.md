@@ -22,6 +22,12 @@ After answering the question, you MUST also:
 3. **Append to `knowledge/log.md`**:
    `- ${now}: Query → created qa/<slug>.md`
 
+## Hard facts (highest authority)
+
+The following facts override anything in the wiki content below. If a wiki article contradicts a fact, prefer the fact and flag the contradiction in your answer. Do NOT write content into `knowledge/facts/` — that folder is owned by `wiki correct`.
+
+${facts_md}
+
 ## Knowledge Base Content
 
 ${wiki_content}

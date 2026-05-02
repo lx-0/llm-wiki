@@ -128,6 +128,7 @@ knowledge/
 ├── qa/               # Filed query answers                  (type: qa)
 ├── people/           # Person pages (one per person)        (type: person)
 ├── projects/         # Project pages (one per project)      (type: project)
+├── facts/            # Hard facts (human-owned, override sources)  (type: fact)
 └── MOCs/             # Curated topic hubs (human-curated)   (type: moc)
 ```
 
@@ -136,7 +137,7 @@ Each article in `knowledge/` carries this YAML frontmatter:
 ```yaml
 ---
 title: "Article Title"
-type: concept | connection | qa | person | project | moc
+type: concept | connection | qa | person | project | moc | fact
 compiled_from: "raw/articles/some-source.md"   # or list[] for multi-source
 created: 2026-04-01
 updated: 2026-05-02
@@ -145,6 +146,8 @@ tags: [topic1, topic2]
 ```
 
 The `type:` field MUST match the destination folder. It is the single source of truth for substrate-type — Dataview queries, lint, dashboard charts, and the compile prompt all rely on it. Lint flags any article whose `type:` is missing or doesn't match its folder.
+
+`knowledge/facts/` is special: it is **human-owned via `wiki correct`**, never written by the compiler. Each fact carries `type: fact`, a `status:` (negation | disambiguation | clarification), an optional list of `negation_terms:` that lint greps across the rest of `knowledge/`, and an `applied:` flag that flips to an ISO timestamp once `wiki correct apply <slug>` has propagated the correction. Facts inject into compile and query prompts at the highest authority — they override any contradicting claim in raw sources.
 
 ### Layer 4: This File (`AGENTS.md`)
 

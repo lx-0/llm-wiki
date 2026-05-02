@@ -37,6 +37,7 @@ CONNECTIONS_DIR = KNOWLEDGE_DIR / "connections"
 QA_DIR = KNOWLEDGE_DIR / "qa"
 PEOPLE_DIR = KNOWLEDGE_DIR / "people"
 PROJECTS_DIR = KNOWLEDGE_DIR / "projects"
+FACTS_DIR = KNOWLEDGE_DIR / "facts"
 REPORTS_DIR = WIKI_DIR / "reports"  # engine output (lint + review-wiki); lives under .wiki/, not vault root
 HOOKS_DIR = WIKI_DIR / "hooks"
 AGENTS_FILE = ROOT_DIR / "AGENTS.md"

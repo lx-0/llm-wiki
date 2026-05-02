@@ -41,6 +41,7 @@ from utils import (
     list_raw_files,
     list_wiki_articles,
     load_state,
+    read_hard_facts,
     read_wiki_index,
     save_state,
 )
@@ -152,6 +153,7 @@ async def compile_file(source: Path, dry_run: bool = False) -> dict | None:
     prompt = render(
         "compile_main",
         agents_md=agents_md,
+        facts_md=read_hard_facts(),
         index_md=index_md,
         source_path=rel_path,
         source_content=source_content,

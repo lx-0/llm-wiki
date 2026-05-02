@@ -4,8 +4,8 @@ slice: S01
 project: llm-wiki
 created: 2026-05-02T16:58:33Z
 status: done
-task_count: 7
-completed_tasks: 7
+task_count: 8
+completed_tasks: 8
 ---
 
 # M003-S01 — Slice Plan
@@ -29,7 +29,21 @@ completed_tasks: 7
 - [x] T04 — Update `install.sh`: copy `Dashboard.md` into vault root if absent (parallel to existing `dashboard.md` clause). Update `seed_obsidian()` to also copy the homepage `data.json`. Document the change in `install.sh` ok-message. Done when running install on a fresh target seeds Dashboard.md, plugin config, and Obsidian opens Dashboard.md on next launch.
 - [x] T05 — Update `docs/PROCESS.md`: add a "Three-layer vault UX" section explaining Dashboard.md (human) vs `knowledge/index.md` (agent) vs `knowledge/MOCs/` (human-curated, lands in S04). Document `dashboard-stats.py` in the piggyback list. Done when `docs/PROCESS.md` has the new section and an internal doc-link from README.md (or AGENTS.md) points to it.
 - [x] T06 — Interactive dashboard rebuild (lx-pattern, but Meta Bind instead of deprecated Buttons plugin). Capture buttons (Notiz / Idee / Frage / Meeting) → QuickAdd → typed-note templates land in `inbox/`. Inbox triage table, Pending review table, Open tasks (Tasks plugin), Orphan list at the bottom. Engine-managed substrates (`raw/` / `daily/` / `knowledge/` / `Templates/`) excluded from working-file queries. Plugins added: meta-bind, quickadd, tasks. Templates folder seeded; `wiki seed` extended to copy `templates/Templates/`.
-- [x] T07 — P1 charts (was originally S03, merged forward). Five live `dataviewjs`-driven visualizations on the dashboard: source-type doughnut (`type:` distribution across knowledge/), top-15-tags bar, articles-per-folder bar, inbound-link histogram (graph-health buckets), daily-activity heatmap (last year, GitHub-style). Plugins added: obsidian-charts, heatmap-calendar. All five charts handle empty-vault and missing-plugin states gracefully.
+- [x] T07 — P1 charts (was originally S03, merged forward). Five live `dataviewjs`-driven visualizations on the dashboard: source-type doughnut (`type:` distribution across knowledge/, with folder fallback for legacy articles), top-15-tags bar, **article freshness** (replaced redundant "articles per folder"), inbound-link histogram (graph-health buckets, red/yellow/green), daily-activity heatmap (last year, GitHub-style). Plugins added: `obsidian-charts`, `heatmap-calendar`. **Theme-aware colors** via Obsidian CSS vars (`--text-normal`, `--background-modifier-border`, `--color-*`) — Chart.js defaults are dark-mode-broken otherwise. Dataview JS-queries auto-enabled via seeded `dataview/data.json`. **Responsive grid layout** via CSS snippet `wiki-dashboard.css` + `cssclasses: [wiki-dashboard]` frontmatter.
+- [x] T08 — Run buttons + wiki CLI expansion. Wiki CLI gained `compile / flush / lint / query / review-wiki` subcommands (was lifecycle-only). `compile`, `flush`, `lint` auto-refresh dashboard counts post-run. New "🔧 Run" section on dashboard with 4 Meta Bind buttons (▶ Compile changed, 🔁 Compile all with confirmation, 🛡 Lint, 🔄 Refresh stats) calling pre-seeded Shell commands. Plugin added: `obsidian-shellcommands`.
+
+## Bug fixes that landed during S01
+
+- **Dataview JS queries disabled by default** — seeded `templates/.obsidian/plugins/dataview/data.json` with `enableDataviewJs: true` so charts render without manual toggle on fresh installs.
+- **Chart colors black-on-black on dark themes** — explicit Chart.js options reading from Obsidian CSS vars per chart.
+- **Source-type "100% untyped"** root-caused: compile prompt didn't set `type:` field. Fixed in 4 places (`prompts/compile_main.md`, `templates/AGENTS.example.md` schema, `lint.py:check_article_type`, `scripts/migrate_add_type.py`).
+- **`check_stale_articles` crash** (`'str' object has no attribute 'get'`) — schema drift between `compile.py:492` (writes string) and `lint.py:131` (read as dict). Defensive `isinstance` handling. Plus per-check `try/except` in lint main loop.
+- **Meta Bind buttons rendering as plain code** — fenced code blocks inside `<div>` HTML wrappers don't get plugin post-processing for Meta Bind (Dataview is unaffected, different post-processor). Fix: `cssclasses: [wiki-dashboard]` frontmatter + scoped CSS, no inline HTML wrappers around button blocks.
+
+## Parallel work (user-led, related but not in S01 plan)
+
+- **Hard-facts subsystem** — `wiki correct add/list/remove/edit/path` CLI (`scripts/correct.py`). `knowledge/facts/<slug>.md` with `type: fact` frontmatter. `prompts/compile_main.md` injects facts as authoritative override block at the top — facts beat any contradicting source claim. `lint.py:FOLDER_TO_TYPE` knows `facts → fact`. `migrate_add_type.py` extended to handle facts/. Status: shipped, integration-test pending on lxw vault.
+- **`wiki seed` follow-up command** — `lib/seed.sh` shared logic, `wiki seed [--force]` re-applies engine templates to installed vaults. Additive merge for `community-plugins.json` (jq union — never drops operator's plugins). Smoke-tested on tmp vault: idempotent additive, `--force` overwrites.
 
 ## Verification
 
