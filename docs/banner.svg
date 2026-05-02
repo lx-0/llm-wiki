@@ -15,6 +15,9 @@
       <feGaussianBlur stdDeviation="6" result="b"/>
       <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="#7dd3fc"/>
+    </marker>
   </defs>
 
   <rect width="1280" height="320" fill="url(#bg)"/>
@@ -54,16 +57,16 @@
       <text x="60" y="26" font-weight="600">raw/</text>
       <text x="60" y="44" fill="#64748b">sources</text>
 
-      <!-- arrow -->
-      <path d="M120 28 L168 28" stroke="url(#accent)" stroke-width="2" fill="none" marker-end="url(#a)"/>
+      <!-- arrow raw → compile -->
+      <line x1="120" y1="28" x2="160" y2="28" stroke="#7dd3fc" stroke-width="2.5" stroke-linecap="round" marker-end="url(#arrow)"/>
 
       <!-- compile -->
-      <rect x="168" y="0" width="120" height="56" rx="8" fill="#1e293b" stroke="url(#accent)"/>
+      <rect x="168" y="0" width="120" height="56" rx="8" fill="#1e293b" stroke="#7dd3fc" stroke-width="1.5"/>
       <text x="228" y="26" font-weight="600">compile.py</text>
       <text x="228" y="44" fill="#94a3b8">claude sdk</text>
 
-      <!-- arrow -->
-      <path d="M288 28 L336 28" stroke="url(#accent)" stroke-width="2" fill="none" marker-end="url(#a)"/>
+      <!-- arrow compile → knowledge -->
+      <line x1="288" y1="28" x2="328" y2="28" stroke="#7dd3fc" stroke-width="2.5" stroke-linecap="round" marker-end="url(#arrow)"/>
 
       <!-- knowledge -->
       <rect x="336" y="0" width="120" height="56" rx="8" fill="#1e293b" stroke="#334155"/>
@@ -74,10 +77,5 @@
       <path d="M396 56 q 0 60 -168 60 q -168 0 -168 -60" fill="none" stroke="#475569" stroke-width="1.5" stroke-dasharray="3 4"/>
       <text x="228" y="132" fill="#64748b" font-size="11">curiosity loop · gaps → next compile</text>
     </g>
-    <defs>
-      <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-        <path d="M0 0 L10 5 L0 10 z" fill="url(#accent)"/>
-      </marker>
-    </defs>
   </g>
 </svg>
