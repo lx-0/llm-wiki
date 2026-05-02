@@ -3,7 +3,7 @@ milestone: M001
 slice: S01
 project: llm-wiki
 created: 2026-05-02T11:35:00Z
-status: in_progress
+status: done
 ---
 
 # M001 / S01 — Install seeds + skill-symlinks

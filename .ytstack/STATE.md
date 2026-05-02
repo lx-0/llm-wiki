@@ -9,7 +9,7 @@ active_task: none
 
 # State
 
-**Status:** M001 planned (size M, 3 slices). Ready to slice.
+**Status:** M001 in progress. S01 done (install seeds + skill-symlinks; smoke-tested). S02 + S03 pending.
 
 **M001 — Engine-Cleanup.** Goal: a new install of llm-wiki produces a working, opinionated vault out of the box, with engine artefacts cleanly separated from user content. Bundles 5 backlog items: cleanup-followups, engine-layout-cleanup, install-symlink-skills, clippings-sweep, wiki-config. Full context in `M001-CONTEXT.md`; tentative slicing in `M001-ROADMAP.md`.
 
