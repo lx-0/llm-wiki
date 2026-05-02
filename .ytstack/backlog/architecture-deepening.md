@@ -75,20 +75,110 @@ The two modules have different *natures* and deserve to stay split, but with hon
 
 ---
 
+## #5 — `compile.py` orchestration vs. I/O separation (HIGH)
+
+**Files:** `scripts/compile.py` (511 lines).
+
+**Problem:** Three phases (select source files → extract via LLM → commit wiki article) plus two post-passes (curiosity loop, suggestion generation) live in one tangled loop. File I/O is woven *inside* the LLM-orchestration; retrying a failed extraction without re-reading source, batching extractions across many files, or testing extraction without file-ops all require surgical cuts into the function. Lines 463–486 already show the post-passes spawning as separate async tasks — but they're triggered from the same loop with implicit state-threading.
+
+**Shape after deepening:** A `Compiler` module (or three free functions if Protocol overhead isn't worth it) with three pure stages:
+- `select(criteria) → list[Path]` — pure I/O, no LLM.
+- `extract(content: str) → WikiArticle` — pure LLM, no file ops.
+- `commit(article: WikiArticle, path: Path)` — pure I/O, no LLM.
+
+`compile.py` becomes a thin orchestrator: `for f in select(): commit(extract(f.read()), output_path)`. Curiosity + suggestion passes become post-processors keyed off the result list, not entangled in the per-file loop.
+
+**Why HIGH:** Deletion test: remove this seam and you scatter state-threading + LLM-retry-policy + file-op coupling across N callers. Locality argument is strong (the engine's central function is currently un-testable end-to-end without mocking five layers).
+
+**Pre-work / risks:**
+- The classification pass (which subdirectory does this file go into?) interleaves with extraction — does it stay in `extract` or become its own stage?
+- Cost-tracking is currently threaded through the loop; needs a clean exit point in the stage refactor.
+- Curiosity/suggestion passes are async; the orchestrator boundary needs to handle "fire-and-forget post-passes" without losing exit codes.
+
+**Verification:** existing pytest suite green. `wiki compile --dry-run` produces the same file list it did before. End-to-end compile of a fixture vault produces byte-identical wiki articles (regression check).
+
+---
+
+## #6 — Preprocessor seam (HIGH)
+
+**Files:** `scripts/process-inbox.py` (252), `scripts/ingest-html.py` (283), `scripts/clippings_sweep.py` (102).
+
+**Problem:** Three scripts that *prepare* files for the compile loop (inbox-routing, HTML→Markdown, Obsidian-clippings sweep). They share shape (read source → transform → write to `raw/`) but have no common interface. Naming inconsistent (`sweep` vs. `ingest` vs. `process`); CLI / dry-run / logging boilerplate reimplemented per script. They are *not* Collectors — they don't read a Substrate, they normalize already-collected raw material before compile reads it.
+
+**Shape after deepening:** A `Preprocessor` `Protocol` parallel to `Collector` (`scripts/preprocessors/base.py`):
+- `SPEC` ClassVar (name, output_subfolder, default_enabled)
+- `run(dry_run: bool) → PreprocessResult`
+- Auto-discovery via Registry (same pattern as Collectors)
+- `wiki preprocess <name>` subcommand
+- Optional: chain into compile loop's pre-step (so `wiki compile` triggers preprocessors first)
+
+**Why HIGH:** Three scripts with structurally identical work, no seam between them today. Cheaper than the Collector epic because no Reader/Filter sub-split needed (preprocessors are singletons, not account-substrates).
+
+**Naming concern:** `Preprocessor` and `Collector` need to stay distinct. Suggest `CONTEXT.md` gets a Preprocessor entry pinpointing the difference — Collectors read from outside the vault (mailbox, calendar, browser), Preprocessors normalize what's already inside the vault's `raw/` or `inbox/`.
+
+**Verification:** `wiki preprocess --list` shows three names. Each runs the same way the legacy script did. `flush.py` piggyback path can dispatch them via Registry (same shape as Collectors).
+
+---
+
+## #7 — Hook-dispatch harness (MEDIUM)
+
+**Files:** `hooks/session-end.py` (119), `hooks/pre-compact.py` (112), `hooks/session-start.py` (81), `hooks/_transcript.py`.
+
+**Problem:** `session-end` and `pre-compact` are ~95% identical: stdin → JSON-parse → Windows-backslash workaround → `read_transcript()` → flush_pipeline staging → spawn `flush.py`. The only deltas are `MIN_TURNS_TO_FLUSH` and the `kind` parameter. `session-start` is read-only and diverges (no flush staging, only context injection). Backslash-regex fix is duplicated; if hook input schema changes, two files must update.
+
+**Shape after deepening:** `hooks/_harness.py` with:
+- `read_hook_input()` — centralized stdin + JSON-parse + backslash-normalization.
+- `run_session_flush(input, kind: str, min_turns: int)` — shared flush-staging path.
+- `run_context_inject(input)` — separate path for session-start.
+
+Each hook script becomes a 10-line wrapper.
+
+**Why MEDIUM, not HIGH:** session-start diverges enough that the abstraction doesn't have three uniform clients yet — it has 2.5. Two adapters is a hypothetical seam (per LANGUAGE.md); three is real. Worth doing once any new hook (post-compact? pre-tool?) lands and forces the count to 3+.
+
+**Verification:** all three hooks fire end-to-end in a real Claude Code session; transcripts get staged, context gets injected; no regressions in flush behavior.
+
+---
+
+## #8 — `StateStore` module + concurrency safety (MEDIUM, with race-risk angle)
+
+**Files:** `scripts/utils.py:load_json_state` / `save_json_state` (8 lines), consumed by `scripts/compile.py`, `scripts/query.py`, and indirectly `scripts/retry-failed-flushes.py` via `flush_pipeline`. State files in `state/`: `state.json`, `email-state.json`, `screenshot-state.json`, dedup windows, cooldowns.
+
+**Problem:** "Load JSON → mutate → save" pattern reimplemented across 3+ scripts. State schema implicit (no type hints, no documentation). **Race-risk:** piggybacks can spawn multiple scripts in parallel via `flush.py`; two scripts simultaneously mutating `state.json` lose writes (last-writer-wins). No atomic-rename, no file-lock today.
+
+**Shape after deepening:** A `StateStore` module (e.g. `scripts/state.py`) with:
+- Typed schema (TypedDict or dataclass) for each known state file.
+- `load(path) → State`, `save(path, state)` with atomic-rename (`tmp + os.replace`).
+- `increment_field(path, key, delta)` — atomic read-modify-write under file lock (`fcntl.flock` on POSIX).
+
+Each script imports one StateStore per state-file-kind; schema is documented at the StateStore.
+
+**Why MEDIUM (not HIGH):** today's usage is simple enough that the abstraction can feel like over-engineering. *But* the race condition is real — it's a latent bug that becomes a HIGH the moment two piggybacks fire concurrently and corrupt state. Worth keeping on the radar; promote to HIGH if a state-corruption incident lands in `KNOWLEDGE.md`.
+
+**Pre-work:** audit current state-file writers, list every concurrent-write path through `flush.py` piggyback dispatch, decide whether file-locking is the right shape vs. a single-writer queue.
+
+**Verification:** existing tests green; new test `tests/test_state_store_concurrent.py` spawning two writers + asserting no lost increments.
+
+---
+
 ## Skipped (false positives, recorded so future walks don't re-suggest)
 
 - **`flush.py` + `flush_pipeline.py` boundary smear.** Re-export-pattern is a polish, not a deepening. Deletion test fails: removing the re-export just moves the import.
 - **`prompts.py` (49 lines).** Looks trivial but earns its keep as *a place* — 10 importers means single point of customization. Locality, not depth.
 - **`execute-suggestions.py` approval flow.** One client, no seam yet. Deepen when a second approval workflow appears.
+- **`utils.py` cohesion split.** Real but LOW-priority polish — three logical groups (state I/O, wiki content, text utils) that don't yet justify a split. Fold into the config-split PR's import-header cleanup or defer.
 
 ---
 
 ## Suggested milestone framing
 
-**Option M003-A — "Pattern roll-out".** Slice S01 = #2 (config split, mechanical), S02 = #1 (collector migration). Skip #3 / #4 entirely; they're not ripe. Sequential because S01 touches every script's import header, S02 touches the same scripts' bodies.
+**Option M003-A — "Config split + Collectors" (Pattern roll-out).** Slice S01 = #2 (config split, mechanical), S02 = #1 (Collector migration). Sequential because S01 touches every script's import header, S02 touches the same scripts' bodies.
 
-**Option M003-B — "Just config split".** Only #2. Smallest scope, locks the import story before anything else moves. #1 becomes M004.
+**Option M003-B — "Just config split."** Only #2. Smallest scope, locks the import story before anything else moves. #1 becomes M004.
 
-**Option M003-C — "Just collectors".** Only #1. Bigger code-reduction win, leaves config-split for later when its motivation gets sharper.
+**Option M003-C — "Just Collectors."** Only #1. Bigger code-reduction win, leaves config-split for later when its motivation gets sharper.
+
+**Option M003-D — "Pre-compile cleanup."** S01 = #2 (config split), S02 = #6 (Preprocessor seam). Hits both shallow-import friction and pre-compile inconsistency in one milestone before touching the Collector epic.
+
+**Option M003-E — "Engine core."** Only #5 (compile.py orchestration). Highest-leverage module gets the cleanest cut. Risky because it touches the engine's hottest path; requires a regression-fixture vault to verify byte-identical wiki output.
 
 Pick at the next `ytstack:plan-milestone` invocation.
