@@ -1,25 +1,27 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-05-02T10:20:23Z
-current_milestone: none
+last_updated: 2026-05-02T11:30:00Z
+current_milestone: M001
 active_slice: none
 active_task: none
 ---
 
 # State
 
-**Status:** initialized 2026-05-02 from validated pitch (`OFFICE-HOURS-self-cartography-engine.md`). Brownfield-doc-migration completed same day (`docs/design-decisions.md` content moved into `.ytstack/KNOWLEDGE.md` "Hard-won learnings"; `docs/plans/*` moved into `.ytstack/backlog/*`; CLAUDE.md / AGENTS.md / docs/concept.md / docs/PROCESS.md / hooks / scripts pointers updated; `project_followups.md` claude-memory moved to `.ytstack/backlog/cleanup-followups.md`). No milestone planned yet.
+**Status:** M001 planned (size M, 3 slices). Ready to slice.
+
+**M001 — Engine-Cleanup.** Goal: a new install of llm-wiki produces a working, opinionated vault out of the box, with engine artefacts cleanly separated from user content. Bundles 5 backlog items: cleanup-followups, engine-layout-cleanup, install-symlink-skills, clippings-sweep, wiki-config. Full context in `M001-CONTEXT.md`; tentative slicing in `M001-ROADMAP.md`.
 
 ## Next action
 
-Run `ytstack:plan-milestone` to define M001. **The milestone scope has not been chosen** — the operator needs to pick what M001 is actually about. Candidate framings to consider during plan-milestone:
+Run `ytstack:slice-milestone` to break M001 into concrete slices + tasks. Tentative slice breakdown:
 
-- Active-use loop (close Q5 build-vs-use weak spot — agents read from `knowledge/` automatically, dashboard surfaces wiki in daily flow)
-- A real feature from `.ytstack/backlog/` (collectors, nas-ingest, obsidian-plugin, compiler-suggestions, wiki-config, karpathy-comparison)
-- Something else the operator decides
+- **S01** install-seeds + skill-symlinks (cleanup-followups template seeds + install-symlink-skills)
+- **S02** layout refactor + Clippings sweep (engine-layout-cleanup + clippings-sweep)
+- **S03** audit + minor cleanups (cleanup-followups remaining items + wiki-config)
 
-Whatever the choice, the cleanup follow-ups in `.ytstack/backlog/cleanup-followups.md` (AGENTS.example.md template, dashboard.md template, .obsidian/ seeds, SKIP_PREFIXES → CONFIG, lib/config.sh generalization, vault hygiene) are not currently scoped to a milestone — they remain in the backlog until promoted.
+Slicing locks the per-slice file paths and verification steps.
 
 ## Open decisions
 

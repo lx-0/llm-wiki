@@ -72,6 +72,63 @@ if [[ -f "$DEST/config.example.yaml" && ! -f "$DEST/config.yaml" ]]; then
   ok "config.yaml seeded from config.example.yaml"
 fi
 
+# ── Seed vault templates ─────────────────────────────────────────────
+# Copy engine templates into the vault root if (and only if) the target
+# files don't exist. Never overwrite. Designed for fresh vaults; on an
+# existing vault, files the operator already authored win.
+TEMPLATES_DIR="$DEST/templates"
+if [[ -d "$TEMPLATES_DIR" ]]; then
+  # AGENTS.md — article-schema spec consumed by every compile prompt.
+  if [[ -f "$TEMPLATES_DIR/AGENTS.example.md" && ! -f "$TARGET/AGENTS.md" ]]; then
+    cp "$TEMPLATES_DIR/AGENTS.example.md" "$TARGET/AGENTS.md"
+    ok "AGENTS.md seeded from templates/AGENTS.example.md (edit Vault Owner + Language sections)"
+  fi
+  # dashboard.md — Obsidian Dataview home page.
+  if [[ -f "$TEMPLATES_DIR/dashboard.md" && ! -f "$TARGET/dashboard.md" ]]; then
+    cp "$TEMPLATES_DIR/dashboard.md" "$TARGET/dashboard.md"
+    ok "dashboard.md seeded"
+  fi
+  # .obsidian/ plugin defaults.
+  if [[ -d "$TEMPLATES_DIR/.obsidian" ]]; then
+    mkdir -p "$TARGET/.obsidian"
+    for f in "$TEMPLATES_DIR/.obsidian"/*.json; do
+      [[ -f "$f" ]] || continue
+      base=$(basename "$f")
+      if [[ ! -f "$TARGET/.obsidian/$base" ]]; then
+        cp "$f" "$TARGET/.obsidian/$base"
+        ok ".obsidian/$base seeded (approve community plugins on first Obsidian launch)"
+      fi
+    done
+  fi
+fi
+
+# ── Wire skills into Claude Code ─────────────────────────────────────
+# Each engine skill at .wiki/skills/<name>/ is symlinked to
+# <vault>/.claude/skills/<name>/ so Claude Code discovers them
+# automatically (and so a `wiki update` pulling new skills makes them
+# immediately available — no manual symlink dance per install).
+SKILLS_SRC="$DEST/skills"
+SKILLS_DST="$TARGET/.claude/skills"
+if [[ -d "$SKILLS_SRC" ]]; then
+  mkdir -p "$SKILLS_DST"
+  symlinked=0
+  for skill_path in "$SKILLS_SRC"/*/; do
+    [[ -d "$skill_path" ]] || continue
+    name=$(basename "$skill_path")
+    target_link="$SKILLS_DST/$name"
+    if [[ -L "$target_link" || -e "$target_link" ]]; then
+      continue
+    fi
+    # Relative symlink so the link survives if the vault is moved
+    # (as long as it stays alongside its own .wiki/).
+    ln -s "../../.wiki/skills/$name" "$target_link"
+    symlinked=$((symlinked + 1))
+  done
+  if (( symlinked > 0 )); then
+    ok "linked $symlinked skill(s) into .claude/skills/"
+  fi
+fi
+
 # ── Permissions ──────────────────────────────────────────────────────
 chmod +x "$DEST/wiki"
 [[ -x "$DEST/wiki" ]] || die "Failed to make $DEST/wiki executable"
