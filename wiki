@@ -12,6 +12,10 @@
 #   wiki hooks install         install hooks into selected agents
 #   wiki hooks uninstall       remove wiki hooks
 #   wiki hooks status          print install status table
+#   wiki skills install        symlink engine skills into <vault>/.claude/skills/
+#   wiki skills uninstall      remove engine-owned skill symlinks
+#   wiki skills sync           install missing + prune stale (used by `wiki update`)
+#   wiki skills status         per-skill linked/collision/missing table
 #   wiki collect --list        list registered Collectors
 #   wiki collect <name>        run one Collector (--dry-run | --incremental | --account ID)
 #   wiki gmail-auth <id>       OAuth bootstrap for a Gmail account-id (one-time)
@@ -33,6 +37,8 @@ source "$WIKI_DIR/lib/ui.sh"
 source "$WIKI_DIR/lib/agents.sh"
 # shellcheck source=lib/hooks.sh
 source "$WIKI_DIR/lib/hooks.sh"
+# shellcheck source=lib/skills.sh
+source "$WIKI_DIR/lib/skills.sh"
 # shellcheck source=lib/config.sh
 source "$WIKI_DIR/lib/config.sh"
 
@@ -157,6 +163,35 @@ cmd_hooks() {
   esac
 }
 
+help_skills() {
+  cat <<EOF
+${C_BOLD}wiki skills${C_RESET} — wire engine skills into Claude Code
+
+${C_BOLD}USAGE${C_RESET}
+  wiki skills install               symlink missing engine skills into .claude/skills/
+  wiki skills uninstall             remove engine-owned symlinks (foreign entries kept)
+  wiki skills sync                  install missing + prune stale (run after wiki update)
+  wiki skills status                per-skill linked / collision / missing table
+
+${C_BOLD}NOTES${C_RESET}
+  Source: $WIKI_DIR/skills/
+  Target: $ROOT_DIR/.claude/skills/
+  Only symlinks pointing at ../../.wiki/skills/<name> are managed.
+  Foreign entries (your own skills, other tools) are never modified.
+EOF
+}
+
+cmd_skills() {
+  case "${1:-}" in
+    install|"")               skills_cmd_install ;;
+    uninstall)                skills_cmd_uninstall ;;
+    sync)                     skills_cmd_sync ;;
+    status)                   skills_cmd_status ;;
+    -h|--help|help)           help_skills ;;
+    *)                        err "unknown: wiki skills $1"; help_skills; exit 1 ;;
+  esac
+}
+
 cmd_setup() {
   case "${1:-}" in
     -h|--help|help)           help_setup; return 0 ;;
@@ -180,6 +215,7 @@ ${C_BOLD}DETAILED HELP${C_RESET}
   wiki setup --help
   wiki config --help
   wiki hooks --help
+  wiki skills --help
 
 ${C_BOLD}DOCS${C_RESET}
   $WIKI_DIR/README.md
@@ -187,6 +223,22 @@ EOF
 }
 
 cmd_update() {
+  local sync_skills=1
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --no-skills)              sync_skills=0; shift ;;
+      -h|--help|help)
+        cat <<EOF
+${C_BOLD}wiki update${C_RESET} — git pull --ff-only the .wiki/ checkout
+
+${C_BOLD}USAGE${C_RESET}
+  wiki update                   pull + sync skill symlinks
+  wiki update --no-skills       pull only, skip skill sync
+EOF
+        return 0 ;;
+      *)                        err "unknown flag: $1"; exit 1 ;;
+    esac
+  done
   if [[ ! -d "$WIKI_DIR/.git" ]]; then
     die "Not a git checkout — wiki/ wasn't installed via install.sh. Manual update required."
   fi
@@ -202,6 +254,11 @@ cmd_update() {
     ok "Updated $before → $after"
     info "If hook payloads or config schema changed, you may want to re-run:"
     info "  wiki hooks install      ${C_DIM}# to refresh agent hook configs${C_RESET}"
+  fi
+  if (( sync_skills == 1 )); then
+    skills_cmd_sync
+  else
+    info "skills: skipped (--no-skills)"
   fi
 }
 
@@ -307,6 +364,7 @@ case "${1:-}" in
   status)           shift; cmd_status "$@" ;;
   config)           shift; cmd_config "$@" ;;
   hooks)            shift; cmd_hooks "$@" ;;
+  skills)           shift; cmd_skills "$@" ;;
   collect)          shift; cmd_collect "$@" ;;
   gmail-auth)       shift; cmd_gmail_auth "$@" ;;
   update)           shift; cmd_update "$@" ;;

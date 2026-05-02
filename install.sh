@@ -105,8 +105,9 @@ fi
 # ── Wire skills into Claude Code ─────────────────────────────────────
 # Each engine skill at .wiki/skills/<name>/ is symlinked to
 # <vault>/.claude/skills/<name>/ so Claude Code discovers them
-# automatically (and so a `wiki update` pulling new skills makes them
-# immediately available — no manual symlink dance per install).
+# automatically. After install, `wiki update` runs `wiki skills sync`
+# as a post-step, so newly-pulled skills land in .claude/skills/ without
+# a manual symlink dance (opt out via `wiki update --no-skills`).
 SKILLS_SRC="$DEST/skills"
 SKILLS_DST="$TARGET/.claude/skills"
 if [[ -d "$SKILLS_SRC" ]]; then
