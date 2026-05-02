@@ -1,27 +1,25 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-05-02T11:30:00Z
-current_milestone: M001
+last_updated: 2026-05-02T14:47:46Z
+current_milestone: M002
 active_slice: none
 active_task: none
 ---
 
 # State
 
-**Status:** M001 **done** (2026-05-02). All 3 slices closed: S01 install seeds + skill-symlinks, S02 engine layout refactor + Clippings sweep, S03 audit + minor cleanups. No active milestone.
+**Status:** M002 planned (size M, 3 slices). Ready to slice. M001 done 2026-05-02.
 
-**M001 — Engine-Cleanup.** Goal: a new install of llm-wiki produces a working, opinionated vault out of the box, with engine artefacts cleanly separated from user content. Bundles 5 backlog items: cleanup-followups, engine-layout-cleanup, install-symlink-skills, clippings-sweep, wiki-config. Full context in `M001-CONTEXT.md`; tentative slicing in `M001-ROADMAP.md`.
+**M002 — Mailbox-Adapter seam + Collector backbone.** Goal: email scanning + filter-application work for Gmail accounts (in addition to Thunderbird-mbox + All-Inkl-Procmail) via a Reader/Filter adapter seam, so new backends don't touch scan/execute call-sites. Architecture locked through the `improve-codebase-architecture` skill flow; full design in `M002-CONTEXT.md`, slice breakdown in `M002-ROADMAP.md`. Domain glossary added at repo root: `CONTEXT.md`.
 
 ## Next action
 
-Pick the next milestone. Candidates:
+Run `ytstack:slice-milestone` to lock the per-slice plans + verification steps. Tentative breakdown:
 
-- **Active-use loop** (Q5 weak spot from the OFFICE-HOURS pitch — the highest-leverage feature work; closes the build-vs-use gap).
-- **Real feature from `.ytstack/backlog/`** — `collectors`, `nas-ingest`, `obsidian-plugin`, `compiler-suggestions`, `connection-quality`, `karpathy-comparison`. The first three are sizable; `connection-quality` is research-driven and could refactor compile prompts.
-- **Operator decides something else.**
-
-Run `ytstack:plan-milestone` once the next scope is chosen.
+- **S01** Backbone + first proof (domain types, Protocols, Registry, EmailCollector with FakeReader, `wiki collect` CLI)
+- **S02** Migrate existing capability (Thunderbird + AllInkl adapters; delete old scan-email.py + thunderbird-rules.py; CONFIG schema enforced)
+- **S03** Add Gmail (Reader + Filter via Gmail API; OAuth cache; live smoke test)
 
 ## Open decisions
 
