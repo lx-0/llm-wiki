@@ -25,5 +25,14 @@ Homepage = "https://github.com/lx-0/llm-wiki"
 Repository = "https://github.com/lx-0/llm-wiki"
 Issues = "https://github.com/lx-0/llm-wiki/issues"
 
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+]
+
 [tool.ruff]
 line-length = 100
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["scripts"]

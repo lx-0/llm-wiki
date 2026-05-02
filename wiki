@@ -12,6 +12,8 @@
 #   wiki hooks install         install hooks into selected agents
 #   wiki hooks uninstall       remove wiki hooks
 #   wiki hooks status          print install status table
+#   wiki collect --list        list registered Collectors
+#   wiki collect <name>        run one Collector (--dry-run | --incremental | --account ID)
 #   wiki update                git pull --ff-only the .wiki/ checkout (preserves config.yaml)
 #   wiki version               print installed git revision
 #   wiki help                  this message
@@ -202,6 +204,37 @@ cmd_update() {
   fi
 }
 
+help_collect() {
+  cat <<EOF
+${C_BOLD}wiki collect${C_RESET} — run a Collector (substrate-shaped raw/ writer)
+
+${C_BOLD}USAGE${C_RESET}
+  wiki collect --list                  list registered Collectors
+  wiki collect <name> [flags]          run one Collector
+
+${C_BOLD}FLAGS${C_RESET}
+  --dry-run                            log what would happen, don't write to disk
+  --incremental                        only scan deltas (when supported)
+  --account ID                         restrict to one account (substrates with accounts)
+
+${C_BOLD}EXAMPLES${C_RESET}
+  wiki collect --list                  show all registered collectors with their SPEC
+  wiki collect email                   full email scan across all configured accounts
+  wiki collect email --account work    one account only
+  wiki collect email --dry-run         no-op preview
+EOF
+}
+
+cmd_collect() {
+  case "${1:-}" in
+    -h|--help|help)
+      help_collect
+      return 0
+      ;;
+  esac
+  uv run --quiet --project "$WIKI_DIR" python "$WIKI_DIR/scripts/cli_collect.py" "$@"
+}
+
 cmd_version() {
   if [[ -d "$WIKI_DIR/.git" ]]; then
     local rev; rev="$(git -C "$WIKI_DIR" rev-parse --short HEAD)"
@@ -244,6 +277,7 @@ case "${1:-}" in
   status)           shift; cmd_status "$@" ;;
   config)           shift; cmd_config "$@" ;;
   hooks)            shift; cmd_hooks "$@" ;;
+  collect)          shift; cmd_collect "$@" ;;
   update)           shift; cmd_update "$@" ;;
   version)          shift; cmd_version "$@" ;;
   help|-h|--help)   cmd_help ;;

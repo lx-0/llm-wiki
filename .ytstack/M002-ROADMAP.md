@@ -5,7 +5,7 @@ size: M
 created: 2026-05-02T14:47:46Z
 status: planned
 total_slices: 3
-completed_slices: 0
+completed_slices: 1
 ---
 
 # M002 Roadmap
@@ -27,7 +27,7 @@ completed_slices: 0
 
 Slice detail lives in per-slice `M002-S##-PLAN.md` files, created by `ytstack:slice-milestone`. Tentative breakdown locked during architecture grill (subject to refinement during slicing):
 
-- [ ] **S01 — Backbone + first proof.** `domain/mail.py` types. `collectors/base.py` (Spec + Protocol + Registry + decorator). `adapters/mailbox/base.py` (Reader + Filter Protocols). `EmailCollector` skeleton with `FakeReader`-driven test (no real adapters yet). `wiki collect` CLI subcommand wired into `wiki` dispatcher. **Outcome:** architecture stands; `wiki collect --list` shows `email`; `wiki collect email --dry-run` runs against a fake reader and writes a sample `raw/notes/email/<fake>.md`. No real backend yet, but the seam is provable.
+- [x] **S01 — Backbone + first proof.** `domain/mail.py` types. `collectors/base.py` (Spec + Protocol + Registry + decorator). `adapters/mailbox/base.py` (Reader + Filter Protocols). `EmailCollector` skeleton with `FakeReader`-driven test (no real adapters yet). `wiki collect` CLI subcommand wired into `wiki` dispatcher. **Outcome:** architecture stands; `wiki collect --list` shows `email`; `wiki collect email --dry-run` runs against a fake reader and writes a sample `raw/notes/email/<fake>.md`. No real backend yet, but the seam is provable.
 
 - [ ] **S02 — Migrate existing capability.** `ThunderbirdMboxReader` + `ThunderbirdMsgFilter` + `AllInklProcmailFilter` adapters. `wiki_config.py:Personal.accounts` schema migrated to nested `reader:` / `filter:` blocks; old schema = hard `ConfigError`. `scripts/scan-email.py` + `scripts/thunderbird-rules.py` deleted; functionality preserved through adapters. `scripts/execute-suggestions.py:163-185` refactored to `resolve_filter(account).apply(rule)` — no `if/elif`. `flush.py:_PIGGYBACK_COMMANDS` replaced by `Registry.piggyback_collectors()` discovery. Operator migrates own `config.yaml` once. **Outcome:** every Thunderbird-mbox + All-Inkl-Procmail capability works exactly as before, only via the new seam.
 
