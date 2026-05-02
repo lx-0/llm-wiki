@@ -108,11 +108,22 @@ gemini_hooks_payload() {
 }
 
 cursor_hooks_payload() {
-  # Cursor only maps SessionEnd → stop reliably; other events differ enough that
-  # we stay minimal until their schema stabilises.
+  # Cursor 1.7+ supports the full lifecycle: sessionStart, sessionEnd, preCompact.
+  # Schema reference: https://cursor.com/docs/hooks (camelCase event names,
+  # version=1, hooks dict with arrays per event, no `matcher` wrapper —
+  # commands attach directly to the event array).
   jq -n \
+    --arg start "uv run --project .wiki python $HOOK_SESSION_START_REL" \
     --arg end "uv run --project .wiki python $HOOK_SESSION_END_REL" \
-    '{ hooks: { stop: [{type:"command", command:$end, timeout:10}] } }'
+    --arg compact "uv run --project .wiki python $HOOK_PRE_COMPACT_REL" \
+    '{
+      version: 1,
+      hooks: {
+        sessionStart: [{type:"command", command:$start,   timeout:15}],
+        sessionEnd:   [{type:"command", command:$end,     timeout:10}],
+        preCompact:   [{type:"command", command:$compact, timeout:10}]
+      }
+    }'
 }
 
 agent_payload() {

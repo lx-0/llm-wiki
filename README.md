@@ -302,7 +302,7 @@ Run `./.wiki/wiki config keys` for the live, full list.
 | claude | `.claude/settings.json` | ✓ | ✓ | ✓ |
 | codex | `.codex/hooks.json` | ✓ | Stop | — |
 | gemini | `.gemini/settings.json` | ✓ | ✓ | PreCompress |
-| cursor | `.cursor/hooks.json` | — | stop | — |
+| cursor | `.cursor/hooks.json` | ✓ | ✓ | ✓ |
 
 Install scope:
 - **project** (default) — `<repo>/<.agent>/...` — only when CWD is this repo
