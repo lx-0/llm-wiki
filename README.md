@@ -250,9 +250,13 @@ cd ~/path/to/vault
 ./.wiki/wiki update --no-skills  # pull only (skip skill sync)
 ./.wiki/wiki skills status       # per-skill linked / collision / missing table
 ./.wiki/wiki skills install      # ad-hoc resync without pulling
+./.wiki/wiki seed                # additive: add missing vault templates (dashboard, plugin configs)
+./.wiki/wiki seed --force        # overwrite existing templates with engine versions
 ```
 
 `wiki update` pulls into `.wiki/` (preserves `config.yaml` + `.venv/`), then runs `wiki skills sync` so newly-shipped engine skills land in `<vault>/.claude/skills/` automatically. Foreign entries (your own skills, other tools' symlinks) are never touched.
+
+`wiki seed` re-applies engine templates to the vault root after an update — adds missing files (`dashboard.md`, `_dashboard-stats.md`, `.obsidian/plugins/<name>/data.json`) and **merges** `community-plugins.json` (additive — never drops your own plugins). Default mode never overwrites your existing files; use `--force` to replace customisations of `dashboard.md` / `AGENTS.md` with the engine version.
 
 ## Running scripts manually
 

@@ -20,6 +20,8 @@
 #   wiki collect <name>        run one Collector (--dry-run | --incremental | --account ID)
 #   wiki gmail-auth <id>       OAuth bootstrap for a Gmail account-id (one-time)
 #   wiki update                git pull --ff-only the .wiki/ checkout (preserves config.yaml)
+#   wiki seed                  re-seed missing vault templates (additive, safe)
+#   wiki seed --force          overwrite existing vault templates with engine versions
 #   wiki version               print installed git revision
 #   wiki help                  this message
 
@@ -41,6 +43,8 @@ source "$WIKI_DIR/lib/hooks.sh"
 source "$WIKI_DIR/lib/skills.sh"
 # shellcheck source=lib/config.sh
 source "$WIKI_DIR/lib/config.sh"
+# shellcheck source=lib/seed.sh
+source "$WIKI_DIR/lib/seed.sh"
 
 require_cmd jq "needed to merge agent hook configs"
 require_cmd uv "needed to run the python config helper"
@@ -222,6 +226,38 @@ ${C_BOLD}DOCS${C_RESET}
 EOF
 }
 
+cmd_seed() {
+  local force=0
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --force)                  force=1; shift ;;
+      -h|--help|help)
+        cat <<EOF
+${C_BOLD}wiki seed${C_RESET} — re-apply engine templates to the vault root
+
+${C_BOLD}USAGE${C_RESET}
+  wiki seed                     additive: add missing files, merge community-plugins
+  wiki seed --force             overwrite existing vault templates with engine versions
+
+${C_BOLD}WHAT IT DOES${C_RESET}
+  - Seeds missing files: AGENTS.md, dashboard.md, _dashboard-stats.md
+  - Seeds missing .obsidian/*.json + .obsidian/plugins/<name>/data.json
+  - Merges community-plugins.json (additive — adds engine plugins, never drops yours)
+
+${C_BOLD}SAFETY${C_RESET}
+  Default mode never overwrites your edits. Run after \`wiki update\` whenever
+  the engine has new templates. Use --force only if you want to discard your
+  customisations of dashboard.md / AGENTS.md and pick up the latest engine version.
+EOF
+        return 0 ;;
+      *)                        err "unknown flag: $1"; exit 1 ;;
+    esac
+  done
+  banner "wiki seed" "$( (( force == 1 )) && echo 'overwrite mode' || echo 'additive mode' )"
+  seed_vault_templates "$ROOT_DIR" "$WIKI_DIR" "$force"
+}
+
+
 cmd_update() {
   local sync_skills=1
   while [[ $# -gt 0 ]]; do
@@ -368,6 +404,7 @@ case "${1:-}" in
   collect)          shift; cmd_collect "$@" ;;
   gmail-auth)       shift; cmd_gmail_auth "$@" ;;
   update)           shift; cmd_update "$@" ;;
+  seed)             shift; cmd_seed "$@" ;;
   version)          shift; cmd_version "$@" ;;
   help|-h|--help)   cmd_help ;;
   *)                err "unknown command: $1"; cmd_help; exit 1 ;;

@@ -73,51 +73,13 @@ if [[ -f "$DEST/config.example.yaml" && ! -f "$DEST/config.yaml" ]]; then
 fi
 
 # ── Seed vault templates ─────────────────────────────────────────────
-# Copy engine templates into the vault root if (and only if) the target
-# files don't exist. Never overwrite. Designed for fresh vaults; on an
-# existing vault, files the operator already authored win.
-TEMPLATES_DIR="$DEST/templates"
-if [[ -d "$TEMPLATES_DIR" ]]; then
-  # AGENTS.md — article-schema spec consumed by every compile prompt.
-  if [[ -f "$TEMPLATES_DIR/AGENTS.example.md" && ! -f "$TARGET/AGENTS.md" ]]; then
-    cp "$TEMPLATES_DIR/AGENTS.example.md" "$TARGET/AGENTS.md"
-    ok "AGENTS.md seeded from templates/AGENTS.example.md (edit Vault Owner + Language sections)"
-  fi
-  # dashboard.md — Obsidian Dataview home page (auto-opens via homepage plugin).
-  if [[ -f "$TEMPLATES_DIR/dashboard.md" && ! -f "$TARGET/dashboard.md" ]]; then
-    cp "$TEMPLATES_DIR/dashboard.md" "$TARGET/dashboard.md"
-    ok "dashboard.md seeded"
-  fi
-  # _dashboard-stats.md — placeholder cache, overwritten after first wiki flush.
-  if [[ -f "$TEMPLATES_DIR/_dashboard-stats.md" && ! -f "$TARGET/_dashboard-stats.md" ]]; then
-    cp "$TEMPLATES_DIR/_dashboard-stats.md" "$TARGET/_dashboard-stats.md"
-    ok "_dashboard-stats.md seeded (placeholder; refreshed by scripts/dashboard_stats.py)"
-  fi
-  # .obsidian/ plugin defaults — top-level *.json + per-plugin data.json files.
-  if [[ -d "$TEMPLATES_DIR/.obsidian" ]]; then
-    mkdir -p "$TARGET/.obsidian"
-    for f in "$TEMPLATES_DIR/.obsidian"/*.json; do
-      [[ -f "$f" ]] || continue
-      base=$(basename "$f")
-      if [[ ! -f "$TARGET/.obsidian/$base" ]]; then
-        cp "$f" "$TARGET/.obsidian/$base"
-        ok ".obsidian/$base seeded (approve community plugins on first Obsidian launch)"
-      fi
-    done
-    # Per-plugin config (e.g. plugins/homepage/data.json) — preserves directory layout.
-    if [[ -d "$TEMPLATES_DIR/.obsidian/plugins" ]]; then
-      while IFS= read -r src; do
-        rel="${src#"$TEMPLATES_DIR/.obsidian/"}"
-        dst="$TARGET/.obsidian/$rel"
-        if [[ ! -f "$dst" ]]; then
-          mkdir -p "$(dirname "$dst")"
-          cp "$src" "$dst"
-          ok ".obsidian/$rel seeded"
-        fi
-      done < <(find "$TEMPLATES_DIR/.obsidian/plugins" -type f -name '*.json')
-    fi
-  fi
-fi
+# Delegates to lib/seed.sh — same code is reused by `wiki seed` for
+# in-place re-seeding on existing installs. Default behavior here mirrors
+# the original install.sh contract: skip files the operator already has.
+info() { printf "ℹ %s\n" "$*"; }
+# shellcheck source=lib/seed.sh
+source "$DEST/lib/seed.sh"
+seed_vault_templates "$TARGET" "$DEST" 0
 
 # ── Wire skills into Claude Code ─────────────────────────────────────
 # Each engine skill at .wiki/skills/<name>/ is symlinked to
