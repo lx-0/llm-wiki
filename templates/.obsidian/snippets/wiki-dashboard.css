@@ -1,29 +1,36 @@
 /* wiki-dashboard.css — layout helpers for the LLM-wiki Dashboard.
  *
  * Enable in Obsidian: Settings → Appearance → CSS snippets → toggle "wiki-dashboard".
- * Used by the dashboard.md template (templates/dashboard.md in the engine repo).
+ * The dashboard note declares `cssclasses: [wiki-dashboard]` in its frontmatter,
+ * which scopes these rules to the dashboard only.
+ *
+ * IMPORTANT: Meta Bind buttons (.block-language-meta-bind-button) cannot be
+ * wrapped in raw <div> HTML in markdown — Obsidian treats fenced code blocks
+ * inside HTML blocks as raw-HTML context, and Meta Bind's post-processor
+ * doesn't run there. Layout MUST be CSS-only via cssclasses.
+ *
+ * Dataviewjs blocks are unaffected (Dataview's post-processor handles HTML
+ * context), so the chart-grid still uses inline <div class="wiki-chart-grid">
+ * for now.
  */
 
-/* Capture buttons: horizontal row that wraps onto multiple lines on narrow viewports. */
-.wiki-button-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  align-items: center;
-  margin: 0.5rem 0 1rem 0;
+/* ── Capture / Run buttons ─────────────────────────────────────────── */
+
+/* Each consecutive Meta Bind button on the dashboard renders inline.
+ * The browser wraps onto a new line when there's not enough horizontal space. */
+.wiki-dashboard .block-language-meta-bind-button {
+  display: inline-block;
+  margin: 0 0.5rem 0.5rem 0;
+  vertical-align: top;
 }
 
-.wiki-button-row > * {
-  margin: 0 !important;
+/* Make sure the button's <p> wrapper (added by Markdown→HTML) doesn't break the row */
+.wiki-dashboard .block-language-meta-bind-button + p:empty {
+  display: none;
 }
 
-/* Each Meta Bind button block expands to a sensible min-width but doesn't grow */
-.wiki-button-row .block-language-meta-bind-button,
-.wiki-button-row > .markdown-rendered > p {
-  margin: 0;
-}
+/* ── Chart grid (still uses <div class="wiki-chart-grid"> in markdown) ─ */
 
-/* Chart grid: 1 column on narrow, 2 on medium, 3 on wide. auto-fit lets it adapt. */
 .wiki-chart-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
@@ -32,7 +39,6 @@
   margin: 0.5rem 0 1.5rem 0;
 }
 
-/* Each grid cell — keep headings inside cells flush, contain chart canvas */
 .wiki-chart-grid > * {
   min-width: 0;            /* prevent grid blowout from long labels */
   margin: 0;
@@ -47,12 +53,23 @@
   max-height: 280px;
 }
 
-/* Heatmap (separate plugin, .heatmap-calendar-graph) — let it expand full width */
+/* Heatmap (separate plugin) — let it expand full width below the chart grid */
 .heatmap-calendar-graph {
   margin: 0.5rem 0;
 }
 
-/* Engine-status callout — give it a subtle accent to distinguish from the rest */
-.markdown-rendered .callout[data-callout="info"]:has(> .callout-title:contains("Pipeline status")) {
-  border-left-width: 3px;
+/* ── Legacy support ───────────────────────────────────────────────── */
+
+/* Kept for vaults still using the old <div class="wiki-button-row"> wrappers
+ * before the cssclasses migration. Safe to remove in a future release. */
+.wiki-button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  margin: 0.5rem 0 1rem 0;
+}
+
+.wiki-button-row > * {
+  margin: 0 !important;
 }

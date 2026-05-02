@@ -1,11 +1,14 @@
+---
+cssclasses: [wiki-dashboard]
+---
+
 # 🗺️ Wiki Dashboard
 
 > Home page for the vault. Auto-opens via the **Homepage** community plugin.
 > Buttons use **Meta Bind**; capture flow uses **QuickAdd**; checkbox aggregation uses **Tasks**.
+> Layout requires the **wiki-dashboard** CSS snippet (Settings → Appearance → CSS snippets).
 
 ## ➕ Capture
-
-<div class="wiki-button-row">
 
 ```meta-bind-button
 label: 📝 Notiz
@@ -55,8 +58,6 @@ actions:
     command: "QuickAdd: Neues Meeting"
 ```
 
-</div>
-
 ---
 
 ## ⚡ Engine status
@@ -66,8 +67,6 @@ actions:
 ## 🔧 Run
 
 > One-click ops. Each button executes a `wiki <subcommand>` via the **Shell commands** plugin. Output appears as a notification.
-
-<div class="wiki-button-row">
 
 ```meta-bind-button
 label: ▶️ Compile changed
@@ -116,8 +115,6 @@ actions:
   - type: command
     command: "Shell commands: Wiki: refresh dashboard stats"
 ```
-
-</div>
 
 ## 🔗 Quick access
 
