@@ -3,7 +3,7 @@ milestone: M002
 project: llm-wiki
 size: M
 created: 2026-05-02T14:47:46Z
-status: done-pending-live-smoke
+status: done
 total_slices: 3
 completed_slices: 3
 ---
@@ -14,14 +14,14 @@ completed_slices: 3
 
 **Exit criteria** (full list in `M002-CONTEXT.md`):
 
-- [ ] `scripts/domain/mail.py` ships frozen-dataclass domain types
-- [ ] Reader + Filter Protocols + 3 adapter pairs in `scripts/adapters/mailbox/`
-- [ ] `Collector` Protocol + `CollectorSpec` + `Registry` in `scripts/collectors/base.py`; `EmailCollector` consumes the seam
-- [ ] `wiki collect <name>` CLI subcommand replaces `scripts/scan-email.py` (deleted)
-- [ ] `flush.py` discovers piggybacks via `Registry`, no hardcoded list
-- [ ] `execute-suggestions.py` dispatches via `resolve_filter(account)`, no `if/elif/else` on account type
-- [ ] `wiki_config.py` enforces new nested `reader:` / `filter:` schema; old schema raises `ConfigError`
-- [ ] Smoke test: Gmail account configured → `wiki collect email --account <id>` runs end-to-end
+- [x] `scripts/domain/mail.py` ships frozen-dataclass domain types
+- [x] Reader + Filter Protocols + 3 adapter pairs in `scripts/adapters/mailbox/`
+- [x] `Collector` Protocol + `CollectorSpec` + `Registry` in `scripts/collectors/base.py`; `EmailCollector` consumes the seam
+- [x] `wiki collect <name>` CLI subcommand replaces `scripts/scan-email.py` (deleted)
+- [x] `flush.py` discovers piggybacks via `Registry`, no hardcoded list
+- [x] `execute-suggestions.py` dispatches via `resolve_filter(account)`, no `if/elif/else` on account type
+- [x] `wiki_config.py` enforces new nested `reader:` / `filter:` schema; old schema raises `ConfigError`
+- [~] Smoke test: Gmail account configured → `wiki collect email --account <id>` runs end-to-end **(operator-side: drop `client_secret.json`, run `wiki gmail-auth`, then collect — deferred, not blocking)**
 
 ## Slices
 

@@ -1,25 +1,30 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-05-02T14:47:46Z
-current_milestone: M002
+last_updated: 2026-05-02T18:00:00Z
+current_milestone: none
 active_slice: none
 active_task: none
 ---
 
 # State
 
-**Status:** M002 **structurally done** (2026-05-02; 22 pytest tests green). All 3 slices closed code-side: S01 backbone + proof, S02 migrate Thunderbird+AllInkl behind seam, S03 Gmail Reader + Filter + OAuth bootstrap (`wiki gmail-auth <id>`) + JSON token cache at `.wiki/state/`. **Live smoke test deferred** — operator places `client_secret.json` at `.claude/gmail-oauth-client.json`, runs `wiki gmail-auth <id>`, then `wiki collect email --account <id>` end-to-end. Legacy `scripts/scan-email.py` and `scripts/thunderbird-rules.py` deleted; functionality lives in adapters.
-
-**M002 — Mailbox-Adapter seam + Collector backbone.** Goal: email scanning + filter-application work for Gmail accounts (in addition to Thunderbird-mbox + All-Inkl-Procmail) via a Reader/Filter adapter seam, so new backends don't touch scan/execute call-sites. Architecture locked through the `improve-codebase-architecture` skill flow; full design in `M002-CONTEXT.md`, slice breakdown in `M002-ROADMAP.md`. Domain glossary added at repo root: `CONTEXT.md`.
+**Status:** M002 **done** (2026-05-02; 25 pytest tests green; commits `15b4916` S01, `14bf844` S02, `4e52520` S03, `b884bf1` finalize). Reader/Filter adapter seam landed for Thunderbird-mbox, All-Inkl-Procmail, and Gmail-API; legacy `scripts/scan-email.py` + `scripts/thunderbird-rules.py` deleted; `wiki_config.py` enforces nested `reader:`/`filter:` schema; round-robin config backup wired into every `wiki config set`. **Live Gmail smoke deferred** as operator-side action (drop `client_secret.json` → `wiki gmail-auth <id>` → `wiki collect email --account <id>`) — does not block M003.
 
 ## Next action
 
-Run `ytstack:slice-milestone` to lock the per-slice plans + verification steps. Tentative breakdown:
+Pick the next milestone. Two open candidates from M002 close-out (and the original pitch):
 
-- **S01** Backbone + first proof (domain types, Protocols, Registry, EmailCollector with FakeReader, `wiki collect` CLI)
-- **S02** Migrate existing capability (Thunderbird + AllInkl adapters; delete old scan-email.py + thunderbird-rules.py; CONFIG schema enforced)
-- **S03** Add Gmail (Reader + Filter via Gmail API; OAuth cache; live smoke test)
+- **Roll the Collector pattern out to other substrates** (calendar, browser, screenshots, tabs). Mailbox proved the seam; M003 would replicate it across the rest. Likely M-sized.
+- **Multi-vault ingest** — does the engine index multiple Obsidian vaults at once, or merge-then-ingest? Surfaced in the pitch as the project's own raison-d'être. Probably needs an `office-hours` round before scoping.
+- **Source-onboarding cadence** — onboard dormant vaults / exports / past-system files manually now, or wait for collectors? Trade-off: incomplete map vs. noisy ingest.
+
+Run `ytstack:plan-milestone` (or `ytstack:office-hours` first if the pitch needs sharpening) to lock M003.
+
+## Open decisions
+
+- **Multi-vault ingest** — see Next action above. Carried forward to M003 scoping.
+- **Source-onboarding cadence** — see Next action above. Carried forward.
 
 ## Open decisions
 
