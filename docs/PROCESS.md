@@ -796,6 +796,28 @@ uv run python scripts/dashboard_stats.py --dry-run   # Stats als JSON ausgeben, 
 - **`dashboard_stats.py` crasht:** Der Aufruf in `flush.py` ist `check=False` mit 30s Timeout; ein Fehler wird geloggt, der Flush-Pfad läuft normal weiter.
 - **MOCs-Ordner fehlt noch (vor S04):** `knowledge/MOCs/` ist leer — das Dashboard zeigt keinen MOC-Block. Wird nachgereicht in M003-S04.
 
+### Lint-Triage-Refresh
+
+Parallel zu `_dashboard-stats.md` schreibt `scripts/dashboard_lint.py` die Datei `_dashboard-lint.md` ans Vault-Root — gleicher Trigger-Pfad (`flush.py:refresh_dashboard_lint()` direkt nach `refresh_dashboard_stats`, plus `wiki lint` / `wiki seed` / `wiki compile` / `wiki correct` über die Shell-Wrapper-Helfer `_refresh_dashboard_lint`).
+
+`dashboard.md`-Section "🛡 Lint triage" rendert vier collapsible Obsidian-Callouts. Counts kommen aus dem `_dashboard-lint.md`-Frontmatter via DataviewJS; Body ist Section-Embed:
+
+| Queue | Quelle | Inhalt |
+|-------|--------|--------|
+| Orphans | `lint.check_orphan_pages()` | Artikel in `knowledge/`, auf die kein anderer Artikel verlinkt |
+| Stale | `lint.check_stale_articles()` | Artikel deren Source seit letztem Compile geändert wurde |
+| Missing backlinks | `lint.check_missing_backlinks()` | Artikel die auf andere verlinken ohne Rück-Link |
+| Failed flushes | `.wiki/sessions/failed-flushes/*.md` | Markdown-Stubs aus crashed Flush-Pipelines |
+
+Empty Queue → `[!success] Title (0)` (auto-collapsed, grün). Non-empty → `[!warning]- Title (N)` (collapsed-by-default, gelb) mit Wikilink-Liste im Body. Klick auf einen Wikilink springt zum Issue-File.
+
+Refresh ist Best-effort wie bei stats — `flush.py:refresh_dashboard_lint()` capturet stderr und loggt `WARNING` bei non-zero Exit (preemptiver S07-T02-Pattern), blockiert aber niemals den Flush.
+
+```bash
+uv run python scripts/dashboard_lint.py              # Refresh
+uv run python scripts/dashboard_lint.py --dry-run    # Lint-Daten als JSON, nichts schreiben
+```
+
 ---
 
 ## 13. Hard Facts (Corrections)
