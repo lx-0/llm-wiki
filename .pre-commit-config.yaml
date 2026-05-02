@@ -1,0 +1,29 @@
+# pre-commit hooks — local-side defense against leaked secrets and trivial
+# style issues. Install once: `pip install pre-commit && pre-commit install`.
+# Then every `git commit` runs these hooks; commits with leaks are blocked.
+
+repos:
+  # Secrets scanner — must come first so a leak halts the rest fast.
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks
+        # Uses .gitleaks.toml automatically.
+
+  # File hygiene — cheap, high-signal checks.
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-added-large-files
+        args: [--maxkb=1024]
+      - id: check-merge-conflict
+      - id: check-yaml
+        # config.example.yaml + workflow files
+      - id: check-json
+        # agent hook payloads
+      - id: detect-private-key
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+        exclude: '\.md$'  # Markdown allows trailing whitespace for line breaks
+      - id: mixed-line-ending
+        args: [--fix=lf]

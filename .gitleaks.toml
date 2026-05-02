@@ -1,0 +1,40 @@
+# gitleaks config — extends the built-in default rules.
+# Run locally: gitleaks detect --source=. --no-banner -v
+# CI: see .github/workflows/secrets-scan.yml
+
+# Inherit all default rules (api keys, tokens, private keys, etc.)
+[extend]
+useDefault = true
+
+# Project-wide allowlist — these patterns are intentional and not secrets.
+[[allowlists]]
+description = "False positives in this repo"
+
+# Email addresses inside prompt templates are examples for routing logic,
+# not credentials. They appear in compile_curiosity.md / compile_suggestion.md.
+paths = [
+  '''^prompts/.*\.md$''',
+  '''^docs/.*\.md$''',
+  '''^docs/plans/.*\.md$''',
+]
+
+# Internal LAN IPs and Ollama URLs are not secrets; they're configuration.
+regexes = [
+  '''192\.168\.\d+\.\d+''',
+  '''localhost:\d+''',
+  '''^http://192\.168\.''',
+]
+
+# Sample secrets shown in install/setup wizard prompts (placeholders).
+[[allowlists]]
+description = "Documentation placeholders"
+paths = [
+  '''^README\.md$''',
+  '''^AGENTS\.md$''',
+  '''^.gitleaks\.toml$''',
+]
+regexes = [
+  '''<your-[a-z-]+>''',
+  '''YOUR_[A-Z_]+''',
+  '''xxx+''',
+]

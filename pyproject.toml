@@ -1,0 +1,29 @@
+[project]
+name = "llm-wiki"
+version = "0.1.0"
+description = "Personal knowledge wiki compiled from conversations and curated sources — based on Karpathy's LLM Wiki + Cole's claude-memory-compiler"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [
+    { name = "Alex Wegener" },
+]
+requires-python = ">=3.12"
+dependencies = [
+    "claude-agent-sdk>=0.1.29",
+    "html2text>=2025.4.15",
+    "imapclient>=3.0.0",
+    "google-auth>=2.0.0",
+    "google-auth-oauthlib>=1.0.0",
+    "pyyaml>=6.0",
+    "playwright>=1.58.0",
+    "python-dotenv>=1.0.0",
+    "tzdata>=2024.1",
+]
+
+[project.urls]
+Homepage = "https://github.com/lx-0/llm-wiki"
+Repository = "https://github.com/lx-0/llm-wiki"
+Issues = "https://github.com/lx-0/llm-wiki/issues"
+
+[tool.ruff]
+line-length = 100

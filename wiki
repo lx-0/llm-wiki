@@ -1,0 +1,251 @@
+#!/usr/bin/env bash
+# wiki — single entry-point CLI for the wiki/ system.
+#
+# Subcommands:
+#   wiki                       interactive top-level menu
+#   wiki setup                 first-time setup (config wizard + hooks install)
+#   wiki status                full system status (config + hooks)
+#   wiki config                interactive config editor
+#   wiki config get KEY        print a config value (dot-notation)
+#   wiki config set KEY VALUE  set a config value
+#   wiki config wizard         re-run the setup wizard for config only
+#   wiki hooks install         install hooks into selected agents
+#   wiki hooks uninstall       remove wiki hooks
+#   wiki hooks status          print install status table
+#   wiki update                git pull --ff-only the .wiki/ checkout (preserves config.yaml)
+#   wiki version               print installed git revision
+#   wiki help                  this message
+
+set -euo pipefail
+
+WIKI_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "$WIKI_DIR/.." && pwd)"
+export WIKI_DIR ROOT_DIR
+
+# shellcheck source=lib/common.sh
+source "$WIKI_DIR/lib/common.sh"
+# shellcheck source=lib/ui.sh
+source "$WIKI_DIR/lib/ui.sh"
+# shellcheck source=lib/agents.sh
+source "$WIKI_DIR/lib/agents.sh"
+# shellcheck source=lib/hooks.sh
+source "$WIKI_DIR/lib/hooks.sh"
+# shellcheck source=lib/config.sh
+source "$WIKI_DIR/lib/config.sh"
+
+require_cmd jq "needed to merge agent hook configs"
+require_cmd uv "needed to run the python config helper"
+
+# ── Subcommand dispatchers ───────────────────────────────────────────
+cmd_status() {
+  banner "wiki status"
+  config_cmd_status
+  echo
+  hooks_status_table
+}
+
+help_config() {
+  cat <<EOF
+${C_BOLD}wiki config${C_RESET} — manage tunable parameters in .wiki/config.yaml
+
+${C_BOLD}USAGE${C_RESET}
+  wiki config                       interactive editor (browse sections, edit fields)
+  wiki config get KEY               print one value
+  wiki config set KEY VALUE         set + write back
+  wiki config keys                  list all settable keys
+  wiki config path                  print path to config.yaml
+  wiki config wizard                re-run the 5-question setup wizard
+  wiki config status                summary table + Ollama probe
+
+${C_BOLD}KEYS${C_RESET} use dot-notation:
+  models.compile_model              claude-opus-4-7 | claude-sonnet-4-6 | claude-haiku-4-5
+  models.ollama_url                 e.g. http://localhost:11434
+  scheduling.compile_after_hour     0–23 (auto-compile trigger hour, local time)
+  features.curiosity_loop           true|false
+  features.vision_screenshots       true|false
+  features.procmail_execution       true|false (off by default — kasserver-specific)
+  piggybacks.<task>.enabled         e.g. piggybacks.scan_screenshots.enabled
+  piggybacks.<task>.cooldown_hours  e.g. 24 (daily) or 168 (weekly)
+
+${C_BOLD}EXAMPLES${C_RESET}
+  wiki config get models.compile_model
+  wiki config set models.compile_model claude-sonnet-4-6
+  wiki config set piggybacks.scan_screenshots.enabled false
+  wiki config keys | grep features
+
+${C_DIM}Note: comments in config.yaml are dropped on programmatic writes (PyYAML round-trip).${C_RESET}
+EOF
+}
+
+help_hooks() {
+  cat <<EOF
+${C_BOLD}wiki hooks${C_RESET} — install session hooks into AI agent configs
+
+${C_BOLD}USAGE${C_RESET}
+  wiki hooks install                interactive: pick agents + scope, merge hooks in
+  wiki hooks uninstall              interactive: remove wiki-managed hooks
+  wiki hooks status                 install table per agent / scope
+
+${C_BOLD}TARGETS${C_RESET}
+  claude   .claude/settings.json     (Claude Code)
+  codex    .codex/hooks.json         (OpenAI Codex CLI 0.30+)
+  gemini   .gemini/settings.json     (Google Gemini CLI)
+  cursor   .cursor/hooks.json        (Cursor 1.7+)
+
+${C_BOLD}SCOPE${C_RESET}
+  user      ~/<.agent>/...           applies to all sessions
+  project   <repo>/<.agent>/...      applies only when CWD is this repo
+
+${C_BOLD}EVENT MAPPING${C_RESET} (auto, per agent)
+                  claude         codex     gemini       cursor
+  session-start   SessionStart   Start     SessionStart  —
+  session-end     SessionEnd     Stop      SessionEnd    stop
+  pre-compact     PreCompact     —         PreCompress   —
+
+${C_BOLD}SAFETY${C_RESET}
+  • Existing config files are merged via jq deep-merge — your other hooks stay.
+  • Every write makes a .bak.YYYYMMDD-HHMMSS backup.
+  • Uninstall only removes entries whose command contains '.wiki/hooks/'.
+
+${C_BOLD}NOT SUPPORTED${C_RESET}
+  pi         TypeScript-only hooks (~/.omp/agent/hooks/{pre,post}/*.ts)
+  opencode   no native hooks yet (sst/opencode#5409)
+EOF
+}
+
+help_setup() {
+  cat <<EOF
+${C_BOLD}wiki setup${C_RESET} — first-time setup
+
+Walks the 5-question config wizard, then runs the hook installer.
+
+${C_BOLD}WIZARD QUESTIONS${C_RESET}
+  1. Ollama base URL    (probed for reachability)
+  2. Compile model      (opus | sonnet | haiku)
+  3. Auto-compile hour  (0–23, local time)
+  4. Procmail execution (kasserver-specific, default off)
+  5. Local-LLM features (curiosity loop + vision screenshots)
+
+Press Enter on any question to keep the current value.
+EOF
+}
+
+cmd_config() {
+  case "${1:-}" in
+    "")                       config_cmd_edit ;;
+    -h|--help|help)           help_config ;;
+    get)   shift; [[ $# -eq 1 ]] || die "usage: wiki config get KEY";  config_get "$1" ;;
+    set)   shift; [[ $# -eq 2 ]] || die "usage: wiki config set KEY VALUE"; config_set "$1" "$2" ;;
+    keys)                     config_keys ;;
+    path)                     config_path ;;
+    wizard)                   config_cmd_setup_wizard ;;
+    status)                   config_cmd_status ;;
+    *)                        err "unknown: wiki config $1"; help_config; exit 1 ;;
+  esac
+}
+
+cmd_hooks() {
+  case "${1:-}" in
+    install|"")               hooks_cmd_install ;;
+    uninstall)                hooks_cmd_uninstall ;;
+    status)                   hooks_cmd_status ;;
+    -h|--help|help)           help_hooks ;;
+    *)                        err "unknown: wiki hooks $1"; help_hooks; exit 1 ;;
+  esac
+}
+
+cmd_setup() {
+  case "${1:-}" in
+    -h|--help|help)           help_setup; return 0 ;;
+  esac
+  banner "wiki setup" "First-time setup: config wizard, then hook install."
+  config_cmd_setup_wizard
+  echo
+  if confirm "Now install hooks into agent configs?" y; then
+    hooks_cmd_install
+  else
+    info "Skipped hook install — run \`wiki hooks install\` later."
+  fi
+}
+
+cmd_help() {
+  # Print the leading comment block (everything up to the first blank line).
+  awk '/^[^#]/ && !/^$/ { exit } /^#!/ { next } { sub(/^# ?/, ""); print }' "$0"
+  cat <<EOF
+
+${C_BOLD}DETAILED HELP${C_RESET}
+  wiki setup --help
+  wiki config --help
+  wiki hooks --help
+
+${C_BOLD}DOCS${C_RESET}
+  $WIKI_DIR/README.md
+EOF
+}
+
+cmd_update() {
+  if [[ ! -d "$WIKI_DIR/.git" ]]; then
+    die "Not a git checkout — wiki/ wasn't installed via install.sh. Manual update required."
+  fi
+  local before; before="$(git -C "$WIKI_DIR" rev-parse --short HEAD 2>/dev/null || echo unknown)"
+  info "Pulling latest into $WIKI_DIR …"
+  if ! git -C "$WIKI_DIR" pull --ff-only; then
+    die "git pull failed (non-fast-forward or network). Resolve manually in $WIKI_DIR."
+  fi
+  local after; after="$(git -C "$WIKI_DIR" rev-parse --short HEAD)"
+  if [[ "$before" == "$after" ]]; then
+    ok "Already up to date ($before)"
+  else
+    ok "Updated $before → $after"
+    info "If hook payloads or config schema changed, you may want to re-run:"
+    info "  wiki hooks install      ${C_DIM}# to refresh agent hook configs${C_RESET}"
+  fi
+}
+
+cmd_version() {
+  if [[ -d "$WIKI_DIR/.git" ]]; then
+    local rev; rev="$(git -C "$WIKI_DIR" rev-parse --short HEAD)"
+    local tag; tag="$(git -C "$WIKI_DIR" describe --tags --always 2>/dev/null || echo "")"
+    local origin; origin="$(git -C "$WIKI_DIR" config --get remote.origin.url 2>/dev/null || echo "")"
+    printf "%-12s %s\n" "revision" "$rev"
+    [[ -n "$tag" && "$tag" != "$rev" ]] && printf "%-12s %s\n" "tag" "$tag"
+    [[ -n "$origin" ]] && printf "%-12s %s\n" "origin" "$origin"
+  else
+    warn "Not a git checkout. Cannot report version."
+  fi
+}
+
+# ── Top-level interactive menu ───────────────────────────────────────
+top_menu() {
+  banner "wiki" "$(printf "Type %swiki help%s for the non-interactive form." "$C_DIM" "$C_RESET")"
+  while :; do
+    echo
+    local action
+    action="$(select_one "What now?" \
+      "show status|run setup wizard|edit config|install hooks|uninstall hooks|update from git|exit" 1)"
+    case "$action" in
+      "show status")        echo; cmd_status ;;
+      "run setup wizard")   echo; cmd_setup ;;
+      "edit config")        echo; config_cmd_edit ;;
+      "install hooks")      echo; hooks_cmd_install ;;
+      "uninstall hooks")    echo; hooks_cmd_uninstall ;;
+      "update from git")    echo; cmd_update ;;
+      "exit")               break ;;
+    esac
+    echo
+    pause
+  done
+}
+
+# ── Entry point ──────────────────────────────────────────────────────
+case "${1:-}" in
+  "")               top_menu ;;
+  setup)            shift; cmd_setup "$@" ;;
+  status)           shift; cmd_status "$@" ;;
+  config)           shift; cmd_config "$@" ;;
+  hooks)            shift; cmd_hooks "$@" ;;
+  update)           shift; cmd_update "$@" ;;
+  version)          shift; cmd_version "$@" ;;
+  help|-h|--help)   cmd_help ;;
+  *)                err "unknown command: $1"; cmd_help; exit 1 ;;
+esac

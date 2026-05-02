@@ -1,0 +1,54 @@
+# Per-instance config — only config.example.yaml is tracked
+config.yaml
+.env
+.env.*
+!.env*.example
+
+# Runtime artifacts — per-instance, never tracked.
+# (Inline `# comments` on these lines do NOT work — gitignore only treats `#`
+#  as a comment when it starts the line. Keep paths on their own lines.)
+# scripts/state/    — *.json hash trackers, dedup, cooldowns
+# scripts/logs/     — *.log files
+# scripts/sessions/ — session-flush-*.md / flush-context-*.md staging + failed-flushes/
+scripts/state/
+scripts/logs/
+scripts/sessions/
+
+# Legacy locations (kept for back-compat with older instances on disk)
+scripts/state.json
+scripts/last-flush.json
+scripts/email-state.json
+scripts/screenshot-state.json
+scripts/piggyback-state.json
+scripts/*.log
+scripts/failed-flushes/
+scripts/session-flush-*.md
+scripts/flush-context-*.md
+
+# Reports
+reports/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+.uv-cache/
+
+# Editor / OS
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*~
+
+# Agents local user settings
+.claude/settings.local.json
+
+# ytstack runtime artifacts (per-install session journal — never tracked)
+.ytstack/journal/
+.ytstack/HANDOFF.md
+
+# TMP
+~*.md
+~*/

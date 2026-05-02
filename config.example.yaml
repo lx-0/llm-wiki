@@ -1,0 +1,113 @@
+# Brain Config — single source of truth for all llm-wiki engine scripts.
+# Editing this file is fine — scripts re-read it on every run.
+# Defaults are defined in scripts/wiki_config.py (dataclass fields); partial
+# overrides are fine — anything missing falls back to its default.
+
+scheduling:
+  # Hour-of-day at which auto-compile + piggyback tasks may spawn from flush.py.
+  compile_after_hour: 18
+  # Dedup window (seconds) for repeated session-flushes of the same session id.
+  dedup_window_seconds: 60
+  # IANA timezone name. Used for compile_after_hour cutoff, daily-log filenames,
+  # and "reviewed" timestamps. Default "UTC" works on any install; override to
+  # your local timezone (e.g. "Europe/Berlin", "America/New_York", "Asia/Tokyo").
+  timezone: UTC
+
+# Piggyback tasks spawned after compile_after_hour.
+# enabled: false → task never runs. cooldown_hours controls the frequency cap.
+piggybacks:
+  email_incremental:
+    enabled: true
+    cooldown_hours: 24
+  lint_structural:
+    enabled: true
+    cooldown_hours: 24
+  review_wiki:
+    enabled: true
+    cooldown_hours: 168  # weekly
+  optimize_claude_md:
+    enabled: true
+    cooldown_hours: 24
+  scan_screenshots:
+    enabled: true
+    cooldown_hours: 24
+    max_per_run: 50
+  follow_requests:
+    enabled: true
+    cooldown_hours: 24
+  sync_memories:
+    enabled: true
+    cooldown_hours: 24
+  retry_failed_flushes:
+    enabled: true
+    cooldown_hours: 24
+    max_per_run: 5
+
+models:
+  # Claude model used by compile.py + retry-failed-flushes.
+  compile_model: claude-opus-4-7
+  # Ollama endpoint (used by all local LLM calls).
+  ollama_url: http://localhost:11434
+  # Vision model for screenshot OCR.
+  vision_model: gemma4:e4b
+  # Curiosity-loop model (compile.py post-pass).
+  curiosity_model: gemma4:e4b
+  # Inbox classifier.
+  classify_model: gemma4:e4b
+
+limits:
+  # Compile-run caps (protection against the 5h Opus rate-limit window).
+  compile_max_files: 30
+  compile_max_consecutive_failures: 3
+  # Flush-extraction retries.
+  flush_max_retries: 3
+  flush_retry_delay_seconds: 30
+  # Screenshot OCR.
+  screenshot_resize_width: 512
+  screenshot_timeout_seconds: 60
+  # Curiosity-loop: max requests per compile run.
+  curiosity_max_gaps: 3
+  curiosity_min_source_chars: 500
+  # Lint.
+  sparse_threshold_words: 200
+
+features:
+  # Master switches for entire capabilities.
+  curiosity_loop: true
+  vision_screenshots: true
+  procmail_execution: true
+
+graph_view:
+  # Mode: knowledge-only | full-vault | sources-only | custom
+  # (applied to .obsidian/graph.json when the plugin builds.)
+  mode: knowledge-only
+  custom_search: ""
+
+# Per-instance, do-not-commit. Drives compile_curiosity.md, compile_suggestion.md,
+# scan_screenshots_vision.md, and scan-email.py so committed files stay free of
+# personal data. Empty defaults are fine; consumers handle absent values gracefully.
+personal:
+  # default account; used for prompt rendering + as a fallback in compile.py
+  primary_account: ""
+  # Path to local Thunderbird profile dir (mbox roots live under here).
+  # Empty string disables scan-email.py.
+  thunderbird_profile: ""
+  # Path to a local Firefox profile directory. Examples:
+  #   macOS:   ~/Library/Application Support/Firefox/Profiles/<id>.default-release
+  #   Linux:   ~/.mozilla/firefox/<id>.default-release
+  # Empty string disables the Firefox half of scan-browser.py.
+  firefox_profile: ""
+  # Path to a Simple Tab Groups (STG) backup directory (where the extension
+  # writes its periodic *.json snapshots). Empty string disables STG imports.
+  stg_backup_dir: ""
+  # account-id -> {email, label, mbox_paths}
+  # mbox_paths are RELATIVE to thunderbird_profile.
+  # Used by compile_suggestion.md (email), compile_curiosity.md (id list +
+  # schema enum), and scan-email.py (mbox locations + display labels).
+  accounts: {}
+  # Folder list for the curiosity loop. Each entry: { path, desc }.
+  # `path` strings also become the schema enum in compile.py — single
+  # source of truth, no drift.
+  email_folders: []
+  # Concrete project/product names used as examples in scan_screenshots_vision.md.
+  project_examples: []
