@@ -91,7 +91,16 @@ seed_vault_templates() {
     "$force" \
     "_dashboard-stats.md"
 
-  # 4. .obsidian/*.json — top-level configs.
+  # 4. Templates/*.md — typed-note templates consumed by QuickAdd.
+  if [[ -d "$templates_dir/Templates" ]]; then
+    local tpl
+    for tpl in "$templates_dir/Templates"/*.md; do
+      [[ -f "$tpl" ]] || continue
+      _seed_file "$tpl" "$target/Templates/$(basename "$tpl")" "$force" "Templates/$(basename "$tpl")"
+    done
+  fi
+
+  # 5. .obsidian/*.json — top-level configs.
   if [[ -d "$templates_dir/.obsidian" ]]; then
     mkdir -p "$target/.obsidian"
     local f base
@@ -105,7 +114,7 @@ seed_vault_templates() {
       fi
     done
 
-    # 5. .obsidian/plugins/*/data.json — per-plugin defaults (recursive).
+    # 6. .obsidian/plugins/*/data.json — per-plugin defaults (recursive).
     if [[ -d "$templates_dir/.obsidian/plugins" ]]; then
       local src rel dst
       while IFS= read -r src; do

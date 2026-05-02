@@ -1,0 +1,80 @@
+{
+  "choices": [
+    {
+      "id": "qa-note-001",
+      "name": "Neue Notiz",
+      "type": "Template",
+      "command": true,
+      "templatePath": "Templates/TPL Note.md",
+      "fileNameFormat": { "enabled": true, "format": "{{VALUE}}" },
+      "folder": { "enabled": true, "folders": ["inbox"], "chooseWhenCreating": false, "createInSameFolderAsActiveFile": false },
+      "appendLink": false,
+      "openFileInNewTab": { "enabled": true, "direction": "vertical", "focus": true },
+      "openFile": true,
+      "openFileInMode": "default",
+      "fileExistsMode": "Increment the file name",
+      "setFileExistsBehavior": false
+    },
+    {
+      "id": "qa-idea-002",
+      "name": "Neue Idee",
+      "type": "Template",
+      "command": true,
+      "templatePath": "Templates/TPL Idea.md",
+      "fileNameFormat": { "enabled": true, "format": "{{VALUE}}" },
+      "folder": { "enabled": true, "folders": ["inbox"], "chooseWhenCreating": false, "createInSameFolderAsActiveFile": false },
+      "appendLink": false,
+      "openFileInNewTab": { "enabled": true, "direction": "vertical", "focus": true },
+      "openFile": true,
+      "openFileInMode": "default",
+      "fileExistsMode": "Increment the file name",
+      "setFileExistsBehavior": false
+    },
+    {
+      "id": "qa-question-003",
+      "name": "Neue Frage",
+      "type": "Template",
+      "command": true,
+      "templatePath": "Templates/TPL Question.md",
+      "fileNameFormat": { "enabled": true, "format": "{{VALUE}}" },
+      "folder": { "enabled": true, "folders": ["inbox"], "chooseWhenCreating": false, "createInSameFolderAsActiveFile": false },
+      "appendLink": false,
+      "openFileInNewTab": { "enabled": true, "direction": "vertical", "focus": true },
+      "openFile": true,
+      "openFileInMode": "default",
+      "fileExistsMode": "Increment the file name",
+      "setFileExistsBehavior": false
+    },
+    {
+      "id": "qa-meeting-004",
+      "name": "Neues Meeting",
+      "type": "Template",
+      "command": true,
+      "templatePath": "Templates/TPL Meeting.md",
+      "fileNameFormat": { "enabled": true, "format": "{{VALUE}}" },
+      "folder": { "enabled": true, "folders": ["inbox"], "chooseWhenCreating": false, "createInSameFolderAsActiveFile": false },
+      "appendLink": false,
+      "openFileInNewTab": { "enabled": true, "direction": "vertical", "focus": true },
+      "openFile": true,
+      "openFileInMode": "default",
+      "fileExistsMode": "Increment the file name",
+      "setFileExistsBehavior": false
+    }
+  ],
+  "macros": [],
+  "inputPrompt": "single-line",
+  "devMode": false,
+  "templateFolderPath": "Templates",
+  "announcements": {},
+  "disableOnlineFeatures": true,
+  "ai": {
+    "defaultModel": "Ask me",
+    "defaultSystemPrompt": "",
+    "promptTemplatesFolderPath": "",
+    "showAssistant": false,
+    "providers": []
+  },
+  "version": "2.0.0",
+  "globalVariables": {},
+  "enableRibbonIcon": false
+}

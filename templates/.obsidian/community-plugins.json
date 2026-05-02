@@ -1,5 +1,8 @@
 [
   "dataview",
   "homepage",
-  "obsidian-excalidraw-plugin"
+  "obsidian-excalidraw-plugin",
+  "obsidian-meta-bind-plugin",
+  "obsidian-tasks-plugin",
+  "quickadd"
 ]
