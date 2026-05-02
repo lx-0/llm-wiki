@@ -48,14 +48,9 @@ def resolve_reader(account: dict[str, Any]) -> MailboxReader | None:
         return ThunderbirdMboxReader(account_id, mbox_paths)
 
     if kind == "gmail-api":
-        # S03 will land GmailReader. For S02, gmail-api filter works
-        # but read is still TODO — gracefully skip with a clear log.
-        log.info(
-            "resolve_reader: kind=%r — GmailReader lands in M002/S03. "
-            "Filter side already works via resolve_filter.",
-            kind,
-        )
-        return None
+        from .gmail import GmailReader
+
+        return GmailReader(account_id=account_id)
 
     log.warning(
         "resolve_reader: unknown kind=%r for account=%r — account will be skipped",

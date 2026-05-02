@@ -3,9 +3,9 @@ milestone: M002
 project: llm-wiki
 size: M
 created: 2026-05-02T14:47:46Z
-status: planned
+status: done-pending-live-smoke
 total_slices: 3
-completed_slices: 2
+completed_slices: 3
 ---
 
 # M002 Roadmap
@@ -31,7 +31,7 @@ Slice detail lives in per-slice `M002-S##-PLAN.md` files, created by `ytstack:sl
 
 - [x] **S02 — Migrate existing capability.** `ThunderbirdMboxReader` + `ThunderbirdMsgFilter` + `AllInklProcmailFilter` adapters. `wiki_config.py:Personal.accounts` schema migrated to nested `reader:` / `filter:` blocks; old schema = hard `ConfigError`. `scripts/scan-email.py` + `scripts/thunderbird-rules.py` deleted; functionality preserved through adapters. `scripts/execute-suggestions.py:163-185` refactored to `resolve_filter(account).apply(rule)` — no `if/elif`. `flush.py:_PIGGYBACK_COMMANDS` replaced by `Registry.piggyback_collectors()` discovery. Operator migrates own `config.yaml` once. **Outcome:** every Thunderbird-mbox + All-Inkl-Procmail capability works exactly as before, only via the new seam.
 
-- [ ] **S03 — Add Gmail (the actual goal).** `GmailReader` + `GmailFilter` adapters via Gmail API. OAuth token cache strategy resolved (open question from CONTEXT). User can declare `accounts.private = { reader: { kind: gmail-api, … }, filter: { kind: gmail-api, … } }` and `wiki collect email --account private` runs end-to-end against the real Gmail API. **Outcome:** the original use-case "scan-email mit Gmail" is live; multi-account multi-kind setup works in production.
+- [x] **S03 — Add Gmail (the actual goal).** `GmailReader` + `GmailFilter` adapters via Gmail API. OAuth token cache strategy resolved (open question from CONTEXT). User can declare `accounts.private = { reader: { kind: gmail-api, … }, filter: { kind: gmail-api, … } }` and `wiki collect email --account private` runs end-to-end against the real Gmail API. **Outcome:** the original use-case "scan-email mit Gmail" is live; multi-account multi-kind setup works in production.
 
 ## Out of scope (deferred — open as M003+ candidates)
 

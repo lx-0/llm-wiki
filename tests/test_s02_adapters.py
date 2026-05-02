@@ -80,10 +80,13 @@ def test_resolve_reader_thunderbird_mbox(tmp_path: Path, monkeypatch: pytest.Mon
     assert isinstance(r, ThunderbirdMboxReader)
 
 
-def test_resolve_reader_gmail_api_returns_none_in_s02() -> None:
-    """GmailReader lands in S03; S02 returns None for the read side of gmail-api."""
+def test_resolve_reader_gmail_api_returns_reader_after_s03() -> None:
+    """S03 landed GmailReader; resolver dispatches gmail-api reader-side."""
     account = {"_id": "g", "reader": {"kind": "gmail-api"}}
-    assert resolve_reader(account) is None
+    r = resolve_reader(account)
+    assert r is not None
+    assert isinstance(r, MailboxReader)
+    assert type(r).__name__ == "GmailReader"
 
 
 # ── Thunderbird .dat translation round-trip ──────────────────────────

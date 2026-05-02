@@ -14,6 +14,7 @@
 #   wiki hooks status          print install status table
 #   wiki collect --list        list registered Collectors
 #   wiki collect <name>        run one Collector (--dry-run | --incremental | --account ID)
+#   wiki gmail-auth <id>       OAuth bootstrap for a Gmail account-id (one-time)
 #   wiki update                git pull --ff-only the .wiki/ checkout (preserves config.yaml)
 #   wiki version               print installed git revision
 #   wiki help                  this message
@@ -235,6 +236,35 @@ cmd_collect() {
   uv run --quiet --project "$WIKI_DIR" python "$WIKI_DIR/scripts/cli_collect.py" "$@"
 }
 
+cmd_gmail_auth() {
+  local account_id="${1:-}"
+  if [[ -z "$account_id" || "$account_id" == "-h" || "$account_id" == "--help" ]]; then
+    cat <<EOF
+${C_BOLD}wiki gmail-auth${C_RESET} — one-time OAuth bootstrap for a Gmail account
+
+${C_BOLD}USAGE${C_RESET}
+  wiki gmail-auth <account-id>
+
+${C_BOLD}WHAT IT DOES${C_RESET}
+  Reads .claude/gmail-oauth-client.json (you provide this — create
+  an installed-app OAuth client at console.cloud.google.com),
+  opens a local-loopback browser for consent, persists the token to
+  .wiki/state/gmail-token-<id>.json. Re-running re-issues consent.
+
+${C_BOLD}EXAMPLES${C_RESET}
+  wiki gmail-auth private    # consent flow for accounts.private
+EOF
+    return 0
+  fi
+  uv run --quiet --project "$WIKI_DIR" python -c "
+import sys; sys.path.insert(0, '$WIKI_DIR/scripts')
+from adapters.mailbox.gmail import gmail_auth_bootstrap
+ok, msg = gmail_auth_bootstrap('$account_id')
+print(msg)
+sys.exit(0 if ok else 1)
+"
+}
+
 cmd_version() {
   if [[ -d "$WIKI_DIR/.git" ]]; then
     local rev; rev="$(git -C "$WIKI_DIR" rev-parse --short HEAD)"
@@ -278,6 +308,7 @@ case "${1:-}" in
   config)           shift; cmd_config "$@" ;;
   hooks)            shift; cmd_hooks "$@" ;;
   collect)          shift; cmd_collect "$@" ;;
+  gmail-auth)       shift; cmd_gmail_auth "$@" ;;
   update)           shift; cmd_update "$@" ;;
   version)          shift; cmd_version "$@" ;;
   help|-h|--help)   cmd_help ;;

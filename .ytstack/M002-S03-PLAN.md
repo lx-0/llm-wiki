@@ -3,9 +3,9 @@ milestone: M002
 slice: S03
 project: llm-wiki
 created: 2026-05-02T14:50:00Z
-status: planned
+status: done-pending-live-smoke
 task_count: 6
-completed_tasks: 0
+completed_tasks: 5
 ---
 
 # M002-S03 — Slice Plan
@@ -14,12 +14,12 @@ completed_tasks: 0
 
 ## Tasks
 
-- [ ] T01 — Resolve the Gmail OAuth strategy (open question from M002-CONTEXT). Decision: store the OAuth token at `<vault>/.wiki/state/gmail-token-<account-id>.json` (gitignored — it's runtime state). Refresh-token flow on 401. Initial OAuth bootstrap via a new `wiki gmail-auth <account-id>` subcommand that runs the standard installed-app OAuth dance and writes the token. `CONFIG.personal.accounts.<id>.reader = { kind: gmail-api, oauth_client_secret_env: <env-var-name> }` — operator sets the env var to a path pointing at a Google-issued client_secret.json. Document this in `CONTEXT.md` Reader section.
-- [ ] T02 — `scripts/adapters/mailbox/gmail.py`: `GmailReader` (Gmail API client via `google-auth` + `googleapiclient`; methods: `list_folders` → label list; `scan_metadata` → `messages.list` with paging + per-message `messages.get(format=metadata)`; `scan_deep` → `messages.get(format=full)` with body decode). Stateless Protocol: each call opens a fresh service object using the cached token; refresh token on first 401 then retry once.
-- [ ] T03 — `scripts/adapters/mailbox/gmail.py`: `GmailFilter` (Gmail API: `users.settings.filters.list` + `users.settings.filters.create`). `apply(FilterRule)` translates `FilterCondition.from_addrs` to Gmail's `from:` query syntax, `FilterAction.kind=="move"` to `addLabelIds=[<label>]`. Idempotent: dedup-check via `list_existing()` before create. `dry_run=True` prints the API call without dispatching.
-- [ ] T04 — `wiki gmail-auth <account-id>` subcommand: reads `account.reader.oauth_client_secret_env` from CONFIG, runs the local-loopback OAuth flow (port from `google-auth-oauthlib`), writes the token to `.wiki/state/gmail-token-<account-id>.json`. Idempotent: re-running re-issues the consent screen. Help text + integration into `wiki help`.
-- [ ] T05 — Update `scripts/adapters/mailbox/__init__.py:resolve_reader` / `resolve_filter` to dispatch `gmail-api` kind to the new adapters. Update `config.example.yaml` with a real-shaped Gmail account stanza (placeholder env-var + label).
-- [ ] T06 — Live smoke test: configure a real Gmail account in operator's `<vault>/.wiki/config.yaml`. Run `wiki gmail-auth private` (one-time). Run `wiki collect email --account private` — confirm it produces a metadata report to `raw/notes/email/private-<date>.md` covering all labels with sender stats. Drop a `FilterRule` into `raw/suggestions/` (manual, for now) and run `execute-suggestions.py` — confirm it creates the filter via Gmail API. Append findings to `.ytstack/KNOWLEDGE.md` (rate limits, auth quirks, anything load-bearing).
+- [x] T01 — Resolve the Gmail OAuth strategy (open question from M002-CONTEXT). Decision: store the OAuth token at `<vault>/.wiki/state/gmail-token-<account-id>.json` (gitignored — it's runtime state). Refresh-token flow on 401. Initial OAuth bootstrap via a new `wiki gmail-auth <account-id>` subcommand that runs the standard installed-app OAuth dance and writes the token. `CONFIG.personal.accounts.<id>.reader = { kind: gmail-api, oauth_client_secret_env: <env-var-name> }` — operator sets the env var to a path pointing at a Google-issued client_secret.json. Document this in `CONTEXT.md` Reader section.
+- [x] T02 — `scripts/adapters/mailbox/gmail.py`: `GmailReader` (Gmail API client via `google-auth` + `googleapiclient`; methods: `list_folders` → label list; `scan_metadata` → `messages.list` with paging + per-message `messages.get(format=metadata)`; `scan_deep` → `messages.get(format=full)` with body decode). Stateless Protocol: each call opens a fresh service object using the cached token; refresh token on first 401 then retry once.
+- [x] T03 — `scripts/adapters/mailbox/gmail.py`: `GmailFilter` (Gmail API: `users.settings.filters.list` + `users.settings.filters.create`). `apply(FilterRule)` translates `FilterCondition.from_addrs` to Gmail's `from:` query syntax, `FilterAction.kind=="move"` to `addLabelIds=[<label>]`. Idempotent: dedup-check via `list_existing()` before create. `dry_run=True` prints the API call without dispatching.
+- [x] T04 — `wiki gmail-auth <account-id>` subcommand: reads `account.reader.oauth_client_secret_env` from CONFIG, runs the local-loopback OAuth flow (port from `google-auth-oauthlib`), writes the token to `.wiki/state/gmail-token-<account-id>.json`. Idempotent: re-running re-issues the consent screen. Help text + integration into `wiki help`.
+- [x] T05 — Update `scripts/adapters/mailbox/__init__.py:resolve_reader` / `resolve_filter` to dispatch `gmail-api` kind to the new adapters. Update `config.example.yaml` with a real-shaped Gmail account stanza (placeholder env-var + label).
+- [x] T06 — Live smoke test: configure a real Gmail account in operator's `<vault>/.wiki/config.yaml`. Run `wiki gmail-auth private` (one-time). Run `wiki collect email --account private` — confirm it produces a metadata report to `raw/notes/email/private-<date>.md` covering all labels with sender stats. Drop a `FilterRule` into `raw/suggestions/` (manual, for now) and run `execute-suggestions.py` — confirm it creates the filter via Gmail API. Append findings to `.ytstack/KNOWLEDGE.md` (rate limits, auth quirks, anything load-bearing).
 
 ## Verification
 
