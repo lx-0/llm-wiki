@@ -248,11 +248,19 @@ _run_script() {
 }
 
 _refresh_dashboard_stats() {
-  uv run --quiet --project "$WIKI_DIR" python "$WIKI_DIR/scripts/dashboard_stats.py" 2>/dev/null || true
+  local tmp; tmp=$(mktemp)
+  if ! uv run --quiet --project "$WIKI_DIR" python "$WIKI_DIR/scripts/dashboard_stats.py" 2>"$tmp"; then
+    warn "dashboard stats refresh failed: $(<"$tmp")"
+  fi
+  rm -f "$tmp"
 }
 
 _refresh_dashboard_lint() {
-  uv run --quiet --project "$WIKI_DIR" python "$WIKI_DIR/scripts/dashboard_lint.py" 2>/dev/null || true
+  local tmp; tmp=$(mktemp)
+  if ! uv run --quiet --project "$WIKI_DIR" python "$WIKI_DIR/scripts/dashboard_lint.py" 2>"$tmp"; then
+    warn "dashboard lint refresh failed: $(<"$tmp")"
+  fi
+  rm -f "$tmp"
 }
 
 cmd_compile() {
