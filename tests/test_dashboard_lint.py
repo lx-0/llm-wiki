@@ -110,3 +110,52 @@ def test_write_dashboard_lint_truncates_long_detail(
     content = output.read_text(encoding="utf-8")
     assert "x" * 500 not in content
     assert "…" in content or "..." in content
+
+
+def test_e2e_one_issue_per_queue(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """End-to-end: one synthetic issue per queue → frontmatter counts all 1,
+    each section has exactly one wikilink line."""
+    import dashboard_lint
+
+    output = tmp_path / "_dashboard-lint.md"
+    monkeypatch.setattr(dashboard_lint, "OUTPUT_FILE", output)
+
+    monkeypatch.setattr(
+        dashboard_lint,
+        "collect_orphans",
+        lambda: [{"link": "knowledge/concepts/orphan-x", "detail": "never linked"}],
+    )
+    monkeypatch.setattr(
+        dashboard_lint,
+        "collect_stale",
+        lambda: [{"link": "knowledge/projects/stale-y", "detail": "stale 90d"}],
+    )
+    monkeypatch.setattr(
+        dashboard_lint,
+        "collect_missing_backlinks",
+        lambda: [{"link": "knowledge/concepts/no-backlink-z", "detail": "links foo, foo doesn't link back"}],
+    )
+    monkeypatch.setattr(
+        dashboard_lint,
+        "collect_failed_flushes",
+        lambda: [{"link": ".wiki/sessions/failed-flushes/2026-04-29T1812.md", "detail": "TimeoutError"}],
+    )
+
+    data = dashboard_lint.compute_lint_data()
+    body = dashboard_lint.render_body(data)
+    dashboard_lint.write_dashboard_lint(data, body)
+
+    content = output.read_text(encoding="utf-8")
+
+    assert "orphans_count: 1" in content
+    assert "stale_count: 1" in content
+    assert "missing_backlinks_count: 1" in content
+    assert "failed_flushes_count: 1" in content
+
+    for header in ("## Orphans", "## Stale", "## Missing backlinks", "## Failed flushes"):
+        assert header in content
+
+    wikilink_lines = [ln for ln in content.splitlines() if ln.startswith("- [[")]
+    assert len(wikilink_lines) == 4, wikilink_lines

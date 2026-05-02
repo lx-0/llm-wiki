@@ -41,3 +41,14 @@ All tasks marked `[x]` and verified via `ytstack:summarize-task`. Exit criterion
 ## Notes
 
 (Add observations during slice execution. Issues that surface become entries in `DECISIONS.md` or `KNOWLEDGE.md`.)
+
+## Notes (T05 manual smoke, 2026-05-02)
+
+`dashboard_lint.py --dry-run` against the lxw vault (`/Users/alex/Library/Mobile Documents/iCloud~md~obsidian/Documents/lxw/`) produced:
+- orphans=0 (knowledge linkage healthy — index covers everything)
+- stale=25 (daily/2026-04-13.md … 2026-05-02.md — sources changed since last compile)
+- missing_backlinks=1838 (high but consistent with `wiki lint --structural-only` output)
+- failed_flushes=1 (one stub from a prior crashed flush)
+- last_updated_ts populated, frontmatter parsed cleanly
+
+Live Obsidian smoke deferred until `wiki update` lands the engine commits in the vault — engine repo is at `commit 541ab76` (T04), vault `.wiki/` still on `c22a125` (M004). Once pushed and updated, operator should see four callouts: Orphans `[!success] (0)`, the other three `[!warning]-` collapsed.
