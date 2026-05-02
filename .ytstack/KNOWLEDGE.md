@@ -21,6 +21,9 @@ The "Conventions" / "Workflow" / "Quick gotchas" sections are quick-reference. T
 
 - **Excalidraw renderer pin.** `@excalidraw/excalidraw@0.18.0` is hard-pinned in `skills/excalidraw-diagram/references/render_template.html` because the unpinned `?bundle` 404s on a transitive `@braintree/sanitize-url` dep. Watch for upstream fix; can re-unpin when 0.18+ becomes the default.
 - **Renderer timeouts.** Bumped to 90s/60s in `render_excalidraw.py` for the 181-element architecture diagram. May need per-call configurability.
+- **Excalidraw theme flag.** `render_excalidraw.py` defaults to `--theme dark` (matches the README hero `architecture.png`). Pass `--theme light` for light-bg targets. The light/dark switch is *post-render SVG inversion* (`filter: invert(93%) hue-rotate(180deg)`) — `appState.viewBackgroundColor` is forced to `#ffffff` either way, so authored colors look different in dark mode than they will on a light page. Always render in the theme the diagram will be consumed in before judging color choices.
+- **Excalidraw library shapes are sketchy.** All four bundled libs (`skills/excalidraw-diagram/references/libraries/*.excalidrawlib` — system-design, technology-logos, cloud-design-patterns, lo-fi-wireframing-kit) use `roughness > 0` (hand-drawn aesthetic). Don't pull from them when the surrounding diagram uses `roughness: 0` (clean modern). They'll look like a Frankenstein mix. Use them only for fully-sketched diagrams, or build geometric icons from primitives for clean-style ones.
+- **Two diagrams in `docs/`, two roles.** `docs/architecture.png` = full cognitive-architecture deep-dive (181 elements, dark, dense). `docs/overview.png` = README hero infographic (Grafana-style stat cards + 3×2 feature panel grid + black footer quote, dark). README hero links overview, body links architecture as the deep-dive. Don't merge — they answer different questions ("what is this in 3 seconds" vs "how does it actually work").
 - **`_skip_prefixes()` in `scripts/seed.py` and `scripts/sync-memories.py`** auto-derives from `Path.home()` parts plus a small generic-workspace set. If this misses a project on a non-standard layout, extend the `_GENERIC_WORKSPACE_DIRS` constant or fall back to the cwd-from-JSONL path used in `sync-memories.py`.
 - **Setup-wizard provider-specific copy.** `lib/config.sh:77-79` mentions "All-Inkl kasserver" by name. Generalize when a second provider is added.
 
@@ -349,3 +352,36 @@ Statuses are policy hints, not enforcement: `negation` (false claim — strike),
 ### Lint check_stale_articles fix preserves both schema shapes
 
 `isinstance(stored, dict)` branch handles old `{hash: ..., compiled_at: ...}` dict shape and current bare-string. No migration needed for state.json — defensive read.
+
+### Obsidian raw-HTML wrappers don't form a DOM hierarchy in reading mode
+
+#### Symptom
+
+Dashboard `## 📊 Vault stats` had four `<div>`-wrapped charts inside `<div class="wiki-chart-grid">…</div>`, with CSS `display: grid` on the wrapper. User reported "charts are still stacked vertically" — grid never engaged.
+
+#### Root cause (two layers)
+
+**Layer 1: snippet not enabled.** Engine seeded `wiki-dashboard.css` into `.obsidian/snippets/` but never wrote `.obsidian/appearance.json` with `enabledCssSnippets: ["wiki-dashboard"]`. Obsidian only loads snippets that are listed there. The CSS file sat on disk, untouched. Operator didn't toggle it manually because the README/dashboard.md mentioned snippet activation only as an aside.
+
+**Layer 2: `<div>` wrappers don't nest in reading mode.** Even with the snippet loaded, the grid wouldn't have worked. Obsidian's reading-mode renderer wraps every top-level markdown block (heading, paragraph, code-fence, raw-HTML block) in its own `.el-X` container under `.markdown-preview-sizer`. Raw-HTML blocks separated by blank lines (CommonMark Type-6 termination) become independent siblings — `<div class="wiki-chart-grid">` ends up an empty wrapper, the inner `<div>`s are also empty wrappers, and the dataviewjs charts render as orphaned `.el-pre` siblings. CSS `display: grid` applies to an empty container; the charts have no grid parent.
+
+This is the same gotcha that hit Meta Bind buttons — the post-processor doesn't run inside HTML blocks for Meta Bind, and the parent-child DOM relationship is broken for any wrapper-style layout.
+
+#### Fix pattern
+
+For grid layouts in Obsidian dashboards, do **not** rely on raw-HTML wrappers. Two reliable patterns:
+
+1. **CSS-only via `cssclasses`** — works when each cell is its own `.block-language-X` and CSS targets siblings (Meta Bind buttons → inline-block via the snippet).
+2. **JS-built grid in a single dataviewjs** — when cells need different content and a parent grid container, build the entire grid + cells in JS within one `dataviewjs` block. The container is created by `this.container.createDiv()` and its children are added by JS — a real DOM hierarchy that Obsidian's per-block wrapping never sees.
+
+The chart grid uses pattern (2): `templates/dashboard.md` consolidates four formerly-separate dataviewjs blocks into one, builds `<div class="wiki-chart-grid">` with `Object.assign(grid.style, {display: "grid", …})` inline, and renders each chart into a `cell()` helper that creates a sized container.
+
+#### Snippet auto-enablement
+
+`templates/.obsidian/appearance.json` ships `{"enabledCssSnippets": ["wiki-dashboard"]}`. `lib/seed.sh:_merge_appearance_json()` unions our entry into the operator's existing list (preserving `cssTheme`, `theme`, etc.) — additive merge, never overwrites. Without this auto-enable step, every `wiki seed` left the snippet off and any cssclasses-driven CSS silently failed.
+
+#### Diagnostic technique
+
+Reading the rendered DOM directly is the only reliable signal. From a running Obsidian session: DevTools → Inspect the dashboard's stats section → confirm whether `.wiki-chart-grid` actually contains the chart elements as descendants or only sits as an empty sibling. CSS-Grid not applying isn't a styling bug; it's a DOM-shape bug.
+
+**Verified:** after the fix, four charts render in a responsive 2-column grid (laptop) / 4-column grid (wide monitor), title + chart per cell, `auto-fit` driven, no snippet required for the grid layout itself.

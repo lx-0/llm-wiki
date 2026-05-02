@@ -67,6 +67,48 @@ _merge_community_plugins() {
 }
 
 
+# ── Internal: merge appearance.json (additive enabledCssSnippets union) ──
+# Preserve operator-set fields (cssTheme, theme, baseFontSize, etc.) and only
+# union the enabledCssSnippets list. Without this, our CSS snippet sits in
+# .obsidian/snippets/ but is never enabled by Obsidian — the dashboard layout
+# silently fails.
+_merge_appearance_json() {
+  local src="$1" dst="$2"
+  if [[ ! -f "$src" ]]; then
+    return 0
+  fi
+  if [[ ! -f "$dst" ]]; then
+    mkdir -p "$(dirname "$dst")"
+    cp "$src" "$dst"
+    ok "seeded appearance.json"
+    return 0
+  fi
+  if ! command -v jq >/dev/null 2>&1; then
+    warn "jq not available — skipping appearance.json merge"
+    return 0
+  fi
+  local before merged after
+  before="$(jq -r '(.enabledCssSnippets // []) | join(",")' "$dst" 2>/dev/null || echo '')"
+  merged="$(jq -s '
+    .[0] as $cur | .[1] as $eng |
+    $cur + {
+      enabledCssSnippets: (((($cur.enabledCssSnippets // []) + ($eng.enabledCssSnippets // [])) | unique))
+    }
+  ' "$dst" "$src" 2>/dev/null || echo '')"
+  if [[ -z "$merged" ]]; then
+    warn "appearance.json — merge failed (malformed JSON?)"
+    return 0
+  fi
+  printf '%s\n' "$merged" > "$dst.tmp" && mv "$dst.tmp" "$dst"
+  after="$(jq -r '(.enabledCssSnippets // []) | join(",")' "$dst")"
+  if [[ "$before" != "$after" ]]; then
+    ok "appearance.json — enabledCssSnippets [$before] → [$after]"
+  else
+    info "appearance.json — enabledCssSnippets already up to date"
+  fi
+}
+
+
 # ── Public: seed all vault templates ───────────────────────────────
 # Args: <target-vault-root> <wiki-dir> [force=0|1]
 seed_vault_templates() {
@@ -109,6 +151,8 @@ seed_vault_templates() {
       base="$(basename "$f")"
       if [[ "$base" == "community-plugins.json" ]]; then
         _merge_community_plugins "$f" "$target/.obsidian/$base"
+      elif [[ "$base" == "appearance.json" ]]; then
+        _merge_appearance_json "$f" "$target/.obsidian/$base"
       else
         _seed_file "$f" "$target/.obsidian/$base" "$force" ".obsidian/$base"
       fi

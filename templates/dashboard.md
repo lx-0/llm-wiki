@@ -124,20 +124,21 @@ actions:
 
 ## 📊 Vault stats
 
-> Live charts. Aggregated from `knowledge/` + `daily/` frontmatter via `dataviewjs`. They update when files change. Requires **Charts**, **Heatmap Calendar**, and the `wiki-dashboard` CSS snippet (Settings → Appearance → CSS snippets).
-
-<div class="wiki-chart-grid">
-
-<div>
-
-### Source-type distribution
+> Live charts. Aggregated from `knowledge/` + `daily/` frontmatter via `dataviewjs`. Updates when files change. Requires **Charts** + **Heatmap Calendar** plugins.
 
 ```dataviewjs
-// Theme-aware palette — pulled from Obsidian CSS vars so it tracks dark / light mode.
+// Single dataviewjs builds the entire 4-chart grid. Why one block instead of four:
+// Obsidian wraps every top-level markdown block in its own `.el-X` container in
+// reading mode, which prevents raw-HTML wrappers like `<div class="grid">…</div>`
+// from forming a real DOM hierarchy with their children — the grid container ends
+// up empty and charts render as orphaned siblings. Building the grid in JS makes
+// the DOM hierarchy independent of Obsidian's per-block wrapping.
+
 const cs = getComputedStyle(document.body);
 const _v = (name, fallback) => (cs.getPropertyValue(name) || fallback).trim();
 const textColor = _v("--text-normal", "#ddd");
 const gridColor = _v("--background-modifier-border", "#444");
+const accent = _v("--color-accent", "#7c8cff");
 const palette = [
   _v("--color-blue", "#5b8def"),
   _v("--color-orange", "#e89954"),
@@ -148,219 +149,157 @@ const palette = [
   _v("--color-yellow", "#d6b85b"),
   _v("--color-pink", "#d36fb8"),
 ];
+const ok = palette[2], warn = palette[6], danger = palette[5];
 
-// Engine articles use folder-as-type (concepts/, connections/, people/, projects/, qa/).
-// Fall back to explicit `type:` frontmatter if set.
-const pages = dv.pages('"knowledge"').filter(p => p.file.name !== "index" && p.file.name !== "log");
-const counts = {};
-for (const p of pages) {
-  let t = p.type;
-  if (!t) {
-    // file.folder looks like "knowledge/concepts" — take the last segment.
-    const folder = p.file.folder || "";
-    const segs = folder.split("/").filter(Boolean);
-    t = segs.length > 1 ? segs[segs.length - 1] : "knowledge-root";
-  }
-  counts[t] = (counts[t] || 0) + 1;
-}
-const labels = Object.keys(counts);
-const data = Object.values(counts);
-if (labels.length === 0) {
-  dv.paragraph("_No articles in `knowledge/` yet — the chart will appear after the first compile._");
-} else if (typeof window.renderChart !== "function") {
+if (typeof window.renderChart !== "function") {
   dv.paragraph("_Charts plugin not installed — Settings → Community Plugins → search **Charts**._");
-} else {
-  window.renderChart({
-    type: "doughnut",
-    data: {
-      labels,
-      datasets: [{
-        label: "Articles",
-        data,
-        backgroundColor: labels.map((_, i) => palette[i % palette.length]),
-        borderColor: gridColor,
-        borderWidth: 1
-      }]
-    },
-    options: {
-      plugins: {
-        legend: { position: "right", labels: { color: textColor } }
-      }
-    }
-  }, this.container);
+  return;
 }
-```
 
-</div>
+// Grid container — styles inlined so it works without the CSS snippet.
+const grid = this.container.createDiv({cls: "wiki-chart-grid"});
+Object.assign(grid.style, {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(380px, 1fr))",
+  gap: "1rem",
+  alignItems: "start",
+  margin: "0.5rem 0 1.5rem 0",
+});
 
-<div>
-
-### Top 15 tags
-
-```dataviewjs
-const cs = getComputedStyle(document.body);
-const _v = (name, fallback) => (cs.getPropertyValue(name) || fallback).trim();
-const textColor = _v("--text-normal", "#ddd");
-const gridColor = _v("--background-modifier-border", "#444");
-const accent = _v("--color-accent", "#7c8cff");
+function cell(title, note) {
+  const c = grid.createDiv({cls: "wiki-chart-cell"});
+  c.style.minWidth = "0";
+  const h = c.createEl("h3", {text: title});
+  h.style.margin = "0 0 0.25rem 0";
+  if (note) {
+    const n = c.createEl("p", {text: note});
+    n.style.cssText = "margin: 0 0 0.5rem 0; color: var(--text-muted); font-size: 0.85rem;";
+  }
+  const wrap = c.createDiv();
+  wrap.style.cssText = "position: relative; height: 280px;";
+  return wrap;
+}
 
 const pages = dv.pages('"knowledge"').filter(p => p.file.name !== "index" && p.file.name !== "log");
-const tagCounts = {};
-for (const p of pages) {
-  const tags = p.tags ?? [];
-  const arr = Array.isArray(tags) ? tags : [tags];
-  for (const t of arr) {
-    const key = String(t);
-    if (!key) continue;
-    tagCounts[key] = (tagCounts[key] || 0) + 1;
+
+// 1) Source-type distribution (doughnut)
+{
+  const counts = {};
+  for (const p of pages) {
+    let t = p.type;
+    if (!t) {
+      const folder = p.file.folder || "";
+      const segs = folder.split("/").filter(Boolean);
+      t = segs.length > 1 ? segs[segs.length - 1] : "knowledge-root";
+    }
+    counts[t] = (counts[t] || 0) + 1;
+  }
+  const labels = Object.keys(counts);
+  const data = Object.values(counts);
+  const target = cell("Source-type distribution");
+  if (labels.length === 0) {
+    target.textContent = "No articles in knowledge/ yet — appears after first compile.";
+  } else {
+    window.renderChart({
+      type: "doughnut",
+      data: { labels, datasets: [{ label: "Articles", data,
+        backgroundColor: labels.map((_, i) => palette[i % palette.length]),
+        borderColor: gridColor, borderWidth: 1 }] },
+      options: { maintainAspectRatio: false,
+        plugins: { legend: { position: "right", labels: { color: textColor } } } }
+    }, target);
   }
 }
-const sorted = Object.entries(tagCounts).sort((a, b) => b[1] - a[1]).slice(0, 15);
-if (sorted.length === 0) {
-  dv.paragraph("_No tags found in compiled articles yet._");
-} else if (typeof window.renderChart !== "function") {
-  dv.paragraph("_Charts plugin not installed._");
-} else {
-  window.renderChart({
-    type: "bar",
-    data: {
-      labels: sorted.map(([k]) => k),
-      datasets: [{
-        label: "Articles",
-        data: sorted.map(([, v]) => v),
-        backgroundColor: accent,
-        borderColor: accent,
-        borderWidth: 1
-      }]
-    },
-    options: {
-      indexAxis: "y",
-      plugins: { legend: { display: false } },
-      scales: {
-        x: { ticks: { color: textColor }, grid: { color: gridColor } },
-        y: { ticks: { color: textColor }, grid: { color: gridColor } }
-      }
+
+// 2) Top 15 tags (horizontal bar)
+{
+  const tagCounts = {};
+  for (const p of pages) {
+    const tags = p.tags ?? [];
+    const arr = Array.isArray(tags) ? tags : [tags];
+    for (const t of arr) {
+      const key = String(t);
+      if (!key) continue;
+      tagCounts[key] = (tagCounts[key] || 0) + 1;
     }
-  }, this.container);
+  }
+  const sorted = Object.entries(tagCounts).sort((a, b) => b[1] - a[1]).slice(0, 15);
+  const target = cell("Top 15 tags");
+  if (sorted.length === 0) {
+    target.textContent = "No tags found in compiled articles yet.";
+  } else {
+    window.renderChart({
+      type: "bar",
+      data: { labels: sorted.map(([k]) => k),
+        datasets: [{ label: "Articles", data: sorted.map(([, v]) => v),
+          backgroundColor: accent, borderColor: accent, borderWidth: 1 }] },
+      options: { maintainAspectRatio: false, indexAxis: "y",
+        plugins: { legend: { display: false } },
+        scales: { x: { ticks: { color: textColor }, grid: { color: gridColor } },
+                  y: { ticks: { color: textColor }, grid: { color: gridColor } } } }
+    }, target);
+  }
+}
+
+// 3) Article freshness (bar)
+{
+  const now = Date.now();
+  const day = 24 * 60 * 60 * 1000;
+  const buckets = { "<7d": 0, "7–30d": 0, "30–90d": 0, "90d+": 0 };
+  for (const p of pages) {
+    const ageDays = (now - p.file.mtime.toMillis()) / day;
+    if (ageDays < 7) buckets["<7d"]++;
+    else if (ageDays < 30) buckets["7–30d"]++;
+    else if (ageDays < 90) buckets["30–90d"]++;
+    else buckets["90d+"]++;
+  }
+  const colors = [ok, ok, warn, danger];
+  const target = cell("Article freshness", "Recent = healthy. Lots of 90d+ = content going stale.");
+  if (pages.length === 0) {
+    target.textContent = "No articles yet.";
+  } else {
+    window.renderChart({
+      type: "bar",
+      data: { labels: Object.keys(buckets),
+        datasets: [{ label: "Articles", data: Object.values(buckets),
+          backgroundColor: colors, borderColor: gridColor, borderWidth: 1 }] },
+      options: { maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { x: { ticks: { color: textColor }, grid: { color: gridColor } },
+                  y: { ticks: { color: textColor }, grid: { color: gridColor } } } }
+    }, target);
+  }
+}
+
+// 4) Inbound-link distribution (bar)
+{
+  const buckets = { "0": 0, "1–2": 0, "3–5": 0, "6–10": 0, "11+": 0 };
+  for (const p of pages) {
+    const n = p.file.inlinks.length;
+    if (n === 0) buckets["0"]++;
+    else if (n <= 2) buckets["1–2"]++;
+    else if (n <= 5) buckets["3–5"]++;
+    else if (n <= 10) buckets["6–10"]++;
+    else buckets["11+"]++;
+  }
+  const colors = [danger, warn, ok, ok, ok];
+  const target = cell("Inbound-link distribution", "Healthy = most articles in 1–10 inlinks. Lots of 0 = orphan problem.");
+  if (pages.length === 0) {
+    target.textContent = "No articles yet.";
+  } else {
+    window.renderChart({
+      type: "bar",
+      data: { labels: Object.keys(buckets),
+        datasets: [{ label: "Articles", data: Object.values(buckets),
+          backgroundColor: colors, borderColor: gridColor, borderWidth: 1 }] },
+      options: { maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { x: { ticks: { color: textColor }, grid: { color: gridColor } },
+                  y: { ticks: { color: textColor }, grid: { color: gridColor } } } }
+    }, target);
+  }
 }
 ```
-
-</div>
-
-<div>
-
-### Article freshness
-
-> When were articles last touched? A healthy wiki has most weight in the recent buckets; lots of 90+ day articles means content is going stale.
-
-```dataviewjs
-const cs = getComputedStyle(document.body);
-const _v = (name, fallback) => (cs.getPropertyValue(name) || fallback).trim();
-const textColor = _v("--text-normal", "#ddd");
-const gridColor = _v("--background-modifier-border", "#444");
-const ok = _v("--color-green", "#5fb364");
-const warn = _v("--color-yellow", "#d6b85b");
-const danger = _v("--color-red", "#d65b5b");
-
-const pages = dv.pages('"knowledge"').filter(p => p.file.name !== "index" && p.file.name !== "log");
-const now = Date.now();
-const day = 24 * 60 * 60 * 1000;
-const buckets = { "<7d": 0, "7–30d": 0, "30–90d": 0, "90d+": 0 };
-for (const p of pages) {
-  const ageDays = (now - p.file.mtime.toMillis()) / day;
-  if (ageDays < 7) buckets["<7d"]++;
-  else if (ageDays < 30) buckets["7–30d"]++;
-  else if (ageDays < 90) buckets["30–90d"]++;
-  else buckets["90d+"]++;
-}
-const colors = [ok, ok, warn, danger];
-if (pages.length === 0) {
-  dv.paragraph("_No articles yet._");
-} else if (typeof window.renderChart !== "function") {
-  dv.paragraph("_Charts plugin not installed._");
-} else {
-  window.renderChart({
-    type: "bar",
-    data: {
-      labels: Object.keys(buckets),
-      datasets: [{
-        label: "Articles",
-        data: Object.values(buckets),
-        backgroundColor: colors,
-        borderColor: gridColor,
-        borderWidth: 1
-      }]
-    },
-    options: {
-      plugins: { legend: { display: false } },
-      scales: {
-        x: { ticks: { color: textColor }, grid: { color: gridColor } },
-        y: { ticks: { color: textColor }, grid: { color: gridColor } }
-      }
-    }
-  }, this.container);
-}
-```
-
-</div>
-
-<div>
-
-### Inbound-link distribution
-
-> How well-connected is the graph? A healthy LLM-wiki has most articles in the 1–10 inlinks range. Many zeros = orphan problem.
-
-```dataviewjs
-const cs = getComputedStyle(document.body);
-const _v = (name, fallback) => (cs.getPropertyValue(name) || fallback).trim();
-const textColor = _v("--text-normal", "#ddd");
-const gridColor = _v("--background-modifier-border", "#444");
-const danger = _v("--color-red", "#d65b5b");
-const ok = _v("--color-green", "#5fb364");
-const warn = _v("--color-yellow", "#d6b85b");
-
-const pages = dv.pages('"knowledge"').filter(p => p.file.name !== "index" && p.file.name !== "log");
-const buckets = { "0": 0, "1–2": 0, "3–5": 0, "6–10": 0, "11+": 0 };
-for (const p of pages) {
-  const n = p.file.inlinks.length;
-  if (n === 0) buckets["0"]++;
-  else if (n <= 2) buckets["1–2"]++;
-  else if (n <= 5) buckets["3–5"]++;
-  else if (n <= 10) buckets["6–10"]++;
-  else buckets["11+"]++;
-}
-const colors = [danger, warn, ok, ok, ok];
-if (pages.length === 0) {
-  dv.paragraph("_No articles yet._");
-} else if (typeof window.renderChart !== "function") {
-  dv.paragraph("_Charts plugin not installed._");
-} else {
-  window.renderChart({
-    type: "bar",
-    data: {
-      labels: Object.keys(buckets),
-      datasets: [{
-        label: "Articles",
-        data: Object.values(buckets),
-        backgroundColor: colors,
-        borderColor: gridColor,
-        borderWidth: 1
-      }]
-    },
-    options: {
-      plugins: { legend: { display: false } },
-      scales: {
-        x: { ticks: { color: textColor }, grid: { color: gridColor } },
-        y: { ticks: { color: textColor }, grid: { color: gridColor } }
-      }
-    }
-  }, this.container);
-}
-```
-
-</div>
-
-</div>
 
 ### Daily activity (current year)
 

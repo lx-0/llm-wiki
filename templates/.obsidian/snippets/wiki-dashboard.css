@@ -1,17 +1,17 @@
 /* wiki-dashboard.css — layout helpers for the LLM-wiki Dashboard.
  *
- * Enable in Obsidian: Settings → Appearance → CSS snippets → toggle "wiki-dashboard".
+ * Auto-enabled by `wiki seed` via .obsidian/appearance.json's enabledCssSnippets.
  * The dashboard note declares `cssclasses: [wiki-dashboard]` in its frontmatter,
  * which scopes these rules to the dashboard only.
  *
- * IMPORTANT: Meta Bind buttons (.block-language-meta-bind-button) cannot be
- * wrapped in raw <div> HTML in markdown — Obsidian treats fenced code blocks
- * inside HTML blocks as raw-HTML context, and Meta Bind's post-processor
- * doesn't run there. Layout MUST be CSS-only via cssclasses.
- *
- * Dataviewjs blocks are unaffected (Dataview's post-processor handles HTML
- * context), so the chart-grid still uses inline <div class="wiki-chart-grid">
- * for now.
+ * GOTCHA: Obsidian wraps every top-level markdown block in its own `.el-X`
+ * container in reading mode. Raw-HTML wrappers like `<div class="grid">…</div>`
+ * spanning multiple blocks do NOT form a real DOM hierarchy with their children
+ * — opening and closing tags become independent empty elements as siblings to
+ * the markdown content they were meant to contain. Same gotcha hit Meta Bind
+ * buttons. Layout therefore must be either:
+ *   (a) CSS rules targeting `.block-language-X` directly via `cssclasses`, or
+ *   (b) DOM built in JS inside a single dataviewjs block (chart grid uses this).
  */
 
 /* ── Capture / Run buttons ─────────────────────────────────────────── */
@@ -29,47 +29,17 @@
   display: none;
 }
 
-/* ── Chart grid (still uses <div class="wiki-chart-grid"> in markdown) ─ */
+/* ── Chart grid (built in JS by templates/dashboard.md) ───────────── */
 
-.wiki-chart-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
-  gap: 1rem;
-  align-items: start;
-  margin: 0.5rem 0 1.5rem 0;
+/* The grid container itself is created with inline styles (display: grid,
+ * grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)), etc.) so the
+ * dashboard layout works without this snippet. Rules here are tweak-friendly
+ * overrides only. */
+.wiki-dashboard .wiki-chart-cell h3 {
+  font-size: 1rem;
 }
 
-.wiki-chart-grid > * {
-  min-width: 0;            /* prevent grid blowout from long labels */
-  margin: 0;
-}
-
-.wiki-chart-grid .block-language-dataviewjs {
-  margin-top: 0.5rem;
-}
-
-/* Chart.js canvases respect a max-height so a single chart doesn't dominate the grid */
-.wiki-chart-grid canvas {
-  max-height: 280px;
-}
-
-/* Heatmap (separate plugin) — let it expand full width below the chart grid */
-.heatmap-calendar-graph {
+/* Heatmap (separate plugin) — full width below the chart grid */
+.wiki-dashboard .heatmap-calendar-graph {
   margin: 0.5rem 0;
-}
-
-/* ── Legacy support ───────────────────────────────────────────────── */
-
-/* Kept for vaults still using the old <div class="wiki-button-row"> wrappers
- * before the cssclasses migration. Safe to remove in a future release. */
-.wiki-button-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  align-items: center;
-  margin: 0.5rem 0 1rem 0;
-}
-
-.wiki-button-row > * {
-  margin: 0 !important;
 }
