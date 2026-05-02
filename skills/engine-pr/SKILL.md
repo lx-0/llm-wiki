@@ -47,7 +47,7 @@ backlog file in the same PR or in a follow-up.
 
 Open a PR when **all** of these are true:
 
-- The change is concrete — paths, files, behavioural shape are nailed down
+- The change is concrete — paths, files, behavioral shape are nailed down
 - The change is small enough to review in one sitting (< ~500 LOC, ideally < 200)
 - A decision is wanted from the engine owner: merge, close, or specific feedback
 - Either: implementation is included in the PR (preferred), or the PR contains
@@ -72,7 +72,7 @@ Branch naming:
 - `cr/<slug>` — change request, doc-only or design proposal
 - `feat/<slug>` — new feature with implementation
 - `fix/<slug>` — bug fix with implementation
-- `refactor/<slug>` — pure code reorganisation, no behaviour change
+- `refactor/<slug>` — pure code reorganization, no behavior change
 - `docs/<slug>` — docs-only
 
 `<slug>` is kebab-case, ≤ 5 words. Match the GitHub label vocabulary where
@@ -113,7 +113,7 @@ gh pr create \
 <the load-bearing reason — incident, gap, request, …>
 
 ## Proposed change
-<what concretely changes — paths, behaviour, config>
+<what concretely changes — paths, behavior, config>
 
 ## Touchpoints
 - file:line — what changes

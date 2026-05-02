@@ -16,7 +16,9 @@ scheduling:
 # Piggyback tasks spawned after compile_after_hour.
 # enabled: false → task never runs. cooldown_hours controls the frequency cap.
 piggybacks:
-  email_incremental:
+  # The 'email' key matches the EmailCollector.SPEC.name (M002+).
+  # Pre-M002 configs used 'email_incremental' — that key is no longer read.
+  email:
     enabled: true
     cooldown_hours: 24
   lint_structural:
@@ -104,10 +106,31 @@ personal:
   # Path to a Simple Tab Groups (STG) backup directory (where the extension
   # writes its periodic *.json snapshots). Empty string disables STG imports.
   stg_backup_dir: ""
-  # account-id -> {email, label, mbox_paths}
-  # mbox_paths are RELATIVE to thunderbird_profile.
-  # Used by compile_suggestion.md (email), compile_curiosity.md (id list +
-  # schema enum), and scan-email.py (mbox locations + display labels).
+  # account-id → {email, label, reader, filter}
+  # `reader` and `filter` are nested blocks with a `kind` discriminator
+  # plus kind-specific fields. resolve_reader/resolve_filter dispatch on
+  # `kind`; unknown kinds are silently skipped (graceful agnostic).
+  # Full kind-table: CONTEXT.md § Account.kind.
+  #
+  # Examples (uncomment one or more, fill in your data):
+  #
+  #   work:
+  #     email: alex@example.com
+  #     label: "Work"
+  #     reader:
+  #       kind: thunderbird-mbox
+  #       mbox_paths: ["ImapMail/server/INBOX.mbox"]   # relative to thunderbird_profile
+  #     filter:
+  #       kind: all-inkl-procmail
+  #       imap_pass_env: WORK_IMAP_PASS                 # env var holding the password
+  #
+  #   private:
+  #     email: alex@gmail.com
+  #     label: "Private"
+  #     reader:
+  #       kind: gmail-api                                # M002/S03 — read-side via Gmail API
+  #     filter:
+  #       kind: gmail-api                                # filter creation via Gmail API
   accounts: {}
   # Folder list for the curiosity loop. Each entry: { path, desc }.
   # `path` strings also become the schema enum in compile.py — single

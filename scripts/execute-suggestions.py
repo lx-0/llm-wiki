@@ -28,9 +28,10 @@ from config import RAW_SUGGESTIONS_DIR, ROOT_DIR, TIMEZONE
 from wiki_config import CONFIG
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from importlib import import_module
 
-tb_rules = import_module("thunderbird-rules")
+from adapters.mailbox import resolve_filter
+import imap_actions
+from domain.mail import FilterAction, FilterCondition, FilterRule
 
 
 # ── YAML I/O ────────────────────────────────────────────────────────
@@ -81,24 +82,14 @@ def describe_action(i: int, action: dict) -> None:
     if action_type == "create-rule":
         rule = action.get("rule", {})
         condition = rule.get("condition", "")
-        acct = tb_rules.ACCOUNTS.get(account, {})
-        filter_path = next((p for p in acct.get("filter_paths", []) if p.exists()), None)
-        _, _, existing = tb_rules.parse_filter_file(filter_path) if filter_path else ("9", "no", [])
-
-        new_rule = tb_rules.FilterRule(
-            name=rule.get("name", ""),
-            condition=condition,
-            actions=[(rule.get("action", "Move to folder"), _build_action_value(account, rule.get("folder", "")))],
-        )
-        print(f"    File: {filter_path}")
-        print(f"    Existing rules: {len(existing)}, new would be #{len(existing) + 1}")
-        for line in new_rule.to_dat().split("\n"):
-            print(f"      {line}")
-
-        # Duplicate warning (safety net)
-        valid, reason = tb_rules.validate_new_rule(account, condition)
-        if not valid:
-            print(f"    ❌ DUPLICATE — {reason} (compiler bug, should never appear here)")
+        folder = rule.get("folder", "")
+        action_label = rule.get("action", "Move to folder")
+        account_cfg = (CONFIG.personal.accounts or {}).get(account, {})
+        filter_kind = (account_cfg.get("filter") or {}).get("kind", "<unset>")
+        print(f"    Account: {account}  Filter kind: {filter_kind}")
+        print(f"    Rule:     {rule.get('name', '?')}")
+        print(f"    Condition: {condition}")
+        print(f"    Action:   {action_label} → {folder}")
 
     elif action_type == "imap-move":
         print(f"    Search: {action.get('search', [])}")
@@ -117,30 +108,6 @@ def describe_action(i: int, action: dict) -> None:
     print()
 
 
-def _build_action_value(account_id: str, folder: str) -> str:
-    """Build a Thunderbird folder URI from account + folder path.
-
-    Reads the IMAP URI base from existing rules of the SAME account only.
-    Falls back to plain folder path if no URI template found.
-    """
-    if not folder or folder.startswith("imap://"):
-        return folder
-    acct = tb_rules.ACCOUNTS.get(account_id, {})
-    # Find URI base from this account's existing rules
-    for fp in acct.get("filter_paths", []):
-        if fp.exists():
-            _, _, existing = tb_rules.parse_filter_file(fp)
-            for r in existing:
-                for _, v in r.actions:
-                    if v and v.startswith("imap://"):
-                        # Verify the URI matches this account's IMAP host
-                        imap_host = acct.get("imap_host", "")
-                        if imap_host and imap_host in v:
-                            base = "/".join(v.split("/", 3)[:3])
-                            return f"{base}/{folder}"
-    return folder
-
-
 # ── Action execution ────────────────────────────────────────────────
 
 
@@ -150,73 +117,31 @@ def execute_action(action: dict, dry_run: bool = True) -> bool:
     account_id = action.get("account", CONFIG.personal.primary_account)
 
     if action_type == "create-rule":
-        rule = action.get("rule", {})
-        condition = rule.get("condition", "")
+        rule_yaml = action.get("rule", {})
+        rule_name = rule_yaml.get("name", "")
+        condition_str = rule_yaml.get("condition", "")
+        folder = rule_yaml.get("folder", "")
 
-        # Safety net — compiler should have filtered this, but double-check
-        valid, reason = tb_rules.validate_new_rule(account_id, condition)
-        if not valid:
-            print(f"    ❌ BLOCKED: {reason}")
-            print(f"    This is a compiler bug — duplicates should be filtered at generation time.")
+        # Resolve the per-account Filter adapter. None = no kind configured
+        # or unknown kind — graceful agnostic, skip with a clear message.
+        account = (CONFIG.personal.accounts or {}).get(account_id, {})
+        # `_id` is a synthetic field for resolver logging; doesn't touch CONFIG file
+        account_with_id = {**account, "_id": account_id}
+        filter_adapter = resolve_filter(account_with_id)
+        if filter_adapter is None:
+            print(f"    SKIP: no filter resolved for account {account_id!r}")
+            print(f"    (configure account.filter.kind — see CONTEXT.md § Account.kind)")
             return False
 
-        # Route: kasserver → procmail (server-side), Gmail → Gmail API, other → msgFilterRules.dat
-        rule_name = rule.get("name", "")
-        folder = rule.get("folder", "").replace("INBOX/", "INBOX.")
+        # Translate the YAML rule to domain.mail.FilterRule.
+        rule = _yaml_to_filter_rule(rule_name, condition_str, folder, rule_yaml.get("action", "Move to folder"))
 
-        if tb_rules.has_procmail_support(account_id):
-            # All-Inkl: server-side procmail via webmail API
-            return tb_rules.add_procmail_rule(rule_name, condition, folder, dry_run=dry_run)
-
-        elif tb_rules.is_gmail_account(account_id):
-            import re
-            from_addrs = []
-            for clause in re.findall(r'\(([^)]+)\)', condition):
-                parts = clause.split(",", 2)
-                if len(parts) >= 3 and "from" in parts[0].lower() and parts[1].strip() == "is":
-                    from_addrs.append(parts[2].strip())
-
-            gmail_folder = rule.get("folder", "").replace("INBOX/", "")
-            if not from_addrs or not gmail_folder:
-                print(f"    ERROR: Could not parse from-addresses or folder from condition")
-                return False
-
-            stats = tb_rules.create_gmail_filter(
-                account_id, from_addrs, gmail_folder, dry_run=dry_run,
-            )
-            return "error" not in stats
-
-        else:
-            # Fallback: msgFilterRules.dat (TB must be closed)
-            acct = tb_rules.ACCOUNTS.get(account_id, {})
-            filter_path = next(
-                (p for p in acct.get("filter_paths", []) if p.exists()),
-                acct.get("filter_paths", [None])[0],
-            )
-            if not filter_path:
-                print(f"    ERROR: No filter path for {account_id}")
-                return False
-
-            action_value = _build_action_value(account_id, rule.get("folder", ""))
-            new_rule = tb_rules.FilterRule(
-                name=rule.get("name", ""),
-                condition=condition,
-                actions=[(rule.get("action", "Move to folder"), action_value)],
-            )
-
-            if dry_run:
-                print(f"    [dry-run] Would write to {filter_path}")
-                return True
-
-            version, logging_val, rules = tb_rules.parse_filter_file(filter_path)
-            rules.append(new_rule)
-            tb_rules.write_filter_file(filter_path, version, logging_val, rules)
-            print(f"    Created rule '{new_rule.name}' ({len(rules)} total)")
-            print(f"    NOTE: Restart Thunderbird to activate.")
-            return True
+        result = filter_adapter.apply(rule, dry_run=dry_run)
+        print(f"    {result.message}")
+        return result.success
 
     elif action_type == "imap-move":
-        stats = tb_rules.imap_move(
+        stats = imap_actions.imap_move(
             account_id,
             action.get("source_folder", "INBOX"),
             action.get("search", []),
@@ -226,7 +151,7 @@ def execute_action(action: dict, dry_run: bool = True) -> bool:
         return "error" not in stats
 
     elif action_type == "imap-tag":
-        stats = tb_rules.imap_tag(
+        stats = imap_actions.imap_tag(
             account_id,
             action.get("folder", "INBOX"),
             action.get("search", []),
@@ -236,7 +161,7 @@ def execute_action(action: dict, dry_run: bool = True) -> bool:
         return "error" not in stats
 
     elif action_type == "imap-set-flags":
-        stats = tb_rules.imap_set_flags(
+        stats = imap_actions.imap_set_flags(
             account_id,
             action.get("folder", "INBOX"),
             action.get("search", []),
@@ -248,6 +173,53 @@ def execute_action(action: dict, dry_run: bool = True) -> bool:
     else:
         print(f"    Unknown action type: {action_type}")
         return False
+
+
+def _yaml_to_filter_rule(name: str, condition_str: str, folder: str, action_label: str) -> FilterRule:
+    """Translate the YAML-suggestion rule shape to domain.mail.FilterRule.
+
+    YAML condition is the legacy TB-style string ('OR (from,is,a@b) (subject,contains,foo)').
+    We parse it into the structured FilterCondition.
+    """
+    import re as _re
+
+    from_addrs: list[str] = []
+    subj: list[str] = []
+    body: list[str] = []
+    for clause in _re.findall(r"\(([^)]+)\)", condition_str):
+        parts = clause.split(",", 2)
+        if len(parts) < 3:
+            continue
+        field_, op, val = parts[0].strip().lower(), parts[1].strip(), parts[2].strip()
+        if field_ == "from" and op == "is":
+            from_addrs.append(val)
+        elif field_ == "subject" and op == "contains":
+            subj.append(val)
+        elif field_ == "body" and op == "contains":
+            body.append(val)
+
+    # Action mapping: "Move to folder" → move; AddTag/Mark flagged/Delete handled too.
+    action_label_lower = action_label.lower()
+    if "move" in action_label_lower:
+        action = FilterAction(kind="move", target=folder)
+    elif "tag" in action_label_lower:
+        action = FilterAction(kind="tag", target=folder)
+    elif "flag" in action_label_lower:
+        action = FilterAction(kind="flag", target="")
+    elif "delete" in action_label_lower:
+        action = FilterAction(kind="delete", target="")
+    else:
+        action = FilterAction(kind="move", target=folder)
+
+    return FilterRule(
+        name=name,
+        condition=FilterCondition(
+            from_addrs=tuple(from_addrs),
+            subject_contains=tuple(subj),
+            body_contains=tuple(body),
+        ),
+        action=action,
+    )
 
 
 # ── CLI ─────────────────────────────────────────────────────────────

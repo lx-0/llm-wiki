@@ -91,15 +91,19 @@ class Personal:
     """
     # default account; used as fallback in compile.py and for prompt rendering
     primary_account: str = ""
-    # account-id -> per-account dict. Fields are sparse / consumer-specific:
-    #   email           (str)        compile_suggestion.md, thunderbird-rules.py login
-    #   label           (str)        scan-email.py display
-    #   mbox_paths      (list[str])  scan-email.py — relative to thunderbird_profile
-    #   filter_paths    (list[str])  thunderbird-rules.py — relative to thunderbird_profile
-    #   imap_host       (str)        thunderbird-rules.py
-    #   imap_user_env   (str)        thunderbird-rules.py — env var name for IMAP user
-    #   imap_pass_env   (str)        thunderbird-rules.py — env var name for IMAP pass
-    #   has_procmail    (bool)       account exposes All-Inkl-style webmail procmail API
+    # account-id -> per-account dict. Schema (M002+):
+    #   email   (str)               sender identity; required
+    #   label   (str, optional)     display label in reports
+    #   reader  (dict, optional)    {kind: thunderbird-mbox|gmail-api|…, <kind-specific keys>}
+    #   filter  (dict, optional)    {kind: thunderbird-msgfilter|all-inkl-procmail|gmail-api|…, …}
+    # See [CONTEXT.md § Account.kind] and [scripts/adapters/mailbox/__init__.py]
+    # for the full kind-table. resolve_reader / resolve_filter dispatch on
+    # reader.kind / filter.kind respectively. Unknown kinds are silently
+    # skipped (graceful agnostic).
+    #
+    # Legacy top-level fields (mbox_paths, filter_paths, imap_host,
+    # imap_user_env, imap_pass_env, has_procmail) are NO LONGER ACCEPTED
+    # — load() raises ConfigError pointing at the migration template.
     accounts: dict[str, dict] = field(default_factory=dict)
     # ordered list of {path, desc} dicts; drives both compile_curiosity.md
     # listing AND compile.py's schema enum (single source of truth)
@@ -195,6 +199,68 @@ def _merge_piggybacks(
     return merged
 
 
+class ConfigError(ValueError):
+    """Raised when config.yaml has a structural problem the operator must fix."""
+
+
+_LEGACY_ACCOUNT_FIELDS = {
+    "mbox_paths",
+    "filter_paths",
+    "imap_host",
+    "imap_user_env",
+    "imap_pass_env",
+    "has_procmail",
+}
+
+
+def _validate_accounts_schema(personal_raw: dict) -> None:
+    """Reject the M001-era flat-account schema.
+
+    M002 moved per-backend keys (mbox_paths, has_procmail, …) into
+    nested `reader:` / `filter:` blocks. This function raises ConfigError
+    pointing at the migration template if the legacy shape is detected.
+    """
+    accounts = (personal_raw or {}).get("accounts") or {}
+    if not isinstance(accounts, dict):
+        return
+    offenders: list[tuple[str, list[str]]] = []
+    for aid, body in accounts.items():
+        if not isinstance(body, dict):
+            continue
+        legacy = sorted(_LEGACY_ACCOUNT_FIELDS & set(body))
+        if legacy:
+            offenders.append((aid, legacy))
+    if not offenders:
+        return
+
+    lines = [
+        "config.yaml uses the legacy account schema (pre-M002).",
+        "Migrate each offending account to the nested reader/filter shape.",
+        "",
+        "Detected:",
+    ]
+    for aid, fields in offenders:
+        lines.append(f"  - personal.accounts.{aid}: legacy keys {fields}")
+    lines += [
+        "",
+        "Migration template (replace the flat keys per account):",
+        "",
+        "  personal:",
+        "    accounts:",
+        "      <id>:",
+        "        email: <addr>",
+        "        reader:",
+        "          kind: thunderbird-mbox        # or gmail-api, etc.",
+        "          mbox_paths: [INBOX.mbox, ...]",
+        "        filter:",
+        "          kind: all-inkl-procmail       # or thunderbird-msgfilter | gmail-api",
+        "          imap_pass_env: <ENV_VAR_NAME>",
+        "",
+        "Full kind-table: CONTEXT.md § Account.kind.",
+    ]
+    raise ConfigError("\n".join(lines))
+
+
 def load() -> WikiConfig:
     cfg = WikiConfig()
     if not CONFIG_FILE.exists():
@@ -206,6 +272,7 @@ def load() -> WikiConfig:
         return cfg
     if not isinstance(raw, dict):
         return cfg
+    _validate_accounts_schema(raw.get("personal") or {})
     cfg.scheduling = _merge_dataclass(cfg.scheduling, raw.get("scheduling") or {})
     cfg.piggybacks = _merge_piggybacks(cfg.piggybacks, raw.get("piggybacks"))
     cfg.models = _merge_dataclass(cfg.models, raw.get("models") or {})

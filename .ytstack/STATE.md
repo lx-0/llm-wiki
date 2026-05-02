@@ -9,7 +9,7 @@ active_task: none
 
 # State
 
-**Status:** M002 in progress. S01 **done** (2026-05-02; 6 pytest tests green; `wiki collect --list` + `wiki collect email --dry-run` smoke-tested live). S02 next.
+**Status:** M002 in progress. S01 + S02 **done** (2026-05-02; 18 pytest tests green). Legacy `scripts/scan-email.py` and `scripts/thunderbird-rules.py` deleted. S03 (Gmail Reader + OAuth + live smoke test) next.
 
 **M002 — Mailbox-Adapter seam + Collector backbone.** Goal: email scanning + filter-application work for Gmail accounts (in addition to Thunderbird-mbox + All-Inkl-Procmail) via a Reader/Filter adapter seam, so new backends don't touch scan/execute call-sites. Architecture locked through the `improve-codebase-architecture` skill flow; full design in `M002-CONTEXT.md`, slice breakdown in `M002-ROADMAP.md`. Domain glossary added at repo root: `CONTEXT.md`.
 

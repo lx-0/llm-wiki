@@ -128,7 +128,7 @@ the **working-system reference range of 0.04–0.07** (i.e. **15–25 inline lin
 per concept**, equivalent to 0.04–0.07 connection-articles per concept if using
 the typed-folder split).
 
-Reference: `.ytstack/backlog/connection-quality.md` synthesises this from the
+Reference: `.ytstack/backlog/connection-quality.md` synthesizes this from the
 wider Karpathy/Cole/Matuschak literature.
 
 If the ratio is significantly above 0.20 (i.e. fewer than 5 concepts per

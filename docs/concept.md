@@ -22,7 +22,7 @@ Three failure modes follow:
 
 **Compile once. Read every day.**
 
-Personal knowledge that stays scattered is illegible. Personal knowledge that gets aggressively centralised is unmaintainable. llm-wiki splits the difference: a small, opinionated set of substrates feeds a Claude-Agent-SDK compile pass that turns them into atomic, cross-linked Markdown articles. The compiled wiki is the working surface — read by you and by every agent that touches your vault. The substrates underneath are immutable; only the compile output is allowed to evolve.
+Personal knowledge that stays scattered is illegible. Personal knowledge that gets aggressively centralized is unmaintainable. llm-wiki splits the difference: a small, opinionated set of substrates feeds a Claude-Agent-SDK compile pass that turns them into atomic, cross-linked Markdown articles. The compiled wiki is the working surface — read by you and by every agent that touches your vault. The substrates underneath are immutable; only the compile output is allowed to evolve.
 
 Mixed reality on the storage side: some sources are referenced (mailbox, calendar, browser data live in their canonical apps; collectors only write metadata into `raw/notes/`); others are owned (web clippings, audio recordings, agent-memory snapshots, PDFs — copies live in `raw/articles/`, `raw/audio/`, `raw/memories/`, `raw/papers/` because their canonical home is unstable or non-existent). The wiki layer (`knowledge/`) is purely derivative — wikilinks and prose, never originals.
 

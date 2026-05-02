@@ -52,31 +52,62 @@ FAILED_FLUSHES_DIR = flush_pipeline.FAILED_DIR
 append_to_daily = flush_pipeline.append_to_daily
 
 # Piggyback tasks — spawned after compile_after_hour if cooldown elapsed and
-# the task is enabled in wiki/config.yaml. The CMD list is canonical (script
-# name + args); cooldown + enabled flag come from CONFIG.piggybacks.
-_PIGGYBACK_COMMANDS: dict[str, list[str]] = {
-    "email_incremental": ["scan-email.py", "--incremental"],
+# the task is enabled in wiki/config.yaml. Two sources of truth, merged at
+# build time:
+#
+# 1. Registry-discovered Collectors with `SPEC.piggyback_default=True` —
+#    spawned as `cli_collect.py <name>` (the canonical CLI for collectors).
+# 2. Legacy commands not yet ported to the Collector pattern — listed
+#    explicitly below until they get migrated (M003 candidate).
+#
+# Cooldown + enabled flag come from CONFIG.piggybacks.<name> for both.
+
+_LEGACY_PIGGYBACK_COMMANDS: dict[str, list[str]] = {
     "lint_structural": ["lint.py", "--structural-only"],
     "review_wiki": ["review-wiki.py"],
     "optimize_claude_md": ["optimize-claude-md.py"],
     "scan_screenshots": ["scan-screenshots.py", "--all", "--limit", "{max_per_run}"],
-    "follow_requests": ["scan-email.py", "--follow-requests"],
     "sync_memories": ["sync-memories.py"],
     "retry_failed_flushes": ["retry-failed-flushes.py", "--limit", "{max_per_run}"],
 }
 
 
 def _build_piggyback_tasks() -> list[dict]:
-    tasks = []
-    for name, cmd_template in _PIGGYBACK_COMMANDS.items():
+    tasks: list[dict] = []
+
+    # 1. Registry-discovered Collectors.
+    try:
+        from collectors import piggyback_collectors  # noqa: WPS433  late import to avoid cycles
+    except ImportError:
+        piggyback_collectors = lambda: []  # type: ignore[assignment]
+
+    for collector in piggyback_collectors():
+        name = collector.SPEC.name
+        task_cfg = CONFIG.piggybacks.get(name)
+        if task_cfg is not None and not task_cfg.enabled:
+            continue
+        cooldown = task_cfg.cooldown_hours if task_cfg else collector.SPEC.piggyback_cooldown_hours
+        cmd = ["cli_collect.py", name]
+        if collector.SPEC.supports_incremental:
+            cmd.append("--incremental")
+        tasks.append({
+            "name": name,
+            "cmd": cmd,
+            "cooldown_hours": cooldown,
+        })
+
+    # 2. Legacy commands not yet on the Registry.
+    for name, cmd_template in _LEGACY_PIGGYBACK_COMMANDS.items():
         task_cfg = CONFIG.piggybacks.get(name)
         if task_cfg is None or not task_cfg.enabled:
+            continue
+        # Avoid double-add if a Collector already claims this name.
+        if any(t["name"] == name for t in tasks):
             continue
         cmd = []
         for arg in cmd_template:
             if arg == "{max_per_run}":
                 if task_cfg.max_per_run is None:
-                    # Drop the flag entirely if no per-run limit configured.
                     if cmd and cmd[-1] in ("--limit", "-n"):
                         cmd.pop()
                     continue
@@ -88,6 +119,7 @@ def _build_piggyback_tasks() -> list[dict]:
             "cmd": cmd,
             "cooldown_hours": task_cfg.cooldown_hours,
         })
+
     return tasks
 
 

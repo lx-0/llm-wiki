@@ -5,13 +5,24 @@
 Unknown `kind` returns `None` (graceful agnostic — collector skips,
 nothing crashes).
 
-Concrete adapters land in S02 (Thunderbird, AllInkl) and S03 (Gmail).
-S01 ships only the base Protocols + stub resolvers.
+Currently registered:
+
+| kind                 | Reader                  | Filter                  |
+|----------------------|-------------------------|-------------------------|
+| thunderbird-mbox     | ThunderbirdMboxReader   | (use other filter kind) |
+| thunderbird-msgfilter| —                       | ThunderbirdMsgFilter    |
+| all-inkl-procmail    | —                       | AllInklProcmailFilter   |
+| gmail-api            | (S03 — GmailReader)     | GmailFilter             |
+
+Read-side (`reader.kind`) and write-side (`filter.kind`) dispatch are
+INDEPENDENT — an account can read via Thunderbird mbox and write filter
+rules via All-Inkl Procmail (the legacy hybrid).
 """
 
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 from typing import Any
 
 from .base import ApplyResult, MailboxFilter, MailboxReader
@@ -20,42 +31,75 @@ log = logging.getLogger(__name__)
 
 
 def resolve_reader(account: dict[str, Any]) -> MailboxReader | None:
-    """Map account.reader.kind to a concrete Reader.
-
-    Returns None if no `reader` block is configured or the kind is unknown.
-    Logs a one-line warning on unknown kinds so typos surface.
-    """
+    """Map account.reader.kind to a concrete Reader."""
     reader_cfg = account.get("reader") or {}
     kind = reader_cfg.get("kind")
     if not kind:
         return None
 
-    # Concrete dispatch lands in S02 (thunderbird-mbox) and S03 (gmail-api).
-    # S01 stub: everything returns None so EmailCollector exercises the
-    # graceful-skip path until the adapters land.
+    account_id = account.get("_id", account.get("email", "unknown"))
+
+    if kind == "thunderbird-mbox":
+        from .thunderbird import ThunderbirdMboxReader
+        from wiki_config import CONFIG
+
+        profile_root = Path(CONFIG.personal.thunderbird_profile or "").expanduser()
+        mbox_paths = [profile_root / p for p in reader_cfg.get("mbox_paths", [])]
+        return ThunderbirdMboxReader(account_id, mbox_paths)
+
+    if kind == "gmail-api":
+        # S03 will land GmailReader. For S02, gmail-api filter works
+        # but read is still TODO — gracefully skip with a clear log.
+        log.info(
+            "resolve_reader: kind=%r — GmailReader lands in M002/S03. "
+            "Filter side already works via resolve_filter.",
+            kind,
+        )
+        return None
+
     log.warning(
-        "resolve_reader: kind=%r — no adapter registered yet (S01 stub). "
-        "Account will be skipped.",
+        "resolve_reader: unknown kind=%r for account=%r — account will be skipped",
         kind,
+        account_id,
     )
     return None
 
 
 def resolve_filter(account: dict[str, Any]) -> MailboxFilter | None:
-    """Map account.filter.kind to a concrete Filter.
-
-    Same shape as resolve_reader; same graceful-skip + warning on
-    unknown kinds.
-    """
+    """Map account.filter.kind to a concrete Filter."""
     filter_cfg = account.get("filter") or {}
     kind = filter_cfg.get("kind")
     if not kind:
         return None
 
+    account_id = account.get("_id", account.get("email", "unknown"))
+
+    if kind == "thunderbird-msgfilter":
+        from .thunderbird import ThunderbirdMsgFilter
+        from wiki_config import CONFIG
+
+        profile_root = Path(CONFIG.personal.thunderbird_profile or "").expanduser()
+        filter_paths = [profile_root / p for p in filter_cfg.get("filter_paths", [])]
+        return ThunderbirdMsgFilter(account_id, filter_paths)
+
+    if kind == "all-inkl-procmail":
+        from .allinkl import AllInklProcmailFilter
+
+        return AllInklProcmailFilter(
+            account_id=account_id,
+            email_addr=account.get("email", ""),
+            imap_pass_env=filter_cfg.get("imap_pass_env", ""),
+        )
+
+    if kind == "gmail-api":
+        from .gmail import GmailFilter
+
+        return GmailFilter(account_id=account_id)
+
     log.warning(
-        "resolve_filter: kind=%r — no adapter registered yet (S01 stub). "
-        "Account will be skipped.",
+        "resolve_filter: unknown kind=%r for account=%r — account will be skipped",
         kind,
+        account_id,
     )
     return None
 

@@ -63,11 +63,11 @@ Everything a caller must know to use a module: types, invariants, error modes, o
 
 ### Depth
 
-Leverage at the interface. Deep = a lot of behaviour behind a small interface. Shallow = interface nearly as complex as the implementation.
+Leverage at the interface. Deep = a lot of behavior behind a small interface. Shallow = interface nearly as complex as the implementation.
 
 ### Seam
 
-Where an interface lives. A place behaviour can be altered without editing in place. Use this term, not "boundary."
+Where an interface lives. A place behavior can be altered without editing in place. Use this term, not "boundary."
 
 ### Adapter
 

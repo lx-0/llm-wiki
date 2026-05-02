@@ -3,7 +3,7 @@ name: ingest-audio
 version: 1.0.0
 description: |
   Ingest audio files into an Obsidian vault. Transcribes audio (Whisper API or local
-  whisper.cpp), categorises content with an LLM, creates a vault note with frontmatter,
+  whisper.cpp), categorizes content with an LLM, creates a vault note with frontmatter,
   embedded audio player, transcript, and suggested filing location.
   Use when: new audio files appear, user drops audio, or asks to transcribe.
 allowed-tools:
@@ -20,7 +20,7 @@ allowed-tools:
 
 ## Overview
 
-Processes audio files (`.mp3`, `.m4a`, `.wav`, `.ogg`, `.webm`) and turns them into structured Obsidian vault notes with transcription, metadata, and categorisation.
+Processes audio files (`.mp3`, `.m4a`, `.wav`, `.ogg`, `.webm`) and turns them into structured Obsidian vault notes with transcription, metadata, and categorization.
 
 ## Configuration
 
@@ -95,9 +95,9 @@ pip install openai-whisper
 If neither works:
 1. Create the note with a `> TODO: transcribe` placeholder.
 2. Tell the user which install options exist (above).
-3. Categorise based on filename, file metadata, and surrounding context.
+3. Categorize based on filename, file metadata, and surrounding context.
 
-### Step 3 — categorise
+### Step 3 — categorize
 
 Analyse the transcript to determine:
 
@@ -129,7 +129,7 @@ date: {{date_from_filename_or_today}}
 
 # {{generated_title}}
 
-> Audio file transcribed and categorised by the ingest-audio pipeline.
+> Audio file transcribed and categorized by the ingest-audio pipeline.
 
 ## Audio
 
@@ -155,11 +155,11 @@ date: {{date_from_filename_or_today}}
 
 - Create the note in `$INBOX/` with `status: review`.
 - Move the audio file into `<target_folder>/_attachments/`.
-- `AskUserQuestion` to confirm the suggested categorisation:
+- `AskUserQuestion` to confirm the suggested categorization :
   - Suggested title
   - Suggested folder
   - Suggested type and tags
-  - Allow override before finalising.
+  - Allow override before finalizing.
 
 ## Rules
 
