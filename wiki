@@ -457,9 +457,10 @@ ${C_BOLD}USAGE${C_RESET}
   wiki seed --force             overwrite existing vault templates with engine versions
 
 ${C_BOLD}WHAT IT DOES${C_RESET}
-  - Seeds missing files: AGENTS.md, dashboard.md, _dashboard-stats.md
+  - Seeds missing files: AGENTS.md, dashboard.md
   - Seeds missing .obsidian/*.json + .obsidian/plugins/<name>/data.json
   - Merges community-plugins.json (additive — adds engine plugins, never drops yours)
+  - Cache files (_dashboard-*.md) are NOT seeded — first \`wiki flush\` writes them.
 
 ${C_BOLD}SAFETY${C_RESET}
   Default mode never overwrites your edits. Run after \`wiki update\` whenever

@@ -186,12 +186,10 @@ seed_vault_templates() {
   # 2. dashboard.md — Obsidian Homepage target.
   _seed_file "$templates_dir/dashboard.md" "$target/dashboard.md" "$force" "dashboard.md"
 
-  # 3. _dashboard-stats.md — placeholder cache; refreshed post-flush.
-  _seed_file \
-    "$templates_dir/_dashboard-stats.md" \
-    "$target/_dashboard-stats.md" \
-    "$force" \
-    "_dashboard-stats.md"
+  # 3. Cache files (_dashboard-*.md) are NOT seeded — they're producer-only outputs
+  #    of dashboard_stats.py / dashboard_lint.py. Seeding them (especially with --force)
+  #    would clobber live data with the placeholder template. First wiki flush writes
+  #    them fresh. See M003-S07 for full rationale.
 
   # 4. Templates/*.md — typed-note templates consumed by QuickAdd.
   if [[ -d "$templates_dir/Templates" ]]; then
