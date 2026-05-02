@@ -17,6 +17,7 @@ Run this file directly to dump the loaded config (useful for debugging):
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field, fields, is_dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -344,11 +345,64 @@ def _enumerate_keys(prefix: str, obj: object) -> list[str]:
     return keys
 
 
+_CONFIG_BACKUP_DIR_NAME = "config-backups"
+_CONFIG_BACKUP_KEEP_LAST = 10
+
+
+def _backup_dir() -> Path:
+    """Where round-robin config backups live. `<.wiki>/state/config-backups/`.
+
+    Imported from `config.py:STATE_DIR` lazily to avoid an import cycle —
+    `config.py` itself imports from `wiki_config.py` for TIMEZONE.
+    """
+    from datetime import datetime  # noqa: WPS433  re-import to avoid name clash
+
+    # Path: WIKI_DIR / state / config-backups
+    wiki_dir = CONFIG_FILE.parent  # CONFIG_FILE = <wiki>/config.yaml
+    return wiki_dir / "state" / _CONFIG_BACKUP_DIR_NAME
+
+
+def _backup_config_before_write() -> Path | None:
+    """Round-robin backup: snapshot the current config to a timestamped file.
+
+    Keeps the last `_CONFIG_BACKUP_KEEP_LAST` snapshots, prunes older.
+    Returns the backup path on success, None when there's nothing to back up.
+    Failures are logged but don't abort the calling save (defensive — losing
+    a backup is better than blocking a config write).
+    """
+    if not CONFIG_FILE.exists():
+        return None
+    try:
+        bdir = _backup_dir()
+        bdir.mkdir(parents=True, exist_ok=True)
+        ts = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+        out = bdir / f"config-{ts}.yaml"
+        # Avoid overwrite within same second — append micro-suffix.
+        if out.exists():
+            out = bdir / f"config-{ts}-{datetime.now(timezone.utc).microsecond:06d}.yaml"
+        out.write_bytes(CONFIG_FILE.read_bytes())
+
+        # Prune oldest beyond keep-count.
+        existing = sorted(bdir.glob("config-*.yaml"))
+        if len(existing) > _CONFIG_BACKUP_KEEP_LAST:
+            for stale in existing[: -_CONFIG_BACKUP_KEEP_LAST]:
+                try:
+                    stale.unlink()
+                except OSError:
+                    pass
+        return out
+    except OSError:
+        return None
+
+
 def _set_in_yaml(key: str, value: object) -> None:
     """Update or insert key in the YAML file. Falls back to a fresh file when missing.
 
     Note: PyYAML drops comments on round-trip. Header banner is re-emitted
     so the YAML stays human-friendly.
+
+    Side effect: every write is preceded by a round-robin backup of the
+    current config (last `_CONFIG_BACKUP_KEEP_LAST` snapshots kept).
     """
     parts = key.split(".")
     if CONFIG_FILE.exists():
@@ -369,11 +423,15 @@ def _set_in_yaml(key: str, value: object) -> None:
         cursor = cursor[part]
     cursor[parts[-1]] = value
 
+    # Round-robin backup before overwriting.
+    _backup_config_before_write()
+
     header = (
         "# Wiki Config — single source of truth for tunable parameters.\n"
         "# Defaults live in .wiki/scripts/wiki_config.py; only overrides need\n"
         "# to be in this file. Edit by hand or via `./.wiki/wiki config set …`.\n"
-        "# Note: comments not present here are dropped on programmatic writes.\n\n"
+        "# Note: comments not present here are dropped on programmatic writes.\n"
+        "# Round-robin backups in .wiki/state/config-backups/ (last 10 saves).\n\n"
     )
     CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
     CONFIG_FILE.write_text(

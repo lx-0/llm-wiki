@@ -117,10 +117,23 @@ def _decode_header(raw: str) -> str:
 
 
 def _parse_date(raw: str) -> datetime | None:
+    """Parse a Date: header into tz-aware UTC datetime.
+
+    Some mbox messages have tz-aware dates, some don't (older Outlook/
+    legacy clients). `min()` over a mixed set raises TypeError. Normalise
+    to tz-aware UTC at parse time so downstream code never has to care.
+    """
+    from datetime import timezone
+
     try:
-        return email.utils.parsedate_to_datetime(raw)
+        dt = email.utils.parsedate_to_datetime(raw)
     except Exception:
         return None
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
 
 
 def _iter_metadata(

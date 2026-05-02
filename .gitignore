@@ -13,6 +13,10 @@ config.yaml
 state/
 logs/
 sessions/
+# Round-robin config backups (every `wiki config set` snapshots the prior
+# state into state/config-backups/, last 10 kept). state/ already covers
+# this — listed explicitly for grep-ability.
+state/config-backups/
 
 # Legacy locations (M001/S02 lifted runtime dirs from scripts/{state,logs,sessions}/
 # up to the engine root; old installs may still have these on disk during the
