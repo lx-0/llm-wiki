@@ -60,10 +60,18 @@ log = logging.getLogger("compile")
 
 LOGS_DIR.mkdir(parents=True, exist_ok=True)
 _compile_log_file = LOGS_DIR / "compile.log"
+_compile_errors_file = LOGS_DIR / "compile-errors.log"
+_log_formatter = logging.Formatter(_LOG_FORMAT, datefmt=_LOG_DATEFMT)
+
 _file_handler = logging.FileHandler(_compile_log_file, encoding="utf-8")
-_file_handler.setFormatter(logging.Formatter(_LOG_FORMAT, datefmt=_LOG_DATEFMT))
+_file_handler.setFormatter(_log_formatter)
 _file_handler.setLevel(logging.INFO)
 logging.getLogger().addHandler(_file_handler)
+
+_error_handler = logging.FileHandler(_compile_errors_file, encoding="utf-8")
+_error_handler.setFormatter(_log_formatter)
+_error_handler.setLevel(logging.WARNING)
+logging.getLogger().addHandler(_error_handler)
 
 from wiki_config import CONFIG  # noqa: E402
 from prompts import render  # noqa: E402
