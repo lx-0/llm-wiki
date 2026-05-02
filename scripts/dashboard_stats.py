@@ -74,6 +74,7 @@ def count_failed_flushes() -> int:
 def count_lint_warnings() -> int:
     """Sum issues across the cheap (non-LLM) lint checks."""
     from lint import (
+        check_article_type,
         check_broken_links,
         check_missing_backlinks,
         check_orphan_pages,
@@ -88,6 +89,7 @@ def count_lint_warnings() -> int:
         check_orphan_sources,
         check_stale_articles,
         check_missing_backlinks,
+        check_article_type,
     )
     for fn in checks:
         try:

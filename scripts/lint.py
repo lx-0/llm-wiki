@@ -161,6 +161,69 @@ def check_missing_backlinks() -> list[dict]:
     return issues
 
 
+FOLDER_TO_TYPE = {
+    "concepts": "concept",
+    "connections": "connection",
+    "qa": "qa",
+    "people": "person",
+    "projects": "project",
+    "MOCs": "moc",
+}
+
+
+def _read_frontmatter(path: Path) -> dict:
+    """Cheap YAML frontmatter parse — returns {} on no/invalid frontmatter."""
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return {}
+    if not text.startswith("---"):
+        return {}
+    end = text.find("\n---", 3)
+    if end == -1:
+        return {}
+    block = text[3:end].strip("\n")
+    out: dict = {}
+    for line in block.splitlines():
+        if ":" not in line or line.lstrip().startswith("#"):
+            continue
+        key, _, val = line.partition(":")
+        out[key.strip()] = val.strip().strip('"').strip("'")
+    return out
+
+
+def check_article_type() -> list[dict]:
+    """Verify every knowledge article carries `type:` and that it matches its folder."""
+    issues = []
+    for article in list_wiki_articles():
+        rel = str(article.relative_to(KNOWLEDGE_DIR))
+        if article.name in ("index.md", "log.md"):
+            continue
+        # First path segment under knowledge/ is the substrate folder.
+        parts = rel.split("/")
+        if len(parts) < 2:
+            continue  # top-level file other than index/log — not a typed article
+        folder = parts[0]
+        expected = FOLDER_TO_TYPE.get(folder)
+        if expected is None:
+            continue  # unknown folder — let other checks handle it
+        fm = _read_frontmatter(article)
+        actual = fm.get("type")
+        if not actual:
+            issues.append(issue(
+                "warning", "missing_type", rel,
+                f"Missing `type:` frontmatter — expected `type: {expected}` (matches folder `{folder}/`)",
+                auto_fixable=True,
+            ))
+        elif actual != expected:
+            issues.append(issue(
+                "warning", "type_mismatch", rel,
+                f"`type: {actual}` does not match folder `{folder}/` (expected `type: {expected}`)",
+                auto_fixable=True,
+            ))
+    return issues
+
+
 def check_sparse_articles() -> list[dict]:
     """Find articles with fewer than SPARSE_THRESHOLD words."""
     issues = []
@@ -282,6 +345,7 @@ async def main() -> None:
         ("Orphan sources", check_orphan_sources),
         ("Stale articles", check_stale_articles),
         ("Missing backlinks", check_missing_backlinks),
+        ("Article type", check_article_type),
         ("Sparse articles", check_sparse_articles),
     ]
 

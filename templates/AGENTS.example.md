@@ -123,12 +123,28 @@ The LLM owns this directory entirely. Humans read it but rarely edit it directly
 knowledge/
 ├── index.md          # Master catalog — every article with one-line summary
 ├── log.md            # Append-only chronological build log
-├── concepts/         # Atomic knowledge articles
-├── connections/      # Cross-cutting insights linking 2+ concepts
-├── qa/               # Filed query answers (compounding knowledge)
-├── people/           # Person pages (one per person)
-└── projects/         # Project pages (one per project)
+├── concepts/         # Atomic knowledge articles            (type: concept)
+├── connections/      # Cross-cutting insights linking 2+    (type: connection)
+├── qa/               # Filed query answers                  (type: qa)
+├── people/           # Person pages (one per person)        (type: person)
+├── projects/         # Project pages (one per project)      (type: project)
+└── MOCs/             # Curated topic hubs (human-curated)   (type: moc)
 ```
+
+Each article in `knowledge/` carries this YAML frontmatter:
+
+```yaml
+---
+title: "Article Title"
+type: concept | connection | qa | person | project | moc
+compiled_from: "raw/articles/some-source.md"   # or list[] for multi-source
+created: 2026-04-01
+updated: 2026-05-02
+tags: [topic1, topic2]
+---
+```
+
+The `type:` field MUST match the destination folder. It is the single source of truth for substrate-type — Dataview queries, lint, dashboard charts, and the compile prompt all rely on it. Lint flags any article whose `type:` is missing or doesn't match its folder.
 
 ### Layer 4: This File (`AGENTS.md`)
 
