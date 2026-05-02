@@ -1,6 +1,8 @@
 [
   "dataview",
+  "heatmap-calendar",
   "homepage",
+  "obsidian-charts",
   "obsidian-excalidraw-plugin",
   "obsidian-meta-bind-plugin",
   "obsidian-tasks-plugin",

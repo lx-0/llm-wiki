@@ -4,8 +4,8 @@ slice: S01
 project: llm-wiki
 created: 2026-05-02T16:58:33Z
 status: done
-task_count: 5
-completed_tasks: 5
+task_count: 7
+completed_tasks: 7
 ---
 
 # M003-S01 — Slice Plan
@@ -28,6 +28,8 @@ completed_tasks: 5
 - [x] T03 — Implement `scripts/dashboard-stats.py`: reads `state.json` (`total_cost`), counts files in `failed-flushes/`, runs `lint.py --json` (or imports lint check functions directly), counts `list_raw_files()` minus `state.ingested` for pending compiles. Writes `_dashboard-stats.md` at vault root with frontmatter only: `pending_compiles`, `failed_flushes`, `lint_warnings`, `total_cost_lifetime`, `total_cost_today` (today comes from `state.history.jsonl` if exists, else null), `last_compile_ts`, `articles_total`, `daily_logs_total`. Runs as flush-piggyback (added to `flush.py` after `maybe_trigger_compile`). Done when `wiki flush` updates `_dashboard-stats.md` and a unit test verifies the file shape.
 - [x] T04 — Update `install.sh`: copy `Dashboard.md` into vault root if absent (parallel to existing `dashboard.md` clause). Update `seed_obsidian()` to also copy the homepage `data.json`. Document the change in `install.sh` ok-message. Done when running install on a fresh target seeds Dashboard.md, plugin config, and Obsidian opens Dashboard.md on next launch.
 - [x] T05 — Update `docs/PROCESS.md`: add a "Three-layer vault UX" section explaining Dashboard.md (human) vs `knowledge/index.md` (agent) vs `knowledge/MOCs/` (human-curated, lands in S04). Document `dashboard-stats.py` in the piggyback list. Done when `docs/PROCESS.md` has the new section and an internal doc-link from README.md (or AGENTS.md) points to it.
+- [x] T06 — Interactive dashboard rebuild (lx-pattern, but Meta Bind instead of deprecated Buttons plugin). Capture buttons (Notiz / Idee / Frage / Meeting) → QuickAdd → typed-note templates land in `inbox/`. Inbox triage table, Pending review table, Open tasks (Tasks plugin), Orphan list at the bottom. Engine-managed substrates (`raw/` / `daily/` / `knowledge/` / `Templates/`) excluded from working-file queries. Plugins added: meta-bind, quickadd, tasks. Templates folder seeded; `wiki seed` extended to copy `templates/Templates/`.
+- [x] T07 — P1 charts (was originally S03, merged forward). Five live `dataviewjs`-driven visualizations on the dashboard: source-type doughnut (`type:` distribution across knowledge/), top-15-tags bar, articles-per-folder bar, inbound-link histogram (graph-health buckets), daily-activity heatmap (last year, GitHub-style). Plugins added: obsidian-charts, heatmap-calendar. All five charts handle empty-vault and missing-plugin states gracefully.
 
 ## Verification
 

@@ -65,6 +65,151 @@ actions:
 
 ---
 
+## 📊 Vault stats
+
+> Live charts. Aggregated from `knowledge/` + `daily/` frontmatter via `dataviewjs`. They update when files change. Requires the **Charts** and **Heatmap Calendar** community plugins.
+
+### Source-type distribution
+
+```dataviewjs
+const pages = dv.pages('"knowledge"').filter(p => p.file.name !== "index" && p.file.name !== "log");
+const counts = {};
+for (const p of pages) {
+  const t = p.type || "untyped";
+  counts[t] = (counts[t] || 0) + 1;
+}
+const labels = Object.keys(counts);
+const data = Object.values(counts);
+if (labels.length === 0) {
+  dv.paragraph("_No articles in `knowledge/` yet — the chart will appear after the first compile._");
+} else if (typeof window.renderChart !== "function") {
+  dv.paragraph("_Charts plugin not installed — Settings → Community Plugins → search **Charts**._");
+} else {
+  window.renderChart({
+    type: "doughnut",
+    data: { labels, datasets: [{ label: "Articles", data }] },
+    options: { plugins: { legend: { position: "right" } } }
+  }, this.container);
+}
+```
+
+### Top 15 tags
+
+```dataviewjs
+const pages = dv.pages('"knowledge"').filter(p => p.file.name !== "index" && p.file.name !== "log");
+const tagCounts = {};
+for (const p of pages) {
+  const tags = p.tags ?? [];
+  const arr = Array.isArray(tags) ? tags : [tags];
+  for (const t of arr) {
+    const key = String(t);
+    if (!key) continue;
+    tagCounts[key] = (tagCounts[key] || 0) + 1;
+  }
+}
+const sorted = Object.entries(tagCounts).sort((a, b) => b[1] - a[1]).slice(0, 15);
+if (sorted.length === 0) {
+  dv.paragraph("_No tags found in compiled articles yet._");
+} else if (typeof window.renderChart !== "function") {
+  dv.paragraph("_Charts plugin not installed._");
+} else {
+  window.renderChart({
+    type: "bar",
+    data: {
+      labels: sorted.map(([k]) => k),
+      datasets: [{ label: "Articles", data: sorted.map(([, v]) => v) }]
+    },
+    options: { indexAxis: "y", plugins: { legend: { display: false } } }
+  }, this.container);
+}
+```
+
+### Articles per folder
+
+```dataviewjs
+const pages = dv.pages('"knowledge"').filter(p => p.file.name !== "index" && p.file.name !== "log");
+const counts = {};
+for (const p of pages) {
+  const f = p.file.folder || "knowledge";
+  counts[f] = (counts[f] || 0) + 1;
+}
+const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+if (sorted.length === 0) {
+  dv.paragraph("_No articles yet._");
+} else if (typeof window.renderChart !== "function") {
+  dv.paragraph("_Charts plugin not installed._");
+} else {
+  window.renderChart({
+    type: "bar",
+    data: {
+      labels: sorted.map(([k]) => k),
+      datasets: [{ label: "Articles", data: sorted.map(([, v]) => v) }]
+    },
+    options: { plugins: { legend: { display: false } } }
+  }, this.container);
+}
+```
+
+### Inbound-link distribution
+
+> How well-connected is the graph? A healthy LLM-wiki has most articles in the 1–10 inlinks range. Many zeros = orphan problem.
+
+```dataviewjs
+const pages = dv.pages('"knowledge"').filter(p => p.file.name !== "index" && p.file.name !== "log");
+const buckets = { "0": 0, "1–2": 0, "3–5": 0, "6–10": 0, "11+": 0 };
+for (const p of pages) {
+  const n = p.file.inlinks.length;
+  if (n === 0) buckets["0"]++;
+  else if (n <= 2) buckets["1–2"]++;
+  else if (n <= 5) buckets["3–5"]++;
+  else if (n <= 10) buckets["6–10"]++;
+  else buckets["11+"]++;
+}
+if (pages.length === 0) {
+  dv.paragraph("_No articles yet._");
+} else if (typeof window.renderChart !== "function") {
+  dv.paragraph("_Charts plugin not installed._");
+} else {
+  window.renderChart({
+    type: "bar",
+    data: {
+      labels: Object.keys(buckets),
+      datasets: [{ label: "Articles", data: Object.values(buckets) }]
+    },
+    options: { plugins: { legend: { display: false } } }
+  }, this.container);
+}
+```
+
+### Daily activity (current year)
+
+> One cell per day. Darker = more session activity captured to `daily/YYYY-MM-DD.md`. Requires the **Heatmap Calendar** plugin.
+
+```dataviewjs
+const dailyPages = dv.pages('"daily"');
+const entries = [];
+for (const p of dailyPages) {
+  const name = p.file.name;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(name)) {
+    const sizeKb = Math.max(1, Math.ceil(p.file.size / 1000));
+    entries.push({ date: name, intensity: Math.min(sizeKb, 5) });
+  }
+}
+if (entries.length === 0) {
+  dv.paragraph("_No daily logs yet — captured automatically by the session-end / pre-compact hooks._");
+} else if (typeof renderHeatmapCalendar !== "function") {
+  dv.paragraph("_Heatmap Calendar plugin not installed — Settings → Community Plugins → search **Heatmap Calendar**._");
+} else {
+  renderHeatmapCalendar(this.container, {
+    year: new Date().getFullYear(),
+    colors: { default: ["#9be9a8", "#40c463", "#30a14e", "#216e39"] },
+    entries
+  });
+}
+```
+
+---
+
 ## 📥 Inbox triage
 
 > New notes that haven't been classified yet. Move into `raw/<type>/` once you know where they belong; the compiler picks them up from there.
