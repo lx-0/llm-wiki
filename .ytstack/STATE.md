@@ -9,19 +9,19 @@ active_task: none
 
 # State
 
-**Status:** M001 in progress. S01 done (install seeds + skill-symlinks; smoke-tested). S02 + S03 pending.
+**Status:** M001 **done** (2026-05-02). All 3 slices closed: S01 install seeds + skill-symlinks, S02 engine layout refactor + Clippings sweep, S03 audit + minor cleanups. No active milestone.
 
 **M001 — Engine-Cleanup.** Goal: a new install of llm-wiki produces a working, opinionated vault out of the box, with engine artefacts cleanly separated from user content. Bundles 5 backlog items: cleanup-followups, engine-layout-cleanup, install-symlink-skills, clippings-sweep, wiki-config. Full context in `M001-CONTEXT.md`; tentative slicing in `M001-ROADMAP.md`.
 
 ## Next action
 
-Run `ytstack:slice-milestone` to break M001 into concrete slices + tasks. Tentative slice breakdown:
+Pick the next milestone. Candidates:
 
-- **S01** install-seeds + skill-symlinks (cleanup-followups template seeds + install-symlink-skills)
-- **S02** layout refactor + Clippings sweep (engine-layout-cleanup + clippings-sweep)
-- **S03** audit + minor cleanups (cleanup-followups remaining items + wiki-config)
+- **Active-use loop** (Q5 weak spot from the OFFICE-HOURS pitch — the highest-leverage feature work; closes the build-vs-use gap).
+- **Real feature from `.ytstack/backlog/`** — `collectors`, `nas-ingest`, `obsidian-plugin`, `compiler-suggestions`, `connection-quality`, `karpathy-comparison`. The first three are sizable; `connection-quality` is research-driven and could refactor compile prompts.
+- **Operator decides something else.**
 
-Slicing locks the per-slice file paths and verification steps.
+Run `ytstack:plan-milestone` once the next scope is chosen.
 
 ## Open decisions
 

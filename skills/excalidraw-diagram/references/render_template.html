@@ -13,6 +13,10 @@
   <div id="root"></div>
 
   <script type="module">
+    // Excalidraw pinned to 0.18.0 because the unpinned `?bundle` URL 404s on a
+    // transitive `@braintree/sanitize-url` dependency at the time of writing.
+    // Re-evaluate periodically: try unpinning to `@excalidraw/excalidraw?bundle`
+    // and verify a sample render still works. If yes, drop the version pin.
     import { exportToSvg } from "https://esm.sh/@excalidraw/excalidraw@0.18.0?bundle";
 
     window.renderDiagram = async function(jsonData) {

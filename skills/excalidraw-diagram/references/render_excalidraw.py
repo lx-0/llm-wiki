@@ -74,8 +74,16 @@ def render(
     output_path: Path | None = None,
     scale: int = 2,
     max_width: int = 1920,
+    module_timeout_ms: int = 90_000,
+    render_timeout_ms: int = 60_000,
 ) -> Path:
-    """Render an .excalidraw file to PNG. Returns the output PNG path."""
+    """Render an .excalidraw file to PNG. Returns the output PNG path.
+
+    Timeouts (in milliseconds) are tunable for large diagrams that exceed the
+    defaults. ``module_timeout_ms`` covers the Excalidraw ES-module load from
+    esm.sh; ``render_timeout_ms`` covers the actual draw-to-SVG once the
+    diagram JSON is injected.
+    """
     # Import playwright here so validation errors show before import errors
     try:
         from playwright.sync_api import sync_playwright
@@ -141,7 +149,7 @@ def render(
         page.goto(template_url)
 
         # Wait for the ES module to load (imports from esm.sh)
-        page.wait_for_function("window.__moduleReady === true", timeout=90000)
+        page.wait_for_function("window.__moduleReady === true", timeout=module_timeout_ms)
 
         # Inject the diagram data and render
         json_str = json.dumps(data)
@@ -154,7 +162,7 @@ def render(
             sys.exit(1)
 
         # Wait for render completion signal
-        page.wait_for_function("window.__renderComplete === true", timeout=60000)
+        page.wait_for_function("window.__renderComplete === true", timeout=render_timeout_ms)
 
         # Screenshot the SVG element
         svg_el = page.query_selector("#root svg")
@@ -244,13 +252,22 @@ def main() -> None:
                         help="Crop region in Excalidraw coords: 'x,y,width,height'. "
                              "Renders full diagram first, then extracts the region. "
                              "Output saved as *-crop.png next to the full render.")
+    parser.add_argument("--module-timeout", type=int, default=90_000,
+                        help="Module-load timeout in ms (default: 90000). Bump for slow networks.")
+    parser.add_argument("--render-timeout", type=int, default=60_000,
+                        help="Render-completion timeout in ms (default: 60000). "
+                             "Bump for very large diagrams (~150+ elements).")
     args = parser.parse_args()
 
     if not args.input.exists():
         print(f"ERROR: File not found: {args.input}", file=sys.stderr)
         sys.exit(1)
 
-    png_path = render(args.input, args.output, args.scale, args.width)
+    png_path = render(
+        args.input, args.output, args.scale, args.width,
+        module_timeout_ms=args.module_timeout,
+        render_timeout_ms=args.render_timeout,
+    )
     print(str(png_path))
 
     if args.crop:
