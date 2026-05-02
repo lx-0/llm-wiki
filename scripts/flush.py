@@ -41,6 +41,7 @@ LOG_FILE = LOGS_DIR / "flush.log"
 LAST_FLUSH_FILE = STATE_DIR / "last-flush.json"
 COMPILE_SCRIPT = SCRIPTS_DIR / "compile.py"
 DASHBOARD_STATS_SCRIPT = SCRIPTS_DIR / "dashboard_stats.py"
+DASHBOARD_LINT_SCRIPT = SCRIPTS_DIR / "dashboard_lint.py"
 TIMEZONE = CONFIG.scheduling.timezone
 COMPILE_AFTER_HOUR = CONFIG.scheduling.compile_after_hour
 DEDUP_WINDOW_SECONDS = CONFIG.scheduling.dedup_window_seconds
@@ -286,6 +287,28 @@ def refresh_dashboard_stats() -> None:
         log.exception("Failed to refresh dashboard stats")
 
 
+def refresh_dashboard_lint() -> None:
+    """Regenerate `_dashboard-lint.md` so the vault Dashboard reflects the
+    lint queues after this flush. Synchronous and best-effort."""
+    try:
+        result = subprocess.run(
+            [sys.executable, str(DASHBOARD_LINT_SCRIPT)],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            stdin=subprocess.DEVNULL,
+            check=False,
+            timeout=30,
+        )
+        if result.returncode != 0:
+            log.warning(
+                "dashboard_lint refresh failed (exit=%d): %s",
+                result.returncode,
+                result.stderr.decode("utf-8", errors="replace")[:500],
+            )
+    except Exception:
+        log.exception("Failed to refresh dashboard lint")
+
+
 # ── Piggyback tasks ─────────────────────────────────────────────────
 
 def _load_piggyback_state() -> dict:
@@ -429,6 +452,9 @@ async def main() -> None:
 
     # Refresh `_dashboard-stats.md` so the vault Dashboard reflects this flush.
     refresh_dashboard_stats()
+
+    # Refresh `_dashboard-lint.md` (lint queues) right after stats.
+    refresh_dashboard_lint()
 
     # Maybe run piggyback tasks (email scan, lint, review)
     maybe_run_piggyback_tasks()
