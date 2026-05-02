@@ -35,10 +35,9 @@ from pathlib import Path
 from typing import Iterable
 from zoneinfo import ZoneInfo
 
-from config import DAILY_DIR, SCRIPTS_DIR, TIMEZONE
+from config import DAILY_DIR, SESSIONS_DIR, TIMEZONE
 
 
-SESSIONS_DIR = SCRIPTS_DIR / "sessions"
 FAILED_DIR = SESSIONS_DIR / "failed-flushes"
 
 # kind -> filename prefix. Adding a new hook = add an entry here.

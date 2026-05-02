@@ -32,8 +32,8 @@ from wiki_config import CONFIG  # noqa: E402
 import flush_pipeline  # noqa: E402
 
 DAILY_DIR = ROOT_DIR / "daily"
-STATE_DIR = SCRIPTS_DIR / "state"     # *.json runtime artifacts (hash trackers, cooldowns)
-LOGS_DIR = SCRIPTS_DIR / "logs"       # *.log files
+STATE_DIR = WIKI_DIR / "state"     # *.json runtime artifacts (hash trackers, cooldowns)
+LOGS_DIR = WIKI_DIR / "logs"       # *.log files
 STATE_DIR.mkdir(parents=True, exist_ok=True)
 LOGS_DIR.mkdir(parents=True, exist_ok=True)
 

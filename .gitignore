@@ -7,14 +7,19 @@ config.yaml
 # Runtime artifacts — per-instance, never tracked.
 # (Inline `# comments` on these lines do NOT work — gitignore only treats `#`
 #  as a comment when it starts the line. Keep paths on their own lines.)
-# scripts/state/    — *.json hash trackers, dedup, cooldowns
-# scripts/logs/     — *.log files
-# scripts/sessions/ — session-flush-*.md / flush-context-*.md staging + failed-flushes/
+# state/    — *.json hash trackers, dedup, cooldowns
+# logs/     — *.log files
+# sessions/ — session-flush-*.md / flush-context-*.md staging + failed-flushes/
+state/
+logs/
+sessions/
+
+# Legacy locations (M001/S02 lifted runtime dirs from scripts/{state,logs,sessions}/
+# up to the engine root; old installs may still have these on disk during the
+# migration window). Drop after a release where every install has updated.
 scripts/state/
 scripts/logs/
 scripts/sessions/
-
-# Legacy locations (kept for back-compat with older instances on disk)
 scripts/state.json
 scripts/last-flush.json
 scripts/email-state.json

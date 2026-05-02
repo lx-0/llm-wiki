@@ -20,7 +20,7 @@ MIN_TURNS_TO_FLUSH = 5
 WIKI_DIR = Path(__file__).resolve().parent.parent  # .wiki/
 ROOT = WIKI_DIR.parent
 SCRIPTS_DIR = WIKI_DIR / "scripts"
-LOGS_DIR = SCRIPTS_DIR / "logs"
+LOGS_DIR = WIKI_DIR / "logs"
 LOGS_DIR.mkdir(parents=True, exist_ok=True)
 FLUSH_SCRIPT = SCRIPTS_DIR / "flush.py"
 LOG_FILE = LOGS_DIR / "flush.log"
