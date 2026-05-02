@@ -56,10 +56,15 @@ agent_config_path() {
 }
 
 # Returns 0 if our hooks are present in the agent's config.
+# Match heuristic: any reference to one of the engine's hook scripts that also
+# sits under a `.wiki/` path. Covers both the current install format
+# (`uv run --project .wiki python .wiki/hooks/session-start.py`) and the older
+# `cd '...wiki' && uv run python hooks/session-start.py` style some installs
+# still carry from earlier engine versions.
 hooks_installed() {
   local cfg="$1"
   [[ -f "$cfg" ]] || return 1
-  grep -q "\.wiki/hooks/" "$cfg" 2>/dev/null
+  grep -qE "\.wiki['\"/ ].*hooks/(session-(start|end)|pre-compact|_transcript)" "$cfg" 2>/dev/null
 }
 
 # ── Hook payload generators ──────────────────────────────────────────
