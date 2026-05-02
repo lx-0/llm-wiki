@@ -1,0 +1,43 @@
+{
+  "collapse-filter": false,
+  "search": "path:knowledge -path:knowledge/index -path:knowledge/log",
+  "showTags": false,
+  "showAttachments": false,
+  "hideUnresolved": false,
+  "showOrphans": false,
+  "collapse-color-groups": false,
+  "colorGroups": [
+    {
+      "query": "path:knowledge/concepts",
+      "color": { "a": 1, "rgb": 4870370 }
+    },
+    {
+      "query": "path:knowledge/projects",
+      "color": { "a": 1, "rgb": 5294712 }
+    },
+    {
+      "query": "path:knowledge/people",
+      "color": { "a": 1, "rgb": 16106264 }
+    },
+    {
+      "query": "path:knowledge/connections",
+      "color": { "a": 1, "rgb": 13056901 }
+    },
+    {
+      "query": "path:knowledge/qa",
+      "color": { "a": 1, "rgb": 52945 }
+    }
+  ],
+  "collapse-display": true,
+  "showArrow": false,
+  "textFadeMultiplier": 0,
+  "nodeSizeMultiplier": 1,
+  "lineSizeMultiplier": 1,
+  "collapse-forces": false,
+  "centerStrength": 0.5,
+  "repelStrength": 10,
+  "linkStrength": 1,
+  "linkDistance": 250,
+  "scale": 1,
+  "close": true
+}
