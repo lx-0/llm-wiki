@@ -5,7 +5,7 @@ size: L
 created: 2026-05-02T16:58:33Z
 status: planned
 total_slices: 7
-completed_slices: 1
+completed_slices: 2
 ---
 
 # M003 Roadmap
@@ -29,7 +29,7 @@ completed_slices: 1
 Slice detail lives in per-slice `M003-S##-PLAN.md` files, created by `ytstack:slice-milestone`.
 
 - [x] S01 — Dashboard scaffold + homepage plugin (basic Dashboard.md, engine-status callout with counts only, recents/top-concepts dataview tables, install homepage) — see `M003-S01-PLAN.md`
-- [ ] S02 — Lint-triage queues (surface lint.py warnings as collapsible callouts on Dashboard: orphans / stale / missing backlinks / failed flushes)
+- [x] S02 — Lint-triage queues (surface lint.py warnings as collapsible callouts on Dashboard: orphans / stale / missing backlinks / failed flushes)
 - [ ] S03 — Reserved (originally "P1 charts + chart plugins"; the 5 P1 charts and both plugins were absorbed into S01-T07. Remaining S03 candidates: Mermaid timelines / Gantt for milestone visualisation, Datacore card views once stable, click-through chart drilldowns. Re-scope at slice-time.)
 - [ ] S04 — MOC layer (knowledge/MOCs/ directory, AGENTS.md schema for `type: moc`, seed 2-3 hand-written MOCs, Dashboard MOC section)
 - [ ] S05 — state.history.jsonl + P2 charts (append-only history layer in utils.py, wire compile.py + flush.py, install obsidian-tracker, add 3 time-series charts)

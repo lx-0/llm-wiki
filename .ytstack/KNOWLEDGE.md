@@ -303,6 +303,28 @@ Default Chart.js text/grid colors are dark gray → invisible on Obsidian's dark
 
 The plugin list might contain operator-added plugins the engine doesn't know about. Default seed mode does **jq union merge** (`jq -s '.[0] + .[1] | unique'`) — never drops entries. Other files (dashboard.md, AGENTS.md) skip-if-exists with `--force` to overwrite.
 
+### Obsidian writes `.obsidian/*.json` from RAM — race-condition with `wiki seed`
+
+`graph.json`, `workspace.json`, `appearance.json`, plugin `data.json` files are all serialized from Obsidian's in-memory state on view-changes / pane-saves / app-quit. If Obsidian is running while `wiki seed --force` deploys a new template, Obsidian's next save **clobbers the template** silently — the search field in `graph.json` survived once because reads happened before saves, but `colorGroups` got wiped to `[]`.
+
+**Operator workflow when re-seeding Obsidian configs:**
+
+1. Cmd+Q Obsidian (full quit, not just window close — background process keeps writing)
+2. `wiki seed --force` (or selective re-deploy)
+3. Reopen Obsidian
+
+Engine perspective: any file under `templates/.obsidian/` that Obsidian also writes to is racing. Seeding is best-effort while the app is live.
+
+### Graph View filter — `knowledge/index.md` and `knowledge/log.md` are excluded by template default
+
+These two top-level files are flat-overview hubs (`index.md` is the auto-generated article table written by `compile.py`; `log.md` is the chronological roll-up). They link to every article by definition → in the Graph View they form a hairball where every node connects to both, dwarfing real semantic edges.
+
+**Filter:** `templates/.obsidian/graph.json` ships `search: "path:knowledge -path:knowledge/index -path:knowledge/log"`. Exclusion works because both are top-level files (not folders) — there's no risk of accidentally hiding a `knowledge/index/*.md` subtree.
+
+**Reports/Dashboard/Lint are already correct** — `WIKI_SUBDIRS` in `scripts/utils.py` only iterates `concepts/`, `connections/`, `qa/`, `people/`, `projects/`, `facts/`, so `list_wiki_articles()` excludes `index.md` / `log.md` from connection-counting, orphan-detection, and missing-backlink scans. The Graph View was the only surface that needed an explicit filter.
+
+The single intentional exception: `lint.py:check_orphan_pages` reads `read_wiki_index()` and treats articles listed in `index.md` as "not orphan". That's by design — the auto-generated index is the canonical reachability list.
+
 ### `homepage` plugin needs binary install + config seed
 
 Seeding `.obsidian/plugins/homepage/data.json` with `value: "dashboard"` and `openOnStartup: true` is necessary but not sufficient. The plugin **binary** must be installed via Settings → Community Plugins → Browse. Once binary lands, it reads our seeded config. Same for `obsidian-charts`, `obsidian-meta-bind-plugin`, `obsidian-tasks-plugin`, `obsidian-shellcommands`, `quickadd`, `heatmap-calendar`.

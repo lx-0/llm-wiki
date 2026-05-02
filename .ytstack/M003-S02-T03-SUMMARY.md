@@ -1,22 +1,21 @@
 ---
 milestone: M003
 slice: S02
-task: T01
+task: T03
 project: llm-wiki
 closed: draft
 verification: pending
 source: post-tool-use-bash-draft
 ---
 
-# M003-S02-T01 -- Summary (draft)
+# M003-S02-T03 -- Summary (draft)
 
 Auto-draft created by the `post-tool-use-bash` hook on first commit of this task. Run `/ytstack:summarize-task` to fill in Outcome / Deviations / Follow-ups / Verification.
 
 ## Commits so far
-- `3f4b287` -- M003-S02-T01 — dashboard_lint.py + flush.py wiring (2026-05-02T20:54:53Z)
-- `86002c0` -- Per-daily-file Summarize button — context-aware via {{file_basename}} (2026-05-02T20:51:24Z)
+- `a50c55b` -- templates/.obsidian/graph.json — filter index.md/log.md from Graph View (2026-05-02T20:57:40Z)
 
-- `86002c0` -- Per-daily-file Summarize button — context-aware via {{file_basename}} (2026-05-02T20:40:21Z)
+- `655f747` -- M003-S02-T03 — wiki shell wrapper refreshes both caches (2026-05-02T20:57:23Z)
 
 ## Outcome
 
