@@ -24,7 +24,7 @@
 
 <table align="center">
   <tr>
-    <td align="center"><strong>8</strong><br/>collectors</td>
+    <td align="center"><strong>9</strong><br/>substrate sources</td>
     <td align="center"><strong>5</strong><br/>skills bundled</td>
     <td align="center"><strong>MIT</strong><br/>open source</td>
   </tr>
@@ -63,7 +63,7 @@ llm-wiki is the **compilation layer** between raw substrates and active consumpt
 
 ## What you get
 
-- **Two-path ingest** — automatic session capture (hooks → `daily/`) and curated sources (8 collectors → `raw/`) converge at one compiler.
+- **Two-path ingest** — automatic session capture (hooks → `daily/`) and 9 substrate-source scripts (scanners + clipper + memory-sync + manual drop → `raw/`) converge at one compiler. One of them, `scan-email`, has been migrated to the formal Collector pattern; the rest are scheduled for the same migration.
 - **Compile once, query fast** — knowledge is distilled into Markdown wikilinks at compile time. No embedding step, no retrieval per query.
 - **Multi-agent hooks** — `session-start` / `session-end` / `pre-compact` wired into Claude Code, Codex, Gemini, and Cursor. Every session ends as a structured daily-log entry.
 - **Curiosity loop** — a small local Ollama model spots gaps after each compile and queues deep-scan requests for the next cycle.
@@ -73,6 +73,8 @@ llm-wiki is the **compilation layer** between raw substrates and active consumpt
 - **One install, one CLI, one venv** — `wiki setup` + `wiki update` + `wiki status` cover the full lifecycle.
 
 ![Architecture](docs/architecture.png)
+
+<sub>Rendered from [`docs/architecture.excalidraw`](docs/architecture.excalidraw) — edit in [excalidraw.com](https://excalidraw.com) or Obsidian's Excalidraw plugin.</sub>
 
 ## What it looks like in Obsidian
 
@@ -244,8 +246,13 @@ cd ~/path/to/vault
 ## Update
 
 ```bash
-./.wiki/wiki update       # pulls latest from main, preserves config.yaml + .venv/
+./.wiki/wiki update              # git pull --ff-only + sync skill symlinks into .claude/skills/
+./.wiki/wiki update --no-skills  # pull only (skip skill sync)
+./.wiki/wiki skills status       # per-skill linked / collision / missing table
+./.wiki/wiki skills install      # ad-hoc resync without pulling
 ```
+
+`wiki update` pulls into `.wiki/` (preserves `config.yaml` + `.venv/`), then runs `wiki skills sync` so newly-shipped engine skills land in `<vault>/.claude/skills/` automatically. Foreign entries (your own skills, other tools' symlinks) are never touched.
 
 ## Running scripts manually
 
@@ -267,7 +274,7 @@ Hooks always use Option B (the `--project` flag is hardcoded into the agent conf
 | Doc | What's inside |
 |---|---|
 | [docs/concept.md](docs/concept.md) | Three-layer architecture, compile-vs-RAG, cognitive-function mapping, curiosity loop |
-| [docs/PROCESS.md](docs/PROCESS.md) | Live documentation of every data flow inside the engine — 11 numbered processes (German prose, English diagrams) |
+| [docs/PROCESS.md](docs/PROCESS.md) *(German)* | Live documentation of every data flow inside the engine — 11 numbered processes (German prose, English diagrams) |
 | [docs/cli.md](docs/cli.md) | Full CLI reference — every `wiki <subcommand>`, every config key, every hook target |
 | [docs/engine-layout.md](docs/engine-layout.md) | File-by-file tree of `.wiki/` — the engine internals |
 | [docs/naming.md](docs/naming.md) | Naming conventions for raw sources and knowledge articles |
