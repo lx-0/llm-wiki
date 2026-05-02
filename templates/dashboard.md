@@ -86,7 +86,7 @@ hidden: false
 class: ""
 tooltip: "Run `wiki compile --all` — force-recompile every source. Ask for confirmation."
 id: btn-compile-all
-style: muted
+style: destructive
 actions:
   - type: command
     command: "Shell commands: Wiki: compile (all sources, force)"
@@ -133,6 +133,12 @@ actions:
 // from forming a real DOM hierarchy with their children — the grid container ends
 // up empty and charts render as orphaned siblings. Building the grid in JS makes
 // the DOM hierarchy independent of Obsidian's per-block wrapping.
+//
+// The IIFE wrapper is required because Dataview executes the script body
+// at top level (no enclosing function), so a bare `return` would throw
+// `SyntaxError: Illegal return statement`.
+
+;(() => {
 
 const cs = getComputedStyle(document.body);
 const _v = (name, fallback) => (cs.getPropertyValue(name) || fallback).trim();
@@ -299,6 +305,8 @@ const pages = dv.pages('"knowledge"').filter(p => p.file.name !== "index" && p.f
     }, target);
   }
 }
+
+})();
 ```
 
 ### Daily activity (current year)
