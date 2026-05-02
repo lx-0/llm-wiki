@@ -127,14 +127,21 @@ def check_stale_articles() -> list[dict]:
 
     for source in list_raw_files():
         rel = str(source.relative_to(ROOT_DIR))
-        if rel in ingested:
-            stored_hash = ingested[rel].get("hash", "")
-            current_hash = file_hash(source)
-            if stored_hash != current_hash:
-                issues.append(issue(
-                    "warning", "stale_article", rel,
-                    f"Stale: {rel} has changed since last compilation",
-                ))
+        if rel not in ingested:
+            continue
+        # state.ingested[rel] is a hash string (compile.py:492 writes file_hash(source) directly).
+        # Older state files used a {hash, compiled_at, ...} dict shape — handle both defensively.
+        stored = ingested[rel]
+        if isinstance(stored, dict):
+            stored_hash = stored.get("hash", "")
+        else:
+            stored_hash = str(stored)
+        current_hash = file_hash(source)
+        if stored_hash != current_hash:
+            issues.append(issue(
+                "warning", "stale_article", rel,
+                f"Stale: {rel} has changed since last compilation",
+            ))
     return issues
 
 
@@ -351,7 +358,15 @@ async def main() -> None:
 
     for name, check_fn in checks:
         log.info("Checking: %s...", name)
-        issues = check_fn()
+        try:
+            issues = check_fn()
+        except Exception as exc:  # noqa: BLE001 — one bad check must not abort the run
+            log.exception("Check %r crashed: %s", name, exc)
+            all_issues.append(issue(
+                "error", "check_crashed", "(system)",
+                f"Lint check {name!r} crashed: {exc}. See logs for traceback.",
+            ))
+            continue
         all_issues.extend(issues)
         log.info("  Found %d issue(s)", len(issues))
 

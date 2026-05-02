@@ -63,6 +63,62 @@ actions:
 
 ![[_dashboard-stats]]
 
+## 🔧 Run
+
+> One-click ops. Each button executes a `wiki <subcommand>` via the **Shell commands** plugin. Output appears as a notification.
+
+<div class="wiki-button-row">
+
+```meta-bind-button
+label: ▶️ Compile changed
+hidden: false
+class: ""
+tooltip: "Run `wiki compile` — process raw/ + daily/ files whose hash changed since last run."
+id: btn-compile
+style: primary
+actions:
+  - type: command
+    command: "Shell commands: Wiki: compile (changed sources)"
+```
+
+```meta-bind-button
+label: 🔁 Compile all
+hidden: false
+class: ""
+tooltip: "Run `wiki compile --all` — force-recompile every source. Ask for confirmation."
+id: btn-compile-all
+style: muted
+actions:
+  - type: command
+    command: "Shell commands: Wiki: compile (all sources, force)"
+```
+
+```meta-bind-button
+label: 🛡 Lint
+hidden: false
+class: ""
+tooltip: "Run `wiki lint --structural-only` — orphan / broken-link / type-mismatch checks (no LLM)."
+id: btn-lint
+style: default
+actions:
+  - type: command
+    command: "Shell commands: Wiki: lint (structural)"
+```
+
+```meta-bind-button
+label: 🔄 Refresh stats
+hidden: false
+class: ""
+tooltip: "Re-run dashboard_stats.py — recompute pending counts, lint warnings, total cost."
+id: btn-refresh-stats
+style: default
+actions:
+  - type: command
+    command: "Shell commands: Wiki: refresh dashboard stats"
+```
+
+</div>
+
 ## 🔗 Quick access
 
 [[knowledge/index|Index]] · [[AGENTS|Schema]] · [[knowledge/log|Compile log]]
