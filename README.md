@@ -3,7 +3,11 @@
 </p>
 
 <p align="center">
-  <em>An LLM-compiled wiki for solo knowledge workers — and the AI agents you work with every day.</em>
+  <em>Self-cartography engine.</em>
+</p>
+
+<p align="center">
+  AI memories + sessions + scans + clippings → an LLM-compiled Obsidian wiki you and your agents read from daily.
 </p>
 
 <p align="center">

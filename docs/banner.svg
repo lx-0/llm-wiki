@@ -37,7 +37,7 @@
   <!-- Tagline -->
   <g font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, Inter, Roboto, sans-serif" fill="#cbd5e1">
     <text x="64" y="220" font-size="22" font-weight="400">
-      AI memories <tspan fill="#64748b">·</tspan> daily logs <tspan fill="#64748b">·</tspan> clippings
+      AI memories <tspan fill="#64748b">·</tspan> sessions <tspan fill="#64748b">·</tspan> scans <tspan fill="#64748b">·</tspan> clippings
     </text>
     <text x="64" y="252" font-size="22" font-weight="400">
       <tspan fill="url(#accent)" font-weight="600">→</tspan> an LLM-compiled Obsidian wiki you and your agents read from daily.
