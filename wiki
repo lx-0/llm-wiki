@@ -22,6 +22,13 @@
 #   wiki update                git pull --ff-only the .wiki/ checkout (preserves config.yaml)
 #   wiki seed                  re-seed missing vault templates (additive, safe)
 #   wiki seed --force          overwrite existing vault templates with engine versions
+#   wiki compile               run compile.py — process all changed sources into knowledge/
+#   wiki compile --file PATH   compile a single source file
+#   wiki flush                 capture current Claude Code context → daily/ (manual flush)
+#   wiki lint                  run lint.py — structural + LLM contradiction checks
+#   wiki lint --structural-only  cheap, no-LLM lint (used by piggyback)
+#   wiki query "QUESTION"      ask the knowledge base via the configured model
+#   wiki review-wiki           per-article quality-score sweep (local LLM, free)
 #   wiki version               print installed git revision
 #   wiki help                  this message
 
@@ -226,6 +233,128 @@ ${C_BOLD}DOCS${C_RESET}
 EOF
 }
 
+_run_script() {
+  # Helper: run a script under the wiki venv. $1 = script name, rest = args.
+  local script="$1"; shift
+  uv run --quiet --project "$WIKI_DIR" python "$WIKI_DIR/scripts/$script" "$@"
+}
+
+_refresh_dashboard_stats() {
+  uv run --quiet --project "$WIKI_DIR" python "$WIKI_DIR/scripts/dashboard_stats.py" 2>/dev/null || true
+}
+
+cmd_compile() {
+  case "${1:-}" in
+    -h|--help|help)
+      cat <<EOF
+${C_BOLD}wiki compile${C_RESET} — run the compiler against changed (or all) sources
+
+${C_BOLD}USAGE${C_RESET}
+  wiki compile                       compile only sources whose hash changed since last run
+  wiki compile --all                 force-recompile every source in raw/ + daily/
+  wiki compile --file PATH           compile a single file (relative to vault root)
+
+${C_BOLD}NOTES${C_RESET}
+  Wraps \`scripts/compile.py\`. Runs Claude Agent SDK against your configured compile_model.
+  LLM cost applies. Dashboard counts refresh automatically afterwards.
+EOF
+      return 0 ;;
+  esac
+  banner "wiki compile"
+  _run_script compile.py "$@"
+  local rc=$?
+  _refresh_dashboard_stats
+  return $rc
+}
+
+cmd_flush() {
+  case "${1:-}" in
+    -h|--help|help)
+      cat <<EOF
+${C_BOLD}wiki flush${C_RESET} — capture the current Claude Code session context to daily/
+
+${C_BOLD}USAGE${C_RESET}
+  wiki flush                         manually trigger a flush (normally automatic via hooks)
+
+${C_BOLD}NOTES${C_RESET}
+  Wraps \`scripts/flush.py\`. Reads recent session transcript, extracts a
+  daily-log entry, appends to \`daily/YYYY-MM-DD.md\`. After 18:00 (or
+  whatever \`scheduling.compile_after_hour\` is set to), triggers compile +
+  piggyback tasks. Dashboard counts refresh automatically afterwards.
+EOF
+      return 0 ;;
+  esac
+  banner "wiki flush"
+  _run_script flush.py "$@"
+  local rc=$?
+  _refresh_dashboard_stats
+  return $rc
+}
+
+cmd_lint() {
+  case "${1:-}" in
+    -h|--help|help)
+      cat <<EOF
+${C_BOLD}wiki lint${C_RESET} — health-check the knowledge base
+
+${C_BOLD}USAGE${C_RESET}
+  wiki lint                          full: structural + LLM contradiction check (\$ cost)
+  wiki lint --structural-only        cheap structural checks only (no LLM)
+
+${C_BOLD}NOTES${C_RESET}
+  Wraps \`scripts/lint.py\`. Structural checks: broken_links, orphan_pages,
+  orphan_sources, stale_articles, missing_backlinks, article_type, sparse_articles.
+  Report saved to \`.wiki/reports/lint-YYYY-MM-DD.md\`. Dashboard counts refresh.
+EOF
+      return 0 ;;
+  esac
+  banner "wiki lint"
+  _run_script lint.py "$@"
+  local rc=$?
+  _refresh_dashboard_stats
+  return $rc
+}
+
+cmd_query() {
+  case "${1:-}" in
+    ""|-h|--help|help)
+      cat <<EOF
+${C_BOLD}wiki query${C_RESET} — ask the knowledge base in natural language
+
+${C_BOLD}USAGE${C_RESET}
+  wiki query "WHAT did we decide about X?"
+
+${C_BOLD}NOTES${C_RESET}
+  Wraps \`scripts/query.py\`. Reads \`knowledge/index.md\`, picks the
+  relevant articles, answers via the configured query model. LLM cost applies.
+EOF
+      return 0 ;;
+  esac
+  banner "wiki query"
+  _run_script query.py "$@"
+}
+
+cmd_review_wiki() {
+  case "${1:-}" in
+    -h|--help|help)
+      cat <<EOF
+${C_BOLD}wiki review-wiki${C_RESET} — per-article quality scores via local LLM
+
+${C_BOLD}USAGE${C_RESET}
+  wiki review-wiki                   sweep every article, score each one
+
+${C_BOLD}NOTES${C_RESET}
+  Wraps \`scripts/review-wiki.py\`. Uses the local Ollama model — \$0 cost.
+  Output goes to \`.wiki/reports/review-YYYY-MM-DD.md\`. Runs as weekly piggyback
+  by default; this command is for ad-hoc manual runs.
+EOF
+      return 0 ;;
+  esac
+  banner "wiki review-wiki"
+  _run_script review-wiki.py "$@"
+}
+
+
 cmd_seed() {
   local force=0
   while [[ $# -gt 0 ]]; do
@@ -405,6 +534,11 @@ case "${1:-}" in
   gmail-auth)       shift; cmd_gmail_auth "$@" ;;
   update)           shift; cmd_update "$@" ;;
   seed)             shift; cmd_seed "$@" ;;
+  compile)          shift; cmd_compile "$@" ;;
+  flush)            shift; cmd_flush "$@" ;;
+  lint)             shift; cmd_lint "$@" ;;
+  query)            shift; cmd_query "$@" ;;
+  review-wiki)      shift; cmd_review_wiki "$@" ;;
   version)          shift; cmd_version "$@" ;;
   help|-h|--help)   cmd_help ;;
   *)                err "unknown command: $1"; cmd_help; exit 1 ;;

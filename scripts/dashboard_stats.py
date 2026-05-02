@@ -49,11 +49,12 @@ FAILED_DIR = SESSIONS_DIR / "failed-flushes"
 # ── Counters ────────────────────────────────────────────────────────
 
 
-def count_pending_compiles() -> int:
-    """Count raw/daily files whose hash differs from `state.ingested`."""
+def list_pending_compiles() -> list[str]:
+    """Return relative paths of raw/daily files whose hash differs from `state.ingested`.
+    Caller decides whether to count or display."""
     state = load_state()
     ingested = state.get("ingested", {})
-    pending = 0
+    pending: list[str] = []
     for f in list_raw_files():
         rel = str(f.relative_to(ROOT_DIR))
         try:
@@ -61,8 +62,13 @@ def count_pending_compiles() -> int:
         except (OSError, ValueError):
             continue
         if ingested.get(rel) != current_hash:
-            pending += 1
+            pending.append(rel)
+    pending.sort()
     return pending
+
+
+def count_pending_compiles() -> int:
+    return len(list_pending_compiles())
 
 
 def count_failed_flushes() -> int:
@@ -115,8 +121,10 @@ def latest_compile_ts() -> str | None:
 
 
 def compute_stats() -> dict:
+    pending = list_pending_compiles()
     return {
-        "pending_compiles": count_pending_compiles(),
+        "pending_compiles": len(pending),
+        "pending_compile_paths": pending,
         "failed_flushes": count_failed_flushes(),
         "lint_warnings": count_lint_warnings(),
         "total_cost_lifetime": round(total_cost_lifetime(), 4),
@@ -143,7 +151,7 @@ def render_callout(stats: dict) -> str:
     failed_icon = "🟢" if failed == 0 else "🔴"
     lint_icon = "🟢" if lint == 0 else ("🟡" if lint < 10 else "🔴")
 
-    return (
+    callout = (
         "> [!info] Pipeline status\n"
         f"> {pending_icon} **Pending compiles:** {pending}\n"
         f"> {failed_icon} **Failed flushes:** {failed}\n"
@@ -152,6 +160,21 @@ def render_callout(stats: dict) -> str:
         f"> 📚 **Articles:** {articles} · **Daily logs:** {daily}\n"
         f"> 🕐 **Last compile:** {last}\n"
     )
+
+    pending_paths = stats.get("pending_compile_paths", [])
+    if pending_paths:
+        preview_n = 20
+        shown = pending_paths[:preview_n]
+        more = len(pending_paths) - len(shown)
+        items = "\n".join(f"- [[{p}]]" for p in shown)
+        if more > 0:
+            items += f"\n- _… and {more} more_"
+        callout += (
+            "\n## ⏭ Pending compile\n\n"
+            f"{items}\n"
+        )
+
+    return callout
 
 
 def write_dashboard_stats(stats: dict, callout: str) -> Path:
