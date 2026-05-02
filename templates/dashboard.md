@@ -5,6 +5,8 @@
 
 ## ➕ Capture
 
+<div class="wiki-button-row">
+
 ```meta-bind-button
 label: 📝 Notiz
 hidden: false
@@ -53,6 +55,8 @@ actions:
     command: "QuickAdd: Neues Meeting"
 ```
 
+</div>
+
 ---
 
 ## ⚡ Engine status
@@ -67,7 +71,11 @@ actions:
 
 ## 📊 Vault stats
 
-> Live charts. Aggregated from `knowledge/` + `daily/` frontmatter via `dataviewjs`. They update when files change. Requires the **Charts** and **Heatmap Calendar** community plugins.
+> Live charts. Aggregated from `knowledge/` + `daily/` frontmatter via `dataviewjs`. They update when files change. Requires **Charts**, **Heatmap Calendar**, and the `wiki-dashboard` CSS snippet (Settings → Appearance → CSS snippets).
+
+<div class="wiki-chart-grid">
+
+<div>
 
 ### Source-type distribution
 
@@ -88,10 +96,18 @@ const palette = [
   _v("--color-pink", "#d36fb8"),
 ];
 
+// Engine articles use folder-as-type (concepts/, connections/, people/, projects/, qa/).
+// Fall back to explicit `type:` frontmatter if set.
 const pages = dv.pages('"knowledge"').filter(p => p.file.name !== "index" && p.file.name !== "log");
 const counts = {};
 for (const p of pages) {
-  const t = p.type || "untyped";
+  let t = p.type;
+  if (!t) {
+    // file.folder looks like "knowledge/concepts" — take the last segment.
+    const folder = p.file.folder || "";
+    const segs = folder.split("/").filter(Boolean);
+    t = segs.length > 1 ? segs[segs.length - 1] : "knowledge-root";
+  }
   counts[t] = (counts[t] || 0) + 1;
 }
 const labels = Object.keys(counts);
@@ -121,6 +137,10 @@ if (labels.length === 0) {
   }, this.container);
 }
 ```
+
+</div>
+
+<div>
 
 ### Top 15 tags
 
@@ -172,23 +192,36 @@ if (sorted.length === 0) {
 }
 ```
 
-### Articles per folder
+</div>
+
+<div>
+
+### Article freshness
+
+> When were articles last touched? A healthy wiki has most weight in the recent buckets; lots of 90+ day articles means content is going stale.
 
 ```dataviewjs
 const cs = getComputedStyle(document.body);
 const _v = (name, fallback) => (cs.getPropertyValue(name) || fallback).trim();
 const textColor = _v("--text-normal", "#ddd");
 const gridColor = _v("--background-modifier-border", "#444");
-const accent = _v("--color-green", "#5fb364");
+const ok = _v("--color-green", "#5fb364");
+const warn = _v("--color-yellow", "#d6b85b");
+const danger = _v("--color-red", "#d65b5b");
 
 const pages = dv.pages('"knowledge"').filter(p => p.file.name !== "index" && p.file.name !== "log");
-const counts = {};
+const now = Date.now();
+const day = 24 * 60 * 60 * 1000;
+const buckets = { "<7d": 0, "7–30d": 0, "30–90d": 0, "90d+": 0 };
 for (const p of pages) {
-  const f = p.file.folder || "knowledge";
-  counts[f] = (counts[f] || 0) + 1;
+  const ageDays = (now - p.file.mtime.toMillis()) / day;
+  if (ageDays < 7) buckets["<7d"]++;
+  else if (ageDays < 30) buckets["7–30d"]++;
+  else if (ageDays < 90) buckets["30–90d"]++;
+  else buckets["90d+"]++;
 }
-const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
-if (sorted.length === 0) {
+const colors = [ok, ok, warn, danger];
+if (pages.length === 0) {
   dv.paragraph("_No articles yet._");
 } else if (typeof window.renderChart !== "function") {
   dv.paragraph("_Charts plugin not installed._");
@@ -196,12 +229,12 @@ if (sorted.length === 0) {
   window.renderChart({
     type: "bar",
     data: {
-      labels: sorted.map(([k]) => k),
+      labels: Object.keys(buckets),
       datasets: [{
         label: "Articles",
-        data: sorted.map(([, v]) => v),
-        backgroundColor: accent,
-        borderColor: accent,
+        data: Object.values(buckets),
+        backgroundColor: colors,
+        borderColor: gridColor,
         borderWidth: 1
       }]
     },
@@ -215,6 +248,10 @@ if (sorted.length === 0) {
   }, this.container);
 }
 ```
+
+</div>
+
+<div>
 
 ### Inbound-link distribution
 
@@ -267,6 +304,10 @@ if (pages.length === 0) {
   }, this.container);
 }
 ```
+
+</div>
+
+</div>
 
 ### Daily activity (current year)
 

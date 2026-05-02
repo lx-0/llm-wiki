@@ -114,7 +114,17 @@ seed_vault_templates() {
       fi
     done
 
-    # 6. .obsidian/plugins/*/data.json — per-plugin defaults (recursive).
+    # 6. .obsidian/snippets/*.css — CSS snippets for the dashboard layout.
+    if [[ -d "$templates_dir/.obsidian/snippets" ]]; then
+      mkdir -p "$target/.obsidian/snippets"
+      local css
+      for css in "$templates_dir/.obsidian/snippets"/*.css; do
+        [[ -f "$css" ]] || continue
+        _seed_file "$css" "$target/.obsidian/snippets/$(basename "$css")" "$force" ".obsidian/snippets/$(basename "$css")"
+      done
+    fi
+
+    # 7. .obsidian/plugins/*/data.json — per-plugin defaults (recursive).
     if [[ -d "$templates_dir/.obsidian/plugins" ]]; then
       local src rel dst
       while IFS= read -r src; do
