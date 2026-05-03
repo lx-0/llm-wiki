@@ -18,7 +18,6 @@ import argparse
 import base64
 import json
 import logging
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -38,7 +37,6 @@ from wiki_config import CONFIG
 
 SCREENSHOTS_DIR = Path.home() / "Screenshots"
 REPORT_DIR = RAW_DIR / "notes" / "screenshots"
-IMG_DIR = REPORT_DIR / "img"
 SIDECAR_DIR = REPORT_DIR / "sidecars"
 STATE_DIR.mkdir(parents=True, exist_ok=True)
 STATE_FILE = STATE_DIR / "screenshot-state.json"
@@ -182,18 +180,17 @@ def describe_screenshot(path: Path) -> dict | None:
 
 # ── Sidecar & Report Generation ────────────────────────────────────
 
-def copy_png_to_vault(src: Path) -> Path:
-    """Copy a screenshot PNG into the vault (idempotent). Returns the vault-side path.
+def _screenshot_uri(src: Path) -> str:
+    """Return a `file://` URL pointing at the original PNG in ~/Screenshots/.
 
-    The original PNG in ~/Screenshots/ stays untouched. Vault copy enables
-    Obsidian image-embeds (`![[Screenshot ...png|400]]`) in batch reports and
-    sidecars, which closes the analysis-to-source loop.
+    Embedded as `![](file://...)` markdown in sidecars + batch reports so
+    Obsidian renders the image inline WITHOUT copying the PNG into the
+    iCloud-synced vault. Mobile/iPad won't be able to load these (no access
+    to ~/Screenshots/) — that's the explicit tradeoff: zero vault disk cost,
+    desktop-only previews.
     """
-    IMG_DIR.mkdir(parents=True, exist_ok=True)
-    dst = IMG_DIR / src.name
-    if not dst.exists():
-        shutil.copy2(src, dst)
-    return dst
+    from urllib.parse import quote
+    return "file://" + quote(str(src.resolve()))
 
 
 def write_home_marker(path: Path) -> Path:
@@ -257,7 +254,7 @@ def write_vault_sidecar(
         "",
         f"# Screenshot {ts_str}",
         "",
-        f"![[{path.name}|600]]",
+        f"![]({_screenshot_uri(path)})",
         "",
         meta.get("summary", "") or "_(no summary)_",
         "",
@@ -313,7 +310,7 @@ def generate_batch_report(results: list[dict]) -> str:
             sidecar_link = f"[[{r['file'].stem}]]"
             lines.append(f"### {ts_str} — `{r['file'].name}`")
             lines.append("")
-            lines.append(f"![[{r['file'].name}|400]]")
+            lines.append(f"![]({_screenshot_uri(r['file'])})")
             lines.append("")
             lines.append(f"- **App**: {m.get('app', '?')}")
             if project != "-":
@@ -396,12 +393,6 @@ def scan(
         meta = describe_screenshot(path)
         if not meta:
             continue
-
-        # Copy PNG into vault so Obsidian can embed it from sidecars + report.
-        try:
-            copy_png_to_vault(path)
-        except OSError as exc:
-            log.warning("  PNG copy failed: %s", exc)
 
         # HOME-side slim marker (skip-detection only).
         marker = write_home_marker(path)
@@ -513,9 +504,19 @@ def _parse_legacy_sidecar(sidecar: Path) -> dict | None:
     }
 
 
-def migrate_home_sidecars(dry_run: bool = False, limit: int | None = None) -> None:
-    """Walk ~/Screenshots/*.md, mirror PNG + write vault sidecar for legacy
-    rich sidecars. Non-destructive: HOME sidecar is left untouched.
+def migrate_home_sidecars(
+    dry_run: bool = False,
+    limit: int | None = None,
+    force: bool = False,
+) -> None:
+    """Walk ~/Screenshots/*.md, write vault sidecar for legacy rich sidecars.
+
+    Non-destructive: HOME sidecar is left untouched. PNGs stay in
+    ~/Screenshots/; vault sidecars embed them via `file://` URLs (no copy,
+    no vault disk cost — desktop-only previews).
+
+    By default, skips entries whose vault sidecar already exists. Pass
+    ``force=True`` to overwrite (used after embed-format changes).
     """
     if not SCREENSHOTS_DIR.exists():
         log.error("Screenshots dir not found: %s", SCREENSHOTS_DIR)
@@ -543,7 +544,7 @@ def migrate_home_sidecars(dry_run: bool = False, limit: int | None = None) -> No
             skipped_no_png += 1
             continue
 
-        if vault_sidecar_path.exists():
+        if vault_sidecar_path.exists() and not force:
             skipped_already += 1
             continue
 
@@ -556,7 +557,6 @@ def migrate_home_sidecars(dry_run: bool = False, limit: int | None = None) -> No
             processed += 1
         else:
             try:
-                copy_png_to_vault(png)
                 write_vault_sidecar(png, ts, meta, batch_report_slug=None)
                 processed += 1
                 if processed % 25 == 0:
@@ -584,9 +584,15 @@ def main() -> None:
     parser.add_argument("--limit", type=int, default=MAX_PER_RUN, help=f"Max screenshots per run (default {MAX_PER_RUN})")
     parser.add_argument("--migrate-home-sidecars", action="store_true",
                         help="Migrate legacy rich HOME sidecars into vault layout (no LLM calls)")
+    parser.add_argument("--force", action="store_true",
+                        help="With --migrate-home-sidecars: overwrite existing vault sidecars (use after embed-format changes)")
     args = parser.parse_args()
     if getattr(args, 'migrate_home_sidecars'):
-        migrate_home_sidecars(dry_run=args.dry_run, limit=args.limit if args.limit != MAX_PER_RUN else None)
+        migrate_home_sidecars(
+            dry_run=args.dry_run,
+            limit=args.limit if args.limit != MAX_PER_RUN else None,
+            force=args.force,
+        )
     else:
         scan(scan_all=getattr(args, 'all'), backfill_days=args.backfill, dry_run=args.dry_run, limit=args.limit)
 
