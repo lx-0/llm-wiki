@@ -3,7 +3,7 @@ milestone: M003
 project: llm-wiki
 size: L
 created: 2026-05-02T16:58:33Z
-status: planned
+status: done
 total_slices: 7
 completed_slices: 6
 ---
@@ -30,7 +30,7 @@ Slice detail lives in per-slice `M003-S##-PLAN.md` files, created by `ytstack:sl
 
 - [x] S01 — Dashboard scaffold + homepage plugin (basic Dashboard.md, engine-status callout with counts only, recents/top-concepts dataview tables, install homepage) — see `M003-S01-PLAN.md`
 - [x] S02 — Lint-triage queues (surface lint.py warnings as collapsible callouts on Dashboard: orphans / stale / missing backlinks / failed flushes)
-- [ ] S03 — Reserved (originally "P1 charts + chart plugins"; the 5 P1 charts and both plugins were absorbed into S01-T07. Remaining S03 candidates: Mermaid timelines / Gantt for milestone visualisation, Datacore card views once stable, click-through chart drilldowns. Re-scope at slice-time.)
+- [-] S03 — Skipped/deferred. Original "P1 charts + chart plugins" scope was absorbed into S01-T07 (Charts plugin + 5 P1 charts shipped there). Remaining nice-to-have candidates (Mermaid timelines / Datacore card views / click-through chart drilldowns) deferred to backlog — none block any M003 exit criterion.
 - [x] S04 — MOC layer (knowledge/MOCs/ directory, AGENTS.md schema for `type: moc`, seed 2-3 hand-written MOCs, Dashboard MOC section)
 - [x] S05 — state.history.jsonl + P2 charts (append-only history layer in utils.py, wire compile.py + flush.py, install obsidian-tracker, add 3 time-series charts)
 - [x] S06 — Bases knowledge browser (native filterable card/table view of knowledge/ with type/tag/status facets)
