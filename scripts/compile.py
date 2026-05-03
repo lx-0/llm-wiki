@@ -515,13 +515,21 @@ async def main() -> None:
         # Curiosity pass — detect knowledge gaps, generate deep-scan requests
         await maybe_generate_curiosity_requests(source)
 
-        # Update state: mark file as ingested with its hash
+        # Update state: mark file as ingested with its hash + persist immediately.
+        # Per-file save (not just end-of-loop) so rate-limit aborts, kills, and
+        # crashes don't lose the compile work that already succeeded — otherwise
+        # the next run would re-compile the same files and re-spend tokens.
+        # Iron rule from KNOWLEDGE.md: "no gap between capture and persist".
         rel = str(source.relative_to(ROOT_DIR))
         if "ingested" not in state:
             state["ingested"] = {}
         state["ingested"][rel] = file_hash(source)
+        state["total_cost"] = round(total_cost, 4)
+        state["last_compile"] = now_iso()
+        save_state(state)
 
-    # Save state
+    # Final save (idempotent — captures total_cost / last_compile if loop had
+    # zero successes and the per-file save above was never reached).
     state["total_cost"] = round(total_cost, 4)
     state["last_compile"] = now_iso()
     save_state(state)
