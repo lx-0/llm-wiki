@@ -50,6 +50,172 @@ FROM "knowledge/MOCs"
 SORT file.name ASC
 ```
 
+## 📈 History
+
+> Time-series from the append-only `state/history.jsonl` event log. Each `wiki compile` adds one event with the article + cost totals at that moment; each `wiki flush` adds one event with the daily-file ref. Charts derive cumulative + per-day views.
+
+```dataviewjs
+;(async () => {
+
+const cs = getComputedStyle(document.body);
+const _v = (name, fallback) => (cs.getPropertyValue(name) || fallback).trim();
+const textColor = _v("--text-normal", "#ddd");
+const gridColor = _v("--background-modifier-border", "#444");
+const palette = [
+  _v("--color-blue", "#5b8def"),
+  _v("--color-green", "#5fb364"),
+  _v("--color-orange", "#e89954"),
+];
+
+if (typeof window.renderChart !== "function") {
+  dv.paragraph("_Charts plugin not installed — Settings → Community Plugins → search **Charts**._");
+  return;
+}
+
+let raw = "";
+try {
+  raw = await app.vault.adapter.read(".wiki/state/history.jsonl");
+} catch (e) {
+  dv.paragraph("_No history yet — run `wiki compile` to populate `.wiki/state/history.jsonl`._");
+  return;
+}
+
+const events = raw.split("\n")
+  .map(line => line.trim())
+  .filter(Boolean)
+  .map(line => { try { return JSON.parse(line); } catch { return null; } })
+  .filter(e => e && e.ts && e.type);
+
+if (events.length === 0) {
+  dv.paragraph("_No history events yet — run `wiki compile` to populate the log._");
+  return;
+}
+
+const compiles = events.filter(e => e.type === "compile");
+
+if (compiles.length === 0) {
+  dv.paragraph(`_${events.length} flush event(s), but no compile events yet — charts populate after the first \`wiki compile\` run._`);
+  return;
+}
+
+// Grid container (same idiom as the Vault stats charts).
+const grid = this.container.createDiv({cls: "wiki-chart-grid"});
+Object.assign(grid.style, {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+  gap: "1rem",
+  alignItems: "start",
+  margin: "0.5rem 0 1.5rem 0",
+});
+
+function cell(title, note) {
+  const c = grid.createDiv({cls: "wiki-chart-cell"});
+  c.style.minWidth = "0";
+  const h = c.createEl("h3", {text: title});
+  h.style.margin = "0 0 0.25rem 0";
+  if (note) {
+    const n = c.createEl("p", {text: note});
+    n.style.cssText = "margin: 0 0 0.5rem 0; color: var(--text-muted); font-size: 0.85rem;";
+  }
+  const wrap = c.createDiv();
+  wrap.style.cssText = "position: relative; height: 280px;";
+  return wrap;
+}
+
+const fmtDate = ts => ts.slice(0, 10);  // YYYY-MM-DD
+
+// 1) Cumulative articles (line)
+{
+  const labels = compiles.map(e => fmtDate(e.ts));
+  const data = compiles.map(e => e.articles_total ?? 0);
+  await window.renderChart({
+    type: "line",
+    data: {
+      labels,
+      datasets: [{
+        label: "Articles",
+        data,
+        borderColor: palette[0],
+        backgroundColor: palette[0] + "33",
+        tension: 0.2,
+        fill: true,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: textColor }, grid: { color: gridColor } },
+        y: { ticks: { color: textColor }, grid: { color: gridColor }, beginAtZero: true },
+      },
+    },
+  }, cell("Cumulative articles", "knowledge/ size at each compile"));
+}
+
+// 2) Cumulative LLM cost (line)
+{
+  const labels = compiles.map(e => fmtDate(e.ts));
+  const data = compiles.map(e => e.cost_total ?? 0);
+  await window.renderChart({
+    type: "line",
+    data: {
+      labels,
+      datasets: [{
+        label: "Cost USD",
+        data,
+        borderColor: palette[2],
+        backgroundColor: palette[2] + "33",
+        tension: 0.2,
+        fill: true,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: textColor }, grid: { color: gridColor } },
+        y: { ticks: { color: textColor, callback: v => "$" + v.toFixed(2) }, grid: { color: gridColor }, beginAtZero: true },
+      },
+    },
+  }, cell("Cumulative LLM cost", "Total $ spent on compile_model"));
+}
+
+// 3) Compile throughput per day (bar)
+{
+  const perDay = {};
+  for (const e of compiles) {
+    const d = fmtDate(e.ts);
+    perDay[d] = (perDay[d] || 0) + (e.compiled_this_run ?? 1);
+  }
+  const labels = Object.keys(perDay).sort();
+  const data = labels.map(d => perDay[d]);
+  await window.renderChart({
+    type: "bar",
+    data: {
+      labels,
+      datasets: [{
+        label: "Articles compiled",
+        data,
+        backgroundColor: palette[1],
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: textColor }, grid: { color: gridColor } },
+        y: { ticks: { color: textColor }, grid: { color: gridColor }, beginAtZero: true },
+      },
+    },
+  }, cell("Compile throughput", "Articles compiled per day"));
+}
+
+})();
+```
+
 ## 🔧 Run
 
 > One-click ops. Each button executes a `wiki <subcommand>` via the **Shell commands** plugin. Output appears as a notification.
