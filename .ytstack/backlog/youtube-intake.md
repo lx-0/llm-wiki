@@ -221,49 +221,18 @@ Genau ein Action wird approved (per `execute-suggestions.py --approve`), die and
 
 **Budget-Cap pro Run** (analog email-collector): `youtube.curiosity_budget_usd: 0.50` — stoppt bei Erreichen. Tier-3-cloud zählt voll, Tier-3-local zählt 0¢ (kcma ist sunk-cost), Tier 0-2 zählt 0¢. Search-Requests selbst sind frei (yt-dlp). De-Dup gegen `raw/notes/youtube/*.json` Sidecars per `video_id` damit der Loop nicht das gleiche Video re-pickt.
 
-### Dashboard-Surface — Approve/Reject per Buttonclick
+### Dashboard-Surface
 
-Beide Request-Typen erscheinen im existierenden `Dashboard.md` (M003-S01 shipped). Neue Section unter "Triage queues":
+Beide Request-Typen (search + upgrade) sollen im `Dashboard.md` mit Approve/Reject-Buttons erscheinen — zusammen mit Curiosity-Requests aus *allen* anderen Collectors (email, screenshots, …). Generisches Design dafür: siehe `.ytstack/backlog/curiosity-dashboard.md`.
 
-```markdown
-## 🎥 Curiosity — YouTube (3)
-
-> [!question]+ Search: "diffusion model classifier-free guidance"
-> Rationale: concept article at concepts/diffusion-models.md mentions CFG but has no source explaining the why
-> Top candidates (yt-dlp ytsearch10):
-> 1. **3blue1brown — Why Classifier-Free Guidance** (14:32, 1.2M views) ★★★
-> 2. AI Coffee Break — Classifier-Free Guidance Explained (8:14, 87k views) ★★
-> 3. Yannic Kilcher — CFG paper review (42:11, 230k views) ★
->
-> `BUTTON[yt-pick-1]`  `BUTTON[yt-pick-2]`  `BUTTON[yt-pick-3]`  `BUTTON[yt-dismiss-search-cfg]`
-
-> [!warning]+ Upgrade: video "Attention is all you need explained" → Tier 3
-> Reason: visual proof at 14:00 not captured in transcript
-> Estimated cost: $0.07 (cloud) or $0 (local, ~3min on kcma)
->
-> `BUTTON[yt-upgrade-abc123-local]`  `BUTTON[yt-upgrade-abc123-cloud]`  `BUTTON[yt-reject-upgrade-abc123]`
-```
-
-**Button-Mechanik:** Meta Bind buttons (gleiches Plugin wie existierende Capture/Run-Buttons im Dashboard). Jeder Button triggert ein CLI-Subcommand:
+YouTube-spezifische Buttons in dieser generischen Surface:
 
 | Button | CLI-Call |
 |---|---|
 | `yt-pick-N` | `wiki ingest-youtube --resolve-search <topic-slug> --pick <N> --tier <tier_on_pick>` |
-| `yt-dismiss-search-X` | `wiki curiosity --dismiss search-<X>` (markiert request `status: dismissed`, kein Ingest) |
 | `yt-upgrade-<vid>-<provider>` | `wiki ingest-youtube --upgrade <vid> --tier 3 --provider <local\|cloud>` |
-| `yt-reject-upgrade-<vid>` | `wiki curiosity --dismiss upgrade-<vid>` |
 
-Implementation-Pfad — **OSS-first**: bestehende `raw/suggestions/*.yaml` + `execute-suggestions.py` Infrastruktur (siehe obsidian-plugin.md) wiederverwenden, nicht parallel rebuilden. YouTube-Requests werden in dieser Queue als `type: youtube-search` und `type: youtube-upgrade` materialisiert. Approve/Reject läuft schon, nur die Action-Handler in `execute-suggestions.py` brauchen zwei neue Branches.
-
-**Render-Pfad:** Dataview/Bases-Query auf `raw/suggestions/*.yaml` filtert auf `type: youtube-*`, rendert pro Request einen Callout. Pro Action im Suggestion-File ein Meta-Bind-Button. Buttons müssen außerhalb von `<div>`-Wrappern leben — Meta-Bind-Post-Processor läuft sonst nicht (bereits dokumentierte Constraint im Vault). Layout über `cssclasses` Frontmatter, nicht raw-HTML.
-
-**Status-Lifecycle pro Action:** `pending → approved (+ executed) | rejected | dismissed`. Bei `approved` läuft das CLI-Subcommand asynchron (Notification beim Fertigstellen via `notify-send` / Obsidian Notice — der CLI-runner schreibt den Exit-Status zurück in die YAML).
-
-**Mobile-Caveat:** Meta Bind buttons funktionieren auf Obsidian Mobile, aber `child_process` nicht (kein lokaler Python-Runner). Mobile-Buttons sind read-only — sie zeigen den Request, der eigentliche Ingest läuft beim nächsten Desktop-Open oder durch den Cron-Hook auf kcma. Markierung im Dashboard: 🖥️-Icon vor Buttons die Desktop-only sind.
-
-**Filter-View:** Dashboard bekommt zusätzlich einen Filter "Show only YouTube curiosity" (Bases-Query gespeichert), für den User der gezielt durch die Video-Queue arbeitet ohne den Rest der Triage zu sehen.
-
-**Cross-Reference:** Diese Surface ist symmetrisch zu der im obsidian-plugin.md beschriebenen Sidebar — die Sidebar ist im *primary* Vault (lx, daily-driver), das Dashboard ist im *wiki* Vault. Beide queues lesen die gleichen Files (`raw/suggestions/*.yaml`, `raw/requests/*.json`), beide Approve-Pfade rufen `execute-suggestions.py` auf. Single source of truth, doppelte UI-Surface.
+Reject/Dismiss läuft generisch über `wiki curiosity --dismiss <request-id>` und ist in der curiosity-dashboard-Surface zentral implementiert.
 
 ## Output-Schema (Sidecar)
 
