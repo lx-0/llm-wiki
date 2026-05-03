@@ -659,34 +659,22 @@ def render_markdown(side: Sidecar) -> str:
     return "\n".join(parts) + "\n"
 
 
-def write_sidecar(side: Sidecar, *, out_dir: Path) -> tuple[Path, Path]:
+def write_sidecar(side: Sidecar, *, out_dir: Path) -> Path:
+    """Write the per-video markdown — single source of truth.
+
+    Earlier revisions also wrote a parallel `.json` sidecar with the raw
+    structured payload. Dropped 2026-05-03: compile.py only reads `.md`,
+    timestamps live as `[mm:ss]` text anchors inside the markdown body,
+    and yt-dlp / transcript-api are deterministic if anyone ever needs
+    to re-derive the structured shape.
+    """
     out_dir.mkdir(parents=True, exist_ok=True)
     channel_slug = slugify(side.metadata.get("channel") or "unknown")
     title_slug = slugify(side.metadata.get("title") or side.video_id, max_len=50)
     base = f"{channel_slug}--{title_slug}--{side.video_id}"
     md_path = out_dir / f"{base}.md"
-    json_path = out_dir / f"{base}.json"
     md_path.write_text(render_markdown(side), encoding="utf-8")
-    json_path.write_text(
-        json.dumps(
-            {
-                "url": side.url,
-                "video_id": side.video_id,
-                "ingested_at": side.ingested_at,
-                "tier": side.tier,
-                "input_source": side.input_source,
-                "user_note": side.user_note,
-                "metadata": side.metadata,
-                "transcript": side.transcript,
-                "comments": side.comments,
-                "visual": side.visual,
-            },
-            indent=2,
-            ensure_ascii=False,
-        ),
-        encoding="utf-8",
-    )
-    return md_path, json_path
+    return md_path
 
 
 # ── Per-video pipeline ───────────────────────────────────────────────
@@ -706,7 +694,7 @@ def ingest_one(
         log.warning("could not extract video id from %s", url)
         return None
 
-    if skip_existing and any(out_dir.glob(f"*--{video_id}.json")):
+    if skip_existing and any(out_dir.glob(f"*--{video_id}.md")):
         log.info("skip existing %s", video_id)
         return {"video_id": video_id, "status": "skipped"}
 
@@ -744,7 +732,7 @@ def ingest_one(
         )
         return {"video_id": video_id, "status": "dry"}
 
-    md_path, _ = write_sidecar(side, out_dir=out_dir)
+    md_path = write_sidecar(side, out_dir=out_dir)
     log.info("  wrote %s", md_path.relative_to(out_dir.parent.parent.parent) if str(md_path).startswith(str(out_dir.parent.parent.parent)) else md_path)
     return {"video_id": video_id, "status": "written", "path": str(md_path)}
 

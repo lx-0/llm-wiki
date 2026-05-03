@@ -460,7 +460,7 @@ ${C_BOLD}FLAGS${C_RESET}
                         3  + visual analysis (gemma4:e4b @ kcma, ffmpeg frames, free)
   --limit N           cap playlist expansion / inbox-list to first N videos
   --dry-run           describe what would be written, don't touch disk
-  --no-skip           re-ingest videos that already have a sidecar in raw/notes/youtube/
+  --no-skip           re-ingest videos that already exist in raw/notes/youtube/
 
 ${C_BOLD}EXAMPLES${C_RESET}
   wiki ingest-youtube --url "https://youtu.be/dQw4w9WgXcQ"
