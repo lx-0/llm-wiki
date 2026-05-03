@@ -841,6 +841,36 @@ Maps of Content sind hand-kuratierte Topic-Hubs unter `knowledge/MOCs/`. Sie bü
 - **MOC ohne `type: moc`**: lint flaggt `type_mismatch`. Auto-fixable durch `wiki lint --fix` (in S05+ geplant) oder manuelles Setzen.
 - **`wiki seed --force` auf hand-kurierte MOCs**: überschreibt die Hand-Edits durch den Stub. Operator-Verantwortung — wie bei `dashboard.md`.
 
+### History-Layer + P2-Charts
+
+`utils.append_history(event_type, **fields)` schreibt eine JSON-Zeile pro Event in `.wiki/state/history.jsonl`. Per-Line-atomic-write — concurrent compile + flush können nicht tearen. `utils.read_history(limit=None)` liest, skipped malformed lines, returnt oldest-first.
+
+**Aktive Event-Typen**:
+
+| Event | Trigger | Payload |
+|-------|---------|---------|
+| `compile` | Ende von `compile.py:main` (nur wenn `compiled_count > 0`) | `articles_total`, `compiled_this_run`, `failed_this_run`, `cost_delta`, `cost_total` |
+| `flush` | Direkt nach `_record_flush` in `flush.py` | `session_id`, `daily_file` (rel-path) |
+
+Auto-injizierte Felder: `ts` (ISO timestamp), `type`. Schema ist forward-only — neue Felder einfach addieren, Konsumenten ignorieren unbekannte.
+
+**Dashboard P2-Charts** (`dashboard.md` Section "## 📈 History") liest die JSONL via `app.vault.adapter.read(".wiki/state/history.jsonl")`, parsed JSON-per-Line in dataviewjs, rendert 3 Charts via `window.renderChart` (Charts-Plugin, gleicher idiom wie S01-T07's Vault-Stats):
+
+1. **Cumulative articles** — Line, x=Datum, y=`articles_total` aus compile-events.
+2. **Cumulative LLM cost** — Line, x=Datum, y=`cost_total` ($-formatted).
+3. **Compile throughput** — Bar, x=Datum, y=Summe `compiled_this_run` pro Tag.
+
+**Edge Cases**:
+- **Datei fehlt**: Placeholder "run `wiki compile` to populate". Kein Crash.
+- **Nur flush-events, keine compiles**: Placeholder "compile to populate charts" — Charts brauchen `articles_total` + `cost_total` aus compile-events.
+- **Malformed line in history.jsonl**: read_history skipped sie silently. JSONL bleibt forward-compatible.
+- **Disk-full / I/O-error in append**: `OSError` wird suppressed (history ist Observability, nicht Source-of-Truth — Compile/Flush dürfen nicht abbrechen weil das Event-Log nicht schreibbar ist).
+
+```bash
+# Inspect last 20 events
+uv run python -c "import sys; sys.path.insert(0, 'scripts'); from utils import read_history; import json; [print(json.dumps(e)) for e in read_history(limit=20)]"
+```
+
 ---
 
 ## 13. Hard Facts (Corrections)

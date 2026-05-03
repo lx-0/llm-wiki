@@ -41,3 +41,10 @@ All 3 tasks marked `[x]`. M003 exit criteria #6 (`state.history.jsonl` append-on
 ## Notes
 
 (Fill during execution.)
+
+## Notes (T03, 2026-05-03)
+
+- 70 pytest tests green (4 new in test_history.py from T01).
+- Live smoke deferred until lxw `wiki update` lands the new utils.py + compile.py + flush.py changes; first real `wiki compile` after that creates `.wiki/state/history.jsonl` and the Dashboard "📈 History" section starts populating.
+- One subtle decision baked in: `cost_delta` is computed against `cost_at_start` snapshot at compile-main entry, NOT against the previous history event. This avoids needing to read history.jsonl during a compile run (cheap + race-free) and matches the "compile-pass-as-unit-of-work" mental model — one event per main() invocation that did real work.
+- `compiled_count > 0` guard means dry-runs and no-op compiles don't generate noise events. Pure observability decision; no semantic impact.
