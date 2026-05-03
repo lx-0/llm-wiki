@@ -40,6 +40,16 @@ for (const q of queues) {
 }
 ```
 
+## 🗂 MOCs
+
+> Hand-curated topic hubs (Maps of Content). Each MOC pins the most important pages of one theme; the dataview-driven body inside each MOC also auto-lists the rest of its `knowledge/<folder>/` subdir. Drop a new `knowledge/MOCs/<name>.md` with `type: moc` frontmatter and it appears here.
+
+```dataview
+LIST
+FROM "knowledge/MOCs"
+SORT file.name ASC
+```
+
 ## 🔧 Run
 
 > One-click ops. Each button executes a `wiki <subcommand>` via the **Shell commands** plugin. Output appears as a notification.
