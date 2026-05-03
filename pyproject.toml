@@ -18,6 +18,8 @@ dependencies = [
     "playwright>=1.58.0",
     "python-dotenv>=1.0.0",
     "tzdata>=2024.1",
+    "yt-dlp>=2026.1.0",
+    "youtube-transcript-api>=1.2.0",
 ]
 
 [project.urls]
