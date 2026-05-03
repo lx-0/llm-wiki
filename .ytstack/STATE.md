@@ -1,8 +1,8 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-05-02T22:40:00Z
-current_milestone: M003
+last_updated: 2026-05-03T00:00:00Z
+current_milestone: M004
 active_slice: none
 active_task: none
 ---
@@ -34,6 +34,8 @@ active_task: none
 **M003 — Human Vault UX:** Dashboard.md (auto-opens via homepage plugin) with engine-status callout, lint-triage queues, P1+P2 charts (5+3, single-snapshot + time-series), MOC layer (≥3 manually curated), state.history.jsonl append-only history, Bases knowledge browser. Six slices S01–S06. Source design in `backlog/vault-dashboard.md`; locked decisions + exit criteria in `M003-CONTEXT.md`.
 
 Carried-forward candidates from M002 (deferred to M004+): Collector-rollout to other substrates, multi-vault ingest, source-onboarding cadence.
+
+**Hotfix post-M004 (2026-05-03, commits `618b1dd` + `5900496`):** `compile.py` now writes a persistent file-log (`<wiki>/logs/compile.log`, INFO+, mirrors stderr) plus a triage-only sibling (`compile-errors.log`, WARNING+). Same run also hardened `maybe_generate_curiosity_requests`: Ollama (`gemma4:e4b`) was observed returning `gaps` as a list of strings despite item-level `type: object` in the schema, killing the curiosity pass with `AttributeError`. Now non-dict items are dropped with a logged sample. Lesson recorded in `.ytstack/KNOWLEDGE.md` "Ollama structured output" section. Docs: `docs/PROCESS.md` §8 Edge Cases + `docs/engine-layout.md` log-file inventory.
 
 **M004 done (2026-05-02):** Agent-Task framework shipped. `scripts/agent_spec.py` (parser, 8 validation cases), `scripts/agent_task.py` (SDK runner with `--list / --dry-run / --var`), `scripts/agent_buttons.py` (discovery + dashboard region-rewrite), `wiki agent <id>` CLI. First concrete task: `prompts/agent_summarize-day.md` (Haiku, Read/Edit/Write, primary button). Auto-wiring via `wiki seed`: jq-merge into shell-commands data.json + marker-based region replace in dashboard.md. 20 pytest tests green (17 spec + 3 summarize-day smoke). PROCESS.md §14 + KNOWLEDGE.md learning + DECISIONS.md two entries (framework + region-marker pattern). Live vault patched, button visible in Run row after reload.
 
