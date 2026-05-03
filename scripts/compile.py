@@ -476,6 +476,7 @@ async def main() -> None:
 
     state = load_state()
     total_cost = state.get("total_cost", 0.0)
+    cost_at_start = total_cost  # for history-event cost_delta
     compiled_count = 0
     failed_count = 0
     consecutive_failures = 0
@@ -524,6 +525,18 @@ async def main() -> None:
     state["total_cost"] = round(total_cost, 4)
     state["last_compile"] = now_iso()
     save_state(state)
+
+    # Append-only history event so Dashboard P2 charts can render time series.
+    if compiled_count > 0:
+        from utils import append_history
+        append_history(
+            "compile",
+            articles_total=len(list_wiki_articles()),
+            compiled_this_run=compiled_count,
+            failed_this_run=failed_count,
+            cost_delta=round(total_cost - cost_at_start, 4),
+            cost_total=state["total_cost"],
+        )
 
     outcome = "ABORTED (rate limit)" if aborted else "complete"
     log.info(

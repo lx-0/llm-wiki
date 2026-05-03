@@ -453,6 +453,14 @@ async def main() -> None:
     # Record flush for dedup
     _record_flush(session_id)
 
+    # Append-only history event for Dashboard P2 charts.
+    from utils import append_history
+    append_history(
+        "flush",
+        session_id=session_id,
+        daily_file=str(daily_file.relative_to(ROOT_DIR)),
+    )
+
     # Maybe trigger compilation
     maybe_trigger_compile(daily_file)
 

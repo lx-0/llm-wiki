@@ -17,7 +17,9 @@ from config import (
     PROJECTS_DIR,
     QA_DIR,
     RAW_DIR,
+    STATE_DIR,
     STATE_FILE,
+    now_iso,
 )
 
 
@@ -47,6 +49,44 @@ def load_state() -> dict:
 def save_state(state: dict) -> None:
     """Save the compiler's primary state.json."""
     save_json_state(STATE_FILE, state)
+
+
+# ── Append-only event history (M003-S05) ──────────────────────────────
+
+def append_history(event_type: str, **fields) -> None:
+    """Append one JSON line to STATE_DIR/history.jsonl.
+
+    Auto-injects `ts` (ISO timestamp) and `type`. Per-line atomic write so
+    concurrent compile + flush events never tear. Best-effort: failures are
+    silently ignored (history is observability, not the source of truth)."""
+    history_file = STATE_DIR / "history.jsonl"
+    try:
+        history_file.parent.mkdir(parents=True, exist_ok=True)
+        payload = {"ts": now_iso(), "type": event_type, **fields}
+        with history_file.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(payload, separators=(",", ":")) + "\n")
+    except OSError:
+        pass
+
+
+def read_history(limit: int | None = None) -> list[dict]:
+    """Read STATE_DIR/history.jsonl. Skips malformed/blank lines silently.
+    Returns events in append order (oldest-first); slice tail with `limit`."""
+    history_file = STATE_DIR / "history.jsonl"
+    if not history_file.exists():
+        return []
+    events: list[dict] = []
+    for line in history_file.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            events.append(json.loads(line))
+        except json.JSONDecodeError:
+            continue
+    if limit is not None:
+        return events[-limit:]
+    return events
 
 
 # ── File hashing ──────────────────────────────────────────────────────

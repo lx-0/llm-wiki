@@ -3,8 +3,8 @@ project: llm-wiki
 slug: llm-wiki
 last_updated: 2026-05-02T22:40:00Z
 current_milestone: M003
-active_slice: S04
-active_task: T05
+active_slice: S05
+active_task: T01
 ---
 
 # State
