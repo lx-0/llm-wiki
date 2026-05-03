@@ -53,6 +53,7 @@ __pycache__/
 
 # Agents local user settings
 .claude/settings.local.json
+.claude/scheduled_tasks.lock
 .claude/worktrees/
 
 # ytstack runtime artifacts (per-install session journal — never tracked)
