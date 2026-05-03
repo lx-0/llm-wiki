@@ -200,6 +200,18 @@ seed_vault_templates() {
     done
   fi
 
+  # 4b. knowledge/MOCs/*.md — Map-of-Content stubs. Operator hand-curates;
+  #     additive copy preserves edits. Producer-style (auto-listed via
+  #     dataview), but seedable because the hand-curated section above the
+  #     dataview block IS the operator's content.
+  if [[ -d "$templates_dir/knowledge/MOCs" ]]; then
+    local moc
+    for moc in "$templates_dir/knowledge/MOCs"/*.md; do
+      [[ -f "$moc" ]] || continue
+      _seed_file "$moc" "$target/knowledge/MOCs/$(basename "$moc")" "$force" "knowledge/MOCs/$(basename "$moc")"
+    done
+  fi
+
   # 5. .obsidian/*.json — top-level configs.
   if [[ -d "$templates_dir/.obsidian" ]]; then
     mkdir -p "$target/.obsidian"
