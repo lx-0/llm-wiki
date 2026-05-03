@@ -547,11 +547,13 @@ async def main() -> None:
         )
 
     outcome = "ABORTED (rate limit)" if aborted else "complete"
+    pending = len(files) - compiled_count - failed_count
     log.info(
-        "Compilation %s — %d done, %d failed, %d total. Cost so far: $%.4f",
+        "Compilation %s — %d done, %d failed, %d pending of %d candidates this run. Cost so far: $%.4f",
         outcome,
         compiled_count,
         failed_count,
+        pending,
         len(files),
         total_cost,
     )
