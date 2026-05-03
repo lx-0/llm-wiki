@@ -7,7 +7,7 @@ related: scripts/scan-screenshots.py, prompts/scan_screenshots_vision.md, prompt
 
 # Screenshots-Intake — Tier 3+4 Backlog
 
-Tier 1+2 (PNG-Embed im Batch-Report, source_screenshots im Compile-Frontmatter, Vault-Sidecars mit raw_response, HOME-Sidecar als Slim-Marker) sind 2026-05-03 implementiert (commit folgt). Die folgenden Items adressieren Output-Qualität und Audit-Tiefe — orthogonal zum Closed-Loop-Fix.
+Tier 1+2 (file:// Image-Embed im Batch-Report, source_screenshots im Compile-Frontmatter, raw_response als `<details>` pro Screenshot im Batch-Report, HOME-Sidecar als Slim-Marker mit Backlink zum Batch) sind 2026-05-03 implementiert. Kein paralleler Vault-Sidecar-Ordner — alle Analyse-Daten leben im jeweiligen Batch-Report. Die folgenden Items adressieren Output-Qualität und Audit-Tiefe — orthogonal zum Closed-Loop-Fix.
 
 ## Tier 3 — Output-Qualität
 
@@ -54,7 +54,7 @@ Empfehlung: **(1) wenn project_examples ≤ 30 Einträge, sonst (2)**. Threshold
 
 ### G. Per-Run Vision-Log
 
-**Problem.** Wenn das Modell drifted (neue Version, neue Tag-Patterns), gibt es keine Möglichkeit das historisch zu auditen. Vault-Sidecars haben `raw_response` für Einzelbilder, aber kein Run-übergreifendes Aggregat.
+**Problem.** Wenn das Modell drifted (neue Version, neue Tag-Patterns), gibt es keine Möglichkeit das historisch zu auditen. Batch-Reports haben `raw_response` als `<details>` pro Screenshot, aber kein Run-übergreifendes maschinenlesbares Aggregat (für Schema-Drift-Skripte etc.).
 
 **Lösung.** Pro Run: `<vault>/raw/notes/screenshots/_runs/<slug>.json` mit:
 
