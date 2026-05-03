@@ -18,6 +18,7 @@ import argparse
 import base64
 import json
 import logging
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -37,6 +38,8 @@ from wiki_config import CONFIG
 
 SCREENSHOTS_DIR = Path.home() / "Screenshots"
 REPORT_DIR = RAW_DIR / "notes" / "screenshots"
+IMG_DIR = REPORT_DIR / "img"
+SIDECAR_DIR = REPORT_DIR / "sidecars"
 STATE_DIR.mkdir(parents=True, exist_ok=True)
 STATE_FILE = STATE_DIR / "screenshot-state.json"
 
@@ -179,27 +182,99 @@ def describe_screenshot(path: Path) -> dict | None:
 
 # ── Sidecar & Report Generation ────────────────────────────────────
 
-def write_sidecar(path: Path, ts: datetime, meta: dict) -> Path:
-    """Write a .md sidecar file next to the screenshot PNG."""
+def copy_png_to_vault(src: Path) -> Path:
+    """Copy a screenshot PNG into the vault (idempotent). Returns the vault-side path.
+
+    The original PNG in ~/Screenshots/ stays untouched. Vault copy enables
+    Obsidian image-embeds (`![[Screenshot ...png|400]]`) in batch reports and
+    sidecars, which closes the analysis-to-source loop.
+    """
+    IMG_DIR.mkdir(parents=True, exist_ok=True)
+    dst = IMG_DIR / src.name
+    if not dst.exists():
+        shutil.copy2(src, dst)
+    return dst
+
+
+def write_home_marker(path: Path) -> Path:
+    """Write the slim HOME-side marker .md (next to the PNG).
+
+    Acts purely as a `scanned` skip-marker for `find_new_screenshots`. Real
+    content lives in the vault sidecar — this file is intentionally minimal
+    so `~/Screenshots/` doesn't accumulate full analyses.
+    """
     sidecar = path.with_suffix(".md")
-    tags_str = ", ".join(meta["tags"])
+    content = (
+        "---\n"
+        f"scanned: {now_iso()}\n"
+        f"vault_sidecar: raw/notes/screenshots/sidecars/{path.stem}.md\n"
+        "---\n"
+        "\n"
+        f"Marker file. Full analysis: see `vault_sidecar` above.\n"
+    )
+    sidecar.write_text(content, encoding="utf-8")
+    return sidecar
+
+
+def write_vault_sidecar(
+    path: Path,
+    ts: datetime,
+    meta: dict,
+    batch_report_slug: str | None = None,
+) -> Path:
+    """Write the rich, searchable sidecar inside the vault.
+
+    Frontmatter carries app/project/tags/relevance + vision metadata + source
+    paths (PNG + batch report). Body embeds the screenshot, prints summary +
+    key_text, and includes the raw LLM response in a collapsible details block
+    for audit/debug.
+    """
+    SIDECAR_DIR.mkdir(parents=True, exist_ok=True)
+    sidecar = SIDECAR_DIR / f"{path.stem}.md"
+
+    tags_str = ", ".join(meta.get("tags", []))
     ts_str = ts.strftime("%Y-%m-%d %H:%M")
     project = meta.get("project") or ""
-    content = f"""---
-app: {meta.get('app', 'unknown')}
-project: {project or 'null'}
-tags: [{tags_str}]
-relevance: {meta['relevance']}
-scanned: {now_iso()}
----
+    raw_response = (meta.get("raw_response") or "").strip()
+    app = meta.get("app", "unknown")
 
-# Screenshot {ts_str}
+    fm = [
+        "---",
+        f"app: {json.dumps(app)}",
+        f"project: {json.dumps(project) if project else 'null'}",
+        f"tags: [{tags_str}]",
+        f"relevance: {meta.get('relevance', 'keep')}",
+        f"scanned: {now_iso()}",
+        f"vision_model: {json.dumps(meta.get('model', ''))}",
+        f"vision_tokens: {int(meta.get('tokens', 0) or 0)}",
+        f"source_png: {json.dumps(str(path))}",
+    ]
+    if batch_report_slug:
+        fm.append(f"batch_report: \"[[{batch_report_slug}]]\"")
+    fm.append("---")
 
-{meta.get('summary', '')}
-
-**Key Text**: {meta.get('key_text', '')}
-"""
-    sidecar.write_text(content, encoding="utf-8")
+    body = [
+        "",
+        f"# Screenshot {ts_str}",
+        "",
+        f"![[{path.name}|600]]",
+        "",
+        meta.get("summary", "") or "_(no summary)_",
+        "",
+        f"**Key Text**: {meta.get('key_text', '') or '_(none)_'}",
+    ]
+    if raw_response:
+        body.extend([
+            "",
+            "<details><summary>Raw vision response</summary>",
+            "",
+            "```json",
+            raw_response,
+            "```",
+            "",
+            "</details>",
+        ])
+    sidecar.write_text("\n".join(fm + body) + "\n", encoding="utf-8")
     return sidecar
 
 
@@ -235,13 +310,18 @@ def generate_batch_report(results: list[dict]) -> str:
             ts_str = r["timestamp"].strftime("%Y-%m-%d %H:%M")
             m = r["meta"]
             project = m.get("project") or "-"
+            sidecar_link = f"[[{r['file'].stem}]]"
             lines.append(f"### {ts_str} — `{r['file'].name}`")
+            lines.append("")
+            lines.append(f"![[{r['file'].name}|400]]")
+            lines.append("")
             lines.append(f"- **App**: {m.get('app', '?')}")
             if project != "-":
                 lines.append(f"- **Project**: {project}")
             lines.append(f"- **Summary**: {m.get('summary', '')}")
             lines.append(f"- **Key Text**: {m.get('key_text', '')}")
             lines.append(f"- **Tags**: {', '.join(m.get('tags', []))}")
+            lines.append(f"- **Sidecar**: {sidecar_link}")
             lines.append("")
 
     lines.append(f"---\n*Auto-generated by scan-screenshots.py at {now_iso()}*")
@@ -300,6 +380,11 @@ def scan(
         log.error("Ollama not reachable at %s", CONFIG.models.ollama_url)
         return
 
+    # Pre-compute the batch slug so vault sidecars can backlink to it.
+    REPORT_DIR.mkdir(parents=True, exist_ok=True)
+    slug = datetime.now().strftime("%Y-%m-%dT%H%M")
+    batch_report_slug = f"screenshots-{slug}"
+
     # Process screenshots
     results = []
     for i, path in enumerate(screenshots, 1):
@@ -312,9 +397,18 @@ def scan(
         if not meta:
             continue
 
-        # Write sidecar .md next to the PNG
-        sidecar = write_sidecar(path, ts, meta)
-        log.info("  Sidecar: %s", sidecar.name)
+        # Copy PNG into vault so Obsidian can embed it from sidecars + report.
+        try:
+            copy_png_to_vault(path)
+        except OSError as exc:
+            log.warning("  PNG copy failed: %s", exc)
+
+        # HOME-side slim marker (skip-detection only).
+        marker = write_home_marker(path)
+        # Vault-side rich sidecar (searchable, backlinkable, full LLM payload).
+        vault_sidecar = write_vault_sidecar(path, ts, meta, batch_report_slug=batch_report_slug)
+        log.info("  Marker: %s  Vault sidecar: raw/notes/screenshots/sidecars/%s",
+                 marker.name, vault_sidecar.name)
 
         results.append({
             "file": path,
@@ -329,9 +423,7 @@ def scan(
         return
 
     # Write batch report for wiki compilation
-    REPORT_DIR.mkdir(parents=True, exist_ok=True)
-    slug = datetime.now().strftime("%Y-%m-%dT%H%M")
-    report_path = REPORT_DIR / f"screenshots-{slug}.md"
+    report_path = REPORT_DIR / f"{batch_report_slug}.md"
     report = generate_batch_report(results)
     report_path.write_text(report, encoding="utf-8")
     log.info("Report: %s (%d screenshots)", report_path.name, len(results))
