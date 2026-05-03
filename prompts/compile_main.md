@@ -74,4 +74,4 @@ ${source_content}
      - Screenshot 2026-05-02 at 22.40.24.png
      - Screenshot 2026-05-02 at 22.41.05.png
    ```
-   This lets a reader jump from the article back to the original visual evidence via the per-screenshot vault sidecars at `raw/notes/screenshots/sidecars/<filename-without-png>.md` (which embed the image and carry the raw vision response).
+   This lets a reader jump from the article back to the original visual evidence: the batch report itself embeds each screenshot inline via `file://` and carries the per-screenshot raw vision response in a `<details>` block, so the filename in `source_screenshots:` is enough to find it via Obsidian search inside the batch report.
