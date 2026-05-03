@@ -37,6 +37,8 @@ from wiki_config import CONFIG
 
 SCREENSHOTS_DIR = Path.home() / "Screenshots"
 REPORT_DIR = RAW_DIR / "notes" / "screenshots"
+THUMB_DIR = REPORT_DIR / "thumb"
+THUMB_WIDTH = 512  # px; 30-50KB per typical screenshot @ 1920×1080
 STATE_DIR.mkdir(parents=True, exist_ok=True)
 STATE_FILE = STATE_DIR / "screenshot-state.json"
 
@@ -179,38 +181,95 @@ def describe_screenshot(path: Path) -> dict | None:
 
 # ── Sidecar & Report Generation ────────────────────────────────────
 
-def _screenshot_uri(src: Path) -> str:
-    """Return a `file://` URL pointing at the original PNG in ~/Screenshots/.
+def make_thumbnail(src: Path) -> Path | None:
+    """Generate a deterministic vault-side thumbnail of the original PNG.
 
-    Embedded as `![](file://...)` markdown in sidecars + batch reports so
-    Obsidian renders the image inline WITHOUT copying the PNG into the
-    iCloud-synced vault. Mobile/iPad won't be able to load these (no access
-    to ~/Screenshots/) — that's the explicit tradeoff: zero vault disk cost,
-    desktop-only previews.
+    512px-wide PNG written to `<vault>/raw/notes/screenshots/thumb/<name>.png`
+    via macOS `sips`. Idempotent: skips if the target already exists. The
+    thumbnail is the only image asset that lives inside the vault — original
+    PNGs stay in ~/Screenshots/, never copied. Embed in batch reports via
+    Obsidian wikilink (`![[thumb/<name>.png]]`) — works on mobile + desktop,
+    syncs via iCloud (~30-50 KB per typical screenshot).
+
+    Returns None on failure (sips not available, src missing).
     """
-    from urllib.parse import quote
-    return "file://" + quote(str(src.resolve()))
+    THUMB_DIR.mkdir(parents=True, exist_ok=True)
+    dst = THUMB_DIR / src.name
+    if dst.exists():
+        return dst
+    try:
+        proc = subprocess.run(
+            ["sips", "--resampleWidth", str(THUMB_WIDTH), str(src), "--out", str(dst)],
+            capture_output=True, text=True,
+        )
+        if proc.returncode != 0:
+            log.warning("  thumbnail failed (%d): %s", proc.returncode, proc.stderr.strip()[:200])
+            return None
+        return dst
+    except FileNotFoundError:
+        log.warning("  sips not available — skipping thumbnail for %s", src.name)
+        return None
 
 
-def write_home_marker(path: Path, batch_report_slug: str | None = None) -> Path:
-    """Write the slim HOME-side marker .md (next to the PNG).
+def write_home_sidecar(
+    path: Path,
+    ts: datetime,
+    meta: dict,
+    batch_report_slug: str | None = None,
+) -> Path:
+    """Write the rich HOME-side sidecar .md next to the PNG.
 
-    Acts purely as a skip-marker for `find_new_screenshots`. The full analysis
-    lives in the batch report at `<vault>/raw/notes/screenshots/<slug>.md`;
-    this marker just records *that* the PNG was scanned and *which* batch
-    consumed it — no rich content duplicated here or in a parallel vault
-    folder.
+    This is THE per-screenshot analysis archive — single source of truth.
+    Frontmatter holds app/project/tags/relevance/scanned plus vision metadata
+    (model, tokens). Body has summary, key_text, and the raw LLM response in
+    a collapsible `<details>` block for audit / debug. Lives next to the
+    original PNG so the operator browsing ~/Screenshots/ in Finder gets a
+    "what was this?" answer without opening the vault.
+
+    The vault batch report is a roll-up aggregate of all sidecars in a scan
+    run — written from the same in-memory `meta` dict, never re-analyzed.
     """
     sidecar = path.with_suffix(".md")
+    tags_str = ", ".join(meta.get("tags", []))
+    ts_str = ts.strftime("%Y-%m-%d %H:%M")
+    project = meta.get("project") or ""
+    raw_response = (meta.get("raw_response") or "").strip()
+    app = meta.get("app", "unknown")
+
     fm = [
         "---",
+        f"app: {json.dumps(app)}",
+        f"project: {json.dumps(project) if project else 'null'}",
+        f"tags: [{tags_str}]",
+        f"relevance: {meta.get('relevance', 'keep')}",
         f"scanned: {now_iso()}",
+        f"vision_model: {json.dumps(meta.get('model', ''))}",
+        f"vision_tokens: {int(meta.get('tokens', 0) or 0)}",
     ]
     if batch_report_slug:
         fm.append(f"batch_report: \"[[{batch_report_slug}]]\"")
     fm.append("---")
-    body = "\nMarker file (skip-detection). Full analysis in the batch report linked above.\n"
-    sidecar.write_text("\n".join(fm) + body, encoding="utf-8")
+
+    body = [
+        "",
+        f"# Screenshot {ts_str}",
+        "",
+        meta.get("summary", "") or "_(no summary)_",
+        "",
+        f"**Key Text**: {meta.get('key_text', '') or '_(none)_'}",
+    ]
+    if raw_response:
+        body.extend([
+            "",
+            "<details><summary>Raw vision response</summary>",
+            "",
+            "```json",
+            raw_response,
+            "```",
+            "",
+            "</details>",
+        ])
+    sidecar.write_text("\n".join(fm + body) + "\n", encoding="utf-8")
     return sidecar
 
 
@@ -249,7 +308,7 @@ def generate_batch_report(results: list[dict]) -> str:
             raw_response = (m.get("raw_response") or "").strip()
             lines.append(f"### {ts_str} — `{r['file'].name}`")
             lines.append("")
-            lines.append(f"![]({_screenshot_uri(r['file'])})")
+            lines.append(f"![[thumb/{r['file'].name}]]")
             lines.append("")
             lines.append(f"- **App**: {m.get('app', '?')}")
             if project != "-":
@@ -344,11 +403,14 @@ def scan(
         if not meta:
             continue
 
-        # HOME-side slim marker (skip-detection + backlink to batch report).
-        # Full analysis (incl. raw_response) lives in the batch report itself,
-        # not in a parallel vault subdirectory.
-        marker = write_home_marker(path, batch_report_slug=batch_report_slug)
-        log.info("  Marker: %s  → batch report: %s", marker.name, batch_report_slug)
+        # HOME sidecar = the analysis (rich, with raw_response). Single source
+        # of truth per screenshot. Batch report aggregates all sidecars in this
+        # run for compile-pipeline consumption.
+        sidecar = write_home_sidecar(path, ts, meta, batch_report_slug=batch_report_slug)
+        # Vault thumbnail (512px PNG) so the batch report can preview inline.
+        thumb = make_thumbnail(path)
+        log.info("  Sidecar: %s  Thumb: %s",
+                 sidecar.name, thumb.name if thumb else "skipped")
 
         results.append({
             "file": path,
@@ -384,14 +446,90 @@ def scan(
     log.info("Done. %d screenshots processed, report at %s", len(results), report_path)
 
 
+def backfill_thumbnails(dry_run: bool = False) -> None:
+    """Generate vault-side thumbnails for every PNG in ~/Screenshots/ that
+    doesn't have one yet. No LLM calls. One-shot retrofit so historical
+    batch reports can also embed `![[thumb/<name>.png]]`.
+    """
+    if not SCREENSHOTS_DIR.exists():
+        log.error("Screenshots dir not found: %s", SCREENSHOTS_DIR)
+        return
+    pngs = sorted(SCREENSHOTS_DIR.glob("Screenshot *.png"))
+    log.info("Backfill thumbnails: scanning %d PNGs", len(pngs))
+    made = skipped = errors = 0
+    for png in pngs:
+        target = THUMB_DIR / png.name
+        if target.exists():
+            skipped += 1
+            continue
+        if dry_run:
+            log.info("  [dry] would thumb %s", png.name)
+            made += 1
+            continue
+        if make_thumbnail(png):
+            made += 1
+            if made % 50 == 0:
+                log.info("  ... %d thumbnails", made)
+        else:
+            errors += 1
+    log.info("Backfill thumbnails: %d made, %d already-present, %d errors",
+             made, skipped, errors)
+
+
+def retrofit_batch_reports(dry_run: bool = False) -> None:
+    """Add ``![[thumb/<filename>]]`` lines under each ``### {ts} — `<file>.png```
+    heading in existing batch reports. Idempotent: skips reports that already
+    have the embed line. Safe to re-run.
+    """
+    if not REPORT_DIR.exists():
+        log.error("Report dir not found: %s", REPORT_DIR)
+        return
+    reports = sorted(REPORT_DIR.glob("screenshots-*.md"))
+    log.info("Retrofit: scanning %d batch reports", len(reports))
+    import re
+    pattern = re.compile(r"^### (.+?) — `(Screenshot [^`]+\.png)`\s*$", re.MULTILINE)
+    patched = skipped = 0
+    for report in reports:
+        text = report.read_text(encoding="utf-8")
+        def repl(m: re.Match) -> str:
+            head = m.group(0)
+            fname = m.group(2)
+            embed = f"![[thumb/{fname}]]"
+            if embed in text:  # already retrofit at some other location
+                return head
+            return f"{head}\n\n{embed}"
+        new_text = pattern.sub(repl, text)
+        # Skip if no real change OR if embed lines already present at all positions
+        embed_count_before = text.count("![[thumb/")
+        embed_count_after = new_text.count("![[thumb/")
+        if embed_count_after > embed_count_before:
+            if not dry_run:
+                report.write_text(new_text, encoding="utf-8")
+            log.info("  patched %s (+%d embeds)", report.name,
+                     embed_count_after - embed_count_before)
+            patched += 1
+        else:
+            skipped += 1
+    log.info("Retrofit: %d patched, %d already-present", patched, skipped)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Scan screenshots with local LLM vision")
     parser.add_argument("--all", action="store_true", help="Scan all screenshots without sidecar (ignore time window)")
     parser.add_argument("--backfill", type=int, metavar="DAYS", help="Scan last N days")
     parser.add_argument("--dry-run", action="store_true", help="Show what would be processed")
     parser.add_argument("--limit", type=int, default=MAX_PER_RUN, help=f"Max screenshots per run (default {MAX_PER_RUN})")
+    parser.add_argument("--backfill-thumbnails", action="store_true",
+                        help="Generate vault thumbnails for every PNG without one (no LLM)")
+    parser.add_argument("--retrofit-batch-reports", action="store_true",
+                        help="Add ![[thumb/...]] embeds to existing batch reports")
     args = parser.parse_args()
-    scan(scan_all=getattr(args, 'all'), backfill_days=args.backfill, dry_run=args.dry_run, limit=args.limit)
+    if getattr(args, 'backfill_thumbnails'):
+        backfill_thumbnails(dry_run=args.dry_run)
+    elif getattr(args, 'retrofit_batch_reports'):
+        retrofit_batch_reports(dry_run=args.dry_run)
+    else:
+        scan(scan_all=getattr(args, 'all'), backfill_days=args.backfill, dry_run=args.dry_run, limit=args.limit)
 
 
 if __name__ == "__main__":
