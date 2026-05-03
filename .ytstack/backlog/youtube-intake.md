@@ -1,11 +1,29 @@
 ---
 created: 2026-05-03
-status: deferred
+status: partial — T0/1/2/3-local SHIPPED 2026-05-03; T3-cloud + curiosity-loop + dashboard deferred
 context: Ingest-Erweiterung für YouTube-Lerninhalte; orthogonal zu screenshots-intake / collectors.md
-related: scripts/scan-screenshots.py, .ytstack/backlog/collectors.md, .ytstack/backlog/obsidian-plugin.md
+related: scripts/scan-youtube.py, scripts/scan-screenshots.py, .ytstack/backlog/collectors.md, .ytstack/backlog/obsidian-plugin.md, .ytstack/backlog/curiosity-dashboard.md, .ytstack/DECISIONS.md (2026-05-03 entries)
 ---
 
 # YouTube Intake — Multi-Tier Video Ingest
+
+## Shipped 2026-05-03 (commits `aafe2a8` `9ca7c43` `825ea94` `5bb0c0e`)
+
+- ✅ Tier 0 (yt-dlp metadata) — `scripts/scan-youtube.py:fetch_metadata`
+- ✅ Tier 1 (transcript via `youtube-transcript-api` + yt-dlp `.json3` fallback) — `:fetch_transcript`
+- ✅ Tier 2 (top comments) — `:slim_comments`
+- ✅ Tier 3-local (ffmpeg chapter-aligned / fixed-interval frames → gemma4:e4b vision → gemma4 aggregate) — `:fetch_visual_local`
+- ✅ Playlist URL normalization (`watch?v=…&list=L` → `playlist?list=L`)
+- ✅ Inbox parser (bare URL / markdown link / shortlink / inline `tier: N`)
+- ✅ Single `.md` sidecar at `raw/notes/youtube/<channel>--<title>--<vid>.md` (JSON dropped per single-source-of-truth lesson)
+- ✅ `wiki ingest-youtube` CLI subcommand (`--url` / `--inbox` / `--tier {0,1,2,3}` / `--limit` / `--dry-run` / `--no-skip`)
+- ✅ All tunables in CONFIG: `limits.youtube_*` (5 keys) + `piggybacks.scan_youtube` + `models.vision_model` (reused for both per-frame and aggregate)
+- ✅ Lxw vault production config has `piggybacks.scan_youtube` (cooldown 24h, max_per_run 10)
+- ✅ Docs: AGENTS.md, README.md, docs/{cli,concept,PROCESS}.md, architecture.excalidraw + overview.excalidraw (substrate count 9 → 10)
+
+End-to-end verified on a 20min Morpheus video with captions disabled: 11/20 informative frames, 6 key concepts + 11 visual artifacts + 2 code snippets, ~14min wall-clock @ $0 (kcma sunk-cost).
+
+## Deferred to follow-up cuts
 
 YouTube-Videos sind eine der wichtigsten Lernquellen für den User. Ziel: ein Collector der mehrere Input-Pfade akzeptiert und mehrere Detailgrade pro Video erlaubt. Folgt dem gleichen **Tier-Pattern** wie screenshots-intake (cheap default, expensive on demand) und dem **Curiosity-Loop-Pattern** aus collectors.md (Compile generiert Upgrade-Requests).
 

@@ -550,3 +550,51 @@ Same lesson for `--source` being **REQUIRED** (not optional with default): the o
 ```bash
 uv run --project skills/excalidraw-diagram/references python skills/excalidraw-diagram/references/render_excalidraw.py docs/architecture.excalidraw --output docs/architecture.png
 ```
+
+### Cloud video ingest — the marketing-headline trap (2026-05-03)
+
+Gemini 2.5 video pricing pages list cost-per-million-tokens with low headline numbers ("2¢ per 10min Flash-Lite"). **Reality is 3.5-14× higher** because (a) video tokenises at ~300 tokens/second default-resolution, and (b) verbatim-transcription prompts (the obvious use case for a knowledge wiki) generate 5-10k output tokens per 10min — and output is the price multiplier nobody surfaces.
+
+**Verified ground-truth** in `~/Code/WebDev/projects/yesterday-ai/clawrag/clawrag/transformers/video_gemini.py:51-52` (clawrag was burned hard enough to hardcode the model with a `# ⚠️ COST PROTECTION` comment + admin-permission gate on the endpoint):
+
+```
+gemini-2.5-flash-lite  ~$0.13 per 3h video   →   ~7¢/10min
+gemini-3.1-pro         ~$5.00 per 3h video   →   ~28¢/10min   (38× the cheap tier)
+```
+
+**Engineering lessons baked into `youtube-intake.md` backlog:**
+- Default model HARDCODED, not API-configurable — `# ⚠️ COST PROTECTION` constant, requires code edit + restart to escalate
+- Per-URL blob cache so same video never gets billed twice (defer write until first cloud-run lands)
+- Pre-run cost-estimate + confirm-gate for any playlist or single video > 30min
+- `--allow-cloud` explicit; no silent fallback when local Ollama is down
+- Per-run budget cap in CONFIG; abort when estimate exceeds it
+- Admin-permission gate on REST/plugin paths (CLI keeps `--allow-cloud` as the equivalent gate)
+
+**When user pushes back on cost numbers:** STOP, re-fetch live pricing docs + a real codebase that paid those bills. Do not defend from prior research-output. CLAUDE.md rule "Bei User-Widerspruch ZUERST re-fetchen, nicht aus Cache verteidigen" applies hard here — cost estimates degrade fastest.
+
+### JSON+MD dual-sidecar is over-design when only one consumer reads (2026-05-03)
+
+First scan-youtube cut wrote `<slug>.md` (compile-input + human-read) AND `<slug>.json` (machine-readable raw structured payload — transcript segments with timestamps, comment metadata, per-frame analysis). Operator caught it immediately: "warum erstellt das json UND md?".
+
+**The trap:** structured-data-preservation feels like a hedge against future needs. But:
+- compile.py only reads `.md` — JSON had zero current consumer
+- 168kB JSON + 44kB MD per video = 4× storage overhead
+- Timestamps preserved fine in MD as `[mm:ss]` text anchors
+- yt-dlp + youtube-transcript-api are deterministic — re-deriving the structured shape from the URL is free
+
+**Rule:** when only one consumer reads the data, write one format. If audit/drift-tracking becomes a real need later, do it via a per-run log (the screenshot-intake "G. Per-Run Vision-Log" pattern), not per-video duplicate state. Single source of truth always, even at the cost of "machine-readable backup".
+
+Same pattern as the screenshots-intake decision: rejected `raw/notes/screenshots/sidecars/` parallel folder because it duplicated HOME-Sidecar content. Keep ONE canonical artifact per source.
+
+### Engine config.py path-resolution assumes nested `.wiki/` (2026-05-03)
+
+`scripts/config.py` computes `ROOT_DIR = SCRIPTS_DIR.parent.parent` — i.e. parent of `.wiki/`. **In production** (engine installed as `<vault>/.wiki/`) this correctly resolves to the vault root.
+
+**In dev** (the engine repo `llm-wiki/` checked out as a top-level repo, not nested in a vault), `ROOT_DIR` resolves to the *parent of llm-wiki* — which on this machine is `WebDev/projects/lx-0/`, a Collection-Dir from the workspace `CLAUDE.md`, not a vault. Running scan-youtube from the dev repo wrote `raw/notes/youtube/*.md` into the Collection-Dir.
+
+**Workarounds when testing engine code from dev:**
+- Run from inside `lxw/.wiki/` (the production install — config resolves correctly there)
+- Or set up a sandbox vault structure (`mkdir /tmp/test-vault && ln -s ~/Code/.../llm-wiki /tmp/test-vault/.wiki`) and run from `/tmp/test-vault/.wiki/`
+- Don't fix `config.py` to special-case dev — production correctness is the primary contract
+
+**Pollution recovery:** after dev-test, files land in `<dev-repo-parent>/raw/`. They're not in the engine repo's git, but they ARE outside the project directory the operator scopes for. Always offer cleanup explicitly + ask before `rm -rf` (CLAUDE.md hard rule).

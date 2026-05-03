@@ -149,6 +149,27 @@ Format for each entry:
 **Reason:** Cache refresh is best-effort observability — must not block flush. But silent failure is worse than no refresh: operator never learns about broken state until they notice stale numbers. Capturing stderr + logging WARNING (engine-side via `log.warning`, shell-side via `warn`) gives the signal without coupling lifecycles.
 **Linked artifacts:** `scripts/flush.py:refresh_dashboard_stats` + `refresh_dashboard_lint`, `wiki:_refresh_dashboard_stats` + `_refresh_dashboard_lint`.
 
+## 2026-05-03: YouTube intake — single markdown sidecar, local-first vision, hardcoded-cost guardrails
+
+**Context:** YouTube videos are a primary learning surface for the operator (German tutorials, AI talks, code walkthroughs). Need an intake that handles single videos, playlists, and an inbox-list, with multiple detail tiers (metadata → transcript → comments → visual analysis). Cloud video models (Gemini 2.5) are 7-28¢/10min in reality (verified against `clawrag/transformers/video_gemini.py:51-52`), not the 2¢ marketing-headline number.
+**Options considered:** (A) Cloud-first via Gemini 2.5; (B) Local-first via gemma4 frame sampling on kcma-d8 GPU host; (C) JSON+MD dual-sidecar like the original backlog sketched; (D) Markdown-only single source of truth.
+**Chose:** Local-first (B) for Tier 3, with cloud as opt-in fallback only via `--allow-cloud` (no silent escalation when Ollama is down). Single markdown sidecar (D), no parallel JSON.
+**Reason:**
+- Local: kcma-d8 is sunk cost, has gemma4:e4b already pulled for screenshots-intake. Speed irrelevant per operator (kcma 100% online), $0 vs Gemini's 7¢/10min Flash-Lite or 28¢/10min for 3.1-pro.
+- Cloud guardrails (lifted from clawrag's pain-driven design): hardcoded `DEFAULT_MODEL = gemini-2.5-flash-lite`, per-URL blob cache (deferred — write when first cloud-run lands), pre-run cost-estimate + confirm-gate, `--allow-cloud` explicit, per-run budget cap, admin-permission gate on REST/plugin endpoints. Documented in `.ytstack/backlog/youtube-intake.md`.
+- Single MD: compile.py only reads `.md`. Per-video JSON was 4× the storage of the MD for zero current consumer. Timestamps preserved as `[mm:ss]` text anchors. Audit-when-needed pattern: per-run log, not per-video duplicate state.
+**Implemented (commits `aafe2a8` `9ca7c43` `825ea94` `5bb0c0e`):** `scripts/scan-youtube.py` Tier 0/1/2/3-local, `wiki ingest-youtube` CLI, playlist URL normalization, inbox parser, transcript fallback chain (`youtube-transcript-api` → `yt-dlp .json3` → none), frame-sampling strategies (chapter-aligned / fixed-interval), CONFIG-driven tunables, end-to-end verified on a 20min Morpheus video (no transcript) producing 11/20 informative frames + 6 key concepts + 11 visual artifacts + 2 code snippets in ~14min @ $0.
+**Deferred to backlog:** Tier 3-cloud (Gemini Flash-Lite with guardrails), Tier 4 chapter-deep-dive, per-URL blob cache, curiosity-loop integration (`youtube-intake.md` + `curiosity-dashboard.md`), `raw/inbox/youtube.md` drop-zone + piggyback hook.
+**Supersedes:** —
+
+## 2026-05-03: Lift hardcoded constants into CONFIG when adding tunables
+
+**Context:** First scan-youtube cut shipped with `LOCAL_VISION_MODEL`, `MAX_FRAMES_PER_VIDEO`, `MAX_DURATION_FOR_T3_S`, `FRAME_RESIZE_WIDTH`, hardcoded timeouts as module constants. Operator pushed back: "bitte nicht hardcoden, sowas muss configurable sein. halte dich an die framework standards".
+**Options considered:** (A) keep hardcoded for "first cut" simplicity; (B) lift to CONFIG only when a second consumer needs different values; (C) lift to CONFIG immediately per AGENTS.md "Adding a tunable" convention.
+**Chose:** C. Always.
+**Reason:** AGENTS.md documents the convention explicitly: "Don't add ad-hoc constants back to scripts — extend the config layer." Every prior scanner follows it. New scanners must too — even on first cut. Defaults preserve behavior, and one-line `wiki config set models.vision_model qwen2.5vl:7b` becomes the upgrade path instead of a code edit. Reused `models.vision_model` for both per-frame vision and aggregate text-mode (gemma4 / qwen2.5-vl handle both) — no separate model field needed.
+**Supersedes:** —
+
 ## 2026-05-03: Hard facts carry trust tier + sources (sources REQUIRED at creation)
 
 **Context:** The hard-facts subsystem (PROCESS.md §13) had no provenance. A throwaway user assertion and an externally-verified contradiction were treated as equivalent authority by the compile/query prompts. Long-term that erodes trust in the override layer itself: which fact is gospel, which is a 3am brain-dump? No way to tell.

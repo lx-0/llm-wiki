@@ -1,7 +1,7 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-05-03T08:20:20Z
+last_updated: 2026-05-03T13:00:00Z
 current_milestone: M004
 active_slice: none
 active_task: none
@@ -39,13 +39,17 @@ Carried-forward candidates from M002 (deferred to M004+): Collector-rollout to o
 
 **Hotfix post-M004 (2026-05-03, commits `618b1dd` + `5900496`):** `compile.py` now writes a persistent file-log (`<wiki>/logs/compile.log`, INFO+, mirrors stderr) plus a triage-only sibling (`compile-errors.log`, WARNING+). Same run also hardened `maybe_generate_curiosity_requests`: Ollama (`gemma4:e4b`) was observed returning `gaps` as a list of strings despite item-level `type: object` in the schema, killing the curiosity pass with `AttributeError`. Now non-dict items are dropped with a logged sample. Lesson recorded in `.ytstack/KNOWLEDGE.md` "Ollama structured output" section. Docs: `docs/PROCESS.md` §8 Edge Cases + `docs/engine-layout.md` log-file inventory.
 
+**YouTube intake landed (2026-05-03, post-M004 feature, commits `aafe2a8` `9ca7c43` `825ea94` `5bb0c0e`):** New `scripts/scan-youtube.py` collector and `wiki ingest-youtube` CLI subcommand. Tier 0 (yt-dlp metadata) + Tier 1 (transcript via `youtube-transcript-api` with `yt-dlp .json3` fallback) + Tier 2 (top comments via yt-dlp) + **Tier 3-local** (ffmpeg chapter-aligned / fixed-interval frame sampling → gemma4:e4b @ kcma per-frame vision → gemma4 text-mode aggregation using transcript + frame summaries). Single `.md` sidecar per video, no parallel JSON. Playlist URL normalization (`watch?v=…&list=L` → `playlist?list=L`), inbox parser (bare URLs / markdown links / shortlinks / inline `tier: N` directives), skip-existing dedup by `video_id`. End-to-end verified on a 20min Morpheus tutorial with captions disabled — 11/20 informative frames, 6 key concepts + 11 visual artifacts + 2 code snippets in ~14min @ $0. CONFIG-driven per `AGENTS.md` framework standard: `limits.youtube_{max_frames,max_duration_s,frame_resize_width,vision_timeout_s,aggregate_timeout_s}` + `piggybacks.scan_youtube`; `models.vision_model` reused for vision + aggregate. Lxw vault config patched to add `piggybacks.scan_youtube`. Docs updated: AGENTS.md, README.md, docs/{cli,concept,PROCESS}.md, architecture.excalidraw + overview.excalidraw (substrate count 9 → 10). Two new DECISIONS entries (intake design + lift-hardcoded-into-CONFIG framework rule), three new KNOWLEDGE.md learnings (cloud-cost-reality, JSON-overdesign, dev-vs-prod path resolution). Tier 3-cloud (Gemini Flash-Lite with cost-protection guardrails lifted from clawrag's pain-driven design), curiosity-loop search/upgrade requests, generic curiosity-dashboard surface deferred to backlog.
+
 **M004 done (2026-05-02):** Agent-Task framework shipped. `scripts/agent_spec.py` (parser, 8 validation cases), `scripts/agent_task.py` (SDK runner with `--list / --dry-run / --var`), `scripts/agent_buttons.py` (discovery + dashboard region-rewrite), `wiki agent <id>` CLI. First concrete task: `prompts/agent_summarize-day.md` (Haiku, Read/Edit/Write, primary button). Auto-wiring via `wiki seed`: jq-merge into shell-commands data.json + marker-based region replace in dashboard.md. 20 pytest tests green (17 spec + 3 summarize-day smoke). PROCESS.md §14 + KNOWLEDGE.md learning + DECISIONS.md two entries (framework + region-marker pattern). Live vault patched, button visible in Run row after reload.
 
 ## Next action
 
-M004 closed. Two paths:
-- **Reassess roadmap** — does the catalogue need more agent tasks now (review-mocs, weekly-digest, extract-todos)? Or move to a different milestone.
-- **Carry-forward**: Auto-pruning of removed agent buttons (currently additive only), `--prune-agent-buttons` flag, per-task scheduling/piggyback integration. All deferred to backlog.
+M004 closed + YouTube intake landed as a post-M004 feature. Three paths:
+- **Use it / harden** — drop URLs into `lxw/inbox/youtube.md`, run `wiki ingest-youtube --inbox <path>` from kcma piggyback. After ~10 real videos, decide if `qwen2.5-vl:7b` upgrade is worth pulling for stronger Code-OCR.
+- **Tier 3-cloud** — implement Gemini Flash-Lite path with all guardrails from `youtube-intake.md` (hardcoded model, blob cache, pre-run estimate, `--allow-cloud`, budget cap). Worth doing once a video clearly needs visual fidelity local-vision can't deliver.
+- **Curiosity-loop integration** — search/upgrade requests + generic dashboard-surface (`curiosity-dashboard.md`). Triggers when ≥5 requests/week from compile-loop justify the surface.
+- **Reassess roadmap (M005?)** — does the agent-task catalogue need more tasks now (review-mocs, weekly-digest, extract-todos)?
 
 ## Open decisions
 
