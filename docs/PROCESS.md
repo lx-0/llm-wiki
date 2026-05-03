@@ -818,6 +818,29 @@ uv run python scripts/dashboard_lint.py              # Refresh
 uv run python scripts/dashboard_lint.py --dry-run    # Lint-Daten als JSON, nichts schreiben
 ```
 
+### MOC-Layer
+
+Maps of Content sind hand-kuratierte Topic-Hubs unter `knowledge/MOCs/`. Sie bündeln die wichtigsten Seiten eines Themas (Personen, Projekte, Konzepte, …) als Wikilink-Liste — der Operator pinnt manuell, was wirklich zentral ist. Darunter listet ein eingebetteter `dataview LIST FROM "knowledge/<folder>"`-Block automatisch alles aus dem entsprechenden Substrat-Ordner, sodass ungepinnte Artikel auch auffindbar sind.
+
+| Element | Wert |
+|---------|------|
+| Verzeichnis | `knowledge/MOCs/` |
+| Frontmatter | `type: moc` (gelintet von `check_article_type`) |
+| Seed-Stubs | `people.md`, `projects.md`, `concepts.md` (siehe `templates/knowledge/MOCs/`) |
+| Seed-Mechanik | `lib/seed.sh:seed_vault_templates` Step 4b — additiv (überschreibt operator-edits nicht) |
+| Dashboard-Wiring | `dashboard.md` Section "## 🗂 MOCs" — `dataview LIST FROM "knowledge/MOCs"`, neue MOCs auto-appear |
+
+**Operator-Workflow**:
+1. Nach `wiki seed` existieren die 3 Seed-MOCs als leere Stubs im Vault.
+2. Operator öffnet z.B. `knowledge/MOCs/people.md`, fügt oben Wikilinks für Top-Personen hinzu.
+3. Der Dataview-Block darunter listet automatisch alle restlichen `knowledge/people/*.md`.
+4. Eigene MOCs (z.B. `knowledge/MOCs/companies.md`) anlegen — `type: moc` setzen, taucht im Dashboard auf.
+
+**Edge Cases**:
+- **Leeres Substrat**: MOC-Stub zeigt nur die hand-kuratierte Liste (oben) plus eine leere Dataview-Tabelle. Kein Crash.
+- **MOC ohne `type: moc`**: lint flaggt `type_mismatch`. Auto-fixable durch `wiki lint --fix` (in S05+ geplant) oder manuelles Setzen.
+- **`wiki seed --force` auf hand-kurierte MOCs**: überschreibt die Hand-Edits durch den Stub. Operator-Verantwortung — wie bei `dashboard.md`.
+
 ---
 
 ## 13. Hard Facts (Corrections)
