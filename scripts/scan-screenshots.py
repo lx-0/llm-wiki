@@ -38,7 +38,7 @@ from wiki_config import CONFIG
 SCREENSHOTS_DIR = Path.home() / "Screenshots"
 REPORT_DIR = RAW_DIR / "notes" / "screenshots"
 THUMB_DIR = REPORT_DIR / "thumb"
-THUMB_WIDTH = 512  # px; 30-50KB per typical screenshot @ 1920×1080
+THUMB_WIDTH = 384  # px; ~60-80KB per Retina-source screenshot — compromise between text legibility and iCloud cost
 STATE_DIR.mkdir(parents=True, exist_ok=True)
 STATE_FILE = STATE_DIR / "screenshot-state.json"
 
