@@ -512,3 +512,20 @@ source: post-tool-use-bash-draft
 EOF
 }
 ```
+
+## Discrete trust tiers > continuous score for human-curated authority (2026-05-03)
+
+When designing the hard-facts trust extension (DECISIONS.md `2026-05-03: Hard facts carry trust tier + sources`), the obvious first move was a `0.0–1.0` float `trust:` score. Rejected in favour of three discrete tiers `confirmed | asserted | provisional` for two reasons:
+
+1. **Float scores invite false precision.** Was that fact a 0.7 or a 0.75? Operators making the call at 11pm don't have a defensible answer; the next operator can't reproduce it. Three tiers map to natural intuition (artifact / I-said / hörensagen) and stay consistent across people and time.
+2. **Auditability.** A discrete enum is greppable. `wiki correct list` can show tier as a column. Future Lint thresholds ("only enforce confirmed-tier negation_terms strictly") become trivial Boolean checks instead of threshold tuning.
+
+Same lesson for `--source` being **REQUIRED** (not optional with default): the original schema let facts exist without provenance and that was the failure mode the override layer was supposed to fix. Required-arg shifts cost-of-creation upward by ~3 seconds — exactly the friction needed to force "where did I learn this?" thinking. User-as-source via `user:<date>` sentinel keeps quick captures viable without lying about evidence. Don't let a default mask the absence of a thing the system depends on.
+
+## llm-wiki-change skill: render-verify excalidraw flag is `--output`, not positional (2026-05-03)
+
+`skills/excalidraw-diagram/references/render_excalidraw.py` takes the input path positionally but the output path requires the `--output` flag. Naïve `render_excalidraw.py docs/x.excalidraw docs/x.png` errors with `unrecognized arguments`. Correct invocation:
+
+```bash
+uv run --project skills/excalidraw-diagram/references python skills/excalidraw-diagram/references/render_excalidraw.py docs/architecture.excalidraw --output docs/architecture.png
+```

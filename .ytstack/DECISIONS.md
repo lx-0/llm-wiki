@@ -148,3 +148,13 @@ Format for each entry:
 **Chose:** B.
 **Reason:** Cache refresh is best-effort observability — must not block flush. But silent failure is worse than no refresh: operator never learns about broken state until they notice stale numbers. Capturing stderr + logging WARNING (engine-side via `log.warning`, shell-side via `warn`) gives the signal without coupling lifecycles.
 **Linked artifacts:** `scripts/flush.py:refresh_dashboard_stats` + `refresh_dashboard_lint`, `wiki:_refresh_dashboard_stats` + `_refresh_dashboard_lint`.
+
+## 2026-05-03: Hard facts carry trust tier + sources (sources REQUIRED at creation)
+
+**Context:** The hard-facts subsystem (PROCESS.md §13) had no provenance. A throwaway user assertion and an externally-verified contradiction were treated as equivalent authority by the compile/query prompts. Long-term that erodes trust in the override layer itself: which fact is gospel, which is a 3am brain-dump? No way to tell.
+**Options considered:** (A) keep flat — facts are facts, all equal; (B) continuous trust score `0.0–1.0` with optional `sources:` list; (C) three discrete tiers `confirmed | asserted | provisional` with REQUIRED `sources:` list (≥1, repeatable); user is a valid source via `user:<context>` sentinel.
+**Chose:** C.
+**Reason:** Float scores invite false precision (0.7 vs 0.75 — who decides?) and drift across operators. Three tiers are auditable, fit on a single help line, and map to natural operator intuition (artifact / I-said / hörensagen). Required `sources:` shifts cost-of-creation slightly upward, which is the point: a fact without provenance is the failure mode the layer was built to fix. User-as-source via `user:<date>` sentinel keeps quick captures viable without lying about evidence.
+**How it works at compile/query time:** `read_hard_facts()` in `scripts/utils.py` sorts injected facts by tier (`confirmed` > `asserted` > `provisional`) then `updated` DESC; renders each with `[trust: X]` header + `> Sources: ...` line. `prompts/compile_main.md` + `prompts/query_main.md` carry one paragraph on conflict resolution (higher tier wins; tie → newer; all three tiers still override raw sources).
+**Migration:** No write-migration. `read_hard_facts()` defaults legacy facts to `asserted` + `user:legacy-pre-trust-schema`, which is semantically correct for the two pre-existing entries (both user-typed). Backfill via `wiki correct edit <slug>`.
+**Linked artifacts:** `scripts/correct.py:cmd_add` (CLI flags + validation), `scripts/utils.py:read_hard_facts` (sort + render + legacy-default), `prompts/compile_main.md`, `prompts/query_main.md`, `templates/AGENTS.example.md`, `docs/PROCESS.md` §13, `docs/architecture.excalidraw` (CLI + YAML + description), `tests/test_correct.py` (9 cases), commit `4ec926e`.

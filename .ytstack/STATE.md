@@ -19,6 +19,8 @@ active_task: none
 
 **Hard-facts subsystem (user-led, parallel to S01)** — new `knowledge/facts/<slug>.md` with `type: fact` frontmatter. `wiki correct add/list/remove/edit/path` CLI in `scripts/correct.py`. `prompts/compile_main.md` injects facts as authoritative override over source material. Lint check_article_type knows about `facts/ → fact`. Migration script + tests adjusted accordingly.
 
+**Hard-facts trust + sources extension (2026-05-03, commit `4ec926e`):** every fact now carries `trust:` (`confirmed | asserted | provisional`, default `asserted`) and `sources:` (≥1, REQUIRED at creation — `wiki correct add` exits 2 without `--source`). User IS a valid source via sentinels like `user:2026-05-03`. `read_hard_facts()` sorts injected facts by trust tier DESC then `updated` DESC; each renders with `[trust: X]` header + `> Sources: ...` line. Compile + query prompts gained a conflict-resolution paragraph (higher tier wins; tie → newer; all tiers still override raw). Two legacy facts in lx-0 vault backfilled to `trust: asserted` + `sources: [user:2026-05-02]`. 9 new pytest cases, full suite 79/79. DECISIONS.md entry added. See PROCESS.md §13 + AGENTS.example.md schema for full schema.
+
 **Root-cause fixes that landed:**
 - `compile_main.md` now sets `type:` per folder; `AGENTS.example.md` documents knowledge/ frontmatter schema; lint flags missing_type / type_mismatch (auto-fixable); `scripts/migrate_add_type.py` backfills legacy articles. Replaces earlier symptom-fix where dashboard chart fell back to folder name.
 - `lint.py:check_stale_articles` defensive isinstance handling for `state.ingested[rel]` (string in current schema, dict in legacy). Per-check try/except in main loop so one crash doesn't kill the run.
