@@ -38,6 +38,7 @@ STATE_DIR.mkdir(parents=True, exist_ok=True)
 LOGS_DIR.mkdir(parents=True, exist_ok=True)
 
 LOG_FILE = LOGS_DIR / "flush.log"
+ERRORS_LOG_FILE = LOGS_DIR / "flush-errors.log"
 LAST_FLUSH_FILE = STATE_DIR / "last-flush.json"
 COMPILE_SCRIPT = SCRIPTS_DIR / "compile.py"
 DASHBOARD_STATS_SCRIPT = SCRIPTS_DIR / "dashboard_stats.py"
@@ -128,13 +129,22 @@ def _build_piggyback_tasks() -> list[dict]:
 PIGGYBACK_TASKS = _build_piggyback_tasks()
 
 # ── Logging ──────────────────────────────────────────────────────────
+_LOG_FORMAT = "%(asctime)s  %(levelname)s  %(message)s"
+_LOG_DATEFMT = "%Y-%m-%dT%H:%M:%S"
+
 logging.basicConfig(
     filename=str(LOG_FILE),
     level=logging.INFO,
-    format="%(asctime)s  %(levelname)s  %(message)s",
-    datefmt="%Y-%m-%dT%H:%M:%S",
+    format=_LOG_FORMAT,
+    datefmt=_LOG_DATEFMT,
 )
 log = logging.getLogger("flush")
+
+_log_formatter = logging.Formatter(_LOG_FORMAT, datefmt=_LOG_DATEFMT)
+_error_handler = logging.FileHandler(ERRORS_LOG_FILE, encoding="utf-8")
+_error_handler.setFormatter(_log_formatter)
+_error_handler.setLevel(logging.WARNING)
+logging.getLogger().addHandler(_error_handler)
 
 
 # ── Dedup helpers ────────────────────────────────────────────────────
