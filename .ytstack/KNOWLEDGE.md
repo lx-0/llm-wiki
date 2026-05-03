@@ -303,6 +303,27 @@ Default Chart.js text/grid colors are dark gray → invisible on Obsidian's dark
 
 The plugin list might contain operator-added plugins the engine doesn't know about. Default seed mode does **jq union merge** (`jq -s '.[0] + .[1] | unique'`) — never drops entries. Other files (dashboard.md, AGENTS.md) skip-if-exists with `--force` to overwrite.
 
+### Screenshot intake — four-artifact architecture, single LLM call
+
+Per Screenshot wird der Vision-LLM **genau einmal** aufgerufen. Das in-memory `meta`-Dict wird in zwei Files serialisiert (HOME-Sidecar + Batch-Report), plus ein deterministisches Thumbnail im Vault. Vier Artefakte pro Bild:
+
+| Datei | Ort | Rolle |
+|---|---|---|
+| `Foo.png` | `~/Screenshots/` | Original-Pixel — bleibt immer in HOME, nie kopiert |
+| `Foo.md` | `~/Screenshots/` | **Kanonische Analyse** (rich Frontmatter + summary + key_text + raw_response in `<details>`) — Source of Truth pro Screenshot. Skip-Marker für `find_new_screenshots`. |
+| `thumb/Foo.png` | `<vault>/raw/notes/screenshots/thumb/` | 384px PNG via macOS `sips`, idempotent (skip-if-exists), ~80 KB. Embed im Batch-Report via Obsidian-Wikilink. |
+| `screenshots-<slug>.md` | `<vault>/raw/notes/screenshots/` | Run-Aggregat (compile-Input). Dieselben Felder wie HOME-Sidecar pro Bild, plus Tabelle. |
+
+**Verworfene Alternativen** (Stand 2026-05-03 nach mehreren Iterationen — nicht erneut probieren ohne den ganzen Kontext zu kennen):
+
+1. **PNG-Copy ins Vault** (`raw/notes/screenshots/img/`): 418 MB iCloud-Bloat bei 453 Retina-Screenshots → verworfen.
+2. **Parallel-Vault-Sidecar-Folder** (`raw/notes/screenshots/sidecars/`): 803 Files Clutter, dupliziert HOME-Sidecar-Inhalt → verworfen. Vault soll **keinen** parallelen Per-Screenshot-File-Layer haben; alle Analyse-Daten leben aggregiert im Batch-Report ODER kanonisch in HOME.
+3. **`file://` Image-Embeds**: zerbrechliche absolute Pfade, mobile-broken (Obsidian iPad/Phone hat keinen Zugriff auf `~/Screenshots/`) → verworfen zugunsten von Wikilink-Embeds auf Vault-Thumbnails.
+4. **HOME-Slim-Marker** (frontmatter-only): degradierte die kanonische Analyse zu einem Stub → verworfen, HOME bleibt rich.
+5. **Symlink-Verzeichnis** (`<vault>/.../originals → ~/Screenshots`): iCloud-Verhalten unklar, macOS-spezifisch, rm-Risiko → nicht implementiert.
+
+**Wichtig für Doku-Konsistenz:** wenn jemand "Sidecar" sagt, ist das die HOME-Datei, NICHT eine Vault-Datei. Frühere Versionen der Doku haben das vermischt.
+
 ### Obsidian writes `.obsidian/*.json` from RAM — race-condition with `wiki seed`
 
 `graph.json`, `workspace.json`, `appearance.json`, plugin `data.json` files are all serialized from Obsidian's in-memory state on view-changes / pane-saves / app-quit. If Obsidian is running while `wiki seed --force` deploys a new template, Obsidian's next save **clobbers the template** silently — the search field in `graph.json` survived once because reads happened before saves, but `colorGroups` got wiped to `[]`.

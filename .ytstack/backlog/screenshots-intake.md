@@ -7,7 +7,17 @@ related: scripts/scan-screenshots.py, prompts/scan_screenshots_vision.md, prompt
 
 # Screenshots-Intake — Tier 3+4 Backlog
 
-Tier 1+2 (file:// Image-Embed im Batch-Report, source_screenshots im Compile-Frontmatter, raw_response als `<details>` pro Screenshot im Batch-Report, HOME-Sidecar als Slim-Marker mit Backlink zum Batch) sind 2026-05-03 implementiert. Kein paralleler Vault-Sidecar-Ordner — alle Analyse-Daten leben im jeweiligen Batch-Report. Die folgenden Items adressieren Output-Qualität und Audit-Tiefe — orthogonal zum Closed-Loop-Fix.
+**Stand 2026-05-03 nach Architektur-Iterationen:**
+
+- HOME-Sidecar `~/Screenshots/<file>.md` ist **kanonische Analyse** (rich Frontmatter + summary + key_text + raw_response in `<details>`). Single Source of Truth pro Screenshot.
+- `<vault>/raw/notes/screenshots/thumb/<file>.png` — 384px PNG-Thumbnail, deterministisch via `sips`, idempotent. ~80 KB pro Bild.
+- `<vault>/raw/notes/screenshots/screenshots-<slug>.md` — Run-Aggregat (compile-Input). Embed via `![[thumb/<file>.png]]` Wikilink. Enthält dieselben Felder wie HOME-Sidecar (eine LLM-Inference, zwei Serialisierungen).
+- Pro PNG **genau ein Vision-LLM-Call**.
+- Tier-1-B (`source_screenshots:` Frontmatter im Compile-Output): Bullet 9 in `prompts/compile_main.md` geschrieben aber noch uncommitted (mixed mit trust-tier-Diff der Kollegen). Ohne diesen Bullet schreibt compile.py das `source_screenshots:` Feld nicht.
+- Vault-Disk-Cost: 81 MB Thumbs für 1274 Screenshots (Ø ~65 KB).
+- Verworfene Designs (irrwege dokumentiert): (a) PNG-Copy ins Vault → 418 MB iCloud-Bloat, (b) Parallel-Vault-Sidecar-Folder (`raw/notes/screenshots/sidecars/`) → 803 Files Clutter, (c) `file://` Image-Embed → mobile broken + brittle absolute Pfade, (d) HOME-Slim-Marker → orphaned data layer.
+
+Die folgenden Items adressieren Output-Qualität und Audit-Tiefe — orthogonal zum Closed-Loop-Fix.
 
 ## Tier 3 — Output-Qualität
 
