@@ -15,6 +15,7 @@ import asyncio
 import json
 import logging
 import sys
+import time
 from pathlib import Path
 
 import httpx  # noqa: E402  exception types only; HTTP via ollama_client
@@ -57,6 +58,11 @@ logging.basicConfig(
     datefmt=_LOG_DATEFMT,
 )
 log = logging.getLogger("compile")
+
+# Silence noisy library loggers — every Ollama curiosity call would otherwise
+# spam an INFO-level "HTTP Request: POST ..." line into compile.log.
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
 
 LOGS_DIR.mkdir(parents=True, exist_ok=True)
 _compile_log_file = LOGS_DIR / "compile.log"
@@ -142,13 +148,27 @@ def select_files(args: argparse.Namespace) -> list[Path]:
 
 # ── Compilation ──────────────────────────────────────────────────────
 
-async def compile_file(source: Path, dry_run: bool = False) -> dict | None:
+def _category_badge(rel_path: str) -> str:
+    """Short tag for the source category — first path segment after raw/, or 'daily'."""
+    if rel_path.startswith("daily/"):
+        return "daily"
+    if rel_path.startswith("raw/"):
+        parts = rel_path.split("/")
+        if len(parts) >= 3 and parts[1] == "notes":
+            return parts[2]  # screenshots / email / browser / etc.
+        if len(parts) >= 2:
+            return parts[1]  # memories / articles / papers / etc.
+    return "?"
+
+
+async def compile_file(source: Path, dry_run: bool = False, prefix: str = "") -> dict | None:
     """Compile a single source file into wiki articles.
 
     Returns usage/cost info dict, or None on failure.
     """
     rel_path = str(source.relative_to(ROOT_DIR))
-    log.info("Compiling: %s", rel_path)
+    badge = _category_badge(rel_path)
+    log.info("%s[%s] %s", prefix, badge, rel_path)
 
     if dry_run:
         log.info("  [dry-run] Would compile %s", rel_path)
@@ -184,6 +204,7 @@ async def compile_file(source: Path, dry_run: bool = False) -> dict | None:
     total_input_tokens = 0
     total_output_tokens = 0
     result_text = ""
+    started = time.time()
 
     try:
         async for message in query(
@@ -203,16 +224,19 @@ async def compile_file(source: Path, dry_run: bool = False) -> dict | None:
             if isinstance(message, ResultMessage):
                 result_text = message.result
     except Exception:
-        log.exception("  Compilation failed for %s", rel_path)
+        log.exception("  ✗ failed after %.1fs", time.time() - started)
         return None
 
-    log.info("  Done: %s", rel_path)
-    log.info(
-        "  Tokens — input: %d, output: %d", total_input_tokens, total_output_tokens
-    )
-
+    elapsed = time.time() - started
     # Estimate cost (Claude Opus 4.6 pricing: $5/M input, $25/M output)
     cost = (total_input_tokens * 5.0 + total_output_tokens * 25.0) / 1_000_000
+    log.info(
+        "  ✓ %.1fs · in:%s out:%s ($%.4f)",
+        elapsed,
+        f"{total_input_tokens:,}",
+        f"{total_output_tokens:,}",
+        cost,
+    )
 
     return {
         "input_tokens": total_input_tokens,
@@ -481,8 +505,14 @@ async def main() -> None:
     failed_count = 0
     consecutive_failures = 0
     aborted = False
+    run_input_tokens = 0
+    run_output_tokens = 0
+    run_started = time.time()
 
-    for source in files:
+    cap = min(args.max_files, len(files)) if args.max_files else len(files)
+    log.info("─── compiling %d of %d candidates (newest first) ───", cap, len(files))
+
+    for idx, source in enumerate(files, 1):
         if args.max_files and compiled_count >= args.max_files:
             log.info(
                 "Reached --max-files limit of %d. Stopping. (Rerun later to continue.)",
@@ -490,7 +520,8 @@ async def main() -> None:
             )
             break
 
-        result = await compile_file(source)
+        prefix = f"[{compiled_count + failed_count + 1}/{cap}] "
+        result = await compile_file(source, prefix=prefix)
         if result is None:
             failed_count += 1
             consecutive_failures += 1
@@ -508,6 +539,8 @@ async def main() -> None:
         consecutive_failures = 0
         compiled_count += 1
         total_cost += result.get("cost_usd", 0.0)
+        run_input_tokens += result.get("input_tokens", 0)
+        run_output_tokens += result.get("output_tokens", 0)
 
         # Suggestion pass for email sources
         await maybe_generate_suggestions(source)
@@ -548,15 +581,22 @@ async def main() -> None:
 
     outcome = "ABORTED (rate limit)" if aborted else "complete"
     pending = len(files) - compiled_count - failed_count
+    elapsed_min, elapsed_sec = divmod(int(time.time() - run_started), 60)
+    run_cost = (run_input_tokens * 5.0 + run_output_tokens * 25.0) / 1_000_000
+    log.info("─── compilation %s ───", outcome)
     log.info(
-        "Compilation %s — %d done, %d failed, %d pending of %d candidates this run. Cost so far: $%.4f",
-        outcome,
-        compiled_count,
-        failed_count,
-        pending,
-        len(files),
-        total_cost,
+        "  files:   %d done · %d failed · %d pending of %d candidates",
+        compiled_count, failed_count, pending, len(files),
     )
+    log.info(
+        "  tokens:  in:%s · out:%s · this run",
+        f"{run_input_tokens:,}", f"{run_output_tokens:,}",
+    )
+    log.info(
+        "  cost:    $%.4f this run · $%.4f lifetime",
+        run_cost, total_cost,
+    )
+    log.info("  time:    %dm %ds", elapsed_min, elapsed_sec)
 
 
 if __name__ == "__main__":
