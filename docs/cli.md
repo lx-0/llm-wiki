@@ -84,6 +84,11 @@ limits.flush_max_retries               int
 limits.flush_retry_delay_seconds       int
 limits.screenshot_resize_width         px
 limits.screenshot_timeout_seconds      seconds
+limits.youtube_max_frames              int — Tier-3 cap frames per video (default 30)
+limits.youtube_max_duration_s          int — Tier-3: skip videos longer than this (default 10800 = 3h)
+limits.youtube_frame_resize_width      px — ffmpeg downscale before vision model (default 512)
+limits.youtube_vision_timeout_s        seconds — per-frame ollama timeout (default 90)
+limits.youtube_aggregate_timeout_s     seconds — final-synthesis ollama timeout (default 300)
 limits.curiosity_max_gaps              int — max requests per compile
 limits.curiosity_min_source_chars      int — skip curiosity for tiny sources
 limits.sparse_threshold_words          int — lint warns under this word count

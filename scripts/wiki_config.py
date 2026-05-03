@@ -63,6 +63,12 @@ class Limits:
     curiosity_max_gaps: int = 3
     curiosity_min_source_chars: int = 500
     sparse_threshold_words: int = 200
+    # YouTube ingest (scan-youtube.py — see also CONFIG.piggybacks.scan_youtube)
+    youtube_max_frames: int = 30          # Tier-3 visual: cap frames per video
+    youtube_max_duration_s: int = 10800   # Tier-3: skip videos longer than this (3h default)
+    youtube_frame_resize_width: int = 512  # ffmpeg downscale before vision model
+    youtube_vision_timeout_s: int = 90    # per-frame ollama call timeout
+    youtube_aggregate_timeout_s: int = 300  # final synthesis call timeout
 
 
 @dataclass

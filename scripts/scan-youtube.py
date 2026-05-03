@@ -31,18 +31,12 @@ from typing import Any
 import yaml
 
 from config import RAW_DIR, now_iso
+from wiki_config import CONFIG
 
 # yt-dlp + youtube-transcript-api are imported lazily so --help works
 # without the deps installed.
 
 REPORT_DIR = RAW_DIR / "notes" / "youtube"
-
-# T3-local guardrails
-MAX_FRAMES_PER_VIDEO = 30          # cap visual inference cost (5s/frame on kcma → ~2.5min)
-MAX_DURATION_FOR_T3_S = 3 * 3600   # > 3h: too long, abort
-FRAME_RESIZE_WIDTH = 512           # match scan-screenshots
-LOCAL_VISION_MODEL = "gemma4:e4b"  # hardcoded — see CONFIG.models.vision_model in seed
-LOCAL_AGG_MODEL = "gemma4:e4b"
 
 logging.basicConfig(
     level=logging.INFO,
@@ -351,11 +345,13 @@ def pick_frame_timestamps(metadata: dict) -> tuple[list[float], str]:
     """Return (timestamps_in_seconds, strategy_name).
 
     Strategy: chapter-aligned (mid-of-chapter) when ≥3 chapters; else fixed
-    interval evenly spread across duration; capped at MAX_FRAMES_PER_VIDEO.
+    interval evenly spread across duration; capped at CONFIG.limits.youtube_max_frames.
     """
     duration = float(metadata.get("duration_s") or 0)
     if duration <= 0:
         return [], "no-duration"
+
+    max_frames = CONFIG.limits.youtube_max_frames
 
     chapters = metadata.get("chapters") or []
     if len(chapters) >= 3:
@@ -364,10 +360,10 @@ def pick_frame_timestamps(metadata: dict) -> tuple[list[float], str]:
             start = float(ch.get("start_time") or 0)
             end = float(ch.get("end_time") or start + 30)
             timestamps.append((start + end) / 2)
-        return timestamps[:MAX_FRAMES_PER_VIDEO], "chapter-aligned"
+        return timestamps[:max_frames], "chapter-aligned"
 
     # Fixed interval: ~one frame per 60s, capped
-    n_frames = min(MAX_FRAMES_PER_VIDEO, max(5, int(duration // 60)))
+    n_frames = min(max_frames, max(5, int(duration // 60)))
     step = duration / (n_frames + 1)
     timestamps = [step * (i + 1) for i in range(n_frames)]
     return timestamps, f"fixed-interval/{n_frames}"
@@ -398,14 +394,15 @@ def ydlp_download_video(url: str, dest_dir: Path, *, format_pref: str = "worst[h
 
 
 def ffmpeg_extract_frame(video: Path, timestamp_s: float, dest: Path) -> bool:
-    """Extract a single JPEG frame at timestamp_s, resized to FRAME_RESIZE_WIDTH."""
+    """Extract a single JPEG frame at timestamp_s, downscaled per CONFIG."""
+    width = CONFIG.limits.youtube_frame_resize_width
     cmd = [
         "ffmpeg", "-y", "-loglevel", "error",
         "-ss", f"{timestamp_s:.2f}",
         "-i", str(video),
         "-vframes", "1",
         "-q:v", "3",
-        "-vf", f"scale={FRAME_RESIZE_WIDTH}:-1",
+        "-vf", f"scale={width}:-1",
         str(dest),
     ]
     r = subprocess.run(cmd, capture_output=True)
@@ -423,8 +420,10 @@ def fetch_visual_local(
         return None
 
     duration = float(metadata.get("duration_s") or 0)
-    if duration > MAX_DURATION_FOR_T3_S:
-        log.warning("video duration %.0fs > %ds — skipping T3", duration, MAX_DURATION_FOR_T3_S)
+    max_dur = CONFIG.limits.youtube_max_duration_s
+    if duration > max_dur:
+        log.warning("video duration %.0fs > %ds (CONFIG.limits.youtube_max_duration_s) — skipping T3",
+                    duration, max_dur)
         return None
     if duration <= 0:
         log.warning("no duration metadata — skipping T3")
@@ -458,9 +457,9 @@ def fetch_visual_local(
                 t1 = time.time()
                 content, _stats = ollama_client.chat_vision(
                     FRAME_PROMPT,
-                    model=LOCAL_VISION_MODEL,
+                    model=CONFIG.models.vision_model,
                     image_b64=img_b64,
-                    timeout=90.0,
+                    timeout=float(CONFIG.limits.youtube_vision_timeout_s),
                 )
                 summary = content.strip()
                 informative = not summary.upper().startswith("UNINFORMATIVE")
@@ -478,13 +477,18 @@ def fetch_visual_local(
                 log.warning("  vision call failed at %.1fs: %s", ts, type(e).__name__)
                 continue
 
-        # Aggregate
-        log.info("  aggregating with %s …", LOCAL_AGG_MODEL)
+        # Aggregate (reuses the local vision-capable model in text mode —
+        # gemma4 / qwen2.5-vl handle both, no need for a second model field).
+        agg_model = CONFIG.models.vision_model
+        log.info("  aggregating with %s …", agg_model)
         agg_prompt = _build_aggregate_prompt(metadata, transcript, per_frame)
         try:
             t1 = time.time()
             aggregate = ollama_client.chat(
-                agg_prompt, model=LOCAL_AGG_MODEL, temperature=0.2, timeout=300.0
+                agg_prompt,
+                model=agg_model,
+                temperature=0.2,
+                timeout=float(CONFIG.limits.youtube_aggregate_timeout_s),
             )
             agg_duration = round(time.time() - t1, 2)
         except Exception as e:  # noqa: BLE001
@@ -494,7 +498,7 @@ def fetch_visual_local(
 
         return {
             "provider": "local",
-            "model": f"{LOCAL_VISION_MODEL}@ollama",
+            "model": f"{CONFIG.models.vision_model}@ollama",
             "strategy": strategy,
             "frames_planned": len(timestamps),
             "frames_analyzed": len(per_frame),
@@ -507,8 +511,10 @@ def fetch_visual_local(
 
 def _build_aggregate_prompt(metadata: dict, transcript: dict | None, frames: list[dict]) -> str:
     transcript_block = (transcript or {}).get("plain") or "(no subtitles available — rely on visual track)"
-    if len(transcript_block) > 12000:  # gemma4 context safety
-        transcript_block = transcript_block[:12000] + "\n[…truncated…]"
+    # Context-window safety: keep transcript + frames within ~16k tokens
+    max_transcript_chars = 12000
+    if len(transcript_block) > max_transcript_chars:
+        transcript_block = transcript_block[:max_transcript_chars] + "\n[…truncated…]"
 
     informative = [f for f in frames if f["informative"]]
     if informative:
@@ -751,7 +757,12 @@ def main() -> int:
     src.add_argument("--url", help="single video or playlist URL")
     src.add_argument("--inbox", help="path to a markdown file with YouTube URLs")
     parser.add_argument("--tier", type=int, choices=[0, 1, 2, 3], default=1)
-    parser.add_argument("--limit", type=int, default=None, help="cap playlist expansion")
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        help="cap playlist/inbox expansion (default: CONFIG.piggybacks.scan_youtube.max_per_run for --inbox, unlimited for --url)",
+    )
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--no-skip", action="store_true", help="re-ingest videos already in raw/notes/youtube/")
     parser.add_argument("--out", type=Path, default=REPORT_DIR)
@@ -761,6 +772,8 @@ def main() -> int:
     if args.url:
         items = [InboxItem(url=args.url)]
         input_source = "cli"
+        # CLI --url paths default to no limit (user explicitly named one URL).
+        effective_limit = args.limit
     else:
         path = Path(args.inbox).expanduser()
         if not path.exists():
@@ -769,18 +782,25 @@ def main() -> int:
         items = parse_inbox(path.read_text(encoding="utf-8"))
         input_source = "inbox"
         log.info("inbox: %d items", len(items))
+        # Inbox piggyback path defaults to CONFIG.piggybacks.scan_youtube.max_per_run
+        # (mirrors scan-screenshots convention) so a runaway inbox doesn't burn a whole day.
+        if args.limit is not None:
+            effective_limit = args.limit
+        else:
+            pb = CONFIG.piggybacks.get("scan_youtube")
+            effective_limit = (pb.max_per_run if pb else None)
 
     urls_to_process: list[tuple[str, str | None, int]] = []
     for it in items:
         tier = it.tier_override if it.tier_override is not None else args.tier
         if is_playlist_url(it.url):
-            for u in expand_playlist(it.url, limit=args.limit):
+            for u in expand_playlist(it.url, limit=effective_limit):
                 urls_to_process.append((u, it.note, tier))
         else:
             urls_to_process.append((it.url, it.note, tier))
 
-    if args.limit and len(urls_to_process) > args.limit:
-        urls_to_process = urls_to_process[: args.limit]
+    if effective_limit and len(urls_to_process) > effective_limit:
+        urls_to_process = urls_to_process[:effective_limit]
 
     log.info("ingesting %d videos at tier %d", len(urls_to_process), args.tier)
     results = []

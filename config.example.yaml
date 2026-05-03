@@ -34,6 +34,10 @@ piggybacks:
     enabled: true
     cooldown_hours: 24
     max_per_run: 50
+  scan_youtube:
+    enabled: true
+    cooldown_hours: 24
+    max_per_run: 10                      # cap inbox-drain per piggyback run
   follow_requests:
     enabled: true
     cooldown_hours: 24
@@ -72,6 +76,12 @@ limits:
   curiosity_min_source_chars: 500
   # Lint.
   sparse_threshold_words: 200
+  # YouTube ingest (scan-youtube.py).
+  youtube_max_frames: 30                 # Tier-3 visual: cap frames per video
+  youtube_max_duration_s: 10800          # Tier-3: skip videos longer than this (default 3h)
+  youtube_frame_resize_width: 512        # ffmpeg downscale before vision model
+  youtube_vision_timeout_s: 90           # per-frame ollama call timeout
+  youtube_aggregate_timeout_s: 300       # final synthesis call timeout
 
 features:
   # Master switches for entire capabilities.
