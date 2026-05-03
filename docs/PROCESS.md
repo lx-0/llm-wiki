@@ -696,26 +696,37 @@ Läuft als Piggyback in flush.py (24h Cooldown, nach 18:00).
 
 ## 11. Screenshot Scanner
 
-Scannt `~/Screenshots/` nach neuen PNG-Screenshots, beschreibt sie via lokalem Vision-LLM (Gemma4), und erstellt Sidecar-Dateien mit YAML-Frontmatter. Sidecar-Dateien bleiben neben den PNGs — das ist die Organisation.
+Scannt `~/Screenshots/` nach neuen PNG-Screenshots, beschreibt sie via lokalem Vision-LLM (Gemma4) **einmal**, und schreibt das Ergebnis in zwei Files: die kanonische HOME-Sidecar (Source of Truth pro Screenshot) und das Batch-Report-Aggregat im Vault (compile-Input). Pro Bild wird zusätzlich ein 384px-PNG-Thumbnail im Vault erzeugt — damit Obsidian inline previews zeigen kann ohne die Original-PNGs in den iCloud-synced Vault zu kopieren.
+
+### Architektur: Vier Artefakte pro Screenshot
+
+| Datei | Ort | Rolle |
+|---|---|---|
+| `Foo.png` | `~/Screenshots/` | Original-Pixel — bleibt immer in HOME, nie kopiert |
+| `Foo.md` | `~/Screenshots/` (neben PNG) | **Die Analyse**: rich Frontmatter (app/project/tags/relevance/scanned + vision_model + vision_tokens) + summary + key_text + raw LLM-Response in `<details>`. Single Source of Truth. |
+| `thumb/Foo.png` | `<vault>/raw/notes/screenshots/thumb/` | 384px-PNG, deterministisch via `sips`, idempotent (skip-if-exists). ~60-80 KB. |
+| `screenshots-<slug>.md` | `<vault>/raw/notes/screenshots/` | Run-Aggregat: Tabelle + pro Bild `### {ts}` Heading, `![[thumb/Foo.png]]` Embed, summary/key_text/tags, Vision-Metadata, raw_response in `<details>`. Compile liest das. |
+
+Pro PNG wird der Vision-LLM **genau einmal** aufgerufen — die in-memory `meta`-Dict wird in beide Files (HOME-Sidecar + Batch-Report-Block) serialisiert.
 
 ### Flow
 
 ```mermaid
 flowchart TD
     DIR["~/Screenshots/\nPNG-Dateien"]
-    DIR --> SCAN["scan-screenshots.py\nFindet neue/unverarbeitete PNGs"]
-    SCAN --> HASH{"SHA-256 Hash\nschon in state?"}
-    HASH -->|Bekannt| SKIP["Übersprungen"]
-    HASH -->|Neu| VISION["Gemma4 Vision\nollama_client.chat_vision()\nCONFIG.models.ollama_url"]
-    VISION --> JSON["Structured JSON:\napp, project, tags,\nrelevance, summary, key_text"]
-    JSON --> SIDECAR["Sidecar .md\nneben PNG in ~/Screenshots/\nYAML Frontmatter"]
-    JSON --> FILTER{"relevance?"}
-    FILTER -->|keep| BATCH["Batch-Report\nraw/notes/screenshots/\nscreenshots-YYYY-MM-DD.md"]
-    FILTER -->|ephemeral| SKIP2["Nicht im Report"]
-    BATCH --> COMPILE["compile.py"]
+    DIR --> SCAN["scan-screenshots.py\nfind_new_screenshots()\n~/Screenshots/Foo.md fehlt?"]
+    SCAN -->|nein| SKIP["Übersprungen"]
+    SCAN -->|ja| VISION["Gemma4 Vision\nchat_vision(prompt, model, image_b64)\nCONFIG.models.ollama_url"]
+    VISION --> META["in-memory meta dict:\napp, project, tags, relevance,\nsummary, key_text, raw_response"]
+    META --> SIDECAR["~/Screenshots/Foo.md\nrich HOME sidecar (canonical)"]
+    META --> THUMB["sips --resampleWidth 384\n→ <vault>/raw/notes/screenshots/thumb/Foo.png"]
+    META --> AGG{"alle Bilder\ndieses Runs"}
+    AGG --> REPORT["<vault>/raw/notes/screenshots/\nscreenshots-YYYY-MM-DDTHHMM.md\n(Run-Aggregat)"]
+    REPORT --> COMPILE["compile.py\nliest raw/notes/screenshots/*.md\n→ knowledge/concepts/*.md"]
 
     style DIR fill:#FFECB9,stroke:#92610F
     style VISION fill:#EFF6FF,stroke:#2563EB
+    style THUMB fill:#FFF7ED,stroke:#EA580C
     style COMPILE fill:#FFD8CB,stroke:#FC4E14,stroke-width:3px
 ```
 
@@ -723,13 +734,13 @@ flowchart TD
 
 **Vision-Modell:** Gemma4:e4b auf dem lokalen GPU-Server (Ollama API, Adresse aus `CONFIG.models.ollama_url`). Aufruf via `ollama_client.chat_vision(prompt, model, image_b64)`. Kostenlos, keine API-Kosten. Gibt strukturiertes JSON zurück: `app`, `project`, `tags`, `relevance` (keep/ephemeral), `summary`, `key_text`. Beispiel-`project`-Werte rendert der Prompt aus `CONFIG.personal.project_examples`.
 
-**Sidecar-Dateien:** Pro Screenshot wird eine `.md`-Datei mit YAML-Frontmatter direkt neben dem PNG in `~/Screenshots/` erstellt (z.B. `screenshot-2026-04-15.png` → `screenshot-2026-04-15.md`). Enthält app, project, tags, relevance, summary, key_text. Keine Kategorie-Ordner — die Sidecar-Dateien neben den PNGs sind die Organisation.
+**Skip-Detection:** `find_new_screenshots()` filtert PNGs deren `.md`-Sidecar (in `~/Screenshots/`) bereits existiert. Die HOME-Sidecar IST der Skip-Marker — keine separate State-Tabelle. Hash-basierter Tracker liegt nur in `state/screenshot-state.json` für Statistik (`total_processed`, `last_scan`).
 
-**Batch-Reports:** Nur Screenshots mit `relevance: keep` werden in den Tages-Report aufgenommen (`raw/notes/screenshots/screenshots-YYYY-MM-DD.md`). Ephemeral Screenshots werden übersprungen. Der Compiler verarbeitet den Report zu Wiki-Artikeln.
+**Thumbnails:** Nach erfolgreichem LLM-Call generiert `make_thumbnail()` per macOS `sips --resampleWidth 384` ein PNG ins Vault (`raw/notes/screenshots/thumb/<filename>.png`). Idempotent: skip-if-exists. Format: PNG (lossless, scharfer Text in UI-Screenshots). Embed im Batch-Report via Obsidian-Wikilink `![[thumb/Foo.png]]` — native, mobile-portabel via iCloud, keine zerbrechlichen file://-Pfade.
 
-**Piggyback:** Läuft als täglicher Piggyback-Task (nach 18:00, 24h Cooldown) — gleiche Mechanik wie Email-Scan und Lint.
+**Batch-Reports:** Nur Screenshots mit `relevance: keep` landen in der Aggregat-Tabelle und im Details-Bereich. Ephemerals kriegen trotzdem eine HOME-Sidecar (für Skip-Detection), aber keinen Wiki-Pfad. Der Compiler verarbeitet `raw/notes/screenshots/screenshots-*.md` zu Wiki-Artikeln und kann via `source_screenshots:` Frontmatter Filenames zur Visual-Trace im Batch-Report zurückreferenzieren.
 
-**State-Tracking:** Verarbeitete Screenshots werden per SHA-256 Hash in State-File getrackt. Bereits beschriebene Screenshots werden übersprungen.
+**Piggyback:** Läuft als täglicher Piggyback-Task (nach 18:00, 24h Cooldown, `MAX_PER_RUN=50`) — gleiche Mechanik wie Email-Scan und Lint.
 
 ### Script
 
@@ -738,12 +749,15 @@ uv run python scripts/scan-screenshots.py                    # neue Screenshots 
 uv run python scripts/scan-screenshots.py --dry-run          # nur zeigen was gescannt würde
 uv run python scripts/scan-screenshots.py --limit 20         # max 20 Screenshots pro Lauf
 uv run python scripts/scan-screenshots.py --backfill 7       # letzte 7 Tage nachscannen
+uv run python scripts/scan-screenshots.py --backfill-thumbnails    # Thumbs für alle PNGs in ~/Screenshots/, kein LLM
+uv run python scripts/scan-screenshots.py --retrofit-batch-reports # adde ![[thumb/...]] zu existierenden Batch-Reports
 ```
 
 ### Edge Cases
 
-- **LLM nicht erreichbar:** Script exited mit Warning, keine Reports/Sidecars geschrieben.
-- **Sehr große Screenshots:** Gemma4 Vision handled beliebige PNG-Größen.
+- **LLM nicht erreichbar:** Script exited mit Warning, weder Sidecar noch Thumb noch Report werden geschrieben.
+- **`sips` nicht verfügbar:** Thumb wird mit Warning übersprungen — Sidecar + Report werden trotzdem geschrieben (Embed-Wikilink im Report ist dann broken bis zum nächsten Backfill-Lauf).
+- **Sehr große Retina-Screenshots (5120×2880):** 384px-Thumb ist ~60-80 KB; volle PNG bleibt nur in HOME.
 - **Erster Lauf / Backfill:** `--backfill N` scannt die letzten N Tage rückwirkend. Ohne Flag nur neue (seit letztem Lauf).
 - **Leerer Screenshot-Ordner:** Script exited sauber, kein Report.
 

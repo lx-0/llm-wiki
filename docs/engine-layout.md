@@ -40,7 +40,7 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 │   ├── scan-email.py          ← Thunderbird mboxes (full / incremental / deep)
 │   ├── scan-calendar.py       ← Thunderbird CalDAV cache → timeline overview
 │   ├── scan-browser.py        ← Firefox + Chrome bookmarks/history/tab-groups
-│   ├── scan-screenshots.py    ← ~/Screenshots/ + Vision LLM (Ollama gemma4)
+│   ├── scan-screenshots.py    ← ~/Screenshots/ + Vision LLM (gemma4) → HOME sidecar + vault thumb (384px) + batch report
 │   ├── scan-tabs.py           ← Firefox Simple Tab Groups backups
 │   ├── sync-memories.py       ← Claude Code project memories → raw/memories/ (file-per-memory)
 │   ├── clippings_sweep.py     ← <vault>/Clippings/ → raw/articles/ (pre-compile lift)
