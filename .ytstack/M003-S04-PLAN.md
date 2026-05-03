@@ -41,3 +41,13 @@ All 5 tasks marked `[x]` and verified. M003 exit criterion #5 ("≥3 MOCs in `kn
 ## Notes
 
 (Add observations during slice execution.)
+
+## Notes (T05, 2026-05-03)
+
+- All 66 pytest tests green (added 2 in S04-T01: test_folder_to_type_includes_moc + test_folder_to_type_covers_all_substrate_folders).
+- Bash subprocess smoke (T02): `seed_vault_templates` against tmp wiki+vault successfully copies all 3 MOC stubs (concepts/people/projects) into target/knowledge/MOCs/.
+- Live Obsidian smoke deferred until lxw `wiki update` lands the new templates. Once that runs:
+  - `wiki seed` populates `knowledge/MOCs/{people,projects,concepts}.md` (additive — no overwrite of existing).
+  - Dashboard reload shows new "🗂 MOCs" section with 3 entries.
+  - Click any MOC → opens stub with frontmatter + H1 + dataview LIST scoped to that subdir.
+- Schema/lint mapping was already in HEAD at slice start (FOLDER_TO_TYPE["MOCs"]="moc"); only the regression test was missing. T01 was therefore lighter than expected; the saved budget went into a fuller PROCESS.md write-up (T04) and MOC stubs with H1 emojis matching the Dashboard section style.
