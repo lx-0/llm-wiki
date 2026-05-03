@@ -5,7 +5,7 @@ size: L
 created: 2026-05-02T16:58:33Z
 status: planned
 total_slices: 7
-completed_slices: 5
+completed_slices: 6
 ---
 
 # M003 Roadmap
@@ -33,7 +33,7 @@ Slice detail lives in per-slice `M003-S##-PLAN.md` files, created by `ytstack:sl
 - [ ] S03 — Reserved (originally "P1 charts + chart plugins"; the 5 P1 charts and both plugins were absorbed into S01-T07. Remaining S03 candidates: Mermaid timelines / Gantt for milestone visualisation, Datacore card views once stable, click-through chart drilldowns. Re-scope at slice-time.)
 - [x] S04 — MOC layer (knowledge/MOCs/ directory, AGENTS.md schema for `type: moc`, seed 2-3 hand-written MOCs, Dashboard MOC section)
 - [x] S05 — state.history.jsonl + P2 charts (append-only history layer in utils.py, wire compile.py + flush.py, install obsidian-tracker, add 3 time-series charts)
-- [ ] S06 — Bases knowledge browser (native filterable card/table view of knowledge/ with type/tag/status facets)
+- [x] S06 — Bases knowledge browser (native filterable card/table view of knowledge/ with type/tag/status facets)
 - [x] S07 — Dashboard cache robustness (stop `wiki seed --force` from clobbering `_dashboard-*.md`; surface silent refresh failures from `flush.py` + `wiki` shell wrapper) — see `M003-S07-PLAN.md`
 
 ## Run order

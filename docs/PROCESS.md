@@ -871,6 +871,24 @@ Auto-injizierte Felder: `ts` (ISO timestamp), `type`. Schema ist forward-only �
 uv run python -c "import sys; sys.path.insert(0, 'scripts'); from utils import read_history; import json; [print(json.dumps(e)) for e in read_history(limit=20)]"
 ```
 
+### Bases-Browser
+
+`templates/knowledge.base` ist eine native Obsidian Bases-Definition (built-in seit 1.10+, kein Plugin nötig). Operator öffnet sie als interaktive, filterbare Tabelle über `knowledge/` — Sortieren, Gruppieren, Filtern direkt in der UI, ohne Dataview-Query schreiben zu müssen.
+
+**Schema** (`templates/knowledge.base`):
+
+| Block | Inhalt |
+|-------|--------|
+| `filters.and` | `file.folder.startsWith("knowledge")`, exkl. `index.md` + `log.md` |
+| `properties` | DisplayName-Mapping für `type`, `file.name`, `file.mtime` |
+| `views` | 2 Tabellen — "All knowledge" (mtime DESC, limit 200) + "By type" (grouped) |
+
+**Seed-Mechanik**: `lib/seed.sh:seed_vault_templates` step 2b kopiert die .base additiv nach `target/knowledge.base`. Operator-Edits bleiben erhalten ohne `--force`.
+
+**Dashboard-Wiring**: `dashboard.md` Section "## 🗃 Browse knowledge" linkt via `[[knowledge.base|Open knowledge browser]]`. Embed (`![[knowledge.base]]`) wäre möglich, ist aber bewusst weggelassen — Bases-Render ist schwerer als Dataview, Dashboard soll snappy bleiben.
+
+**Erweitern**: Operator dupliziert die `.base` (z.B. `recent.base` mit zusätzlichem mtime-Range-Filter, oder `by-type-cards.base` mit type=cards View). Eigene Bases erscheinen automatisch im File-Tree und können via `[[<name>.base]]` aus jedem Markdown-File geöffnet werden.
+
 ---
 
 ## 13. Hard Facts (Corrections)

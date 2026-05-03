@@ -35,3 +35,14 @@ Both tasks marked `[x]`. M003 exit criterion #8 (Bases view as filterable knowle
 ## Notes
 
 (Fill during execution.)
+
+## Notes (T02, 2026-05-03)
+
+- 70 pytest tests green (no new tests in this slice — Bases is operator-facing UI; YAML is verified by Obsidian itself).
+- T01 subprocess smoke verified `seed_vault_templates` copies `knowledge.base` cleanly.
+- Live Obsidian smoke deferred until lxw `wiki update`. Once that runs:
+  - `wiki seed` puts `knowledge.base` at vault root.
+  - Dashboard "🗃 Browse knowledge" wikilink opens the Base.
+  - Two views (All / By type) should render the 470 articles in lxw `knowledge/`.
+- Schema chose mtime DESC + limit 200 to avoid laggy initial render on large vaults. Operator can edit views in-place — seed is additive.
+- Decision baked: NO embed (`![[knowledge.base]]`) in Dashboard. Bases render is heavier than Dataview; Dashboard stays snappy with a wikilink instead. Operator can add an embed if they want one.
