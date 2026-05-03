@@ -444,14 +444,151 @@ def scan(
     log.info("Done. %d screenshots processed, report at %s", len(results), report_path)
 
 
+# ── Backfill: migrate legacy HOME sidecars into vault layout ─────────
+
+def _parse_legacy_sidecar(sidecar: Path) -> dict | None:
+    """Read a pre-2026-05-03 rich HOME sidecar and reconstruct a `meta` dict.
+
+    Returns None for slim marker files (post-2026-05-03 layout) — those carry
+    a `vault_sidecar:` frontmatter key and no analysis content.
+    """
+    try:
+        text = sidecar.read_text(encoding="utf-8")
+    except OSError:
+        return None
+    if not text.startswith("---"):
+        return None
+    end = text.find("---", 3)
+    if end == -1:
+        return None
+    fm_block = text[3:end].strip()
+    body = text[end + 3:].strip()
+
+    fm = {}
+    for line in fm_block.splitlines():
+        if ":" not in line:
+            continue
+        key, _, val = line.partition(":")
+        fm[key.strip()] = val.strip()
+
+    # Slim markers carry vault_sidecar: and no analysis fields — skip.
+    if "vault_sidecar" in fm and "app" not in fm:
+        return None
+    if "app" not in fm:
+        return None
+
+    # Body shape: "# Screenshot YYYY-MM-DD HH:MM\n\n<summary>\n\n**Key Text**: <key_text>"
+    summary = ""
+    key_text = ""
+    if body:
+        # Drop the leading H1 if present.
+        lines = body.splitlines()
+        if lines and lines[0].startswith("# Screenshot"):
+            lines = lines[1:]
+        rest = "\n".join(lines).strip()
+        if "**Key Text**:" in rest:
+            summary_part, _, key_part = rest.partition("**Key Text**:")
+            summary = summary_part.strip()
+            key_text = key_part.strip()
+        else:
+            summary = rest
+
+    tags_raw = fm.get("tags", "").strip("[]")
+    tags = [t.strip() for t in tags_raw.split(",") if t.strip()]
+
+    project = fm.get("project", "").strip()
+    if project.lower() in ("null", ""):
+        project = None
+
+    return {
+        "app": fm.get("app", "unknown"),
+        "project": project,
+        "tags": tags,
+        "relevance": fm.get("relevance", "keep"),
+        "summary": summary,
+        "key_text": key_text,
+        "model": "",  # legacy sidecars predated vision_model: tracking
+        "tokens": 0,
+        "raw_response": "",
+    }
+
+
+def migrate_home_sidecars(dry_run: bool = False, limit: int | None = None) -> None:
+    """Walk ~/Screenshots/*.md, mirror PNG + write vault sidecar for legacy
+    rich sidecars. Non-destructive: HOME sidecar is left untouched.
+    """
+    if not SCREENSHOTS_DIR.exists():
+        log.error("Screenshots dir not found: %s", SCREENSHOTS_DIR)
+        return
+
+    sidecars = sorted(SCREENSHOTS_DIR.glob("Screenshot *.md"))
+    log.info("Scanning %d HOME sidecars", len(sidecars))
+
+    processed = 0
+    skipped_marker = 0
+    skipped_no_png = 0
+    errors = 0
+    skipped_already = 0
+
+    for sidecar in sidecars:
+        png = sidecar.with_suffix(".png")
+        vault_sidecar_path = SIDECAR_DIR / f"{sidecar.stem}.md"
+
+        meta = _parse_legacy_sidecar(sidecar)
+        if meta is None:
+            skipped_marker += 1
+            continue
+
+        if not png.exists():
+            skipped_no_png += 1
+            continue
+
+        if vault_sidecar_path.exists():
+            skipped_already += 1
+            continue
+
+        ts = parse_screenshot_timestamp(png) or datetime.fromtimestamp(
+            png.stat().st_mtime, tz=TZ
+        )
+
+        if dry_run:
+            log.info("  [dry] would migrate %s", png.name)
+            processed += 1
+        else:
+            try:
+                copy_png_to_vault(png)
+                write_vault_sidecar(png, ts, meta, batch_report_slug=None)
+                processed += 1
+                if processed % 25 == 0:
+                    log.info("  ... %d migrated", processed)
+            except Exception as exc:
+                log.warning("  failed: %s — %s", png.name, exc)
+                errors += 1
+
+        if limit and processed >= limit:
+            log.info("Limit %d reached", limit)
+            break
+
+    log.info(
+        "Backfill: %d migrated, %d marker-skipped, %d already-in-vault, "
+        "%d missing-png, %d errors",
+        processed, skipped_marker, skipped_already, skipped_no_png, errors,
+    )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Scan screenshots with local LLM vision")
     parser.add_argument("--all", action="store_true", help="Scan all screenshots without sidecar (ignore time window)")
     parser.add_argument("--backfill", type=int, metavar="DAYS", help="Scan last N days")
     parser.add_argument("--dry-run", action="store_true", help="Show what would be processed")
     parser.add_argument("--limit", type=int, default=MAX_PER_RUN, help=f"Max screenshots per run (default {MAX_PER_RUN})")
+    parser.add_argument("--migrate-home-sidecars", action="store_true",
+                        help="Migrate legacy rich HOME sidecars into vault layout (no LLM calls)")
     args = parser.parse_args()
-    scan(scan_all=getattr(args, 'all'), backfill_days=args.backfill, dry_run=args.dry_run, limit=args.limit)
+    if getattr(args, 'migrate_home_sidecars'):
+        migrate_home_sidecars(dry_run=args.dry_run, limit=args.limit if args.limit != MAX_PER_RUN else None)
+    else:
+        scan(scan_all=getattr(args, 'all'), backfill_days=args.backfill, dry_run=args.dry_run, limit=args.limit)
 
 
 if __name__ == "__main__":
