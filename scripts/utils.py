@@ -5,6 +5,8 @@ import json
 import re
 from pathlib import Path
 
+import yaml
+
 from config import (
     CONCEPTS_DIR,
     CONNECTIONS_DIR,
@@ -151,22 +153,75 @@ def read_all_wiki_content() -> str:
     return "\n\n---\n\n".join(parts)
 
 
+_TRUST_RANK = {"confirmed": 0, "asserted": 1, "provisional": 2}
+_LEGACY_TRUST = "asserted"
+_LEGACY_SOURCE = "user:legacy-pre-trust-schema"
+
+
+def _parse_fact_frontmatter(md_file: Path) -> tuple[dict, str]:
+    """Return (frontmatter_dict, raw_text). Tolerates malformed YAML."""
+    text = md_file.read_text(encoding="utf-8")
+    if not text.startswith("---\n"):
+        return {}, text
+    end = text.find("\n---\n", 4)
+    if end == -1:
+        return {}, text
+    block = text[4:end]
+    try:
+        fm = yaml.safe_load(block) or {}
+    except yaml.YAMLError:
+        fm = {}
+    return (fm if isinstance(fm, dict) else {}), text
+
+
 def read_hard_facts() -> str:
     """Read all knowledge/facts/*.md and join them into one prompt-ready block.
+
+    Facts are sorted by trust tier (confirmed > asserted > provisional), then by
+    `updated` (most recent first) as tiebreaker. Each fact is rendered with a
+    `[trust: ...]` header and a `Sources:` line so the LLM can weigh authority.
 
     Returns an empty placeholder when no facts exist, so prompts that
     inject `${facts_md}` always get a non-empty string.
     """
     if not FACTS_DIR.exists():
         return "(no hard facts recorded)"
-    parts = []
+
+    entries = []
     for md_file in sorted(FACTS_DIR.glob("*.md")):
+        fm, raw_text = _parse_fact_frontmatter(md_file)
+        trust = str(fm.get("trust") or _LEGACY_TRUST)
+        if trust not in _TRUST_RANK:
+            trust = _LEGACY_TRUST
+        sources = fm.get("sources") or []
+        if not isinstance(sources, list) or not sources:
+            sources = [_LEGACY_SOURCE]
+        sources = [str(s) for s in sources if s]
+        updated = str(fm.get("updated") or fm.get("created") or "")
         rel = md_file.relative_to(KNOWLEDGE_DIR)
-        content = md_file.read_text(encoding="utf-8")
-        parts.append(f"### {rel}\n\n{content}")
-    if not parts:
+        entries.append((trust, updated, rel, sources, raw_text))
+
+    if not entries:
         return "(no hard facts recorded)"
+
+    # Sort: trust tier ASC (rank 0 first), then updated DESC (most recent first).
+    entries.sort(key=lambda e: (_TRUST_RANK.get(e[0], 99), -_str_sort_key(e[1])))
+
+    parts = []
+    for trust, _updated, rel, sources, raw_text in entries:
+        sources_line = ", ".join(sources)
+        parts.append(
+            f"### {rel}  [trust: {trust}]\n\n"
+            f"> Sources: {sources_line}\n\n"
+            f"{raw_text}"
+        )
     return "\n\n".join(parts)
+
+
+def _str_sort_key(s: str) -> int:
+    """Map an ISO-ish date string to a sortable int. Empty / unparseable → 0."""
+    digits = "".join(c for c in s if c.isdigit())
+    return int(digits[:14]) if digits else 0
 
 
 def list_wiki_articles() -> list[Path]:

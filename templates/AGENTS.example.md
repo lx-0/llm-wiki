@@ -147,7 +147,16 @@ tags: [topic1, topic2]
 
 The `type:` field MUST match the destination folder. It is the single source of truth for substrate-type — Dataview queries, lint, dashboard charts, and the compile prompt all rely on it. Lint flags any article whose `type:` is missing or doesn't match its folder.
 
-`knowledge/facts/` is special: it is **human-owned via `wiki correct`**, never written by the compiler. Each fact carries `type: fact`, a `status:` (negation | disambiguation | clarification), an optional list of `negation_terms:` that lint greps across the rest of `knowledge/`, and an `applied:` flag that flips to an ISO timestamp once `wiki correct apply <slug>` has propagated the correction. Facts inject into compile and query prompts at the highest authority — they override any contradicting claim in raw sources.
+`knowledge/facts/` is special: it is **human-owned via `wiki correct`**, never written by the compiler. Each fact carries `type: fact`, a `status:` (negation | disambiguation | clarification), an optional list of `negation_terms:` that lint greps across the rest of `knowledge/`, and an `applied:` flag that flips to an ISO timestamp once `wiki correct apply <slug>` has propagated the correction.
+
+Every fact also carries a **`trust:`** tier and a **`sources:`** list (≥1, required at creation):
+
+- `trust:` one of `confirmed` (externally verifiable artifact — URL, document, screenshot), `asserted` (user direct statement, no external artifact, default), `provisional` (hearsay, needs verification).
+- `sources:` list of evidence pointers. Free-form: URL, vault-relative path, or sentinel like `user:<context>`, `screenshot:<file>`, `hearsay:<who>`.
+
+Facts inject into compile and query prompts at the highest authority — they override any contradicting claim in raw sources. Within the facts block, they are sorted `confirmed` > `asserted` > `provisional` (then most-recently-updated first), and each is rendered with its trust tier and sources line so the LLM can weigh authority when two facts conflict.
+
+Pre-trust legacy facts without `trust:` / `sources:` keys are rendered with reader-defaults (`asserted`, source `user:legacy-pre-trust-schema`) — no migration script is required, but `wiki correct edit <slug>` can backfill explicit values.
 
 ### Layer 4: This File (`AGENTS.md`)
 

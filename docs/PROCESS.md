@@ -925,6 +925,10 @@ flowchart TD
 title: "Senkrechtstarter award (NOT won)"
 type: fact
 status: negation              # negation | disambiguation | clarification
+trust: confirmed              # confirmed | asserted | provisional
+sources:                      # ≥1 required at creation (CLI rejects empty)
+  - "https://handelsblatt.de/..."
+  - "raw/clippings/2026-04-12-mail.md"
 created: 2026-05-02
 updated: 2026-05-02
 applied: false                # oder ISO-Zeitstempel nach apply
@@ -935,6 +939,40 @@ negation_terms:
 
 We did NOT win the Senkrechtstarter award. Strike any article asserting otherwise.
 ```
+
+### Trust + Sources
+
+Jeder Fact trägt einen Trust-Tier und ≥1 Source. Beide werden bei `wiki correct add` erfasst und in `read_hard_facts()` zusammen mit dem Body in den Prompt-Block injiziert.
+
+| Tier | Bedeutung | Typische Source |
+|------|-----------|-----------------|
+| `confirmed` | extern verifizierbares Artefakt | URL, Mail, Screenshot, Vertrag, Vault-Datei |
+| `asserted` *(default)* | User-Direktaussage (User IST die Source) | `user:2026-05-03` |
+| `provisional` | Hörensagen, prüfbedürftig | `hearsay:from-michael` |
+
+CLI:
+
+```bash
+# externally-verifiable fact
+wiki correct add "Senkrechtstarter award" \
+  --status negation --trust confirmed \
+  --source "https://handelsblatt.de/..." \
+  --source "raw/clippings/2026-04-12-mail.md" \
+  --term "won the senkrechtstarter" \
+  "We did NOT win the Senkrechtstarter award."
+
+# user-only fact (default trust = asserted)
+wiki correct add "Office hours" \
+  --status clarification \
+  --source "user:2026-05-03" \
+  "Office opens at 10am Monday."
+```
+
+`scripts/correct.py:cmd_add` lehnt fehlende `--source` mit `exit 2` ab. Trust-Werte ausserhalb der drei Tiers werden vom argparse-Choices-Validator geblockt.
+
+Im Prompt-Block sortiert `read_hard_facts()` Facts nach Tier (`confirmed` > `asserted` > `provisional`), dann nach `updated` DESC. Jeder Eintrag bekommt einen Header `### facts/<slug>.md  [trust: <tier>]` plus eine `> Sources: ...`-Zeile. Compile- und Query-Prompts erklären die Konflikt-Regel: höherer Tier gewinnt; bei Gleichstand der neuere `updated`. Alle drei Tiers überstimmen weiterhin Raw-Sources.
+
+**Legacy-Facts** (vor diesem Schema geschrieben, ohne `trust`/`sources`) werden vom Reader mit Defaults gerendert: `trust: asserted`, `sources: ["user:legacy-pre-trust-schema"]`. Kein Migrate-Skript nötig — `wiki correct edit <slug>` ist der manuelle Backfill-Pfad.
 
 ### Status-Tabelle
 

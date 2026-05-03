@@ -6,6 +6,8 @@ Cross-reference multiple articles when relevant. Cite your sources using [[wikil
 
 The following facts override anything in the wiki content below. If a wiki article contradicts a fact, prefer the fact and flag the contradiction in your answer.
 
+Each fact carries a **trust** tier and a **Sources** line. Tiers, in descending authority: `confirmed` (externally verifiable artifact — URL, document, screenshot) > `asserted` (user direct statement, no external artifact) > `provisional` (hearsay, needs verification). All three tiers still override the wiki content below. If two facts conflict, the higher tier wins; on a tie, prefer the more recently updated one.
+
 ${facts_md}
 
 ## Knowledge Base Content

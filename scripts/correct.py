@@ -7,8 +7,17 @@ fact wins.
 Usage:
     uv run python correct.py add "Senkrechtstarter award" \
         --status negation \
+        --trust confirmed \
+        --source "https://handelsblatt.de/..." \
+        --source "raw/clippings/2026-04-12-mail.md" \
         --term "senkrechtstarter award" --term "won the senkrechtstarter" \
         "We did NOT win the Senkrechtstarter award."
+
+    # user-only fact (default trust = asserted):
+    uv run python correct.py add "Office hours" \
+        --status clarification \
+        --source "user:2026-05-03" \
+        "Office opens at 10am starting Monday."
 
     uv run python correct.py list
     uv run python correct.py remove <slug>
@@ -41,6 +50,8 @@ logging.basicConfig(
 log = logging.getLogger("correct")
 
 VALID_STATUS = {"negation", "disambiguation", "clarification"}
+VALID_TRUST = ("confirmed", "asserted", "provisional")
+DEFAULT_TRUST = "asserted"
 
 
 def _fact_path(slug: str) -> Path:
@@ -102,6 +113,19 @@ def cmd_add(args: argparse.Namespace) -> int:
         log.error("body must not be empty")
         return 2
 
+    sources = [s.strip() for s in (args.source or []) if s and s.strip()]
+    if not sources:
+        log.error(
+            "at least one --source is required. Use a URL, vault-relative path, "
+            "or a sentinel like 'user:<context>', 'screenshot:<file>', 'hearsay:<who>'."
+        )
+        return 2
+
+    trust = args.trust
+    if trust not in VALID_TRUST:
+        log.error("--trust must be one of %s", list(VALID_TRUST))
+        return 2
+
     slug = args.slug.strip() if args.slug else slugify(title)
     if not slug:
         log.error("could not derive a slug from title %r", title)
@@ -126,6 +150,8 @@ def cmd_add(args: argparse.Namespace) -> int:
         "title": title,
         "type": "fact",
         "status": status,
+        "trust": trust,
+        "sources": sources,
         "created": today,
         "updated": today,
         "applied": False,
@@ -145,10 +171,13 @@ def cmd_list(args: argparse.Namespace) -> int:
         fm, _ = _read_frontmatter(path)
         title = fm.get("title", "(untitled)")
         status = fm.get("status", "?")
+        trust = fm.get("trust", DEFAULT_TRUST)
+        sources = fm.get("sources") or []
         terms = fm.get("negation_terms") or []
         slug = path.stem
+        src_hint = f" [{len(sources)} src]" if sources else " [0 src]"
         terms_hint = f" [{len(terms)} term(s)]" if terms else ""
-        print(f"{slug:40s} {status:14s} {title}{terms_hint}")
+        print(f"{slug:40s} {status:14s} {trust:11s} {title}{src_hint}{terms_hint}")
     return 0
 
 
@@ -204,6 +233,21 @@ def main() -> int:
         action="append",
         default=[],
         help="exact substring lint should grep for (repeatable). For status=negation only.",
+    )
+    p_add.add_argument(
+        "--source",
+        action="append",
+        default=[],
+        required=False,
+        help="evidence source for this fact (repeatable, REQUIRED). URL, vault-relative path, "
+        "or sentinel like 'user:<context>', 'screenshot:<file>', 'hearsay:<who>'.",
+    )
+    p_add.add_argument(
+        "--trust",
+        default=DEFAULT_TRUST,
+        choices=list(VALID_TRUST),
+        help=f"trust tier (default: {DEFAULT_TRUST}). confirmed = externally verifiable artifact; "
+        "asserted = user direct statement; provisional = hearsay / needs verification.",
     )
     p_add.add_argument(
         "--slug",
