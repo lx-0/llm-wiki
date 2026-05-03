@@ -132,3 +132,19 @@ Format for each entry:
 **Chose:** C.
 **Reason:** Lets the operator customise everything outside markers (re-order sections, change copy, add custom buttons, tweak callouts). Marker pairs are explicit — operator removing them opts out cleanly. Idempotent re-runs. Works for any markdown file, generalises beyond dashboard.
 **Linked artifacts:** `scripts/agent_buttons.py:update_dashboard()`, `lib/seed.sh:_rewrite_dashboard_agent_buttons()`, `templates/dashboard.md` (markers in Run section + at end-of-file).
+
+## 2026-05-03: Cache files (`_dashboard-*.md`) are producer-only — never seeded (M003-S07-T01)
+
+**Context:** `_dashboard-stats.md` was bytegenau identical to its template after `wiki seed --force`. Live counts (303 pending, 470 articles, $7.25 cost) silently regressed to all-zero placeholder text on every seed run.
+**Options considered:** (A) keep seeding, add a content-check guard (skip if not placeholder), (B) remove cache files from `seed_vault_templates` entirely — they're producer-only outputs, (C) add a cache-only `--force` flag.
+**Chose:** B.
+**Reason:** Cache files have a single owner (the producer script: `dashboard_stats.py` / `dashboard_lint.py`). Seeding them at all is a category error — they're the *output* layer, not the *template* layer. First boot: cache file doesn't exist, Dashboard embed renders empty until first flush — acceptable. `wiki seed` end now triggers both producer scripts so a fresh-install vault has populated caches without needing a flush first (S04-T03 / M003-S04 wiring).
+**Linked artifacts:** `lib/seed.sh:189` (cache-files-not-seeded comment), `wiki:487-488` (`cmd_seed` end calls both producers), `tests/test_seed_preserves_caches.py` (regression test asserts md5 unchanged after `seed --force`).
+
+## 2026-05-03: Refresh helpers must surface failures (M003-S07-T02 + T03)
+
+**Context:** `flush.py:refresh_dashboard_stats()` and `wiki:_refresh_dashboard_stats()` both routed stderr to `/dev/null` and ignored exit codes. Crashed scripts (ImportError, broken `state.json`, etc.) left the cache stale with zero observable signal — exactly how the lxw bug compounded.
+**Options considered:** (A) keep silent (best-effort), (B) capture stderr + log warning on non-zero exit, retain `check=False` so flush still completes, (C) propagate failures (block flush).
+**Chose:** B.
+**Reason:** Cache refresh is best-effort observability — must not block flush. But silent failure is worse than no refresh: operator never learns about broken state until they notice stale numbers. Capturing stderr + logging WARNING (engine-side via `log.warning`, shell-side via `warn`) gives the signal without coupling lifecycles.
+**Linked artifacts:** `scripts/flush.py:refresh_dashboard_stats` + `refresh_dashboard_lint`, `wiki:_refresh_dashboard_stats` + `_refresh_dashboard_lint`.
