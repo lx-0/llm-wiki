@@ -234,12 +234,19 @@ def list_wiki_articles() -> list[Path]:
 
 
 def list_raw_files() -> list[Path]:
-    """List all daily log files AND raw source files."""
-    files = []
+    """List all daily log files AND raw source files, newest first by mtime.
+
+    Order policy: mtime DESC so the compile pipeline processes recent activity
+    before old backlog. Rate-limit aborts (5h Opus window) hit the tail of
+    the queue rather than starving newest content. The compile path is the
+    only order-sensitive caller; lint and dashboard_stats are order-agnostic.
+    """
+    files: list[Path] = []
     if DAILY_DIR.exists():
-        files.extend(sorted(DAILY_DIR.glob("*.md")))
+        files.extend(DAILY_DIR.glob("*.md"))
     if RAW_DIR.exists():
-        files.extend(sorted(RAW_DIR.rglob("*.md")))
+        files.extend(RAW_DIR.rglob("*.md"))
+    files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
     return files
 
 
