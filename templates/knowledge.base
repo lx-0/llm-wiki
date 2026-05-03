@@ -1,0 +1,39 @@
+# Filterable knowledge browser. Native Obsidian Bases (built-in 1.10+).
+# Operator can duplicate this file or edit views in place — seed is additive,
+# `wiki seed` will not overwrite local edits unless --force is passed.
+
+filters:
+  and:
+    - file.folder.startsWith("knowledge")
+    - file.name != "index"
+    - file.name != "log"
+
+properties:
+  type:
+    displayName: Type
+  file.name:
+    displayName: Title
+  file.mtime:
+    displayName: Modified
+
+views:
+  - type: table
+    name: All knowledge
+    order:
+      - file.name
+      - type
+      - file.mtime
+    sort:
+      - column: file.mtime
+        direction: DESC
+    limit: 200
+
+  - type: table
+    name: By type
+    group_by: type
+    order:
+      - file.name
+      - file.mtime
+    sort:
+      - column: file.name
+        direction: ASC

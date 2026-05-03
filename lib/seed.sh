@@ -186,6 +186,9 @@ seed_vault_templates() {
   # 2. dashboard.md — Obsidian Homepage target.
   _seed_file "$templates_dir/dashboard.md" "$target/dashboard.md" "$force" "dashboard.md"
 
+  # 2b. knowledge.base — native Obsidian Bases knowledge browser (built-in 1.10+).
+  _seed_file "$templates_dir/knowledge.base" "$target/knowledge.base" "$force" "knowledge.base"
+
   # 3. Cache files (_dashboard-*.md) are NOT seeded — they're producer-only outputs
   #    of dashboard_stats.py / dashboard_lint.py. Seeding them (especially with --force)
   #    would clobber live data with the placeholder template. First wiki flush writes
