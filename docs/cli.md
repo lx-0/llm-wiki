@@ -44,6 +44,8 @@ Operational layer for an LLM Wiki vault. The `.wiki/` directory is hidden from O
 | `wiki correct list` | list recorded hard facts |
 | `wiki correct remove SLUG` / `edit SLUG` / `path SLUG` | manage individual facts |
 | `wiki correct apply SLUG [--dry-run]` | spawn Claude Agent SDK over the vault to propagate the correction (edits `knowledge/`, annotates `daily/`, leaves `raw/` immutable) |
+| `wiki ingest-youtube --url URL [--tier 0\|1\|2\|3] [--limit N]` | ingest a single video or a playlist. Tier 0 = metadata, 1 = + transcript, 2 = + comments, 3 = + visual analysis (gemma4 frames @ kcma — free, slow). Output to `raw/notes/youtube/`. |
+| `wiki ingest-youtube --inbox PATH` | parse a markdown file with YouTube URLs (bare / markdown-link / shortlink, optional inline `tier: N` directive). |
 
 ## Setup wizard — what's asked
 

@@ -214,6 +214,7 @@ flowchart TD
 | Email Incremental Scan | `scan-email.py --incremental` | 24h | $0 (lokal) |
 | Curiosity Loop Requests | `scan-email.py --follow-requests` | 24h | $0 (Ollama/Gemma4) |
 | Screenshot Scan | `scan-screenshots.py --all --limit N` | 24h | $0 (Ollama/Gemma4) |
+| YouTube Inbox Drain | `scan-youtube.py --inbox raw/inbox/youtube.md` | manual / 24h | $0 (T0-T2) / $0 local-vision (T3) |
 | Structural Lint | `lint.py --structural-only` | 24h | $0 (kein LLM) |
 | Wiki Review | `review-wiki.py` | 168h (1x/Woche) | $0 (Ollama/Gemma4) |
 | CLAUDE.md Optimizer | `optimize-claude-md.py` | 24h | $ (Claude API) |
@@ -313,28 +314,38 @@ flowchart LR
         TB["Thunderbird\nmbox + SQLite"]
         FF["Firefox\nplaces.sqlite + STG"]
         CH["Chrome\nBookmarks + History"]
+        SS["~/Screenshots/\n(macOS)"]
+        YT["YouTube\n(yt-dlp + transcript-api)"]
     end
 
     subgraph Scanners
         SE["scan-email.py"]
         SC["scan-calendar.py"]
         SB["scan-browser.py"]
+        SCR["scan-screenshots.py"]
+        SY["scan-youtube.py"]
     end
 
     subgraph Output
         RE["raw/notes/email/"]
         RC["raw/notes/calendar/"]
         RB["raw/notes/browser/"]
+        RS["raw/notes/screenshots/"]
+        RY["raw/notes/youtube/"]
     end
 
     TB --> SE --> RE
     TB --> SC --> RC
     FF --> SB --> RB
     CH --> SB
+    SS --> SCR --> RS
+    YT --> SY --> RY
 
     RE --> COMPILE["compile.py"]
     RC --> COMPILE
     RB --> COMPILE
+    RS --> COMPILE
+    RY --> COMPILE
 
     style COMPILE fill:#FFD8CB,stroke:#FC4E14,stroke-width:3px
 ```
@@ -346,6 +357,8 @@ flowchart LR
 | `scan-email.py` | Thunderbird mbox (lokal) | tausende Mails über mehrere Accounts/Ordner. | `raw/notes/email/` |
 | `scan-calendar.py` | Thunderbird calendar SQLite | hunderte bis tausende Events, Attendees, Kategorien. | `raw/notes/calendar/` |
 | `scan-browser.py` | Firefox places.sqlite + STG + Chrome | tausende Tabs, Bookmarks, zehntausende Visits. | `raw/notes/browser/` |
+| `scan-screenshots.py` | `~/Screenshots/` (macOS PNG-Dump) | gemma4 Vision pro Screenshot, batch-report mit allen analyses + thumbnails. | `raw/notes/screenshots/screenshots-<slug>.md` + `~/Screenshots/<file>.md` (canonical sidecar) |
+| `scan-youtube.py` | YouTube (yt-dlp Metadaten + youtube-transcript-api Captions + Comments + optional ffmpeg-Frames + gemma4 Vision) | pro Video Markdown + JSON-Sidecar. Tier-based ingest: 0=metadata, 1=+transcript, 2=+comments, 3=+visual analysis. Playlist-Expansion via `playlist?list=` Normalisierung. | `raw/notes/youtube/<channel>--<title>--<vid>.{md,json}` |
 
 ### Email Scanner — Drei Modi
 
@@ -386,6 +399,18 @@ uv run python scripts/scan-email.py --deep --folder "INBOX/<folder>" --model gem
 
 # Email — Curiosity Loop Request verarbeiten
 uv run python scripts/scan-email.py --follow-requests
+
+# YouTube — Single video at default tier (1 = transcript)
+uv run python scripts/scan-youtube.py --url "https://youtu.be/<id>"
+
+# YouTube — Playlist mit Tier 2 (transcript + top comments), capped at 10 videos
+uv run python scripts/scan-youtube.py --url "https://www.youtube.com/playlist?list=<L>" --tier 2 --limit 10
+
+# YouTube — Tier 3 (visual analysis via gemma4 frame sampling on kcma)
+uv run python scripts/scan-youtube.py --url "https://youtu.be/<id>" --tier 3
+
+# YouTube — Inbox-list (markdown file, optional inline `tier: N` directives)
+uv run python scripts/scan-youtube.py --inbox raw/inbox/youtube.md --tier 1
 
 # Calendar
 uv run python scripts/scan-calendar.py

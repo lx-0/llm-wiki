@@ -124,14 +124,28 @@ Local-first ist Default weil 0 Kosten + 100% online (User-Setup). Cloud ist Fall
 
 Beide Provider schreiben in dieselbe `analysis`-Sidecar-Section, das `model:` Feld unterscheidet (`gemma4:e4b@kcma` vs `gemini-2.5-flash-lite`). Compile-Pipeline ist agnostisch — die epistemische Verlässlichkeit beider Outputs ist nahe genug für gleichen Treatment.
 
-### Tier 3-cloud — Full Visual via Gemini 2.5 (≈2-7¢ pro 10min Video)
+### Tier 3-cloud — Full Visual via Gemini 2.5 (real cost: 7-28¢ pro 10min)
 
-Gemini 2.5 unterstützt **direkte YouTube-URL-Ingestion** (Preview-Status, aktuell kostenlos für YouTube-URLs als Input — separat von Token-Pricing). Falls Preview endet: Fallback auf File-Upload via Files API (bis 2GB, längere Videos dann downsamplen).
+Gemini 2.5 unterstützt **direkte YouTube-URL-Ingestion** (Preview, derzeit kostenlos für die URL als Input — separat von Token-Pricing). Falls Preview endet: Fallback auf File-Upload via Files API (bis 2GB).
 
-**Modelle / Kosten:**
-- `gemini-2.5-flash-lite` — ~2¢ pro 10min Video. Default für Tier 3.
-- `gemini-2.5-flash` — ~7¢ pro 10min. Wenn flash-lite zu schwach für visuell dichten Content (Code-Walkthroughs, Whiteboard-Talks).
-- `gemini-2.5-pro` — $1.25/1M input ≤200k context, $10/1M output. Nur für Tier-4-Deep-Dive.
+**Real-world Kosten** (verifiziert gegen `clawrag/transformers/video_gemini.py:51-52`, [Gemini Pricing 2026-04-30](https://ai.google.dev/gemini-api/docs/pricing), [Video Token Counting](https://ai.google.dev/gemini-api/docs/video-understanding)):
+
+| Model | Per 3h video | Per 10min | Notes |
+|---|---|---|---|
+| `gemini-2.5-flash-lite` | ~$0.13 | **~7¢** | Default. Reicht für Lecture/Talks. |
+| `gemini-2.5-flash` | ~$0.45 | ~24¢ | Pulls dichteren Visual-Content besser. |
+| `gemini-3.1-pro` | ~$5.00 | **~28¢** | 38× teurer als flash-lite. Nur für Tier-4-Deep-Dive. |
+
+Video tokenisiert mit ~300 Tokens/Sekunde Default (oder 100 Tokens/s im low-resolution-Mode). Output-Tokens sind der versteckte Kostentreiber — clawrag's "verbatim transcript with sections every 30-60s" Prompt erzeugt 5-10k Output pro 10min Video. Marketing-Headlines unterschätzen das systematisch.
+
+**Cost-Protection-Guardrails** (lessons learned von clawrag):
+
+1. **Default-Model HARDCODED** als `gemini-2.5-flash-lite` — kein API-Param erlaubt Pro-Eskalation. Wer Pro will, editiert Code + restartet. (clawrag-Pattern: `DEFAULT_MODEL` als ClassVar in der Transformer-Klasse, mit `# ⚠️ COST PROTECTION` Kommentar.)
+2. **Per-URL Blob-Cache** — `(video_id, model, prompt_hash)` als Key, gleiche URL nie zweimal Cloud-billen. Cache-Hit liefert das frühere Resultat free. (clawrag-Pattern: `~/.clawrag/cache/<op>/<hash[:2]>/<hash>.json`.)
+3. **Pre-Run Cost-Estimate + Confirm-Gate** — bei Playlist > 1 Video oder Single-Video > 30min wird estimated cost berechnet (`duration_total_s × 300 tokens/s × $0.10/1M + estimated_output`) und dem User gezeigt: `"35 videos, ~9h total, estimated $0.40-1.00 with flash-lite. Continue? [y/N]"`. Skipt automatisch bei `< 5¢`.
+4. **`--allow-cloud` muss explizit** gesetzt sein — kein silent fallback wenn Local nicht erreichbar ist. Stattdessen Error mit klarem Hinweis.
+5. **Budget-Cap pro Run** in CONFIG (`youtube.cloud_budget_usd_per_run: 1.00`) — abort wenn Estimate cap überschreitet.
+6. **Admin-Permission auf Endpoint** wenn Pipeline irgendwann via REST/Plugin getriggert wird (clawrag's `routes_ingest.py:1051` — "Video ingest requires admin permission (cost protection)"). CLI-only-Pfad bleibt frei aber muss `--allow-cloud` setzen.
 
 **Was Tier 3 hinzufügt** über Subtitles+Kommentare hinaus:
 - Visuelle Slides / Whiteboards / Code-on-Screen die nie gesprochen werden

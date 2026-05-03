@@ -42,7 +42,7 @@ Mixed reality on the storage side: some sources are referenced (mailbox, calenda
 Working memory   = vault (Obsidian root)    you read & edit here
 Knowledge        = compiled wiki (knowledge/)  LLM writes here
 Long-term recall = optional vector RAG (L2)    deep semantic search
-Senses           = collectors (email, calendar, browser, screenshots, NAS, …)
+Senses           = collectors (email, calendar, browser, screenshots, youtube, NAS, …)
 Body             = filesystem, drives, APIs
 ```
 
@@ -95,6 +95,7 @@ Collectors        Curated sources       Sessions
  scan-calendar,    raw/papers,           via session-end hook)
  scan-browser,     raw/notes,
  scan-screenshots, raw/transcripts)
+ scan-youtube,
  scan-nas)             │                     │
        │               │                     │
        ▼               ▼                     ▼

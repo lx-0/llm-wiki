@@ -63,7 +63,7 @@ llm-wiki is the **compilation layer** between raw substrates and active consumpt
 
 ## What you get
 
-- **Two-path ingest** — automatic session capture (hooks → `daily/`) and 9 substrate-source scripts (scanners + clipper + memory-sync + manual drop → `raw/`) converge at one compiler. One of them, `scan-email`, has been migrated to the formal Collector pattern; the rest are scheduled for the same migration.
+- **Two-path ingest** — automatic session capture (hooks → `daily/`) and 10 substrate-source scripts (scanners + clipper + memory-sync + manual drop → `raw/`) converge at one compiler. One of them, `scan-email`, has been migrated to the formal Collector pattern; the rest are scheduled for the same migration.
 - **Compile once, query fast** — knowledge is distilled into Markdown wikilinks at compile time. No embedding step, no retrieval per query.
 - **Multi-agent hooks** — `session-start` / `session-end` / `pre-compact` wired into Claude Code, Codex, Gemini, and Cursor. Every session ends as a structured daily-log entry.
 - **Curiosity loop** — a small local Ollama model spots gaps after each compile and queues deep-scan requests for the next cycle.
@@ -88,15 +88,16 @@ The sidebar is the data layout — `raw/`, `daily/`, `knowledge/` — exactly th
 PATH A — Automatic capture                PATH B — Curated sources
 ─────────────────────────────             ──────────────────────────────────
 session-start / session-end /             Scanners + manual drops + clipper:
-pre-compact hooks attach to every         · scan-email      (Thunderbird)
-Claude Code / Codex / Gemini /            · scan-calendar   (Thunderbird CalDAV)
-Cursor session.  flush.py extracts        · scan-browser    (Firefox + Chrome)
+pre-compact hooks attach to every         · scan-email       (Thunderbird)
+Claude Code / Codex / Gemini /            · scan-calendar    (Thunderbird CalDAV)
+Cursor session.  flush.py extracts        · scan-browser     (Firefox + Chrome)
 the conversation transcript and           · scan-screenshots (Vision LLM)
-appends a structured entry to             · scan-tabs       (Firefox STG)
-daily/YYYY-MM-DD.md.                      · sync-memories   (Claude Code memory)
-                                          · clippings-sweep (Obsidian Web Clipper)
-                                          · ingest-html     (file or URL)
-            │                             · process-inbox   (LLM-classified drop)
+appends a structured entry to             · scan-tabs        (Firefox STG)
+daily/YYYY-MM-DD.md.                      · scan-youtube     (yt-dlp + gemma4 visual)
+                                          · sync-memories    (Claude Code memory)
+                                          · clippings-sweep  (Obsidian Web Clipper)
+            │                             · ingest-html      (file or URL)
+                                          · process-inbox    (LLM-classified drop)
             ▼                                          │
      daily/YYYY-MM-DD.md                               ▼
                                           raw/{articles,papers,notes,transcripts,

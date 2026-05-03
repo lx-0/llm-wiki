@@ -2355,6 +2355,149 @@
     },
     {
       "type": "rectangle",
+      "id": "scanner_youtube",
+      "x": 2120,
+      "y": 660,
+      "width": 260,
+      "height": 100,
+      "strokeColor": "#FC4E14",
+      "backgroundColor": "#FFD8CB",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 0,
+      "opacity": 100,
+      "angle": 0,
+      "seed": 3090,
+      "version": 1,
+      "versionNonce": 12345,
+      "isDeleted": false,
+      "groupIds": [],
+      "boundElements": [
+        {
+          "id": "scanner_youtube_t",
+          "type": "text"
+        },
+        {
+          "id": "arr_youtube_raw",
+          "type": "arrow"
+        }
+      ],
+      "link": null,
+      "locked": false,
+      "roundness": {
+        "type": 3
+      },
+      "index": "alV",
+      "frameId": null,
+      "updated": 0
+    },
+    {
+      "type": "text",
+      "id": "scanner_youtube_t",
+      "x": 2130,
+      "y": 665,
+      "width": 240,
+      "height": 100,
+      "text": "YouTube Scanner\nyt-dlp + transcript-api + gemma4 frames\n\nTier 0  metadata\nTier 1  +transcript\nTier 2  +comments\nTier 3  +visual analysis (free, kcma)",
+      "originalText": "YouTube Scanner\nyt-dlp + transcript-api + gemma4 frames\n\nTier 0  metadata\nTier 1  +transcript\nTier 2  +comments\nTier 3  +visual analysis (free, kcma)",
+      "fontSize": 12,
+      "fontFamily": 3,
+      "textAlign": "center",
+      "verticalAlign": "middle",
+      "strokeColor": "#FC4E14",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "solid",
+      "roughness": 0,
+      "opacity": 100,
+      "angle": 0,
+      "seed": 3092,
+      "version": 1,
+      "versionNonce": 12346,
+      "isDeleted": false,
+      "groupIds": [],
+      "boundElements": [],
+      "link": null,
+      "locked": false,
+      "containerId": "scanner_youtube",
+      "lineHeight": 1.25,
+      "index": "alW",
+      "frameId": null,
+      "roundness": null,
+      "updated": 0,
+      "autoResize": true
+    },
+    {
+      "type": "arrow",
+      "id": "arr_youtube_raw",
+      "x": 2114,
+      "y": 716,
+      "width": 47,
+      "height": 112,
+      "strokeColor": "#FC4E14",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 0,
+      "opacity": 100,
+      "angle": 0,
+      "seed": 3094,
+      "version": 1,
+      "versionNonce": 12347,
+      "isDeleted": false,
+      "groupIds": [],
+      "boundElements": [],
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          -47,
+          0
+        ],
+        [
+          -47,
+          112
+        ]
+      ],
+      "startBinding": {
+        "elementId": "scanner_youtube",
+        "focus": -0.17,
+        "gap": 6,
+        "fixedPoint": [
+          -0.02,
+          0.65
+        ]
+      },
+      "endBinding": {
+        "elementId": "raw_rect",
+        "fixedPoint": [
+          0.9,
+          -0.015
+        ],
+        "focus": 0,
+        "gap": 0
+      },
+      "startArrowhead": null,
+      "endArrowhead": "arrow",
+      "lastCommittedPoint": null,
+      "index": "asV",
+      "frameId": null,
+      "roundness": null,
+      "updated": 0,
+      "elbowed": true,
+      "fixedSegments": null,
+      "startIsSpecial": null,
+      "endIsSpecial": null
+    },
+    {
+      "type": "rectangle",
       "id": "raw_rect",
       "x": 1649.89013671875,
       "y": 647.7262496948242,
@@ -2408,6 +2551,10 @@
         },
         {
           "id": "curiosity_arrow",
+          "type": "arrow"
+        },
+        {
+          "id": "arr_youtube_raw",
           "type": "arrow"
         }
       ],

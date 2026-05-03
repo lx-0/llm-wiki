@@ -16,10 +16,14 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import base64
 import json
 import logging
 import re
+import subprocess
 import sys
+import tempfile
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -32,6 +36,13 @@ from config import RAW_DIR, now_iso
 # without the deps installed.
 
 REPORT_DIR = RAW_DIR / "notes" / "youtube"
+
+# T3-local guardrails
+MAX_FRAMES_PER_VIDEO = 30          # cap visual inference cost (5s/frame on kcma → ~2.5min)
+MAX_DURATION_FOR_T3_S = 3 * 3600   # > 3h: too long, abort
+FRAME_RESIZE_WIDTH = 512           # match scan-screenshots
+LOCAL_VISION_MODEL = "gemma4:e4b"  # hardcoded — see CONFIG.models.vision_model in seed
+LOCAL_AGG_MODEL = "gemma4:e4b"
 
 logging.basicConfig(
     level=logging.INFO,
@@ -278,6 +289,244 @@ def slim_comments(raw_comments: list[dict] | None, *, top_n: int = 20) -> list[d
     return [trim(c) for c in picked]
 
 
+# ── Tier 3-local: ffmpeg frame sampling + gemma4 vision ──────────────
+
+FRAME_PROMPT = """You are analyzing ONE FRAME from a YouTube video for a knowledge wiki.
+
+In 2-4 sentences, describe:
+- What is shown (slide title, code on screen, diagram, terminal, IDE, talking head, blank/transition).
+- Any readable text — transcribe key text verbatim. For code on screen, copy what you can read.
+- Visual concepts (UI elements visible, formulas, chart axes, architecture-diagram boxes).
+
+Rules:
+- Be concrete. No "the speaker discusses something interesting".
+- If the frame is uninformative (transition, talking-head with no slide, blank), reply with the single word: UNINFORMATIVE.
+- No greetings, no preamble, just the description."""
+
+
+AGGREGATE_PROMPT_TEMPLATE = """You are writing a knowledge-wiki entry about this YouTube video. Output Markdown only — no preamble.
+
+# Source
+
+- Title: {title}
+- Channel: {channel}
+- Duration: {duration_min} min
+- Upload date: {upload_date}
+
+# Transcript (subtitles)
+
+{transcript_block}
+
+# Per-frame visual analysis (chronological)
+
+{frames_block}
+
+# Your task
+
+Synthesize into Markdown sections (use these exact headers):
+
+## Key concepts
+
+3-7 bullets, each one short concrete claim grounded in transcript or visual.
+
+## Visual artifacts
+
+Slides / diagrams / charts / IDE-content shown. List them with timestamps `[mm:ss]` from the per-frame log. Skip frames marked UNINFORMATIVE.
+
+## Code on screen
+
+Any code visible in frames — fenced blocks with language tag where you can detect it. If none was visible, write "(none captured)".
+
+## Audio-visual divergence
+
+Cases where the visual shows something the transcript doesn't cover (or vice versa). One bullet per divergence with the timestamp. If transcript is missing, treat the entire visual track as new information."""
+
+
+def _ts_to_label(seconds: float) -> str:
+    s = int(seconds)
+    return f"{s // 60:02d}:{s % 60:02d}"
+
+
+def pick_frame_timestamps(metadata: dict) -> tuple[list[float], str]:
+    """Return (timestamps_in_seconds, strategy_name).
+
+    Strategy: chapter-aligned (mid-of-chapter) when ≥3 chapters; else fixed
+    interval evenly spread across duration; capped at MAX_FRAMES_PER_VIDEO.
+    """
+    duration = float(metadata.get("duration_s") or 0)
+    if duration <= 0:
+        return [], "no-duration"
+
+    chapters = metadata.get("chapters") or []
+    if len(chapters) >= 3:
+        timestamps = []
+        for ch in chapters:
+            start = float(ch.get("start_time") or 0)
+            end = float(ch.get("end_time") or start + 30)
+            timestamps.append((start + end) / 2)
+        return timestamps[:MAX_FRAMES_PER_VIDEO], "chapter-aligned"
+
+    # Fixed interval: ~one frame per 60s, capped
+    n_frames = min(MAX_FRAMES_PER_VIDEO, max(5, int(duration // 60)))
+    step = duration / (n_frames + 1)
+    timestamps = [step * (i + 1) for i in range(n_frames)]
+    return timestamps, f"fixed-interval/{n_frames}"
+
+
+def ydlp_download_video(url: str, dest_dir: Path, *, format_pref: str = "worst[height<=480]") -> Path | None:
+    """Download a video at low resolution for frame extraction. Returns the path or None."""
+    from yt_dlp import YoutubeDL  # type: ignore
+
+    out_tmpl = str(dest_dir / "%(id)s.%(ext)s")
+    opts = {
+        "quiet": True,
+        "no_warnings": True,
+        "format": format_pref,
+        "outtmpl": out_tmpl,
+        "noplaylist": True,
+    }
+    try:
+        with YoutubeDL(opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+        # Resolve actual file path
+        candidates = list(dest_dir.glob(f"{info['id']}.*"))
+        videos = [p for p in candidates if p.suffix.lower() not in (".json", ".description")]
+        return videos[0] if videos else None
+    except Exception as e:  # noqa: BLE001
+        log.warning("yt-dlp download failed: %s", type(e).__name__)
+        return None
+
+
+def ffmpeg_extract_frame(video: Path, timestamp_s: float, dest: Path) -> bool:
+    """Extract a single JPEG frame at timestamp_s, resized to FRAME_RESIZE_WIDTH."""
+    cmd = [
+        "ffmpeg", "-y", "-loglevel", "error",
+        "-ss", f"{timestamp_s:.2f}",
+        "-i", str(video),
+        "-vframes", "1",
+        "-q:v", "3",
+        "-vf", f"scale={FRAME_RESIZE_WIDTH}:-1",
+        str(dest),
+    ]
+    r = subprocess.run(cmd, capture_output=True)
+    return r.returncode == 0 and dest.exists()
+
+
+def fetch_visual_local(
+    url: str, video_id: str, metadata: dict, transcript: dict | None,
+) -> dict | None:
+    """T3-local: download video, sample frames, gemma4 vision per frame, aggregate."""
+    import ollama_client  # noqa: WPS433  late import — config must be ready
+
+    if not ollama_client.is_reachable():
+        log.warning("Ollama not reachable — skipping T3 visual")
+        return None
+
+    duration = float(metadata.get("duration_s") or 0)
+    if duration > MAX_DURATION_FOR_T3_S:
+        log.warning("video duration %.0fs > %ds — skipping T3", duration, MAX_DURATION_FOR_T3_S)
+        return None
+    if duration <= 0:
+        log.warning("no duration metadata — skipping T3")
+        return None
+
+    timestamps, strategy = pick_frame_timestamps(metadata)
+    if not timestamps:
+        return None
+    log.info("T3-local: %d frames, strategy=%s", len(timestamps), strategy)
+
+    with tempfile.TemporaryDirectory(prefix=f"yt-t3-{video_id}-") as tmp_str:
+        tmp = Path(tmp_str)
+        log.info("  downloading video at low-res …")
+        t0 = time.time()
+        video_path = ydlp_download_video(url, tmp)
+        if not video_path or not video_path.exists():
+            log.warning("  no video file downloaded — skipping T3")
+            return None
+        log.info("  downloaded %s (%.1f MB) in %.1fs",
+                 video_path.name, video_path.stat().st_size / 1e6, time.time() - t0)
+
+        per_frame: list[dict] = []
+        for i, ts in enumerate(timestamps):
+            frame_path = tmp / f"frame-{i:03d}.jpg"
+            ok = ffmpeg_extract_frame(video_path, ts, frame_path)
+            if not ok:
+                log.warning("  frame extract failed at %.1fs", ts)
+                continue
+            try:
+                img_b64 = base64.b64encode(frame_path.read_bytes()).decode()
+                t1 = time.time()
+                content, _stats = ollama_client.chat_vision(
+                    FRAME_PROMPT,
+                    model=LOCAL_VISION_MODEL,
+                    image_b64=img_b64,
+                    timeout=90.0,
+                )
+                summary = content.strip()
+                informative = not summary.upper().startswith("UNINFORMATIVE")
+                per_frame.append({
+                    "timestamp_s": round(ts, 2),
+                    "timestamp_label": _ts_to_label(ts),
+                    "informative": informative,
+                    "summary": summary,
+                    "duration_s": round(time.time() - t1, 2),
+                })
+                log.info("  frame %d/%d @ %s: %s",
+                         i + 1, len(timestamps), _ts_to_label(ts),
+                         "skip (uninformative)" if not informative else summary[:80])
+            except Exception as e:  # noqa: BLE001
+                log.warning("  vision call failed at %.1fs: %s", ts, type(e).__name__)
+                continue
+
+        # Aggregate
+        log.info("  aggregating with %s …", LOCAL_AGG_MODEL)
+        agg_prompt = _build_aggregate_prompt(metadata, transcript, per_frame)
+        try:
+            t1 = time.time()
+            aggregate = ollama_client.chat(
+                agg_prompt, model=LOCAL_AGG_MODEL, temperature=0.2, timeout=300.0
+            )
+            agg_duration = round(time.time() - t1, 2)
+        except Exception as e:  # noqa: BLE001
+            log.warning("aggregate call failed: %s", type(e).__name__)
+            aggregate = ""
+            agg_duration = 0
+
+        return {
+            "provider": "local",
+            "model": f"{LOCAL_VISION_MODEL}@ollama",
+            "strategy": strategy,
+            "frames_planned": len(timestamps),
+            "frames_analyzed": len(per_frame),
+            "frames_informative": sum(1 for f in per_frame if f["informative"]),
+            "per_frame": per_frame,
+            "aggregate": aggregate,
+            "aggregate_duration_s": agg_duration,
+        }
+
+
+def _build_aggregate_prompt(metadata: dict, transcript: dict | None, frames: list[dict]) -> str:
+    transcript_block = (transcript or {}).get("plain") or "(no subtitles available — rely on visual track)"
+    if len(transcript_block) > 12000:  # gemma4 context safety
+        transcript_block = transcript_block[:12000] + "\n[…truncated…]"
+
+    informative = [f for f in frames if f["informative"]]
+    if informative:
+        frames_block = "\n".join(f"[{f['timestamp_label']}] {f['summary']}" for f in informative)
+    else:
+        frames_block = "(no informative frames captured)"
+
+    duration_min = int((metadata.get("duration_s") or 0) // 60)
+    return AGGREGATE_PROMPT_TEMPLATE.format(
+        title=metadata.get("title") or "(untitled)",
+        channel=metadata.get("channel") or "(unknown)",
+        duration_min=duration_min,
+        upload_date=metadata.get("upload_date") or "(unknown)",
+        transcript_block=transcript_block,
+        frames_block=frames_block,
+    )
+
+
 # ── Slugging + write ─────────────────────────────────────────────────
 
 _SLUG_RE = re.compile(r"[^a-z0-9]+")
@@ -299,6 +548,7 @@ class Sidecar:
     metadata: dict
     transcript: dict | None = None
     comments: list[dict] = field(default_factory=list)
+    visual: dict | None = None  # T3 analysis (local or cloud)
 
 
 def slim_metadata(info: dict) -> dict:
@@ -339,6 +589,8 @@ def render_markdown(side: Sidecar) -> str:
         "input_source": side.input_source,
         "transcript_language": (side.transcript or {}).get("language"),
         "comment_sample_size": len(side.comments),
+        "visual_model": (side.visual or {}).get("model"),
+        "visual_frames": (side.visual or {}).get("frames_analyzed"),
     }
     if side.user_note:
         front["user_note"] = side.user_note
@@ -377,6 +629,18 @@ def render_markdown(side: Sidecar) -> str:
         parts.append(side.transcript["plain"])
         parts.append("")
 
+    if side.visual and side.visual.get("aggregate"):
+        v = side.visual
+        parts.append(f"## Visual analysis ({v.get('model')}, {v.get('frames_informative', 0)}/{v.get('frames_analyzed', 0)} informative frames)\n")
+        parts.append(v["aggregate"].strip())
+        parts.append("")
+        parts.append("<details><summary>Per-frame log</summary>\n")
+        for f in v.get("per_frame", []):
+            tag = "" if f.get("informative") else " _(uninformative)_"
+            parts.append(f"- `[{f.get('timestamp_label')}]`{tag} {f.get('summary')}")
+        parts.append("\n</details>")
+        parts.append("")
+
     if side.comments:
         parts.append(f"## Top comments ({len(side.comments)})\n")
         for c in side.comments:
@@ -409,6 +673,7 @@ def write_sidecar(side: Sidecar, *, out_dir: Path) -> tuple[Path, Path]:
                 "metadata": side.metadata,
                 "transcript": side.transcript,
                 "comments": side.comments,
+                "visual": side.visual,
             },
             indent=2,
             ensure_ascii=False,
@@ -445,6 +710,9 @@ def ingest_one(
 
     transcript = fetch_transcript(video_id) if tier >= 1 else None
     comments = slim_comments(info.get("comments")) if tier >= 2 else []
+    visual = None
+    if tier >= 3 and not dry_run:
+        visual = fetch_visual_local(url, video_id, metadata, transcript)
 
     side = Sidecar(
         url=url,
@@ -456,15 +724,17 @@ def ingest_one(
         metadata=metadata,
         transcript=transcript,
         comments=comments,
+        visual=visual,
     )
 
     if dry_run:
         log.info(
-            "  DRY: %s — %s · transcript=%s · comments=%d",
+            "  DRY: %s — %s · transcript=%s · comments=%d · visual=%s",
             metadata.get("title"),
             metadata.get("channel"),
             "yes" if transcript else "no",
             len(comments),
+            "yes" if visual else ("would-run" if tier >= 3 else "no"),
         )
         return {"video_id": video_id, "status": "dry"}
 
@@ -480,7 +750,7 @@ def main() -> int:
     src = parser.add_mutually_exclusive_group(required=True)
     src.add_argument("--url", help="single video or playlist URL")
     src.add_argument("--inbox", help="path to a markdown file with YouTube URLs")
-    parser.add_argument("--tier", type=int, choices=[0, 1, 2], default=1)
+    parser.add_argument("--tier", type=int, choices=[0, 1, 2, 3], default=1)
     parser.add_argument("--limit", type=int, default=None, help="cap playlist expansion")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--no-skip", action="store_true", help="re-ingest videos already in raw/notes/youtube/")

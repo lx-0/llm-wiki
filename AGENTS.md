@@ -16,7 +16,7 @@ The **tooling** for an LLM Wiki — a Karpathy-pattern personal knowledge base. 
 
 A vault that uses this tooling has three layers:
 
-1. **`raw/`** — immutable curated sources (LLM reads, never writes). Top-level subfolders: `articles/`, `papers/`, `notes/`, `transcripts/`, `audio/`, `memories/`, `requests/`, `suggestions/`. Scanner output lives in nested per-scanner folders: `raw/notes/email/<account>-<date>.md` (scan-email), `raw/notes/calendar/`, `raw/notes/browser/`, `raw/notes/screenshots/screenshots-<slug>.md` (batch reports) + `raw/notes/screenshots/thumb/<file>.png` (384px previews; original PNGs stay in `~/Screenshots/`, never copied; canonical analysis sidecar lives at `~/Screenshots/<file>.md`), `raw/notes/tabs/`.
+1. **`raw/`** — immutable curated sources (LLM reads, never writes). Top-level subfolders: `articles/`, `papers/`, `notes/`, `transcripts/`, `audio/`, `memories/`, `requests/`, `suggestions/`. Scanner output lives in nested per-scanner folders: `raw/notes/email/<account>-<date>.md` (scan-email), `raw/notes/calendar/`, `raw/notes/browser/`, `raw/notes/screenshots/screenshots-<slug>.md` (batch reports) + `raw/notes/screenshots/thumb/<file>.png` (384px previews; original PNGs stay in `~/Screenshots/`, never copied; canonical analysis sidecar lives at `~/Screenshots/<file>.md`), `raw/notes/tabs/`, `raw/notes/youtube/<channel>--<title>--<vid>.{md,json}` (scan-youtube — video metadata + transcript + comments + optional gemma4 visual analysis).
 2. **`daily/`** — auto-captured Claude Code session logs (immutable).
 3. **`knowledge/`** — LLM-compiled wiki articles (LLM owns, human reads). Subfolders: `concepts/`, `connections/`, `people/`, `projects/`, `qa/`, `facts/` (the last is human-owned via `wiki correct` — hard facts that override anything in raw/daily sources).
 
@@ -45,7 +45,7 @@ llm-wiki/
 │   ├── flush.py            ← session-end → daily/ append + piggyback spawner
 │   ├── lint.py             ← 6 structural checks + 1 LLM contradiction check
 │   ├── query.py            ← Claude Agent SDK query (read-only or file-back)
-│   ├── scan-*.py           ← collectors: email, calendar, browser, screenshots
+│   ├── scan-*.py           ← collectors: email, calendar, browser, screenshots, youtube
 │   ├── process-inbox.py    ← classify dropped files into raw/ subfolders
 │   ├── optimize-claude-md.py ← suggests CLAUDE.md edits from compiled patterns
 │   ├── review-wiki.py      ← per-article quality scoring (Ollama)
