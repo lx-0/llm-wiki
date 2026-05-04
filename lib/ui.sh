@@ -18,12 +18,16 @@ confirm() {
 
 # ask "Prompt" [default] [validator_fn]
 # Reads a line, returns it (echoed) — validator_fn can re-prompt by returning 1.
+# Prompt + hints go to stderr so callers can capture the answer with $(ask …)
+# without the prompt-text leaking into the captured value. Without this, the
+# user sees an apparent hang (prompt swallowed by command substitution) and
+# whatever they type ends up concatenated with the prompt as the "answer".
 ask() {
   local prompt="$1" default="${2:-}" validator="${3:-}"
   local hint=""
   [[ -n "$default" ]] && hint=" ${C_DIM}[$default]${C_RESET}"
   while :; do
-    printf "%s%s: " "$prompt" "$hint"
+    printf "%s%s: " "$prompt" "$hint" >&2
     local input; read -r input
     input="${input:-$default}"
     if [[ -n "$validator" ]]; then

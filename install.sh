@@ -74,12 +74,50 @@ fi
 
 # ── Seed vault templates ─────────────────────────────────────────────
 # Delegates to lib/seed.sh — same code is reused by `wiki seed` for
-# in-place re-seeding on existing installs. Default behavior here mirrors
-# the original install.sh contract: skip files the operator already has.
+# in-place re-seeding on existing installs. When stdin is a TTY (or
+# /dev/tty is reachable, which covers curl|bash when run in a real
+# terminal), prompt once for keep / overwrite / abort. When non-TTY
+# (true headless), default to keep — matching the original contract.
 info() { printf "ℹ %s\n" "$*"; }
 # shellcheck source=lib/seed.sh
 source "$DEST/lib/seed.sh"
-seed_vault_templates "$TARGET" "$DEST" 0
+
+seed_force=0
+# Detect whether the operator already has any seedable files. If not, the
+# prompt is pointless — there's nothing to overwrite or skip.
+has_existing=0
+for probe in \
+    "$TARGET/AGENTS.md" \
+    "$TARGET/dashboard.md" \
+    "$TARGET/knowledge.base" \
+    "$TARGET/.obsidian/community-plugins.json"; do
+  [[ -e "$probe" ]] && { has_existing=1; break; }
+done
+
+if (( has_existing )); then
+  # Reuse /dev/tty so curl|bash still gets an interactive prompt.
+  if [[ -t 0 ]] || [[ -r /dev/tty ]]; then
+    printf "\n%sExisting vault files detected at %s%s\n" "$Y" "$TARGET" "$N"
+    printf "  ${B}k${N})eep existing — engine versions will NOT overwrite your edits ${D}(default)${N}\n"
+    printf "  ${B}o${N})verwrite — replace template files with engine defaults ${D}(your edits in those files are lost)${N}\n"
+    printf "  ${B}a${N})bort — stop install; .wiki/ is already cloned, run installer again later\n"
+    printf "Choose [k/o/a]: "
+    if [[ -t 0 ]]; then
+      read -r seed_choice
+    else
+      read -r seed_choice </dev/tty
+    fi
+    case "${seed_choice:-k}" in
+      o|O|overwrite) seed_force=1; ok "will overwrite existing template files" ;;
+      a|A|abort)     warn "aborted before seeding. .wiki/ remains at $DEST."; exit 0 ;;
+      *)             info "keeping existing files (engine defaults skipped where files already exist)" ;;
+    esac
+  else
+    info "non-interactive install — keeping existing files (rerun './.wiki/wiki seed --force' to overwrite)"
+  fi
+fi
+
+seed_vault_templates "$TARGET" "$DEST" "$seed_force"
 
 # ── Wire skills into Claude Code ─────────────────────────────────────
 # Each engine skill at .wiki/skills/<name>/ is symlinked to

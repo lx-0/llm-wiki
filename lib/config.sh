@@ -52,14 +52,18 @@ config_cmd_setup_wizard() {
   # 2. Compile model
   local current_model; current_model="$(config_get models.compile_model)"
   info "Compile model — Claude tier for compile.py and retry-failed-flushes.py"
+  # Resolve default-index in plain shell BEFORE calling select_one. macOS
+  # bash 3.2 mis-parses nested $( case … esac ) inside another $( … ) with
+  # case-pattern ')' tokens (syntax error: unexpected newline near *)).
+  local model_default_idx
+  case "$current_model" in
+    claude-opus-4-7)   model_default_idx=1 ;;
+    claude-sonnet-4-6) model_default_idx=2 ;;
+    claude-haiku-4-5)  model_default_idx=3 ;;
+    *)                 model_default_idx=1 ;;
+  esac
   local model
-  model="$(select_one "Pick" "claude-opus-4-7|claude-sonnet-4-6|claude-haiku-4-5" \
-    "$( case "$current_model" in
-         claude-opus-4-7) echo 1 ;;
-         claude-sonnet-4-6) echo 2 ;;
-         claude-haiku-4-5) echo 3 ;;
-         *) echo 1 ;;
-       esac )")"
+  model="$(select_one "Pick" "claude-opus-4-7|claude-sonnet-4-6|claude-haiku-4-5" "$model_default_idx")"
   if [[ "$model" != "$current_model" ]]; then
     config_set models.compile_model "$model"
   fi
