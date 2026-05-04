@@ -378,7 +378,12 @@ async def maybe_generate_curiosity_requests(source: Path) -> None:
     }
 
     try:
-        content = ollama_client.chat_schema(prompt, model=CURIOSITY_MODEL, schema=schema)
+        content = ollama_client.chat_schema(
+            prompt,
+            model=CURIOSITY_MODEL,
+            schema=schema,
+            timeout=CONFIG.limits.curiosity_timeout_s,
+        )
         try:
             parsed = ollama_client.parse_json_lenient(content)
         except json.JSONDecodeError:

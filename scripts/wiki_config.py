@@ -62,6 +62,8 @@ class Limits:
     screenshot_timeout_seconds: int = 60
     curiosity_max_gaps: int = 3
     curiosity_min_source_chars: int = 500
+    curiosity_timeout_s: int = 240         # ollama chat_schema timeout for curiosity gap-detection
+                                           # (gemma4:e4b on long YT-notes regularly hits >90s)
     sparse_threshold_words: int = 200
     # YouTube ingest (scan-youtube.py — see also CONFIG.piggybacks.scan_youtube)
     youtube_max_frames: int = 30          # Tier-3 visual: cap frames per video

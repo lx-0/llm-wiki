@@ -74,6 +74,7 @@ limits:
   # Curiosity-loop: max requests per compile run.
   curiosity_max_gaps: 3
   curiosity_min_source_chars: 500
+  curiosity_timeout_s: 240               # ollama gap-detection call (gemma4:e4b on long YT-notes >90s)
   # Lint.
   sparse_threshold_words: 200
   # YouTube ingest (scan-youtube.py).
