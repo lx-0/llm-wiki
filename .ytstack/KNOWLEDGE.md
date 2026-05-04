@@ -224,6 +224,30 @@ for k in ('scale', 'close'):
 vault.write_text(json.dumps(new, indent=2) + '\n')
 ```
 
+### Per-substrate citability — don't lump subtrees by surface shape
+
+#### Lesson from a 2026-05-04 over-reach
+
+The first cut of distill-don't-cite (commit `696a643`) banned *all* `[[raw/...]]` and `[[daily/...]]` body wikilinks because "gleiche churn-rate eigentlich". That was a sloppy claim. The migration stripped 892 wikilinks; only ~502 (`raw/memories/`) were the actual problem. 308 `daily/` + 73 `raw/notes/` + 9 `raw/articles/` were durable references that should have stayed. Operator caught it ("hast du ALLES unlinked aus raw/?"); commit `4af8e54` corrected the scope.
+
+#### Citability is determined by prune-lifecycle, not prefix
+
+| Subtree | Pruned by? | Citable? |
+|---|---|---|
+| `raw/memories/` | `sync-memories.py:202` (managed mirror of `~/.claude/projects/<encoded>/memory/`) | **NO** |
+| `raw/notes/email/*` | nobody — `scan-email` appends; existing files survive | YES |
+| `raw/notes/screenshots/*` | nobody — `scan-screenshots` writes per-batch reports + thumbs | YES |
+| `raw/notes/youtube/*` | nobody — `scan-youtube` skip-existing dedup | YES |
+| `raw/notes/calendar/*`, `raw/notes/browser/*`, `raw/notes/tabs/*` | nobody | YES |
+| `raw/articles/*` | nobody — manual drops + clippings-sweep | YES |
+| `daily/*.md` | nobody — append-only session-history | YES |
+
+The shared prefix `raw/` says nothing about whether a subtree is durable. The only durability signal is "who runs `unlink()` against this path." `grep -rn "unlink\|rename\|move" scripts/` is the audit.
+
+#### Process rule
+
+When proposing a body-citation ban (or any scope-rule across substrate subtrees), enumerate the prune-paths case-by-case before lumping. "Same surface shape" is not a reason; "same upstream owner with the same lifecycle behavior" is. If you catch yourself writing "gleiche … eigentlich" without a code reference, stop and grep.
+
 ### Substrate is not citable — distill, don't cite
 
 #### Symptom

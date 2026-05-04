@@ -180,6 +180,25 @@ Format for each entry:
 **Migration:** No write-migration. `read_hard_facts()` defaults legacy facts to `asserted` + `user:legacy-pre-trust-schema`, which is semantically correct for the two pre-existing entries (both user-typed). Backfill via `wiki correct edit <slug>`.
 **Linked artifacts:** `scripts/correct.py:cmd_add` (CLI flags + validation), `scripts/utils.py:read_hard_facts` (sort + render + legacy-default), `prompts/compile_main.md`, `prompts/query_main.md`, `templates/AGENTS.example.md`, `docs/PROCESS.md` §13, `docs/architecture.excalidraw` (CLI + YAML + description), `tests/test_correct.py` (9 cases), commit `4ec926e`.
 
+## 2026-05-04 (correction): Narrow distill-don't-cite to `raw/memories/` only
+
+**Context:** The original entry below ("2026-05-04: Distill, don't cite") banned body wikilinks to *all* of `raw/` and `daily/`, citing "gleiche churn-rate eigentlich". That was an unjustified scope expansion: only `raw/memories/` is a managed mirror that prunes (`scripts/sync-memories.py:202`). `daily/*.md`, `raw/notes/*`, `raw/articles/*` are durable — no engine code prunes them. The over-broad migration on the lxw vault stripped 308 valid `daily/` wikilinks, 73 `raw/notes/`, and 9 `raw/articles/` alongside the ~502 `raw/memories/` ones it was supposed to target. Operator caught it: *"hast du ALLES unlinked aus raw/?"*
+**Options considered:** (A) leave the over-broad ban in place + accept the loss of citable durable substrates — clean rule, but discards working audit-trail wikilinks the operator relies on; (B) reverse the migration entirely + lose the raw/memories/ fix too; (C) narrow the rule to `raw/memories/` only and selectively restore daily/ + raw/notes/ + raw/articles/ in the live vault from `git show :path` (staged-version) so user's pre-existing staged work is preserved.
+**Chose:** C.
+**Reason:** Citation-citability is a per-substrate property determined by who owns the prune lifecycle, not by surface-shape similarity ("starts with `raw/`"). Lumping subtrees together because they share a prefix is sloppy. Each subtree gets evaluated on its actual upstream-source behavior:
+
+| Subtree | Pruned by? | Citable in body? |
+|---|---|---|
+| `raw/memories/` | `sync-memories.py:202` (managed mirror) | NO |
+| `raw/notes/email/*`, `raw/notes/screenshots/*`, `raw/notes/youtube/*`, `raw/notes/calendar/*`, `raw/notes/browser/*`, `raw/notes/tabs/*` | nobody (collectors are append-only / skip-existing) | YES |
+| `raw/articles/*` | nobody (manual + clipper) | YES |
+| `daily/*.md` | nobody (append-only session-history) | YES |
+
+The narrowing also unlocks lint to surface broken `[[daily/...]]` / `[[raw/notes/...]]` wikilinks as ordinary `error broken_link` instead of suppressing them — better signal for the next round of triage.
+
+**Linked artifacts:** `prompts/compile_main.md` rule 6 (rewritten to ban only `raw/memories/`), `scripts/migrate_strip_substrate_links.py` regex narrowed to `raw/memories/[^|\]]+`, `scripts/lint.py:check_broken_links` substrate_link warning fires only for `raw/memories/` + new `_wikilink_target_exists` helper resolves `daily/` and `raw/` paths against `ROOT_DIR`. Lxw vault remediated via a `git show :path` (staged-version) base + narrow re-strip — preserves user's pre-staged work in 99 MM + 182 AM files. Engine commit `4af8e54`, doc-sync `7a750b1`, infographic-sync `ee7e768`.
+**Supersedes:** the broad scope of "2026-05-04: Distill, don't cite". The original entry's *principle* still holds (managed-mirror substrates aren't body-citable); only the scope identification was wrong.
+
 ## 2026-05-04: Graph view defaults — semantic Material palette, no greens, tuned forces
 
 **Context:** Audit of the lxw vault graph view (~668 nodes) surfaced three problems: (1) `knowledge/facts/` (1 node, authoritative) and `knowledge/MOCs/` (3 nodes, hub navigation) had no color group at all — the rarest and most important node types rendered in the same default color as everything else; (2) the existing palette (pastel pink for people, light violet for connections) had no semantic grouping and low saturation that washed out at small node sizes; (3) forces were contradictory (`linkStrength: 1` + `linkDistance: 250` — max-pull and max-stretch simultaneously) producing the tight-blob look in graph screenshots.
