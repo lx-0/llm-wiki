@@ -442,6 +442,34 @@ EOF
   return $rc
 }
 
+cmd_pin() {
+  case "${1:-}" in
+    -h|--help|help)
+      cat <<EOF
+${C_BOLD}wiki pin${C_RESET} — pin an article into a Map-of-Content (MOC)
+
+${C_BOLD}USAGE${C_RESET}
+  wiki pin <article>                              interactive section picker
+  wiki pin <article> --section "Active"           skip prompt, choose section
+  wiki pin <article> --moc people                 override target MOC
+  wiki pin <article> --summary "one-line note"    override annotation
+
+${C_BOLD}NOTES${C_RESET}
+  \`<article>\` accepts a bare basename (\`alex\`), a vault-relative path
+  (\`knowledge/people/alex.md\`), or an absolute path.
+
+  Target MOC is auto-derived from the article's \`type:\` frontmatter:
+    concept→concepts · connection→connections · person→people
+    project→projects · qa→qa
+
+  Idempotent: re-running on a file already pinned anywhere in the MOC is
+  a no-op. New section names create a new H2 above the dataview block.
+EOF
+      return 0 ;;
+  esac
+  _run_script pin.py "$@"
+}
+
 cmd_ingest_youtube() {
   case "${1:-}" in
     -h|--help|help)
@@ -689,6 +717,7 @@ case "${1:-}" in
   query)            shift; cmd_query "$@" ;;
   agent)            shift; cmd_agent "$@" ;;
   correct)          shift; cmd_correct "$@" ;;
+  pin)              shift; cmd_pin "$@" ;;
   review-wiki)      shift; cmd_review_wiki "$@" ;;
   ingest-youtube)   shift; cmd_ingest_youtube "$@" ;;
   version)          shift; cmd_version "$@" ;;

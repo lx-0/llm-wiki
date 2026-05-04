@@ -50,6 +50,21 @@ FROM "knowledge/MOCs"
 SORT file.name ASC
 ```
 
+### 🪝 Not pinned in any MOC
+
+> Compiled articles that no MOC currently links to. Triage candidates: open one, decide if it deserves a section pin, then run `wiki pin <basename>` (or just edit the MOC by hand). Newest first, capped at 20.
+
+```dataview
+TABLE WITHOUT ID
+  file.link AS "Article",
+  file.folder AS "Folder",
+  dateformat(file.cday, "yyyy-MM-dd") AS "Created"
+FROM "knowledge/concepts" OR "knowledge/connections" OR "knowledge/people" OR "knowledge/projects"
+WHERE !any(file.inlinks, (l) => contains(string(l.path), "knowledge/MOCs/"))
+SORT file.cday DESC
+LIMIT 20
+```
+
 ## 📈 History
 
 > Time-series from the append-only `state/history.jsonl` event log. Each `wiki compile` adds one event with the article + cost totals at that moment; each `wiki flush` adds one event with the daily-file ref. Charts derive cumulative + per-day views.
