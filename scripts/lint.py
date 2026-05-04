@@ -328,6 +328,8 @@ def check_facts_violations() -> list[dict]:
 # ── LLM contradiction check ─────────────────────────────────────────
 
 from prompts import render  # noqa: E402
+from sdk_helpers import StderrCapture, log_sdk_failure  # noqa: E402
+import time as _time  # noqa: E402
 
 
 async def check_contradictions() -> list[dict]:
@@ -339,6 +341,8 @@ async def check_contradictions() -> list[dict]:
     prompt = render("lint_contradiction", wiki_content=wiki_content)
     result_parts: list[str] = []
 
+    started = _time.time()
+    capture = StderrCapture()
     try:
         async for message in query(
             prompt=prompt,
@@ -347,14 +351,26 @@ async def check_contradictions() -> list[dict]:
                 allowed_tools=[],
                 max_turns=3,
                 setting_sources=[],
+                stderr=capture.callback,
             ),
         ):
             if isinstance(message, ResultMessage):
                 if message.subtype == "success" and message.result:
                     result_parts.append(message.result)
-    except Exception:
-        log.exception("Contradiction check failed")
-        return [issue("error", "contradiction", "(system)", "LLM contradiction check failed (see logs)")]
+    except Exception as exc:
+        failure = log_sdk_failure(
+            log,
+            label="lint_contradiction",
+            model="(default)",
+            input_chars=len(prompt),
+            started=started,
+            capture=capture,
+            exc=exc,
+        )
+        return [issue(
+            "error", "contradiction", "(system)",
+            f"LLM contradiction check failed (kind={failure.kind}, see logs)",
+        )]
 
     result = "\n".join(result_parts)
     if "NO_ISSUES" in result:

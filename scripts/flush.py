@@ -11,6 +11,8 @@ import os
 os.environ["CLAUDE_INVOKED_BY"] = "memory_flush"
 
 import asyncio
+import contextlib
+import fcntl
 import json
 import logging
 import subprocess
@@ -28,6 +30,7 @@ WIKI_DIR = SCRIPTS_DIR.parent
 ROOT_DIR = WIKI_DIR.parent
 sys.path.insert(0, str(SCRIPTS_DIR))
 from wiki_config import CONFIG  # noqa: E402
+from sdk_helpers import StderrCapture, log_sdk_failure  # noqa: E402
 
 import flush_pipeline  # noqa: E402
 
@@ -43,6 +46,13 @@ LAST_FLUSH_FILE = STATE_DIR / "last-flush.json"
 COMPILE_SCRIPT = SCRIPTS_DIR / "compile.py"
 DASHBOARD_STATS_SCRIPT = SCRIPTS_DIR / "dashboard_stats.py"
 DASHBOARD_LINT_SCRIPT = SCRIPTS_DIR / "dashboard_lint.py"
+DASHBOARD_LOCK_FILE = STATE_DIR / "dashboard-refresh.lock"
+# 30s was too tight on iCloud-synced vaults under post-compile-hour
+# concurrent-flush bursts (incident 2026-05-03: 103 timeout records in
+# ~30 seconds). The dashboard scripts themselves take 5-15 s in steady
+# state; 120 s gives headroom against fs-stalls without blocking the
+# flush forever.
+DASHBOARD_REFRESH_TIMEOUT_S = 120
 TIMEZONE = CONFIG.scheduling.timezone
 COMPILE_AFTER_HOUR = CONFIG.scheduling.compile_after_hour
 DEDUP_WINDOW_SECONDS = CONFIG.scheduling.dedup_window_seconds
@@ -188,17 +198,15 @@ MAX_RETRIES = CONFIG.limits.flush_max_retries
 RETRY_DELAY = CONFIG.limits.flush_retry_delay_seconds
 
 
-def _stderr_logger(line: str) -> None:
-    """Forward CLI stderr lines into our flush.log so failures aren't opaque."""
-    log.warning("CLI stderr: %s", line.rstrip())
-
-
 async def extract_from_context(context: str) -> str | None:
     """Use Claude to extract structured knowledge from a conversation context."""
     prompt = render("flush_extract", context=context)
 
+    last_failure = None
     for attempt in range(1, MAX_RETRIES + 1):
         result_parts: list[str] = []
+        capture = StderrCapture()
+        started = time.time()
         try:
             async for message in query(
                 prompt=prompt,
@@ -207,22 +215,34 @@ async def extract_from_context(context: str) -> str | None:
                     allowed_tools=[],
                     max_turns=3,
                     setting_sources=[],
-                    stderr=_stderr_logger,
+                    stderr=capture.callback,
                 ),
             ):
                 if isinstance(message, ResultMessage):
                     if message.subtype == "success" and message.result:
                         result_parts.append(message.result)
             return "\n".join(result_parts) if result_parts else None
-        except Exception:
+        except Exception as exc:
+            last_failure = log_sdk_failure(
+                log,
+                label=f"flush_extract attempt {attempt}/{MAX_RETRIES}",
+                model="(default)",
+                input_chars=len(context),
+                started=started,
+                capture=capture,
+                exc=exc,
+            )
             if attempt < MAX_RETRIES:
                 log.warning(
-                    "Claude extraction failed (attempt %d/%d), retrying in %ds...",
-                    attempt, MAX_RETRIES, RETRY_DELAY,
+                    "Retrying in %ds (last kind=%s)...",
+                    RETRY_DELAY, last_failure.kind,
                 )
                 await asyncio.sleep(RETRY_DELAY)
             else:
-                log.exception("Claude extraction failed after %d attempts", MAX_RETRIES)
+                log.error(
+                    "Claude extraction failed after %d attempts (last kind=%s)",
+                    MAX_RETRIES, last_failure.kind,
+                )
                 return None
 
 
@@ -280,49 +300,90 @@ def maybe_trigger_compile(daily_file: Path) -> None:
 
 # ── Dashboard refresh ───────────────────────────────────────────────
 
-def refresh_dashboard_stats() -> None:
-    """Regenerate `_dashboard-stats.md` so the vault Dashboard reflects the
-    counts after this flush. Synchronous and best-effort: failures are logged
-    but never block the flush itself."""
+@contextlib.contextmanager
+def _dashboard_refresh_lock():
+    """Non-blocking lock so concurrent SessionEnd hooks don't all spawn
+    their own dashboard refresh.
+
+    Symptom on 2026-05-03: 103 `subprocess.TimeoutExpired` records in
+    ~30s, all clustered around the post-compile-hour trigger when
+    multiple flush hooks fired in quick succession on an iCloud-synced
+    vault. The refresh is idempotent and best-effort, so the cheapest
+    fix is to serialize: first flush wins the lock, others skip — the
+    next flush picks up the latest state anyway.
+    """
+    DASHBOARD_LOCK_FILE.parent.mkdir(parents=True, exist_ok=True)
+    fd = open(DASHBOARD_LOCK_FILE, "w")
+    try:
+        try:
+            fcntl.flock(fd.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            log.info(
+                "dashboard refresh: another flush holds the lock — skipping (idempotent, next flush will retry)"
+            )
+            yield False
+            return
+        yield True
+    finally:
+        try:
+            fcntl.flock(fd.fileno(), fcntl.LOCK_UN)
+        except OSError:
+            pass
+        fd.close()
+
+
+def _run_dashboard_script(script: Path, label: str) -> None:
+    """Run one dashboard regen script, logging structured diagnostics on
+    failure so the operator can tell timeouts apart from crashes."""
+    started = time.time()
     try:
         result = subprocess.run(
-            [sys.executable, str(DASHBOARD_STATS_SCRIPT)],
+            [sys.executable, str(script)],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             stdin=subprocess.DEVNULL,
             check=False,
-            timeout=30,
+            timeout=DASHBOARD_REFRESH_TIMEOUT_S,
         )
-        if result.returncode != 0:
-            log.warning(
-                "dashboard_stats refresh failed (exit=%d): %s",
-                result.returncode,
-                result.stderr.decode("utf-8", errors="replace")[:500],
-            )
+    except subprocess.TimeoutExpired as exc:
+        elapsed = time.time() - started
+        log.error(
+            "dashboard %s refresh TIMEOUT after %.1fs (limit=%ds) — %s",
+            label, elapsed, DASHBOARD_REFRESH_TIMEOUT_S, script.name,
+        )
+        if exc.stderr:
+            log.error("    stderr: %s", exc.stderr.decode("utf-8", errors="replace")[:500])
+        return
     except Exception:
-        log.exception("Failed to refresh dashboard stats")
+        log.exception("dashboard %s refresh: spawn failed", label)
+        return
+    elapsed = time.time() - started
+    if result.returncode != 0:
+        log.warning(
+            "dashboard %s refresh failed (exit=%d, %.1fs): %s",
+            label, result.returncode, elapsed,
+            result.stderr.decode("utf-8", errors="replace")[:500],
+        )
+    else:
+        log.info("dashboard %s refresh ok (%.1fs)", label, elapsed)
+
+
+def refresh_dashboard_stats() -> None:
+    """Regenerate `_dashboard-stats.md` so the vault Dashboard reflects
+    the counts after this flush. Best-effort: never blocks the flush."""
+    with _dashboard_refresh_lock() as acquired:
+        if not acquired:
+            return
+        _run_dashboard_script(DASHBOARD_STATS_SCRIPT, "stats")
 
 
 def refresh_dashboard_lint() -> None:
-    """Regenerate `_dashboard-lint.md` so the vault Dashboard reflects the
-    lint queues after this flush. Synchronous and best-effort."""
-    try:
-        result = subprocess.run(
-            [sys.executable, str(DASHBOARD_LINT_SCRIPT)],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            stdin=subprocess.DEVNULL,
-            check=False,
-            timeout=30,
-        )
-        if result.returncode != 0:
-            log.warning(
-                "dashboard_lint refresh failed (exit=%d): %s",
-                result.returncode,
-                result.stderr.decode("utf-8", errors="replace")[:500],
-            )
-    except Exception:
-        log.exception("Failed to refresh dashboard lint")
+    """Regenerate `_dashboard-lint.md` so the vault Dashboard reflects
+    the lint queues after this flush. Best-effort."""
+    with _dashboard_refresh_lock() as acquired:
+        if not acquired:
+            return
+        _run_dashboard_script(DASHBOARD_LINT_SCRIPT, "lint")
 
 
 # ── Piggyback tasks ─────────────────────────────────────────────────

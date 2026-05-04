@@ -30,9 +30,12 @@ from claude_agent_sdk import (
     query,
 )
 
+import time
+
 from agent_spec import AgentSpec, SpecError, list_specs, parse_spec
 from config import LOGS_DIR, WIKI_DIR, now_iso, today_iso
 from wiki_config import CONFIG  # noqa: E402
+from sdk_helpers import StderrCapture, log_sdk_failure  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO,
@@ -111,6 +114,8 @@ async def run(spec: AgentSpec, dry_run: bool, extra_vars: dict[str, str]) -> int
     total_output_tokens = 0
     result_text = ""
 
+    started = time.time()
+    capture = StderrCapture()
     try:
         async for message in query(
             prompt=rendered,
@@ -121,6 +126,7 @@ async def run(spec: AgentSpec, dry_run: bool, extra_vars: dict[str, str]) -> int
                 permission_mode=spec.permission_mode,
                 max_turns=spec.max_turns,
                 system_prompt={"type": "preset", "preset": "claude_code"},
+                stderr=capture.callback,
             ),
         ):
             if isinstance(message, AssistantMessage) and message.usage:
@@ -128,8 +134,17 @@ async def run(spec: AgentSpec, dry_run: bool, extra_vars: dict[str, str]) -> int
                 total_output_tokens += message.usage.get("output_tokens", 0)
             if isinstance(message, ResultMessage):
                 result_text = message.result or ""
-    except Exception:
-        log.exception("Agent task %r failed", spec.id)
+    except Exception as exc:
+        log_sdk_failure(
+            log,
+            label=f"agent_task:{spec.id}",
+            source=f"agent:{spec.id}",
+            model=model,
+            input_chars=len(rendered),
+            started=started,
+            capture=capture,
+            exc=exc,
+        )
         return 2
 
     log.info(

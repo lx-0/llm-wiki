@@ -38,6 +38,8 @@ logging.basicConfig(
 log = logging.getLogger("query")
 
 from prompts import render  # noqa: E402
+from sdk_helpers import StderrCapture, log_sdk_failure  # noqa: E402
+import time as _time  # noqa: E402
 
 # ── Query prompt ─────────────────────────────────────────────────────
 
@@ -87,6 +89,8 @@ async def main() -> None:
     total_output_tokens = 0
     result_text = ""
 
+    started = _time.time()
+    capture = StderrCapture()
     try:
         async for message in query(
             prompt=prompt,
@@ -96,6 +100,7 @@ async def main() -> None:
                 allowed_tools=allowed_tools,
                 permission_mode="acceptEdits",
                 max_turns=15,
+                stderr=capture.callback,
             ),
         ):
             if isinstance(message, AssistantMessage) and message.usage:
@@ -103,8 +108,16 @@ async def main() -> None:
                 total_output_tokens += message.usage.get("output_tokens", 0)
             if isinstance(message, ResultMessage):
                 result_text = message.result
-    except Exception:
-        log.exception("Query failed")
+    except Exception as exc:
+        log_sdk_failure(
+            log,
+            label="query",
+            model="(default)",
+            input_chars=len(prompt),
+            started=started,
+            capture=capture,
+            exc=exc,
+        )
         sys.exit(1)
 
     # Print the answer

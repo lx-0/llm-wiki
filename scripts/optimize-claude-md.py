@@ -39,6 +39,8 @@ logging.basicConfig(
 log = logging.getLogger("optimize-claude-md")
 
 from prompts import render  # noqa: E402
+from sdk_helpers import StderrCapture, log_sdk_failure  # noqa: E402
+import time as _time  # noqa: E402
 
 # ── Main ────────────────────────────────────────────────────────────
 
@@ -79,6 +81,8 @@ async def optimize(dry_run: bool = False) -> None:
         current_lines=current_lines,
     )
 
+    started = _time.time()
+    capture = StderrCapture()
     try:
         async for message in query(
             prompt=prompt,
@@ -88,12 +92,22 @@ async def optimize(dry_run: bool = False) -> None:
                 permission_mode="acceptEdits",
                 max_turns=10,
                 system_prompt={"type": "preset", "preset": "claude_code"},
+                stderr=capture.callback,
             ),
         ):
             if isinstance(message, ResultMessage):
                 log.info("Result: %s", message.result[:300])
-    except Exception:
-        log.exception("Optimization failed")
+    except Exception as exc:
+        log_sdk_failure(
+            log,
+            label="optimize_claude_md",
+            source=str(staging),
+            model="(default)",
+            input_chars=len(prompt),
+            started=started,
+            capture=capture,
+            exc=exc,
+        )
         staging.unlink(missing_ok=True)
         return
 

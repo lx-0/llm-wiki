@@ -47,6 +47,12 @@ from utils import (
     read_wiki_index,
     save_state,
 )
+from sdk_helpers import (
+    FailureClass,
+    StderrCapture,
+    is_fatal,
+    log_sdk_failure,
+)
 
 # ── Logging ──────────────────────────────────────────────────────────
 _LOG_FORMAT = "%(asctime)s  %(levelname)s  %(message)s"
@@ -205,6 +211,7 @@ async def compile_file(source: Path, dry_run: bool = False, prefix: str = "") ->
     total_output_tokens = 0
     result_text = ""
     started = time.time()
+    capture = StderrCapture()
 
     try:
         async for message in query(
@@ -216,6 +223,7 @@ async def compile_file(source: Path, dry_run: bool = False, prefix: str = "") ->
                 permission_mode="acceptEdits",
                 max_turns=30,
                 system_prompt={"type": "preset", "preset": "claude_code"},
+                stderr=capture.callback,
             ),
         ):
             if isinstance(message, AssistantMessage) and message.usage:
@@ -223,9 +231,18 @@ async def compile_file(source: Path, dry_run: bool = False, prefix: str = "") ->
                 total_output_tokens += message.usage.get("output_tokens", 0)
             if isinstance(message, ResultMessage):
                 result_text = message.result
-    except Exception:
-        log.exception("  ✗ failed after %.1fs", time.time() - started)
-        return None
+    except Exception as exc:
+        failure = log_sdk_failure(
+            log,
+            label="compile_file",
+            source=rel_path,
+            model=CONFIG.models.compile_model,
+            input_chars=len(source_content),
+            started=started,
+            capture=capture,
+            exc=exc,
+        )
+        return {"_failure": failure}
 
     elapsed = time.time() - started
     # Estimate cost (Claude Opus 4.6 pricing: $5/M input, $25/M output)
@@ -284,6 +301,8 @@ async def maybe_generate_suggestions(source: Path, dry_run: bool = False) -> Non
         email_accounts_inline=accounts_inline,
     )
 
+    started = time.time()
+    capture = StderrCapture()
     try:
         async for message in query(
             prompt=prompt,
@@ -294,12 +313,22 @@ async def maybe_generate_suggestions(source: Path, dry_run: bool = False) -> Non
                 permission_mode="acceptEdits",
                 max_turns=10,
                 system_prompt={"type": "preset", "preset": "claude_code"},
+                stderr=capture.callback,
             ),
         ):
             if isinstance(message, ResultMessage):
                 log.info("  Suggestions: %s", message.result[:200])
-    except Exception:
-        log.exception("  Suggestion pass failed for %s", rel_path)
+    except Exception as exc:
+        log_sdk_failure(
+            log,
+            label="suggestion_pass",
+            source=rel_path,
+            model=CONFIG.models.compile_model,
+            input_chars=len(source_content),
+            started=started,
+            capture=capture,
+            exc=exc,
+        )
 
 
 # ── Curiosity pass ──────────────────────────────────────────────────
@@ -509,7 +538,9 @@ async def main() -> None:
     compiled_count = 0
     failed_count = 0
     consecutive_failures = 0
+    recent_failures: list[FailureClass] = []
     aborted = False
+    abort_reason = ""
     run_input_tokens = 0
     run_output_tokens = 0
     run_started = time.time()
@@ -527,15 +558,55 @@ async def main() -> None:
 
         prefix = f"[{compiled_count + failed_count + 1}/{cap}] "
         result = await compile_file(source, prefix=prefix)
-        if result is None:
+        if result is None or "_failure" in result:
             failed_count += 1
             consecutive_failures += 1
+            failure = result.get("_failure") if result else None
+            if failure is not None:
+                recent_failures.append(failure)
+                # Fail-fast on auth/model errors — they will repeat identically
+                # for every remaining file. Operator must fix config first.
+                if is_fatal(failure):
+                    log.error(
+                        "Fatal failure (kind=%s): %s. Aborting before wasting "
+                        "more attempts on the same misconfiguration.",
+                        failure.kind, failure.detail,
+                    )
+                    aborted = True
+                    abort_reason = f"fatal/{failure.kind}"
+                    break
             if consecutive_failures >= args.max_consecutive_failures:
-                log.error(
-                    "%d consecutive failures — likely rate-limited (5h Opus window). "
-                    "Aborting. Rerun in 60-90 minutes to continue with remaining files.",
-                    consecutive_failures,
-                )
+                window = recent_failures[-consecutive_failures:]
+                kinds = [f.kind for f in window]
+                if "rate_limit" in kinds:
+                    log.error(
+                        "%d consecutive failures incl. rate_limit signal — "
+                        "Anthropic 5h Opus window likely. Rerun in 60-90 min.",
+                        consecutive_failures,
+                    )
+                    abort_reason = "rate_limit"
+                elif kinds and all(k == "cli_crash" for k in kinds):
+                    log.error(
+                        "%d consecutive bundled-CLI fast-crashes (kind=cli_crash). "
+                        "This is NOT a rate-limit. See [CLI-STDERR] above. "
+                        "Sanity-check: `claude --version` and `claude -p \"hi\"`.",
+                        consecutive_failures,
+                    )
+                    abort_reason = "cli_crash"
+                elif "network" in kinds:
+                    log.error(
+                        "%d consecutive failures incl. network errors — "
+                        "transient connectivity issue. Retry shortly.",
+                        consecutive_failures,
+                    )
+                    abort_reason = "network"
+                else:
+                    log.error(
+                        "%d consecutive failures (kinds=%s). See *-errors.log "
+                        "for captured stderr. Aborting.",
+                        consecutive_failures, ",".join(kinds) or "unknown",
+                    )
+                    abort_reason = "mixed"
                 aborted = True
                 break
             continue
@@ -584,7 +655,7 @@ async def main() -> None:
             cost_total=state["total_cost"],
         )
 
-    outcome = "ABORTED (rate limit)" if aborted else "complete"
+    outcome = f"ABORTED ({abort_reason or 'unknown'})" if aborted else "complete"
     pending = len(files) - compiled_count - failed_count
     elapsed_min, elapsed_sec = divmod(int(time.time() - run_started), 60)
     run_cost = (run_input_tokens * 5.0 + run_output_tokens * 25.0) / 1_000_000

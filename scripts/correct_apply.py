@@ -32,6 +32,7 @@ from claude_agent_sdk import (
 from config import FACTS_DIR, ROOT_DIR, now_iso, today_iso
 from wiki_config import CONFIG  # noqa: E402
 from prompts import render  # noqa: E402
+from sdk_helpers import StderrCapture, log_sdk_failure  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO,
@@ -105,6 +106,9 @@ async def apply(slug: str, dry_run: bool) -> int:
     total_output_tokens = 0
     result_text = ""
 
+    import time as _time
+    started = _time.time()
+    capture = StderrCapture()
     try:
         async for message in query(
             prompt=prompt,
@@ -115,6 +119,7 @@ async def apply(slug: str, dry_run: bool) -> int:
                 permission_mode="acceptEdits",
                 max_turns=50,
                 system_prompt={"type": "preset", "preset": "claude_code"},
+                stderr=capture.callback,
             ),
         ):
             if isinstance(message, AssistantMessage) and message.usage:
@@ -122,8 +127,17 @@ async def apply(slug: str, dry_run: bool) -> int:
                 total_output_tokens += message.usage.get("output_tokens", 0)
             if isinstance(message, ResultMessage):
                 result_text = message.result or ""
-    except Exception:
-        log.exception("Agent run failed for fact %s", slug)
+    except Exception as exc:
+        log_sdk_failure(
+            log,
+            label="correct_apply",
+            source=f"fact:{slug}",
+            model=CONFIG.models.compile_model,
+            input_chars=len(prompt),
+            started=started,
+            capture=capture,
+            exc=exc,
+        )
         return 2
 
     log.info("Agent done. Tokens — input: %d, output: %d", total_input_tokens, total_output_tokens)
