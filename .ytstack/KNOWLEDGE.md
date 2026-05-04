@@ -179,6 +179,37 @@ The outcome banner uses `f"ABORTED ({abort_reason})"` so post-mortems can grep `
 
 Cascading failures after ~2 h of runtime can be the rate cap, not a crash. The new classifier confirms via stderr keyword rather than guessing from timing — but `--max-files N` and `--max-consecutive-failures N` are still the right operational guard rails.
 
+### Substrate is not citable — distill, don't cite
+
+#### Symptom
+
+Obsidian Graph View on lxw (2026-05-04) showed dozens of ghost nodes — translucent placeholders for unresolved wikilink targets. Audit: 892 substrate-citing wikilinks across `knowledge/` bodies (584 `[[raw/...]]`, 308 `[[daily/...]]`), 156 already broken (~70% of `raw/memories/` references).
+
+#### Root cause
+
+Architectural mismatch. The compile prompt encouraged the LLM to cite sources via wikilinks (`[[raw/memories/<project>__<name>.md]]`), but those substrates are mutable working state:
+
+- `raw/memories/` is a managed mirror (`sync-memories.py:202`) that **deletes** files whenever the upstream `~/.claude/projects/<encoded>/memory/*.md` is gone. Auto-memories churn constantly: Claude proactively rewrites + prunes them (documented memory-hygiene feature), sandbox cwds die (Paperclip ephemeral workspaces), `/claude-cleanup` removes old projects.
+- `daily/*.md` rolls over by date and gets compacted/migrated.
+- Sandbox-derived encoded keys orphan en masse the moment a Paperclip company is destroyed.
+
+Citations imply durability, substrate is ephemeral, the resulting wikilinks dangle. `lint.py:check_broken_links` made it worse by hard-skipping both prefixes with a comment "source references are valid" — an assumption that was never true once sync-memories started pruning.
+
+#### What Karpathy + Cole Medin do
+
+Both implicitly avoid this — neither mirrors auto-memory. Karpathy's pattern is a single hand-curated `context.md` owned by the operator; he ingests inputs and forgets them. Cole Medin's `claude-memory-compiler` captures chat transcripts (PreCompact + SessionEnd hooks → `daily/`) and compiles, but never touches `~/.claude/projects/<encoded>/memory/`. The mirror was unique to llm-wiki and reproducing the bug.
+
+#### Fix landed (2026-05-04, commit `696a643`)
+
+- `prompts/compile_main.md` rule 6: explicit ban on body wikilinks to `raw/` or `daily/`. Provenance lives in `compiled_from:` YAML and `index.md`'s "source file(s)" column.
+- `scripts/migrate_strip_substrate_links.py`: one-time migration. Strips `[[raw/...]]` and `[[daily/...]]` from `knowledge/` bodies. Aliases preserved (`[[raw/foo|nice]]` → `nice`); paths unbracketed otherwise (`[[raw/foo]]` → `raw/foo`). Skips `knowledge/facts/` and embed syntax `![[...]]`. `--vault PATH`, default dry-run, `--apply` gates writing.
+- `lint.py:check_broken_links`: skip removed. Substrate links in body now surface as `warning severity=substrate_link` with migration command in detail; in-knowledge broken links remain `error`.
+- `config.example.yaml piggybacks.sync_memories.enabled`: `true` → `false`. Default OFF for new installs; the script remains as plugin-style opt-in. Removal candidate when no opt-ins for ~6 months.
+
+#### Rule for any new compiler-style prompt
+
+Wikilinks in article bodies are for cross-references **inside the persistent knowledge layer**. Substrate paths are provenance metadata (frontmatter, plain-text mentions) — never durable hyperlinks. Anchor: "if the path can disappear without the article being rewritten, don't make it a wikilink."
+
 ### Dashboard refresh storm under iCloud + concurrent SessionEnd hooks (2026-05-03)
 
 #### Symptom
