@@ -1,19 +1,29 @@
-"""Strip `[[raw/...]]` and `[[daily/...]]` wikilinks from `knowledge/` bodies.
+"""Strip `[[raw/memories/...]]` wikilinks from `knowledge/` bodies.
 
 One-time migration enforcing the "distill, don't cite" rule (see
-`prompts/compile_main.md` rule 6 and the 2026-05-04 DECISIONS entry).
-Substrate sources are ephemeral working state — `raw/memories/*.md`
-are pruned by `sync-memories.py` whenever the source under
-`~/.claude/projects/<encoded>/memory/` disappears, daily logs roll
-over, sandbox cwds vanish. Body wikilinks pointing at them produce
-graph-view ghost nodes and broken-link noise. Provenance lives in the
-article's `compiled_from:` frontmatter list, not in the body.
+`prompts/compile_main.md` rule 6 and the 2026-05-04 DECISIONS entry,
+narrowed by the 2026-05-04 follow-up correction).
+
+Only `raw/memories/` is in scope: that subtree is a managed mirror
+(`sync-memories.py:202`) which prunes whenever the upstream
+`~/.claude/projects/<encoded>/memory/` source is gone — and that
+upstream churns constantly (Claude rewrites + prunes auto-memories,
+sandbox cwds vanish, /claude-cleanup discards old projects). Body
+wikilinks to that subtree become ghost nodes en masse.
+
+Other substrates are durable and remain citable:
+  - `daily/*.md`           — append-only session-history; no engine prunes
+  - `raw/notes/email/*`    — scan-email artefacts; durable
+  - `raw/notes/screenshots/*` — vision-LLM batch reports; durable
+  - `raw/notes/youtube/*`  — scan-youtube ingests; skip-existing dedup
+  - `raw/articles/*`       — manually-curated; durable
 
 Strip rules:
-  - `[[raw/foo|alias]]`   -> `alias`         (alias preserved, link removed)
-  - `[[raw/foo]]`         -> `raw/foo`        (path preserved as plain text)
-  - `[[daily/2026-…]]`    -> `daily/2026-…`   (same)
-  - `![[raw/...]]`        -> `![[raw/...]]`   (left alone — embeds, not citations; rare and intentional)
+  - `[[raw/memories/foo|alias]]` -> `alias`            (alias preserved)
+  - `[[raw/memories/foo]]`       -> `raw/memories/foo` (path as plain text)
+  - `[[raw/notes/foo]]`          -> `[[raw/notes/foo]]` (left alone)
+  - `[[daily/2026-…]]`           -> `[[daily/2026-…]]`  (left alone)
+  - `![[raw/memories/...]]`      -> `![[raw/memories/...]]` (embeds untouched)
 
 Frontmatter is left untouched (compiled_from is provenance, not a wikilink).
 The `knowledge/facts/` subtree is also left untouched — facts are managed by
@@ -39,10 +49,12 @@ logging.basicConfig(
 )
 log = logging.getLogger("migrate-strip-substrate-links")
 
-# Match `[[raw/…]]` or `[[daily/…]]` with optional `|alias` and optional
-# `#anchor`. Negative lookbehind for `!` skips embed-syntax (`![[...]]`).
+# Match `[[raw/memories/…]]` only (the managed-mirror subtree).
+# Negative lookbehind for `!` skips embed-syntax (`![[...]]`).
+# `daily/`, `raw/notes/`, `raw/articles/` are durable substrates and
+# stay citable.
 _LINK_RE = re.compile(
-    r"(?<!!)\[\[(raw/[^|\]]+|daily/[^|\]]+)(?:\|([^\]]+))?\]\]"
+    r"(?<!!)\[\[(raw/memories/[^|\]]+)(?:\|([^\]]+))?\]\]"
 )
 
 

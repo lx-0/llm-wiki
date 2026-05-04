@@ -67,35 +67,59 @@ def issue(severity: str, check: str, file: str, detail: str, auto_fixable: bool 
 
 # ── Structural checks ───────────────────────────────────────────────
 
+def _wikilink_target_exists(link: str) -> bool:
+    """Resolve an Obsidian-style wikilink target against the vault.
+
+    Obsidian resolves `[[daily/2026-04-25.md]]` against vault root and
+    `[[concepts/foo]]` against any indexed dir. We mirror that:
+    in-knowledge bare names go through `wiki_article_exists`; substrate
+    paths (daily/, raw/) resolve as-given against `ROOT_DIR`.
+    """
+    from config import ROOT_DIR
+    if link.startswith(("daily/", "raw/")):
+        # Substrate path — resolve verbatim against vault root.
+        # Tolerate both with-suffix (`daily/X.md`) and without (`daily/X`).
+        candidate = ROOT_DIR / link
+        if candidate.exists():
+            return True
+        if not link.endswith(".md") and (ROOT_DIR / f"{link}.md").exists():
+            return True
+        return False
+    return wiki_article_exists(link)
+
+
 def check_broken_links() -> list[dict]:
     """Find wikilinks that point to non-existent targets.
 
-    Per `prompts/compile_main.md` rule 6 (distill-don't-cite), article
-    bodies must NOT carry `[[raw/...]]` or `[[daily/...]]` wikilinks —
-    those substrates are ephemeral (sync-memories prunes raw/memories
-    when the upstream is gone, daily logs roll over, sandbox cwds
-    vanish). Provenance lives in `compiled_from:` frontmatter instead.
+    Per `prompts/compile_main.md` rule 6 (distill-don't-cite, narrowed
+    2026-05-04): only `raw/memories/` is policy-banned in article bodies
+    because it's a managed mirror that prunes (sync-memories.py:202).
+    `daily/`, `raw/notes/`, `raw/articles/` are durable substrates and
+    citable — they get the ordinary broken-link check.
 
-    Two failure modes therefore surface here:
-      - `error` — wikilink target inside knowledge/ does not exist
-      - `warning` — wikilink in body points at substrate (raw/ or daily/),
-        regardless of resolvability; a leakage from the compile prompt
+    Failure modes:
+      - `warning substrate_link` — body carries `[[raw/memories/...]]`
+        (policy violation; run migrate_strip_substrate_links.py)
+      - `error broken_link`      — wikilink target does not exist,
+        regardless of which directory it points at
     """
     issues = []
     for article in list_wiki_articles():
         content = article.read_text(encoding="utf-8")
         rel = str(article.relative_to(KNOWLEDGE_DIR))
         for link in extract_wikilinks(content):
-            if link.startswith("daily/") or link.startswith("raw/"):
-                # Substrate citation in body — violates distill-don't-cite.
-                # Run scripts/migrate_strip_substrate_links.py to clean up.
+            if link.startswith("raw/memories/"):
+                # Body citation of the managed-mirror subtree — violates
+                # distill-don't-cite. Run scripts/migrate_strip_substrate_links.py.
                 issues.append(issue(
                     "warning", "substrate_link", rel,
                     f"Substrate link in body: [[{link}]] — strip via "
                     f"`uv run python scripts/migrate_strip_substrate_links.py --apply`",
                 ))
                 continue
-            if not wiki_article_exists(link):
+            # All other targets (knowledge/, daily/, raw/notes/, raw/articles/)
+            # get the ordinary broken-link check.
+            if not _wikilink_target_exists(link):
                 issues.append(issue(
                     "error", "broken_link", rel,
                     f"Broken link: [[{link}]] — target does not exist",
