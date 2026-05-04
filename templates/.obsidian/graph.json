@@ -3,41 +3,45 @@
   "search": "path:knowledge -path:knowledge/index -path:knowledge/log",
   "showTags": false,
   "showAttachments": false,
-  "hideUnresolved": false,
+  "hideUnresolved": true,
   "showOrphans": false,
   "collapse-color-groups": false,
   "colorGroups": [
     {
-      "query": "path:knowledge/concepts",
-      "color": { "a": 1, "rgb": 4870370 }
+      "query": "path:knowledge/facts",
+      "color": { "a": 1, "rgb": 14685770 }
     },
     {
-      "query": "path:knowledge/projects",
-      "color": { "a": 1, "rgb": 5294712 }
-    },
-    {
-      "query": "path:knowledge/people",
-      "color": { "a": 1, "rgb": 16106264 }
+      "query": "path:knowledge/MOCs",
+      "color": { "a": 1, "rgb": 16766730 }
     },
     {
       "query": "path:knowledge/connections",
-      "color": { "a": 1, "rgb": 13056901 }
+      "color": { "a": 1, "rgb": 16747074 }
     },
     {
-      "query": "path:knowledge/qa",
-      "color": { "a": 1, "rgb": 52945 }
+      "query": "path:knowledge/projects",
+      "color": { "a": 1, "rgb": 5164996 }
+    },
+    {
+      "query": "path:knowledge/people",
+      "color": { "a": 1, "rgb": 10980346 }
+    },
+    {
+      "query": "path:knowledge/concepts",
+      "color": { "a": 1, "rgb": 5995701 }
     }
   ],
   "collapse-display": true,
   "showArrow": false,
-  "textFadeMultiplier": 0,
-  "nodeSizeMultiplier": 1,
-  "lineSizeMultiplier": 1,
+  "textFadeMultiplier": 1.5,
+  "nodeSizeMultiplier": 1.2,
+  "lineSizeMultiplier": 0.5,
   "collapse-forces": false,
-  "centerStrength": 0.5,
-  "repelStrength": 10,
-  "linkStrength": 1,
-  "linkDistance": 250,
+  "centerStrength": 0.3,
+  "repelStrength": 15,
+  "linkStrength": 0.5,
+  "linkDistance": 200,
   "scale": 1,
   "close": true
 }
