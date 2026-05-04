@@ -145,19 +145,66 @@ Ollama caches responses for identical prompt + temp=0. Inject a timestamp (or ot
 
 Use the native endpoint (`/api/chat`), not the OpenAI-compatible one. Images go base64-encoded in `messages[].images[]`, not `image_url`. Resize to 512 px for 11 GB VRAM.
 
-### Rate limits are hard to debug
+### SDK failure observability — `stderr=callback` is mandatory (was: "rate limits are hard to debug")
 
-#### Claude Agent SDK swallows stderr
+#### Symptom
 
-`Command failed with exit code 1 — Check stderr output for details` — but stderr isn't accessible from the SDK. To see the real error, run the bundled CLI directly.
+`Command failed with exit code 1 — Check stderr output for details` — but the SDK's `_internal/transport/subprocess_cli.py` only pipes the bundled-CLI's stderr to a callback if `options.stderr is not None`. Without it, every failure looks identical regardless of root cause (auth, model name, network blip, rate-limit, hard CLI crash).
 
-#### Claude Code has a 5 h rolling window (Opus)
+The earlier "fast failures = rate-limit" heuristic in this section was **wrong**: investigation 2026-05-04 of compile-errors.log showed three back-to-back failures completing in 1.9s / 2.7s / 3.3s, which the loop labelled "rate-limited" — far too fast for any real Anthropic 429. Real cause was unrecoverable bundled-CLI crashes, invisible because stderr was never captured.
 
-Cascading failures after ~2 h of runtime usually mean the rate cap, not a crash. Handle with `--max-files N` and `--max-consecutive-failures N` flags in the script — abort instead of failing repeatedly.
+#### Fix landed (2026-05-04, commit `25bcab8`)
 
-#### Rate limits manifest as fast failures
+`scripts/sdk_helpers.py` provides three primitives that every SDK call site now uses:
 
-Normal API calls take 10–60 s. Rate-limited calls fail in 2–5 s. The timing pattern is the giveaway.
+- **`StderrCapture`** — ring-buffer (default 200 lines) usable as the `stderr=` callback.
+- **`classify_failure(elapsed, captured_text, exc_text)`** — pattern-matches stderr + exception against `429/overload/quota`, `401/403/unauthorized`, `invalid model`, `ECONNRESET/ETIMEDOUT`, `out of memory`, then falls back to duration heuristics (<5 s + empty stderr → `cli_crash`).
+- **`log_sdk_failure(log, label, started, capture, exc, source, model, input_chars, …)`** — single diagnostic record at ERROR level (lands in `*-errors.log`): kind, source path, model, input size in chars/KB, elapsed, exception text, and the captured CLI stderr lines.
+
+Wired into all 8 SDK call sites: compile.py (compile_file + suggestion pass), flush.py (extract_from_context), correct_apply.py, agent_task.py, lint.py (contradiction check), optimize-claude-md.py, query.py.
+
+#### Rate-limit detection is now classification-aware
+
+`compile.py:main()` no longer blindly calls 3 consecutive failures "rate-limited". Each failure produces a `FailureClass`; the abort message reads the recent window:
+
+- `auth` / `model` → **fail-fast immediately** (no point hammering 100 more files with broken config). `is_fatal()` returns true.
+- contains `rate_limit` → "Anthropic 5 h Opus window likely. Rerun in 60-90 min."
+- all `cli_crash` → "NOT a rate-limit. See [CLI-STDERR] above. Sanity-check: `claude --version` and `claude -p "hi"`."
+- contains `network` → "transient connectivity issue."
+- mixed → "see *-errors.log for captured stderr."
+
+The outcome banner uses `f"ABORTED ({abort_reason})"` so post-mortems can grep `ABORTED (cli_crash)` vs `ABORTED (rate_limit)` directly.
+
+#### Claude Code has a 5 h rolling window (Opus) — still true
+
+Cascading failures after ~2 h of runtime can be the rate cap, not a crash. The new classifier confirms via stderr keyword rather than guessing from timing — but `--max-files N` and `--max-consecutive-failures N` are still the right operational guard rails.
+
+### Dashboard refresh storm under iCloud + concurrent SessionEnd hooks (2026-05-03)
+
+#### Symptom
+
+`flush-errors.log` showed 103 `subprocess.TimeoutExpired` records clustered in ~30 seconds on 2026-05-03 around 19:02 (right after `compile_after_hour=18` triggered). `dashboard_stats.py` and `dashboard_lint.py` — which take 5–15 s in steady state — both hit the 30 s timeout repeatedly.
+
+#### Root cause
+
+When the post-compile-hour rush kicks in, multiple agent SessionEnd hooks fire within seconds. Each hook spawned its own `flush.py`, each `flush.py` spawned its own pair of dashboard refreshers. With the vault on iCloud Drive, the resulting fs-stat storm (every refresher walks the entire vault) stalled metadata reads enough that all racers blew the 30 s deadline together.
+
+#### Fix landed (2026-05-04, commit `25bcab8`)
+
+`flush.py` now wraps both refreshers in a non-blocking fcntl lock on `state/dashboard-refresh.lock`:
+
+```python
+with _dashboard_refresh_lock() as acquired:
+    if not acquired:
+        return  # another flush owns it; ours skips. Idempotent — next flush picks up.
+    _run_dashboard_script(DASHBOARD_STATS_SCRIPT, "stats")
+```
+
+Plus: timeout 30 s → 120 s, and a structured logger (`_run_dashboard_script`) that distinguishes `TIMEOUT` / `spawn failed` / non-zero exit instead of one generic `Failed to refresh dashboard …`.
+
+#### Why a lock and not retry-with-backoff
+
+The refresh is idempotent: every flush re-derives the dashboard from scratch. Skipping a contended refresh costs nothing — the next flush, microseconds later, picks up the latest state. Retry would just amplify the storm.
 
 ### NAS connectivity: SMB > WebDAV > SSH
 

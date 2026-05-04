@@ -16,3 +16,12 @@ The engine cannot edit per-install vault content from `install.sh` or `wiki upda
 ## External dependencies
 
 - **Excalidraw renderer pin** — `@excalidraw/excalidraw@0.18.0` is pinned in `skills/excalidraw-diagram/references/render_template.html` because the unpinned `?bundle` URL 404s on a transitive `@braintree/sanitize-url` dependency at the time of writing. A comment at the import site (M001/S03) describes the re-evaluation path. Re-test by replacing the pinned URL with `https://esm.sh/@excalidraw/excalidraw?bundle` and rendering a sample diagram; if it works, drop the pin. Worth a 1-minute check whenever someone is in that file anyway.
+
+## SDK error-handling — verify in production after deployment (commit `25bcab8`, 2026-05-04)
+
+The engine clone in the lxw vault is still on pre-fix code until the operator runs `wiki update`. Verification path after the next sync:
+
+- **Trigger one real SDK failure** (let `compile_after_hour=18` fire, or run `wiki compile` on a known-large source). Confirm `compile-errors.log` now carries the structured diagnostic block — `kind=`, `source:`, `model:`, `input:`, `[CLI-STDERR]` lines — instead of the bare `Command failed with exit code 1` traceback.
+- **Verify the rate-limit classification.** If the next abort banner reads `ABORTED (cli_crash)` (or `auth` / `network`) for fast-fail bursts, the misclassification fix landed correctly. If it still says `rate_limit` for sub-5 s failures, the stderr keyword pattern in `sdk_helpers.classify_failure` needs widening — record findings here.
+- **Dashboard lock under real load.** Watch `flush-errors.log` during the next post-compile-hour window. Expected: zero `subprocess.TimeoutExpired` records; instead `dashboard refresh: another flush holds the lock — skipping (idempotent, next flush will retry)` lines in `flush.log` from contended flushes.
+- **Consider a `wiki diagnose` subcommand** if classification keeps misfiring — runs `claude --version`, a one-shot `claude -p "ok"`, prints last 20 [CLI-STDERR] lines from `compile-errors.log`, surfaces auth file mtime. Pitch via office-hours if the operator hits "wait, what's actually broken" twice in a row.
