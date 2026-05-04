@@ -51,6 +51,7 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 │   ├── review-wiki.py         ← per-article quality scoring via local LLM
 │   ├── optimize-claude-md.py  ← cross-project pattern → ~/.claude/CLAUDE.md edits
 │   ├── retry-failed-flushes.py ← reprocess archived flush contexts
+│   ├── pin.py                 ← `wiki pin <article>` — append wikilink to a MOC section (no LLM)
 │   ├── seed.py                ← initial bulk import from ~/.claude/projects/*/memory/
 │   └── health.py              ← read-only colored ASCII vault dashboard
 ├── hooks/

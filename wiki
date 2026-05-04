@@ -36,6 +36,8 @@
 #   wiki correct remove SLUG   delete a hard fact
 #   wiki correct edit SLUG     open a hard fact in $EDITOR
 #   wiki correct apply SLUG    propagate a fact across knowledge/, daily/, raw/ (agentic, $$$)
+#   wiki pin <article>         pin an article to a Map-of-Content (no LLM, idempotent)
+#   wiki pin <article> --section "Name" --moc people --summary "X"
 #   wiki review-wiki           per-article quality-score sweep (local LLM, free)
 #   wiki ingest-youtube --url URL [--tier 0|1|2] [--limit N] [--dry-run]
 #   wiki ingest-youtube --inbox PATH [--tier 0|1|2] [--limit N] [--dry-run]

@@ -875,10 +875,29 @@ Maps of Content sind hand-kuratierte Topic-Hubs unter `knowledge/MOCs/`. Sie bü
 3. Der Dataview-Block darunter listet automatisch alle restlichen `knowledge/people/*.md`.
 4. Eigene MOCs (z.B. `knowledge/MOCs/companies.md`) anlegen — `type: moc` setzen, taucht im Dashboard auf.
 
+**Triage + Pinning (M003-S08, 2026-05-04):**
+
+Damit der Operator nicht selbst durchsuchen muss was schon gepinnt ist, hat das Dashboard eine Triage-Section "🪝 Not pinned in any MOC" unterhalb der MOC-Liste. Dataview-Tabelle zeigt compiled Articles aus `concepts/`, `connections/`, `people/`, `projects/` deren Inlinks keinen `knowledge/MOCs/<x>.md` enthalten — sortiert nach `file.cday DESC`, Limit 20.
+
+Pinning ist ein Plain-Script ohne LLM:
+
+```bash
+wiki pin <article>                              # interaktiver Section-Picker
+wiki pin <article> --section "Active"           # ohne Prompt
+wiki pin <article> --moc people --summary "..." # Override
+```
+
+`<article>` akzeptiert Basename (`alex`), Vault-relativ (`knowledge/people/alex.md`), oder absoluten Pfad. Ziel-MOC wird aus dem `type:` Frontmatter abgeleitet (`concept`→`concepts.md`, `person`→`people.md`, etc.). Annotation kommt aus der `knowledge/index.md`-Zeile (Spalte 2). Idempotent — schon gepinnte Wikilinks werden no-op'd. Neue Section-Namen werden vor dem trailing dataview-Block eingefügt.
+
+Code: `scripts/pin.py` (~200 LOC, kein LLM, kein Cost). CLI-Wrapper: `wiki:cmd_pin`.
+
+**Bewusst NICHT als Agent-Task**: Section-Wahl ist 1-aus-N Operator-Entscheidung, Summary-Lookup ist deterministisch, Insert ist Markdown-Edit — nichts profitiert von einem LLM. Eine Bulk-Pin-Variante mit LLM-Smart-Section-Suggestion ist Backlog (siehe `.ytstack/backlog/` falls relevant).
+
 **Edge Cases**:
 - **Leeres Substrat**: MOC-Stub zeigt nur die hand-kuratierte Liste (oben) plus eine leere Dataview-Tabelle. Kein Crash.
 - **MOC ohne `type: moc`**: lint flaggt `type_mismatch`. Auto-fixable durch `wiki lint --fix` (in S05+ geplant) oder manuelles Setzen.
 - **`wiki seed --force` auf hand-kurierte MOCs**: überschreibt die Hand-Edits durch den Stub. Operator-Verantwortung — wie bei `dashboard.md`.
+- **`wiki pin` ohne `type:` Frontmatter im Article**: Script bricht ab mit Fehlermeldung — `--moc` explizit setzen.
 
 ### History-Layer + P2-Charts
 
