@@ -402,6 +402,34 @@ Per Screenshot wird der Vision-LLM **genau einmal** aufgerufen. Das in-memory `m
 
 **Wichtig für Doku-Konsistenz:** wenn jemand "Sidecar" sagt, ist das die HOME-Datei, NICHT eine Vault-Datei. Frühere Versionen der Doku haben das vermischt.
 
+### Compile state must persist per-file, not at end-of-loop
+
+`scripts/compile.py:compile()` originally accumulated `state["ingested"][rel] = file_hash(source)` updates in memory across the for-loop and only called `save_state(state)` ONCE after the loop finished. Symptom: a rate-limit abort (5h Opus window, `--max-consecutive-failures` triggered) at file 12 of 180 caused all 11 successful compiles to evaporate from `state.json` — next run saw the same files as candidates, re-spent tokens, hit rate limit at the same point. Endless loop, never reached the bottom of the queue (screenshots).
+
+**Fix (commit `c587801`, 2026-05-03):** call `save_state(state)` inside the loop after every successful `state["ingested"][rel] = ...` write. The post-loop `save_state` stays as a tail call so total_cost / last_compile get updated even when zero files succeeded.
+
+**Iron rule restated:** any work that touches an external resource (LLM calls = $$) must be tracked in persistent state synchronously, not buffered. Same invariant as `flush_pipeline.py`'s "no gap between capture and persist". If you find batched-end-of-loop persistence anywhere else in the engine, treat it as a bug.
+
+### `list_raw_files()` ordering: mtime DESC, not path-alphabetical
+
+`scripts/utils.py:list_raw_files()` is consumed by `compile.py:select_files()` to determine processing order. Original sort was `sorted(...)` over Path objects (= lexicographic by string). With 157 memory files alphabetically before 15 screenshot batches in `raw/notes/`, rate-limit aborts always starved the screenshot tail. Operator never saw screenshots compiled despite scanning them daily.
+
+**Fix (commit `9c5f888`, 2026-05-03):** sort by `p.stat().st_mtime, reverse=True`. Recent-activity content compiles first; rate-limit truncations hit the deepest-stale tail rather than the freshest content.
+
+Other `list_raw_files()` consumers (`lint.py`, `dashboard_stats.py`) are order-agnostic, so the change is safe.
+
+### MOC pinning: deterministic script, not agent
+
+When a user-action looks like "click button → fill form → write a markdown line", the default reach-for-tool is **NOT** a Claude Agent task. M004's agent-task framework is appropriate when LLM heuristic adds genuine signal (smart section-suggestion across 50 unpinned articles, summary extraction from prose). Single-pin "add `[[link]]` to MOC under section X" is:
+
+- Section choice: 1-of-N operator pick → interactive CLI dropdown
+- Summary lookup: `knowledge/index.md` row → table-column read
+- Insert: markdown editing → `awk`/Python list manipulation
+
+`scripts/pin.py` (commit `ea8db42`, 2026-05-04) is ~200 LOC, zero LLM cost, idempotent. Wired through `wiki pin <article> [--moc N] [--section "X"] [--summary "Y"]`. The "🪝 Not pinned in any MOC" dataview block on the dashboard surfaces triage candidates without code.
+
+**Heuristic for future "should this be an agent?" decisions:** if the LLM would only echo deterministic logic the operator already knows, skip the agent. Save agents for: smart selection from large set, content extraction from unstructured prose, multi-step reasoning chains. Single edits triggered by operator are scripts.
+
 ### Obsidian writes `.obsidian/*.json` from RAM — race-condition with `wiki seed`
 
 `graph.json`, `workspace.json`, `appearance.json`, plugin `data.json` files are all serialized from Obsidian's in-memory state on view-changes / pane-saves / app-quit. If Obsidian is running while `wiki seed --force` deploys a new template, Obsidian's next save **clobbers the template** silently — the search field in `graph.json` survived once because reads happened before saves, but `colorGroups` got wiped to `[]`.
