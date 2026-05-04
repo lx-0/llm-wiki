@@ -179,6 +179,51 @@ The outcome banner uses `f"ABORTED ({abort_reason})"` so post-mortems can grep `
 
 Cascading failures after ~2 h of runtime can be the rate cap, not a crash. The new classifier confirms via stderr keyword rather than guessing from timing — but `--max-files N` and `--max-consecutive-failures N` are still the right operational guard rails.
 
+### Graph view config — semantic colors, tuned forces, no green band
+
+#### Color groups encode semantic priority, not aesthetics
+
+The graph-view audit 2026-05-04 found two classes of bug in the previous palette: (a) the rarest, most important node types (`facts/`, `MOCs/`) had no group at all and rendered in default-grey alongside everything else; (b) the existing colors were chosen aesthetically (pastel pink for people, light violet for connections) — they decoded as "different" but not as "more important than the baseline." For 668-node vaults dominated by one type (566 concepts ≈ 85%), the palette must give the rare types visual priority, not equal-weight pretty-color rotation.
+
+Final lxw template palette (commit `15490da`), Material A-tier saturated hues:
+
+| Group         | Hex       | Why |
+|---------------|-----------|-----|
+| `facts/`      | `#FF1744` | red — authoritative override, must pop |
+| `MOCs/`       | `#FFC107` | amber/gold — hub navigation (Zettelkasten convention) |
+| `connections/`| `#FF6F00` | orange — cross-reference glue |
+| `projects/`   | `#00BCD4` | cyan — cool entity, distinct from green |
+| `people/`     | `#D500F9` | magenta — vivid entity |
+| `concepts/`   | `#3D5AFE` | indigo — baseline; 85% of vault, must recede |
+
+#### "No green band" hard rule
+
+Obsidian's Tags filter renders tag-nodes green. Color groups must avoid the `~120°` hue band so that toggling `showTags: true` doesn't produce an axis collision. Greens are reserved for tags; pick from red / orange / amber / cyan / blue / indigo / purple / magenta with ≥40° hue spacing.
+
+#### Force tuning for ~500-1000 nodes
+
+The Obsidian default `linkStrength: 1` + `linkDistance: 250` is contradictory (max pull + max stretch) and produces the dense-blob look common in screenshots. Forum data on a comparably-sized vault settled on `repel ≈ 16 / distance ≈ 200 / linkStrength ≈ 0.45`. We use `centerStrength 0.3 / repelStrength 15 / linkStrength 0.5 / linkDistance 200` — relaxed centering, modest repulsion, ~half-strength links. The result is a graph where clusters separate visibly without flying off-canvas.
+
+#### Display
+
+- `textFadeMultiplier: 1.5` — labels visible when zoomed in (default 0 = always hidden, turns the graph into an abstract lava lamp).
+- `nodeSizeMultiplier: 1.2` — hubs and high-link-count nodes more visually prominent.
+- `lineSizeMultiplier: 0.5` — thinner edges reduce noise on dense graphs.
+- `hideUnresolved: true` — only correct after the substrate-link migration (commit `696a643`); before that, ghost nodes carried triage signal and had to stay visible. Post-migration: clean graph, lint surfaces broken links structurally.
+- `showOrphans: false`, `showTags: false`, `showAttachments: false`.
+
+#### Operator deploy path (preserve runtime state)
+
+`.obsidian/graph.json` carries both policy fields (search query, color groups, forces, display flags) and runtime fields (`scale` = last zoom, `close` = panel-collapsed-state). When patching the live vault from the engine template, preserve the runtime fields so the operator's last view position is not reset:
+
+```python
+new = json.loads(template.read_text())
+current = json.loads(vault.read_text())
+for k in ('scale', 'close'):
+    if k in current: new[k] = current[k]
+vault.write_text(json.dumps(new, indent=2) + '\n')
+```
+
 ### Substrate is not citable — distill, don't cite
 
 #### Symptom
