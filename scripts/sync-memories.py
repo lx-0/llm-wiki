@@ -1,13 +1,28 @@
 """
 Sync Claude Code project memories and CLAUDE.md files into raw/memories/.
 
+⚠ Phase-out (2026-05-04, default OFF in config.example.yaml).
+Auto-memories under ~/.claude/projects/<encoded>/memory/*.md are
+mutable working state — Claude rewrites + prunes them actively,
+sandbox cwds vanish, /claude-cleanup discards old projects. The
+mirror was citing them via knowledge/ wikilinks, which then dangled
+en masse (audit 2026-05-04: 502 of 584 raw/-citations were memories;
+~70% broken). The compile prompt no longer body-cites raw/ or daily/
+substrates (see prompts/compile_main.md rule 6); raw/memories/ has no
+remaining consumer in the default flow.
+
+The script is intentionally self-contained — no other engine code
+imports it, the registration in flush.py:_LEGACY_PIGGYBACK_COMMANDS
+already routes via subprocess. Operators who specifically want
+auto-memory churn tracked can opt back in by flipping
+piggybacks.sync_memories.enabled: true. Removal candidate when
+nobody re-enables it for ~6 months.
+
 File-per-memory pattern (Option A):
 - Each memory file → its own source: raw/memories/{project}__{memory_name}.md
 - Each project's CLAUDE.md (from cwd in session jsonl) → raw/memories/{project}__CLAUDE.md
 - Unchanged files produce identical output → compile hash detects no-change → skipped
 - Removed memories are deleted from raw/memories/ (keeps the mirror clean)
-
-Runs as a daily piggyback task.
 
 Usage:
     uv run python scripts/sync-memories.py               # sync all

@@ -68,14 +68,33 @@ def issue(severity: str, check: str, file: str, detail: str, auto_fixable: bool 
 # ── Structural checks ───────────────────────────────────────────────
 
 def check_broken_links() -> list[dict]:
-    """Find wikilinks that point to non-existent articles."""
+    """Find wikilinks that point to non-existent targets.
+
+    Per `prompts/compile_main.md` rule 6 (distill-don't-cite), article
+    bodies must NOT carry `[[raw/...]]` or `[[daily/...]]` wikilinks —
+    those substrates are ephemeral (sync-memories prunes raw/memories
+    when the upstream is gone, daily logs roll over, sandbox cwds
+    vanish). Provenance lives in `compiled_from:` frontmatter instead.
+
+    Two failure modes therefore surface here:
+      - `error` — wikilink target inside knowledge/ does not exist
+      - `warning` — wikilink in body points at substrate (raw/ or daily/),
+        regardless of resolvability; a leakage from the compile prompt
+    """
     issues = []
     for article in list_wiki_articles():
         content = article.read_text(encoding="utf-8")
         rel = str(article.relative_to(KNOWLEDGE_DIR))
         for link in extract_wikilinks(content):
             if link.startswith("daily/") or link.startswith("raw/"):
-                continue  # source references are valid
+                # Substrate citation in body — violates distill-don't-cite.
+                # Run scripts/migrate_strip_substrate_links.py to clean up.
+                issues.append(issue(
+                    "warning", "substrate_link", rel,
+                    f"Substrate link in body: [[{link}]] — strip via "
+                    f"`uv run python scripts/migrate_strip_substrate_links.py --apply`",
+                ))
+                continue
             if not wiki_article_exists(link):
                 issues.append(issue(
                     "error", "broken_link", rel,
