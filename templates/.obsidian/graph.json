@@ -9,27 +9,27 @@
   "colorGroups": [
     {
       "query": "path:knowledge/facts",
-      "color": { "a": 1, "rgb": 14685770 }
+      "color": { "a": 1, "rgb": 16717636 }
     },
     {
       "query": "path:knowledge/MOCs",
-      "color": { "a": 1, "rgb": 16766730 }
+      "color": { "a": 1, "rgb": 16761095 }
     },
     {
       "query": "path:knowledge/connections",
-      "color": { "a": 1, "rgb": 16747074 }
+      "color": { "a": 1, "rgb": 16740096 }
     },
     {
       "query": "path:knowledge/projects",
-      "color": { "a": 1, "rgb": 5164996 }
+      "color": { "a": 1, "rgb": 48340 }
     },
     {
       "query": "path:knowledge/people",
-      "color": { "a": 1, "rgb": 10980346 }
+      "color": { "a": 1, "rgb": 13959417 }
     },
     {
       "query": "path:knowledge/concepts",
-      "color": { "a": 1, "rgb": 5995701 }
+      "color": { "a": 1, "rgb": 4020990 }
     }
   ],
   "collapse-display": true,
