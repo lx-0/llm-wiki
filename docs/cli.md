@@ -157,7 +157,7 @@ piggybacks.review_wiki.{enabled, cooldown_hours}
 piggybacks.optimize_claude_md.{enabled, cooldown_hours}
 piggybacks.scan_screenshots.{enabled, cooldown_hours}
 piggybacks.follow_requests.{enabled, cooldown_hours, max_per_run}
-piggybacks.sync_memories.{enabled, cooldown_hours}
+piggybacks.sync_memories.{enabled, cooldown_hours}    # default OFF (phase-out, 2026-05-04)
 piggybacks.retry_failed_flushes.{enabled, cooldown_hours, max_per_run}
 
 graph_view.mode                        knowledge-only | full-vault | sources-only | custom

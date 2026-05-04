@@ -42,7 +42,7 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 │   ├── scan-browser.py        ← Firefox + Chrome bookmarks/history/tab-groups
 │   ├── scan-screenshots.py    ← ~/Screenshots/ + Vision LLM (gemma4) → HOME sidecar + vault thumb (384px) + batch report
 │   ├── scan-tabs.py           ← Firefox Simple Tab Groups backups
-│   ├── sync-memories.py       ← Claude Code project memories → raw/memories/ (file-per-memory)
+│   ├── sync-memories.py       ← Claude Code project memories → raw/memories/ (file-per-memory; opt-in, default OFF since 2026-05-04 — phase-out)
 │   ├── clippings_sweep.py     ← <vault>/Clippings/ → raw/articles/ (pre-compile lift)
 │   ├── ingest-html.py         ← HTML file or URL → text + visual (Playwright + Vision LLM)
 │   ├── process-inbox.py       ← <vault>/inbox/ → classify + move to raw/ subfolder
@@ -52,7 +52,7 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 │   ├── optimize-claude-md.py  ← cross-project pattern → ~/.claude/CLAUDE.md edits
 │   ├── retry-failed-flushes.py ← reprocess archived flush contexts
 │   ├── pin.py                 ← `wiki pin <article>` — append wikilink to a MOC section (no LLM)
-│   ├── seed.py                ← initial bulk import from ~/.claude/projects/*/memory/
+│   ├── seed.py                ← initial bulk import from ~/.claude/projects/*/memory/ (opt-in companion to sync-memories; one-shot at onboarding)
 │   └── health.py              ← read-only colored ASCII vault dashboard
 ├── hooks/
 │   ├── _transcript.py         ← shared transcript walker + tool summarizer

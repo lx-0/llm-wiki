@@ -94,7 +94,7 @@ Cursor session.  flush.py extracts        · scan-browser     (Firefox + Chrome)
 the conversation transcript and           · scan-screenshots (Vision LLM)
 appends a structured entry to             · scan-tabs        (Firefox STG)
 daily/YYYY-MM-DD.md.                      · scan-youtube     (yt-dlp + gemma4 visual)
-                                          · sync-memories    (Claude Code memory)
+                                          · sync-memories    (Claude Code memory; opt-in)
                                           · clippings-sweep  (Obsidian Web Clipper)
             │                             · ingest-html      (file or URL)
                                           · process-inbox    (LLM-classified drop)
@@ -178,13 +178,13 @@ line in `CLAUDE.md` caused an agent to base a PR on the wrong branch …
 
 - [[daily/2026-04-16.md]] — Session `fd9195f9` (18:08): PR #121 rejected
 - [[daily/2026-04-24.md]] — A2A skill hallucinated obsolete UI path
-- [[raw/memories/pixeltales__CLAUDE.md]] — workspace CLAUDE.md describes V1
+- raw/memories/pixeltales__CLAUDE.md — workspace CLAUDE.md describes V1 (plain-text reference; see "managed-mirror" note below)
 ```
 
 Three things to notice:
 
 - **Frontmatter** is structured (aliases, tags, sources, dates) so Dataview queries hit it cleanly.
-- **`[[wikilinks]]`** point both *into* the wiki (`concepts/...`) and *back to sources* (`daily/...`, `raw/memories/...`) — the audit trail is part of the article, not a metadata field.
+- **`[[wikilinks]]`** point both *into* the wiki (`concepts/...`) and *back to durable sources* (`daily/...`, `raw/notes/...`, `raw/articles/...`) — the audit trail is part of the article, not a metadata field. The one exception is `raw/memories/` (managed mirror that prunes when upstream Claude Code memory is removed): provenance lives in the `sources:` frontmatter list as plain-text path, never as a body wikilink.
 - **The article is atomic.** It argues one idea, cites three different days' sessions, and links to four sibling concepts. The compiler chose this granularity from the raw substrates; nothing is hand-curated.
 
 ## The defining choice: compile once, query fast

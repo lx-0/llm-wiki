@@ -25,7 +25,7 @@ Zwei fundamental getrennte Ingest-Pfade konvergieren bei `compile.py`:
 | [2](#2-automatic-session-capture-hooks) | Automatic Session Capture | Hooks → `daily/YYYY-MM-DD.md` | session-start / session-end / pre-compact |
 | [3](#3-compilation) | Compilation | Claude Agent SDK liest `raw/` + `daily/`, schreibt Articles in `knowledge/` | manuell oder cron-after-hour |
 | [4](#4-scanners) | Scanners | Email · Calendar · Browser · Screenshots · Tabs → `raw/notes/` | per-Scanner Cron oder piggyback |
-| [5](#5-seed-einmalig) | Seed (einmalig) | Bulk-Import aus `~/.claude/projects/*/memory/` | One-shot bei Onboarding |
+| [5](#5-seed-einmalig) | Seed (einmalig, opt-in) | Bulk-Import aus `~/.claude/projects/*/memory/` — *seit 2026-05-04 nicht mehr Standard, siehe Phase-Out-Hinweis dort* | One-shot bei Onboarding |
 | [6](#6-query--lint) | Query + Lint | NL-Query gegen Wiki · 6 strukturelle Checks · 1 LLM-Contradiction-Scan | manuell |
 | [7](#7-wiki-review-lokal-kostenlos) | Wiki Review | Per-Article Quality-Score via lokales LLM | piggyback |
 | [8](#8-curiosity-loop) | Curiosity Loop | Gap-Detection → JSON-Requests in `raw/requests/` | nach jedem Compile |
@@ -218,7 +218,7 @@ flowchart TD
 | Structural Lint | `lint.py --structural-only` | 24h | $0 (kein LLM) |
 | Wiki Review | `review-wiki.py` | 168h (1x/Woche) | $0 (Ollama/Gemma4) |
 | CLAUDE.md Optimizer | `optimize-claude-md.py` | 24h | $ (Claude API) |
-| Memory Sync | `sync-memories.py` | 24h | $0 (kein LLM) |
+| Memory Sync (opt-in) | `sync-memories.py` | 24h | $0 (kein LLM) — **default OFF seit 2026-05-04, Phase-Out-Kandidat** |
 | Retry Failed Flushes | `retry-failed-flushes.py --limit N` | 24h | $ (Claude API) |
 | Dashboard Stats Refresh | `dashboard_stats.py` (synchron, kein Piggyback) | nach jedem Flush | $0 (kein LLM) |
 
@@ -431,7 +431,9 @@ uv run python scripts/scan-browser.py --source firefox
 
 ---
 
-## 5. Seed (Einmalig)
+## 5. Seed (Einmalig, opt-in)
+
+> **Phase-Out-Hinweis (2026-05-04):** Seed + sync-memories sind **nicht mehr Standard**. Auto-Memories unter `~/.claude/projects/<encoded>/memory/*.md` sind mutable working state — Claude rewrited + prunt sie aktiv, ephemere Sandbox-cwds verschwinden, `/claude-cleanup` entfernt alte Projekte. Im lxw-Vault-Audit waren ~70% aller `[[raw/memories/...]]`-Wikilinks aus `knowledge/` bereits broken (DECISIONS.md `2026-05-04: Distill, don't cite`). Default in `config.example.yaml` ist jetzt `piggybacks.sync_memories.enabled: false`. Compile-Prompt verbietet `[[raw/memories/...]]` body-Wikilinks (`prompts/compile_main.md` rule 6). Lint warnt als `severity=warning kind=substrate_link`. Existierende Vaults behalten ihre Konfig — wer den Mirror weiter will, lässt `enabled: true` und alles funktioniert wie vorher. Removal-Kandidat in ~6 Monaten ohne opt-ins.
 
 Einmaliges Bootstrapping: sammelt alle Claude Code Memory-Dateien aus allen Projekten und kompiliert sie ins Wiki.
 
