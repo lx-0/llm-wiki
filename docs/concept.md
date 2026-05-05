@@ -144,7 +144,7 @@ The system has the same shape as memory in cognition:
 | **Episodic memory** | `daily/` — chronological session logs (what happened, when) |
 | **Consolidation** | `compile.py` distills episodic + curated sources into structured wiki |
 | **Semantic memory** | `knowledge/` — atomic concepts, connections, projects, people |
-| **Working memory** | `session-start` hook injects `index.md` into next session's context |
+| **Working memory** | `session-start` hook injects a pointer block (paths to `index.md`, `knowledge/`, `raw/`, `AGENTS.md`) + recent daily-log tail; the agent pulls articles on demand via Read/Grep |
 | **Retrieval** | `query.py` walks the wiki, optionally writes answers back as Q&A |
 | **Self-healing** | `lint.py` — orphan detection, stale frontmatter, broken links, contradictions |
 | **Curiosity** | post-compile gap detection → deep-scan requests → next compile fills the gap |

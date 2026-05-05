@@ -53,7 +53,7 @@ llm-wiki/
 │   └── sync-memories.py    ← mirror Claude Code project memories into raw/memories/ (opt-in, default OFF since 2026-05-04 — phase-out)
 ├── hooks/
 │   ├── _transcript.py      ← shared transcript walker + tool summarizer
-│   ├── session-start.py    ← inject index.md into next session's context
+│   ├── session-start.py    ← inject a pointer block + recent daily-log tail; agent pulls articles on demand
 │   ├── session-end.py      ← spawn flush.py with the conversation transcript
 │   └── pre-compact.py      ← safety-net flush before context compaction
 ├── prompts/                ← LLM prompts as .md files (${var} placeholders)

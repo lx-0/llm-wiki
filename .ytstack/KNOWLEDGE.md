@@ -92,6 +92,38 @@ Embed only `index.md`. Give the agent `Read`, `Grep`, `Glob` tools and let it fe
 
 **Why:** prompt caching does not compensate for TPM limits. Large static prompts are not a free lunch.
 
+**Scope:** this rationale applies to `compile.py` only (the compile-time prompt that needs catalog awareness to wire cross-links). It does **not** apply to the SessionStart hook — see next entry.
+
+### SessionStart hook — pointer block, not body embed
+
+#### Anti-pattern: full-index injection at session start
+
+Until 2026-05-05, `hooks/session-start.py` embedded the body of `knowledge/index.md` (capped at 20 000 chars) into every session's prefix. Two problems:
+
+1. The cap meant only ~7 % of a 297 KB index actually reached the model. The other 93 % was dead weight in every session.
+2. Most sessions don't need the wiki at all (shell ops, single-file edits). Every session paid the prefix tax regardless.
+
+The original justification was a Working-Memory cognitive analogy in `docs/concept.md` and an extrapolation from the compile-time TPM-fix above. Neither inspiration source actually does this:
+
+- **Karpathy** reads the index *on demand* at query time (gist: *"the LLM reads the index first to find relevant pages, then drills into them"*). No SessionStart hook in the original design.
+- **Cole Medin** injects (where applicable) a curated single-file `memory.md`, never the full catalog; daily logs are queried on demand via SQLite.
+
+#### Correct: inject pointer + recent-daily-tail
+
+SessionStart now injects a small constant **pointer block** (paths to `knowledge/index.md`, the `knowledge/<type>/` folders, `raw/` substrates, `AGENTS.md` schema) plus the date stamp and the last 30 lines of today's or yesterday's daily log. The agent pulls articles on demand via `Read` / `Grep`. The 20 000-char cap is gone — the new context is bounded only by the daily-tail size.
+
+**Why:** the same logic that justifies index-only-embed at compile time (let the model navigate via tools) justifies pointer-only-embed at session start. Body-embed at session start was a layer-confusion: applying a compile-time fix to the wrong code path.
+
+**Trade-off accepted:** when a session does need the wiki, the agent will spend +1-2 tool calls (grep then read). For the majority of sessions that don't touch the wiki, the prefix tax disappears entirely. Net better.
+
+**Pattern name:** this is "Progressive Disclosure Index" in the wider Claude-Code-hooks community — formalized by `claude-mem` (recent-summary tables with legend indicators + MCP search for full detail) and `eugeniughelbur/obsidian-second-brain` (progressive token budgets L0-L3, e.g. `CRITICAL_FACTS.md` as a 120-token identity load). Our pointer block is the lean variant of the same family.
+
+**Anthropic context-cap is 10 000 chars, not 20 000.** The old `MAX_CONTEXT_CHARS = 20_000` constant was over-spec; the harness already truncated `additionalContext` at 10 000 and saved overflow to a side-file with a preview. So the old SessionStart was effectively delivering ≤10 000 chars, not 20 000 — the previous "~7 % of the index reaches the model" estimate was already optimistic. Source: `code.claude.com/docs/en/hooks` (*"Hook output injected into context (additionalContext, systemMessage, or plain stdout) is capped at 10,000 characters."*).
+
+**Why a hook and not `AGENTS.md` for the pointer-block.** Anthropic's official advice for static knowledge is *"use CLAUDE.md instead, which loads without running a script."* That advice does **not** apply here: the wiki vault's `AGENTS.md` is project-local — Claude Code only loads it when the operator opens a session *inside the vault directory*. The whole point of the hook is to make any session, regardless of working directory, aware that the vault exists and how to navigate it. A globally-registered SessionStart hook is the only way to deliver vault-aware context across sessions launched from arbitrary CWDs. So the hook stays — even though its content is static, the injection mechanism must be global.
+
+**Companion future work:** deterministic per-prompt grep injection via `UserPromptSubmit` hook is captured in `.ytstack/backlog/prompt-aware-index-injection.md`. Conditional `source: "compaction"` SessionStart firing (ClawMem's `postcompact-inject` pattern) is captured in `.ytstack/backlog/postcompact-only-injection.md`. Both opt-in, both wait for observation data on the current pointer-block implementation.
+
 ### Flush context — Karpathy/Cole's pattern is wrong for agentic workflows
 
 #### Anti-pattern (Cole Medin's `claude-memory-compiler`)

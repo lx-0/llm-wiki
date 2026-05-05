@@ -168,7 +168,7 @@ flowchart TD
     PB_CHECK -->|Nein| DONE["Fertig"]
     PB_SPAWN --> DONE
 
-    NEXT["Nächste Session"] --> INJECT["SessionStart Hook\nInjiziert index.md"]
+    NEXT["Nächste Session"] --> INJECT["SessionStart Hook\nInjiziert Pointer-Block + Daily-Tail"]
     INJECT --> SESSION
 
     style SESSION fill:#EFF6FF,stroke:#2563EB
@@ -193,7 +193,7 @@ flowchart TD
 
 **Hooks sind global** konfiguriert (`~/.claude/settings.json`), nicht projekt-lokal. Jede Claude Code Session wird captured — egal in welchem Projekt der Operator gerade arbeitet.
 
-**SessionStart** injiziert `index.md` (Master-Katalog aller Wiki-Artikel) + die letzten 30 Zeilen des heutigen `daily/` Logs. Max 20K Zeichen. Keine API-Calls, reines File-I/O, <1 Sekunde.
+**SessionStart** injiziert einen kleinen **Pointer-Block** (Pfade zu `knowledge/index.md`, den `knowledge/<type>/`-Ordnern, `raw/`-Substraten, `AGENTS.md`) + die letzten 30 Zeilen des heutigen oder gestrigen `daily/` Logs. Datum-Stempel oben drauf. Kein Body-Embed des Index — der Agent grep'd / read't bei Bedarf selbst. Keine API-Calls, reines File-I/O, <1 Sekunde. Begründung in `.ytstack/KNOWLEDGE.md` ("SessionStart-Pointer statt Body-Embed").
 
 **SessionEnd/PreCompact** lesen das JSONL-Transcript, extrahieren die letzten 30 Turns (max 15K Zeichen), staging das Temp-File via `flush_pipeline.stage(kind, session_id, content)`, und spawnen `flush.py` als detached Background-Prozess. Beide Hooks teilen `hooks/_transcript.py` für Transcript-Walk + Tool-Summarization (Edit/Write/Bash/Read mit Detail) — pre-compact hatte historisch eine lossy Variante (`[tool: X]` / `[tool result]`), das ist jetzt eliminiert.
 
