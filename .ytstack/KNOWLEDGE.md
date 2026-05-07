@@ -76,6 +76,20 @@ In result handling: `if message.subtype == "success" and message.result:` — ne
 
 **Verified:** what previously failed at 7 turns now succeeds at 2 turns with 2,909 chars of clean output.
 
+### Compile abort-counter — empty-file skip is not a failure
+
+#### Anti-pattern (fixed 2026-05-07)
+
+`compile_file()` returned `None` for both legitimate skips (empty source, dry-run) and for any unexpected falsy path. The main loop treated every `None` as a failure (`if result is None or "_failure" in result`), so three consecutive empty `raw/memories/*.md` files at file slots [6][7][8] tripped the 3-strike `--max-consecutive-failures` abort with `kinds=unknown,unknown` even though no real failure happened. Compile run terminated after 8 of 100 attempted files with 3 done · 5 "failed" (3 of which were the empty-skip false positives).
+
+#### Fix
+
+`compile_file()` now returns `{"_skipped": "<reason>"}` for empty-file and dry-run paths. The main loop treats `_skipped` as neutral — no counter touch, just `continue`. Hard `None` would still raise the failure path (defensive — that would indicate a programmer bug elsewhere).
+
+**Why preserve the streak across skips:** if real failures sit at slots [3][5][7] separated by skips at [4][6], the streak is still 3 real consecutive failures and the abort should trigger. Resetting on skip would mask that. So skip = neutral, not reset.
+
+**Adjacent observation:** the underlying bundled-CLI silent-crash bug ("Fatal error in message reader: Command failed with exit code 1, [CLI-STDERR] empty") is a known class — `claude-agent-sdk-python` hardcodes the stderr placeholder in `subprocess_cli.py:626` (issue #515). Same crash signature appears for chronic flush-failure files. Content-dependent, not size-dependent. Captured separately; not addressed by this fix.
+
 ### Compile prompt design — don't embed the whole wiki
 
 #### Anti-pattern

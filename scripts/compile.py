@@ -178,13 +178,13 @@ async def compile_file(source: Path, dry_run: bool = False, prefix: str = "") ->
 
     if dry_run:
         log.info("  [dry-run] Would compile %s", rel_path)
-        return None
+        return {"_skipped": "dry_run"}
 
     # Read source content
     source_content = source.read_text(encoding="utf-8")
     if not source_content.strip():
         log.warning("  Skipping empty file: %s", rel_path)
-        return None
+        return {"_skipped": "empty"}
 
     # Read current wiki state
     agents_md = ""
@@ -558,6 +558,11 @@ async def main() -> None:
 
         prefix = f"[{compiled_count + failed_count + 1}/{cap}] "
         result = await compile_file(source, prefix=prefix)
+        if result is not None and "_skipped" in result:
+            # Skipped (empty file, dry-run): neither success nor failure.
+            # Don't touch counters — preserves the consecutive-failure streak
+            # across legitimate skips so abort thresholds reflect real failures.
+            continue
         if result is None or "_failure" in result:
             failed_count += 1
             consecutive_failures += 1
