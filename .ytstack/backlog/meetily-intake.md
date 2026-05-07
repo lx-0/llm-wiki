@@ -6,7 +6,7 @@
 
 ## What
 
-A `wiki ingest-meetily` subcommand that reads Meetily's local SQLite DB read-only and writes one markdown file per meeting into `<vault>/raw/transcripts/meetily/`. No re-recording, no separate audio pipeline — Meetily owns audio capture + transcription + LLM summarisation; the wiki engine only consumes its output.
+A `wiki ingest-meetily` subcommand that reads Meetily's local SQLite DB read-only and writes one markdown file per meeting into `<vault>/raw/transcripts/meetily/`. No re-recording, no separate audio pipeline — Meetily owns audio capture + transcription + LLM summarization; the wiki engine only consumes its output.
 
 Pattern is a thin parallel to `scan-youtube.py` but radically simpler (no LLM tiers, no network, no rate-limit handling — Meetily already did the work; we map rows → markdown).
 
@@ -15,7 +15,7 @@ Pattern is a thin parallel to `scan-youtube.py` but radically simpler (no LLM ti
 - Three FOSS meeting-intake candidates were evaluated (Meetily / Screenpipe / Ghostpepper). Meetily won on installed-and-working basis (test summary already exists in DB at install time).
 - Jamie was rejected (Pro-gated API + nothing local), Hyprnote/anarlog deprioritised (team focus shifted to commercial char.com).
 - Meetings are a high-value first-party signal — action items, decisions, attendees — currently entirely missing from the wiki's substrate set.
-- Meetily writes `summary_processes.result.markdown` already formatted with `**Summary**` / `**Key Decisions**` / `**Action Items**` table — wiki compile.py can consume this directly without re-summarisation.
+- Meetily writes `summary_processes.result.markdown` already formatted with `**Summary**` / `**Key Decisions**` / `**Action Items**` table — wiki compile.py can consume this directly without re-summarization.
 
 ## How
 
@@ -67,9 +67,11 @@ Body sections (in order, only emitted when source data present):
 2. **Summary** — verbatim `summary_processes.result.markdown` (already formatted by Meetily's local LLM)
 3. **User notes** — `meeting_notes.notes_markdown` if non-empty, in a `> [!note]` callout
 4. **Transcript** — concatenated chunks, ordered by `audio_start_time`, formatted as:
+
    ```
    `[mm:ss]` **<speaker>** — <text>
    ```
+
    `[mm:ss]` anchor matches youtube-intake convention so compile.py + lint stay uniform.
 
 ### CLI
@@ -104,7 +106,7 @@ Ran from `flush.py` after `compile_after_hour`. Skip-existing keyed on `meeting_
 | Case | Behavior |
 |---|---|
 | DB locked (Meetily live-recording) | Open via SQLite URI `file:...?mode=ro&immutable=0` — WAL mode is concurrent-read-safe. |
-| Empty `summary_processes.result` (still summarising or failed) | Write tier-0 file with `summary_status: pending` in frontmatter; piggyback re-tries on next run since meeting_id stays the same. **Add `--no-skip` semantics: re-write if `summary_status: pending`.** |
+| Empty `summary_processes.result` (still summarizing or failed) | Write tier-0 file with `summary_status: pending` in frontmatter; piggyback re-tries on next run since meeting_id stays the same. **Add `--no-skip` semantics: re-write if `summary_status: pending`.** |
 | No `summary_processes` row at all (very fresh recording) | Skip; cooldown means we'll catch it next run. Log at INFO. |
 | Empty `transcripts` table for a meeting | Tier-2 emits "(no transcript chunks captured)" placeholder — meeting still has summary value. |
 | `meetings.folder_path` NULL | Frontmatter omits the field; no error. |
