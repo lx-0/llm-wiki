@@ -90,6 +90,41 @@ In result handling: `if message.subtype == "success" and message.result:` — ne
 
 **Adjacent observation:** the underlying bundled-CLI silent-crash bug ("Fatal error in message reader: Command failed with exit code 1, [CLI-STDERR] empty") is a known class — `claude-agent-sdk-python` hardcodes the stderr placeholder in `subprocess_cli.py:626` (issue #515). Same crash signature appears for chronic flush-failure files. Content-dependent, not size-dependent. Captured separately; not addressed by this fix.
 
+### Compile silent CLI crash — the `claude_code` preset spec was the trigger
+
+#### Symptom
+
+`compile_file ✗ failed · kind=unknown · empty stderr` after 300-500s of mid-stream silence. Bundled Claude Code CLI subprocess exits with code 1, no stderr written. Reproduces non-deterministically on certain daily/ and large memory files. Sometimes a successful run is followed by a 2-second `kind=cli_crash` cascade (3-strike abort).
+
+#### Root cause
+
+`compile.py` set `system_prompt={"type": "preset", "preset": "claude_code"}` on every `query()` call. The SDK's `_build_command` only serializes preset specs that carry an `"append"` key (`subprocess_cli.py:178-180`):
+
+```python
+elif sp.get("type") == "preset" and "append" in sp:
+    cmd.extend(["--append-system-prompt", sp["append"]])
+```
+
+Without `"append"` the spec falls through with no `--system-prompt` flag emitted, so the bundled CLI uses its **own interactive default** — the full Claude Code system prompt with all agent definitions, deferred tool catalogs, MCP server descriptions, ytstack content, and skill listings. ~50-100K input tokens of overhead per call. That heavy default is what triggers the streaming crash; bundled CLI manually invoked with the same content but a minimal system prompt completes cleanly.
+
+#### Fix
+
+Pass an explicit, minimal system prompt as a string. Pattern follows `flush.py:214` (`render("flush_extract_system")`):
+
+```python
+system_prompt=render("compile_main_system"),
+setting_sources=[],
+```
+
+`prompts/compile_main_system.md` and `prompts/compile_suggestion_system.md` hold the actual text — never inline a system prompt as a Python string constant in `scripts/`. `setting_sources=[]` blocks the SDK from layering CLAUDE.md / project-settings on top.
+
+**Verified 2026-05-10:** `daily/2026-05-08.md` had crashed at 512s in production; with the patch it compiles cleanly in 221s, $0.025. Matching pattern applied to the suggestion-pass query as well.
+
+#### Adjacent
+
+- The bundled CLI's empty-stderr crash class is a real upstream behaviour, but reproducing it manually with the SDK-equivalent invocation succeeds — the trigger is specifically the *combination* of heavy preset system prompt × certain user-prompt content × server-side variability. We don't fix it upstream (per project policy), we just stop sending the heavy preset.
+- `compile_file()` empty-skip false-positive abort fix (above) was a separate bug surfaced during the same investigation.
+
 ### Compile prompt design — don't embed the whole wiki
 
 #### Anti-pattern

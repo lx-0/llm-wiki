@@ -222,7 +222,8 @@ async def compile_file(source: Path, dry_run: bool = False, prefix: str = "") ->
                 allowed_tools=["Read", "Write", "Edit", "Glob", "Grep"],
                 permission_mode="acceptEdits",
                 max_turns=30,
-                system_prompt={"type": "preset", "preset": "claude_code"},
+                system_prompt=render("compile_main_system"),
+                setting_sources=[],
                 stderr=capture.callback,
             ),
         ):
@@ -312,7 +313,8 @@ async def maybe_generate_suggestions(source: Path, dry_run: bool = False) -> Non
                 allowed_tools=["Read", "Write", "Glob"],
                 permission_mode="acceptEdits",
                 max_turns=10,
-                system_prompt={"type": "preset", "preset": "claude_code"},
+                system_prompt=render("compile_suggestion_system"),
+                setting_sources=[],
                 stderr=capture.callback,
             ),
         ):
