@@ -6,9 +6,11 @@ Vocabulary: domain terms from `CONTEXT.md`, architecture terms from improve-code
 
 ---
 
-## #1 — Scan-Scripts → Collector pattern (HIGH)
+## #1 — Scan-Scripts → Collector pattern (HIGH — partial progress 2026-05-13)
 
-**Files:** `scripts/scan-calendar.py` (247), `scripts/scan-browser.py` (524), `scripts/scan-tabs.py` (185), `scripts/scan-screenshots.py` (366). Plus `scripts/flush.py:_LEGACY_PIGGYBACK_COMMANDS` which hardcodes them.
+**Status update (2026-05-13):** Phase 1 (relocation) complete. The five `scan-*.py` files now live in `scripts/collectors/scan-browser.py`, `scan-calendar.py`, `scan-screenshots.py`, `scan-tabs.py`, `scan-youtube.py`. Cross-package imports + wiki CLI + `flush.py:_LEGACY_PIGGYBACK_COMMANDS` paths updated. **Protocol migration (Phase 2) still pending** — each script still has its own argparse main, no `SPEC`/`@register`, and `flush.py:_LEGACY_PIGGYBACK_COMMANDS` continues to dispatch them by hardcoded path. Phase 2 is the actual leverage win; Phase 1 just bought folder hygiene.
+
+**Files (Phase 2 scope):** `scripts/collectors/scan-calendar.py` (247), `scripts/collectors/scan-browser.py` (524), `scripts/collectors/scan-tabs.py` (185), `scripts/collectors/scan-screenshots.py` (366), `scripts/collectors/scan-youtube.py`. Plus `scripts/flush.py:_LEGACY_PIGGYBACK_COMMANDS` which hardcodes them.
 
 **Problem:** Four near-clones of the same procedure (read substrate → metadata → `raw/` → log). Each reinvents CLI parsing, state tracking, report formatting. They bypass the `Registry` entirely; `flush.py` carries a legacy hardcoded dispatch table specifically for them. The Collector seam exists and works (EmailCollector proved it during M002) — these scripts are leaving its leverage on the table.
 

@@ -24,7 +24,7 @@
 
 <table align="center">
   <tr>
-    <td align="center"><strong>9</strong><br/>substrate sources</td>
+    <td align="center"><strong>2 + 5</strong><br/>collectors + legacy scanners</td>
     <td align="center"><strong>5</strong><br/>skills bundled</td>
     <td align="center"><strong>MIT</strong><br/>open source</td>
   </tr>
@@ -63,12 +63,12 @@ llm-wiki is the **compilation layer** between raw substrates and active consumpt
 
 ## What you get
 
-- **Two-path ingest** — automatic session capture (hooks → `daily/`) and 10 substrate-source scripts (scanners + clipper + memory-sync + manual drop → `raw/`) converge at one compiler. One of them, `scan-email`, has been migrated to the formal Collector pattern; the rest are scheduled for the same migration.
+- **Two-path ingest** — automatic session capture (hooks → `daily/`) and substrate-source writers (Registry-discovered Collectors + legacy scanners + clipper + manual drop → `raw/`) converge at one compiler. Email and Jamie ride the formal Collector Protocol (`SPEC` + `@register` + `run()`); the remaining `scan-*.py` scripts are scheduled for the same migration.
 - **Compile once, query fast** — knowledge is distilled into Markdown wikilinks at compile time. No embedding step, no retrieval per query.
 - **Multi-agent hooks** — `session-start` / `session-end` / `pre-compact` wired into Claude Code, Codex, Gemini, and Cursor. Every session ends as a structured daily-log entry.
 - **Curiosity loop** — a small local Ollama model spots gaps after each compile and queues deep-scan requests for the next cycle.
 - **Optimization suggestions** — the compiler proposes YAML automations (e.g. mail-filter rules) with per-action approval before execution.
-- **Self-healing wiki** — `lint.py` runs 6 structural checks plus an LLM contradiction scan, so the wiki stays consistent as it grows.
+- **Self-healing wiki** — `lint.py` runs 8 structural checks plus an LLM contradiction scan, so the wiki stays consistent as it grows.
 - **Engine / vault split** — engine code, prompts, hooks, runtime state, and venv all live under `<vault>/.wiki/`. The vault root stays clean.
 - **One install, one CLI, one venv** — `wiki setup` + `wiki update` + `wiki status` cover the full lifecycle.
 
@@ -87,17 +87,21 @@ The sidebar is the data layout — `raw/`, `daily/`, `knowledge/` — exactly th
 ```text
 PATH A — Automatic capture                PATH B — Curated sources
 ─────────────────────────────             ──────────────────────────────────
-session-start / session-end /             Scanners + manual drops + clipper:
-pre-compact hooks attach to every         · scan-email       (Thunderbird)
-Claude Code / Codex / Gemini /            · scan-calendar    (Thunderbird CalDAV)
-Cursor session.  flush.py extracts        · scan-browser     (Firefox + Chrome)
-the conversation transcript and           · scan-screenshots (Vision LLM)
-appends a structured entry to             · scan-tabs        (Firefox STG)
-daily/YYYY-MM-DD.md.                      · scan-youtube     (yt-dlp + gemma4 visual)
-                                          · jamie            (Jamie AI meetings)
+session-start / session-end /             Collectors (Registry):
+pre-compact hooks attach to every         · email            (multi-backend mailboxes)
+Claude Code / Codex / Gemini /            · jamie            (Jamie AI meetings)
+Cursor session.  flush.py extracts
+the conversation transcript and           Scanners (legacy CLI, pending port):
+appends a structured entry to             · scan-calendar    (Thunderbird CalDAV)
+daily/YYYY-MM-DD.md.                      · scan-browser     (Firefox + Chrome)
+                                          · scan-screenshots (Vision LLM)
+                                          · scan-tabs        (Firefox STG)
+                                          · scan-youtube     (yt-dlp + gemma4 visual)
+
+                                          Other writers:
                                           · sync-memories    (Claude Code memory; opt-in)
-                                          · clippings-sweep  (Obsidian Web Clipper)
-            │                             · ingest-html      (file or URL)
+            │                             · clippings-sweep  (Obsidian Web Clipper)
+                                          · ingest-html      (file or URL)
                                           · process-inbox    (LLM-classified drop)
             ▼                                          │
      daily/YYYY-MM-DD.md                               ▼
@@ -131,7 +135,7 @@ After every compile, two side loops run on the new article:
 - **Curiosity loop** — a small local Ollama model spots gaps and writes JSON deep-scan requests to `raw/requests/`. The next compile cycle picks one up and fills the gap.
 - **Optimization suggestions** — the compiler emits YAML proposals to `raw/suggestions/` for repeatable manual actions (e.g. mail filter rules). `suggestions/cli.py` applies them only after explicit per-action approval.
 
-`lint.py` watches the wiki itself: 7 structural checks (broken links, orphan pages, orphan sources, stale articles, missing backlinks, sparse articles, fact violations) plus one LLM-driven contradiction scan.
+`lint.py` watches the wiki itself: 8 structural checks (broken links, orphan pages, orphan sources, stale articles, missing backlinks, article type, sparse articles, fact violations) plus one LLM-driven contradiction scan.
 
 When raw sources contradict reality — a Slack thread that calls a project by its old name, an old memo that claims a never-won award — `wiki correct` lets you write a **hard fact** to `knowledge/facts/<slug>.md`. Hard facts inject into compile + query prompts at the highest authority, so future compilations honour them automatically. `wiki correct apply <slug>` then spawns an agent that walks the existing wiki, strikes contaminated claims, fixes wikilinks, and — for disambiguation facts — renames files. Raw sources stay immutable; only `knowledge/` (and minimal correction notes in `daily/`) are touched.
 

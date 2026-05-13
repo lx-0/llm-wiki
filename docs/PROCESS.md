@@ -669,7 +669,7 @@ uv run python scripts/suggestions/cli.py
 ### Edge Cases
 
 - **Procmail Folder-Separator:** Muss `/` sein (nicht `.`). z.B. `INBOX/Work/Newsletters`.
-- **Duplikat-Sender:** Compiler prüft Procmail + TB-Regeln. execute-suggestions.py blockt als Safety-Net.
+- **Duplikat-Sender:** Compiler prüft Procmail + TB-Regeln. `scripts/suggestions/cli.py` blockt als Safety-Net.
 - **Merge statt neue Regel:** Compiler bevorzugt Erweiterung bestehender Gruppen.
 - **Procmail Backup:** Vor jedem Save in `raw/notes/email/procmail-backup-*.txt`.
 - **Gmail OAuth2:** Browser öffnet sich einmalig für Autorisierung. Token persistent.

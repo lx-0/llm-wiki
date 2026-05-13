@@ -90,15 +90,14 @@ Collectors scan L3 → write metadata to `raw/notes/` → the compiler turns it 
 ## Data flow
 
 ```text
-Collectors        Curated sources       Sessions
-(scan-email,      (raw/articles,        (daily/, auto-captured
- scan-calendar,    raw/papers,           via session-end hook)
- scan-browser,     raw/notes,
- scan-screenshots, raw/transcripts)
- scan-youtube,
- scan-nas)             │                     │
-       │               │                     │
-       ▼               ▼                     ▼
+Collectors                   Curated sources       Sessions
+(email, jamie via Registry;  (raw/articles,        (daily/, auto-captured
+ scan-{calendar,browser,      raw/papers,           via session-end hook)
+ screenshots,tabs,youtube}    raw/notes,
+ legacy CLIs)                 raw/transcripts)
+       │                          │                     │
+       │                          │                     │
+       ▼                          ▼                     ▼
                 ┌──────────────────┐
                 │       raw/       │  ← immutable; LLM reads, never writes
                 └──────────────────┘
@@ -151,7 +150,9 @@ The system has the same shape as memory in cognition:
 
 ## Curiosity loop
 
-After each compile, a small local LLM (Ollama, free) inspects the new article + index and identifies gaps. It writes JSON requests to `raw/requests/`. A piggyback task picks up the oldest pending request and runs a deep scan (e.g. read full email bodies in a specific folder, reconstruct threads, filter via LLM). The deep-scan output lands in `raw/notes/` and gets compiled in the next cycle.
+After each compile, a small local LLM (Ollama, free) inspects the new article + index and identifies gaps. It writes JSON requests to `raw/requests/`. The intended consumer is a deep-scan pass (read full email bodies in a specific folder, reconstruct threads, filter via LLM) whose output lands in `raw/notes/` and gets compiled in the next cycle.
+
+> **Implementation status (2026-05-13):** The producer is active inside `compile.py`. The deep-scan consumer historically lived in `scan-email.py --follow-requests`, which was removed when the email scanner was ported to the Collector pattern. Requests currently accumulate in `raw/requests/` without an executor; reactivation requires either a deep-scan mode in the email Collector or a separate consumer subsystem.
 
 ```text
 compile.py → curiosity model → raw/requests/*.json
@@ -165,9 +166,9 @@ The curiosity model uses a full JSON Schema with `enum` constraints (not just `f
 
 ## Optimization suggestions
 
-The compiler can also generate **action proposals** — e.g., "this folder receives 80% newsletter mail; consider an auto-filter rule." Each suggestion is a YAML file in `raw/suggestions/`, with per-action approval. A separate executor script applies approved actions.
+The compiler can also generate **action proposals** — e.g., "this folder receives 80% newsletter mail; consider an auto-filter rule." Each suggestion is a YAML file in `raw/suggestions/`, with per-action approval. An interactive executor (`suggestions/cli.py`) walks the YAML, prompts for approve / reject / dry-run per action, and dispatches approved ones to a backend (`suggestions/backends/imap.py` for IMAP move/tag/set-flags actions; future backends plug in alongside).
 
-The pattern generalizes beyond email — anywhere the compiler spots a repeatable manual action, it can propose automation.
+The producer is a small subsystem (`suggestions/producer.py`) called from `compile.py` whenever an email source is processed. The pattern generalizes beyond email — anywhere the compiler spots a repeatable manual action, it can propose automation under the same producer-executor-backend split.
 
 ## Design rationale
 

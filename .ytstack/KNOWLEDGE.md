@@ -112,6 +112,26 @@ When moving Python modules that compute paths from `__file__`, audit every `Path
 
 Introduced `CORE_DIR` as the new `__file__`-relative anchor in `core/config.py` (semantic correctness > terse code), added one extra `.parent` everywhere else. Pytest 79/79 pass; vault `wiki config get personal.jamie` resolves correctly.
 
+### Sub-package module name shadowing stdlib (2026-05-13)
+
+#### Symptom
+
+Right after `chore(scripts): move scan-*.py into scripts/collectors/`, running `scripts/collectors/scan-screenshots.py --help` crashed deep inside `httpx` — at `from urllib.request import parse_http_list`, which triggers stdlib `import email`. The error message was a `ValueError` from our own `@register` decorator complaining that the `email` collector was already registered.
+
+#### Root cause
+
+`scripts/collectors/email.py` existed (the EmailCollector module). When `scan-screenshots.py` lives inside `scripts/collectors/`, Python sets `sys.path[0]` to `scripts/collectors/` automatically (because that's the script's parent dir). Transitive stdlib `import email` then resolves to **our `email.py`**, not `email/` from the standard library — and importing our file re-triggers the `@register` decorator, blowing up on a "name already registered" guard.
+
+Adding `sys.path.insert(0, str(parent.parent))` to scan-screenshots.py only helped for *our* modules; it didn't displace the script-dir from sys.path[0].
+
+#### Lesson
+
+A sub-package directory that contains both **importable modules** and **directly-invoked scripts** must not declare modules whose names shadow the stdlib (or any other reachable package). Even if our own imports use `from collectors.email import …`, the directly-invoked sibling scripts will be ambushed by transitive third-party imports that go through the script-dir.
+
+#### Fix
+
+Renamed `scripts/collectors/email.py` → `scripts/collectors/email_collector.py`. All importers updated (`collectors/__init__.py:from collectors import email_collector`, `tests/test_email_collector_fakereader.py`). The Collector's `SPEC.name = "email"` is unchanged — the rename is purely about the Python module name, not the Registry key, so `wiki collect email` still works verbatim.
+
 ### Claude Agent SDK — `query()` with `allowed_tools=[]` is not enough
 
 #### Symptom
