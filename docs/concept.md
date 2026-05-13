@@ -150,9 +150,9 @@ The system has the same shape as memory in cognition:
 
 ## Curiosity loop
 
-After each compile, a small local LLM (Ollama, free) inspects the new article + index and identifies gaps. It writes JSON requests to `raw/requests/`. The intended consumer is a deep-scan pass (read full email bodies in a specific folder, reconstruct threads, filter via LLM) whose output lands in `raw/notes/` and gets compiled in the next cycle.
+After each compile, a small local LLM (Ollama, free) inspects the new article + index and identifies gaps. It writes JSON requests to `raw/requests/`. A consumer (`wiki curiosity`, also wired as a 24h piggyback) picks the oldest pending request, dispatches it to the matching backend (`scripts/curiosity/backends/<type>.py`), and writes the deep-scan output into `raw/notes/`. The next compile distills it into knowledge.
 
-> **Implementation status (2026-05-13):** The producer is active inside `compile.py`. The deep-scan consumer historically lived in `scan-email.py --follow-requests`, which was removed when the email scanner was ported to the Collector pattern. Requests currently accumulate in `raw/requests/` without an executor; reactivation requires either a deep-scan mode in the email Collector or a separate consumer subsystem.
+Today there's one backend: `email-deep-scan`. It reads the request's account + folder, calls `scan_deep` on the Mailbox adapter (Thunderbird mbox, Gmail API, or All-Inkl IMAP), and writes a markdown report with full bodies into `raw/notes/email/deep-{slug}.md`. Future request types (e.g. `youtube-deep-watch`, `jamie-followup`) plug in as additional backend modules without touching the producer or the CLI.
 
 ```text
 compile.py → curiosity model → raw/requests/*.json

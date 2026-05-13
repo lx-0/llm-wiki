@@ -1,9 +1,12 @@
 ---
 created: 2026-05-13
-status: ready
+status: shipped
 priority: high
+resolved: 2026-05-13
 related: .ytstack/backlog/curiosity-dashboard.md, .ytstack/backlog/architecture-deepening.md
 ---
+
+> **Resolved 2026-05-13:** Option B shipped. `scripts/curiosity/` Sub-Package mirrors `suggestions/`: `producer.py` (extrahiert aus `compile.py`), `cli.py` (Operator-CLI `wiki curiosity`), `backends/email.py` (verarbeitet `email-deep-scan` Requests via existing Mailbox-adapter `scan_deep`). Piggyback `curiosity_followup` (24h cooldown) ruft `--run-oldest` automatisch. Future request types plug in als `backends/<type>.py`. Siehe FEATURES.md Tabelle "Side loops" und PROCESS.md §7.
 
 # Curiosity-Loop — Konsumenten-Lücke (Producer arbeitet, Executor fehlt)
 

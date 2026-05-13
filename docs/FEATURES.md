@@ -91,8 +91,8 @@ Lint check inventory (in execution order in `lint.py`):
 
 | Loop | Status | Code | Trigger | Known gaps |
 |---|---|---|---|---|
-| Curiosity loop — producer | 🟢 | `scripts/compile.py:maybe_generate_curiosity_requests` (called per compiled file) | After each compile, Gemma4 via Ollama writes `raw/requests/request-{slug}-{date}.json` | Producer runs cleanly when `features.curiosity_loop=true` |
-| Curiosity loop — consumer | 🔴 | (missing) | Historical: `scan-email.py --follow-requests` deleted in commit `14bf844` (M002/S02) | **Backlog: `.ytstack/backlog/curiosity-consumer-gap.md`.** Requests accumulate in `raw/requests/` without an executor. |
+| Curiosity loop — producer | 🟢 | `scripts/curiosity/producer.py:maybe_generate_curiosity_requests` (called from compile.py per file) | After each compile, Gemma4 via Ollama writes `raw/requests/request-{slug}-{date}.json` | Runs when `features.curiosity_loop=true` |
+| Curiosity loop — consumer | 🟢 | `scripts/curiosity/cli.py`, `scripts/curiosity/backends/email.py` | `wiki curiosity --list / --run-oldest / --run <slug> / --run-all / --clear-done`; piggyback `piggybacks.curiosity_followup` (24h cooldown) runs `--run-oldest` automatically | Backend dispatches by request `type`. Today: `email-deep-scan` (full bodies via Mailbox-adapter scan_deep). Future types add as `curiosity/backends/<type>.py`. |
 | Optimization suggestions — producer | 🟢 | `scripts/suggestions/producer.py:maybe_generate_suggestions` (called from compile.py for email sources) | Triggered when compile.py processes an email source | — |
 | Optimization suggestions — executor | 🟢 | `scripts/suggestions/cli.py` | `wiki suggestions --list / --approve / --reject / --review / --dry-run` (or direct `uv run python scripts/suggestions/cli.py …`) | — |
 | Optimization suggestions — IMAP backend | 🟢 | `scripts/suggestions/backends/imap.py` | Invoked by `suggestions/cli.py` for `imap-move` / `imap-tag` / `imap-set-flags` actions | Account credentials via `.claude/.env` |
@@ -150,7 +150,7 @@ These are pinned reality-vs-docs checks. Each should either get fixed or get an 
 
 | # | Gap | Documented as | Actual state | Action |
 |---|---|---|---|---|
-| 1 | **Curiosity-loop consumer missing** | PROCESS §7, concept "Curiosity loop", README "Curiosity loop" all describe a producer→consumer cycle | Producer alive (`compile.py:maybe_generate_curiosity_requests`), consumer (`scan-email.py --follow-requests`) deleted in M002/S02. Requests accumulate without executor. | `.ytstack/backlog/curiosity-consumer-gap.md` — decision pending between Option A (deep-scan mode in EmailCollector), B (separate `curiosity/` package), C (remove producer too) |
+| 1 | ~~Curiosity-loop consumer missing~~ | PROCESS §7, concept "Curiosity loop", README "Curiosity loop" all describe a producer→consumer cycle | **Closed 2026-05-13:** `scripts/curiosity/` subsystem shipped (Option B from backlog) — producer extracted from compile.py, `wiki curiosity` CLI consumer, `backends/email.py` dispatches `email-deep-scan` requests via the existing Mailbox adapters' `scan_deep`. Piggyback `curiosity_followup` runs `--run-oldest` every 24h. |
 | 2 | ~~No `wiki process-inbox` subcommand~~ | PROCESS §1 documents Inbox Processing as a numbered process | **Closed 2026-05-13:** `wiki process-inbox` wrapper landed. |
 | 3 | ~~No `wiki ingest-html` subcommand~~ | README "Path B" lists `ingest-html (file or URL)` as a substrate-source writer | **Closed 2026-05-13:** `wiki ingest-html` wrapper landed. |
 | 4 | ~~No `wiki suggestions` subcommand~~ | PROCESS §8 documents the suggestion executor as part of the engine CLI surface | **Closed 2026-05-13:** `wiki suggestions` wrapper landed. |

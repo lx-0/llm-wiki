@@ -58,6 +58,10 @@ llm-wiki/
 │   │   ├── producer.py         ← maybe_generate_suggestions (called from compile.py)
 │   │   ├── cli.py              ← interactive approve/review/reject/execute
 │   │   └── backends/imap.py    ← IMAP move/tag/set-flags executor
+│   ├── curiosity/          ← gap-detection loop (raw/requests/ producer + consumer)
+│   │   ├── producer.py         ← maybe_generate_curiosity_requests (called from compile.py)
+│   │   ├── cli.py              ← wiki curiosity: list / run-oldest / run / run-all / clear-done
+│   │   └── backends/email.py   ← email-deep-scan: scan_deep via Mailbox-adapter → raw/notes/email/deep-*.md
 │   ├── dashboard/          ← Obsidian dashboard helpers
 │   │   ├── dashboard_stats.py  ← _dashboard-stats.md generator (post-flush refresh)
 │   │   ├── dashboard_lint.py   ← _dashboard-lint.md generator (post-flush refresh)

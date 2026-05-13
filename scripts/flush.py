@@ -81,6 +81,7 @@ _LEGACY_PIGGYBACK_COMMANDS: dict[str, list[str]] = {
     "optimize_claude_md": ["optimize-claude-md.py"],
     "scan_screenshots": ["collectors/scan-screenshots.py", "--all", "--limit", "{max_per_run}"],
     "retry_failed_flushes": ["retry-failed-flushes.py", "--limit", "{max_per_run}"],
+    "curiosity_followup": ["curiosity/cli.py", "--run-oldest"],
 }
 
 

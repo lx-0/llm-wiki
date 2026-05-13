@@ -378,7 +378,7 @@ Der `email`-Collector iteriert über `CONFIG.personal.accounts` und resolvet pro
 
 Output ist pro Account ein Markdown-Report mit Headers (From/To/Subject/Date) und einer Kategorie-Aufschlüsselung. Bei `--incremental` werden nur Accounts gescannt deren Mailbox-State sich seit dem letzten Lauf geändert hat (Adapter-spezifischer Marker: mbox-size für Thunderbird, message-id-watermark für IMAP-Backends).
 
-> **Deep-Scan und Follow-Requests-Pfad sind aktuell nicht implementiert** — die historische `scan-email.py --deep` / `--follow-requests` Variante existierte als separater Script-Pfad und wurde mit der Collector-Portierung nicht mitgenommen. `compile.py:maybe_generate_curiosity_requests` schreibt zwar weiterhin Deep-Scan-Requests nach `raw/requests/`, ein Konsument fehlt jedoch derzeit. Siehe Section 8 (Curiosity Loop).
+> **Deep-Scan** läuft heute über das `curiosity/`-Subsystem (`scripts/curiosity/backends/email.py`), getriggert durch eine pending Request in `raw/requests/`. Der Email-Collector selbst macht nur den Metadata-Sweep; der Body-Lese-Pfad wandert pro Anfrage durch den Curiosity-Konsumenten. Siehe §7 (Curiosity Loop).
 
 ### Andere Scanner
 
@@ -506,7 +506,7 @@ flowchart TD
     FILTER -->|Ja| REQ["raw/requests/request-{slug}-{date}.json\nmax 3 pro Compile"]
     FILTER -->|Nein| SKIP["Übersprungen"]
     REQ --> PIGGY["Piggyback: flush.py\nfollow-requests Task\n24h Cooldown"]
-    PIGGY --> DEEP["⚠ Konsument fehlt\n(`scan-email.py --follow-requests`\nwurde mit Collector-Portierung entfernt)\nRequests bleiben pending in raw/requests/"]
+    PIGGY --> DEEP["curiosity/cli.py --run-oldest\ndispatch by request.type\n→ curiosity/backends/email.py\n  scan_deep(folder) via Mailbox-Adapter"]
     DEEP --> RAW["raw/notes/email/\ndeep-*.md"]
     RAW --> COMPILE2["compile.py\nnächster Zyklus → Lücke geschlossen"]
 
@@ -541,9 +541,15 @@ flowchart TD
 
 Dateiname: `raw/requests/request-{slug}-{date}.json`
 
-**Konsumenten-Lücke (2026-05-13):** Der ursprünglich vorgesehene Konsument `scan-email.py --follow-requests` existiert nicht mehr — `scan-email.py` wurde durch den Email-Collector ersetzt und der `--follow-requests`-Pfad wurde nicht mitportiert. Curiosity-Requests werden derzeit weiterhin produziert (Producer in `compile.py:maybe_generate_curiosity_requests` ist unverändert aktiv) und sammeln sich in `raw/requests/*.json`, werden aber nicht abgearbeitet. Reaktivierung erfordert einen Deep-Scan-Modus im `email`-Collector oder einen separaten Konsumenten — siehe Architektur-Backlog (`.ytstack/backlog/`).
+**Konsument (2026-05-13):** Das `scripts/curiosity/` Sub-Package spiegelt das `suggestions/`-Pattern: `producer.py` (extrahiert aus `compile.py`), `cli.py` (Operator-CLI `wiki curiosity`), `backends/email.py` (verarbeitet `type: "email-deep-scan"` Requests).
 
-**Producer-Code:** `scripts/compile.py:maybe_generate_curiosity_requests` (vor der Collector-Extraktion intern; ist Migrations-Kandidat nach `scripts/curiosity/producer.py` parallel zum `scripts/suggestions/producer.py`-Pattern).
+**Producer:** `scripts/curiosity/producer.py:maybe_generate_curiosity_requests` (von `compile.py:639` per file aufgerufen).
+
+**Consumer:** `scripts/curiosity/cli.py` mit `--list / --run-oldest / --run <slug> / --run-all / --clear-done`. Piggyback `curiosity_followup` (24h Cooldown) ruft `--run-oldest` automatisch.
+
+**Email-Backend:** liest Request-JSON, resolved Account via `adapters.mailbox.resolve_reader`, ruft `scan_deep(folder, limit)` für volle Bodies (Thunderbird mbox, Gmail API, All-Inkl IMAP), rendert `raw/notes/email/deep-<slug>.md`, setzt Request-Status `done`. Nächster Compile distilliert.
+
+**Erweiterung:** Neue Request-Typen (`type: "youtube-deep-watch"`, `type: "jamie-followup"`, …) plug-in als zusätzliche `curiosity/backends/<type>.py` ohne CLI- oder Producer-Änderung — Dispatcher in `cli.py:_dispatch` matcht auf `request["type"]`.
 
 ### Edge Cases
 

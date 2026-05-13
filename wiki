@@ -45,6 +45,8 @@
 #   wiki ingest-youtube --url URL [--tier 0|1|2] [--limit N] [--dry-run]
 #   wiki ingest-youtube --inbox PATH [--tier 0|1|2] [--limit N] [--dry-run]
 #                              ingest YouTube videos / playlists into raw/notes/youtube/
+#   wiki curiosity [--list|--run-oldest|--run SLUG|--run-all|--clear-done]
+#                              process raw/requests/ deep-scan requests (consumer side)
 #   wiki suggestions [--list|--review ID|--approve ID N|--reject ID N|--dry-run]
 #                              review + execute YAML optimization suggestions
 #   wiki version               print installed git revision
@@ -590,6 +592,40 @@ EOF
   _run_script ingest-html.py "$@"
 }
 
+cmd_curiosity() {
+  case "${1:-}" in
+    -h|--help|help)
+      cat <<EOF
+${C_BOLD}wiki curiosity${C_RESET} — review + run curiosity-loop deep-scan requests
+
+${C_BOLD}USAGE${C_RESET}
+  wiki curiosity --list                          list all pending + done requests
+  wiki curiosity --run-oldest                    run the oldest pending request
+  wiki curiosity --run <slug>                    run one request by slug substring
+  wiki curiosity --run-all                       run every pending request
+  wiki curiosity --dry-run --run-oldest          plan only (no mailbox access)
+  wiki curiosity --clear-done                    delete request files with status: done
+
+${C_BOLD}WHAT IT DOES${C_RESET}
+  After each compile, \`compile.py\` writes JSON gap-requests into
+  \`raw/requests/\` (curiosity producer). This command is the consumer:
+  reads one request, resolves the account's MailboxReader, calls scan_deep
+  to pull full message bodies, renders one markdown report into
+  \`raw/notes/email/deep-<slug>.md\`. The next compile distills it.
+
+${C_BOLD}BACKENDS${C_RESET}
+  email-deep-scan → \`scripts/curiosity/backends/email.py\` (Thunderbird mbox,
+  Gmail API, All-Inkl IMAP via the existing Mailbox adapters).
+
+${C_BOLD}NOTES${C_RESET}
+  Wraps \`scripts/curiosity/cli.py\`. See PROCESS §7.
+EOF
+      return 0 ;;
+  esac
+  banner "wiki curiosity"
+  _run_script curiosity/cli.py "$@"
+}
+
 cmd_suggestions() {
   case "${1:-}" in
     -h|--help|help)
@@ -835,6 +871,7 @@ case "${1:-}" in
   process-inbox)    shift; cmd_process_inbox "$@" ;;
   ingest-html)      shift; cmd_ingest_html "$@" ;;
   ingest-youtube)   shift; cmd_ingest_youtube "$@" ;;
+  curiosity)        shift; cmd_curiosity "$@" ;;
   suggestions)      shift; cmd_suggestions "$@" ;;
   version)          shift; cmd_version "$@" ;;
   help|-h|--help)   cmd_help ;;

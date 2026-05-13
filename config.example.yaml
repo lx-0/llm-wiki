@@ -46,7 +46,10 @@ piggybacks:
     enabled: true
     cooldown_hours: 6                    # tighter than scan_youtube — meetings are time-sensitive
     max_per_run: 20
-  follow_requests:
+  # Curiosity-loop consumer (scripts/curiosity/cli.py --run-oldest). Producer
+  # in compile.py writes raw/requests/*.json; this task picks the oldest pending
+  # one and runs the matching backend (email-deep-scan today).
+  curiosity_followup:
     enabled: true
     cooldown_hours: 24
   retry_failed_flushes:
