@@ -8937,6 +8937,149 @@
       "roundness": null,
       "updated": 1777800822778,
       "autoResize": true
+    },
+    {
+      "type": "rectangle",
+      "id": "scanner_jamie",
+      "x": 2132.7418857362213,
+      "y": 365.0,
+      "width": 260,
+      "height": 70.0,
+      "strokeColor": "#FC4E14",
+      "backgroundColor": "#FFD8CB",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 0,
+      "opacity": 100,
+      "angle": 0,
+      "seed": 318241,
+      "version": 272,
+      "versionNonce": 318242,
+      "isDeleted": false,
+      "groupIds": [],
+      "boundElements": [
+        {
+          "id": "scanner_jamie_t",
+          "type": "text"
+        },
+        {
+          "id": "arr_jamie_raw",
+          "type": "arrow"
+        }
+      ],
+      "link": null,
+      "locked": false,
+      "roundness": {
+        "type": 3
+      },
+      "index": "alV",
+      "frameId": null,
+      "updated": 1777800916464
+    },
+    {
+      "type": "text",
+      "id": "scanner_jamie_t",
+      "x": 2142.7418857362213,
+      "y": 372.0,
+      "width": 240,
+      "height": 56.0,
+      "text": "Jamie Meetings\ncollectors/jamie.py (tRPC API)\nspeaker-diarised + action items",
+      "originalText": "Jamie Meetings\ncollectors/jamie.py (tRPC API)\nspeaker-diarised + action items",
+      "fontSize": 12,
+      "fontFamily": 3,
+      "textAlign": "center",
+      "verticalAlign": "middle",
+      "strokeColor": "#FC4E14",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "solid",
+      "roughness": 0,
+      "opacity": 100,
+      "angle": 0,
+      "seed": 318243,
+      "version": 271,
+      "versionNonce": 318244,
+      "isDeleted": false,
+      "groupIds": [],
+      "boundElements": [],
+      "link": null,
+      "locked": false,
+      "containerId": "scanner_jamie",
+      "lineHeight": 1.25,
+      "index": "alW",
+      "frameId": null,
+      "roundness": null,
+      "updated": 1777800916049,
+      "autoResize": true
+    },
+    {
+      "type": "arrow",
+      "id": "arr_jamie_raw",
+      "x": 2127.5418857362215,
+      "y": 410.5,
+      "width": 35.82025623786558,
+      "height": 236.25599881962694,
+      "strokeColor": "#FC4E14",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 0,
+      "opacity": 100,
+      "angle": 0,
+      "seed": 318245,
+      "version": 348,
+      "versionNonce": 318246,
+      "isDeleted": false,
+      "groupIds": [],
+      "boundElements": [],
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          -35.82025623786558,
+          0
+        ],
+        [
+          -35.82025623786558,
+          236.25599881962694
+        ]
+      ],
+      "startBinding": {
+        "elementId": "scanner_jamie",
+        "focus": -0.17,
+        "gap": 6,
+        "fixedPoint": [
+          -0.02,
+          0.65
+        ]
+      },
+      "endBinding": {
+        "elementId": "raw_rect",
+        "fixedPoint": [
+          0.88,
+          -0.015
+        ],
+        "focus": 0,
+        "gap": 0
+      },
+      "startArrowhead": null,
+      "endArrowhead": "arrow",
+      "lastCommittedPoint": null,
+      "index": "asV",
+      "frameId": null,
+      "roundness": null,
+      "updated": 1777800962760,
+      "elbowed": true,
+      "fixedSegments": null,
+      "startIsSpecial": null,
+      "endIsSpecial": null
     }
   ],
   "appState": {
