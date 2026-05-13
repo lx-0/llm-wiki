@@ -1,13 +1,21 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-05-13T11:30:00Z
+last_updated: 2026-05-13T18:00:00Z
 current_milestone: M004
 active_slice: none
 active_task: none
 ---
 
 # State
+
+**Jamie meeting-intake shipped (2026-05-13, full llm-wiki-change 5-phase pass)** — third substrate-collector after email + youtube. New `scripts/collectors/jamie.py` (~470 LOC) speaks Jamie's tRPC API (`https://beta-api.meetjamie.ai`, `x-api-key` auth, `meetings.list`/`meetings.get` operations, `?input=<JSON-encoded {"json":params}>` GET-with-input encoding, `result.data.json` envelope unwrap — discovered via vicampuzano/jamie-mcp source after marketing-docs claimed REST). Speaker-diarised transcript reformatter rewrites Jamie's `<speaker>\n\n\n###### MM:SS - MM:SS\n\n<text>` shape to youtube-uniform `**Speaker** [mm:ss] — text`. State at `state/jamie-state.json` (last_seen_ts). Auto-discovered piggyback via Registry walk (zero `flush.py` edit). Six real meetings live in lxw vault at `raw/transcripts/jamie/`. Single-tenant `personal.jamie` config block; secret in `JAMIE_API_KEY` env var.
+
+**`.env` auto-load + seeded template** — `scripts/core/config.py` calls `load_dotenv(<vault>/.claude/.env, override=False)` at import; 32 engine scripts now pick up secrets without manual shell-export (gap discovered when `wiki collect jamie` from a plain terminal saw empty env vars while piggyback runs worked because Claude Code auto-injects `.claude/.env`). Engine `.claude/.env.example` moved to `templates/.claude/.env.example` (depersonalised, full catalogue: OpenAI / Jamie / IMAP-pattern / NAS / LinkedIn-MCP note), additive seed via `wiki seed`.
+
+**Vault README template + drift detection (2026-05-13)** — `templates/README.md` ships a vault-owner-facing quickstart (~120 lines). `wiki seed --check` audits every seeded file as `up-to-date` / `drifted` / `missing` via binary `cmp -s` (semantic-JSON-diff for `.obsidian/`-runtime files backlog'd at `.ytstack/backlog/seed-semantic-diff.md`). Default `wiki seed` distinguishes the two states in its keep-existing line. Two engine-template fixes surfaced + landed via the audit: `templates/knowledge.base` switched to Obsidian-Bases-1.10+ syntax (`property:` not `column:`); `templates/.obsidian/core-plugins.json` enables `bases: true` so the shipped `.base` file actually renders in fresh installs.
+
+**sync-memories hard-removed (commit `3c40fbe`, 2026-05-13)** — 17 files / -700 LOC. Replaces the 2026-05-04 "soft phase-out, default-off, 6-month grace" decision. No external users → no migration path → carry-cost of doc/prompt/lint exception surface area exceeded benefit. `scripts/seed.py`, `scripts/sync-memories.py`, `scripts/migrations/migrate_strip_substrate_links.py` deleted; engine wiring (piggybacks, `RAW_MEMORIES_DIR`, config block) gone; managed-mirror exceptions in `lint.py` + `prompts/compile_main.md` rule 6 + `hooks/session-start.py` pointer-list removed; doc + infographic surface synced. Vault `raw/memories/` data is operator's call (engine no longer touches it).
 
 **SessionStart hook + compile fixes (2026-05-05 → 2026-05-10) — three engine commits** surfaced from an audit of why daily files were silently failing to compile and how the SessionStart hook compared to Karpathy / Cole Medin's reference implementations.
 
@@ -78,11 +86,13 @@ Carried-forward candidates from M002 (deferred to M004+): Collector-rollout to o
 
 ## Next action
 
-M004 closed + YouTube intake landed as a post-M004 feature. Three paths:
-- **Use it / harden** — drop URLs into `lxw/inbox/youtube.md`, run `wiki ingest-youtube --inbox <path>` from kcma piggyback. After ~10 real videos, decide if `qwen2.5-vl:7b` upgrade is worth pulling for stronger Code-OCR.
-- **Tier 3-cloud** — implement Gemini Flash-Lite path with all guardrails from `youtube-intake.md` (hardcoded model, blob cache, pre-run estimate, `--allow-cloud`, budget cap). Worth doing once a video clearly needs visual fidelity local-vision can't deliver.
+Three substrate-collectors live (email, jamie, youtube). Eight piggybacks (was 9 before sync-memories cull). Docs + infographics consistent across the engine. Open paths:
+
+- **Use Jamie ingest** — automatic 6 h piggyback runs once the operator has accumulated more meetings. First six live in lxw vault; first compile pass over them will tell if the LLM-summary → wiki-article distillation is clean or needs prompt tuning.
+- **Semantic seed-drift diff** — `.ytstack/backlog/seed-semantic-diff.md` — strip Obsidian-runtime-noise (`graph.json` UI state, `quickadd` provider catalogue, `shellcommands` icons) from drift reports. P2 refinement; current binary-cmp works but is 5-of-6-noise on the productive vault.
+- **YouTube Tier 3-cloud** — Gemini Flash-Lite with cost-protection guardrails (lifted from clawrag's pain-driven design). Triggers when a video clearly needs visual fidelity local-vision can't deliver.
 - **Curiosity-loop integration** — search/upgrade requests + generic dashboard-surface (`curiosity-dashboard.md`). Triggers when ≥5 requests/week from compile-loop justify the surface.
-- **Reassess roadmap (M005?)** — does the agent-task catalogue need more tasks now (review-mocs, weekly-digest, extract-todos)?
+- **Reassess roadmap (M005?)** — does the agent-task catalogue need more tasks now (review-mocs, weekly-digest, extract-todos)? Curiosity-consumer gap (`.ytstack/backlog/curiosity-consumer-gap.md`) still open: `compile.py:maybe_generate_curiosity_requests` writes to `raw/requests/` but no consumer reads them post-`scan-email.py --follow-requests` removal.
 
 ## Open decisions
 
