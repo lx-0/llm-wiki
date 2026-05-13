@@ -61,8 +61,8 @@ Dispatcher: `scripts/collectors/cli.py` (`wiki collect <name>` and `wiki collect
 
 | Feature | Status | Code | Trigger | Known gaps |
 |---|---|---|---|---|
-| Inbox classifier | 🟡 | `scripts/process-inbox.py` | `uv run python scripts/process-inbox.py` (manual) | **No `wiki` subcommand wrapper.** PROCESS §1 describes the flow but the only invocation is direct `uv run`. UX gap — see Known Gaps. |
-| HTML ingest (file or URL) | 🟡 | `scripts/ingest-html.py` | Transitively invoked by `process-inbox.py` for HTML drops; or `uv run python scripts/ingest-html.py` directly | **No `wiki` subcommand wrapper.** README "Path B" lists it as if it has its own CLI. |
+| Inbox classifier | 🟢 | `scripts/process-inbox.py` | `wiki process-inbox` (+ `--no-compile` / `--dry-run` / `--model`); or `uv run python scripts/process-inbox.py` | — |
+| HTML ingest (file or URL) | 🟢 | `scripts/ingest-html.py` | `wiki ingest-html PATH-OR-URL [--mode content\|visual\|both]`; also auto-invoked by `process-inbox.py` for HTML drops | — |
 | Clippings sweep | 🟢 | `scripts/clippings_sweep.py` | Auto-triggered by `compile.py:start` when `features.clippings_sweep=true`; moves `<vault>/Clippings/*` → `raw/articles/` before compile | PROCESS §3, README — wired correctly via compile.py call site |
 
 ## Compilation & query
@@ -94,7 +94,7 @@ Lint check inventory (in execution order in `lint.py`):
 | Curiosity loop — producer | 🟢 | `scripts/compile.py:maybe_generate_curiosity_requests` (called per compiled file) | After each compile, Gemma4 via Ollama writes `raw/requests/request-{slug}-{date}.json` | Producer runs cleanly when `features.curiosity_loop=true` |
 | Curiosity loop — consumer | 🔴 | (missing) | Historical: `scan-email.py --follow-requests` deleted in commit `14bf844` (M002/S02) | **Backlog: `.ytstack/backlog/curiosity-consumer-gap.md`.** Requests accumulate in `raw/requests/` without an executor. |
 | Optimization suggestions — producer | 🟢 | `scripts/suggestions/producer.py:maybe_generate_suggestions` (called from compile.py for email sources) | Triggered when compile.py processes an email source | — |
-| Optimization suggestions — executor | 🟢 | `scripts/suggestions/cli.py` | `uv run python scripts/suggestions/cli.py --list / --approve / --reject / --review / --dry-run` | No `wiki suggestions` subcommand wrapper. |
+| Optimization suggestions — executor | 🟢 | `scripts/suggestions/cli.py` | `wiki suggestions --list / --approve / --reject / --review / --dry-run` (or direct `uv run python scripts/suggestions/cli.py …`) | — |
 | Optimization suggestions — IMAP backend | 🟢 | `scripts/suggestions/backends/imap.py` | Invoked by `suggestions/cli.py` for `imap-move` / `imap-tag` / `imap-set-flags` actions | Account credentials via `.claude/.env` |
 | CLAUDE.md optimizer | 🟢 | `scripts/optimize-claude-md.py` | `uv run python scripts/optimize-claude-md.py`; piggyback `piggybacks.optimize_claude_md` (24h cooldown) | PROCESS §9 |
 | Wiki review (per-article quality) | 🟢 | `scripts/review-wiki.py` | `wiki review-wiki`; piggyback `piggybacks.review_wiki` (168h / weekly) | PROCESS §6 |
@@ -151,9 +151,9 @@ These are pinned reality-vs-docs checks. Each should either get fixed or get an 
 | # | Gap | Documented as | Actual state | Action |
 |---|---|---|---|---|
 | 1 | **Curiosity-loop consumer missing** | PROCESS §7, concept "Curiosity loop", README "Curiosity loop" all describe a producer→consumer cycle | Producer alive (`compile.py:maybe_generate_curiosity_requests`), consumer (`scan-email.py --follow-requests`) deleted in M002/S02. Requests accumulate without executor. | `.ytstack/backlog/curiosity-consumer-gap.md` — decision pending between Option A (deep-scan mode in EmailCollector), B (separate `curiosity/` package), C (remove producer too) |
-| 2 | **No `wiki process-inbox` subcommand** | PROCESS §1 documents Inbox Processing as a numbered process | Only invocable via `uv run python scripts/process-inbox.py` | UX gap — either add `wiki process-inbox` wrapper or update PROCESS §1 to say "manual `uv run`" |
-| 3 | **No `wiki ingest-html` subcommand** | README "Path B" lists `ingest-html (file or URL)` as a substrate-source writer | Only transitively invoked via `process-inbox.py:148`; direct invocation = `uv run python scripts/ingest-html.py` | Same as #2 — wrapper or doc update |
-| 4 | **No `wiki suggestions` subcommand** | PROCESS §8 documents the suggestion executor as part of the engine CLI surface | Only `uv run python scripts/suggestions/cli.py …` | Wrapper or doc clarification |
+| 2 | ~~No `wiki process-inbox` subcommand~~ | PROCESS §1 documents Inbox Processing as a numbered process | **Closed 2026-05-13:** `wiki process-inbox` wrapper landed. |
+| 3 | ~~No `wiki ingest-html` subcommand~~ | README "Path B" lists `ingest-html (file or URL)` as a substrate-source writer | **Closed 2026-05-13:** `wiki ingest-html` wrapper landed. |
+| 4 | ~~No `wiki suggestions` subcommand~~ | PROCESS §8 documents the suggestion executor as part of the engine CLI surface | **Closed 2026-05-13:** `wiki suggestions` wrapper landed. |
 | 5 | **`scan-*.py` legacy pattern still in `_LEGACY_PIGGYBACK_COMMANDS`** | README "Two-path ingest" says "remaining `scan-*.py` are scheduled for [Collector] migration" | True — 5 scripts still legacy (browser, calendar, screenshots, tabs, youtube). Status documented in `.ytstack/backlog/architecture-deepening.md` candidate #1 Phase 2. | Honest gap — backlog tracked |
 | 6 | **`origin: "scan-email/<id>"` in email Collector report frontmatter** | n/a (cosmetic) | `collectors/email_collector.py:111` still writes the old origin string. No engine reader; cosmetic only. | Flagged; intentionally left to avoid splitting report vintages |
 

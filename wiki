@@ -39,9 +39,14 @@
 #   wiki pin <article>         pin an article to a Map-of-Content (no LLM, idempotent)
 #   wiki pin <article> --section "Name" --moc people --summary "X"
 #   wiki review-wiki           per-article quality-score sweep (local LLM, free)
+#   wiki process-inbox [flags] classify files in <vault>/inbox/ via Ollama, route to raw/
+#   wiki ingest-html PATH-OR-URL [--mode content|visual|both]
+#                              convert HTML into raw/articles/ (and/or raw/notes/ visual)
 #   wiki ingest-youtube --url URL [--tier 0|1|2] [--limit N] [--dry-run]
 #   wiki ingest-youtube --inbox PATH [--tier 0|1|2] [--limit N] [--dry-run]
 #                              ingest YouTube videos / playlists into raw/notes/youtube/
+#   wiki suggestions [--list|--review ID|--approve ID N|--reject ID N|--dry-run]
+#                              review + execute YAML optimization suggestions
 #   wiki version               print installed git revision
 #   wiki help                  this message
 
@@ -528,6 +533,96 @@ EOF
   _run_script review-wiki.py "$@"
 }
 
+cmd_process_inbox() {
+  case "${1:-}" in
+    -h|--help|help)
+      cat <<EOF
+${C_BOLD}wiki process-inbox${C_RESET} — classify files dropped into <vault>/inbox/
+
+${C_BOLD}USAGE${C_RESET}
+  wiki process-inbox                       classify + move, then compile
+  wiki process-inbox --no-compile          classify + move only (no compile)
+  wiki process-inbox --dry-run             show what would be moved without writing
+  wiki process-inbox --model MODEL         override classifier model (default gemma3:4b)
+
+${C_BOLD}WHAT IT DOES${C_RESET}
+  Walks \`<vault>/inbox/\`. For each file, calls a local Ollama model to
+  classify it (article / paper / note / transcript / audio / memory / suggestion)
+  and moves it into the matching \`raw/<type>/\` subfolder. HTML files are
+  delegated to \`scripts/ingest-html.py\` (text + visual). After the sweep,
+  triggers \`wiki compile\` on the freshly-routed sources.
+
+${C_BOLD}NOTES${C_RESET}
+  Wraps \`scripts/process-inbox.py\`. Free — uses local Ollama, no Claude API
+  calls until the downstream compile step. Inbox is transient: the LLM owns
+  classification, the operator just drops files. See PROCESS §1.
+EOF
+      return 0 ;;
+  esac
+  banner "wiki process-inbox"
+  _run_script process-inbox.py "$@"
+}
+
+cmd_ingest_html() {
+  case "${1:-}" in
+    -h|--help|help)
+      cat <<EOF
+${C_BOLD}wiki ingest-html${C_RESET} — convert an HTML file or URL into raw/
+
+${C_BOLD}USAGE${C_RESET}
+  wiki ingest-html PATH-OR-URL [flags]
+
+${C_BOLD}FLAGS${C_RESET}
+  --mode {content,visual,both}    extraction mode (default content)
+                                    content  html2text → raw/articles/<slug>.md
+                                    visual   Playwright screenshot → Vision LLM → raw/notes/
+                                    both     run both pipelines back-to-back
+  --dry-run                       show what would be written, don't touch disk
+
+${C_BOLD}NOTES${C_RESET}
+  Wraps \`scripts/ingest-html.py\`. Visual mode needs Playwright + a local
+  Vision-capable Ollama model; content mode runs offline. Also auto-invoked
+  by \`wiki process-inbox\` for any \`.html\` files in the inbox.
+EOF
+      return 0 ;;
+  esac
+  banner "wiki ingest-html"
+  _run_script ingest-html.py "$@"
+}
+
+cmd_suggestions() {
+  case "${1:-}" in
+    -h|--help|help)
+      cat <<EOF
+${C_BOLD}wiki suggestions${C_RESET} — review + execute optimization suggestions
+
+${C_BOLD}USAGE${C_RESET}
+  wiki suggestions --list                          list all suggestion files + action statuses
+  wiki suggestions --review <suggestion-id>        interactive review of one suggestion
+  wiki suggestions --approve <suggestion-id> N     approve action #N
+  wiki suggestions --reject <suggestion-id> N      reject action #N
+  wiki suggestions --dry-run                       preview approved actions
+  wiki suggestions                                 execute approved actions
+
+${C_BOLD}WHAT IT DOES${C_RESET}
+  The compiler emits YAML proposals into \`raw/suggestions/\` after each
+  email-source compile (filter rules, mail moves, tag applications). This
+  command is the per-action approval + execution surface.
+
+${C_BOLD}BACKENDS${C_RESET}
+  IMAP move/tag/set-flags actions dispatch to \`suggestions/backends/imap.py\`.
+  Account credentials come from \`<vault>/.claude/.env\` per
+  \`personal.accounts.<id>.reader.imap_user_env\` / \`imap_pass_env\`.
+
+${C_BOLD}NOTES${C_RESET}
+  Wraps \`scripts/suggestions/cli.py\`. See PROCESS §8.
+EOF
+      return 0 ;;
+  esac
+  banner "wiki suggestions"
+  _run_script suggestions/cli.py "$@"
+}
+
 
 cmd_seed() {
   local force=0 check=0
@@ -737,7 +832,10 @@ case "${1:-}" in
   correct)          shift; cmd_correct "$@" ;;
   pin)              shift; cmd_pin "$@" ;;
   review-wiki)      shift; cmd_review_wiki "$@" ;;
+  process-inbox)    shift; cmd_process_inbox "$@" ;;
+  ingest-html)      shift; cmd_ingest_html "$@" ;;
   ingest-youtube)   shift; cmd_ingest_youtube "$@" ;;
+  suggestions)      shift; cmd_suggestions "$@" ;;
   version)          shift; cmd_version "$@" ;;
   help|-h|--help)   cmd_help ;;
   *)                err "unknown command: $1"; cmd_help; exit 1 ;;

@@ -96,6 +96,9 @@ Grouped by purpose. Run `wiki <cmd> --help` for the full per-command help block.
 | `wiki ingest-youtube --url URL [flags]` | ingest a single video or a playlist. Output to `raw/notes/youtube/`. |
 | `wiki ingest-youtube --inbox PATH [flags]` | parse a markdown file with YouTube URLs (bare / markdown-link / shortlink, optional inline `tier: N` directive). |
 |  | Shared flags: `--tier {0,1,2,3}` (default 1; 0=metadata, 1=+transcript, 2=+comments, 3=+visual via gemma4@kcma), `--limit N` (cap playlist/inbox to first N), `--dry-run`, `--no-skip` (re-ingest videos that already exist). |
+| `wiki ingest-html PATH-OR-URL [--mode content\|visual\|both]` | convert HTML (file or URL) into raw/. `content` mode runs html2text → `raw/articles/`; `visual` mode screenshots via Playwright then a Vision-LLM describes layout → `raw/notes/`; `both` runs them back-to-back. Auto-invoked by `wiki process-inbox` for `.html` files in inbox. |
+| `wiki process-inbox [flags]` | walk `<vault>/inbox/`, classify each file via local Ollama, move to matching `raw/<type>/`, then compile. Flags: `--no-compile` (route only), `--dry-run` (show plan), `--model MODEL` (override classifier model). HTML files are delegated to `wiki ingest-html`. |
+| `wiki suggestions [flags]` | review + execute YAML optimization suggestions in `raw/suggestions/`. Modes: `--list` (overview), `--review ID` (interactive), `--approve ID N` / `--reject ID N` (per-action), `--dry-run` (preview approved), no-args (execute). IMAP backend uses `.claude/.env` credentials. |
 
 ### Agentic tasks
 
