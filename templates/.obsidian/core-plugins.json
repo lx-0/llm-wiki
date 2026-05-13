@@ -28,5 +28,6 @@
   "slides": false,
   "audio-recorder": false,
   "workspaces": false,
-  "webviewer": false
+  "webviewer": false,
+  "bases": true
 }

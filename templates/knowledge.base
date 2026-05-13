@@ -24,7 +24,7 @@ views:
       - type
       - file.mtime
     sort:
-      - column: file.mtime
+      - property: file.mtime
         direction: DESC
     limit: 200
 
@@ -35,5 +35,5 @@ views:
       - file.name
       - file.mtime
     sort:
-      - column: file.name
+      - property: file.name
         direction: ASC
