@@ -71,6 +71,9 @@ class Limits:
     youtube_frame_resize_width: int = 512  # ffmpeg downscale before vision model
     youtube_vision_timeout_s: int = 90    # per-frame ollama call timeout
     youtube_aggregate_timeout_s: int = 300  # final synthesis call timeout
+    # Jamie ingest (collectors/jamie.py — see also CONFIG.piggybacks.jamie)
+    jamie_request_timeout_s: int = 30     # per-HTTP-call timeout against api.meetjamie.ai
+    jamie_max_per_run: int = 50           # default cap (overridable via CONFIG.personal.jamie.max_per_run)
 
 
 @dataclass
@@ -89,6 +92,35 @@ class Features:
 class GraphView:
     mode: str = "knowledge-only"
     custom_search: str = ""
+
+
+@dataclass
+class JamieConfig:
+    """Jamie AI meeting-notetaker integration (collectors/jamie.py).
+
+    Single-tenant per install: one Jamie account, one API key. If multi-account
+    is ever needed, lift this into `personal.accounts.<id>` with `kind: jamie-api`
+    (mirror the email pattern). Keep flat until that demand actually exists.
+
+    Secret hygiene: only the env-var *name* lives in config.yaml. The key
+    itself (jk_...) is read from `os.environ[api_key_env]` at run time.
+    """
+
+    # Name of the env var holding the jk_... API key. Empty/unset disables the
+    # collector (graceful agnostic — piggyback skips, CLI prints "not configured").
+    api_key_env: str = ""
+    # "personal" → /v1/me/... routes (your own meetings + meetings shared with you)
+    # "workspace" → /v1/workspace/... routes (workspace-scoped key required)
+    key_type: str = "personal"
+    # ISO 8601 date. First-install backfill cap — meetings with started_at <
+    # this value are skipped on the first full sweep. Has no effect on
+    # incremental runs (state file's last_seen_ts wins). Empty = no cap.
+    since: str = ""
+    # Per-account override of CONFIG.limits.jamie_max_per_run. None = inherit.
+    max_per_run: int | None = None
+    # Display id used in frontmatter `account_id` (for provenance when you
+    # ever do flip to multi-account). Cosmetic, no behavioural impact.
+    account_id: str = "default"
 
 
 @dataclass
@@ -150,6 +182,9 @@ class Personal:
     # writes its periodic *.json snapshots). Empty string disables STG-import
     # paths in scan-tabs.py / scan-browser.py.
     stg_backup_dir: str = ""
+    # Jamie AI integration — see JamieConfig docstring. Empty defaults render
+    # collectors/jamie.py inert; set `api_key_env` to enable.
+    jamie: JamieConfig = field(default_factory=JamieConfig)
 
 
 # Default piggyback set — script names match flush.py's PIGGYBACK_TASKS keys.
@@ -161,6 +196,7 @@ def _default_piggybacks() -> dict[str, PiggybackTask]:
         "optimize_claude_md": PiggybackTask(cooldown_hours=24),
         "scan_screenshots": PiggybackTask(cooldown_hours=24, max_per_run=50),
         "follow_requests": PiggybackTask(cooldown_hours=24),
+        "jamie": PiggybackTask(cooldown_hours=6, max_per_run=20),
         "sync_memories": PiggybackTask(cooldown_hours=24),
         "retry_failed_flushes": PiggybackTask(cooldown_hours=24, max_per_run=5),
     }

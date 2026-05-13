@@ -38,6 +38,14 @@ piggybacks:
     enabled: true
     cooldown_hours: 24
     max_per_run: 10                      # cap inbox-drain per piggyback run
+  # Pulls meetings from the Jamie AI public API via collectors/jamie.py.
+  # Requires CONFIG.personal.jamie.api_key_env to resolve to a non-empty
+  # environment variable holding a jk_... key. If unset, this piggyback
+  # is silently skipped (graceful agnostic).
+  jamie:
+    enabled: true
+    cooldown_hours: 6                    # tighter than scan_youtube — meetings are time-sensitive
+    max_per_run: 20
   follow_requests:
     enabled: true
     cooldown_hours: 24
@@ -93,6 +101,9 @@ limits:
   youtube_frame_resize_width: 512        # ffmpeg downscale before vision model
   youtube_vision_timeout_s: 90           # per-frame ollama call timeout
   youtube_aggregate_timeout_s: 300       # final synthesis call timeout
+  # Jamie ingest (collectors/jamie.py).
+  jamie_request_timeout_s: 30            # per-HTTP-call timeout against api.meetjamie.ai
+  jamie_max_per_run: 50                  # default cap; CONFIG.personal.jamie.max_per_run overrides
 
 features:
   # Master switches for entire capabilities.
@@ -127,6 +138,19 @@ personal:
   # Path to a Simple Tab Groups (STG) backup directory (where the extension
   # writes its periodic *.json snapshots). Empty string disables STG imports.
   stg_backup_dir: ""
+  # Jamie AI meeting-notetaker integration — single-tenant flat block (one
+  # account per install). collectors/jamie.py reads the API key from the env
+  # var named below; the value never lives in this file. Leave api_key_env
+  # empty to disable the collector (graceful agnostic).
+  #
+  # Generate the key in Jamie: Settings → Developers → API Keys (Pro/Team/
+  # Enterprise plan required). All keys carry the jk_ prefix.
+  jamie:
+    api_key_env: ""                       # e.g. JAMIE_API_KEY ; empty disables
+    key_type: personal                    # personal | workspace (selects route prefix)
+    since: ""                             # ISO date "2026-01-01"; empty = no backfill cap
+    max_per_run: null                     # null inherits CONFIG.limits.jamie_max_per_run
+    account_id: default                   # cosmetic — written into frontmatter for provenance
   # account-id → {email, label, reader, filter}
   # `reader` and `filter` are nested blocks with a `kind` discriminator
   # plus kind-specific fields. resolve_reader/resolve_filter dispatch on
