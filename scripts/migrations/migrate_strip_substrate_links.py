@@ -30,8 +30,8 @@ The `knowledge/facts/` subtree is also left untouched — facts are managed by
 `wiki correct`, not by the compiler.
 
 Usage:
-    uv run python scripts/migrate_strip_substrate_links.py --dry-run
-    uv run python scripts/migrate_strip_substrate_links.py --apply
+    uv run python scripts/migrations/migrate_strip_substrate_links.py --dry-run
+    uv run python scripts/migrations/migrate_strip_substrate_links.py --apply
 """
 
 from __future__ import annotations

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 
 def test_needs_migration_missing_frontmatter() -> None:
-    import migrate_add_type as m
+    from migrations import migrate_add_type as m
 
     change, reason = m.needs_migration("# Just a heading\n\nbody\n", "concept")
     assert change is True
@@ -12,7 +12,7 @@ def test_needs_migration_missing_frontmatter() -> None:
 
 
 def test_needs_migration_missing_type() -> None:
-    import migrate_add_type as m
+    from migrations import migrate_add_type as m
 
     fm = '---\ntitle: "X"\ntags: []\n---\nbody\n'
     change, reason = m.needs_migration(fm, "concept")
@@ -21,7 +21,7 @@ def test_needs_migration_missing_type() -> None:
 
 
 def test_needs_migration_wrong_type() -> None:
-    import migrate_add_type as m
+    from migrations import migrate_add_type as m
 
     fm = '---\ntitle: "X"\ntype: project\n---\nbody\n'
     change, reason = m.needs_migration(fm, "concept")
@@ -30,7 +30,7 @@ def test_needs_migration_wrong_type() -> None:
 
 
 def test_needs_migration_correct() -> None:
-    import migrate_add_type as m
+    from migrations import migrate_add_type as m
 
     fm = '---\ntitle: "X"\ntype: concept\n---\nbody\n'
     change, reason = m.needs_migration(fm, "concept")
@@ -38,7 +38,7 @@ def test_needs_migration_correct() -> None:
 
 
 def test_apply_migration_inserts_after_title() -> None:
-    import migrate_add_type as m
+    from migrations import migrate_add_type as m
 
     src = '---\ntitle: "X"\ntags: []\n---\nbody\n'
     out = m.apply_migration(src, "concept")
@@ -49,7 +49,7 @@ def test_apply_migration_inserts_after_title() -> None:
 
 
 def test_apply_migration_corrects_existing_wrong_type() -> None:
-    import migrate_add_type as m
+    from migrations import migrate_add_type as m
 
     src = '---\ntitle: "X"\ntype: project\ntags: []\n---\nbody\n'
     out = m.apply_migration(src, "concept")
@@ -60,7 +60,7 @@ def test_apply_migration_corrects_existing_wrong_type() -> None:
 
 
 def test_apply_migration_no_frontmatter_wraps_minimal() -> None:
-    import migrate_add_type as m
+    from migrations import migrate_add_type as m
 
     src = "# Just body\n"
     out = m.apply_migration(src, "concept")
@@ -70,7 +70,7 @@ def test_apply_migration_no_frontmatter_wraps_minimal() -> None:
 
 
 def test_apply_migration_idempotent() -> None:
-    import migrate_add_type as m
+    from migrations import migrate_add_type as m
 
     src = '---\ntitle: "X"\ntype: concept\ntags: []\n---\nbody\n'
     out = m.apply_migration(src, "concept")

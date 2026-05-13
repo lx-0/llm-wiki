@@ -99,7 +99,7 @@ def check_broken_links() -> list[dict]:
 
     Failure modes:
       - `warning substrate_link` — body carries `[[raw/memories/...]]`
-        (policy violation; run migrate_strip_substrate_links.py)
+        (policy violation; run migrations/migrate_strip_substrate_links.py)
       - `error broken_link`      — wikilink target does not exist,
         regardless of which directory it points at
     """
@@ -110,11 +110,11 @@ def check_broken_links() -> list[dict]:
         for link in extract_wikilinks(content):
             if link.startswith("raw/memories/"):
                 # Body citation of the managed-mirror subtree — violates
-                # distill-don't-cite. Run scripts/migrate_strip_substrate_links.py.
+                # distill-don't-cite. Run scripts/migrations/migrate_strip_substrate_links.py.
                 issues.append(issue(
                     "warning", "substrate_link", rel,
                     f"Substrate link in body: [[{link}]] — strip via "
-                    f"`uv run python scripts/migrate_strip_substrate_links.py --apply`",
+                    f"`uv run python scripts/migrations/migrate_strip_substrate_links.py --apply`",
                 ))
                 continue
             # All other targets (knowledge/, daily/, raw/notes/, raw/articles/)

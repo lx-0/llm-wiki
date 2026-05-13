@@ -8,8 +8,8 @@ charts treat them uniformly.
 Cheap operation — pure folder→type mapping, no LLM call. Idempotent.
 
 Usage:
-    uv run python scripts/migrate_add_type.py             # write
-    uv run python scripts/migrate_add_type.py --dry-run   # preview only
+    uv run python scripts/migrations/migrate_add_type.py             # write
+    uv run python scripts/migrations/migrate_add_type.py --dry-run   # preview only
 """
 
 from __future__ import annotations
