@@ -235,6 +235,48 @@ def _shallow_keys(payload: Any) -> str:
 
 # ── Rendering ────────────────────────────────────────────────────────
 
+# Jamie ships the transcript as a single markdown string in the shape:
+#
+#     <Speaker Name>
+#     \n
+#     \n
+#     ###### MM:SS - MM:SS
+#     \n
+#     <utterance text>
+#     \n
+#     \n
+#     <Next Speaker Name>
+#     …
+#
+# That renders in Obsidian as washed-out bare-text speaker names, oversized
+# whitespace gaps, and timestamps as awkward H6 headings. We reformat each
+# turn to the youtube-intake-uniform shape `**Speaker** [mm:ss] — text`.
+# Falls back to verbatim passthrough if no turn boundaries match — robust
+# to Jamie changing the wire format.
+_JAMIE_TURN_RE = re.compile(
+    r"(?P<speaker>^[^\n#][^\n]*?)\n{2,}"
+    r"######\s+(?P<ts>\d{1,2}:\d{2})\s*-\s*\d{1,2}:\d{2}\n+"
+    r"(?P<text>.+?)"
+    r"(?=\n{2,}[^\n#][^\n]*?\n{2,}######|\Z)",
+    re.DOTALL | re.MULTILINE,
+)
+
+
+def _reformat_jamie_transcript(raw: str) -> str:
+    matches = list(_JAMIE_TURN_RE.finditer(raw))
+    if not matches:
+        return raw.strip()
+    turns: list[str] = []
+    for m in matches:
+        speaker = m["speaker"].strip()
+        ts = m["ts"]
+        text = re.sub(r"\s+", " ", m["text"]).strip()
+        if not text:
+            continue
+        turns.append(f"**{speaker}** [{ts}] — {text}")
+    return "\n\n".join(turns) if turns else raw.strip()
+
+
 def _participants_label(participants: list[dict]) -> str:
     """Inline label for the header line."""
     names = [p.get("name") or p.get("email") or "?" for p in participants if isinstance(p, dict)]
@@ -360,9 +402,7 @@ def _render_markdown(meeting: dict, *, account_id: str, key_type: str, input_sou
     if transcript_md:
         parts.append("## Transcript")
         parts.append("")
-        # Jamie ships a fully-formatted markdown transcript with speaker names
-        # and `###### MM:SS - MM:SS` anchors. Passthrough — no re-parse.
-        parts.append(transcript_md.strip())
+        parts.append(_reformat_jamie_transcript(transcript_md))
         parts.append("")
 
     return "\n".join(parts) + "\n"
