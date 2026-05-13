@@ -38,6 +38,80 @@ The "Conventions" / "Workflow" / "Quick gotchas" sections are quick-reference. T
 
 Distilled from sessions 2026-04-11 → 2026-04-30 building this implementation. Each section is something that bit us in production — read before changing related code.
 
+### Jamie API: marketing says REST, wire is tRPC (2026-05-13)
+
+#### Symptom
+
+`wiki collect jamie` returned `404 Not Found` on every endpoint. Docs at `docs.meetjamie.ai` advertise `GET /meetings`, `GET /meetings/{id}`, etc. — classic REST. Built the collector against that shape with `Authorization: Bearer jk_...`. Every route 404'd.
+
+#### Discovery
+
+Probed `app.meetjamie.ai/api/trpc/meetings` (a guess) and got back `{"error":{"json":{"message":"No procedure found on path \"meetings\""}}}` — a tRPC error envelope. Then read `vicampuzano/jamie-mcp` source on GitHub to find the actual base URL + auth + route shape.
+
+#### Root cause
+
+Jamie's public "API" is the same tRPC mount their frontend uses. Marketing docs describe it as REST because the *shape* (list / get / search) maps cleanly, but the wire format does not:
+
+- Base URL: `https://beta-api.meetjamie.ai` (not `api.meetjamie.ai`)
+- Auth: `x-api-key: jk_...` (no `Bearer` prefix)
+- Routes: `/v1/<scope>/<resource>.<op>` — `meetings.list`, `meetings.get`, `tasks.list`, `tags.list`. Verb-dot-noun, not REST.
+- GET params: `?input=<urlencoded JSON {"json": params}>` — tRPC's GET-with-input convention
+- Response: `{"result": {"data": {"json": <payload>}}}` — envelope unwrap required before consuming
+- Pagination filter: `startDate` (not `since`)
+
+#### Lesson
+
+For any "API integration" task: read the **MCP server / SDK source** before building against marketing docs. MCP wrappers are the cheapest live-format-verification we have — they exist precisely because someone already did the reverse engineering.
+
+#### Fix
+
+Rewrote `_JamieClient` against the discovered shape (`scripts/collectors/jamie.py`). Constants are pinned at the top of the file so future format drift is a one-line edit, not a rewrite. First response logs `_shallow_keys` at DEBUG so smoke-test verifies shape on day one.
+
+### `.env` loader gap — secrets worked only inside Claude-spawned subprocesses (2026-05-13)
+
+#### Symptom
+
+`imap_actions.py` error message said "IMAP creds not set: ... (in .claude/.env)". `python-dotenv` was in `pyproject.toml`. But operator-launched `wiki collect <x>` from a plain terminal saw empty env vars. Only piggyback runs (Claude-Code-spawned via SessionEnd hook) had the values.
+
+#### Root cause
+
+Nothing called `load_dotenv()`. The codebase referenced `.claude/.env` as if it were auto-loaded — but the only reason it worked at all was Claude Code's auto-injection of `.claude/.env` into agent subprocesses. CLI-launched processes had no such injection.
+
+#### Fix
+
+Added `load_dotenv(ROOT_DIR / ".claude" / ".env", override=False)` at the top of `scripts/core/config.py` — module imported by 32 scripts, so every entry-point now picks up secrets. `override=False` keeps shell-exports authoritative. Missing file is a graceful no-op.
+
+Plus: `.claude/.env.example` was sitting in `<engine>/.claude/` where the seeder couldn't find it. Moved to `<engine>/templates/.claude/.env.example` + extended `seed_vault_templates()` to copy it into the vault (additive — operator-curated `.env.example` is preserved).
+
+#### Lesson
+
+A reference site for a behavior (an error message saying "set this in `.env`") is **not the same** as the behavior existing. Audit `grep` for `load_dotenv\|dotenv` before trusting that a `python-dotenv` dependency means anything.
+
+### Engine path computation after `scripts/core/` refactor (2026-05-13)
+
+#### Symptom
+
+After a `chore(scripts): move shared engine modules into scripts/core/` refactor, every script silently ran with **dataclass defaults** instead of the operator's `config.yaml`. No error, just empty `personal.accounts`, default models, UTC timezone, etc.
+
+#### Root cause
+
+`scripts/core/wiki_config.py:26`:
+```python
+CONFIG_FILE = Path(__file__).resolve().parent.parent / "config.yaml"
+```
+
+Worked when the file lived at `scripts/wiki_config.py` (→ `<wiki>/config.yaml`). After the move to `scripts/core/wiki_config.py` the same `.parent.parent` resolves to `scripts/config.yaml` — which doesn't exist, so `CONFIG_FILE.exists() → False` → fall through to dataclass defaults silently.
+
+Same bug in `scripts/core/config.py` (`SCRIPTS_DIR/WIKI_DIR/ROOT_DIR` cascade), `scripts/core/prompts.py` (`PROMPTS_DIR`), and `lib/common.sh` (`WIKI_CONFIG_PY` still pointed at the deleted `scripts/wiki_config.py` path).
+
+#### Lesson
+
+When moving Python modules that compute paths from `__file__`, audit every `Path(__file__).resolve().parent.<N>` chain in the moved file AND every bash caller that invokes the file as `python <path>`. The compiler doesn't warn — and `CONFIG_FILE.exists() → False` is a *valid* state (fresh-install vault), so the fallback path masks the bug.
+
+#### Fix
+
+Introduced `CORE_DIR` as the new `__file__`-relative anchor in `core/config.py` (semantic correctness > terse code), added one extra `.parent` everywhere else. Pytest 79/79 pass; vault `wiki config get personal.jamie` resolves correctly.
+
 ### Claude Agent SDK — `query()` with `allowed_tools=[]` is not enough
 
 #### Symptom

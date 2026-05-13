@@ -1,0 +1,225 @@
+# Config Reference
+
+Every settable key in `<vault>/.wiki/config.yaml`, plus the secrets surface in `<vault>/.claude/.env`. Dataclass defaults live in `scripts/core/wiki_config.py` — only the keys you want to *override* need to appear in `config.yaml`. Missing keys silently fall back to the default.
+
+## Contents
+
+- [Files at a glance](#files-at-a-glance)
+- [Section index](#section-index)
+- [scheduling](#scheduling)
+- [models](#models)
+- [features](#features)
+- [limits](#limits)
+- [piggybacks](#piggybacks)
+- [graph_view](#graph_view)
+- [personal](#personal) — primary account, accounts, jamie, email folders, scanners
+- [Secrets — `.claude/.env`](#secrets--claudeenv)
+
+Run `./.wiki/wiki config keys` for the live, full list of every leaf key the dataclass exposes.
+
+## Files at a glance
+
+| File | Purpose | Tracked? |
+|---|---|---|
+| `<engine>/config.example.yaml` | Engine-shipped defaults + comments. Copied once at install. | yes |
+| `<vault>/.wiki/config.yaml` | Per-install overrides. Read by every script via `core.wiki_config.CONFIG`. | gitignored |
+| `<vault>/.claude/.env` | Secrets (API keys, IMAP passwords). Loaded by `core.config` at import. | gitignored |
+| `<vault>/.claude/.env.example` | Catalogue of every env-var the engine recognises. Seeded by `wiki seed`. | tracked (template) |
+
+The `.env` file: only the **variable NAME** lives in `config.yaml` (e.g. `api_key_env: JAMIE_API_KEY`); the **value** lives in `.env`. Shell exports override `.env` values (`override=False` policy). A missing `.env` is a clean no-op.
+
+## Section index
+
+| Section | Lives in |
+|---|---|
+| `scheduling.*` | `Scheduling` dataclass |
+| `models.*` | `Models` dataclass |
+| `features.*` | `Features` dataclass |
+| `limits.*` | `Limits` dataclass |
+| `piggybacks.<task>.*` | `PiggybackTask` dataclass per task |
+| `graph_view.*` | `GraphView` dataclass |
+| `personal.*` | `Personal` dataclass (includes `JamieConfig` nested) |
+
+## scheduling
+
+| Key | Default | Meaning |
+|---|---|---|
+| `scheduling.compile_after_hour` | `18` | Hour-of-day (`0`–`23`, local time) at which auto-compile + piggyback tasks may spawn from `flush.py`. Set to `0` to disable the time-gate. |
+| `scheduling.dedup_window_seconds` | `60` | Dedup window for repeated session-flushes of the same session id. |
+| `scheduling.timezone` | `"UTC"` | IANA timezone name (`Europe/Berlin`, `America/New_York`, …). Drives `compile_after_hour` cutoff + daily-log filename + `reviewed` timestamps. |
+
+## models
+
+| Key | Default | Meaning |
+|---|---|---|
+| `models.compile_model` | `"claude-opus-4-7"` | Claude model used by `compile.py` + `retry-failed-flushes.py`. Options: `claude-opus-4-7`, `claude-sonnet-4-6`, `claude-haiku-4-5`. |
+| `models.ollama_url` | `"http://localhost:11434"` | Ollama endpoint for every local-LLM call. |
+| `models.vision_model` | `"gemma4:e4b"` | Vision model for screenshot OCR + YouTube Tier-3 frame analysis. |
+| `models.curiosity_model` | `"gemma4:e4b"` | Curiosity-loop gap-detection model (compile post-pass). |
+| `models.classify_model` | `"gemma4:e4b"` | Inbox classifier. |
+
+## features
+
+Master switches for entire capabilities. Disable when the dependency (Ollama, webmail API, browser extension) isn't available.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `features.curiosity_loop` | `true` | Gap detection after each compile run. Writes follow-up requests to `raw/requests/`. |
+| `features.vision_screenshots` | `true` | Local vision OCR for `scan-screenshots`. |
+| `features.procmail_execution` | `true` | Allow `suggestions/cli.py` to call webmail Procmail APIs. Default off in `config.example.yaml` (kasserver-specific). |
+| `features.clippings_sweep` | `true` | Pre-compile sweep of `<vault>/Clippings/*.md` into `<vault>/raw/articles/`. Disable if Obsidian Web Clipper drops directly into `raw/articles/`. |
+
+## limits
+
+Knob block. Defaults sized for an Opus-on-5h-window install — tighten on smaller plans.
+
+### Compile + flush
+
+| Key | Default | Meaning |
+|---|---|---|
+| `limits.compile_max_files` | `30` | Per-run cap (rate-limit guard for the 5h Opus window). |
+| `limits.compile_max_consecutive_failures` | `3` | Abort after N back-to-back compile failures. |
+| `limits.flush_max_retries` | `3` | Retries for flush-extraction calls. |
+| `limits.flush_retry_delay_seconds` | `30` | Delay between flush retries. |
+
+### Screenshots
+
+| Key | Default | Meaning |
+|---|---|---|
+| `limits.screenshot_resize_width` | `512` | Pixel width before sending a screenshot to the vision model. |
+| `limits.screenshot_timeout_seconds` | `60` | Per-screenshot Ollama timeout. |
+
+### Curiosity loop
+
+| Key | Default | Meaning |
+|---|---|---|
+| `limits.curiosity_max_gaps` | `3` | Max curiosity-requests written per compile run. |
+| `limits.curiosity_min_source_chars` | `500` | Skip curiosity for sources shorter than this. |
+| `limits.curiosity_timeout_s` | `240` | Ollama timeout for the gap-detection call (long YT-notes hit >90 s on gemma4:e4b). |
+
+### Lint
+
+| Key | Default | Meaning |
+|---|---|---|
+| `limits.sparse_threshold_words` | `200` | Lint warns under this word count per article. |
+
+### YouTube ingest (Tier-3 visual)
+
+| Key | Default | Meaning |
+|---|---|---|
+| `limits.youtube_max_frames` | `30` | Cap frames per video. |
+| `limits.youtube_max_duration_s` | `10800` | Skip videos longer than this (3 h). |
+| `limits.youtube_frame_resize_width` | `512` | `ffmpeg` downscale before vision model. |
+| `limits.youtube_vision_timeout_s` | `90` | Per-frame Ollama timeout. |
+| `limits.youtube_aggregate_timeout_s` | `300` | Final synthesis Ollama timeout. |
+
+### Jamie ingest
+
+| Key | Default | Meaning |
+|---|---|---|
+| `limits.jamie_request_timeout_s` | `30` | Per-HTTP-call timeout against `beta-api.meetjamie.ai`. |
+| `limits.jamie_max_per_run` | `50` | Default cap on meetings pulled per run. `CONFIG.personal.jamie.max_per_run` overrides per-install. |
+
+## piggybacks
+
+Recurring tasks spawned by `flush.py` after `compile_after_hour`. Each entry takes `enabled` (bool), `cooldown_hours` (int), and optionally `max_per_run` (int).
+
+| Key | Default | Cap | Notes |
+|---|---|---|---|
+| `piggybacks.email` | `enabled: true, cooldown_hours: 24` | — | `EmailCollector` — incremental mailbox sweep. (Renamed from `email_incremental` in M002.) |
+| `piggybacks.lint_structural` | `enabled: true, cooldown_hours: 24` | — | No-LLM structural lint sweep. |
+| `piggybacks.review_wiki` | `enabled: true, cooldown_hours: 168` | — | Weekly per-article quality-score via local Ollama. |
+| `piggybacks.optimize_claude_md` | `enabled: true, cooldown_hours: 24` | — | Suggests CLAUDE.md edits from compiled patterns. |
+| `piggybacks.scan_screenshots` | `enabled: true, cooldown_hours: 24` | `max_per_run: 50` | Local-vision OCR of new screenshots. |
+| `piggybacks.scan_youtube` | `enabled: true, cooldown_hours: 24` | `max_per_run: 10` | Drains the YouTube inbox file. |
+| `piggybacks.jamie` | `enabled: true, cooldown_hours: 6` | `max_per_run: 20` | Pulls new meetings from the Jamie API. Tighter cooldown — meetings are time-sensitive. |
+| `piggybacks.follow_requests` | `enabled: true, cooldown_hours: 24` | — | Acts on `raw/requests/` items from the curiosity loop. |
+| `piggybacks.retry_failed_flushes` | `enabled: true, cooldown_hours: 24` | `max_per_run: 5` | Re-processes archived flush contexts. |
+| `piggybacks.sync_memories` | `enabled: false, cooldown_hours: 24` | — | **Default OFF** (phase-out 2026-05-04). Mirrors `~/.claude/projects/<encoded>/memory/` into `raw/memories/`. |
+
+## graph_view
+
+Drives `.obsidian/graph.json` rebuilds by `wiki seed`.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `graph_view.mode` | `"knowledge-only"` | One of: `knowledge-only`, `full-vault`, `sources-only`, `custom`. |
+| `graph_view.custom_search` | `""` | Obsidian search expression when `mode=custom`. |
+
+## personal
+
+Per-instance data — operator-specific. **Never committed** (lives in `config.yaml`, gitignored). `config.example.yaml` ships empty defaults so prompts and schemas render cleanly on a fresh install.
+
+### Top-level
+
+| Key | Default | Meaning |
+|---|---|---|
+| `personal.primary_account` | `""` | Account id used as default in prompts + fallback in `compile.py`. |
+| `personal.thunderbird_profile` | `""` | Absolute path to local Thunderbird profile. Empty disables `scan-email` + `thunderbird-rules`. |
+| `personal.firefox_profile` | `""` | Absolute path to Firefox profile (`Library/Application Support/Firefox/Profiles/<id>.default-release` on macOS). Drives `scan-browser`. |
+| `personal.stg_backup_dir` | `""` | Simple Tab Groups backup dir. Drives `scan-tabs` STG import path. |
+
+### Accounts (M002+ nested schema)
+
+```yaml
+personal:
+  accounts:
+    work:
+      email: alex@example.com           # required — used in prompts + reports
+      label: "Work"                     # optional — display label
+      reader:
+        kind: thunderbird-mbox          # thunderbird-mbox | gmail-api
+        mbox_paths:                     # relative to thunderbird_profile
+          - ImapMail/server/INBOX.mbox
+      filter:
+        kind: all-inkl-procmail         # thunderbird-msgfilter | all-inkl-procmail | gmail-api
+        imap_user_env: WORK_IMAP_USER   # env var name (not value)
+        imap_pass_env: WORK_IMAP_PASS
+        imap_host: mail.example.com
+```
+
+`reader.kind` and `filter.kind` dispatch independently — an account can read via Thunderbird mbox and write filter rules via All-Inkl Procmail (the legacy hybrid). Unknown kinds are silently skipped (graceful agnostic).
+
+The pre-M002 flat-account schema (`mbox_paths`, `imap_host`, `has_procmail` directly on the account) is rejected at config load with an explicit migration error.
+
+### Jamie (single-tenant)
+
+```yaml
+personal:
+  jamie:
+    api_key_env: JAMIE_API_KEY         # name of env var holding the jk_... key
+    key_type: personal                 # personal | workspace
+    since: ""                          # ISO date "2026-01-01" — first-install backfill cap
+    max_per_run: null                  # null inherits CONFIG.limits.jamie_max_per_run
+    account_id: default                # cosmetic — written to frontmatter
+```
+
+Flat (not nested under `accounts`) because a Jamie install is single-tenant: one account, one key. If multi-account ever needed, lift into `personal.accounts.<id>` with `kind: jamie-api`.
+
+### Email folders + scanner-prompt config
+
+| Key | Default | Meaning |
+|---|---|---|
+| `personal.email_folders` | `[]` | List of `{path, desc}` pairs. Drives both the `compile_curiosity` prompt and `compile.py`'s schema enum — single source of truth. |
+| `personal.project_examples` | `[]` | List of project / product names rendered into `scan_screenshots_vision.md` as concrete examples. |
+| `personal.calendar_work_keywords` | `[]` | Substrings marking calendar events as work-relevant (customer / partner / team names). |
+| `personal.calendar_skip_keywords` | `[]` | Substrings marking holidays / observances to skip. Locale-specific. |
+| `personal.calendar_categories` | `{}` | Mapping of category-label → list of substring keywords used for bucketing in `scan-calendar`. First match wins. |
+| `personal.calendar_report_language` | `"en"` | Output language for the calendar scan report. `en` or `de`. |
+
+## Secrets — `.claude/.env`
+
+Loaded automatically at import via `core.config.load_dotenv(<vault>/.claude/.env, override=False)`. Add new entries to `<engine>/templates/.claude/.env.example` to ship them to fresh vaults via `wiki seed`.
+
+| Variable | Used by | Notes |
+|---|---|---|
+| `OPENAI_API_KEY` | Whisper audio transcription (and future OpenAI paths) | — |
+| `JAMIE_API_KEY` | `collectors/jamie.py` | Pro/Team/Enterprise plan. `jk_` prefix. Generate in Jamie: Settings → Developers → API Keys. |
+| `IMAP_<ACCOUNT>_USER` / `_PASS` | `suggestions/backends/imap.py`, `adapters/mailbox/allinkl.py` | `<ACCOUNT>` matches the value of `imap_user_env` / `imap_pass_env` in the account's `filter` block. Gmail/2FA needs an App Password. |
+| `NAS_HOST` / `NAS_USER` / `NAS_PASS` | Future `scan-nas.py` / SMB-backed collectors | — |
+| `LINKEDIN_EMAIL` / `LINKEDIN_PASSWORD` | adhikasp/mcp-linkedin MCP server | **Not loaded from `.env`** — set in `~/.claude.json` under `mcpServers.linkedin.env`. Listed only as a reminder. |
+
+## Editing safely
+
+- **Programmatic edits** (`wiki config set`) round-robin-backup the file to `.wiki/state/config-backups/` (last 10 retained) before writing. PyYAML drops comments on round-trip — manual edits in `$EDITOR` preserve them.
+- **Round-trip caveat**: if you `wiki config set` after hand-editing, the next read-back may not match your file byte-for-byte (comment loss, key reordering inside a section). The dataclass semantics survive — values stay correct.

@@ -94,6 +94,7 @@ Cursor session.  flush.py extracts        · scan-browser     (Firefox + Chrome)
 the conversation transcript and           · scan-screenshots (Vision LLM)
 appends a structured entry to             · scan-tabs        (Firefox STG)
 daily/YYYY-MM-DD.md.                      · scan-youtube     (yt-dlp + gemma4 visual)
+                                          · jamie            (Jamie AI meetings)
                                           · sync-memories    (Claude Code memory; opt-in)
                                           · clippings-sweep  (Obsidian Web Clipper)
             │                             · ingest-html      (file or URL)
@@ -128,7 +129,7 @@ daily/YYYY-MM-DD.md.                      · scan-youtube     (yt-dlp + gemma4 v
 After every compile, two side loops run on the new article:
 
 - **Curiosity loop** — a small local Ollama model spots gaps and writes JSON deep-scan requests to `raw/requests/`. The next compile cycle picks one up and fills the gap.
-- **Optimization suggestions** — the compiler emits YAML proposals to `raw/suggestions/` for repeatable manual actions (e.g. mail filter rules). `execute-suggestions.py` applies them only after explicit per-action approval.
+- **Optimization suggestions** — the compiler emits YAML proposals to `raw/suggestions/` for repeatable manual actions (e.g. mail filter rules). `suggestions/cli.py` applies them only after explicit per-action approval.
 
 `lint.py` watches the wiki itself: 7 structural checks (broken links, orphan pages, orphan sources, stale articles, missing backlinks, sparse articles, fact violations) plus one LLM-driven contradiction scan.
 

@@ -7,7 +7,7 @@ Operational layer for an LLM Wiki vault. The `.wiki/` directory is hidden from O
 - [Quick start](#quick-start) — top-level commands at a glance
 - [Subcommand cheat sheet](#subcommand-cheat-sheet) — every `wiki <subcommand>`
 - [Setup wizard — what's asked](#setup-wizard--whats-asked) — the 5 questions
-- [Config keys](#config-keys) — every settable key in `config.yaml`
+- [Config keys](#config-keys) — pointer to the full reference in [config.md](config.md)
 - [Hook targets](#hook-targets) — which agents are wired, with what scope
 
 ## Quick start
@@ -90,6 +90,8 @@ Grouped by purpose. Run `wiki <cmd> --help` for the full per-command help block.
 |---|---|
 | `wiki collect --list` | list registered Collectors with their `SPEC` |
 | `wiki collect <name> [flags]` | run one Collector. Flags: `--dry-run` (log without writing), `--incremental` (delta-only when supported), `--account ID` (restrict to one account, where applicable). |
+| `wiki collect email` | sweep configured mailboxes — output to `raw/notes/email/<account>-<date>.md`. Reads accounts from `personal.accounts.*`; secrets from `.claude/.env`. |
+| `wiki collect jamie` | pull meetings from the Jamie AI API into `raw/transcripts/jamie/<date>--<slug>--<id>.md`. Single-tenant: configured via `personal.jamie` + `JAMIE_API_KEY` env var. Auto-runs as piggyback every 6 h. |
 | `wiki gmail-auth <account-id>` | one-time OAuth bootstrap for a Gmail account-id. Reads `.claude/gmail-oauth-client.json`, runs local-loopback consent, persists token to `.wiki/state/gmail-token-<id>.json`. |
 | `wiki ingest-youtube --url URL [flags]` | ingest a single video or a playlist. Output to `raw/notes/youtube/`. |
 | `wiki ingest-youtube --inbox PATH [flags]` | parse a markdown file with YouTube URLs (bare / markdown-link / shortlink, optional inline `tier: N` directive). |
@@ -111,78 +113,20 @@ The 5 questions, in order:
 1. **Ollama base URL** — probed live; if unreachable the next question gets a warning.
 2. **Compile model** — `claude-opus-4-7` / `claude-sonnet-4-6` / `claude-haiku-4-5`. Used by `compile.py` and `retry-failed-flushes.py`.
 3. **Auto-compile starts at hour** (`0`–`23`, local time) — `scheduling.compile_after_hour`.
-4. **Procmail execution** (default OFF) — only enable if `execute-suggestions.py` should call a webmail-procmail provider API.
+4. **Procmail execution** (default OFF) — only enable if `suggestions/cli.py` should call a webmail-procmail provider API.
 5. **Local-LLM features** (curiosity loop + vision screenshots, bundled) — only offered when Ollama probed successfully.
 
 Re-run anytime via `./.wiki/wiki config wizard`.
 
 ## Config keys
 
-All in `.wiki/config.yaml`, dot-notation:
+Full reference with defaults, grouped tables, and the `personal.accounts` schema lives in **[`docs/config.md`](config.md)**. Quick pointers:
 
-```text
-scheduling.compile_after_hour          0–23 (default 18)
-scheduling.dedup_window_seconds        seconds (default 60)
+- `./.wiki/wiki config get KEY` / `set KEY VALUE` / `keys` / `path` — runtime introspection
+- `./.wiki/wiki config wizard` — re-run the 5-question setup
+- Secrets go in `<vault>/.claude/.env` (loaded automatically at import; see [config.md § Secrets](config.md#secrets--claudeenv))
 
-models.compile_model                   claude-opus-4-7 | claude-sonnet-4-6 | claude-haiku-4-5
-models.ollama_url                      e.g. http://localhost:11434
-models.vision_model                    e.g. gemma4:e4b
-models.curiosity_model                 e.g. gemma4:e4b
-models.classify_model                  e.g. gemma4:e4b
-
-features.curiosity_loop                bool — gap detection after compile
-features.vision_screenshots            bool — local vision OCR for screenshots
-features.procmail_execution            bool — webmail Procmail API calls (default OFF)
-features.clippings_sweep               bool — pre-compile lift of <vault>/Clippings/
-
-limits.compile_max_files               int — per-run cap (rate-limit guard)
-limits.compile_max_consecutive_failures int — abort after N back-to-back failures
-limits.flush_max_retries               int
-limits.flush_retry_delay_seconds       int
-limits.screenshot_resize_width         px
-limits.screenshot_timeout_seconds      seconds
-limits.youtube_max_frames              int — Tier-3 cap frames per video (default 30)
-limits.youtube_max_duration_s          int — Tier-3: skip videos longer than this (default 10800 = 3h)
-limits.youtube_frame_resize_width      px — ffmpeg downscale before vision model (default 512)
-limits.youtube_vision_timeout_s        seconds — per-frame ollama timeout (default 90)
-limits.youtube_aggregate_timeout_s     seconds — final-synthesis ollama timeout (default 300)
-limits.curiosity_max_gaps              int — max requests per compile
-limits.curiosity_min_source_chars      int — skip curiosity for tiny sources
-limits.sparse_threshold_words          int — lint warns under this word count
-
-# Recurring tasks spawned at session-end after flush.
-piggybacks.email_incremental.{enabled, cooldown_hours}
-piggybacks.lint_structural.{enabled, cooldown_hours}
-piggybacks.review_wiki.{enabled, cooldown_hours}
-piggybacks.optimize_claude_md.{enabled, cooldown_hours}
-piggybacks.scan_screenshots.{enabled, cooldown_hours}
-piggybacks.follow_requests.{enabled, cooldown_hours, max_per_run}
-piggybacks.sync_memories.{enabled, cooldown_hours}    # default OFF (phase-out, 2026-05-04)
-piggybacks.retry_failed_flushes.{enabled, cooldown_hours, max_per_run}
-
-graph_view.mode                        knowledge-only | full-vault | sources-only | custom
-graph_view.custom_search               obsidian search string (when mode=custom)
-
-# Per-instance personal data — drives compile prompts, scan-email, scan-calendar,
-# thunderbird-rules, execute-suggestions. Lives in config.yaml only (gitignored);
-# config.example.yaml ships empty defaults.
-personal.primary_account               account-id used as default in prompts + fallback in compile.py
-personal.thunderbird_profile           absolute path; empty disables scan-email + thunderbird-rules
-personal.stg_backup_dir                Firefox Simple Tab Groups backup dir (drives scan-tabs)
-personal.accounts.<id>.email           full address (used in prompts + Webmail login)
-personal.accounts.<id>.label           display label for scan-email reports
-personal.accounts.<id>.mbox_paths      list of paths under thunderbird_profile (scan-email)
-personal.accounts.<id>.filter_paths    list of paths to msgFilterRules.dat (thunderbird-rules)
-personal.accounts.<id>.imap_host       IMAP hostname (thunderbird-rules)
-personal.accounts.<id>.imap_user_env   env var name for IMAP user
-personal.accounts.<id>.imap_pass_env   env var name for IMAP password
-personal.accounts.<id>.has_procmail    bool — account exposes Webmail Procmail API
-personal.email_folders[]               { path, desc } — drives compile_curiosity prompt + schema enum
-personal.project_examples              list[str] — examples in scan_screenshots vision prompt
-personal.calendar_work_keywords        list[str] — substrings marking work events in scan-calendar
-```
-
-Run `./.wiki/wiki config keys` for the live, full list.
+Run `./.wiki/wiki config keys` for the live enumeration of every settable leaf.
 
 ## Hook targets
 

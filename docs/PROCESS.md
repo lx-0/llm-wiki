@@ -359,6 +359,11 @@ flowchart LR
 | `scan-browser.py` | Firefox places.sqlite + STG + Chrome | tausende Tabs, Bookmarks, zehntausende Visits. | `raw/notes/browser/` |
 | `scan-screenshots.py` | `~/Screenshots/` (macOS PNG-Dump) | gemma4 Vision pro Screenshot, batch-report mit allen analyses + thumbnails. | `raw/notes/screenshots/screenshots-<slug>.md` + `~/Screenshots/<file>.md` (canonical sidecar) |
 | `scan-youtube.py` | YouTube (yt-dlp Metadaten + youtube-transcript-api Captions + Comments + optional ffmpeg-Frames + gemma4 Vision) | pro Video ein Markdown-File (single source of truth). Tier-based ingest: 0=metadata, 1=+transcript, 2=+comments, 3=+visual analysis. Playlist-Expansion via `playlist?list=` Normalisierung. | `raw/notes/youtube/<channel>--<title>--<vid>.md` |
+| `collectors/jamie.py` | Jamie AI public tRPC API (`beta-api.meetjamie.ai`, `x-api-key` auth) | pro Meeting ein Markdown-File: frontmatter (id, participants, tags, calendar event) + Jamie-LLM-Summary verbatim + Action-Items als Obsidian-Tasks + Speaker-diarisierter Transcript (`**Name** [mm:ss] — text`). Skip-existing per `meeting_id`; incremental via `last_seen_ts` state. | `raw/transcripts/jamie/<date>--<slug>--<short-id>.md` |
+
+> **Hinweis Collector vs Scanner**: Jamie folgt dem neuen `Collector` Pattern (`scripts/collectors/base.py` — `SPEC`-deklariert + `@register` decorator + `run(dry_run, incremental) → RunResult`) statt dem alten `scan-*.py` CLI-Pattern. `flush.py` entdeckt alle Collectors automatisch über `piggyback_collectors()` Registry-walk — keine hardcoded Liste. Migration der bestehenden `scan-*.py` Scripts auf das Pattern ist work-in-progress; aktuell laufen sie parallel.
+
+> **Secrets**: `JAMIE_API_KEY` (+ alle anderen `*_API_KEY` / `IMAP_*_PASS` / `NAS_*`) liegen in `<vault>/.claude/.env`. `core.config` lädt das File einmal beim Import via `load_dotenv(..., override=False)` — keine manuellen `export`-Statements nötig, weder für Piggyback-Runs noch für Operator-CLI-Aufrufe. Shell-Exports überschreiben `.env`-Werte. Fresh-Vault-Seed über `wiki seed` kopiert `templates/.claude/.env.example` in den Vault (additiv).
 
 ### Email Scanner — Drei Modi
 
