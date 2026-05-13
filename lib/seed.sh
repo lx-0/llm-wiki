@@ -10,12 +10,28 @@ __WIKI_SEED_LOADED=1
 
 
 # ── Internal: copy if absent / overwrite if --force ────────────────
+# Modes:
+#   force=0 check=0   normal seed: copy when missing, keep + report drift if exists
+#   force=1           overwrite: copy unconditionally (destructive)
+#   check=1           read-only: report state (missing/drifted/up-to-date); never writes
 _seed_file() {
-  local src="$1" dst="$2" force="$3" label="${4:-}"
+  local src="$1" dst="$2" force="$3" label="${4:-}" check="${5:-0}"
   [[ -z "$label" ]] && label="$(basename "$dst")"
   if [[ ! -f "$src" ]]; then
     return 0  # template missing — silently skip
   fi
+
+  if [[ "$check" == "1" ]]; then
+    if [[ ! -f "$dst" ]]; then
+      warn "missing $label (run \`wiki seed\` to install)"
+    elif cmp -s "$src" "$dst"; then
+      ok "up-to-date $label"
+    else
+      info "drifted $label (engine template differs; \`wiki seed --force\` overwrites)"
+    fi
+    return 0
+  fi
+
   if [[ ! -f "$dst" ]]; then
     mkdir -p "$(dirname "$dst")"
     cp "$src" "$dst"
@@ -28,19 +44,28 @@ _seed_file() {
     ok "overwrote $label (--force)"
     return 0
   fi
-  info "kept existing $label (engine version available; rerun with --force to overwrite)"
+  if cmp -s "$src" "$dst"; then
+    info "kept existing $label (up-to-date)"
+  else
+    info "kept existing $label (drifted from engine; rerun with --force to overwrite, or \`wiki seed --check\` to audit)"
+  fi
 }
 
 
 # ── Internal: merge community-plugins.json (additive union) ────────
 # This is always safe — we only ADD missing engine plugins to the list,
-# never remove operator-added entries. Idempotent.
+# never remove operator-added entries. Idempotent. check=1 reports
+# pending merges without writing.
 _merge_community_plugins() {
-  local src="$1" dst="$2"
+  local src="$1" dst="$2" check="${3:-0}"
   if [[ ! -f "$src" ]]; then
     return 0
   fi
   if [[ ! -f "$dst" ]]; then
+    if [[ "$check" == "1" ]]; then
+      warn "missing community-plugins.json"
+      return 0
+    fi
     mkdir -p "$(dirname "$dst")"
     cp "$src" "$dst"
     ok "seeded community-plugins.json"
@@ -57,8 +82,16 @@ _merge_community_plugins() {
     warn "community-plugins.json — merge failed (malformed JSON?)"
     return 0
   fi
+  after="$(printf '%s\n' "$merged" | jq -r 'length')"
+  if [[ "$check" == "1" ]]; then
+    if [[ "$before" != "$after" ]]; then
+      info "drifted community-plugins.json ($before installed; engine ships $after — would merge to $after)"
+    else
+      ok "up-to-date community-plugins.json"
+    fi
+    return 0
+  fi
   printf '%s\n' "$merged" > "$dst.tmp" && mv "$dst.tmp" "$dst"
-  after="$(jq -r 'length' "$dst")"
   if [[ "$before" != "$after" ]]; then
     ok "community-plugins.json — merged ($before → $after entries)"
   else
@@ -73,11 +106,15 @@ _merge_community_plugins() {
 # .obsidian/snippets/ but is never enabled by Obsidian — the dashboard layout
 # silently fails.
 _merge_appearance_json() {
-  local src="$1" dst="$2"
+  local src="$1" dst="$2" check="${3:-0}"
   if [[ ! -f "$src" ]]; then
     return 0
   fi
   if [[ ! -f "$dst" ]]; then
+    if [[ "$check" == "1" ]]; then
+      warn "missing appearance.json"
+      return 0
+    fi
     mkdir -p "$(dirname "$dst")"
     cp "$src" "$dst"
     ok "seeded appearance.json"
@@ -99,8 +136,16 @@ _merge_appearance_json() {
     warn "appearance.json — merge failed (malformed JSON?)"
     return 0
   fi
+  after="$(printf '%s\n' "$merged" | jq -r '(.enabledCssSnippets // []) | join(",")')"
+  if [[ "$check" == "1" ]]; then
+    if [[ "$before" != "$after" ]]; then
+      info "drifted appearance.json (enabledCssSnippets [$before] → would merge to [$after])"
+    else
+      ok "up-to-date appearance.json"
+    fi
+    return 0
+  fi
   printf '%s\n' "$merged" > "$dst.tmp" && mv "$dst.tmp" "$dst"
-  after="$(jq -r '(.enabledCssSnippets // []) | join(",")' "$dst")"
   if [[ "$before" != "$after" ]]; then
     ok "appearance.json — enabledCssSnippets [$before] → [$after]"
   else
@@ -170,9 +215,10 @@ _rewrite_dashboard_agent_buttons() {
 
 
 # ── Public: seed all vault templates ───────────────────────────────
-# Args: <target-vault-root> <wiki-dir> [force=0|1]
+# Args: <target-vault-root> <wiki-dir> [force=0|1] [check=0|1]
+# check=1 reports drift without writing anything (read-only audit).
 seed_vault_templates() {
-  local target="$1" wiki_dir="$2" force="${3:-0}"
+  local target="$1" wiki_dir="$2" force="${3:-0}" check="${4:-0}"
   local templates_dir="$wiki_dir/templates"
 
   if [[ ! -d "$templates_dir" ]]; then
@@ -180,85 +226,85 @@ seed_vault_templates() {
     return 1
   fi
 
-  # 1. AGENTS.md — vault-owner editable schema.
-  _seed_file "$templates_dir/AGENTS.example.md" "$target/AGENTS.md" "$force" "AGENTS.md"
+  # 1. README.md — vault-owner-facing quickstart.
+  _seed_file "$templates_dir/README.md" "$target/README.md" "$force" "README.md" "$check"
 
-  # 2. dashboard.md — Obsidian Homepage target.
-  _seed_file "$templates_dir/dashboard.md" "$target/dashboard.md" "$force" "dashboard.md"
+  # 2. AGENTS.md — article-schema spec read by every compile prompt.
+  _seed_file "$templates_dir/AGENTS.example.md" "$target/AGENTS.md" "$force" "AGENTS.md" "$check"
 
-  # 2b. knowledge.base — native Obsidian Bases knowledge browser (built-in 1.10+).
-  _seed_file "$templates_dir/knowledge.base" "$target/knowledge.base" "$force" "knowledge.base"
+  # 3. dashboard.md — Obsidian Homepage target.
+  _seed_file "$templates_dir/dashboard.md" "$target/dashboard.md" "$force" "dashboard.md" "$check"
 
-  # 3. Cache files (_dashboard-*.md) are NOT seeded — they're producer-only outputs
+  # 3b. knowledge.base — native Obsidian Bases knowledge browser (built-in 1.10+).
+  _seed_file "$templates_dir/knowledge.base" "$target/knowledge.base" "$force" "knowledge.base" "$check"
+
+  # 4. Cache files (_dashboard-*.md) are NOT seeded — they're producer-only outputs
   #    of dashboard_stats.py / dashboard_lint.py. Seeding them (especially with --force)
   #    would clobber live data with the placeholder template. First wiki flush writes
   #    them fresh. See M003-S07 for full rationale.
 
-  # 4. Templates/*.md — typed-note templates consumed by QuickAdd.
+  # 5. Templates/*.md — typed-note templates consumed by QuickAdd.
   if [[ -d "$templates_dir/Templates" ]]; then
     local tpl
     for tpl in "$templates_dir/Templates"/*.md; do
       [[ -f "$tpl" ]] || continue
-      _seed_file "$tpl" "$target/Templates/$(basename "$tpl")" "$force" "Templates/$(basename "$tpl")"
+      _seed_file "$tpl" "$target/Templates/$(basename "$tpl")" "$force" "Templates/$(basename "$tpl")" "$check"
     done
   fi
 
-  # 4b. knowledge/MOCs/*.md — Map-of-Content stubs. Operator hand-curates;
-  #     additive copy preserves edits. Producer-style (auto-listed via
-  #     dataview), but seedable because the hand-curated section above the
-  #     dataview block IS the operator's content.
+  # 5b. knowledge/MOCs/*.md — Map-of-Content stubs.
   if [[ -d "$templates_dir/knowledge/MOCs" ]]; then
     local moc
     for moc in "$templates_dir/knowledge/MOCs"/*.md; do
       [[ -f "$moc" ]] || continue
-      _seed_file "$moc" "$target/knowledge/MOCs/$(basename "$moc")" "$force" "knowledge/MOCs/$(basename "$moc")"
+      _seed_file "$moc" "$target/knowledge/MOCs/$(basename "$moc")" "$force" "knowledge/MOCs/$(basename "$moc")" "$check"
     done
   fi
 
-  # 5. .obsidian/*.json — top-level configs.
+  # 6. .obsidian/*.json — top-level configs.
   if [[ -d "$templates_dir/.obsidian" ]]; then
-    mkdir -p "$target/.obsidian"
+    [[ "$check" == "1" ]] || mkdir -p "$target/.obsidian"
     local f base
     for f in "$templates_dir/.obsidian"/*.json; do
       [[ -f "$f" ]] || continue
       base="$(basename "$f")"
       if [[ "$base" == "community-plugins.json" ]]; then
-        _merge_community_plugins "$f" "$target/.obsidian/$base"
+        _merge_community_plugins "$f" "$target/.obsidian/$base" "$check"
       elif [[ "$base" == "appearance.json" ]]; then
-        _merge_appearance_json "$f" "$target/.obsidian/$base"
+        _merge_appearance_json "$f" "$target/.obsidian/$base" "$check"
       else
-        _seed_file "$f" "$target/.obsidian/$base" "$force" ".obsidian/$base"
+        _seed_file "$f" "$target/.obsidian/$base" "$force" ".obsidian/$base" "$check"
       fi
     done
 
-    # 6. .obsidian/snippets/*.css — CSS snippets for the dashboard layout.
+    # 7. .obsidian/snippets/*.css — CSS snippets for the dashboard layout.
     if [[ -d "$templates_dir/.obsidian/snippets" ]]; then
-      mkdir -p "$target/.obsidian/snippets"
+      [[ "$check" == "1" ]] || mkdir -p "$target/.obsidian/snippets"
       local css
       for css in "$templates_dir/.obsidian/snippets"/*.css; do
         [[ -f "$css" ]] || continue
-        _seed_file "$css" "$target/.obsidian/snippets/$(basename "$css")" "$force" ".obsidian/snippets/$(basename "$css")"
+        _seed_file "$css" "$target/.obsidian/snippets/$(basename "$css")" "$force" ".obsidian/snippets/$(basename "$css")" "$check"
       done
     fi
 
-    # 7. .obsidian/plugins/*/data.json — per-plugin defaults (recursive).
+    # 8. .obsidian/plugins/*/data.json — per-plugin defaults (recursive).
     if [[ -d "$templates_dir/.obsidian/plugins" ]]; then
       local src rel dst
       while IFS= read -r src; do
         rel="${src#"$templates_dir/.obsidian/"}"
         dst="$target/.obsidian/$rel"
-        _seed_file "$src" "$dst" "$force" ".obsidian/$rel"
+        _seed_file "$src" "$dst" "$force" ".obsidian/$rel" "$check"
       done < <(find "$templates_dir/.obsidian/plugins" -type f -name '*.json')
     fi
   fi
 
-  # 8. .claude/.env.example — secrets template. Additive: an existing
-  #    operator-curated .env.example is preserved (carries account-specific
-  #    IMAP_<account>_* lines etc.). --force overwrites — only use if you're
-  #    intentionally reverting to the engine-default catalogue.
-  _seed_file "$templates_dir/.claude/.env.example" "$target/.claude/.env.example" "$force" ".claude/.env.example"
+  # 9. .claude/.env.example — secrets template (catalogue of recognised env vars).
+  _seed_file "$templates_dir/.claude/.env.example" "$target/.claude/.env.example" "$force" ".claude/.env.example" "$check"
 
-  # 9. Agent-task auto-wiring — discovered from prompts/agent_*.md `button:` frontmatter.
-  _merge_agent_shell_commands "$target" "$wiki_dir"
-  _rewrite_dashboard_agent_buttons "$target" "$wiki_dir"
+  # 10. Agent-task auto-wiring — discovered from prompts/agent_*.md `button:` frontmatter.
+  #     Skipped in check mode (these are destructive merges + dashboard rewrites).
+  if [[ "$check" != "1" ]]; then
+    _merge_agent_shell_commands "$target" "$wiki_dir"
+    _rewrite_dashboard_agent_buttons "$target" "$wiki_dir"
+  fi
 }
