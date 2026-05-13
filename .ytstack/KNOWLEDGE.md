@@ -854,3 +854,26 @@ Same pattern as the screenshots-intake decision: rejected `raw/notes/screenshots
 - Don't fix `config.py` to special-case dev — production correctness is the primary contract
 
 **Pollution recovery:** after dev-test, files land in `<dev-repo-parent>/raw/`. They're not in the engine repo's git, but they ARE outside the project directory the operator scopes for. Always offer cleanup explicitly + ask before `rm -rf` (CLAUDE.md hard rule).
+
+### `install.sh` first-run UX — three cascading bugs (2026-05-13, commit `ae5bcd2`)
+
+User reported a fresh-laptop install where (a) "kept existing" lines flew by without a prompt, (b) `wiki setup` "wasn't visibly a question" — looked hung, (c) crashed mid-wizard. Three independent root-causes layered into one bad experience:
+
+**Bug 1 — `lib/ui.sh ask()` printed prompts to stdout.** Both call-sites (`config.sh:39`, `config.sh:71`) capture with `$(ask …)`. Inside command substitution, stdout is the pipe — the prompt text never reaches the terminal. User sees a black pause and assumes hang. When they eventually press Enter, the *captured* stdout includes the prompt text + ANSI bytes + their typed input. That whole string got written to `config.yaml` as `models.ollama_url`. `select_one` got this right years ago by routing prompts to `>&2`; `ask` was the outlier.
+**Rule:** any helper whose return value is captured with `$(…)` MUST route its prompts to `>&2`. Stdout is for the value, period.
+
+**Bug 2 — macOS bash 3.2 mis-parses `$( case … esac )` nested in `$( … )`.** `config.sh:56-62` had:
+```bash
+model="$(select_one "Pick" "claude-opus-…|…" \
+  "$( case "$current_model" in
+       claude-opus-4-7) echo 1 ;;
+       …
+     esac )")"
+```
+Bash 3.2's paren-balancing on case-pattern `)` tokens fails when the outer `$()` is also active. Crashes with `syntax error near unexpected token 'newline'` on the line *after* the first `;;`. macOS ships 3.2 to this day; `install.sh` only *warns* on `bash_major < 4`, doesn't refuse. The crash surfaces during the second wizard question — i.e. the operator already typed the Ollama URL and thinks they're nearly done.
+**Rule:** never nest `$( case … esac )` inside another `$()`. Resolve the value in plain shell first, pass the result as a simple variable. Cheap and works on every bash since 2.0.
+
+**Bug 3 — installer seeded silently.** `seed_vault_templates` was called with hardcoded `force=0`, so every existing file printed `kept existing` and the operator had no agency. On a fresh laptop where the user *wanted* templates to land, this is the wrong default; even when defaults are right, the lack of a one-shot prompt feels like the installer is doing things behind your back.
+**Fix pattern for installers piped via `curl | bash`:** `[[ -t 0 ]] || [[ -r /dev/tty ]]` gates the prompt; when stdin isn't a TTY but `/dev/tty` is readable (curl|bash inside an interactive terminal), `read -r choice </dev/tty` works. Only fall back to a non-interactive default when *both* are unavailable (true headless / CI).
+
+**Verification approach that worked:** `bash -n <file>` for syntax (catches the case-block fix even on local bash 3.2), then two tiny `/tmp/test_*.sh` smoke tests — one feeding `ask()` via pipe to confirm the captured value is clean, one running the standalone case-block to confirm it resolves on bash 3.2. End-to-end install was not re-run; the three fixes are surgical and independently verified, and a real install would mean a throwaway vault dir for one-shot value. Unit-style smoke tests covered the regression surface at a fraction of the cost.
