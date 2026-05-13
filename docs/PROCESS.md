@@ -448,7 +448,7 @@ uv run python scripts/query.py "Wie funktioniert der Compile-Prozess?" --file-ba
 
 ### Lint
 
-7-Punkt Health Check mit Severity Levels (error/warning/suggestion) und Auto-Fixable Flags.
+8-Punkt Health Check mit Severity Levels (error/warning/suggestion) und Auto-Fixable Flags. Plus ein async LLM-Contradiction-Check (kostenpflichtig, von `--structural-only` ausgeklammert).
 
 | Check | Severity | Auto-fixable | Was |
 |-------|----------|--------------|-----|
@@ -457,13 +457,14 @@ uv run python scripts/query.py "Wie funktioniert der Compile-Prozess?" --file-ba
 | Orphan Sources | warning | nein | Sources in daily/raw/ die nie kompiliert wurden |
 | Stale Articles | warning | nein | Source hat sich seit letztem Compile geändert |
 | Missing Backlinks | suggestion | ja | A → B aber B → A fehlt |
+| Article Type | warning | ja | `type:` frontmatter fehlt oder passt nicht zum Substrat (`concept` vs `connection` vs `person` …) |
 | Sparse Articles | suggestion | nein | Unter 200 Wörter |
 | Facts Violations | warning | nein | Artikel enthält `negation_terms` aus einem Hard Fact (siehe §13) |
-| Contradictions | warning | nein | Widersprüche zwischen Artikeln (LLM-Check) |
+| Contradictions | warning | nein | Widersprüche zwischen Artikeln (LLM-Check, async, kostenpflichtig) |
 
 ```bash
-uv run python scripts/lint.py                        # alle 7 Checks
-uv run python scripts/lint.py --structural-only      # ohne LLM (kostenlos)
+uv run python scripts/lint.py                        # alle 8 strukturellen Checks + LLM-Contradiction-Scan
+uv run python scripts/lint.py --structural-only      # nur die 8 strukturellen (kostenlos)
 ```
 
 ---

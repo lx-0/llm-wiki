@@ -71,7 +71,7 @@ Grouped by purpose. Run `wiki <cmd> --help` for the full per-command help block.
 | `wiki compile --file PATH` | compile a single file (path relative to vault root). |
 | `wiki flush` | manual flush — capture current Claude Code session transcript into `daily/YYYY-MM-DD.md` (normally automatic via SessionEnd hook). After `compile_after_hour` triggers compile + piggybacks. |
 | `wiki lint` | full health check — structural + LLM contradiction sweep ($ cost). Report → `.wiki/reports/lint-YYYY-MM-DD.md`. |
-| `wiki lint --structural-only` | cheap, no-LLM lint (`broken_links`, `orphan_pages`, `orphan_sources`, `stale_articles`, `missing_backlinks`, `article_type`, `sparse_articles`). Used by piggyback. |
+| `wiki lint --structural-only` | cheap, no-LLM lint — 8 checks (`broken_links`, `orphan_pages`, `orphan_sources`, `stale_articles`, `missing_backlinks`, `article_type`, `sparse_articles`, `facts_violations`). Used by piggyback. |
 | `wiki query "QUESTION"` | ask the knowledge base — picks relevant articles via `knowledge/index.md`, answers via configured query model (LLM cost). |
 | `wiki review-wiki` | per-article quality-score sweep via local Ollama ($0). Output → `.wiki/reports/review-YYYY-MM-DD.md`. Runs as weekly piggyback by default. |
 

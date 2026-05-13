@@ -68,7 +68,7 @@ llm-wiki/
 │   ├── domain/             ← pure domain types (mail message, etc.)
 │   ├── compile.py          ← Claude Agent SDK compiler (raw/daily → knowledge/)
 │   ├── flush.py            ← session-end → daily/ append + piggyback spawner
-│   ├── lint.py             ← 6 structural checks + 1 LLM contradiction check
+│   ├── lint.py             ← 8 structural checks + 1 LLM contradiction check
 │   ├── query.py            ← Claude Agent SDK query (read-only or file-back)
 │   ├── process-inbox.py    ← classify dropped files into raw/ subfolders
 │   ├── optimize-claude-md.py ← suggests CLAUDE.md edits from compiled patterns
