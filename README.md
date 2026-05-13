@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  AI memories + sessions + scans + clippings → an LLM-compiled Obsidian wiki you and your agents read from daily.
+  Turn your scattered personal data into a queryable Obsidian wiki. You and your agents read from the same surface.
 </p>
 
 <p align="center">
@@ -41,7 +41,7 @@
 
 ## What is this
 
-An opinionated **knowledge-compilation engine** for personal substrates. Drop raw materials in — daily session logs, AI-agent memories, web clippings, screenshots, emails, calendars, browser history, HTML files — and a Claude Agent SDK loop compiles them into atomic Markdown articles with wikilinks. Renders as a navigable wiki inside [Obsidian](https://obsidian.md). The same wiki gets injected into every AI-agent session as context, so the loop closes: you read what you wrote, the agent reads what it wrote, both refine the same surface.
+An opinionated **knowledge-compilation engine** for personal substrates. Drop raw materials in — daily session logs, web clippings, screenshots, emails, calendars, browser history, HTML files — and a Claude Agent SDK loop compiles them into atomic Markdown articles with wikilinks. Renders as a navigable wiki inside [Obsidian](https://obsidian.md). The same wiki gets injected into every AI-agent session as context, so the loop closes: you read what you wrote, the agent reads what it wrote, both refine the same surface.
 
 The vault holds **data**. The `.wiki/` directory holds the **engine**. They never mix on disk.
 
