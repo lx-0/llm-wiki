@@ -17,9 +17,9 @@ import subprocess
 import sys
 from pathlib import Path
 
-import ollama_client
+from core import ollama_client
 
-from config import (
+from core.config import (
     RAW_ARTICLES_DIR,
     RAW_AUDIO_DIR,
     RAW_DIR,
@@ -37,7 +37,7 @@ logging.basicConfig(
 )
 log = logging.getLogger("inbox")
 
-from wiki_config import CONFIG
+from core.wiki_config import CONFIG
 
 INBOX_DIR = ROOT_DIR / "inbox"
 DEFAULT_MODEL = CONFIG.models.classify_model
@@ -62,7 +62,7 @@ CATEGORY_DIRS = {
     "papers": RAW_PAPERS_DIR,
 }
 
-from prompts import render  # noqa: E402
+from core.prompts import render  # noqa: E402
 
 
 def classify_file(file_path: Path, model: str) -> dict | None:

@@ -50,7 +50,7 @@ def test_gmail_auth_bootstrap_missing_client_secret(
 
 def test_token_path_under_state_dir() -> None:
     from adapters.mailbox.gmail import _token_path
-    from config import STATE_DIR
+    from core.config import STATE_DIR
 
     p = _token_path("private")
     assert p.parent == STATE_DIR

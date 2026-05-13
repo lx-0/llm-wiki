@@ -23,8 +23,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from config import RAW_DIR, ROOT_DIR, today_iso
-from wiki_config import CONFIG
+from core.config import RAW_DIR, ROOT_DIR, today_iso
+from core.wiki_config import CONFIG
 
 _TB_PROFILE_RAW = CONFIG.personal.thunderbird_profile
 THUNDERBIRD_PROFILE = (

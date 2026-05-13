@@ -20,8 +20,8 @@ from claude_agent_sdk import (
     query,
 )
 
-from config import KNOWLEDGE_DIR, QA_DIR, ROOT_DIR, now_iso, today_iso
-from utils import (
+from core.config import KNOWLEDGE_DIR, QA_DIR, ROOT_DIR, now_iso, today_iso
+from core.utils import (
     load_state,
     read_all_wiki_content,
     read_hard_facts,
@@ -37,8 +37,8 @@ logging.basicConfig(
 )
 log = logging.getLogger("query")
 
-from prompts import render  # noqa: E402
-from sdk_helpers import StderrCapture, log_sdk_failure  # noqa: E402
+from core.prompts import render  # noqa: E402
+from core.sdk_helpers import StderrCapture, log_sdk_failure  # noqa: E402
 import time as _time  # noqa: E402
 
 # ── Query prompt ─────────────────────────────────────────────────────

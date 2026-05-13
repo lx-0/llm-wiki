@@ -21,7 +21,7 @@ from pathlib import Path
 import httpx
 
 from adapters.mailbox.base import ApplyResult
-from config import RAW_DIR
+from core.config import RAW_DIR
 from domain.mail import FilterRule
 
 log = logging.getLogger(__name__)

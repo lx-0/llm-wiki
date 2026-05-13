@@ -18,9 +18,9 @@ from pathlib import Path
 
 from adapters.mailbox import MailboxReader, resolve_reader
 from collectors.base import Collector, CollectorSpec, RunResult, register
-from config import RAW_DIR, ROOT_DIR, today_iso
+from core.config import RAW_DIR, ROOT_DIR, today_iso
 from domain.mail import MessageMeta
-from wiki_config import CONFIG
+from core.wiki_config import CONFIG
 
 log = logging.getLogger(__name__)
 

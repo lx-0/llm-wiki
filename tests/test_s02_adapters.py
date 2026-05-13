@@ -65,7 +65,7 @@ def test_resolve_filter_no_kind_returns_none() -> None:
 
 def test_resolve_reader_thunderbird_mbox(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     # Stub thunderbird_profile so the resolver can build an absolute path.
-    import wiki_config
+    from core import wiki_config
 
     monkeypatch.setattr(wiki_config.CONFIG.personal, "thunderbird_profile", str(tmp_path))
 
@@ -168,7 +168,7 @@ def test_config_error_on_legacy_account_schema(tmp_path: Path, monkeypatch: pyte
         encoding="utf-8",
     )
 
-    import wiki_config
+    from core import wiki_config
 
     monkeypatch.setattr(wiki_config, "CONFIG_FILE", legacy_yaml)
     with pytest.raises(wiki_config.ConfigError) as exc:
@@ -191,7 +191,7 @@ def test_new_schema_accepted(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) ->
         encoding="utf-8",
     )
 
-    import wiki_config
+    from core import wiki_config
 
     monkeypatch.setattr(wiki_config, "CONFIG_FILE", new_yaml)
     cfg = wiki_config.load()

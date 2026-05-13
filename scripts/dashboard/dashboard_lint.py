@@ -24,7 +24,7 @@ import argparse
 import json
 import logging
 
-from config import ROOT_DIR, SESSIONS_DIR, now_iso
+from core.config import ROOT_DIR, SESSIONS_DIR, now_iso
 
 logging.basicConfig(
     level=logging.INFO,

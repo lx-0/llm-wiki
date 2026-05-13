@@ -32,8 +32,8 @@ import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from config import RAW_DIR, now_iso
-from wiki_config import CONFIG
+from core.config import RAW_DIR, now_iso
+from core.wiki_config import CONFIG
 
 # yt-dlp + youtube-transcript-api are imported lazily so --help works
 # without the deps installed.
@@ -415,7 +415,7 @@ def fetch_visual_local(
     url: str, video_id: str, metadata: dict, transcript: dict | None,
 ) -> dict | None:
     """T3-local: download video, sample frames, gemma4 vision per frame, aggregate."""
-    import ollama_client  # noqa: WPS433  late import — config must be ready
+    from core import ollama_client  # noqa: WPS433  late import — config must be ready
 
     if not ollama_client.is_reachable():
         log.warning("Ollama not reachable — skipping T3 visual")

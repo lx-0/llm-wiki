@@ -24,8 +24,10 @@ import re
 import sys
 from pathlib import Path
 
-from config import KNOWLEDGE_DIR
-from utils import list_wiki_articles
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from core.config import KNOWLEDGE_DIR
+from core.utils import list_wiki_articles
 
 logging.basicConfig(
     level=logging.INFO,

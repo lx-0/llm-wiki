@@ -23,7 +23,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from config import DAILY_DIR
+from core.config import DAILY_DIR
 
 
 BEGIN = "<!-- summarize-button:begin -->"

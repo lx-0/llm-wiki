@@ -22,8 +22,8 @@ from urllib.parse import urlparse
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from config import RAW_DIR, ROOT_DIR, today_iso
-from wiki_config import CONFIG
+from core.config import RAW_DIR, ROOT_DIR, today_iso
+from core.wiki_config import CONFIG
 
 _STG_RAW = CONFIG.personal.stg_backup_dir
 DEFAULT_BACKUP_DIR = Path(_STG_RAW).expanduser() if _STG_RAW else Path()

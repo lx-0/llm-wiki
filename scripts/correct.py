@@ -39,8 +39,8 @@ from pathlib import Path
 
 import yaml
 
-from config import FACTS_DIR, today_iso
-from utils import slugify
+from core.config import FACTS_DIR, today_iso
+from core.utils import slugify
 
 logging.basicConfig(
     level=logging.INFO,

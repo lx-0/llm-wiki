@@ -23,7 +23,7 @@ from typing import Any
 
 import httpx
 
-from wiki_config import CONFIG
+from .wiki_config import CONFIG
 
 
 _FENCE_LEADING = re.compile(r"^```[a-zA-Z]*\s*", flags=re.MULTILINE)

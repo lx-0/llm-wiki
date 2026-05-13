@@ -30,10 +30,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import httpx  # noqa: E402  exception types only; HTTP via ollama_client
 
-import ollama_client
-from config import RAW_DIR, ROOT_DIR, STATE_DIR, TIMEZONE, now_iso
-from utils import load_json_state, save_json_state
-from wiki_config import CONFIG
+from core import ollama_client
+from core.config import RAW_DIR, ROOT_DIR, STATE_DIR, TIMEZONE, now_iso
+from core.utils import load_json_state, save_json_state
+from core.wiki_config import CONFIG
 
 # ── Config ──────────────────────────────────────────────────────────
 
@@ -59,7 +59,7 @@ logging.basicConfig(
 )
 log = logging.getLogger("scan-screenshots")
 
-from prompts import render  # noqa: E402
+from core.prompts import render  # noqa: E402
 
 
 # ── State ───────────────────────────────────────────────────────────

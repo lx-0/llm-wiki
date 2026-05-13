@@ -7,7 +7,7 @@ from pathlib import Path
 
 import yaml
 
-from config import (
+from .config import (
     CONCEPTS_DIR,
     CONNECTIONS_DIR,
     DAILY_DIR,

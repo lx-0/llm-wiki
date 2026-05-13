@@ -11,9 +11,9 @@ import yaml
 
 def _patch_facts_dir(monkeypatch: pytest.MonkeyPatch, facts_dir: Path) -> None:
     """Point both correct.py and utils.py at a tmp facts dir."""
-    import config
+    from core import config
     import correct
-    import utils
+    from core import utils
 
     facts_dir.mkdir(parents=True, exist_ok=True)
     monkeypatch.setattr(config, "FACTS_DIR", facts_dir)
@@ -140,7 +140,7 @@ def test_read_hard_facts_sorts_by_trust(monkeypatch: pytest.MonkeyPatch, tmp_pat
     facts_dir = tmp_path / "knowledge" / "facts"
     _patch_facts_dir(monkeypatch, facts_dir)
     import correct
-    import utils
+    from core import utils
 
     correct.cmd_add(_add_args(title="A provisional", body="X", trust="provisional", term=[]))
     correct.cmd_add(_add_args(title="B confirmed", body="Y", trust="confirmed", term=[]))
@@ -157,7 +157,7 @@ def test_read_hard_facts_renders_sources(monkeypatch: pytest.MonkeyPatch, tmp_pa
     facts_dir = tmp_path / "knowledge" / "facts"
     _patch_facts_dir(monkeypatch, facts_dir)
     import correct
-    import utils
+    from core import utils
 
     correct.cmd_add(_add_args(
         source=["https://x.test/a", "user:2026-05-03"],
@@ -172,7 +172,7 @@ def test_read_hard_facts_renders_sources(monkeypatch: pytest.MonkeyPatch, tmp_pa
 def test_read_hard_facts_legacy_defaults(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     facts_dir = tmp_path / "knowledge" / "facts"
     _patch_facts_dir(monkeypatch, facts_dir)
-    import utils
+    from core import utils
 
     _write_legacy_fact(facts_dir, "old-fact")
     out = utils.read_hard_facts()
@@ -183,6 +183,6 @@ def test_read_hard_facts_legacy_defaults(monkeypatch: pytest.MonkeyPatch, tmp_pa
 def test_read_hard_facts_empty(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     facts_dir = tmp_path / "knowledge" / "facts"
     _patch_facts_dir(monkeypatch, facts_dir)
-    import utils
+    from core import utils
 
     assert utils.read_hard_facts() == "(no hard facts recorded)"

@@ -20,7 +20,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from config import RAW_DIR, ROOT_DIR, now_iso, today_iso
+from core.config import RAW_DIR, ROOT_DIR, now_iso, today_iso
 
 CLAUDE_PROJECTS_DIR = Path.home() / ".claude" / "projects"
 MEMORIES_DIR = RAW_DIR / "memories"

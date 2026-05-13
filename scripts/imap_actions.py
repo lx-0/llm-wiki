@@ -19,7 +19,7 @@ import logging
 import os
 import re
 
-from wiki_config import CONFIG
+from core.wiki_config import CONFIG
 
 log = logging.getLogger(__name__)
 

@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Iterator
 
 from adapters.mailbox.base import ApplyResult
-from config import ROOT_DIR, STATE_DIR
+from core.config import ROOT_DIR, STATE_DIR
 from domain.mail import FilterRule, Message, MessageMeta
 
 log = logging.getLogger(__name__)

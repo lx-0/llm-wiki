@@ -23,14 +23,14 @@ import json
 import logging
 from datetime import datetime, timezone
 
-from config import (
+from core.config import (
     DAILY_DIR,
     KNOWLEDGE_DIR,
     ROOT_DIR,
     SESSIONS_DIR,
     now_iso,
 )
-from utils import (
+from core.utils import (
     file_hash,
     list_raw_files,
     list_wiki_articles,

@@ -27,7 +27,7 @@ from claude_agent_sdk import (
     query,
 )
 
-from config import (
+from core.config import (
     AGENTS_FILE,
     KNOWLEDGE_DIR,
     LOG_FILE,
@@ -38,7 +38,7 @@ from config import (
     now_iso,
     today_iso,
 )
-from utils import (
+from core.utils import (
     file_hash,
     list_raw_files,
     list_wiki_articles,
@@ -47,7 +47,7 @@ from utils import (
     read_wiki_index,
     save_state,
 )
-from sdk_helpers import (
+from core.sdk_helpers import (
     FailureClass,
     StderrCapture,
     is_fatal,
@@ -85,9 +85,9 @@ _error_handler.setFormatter(_log_formatter)
 _error_handler.setLevel(logging.WARNING)
 logging.getLogger().addHandler(_error_handler)
 
-from wiki_config import CONFIG  # noqa: E402
-from prompts import render  # noqa: E402
-import ollama_client  # noqa: E402
+from core.wiki_config import CONFIG  # noqa: E402
+from core.prompts import render  # noqa: E402
+from core import ollama_client  # noqa: E402
 
 CURIOSITY_MODEL = CONFIG.models.curiosity_model
 
@@ -652,7 +652,7 @@ async def main() -> None:
 
     # Append-only history event so Dashboard P2 charts can render time series.
     if compiled_count > 0:
-        from utils import append_history
+        from core.utils import append_history
         append_history(
             "compile",
             articles_total=len(list_wiki_articles()),

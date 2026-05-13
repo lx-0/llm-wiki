@@ -25,7 +25,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from agent_spec import AgentSpec, parse_spec
-from config import WIKI_DIR
+from core.config import WIKI_DIR
 
 PROMPTS_DIR = WIKI_DIR / "prompts"
 

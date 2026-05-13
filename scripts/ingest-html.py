@@ -30,9 +30,9 @@ from urllib.parse import urlparse
 import html2text
 import httpx
 
-import ollama_client
-from config import RAW_ARTICLES_DIR, RAW_DIR, RAW_NOTES_DIR, ROOT_DIR, today_iso
-from wiki_config import CONFIG
+from core import ollama_client
+from core.config import RAW_ARTICLES_DIR, RAW_DIR, RAW_NOTES_DIR, ROOT_DIR, today_iso
+from core.wiki_config import CONFIG
 
 logging.basicConfig(
     level=logging.INFO,

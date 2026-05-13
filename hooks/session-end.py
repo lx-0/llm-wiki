@@ -27,7 +27,7 @@ FLUSH_SCRIPT = SCRIPTS_DIR / "flush.py"
 LOG_FILE = LOGS_DIR / "flush.log"
 
 sys.path.insert(0, str(SCRIPTS_DIR))
-import flush_pipeline  # noqa: E402  staging owned by the pipeline module
+from core import flush_pipeline  # noqa: E402  staging owned by the pipeline module
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _transcript import build_context, read_transcript  # noqa: E402

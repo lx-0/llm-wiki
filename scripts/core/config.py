@@ -79,7 +79,7 @@ load_dotenv(DOTENV_FILE, override=False)
 
 # ── Timezone ───────────────────────────────────────────────────────────
 # Sourced from CONFIG.scheduling.timezone (default "UTC"); override via config.yaml.
-from wiki_config import CONFIG  # noqa: E402  (import here to avoid early-init circularity)
+from .wiki_config import CONFIG  # noqa: E402  (import here to avoid early-init circularity)
 TIMEZONE = CONFIG.scheduling.timezone
 
 

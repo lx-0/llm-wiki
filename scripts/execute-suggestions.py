@@ -24,8 +24,8 @@ from zoneinfo import ZoneInfo
 
 import yaml
 
-from config import RAW_SUGGESTIONS_DIR, ROOT_DIR, TIMEZONE
-from wiki_config import CONFIG
+from core.config import RAW_SUGGESTIONS_DIR, ROOT_DIR, TIMEZONE
+from core.wiki_config import CONFIG
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 

@@ -16,10 +16,10 @@ import logging
 import sys
 from pathlib import Path
 
-import ollama_client
+from core import ollama_client
 
-from config import KNOWLEDGE_DIR, REPORTS_DIR, ROOT_DIR, now_iso, today_iso
-from utils import get_article_word_count, list_wiki_articles, read_wiki_index
+from core.config import KNOWLEDGE_DIR, REPORTS_DIR, ROOT_DIR, now_iso, today_iso
+from core.utils import get_article_word_count, list_wiki_articles, read_wiki_index
 
 logging.basicConfig(
     level=logging.INFO,
@@ -28,8 +28,8 @@ logging.basicConfig(
 )
 log = logging.getLogger("review")
 
-from wiki_config import CONFIG  # noqa: E402
-from prompts import render  # noqa: E402
+from core.wiki_config import CONFIG  # noqa: E402
+from core.prompts import render  # noqa: E402
 
 DEFAULT_MODEL = CONFIG.models.classify_model
 

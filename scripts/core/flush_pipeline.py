@@ -35,7 +35,7 @@ from pathlib import Path
 from typing import Iterable
 from zoneinfo import ZoneInfo
 
-from config import DAILY_DIR, SESSIONS_DIR, TIMEZONE
+from .config import DAILY_DIR, SESSIONS_DIR, TIMEZONE
 
 
 FAILED_DIR = SESSIONS_DIR / "failed-flushes"

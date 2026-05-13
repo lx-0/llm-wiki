@@ -36,16 +36,31 @@ llm-wiki/
 │   ├── hooks.sh            ← interactive flows: install/uninstall/status
 │   └── config.sh           ← wraps Python config CLI + setup wizard + editor
 ├── scripts/
-│   ├── wiki_config.py      ← config dataclass + get/set/keys CLI (incl. `Personal`)
-│   ├── prompts.py          ← prompt template loader (${var} substitution)
-│   ├── config.py           ← path constants (computed once, used everywhere)
-│   ├── ollama_client.py    ← single Ollama transport (chat / chat_schema / chat_vision)
-│   ├── flush_pipeline.py   ← staged-flush state machine (stage/commit/archive/pending)
+│   ├── core/               ← shared engine plumbing (imported, not invoked)
+│   │   ├── config.py           ← path constants (computed once, used everywhere)
+│   │   ├── wiki_config.py      ← config dataclass + get/set/keys CLI (incl. `Personal`)
+│   │   ├── prompts.py          ← prompt template loader (${var} substitution)
+│   │   ├── ollama_client.py    ← single Ollama transport (chat / chat_schema / chat_vision)
+│   │   ├── sdk_helpers.py      ← StderrCapture + log_sdk_failure for Claude Agent SDK calls
+│   │   ├── utils.py            ← shared helpers (article listing, JSON state, history)
+│   │   └── flush_pipeline.py   ← staged-flush state machine (stage/commit/archive/pending)
+│   ├── collectors/         ← substrate→raw/ writers (Registry + scan-* CLIs)
+│   │   ├── base.py             ← Collector Protocol, SPEC, Registry
+│   │   ├── email_collector.py  ← email collector (renamed from email.py to avoid stdlib shadow)
+│   │   ├── jamie.py            ← Jamie AI meeting-notetaker
+│   │   └── scan-*.py           ← browser, calendar, screenshots, tabs, youtube (CLI scanners)
+│   ├── dashboard/          ← Obsidian dashboard helpers
+│   │   ├── dashboard_stats.py  ← _dashboard-stats.md generator (post-flush refresh)
+│   │   ├── dashboard_lint.py   ← _dashboard-lint.md generator (post-flush refresh)
+│   │   ├── agent_buttons.py    ← agent-button discovery + dashboard.md rewriter
+│   │   └── inject_daily_button.py ← idempotent Summarize-button injection into daily/*.md
+│   ├── migrations/         ← one-shot schema/data migrations (not active CLI surface)
+│   ├── adapters/           ← MailboxReader implementations (gmail, thunderbird, allinkl)
+│   ├── domain/             ← pure domain types (mail message, etc.)
 │   ├── compile.py          ← Claude Agent SDK compiler (raw/daily → knowledge/)
 │   ├── flush.py            ← session-end → daily/ append + piggyback spawner
 │   ├── lint.py             ← 6 structural checks + 1 LLM contradiction check
 │   ├── query.py            ← Claude Agent SDK query (read-only or file-back)
-│   ├── scan-*.py           ← collectors: email, calendar, browser, screenshots, youtube
 │   ├── process-inbox.py    ← classify dropped files into raw/ subfolders
 │   ├── optimize-claude-md.py ← suggests CLAUDE.md edits from compiled patterns
 │   ├── review-wiki.py      ← per-article quality scoring (Ollama)

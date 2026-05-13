@@ -27,9 +27,9 @@ import os
 os.environ["CLAUDE_INVOKED_BY"] = "flush_retry"
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import flush_pipeline
+from core import flush_pipeline
 from flush import extract_from_context
-from wiki_config import CONFIG
+from core.wiki_config import CONFIG
 
 logging.basicConfig(
     level=logging.INFO,

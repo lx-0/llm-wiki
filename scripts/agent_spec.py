@@ -16,7 +16,7 @@ from pathlib import Path
 
 import yaml
 
-from config import ROOT_DIR, WIKI_DIR
+from core.config import ROOT_DIR, WIKI_DIR
 
 
 VALID_TOOLS = frozenset(

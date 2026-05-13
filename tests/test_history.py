@@ -14,7 +14,7 @@ import pytest
 def test_append_history_creates_file(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    import utils
+    from core import utils
 
     monkeypatch.setattr(utils, "STATE_DIR", tmp_path)
     utils.append_history("compile", articles_total=5, cost_delta=0.01)
@@ -32,7 +32,7 @@ def test_append_history_creates_file(
 def test_append_history_appends_not_overwrites(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    import utils
+    from core import utils
 
     monkeypatch.setattr(utils, "STATE_DIR", tmp_path)
     utils.append_history("compile", articles_total=1)
@@ -49,7 +49,7 @@ def test_read_history_skips_malformed_lines(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """A truncated or corrupted line must not crash the reader."""
-    import utils
+    from core import utils
 
     monkeypatch.setattr(utils, "STATE_DIR", tmp_path)
     history_file = tmp_path / "history.jsonl"
@@ -70,7 +70,7 @@ def test_read_history_skips_malformed_lines(
 def test_read_history_returns_empty_when_file_missing(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    import utils
+    from core import utils
 
     monkeypatch.setattr(utils, "STATE_DIR", tmp_path)
     assert utils.read_history() == []

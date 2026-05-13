@@ -26,8 +26,8 @@ from urllib.parse import urlparse
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from config import RAW_DIR, ROOT_DIR, today_iso
-from wiki_config import CONFIG
+from core.config import RAW_DIR, ROOT_DIR, today_iso
+from core.wiki_config import CONFIG
 
 # Paths — populated from CONFIG.personal so the engine has no hardcoded
 # personal profile IDs / backup folders. Empty CONFIG values mean the

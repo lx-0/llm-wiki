@@ -29,10 +29,10 @@ SCRIPTS_DIR = Path(__file__).resolve().parent
 WIKI_DIR = SCRIPTS_DIR.parent
 ROOT_DIR = WIKI_DIR.parent
 sys.path.insert(0, str(SCRIPTS_DIR))
-from wiki_config import CONFIG  # noqa: E402
-from sdk_helpers import StderrCapture, log_sdk_failure  # noqa: E402
+from core.wiki_config import CONFIG  # noqa: E402
+from core.sdk_helpers import StderrCapture, log_sdk_failure  # noqa: E402
 
-import flush_pipeline  # noqa: E402
+from core import flush_pipeline  # noqa: E402
 
 DAILY_DIR = ROOT_DIR / "daily"
 STATE_DIR = WIKI_DIR / "state"     # *.json runtime artifacts (hash trackers, cooldowns)
@@ -192,7 +192,7 @@ def _record_flush(session_id: str) -> None:
 
 # ── Extraction ───────────────────────────────────────────────────────
 
-from prompts import render  # noqa: E402
+from core.prompts import render  # noqa: E402
 
 MAX_RETRIES = CONFIG.limits.flush_max_retries
 RETRY_DELAY = CONFIG.limits.flush_retry_delay_seconds
@@ -525,7 +525,7 @@ async def main() -> None:
     _record_flush(session_id)
 
     # Append-only history event for Dashboard P2 charts.
-    from utils import append_history
+    from core.utils import append_history
     append_history(
         "flush",
         session_id=session_id,
