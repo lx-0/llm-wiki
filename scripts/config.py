@@ -1,7 +1,19 @@
-"""Path constants and configuration for the personal knowledge base."""
+"""Path constants and configuration for the personal knowledge base.
+
+Side effect on import: loads `<vault>/.claude/.env` via python-dotenv so every
+script that imports from `config` (32 of them) gets secret env vars without
+manual shell-export. The file is the canonical secrets surface — IMAP creds,
+API keys, NAS passwords — and is referenced by name in `.env.example`. Shell
+exports always win (`override=False`), and a missing file is a clean no-op.
+
+Configured per CONFIG.personal.<x>.api_key_env / imap_pass_env style — the
+config.yaml carries only the VARIABLE NAME, the .env carries the VALUE.
+"""
 
 from pathlib import Path
 from datetime import datetime, timezone
+
+from dotenv import load_dotenv
 
 # ── Paths ──────────────────────────────────────────────────────────────
 # Layout:
@@ -55,6 +67,15 @@ SESSIONS_DIR = WIKI_DIR / "sessions"  # session-flush staging + failed-flushes/
 
 STATE_FILE = STATE_DIR / "state.json"
 EMAIL_STATE_FILE = STATE_DIR / "email-state.json"
+
+# ── .env bootstrap ─────────────────────────────────────────────────────
+# Loaded once at import time. Idempotent across multiple imports because
+# load_dotenv is itself idempotent. override=False = if a shell export
+# already populated the var, keep that — .env is the fallback, not the
+# authority. Missing file: graceful no-op (fresh-install vaults have
+# only `.env.example` until the operator copies it).
+DOTENV_FILE = ROOT_DIR / ".claude" / ".env"
+load_dotenv(DOTENV_FILE, override=False)
 
 # ── Timezone ───────────────────────────────────────────────────────────
 # Sourced from CONFIG.scheduling.timezone (default "UTC"); override via config.yaml.

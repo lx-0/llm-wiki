@@ -252,7 +252,13 @@ seed_vault_templates() {
     fi
   fi
 
-  # 8. Agent-task auto-wiring — discovered from prompts/agent_*.md `button:` frontmatter.
+  # 8. .claude/.env.example — secrets template. Additive: an existing
+  #    operator-curated .env.example is preserved (carries account-specific
+  #    IMAP_<account>_* lines etc.). --force overwrites — only use if you're
+  #    intentionally reverting to the engine-default catalogue.
+  _seed_file "$templates_dir/.claude/.env.example" "$target/.claude/.env.example" "$force" ".claude/.env.example"
+
+  # 9. Agent-task auto-wiring — discovered from prompts/agent_*.md `button:` frontmatter.
   _merge_agent_shell_commands "$target" "$wiki_dir"
   _rewrite_dashboard_agent_buttons "$target" "$wiki_dir"
 }
