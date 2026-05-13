@@ -5,13 +5,13 @@ defaults when the file or individual keys are missing. Module-level
 singleton `CONFIG` is the API — import it from any script.
 
 Usage:
-    from wiki_config import CONFIG
+    from core.wiki_config import CONFIG
     if CONFIG.features.curiosity_loop:
         ...
     timeout = CONFIG.limits.screenshot_timeout_seconds
 
 Run this file directly to dump the loaded config (useful for debugging):
-    uv run python scripts/wiki_config.py
+    uv run python scripts/core/wiki_config.py
 """
 
 from __future__ import annotations
@@ -23,7 +23,8 @@ from typing import Any
 
 import yaml
 
-CONFIG_FILE = Path(__file__).resolve().parent.parent / "config.yaml"
+# scripts/core/wiki_config.py → parents: core → scripts → <wiki>/config.yaml
+CONFIG_FILE = Path(__file__).resolve().parent.parent.parent / "config.yaml"
 
 
 @dataclass

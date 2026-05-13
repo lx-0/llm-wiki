@@ -19,17 +19,19 @@ from dotenv import load_dotenv
 # Layout:
 #   <vault>/                ← ROOT_DIR (user-visible content)
 #   ├── .wiki/              ← WIKI_DIR (engine, hidden from Obsidian)
-#   │   ├── scripts/        ← SCRIPTS_DIR  (this file lives here)
+#   │   ├── scripts/        ← SCRIPTS_DIR
+#   │   │   └── core/       ← CORE_DIR (this file lives here)
 #   │   ├── hooks/          ← HOOKS_DIR
-#   │   ├── prompts/        ← (loaded by prompts.py)
-#   │   ├── config.yaml     ← (loaded by wiki_config.py)
+#   │   ├── prompts/        ← (loaded by core/prompts.py)
+#   │   ├── config.yaml     ← (loaded by core/wiki_config.py)
 #   │   ├── state/          ← STATE_DIR (json hash trackers / cooldowns / dedup)
 #   │   ├── logs/           ← LOGS_DIR (flush + compile log output)
 #   │   ├── sessions/       ← SESSIONS_DIR (session-flush staging + failed-flushes/)
 #   │   └── reports/        ← REPORTS_DIR (lint + review-wiki output)
 #   ├── daily/, raw/, knowledge/, inbox/   ← user-visible content
 #   └── AGENTS.md, README.md, ...
-SCRIPTS_DIR = Path(__file__).resolve().parent
+CORE_DIR = Path(__file__).resolve().parent
+SCRIPTS_DIR = CORE_DIR.parent
 WIKI_DIR = SCRIPTS_DIR.parent
 ROOT_DIR = WIKI_DIR.parent
 DAILY_DIR = ROOT_DIR / "daily"

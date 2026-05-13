@@ -13,7 +13,7 @@ LIB_DIR="$WIKI_DIR/lib"
 SCRIPTS_DIR="$WIKI_DIR/scripts"
 HOOKS_DIR="$WIKI_DIR/hooks"
 CONFIG_FILE="$WIKI_DIR/config.yaml"
-WIKI_CONFIG_PY="$SCRIPTS_DIR/wiki_config.py"
+WIKI_CONFIG_PY="$SCRIPTS_DIR/core/wiki_config.py"
 
 # Hook-script paths used inside generated agent configs.
 # Relative paths (project-scope-only — assume CWD = vault root):

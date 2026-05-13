@@ -1,7 +1,7 @@
 """Prompt loader — reads markdown prompts from `<vault>/.wiki/prompts/` and substitutes `${var}` placeholders.
 
 Usage:
-    from prompts import render
+    from core.prompts import render
     prompt = render("flush_extract", context=context_text)
     system = render("flush_extract_system")  # no vars
 
@@ -20,7 +20,8 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-PROMPTS_DIR = Path(__file__).resolve().parent.parent / "prompts"  # .wiki/prompts/
+# scripts/core/prompts.py → parents: core → scripts → <wiki>/prompts/
+PROMPTS_DIR = Path(__file__).resolve().parent.parent.parent / "prompts"
 
 _PLACEHOLDER_RE = re.compile(r"\$\{([a-zA-Z_][a-zA-Z0-9_]*)\}")
 
