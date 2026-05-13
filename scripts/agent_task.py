@@ -120,6 +120,7 @@ async def run(spec: AgentSpec, dry_run: bool, extra_vars: dict[str, str]) -> int
         async for message in query(
             prompt=rendered,
             options=ClaudeAgentOptions(
+                max_buffer_size=CONFIG.limits.sdk_max_buffer_size_mb * 1024 * 1024,
                 cwd=str(spec.cwd_path()),
                 model=model,
                 allowed_tools=list(spec.allowed_tools),

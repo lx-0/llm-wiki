@@ -23,6 +23,7 @@ from pathlib import Path
 from claude_agent_sdk import ClaudeAgentOptions, ResultMessage, query
 
 from core.config import KNOWLEDGE_DIR, ROOT_DIR, now_iso
+from core.wiki_config import CONFIG
 from core.utils import read_all_wiki_content, read_wiki_index
 
 # ── Config ──────────────────────────────────────────────────────────
@@ -87,6 +88,7 @@ async def optimize(dry_run: bool = False) -> None:
         async for message in query(
             prompt=prompt,
             options=ClaudeAgentOptions(
+                max_buffer_size=CONFIG.limits.sdk_max_buffer_size_mb * 1024 * 1024,
                 cwd=str(ROOT_DIR),
                 allowed_tools=["Read", "Edit", "Grep"],
                 permission_mode="acceptEdits",

@@ -21,6 +21,7 @@ from claude_agent_sdk import (
 )
 
 from core.config import KNOWLEDGE_DIR, QA_DIR, ROOT_DIR, now_iso, today_iso
+from core.wiki_config import CONFIG
 from core.utils import (
     load_state,
     read_all_wiki_content,
@@ -95,6 +96,7 @@ async def main() -> None:
         async for message in query(
             prompt=prompt,
             options=ClaudeAgentOptions(
+                max_buffer_size=CONFIG.limits.sdk_max_buffer_size_mb * 1024 * 1024,
                 cwd=str(ROOT_DIR),
                 system_prompt={"type": "preset", "preset": "claude_code"},
                 allowed_tools=allowed_tools,

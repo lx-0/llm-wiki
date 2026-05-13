@@ -38,6 +38,31 @@ The "Conventions" / "Workflow" / "Quick gotchas" sections are quick-reference. T
 
 Distilled from sessions 2026-04-11 → 2026-04-30 building this implementation. Each section is something that bit us in production — read before changing related code.
 
+### Claude Agent SDK silently crashes on >1 MB stream-json messages (2026-05-13)
+
+#### Symptom
+
+`compile_file ✗ failed · kind=unknown` after 100-500 s, sometimes with `Failed to decode JSON: ... exceeded maximum buffer size of 1048576 bytes` in the captured exception, sometimes just `Command failed with exit code 1` and empty stderr. Misclassified as the previous `claude_code`-preset-spec crash (which was a different bug, fixed in commit `38910a4`). The earlier fix solved 50-100 KB of overhead in the input prompt; this one is downstream — about the *response* side.
+
+#### Root cause
+
+`claude_agent_sdk._internal.transport.subprocess_cli` has `_DEFAULT_MAX_BUFFER_SIZE = 1024 * 1024` (1 MB) for the per-line stream-json parser. When a single stream-json message from the bundled CLI exceeds 1 MB it raises `SDKJSONDecodeError`, surfacing as `Failed to decode JSON: ... exceeded maximum buffer size`. Sometimes the CLI itself dies first (memory pressure or downstream consequence) and we see `exit 1 / empty stderr` instead of the explicit decode error.
+
+What carries 1 MB in one stream-json line:
+- `Read` tool result with `knowledge/index.md` body (~300 KB raw → ~600 KB after JSON-escaping; close to the limit, sometimes over)
+- `Write` / `Edit` tool calls on big articles (a 200 KB markdown article emitted in one `content` field exceeds 1 MB after escaping)
+- A single `AssistantMessage` text run that's very long
+
+The 9 KB Jamie compile worked (5 min, $0.03, in:106 tokens) because Opus didn't need any big tool-results — embedded source in the prompt, emitted small Write calls. The 35 KB Jamie compile failed because Opus picked up bigger tool-results mid-run (likely reading the index).
+
+#### Fix
+
+`ClaudeAgentOptions` exposes `max_buffer_size: int | None` per call. Lifted to `CONFIG.limits.sdk_max_buffer_size_mb` (default 50 MB) and applied at all 8 SDK call sites: `compile.py`, `flush.py`, `lint.py`, `query.py`, `agent_task.py`, `optimize-claude-md.py`, `suggestions/producer.py`, `facts/correct_apply.py`. 50 MB is well above any realistic single-message scenario without hiding genuine runaway responses.
+
+#### Lesson
+
+When the SDK exposes a tunable for a hard limit, set it explicitly at every call site instead of trusting the documented default. The 1 MB default is reasonable for the SDK's general audience but too small for a knowledge-base compiler that reads/writes long markdown articles. Per project rule: any hard SDK constant → goes through `CONFIG.limits.*` (see `feedback_lift_hardcoded_to_config.md` memory).
+
 ### Jamie API: marketing says REST, wire is tRPC (2026-05-13)
 
 #### Symptom

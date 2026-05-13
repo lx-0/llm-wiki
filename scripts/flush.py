@@ -210,6 +210,7 @@ async def extract_from_context(context: str) -> str | None:
             async for message in query(
                 prompt=prompt,
                 options=ClaudeAgentOptions(
+                    max_buffer_size=CONFIG.limits.sdk_max_buffer_size_mb * 1024 * 1024,
                     system_prompt=render("flush_extract_system"),
                     allowed_tools=[],
                     max_turns=3,

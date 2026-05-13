@@ -64,6 +64,7 @@ async def maybe_generate_suggestions(source: Path, dry_run: bool = False) -> Non
         async for message in query(
             prompt=prompt,
             options=ClaudeAgentOptions(
+                max_buffer_size=CONFIG.limits.sdk_max_buffer_size_mb * 1024 * 1024,
                 cwd=str(ROOT_DIR),
                 model=CONFIG.models.compile_model,
                 allowed_tools=["Read", "Write", "Glob"],

@@ -120,6 +120,12 @@ Knob block. Defaults sized for an Opus-on-5h-window install — tighten on small
 | `limits.jamie_request_timeout_s` | `30` | Per-HTTP-call timeout against `beta-api.meetjamie.ai`. |
 | `limits.jamie_max_per_run` | `50` | Default cap on meetings pulled per run. `CONFIG.personal.jamie.max_per_run` overrides per-install. |
 
+### Claude Agent SDK
+
+| Key | Default | Meaning |
+|---|---|---|
+| `limits.sdk_max_buffer_size_mb` | `50` | Per-message buffer for stream-json output from the bundled CLI. SDK default is 1 MB; trips on tool-result messages carrying `knowledge/index.md` (~300 KB raw → ~600 KB JSON-escaped) or Write/Edit calls on large articles with a confusing `Failed to decode JSON: ... exceeded maximum buffer size of 1048576 bytes` exception. 50 MB is safe headroom; bump higher if `knowledge/` grows past ~5 MB per article. |
+
 ## piggybacks
 
 Recurring tasks spawned by `flush.py` after `compile_after_hour`. Each entry takes `enabled` (bool), `cooldown_hours` (int), and optionally `max_per_run` (int).

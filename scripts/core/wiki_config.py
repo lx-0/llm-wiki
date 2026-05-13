@@ -75,6 +75,13 @@ class Limits:
     # Jamie ingest (collectors/jamie.py — see also CONFIG.piggybacks.jamie)
     jamie_request_timeout_s: int = 30     # per-HTTP-call timeout against api.meetjamie.ai
     jamie_max_per_run: int = 50           # default cap (overridable via CONFIG.personal.jamie.max_per_run)
+    # Claude Agent SDK per-message buffer (stream-json line buffer). SDK default is
+    # 1 MB; trips on tool-result messages carrying knowledge/index.md (~300 KB raw,
+    # ~600 KB JSON-escaped) or Write/Edit calls on large articles, with a confusing
+    # `Failed to decode JSON: ... exceeded maximum buffer size of 1048576 bytes`
+    # exception. Bumped to 50 MB by default — safe headroom for any realistic
+    # single-message scenario without hiding real runaway responses.
+    sdk_max_buffer_size_mb: int = 50
 
 
 @dataclass

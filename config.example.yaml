@@ -91,6 +91,10 @@ limits:
   # Jamie ingest (collectors/jamie.py).
   jamie_request_timeout_s: 30            # per-HTTP-call timeout against api.meetjamie.ai
   jamie_max_per_run: 50                  # default cap; CONFIG.personal.jamie.max_per_run overrides
+  # Claude Agent SDK per-message buffer (stream-json line buffer). SDK default 1 MB
+  # trips on tool-result messages carrying large knowledge/index.md or Write/Edit
+  # calls on big articles. 50 MB is safe headroom.
+  sdk_max_buffer_size_mb: 50
 
 features:
   # Master switches for entire capabilities.
