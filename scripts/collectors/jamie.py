@@ -34,6 +34,7 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterator
+from urllib.parse import urlencode
 
 import httpx
 import yaml
@@ -45,20 +46,28 @@ from core.wiki_config import CONFIG
 log = logging.getLogger(__name__)
 
 
-# ── API constants (verify on first live request) ─────────────────────
+# ── API constants ────────────────────────────────────────────────────
+# Discovered 2026-05-13 by probing live + reading vicampuzano/jamie-mcp source:
+# Jamie's public API is tRPC, not REST. Bearer auth + plain query strings
+# do NOT work. Real shape:
+#   base    https://beta-api.meetjamie.ai
+#   auth    x-api-key: <jk_...>   (no "Bearer" prefix)
+#   path    /v1/<scope>/<resource>.<op>   (e.g. meetings.list, meetings.get)
+#   GET     ?input=<urlencoded JSON {"json": params}>
+#   POST    body = {"json": params}     (we only use GET — no mutations)
+#   reply   {"result": {"data": {"json": <payload>}}}   ← unwrap before use
 
-_BASE_URL = "https://api.meetjamie.ai/v1"
-_AUTH_HEADER = "Authorization"      # value: f"Bearer {api_key}"
+_BASE_URL = "https://beta-api.meetjamie.ai"
+_AUTH_HEADER = "x-api-key"
 _USER_AGENT = "llm-wiki/jamie-collector"
 
-# Per `JAMIE_KEY_TYPE` — selects route prefix.
 _ROUTE_PERSONAL = "me"
 _ROUTE_WORKSPACE = "workspace"
 
-# Query parameter names. Adjust if the live API uses different keys.
-_PARAM_SINCE = "since"              # ISO 8601 — filter by started_at >= since
+# tRPC parameter names (Jamie's vocabulary, not generic REST).
 _PARAM_LIMIT = "limit"
-_PARAM_CURSOR = "cursor"            # opaque pagination cursor (if applicable)
+_PARAM_CURSOR = "cursor"
+_PARAM_START_DATE = "startDate"     # ISO 8601 — filter by startTime >= startDate
 
 _STATE_FILE = STATE_DIR / "jamie-state.json"
 _API_VERSION = "v1"
@@ -107,63 +116,82 @@ class _JamieClient:
     @property
     def headers(self) -> dict[str, str]:
         return {
-            _AUTH_HEADER: f"Bearer {self.api_key}",
+            _AUTH_HEADER: self.api_key,
             "User-Agent": _USER_AGENT,
             "Accept": "application/json",
         }
 
-    def _get(self, path: str, params: dict[str, Any] | None = None) -> Any:
-        """One GET with single retry on 429/5xx. Returns parsed JSON or raises."""
-        url = f"{_BASE_URL}/{self.route_prefix}{path}"
+    def _get(self, operation: str, params: dict[str, Any] | None = None) -> Any:
+        """tRPC GET. Returns the unwrapped `result.data.json` payload or raises.
+
+        `operation` is the dot-suffixed route fragment, e.g. "meetings.list"
+        — gets prefixed with /v1/<scope>/ here. Params are JSON-encoded
+        inside an `input` query param per tRPC's GET-with-input convention.
+        """
+        url = f"{_BASE_URL}/v1/{self.route_prefix}/{operation}"
+        if params:
+            clean = {k: v for k, v in params.items() if v is not None}
+            if clean:
+                url += "?" + urlencode({"input": json.dumps({"json": clean})})
+
         for attempt in (1, 2):
             try:
-                r = httpx.get(url, params=params or {}, headers=self.headers, timeout=self.timeout_s)
+                r = httpx.get(url, headers=self.headers, timeout=self.timeout_s)
             except httpx.HTTPError as e:
                 if attempt == 2:
-                    raise JamieAPIError(f"network failure on {path}: {type(e).__name__}: {e}") from e
-                log.warning("jamie %s: %s — retrying once in 5s", path, type(e).__name__)
+                    raise JamieAPIError(f"network failure on {operation}: {type(e).__name__}: {e}") from e
+                log.warning("jamie %s: %s — retrying once in 5s", operation, type(e).__name__)
                 time.sleep(5)
                 continue
 
             if r.status_code == 401:
                 raise JamieAPIError(
-                    f"401 on {path} — api key invalid or revoked. Check env var content."
+                    f"401 on {operation} — api key invalid or revoked. Check env var content."
                 )
             if r.status_code == 429:
                 wait = int(r.headers.get("Retry-After", "10"))
                 if attempt == 2:
-                    raise JamieAPIError(f"429 on {path} after retry (waited {wait}s)")
-                log.warning("jamie %s: 429 rate-limit — sleeping %ds before retry", path, wait)
+                    raise JamieAPIError(f"429 on {operation} after retry (waited {wait}s)")
+                log.warning("jamie %s: 429 rate-limit — sleeping %ds before retry", operation, wait)
                 time.sleep(wait)
                 continue
             if 500 <= r.status_code < 600:
                 if attempt == 2:
-                    raise JamieAPIError(f"persistent {r.status_code} on {path}: {r.text[:200]}")
-                log.warning("jamie %s: %d — retrying once in 5s", path, r.status_code)
+                    raise JamieAPIError(f"persistent {r.status_code} on {operation}: {r.text[:200]}")
+                log.warning("jamie %s: %d — retrying once in 5s", operation, r.status_code)
                 time.sleep(5)
                 continue
             if r.status_code != 200:
-                raise JamieAPIError(f"unexpected {r.status_code} on {path}: {r.text[:200]}")
+                raise JamieAPIError(f"unexpected {r.status_code} on {operation}: {r.text[:200]}")
 
-            payload = r.json()
+            envelope = r.json()
+            # tRPC envelope unwrap: result.data.json holds the actual payload.
+            payload = (
+                envelope.get("result", {}).get("data", {}).get("json")
+                if isinstance(envelope, dict) else None
+            )
+            if payload is None:
+                # Some endpoints might return the bare payload — fall through.
+                payload = envelope
+
             if not self._logged_discovery:
-                log.debug("jamie discovery: GET %s keys=%s", path, _shallow_keys(payload))
+                log.debug("jamie discovery: GET %s keys=%s", operation, _shallow_keys(payload))
                 self._logged_discovery = True
             return payload
 
-        raise JamieAPIError(f"unreachable: exhausted retries on {path}")
+        raise JamieAPIError(f"unreachable: exhausted retries on {operation}")
 
     def list_meetings(
-        self, *, since: str | None = None, limit: int | None = None,
+        self, *, start_date: str | None = None, limit: int | None = None,
     ) -> Iterator[dict]:
-        """Yield meeting summaries. Paginates if the response carries a cursor.
+        """Yield meeting stubs (id, title, startTime, endTime, ...).
 
-        Best-effort against a doc-only-partially-public API: accepts the most
-        common pagination shapes (`items` + `next_cursor`, or bare list).
+        Stubs are minimal — call `get_meeting(id)` for transcript + summary.
+        Paginates while `nextCursor` is non-empty.
         """
         params: dict[str, Any] = {}
-        if since:
-            params[_PARAM_SINCE] = since
+        if start_date:
+            params[_PARAM_START_DATE] = start_date
         if limit:
             params[_PARAM_LIMIT] = limit
 
@@ -173,21 +201,27 @@ class _JamieClient:
             page_params = dict(params)
             if cursor:
                 page_params[_PARAM_CURSOR] = cursor
-            payload = self._get("/meetings", page_params)
+            payload = self._get("meetings.list", page_params)
 
-            items, next_cursor = _normalize_list_payload(payload)
-            for item in items:
+            if not isinstance(payload, dict):
+                raise JamieAPIError(f"meetings.list returned {type(payload).__name__}, expected dict")
+            meetings = payload.get("meetings") or []
+            for item in meetings:
                 yield item
                 seen += 1
                 if limit and seen >= limit:
                     return
+            next_cursor = payload.get("nextCursor")
             if not next_cursor:
                 return
             cursor = next_cursor
 
     def get_meeting(self, meeting_id: str) -> dict:
-        """Full meeting payload (summary + transcript + participants + tasks)."""
-        return self._get(f"/meetings/{meeting_id}")
+        """Full meeting payload (summary + transcript + participants + tasks + event)."""
+        payload = self._get("meetings.get", {"meetingId": meeting_id})
+        if not isinstance(payload, dict):
+            raise JamieAPIError(f"meetings.get returned {type(payload).__name__}, expected dict")
+        return payload
 
 
 def _shallow_keys(payload: Any) -> str:
@@ -197,19 +231,6 @@ def _shallow_keys(payload: Any) -> str:
     if isinstance(payload, list):
         return f"list(len={len(payload)})"
     return type(payload).__name__
-
-
-def _normalize_list_payload(payload: Any) -> tuple[list[dict], str | None]:
-    """Accept either {items:[...], next_cursor: "..."} or a bare list."""
-    if isinstance(payload, list):
-        return payload, None
-    if not isinstance(payload, dict):
-        raise JamieAPIError(f"unexpected list response shape: {type(payload).__name__}")
-    items = payload.get("items") or payload.get("data") or payload.get("meetings") or []
-    if not isinstance(items, list):
-        raise JamieAPIError(f"list payload had no list under items/data/meetings: keys={sorted(payload.keys())}")
-    cursor = payload.get("next_cursor") or payload.get("nextCursor") or payload.get("cursor")
-    return items, (cursor if isinstance(cursor, str) and cursor else None)
 
 
 # ── Rendering ────────────────────────────────────────────────────────
@@ -224,34 +245,59 @@ def _participants_label(participants: list[dict]) -> str:
     return f"{', '.join(names[:3])} +{len(names) - 3}"
 
 
-def _duration_minutes(meeting: dict) -> int | None:
-    """Best-effort minute extraction from any of the shapes the API might use."""
-    if "duration_min" in meeting:
-        return int(meeting["duration_min"])
-    if "duration_s" in meeting:
-        return int(meeting["duration_s"]) // 60
-    if "duration" in meeting:
-        try:
-            return int(meeting["duration"]) // 60
-        except (TypeError, ValueError):
-            return None
-    return None
+def _duration_minutes(started_at: str | None, ended_at: str | None) -> int | None:
+    """Derive duration from start/end ISO timestamps. None if either is missing/malformed."""
+    if not started_at or not ended_at:
+        return None
+    try:
+        from datetime import datetime
+        s = datetime.fromisoformat(str(started_at).replace("Z", "+00:00"))
+        e = datetime.fromisoformat(str(ended_at).replace("Z", "+00:00"))
+        return max(0, int((e - s).total_seconds()) // 60)
+    except (ValueError, TypeError):
+        return None
 
 
 def _render_markdown(meeting: dict, *, account_id: str, key_type: str, input_source: str) -> str:
-    """One markdown file per meeting. Sections only emitted when source data present."""
-    meeting_id = meeting.get("id") or meeting.get("meeting_id") or "unknown"
-    title = meeting.get("title") or meeting.get("name") or meeting_id
-    started_at = meeting.get("started_at") or meeting.get("startedAt") or meeting.get("start_time")
-    ended_at = meeting.get("ended_at") or meeting.get("endedAt") or meeting.get("end_time")
-    duration_min = _duration_minutes(meeting)
-    participants = meeting.get("participants") or meeting.get("attendees") or []
+    """One markdown file per meeting. Sections only emitted when source data present.
+
+    Maps Jamie's tRPC payload (id, title, startTime, endTime, participants[{email, id, name}],
+    summary{markdown, html, short}, transcript[str], tasks[{assignee, completed, content}],
+    tags[…], event{id, attendees, scheduledTime, title}) onto the wiki's substrate-uniform
+    frontmatter + markdown body.
+    """
+    meeting_id = meeting.get("id") or "unknown"
+    title = meeting.get("title") or meeting_id
+    started_at = meeting.get("startTime")
+    ended_at = meeting.get("endTime")
+    duration_min = _duration_minutes(started_at, ended_at)
+    participants = meeting.get("participants") or []
     tags = meeting.get("tags") or []
-    summary = (meeting.get("summary") or meeting.get("summary_markdown") or "").strip()
-    action_items = meeting.get("action_items") or meeting.get("tasks") or []
-    transcript_segments = meeting.get("transcript") or meeting.get("segments") or []
-    jamie_url = meeting.get("url") or meeting.get("share_url")
-    calendar_event = meeting.get("calendar_event_id") or meeting.get("event_id")
+    tasks = meeting.get("tasks") or []
+
+    summary_obj = meeting.get("summary") or {}
+    summary_md = ""
+    if isinstance(summary_obj, dict):
+        summary_md = (summary_obj.get("markdown") or summary_obj.get("short") or "").strip()
+    elif isinstance(summary_obj, str):
+        # Older or alternative shapes — defensive.
+        summary_md = summary_obj.strip()
+
+    transcript_md = meeting.get("transcript")
+    if not isinstance(transcript_md, str):
+        transcript_md = ""
+
+    event = meeting.get("event") if isinstance(meeting.get("event"), dict) else {}
+    calendar_event_id = event.get("id") or event.get("externalId")
+
+    tag_names: list[str] = []
+    for t in tags:
+        if isinstance(t, dict):
+            n = t.get("name")
+            if n:
+                tag_names.append(str(n))
+        elif isinstance(t, str):
+            tag_names.append(t)
 
     front: dict[str, Any] = {
         "type": "transcript",
@@ -265,15 +311,14 @@ def _render_markdown(meeting: dict, *, account_id: str, key_type: str, input_sou
             {"name": p.get("name"), "email": p.get("email")}
             for p in participants if isinstance(p, dict)
         ],
-        "calendar_event": calendar_event,
-        "tags": list(dict.fromkeys(["jamie", "meeting", *[str(t) for t in tags if t]])),
+        "calendar_event": calendar_event_id,
+        "tags": list(dict.fromkeys(["jamie", "meeting", *tag_names])),
         "ingested_at": now_iso(),
         "input_source": input_source,
         "account_id": account_id,
         "key_type": key_type,
         "api_version": _API_VERSION,
-        "jamie_url": jamie_url,
-        "transcript_status": "pending" if not transcript_segments and not summary else None,
+        "transcript_status": "pending" if not transcript_md and not summary_md else None,
     }
     # Drop empty keys for a clean frontmatter.
     front = {k: v for k, v in front.items() if v not in (None, [], "")}
@@ -290,42 +335,34 @@ def _render_markdown(meeting: dict, *, account_id: str, key_type: str, input_sou
     parts.append(f"_{' · '.join(header_bits)}_")
     parts.append("")
 
-    if summary:
+    if summary_md:
         parts.append("## Summary")
         parts.append("")
-        parts.append(summary)
+        parts.append(summary_md)
         parts.append("")
 
-    if action_items:
+    if tasks:
         parts.append("## Action items")
         parts.append("")
-        for item in action_items:
+        for item in tasks:
             if not isinstance(item, dict):
                 continue
-            owner = item.get("owner") or item.get("assignee") or item.get("name") or ""
-            task = item.get("task") or item.get("text") or item.get("description") or ""
-            if not task:
+            content = (item.get("content") or "").strip()
+            if not content:
                 continue
-            prefix = f"{owner}: " if owner else ""
-            parts.append(f"- [ ] {prefix}{task}")
+            assignee = item.get("assignee") or ""
+            done = bool(item.get("completed"))
+            checkbox = "[x]" if done else "[ ]"
+            prefix = f"{assignee}: " if assignee else ""
+            parts.append(f"- {checkbox} {prefix}{content}")
         parts.append("")
 
-    if transcript_segments:
+    if transcript_md:
         parts.append("## Transcript")
         parts.append("")
-        for seg in transcript_segments:
-            if not isinstance(seg, dict):
-                continue
-            speaker = seg.get("speaker") or seg.get("speaker_name") or "unknown"
-            text = (seg.get("text") or "").strip()
-            start_s = seg.get("start_s") or seg.get("start") or 0
-            try:
-                ts = int(float(start_s))
-            except (TypeError, ValueError):
-                ts = 0
-            anchor = f"[{ts // 60:02d}:{ts % 60:02d}]"
-            if text:
-                parts.append(f"**{speaker}** {anchor} — {text}")
+        # Jamie ships a fully-formatted markdown transcript with speaker names
+        # and `###### MM:SS - MM:SS` anchors. Passthrough — no re-parse.
+        parts.append(transcript_md.strip())
         parts.append("")
 
     return "\n".join(parts) + "\n"
@@ -385,24 +422,24 @@ class JamieCollector:
 
         output_root = ROOT_DIR / self.SPEC.output_subfolder
         state = _load_state()
-        since = state.get("last_seen_ts") if incremental else self._configured_since
+        start_date = state.get("last_seen_ts") if incremental else self._configured_since
 
         client = _JamieClient(
             api_key=self._api_key, key_type=self._key_type, timeout_s=self._timeout_s,
         )
 
         log.info(
-            "JamieCollector: listing meetings (key_type=%s, since=%s, limit=%d)",
-            self._key_type, since or "—", self._max_per_run,
+            "JamieCollector: listing meetings (key_type=%s, startDate=%s, limit=%d)",
+            self._key_type, start_date or "—", self._max_per_run,
         )
 
         try:
-            summaries = list(client.list_meetings(since=since, limit=self._max_per_run))
+            stubs = list(client.list_meetings(start_date=start_date, limit=self._max_per_run))
         except JamieAPIError as e:
             log.error("JamieCollector: list failed: %s", e)
             return RunResult(message=f"list failed: {e}")
 
-        if not summaries:
+        if not stubs:
             log.info("JamieCollector: 0 meetings in window — nothing to ingest")
             return RunResult(message="no-op (0 meetings in window)")
 
@@ -420,11 +457,11 @@ class JamieCollector:
 
         input_source = "piggyback" if not dry_run and incremental else "cli"
 
-        for summary in summaries:
-            mid = summary.get("id") or summary.get("meeting_id")
+        for stub in stubs:
+            mid = stub.get("id")
             if not mid:
                 log.warning("JamieCollector: list-row missing id — skipping: %r",
-                            sorted(summary.keys()) if isinstance(summary, dict) else type(summary).__name__)
+                            sorted(stub.keys()) if isinstance(stub, dict) else type(stub).__name__)
                 continue
             short = _short_id(mid)
             if short in already_present:
@@ -439,10 +476,8 @@ class JamieCollector:
 
             md = _render_markdown(full, account_id=self._account_id,
                                   key_type=self._key_type, input_source=input_source)
-            title = full.get("title") or full.get("name") or mid
-            started_at = (
-                full.get("started_at") or full.get("startedAt") or full.get("start_time") or ""
-            )
+            title = full.get("title") or mid
+            started_at = full.get("startTime") or stub.get("startTime") or ""
             date_prefix = str(started_at)[:10] if started_at else now_iso()[:10]
             fname = f"{date_prefix}--{_slugify(title)}--{short}.md"
             target = output_root / fname
@@ -468,7 +503,7 @@ class JamieCollector:
             files_skipped=skipped,
             state_keys_touched=("last_seen_ts",) if not dry_run else (),
             message=(
-                f"listed {len(summaries)} · wrote {len(files_written)} · "
-                f"skipped {skipped} · since={since or '—'}"
+                f"listed {len(stubs)} · wrote {len(files_written)} · "
+                f"skipped {skipped} · startDate={start_date or '—'}"
             ),
         )
