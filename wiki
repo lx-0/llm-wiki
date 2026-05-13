@@ -420,7 +420,7 @@ ${C_BOLD}EXAMPLES${C_RESET}
       --status disambiguation
 
 ${C_BOLD}NOTES${C_RESET}
-  Wraps \`scripts/correct.py\`. Facts live in \`knowledge/facts/<slug>.md\` with
+  Wraps \`scripts/facts/correct.py\`. Facts live in \`knowledge/facts/<slug>.md\` with
   \`type: fact\` frontmatter. Compile + query inject them as a Hard-facts block at
   highest authority. Lint surfaces violations of any \`negation_terms\`.
 EOF
@@ -430,14 +430,14 @@ EOF
   if [[ "${1:-}" == "apply" ]]; then
     shift
     banner "wiki correct apply" "Agentic propagation — Claude Agent SDK over vault root."
-    _run_script correct_apply.py "$@"
+    _run_script facts/correct_apply.py "$@"
     local rc=$?
     _refresh_dashboard_stats
     _refresh_dashboard_lint
     return $rc
   fi
   banner "wiki correct"
-  _run_script correct.py "$@"
+  _run_script facts/correct.py "$@"
   local rc=$?
   _refresh_dashboard_stats
   _refresh_dashboard_lint
@@ -634,7 +634,7 @@ cmd_collect() {
       return 0
       ;;
   esac
-  uv run --quiet --project "$WIKI_DIR" python "$WIKI_DIR/scripts/cli_collect.py" "$@"
+  uv run --quiet --project "$WIKI_DIR" python "$WIKI_DIR/scripts/collectors/cli.py" "$@"
 }
 
 cmd_gmail_auth() {

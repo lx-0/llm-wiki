@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from agent_spec import (
+from core.agent_spec import (
     AgentSpec,
     ButtonSpec,
     SpecError,

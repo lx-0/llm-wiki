@@ -43,12 +43,17 @@ llm-wiki/
 │   │   ├── ollama_client.py    ← single Ollama transport (chat / chat_schema / chat_vision)
 │   │   ├── sdk_helpers.py      ← StderrCapture + log_sdk_failure for Claude Agent SDK calls
 │   │   ├── utils.py            ← shared helpers (article listing, JSON state, history)
+│   │   ├── agent_spec.py       ← agent-task spec parser (prompts/agent_*.md → AgentSpec)
 │   │   └── flush_pipeline.py   ← staged-flush state machine (stage/commit/archive/pending)
-│   ├── collectors/         ← substrate→raw/ writers (Registry + scan-* CLIs)
+│   ├── collectors/         ← substrate→raw/ writers (Registry + scan-* CLIs + dispatcher)
 │   │   ├── base.py             ← Collector Protocol, SPEC, Registry
+│   │   ├── cli.py              ← `wiki collect` dispatcher (Registry lookup + run-one)
 │   │   ├── email_collector.py  ← email collector (renamed from email.py to avoid stdlib shadow)
 │   │   ├── jamie.py            ← Jamie AI meeting-notetaker
 │   │   └── scan-*.py           ← browser, calendar, screenshots, tabs, youtube (CLI scanners)
+│   ├── facts/              ← hard-fact subsystem (knowledge/facts/<slug>.md consumers)
+│   │   ├── correct.py          ← CRUD CLI: add/list/remove/edit/path
+│   │   └── correct_apply.py    ← agent-driven propagation across vault
 │   ├── dashboard/          ← Obsidian dashboard helpers
 │   │   ├── dashboard_stats.py  ← _dashboard-stats.md generator (post-flush refresh)
 │   │   ├── dashboard_lint.py   ← _dashboard-lint.md generator (post-flush refresh)

@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from agent_spec import parse_spec
+from core.agent_spec import parse_spec
 
 
 PROMPTS_DIR = Path(__file__).resolve().parent.parent / "prompts"

@@ -5,7 +5,7 @@ authority during compile + query: when a source claim contradicts a fact, the
 fact wins.
 
 Usage:
-    uv run python correct.py add "Senkrechtstarter award" \
+    uv run python scripts/facts/correct.py add "Senkrechtstarter award" \
         --status negation \
         --trust confirmed \
         --source "https://handelsblatt.de/..." \
@@ -14,15 +14,15 @@ Usage:
         "We did NOT win the Senkrechtstarter award."
 
     # user-only fact (default trust = asserted):
-    uv run python correct.py add "Office hours" \
+    uv run python scripts/facts/correct.py add "Office hours" \
         --status clarification \
         --source "user:2026-05-03" \
         "Office opens at 10am starting Monday."
 
-    uv run python correct.py list
-    uv run python correct.py remove <slug>
-    uv run python correct.py edit <slug>
-    uv run python correct.py path <slug>     # print absolute path
+    uv run python scripts/facts/correct.py list
+    uv run python scripts/facts/correct.py remove <slug>
+    uv run python scripts/facts/correct.py edit <slug>
+    uv run python scripts/facts/correct.py path <slug>     # print absolute path
 """
 
 import os
@@ -36,6 +36,8 @@ import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import yaml
 
@@ -136,7 +138,7 @@ def cmd_add(args: argparse.Namespace) -> int:
 
     if path.exists() and not args.force:
         log.error(
-            "%s already exists. Use `correct.py edit %s` or pass --force.",
+            "%s already exists. Use `facts/correct.py edit %s` or pass --force.",
             path,
             slug,
         )

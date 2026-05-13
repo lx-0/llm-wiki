@@ -12,7 +12,7 @@ import yaml
 def _patch_facts_dir(monkeypatch: pytest.MonkeyPatch, facts_dir: Path) -> None:
     """Point both correct.py and utils.py at a tmp facts dir."""
     from core import config
-    import correct
+    from facts import correct
     from core import utils
 
     facts_dir.mkdir(parents=True, exist_ok=True)
@@ -52,7 +52,7 @@ def _read_fact(facts_dir: Path, slug: str) -> dict:
 def test_add_writes_sources_and_trust(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     facts_dir = tmp_path / "knowledge" / "facts"
     _patch_facts_dir(monkeypatch, facts_dir)
-    import correct
+    from facts import correct
 
     rc = correct.cmd_add(_add_args(
         source=["https://handelsblatt.de/x", "raw/clippings/mail.md"],
@@ -72,7 +72,7 @@ def test_add_writes_sources_and_trust(monkeypatch: pytest.MonkeyPatch, tmp_path:
 def test_add_rejects_missing_source(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     facts_dir = tmp_path / "knowledge" / "facts"
     _patch_facts_dir(monkeypatch, facts_dir)
-    import correct
+    from facts import correct
 
     rc = correct.cmd_add(_add_args(source=[]))
     assert rc == 2
@@ -82,7 +82,7 @@ def test_add_rejects_missing_source(monkeypatch: pytest.MonkeyPatch, tmp_path: P
 def test_add_rejects_blank_source(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     facts_dir = tmp_path / "knowledge" / "facts"
     _patch_facts_dir(monkeypatch, facts_dir)
-    import correct
+    from facts import correct
 
     rc = correct.cmd_add(_add_args(source=["   ", ""]))
     assert rc == 2
@@ -91,7 +91,7 @@ def test_add_rejects_blank_source(monkeypatch: pytest.MonkeyPatch, tmp_path: Pat
 def test_add_user_source_with_default_trust(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     facts_dir = tmp_path / "knowledge" / "facts"
     _patch_facts_dir(monkeypatch, facts_dir)
-    import correct
+    from facts import correct
 
     rc = correct.cmd_add(_add_args(
         title="Office hours",
@@ -111,7 +111,7 @@ def test_add_user_source_with_default_trust(monkeypatch: pytest.MonkeyPatch, tmp
 def test_add_rejects_invalid_trust(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     facts_dir = tmp_path / "knowledge" / "facts"
     _patch_facts_dir(monkeypatch, facts_dir)
-    import correct
+    from facts import correct
 
     rc = correct.cmd_add(_add_args(trust="bogus"))
     assert rc == 2
@@ -139,7 +139,7 @@ def _write_legacy_fact(facts_dir: Path, slug: str, body: str = "Legacy body.") -
 def test_read_hard_facts_sorts_by_trust(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     facts_dir = tmp_path / "knowledge" / "facts"
     _patch_facts_dir(monkeypatch, facts_dir)
-    import correct
+    from facts import correct
     from core import utils
 
     correct.cmd_add(_add_args(title="A provisional", body="X", trust="provisional", term=[]))
@@ -156,7 +156,7 @@ def test_read_hard_facts_sorts_by_trust(monkeypatch: pytest.MonkeyPatch, tmp_pat
 def test_read_hard_facts_renders_sources(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     facts_dir = tmp_path / "knowledge" / "facts"
     _patch_facts_dir(monkeypatch, facts_dir)
-    import correct
+    from facts import correct
     from core import utils
 
     correct.cmd_add(_add_args(

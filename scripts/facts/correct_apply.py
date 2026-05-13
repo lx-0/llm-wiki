@@ -6,8 +6,8 @@ for disambiguation, and fixes wikilinks. On success the fact's frontmatter
 gets `applied: <iso-ts>` written back.
 
 Usage:
-    uv run python correct_apply.py <slug>           # apply one fact
-    uv run python correct_apply.py <slug> --dry-run # plan only, no edits
+    uv run python scripts/facts/correct_apply.py <slug>           # apply one fact
+    uv run python scripts/facts/correct_apply.py <slug> --dry-run # plan only, no edits
 """
 
 import os
@@ -19,6 +19,8 @@ import logging
 import sys
 from datetime import datetime
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import yaml
 

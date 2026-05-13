@@ -69,7 +69,7 @@ append_to_daily = flush_pipeline.append_to_daily
 # build time:
 #
 # 1. Registry-discovered Collectors with `SPEC.piggyback_default=True` —
-#    spawned as `cli_collect.py <name>` (the canonical CLI for collectors).
+#    spawned as `collectors/cli.py <name>` (the canonical CLI for collectors).
 # 2. Legacy commands not yet ported to the Collector pattern — listed
 #    explicitly below until they get migrated (M003 candidate).
 #
@@ -100,7 +100,7 @@ def _build_piggyback_tasks() -> list[dict]:
         if task_cfg is not None and not task_cfg.enabled:
             continue
         cooldown = task_cfg.cooldown_hours if task_cfg else collector.SPEC.piggyback_cooldown_hours
-        cmd = ["cli_collect.py", name]
+        cmd = ["collectors/cli.py", name]
         if collector.SPEC.supports_incremental:
             cmd.append("--incremental")
         tasks.append({
