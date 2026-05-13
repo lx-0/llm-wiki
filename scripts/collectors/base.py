@@ -118,10 +118,16 @@ def register(cls: type[Collector]) -> type[Collector]:
         )
     spec = cls.SPEC  # type: ignore[attr-defined]
     if spec.name in _COLLECTORS:
-        existing = _COLLECTORS[spec.name].__name__
+        existing = _COLLECTORS[spec.name]
+        # A Collector module run as `__main__` gets re-imported as
+        # `collectors.<name>` by the package __init__'s auto-import — same
+        # SPEC.name appears twice with classes of the same qualname. Treat
+        # same-class re-registration as a no-op; only flag genuine collisions.
+        if existing.__qualname__ == cls.__qualname__:
+            return cls
         raise ValueError(
             f"@register: collector name {spec.name!r} already registered "
-            f"by {existing}; would overwrite with {cls.__name__}."
+            f"by {existing.__name__}; would overwrite with {cls.__name__}."
         )
     _COLLECTORS[spec.name] = cls
     return cls

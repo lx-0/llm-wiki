@@ -6,9 +6,11 @@ Vocabulary: domain terms from `CONTEXT.md`, architecture terms from improve-code
 
 ---
 
-## #1 — Scan-Scripts → Collector pattern (HIGH — partial progress 2026-05-13)
+## #1 — Scan-Scripts → Collector pattern (HIGH — Phase 2 in progress)
 
-**Status update (2026-05-13):** Phase 1 (relocation) complete. The five `scan-*.py` files now live in `scripts/collectors/scan-browser.py`, `scan-calendar.py`, `scan-screenshots.py`, `scan-tabs.py`, `scan-youtube.py`. Cross-package imports + wiki CLI + `flush.py:_LEGACY_PIGGYBACK_COMMANDS` paths updated. **Protocol migration (Phase 2) still pending** — each script still has its own argparse main, no `SPEC`/`@register`, and `flush.py:_LEGACY_PIGGYBACK_COMMANDS` continues to dispatch them by hardcoded path. Phase 2 is the actual leverage win; Phase 1 just bought folder hygiene.
+**Status update (2026-05-13, evening):** Phase 1 (relocation) complete. Phase 2 (Protocol migration) underway — **scan-tabs ported as pilot.** `scripts/collectors/scan_tabs.py:TabsCollector` is now Registry-discoverable (`@register` + `SPEC`), runs via `wiki collect tabs`, retains direct-CLI invocation. Same-class re-registration is now a no-op in `base.py:register` to handle `__main__ ↔ collectors.<name>` double-load. 8 unit tests cover Protocol conformance + dry-run + write-path + collision detection.
+
+**Remaining Phase-2 ports:** browser (524 LOC, multi-source), calendar (247 LOC), screenshots (366 LOC, vision-LLM sub-step), youtube (>700 LOC, tier system + CLI flags). The screenshots and youtube ports will likely surface Protocol gaps (e.g. flag pass-through for tier/limit/backfill) — extension via `SPEC.cli_args` is a candidate.
 
 **Files (Phase 2 scope):** `scripts/collectors/scan-calendar.py` (247), `scripts/collectors/scan-browser.py` (524), `scripts/collectors/scan-tabs.py` (185), `scripts/collectors/scan-screenshots.py` (366), `scripts/collectors/scan-youtube.py`. Plus `scripts/flush.py:_LEGACY_PIGGYBACK_COMMANDS` which hardcodes them.
 

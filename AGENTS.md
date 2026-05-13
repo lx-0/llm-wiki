@@ -50,7 +50,8 @@ llm-wiki/
 │   │   ├── cli.py              ← `wiki collect` dispatcher (Registry lookup + run-one)
 │   │   ├── email_collector.py  ← email collector (renamed from email.py to avoid stdlib shadow)
 │   │   ├── jamie.py            ← Jamie AI meeting-notetaker
-│   │   └── scan-*.py           ← browser, calendar, screenshots, tabs, youtube (CLI scanners)
+│   │   ├── scan_tabs.py        ← TabsCollector (Registry; migrated 2026-05-13)
+│   │   └── scan-*.py           ← browser, calendar, screenshots, youtube (Legacy CLI, port pending)
 │   ├── facts/              ← hard-fact subsystem (knowledge/facts/<slug>.md consumers)
 │   │   ├── correct.py          ← CRUD CLI: add/list/remove/edit/path
 │   │   └── correct_apply.py    ← agent-driven propagation across vault

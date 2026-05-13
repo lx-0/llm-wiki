@@ -4,16 +4,19 @@ Scan Firefox Simple Tab Groups backups and produce a metadata overview.
 Reads STG backup JSON files and extracts tab groups, URLs, and titles.
 Produces a structured overview of research interests, projects, and browsing patterns.
 
-Usage:
-    uv run python scripts/collectors/scan-tabs.py                      # full scan, save report
-    uv run python scripts/collectors/scan-tabs.py --dry-run            # just show group stats
-    uv run python scripts/collectors/scan-tabs.py --backup-dir ~/path  # custom backup location
+Wired in two ways:
+  - As a Registry-discovered Collector: `wiki collect tabs`. The `@register`
+    decorator below adds `TabsCollector` to `collectors.Registry`; `flush.py`
+    auto-spawns it as `collectors/cli.py tabs` when piggyback fires.
+  - As a direct CLI: `uv run python scripts/collectors/scan-tabs.py` still works
+    and preserves the historical `--dry-run` / `--backup-dir` flags.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import logging
 import os
 import sys
 from collections import Counter
@@ -22,8 +25,11 @@ from urllib.parse import urlparse
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from collectors.base import Collector, CollectorSpec, RunResult, register
 from core.config import RAW_DIR, ROOT_DIR, today_iso
 from core.wiki_config import CONFIG
+
+log = logging.getLogger(__name__)
 
 _STG_RAW = CONFIG.personal.stg_backup_dir
 DEFAULT_BACKUP_DIR = Path(_STG_RAW).expanduser() if _STG_RAW else Path()
@@ -150,6 +156,60 @@ def generate_report(data: dict) -> str:
         lines.append("")
 
     return "\n".join(lines)
+
+
+# ── Collector wrapper ───────────────────────────────────────────────
+
+
+@register
+class TabsCollector:
+    """Firefox Simple Tab Groups backup scanner — Collector Protocol wrapper.
+
+    Wraps the existing scan_backup + generate_report functions in the
+    Registry-aware shape so `wiki collect tabs` works alongside email
+    and jamie. Single-source substrate; --backup-dir override flows via
+    CONFIG.personal.stg_backup_dir, not a per-run flag.
+    """
+
+    SPEC = CollectorSpec(
+        name="tabs",
+        output_subfolder="raw/notes/browser",
+        piggyback_default=False,  # operator-invoked; STG backups are sporadic
+        piggyback_cooldown_hours=24,
+        supports_incremental=False,  # full snapshot each time; no delta concept
+        supports_account_loop=False,
+    )
+
+    def is_configured(self) -> bool:
+        """True iff CONFIG.personal.stg_backup_dir resolves to an existing dir."""
+        return bool(_STG_RAW) and DEFAULT_BACKUP_DIR.exists()
+
+    def run(self, *, dry_run: bool = False, incremental: bool = False) -> RunResult:
+        if not self.is_configured():
+            return RunResult(message="STG backup dir not configured or missing")
+
+        backup_path = find_newest_backup(DEFAULT_BACKUP_DIR)
+        if not backup_path:
+            return RunResult(message=f"No STG backup found in {DEFAULT_BACKUP_DIR}")
+
+        data = scan_backup(backup_path)
+        if dry_run:
+            return RunResult(
+                files_skipped=1,
+                message=f"[dry-run] would scan {data['total_tabs']} tabs in {data['total_groups']} groups",
+            )
+
+        report = generate_report(data)
+        REPORT_DIR.mkdir(parents=True, exist_ok=True)
+        report_path = REPORT_DIR / f"tab-groups-overview-{today_iso()}.md"
+        report_path.write_text(report, encoding="utf-8")
+        return RunResult(
+            files_written=(report_path,),
+            message=f"{data['total_tabs']} tabs in {data['total_groups']} groups → {report_path.name}",
+        )
+
+
+# ── Direct CLI entry (backward-compat) ──────────────────────────────
 
 
 def main():

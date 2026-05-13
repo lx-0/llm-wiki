@@ -51,7 +51,7 @@ Dispatcher: `scripts/collectors/cli.py` (`wiki collect <name>` and `wiki collect
 |---|---|---|---|
 | `scan-calendar` | 🟢 | `scripts/collectors/scan-calendar.py` | `raw/notes/calendar/` |
 | `scan-browser` | 🟢 | `scripts/collectors/scan-browser.py` | `raw/notes/browser/` |
-| `scan-tabs` | 🟢 | `scripts/collectors/scan-tabs.py` | `raw/notes/tabs/` |
+| `tabs` | 🟢 | `scripts/collectors/scan_tabs.py:TabsCollector` (Registry) + script-mode CLI | `raw/notes/browser/tab-groups-overview-<date>.md` |
 | `scan-screenshots` | 🟢 | `scripts/collectors/scan-screenshots.py` | `~/Screenshots/<file>.md` (canonical) + `raw/notes/screenshots/thumb/<file>.png` + `raw/notes/screenshots/screenshots-<slug>.md` (batch report) |
 | `scan-youtube` | 🟢 | `scripts/collectors/scan-youtube.py` | `raw/notes/youtube/<channel>--<title>--<vid>.md` |
 
@@ -154,7 +154,7 @@ These are pinned reality-vs-docs checks. Each should either get fixed or get an 
 | 2 | ~~No `wiki process-inbox` subcommand~~ | PROCESS §1 documents Inbox Processing as a numbered process | **Closed 2026-05-13:** `wiki process-inbox` wrapper landed. |
 | 3 | ~~No `wiki ingest-html` subcommand~~ | README "Path B" lists `ingest-html (file or URL)` as a substrate-source writer | **Closed 2026-05-13:** `wiki ingest-html` wrapper landed. |
 | 4 | ~~No `wiki suggestions` subcommand~~ | PROCESS §8 documents the suggestion executor as part of the engine CLI surface | **Closed 2026-05-13:** `wiki suggestions` wrapper landed. |
-| 5 | **`scan-*.py` legacy pattern still in `_LEGACY_PIGGYBACK_COMMANDS`** | README "Two-path ingest" says "remaining `scan-*.py` are scheduled for [Collector] migration" | True — 5 scripts still legacy (browser, calendar, screenshots, tabs, youtube). Status documented in `.ytstack/backlog/architecture-deepening.md` candidate #1 Phase 2. | Honest gap — backlog tracked |
+| 5 | **`scan-*.py` legacy pattern still in `_LEGACY_PIGGYBACK_COMMANDS`** | README "Two-path ingest" says "remaining `scan-*.py` are scheduled for [Collector] migration" | Phase 2 underway. **2026-05-13:** `scan-tabs` migrated → `scan_tabs.py:TabsCollector` (Registry). Remaining: browser, calendar, screenshots, youtube. Status documented in `.ytstack/backlog/architecture-deepening.md` candidate #1 Phase 2. |
 | 6 | **`origin: "scan-email/<id>"` in email Collector report frontmatter** | n/a (cosmetic) | `collectors/email_collector.py:111` still writes the old origin string. No engine reader; cosmetic only. | Flagged; intentionally left to avoid splitting report vintages |
 
 ## Maintenance protocol
