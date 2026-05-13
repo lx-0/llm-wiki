@@ -3,7 +3,7 @@
 Distinct from MailboxFilter (which creates server-side rules for FUTURE
 messages). These functions act on EXISTING messages already in a folder.
 
-Called from execute-suggestions.py for `imap-move`, `imap-tag`,
+Called from `suggestions/cli.py` for `imap-move`, `imap-tag`,
 `imap-set-flags` action types. Account credentials are read from
 `CONFIG.personal.accounts.<id>` — Gmail accounts use OAuth2, others
 use password env-vars (`reader.imap_user_env`/`reader.imap_pass_env`

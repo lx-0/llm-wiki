@@ -27,29 +27,6 @@ def _is_email_source(source_path: str) -> bool:
     return "email" in source_path.lower() or "thunderbird" in source_path.lower()
 
 
-def _read_rules_overview() -> str:
-    """Read the Thunderbird rules overview if it exists."""
-    overview = ROOT_DIR / "raw" / "notes" / "email" / "thunderbird-rules-overview.md"
-    if overview.exists():
-        return overview.read_text(encoding="utf-8")
-    return "(No rules overview found. Run: thunderbird-rules.py --export)"
-
-
-def _read_procmail_config() -> str:
-    """Read current procmail config from server if available."""
-    try:
-        import sys
-        sys.path.insert(0, str(ROOT_DIR / "scripts"))
-        from importlib import import_module
-        tb = import_module("thunderbird-rules")
-        config = tb.get_procmail_config()
-        if config:
-            return config
-    except Exception:
-        pass
-    return "(Procmail config not available)"
-
-
 async def maybe_generate_suggestions(source: Path, dry_run: bool = False) -> None:
     """If the source is email data, run a suggestion pass."""
     rel_path = str(source.relative_to(ROOT_DIR))
@@ -65,10 +42,7 @@ async def maybe_generate_suggestions(source: Path, dry_run: bool = False) -> Non
     RAW_SUGGESTIONS_DIR.mkdir(parents=True, exist_ok=True)
 
     source_content = source.read_text(encoding="utf-8")
-    rules_overview = _read_rules_overview()
     index_md = read_wiki_index()
-
-    procmail_config = _read_procmail_config()
 
     accounts_inline = ", ".join(
         f"{name} = {info.get('email', '')}" for name, info in CONFIG.personal.accounts.items()
@@ -76,8 +50,6 @@ async def maybe_generate_suggestions(source: Path, dry_run: bool = False) -> Non
 
     prompt = render(
         "compile_suggestion",
-        rules_overview=rules_overview,
-        procmail_config=procmail_config,
         source_path=rel_path,
         source_content=source_content,
         index_md=index_md,

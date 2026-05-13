@@ -74,7 +74,7 @@ class MailboxReader(Protocol):
 
 @dataclass(frozen=True)
 class ApplyResult:
-    """What `MailboxFilter.apply()` returns — feedback for execute-suggestions."""
+    """What `MailboxFilter.apply()` returns — feedback for `suggestions/cli.py`."""
 
     success: bool
     rule_id: str | None = None  # backend's id for the persisted rule, when known

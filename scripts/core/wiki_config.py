@@ -172,7 +172,8 @@ class Personal:
     # Output language for the calendar scan report. "en" or "de".
     calendar_report_language: str = "en"
     # Path to local Thunderbird profile directory (mbox + filter roots live here).
-    # Empty string disables scan-email.py and thunderbird-rules.py.
+    # Empty string disables the email Collector's thunderbird-mbox adapter
+    # and the scan-calendar legacy CLI (both consume the Thunderbird profile).
     thunderbird_profile: str = ""
     # Path to a local Firefox profile directory (e.g. ~/Library/Application
     # Support/Firefox/Profiles/<id>.default-release on macOS, or

@@ -69,7 +69,7 @@ class FilterAction:
 @dataclass(frozen=True)
 class FilterRule:
     """A complete rule. Compiler emits these as YAML in raw/suggestions/;
-    execute-suggestions resolves the account's MailboxFilter and dispatches.
+    `suggestions/cli.py` resolves the account's MailboxFilter and dispatches.
     """
 
     name: str
