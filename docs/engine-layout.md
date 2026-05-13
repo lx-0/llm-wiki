@@ -28,26 +28,52 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 │   ├── hooks.sh               ← interactive flows for `wiki hooks {install,uninstall,status}`
 │   └── config.sh              ← Python config CLI wrapper + setup wizard + interactive editor
 ├── scripts/
-│   ├── wiki_config.py         ← config dataclass + get/set/keys CLI (incl. Personal block)
-│   ├── config.py              ← path constants (single source of truth for *_DIR)
-│   ├── prompts.py             ← prompt template loader (${var} substitution)
-│   ├── ollama_client.py       ← single Ollama transport (chat / chat_schema / chat_vision)
-│   ├── flush_pipeline.py      ← staged-flush state machine (stage / commit / archive / pending)
+│   ├── core/                  ← shared engine plumbing (imported, never invoked)
+│   │   ├── config.py              ← path constants (single source of truth for *_DIR)
+│   │   ├── wiki_config.py         ← config dataclass + get/set/keys CLI (incl. Personal block)
+│   │   ├── prompts.py             ← prompt template loader (${var} substitution)
+│   │   ├── ollama_client.py       ← single Ollama transport (chat / chat_schema / chat_vision)
+│   │   ├── sdk_helpers.py         ← StderrCapture + log_sdk_failure for Claude Agent SDK
+│   │   ├── utils.py               ← shared helpers (article listing, JSON state, history)
+│   │   ├── agent_spec.py          ← agent-task spec parser (prompts/agent_*.md → AgentSpec)
+│   │   └── flush_pipeline.py      ← staged-flush state machine (stage / commit / archive / pending)
+│   ├── collectors/            ← substrate→raw/ writers (Registry + scan-* CLIs + dispatcher)
+│   │   ├── base.py                ← Collector Protocol, SPEC, Registry
+│   │   ├── cli.py                 ← `wiki collect` dispatcher (Registry lookup + run-one)
+│   │   ├── email_collector.py     ← email Collector (multi-backend via adapters/mailbox/)
+│   │   ├── jamie.py               ← Jamie AI meeting-notetaker
+│   │   ├── scan-browser.py        ← Firefox + Chrome bookmarks/history/tab-groups
+│   │   ├── scan-calendar.py       ← Thunderbird CalDAV cache → timeline overview
+│   │   ├── scan-screenshots.py    ← ~/Screenshots/ + Vision LLM (gemma4) → HOME sidecar + vault thumb (384px) + batch report
+│   │   ├── scan-tabs.py           ← Firefox Simple Tab Groups backups
+│   │   └── scan-youtube.py        ← yt-dlp + youtube-transcript-api + optional gemma4 visual analysis
+│   ├── adapters/              ← MailboxReader implementations consumed by email_collector
+│   │   └── mailbox/{gmail,thunderbird,allinkl,base}.py
+│   ├── domain/                ← pure domain types (mail message, filter rule)
+│   ├── facts/                 ← hard-fact subsystem (knowledge/facts/<slug>.md consumers)
+│   │   ├── correct.py             ← CRUD CLI: add/list/remove/edit/path
+│   │   └── correct_apply.py       ← agent-driven propagation across vault
+│   ├── suggestions/           ← email-suggestion pipeline (raw/suggestions/ producer + executor)
+│   │   ├── producer.py            ← maybe_generate_suggestions (called from compile.py)
+│   │   ├── cli.py                 ← interactive approve/review/reject/execute
+│   │   └── backends/imap.py       ← IMAP move/tag/set-flags executor
+│   ├── dashboard/             ← Obsidian dashboard helpers (post-flush + seed-time)
+│   │   ├── dashboard_stats.py     ← _dashboard-stats.md generator
+│   │   ├── dashboard_lint.py      ← _dashboard-lint.md generator
+│   │   ├── agent_buttons.py       ← agent-button discovery + dashboard.md rewriter
+│   │   └── inject_daily_button.py ← idempotent Summarize-button injection into daily/*.md
+│   ├── migrations/            ← one-shot schema/data migrations
+│   │   ├── migrate_add_type.py    ← backfill type: frontmatter
+│   │   └── migrate_strip_substrate_links.py ← enforce distill-don't-cite (raw/memories/)
 │   ├── compile.py             ← Claude Agent SDK compiler (raw/ + daily/ → knowledge/)
 │   ├── flush.py               ← session-end → daily/ append + piggyback spawner
 │   ├── lint.py                ← 6 structural checks + 1 LLM contradiction check
 │   ├── query.py               ← Claude Agent SDK natural-language query (read-only / file-back)
-│   ├── scan-email.py          ← Thunderbird mboxes (full / incremental / deep)
-│   ├── scan-calendar.py       ← Thunderbird CalDAV cache → timeline overview
-│   ├── scan-browser.py        ← Firefox + Chrome bookmarks/history/tab-groups
-│   ├── scan-screenshots.py    ← ~/Screenshots/ + Vision LLM (gemma4) → HOME sidecar + vault thumb (384px) + batch report
-│   ├── scan-tabs.py           ← Firefox Simple Tab Groups backups
-│   ├── sync-memories.py       ← Claude Code project memories → raw/memories/ (file-per-memory; opt-in, default OFF since 2026-05-04 — phase-out)
+│   ├── agent_task.py          ← generic Claude Agent SDK runner for prompts/agent_*.md
+│   ├── sync-memories.py       ← Claude Code project memories → raw/memories/ (opt-in, default OFF since 2026-05-04 — phase-out)
 │   ├── clippings_sweep.py     ← <vault>/Clippings/ → raw/articles/ (pre-compile lift)
 │   ├── ingest-html.py         ← HTML file or URL → text + visual (Playwright + Vision LLM)
 │   ├── process-inbox.py       ← <vault>/inbox/ → classify + move to raw/ subfolder
-│   ├── execute-suggestions.py ← per-action approval for raw/suggestions/*.yaml
-│   ├── thunderbird-rules.py   ← parse/list/create/export/execute TB filter rules
 │   ├── review-wiki.py         ← per-article quality scoring via local LLM
 │   ├── optimize-claude-md.py  ← cross-project pattern → ~/.claude/CLAUDE.md edits
 │   ├── retry-failed-flushes.py ← reprocess archived flush contexts

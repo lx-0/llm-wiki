@@ -1,7 +1,7 @@
 ---
 type: process-documentation
-version: "1.2"
-updated: "2026-05-01"
+version: "1.3"
+updated: "2026-05-13"
 scope: llm-wiki engine — all data flows
 format: markdown + mermaid + yaml-frontmatter
 ---
@@ -199,7 +199,7 @@ flowchart TD
 
 **flush.py** nutzt den Claude Agent SDK mit `allowed_tools=[]` (nur Text rein/raus, keine Dateioperationen). Extrahiert: Context, Key Exchanges, Decisions, Lessons Learned, Action Items. Bei Erfolg → `flush_pipeline.append_to_daily(content, session_id)` + `mark_complete(staged)`. Bei Failure → `flush_pipeline.archive_failure(staged)` (nach `.wiki/sessions/failed-flushes/`); ein Piggyback-Task retried das später.
 
-**State-Machine in einem Modul.** Die ganze Lifecycle (Capture → Stage → Commit / Archive → Retry) lebt in `scripts/flush_pipeline.py`. Hooks, `flush.py` und `retry-failed-flushes.py` gehen alle durch dieselbe API. Die Invariante "no gap between capture and persist" hat damit ein Code-Home, nicht nur Prosa in `.ytstack/KNOWLEDGE.md`.
+**State-Machine in einem Modul.** Die ganze Lifecycle (Capture → Stage → Commit / Archive → Retry) lebt in `scripts/core/flush_pipeline.py`. Hooks, `flush.py` und `retry-failed-flushes.py` gehen alle durch dieselbe API. Die Invariante "no gap between capture and persist" hat damit ein Code-Home, nicht nur Prosa in `.ytstack/KNOWLEDGE.md`.
 
 **Recursion Guard:** Alle Agent SDK Scripts (flush, compile, query, lint) setzen `CLAUDE_INVOKED_BY` env var. Die Hooks prüfen diese Variable und exiten sofort wenn gesetzt. Verhindert dass Hooks auf ihre eigenen Sessions feuern.
 
@@ -207,20 +207,20 @@ flowchart TD
 
 **Retry bei Rate Limits:** 3 Versuche mit 30 Sekunden Pause. Nach 3 Fehlern: Temp-File wird trotzdem gelöscht, Warning geloggt.
 
-**Piggyback-Scheduler:** Nach erfolgreichem Flush (und ggf. Compile) prüft `flush.py` ob konfigurierte Hintergrund-Tasks gestartet werden sollen. Bedingungen: nach 18:00 UND konfigurierbarer Cooldown abgelaufen. State in `.wiki/state/piggyback-state.json`. Task-Liste lebt in `flush.py:_PIGGYBACK_COMMANDS`; pro Task ist `enabled` und `cooldown_hours` über `CONFIG.piggybacks.<name>` einstellbar.
+**Piggyback-Scheduler:** Nach erfolgreichem Flush (und ggf. Compile) prüft `flush.py` ob konfigurierte Hintergrund-Tasks gestartet werden sollen. Bedingungen: nach `compile_after_hour` UND konfigurierbarer Cooldown abgelaufen. State in `.wiki/state/piggyback-state.json`. Task-Liste wird zur Laufzeit aus zwei Quellen gemerged (`flush.py:_build_piggyback_tasks`): (1) Registry-discovered Collectors mit `SPEC.piggyback_default=True` werden als `collectors/cli.py <name>` gespawnt; (2) `flush.py:_LEGACY_PIGGYBACK_COMMANDS` für noch nicht aufs Collector-Pattern portierte Scripts. Pro Task ist `enabled` und `cooldown_hours` über `CONFIG.piggybacks.<name>` einstellbar.
 
-| Task | Script | Cooldown | Kosten |
-|------|--------|----------|--------|
-| Email Incremental Scan | `scan-email.py --incremental` | 24h | $0 (lokal) |
-| Curiosity Loop Requests | `scan-email.py --follow-requests` | 24h | $0 (Ollama/Gemma4) |
-| Screenshot Scan | `scan-screenshots.py --all --limit N` | 24h | $0 (Ollama/Gemma4) |
-| YouTube Inbox Drain | `scan-youtube.py --inbox raw/inbox/youtube.md` | manual / 24h | $0 (T0-T2) / $0 local-vision (T3) |
-| Structural Lint | `lint.py --structural-only` | 24h | $0 (kein LLM) |
-| Wiki Review | `review-wiki.py` | 168h (1x/Woche) | $0 (Ollama/Gemma4) |
-| CLAUDE.md Optimizer | `optimize-claude-md.py` | 24h | $ (Claude API) |
-| Memory Sync (opt-in) | `sync-memories.py` | 24h | $0 (kein LLM) — **default OFF seit 2026-05-04, Phase-Out-Kandidat** |
-| Retry Failed Flushes | `retry-failed-flushes.py --limit N` | 24h | $ (Claude API) |
-| Dashboard Stats Refresh | `dashboard_stats.py` (synchron, kein Piggyback) | nach jedem Flush | $0 (kein LLM) |
+| Task | Quelle | Script | Cooldown | Kosten |
+|------|--------|--------|----------|--------|
+| `email` | Collector Registry | `collectors/cli.py email --incremental` | 24h | $0 (lokal) |
+| `jamie` | Collector Registry | `collectors/cli.py jamie --incremental` | 6h | $0 (Jamie API) |
+| `scan_screenshots` | Legacy | `collectors/scan-screenshots.py --all --limit N` | 24h | $0 (Ollama/Gemma4) |
+| `lint_structural` | Legacy | `lint.py --structural-only` | 24h | $0 (kein LLM) |
+| `review_wiki` | Legacy | `review-wiki.py` | 168h (1x/Woche) | $0 (Ollama/Gemma4) |
+| `optimize_claude_md` | Legacy | `optimize-claude-md.py` | 24h | $ (Claude API) |
+| `sync_memories` | Legacy | `sync-memories.py` | 24h | $0 (kein LLM) — **default OFF seit 2026-05-04, Phase-Out-Kandidat** |
+| `retry_failed_flushes` | Legacy | `retry-failed-flushes.py --limit N` | 24h | $ (Claude API) |
+| Dashboard Stats Refresh | (synchron, kein Piggyback) | `dashboard/dashboard_stats.py` | nach jedem Flush | $0 (kein LLM) |
+| Dashboard Lint Refresh | (synchron, kein Piggyback) | `dashboard/dashboard_lint.py` | nach jedem Flush | $0 (kein LLM) |
 
 Tasks werden als detached Background-Prozesse gespawnt (gleiche Mechanik wie compile.py). Sie laufen unabhängig voneinander und vom Compile. Der Piggyback läuft nur nach erfolgreichem Flush — bei Dedup, Empty oder Fail wird er übersprungen.
 
@@ -319,11 +319,11 @@ flowchart LR
     end
 
     subgraph Scanners
-        SE["scan-email.py"]
-        SC["scan-calendar.py"]
-        SB["scan-browser.py"]
-        SCR["scan-screenshots.py"]
-        SY["scan-youtube.py"]
+        SE["collectors/email_collector.py\n(Registry: `wiki collect email`)"]
+        SC["collectors/scan-calendar.py"]
+        SB["collectors/scan-browser.py"]
+        SCR["collectors/scan-screenshots.py"]
+        SY["collectors/scan-youtube.py"]
     end
 
     subgraph Output
@@ -352,28 +352,35 @@ flowchart LR
 
 ### Scanner-Tabelle
 
-| Scanner | Quelle | Daten | Output |
-|---------|--------|-------|--------|
-| `scan-email.py` | Thunderbird mbox (lokal) | tausende Mails über mehrere Accounts/Ordner. | `raw/notes/email/` |
-| `scan-calendar.py` | Thunderbird calendar SQLite | hunderte bis tausende Events, Attendees, Kategorien. | `raw/notes/calendar/` |
-| `scan-browser.py` | Firefox places.sqlite + STG + Chrome | tausende Tabs, Bookmarks, zehntausende Visits. | `raw/notes/browser/` |
-| `scan-screenshots.py` | `~/Screenshots/` (macOS PNG-Dump) | gemma4 Vision pro Screenshot, batch-report mit allen analyses + thumbnails. | `raw/notes/screenshots/screenshots-<slug>.md` + `~/Screenshots/<file>.md` (canonical sidecar) |
-| `scan-youtube.py` | YouTube (yt-dlp Metadaten + youtube-transcript-api Captions + Comments + optional ffmpeg-Frames + gemma4 Vision) | pro Video ein Markdown-File (single source of truth). Tier-based ingest: 0=metadata, 1=+transcript, 2=+comments, 3=+visual analysis. Playlist-Expansion via `playlist?list=` Normalisierung. | `raw/notes/youtube/<channel>--<title>--<vid>.md` |
-| `collectors/jamie.py` | Jamie AI public tRPC API (`beta-api.meetjamie.ai`, `x-api-key` auth) | pro Meeting ein Markdown-File: frontmatter (id, participants, tags, calendar event) + Jamie-LLM-Summary verbatim + Action-Items als Obsidian-Tasks + Speaker-diarisierter Transcript (`**Name** [mm:ss] — text`). Skip-existing per `meeting_id`; incremental via `last_seen_ts` state. | `raw/transcripts/jamie/<date>--<slug>--<short-id>.md` |
+| Scanner | Pattern | Quelle | Daten | Output |
+|---------|---------|--------|-------|--------|
+| `collectors/email_collector.py` | Collector Registry | Mailbox-Adapter (Thunderbird mbox, Gmail API, All-Inkl IMAP) via `adapters/mailbox/resolve_reader` | Metadata-Sweep pro Account aus `CONFIG.personal.accounts`. Ein Markdown-Report pro Account. | `raw/notes/email/<account>-<date>.md` |
+| `collectors/jamie.py` | Collector Registry | Jamie AI public tRPC API (`beta-api.meetjamie.ai`, `x-api-key` auth) | Pro Meeting ein Markdown-File: frontmatter (id, participants, tags, calendar event) + Jamie-LLM-Summary verbatim + Action-Items als Obsidian-Tasks + Speaker-diarisierter Transcript (`**Name** [mm:ss] — text`). Skip-existing per `meeting_id`; incremental via `last_seen_ts` state. | `raw/transcripts/jamie/<date>--<slug>--<short-id>.md` |
+| `collectors/scan-calendar.py` | Legacy CLI | Thunderbird calendar SQLite | Hunderte bis tausende Events, Attendees, Kategorien. | `raw/notes/calendar/` |
+| `collectors/scan-browser.py` | Legacy CLI | Firefox places.sqlite + STG + Chrome | Tausende Tabs, Bookmarks, zehntausende Visits. | `raw/notes/browser/` |
+| `collectors/scan-tabs.py` | Legacy CLI | Firefox Simple Tab Groups Backup | Aktive Tab-Gruppen, deren Tab-URLs/Titel. | `raw/notes/tabs/` |
+| `collectors/scan-screenshots.py` | Legacy CLI | `~/Screenshots/` (macOS PNG-Dump) | gemma4 Vision pro Screenshot, batch-report mit allen analyses + thumbnails. | `raw/notes/screenshots/screenshots-<slug>.md` + `~/Screenshots/<file>.md` (canonical sidecar) |
+| `collectors/scan-youtube.py` | Legacy CLI | YouTube (yt-dlp Metadaten + youtube-transcript-api Captions + Comments + optional ffmpeg-Frames + gemma4 Vision) | Pro Video ein Markdown-File (single source of truth). Tier-based ingest: 0=metadata, 1=+transcript, 2=+comments, 3=+visual analysis. Playlist-Expansion via `playlist?list=` Normalisierung. | `raw/notes/youtube/<channel>--<title>--<vid>.md` |
 
-> **Hinweis Collector vs Scanner**: Jamie folgt dem neuen `Collector` Pattern (`scripts/collectors/base.py` — `SPEC`-deklariert + `@register` decorator + `run(dry_run, incremental) → RunResult`) statt dem alten `scan-*.py` CLI-Pattern. `flush.py` entdeckt alle Collectors automatisch über `piggyback_collectors()` Registry-walk — keine hardcoded Liste. Migration der bestehenden `scan-*.py` Scripts auf das Pattern ist work-in-progress; aktuell laufen sie parallel.
+> **Hinweis Collector vs Scanner**: Zwei Patterns laufen aktuell parallel.
+> - **Collector Registry** (`scripts/collectors/base.py`): Klassen mit `SPEC`-Deklaration + `@register`-Decorator + `run(dry_run, incremental) → RunResult`. `flush.py` entdeckt sie automatisch über `piggyback_collectors()` Registry-walk. Operator-CLI: `wiki collect <name>` über `scripts/collectors/cli.py`. Aktuell portiert: `email`, `jamie`.
+> - **Legacy CLI** (`scan-*.py`): direkt-aufrufbare Scripts mit eigenem argparse, hardcoded in `flush.py:_LEGACY_PIGGYBACK_COMMANDS`. Migration aufs Collector-Pattern ist work-in-progress; aktuell betroffen: `scan-browser`, `scan-calendar`, `scan-screenshots`, `scan-tabs`, `scan-youtube`.
 
 > **Secrets**: `JAMIE_API_KEY` (+ alle anderen `*_API_KEY` / `IMAP_*_PASS` / `NAS_*`) liegen in `<vault>/.claude/.env`. `core.config` lädt das File einmal beim Import via `load_dotenv(..., override=False)` — keine manuellen `export`-Statements nötig, weder für Piggyback-Runs noch für Operator-CLI-Aufrufe. Shell-Exports überschreiben `.env`-Werte. Fresh-Vault-Seed über `wiki seed` kopiert `templates/.claude/.env.example` in den Vault (additiv).
 
-### Email Scanner — Drei Modi
+### Email Collector — Multi-Backend Metadata-Sweep
 
-**Full Scan** (default): Metadata-Überblick aller Accounts/Ordner. Nur Headers (From/To/Subject/Date). Output: `thunderbird-overview-YYYY-MM-DD.md`. Speichert Dateigröße pro mbox in `email-state.json`.
+Der `email`-Collector iteriert über `CONFIG.personal.accounts` und resolvet pro Account einen `MailboxReader` via `adapters/mailbox/resolve_reader`. Adapter-Implementierungen liegen in `scripts/adapters/mailbox/`:
 
-**Incremental** (`--incremental`): Prüft mbox-Dateigröße gegen `email-state.json`. Nur Ordner die gewachsen sind werden gescannt. Output: `delta-YYYY-MM-DD.md` — nur neue/geänderte Ordner. Für tägliche Routine geeignet (Sekunden, kostenlos).
+| Adapter | `reader.kind` | Datenquelle |
+|---------|---------------|-------------|
+| `thunderbird.py` | `thunderbird_mbox` | Lokale Thunderbird mbox-Dateien (Python `mailbox`-Modul, kein IMAP nötig) |
+| `gmail.py` | `gmail_api` | Gmail API (OAuth2 via `gmail-oauth-client.json` → `state/gmail-token-<id>.json`) |
+| `allinkl.py` | `allinkl_imap` | All-Inkl IMAP über `imapclient` (procmail-fähig via Webmail API) |
 
-**Deep Scan** (`--deep --folder X`): Liest Mail-Bodies, rekonstruiert Threads (via Message-ID/In-Reply-To/References), optional LLM-Filterung (Gemma4 bewertet Relevanz). Output: `deep-{folder}-YYYY-MM-DD.md` mit Thread-Zusammenfassungen. Folder-Filter ist rekursiv — `--folder "COMPANY"` findet auch alle verschachtelten Unterordner.
+Output ist pro Account ein Markdown-Report mit Headers (From/To/Subject/Date) und einer Kategorie-Aufschlüsselung. Bei `--incremental` werden nur Accounts gescannt deren Mailbox-State sich seit dem letzten Lauf geändert hat (Adapter-spezifischer Marker: mbox-size für Thunderbird, message-id-watermark für IMAP-Backends).
 
-**Follow Requests** (`--follow-requests`): Liest einen pending Request aus `raw/requests/*.json` (Typ `email-deep-scan`), führt Deep-Scan für den angegebenen Ordner aus, markiert Request als done. Für den Curiosity Loop.
+> **Deep-Scan und Follow-Requests-Pfad sind aktuell nicht implementiert** — die historische `scan-email.py --deep` / `--follow-requests` Variante existierte als separater Script-Pfad und wurde mit der Collector-Portierung nicht mitgenommen. `compile.py:maybe_generate_curiosity_requests` schreibt zwar weiterhin Deep-Scan-Requests nach `raw/requests/`, ein Konsument fehlt jedoch derzeit. Siehe Section 8 (Curiosity Loop).
 
 ### Andere Scanner
 
@@ -383,47 +390,41 @@ flowchart LR
 
 **Thunderbird mbox:** Python's `mailbox` Modul liest mbox-Dateien direkt. Kein Thunderbird nötig, kein IMAP. Robustes Error-Handling für kaputte Mails.
 
-**Account-Konfiguration ist gitignored.** scan-email/calendar/thunderbird-rules lesen Account-Map (id → email, label, mbox-paths, IMAP-host, env-var-namen) zur Laufzeit aus `CONFIG.personal.accounts`. Defaults in `config.example.yaml` sind leer; per-install Werte leben in `config.yaml` (gitignored). Pfad zum Thunderbird-Profil: `CONFIG.personal.thunderbird_profile` (leer = Scanner deaktiviert).
+**Account-Konfiguration ist gitignored.** Email-Collector und scan-calendar lesen Account-Map (id → email, label, mbox-paths, IMAP-host, env-var-namen) zur Laufzeit aus `CONFIG.personal.accounts`. Defaults in `config.example.yaml` sind leer; per-install Werte leben in `config.yaml` (gitignored). Pfad zum Thunderbird-Profil: `CONFIG.personal.thunderbird_profile` (leer = entsprechende Scanner deaktiviert).
 
-**Ollama-Aufrufe** (LLM-Filterung im Deep-Scan, JSON-Klassifizierung, Vision in Screenshots) gehen alle durch `scripts/ollama_client.py` — die Gotchas (Markdown-Fence-Stripping, `format`-Schema mit `enum` für non-empty Strings, `/api/chat` für Vision) leben dort, nicht in jedem Caller.
+**Ollama-Aufrufe** (LLM-Filterung im Deep-Scan, JSON-Klassifizierung, Vision in Screenshots) gehen alle durch `scripts/core/ollama_client.py` — die Gotchas (Markdown-Fence-Stripping, `format`-Schema mit `enum` für non-empty Strings, `/api/chat` für Vision) leben dort, nicht in jedem Caller.
 
 ### Script
 
 ```bash
-# Email — Full Scan
-uv run python scripts/scan-email.py
-uv run python scripts/scan-email.py --account <id>          # restrict to one account from CONFIG.personal.accounts
-uv run python scripts/scan-email.py --dry-run
+# Email — Registry-discovered Collector
+./.wiki/wiki collect email                                  # all configured accounts
+./.wiki/wiki collect email --account <id>                   # restrict to one account
+./.wiki/wiki collect email --incremental                    # delta only (default in piggyback)
+./.wiki/wiki collect email --dry-run                        # no writes
 
-# Email — Incremental (nur Deltas)
-uv run python scripts/scan-email.py --incremental
-
-# Email — Deep Scan (Bodies lesen)
-uv run python scripts/scan-email.py --deep --folder "INBOX/<folder>" --limit 10
-uv run python scripts/scan-email.py --deep --folder "INBOX/<folder>" --model gemma4:e4b
-
-# Email — Curiosity Loop Request verarbeiten
-uv run python scripts/scan-email.py --follow-requests
+# Equivalent direct invocation:
+uv run python scripts/collectors/cli.py email --incremental
 
 # YouTube — Single video at default tier (1 = transcript)
-uv run python scripts/scan-youtube.py --url "https://youtu.be/<id>"
+uv run python scripts/collectors/scan-youtube.py --url "https://youtu.be/<id>"
 
 # YouTube — Playlist mit Tier 2 (transcript + top comments), capped at 10 videos
-uv run python scripts/scan-youtube.py --url "https://www.youtube.com/playlist?list=<L>" --tier 2 --limit 10
+uv run python scripts/collectors/scan-youtube.py --url "https://www.youtube.com/playlist?list=<L>" --tier 2 --limit 10
 
 # YouTube — Tier 3 (visual analysis via gemma4 frame sampling on kcma)
-uv run python scripts/scan-youtube.py --url "https://youtu.be/<id>" --tier 3
+uv run python scripts/collectors/scan-youtube.py --url "https://youtu.be/<id>" --tier 3
 
 # YouTube — Inbox-list (markdown file, optional inline `tier: N` directives)
-uv run python scripts/scan-youtube.py --inbox raw/inbox/youtube.md --tier 1
+uv run python scripts/collectors/scan-youtube.py --inbox raw/inbox/youtube.md --tier 1
 
 # Calendar
-uv run python scripts/scan-calendar.py
-uv run python scripts/scan-calendar.py --year 2025
+uv run python scripts/collectors/scan-calendar.py
+uv run python scripts/collectors/scan-calendar.py --year 2025
 
 # Browser
-uv run python scripts/scan-browser.py
-uv run python scripts/scan-browser.py --source firefox
+uv run python scripts/collectors/scan-browser.py
+uv run python scripts/collectors/scan-browser.py --source firefox
 ```
 
 ### Edge Cases
@@ -543,7 +544,7 @@ flowchart TD
     FILTER -->|Ja| REQ["raw/requests/request-{slug}-{date}.json\nmax 3 pro Compile"]
     FILTER -->|Nein| SKIP["Übersprungen"]
     REQ --> PIGGY["Piggyback: flush.py\nfollow-requests Task\n24h Cooldown"]
-    PIGGY --> DEEP["scan-email.py --follow-requests\nDeep Scan: Bodies lesen\nThread-Rekonstruktion\nLLM-Filterung"]
+    PIGGY --> DEEP["⚠ Konsument fehlt\n(`scan-email.py --follow-requests`\nwurde mit Collector-Portierung entfernt)\nRequests bleiben pending in raw/requests/"]
     DEEP --> RAW["raw/notes/email/\ndeep-*.md"]
     RAW --> COMPILE2["compile.py\nnächster Zyklus → Lücke geschlossen"]
 
@@ -578,7 +579,9 @@ flowchart TD
 
 Dateiname: `raw/requests/request-{slug}-{date}.json`
 
-**Piggyback:** `follow-requests` Task in flush.py (24h Cooldown). `scan-email.py --follow-requests` nimmt den ältesten pending Request, führt Deep Scan für den angegebenen Ordner aus, markiert Request als done. Deep Scan liest Mail-Bodies, rekonstruiert Threads, filtert via LLM. Output: `raw/notes/email/deep-*.md` — wird beim nächsten Compile verarbeitet.
+**Konsumenten-Lücke (2026-05-13):** Der ursprünglich vorgesehene Konsument `scan-email.py --follow-requests` existiert nicht mehr — `scan-email.py` wurde durch den Email-Collector ersetzt und der `--follow-requests`-Pfad wurde nicht mitportiert. Curiosity-Requests werden derzeit weiterhin produziert (Producer in `compile.py:maybe_generate_curiosity_requests` ist unverändert aktiv) und sammeln sich in `raw/requests/*.json`, werden aber nicht abgearbeitet. Reaktivierung erfordert einen Deep-Scan-Modus im `email`-Collector oder einen separaten Konsumenten — siehe Architektur-Backlog (`.ytstack/backlog/`).
+
+**Producer-Code:** `scripts/compile.py:maybe_generate_curiosity_requests` (vor der Collector-Extraktion intern; ist Migrations-Kandidat nach `scripts/curiosity/producer.py` parallel zum `scripts/suggestions/producer.py`-Pattern).
 
 ### Edge Cases
 
@@ -598,17 +601,17 @@ Der Compiler erkennt Optimierungspotential in Email-Scanner-Daten und schlägt A
 
 ```mermaid
 flowchart TD
-    SCAN["scan-email.py\n+ thunderbird-rules.py --export"]
-    SCAN --> RAW["raw/notes/email/\nMetadaten + Regeln + Procmail"]
-    RAW --> COMPILE["compile.py\nErkennt Muster\n(prüft TB-Regeln + Procmail)"]
+    SCAN["wiki collect email\n→ collectors/email_collector.py"]
+    SCAN --> RAW["raw/notes/email/\nMetadaten pro Account"]
+    RAW --> COMPILE["compile.py\n+ suggestions/producer.py\n(Email-Pattern-Detection)"]
     COMPILE --> SUGGEST["raw/suggestions/*.yaml\nPer-Action Status"]
-    SUGGEST --> REVIEW{"Human Review\nexecute-suggestions.py --list"}
-    REVIEW -->|approve #N| EXEC["execute-suggestions.py"]
+    SUGGEST --> REVIEW{"Human Review\nsuggestions/cli.py --list"}
+    REVIEW -->|approve #N| EXEC["suggestions/cli.py"]
     REVIEW -->|reject #N| SKIP["status: rejected"]
-    EXEC --> ROUTE{"Account?"}
-    ROUTE -->|has_procmail| PROCMAIL["Procmail\n(All-Inkl Webmail API)\nserverseitig, sofort aktiv"]
-    ROUTE -->|gmail| GMAIL["Gmail API / IMAP\n(OAuth2)"]
-    ROUTE -->|alle| IMAP["IMAP direkt\nMails verschieben/taggen"]
+    EXEC --> ROUTE{"Action-Typ?"}
+    ROUTE -->|create-rule, account has_procmail| PROCMAIL["Procmail\n(All-Inkl Webmail API)\nserverseitig, sofort aktiv"]
+    ROUTE -->|create-rule, gmail| GMAIL["Gmail API Filter\n(OAuth2)"]
+    ROUTE -->|imap-move, imap-tag, imap-set-flags| IMAP["suggestions/backends/imap.py\nMails verschieben/taggen"]
 
     style COMPILE fill:#FFD8CB,stroke:#FC4E14,stroke-width:3px
     style SUGGEST fill:#FFECB9,stroke:#92610F
@@ -641,7 +644,9 @@ Jede Action innerhalb einer Suggestion hat ein eigenes `status` Feld. Der User a
 
 ### Duplikat-Erkennung
 
-Der Compiler prüft VOR dem Generieren: Thunderbird-Regeln + Procmail-Config. Wenn ein Sender bereits abgedeckt ist, wird keine Suggestion generiert. Safety-Net in `execute-suggestions.py` blockt Duplikate bei Execution.
+Der Suggestion-Producer prüft VOR dem Generieren: bestehende Procmail-Config (für Accounts mit `has_procmail: true`). Wenn ein Sender bereits abgedeckt ist, wird keine Suggestion generiert. Safety-Net in `suggestions/cli.py` blockt Duplikate bei Execution.
+
+> **Code-Topologie (M003 follow-up, 2026-05-13):** Die ehemals in `compile.py` lebende Producer-Logik (`maybe_generate_suggestions` + `_is_email_source` + `_read_rules_overview` + `_read_procmail_config`) wurde nach `scripts/suggestions/producer.py` extrahiert. compile.py importiert nur noch die Top-Level-Funktion. Die historische `scripts/thunderbird-rules.py` (Regel-Export für Compile-Input) existiert nicht mehr — TB-Regeln werden derzeit nicht aktiv eingespeist.
 
 ### Procmail (All-Inkl Webmail API)
 
@@ -652,19 +657,13 @@ Syntax: `:0 w` + `* ^From:.*pattern` + `| $DELIVER -m "INBOX/folder"`. Folder-Se
 ### Scripts
 
 ```bash
-# Thunderbird-Regeln anzeigen
-uv run python scripts/thunderbird-rules.py --list --account <id>
-
-# Regeln exportieren (Input für Compiler)
-uv run python scripts/thunderbird-rules.py --export
-
 # Suggestions reviewen (per-Action)
-uv run python scripts/execute-suggestions.py --list
-uv run python scripts/execute-suggestions.py --approve <suggestion-id> 1
-uv run python scripts/execute-suggestions.py --reject <suggestion-id> 2
-uv run python scripts/execute-suggestions.py --review <suggestion-id>
-uv run python scripts/execute-suggestions.py --dry-run
-uv run python scripts/execute-suggestions.py
+uv run python scripts/suggestions/cli.py --list
+uv run python scripts/suggestions/cli.py --approve <suggestion-id> 1
+uv run python scripts/suggestions/cli.py --reject <suggestion-id> 2
+uv run python scripts/suggestions/cli.py --review <suggestion-id>
+uv run python scripts/suggestions/cli.py --dry-run
+uv run python scripts/suggestions/cli.py
 ```
 
 ### Edge Cases
@@ -746,7 +745,7 @@ Pro PNG wird der Vision-LLM **genau einmal** aufgerufen — die in-memory `meta`
 ```mermaid
 flowchart TD
     DIR["~/Screenshots/\nPNG-Dateien"]
-    DIR --> SCAN["scan-screenshots.py\nfind_new_screenshots()\n~/Screenshots/Foo.md fehlt?"]
+    DIR --> SCAN["collectors/scan-screenshots.py\nfind_new_screenshots()\n~/Screenshots/Foo.md fehlt?"]
     SCAN -->|nein| SKIP["Übersprungen"]
     SCAN -->|ja| VISION["Gemma4 Vision\nchat_vision(prompt, model, image_b64)\nCONFIG.models.ollama_url"]
     VISION --> META["in-memory meta dict:\napp, project, tags, relevance,\nsummary, key_text, raw_response"]
@@ -777,12 +776,12 @@ flowchart TD
 ### Script
 
 ```bash
-uv run python scripts/scan-screenshots.py                    # neue Screenshots scannen
-uv run python scripts/scan-screenshots.py --dry-run          # nur zeigen was gescannt würde
-uv run python scripts/scan-screenshots.py --limit 20         # max 20 Screenshots pro Lauf
-uv run python scripts/scan-screenshots.py --backfill 7       # letzte 7 Tage nachscannen
-uv run python scripts/scan-screenshots.py --backfill-thumbnails    # Thumbs für alle PNGs in ~/Screenshots/, kein LLM
-uv run python scripts/scan-screenshots.py --retrofit-batch-reports # adde ![[thumb/...]] zu existierenden Batch-Reports
+uv run python scripts/collectors/scan-screenshots.py                    # neue Screenshots scannen
+uv run python scripts/collectors/scan-screenshots.py --dry-run          # nur zeigen was gescannt würde
+uv run python scripts/collectors/scan-screenshots.py --limit 20         # max 20 Screenshots pro Lauf
+uv run python scripts/collectors/scan-screenshots.py --backfill 7       # letzte 7 Tage nachscannen
+uv run python scripts/collectors/scan-screenshots.py --backfill-thumbnails    # Thumbs für alle PNGs in ~/Screenshots/, kein LLM
+uv run python scripts/collectors/scan-screenshots.py --retrofit-batch-reports # adde ![[thumb/...]] zu existierenden Batch-Reports
 ```
 
 ### Edge Cases
@@ -815,7 +814,7 @@ uv run python scripts/scan-screenshots.py --retrofit-batch-reports # adde ![[thu
 
 `dashboard.md` zeigt einen Engine-Status-Callout (pending compiles, failed flushes, lint warnings, total cost) per Transklusion `![[_dashboard-stats]]`. Die Werte stehen als Frontmatter + gerenderter Callout in `_dashboard-stats.md` am Vault-Root.
 
-`scripts/dashboard_stats.py` regeneriert die Datei. Der Refresh ist **synchron post-flush** (kein Piggyback) — `flush.py:refresh_dashboard_stats()` ruft das Script direkt nach `maybe_trigger_compile` auf, sodass die Counts immer den letzten Flush widerspiegeln. Best-effort: ein Crash blockiert den Flush nicht.
+`scripts/dashboard/dashboard_stats.py` regeneriert die Datei. Der Refresh ist **synchron post-flush** (kein Piggyback) — `flush.py:refresh_dashboard_stats()` ruft das Script direkt nach `maybe_trigger_compile` auf, sodass die Counts immer den letzten Flush widerspiegeln. Best-effort: ein Crash blockiert den Flush nicht.
 
 Der Inhalt der Frontmatter:
 
@@ -832,8 +831,8 @@ Der Inhalt der Frontmatter:
 ### Script
 
 ```bash
-uv run python scripts/dashboard_stats.py             # Refresh
-uv run python scripts/dashboard_stats.py --dry-run   # Stats als JSON ausgeben, nichts schreiben
+uv run python scripts/dashboard/dashboard_stats.py             # Refresh
+uv run python scripts/dashboard/dashboard_stats.py --dry-run   # Stats als JSON ausgeben, nichts schreiben
 ```
 
 ### Edge Cases
@@ -844,7 +843,7 @@ uv run python scripts/dashboard_stats.py --dry-run   # Stats als JSON ausgeben, 
 
 ### Lint-Triage-Refresh
 
-Parallel zu `_dashboard-stats.md` schreibt `scripts/dashboard_lint.py` die Datei `_dashboard-lint.md` ans Vault-Root — gleicher Trigger-Pfad (`flush.py:refresh_dashboard_lint()` direkt nach `refresh_dashboard_stats`, plus `wiki lint` / `wiki seed` / `wiki compile` / `wiki correct` über die Shell-Wrapper-Helfer `_refresh_dashboard_lint`).
+Parallel zu `_dashboard-stats.md` schreibt `scripts/dashboard/dashboard_lint.py` die Datei `_dashboard-lint.md` ans Vault-Root — gleicher Trigger-Pfad (`flush.py:refresh_dashboard_lint()` direkt nach `refresh_dashboard_stats`, plus `wiki lint` / `wiki seed` / `wiki compile` / `wiki correct` über die Shell-Wrapper-Helfer `_refresh_dashboard_lint`).
 
 `dashboard.md`-Section "🛡 Lint triage" rendert vier collapsible Obsidian-Callouts. Counts kommen aus dem `_dashboard-lint.md`-Frontmatter via DataviewJS; Body ist Section-Embed:
 
@@ -860,8 +859,8 @@ Empty Queue → `[!success] Title (0)` (auto-collapsed, grün). Non-empty → `[
 Refresh ist Best-effort wie bei stats — `flush.py:refresh_dashboard_lint()` capturet stderr und loggt `WARNING` bei non-zero Exit (preemptiver S07-T02-Pattern), blockiert aber niemals den Flush.
 
 ```bash
-uv run python scripts/dashboard_lint.py              # Refresh
-uv run python scripts/dashboard_lint.py --dry-run    # Lint-Daten als JSON, nichts schreiben
+uv run python scripts/dashboard/dashboard_lint.py              # Refresh
+uv run python scripts/dashboard/dashboard_lint.py --dry-run    # Lint-Daten als JSON, nichts schreiben
 ```
 
 ### MOC-Layer
@@ -933,7 +932,7 @@ Auto-injizierte Felder: `ts` (ISO timestamp), `type`. Schema ist forward-only �
 
 ```bash
 # Inspect last 20 events
-uv run python -c "import sys; sys.path.insert(0, 'scripts'); from utils import read_history; import json; [print(json.dumps(e)) for e in read_history(limit=20)]"
+uv run python -c "import sys; sys.path.insert(0, 'scripts'); from core.utils import read_history; import json; [print(json.dumps(e)) for e in read_history(limit=20)]"
 ```
 
 ### Bases-Browser
@@ -965,11 +964,11 @@ uv run python -c "import sys; sys.path.insert(0, 'scripts'); from utils import r
 ```mermaid
 flowchart TD
     USER["wiki correct add ..."]
-    USER --> WRITE["scripts/correct.py\nschreibt knowledge/facts/<slug>.md\ntype: fact, applied: false"]
+    USER --> WRITE["scripts/facts/correct.py\nschreibt knowledge/facts/<slug>.md\ntype: fact, applied: false"]
     WRITE --> INJECT["Bei nächstem compile/query:\n${facts_md} Block top-of-prompt\n→ höchste Autorität"]
     INJECT --> LINTHIT["wiki lint\ncheck_facts_violations()\ngrept negation_terms ueber knowledge/"]
     LINTHIT --> APPLY{"Drift gefunden?"}
-    APPLY -->|Ja| AGENTIC["wiki correct apply <slug>\nscripts/correct_apply.py\nClaude Agent SDK ueber Vault-Root"]
+    APPLY -->|Ja| AGENTIC["wiki correct apply <slug>\nscripts/facts/correct_apply.py\nClaude Agent SDK ueber Vault-Root"]
     AGENTIC --> EDIT["Edit/Rename in knowledge/\nAnnotate in daily/\nraw/ unangetastet (immutable)"]
     EDIT --> MARK["Fact frontmatter\napplied: <iso-ts>"]
     APPLY -->|Nein| DONE["nichts zu tun"]
@@ -1033,7 +1032,7 @@ wiki correct add "Office hours" \
   "Office opens at 10am Monday."
 ```
 
-`scripts/correct.py:cmd_add` lehnt fehlende `--source` mit `exit 2` ab. Trust-Werte ausserhalb der drei Tiers werden vom argparse-Choices-Validator geblockt.
+`scripts/facts/correct.py:cmd_add` lehnt fehlende `--source` mit `exit 2` ab. Trust-Werte ausserhalb der drei Tiers werden vom argparse-Choices-Validator geblockt.
 
 Im Prompt-Block sortiert `read_hard_facts()` Facts nach Tier (`confirmed` > `asserted` > `provisional`), dann nach `updated` DESC. Jeder Eintrag bekommt einen Header `### facts/<slug>.md  [trust: <tier>]` plus eine `> Sources: ...`-Zeile. Compile- und Query-Prompts erklären die Konflikt-Regel: höherer Tier gewinnt; bei Gleichstand der neuere `updated`. Alle drei Tiers überstimmen weiterhin Raw-Sources.
 
@@ -1065,7 +1064,7 @@ wiki correct apply township-project-fleet --dry-run         # plan only
 
 Was passiert:
 
-1. `scripts/correct_apply.py` liest das Fact-File und rendert `prompts/correct_apply.md`.
+1. `scripts/facts/correct_apply.py` liest das Fact-File und rendert `prompts/correct_apply.md`.
 2. Spawned Claude Agent SDK mit `cwd=<vault-root>`, `permission_mode=acceptEdits`, allowed_tools = `Read, Write, Edit, Glob, Grep, Bash`. Model = `CONFIG.models.compile_model` (Opus by default — Apply ist selten und teuer).
 3. Der Agent grept den ganzen Vault, editiert/strikes Claims in `knowledge/`, prepended Correction-Notes in `daily/`, lässt `raw/` unangetastet (Layer-Konvention: raw ist immutable). Bei Disambiguation darf er via `git mv` umbenennen und Wikilinks sweepen.
 4. Nach Erfolg setzt `correct_apply.py` das Fact-Frontmatter auf `applied: <iso-ts>` (mit `.bak.<ts>` Backup).
@@ -1149,7 +1148,7 @@ Operator-bereitgestellt via `wiki agent <id> --var key=value` (repeatable).
 
 ### Auto-Wiring durch `wiki seed`
 
-`scripts/agent_buttons.py` discovered alle `prompts/agent_*.md` mit `button:` Frontmatter. `lib/seed.sh` ruft das auf zwei Pfaden:
+`scripts/dashboard/agent_buttons.py` discovered alle `prompts/agent_*.md` mit `button:` Frontmatter. `lib/seed.sh` ruft das auf zwei Pfaden:
 
 1. **Shell-Commands additiver Merge:** `_merge_agent_shell_commands()` jq-merged neue `agent-<id>` Einträge in `.obsidian/plugins/obsidian-shellcommands/data.json`. Bestehende User-Einträge bleiben.
 2. **Dashboard Region-Replace:** `_rewrite_dashboard_agent_buttons()` ersetzt zwei marker-begrenzte Bereiche in `dashboard.md`:
