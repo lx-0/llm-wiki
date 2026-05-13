@@ -99,14 +99,13 @@ daily/YYYY-MM-DD.md.                      · scan-browser     (Firefox + Chrome)
                                           · scan-youtube     (yt-dlp + gemma4 visual)
 
                                           Other writers:
-                                          · sync-memories    (Claude Code memory; opt-in)
             │                             · clippings-sweep  (Obsidian Web Clipper)
                                           · ingest-html      (file or URL)
                                           · process-inbox    (LLM-classified drop)
             ▼                                          │
      daily/YYYY-MM-DD.md                               ▼
                                           raw/{articles,papers,notes,transcripts,
-                                              audio,memories,requests,suggestions}/
+                                              audio,requests,suggestions}/
             │                                          │
             └──────────────┐    ┌──────────────────────┘
                            ▼    ▼
@@ -151,7 +150,6 @@ tags: [agents, configuration, claude-md, incident]
 sources:
   - "daily/2026-04-16.md"
   - "daily/2026-04-24.md"
-  - "raw/memories/pixeltales__CLAUDE.md"
 created: 2026-04-16
 updated: 2026-05-02
 ---
@@ -183,14 +181,13 @@ line in `CLAUDE.md` caused an agent to base a PR on the wrong branch …
 
 - [[daily/2026-04-16.md]] — Session `fd9195f9` (18:08): PR #121 rejected
 - [[daily/2026-04-24.md]] — A2A skill hallucinated obsolete UI path
-- raw/memories/pixeltales__CLAUDE.md — workspace CLAUDE.md describes V1 (plain-text reference; see "managed-mirror" note below)
 ```
 
 Three things to notice:
 
 - **Frontmatter** is structured (aliases, tags, sources, dates) so Dataview queries hit it cleanly.
-- **`[[wikilinks]]`** point both *into* the wiki (`concepts/...`) and *back to durable sources* (`daily/...`, `raw/notes/...`, `raw/articles/...`) — the audit trail is part of the article, not a metadata field. The one exception is `raw/memories/` (managed mirror that prunes when upstream Claude Code memory is removed): provenance lives in the `sources:` frontmatter list as plain-text path, never as a body wikilink.
-- **The article is atomic.** It argues one idea, cites three different days' sessions, and links to four sibling concepts. The compiler chose this granularity from the raw substrates; nothing is hand-curated.
+- **`[[wikilinks]]`** point both *into* the wiki (`concepts/...`) and *back to durable sources* (`daily/...`, `raw/notes/...`, `raw/articles/...`, `raw/transcripts/...`) — the audit trail is part of the article, not a metadata field.
+- **The article is atomic.** It argues one idea, cites two different days' sessions, and links to four sibling concepts. The compiler chose this granularity from the raw substrates; nothing is hand-curated.
 
 ## The defining choice: compile once, query fast
 
@@ -287,7 +284,7 @@ Hooks always use Option B (the `--project` flag is hardcoded into the agent conf
 | Doc | What's inside |
 |---|---|
 | [docs/concept.md](docs/concept.md) | Three-layer architecture, compile-vs-RAG, cognitive-function mapping, curiosity loop |
-| [docs/PROCESS.md](docs/PROCESS.md) *(German)* | Live documentation of every data flow inside the engine — 14 numbered processes (German prose, English diagrams) |
+| [docs/PROCESS.md](docs/PROCESS.md) *(German)* | Live documentation of every data flow inside the engine — 13 numbered processes (German prose, English diagrams) |
 | [docs/cli.md](docs/cli.md) | Full CLI reference — every `wiki <subcommand>`, every config key, every hook target |
 | [docs/engine-layout.md](docs/engine-layout.md) | File-by-file tree of `.wiki/` — the engine internals |
 | [docs/naming.md](docs/naming.md) | Naming conventions for raw sources and knowledge articles |

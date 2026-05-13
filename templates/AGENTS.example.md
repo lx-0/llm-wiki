@@ -437,17 +437,7 @@ For non-conversation sources (articles, audio, PDFs, notes):
 2. For audio: transcribe via Whisper (API or local), save transcript to `raw/transcripts/`, audio to `raw/audio/`.
 3. Trigger compilation of the new source.
 
-### 5. Seed (One-Time Memory Import)
-
-`scripts/seed.py` collects all existing Claude Code memory files from `~/.claude/projects/*/memory/*.md` and places them as source files in `raw/memories/`, grouped by project.
-
-```bash
-uv run python scripts/seed.py              # collect + compile
-uv run python scripts/seed.py --dry-run    # preview only
-uv run python scripts/seed.py --no-compile # collect without compiling
-```
-
-### 6. Scan (Local Data Sources → `raw/notes/`)
+### 5. Scan (Local Data Sources → `raw/notes/`)
 
 Scanner scripts extract metadata from local applications without reading content. They produce structured overviews that the compiler turns into knowledge articles.
 

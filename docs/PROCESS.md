@@ -17,24 +17,23 @@ Zwei fundamental getrennte Ingest-Pfade konvergieren bei `compile.py`:
 - **Path A** — Automatische Session-Capture (Hooks → daily/ → compile)
 - **Path B** — Kuratierte Quellen (Scanners/Manual/Inbox → raw/ → compile)
 
-## Übersicht — die 14 Prozesse
+## Übersicht — die 13 Prozesse
 
 | # | Process | Was passiert | Trigger |
 |---|---|---|---|
 | [1](#1-inbox-processing) | Inbox Processing | Klassifiziert Drops in `inbox/`, verschiebt in `raw/<typ>/` | Manueller Drop |
 | [2](#2-automatic-session-capture-hooks) | Automatic Session Capture | Hooks → `daily/YYYY-MM-DD.md` | session-start / session-end / pre-compact |
 | [3](#3-compilation) | Compilation | Claude Agent SDK liest `raw/` + `daily/`, schreibt Articles in `knowledge/` | manuell oder cron-after-hour |
-| [4](#4-scanners) | Scanners | Email · Calendar · Browser · Screenshots · Tabs → `raw/notes/` | per-Scanner Cron oder piggyback |
-| [5](#5-seed-einmalig) | Seed (einmalig, opt-in) | Bulk-Import aus `~/.claude/projects/*/memory/` — *seit 2026-05-04 nicht mehr Standard, siehe Phase-Out-Hinweis dort* | One-shot bei Onboarding |
-| [6](#6-query--lint) | Query + Lint | NL-Query gegen Wiki · 6 strukturelle Checks · 1 LLM-Contradiction-Scan | manuell |
-| [7](#7-wiki-review-lokal-kostenlos) | Wiki Review | Per-Article Quality-Score via lokales LLM | piggyback |
-| [8](#8-curiosity-loop) | Curiosity Loop | Gap-Detection → JSON-Requests in `raw/requests/` | nach jedem Compile |
-| [9](#9-optimization-suggestions-email) | Optimization Suggestions | YAML-Proposals (z.B. Mail-Filter) → per-action approval | nach Compile |
-| [10](#10-claudemd-optimizer) | CLAUDE.md Optimizer | Cross-Project-Pattern → `~/.claude/CLAUDE.md` Edits | piggyback |
-| [11](#11-screenshot-scanner) | Screenshot Scanner | `~/Screenshots/` → Vision-LLM → `raw/notes/` | piggyback (lokal-only) |
-| [12](#12-vault-ux-layer-dashboard--mocs) | Vault UX Layer | Dashboard.md (Auto-Open) + `_dashboard-stats.md` Refresh + MOCs (in Arbeit) | nach jedem Flush (synchron) |
-| [13](#13-hard-facts-corrections) | Hard Facts (Corrections) | `wiki correct` schreibt `knowledge/facts/<slug>.md` → injected in compile/query/lint; `apply` propagiert agentisch über `knowledge/`+`daily/` | manuell (`wiki correct add` / `wiki correct apply`) |
-| [14](#14-agent-tasks) | Agent Tasks | `prompts/agent_<id>.md` declares Claude Agent SDK config (model + tools + permission + button) per task. `wiki agent <id>` runs it. Dashboard buttons auto-wired via `wiki seed`. | manuell oder per Dashboard-Button |
+| [4](#4-scanners) | Scanners | Email · Calendar · Browser · Screenshots · Tabs · YouTube · Jamie → `raw/notes/` + `raw/transcripts/` | per-Scanner Cron oder piggyback |
+| [5](#5-query--lint) | Query + Lint | NL-Query gegen Wiki · 8 strukturelle Checks · 1 LLM-Contradiction-Scan | manuell |
+| [6](#6-wiki-review-lokal-kostenlos) | Wiki Review | Per-Article Quality-Score via lokales LLM | piggyback |
+| [7](#7-curiosity-loop) | Curiosity Loop | Gap-Detection → JSON-Requests in `raw/requests/` | nach jedem Compile |
+| [8](#8-optimization-suggestions-email) | Optimization Suggestions | YAML-Proposals (z.B. Mail-Filter) → per-action approval | nach Compile |
+| [9](#9-claudemd-optimizer) | CLAUDE.md Optimizer | Cross-Project-Pattern → `~/.claude/CLAUDE.md` Edits | piggyback |
+| [10](#10-screenshot-scanner) | Screenshot Scanner | `~/Screenshots/` → Vision-LLM → `raw/notes/` | piggyback (lokal-only) |
+| [11](#11-vault-ux-layer-dashboard--mocs) | Vault UX Layer | Dashboard.md (Auto-Open) + `_dashboard-stats.md` Refresh + MOCs (in Arbeit) | nach jedem Flush (synchron) |
+| [12](#12-hard-facts-corrections) | Hard Facts (Corrections) | `wiki correct` schreibt `knowledge/facts/<slug>.md` → injected in compile/query/lint; `apply` propagiert agentisch über `knowledge/`+`daily/` | manuell (`wiki correct add` / `wiki correct apply`) |
+| [13](#13-agent-tasks) | Agent Tasks | `prompts/agent_<id>.md` declares Claude Agent SDK config (model + tools + permission + button) per task. `wiki agent <id>` runs it. Dashboard buttons auto-wired via `wiki seed`. | manuell oder per Dashboard-Button |
 
 ---
 
@@ -217,7 +216,6 @@ flowchart TD
 | `lint_structural` | Legacy | `lint.py --structural-only` | 24h | $0 (kein LLM) |
 | `review_wiki` | Legacy | `review-wiki.py` | 168h (1x/Woche) | $0 (Ollama/Gemma4) |
 | `optimize_claude_md` | Legacy | `optimize-claude-md.py` | 24h | $ (Claude API) |
-| `sync_memories` | Legacy | `sync-memories.py` | 24h | $0 (kein LLM) — **default OFF seit 2026-05-04, Phase-Out-Kandidat** |
 | `retry_failed_flushes` | Legacy | `retry-failed-flushes.py --limit N` | 24h | $ (Claude API) |
 | Dashboard Stats Refresh | (synchron, kein Piggyback) | `dashboard/dashboard_stats.py` | nach jedem Flush | $0 (kein LLM) |
 | Dashboard Lint Refresh | (synchron, kein Piggyback) | `dashboard/dashboard_lint.py` | nach jedem Flush | $0 (kein LLM) |
@@ -437,44 +435,7 @@ uv run python scripts/collectors/scan-browser.py --source firefox
 
 ---
 
-## 5. Seed (Einmalig, opt-in)
-
-> **Phase-Out-Hinweis (2026-05-04):** Seed + sync-memories sind **nicht mehr Standard**. Auto-Memories unter `~/.claude/projects/<encoded>/memory/*.md` sind mutable working state — Claude rewrited + prunt sie aktiv, ephemere Sandbox-cwds verschwinden, `/claude-cleanup` entfernt alte Projekte. Im lxw-Vault-Audit waren ~70% aller `[[raw/memories/...]]`-Wikilinks aus `knowledge/` bereits broken (DECISIONS.md `2026-05-04: Distill, don't cite`). Default in `config.example.yaml` ist jetzt `piggybacks.sync_memories.enabled: false`. Compile-Prompt verbietet `[[raw/memories/...]]` body-Wikilinks (`prompts/compile_main.md` rule 6). Lint warnt als `severity=warning kind=substrate_link`. Existierende Vaults behalten ihre Konfig — wer den Mirror weiter will, lässt `enabled: true` und alles funktioniert wie vorher. Removal-Kandidat in ~6 Monaten ohne opt-ins.
-
-Einmaliges Bootstrapping: sammelt alle Claude Code Memory-Dateien aus allen Projekten und kompiliert sie ins Wiki.
-
-### Flow
-
-```mermaid
-flowchart TD
-    MEM["~/.claude/projects/*/memory/*.md\n118 Files, 14 Projekte"]
-    MEM --> SEED["seed.py\nGruppiert pro Projekt"]
-    SEED --> RAW["raw/memories/\n14 Source-Dateien"]
-    RAW --> COMPILE["compile.py"]
-    COMPILE --> KNOWLEDGE["knowledge/\n75+ Artikel"]
-
-    style SEED fill:#FFECB9,stroke:#FFBB38
-    style COMPILE fill:#FFD8CB,stroke:#FC4E14,stroke-width:3px
-    style KNOWLEDGE fill:#E6F4EC,stroke:#1B7340
-```
-
-### Details
-
-Memories sind schon destilliertes Wissen — Decisions, Lessons, Feedback, Projekt-Kontext. Sie überlappen teilweise mit Session-Captures (da Memories aus Sessions entstehen), aber der Compiler deduped natürlich.
-
-Nach dem Seed übernehmen die globalen Hooks. Neue Memories entstehen aus Sessions, und die Sessions werden direkt captured. Das Seed-Script muss nur einmal laufen.
-
-### Script
-
-```bash
-uv run python scripts/seed.py                    # sammeln + kompilieren
-uv run python scripts/seed.py --dry-run          # nur zeigen was gesammelt würde
-uv run python scripts/seed.py --no-compile       # sammeln ohne compile
-```
-
----
-
-## 6. Query + Lint
+## 5. Query + Lint
 
 ### Query
 
@@ -507,7 +468,7 @@ uv run python scripts/lint.py --structural-only      # ohne LLM (kostenlos)
 
 ---
 
-## 7. Wiki Review (Lokal, Kostenlos)
+## 6. Wiki Review (Lokal, Kostenlos)
 
 Gemma4 auf dem lokalen GPU-Server bewertet alle Wiki-Artikel nach 5 Kriterien und gibt Verdicts.
 
@@ -531,7 +492,7 @@ Report in `.wiki/reports/wiki-review-YYYY-MM-DD.md`.
 
 ---
 
-## 8. Curiosity Loop
+## 7. Curiosity Loop
 
 Nach jeder Compilation analysiert der Compiler die Source + den Wiki-Index auf Wissenslücken und generiert automatisch Deep-Scan-Requests. Diese werden täglich als Piggyback abgearbeitet.
 
@@ -593,7 +554,7 @@ Dateiname: `raw/requests/request-{slug}-{date}.json`
 
 ---
 
-## 9. Optimization Suggestions (Email)
+## 8. Optimization Suggestions (Email)
 
 Der Compiler erkennt Optimierungspotential in Email-Scanner-Daten und schlägt Aktionen vor. Der Mensch reviewed per-Action, ein Script führt aus. Regeln werden serverseitig erstellt (Procmail für Accounts mit `has_procmail: true`, Gmail API für Gmail).
 
@@ -678,7 +639,7 @@ uv run python scripts/suggestions/cli.py
 
 ---
 
-## 10. CLAUDE.md Optimizer
+## 9. CLAUDE.md Optimizer
 
 Hält `~/.claude/CLAUDE.md` automatisch aktuell basierend auf Wiki-Wissen. Erkennt Cross-Project Patterns und aktualisiert die globale Config direkt. Läuft täglich als Piggyback.
 
@@ -725,7 +686,7 @@ Läuft als Piggyback in flush.py (24h Cooldown, nach 18:00).
 
 ---
 
-## 11. Screenshot Scanner
+## 10. Screenshot Scanner
 
 Scannt `~/Screenshots/` nach neuen PNG-Screenshots, beschreibt sie via lokalem Vision-LLM (Gemma4) **einmal**, und schreibt das Ergebnis in zwei Files: die kanonische HOME-Sidecar (Source of Truth pro Screenshot) und das Batch-Report-Aggregat im Vault (compile-Input). Pro Bild wird zusätzlich ein 384px-PNG-Thumbnail im Vault erzeugt — damit Obsidian inline previews zeigen kann ohne die Original-PNGs in den iCloud-synced Vault zu kopieren.
 
@@ -794,7 +755,7 @@ uv run python scripts/collectors/scan-screenshots.py --retrofit-batch-reports # 
 
 ---
 
-## 12. Vault UX Layer (Dashboard + MOCs)
+## 11. Vault UX Layer (Dashboard + MOCs)
 
 > Eingeführt mit M003. Aufteilung des Vaults in einen **Agent-Layer** (`knowledge/index.md`, vom Compiler gepflegt) und einen **Human-Layer** (`dashboard.md` + `knowledge/MOCs/`, für den Leser kuratiert). Der Engine-Code bleibt für beide Layer dieselbe Quelle.
 
@@ -955,7 +916,7 @@ uv run python -c "import sys; sys.path.insert(0, 'scripts'); from core.utils imp
 
 ---
 
-## 13. Hard Facts (Corrections)
+## 12. Hard Facts (Corrections)
 
 > Authority-Layer **über** allen Sources. LLM-Compiler und Sources sind drift-anfällig: einzelne Mails, Memos oder veraltete Quellen kontaminieren das Wiki, weil der Compiler keine Hierarchie zwischen Sources hat. Hard Facts sind ein Mensch-geschriebener Override-Layer, der bei Compile + Query stärker gewichtet wird als jede Source.
 
@@ -1079,7 +1040,7 @@ Was passiert:
 
 ---
 
-## 14. Agent Tasks
+## 13. Agent Tasks
 
 > Eingeführt mit M004. Generischer Runner für agentic Tasks (Claude SDK), die per Markdown-Datei deklariert werden — kein Engine-Code-Change nötig um eine neue Task hinzuzufügen.
 

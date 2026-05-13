@@ -49,19 +49,6 @@ piggybacks:
   follow_requests:
     enabled: true
     cooldown_hours: 24
-  # sync_memories: default OFF (2026-05-04 phase-out).
-  # Mirrored ~/.claude/projects/<encoded>/memory/*.md into raw/memories/, and
-  # compile cited those files via wikilinks — but auto-memories are mutable
-  # working state (Claude actively rewrites + prunes them, sandbox cwds vanish,
-  # /claude-cleanup discards old projects). Result: ghost-node graph entries
-  # and broken-link lint noise. Compile no longer body-cites substrate (see
-  # prompts/compile_main.md rule 6). The script is kept as an opt-in tool —
-  # flip enabled: true if you specifically want raw/memories/ to track your
-  # auto-memory churn. Plugin-style: scripts/sync-memories.py is self-contained,
-  # no other engine code imports it.
-  sync_memories:
-    enabled: false
-    cooldown_hours: 24
   retry_failed_flushes:
     enabled: true
     cooldown_hours: 24

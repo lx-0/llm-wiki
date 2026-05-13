@@ -16,7 +16,7 @@ The **tooling** for an LLM Wiki — a Karpathy-pattern personal knowledge base. 
 
 A vault that uses this tooling has three layers:
 
-1. **`raw/`** — curated sources (LLM reads, never writes). Top-level subfolders: `articles/`, `papers/`, `notes/`, `transcripts/`, `audio/`, `memories/`, `requests/`, `suggestions/`. Scanner output lives in nested per-scanner folders: `raw/notes/email/<account>-<date>.md` (scan-email), `raw/notes/calendar/`, `raw/notes/browser/`, `raw/notes/screenshots/screenshots-<slug>.md` (batch reports) + `raw/notes/screenshots/thumb/<file>.png` (384px previews; original PNGs stay in `~/Screenshots/`, never copied; canonical analysis sidecar lives at `~/Screenshots/<file>.md`), `raw/notes/tabs/`, `raw/notes/youtube/<channel>--<title>--<vid>.md` (scan-youtube — video metadata + transcript + comments + optional gemma4 visual analysis, single-file markdown), `raw/transcripts/jamie/<date>--<slug>--<short-id>.md` (collectors/jamie.py — pulls meetings from the Jamie AI tRPC API; summary + speaker-diarised transcript + action-items in one file). **Durability exception:** `raw/memories/` is a *managed mirror* of `~/.claude/projects/<encoded>/memory/` — `sync-memories.py` (default OFF since 2026-05-04, opt-in only) prunes it whenever the upstream source is gone. Citation rule below treats it differently from the durable subtrees.
+1. **`raw/`** — curated sources (LLM reads, never writes). Top-level subfolders: `articles/`, `papers/`, `notes/`, `transcripts/`, `audio/`, `requests/`, `suggestions/`. Scanner output lives in nested per-scanner folders: `raw/notes/email/<account>-<date>.md` (scan-email), `raw/notes/calendar/`, `raw/notes/browser/`, `raw/notes/screenshots/screenshots-<slug>.md` (batch reports) + `raw/notes/screenshots/thumb/<file>.png` (384px previews; original PNGs stay in `~/Screenshots/`, never copied; canonical analysis sidecar lives at `~/Screenshots/<file>.md`), `raw/notes/tabs/`, `raw/notes/youtube/<channel>--<title>--<vid>.md` (scan-youtube — video metadata + transcript + comments + optional gemma4 visual analysis, single-file markdown), `raw/transcripts/jamie/<date>--<slug>--<short-id>.md` (collectors/jamie.py — pulls meetings from the Jamie AI tRPC API; summary + speaker-diarised transcript + action-items in one file).
 2. **`daily/`** — auto-captured Claude Code session logs (immutable).
 3. **`knowledge/`** — LLM-compiled wiki articles (LLM owns, human reads). Subfolders: `concepts/`, `connections/`, `people/`, `projects/`, `qa/`, `facts/` (the last is human-owned via `wiki correct` — hard facts that override anything in raw/daily sources).
 
@@ -73,8 +73,7 @@ llm-wiki/
 │   ├── process-inbox.py    ← classify dropped files into raw/ subfolders
 │   ├── optimize-claude-md.py ← suggests CLAUDE.md edits from compiled patterns
 │   ├── review-wiki.py      ← per-article quality scoring (Ollama)
-│   ├── retry-failed-flushes.py ← reprocess archived flush contexts
-│   └── sync-memories.py    ← mirror Claude Code project memories into raw/memories/ (opt-in, default OFF since 2026-05-04 — phase-out)
+│   └── retry-failed-flushes.py ← reprocess archived flush contexts
 ├── hooks/
 │   ├── _transcript.py      ← shared transcript walker + tool summarizer
 │   ├── session-start.py    ← inject a pointer block + recent daily-log tail; agent pulls articles on demand
@@ -142,10 +141,6 @@ The Python venv lives at `<vault>/.wiki/.venv/` (inside the engine, NOT at the v
 - **YAML editing in CLI** → goes through `wiki_config.py set` (Python with PyYAML). Bash never parses YAML.
 - **JSON merge for agent configs** → `jq` deep-merge in `lib/agents.sh`. Always backup before write.
 - **LLM JSON output** → use `jsonrepair` or schema-constrained decoding (Ollama `format` field). Never raw `JSON.parse`.
-
-### Substrate citability — distill, don't cite the managed mirror
-
-Article bodies in `knowledge/` cross-reference each other freely with `[[wikilinks]]` and may also cite **durable** substrates: `daily/*.md`, `raw/notes/*`, `raw/articles/*`. **Do not** body-link `[[raw/memories/...]]` — that subtree is a managed mirror of `~/.claude/projects/<encoded>/memory/` (via `scripts/sync-memories.py`, default OFF since 2026-05-04) and prunes whenever the upstream source disappears. Provenance for `raw/memories/` content lives in the article's `compiled_from:` / `sources:` frontmatter list as a plain-text path. The compile prompt enforces the rule (`prompts/compile_main.md` rule 6); `lint.py:check_broken_links` warns on any leakage as `severity=warning kind=substrate_link`.
 
 ### Side effects
 

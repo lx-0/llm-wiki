@@ -63,14 +63,12 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 │   │   ├── agent_buttons.py       ← agent-button discovery + dashboard.md rewriter
 │   │   └── inject_daily_button.py ← idempotent Summarize-button injection into daily/*.md
 │   ├── migrations/            ← one-shot schema/data migrations
-│   │   ├── migrate_add_type.py    ← backfill type: frontmatter
-│   │   └── migrate_strip_substrate_links.py ← enforce distill-don't-cite (raw/memories/)
+│   │   └── migrate_add_type.py    ← backfill type: frontmatter
 │   ├── compile.py             ← Claude Agent SDK compiler (raw/ + daily/ → knowledge/)
 │   ├── flush.py               ← session-end → daily/ append + piggyback spawner
-│   ├── lint.py                ← 6 structural checks + 1 LLM contradiction check
+│   ├── lint.py                ← 8 structural checks + 1 LLM contradiction check
 │   ├── query.py               ← Claude Agent SDK natural-language query (read-only / file-back)
 │   ├── agent_task.py          ← generic Claude Agent SDK runner for prompts/agent_*.md
-│   ├── sync-memories.py       ← Claude Code project memories → raw/memories/ (opt-in, default OFF since 2026-05-04 — phase-out)
 │   ├── clippings_sweep.py     ← <vault>/Clippings/ → raw/articles/ (pre-compile lift)
 │   ├── ingest-html.py         ← HTML file or URL → text + visual (Playwright + Vision LLM)
 │   ├── process-inbox.py       ← <vault>/inbox/ → classify + move to raw/ subfolder
@@ -78,7 +76,6 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 │   ├── optimize-claude-md.py  ← cross-project pattern → ~/.claude/CLAUDE.md edits
 │   ├── retry-failed-flushes.py ← reprocess archived flush contexts
 │   ├── pin.py                 ← `wiki pin <article>` — append wikilink to a MOC section (no LLM)
-│   ├── seed.py                ← initial bulk import from ~/.claude/projects/*/memory/ (opt-in companion to sync-memories; one-shot at onboarding)
 │   └── health.py              ← read-only colored ASCII vault dashboard
 ├── hooks/
 │   ├── _transcript.py         ← shared transcript walker + tool summarizer

@@ -80,7 +80,6 @@ _LEGACY_PIGGYBACK_COMMANDS: dict[str, list[str]] = {
     "review_wiki": ["review-wiki.py"],
     "optimize_claude_md": ["optimize-claude-md.py"],
     "scan_screenshots": ["collectors/scan-screenshots.py", "--all", "--limit", "{max_per_run}"],
-    "sync_memories": ["sync-memories.py"],
     "retry_failed_flushes": ["retry-failed-flushes.py", "--limit", "{max_per_run}"],
 }
 

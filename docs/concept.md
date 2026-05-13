@@ -36,7 +36,7 @@ Three failure modes follow:
 
 Personal knowledge that stays scattered is illegible. Personal knowledge that gets aggressively centralized is unmaintainable. llm-wiki splits the difference: a small, opinionated set of substrates feeds a Claude-Agent-SDK compile pass that turns them into atomic, cross-linked Markdown articles. The compiled wiki is the working surface — read by you and by every agent that touches your vault. The substrates underneath are immutable; only the compile output is allowed to evolve.
 
-Mixed reality on the storage side: some sources are referenced (mailbox, calendar, browser data live in their canonical apps; collectors only write metadata into `raw/notes/`); others are owned (web clippings, audio recordings, agent-memory snapshots, PDFs — copies live in `raw/articles/`, `raw/audio/`, `raw/memories/`, `raw/papers/` because their canonical home is unstable or non-existent). The wiki layer (`knowledge/`) is purely derivative — wikilinks and prose, never originals.
+Mixed reality on the storage side: some sources are referenced (mailbox, calendar, browser data live in their canonical apps; collectors only write metadata into `raw/notes/`); others are owned (web clippings, audio recordings, meeting transcripts, PDFs — copies live in `raw/articles/`, `raw/audio/`, `raw/transcripts/`, `raw/papers/` because their canonical home is unstable or non-existent). The wiki layer (`knowledge/`) is purely derivative — wikilinks and prose, never originals.
 
 ```text
 Working memory   = vault (Obsidian root)    you read & edit here
@@ -61,7 +61,7 @@ The compiler reads `raw/` (memories, mail metadata, calendar events, browser his
 
 - **Code repos and OS-managed media never enter L1.** Code stays in `~/Code/`, screenshots stay in `~/Screenshots/`, browser data stays in profile dirs. Reference notes only (`→ see ~/Code/<repo>`).
 - **Mailbox / calendar bodies never enter L1** — collectors write metadata to `raw/notes/` only.
-- **Things without a stable canonical home DO enter L1.** Web clippings (`raw/articles/*.html`), audio you record (`raw/audio/`), papers (`raw/papers/`), agent-memory snapshots (`raw/memories/`), Whisper transcripts (`raw/transcripts/`). The compromise is deliberate: these substrates need ownership, and storing the original is what guarantees the compile pass is reproducible.
+- **Things without a stable canonical home DO enter L1.** Web clippings (`raw/articles/*.html`), audio you record (`raw/audio/`), papers (`raw/papers/`), meeting transcripts (`raw/transcripts/`). The compromise is deliberate: these substrates need ownership, and storing the original is what guarantees the compile pass is reproducible.
 - **Vault size budget is loose.** Karpathy's gist suggests <100 MB; in practice this engine handles a few GB across `raw/audio/` + `raw/papers/` without trouble. The hard bound is "Obsidian still indexes responsively."
 
 ### L2 — Optional Vector RAG (deep search)

@@ -198,7 +198,6 @@ def _default_piggybacks() -> dict[str, PiggybackTask]:
         "scan_screenshots": PiggybackTask(cooldown_hours=24, max_per_run=50),
         "follow_requests": PiggybackTask(cooldown_hours=24),
         "jamie": PiggybackTask(cooldown_hours=6, max_per_run=20),
-        "sync_memories": PiggybackTask(cooldown_hours=24),
         "retry_failed_flushes": PiggybackTask(cooldown_hours=24, max_per_run=5),
     }
 

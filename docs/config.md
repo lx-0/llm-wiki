@@ -135,7 +135,6 @@ Recurring tasks spawned by `flush.py` after `compile_after_hour`. Each entry tak
 | `piggybacks.jamie` | `enabled: true, cooldown_hours: 6` | `max_per_run: 20` | Pulls new meetings from the Jamie API. Tighter cooldown — meetings are time-sensitive. |
 | `piggybacks.follow_requests` | `enabled: true, cooldown_hours: 24` | — | Acts on `raw/requests/` items from the curiosity loop. |
 | `piggybacks.retry_failed_flushes` | `enabled: true, cooldown_hours: 24` | `max_per_run: 5` | Re-processes archived flush contexts. |
-| `piggybacks.sync_memories` | `enabled: false, cooldown_hours: 24` | — | **Default OFF** (phase-out 2026-05-04). Mirrors `~/.claude/projects/<encoded>/memory/` into `raw/memories/`. |
 
 ## graph_view
 

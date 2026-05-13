@@ -20,7 +20,7 @@ DAILY_DIR = ROOT / "daily"
 POINTER_BLOCK = """# Knowledge base
 - Index: `knowledge/index.md` — flat catalog of all wiki articles. One row per article (link, summary, sources, date). Grep by topic, then Read the matched article(s). Don't try to load the full index — it's large.
 - Articles by type: `knowledge/concepts/`, `knowledge/projects/`, `knowledge/people/`, `knowledge/facts/`, `knowledge/MOCs/`, `knowledge/connections/`, `knowledge/qa/`.
-- Raw substrate (read-only, never write): `raw/memories/`, `raw/notes/`, `daily/`.
+- Raw substrate (read-only, never write): `raw/notes/`, `raw/articles/`, `raw/transcripts/`, `raw/papers/`, `daily/`.
 - Schema + conventions: `AGENTS.md` at vault root."""
 
 

@@ -62,7 +62,7 @@ ${source_content}
 5. **Append to `knowledge/log.md`** — add a dated entry summarizing what was compiled:
    `- ${now}: Compiled `${source_path}` → [list of articles created/updated]`
 
-6. Use `[[wikilinks]]` to cross-reference between articles inside `knowledge/`, and to cite durable substrate sources (`daily/*.md`, `raw/notes/*`, `raw/articles/*`). **One exception:** never write `[[raw/memories/...]]` wikilinks in article bodies — that subtree is a managed mirror of `~/.claude/projects/<encoded>/memory/` and gets pruned by `sync-memories.py` whenever the upstream is gone (auto-memories churn, sandbox cwds vanish, `/claude-cleanup` discards old projects). Body wikilinks to it become ghost nodes en masse. For `raw/memories/` provenance, the `compiled_from:` frontmatter list already records the source path — that's enough. If you need to mention a `raw/memories/` path in prose, write it as plain text without brackets.
+6. Use `[[wikilinks]]` to cross-reference between articles inside `knowledge/`, and to cite durable substrate sources (`daily/*.md`, `raw/notes/*`, `raw/articles/*`, `raw/transcripts/*`).
 
 7. Write in the same language as the source material (German or English).
 
