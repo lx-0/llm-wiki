@@ -30,7 +30,7 @@ def _base_stats(**overrides) -> dict:
 
 
 def test_render_callout_includes_all_fields() -> None:
-    import dashboard_stats
+    from dashboard import dashboard_stats
 
     callout = dashboard_stats.render_callout(_base_stats())
     assert "Pipeline status" in callout
@@ -43,7 +43,7 @@ def test_render_callout_includes_all_fields() -> None:
 
 
 def test_render_callout_traffic_lights() -> None:
-    import dashboard_stats
+    from dashboard import dashboard_stats
 
     green = dashboard_stats.render_callout(
         _base_stats(pending_compiles=0, failed_flushes=0, lint_warnings=0)
@@ -62,7 +62,7 @@ def test_render_callout_traffic_lights() -> None:
 def test_write_dashboard_stats_frontmatter_shape(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    import dashboard_stats
+    from dashboard import dashboard_stats
 
     output = tmp_path / "_dashboard-stats.md"
     monkeypatch.setattr(dashboard_stats, "OUTPUT_FILE", output)
@@ -92,7 +92,7 @@ def test_write_dashboard_stats_handles_null_compile_ts(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Fresh vault (no compiled articles) writes `last_compile_ts: null`."""
-    import dashboard_stats
+    from dashboard import dashboard_stats
 
     output = tmp_path / "_dashboard-stats.md"
     monkeypatch.setattr(dashboard_stats, "OUTPUT_FILE", output)

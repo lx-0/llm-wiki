@@ -44,8 +44,8 @@ LOG_FILE = LOGS_DIR / "flush.log"
 ERRORS_LOG_FILE = LOGS_DIR / "flush-errors.log"
 LAST_FLUSH_FILE = STATE_DIR / "last-flush.json"
 COMPILE_SCRIPT = SCRIPTS_DIR / "compile.py"
-DASHBOARD_STATS_SCRIPT = SCRIPTS_DIR / "dashboard_stats.py"
-DASHBOARD_LINT_SCRIPT = SCRIPTS_DIR / "dashboard_lint.py"
+DASHBOARD_STATS_SCRIPT = SCRIPTS_DIR / "dashboard" / "dashboard_stats.py"
+DASHBOARD_LINT_SCRIPT = SCRIPTS_DIR / "dashboard" / "dashboard_lint.py"
 DASHBOARD_LOCK_FILE = STATE_DIR / "dashboard-refresh.lock"
 # 30s was too tight on iCloud-synced vaults under post-compile-hour
 # concurrent-flush bursts (incident 2026-05-03: 103 timeout records in

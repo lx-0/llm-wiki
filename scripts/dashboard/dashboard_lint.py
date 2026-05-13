@@ -8,19 +8,21 @@ via `![[_dashboard-lint#Section]]` embeds.
 Runs after every flush (called from `flush.py` post-`refresh_dashboard_stats`).
 Also runnable standalone:
 
-    uv run python scripts/dashboard_lint.py            # write
-    uv run python scripts/dashboard_lint.py --dry-run  # print without writing
+    uv run python scripts/dashboard/dashboard_lint.py            # write
+    uv run python scripts/dashboard/dashboard_lint.py --dry-run  # print without writing
 """
 
 import os
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 os.environ["CLAUDE_INVOKED_BY"] = "dashboard_lint"
 
 import argparse
 import json
 import logging
-import sys
-from pathlib import Path
 
 from config import ROOT_DIR, SESSIONS_DIR, now_iso
 

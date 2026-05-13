@@ -39,7 +39,7 @@ def _base_data(**overrides) -> dict:
 
 
 def test_render_body_has_all_four_sections() -> None:
-    import dashboard_lint
+    from dashboard import dashboard_lint
 
     body = dashboard_lint.render_body(_base_data())
     assert "## Orphans" in body
@@ -49,7 +49,7 @@ def test_render_body_has_all_four_sections() -> None:
 
 
 def test_render_body_renders_each_issue_as_wikilink_with_detail() -> None:
-    import dashboard_lint
+    from dashboard import dashboard_lint
 
     body = dashboard_lint.render_body(_base_data())
     assert "- [[knowledge/concepts/foo]] — never linked from index" in body
@@ -58,7 +58,7 @@ def test_render_body_renders_each_issue_as_wikilink_with_detail() -> None:
 
 def test_render_body_empty_queue_still_renders_header() -> None:
     """Empty section must still render its `## Title` so embeds resolve."""
-    import dashboard_lint
+    from dashboard import dashboard_lint
 
     data = _base_data(orphans_count=0, orphans=[])
     body = dashboard_lint.render_body(data)
@@ -72,7 +72,7 @@ def test_render_body_empty_queue_still_renders_header() -> None:
 def test_write_dashboard_lint_frontmatter_shape(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    import dashboard_lint
+    from dashboard import dashboard_lint
 
     output = tmp_path / "_dashboard-lint.md"
     monkeypatch.setattr(dashboard_lint, "OUTPUT_FILE", output)
@@ -97,7 +97,7 @@ def test_write_dashboard_lint_truncates_long_detail(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Issue detail strings longer than ~120 chars get truncated to keep lines scannable."""
-    import dashboard_lint
+    from dashboard import dashboard_lint
 
     output = tmp_path / "_dashboard-lint.md"
     monkeypatch.setattr(dashboard_lint, "OUTPUT_FILE", output)
@@ -117,7 +117,7 @@ def test_e2e_one_issue_per_queue(
 ) -> None:
     """End-to-end: one synthetic issue per queue → frontmatter counts all 1,
     each section has exactly one wikilink line."""
-    import dashboard_lint
+    from dashboard import dashboard_lint
 
     output = tmp_path / "_dashboard-lint.md"
     monkeypatch.setattr(dashboard_lint, "OUTPUT_FILE", output)

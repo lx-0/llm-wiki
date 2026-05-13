@@ -125,7 +125,7 @@ _merge_agent_shell_commands() {
     return 0
   fi
   local entries
-  entries="$(uv run --quiet --project "$wiki_dir" python "$wiki_dir/scripts/agent_buttons.py" shell-commands 2>/dev/null || echo '{}')"
+  entries="$(uv run --quiet --project "$wiki_dir" python "$wiki_dir/scripts/dashboard/agent_buttons.py" shell-commands 2>/dev/null || echo '{}')"
   if [[ -z "$entries" ]] || [[ "$entries" == "{}" ]]; then
     return 0
   fi
@@ -160,7 +160,7 @@ _rewrite_dashboard_agent_buttons() {
     return 0
   fi
   local result
-  result="$(uv run --quiet --project "$wiki_dir" python "$wiki_dir/scripts/agent_buttons.py" update-dashboard "$dashboard" 2>&1 || echo unchanged)"
+  result="$(uv run --quiet --project "$wiki_dir" python "$wiki_dir/scripts/dashboard/agent_buttons.py" update-dashboard "$dashboard" 2>&1 || echo unchanged)"
   if [[ "$result" == "changed" ]]; then
     ok "dashboard.md — agent-buttons regions refreshed"
   else

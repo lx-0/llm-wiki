@@ -11,9 +11,9 @@ Designed to be called from bash (JSON output to stdout) so seeding stays
 idempotent and additive (operator's existing buttons untouched).
 
 Usage from bash:
-    uv run python agent_buttons.py shell-commands  # JSON for shell-commands merge
-    uv run python agent_buttons.py meta-bind-defs  # markdown blocks for dashboard.md
-    uv run python agent_buttons.py inline-refs     # inline `BUTTON[id]` refs (one line)
+    uv run python scripts/dashboard/agent_buttons.py shell-commands  # JSON for shell-commands merge
+    uv run python scripts/dashboard/agent_buttons.py meta-bind-defs  # markdown blocks for dashboard.md
+    uv run python scripts/dashboard/agent_buttons.py inline-refs     # inline `BUTTON[id]` refs (one line)
 """
 
 from __future__ import annotations
@@ -21,6 +21,8 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from agent_spec import AgentSpec, parse_spec
 from config import WIKI_DIR
@@ -161,7 +163,7 @@ def main() -> int:
         "shell-commands", "meta-bind-defs", "inline-refs", "update-dashboard",
     }:
         print(
-            "usage: agent_buttons.py {shell-commands | meta-bind-defs | inline-refs | update-dashboard <path>}",
+            "usage: scripts/dashboard/agent_buttons.py {shell-commands | meta-bind-defs | inline-refs | update-dashboard <path>}",
             file=sys.stderr,
         )
         return 2
@@ -174,7 +176,7 @@ def main() -> int:
         sys.stdout.write(inline_refs())
     elif mode == "update-dashboard":
         if len(sys.argv) != 3:
-            print("usage: agent_buttons.py update-dashboard <dashboard.md>", file=sys.stderr)
+            print("usage: scripts/dashboard/agent_buttons.py update-dashboard <dashboard.md>", file=sys.stderr)
             return 2
         changed = update_dashboard(Path(sys.argv[2]))
         print("changed" if changed else "unchanged")

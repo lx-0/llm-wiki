@@ -6,20 +6,22 @@ Markdown fragment that `dashboard.md` transcludes via `![[_dashboard-stats]]`.
 Runs after every flush (called from `flush.py` post-compile). Also runnable
 standalone:
 
-    uv run python scripts/dashboard-stats.py            # write
-    uv run python scripts/dashboard-stats.py --dry-run  # print without writing
+    uv run python scripts/dashboard/dashboard_stats.py            # write
+    uv run python scripts/dashboard/dashboard_stats.py --dry-run  # print without writing
 """
 
 import os
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 os.environ["CLAUDE_INVOKED_BY"] = "dashboard_stats"
 
 import argparse
 import json
 import logging
-import sys
 from datetime import datetime, timezone
-from pathlib import Path
 
 from config import (
     DAILY_DIR,
