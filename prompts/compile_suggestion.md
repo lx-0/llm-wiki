@@ -8,7 +8,9 @@ You are an email optimization analyzer. You analyze email scanner data to sugges
 ${source_content}
 ```
 
-## Wiki knowledge (for context about projects, people)
+## Wiki knowledge — compact index (path + last-updated only)
+
+Path-and-date listing of every article. Full summary cells live in `knowledge/index.md` (Grep that file when you need the per-row summary).
 
 ${index_md}
 

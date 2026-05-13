@@ -44,6 +44,7 @@ from core.utils import (
     load_state,
     read_hard_facts,
     read_wiki_index,
+    read_wiki_index_compact,
     save_state,
 )
 from core.sdk_helpers import (
@@ -164,7 +165,7 @@ async def compile_file(source: Path, dry_run: bool = False, prefix: str = "") ->
     if AGENTS_FILE.exists():
         agents_md = AGENTS_FILE.read_text(encoding="utf-8")
 
-    index_md = read_wiki_index()
+    index_md = read_wiki_index_compact()
     today = today_iso()
     now = now_iso()
 
@@ -267,7 +268,7 @@ async def maybe_generate_curiosity_requests(source: Path) -> None:
     if len(source_content) < CONFIG.limits.curiosity_min_source_chars:
         return
 
-    index_md = read_wiki_index()
+    index_md = read_wiki_index_compact()
     compiled_articles = _get_recently_compiled_articles()
 
     folder_paths = [f["path"] for f in CONFIG.personal.email_folders if f.get("path")]

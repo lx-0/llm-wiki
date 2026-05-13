@@ -6,7 +6,9 @@ You are a CLAUDE.md optimizer. Your job is to keep the global `~/.claude/CLAUDE.
 ${current_claude_md}
 ```
 
-## Wiki Index (all compiled knowledge)
+## Wiki Index — compact (path + last-updated only)
+
+Path-and-date listing. Full summary cells live in `knowledge/index.md` (Grep on demand).
 
 ${index_md}
 

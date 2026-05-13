@@ -12,11 +12,17 @@ ${facts_md}
 
 ${agents_md}
 
-## Current index.md (list of all existing articles)
+## Existing articles — compact index (path + last-updated only)
+
+The list below shows every article that currently exists, but only the path and date columns — the full per-row summary lives in `knowledge/index.md`. The index file grows linearly with the wiki and was too large to embed in full without straddling the model's context window (~550 KB at ~700 articles).
 
 ${index_md}
 
-**You have Read, Grep, and Glob tools.** To avoid loading the whole wiki into your context, use these tools to fetch specific articles only when you need their content (e.g. before updating an existing article, or when checking if a concept is already covered). Prefer Grep/Glob to scan titles and cross-links before reading full files.
+**You have Read, Grep, and Glob tools — use them on `knowledge/`.** Workflow:
+
+1. For each concept you identify in the source, **first Grep** `knowledge/index.md` for related keywords. The grep result returns the matching rows with their summary cells — enough signal to judge augment-vs-new.
+2. **Read** an article's full body only when you've decided to augment it (need to see the existing claims) or when a Grep hit looks like a near-duplicate.
+3. **Avoid reading `knowledge/index.md` in full** — at this size it eats most of the context budget. Grep is the right tool.
 
 ## Source material to compile
 

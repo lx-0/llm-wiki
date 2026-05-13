@@ -38,6 +38,30 @@ The "Conventions" / "Workflow" / "Quick gotchas" sections are quick-reference. T
 
 Distilled from sessions 2026-04-11 → 2026-04-30 building this implementation. Each section is something that bit us in production — read before changing related code.
 
+### Compile context overflow — `${index_md}` body embed grew past Opus's 200K-token window (2026-05-13)
+
+#### Symptom
+
+After fixing the SDK's 1 MB stream-json buffer (same-day commit `70d2fef`), Jamie meeting compiles ≥60 KB still failed with the same `Command failed with exit code 1` / empty stderr / no AssistantMessage profile. 35 KB succeeded; 60 KB failed in 4-9 min variable timing; 75 KB never tested. Cost stayed at `$0.0000` — the bundled CLI never produced a parseable stream-json message in 4-9 minutes of activity, then died silently.
+
+#### Root cause
+
+`compile_main.md` (and three sibling prompts) embedded the full `${index_md}` — the per-row-summary `knowledge/index.md` file — into every prompt. Index size at 700+ articles: **550 KB**, ~140K tokens. Combined with a 60 KB source + 25 KB AGENTS + facts + template, the prompt straddles **~190K tokens** — pushing right against Opus's 200K context window. Add German tokenization density (~3 chars/token vs 4 for English) and the 60 KB source pushes the prompt over the limit. The API either rejected silently or the bundled CLI crashed handling a 200K-token request; either way the SDK saw exit-1 with no stream-json output.
+
+The previous SessionStart-hook fix (`ab090b0`) used the same "compact pointer, not body embed" pattern — but compile.py, suggestions/producer.py, and optimize-claude-md.py never got the same treatment. Three more prompts (`compile_curiosity.md`, `compile_suggestion.md`, `optimize_claude_md.md`) had the identical embed.
+
+#### Fix
+
+New helper `core.utils.read_wiki_index_compact()` — same parser but strips the bulky summary + sources columns, keeps Article + Updated only. Obsidian pipe-alias syntax (`[[X\|alias]]`) preserved via sentinel-replace before split. Result: 90.7% reduction (550 KB → 51 KB) — well clear of the context budget.
+
+Applied at four prompt-embedding call sites: `compile.py` (main + curiosity), `suggestions/producer.py`, `optimize-claude-md.py`. Four prompts updated to label the index as compact + reinforce the Grep-first-Read-second workflow (Grep on `knowledge/index.md` returns full row summaries; the compact in-context list is the all-paths catalogue).
+
+`lint.py:check_orphan_pages` still uses `read_wiki_index()` (full content, no LLM call) — different consumer pattern, no fix needed.
+
+#### Lesson
+
+In-context body embeds that grow linearly with the corpus (an index, a log, a catalogue) become a context-overflow ticking bomb. The Karpathy-style pattern is **pointer-first**: tell the LLM what file to look at, hand over Read/Grep/Glob, let it fetch on demand. Body-embed is fine for small fixed surfaces (facts, AGENTS schema) and bad for growth surfaces (index, log, daily archive). Apply this whenever a `${var}` substitution in a prompt template carries a linearly-growing artifact.
+
 ### Claude Agent SDK silently crashes on >1 MB stream-json messages (2026-05-13)
 
 #### Symptom

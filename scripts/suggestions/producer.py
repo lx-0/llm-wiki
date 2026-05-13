@@ -16,7 +16,7 @@ from claude_agent_sdk import ClaudeAgentOptions, ResultMessage, query
 from core.config import RAW_SUGGESTIONS_DIR, ROOT_DIR, today_iso
 from core.prompts import render
 from core.sdk_helpers import StderrCapture, log_sdk_failure
-from core.utils import read_wiki_index
+from core.utils import read_wiki_index, read_wiki_index_compact
 from core.wiki_config import CONFIG
 
 log = logging.getLogger("compile")
@@ -42,7 +42,7 @@ async def maybe_generate_suggestions(source: Path, dry_run: bool = False) -> Non
     RAW_SUGGESTIONS_DIR.mkdir(parents=True, exist_ok=True)
 
     source_content = source.read_text(encoding="utf-8")
-    index_md = read_wiki_index()
+    index_md = read_wiki_index_compact()
 
     accounts_inline = ", ".join(
         f"{name} = {info.get('email', '')}" for name, info in CONFIG.personal.accounts.items()

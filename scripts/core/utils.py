@@ -138,6 +138,54 @@ def read_wiki_index() -> str:
     )
 
 
+def read_wiki_index_compact() -> str:
+    """Compact index for in-context-window prompt embedding.
+
+    The full `knowledge/index.md` grows roughly linearly with the wiki —
+    at 700+ articles it reaches ~550 KB (single-cell summary bodies dominate
+    the size). Embedding the full file into every compile / curiosity /
+    suggestion prompt pushed the total context past Opus's 200K-token
+    window once a 60 KB source was added, causing the bundled CLI to
+    crash silently after 4-9 min with exit-1 and empty stderr.
+
+    The compact form keeps only the Article and Updated columns. ~90 %
+    size reduction (550 KB → 51 KB). LLM still sees every article path
+    + last-updated date — enough signal to dedup or detect staleness;
+    full row content comes via the Read tool on demand. Obsidian
+    pipe-alias syntax (`[[X\\|alias]]`) is preserved.
+    """
+    if not INDEX_FILE.exists():
+        return (
+            "# Knowledge Base Index\n\n"
+            "| Article | Updated |\n"
+            "|---|---|"
+        )
+    txt = INDEX_FILE.read_text(encoding="utf-8")
+    out: list[str] = []
+    in_table_head = False
+    PIPE_SENTINEL = "\x00"  # placeholder for `\|` while we split on `|`
+    for line in txt.splitlines():
+        if line.startswith("| Article |"):
+            out.append("| Article | Updated |")
+            in_table_head = True
+            continue
+        if in_table_head and line.startswith("|---"):
+            out.append("|---|---|")
+            in_table_head = False
+            continue
+        if not line.startswith("| "):
+            out.append(line)
+            continue
+        safe = line.replace(r"\|", PIPE_SENTINEL)
+        cols = [c.strip().replace(PIPE_SENTINEL, r"\|") for c in safe.split("|")]
+        # Standard shape: ['', title, summary, sources, date, '']
+        if len(cols) < 6:
+            out.append(line)
+            continue
+        out.append(f"| {cols[1]} | {cols[4]} |")
+    return "\n".join(out)
+
+
 def read_all_wiki_content() -> str:
     """Read index + all wiki articles into a single string for context."""
     parts = [f"## INDEX\n\n{read_wiki_index()}"]
