@@ -159,4 +159,5 @@ The Python venv lives at `<vault>/.wiki/.venv/` (inside the engine, NOT at the v
 
 - Read `docs/concept.md` for the design rationale.
 - Read `docs/architecture.excalidraw` (open in Obsidian / excalidraw.com) for the data flow.
+- Read `docs/FEATURES.md` for the implementation map (status, code location, known gaps per feature). Update it whenever you add / move / retire a feature.
 - Check `.ytstack/backlog/` for unvalidated future-milestone pitches; `.ytstack/STATE.md` for current milestone status.

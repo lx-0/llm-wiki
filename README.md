@@ -286,6 +286,7 @@ Hooks always use Option B (the `--project` flag is hardcoded into the agent conf
 | [docs/concept.md](docs/concept.md) | Three-layer architecture, compile-vs-RAG, cognitive-function mapping, curiosity loop |
 | [docs/PROCESS.md](docs/PROCESS.md) *(German)* | Live documentation of every data flow inside the engine — 13 numbered processes (German prose, English diagrams) |
 | [docs/cli.md](docs/cli.md) | Full CLI reference — every `wiki <subcommand>`, every config key, every hook target |
+| [docs/FEATURES.md](docs/FEATURES.md) | Implementation map of every engine feature — status, code location, trigger, known gaps. Maintained alongside code. |
 | [docs/engine-layout.md](docs/engine-layout.md) | File-by-file tree of `.wiki/` — the engine internals |
 | [docs/naming.md](docs/naming.md) | Naming conventions for raw sources and knowledge articles |
 | [docs/architecture.png](docs/architecture.png) | Full Excalidraw render of the cognitive architecture |
