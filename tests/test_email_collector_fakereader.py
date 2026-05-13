@@ -117,7 +117,7 @@ def test_email_collector_renders_report(
     """Drive EmailCollector with a FakeReader; expect a markdown report on disk."""
 
     # Stub CONFIG.personal.accounts so the collector finds one account.
-    from collectors import email as email_mod
+    from collectors import email_collector as email_mod
 
     fake_reader = FakeMailboxReader("testacct", sample_messages)
 
@@ -150,7 +150,7 @@ def test_email_collector_skips_unconfigured_account(
     tmp_path: Path,
 ) -> None:
     """Account whose reader.kind doesn't resolve → silently skipped (graceful agnostic)."""
-    from collectors import email as email_mod
+    from collectors import email_collector as email_mod
 
     class _PersonalStub:
         accounts = {"unknown_kind": {"reader": {"kind": "totally-made-up"}}}
@@ -176,7 +176,7 @@ def test_email_collector_dry_run_writes_nothing(
     sample_messages: list[MessageMeta],
 ) -> None:
     """--dry-run preserves the no-side-effects contract."""
-    from collectors import email as email_mod
+    from collectors import email_collector as email_mod
 
     fake_reader = FakeMailboxReader("testacct", sample_messages)
 

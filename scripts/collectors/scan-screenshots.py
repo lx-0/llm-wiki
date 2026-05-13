@@ -5,11 +5,11 @@ and save as raw notes for wiki compilation.
 Runs as a daily piggyback task. Tracks last scan timestamp in state file.
 
 Usage:
-    uv run python scripts/scan-screenshots.py                    # scan new screenshots
-    uv run python scripts/scan-screenshots.py --all               # all without sidecar
-    uv run python scripts/scan-screenshots.py --all --limit 50    # batch of 50
-    uv run python scripts/scan-screenshots.py --backfill 7        # last 7 days
-    uv run python scripts/scan-screenshots.py --dry-run            # show what would be processed
+    uv run python scripts/collectors/scan-screenshots.py                    # scan new screenshots
+    uv run python scripts/collectors/scan-screenshots.py --all               # all without sidecar
+    uv run python scripts/collectors/scan-screenshots.py --all --limit 50    # batch of 50
+    uv run python scripts/collectors/scan-screenshots.py --backfill 7        # last 7 days
+    uv run python scripts/collectors/scan-screenshots.py --dry-run            # show what would be processed
 """
 
 from __future__ import annotations
@@ -25,6 +25,8 @@ import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import httpx  # noqa: E402  exception types only; HTTP via ollama_client
 

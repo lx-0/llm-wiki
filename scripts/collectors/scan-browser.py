@@ -5,10 +5,10 @@ Produces a comprehensive overview of browsing patterns, research interests,
 and saved resources.
 
 Usage:
-    uv run python scripts/scan-browser.py                   # full scan, save report
-    uv run python scripts/scan-browser.py --dry-run         # just show stats
-    uv run python scripts/scan-browser.py --source firefox  # only Firefox
-    uv run python scripts/scan-browser.py --source chrome   # only Chrome
+    uv run python scripts/collectors/scan-browser.py                   # full scan, save report
+    uv run python scripts/collectors/scan-browser.py --dry-run         # just show stats
+    uv run python scripts/collectors/scan-browser.py --source firefox  # only Firefox
+    uv run python scripts/collectors/scan-browser.py --source chrome   # only Chrome
 """
 
 from __future__ import annotations
@@ -18,10 +18,13 @@ import json
 import os
 import shutil
 import sqlite3
+import sys
 from collections import Counter
 from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlparse
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from config import RAW_DIR, ROOT_DIR, today_iso
 from wiki_config import CONFIG

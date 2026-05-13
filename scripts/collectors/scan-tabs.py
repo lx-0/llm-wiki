@@ -5,9 +5,9 @@ Reads STG backup JSON files and extracts tab groups, URLs, and titles.
 Produces a structured overview of research interests, projects, and browsing patterns.
 
 Usage:
-    uv run python scripts/scan-tabs.py                      # full scan, save report
-    uv run python scripts/scan-tabs.py --dry-run            # just show group stats
-    uv run python scripts/scan-tabs.py --backup-dir ~/path  # custom backup location
+    uv run python scripts/collectors/scan-tabs.py                      # full scan, save report
+    uv run python scripts/collectors/scan-tabs.py --dry-run            # just show group stats
+    uv run python scripts/collectors/scan-tabs.py --backup-dir ~/path  # custom backup location
 """
 
 from __future__ import annotations
@@ -15,9 +15,12 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import sys
 from collections import Counter
 from pathlib import Path
 from urllib.parse import urlparse
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from config import RAW_DIR, ROOT_DIR, today_iso
 from wiki_config import CONFIG

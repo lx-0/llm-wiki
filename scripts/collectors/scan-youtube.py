@@ -8,9 +8,9 @@ yt-dlp). All free, no LLM. Tier 3 (gemma4 frame-sampling / Gemini cloud)
 is a follow-up — see .ytstack/backlog/youtube-intake.md.
 
 Usage:
-    uv run python scripts/scan-youtube.py --url URL [--tier {0,1,2}] [--limit N]
-    uv run python scripts/scan-youtube.py --inbox PATH [--tier {0,1,2}] [--limit N]
-    uv run python scripts/scan-youtube.py --url URL --dry-run
+    uv run python scripts/collectors/scan-youtube.py --url URL [--tier {0,1,2}] [--limit N]
+    uv run python scripts/collectors/scan-youtube.py --inbox PATH [--tier {0,1,2}] [--limit N]
+    uv run python scripts/collectors/scan-youtube.py --url URL --dry-run
 """
 
 from __future__ import annotations
@@ -29,6 +29,8 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from config import RAW_DIR, now_iso
 from wiki_config import CONFIG

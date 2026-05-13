@@ -5,9 +5,9 @@ Reads from the cached SQLite calendar database (Google Calendar sync).
 Produces a structured timeline of events, attendees, and patterns.
 
 Usage:
-    uv run python scripts/scan-calendar.py                  # full scan, save report
-    uv run python scripts/scan-calendar.py --year 2025      # only one year
-    uv run python scripts/scan-calendar.py --dry-run        # just show stats
+    uv run python scripts/collectors/scan-calendar.py                  # full scan, save report
+    uv run python scripts/collectors/scan-calendar.py --year 2025      # only one year
+    uv run python scripts/collectors/scan-calendar.py --dry-run        # just show stats
 """
 
 from __future__ import annotations
@@ -16,9 +16,12 @@ import argparse
 import re
 import shutil
 import sqlite3
+import sys
 from collections import Counter
 from datetime import datetime
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from config import RAW_DIR, ROOT_DIR, today_iso
 from wiki_config import CONFIG
