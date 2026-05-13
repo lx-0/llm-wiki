@@ -5,12 +5,12 @@ Each suggestion file contains multiple actions. Each action has its own status
 and must be individually approved before execution.
 
 Usage:
-    uv run python scripts/execute-suggestions.py --list                          # show all suggestions + action statuses
-    uv run python scripts/execute-suggestions.py --review test-billing           # interactively review each action
-    uv run python scripts/execute-suggestions.py --approve test-billing 1        # approve action #1
-    uv run python scripts/execute-suggestions.py --reject test-billing 2         # reject action #2
-    uv run python scripts/execute-suggestions.py --dry-run                       # preview approved actions
-    uv run python scripts/execute-suggestions.py                                 # execute approved actions
+    uv run python scripts/suggestions/cli.py --list                          # show all suggestions + action statuses
+    uv run python scripts/suggestions/cli.py --review test-billing           # interactively review each action
+    uv run python scripts/suggestions/cli.py --approve test-billing 1        # approve action #1
+    uv run python scripts/suggestions/cli.py --reject test-billing 2         # reject action #2
+    uv run python scripts/suggestions/cli.py --dry-run                       # preview approved actions
+    uv run python scripts/suggestions/cli.py                                 # execute approved actions
 """
 
 from __future__ import annotations
@@ -22,15 +22,15 @@ from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 import yaml
 
 from core.config import RAW_SUGGESTIONS_DIR, ROOT_DIR, TIMEZONE
 from core.wiki_config import CONFIG
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-
 from adapters.mailbox import resolve_filter
-import imap_actions
+from suggestions.backends import imap as imap_actions
 from domain.mail import FilterAction, FilterCondition, FilterRule
 
 

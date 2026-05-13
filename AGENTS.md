@@ -16,7 +16,7 @@ The **tooling** for an LLM Wiki — a Karpathy-pattern personal knowledge base. 
 
 A vault that uses this tooling has three layers:
 
-1. **`raw/`** — curated sources (LLM reads, never writes). Top-level subfolders: `articles/`, `papers/`, `notes/`, `transcripts/`, `audio/`, `memories/`, `requests/`, `suggestions/`. Scanner output lives in nested per-scanner folders: `raw/notes/email/<account>-<date>.md` (scan-email), `raw/notes/calendar/`, `raw/notes/browser/`, `raw/notes/screenshots/screenshots-<slug>.md` (batch reports) + `raw/notes/screenshots/thumb/<file>.png` (384px previews; original PNGs stay in `~/Screenshots/`, never copied; canonical analysis sidecar lives at `~/Screenshots/<file>.md`), `raw/notes/tabs/`, `raw/notes/youtube/<channel>--<title>--<vid>.md` (scan-youtube — video metadata + transcript + comments + optional gemma4 visual analysis, single-file markdown). **Durability exception:** `raw/memories/` is a *managed mirror* of `~/.claude/projects/<encoded>/memory/` — `sync-memories.py` (default OFF since 2026-05-04, opt-in only) prunes it whenever the upstream source is gone. Citation rule below treats it differently from the durable subtrees.
+1. **`raw/`** — curated sources (LLM reads, never writes). Top-level subfolders: `articles/`, `papers/`, `notes/`, `transcripts/`, `audio/`, `memories/`, `requests/`, `suggestions/`. Scanner output lives in nested per-scanner folders: `raw/notes/email/<account>-<date>.md` (scan-email), `raw/notes/calendar/`, `raw/notes/browser/`, `raw/notes/screenshots/screenshots-<slug>.md` (batch reports) + `raw/notes/screenshots/thumb/<file>.png` (384px previews; original PNGs stay in `~/Screenshots/`, never copied; canonical analysis sidecar lives at `~/Screenshots/<file>.md`), `raw/notes/tabs/`, `raw/notes/youtube/<channel>--<title>--<vid>.md` (scan-youtube — video metadata + transcript + comments + optional gemma4 visual analysis, single-file markdown), `raw/transcripts/jamie/<date>--<slug>--<short-id>.md` (collectors/jamie.py — pulls meetings from the Jamie AI tRPC API; summary + speaker-diarised transcript + action-items in one file). **Durability exception:** `raw/memories/` is a *managed mirror* of `~/.claude/projects/<encoded>/memory/` — `sync-memories.py` (default OFF since 2026-05-04, opt-in only) prunes it whenever the upstream source is gone. Citation rule below treats it differently from the durable subtrees.
 2. **`daily/`** — auto-captured Claude Code session logs (immutable).
 3. **`knowledge/`** — LLM-compiled wiki articles (LLM owns, human reads). Subfolders: `concepts/`, `connections/`, `people/`, `projects/`, `qa/`, `facts/` (the last is human-owned via `wiki correct` — hard facts that override anything in raw/daily sources).
 
@@ -54,6 +54,10 @@ llm-wiki/
 │   ├── facts/              ← hard-fact subsystem (knowledge/facts/<slug>.md consumers)
 │   │   ├── correct.py          ← CRUD CLI: add/list/remove/edit/path
 │   │   └── correct_apply.py    ← agent-driven propagation across vault
+│   ├── suggestions/        ← email-suggestion pipeline (raw/suggestions/ producer + executor)
+│   │   ├── producer.py         ← maybe_generate_suggestions (called from compile.py)
+│   │   ├── cli.py              ← interactive approve/review/reject/execute
+│   │   └── backends/imap.py    ← IMAP move/tag/set-flags executor
 │   ├── dashboard/          ← Obsidian dashboard helpers
 │   │   ├── dashboard_stats.py  ← _dashboard-stats.md generator (post-flush refresh)
 │   │   ├── dashboard_lint.py   ← _dashboard-lint.md generator (post-flush refresh)
@@ -87,17 +91,18 @@ llm-wiki/
 
 ### Adding a tunable
 
-1. Extend the matching dataclass in `scripts/wiki_config.py`.
+1. Extend the matching dataclass in `scripts/core/wiki_config.py`.
 2. Document the default in `config.example.yaml` with a comment.
-3. Replace the hardcoded constant in the script with `CONFIG.<section>.<field>`.
-4. Don't add ad-hoc constants back to scripts — extend the config layer.
+3. Document it in `docs/config.md` (the grouped reference).
+4. Replace the hardcoded constant in the script with `CONFIG.<section>.<field>`.
+5. Don't add ad-hoc constants back to scripts — extend the config layer.
 
 ### Adding per-instance / personal data
 
 Different rule for anything personal: email addresses, customer/partner names,
 hostnames, mbox paths, project names mentioned in prompts, etc.
 
-1. Extend `Personal` in `scripts/wiki_config.py`.
+1. Extend `Personal` in `scripts/core/wiki_config.py`.
 2. `config.example.yaml` ships an **empty** default for the field — never a real value.
 3. The actual value goes in the user's local `config.yaml` (gitignored).
 4. Consumers (prompts via `${var}`, compile.py schema enums, scan-* runtime maps) read

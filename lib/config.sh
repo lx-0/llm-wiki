@@ -79,7 +79,7 @@ config_cmd_setup_wizard() {
 
   echo
   # 4. Procmail execution (default OFF — destructive without webmail-procmail provider setup)
-  info "Procmail execution lets execute-suggestions.py call a webmail-procmail provider API to apply mail rules server-side."
+  info "Procmail execution lets suggestions/cli.py call a webmail-procmail provider API to apply mail rules server-side."
   warn "Default OFF. Only enable if you have a procmail-capable webmail account configured (e.g. All-Inkl kasserver)."
   local procmail_default="n"
   [[ "$(config_get features.procmail_execution)" == "True" ]] && procmail_default="y"
