@@ -64,6 +64,10 @@ The `94c9d6b` sweep enumerated compile / suggestions / optimize-claude-md but mi
 
 Second instance fixed in the same pass: `optimize-claude-md.py` still passed `wiki_content=read_all_wiki_content()` into its prompt (`${wiki_content}` live in `optimize_claude_md.md`) — the `94c9d6b` commit added the compact index *alongside* but never removed the full-body embed (its commit message claimed the file was fixed; it wasn't). Same latent overflow, untriggered only because it runs against the engine repo, not lxw. Fixed identically + dropped the now-dead `read_wiki_index` import. Lesson: **when porting a fix-pattern across call sites, diff the prompt template too — adding the new var doesn't remove the old one.** After this, the only remaining `read_all_wiki_content()` consumer is `lint.py` (Python grep, no LLM call) — correct to keep.
 
+#### Defense-in-depth (2026-05-14): pre-flight prompt-size guard
+
+Context overflow can't be classified *after* the fact — empty stderr, variable timing, no signal for `classify_failure` to match → it falls through to `kind=unknown`. The only reliable catch is *before* the SDK call. Added `sdk_helpers.assert_prompt_within_budget(prompt_chars, limit, label=, breakdown=)` — raises `PromptTooLargeError` with a clear, breakdown-carrying operator message. Wired into `query.py` against `CONFIG.limits.query_max_prompt_chars` (default 500K chars ≈ 167K tokens at German density). The other three LLM scripts (compile / optimize-claude-md / suggestions) don't use the guard yet — same helper, ~3 lines each, open follow-up.
+
 #### Lesson
 
 In-context body embeds that grow linearly with the corpus (an index, a log, a catalogue) become a context-overflow ticking bomb. The Karpathy-style pattern is **pointer-first**: tell the LLM what file to look at, hand over Read/Grep/Glob, let it fetch on demand. Body-embed is fine for small fixed surfaces (facts, AGENTS schema) and bad for growth surfaces (index, log, daily archive). Apply this whenever a `${var}` substitution in a prompt template carries a linearly-growing artifact.

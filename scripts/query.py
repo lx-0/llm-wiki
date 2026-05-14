@@ -39,7 +39,12 @@ logging.basicConfig(
 log = logging.getLogger("query")
 
 from core.prompts import render  # noqa: E402
-from core.sdk_helpers import StderrCapture, log_sdk_failure  # noqa: E402
+from core.sdk_helpers import (  # noqa: E402
+    PromptTooLargeError,
+    StderrCapture,
+    assert_prompt_within_budget,
+    log_sdk_failure,
+)
 import time as _time  # noqa: E402
 
 # ── Query prompt ─────────────────────────────────────────────────────
@@ -87,6 +92,20 @@ async def main() -> None:
             question=question,
         )
         allowed_tools = ["Read", "Glob", "Grep"]
+
+    # Pre-flight: reject a corpus-sized prompt before the SDK call. Without
+    # this guard, an oversized prompt dies inside the bundled CLI with an
+    # opaque exit-1 / empty-stderr kind=unknown failure (see KNOWLEDGE.md).
+    try:
+        assert_prompt_within_budget(
+            len(prompt),
+            CONFIG.limits.query_max_prompt_chars,
+            label="query",
+            breakdown={"compact index": len(index_md), "hard facts": len(facts_md)},
+        )
+    except PromptTooLargeError as exc:
+        log.error("%s", exc)
+        sys.exit(1)
 
     # Run the query agent
     total_input_tokens = 0

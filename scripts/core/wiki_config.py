@@ -82,6 +82,13 @@ class Limits:
     # exception. Bumped to 50 MB by default — safe headroom for any realistic
     # single-message scenario without hiding real runaway responses.
     sdk_max_buffer_size_mb: int = 50
+    # Pre-flight cap for `wiki query` prompts. A query embeds the compact
+    # index + hard facts; once the knowledge base outgrows the model's
+    # context window the SDK dies with an opaque exit-1 / empty-stderr
+    # `kind=unknown`. Tripping this limit first turns that into a clear
+    # operator message. 500K chars ≈ 167K tokens at German density —
+    # inside a 200K-token window with headroom for the response.
+    query_max_prompt_chars: int = 500_000
 
 
 @dataclass
@@ -100,6 +107,19 @@ class Features:
 class GraphView:
     mode: str = "knowledge-only"
     custom_search: str = ""
+
+
+@dataclass
+class Skills:
+    """Engine-skill distribution preferences (see `wiki skills`)."""
+
+    # When true, `wiki skills install` / `wiki skills sync` also link
+    # global-eligible skills (currently: use-llm-wiki) into ~/.claude/skills/
+    # and register this vault in ~/.config/llm-wiki/vaults, so agents working
+    # in *any* project can discover and query this wiki. Opt-in — default
+    # false keeps the install vault-local (the other bundled skills are always
+    # vault-local; they operate inside a vault).
+    global_install: bool = False
 
 
 @dataclass
@@ -218,6 +238,7 @@ class WikiConfig:
     limits: Limits = field(default_factory=Limits)
     features: Features = field(default_factory=Features)
     graph_view: GraphView = field(default_factory=GraphView)
+    skills: Skills = field(default_factory=Skills)
     personal: Personal = field(default_factory=Personal)
 
 
@@ -332,6 +353,7 @@ def load() -> WikiConfig:
     cfg.limits = _merge_dataclass(cfg.limits, raw.get("limits") or {})
     cfg.features = _merge_dataclass(cfg.features, raw.get("features") or {})
     cfg.graph_view = _merge_dataclass(cfg.graph_view, raw.get("graph_view") or {})
+    cfg.skills = _merge_dataclass(cfg.skills, raw.get("skills") or {})
     cfg.personal = _merge_dataclass(cfg.personal, raw.get("personal") or {})
     return cfg
 

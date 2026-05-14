@@ -101,6 +101,9 @@ limits:
   # trips on tool-result messages carrying large knowledge/index.md or Write/Edit
   # calls on big articles. 50 MB is safe headroom.
   sdk_max_buffer_size_mb: 50
+  # Pre-flight cap for `wiki query` prompts — aborts with a clear message
+  # before the SDK call if the knowledge base outgrows the context window.
+  query_max_prompt_chars: 500000
 
 features:
   # Master switches for entire capabilities.
@@ -117,6 +120,15 @@ graph_view:
   # (applied to .obsidian/graph.json when the plugin builds.)
   mode: knowledge-only
   custom_search: ""
+
+skills:
+  # When true, `wiki skills install` / `wiki skills sync` also link
+  # global-eligible skills (currently: use-llm-wiki) into ~/.claude/skills/
+  # and register this vault in ~/.config/llm-wiki/vaults — so agents working
+  # in *any* project can discover and query this wiki. Default false keeps
+  # the install vault-local. Toggle via `wiki skills install --global` /
+  # `--no-global`, the setup wizard, or `wiki config set skills.global_install`.
+  global_install: false
 
 # Per-instance, do-not-commit. Drives compile_curiosity.md, compile_suggestion.md,
 # scan_screenshots_vision.md, and scan-email.py so committed files stay free of
@@ -173,6 +185,16 @@ personal:
   #       kind: gmail-api                                # M002/S03 — read-side via Gmail API
   #     filter:
   #       kind: gmail-api                                # filter creation via Gmail API
+  #
+  #   personal-gmail:                                    # no local client, no GCP project
+  #     email: you@gmail.com
+  #     label: "Personal Gmail"
+  #     reader:
+  #       kind: imap
+  #       imap_host: imap.gmail.com
+  #       imap_pass_env: IMAP_PERSONAL_GMAIL_PASS         # Google App Password (account needs 2FA)
+  #       # imap_user_env: ...                           # optional; omit → uses account.email
+  #       # folders: [INBOX]                             # optional allowlist; omit → all folders
   accounts: {}
   # Folder list for the curiosity loop. Each entry: { path, desc }.
   # `path` strings also become the schema enum in compile.py — single

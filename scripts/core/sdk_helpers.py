@@ -6,7 +6,7 @@ unhelpful `Command failed with exit code 1 - Check stderr output for
 details`. Without root-cause info the operator can only guess at
 rate-limits, auth failures, network blips, or hard CLI crashes.
 
-This module gives every SDK call site three primitives:
+This module gives every SDK call site four primitives:
 
   - ``StderrCapture`` — ring-buffer collector that doubles as the
     ``stderr=`` callback. Holds the last N lines for diagnostic dumps.
@@ -15,6 +15,9 @@ This module gives every SDK call site three primitives:
   - ``log_sdk_failure`` — single call site that writes a diagnostic
     record (source, model, input size, elapsed, classification, last
     captured stderr lines) to the caller's logger.
+  - ``assert_prompt_within_budget`` — pre-flight guard that rejects a
+    corpus-sized prompt *before* the SDK call, where context-window
+    overflow would otherwise surface as an opaque ``kind=unknown``.
 
 Use from each SDK call site::
 
@@ -119,6 +122,43 @@ class FailureClass:
 
     def __str__(self) -> str:  # pragma: no cover — formatting only
         return f"{self.kind}: {self.detail}"
+
+
+class PromptTooLargeError(Exception):
+    """Raised by ``assert_prompt_within_budget`` when an assembled LLM
+    prompt exceeds the configured character budget — a pre-flight catch
+    for context-window overflow that would otherwise surface as an opaque
+    exit-1 / empty-stderr ``kind=unknown`` SDK failure."""
+
+
+def assert_prompt_within_budget(
+    prompt_chars: int,
+    limit_chars: int,
+    *,
+    label: str,
+    breakdown: dict[str, int] | None = None,
+) -> None:
+    """Raise ``PromptTooLargeError`` if ``prompt_chars`` exceeds ``limit_chars``.
+
+    Catches a corpus-sized prompt *before* the SDK call. Without this the
+    bundled CLI dies silently mid-request and ``classify_failure`` can only
+    report ``kind=unknown`` — empty stderr, variable timing, no signal to
+    match on. ``breakdown`` is an optional ``{component: chars}`` map so the
+    operator sees which embedded part bloated.
+    """
+    if prompt_chars <= limit_chars:
+        return
+    detail = ""
+    if breakdown:
+        detail = " — " + ", ".join(
+            f"{name} {n:,} chars" for name, n in breakdown.items()
+        )
+    raise PromptTooLargeError(
+        f"{label}: assembled prompt is {prompt_chars:,} chars, over the "
+        f"{limit_chars:,}-char budget{detail}. The input has outgrown an "
+        f"inline LLM call — prune the embedded content, or raise the limit "
+        f"in config.yaml if the model's context window allows."
+    )
 
 
 def classify_failure(
