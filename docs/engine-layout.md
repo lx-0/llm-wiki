@@ -33,7 +33,7 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 │   │   ├── wiki_config.py         ← config dataclass + get/set/keys CLI (incl. Personal block)
 │   │   ├── prompts.py             ← prompt template loader (${var} substitution)
 │   │   ├── ollama_client.py       ← single Ollama transport (chat / chat_schema / chat_vision)
-│   │   ├── sdk_helpers.py         ← StderrCapture + log_sdk_failure for Claude Agent SDK
+│   │   ├── sdk_helpers.py         ← StderrCapture + log_sdk_failure + assert_prompt_within_budget (Claude Agent SDK)
 │   │   ├── utils.py               ← shared helpers (article listing, JSON state, history)
 │   │   ├── agent_spec.py          ← agent-task spec parser (prompts/agents/*.md → AgentSpec)
 │   │   └── flush_pipeline.py      ← staged-flush state machine (stage / commit / archive / pending)

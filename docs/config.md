@@ -127,6 +127,7 @@ Knob block. Defaults sized for an Opus-on-5h-window install — tighten on small
 | Key | Default | Meaning |
 |---|---|---|
 | `limits.sdk_max_buffer_size_mb` | `50` | Per-message buffer for stream-json output from the bundled CLI. SDK default is 1 MB; trips on tool-result messages carrying `knowledge/index.md` (~300 KB raw → ~600 KB JSON-escaped) or Write/Edit calls on large articles with a confusing `Failed to decode JSON: ... exceeded maximum buffer size of 1048576 bytes` exception. 50 MB is safe headroom; bump higher if `knowledge/` grows past ~5 MB per article. |
+| `limits.query_max_prompt_chars` | `500000` | Pre-flight cap for `wiki query` prompts. `query.py` checks `len(prompt)` before the SDK call and aborts with a clear `PromptTooLargeError` message (size + limit + per-component breakdown) instead of the opaque exit-1 / empty-stderr death an oversized prompt causes inside the bundled CLI. ~167K tokens at German density — inside a 200K-token window with response headroom. Raise it if you run a larger-context model. |
 
 ## piggybacks
 

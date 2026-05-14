@@ -1,13 +1,17 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-05-14T00:00:00Z
+last_updated: 2026-05-14T14:00:00Z
 current_milestone: M004
 active_slice: none
 active_task: none
 ---
 
 # State
+
+**Agent specs relocated to `prompts/agents/` (2026-05-14, commit `ec5683a`)** — `prompts/agent_<id>.md` → `prompts/agents/<id>.md`; the `agent_` prefix dropped (the folder carries the semantic), glob `agent_*.md` → `agents/*.md`, path centralised as `core/config.py:AGENT_SPECS_DIR` (was a duplicated local `PROMPTS_DIR` in `agent_task.py` + `agent_buttons.py`). Separates self-contained agent specs from `render()` template fragments. Supersedes the M004-CONTEXT flat-layout note — its stated rationale ("sit alongside `prompts.py`'s `${var}` pipeline") never held: specs parse via `agent_spec.py` with their own `AgentSpec.render_body`. All 3 consumers + tests + engine/vault docs updated, 201/201 pass. New DECISIONS.md 2026-05-14 entry; rejected the alternative of realigning the frontmatter to the generic Claude-Code subagent format (the spec is a deliberate superset — `button` / `cwd` / `last_run` drive the dashboard+runner integration).
+
+**Context-overflow root cause — `wiki query` (2026-05-14, commits `ba26421` + `fa81b72` + `6957959`)** — `wiki query` failed on the 852-article lxw vault with the exit-1 / empty-stderr / `kind=unknown` profile, input 4,484,234 chars. `query.py` body-embedded `read_all_wiki_content()` (index **plus every article body**) — the same context-overflow class fixed for the compile-side prompts on 2026-05-13 (`94c9d6b`), but `query.py` was the missed call site, and the worst one. `ba26421` migrated it to `read_wiki_index_compact()` + a Grep/Read-on-demand workflow in both query prompts (4,484,234 → 52,262 chars on lxw, 98.8% reduction). Auditing the other call sites found `optimize-claude-md.py` *also* still body-embedding `read_all_wiki_content()` — `94c9d6b` added the compact index alongside but never removed the full embed; `fa81b72` finishes that and drops the dead `read_wiki_index` import. `6957959` adds defense-in-depth: `sdk_helpers.assert_prompt_within_budget()` (new 4th SDK primitive) rejects an over-budget prompt *before* the SDK call with a clear breakdown-carrying message — context overflow can't be classified after the fact (empty stderr, variable timing → `classify_failure` returns `kind=unknown`), so the only honest catch is pre-flight. New `CONFIG.limits.query_max_prompt_chars` (500K default). pytest 201/201 (was 195; +6 in `tests/test_sdk_helpers.py`). DECISIONS.md "2026-05-14: Pre-flight prompt-size guard" + KNOWLEDGE.md "Compile context overflow" follow-up + defense-in-depth subsection. Open follow-up: `compile.py` / `optimize-claude-md.py` / `suggestions/producer.py` can adopt the same guard (`.ytstack/backlog/preflight-guard-rollout.md`).
 
 **Two-class compile crash chain root-caused + fixed (2026-05-13 evening, commits `70d2fef` + `94c9d6b`)** — surfaced from the Jamie meeting-compile pipeline test. Two architecturally-distinct SDK-boundary bugs were misdiagnosed as the same prior `claude_code`-preset crash (already fixed commit `38910a4`); both have the same exit-1-empty-stderr symptom but different mechanisms:
 
@@ -107,6 +111,7 @@ Three substrate-collectors live (email, jamie, youtube). Eight piggybacks (was 9
 - **YouTube Tier 3-cloud** — Gemini Flash-Lite with cost-protection guardrails (lifted from clawrag's pain-driven design). Triggers when a video clearly needs visual fidelity local-vision can't deliver.
 - **Curiosity-loop integration** — search/upgrade requests + generic dashboard-surface (`curiosity-dashboard.md`). Triggers when ≥5 requests/week from compile-loop justify the surface.
 - **Reassess roadmap (M005?)** — does the agent-task catalogue need more tasks now (review-mocs, weekly-digest, extract-todos)? Curiosity-consumer gap (`.ytstack/backlog/curiosity-consumer-gap.md`) still open: `compile.py:maybe_generate_curiosity_requests` writes to `raw/requests/` but no consumer reads them post-`scan-email.py --follow-requests` removal.
+- **Pre-flight guard rollout** — `.ytstack/backlog/preflight-guard-rollout.md` — wire `assert_prompt_within_budget` into the remaining 3 LLM scripts (compile / optimize-claude-md / suggestions). ~3 lines each; P2 defense-in-depth.
 
 ## Open decisions
 
