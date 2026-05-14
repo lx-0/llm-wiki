@@ -310,3 +310,41 @@ The 2026-05-04 entry "Distill, don't cite" (citation-mechanics rule) plus its co
 **Operator follow-up:** None blocking. `wiki collect jamie` is wired as auto-piggyback at `cooldown_hours: 6, max_per_run: 20`. Six real meetings live in lxw vault `raw/transcripts/jamie/`; first `wiki compile` pass over them will be the proof-of-distillation. If Jamie sunsets, drop a second `Collector` next to `jamie.py` (Otter / Granola / whatever); the engine wiring (config block, Registry, `RAW_TRANSCRIPTS_DIR` substrate, compile-prompt rule 6 covering durable substrates) doesn't need to change.
 
 **Supersedes:** The pre-2026-05-13 "no meeting substrate" state — `RAW_TRANSCRIPTS_DIR` had been declared in `core/config.py` and the substrate listed in AGENTS.md, but nothing wrote to it. Now `raw/transcripts/jamie/` is alive.
+
+## 2026-05-13: Compile-prompt index — compact (path + date), not full body — pointer-first for growth substrates
+
+**Context:** Jamie meeting-compile pipeline rolled out 2026-05-13 (Phases 3-5 of llm-wiki-change). End-to-end test on four real meetings (9 KB / 35 KB / 60 KB / 75 KB sources) revealed a class of silent crashes at ≥60 KB: bundled CLI exits 1 with empty stderr after 4-9 min of activity, no parseable stream-json messages emitted, `$0.00` cost. The SDK-buffer fix from commit `70d2fef` (raised `max_buffer_size` to 50 MB) didn't help — different mechanism.
+
+**Architectural framing:** `compile_main.md` and three sibling prompts embedded the full `${index_md}` body. `knowledge/index.md` at 700+ articles = 550 KB ≈ 140K tokens. Combined with a 60 KB source + 25 KB AGENTS + facts + template = ~190K tokens — straddling Opus's 200K context window. The SessionStart-hook fix (commit `ab090b0`, 2026-05-05) had already established the **pointer-first** pattern: tell the LLM what file to inspect via Read/Grep/Glob, don't embed the body. That pattern was applied to one substrate (SessionStart pointer block) but not to the four compile-side prompts that have the identical growth profile.
+
+**Options considered:** (A) compact-index — strip summary + sources columns from `knowledge/index.md`, keep Article + Updated only, embed the compact form in prompts; full row content available on demand via Grep. (B) full pointer-first — remove `${index_md}` entirely, force Grep-then-Read for every dedup decision; smallest possible prompt but the LLM loses the at-a-glance article catalogue. (C) maintain a separately-generated `knowledge/index-compact.md` file on disk, alongside the main index; the prompt embeds the compact file. (D) chunk the index by article type and embed the type that matches the source (e.g. screenshots → concepts only).
+
+**Chose:** A.
+
+**Reason:** (A) gives the LLM the **complete article catalogue** (every path it can possibly link to) at one-third the prior size, with the workflow-reinforcement (Grep for summary, Read for body) baked into the prompt. (B) loses the catalogue and risks duplicate-creation. (C) doubles the index files and adds a drift-management burden. (D) imposes a substrate→type mapping decision that doesn't generalise (Jamie transcripts produce concepts AND people AND projects from the same source).
+
+The compact form is computed at runtime from `knowledge/index.md` (Python helper `core.utils.read_wiki_index_compact()`) — no second file to keep in sync, no operator-visible artefact. Obsidian's `[[X\|alias]]` pipe-escape syntax is preserved via sentinel-replace before column-split.
+
+**Linked artifacts:** Commit `94c9d6b` (helper + 4 call sites: `compile.py:168/271`, `suggestions/producer.py:45`, `optimize-claude-md.py:55`; four prompts updated: `compile_main.md`, `compile_curiosity.md`, `compile_suggestion.md`, `optimize_claude_md.md`). `core/utils.py:read_wiki_index_compact()` is the canonical implementation. KNOWLEDGE.md entry "Compile context overflow — `${index_md}` body embed grew past Opus's 200K-token window (2026-05-13)". Live verification: 4 Jamie meeting compiles (including the previously-failing 60 KB twice and the 75 KB Bad Nauheim Workshop) all succeed post-fix at $0.03-0.05 per compile.
+
+**Lesson generalised:** Any prompt template substitution carrying an artifact that **grows linearly with the corpus** (an index, a log, a daily archive, a participant directory) is a context-overflow ticking bomb. The pattern applies whenever a `${var}` in `prompts/*.md` is bound to "all the X". Compact (project columns) or pointer (Grep-the-file) is the right shape. Body-embed is fine only for **bounded** surfaces — facts (a few rows), AGENTS schema (operator-curated, capped), the source itself.
+
+**Supersedes:** The pre-2026-05-13 compile-prompt design that embedded the full `${index_md}` in four prompts. The SessionStart-hook `ab090b0` precedent is now generalised across all LLM-prompt call sites that previously body-embedded the index.
+
+**Follow-up (open):** `lint.py:check_orphan_pages` still uses `read_wiki_index()` full body — different consumer (Python grep, no LLM call), no fix needed. If any future LLM-prompt site needs the index, default to `read_wiki_index_compact()`.
+
+## 2026-05-13: Claude Agent SDK per-message buffer — explicit 50 MB, not the 1 MB default
+
+**Context:** Same Jamie meeting-compile pipeline. Three pre-buffer-fix runs surfaced a different class of crash with the same exit-1-empty-stderr symptom: `Failed to decode JSON: ... exceeded maximum buffer size of 1048576 bytes`. The SDK's `_internal/transport/subprocess_cli.py:_DEFAULT_MAX_BUFFER_SIZE = 1024 * 1024` (1 MB) limits each line of stream-json from the bundled CLI to 1 MB. Tool-result messages carrying `knowledge/index.md` body (~300 KB raw → ~600 KB JSON-escaped) and Write/Edit calls on large articles (200 KB content → >1 MB after escaping) blow the limit.
+
+**Options considered:** (A) raise `max_buffer_size` to a generous value via `ClaudeAgentOptions(max_buffer_size=...)` at every call site; the SDK exposes the override per call. (B) wrap `query()` in a custom transport that bumps the buffer at the SDK level (subclass / monkey-patch). (C) shrink every potential big message at the prompt layer — never let the LLM Read/Write big files (would require chunking workflows and severely limits the design).
+
+**Chose:** A.
+
+**Reason:** (A) uses the SDK's documented escape-hatch as designed. (B) re-implements internals. (C) makes the compile prompt design hostage to the SDK's hardcoded constant. Lifted to `CONFIG.limits.sdk_max_buffer_size_mb` (default 50 MB) per the project's "lift hardcoded constants to CONFIG immediately" rule. 50 MB is well above any realistic single-message scenario (largest foreseeable article × 5 safety factor) without hiding genuinely runaway responses.
+
+**Linked artifacts:** Commit `70d2fef`. All 8 SDK call sites threaded with `max_buffer_size=CONFIG.limits.sdk_max_buffer_size_mb * 1024 * 1024`: compile, flush, lint, query, agent_task, optimize-claude-md, suggestions/producer, facts/correct_apply. KNOWLEDGE.md entry "Claude Agent SDK silently crashes on >1 MB stream-json messages (2026-05-13)". Verified: 35 KB Jamie compile that previously failed at 543s (`exit-1`) now succeeds in 319s ($0.05).
+
+**Lesson:** When an SDK exposes a per-call tunable for a hard limit, set it explicitly at every call site instead of trusting the documented default. The 1 MB default is reasonable for the SDK's general audience; too small for a knowledge-base compiler that reads/writes long markdown.
+
+**Supersedes:** The pre-fix invocation pattern at all 8 call sites that relied on the SDK default. Future SDK call sites must include the `max_buffer_size=` parameter.

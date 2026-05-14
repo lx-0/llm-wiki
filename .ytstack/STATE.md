@@ -1,13 +1,27 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-05-13T18:00:00Z
+last_updated: 2026-05-14T00:00:00Z
 current_milestone: M004
 active_slice: none
 active_task: none
 ---
 
 # State
+
+**Two-class compile crash chain root-caused + fixed (2026-05-13 evening, commits `70d2fef` + `94c9d6b`)** — surfaced from the Jamie meeting-compile pipeline test. Two architecturally-distinct SDK-boundary bugs were misdiagnosed as the same prior `claude_code`-preset crash (already fixed commit `38910a4`); both have the same exit-1-empty-stderr symptom but different mechanisms:
+
+- `70d2fef` — `claude_agent_sdk._internal.transport.subprocess_cli._DEFAULT_MAX_BUFFER_SIZE = 1 MB` trips on tool-result messages carrying large article bodies (Read on `knowledge/index.md` returns ~600 KB JSON-escaped, near the limit; Write/Edit on big articles exceeds it). Surfaces explicitly as `Failed to decode JSON: ... exceeded maximum buffer size of 1048576 bytes` or implicitly as `Command failed with exit code 1` if the CLI dies first. Fix: `CONFIG.limits.sdk_max_buffer_size_mb` (default 50 MB), threaded through `ClaudeAgentOptions(max_buffer_size=...)` at all 8 SDK call sites (compile, flush, lint, query, agent_task, optimize-claude-md, suggestions/producer, facts/correct_apply).
+- `94c9d6b` — `compile_main.md` and three sibling prompts (`compile_curiosity.md`, `compile_suggestion.md`, `optimize_claude_md.md`) embedded the **full** `${index_md}` body. At 700+ articles `knowledge/index.md` reached ~550 KB (~140K tokens); combined with a 60 KB source + AGENTS + facts + template the prompt straddled Opus's 200K-token context window. German tokenization density pushed it over. Fix: new `core.utils.read_wiki_index_compact()` — same parser, strips the bulky summary + sources columns, keeps Article + Updated only (90.7% reduction: 550 KB → 51 KB). Obsidian pipe-alias syntax preserved via sentinel-replace. Four prompts updated to label the index as compact + reinforce the Grep-first-Read-second workflow. Matches the SessionStart-hook pointer-first pattern from `ab090b0`; same Karpathy alignment, just applied to the four compile-side prompts that hadn't gotten the treatment yet.
+
+**Live verification (4 Jamie meetings, post-fix):**
+- 9 KB Alex×Sid 3/3 (7 min meeting): ✓ 5:28 · $0.03 · 3 concepts + 1 person + 3 augmentations
+- 35 KB Alex×Sid 1/3 (31 min): ✓ 5:47 · $0.05 · 8 concepts + 1 person + 2 augmentations
+- 60 KB Alex×Sid 2/3 (69 min): ✓ 7:27 · $0.04 · 8 concepts + 1 project + 1 augmentation (2× failed pre-fix)
+- 75 KB Bad Nauheim Workshop (177 min): ✓ 5:46 · $0.03 · 8 concepts + 4 people + 1 project (would have failed pre-fix)
+- Total ~284 min meetings → 35 new + 6 augmentations = 41 articles, $0.15, ~24 min wall. Per-minute meeting ~3-8× more knowledge-dense than per-minute daily.
+
+KNOWLEDGE.md gained two new Hard-won entries: "Claude Agent SDK silently crashes on >1 MB stream-json messages" and "Compile context overflow — `${index_md}` body embed grew past Opus's 200K-token window". Both reference the SessionStart `ab090b0` precedent as the pattern these fixes belatedly applied to other call sites.
 
 **Jamie meeting-intake shipped (2026-05-13, full llm-wiki-change 5-phase pass)** — third substrate-collector after email + youtube. New `scripts/collectors/jamie.py` (~470 LOC) speaks Jamie's tRPC API (`https://beta-api.meetjamie.ai`, `x-api-key` auth, `meetings.list`/`meetings.get` operations, `?input=<JSON-encoded {"json":params}>` GET-with-input encoding, `result.data.json` envelope unwrap — discovered via vicampuzano/jamie-mcp source after marketing-docs claimed REST). Speaker-diarised transcript reformatter rewrites Jamie's `<speaker>\n\n\n###### MM:SS - MM:SS\n\n<text>` shape to youtube-uniform `**Speaker** [mm:ss] — text`. State at `state/jamie-state.json` (last_seen_ts). Auto-discovered piggyback via Registry walk (zero `flush.py` edit). Six real meetings live in lxw vault at `raw/transcripts/jamie/`. Single-tenant `personal.jamie` config block; secret in `JAMIE_API_KEY` env var.
 
