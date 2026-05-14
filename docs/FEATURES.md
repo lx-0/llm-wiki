@@ -50,7 +50,7 @@ Dispatcher: `scripts/collectors/cli.py` (`wiki collect <name>` and `wiki collect
 | Scanner | Status | Code | Output |
 |---|---|---|---|
 | `calendar` | 🟢 | `scripts/collectors/scan_calendar.py:CalendarCollector` (Registry) + script-mode CLI | `raw/notes/calendar/calendar-overview-<date>.md` |
-| `scan-browser` | 🟢 | `scripts/collectors/scan-browser.py` | `raw/notes/browser/` |
+| `browser` | 🟢 | `scripts/collectors/scan_browser.py:BrowserCollector` (Registry) + script-mode CLI | `raw/notes/browser/browser-overview-<date>.md` |
 | `tabs` | 🟢 | `scripts/collectors/scan_tabs.py:TabsCollector` (Registry) + script-mode CLI | `raw/notes/browser/tab-groups-overview-<date>.md` |
 | `scan-screenshots` | 🟢 | `scripts/collectors/scan-screenshots.py` | `~/Screenshots/<file>.md` (canonical) + `raw/notes/screenshots/thumb/<file>.png` + `raw/notes/screenshots/screenshots-<slug>.md` (batch report) |
 | `scan-youtube` | 🟢 | `scripts/collectors/scan-youtube.py` | `raw/notes/youtube/<channel>--<title>--<vid>.md` |

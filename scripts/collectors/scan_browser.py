@@ -4,17 +4,22 @@ Scan all browser data: Firefox Tab Groups, Bookmarks, History + Chrome Bookmarks
 Produces a comprehensive overview of browsing patterns, research interests,
 and saved resources.
 
-Usage:
-    uv run python scripts/collectors/scan-browser.py                   # full scan, save report
-    uv run python scripts/collectors/scan-browser.py --dry-run         # just show stats
-    uv run python scripts/collectors/scan-browser.py --source firefox  # only Firefox
-    uv run python scripts/collectors/scan-browser.py --source chrome   # only Chrome
+Wired in two ways:
+  - As a Registry-discovered Collector: `wiki collect browser`. The
+    `@register` decorator below adds `BrowserCollector` to the Registry;
+    `flush.py` auto-spawns it as `collectors/cli.py browser` when the
+    piggyback fires.
+  - As a direct CLI: `uv run python scripts/collectors/scan_browser.py`
+    still works and preserves the historical `--dry-run` / `--source` flags.
+    (`--source firefox|chrome` is CLI-only; the Collector path always scans
+    every available source.)
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import logging
 import os
 import shutil
 import sqlite3
@@ -26,8 +31,11 @@ from urllib.parse import urlparse
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from collectors.base import Collector, CollectorSpec, RunResult, register
 from core.config import RAW_DIR, ROOT_DIR, today_iso
 from core.wiki_config import CONFIG
+
+log = logging.getLogger(__name__)
 
 # Paths — populated from CONFIG.personal so the engine has no hardcoded
 # personal profile IDs / backup folders. Empty CONFIG values mean the
@@ -67,7 +75,9 @@ def clean_domain(url: str) -> str | None:
 
 def scan_stg(backup_dir: Path) -> dict | None:
     """Scan Simple Tab Groups backup."""
-    if not backup_dir.exists():
+    # Empty config → Path() == Path(".") — which exists as the cwd. Guard
+    # explicitly so an unconfigured STG dir is a no-op, not a cwd glob.
+    if backup_dir == Path() or not backup_dir.is_dir():
         return None
     files = sorted(backup_dir.glob("*.json"))
     if not files:
@@ -100,7 +110,9 @@ def scan_stg(backup_dir: Path) -> dict | None:
 
 def scan_firefox_places(places_path: Path) -> dict | None:
     """Scan Firefox places.sqlite for bookmarks and history."""
-    if not places_path.exists():
+    # `.exists()` is True for an empty-config `Path()` (== cwd); require an
+    # actual file so an unconfigured Firefox profile is a clean no-op.
+    if not places_path.is_file():
         return None
 
     tmp = Path("/tmp/ff-places-scan.sqlite")
@@ -467,6 +479,83 @@ def generate_report(ff_stg: dict | None, ff_places: dict | None,
         lines.append("")
 
     return "\n".join(lines)
+
+
+# ── Collector wrapper ───────────────────────────────────────────────
+
+
+def _scan_all_sources() -> dict:
+    """Run all four browser scans, return a dict of results (None when a source is absent)."""
+    return {
+        "ff_stg": scan_stg(STG_BACKUP_DIR),
+        "ff_places": scan_firefox_places(FF_PLACES),
+        "chrome_bm": scan_chrome_bookmarks(CHROME_BOOKMARKS),
+        "chrome_hist": scan_chrome_history(CHROME_HISTORY),
+    }
+
+
+@register
+class BrowserCollector:
+    """Firefox + Chrome browser-data scanner — Collector Protocol wrapper.
+
+    Multi-source substrate: Firefox Tab Groups (STG backup), Firefox
+    places.sqlite (bookmarks + history + searches), Chrome bookmarks,
+    Chrome history. Kept as ONE collector (not split per-browser) — per
+    the architecture-deepening backlog, browser is a singleton substrate;
+    no Reader/Filter adapter seam. The historical `--source firefox|chrome`
+    filter is CLI-only — the Collector path scans every available source.
+    """
+
+    SPEC = CollectorSpec(
+        name="browser",
+        output_subfolder="raw/notes/browser",
+        piggyback_default=False,  # operator-invoked; browser data is slow-changing
+        piggyback_cooldown_hours=24,
+        supports_incremental=False,  # full snapshot each time
+        supports_account_loop=False,
+    )
+
+    def is_configured(self) -> bool:
+        """True iff at least one browser source is reachable.
+
+        Firefox needs CONFIG.personal.firefox_profile / stg_backup_dir;
+        Chrome lives at a fixed ~/Library path. Any one resolving is enough.
+        """
+        return bool(
+            (_FF_PROFILE_RAW and FF_PLACES.exists())
+            or (_STG_RAW and STG_BACKUP_DIR.exists())
+            or CHROME_BOOKMARKS.exists()
+            or CHROME_HISTORY.exists()
+        )
+
+    def run(self, *, dry_run: bool = False, incremental: bool = False) -> RunResult:
+        if not self.is_configured():
+            return RunResult(message="No browser sources configured (Firefox profile / STG dir / Chrome)")
+
+        sources = _scan_all_sources()
+        present = [k for k, v in sources.items() if v]
+        if not present:
+            return RunResult(message="Browser sources configured but none yielded data")
+
+        if dry_run:
+            return RunResult(
+                files_skipped=1,
+                message=f"[dry-run] would scan {len(present)} source(s): {', '.join(present)}",
+            )
+
+        report = generate_report(
+            sources["ff_stg"], sources["ff_places"], sources["chrome_bm"], sources["chrome_hist"]
+        )
+        REPORT_DIR.mkdir(parents=True, exist_ok=True)
+        report_path = REPORT_DIR / f"browser-overview-{today_iso()}.md"
+        report_path.write_text(report, encoding="utf-8")
+        return RunResult(
+            files_written=(report_path,),
+            message=f"{len(present)} source(s) scanned ({', '.join(present)}) → {report_path.name}",
+        )
+
+
+# ── Direct CLI entry (backward-compat) ──────────────────────────────
 
 
 def main():
