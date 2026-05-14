@@ -12,9 +12,13 @@ Path-and-date listing. Full summary cells live in `knowledge/index.md` (Grep on 
 
 ${index_md}
 
-## Selected Wiki Articles (cross-project patterns)
+## Finding cross-project patterns
 
-${wiki_content}
+The compact index above lists every article. You have **Read and Grep tools** — use them on `knowledge/`:
+
+1. **Grep** `knowledge/index.md` for cross-project themes (tech-stack choices, conventions, pitfalls); the matching rows carry full summary cells — enough signal to spot 2+-project patterns.
+2. **Read** the full body of an article only when it looks like a genuine cross-project pattern worth lifting a rule from.
+3. **Avoid reading `knowledge/index.md` in full** — at this size it eats most of the context budget. Grep is the right tool.
 
 ---
 

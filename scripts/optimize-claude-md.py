@@ -24,7 +24,7 @@ from claude_agent_sdk import ClaudeAgentOptions, ResultMessage, query
 
 from core.config import KNOWLEDGE_DIR, ROOT_DIR, now_iso
 from core.wiki_config import CONFIG
-from core.utils import read_all_wiki_content, read_wiki_index, read_wiki_index_compact
+from core.utils import read_wiki_index_compact
 
 # ── Config ──────────────────────────────────────────────────────────
 
@@ -53,13 +53,12 @@ async def optimize(dry_run: bool = False) -> None:
     current = CLAUDE_MD.read_text(encoding="utf-8")
     current_lines = len(current.strip().split("\n"))
     index_md = read_wiki_index_compact()
-    wiki_content = read_all_wiki_content()
 
     log.info("Current CLAUDE.md: %d lines, %d chars", current_lines, len(current))
-    log.info("Wiki: %d chars index, %d chars content", len(index_md), len(wiki_content))
+    log.info("Wiki: %d chars compact index", len(index_md))
 
     if dry_run:
-        log.info("[dry-run] Would optimize CLAUDE.md based on %d chars of wiki content", len(wiki_content))
+        log.info("[dry-run] Would optimize CLAUDE.md based on %d chars of wiki index", len(index_md))
         return
 
     # Backup
@@ -77,7 +76,6 @@ async def optimize(dry_run: bool = False) -> None:
         "optimize_claude_md",
         current_claude_md=current,
         index_md=index_md,
-        wiki_content=wiki_content,
         claude_md_path=str(staging),
         current_lines=current_lines,
     )
