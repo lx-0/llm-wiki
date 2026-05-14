@@ -78,10 +78,11 @@ class ImapReader:
     def _connect(self):
         """Open + login an IMAPClient, or None (warning logged) on failure.
 
-        `normalise_times=False` keeps INTERNALDATE tz-aware (UTC) instead of
-        being flattened to a naive local datetime — downstream code must
-        never deal with naive datetimes (see KNOWLEDGE.md, the undated-mail
-        regression).
+        `normalise_times` is an *instance attribute* (not a constructor
+        kwarg) in imapclient 3.x. Setting it to False keeps INTERNALDATE
+        tz-aware (UTC) instead of flattened to a naive local datetime —
+        downstream code must never deal with naive datetimes (see
+        KNOWLEDGE.md, the undated-mail regression).
         """
         creds = self._credentials()
         if creds is None:
@@ -94,7 +95,8 @@ class ImapReader:
                         self._account_id)
             return None
         try:
-            client = IMAPClient(self._host, port=_IMAP_SSL_PORT, ssl=True, normalise_times=False)
+            client = IMAPClient(self._host, port=_IMAP_SSL_PORT, ssl=True)
+            client.normalise_times = False
             client.login(user, password)
             return client
         except Exception as e:  # noqa: BLE001  any failure → graceful no-op

@@ -54,8 +54,12 @@ class FakeIMAPClient:
     FOLDERS: dict[str, dict[int, dict]] = {}
     RAISE_ON_LOGIN = False
 
-    def __init__(self, host, port=993, ssl=True, normalise_times=True) -> None:
+    def __init__(self, host, port=993, ssl=True) -> None:
+        # Faithful to imapclient 3.x: normalise_times is an instance
+        # attribute the real IMAPClient sets in __init__, NOT a ctor kwarg.
+        # ImapReader._connect flips it to False after construction.
         self.host = host
+        self.normalise_times = True
         self._selected: str | None = None
 
     def login(self, user, password):
