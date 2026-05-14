@@ -4,15 +4,20 @@ Scan Thunderbird calendar data and produce a metadata overview.
 Reads from the cached SQLite calendar database (Google Calendar sync).
 Produces a structured timeline of events, attendees, and patterns.
 
-Usage:
-    uv run python scripts/collectors/scan-calendar.py                  # full scan, save report
-    uv run python scripts/collectors/scan-calendar.py --year 2025      # only one year
-    uv run python scripts/collectors/scan-calendar.py --dry-run        # just show stats
+Wired in two ways:
+  - As a Registry-discovered Collector: `wiki collect calendar`. The
+    `@register` decorator below adds `CalendarCollector` to the Registry;
+    `flush.py` auto-spawns it as `collectors/cli.py calendar` when the
+    piggyback fires.
+  - As a direct CLI: `uv run python scripts/collectors/scan_calendar.py`
+    still works and preserves the historical `--dry-run` / `--year` flags.
+    (`--year` is CLI-only; the Collector path always does the full scan.)
 """
 
 from __future__ import annotations
 
 import argparse
+import logging
 import re
 import shutil
 import sqlite3
@@ -23,8 +28,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from collectors.base import Collector, CollectorSpec, RunResult, register
 from core.config import RAW_DIR, ROOT_DIR, today_iso
 from core.wiki_config import CONFIG
+
+log = logging.getLogger(__name__)
 
 _TB_PROFILE_RAW = CONFIG.personal.thunderbird_profile
 THUNDERBIRD_PROFILE = (
@@ -215,6 +223,56 @@ def generate_report(data: dict) -> str:
         lines.append("")
 
     return "\n".join(lines)
+
+
+# ── Collector wrapper ───────────────────────────────────────────────
+
+
+@register
+class CalendarCollector:
+    """Thunderbird calendar SQLite scanner — Collector Protocol wrapper.
+
+    Wraps scan_calendar + generate_report in the Registry-aware shape so
+    `wiki collect calendar` works alongside email / jamie / tabs. Single-
+    source substrate (one Thunderbird profile); the historical `--year`
+    filter is CLI-only — the Collector path always does the full scan.
+    """
+
+    SPEC = CollectorSpec(
+        name="calendar",
+        output_subfolder="raw/notes/calendar",
+        piggyback_default=False,  # operator-invoked; calendar shifts slowly
+        piggyback_cooldown_hours=24,
+        supports_incremental=False,  # full snapshot each time; no delta concept
+        supports_account_loop=False,
+    )
+
+    def is_configured(self) -> bool:
+        """True iff CONFIG.personal.thunderbird_profile resolves to a calendar DB."""
+        return bool(_TB_PROFILE_RAW) and CALENDAR_DB.exists()
+
+    def run(self, *, dry_run: bool = False, incremental: bool = False) -> RunResult:
+        if not self.is_configured():
+            return RunResult(message="Thunderbird profile not configured or calendar DB missing")
+
+        data = scan_calendar(CALENDAR_DB)
+        if dry_run:
+            return RunResult(
+                files_skipped=1,
+                message=f"[dry-run] would scan {data['total_events']} events across {len(data['years'])} year(s)",
+            )
+
+        report = generate_report(data)
+        REPORT_DIR.mkdir(parents=True, exist_ok=True)
+        report_path = REPORT_DIR / f"calendar-overview-{today_iso()}.md"
+        report_path.write_text(report, encoding="utf-8")
+        return RunResult(
+            files_written=(report_path,),
+            message=f"{data['total_events']} events across {len(data['years'])} year(s) → {report_path.name}",
+        )
+
+
+# ── Direct CLI entry (backward-compat) ──────────────────────────────
 
 
 def main():
