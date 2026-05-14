@@ -25,7 +25,7 @@
 <table align="center">
   <tr>
     <td align="center"><strong>2 + 5</strong><br/>collectors + legacy scanners</td>
-    <td align="center"><strong>5</strong><br/>skills bundled</td>
+    <td align="center"><strong>6</strong><br/>skills bundled</td>
     <td align="center"><strong>MIT</strong><br/>open source</td>
   </tr>
 </table>
@@ -236,7 +236,7 @@ The installer clones into `<target>/.wiki/`, seeds `config.yaml` from `config.ex
 | `<vault>/dashboard.md` | `templates/dashboard.md` | Obsidian Dataview home (recently-compiled / wiki stats / recent daily logs). |
 | `<vault>/.obsidian/community-plugins.json` | `templates/.obsidian/` | Lists `dataview` + `obsidian-excalidraw-plugin` for first-launch approval. |
 | `<vault>/.obsidian/core-plugins.json` | `templates/.obsidian/` | Sensible defaults (daily-notes, properties, graph on; sync/publish off). |
-| `<vault>/.claude/skills/<name>` | symlink to `.wiki/skills/<name>` | Claude Code auto-discovers engine skills (`engine-pr`, `excalidraw-diagram`, `ingest-audio`, `vault-health-check`, `vault-triage`). New skills shipped via `wiki update` are picked up automatically. |
+| `<vault>/.claude/skills/<name>` | symlink to `.wiki/skills/<name>` | Claude Code auto-discovers engine skills (`engine-pr`, `excalidraw-diagram`, `ingest-audio`, `use-llm-wiki`, `vault-health-check`, `vault-triage`). New skills shipped via `wiki update` are picked up automatically. `use-llm-wiki` is also *global-eligible* — `wiki skills install --global` links it into `~/.claude/skills/` so agents in any project can query this wiki. |
 
 **Prerequisites:** `bash` ≥ 4, `git`, `jq`, `uv` (Python package manager). Optional but recommended: a local [Ollama](https://ollama.com) — the curiosity loop, screenshot vision, inbox classification, HTML visual analysis, and per-article review all run on local models. The Claude paths (compile, query, lint contradiction check, flush) work without it.
 
@@ -244,23 +244,25 @@ After install:
 
 ```bash
 cd ~/path/to/vault
-./.wiki/wiki setup        # 5-question wizard: Ollama URL, compile model,
-                          #   compile-after hour, procmail execution, local-LLM bundle
+./.wiki/wiki setup        # 6-question wizard: Ollama URL, compile model,
+                          #   compile-after hour, procmail execution, local-LLM
+                          #   bundle, global skill install
 ./.wiki/wiki status       # config + hook install table + Ollama probe
 ```
 
 ## Update
 
 ```bash
-./.wiki/wiki update              # git pull --ff-only + sync skill symlinks into .claude/skills/
-./.wiki/wiki update --no-skills  # pull only (skip skill sync)
-./.wiki/wiki skills status       # per-skill linked / collision / missing table
-./.wiki/wiki skills install      # ad-hoc resync without pulling
-./.wiki/wiki seed                # additive: add missing vault templates (dashboard, plugin configs)
-./.wiki/wiki seed --force        # overwrite existing templates with engine versions
+./.wiki/wiki update                # git pull --ff-only + sync skill symlinks into .claude/skills/
+./.wiki/wiki update --no-skills    # pull only (skip skill sync)
+./.wiki/wiki skills status         # per-skill linked / collision / missing table + global state
+./.wiki/wiki skills install        # ad-hoc resync without pulling
+./.wiki/wiki skills install --global  # also link use-llm-wiki into ~/.claude/skills/ + register vault
+./.wiki/wiki seed                  # additive: add missing vault templates (dashboard, plugin configs)
+./.wiki/wiki seed --force          # overwrite existing templates with engine versions
 ```
 
-`wiki update` pulls into `.wiki/` (preserves `config.yaml` + `.venv/`), then runs `wiki skills sync` so newly-shipped engine skills land in `<vault>/.claude/skills/` automatically. Foreign entries (your own skills, other tools' symlinks) are never touched.
+`wiki update` pulls into `.wiki/` (preserves `config.yaml` + `.venv/`), then runs `wiki skills sync` so newly-shipped engine skills land in `<vault>/.claude/skills/` automatically. Foreign entries (your own skills, other tools' symlinks) are never touched. When `skills.global_install` is on, the sync also refreshes the global `~/.claude/skills/` symlink — the opt-in survives updates with no re-flagging.
 
 `wiki seed` re-applies engine templates to the vault root after an update — adds missing files (`dashboard.md`, `_dashboard-stats.md`, `.obsidian/plugins/<name>/data.json`) and **merges** `community-plugins.json` (additive — never drops your own plugins). Default mode never overwrites your existing files; use `--force` to replace customisations of `dashboard.md` / `AGENTS.md` with the engine version.
 

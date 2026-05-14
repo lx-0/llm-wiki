@@ -13,9 +13,12 @@
 #   wiki hooks uninstall       remove wiki hooks
 #   wiki hooks status          print install status table
 #   wiki skills install        symlink engine skills into <vault>/.claude/skills/
+#   wiki skills install --global  also link global skills into ~/.claude/skills/
+#                                 + register the vault (sets skills.global_install)
 #   wiki skills uninstall      remove engine-owned skill symlinks
+#   wiki skills uninstall --global  also remove global links + deregister vault
 #   wiki skills sync           install missing + prune stale (used by `wiki update`)
-#   wiki skills status         per-skill linked/collision/missing table
+#   wiki skills status         per-skill linked/collision/missing table + global state
 #   wiki collect --list        list registered Collectors
 #   wiki collect <name>        run one Collector (--dry-run | --incremental | --account ID)
 #   wiki gmail-auth <id>       OAuth bootstrap for a Gmail account-id (one-time)
@@ -28,7 +31,7 @@
 #   wiki lint                  run lint.py — structural + LLM contradiction checks
 #   wiki lint --structural-only  cheap, no-LLM lint (used by piggyback)
 #   wiki query "QUESTION"      ask the knowledge base via the configured model
-#   wiki agent <id>            run an agentic task (Claude SDK driven by prompts/agent_<id>.md)
+#   wiki agent <id>            run an agentic task (Claude SDK driven by prompts/agents/<id>.md)
 #   wiki agent --list          list registered agent tasks
 #   wiki correct add "TITLE" "TRUTH" [--status S] [--term T ...]
 #                              record a hard fact that overrides any source
@@ -200,7 +203,10 @@ ${C_BOLD}wiki skills${C_RESET} — wire engine skills into Claude Code
 
 ${C_BOLD}USAGE${C_RESET}
   wiki skills install               symlink missing engine skills into .claude/skills/
+  wiki skills install --global      also link global skills into ~/.claude/skills/
+  wiki skills install --no-global   vault-local only (turns the global opt-in off)
   wiki skills uninstall             remove engine-owned symlinks (foreign entries kept)
+  wiki skills uninstall --global    also remove this vault's global links + deregister
   wiki skills sync                  install missing + prune stale (run after wiki update)
   wiki skills status                per-skill linked / collision / missing table
 
@@ -209,17 +215,52 @@ ${C_BOLD}NOTES${C_RESET}
   Target: $ROOT_DIR/.claude/skills/
   Only symlinks pointing at ../../.wiki/skills/<name> are managed.
   Foreign entries (your own skills, other tools) are never modified.
+
+${C_BOLD}GLOBAL INSTALL${C_RESET}
+  Most skills operate inside a vault and stay vault-local. A few (currently:
+  use-llm-wiki) let an agent in *any* project discover and use this wiki —
+  those can also be linked into ~/.claude/skills/.
+  The opt-in is the ${C_BOLD}skills.global_install${C_RESET} config key; the --global /
+  --no-global flags are one-shot shortcuts that write it (so it persists —
+  \`wiki update\` keeps an opted-in vault globally linked). The vault root is
+  recorded in ${XDG_CONFIG_HOME:-\$HOME/.config}/llm-wiki/vaults for the skill's
+  discovery probe. Equivalent: wiki config set skills.global_install true.
 EOF
 }
 
 cmd_skills() {
-  case "${1:-}" in
-    install|"")               skills_cmd_install ;;
-    uninstall)                skills_cmd_uninstall ;;
+  # --global / --no-global may appear anywhere; strip them, keep the rest.
+  local global_flag="" a
+  local -a rest=()
+  for a in "$@"; do
+    case "$a" in
+      --global)    global_flag=1 ;;
+      --no-global) global_flag=0 ;;
+      *)           rest+=("$a") ;;
+    esac
+  done
+  case "${rest[0]:-}" in
+    install|"")
+      [[ "$global_flag" == "1" ]] && config_set skills.global_install true  >/dev/null
+      [[ "$global_flag" == "0" ]] && config_set skills.global_install false >/dev/null
+      skills_cmd_install ;;
+    uninstall)
+      skills_cmd_uninstall
+      if [[ "$global_flag" == "1" ]]; then
+        config_set skills.global_install false >/dev/null
+        skills_uninstall_global
+        echo
+        if (( _skills_global_removed > 0 )); then
+          ok "removed $_skills_global_removed global symlink(s) from $GLOBAL_SKILLS_DST"
+        else
+          info "no global symlinks for this vault"
+        fi
+        info "vault deregistered from $REGISTRY_FILE; skills.global_install set false"
+      fi ;;
     sync)                     skills_cmd_sync ;;
     status)                   skills_cmd_status ;;
     -h|--help|help)           help_skills ;;
-    *)                        err "unknown: wiki skills $1"; help_skills; exit 1 ;;
+    *)                        err "unknown: wiki skills ${rest[0]}"; help_skills; exit 1 ;;
   esac
 }
 
@@ -376,7 +417,7 @@ cmd_agent() {
 ${C_BOLD}wiki agent${C_RESET} — run an agentic task
 
 ${C_BOLD}USAGE${C_RESET}
-  wiki agent <id>                          run task defined in prompts/agent_<id>.md
+  wiki agent <id>                          run task defined in prompts/agents/<id>.md
   wiki agent <id> --dry-run                resolve + print spec without spawning
   wiki agent <id> --var key=value          substitute \${key} in the prompt body
   wiki agent --list                        list registered tasks

@@ -12,6 +12,7 @@ Every settable key in `<vault>/.wiki/config.yaml`, plus the secrets surface in `
 - [limits](#limits)
 - [piggybacks](#piggybacks)
 - [graph_view](#graph_view)
+- [skills](#skills)
 - [personal](#personal) — primary account, accounts, jamie, email folders, scanners
 - [Secrets — `.claude/.env`](#secrets--claudeenv)
 
@@ -38,6 +39,7 @@ The `.env` file: only the **variable NAME** lives in `config.yaml` (e.g. `api_ke
 | `limits.*` | `Limits` dataclass |
 | `piggybacks.<task>.*` | `PiggybackTask` dataclass per task |
 | `graph_view.*` | `GraphView` dataclass |
+| `skills.*` | `Skills` dataclass |
 | `personal.*` | `Personal` dataclass (includes `JamieConfig` nested) |
 
 ## scheduling
@@ -150,6 +152,16 @@ Drives `.obsidian/graph.json` rebuilds by `wiki seed`.
 |---|---|---|
 | `graph_view.mode` | `"knowledge-only"` | One of: `knowledge-only`, `full-vault`, `sources-only`, `custom`. |
 | `graph_view.custom_search` | `""` | Obsidian search expression when `mode=custom`. |
+
+## skills
+
+Engine-skill distribution. Most bundled skills operate *inside* a vault and are always linked vault-locally into `<vault>/.claude/skills/`. A few are global-eligible — they let an agent in *any* project discover and use this wiki — and can additionally be linked into `~/.claude/skills/`.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `skills.global_install` | `false` | When `true`, `wiki skills install` / `wiki skills sync` also link global-eligible skills (currently `use-llm-wiki`) into `~/.claude/skills/` and register this vault's root in `~/.config/llm-wiki/vaults` (the discovery registry the `use-llm-wiki` skill reads). The `--global` / `--no-global` flags on `wiki skills install` are one-shot shortcuts that write this key — it is the durable opt-in, so an opted-in vault stays globally linked across `wiki update`. The setup wizard's 6th question sets it too. |
+
+The registry file `~/.config/llm-wiki/vaults` (honours `XDG_CONFIG_HOME`) is plain newline-delimited vault-root paths — engine state, not a tracked artefact, and the only thing the engine writes outside the vault.
 
 ## personal
 

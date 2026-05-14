@@ -4,6 +4,12 @@
 # <vault>/.claude/skills/<name>/ so Claude Code discovers them. Only symlinks
 # pointing at ../../.wiki/skills/<name> are owned by the engine; foreign
 # entries (user-authored skills, other tools' symlinks) are never touched.
+#
+# Global install: a few skills are global-eligible (GLOBAL_SKILLS) — they let
+# an agent in *any* project discover and use a locally-available wiki. When
+# `skills.global_install` is enabled, those are also linked into
+# ~/.claude/skills/ and the vault is recorded in ~/.config/llm-wiki/vaults so
+# the skill's discovery probe can find it.
 
 [[ -n "${__WIKI_SKILLS_LOADED:-}" ]] && return 0
 __WIKI_SKILLS_LOADED=1
@@ -12,12 +18,26 @@ SKILLS_SRC_DIR="$WIKI_DIR/skills"
 SKILLS_DST_DIR="$ROOT_DIR/.claude/skills"
 SKILLS_LINK_TARGET_PREFIX="../../.wiki/skills"
 
+# Global-install constants. GLOBAL_SKILLS is the allowlist of skills safe to
+# link outside a vault — keep it tight; the others operate *inside* a vault.
+GLOBAL_SKILLS=(use-llm-wiki)
+GLOBAL_SKILLS_DST="$HOME/.claude/skills"
+REGISTRY_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/llm-wiki"
+REGISTRY_FILE="$REGISTRY_DIR/vaults"
+
 # True iff $1 is a symlink pointing into the engine's skills dir.
 _skill_is_engine_owned() {
   local link="$1"
   [[ -L "$link" ]] || return 1
   local target; target="$(readlink "$link")"
   [[ "$target" == "$SKILLS_LINK_TARGET_PREFIX/"* ]]
+}
+
+# True iff `skills.global_install` is enabled in config.yaml. config_get is
+# defined in lib/config.sh (sourced by `wiki` after this file — fine: this is
+# only ever called at runtime, by which point every lib is loaded).
+_skills_global_enabled() {
+  [[ "$(config_get skills.global_install 2>/dev/null)" == "True" ]]
 }
 
 # Install missing engine-skill symlinks. Idempotent: existing engine-owned links
@@ -70,6 +90,82 @@ skills_prune_stale_silent() {
   done
 }
 
+# ── Global install: registry + symlink helpers ─────────────────────────
+# The registry is a plain newline-delimited file of absolute vault-root paths.
+# It is the cross-vault source of truth the discovery probe reads; each vault
+# adds/removes only its own line. Writes fail soft — a missing global symlink
+# is recoverable, a hard error on `wiki update` is not.
+_registry_add() {
+  mkdir -p "$REGISTRY_DIR" 2>/dev/null || { warn "cannot create $REGISTRY_DIR — vault not registered"; return 0; }
+  touch "$REGISTRY_FILE" 2>/dev/null   || { warn "cannot write $REGISTRY_FILE — vault not registered"; return 0; }
+  grep -qxF "$ROOT_DIR" "$REGISTRY_FILE" 2>/dev/null || printf '%s\n' "$ROOT_DIR" >> "$REGISTRY_FILE"
+}
+
+_registry_remove() {
+  [[ -f "$REGISTRY_FILE" ]] || return 0
+  local tmp; tmp="$(mktemp)" || return 0
+  grep -vxF "$ROOT_DIR" "$REGISTRY_FILE" > "$tmp" 2>/dev/null || true
+  mv "$tmp" "$REGISTRY_FILE" 2>/dev/null || rm -f "$tmp"
+}
+
+# Link GLOBAL_SKILLS into ~/.claude/skills/ with an *absolute* target (relative
+# targets don't resolve from ~/.claude/). A pre-existing link into *any*
+# .wiki/skills/ is engine-owned and left alone — the SKILL.md is engine-
+# identical across vaults and discovery is registry-driven, so "points at
+# another vault" is not a collision. Only genuinely foreign entries are
+# reported. Counts via globals; also registers the vault.
+_skills_global_added=0
+_skills_global_skipped=0
+_skills_global_foreign=0
+skills_install_global_silent() {
+  _skills_global_added=0
+  _skills_global_skipped=0
+  _skills_global_foreign=0
+  [[ -d "$SKILLS_SRC_DIR" ]] || return 0
+  mkdir -p "$GLOBAL_SKILLS_DST"
+  local name link target cur
+  for name in "${GLOBAL_SKILLS[@]}"; do
+    [[ -d "$SKILLS_SRC_DIR/$name" ]] || continue
+    link="$GLOBAL_SKILLS_DST/$name"
+    target="$SKILLS_SRC_DIR/$name"
+    if [[ -L "$link" ]]; then
+      cur="$(readlink "$link")"
+      if [[ "$cur" == "$target" || "$cur" == */.wiki/skills/* ]]; then
+        _skills_global_skipped=$((_skills_global_skipped + 1))
+      else
+        _skills_global_foreign=$((_skills_global_foreign + 1))
+      fi
+      continue
+    fi
+    if [[ -e "$link" ]]; then
+      _skills_global_foreign=$((_skills_global_foreign + 1))
+      continue
+    fi
+    ln -s "$target" "$link"
+    _skills_global_added=$((_skills_global_added + 1))
+  done
+  _registry_add
+}
+
+# Remove global symlinks that point into *this* vault's .wiki/skills/, and
+# deregister this vault. Other vaults' global links and foreign entries are
+# left untouched. Count via global.
+_skills_global_removed=0
+skills_uninstall_global() {
+  _skills_global_removed=0
+  if [[ -d "$GLOBAL_SKILLS_DST" ]]; then
+    local name link
+    for name in "${GLOBAL_SKILLS[@]}"; do
+      link="$GLOBAL_SKILLS_DST/$name"
+      [[ -L "$link" ]] || continue
+      [[ "$(readlink "$link")" == "$SKILLS_SRC_DIR/$name" ]] || continue
+      rm -- "$link"
+      _skills_global_removed=$((_skills_global_removed + 1))
+    done
+  fi
+  _registry_remove
+}
+
 # ── User-facing subcommands ────────────────────────────────────────────
 skills_cmd_install() {
   banner "wiki skills install" "Symlink engine skills into .claude/skills/"
@@ -86,6 +182,16 @@ skills_cmd_install() {
   fi
   if (( _skills_install_count_added + _skills_install_count_skipped + _skills_install_count_foreign == 0 )); then
     info "no skills found in $SKILLS_SRC_DIR — nothing to do"
+  fi
+  # Global-eligible skills, when opted in via `skills.global_install`.
+  if _skills_global_enabled; then
+    echo
+    skills_install_global_silent
+    info "global install (skills.global_install: true)"
+    (( _skills_global_added > 0 ))   && ok   "linked $_skills_global_added skill(s) into $GLOBAL_SKILLS_DST"
+    (( _skills_global_skipped > 0 )) && info "$_skills_global_skipped global skill(s) already linked"
+    (( _skills_global_foreign > 0 )) && warn "$_skills_global_foreign global name(s) collide with non-engine entries — left untouched"
+    info "vault registered in $REGISTRY_FILE"
   fi
 }
 
@@ -105,20 +211,29 @@ skills_cmd_uninstall() {
   fi
 }
 
-# Used by `wiki update` after `git pull` — install new + prune stale, single-line summary.
+# Used by `wiki update` after `git pull` — install new + prune stale, single-line
+# summary. When `skills.global_install` is on, also refreshes the global links
+# and re-registers the vault — so an opted-in vault stays globally linked across
+# updates with no re-flagging (the config key is the durable opt-in).
 skills_cmd_sync() {
   skills_install_silent
   skills_prune_stale_silent
   local added="$_skills_install_count_added"
   local pruned="$_skills_prune_count"
   local foreign="$_skills_install_count_foreign"
-  if (( added == 0 && pruned == 0 && foreign == 0 )); then
+  local global_added=0
+  if _skills_global_enabled; then
+    skills_install_global_silent
+    global_added="$_skills_global_added"
+  fi
+  if (( added == 0 && pruned == 0 && foreign == 0 && global_added == 0 )); then
     info "skills: up to date"
   else
     local msg="skills:"
     (( added > 0 )) && msg+=" +$added linked"
     (( pruned > 0 )) && msg+=" -$pruned pruned"
     (( foreign > 0 )) && msg+=" $foreign collision(s)"
+    (( global_added > 0 )) && msg+=" +$global_added global"
     ok "$msg"
   fi
 }
@@ -161,5 +276,47 @@ skills_cmd_status() {
       printf "  %s\n" "$name"
     done
     (( any_stale == 1 )) && info "Run 'wiki skills sync' to prune them."
+  fi
+
+  # ── Global install ──────────────────────────────────────────────────
+  echo
+  local global_on; global_on="$(config_get skills.global_install 2>/dev/null || echo '?')"
+  if [[ "$global_on" == "True" ]]; then
+    printf "%-32s %s\n" "GLOBAL INSTALL" "${C_GREEN}on${C_RESET}  (skills.global_install)"
+  else
+    printf "%-32s %s\n" "GLOBAL INSTALL" "${C_DIM}off${C_RESET} (skills.global_install — wiki skills install --global)"
+  fi
+  local gname glink gcur gstate
+  for gname in "${GLOBAL_SKILLS[@]}"; do
+    glink="$GLOBAL_SKILLS_DST/$gname"
+    if [[ -L "$glink" ]]; then
+      gcur="$(readlink "$glink")"
+      if [[ "$gcur" == "$SKILLS_SRC_DIR/$gname" ]]; then
+        gstate="${C_GREEN}linked${C_RESET} → this vault"
+      elif [[ "$gcur" == */.wiki/skills/* ]]; then
+        gstate="${C_YELLOW}linked${C_RESET} → other vault ($gcur)"
+      else
+        gstate="${C_YELLOW}collision${C_RESET} (foreign entry — not managed)"
+      fi
+    elif [[ -e "$glink" ]]; then
+      gstate="${C_YELLOW}collision${C_RESET} (foreign entry — not managed)"
+    else
+      gstate="${C_DIM}not linked${C_RESET}"
+    fi
+    printf "  %-30s %s\n" "$gname" "$gstate"
+  done
+  if [[ -f "$REGISTRY_FILE" ]]; then
+    printf "  %-30s %s\n" "registry" "$REGISTRY_FILE"
+    local v
+    while IFS= read -r v; do
+      [[ -n "$v" ]] || continue
+      if [[ -x "$v/.wiki/wiki" ]]; then
+        printf "    %s%s%s %s\n" "$C_GREEN" "✓" "$C_RESET" "$v"
+      else
+        printf "    %s%s%s %s %s(stale — no .wiki/wiki)%s\n" "$C_YELLOW" "!" "$C_RESET" "$v" "$C_DIM" "$C_RESET"
+      fi
+    done < "$REGISTRY_FILE"
+  else
+    printf "  %-30s %s%s%s\n" "registry" "$C_DIM" "none ($REGISTRY_FILE)" "$C_RESET"
   fi
 }

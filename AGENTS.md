@@ -155,6 +155,7 @@ The Python venv lives at `<vault>/.wiki/.venv/` (inside the engine, NOT at the v
 - Hooks run in **<10s** budget — no API calls, only file I/O. Heavy work goes to spawned background processes (`flush.py`, piggybacks).
 - `compile.py` and `query.py` use the Claude Agent SDK with `model=CONFIG.models.compile_model`. Other scripts use Ollama (configurable via `models.ollama_url`).
 - Every config write makes a `.bak.YYYYMMDD-HHMMSS`. Idempotent install/uninstall.
+- The engine writes **inside the vault and `.wiki/` only**, with one exception: when `skills.global_install` is on, `wiki skills install/sync` symlinks `use-llm-wiki` into `~/.claude/skills/` and records the vault root in `~/.config/llm-wiki/vaults` (the discovery registry the skill reads). Both writes fail soft — a missing global link is recoverable, a hard error on `wiki update` is not.
 
 ## Style
 

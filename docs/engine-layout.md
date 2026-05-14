@@ -91,6 +91,7 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 │   ├── engine-pr/SKILL.md
 │   ├── excalidraw-diagram/SKILL.md
 │   ├── ingest-audio/SKILL.md
+│   ├── use-llm-wiki/SKILL.md   ← global-eligible: also links into ~/.claude/skills/
 │   ├── vault-health-check/SKILL.md
 │   └── vault-triage/SKILL.md
 └── (gitignored runtime)

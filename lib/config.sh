@@ -30,7 +30,7 @@ _validate_url()          { [[ "$1" =~ ^https?:// ]] || { warn "Must start with h
 # Asks the 5 questions worth asking, writes answers to config.yaml.
 config_cmd_setup_wizard() {
   banner "wiki config — setup wizard" \
-    "5 questions. Skip with Enter to keep the current value."
+    "6 questions. Skip with Enter to keep the current value."
   echo
 
   # 1. Ollama URL
@@ -105,6 +105,18 @@ config_cmd_setup_wizard() {
   fi
 
   echo
+  # 6. Global skill install — make `use-llm-wiki` reachable from any project.
+  info "Global skill install links the 'use-llm-wiki' skill into ~/.claude/skills/"
+  info "so an agent working in *any* project can discover and query this wiki."
+  local global_default="n"
+  [[ "$(config_get skills.global_install)" == "True" ]] && global_default="y"
+  if confirm "Make this wiki's use-llm-wiki skill globally available?" "$global_default"; then
+    config_set skills.global_install true
+  else
+    config_set skills.global_install false
+  fi
+
+  echo
   ok "Wizard complete. Config written to $(config_path)."
 }
 
@@ -115,7 +127,7 @@ config_cmd_edit() {
   while :; do
     echo
     local section
-    section="$(select_one "Section" "models|scheduling|features|piggybacks|limits|graph_view|exit" 7)"
+    section="$(select_one "Section" "models|scheduling|features|piggybacks|limits|graph_view|skills|exit" 8)"
     [[ "$section" == "exit" ]] && break
 
     # Build the key list under this section.
@@ -170,6 +182,7 @@ config_cmd_status() {
   printf "%-40s %s\n" "features.curiosity_loop" "$(config_get features.curiosity_loop)"
   printf "%-40s %s\n" "features.vision_screenshots" "$(config_get features.vision_screenshots)"
   printf "%-40s %s\n" "features.procmail_execution" "$(config_get features.procmail_execution)"
+  printf "%-40s %s\n" "skills.global_install" "$(config_get skills.global_install)"
   echo
   if _probe_ollama "$(config_get models.ollama_url)"; then
     ok "Ollama reachable"

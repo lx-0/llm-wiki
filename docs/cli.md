@@ -58,9 +58,11 @@ Grouped by purpose. Run `wiki <cmd> --help` for the full per-command help block.
 | `wiki hooks uninstall` | remove wiki-managed hooks |
 | `wiki hooks status` | install table per agent / scope |
 | `wiki skills install` | symlink missing engine skills into `<vault>/.claude/skills/` |
+| `wiki skills install --global` | also link global-eligible skills (`use-llm-wiki`) into `~/.claude/skills/` and register the vault in `~/.config/llm-wiki/vaults`. Sets `skills.global_install: true` so the opt-in persists across `wiki update`. `--no-global` is the inverse. |
 | `wiki skills uninstall` | remove engine-owned symlinks (foreign skill entries kept untouched) |
-| `wiki skills sync` | install missing + prune stale (auto-called by `wiki update`) |
-| `wiki skills status` | per-skill `linked` / `collision` / `missing` table |
+| `wiki skills uninstall --global` | also remove this vault's global symlinks, deregister it, and set `skills.global_install: false` |
+| `wiki skills sync` | install missing + prune stale (auto-called by `wiki update`); also refreshes global symlinks when `skills.global_install` is on |
+| `wiki skills status` | per-skill `linked` / `collision` / `missing` table, plus a GLOBAL section (opt-in state, global link state, registered vaults) |
 
 ### Content pipeline
 
