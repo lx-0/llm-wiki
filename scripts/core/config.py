@@ -22,7 +22,8 @@ from dotenv import load_dotenv
 #   │   ├── scripts/        ← SCRIPTS_DIR
 #   │   │   └── core/       ← CORE_DIR (this file lives here)
 #   │   ├── hooks/          ← HOOKS_DIR
-#   │   ├── prompts/        ← (loaded by core/prompts.py)
+#   │   ├── prompts/        ← (render() templates, loaded by core/prompts.py)
+#   │   │   └── agents/     ← (agent-task specs, loaded by core/agent_spec.py)
 #   │   ├── config.yaml     ← (loaded by core/wiki_config.py)
 #   │   ├── state/          ← STATE_DIR (json hash trackers / cooldowns / dedup)
 #   │   ├── logs/           ← LOGS_DIR (flush + compile log output)
@@ -53,6 +54,7 @@ PROJECTS_DIR = KNOWLEDGE_DIR / "projects"
 FACTS_DIR = KNOWLEDGE_DIR / "facts"
 REPORTS_DIR = WIKI_DIR / "reports"  # engine output (lint + review-wiki); lives under .wiki/, not vault root
 HOOKS_DIR = WIKI_DIR / "hooks"
+AGENT_SPECS_DIR = WIKI_DIR / "prompts" / "agents"  # agent-task specs (*.md) — see core/agent_spec.py
 AGENTS_FILE = ROOT_DIR / "AGENTS.md"
 
 INDEX_FILE = KNOWLEDGE_DIR / "index.md"

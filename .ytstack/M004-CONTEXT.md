@@ -27,7 +27,7 @@ M — 3 slices planned. See `M004-ROADMAP.md` for slice breakdown.
 ## Decisions locked in discuss phase
 
 - 2026-05-02: chose combined Option 2+3 from triage (generic framework + ship summarize-day as the first concrete task) over either pure-bespoke (per-task Python scripts → script explosion) or pure-framework (plumbing without users). Prompt-as-config means the operator's editing surface is a single `.md` file per task.
-- 2026-05-02: tasks live in `prompts/agent_*.md` (not a separate `agents/` dir) so they sit alongside the existing prompt-rendering convention (`prompts.py` already does `${var}` substitution). New agent tasks reuse that pipeline.
+- 2026-05-02: tasks live in `prompts/agent_*.md` (not a separate `agents/` dir) so they sit alongside the existing prompt-rendering convention (`prompts.py` already does `${var}` substitution). New agent tasks reuse that pipeline. **Superseded 2026-05-14:** moved to `prompts/agents/<id>.md`. The stated rationale didn't hold — agent specs never used `prompts.py:render()`; they parse via `agent_spec.py` with their own `${var}` substitution (`AgentSpec.render_body`). A dedicated subfolder separates self-contained agent specs from `render()` template fragments. See DECISIONS.md 2026-05-14.
 - 2026-05-02: Dashboard button auto-wiring runs at `wiki seed` (idempotent merge), not at runtime (`wiki agent --list` is purely read-only). Operators ship the engine, then `wiki seed` to refresh button definitions.
 
 ## Open questions

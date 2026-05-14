@@ -43,7 +43,7 @@ llm-wiki/
 │   │   ├── ollama_client.py    ← single Ollama transport (chat / chat_schema / chat_vision)
 │   │   ├── sdk_helpers.py      ← StderrCapture + log_sdk_failure for Claude Agent SDK calls
 │   │   ├── utils.py            ← shared helpers (article listing, JSON state, history)
-│   │   ├── agent_spec.py       ← agent-task spec parser (prompts/agent_*.md → AgentSpec)
+│   │   ├── agent_spec.py       ← agent-task spec parser (prompts/agents/*.md → AgentSpec)
 │   │   └── flush_pipeline.py   ← staged-flush state machine (stage/commit/archive/pending)
 │   ├── collectors/         ← substrate→raw/ writers (Registry + scan-* CLIs + dispatcher)
 │   │   ├── base.py             ← Collector Protocol, SPEC, Registry
@@ -72,7 +72,7 @@ llm-wiki/
 │   │   ├── agent_buttons.py    ← agent-button discovery + dashboard.md rewriter
 │   │   └── inject_daily_button.py ← idempotent Summarize-button injection into daily/*.md
 │   ├── migrations/         ← one-shot schema/data migrations (not active CLI surface)
-│   ├── adapters/           ← MailboxReader implementations (gmail, thunderbird, allinkl)
+│   ├── adapters/           ← Mailbox Reader/Filter adapters (thunderbird, gmail, imap; allinkl = filter)
 │   ├── domain/             ← pure domain types (mail message, etc.)
 │   ├── compile.py          ← Claude Agent SDK compiler (raw/daily → knowledge/)
 │   ├── flush.py            ← session-end → daily/ append + piggyback spawner

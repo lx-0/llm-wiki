@@ -27,7 +27,7 @@ from core.agent_spec import (
 
 
 def _write_spec(dirpath: Path, slug: str, frontmatter: str, body: str = "Body") -> Path:
-    path = dirpath / f"agent_{slug}.md"
+    path = dirpath / f"{slug}.md"
     path.write_text(f"---\n{frontmatter.strip()}\n---\n\n{body}\n", encoding="utf-8")
     return path
 
@@ -109,7 +109,7 @@ def test_button_default_shell_command_id(tmp_path: Path) -> None:
 
 
 def test_parse_spec_no_frontmatter(tmp_path: Path) -> None:
-    path = tmp_path / "agent_bad.md"
+    path = tmp_path / "bad.md"
     path.write_text("just body, no fences\n")
     with pytest.raises(SpecError, match="frontmatter"):
         parse_spec(path)
@@ -197,7 +197,7 @@ def test_parse_spec_max_turns_out_of_range(tmp_path: Path) -> None:
 
 
 def test_parse_spec_malformed_yaml(tmp_path: Path) -> None:
-    path = tmp_path / "agent_yaml.md"
+    path = tmp_path / "yaml.md"
     path.write_text("---\nid: yaml\n  title: bad indent\nallowed_tools: [Read]\n---\nbody\n")
     with pytest.raises(SpecError, match="YAML"):
         parse_spec(path)
@@ -210,13 +210,14 @@ def test_list_specs_empty_dir(tmp_path: Path) -> None:
     assert list_specs(tmp_path) == []
 
 
-def test_list_specs_skips_non_agent_files(tmp_path: Path) -> None:
+def test_list_specs_skips_non_md_files(tmp_path: Path) -> None:
+    """Discovery globs `*.md` only — backup/sidecar files are ignored."""
     _write_spec(
         tmp_path, "real",
         "id: real\ntitle: R\nallowed_tools: [Read]",
     )
-    (tmp_path / "compile_main.md").write_text("not an agent")
-    (tmp_path / "agent_real.md.bak").write_text("backup file")
+    (tmp_path / "real.md.bak").write_text("backup file")
+    (tmp_path / "notes.txt").write_text("not markdown")
     specs = list_specs(tmp_path)
     assert [s.id for s in specs] == ["real"]
 

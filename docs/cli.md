@@ -105,7 +105,7 @@ Grouped by purpose. Run `wiki <cmd> --help` for the full per-command help block.
 
 | Command | What it does |
 |---|---|
-| `wiki agent --list` | list registered tasks (one per `prompts/agent_<id>.md`) |
+| `wiki agent --list` | list registered tasks (one per `prompts/agents/<id>.md`) |
 | `wiki agent <id>` | spawn Claude Agent SDK with the model / `allowed_tools` / `permission_mode` / `max_turns` / `cwd` declared in the task's frontmatter. Result logged to `.wiki/logs/agent-<id>-<ts>.log`; on success the prompt's frontmatter gets `last_run: <iso-ts>` written back. |
 | `wiki agent <id> --dry-run` | resolve + print the spec without spawning |
 | `wiki agent <id> --var key=value` | substitute `${key}` in the prompt body (repeatable) |

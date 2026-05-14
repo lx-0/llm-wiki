@@ -1,6 +1,6 @@
 """Discovery + auto-wiring helpers for agent-task Dashboard buttons.
 
-Walks `prompts/agent_*.md` for specs that declare a `button:` block, and
+Walks `prompts/agents/*.md` for specs that declare a `button:` block, and
 emits the data needed by `lib/seed.sh` to:
 
   1. merge entries into `.obsidian/plugins/obsidian-shellcommands/data.json`
@@ -25,16 +25,14 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from core.agent_spec import AgentSpec, parse_spec
-from core.config import WIKI_DIR
-
-PROMPTS_DIR = WIKI_DIR / "prompts"
+from core.config import AGENT_SPECS_DIR
 
 
 def discover() -> list[AgentSpec]:
     specs: list[AgentSpec] = []
-    if not PROMPTS_DIR.exists():
+    if not AGENT_SPECS_DIR.exists():
         return specs
-    for path in sorted(PROMPTS_DIR.glob("agent_*.md")):
+    for path in sorted(AGENT_SPECS_DIR.glob("*.md")):
         try:
             spec = parse_spec(path)
         except Exception as exc:
@@ -127,7 +125,7 @@ def update_dashboard(dashboard_path: Path) -> bool:
 
     refs = inline_refs()
     if not refs:
-        refs = "_(no agent buttons declared yet — drop a `prompts/agent_<id>.md` with a `button:` block.)_"
+        refs = "_(no agent buttons declared yet — drop a `prompts/agents/<id>.md` with a `button:` block.)_"
     defs = meta_bind_blocks()
 
     text = _replace_region(

@@ -106,7 +106,7 @@ Lint check inventory (in execution order in `lint.py`):
 | Dashboard.md (Obsidian Homepage) | 🟢 | `templates/dashboard.md`, `lib/seed.sh:seed_vault_templates` | Seeded on install / `wiki seed` | PROCESS §11, README |
 | Dashboard stats refresh (`_dashboard-stats.md`) | 🟢 | `scripts/dashboard/dashboard_stats.py` | Synchronous post-flush in `flush.py:refresh_dashboard_stats` + `wiki compile / lint / seed / correct` shell-wrapper helpers | PROCESS §11 |
 | Dashboard lint refresh (`_dashboard-lint.md`) | 🟢 | `scripts/dashboard/dashboard_lint.py` | Synchronous post-flush in `flush.py:refresh_dashboard_lint`; same shell-wrapper helpers | PROCESS §11 |
-| Agent-button auto-wiring | 🟢 | `scripts/dashboard/agent_buttons.py`, `lib/seed.sh:_merge_agent_shell_commands` + `_rewrite_dashboard_agent_buttons` | `wiki seed` discovers `prompts/agent_*.md` with `button:` block, merges shell-commands data.json, rewrites marker regions in dashboard.md | PROCESS §13, M004 |
+| Agent-button auto-wiring | 🟢 | `scripts/dashboard/agent_buttons.py`, `lib/seed.sh:_merge_agent_shell_commands` + `_rewrite_dashboard_agent_buttons` | `wiki seed` discovers `prompts/agents/*.md` with `button:` block, merges shell-commands data.json, rewrites marker regions in dashboard.md | PROCESS §13, M004 |
 | Daily-button injection | 🟢 | `scripts/dashboard/inject_daily_button.py` | `uv run python scripts/dashboard/inject_daily_button.py` | — |
 | Maps of Content (MOCs) | 🟢 | `knowledge/MOCs/*.md`, templates in `templates/knowledge/MOCs/`, `scripts/pin.py` | `wiki seed` seeds `people.md` / `projects.md` / `concepts.md` stubs; operator adds wikilinks | PROCESS §11 MOC subsection |
 | `wiki pin` (article → MOC section) | 🟢 | `scripts/pin.py` | `wiki pin <article> [--section "Name"] [--moc people] [--summary "X"]` | PROCESS §11 |
@@ -126,9 +126,9 @@ Lint check inventory (in execution order in `lint.py`):
 | Feature | Status | Code | Trigger | Docs |
 |---|---|---|---|---|
 | Generic agent runner | 🟢 | `scripts/agent_task.py`, spec parser `scripts/core/agent_spec.py` | `wiki agent <id>`, `wiki agent --list`, `wiki agent <id> --dry-run`, `wiki agent <id> --var key=value` | PROCESS §13, M004 |
-| `summarize-day` task | 🟢 | `prompts/agent_summarize-day.md` | `wiki agent summarize-day --var date=YYYY-MM-DD` | M004-S02 |
+| `summarize-day` task | 🟢 | `prompts/agents/summarize-day.md` | `wiki agent summarize-day --var date=YYYY-MM-DD` | M004-S02 |
 
-Currently 1 agent task ships. Adding a new task = drop `prompts/agent_<id>.md` with frontmatter spec + optional `button:` block. No engine code change required.
+Currently 1 agent task ships. Adding a new task = drop `prompts/agents/<id>.md` with frontmatter spec + optional `button:` block. No engine code change required.
 
 ## Lifecycle CLI
 

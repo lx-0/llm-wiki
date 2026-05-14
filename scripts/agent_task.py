@@ -1,6 +1,6 @@
 """Generic agent-task runner.
 
-Reads `prompts/agent_<id>.md`, parses the task spec, spawns Claude Agent SDK
+Reads `prompts/agents/<id>.md`, parses the task spec, spawns Claude Agent SDK
 with declared model + tools + permissions, persists the result to a log,
 and updates the spec's `last_run:` frontmatter on success.
 
@@ -33,7 +33,7 @@ from claude_agent_sdk import (
 import time
 
 from core.agent_spec import AgentSpec, SpecError, list_specs, parse_spec
-from core.config import LOGS_DIR, WIKI_DIR, now_iso, today_iso
+from core.config import AGENT_SPECS_DIR, LOGS_DIR, now_iso, today_iso
 from core.wiki_config import CONFIG  # noqa: E402
 from core.sdk_helpers import StderrCapture, log_sdk_failure  # noqa: E402
 
@@ -43,8 +43,6 @@ logging.basicConfig(
     datefmt="%Y-%m-%dT%H:%M:%S",
 )
 log = logging.getLogger("agent-task")
-
-PROMPTS_DIR = WIKI_DIR / "prompts"
 
 
 def _resolve_model(spec: AgentSpec) -> str:
@@ -165,14 +163,14 @@ async def run(spec: AgentSpec, dry_run: bool, extra_vars: dict[str, str]) -> int
 def cmd_list() -> int:
     specs: list[AgentSpec] = []
     errors: list[tuple[Path, Exception]] = []
-    for path in sorted(PROMPTS_DIR.glob("agent_*.md")):
+    for path in sorted(AGENT_SPECS_DIR.glob("*.md")):
         try:
             specs.append(parse_spec(path))
         except Exception as exc:
             errors.append((path, exc))
 
     if not specs and not errors:
-        print("(no agent tasks defined yet — drop prompts/agent_<id>.md files to add them)")
+        print("(no agent tasks defined yet — drop prompts/agents/<id>.md files to add them)")
         return 0
 
     width = max((len(s.id) for s in specs), default=20)
@@ -192,7 +190,7 @@ def cmd_list() -> int:
 
 async def main_async() -> int:
     parser = argparse.ArgumentParser(description="Run an agentic task.")
-    parser.add_argument("id", nargs="?", help="task id (matches prompts/agent_<id>.md)")
+    parser.add_argument("id", nargs="?", help="task id (matches prompts/agents/<id>.md)")
     parser.add_argument("--list", action="store_true", help="list available tasks")
     parser.add_argument("--dry-run", action="store_true", help="resolve + print spec without spawning")
     parser.add_argument(
@@ -207,7 +205,7 @@ async def main_async() -> int:
     if not args.id:
         parser.error("expected task id (or --list)")
 
-    spec_path = PROMPTS_DIR / f"agent_{args.id}.md"
+    spec_path = AGENT_SPECS_DIR / f"{args.id}.md"
     try:
         spec = parse_spec(spec_path)
     except SpecError as exc:

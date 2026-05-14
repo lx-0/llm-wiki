@@ -1,10 +1,10 @@
 """Agent-task spec parser.
 
-A "task spec" lives in `prompts/agent_<id>.md`. The YAML frontmatter declares
+A "task spec" lives in `prompts/agents/<id>.md`. The YAML frontmatter declares
 how to invoke the Claude Agent SDK; the body is the prompt with optional
 `${var}` placeholders.
 
-See `.ytstack/M004-CONTEXT.md` and `prompts/agent_summarize-day.md` for the
+See `.ytstack/M004-CONTEXT.md` and `prompts/agents/summarize-day.md` for the
 full schema and a reference example.
 """
 
@@ -158,12 +158,13 @@ def parse_spec(path: Path) -> AgentSpec:
     return spec
 
 
-def list_specs(prompts_dir: Path) -> list[AgentSpec]:
-    """Scan `prompts/agent_*.md` and return all valid specs.
+def list_specs(specs_dir: Path) -> list[AgentSpec]:
+    """Scan `prompts/agents/*.md` and return all valid specs.
 
-    Invalid specs raise — keep validation strict so operators see breakage early.
+    Every `.md` in the dir is treated as an agent spec — invalid ones raise,
+    keeping validation strict so operators see breakage early.
     """
     specs: list[AgentSpec] = []
-    for path in sorted(prompts_dir.glob("agent_*.md")):
+    for path in sorted(specs_dir.glob("*.md")):
         specs.append(parse_spec(path))
     return specs

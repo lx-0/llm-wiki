@@ -72,7 +72,7 @@ Full key-by-key config reference: [`.wiki/docs/config.md`](.wiki/docs/config.md)
 ./.wiki/wiki config set scheduling.compile_after_hour 20
 ./.wiki/wiki hooks status                      # which agents are wired
 ./.wiki/wiki collect --list                    # registered collectors
-./.wiki/wiki agent --list                      # agentic-task definitions in prompts/agent_*.md
+./.wiki/wiki agent --list                      # agentic-task definitions in prompts/agents/*.md
 ./.wiki/wiki lint --structural-only            # free vault-health sweep
 ```
 

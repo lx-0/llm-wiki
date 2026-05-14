@@ -33,7 +33,7 @@ Zwei fundamental getrennte Ingest-Pfade konvergieren bei `compile.py`:
 | [10](#10-screenshot-scanner) | Screenshot Scanner | `~/Screenshots/` → Vision-LLM → `raw/notes/` | piggyback (lokal-only) |
 | [11](#11-vault-ux-layer-dashboard--mocs) | Vault UX Layer | Dashboard.md (Auto-Open) + `_dashboard-stats.md` Refresh + MOCs (in Arbeit) | nach jedem Flush (synchron) |
 | [12](#12-hard-facts-corrections) | Hard Facts (Corrections) | `wiki correct` schreibt `knowledge/facts/<slug>.md` → injected in compile/query/lint; `apply` propagiert agentisch über `knowledge/`+`daily/` | manuell (`wiki correct add` / `wiki correct apply`) |
-| [13](#13-agent-tasks) | Agent Tasks | `prompts/agent_<id>.md` declares Claude Agent SDK config (model + tools + permission + button) per task. `wiki agent <id>` runs it. Dashboard buttons auto-wired via `wiki seed`. | manuell oder per Dashboard-Button |
+| [13](#13-agent-tasks) | Agent Tasks | `prompts/agents/<id>.md` declares Claude Agent SDK config (model + tools + permission + button) per task. `wiki agent <id>` runs it. Dashboard buttons auto-wired via `wiki seed`. | manuell oder per Dashboard-Button |
 
 ---
 
@@ -352,7 +352,7 @@ flowchart LR
 
 | Scanner | Pattern | Quelle | Daten | Output |
 |---------|---------|--------|-------|--------|
-| `collectors/email_collector.py` | Collector Registry | Mailbox-Adapter (Thunderbird mbox, Gmail API, All-Inkl IMAP) via `adapters/mailbox/resolve_reader` | Zwei Modi: **Full-Sweep** (`wiki collect email`) = Metadata-Overview pro Account. **Incremental** (täglicher Piggyback, `--incremental`) = nur Mails neuer als der Per-Account-Watermark in `state/email-state.json`, als Delta-Report (Per-Message-Zeilen: Datum · Sender · Betreff, nach Ordner gruppiert). Mails ohne parsebaren Date-Header werden im Delta-Modus übersprungen (sonst würden sie in jedem Lauf neu gemeldet). Erster Incremental-Lauf pro Account = Baseline (Watermark gesetzt, kein Report — der Einmal-Bulk-Ingest wird nicht erneut ausgegeben). | `raw/notes/email/<account>-<date>.md` (full) · `raw/notes/email/<account>-delta-<ts>.md` (delta) |
+| `collectors/email_collector.py` | Collector Registry | Mailbox-Adapter (Thunderbird mbox, Gmail API, generic IMAP) via `adapters/mailbox/resolve_reader` | Zwei Modi: **Full-Sweep** (`wiki collect email`) = Metadata-Overview pro Account. **Incremental** (täglicher Piggyback, `--incremental`) = nur Mails neuer als der Per-Account-Watermark in `state/email-state.json`, als Delta-Report (Per-Message-Zeilen: Datum · Sender · Betreff, nach Ordner gruppiert). Mails ohne parsebaren Date-Header werden im Delta-Modus übersprungen (sonst würden sie in jedem Lauf neu gemeldet). Erster Incremental-Lauf pro Account = Baseline (Watermark gesetzt, kein Report — der Einmal-Bulk-Ingest wird nicht erneut ausgegeben). | `raw/notes/email/<account>-<date>.md` (full) · `raw/notes/email/<account>-delta-<ts>.md` (delta) |
 | `collectors/jamie.py` | Collector Registry | Jamie AI public tRPC API (`beta-api.meetjamie.ai`, `x-api-key` auth) | Pro Meeting ein Markdown-File: frontmatter (id, participants, tags, calendar event) + Jamie-LLM-Summary verbatim + Action-Items als Obsidian-Tasks + Speaker-diarisierter Transcript (`**Name** [mm:ss] — text`). Skip-existing per `meeting_id`; incremental via `last_seen_ts` state. | `raw/transcripts/jamie/<date>--<slug>--<short-id>.md` |
 | `collectors/scan_calendar.py` | Collector Registry | Thunderbird calendar SQLite | Hunderte bis tausende Events, Attendees, Kategorien. `--year` ist CLI-only. | `raw/notes/calendar/` |
 | `collectors/scan_browser.py` | Collector Registry | Firefox places.sqlite + STG + Chrome | Tausende Tabs, Bookmarks, zehntausende Visits. Multi-source, ein Collector. `--source` ist CLI-only. | `raw/notes/browser/` |
@@ -369,15 +369,17 @@ flowchart LR
 
 ### Email Collector — Multi-Backend Metadata-Sweep
 
-Der `email`-Collector iteriert über `CONFIG.personal.accounts` und resolvet pro Account einen `MailboxReader` via `adapters/mailbox/resolve_reader`. Adapter-Implementierungen liegen in `scripts/adapters/mailbox/`:
+Der `email`-Collector iteriert über `CONFIG.personal.accounts` und resolvet pro Account einen `MailboxReader` via `adapters/mailbox/resolve_reader`. Reader-Adapter liegen in `scripts/adapters/mailbox/`:
 
-| Adapter | `reader.kind` | Datenquelle |
-|---------|---------------|-------------|
-| `thunderbird.py` | `thunderbird_mbox` | Lokale Thunderbird mbox-Dateien (Python `mailbox`-Modul, kein IMAP nötig) |
-| `gmail.py` | `gmail_api` | Gmail API (OAuth2 via `gmail-oauth-client.json` → `state/gmail-token-<id>.json`) |
-| `allinkl.py` | `allinkl_imap` | All-Inkl IMAP über `imapclient` (procmail-fähig via Webmail API) |
+| Adapter | `reader.kind` | Datenquelle | Credential |
+|---------|---------------|-------------|------------|
+| `thunderbird.py` | `thunderbird-mbox` | Lokale Thunderbird mbox-Dateien (Python `mailbox`-Modul) | keins — der Mail-Client besitzt die Auth |
+| `gmail.py` | `gmail-api` | Gmail API (OAuth2 via `gmail-oauth-client.json` → `state/gmail-token-<id>.json`) | OAuth-Token |
+| `imap.py` | `imap` | Beliebiger IMAP-Host via `imapclient`, für Accounts ohne lokalen Client und ohne GCP-Projekt | App-Passwort in env var (`reader.imap_pass_env`) |
 
-Output ist pro Account ein Markdown-Report mit Headers (From/To/Subject/Date) und einer Kategorie-Aufschlüsselung. Bei `--incremental` werden nur Accounts gescannt deren Mailbox-State sich seit dem letzten Lauf geändert hat (Adapter-spezifischer Marker: mbox-size für Thunderbird, message-id-watermark für IMAP-Backends).
+(`allinkl.py` ist ein **Filter**-Adapter, kein Reader — Write-Seite, `filter.kind: all-inkl-procmail`.)
+
+Bei `--incremental` läuft jeder Account gegen seinen Per-Account-Watermark (`last_run_ts` in `state/email-state.json`): der Reader bekommt `since=` durchgereicht und liefert nur neuere Mails (Thunderbird filtert mbox-seitig, Gmail via `after:`-Query, IMAP via `SEARCH SINCE` + präziser Python-Nachfilter). Output ist pro Account ein Delta-Report (Per-Message-Zeilen). Full-Sweep (`wiki collect email` ohne `--incremental`) liefert stattdessen den aggregierten Overview pro Account. Siehe Scanner-Tabelle oben für die Modus-Details.
 
 > **Deep-Scan** läuft heute über das `curiosity/`-Subsystem (`scripts/curiosity/backends/email.py`), getriggert durch eine pending Request in `raw/requests/`. Der Email-Collector selbst macht nur den Metadata-Sweep; der Body-Lese-Pfad wandert pro Anfrage durch den Curiosity-Konsumenten. Siehe §7 (Curiosity Loop).
 
@@ -1056,7 +1058,7 @@ Was passiert:
 
 ```mermaid
 flowchart TD
-    DROP["📝 prompts/agent_<id>.md\n(YAML frontmatter + prompt body)"]
+    DROP["📝 prompts/agents/<id>.md\n(YAML frontmatter + prompt body)"]
     DROP --> SEED["wiki seed"]
     SEED --> SC["additive merge in\n.obsidian/plugins/\nobsidian-shellcommands/data.json"]
     SEED --> DASH["rewrite agent-buttons\nregions in dashboard.md\n(marker-based, idempotent)"]
@@ -1075,7 +1077,7 @@ flowchart TD
 
 ### Anatomie einer Task-Definition
 
-`prompts/agent_<id>.md`:
+`prompts/agents/<id>.md`:
 
 ```yaml
 ---
@@ -1117,7 +1119,7 @@ Operator-bereitgestellt via `wiki agent <id> --var key=value` (repeatable).
 
 ### Auto-Wiring durch `wiki seed`
 
-`scripts/dashboard/agent_buttons.py` discovered alle `prompts/agent_*.md` mit `button:` Frontmatter. `lib/seed.sh` ruft das auf zwei Pfaden:
+`scripts/dashboard/agent_buttons.py` discovered alle `prompts/agents/*.md` mit `button:` Frontmatter. `lib/seed.sh` ruft das auf zwei Pfaden:
 
 1. **Shell-Commands additiver Merge:** `_merge_agent_shell_commands()` jq-merged neue `agent-<id>` Einträge in `.obsidian/plugins/obsidian-shellcommands/data.json`. Bestehende User-Einträge bleiben.
 2. **Dashboard Region-Replace:** `_rewrite_dashboard_agent_buttons()` ersetzt zwei marker-begrenzte Bereiche in `dashboard.md`:

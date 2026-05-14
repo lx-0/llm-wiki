@@ -16,12 +16,12 @@ import pytest
 from core.agent_spec import parse_spec
 
 
-PROMPTS_DIR = Path(__file__).resolve().parent.parent / "prompts"
+AGENT_SPECS_DIR = Path(__file__).resolve().parent.parent / "prompts" / "agents"
 
 
 def test_summarize_day_spec_loads() -> None:
-    """The shipped prompts/agent_summarize-day.md must be a valid spec."""
-    spec = parse_spec(PROMPTS_DIR / "agent_summarize-day.md")
+    """The shipped prompts/agents/summarize-day.md must be a valid spec."""
+    spec = parse_spec(AGENT_SPECS_DIR / "summarize-day.md")
     assert spec.id == "summarize-day"
     assert spec.model == "claude-haiku-4-5"
     assert "Read" in spec.allowed_tools
@@ -32,7 +32,7 @@ def test_summarize_day_spec_loads() -> None:
 
 def test_summarize_day_body_renders_with_today() -> None:
     """${today} placeholder gets substituted into the prompt body."""
-    spec = parse_spec(PROMPTS_DIR / "agent_summarize-day.md")
+    spec = parse_spec(AGENT_SPECS_DIR / "summarize-day.md")
     rendered = spec.render_body(today="2026-05-02", now="2026-05-02T10:00:00+02:00")
     assert "daily/2026-05-02.md" in rendered
     assert "${today}" not in rendered
@@ -45,8 +45,8 @@ def test_summarize_day_runs_against_fixture(
     """End-to-end smoke: spec resolution → mocked SDK → log persistence → last_run update."""
     import agent_task
 
-    spec_src = (PROMPTS_DIR / "agent_summarize-day.md").read_text(encoding="utf-8")
-    spec_copy = tmp_path / "agent_summarize-day.md"
+    spec_src = (AGENT_SPECS_DIR / "summarize-day.md").read_text(encoding="utf-8")
+    spec_copy = tmp_path / "summarize-day.md"
     spec_copy.write_text(spec_src, encoding="utf-8")
     spec = parse_spec(spec_copy)
 

@@ -35,7 +35,7 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 │   │   ├── ollama_client.py       ← single Ollama transport (chat / chat_schema / chat_vision)
 │   │   ├── sdk_helpers.py         ← StderrCapture + log_sdk_failure for Claude Agent SDK
 │   │   ├── utils.py               ← shared helpers (article listing, JSON state, history)
-│   │   ├── agent_spec.py          ← agent-task spec parser (prompts/agent_*.md → AgentSpec)
+│   │   ├── agent_spec.py          ← agent-task spec parser (prompts/agents/*.md → AgentSpec)
 │   │   └── flush_pipeline.py      ← staged-flush state machine (stage / commit / archive / pending)
 │   ├── collectors/            ← substrate→raw/ writers (Registry + scan-* CLIs + dispatcher)
 │   │   ├── base.py                ← Collector Protocol, SPEC, Registry
@@ -68,7 +68,7 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 │   ├── flush.py               ← session-end → daily/ append + piggyback spawner
 │   ├── lint.py                ← 8 structural checks + 1 LLM contradiction check
 │   ├── query.py               ← Claude Agent SDK natural-language query (read-only / file-back)
-│   ├── agent_task.py          ← generic Claude Agent SDK runner for prompts/agent_*.md
+│   ├── agent_task.py          ← generic Claude Agent SDK runner for prompts/agents/*.md
 │   ├── clippings_sweep.py     ← <vault>/Clippings/ → raw/articles/ (pre-compile lift)
 │   ├── ingest-html.py         ← HTML file or URL → text + visual (Playwright + Vision LLM)
 │   ├── process-inbox.py       ← <vault>/inbox/ → classify + move to raw/ subfolder

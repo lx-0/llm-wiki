@@ -155,7 +155,7 @@ _merge_appearance_json() {
 
 
 # ── Internal: merge agent-task buttons into shell-commands data.json ──
-# For every prompts/agent_*.md declaring a `button:` block, ensure a matching
+# For every prompts/agents/*.md declaring a `button:` block, ensure a matching
 # entry exists in <vault>/.obsidian/plugins/obsidian-shellcommands/data.json
 # under the spec's shell_command_id. Additive merge — operator's other shell
 # commands are preserved, never modified. Idempotent.
@@ -301,7 +301,7 @@ seed_vault_templates() {
   # 9. .claude/.env.example — secrets template (catalogue of recognised env vars).
   _seed_file "$templates_dir/.claude/.env.example" "$target/.claude/.env.example" "$force" ".claude/.env.example" "$check"
 
-  # 10. Agent-task auto-wiring — discovered from prompts/agent_*.md `button:` frontmatter.
+  # 10. Agent-task auto-wiring — discovered from prompts/agents/*.md `button:` frontmatter.
   #     Skipped in check mode (these are destructive merges + dashboard rewrites).
   if [[ "$check" != "1" ]]; then
     _merge_agent_shell_commands "$target" "$wiki_dir"
