@@ -173,7 +173,7 @@ personal:
       email: alex@example.com           # required — used in prompts + reports
       label: "Work"                     # optional — display label
       reader:
-        kind: thunderbird-mbox          # thunderbird-mbox | gmail-api
+        kind: thunderbird-mbox          # thunderbird-mbox | gmail-api | imap
         mbox_paths:                     # relative to thunderbird_profile
           - ImapMail/server/INBOX.mbox
       filter:
@@ -185,7 +185,13 @@ personal:
 
 `reader.kind` and `filter.kind` dispatch independently — an account can read via Thunderbird mbox and write filter rules via All-Inkl Procmail (the legacy hybrid). Unknown kinds are silently skipped (graceful agnostic).
 
-The pre-M002 flat-account schema (`mbox_paths`, `imap_host`, `has_procmail` directly on the account) is rejected at config load with an explicit migration error.
+**Reader kinds:**
+
+- `thunderbird-mbox` — reads local mbox files a Thunderbird profile already synced. No credentials in the engine; the mail client owns auth. Keys: `mbox_paths` (relative to `personal.thunderbird_profile`).
+- `gmail-api` — Gmail API over OAuth2. Needs an OAuth client at `.claude/gmail-oauth-client.json` and a one-time `wiki gmail-auth <id>`. No extra `reader` keys.
+- `imap` — generic IMAP, for accounts with **no local client and no Google Cloud project**. Auth is an IMAP login with a username + **app password** (Gmail: enable 2FA, then generate an App Password). Keys: `imap_host` (required), `imap_pass_env` (required — env-var *name* holding the password), `imap_user_env` (optional — env-var name for the username; omit → falls back to `account.email`), `folders` (optional list — only scan these; omit → all folders).
+
+The pre-M002 flat-account schema (`mbox_paths`, `imap_host`, `has_procmail` directly on the account) is rejected at config load with an explicit migration error. Note this only rejects those keys at the *account* level — nested inside `reader:` / `filter:` they are the normal schema.
 
 ### Jamie (single-tenant)
 

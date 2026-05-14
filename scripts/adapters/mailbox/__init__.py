@@ -12,7 +12,8 @@ Currently registered:
 | thunderbird-mbox     | ThunderbirdMboxReader   | (use other filter kind) |
 | thunderbird-msgfilter| —                       | ThunderbirdMsgFilter    |
 | all-inkl-procmail    | —                       | AllInklProcmailFilter   |
-| gmail-api            | (S03 — GmailReader)     | GmailFilter             |
+| gmail-api            | GmailReader             | GmailFilter             |
+| imap                 | ImapReader              | —                       |
 
 Read-side (`reader.kind`) and write-side (`filter.kind`) dispatch are
 INDEPENDENT — an account can read via Thunderbird mbox and write filter
@@ -51,6 +52,21 @@ def resolve_reader(account: dict[str, Any]) -> MailboxReader | None:
         from .gmail import GmailReader
 
         return GmailReader(account_id=account_id)
+
+    if kind == "imap":
+        from .imap import ImapReader
+
+        # Env-var *names* only — ImapReader reads os.environ at connect time,
+        # same discipline as AllInklProcmailFilter. default_user falls back
+        # to account.email when imap_user_env is unset (Gmail: user == email).
+        return ImapReader(
+            account_id,
+            host=reader_cfg.get("imap_host", ""),
+            pass_env=reader_cfg.get("imap_pass_env", ""),
+            user_env=reader_cfg.get("imap_user_env", ""),
+            default_user=account.get("email", ""),
+            folders=reader_cfg.get("folders") or None,
+        )
 
     log.warning(
         "resolve_reader: unknown kind=%r for account=%r — account will be skipped",

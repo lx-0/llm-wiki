@@ -123,7 +123,7 @@ Format for each entry:
 **Options considered:** (A) one Python script per task, (B) generic runner with prompt-as-config (`prompts/agent_<id>.md` declares model + tools + permission + button), (C) build into a heavier "agent definition" YAML separate from prompts/.
 **Chose:** B.
 **Reason:** Single editing surface per task — operator drops a markdown file with frontmatter + body. Reuses the existing `prompts/` directory pattern. No engine code change to add a task. Auto-wiring via `wiki seed` (jq additive merge for shell-commands, marker-based region rewrite for dashboard.md) keeps button registration data-driven too.
-**Linked artifacts:** `scripts/agent_spec.py`, `scripts/agent_task.py`, `scripts/agent_buttons.py`, `prompts/agent_summarize-day.md`, `lib/seed.sh:_merge_agent_shell_commands`, `lib/seed.sh:_rewrite_dashboard_agent_buttons`, `wiki agent` subcommand.
+**Linked artifacts:** `scripts/agent_spec.py`, `scripts/agent_task.py`, `scripts/agent_buttons.py`, `prompts/agents/summarize-day.md`, `lib/seed.sh:_merge_agent_shell_commands`, `lib/seed.sh:_rewrite_dashboard_agent_buttons`, `wiki agent` subcommand.
 
 ## 2026-05-02: Marker-based region replace as the "rewriteable section" pattern
 
@@ -376,3 +376,34 @@ The compact form is computed at runtime from `knowledge/index.md` (Python helper
 1. **Undated messages leaked into every delta.** `ThunderbirdMboxReader` filtered `date < since` but let `date is None` pass — the legacy `scan-email.py` had explicitly skipped undated mail in delta mode. Without the skip, every message with an unparseable Date header re-reports forever. Fixed in `_iter_metadata` + `_iter_deep`: `since is not None and (date is None or date < since)`.
 2. **Delta report was too thin to compile from.** It emitted only folder/count/date-range/top-sender aggregates — `MessageMeta.subject` was carried through the pipeline then discarded. A delta is a bounded set (unlike the 50k-message full sweep), so `_render_delta_report` now lists each message as `date · sender · subject`. The subject is the highest-signal field and the only thing the compiler can meaningfully distil.
 The full-sweep `_render_report` is unchanged — aggregation is still correct there because a full mailbox can't be listed line-by-line.
+
+
+## 2026-05-14: IMAP reader — the no-local-client, no-GCP-project mailbox path
+
+**Context:** The mailbox-collector architecture had two reader kinds: `thunderbird-mbox` (reads what a local mail client already synced — zero credentials in the engine) and `gmail-api` (Gmail API + OAuth). A colleague who runs **no local mail client** and is on a **personal `@gmail.com`** is served by neither: `thunderbird-mbox` has nothing to read, and `gmail-api` dead-ends because end users won't create a Google Cloud project — and a borrowed/sample `client_secret.json` gets hard-blocked by Google ("Diese App ist blockiert"). The wiki is internal-user-only; many colleagues are exactly this cloud-only-Gmail, no-local-client case.
+
+**Research (2026-05, see `.ytstack/backlog/imap-reader-and-gmail-strategy.md`):** Basic-auth over IMAP is dead since 2025. App passwords still work for **consumer `@gmail.com`** (not Workspace) with 2FA — the standard no-GCP-project, no-local-client path, though on Google's slow deprecation watch. Email clients "just work" because they ship a pre-registered, Google-verified OAuth client; a small tool can't replicate that for the restricted `https://mail.google.com/` scope without Google's security assessment. An OAuth app with User Type **"Internal"** skips verification entirely — but only for members of the owning Workspace.
+
+**Options considered:** (A) generic `imap` reader + app password. (B) ship one verified OAuth client with the engine — needs Google's restricted-scope security assessment, annual cost, project-level maintenance. (C) one shared **"Internal"** OAuth app owned by the org — clean for Workspace colleagues, but doesn't cover personal `@gmail.com`, and is org-process not engine code. (D) SaaS OAuth broker (Composio etc.) — adds a third party + their cloud to the data path, antithetical to the local/no-cloud ethos.
+
+**Chose:** A for the engine change (covers the immediate audience: cloud-only personal Gmail + any plain IMAP host). C documented as the org-side path for Workspace colleagues (no engine work — the existing `gmail-api` reader already supports it; what was wrong before was the borrowed `client_secret.json`, not the approach). B and D rejected.
+
+**Reason:** A keeps the engine's "no cloud, credentials are env-var names only" discipline — `config.yaml` carries `imap_pass_env` (a name), the app password lives in `.claude/.env`, exactly like the existing `all-inkl-procmail` filter. It works *today* for the colleagues who are blocked *today*. C is the cleaner long-term answer for Workspace users but it's org bureaucracy, not something the engine can ship.
+
+**Design:** New `scripts/adapters/mailbox/imap.py` — `ImapReader` implements the existing `MailboxReader` Protocol unchanged (`list_folders` / `scan_metadata` / `scan_deep`), so `EmailCollector`, `collectors/cli.py`, and the curiosity deep-scan consume it without edits. Stateless: connect → `SEARCH` → batched `FETCH` → logout per call. `since` pushed to the server via IMAP `SEARCH SINCE` (date-granular) then re-filtered in Python against the precise watermark — and undated messages skipped in delta mode, the same rule as `ThunderbirdMboxReader` (KNOWLEDGE.md). `IMAPClient(normalise_times=False)` keeps timestamps tz-aware. Optional `folders` allowlist scopes Gmail's `[Gmail]/All Mail` double-count away. `imapclient>=3.0.0` was already a dependency.
+
+**Linked artifacts:** New `adapters/mailbox/imap.py`; `adapters/mailbox/__init__.py` (`kind: imap` dispatch + kind-table); `config.example.yaml` + `templates/.claude/.env.example` (imap reader example, `IMAP_<ACCOUNT>_PASS` convention); `tests/test_imap_reader.py` (7 tests — Protocol conformance, MessageMeta build, since+undated filter, folder allowlist, graceful no-creds / login-failure, resolve_reader dispatch); 195/195 pass. lxw `config.yaml` reconfigures `gmail-personal` from `gmail-api` → `imap`. `.ytstack/backlog/imap-reader-and-gmail-strategy.md` carries the concept + the org-side "Internal OAuth app" strategy.
+
+**Operator follow-up:** lxw `gmail-personal` needs `IMAP_GMAIL_PERSONAL_PASS` set in `.claude/.env` to a Google App Password (2FA must be enabled on the account first). Until then the account is a graceful no-op (warning logged, nothing scanned).
+
+
+## 2026-05-14: Agent specs move to `prompts/agents/` subfolder
+
+**Context:** M004 placed agent-task specs flat in `prompts/` as `agent_<id>.md`. M004-CONTEXT.md justified the flat layout by "they sit alongside the prompt-rendering convention and reuse `prompts.py`'s `${var}` pipeline" — but that rationale never matched the implementation: agent specs are parsed by `agent_spec.py` and do their own `${var}` substitution in `AgentSpec.render_body()`. `prompts.py:render()` is never involved. So `prompts/` was holding two unrelated artifact kinds — `render()` template fragments (`compile_main.md`, `flush_extract.md`, …) and self-contained, frontmatter-declared, independently-runnable agent specs.
+
+**Options considered:** (A) leave flat, keep `agent_` prefix. (B) move to `prompts/agents/<id>.md`, drop the now-redundant prefix. (C) move *and* realign frontmatter to the generic Claude-Code subagent format (`name`/`tools`/`model`).
+
+**Chose:** B.
+**Reason:** A dedicated subfolder cleanly separates the two artifact kinds; the folder name carries the semantic, so the `agent_` filename prefix is redundant. C was rejected — the spec format is a deliberate superset (`button`, `cwd`, `last_run`, `shell_command_id`, `max_turns`, `permission_mode`) driven by the dashboard-button + runner integration that *is* M004; adopting the generic format would either lose those fields or just rename overlapping keys for cosmetic conformance. Glob changes from `agent_*.md` to `agents/*.md` — every `.md` in the dedicated dir is now a spec. Path centralised as `core/config.py:AGENT_SPECS_DIR` (was duplicated as a local `PROMPTS_DIR` in `agent_task.py` and `agent_buttons.py`).
+
+**Linked artifacts:** `core/config.py:AGENT_SPECS_DIR`; `core/agent_spec.py:list_specs`; `scripts/agent_task.py`; `scripts/dashboard/agent_buttons.py`; `prompts/agents/summarize-day.md` (moved via `git mv`); `tests/test_agent_task.py` + `tests/test_summarize_day.py`. Supersedes the 2026-05-02 flat-layout note in `M004-CONTEXT.md`.
