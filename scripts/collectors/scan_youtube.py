@@ -7,10 +7,15 @@ youtube-transcript-api with yt-dlp fallback), Tier 2 (top comments via
 yt-dlp). All free, no LLM. Tier 3 (gemma4 frame-sampling / Gemini cloud)
 is a follow-up — see .ytstack/backlog/youtube-intake.md.
 
-Usage:
-    uv run python scripts/collectors/scan-youtube.py --url URL [--tier {0,1,2}] [--limit N]
-    uv run python scripts/collectors/scan-youtube.py --inbox PATH [--tier {0,1,2}] [--limit N]
-    uv run python scripts/collectors/scan-youtube.py --url URL --dry-run
+Wired in two ways:
+  - As a Registry-discovered Collector: `wiki collect youtube`. The
+    `@register` decorator below adds `YoutubeCollector` to the Registry.
+    The Collector's `run()` is the inbox-drain mode — it processes
+    `raw/inbox/youtube.md` (a markdown URL list). The rich per-URL flags
+    (`--url` / `--tier` / `--no-skip`) are CLI-only, same as calendar's
+    `--year` and browser's `--source`.
+  - As a direct CLI: `uv run python scripts/collectors/scan_youtube.py
+    --url URL [--tier N]` (also wrapped by `wiki ingest-youtube`).
 """
 
 from __future__ import annotations
@@ -32,6 +37,7 @@ import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from collectors.base import Collector, CollectorSpec, RunResult, register
 from core.config import RAW_DIR, now_iso
 from core.wiki_config import CONFIG
 
@@ -39,6 +45,7 @@ from core.wiki_config import CONFIG
 # without the deps installed.
 
 REPORT_DIR = RAW_DIR / "notes" / "youtube"
+INBOX_FILE = RAW_DIR / "inbox" / "youtube.md"
 
 logging.basicConfig(
     level=logging.INFO,
@@ -741,6 +748,158 @@ def ingest_one(
 
 # ── CLI ──────────────────────────────────────────────────────────────
 
+def _ingest_items(
+    items: list[InboxItem],
+    *,
+    default_tier: int,
+    input_source: str,
+    effective_limit: int | None,
+    dry_run: bool,
+    skip_existing: bool,
+    out_dir: Path,
+) -> dict:
+    """Expand playlists, cap by limit, ingest each video. Shared by `main()`
+    (CLI) and `drain_inbox()` (Collector path).
+
+    Returns a result dict: ``{"written", "skipped", "failed", "results"}``.
+    """
+    urls_to_process: list[tuple[str, str | None, int]] = []
+    for it in items:
+        tier = it.tier_override if it.tier_override is not None else default_tier
+        if is_playlist_url(it.url):
+            for u in expand_playlist(it.url, limit=effective_limit):
+                urls_to_process.append((u, it.note, tier))
+        else:
+            urls_to_process.append((it.url, it.note, tier))
+
+    if effective_limit and len(urls_to_process) > effective_limit:
+        urls_to_process = urls_to_process[:effective_limit]
+
+    log.info("ingesting %d videos at tier %d", len(urls_to_process), default_tier)
+    results: list[dict] = []
+    for u, note, tier in urls_to_process:
+        try:
+            r = ingest_one(
+                u,
+                tier=tier,
+                input_source=input_source,
+                user_note=note,
+                out_dir=out_dir,
+                dry_run=dry_run,
+                skip_existing=skip_existing,
+            )
+            if r:
+                results.append(r)
+        except KeyboardInterrupt:
+            log.warning("interrupted")
+            break
+        except Exception as e:  # noqa: BLE001
+            log.exception("failed on %s: %s", u, e)
+            results.append({"url": u, "status": "failed", "error": str(e)})
+
+    written = sum(1 for r in results if r.get("status") == "written")
+    skipped = sum(1 for r in results if r.get("status") == "skipped")
+    failed = sum(1 for r in results if r.get("status") == "failed")
+    log.info("done — %d written · %d skipped · %d failed", written, skipped, failed)
+    return {"written": written, "skipped": skipped, "failed": failed, "results": results}
+
+
+def drain_inbox(
+    inbox_path: Path = INBOX_FILE,
+    *,
+    tier: int = 1,
+    limit: int | None = None,
+    dry_run: bool = False,
+) -> dict:
+    """Process a YouTube inbox markdown file (the Collector / piggyback path).
+
+    Returns ``{"processed", "written", "report_paths", "message"}``. A
+    missing inbox file is a clean no-op, not an error.
+    """
+    if not inbox_path.exists():
+        return {"processed": 0, "written": 0, "report_paths": [],
+                "message": f"no inbox file at {inbox_path}"}
+
+    items = parse_inbox(inbox_path.read_text(encoding="utf-8"))
+    if not items:
+        return {"processed": 0, "written": 0, "report_paths": [],
+                "message": f"inbox {inbox_path.name} is empty"}
+
+    # Inbox limit defaults to CONFIG.piggybacks.scan_youtube.max_per_run so a
+    # runaway inbox doesn't burn a whole day. (Config key stays scan_youtube —
+    # see config.example.yaml; the Collector SPEC.name is "youtube".)
+    if limit is None:
+        pb = CONFIG.piggybacks.get("scan_youtube")
+        limit = pb.max_per_run if pb else None
+
+    result = _ingest_items(
+        items,
+        default_tier=tier,
+        input_source="inbox",
+        effective_limit=limit,
+        dry_run=dry_run,
+        skip_existing=True,
+        out_dir=REPORT_DIR,
+    )
+    report_paths = [
+        Path(r["path"]) for r in result["results"] if r.get("status") == "written" and r.get("path")
+    ]
+    return {
+        "processed": len(result["results"]),
+        "written": result["written"],
+        "report_paths": report_paths,
+        "message": (
+            f"{result['written']} written · {result['skipped']} skipped · {result['failed']} failed"
+        ),
+    }
+
+
+# ── Collector wrapper ───────────────────────────────────────────────
+
+
+@register
+class YoutubeCollector:
+    """YouTube ingest — Collector Protocol wrapper.
+
+    The Collector path is the **inbox-drain** mode: `run()` processes
+    `raw/inbox/youtube.md` (a markdown URL list, optionally with inline
+    `tier: N` directives). The rich per-URL CLI (`--url`, `--tier`,
+    `--no-skip`, playlist expansion) stays on the direct script /
+    `wiki ingest-youtube` wrapper — same split as calendar's `--year`
+    and browser's `--source`.
+
+    `piggyback_default=False`: youtube ingest is operator-paced (you drop
+    URLs into the inbox, then drain when ready), not a blind daily sweep.
+    """
+
+    SPEC = CollectorSpec(
+        name="youtube",
+        output_subfolder="raw/notes/youtube",
+        piggyback_default=False,
+        piggyback_cooldown_hours=24,
+        supports_incremental=False,  # skip-existing dedup is always on; no delta concept
+        supports_account_loop=False,
+    )
+
+    def is_configured(self) -> bool:
+        """True iff the YouTube inbox file exists (that's the Collector path's input)."""
+        return INBOX_FILE.is_file()
+
+    def run(self, *, dry_run: bool = False, incremental: bool = False) -> RunResult:
+        if not self.is_configured():
+            return RunResult(message=f"No YouTube inbox at {INBOX_FILE} — drop URLs there or use `wiki ingest-youtube --url`")
+
+        result = drain_inbox(INBOX_FILE, dry_run=dry_run)
+        return RunResult(
+            files_written=tuple(result["report_paths"]),
+            files_skipped=result["processed"] - result["written"],
+            message=result["message"],
+        )
+
+
+# ── Direct CLI entry (backward-compat) ──────────────────────────────
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(prog="scan-youtube")
     src = parser.add_mutually_exclusive_group(required=True)
@@ -780,45 +939,16 @@ def main() -> int:
             pb = CONFIG.piggybacks.get("scan_youtube")
             effective_limit = (pb.max_per_run if pb else None)
 
-    urls_to_process: list[tuple[str, str | None, int]] = []
-    for it in items:
-        tier = it.tier_override if it.tier_override is not None else args.tier
-        if is_playlist_url(it.url):
-            for u in expand_playlist(it.url, limit=effective_limit):
-                urls_to_process.append((u, it.note, tier))
-        else:
-            urls_to_process.append((it.url, it.note, tier))
-
-    if effective_limit and len(urls_to_process) > effective_limit:
-        urls_to_process = urls_to_process[:effective_limit]
-
-    log.info("ingesting %d videos at tier %d", len(urls_to_process), args.tier)
-    results = []
-    for u, note, tier in urls_to_process:
-        try:
-            r = ingest_one(
-                u,
-                tier=tier,
-                input_source=input_source,
-                user_note=note,
-                out_dir=args.out,
-                dry_run=args.dry_run,
-                skip_existing=not args.no_skip,
-            )
-            if r:
-                results.append(r)
-        except KeyboardInterrupt:
-            log.warning("interrupted")
-            break
-        except Exception as e:  # noqa: BLE001
-            log.exception("failed on %s: %s", u, e)
-            results.append({"url": u, "status": "failed", "error": str(e)})
-
-    written = sum(1 for r in results if r.get("status") == "written")
-    skipped = sum(1 for r in results if r.get("status") == "skipped")
-    failed = sum(1 for r in results if r.get("status") == "failed")
-    log.info("done — %d written · %d skipped · %d failed", written, skipped, failed)
-    return 0 if failed == 0 else 1
+    result = _ingest_items(
+        items,
+        default_tier=args.tier,
+        input_source=input_source,
+        effective_limit=effective_limit,
+        dry_run=args.dry_run,
+        skip_existing=not args.no_skip,
+        out_dir=args.out,
+    )
+    return 0 if result["failed"] == 0 else 1
 
 
 if __name__ == "__main__":

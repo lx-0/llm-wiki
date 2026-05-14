@@ -54,7 +54,7 @@ llm-wiki/
 │   │   ├── scan_calendar.py    ← CalendarCollector (Registry; migrated 2026-05-14)
 │   │   ├── scan_browser.py     ← BrowserCollector (Registry; migrated 2026-05-14)
 │   │   ├── scan_screenshots.py ← ScreenshotsCollector (Registry, piggyback; migrated 2026-05-14)
-│   │   └── scan-youtube.py     ← Legacy CLI (port pending — tier system + CLI flags)
+│   │   └── scan_youtube.py     ← YoutubeCollector (Registry; migrated 2026-05-14 — Phase 2 complete)
 │   ├── facts/              ← hard-fact subsystem (knowledge/facts/<slug>.md consumers)
 │   │   ├── correct.py          ← CRUD CLI: add/list/remove/edit/path
 │   │   └── correct_apply.py    ← agent-driven propagation across vault

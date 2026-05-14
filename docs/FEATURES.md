@@ -45,7 +45,7 @@ Living overview of every engine feature: what's documented, where it's implement
 
 Dispatcher: `scripts/collectors/cli.py` (`wiki collect <name>` and `wiki collect --list`). Piggyback wiring: `flush.py:_build_piggyback_tasks` auto-discovers Collectors with `SPEC.piggyback_default=True`.
 
-### Legacy CLI scanners (pending Collector port — backlog #1 in `architecture-deepening.md`)
+### Substrate scanners (all on the Collector Protocol since 2026-05-14)
 
 | Scanner | Status | Code | Output |
 |---|---|---|---|
@@ -53,9 +53,9 @@ Dispatcher: `scripts/collectors/cli.py` (`wiki collect <name>` and `wiki collect
 | `browser` | 🟢 | `scripts/collectors/scan_browser.py:BrowserCollector` (Registry) + script-mode CLI | `raw/notes/browser/browser-overview-<date>.md` |
 | `tabs` | 🟢 | `scripts/collectors/scan_tabs.py:TabsCollector` (Registry) + script-mode CLI | `raw/notes/browser/tab-groups-overview-<date>.md` |
 | `screenshots` | 🟢 | `scripts/collectors/scan_screenshots.py:ScreenshotsCollector` (Registry, **piggyback**) + script-mode CLI | `~/Screenshots/<file>.md` (canonical) + `raw/notes/screenshots/thumb/<file>.png` + `raw/notes/screenshots/screenshots-<slug>.md` (batch report) |
-| `scan-youtube` | 🟢 | `scripts/collectors/scan-youtube.py` (Legacy CLI — port pending) | `raw/notes/youtube/<channel>--<title>--<vid>.md` |
+| `youtube` | 🟢 | `scripts/collectors/scan_youtube.py:YoutubeCollector` (Registry) + script-mode CLI | `raw/notes/youtube/<channel>--<title>--<vid>.md` |
 
-`scan-youtube` is exposed via `wiki ingest-youtube`. `screenshots` runs as a Registry-discovered piggyback (`piggybacks.screenshots`). `tabs` / `calendar` / `browser` are operator-invoked via `wiki collect <name>` (or direct `uv run`). Only `scan-youtube` remains on the legacy CLI pattern.
+All seven collectors are Registry-discovered (`wiki collect --list`). `email` / `jamie` / `screenshots` carry `piggyback_default=True` (auto-run after compile); `tabs` / `calendar` / `browser` / `youtube` are operator-invoked via `wiki collect <name>`. The migrated scanners keep a rich direct-CLI entry for per-URL/-flag use — `youtube` via `wiki ingest-youtube`, the rest via `uv run python scripts/collectors/scan_<name>.py`. The Collector `run()` path handles the piggyback-shaped behaviour (full sweep / inbox-drain); CLI-only flags (`--year`, `--source`, `--url`, `--tier`) stay on the script entry.
 
 ### Drop-box / manual ingest
 
@@ -154,7 +154,7 @@ These are pinned reality-vs-docs checks. Each should either get fixed or get an 
 | 2 | ~~No `wiki process-inbox` subcommand~~ | PROCESS §1 documents Inbox Processing as a numbered process | **Closed 2026-05-13:** `wiki process-inbox` wrapper landed. |
 | 3 | ~~No `wiki ingest-html` subcommand~~ | README "Path B" lists `ingest-html (file or URL)` as a substrate-source writer | **Closed 2026-05-13:** `wiki ingest-html` wrapper landed. |
 | 4 | ~~No `wiki suggestions` subcommand~~ | PROCESS §8 documents the suggestion executor as part of the engine CLI surface | **Closed 2026-05-13:** `wiki suggestions` wrapper landed. |
-| 5 | **`scan-*.py` legacy pattern** | README "Two-path ingest" says "remaining `scan-*.py` are scheduled for [Collector] migration" | Phase 2 nearly done. Migrated 2026-05-13/14: `tabs`, `calendar`, `browser`, `screenshots` → Registry collectors (snake_case filenames). **Only `scan-youtube` remains** on the legacy CLI pattern. `_LEGACY_PIGGYBACK_COMMANDS` no longer carries any substrate collector. Config-key migration shipped: `scripts/migrations/migrate_config_keys.py` renames `scan_screenshots`→`screenshots` etc. in operator config.yaml. |
+| 5 | ~~`scan-*.py` legacy pattern~~ | README "Two-path ingest" said "remaining `scan-*.py` are scheduled for [Collector] migration" | **Closed 2026-05-14.** Phase 2 complete — all 5 scanners (`tabs`, `calendar`, `browser`, `screenshots`, `youtube`) ported to Registry collectors with snake_case filenames. `_LEGACY_PIGGYBACK_COMMANDS` carries zero substrate collectors. Config-key migration shipped (`scripts/migrations/migrate_config_keys.py`). |
 | 6 | **`origin: "scan-email/<id>"` in email Collector report frontmatter** | n/a (cosmetic) | `collectors/email_collector.py:111` still writes the old origin string. No engine reader; cosmetic only. | Flagged; intentionally left to avoid splitting report vintages |
 
 ## Maintenance protocol

@@ -505,14 +505,14 @@ ${C_BOLD}EXAMPLES${C_RESET}
   wiki ingest-youtube --inbox raw/inbox/youtube.md --tier 1
 
 ${C_BOLD}NOTES${C_RESET}
-  Wraps \`scripts/collectors/scan-youtube.py\`. T0–T2 are free (no LLM). T3 (visual via
+  Wraps \`scripts/collectors/scan_youtube.py\`. T0–T2 are free (no LLM). T3 (visual via
   gemma4@kcma or Gemini 2.5) is on the backlog — see
   .ytstack/backlog/youtube-intake.md.
 EOF
       return 0 ;;
   esac
   banner "wiki ingest-youtube"
-  _run_script collectors/scan-youtube.py "$@"
+  _run_script collectors/scan_youtube.py "$@"
 }
 
 cmd_review_wiki() {

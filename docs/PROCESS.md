@@ -321,7 +321,7 @@ flowchart LR
         SC["collectors/scan_calendar.py"]
         SB["collectors/scan_browser.py"]
         SCR["collectors/scan_screenshots.py"]
-        SY["collectors/scan-youtube.py"]
+        SY["collectors/scan_youtube.py"]
     end
 
     subgraph Output
@@ -354,16 +354,16 @@ flowchart LR
 |---------|---------|--------|-------|--------|
 | `collectors/email_collector.py` | Collector Registry | Mailbox-Adapter (Thunderbird mbox, Gmail API, All-Inkl IMAP) via `adapters/mailbox/resolve_reader` | Zwei Modi: **Full-Sweep** (`wiki collect email`) = Metadata-Overview pro Account. **Incremental** (täglicher Piggyback, `--incremental`) = nur Mails neuer als der Per-Account-Watermark in `state/email-state.json`, als Delta-Report. Erster Incremental-Lauf pro Account = Baseline (Watermark gesetzt, kein Report — der Einmal-Bulk-Ingest wird nicht erneut ausgegeben). | `raw/notes/email/<account>-<date>.md` (full) · `raw/notes/email/<account>-delta-<ts>.md` (delta) |
 | `collectors/jamie.py` | Collector Registry | Jamie AI public tRPC API (`beta-api.meetjamie.ai`, `x-api-key` auth) | Pro Meeting ein Markdown-File: frontmatter (id, participants, tags, calendar event) + Jamie-LLM-Summary verbatim + Action-Items als Obsidian-Tasks + Speaker-diarisierter Transcript (`**Name** [mm:ss] — text`). Skip-existing per `meeting_id`; incremental via `last_seen_ts` state. | `raw/transcripts/jamie/<date>--<slug>--<short-id>.md` |
-| `collectors/scan_calendar.py` | Legacy CLI | Thunderbird calendar SQLite | Hunderte bis tausende Events, Attendees, Kategorien. | `raw/notes/calendar/` |
-| `collectors/scan_browser.py` | Legacy CLI | Firefox places.sqlite + STG + Chrome | Tausende Tabs, Bookmarks, zehntausende Visits. | `raw/notes/browser/` |
-| `collectors/scan_tabs.py` | Legacy CLI | Firefox Simple Tab Groups Backup | Aktive Tab-Gruppen, deren Tab-URLs/Titel. | `raw/notes/tabs/` |
-| `collectors/scan_screenshots.py` | Legacy CLI | `~/Screenshots/` (macOS PNG-Dump) | gemma4 Vision pro Screenshot, batch-report mit allen analyses + thumbnails. | `raw/notes/screenshots/screenshots-<slug>.md` + `~/Screenshots/<file>.md` (canonical sidecar) |
-| `collectors/scan-youtube.py` | Legacy CLI | YouTube (yt-dlp Metadaten + youtube-transcript-api Captions + Comments + optional ffmpeg-Frames + gemma4 Vision) | Pro Video ein Markdown-File (single source of truth). Tier-based ingest: 0=metadata, 1=+transcript, 2=+comments, 3=+visual analysis. Playlist-Expansion via `playlist?list=` Normalisierung. | `raw/notes/youtube/<channel>--<title>--<vid>.md` |
+| `collectors/scan_calendar.py` | Collector Registry | Thunderbird calendar SQLite | Hunderte bis tausende Events, Attendees, Kategorien. `--year` ist CLI-only. | `raw/notes/calendar/` |
+| `collectors/scan_browser.py` | Collector Registry | Firefox places.sqlite + STG + Chrome | Tausende Tabs, Bookmarks, zehntausende Visits. Multi-source, ein Collector. `--source` ist CLI-only. | `raw/notes/browser/` |
+| `collectors/scan_tabs.py` | Collector Registry | Firefox Simple Tab Groups Backup | Aktive Tab-Gruppen, deren Tab-URLs/Titel. | `raw/notes/tabs/` |
+| `collectors/scan_screenshots.py` | Collector Registry (piggyback) | `~/Screenshots/` (macOS PNG-Dump) | gemma4 Vision pro Screenshot, batch-report mit allen analyses + thumbnails. | `raw/notes/screenshots/screenshots-<slug>.md` + `~/Screenshots/<file>.md` (canonical sidecar) |
+| `collectors/scan_youtube.py` | Collector Registry | YouTube (yt-dlp Metadaten + youtube-transcript-api Captions + Comments + optional ffmpeg-Frames + gemma4 Vision) | Pro Video ein Markdown-File. Tier-based ingest: 0=metadata, 1=+transcript, 2=+comments, 3=+visual analysis. `run()` = inbox-drain (`raw/inbox/youtube.md`); `--url`/`--tier`/`--no-skip` sind CLI-only. | `raw/notes/youtube/<channel>--<title>--<vid>.md` |
 
-> **Hinweis Collector vs Scanner**: Zwei Patterns laufen aktuell parallel.
-> - **Collector Registry** (`scripts/collectors/base.py`): Klassen mit `SPEC`-Deklaration + `@register`-Decorator + `run(dry_run, incremental) → RunResult`. `flush.py` entdeckt sie automatisch über `piggyback_collectors()` Registry-walk. Operator-CLI: `wiki collect <name>` über `scripts/collectors/cli.py`. Aktuell portiert: `email`, `jamie`.
-> - **Registry-Collectors (Phase-2 portiert):** `scan_tabs.py:TabsCollector`, `scan_calendar.py:CalendarCollector`, `scan_browser.py:BrowserCollector`, `scan_screenshots.py:ScreenshotsCollector` — `SPEC` + `@register`, laufen via `wiki collect <name>`, behalten ihren Direct-CLI-Einstieg.
-> - **Legacy CLI (Port ausstehend):** nur noch `scan-youtube.py` — eigenes argparse mit Tier-System. Migration ist work-in-progress (`.ytstack/backlog/architecture-deepening.md` #1).
+> **Hinweis Collector-Pattern**: Phase 2 abgeschlossen (2026-05-14) — **alle Substrate-Scanner laufen auf dem Collector Registry Pattern.**
+> - **Collector Registry** (`scripts/collectors/base.py`): Klassen mit `SPEC`-Deklaration + `@register`-Decorator + `run(dry_run, incremental) → RunResult`. `flush.py` entdeckt Piggyback-Collectors automatisch über `piggyback_collectors()` Registry-walk. Operator-CLI: `wiki collect <name>` über `scripts/collectors/cli.py`.
+> - **Registry-Collectors:** `email`, `jamie`, `tabs`, `calendar`, `browser`, `screenshots`, `youtube` — alle sieben. Migrierte Scanner haben snake_case-Dateinamen (`scan_tabs.py` etc.) und behalten ihren Direct-CLI-Einstieg für rich Per-URL/-Flag-Bedienung.
+> - **`_LEGACY_PIGGYBACK_COMMANDS`** in `flush.py` trägt jetzt nur noch Nicht-Substrate-Tasks: `lint_structural`, `review_wiki`, `optimize_claude_md`, `retry_failed_flushes`, `curiosity_followup`.
 
 > **Secrets**: `JAMIE_API_KEY` (+ alle anderen `*_API_KEY` / `IMAP_*_PASS` / `NAS_*`) liegen in `<vault>/.claude/.env`. `core.config` lädt das File einmal beim Import via `load_dotenv(..., override=False)` — keine manuellen `export`-Statements nötig, weder für Piggyback-Runs noch für Operator-CLI-Aufrufe. Shell-Exports überschreiben `.env`-Werte. Fresh-Vault-Seed über `wiki seed` kopiert `templates/.claude/.env.example` in den Vault (additiv).
 
@@ -406,16 +406,16 @@ Output ist pro Account ein Markdown-Report mit Headers (From/To/Subject/Date) un
 uv run python scripts/collectors/cli.py email --incremental
 
 # YouTube — Single video at default tier (1 = transcript)
-uv run python scripts/collectors/scan-youtube.py --url "https://youtu.be/<id>"
+uv run python scripts/collectors/scan_youtube.py --url "https://youtu.be/<id>"
 
 # YouTube — Playlist mit Tier 2 (transcript + top comments), capped at 10 videos
-uv run python scripts/collectors/scan-youtube.py --url "https://www.youtube.com/playlist?list=<L>" --tier 2 --limit 10
+uv run python scripts/collectors/scan_youtube.py --url "https://www.youtube.com/playlist?list=<L>" --tier 2 --limit 10
 
 # YouTube — Tier 3 (visual analysis via gemma4 frame sampling on kcma)
-uv run python scripts/collectors/scan-youtube.py --url "https://youtu.be/<id>" --tier 3
+uv run python scripts/collectors/scan_youtube.py --url "https://youtu.be/<id>" --tier 3
 
 # YouTube — Inbox-list (markdown file, optional inline `tier: N` directives)
-uv run python scripts/collectors/scan-youtube.py --inbox raw/inbox/youtube.md --tier 1
+uv run python scripts/collectors/scan_youtube.py --inbox raw/inbox/youtube.md --tier 1
 
 # Calendar
 uv run python scripts/collectors/scan_calendar.py

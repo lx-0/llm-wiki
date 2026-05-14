@@ -6,31 +6,19 @@ Vocabulary: domain terms from `CONTEXT.md`, architecture terms from improve-code
 
 ---
 
-## #1 — Scan-Scripts → Collector pattern (HIGH — Phase 2 in progress)
+## #1 — Scan-Scripts → Collector pattern (✅ DONE — Phase 2 complete 2026-05-14)
 
-**Status update (2026-05-14):** Phase 1 (relocation) complete. Phase 2 (Protocol migration) **4 of 5 done** — `tabs`, `calendar`, `browser`, `screenshots` all ported to Registry collectors. Each has `@register` + `SPEC`, runs via `wiki collect <name>`, retains direct-CLI invocation. Same-class re-registration is a no-op in `base.py:register` (handles `__main__ ↔ collectors.<name>` double-load). Convention locked: migrated collectors get snake_case filenames; the lone unmigrated one keeps the hyphen. 34 unit tests across the four.
+**Resolved 2026-05-14.** All five `scan-*.py` scanners ported to the Collector Protocol. `wiki collect --list` now shows seven Registry collectors: `email`, `jamie`, `tabs`, `calendar`, `browser`, `screenshots`, `youtube`. `_LEGACY_PIGGYBACK_COMMANDS` carries zero substrate collectors — only `lint_structural`, `review_wiki`, `optimize_claude_md`, `retry_failed_flushes`, `curiosity_followup` (non-substrate tasks, legacy by design). 44 unit tests across the five new collectors.
+
+Migration log (commits): `5362f6c` tabs (pilot) · `1b0a2d3` calendar · `b60c4cc` browser · `9d41c68` screenshots + config-key migration · scan-youtube (this commit).
 
 Notable findings during the ports:
+- **Convention locked:** migrated collectors get snake_case filenames (`scan_tabs.py` etc.) — hyphenated names aren't importable as Python modules. `base.py:register` made idempotent for same-class re-registration (handles the `__main__ ↔ collectors.<name>` double-load when a collector module is run directly).
 - **browser** stayed ONE collector (not split per-browser) — singleton substrate, no Reader/Filter seam. Surfaced + fixed a pre-existing latent bug: `scan_stg` / `scan_firefox_places` used `.exists()` guards that pass for empty-config `Path()` == cwd.
-- **screenshots** was the one already in `_LEGACY_PIGGYBACK_COMMANDS`. Porting it moved it to Registry-discovered piggyback (`piggyback_default=True`). Config key `scan_screenshots` → `screenshots` for naming consistency; `scripts/migrations/migrate_config_keys.py` shipped to migrate operator config.yaml files (also handles `follow_requests`→`curiosity_followup`, drops removed `sync_memories`).
-- `_LEGACY_PIGGYBACK_COMMANDS` no longer carries ANY substrate collector — just `lint_structural`, `review_wiki`, `optimize_claude_md`, `retry_failed_flushes`, `curiosity_followup` (none of which are substrate scanners — they stay legacy by design).
+- **screenshots** was the only scanner in `_LEGACY_PIGGYBACK_COMMANDS`. Porting moved it to Registry-discovered piggyback (`piggyback_default=True`). Config key `scan_screenshots` → `screenshots`; `scripts/migrations/migrate_config_keys.py` shipped to migrate operator config.yaml (also `follow_requests`→`curiosity_followup`, drops removed `sync_memories`).
+- **youtube** — the feared "Protocol gap" did NOT materialise into a `SPEC.cli_args` extension. Resolution: the Collector `run()` is the **inbox-drain mode** (processes `raw/inbox/youtube.md`); the rich per-URL flags (`--url`/`--tier`/`--no-skip`) stay CLI-only — same split already established by calendar's `--year` and browser's `--source`. The orchestration loop was extracted into a shared `_ingest_items()` helper used by both `main()` (CLI) and `drain_inbox()` (Collector). No Protocol change needed.
 
-**Remaining Phase-2 port:** `scan-youtube` only (>700 LOC, tier system 0-3 + CLI flags `--url`/`--inbox`/`--tier`/`--limit`/`--no-skip`). This is the one that will surface the Protocol gap — `run(dry_run, incremental)` can't express tier/url/inbox. Likely needs `SPEC.cli_args` (declarative flag pass-through) or a `run(**kwargs)` escape hatch. Worth a design pass before porting.
-
-**Files (Phase 2 scope):** `scripts/collectors/scan-calendar.py` (247), `scripts/collectors/scan-browser.py` (524), `scripts/collectors/scan-tabs.py` (185), `scripts/collectors/scan-screenshots.py` (366), `scripts/collectors/scan-youtube.py`. Plus `scripts/flush.py:_LEGACY_PIGGYBACK_COMMANDS` which hardcodes them.
-
-**Problem:** Four near-clones of the same procedure (read substrate → metadata → `raw/` → log). Each reinvents CLI parsing, state tracking, report formatting. They bypass the `Registry` entirely; `flush.py` carries a legacy hardcoded dispatch table specifically for them. The Collector seam exists and works (EmailCollector proved it during M002) — these scripts are leaving its leverage on the table.
-
-**Shape after deepening:** Each becomes a `Collector` subclass (`scripts/collectors/calendar.py`, `browser.py`, `tabs.py`, `screenshots.py`) with its own `SPEC`. Auto-discovered via `Registry`. Dispatch via `wiki collect <name>`. `flush.py:_LEGACY_PIGGYBACK_COMMANDS` deletes; piggyback discovery is purely registry-driven. Estimated ~40% line reduction across the four (CLI/state/error-handling boilerplate moves to base).
-
-**Out of scope for the migration:** Adapter seams for sub-backends (e.g. Firefox vs. Chrome). Browser is a singleton substrate (per CONTEXT.md "Substrate-with-accounts") — no `Reader`/`Filter` split needed.
-
-**Risks / shape-divergence to watch:**
-- Screenshots has a vision-LLM sub-step (different from Email's pure-metadata flow) — does the `Collector` interface accommodate without forcing a fake `is_configured()`?
-- Browser does multi-source aggregation (tabs + bookmarks + visits) inside one script — split into multiple Collectors, or one with multi-output?
-- Scan-tabs imports browser-tab raw data; possible overlap with scan-browser.
-
-**Verification:** `wiki collect --list` shows email, calendar, browser, tabs, screenshots. `flush.py` cooldown loop spawns each via Collector path, no hardcoded list. Existing piggyback-flush schedule still fires correctly post-migration.
+**Pattern that emerged for all five ports:** the scan functions were already pure (`scan_backup`, `scan_calendar`, `generate_report`, …) — the port is a thin `@register class XCollector` wrapper with `SPEC` + `is_configured()` + `run()`, plus a result-dict return value where the legacy `scan()` returned `None`. CLI-only flags stay on `main()`; the Collector path does the piggyback-shaped full-sweep / inbox-drain behaviour.
 
 ---
 
