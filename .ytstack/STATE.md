@@ -1,13 +1,15 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-05-14T18:30:00Z
+last_updated: 2026-05-14T20:00:00Z
 current_milestone: M004
 active_slice: none
 active_task: none
 ---
 
 # State
+
+**gmeet collector shipped — Google Meet / Gemini transcripts as a substrate (2026-05-14, full llm-wiki-change 5-phase pass)** — fourth substrate-collector after email + jamie + youtube. Triggered by "how could we integrate the Google Meet recordings / transcriptions into the intake?". New `scripts/collectors/gmeet.py` (473 LOC): exports the Gemini-generated transcript + "Notes by Gemini" Google Docs from the Drive "Meet Recordings" folder via the Drive API v3 (`drive.meet.readonly` scope), one Drive Doc → one `.md` in `raw/transcripts/gmeet/`, skip-existing per Drive-file short-id, incremental via `state/gmeet-state.json` `last_seen_ts`. Auto-piggyback every 6 h via Registry walk. New `core/google_oauth.py` — the installed-app OAuth dance lifted out of `gmail.py` into a shared `OAuthApp`-parameterised helper; `gmail.py` refactored onto it (4/4 S03 tests still green via a per-call `_app()` builder that keeps the `_OAUTH_CLIENT` monkeypatch live). `GmeetConfig` + `Personal.gmeet` + `Limits.gmeet_*` + `piggybacks.gmeet`; `wiki gmeet-auth <id>` bootstrap. **Drive-only wedge** — the Meet REST API was evaluated and deferred: research exposed `conferenceRecords.list` as organizer-only, records expire 30 days after the conference, and transcript-entry speakers are unresolved resource names. 204/204 tests pass. DECISIONS.md "2026-05-14: gmeet collector" + KNOWLEDGE.md "The purpose-built API isn't always the right one" + `.ytstack/backlog/gmeet-collector.md` (status → implemented; Meet-API enrichment + meeting-grouping remain backlogged). **Git note:** the code landed in commit `74f3d84` (`refactor(core): config split`) — a parallel session `git add -A`'d it into their refactor commit; the docs + architecture-diagram update are the standalone `7731640`. See `feedback_explicit_staging_under_churn`.
 
 **Email-collector pipeline hardened — delta-ingest restored, generic IMAP reader, watermark-on-failure fixed (2026-05-14, commits `3840d6e` `b36ec5d` `b1cd539` `804ceb3` `bc8a2ea` `8cdc64a`)** — a session-long arc on the mailbox collector, triggered by a "how is the email delta-ingest actually wired?" question that surfaced a regression chain:
 - **Delta-ingest restored** (`3840d6e`): the M002/S02 Collector refactor (`14bf844`) had silently dropped the delta logic — `EmailCollector.run()` accepted `incremental` but never read it, never touched `email-state.json`, never passed `since=`. lxw's last delta was 2026-05-01: a 13-day silent regression. Restored with a per-account `last_run_ts` watermark, baseline-on-first-run (the one-time bulk ingest is not re-dumped), legacy per-mbox state migrated on read.
@@ -118,9 +120,10 @@ Carried-forward candidates from M002 (deferred to M004+): Collector-rollout to o
 
 ## Next action
 
-Three substrate-collectors live (email, jamie, youtube). Eight piggybacks (was 9 before sync-memories cull). Docs + infographics consistent across the engine. Open paths:
+Four substrate-collectors live (email, jamie, youtube, gmeet). Nine piggybacks. Docs + infographics consistent across the engine. Open paths:
 
 - **Use Jamie ingest** — automatic 6 h piggyback runs once the operator has accumulated more meetings. First six live in lxw vault; first compile pass over them will tell if the LLM-summary → wiki-article distillation is clean or needs prompt tuning.
+- **Bootstrap + use gmeet ingest** — `wiki gmeet-auth <id>` once (needs `.claude/google-oauth-client.json` or the gmail one + `drive.meet.readonly` enabled on the GCP project), set `personal.gmeet.oauth_account_id` (+ `drive_folder_id` if the narrow scope blocks the folder name-search). First live run will show whether the Drive markdown export of the Gemini Docs distills cleanly, and whether transcript+notes Docs should be paired per meeting (currently one Doc → one file — see `.ytstack/backlog/gmeet-collector.md`). Meet-REST-API enrichment stays deferred there too.
 - **Semantic seed-drift diff** — `.ytstack/backlog/seed-semantic-diff.md` — strip Obsidian-runtime-noise (`graph.json` UI state, `quickadd` provider catalogue, `shellcommands` icons) from drift reports. P2 refinement; current binary-cmp works but is 5-of-6-noise on the productive vault.
 - **YouTube Tier 3-cloud** — Gemini Flash-Lite with cost-protection guardrails (lifted from clawrag's pain-driven design). Triggers when a video clearly needs visual fidelity local-vision can't deliver.
 - **Curiosity-loop integration** — search/upgrade requests + generic dashboard-surface (`curiosity-dashboard.md`). Triggers when ≥5 requests/week from compile-loop justify the surface.
