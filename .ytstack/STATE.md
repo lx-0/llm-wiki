@@ -1,13 +1,27 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-05-14T14:00:00Z
+last_updated: 2026-05-14T18:30:00Z
 current_milestone: M004
 active_slice: none
 active_task: none
 ---
 
 # State
+
+**Email-collector pipeline hardened — delta-ingest restored, generic IMAP reader, watermark-on-failure fixed (2026-05-14, commits `3840d6e` `b36ec5d` `b1cd539` `804ceb3` `bc8a2ea` `8cdc64a`)** — a session-long arc on the mailbox collector, triggered by a "how is the email delta-ingest actually wired?" question that surfaced a regression chain:
+- **Delta-ingest restored** (`3840d6e`): the M002/S02 Collector refactor (`14bf844`) had silently dropped the delta logic — `EmailCollector.run()` accepted `incremental` but never read it, never touched `email-state.json`, never passed `since=`. lxw's last delta was 2026-05-01: a 13-day silent regression. Restored with a per-account `last_run_ts` watermark, baseline-on-first-run (the one-time bulk ingest is not re-dumped), legacy per-mbox state migrated on read.
+- **Per-message deltas + undated-mail skip** (`b36ec5d`, `bc8a2ea`): undated mail leaked into every delta forever (reader filtered `date<since` but passed `date is None` through) — skipped in delta mode now. Delta reports went from folder-count aggregates to per-message lines `date · sender · subject`, then gained the time (`%m-%d %H:%M`).
+- **Generic IMAP reader** (`b1cd539`, `804ceb3`): new `adapters/mailbox/imap.py` — `kind: imap`, app-password auth, for colleagues with no local mail client and no Google Cloud project. (`804ceb3`: `normalise_times` is an imapclient instance attribute, not a ctor kwarg — the test fake's wrong signature had masked it; caught by the first live lxw run.)
+- **`[Gmail]` noselect skip** (`bc8a2ea`): Gmail's `[Gmail]` namespace folder is `\Noselect` and can't be SELECTed — `_target_folders` skips `\Noselect`/`\NonExistent`.
+- **Watermark-on-failure fixed** (`8cdc64a`): a reader signalled "scan failed" and "0 new messages" identically (both yield nothing), so the collector advanced the watermark on a transient failure — silently skipping a never-read window (lxw `gmail-personal` lost ~2 weeks of mail this way across failed-login runs). New `MailboxReadError`: readers raise on connect/login/credential failure; the collector holds the watermark, records `last_error`/`last_error_at` on the account's state entry (cleared by the next success), logs to `logs/collectors.log` (survives flush.py's DEVNULL'd piggyback spawn), exits non-zero. 204/204 pass.
+
+lxw config reconfigured: `gmail-yesterday` mbox path corrected (the `imap.gmail.com` dir is an orphaned dead account — real path is `imap.gmail-1.com`, confirmed via `prefs.js`); `gmail-personal` → `kind: imap` with a working App Password; `pflegix` scoped to its Local-Folders subtree. Gmail-access landscape + the org-side "Internal OAuth app" strategy for Workspace colleagues documented in `.ytstack/backlog/imap-reader-and-gmail-strategy.md`. DECISIONS.md: 3 new entries. KNOWLEDGE.md: 4 new entries. Backlog: `imap-reader-and-gmail-strategy.md`, `watermark-on-failure-fix.md`.
+
+**Open follow-ups (carry into next session):**
+- **Bug 2 — Gmail IMAP double-count**: `INBOX` and `[Gmail]/Alle Nachrichten` mirror every message, so a delta of "18" is really 9. Fix is a config line — `folders: ["[Gmail]/Alle Nachrichten"]` on lxw `gmail-personal` (All Mail is the single source: every message once, Spam/Trash excluded). Not yet applied; "config not code bug" — a normal IMAP server's folders don't overlap.
+- **Deploy `8cdc64a`**: committed locally, not pushed, not on lxw. Push + `wiki update` to make the watermark-on-failure fix live (pure logic fix, unit-tested — no live verification needed like the imap reader had).
+- **`docs/architecture.excalidraw`**: the `imap` reader line is deferred (the adapter node would overflow into the calendar node — needs a reflow); also owes the four 2026-05-14 collector-port updates.
 
 **Agent specs relocated to `prompts/agents/` (2026-05-14, commit `ec5683a`)** — `prompts/agent_<id>.md` → `prompts/agents/<id>.md`; the `agent_` prefix dropped (the folder carries the semantic), glob `agent_*.md` → `agents/*.md`, path centralised as `core/config.py:AGENT_SPECS_DIR` (was a duplicated local `PROMPTS_DIR` in `agent_task.py` + `agent_buttons.py`). Separates self-contained agent specs from `render()` template fragments. Supersedes the M004-CONTEXT flat-layout note — its stated rationale ("sit alongside `prompts.py`'s `${var}` pipeline") never held: specs parse via `agent_spec.py` with their own `AgentSpec.render_body`. All 3 consumers + tests + engine/vault docs updated, 201/201 pass. New DECISIONS.md 2026-05-14 entry; rejected the alternative of realigning the frontmatter to the generic Claude-Code subagent format (the spec is a deliberate superset — `button` / `cwd` / `last_run` drive the dashboard+runner integration).
 
@@ -113,6 +127,7 @@ Three substrate-collectors live (email, jamie, youtube). Eight piggybacks (was 9
 - **Entity-pages layer (M005 candidate)** — gbrain (garrytan) reference-implementation analysis done 2026-05-14 (`.ytstack/backlog/gbrain-comparison.md`). Three transferable patterns backlogged as a coherent cluster: `entity-pages-state-timeline.md` (two-layer page anatomy for `people/`+`projects/`), `takes-substrate.md` (third-party belief attribution), `dream-cycle.md` (scheduled cross-time synthesis). Share a per-entity/time-aware/attribution-aware axis — strongest bundled as M005, weaker separate. Live trigger: Jamie meeting attendees accumulate with no people-page aggregation surface. Open: bundle-vs-separate + anchor folder — decide in a pitch / `plan-milestone` phase, not the backlog files.
 - **Reassess roadmap (M005?)** — does the agent-task catalogue need more tasks now (review-mocs, weekly-digest, extract-todos)? Curiosity-consumer gap (`.ytstack/backlog/curiosity-consumer-gap.md`) still open: `compile.py:maybe_generate_curiosity_requests` writes to `raw/requests/` but no consumer reads them post-`scan-email.py --follow-requests` removal.
 - **Pre-flight guard rollout** — `.ytstack/backlog/preflight-guard-rollout.md` — wire `assert_prompt_within_budget` into the remaining 3 LLM scripts (compile / optimize-claude-md / suggestions). ~3 lines each; P2 defense-in-depth.
+- **Email-collector follow-ups** — see the top STATE entry's "Open follow-ups": apply the Gmail double-count config line (`folders: ["[Gmail]/Alle Nachrichten"]`) on lxw `gmail-personal`; push + `wiki update` to deploy `8cdc64a` (watermark-on-failure fix); the deferred `architecture.excalidraw` reflow.
 
 ## Open decisions
 
