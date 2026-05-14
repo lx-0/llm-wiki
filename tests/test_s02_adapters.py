@@ -202,13 +202,17 @@ def test_new_schema_accepted(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) ->
 # ── Reader: date normalisation ───────────────────────────────────────
 
 
-def test_reader_normalises_undated_messages_to_aware(tmp_path: Path) -> None:
-    """A message with a missing/unparseable Date header must still yield a
-    tz-aware `date`. A naive fallback crashes `min()`/`max()` in the report
-    renderers (`_render_report` / `_render_delta_report`) the moment it is
-    mixed with the aware dates of normal messages — and the reader does NOT
-    drop undated messages from a since-filtered scan, so every delta would
-    carry one.
+def test_reader_skips_undated_messages_when_since_set(tmp_path: Path) -> None:
+    """Date-header handling across the two scan modes.
+
+    Unfiltered scan: undated messages are included, and the epoch fallback
+    is tz-aware so `min()`/`max()` in the report renderers never hit the
+    naive-vs-aware TypeError.
+
+    Delta mode (`since` set): undated messages are skipped — they can't be
+    placed relative to the watermark, so including them would re-report the
+    same messages in every incremental run forever (the legacy scan-email.py
+    skipped them explicitly: "unknown date, skip in delta mode").
     """
     import mailbox
     from datetime import datetime, timezone
@@ -229,11 +233,11 @@ def test_reader_normalises_undated_messages_to_aware(tmp_path: Path) -> None:
 
     reader = ThunderbirdMboxReader("testacct", [tmp_path])
 
+    # Unfiltered: both messages, all dates tz-aware (no naive epoch).
     metas = list(reader.scan_metadata())
-    assert len(metas) == 2
+    assert {m.subject for m in metas} == {"dated", "undated"}
     assert all(m.date.tzinfo is not None for m in metas)
 
-    # The aware-ness must survive a since-filter comparison without TypeError,
-    # and the undated message must not be silently dropped.
+    # Delta mode: the undated message is dropped — only the dated one passes.
     recent = list(reader.scan_metadata(since=datetime(2026, 5, 1, tzinfo=timezone.utc)))
-    assert {m.subject for m in recent} == {"dated", "undated"}
+    assert {m.subject for m in recent} == {"dated"}

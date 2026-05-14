@@ -299,8 +299,12 @@ def test_incremental_emits_delta(
     content = report.read_text(encoding="utf-8")
     assert "type: email-delta" in content
     assert "# Email Delta — testacct" in content
-    # msg 2 (May 10) + msg 3 (May 12) are after the watermark; msg 1 (May 1) is not.
-    assert "INBOX/Work" in content and "bob@example.com" in content
+    # msg 2 (May 10, INBOX/Work) + msg 3 (May 12, INBOX) are after the
+    # watermark; msg 1 (May 1) is not. Per-message lines carry the subject —
+    # the signal the compiler distils from.
+    assert "## INBOX/Work" in content
+    assert "— subject-2" in content and "— subject-3" in content
+    assert "bob@example.com" in content
     assert "subject-1" not in content  # the pre-watermark message is excluded
     # Watermark advanced past the seeded value.
     state = json.loads(_isolate_email_state.read_text(encoding="utf-8"))

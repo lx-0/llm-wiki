@@ -257,10 +257,12 @@ def _render_delta_report(
 ) -> str:
     """Delta sibling of `_render_report` — only messages newer than the watermark.
 
-    One file per account. Folders are the new-mail folders; per folder we
-    show the new-message count, the summed size of *those* messages (the
-    real delta size, not the mbox file size the legacy scanner reported),
-    date range, and top senders.
+    One file per account. Unlike the full-sweep overview (which aggregates,
+    because a mailbox can hold 50k messages), a delta is a bounded set — so
+    it lists each new message: date, sender, subject. The subject is the
+    highest-signal metadata field and is what the compiler actually distils
+    from; folder counts + sender domains alone give it nothing to work with.
+    Grouped by folder, newest message first.
     """
     folders = Counter(m.folder for m in messages)
 
@@ -282,17 +284,21 @@ def _render_delta_report(
     ]
 
     for folder, _n in folders.most_common():
-        folder_msgs = [m for m in messages if m.folder == folder]
+        folder_msgs = sorted(
+            (m for m in messages if m.folder == folder),
+            key=lambda m: m.date,
+            reverse=True,
+        )
         f_earliest = min(m.date for m in folder_msgs)
         f_latest = max(m.date for m in folder_msgs)
-        f_mb = sum(m.size_bytes for m in folder_msgs) / 1024 / 1024
-        senders = Counter(m.from_addr for m in folder_msgs)
-        lines.append(f"## {folder}")
-        lines.append(f"- **{len(folder_msgs):,} neue Mails** ({f_mb:.1f} MB)")
-        lines.append(f"- Zeitraum: {f_earliest:%Y-%m-%d} — {f_latest:%Y-%m-%d}")
-        top = ", ".join(f"{s} ({c})" for s, c in senders.most_common(5))
-        if top:
-            lines.append(f"- Top Sender: {top}")
+        lines.append(
+            f"## {folder}  ({len(folder_msgs):,} neue Mails · "
+            f"{f_earliest:%Y-%m-%d}–{f_latest:%Y-%m-%d})"
+        )
+        for m in folder_msgs:
+            subject = " ".join(m.subject.split()) or "(kein Betreff)"
+            sender = m.from_addr or "(unbekannt)"
+            lines.append(f"- `{m.date:%m-%d}` {sender} — {subject}")
         lines.append("")
 
     return "\n".join(lines)

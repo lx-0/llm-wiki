@@ -154,7 +154,11 @@ def _iter_metadata(
             continue
 
         date = _parse_date(msg.get("Date", ""))
-        if since is not None and date is not None and date < since:
+        # Delta mode (`since` set): a message with no parseable Date can't be
+        # placed relative to the watermark. Skip it — exactly as the legacy
+        # scan-email.py did ("unknown date, skip in delta mode"). Otherwise
+        # every undated message re-reports in every incremental run forever.
+        if since is not None and (date is None or date < since):
             continue
 
         from_name, from_addr = email.utils.parseaddr(msg.get("From", ""))
@@ -198,7 +202,11 @@ def _iter_deep(
             continue
 
         date = _parse_date(msg.get("Date", ""))
-        if since is not None and date is not None and date < since:
+        # Delta mode (`since` set): a message with no parseable Date can't be
+        # placed relative to the watermark. Skip it — exactly as the legacy
+        # scan-email.py did ("unknown date, skip in delta mode"). Otherwise
+        # every undated message re-reports in every incremental run forever.
+        if since is not None and (date is None or date < since):
             continue
 
         from_name, from_addr = email.utils.parseaddr(msg.get("From", ""))
