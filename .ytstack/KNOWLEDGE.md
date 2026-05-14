@@ -1066,3 +1066,17 @@ Researched while adding the `imap` reader. The constraint map for "ingest a user
 **The rule:** a function whose result a caller uses to *advance state* must make "I failed" and "I have no results" **distinguishable**. The clean Python shape is: failure raises (a typed exception — here `MailboxReadError`), emptiness returns empty. A bare empty return for both is a silent-data-loss generator. When you see "the caller treats failure and emptiness the same," look for the state-advance it's feeding — that's where the data leaks.
 
 **Corollary — a failure is only "surfaced" if it lands somewhere durable.** `flush.py` spawns piggybacks with `stdout/stderr = DEVNULL`; a `log.error(...)` in a piggyback-spawned script goes to `/dev/null`. "Don't hide errors" therefore needs a persistent sink the parent can't discard: a `FileHandler` the child sets up itself (`logs/collectors.log`), a field in a state file the operator/dashboard reads (`email-state.json` `last_error`), a non-zero exit code. Logging alone, in a DEVNULL'd child, *is* hiding the error.
+
+### The purpose-built API isn't always the right one — Google Meet transcripts (2026-05-14)
+
+Adding a Google Meet collector, the obvious pick was the **Meet REST API v2** (`meet.googleapis.com` — `conferenceRecords.transcripts.entries`): purpose-built, structured speaker/timestamp entries. Research before writing the client exposed three constraints the name doesn't advertise:
+
+- `conferenceRecords.list` is **organizer-only** — meetings you merely attended return nothing.
+- ConferenceRecords carry an `expireTime` — **deleted 30 days after the conference**. The API is a rolling 30-day window, not an archive.
+- A transcript entry's `participant` is a **resource name**, not a display name — resolving the speaker needs an extra `conferenceRecords.participants` call per participant.
+
+Meanwhile the "dumber" path — exporting the Gemini-generated Docs from the Drive "Meet Recordings" folder via the **Drive API** — has none of those limits: it sees organized *and* attended meetings, Docs persist indefinitely, the transcript Doc is already speaker-diarised text, and `text/markdown` export is officially supported. There's even a dedicated narrow scope, `drive.meet.readonly`, for exactly these files.
+
+**Lesson:** a vendor's purpose-built API can be narrower than the generic one it sits next to. Check the boring constraints — auth scope of the *list* call, record TTL, whether IDs are pre-resolved — before committing to the API that "sounds right." Here the generic Drive API was the better substrate; the Meet REST API's only real add (per-utterance timestamps) didn't justify its constraints, so it was deferred (`.ytstack/backlog/gmeet-collector.md`).
+
+**Side benefit recorded here too:** gmail and gmeet both need the installed-app OAuth dance (consent flow, JSON token cache, refresh, legacy-pickle migration). It was lifted into `core/google_oauth.py` as an `OAuthApp`-parameterised helper rather than copied. The one snag: `adapters/mailbox/gmail.py` keeps a module-level `_OAUTH_CLIENT` that `test_s03_gmail.py` monkeypatches — so the gmail wrappers build their `OAuthApp` through a per-call `_app()` function (not a module constant), or the monkeypatch silently wouldn't take.

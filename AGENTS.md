@@ -16,7 +16,7 @@ The **tooling** for an LLM Wiki — a Karpathy-pattern personal knowledge base. 
 
 A vault that uses this tooling has three layers:
 
-1. **`raw/`** — curated sources (LLM reads, never writes). Top-level subfolders: `articles/`, `papers/`, `notes/`, `transcripts/`, `audio/`, `requests/`, `suggestions/`. Scanner output lives in nested per-scanner folders: `raw/notes/email/<account>-<date>.md` (scan-email full sweep) + `raw/notes/email/<account>-delta-<ts>.md` (scan-email incremental piggyback — only mail newer than the per-account watermark in `.wiki/state/email-state.json`), `raw/notes/calendar/`, `raw/notes/browser/`, `raw/notes/screenshots/screenshots-<slug>.md` (batch reports) + `raw/notes/screenshots/thumb/<file>.png` (384px previews; original PNGs stay in `~/Screenshots/`, never copied; canonical analysis sidecar lives at `~/Screenshots/<file>.md`), `raw/notes/tabs/`, `raw/notes/youtube/<channel>--<title>--<vid>.md` (scan-youtube — video metadata + transcript + comments + optional gemma4 visual analysis, single-file markdown), `raw/transcripts/jamie/<date>--<slug>--<short-id>.md` (collectors/jamie.py — pulls meetings from the Jamie AI tRPC API; summary + speaker-diarised transcript + action-items in one file).
+1. **`raw/`** — curated sources (LLM reads, never writes). Top-level subfolders: `articles/`, `papers/`, `notes/`, `transcripts/`, `audio/`, `requests/`, `suggestions/`. Scanner output lives in nested per-scanner folders: `raw/notes/email/<account>-<date>.md` (scan-email full sweep) + `raw/notes/email/<account>-delta-<ts>.md` (scan-email incremental piggyback — only mail newer than the per-account watermark in `.wiki/state/email-state.json`), `raw/notes/calendar/`, `raw/notes/browser/`, `raw/notes/screenshots/screenshots-<slug>.md` (batch reports) + `raw/notes/screenshots/thumb/<file>.png` (384px previews; original PNGs stay in `~/Screenshots/`, never copied; canonical analysis sidecar lives at `~/Screenshots/<file>.md`), `raw/notes/tabs/`, `raw/notes/youtube/<channel>--<title>--<vid>.md` (scan-youtube — video metadata + transcript + comments + optional gemma4 visual analysis, single-file markdown), `raw/transcripts/jamie/<date>--<slug>--<short-id>.md` (collectors/jamie.py — pulls meetings from the Jamie AI tRPC API; summary + speaker-diarised transcript + action-items in one file), `raw/transcripts/gmeet/<date>--<slug>--<short-id>.md` (collectors/gmeet.py — exports the Gemini-generated transcript + notes Docs from the Drive "Meet Recordings" folder via the Drive API; one Drive Doc → one file).
 2. **`daily/`** — auto-captured Claude Code session logs (immutable).
 3. **`knowledge/`** — LLM-compiled wiki articles (LLM owns, human reads). Subfolders: `concepts/`, `connections/`, `people/`, `projects/`, `qa/`, `facts/` (the last is human-owned via `wiki correct` — hard facts that override anything in raw/daily sources).
 
@@ -44,13 +44,14 @@ llm-wiki/
 │   │   ├── sdk_helpers.py      ← StderrCapture + log_sdk_failure + assert_prompt_within_budget (Claude Agent SDK)
 │   │   ├── utils.py            ← shared helpers (article listing, JSON state, history) + now_iso/today_iso
 │   │   ├── agent_spec.py       ← agent-task spec parser (prompts/agents/*.md → AgentSpec)
-│   │   ├── google_oauth.py     ← Gmail OAuth2 bootstrap (local-loopback consent flow)
+│   │   ├── google_oauth.py     ← shared Google OAuth2 helper (local-loopback consent + token cache; used by gmail + gmeet)
 │   │   └── flush_pipeline.py   ← staged-flush state machine (stage/commit/archive/pending)
 │   ├── collectors/         ← substrate→raw/ writers (Registry + scan-* CLIs + dispatcher)
 │   │   ├── base.py             ← Collector Protocol, SPEC, Registry
 │   │   ├── cli.py              ← `wiki collect` dispatcher (Registry lookup + run-one)
 │   │   ├── email_collector.py  ← email collector (renamed from email.py to avoid stdlib shadow)
 │   │   ├── jamie.py            ← Jamie AI meeting-notetaker
+│   │   ├── gmeet.py            ← Google Meet / Gemini transcripts (Drive API; OAuth via core/google_oauth.py)
 │   │   ├── scan_tabs.py        ← TabsCollector (Registry; migrated 2026-05-13)
 │   │   ├── scan_calendar.py    ← CalendarCollector (Registry; migrated 2026-05-14)
 │   │   ├── scan_browser.py     ← BrowserCollector (Registry; migrated 2026-05-14)
