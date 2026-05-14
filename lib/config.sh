@@ -1,5 +1,5 @@
 # shellcheck shell=bash
-# config.sh — wraps the Python wiki_config.py CLI for bash callers and
+# config.sh — wraps the Python core/config.py CLI for bash callers and
 # defines the interactive setup wizard / config editor.
 
 [[ -n "${__WIKI_CONFIG_LOADED:-}" ]] && return 0

@@ -40,8 +40,9 @@ import httpx
 import yaml
 
 from collectors.base import Collector, CollectorSpec, RunResult, register
-from core.config import RAW_DIR, ROOT_DIR, STATE_DIR, now_iso
-from core.wiki_config import CONFIG
+from core.paths import RAW_DIR, ROOT_DIR, STATE_DIR
+from core.utils import now_iso
+from core.config import CONFIG
 
 log = logging.getLogger(__name__)
 

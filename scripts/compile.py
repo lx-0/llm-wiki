@@ -27,25 +27,18 @@ from claude_agent_sdk import (
     query,
 )
 
-from core.config import (
-    AGENTS_FILE,
-    KNOWLEDGE_DIR,
-    LOG_FILE,
-    LOGS_DIR,
-    ROOT_DIR,
-    STATE_FILE,
-    now_iso,
-    today_iso,
-)
+from core.paths import AGENTS_FILE, KNOWLEDGE_DIR, LOGS_DIR, LOG_FILE, ROOT_DIR, STATE_FILE
 from core.utils import (
     file_hash,
     list_raw_files,
     list_wiki_articles,
     load_state,
+    now_iso,
     read_hard_facts,
     read_wiki_index,
     read_wiki_index_compact,
     save_state,
+    today_iso,
 )
 from core.sdk_helpers import (
     FailureClass,
@@ -85,7 +78,7 @@ _error_handler.setFormatter(_log_formatter)
 _error_handler.setLevel(logging.WARNING)
 logging.getLogger().addHandler(_error_handler)
 
-from core.wiki_config import CONFIG  # noqa: E402
+from core.config import CONFIG  # noqa: E402
 from core.prompts import render  # noqa: E402
 from core import ollama_client  # noqa: E402
 

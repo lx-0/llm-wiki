@@ -19,8 +19,9 @@ from datetime import datetime
 from pathlib import Path
 
 from adapters.mailbox import resolve_reader
-from core.config import RAW_DIR, ROOT_DIR, now_iso, today_iso
-from core.wiki_config import CONFIG
+from core.paths import RAW_DIR, ROOT_DIR
+from core.utils import now_iso, today_iso
+from core.config import CONFIG
 
 log = logging.getLogger("curiosity")
 

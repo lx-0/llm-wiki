@@ -31,8 +31,9 @@ from claude_agent_sdk import (
     query,
 )
 
-from core.config import FACTS_DIR, ROOT_DIR, now_iso, today_iso
-from core.wiki_config import CONFIG  # noqa: E402
+from core.paths import FACTS_DIR, ROOT_DIR
+from core.utils import now_iso, today_iso
+from core.config import CONFIG  # noqa: E402
 from core.prompts import render  # noqa: E402
 from core.sdk_helpers import StderrCapture, log_sdk_failure  # noqa: E402
 

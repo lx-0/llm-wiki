@@ -29,8 +29,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from collectors.base import Collector, CollectorSpec, RunResult, register
-from core.config import RAW_DIR, ROOT_DIR, today_iso
-from core.wiki_config import CONFIG
+from core.paths import RAW_DIR, ROOT_DIR
+from core.utils import today_iso
+from core.config import CONFIG
 
 log = logging.getLogger(__name__)
 

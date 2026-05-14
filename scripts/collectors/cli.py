@@ -72,7 +72,7 @@ def _setup_logging() -> None:
     routed to DEVNULL — without the FileHandler a failed run would leave no
     trace at all. `logs/collectors.log` is that trace.
     """
-    from core.config import LOGS_DIR
+    from core.paths import LOGS_DIR
 
     LOGS_DIR.mkdir(parents=True, exist_ok=True)
     root = logging.getLogger()

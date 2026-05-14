@@ -20,14 +20,16 @@ from claude_agent_sdk import (
     query,
 )
 
-from core.config import KNOWLEDGE_DIR, QA_DIR, ROOT_DIR, now_iso, today_iso
-from core.wiki_config import CONFIG
+from core.paths import KNOWLEDGE_DIR, QA_DIR, ROOT_DIR
+from core.config import CONFIG
 from core.utils import (
     load_state,
+    now_iso,
     read_hard_facts,
     read_wiki_index_compact,
     save_state,
     slugify,
+    today_iso,
 )
 
 # ── Logging ──────────────────────────────────────────────────────────

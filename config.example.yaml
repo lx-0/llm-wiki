@@ -1,6 +1,6 @@
 # Brain Config — single source of truth for all llm-wiki engine scripts.
 # Editing this file is fine — scripts re-read it on every run.
-# Defaults are defined in scripts/wiki_config.py (dataclass fields); partial
+# Defaults are defined in scripts/core/config.py (dataclass fields); partial
 # overrides are fine — anything missing falls back to its default.
 
 scheduling:
@@ -46,6 +46,13 @@ piggybacks:
   # environment variable holding a jk_... key. If unset, this piggyback
   # is silently skipped (graceful agnostic).
   jamie:
+    enabled: true
+    cooldown_hours: 6                    # tighter than scan_youtube — meetings are time-sensitive
+    max_per_run: 20
+  # Pulls Google Meet / Gemini transcripts from Drive via collectors/gmeet.py.
+  # Requires CONFIG.personal.gmeet.oauth_account_id set + `wiki gmeet-auth` run
+  # once. If unconfigured, this piggyback is silently skipped (graceful agnostic).
+  gmeet:
     enabled: true
     cooldown_hours: 6                    # tighter than scan_youtube — meetings are time-sensitive
     max_per_run: 20
@@ -97,6 +104,9 @@ limits:
   # Jamie ingest (collectors/jamie.py).
   jamie_request_timeout_s: 30            # per-HTTP-call timeout against api.meetjamie.ai
   jamie_max_per_run: 50                  # default cap; CONFIG.personal.jamie.max_per_run overrides
+  # Google Meet ingest (collectors/gmeet.py).
+  gmeet_request_timeout_s: 30            # per-HTTP-call timeout against the Drive API
+  gmeet_max_per_run: 50                  # default cap; CONFIG.personal.gmeet.max_per_run overrides
   # Claude Agent SDK per-message buffer (stream-json line buffer). SDK default 1 MB
   # trips on tool-result messages carrying large knowledge/index.md or Write/Edit
   # calls on big articles. 50 MB is safe headroom.
@@ -160,6 +170,18 @@ personal:
     since: ""                             # ISO date "2026-01-01"; empty = no backfill cap
     max_per_run: null                     # null inherits CONFIG.limits.jamie_max_per_run
     account_id: default                   # cosmetic — written into frontmatter for provenance
+  # Google Meet / Gemini transcript integration — single-tenant flat block.
+  # collectors/gmeet.py exports the Gemini-generated transcript + notes Docs
+  # from the Drive "Meet Recordings" folder. OAuth is bootstrapped once via
+  # `wiki gmeet-auth <oauth_account_id>` (reuses .claude/google-oauth-client.json,
+  # falling back to .claude/gmail-oauth-client.json). Leave oauth_account_id
+  # empty to disable the collector (graceful agnostic).
+  gmeet:
+    oauth_account_id: ""                  # e.g. "work" ; empty disables. Run `wiki gmeet-auth work`.
+    drive_folder_id: ""                   # Drive folder id from the folder URL; empty → auto-resolve by name
+    drive_folder_name: "Meet Recordings"  # name used for the auto-resolve fallback
+    since: ""                             # ISO date "2026-01-01"; empty = no backfill cap
+    max_per_run: null                     # null inherits CONFIG.limits.gmeet_max_per_run
   # account-id → {email, label, reader, filter}
   # `reader` and `filter` are nested blocks with a `kind` discriminator
   # plus kind-specific fields. resolve_reader/resolve_filter dispatch on

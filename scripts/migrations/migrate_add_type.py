@@ -26,7 +26,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from core.config import KNOWLEDGE_DIR
+from core.paths import KNOWLEDGE_DIR
 from core.utils import list_wiki_articles
 
 logging.basicConfig(

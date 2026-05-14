@@ -138,7 +138,7 @@ Currently 1 agent task ships. Adding a new task = drop `prompts/agents/<id>.md` 
 | `wiki status` | 🟢 | `wiki:cmd_status` | Config summary + hook install table + Ollama probe |
 | `wiki update` | 🟢 | `wiki:cmd_update`, `lib/skills.sh` | `git pull --ff-only` + skill sync; preserves `config.yaml` + `.venv/` |
 | `wiki seed` / `wiki seed --force` | 🟢 | `wiki:cmd_seed`, `lib/seed.sh` | Additive template seed + drift detection |
-| `wiki config` (get/set/keys/path/wizard/status) | 🟢 | `wiki:cmd_config`, `lib/config.sh`, `scripts/core/wiki_config.py` | Round-robin backup on every set |
+| `wiki config` (get/set/keys/path/wizard/status) | 🟢 | `wiki:cmd_config`, `lib/config.sh`, `scripts/core/config.py` | Round-robin backup on every set |
 | `wiki hooks` (install/uninstall/status) | 🟢 | `wiki:cmd_hooks`, `lib/hooks.sh`, `lib/agents.sh` | jq-merge into agent settings.json |
 | `wiki skills` (install/uninstall/sync/status) | 🟢 | `wiki:cmd_skills`, `lib/skills.sh` | Symlink into `<vault>/.claude/skills/`, foreign entries preserved. `--global` (gated by `skills.global_install`) also links global-eligible skills into `~/.claude/skills/` + registers the vault in `~/.config/llm-wiki/vaults` |
 | `wiki gmail-auth <id>` | 🟢 | `wiki:cmd_gmail_auth`, `scripts/adapters/mailbox/gmail.py` | One-time OAuth bootstrap |

@@ -24,7 +24,7 @@ Zwei fundamental getrennte Ingest-Pfade konvergieren bei `compile.py`:
 | [1](#1-inbox-processing) | Inbox Processing | Klassifiziert Drops in `inbox/`, verschiebt in `raw/<typ>/` | Manueller Drop |
 | [2](#2-automatic-session-capture-hooks) | Automatic Session Capture | Hooks → `daily/YYYY-MM-DD.md` | session-start / session-end / pre-compact |
 | [3](#3-compilation) | Compilation | Claude Agent SDK liest `raw/` + `daily/`, schreibt Articles in `knowledge/` | manuell oder cron-after-hour |
-| [4](#4-scanners) | Scanners | Email · Calendar · Browser · Screenshots · Tabs · YouTube · Jamie → `raw/notes/` + `raw/transcripts/` | per-Scanner Cron oder piggyback |
+| [4](#4-scanners) | Scanners | Email · Calendar · Browser · Screenshots · Tabs · YouTube · Jamie · Google Meet → `raw/notes/` + `raw/transcripts/` | per-Scanner Cron oder piggyback |
 | [5](#5-query--lint) | Query + Lint | NL-Query gegen Wiki · 8 strukturelle Checks · 1 LLM-Contradiction-Scan | manuell |
 | [6](#6-wiki-review-lokal-kostenlos) | Wiki Review | Per-Article Quality-Score via lokales LLM | piggyback |
 | [7](#7-curiosity-loop) | Curiosity Loop | Gap-Detection → JSON-Requests in `raw/requests/` | nach jedem Compile |
@@ -212,6 +212,7 @@ flowchart TD
 |------|--------|--------|----------|--------|
 | `email` | Collector Registry | `collectors/cli.py email --incremental` | 24h | $0 (lokal) |
 | `jamie` | Collector Registry | `collectors/cli.py jamie --incremental` | 6h | $0 (Jamie API) |
+| `gmeet` | Collector Registry | `collectors/cli.py gmeet --incremental` | 6h | $0 (Drive API) |
 | `screenshots` | Collector Registry | `collectors/cli.py screenshots` | 24h | $0 (Ollama/Gemma4) |
 | `lint_structural` | Legacy | `lint.py --structural-only` | 24h | $0 (kein LLM) |
 | `review_wiki` | Legacy | `review-wiki.py` | 168h (1x/Woche) | $0 (Ollama/Gemma4) |

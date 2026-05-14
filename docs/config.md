@@ -1,6 +1,6 @@
 # Config Reference
 
-Every settable key in `<vault>/.wiki/config.yaml`, plus the secrets surface in `<vault>/.claude/.env`. Dataclass defaults live in `scripts/core/wiki_config.py` — only the keys you want to *override* need to appear in `config.yaml`. Missing keys silently fall back to the default.
+Every settable key in `<vault>/.wiki/config.yaml`, plus the secrets surface in `<vault>/.claude/.env`. Dataclass defaults live in `scripts/core/config.py` — only the keys you want to *override* need to appear in `config.yaml`. Missing keys silently fall back to the default.
 
 ## Contents
 
@@ -23,7 +23,7 @@ Run `./.wiki/wiki config keys` for the live, full list of every leaf key the dat
 | File | Purpose | Tracked? |
 |---|---|---|
 | `<engine>/config.example.yaml` | Engine-shipped defaults + comments. Copied once at install. | yes |
-| `<vault>/.wiki/config.yaml` | Per-install overrides. Read by every script via `core.wiki_config.CONFIG`. | gitignored |
+| `<vault>/.wiki/config.yaml` | Per-install overrides. Read by every script via `core.config.CONFIG`. | gitignored |
 | `<vault>/.claude/.env` | Secrets (API keys, IMAP passwords). Loaded by `core.config` at import. | gitignored |
 | `<vault>/.claude/.env.example` | Catalogue of every env-var the engine recognises. Seeded by `wiki seed`. | tracked (template) |
 

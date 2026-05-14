@@ -41,8 +41,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import yaml
 
-from core.config import FACTS_DIR, today_iso
-from core.utils import slugify
+from core.paths import FACTS_DIR
+from core.utils import slugify, today_iso
 
 logging.basicConfig(
     level=logging.INFO,

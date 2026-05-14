@@ -22,25 +22,20 @@ Notable findings during the ports:
 
 ---
 
-## #2 — Config split: `paths.py` + `config.py` (HIGH, design locked)
+## #2 — Config split: `paths.py` + `config.py` (✅ DONE 2026-05-14)
 
-**Files:** `scripts/config.py` (71 lines, path constants + time helpers + bridge to wiki_config), `scripts/wiki_config.py` (512 lines, CONFIG singleton + dataclasses + validation + round-robin backup). 36 importer sites across `scripts/`, `hooks/`, `wiki` CLI. Eleven scripts import from BOTH.
+**Resolved 2026-05-14.** The fuzzy `config.py` / `wiki_config.py` boundary is gone. Three honestly-named modules under `scripts/core/`:
+- **`core/paths.py`** (NEW) — eager path constants from `__file__`. Zero deps, zero side effects. The dependency-free base of the config layer.
+- **`core/config.py`** (was `wiki_config.py`) — `CONFIG` singleton, YAML-driven, validation + round-robin backup + get/set/keys CLI. Now also owns the `.env` bootstrap (`load_dotenv` at import) and `TIMEZONE` (CONFIG-derived). Imports `CONFIG_FILE` / `DOTENV_FILE` from `paths.py`.
+- **`core/utils.py`** — gained `now_iso()` / `today_iso()` (no config dependency → they belonged here, not in the stateful config module).
 
-**Problem:** Two modules, one fuzzy boundary, with circular import (`config.py` imports `wiki_config.CONFIG` for `TIMEZONE`). Caller can't answer "where does this new setting go?" without reading both. Module names don't communicate the actual split.
+The old circular import (`config.py` ↔ `wiki_config.py` for `TIMEZONE`) is eliminated: import DAG is now `paths` (leaf) → `config` / `utils` → everything else.
 
-**Locked design** (decided 2026-05-02 during architecture grill — *not* a minimal-diff merge):
+**Migration mechanics:** 37 importer sites swept by a one-shot Python rewriter (`/tmp/sweep_config_imports.py`) that buckets each imported symbol → `paths` / `config` / `utils` and emits up to three import lines. Mixed imports like `from core.config import RAW_DIR, TIMEZONE, now_iso` became three lines. A follow-up merge pass deduplicated same-module import lines. `scripts/migrations/*.py` were swept too (they're importer sites). No config.yaml *data* migration needed — the split is import-path only, the YAML schema is unchanged.
 
-The two modules have different *natures* and deserve to stay split, but with honest names:
-- **`scripts/paths.py`** — eager path constants computed from `__file__`. No deps. Pure locality (Path-construction in 20 sites consolidates here).
-- **`scripts/config.py`** — `CONFIG` singleton, YAML-driven, lazy-loaded, with validation + round-robin backup. Real module-with-state.
-- **`scripts/utils.py`** — gains `now_iso()` and `today_iso()` (currently mis-located in config.py).
-- `TIMEZONE` (CONFIG-derived) stays in `config.py`.
-- `wiki_config.py` → renamed to `config.py`.
-- 36 importer sites migrated mechanically (`from wiki_config import CONFIG` → `from config import CONFIG`; `from config import RAW_DIR` → `from paths import RAW_DIR`).
+**Verification:** 204 pytest green; `grep -rE "wiki_config" scripts/ hooks/` returns empty; `python -c "from core import paths, config, utils"` clean; bash -n + gitleaks pass; all CLIs + `wiki collect --list` smoke-test clean. Commit: this one.
 
-**Deletion test passes both ways:** removing `paths.py` scatters `Path(__file__).parent.parent` across 20 files; removing `config.py` scatters `yaml.safe_load + dataclass parsing + backup logic` across N callers. Both modules earn their keep at their own seam.
-
-**Verification:** all scripts run; pytest green; `grep -rE "from wiki_config" scripts/` returns empty; no circular imports.
+**Test-side fallout fixed:** `test_correct.py` (`monkeypatch.setattr(config, "FACTS_DIR")` → path consts moved to `paths`; patch the consumer modules `correct`/`utils` instead), `test_s02_adapters.py` + `test_config_backup.py` (`from core import wiki_config` → `config`), `test_s03_gmail.py` (indented `from core.config import STATE_DIR` → `paths`).
 
 ---
 

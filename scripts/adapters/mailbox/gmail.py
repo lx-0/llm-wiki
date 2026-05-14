@@ -12,14 +12,15 @@ an OAuth client at https://console.cloud.google.com.
 
 from __future__ import annotations
 
-import json
 import logging
 from datetime import datetime
 from pathlib import Path
 from typing import Iterator
 
 from adapters.mailbox.base import ApplyResult, MailboxReadError
-from core.config import ROOT_DIR, STATE_DIR
+from core import google_oauth
+from core.paths import ROOT_DIR
+from core.google_oauth import OAuthApp
 from domain.mail import FilterRule, Message, MessageMeta
 
 log = logging.getLogger(__name__)
@@ -289,109 +290,32 @@ class GmailFilter:
         return []
 
 
-# ── Session + token cache ────────────────────────────────────────────
+# ── OAuth — thin wrappers over core.google_oauth ─────────────────────
+#
+# The OAuth dance (consent flow, JSON token cache, refresh, legacy-pickle
+# migration) lives in core/google_oauth.py — shared with collectors/gmeet.py.
+# `_app()` is rebuilt per call so tests that monkeypatch `_OAUTH_CLIENT`
+# still take effect.
 
 
-def _session(account_id: str):
-    """Returns (session, error_msg). Session is google-auth AuthorizedSession."""
-    try:
-        from google.auth.transport.requests import AuthorizedSession
-    except ImportError:
-        return None, "google-auth-oauthlib not installed (uv sync should have it)"
-
-    creds, err = _credentials(account_id)
-    if err:
-        return None, err
-    return AuthorizedSession(creds), None
-
-
-def _token_path(account_id: str) -> Path:
-    """Token cache lives at `<.wiki>/state/gmail-token-<id>.json` (S03+).
-
-    Migrated from legacy pickle at `<vault>/.claude/gmail-token-<id>.pickle`
-    by `gmail_auth_bootstrap` on first run after upgrade.
-    """
-    return STATE_DIR / f"gmail-token-{account_id}.json"
-
-
-def _legacy_pickle_path(account_id: str) -> Path:
-    return ROOT_DIR / ".claude" / f"gmail-token-{account_id}.pickle"
-
-
-def _credentials(account_id: str):
-    """Load + refresh OAuth credentials. Returns (creds, error_msg).
-
-    Token cache at `<.wiki>/state/gmail-token-<id>.json`. If missing,
-    falls back to legacy pickle at `<vault>/.claude/gmail-token-<id>.pickle`
-    and migrates on first successful load.
-    """
-    from google.auth.transport.requests import Request
-    from google.oauth2.credentials import Credentials
-
-    token_file = _token_path(account_id)
-
-    creds = None
-    if token_file.exists():
-        try:
-            data = json.loads(token_file.read_text(encoding="utf-8"))
-            creds = Credentials.from_authorized_user_info(data, _SCOPES)
-        except Exception as e:  # noqa: BLE001
-            log.warning("Bad JSON token at %s: %s — will re-bootstrap", token_file, e)
-            creds = None
-
-    if creds is None:
-        # Try legacy pickle migration.
-        legacy = _legacy_pickle_path(account_id)
-        if legacy.exists():
-            import pickle  # noqa: S403  own OAuth tokens
-
-            try:
-                with open(legacy, "rb") as f:
-                    creds = pickle.load(f)  # noqa: S301
-                _persist(creds, token_file)
-                log.info("Migrated Gmail token from %s → %s", legacy, token_file)
-            except Exception as e:  # noqa: BLE001
-                log.warning("Could not migrate legacy pickle %s: %s", legacy, e)
-                creds = None
-
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            try:
-                creds.refresh(Request())
-                _persist(creds, token_file)
-            except Exception as e:  # noqa: BLE001
-                return None, f"Token refresh failed: {e}"
-        else:
-            return None, _bootstrap_hint(account_id)
-
-    return creds, None
-
-
-def _persist(creds, token_file: Path) -> None:
-    token_file.parent.mkdir(parents=True, exist_ok=True)
-    payload = {
-        "token": creds.token,
-        "refresh_token": creds.refresh_token,
-        "token_uri": creds.token_uri,
-        "client_id": creds.client_id,
-        "client_secret": creds.client_secret,
-        "scopes": list(creds.scopes or _SCOPES),
-    }
-    if hasattr(creds, "expiry") and creds.expiry is not None:
-        payload["expiry"] = creds.expiry.isoformat()
-    token_file.write_text(json.dumps(payload, indent=2), encoding="utf-8")
-
-
-def _bootstrap_hint(account_id: str) -> str:
-    return (
-        f"Gmail OAuth credentials missing for {account_id!r}. "
-        f"Place an OAuth client_secret.json at {_OAUTH_CLIENT}, then run "
-        f"`wiki gmail-auth {account_id}`. The token cache will be written to "
-        f"{_token_path(account_id)}."
+def _app() -> OAuthApp:
+    return OAuthApp(
+        client_file=_OAUTH_CLIENT,
+        scopes=tuple(_SCOPES),
+        token_prefix="gmail-token",
+        bootstrap_cmd="wiki gmail-auth",
+        service_label="Gmail",
     )
 
 
-# ── OAuth bootstrap (called from `wiki gmail-auth <id>`) ─────────────
+def _session(account_id: str):
+    """Returns (session, error_msg). Session is a google-auth AuthorizedSession."""
+    return google_oauth.session(_app(), account_id)
+
+
+def _token_path(account_id: str) -> Path:
+    """Token cache: `<.wiki>/state/gmail-token-<id>.json`."""
+    return google_oauth.token_path(_app(), account_id)
 
 
 def gmail_auth_bootstrap(account_id: str) -> tuple[bool, str]:
@@ -399,24 +323,9 @@ def gmail_auth_bootstrap(account_id: str) -> tuple[bool, str]:
 
     Operator pre-condition: place OAuth client_secret.json at the path
     reported by `_OAUTH_CLIENT`. The flow opens a local-loopback browser
-    for the consent screen.
+    for the consent screen. Called from `wiki gmail-auth <id>`.
     """
-    if not _OAUTH_CLIENT.exists():
-        return False, (
-            f"Missing OAuth client config: {_OAUTH_CLIENT}\n"
-            "Create an installed-app OAuth client at "
-            "https://console.cloud.google.com/apis/credentials, "
-            "download the JSON, save it to that path, and re-run."
-        )
-    try:
-        from google_auth_oauthlib.flow import InstalledAppFlow
-
-        flow = InstalledAppFlow.from_client_secrets_file(str(_OAUTH_CLIENT), _SCOPES)
-        creds = flow.run_local_server(port=0)
-        _persist(creds, _token_path(account_id))
-    except Exception as e:  # noqa: BLE001
-        return False, f"OAuth flow failed: {type(e).__name__}: {e}"
-    return True, f"Token cached at {_token_path(account_id)}"
+    return google_oauth.bootstrap(_app(), account_id)
 
 
 def _ensure_label(session, label_name: str) -> str | None:

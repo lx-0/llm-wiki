@@ -24,7 +24,7 @@ from typing import NoReturn
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from core.config import ROOT_DIR
+from core.paths import ROOT_DIR
 from curiosity.backends import email as email_backend
 
 REQUESTS_DIR = ROOT_DIR / "raw" / "requests"

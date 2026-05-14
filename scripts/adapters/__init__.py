@@ -11,5 +11,5 @@ Layout:
     └── (future substrates: calendar/, browser/, …)
 
 Adapters import from `domain/`; the reverse is forbidden.
-Adapters import from `wiki_config` only to read their own config block.
+Adapters import from `core.config` only to read their own config block.
 """

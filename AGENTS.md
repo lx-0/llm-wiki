@@ -37,13 +37,14 @@ llm-wiki/
 │   └── config.sh           ← wraps Python config CLI + setup wizard + editor
 ├── scripts/
 │   ├── core/               ← shared engine plumbing (imported, not invoked)
-│   │   ├── config.py           ← path constants (computed once, used everywhere)
-│   │   ├── wiki_config.py      ← config dataclass + get/set/keys CLI (incl. `Personal`)
+│   │   ├── paths.py            ← eager path constants from __file__ — zero deps
+│   │   ├── config.py           ← CONFIG singleton (YAML-driven) + get/set/keys CLI + TIMEZONE + .env bootstrap
 │   │   ├── prompts.py          ← prompt template loader (${var} substitution)
 │   │   ├── ollama_client.py    ← single Ollama transport (chat / chat_schema / chat_vision)
 │   │   ├── sdk_helpers.py      ← StderrCapture + log_sdk_failure + assert_prompt_within_budget (Claude Agent SDK)
-│   │   ├── utils.py            ← shared helpers (article listing, JSON state, history)
+│   │   ├── utils.py            ← shared helpers (article listing, JSON state, history) + now_iso/today_iso
 │   │   ├── agent_spec.py       ← agent-task spec parser (prompts/agents/*.md → AgentSpec)
+│   │   ├── google_oauth.py     ← Gmail OAuth2 bootstrap (local-loopback consent flow)
 │   │   └── flush_pipeline.py   ← staged-flush state machine (stage/commit/archive/pending)
 │   ├── collectors/         ← substrate→raw/ writers (Registry + scan-* CLIs + dispatcher)
 │   │   ├── base.py             ← Collector Protocol, SPEC, Registry
@@ -98,7 +99,7 @@ llm-wiki/
 
 ### Adding a tunable
 
-1. Extend the matching dataclass in `scripts/core/wiki_config.py`.
+1. Extend the matching dataclass in `scripts/core/config.py`.
 2. Document the default in `config.example.yaml` with a comment.
 3. Document it in `docs/config.md` (the grouped reference).
 4. Replace the hardcoded constant in the script with `CONFIG.<section>.<field>`.
@@ -109,7 +110,7 @@ llm-wiki/
 Different rule for anything personal: email addresses, customer/partner names,
 hostnames, mbox paths, project names mentioned in prompts, etc.
 
-1. Extend `Personal` in `scripts/core/wiki_config.py`.
+1. Extend `Personal` in `scripts/core/config.py`.
 2. `config.example.yaml` ships an **empty** default for the field — never a real value.
 3. The actual value goes in the user's local `config.yaml` (gitignored).
 4. Consumers (prompts via `${var}`, compile.py schema enums, scan-* runtime maps) read
@@ -146,7 +147,7 @@ The Python venv lives at `<vault>/.wiki/.venv/` (inside the engine, NOT at the v
 
 ### YAML & JSON
 
-- **YAML editing in CLI** → goes through `wiki_config.py set` (Python with PyYAML). Bash never parses YAML.
+- **YAML editing in CLI** → goes through `config.py set` (Python with PyYAML). Bash never parses YAML.
 - **JSON merge for agent configs** → `jq` deep-merge in `lib/agents.sh`. Always backup before write.
 - **LLM JSON output** → use `jsonrepair` or schema-constrained decoding (Ollama `format` field). Never raw `JSON.parse`.
 

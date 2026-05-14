@@ -29,13 +29,14 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 │   └── config.sh              ← Python config CLI wrapper + setup wizard + interactive editor
 ├── scripts/
 │   ├── core/                  ← shared engine plumbing (imported, never invoked)
-│   │   ├── config.py              ← path constants (single source of truth for *_DIR)
-│   │   ├── wiki_config.py         ← config dataclass + get/set/keys CLI (incl. Personal block)
+│   │   ├── paths.py               ← eager path constants from __file__ — zero deps, no side effects
+│   │   ├── config.py              ← CONFIG singleton (YAML-driven) + get/set/keys CLI + TIMEZONE + .env bootstrap
 │   │   ├── prompts.py             ← prompt template loader (${var} substitution)
 │   │   ├── ollama_client.py       ← single Ollama transport (chat / chat_schema / chat_vision)
 │   │   ├── sdk_helpers.py         ← StderrCapture + log_sdk_failure + assert_prompt_within_budget (Claude Agent SDK)
-│   │   ├── utils.py               ← shared helpers (article listing, JSON state, history)
+│   │   ├── utils.py               ← shared helpers (article listing, JSON state, history) + now_iso/today_iso
 │   │   ├── agent_spec.py          ← agent-task spec parser (prompts/agents/*.md → AgentSpec)
+│   │   ├── google_oauth.py        ← Gmail OAuth2 bootstrap (local-loopback consent flow)
 │   │   └── flush_pipeline.py      ← staged-flush state machine (stage / commit / archive / pending)
 │   ├── collectors/            ← substrate→raw/ writers (Registry + scan-* CLIs + dispatcher)
 │   │   ├── base.py                ← Collector Protocol, SPEC, Registry

@@ -25,7 +25,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from core.agent_spec import AgentSpec, parse_spec
-from core.config import AGENT_SPECS_DIR
+from core.paths import AGENT_SPECS_DIR
 
 
 def discover() -> list[AgentSpec]:

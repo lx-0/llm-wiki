@@ -17,6 +17,7 @@ from collectors.base import (  # noqa: F401  re-export the public API
 
 # Trigger @register side-effects.
 from collectors import email_collector  # noqa: F401,E402
+from collectors import gmeet  # noqa: F401,E402
 from collectors import jamie  # noqa: F401,E402
 from collectors import scan_browser  # noqa: F401,E402
 from collectors import scan_calendar  # noqa: F401,E402

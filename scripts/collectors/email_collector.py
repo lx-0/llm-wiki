@@ -31,9 +31,10 @@ from pathlib import Path
 
 from adapters.mailbox import MailboxReader, MailboxReadError, resolve_reader
 from collectors.base import Collector, CollectorSpec, RunResult, register
-from core.config import EMAIL_STATE_FILE, ROOT_DIR, now_iso, today_iso
+from core.paths import EMAIL_STATE_FILE, ROOT_DIR
+from core.utils import now_iso, today_iso
 from domain.mail import MessageMeta
-from core.wiki_config import CONFIG
+from core.config import CONFIG
 
 log = logging.getLogger(__name__)
 

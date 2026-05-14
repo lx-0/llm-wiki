@@ -10,14 +10,16 @@ import yaml
 
 
 def _patch_facts_dir(monkeypatch: pytest.MonkeyPatch, facts_dir: Path) -> None:
-    """Point both correct.py and utils.py at a tmp facts dir."""
-    from core import config
+    """Point both correct.py and utils.py at a tmp facts dir.
+
+    Path constants live in `core.paths` since the 2026-05-14 config split,
+    but each consumer module binds its own name via `from core.paths import …`
+    — monkeypatch must hit every consumer, not just the source module.
+    """
     from facts import correct
     from core import utils
 
     facts_dir.mkdir(parents=True, exist_ok=True)
-    monkeypatch.setattr(config, "FACTS_DIR", facts_dir)
-    monkeypatch.setattr(config, "KNOWLEDGE_DIR", facts_dir.parent)
     monkeypatch.setattr(correct, "FACTS_DIR", facts_dir)
     monkeypatch.setattr(utils, "FACTS_DIR", facts_dir)
     monkeypatch.setattr(utils, "KNOWLEDGE_DIR", facts_dir.parent)

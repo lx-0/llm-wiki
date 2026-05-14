@@ -1,13 +1,20 @@
-"""Shared utilities for the personal knowledge base."""
+"""Shared utilities for the personal knowledge base.
+
+Also home to the datetime helpers `now_iso()` / `today_iso()` — they have
+no config dependency, so they live here rather than in the (stateful,
+YAML-driven) `config.py` module. Moved here in the 2026-05-14 config split
+(architecture-deepening #2).
+"""
 
 import hashlib
 import json
 import re
+from datetime import datetime, timezone
 from pathlib import Path
 
 import yaml
 
-from .config import (
+from .paths import (
     CONCEPTS_DIR,
     CONNECTIONS_DIR,
     DAILY_DIR,
@@ -21,8 +28,19 @@ from .config import (
     RAW_DIR,
     STATE_DIR,
     STATE_FILE,
-    now_iso,
 )
+
+
+# ── Datetime helpers ──────────────────────────────────────────────────
+
+def now_iso() -> str:
+    """Current time in ISO 8601 format (local tz, second precision)."""
+    return datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
+
+
+def today_iso() -> str:
+    """Current date as YYYY-MM-DD (local tz)."""
+    return datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d")
 
 
 # ── State management ──────────────────────────────────────────────────

@@ -42,7 +42,7 @@ def resolve_reader(account: dict[str, Any]) -> MailboxReader | None:
 
     if kind == "thunderbird-mbox":
         from .thunderbird import ThunderbirdMboxReader
-        from core.wiki_config import CONFIG
+        from core.config import CONFIG
 
         profile_root = Path(CONFIG.personal.thunderbird_profile or "").expanduser()
         mbox_paths = [profile_root / p for p in reader_cfg.get("mbox_paths", [])]
@@ -87,7 +87,7 @@ def resolve_filter(account: dict[str, Any]) -> MailboxFilter | None:
 
     if kind == "thunderbird-msgfilter":
         from .thunderbird import ThunderbirdMsgFilter
-        from core.wiki_config import CONFIG
+        from core.config import CONFIG
 
         profile_root = Path(CONFIG.personal.thunderbird_profile or "").expanduser()
         filter_paths = [profile_root / p for p in filter_cfg.get("filter_paths", [])]

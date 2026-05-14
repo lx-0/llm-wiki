@@ -65,9 +65,9 @@ def test_resolve_filter_no_kind_returns_none() -> None:
 
 def test_resolve_reader_thunderbird_mbox(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     # Stub thunderbird_profile so the resolver can build an absolute path.
-    from core import wiki_config
+    from core import config
 
-    monkeypatch.setattr(wiki_config.CONFIG.personal, "thunderbird_profile", str(tmp_path))
+    monkeypatch.setattr(config.CONFIG.personal, "thunderbird_profile", str(tmp_path))
 
     account = {
         "_id": "test",
@@ -168,11 +168,11 @@ def test_config_error_on_legacy_account_schema(tmp_path: Path, monkeypatch: pyte
         encoding="utf-8",
     )
 
-    from core import wiki_config
+    from core import config
 
-    monkeypatch.setattr(wiki_config, "CONFIG_FILE", legacy_yaml)
-    with pytest.raises(wiki_config.ConfigError) as exc:
-        wiki_config.load()
+    monkeypatch.setattr(config, "CONFIG_FILE", legacy_yaml)
+    with pytest.raises(config.ConfigError) as exc:
+        config.load()
     msg = str(exc.value)
     assert "legacy" in msg.lower()
     assert "mbox_paths" in msg or "has_procmail" in msg
@@ -191,10 +191,10 @@ def test_new_schema_accepted(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) ->
         encoding="utf-8",
     )
 
-    from core import wiki_config
+    from core import config
 
-    monkeypatch.setattr(wiki_config, "CONFIG_FILE", new_yaml)
-    cfg = wiki_config.load()
+    monkeypatch.setattr(config, "CONFIG_FILE", new_yaml)
+    cfg = config.load()
     assert "work" in cfg.personal.accounts
     assert cfg.personal.accounts["work"]["reader"]["kind"] == "thunderbird-mbox"
 

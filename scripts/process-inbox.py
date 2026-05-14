@@ -19,16 +19,8 @@ from pathlib import Path
 
 from core import ollama_client
 
-from core.config import (
-    RAW_ARTICLES_DIR,
-    RAW_AUDIO_DIR,
-    RAW_DIR,
-    RAW_NOTES_DIR,
-    RAW_PAPERS_DIR,
-    RAW_TRANSCRIPTS_DIR,
-    ROOT_DIR,
-    today_iso,
-)
+from core.paths import RAW_ARTICLES_DIR, RAW_AUDIO_DIR, RAW_DIR, RAW_NOTES_DIR, RAW_PAPERS_DIR, RAW_TRANSCRIPTS_DIR, ROOT_DIR
+from core.utils import today_iso
 
 logging.basicConfig(
     level=logging.INFO,
@@ -37,7 +29,7 @@ logging.basicConfig(
 )
 log = logging.getLogger("inbox")
 
-from core.wiki_config import CONFIG
+from core.config import CONFIG
 
 INBOX_DIR = ROOT_DIR / "inbox"
 DEFAULT_MODEL = CONFIG.models.classify_model

@@ -31,8 +31,9 @@ import html2text
 import httpx
 
 from core import ollama_client
-from core.config import RAW_ARTICLES_DIR, RAW_DIR, RAW_NOTES_DIR, ROOT_DIR, today_iso
-from core.wiki_config import CONFIG
+from core.paths import RAW_ARTICLES_DIR, RAW_DIR, RAW_NOTES_DIR, ROOT_DIR
+from core.utils import today_iso
+from core.config import CONFIG
 
 logging.basicConfig(
     level=logging.INFO,

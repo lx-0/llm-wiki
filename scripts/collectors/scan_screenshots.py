@@ -32,9 +32,9 @@ import httpx  # noqa: E402  exception types only; HTTP via ollama_client
 
 from collectors.base import Collector, CollectorSpec, RunResult, register
 from core import ollama_client
-from core.config import RAW_DIR, ROOT_DIR, STATE_DIR, TIMEZONE, now_iso
-from core.utils import load_json_state, save_json_state
-from core.wiki_config import CONFIG
+from core.paths import RAW_DIR, ROOT_DIR, STATE_DIR
+from core.config import CONFIG, TIMEZONE
+from core.utils import load_json_state, now_iso, save_json_state
 
 # ── Config ──────────────────────────────────────────────────────────
 

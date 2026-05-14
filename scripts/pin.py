@@ -34,7 +34,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from core.config import KNOWLEDGE_DIR, ROOT_DIR
+from core.paths import KNOWLEDGE_DIR, ROOT_DIR
 
 TYPE_TO_MOC = {
     "concept": "concepts",

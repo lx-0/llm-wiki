@@ -33,8 +33,9 @@ from claude_agent_sdk import (
 import time
 
 from core.agent_spec import AgentSpec, SpecError, list_specs, parse_spec
-from core.config import AGENT_SPECS_DIR, LOGS_DIR, now_iso, today_iso
-from core.wiki_config import CONFIG  # noqa: E402
+from core.paths import AGENT_SPECS_DIR, LOGS_DIR
+from core.utils import now_iso, today_iso
+from core.config import CONFIG  # noqa: E402
 from core.sdk_helpers import StderrCapture, log_sdk_failure  # noqa: E402
 
 logging.basicConfig(

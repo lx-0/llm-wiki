@@ -22,6 +22,7 @@
 #   wiki collect --list        list registered Collectors
 #   wiki collect <name>        run one Collector (--dry-run | --incremental | --account ID)
 #   wiki gmail-auth <id>       OAuth bootstrap for a Gmail account-id (one-time)
+#   wiki gmeet-auth <id>       OAuth bootstrap for Google Meet transcripts (one-time)
 #   wiki update                git pull --ff-only the .wiki/ checkout (preserves config.yaml)
 #   wiki seed                  re-seed missing vault templates (additive, safe)
 #   wiki seed --force          overwrite existing vault templates with engine versions
@@ -854,6 +855,38 @@ sys.exit(0 if ok else 1)
 "
 }
 
+cmd_gmeet_auth() {
+  local account_id="${1:-}"
+  if [[ -z "$account_id" || "$account_id" == "-h" || "$account_id" == "--help" ]]; then
+    cat <<EOF
+${C_BOLD}wiki gmeet-auth${C_RESET} — one-time OAuth bootstrap for Google Meet transcripts
+
+${C_BOLD}USAGE${C_RESET}
+  wiki gmeet-auth <account-id>
+
+${C_BOLD}WHAT IT DOES${C_RESET}
+  Reads .claude/google-oauth-client.json (or .claude/gmail-oauth-client.json
+  as a fallback — you provide this, an installed-app OAuth client from
+  console.cloud.google.com), opens a local-loopback browser for consent
+  (scope: drive.meet.readonly), persists the token to
+  .wiki/state/gmeet-token-<id>.json. Re-running re-issues consent.
+
+  <account-id> must match CONFIG.personal.gmeet.oauth_account_id.
+
+${C_BOLD}EXAMPLES${C_RESET}
+  wiki gmeet-auth work    # consent flow for personal.gmeet.oauth_account_id: work
+EOF
+    return 0
+  fi
+  uv run --quiet --project "$WIKI_DIR" python -c "
+import sys; sys.path.insert(0, '$WIKI_DIR/scripts')
+from collectors.gmeet import gmeet_auth_bootstrap
+ok, msg = gmeet_auth_bootstrap('$account_id')
+print(msg)
+sys.exit(0 if ok else 1)
+"
+}
+
 cmd_version() {
   if [[ -d "$WIKI_DIR/.git" ]]; then
     local rev; rev="$(git -C "$WIKI_DIR" rev-parse --short HEAD)"
@@ -899,6 +932,7 @@ case "${1:-}" in
   skills)           shift; cmd_skills "$@" ;;
   collect)          shift; cmd_collect "$@" ;;
   gmail-auth)       shift; cmd_gmail_auth "$@" ;;
+  gmeet-auth)       shift; cmd_gmeet_auth "$@" ;;
   update)           shift; cmd_update "$@" ;;
   seed)             shift; cmd_seed "$@" ;;
   compile)          shift; cmd_compile "$@" ;;

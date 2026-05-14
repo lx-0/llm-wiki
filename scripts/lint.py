@@ -16,15 +16,7 @@ from pathlib import Path
 
 from claude_agent_sdk import ClaudeAgentOptions, ResultMessage, query
 
-from core.config import (
-    DAILY_DIR,
-    KNOWLEDGE_DIR,
-    RAW_DIR,
-    REPORTS_DIR,
-    ROOT_DIR,
-    now_iso,
-    today_iso,
-)
+from core.paths import DAILY_DIR, KNOWLEDGE_DIR, RAW_DIR, REPORTS_DIR, ROOT_DIR
 from core.utils import (
     count_inbound_links,
     extract_wikilinks,
@@ -33,9 +25,11 @@ from core.utils import (
     list_raw_files,
     list_wiki_articles,
     load_state,
+    now_iso,
     read_all_wiki_content,
     read_wiki_index,
     save_state,
+    today_iso,
     wiki_article_exists,
 )
 
@@ -47,7 +41,7 @@ logging.basicConfig(
 )
 log = logging.getLogger("lint")
 
-from core.wiki_config import CONFIG  # noqa: E402
+from core.config import CONFIG  # noqa: E402
 
 SPARSE_THRESHOLD = CONFIG.limits.sparse_threshold_words
 
@@ -75,7 +69,7 @@ def _wikilink_target_exists(link: str) -> bool:
     in-knowledge bare names go through `wiki_article_exists`; substrate
     paths (daily/, raw/) resolve as-given against `ROOT_DIR`.
     """
-    from core.config import ROOT_DIR
+    from core.paths import ROOT_DIR
     if link.startswith(("daily/", "raw/")):
         # Substrate path — resolve verbatim against vault root.
         # Tolerate both with-suffix (`daily/X.md`) and without (`daily/X`).

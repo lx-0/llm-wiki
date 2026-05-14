@@ -21,7 +21,7 @@ import logging
 import re
 from pathlib import Path
 
-from core.config import RAW_ARTICLES_DIR, ROOT_DIR, STATE_DIR
+from core.paths import RAW_ARTICLES_DIR, ROOT_DIR, STATE_DIR
 
 log = logging.getLogger(__name__)
 

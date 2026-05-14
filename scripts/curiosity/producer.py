@@ -16,10 +16,10 @@ from pathlib import Path
 import httpx  # noqa: E402  exception types only; HTTP via ollama_client
 
 from core import ollama_client
-from core.config import KNOWLEDGE_DIR, ROOT_DIR, now_iso, today_iso
+from core.paths import KNOWLEDGE_DIR, ROOT_DIR
+from core.utils import now_iso, read_wiki_index_compact, today_iso
 from core.prompts import render
-from core.utils import read_wiki_index_compact
-from core.wiki_config import CONFIG
+from core.config import CONFIG
 
 log = logging.getLogger("compile")
 

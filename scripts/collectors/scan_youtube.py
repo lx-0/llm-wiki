@@ -38,8 +38,9 @@ import yaml
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from collectors.base import Collector, CollectorSpec, RunResult, register
-from core.config import RAW_DIR, now_iso
-from core.wiki_config import CONFIG
+from core.paths import RAW_DIR
+from core.utils import now_iso
+from core.config import CONFIG
 
 # yt-dlp + youtube-transcript-api are imported lazily so --help works
 # without the deps installed.

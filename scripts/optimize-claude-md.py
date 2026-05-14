@@ -22,9 +22,9 @@ from pathlib import Path
 
 from claude_agent_sdk import ClaudeAgentOptions, ResultMessage, query
 
-from core.config import KNOWLEDGE_DIR, ROOT_DIR, now_iso
-from core.wiki_config import CONFIG
-from core.utils import read_wiki_index_compact
+from core.paths import KNOWLEDGE_DIR, ROOT_DIR
+from core.utils import now_iso, read_wiki_index_compact
+from core.config import CONFIG
 
 # ── Config ──────────────────────────────────────────────────────────
 

@@ -26,8 +26,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import yaml
 
-from core.config import RAW_SUGGESTIONS_DIR, ROOT_DIR, TIMEZONE
-from core.wiki_config import CONFIG
+from core.paths import RAW_SUGGESTIONS_DIR, ROOT_DIR
+from core.config import CONFIG, TIMEZONE
 
 from adapters.mailbox import resolve_filter
 from suggestions.backends import imap as imap_actions
