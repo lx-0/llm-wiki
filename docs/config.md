@@ -202,7 +202,7 @@ personal:
 
 - `thunderbird-mbox` — reads local mbox files a Thunderbird profile already synced. No credentials in the engine; the mail client owns auth. Keys: `mbox_paths` (relative to `personal.thunderbird_profile`).
 - `gmail-api` — Gmail API over OAuth2. Needs an OAuth client at `.claude/gmail-oauth-client.json` and a one-time `wiki gmail-auth <id>`. No extra `reader` keys.
-- `imap` — generic IMAP, for accounts with **no local client and no Google Cloud project**. Auth is an IMAP login with a username + **app password** (Gmail: enable 2FA, then generate an App Password). Keys: `imap_host` (required), `imap_pass_env` (required — env-var *name* holding the password), `imap_user_env` (optional — env-var name for the username; omit → falls back to `account.email`), `folders` (optional list — only scan these; omit → all folders).
+- `imap` — generic IMAP, for accounts with **no local client and no Google Cloud project**. Auth is an IMAP login with a username + **app password**. For Gmail: enable 2-Step Verification, then generate an App Password (`myaccount.google.com/apppasswords`) — it is **16 lowercase letters**; paste those 16 chars into `.env` **without the display spaces** (Google shows it grouped as `xxxx xxxx xxxx xxxx`). Keys: `imap_host` (required), `imap_pass_env` (required — env-var *name* holding the password), `imap_user_env` (optional — env-var name for the username; omit → falls back to `account.email`), `folders` (optional list — only scan these; omit → all folders, which on Gmail includes the `[Gmail]/All Mail` per-label duplicate).
 
 The pre-M002 flat-account schema (`mbox_paths`, `imap_host`, `has_procmail` directly on the account) is rejected at config load with an explicit migration error. Note this only rejects those keys at the *account* level — nested inside `reader:` / `filter:` they are the normal schema.
 
@@ -239,7 +239,7 @@ Loaded automatically at import via `core.config.load_dotenv(<vault>/.claude/.env
 |---|---|---|
 | `OPENAI_API_KEY` | Whisper audio transcription (and future OpenAI paths) | — |
 | `JAMIE_API_KEY` | `collectors/jamie.py` | Pro/Team/Enterprise plan. `jk_` prefix. Generate in Jamie: Settings → Developers → API Keys. |
-| `IMAP_<ACCOUNT>_USER` / `_PASS` | `suggestions/backends/imap.py`, `adapters/mailbox/allinkl.py` | `<ACCOUNT>` matches the value of `imap_user_env` / `imap_pass_env` in the account's `filter` block. Gmail/2FA needs an App Password. |
+| `IMAP_<ACCOUNT>_USER` / `_PASS` | `adapters/mailbox/imap.py` (`imap` reader), `suggestions/backends/imap.py`, `adapters/mailbox/allinkl.py` | `<ACCOUNT>` matches the value of `imap_user_env` / `imap_pass_env` in the account's `reader` (kind: imap) or `filter` block. Gmail needs an App Password — 16 lowercase chars, pasted without the display spaces. |
 | `NAS_HOST` / `NAS_USER` / `NAS_PASS` | Future `scan-nas.py` / SMB-backed collectors | — |
 | `LINKEDIN_EMAIL` / `LINKEDIN_PASSWORD` | adhikasp/mcp-linkedin MCP server | **Not loaded from `.env`** — set in `~/.claude.json` under `mcpServers.linkedin.env`. Listed only as a reminder. |
 

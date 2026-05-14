@@ -49,9 +49,17 @@ def _fetch_row(subject: str, sender: str, date: datetime | None, *, internaldate
 
 
 class FakeIMAPClient:
-    """In-memory IMAPClient stand-in. FOLDERS: {folder_name: {uid: fetch_row}}."""
+    """In-memory IMAPClient stand-in. FOLDERS: {folder_name: {uid: fetch_row}}.
+
+    NOSELECT: folder names that carry the `\\Noselect` flag and raise on
+    select_folder — faithful to Gmail's `[Gmail]` namespace container.
+    SELECTED_LOG: every folder select_folder was *attempted* on, so a test
+    can assert a folder was skipped, not merely caught.
+    """
 
     FOLDERS: dict[str, dict[int, dict]] = {}
+    NOSELECT: set[str] = set()
+    SELECTED_LOG: list[str] = []
     RAISE_ON_LOGIN = False
 
     def __init__(self, host, port=993, ssl=True) -> None:
@@ -67,9 +75,16 @@ class FakeIMAPClient:
             raise RuntimeError("authentication failed")
 
     def list_folders(self):
-        return [((), b"/", name) for name in FakeIMAPClient.FOLDERS]
+        out = []
+        for name in FakeIMAPClient.FOLDERS:
+            flags = (b"\\Noselect",) if name in FakeIMAPClient.NOSELECT else (b"\\HasNoChildren",)
+            out.append((flags, b"/", name))
+        return out
 
     def select_folder(self, name, readonly=False):
+        FakeIMAPClient.SELECTED_LOG.append(name)
+        if name in FakeIMAPClient.NOSELECT:
+            raise Exception(f"[NONEXISTENT] Unknown Mailbox: {name}")
         self._selected = name
 
     def search(self, criteria):  # noqa: ARG002  fake ignores SINCE on purpose
@@ -87,6 +102,8 @@ class FakeIMAPClient:
 def _fake_imapclient(monkeypatch: pytest.MonkeyPatch):
     """Swap in the fake + a clean slate per test."""
     FakeIMAPClient.FOLDERS = {}
+    FakeIMAPClient.NOSELECT = set()
+    FakeIMAPClient.SELECTED_LOG = []
     FakeIMAPClient.RAISE_ON_LOGIN = False
     monkeypatch.setattr("imapclient.IMAPClient", FakeIMAPClient)
     monkeypatch.setenv("TEST_IMAP_PASS", "app-password-1234")
@@ -153,6 +170,23 @@ def test_scan_metadata_folder_allowlist() -> None:
     }
     metas = list(_reader(folders=["INBOX"]).scan_metadata())
     assert {m.subject for m in metas} == {"keep"}
+
+
+def test_scan_metadata_skips_noselect_folders() -> None:
+    """`\\Noselect` folders (Gmail's `[Gmail]` container) are never selected —
+    not merely caught after a failed SELECT. Asserts via SELECTED_LOG.
+    """
+    FakeIMAPClient.FOLDERS = {
+        "[Gmail]": {},  # noselect namespace container
+        "[Gmail]/All Mail": {1: _fetch_row("real", "a@x.com", datetime(2026, 5, 10, tzinfo=timezone.utc))},
+    }
+    FakeIMAPClient.NOSELECT = {"[Gmail]"}
+
+    metas = list(_reader().scan_metadata())
+
+    assert {m.subject for m in metas} == {"real"}
+    assert "[Gmail]" not in FakeIMAPClient.SELECTED_LOG  # skipped, not attempted
+    assert "[Gmail]/All Mail" in FakeIMAPClient.SELECTED_LOG
 
 
 def test_scan_metadata_graceful_without_credentials(monkeypatch: pytest.MonkeyPatch) -> None:

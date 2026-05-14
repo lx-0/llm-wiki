@@ -259,10 +259,10 @@ def _render_delta_report(
 
     One file per account. Unlike the full-sweep overview (which aggregates,
     because a mailbox can hold 50k messages), a delta is a bounded set — so
-    it lists each new message: date, sender, subject. The subject is the
-    highest-signal metadata field and is what the compiler actually distils
-    from; folder counts + sender domains alone give it nothing to work with.
-    Grouped by folder, newest message first.
+    it lists each new message: date+time, sender, subject. The subject is the
+    highest-signal field and is what the compiler actually distils from; the
+    timestamp orders same-day messages and lets the compiler reason about
+    recency. Grouped by folder, newest message first.
     """
     folders = Counter(m.folder for m in messages)
 
@@ -298,7 +298,7 @@ def _render_delta_report(
         for m in folder_msgs:
             subject = " ".join(m.subject.split()) or "(kein Betreff)"
             sender = m.from_addr or "(unbekannt)"
-            lines.append(f"- `{m.date:%m-%d}` {sender} — {subject}")
+            lines.append(f"- `{m.date:%m-%d %H:%M}` {sender} — {subject}")
         lines.append("")
 
     return "\n".join(lines)

@@ -121,9 +121,17 @@ class ImapReader:
             _quiet_logout(client)
 
     def _target_folders(self, client) -> list[tuple[str, str]]:
-        """(raw_name, normalised_name) pairs to scan, honouring the optional allowlist."""
+        """(raw_name, normalised_name) pairs to scan, honouring the optional allowlist.
+
+        Skips `\\Noselect` / `\\NonExistent` folders — IMAP hierarchy parents
+        that exist in the namespace but cannot be SELECTed (Gmail's `[Gmail]`
+        container is the canonical case; selecting it raises `[NONEXISTENT]`).
+        """
         out: list[tuple[str, str]] = []
-        for _flags, delim, name in client.list_folders():
+        for flags, delim, name in client.list_folders():
+            flag_names = {f.decode() if isinstance(f, bytes) else f for f in flags}
+            if r"\Noselect" in flag_names or r"\NonExistent" in flag_names:
+                continue
             norm = _normalise_folder(name, delim)
             if self._folders is not None and norm not in self._folders:
                 continue

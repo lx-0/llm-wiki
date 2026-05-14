@@ -192,7 +192,7 @@ personal:
   #     reader:
   #       kind: imap
   #       imap_host: imap.gmail.com
-  #       imap_pass_env: IMAP_PERSONAL_GMAIL_PASS         # Google App Password (account needs 2FA)
+  #       imap_pass_env: IMAP_PERSONAL_GMAIL_PASS         # Google App Password: 16 lowercase chars, no spaces, needs 2FA
   #       # imap_user_env: ...                           # optional; omit → uses account.email
   #       # folders: [INBOX]                             # optional allowlist; omit → all folders
   accounts: {}

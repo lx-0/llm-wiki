@@ -305,6 +305,8 @@ def test_incremental_emits_delta(
     assert "## INBOX/Work" in content
     assert "— subject-2" in content and "— subject-3" in content
     assert "bob@example.com" in content
+    # Per-message line carries date+time, not just the date.
+    assert "`05-10 09:00`" in content and "`05-12 15:00`" in content
     assert "subject-1" not in content  # the pre-watermark message is excluded
     # Watermark advanced past the seeded value.
     state = json.loads(_isolate_email_state.read_text(encoding="utf-8"))
