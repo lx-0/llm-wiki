@@ -58,6 +58,12 @@ Applied at four prompt-embedding call sites: `compile.py` (main + curiosity), `s
 
 `lint.py:check_orphan_pages` still uses `read_wiki_index()` (full content, no LLM call) — different consumer pattern, no fix needed.
 
+#### Follow-up (2026-05-14): `query.py` was a missed call site
+
+The `94c9d6b` sweep enumerated compile / suggestions / optimize-claude-md but missed `query.py` — the worst offender. It embedded `read_all_wiki_content()` (index **plus every article body**), not just the index. On the 852-article lxw vault that was 4,484,234 chars → query failed deterministically with the same exit-1 / empty-stderr profile after 8.6 s. Fixed the same way: `read_wiki_index_compact()` + Grep/Read-on-demand workflow in `query_main.md` / `query_file_back.md`. Smoke: 4,484,234 → 52,262 chars (98.8% reduction).
+
+Audit caveat: `optimize-claude-md.py:80` still passes `wiki_content=read_all_wiki_content()` into its prompt (`${wiki_content}` live in `optimize_claude_md.md:17`) — the `94c9d6b` commit added the compact index *alongside* but never removed the full-body embed. Same latent overflow, not yet triggered (runs against the engine repo, not lxw). Lesson: **when porting a fix-pattern across call sites, diff the prompt template too — adding the new var doesn't remove the old one.**
+
 #### Lesson
 
 In-context body embeds that grow linearly with the corpus (an index, a log, a catalogue) become a context-overflow ticking bomb. The Karpathy-style pattern is **pointer-first**: tell the LLM what file to look at, hand over Read/Grep/Glob, let it fetch on demand. Body-embed is fine for small fixed surfaces (facts, AGENTS schema) and bad for growth surfaces (index, log, daily archive). Apply this whenever a `${var}` substitution in a prompt template carries a linearly-growing artifact.

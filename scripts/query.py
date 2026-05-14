@@ -24,8 +24,8 @@ from core.config import KNOWLEDGE_DIR, QA_DIR, ROOT_DIR, now_iso, today_iso
 from core.wiki_config import CONFIG
 from core.utils import (
     load_state,
-    read_all_wiki_content,
     read_hard_facts,
+    read_wiki_index_compact,
     save_state,
     slugify,
 )
@@ -61,15 +61,18 @@ async def main() -> None:
 
     log.info("Query: %s (file_back=%s)", question, file_back)
 
-    # Load entire wiki content for context
-    wiki_content = read_all_wiki_content()
+    # Embed only the compact article index (path + date); the agent pulls
+    # full article bodies on demand via Read/Grep/Glob. Embedding every
+    # article body here overflowed the model's context window once the
+    # vault grew large (4.4 MB / >1M tokens on the 850-article lxw vault).
+    index_md = read_wiki_index_compact()
     facts_md = read_hard_facts()
 
     if file_back:
         QA_DIR.mkdir(parents=True, exist_ok=True)
         prompt = render(
             "query_file_back",
-            wiki_content=wiki_content,
+            index_md=index_md,
             facts_md=facts_md,
             question=question,
             today=today_iso(),
@@ -79,7 +82,7 @@ async def main() -> None:
     else:
         prompt = render(
             "query_main",
-            wiki_content=wiki_content,
+            index_md=index_md,
             facts_md=facts_md,
             question=question,
         )
