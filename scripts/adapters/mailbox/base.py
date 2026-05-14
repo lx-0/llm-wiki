@@ -20,6 +20,22 @@ from typing import Iterator, Protocol, runtime_checkable
 from domain.mail import FilterRule, Message, MessageMeta
 
 
+# ── Failure signal ───────────────────────────────────────────────────
+
+class MailboxReadError(RuntimeError):
+    """A reader could not complete a scan of a *configured* account.
+
+    Raised for: missing/invalid credentials, connect failure, login failure,
+    an aborting backend error. NOT raised for "scanned fine, 0 new messages"
+    (that stays an empty iterator) nor for "no reader configured" (such an
+    account never reaches the scan loop).
+
+    The collector catches this per-account: it leaves the account's watermark
+    untouched (so the next run retries the same window — self-healing) and
+    surfaces the error instead of silently advancing past unread mail.
+    """
+
+
 # ── Read side ────────────────────────────────────────────────────────
 
 @runtime_checkable

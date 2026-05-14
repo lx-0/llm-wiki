@@ -60,6 +60,7 @@ class RunResult:
     files_skipped: int = 0
     state_keys_touched: tuple[str, ...] = ()
     message: str = ""  # one-line operator-facing summary
+    errors: tuple[str, ...] = ()  # per-account scan failures (e.g. MailboxReadError)
 
 
 # ── Collector Protocol ───────────────────────────────────────────────

@@ -18,7 +18,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Iterator
 
-from adapters.mailbox.base import ApplyResult
+from adapters.mailbox.base import ApplyResult, MailboxReadError
 from core.config import ROOT_DIR, STATE_DIR
 from domain.mail import FilterRule, Message, MessageMeta
 
@@ -59,8 +59,7 @@ class GmailReader:
     ) -> Iterator[MessageMeta]:
         session, err = _session(self._account_id)
         if err:
-            log.warning("GmailReader.scan_metadata: %s", err)
-            return
+            raise MailboxReadError(f"GmailReader[{self._account_id}]: {err}")
 
         query_parts: list[str] = []
         if folder:
@@ -78,8 +77,10 @@ class GmailReader:
                 params["pageToken"] = page_token
             resp = session.get(f"{_API_BASE}/messages", params=params)
             if resp.status_code != 200:
-                log.warning("Gmail messages.list HTTP %s: %s", resp.status_code, resp.text[:200])
-                return
+                raise MailboxReadError(
+                    f"GmailReader[{self._account_id}]: messages.list HTTP "
+                    f"{resp.status_code}: {resp.text[:200]}"
+                )
             data = resp.json()
             for ref in data.get("messages") or ():
                 meta = _fetch_metadata(session, self._account_id, ref["id"])
@@ -97,8 +98,7 @@ class GmailReader:
     ) -> Iterator[Message]:
         session, err = _session(self._account_id)
         if err:
-            log.warning("GmailReader.scan_deep: %s", err)
-            return
+            raise MailboxReadError(f"GmailReader[{self._account_id}]: {err}")
 
         query_parts = [f"label:{folder}"]
         if since is not None:
@@ -113,7 +113,10 @@ class GmailReader:
                 params["pageToken"] = page_token
             resp = session.get(f"{_API_BASE}/messages", params=params)
             if resp.status_code != 200:
-                return
+                raise MailboxReadError(
+                    f"GmailReader[{self._account_id}]: messages.list HTTP "
+                    f"{resp.status_code}: {resp.text[:200]}"
+                )
             data = resp.json()
             for ref in data.get("messages") or ():
                 msg = _fetch_full(session, self._account_id, ref["id"])

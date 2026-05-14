@@ -54,11 +54,41 @@ def _run_one(name: str, *, dry_run: bool, incremental: bool, account: str | None
     print(result.message)
     print(f"  files written: {len(result.files_written)}")
     print(f"  files skipped: {result.files_skipped}")
+    if result.errors:
+        # Surface scan failures loudly + exit non-zero — a piggyback run's
+        # output is DEVNULL'd by flush.py, but the FileHandler keeps a trace
+        # and the exit code lets any wrapper detect the failure.
+        print(f"  errors: {len(result.errors)}", file=sys.stderr)
+        for err in result.errors:
+            print(f"    ✗ {err}", file=sys.stderr)
+        sys.exit(1)
     sys.exit(0)
 
 
+def _setup_logging() -> None:
+    """Console (stderr, terse) + a persistent timestamped file.
+
+    Piggyback collector runs are spawned by `flush.py` with stdout/stderr
+    routed to DEVNULL — without the FileHandler a failed run would leave no
+    trace at all. `logs/collectors.log` is that trace.
+    """
+    from core.config import LOGS_DIR
+
+    LOGS_DIR.mkdir(parents=True, exist_ok=True)
+    root = logging.getLogger()
+    root.setLevel(logging.INFO)
+
+    console = logging.StreamHandler(sys.stderr)
+    console.setFormatter(logging.Formatter("%(levelname)s %(message)s"))
+    root.addHandler(console)
+
+    file_handler = logging.FileHandler(LOGS_DIR / "collectors.log", encoding="utf-8")
+    file_handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
+    root.addHandler(file_handler)
+
+
 def main() -> NoReturn:
-    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
+    _setup_logging()
 
     parser = argparse.ArgumentParser(prog="wiki collect")
     parser.add_argument("--list", action="store_true", help="enumerate registered collectors")

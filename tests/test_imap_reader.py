@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from adapters.mailbox import MailboxReader, resolve_reader
+from adapters.mailbox import MailboxReader, MailboxReadError, resolve_reader
 from adapters.mailbox.imap import ImapReader
 
 imapclient = pytest.importorskip("imapclient")
@@ -189,18 +189,22 @@ def test_scan_metadata_skips_noselect_folders() -> None:
     assert "[Gmail]/All Mail" in FakeIMAPClient.SELECTED_LOG
 
 
-def test_scan_metadata_graceful_without_credentials(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Unset password env var → warning logged, scan yields nothing, no crash."""
+def test_scan_metadata_raises_without_credentials(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Unset password env var → MailboxReadError, NOT a silent empty scan —
+    the collector must be able to tell "couldn't read" from "0 new mail".
+    """
     monkeypatch.delenv("TEST_IMAP_PASS", raising=False)
     FakeIMAPClient.FOLDERS = {"INBOX": {1: _fetch_row("x", "a@x.com", datetime(2026, 5, 10, tzinfo=timezone.utc))}}
-    assert list(_reader().scan_metadata()) == []
+    with pytest.raises(MailboxReadError):
+        list(_reader().scan_metadata())
 
 
-def test_scan_metadata_graceful_on_login_failure() -> None:
-    """Bad app password → IMAP login raises → caught, yields nothing."""
+def test_scan_metadata_raises_on_login_failure() -> None:
+    """Bad app password → IMAP login fails → surfaced as MailboxReadError."""
     FakeIMAPClient.RAISE_ON_LOGIN = True
     FakeIMAPClient.FOLDERS = {"INBOX": {1: _fetch_row("x", "a@x.com", datetime(2026, 5, 10, tzinfo=timezone.utc))}}
-    assert list(_reader().scan_metadata()) == []
+    with pytest.raises(MailboxReadError):
+        list(_reader().scan_metadata())
 
 
 # ── resolve_reader dispatch ──────────────────────────────────────────

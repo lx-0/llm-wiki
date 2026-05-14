@@ -25,7 +25,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterator
 
-from adapters.mailbox.base import ApplyResult
+from adapters.mailbox.base import ApplyResult, MailboxReadError
 from domain.mail import (
     FilterAction,
     FilterCondition,
@@ -56,11 +56,27 @@ class ThunderbirdMboxReader:
                 names.add(folder_name)
         return sorted(names)
 
+    def _check_roots(self) -> None:
+        """Raise if no configured mbox root is readable.
+
+        An empty `mbox_paths`, or paths that all point at a vanished
+        Thunderbird profile, is a misconfiguration the operator must see —
+        not a silent "0 new messages". Per-file open errors stay graceful
+        (logged + skipped in `_iter_metadata`); only an *account*-wide dead
+        end raises (see `MailboxReadError`).
+        """
+        if not any(root.exists() for root in self._roots):
+            raise MailboxReadError(
+                f"ThunderbirdMboxReader[{self._account_id}]: no mbox root exists — "
+                f"checked {[str(r) for r in self._roots] or '(no mbox_paths configured)'}"
+            )
+
     def scan_metadata(
         self,
         folder: str | None = None,
         since: datetime | None = None,
     ) -> Iterator[MessageMeta]:
+        self._check_roots()
         for root in self._roots:
             if not root.exists():
                 continue
@@ -73,6 +89,7 @@ class ThunderbirdMboxReader:
         limit: int = 0,
         since: datetime | None = None,
     ) -> Iterator[Message]:
+        self._check_roots()
         emitted = 0
         for root in self._roots:
             if not root.exists():

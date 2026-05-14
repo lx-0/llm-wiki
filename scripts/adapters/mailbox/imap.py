@@ -12,9 +12,12 @@ Stateless per the `MailboxReader` Protocol: each call opens a fresh
 connection, does its work, logs out. No connection pooling — a collector
 run is one search + one batched fetch per folder, then exit.
 
-Graceful-agnostic: a missing `imap_host` or unset credential env vars →
-a warning is logged and the scan yields nothing. The collector is never
-crashed by an unconfigured or unreachable IMAP account.
+Failure contract: a configured account that can't be scanned — missing
+`imap_host`, unset credential env vars, connect failure, login failure —
+raises `MailboxReadError` from `scan_metadata` / `scan_deep`. The collector
+catches it, leaves the account's watermark untouched (next run retries) and
+surfaces the error. `list_folders` is informational and stays graceful
+(catches → `[]`).
 """
 
 from __future__ import annotations
@@ -26,6 +29,7 @@ import os
 from datetime import datetime, timezone
 from typing import Iterator
 
+from adapters.mailbox.base import MailboxReadError
 from domain.mail import Message, MessageMeta
 
 log = logging.getLogger(__name__)
@@ -57,26 +61,24 @@ class ImapReader:
 
     # ── credentials + connection ─────────────────────────────────────
 
-    def _credentials(self) -> tuple[str, str] | None:
-        """(user, password), or None with a logged warning if unconfigured."""
+    def _credentials(self) -> tuple[str, str]:
+        """(user, password). Raises MailboxReadError if host/creds are unset."""
         if not self._host:
-            log.warning("ImapReader[%s]: no imap_host configured — skipping.", self._account_id)
-            return None
+            raise MailboxReadError(
+                f"ImapReader[{self._account_id}]: no imap_host configured"
+            )
         user = (os.environ.get(self._user_env, "") if self._user_env else "") or self._default_user
         password = os.environ.get(self._pass_env, "") if self._pass_env else ""
         if not user or not password:
-            log.warning(
-                "ImapReader[%s]: missing IMAP credentials — set $%s (app password) "
-                "and either $%s or account.email (user). Skipping.",
-                self._account_id,
-                self._pass_env or "<imap_pass_env>",
-                self._user_env or "<imap_user_env>",
+            raise MailboxReadError(
+                f"ImapReader[{self._account_id}]: missing IMAP credentials — set "
+                f"${self._pass_env or '<imap_pass_env>'} (app password) and either "
+                f"${self._user_env or '<imap_user_env>'} or account.email (user)"
             )
-            return None
         return user, password
 
     def _connect(self):
-        """Open + login an IMAPClient, or None (warning logged) on failure.
+        """Open + login an IMAPClient, or raise MailboxReadError on any failure.
 
         `normalise_times` is an *instance attribute* (not a constructor
         kwarg) in imapclient 3.x. Setting it to False keeps INTERNALDATE
@@ -84,31 +86,34 @@ class ImapReader:
         downstream code must never deal with naive datetimes (see
         KNOWLEDGE.md, the undated-mail regression).
         """
-        creds = self._credentials()
-        if creds is None:
-            return None
-        user, password = creds
+        user, password = self._credentials()
         try:
             from imapclient import IMAPClient
-        except ImportError:
-            log.warning("ImapReader[%s]: imapclient not installed (uv sync should provide it).",
-                        self._account_id)
-            return None
+        except ImportError as e:
+            raise MailboxReadError(
+                f"ImapReader[{self._account_id}]: imapclient not installed "
+                "(uv sync should provide it)"
+            ) from e
         try:
             client = IMAPClient(self._host, port=_IMAP_SSL_PORT, ssl=True)
             client.normalise_times = False
             client.login(user, password)
             return client
-        except Exception as e:  # noqa: BLE001  any failure → graceful no-op
-            log.warning("ImapReader[%s]: IMAP connect/login failed: %s: %s",
-                        self._account_id, type(e).__name__, e)
-            return None
+        except Exception as e:  # noqa: BLE001  any connect/login failure
+            raise MailboxReadError(
+                f"ImapReader[{self._account_id}]: IMAP connect/login failed: "
+                f"{type(e).__name__}: {e}"
+            ) from e
 
     # ── folder discovery ─────────────────────────────────────────────
 
     def list_folders(self) -> list[str]:
-        client = self._connect()
-        if client is None:
+        # Informational, not the ingest path — stays graceful (→ []), unlike
+        # scan_metadata / scan_deep which let MailboxReadError propagate.
+        try:
+            client = self._connect()
+        except MailboxReadError as e:
+            log.warning("ImapReader[%s]: list_folders skipped: %s", self._account_id, e)
             return []
         try:
             return sorted(
@@ -145,9 +150,7 @@ class ImapReader:
         folder: str | None = None,
         since: datetime | None = None,
     ) -> Iterator[MessageMeta]:
-        client = self._connect()
-        if client is None:
-            return
+        client = self._connect()  # raises MailboxReadError on connect/login failure
         try:
             targets = self._target_folders(client)
             if folder is not None:
@@ -184,9 +187,7 @@ class ImapReader:
         limit: int = 0,
         since: datetime | None = None,
     ) -> Iterator[Message]:
-        client = self._connect()
-        if client is None:
-            return
+        client = self._connect()  # raises MailboxReadError on connect/login failure
         try:
             targets = [(r, n) for r, n in self._target_folders(client) if n == folder]
             criteria = ["SINCE", since.date()] if since is not None else ["ALL"]

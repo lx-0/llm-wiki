@@ -29,7 +29,7 @@ from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 
-from adapters.mailbox import MailboxReader, resolve_reader
+from adapters.mailbox import MailboxReader, MailboxReadError, resolve_reader
 from collectors.base import Collector, CollectorSpec, RunResult, register
 from core.config import EMAIL_STATE_FILE, ROOT_DIR, now_iso, today_iso
 from domain.mail import MessageMeta
@@ -90,22 +90,34 @@ class EmailCollector:
         """Complete metadata sweep — one overview report per account.
 
         Advances each account's watermark so a subsequent incremental run
-        picks up only what arrived after this sweep.
+        picks up only what arrived after this sweep. A `MailboxReadError`
+        (couldn't reach the mailbox) leaves that account's watermark and
+        prior state untouched and is surfaced — never silently swallowed.
         """
         files_written: list[Path] = []
         skipped = 0
+        errors: list[str] = []
         run_start = now_iso()
         state = _load_state()
         accounts_state = state.setdefault("accounts", {})
 
         for account_id, _account, reader in active_accounts:
             log.info("EmailCollector: scanning %s", account_id)
-            messages = list(reader.scan_metadata())
+            try:
+                messages = list(reader.scan_metadata())
+            except MailboxReadError as e:
+                log.error("EmailCollector: %s — scan FAILED, watermark untouched: %s",
+                          account_id, e)
+                errors.append(f"{account_id}: {e}")
+                if not dry_run:
+                    _record_failure(accounts_state, account_id, str(e), run_start)
+                continue
+
             if not messages:
                 log.info("  %s: 0 messages — skipping report", account_id)
                 skipped += 1
                 if not dry_run:
-                    accounts_state[account_id] = {"last_run_ts": run_start}
+                    _record_success(accounts_state, account_id, run_start)
                 continue
 
             report_path = output_root / f"{account_id}-{today_iso()}.md"
@@ -119,16 +131,20 @@ class EmailCollector:
             report_path.write_text(report_text, encoding="utf-8")
             log.info("  wrote %d-msg report → %s", len(messages), report_path.relative_to(ROOT_DIR))
             files_written.append(report_path)
-            accounts_state[account_id] = {"last_run_ts": run_start}
+            _record_success(accounts_state, account_id, run_start)
 
         if not dry_run:
             _save_state(state)
 
+        message = f"scanned {len(active_accounts)} account(s), wrote {len(files_written)} report(s)"
+        if errors:
+            message += f", {len(errors)} FAILED"
         return RunResult(
             files_written=tuple(files_written),
             files_skipped=skipped,
             state_keys_touched=("accounts",) if not dry_run else (),
-            message=f"scanned {len(active_accounts)} account(s), wrote {len(files_written)} report(s)",
+            message=message,
+            errors=tuple(errors),
         )
 
     # ── Incremental delta ────────────────────────────────────────────
@@ -143,13 +159,20 @@ class EmailCollector:
 
         First run for an account (no watermark, or an unparseable one):
         record a baseline and emit nothing — the operator's one-time bulk
-        ingest must not be re-dumped as a "delta". Every run advances the
-        watermark to the run start time (not the max message date — a
+        ingest must not be re-dumped as a "delta". A successful run advances
+        the watermark to the run start time (not the max message date — a
         bogus future-dated message must not push the watermark forward).
+
+        A `MailboxReadError` (login/connect failure, missing credentials, …)
+        leaves the watermark exactly where it was — so the next run retries
+        the same window instead of skipping past unread mail — and records
+        the error on the account's state entry. The failure is never
+        silently swallowed.
         """
         files_written: list[Path] = []
         skipped = 0
         baselined: list[str] = []
+        errors: list[str] = []
         run_start = now_iso()
         state = _load_state()
         accounts_state = state.setdefault("accounts", {})
@@ -169,12 +192,22 @@ class EmailCollector:
                              account_id)
                 baselined.append(account_id)
                 if not dry_run:
-                    accounts_state[account_id] = {"last_run_ts": run_start}
+                    _record_success(accounts_state, account_id, run_start)
                 continue
 
             log.info("EmailCollector: %s — incremental scan since %s",
                      account_id, since.isoformat())
-            messages = list(reader.scan_metadata(since=since))
+            try:
+                messages = list(reader.scan_metadata(since=since))
+            except MailboxReadError as e:
+                # Scan failed — hold the watermark so the next run retries
+                # this exact window, and surface the error instead of hiding it.
+                log.error("EmailCollector: %s — scan FAILED, watermark held at %s: %s",
+                          account_id, prev.get("last_run_ts"), e)
+                errors.append(f"{account_id}: {e}")
+                if not dry_run:
+                    _record_failure(accounts_state, account_id, str(e), run_start)
+                continue
 
             if messages:
                 report_path = output_root / f"{account_id}-delta-{_now_slug()}.md"
@@ -193,20 +226,24 @@ class EmailCollector:
                 skipped += 1
 
             if not dry_run:
-                accounts_state[account_id] = {"last_run_ts": run_start}
+                _record_success(accounts_state, account_id, run_start)
 
         if not dry_run:
             _save_state(state)
 
+        message = (
+            f"incremental: {len(active_accounts)} account(s), "
+            f"{len(files_written)} delta report(s), "
+            f"{len(baselined)} baselined, {skipped} with no new mail"
+        )
+        if errors:
+            message += f", {len(errors)} FAILED"
         return RunResult(
             files_written=tuple(files_written),
             files_skipped=skipped,
             state_keys_touched=("accounts",) if not dry_run else (),
-            message=(
-                f"incremental: {len(active_accounts)} account(s), "
-                f"{len(files_written)} delta report(s), "
-                f"{len(baselined)} baselined, {skipped} with no new mail"
-            ),
+            message=message,
+            errors=tuple(errors),
         )
 
 
@@ -305,8 +342,34 @@ def _render_delta_report(
 
 
 # ── State persistence ────────────────────────────────────────────────
-# Per-account incremental watermarks. New shape:
-#   {"accounts": {<account_id>: {"last_run_ts": "<iso8601>"}}}
+# Per-account incremental watermarks. Shape:
+#   {"accounts": {<account_id>: {"last_run_ts": "<iso8601>",
+#                                "last_error": "<msg>",          # only if last scan failed
+#                                "last_error_at": "<iso8601>"}}}
+
+def _record_success(accounts_state: dict, account_id: str, run_start: str) -> None:
+    """Advance the watermark and drop any prior error — the scan completed.
+
+    Replacing the whole entry (rather than mutating `last_run_ts`) is what
+    clears a stale `last_error` / `last_error_at`, so the state file always
+    reflects current health.
+    """
+    accounts_state[account_id] = {"last_run_ts": run_start}
+
+
+def _record_failure(accounts_state: dict, account_id: str, error: str, at: str) -> None:
+    """Record a scan failure WITHOUT touching the watermark.
+
+    The watermark stays exactly where it was so the next run retries the
+    same window — no silent skip past unread mail. `last_error` /
+    `last_error_at` make the failure visible and let a recovered account be
+    detected (the next `_record_success` clears them).
+    """
+    entry = dict(accounts_state.get(account_id) or {})
+    entry["last_error"] = error
+    entry["last_error_at"] = at
+    accounts_state[account_id] = entry
+
 
 def _now_slug() -> str:
     """Filename timestamp slug in local time: 2026-05-14T1830."""

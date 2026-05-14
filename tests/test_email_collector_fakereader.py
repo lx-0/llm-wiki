@@ -14,7 +14,7 @@ from typing import Iterator
 
 import pytest
 
-from adapters.mailbox import MailboxReader
+from adapters.mailbox import MailboxReader, MailboxReadError
 from domain.mail import Message, MessageMeta
 
 
@@ -32,11 +32,23 @@ def _isolate_email_state(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Pat
 
 
 class FakeMailboxReader:
-    """In-memory MailboxReader. Seeded with a list of MessageMeta."""
+    """In-memory MailboxReader. Seeded with a list of MessageMeta.
 
-    def __init__(self, account_id: str, messages: list[MessageMeta]) -> None:
+    `raises=` makes `scan_metadata` raise instead of yielding — for testing
+    the collector's failure path (a real reader raises MailboxReadError on
+    connect/login failure).
+    """
+
+    def __init__(
+        self,
+        account_id: str,
+        messages: list[MessageMeta],
+        *,
+        raises: Exception | None = None,
+    ) -> None:
         self._account_id = account_id
         self._messages = messages
+        self._raises = raises
 
     def list_folders(self) -> list[str]:
         return sorted({m.folder for m in self._messages})
@@ -44,6 +56,8 @@ class FakeMailboxReader:
     def scan_metadata(
         self, folder: str | None = None, since: datetime | None = None
     ) -> Iterator[MessageMeta]:
+        if self._raises is not None:
+            raise self._raises
         for m in self._messages:
             if folder is not None and m.folder != folder:
                 continue
@@ -354,6 +368,66 @@ def test_incremental_dry_run_leaves_state_untouched(
     assert result.files_written == ()
     assert list(tmp_path.rglob("*.md")) == []
     assert json.loads(_isolate_email_state.read_text(encoding="utf-8")) == seed
+
+
+def test_incremental_does_not_advance_watermark_on_failure(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    _isolate_email_state: Path,
+) -> None:
+    """A MailboxReadError holds the watermark exactly where it was — so the
+    next run retries the same window — and records last_error. The failure
+    is surfaced in RunResult.errors, never silently swallowed.
+    """
+    seed_ts = "2026-05-05T00:00:00+00:00"
+    _isolate_email_state.write_text(
+        json.dumps({"accounts": {"testacct": {"last_run_ts": seed_ts}}}),
+        encoding="utf-8",
+    )
+    failing_reader = FakeMailboxReader(
+        "testacct", [], raises=MailboxReadError("login failed: bad app password")
+    )
+    email_mod = _email_mod_with_account(monkeypatch, tmp_path, failing_reader)
+
+    result = email_mod.EmailCollector().run(incremental=True)
+
+    # Failure surfaced, no delta written.
+    assert result.files_written == ()
+    assert any("login failed" in e for e in result.errors)
+    assert "FAILED" in result.message
+    # Watermark HELD (not advanced), error recorded + timestamped.
+    entry = json.loads(_isolate_email_state.read_text(encoding="utf-8"))["accounts"]["testacct"]
+    assert entry["last_run_ts"] == seed_ts
+    assert "login failed" in entry["last_error"]
+    assert entry["last_error_at"]
+
+
+def test_incremental_clears_last_error_on_recovery(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    tz_messages: list[MessageMeta],
+    _isolate_email_state: Path,
+) -> None:
+    """A successful scan clears a stale last_error — the state file always
+    reflects current health, not a frozen old failure."""
+    _isolate_email_state.write_text(
+        json.dumps({"accounts": {"testacct": {
+            "last_run_ts": "2026-05-05T00:00:00+00:00",
+            "last_error": "login failed earlier",
+            "last_error_at": "2026-05-13T00:00:00+00:00",
+        }}}),
+        encoding="utf-8",
+    )
+    email_mod = _email_mod_with_account(
+        monkeypatch, tmp_path, FakeMailboxReader("testacct", tz_messages)
+    )
+
+    email_mod.EmailCollector().run(incremental=True)
+
+    entry = json.loads(_isolate_email_state.read_text(encoding="utf-8"))["accounts"]["testacct"]
+    assert "last_error" not in entry
+    assert "last_error_at" not in entry
+    assert entry["last_run_ts"] != "2026-05-05T00:00:00+00:00"  # advanced on success
 
 
 def test_load_state_migrates_legacy_shape(

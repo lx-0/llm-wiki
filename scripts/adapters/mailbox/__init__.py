@@ -26,7 +26,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from .base import ApplyResult, MailboxFilter, MailboxReader
+from .base import ApplyResult, MailboxFilter, MailboxReader, MailboxReadError
 
 log = logging.getLogger(__name__)
 
@@ -118,6 +118,7 @@ def resolve_filter(account: dict[str, Any]) -> MailboxFilter | None:
 __all__ = [
     "ApplyResult",
     "MailboxFilter",
+    "MailboxReadError",
     "MailboxReader",
     "resolve_filter",
     "resolve_reader",
