@@ -197,3 +197,43 @@ def test_new_schema_accepted(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) ->
     cfg = wiki_config.load()
     assert "work" in cfg.personal.accounts
     assert cfg.personal.accounts["work"]["reader"]["kind"] == "thunderbird-mbox"
+
+
+# ── Reader: date normalisation ───────────────────────────────────────
+
+
+def test_reader_normalises_undated_messages_to_aware(tmp_path: Path) -> None:
+    """A message with a missing/unparseable Date header must still yield a
+    tz-aware `date`. A naive fallback crashes `min()`/`max()` in the report
+    renderers (`_render_report` / `_render_delta_report`) the moment it is
+    mixed with the aware dates of normal messages — and the reader does NOT
+    drop undated messages from a since-filtered scan, so every delta would
+    carry one.
+    """
+    import mailbox
+    from datetime import datetime, timezone
+
+    box = mailbox.mbox(str(tmp_path / "INBOX"))
+    dated = mailbox.mboxMessage()
+    dated["From"] = "alice@example.com"
+    dated["Subject"] = "dated"
+    dated["Date"] = "Mon, 11 May 2026 10:00:00 +0000"
+    dated.set_payload("body")
+    undated = mailbox.mboxMessage()
+    undated["From"] = "bob@example.com"
+    undated["Subject"] = "undated"  # no Date header
+    undated.set_payload("body")
+    box.add(dated)
+    box.add(undated)
+    box.flush()
+
+    reader = ThunderbirdMboxReader("testacct", [tmp_path])
+
+    metas = list(reader.scan_metadata())
+    assert len(metas) == 2
+    assert all(m.date.tzinfo is not None for m in metas)
+
+    # The aware-ness must survive a since-filter comparison without TypeError,
+    # and the undated message must not be silently dropped.
+    recent = list(reader.scan_metadata(since=datetime(2026, 5, 1, tzinfo=timezone.utc)))
+    assert {m.subject for m in recent} == {"dated", "undated"}

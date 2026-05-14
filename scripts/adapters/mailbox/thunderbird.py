@@ -21,7 +21,7 @@ import logging
 import mailbox
 import re
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterator
 
@@ -123,8 +123,6 @@ def _parse_date(raw: str) -> datetime | None:
     legacy clients). `min()` over a mixed set raises TypeError. Normalise
     to tz-aware UTC at parse time so downstream code never has to care.
     """
-    from datetime import timezone
-
     try:
         dt = email.utils.parsedate_to_datetime(raw)
     except Exception:
@@ -173,7 +171,7 @@ def _iter_metadata(
             from_addr=from_addr or from_name,
             to_addrs=to_addrs,
             subject=_decode_header(msg.get("Subject", "")),
-            date=date or datetime.fromtimestamp(0),
+            date=date or datetime.fromtimestamp(0, timezone.utc),
             size_bytes=len(bytes(msg)) if hasattr(msg, "as_bytes") else 0,
             in_reply_to=msg.get("In-Reply-To"),
             message_id=msg.get("Message-ID"),
@@ -217,7 +215,7 @@ def _iter_deep(
             from_addr=from_addr or from_name,
             to_addrs=to_addrs,
             subject=_decode_header(msg.get("Subject", "")),
-            date=date or datetime.fromtimestamp(0),
+            date=date or datetime.fromtimestamp(0, timezone.utc),
             size_bytes=len(bytes(msg)) if hasattr(msg, "as_bytes") else 0,
             in_reply_to=msg.get("In-Reply-To"),
             message_id=msg.get("Message-ID"),

@@ -7,7 +7,8 @@ in-memory; pytest exercises EmailCollector against it.
 
 from __future__ import annotations
 
-from datetime import datetime
+import json
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterator
 
@@ -18,6 +19,16 @@ from domain.mail import Message, MessageMeta
 
 
 # ── Fixtures ─────────────────────────────────────────────────────────
+
+
+@pytest.fixture(autouse=True)
+def _isolate_email_state(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
+    """Point EMAIL_STATE_FILE into tmp_path so no test touches real engine state."""
+    from collectors import email_collector as email_mod
+
+    state_file = tmp_path / "email-state.json"
+    monkeypatch.setattr(email_mod, "EMAIL_STATE_FILE", state_file)
+    return state_file
 
 
 class FakeMailboxReader:
@@ -84,6 +95,47 @@ def sample_messages() -> list[MessageMeta]:
             size_bytes=890,
         ),
     ]
+
+
+@pytest.fixture
+def tz_messages() -> list[MessageMeta]:
+    """tz-aware messages — mirrors the real Thunderbird reader, which
+    normalises every Date header to UTC-aware. The incremental path
+    compares against a tz-aware `since`, so its fixtures must be aware too.
+    """
+    def _msg(mid: str, folder: str, sender: str, dt: datetime) -> MessageMeta:
+        return MessageMeta(
+            id=mid,
+            account_id="testacct",
+            folder=folder,
+            from_addr=sender,
+            to_addrs=("operator@example.com",),
+            subject=f"subject-{mid}",
+            date=dt,
+            size_bytes=1024,
+        )
+
+    return [
+        _msg("1", "INBOX", "alice@example.com", datetime(2026, 5, 1, 10, 0, tzinfo=timezone.utc)),
+        _msg("2", "INBOX/Work", "bob@example.com", datetime(2026, 5, 10, 9, 0, tzinfo=timezone.utc)),
+        _msg("3", "INBOX", "alice@example.com", datetime(2026, 5, 12, 15, 0, tzinfo=timezone.utc)),
+    ]
+
+
+def _email_mod_with_account(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, reader: object):
+    """Wire EmailCollector to a single fake-account + injected reader."""
+    from collectors import email_collector as email_mod
+
+    class _PersonalStub:
+        accounts = {"testacct": {"reader": {"kind": "fake"}}}
+
+    class _ConfigStub:
+        personal = _PersonalStub()
+
+    monkeypatch.setattr(email_mod, "CONFIG", _ConfigStub())
+    monkeypatch.setattr(email_mod, "ROOT_DIR", tmp_path)
+    monkeypatch.setattr(email_mod, "resolve_reader", lambda account: reader)
+    return email_mod
 
 
 # ── Protocol conformance ─────────────────────────────────────────────
@@ -195,6 +247,140 @@ def test_email_collector_dry_run_writes_nothing(
     # No files anywhere under tmp_path.
     written = list(tmp_path.rglob("*.md"))
     assert written == []
+
+
+# ── Incremental delta path ───────────────────────────────────────────
+
+
+def test_incremental_first_run_baselines(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    tz_messages: list[MessageMeta],
+    _isolate_email_state: Path,
+) -> None:
+    """First incremental run for an account: record a watermark, emit nothing.
+
+    The operator's one-time bulk ingest must not be re-dumped as a "delta".
+    """
+    email_mod = _email_mod_with_account(
+        monkeypatch, tmp_path, FakeMailboxReader("testacct", tz_messages)
+    )
+
+    result = email_mod.EmailCollector().run(incremental=True)
+
+    assert result.files_written == ()
+    assert "baselined" in result.message
+    assert list(tmp_path.rglob("*.md")) == []
+    # Watermark persisted for the account.
+    state = json.loads(_isolate_email_state.read_text(encoding="utf-8"))
+    assert state["accounts"]["testacct"]["last_run_ts"]
+
+
+def test_incremental_emits_delta(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    tz_messages: list[MessageMeta],
+    _isolate_email_state: Path,
+) -> None:
+    """With a watermark in place, only messages newer than it land in the delta."""
+    _isolate_email_state.write_text(
+        json.dumps({"accounts": {"testacct": {"last_run_ts": "2026-05-05T00:00:00+00:00"}}}),
+        encoding="utf-8",
+    )
+    email_mod = _email_mod_with_account(
+        monkeypatch, tmp_path, FakeMailboxReader("testacct", tz_messages)
+    )
+
+    result = email_mod.EmailCollector().run(incremental=True)
+
+    assert len(result.files_written) == 1
+    report = result.files_written[0]
+    assert report.name.startswith("testacct-delta-")
+    content = report.read_text(encoding="utf-8")
+    assert "type: email-delta" in content
+    assert "# Email Delta — testacct" in content
+    # msg 2 (May 10) + msg 3 (May 12) are after the watermark; msg 1 (May 1) is not.
+    assert "INBOX/Work" in content and "bob@example.com" in content
+    assert "subject-1" not in content  # the pre-watermark message is excluded
+    # Watermark advanced past the seeded value.
+    state = json.loads(_isolate_email_state.read_text(encoding="utf-8"))
+    assert state["accounts"]["testacct"]["last_run_ts"] != "2026-05-05T00:00:00+00:00"
+
+
+def test_incremental_no_new_mail(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    tz_messages: list[MessageMeta],
+    _isolate_email_state: Path,
+) -> None:
+    """Watermark newer than all mail: no report, but the watermark still advances."""
+    _isolate_email_state.write_text(
+        json.dumps({"accounts": {"testacct": {"last_run_ts": "2026-05-20T00:00:00+00:00"}}}),
+        encoding="utf-8",
+    )
+    email_mod = _email_mod_with_account(
+        monkeypatch, tmp_path, FakeMailboxReader("testacct", tz_messages)
+    )
+
+    result = email_mod.EmailCollector().run(incremental=True)
+
+    assert result.files_written == ()
+    assert result.files_skipped == 1
+    state = json.loads(_isolate_email_state.read_text(encoding="utf-8"))
+    assert state["accounts"]["testacct"]["last_run_ts"] != "2026-05-20T00:00:00+00:00"
+
+
+def test_incremental_dry_run_leaves_state_untouched(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    tz_messages: list[MessageMeta],
+    _isolate_email_state: Path,
+) -> None:
+    """--dry-run on the incremental path writes neither a report nor the watermark."""
+    seed = {"accounts": {"testacct": {"last_run_ts": "2026-05-05T00:00:00+00:00"}}}
+    _isolate_email_state.write_text(json.dumps(seed), encoding="utf-8")
+    email_mod = _email_mod_with_account(
+        monkeypatch, tmp_path, FakeMailboxReader("testacct", tz_messages)
+    )
+
+    result = email_mod.EmailCollector().run(incremental=True, dry_run=True)
+
+    assert result.files_written == ()
+    assert list(tmp_path.rglob("*.md")) == []
+    assert json.loads(_isolate_email_state.read_text(encoding="utf-8")) == seed
+
+
+def test_load_state_migrates_legacy_shape(
+    monkeypatch: pytest.MonkeyPatch,
+    _isolate_email_state: Path,
+) -> None:
+    """Legacy per-mbox state → per-account watermarks seeded from last_incremental."""
+    from collectors import email_collector as email_mod
+
+    _isolate_email_state.write_text(
+        json.dumps({
+            "mboxes": {"ImapMail/server/INBOX": {"size": 1, "count": 1, "last_scan": "2026-04-01"}},
+            "last_incremental": "2026-05-01",
+        }),
+        encoding="utf-8",
+    )
+
+    class _PersonalStub:
+        accounts = {"work": {}, "private": {}}
+
+    class _ConfigStub:
+        personal = _PersonalStub()
+
+    monkeypatch.setattr(email_mod, "CONFIG", _ConfigStub())
+
+    state = email_mod._load_state()
+
+    assert state == {
+        "accounts": {
+            "work": {"last_run_ts": "2026-05-01T00:00:00+00:00"},
+            "private": {"last_run_ts": "2026-05-01T00:00:00+00:00"},
+        }
+    }
 
 
 # ── Registry ─────────────────────────────────────────────────────────

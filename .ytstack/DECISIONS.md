@@ -348,3 +348,26 @@ The compact form is computed at runtime from `knowledge/index.md` (Python helper
 **Lesson:** When an SDK exposes a per-call tunable for a hard limit, set it explicitly at every call site instead of trusting the documented default. The 1 MB default is reasonable for the SDK's general audience; too small for a knowledge-base compiler that reads/writes long markdown.
 
 **Supersedes:** The pre-fix invocation pattern at all 8 call sites that relied on the SDK default. Future SDK call sites must include the `max_buffer_size=` parameter.
+
+
+## 2026-05-14: Email delta-ingest restored — per-account watermark, run-start-time, baseline-on-first-run
+
+**Context:** The M002/S02 Collector refactor (commit `14bf844`) ported `scan-email.py` into `EmailCollector` and silently dropped the delta logic — `run()` accepted `incremental` but never used it, never read `email-state.json`, never passed `since=` to the reader. The piggyback kept spawning but produced zero files; the lxw vault's last delta was `2026-05-01`, a 13-day-and-counting regression. The seam (`MailboxReader.scan_metadata(since=)`) was already correct; only the Collector forgot to use it.
+
+**Decision points (each had real alternatives):**
+
+1. **State shape — per-account, not per-mbox-file.** The legacy `scan-email.py` tracked per-mbox-file `{size, count, last_scan}` and used a cheap size-stat to skip unchanged mboxes. The new architecture pushed mbox iteration *into* the stateless `MailboxReader`, so the Collector can't see individual mbox files anymore — and shouldn't (Gmail has no "mbox files"). New shape `{"accounts": {<id>: {"last_run_ts": "<iso>"}}}` mirrors Jamie's `last_seen_ts` but keyed per account (email is `supports_account_loop=True`). The lost size-stat optimisation is accepted: `scan_metadata(since=)` re-opens every mbox each run, but date-filtering inside the reader is correct, and the alternative (leaking mbox-file knowledge back out of the seam) would re-break the abstraction the refactor just built.
+
+2. **Watermark = run-start time, not max-message-date.** Jamie uses the highest `started_at` seen. Email rejects that: bogus future-dated spam is common, and a max-date watermark would jump to the future and skip everything after it. Run-start-time is monotonic, immune to message-date garbage, and the legacy script's date-granularity `last_incremental` already worked this way (just coarser). Trade-off: a message delivered *during* a scan with a `Date` header just before run-start could be missed — accepted as a rare edge, documented.
+
+3. **First incremental run = baseline, emits nothing.** With no watermark, `since=None` would scan the *entire* mailbox and render it as one giant "delta" — re-dumping the operator's one-time bulk ingest. Instead: record `last_run_ts = now`, write no report, let the next run produce the first real delta. Mirrors the legacy script's "baseline recorded, will scan on next run".
+
+4. **Legacy state migrated, not discarded.** `_load_state()` detects the old `{"mboxes": {...}, "last_incremental": "..."}` shape and seeds every configured account's `last_run_ts` from `last_incremental`. On lxw this means the first post-deploy run picks up the full 2026-05-01 → now gap instead of silently re-baselining and losing 13 days of mail.
+
+5. **Full sweep also advances the watermark.** `wiki collect email` (full mode) writes the overview report *and* updates `last_run_ts` — both modes "observed the mailbox", so both maintain the watermark. Keeps a manual full sweep from causing the next incremental run to re-scan everything it just saw.
+
+**Scope:** One code file — `scripts/collectors/email_collector.py`. The fix is localised because the seam was already right; `flush.py`→`cli.py`→`run()` already plumbed `--incremental`, the adapters already honoured `since=`. No new config key (`piggybacks.email` already existed), no new hook.
+
+**Linked artifacts:** `scripts/collectors/email_collector.py` (`_run_full` / `_run_incremental` split, `_load_state` with legacy migration, `_render_delta_report`, `_parse_since`, `_now_slug`). `tests/test_email_collector_fakereader.py` +5 incremental-path tests (baseline, delta, no-new-mail, dry-run-no-state, legacy-migration) + autouse state-isolation fixture; 157/157 pass. KNOWLEDGE.md entry "A Protocol flag the implementation ignores is worse than no flag (2026-05-14)". Delta output: `raw/notes/email/<account>-delta-<ts>.md`, frontmatter `type: email-delta`.
+
+**Operator follow-up:** Deploy to lxw via `wiki update`. First incremental piggyback run after deploy migrates the stale `email-state.json` and emits one delta per account covering the 2026-05-01 → now gap; subsequent runs are true incrementals.
