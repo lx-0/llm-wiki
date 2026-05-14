@@ -52,10 +52,10 @@ Dispatcher: `scripts/collectors/cli.py` (`wiki collect <name>` and `wiki collect
 | `calendar` | 🟢 | `scripts/collectors/scan_calendar.py:CalendarCollector` (Registry) + script-mode CLI | `raw/notes/calendar/calendar-overview-<date>.md` |
 | `browser` | 🟢 | `scripts/collectors/scan_browser.py:BrowserCollector` (Registry) + script-mode CLI | `raw/notes/browser/browser-overview-<date>.md` |
 | `tabs` | 🟢 | `scripts/collectors/scan_tabs.py:TabsCollector` (Registry) + script-mode CLI | `raw/notes/browser/tab-groups-overview-<date>.md` |
-| `scan-screenshots` | 🟢 | `scripts/collectors/scan-screenshots.py` | `~/Screenshots/<file>.md` (canonical) + `raw/notes/screenshots/thumb/<file>.png` + `raw/notes/screenshots/screenshots-<slug>.md` (batch report) |
-| `scan-youtube` | 🟢 | `scripts/collectors/scan-youtube.py` | `raw/notes/youtube/<channel>--<title>--<vid>.md` |
+| `screenshots` | 🟢 | `scripts/collectors/scan_screenshots.py:ScreenshotsCollector` (Registry, **piggyback**) + script-mode CLI | `~/Screenshots/<file>.md` (canonical) + `raw/notes/screenshots/thumb/<file>.png` + `raw/notes/screenshots/screenshots-<slug>.md` (batch report) |
+| `scan-youtube` | 🟢 | `scripts/collectors/scan-youtube.py` (Legacy CLI — port pending) | `raw/notes/youtube/<channel>--<title>--<vid>.md` |
 
-`scan-youtube` is exposed via `wiki ingest-youtube`. `scan-screenshots` runs as piggyback (`piggybacks.scan_screenshots`). The others are operator-invoked via `uv run python scripts/collectors/scan-*.py` — no direct `wiki` subcommand yet.
+`scan-youtube` is exposed via `wiki ingest-youtube`. `screenshots` runs as a Registry-discovered piggyback (`piggybacks.screenshots`). `tabs` / `calendar` / `browser` are operator-invoked via `wiki collect <name>` (or direct `uv run`). Only `scan-youtube` remains on the legacy CLI pattern.
 
 ### Drop-box / manual ingest
 
@@ -154,7 +154,7 @@ These are pinned reality-vs-docs checks. Each should either get fixed or get an 
 | 2 | ~~No `wiki process-inbox` subcommand~~ | PROCESS §1 documents Inbox Processing as a numbered process | **Closed 2026-05-13:** `wiki process-inbox` wrapper landed. |
 | 3 | ~~No `wiki ingest-html` subcommand~~ | README "Path B" lists `ingest-html (file or URL)` as a substrate-source writer | **Closed 2026-05-13:** `wiki ingest-html` wrapper landed. |
 | 4 | ~~No `wiki suggestions` subcommand~~ | PROCESS §8 documents the suggestion executor as part of the engine CLI surface | **Closed 2026-05-13:** `wiki suggestions` wrapper landed. |
-| 5 | **`scan-*.py` legacy pattern still in `_LEGACY_PIGGYBACK_COMMANDS`** | README "Two-path ingest" says "remaining `scan-*.py` are scheduled for [Collector] migration" | Phase 2 underway. **2026-05-13:** `scan-tabs` migrated → `scan_tabs.py:TabsCollector`. **2026-05-14:** `scan-calendar` migrated → `scan_calendar.py:CalendarCollector`. Remaining: browser, screenshots, youtube. Status in `.ytstack/backlog/architecture-deepening.md` candidate #1 Phase 2. |
+| 5 | **`scan-*.py` legacy pattern** | README "Two-path ingest" says "remaining `scan-*.py` are scheduled for [Collector] migration" | Phase 2 nearly done. Migrated 2026-05-13/14: `tabs`, `calendar`, `browser`, `screenshots` → Registry collectors (snake_case filenames). **Only `scan-youtube` remains** on the legacy CLI pattern. `_LEGACY_PIGGYBACK_COMMANDS` no longer carries any substrate collector. Config-key migration shipped: `scripts/migrations/migrate_config_keys.py` renames `scan_screenshots`→`screenshots` etc. in operator config.yaml. |
 | 6 | **`origin: "scan-email/<id>"` in email Collector report frontmatter** | n/a (cosmetic) | `collectors/email_collector.py:111` still writes the old origin string. No engine reader; cosmetic only. | Flagged; intentionally left to avoid splitting report vintages |
 
 ## Maintenance protocol

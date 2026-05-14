@@ -30,6 +30,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import httpx  # noqa: E402  exception types only; HTTP via ollama_client
 
+from collectors.base import Collector, CollectorSpec, RunResult, register
 from core import ollama_client
 from core.config import RAW_DIR, ROOT_DIR, STATE_DIR, TIMEZONE, now_iso
 from core.utils import load_json_state, save_json_state
@@ -46,7 +47,7 @@ STATE_FILE = STATE_DIR / "screenshot-state.json"
 
 MODEL = CONFIG.models.vision_model
 RESIZE_WIDTH = CONFIG.limits.screenshot_resize_width
-_screenshot_pb = CONFIG.piggybacks.get("scan_screenshots")
+_screenshot_pb = CONFIG.piggybacks.get("screenshots")
 MAX_PER_RUN = (_screenshot_pb.max_per_run if _screenshot_pb else None) or 50
 TIMEOUT = float(CONFIG.limits.screenshot_timeout_seconds)
 
@@ -343,7 +344,13 @@ def scan(
     backfill_days: int | None = None,
     dry_run: bool = False,
     limit: int = MAX_PER_RUN,
-) -> None:
+) -> dict:
+    """Scan screenshots, write sidecars + batch report.
+
+    Returns a result dict: ``{"processed": int, "report_path": Path | None,
+    "message": str}``. The CLI ignores it; the Collector wrapper maps it
+    onto a RunResult.
+    """
     state = _load_state()
 
     # Determine scan window
@@ -369,7 +376,7 @@ def scan(
     if not screenshots:
         state["last_scan"] = now_iso()
         _save_state(state)
-        return
+        return {"processed": 0, "report_path": None, "message": "no new screenshots"}
 
     if limit and len(screenshots) > limit:
         log.info("Limiting to %d (of %d)", limit, len(screenshots))
@@ -381,12 +388,14 @@ def scan(
             ts_str = ts.strftime("%Y-%m-%d %H:%M") if ts else "?"
             print(f"  [{ts_str}] {s.name} ({s.stat().st_size // 1024}KB)")
         print(f"\n{len(screenshots)} screenshots would be processed.")
-        return
+        return {"processed": 0, "report_path": None,
+                "message": f"[dry-run] {len(screenshots)} screenshot(s) would be processed"}
 
     # Check Ollama connectivity
     if not ollama_client.is_reachable():
         log.error("Ollama not reachable at %s", CONFIG.models.ollama_url)
-        return
+        return {"processed": 0, "report_path": None,
+                "message": f"Ollama not reachable at {CONFIG.models.ollama_url}"}
 
     # Pre-compute the batch slug so vault sidecars can backlink to it.
     REPORT_DIR.mkdir(parents=True, exist_ok=True)
@@ -424,7 +433,8 @@ def scan(
         log.warning("No screenshots processed successfully")
         state["last_scan"] = now_iso()
         _save_state(state)
-        return
+        return {"processed": 0, "report_path": None,
+                "message": "no screenshots processed successfully"}
 
     # Write batch report for wiki compilation
     report_path = REPORT_DIR / f"{batch_report_slug}.md"
@@ -446,6 +456,11 @@ def scan(
     _save_state(state)
 
     log.info("Done. %d screenshots processed, report at %s", len(results), report_path)
+    return {
+        "processed": len(results),
+        "report_path": report_path,
+        "message": f"{len(results)} screenshot(s) processed ({keeps} keep, {ephemerals} ephemeral) → {report_path.name}",
+    }
 
 
 def backfill_thumbnails(dry_run: bool = False) -> None:
@@ -513,6 +528,59 @@ def retrofit_batch_reports(dry_run: bool = False) -> None:
         else:
             skipped += 1
     log.info("Retrofit: %d patched, %d already-present", patched, skipped)
+
+
+# ── Collector wrapper ───────────────────────────────────────────────
+
+
+@register
+class ScreenshotsCollector:
+    """~/Screenshots/ → vision-LLM → raw/notes/screenshots/ — Collector Protocol wrapper.
+
+    The one Collector with an LLM sub-step: each PNG goes through gemma4
+    vision once, producing a HOME sidecar + 384px vault thumbnail + an
+    entry in the run's batch report. `is_configured()` only checks the
+    screenshots dir — Ollama reachability is checked inside `scan()` and
+    degrades gracefully (returns a no-op result, never crashes).
+
+    This Collector REPLACES the legacy `_LEGACY_PIGGYBACK_COMMANDS`
+    "scan_screenshots" entry — `piggyback_default=True` makes flush.py
+    auto-discover it via the Registry walk. The piggyback config key is
+    `piggybacks.screenshots` (renamed from `scan_screenshots` for naming
+    consistency with the other Registry collectors).
+    """
+
+    SPEC = CollectorSpec(
+        name="screenshots",
+        output_subfolder="raw/notes/screenshots",
+        piggyback_default=True,  # was a daily piggyback in the legacy hardcoded list
+        piggyback_cooldown_hours=24,
+        supports_incremental=False,  # run() always does the "all without sidecar" sweep
+        supports_account_loop=False,
+    )
+
+    def is_configured(self) -> bool:
+        """True iff ~/Screenshots/ exists. Ollama reachability is a runtime concern."""
+        return SCREENSHOTS_DIR.exists()
+
+    def run(self, *, dry_run: bool = False, incremental: bool = False) -> RunResult:
+        if not self.is_configured():
+            return RunResult(message=f"Screenshots dir not found: {SCREENSHOTS_DIR}")
+
+        # scan_all=True mirrors the legacy piggyback invocation
+        # (`--all --limit {max_per_run}`): process every PNG without a
+        # sidecar, capped at MAX_PER_RUN. The state-file time window is a
+        # CLI-only mode (the no-flag default of the direct script).
+        result = scan(scan_all=True, dry_run=dry_run, limit=MAX_PER_RUN)
+        report_path = result.get("report_path")
+        return RunResult(
+            files_written=(report_path,) if report_path else (),
+            files_skipped=0 if report_path else 1,
+            message=result.get("message", ""),
+        )
+
+
+# ── Direct CLI entry (backward-compat) ──────────────────────────────
 
 
 def main() -> None:

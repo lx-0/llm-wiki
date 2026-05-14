@@ -30,7 +30,10 @@ piggybacks:
   optimize_claude_md:
     enabled: true
     cooldown_hours: 24
-  scan_screenshots:
+  # The 'screenshots' key matches ScreenshotsCollector.SPEC.name — it's a
+  # Registry-discovered collector (was the hardcoded 'scan_screenshots'
+  # legacy piggyback before the 2026-05-14 Protocol port).
+  screenshots:
     enabled: true
     cooldown_hours: 24
     max_per_run: 50

@@ -16,7 +16,7 @@ The **tooling** for an LLM Wiki — a Karpathy-pattern personal knowledge base. 
 
 A vault that uses this tooling has three layers:
 
-1. **`raw/`** — curated sources (LLM reads, never writes). Top-level subfolders: `articles/`, `papers/`, `notes/`, `transcripts/`, `audio/`, `requests/`, `suggestions/`. Scanner output lives in nested per-scanner folders: `raw/notes/email/<account>-<date>.md` (scan-email), `raw/notes/calendar/`, `raw/notes/browser/`, `raw/notes/screenshots/screenshots-<slug>.md` (batch reports) + `raw/notes/screenshots/thumb/<file>.png` (384px previews; original PNGs stay in `~/Screenshots/`, never copied; canonical analysis sidecar lives at `~/Screenshots/<file>.md`), `raw/notes/tabs/`, `raw/notes/youtube/<channel>--<title>--<vid>.md` (scan-youtube — video metadata + transcript + comments + optional gemma4 visual analysis, single-file markdown), `raw/transcripts/jamie/<date>--<slug>--<short-id>.md` (collectors/jamie.py — pulls meetings from the Jamie AI tRPC API; summary + speaker-diarised transcript + action-items in one file).
+1. **`raw/`** — curated sources (LLM reads, never writes). Top-level subfolders: `articles/`, `papers/`, `notes/`, `transcripts/`, `audio/`, `requests/`, `suggestions/`. Scanner output lives in nested per-scanner folders: `raw/notes/email/<account>-<date>.md` (scan-email full sweep) + `raw/notes/email/<account>-delta-<ts>.md` (scan-email incremental piggyback — only mail newer than the per-account watermark in `.wiki/state/email-state.json`), `raw/notes/calendar/`, `raw/notes/browser/`, `raw/notes/screenshots/screenshots-<slug>.md` (batch reports) + `raw/notes/screenshots/thumb/<file>.png` (384px previews; original PNGs stay in `~/Screenshots/`, never copied; canonical analysis sidecar lives at `~/Screenshots/<file>.md`), `raw/notes/tabs/`, `raw/notes/youtube/<channel>--<title>--<vid>.md` (scan-youtube — video metadata + transcript + comments + optional gemma4 visual analysis, single-file markdown), `raw/transcripts/jamie/<date>--<slug>--<short-id>.md` (collectors/jamie.py — pulls meetings from the Jamie AI tRPC API; summary + speaker-diarised transcript + action-items in one file).
 2. **`daily/`** — auto-captured Claude Code session logs (immutable).
 3. **`knowledge/`** — LLM-compiled wiki articles (LLM owns, human reads). Subfolders: `concepts/`, `connections/`, `people/`, `projects/`, `qa/`, `facts/` (the last is human-owned via `wiki correct` — hard facts that override anything in raw/daily sources).
 
@@ -53,7 +53,8 @@ llm-wiki/
 │   │   ├── scan_tabs.py        ← TabsCollector (Registry; migrated 2026-05-13)
 │   │   ├── scan_calendar.py    ← CalendarCollector (Registry; migrated 2026-05-14)
 │   │   ├── scan_browser.py     ← BrowserCollector (Registry; migrated 2026-05-14)
-│   │   └── scan-*.py           ← screenshots, youtube (Legacy CLI, port pending)
+│   │   ├── scan_screenshots.py ← ScreenshotsCollector (Registry, piggyback; migrated 2026-05-14)
+│   │   └── scan-youtube.py     ← Legacy CLI (port pending — tier system + CLI flags)
 │   ├── facts/              ← hard-fact subsystem (knowledge/facts/<slug>.md consumers)
 │   │   ├── correct.py          ← CRUD CLI: add/list/remove/edit/path
 │   │   └── correct_apply.py    ← agent-driven propagation across vault

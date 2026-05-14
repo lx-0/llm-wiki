@@ -20,6 +20,7 @@ from collectors import email_collector  # noqa: F401,E402
 from collectors import jamie  # noqa: F401,E402
 from collectors import scan_browser  # noqa: F401,E402
 from collectors import scan_calendar  # noqa: F401,E402
+from collectors import scan_screenshots  # noqa: F401,E402
 from collectors import scan_tabs  # noqa: F401,E402
 
 __all__ = [

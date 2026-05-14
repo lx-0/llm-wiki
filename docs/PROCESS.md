@@ -163,7 +163,7 @@ flowchart TD
 
     COMPILE --> PIGGY{"Piggyback\nTasks?"}
     PIGGY --> PB_CHECK{"Cooldown\nabgelaufen?"}
-    PB_CHECK -->|Ja| PB_SPAWN["Spawn:\nemail-scan / lint / review"]
+    PB_CHECK -->|Ja| PB_SPAWN["Spawn:\nemail-delta / lint / review"]
     PB_CHECK -->|Nein| DONE["Fertig"]
     PB_SPAWN --> DONE
 
@@ -212,7 +212,7 @@ flowchart TD
 |------|--------|--------|----------|--------|
 | `email` | Collector Registry | `collectors/cli.py email --incremental` | 24h | $0 (lokal) |
 | `jamie` | Collector Registry | `collectors/cli.py jamie --incremental` | 6h | $0 (Jamie API) |
-| `scan_screenshots` | Legacy | `collectors/scan-screenshots.py --all --limit N` | 24h | $0 (Ollama/Gemma4) |
+| `screenshots` | Collector Registry | `collectors/cli.py screenshots` | 24h | $0 (Ollama/Gemma4) |
 | `lint_structural` | Legacy | `lint.py --structural-only` | 24h | $0 (kein LLM) |
 | `review_wiki` | Legacy | `review-wiki.py` | 168h (1x/Woche) | $0 (Ollama/Gemma4) |
 | `optimize_claude_md` | Legacy | `optimize-claude-md.py` | 24h | $ (Claude API) |
@@ -318,9 +318,9 @@ flowchart LR
 
     subgraph Scanners
         SE["collectors/email_collector.py\n(Registry: `wiki collect email`)"]
-        SC["collectors/scan-calendar.py"]
-        SB["collectors/scan-browser.py"]
-        SCR["collectors/scan-screenshots.py"]
+        SC["collectors/scan_calendar.py"]
+        SB["collectors/scan_browser.py"]
+        SCR["collectors/scan_screenshots.py"]
         SY["collectors/scan-youtube.py"]
     end
 
@@ -352,17 +352,18 @@ flowchart LR
 
 | Scanner | Pattern | Quelle | Daten | Output |
 |---------|---------|--------|-------|--------|
-| `collectors/email_collector.py` | Collector Registry | Mailbox-Adapter (Thunderbird mbox, Gmail API, All-Inkl IMAP) via `adapters/mailbox/resolve_reader` | Metadata-Sweep pro Account aus `CONFIG.personal.accounts`. Ein Markdown-Report pro Account. | `raw/notes/email/<account>-<date>.md` |
+| `collectors/email_collector.py` | Collector Registry | Mailbox-Adapter (Thunderbird mbox, Gmail API, All-Inkl IMAP) via `adapters/mailbox/resolve_reader` | Zwei Modi: **Full-Sweep** (`wiki collect email`) = Metadata-Overview pro Account. **Incremental** (täglicher Piggyback, `--incremental`) = nur Mails neuer als der Per-Account-Watermark in `state/email-state.json`, als Delta-Report. Erster Incremental-Lauf pro Account = Baseline (Watermark gesetzt, kein Report — der Einmal-Bulk-Ingest wird nicht erneut ausgegeben). | `raw/notes/email/<account>-<date>.md` (full) · `raw/notes/email/<account>-delta-<ts>.md` (delta) |
 | `collectors/jamie.py` | Collector Registry | Jamie AI public tRPC API (`beta-api.meetjamie.ai`, `x-api-key` auth) | Pro Meeting ein Markdown-File: frontmatter (id, participants, tags, calendar event) + Jamie-LLM-Summary verbatim + Action-Items als Obsidian-Tasks + Speaker-diarisierter Transcript (`**Name** [mm:ss] — text`). Skip-existing per `meeting_id`; incremental via `last_seen_ts` state. | `raw/transcripts/jamie/<date>--<slug>--<short-id>.md` |
-| `collectors/scan-calendar.py` | Legacy CLI | Thunderbird calendar SQLite | Hunderte bis tausende Events, Attendees, Kategorien. | `raw/notes/calendar/` |
-| `collectors/scan-browser.py` | Legacy CLI | Firefox places.sqlite + STG + Chrome | Tausende Tabs, Bookmarks, zehntausende Visits. | `raw/notes/browser/` |
-| `collectors/scan-tabs.py` | Legacy CLI | Firefox Simple Tab Groups Backup | Aktive Tab-Gruppen, deren Tab-URLs/Titel. | `raw/notes/tabs/` |
-| `collectors/scan-screenshots.py` | Legacy CLI | `~/Screenshots/` (macOS PNG-Dump) | gemma4 Vision pro Screenshot, batch-report mit allen analyses + thumbnails. | `raw/notes/screenshots/screenshots-<slug>.md` + `~/Screenshots/<file>.md` (canonical sidecar) |
+| `collectors/scan_calendar.py` | Legacy CLI | Thunderbird calendar SQLite | Hunderte bis tausende Events, Attendees, Kategorien. | `raw/notes/calendar/` |
+| `collectors/scan_browser.py` | Legacy CLI | Firefox places.sqlite + STG + Chrome | Tausende Tabs, Bookmarks, zehntausende Visits. | `raw/notes/browser/` |
+| `collectors/scan_tabs.py` | Legacy CLI | Firefox Simple Tab Groups Backup | Aktive Tab-Gruppen, deren Tab-URLs/Titel. | `raw/notes/tabs/` |
+| `collectors/scan_screenshots.py` | Legacy CLI | `~/Screenshots/` (macOS PNG-Dump) | gemma4 Vision pro Screenshot, batch-report mit allen analyses + thumbnails. | `raw/notes/screenshots/screenshots-<slug>.md` + `~/Screenshots/<file>.md` (canonical sidecar) |
 | `collectors/scan-youtube.py` | Legacy CLI | YouTube (yt-dlp Metadaten + youtube-transcript-api Captions + Comments + optional ffmpeg-Frames + gemma4 Vision) | Pro Video ein Markdown-File (single source of truth). Tier-based ingest: 0=metadata, 1=+transcript, 2=+comments, 3=+visual analysis. Playlist-Expansion via `playlist?list=` Normalisierung. | `raw/notes/youtube/<channel>--<title>--<vid>.md` |
 
 > **Hinweis Collector vs Scanner**: Zwei Patterns laufen aktuell parallel.
 > - **Collector Registry** (`scripts/collectors/base.py`): Klassen mit `SPEC`-Deklaration + `@register`-Decorator + `run(dry_run, incremental) → RunResult`. `flush.py` entdeckt sie automatisch über `piggyback_collectors()` Registry-walk. Operator-CLI: `wiki collect <name>` über `scripts/collectors/cli.py`. Aktuell portiert: `email`, `jamie`.
-> - **Legacy CLI** (`scan-*.py`): direkt-aufrufbare Scripts mit eigenem argparse, hardcoded in `flush.py:_LEGACY_PIGGYBACK_COMMANDS`. Migration aufs Collector-Pattern ist work-in-progress; aktuell betroffen: `scan-browser`, `scan-calendar`, `scan-screenshots`, `scan-tabs`, `scan-youtube`.
+> - **Registry-Collectors (Phase-2 portiert):** `scan_tabs.py:TabsCollector`, `scan_calendar.py:CalendarCollector`, `scan_browser.py:BrowserCollector`, `scan_screenshots.py:ScreenshotsCollector` — `SPEC` + `@register`, laufen via `wiki collect <name>`, behalten ihren Direct-CLI-Einstieg.
+> - **Legacy CLI (Port ausstehend):** nur noch `scan-youtube.py` — eigenes argparse mit Tier-System. Migration ist work-in-progress (`.ytstack/backlog/architecture-deepening.md` #1).
 
 > **Secrets**: `JAMIE_API_KEY` (+ alle anderen `*_API_KEY` / `IMAP_*_PASS` / `NAS_*`) liegen in `<vault>/.claude/.env`. `core.config` lädt das File einmal beim Import via `load_dotenv(..., override=False)` — keine manuellen `export`-Statements nötig, weder für Piggyback-Runs noch für Operator-CLI-Aufrufe. Shell-Exports überschreiben `.env`-Werte. Fresh-Vault-Seed über `wiki seed` kopiert `templates/.claude/.env.example` in den Vault (additiv).
 
@@ -417,12 +418,12 @@ uv run python scripts/collectors/scan-youtube.py --url "https://youtu.be/<id>" -
 uv run python scripts/collectors/scan-youtube.py --inbox raw/inbox/youtube.md --tier 1
 
 # Calendar
-uv run python scripts/collectors/scan-calendar.py
-uv run python scripts/collectors/scan-calendar.py --year 2025
+uv run python scripts/collectors/scan_calendar.py
+uv run python scripts/collectors/scan_calendar.py --year 2025
 
 # Browser
-uv run python scripts/collectors/scan-browser.py
-uv run python scripts/collectors/scan-browser.py --source firefox
+uv run python scripts/collectors/scan_browser.py
+uv run python scripts/collectors/scan_browser.py --source firefox
 ```
 
 ### Edge Cases
@@ -570,7 +571,7 @@ Der Compiler erkennt Optimierungspotential in Email-Scanner-Daten und schlägt A
 ```mermaid
 flowchart TD
     SCAN["wiki collect email\n→ collectors/email_collector.py"]
-    SCAN --> RAW["raw/notes/email/\nMetadaten pro Account"]
+    SCAN --> RAW["raw/notes/email/\nOverview + Delta-Reports"]
     RAW --> COMPILE["compile.py\n+ suggestions/producer.py\n(Email-Pattern-Detection)"]
     COMPILE --> SUGGEST["raw/suggestions/*.yaml\nPer-Action Status"]
     SUGGEST --> REVIEW{"Human Review\nsuggestions/cli.py --list"}
@@ -713,7 +714,7 @@ Pro PNG wird der Vision-LLM **genau einmal** aufgerufen — die in-memory `meta`
 ```mermaid
 flowchart TD
     DIR["~/Screenshots/\nPNG-Dateien"]
-    DIR --> SCAN["collectors/scan-screenshots.py\nfind_new_screenshots()\n~/Screenshots/Foo.md fehlt?"]
+    DIR --> SCAN["collectors/scan_screenshots.py\nfind_new_screenshots()\n~/Screenshots/Foo.md fehlt?"]
     SCAN -->|nein| SKIP["Übersprungen"]
     SCAN -->|ja| VISION["Gemma4 Vision\nchat_vision(prompt, model, image_b64)\nCONFIG.models.ollama_url"]
     VISION --> META["in-memory meta dict:\napp, project, tags, relevance,\nsummary, key_text, raw_response"]
@@ -744,12 +745,12 @@ flowchart TD
 ### Script
 
 ```bash
-uv run python scripts/collectors/scan-screenshots.py                    # neue Screenshots scannen
-uv run python scripts/collectors/scan-screenshots.py --dry-run          # nur zeigen was gescannt würde
-uv run python scripts/collectors/scan-screenshots.py --limit 20         # max 20 Screenshots pro Lauf
-uv run python scripts/collectors/scan-screenshots.py --backfill 7       # letzte 7 Tage nachscannen
-uv run python scripts/collectors/scan-screenshots.py --backfill-thumbnails    # Thumbs für alle PNGs in ~/Screenshots/, kein LLM
-uv run python scripts/collectors/scan-screenshots.py --retrofit-batch-reports # adde ![[thumb/...]] zu existierenden Batch-Reports
+uv run python scripts/collectors/scan_screenshots.py                    # neue Screenshots scannen
+uv run python scripts/collectors/scan_screenshots.py --dry-run          # nur zeigen was gescannt würde
+uv run python scripts/collectors/scan_screenshots.py --limit 20         # max 20 Screenshots pro Lauf
+uv run python scripts/collectors/scan_screenshots.py --backfill 7       # letzte 7 Tage nachscannen
+uv run python scripts/collectors/scan_screenshots.py --backfill-thumbnails    # Thumbs für alle PNGs in ~/Screenshots/, kein LLM
+uv run python scripts/collectors/scan_screenshots.py --retrofit-batch-reports # adde ![[thumb/...]] zu existierenden Batch-Reports
 ```
 
 ### Edge Cases

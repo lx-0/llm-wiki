@@ -203,7 +203,7 @@ def _default_piggybacks() -> dict[str, PiggybackTask]:
         "lint_structural": PiggybackTask(cooldown_hours=24),
         "review_wiki": PiggybackTask(cooldown_hours=168),
         "optimize_claude_md": PiggybackTask(cooldown_hours=24),
-        "scan_screenshots": PiggybackTask(cooldown_hours=24, max_per_run=50),
+        "screenshots": PiggybackTask(cooldown_hours=24, max_per_run=50),
         "curiosity_followup": PiggybackTask(cooldown_hours=24),
         "jamie": PiggybackTask(cooldown_hours=6, max_per_run=20),
         "retry_failed_flushes": PiggybackTask(cooldown_hours=24, max_per_run=5),
