@@ -1,10 +1,11 @@
 """Gmeet Collector — pulls Google Meet / Gemini transcripts from Google Drive.
 
-Substrate-shaped: configured via `CONFIG.personal.gmeet` (single-tenant flat
-block, like JamieConfig). When Google Meet records a meeting with Gemini, it
-drops Google Docs into the Drive "Meet Recordings" folder — a transcript Doc
-(already speaker-diarised) and/or a "Notes by Gemini" Doc. This collector
-exports those Docs as markdown into `raw/transcripts/gmeet/`.
+Multi-tenant: per-account `gmeet:` sub-block under `CONFIG.personal.accounts.<id>`,
+discriminated by `kind: gmeet-api` (mirrors the email Reader/Filter pattern). When
+Google Meet records a meeting with Gemini, it drops Google Docs into the Drive
+"Meet Recordings" folder — a transcript Doc (already speaker-diarised) and/or a
+"Notes by Gemini" Doc. This collector exports those Docs as markdown into
+`raw/transcripts/gmeet/`, looping over every configured account each run.
 
 Drive-only wedge. The Meet REST API (`conferenceRecords`) was evaluated and
 deferred — see `.ytstack/backlog/gmeet-collector.md`: it is organizer-only,
@@ -12,24 +13,31 @@ its records expire 30 days after the conference, and transcript-entry speakers
 are resource names needing extra resolution calls. The Drive Doc export has
 none of those limits and is already diarised.
 
-Auth:
+Auth (per account):
 - OAuth via `core/google_oauth.py` (shared with `adapters/mailbox/gmail.py`).
   Scope `drive.meet.readonly` — the dedicated narrow scope for files created
-  or edited by Google Meet. Bootstrapped once via `wiki gmeet-auth <id>`;
-  token cache at `state/gmeet-token-<id>.json`.
+  or edited by Google Meet. Bootstrapped once per account via
+  `wiki gmeet-auth <account-id>` (`<account-id>` matches the key under
+  `personal.accounts`); token cache at `state/gmeet-token-<account-id>.json`.
 - Client secret: `<vault>/.claude/google-oauth-client.json`, falling back to
   the existing `.claude/gmail-oauth-client.json` (same GCP installed-app
-  client works for any scope; tokens are cached separately).
-- Empty `oauth_account_id` or a missing token cache → `is_configured()`
-  returns False and the collector is silently skipped (graceful-agnostic).
+  client works for any scope and any user account; tokens are cached
+  separately per user).
+- An account with no `gmeet:` sub-block, or with the sub-block but no
+  cached token, is silently skipped (graceful-agnostic) — the rest of the
+  loop still runs.
 
 State:
-- `state/gmeet-state.json` carries `last_seen_ts` (ISO 8601). Incremental runs
-  query Drive for Docs with `createdTime` greater than it; the highest
-  `createdTime` seen during a successful run becomes the new `last_seen_ts`.
+- `state/gmeet-state.json` carries `{<account_id>: {last_seen_ts: ISO 8601}}`.
+  Incremental runs query Drive per account for Docs with `createdTime` greater
+  than its watermark; the highest `createdTime` seen during a successful
+  per-account scan becomes the new watermark *for that account only*. A failed
+  account leaves its watermark untouched (mirrors the email-collector
+  failure-vs-empty discipline).
 - Skip-existing is keyed on the Drive file id: any file under
   `raw/transcripts/gmeet/` whose name ends in `--<short-id>.md` is considered
-  already ingested.
+  already ingested. Drive file ids are globally unique, so the flat output
+  folder works across accounts.
 
 Shape note: one Drive Doc → one markdown file. Meet emits up to two Docs per
 meeting (transcript + notes); grouping them into a single article is a
@@ -143,13 +151,49 @@ def _app() -> OAuthApp:
 
 
 def gmeet_auth_bootstrap(account_id: str) -> tuple[bool, str]:
-    """Run the installed-app OAuth flow once. Called from `wiki gmeet-auth <id>`.
-
-    Operator pre-condition: an installed-app client secret at
-    `.claude/google-oauth-client.json` (or the gmail one). Opens a
-    local-loopback browser for the consent screen.
-    """
+    """Run the installed-app OAuth flow once for one account. Called from
+    `wiki gmeet-auth <account-id>`. The account-id should match a key under
+    `personal.accounts.<id>` whose body has a `gmeet:` sub-block — but the
+    bootstrap itself is config-agnostic; it just persists a token under
+    that id. Opens a local-loopback browser for the consent screen."""
     return google_oauth.bootstrap(_app(), account_id)
+
+
+# ── Per-account resolution ───────────────────────────────────────────
+
+@dataclass(frozen=True)
+class _GmeetAccount:
+    """Resolved gmeet config for one `personal.accounts.<id>` entry."""
+    account_id: str
+    drive_folder_id: str
+    drive_folder_name: str
+    since: str | None
+    max_per_run: int
+
+
+def _resolve_gmeet_accounts() -> list[_GmeetAccount]:
+    """Iterate `CONFIG.personal.accounts`, return the ones with a
+    `gmeet:` sub-block whose `kind == "gmeet-api"`. Mirrors the
+    `resolve_reader` / `resolve_filter` dispatch on `kind`. Unknown
+    kinds are silently skipped (graceful-agnostic)."""
+    out: list[_GmeetAccount] = []
+    accounts = CONFIG.personal.accounts or {}
+    default_max = CONFIG.limits.gmeet_max_per_run
+    for aid, body in accounts.items():
+        if not isinstance(body, dict):
+            continue
+        block = body.get("gmeet")
+        if not isinstance(block, dict) or block.get("kind") != "gmeet-api":
+            continue
+        per_acct_max = block.get("max_per_run")
+        out.append(_GmeetAccount(
+            account_id=aid,
+            drive_folder_id=block.get("drive_folder_id") or "",
+            drive_folder_name=block.get("drive_folder_name") or "Meet Recordings",
+            since=block.get("since") or None,
+            max_per_run=per_acct_max if per_acct_max is not None else default_max,
+        ))
+    return out
 
 
 # ── HTTP client (inline — Drive API over the shared OAuth session) ────
@@ -344,69 +388,37 @@ class GmeetCollector:
         piggyback_default=True,
         piggyback_cooldown_hours=6,
         supports_incremental=True,
-        supports_account_loop=False,
+        supports_account_loop=True,
     )
 
     def __init__(self) -> None:
-        gmeet_cfg = CONFIG.personal.gmeet
-        self._account_id = gmeet_cfg.oauth_account_id or ""
-        self._folder_id = gmeet_cfg.drive_folder_id or ""
-        self._folder_name = gmeet_cfg.drive_folder_name or "Meet Recordings"
-        self._configured_since = gmeet_cfg.since or None
-        self._max_per_run = (
-            gmeet_cfg.max_per_run
-            if gmeet_cfg.max_per_run is not None
-            else CONFIG.limits.gmeet_max_per_run
-        )
+        self._accounts = _resolve_gmeet_accounts()
         self._timeout_s = float(CONFIG.limits.gmeet_request_timeout_s)
 
     def is_configured(self) -> bool:
-        """Configured = an oauth_account_id is set AND its token cache exists.
-        A set account-id without a bootstrapped token is treated as not yet
-        configured — the piggyback skips, the CLI prints a hint."""
-        if not self._account_id:
+        """At least one account has `kind: gmeet-api` AND a bootstrapped token cache.
+        Configured-but-not-bootstrapped accounts (no token) don't count — the
+        piggyback should silently skip until the operator has run `wiki gmeet-auth`
+        for at least one. Per-account is_configured is decided inside `run()`."""
+        if not self._accounts:
             return False
-        return google_oauth.token_path(_app(), self._account_id).exists()
-
-    def run(self, *, dry_run: bool = False, incremental: bool = False) -> RunResult:
-        if not self._account_id:
-            log.info("GmeetCollector: oauth_account_id unset — skipping.")
-            return RunResult(message="no-op (gmeet oauth_account_id unset)")
-
-        sess, err = google_oauth.session(_app(), self._account_id)
-        if err:
-            log.info("GmeetCollector: not authorised — %s", err)
-            return RunResult(message=f"no-op (gmeet auth: {err})")
-
-        client = _DriveClient(session=sess, timeout_s=self._timeout_s)
-
-        folder_id = self._folder_id or client.resolve_folder_id(self._folder_name)
-        if not folder_id:
-            msg = (
-                f"folder {self._folder_name!r} not found — set "
-                "CONFIG.personal.gmeet.drive_folder_id (copy it from the folder URL)"
-            )
-            log.error("GmeetCollector: %s", msg)
-            return RunResult(message=msg)
-
-        state = load_json_state(_STATE_FILE)
-        since = state.get("last_seen_ts") if incremental else self._configured_since
-
-        log.info(
-            "GmeetCollector: listing Docs (folder=%s, since=%s, limit=%d)",
-            folder_id, since or "—", self._max_per_run,
+        return any(
+            google_oauth.token_path(_app(), a.account_id).exists()
+            for a in self._accounts
         )
 
-        try:
-            stubs = list(client.list_docs(folder_id, since=since, limit=self._max_per_run))
-        except GmeetAPIError as e:
-            log.error("GmeetCollector: list failed: %s", e)
-            return RunResult(message=f"list failed: {e}")
+    def run(self, *, dry_run: bool = False, incremental: bool = False) -> RunResult:
+        if not self._accounts:
+            log.info("GmeetCollector: no accounts with kind=gmeet-api — skipping.")
+            return RunResult(message="no-op (no gmeet accounts configured)")
 
-        if not stubs:
-            log.info("GmeetCollector: 0 Docs in window — nothing to ingest")
-            return RunResult(message="no-op (0 docs in window)")
+        all_files: list[Path] = []
+        total_skipped = 0
+        per_acct_messages: list[str] = []
+        any_state_touched = False
 
+        # Output dir + skip-existing set are shared across accounts (Drive file
+        # ids are globally unique, the flat output folder is fine).
         output_root = ROOT_DIR / self.SPEC.output_subfolder
         already_present: set[str] = set()
         if output_root.exists():
@@ -416,16 +428,103 @@ class GmeetCollector:
                 if "--" in p.stem
             }
 
+        state = load_json_state(_STATE_FILE)
+        # Migrate the pre-multi-tenant flat shape ({last_seen_ts: ...}) into a
+        # default per-account bucket so a clean lift doesn't lose the watermark.
+        if "last_seen_ts" in state and not any(
+            isinstance(v, dict) and "last_seen_ts" in v for v in state.values()
+        ):
+            legacy = state.pop("last_seen_ts")
+            state.setdefault("default", {})["last_seen_ts"] = legacy
+            log.info("GmeetCollector: migrated legacy flat state → state['default']")
+
+        for acct in self._accounts:
+            try:
+                msg, files, skipped, state_touched = self._run_one_account(
+                    acct,
+                    state=state,
+                    already_present=already_present,
+                    dry_run=dry_run,
+                    incremental=incremental,
+                )
+            except Exception as e:  # noqa: BLE001
+                log.exception("GmeetCollector[%s]: unexpected", acct.account_id)
+                per_acct_messages.append(f"{acct.account_id}: ERROR {type(e).__name__}: {e}")
+                continue
+            all_files.extend(files)
+            total_skipped += skipped
+            per_acct_messages.append(f"{acct.account_id}: {msg}")
+            # New filenames added this account count toward the next account's
+            # skip-set (rare collision case: same Doc shared with two accounts).
+            already_present.update(_short_id(p.stem.rsplit("--", 1)[-1]) for p in files)
+            any_state_touched = any_state_touched or state_touched
+
+        if not dry_run and any_state_touched:
+            save_json_state(_STATE_FILE, state)
+
+        return RunResult(
+            files_written=tuple(all_files),
+            files_skipped=total_skipped,
+            state_keys_touched=tuple(a.account_id for a in self._accounts) if any_state_touched else (),
+            message=" · ".join(per_acct_messages) or "no-op",
+        )
+
+    def _run_one_account(
+        self,
+        acct: _GmeetAccount,
+        *,
+        state: dict,
+        already_present: set[str],
+        dry_run: bool,
+        incremental: bool,
+    ) -> tuple[str, list[Path], int, bool]:
+        """Run one account's scan. Returns (one-line message, files, skipped, state_touched).
+        Mutates `state[acct.account_id]['last_seen_ts']` only on a successful scan
+        that wrote files — failures leave the watermark untouched."""
+        sess, err = google_oauth.session(_app(), acct.account_id)
+        if err:
+            return f"auth: {err}", [], 0, False
+
+        client = _DriveClient(session=sess, timeout_s=self._timeout_s)
+
+        folder_id = acct.drive_folder_id or client.resolve_folder_id(acct.drive_folder_name)
+        if not folder_id:
+            return (
+                f"folder {acct.drive_folder_name!r} not found — set "
+                f"personal.accounts.{acct.account_id}.gmeet.drive_folder_id "
+                "(copy it from the folder URL)"
+            ), [], 0, False
+
+        per_acct_state = state.get(acct.account_id) or {}
+        since = per_acct_state.get("last_seen_ts") if incremental else acct.since
+
+        log.info(
+            "GmeetCollector[%s]: listing Docs (folder=%s, since=%s, limit=%d)",
+            acct.account_id, folder_id, since or "—", acct.max_per_run,
+        )
+
+        try:
+            stubs = list(client.list_docs(folder_id, since=since, limit=acct.max_per_run))
+        except GmeetAPIError as e:
+            log.error("GmeetCollector[%s]: list failed: %s", acct.account_id, e)
+            return f"list failed: {e}", [], 0, False
+
+        if not stubs:
+            return f"no-op (0 docs in window since={since or '—'})", [], 0, False
+
         files_written: list[Path] = []
         skipped = 0
-        highest_created: str | None = state.get("last_seen_ts")
+        highest_created: str | None = per_acct_state.get("last_seen_ts")
         input_source = "piggyback" if not dry_run and incremental else "cli"
 
         for stub in stubs:
             file_id = stub.get("id")
             if not file_id:
-                log.warning("GmeetCollector: list-row missing id — skipping: %r",
-                            sorted(stub.keys()) if isinstance(stub, dict) else type(stub).__name__)
+                log.warning(
+                    "GmeetCollector[%s]: list-row missing id — skipping: %r",
+                    acct.account_id,
+                    sorted(stub.keys()) if isinstance(stub, dict) else type(stub).__name__,
+                )
                 continue
             short = _short_id(file_id)
             if short in already_present:
@@ -435,39 +534,39 @@ class GmeetCollector:
             try:
                 exported = client.export_doc(file_id)
             except GmeetAPIError as e:
-                log.warning("GmeetCollector: export %s — %s", file_id, e)
+                log.warning("GmeetCollector[%s]: export %s — %s", acct.account_id, file_id, e)
                 continue
 
-            md = _render_markdown(stub, exported, account_id=self._account_id,
+            md = _render_markdown(stub, exported, account_id=acct.account_id,
                                   input_source=input_source)
             name = stub.get("name") or file_id
             created = stub.get("createdTime") or ""
             date_prefix = str(created)[:10] if created else now_iso()[:10]
             fname = f"{date_prefix}--{_slugify(_meeting_title(name))}--{short}.md"
-            target = output_root / fname
+            target = (ROOT_DIR / self.SPEC.output_subfolder) / fname
 
             if dry_run:
-                log.info("  DRY: would write %s (%d bytes)", target.relative_to(ROOT_DIR), len(md))
+                log.info("  DRY[%s]: would write %s (%d bytes)",
+                         acct.account_id, target.relative_to(ROOT_DIR), len(md))
                 continue
 
-            output_root.mkdir(parents=True, exist_ok=True)
+            target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(md, encoding="utf-8")
-            log.info("  wrote %s", target.relative_to(ROOT_DIR))
+            log.info("  [%s] wrote %s", acct.account_id, target.relative_to(ROOT_DIR))
             files_written.append(target)
 
             if created and (highest_created is None or str(created) > str(highest_created)):
                 highest_created = str(created)
 
-        if not dry_run and highest_created:
-            state["last_seen_ts"] = highest_created
-            save_json_state(_STATE_FILE, state)
+        state_touched = False
+        if not dry_run and highest_created and highest_created != per_acct_state.get("last_seen_ts"):
+            per_acct_state["last_seen_ts"] = highest_created
+            state[acct.account_id] = per_acct_state
+            state_touched = True
 
-        return RunResult(
-            files_written=tuple(files_written),
-            files_skipped=skipped,
-            state_keys_touched=("last_seen_ts",) if not dry_run else (),
-            message=(
-                f"listed {len(stubs)} · wrote {len(files_written)} · "
-                f"skipped {skipped} · since={since or '—'}"
-            ),
+        return (
+            f"listed {len(stubs)} · wrote {len(files_written)} · skipped {skipped}",
+            files_written,
+            skipped,
+            state_touched,
         )

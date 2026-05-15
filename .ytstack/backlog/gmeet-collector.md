@@ -1,10 +1,15 @@
 # gmeet collector — Google Meet / Gemini transcripts as a substrate
 
-**Status: implemented 2026-05-14** (`scripts/collectors/gmeet.py`, `core/google_oauth.py`,
-config + `wiki gmeet-auth` + docs + architecture diagram). What remains backlogged
-is the **Deferred: Meet REST API enrichment** section below and the meeting-grouping
-refinement (one Drive Doc → one file today; pairing transcript+notes Docs needs
-live data to pin Google's locale-dependent naming).
+**Status: implemented 2026-05-14, lifted multi-tenant 2026-05-15**
+(`scripts/collectors/gmeet.py`, `core/google_oauth.py`, config + `wiki gmeet-auth`
++ docs + architecture diagram). The 2026-05-15 lift moved gmeet from a flat
+`personal.gmeet` block to a per-account `personal.accounts.<id>.gmeet` sub-block
+with `kind: gmeet-api` after the very first lxw setup hit the wall on multiple
+Drive accounts — see DECISIONS 2026-05-15 (architecture policy: account-bound
+collectors multi-tenant from day one). What remains backlogged: the **Deferred:
+Meet REST API enrichment** section below and the meeting-grouping refinement (one
+Drive Doc → one file today; pairing transcript+notes Docs needs live data to pin
+Google's locale-dependent naming).
 
 **Priority:** P2 — new substrate, not a live bug. Operator already produces the
 substrate (the "Meet Recordings" Drive folder fills up with Gemini transcripts);

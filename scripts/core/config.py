@@ -94,9 +94,11 @@ class Limits:
     # Jamie ingest (collectors/jamie.py — see also CONFIG.piggybacks.jamie)
     jamie_request_timeout_s: int = 30     # per-HTTP-call timeout against api.meetjamie.ai
     jamie_max_per_run: int = 50           # default cap (overridable via CONFIG.personal.jamie.max_per_run)
-    # Google Meet ingest (collectors/gmeet.py — see also CONFIG.piggybacks.gmeet)
+    # Google Meet ingest (collectors/gmeet.py — see also CONFIG.piggybacks.gmeet).
+    # Multi-tenant: per-account gmeet block under personal.accounts.<id>.gmeet
+    # (kind: gmeet-api, drive_folder_id, drive_folder_name, since, max_per_run).
     gmeet_request_timeout_s: int = 30     # per-HTTP-call timeout against the Drive API
-    gmeet_max_per_run: int = 50           # default cap (overridable via CONFIG.personal.gmeet.max_per_run)
+    gmeet_max_per_run: int = 50           # default cap; per-account override is the gmeet sub-block's max_per_run
     # Claude Agent SDK per-message buffer (stream-json line buffer). SDK default is
     # 1 MB; trips on tool-result messages carrying knowledge/index.md (~300 KB raw,
     # ~600 KB JSON-escaped) or Write/Edit calls on large articles, with a confusing
@@ -173,35 +175,10 @@ class JamieConfig:
     account_id: str = "default"
 
 
-@dataclass
-class GmeetConfig:
-    """Google Meet / Gemini transcript integration (collectors/gmeet.py).
-
-    Single-tenant per install — one Google account. Pulls the Gemini-generated
-    transcript + notes Docs from the Drive "Meet Recordings" folder. OAuth is
-    bootstrapped once via `wiki gmeet-auth <oauth_account_id>`; the token cache
-    lives at `state/gmeet-token-<oauth_account_id>.json`. Empty oauth_account_id
-    (or a missing token cache) renders the collector inert (graceful agnostic).
-    """
-
-    # Account id passed to `wiki gmeet-auth` — also the token-cache filename
-    # suffix. Empty disables the collector (piggyback skips, CLI says "not
-    # configured").
-    oauth_account_id: str = ""
-    # Drive folder id of the "Meet Recordings" folder (copy it from the folder
-    # URL). Empty → the collector attempts to auto-resolve by name; if the
-    # narrow OAuth scope blocks the name search, it errors with a hint to set
-    # this explicitly.
-    drive_folder_id: str = ""
-    # Folder name used for the auto-resolve fallback when drive_folder_id is
-    # empty. Localised installs may have renamed the Meet-created folder.
-    drive_folder_name: str = "Meet Recordings"
-    # ISO 8601 date. First-install backfill cap — Docs created before this are
-    # skipped on the first full sweep. No effect on incremental runs (state
-    # file's last_seen_ts wins). Empty = no cap.
-    since: str = ""
-    # Per-account override of CONFIG.limits.gmeet_max_per_run. None = inherit.
-    max_per_run: int | None = None
+# Note (2026-05-15, multi-tenant policy): gmeet has no flat dataclass —
+# its config lives per-account under `personal.accounts.<id>.gmeet` with
+# `kind: gmeet-api`, mirroring the email Reader/Filter sub-block pattern.
+# `collectors/gmeet.py:_resolve_gmeet_accounts` reads the dispatch.
 
 
 @dataclass
@@ -266,11 +243,14 @@ class Personal:
     stg_backup_dir: str = ""
     # Jamie AI integration — see JamieConfig docstring. Empty defaults render
     # collectors/jamie.py inert; set `api_key_env` to enable.
+    # NOTE: jamie is still flat single-tenant (legacy from before the
+    # multi-tenant policy); a lift into `personal.accounts.<id>.jamie` with
+    # `kind: jamie-api` is open follow-up. New account-bound collectors must
+    # go straight to the multi-tenant pattern (see DECISIONS 2026-05-15).
     jamie: JamieConfig = field(default_factory=JamieConfig)
-    # Google Meet / Gemini integration — see GmeetConfig docstring. Empty
-    # defaults render collectors/gmeet.py inert; set `oauth_account_id` and
-    # run `wiki gmeet-auth` to enable.
-    gmeet: GmeetConfig = field(default_factory=GmeetConfig)
+    # Google Meet / Gemini integration — multi-tenant via per-account
+    # `gmeet:` sub-block under `personal.accounts.<id>` (kind: gmeet-api).
+    # No flat dataclass; resolved at run time by collectors/gmeet.py.
 
 
 # Default piggyback set — script names match flush.py's PIGGYBACK_TASKS keys.

@@ -871,10 +871,13 @@ ${C_BOLD}WHAT IT DOES${C_RESET}
   (scope: drive.meet.readonly), persists the token to
   .wiki/state/gmeet-token-<id>.json. Re-running re-issues consent.
 
-  <account-id> must match CONFIG.personal.gmeet.oauth_account_id.
+  <account-id> matches a key under personal.accounts.<id> whose body has
+  a "gmeet:" sub-block with "kind: gmeet-api". Run once per account that
+  owns a "Meet Recordings" Drive folder you want to ingest.
 
 ${C_BOLD}EXAMPLES${C_RESET}
-  wiki gmeet-auth work    # consent flow for personal.gmeet.oauth_account_id: work
+  wiki gmeet-auth work        # consent flow for personal.accounts.work
+  wiki gmeet-auth private     # second account; separate token cache
 EOF
     return 0
   fi
