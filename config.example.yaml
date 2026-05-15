@@ -137,7 +137,7 @@ limits:
   curiosity_quote_min_anchor_tokens: 5
   # Lint.
   sparse_threshold_words: 200
-  # YouTube ingest (scan-youtube.py).
+  # YouTube ingest (collectors/scan_youtube.py).
   youtube_max_frames: 30                 # Tier-3 visual: cap frames per video
   youtube_max_duration_s: 10800          # Tier-3: skip videos longer than this (default 3h)
   youtube_frame_resize_width: 512        # ffmpeg downscale before vision model
@@ -198,18 +198,18 @@ skills:
   global_install: false
 
 # Per-instance, do-not-commit. Drives compile_curiosity.md, compile_suggestion.md,
-# scan_screenshots_vision.md, and scan-email.py so committed files stay free of
+# scan_screenshots_vision.md, and the email collector so committed files stay free of
 # personal data. Empty defaults are fine; consumers handle absent values gracefully.
 personal:
   # default account; used for prompt rendering + as a fallback in compile.py
   primary_account: ""
   # Path to local Thunderbird profile dir (mbox roots live under here).
-  # Empty string disables scan-email.py.
+  # Empty string disables the Thunderbird-mbox path of the email collector.
   thunderbird_profile: ""
   # Path to a local Firefox profile directory. Examples:
   #   macOS:   ~/Library/Application Support/Firefox/Profiles/<id>.default-release
   #   Linux:   ~/.mozilla/firefox/<id>.default-release
-  # Empty string disables the Firefox half of scan-browser.py.
+  # Empty string disables the Firefox half of the browser collector.
   firefox_profile: ""
   # Path to a Simple Tab Groups (STG) backup directory (where the extension
   # writes its periodic *.json snapshots). Empty string disables STG imports.

@@ -45,11 +45,12 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 │   │   ├── jamie.py               ← Jamie AI meeting-notetaker
 │   │   ├── gmeet.py               ← Google Meet / Gemini transcripts (Drive API)
 │   │   ├── voice.py               ← inbox-watch dictation ingester (iOS Shortcuts / OpenWhispr / FluidVoice)
-│   │   ├── scan-browser.py        ← Firefox + Chrome bookmarks/history/tab-groups
-│   │   ├── scan-calendar.py       ← Thunderbird CalDAV cache → timeline overview
-│   │   ├── scan-screenshots.py    ← ~/Screenshots/ + Vision LLM (gemma4) → HOME sidecar + vault thumb (384px) + batch report
-│   │   ├── scan-tabs.py           ← Firefox Simple Tab Groups backups
-│   │   └── scan-youtube.py        ← yt-dlp + youtube-transcript-api + optional gemma4 visual analysis
+│   │   ├── health.py              ← Oura REST daily biometric rollup (sleep / readiness / HRV / steps)
+│   │   ├── scan_browser.py        ← Firefox + Chrome bookmarks/history/tab-groups
+│   │   ├── scan_calendar.py       ← Thunderbird CalDAV cache → timeline overview
+│   │   ├── scan_screenshots.py    ← ~/Screenshots/ + Vision LLM (gemma4) → HOME sidecar + vault thumb (384px) + batch report
+│   │   ├── scan_tabs.py           ← Firefox Simple Tab Groups backups
+│   │   └── scan_youtube.py        ← yt-dlp + youtube-transcript-api + optional gemma4 visual analysis
 │   ├── adapters/              ← MailboxReader implementations consumed by email_collector
 │   │   └── mailbox/{gmail,thunderbird,allinkl,base}.py
 │   ├── domain/                ← pure domain types (mail message, filter rule)

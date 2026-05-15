@@ -179,9 +179,9 @@ Per-instance data — operator-specific. **Never committed** (lives in `config.y
 | Key | Default | Meaning |
 |---|---|---|
 | `personal.primary_account` | `""` | Account id used as default in prompts + fallback in `compile.py`. |
-| `personal.thunderbird_profile` | `""` | Absolute path to local Thunderbird profile. Empty disables `scan-email` + `thunderbird-rules`. |
-| `personal.firefox_profile` | `""` | Absolute path to Firefox profile (`Library/Application Support/Firefox/Profiles/<id>.default-release` on macOS). Drives `scan-browser`. |
-| `personal.stg_backup_dir` | `""` | Simple Tab Groups backup dir. Drives `scan-tabs` STG import path. |
+| `personal.thunderbird_profile` | `""` | Absolute path to local Thunderbird profile. Empty disables the Thunderbird-mbox reader + `thunderbird-rules`. |
+| `personal.firefox_profile` | `""` | Absolute path to Firefox profile (`Library/Application Support/Firefox/Profiles/<id>.default-release` on macOS). Drives the browser collector. |
+| `personal.stg_backup_dir` | `""` | Simple Tab Groups backup dir. Drives the tabs collector STG import path. |
 
 ### Accounts (M002+ nested schema)
 
@@ -237,7 +237,7 @@ Per-account `jamie:` sub-block with `kind: jamie-api`, mirroring the `reader:` /
 | `personal.project_examples` | `[]` | List of project / product names rendered into `scan_screenshots_vision.md` as concrete examples. |
 | `personal.calendar_work_keywords` | `[]` | Substrings marking calendar events as work-relevant (customer / partner / team names). |
 | `personal.calendar_skip_keywords` | `[]` | Substrings marking holidays / observances to skip. Locale-specific. |
-| `personal.calendar_categories` | `{}` | Mapping of category-label → list of substring keywords used for bucketing in `scan-calendar`. First match wins. |
+| `personal.calendar_categories` | `{}` | Mapping of category-label → list of substring keywords used for bucketing in the calendar collector. First match wins. |
 | `personal.calendar_report_language` | `"en"` | Output language for the calendar scan report. `en` or `de`. |
 
 ## Secrets — `.claude/.env`
