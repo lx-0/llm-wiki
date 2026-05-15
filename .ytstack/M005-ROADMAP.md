@@ -5,7 +5,7 @@ size: L
 created: 2026-05-15T16:45:00Z
 status: planned
 total_slices: 5
-completed_slices: 0
+completed_slices: 1
 ---
 
 # M005 Roadmap
@@ -26,7 +26,7 @@ completed_slices: 0
 
 Slice detail lives in per-slice `M005-S##-PLAN.md` files, created by `ytstack:slice-milestone`.
 
-- [ ] S01 — Schema + compile-prompt branching (two-layer for `person|project`, canary migration) — 4 tasks — `M005-S01-PLAN.md`
+- [x] S01 — Schema + compile-prompt branching (two-layer for `person|project`, canary migration) — 4 tasks — `M005-S01-PLAN.md`
 - [ ] S02 — Lint + structural checks (`check_two_layer_pages` + `check_action_item_syntax`) — 3 tasks — `M005-S02-PLAN.md`
 - [ ] S03 — Substrate extraction (jamie + gmeet commitments → entity pages) — 5 tasks — `M005-S03-PLAN.md`
 - [ ] S04 — Lifecycle (resolution demotion + manual-`[x]` preservation) — 4 tasks — `M005-S04-PLAN.md`
