@@ -59,6 +59,19 @@ def test_compile_prompt_carries_entity_resolution_rule() -> None:
     assert "Don't stub for one-off mentions" in rendered
 
 
+def test_compile_prompt_carries_lifecycle_rules() -> None:
+    """M005-S04-T01: lifecycle carry-forward + manual-[x] preservation must
+    reach the rendered prompt unchanged.
+    """
+    rendered = render("compile_main", **_DUMMY_VARS)
+    assert "Lifecycle: carry-forward and manual-check preservation" in rendered
+    assert "Read first, rewrite second" in rendered
+    assert "Carry forward unresolved Action Items" in rendered
+    assert "Preserve manual `- [x]`" in rendered
+    assert "Deduplicate by task-phrase similarity" in rendered
+    assert "Stale-flag, don't auto-delete" in rendered or "stale?" in rendered
+
+
 def test_compile_prompt_carries_commitment_extraction_rule() -> None:
     """M005-S03-T01: the meeting-substrate commitment-extraction rule (Task/
     Owner/Deadline/Context quartet + entity routing + Timeline citation) must

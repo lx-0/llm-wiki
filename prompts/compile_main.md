@@ -159,6 +159,19 @@ ${source_content}
 
    5. **Don't stub for one-off mentions.** If the speaker appears in exactly one line of dialogue and that line is not a commitment (passing reference, "and Bob said hi"), do NOT create a stub. Only **commitments-by-speaker** trigger stubbing — pure mentions stay as one Timeline entry on the meeting attendees' existing pages (if any) or are skipped entirely.
 
+   **Lifecycle: carry-forward and manual-check preservation.** State is "compiled truth, rewritten each compile pass" — but **not from scratch**. The rewrite must be stateful: carry forward unresolved items from the existing State, preserve operator edits, never silently lose a commitment.
+
+   Procedure when updating an entity page that already exists:
+
+   1. **Read first, rewrite second.** Before rewriting the State block, Read the current file. Note every Action Item, Open Thread, and any manual `- [x]` checks the operator has made.
+   2. **Carry forward unresolved Action Items.** If an existing `- [ ]` line has no resolution evidence in the new substrate, it stays in the rewritten State block, unchanged. Same wording, same `📅` date, same `⏫` priority.
+   3. **Preserve manual `- [x]`.** Operator-checked items (`- [x]` or `- [X]`) remain in State as-is on rewrite. The operator can manually move them to Timeline if they want; compile does NOT auto-demote `[x]` lines unless substrate evidence also indicates resolution (which is the T02-domain resolution-demotion logic).
+   4. **Deduplicate by task-phrase similarity.** If the new substrate would produce an Action Item already in State (same verb + same object, within reasonable paraphrase tolerance), do NOT add a duplicate. Instead, append a Timeline citation: `- **${today}** | \`${source_path}\` — Re-mentioned <task summary>.`
+   5. **Open Threads carry forward** the same way. Unless the new substrate explicitly resolves a thread, it stays in State.
+   6. **Stale-flag, don't auto-delete.** If an Action Item or Open Thread has no substrate evidence for 90+ days (compare its earliest Timeline-cited date to `${today}`), append `[stale?]` at the end of the line. Don't remove. The operator triages stale items manually.
+
+   Anti-loss guard: if you're about to rewrite State and the new substrate produces FEWER Action Items than the existing State had, that's a smell — re-check Read for accuracy before committing the rewrite.
+
 4. **Create connection articles** in `knowledge/connections/` when you identify meaningful relationships between concepts (patterns, contradictions, analogies). Use the same frontmatter format with `type: connection`.
 
 5. **Update `knowledge/index.md`** — add or update the table row for each article you created or modified. Format:
