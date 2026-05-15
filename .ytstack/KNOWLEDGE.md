@@ -134,6 +134,16 @@ After `94c9d6b` shrank the *initial* prompt embed via the compact index, a fresh
 2. Caps mitigate, they don't solve, when the size mismatch is fundamental. If a single source is 138 KB and the model's window is 200K, you're one bad turn away from the cliff regardless of how tightly you guard the rest. Match the model to the data, then cap.
 3. *Don't claim a fix without re-running the failing case.* The first attempt looked plausible (burn time dropped 3.7×) but the symptom was unchanged. Per CLAUDE.md "Symptom vs Root-Cause": be explicit when only mitigating.
 
+#### Follow-up (2026-05-15 evening): the fan-out is stochastic on tiny sources too
+
+The 50 KB source-size threshold above catches the *deterministic* overflow case. But the same `kind=unknown` signature recurred on a fresh class: small memory raws (0.7–23 KB) failing ~30 % of the time, succeeding ~70 %, same-file same-run. The 0.7 KB `CLAUDE.md` pointer file dying after 111 s is the smoking gun — at that input size, the only way to spend 111 s is for the model to be in the tool loop. The Read/Grep fan-out into `knowledge/` is what's blowing the window — source size is just a co-variate, not the driver. Non-monotonic with size was already documented above ("60 KB ✗, 75 KB ✓"); this strengthens that observation into a *small*-source class too.
+
+**Fix (commit `ccf7dd5`):** one-shot retry with `compile_large_source_model` when `classify_failure` returns `kind=unknown` and we haven't already used the long-context model. Gated by `CONFIG.limits.compile_retry_long_context_on_unknown` (default true). The size-threshold catches deterministic overflows up-front; the retry catches stochastic ones reactively. Operator sees a `WARNING  retrying with long-context model claude-opus-4-7[1m]` line when it triggers, so the rate is visible in the log.
+
+**Reading the run:**
+- retry-line followed by `✓` → context-overflow class confirmed, the 1M variant absorbs the fan-out.
+- retry-line followed by `✗` → bottleneck is upstream of the model variant (Anthropic-side timeout, CLI bug on specific content shape, or output-side ballooning). Drop to source-splitting at section boundaries pre-compile.
+
 #### Lesson
 
 In-context body embeds that grow linearly with the corpus (an index, a log, a catalogue) become a context-overflow ticking bomb. The Karpathy-style pattern is **pointer-first**: tell the LLM what file to look at, hand over Read/Grep/Glob, let it fetch on demand. Body-embed is fine for small fixed surfaces (facts, AGENTS schema) and bad for growth surfaces (index, log, daily archive). Apply this whenever a `${var}` substitution in a prompt template carries a linearly-growing artifact.
