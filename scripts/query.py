@@ -2,6 +2,7 @@
 
 Usage:
     uv run python query.py "What do I know about X?"
+    uv run python query.py "What do I know about X?" --brief
     uv run python query.py "What do I know about X?" --file-back
 """
 
@@ -59,14 +60,30 @@ async def main() -> None:
     parser.add_argument(
         "--file-back",
         action="store_true",
-        help="Save the answer as a Q&A article in the wiki",
+        help="Save the answer as a Q&A article in the wiki (implies full mode)",
+    )
+    parser.add_argument(
+        "--brief",
+        action="store_true",
+        help="Short bullet answer instead of a full essay (incompatible with --file-back)",
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="With --file-back: overwrite an existing qa/ note that matches the question slug",
     )
     args = parser.parse_args()
 
     question = args.question
     file_back = args.file_back
+    brief = args.brief
+    force = args.force
 
-    log.info("Query: %s (file_back=%s)", question, file_back)
+    if brief and file_back:
+        log.error("--brief and --file-back are mutually exclusive — brief mode answers in-line only")
+        sys.exit(2)
+
+    log.info("Query: %s (brief=%s, file_back=%s)", question, brief, file_back)
 
     # Embed only the compact article index (path + date); the agent pulls
     # full article bodies on demand via Read/Grep/Glob. Embedding every
@@ -77,6 +94,18 @@ async def main() -> None:
 
     if file_back:
         QA_DIR.mkdir(parents=True, exist_ok=True)
+        # Dedup guard: refuse to overwrite an existing qa/ note unless --force.
+        # Match by exact slug; near-duplicates are still possible but cheap
+        # protection against accidental double-runs of the same question.
+        candidate_slug = slugify(question)[:80]  # cap length to match write
+        existing = list(QA_DIR.glob(f"{candidate_slug}*.md"))
+        if existing and not force:
+            log.error(
+                "qa/ already has %d note(s) matching slug `%s*.md` (%s). "
+                "Re-run with --force to overwrite, or rephrase the question for a distinct slug.",
+                len(existing), candidate_slug, ", ".join(p.name for p in existing[:3]),
+            )
+            sys.exit(3)
         prompt = render(
             "query_file_back",
             index_md=index_md,
@@ -86,6 +115,14 @@ async def main() -> None:
             now=now_iso(),
         )
         allowed_tools = ["Read", "Glob", "Grep", "Write", "Edit"]
+    elif brief:
+        prompt = render(
+            "query_brief",
+            index_md=index_md,
+            facts_md=facts_md,
+            question=question,
+        )
+        allowed_tools = ["Read", "Glob", "Grep"]
     else:
         prompt = render(
             "query_main",

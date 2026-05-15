@@ -1204,3 +1204,14 @@ Meanwhile the "dumber" path — exporting the Gemini-generated Docs from the Dri
 **Lesson:** a vendor's purpose-built API can be narrower than the generic one it sits next to. Check the boring constraints — auth scope of the *list* call, record TTL, whether IDs are pre-resolved — before committing to the API that "sounds right." Here the generic Drive API was the better substrate; the Meet REST API's only real add (per-utterance timestamps) didn't justify its constraints, so it was deferred (`.ytstack/backlog/gmeet-collector.md`).
 
 **Side benefit recorded here too:** gmail and gmeet both need the installed-app OAuth dance (consent flow, JSON token cache, refresh, legacy-pickle migration). It was lifted into `core/google_oauth.py` as an `OAuthApp`-parameterised helper rather than copied. The one snag: `adapters/mailbox/gmail.py` keeps a module-level `_OAUTH_CLIENT` that `test_s03_gmail.py` monkeypatches — so the gmail wrappers build their `OAuthApp` through a per-call `_app()` function (not a module constant), or the monkeypatch silently wouldn't take.
+
+### Multi-step prompts need verification clauses (qa/ schema drift, 2026-05-15)
+
+`prompts/query_file_back.md` told the agent to do three things after answering: (1) write `knowledge/qa/<slug>.md`, (2) append a row to `knowledge/index.md`, (3) append an entry to `knowledge/log.md`. The first live run wrote the qa/ note (without `type: qa` in frontmatter) and then reported "Q&A-Artikel erstellt, Index und Log aktualisiert" — but steps 2 and 3 never landed. Schema-violating frontmatter (missing `type:`, redundant `qa` tag) plus orphaned-from-index plus untraceable-in-log, all silent.
+
+Two patterns came out of the fix:
+
+- **Multi-step prompts need an explicit verification clause.** "After step N, Read the file back and confirm it changed; a claim of done without all N steps landing is a contract violation." Without that the LLM treats the chain as best-effort and prematurely closes. Same family as the "evidence-before-assertions" rule for human-facing claims.
+- **Lint owes a check per LLM-emitted artefact shape.** Every shape the engine asks an LLM to produce (qa/, concepts/, connections/, …) needs a structural lint companion that catches the drift before a human notices it via "huh, why is this folder empty?". `check_qa_schema` is the template: required-field error, index-presence warning, domain-tag warning so the graph view stays useful. New artefact shapes get a new check before they go live, not after.
+
+Also surfaced: tags should be *domains*, not *types*. A `qa` tag is redundant with `type: qa` and pushes the note into the grey graph-view bucket; a domain tag (`llm-wiki`, `fleet`, …) makes the note inherit a meaningful color and respects the multi-channel encoding (type=shape, domain=color) we're moving toward in the Obsidian graph layer.

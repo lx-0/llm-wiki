@@ -262,6 +262,73 @@ def check_article_type() -> list[dict]:
     return issues
 
 
+# Domain tags considered "meaningful" for graph-view coloring. A qa/ note
+# without any of these gets a warning so it doesn't fall into the grey
+# fallback bucket. List is sourced from CONFIG.graph_view.domain_tags when
+# present; fallback covers the lxw vault's main domains. Add via config.yaml:
+#   graph_view:
+#     domain_tags: [fleet, openclaw, claude-code, ...]
+_DEFAULT_DOMAIN_TAGS = (
+    "fleet", "openclaw", "claude-code", "yesterday", "llm-wiki",
+    "paperclip", "ytstack", "township", "pixeltales",
+)
+
+
+def _domain_tags() -> tuple[str, ...]:
+    cfg = getattr(CONFIG.graph_view, "domain_tags", None)
+    if cfg and isinstance(cfg, list):
+        return tuple(t for t in cfg if isinstance(t, str))
+    return _DEFAULT_DOMAIN_TAGS
+
+
+def check_qa_schema() -> list[dict]:
+    """Verify each knowledge/qa/ note has type:qa, an index row, and ≥1 domain tag.
+
+    qa/ notes are written by `wiki query --file-back` via the Claude SDK. The
+    prompt instructs three follow-up steps (frontmatter type, index row, log
+    entry) but historically the agent sometimes reports success while skipping
+    one. This check catches that drift.
+    """
+    issues = []
+    qa_dir = KNOWLEDGE_DIR / "qa"
+    if not qa_dir.exists():
+        return issues
+    index_content = read_wiki_index()
+    domain_set = set(_domain_tags())
+    for article in sorted(qa_dir.glob("*.md")):
+        if article.name in ("index.md", "log.md"):
+            continue
+        rel = str(article.relative_to(KNOWLEDGE_DIR))
+        fm = _read_yaml_frontmatter(article)
+        # 1. type: qa required
+        if fm.get("type") != "qa":
+            actual = fm.get("type") or "(missing)"
+            issues.append(issue(
+                "error", "qa_missing_type", rel,
+                f"qa/ note has `type: {actual}` — must be `type: qa` per schema",
+                auto_fixable=True,
+            ))
+        # 2. must appear in index.md
+        stem = article.stem
+        if f"[[qa/{stem}]]" not in index_content:
+            issues.append(issue(
+                "warning", "qa_not_in_index", rel,
+                f"qa/{stem} is not referenced in knowledge/index.md — "
+                f"`wiki query --file-back` should have added a row",
+            ))
+        # 3. should have ≥1 domain tag (else falls into grey bucket in graph view)
+        raw_tags = fm.get("tags") or []
+        tags = set(raw_tags) if isinstance(raw_tags, list) else set()
+        # Strip the redundant `qa` tag — that information lives in type:
+        if not (tags & domain_set):
+            issues.append(issue(
+                "warning", "qa_no_domain_tag", rel,
+                f"qa/ note has no domain tag from {sorted(domain_set)} — "
+                f"will render grey in graph view. Add e.g. `tags: [llm-wiki]`.",
+            ))
+    return issues
+
+
 def check_sparse_articles() -> list[dict]:
     """Find articles with fewer than SPARSE_THRESHOLD words."""
     issues = []
@@ -467,6 +534,7 @@ async def main() -> None:
         ("Stale articles", check_stale_articles),
         ("Missing backlinks", check_missing_backlinks),
         ("Article type", check_article_type),
+        ("QA schema", check_qa_schema),
         ("Sparse articles", check_sparse_articles),
         ("Facts violations", check_facts_violations),
     ]

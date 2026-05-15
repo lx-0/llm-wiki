@@ -192,6 +192,14 @@ class Features:
 class GraphView:
     mode: str = "knowledge-only"
     custom_search: str = ""
+    # Tag names treated as "domain anchors" for graph-view coloring and
+    # qa-schema lint. Notes carrying at least one of these get a meaningful
+    # color in the graph; notes without any fall into the grey fallback.
+    # Empty list = use the engine default (see scripts/lint.py
+    # _DEFAULT_DOMAIN_TAGS). Override per vault in config.yaml:
+    #   graph_view:
+    #     domain_tags: [fleet, openclaw, my-product]
+    domain_tags: list[str] = field(default_factory=list)
 
 
 @dataclass

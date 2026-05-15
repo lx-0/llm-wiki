@@ -32,6 +32,8 @@
 #   wiki lint                  run lint.py — structural + LLM contradiction checks
 #   wiki lint --structural-only  cheap, no-LLM lint (used by piggyback)
 #   wiki query "QUESTION"      ask the knowledge base via the configured model
+#   wiki query "Q" --brief     5-10 line bullet answer (cheapest)
+#   wiki query "Q" --file-back full answer, persisted as knowledge/qa/<slug>.md
 #   wiki agent <id>            run an agentic task (Claude SDK driven by prompts/agents/<id>.md)
 #   wiki agent --list          list registered agent tasks
 #   wiki correct add "TITLE" "TRUTH" [--status S] [--term T ...]
@@ -400,10 +402,15 @@ ${C_BOLD}wiki query${C_RESET} — ask the knowledge base in natural language
 
 ${C_BOLD}USAGE${C_RESET}
   wiki query "WHAT did we decide about X?"
+  wiki query "..." --brief           5-10 line bullet answer (cheapest mode)
+  wiki query "..." --file-back       full answer + persist as knowledge/qa/<slug>.md
+  wiki query "..." --file-back --force   overwrite an existing qa/ note
 
 ${C_BOLD}NOTES${C_RESET}
   Wraps \`scripts/query.py\`. Reads \`knowledge/index.md\`, picks the
   relevant articles, answers via the configured query model. LLM cost applies.
+  --brief and --file-back are mutually exclusive. --file-back refuses to
+  overwrite an existing qa/ slug-match without --force.
 EOF
       return 0 ;;
   esac
