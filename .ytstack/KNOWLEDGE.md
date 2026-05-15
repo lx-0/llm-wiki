@@ -1371,3 +1371,20 @@ Real sequence:
 **Standing rule:** when an engine retries an API call within seconds of a failure, **always backoff first**. The retry is exactly the time when rate-limit is most likely. Doing it instantly maximises the cascade probability. This applies beyond compile.py — any engine path that auto-retries on the same backend.
 
 **Caveat for the next debugger:** "fast-fail + empty stderr = CLI crash" is still the right *default* heuristic. But check batch position before recommending `claude --version` / `claude -p "hi"`: if the failure follows a `kind=unknown` in the same batch, the CLI is probably fine and the API just rate-limited the burst.
+
+### Seed-drift audit — three buckets (added 2026-05-15)
+
+When the operator asks "is the lxw vault in sync with the engine?", run a per-surface diff and classify each diff into one of three buckets:
+
+1. **Real drift** — engine ships X, vault has Y, neither protected. Needs `wiki seed --force` to re-copy template → vault. Examples: `dashboard.md` (M005 Personal Tasks pane), `knowledge/MOCs/inbox-tasks.md`.
+
+2. **Operator-customization (preserved by design)** — vault has fields the engine doesn't ship. `lib/seed.sh` is built to respect these:
+   - `.obsidian/community-plugins.json`: **additive union** via `_merge_community_plugins` — only adds missing engine plugins, never removes operator-installed ones. Idempotent.
+   - `.obsidian/appearance.json`: drift-warning logged but the operator's custom `cssTheme`, `translucency`, etc. stay. Engine ships the bare minimum.
+   - `AGENTS.md`: backed up to `AGENTS.md.bak-YYYYMMDD-HHMMSS` before overwrite, so an over-eager `--force` is recoverable.
+
+3. **Regenerated-by-flush (not seeded at all)** — `_dashboard-stats.md` is rewritten by `scripts/dashboard/dashboard_stats.py` after every flush. The `templates/_dashboard-stats.md` placeholder only matters for fresh-install bootstrap; existing vaults pick up new keys (e.g. M005 `open_commitments`) on next flush automatically.
+
+**The actual seed surface** (canonical list from `lib/seed.sh`): `README.md`, `AGENTS.example.md → AGENTS.md`, `dashboard.md`, `knowledge.base`, `Templates/*.md` (Obsidian quick-add templates), `knowledge/MOCs/*.md` (glob), `.obsidian/*.json` + `.obsidian/snippets/*.css`, `.claude/.env.example`. Anything outside this list is either operator-data (`raw/`, `daily/`, `knowledge/<typed-articles>/`) or `wiki update` territory (`.wiki/` engine code, prompts, scripts).
+
+**Anti-pattern**: telling the operator to "run `wiki seed --force`" without first per-surface-diffing. If only `.obsidian/community-plugins.json` differs and the difference is two operator-installed plugins, no seed is needed — the diff is by-design preservation. Wasting an operator's tab-context on a no-op seed run is a low-trust move.
