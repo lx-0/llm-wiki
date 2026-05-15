@@ -1495,3 +1495,56 @@ Single key, single replace, every other byte preserved. Idempotent shape: re-run
 **Generalisable rule.** When writing back a single field into a YAML frontmatter file that an operator might also hand-edit, use targeted regex replacement, not parse-mutate-dump. `yaml.safe_dump` is for files you're CREATING; surgical replacement is for files you're UPDATING. The library that knows how to parse YAML doesn't know which whitespace and quoting choices were intentional.
 
 **Sibling lesson — overwrite guards.** The same arc's daily-digest agent had a guard "refuse if existing root has different `type:`" that treated "type missing entirely" as "type different". This is a classic default-deny-on-absence bug. The fix enumerates three cases explicitly: matches (overwrite), differs (refuse), missing (overwrite). Any future overwrite-guard on frontmatter attributes should follow the same triplet.
+
+## Sentinel-delimited managed regions inside per-date rollups
+
+**Problem.** When a collector owns a markdown file's *body* but the operator also wants to type notes into the same file, the regenerate-the-whole-body strategy clobbers operator prose. The gmeet collector solved this differently (one Google Doc → one collector-owned file, no operator prose expected) but a per-date calendar rollup is a natural surface for the operator to jot "talked to X about Y after standup" or "remember to follow up by Friday".
+
+**Pattern.** Wrap the collector-managed region with HTML comment sentinels:
+
+```markdown
+# Calendar — 2026-05-15
+
+Operator-typed prose above survives.
+
+<!-- calendar:events:begin -->
+
+## 09:00–09:30 · Standup
+- **Calendar:** …
+- **Attendees:** …
+
+## 10:30–12:00 · Focus block
+…
+
+<!-- calendar:events:end -->
+
+Operator-typed prose below also survives.
+```
+
+The collector's `_render_date_file` parses the existing file (if any), pulls the pre- and post-sentinel prose verbatim, regenerates only the managed region, and re-emits. The frontmatter is fully owned by the collector (re-computed each run from current event metadata). The H1 is also collector-owned (so date-key changes propagate).
+
+**Edge cases the implementation handles:**
+
+- **No existing file** → both pre/post prose empty, write a fresh shape.
+- **File without sentinels** (legacy or hand-authored) → treat the entire post-H1 body as pre-prose, append the new managed region after it. The next run will then find sentinels and act normally.
+- **Sentinels swapped or one missing** → fall back to "no sentinels" path; don't truncate operator prose on the basis of malformed markers.
+
+**Generalisable rule.** Any collector that wants to own *part* of a file the operator might also write to should use a sentinel-pair, not a frontmatter-key, not whole-file regeneration. Sentinels survive yaml reformatting, markdown linters, and (because they're HTML comments) Obsidian's rendering. Keep the sentinel string narrow + namespaced — `<!-- calendar:events:begin -->` not `<!-- BEGIN -->`.
+
+## OAuth scope additivity: re-consent vs. token-cache invalidation
+
+**Problem.** Operator already has `wiki gmeet-auth work` cached at `state/gmeet-token-work.json` (scope: `drive.meet.readonly`). They run `wiki calendar-auth work`. The new flow requests `calendar.readonly` only — a *different* scope set, written to a *different* file (`state/calendar-token-work.json`). Both tokens coexist; each integration uses its own.
+
+**Why this works.** `core/google_oauth.py:OAuthApp` carries `token_prefix` as an integration identifier. Token-cache paths are `state/<token_prefix>-<account_id>.json`. Each integration gets its own slot. Adding a new account-bound Google integration (`youtube-api`, `gmail-readonly`, …) means picking a new `token_prefix` and a new scope set; the existing tokens stay untouched. **Never reuse another integration's `token_prefix`** even if the scope set is identical — the file naming is the discriminator, not the scope.
+
+**Counter-example that would have broken.** If `calendar.py` had picked `token_prefix="gmeet-token"` to "reuse the existing token", the calendar flow would have overwritten gmeet's cache with a calendar-only-scope token, breaking gmeet on the next run (it'd try to call Drive with a token that doesn't carry `drive.meet.readonly`). Per-integration prefixes are not a stylistic choice; they're the safety boundary.
+
+## Recurring-event collapse: persist the slug, not the title
+
+**Problem.** Google Calendar's `recurringEventId` is a stable opaque id for the series. The collector wants to turn each occurrence into `[[concepts/<slug>|Title]]` and write the concept page once per series. The naive approach derives the slug from the event summary on every run — but operator-edited event titles change over time, and even Gemini's title rendering varies between client and API ("Sprint Sync" vs. "Sprint sync 2026-05-15"). Re-deriving the slug each run produces a different file per title variation.
+
+**Solution.** Persist the `recurringEventId → slug` mapping in the per-account state (`state/calendar-state.json` under `<account>.recurring`). First sighting computes the slug from the current summary, stores it, writes the concept page. Every subsequent sighting looks the slug up by `recurringEventId` and re-uses it — even if the operator has since edited the title.
+
+**Implication for concept-page upkeep.** The first sighting also decides the concept page's H1 + frontmatter `title`. Later title drift on the calendar side doesn't update the concept page (the collector only writes the concept page once, with `if not path.exists(): write()`). This is deliberate — the concept page is operator-owned content from then on, the calendar-side title is a snapshot of the series at first sighting. If the series gets retitled and the operator wants the concept page updated, they edit it directly.
+
+**Generalisable rule.** Any time an external system gives you a stable id alongside human-readable metadata, persist the (id → derived-name) mapping the first time you compute the name. Don't recompute from drifting metadata.

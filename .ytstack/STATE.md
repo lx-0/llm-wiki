@@ -1,7 +1,7 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-05-15T22:35:00Z
+last_updated: 2026-05-15T22:45:00Z
 current_milestone: M006
 active_slice: none
 active_task: none
@@ -9,7 +9,11 @@ active_task: none
 
 # State
 
-**Status:** **M006 planned (L). Calendar-collector redesign committed. Ready to slice.** Goal: replace year-count `scan_calendar.py` stub with full Google Calendar substrate (per-date rollups, multi-tenant, recurring-event collapse, gmeet/jamie cross-link). Backlog file `.ytstack/backlog/calendar-collector.md` consumed as the source pitch. Next: run `ytstack:slice-milestone` to define S01–S04 in detail.
+**Status:** **M006 SHIPPED (single push, 2026-05-15).** Calendar collector replaces SQLite year-counts stub with Google Calendar v3 substrate. 31/31 new tests green; 311 prior tests still pass (2 pre-existing failures in `test_agent_task` / `test_summarize_day` from agent_spec last_run datetime/string mismatch — unrelated to M006, touched by `ec5683a`). Code: `scripts/collectors/calendar.py` (~600 LOC) + `scripts/adapters/calendar/google.py` REST client + `wiki calendar-auth` CLI. Legacy `scripts/collectors/scan_calendar.py` removed. Per-date rollups at `raw/notes/calendar/<YYYY-MM-DD>.md` with sentinel-delimited managed events region (operator prose outside survives regeneration). Recurring-event series collapse to `knowledge/concepts/<slug>.md`. Same-date title-slug match cross-links gmeet+jamie transcripts. Multi-tenant via `personal.accounts.<id>.calendar` (kind: `google-calendar`). OAuth re-uses `core/google_oauth.py` (scope `calendar.readonly`). Multi-calendar loop with `selected: true` default + explicit `include:` override. Mutable-event handling via per-event etag + per-calendar `updatedMin` watermark (defaults: 90 d backfill, 7 d future re-fetch). New `CONFIG.limits.calendar_*` (request_timeout_s, max_per_run, backfill_days, future_days). Default piggyback `calendar: 6h`. Docs synchronized across AGENTS / PROCESS / FEATURES / cli / config / engine-layout / README / config.example. Infographics: `docs/architecture.excalidraw` (scanner_calendar rebranded + height-bumped + "97d" stat + new `pb_calendar 6h` piggyback row) + `docs/overview.excalidraw` (substrate footer reordered) both re-rendered. `.ytstack/backlog/calendar-collector.md` flipped to status `shipped`; `.ytstack/DECISIONS.md` + `.ytstack/KNOWLEDGE.md` got the M006 entries; memory pointer `project_calendar_collector_shipped.md` written.
+
+**Operator-side TODO on lxw vault:** drop `personal.accounts.<id>.calendar: {kind: google-calendar}` into `config.yaml` for each account that should sync, run `wiki update` + `wiki calendar-auth <id>` per account, then `wiki collect calendar --dry-run` to confirm the OAuth + calendar-selection logic against live data. Piggyback auto-runs every 6 h afterwards.
+
+---
 
 ---
 

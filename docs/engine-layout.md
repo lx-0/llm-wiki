@@ -46,13 +46,14 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 │   │   ├── gmeet.py               ← Google Meet / Gemini transcripts (Drive API)
 │   │   ├── voice.py               ← inbox-watch dictation ingester (iOS Shortcuts / OpenWhispr / FluidVoice)
 │   │   ├── health.py              ← Oura REST daily biometric rollup (sleep / readiness / HRV / steps)
+│   │   ├── calendar.py            ← Google Calendar v3 → per-date rollups (multi-tenant, OAuth; M006 — replaces legacy scan_calendar SQLite stub)
 │   │   ├── scan_browser.py        ← Firefox + Chrome bookmarks/history/tab-groups
-│   │   ├── scan_calendar.py       ← Thunderbird CalDAV cache → timeline overview
 │   │   ├── scan_screenshots.py    ← ~/Screenshots/ + Vision LLM (gemma4) → HOME sidecar + vault thumb (384px) + batch report
 │   │   ├── scan_tabs.py           ← Firefox Simple Tab Groups backups
 │   │   └── scan_youtube.py        ← yt-dlp + youtube-transcript-api + optional gemma4 visual analysis
-│   ├── adapters/              ← MailboxReader implementations consumed by email_collector
-│   │   └── mailbox/{gmail,thunderbird,allinkl,base}.py
+│   ├── adapters/              ← MailboxReader + calendar.googleapis.com client used by collectors
+│   │   ├── calendar/google.py     ← Google Calendar v3 REST wrapper (list_calendars / list_events / get_event)
+│   │   └── mailbox/{gmail,thunderbird,allinkl,imap,base}.py
 │   ├── domain/                ← pure domain types (mail message, filter rule)
 │   ├── facts/                 ← hard-fact subsystem (knowledge/facts/<slug>.md consumers)
 │   │   ├── correct.py             ← CRUD CLI: add/list/remove/edit/path

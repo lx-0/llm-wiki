@@ -92,8 +92,8 @@ session-start / session-end /             Collectors (Registry):
 pre-compact hooks attach to every         · email            (multi-backend mailboxes)
 Claude Code / Codex / Gemini /            · jamie            (Jamie AI meetings)
 Cursor session.  flush.py extracts        · gmeet            (Google Meet / Gemini transcripts)
-the conversation transcript and           Scanners (legacy CLI, pending port):
-appends a structured entry to             · scan-calendar    (Thunderbird SQLite)
+the conversation transcript and           · calendar         (Google Calendar v3, per-date rollups)
+appends a structured entry to             Scanners (Registry, ported 2026-05-14):
 daily/YYYY-MM-DD.md.                      · scan-browser     (Firefox + Chrome)
                                           · scan-screenshots (Vision LLM)
                                           · scan-tabs        (Firefox STG)

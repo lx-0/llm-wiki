@@ -339,7 +339,7 @@ flowchart LR
         SG["collectors/gmeet.py\n(Registry: `wiki collect gmeet`)"]
         SV["collectors/voice.py\n(Registry: `wiki collect voice`)"]
         SH["collectors/health.py\n(Registry: `wiki collect health`)"]
-        SC["collectors/scan_calendar.py"]
+        SC["collectors/calendar.py\n(Registry: `wiki collect calendar`)"]
         SB["collectors/scan_browser.py"]
         SCR["collectors/scan_screenshots.py"]
         SY["collectors/scan_youtube.py"]
@@ -362,7 +362,7 @@ flowchart LR
     DR["Google Drive\n(Meet Recordings)"] --> SG --> RG
     VI["voice_inbox/\n(iOS Shortcut / OpenWhispr)"] --> SV --> RV
     OU["Oura REST API\n(api.ouraring.com/v2)"] --> SH --> RH
-    TB --> SC --> RC
+    GC["Google Calendar v3 API"] --> SC --> RC
     FF --> SB --> RB
     CH --> SB
     SS --> SCR --> RS
@@ -388,7 +388,7 @@ flowchart LR
 | `collectors/email_collector.py` | Collector Registry | Mailbox-Adapter (Thunderbird mbox, Gmail API, generic IMAP) via `adapters/mailbox/resolve_reader` | Zwei Modi: **Full-Sweep** (`wiki collect email`) = Metadata-Overview pro Account. **Incremental** (täglicher Piggyback, `--incremental`) = nur Mails neuer als der Per-Account-Watermark in `state/email-state.json`, als Delta-Report (Per-Message-Zeilen: Datum · Sender · Betreff, nach Ordner gruppiert). Mails ohne parsebaren Date-Header werden im Delta-Modus übersprungen (sonst würden sie in jedem Lauf neu gemeldet). Erster Incremental-Lauf pro Account = Baseline (Watermark gesetzt, kein Report — der Einmal-Bulk-Ingest wird nicht erneut ausgegeben). | `raw/notes/email/<account>-<date>.md` (full) · `raw/notes/email/<account>-delta-<ts>.md` (delta) |
 | `collectors/jamie.py` | Collector Registry | Jamie AI public tRPC API (`beta-api.meetjamie.ai`, `x-api-key` auth) — **multi-tenant** via `personal.accounts.<id>.jamie` (`kind: jamie-api`), je Account ein eigener `api_key_env` | Pro Meeting ein Markdown-File: frontmatter (id, participants, tags, calendar event, `account_id`, `key_type`) + Jamie-LLM-Summary verbatim + Action-Items als Obsidian-Tasks + Speaker-diarisierter Transcript (`**Name** [mm:ss] — text`). Skip-existing per `meeting_id`; incremental via per-account `last_seen_ts` state. | `raw/transcripts/jamie/<date>--<slug>--<short-id>.md` |
 | `collectors/gmeet.py` | Collector Registry | Google Drive API v3 (`drive.meet.readonly` scope, OAuth via `core/google_oauth.py`) — die Gemini-generierten Transcript- + Notes-Docs aus dem "Meet Recordings"-Drive-Ordner | **Ein Meeting → ein Markdown-File**: frontmatter (`doc_kinds: [...]` Liste, `drive_docs: [{id, name, kind, url, created}]` Liste, `started_at`) + paired `## Summary` (Notes-Doc) + `## Transcript` (Transcript-Doc) Sections. Cross-run merge via stable `meeting_key` (sha256 des normalisierten Title — Whitespace + Quote-Glyph-Varianten gestrippt): landet Notes in Run N + Transcript in Run N+1, mergt Run N+1 die zweite Section in die existierende Datei statt Duplikat. Drive-folder-id Auto-Resolve emittiert WARNING mit aufgelöster ID damit operator pinnen kann (Workspace-Kollisions-Schutz). Skip-existing zweischichtig: Filename-Suffix + jede `drive_docs[*].id` im Frontmatter. Drive-only Wedge — Meet REST API deferred (organizer-only + 30-Tage-Expiry), siehe `.ytstack/backlog/gmeet-collector.md`. | `raw/transcripts/gmeet/<date>--<slug>--<meeting-key>.md` |
-| `collectors/scan_calendar.py` | Collector Registry | Thunderbird calendar SQLite | Hunderte bis tausende Events, Attendees, Kategorien. `--year` ist CLI-only. | `raw/notes/calendar/` |
+| `collectors/calendar.py` | Collector Registry | Google Calendar v3 (`calendar.readonly` scope, OAuth via `core/google_oauth.py`) — **multi-tenant** via `personal.accounts.<id>.calendar` (`kind: google-calendar`), per-account Token-Cache | **Ein Markdown-File pro Datum** (`raw/notes/calendar/<YYYY-MM-DD>.md`): frontmatter (`event_count`, `meeting_hours`, `focus_hours`, `people`, `event_ids`) + per-event Body-Block (`## HH:MM–HH:MM · Title` + `- **Calendar:** …`, `- **Attendees:** …`, `- **Recurring:** [[concepts/<slug>\|Title]]`, `- **Transcript:** [[…\|gmeet]]`). Recurring-Series collapsen einmal in `knowledge/concepts/<slug>.md` (echte Concept-Page mit `type: concept` + `series: true` + `tags: [meeting, recurring]`); jede Instanz im Date-Rollup linkt dort hin. Same-Date Cross-Link mit `raw/transcripts/{gmeet,jamie}/` via Title-Slug fuzzy-match. Sentinel-delimited managed region (`<!-- calendar:events:begin/end -->`) — operator-Prose außerhalb übersteht jede Regeneration. Multi-Calendar via `include:` list (default = alle `selected: true` Calendars, sonst primary). Mutationen erkannt über per-event `etag` + per-Calendar `updated`-Watermark in `state/calendar-state.json`. | `raw/notes/calendar/<YYYY-MM-DD>.md` + `knowledge/concepts/<slug>.md` für recurring series |
 | `collectors/scan_browser.py` | Collector Registry | Firefox places.sqlite + STG + Chrome | Tausende Tabs, Bookmarks, zehntausende Visits. Multi-source, ein Collector. `--source` ist CLI-only. | `raw/notes/browser/` |
 | `collectors/scan_tabs.py` | Collector Registry | Firefox Simple Tab Groups Backup | Aktive Tab-Gruppen, deren Tab-URLs/Titel. | `raw/notes/tabs/` |
 | `collectors/scan_screenshots.py` | Collector Registry (piggyback) | `~/Screenshots/` (macOS PNG-Dump) | gemma4 Vision pro Screenshot, batch-report mit allen analyses + thumbnails. | `raw/notes/screenshots/screenshots-<slug>.md` + `~/Screenshots/<file>.md` (canonical sidecar) |
@@ -423,13 +423,13 @@ Bei `--incremental` läuft jeder Account gegen seinen Per-Account-Watermark (`la
 
 ### Andere Scanner
 
-**Calendar:** Thunderbird SQLite. Feiertage gefiltert. Events + Attendees + Kategorien. Work-Keywords (Customer-/Partner-Namen für die `Kunden / Workshops`-Kategorie) kommen aus `CONFIG.personal.calendar_work_keywords`.
+**Calendar:** Google Calendar v3 via OAuth, multi-tenant. Per-Date-Rollups mit per-event Body-Blocks (Titel · Zeit · Attendees · Location · Recurring · Transcript-Cross-Link). Recurring-Series collapsen zu Concept-Pages. Feiertage gefiltert via `CONFIG.personal.calendar_skip_keywords` (Substring-Match auf Event-Title). Declined-Events (operator-side `responseStatus: declined`) + Cancelled-Events übersprungen.
 
 **Browser:** Firefox places.sqlite + STG Backup + Chrome. Tabs, Bookmarks, History, Search History.
 
 **Thunderbird mbox:** Python's `mailbox` Modul liest mbox-Dateien direkt. Kein Thunderbird nötig, kein IMAP. Robustes Error-Handling für kaputte Mails.
 
-**Account-Konfiguration ist gitignored.** Email-Collector und scan-calendar lesen Account-Map (id → email, label, mbox-paths, IMAP-host, env-var-namen) zur Laufzeit aus `CONFIG.personal.accounts`. Defaults in `config.example.yaml` sind leer; per-install Werte leben in `config.yaml` (gitignored). Pfad zum Thunderbird-Profil: `CONFIG.personal.thunderbird_profile` (leer = entsprechende Scanner deaktiviert).
+**Account-Konfiguration ist gitignored.** Email-Collector liest Account-Map (id → email, label, mbox-paths, IMAP-host, env-var-namen) zur Laufzeit aus `CONFIG.personal.accounts`. Defaults in `config.example.yaml` sind leer; per-install Werte leben in `config.yaml` (gitignored). Pfad zum Thunderbird-Profil: `CONFIG.personal.thunderbird_profile` (leer = mbox-Reader deaktiviert). Calendar / gmeet / jamie sind jeweils per-Account sub-blocks unter `personal.accounts.<id>.{calendar,gmeet,jamie}` mit eigenem `kind:`-Discriminator.
 
 **Ollama-Aufrufe** (LLM-Filterung im Deep-Scan, JSON-Klassifizierung, Vision in Screenshots) gehen alle durch `scripts/core/ollama_client.py` — die Gotchas (Markdown-Fence-Stripping, `format`-Schema mit `enum` für non-empty Strings, `/api/chat` für Vision) leben dort, nicht in jedem Caller.
 
@@ -458,8 +458,9 @@ uv run python scripts/collectors/scan_youtube.py --url "https://youtu.be/<id>" -
 uv run python scripts/collectors/scan_youtube.py --inbox raw/inbox/youtube.md --tier 1
 
 # Calendar
-uv run python scripts/collectors/scan_calendar.py
-uv run python scripts/collectors/scan_calendar.py --year 2025
+uv run python scripts/collectors/cli.py calendar --dry-run     # preview
+wiki collect calendar --incremental                            # delta via updatedMin watermark
+wiki calendar-auth <account-id>                                # one-time OAuth bootstrap
 
 # Browser
 uv run python scripts/collectors/scan_browser.py

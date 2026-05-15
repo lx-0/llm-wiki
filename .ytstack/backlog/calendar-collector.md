@@ -1,6 +1,23 @@
-# Calendar collector — Google/Apple Calendar events as substrate
+# Calendar collector — Google Calendar events as substrate
 
-**Priority:** P1 — already listed as "high" in `collectors.md` index; complements gmeet/jamie (which only see meetings with notes). Calendar gives full schedule context: who, when, where, how often, with whom.
+**Status:** ✅ **SHIPPED 2026-05-15** as milestone M006. See `.ytstack/DECISIONS.md § 2026-05-15 — M006 Calendar collector` for the shape that landed.
+
+**What shipped (vs. original pitch):**
+
+- ✅ Phase 1 — Google Calendar primary calendar via OAuth, per-date rollups
+- ✅ Phase 2 — Multi-calendar loop with `selected: true` default + explicit `include:` override
+- ✅ Phase 3 — gmeet/jamie transcript cross-link via title-slug + date match
+- ✅ Plus the "anti-slop heuristics" pass: cancelled/declined/holiday-keyword filtering, recurring-event collapse to `knowledge/concepts/<slug>.md`
+- ✅ Plus operator-prose preservation via `<!-- calendar:events:begin/end -->` sentinels (an addition over the original pitch)
+- ⏸ Phase 4 — Apple Calendar fallback. Deferred (operator's primary is Google; adapter slot `scripts/adapters/calendar/` already named to land it additively).
+
+**Code touchpoints:** `scripts/collectors/calendar.py` (~600 LOC) · `scripts/adapters/calendar/google.py` · `wiki calendar-auth` · `tests/test_calendar_collector.py` (31 cases) · `docs/{architecture,overview}.excalidraw` + PNGs.
+
+The rest of this file is preserved as the **as-pitched origin notes** for historical context — what we chose, what we deferred, the open questions we closed.
+
+---
+
+**Original priority:** P1 — already listed as "high" in `collectors.md` index; complements gmeet/jamie (which only see meetings with notes). Calendar gives full schedule context: who, when, where, how often, with whom.
 
 **Origin:** 2026-05-15 substrate-landscape second-wave sweep. Existing `collectors.md` row from the original collectors-pitch.
 
@@ -102,4 +119,4 @@ Pair across substrates: if `raw/transcripts/jamie/` or `raw/transcripts/gmeet/` 
 
 ## Status
 
-Backlog, concept-stage. Existing `collectors.md` row promoted to a deep file. OAuth infrastructure already in place — Phase 1 is mostly REST-client + watermark plumbing.
+**Shipped 2026-05-15 (M006).** See top-of-file ✅ block + `.ytstack/DECISIONS.md § 2026-05-15 — M006 Calendar collector` for the locked shape. Phase 4 (Apple Calendar / Microsoft Graph) remains additive when needed; the `scripts/adapters/calendar/` package slot is named for it.

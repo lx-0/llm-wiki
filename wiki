@@ -23,6 +23,7 @@
 #   wiki collect <name>        run one Collector (--dry-run | --incremental | --account ID)
 #   wiki gmail-auth <id>       OAuth bootstrap for a Gmail account-id (one-time)
 #   wiki gmeet-auth <id>       OAuth bootstrap for Google Meet transcripts (one-time)
+#   wiki calendar-auth <id>    OAuth bootstrap for Google Calendar events (one-time)
 #   wiki update                git pull --ff-only the .wiki/ checkout (preserves config.yaml)
 #   wiki seed                  re-seed missing vault templates (additive, safe)
 #   wiki seed --force          overwrite existing vault templates with engine versions
@@ -897,6 +898,41 @@ sys.exit(0 if ok else 1)
 "
 }
 
+cmd_calendar_auth() {
+  local account_id="${1:-}"
+  if [[ -z "$account_id" || "$account_id" == "-h" || "$account_id" == "--help" ]]; then
+    cat <<EOF
+${C_BOLD}wiki calendar-auth${C_RESET} — one-time OAuth bootstrap for Google Calendar
+
+${C_BOLD}USAGE${C_RESET}
+  wiki calendar-auth <account-id>
+
+${C_BOLD}WHAT IT DOES${C_RESET}
+  Reads .claude/google-oauth-client.json (or .claude/gmail-oauth-client.json
+  as a fallback — you provide this, an installed-app OAuth client from
+  console.cloud.google.com), opens a local-loopback browser for consent
+  (scope: calendar.readonly), persists the token to
+  .wiki/state/calendar-token-<id>.json. Re-running re-issues consent.
+
+  <account-id> matches a key under personal.accounts.<id> whose body has
+  a "calendar:" sub-block with "kind: google-calendar". Run once per
+  account whose calendars you want to ingest.
+
+${C_BOLD}EXAMPLES${C_RESET}
+  wiki calendar-auth work       # consent flow for personal.accounts.work
+  wiki calendar-auth private    # second account; separate token cache
+EOF
+    return 0
+  fi
+  uv run --quiet --project "$WIKI_DIR" python -c "
+import sys; sys.path.insert(0, '$WIKI_DIR/scripts')
+from collectors.calendar import calendar_auth_bootstrap
+ok, msg = calendar_auth_bootstrap('$account_id')
+print(msg)
+sys.exit(0 if ok else 1)
+"
+}
+
 cmd_version() {
   if [[ -d "$WIKI_DIR/.git" ]]; then
     local rev; rev="$(git -C "$WIKI_DIR" rev-parse --short HEAD)"
@@ -943,6 +979,7 @@ case "${1:-}" in
   collect)          shift; cmd_collect "$@" ;;
   gmail-auth)       shift; cmd_gmail_auth "$@" ;;
   gmeet-auth)       shift; cmd_gmeet_auth "$@" ;;
+  calendar-auth)    shift; cmd_calendar_auth "$@" ;;
   update)           shift; cmd_update "$@" ;;
   seed)             shift; cmd_seed "$@" ;;
   compile)          shift; cmd_compile "$@" ;;

@@ -153,6 +153,14 @@ class Limits:
     # (kind: gmeet-api, drive_folder_id, drive_folder_name, since, max_per_run).
     gmeet_request_timeout_s: int = 30     # per-HTTP-call timeout against the Drive API
     gmeet_max_per_run: int = 50           # default cap; per-account override is the gmeet sub-block's max_per_run
+    # Google Calendar ingest (collectors/calendar.py — see also
+    # CONFIG.piggybacks.calendar). Multi-tenant: per-account calendar block
+    # under personal.accounts.<id>.calendar (kind: google-calendar,
+    # include, backfill_days, future_days, since, max_per_run).
+    calendar_request_timeout_s: int = 30  # per-HTTP-call timeout against calendar.googleapis.com
+    calendar_max_per_run: int = 500       # default per-calendar cap; per-account override is the calendar sub-block's max_per_run
+    calendar_backfill_days: int = 90      # default past window per run (events with updated >= now-N for delta sync)
+    calendar_future_days: int = 7         # default future window re-fetched every run (catches mutations on upcoming events)
     # Oura health ingest (collectors/health.py — Phase 1, oura-only).
     # Multi-tenant: per-account health.oura block under personal.accounts.<id>.health
     # (kind: oura-pat, api_key_env, backfill_days).
@@ -255,11 +263,12 @@ class Skills:
     global_install: bool = False
 
 
-# Note (2026-05-15, multi-tenant policy): both `gmeet` and `jamie` are
-# account-bound — their config lives per-account under
-# `personal.accounts.<id>.{gmeet,jamie}` with `kind: gmeet-api` / `jamie-api`,
-# mirroring the email Reader/Filter sub-block pattern.
-# `collectors/{gmeet,jamie}.py:_resolve_*_accounts()` read the dispatch.
+# Note (2026-05-15, multi-tenant policy): `gmeet`, `jamie`, and `calendar`
+# are all account-bound — their config lives per-account under
+# `personal.accounts.<id>.{gmeet,jamie,calendar}` with `kind: gmeet-api` /
+# `jamie-api` / `google-calendar`, mirroring the email Reader/Filter
+# sub-block pattern. `collectors/{gmeet,jamie,calendar}.py:_resolve_*_accounts()`
+# read the dispatch.
 
 
 @dataclass
@@ -298,27 +307,13 @@ class Personal:
     # short list of project / product names rendered into
     # scan_screenshots_vision.md as concrete examples
     project_examples: list[str] = field(default_factory=list)
-    # Substring keywords that mark calendar events as work-relevant in
-    # scan-calendar.py (customer/partner/team names).
-    calendar_work_keywords: list[str] = field(default_factory=list)
     # Substring keywords whose presence in a calendar event title marks it as a
-    # holiday / observance to skip during scan-calendar.py. Locale-specific
+    # holiday / observance to skip during collectors/calendar.py. Locale-specific
     # (e.g. ["Christmas", "Easter"] for English; ["Weihnacht", "Ostern"] for
     # German). Empty list = no skipping.
     calendar_skip_keywords: list[str] = field(default_factory=list)
-    # Mapping of category-label -> list of substring keywords used by
-    # scan-calendar.py to bucket events. First match wins, so put more
-    # specific categories before generic ones in your config.yaml.
-    # Example:
-    #   calendar_categories:
-    #     "Workshops": ["workshop", "training"]
-    #     "Concerts":  ["concert", "festival"]
-    calendar_categories: dict[str, list[str]] = field(default_factory=dict)
-    # Output language for the calendar scan report. "en" or "de".
-    calendar_report_language: str = "en"
     # Path to local Thunderbird profile directory (mbox + filter roots live here).
-    # Empty string disables the email Collector's thunderbird-mbox adapter
-    # and the scan-calendar legacy CLI (both consume the Thunderbird profile).
+    # Empty string disables the email Collector's thunderbird-mbox adapter.
     thunderbird_profile: str = ""
     # Path to a local Firefox profile directory (e.g. ~/Library/Application
     # Support/Firefox/Profiles/<id>.default-release on macOS, or
@@ -334,10 +329,11 @@ class Personal:
     # recommendation; FluidVoice / macOS dictation / Hammerspoon snippets
     # also work). Empty string disables collectors/voice.py.
     voice_inbox: str = ""
-    # Jamie AI + Google Meet integrations are multi-tenant via per-account
-    # `jamie:` / `gmeet:` sub-blocks under `personal.accounts.<id>` (kinds:
-    # `jamie-api`, `gmeet-api`). No flat dataclass — resolved at run time by
-    # `collectors/{jamie,gmeet}.py:_resolve_*_accounts()`.
+    # Jamie AI + Google Meet + Google Calendar integrations are multi-tenant via
+    # per-account `jamie:` / `gmeet:` / `calendar:` sub-blocks under
+    # `personal.accounts.<id>` (kinds: `jamie-api`, `gmeet-api`,
+    # `google-calendar`). No flat dataclass — resolved at run time by
+    # `collectors/{jamie,gmeet,calendar}.py:_resolve_*_accounts()`.
 
 
 # Default piggyback set — script names match flush.py's PIGGYBACK_TASKS keys.
@@ -351,6 +347,7 @@ def _default_piggybacks() -> dict[str, PiggybackTask]:
         "curiosity_followup": PiggybackTask(cooldown_hours=24),
         "jamie": PiggybackTask(cooldown_hours=6, max_per_run=20),
         "gmeet": PiggybackTask(cooldown_hours=6, max_per_run=20),
+        "calendar": PiggybackTask(cooldown_hours=6, max_per_run=500),
         "voice": PiggybackTask(cooldown_hours=1),
         # Distill yesterday's per-source captures (daily/<yesterday>/*.md)
         # into a single ≤500-word digest at daily/<yesterday>.md. Runs once

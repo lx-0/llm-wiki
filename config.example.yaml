@@ -58,6 +58,16 @@ piggybacks:
     enabled: true
     cooldown_hours: 6                    # tighter than scan_youtube — meetings are time-sensitive
     max_per_run: 20
+  # Pulls Google Calendar events via collectors/calendar.py. Multi-tenant:
+  # requires at least one personal.accounts.<id>.calendar sub-block
+  # (kind: google-calendar) AND `wiki calendar-auth <id>` run for that
+  # account. Otherwise silently skipped (graceful agnostic). One markdown
+  # file per date is written to raw/notes/calendar/<YYYY-MM-DD>.md;
+  # recurring-event series collapse to knowledge/concepts/<slug>.md.
+  calendar:
+    enabled: true
+    cooldown_hours: 6                    # mirrors gmeet/jamie — same temporal sensitivity
+    max_per_run: 500                     # per-calendar; multiple selected calendars multiply
   # Inbox-watch for dictated voice notes (collectors/voice.py). Reads
   # *.txt / *.md from `personal.voice_inbox`, writes raw/voice/*.md,
   # archives the source under `<voice_inbox>/.processed/`. Silently
@@ -150,6 +160,12 @@ limits:
   # is the gmeet sub-block's max_per_run under personal.accounts.<id>.gmeet).
   gmeet_request_timeout_s: 30            # per-HTTP-call timeout against the Drive API
   gmeet_max_per_run: 50                  # default cap per account
+  # Google Calendar ingest (collectors/calendar.py — multi-tenant; per-account
+  # override is the calendar sub-block under personal.accounts.<id>.calendar).
+  calendar_request_timeout_s: 30         # per-HTTP-call timeout against calendar.googleapis.com
+  calendar_max_per_run: 500              # per-calendar event cap; selected calendars multiply
+  calendar_backfill_days: 90             # default past window (in days) on first run
+  calendar_future_days: 7                # default future window re-fetched every run for mutations
   # Claude Agent SDK per-message buffer (stream-json line buffer). SDK default 1 MB
   # trips on tool-result messages carrying large knowledge/index.md or Write/Edit
   # calls on big articles. 50 MB is safe headroom.
@@ -259,6 +275,13 @@ personal:
   #       key_type: personal                             # personal | workspace (selects route prefix)
   #       since: ""                                      # ISO date "2026-01-01"; empty = no backfill cap
   #       max_per_run: null                              # null = inherit CONFIG.limits.jamie_max_per_run
+  #     calendar:
+  #       kind: google-calendar                          # collectors/calendar.py — Google Calendar events as substrate
+  #       include: []                                    # list of calendar ids or summaries; empty = all "selected: true" calendars (Google UI toggle)
+  #       backfill_days: 90                              # past window per run; null = inherit CONFIG.limits.calendar_backfill_days
+  #       future_days: 7                                 # future window re-fetched every run (catches mutations)
+  #       since: ""                                      # ISO date "2026-01-01"; empty = no backfill cap (overrides backfill_days)
+  #       max_per_run: null                              # null = inherit CONFIG.limits.calendar_max_per_run
   #     health:
   #       oura:
   #         kind: oura-pat                               # collectors/health.py — Oura Ring daily biometrics

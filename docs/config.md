@@ -235,10 +235,11 @@ Per-account `jamie:` sub-block with `kind: jamie-api`, mirroring the `reader:` /
 |---|---|---|
 | `personal.email_folders` | `[]` | List of `{path, desc}` pairs. Drives both the `compile_curiosity` prompt and `compile.py`'s schema enum — single source of truth. |
 | `personal.project_examples` | `[]` | List of project / product names rendered into `scan_screenshots_vision.md` as concrete examples. |
-| `personal.calendar_work_keywords` | `[]` | Substrings marking calendar events as work-relevant (customer / partner / team names). |
-| `personal.calendar_skip_keywords` | `[]` | Substrings marking holidays / observances to skip. Locale-specific. |
-| `personal.calendar_categories` | `{}` | Mapping of category-label → list of substring keywords used for bucketing in the calendar collector. First match wins. |
-| `personal.calendar_report_language` | `"en"` | Output language for the calendar scan report. `en` or `de`. |
+| `personal.calendar_skip_keywords` | `[]` | Substrings marking holidays / observances to skip during `collectors/calendar.py` ingest. Locale-specific (e.g. `["Christmas", "Easter"]` vs. `["Weihnacht", "Ostern"]`). |
+| `limits.calendar_request_timeout_s` | `30` | Per-HTTP-call timeout against `calendar.googleapis.com`. |
+| `limits.calendar_max_per_run` | `500` | Per-calendar event cap (multiplied by the number of selected calendars). Override per-account via the `max_per_run:` field on the `calendar:` sub-block. |
+| `limits.calendar_backfill_days` | `90` | Past window in days on first run (events with `updated >= now-N` for delta sync). Override per-account via `backfill_days:`. |
+| `limits.calendar_future_days` | `7` | Future window re-fetched every run — picks up event mutations on upcoming meetings (moved, cancelled, retitled). Override per-account via `future_days:`. |
 
 ## Secrets — `.claude/.env`
 
