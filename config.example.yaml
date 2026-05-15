@@ -190,9 +190,10 @@ limits:
   # Force the long-context model for substrates whose compile reliably
   # fans out into many existing articles (e.g. daily-digest references
   # 6+ topics in <2 KB and blows the 200K window via tool-turn reads
-  # before producing output). Matched by frontmatter `type:` value.
-  # Empty list disables the override.
-  compile_force_long_context_types: ["daily-digest"]
+  # before producing output; calendar-rollup days with 8+ attendees +
+  # recurring-concept wikilinks have the same shape). Matched by
+  # frontmatter `type:` value. Empty list disables the override.
+  compile_force_long_context_types: ["daily-digest", "calendar-rollup"]
   # When a kind=unknown failure cannot be retried (small source OR
   # already on the long-context model), treat it as a skip instead of a
   # hard failure — preserves the consecutive-failure budget so the batch

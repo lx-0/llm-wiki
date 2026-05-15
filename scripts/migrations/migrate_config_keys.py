@@ -25,6 +25,7 @@ Key changes covered (chronological):
   personal.calendar_work_keywords         → (dropped 2026-05-15 M006, scan_calendar-only legacy field)
   personal.calendar_categories            → (dropped 2026-05-15 M006, scan_calendar-only legacy field)
   personal.calendar_report_language       → (dropped 2026-05-15 M006, scan_calendar-only legacy field)
+  limits.compile_force_long_context_types ← list-extend with "calendar-rollup" (2026-05-16, M006 hardening)
 
 Idempotent: a config already on the current schema produces no change.
 
@@ -94,6 +95,21 @@ KEY_ADDITIONS: dict[str, dict[str, object]] = {
     },
 }
 
+# Elements to add to existing list-valued config entries. Used when an
+# engine update widens a list default (e.g. a new substrate type added to
+# `compile_force_long_context_types`). KEY_ADDITIONS only injects MISSING
+# keys, so an operator who already pinned the list to the old default
+# wouldn't otherwise pick up the new element. Structure: dotted parent.key
+# path → list of elements to ensure are present. Idempotent: existing
+# elements are left untouched. Missing parent block / missing key falls
+# through to KEY_ADDITIONS for first-time injection.
+LIST_ADDITIONS: dict[str, list[object]] = {
+    # 2026-05-16 — calendar-rollup substrate has the same fan-out shape as
+    # daily-digest (small source, many wikilinks → 200K context overflow
+    # mid-stream → silent CLI exit-1). Force [1m] up-front for both.
+    "limits.compile_force_long_context_types": ["calendar-rollup"],
+}
+
 # Fields whose backing dataclass entry was removed; their leftover entries
 # in operator configs are silently ignored on load but linger as YAML cruft
 # until pruned. Structure: parent block name → set of orphan field names.
@@ -131,6 +147,32 @@ def migrate_additions(data: dict) -> list[str]:
                 continue
             block[key] = default
             changes.append(f"added {parent}.{key} = {default!r}")
+    return changes
+
+
+def migrate_list_additions(data: dict) -> list[str]:
+    """Append missing elements to existing list-valued config entries.
+
+    Only acts when the parent block AND the target key already exist as a
+    list. Missing keys are left for KEY_ADDITIONS to inject with the engine
+    default. Mutates `data` in place. Returns human-readable change strings.
+    """
+    changes: list[str] = []
+    for path, additions in LIST_ADDITIONS.items():
+        parent_name, _, key = path.partition(".")
+        if not key:
+            continue
+        block = data.get(parent_name)
+        if not isinstance(block, dict):
+            continue
+        existing = block.get(key)
+        if not isinstance(existing, list):
+            continue
+        for item in additions:
+            if item in existing:
+                continue
+            existing.append(item)
+            changes.append(f"appended {item!r} to {path}")
     return changes
 
 
@@ -197,6 +239,13 @@ def migrate_config(config_path: Path) -> tuple[str | None, list[str]]:
     # visible to the operator. Runs unconditionally; entries already present
     # are left untouched.
     changes.extend(migrate_additions(data))
+
+    # List-element additions — widen existing list-valued knobs (e.g. when
+    # a new substrate type joins compile_force_long_context_types). Must
+    # run after migrate_additions so a freshly-injected list also gets
+    # any LIST_ADDITIONS for it (idempotent: already-present entries are
+    # untouched).
+    changes.extend(migrate_list_additions(data))
 
     # Orphan-field drops — prune entries whose backing dataclass field is
     # gone, otherwise they live forever in operator YAML as silent cruft.

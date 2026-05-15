@@ -230,7 +230,11 @@ class Limits:
     # CLI exit-1 / kind=unknown after 1-5 minutes. The size-threshold above
     # never catches it (source is small). Force the 1M variant for these
     # types regardless of size. Empty tuple disables the override.
-    compile_force_long_context_types: tuple[str, ...] = ("daily-digest",)
+    # `calendar-rollup` joined the list 2026-05-16 after the same kind=unknown
+    # signature hit 7 KB / 3 KB calendar days: the agent Reads each attendee's
+    # knowledge/people/*.md page plus every recurring-concept page in the
+    # rollup, accumulating context until the 200K window dies mid-stream.
+    compile_force_long_context_types: tuple[str, ...] = ("daily-digest", "calendar-rollup")
     # When a kind=unknown failure has no further retry path available
     # (small source skipping retry, OR already on the long-context model),
     # treat it as a skip rather than a hard failure: log WARNING, return
