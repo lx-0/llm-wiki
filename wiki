@@ -938,7 +938,7 @@ EOF
   fi
   uv run --quiet --project "$WIKI_DIR" python -c "
 import sys; sys.path.insert(0, '$WIKI_DIR/scripts')
-from collectors.calendar import calendar_auth_bootstrap
+from collectors.calendar_collector import calendar_auth_bootstrap
 ok, msg = calendar_auth_bootstrap('$account_id')
 print(msg)
 sys.exit(0 if ok else 1)

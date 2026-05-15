@@ -1,4 +1,4 @@
-"""Tests for the Google Calendar collector (collectors/calendar.py).
+"""Tests for the Google Calendar collector (collectors/calendar_collector.py).
 
 Replaces the M005-era Thunderbird-SQLite scan tests. The new collector is
 a real substrate (Google Calendar v3 via OAuth); tests wrap it with a
@@ -33,7 +33,7 @@ from typing import Any
 
 import pytest
 
-from collectors import calendar as cal
+from collectors import calendar_collector as cal
 
 
 # ── Registry / Spec ─────────────────────────────────────────────────
@@ -57,6 +57,24 @@ def test_legacy_scan_calendar_module_removed():
 
     with pytest.raises(ModuleNotFoundError):
         importlib.import_module("collectors.scan_calendar")
+
+
+def test_collector_filename_avoids_stdlib_shadow():
+    """`scripts/collectors/calendar.py` would shadow Python's stdlib `calendar`
+    via `http.cookiejar`'s `from calendar import timegm` whenever
+    `scripts/collectors/` ends up on sys.path (which happens when `cli.py`
+    is invoked directly). The filename must carry the `_collector` suffix.
+    Same fix pattern as `email_collector.py` (pre-existing)."""
+    import collectors
+
+    assert hasattr(collectors, "calendar_collector"), (
+        "calendar_collector module missing — was it renamed back to calendar.py? "
+        "That shadows stdlib calendar via http.cookiejar."
+    )
+    # Stdlib `calendar` must still be reachable.
+    import calendar as stdlib_calendar
+    from calendar import timegm  # noqa: F401 — what http.cookiejar does
+    assert callable(stdlib_calendar.timegm)
 
 
 # ── Time parsing ────────────────────────────────────────────────────

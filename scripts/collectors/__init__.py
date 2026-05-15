@@ -16,7 +16,11 @@ from collectors.base import (  # noqa: F401  re-export the public API
 )
 
 # Trigger @register side-effects.
-from collectors import calendar  # noqa: F401,E402
+# Note: calendar_collector.py is named with a `_collector` suffix to avoid
+# shadowing the stdlib `calendar` module — `http.cookiejar` does
+# `from calendar import timegm`, and `scripts/collectors/` sits on sys.path
+# when `cli.py` runs directly. Same fix pattern as email_collector.py.
+from collectors import calendar_collector  # noqa: F401,E402
 from collectors import email_collector  # noqa: F401,E402
 from collectors import gmeet  # noqa: F401,E402
 from collectors import health  # noqa: F401,E402
