@@ -570,3 +570,29 @@ Same logic governs:
 - any other `templates/` file copied into vaults via `wiki seed`.
 
 Memory recorded as [[feedback_template_resync_not_optional]].
+
+## 2026-05-15: Operator skills consolidated; repo exposed as Claude Code plugin
+
+Audit of `skills/` (five SKILL.md, all symlinked into vault `<vault>/.claude/skills/` via `wiki skills install`) found mixed audiences and stale entries. Restructured against agentskills.io progressive-disclosure best-practices and added a marketplace surface so any project can install the operator skill.
+
+**Decisions locked:**
+
+1. **One operator skill — `skills/use-llm-wiki/`.** Four tiers (Read / Diagnose / Contribute / Maintain) + off-tier "Report a problem". `SKILL.md` (241 LOC) stays under the 500-line / 5K-token budget. Full flows split into `references/health-check.md` + `references/report-issue.md`, loaded on demand via explicit "Read `references/X.md` when ..." pointers — the exact progressive-disclosure pattern the spec recommends. Trigger surface extended to cover "wiki health" / "vault status" / "is the pipeline healthy" / "file a bug against the engine".
+
+2. **Engine-dev skills stay in `.claude/skills/`, never `skills/`.** The two engine-dev skills (`llm-wiki-change`, `sync-process-docs`) are not symlinked into operator vaults. Rule going forward: a skill ships to `skills/` only if its audience is *operators of an installed vault*; engine-development workflow stays in the engine repo's `.claude/skills/`.
+
+3. **Deleted four skills.** `vault-health-check/` (folded as Diagnose tier) and `engine-pr/` (operator-relevant slice folded as Report-a-problem; the PR-against-engine path was dev-only and dropped) replaced by `references/` files inside `use-llm-wiki/`. `ingest-audio/` and `vault-triage/` removed outright — both assumed a generic Obsidian-PARA layout (`Inbox/`, `Projects/`, `Areas/`, `Resources/`, `Archives/`, `_attachments/`) that does not match the LLM-wiki vault structure (`raw/`, `knowledge/`, `daily/`); the `voice` collector replaces `ingest-audio`'s purpose for wiki vaults.
+
+4. **`.claude-plugin/plugin.json` at repo root — single-plugin source.** Lets the repo be referenced from any Claude Code marketplace as `source: { source: github, repo: lx-0/llm-wiki }`. **No `version` field** per the [lx-0/skills AGENTS rule](https://github.com/lx-0/skills/blob/main/AGENTS.md) — git SHA is the update signal. License: MIT. Operator install path: `/plugin marketplace add lx-0/skills` + `/plugin install llm-wiki@lx-0-public-plugins`.
+
+5. **Listed in `lx-0/skills` public catalog.** Above `sunoflow` in `marketplace.json`; catalog `README.md` updated per the CLAUDE.md hard rule "Plugin-Marketplace-Aenderung = README-Update Pflicht". Public-eligible because `lx-0/llm-wiki` is PUBLIC on GitHub.
+
+**Why this matters:** Before the consolidation, an operator opening a vault would see five SKILL.md files in their `.claude/skills/`, half written for a different (PARA-shaped) vault. After, a single progressive-disclosure skill covers the full operator surface. The plugin path means installation no longer requires cloning the engine first — the skill arrives via Claude Code's standard marketplace flow.
+
+**Standing rule:** Future operator-facing capability goes inside `skills/use-llm-wiki/` (new section or new `references/<topic>.md`). Do not spawn standalone operator skills unless the scope is genuinely orthogonal to "use the wiki".
+
+**Linked artifacts:**
+- llm-wiki commits: `4b3198a` (plugin.json), and the consolidation diff lives inside `9ef34b6` ("feat(daily): Phase 3 ...") — bundling incident per [[feedback_explicit_staging_under_churn]]; content is correct, headline misleading, deliberately not split-rewritten.
+- lx-0/skills: `marketplace.json` + `README.md` + `.compiled/marketplace.json` staged but uncommitted at session end (separate repo — left for operator).
+- Reference: [https://agentskills.io/skill-creation/best-practices](https://agentskills.io/skill-creation/best-practices) — progressive disclosure spec, gotchas-stay-in-SKILL.md, ≤500 LOC budget, "when to load" pointers.
+- Memory: `~/.claude/projects/.../memory/project_skills_consolidation.md`.
