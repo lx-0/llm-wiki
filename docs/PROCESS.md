@@ -274,6 +274,8 @@ flowchart TD
 
 **Auto Model-Upgrade für große Sources:** Sobald `len(source) >= CONFIG.limits.compile_large_source_chars` (default 50 KB), wechselt der Compile auf `CONFIG.models.compile_large_source_model` (engine default `claude-opus-4-7[1m]`, 1M-context). Hintergrund: das 200K-Window stirbt mid-stream silent (exit-1, empty stderr) wenn Source + Tool-Turn-Reads kombiniert über 200K tokens hinauswachsen — `max_turns`-Cap allein hat das Symptom nur abgekürzt (793s → 210s), nicht behoben. Operator-opt-out: `compile_large_source_model: ""` in config.yaml pinnt alles auf den Standard-Variant.
 
+**Retry-on-`kind=unknown` für kleine Sources:** Die Size-Schwelle fängt deterministische Overflows; stochastische bleiben — kleine Memory-Raws (0.7–23 KB) failen ~30 % mit derselben `kind=unknown`-Signatur, weil der Read/Grep-Fan-out in `knowledge/` der eigentliche Kostentreiber ist, nicht die Source-Größe. Wenn `classify_failure` `kind=unknown` zurückgibt und wir nicht schon auf dem Long-Context-Variant laufen, retryed `compile.py` einmal mit `compile_large_source_model`. Gated durch `CONFIG.limits.compile_retry_long_context_on_unknown` (default true). Operator sieht eine `WARNING  retrying with long-context model …`-Zeile in `compile.log` — Retry-Rate ist damit beobachtbar.
+
 **Was der Compiler macht pro Source:**
 
 1. Liest die Source komplett

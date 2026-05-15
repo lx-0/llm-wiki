@@ -81,6 +81,10 @@ Knob block. Defaults sized for an Opus-on-5h-window install — tighten on small
 |---|---|---|
 | `limits.compile_max_files` | `30` | Per-run cap (rate-limit guard for the 5h Opus window). |
 | `limits.compile_max_consecutive_failures` | `3` | Abort after N back-to-back compile failures. |
+| `limits.compile_max_prompt_chars` | `400000` | Pre-flight cap on the assembled compile prompt. Trips with a clear breakdown instead of 13 min of silent `kind=unknown`. |
+| `limits.compile_max_turns` | `12` | Tool-turn ceiling per compile run. Was 30 — large sources looped on Read/Grep into `knowledge/` until they blew the context window. |
+| `limits.compile_large_source_chars` | `50000` | At/above this source size, auto-upgrade to `models.compile_large_source_model` (1M-context Opus). Catches deterministic overflows. |
+| `limits.compile_retry_long_context_on_unknown` | `true` | On `kind=unknown` failure (stochastic context overflow from tool fan-out), retry once with `models.compile_large_source_model`. Catches small-source overflows the size-threshold misses. Set false to surface the failure instead. |
 | `limits.flush_max_retries` | `3` | Retries for flush-extraction calls. |
 | `limits.flush_retry_delay_seconds` | `30` | Delay between flush retries. |
 
