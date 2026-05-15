@@ -1,7 +1,7 @@
 ---
 type: process-documentation
-version: "1.3"
-updated: "2026-05-13"
+version: "1.4"
+updated: "2026-05-15"
 scope: llm-wiki engine — all data flows
 format: markdown + mermaid + yaml-frontmatter
 ---
@@ -24,7 +24,7 @@ Zwei fundamental getrennte Ingest-Pfade konvergieren bei `compile.py`:
 | [1](#1-inbox-processing) | Inbox Processing | Klassifiziert Drops in `inbox/`, verschiebt in `raw/<typ>/` | Manueller Drop |
 | [2](#2-automatic-session-capture-hooks) | Automatic Session Capture | Hooks → `daily/YYYY-MM-DD.md` | session-start / session-end / pre-compact |
 | [3](#3-compilation) | Compilation | Claude Agent SDK liest `raw/` + `daily/`, schreibt Articles in `knowledge/` | manuell oder cron-after-hour |
-| [4](#4-scanners) | Scanners | Email · Calendar · Browser · Screenshots · Tabs · YouTube · Jamie · Google Meet → `raw/notes/` + `raw/transcripts/` | per-Scanner Cron oder piggyback |
+| [4](#4-scanners) | Scanners | Email · Calendar · Browser · Screenshots · Tabs · YouTube · Jamie · Google Meet · Voice → `raw/notes/` + `raw/transcripts/` + `raw/voice/` | per-Scanner Cron oder piggyback |
 | [5](#5-query--lint) | Query + Lint | NL-Query gegen Wiki · 8 strukturelle Checks · 1 LLM-Contradiction-Scan | manuell |
 | [6](#6-wiki-review-lokal-kostenlos) | Wiki Review | Per-Article Quality-Score via lokales LLM | piggyback |
 | [7](#7-curiosity-loop) | Curiosity Loop | Gap-Detection → JSON-Requests in `raw/requests/` | nach jedem Compile |
@@ -213,6 +213,7 @@ flowchart TD
 | `email` | Collector Registry | `collectors/cli.py email --incremental` | 24h | $0 (lokal) |
 | `jamie` | Collector Registry | `collectors/cli.py jamie --incremental` | 6h | $0 (Jamie API) |
 | `gmeet` | Collector Registry | `collectors/cli.py gmeet --incremental` | 6h | $0 (Drive API) |
+| `voice` | Collector Registry | `collectors/cli.py voice` | 1h | $0 (folder-watch) |
 | `screenshots` | Collector Registry | `collectors/cli.py screenshots` | 24h | $0 (Ollama/Gemma4) |
 | `lint_structural` | Legacy | `lint.py --structural-only` | 24h | $0 (kein LLM) |
 | `review_wiki` | Legacy | `review-wiki.py` | 168h (1x/Woche) | $0 (Ollama/Gemma4) |
@@ -323,6 +324,9 @@ flowchart LR
 
     subgraph Scanners
         SE["collectors/email_collector.py\n(Registry: `wiki collect email`)"]
+        SJ["collectors/jamie.py\n(Registry: `wiki collect jamie`)"]
+        SG["collectors/gmeet.py\n(Registry: `wiki collect gmeet`)"]
+        SV["collectors/voice.py\n(Registry: `wiki collect voice`)"]
         SC["collectors/scan_calendar.py"]
         SB["collectors/scan_browser.py"]
         SCR["collectors/scan_screenshots.py"]
@@ -331,6 +335,9 @@ flowchart LR
 
     subgraph Output
         RE["raw/notes/email/"]
+        RJ["raw/transcripts/jamie/"]
+        RG["raw/transcripts/gmeet/"]
+        RV["raw/voice/"]
         RC["raw/notes/calendar/"]
         RB["raw/notes/browser/"]
         RS["raw/notes/screenshots/"]
@@ -338,6 +345,9 @@ flowchart LR
     end
 
     TB --> SE --> RE
+    JA["Jamie AI API"] --> SJ --> RJ
+    DR["Google Drive\n(Meet Recordings)"] --> SG --> RG
+    VI["voice_inbox/\n(iOS Shortcut / OpenWhispr)"] --> SV --> RV
     TB --> SC --> RC
     FF --> SB --> RB
     CH --> SB
@@ -345,6 +355,9 @@ flowchart LR
     YT --> SY --> RY
 
     RE --> COMPILE["compile.py"]
+    RJ --> COMPILE
+    RG --> COMPILE
+    RV --> COMPILE
     RC --> COMPILE
     RB --> COMPILE
     RS --> COMPILE
@@ -365,10 +378,11 @@ flowchart LR
 | `collectors/scan_tabs.py` | Collector Registry | Firefox Simple Tab Groups Backup | Aktive Tab-Gruppen, deren Tab-URLs/Titel. | `raw/notes/tabs/` |
 | `collectors/scan_screenshots.py` | Collector Registry (piggyback) | `~/Screenshots/` (macOS PNG-Dump) | gemma4 Vision pro Screenshot, batch-report mit allen analyses + thumbnails. | `raw/notes/screenshots/screenshots-<slug>.md` + `~/Screenshots/<file>.md` (canonical sidecar) |
 | `collectors/scan_youtube.py` | Collector Registry | YouTube (yt-dlp Metadaten + youtube-transcript-api Captions + Comments + optional ffmpeg-Frames + gemma4 Vision) | Pro Video ein Markdown-File. Tier-based ingest: 0=metadata, 1=+transcript, 2=+comments, 3=+visual analysis. `run()` = inbox-drain (`raw/inbox/youtube.md`); `--url`/`--tier`/`--no-skip` sind CLI-only. | `raw/notes/youtube/<channel>--<title>--<vid>.md` |
+| `collectors/voice.py` | Collector Registry | Folder-watch auf `personal.voice_inbox` — `.txt` / `.md` Dateien die von beliebigen Dictation-Tools dort abgelegt werden (iOS Shortcut → iCloud Drive ist der mobile-primary Pfad; OpenWhispr / FluidVoice / macOS-Dictation / Hammerspoon-Snippet als Mac-Alternativen). | Pro Source-Datei ein Markdown-File: frontmatter (`type: voice-note`, `origin: voice-intake`, `captured_at`, `source`, `tags: [voice]`) + Body verbatim. Source nach Ingest in `<voice_inbox>/.processed/` archiviert (Archive-Move IST der Dedup-Mechanismus, kein State-File). Slug aus den ersten 6 Wörtern. Same-Minute-Slug-Kollision: Seconds-Suffix. | `raw/voice/voice-<date>-<HHMM>-<slug>.md` |
 
 > **Hinweis Collector-Pattern**: Phase 2 abgeschlossen (2026-05-14) — **alle Substrate-Scanner laufen auf dem Collector Registry Pattern.**
 > - **Collector Registry** (`scripts/collectors/base.py`): Klassen mit `SPEC`-Deklaration + `@register`-Decorator + `run(dry_run, incremental) → RunResult`. `flush.py` entdeckt Piggyback-Collectors automatisch über `piggyback_collectors()` Registry-walk. Operator-CLI: `wiki collect <name>` über `scripts/collectors/cli.py`.
-> - **Registry-Collectors:** `email`, `jamie`, `gmeet`, `tabs`, `calendar`, `browser`, `screenshots`, `youtube` — alle acht. Migrierte Scanner haben snake_case-Dateinamen (`scan_tabs.py` etc.) und behalten ihren Direct-CLI-Einstieg für rich Per-URL/-Flag-Bedienung.
+> - **Registry-Collectors:** `email`, `jamie`, `gmeet`, `voice`, `tabs`, `calendar`, `browser`, `screenshots`, `youtube` — alle neun. Migrierte Scanner haben snake_case-Dateinamen (`scan_tabs.py` etc.) und behalten ihren Direct-CLI-Einstieg für rich Per-URL/-Flag-Bedienung.
 > - **`_LEGACY_PIGGYBACK_COMMANDS`** in `flush.py` trägt jetzt nur noch Nicht-Substrate-Tasks: `lint_structural`, `review_wiki`, `optimize_claude_md`, `retry_failed_flushes`, `curiosity_followup`.
 
 > **Secrets**: `JAMIE_<ACCOUNT>_API_KEY` (multi-tenant — eine pro Account-Sub-Block) + alle anderen `*_API_KEY` / `IMAP_*_PASS` / `NAS_*` liegen in `<vault>/.claude/.env`. `core.config` lädt das File einmal beim Import via `load_dotenv(..., override=False)` — keine manuellen `export`-Statements nötig, weder für Piggyback-Runs noch für Operator-CLI-Aufrufe. Shell-Exports überschreiben `.env`-Werte. Fresh-Vault-Seed über `wiki seed` kopiert `templates/.claude/.env.example` in den Vault (additiv).
