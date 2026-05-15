@@ -12,6 +12,7 @@ An LLM Wiki implementation that turns scattered personal data into a compiled, q
 - [Cognitive functions](#cognitive-functions) — perception, memory, attention as system roles
 - [Curiosity loop](#curiosity-loop) — gap detection that queues the next compile
 - [Optimization suggestions](#optimization-suggestions) — YAML proposals with per-action approval
+- [Personal tasks](#personal-tasks) — operator commitments extracted into entity pages (M005)
 - [Design rationale](#design-rationale) — the hard trade-offs
 
 ## The problem
@@ -91,10 +92,10 @@ Collectors scan L3 → write metadata to `raw/notes/` → the compiler turns it 
 
 ```text
 Collectors                   Curated sources       Sessions
-(email, jamie via Registry;  (raw/articles,        (daily/, auto-captured
- scan-{calendar,browser,      raw/papers,           via session-end hook)
- screenshots,tabs,youtube}    raw/notes,
- legacy CLIs)                 raw/transcripts)
+(email, jamie, gmeet, voice, (raw/articles,        (daily/, auto-captured
+ health + calendar, browser,  raw/papers,           via session-end hook)
+ tabs, screenshots, youtube   raw/notes,
+ — all Registry-discovered)   raw/transcripts)
        │                          │                     │
        │                          │                     │
        ▼                          ▼                     ▼
@@ -169,6 +170,20 @@ The curiosity model uses a full JSON Schema with `enum` constraints (not just `f
 The compiler can also generate **action proposals** — e.g., "this folder receives 80% newsletter mail; consider an auto-filter rule." Each suggestion is a YAML file in `raw/suggestions/`, with per-action approval. An interactive executor (`suggestions/cli.py`) walks the YAML, prompts for approve / reject / dry-run per action, and dispatches approved ones to a backend (`suggestions/backends/imap.py` for IMAP move/tag/set-flags actions; future backends plug in alongside).
 
 The producer is a small subsystem (`suggestions/producer.py`) called from `compile.py` whenever an email source is processed. The pattern generalizes beyond email — anywhere the compiler spots a repeatable manual action, it can propose automation under the same producer-executor-backend split.
+
+## Personal tasks
+
+The compiled wiki is a knowledge base, but personal data also carries **commitments** — "I'll send the deck by Friday", "waiting on Bob's intro", decisions to follow up on. Karpathy's and Cole Medin's concepts both scope themselves to reference content only; tasks are out. gbrain (Garry Tan's production-tested 15.4K-star LLM-wiki) made the opposite call: `commitment` is a Fact-kind, embedded in entity pages as `## Action Items` + `## Open Threads` sections. llm-wiki took that path in **M005**: tasks live **inside** `knowledge/people/<slug>.md` and `knowledge/projects/<slug>.md`, **not** in a separate top-level folder.
+
+The mechanics:
+
+- **Two-layer page shape** for `type: person|project`. Compiled-truth State block above `---` (executive summary, structured fields, `## Action Items` in Obsidian-Tasks-plugin syntax — `- [ ]` + `📅 YYYY-MM-DD` + `⏫` + `🔁`, `## Open Threads` as prose bullets, free-prose body, `## See also`), append-only `## Timeline` below. Atomic shape stays for `concept | connection | qa | moc | fact`. Compile prompt branches on `type:`.
+- **Extraction.** `compile.py` reads jamie/gmeet transcripts (and email when the substrate has explicit commitments), identifies the **Task / Owner / Deadline / Context** quartet, slugifies owners (`Jane Doe` → `jane-doe`), looks up existing entity pages (index grep + aliases-frontmatter grep), creates stubs for new owners, routes commitments to the owner's `## Action Items`, blocked items to `## Open Threads`, and adds a Timeline citation on every entity page touched.
+- **Lifecycle.** Each compile pass reads existing State before rewriting. Unresolved items carry forward unchanged. Manual `- [x]` (operator-checked) is preserved across re-runs. When new substrate provides resolution evidence ("sent the deck", "Bob and I synced"), the matching item demotes to a Timeline entry marked `[resolved]`.
+- **Lint** enforces the shape: `check_two_layer_pages` (State + `---` + Timeline + reverse-chronological order), `check_action_item_syntax` (Obsidian-Tasks-plugin syntax validity).
+- **Surface.** The Obsidian dashboard's `## 📌 Personal Tasks (Wiki)` pane shows Overdue / Today / This week / No-due-date queries. The `knowledge/MOCs/inbox-tasks.md` MOC is the full cross-entity inbox. A `📌 Open commitments: N across M entities` stat card sits next to the engine pipeline status.
+
+LLM-emission quality cannot be CI-tested. The plumbing (prompt rules + lint + fixtures) is CI-covered; real extraction quality lives in `docs/m005-s03-canary-procedure.md` — three canaries (synthetic fixture → live jamie → live gmeet) with grep verification and pass/fail/caveat decisions.
 
 ## Design rationale
 

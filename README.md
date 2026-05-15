@@ -24,7 +24,7 @@
 
 <table align="center">
   <tr>
-    <td align="center"><strong>9</strong><br/>substrate collectors</td>
+    <td align="center"><strong>10</strong><br/>substrate collectors</td>
     <td align="center"><strong>6</strong><br/>skills bundled</td>
     <td align="center"><strong>MIT</strong><br/>open source</td>
   </tr>
@@ -63,10 +63,11 @@ llm-wiki is the **compilation layer** between raw substrates and active consumpt
 
 ## What you get
 
-- **Two-path ingest** — automatic session capture (hooks → `daily/`) and substrate-source writers (Registry-discovered Collectors + legacy scanners + clipper + manual drop → `raw/`) converge at one compiler. All nine collectors ride the formal Collector Protocol (`SPEC` + `@register` + `run()`): email, jamie, gmeet, voice (named modules) plus calendar, browser, tabs, screenshots, youtube (migrated 2026-05-14 from `scan-*.py` scripts).
+- **Two-path ingest** — automatic session capture (hooks → `daily/`) and substrate-source writers (Registry-discovered Collectors + legacy scanners + clipper + manual drop → `raw/`) converge at one compiler. All ten collectors ride the formal Collector Protocol (`SPEC` + `@register` + `run()`): email, jamie, gmeet, voice, health (named modules) plus calendar, browser, tabs, screenshots, youtube (migrated 2026-05-14 from `scan-*.py` scripts).
 - **Compile once, query fast** — knowledge is distilled into Markdown wikilinks at compile time. No embedding step, no retrieval per query.
 - **Multi-agent hooks** — `session-start` / `session-end` / `pre-compact` wired into Claude Code, Codex, Gemini, and Cursor. Every session ends as a structured daily-log entry.
 - **Curiosity loop** — a small local Ollama model spots gaps after each compile and queues deep-scan requests for the next cycle.
+- **Personal-task layer** (M005) — the compiler extracts commitments from jamie + gmeet transcripts (Task / Owner / Deadline / Context quartet) and routes them into `knowledge/people/<slug>.md` + `knowledge/projects/<slug>.md` entity pages as `## Action Items` (Obsidian-Tasks-plugin syntax) and `## Open Threads`. Resolved items demote to Timeline on the next compile. Dashboard pane + cross-entity Inbox MOC surface the layer.
 - **Optimization suggestions** — the compiler proposes YAML automations (e.g. mail-filter rules) with per-action approval before execution.
 - **Self-healing wiki** — `lint.py` runs 8 structural checks plus an LLM contradiction scan, so the wiki stays consistent as it grows.
 - **Engine / vault split** — engine code, prompts, hooks, runtime state, and venv all live under `<vault>/.wiki/`. The vault root stays clean.
