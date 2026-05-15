@@ -72,6 +72,23 @@ def test_compile_prompt_carries_lifecycle_rules() -> None:
     assert "Stale-flag, don't auto-delete" in rendered or "stale?" in rendered
 
 
+def test_compile_prompt_carries_resolution_rules() -> None:
+    """M005-S04-T02: resolution-detection + demotion rules must reach the
+    rendered prompt unchanged.
+    """
+    rendered = render("compile_main", **_DUMMY_VARS)
+    assert "Resolution detection and demotion" in rendered
+    # Sample resolution-signal phrases the prompt names
+    assert "Sent the deck" in rendered
+    # Demotion mechanic
+    assert "REMOVE the `- [ ]` line" in rendered or "REMOVE the - [ ] line" in rendered
+    assert "[resolved]" in rendered
+    # Anti-false-positive guard
+    assert "never demote based on hypothetical" in rendered
+    # Confirmed-resolved special case
+    assert "[resolved-manual+substrate]" in rendered
+
+
 def test_compile_prompt_carries_commitment_extraction_rule() -> None:
     """M005-S03-T01: the meeting-substrate commitment-extraction rule (Task/
     Owner/Deadline/Context quartet + entity routing + Timeline citation) must

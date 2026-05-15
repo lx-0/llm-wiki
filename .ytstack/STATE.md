@@ -1,15 +1,15 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-05-15T19:40:00Z
+last_updated: 2026-05-15T19:50:00Z
 current_milestone: M005
 active_slice: S04
-active_task: none
+active_task: T03
 ---
 
 # State
 
-**Status:** M005 / S04 — 1/4 tasks done. T01 closed (lifecycle carry-forward + manual-`[x]` preservation; 234/234 green). Next: T02 resolution-demotion prompt rule.
+**Status:** M005 / S04 — 2/4 tasks done. T02 closed (resolution-detection + demotion rule shipped; 235/235 green). Next: T03 + T04 fixture tests.
 
 M005 plan: 5 slices, 20 tasks total (see `M005-ROADMAP.md`). Locked decisions: tasks live inside `knowledge/people/` + `knowledge/projects/` entity pages as `## Action Items` + `## Open Threads` sections (no top-level `tasks/` folder); Obsidian-Tasks-plugin syntax canonical; two shapes coexist (atomic for concepts/qa/facts/connections, State+Timeline only for people/projects); extraction priority jamie > gmeet > email; dashboard pane reuses M003-S01 infra. Conceptual groundwork: `.ytstack/backlog/entity-pages-state-timeline.md` + `.ytstack/backlog/gbrain-comparison.md`.
 

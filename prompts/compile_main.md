@@ -172,6 +172,30 @@ ${source_content}
 
    Anti-loss guard: if you're about to rewrite State and the new substrate produces FEWER Action Items than the existing State had, that's a smell — re-check Read for accuracy before committing the rewrite.
 
+   **Resolution detection and demotion.** The dual to carry-forward: when new substrate contains a signal that an existing State item is now done, demote it to Timeline with a `[resolved]` marker.
+
+   Resolution signals (substrate phrases that indicate previously-open work is complete):
+
+   - **"Sent the deck"**, "delivered X", "shared the doc", "shipped Y" → resolves a State Action Item shaped like "Send X" / "Deliver Y" / "Share Z"
+   - **"Met with Bob yesterday"**, "Bob and I synced", "had the call with Bob" → resolves "Follow up with Bob" / "Set up Bob intro" / similar
+   - **"Decision made: we'll go with X"** → resolves "Decide on X" / "Need to pick X vs Y"
+   - **"Hetzner came back with the capacity decision"**, "infra unblocked us" → resolves the matching Open Threads entry
+   - **Past-tense first-person announcements** of any previously-committed action ("I sent Y this morning" → resolves "I'll send Y")
+
+   Matching procedure: use task-phrase similarity (verb + object). The resolution signal doesn't have to be word-for-word with the original commitment; "send the deck" matches "share the slides for Q3" if the substrate makes the connection clear.
+
+   Demotion mechanic when a match is found:
+
+   1. REMOVE the `- [ ]` line from State `## Action Items` (or the bullet from `## Open Threads`).
+   2. APPEND a new Timeline entry: `- **${today}** | \`${source_path}\` — [resolved] <original task summary>.`
+   3. Do NOT also keep the State line. One item, one place.
+
+   Conservative bias: if the resolution signal is ambiguous (the substrate hints but doesn't confirm), do NOT demote. Leave the State item in place; add a Timeline entry citing the partial-resolution mention. The operator can manually move it to Timeline if they want.
+
+   Confirmed-resolved (both manual `[x]` and substrate evidence): if State already has `- [x]` for the item (T01 preserved it) AND new substrate confirms the resolution, demote with marker `[resolved-manual+substrate]`. This is the cleanest demotion case.
+
+   Anti-false-positive: never demote based on hypothetical or future-tense statements ("we should send the deck", "I'll send it next week"). Resolution requires past-tense + first-person OR explicit third-party confirmation in the substrate.
+
 4. **Create connection articles** in `knowledge/connections/` when you identify meaningful relationships between concepts (patterns, contradictions, analogies). Use the same frontmatter format with `type: connection`.
 
 5. **Update `knowledge/index.md`** — add or update the table row for each article you created or modified. Format:

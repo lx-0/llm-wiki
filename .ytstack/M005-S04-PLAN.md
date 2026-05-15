@@ -5,7 +5,7 @@ project: llm-wiki
 created: 2026-05-15T17:00:00Z
 status: planned
 task_count: 4
-completed_tasks: 1
+completed_tasks: 2
 ---
 
 # M005-S04 -- Slice Plan
@@ -15,7 +15,7 @@ completed_tasks: 1
 ## Tasks
 
 - [x] T01 -- Compile-prompt rule -- read existing State Action Items + Open Threads BEFORE rewriting; carry forward unresolved; preserve manual `[x]` state
-- [ ] T02 -- Resolution detection -- when next-pass substrate contains semantic resolution evidence ("sent the deck", "Bob made the intro"), the matching State item moves to Timeline with `[resolved]` + citation
+- [x] T02 -- Resolution detection -- when next-pass substrate contains semantic resolution evidence ("sent the deck", "Bob made the intro"), the matching State item moves to Timeline with `[resolved]` + citation
 - [ ] T03 -- Fixture test -- existing person page with State items + new substrate with resolution evidence → verify demotion to Timeline with citation
 - [ ] T04 -- Fixture test -- manual `- [x]` in State Action Items → verify compile preserves it across re-runs
 
