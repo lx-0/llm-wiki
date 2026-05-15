@@ -22,6 +22,8 @@ def _base_stats(**overrides) -> dict:
         "total_cost_lifetime": 3.4567,
         "articles_total": 263,
         "daily_logs_total": 47,
+        "open_commitments": 0,
+        "entities_with_action_items": 0,
         "last_compile_ts": "2026-05-02T16:00:00+00:00",
         "generated_at": "2026-05-02T17:00:00+00:00",
     }

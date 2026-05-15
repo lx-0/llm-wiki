@@ -117,8 +117,48 @@ def latest_compile_ts() -> str | None:
     return datetime.fromtimestamp(newest.stat().st_mtime, tz=timezone.utc).isoformat()
 
 
+def _open_action_items_in_entities(knowledge_dir: Path = KNOWLEDGE_DIR) -> tuple[int, int]:
+    """Return (open_commitments_count, entities_with_action_items_count).
+
+    Scans `knowledge/people/*.md` + `knowledge/projects/*.md`, locates each file's
+    `## Action Items` section, and counts non-empty lines that begin with `- [ ]`
+    (open). `- [x]`/`- [X]` (operator-checked) excluded. Used by the dashboard
+    stat-card to surface the personal-task layer (M005 entity-pages).
+    """
+    import re
+    open_total = 0
+    entities_with = 0
+    for folder in ("people", "projects"):
+        folder_path = knowledge_dir / folder
+        if not folder_path.exists():
+            continue
+        for article in sorted(folder_path.glob("*.md")):
+            if article.name in ("index.md", "log.md"):
+                continue
+            try:
+                text = article.read_text(encoding="utf-8")
+            except OSError:
+                continue
+            ai_match = re.search(r"^## Action Items\s*$", text, re.MULTILINE)
+            if not ai_match:
+                continue
+            after = text[ai_match.end():]
+            section_end = re.search(r"^(## |---\s*$)", after, re.MULTILINE)
+            section = after[:section_end.start()] if section_end else after
+            file_open = 0
+            for raw_line in section.splitlines():
+                line = raw_line.strip()
+                if line.startswith("- [ ]"):
+                    file_open += 1
+            if file_open:
+                open_total += file_open
+                entities_with += 1
+    return open_total, entities_with
+
+
 def compute_stats() -> dict:
     pending = list_pending_compiles()
+    open_commitments, entities_with_action_items = _open_action_items_in_entities()
     return {
         "pending_compiles": len(pending),
         "pending_compile_paths": pending,
@@ -127,6 +167,8 @@ def compute_stats() -> dict:
         "total_cost_lifetime": round(total_cost_lifetime(), 4),
         "articles_total": len(list_wiki_articles()),
         "daily_logs_total": len(list(DAILY_DIR.glob("*.md"))) if DAILY_DIR.exists() else 0,
+        "open_commitments": open_commitments,
+        "entities_with_action_items": entities_with_action_items,
         "last_compile_ts": latest_compile_ts(),
         "generated_at": now_iso(),
     }
@@ -148,6 +190,19 @@ def render_callout(stats: dict) -> str:
     failed_icon = "🟢" if failed == 0 else "🔴"
     lint_icon = "🟢" if lint == 0 else ("🟡" if lint < 10 else "🔴")
 
+    open_commitments = stats.get("open_commitments", 0)
+    entities_with = stats.get("entities_with_action_items", 0)
+    if open_commitments == 0:
+        commitments_line = (
+            "> 📌 **Commitments inbox:** empty — "
+            "first jamie/gmeet compile will populate this from meeting substrates.\n"
+        )
+    else:
+        commitments_line = (
+            f"> 📌 **Open commitments:** {open_commitments} across "
+            f"{entities_with} {'entity' if entities_with == 1 else 'entities'}\n"
+        )
+
     callout = (
         "> [!info] Pipeline status\n"
         f"> {pending_icon} **Pending compiles:** {pending}\n"
@@ -155,6 +210,7 @@ def render_callout(stats: dict) -> str:
         f"> {lint_icon} **Lint warnings:** {lint}\n"
         f"> 💰 **LLM spend (lifetime):** ${cost:.2f}\n"
         f"> 📚 **Articles:** {articles} · **Daily logs:** {daily}\n"
+        f"{commitments_line}"
         f"> 🕐 **Last compile:** {last}\n"
     )
 
@@ -183,6 +239,8 @@ def write_dashboard_stats(stats: dict, callout: str) -> Path:
         "total_cost_lifetime",
         "articles_total",
         "daily_logs_total",
+        "open_commitments",
+        "entities_with_action_items",
     )
     lines = ["---"]
     for key in fm_keys:
