@@ -1,47 +1,126 @@
 {
   "collapse-filter": false,
   "search": "path:knowledge -path:knowledge/index -path:knowledge/log",
-  "showTags": false,
+  "showTags": true,
   "showAttachments": false,
   "hideUnresolved": true,
   "showOrphans": false,
   "collapse-color-groups": false,
   "colorGroups": [
     {
+      "query": "tag:#fleet",
+      "color": {
+        "a": 1,
+        "rgb": 15158332
+      }
+    },
+    {
+      "query": "tag:#openclaw",
+      "color": {
+        "a": 1,
+        "rgb": 15105570
+      }
+    },
+    {
+      "query": "tag:#claude-code",
+      "color": {
+        "a": 1,
+        "rgb": 15844367
+      }
+    },
+    {
+      "query": "tag:#yesterday",
+      "color": {
+        "a": 1,
+        "rgb": 10181046
+      }
+    },
+    {
+      "query": "tag:#llm-wiki",
+      "color": {
+        "a": 1,
+        "rgb": 1482885
+      }
+    },
+    {
+      "query": "tag:#paperclip",
+      "color": {
+        "a": 1,
+        "rgb": 3447003
+      }
+    },
+    {
+      "query": "tag:#ytstack",
+      "color": {
+        "a": 1,
+        "rgb": 1752220
+      }
+    },
+    {
+      "query": "tag:#township",
+      "color": {
+        "a": 1,
+        "rgb": 15277667
+      }
+    },
+    {
+      "query": "tag:#pixeltales",
+      "color": {
+        "a": 1,
+        "rgb": 9323693
+      }
+    },
+    {
       "query": "path:knowledge/facts",
-      "color": { "a": 1, "rgb": 16717636 }
+      "color": {
+        "a": 1,
+        "rgb": 16717636
+      }
     },
     {
       "query": "path:knowledge/MOCs",
-      "color": { "a": 1, "rgb": 16761095 }
+      "color": {
+        "a": 1,
+        "rgb": 16761095
+      }
     },
     {
       "query": "path:knowledge/connections",
-      "color": { "a": 1, "rgb": 16740096 }
+      "color": {
+        "a": 1,
+        "rgb": 16740096
+      }
     },
     {
       "query": "path:knowledge/projects",
-      "color": { "a": 1, "rgb": 48340 }
+      "color": {
+        "a": 1,
+        "rgb": 48340
+      }
     },
     {
       "query": "path:knowledge/people",
-      "color": { "a": 1, "rgb": 13959417 }
+      "color": {
+        "a": 1,
+        "rgb": 13959417
+      }
     },
     {
       "query": "path:knowledge/concepts",
-      "color": { "a": 1, "rgb": 4020990 }
+      "color": {
+        "a": 1,
+        "rgb": 4020990
+      }
     }
   ],
-  "collapse-display": true,
+  "collapse-display": false,
   "showArrow": false,
   "textFadeMultiplier": 1.5,
   "nodeSizeMultiplier": 1.2,
   "lineSizeMultiplier": 0.5,
   "collapse-forces": false,
-  "centerStrength": 0.3,
-  "repelStrength": 15,
-  "linkStrength": 0.5,
-  "linkDistance": 200,
-  "scale": 1,
-  "close": true
+  "centerStrength": 0.1,
+  "repelStrength": 30,
+  "linkStrength": 0.2,
+  "linkDistance": 250
 }

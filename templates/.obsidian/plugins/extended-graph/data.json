@@ -1,0 +1,558 @@
+{
+  "enableFeatures": {
+    "graph": {
+      "auto-enabled": true,
+      "tags": true,
+      "properties": true,
+      "property-key": false,
+      "links": false,
+      "linksSameColorAsNode": false,
+      "folders": false,
+      "imagesFromProperty": false,
+      "imagesFromEmbeds": false,
+      "imagesForAttachments": false,
+      "focus": false,
+      "shapes": true,
+      "elements-stats": false,
+      "names": true,
+      "icons": false,
+      "arrows": false,
+      "layers": false
+    },
+    "localgraph": {
+      "auto-enabled": false,
+      "tags": false,
+      "properties": false,
+      "property-key": false,
+      "links": false,
+      "linksSameColorAsNode": false,
+      "folders": false,
+      "imagesFromProperty": false,
+      "imagesFromEmbeds": false,
+      "imagesForAttachments": false,
+      "focus": false,
+      "shapes": false,
+      "elements-stats": false,
+      "names": false,
+      "icons": false,
+      "arrows": false,
+      "layers": false
+    }
+  },
+  "interactiveSettings": {
+    "tag": {
+      "colormap": "hsv",
+      "colors": [
+        {
+          "type": "fleet",
+          "color": "#e74c3c"
+        },
+        {
+          "type": "openclaw",
+          "color": "#e67e22"
+        },
+        {
+          "type": "claude-code",
+          "color": "#f1c40f"
+        },
+        {
+          "type": "yesterday",
+          "color": "#9b59b6"
+        },
+        {
+          "type": "llm-wiki",
+          "color": "#16a085"
+        },
+        {
+          "type": "paperclip",
+          "color": "#3498db"
+        },
+        {
+          "type": "ytstack",
+          "color": "#1abc9c"
+        },
+        {
+          "type": "township",
+          "color": "#e91e63"
+        },
+        {
+          "type": "pixeltales",
+          "color": "#8e44ad"
+        }
+      ],
+      "unselected": [],
+      "excludeRegex": {
+        "regex": "^(?!(?:fleet|openclaw|claude-code|yesterday|llm-wiki|paperclip|ytstack|township|pixeltales)$).+",
+        "flags": ""
+      },
+      "noneType": "none",
+      "showOnGraph": true,
+      "enableByDefault": true
+    },
+    "link": {
+      "colormap": "rainbow",
+      "colors": [],
+      "unselected": [],
+      "excludeRegex": {
+        "regex": "",
+        "flags": ""
+      },
+      "noneType": "none",
+      "showOnGraph": true,
+      "enableByDefault": true
+    },
+    "folder": {
+      "colormap": "winter",
+      "colors": [],
+      "unselected": [],
+      "excludeRegex": {
+        "regex": "",
+        "flags": ""
+      },
+      "noneType": "/",
+      "showOnGraph": false,
+      "enableByDefault": false
+    }
+  },
+  "additionalProperties": {},
+  "backupGraphOptions": {
+    "collapse-filter": true,
+    "search": "path:knowledge -path:knowledge/index -path:knowledge/log",
+    "showTags": true,
+    "showAttachments": false,
+    "hideUnresolved": true,
+    "showOrphans": false,
+    "collapse-color-groups": true,
+    "colorGroups": [
+      {
+        "query": "tag:#fleet",
+        "color": {
+          "a": 1,
+          "rgb": 15158332
+        }
+      },
+      {
+        "query": "tag:#openclaw",
+        "color": {
+          "a": 1,
+          "rgb": 15105570
+        }
+      },
+      {
+        "query": "tag:#claude-code",
+        "color": {
+          "a": 1,
+          "rgb": 15844367
+        }
+      },
+      {
+        "query": "tag:#yesterday",
+        "color": {
+          "a": 1,
+          "rgb": 10181046
+        }
+      },
+      {
+        "query": "tag:#llm-wiki",
+        "color": {
+          "a": 1,
+          "rgb": 1482885
+        }
+      },
+      {
+        "query": "tag:#paperclip",
+        "color": {
+          "a": 1,
+          "rgb": 3447003
+        }
+      },
+      {
+        "query": "tag:#ytstack",
+        "color": {
+          "a": 1,
+          "rgb": 1752220
+        }
+      },
+      {
+        "query": "tag:#township",
+        "color": {
+          "a": 1,
+          "rgb": 15277667
+        }
+      },
+      {
+        "query": "tag:#pixeltales",
+        "color": {
+          "a": 1,
+          "rgb": 9323693
+        }
+      },
+      {
+        "query": "path:knowledge/facts",
+        "color": {
+          "a": 1,
+          "rgb": 16717636
+        }
+      },
+      {
+        "query": "path:knowledge/MOCs",
+        "color": {
+          "a": 1,
+          "rgb": 16761095
+        }
+      },
+      {
+        "query": "path:knowledge/connections",
+        "color": {
+          "a": 1,
+          "rgb": 16740096
+        }
+      },
+      {
+        "query": "path:knowledge/projects",
+        "color": {
+          "a": 1,
+          "rgb": 48340
+        }
+      },
+      {
+        "query": "path:knowledge/people",
+        "color": {
+          "a": 1,
+          "rgb": 13959417
+        }
+      },
+      {
+        "query": "path:knowledge/concepts",
+        "color": {
+          "a": 1,
+          "rgb": 4020990
+        }
+      }
+    ],
+    "collapse-display": true,
+    "showArrow": false,
+    "textFadeMultiplier": -3,
+    "nodeSizeMultiplier": 0.926236979166667,
+    "lineSizeMultiplier": 0.1,
+    "collapse-forces": true,
+    "centerStrength": 0.0961805555555556,
+    "repelStrength": 20,
+    "linkStrength": 0.196137152777778,
+    "linkDistance": 250
+  },
+  "openInNewTab": false,
+  "canonicalizePropertiesWithDataview": true,
+  "states": [
+    {
+      "id": "default-vault",
+      "name": "Default state",
+      "engineOptions": {
+        "colorGroups": [],
+        "search": "",
+        "hideUnresolved": false,
+        "showAttachments": false,
+        "showOrphans": true,
+        "showTags": false,
+        "localBacklinks": true,
+        "localForelinks": true,
+        "localInterlinks": false,
+        "localJumps": 1,
+        "lineSizeMultiplier": 1,
+        "nodeSizeMultiplier": 1,
+        "showArrow": false,
+        "textFadeMultiplier": 0,
+        "centerStrength": 0.5187132489703118,
+        "linkDistance": 250,
+        "linkStrength": 1,
+        "repelStrength": 10
+      },
+      "toggleTypes": {
+        "tag": [],
+        "link": [],
+        "folder": []
+      },
+      "logicTypes": {
+        "tag": "OR",
+        "link": "OR",
+        "folder": "OR"
+      },
+      "enableLayers": false,
+      "currentLayerLevel": 0,
+      "pinNodes": {},
+      "hiddenLegendRows": [],
+      "collapsedLegendRows": []
+    }
+  ],
+  "startingStateID": "default-vault",
+  "syncDefaultState": false,
+  "saveConfigsWithState": false,
+  "customColorMaps": {},
+  "imageProperties": [
+    "image"
+  ],
+  "borderFactor": 0.06,
+  "allowExternalImages": false,
+  "allowExternalLocalImages": false,
+  "nodesSizeProperties": [
+    ""
+  ],
+  "nodesSizeFunction": "default",
+  "nodesSizeRange": {
+    "min": 0.5,
+    "max": 1.5
+  },
+  "nodesColorColormap": "YlOrRd",
+  "nodesColorFunction": "default",
+  "graphStatsDirection": "normal",
+  "linksSizeFunction": "default",
+  "linksColorColormap": "YlOrRd",
+  "linksColorFunction": "default",
+  "recomputeStatsOnGraphChange": false,
+  "zoomFactor": 2,
+  "focusScaleFactor": 1.8,
+  "highlightOpenNodes": false,
+  "highlightSearchResults": false,
+  "maxNodes": 3000,
+  "delay": 500,
+  "revertAction": false,
+  "enableCSS": false,
+  "cssSnippetFilename": "",
+  "shapeQueries": {
+    "circle": {
+      "combinationLogic": "AND",
+      "index": 0,
+      "rules": [
+        {
+          "source": "property",
+          "property": "type",
+          "value": "concept",
+          "logic": "is"
+        }
+      ]
+    },
+    "square": {
+      "combinationLogic": "AND",
+      "index": 1,
+      "rules": [
+        {
+          "source": "property",
+          "property": "type",
+          "value": "project",
+          "logic": "is"
+        }
+      ]
+    },
+    "triangle": {
+      "combinationLogic": "AND",
+      "index": 2,
+      "rules": [
+        {
+          "source": "property",
+          "property": "type",
+          "value": "fact",
+          "logic": "is"
+        }
+      ]
+    },
+    "diamond": {
+      "combinationLogic": "AND",
+      "index": 3,
+      "rules": [
+        {
+          "source": "property",
+          "property": "type",
+          "value": "connection",
+          "logic": "is"
+        }
+      ]
+    },
+    "pentagon": {
+      "combinationLogic": "AND",
+      "index": 4,
+      "rules": [
+        {
+          "source": "property",
+          "property": "type",
+          "value": "qa",
+          "logic": "is"
+        }
+      ]
+    },
+    "hexagon": {
+      "combinationLogic": "AND",
+      "index": 5,
+      "rules": [
+        {
+          "source": "property",
+          "property": "type",
+          "value": "person",
+          "logic": "is"
+        }
+      ]
+    },
+    "octagon": {
+      "combinationLogic": "AND",
+      "index": 6,
+      "rules": []
+    },
+    "decagon": {
+      "combinationLogic": "AND",
+      "index": 7,
+      "rules": []
+    },
+    "star4": {
+      "combinationLogic": "AND",
+      "index": 8,
+      "rules": []
+    },
+    "star5": {
+      "combinationLogic": "AND",
+      "index": 9,
+      "rules": [
+        {
+          "source": "property",
+          "property": "type",
+          "value": "moc",
+          "logic": "is"
+        }
+      ]
+    },
+    "star6": {
+      "combinationLogic": "AND",
+      "index": 10,
+      "rules": []
+    },
+    "star8": {
+      "combinationLogic": "AND",
+      "index": 11,
+      "rules": []
+    },
+    "star10": {
+      "combinationLogic": "AND",
+      "index": 12,
+      "rules": []
+    }
+  },
+  "colorBasedOnDepth": false,
+  "depthColormap": "rainbow",
+  "currentNode": {
+    "useColor": false,
+    "color": "#000000",
+    "size": 100,
+    "shape": "circle"
+  },
+  "fadeOnDisable": false,
+  "borderUnresolved": "",
+  "spreadArcs": true,
+  "weightArcs": true,
+  "animateDotsOnLinks": false,
+  "animationSpeedForDots": 1,
+  "interactivesBrightness": {
+    "light": 1,
+    "dark": 1
+  },
+  "fadeInElements": false,
+  "externalLinks": "none",
+  "externalLinksProperties": [
+    "url"
+  ],
+  "externalLinkOpenMode": "note",
+  "showPinIcon": true,
+  "allowMultipleLinkTypes": false,
+  "disableSource": false,
+  "disableTarget": false,
+  "excludedSourcesFolder": [],
+  "excludedTargetsFolder": [],
+  "curvedLinks": false,
+  "curvedFactor": 1,
+  "outlineLinks": false,
+  "displayLinkTypeLabel": false,
+  "colorLinkTypeLabel": false,
+  "noLineHighlight": false,
+  "folderShowFullPath": true,
+  "invertArrows": false,
+  "flatArrows": false,
+  "opaqueArrowsButKeepFading": false,
+  "alwaysOpaqueArrows": false,
+  "arrowScale": 1,
+  "arrowFixedSize": false,
+  "arrowColorBool": false,
+  "arrowColor": "",
+  "numberOfCharacters": null,
+  "ellipsis": "\u2026",
+  "showOnlyFileName": false,
+  "noExtension": false,
+  "usePropertiesForName": [],
+  "addBackgroundToName": false,
+  "nameVerticalOffset": 0,
+  "dynamicVerticalOffset": false,
+  "showNamesWhenNeighborHighlighted": false,
+  "iconProperties": [
+    ""
+  ],
+  "usePluginForIcon": true,
+  "usePluginForIconColor": true,
+  "useParentIcon": false,
+  "backgroundOpacityWithIcon": 0,
+  "useIconColorForBackgroud": true,
+  "borderWidthWithIcon": 0,
+  "layerProperties": [
+    "layer"
+  ],
+  "numberOfActiveLayers": 4,
+  "layersOrder": "ASC",
+  "displayLabelsInUI": true,
+  "nodesWithoutLayerOpacity": 0,
+  "useLayerCustomOpacity": true,
+  "layersCustomOpacity": {},
+  "layersLevels": {},
+  "defaultLevelForLayers": 0,
+  "horizontalLegend": false,
+  "useRadialMenu": false,
+  "radialMenuModifier": "Shift",
+  "pinNodeModifier": "Alt",
+  "useLeftClickToSelect": true,
+  "selectNodeModifier": "Shift",
+  "filterAbstractFiles": [],
+  "ignoreInlineLinks": false,
+  "collapseState": true,
+  "collapseLegend": true,
+  "resetAfterChanges": false,
+  "collapsedSettings": {
+    "automation": true,
+    "tags": true,
+    "properties": true,
+    "links": true,
+    "arrows": true,
+    "folders": true,
+    "images": true,
+    "icons": true,
+    "focus": true,
+    "shapes": true,
+    "layers": true,
+    "elements-stats": true,
+    "names": true,
+    "zoom": true,
+    "local-graph": true,
+    "display": true,
+    "filter": true,
+    "inputs": true,
+    "performances": false,
+    "beta": true
+  },
+  "selectionMode": "replace",
+  "exportSVGOptions": {
+    "asImage": true,
+    "onlyVisibleArea": false,
+    "showNodeNames": true,
+    "useCurvedLinks": false,
+    "useModifiedArrows": true,
+    "useNodesShapes": false,
+    "showArcs": false,
+    "showFolders": true,
+    "useModifiedNames": true,
+    "showIcons": false
+  },
+  "multipleNodesData": {}
+}

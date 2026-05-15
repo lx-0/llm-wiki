@@ -472,3 +472,39 @@ The full-sweep `_render_report` is unchanged — aggregation is still correct th
 **Chose:** D. Two shapes coexist in `knowledge/`: atomic (concept / connection / qa / moc / fact, unchanged) and two-layer State+Timeline (`person | project`, new). Compile prompt is type-conditional. Obsidian-Tasks-plugin syntax is the canonical form (`- [ ]` + `📅 YYYY-MM-DD` + `⏫` + `🔁`). Dashboard pane + Inbox MOC + open-commitments stat card surface the layer; lint enforces the shape (`check_two_layer_pages` + `check_action_item_syntax`); lifecycle rules (carry-forward, manual-`[x]` preservation, resolution-demotion) are encoded in the compile prompt.
 **Reason:** Tasks belong on the entity they pertain to (a person, a project) so context is local — that's the gbrain insight. A separate folder loses cross-link locality. Karpathy/Cole's exclusion of tasks is honest about their original scope, not normative; gbrain proves embedded-in-entity-pages works in production. Single source of truth for "what do I owe Jane?" is `knowledge/people/jane-doe.md`.
 **Reference:** `.ytstack/M005-CONTEXT.md` + `M005-ROADMAP.md`; `prompts/compile_main.md` Instruction 3 (schema + extraction + entity-resolution + lifecycle subsections); `scripts/lint.py:check_two_layer_pages` + `:check_action_item_syntax`; canonical fixtures `tests/fixtures/two_layer/`; canary runbook `docs/m005-s03-canary-procedure.md`.
+
+## 2026-05-15: Graph-view + qa-schema + domain-tag arc (session-late)
+
+**Context:** Operator-pain trigger was "the graph view shows no thematic clusters" — opening a session-long investigation into Obsidian graph clustering, plugin choice, and the schema gaps the investigation surfaced. End-of-session bilanz: the graph layer is now multi-channel (shape=type, color=domain), schema enforcement closed two silent-drift loopholes, and one tempting fix was rejected after audit re-verify.
+
+**Decisions made:**
+
+1. **Multi-channel graph encoding via Extended Graph plugin** (March-2025 community plugin). `type` → node shape (concept=circle / connection=diamond / project=square / person=hexagon / moc=star / fact=triangle / qa=pentagon); domain-tag → coloured arcs (concentric rings, multi-domain notes show multiple); native color-groups remain as fallback. Configured in `templates/.obsidian/plugins/extended-graph/data.json`. Trade-off vs InfraNodus: no community-detection / modularity layout, but local-first / no-cloud / no-subscription.
+
+2. **Native graph palette: 9 domain tag-color-groups + 6 folder fallback** in `templates/.obsidian/graph.json`. Domain order = backlink prominence (`fleet > openclaw > claude-code > yesterday > llm-wiki > paperclip > ytstack > township > pixeltales`). Forces tuned to `centerStrength=0.1, repelStrength=30, linkStrength=0.2, linkDistance=250` — spread cluster-friendly, away from the default that produces hairball. `showTags: true` enables tag-nodes as mechanical cluster-anchors.
+
+3. **`qa/` schema hardening** (commit `11c2d27`). The `wiki query --file-back` flow shipped a buggy `query_file_back.md` prompt: the LLM claimed "Q&A-Artikel erstellt, Index und Log aktualisiert" while skipping the index + log steps and emitting `tags: [qa]` instead of `type: qa`. Three fixes:
+   - Prompt requires `type: qa` + explicit Read-back verification of all three target files before "done"
+   - New lint `check_qa_schema`: error on missing `type: qa`, warn on missing index row, warn on missing domain tag
+   - `wiki query` gains `--brief` (short bullet answer mode) and `--file-back` slug-dedup (refuses to overwrite without `--force`)
+
+4. **Domain-tag rule for `concepts/` and `qa/`** (commit `da23f2b` + co-mingled compile-prompt edit). Compile prompt now requires every concept/qa note to carry ≥1 domain tag from a canonical list (engine default = lxw's top-10 backlink domains). Domain tags drive graph coloring; without one, a note falls into the grey-fallback bucket and disappears from the visual cluster map. New lint `check_concept_domain_tag` enforces. Config: `graph_view.domain_tags: list[str]` is operator-overridable; engine default extended to include `lxw` (was missing despite 53 occurrences).
+
+5. **Lateral-linking (Tag-Jaccard `## Related` sections) — REJECTED after audit re-verify** (commit `796e97e`). The motivating audit ("0 lateral concept→concept wikilinks out of 6743") was buggy: the grep matched bare `[[slug]]` but missed `[[concepts/slug]]` (the form `compile.py` actually emits in `## Related Concepts` sections). Real count: **5392 lateral wikilinks, 77% of all concept-from links.** 686 of 873 concepts already carry curated Related sections. The cluster-perception problem is force-layout dominance by 8-10 mega-hub notes (`projects/fleet`=150, `agentisches-manifest`=69, …), not missing edges. Working implementation discarded before commit. Backlog file `lateral-linking.md` preserved with REJECTED status + audit-bug forensics so the next agent doesn't re-derive the design.
+
+6. **Domain MOCs as curated topic-hubs** (lxw vault). Five domain MOCs scaffolded under `knowledge/MOCs/`: `llm-wiki`, `fleet`, `openclaw`, `claude-code`, `yesterday`. Shape: Snapshot → Trunk Concepts (top-backlink-anchored) → thematic subsections → Active Projects → People → Dataview fallback. Per-folder generic MOCs (`concepts.md`, `people.md`, `projects.md`, `inbox-tasks.md`) remain untouched — domain MOCs are the curated layer on top. Engine-codification (`wiki moc <domain>` subcommand) deferred until pattern is validated and re-generation is a use-case.
+
+**Standing rules established by this arc:**
+
+- **Multi-step prompts need verification clauses.** Any prompt that instructs N artifact-mutations must end with explicit Read-back-and-confirm — a claim of "done" without all N landing is a contract violation. Lint owes a structural check per LLM-emitted artifact shape (`check_qa_schema` is the template).
+- **Audit your premise before designing the fix.** Re-derive load-bearing metrics two ways (Bash + Python parser, two different greps) before committing design to them. A single load-bearing number that's off cost half a session. Lesson recorded in KNOWLEDGE.md.
+- **Tags are domains, not types.** A `qa` tag is redundant with `type: qa` and pollutes the colour layer; a `gotcha` / `pattern` / `discipline` tag is a shape descriptor, not a clustering signal. Tags must encode the domain (`fleet`, `openclaw`, …).
+- **Engine templates must persist operator-configured surfaces.** Any operator-facing config (graph.json, plugin data.json) that gets overwritten by `wiki seed --force` needs an updated engine template at the same time, otherwise `wiki update` silently reverts the operator's work. Today's first symptom: lxw `graph.json` got reset on `wiki update` because the template still carried the pre-arc 6-folder palette.
+
+**Linked artifacts:**
+- Commits: `11c2d27` (qa hardening), `da23f2b` (concept domain-tag lint), `796e97e` (lateral-linking arc closed), this commit (template + AGENTS sync + DECISIONS).
+- Engine: `prompts/compile_main.md` (domain-tag clause + verification clause), `prompts/query_file_back.md` (qa schema enforcement), `prompts/query_brief.md` (new), `scripts/query.py` (`--brief` + `--force` + dedup), `scripts/lint.py` (`check_qa_schema`, `check_concept_domain_tag`, `_domain_tags()` helper), `scripts/core/config.py` (`graph_view.domain_tags: list[str]`).
+- Templates: `templates/.obsidian/graph.json` (15 color groups, tuned forces, showTags=True), `templates/.obsidian/plugins/extended-graph/data.json` (new — Multi-Channel config).
+- Backlog: `subtype-axis.md` (superseded by Extended Graph), `lateral-linking.md` (REJECTED with audit forensics).
+- KNOWLEDGE.md: "Multi-step prompts need verification clauses", "Audit your premise before designing the fix".
+- Vault-side: `lxw/knowledge/MOCs/{llm-wiki, fleet, openclaw, claude-code, yesterday}.md` — 5 domain MOCs.
