@@ -6,13 +6,13 @@
 
 ## Scope
 
-Wire `assert_prompt_within_budget` into the other three LLM-prompt call sites — same helper, ~3 lines each (build prompt → guard → SDK call):
+Wire `assert_prompt_within_budget` into the remaining LLM-prompt call sites — same helper, ~3 lines each (build prompt → guard → SDK call):
 
-- `compile.py` — `compile_file()` builds the largest prompts (compact index + source + AGENTS + facts + template). Highest value; also `maybe_generate_curiosity_requests`.
+- ~~`compile.py` — `compile_file()`.~~ **Done 2026-05-15** (commit pending) — `CONFIG.limits.compile_max_prompt_chars: 400_000`, plus `compile_max_turns: 12` (was 30) to cap tool-turn ballooning. Closed via the gmeet-138 KB incident.
 - `optimize-claude-md.py` — `optimize()` after `render("optimize_claude_md", ...)`.
 - `suggestions/producer.py` — after its `render(...)` call.
 
-Each needs a char budget lifted into `wiki_config.py` + `config.example.yaml` per the lift-hardcoded-to-CONFIG rule.
+Each remaining call site needs a char budget lifted into `core/config.py` + `config.example.yaml` per the lift-hardcoded-to-CONFIG rule.
 
 ## Design question
 

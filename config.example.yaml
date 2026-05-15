@@ -117,6 +117,14 @@ limits:
   # Pre-flight cap for `wiki query` prompts — aborts with a clear message
   # before the SDK call if the knowledge base outgrows the context window.
   query_max_prompt_chars: 500000
+  # Pre-flight cap for `wiki compile` prompts (same overflow class — source
+  # size is the variable bit, gmeet transcripts can hit 100+ KB).
+  compile_max_prompt_chars: 400000
+  # Tool-turn ceiling per compile run. Bumped down from 30 — large sources
+  # otherwise loop on Read/Grep until they hit the 200K context window.
+  compile_max_turns: 12
+  # Surface an INFO line when source ≥ this many chars (logging signal only).
+  compile_large_source_chars: 50000
 
 features:
   # Master switches for entire capabilities.

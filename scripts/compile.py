@@ -42,7 +42,9 @@ from core.utils import (
 )
 from core.sdk_helpers import (
     FailureClass,
+    PromptTooLargeError,
     StderrCapture,
+    assert_prompt_within_budget,
     is_fatal,
     log_sdk_failure,
 )
@@ -161,16 +163,45 @@ async def compile_file(source: Path, dry_run: bool = False, prefix: str = "") ->
     today = today_iso()
     now = now_iso()
 
+    facts_md = read_hard_facts()
     prompt = render(
         "compile_main",
         agents_md=agents_md,
-        facts_md=read_hard_facts(),
+        facts_md=facts_md,
         index_md=index_md,
         source_path=rel_path,
         source_content=source_content,
         today=today,
         now=now,
     )
+
+    # Pre-flight guard: assembled prompt + later tool-turns must fit Opus's
+    # 200K-token window. Without this a 138 KB gmeet transcript loops on
+    # Read/Grep until the SDK dies silently with exit-1 / empty stderr after
+    # 13 minutes of kind=unknown (see KNOWLEDGE.md). Surfaces the bloated
+    # component to the operator instead.
+    try:
+        assert_prompt_within_budget(
+            len(prompt),
+            CONFIG.limits.compile_max_prompt_chars,
+            label=f"compile_file {rel_path}",
+            breakdown={
+                "compact index": len(index_md),
+                "AGENTS.md": len(agents_md),
+                "hard facts": len(facts_md),
+                "source": len(source_content),
+            },
+        )
+    except PromptTooLargeError as exc:
+        log.error("  %s", exc)
+        return {"_skipped": "prompt_too_large"}
+
+    if len(source_content) >= CONFIG.limits.compile_large_source_chars:
+        log.info(
+            "  large source: %d chars (%.1f KB) — max_turns capped at %d",
+            len(source_content), len(source_content) / 1024,
+            CONFIG.limits.compile_max_turns,
+        )
 
     # Run the agent with file editing tools
     total_input_tokens = 0
@@ -188,7 +219,7 @@ async def compile_file(source: Path, dry_run: bool = False, prefix: str = "") ->
                 model=CONFIG.models.compile_model,
                 allowed_tools=["Read", "Write", "Edit", "Glob", "Grep"],
                 permission_mode="acceptEdits",
-                max_turns=30,
+                max_turns=CONFIG.limits.compile_max_turns,
                 system_prompt=render("compile_main_system"),
                 setting_sources=[],
                 stderr=capture.callback,

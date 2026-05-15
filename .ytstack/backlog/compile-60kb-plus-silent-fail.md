@@ -48,7 +48,28 @@ Not the 1 MB stream-json buffer class — that one was diagnosed via the explici
 - `.ytstack/KNOWLEDGE.md` "Claude Agent SDK silently crashes on >1 MB stream-json messages (2026-05-13)" — closely-related but different class. Same exit-1-empty-stderr surface, different mechanism.
 - `.ytstack/backlog/compile-per-call-timeout.md` — proposes `asyncio.wait_for` per-message-stall timeout. Would convert the current 4-9 min silent stall into a logged timeout, surfacing this failure mode earlier.
 
+## 2026-05-15 update: partial fix landed, full root-cause still open
+
+New data point: lxw `gmeet/2026-05-13--...--1qvzqCWczl6u.md` (138 KB) failed with the same exit-1 / empty stderr profile after 793 s. Re-checking the 2026-05-13 ranking:
+
+| File | Size | Result | Notes |
+|---|---|---|---|
+| sid-3-3 | 9 KB | ✓ | |
+| sid-1-3 | 35 KB | ✓ | |
+| sid-2-3 | 60 KB | ✗ (then) | |
+| Bad Nauheim Workshop 3-3 | 75 KB | ✓ | succeeded 2026-05-13 19:01 — so size alone is not the discriminator |
+| gmeet 2026-05-13 | 138 KB | ✗ | |
+
+So failure is **non-monotonic in size** — a 60 KB file can fail while a 75 KB file succeeds. Strengthens hypothesis 1 (tool-turn fan-out, not raw size) over hypothesis 4 (resource ceiling).
+
+**Partial fix (commit pending, 2026-05-15):**
+- `compile.py` now wires `assert_prompt_within_budget` (`compile_max_prompt_chars: 400_000`) — catches truly oversized initial prompts before the SDK call. The 138 KB case currently fits.
+- `max_turns` dropped from 30 to 12 (`compile_max_turns`) — caps tool-turn ballooning, which is the suspected real driver. A model on a huge source that wants to Read+Grep 25 articles will instead commit at 12 turns. May trigger `error_max_turns` on legitimately-deep compiles; if observed, raise to 15-18.
+- INFO line on sources ≥ 50 KB so the operator sees *which* file slowed things down without re-reading the error log.
+
+**Still open:** confirm 138 KB compiles cleanly under the new caps, and characterize whether `max_turns=12` is too tight for any other historic-success workload. If the 138 KB still fails, drop to splitting the transcript at meeting-section boundaries pre-compile.
+
 ## Operator workaround for now
 
-- Skip compile of any source >50 KB until investigation lands.
-- For Jamie meetings specifically: 9 KB + 35 KB compiles validated the value (8 concepts + 1 person + 2 augmentations from a 31-min meeting at $0.05). 60 KB+ deferred.
+- The new pre-flight + max_turns cap should let `wiki compile` chew through the 138 KB case at known cost (or abort cleanly with `error_max_turns` instead of silent burn). Validate on the next lxw run.
+- Fallback if it still fails: split sources >100 KB at section boundaries before placing under `raw/transcripts/`.

@@ -115,6 +115,23 @@ class Limits:
     # operator message. 500K chars ≈ 167K tokens at German density —
     # inside a 200K-token window with headroom for the response.
     query_max_prompt_chars: int = 500_000
+    # Pre-flight cap for `wiki compile` prompts. Embeds compact index +
+    # AGENTS.md + facts + raw source. Same overflow class as query, but
+    # the source content varies wildly (small daily notes vs 100+ KB
+    # gmeet transcripts) — the budget guard catches outliers before they
+    # cost 13 minutes of opaque kind=unknown silence. 400K chars ≈ 110K
+    # tokens initial; the remaining ~90K tokens absorb tool-turn growth.
+    compile_max_prompt_chars: int = 400_000
+    # Tool-turn ceiling per compile run. 30 was generous enough to let
+    # the model loop on a huge source until it hit the context window
+    # (see KNOWLEDGE.md: gmeet 138 KB transcript). 12 is what lint.py /
+    # suggestions/ already run with and matches the actual depth of
+    # legitimate compiles (read index → grep → read 2-4 articles → write).
+    compile_max_turns: int = 12
+    # Threshold above which a source counts as "large" — surfaces one
+    # extra INFO line so the operator can see *which* file was big when
+    # the SDK call slows down. Pure logging signal, no behavior change.
+    compile_large_source_chars: int = 50_000
 
 
 @dataclass
