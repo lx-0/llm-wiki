@@ -359,6 +359,104 @@ def check_concept_domain_tag() -> list[dict]:
     return issues
 
 
+def check_two_layer_pages() -> list[dict]:
+    """Enforce the two-layer State+Timeline shape for `type: person|project` articles.
+
+    Each entity page MUST have: a `## State` heading, a body-level `---` separator
+    between State and Timeline, a `## Timeline` heading, and Timeline entries in
+    reverse-chronological order. If an `## Action Items` section is present, its
+    non-empty list lines must start with `- [ ]` or `- [x]` (full Obsidian-Tasks-
+    plugin syntax validation lives in check_action_item_syntax).
+
+    Spec: prompts/compile_main.md Instruction 3 + templates/AGENTS.example.md.
+    Reference fixtures: tests/fixtures/two_layer/.
+    """
+    import re
+    issues: list[dict] = []
+    entity_folders = (("people", "person"), ("projects", "project"))
+    for folder, expected_type in entity_folders:
+        folder_path = KNOWLEDGE_DIR / folder
+        if not folder_path.exists():
+            continue
+        for article in sorted(folder_path.glob("*.md")):
+            if article.name in ("index.md", "log.md"):
+                continue
+            rel = str(article.relative_to(KNOWLEDGE_DIR))
+            fm = _read_yaml_frontmatter(article)
+            if fm.get("type") != expected_type:
+                # Type-mismatch is caught by check_article_type; don't double-report
+                continue
+
+            text = article.read_text(encoding="utf-8")
+            # Strip frontmatter so we only inspect the body
+            body = text
+            if text.startswith("---"):
+                end = text.find("\n---", 3)
+                if end != -1:
+                    body = text[end + 4:]
+
+            has_state = re.search(r"^## State\s*$", body, re.MULTILINE) is not None
+            has_timeline = re.search(r"^## Timeline\s*$", body, re.MULTILINE) is not None
+            separator_lines = [m.start() for m in re.finditer(r"^---\s*$", body, re.MULTILINE)]
+            timeline_match = re.search(r"^## Timeline\s*$", body, re.MULTILINE)
+            has_body_separator = bool(
+                separator_lines and timeline_match
+                and any(pos < timeline_match.start() for pos in separator_lines)
+            )
+
+            if not has_state:
+                issues.append(issue(
+                    "error", "two_layer_missing_state", rel,
+                    f"`type: {expected_type}` article missing `## State` section "
+                    f"(spec: prompts/compile_main.md Instruction 3)",
+                ))
+            if not has_body_separator:
+                issues.append(issue(
+                    "error", "two_layer_missing_body_separator", rel,
+                    f"`type: {expected_type}` article missing the `---` separator "
+                    f"between State and Timeline blocks",
+                ))
+            if not has_timeline:
+                issues.append(issue(
+                    "error", "two_layer_missing_timeline", rel,
+                    f"`type: {expected_type}` article missing `## Timeline` section",
+                ))
+
+            # Reverse-chronological check on Timeline entries
+            if has_timeline:
+                tail = body[timeline_match.end():]
+                # Match `- **YYYY-MM-DD**` line starts
+                dates = re.findall(r"^- \*\*(\d{4}-\d{2}-\d{2})\*\*", tail, re.MULTILINE)
+                for i in range(len(dates) - 1):
+                    if dates[i] < dates[i + 1]:
+                        issues.append(issue(
+                            "warning", "timeline_not_reverse_chronological", rel,
+                            f"Timeline entries out of order: {dates[i]} before {dates[i + 1]} "
+                            f"(newest first expected)",
+                        ))
+                        break  # one warning per file
+
+            # Action Items prefix sanity (deep syntax = T02)
+            ai_match = re.search(r"^## Action Items\s*$", body, re.MULTILINE)
+            if ai_match:
+                # Scan lines until next `## ` heading or `---`
+                after = body[ai_match.end():]
+                section_end = re.search(r"^(## |---\s*$)", after, re.MULTILINE)
+                section = after[:section_end.start()] if section_end else after
+                for raw_line in section.splitlines():
+                    line = raw_line.strip()
+                    if not line:
+                        continue
+                    if not (line.startswith("- [ ]") or line.startswith("- [x]") or line.startswith("- [X]")):
+                        issues.append(issue(
+                            "warning", "action_items_malformed", rel,
+                            f"Action Items line does not start with `- [ ]` or `- [x]`: "
+                            f"{line[:80]!r}",
+                        ))
+                        break  # one warning per file
+    return issues
+
+
 def check_sparse_articles() -> list[dict]:
     """Find articles with fewer than SPARSE_THRESHOLD words."""
     issues = []
@@ -566,6 +664,7 @@ async def main() -> None:
         ("Article type", check_article_type),
         ("QA schema", check_qa_schema),
         ("Concept domain tag", check_concept_domain_tag),
+        ("Two-layer pages", check_two_layer_pages),
         ("Sparse articles", check_sparse_articles),
         ("Facts violations", check_facts_violations),
     ]
