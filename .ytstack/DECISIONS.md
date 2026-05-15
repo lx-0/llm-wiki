@@ -683,3 +683,22 @@ These are companion-rules to [[Templates are load-bearing — never backlog temp
 **Touchpoints.** `scripts/collectors/calendar.py` (~600 LOC) · `scripts/adapters/calendar/google.py` REST client · `scripts/core/google_oauth.py` (no changes; parameterised already) · `wiki calendar-auth` bash subcommand · `scripts/core/config.py` (`Limits.calendar_*` × 4, `Personal.calendar_*` cleanup, default piggyback `calendar: 6h`) · `tests/test_calendar_collector.py` (31 cases, full pipeline + adapter fakes) · docs: AGENTS, PROCESS, FEATURES, cli, config, engine-layout, README · infographics: `docs/architecture.excalidraw` (scanner_calendar rebranded, height-bumped, "97d" stat, new `pb_calendar 6h` piggyback row) + `docs/overview.excalidraw` (substrate footer reordered to lead with the four account-bound collectors).
 
 **Supersedes.** The earlier `scan_calendar` Registry entry (2026-05-14 Phase-2 port). Backlog file `.ytstack/backlog/calendar-collector.md` moves to status `shipped`.
+
+
+## 2026-05-15 — Collector filenames must avoid stdlib top-level module names
+
+**Context.** M006 shipped `scripts/collectors/calendar.py` as the new Google Calendar collector. First live `wiki collect --list` invocation in lxw vault died with `ImportError: cannot import name 'timegm' from 'calendar' (.../scripts/collectors/calendar.py)`. Mechanism: `scripts/collectors/cli.py` is invoked as a script; Python sets `sys.path[0]` to the script's directory (`scripts/collectors/`); any transitive `from calendar import …` (here: `httpx → http.cookiejar → from calendar import timegm`) resolves to the local file instead of stdlib. Same class of bug as the pre-existing `email.py → email_collector.py` rename.
+
+**Decision.** Any new collector file under `scripts/collectors/` whose basename collides with a Python stdlib top-level module name MUST carry the `_collector` suffix. The Registry name (`SPEC.name = "calendar"`) is unaffected — it's a logical identifier, not a filename. Operator-facing UX (`wiki collect calendar`, `wiki calendar-auth`, `personal.accounts.<id>.calendar`) stays clean.
+
+**How to apply.** Before naming a new collector file, check it against `python3 -c "import sys; print(sorted(sys.stdlib_module_names))"`. Common collisions to watch for: `calendar`, `email`, `html`, `http`, `json`, `logging`, `urllib`, `xml`, `csv`, `zoneinfo`. The Registry-name and the filename do NOT have to match; prefer a `_collector` suffix on filenames when stdlib-collision is even a possibility.
+
+**Touchpoints.** `scripts/collectors/calendar.py` → `scripts/collectors/calendar_collector.py` (commit `c588fd3`). Registry import + Wiki shell CLI dispatch + test imports updated. New regression test `test_collector_filename_avoids_stdlib_shadow` in `tests/test_calendar_collector.py` asserts both that the suffixed module is reachable AND that `from calendar import timegm` still resolves to stdlib.
+
+## 2026-05-15 — Operator-facing URL verification policy (now CLAUDE.md hard rule)
+
+**Context.** During M006 live-deployment on lxw, the calendar collector hit a `403: Google Calendar API has not been used in project 588320185878` error after OAuth consent succeeded. I handed the operator a `console.cloud.google.com/apis/library/calendar.googleapis.com?project=588320185878` URL — the numeric project-number form pulled verbatim from the API error. Operator opened it, Google Console rendered "Fehler beim Laden", and the page also showed the project context as `llm-wiki-496408` (the project-ID form), which the operator read as "wrong project". Multiple rounds of clarification followed before I read the local `<vault>/.claude/google-oauth-client.json` and confirmed both forms refer to the same project.
+
+**Decision.** Codified as a hard rule in the project's `CLAUDE.md` (commit `2e19037`): URLs handed to the operator are derived from authoritative local data before being stated, in the form the operator recognises (named project-ID, not numeric project-number), once, correctly. No probing with the operator's browser. If the data isn't locally available, say so — don't guess.
+
+**How to apply.** Before any URL appears in a response, read the appropriate local source: `<vault>/.claude/*-oauth-client.json` (`installed.project_id` + client_id prefix for project-number), error payloads, config.yaml. Build the URL with named project-ID. Never mix forms across messages — pick one and stick with it. Applies to all cloud-console / dashboard / OAuth-enable / vendor-portal URLs.

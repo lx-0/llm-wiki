@@ -1564,3 +1564,24 @@ The collector's `_render_date_file` parses the existing file (if any), pulls the
 **Implication for concept-page upkeep.** The first sighting also decides the concept page's H1 + frontmatter `title`. Later title drift on the calendar side doesn't update the concept page (the collector only writes the concept page once, with `if not path.exists(): write()`). This is deliberate — the concept page is operator-owned content from then on, the calendar-side title is a snapshot of the series at first sighting. If the series gets retitled and the operator wants the concept page updated, they edit it directly.
 
 **Generalisable rule.** Any time an external system gives you a stable id alongside human-readable metadata, persist the (id → derived-name) mapping the first time you compute the name. Don't recompute from drifting metadata.
+
+## Stdlib-shadow via sys.path when `cli.py` runs directly
+
+A Python file under `scripts/collectors/` whose basename collides with a stdlib top-level module name (`calendar`, `email`, `html`, `json`, …) silently shadows the stdlib module any time `scripts/collectors/cli.py` is invoked directly. Reason: Python sets `sys.path[0]` to the script's directory, so `scripts/collectors/` is on the absolute-import search path. A transitive import like `httpx → http.cookiejar → from calendar import timegm` resolves to our local file instead of stdlib and crashes with `cannot import name 'timegm' from 'calendar' (.../scripts/collectors/calendar.py)`.
+
+**Tests don't catch this** because `tests/conftest.py` only puts `scripts/` on sys.path (not `scripts/collectors/`), and test code imports the module package-qualified (`from collectors import calendar`) which unambiguously resolves to the package member, not the absolute `calendar` name. The CLI runtime path is the broken one.
+
+**Affected entry points:** every `wiki collect` invocation (list, per-name, piggyback dispatch from `flush.py`). The bug is invisible until the operator actually runs the CLI in a vault.
+
+**Fix pattern:** rename `<stdlib_name>.py` → `<stdlib_name>_collector.py`. The Registry name (`SPEC.name`) stays as the clean operator-facing identifier; only the filename carries the suffix. Pre-existing precedent: `email_collector.py` (`email` is also a stdlib package). M006 added a second case: `calendar_collector.py`.
+
+**Generalisable rule:** any new `scripts/collectors/<name>.py` must check `<name>` against `python3 -c "import sys; print(sorted(sys.stdlib_module_names))"`. When unsure, add the `_collector` suffix unconditionally — costs nothing, removes the foot-gun. Codified in [[DECISIONS.md § 2026-05-15 — Collector filenames must avoid stdlib top-level module names]].
+
+## Live M006 deployment exposed the migration's own dead-code bug
+
+M006 surfaced TWO orthogonal bugs that had been latent:
+
+1. **Stdlib-shadow** (above) — the `calendar.py` filename. Caught the first second the CLI ran in lxw.
+2. **`migrate_additions` was dead code** — `scripts/migrations/migrate_config_keys.py` had defined the function but never called it from `migrate_config`. Every prior addition to `KEY_ADDITIONS` (the 2026-05-15 entries for `compile_force_long_context_types` + `compile_skip_on_long_context_unknown`) had been silently failing to land in operator configs. Discovered while extending the migration for M006's calendar keys and noticing the wiring was missing. Repaired in commit `734439a`.
+
+**Generalisable rule:** when adding a new helper to a maintenance-script-style file (migrations, lints, sweepers), grep for an actual call-site for the helper before considering the change complete. Defense-in-depth call sites only catch bugs if they're actually wired. A test would have caught this too (`test_migrate_config_file_round_trip` was tied to piggyback-rename changes and didn't exercise the additions path until after I rewired the function).

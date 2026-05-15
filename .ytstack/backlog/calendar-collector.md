@@ -1,6 +1,6 @@
 # Calendar collector — Google Calendar events as substrate
 
-**Status:** ✅ **SHIPPED 2026-05-15** as milestone M006. See `.ytstack/DECISIONS.md § 2026-05-15 — M006 Calendar collector` for the shape that landed.
+**Status:** ✅ **SHIPPED + LIVE-DEPLOYED 2026-05-15** as milestone M006. See `.ytstack/DECISIONS.md § 2026-05-15 — M006 Calendar collector` for the shape that landed. First live run on lxw `gmail-yesterday` account: 4 selected calendars · 402 events · 13 recurring concept pages · 79 per-date rollup files. Two follow-up bugs surfaced + fixed during live deployment: stdlib-shadow rename (`c588fd3`) and `migrate_additions` dead-code repair (`734439a`).
 
 **What shipped (vs. original pitch):**
 
