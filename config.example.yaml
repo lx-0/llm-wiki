@@ -187,6 +187,18 @@ limits:
   # stochastic overflows on small sources that the size-threshold above
   # misses. Set to false to skip the retry and surface the failure.
   compile_retry_long_context_on_unknown: true
+  # Force the long-context model for substrates whose compile reliably
+  # fans out into many existing articles (e.g. daily-digest references
+  # 6+ topics in <2 KB and blows the 200K window via tool-turn reads
+  # before producing output). Matched by frontmatter `type:` value.
+  # Empty list disables the override.
+  compile_force_long_context_types: ["daily-digest"]
+  # When a kind=unknown failure cannot be retried (small source OR
+  # already on the long-context model), treat it as a skip instead of a
+  # hard failure — preserves the consecutive-failure budget so the batch
+  # survives a structurally-unprocessable file. Set to false to surface
+  # every kind=unknown as a failure (legacy pre-2026-05-15 behavior).
+  compile_skip_on_long_context_unknown: true
 
 features:
   # Master switches for entire capabilities.

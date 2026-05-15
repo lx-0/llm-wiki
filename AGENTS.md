@@ -108,6 +108,14 @@ llm-wiki/
 3. Document it in `docs/config.md` (the grouped reference).
 4. Replace the hardcoded constant in the script with `CONFIG.<section>.<field>`.
 5. Don't add ad-hoc constants back to scripts — extend the config layer.
+6. **Add the key to `scripts/migrations/migrate_config_keys.py`** under
+   `KEY_ADDITIONS[<parent>]` with the same default. Operator vaults already
+   carry their own `config.yaml`; without this entry the new key is invisible
+   to the operator (dataclass defaults silently fire) and any rollout that
+   depends on the operator *seeing* the knob is broken. Same rule for
+   renames (extend `PIGGYBACK_RENAMES` etc.) and removals (`new_key=None`).
+   Direct edits to `<vault>/.wiki/config.yaml` are forbidden — the migration
+   is the only legal write path into an operator vault.
 
 ### Adding per-instance / personal data
 

@@ -222,6 +222,25 @@ class Limits:
     # there. Sources under this threshold abort on first failure instead
     # of burning a rate-limit slot. Default 10 KB.
     compile_retry_long_context_min_source_chars: int = 10_240
+    # Force the long-context model up-front for substrates known to fan out
+    # heavily into existing knowledge during compile (matched by frontmatter
+    # `type:`). A daily-digest is <2 KB on the surface but references 6+
+    # topics — the compile agent Reads each related article to ground the
+    # synthesis, and the running context blows past 200K mid-stream → silent
+    # CLI exit-1 / kind=unknown after 1-5 minutes. The size-threshold above
+    # never catches it (source is small). Force the 1M variant for these
+    # types regardless of size. Empty tuple disables the override.
+    compile_force_long_context_types: tuple[str, ...] = ("daily-digest",)
+    # When a kind=unknown failure has no further retry path available
+    # (small source skipping retry, OR already on the long-context model),
+    # treat it as a skip rather than a hard failure: log WARNING, return
+    # `_skipped`, and don't count toward consecutive-failure abort. The
+    # underlying file genuinely cannot compile under the current architecture
+    # (tool-fanout overflow on a too-rich substrate) — operator can't fix
+    # it by rerunning, so eroding the failure budget on a structural skip
+    # would just abort the batch on unrelated files. Off-switch surfaces
+    # every kind=unknown as a failure (legacy behavior, pre-2026-05-15).
+    compile_skip_on_long_context_unknown: bool = True
 
 
 @dataclass

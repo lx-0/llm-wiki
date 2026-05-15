@@ -85,6 +85,8 @@ Knob block. Defaults sized for an Opus-on-5h-window install — tighten on small
 | `limits.compile_max_turns` | `12` | Tool-turn ceiling per compile run. Was 30 — large sources looped on Read/Grep into `knowledge/` until they blew the context window. |
 | `limits.compile_large_source_chars` | `50000` | At/above this source size, auto-upgrade to `models.compile_large_source_model` (1M-context Opus). Catches deterministic overflows. |
 | `limits.compile_retry_long_context_on_unknown` | `true` | On `kind=unknown` failure (stochastic context overflow from tool fan-out), retry once with `models.compile_large_source_model`. Catches small-source overflows the size-threshold misses. Set false to surface the failure instead. |
+| `limits.compile_force_long_context_types` | `["daily-digest"]` | Substrates whose compile reliably fans out into many existing articles (matched by frontmatter `type:`). Forces `models.compile_large_source_model` up-front regardless of source size — daily-digest is <2 KB but references 6+ topics, blowing the 200K window mid-stream. Empty list disables the override. |
+| `limits.compile_skip_on_long_context_unknown` | `true` | Treat `kind=unknown` failures with no further retry path (small source OR already on the 1M model) as skips instead of hard failures. Preserves the consecutive-failure budget so the batch survives a structurally-unprocessable file. Set false to surface every `kind=unknown` as a failure (legacy pre-2026-05-15 behavior). |
 | `limits.flush_max_retries` | `3` | Retries for flush-extraction calls. |
 | `limits.flush_retry_delay_seconds` | `30` | Delay between flush retries. |
 

@@ -796,6 +796,18 @@ EOF
     info "If hook payloads or config schema changed, you may want to re-run:"
     info "  wiki hooks install      ${C_DIM}# to refresh agent hook configs${C_RESET}"
   fi
+
+  # Run config-schema migration unconditionally — idempotent, prints
+  # "no change" when the vault is already on the current schema, prints
+  # the rename/add/drop diff and applies it otherwise. Keeps the vault's
+  # config.yaml in sync with whatever the engine pull just introduced.
+  info "Migrating config.yaml to current schema (idempotent) …"
+  if ! uv run --quiet --project "$WIKI_DIR" python \
+        "$WIKI_DIR/scripts/migrations/migrate_config_keys.py" \
+        --vault "$ROOT_DIR" --apply; then
+    warn "Config migration reported errors — inspect $ROOT_DIR/.wiki/config.yaml manually."
+  fi
+
   if (( sync_skills == 1 )); then
     skills_cmd_sync
   else

@@ -135,6 +135,25 @@ def _category_badge(rel_path: str) -> str:
     return "?"
 
 
+def _frontmatter_type(content: str) -> str | None:
+    """Extract `type:` from a leading YAML frontmatter block, or None.
+
+    Regex-only — sufficient for the single scalar field we need and avoids
+    pulling a yaml dependency into the compile hot path. Tolerates quoted
+    values and trailing whitespace; matches the first `type:` inside the
+    leading `---` … `---` fence, not anywhere else in the body.
+    """
+    if not content.startswith("---"):
+        return None
+    end = content.find("\n---", 3)
+    if end == -1:
+        return None
+    block = content[3:end]
+    import re
+    m = re.search(r"^type:\s*[\"']?([\w-]+)[\"']?\s*$", block, re.MULTILINE)
+    return m.group(1) if m else None
+
+
 async def compile_file(source: Path, dry_run: bool = False, prefix: str = "") -> dict | None:
     """Compile a single source file into wiki articles.
 
@@ -201,8 +220,27 @@ async def compile_file(source: Path, dry_run: bool = False, prefix: str = "") ->
     # source + tool-turn reads exceed the window (see KNOWLEDGE.md
     # "tool-turn ballooning"). Operator can pin to the small variant by
     # setting `compile_large_source_model: ""` in config.yaml.
+    #
+    # The size threshold is necessary but not sufficient: some substrates
+    # are small on the surface yet fan out heavily into existing knowledge
+    # during compile (daily-digest is the canonical case — <2 KB source
+    # references 6+ topics, agent Reads each related article, context
+    # overflows mid-stream). Force [1m] up-front for those substrates
+    # regardless of size (`compile_force_long_context_types`).
     model = CONFIG.models.compile_model
-    if (
+    source_type = _frontmatter_type(source_content)
+    force_long_ctx = (
+        source_type is not None
+        and source_type in CONFIG.limits.compile_force_long_context_types
+        and CONFIG.models.compile_large_source_model
+    )
+    if force_long_ctx:
+        model = CONFIG.models.compile_large_source_model
+        log.info(
+            "  type=%s — forcing %s (substrate fans out into knowledge/ during compile)",
+            source_type, model,
+        )
+    elif (
         len(source_content) >= CONFIG.limits.compile_large_source_chars
         and CONFIG.models.compile_large_source_model
     ):
@@ -335,6 +373,36 @@ async def compile_file(source: Path, dry_run: bool = False, prefix: str = "") ->
             "small-source kind=unknown is typically tool-fanout, not context overflow",
             len(source_content), min_for_retry,
         )
+
+    # Skip-and-flag: when a kind=unknown failure has no further retry
+    # path available — small source skipping the retry, OR we were already
+    # on the long-context model so there's nothing left to escalate to —
+    # treat it as a structural skip rather than a hard failure. The file
+    # genuinely cannot compile under the current architecture (tool-fanout
+    # overflow on too-rich substrate); making the operator's batch abort
+    # on it just punishes unrelated files via consecutive-failure budget.
+    if (
+        failure is not None
+        and failure.kind == "unknown"
+        and CONFIG.limits.compile_skip_on_long_context_unknown
+    ):
+        if model == long_ctx_model:
+            log.warning(
+                "  skipping: kind=unknown on long-context model %s "
+                "— tool-fanout overflow exceeds even the 1M window; "
+                "the source likely references too many existing articles. "
+                "Not counted toward consecutive-failure abort.",
+                model,
+            )
+            return {"_skipped": "kind_unknown_on_long_context"}
+        if len(source_content) < min_for_retry:
+            log.warning(
+                "  skipping: small-source kind=unknown with no retry path "
+                "(source %d chars < %d, long-context retry doesn't help here). "
+                "Not counted toward consecutive-failure abort.",
+                len(source_content), min_for_retry,
+            )
+            return {"_skipped": "kind_unknown_small_source"}
 
     if failure is not None:
         return {"_failure": failure}

@@ -186,6 +186,22 @@ The 50 KB source-size threshold above catches the *deterministic* overflow case.
 - retry-line followed by `✓` → context-overflow class confirmed, the 1M variant absorbs the fan-out.
 - retry-line followed by `✗` → bottleneck is upstream of the model variant (Anthropic-side timeout, CLI bug on specific content shape, or output-side ballooning). Drop to source-splitting at section boundaries pre-compile.
 
+#### Follow-up (2026-05-15 night): digest substrates are deterministic fan-outs and need [1m] up-front
+
+The next failure class: `daily/<date>.md` digests after the `daily/`-as-rollup arc. Surface signature was `kind=unknown` after 98–248 s on 1.3–1.9 KB sources — well under the 10 KB retry-skip floor, so the documented small-source-skip-retry behavior just terminally failed the file every time. The bandwidth-driver isn't source size; it's that a daily-digest packs 6+ topic references into <2 KB and the compile agent dutifully Reads each related `knowledge/` article to ground the synthesis. Every run hits the same wall on the same files.
+
+The stochastic-retry fix from `ccf7dd5` is wrong here twice over:
+- The size gate (`< compile_retry_long_context_min_source_chars`) explicitly skipped digest files because they're tiny.
+- Even if it did retry, a digest fans out the same way on the next call — stochasticity isn't a property of small inputs that reference many topics; it's a property of small inputs that reference *few* not-yet-described topics. Digests are deterministic.
+
+Two fixes, shipped together:
+
+1. **Force `[1m]` up-front for substrates known to fan out.** `CONFIG.limits.compile_force_long_context_types: tuple[str, ...] = ("daily-digest",)` reads frontmatter `type:` via `_frontmatter_type(content)` and routes any source whose type is in the list straight to `compile_large_source_model`, regardless of size. Operator log: `type=daily-digest — forcing claude-opus-4-7[1m] (substrate fans out into knowledge/ during compile)`. This is the function fix — the digest now actually compiles.
+
+2. **Skip-and-flag for `kind=unknown` with no further retry path.** `CONFIG.limits.compile_skip_on_long_context_unknown: bool = True` (default on). When `failure.kind == "unknown"` AND (`model == long_ctx_model` OR `source < min_for_retry`), return `{"_skipped": "kind_unknown_*"}` instead of `{"_failure": ...}`. The file genuinely cannot compile under the current architecture — making the operator's batch abort on it just punishes unrelated files via the consecutive-failure budget. WARNING-level log so the rate is visible. This is the resilience fix — covers both the still-failing small sources (digest fan-out exceeds even 1M, or non-digest small-source overflow on a substrate not yet on the force-list) and the previously-uncovered already-on-`[1m]` gap.
+
+**Auto-migration is mandatory.** New `limits.*` keys must reach operator vaults' `config.yaml` files; relying on dataclass-default fall-through hides the knob from the operator. `scripts/migrations/migrate_config_keys.py` gained a `KEY_ADDITIONS` block + `migrate_additions(data)` function that injects the new keys (idempotently, preserving operator overrides) — and `wiki update` now runs the migration unconditionally after `git pull --ff-only`. Policy locked in `CLAUDE.md` and the `Adding a tunable` section of `AGENTS.md`.
+
 #### Lesson
 
 In-context body embeds that grow linearly with the corpus (an index, a log, a catalogue) become a context-overflow ticking bomb. The Karpathy-style pattern is **pointer-first**: tell the LLM what file to look at, hand over Read/Grep/Glob, let it fetch on demand. Body-embed is fine for small fixed surfaces (facts, AGENTS schema) and bad for growth surfaces (index, log, daily archive). Apply this whenever a `${var}` substitution in a prompt template carries a linearly-growing artifact.
