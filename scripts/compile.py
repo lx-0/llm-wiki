@@ -226,11 +226,29 @@ async def compile_file(source: Path, dry_run: bool = False, prefix: str = "") ->
                     max_buffer_size=CONFIG.limits.sdk_max_buffer_size_mb * 1024 * 1024,
                     cwd=str(ROOT_DIR),
                     model=model_id,
-                    allowed_tools=["Read", "Write", "Edit", "Glob", "Grep"],
+                    # PATH-SCOPED ALLOWLIST (locked 2026-05-15). Write/Edit
+                    # are restricted to `knowledge/**` by tool-pattern. Any
+                    # other target path is default-denied by the bundled CLI
+                    # without needing a corresponding entry in `disallowed_tools`.
+                    # This is a tighter posture than the denylist that
+                    # preceded it: substrate (daily/, raw/) routinely
+                    # contains literal change-descriptions of engine files
+                    # (`.ytstack/*`, `docs/*`, `AGENTS.md`, ...) which the
+                    # agent otherwise treated as instructions and executed
+                    # against `<vault>/.wiki/`. See KNOWLEDGE.md "Compile
+                    # prompt injection via substrate".
+                    allowed_tools=[
+                        "Read", "Glob", "Grep",
+                        "Write(knowledge/**)",
+                        "Edit(knowledge/**)",
+                    ],
                     permission_mode="acceptEdits",
                     max_turns=CONFIG.limits.compile_max_turns,
                     system_prompt=render("compile_main_system"),
-                    setting_sources=[],
+                    # Pick up the vault's CLAUDE.md (if any) so operator
+                    # scope-discipline rules reach the agent. Empty list
+                    # killed that signal previously.
+                    setting_sources=["project"],
                     stderr=capture.callback,
                 ),
             ):
