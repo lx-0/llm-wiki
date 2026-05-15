@@ -1270,3 +1270,19 @@ Plumbing tests (does the rendered prompt carry the rule?) are CI-friendly and ra
 Pattern for non-CI-testable LLM behavior: ship the harness (fixtures + plumbing tests) in the engine repo; ship the validation as an **operator runbook** with explicit pass/fail criteria. Example: `docs/m005-s03-canary-procedure.md` has three canaries (synthetic fixture, live jamie, live gmeet) with grep commands, pass/fail/caveat decisions, and rollback paths.
 
 This is *not* "we skipped testing"; it's "we tested the part that's testable and explicitly documented the part that isn't, with falsifiable criteria for the human-in-the-loop step".
+
+### Audit your premise before designing the fix (lateral-linking false start, 2026-05-15)
+
+A perception-bug investigation ("the graph view shows no thematic clusters") motivated a substantial design: a deterministic Tag-Jaccard `## Related` pass over `concepts/`. The pitched evidence: a Bash audit reported **0 lateral concept→concept wikilinks** out of 6743 — interpreted as "everything points outward, nothing sideways, no edges to form clusters".
+
+That number was an artefact of the audit script. The grep matched `[[slug]]` but the compile prompt emits `[[concepts/slug]]` (full path form) in its `## Related Concepts` sections — which the matcher silently dropped. Real count: **5392 lateral edges, 77% of all wikilinks from concepts/**. The premise the design was solving did not exist.
+
+The cluster-perception problem is real but different: 8–10 mega-hub notes (`projects/fleet`=150 backlinks, `agentisches-manifest`=69, `audit-before-declaring-done`=68, …) gravitationally dominate any force-directed layout. Cross-cutting disciplines genuinely apply to every domain, so the graph is dense-within AND dense-between. Themed-island visualisation requires sparse-between, which this knowledge base structurally doesn't have (and shouldn't — sparsity would mean fewer connections, less synthesis).
+
+Lessons:
+
+- **Audit-numbers stake a design.** A single load-bearing metric ("0 lateral links") committed the next several hours to an architecture. Re-derive that metric two ways before proposing on it. `grep '[[slug]]'` vs `grep '[[concepts/slug]]'` vs a Python parser using a proper wikilink regex would all have surfaced the bug instantly.
+- **"The graph looks like a hairball" is a perception, not a topology claim.** Tease them apart: is the issue "edges are missing" (topology), "layout doesn't separate clusters that exist" (force-balance), or "the knowledge base is genuinely densely connected and the visual representation is honest about that"? Different fixes for each. Default-assuming the first is what cost the session.
+- **Match the fix to the data shape.** If 77% of wikilinks are already lateral, adding more of them produces noise, not signal. The investment goes to either accepting the dense graph as truth (and optimising for local-graph navigation), or moving to a different visualisation paradigm (community-detection plugins, MOCs as curated entry-points). Neither is "more edges".
+
+Concrete artefacts that survive: `.ytstack/backlog/lateral-linking.md` is marked REJECTED with the audit-bug forensics, so the next agent who has the same intuition doesn't re-derive the design from scratch.
