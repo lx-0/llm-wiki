@@ -270,7 +270,7 @@ def check_article_type() -> list[dict]:
 #     domain_tags: [fleet, openclaw, claude-code, ...]
 _DEFAULT_DOMAIN_TAGS = (
     "fleet", "openclaw", "claude-code", "yesterday", "llm-wiki",
-    "paperclip", "ytstack", "township", "pixeltales",
+    "paperclip", "ytstack", "township", "pixeltales", "lxw",
 )
 
 
@@ -325,6 +325,36 @@ def check_qa_schema() -> list[dict]:
                 "warning", "qa_no_domain_tag", rel,
                 f"qa/ note has no domain tag from {sorted(domain_set)} — "
                 f"will render grey in graph view. Add e.g. `tags: [llm-wiki]`.",
+            ))
+    return issues
+
+
+def check_concept_domain_tag() -> list[dict]:
+    """Warn on knowledge/concepts/ notes whose tags miss any domain anchor.
+
+    Concepts/ is the largest folder (87% of lxw vault). Without a domain tag
+    in `graph_view.domain_tags`, a note paints into the grey-fallback color
+    group and disappears into the visual hairball. The compile prompt now
+    requires a domain tag at creation; this check surfaces pre-rule notes
+    and any future drift.
+    """
+    issues = []
+    concepts_dir = KNOWLEDGE_DIR / "concepts"
+    if not concepts_dir.exists():
+        return issues
+    domain_set = set(_domain_tags())
+    for article in sorted(concepts_dir.glob("*.md")):
+        if article.name in ("index.md", "log.md"):
+            continue
+        rel = str(article.relative_to(KNOWLEDGE_DIR))
+        fm = _read_yaml_frontmatter(article)
+        raw_tags = fm.get("tags") or []
+        tags = set(raw_tags) if isinstance(raw_tags, list) else set()
+        if not (tags & domain_set):
+            issues.append(issue(
+                "warning", "concept_no_domain_tag", rel,
+                f"concept has no tag from {sorted(domain_set)} — "
+                f"will render grey in graph view. Current tags: {sorted(tags)[:6]}",
             ))
     return issues
 
@@ -535,6 +565,7 @@ async def main() -> None:
         ("Missing backlinks", check_missing_backlinks),
         ("Article type", check_article_type),
         ("QA schema", check_qa_schema),
+        ("Concept domain tag", check_concept_domain_tag),
         ("Sparse articles", check_sparse_articles),
         ("Facts violations", check_facts_violations),
     ]
