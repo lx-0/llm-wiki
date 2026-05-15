@@ -309,75 +309,109 @@ filed: 2026-04-05
 
 ### People Articles (`knowledge/people/`)
 
-One page per person. Accumulates information over time.
+One page per person. Uses the **two-layer shape** (compiled-truth State block above `---`, append-only Timeline below). State is rewritten each compile pass; Timeline only appends.
 
 ```markdown
 ---
 title: "Person Name"
+type: person
 aliases: []
 tags: [person, role-or-context]
-sources:
-  - "daily/2026-04-01.md"
+compiled_from:
+  - "raw/transcripts/jamie/2026-04-15--review--abc.md"
+  - "daily/2026-04-12.md"
 created: 2026-04-01
-updated: 2026-04-05
+updated: 2026-04-15
 ---
 
 # Person Name
 
-[Who they are, relationship, role]
+> One-paragraph executive summary: who, role, why they matter to the operator.
 
-## Key Facts
+## State
+- **Role:** VP Eng, Acme
+- **Relationship:** former colleague
 
-- [What you know about them]
+## Action Items
+- [ ] Send the Q3 deck 📅 2026-05-20
+- [ ] Follow up on Bob intro
 
-## Interactions
+## Open Threads
+- Waiting on her intro to Bob (mentioned 2026-04-15)
 
-- [Notable conversations, decisions, collaborations]
+## What they're building
+[Free prose with [[wikilinks]] into concepts/projects.]
 
-## Related
+## See also
+- [[knowledge/projects/yesterday-platform]] - Collaboration context
+- [[knowledge/concepts/relevant-topic]] - Shared expertise
 
-- [[projects/project-name]] - Collaboration context
-- [[concepts/relevant-topic]] - Shared expertise
+---
+
+## Timeline
+- **2026-04-15** | `raw/transcripts/jamie/2026-04-15--review--abc.md` — Reviewed Q1 roadmap; pushed back on inference-cost framing.
+- **2026-04-12** | `daily/2026-04-12.md` — Mentioned during agent-config debugging session.
 ```
+
+**Rules** (canonical in `prompts/compile_main.md` Instruction 3):
+
+- **State block above `---`** is compiled truth — rewritten each compile pass from current substrate.
+- **`## Action Items`** uses Obsidian-Tasks-plugin syntax exclusively: `- [ ]` (or `- [x]`) + optional `📅 YYYY-MM-DD`, `⏫` priority, `🔁` recurrence.
+- **`## Open Threads`** lists waiting/blocked items as prose bullets, one per line. Distinct from Action Items: threads describe blocked state, action items are owned commitments.
+- **`---` separator** between State and Timeline is mandatory.
+- **`## Timeline`** below `---` is append-only and reverse-chronological (newest first). One entry per substrate touch: `- **YYYY-MM-DD** | \`raw/...md\` — short note.`
 
 ### Project Articles (`knowledge/projects/`)
 
-One page per project. Tracks evolution over time.
+One page per project. Same **two-layer shape** as People articles — State captures current project status; Timeline accretes substrate touches.
 
 ```markdown
 ---
 title: "Project Name"
+type: project
 aliases: []
 tags: [project, domain]
-status: active | paused | completed
-sources:
-  - "daily/2026-04-01.md"
+compiled_from:
   - "raw/notes/project-spec.md"
+  - "daily/2026-04-01.md"
 created: 2026-04-01
 updated: 2026-04-08
 ---
 
 # Project Name
 
-[What it is, why it exists]
+> One-paragraph executive summary: what it is, why it exists, where it stands.
 
-## Current State
+## State
+- **Status:** active | paused | completed
+- **Stack:** Next.js 15 + tRPC + Drizzle
+- **Owner:** [[knowledge/people/jane-doe]]
 
-[What's happening now]
+## Action Items
+- [ ] Ship S03 dashboard pane 📅 2026-05-22 ⏫
+- [ ] Decide on auth-provider migration
+
+## Open Threads
+- Waiting on infra capacity decision (mentioned 2026-04-05)
+
+## What it is
+[Free prose with [[wikilinks]] into concepts/people.]
 
 ## Key Decisions
-
 - [Decision with date and rationale]
 
-## Architecture / Stack
+## See also
+- [[knowledge/people/jane-doe]] - Team member
+- [[knowledge/concepts/relevant-pattern]] - Key pattern used
 
-[Technical details if applicable]
+---
 
-## Related
-
-- [[people/person-name]] - Team member
-- [[concepts/relevant-pattern]] - Key pattern used
+## Timeline
+- **2026-04-08** | `daily/2026-04-08.md` — Architecture review with Jane; tRPC v11 confirmed.
+- **2026-04-01** | `raw/notes/project-spec.md` — Initial spec doc.
 ```
+
+Rules: same as People Articles (above) — see `prompts/compile_main.md` Instruction 3 for the canonical contract.
 
 ---
 

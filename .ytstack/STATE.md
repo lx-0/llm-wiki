@@ -1,7 +1,7 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-05-15T17:30:00Z
+last_updated: 2026-05-15T17:45:00Z
 current_milestone: M005
 active_slice: S01
 active_task: none
@@ -9,7 +9,7 @@ active_task: none
 
 # State
 
-**Status:** M005 / S01 — 1/4 tasks done in slice. T01 closed (two-layer schema in `prompts/compile_main.md`). Next: `/ytstack:plan-task` for T02 (AGENTS.md + templates/ entity-page skeleton).
+**Status:** M005 / S01 — 2/4 tasks done in slice. T02 closed (schema doc agrees with compile prompt on two-layer shape). Next: T03 hand-migrate one existing `knowledge/people/<slug>.md` to two-layer shape as canary.
 
 M005 plan: 5 slices, 20 tasks total (see `M005-ROADMAP.md`). Locked decisions: tasks live inside `knowledge/people/` + `knowledge/projects/` entity pages as `## Action Items` + `## Open Threads` sections (no top-level `tasks/` folder); Obsidian-Tasks-plugin syntax canonical; two shapes coexist (atomic for concepts/qa/facts/connections, State+Timeline only for people/projects); extraction priority jamie > gmeet > email; dashboard pane reuses M003-S01 infra. Conceptual groundwork: `.ytstack/backlog/entity-pages-state-timeline.md` + `.ytstack/backlog/gbrain-comparison.md`.
 
