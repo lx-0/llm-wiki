@@ -1,15 +1,15 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-05-15T19:20:00Z
+last_updated: 2026-05-15T19:30:00Z
 current_milestone: M005
-active_slice: S03
-active_task: T05
+active_slice: none
+active_task: none
 ---
 
 # State
 
-**Status:** M005 / S03 — 4/5 tasks done. T04 closed (synthetic jamie fixture under `tests/fixtures/jamie/` + 3 plumbing tests). Next: T05 real-substrate canary — operator-run, LLM-emission spot-check.
+**Status:** M005 — **S03 complete** (5/5 tasks). Commitment-extraction prompt rules + entity-resolution + audit + synthetic fixture + canary-runbook shipped. 233/233 green. Next: S04 (lifecycle — resolution demotion + manual-[x] preservation).
 
 M005 plan: 5 slices, 20 tasks total (see `M005-ROADMAP.md`). Locked decisions: tasks live inside `knowledge/people/` + `knowledge/projects/` entity pages as `## Action Items` + `## Open Threads` sections (no top-level `tasks/` folder); Obsidian-Tasks-plugin syntax canonical; two shapes coexist (atomic for concepts/qa/facts/connections, State+Timeline only for people/projects); extraction priority jamie > gmeet > email; dashboard pane reuses M003-S01 infra. Conceptual groundwork: `.ytstack/backlog/entity-pages-state-timeline.md` + `.ytstack/backlog/gbrain-comparison.md`.
 
