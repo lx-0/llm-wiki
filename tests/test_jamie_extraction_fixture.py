@@ -48,7 +48,7 @@ def test_rendered_prompt_carries_substrate_and_extraction_rule() -> None:
         now="2026-04-15T10:00:00Z",
     )
     # Extraction rule reaches the prompt
-    assert "Extracting commitments from meeting substrates" in rendered
+    assert "Extracting commitments from meeting + voice substrates" in rendered
     # The substrate body is interpolated unchanged (substring check)
     assert "I'll send the Q3 deck by next Friday" in rendered
     assert "waiting on the infra-capacity decision from Hetzner" in rendered

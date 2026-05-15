@@ -117,7 +117,7 @@ ${source_content}
    - **For all OTHER `type:` values** (`concept`, `connection`, `qa`, `moc`), use the existing flat atomic shape -- do NOT emit the two-layer structure.
    - If the current source has no concrete commitments for the entity, leave `## Action Items` empty (the section header still appears).
 
-   **Extracting commitments from meeting substrates.** When `${source_path}` matches `raw/transcripts/jamie/*.md` or `raw/transcripts/gmeet/*.md`, the source is a meeting transcript and you MUST scan it for commitments and route them to the right entity page's State block.
+   **Extracting commitments from meeting + voice substrates.** When `${source_path}` matches `raw/transcripts/jamie/*.md`, `raw/transcripts/gmeet/*.md`, or `raw/voice/*.md`, the source carries first-person or attributed commitments and you MUST scan it and route them to the right entity page's State block. Voice notes are single-speaker (the operator) — every commitment in them is a first-person commitment; apply the "Owner is the operator" routing rule below.
 
    A commitment is a quartet:
    - **Task** — verb phrase (what gets done)

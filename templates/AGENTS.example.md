@@ -473,21 +473,26 @@ For non-conversation sources (articles, audio, PDFs, notes):
 2. For audio: transcribe via Whisper (API or local), save transcript to `raw/transcripts/`, audio to `raw/audio/`.
 3. Trigger compilation of the new source.
 
-### 5. Scan (Local Data Sources → `raw/notes/`)
+### 5. Collect (Substrate Sources → `raw/`)
 
-Scanner scripts extract metadata from local applications without reading content. They produce structured overviews that the compiler turns into knowledge articles.
+Substrate collectors extract metadata or transcripts from local apps + APIs without reading user content beyond what each substrate's mandate covers. They produce structured input the compiler turns into knowledge articles. All ten ride the Collector Registry (`scripts/collectors/base.py`); operator invocation via `wiki collect <name>`; piggyback-eligible collectors auto-run after `compile_after_hour`.
 
-| Script | Source | Output |
-|---|---|---|
-| `scan-email.py` | Thunderbird mailboxes | `raw/notes/email/` — sender/recipient stats, volume over time, folder structure |
-| `scan-calendar.py` | Thunderbird calendar SQLite | `raw/notes/calendar/` — event categories, frequency, time allocation |
-| `scan-browser.py` | Firefox + Chrome bookmarks/history/tabs | `raw/notes/browser/` — tab clusters, bookmark taxonomy, visit patterns, search topics |
-| `scan-screenshots.py` | `~/Screenshots/` PNG files via local Vision LLM | per-PNG sidecar `.md` + batch report in `raw/notes/screenshots/` |
-| `collectors/health.py` | Oura REST API (per-account PAT) | daily biometric rollup in `raw/notes/health/<year>/<date>--<account>.md` — sleep / readiness / HRV / steps / resting HR; numeric frontmatter, `sensitivity: high` |
+| Collector | Source | Output | Trigger |
+|---|---|---|---|
+| `email` | Mailbox via adapters (Thunderbird mbox, Gmail API, generic IMAP) — multi-tenant per `personal.accounts.<id>.reader` | `raw/notes/email/<account>-<date>.md` (full) + `<account>-delta-<ts>.md` (incremental) | piggyback 24 h |
+| `jamie` | Jamie AI tRPC API — multi-tenant per `personal.accounts.<id>.jamie` (kind: `jamie-api`) | `raw/transcripts/jamie/<date>--<slug>--<id>.md` — summary + speaker-diarised transcript + action items | piggyback 6 h |
+| `gmeet` | Google Drive API v3 (`drive.meet.readonly`) — Gemini Meet Notes + Transcript Docs, multi-tenant per `personal.accounts.<id>.gmeet` | `raw/transcripts/gmeet/<date>--<slug>--<meeting-key>.md` — paired `## Summary` + `## Transcript` sections | piggyback 6 h |
+| `voice` | Folder-watch on `personal.voice_inbox` — `.txt` / `.md` from any dictation tool (iOS Shortcut → iCloud Drive recommended; OpenWhispr / FluidVoice / macOS dictation as alternatives) | `raw/voice/voice-<date>-<HHMM>-<slug>.md` | piggyback 1 h |
+| `health` | Oura REST API (per-account PAT) — multi-tenant per `personal.accounts.<id>.health` (kind: `oura-pat`) | `raw/notes/health/<year>/<date>--<account>.md` — sleep / readiness / HRV / steps / resting HR; `sensitivity: high` | piggyback 24 h |
+| `screenshots` | `~/Screenshots/` PNG files via local Vision LLM (gemma4 over Ollama) | per-PNG sidecar `.md` at `~/Screenshots/<file>.md` + 384 px thumb + batch report in `raw/notes/screenshots/` | piggyback 24 h |
+| `calendar` | Thunderbird calendar SQLite (Google Calendar sync) | `raw/notes/calendar/calendar-overview-<date>.md` — event categories, attendees, time allocation | `wiki collect calendar` |
+| `browser` | Firefox `places.sqlite` + STG backups + Chrome bookmarks/history | `raw/notes/browser/browser-overview-<date>.md` — tab clusters, bookmark taxonomy, visit patterns | `wiki collect browser` |
+| `tabs` | Firefox Simple Tab Groups (STG) backup directory | `raw/notes/browser/tab-groups-overview-<date>.md` — active groups + tab URLs/titles | `wiki collect tabs` |
+| `youtube` | yt-dlp + youtube-transcript-api + comments + optional ffmpeg frames (gemma4 Vision) | `raw/notes/youtube/<channel>--<title>--<vid>.md` — tiered: 0=meta, 1=+transcript, 2=+comments, 3=+visual | `wiki collect youtube` / `wiki ingest-youtube` |
 
-> **Note**: this table is the operator-facing orientation list. The Collector Registry (`scripts/collectors/base.py`) is the authoritative source — additional registered collectors not yet documented in this table: `jamie`, `gmeet`, `voice`, `youtube`, `tabs`. See `docs/PROCESS.md` § Scanner-Tabelle in the engine repo for the full current list. Table-resync backlogged.
+Discovery + dispatch: `wiki collect --list` enumerates everything registered above. Source-of-truth lives in `scripts/collectors/` (engine repo) — this table is the operator-facing orientation, kept in sync via `docs/setup-voice.md`-style per-collector setup docs in the engine repo.
 
-Scanners extract **metadata only** — no email bodies, no page content, no credentials. Output files use the standard `raw/` frontmatter with `type: note` and `origin: scan-{type}`.
+Collectors extract **metadata or substrate transcripts only** — no email bodies, no page content, no credentials. Output files use the standard `raw/` frontmatter with `type: note` and `origin: <collector-name>`.
 
 #### The Curiosity Loop
 

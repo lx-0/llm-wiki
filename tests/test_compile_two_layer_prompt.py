@@ -96,7 +96,7 @@ def test_compile_prompt_carries_commitment_extraction_rule() -> None:
     """
     rendered = render("compile_main", **_DUMMY_VARS)
     # Section headline
-    assert "Extracting commitments from meeting substrates" in rendered
+    assert "Extracting commitments from meeting + voice substrates" in rendered
     # Quartet markers
     for marker in ("**Task**", "**Owner**", "**Deadline**", "**Context**"):
         assert marker in rendered, f"missing commitment-quartet marker: {marker}"
