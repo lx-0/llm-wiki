@@ -147,6 +147,8 @@ tags: [topic1, topic2]
 
 The `type:` field MUST match the destination folder. It is the single source of truth for substrate-type — Dataview queries, lint, dashboard charts, and the compile prompt all rely on it. Lint flags any article whose `type:` is missing or doesn't match its folder.
 
+**Domain-tag rule (`concepts/` and `qa/` only):** the `tags:` list must include at least one *domain* tag — a name from your active stack/product list, not a generic type-word like `pattern` or `discipline`. The graph view colors nodes by domain tag; notes without one fall into a grey fallback bucket. Configure your domain list in `config.yaml` under `graph_view.domain_tags`; the engine default covers a known operator set (`fleet`, `openclaw`, `claude-code`, `yesterday`, `llm-wiki`, `paperclip`, `ytstack`, `township`, `pixeltales`, `lxw`). Lint check `check_concept_domain_tag` warns on non-conforming concepts; `check_qa_schema` also enforces `type: qa` presence + index-row presence on every `qa/` note.
+
 `knowledge/facts/` is special: it is **human-owned via `wiki correct`**, never written by the compiler. Each fact carries `type: fact`, a `status:` (negation | disambiguation | clarification), an optional list of `negation_terms:` that lint greps across the rest of `knowledge/`, and an `applied:` flag that flips to an ISO timestamp once `wiki correct apply <slug>` has propagated the correction.
 
 Every fact also carries a **`trust:`** tier and a **`sources:`** list (≥1, required at creation):
@@ -481,6 +483,9 @@ Scanner scripts extract metadata from local applications without reading content
 | `scan-calendar.py` | Thunderbird calendar SQLite | `raw/notes/calendar/` — event categories, frequency, time allocation |
 | `scan-browser.py` | Firefox + Chrome bookmarks/history/tabs | `raw/notes/browser/` — tab clusters, bookmark taxonomy, visit patterns, search topics |
 | `scan-screenshots.py` | `~/Screenshots/` PNG files via local Vision LLM | per-PNG sidecar `.md` + batch report in `raw/notes/screenshots/` |
+| `collectors/health.py` | Oura REST API (per-account PAT) | daily biometric rollup in `raw/notes/health/<year>/<date>--<account>.md` — sleep / readiness / HRV / steps / resting HR; numeric frontmatter, `sensitivity: high` |
+
+> **Note**: this table is the operator-facing orientation list. The Collector Registry (`scripts/collectors/base.py`) is the authoritative source — additional registered collectors not yet documented in this table: `jamie`, `gmeet`, `voice`, `youtube`, `tabs`. See `docs/PROCESS.md` § Scanner-Tabelle in the engine repo for the full current list. Table-resync backlogged.
 
 Scanners extract **metadata only** — no email bodies, no page content, no credentials. Output files use the standard `raw/` frontmatter with `type: note` and `origin: scan-{type}`.
 
