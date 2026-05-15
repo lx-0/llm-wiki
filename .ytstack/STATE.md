@@ -1,15 +1,15 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-05-15T18:25:00Z
+last_updated: 2026-05-15T18:35:00Z
 current_milestone: M005
-active_slice: S02
+active_slice: none
 active_task: none
 ---
 
 # State
 
-**Status:** M005 / S02 — 2/3 tasks done. T02 closed (`check_action_item_syntax` shipped). Next: T03 broken-case test fixtures + integration tests for both new lint checks.
+**Status:** M005 — **S02 complete** (3/3 tasks). `check_two_layer_pages` + `check_action_item_syntax` shipped, registered in `wiki lint`, 8 new test cases on valid + broken fixtures (228/228 green). Next: S03 substrate extraction (jamie + gmeet commitments → entity pages).
 
 M005 plan: 5 slices, 20 tasks total (see `M005-ROADMAP.md`). Locked decisions: tasks live inside `knowledge/people/` + `knowledge/projects/` entity pages as `## Action Items` + `## Open Threads` sections (no top-level `tasks/` folder); Obsidian-Tasks-plugin syntax canonical; two shapes coexist (atomic for concepts/qa/facts/connections, State+Timeline only for people/projects); extraction priority jamie > gmeet > email; dashboard pane reuses M003-S01 infra. Conceptual groundwork: `.ytstack/backlog/entity-pages-state-timeline.md` + `.ytstack/backlog/gbrain-comparison.md`.
 
