@@ -1466,3 +1466,32 @@ We took the third. Each substrate-source owns ONE file at `daily/<date>/<source>
 **Operator pacing.** The cleanup step is gated on operator decision — "am I confident the new structure works?" The system carries both shapes during the rollout window and surfaces lint warnings to keep the dual-state visible. No silent migration. No "trust me, I deleted the originals."
 
 This pattern is reusable for any other folder-structure refactor in the engine — the four-step shape (copy → verify → byte-match-delete → idempotent-everywhere) is the durable recipe.
+
+## Single-key frontmatter writeback: surgical line-replace, not yaml round-trip (2026-05-15)
+
+**The trap.** `scripts/agent_task.py:_update_last_run` wrote `last_run: <iso>` back to the agent's spec-file frontmatter via:
+
+```python
+fm = yaml.safe_load(block)
+fm["last_run"] = now_iso()
+serialized = yaml.safe_dump(fm, sort_keys=False, allow_unicode=True)
+```
+
+PyYAML's safe_dump is correct YAML but doesn't preserve the operator's formatting choices: double-quoted strings lose their quotes, long values get rewrapped, list-items get re-indented from 2 spaces to 0. The result is byte-different from the original even when no field but `last_run` changed. Every agent run produced a noisy diff against the engine-committed copy.
+
+**The fix.** Treat the file as text, not as a structured doc:
+
+```python
+new_line = f"last_run: {now_iso()}"
+pattern = re.compile(r"^last_run:.*$", re.MULTILINE)
+if pattern.search(block):
+    new_block = pattern.sub(new_line, block, count=1)
+else:
+    new_block = block.rstrip("\n") + "\n" + new_line
+```
+
+Single key, single replace, every other byte preserved. Idempotent shape: re-running with a fresh timestamp produces the same diff pattern as the first run, never new formatting drift.
+
+**Generalisable rule.** When writing back a single field into a YAML frontmatter file that an operator might also hand-edit, use targeted regex replacement, not parse-mutate-dump. `yaml.safe_dump` is for files you're CREATING; surgical replacement is for files you're UPDATING. The library that knows how to parse YAML doesn't know which whitespace and quoting choices were intentional.
+
+**Sibling lesson — overwrite guards.** The same arc's daily-digest agent had a guard "refuse if existing root has different `type:`" that treated "type missing entirely" as "type different". This is a classic default-deny-on-absence bug. The fix enumerates three cases explicitly: matches (overwrite), differs (refuse), missing (overwrite). Any future overwrite-guard on frontmatter attributes should follow the same triplet.

@@ -643,3 +643,15 @@ Audit of `skills/` (five SKILL.md, all symlinked into vault `<vault>/.claude/ski
 - 90-day mass digest regenerate fires once after first migration (currently running batch as `bmxkpclrf`).
 - Lint `daily_root_not_digest` warns whenever a root exists without `type: daily-digest` frontmatter; surfaces remaining legacy state after each migration.
 - Future collectors that want to mirror into the daily rollup: extend `KNOWN_SOURCES`, call `daily_capture.append` or `replace_section` at end of `run()`, wrap in try/except (rollup is side-effect, never break primary write).
+
+## 2026-05-15: Frontmatter writeback = surgical line-replace, never yaml.safe_dump
+
+Two daily-digest-arc edge cases were both caused by misuse of YAML libs and string-matching defaults — fixed at root in commit `4d4f6d7`.
+
+**Decisions locked:**
+
+1. **`yaml.safe_dump` is for write-anew, NEVER for write-update of a single key.** `scripts/agent_task.py:_update_last_run` was round-tripping the whole frontmatter dict to write a single `last_run:` field — that's destructive to operator-chosen formatting (quoted strings drop quotes, multi-line lists re-indent, long values re-wrap). The replacement is a regex line-replace that touches the single target key and leaves the rest byte-identical. Same rule applies to every other engine site that writes a single frontmatter field; treat yaml.safe_dump as a code smell when the input is already YAML-on-disk.
+
+2. **Overwrite-guards distinguish "attribute missing" from "attribute different".** Prompt-side refusal rules over file frontmatter (the `daily-digest` agent's "refuse on non-digest type" guard) must explicitly handle three cases: type matches (overwrite), type is something else (refuse), type missing or frontmatter absent (treat as overwritable). Default-deny on absence locks the agent against its own legitimate first-write case — exactly the trap the digest agent hit on lxw's legacy flat daily files.
+
+These are companion-rules to [[Templates are load-bearing — never backlog template-resync]] and the existing memory [[Yesterday-AI Org-Workflow — Plugin-Marketplace-Aenderung = README-Update Pflicht]] — operator-facing files are part of the contract; engine-side writes preserve them.
