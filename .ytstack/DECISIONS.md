@@ -508,3 +508,32 @@ The full-sweep `_render_report` is unchanged — aggregation is still correct th
 - Backlog: `subtype-axis.md` (superseded by Extended Graph), `lateral-linking.md` (REJECTED with audit forensics).
 - KNOWLEDGE.md: "Multi-step prompts need verification clauses", "Audit your premise before designing the fix".
 - Vault-side: `lxw/knowledge/MOCs/{llm-wiki, fleet, openclaw, claude-code, yesterday}.md` — 5 domain MOCs.
+
+## 2026-05-15: Voice intake collector — folder-watch with mobile-first iOS Shortcut path
+
+Fifth substrate-collector (`collectors/voice.py`) — shipped off-roadmap as a durchstich during M005-S04 work. 8 commits, all on `main`. Follow-up commits in the same arc closed an unrelated pre-existing gmeet docu gap (`01b8dd3`, `d4bfbe1`) and a functional gap in `compile_main.md` (`1df673c`).
+
+**Decisions locked:**
+
+1. **Folder-watch over an audio pipeline.** The collector reads pre-transcribed `.txt` / `.md` from `personal.voice_inbox`; transcription happens *on the operator's device* (iOS native dictation, OpenWhispr, FluidVoice, Aiko). Substrate-agnostic on capture, opinionated on storage — same posture as jamie + gmeet, and the same posture `garrytan/gbrain`'s `voice-note-ingest` skill takes. Engine stays Whisper-free.
+
+2. **Archive-move-as-dedup, no state file.** Successful ingest moves the source to `<voice_inbox>/.processed/`. The presence of the source file *is* the work-to-do signal; the move *is* the work-done marker. No `voice-state.json`, no watermark drift, no orphan-recovery branch.
+
+3. **Operator-singular (no multi-tenant).** Voice is the first new collector that does *not* trigger the [[Architecture policy — account-bound collectors/adapters multi-tenant from day one]] rule. The inbox is a local-machine path; there is no "voice account". Config is a flat `personal.voice_inbox: ""` string.
+
+4. **Mobile-primary capture via iOS Shortcut → iCloud Drive.** The recommended `voice_inbox` is an iCloud-Drive-synced folder so iPhone Shortcuts can write directly. iCloud syncs to the Mac in ~30 s–2 min; the existing 1 h-cooldown piggyback ingests. **Engine change for the mobile pivot: zero.** Mac-only paths (OpenWhispr/FluidVoice/macOS-dictation/Hammerspoon) work the same way against a local path.
+
+5. **Audio-file ingestion deliberately deferred.** Voice Memos `.m4a` + Mac-side whisper.cpp watcher is the next-up backlog item (`.ytstack/backlog/voice-intake.md` § Deferred). Wait until the iOS-Shortcut path proves daily-use before adding the audio surface.
+
+6. **Voice notes carry first-person commitments — compile-prompt scans them.** The compile-prompt's commitment-extraction header (line 120 of `prompts/compile_main.md`) was originally restricted to `raw/transcripts/jamie/*.md` + `raw/transcripts/gmeet/*.md`. Voice notes contain "remind me to X" / "todo Y" content that was silently dropped from action-item routing. Header now matches `raw/voice/*.md` too, with an inline note that voice is single-speaker so all commitments route through the existing "Owner is the operator" rule.
+
+**Standing rule established by this arc:**
+
+- **Audit *functional* gaps after a docu sweep, not just doc gaps.** The voice-intake docu-sweep was clean; the post-ship structural audit caught that `compile_main.md` would silently ignore voice commitments — a behavior gap, not a documentation gap. Lesson recorded in `KNOWLEDGE.md` § "Post-ship audit catches functional gaps, not just docu gaps".
+
+**Linked artifacts:**
+- Commits: `727c981` (durchstich code — swept into a parallel MOC commit, code is in there despite the misleading "feat(moc)" headline), `3eb4f8f` (8 regression tests), `12874ce` (iOS Shortcuts docs + backlog pivot), `01b8dd3` (7-file docu sweep — voice + closing pre-existing gmeet docu gap), `d4bfbe1` (PROCESS.md v1.4 + overview.png 10→12 + architecture.png "Audio Ingest" → "Voice Intake"), `1df673c` (compile_main.md voice commitment-extraction + templates/AGENTS scanner table rewrite).
+- Engine: `scripts/collectors/voice.py` (169 LOC), `scripts/collectors/__init__.py` (registry import), `scripts/core/config.py` (`Personal.voice_inbox: str` + `piggybacks.voice: cooldown_hours=1`), `prompts/compile_main.md` (voice path on commitment-extraction header).
+- Tests: `tests/test_voice_collector.py` (8 cases — graceful agnostic, dry-run, real-run, dot/wrong-suffix ignore, idempotent re-run, empty-file archive, slug-collision seconds-suffix), `tests/test_compile_two_layer_prompt.py` + `tests/test_jamie_extraction_fixture.py` (wording update for "meeting + voice substrates").
+- Docs: `docs/setup-voice.md` (iOS Shortcut recipe + Mac alternatives + troubleshooting), `.ytstack/backlog/voice-intake.md` (research, tool landscape, deferred set), README/AGENTS/FEATURES/cli/concept/config/engine-layout (all swept to "ten collectors"), `docs/PROCESS.md` v1.4, `docs/overview.{excalidraw,png}`, `docs/architecture.{excalidraw,png}`.
+- Memory: `~/.claude/projects/.../memory/project_voice_intake.md`.

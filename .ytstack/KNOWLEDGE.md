@@ -1320,3 +1320,54 @@ Mirror in `scripts/collectors/jamie.py`: the `_logged_discovery` flag exists for
 - `lowest_heart_rate` is the standard "resting HR" proxy. Fall back to `average_heart_rate` when missing.
 
 **Fix-coverage on live data after `9a7f585`:** 75/90 full-data days, 13/90 steps-only (ring not worn but phone tracked), 2/90 metrics-but-no-scores (session finished after Oura's score-compute window). This is the real ring-wear ceiling for this operator.
+
+### Post-ship audit catches functional gaps, not just docu gaps (voice intake, 2026-05-15)
+
+After the voice-intake docu-sweep landed (7 files, README/AGENTS/FEATURES/cli/concept/config/engine-layout), an "alles dokumentiert?" audit grep'd every `.md` that mentions an existing collector but not voice. The textual gaps were trivial fixes — but the audit also caught a **behavior** gap: `prompts/compile_main.md` hard-coded commitment-extraction to `raw/transcripts/jamie/*.md` + `raw/transcripts/gmeet/*.md`. Voice notes (which carry first-person commitments like "remind me to X" / "todo Y") were silently dropped from the action-item routing. Not a docu drift, a real functional drift.
+
+**Lesson.** Doc-sweeps after a new substrate ships need to include a grep across **prompts**, not just docs. Hard-coded substrate-path enums in LLM prompts are functional contracts — if a new substrate doesn't match the enum, the prompt silently ignores it. A few patterns worth scanning post-ship:
+
+- `prompts/*.md` for hard-coded `raw/transcripts/<name>/` or `raw/notes/<name>/` lists
+- `scripts/lint.py` / `scripts/correct_apply.py` for substrate-specific routing branches
+- `scripts/curiosity/` for hard-coded `source-globs` allowlists (`CONFIG.limits.curiosity_source_globs` is the config-driven version; check it covers the new substrate)
+- Compile-prompt frontmatter-schema enums (`origin:` values, `type:` values) — new substrates need to be in the allowed set
+
+**The audit prompt that surfaced it (reusable):**
+
+```bash
+grep -rln "raw/transcripts/jamie\|raw/transcripts/gmeet\|raw/notes/<existing-substrate>" \
+  prompts/ scripts/ docs/
+```
+
+Run it after every new collector ships. Any prompt hit is a candidate functional gap.
+
+Verified-against-fix: `1df673c` extended the compile-prompt header to match `raw/voice/*.md`; the two-layer prompt test (`tests/test_compile_two_layer_prompt.py`) gained an assertion for `raw/voice/` alongside `raw/transcripts/jamie/`. 274/274 pass.
+
+### Rate-limit cascade misclassified as cli_crash (2026-05-15)
+
+A compile batch aborted after 3 "consecutive bundled-CLI fast-crashes (kind=cli_crash)" on `raw/notes/health/2026/*.md` sources. Surface looked like the documented CLI-crash pattern (sub-5s exit-1 with empty stderr) and the engine's `feedback_fast_fail_not_rate_limit` rule said "this is NOT a rate limit." But running the same file in isolation 20 minutes later succeeded in 56s. The cascade only happened mid-batch.
+
+Real sequence:
+
+1. File 19 (288-char health source) failed `kind=unknown` at 8.8s — real mid-stream context overflow. The Claude agent over-explored existing `knowledge/concepts/health-rollup-intake-format.md` and neighbors trying to figure out where to put a not-yet-described `type: health-rollup` substrate, blowing past the 200K Opus context window via tool-turn fan-out.
+2. compile.py auto-retried *immediately* with the 1M-context variant — back-to-back with the failed call, against the same Anthropic API account.
+3. Anthropic's per-minute rate-limit window caught the retry. The bundled CLI received a 429 but exited silently exit-1 / empty-stderr (the CLI's known behaviour for API 429s — it doesn't surface them on stderr).
+4. `classify_failure` saw fast-fail + empty stderr → returned `cli_crash`. Honest given the signal it had, but wrong about the cause.
+5. Files 20 and 21 were called inside the same rate-limit window, also failed fast, also classified `cli_crash`. The 3-consecutive guard tripped and aborted the run.
+
+**Three compounding mistakes in the engine:**
+
+- **Immediate retry-with-[1m] after a kind=unknown.** No backoff. The retry was the call that opened the rate-limit cascade.
+- **Auto-retry [1m] fires for any kind=unknown, even on small sources.** A 288-char source has no business escalating to 1M context — its kind=unknown was tool-fanout, not real context overflow.
+- **The classifier can't see batch state.** A single-call `cli_crash` and a cascade-`cli_crash` look the same to `classify_failure`. The caller (compile.py) has to add the second-level interpretation.
+
+**Fixes applied:**
+
+- `CONFIG.limits.compile_failure_backoff_s = 60` — sleep before any retry, clears the rate-limit window.
+- `CONFIG.limits.compile_retry_long_context_min_source_chars = 10_240` — small-source kind=unknown skips the 1M retry entirely (tool-fanout doesn't benefit from more context).
+- `hooks/session-start.py` got the `CLAUDE_INVOKED_BY` recursion guard that `session-end.py` + `pre-compact.py` already had. Was injecting the daily-log into every engine-spawned CLI session — not the trigger here, but extra context piled on top of an already-tight compile prompt budget.
+- Memory `feedback_fast_fail_not_rate_limit` rewritten to acknowledge the exception: fast-fail + empty stderr + **prior consecutive failures in the same batch** = probable rate-limit cascade, not CLI crash.
+
+**Standing rule:** when an engine retries an API call within seconds of a failure, **always backoff first**. The retry is exactly the time when rate-limit is most likely. Doing it instantly maximises the cascade probability. This applies beyond compile.py — any engine path that auto-retries on the same backend.
+
+**Caveat for the next debugger:** "fast-fail + empty stderr = CLI crash" is still the right *default* heuristic. But check batch position before recommending `claude --version` / `claude -p "hi"`: if the failure follows a `kind=unknown` in the same batch, the CLI is probably fine and the API just rate-limited the burst.
