@@ -3,9 +3,9 @@ milestone: M005
 project: llm-wiki
 size: L
 created: 2026-05-15T16:45:00Z
-status: planned
+status: done
 total_slices: 5
-completed_slices: 4
+completed_slices: 5
 ---
 
 # M005 Roadmap
@@ -30,7 +30,7 @@ Slice detail lives in per-slice `M005-S##-PLAN.md` files, created by `ytstack:sl
 - [x] S02 — Lint + structural checks (`check_two_layer_pages` + `check_action_item_syntax`) — 3 tasks — `M005-S02-PLAN.md`
 - [x] S03 — Substrate extraction (jamie + gmeet commitments → entity pages) — 5 tasks — `M005-S03-PLAN.md`
 - [x] S04 — Lifecycle (resolution demotion + manual-`[x]` preservation) — 4 tasks — `M005-S04-PLAN.md`
-- [ ] S05 — Dashboard pane + cross-entity Inbox MOC — 4 tasks — `M005-S05-PLAN.md`
+- [x] S05 — Dashboard pane + cross-entity Inbox MOC — 4 tasks — `M005-S05-PLAN.md`
 
 ## Tentative slice arc (refine in slice-milestone)
 

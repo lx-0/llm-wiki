@@ -1,15 +1,15 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-05-15T20:50:00Z
+last_updated: 2026-05-15T21:00:00Z
 current_milestone: M005
-active_slice: S05
-active_task: T04
+active_slice: none
+active_task: none
 ---
 
 # State
 
-**Status:** M005 — **S04 complete** (4/4 tasks). Lifecycle prompt rules (T01+T02) + fixture pairs for both resolution-demotion (T03) and manual-`[x]` preservation (T04). 241/241 green. Next: S05 (dashboard pane + Inbox MOC).
+**Status:** **M005 COMPLETE.** All 5 slices, 20 tasks closed. Personal task management lives on the wiki: prompt rules for two-layer schema + commitment extraction + entity resolution + lifecycle (S01+S03+S04), lint enforcement (S02), dashboard pane + Inbox MOC + stat card (S05). 246/246 tests green. Operator-side: run `docs/m005-s03-canary-procedure.md` to validate real-substrate LLM emission. Roadmap status: done.
 
 M005 plan: 5 slices, 20 tasks total (see `M005-ROADMAP.md`). Locked decisions: tasks live inside `knowledge/people/` + `knowledge/projects/` entity pages as `## Action Items` + `## Open Threads` sections (no top-level `tasks/` folder); Obsidian-Tasks-plugin syntax canonical; two shapes coexist (atomic for concepts/qa/facts/connections, State+Timeline only for people/projects); extraction priority jamie > gmeet > email; dashboard pane reuses M003-S01 infra. Conceptual groundwork: `.ytstack/backlog/entity-pages-state-timeline.md` + `.ytstack/backlog/gbrain-comparison.md`.
 
