@@ -81,8 +81,10 @@ models:
   ollama_url: http://localhost:11434
   # Vision model for screenshot OCR.
   vision_model: gemma4:e4b
-  # Curiosity-loop model (compile.py post-pass).
-  curiosity_model: gemma4:e4b
+  # Curiosity-loop model (compile.py post-pass). Needs reliable JSON-Schema
+  # honoring — gemma4:e4b ignored the schema and produced invented field
+  # names, dropping every gap. phi4:14b honors it. Both are local/free.
+  curiosity_model: phi4:14b
   # Inbox classifier.
   classify_model: gemma4:e4b
 

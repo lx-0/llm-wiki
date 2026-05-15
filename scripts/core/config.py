@@ -75,7 +75,13 @@ class Models:
     compile_large_source_model: str = "claude-opus-4-7[1m]"
     ollama_url: str = "http://localhost:11434"
     vision_model: str = "gemma4:e4b"
-    curiosity_model: str = "gemma4:e4b"
+    # Curiosity gap-detection: needs reliable JSON-Schema honoring. gemma4:e4b
+    # (4B) ignores Ollama's `format` schema entirely — invents its own field
+    # names (`reasoning`, `suggested_action` instead of `folder_index`,
+    # `rationale`). phi4:14b honors the schema rigorously (verified 2026-05-15
+    # against the actual prompt) and is locally hosted, so still zero-cost.
+    # ~10-30 s/call vs ~5 s for gemma4. Trade-off is acceptable.
+    curiosity_model: str = "phi4:14b"
     classify_model: str = "gemma4:e4b"
 
 

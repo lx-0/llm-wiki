@@ -437,16 +437,30 @@ Stays under the 10s hook timeout but preserves massive signal.
 
 **Defensive read pattern after `chat_schema`:** never assume the parsed structure matches the declared schema. Always shape-guard at the boundary — same principle as the `state.ingested[rel]` string-vs-dict gotcha further down. Constrained decoding is best-effort, not a contract.
 
-#### Small-model enum failure mode (2026-05-15): curiosity loop silently dropping every gap
+#### Small-model schema failure mode (2026-05-15): curiosity loop silently dropping every gap
 
 `compile_curiosity.md` asked `gemma4:e4b` to fill `folder: string (enum: [<26 email folder paths>])` per gap. From `2026-05-03` through `2026-05-15` every curiosity pass (~hundreds of compiles) returned gaps with `folder=""`, `rationale=""` — the producer dropped all of them as the schema validator on our side enforced the rule the model wouldn't. Net effect: the entire deep-scan loop produced **zero** requests for 6 weeks. The pattern was invisible in logs because the per-skip line looked innocuous (`Curiosity: skipping (folder='', topic='Project Timeline/Milestones', rationale='')`).
 
-Two-part lesson and fix:
+**First attempt (commit `4844b26`)** — restructured the schema to `folder_index: integer (minimum: 1, maximum: N)` on the theory that gemma4:e4b would honor an integer-range constraint when it didn't honor a 26-entry string-enum. Aggregate skip telemetry surfaced the systemic failure (`Curiosity: 1 gen, 0 kept (folder_unmapped=1)`) on every source. *That part worked* — the loop is no longer invisible.
 
-1. **A 4B-parameter model can't reliably honor a 26-entry string-enum.** Token-level enum constraints work for tight choice-sets (yes/no, type tags) but degrade as the enum grows — the model picks an empty fallback. Fix: pivot to an integer schema (`folder_index: integer, minimum: 1, maximum: N`). Producer maps `index → folder_path` deterministically. Numbered listing in the prompt (`1. INBOX — unsorted mail`) anchors the choice.
-2. **Per-skip logging at INFO loses the systemic-failure signal.** Each "skipping (folder='')" line read like a normal "we considered this and passed" — operator scanned past them. Fix: aggregate one summary line per source (`Curiosity: 3 gap(s) gen, 0 kept (dropped: folder_unmapped=3)`) so a stuck loop surfaces immediately. Same principle as audit-by-aggregate-log, not by per-event line.
+**Real root cause (revealed by the new telemetry)**: gemma4:e4b ignores Ollama's `format` JSON-Schema **entirely**. Direct test against the actual prompt returned:
 
-Producer accepts both the new `folder_index` and the legacy `folder` field during rollout, so a temporarily stale prompt template doesn't break parsing.
+```json
+[{"topic": "Township/Local Governance Details",
+  "reasoning": "...",
+  "suggested_action": "..."}]
+```
+
+Not just empty `folder` — *the model invented its own field names* (`reasoning`, `suggested_action`) and returned a bare list instead of `{"gaps": [...]}`. The 4B model picks up the prompt's intent (find gaps) but discards the schema constraints. Token-level schema enforcement via `format` is essentially decorative for this model.
+
+**Final fix (commit pending):** switch `curiosity_model` default from `gemma4:e4b` → `phi4:14b`. Verified via Ollama probe against the live prompt: phi4:14b honors the schema rigorously (right field names, integer in range, valid account enum value). `qwen3:8b` and `llama3.1:8b` also pass; chose phi4:14b for the strongest instruction-follow + accurate account-pick. Local, zero-cost, ~10-30 s/call (vs ~5 s for gemma4 — acceptable tradeoff).
+
+**Three lessons:**
+1. **`format` JSON-Schema in Ollama is not a contract for small models.** Test the actual model against the actual prompt before assuming any schema is enforced — don't infer from docs or general assumption. The earlier "Ollama structured output" section in this file already warned that `minLength` is ignored and item-level `type: object` isn't always honored; this case extends that: a 4B model can ignore the entire schema and still get a 200 OK response.
+2. **Aggregate skip telemetry caught the systemic failure that 6 weeks of per-skip lines hid.** Audit-by-aggregate-log beats audit-by-per-event-log for failure-mode visibility.
+3. **A schema change does not fix a model that ignores schemas.** The 4844b26 commit pivoted from enum → integer-range to "make it easier for the model"; the real issue was that the model wasn't reading the schema at all. Always probe the model directly before reshaping the schema.
+
+Producer still accepts both the new `folder_index` and the legacy `folder` field during rollout, so a temporarily stale prompt template doesn't break parsing.
 
 #### Cache-buster needed at `temperature: 0`
 
