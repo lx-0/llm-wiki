@@ -51,6 +51,31 @@ def _normalize_quote(s: str) -> str:
     return re.sub(r"\s+", " ", s).strip().lower()
 
 
+def _quote_anchored_in_source(quote_norm: str, source_norm: str, min_tokens: int) -> bool:
+    """Return True if any `min_tokens`-long token window from the quote
+    appears verbatim in the source.
+
+    LLMs routinely paraphrase the edges of a quote while keeping a verbatim
+    core (observed 2026-05-15 against `daily/2026-05-15.md`: 3/3 gaps had
+    matched n-grams of 6-15 tokens, but strict whole-quote substring missed
+    all three). The anchor check accepts the quote if it has *at least one*
+    contiguous N-word block in the source — verifiable proof the model
+    actually cited rather than invented, even if the edges drift.
+    """
+    if not quote_norm:
+        return False
+    tokens = quote_norm.split()
+    if len(tokens) < min_tokens:
+        # Quote too short for the anchor check — fall back to strict substring.
+        # Reading a 1-4 word phrase loosely is risky (stop-word coincidence).
+        return quote_norm in source_norm
+    for start in range(len(tokens) - min_tokens + 1):
+        window = " ".join(tokens[start:start + min_tokens])
+        if window in source_norm:
+            return True
+    return False
+
+
 async def maybe_generate_curiosity_requests(source: Path) -> None:
     """Detect knowledge gaps and write deep-scan requests to raw/requests/."""
     if not CONFIG.features.curiosity_loop:
@@ -251,15 +276,21 @@ async def maybe_generate_curiosity_requests(source: Path) -> None:
                 dropped["empty_rationale"] = dropped.get("empty_rationale", 0) + 1
                 continue
 
-            # Anti-hallucination gate: the quote must appear in the source
-            # excerpt the model actually saw. Whitespace + case are normalised
-            # to absorb the small formatting tweaks LLMs commonly make.
-            # Reject anything shorter than 8 chars — too short to be a
-            # meaningful anchor (matches stop-words like "the project").
+            # Anti-hallucination gate: the quote must be anchored in the
+            # source excerpt the model actually saw. We accept the quote if
+            # ANY contiguous N-token window from the (normalised) quote
+            # appears in the source — tolerant of edge paraphrase but still
+            # verifiable proof of source-anchoring. Reject quotes shorter
+            # than 8 chars — too short to be a meaningful anchor (matches
+            # stop-words like "the project").
             if not source_quote or len(source_quote) < 8:
                 dropped["quote_missing"] = dropped.get("quote_missing", 0) + 1
                 continue
-            if _normalize_quote(source_quote) not in src_excerpt_norm:
+            if not _quote_anchored_in_source(
+                _normalize_quote(source_quote),
+                src_excerpt_norm,
+                CONFIG.limits.curiosity_quote_min_anchor_tokens,
+            ):
                 dropped["quote_unsourced"] = dropped.get("quote_unsourced", 0) + 1
                 continue
 

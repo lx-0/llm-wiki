@@ -126,6 +126,16 @@ class Limits:
     # `folder_low_confidence`. Forces the model to hedge openly instead
     # of defaulting to a generic catch-all folder.
     curiosity_folder_confidence_min: int = 3
+    # `curiosity_quote_min_anchor_tokens`: the source_quote gate accepts the
+    # quote if ANY contiguous N-token window from the (normalised) quote
+    # appears in the (normalised) source excerpt. Strict whole-quote
+    # substring is too brittle — LLMs routinely add interpretive
+    # prefix/suffix or paraphrase the edges while keeping a verbatim core.
+    # Token-window anchor is verifiable AND tolerant of those cosmetic
+    # edits. 5 is a healthy minimum — a 5-word phrase rarely matches by
+    # accident, so a model that returns a 5+ token verbatim block is
+    # genuinely citing the source.
+    curiosity_quote_min_anchor_tokens: int = 5
     sparse_threshold_words: int = 200
     # YouTube ingest (scan-youtube.py — see also CONFIG.piggybacks.scan_youtube)
     youtube_max_frames: int = 30          # Tier-3 visual: cap frames per video

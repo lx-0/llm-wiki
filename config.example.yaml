@@ -124,6 +124,10 @@ limits:
   # Below this threshold the gap is dropped (telemetry: folder_low_confidence).
   # Forces explicit abstention instead of "INBOX/COMPANY/00 COMPANY" hedging.
   curiosity_folder_confidence_min: 3
+  # source_quote gate: accept the quote if ANY contiguous N-token window from
+  # the normalised quote appears verbatim in the normalised source excerpt.
+  # 5 = a 5-word verbatim block; lower = more permissive, higher = stricter.
+  curiosity_quote_min_anchor_tokens: 5
   # Lint.
   sparse_threshold_words: 200
   # YouTube ingest (scan-youtube.py).
