@@ -38,6 +38,55 @@ The "Conventions" / "Workflow" / "Quick gotchas" sections are quick-reference. T
 
 Distilled from sessions 2026-04-11 → 2026-04-30 building this implementation. Each section is something that bit us in production — read before changing related code.
 
+### gmeet pairing — title-hash works because Gemini preserves the meeting-title prefix; quote-glyph variation is the only surprise (2026-05-15)
+
+#### Symptom
+
+Notes-Doc and Transcript-Doc for the same Google Meet meeting carry titles that differ only in the trailing kind-suffix (`– Notizen von Gemini` vs `– Transcript`). Pairing them via `sha256(stripped_title)[:12]` looks trivial — until the curly-vs-straight quote glyph in one Doc's title silently breaks the hash for ~5% of meetings.
+
+#### Root cause
+
+Google's Gemini sometimes renders the same title with different quote glyphs across the two Docs — straight `"` in one, curly `“"` in the other, occasionally angle `«»`. The text *looks* identical to a human; the hash is different. Same root cause as the "smart-quote drift" pattern that breaks LLM-output matching in other places — a Unicode normalisation step that should be there isn't.
+
+#### Fix
+
+`_TITLE_NORMALISE_QUOTES_RE` (in `scripts/collectors/gmeet.py`) is an explicit character class covering the full quote family: ASCII `"` `'`, double angle `«» `, single curly `' '`, double curly `" "`, low-9 `‚„`, high-reversed-9 `‛‟`, single angle `‹›`. All map to empty. Whitespace is collapsed to single space before hashing. Adding more glyphs is cheap (just extend the regex) — preferable to a heavyweight `unicodedata.normalize("NFKD", ...)` strip because we want this *visible* in the source for future maintainers to extend.
+
+#### Trap (cost me 10 min)
+
+When you embed a quote-glyph character class as a Python raw string, **never** sit a `"""` next to other quotes — Python parses it as a triple-quoted string opener. The fix is one string literal `"['" + ...]"` form, with the glyphs grouped by family across continuation lines but all single-quoted.
+
+#### Defense-in-depth
+
+Pairing identity is **stable across Doc-arrival-order** but **NOT idempotent under title changes**. If the operator renames the Notes Doc in Drive after first ingest, the next run will re-classify it as a new meeting (different hash) and ingest a duplicate. Acceptable trade-off — Drive renames are rare and the operator can manually delete the old file.
+
+#### Lesson
+
+For pair-Docs-by-title patterns, normalise quote glyphs + whitespace + case. Don't trust visual title identity even when both Docs come from the same provider.
+
+### Engine-version-skew during dual-write rollouts — never delete the legacy block in vault config before `wiki update` runs on that vault (2026-05-15)
+
+#### Symptom
+
+Engine repo: jamie-multi-tenant-lift commits cleanly, tests green. Engine repo's `<vault>/.wiki/scripts/` is the post-lift code. lxw operator's `<vault>/.wiki/` is its own git clone of the engine repo, frozen on a pre-lift checkout. lxw's `config.yaml` carries a **dual-form jamie block**: the flat `personal.jamie:` (for the pre-lift engine) AND the per-account `personal.accounts.<id>.jamie` (for the post-lift engine). I dropped the flat block "to clean up" — silently broke jamie ingest on lxw, because the pre-lift `JamieCollector` falls back to empty defaults (`is_configured()` returns False, piggyback silently skips).
+
+#### Root cause
+
+A vault on a pre-lift engine still has `Personal.jamie: JamieConfig` as a dataclass field. Removing the flat block from `config.yaml` doesn't error — it just defaults — and the resulting silent skip looks identical to "not configured yet." No diagnostic surfaces the version mismatch.
+
+#### Fix (per-vault, not per-engine)
+
+The order for a config-schema-affecting engine change is fixed:
+1. Engine: commit + push the schema migration code.
+2. Vault: `wiki update` (or `git -C <vault>/.wiki pull --ff-only`) to land the post-schema code.
+3. Vault `config.yaml`: drop the legacy form.
+
+Skipping step 2 between 1 and 3 breaks the vault silently. The dual-form interim is the safety net.
+
+#### Lesson
+
+Vault config edits that depend on engine version must be **gated on the running engine version**, not on what the engine repo's HEAD says. Always check `<vault>/.wiki/scripts/collectors/<x>.py` (or wherever the schema reader lives) before deleting a legacy block. The engine repo and the vault's `.wiki/` are independent checkouts.
+
 ### Compile context overflow — `${index_md}` body embed grew past Opus's 200K-token window (2026-05-13)
 
 #### Symptom
