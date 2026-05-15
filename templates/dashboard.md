@@ -507,6 +507,56 @@ SORT file.mtime DESC
 LIMIT 30
 ```
 
+## 📌 Personal Tasks (Wiki)
+
+> Action items the LLM extracted from meetings into entity pages under `knowledge/people/` and `knowledge/projects/`. Obsidian-Tasks-plugin syntax: `- [ ]` + `📅 YYYY-MM-DD` due, `⏫` priority. Compile updates these from jamie + gmeet substrates; you check them off manually. See [[knowledge/MOCs/inbox-tasks]] for the full cross-entity inbox.
+
+### 🔥 Overdue
+
+```tasks
+not done
+(path includes knowledge/people) OR (path includes knowledge/projects)
+due before today
+sort by due
+limit 20
+short mode
+```
+
+### ⚡ Today
+
+```tasks
+not done
+(path includes knowledge/people) OR (path includes knowledge/projects)
+due on today
+sort by priority
+short mode
+```
+
+### 🗓 This week
+
+```tasks
+not done
+(path includes knowledge/people) OR (path includes knowledge/projects)
+due after today
+due before in 7 days
+sort by due
+limit 20
+short mode
+```
+
+### 📂 All open (no due date)
+
+```tasks
+not done
+(path includes knowledge/people) OR (path includes knowledge/projects)
+no due date
+group by folder
+limit 25
+short mode
+```
+
+---
+
 ## ✅ Open tasks
 
 > Aggregated checkboxes from working files only. Engine-managed substrates (`raw/` is immutable ground-truth, `daily/` is the session audit log, `knowledge/` is LLM output) are excluded — checkboxes there aren't yours to act on.
