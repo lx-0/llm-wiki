@@ -259,6 +259,11 @@ personal:
   #       key_type: personal                             # personal | workspace (selects route prefix)
   #       since: ""                                      # ISO date "2026-01-01"; empty = no backfill cap
   #       max_per_run: null                              # null = inherit CONFIG.limits.jamie_max_per_run
+  #     health:
+  #       oura:
+  #         kind: oura-pat                               # collectors/health.py — Oura Ring daily biometrics
+  #         api_key_env: OURA_PRIVATE_PAT                # env var holding the Bearer PAT (free at cloud.ouraring.com/personal-access-tokens)
+  #         backfill_days: null                          # null = inherit CONFIG.limits.oura_max_backfill_days (90)
   #
   #   personal-gmail:                                    # no local client, no GCP project
   #     email: you@gmail.com

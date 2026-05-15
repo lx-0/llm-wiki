@@ -153,6 +153,11 @@ class Limits:
     # (kind: gmeet-api, drive_folder_id, drive_folder_name, since, max_per_run).
     gmeet_request_timeout_s: int = 30     # per-HTTP-call timeout against the Drive API
     gmeet_max_per_run: int = 50           # default cap; per-account override is the gmeet sub-block's max_per_run
+    # Oura health ingest (collectors/health.py — Phase 1, oura-only).
+    # Multi-tenant: per-account health.oura block under personal.accounts.<id>.health
+    # (kind: oura-pat, api_key_env, backfill_days).
+    oura_request_timeout_s: int = 30      # per-HTTP-call timeout against api.ouraring.com
+    oura_max_backfill_days: int = 90      # default first-run window; per-account override via backfill_days
     # Claude Agent SDK per-message buffer (stream-json line buffer). SDK default is
     # 1 MB; trips on tool-result messages carrying knowledge/index.md (~300 KB raw,
     # ~600 KB JSON-escaped) or Write/Edit calls on large articles, with a confusing
