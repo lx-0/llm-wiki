@@ -136,6 +136,29 @@ ${source_content}
 
    Quality bar: better to miss a fuzzy commitment than fabricate one. If you're unsure whether something is a real commitment, skip it. The operator can re-prompt for missed items; can't easily un-prompt for hallucinated ones.
 
+   **Resolving the Owner to an entity page.** When you have a commitment-owner name from a transcript, follow this lookup procedure deterministically:
+
+   1. **Slugify the name.** Lowercase, replace whitespace and non-alphanumerics with `-`, collapse runs of `-`, strip leading/trailing `-`. Examples: `Jane Doe` → `jane-doe`, `José García` → `jose-garcia` (drop accents to ASCII first), `Bob (CEO)` → `bob`. The slug becomes the filename `knowledge/people/<slug>.md`.
+
+   2. **Lookup order:**
+      a. Grep `knowledge/index.md` for the slug AND for the speaker's name as-typed.
+      b. If neither hits, Grep `knowledge/people/*.md` frontmatter `aliases:` for a case-insensitive match — many people are referenced by first name, email, or nickname in transcripts.
+      c. If still no match, this is a new person; go to the stub-creation step (4) below.
+
+   3. **Disambiguation when two pages match** (e.g. two Janes): pick the one whose Timeline entries share more attendees with the current meeting's attendee list. If still tied, prefer the page with the most recent `updated:` date. Never silently merge two pages — if the meeting's context genuinely matches both, route the commitment to the most-recent one and add a `## Open Threads` entry on each saying "Possible name collision: see also `[[knowledge/people/<other-slug>]]` — operator to disambiguate".
+
+   4. **Stub-creation when no match exists.** Create `knowledge/people/<slug>.md` with the two-layer template (Instruction 3 schema), populated minimally:
+      - Frontmatter: `title: "<Name As Typed>"`, `type: person`, `tags: [person]`, `compiled_from: ["${source_path}"]`, `created: "${today}"`, `updated: "${today}"`, `aliases: []` (operator can fill later).
+      - Executive blockquote: `> First seen in \`${source_path}\` on ${today}. <One-line context from the transcript — role / company / project tie if surfaced, else "no further context yet".>`
+      - `## State` block with `- **Role:** unknown` if nothing surfaced; if the meeting reveals a role / company / relationship, populate it.
+      - `## Action Items` populated with the commitment that triggered the stub.
+      - `## Open Threads` empty.
+      - `## What they're building` empty body or single sentence.
+      - `## See also` empty.
+      - `---` + `## Timeline` with one entry citing the source substrate.
+
+   5. **Don't stub for one-off mentions.** If the speaker appears in exactly one line of dialogue and that line is not a commitment (passing reference, "and Bob said hi"), do NOT create a stub. Only **commitments-by-speaker** trigger stubbing — pure mentions stay as one Timeline entry on the meeting attendees' existing pages (if any) or are skipped entirely.
+
 4. **Create connection articles** in `knowledge/connections/` when you identify meaningful relationships between concepts (patterns, contradictions, analogies). Use the same frontmatter format with `type: connection`.
 
 5. **Update `knowledge/index.md`** — add or update the table row for each article you created or modified. Format:

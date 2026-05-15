@@ -41,6 +41,24 @@ def test_compile_prompt_includes_atomic_exception_for_other_types() -> None:
     assert "do NOT emit the two-layer structure" in rendered
 
 
+def test_compile_prompt_carries_entity_resolution_rule() -> None:
+    """M005-S03-T02: the entity-resolution deepening (slugification +
+    alias-fallback + disambiguation + stub-minimum) must reach the rendered
+    prompt unchanged.
+    """
+    rendered = render("compile_main", **_DUMMY_VARS)
+    assert "Resolving the Owner to an entity page" in rendered
+    assert "Slugify the name" in rendered
+    # Slug example
+    assert "jane-doe" in rendered
+    # Alias-fallback lookup
+    assert "aliases:" in rendered
+    # Disambiguation rule
+    assert "Disambiguation" in rendered or "two pages match" in rendered
+    # Stub-creation guard
+    assert "Don't stub for one-off mentions" in rendered
+
+
 def test_compile_prompt_carries_commitment_extraction_rule() -> None:
     """M005-S03-T01: the meeting-substrate commitment-extraction rule (Task/
     Owner/Deadline/Context quartet + entity routing + Timeline citation) must

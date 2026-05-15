@@ -1,7 +1,7 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-05-15T18:45:00Z
+last_updated: 2026-05-15T18:55:00Z
 current_milestone: M005
 active_slice: S03
 active_task: none
@@ -9,7 +9,7 @@ active_task: none
 
 # State
 
-**Status:** M005 / S03 — 1/5 tasks done. T01 closed (commitment-extraction rule landed as Instruction 3 sub-section; 229/229 green). Next: T02 deepen entity-resolution (existing-entity match + create-stub fallback).
+**Status:** M005 / S03 — 2/5 tasks done. T02 closed (entity-resolution rules: slugification + aliases + disambiguation + stub-minimum). Next: T03 audit `scripts/compile.py` SDK-options/routing.
 
 M005 plan: 5 slices, 20 tasks total (see `M005-ROADMAP.md`). Locked decisions: tasks live inside `knowledge/people/` + `knowledge/projects/` entity pages as `## Action Items` + `## Open Threads` sections (no top-level `tasks/` folder); Obsidian-Tasks-plugin syntax canonical; two shapes coexist (atomic for concepts/qa/facts/connections, State+Timeline only for people/projects); extraction priority jamie > gmeet > email; dashboard pane reuses M003-S01 infra. Conceptual groundwork: `.ytstack/backlog/entity-pages-state-timeline.md` + `.ytstack/backlog/gbrain-comparison.md`.
 
