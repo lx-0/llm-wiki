@@ -91,9 +91,11 @@ class Limits:
     youtube_frame_resize_width: int = 512  # ffmpeg downscale before vision model
     youtube_vision_timeout_s: int = 90    # per-frame ollama call timeout
     youtube_aggregate_timeout_s: int = 300  # final synthesis call timeout
-    # Jamie ingest (collectors/jamie.py — see also CONFIG.piggybacks.jamie)
+    # Jamie ingest (collectors/jamie.py — see also CONFIG.piggybacks.jamie).
+    # Multi-tenant: per-account jamie block under personal.accounts.<id>.jamie
+    # (kind: jamie-api, api_key_env, key_type, since, max_per_run).
     jamie_request_timeout_s: int = 30     # per-HTTP-call timeout against api.meetjamie.ai
-    jamie_max_per_run: int = 50           # default cap (overridable via CONFIG.personal.jamie.max_per_run)
+    jamie_max_per_run: int = 50           # default cap per account (overridable via the per-account jamie sub-block)
     # Google Meet ingest (collectors/gmeet.py — see also CONFIG.piggybacks.gmeet).
     # Multi-tenant: per-account gmeet block under personal.accounts.<id>.gmeet
     # (kind: gmeet-api, drive_folder_id, drive_folder_name, since, max_per_run).
@@ -146,39 +148,11 @@ class Skills:
     global_install: bool = False
 
 
-@dataclass
-class JamieConfig:
-    """Jamie AI meeting-notetaker integration (collectors/jamie.py).
-
-    Single-tenant per install: one Jamie account, one API key. If multi-account
-    is ever needed, lift this into `personal.accounts.<id>` with `kind: jamie-api`
-    (mirror the email pattern). Keep flat until that demand actually exists.
-
-    Secret hygiene: only the env-var *name* lives in config.yaml. The key
-    itself (jk_...) is read from `os.environ[api_key_env]` at run time.
-    """
-
-    # Name of the env var holding the jk_... API key. Empty/unset disables the
-    # collector (graceful agnostic — piggyback skips, CLI prints "not configured").
-    api_key_env: str = ""
-    # "personal" → /v1/me/... routes (your own meetings + meetings shared with you)
-    # "workspace" → /v1/workspace/... routes (workspace-scoped key required)
-    key_type: str = "personal"
-    # ISO 8601 date. First-install backfill cap — meetings with started_at <
-    # this value are skipped on the first full sweep. Has no effect on
-    # incremental runs (state file's last_seen_ts wins). Empty = no cap.
-    since: str = ""
-    # Per-account override of CONFIG.limits.jamie_max_per_run. None = inherit.
-    max_per_run: int | None = None
-    # Display id used in frontmatter `account_id` (for provenance when you
-    # ever do flip to multi-account). Cosmetic, no behavioural impact.
-    account_id: str = "default"
-
-
-# Note (2026-05-15, multi-tenant policy): gmeet has no flat dataclass —
-# its config lives per-account under `personal.accounts.<id>.gmeet` with
-# `kind: gmeet-api`, mirroring the email Reader/Filter sub-block pattern.
-# `collectors/gmeet.py:_resolve_gmeet_accounts` reads the dispatch.
+# Note (2026-05-15, multi-tenant policy): both `gmeet` and `jamie` are
+# account-bound — their config lives per-account under
+# `personal.accounts.<id>.{gmeet,jamie}` with `kind: gmeet-api` / `jamie-api`,
+# mirroring the email Reader/Filter sub-block pattern.
+# `collectors/{gmeet,jamie}.py:_resolve_*_accounts()` read the dispatch.
 
 
 @dataclass
@@ -241,16 +215,10 @@ class Personal:
     # writes its periodic *.json snapshots). Empty string disables STG-import
     # paths in scan-tabs.py / scan-browser.py.
     stg_backup_dir: str = ""
-    # Jamie AI integration — see JamieConfig docstring. Empty defaults render
-    # collectors/jamie.py inert; set `api_key_env` to enable.
-    # NOTE: jamie is still flat single-tenant (legacy from before the
-    # multi-tenant policy); a lift into `personal.accounts.<id>.jamie` with
-    # `kind: jamie-api` is open follow-up. New account-bound collectors must
-    # go straight to the multi-tenant pattern (see DECISIONS 2026-05-15).
-    jamie: JamieConfig = field(default_factory=JamieConfig)
-    # Google Meet / Gemini integration — multi-tenant via per-account
-    # `gmeet:` sub-block under `personal.accounts.<id>` (kind: gmeet-api).
-    # No flat dataclass; resolved at run time by collectors/gmeet.py.
+    # Jamie AI + Google Meet integrations are multi-tenant via per-account
+    # `jamie:` / `gmeet:` sub-blocks under `personal.accounts.<id>` (kinds:
+    # `jamie-api`, `gmeet-api`). No flat dataclass — resolved at run time by
+    # `collectors/{jamie,gmeet}.py:_resolve_*_accounts()`.
 
 
 # Default piggyback set — script names match flush.py's PIGGYBACK_TASKS keys.

@@ -1,5 +1,18 @@
 # Lift `jamie` to multi-tenant — `personal.accounts.<id>.jamie` with `kind: jamie-api`
 
+**Status: DONE 2026-05-15** — shipped same-day as the gmeet lift / architecture policy.
+`JamieConfig` + `Personal.jamie` removed from `core/config.py`; `_resolve_jamie_accounts()`
++ `_JamieAccount` dataclass + per-account `_run_one_account()` loop in `collectors/jamie.py`;
+`SPEC.supports_account_loop = True`; per-account state migration (legacy flat `last_seen_ts`
+→ `state["default"]["last_seen_ts"]`). `config.example.yaml` per-account `jamie:` example
+landed alongside `gmeet:`. `docs/cli.md` + `docs/config.md` flipped to multi-tenant.
+204/204 pass. Architecture policy fully applied — no flat `personal.<service>` blocks
+remain for account-bound collectors.
+
+Original scope kept below for reference / history.
+
+---
+
 **Priority:** P2 — not a live bug today (jamie is single-Jamie-account in practice for the
 operator), but the **architecture policy** locked on 2026-05-15 says account-bound
 collectors must be multi-tenant from day one. Jamie is the last flat hold-out.

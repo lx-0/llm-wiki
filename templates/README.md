@@ -82,7 +82,7 @@ Copy `.claude/.env.example` to `.claude/.env`, fill values. `.wiki/scripts/core/
 
 The most common secrets:
 - `OPENAI_API_KEY` — Whisper audio transcription
-- `JAMIE_API_KEY` — Jamie AI meeting collector
+- `JAMIE_<ACCOUNT>_API_KEY` — Jamie AI meeting collector (one per account)
 - `IMAP_<ACCOUNT>_USER` / `_PASS` — mailbox writes via the email Collector
 
 ## Updating

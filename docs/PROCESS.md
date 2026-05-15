@@ -367,7 +367,7 @@ flowchart LR
 > - **Registry-Collectors:** `email`, `jamie`, `gmeet`, `tabs`, `calendar`, `browser`, `screenshots`, `youtube` — alle acht. Migrierte Scanner haben snake_case-Dateinamen (`scan_tabs.py` etc.) und behalten ihren Direct-CLI-Einstieg für rich Per-URL/-Flag-Bedienung.
 > - **`_LEGACY_PIGGYBACK_COMMANDS`** in `flush.py` trägt jetzt nur noch Nicht-Substrate-Tasks: `lint_structural`, `review_wiki`, `optimize_claude_md`, `retry_failed_flushes`, `curiosity_followup`.
 
-> **Secrets**: `JAMIE_API_KEY` (+ alle anderen `*_API_KEY` / `IMAP_*_PASS` / `NAS_*`) liegen in `<vault>/.claude/.env`. `core.config` lädt das File einmal beim Import via `load_dotenv(..., override=False)` — keine manuellen `export`-Statements nötig, weder für Piggyback-Runs noch für Operator-CLI-Aufrufe. Shell-Exports überschreiben `.env`-Werte. Fresh-Vault-Seed über `wiki seed` kopiert `templates/.claude/.env.example` in den Vault (additiv).
+> **Secrets**: `JAMIE_<ACCOUNT>_API_KEY` (multi-tenant — eine pro Account-Sub-Block) + alle anderen `*_API_KEY` / `IMAP_*_PASS` / `NAS_*` liegen in `<vault>/.claude/.env`. `core.config` lädt das File einmal beim Import via `load_dotenv(..., override=False)` — keine manuellen `export`-Statements nötig, weder für Piggyback-Runs noch für Operator-CLI-Aufrufe. Shell-Exports überschreiben `.env`-Werte. Fresh-Vault-Seed über `wiki seed` kopiert `templates/.claude/.env.example` in den Vault (additiv).
 
 ### Email Collector — Multi-Backend Metadata-Sweep
 

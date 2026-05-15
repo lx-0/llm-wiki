@@ -42,9 +42,10 @@ piggybacks:
     cooldown_hours: 24
     max_per_run: 10                      # cap inbox-drain per piggyback run
   # Pulls meetings from the Jamie AI public API via collectors/jamie.py.
-  # Requires CONFIG.personal.jamie.api_key_env to resolve to a non-empty
-  # environment variable holding a jk_... key. If unset, this piggyback
-  # is silently skipped (graceful agnostic).
+  # Multi-tenant: requires at least one personal.accounts.<id>.jamie sub-block
+  # (kind: jamie-api) whose `api_key_env` resolves to a non-empty environment
+  # variable holding a jk_... key. If unset, this piggyback is silently
+  # skipped (graceful agnostic).
   jamie:
     enabled: true
     cooldown_hours: 6                    # tighter than scan_youtube — meetings are time-sensitive
@@ -104,7 +105,7 @@ limits:
   youtube_aggregate_timeout_s: 300       # final synthesis call timeout
   # Jamie ingest (collectors/jamie.py).
   jamie_request_timeout_s: 30            # per-HTTP-call timeout against api.meetjamie.ai
-  jamie_max_per_run: 50                  # default cap; CONFIG.personal.jamie.max_per_run overrides
+  jamie_max_per_run: 50                  # default cap per account (per-account override is the jamie sub-block's max_per_run)
   # Google Meet ingest (collectors/gmeet.py — multi-tenant; per-account override
   # is the gmeet sub-block's max_per_run under personal.accounts.<id>.gmeet).
   gmeet_request_timeout_s: 30            # per-HTTP-call timeout against the Drive API
@@ -159,26 +160,13 @@ personal:
   # Path to a Simple Tab Groups (STG) backup directory (where the extension
   # writes its periodic *.json snapshots). Empty string disables STG imports.
   stg_backup_dir: ""
-  # Jamie AI meeting-notetaker integration — single-tenant flat block (one
-  # account per install). collectors/jamie.py reads the API key from the env
-  # var named below; the value never lives in this file. Leave api_key_env
-  # empty to disable the collector (graceful agnostic).
-  #
-  # Generate the key in Jamie: Settings → Developers → API Keys (Pro/Team/
-  # Enterprise plan required). All keys carry the jk_ prefix.
-  jamie:
-    api_key_env: ""                       # e.g. JAMIE_API_KEY ; empty disables
-    key_type: personal                    # personal | workspace (selects route prefix)
-    since: ""                             # ISO date "2026-01-01"; empty = no backfill cap
-    max_per_run: null                     # null inherits CONFIG.limits.jamie_max_per_run
-    account_id: default                   # cosmetic — written into frontmatter for provenance
-  # account-id → {email, label, reader?, filter?, gmeet?, …}
-  # `reader`, `filter`, `gmeet` are nested blocks with a `kind` discriminator
-  # plus kind-specific fields. resolve_reader / resolve_filter / gmeet's
-  # _resolve_gmeet_accounts all dispatch on `kind`; unknown kinds are
-  # silently skipped (graceful agnostic). Adding a new account-bound
-  # collector? Same shape — see DECISIONS 2026-05-15 multi-tenant policy.
-  # Full kind-table: CONTEXT.md § Account.kind.
+  # account-id → {email, label, reader?, filter?, gmeet?, jamie?, …}
+  # `reader`, `filter`, `gmeet`, `jamie` are nested blocks with a `kind`
+  # discriminator plus kind-specific fields. resolve_reader / resolve_filter /
+  # _resolve_gmeet_accounts / _resolve_jamie_accounts all dispatch on `kind`;
+  # unknown kinds are silently skipped (graceful agnostic). Adding a new
+  # account-bound collector? Same shape — see DECISIONS 2026-05-15
+  # multi-tenant policy. Full kind-table: CONTEXT.md § Account.kind.
   #
   # Examples (uncomment one or more, fill in your data):
   #
@@ -205,6 +193,12 @@ personal:
   #       drive_folder_name: "Meet Recordings"           # auto-resolve fallback name
   #       since: ""                                      # ISO date "2026-01-01"; empty = no backfill cap
   #       max_per_run: null                              # null = inherit CONFIG.limits.gmeet_max_per_run
+  #     jamie:
+  #       kind: jamie-api                                # collectors/jamie.py — Jamie AI meeting-notetaker
+  #       api_key_env: JAMIE_PRIVATE_API_KEY             # env var holding the jk_... key; empty/unset disables this account
+  #       key_type: personal                             # personal | workspace (selects route prefix)
+  #       since: ""                                      # ISO date "2026-01-01"; empty = no backfill cap
+  #       max_per_run: null                              # null = inherit CONFIG.limits.jamie_max_per_run
   #
   #   personal-gmail:                                    # no local client, no GCP project
   #     email: you@gmail.com

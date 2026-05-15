@@ -13,7 +13,7 @@ Every settable key in `<vault>/.wiki/config.yaml`, plus the secrets surface in `
 - [piggybacks](#piggybacks)
 - [graph_view](#graph_view)
 - [skills](#skills)
-- [personal](#personal) — primary account, accounts, jamie, email folders, scanners
+- [personal](#personal) — primary account, accounts (with per-service sub-blocks: reader/filter/gmeet/jamie), email folders, scanners
 - [Secrets — `.claude/.env`](#secrets--claudeenv)
 
 Run `./.wiki/wiki config keys` for the live, full list of every leaf key the dataclass exposes.
@@ -27,7 +27,7 @@ Run `./.wiki/wiki config keys` for the live, full list of every leaf key the dat
 | `<vault>/.claude/.env` | Secrets (API keys, IMAP passwords). Loaded by `core.config` at import. | gitignored |
 | `<vault>/.claude/.env.example` | Catalogue of every env-var the engine recognises. Seeded by `wiki seed`. | tracked (template) |
 
-The `.env` file: only the **variable NAME** lives in `config.yaml` (e.g. `api_key_env: JAMIE_API_KEY`); the **value** lives in `.env`. Shell exports override `.env` values (`override=False` policy). A missing `.env` is a clean no-op.
+The `.env` file: only the **variable NAME** lives in `config.yaml` (e.g. `api_key_env: JAMIE_WORK_API_KEY`); the **value** lives in `.env`. Shell exports override `.env` values (`override=False` policy). A missing `.env` is a clean no-op.
 
 ## Section index
 
@@ -40,7 +40,7 @@ The `.env` file: only the **variable NAME** lives in `config.yaml` (e.g. `api_ke
 | `piggybacks.<task>.*` | `PiggybackTask` dataclass per task |
 | `graph_view.*` | `GraphView` dataclass |
 | `skills.*` | `Skills` dataclass |
-| `personal.*` | `Personal` dataclass (includes `JamieConfig` nested) |
+| `personal.*` | `Personal` dataclass (accounts hold per-service sub-blocks: `reader`, `filter`, `gmeet`, `jamie`) |
 
 ## scheduling
 
@@ -120,7 +120,7 @@ Knob block. Defaults sized for an Opus-on-5h-window install — tighten on small
 | Key | Default | Meaning |
 |---|---|---|
 | `limits.jamie_request_timeout_s` | `30` | Per-HTTP-call timeout against `beta-api.meetjamie.ai`. |
-| `limits.jamie_max_per_run` | `50` | Default cap on meetings pulled per run. `CONFIG.personal.jamie.max_per_run` overrides per-install. |
+| `limits.jamie_max_per_run` | `50` | Default cap on meetings pulled per run per account. Per-account override lives at `personal.accounts.<id>.jamie.max_per_run`. |
 
 ### Claude Agent SDK
 
@@ -206,19 +206,22 @@ personal:
 
 The pre-M002 flat-account schema (`mbox_paths`, `imap_host`, `has_procmail` directly on the account) is rejected at config load with an explicit migration error. Note this only rejects those keys at the *account* level — nested inside `reader:` / `filter:` they are the normal schema.
 
-### Jamie (single-tenant)
+### Jamie (multi-tenant)
 
 ```yaml
 personal:
-  jamie:
-    api_key_env: JAMIE_API_KEY         # name of env var holding the jk_... key
-    key_type: personal                 # personal | workspace
-    since: ""                          # ISO date "2026-01-01" — first-install backfill cap
-    max_per_run: null                  # null inherits CONFIG.limits.jamie_max_per_run
-    account_id: default                # cosmetic — written to frontmatter
+  accounts:
+    work:
+      email: alex@example.com
+      jamie:
+        kind: jamie-api
+        api_key_env: JAMIE_WORK_API_KEY   # env var holding the jk_... key
+        key_type: personal                # personal | workspace
+        since: ""                         # ISO date "2026-01-01" — first-install backfill cap
+        max_per_run: null                 # null inherits CONFIG.limits.jamie_max_per_run
 ```
 
-Flat (not nested under `accounts`) because a Jamie install is single-tenant: one account, one key. If multi-account ever needed, lift into `personal.accounts.<id>` with `kind: jamie-api`.
+Per-account `jamie:` sub-block with `kind: jamie-api`, mirroring the `reader:` / `filter:` / `gmeet:` pattern. An account with no `jamie:` sub-block is silently skipped; an account whose `api_key_env` resolves to an empty/unset env var is also skipped (graceful-agnostic) — the rest of the loop still runs. State per account at `state/jamie-state.json` keyed by account-id.
 
 ### Email folders + scanner-prompt config
 
@@ -238,7 +241,7 @@ Loaded automatically at import via `core.config.load_dotenv(<vault>/.claude/.env
 | Variable | Used by | Notes |
 |---|---|---|
 | `OPENAI_API_KEY` | Whisper audio transcription (and future OpenAI paths) | — |
-| `JAMIE_API_KEY` | `collectors/jamie.py` | Pro/Team/Enterprise plan. `jk_` prefix. Generate in Jamie: Settings → Developers → API Keys. |
+| `JAMIE_<ACCOUNT>_API_KEY` | `collectors/jamie.py` | One per account with a `jamie:` sub-block. Name matches the `api_key_env` field; `<ACCOUNT>` is your choice. Pro/Team/Enterprise plan. `jk_` prefix. Generate in Jamie: Settings → Developers → API Keys. |
 | `IMAP_<ACCOUNT>_USER` / `_PASS` | `adapters/mailbox/imap.py` (`imap` reader), `suggestions/backends/imap.py`, `adapters/mailbox/allinkl.py` | `<ACCOUNT>` matches the value of `imap_user_env` / `imap_pass_env` in the account's `reader` (kind: imap) or `filter` block. Gmail needs an App Password — 16 lowercase chars, pasted without the display spaces. |
 | `NAS_HOST` / `NAS_USER` / `NAS_PASS` | Future `scan-nas.py` / SMB-backed collectors | — |
 | `LINKEDIN_EMAIL` / `LINKEDIN_PASSWORD` | adhikasp/mcp-linkedin MCP server | **Not loaded from `.env`** — set in `~/.claude.json` under `mcpServers.linkedin.env`. Listed only as a reminder. |
