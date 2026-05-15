@@ -1,0 +1,20 @@
+{
+  "name": "llm-wiki",
+  "description": "Cross-project bridge to a locally-installed LLM-wiki. Read your compiled knowledge from any project, diagnose pipeline health, contribute back (capture, ingest, hard facts), run maintenance, or report engine bugs upstream. Ships the use-llm-wiki skill; the wiki CLI itself comes from the llm-wiki engine.",
+  "author": {
+    "name": "lx-0",
+    "url": "https://github.com/lx-0"
+  },
+  "homepage": "https://github.com/lx-0/llm-wiki",
+  "repository": "https://github.com/lx-0/llm-wiki",
+  "license": "MIT",
+  "keywords": [
+    "claude-code",
+    "obsidian",
+    "knowledge-base",
+    "personal-wiki",
+    "second-brain",
+    "rag-alternative",
+    "llm-wiki"
+  ]
+}
