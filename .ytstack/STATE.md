@@ -1,7 +1,7 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-05-15T21:00:00Z
+last_updated: 2026-05-15T22:30:00Z
 current_milestone: M005
 active_slice: none
 active_task: none
@@ -16,6 +16,8 @@ M005 plan: 5 slices, 20 tasks total (see `M005-ROADMAP.md`). Locked decisions: t
 ---
 
 ## M004 — closed-out notes
+
+**Compile retry-on-`kind=unknown` shipped (2026-05-15 evening, commits `ccf7dd5` + `1c88352` + `47c76c1` + `254d8a0`)** — post-M005 hardening triggered by an lxw compile run where small memory raws (0.7–23 KB) failed ~30 % of the time with the exit-1 / empty-stderr / `kind=unknown` signature. Same context-overflow class as commit `8fe658f` (138 KB gmeet) — but stochastic on tiny sources, because Read/Grep fan-out into `knowledge/` is the cost driver, not source size. The 50 KB auto-upgrade threshold only catches the deterministic case. Fix: one-shot retry with `compile_large_source_model` (1M-context Opus) when `classify_failure` returns `kind=unknown` and we haven't already used the long-context model. Gated by `CONFIG.limits.compile_retry_long_context_on_unknown` (default true); operator sees a `WARNING  retrying with long-context model …` line in compile.log so retry rate is observable. Documentation full-stack: KNOWLEDGE.md gained a 2026-05-15-evening follow-up under "Compile context overflow"; PROCESS.md §3 + `docs/config.md` table updated; both `architecture.excalidraw` + `overview.excalidraw` got a green "self-healing · 1M-context retry on overflow" caption next to compile.py. Verify on next lxw `wiki update` + run — retry-then-✓ = root-cause confirmed; retry-then-✗ = bottleneck is upstream of model variant, drop to source-splitting.
 
 **gmeet pairing + folder-pin warning shipped (2026-05-15, commit `4762a99`)** — gmeet output shape went from "one Drive Doc → one .md" to **one meeting → one .md** with paired `## Summary` (Notes-Doc) + `## Transcript` (Transcript-Doc) sections. Same meeting's two Docs share a stable `meeting_key` = `sha256(normalised_stripped_title)[:12]` — normalisation drops whitespace + quote-glyph variation (ASCII / curly / angle / low-9 families) because Gemini renders the same title with different quote glyphs across the Notes-Doc and Transcript-Doc. **Cross-run merge**: if Notes lands in run N and Transcript only shows up in run N+1, `_merge_into_sibling()` appends the second section into the existing file and migrates legacy singular frontmatter (`doc_kind:` / `drive_doc_id:`) to the new list shape (`doc_kinds: [...]` + `drive_docs: [{id, name, kind, url, created}, ...]`). Skip-existing two-layered: filename suffix AND every `drive_docs[*].id` recorded inside frontmatter. Filename keying for fresh writes flipped from `--<drive-doc-short-id>.md` to `--<meeting-key>.md` so the file never has to be renamed when a paired Doc arrives later — pre-pairing files keep their old filenames and continue to match via the augmented index built by `_scan_siblings()`. Same commit added a folder-pin WARNING: when `drive_folder_id` is unset and auto-resolve succeeds, log the resolved id and prompt the operator to pin it (Workspace-collision protection). `tests/test_gmeet_pairing.py` — 14 cases. 218/218 pass. Open: live verification on lxw needs `wiki update` to pull the post-pairing engine into `<vault>/.wiki/`.
 
