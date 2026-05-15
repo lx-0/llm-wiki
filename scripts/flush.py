@@ -81,6 +81,10 @@ _LEGACY_PIGGYBACK_COMMANDS: dict[str, list[str]] = {
     "optimize_claude_md": ["optimize-claude-md.py"],
     "retry_failed_flushes": ["retry-failed-flushes.py", "--limit", "{max_per_run}"],
     "curiosity_followup": ["curiosity/cli.py", "--run-oldest"],
+    # Distills yesterday's per-source captures under daily/<yesterday>/ into
+    # a tight ≤500-word digest at daily/<yesterday>.md. Runs morning-after so
+    # all collector piggybacks have already landed their per-source files.
+    "daily_digest_yesterday": ["daily_digest_runner.py", "--date", "yesterday"],
 }
 
 

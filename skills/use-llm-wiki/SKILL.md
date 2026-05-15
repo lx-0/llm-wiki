@@ -4,13 +4,16 @@ version: 1.0.0
 description: |
   Discover and use a locally-available LLM-wiki through its `wiki` CLI — from
   any project, not just inside the vault. Read the knowledge base to ground
-  answers in the operator's own compiled knowledge; contribute back (capture
-  context, record a hard fact, ingest a source); or run maintenance (compile,
-  lint, review). Step 1 locates the wiki (env var, walk-up, or registry) — if
-  none is found, the skill does not apply and exits cleanly.
-  Use when: an agent in any project should consult or feed the operator's
-  knowledge base — "check the wiki", "what does my wiki say about X", "add
-  this to the wiki", "ingest this into the wiki", "compile the wiki".
+  answers in the operator's own compiled knowledge; diagnose pipeline health;
+  contribute back (capture context, record a hard fact, ingest a source); run
+  maintenance (compile, lint, review); or report engine bugs upstream. Step 1
+  locates the wiki (env var, walk-up, or registry) — if none is found, the
+  skill does not apply and exits cleanly.
+  Use when: an agent in any project should consult, feed, diagnose, or report
+  on the operator's knowledge base — "check the wiki", "what does my wiki say
+  about X", "add this to the wiki", "ingest this", "compile the wiki", "wiki
+  health", "vault status", "is the pipeline healthy", "file a bug against the
+  engine", "report this to lx-0/llm-wiki".
 allowed-tools:
   - Bash
   - Read
@@ -83,14 +86,18 @@ WIKI="<vault-root>/.wiki/wiki"
 
 ## Step 2 — Pick the operation tier
 
-Three tiers, escalating in cost and risk. Default to **Read**. Never silently
+Four tiers, escalating in cost and risk. Default to **Read**. Never silently
 cross a tier boundary.
 
 | Tier | What | Gate |
 |---|---|---|
 | **Read** | grep `knowledge/index.md` → `Read` the article; `wiki query` for synthesis | None — but prefer the index-grep path |
+| **Diagnose** | `wiki status`; full vault health dashboard via `.wiki/scripts/health.py` | None — read-only |
 | **Contribute** | `wiki flush`, `wiki correct add`, `wiki ingest-html`, `wiki ingest-youtube`, `wiki collect <name>` | Confirm with the operator first — these write to the vault |
 | **Maintain** | `wiki compile`, `wiki lint`, `wiki review-wiki`, `wiki curiosity`, `wiki suggestions`, `wiki process-inbox`, `wiki correct apply` | Explicit confirmation **and** name the cost |
+
+A separate, off-tier operation: **Report a problem** to the engine repo
+(`gh issue create` against `lx-0/llm-wiki`) — operators report, they don't PR.
 
 ## Read tier
 
@@ -113,6 +120,26 @@ it spends one LLM call (the configured compile model):
 ```
 
 If the index-grep already answers it, don't run `wiki query`.
+
+## Diagnose tier
+
+Read-only operational snapshot. No mutations, no fixes — the operator decides
+what to act on.
+
+- **`wiki status`** — quick config + hook state. One-liner sanity check.
+- **Vault health dashboard** — when the operator asks "wiki status", "vault
+  status", "compile backlog", "is the pipeline healthy", "wie geht's der wiki",
+  "health check":
+
+  ```sh
+  uv run --project .wiki python .wiki/scripts/health.py --vault .
+  ```
+
+  Surface the script's stdout verbatim, then add **one** sentence of
+  plain-language diagnosis at the bottom. Don't paraphrase the dashboard.
+
+  If `health.py` fails or you need to interpret the output (graph density,
+  silent failures, manual fallback flow): **Read `references/health-check.md`**.
 
 ## Contribute tier
 
@@ -150,6 +177,22 @@ Heavy and/or costs real money. Confirm explicitly **and** state the cost.
   slow).
 - **`wiki curiosity`**, **`wiki suggestions`**, **`wiki process-inbox`** — the
   consumer-side loops. Local-LLM, but still slow; confirm before running.
+
+## Report a problem to the engine
+
+When the wiki itself misbehaves (CLI crash, stale state, schema mismatch,
+missing feature, prompt regression), file an issue against `lx-0/llm-wiki`.
+Operators report; they don't PR.
+
+Quick path:
+
+```sh
+gh issue list --repo lx-0/llm-wiki --search "<keyword>"   # check for duplicate first
+gh issue create --repo lx-0/llm-wiki --label bug --title "..." --body "..."
+```
+
+For the full flow (when to file vs. backlog-locally, evidence gathering, body
+template, label vocabulary, rules): **Read `references/report-issue.md`**.
 
 ## Rules
 

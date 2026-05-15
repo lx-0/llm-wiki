@@ -352,6 +352,10 @@ def _default_piggybacks() -> dict[str, PiggybackTask]:
         "jamie": PiggybackTask(cooldown_hours=6, max_per_run=20),
         "gmeet": PiggybackTask(cooldown_hours=6, max_per_run=20),
         "voice": PiggybackTask(cooldown_hours=1),
+        # Distill yesterday's per-source captures (daily/<yesterday>/*.md)
+        # into a single ≤500-word digest at daily/<yesterday>.md. Runs once
+        # in the morning after the per-collector piggybacks have settled.
+        "daily_digest_yesterday": PiggybackTask(cooldown_hours=24),
         "retry_failed_flushes": PiggybackTask(cooldown_hours=24, max_per_run=5),
     }
 
