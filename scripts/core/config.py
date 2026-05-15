@@ -299,6 +299,11 @@ class Personal:
     # writes its periodic *.json snapshots). Empty string disables STG-import
     # paths in scan-tabs.py / scan-browser.py.
     stg_backup_dir: str = ""
+    # Path to a directory the operator dumps dictation transcripts into
+    # (any tool that writes .txt or .md works — OpenWhispr is the default
+    # recommendation; FluidVoice / macOS dictation / Hammerspoon snippets
+    # also work). Empty string disables collectors/voice.py.
+    voice_inbox: str = ""
     # Jamie AI + Google Meet integrations are multi-tenant via per-account
     # `jamie:` / `gmeet:` sub-blocks under `personal.accounts.<id>` (kinds:
     # `jamie-api`, `gmeet-api`). No flat dataclass — resolved at run time by
@@ -316,6 +321,7 @@ def _default_piggybacks() -> dict[str, PiggybackTask]:
         "curiosity_followup": PiggybackTask(cooldown_hours=24),
         "jamie": PiggybackTask(cooldown_hours=6, max_per_run=20),
         "gmeet": PiggybackTask(cooldown_hours=6, max_per_run=20),
+        "voice": PiggybackTask(cooldown_hours=1),
         "retry_failed_flushes": PiggybackTask(cooldown_hours=24, max_per_run=5),
     }
 

@@ -58,6 +58,13 @@ piggybacks:
     enabled: true
     cooldown_hours: 6                    # tighter than scan_youtube — meetings are time-sensitive
     max_per_run: 20
+  # Inbox-watch for dictated voice notes (collectors/voice.py). Reads
+  # *.txt / *.md from `personal.voice_inbox`, writes raw/voice/*.md,
+  # archives the source under `<voice_inbox>/.processed/`. Silently
+  # skipped when voice_inbox is empty (graceful agnostic).
+  voice:
+    enabled: true
+    cooldown_hours: 1                    # voice is time-sensitive
   # Curiosity-loop consumer (scripts/curiosity/cli.py --run-oldest). Producer
   # in compile.py writes raw/requests/*.json; this task picks the oldest pending
   # one and runs the matching backend (email-deep-scan today).
@@ -201,6 +208,12 @@ personal:
   # Path to a Simple Tab Groups (STG) backup directory (where the extension
   # writes its periodic *.json snapshots). Empty string disables STG imports.
   stg_backup_dir: ""
+  # Directory the operator dumps dictation transcripts into. Any tool that
+  # writes a .txt or .md works (OpenWhispr is the default recommendation;
+  # FluidVoice, macOS dictation, Hammerspoon snippets also work). The voice
+  # collector scans this directory, ingests new files into raw/voice/, then
+  # moves the source under <voice_inbox>/.processed/. Empty = disabled.
+  voice_inbox: ""
   # account-id → {email, label, reader?, filter?, gmeet?, jamie?, …}
   # `reader`, `filter`, `gmeet`, `jamie` are nested blocks with a `kind`
   # discriminator plus kind-specific fields. resolve_reader / resolve_filter /
