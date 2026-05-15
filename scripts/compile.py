@@ -12,6 +12,8 @@ os.environ["CLAUDE_INVOKED_BY"] = "compile"
 
 import argparse
 import asyncio
+import fcntl
+import io
 import json
 import logging
 import sys
@@ -27,7 +29,7 @@ from claude_agent_sdk import (
     query,
 )
 
-from core.paths import AGENTS_FILE, KNOWLEDGE_DIR, LOGS_DIR, LOG_FILE, ROOT_DIR, STATE_FILE
+from core.paths import AGENTS_FILE, KNOWLEDGE_DIR, LOGS_DIR, LOG_FILE, ROOT_DIR, STATE_DIR, STATE_FILE
 from core.utils import (
     file_hash,
     list_raw_files,
@@ -409,6 +411,38 @@ async def compile_file(source: Path, dry_run: bool = False, prefix: str = "") ->
     return success
 
 
+# ── Process-level mutex ──────────────────────────────────────────────
+
+_COMPILE_LOCK_FILE = STATE_DIR / "compile.lock"
+
+
+def _acquire_exclusive_lock(lock_path: Path) -> io.IOBase | None:
+    """Try to acquire an exclusive non-blocking flock on ``lock_path``.
+
+    Returns the open file handle on success — caller MUST keep the
+    reference alive for the duration of the critical section. The kernel
+    releases the flock automatically on process exit (or on explicit
+    ``handle.close()``), so no manual unlock is needed.
+
+    Returns ``None`` if another process already holds the lock.
+
+    Background: 2026-05-15 incident — parallel SessionEnd hooks each
+    spawned ``compile.py --file daily/<X>.md`` for the same daily file,
+    producing 3-4 concurrent bundled-CLI subprocesses that competed for
+    the Claude subscription quota and crashed mid-stream with
+    ``kind=unknown``/empty stderr. A single global compile-lock prevents
+    the storm.
+    """
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    fd = open(lock_path, "w")
+    try:
+        fcntl.flock(fd.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        fd.close()
+        return None
+    return fd
+
+
 # ── Main ─────────────────────────────────────────────────────────────
 
 async def main() -> None:
@@ -428,6 +462,18 @@ async def main() -> None:
         help="Abort run when this many files fail back-to-back (rate-limit signal).",
     )
     args = parser.parse_args()
+
+    # Global mutex — only one compile process at a time. Concurrent spawns
+    # from parallel SessionEnd hooks (or operator + hook) used to converge
+    # on the same daily-file and crash the bundled CLI mid-stream under
+    # subscription-quota contention. The lock is released on process exit.
+    _compile_lock = _acquire_exclusive_lock(_COMPILE_LOCK_FILE)
+    if _compile_lock is None:
+        log.info(
+            "Another compile process is already running (lock %s held) — exiting cleanly.",
+            _COMPILE_LOCK_FILE,
+        )
+        return
 
     # Pre-compile sweep: move <vault>/Clippings/*.md into raw/articles/
     # so Obsidian Web Clipper output is visible to the source-glob below.
