@@ -9,6 +9,7 @@ previously meant ~7% of a 297 KB index reached the model anyway.
 """
 
 import json
+import os
 import sys
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -52,6 +53,19 @@ def build_context() -> str:
 
 
 def main() -> None:
+    # Recursion guard: when compile.py / query.py / agent_task.py / etc. spawn
+    # the bundled Claude CLI as a subprocess, this hook fires inside that
+    # subprocess and re-injects the daily-log + wiki-pointer context on top of
+    # the carefully-budgeted compile prompt. On 2026-05-15 that contributed to
+    # a context-overflow + rate-limit cascade that aborted a full compile run.
+    # Sibling hooks (session-end, pre-compact) already have this guard; adding
+    # it here closes the gap. The CLI invoker sets CLAUDE_INVOKED_BY in
+    # scripts/{compile,query,agent_task,flush}.py.
+    if os.environ.get("CLAUDE_INVOKED_BY"):
+        # Emit an empty hookSpecificOutput so the SDK doesn't think the hook
+        # crashed; just contribute no extra context to engine-launched sessions.
+        json.dump({"hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": ""}}, sys.stdout)
+        return
     context = build_context()
     output = {
         "hookSpecificOutput": {

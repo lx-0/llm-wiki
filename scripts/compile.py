@@ -275,23 +275,48 @@ async def compile_file(source: Path, dry_run: bool = False, prefix: str = "") ->
     success, failure = await _attempt(model)
 
     # Retry once with the 1M-context variant on the kind=unknown signature
-    # of mid-stream context overflow from tool-turn fan-out. Deterministic
-    # overflows are already caught by the source-size threshold above; this
-    # covers the stochastic ones on small sources where the same file
-    # succeeds ~70% and fails ~30%.
+    # of mid-stream context overflow from tool-turn fan-out. Two guards
+    # added 2026-05-15 after a rate-limit cascade was misclassified as
+    # `cli_crash` (see KNOWLEDGE.md):
+    #   - Source-size gate: small sources fail kind=unknown for non-context
+    #     reasons (over-eager tool fan-out for new substrate types). The
+    #     1M variant doesn't help there and the retry burns an API rate
+    #     limit slot.
+    #   - Backoff: the immediate retry is what triggered the cascade; the
+    #     original call + retry + next file's call inside a 3-second
+    #     window all landed in the same rate-limit minute. Sleep clears it.
     long_ctx_model = CONFIG.models.compile_large_source_model
+    min_for_retry = CONFIG.limits.compile_retry_long_context_min_source_chars
     if (
         failure is not None
         and failure.kind == "unknown"
         and CONFIG.limits.compile_retry_long_context_on_unknown
         and long_ctx_model
         and model != long_ctx_model
+        and len(source_content) >= min_for_retry
     ):
+        backoff = CONFIG.limits.compile_failure_backoff_s
+        if backoff > 0:
+            log.warning(
+                "  sleeping %ds before long-context retry (rate-limit cushion)",
+                backoff,
+            )
+            await asyncio.sleep(backoff)
         log.warning(
             "  retrying with long-context model %s after kind=unknown",
             long_ctx_model,
         )
         success, failure = await _attempt(long_ctx_model)
+    elif (
+        failure is not None
+        and failure.kind == "unknown"
+        and len(source_content) < min_for_retry
+    ):
+        log.info(
+            "  skipping long-context retry (source %d chars < %d) — "
+            "small-source kind=unknown is typically tool-fanout, not context overflow",
+            len(source_content), min_for_retry,
+        )
 
     if failure is not None:
         return {"_failure": failure}

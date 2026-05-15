@@ -198,6 +198,22 @@ class Limits:
     # of the time and fails 30%. Off-switch for operators who would
     # rather see the failure than pay the 1M-variant premium.
     compile_retry_long_context_on_unknown: bool = True
+    # Seconds to sleep after a kind=unknown failure before retrying with the
+    # long-context model. The retry is back-to-back with the original failed
+    # call against the same Anthropic API account — without backoff, the
+    # API's per-minute rate-limit window catches both the retry AND any
+    # subsequent batch calls, surfacing as silent CLI exit-1 / empty-stderr
+    # (classified by the SDK helper as `cli_crash`). 60s clears the
+    # 5-request-per-minute Opus window cleanly. Set 0 to disable.
+    compile_failure_backoff_s: int = 60
+    # Skip the long-context retry on small sources. The retry only earns
+    # its rate-limit cost on sources large enough to actually benefit from
+    # the 1M-context variant — small sources fail kind=unknown for OTHER
+    # reasons (tool-turn fan-out into many existing articles for a
+    # not-yet-described substrate type), and the 1M variant doesn't help
+    # there. Sources under this threshold abort on first failure instead
+    # of burning a rate-limit slot. Default 10 KB.
+    compile_retry_long_context_min_source_chars: int = 10_240
 
 
 @dataclass
