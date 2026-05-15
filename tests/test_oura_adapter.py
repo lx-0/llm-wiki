@@ -1,7 +1,19 @@
 """Adapter-unit tests for the Oura REST client.
 
-Pure-parse tests against documented Oura v2 response shapes. Network is
-isolated via httpx mocking; no real PAT required to run these.
+Pure-parse tests against documented Oura v2 response shapes (verified
+live 2026-05-15 against the operator's account):
+
+- `/daily_sleep`     — daily SCORE only (5 keys: id, day, score, timestamp, contributors).
+                       Sleep duration / HRV / HR live elsewhere — NOT here.
+- `/daily_readiness` — daily readiness score + temperature deltas + contributors.
+- `/daily_activity`  — daily steps + activity scores + duration breakdowns.
+- `/sleep`           — session-level rows (potentially multiple per `day`:
+                       long_sleep + naps). Carries `total_sleep_duration`,
+                       `average_hrv`, `lowest_heart_rate`, `average_heart_rate`.
+                       Adapter picks the longest-duration session per day to
+                       extract overnight metrics.
+
+Network is isolated via direct payload injection; no real PAT required.
 """
 from __future__ import annotations
 
@@ -13,19 +25,16 @@ from adapters.health.oura import (
     _parse_daily_sleep,
     _parse_daily_readiness,
     _parse_daily_activity,
+    _parse_sleep_sessions,
     _merge_by_day,
 )
 
 
-# ── Response fixtures (shape from cloud.ouraring.com/v2 docs) ────────
+# ── Response fixtures (shape verified live 2026-05-15) ───────────────
 
 
-# /v2/usercollection/daily_sleep — daily sleep *score* + contributors.
-# The full sleep-session metrics (total_sleep_duration, average_hrv,
-# average_heart_rate) live on /v2/usercollection/sleep, but `daily_sleep`
-# also carries them at top level for the day's primary session in current
-# API revisions. Parse defensively: pull whichever fields are present.
-SLEEP_PAYLOAD = {
+# `/daily_sleep` is JUST the score. No duration / HRV / HR fields here.
+DAILY_SLEEP_PAYLOAD = {
     "data": [
         {
             "id": "abc-001",
@@ -41,9 +50,6 @@ SLEEP_PAYLOAD = {
                 "timing": 88,
                 "total_sleep": 86,
             },
-            "total_sleep_duration": 25920,
-            "average_hrv": 52,
-            "average_heart_rate": 54,
         },
         {
             "id": "abc-002",
@@ -51,9 +57,49 @@ SLEEP_PAYLOAD = {
             "score": 79,
             "timestamp": "2026-05-13T06:55:00+00:00",
             "contributors": {},
-            "total_sleep_duration": 23400,
+        },
+    ],
+    "next_token": None,
+}
+
+
+# `/sleep` is session-level — duration/HRV/HR live here. Multiple rows
+# per `day` are normal (one long_sleep + zero-or-more naps).
+SLEEP_SESSIONS_PAYLOAD = {
+    "data": [
+        # 2026-05-14: one long_sleep
+        {
+            "id": "ss-001",
+            "day": "2026-05-14",
+            "type": "long_sleep",
+            "period": 0,
+            "bedtime_start": "2026-05-13T23:30:00+00:00",
+            "bedtime_end": "2026-05-14T06:48:00+00:00",
+            "total_sleep_duration": 25920,    # 7.2 h
+            "average_hrv": 52,
+            "average_heart_rate": 58.2,
+            "lowest_heart_rate": 54,
+        },
+        # 2026-05-13: long_sleep + a short nap. Adapter must pick the longer one.
+        {
+            "id": "ss-002",
+            "day": "2026-05-13",
+            "type": "late_nap",
+            "period": 1,
+            "total_sleep_duration": 1200,     # 20-min nap — shorter
+            "average_hrv": 45,
+            "average_heart_rate": 65.0,
+            "lowest_heart_rate": 62,
+        },
+        {
+            "id": "ss-003",
+            "day": "2026-05-13",
+            "type": "long_sleep",
+            "period": 0,
+            "total_sleep_duration": 23400,    # 6.5 h — the longer, correct one
             "average_hrv": 48,
-            "average_heart_rate": 56,
+            "average_heart_rate": 60.0,
+            "lowest_heart_rate": 56,
         },
     ],
     "next_token": None,
@@ -106,47 +152,92 @@ ACTIVITY_PAYLOAD = {
 }
 
 
-# ── _parse_daily_sleep ───────────────────────────────────────────────
+# ── _parse_daily_sleep — score-only ──────────────────────────────────
 
 
-def test_parse_sleep_extracts_score_hours_hrv_and_hr_per_day() -> None:
-    out = _parse_daily_sleep(SLEEP_PAYLOAD)
+def test_parse_daily_sleep_extracts_score_only() -> None:
+    """daily_sleep has score + day; everything else lives on /sleep sessions."""
+    out = _parse_daily_sleep(DAILY_SLEEP_PAYLOAD)
     assert set(out.keys()) == {"2026-05-14", "2026-05-13"}
-    may_14 = out["2026-05-14"]
-    assert may_14["sleep_score"] == 84
-    assert may_14["sleep_hours"] == pytest.approx(25920 / 3600, rel=1e-3)  # 7.2 h
-    assert may_14["hrv_overnight"] == 52
-    assert may_14["resting_hr"] == 54
+    assert out["2026-05-14"]["sleep_score"] == 84
+    assert out["2026-05-13"]["sleep_score"] == 79
+    # No other fields on this endpoint — the parser must NOT invent them.
+    assert set(out["2026-05-14"].keys()) == {"sleep_score"}
 
 
-def test_parse_sleep_tolerates_missing_optional_fields() -> None:
-    # A minimal Oura payload — only `day` + `score`, no session metrics.
-    minimal = {"data": [{"day": "2026-05-14", "score": 80}], "next_token": None}
-    out = _parse_daily_sleep(minimal)
-    assert out["2026-05-14"]["sleep_score"] == 80
-    # Missing fields stay None — never raise KeyError.
-    assert out["2026-05-14"]["sleep_hours"] is None
-    assert out["2026-05-14"]["hrv_overnight"] is None
-    assert out["2026-05-14"]["resting_hr"] is None
-
-
-def test_parse_sleep_skips_rows_without_day() -> None:
-    # Oura occasionally emits rows lacking `day` (mid-session edge cases).
-    payload = {
-        "data": [
-            {"day": "2026-05-14", "score": 84},
-            {"score": 70},  # no day — drop
-        ],
-        "next_token": None,
-    }
+def test_parse_daily_sleep_skips_rows_without_day() -> None:
+    payload = {"data": [{"day": "2026-05-14", "score": 84}, {"score": 70}]}
     out = _parse_daily_sleep(payload)
     assert set(out.keys()) == {"2026-05-14"}
 
 
-def test_parse_sleep_returns_empty_on_no_data() -> None:
+def test_parse_daily_sleep_handles_missing_score() -> None:
+    payload = {"data": [{"day": "2026-05-14"}]}
+    out = _parse_daily_sleep(payload)
+    assert out["2026-05-14"]["sleep_score"] is None
+
+
+def test_parse_daily_sleep_returns_empty_on_no_data() -> None:
     assert _parse_daily_sleep({"data": [], "next_token": None}) == {}
     assert _parse_daily_sleep({"data": None}) == {}
     assert _parse_daily_sleep({}) == {}
+
+
+# ── _parse_sleep_sessions — picks longest session per day ────────────
+
+
+def test_parse_sleep_sessions_extracts_metrics_from_longest_session_per_day() -> None:
+    out = _parse_sleep_sessions(SLEEP_SESSIONS_PAYLOAD)
+    # 2026-05-14: only one session — picked directly.
+    may_14 = out["2026-05-14"]
+    assert may_14["sleep_hours"] == pytest.approx(7.2, rel=1e-3)
+    assert may_14["hrv_overnight"] == 52
+    assert may_14["resting_hr"] == 54
+    # 2026-05-13: long_sleep + nap. Adapter must pick the longer one
+    # (23400s long_sleep, NOT the 1200s nap).
+    may_13 = out["2026-05-13"]
+    assert may_13["sleep_hours"] == pytest.approx(6.5, rel=1e-3)
+    assert may_13["hrv_overnight"] == 48
+    assert may_13["resting_hr"] == 56  # from long_sleep, not the 62 from the nap
+
+
+def test_parse_sleep_sessions_tolerates_missing_optional_fields() -> None:
+    payload = {"data": [{"day": "2026-05-14", "total_sleep_duration": 25920}]}
+    out = _parse_sleep_sessions(payload)
+    assert out["2026-05-14"]["sleep_hours"] == pytest.approx(7.2, rel=1e-3)
+    assert out["2026-05-14"]["hrv_overnight"] is None
+    assert out["2026-05-14"]["resting_hr"] is None
+
+
+def test_parse_sleep_sessions_skips_rows_without_day_or_duration() -> None:
+    payload = {
+        "data": [
+            {"day": "2026-05-14", "total_sleep_duration": 25920},
+            {"total_sleep_duration": 5000},        # no day — drop
+            {"day": "2026-05-13"},                  # no duration — drop
+        ]
+    }
+    out = _parse_sleep_sessions(payload)
+    assert set(out.keys()) == {"2026-05-14"}
+
+
+def test_parse_sleep_sessions_returns_empty_on_no_data() -> None:
+    assert _parse_sleep_sessions({"data": []}) == {}
+    assert _parse_sleep_sessions({}) == {}
+
+
+def test_parse_sleep_sessions_falls_back_to_average_hr_when_lowest_missing() -> None:
+    """Older API responses may emit `average_heart_rate` only. Use that as a fallback."""
+    payload = {
+        "data": [{
+            "day": "2026-05-14",
+            "total_sleep_duration": 25920,
+            "average_heart_rate": 58.2,
+            # lowest_heart_rate absent
+        }]
+    }
+    out = _parse_sleep_sessions(payload)
+    assert out["2026-05-14"]["resting_hr"] == 58  # int-cast of average
 
 
 # ── _parse_daily_readiness ───────────────────────────────────────────
@@ -177,57 +268,55 @@ def test_parse_activity_tolerates_missing_steps() -> None:
     assert out["2026-05-14"]["steps"] is None
 
 
-# ── _merge_by_day ────────────────────────────────────────────────────
+# ── _merge_by_day (four sources) ─────────────────────────────────────
 
 
-def test_merge_by_day_combines_three_endpoints_into_one_summary_per_day() -> None:
-    sleep = _parse_daily_sleep(SLEEP_PAYLOAD)
+def test_merge_by_day_combines_four_endpoints_into_one_summary_per_day() -> None:
+    sleep = _parse_daily_sleep(DAILY_SLEEP_PAYLOAD)
+    sessions = _parse_sleep_sessions(SLEEP_SESSIONS_PAYLOAD)
     readiness = _parse_daily_readiness(READINESS_PAYLOAD)
     activity = _parse_daily_activity(ACTIVITY_PAYLOAD)
 
-    summaries = _merge_by_day(sleep, readiness, activity)
+    summaries = _merge_by_day(sleep, sessions, readiness, activity)
     by_day = {s.day: s for s in summaries}
 
     assert set(by_day.keys()) == {"2026-05-14", "2026-05-13"}
     may_14 = by_day["2026-05-14"]
-    assert may_14.sleep_score == 84
-    assert may_14.sleep_hours == pytest.approx(7.2, rel=1e-2)
-    assert may_14.hrv_overnight == 52
-    assert may_14.resting_hr == 54
-    assert may_14.readiness_score == 79
-    assert may_14.steps == 8412
+    assert may_14.sleep_score == 84              # /daily_sleep
+    assert may_14.sleep_hours == pytest.approx(7.2, rel=1e-3)  # /sleep
+    assert may_14.hrv_overnight == 52            # /sleep
+    assert may_14.resting_hr == 54               # /sleep
+    assert may_14.readiness_score == 79          # /daily_readiness
+    assert may_14.steps == 8412                  # /daily_activity
 
 
-def test_merge_by_day_yields_summary_for_each_day_present_in_any_source() -> None:
-    # Day 2026-05-12 in activity-only — should still get a summary
-    # with sleep/readiness fields None.
-    sleep = {"2026-05-14": {"sleep_score": 84, "sleep_hours": 7.2, "hrv_overnight": 52, "resting_hr": 54}}
+def test_merge_by_day_yields_summary_for_each_day_in_any_source() -> None:
+    sleep = {"2026-05-14": {"sleep_score": 84}}
+    sessions = {"2026-05-14": {"sleep_hours": 7.2, "hrv_overnight": 52, "resting_hr": 54}}
     readiness = {"2026-05-14": {"readiness_score": 79}}
     activity = {"2026-05-14": {"steps": 8412}, "2026-05-12": {"steps": 6000}}
 
-    summaries = _merge_by_day(sleep, readiness, activity)
+    summaries = _merge_by_day(sleep, sessions, readiness, activity)
     by_day = {s.day: s for s in summaries}
 
     assert set(by_day.keys()) == {"2026-05-14", "2026-05-12"}
     may_12 = by_day["2026-05-12"]
     assert may_12.steps == 6000
     assert may_12.sleep_score is None
-    assert may_12.readiness_score is None
+    assert may_12.sleep_hours is None
 
 
 def test_merge_by_day_skips_days_with_only_None_metrics() -> None:
-    """A day where every metric is None contributes nothing (skip-empty rule)."""
-    sleep = {"2026-05-14": {"sleep_score": None, "sleep_hours": None, "hrv_overnight": None, "resting_hr": None}}
+    sleep = {"2026-05-14": {"sleep_score": None}}
+    sessions = {"2026-05-14": {"sleep_hours": None, "hrv_overnight": None, "resting_hr": None}}
     readiness = {"2026-05-14": {"readiness_score": None}}
     activity = {"2026-05-14": {"steps": None}}
-
-    summaries = _merge_by_day(sleep, readiness, activity)
-    assert summaries == []
+    assert _merge_by_day(sleep, sessions, readiness, activity) == []
 
 
 def test_merge_by_day_returns_results_sorted_by_day_ascending() -> None:
     sleep = {"2026-05-10": {"sleep_score": 70}, "2026-05-14": {"sleep_score": 84}}
-    summaries = _merge_by_day(sleep, {}, {})
+    summaries = _merge_by_day(sleep, {}, {}, {})
     assert [s.day for s in summaries] == ["2026-05-10", "2026-05-14"]
 
 
@@ -255,5 +344,4 @@ def test_daily_summary_is_empty_when_all_metrics_none() -> None:
 
 
 def test_oura_api_error_subclasses_runtime_error() -> None:
-    # Mirrors JamieAPIError — callers can catch (RuntimeError, OuraAPIError).
     assert issubclass(OuraAPIError, RuntimeError)

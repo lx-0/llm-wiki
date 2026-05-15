@@ -1,19 +1,22 @@
 """Oura REST client + daily-summary parsing.
 
-Wire shape (cloud.ouraring.com/v2, Bearer PAT):
+Wire shape (cloud.ouraring.com/v2, Bearer PAT — verified live 2026-05-15):
 
     base    https://api.ouraring.com/v2/usercollection
     auth    Authorization: Bearer <pat>
     endpoints used (Phase 1):
-      /daily_sleep?start_date=&end_date=
-      /daily_readiness?start_date=&end_date=
-      /daily_activity?start_date=&end_date=
+      /daily_sleep?start_date=&end_date=      — daily SCORE ONLY (5-key row)
+      /daily_readiness?start_date=&end_date=  — daily readiness score + temp deltas
+      /daily_activity?start_date=&end_date=   — daily steps + activity scores
+      /sleep?start_date=&end_date=            — session-level rows (long_sleep + naps)
     response  {"data": [{...row...}], "next_token": null | "<cursor>"}
 
-Each endpoint returns daily rows keyed by `day` (ISO date). The adapter
-hits all three endpoints for the same window, then merges by `day` into
-DailySummary records that the HealthCollector renders as one md file per
-day per account.
+`/daily_sleep` carries ONLY the score (id, day, score, timestamp,
+contributors). The session-level metrics (`total_sleep_duration`,
+`average_hrv`, `lowest_heart_rate`) live on `/sleep` instead, where
+multiple rows per day are normal (one `long_sleep` + zero-or-more naps).
+The adapter picks the longest-duration session per day to extract
+overnight metrics — naps don't contribute to "resting" baselines.
 
 `_parse_*` helpers are pure — tested in isolation. The OuraClient is a
 thin httpx shell around them with retry + auth + pagination.
@@ -100,28 +103,69 @@ def _iter_rows(payload: Any) -> list[dict]:
 
 
 def _parse_daily_sleep(payload: Any) -> dict[str, dict]:
-    """Extract per-day {sleep_score, sleep_hours, hrv_overnight, resting_hr}.
+    """Extract per-day {sleep_score}.
 
-    Returns {day: {field: value | None}} for each row that has a `day`.
-    Missing optional fields stay None — never raises KeyError.
+    `/daily_sleep` rows carry ONLY the score (verified live 2026-05-15).
+    Duration / HRV / heart rate live on `/sleep` — see `_parse_sleep_sessions`.
     """
     out: dict[str, dict] = {}
     for row in _iter_rows(payload):
         day = row.get("day")
         if not isinstance(day, str) or not day:
             continue
-        duration_s = row.get("total_sleep_duration")
-        sleep_hours: float | None = None
-        if isinstance(duration_s, (int, float)) and duration_s > 0:
-            sleep_hours = float(duration_s) / 3600.0
         score = row.get("score")
-        hrv = row.get("average_hrv")
-        hr = row.get("average_heart_rate")
         out[day] = {
             "sleep_score": int(score) if isinstance(score, (int, float)) else None,
-            "sleep_hours": sleep_hours,
+        }
+    return out
+
+
+def _parse_sleep_sessions(payload: Any) -> dict[str, dict]:
+    """Extract per-day {sleep_hours, hrv_overnight, resting_hr} from /sleep.
+
+    `/sleep` returns session-level rows — potentially multiple per `day`:
+    one `long_sleep` plus zero-or-more `late_nap` / `short_nap` rows.
+    We pick the longest-duration session per day; naps don't contribute
+    to overnight baselines (the operator's resting metrics).
+
+    `resting_hr` uses `lowest_heart_rate` (the minimum observed during the
+    session — standard fitness-app definition of "resting"). Falls back to
+    `average_heart_rate` when `lowest_heart_rate` is missing.
+
+    Rows without `day` or without `total_sleep_duration` are dropped —
+    no duration means we can't pick a "longest" session for that day.
+    """
+    # group rows by day, retain the one with max duration
+    longest_per_day: dict[str, dict] = {}
+    for row in _iter_rows(payload):
+        day = row.get("day")
+        if not isinstance(day, str) or not day:
+            continue
+        duration_s = row.get("total_sleep_duration")
+        if not isinstance(duration_s, (int, float)) or duration_s <= 0:
+            continue
+        existing = longest_per_day.get(day)
+        if existing is None or duration_s > existing.get("total_sleep_duration", 0):
+            longest_per_day[day] = row
+
+    out: dict[str, dict] = {}
+    for day, row in longest_per_day.items():
+        duration_s = row["total_sleep_duration"]
+        hrv = row.get("average_hrv")
+        # `resting_hr` = lowest_heart_rate when present, else average_heart_rate.
+        # Both standard fitness conventions; either is more useful than nothing.
+        lowest = row.get("lowest_heart_rate")
+        avg_hr = row.get("average_heart_rate")
+        if isinstance(lowest, (int, float)):
+            resting_hr: int | None = int(lowest)
+        elif isinstance(avg_hr, (int, float)):
+            resting_hr = int(avg_hr)
+        else:
+            resting_hr = None
+        out[day] = {
+            "sleep_hours": float(duration_s) / 3600.0,
             "hrv_overnight": int(hrv) if isinstance(hrv, (int, float)) else None,
-            "resting_hr": int(hr) if isinstance(hr, (int, float)) else None,
+            "resting_hr": resting_hr,
         }
     return out
 
@@ -155,28 +199,35 @@ def _parse_daily_activity(payload: Any) -> dict[str, dict]:
 
 
 def _merge_by_day(
-    sleep: dict[str, dict],
+    daily_sleep: dict[str, dict],
+    sleep_sessions: dict[str, dict],
     readiness: dict[str, dict],
     activity: dict[str, dict],
 ) -> list[DailySummary]:
     """Union the day-keyed dicts, build DailySummary per day, drop fully-empty days.
 
+    Four sources: `/daily_sleep` (score), `/sleep` (duration/HRV/HR),
+    `/daily_readiness` (readiness score), `/daily_activity` (steps).
+
     Returns results sorted by day ascending.
     """
-    all_days: set[str] = set(sleep) | set(readiness) | set(activity)
+    all_days: set[str] = (
+        set(daily_sleep) | set(sleep_sessions) | set(readiness) | set(activity)
+    )
     out: list[DailySummary] = []
     for day in sorted(all_days):
-        s = sleep.get(day, {})
+        ds = daily_sleep.get(day, {})
+        ss = sleep_sessions.get(day, {})
         r = readiness.get(day, {})
         a = activity.get(day, {})
         summary = DailySummary(
             day=day,
-            sleep_hours=s.get("sleep_hours"),
-            sleep_score=s.get("sleep_score"),
+            sleep_hours=ss.get("sleep_hours"),
+            sleep_score=ds.get("sleep_score"),
             readiness_score=r.get("readiness_score"),
-            hrv_overnight=s.get("hrv_overnight"),
+            hrv_overnight=ss.get("hrv_overnight"),
             steps=a.get("steps"),
-            resting_hr=s.get("resting_hr"),
+            resting_hr=ss.get("resting_hr"),
         )
         if summary.is_empty():
             continue
@@ -285,12 +336,19 @@ class OuraClient:
                 return all_rows
 
     def fetch_daily_summaries(self, start_date: str, end_date: str) -> list[DailySummary]:
-        """Pull all three daily endpoints for [start_date, end_date], merge by day."""
-        sleep_rows = self._fetch_all_pages("daily_sleep", start_date, end_date)
+        """Pull all four endpoints for [start_date, end_date], merge by day.
+
+        Four GETs per call (daily_sleep + sleep + daily_readiness + daily_activity).
+        `/sleep` carries the heavy session-level metrics; the three `daily_*`
+        endpoints carry the daily-rollup scores.
+        """
+        daily_sleep_rows = self._fetch_all_pages("daily_sleep", start_date, end_date)
+        sleep_session_rows = self._fetch_all_pages("sleep", start_date, end_date)
         readiness_rows = self._fetch_all_pages("daily_readiness", start_date, end_date)
         activity_rows = self._fetch_all_pages("daily_activity", start_date, end_date)
 
-        sleep = _parse_daily_sleep({"data": sleep_rows})
+        daily_sleep = _parse_daily_sleep({"data": daily_sleep_rows})
+        sleep_sessions = _parse_sleep_sessions({"data": sleep_session_rows})
         readiness = _parse_daily_readiness({"data": readiness_rows})
         activity = _parse_daily_activity({"data": activity_rows})
-        return _merge_by_day(sleep, readiness, activity)
+        return _merge_by_day(daily_sleep, sleep_sessions, readiness, activity)
