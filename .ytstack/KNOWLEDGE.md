@@ -1215,3 +1215,58 @@ Two patterns came out of the fix:
 - **Lint owes a check per LLM-emitted artefact shape.** Every shape the engine asks an LLM to produce (qa/, concepts/, connections/, …) needs a structural lint companion that catches the drift before a human notices it via "huh, why is this folder empty?". `check_qa_schema` is the template: required-field error, index-presence warning, domain-tag warning so the graph view stays useful. New artefact shapes get a new check before they go live, not after.
 
 Also surfaced: tags should be *domains*, not *types*. A `qa` tag is redundant with `type: qa` and pushes the note into the grey graph-view bucket; a domain tag (`llm-wiki`, `fleet`, …) makes the note inherit a meaningful color and respects the multi-channel encoding (type=shape, domain=color) we're moving toward in the Obsidian graph layer.
+
+## M005 lessons — entity-page tasks layer
+
+### Two-shape coexistence in `knowledge/` (added during M005-S01)
+
+`knowledge/` now carries two article shapes:
+
+- **Atomic** (`concept | connection | qa | moc | fact`) — flat body, optional sections like `## Key Points`, `## Details`. The original Karpathy/Cole shape.
+- **Two-layer State + Timeline** (`person | project`, new in M005) — compiled-truth State block above `---` (executive summary, `## State`, `## Action Items`, `## Open Threads`, body, `## See also`), append-only `## Timeline` below.
+
+The compile prompt branches on `type:` (Instruction 3). The lint enforces the structure for entity-types only (`check_two_layer_pages`). `templates/AGENTS.example.md` documents both shapes.
+
+Pitfall: don't migrate atomic-shape `connections/` entries into people pages just because they describe a person — `connections/` are *cross-cutting insights*, people pages are *entity-state*. If you want to attach an action item to a person, the person page is the home; if you want to record an observation about how that person thinks, `connections/` still wins.
+
+### Audit-tasks are valid deliverables (added during M005-S03 + S05)
+
+Twice in M005 (S03-T03 routing-logic audit, S05-T04 seed-management audit) the slice-plan implied a code-change task but the audit revealed the configuration was already correct. Both shipped as documented audits — a PLAN file explaining the audit, a SUMMARY file recording the findings, zero code change.
+
+This is the right move when:
+- The slice-plan was written before the relevant code was inspected
+- The existing config genuinely already supports the new feature
+- Documenting *why no change is needed* prevents future re-investigation
+
+It is NOT the right move when:
+- The audit reveals genuine gaps and you skip them
+- "Already configured correctly" turns out to mean "configured for a different feature"
+
+If in doubt, the SUMMARY should name what *would* break the audit and what the response would be.
+
+### Parallel-session shared-index hazard (added during M005)
+
+The git index is shared between parallel Claude sessions in the same repo. Even with `git add <my-explicit-paths>`, `git commit` picks up *everything currently staged* — including files the parallel session staged before yours ran. Three concrete failure modes seen in M005:
+
+1. **`git add <paths>` + `git diff --cached --stat` looked clean** → the stat genuinely showed only my files at that moment, but the parallel session staged its files in the microsecond before `git commit` fired.
+2. **Sequential commits got contaminated** with parallel-session backlog files (`voice.py`, `browser-history-collector.md`, etc.).
+3. **The `post-tool-use-bash` auto-draft hook attributed parallel-session commits to whichever `active_task` was current** when those commits landed — surfaces in T##-SUMMARY.md `Commits so far` blocks as misleading attribution.
+
+Defensive pattern (used from S05-T04 onward):
+
+```bash
+git reset HEAD          # clear the entire index
+git add <my-paths>      # stage only my files
+git diff --cached --stat  # final verification
+git commit -m "..."
+```
+
+The `git reset HEAD` step is the new defense — unstages anything the parallel session added before my work was ready. Safe under `feedback_explicit_staging_under_churn` (parallel worker's *working tree* is untouched; only the index is reset).
+
+### LLM-emission validation is not CI-testable (added during M005-S03)
+
+Plumbing tests (does the rendered prompt carry the rule?) are CI-friendly and ran across M005-S03 + S04 in `tests/test_compile_two_layer_prompt.py`, `tests/test_jamie_extraction_fixture.py`, `tests/test_lifecycle_resolution.py`, `tests/test_lifecycle_preservation.py`. Emission tests (does the LLM *obey* the rule on real substrate?) are non-deterministic, cost real API budget, and need vault-side state.
+
+Pattern for non-CI-testable LLM behavior: ship the harness (fixtures + plumbing tests) in the engine repo; ship the validation as an **operator runbook** with explicit pass/fail criteria. Example: `docs/m005-s03-canary-procedure.md` has three canaries (synthetic fixture, live jamie, live gmeet) with grep commands, pass/fail/caveat decisions, and rollback paths.
+
+This is *not* "we skipped testing"; it's "we tested the part that's testable and explicitly documented the part that isn't, with falsifiable criteria for the human-in-the-loop step".
