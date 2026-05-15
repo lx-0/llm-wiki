@@ -1,13 +1,21 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-05-15T12:30:00Z
-current_milestone: M004
+last_updated: 2026-05-15T16:50:00Z
+current_milestone: M005
 active_slice: none
 active_task: none
 ---
 
 # State
+
+**Status:** M005 planned (L — 5 slices). Ready to slice.
+
+**Next action:** Run `ytstack:slice-milestone` to break M005 into concrete slices and tasks. M005 = "Personal task management on the wiki" — `knowledge/people/` + `knowledge/projects/` adopt two-layer State+Timeline shape with `## Action Items` + `## Open Threads`; compile.py extracts commitments from jamie/gmeet/email substrates; lifecycle demotes resolved items to Timeline; existing Obsidian dashboard surfaces the task layer. See `M005-CONTEXT.md` + `M005-ROADMAP.md`. The conceptual groundwork is in `.ytstack/backlog/entity-pages-state-timeline.md` (updated 2026-05-15 with action-items angle, commit `ef4ce50`) and `.ytstack/backlog/gbrain-comparison.md` (verifies gbrain treats commitments as Fact-kind, embeds tasks in entity pages — no separate `tasks/` folder needed).
+
+---
+
+## M004 — closed-out notes
 
 **gmeet pairing + folder-pin warning shipped (2026-05-15, commit `4762a99`)** — gmeet output shape went from "one Drive Doc → one .md" to **one meeting → one .md** with paired `## Summary` (Notes-Doc) + `## Transcript` (Transcript-Doc) sections. Same meeting's two Docs share a stable `meeting_key` = `sha256(normalised_stripped_title)[:12]` — normalisation drops whitespace + quote-glyph variation (ASCII / curly / angle / low-9 families) because Gemini renders the same title with different quote glyphs across the Notes-Doc and Transcript-Doc. **Cross-run merge**: if Notes lands in run N and Transcript only shows up in run N+1, `_merge_into_sibling()` appends the second section into the existing file and migrates legacy singular frontmatter (`doc_kind:` / `drive_doc_id:`) to the new list shape (`doc_kinds: [...]` + `drive_docs: [{id, name, kind, url, created}, ...]`). Skip-existing two-layered: filename suffix AND every `drive_docs[*].id` recorded inside frontmatter. Filename keying for fresh writes flipped from `--<drive-doc-short-id>.md` to `--<meeting-key>.md` so the file never has to be renamed when a paired Doc arrives later — pre-pairing files keep their old filenames and continue to match via the augmented index built by `_scan_siblings()`. Same commit added a folder-pin WARNING: when `drive_folder_id` is unset and auto-resolve succeeds, log the resolved id and prompt the operator to pin it (Workspace-collision protection). `tests/test_gmeet_pairing.py` — 14 cases. 218/218 pass. Open: live verification on lxw needs `wiki update` to pull the post-pairing engine into `<vault>/.wiki/`.
 
