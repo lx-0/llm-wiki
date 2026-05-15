@@ -63,7 +63,7 @@ llm-wiki is the **compilation layer** between raw substrates and active consumpt
 
 ## What you get
 
-- **Two-path ingest** — automatic session capture (hooks → `daily/`) and substrate-source writers (Registry-discovered Collectors + legacy scanners + clipper + manual drop → `raw/`) converge at one compiler. All ten collectors ride the formal Collector Protocol (`SPEC` + `@register` + `run()`): email, jamie, gmeet, voice, health (named modules) plus calendar, browser, tabs, screenshots, youtube (migrated 2026-05-14 from `scan-*.py` scripts).
+- **Two-path ingest + per-day rollup** — automatic session capture (hooks → `daily/<date>/sessions.md`) and substrate-source writers (Registry-discovered Collectors + legacy scanners + clipper + manual drop → `raw/`, plus per-day mirror one-liners into `daily/<date>/{health,meetings,voice,email}.md`) converge at one compiler. A daily-digest pass distills the five per-source captures into a single `daily/<date>.md` (~500 words). All ten collectors ride the formal Collector Protocol (`SPEC` + `@register` + `run()`): email, jamie, gmeet, voice, health (named modules) plus calendar, browser, tabs, screenshots, youtube (migrated 2026-05-14 from `scan-*.py` scripts).
 - **Compile once, query fast** — knowledge is distilled into Markdown wikilinks at compile time. No embedding step, no retrieval per query.
 - **Multi-agent hooks** — `session-start` / `session-end` / `pre-compact` wired into Claude Code, Codex, Gemini, and Cursor. Every session ends as a structured daily-log entry.
 - **Curiosity loop** — a small local Ollama model spots gaps after each compile and queues deep-scan requests for the next cycle.
@@ -210,7 +210,7 @@ Inspired by [Andrej Karpathy's LLM Wiki](https://gist.github.com/karpathy/442a6b
 ├── AGENTS.md              ← article-schema spec (seeded from templates/, then yours)
 ├── dashboard.md           ← Dataview home page (seeded from templates/, then yours)
 ├── raw/                   ← immutable curated sources (LLM reads, never writes)
-├── daily/                 ← session transcripts (one file per day, append-only)
+├── daily/                 ← per-day rollup: <date>/{sessions,health,meetings,voice,email}.md per-source captures + <date>.md compile-stage digest
 ├── knowledge/             ← LLM-compiled wiki (LLM owns, you and agents read)
 ├── inbox/                 ← transient — process-inbox.py classifies + moves to raw/
 ├── Clippings/             ← optional — Obsidian Web Clipper drop point

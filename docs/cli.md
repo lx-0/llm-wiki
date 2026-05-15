@@ -71,7 +71,8 @@ Grouped by purpose. Run `wiki <cmd> --help` for the full per-command help block.
 | `wiki compile` | run `compile.py` against sources whose hash changed since last run (LLM cost via `models.compile_model`). Refreshes dashboard counts. |
 | `wiki compile --all` | force-recompile every source under `raw/` + `daily/`. |
 | `wiki compile --file PATH` | compile a single file (path relative to vault root). |
-| `wiki flush` | manual flush — capture current Claude Code session transcript into `daily/YYYY-MM-DD.md` (normally automatic via SessionEnd hook). After `compile_after_hour` triggers compile + piggybacks. |
+| `wiki flush` | manual flush — capture current Claude Code session transcript into `daily/YYYY-MM-DD/sessions.md` (post-2026-05-15 rollup arc; normally automatic via SessionEnd hook). After `compile_after_hour` triggers compile + piggybacks. |
+| `wiki agent daily-digest --var date=YYYY-MM-DD` | run the `daily-digest` agent: read all `daily/<date>/*.md` per-source captures and write a ≤500-word distillation into `daily/<date>.md`. Also runs once-daily as the `daily_digest_yesterday` piggyback. |
 | `wiki lint` | full health check — structural + LLM contradiction sweep ($ cost). Report → `.wiki/reports/lint-YYYY-MM-DD.md`. |
 | `wiki lint --structural-only` | cheap, no-LLM lint — 8 checks (`broken_links`, `orphan_pages`, `orphan_sources`, `stale_articles`, `missing_backlinks`, `article_type`, `sparse_articles`, `facts_violations`). Used by piggyback. |
 | `wiki query "QUESTION"` | ask the knowledge base — picks relevant articles via `knowledge/index.md`, answers via configured query model (LLM cost). |
@@ -113,6 +114,17 @@ Grouped by purpose. Run `wiki <cmd> --help` for the full per-command help block.
 | `wiki agent <id>` | spawn Claude Agent SDK with the model / `allowed_tools` / `permission_mode` / `max_turns` / `cwd` declared in the task's frontmatter. Result logged to `.wiki/logs/agent-<id>-<ts>.log`; on success the prompt's frontmatter gets `last_run: <iso-ts>` written back. |
 | `wiki agent <id> --dry-run` | resolve + print the spec without spawning |
 | `wiki agent <id> --var key=value` | substitute `${key}` in the prompt body (repeatable) |
+
+### Operator-invoked one-shot scripts (`uv run python scripts/<name>.py`)
+
+These scripts are not exposed via `wiki <cmd>` — they're explicit one-shots run from inside `.wiki/` (use `cd .wiki/` or pass paths absolute):
+
+| Script | What it does |
+|---|---|
+| `migrate_daily_to_rollup.py --vault <path> [--dry-run]` | One-shot migration for vaults installed before the 2026-05-15 `daily/`-as-rollup arc. **Copies** (not moves) each flat `daily/<date>.md` into `daily/<date>/sessions.md`. Idempotent re-runs are no-ops. Originals stay in place until `cleanup_legacy_daily_roots.py` is invoked. |
+| `backfill_daily_rollup.py --vault <path> [--source {health,voice,meetings,all}] [--dry-run]` | One-shot: walk existing substrate files in `raw/notes/health/`, `raw/voice/`, `raw/transcripts/{jamie,gmeet}/` and write per-day rollup one-liners to `daily/<date>/<source>.md`. Required after migration to backfill historical substrate that pre-dated the Phase 2 collector wiring. Idempotent (exact-line skip). |
+| `cleanup_legacy_daily_roots.py --vault <path> [--dry-run]` | Removes legacy flat `daily/<date>.md` files after verifying byte-identical match against `daily/<date>/sessions.md`. Refuses on content divergence, on `type: daily-digest` frontmatter (real digest), and on today's date. |
+| `daily_digest_runner.py --date {today,yesterday,YYYY-MM-DD}` | Wrapper invoked by the `daily_digest_yesterday` piggyback. Short-circuits if no `daily/<date>/` subfolder exists, else shells out to `wiki agent daily-digest --var date=<iso>`. |
 
 ## Setup wizard — what's asked
 

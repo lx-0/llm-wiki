@@ -28,10 +28,11 @@ Engine lives in `.wiki/` (hidden from Obsidian by default). Vault content lives 
 
 ## What runs automatically
 
-Every Claude Code / Codex / Gemini / Cursor session ends as a structured `daily/YYYY-MM-DD.md` entry — no action from you. After 18:00 (or whatever `scheduling.compile_after_hour` is set to), `flush.py` triggers:
+Every Claude Code / Codex / Gemini / Cursor session ends as a structured entry in `daily/YYYY-MM-DD/sessions.md` — no action from you. Collectors run alongside and land their own one-liners in sibling files (`daily/YYYY-MM-DD/{health,meetings,voice,email}.md`). Once a day, the `daily-digest` agent distills all five per-source captures into a single ≤500-word `daily/YYYY-MM-DD.md`. After 18:00 (or whatever `scheduling.compile_after_hour` is set to), `flush.py` triggers:
 
 - `compile.py` over any new `raw/` + `daily/` content → atomic articles in `knowledge/`
-- Piggyback Collectors (Jamie meetings every 6 h, email daily, screenshot OCR daily, …)
+- Piggyback Collectors (Jamie meetings every 6 h, email daily, screenshot OCR daily, health daily, …)
+- `daily_digest_yesterday` piggyback — distills yesterday's per-source captures into one digest
 - Quality sweeps: structural lint daily, wiki-quality review weekly
 - Curiosity loop — Ollama spots gaps after each compile, queues deep-scan requests
 
@@ -41,7 +42,7 @@ Cap, cooldown, and per-task on/off live in `.wiki/config.yaml`.
 
 ```
 raw/          ← immutable curated sources (LLM reads, never writes)
-daily/        ← session transcripts (one file per day, append-only)
+daily/        ← per-day rollup: <date>/{sessions,health,meetings,voice,email}.md + <date>.md digest
 knowledge/    ← LLM-compiled wiki (LLM owns, you and agents read)
 ```
 

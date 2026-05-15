@@ -11,7 +11,7 @@ updated: 2026-05-02T09:08:51Z
 
 ## What this project is
 
-An opinionated LLM-driven knowledge-compilation engine. Two-tier architecture: the engine code, configuration, and engine documentation live under `<vault>/.wiki/`; the user's actual Obsidian-style knowledge base (the "vault") owns the data — `raw/`, `daily/`, `knowledge/`, `inbox/`, `reports/`. The pipeline ingests raw materials and synthesizes structured articles via LLM compilation, rendered for Obsidian.
+An opinionated LLM-driven knowledge-compilation engine. Two-tier architecture: the engine code, configuration, and engine documentation live under `<vault>/.wiki/`; the user's actual Obsidian-style knowledge base (the "vault") owns the data — `raw/`, `daily/`, `knowledge/`, `inbox/`, `reports/`. `daily/` is itself a two-layer structure since 2026-05-15 — per-source subfolder (`daily/<date>/{sessions,health,meetings,voice,email}.md`) + compile-stage digest (`daily/<date>.md`). The pipeline ingests raw materials and synthesizes structured articles via LLM compilation, rendered for Obsidian.
 
 Surface framing: "personal-knowledge OS." Deeper framing: **self-cartography you actually use** — externalize parts of one's thinking that currently live in scattered substrates (daily logs, agent memories, clippings, other streams) into a navigable, machine-readable, AI-consumable map *that is read daily* by both the operator and their AI agents. The wiki is not an archive to be left behind; it is a working surface that gets refined by being used.
 

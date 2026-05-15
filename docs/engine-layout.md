@@ -65,11 +65,15 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 │   │   ├── dashboard_stats.py     ← _dashboard-stats.md generator
 │   │   ├── dashboard_lint.py      ← _dashboard-lint.md generator
 │   │   ├── agent_buttons.py       ← agent-button discovery + dashboard.md rewriter
-│   │   └── inject_daily_button.py ← idempotent Summarize-button injection into daily/*.md
+│   │   └── inject_daily_button.py ← idempotent Summarize-button injection into daily/<date>/sessions.md
 │   ├── migrations/            ← one-shot schema/data migrations
 │   │   └── migrate_add_type.py    ← backfill type: frontmatter
-│   ├── compile.py             ← Claude Agent SDK compiler (raw/ + daily/ → knowledge/)
-│   ├── flush.py               ← session-end → daily/ append + piggyback spawner
+│   ├── compile.py             ← Claude Agent SDK compiler (raw/ + daily/<date>/* + daily/<date>.md → knowledge/)
+│   ├── flush.py               ← session-end → daily/<date>/sessions.md append + piggyback spawner
+│   ├── migrate_daily_to_rollup.py   ← one-shot: legacy daily/<date>.md → daily/<date>/sessions.md
+│   ├── backfill_daily_rollup.py     ← one-shot: raw/{health,voice,transcripts/{jamie,gmeet}} → daily/<date>/{health,voice,meetings}.md
+│   ├── cleanup_legacy_daily_roots.py ← one-shot: byte-match-verified delete of legacy daily/<date>.md
+│   ├── daily_digest_runner.py       ← piggyback wrapper for `wiki agent daily-digest`
 │   ├── lint.py                ← 8 structural checks + 1 LLM contradiction check
 │   ├── query.py               ← Claude Agent SDK natural-language query (read-only / file-back)
 │   ├── agent_task.py          ← generic Claude Agent SDK runner for prompts/agents/*.md

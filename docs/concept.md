@@ -91,11 +91,12 @@ Collectors scan L3 → write metadata to `raw/notes/` → the compiler turns it 
 ## Data flow
 
 ```text
-Collectors                   Curated sources       Sessions
-(email, jamie, gmeet, voice, (raw/articles,        (daily/, auto-captured
- health + calendar, browser,  raw/papers,           via session-end hook)
- tabs, screenshots, youtube   raw/notes,
- — all Registry-discovered)   raw/transcripts)
+Collectors                   Curated sources       Daily rollup (per-day)
+(email, jamie, gmeet, voice, (raw/articles,        (daily/<date>/sessions.md
+ health + calendar, browser,  raw/papers,           by session-hook;
+ tabs, screenshots, youtube   raw/notes,            health/meetings/voice/email
+ — all Registry-discovered)   raw/transcripts)      by collectors; daily/<date>.md
+                                                    digest by compile-stage)
        │                          │                     │
        │                          │                     │
        ▼                          ▼                     ▼
@@ -141,7 +142,7 @@ The system has the same shape as memory in cognition:
 | Function | Implementation |
 |---|---|
 | **Sensory buffer** | session-end hook captures the live conversation transcript |
-| **Episodic memory** | `daily/` — chronological session logs (what happened, when) |
+| **Episodic memory** | `daily/<date>/` — per-day, per-source captures (sessions / health / meetings / voice / email). Compile-stage `daily-digest` agent produces a `daily/<date>.md` distillation across all sources. |
 | **Consolidation** | `compile.py` distills episodic + curated sources into structured wiki |
 | **Semantic memory** | `knowledge/` — atomic concepts, connections, projects, people |
 | **Working memory** | `session-start` hook injects a pointer block (paths to `index.md`, `knowledge/`, `raw/`, `AGENTS.md`) + recent daily-log tail; the agent pulls articles on demand via Read/Grep |

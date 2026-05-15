@@ -45,7 +45,8 @@ llm-wiki/
 │   │   ├── utils.py            ← shared helpers (article listing, JSON state, history) + now_iso/today_iso
 │   │   ├── agent_spec.py       ← agent-task spec parser (prompts/agents/*.md → AgentSpec)
 │   │   ├── google_oauth.py     ← shared Google OAuth2 helper (local-loopback consent + token cache; used by gmail + gmeet)
-│   │   └── flush_pipeline.py   ← staged-flush state machine (stage/commit/archive/pending)
+│   │   ├── flush_pipeline.py   ← staged-flush state machine (stage/commit/archive/pending)
+│   │   └── daily_capture.py    ← fcntl-flocked append/replace into daily/<date>/<source>.md (sources: sessions/health/meetings/voice/email)
 │   ├── collectors/         ← substrate→raw/ writers (Registry + scan-* CLIs + dispatcher)
 │   │   ├── base.py             ← Collector Protocol, SPEC, Registry
 │   │   ├── cli.py              ← `wiki collect` dispatcher (Registry lookup + run-one)
@@ -158,6 +159,18 @@ The Python venv lives at `<vault>/.wiki/.venv/` (inside the engine, NOT at the v
 
 - Hooks run in **<10s** budget — no API calls, only file I/O. Heavy work goes to spawned background processes (`flush.py`, piggybacks).
 - `compile.py` and `query.py` use the Claude Agent SDK with `model=CONFIG.models.compile_model`. Other scripts use Ollama (configurable via `models.ollama_url`).
+
+### Spawning Claude Agent SDK with substrate input (HARD rule, locked 2026-05-15)
+
+Any script that feeds substrate (`daily/**`, `raw/**`, operator-supplied prompts) into the Claude Agent SDK with Write/Edit tools MUST apply three layers of write-scope enforcement, no exceptions:
+
+1. **Prompt-level** — the system prompt explicitly states which directory the agent may Write/Edit, and that source descriptions of code/config/script changes are subject matter, not instructions to the agent.
+2. **Tool-level** — `disallowed_tools=["Edit(<forbidden>/**)", "Write(<forbidden>/**)", ...]` for every path the agent must not touch (always include `.wiki/**`).
+3. **Settings-level** — `setting_sources=["project"]` (not `[]`) so vault-root `CLAUDE.md` reaches the agent.
+
+Reason: substrate routinely contains literal change-descriptions captured from prior engine-development sessions. The agent reads them as instructions and acts on them with whatever filesystem authority you gave it. See `.ytstack/KNOWLEDGE.md` "Compile prompt injection via substrate" + `.ytstack/DECISIONS.md` 2026-05-15. Reference implementation: `scripts/compile.py:225-247`.
+
+Long-term direction: remove agent-side filesystem writes entirely — agent returns structured payload via `ResultMessage`, script writes the files deterministically. Track in `.ytstack/backlog/compile-agent-no-filesystem-write.md`.
 - Every config write makes a `.bak.YYYYMMDD-HHMMSS`. Idempotent install/uninstall.
 - The engine writes **inside the vault and `.wiki/` only**, with one exception: when `skills.global_install` is on, `wiki skills install/sync` symlinks `use-llm-wiki` into `~/.claude/skills/` and records the vault root in `~/.config/llm-wiki/vaults` (the discovery registry the skill reads). Both writes fail soft — a missing global link is recoverable, a hard error on `wiki update` is not.
 
