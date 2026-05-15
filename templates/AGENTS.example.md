@@ -86,40 +86,50 @@ language: de | en
 ---
 ```
 
-### Layer 2: `daily/` — Conversation Logs (Immutable, Auto-Captured)
+### Layer 2: `daily/` — Per-Day Operational Rollup
 
-Auto-captured Claude Code session summaries. Append-only, never edited after creation.
+Two-shape since the 2026-05-15 `daily/`-as-rollup arc:
 
 ```
 daily/
-├── 2026-04-08.md
-├── 2026-04-09.md
-└── ...
+├── 2026-05-14.md              ← compile-stage digest (≤500 words, distilled)
+└── 2026-05-14/                ← per-source append-only captures
+    ├── sessions.md            ← Claude Code session-end hook captures
+    ├── health.md              ← collectors/health.py — Oura daily one-liners
+    ├── meetings.md            ← collectors/{gmeet,jamie}.py — meeting one-liners
+    ├── voice.md               ← collectors/voice.py — dictation intakes
+    └── email.md               ← collectors/email_collector.py — delta links
 ```
 
-Each file follows this format:
+**Subfolder (`daily/<date>/<source>.md`)** — append-only captures owned by exactly one writer each. All five writers go through `core.daily_capture` (fcntl-flocked, source-name validated against `KNOWN_SOURCES`). Failures in the rollup write never break the primary substrate write — they're side-effects on top.
+
+**Root file (`daily/<date>.md`)** — the compile-stage digest. Written by the `daily-digest` agent (`prompts/agents/daily-digest.md`) or the `daily_digest_yesterday` piggyback (`scripts/daily_digest_runner.py`). Hard length cap (~500 words) so the digest stays a digest. Refuses to overwrite if the file already has non-digest frontmatter (operator-edit protection).
 
 ```markdown
-# Daily Log: YYYY-MM-DD
+---
+title: "Daily — 2026-05-14"
+type: daily-digest
+date: 2026-05-14
+sources: [sessions, health, meetings, voice]
+---
 
-## Sessions
+# Daily — 2026-05-14
 
-### Session (HH:MM) - Brief Title
+## Highlights
+- 3-7 bullets across all substrates
 
-**Context:** What the user was working on.
+## Physical
+One-paragraph from Oura if health.md exists.
 
-**Key Exchanges:**
-- User asked about X, assistant explained Y
-
-**Decisions Made:**
-- Chose library X over Y because...
-
-**Lessons Learned:**
-- Always do X before Y to avoid...
-
-**Action Items:**
-- [ ] Follow up on X
+## Meetings / Voice notes / Email
+Bullets / one-liners from each source's per-source capture.
 ```
+
+Sessions captures inside `daily/<date>/sessions.md` follow the older per-session block format (header `### Session HH:MM`, key-exchanges, decisions, action-items) — hooks unchanged in shape, only relocated.
+
+Migration of pre-2026-05-15 flat-daily files: `uv run python scripts/migrate_daily_to_rollup.py --vault <vault>`. Copies (not moves) `daily/<date>.md` → `daily/<date>/sessions.md`; idempotent re-runs are a no-op.
+
+Lint `check_daily_consistency` flags: (a) subfolder-without-digest, (b) root-without-subfolder (legacy flat-daily), (c) unknown source names in the subfolder.
 
 ### Layer 3: `knowledge/` — Compiled Knowledge (LLM-Owned)
 

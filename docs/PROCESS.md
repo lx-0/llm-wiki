@@ -22,7 +22,7 @@ Zwei fundamental getrennte Ingest-Pfade konvergieren bei `compile.py`:
 | # | Process | Was passiert | Trigger |
 |---|---|---|---|
 | [1](#1-inbox-processing) | Inbox Processing | Klassifiziert Drops in `inbox/`, verschiebt in `raw/<typ>/` | Manueller Drop |
-| [2](#2-automatic-session-capture-hooks) | Automatic Session Capture | Hooks → `daily/YYYY-MM-DD.md` | session-start / session-end / pre-compact |
+| [2](#2-automatic-session-capture-hooks) | Automatic Session Capture | Session-Hook → `daily/YYYY-MM-DD/sessions.md`; Collectors → `daily/YYYY-MM-DD/{health,meetings,voice,email}.md`; `daily-digest` agent → distilled `daily/YYYY-MM-DD.md` (≤500 words) | session-start / session-end / pre-compact / `daily_digest_yesterday` piggyback |
 | [3](#3-compilation) | Compilation | Claude Agent SDK liest `raw/` + `daily/`, schreibt Articles in `knowledge/` | manuell oder cron-after-hour |
 | [4](#4-scanners) | Scanners | Email · Calendar · Browser · Screenshots · Tabs · YouTube · Jamie · Google Meet · Voice · Health → `raw/notes/` + `raw/transcripts/` + `raw/voice/` | per-Scanner Cron oder piggyback |
 | [5](#5-query--lint) | Query + Lint | NL-Query gegen Wiki · 8 strukturelle Checks · 1 LLM-Contradiction-Scan | manuell |

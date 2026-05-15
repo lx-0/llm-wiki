@@ -566,6 +566,86 @@ def _read_yaml_frontmatter(path: Path) -> dict:
     return data if isinstance(data, dict) else {}
 
 
+def check_daily_consistency() -> list[dict]:
+    """Verify the daily/-rollup invariants (post-2026-05-15 architecture).
+
+    Two structural rules — both warnings, neither blocks:
+
+    1. **Subfolder ↔ root digest pairing.** When `daily/<date>/` exists with
+       any per-source captures, `daily/<date>.md` should also exist (the
+       compile-stage digest). The digest is produced by the
+       `daily-digest` agent / `daily_digest_yesterday` piggyback; a
+       missing root file means the digest pass hasn't run yet or has
+       failed silently. Inverse: a root file without a subfolder is a
+       legacy pre-2026-05-15 flat-daily — flagged for migration.
+    2. **Known sources only.** Files under `daily/<date>/` should match
+       `core.daily_capture.KNOWN_SOURCES`. Stray files (e.g. operator-
+       hand-typed `daily/2026-05-14/scratchpad.md`) get a quality nudge
+       — either rename to a known source or move out of `daily/`.
+
+    Skips the current day's date (digest legitimately not run yet).
+    """
+    from datetime import date as _date
+    issues: list[dict] = []
+    daily_root = ROOT_DIR / "daily"
+    if not daily_root.is_dir():
+        return issues
+
+    try:
+        from core.daily_capture import KNOWN_SOURCES
+    except ImportError:
+        KNOWN_SOURCES = frozenset()
+
+    today_iso = _date.today().isoformat()
+    iso_date_re = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+    iso_md_re = re.compile(r"^\d{4}-\d{2}-\d{2}\.md$")
+
+    # Collect dates with subfolders + with root files
+    subfolder_dates: dict[str, list[str]] = {}
+    root_md_dates: set[str] = set()
+
+    for entry in daily_root.iterdir():
+        if entry.is_dir() and iso_date_re.match(entry.name):
+            captures = sorted(p.name for p in entry.glob("*.md"))
+            if captures:
+                subfolder_dates[entry.name] = captures
+        elif entry.is_file() and iso_md_re.match(entry.name):
+            root_md_dates.add(entry.stem)
+
+    for d, captures in subfolder_dates.items():
+        if d == today_iso:
+            continue  # digest may not have run yet for today
+        if d not in root_md_dates:
+            issues.append(issue(
+                "warning", "daily_missing_digest", f"daily/{d}.md",
+                f"daily/{d}/ has {len(captures)} per-source capture(s) "
+                f"({', '.join(captures)}) but no root digest. Run "
+                f"`wiki agent daily-digest --var date={d}` to produce it.",
+            ))
+        # Unknown sources nudge
+        for cap in captures:
+            stem = cap[:-3] if cap.endswith(".md") else cap
+            if KNOWN_SOURCES and stem not in KNOWN_SOURCES:
+                issues.append(issue(
+                    "warning", "daily_unknown_source", f"daily/{d}/{cap}",
+                    f"Source name {stem!r} is not in daily_capture.KNOWN_SOURCES "
+                    f"({sorted(KNOWN_SOURCES)}). Rename or relocate.",
+                ))
+
+    for d in root_md_dates - set(subfolder_dates):
+        if d == today_iso:
+            continue
+        issues.append(issue(
+            "warning", "daily_legacy_flat", f"daily/{d}.md",
+            f"daily/{d}.md exists without a daily/{d}/ subfolder — this is "
+            "the pre-2026-05-15 flat-daily shape. Run "
+            "`uv run python scripts/migrate_daily_to_rollup.py --vault <path>` "
+            "to migrate.",
+        ))
+
+    return issues
+
+
 def check_facts_violations() -> list[dict]:
     """For each hard fact with negation_terms, grep all non-facts knowledge files for hits.
 
@@ -739,6 +819,7 @@ async def main() -> None:
         ("Concept domain tag", check_concept_domain_tag),
         ("Two-layer pages", check_two_layer_pages),
         ("Action item syntax", check_action_item_syntax),
+        ("Daily consistency", check_daily_consistency),
         ("Sparse articles", check_sparse_articles),
         ("Facts violations", check_facts_violations),
     ]
