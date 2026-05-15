@@ -72,6 +72,11 @@ piggybacks:
 models:
   # Claude model used by compile.py + retry-failed-flushes.
   compile_model: claude-opus-4-7
+  # Compile fallback for sources >= limits.compile_large_source_chars.
+  # Standard 200K Opus window dies silently on 100+ KB transcripts. The 1M
+  # variant absorbs both the source and tool-turn reads. Set to empty string
+  # to disable the auto-upgrade.
+  compile_large_source_model: claude-opus-4-7[1m]
   # Ollama endpoint (used by all local LLM calls).
   ollama_url: http://localhost:11434
   # Vision model for screenshot OCR.

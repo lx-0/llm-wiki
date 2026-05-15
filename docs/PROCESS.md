@@ -269,7 +269,9 @@ flowchart TD
 
 **Agent SDK Config:** `allowed_tools=["Read", "Write", "Edit", "Glob", "Grep"]`, `permission_mode="acceptEdits"`, `max_turns=CONFIG.limits.compile_max_turns` (default 12, war 30 — siehe `.ytstack/KNOWLEDGE.md` "tool-turn ballooning"), `system_prompt=claude_code`. Der LLM hat volle Dateioperations-Rechte innerhalb von `knowledge/`.
 
-**Pre-flight Prompt Budget:** `compile.py` ruft `assert_prompt_within_budget(len(prompt), CONFIG.limits.compile_max_prompt_chars, breakdown={…})` vor dem SDK-Call. Default 400K chars (~110K tokens) — schiebt ein 138 KB Gmeet-Transcript noch knapp durch, eskaliert aber Outlier mit klarer Operator-Message statt 13 Minuten silent kind=unknown. Bei `len(source) >= 50_000` chars zusätzlich eine INFO-Zeile in compile.log mit der Source-Größe, damit timing-Anomalien auf die richtige Datei zeigen.
+**Pre-flight Prompt Budget:** `compile.py` ruft `assert_prompt_within_budget(len(prompt), CONFIG.limits.compile_max_prompt_chars, breakdown={…})` vor dem SDK-Call. Default 400K chars (~110K tokens) — schiebt ein 138 KB Gmeet-Transcript noch knapp durch, eskaliert aber Outlier mit klarer Operator-Message statt 13 Minuten silent kind=unknown. Bei `len(source) >= 50_000` chars zusätzlich eine INFO-Zeile in compile.log mit der Source-Größe.
+
+**Auto Model-Upgrade für große Sources:** Sobald `len(source) >= CONFIG.limits.compile_large_source_chars` (default 50 KB), wechselt der Compile auf `CONFIG.models.compile_large_source_model` (engine default `claude-opus-4-7[1m]`, 1M-context). Hintergrund: das 200K-Window stirbt mid-stream silent (exit-1, empty stderr) wenn Source + Tool-Turn-Reads kombiniert über 200K tokens hinauswachsen — `max_turns`-Cap allein hat das Symptom nur abgekürzt (793s → 210s), nicht behoben. Operator-opt-out: `compile_large_source_model: ""` in config.yaml pinnt alles auf den Standard-Variant.
 
 **Was der Compiler macht pro Source:**
 

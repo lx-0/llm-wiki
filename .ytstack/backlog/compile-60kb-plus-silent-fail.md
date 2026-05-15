@@ -62,14 +62,21 @@ New data point: lxw `gmeet/2026-05-13--...--1qvzqCWczl6u.md` (138 KB) failed wit
 
 So failure is **non-monotonic in size** — a 60 KB file can fail while a 75 KB file succeeds. Strengthens hypothesis 1 (tool-turn fan-out, not raw size) over hypothesis 4 (resource ceiling).
 
-**Partial fix (commit pending, 2026-05-15):**
-- `compile.py` now wires `assert_prompt_within_budget` (`compile_max_prompt_chars: 400_000`) — catches truly oversized initial prompts before the SDK call. The 138 KB case currently fits.
-- `max_turns` dropped from 30 to 12 (`compile_max_turns`) — caps tool-turn ballooning, which is the suspected real driver. A model on a huge source that wants to Read+Grep 25 articles will instead commit at 12 turns. May trigger `error_max_turns` on legitimately-deep compiles; if observed, raise to 15-18.
-- INFO line on sources ≥ 50 KB so the operator sees *which* file slowed things down without re-reading the error log.
+**Attempted fix (commit `8fe658f`, 2026-05-15):**
+- `compile.py` now wires `assert_prompt_within_budget` (`compile_max_prompt_chars: 400_000`).
+- `max_turns` dropped from 30 to 12 (`compile_max_turns`).
+- INFO line on sources ≥ 50 KB.
 
-**Still open:** confirm 138 KB compiles cleanly under the new caps, and characterize whether `max_turns=12` is too tight for any other historic-success workload. If the 138 KB still fails, drop to splitting the transcript at meeting-section boundaries pre-compile.
+**Re-run result (2026-05-15 13:55):** 138 KB gmeet still failed, same `kind=unknown` / exit-1 / empty-stderr profile. Burn time dropped `793 s → 210 s` — max_turns cap engaged — but the silent CLI exit persisted. The tool-turn-ballooning hypothesis was at most partial.
+
+**Working fix (commit pending, 2026-05-15):**
+- `CONFIG.models.compile_large_source_model: claude-opus-4-7[1m]` (1M-context Opus) — auto-engages when `len(source) >= compile_large_source_chars` (50 KB).
+- Operator opt-out: set to `""` to stay on the 200K variant.
+- Validated the model id `claude-opus-4-7[1m]` is accepted by the bundled Claude CLI via `--model` smoke.
+
+**Still to verify:** that the next lxw compile run with the new engine actually completes the 138 KB transcript and produces compiled articles. If yes, this backlog closes. If still fails: the bottleneck is elsewhere (Anthropic-side timeout, CLI bug on specific content shape, output-side ballooning) — drop to splitting transcripts at section boundaries pre-compile.
 
 ## Operator workaround for now
 
-- The new pre-flight + max_turns cap should let `wiki compile` chew through the 138 KB case at known cost (or abort cleanly with `error_max_turns` instead of silent burn). Validate on the next lxw run.
-- Fallback if it still fails: split sources >100 KB at section boundaries before placing under `raw/transcripts/`.
+- After `wiki update` in lxw: the 1M-variant auto-upgrade should let the 138 KB transcript compile cleanly. Operator does not need to edit `config.yaml` — the new field is engine-default.
+- If the next run still fails with the same signature: split sources >100 KB at `### MM:SS` section boundaries pre-compile.

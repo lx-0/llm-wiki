@@ -196,11 +196,21 @@ async def compile_file(source: Path, dry_run: bool = False, prefix: str = "") ->
         log.error("  %s", exc)
         return {"_skipped": "prompt_too_large"}
 
-    if len(source_content) >= CONFIG.limits.compile_large_source_chars:
+    # Pick the model. Large sources auto-upgrade to the 1M-context variant
+    # because the standard 200K window dies silently mid-stream once the
+    # source + tool-turn reads exceed the window (see KNOWLEDGE.md
+    # "tool-turn ballooning"). Operator can pin to the small variant by
+    # setting `compile_large_source_model: ""` in config.yaml.
+    model = CONFIG.models.compile_model
+    if (
+        len(source_content) >= CONFIG.limits.compile_large_source_chars
+        and CONFIG.models.compile_large_source_model
+    ):
+        model = CONFIG.models.compile_large_source_model
         log.info(
-            "  large source: %d chars (%.1f KB) — max_turns capped at %d",
+            "  large source: %d chars (%.1f KB) — using %s (max_turns=%d)",
             len(source_content), len(source_content) / 1024,
-            CONFIG.limits.compile_max_turns,
+            model, CONFIG.limits.compile_max_turns,
         )
 
     # Run the agent with file editing tools
@@ -216,7 +226,7 @@ async def compile_file(source: Path, dry_run: bool = False, prefix: str = "") ->
             options=ClaudeAgentOptions(
                 max_buffer_size=CONFIG.limits.sdk_max_buffer_size_mb * 1024 * 1024,
                 cwd=str(ROOT_DIR),
-                model=CONFIG.models.compile_model,
+                model=model,
                 allowed_tools=["Read", "Write", "Edit", "Glob", "Grep"],
                 permission_mode="acceptEdits",
                 max_turns=CONFIG.limits.compile_max_turns,
@@ -235,7 +245,7 @@ async def compile_file(source: Path, dry_run: bool = False, prefix: str = "") ->
             log,
             label="compile_file",
             source=rel_path,
-            model=CONFIG.models.compile_model,
+            model=model,
             input_chars=len(source_content),
             started=started,
             capture=capture,

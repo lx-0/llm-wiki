@@ -66,6 +66,13 @@ class PiggybackTask:
 @dataclass
 class Models:
     compile_model: str = "claude-opus-4-7"
+    # Compile fallback for sources >= CONFIG.limits.compile_large_source_chars.
+    # The standard 200K-token Opus window dies silently (exit-1, empty stderr)
+    # on 100+ KB transcripts even with max_turns capped — Read-tool fan-out into
+    # knowledge/ articles plus the source itself blow past the window mid-stream.
+    # The 1M variant absorbs both. Set to "" to disable the auto-upgrade and
+    # stay on `compile_model` regardless of source size.
+    compile_large_source_model: str = "claude-opus-4-7[1m]"
     ollama_url: str = "http://localhost:11434"
     vision_model: str = "gemma4:e4b"
     curiosity_model: str = "gemma4:e4b"

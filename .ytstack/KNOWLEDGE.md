@@ -121,12 +121,18 @@ Context overflow can't be classified *after* the fact — empty stderr, variable
 
 After `94c9d6b` shrank the *initial* prompt embed via the compact index, a fresh case appeared: lxw gmeet transcript at 138 KB. Initial prompt only 227 KB chars (~65K tokens) — well inside the budget. But `max_turns=30` plus a meaty source = the model keeps Reading/Grepping `knowledge/` articles to look for prior context, and each tool turn adds 5-20 KB of content to the context. After ~25 such turns the running context blows past 200K tokens and the bundled CLI exits with the same `kind=unknown` / 793 s / empty stderr signature.
 
-**Fix** (commit pending): two complementary caps wired in `compile.py`:
-- `CONFIG.limits.compile_max_prompt_chars` (default 400K, ≈ 110K tokens) — `assert_prompt_within_budget` pre-flight, parity with `query.py`. Aborts with a breakdown line *before* the SDK call.
-- `CONFIG.limits.compile_max_turns: 12` (down from 30) — matches the depth real compiles use (grep index → read 2-4 articles → write). Forces the model to commit instead of looping.
-- INFO line on sources ≥ 50K chars so the operator sees *which* file was big when timings get long.
+**First fix (commit `8fe658f`):** two caps in `compile.py` — `compile_max_prompt_chars` pre-flight + `compile_max_turns: 12` (was 30) — reduced burn time `793 s → 210 s` but did **not** solve the silent exit. The failure recurred with the same signature on the same 138 KB file under max_turns=12. So tool-turn count alone was not the root cause; it was *one* axis of context growth among several. The cap is still defense-in-depth (limits worst-case burn), kept in place.
 
-**Lesson:** A budget guard on the *initial* prompt only covers half the overflow surface. Tool-using agents accumulate context turn-by-turn — `max_turns` is the second axis. When the model has a huge source plus 30 turns of file-read freedom, it will use both. Pick `max_turns` against the depth real successful compiles need, not the worst-case theoretical exploration.
+**Real fix (commit pending):** the 200K window is the wrong tool for 100+ KB sources. Switching to the 1M-context Opus variant absorbs both the source and the tool-turn reads. Wired as a size-triggered model upgrade:
+
+- `CONFIG.models.compile_large_source_model: claude-opus-4-7[1m]` — engine default. When `len(source) >= compile_large_source_chars` (50 KB), `compile.py` uses this model instead of `compile_model`. Smaller files keep the cheaper standard variant.
+- The bundled Claude Code CLI accepts the bracketed-suffix model id directly (`--model 'claude-opus-4-7[1m]'`); verified via `claude --print` smoke.
+- Operator opt-out: set `compile_large_source_model: ""` in `config.yaml` and the upgrade short-circuits — useful if 1M pricing becomes a concern or as a debugging knob.
+
+**Lessons:**
+1. A budget guard on the *initial* prompt only covers half the overflow surface. Tool-using agents accumulate context turn-by-turn — `max_turns` is the second axis. Pick it against the depth real successful compiles need, not worst-case theoretical exploration.
+2. Caps mitigate, they don't solve, when the size mismatch is fundamental. If a single source is 138 KB and the model's window is 200K, you're one bad turn away from the cliff regardless of how tightly you guard the rest. Match the model to the data, then cap.
+3. *Don't claim a fix without re-running the failing case.* The first attempt looked plausible (burn time dropped 3.7×) but the symptom was unchanged. Per CLAUDE.md "Symptom vs Root-Cause": be explicit when only mitigating.
 
 #### Lesson
 
