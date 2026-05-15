@@ -104,7 +104,9 @@ Numeric fields in frontmatter so query/lint can grep without prose parsing. comp
 
 ## Status
 
-Backlog, concept-stage. Substrate is already producing daily — only the pull-into-wiki step missing. Phase 1 is the lowest-effort high-yield collector in the current backlog.
+**Phase 1 shipped 2026-05-15** as an ad-hoc out-of-milestone arc — commits `c7aaef1` (plan) → `1fd1044` (impl) → `241ad4a` (env-template) → `9a7f585` (schema fix) → `047c55d` (docs). Live on lxw vault with the `default` account holding the operator's Oura PAT; 90-day backfill at 75/90 full-data days, 13/90 steps-only (ring not worn), 2/90 sessions-but-no-scores. Watermark advances incrementally. See `.ytstack/AD-HOC-health-phase-1-SUMMARY.md` for the closure record.
+
+Phase 2 (HealthKit XML quarterly drop-folder) and Phase 3 (Health Auto Export) remain backlogged as documented above.
 
 ## Cross-references
 
