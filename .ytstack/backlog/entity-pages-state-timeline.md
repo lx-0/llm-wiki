@@ -20,7 +20,14 @@ sources: ["daily/2026-04-12.md", "raw/transcripts/jamie/2026-04-15--review--abc.
 ## State
 - **Role:** VP Eng, Acme
 - **Relationship:** former colleague
-- **Open threads:** waiting on her intro to Bob; promised to send Q3 deck
+
+## Action Items
+- [ ] Send Q3 deck 📅 2026-05-20
+- [ ] Follow up on Bob intro
+
+## Open Threads
+- Waiting on her intro to Bob (mentioned 2026-04-15)
+- Pending: confirm Q3 review attendance
 
 ## What they're building
 Prose, with `[[wikilinks]]` into concepts/projects.
@@ -41,6 +48,7 @@ Prose, with `[[wikilinks]]` into concepts/projects.
 - Jamie meetings (live since 2026-05-13) have `attendees`. They currently land in `raw/transcripts/jamie/<date>--<slug>.md` and nowhere aggregates "all meetings attended by Jane". The compile pass distills *content*, not *participation*.
 - `daily/` mentions of people accumulate without ever rolling up.
 - Atomic-article pattern works for `concepts/` and `qa/`. It under-aggregates for `people/` and `projects/`.
+- **Action items + Open Threads have no home today.** Meeting transcripts (jamie/gmeet) and email substrates contain commitments ("I'll send the deck", "waiting on Bob's intro"). Karpathy/Cole concepts exclude tasks. gbrain treats them as first-class: `commitment` is a Fact-kind, entity pages have explicit `## Action Items` + `## Open Threads` sections in the State block, and meeting-ingestion cron extracts tasks and propagates them to entity pages (`docs/GBRAIN_RECOMMENDED_SCHEMA.md`, `docs/takes-vs-facts.md`). Adopting entity-pages gives us the natural home for personal task management without inventing a top-level `tasks/` folder.
 
 ## Open design questions
 
@@ -49,6 +57,9 @@ Prose, with `[[wikilinks]]` into concepts/projects.
 - **Timeline source granularity.** Per-substrate-file (one entry per source) or per-event (multiple entries for a single long meeting transcript)? Probably per-source for simplicity; revisit if entries become too dense.
 - **Who writes the State block — LLM or operator?** Compile prompt rewrites State each pass from current substrate; operator edits get preserved only inside markers (analogous to dashboard agent-button markers). Or: State is fully LLM-owned, operator overrides go to `facts/` as today.
 - **`compiled_from` provenance** stays in frontmatter; Timeline cites the same sources but with one-line context. Some duplication is OK.
+- **Action-item extraction from substrates.** Should `compile.py` extract `- [ ]` checkboxes from jamie/gmeet/email during compile and route them to the right entity's `## Action Items` section? Open: who-mentioned-whom resolution (commitment "I'll send the deck" by Jane in a meeting → does it land on Jane's page, the operator's page, or the project page?). gbrain's answer: meeting-ingestion fires `extract tasks → propagate to entity pages`. Probably defer until first compile pass over jamie content reveals the shape of real commitments.
+- **Lifecycle: how do `- [ ]` items get checked off?** Three candidates: (a) operator edits in Obsidian, Tasks plugin handles state; (b) next compile pass detects "resolution evidence" in substrate and moves the item to Timeline below `---`; (c) explicit `wiki tasks close <id>` CLI. (a) is the lowest-friction default and Obsidian-Tasks-compatible.
+- **Compatibility with Obsidian Tasks plugin.** `- [ ]` + inline metadata (`📅 due`, `⏫ priority`, `🔁 recurrence`) is the standard. Dataview queries (`TASK WHERE !completed AND contains(file.path, "knowledge/people/")`) give us free Inbox/Today/Waiting views without extra engine code.
 
 ## Touchpoints
 
@@ -78,6 +89,7 @@ Prose, with `[[wikilinks]]` into concepts/projects.
 
 - First Jamie compile pass produces person-shaped output that wants aggregation (probably within 10-20 meetings).
 - OR operator hits a "where is everything about Jane?" moment and has to grep `daily/` + `raw/transcripts/`.
+- OR operator wants personal task-management against the wiki and currently has nowhere to land action items — this backlog file becomes the answer (entity-pages with `## Action Items` section, Obsidian Tasks plugin for query/check-off).
 
 ## Status
 
