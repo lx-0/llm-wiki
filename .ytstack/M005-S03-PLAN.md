@@ -5,7 +5,7 @@ project: llm-wiki
 created: 2026-05-15T17:00:00Z
 status: planned
 task_count: 5
-completed_tasks: 2
+completed_tasks: 3
 ---
 
 # M005-S03 -- Slice Plan
@@ -16,7 +16,7 @@ completed_tasks: 2
 
 - [x] T01 -- Compile-prompt rule -- LLM identifies commitments (Task/Owner/Deadline/Context) when reading jamie/gmeet substrates
 - [x] T02 -- Entity resolution -- given "Jane will send the deck", match speaker → `knowledge/people/jane-doe.md` (existing-entity match + create-stub fallback)
-- [ ] T03 -- Routing logic in `scripts/compile.py` so extracted commitments land in the right entity page's State block, with Timeline citation of the source substrate
+- [x] T03 -- Routing logic in `scripts/compile.py` so extracted commitments land in the right entity page's State block, with Timeline citation of the source substrate
 - [ ] T04 -- Fixture test -- `tests/fixtures/jamie/<canary>.md` with known commitments, verify compile emits correct items on correct pages
 - [ ] T05 -- Real-substrate canary -- spot-check on one jamie + one gmeet meeting, iterate prompt if extraction quality is weak
 

@@ -33,6 +33,9 @@ The wiki engine is a **compiler** — it turns raw sources into wiki articles. G
 | **LinkedIn ingest** | LinkedIn API / MCP | contacts, posts, messages → `raw/notes/linkedin/` | weekly | low |
 | **Messages digest** | iMessage / Signal / Slack | relevant convos → `raw/notes/messages/` | tbd | low |
 | **Articles / RSS** | RSS feeds | new articles → `raw/articles/` | daily | low |
+| **LLM transcripts** | Claude Code JSONL / Cursor / Claude.ai+ChatGPT exports | per-session distillates → `raw/transcripts/llm/` | daily | high — see `llm-transcripts-collector.md` |
+| **GitHub activity** | `gh` GraphQL / REST across orgs | own commits/PRs/comments → `raw/notes/github/` | daily | high — see `github-activity-collector.md` |
+| **SunoFlow** | sunoflow.up.railway.app REST (`sk-`) | own songs (Phase 1) + play-history (Phase 2, blocked on lx-0/SunoFlow#70) → `raw/notes/sunoflow/` | 12h piggyback | medium — see `sunoflow-collector.md` |
 
 ## Email ingest pattern (template for others)
 
