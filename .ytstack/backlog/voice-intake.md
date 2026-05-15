@@ -85,29 +85,41 @@ Piggyback default: `True`, cooldown 1 h (voice is time-sensitive).
 `is_configured()` returns False when `voice_inbox` is empty or missing →
 graceful agnostic, no error.
 
-## Operator setup (OpenWhispr path)
+## Operator setup
 
-Documented in `docs/setup-voice.md`. TL;DR:
+**Mobile primary (2026-05-15 pivot):** the operator dictates on iPhone,
+not Mac. Setup `docs/setup-voice.md` documents the path; TL;DR:
 
-1. `mkdir -p ~/VoiceIntake`
-2. Install OpenWhispr; configure its "save transcript to file" target to
-   `~/VoiceIntake/voice-$(date +%s).txt`.
-3. Set `personal.voice_inbox: "~/VoiceIntake"` in
-   `<vault>/.wiki/config.yaml`.
-4. Either: wait for the piggyback (auto, 1 h cooldown), or run
-   `wiki collect voice` manually.
+1. `mkdir -p ~/Library/Mobile\ Documents/com~apple~CloudDocs/VoiceIntake`
+2. Set `personal.voice_inbox` to that iCloud-Drive-synced path.
+3. On iPhone, build a Shortcut: *Dictate Text → Save File → iCloud
+   Drive/VoiceIntake/voice-<timestamp>.txt*. Bind to Action Button or
+   Back Tap.
+4. iCloud syncs the file to Mac (~30 s–2 min). Piggyback or
+   `wiki collect voice` ingests.
 
-Alternative paths (no engine change required):
+**Engine change for the mobile pivot: zero.** The collector is
+path-agnostic; iCloud Drive just happens to be a folder.
 
-- FluidVoice: same approach, point its export at `~/VoiceIntake`.
-- macOS built-in dictation: paste into a `.txt` in the inbox.
+**Mac-side alternatives (no engine change either):**
+
+- OpenWhispr: BYOK Whisper / Parakeet, MIT, cross-platform. Best Mac pick.
+- FluidVoice: macOS-native Swift, pure-local, GPLv3.
+- macOS built-in dictation: hold Fn, paste into a `.txt` in the inbox.
 - Hammerspoon snippet: capture clipboard → write timestamped file.
+- Aiko (iOS): free, MIT-spirit, on-device Whisper — better quality than
+  Apple's native dictation for proper-noun-heavy domains.
 
 ## Deferred (not in durchstich)
 
-- **Audio-file ingestion** — pass `.m4a` / `.wav` through whisper.cpp /
-  Parakeet ourselves. Doubles the value but doubles the surface; only
-  worth it once the text-inbox path proves daily-use.
+- **Audio-file ingestion (next-up after the Shortcut path lands)** —
+  pass `.m4a` / `.wav` through whisper.cpp / Parakeet ourselves. The
+  iOS Shortcut path caps out around 60 s of silence-triggered cutoff,
+  so long-form capture (5–30 min commute / walks) needs Voice Memos +
+  a Mac-side launchd watcher transcribing `.m4a`s out of
+  `~/Library/Group Containers/group.com.apple.VoiceMemos.shared/Recordings/`.
+  Was "doubles the surface; wait for daily-use to prove" pre-2026-05-15;
+  the mobile-first pivot makes this the natural next slice.
 - **Voice-note → daily-log pairing** — append short voice notes to the
   current `daily/YYYY-MM-DD.md` instead of a standalone raw file. Wait
   for compile feedback on the first batch before committing.
