@@ -49,12 +49,18 @@ Manually curated source documents. The LLM reads from them but **NEVER modifies 
 raw/
 ├── articles/        # PERMANENT: web articles, blog posts, HTML originals + enriched markdown
 ├── papers/          # PERMANENT: PDFs, research papers (text-extracted)
-├── notes/           # PERMANENT: manually written notes, scanner outputs
-│   ├── email/       # Scanner output: email metadata, deltas, deep scans
-│   ├── calendar/    # Scanner output: calendar metadata
-│   ├── browser/     # Scanner output: browser metadata
-│   └── screenshots/ # Scanner output: screenshot descriptions (Vision LLM)
-├── transcripts/     # PERMANENT: audio transcriptions (Whisper output)
+├── notes/           # PERMANENT: collector output (one subfolder per collector)
+│   ├── email/       # Collector: email metadata + deltas + deep scans
+│   ├── calendar/    # Collector: calendar metadata
+│   ├── browser/     # Collector: browser bookmarks/history/tabs
+│   ├── tabs/        # Collector: Firefox Simple Tab Groups snapshots
+│   ├── screenshots/ # Collector: screenshot Vision-LLM descriptions
+│   ├── youtube/     # Collector: video metadata + transcript + comments (per-video markdown)
+│   └── health/      # Collector: daily biometric rollup (Oura) — `<year>/<date>--<account>.md`
+├── transcripts/     # PERMANENT: meeting + audio transcripts
+│   ├── jamie/       # Collector: Jamie AI meeting-notetaker (paired summary + diarised transcript)
+│   └── gmeet/       # Collector: Gemini Meet Notes + Transcript Docs (Drive API; paired sections)
+├── voice/           # PERMANENT: dictation transcripts (collectors/voice.py — folder-watch on personal.voice_inbox)
 ├── audio/           # PERMANENT: original audio files (referenced by transcripts)
 ├── memories/        # PERMANENT: seeded Claude Code memories
 ├── requests/        # MUTABLE: compiler-generated ingest requests (status changes)
@@ -507,7 +513,7 @@ Analyzes source + wiki index → identifies specific gaps
        ↓
 Writes JSON request files to raw/requests/ (cap: limits.curiosity_max_gaps)
        ↓
-Piggyback task: scan-email.py --follow-requests (daily, 24h cooldown)
+Piggyback task: `wiki curiosity run-oldest` (daily, 24h cooldown) — dispatches by request kind
        ↓
 Deep scan reads email bodies → thread reconstruction → LLM filtering
        ↓
@@ -634,7 +640,8 @@ All LLM prompts live as standalone `.md` files under `<vault>/.wiki/prompts/`. S
 ├── README.md                      # User-facing documentation
 ├── dashboard.md                   # Obsidian home page (Dataview)
 ├── raw/                           # Curated sources (immutable)
-│   ├── articles/, papers/, notes/, transcripts/, audio/
+│   ├── articles/, papers/, notes/{email,calendar,browser,tabs,screenshots,youtube,health}/
+│   ├── transcripts/{jamie,gmeet}/, voice/, audio/
 │   ├── memories/
 │   ├── requests/                  # Compiler-generated ingest requests
 │   └── suggestions/               # Compiler-generated optimization suggestions
