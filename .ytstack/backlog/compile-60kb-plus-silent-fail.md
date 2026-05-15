@@ -80,3 +80,19 @@ So failure is **non-monotonic in size** — a 60 KB file can fail while a 75 KB 
 
 - After `wiki update` in lxw: the 1M-variant auto-upgrade should let the 138 KB transcript compile cleanly. Operator does not need to edit `config.yaml` — the new field is engine-default.
 - If the next run still fails with the same signature: split sources >100 KB at `### MM:SS` section boundaries pre-compile.
+
+## 2026-05-15 evening update: small-source stochastic fan-out also fails
+
+Same exit-1 / empty-stderr / kind=unknown signature observed on **small** memory raws (0.7–23 KB) in lxw's run between 17:00 and 17:51 — ~30 % failure rate, same file succeeds on retry. Examples in the same run:
+
+| File | Size | Result | Duration |
+|---|---|---|---|
+| `lxw--wiki__AGENTS.md` | 9.4 KB | ✓ | 115 s |
+| `lxw--wiki__CLAUDE.md` | 0.7 KB | ✗ | 111 s |
+| `lxw__AGENTS.md` | 22.5 KB | ✗ | 130 s |
+
+A 0.7 KB source failing after 111 s rules out raw-size as the discriminator — confirms hypothesis 1 (tool-turn fan-out into `knowledge/`) is doing the damage even on tiny inputs, since the cost driver is the model's Read/Grep loop over the knowledge index, not the source itself.
+
+**Added knob (this commit):** `compile_retry_long_context_on_unknown` (default `true`). After a `kind=unknown` failure, retry once with `compile_large_source_model` (1M-context Opus). Closes the gap left by the size-threshold auto-upgrade — the threshold catches deterministic overflows, the retry catches the stochastic ones. Hypothesis-1-confirming if the retry rate stays near the prior failure rate; falsifying if the 1M variant also fails on the same files.
+
+**Verifies on next lxw run.** Watch for `WARNING  retrying with long-context model …` lines and whether the second attempt succeeds.

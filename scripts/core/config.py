@@ -184,6 +184,15 @@ class Limits:
     # extra INFO line so the operator can see *which* file was big when
     # the SDK call slows down. Pure logging signal, no behavior change.
     compile_large_source_chars: int = 50_000
+    # Retry once with `compile_large_source_model` (the 1M-context Opus
+    # variant) when a compile call returns kind=unknown — the silent
+    # exit-1 / empty-stderr signature of mid-stream context overflow from
+    # tool-turn fan-out into knowledge/ articles. The 50 KB source-size
+    # threshold catches deterministic overflows; this retry catches the
+    # stochastic ones on small sources where the same file succeeds 70%
+    # of the time and fails 30%. Off-switch for operators who would
+    # rather see the failure than pay the 1M-variant premium.
+    compile_retry_long_context_on_unknown: bool = True
 
 
 @dataclass

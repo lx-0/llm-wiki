@@ -213,63 +213,89 @@ async def compile_file(source: Path, dry_run: bool = False, prefix: str = "") ->
             model, CONFIG.limits.compile_max_turns,
         )
 
-    # Run the agent with file editing tools
-    total_input_tokens = 0
-    total_output_tokens = 0
-    result_text = ""
-    started = time.time()
-    capture = StderrCapture()
+    async def _attempt(model_id: str) -> tuple[dict, FailureClass | None]:
+        total_input_tokens = 0
+        total_output_tokens = 0
+        result_text = ""
+        started = time.time()
+        capture = StderrCapture()
+        try:
+            async for message in query(
+                prompt=prompt,
+                options=ClaudeAgentOptions(
+                    max_buffer_size=CONFIG.limits.sdk_max_buffer_size_mb * 1024 * 1024,
+                    cwd=str(ROOT_DIR),
+                    model=model_id,
+                    allowed_tools=["Read", "Write", "Edit", "Glob", "Grep"],
+                    permission_mode="acceptEdits",
+                    max_turns=CONFIG.limits.compile_max_turns,
+                    system_prompt=render("compile_main_system"),
+                    setting_sources=[],
+                    stderr=capture.callback,
+                ),
+            ):
+                if isinstance(message, AssistantMessage) and message.usage:
+                    total_input_tokens += message.usage.get("input_tokens", 0)
+                    total_output_tokens += message.usage.get("output_tokens", 0)
+                if isinstance(message, ResultMessage):
+                    result_text = message.result
+        except Exception as exc:
+            failure = log_sdk_failure(
+                log,
+                label="compile_file",
+                source=rel_path,
+                model=model_id,
+                input_chars=len(source_content),
+                started=started,
+                capture=capture,
+                exc=exc,
+            )
+            return {}, failure
 
-    try:
-        async for message in query(
-            prompt=prompt,
-            options=ClaudeAgentOptions(
-                max_buffer_size=CONFIG.limits.sdk_max_buffer_size_mb * 1024 * 1024,
-                cwd=str(ROOT_DIR),
-                model=model,
-                allowed_tools=["Read", "Write", "Edit", "Glob", "Grep"],
-                permission_mode="acceptEdits",
-                max_turns=CONFIG.limits.compile_max_turns,
-                system_prompt=render("compile_main_system"),
-                setting_sources=[],
-                stderr=capture.callback,
-            ),
-        ):
-            if isinstance(message, AssistantMessage) and message.usage:
-                total_input_tokens += message.usage.get("input_tokens", 0)
-                total_output_tokens += message.usage.get("output_tokens", 0)
-            if isinstance(message, ResultMessage):
-                result_text = message.result
-    except Exception as exc:
-        failure = log_sdk_failure(
-            log,
-            label="compile_file",
-            source=rel_path,
-            model=model,
-            input_chars=len(source_content),
-            started=started,
-            capture=capture,
-            exc=exc,
+        elapsed = time.time() - started
+        # Claude Opus 4.7 pricing: $5/M input, $25/M output
+        cost = (total_input_tokens * 5.0 + total_output_tokens * 25.0) / 1_000_000
+        log.info(
+            "  ✓ %.1fs · in:%s out:%s ($%.4f)",
+            elapsed,
+            f"{total_input_tokens:,}",
+            f"{total_output_tokens:,}",
+            cost,
         )
+        return (
+            {
+                "input_tokens": total_input_tokens,
+                "output_tokens": total_output_tokens,
+                "cost_usd": cost,
+                "result": result_text,
+            },
+            None,
+        )
+
+    success, failure = await _attempt(model)
+
+    # Retry once with the 1M-context variant on the kind=unknown signature
+    # of mid-stream context overflow from tool-turn fan-out. Deterministic
+    # overflows are already caught by the source-size threshold above; this
+    # covers the stochastic ones on small sources where the same file
+    # succeeds ~70% and fails ~30%.
+    long_ctx_model = CONFIG.models.compile_large_source_model
+    if (
+        failure is not None
+        and failure.kind == "unknown"
+        and CONFIG.limits.compile_retry_long_context_on_unknown
+        and long_ctx_model
+        and model != long_ctx_model
+    ):
+        log.warning(
+            "  retrying with long-context model %s after kind=unknown",
+            long_ctx_model,
+        )
+        success, failure = await _attempt(long_ctx_model)
+
+    if failure is not None:
         return {"_failure": failure}
-
-    elapsed = time.time() - started
-    # Estimate cost (Claude Opus 4.6 pricing: $5/M input, $25/M output)
-    cost = (total_input_tokens * 5.0 + total_output_tokens * 25.0) / 1_000_000
-    log.info(
-        "  ✓ %.1fs · in:%s out:%s ($%.4f)",
-        elapsed,
-        f"{total_input_tokens:,}",
-        f"{total_output_tokens:,}",
-        cost,
-    )
-
-    return {
-        "input_tokens": total_input_tokens,
-        "output_tokens": total_output_tokens,
-        "cost_usd": cost,
-        "result": result_text,
-    }
+    return success
 
 
 # ── Main ─────────────────────────────────────────────────────────────

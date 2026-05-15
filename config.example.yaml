@@ -165,6 +165,12 @@ limits:
   compile_max_turns: 12
   # Surface an INFO line when source ≥ this many chars (logging signal only).
   compile_large_source_chars: 50000
+  # Retry once with `models.compile_large_source_model` on kind=unknown
+  # (the silent exit-1 / empty-stderr signature of mid-stream context
+  # overflow from tool-turn fan-out into knowledge/). Catches the
+  # stochastic overflows on small sources that the size-threshold above
+  # misses. Set to false to skip the retry and surface the failure.
+  compile_retry_long_context_on_unknown: true
 
 features:
   # Master switches for entire capabilities.
