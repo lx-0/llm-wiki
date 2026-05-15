@@ -61,27 +61,50 @@ async def maybe_generate_curiosity_requests(source: Path) -> None:
     if not folder_paths:
         log.info("  Curiosity: no personal.email_folders configured, skipping")
         return
-    # Numbered listing — gemma4:e4b reliably honours an integer-range schema
-    # but historically left the free-vocab `folder` enum empty on ~100 % of
-    # gaps, dropping every request since 2026-05-03. Index-based picking
-    # constrains the choice to N integers Ollama can actually enforce.
+    # Numbered listing — the schema constrains `folder_index` to an integer
+    # range, but the prompt still has to spell out which integer maps to
+    # which folder. Single source of truth: the same enumerate order is
+    # used to map `folder_index → folder_path` after parsing.
     folder_listing = "\n".join(
         f"{i+1}. {f['path']} — {f.get('desc', '')}".rstrip(" —")
         for i, f in enumerate(CONFIG.personal.email_folders)
     )
 
+    # Pre-flight: keep the prompt under the picked model's effective window.
+    # Different models silently degrade differently when oversized — phi4's
+    # 16k window truncated and hallucinated; gemma4 ignores the schema
+    # entirely. The compact-index portion grows linearly with the vault and
+    # is the only knob we can shrink without losing the source signal. If
+    # the assembled prompt would breach budget, truncate index_md in place,
+    # warn the operator, and continue — curiosity is opportunistic, not
+    # blocking.
+    src_excerpt = source_content[:5000]
+    compiled_excerpt = compiled_articles[:3000]
+    budget = CONFIG.limits.curiosity_max_prompt_chars
+    # Reserve room for everything except index_md (template, source excerpt,
+    # folder listing, compiled excerpt, timestamp, slack).
+    non_index_chars = len(src_excerpt) + len(compiled_excerpt) + len(folder_listing) + 4_000
+    max_index_chars = max(10_000, budget - non_index_chars)
+    if len(index_md) > max_index_chars:
+        log.warning(
+            "  Curiosity: compact index (%d chars) exceeds budget — truncating to %d chars",
+            len(index_md), max_index_chars,
+        )
+        index_md = index_md[:max_index_chars] + "\n\n_[index truncated for curiosity budget]_\n"
+
     prompt = render(
         "compile_curiosity",
         index_md=index_md,
         source_path=rel_path,
-        source_content=source_content[:5000],  # cap to avoid huge prompts
-        compiled_articles=compiled_articles[:3000],
+        source_content=src_excerpt,
+        compiled_articles=compiled_excerpt,
         timestamp=now_iso(),  # cache-buster
         primary_account=CONFIG.personal.primary_account,
         email_folders_listing=folder_listing,
     )
 
-    log.info("  Curiosity pass for %s", rel_path)
+    log.info("  Curiosity pass for %s (model=%s, prompt=%d chars)",
+             rel_path, CURIOSITY_MODEL, len(prompt))
 
     account_names = list(CONFIG.personal.accounts.keys()) or [CONFIG.personal.primary_account]
     schema = {
@@ -196,7 +219,22 @@ async def maybe_generate_curiosity_requests(source: Path) -> None:
             )
 
     except httpx.TimeoutException:
-        log.warning("  Curiosity: Ollama timeout")
+        log.warning("  Curiosity: Ollama timeout (model=%s, %ds)",
+                    CURIOSITY_MODEL, CONFIG.limits.curiosity_timeout_s)
+    except httpx.HTTPStatusError as e:
+        # Distinguish "model not pulled" (404) from generic Ollama errors so
+        # the operator gets a clear "ollama pull <model>" hint when needed.
+        if e.response.status_code == 404:
+            log.warning(
+                "  Curiosity: Ollama model %r not available — pull it on the host "
+                "(`ollama pull %s`) or change CONFIG.models.curiosity_model",
+                CURIOSITY_MODEL, CURIOSITY_MODEL,
+            )
+        else:
+            log.warning("  Curiosity: Ollama HTTP %s — %s",
+                        e.response.status_code, e.response.text[:200])
+    except httpx.HTTPError as e:
+        log.warning("  Curiosity: Ollama connection error: %s", e)
     except (json.JSONDecodeError, KeyError) as e:
         log.warning("  Curiosity: parse error: %s", e)
     except Exception:

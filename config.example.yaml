@@ -81,10 +81,14 @@ models:
   ollama_url: http://localhost:11434
   # Vision model for screenshot OCR.
   vision_model: gemma4:e4b
-  # Curiosity-loop model (compile.py post-pass). Needs reliable JSON-Schema
-  # honoring — gemma4:e4b ignored the schema and produced invented field
-  # names, dropping every gap. phi4:14b honors it. Both are local/free.
-  curiosity_model: phi4:14b
+  # Curiosity-loop model (compile.py post-pass). Picks via 3 constraints:
+  #   1. Honors Ollama JSON-Schema (gemma4:e4b doesn't — invents own fields)
+  #   2. Context window fits the curiosity prompt (~22-25k tokens at vault
+  #      sizes ≥ 700 articles — phi4:14b's 16k window silently truncates and
+  #      the model hallucinates topics from index fragments)
+  #   3. Quality on instruction-follow + reasoning
+  # llama3.1:8b clears all three (MT 9.14, 128k ctx, schema ✓, local/free).
+  curiosity_model: llama3.1:8b
   # Inbox classifier.
   classify_model: gemma4:e4b
 
@@ -102,6 +106,10 @@ limits:
   curiosity_max_gaps: 3
   curiosity_min_source_chars: 500
   curiosity_timeout_s: 240               # ollama gap-detection call (gemma4:e4b on long YT-notes >90s)
+  # Pre-flight cap for the curiosity prompt — index_md is truncated in-place
+  # if total exceeds this. Keep some headroom under the picked model's
+  # context window (llama3.1:8b = 128k = ~430K chars).
+  curiosity_max_prompt_chars: 250000
   # Lint.
   sparse_threshold_words: 200
   # YouTube ingest (scan-youtube.py).

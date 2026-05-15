@@ -75,13 +75,17 @@ class Models:
     compile_large_source_model: str = "claude-opus-4-7[1m]"
     ollama_url: str = "http://localhost:11434"
     vision_model: str = "gemma4:e4b"
-    # Curiosity gap-detection: needs reliable JSON-Schema honoring. gemma4:e4b
-    # (4B) ignores Ollama's `format` schema entirely — invents its own field
-    # names (`reasoning`, `suggested_action` instead of `folder_index`,
-    # `rationale`). phi4:14b honors the schema rigorously (verified 2026-05-15
-    # against the actual prompt) and is locally hosted, so still zero-cost.
-    # ~10-30 s/call vs ~5 s for gemma4. Trade-off is acceptable.
-    curiosity_model: str = "phi4:14b"
+    # Curiosity gap-detection. Needs *both* schema-honoring AND enough context
+    # to fit the curiosity prompt (compact index + source + folder listing).
+    # Decision matrix (skills/local-llm 2026-05-04 + 2026-05-15 probe):
+    #   - gemma4:e4b → MT 9.16, 128k ctx, BUT ignores Ollama JSON-Schema entirely
+    #     (invents `reasoning`/`suggested_action` field names). 6-week stillstand.
+    #   - phi4:14b   → MT 9.26, but only **16k** ctx. lxw curiosity prompt is
+    #     ~22-25k tokens (64 KB compact index dominates) → silent truncation,
+    #     model reasons on a fragment, hallucinates topics from random index rows.
+    #   - llama3.1:8b → MT 9.14, **128k** ctx, schema-honors ✓ (verified probe).
+    #     Quality near-tie with phi4 without the context cliff. Right pick.
+    curiosity_model: str = "llama3.1:8b"
     classify_model: str = "gemma4:e4b"
 
 
@@ -97,6 +101,15 @@ class Limits:
     curiosity_min_source_chars: int = 500
     curiosity_timeout_s: int = 240         # ollama chat_schema timeout for curiosity gap-detection
                                            # (gemma4:e4b on long YT-notes regularly hits >90s)
+    # Pre-flight cap for the curiosity-pass prompt (Ollama side, not Claude).
+    # llama3.1:8b has 128k context (~430K chars at German density); we leave
+    # headroom for the model's own response + cache. If the compact index
+    # outgrows this, the producer truncates the index portion in-place
+    # rather than aborting — curiosity is a nice-to-have, keep the loop
+    # alive with reduced coverage. Symptom-on-overflow without this guard
+    # is model-specific: 16k-window models (phi4) silently truncate and
+    # hallucinate; 128k-window models eventually OOM-stall on Ollama side.
+    curiosity_max_prompt_chars: int = 250_000
     sparse_threshold_words: int = 200
     # YouTube ingest (scan-youtube.py — see also CONFIG.piggybacks.scan_youtube)
     youtube_max_frames: int = 30          # Tier-3 visual: cap frames per video
