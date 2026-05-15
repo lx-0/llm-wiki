@@ -79,6 +79,11 @@ Single line from `email.md` if there was a delta-run. Skip otherwise.
 - **Length cap: ≤ 500 words total.** The whole point of this digest is that current daily/ files are "uebertrieben lang" — keep this tight. If you find yourself near the cap, cut Highlights bullets, not the substrate sections.
 - **Do not paste verbatim from `sessions.md`.** It's the longest source and the lowest signal-per-word. Use it for "what was the day's narrative arc" — one or two bullets max in Highlights.
 - **Empty days are not failures.** If only `sessions.md` exists with brief content, write a 3-bullet Highlights + skip the other sections.
-- **Existing root file:** if `daily/${date}.md` already exists with a different `type:` (e.g. operator hand-edited it for some reason), STOP and print `"daily/${date}.md exists with non-digest frontmatter — refusing to overwrite operator content."` Do not write.
+- **Existing root file — refuse only on explicit non-digest type.** Read `daily/${date}.md` if it exists. Parse its YAML frontmatter (the block between two `---` delimiters at the top). Decision rules:
+  - No file → write the new digest.
+  - File exists, YAML frontmatter present, `type:` field is `daily-digest` → overwrite (re-run of this same agent is a digest refresh, expected).
+  - File exists, YAML frontmatter present, `type:` field is something OTHER than `daily-digest` (e.g. `note`, `qa`, `daily-log`) → STOP and print `"daily/${date}.md exists with non-digest type=<X> — refusing to overwrite operator content."` Do not write.
+  - File exists but has NO YAML frontmatter at all (legacy flat-daily, pre-2026-05-15 rollup-arc shape) → overwrite. The migration is supposed to delete these but operator-pre-existing or operator-edited files may slip through; the digest replaces the legacy content.
+  - File exists with frontmatter but no `type:` field → overwrite (treat as missing-type, same as no-frontmatter case).
 
 When done, the edit to `daily/${date}.md` is the deliverable.

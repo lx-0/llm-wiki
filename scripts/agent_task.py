@@ -17,11 +17,11 @@ os.environ["CLAUDE_INVOKED_BY"] = "agent_task"
 import argparse
 import asyncio
 import logging
+import re
 import sys
 from datetime import datetime
 from pathlib import Path
 
-import yaml
 
 from claude_agent_sdk import (
     AssistantMessage,
@@ -60,7 +60,16 @@ def _bake_vars(extra_vars: dict[str, str]) -> dict[str, str]:
 
 
 def _update_last_run(spec: AgentSpec) -> None:
-    """Write `last_run: <iso>` back to the spec's frontmatter (preserving body)."""
+    """Write `last_run: <iso>` back to the spec's frontmatter, preserving the
+    rest of the frontmatter byte-for-byte.
+
+    Previous implementation used `yaml.safe_dump` over the full parsed dict
+    — that round-trip drops quoted-string markers, re-wraps long values,
+    re-indents list items, and otherwise normalises the operator's chosen
+    formatting. Every agent run produced a noisy diff against the engine-
+    committed prompt file. Fix: surgical line-replace on the `last_run:`
+    key only. Append the line if missing.
+    """
     if spec.path is None:
         return
     text = spec.path.read_text(encoding="utf-8")
@@ -71,15 +80,19 @@ def _update_last_run(spec: AgentSpec) -> None:
         return
     block = text[4:end]
     body_after = text[end + 5 :]
-    try:
-        fm = yaml.safe_load(block) or {}
-    except yaml.YAMLError:
-        return
-    if not isinstance(fm, dict):
-        return
-    fm["last_run"] = now_iso()
-    serialized = yaml.safe_dump(fm, sort_keys=False, allow_unicode=True).rstrip()
-    spec.path.write_text(f"---\n{serialized}\n---\n{body_after}", encoding="utf-8")
+
+    new_line = f"last_run: {now_iso()}"
+    # ^last_run: <anything-up-to-end-of-line>$ at the frontmatter top level
+    # (no leading whitespace — nested keys with the same name are out of scope).
+    pattern = re.compile(r"^last_run:.*$", re.MULTILINE)
+    if pattern.search(block):
+        new_block = pattern.sub(new_line, block, count=1)
+    else:
+        # Append at the end of the frontmatter block, trimming any trailing
+        # newline first so we don't end up with `\n\nlast_run:`.
+        new_block = block.rstrip("\n") + "\n" + new_line
+
+    spec.path.write_text(f"---\n{new_block}\n---\n{body_after}", encoding="utf-8")
 
 
 async def run(spec: AgentSpec, dry_run: bool, extra_vars: dict[str, str]) -> int:
