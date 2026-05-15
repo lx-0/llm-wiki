@@ -50,7 +50,7 @@ Explicitly NOT touched in this arc:
 | Backfill window | 90 days on first run, configurable via `oura_backfill_days` | Backlog file default; Oura serves arbitrary historical ranges |
 | Multi-tenant | From day one — `personal.accounts.<id>.health.oura` with `kind: oura-pat` | Policy: never ship a flat block (`feedback_account_adapters_multi_tenant`) |
 | Output shape | One md per date per account in `raw/notes/health/<year>/<date>--<account-id>.md` | Per-account file suffix matches gmeet sibling-scan convention; year subdirs from day 1 |
-| Endpoints | daily_sleep + daily_readiness + daily_activity | Three calls per day per account; aggregate into single frontmatter |
+| Endpoints | daily_sleep + daily_readiness + daily_activity + **sleep** (session-level) | **Revised 2026-05-15** after live probe (commit `9a7f585`). Original assumption: three daily endpoints carry score + duration + HRV + HR + steps. Reality: `/daily_sleep` carries score-only; `total_sleep_duration`, `average_hrv`, `lowest_heart_rate` live on the session-level `/sleep` endpoint (multiple rows per day → adapter picks longest-duration session). Four GETs per (account, run). |
 | Frontmatter shape | `weight_kg / sleep_hours / sleep_score / readiness_score / hrv_overnight / steps / resting_hr / sensitivity: high` | Phase 1: weight_kg stays empty (HealthKit Phase 2); all Oura fields populate from daily_* endpoints |
 | State | `state/health-state.json` with `{accounts: {<id>: {oura: {last_day: "YYYY-MM-DD"}}}}` | Watermark-on-success rule applies (`feedback_watermark_on_failure_fix` precedent) |
 | Skip empty days | If all three Oura endpoints return empty for a day → don't write the file | Anti-slop heuristic from backlog file |

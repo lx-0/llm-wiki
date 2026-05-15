@@ -1286,3 +1286,27 @@ Lessons:
 - **Match the fix to the data shape.** If 77% of wikilinks are already lateral, adding more of them produces noise, not signal. The investment goes to either accepting the dense graph as truth (and optimising for local-graph navigation), or moving to a different visualisation paradigm (community-detection plugins, MOCs as curated entry-points). Neither is "more edges".
 
 Concrete artefacts that survive: `.ytstack/backlog/lateral-linking.md` is marked REJECTED with the audit-bug forensics, so the next agent who has the same intuition doesn't re-derive the design from scratch.
+
+## Live-probe before TDD-ing a parser against an undocumented schema (2026-05-15, Health Phase 1 / commits `1fd1044` → `9a7f585`)
+
+**Symptom.** Oura adapter shipped on `1fd1044` ran cleanly against the live API for 90 days, wrote 90 daily files, **but `sleep_hours`, `hrv_overnight`, `resting_hr` were 0/90 — systematic, not data gaps**. Fields silently missing from frontmatter (because the None-drop renderer hid them politely).
+
+**Root cause.** I trusted my training-set memory of the Oura v2 API shape:
+- Believed: `/daily_sleep` carries `score` + `total_sleep_duration` + `average_hrv` + `average_heart_rate`.
+- Reality (verified live 2026-05-15): `/daily_sleep` is **score-only** (5 keys: id, day, score, timestamp, contributors). The session-level metrics live on `/sleep` — where multiple rows per day are normal (one `long_sleep` + zero-or-more naps).
+
+The TDD cycle didn't catch it because the test fixtures encoded the *wrong* shape; the parser matched the fixtures perfectly while diverging from reality. **RED proves the test fails before implementation; it does not prove the test exercises the real schema.**
+
+**Lesson.** For any external API where the response shape isn't directly verifiable from a vendored OpenAPI spec or upstream test fixtures, do a 30-second `curl` probe **before** writing the parser tests. Two commits:
+1. `live-probe.py` (throwaway): hit each endpoint once, log top-level keys + a sample row. Inspect what's really there.
+2. Then TDD the parser against fixtures derived from that real shape.
+
+Mirror in `scripts/collectors/jamie.py`: the `_logged_discovery` flag exists for exactly this reason — it logs the top-level keys of the first payload on every fresh run. Worth porting that pattern to every new adapter so schema drift surfaces in logs even after ship.
+
+**Field semantics to remember (Oura v2, May 2026):**
+- `/daily_sleep` row keys: `[id, day, score, timestamp, contributors]`
+- `/sleep` row keys (long-list): `[id, day, type, period, bedtime_start, bedtime_end, total_sleep_duration, average_hrv, average_heart_rate, lowest_heart_rate, hrv, heart_rate, ...]` — `total_sleep_duration` is seconds, `hrv`/`heart_rate` are 5-min-binned series.
+- `/sleep` multiple rows per day: `type ∈ {long_sleep, late_nap, short_nap, ...}`. For "overnight" metrics, pick the longest-duration row (naps don't belong in a resting baseline).
+- `lowest_heart_rate` is the standard "resting HR" proxy. Fall back to `average_heart_rate` when missing.
+
+**Fix-coverage on live data after `9a7f585`:** 75/90 full-data days, 13/90 steps-only (ring not worn but phone tracked), 2/90 metrics-but-no-scores (session finished after Oura's score-compute window). This is the real ring-wear ceiling for this operator.
