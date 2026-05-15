@@ -1,17 +1,17 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-05-15T16:50:00Z
+last_updated: 2026-05-15T17:30:00Z
 current_milestone: M005
-active_slice: none
+active_slice: S01
 active_task: none
 ---
 
 # State
 
-**Status:** M005 planned (L — 5 slices). Ready to slice.
+**Status:** M005 / S01 — 1/4 tasks done in slice. T01 closed (two-layer schema in `prompts/compile_main.md`). Next: `/ytstack:plan-task` for T02 (AGENTS.md + templates/ entity-page skeleton).
 
-**Next action:** Run `ytstack:slice-milestone` to break M005 into concrete slices and tasks. M005 = "Personal task management on the wiki" — `knowledge/people/` + `knowledge/projects/` adopt two-layer State+Timeline shape with `## Action Items` + `## Open Threads`; compile.py extracts commitments from jamie/gmeet/email substrates; lifecycle demotes resolved items to Timeline; existing Obsidian dashboard surfaces the task layer. See `M005-CONTEXT.md` + `M005-ROADMAP.md`. The conceptual groundwork is in `.ytstack/backlog/entity-pages-state-timeline.md` (updated 2026-05-15 with action-items angle, commit `ef4ce50`) and `.ytstack/backlog/gbrain-comparison.md` (verifies gbrain treats commitments as Fact-kind, embeds tasks in entity pages — no separate `tasks/` folder needed).
+M005 plan: 5 slices, 20 tasks total (see `M005-ROADMAP.md`). Locked decisions: tasks live inside `knowledge/people/` + `knowledge/projects/` entity pages as `## Action Items` + `## Open Threads` sections (no top-level `tasks/` folder); Obsidian-Tasks-plugin syntax canonical; two shapes coexist (atomic for concepts/qa/facts/connections, State+Timeline only for people/projects); extraction priority jamie > gmeet > email; dashboard pane reuses M003-S01 infra. Conceptual groundwork: `.ytstack/backlog/entity-pages-state-timeline.md` + `.ytstack/backlog/gbrain-comparison.md`.
 
 ---
 
