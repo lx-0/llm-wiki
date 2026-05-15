@@ -61,9 +61,13 @@ async def maybe_generate_curiosity_requests(source: Path) -> None:
     if not folder_paths:
         log.info("  Curiosity: no personal.email_folders configured, skipping")
         return
+    # Numbered listing — gemma4:e4b reliably honours an integer-range schema
+    # but historically left the free-vocab `folder` enum empty on ~100 % of
+    # gaps, dropping every request since 2026-05-03. Index-based picking
+    # constrains the choice to N integers Ollama can actually enforce.
     folder_listing = "\n".join(
-        f"- {f['path']} — {f.get('desc', '')}".rstrip(" —")
-        for f in CONFIG.personal.email_folders
+        f"{i+1}. {f['path']} — {f.get('desc', '')}".rstrip(" —")
+        for i, f in enumerate(CONFIG.personal.email_folders)
     )
 
     prompt = render(
@@ -89,11 +93,15 @@ async def maybe_generate_curiosity_requests(source: Path) -> None:
                     "type": "object",
                     "properties": {
                         "topic": {"type": "string"},
-                        "folder": {"type": "string", "enum": folder_paths},
+                        "folder_index": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": len(folder_paths),
+                        },
                         "account": {"type": "string", "enum": account_names},
                         "rationale": {"type": "string"},
                     },
-                    "required": ["topic", "folder", "account", "rationale"],
+                    "required": ["topic", "folder_index", "account", "rationale"],
                 },
             },
         },
@@ -134,20 +142,36 @@ async def maybe_generate_curiosity_requests(source: Path) -> None:
 
         RAW_REQUESTS_DIR.mkdir(parents=True, exist_ok=True)
 
+        raw_count = len(gaps)
+        kept = 0
+        dropped: dict[str, int] = {}
         for gap in gaps[:CONFIG.limits.curiosity_max_gaps]:
-            folder = gap.get("folder", "").strip()
             topic = gap.get("topic", "").strip()
             rationale = gap.get("rationale", "").strip()
-
-            if not folder or not topic or not rationale:
-                log.info("  Curiosity: skipping (folder=%r, topic=%r, rationale=%r)",
-                         folder[:30] if folder else '', topic[:30] if topic else '', rationale[:30] if rationale else '')
+            # Accept both new (folder_index) and legacy (folder) shapes during
+            # the rollout — Ollama JSON Schema enforcement is best-effort, so
+            # the gap may carry either field even when only one is required.
+            folder_index = gap.get("folder_index")
+            folder = (gap.get("folder") or "").strip()
+            if isinstance(folder_index, int) and 1 <= folder_index <= len(folder_paths):
+                folder = folder_paths[folder_index - 1]
+            elif folder not in folder_paths:
+                dropped["folder_unmapped"] = dropped.get("folder_unmapped", 0) + 1
                 continue
+
+            if not topic:
+                dropped["empty_topic"] = dropped.get("empty_topic", 0) + 1
+                continue
+            if not rationale:
+                dropped["empty_rationale"] = dropped.get("empty_rationale", 0) + 1
+                continue
+
             slug = re.sub(r"[^a-z0-9]+", "-", topic.lower())[:40].strip("-")
             request_path = RAW_REQUESTS_DIR / f"request-{slug}-{today_iso()}.json"
 
             if request_path.exists():
-                continue  # don't overwrite
+                dropped["duplicate"] = dropped.get("duplicate", 0) + 1
+                continue
 
             request = {
                 "type": "email-deep-scan",
@@ -161,7 +185,15 @@ async def maybe_generate_curiosity_requests(source: Path) -> None:
                 "created": now_iso(),
             }
             request_path.write_text(json.dumps(request, indent=2), encoding="utf-8")
+            kept += 1
             log.info("  Curiosity request: %s → %s", topic, folder)
+
+        if dropped or kept != raw_count:
+            drop_str = ", ".join(f"{k}={v}" for k, v in dropped.items()) or "none"
+            log.info(
+                "  Curiosity: %d gap(s) gen, %d kept (dropped: %s)",
+                raw_count, kept, drop_str,
+            )
 
     except httpx.TimeoutException:
         log.warning("  Curiosity: Ollama timeout")

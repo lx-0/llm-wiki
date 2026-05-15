@@ -33,23 +33,23 @@ Respond with a JSON object containing a "gaps" array. Use EXACTLY these field na
 
 ```json
 {"gaps": [
-  {"topic": "<specific topic>", "folder": "<one of the folders below>", "account": "${primary_account}", "rationale": "<why this folder likely has the answer>"}
+  {"topic": "<specific topic>", "folder_index": <integer from the numbered folder list below>, "account": "${primary_account}", "rationale": "<why this folder likely has the answer>"}
 ]}
 ```
 
 If no gaps: `{"gaps": []}`
 
-IMPORTANT — each gap MUST have these 4 fields: topic, folder, account, rationale. No other fields.
+IMPORTANT — each gap MUST have these 4 fields: topic, folder_index, account, rationale. No other fields.
 
 RULES:
-- "folder" MUST be one of the folders listed below. NEVER leave it empty.
+- "folder_index" MUST be one of the integers listed below (the number prefix on each folder line). Pick the single folder most likely to contain the answer.
 - "topic" must be specific (bad: "more info about X", good: "ProjectName delivery timeline")
 - "rationale" MUST explain WHY this folder likely has the answer. NEVER leave it empty.
 - If you cannot map a gap to a specific folder, DO NOT include it.
 - Prefer fewer, high-quality requests over many vague ones.
 - An empty array [] is a VALID and PREFERRED response when no clear gaps exist.
 
-Available email folders (${primary_account} account):
+Available email folders (${primary_account} account) — pick by number:
 ${email_folders_listing}
 
 Analysis timestamp: ${timestamp}

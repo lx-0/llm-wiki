@@ -267,7 +267,9 @@ flowchart TD
 
 **Input:** AGENTS.md (Schema) + index.md (Katalog) + die neue Source. Der Compiler bekommt `Read`/`Grep`/`Glob` Tools und holt sich Detailartikel on-demand statt das ganze Wiki in den Prompt zu laden — das war der ursprüngliche Ansatz, hat aber TPM-Limits getriggert (siehe `.ytstack/KNOWLEDGE.md` "Compile prompt design"). Index-guided Retrieval funktioniert besser als RAG bei <500 Artikeln.
 
-**Agent SDK Config:** `allowed_tools=["Read", "Write", "Edit", "Glob", "Grep"]`, `permission_mode="acceptEdits"`, `max_turns=30`, `system_prompt=claude_code`. Der LLM hat volle Dateioperations-Rechte innerhalb von `knowledge/`.
+**Agent SDK Config:** `allowed_tools=["Read", "Write", "Edit", "Glob", "Grep"]`, `permission_mode="acceptEdits"`, `max_turns=CONFIG.limits.compile_max_turns` (default 12, war 30 — siehe `.ytstack/KNOWLEDGE.md` "tool-turn ballooning"), `system_prompt=claude_code`. Der LLM hat volle Dateioperations-Rechte innerhalb von `knowledge/`.
+
+**Pre-flight Prompt Budget:** `compile.py` ruft `assert_prompt_within_budget(len(prompt), CONFIG.limits.compile_max_prompt_chars, breakdown={…})` vor dem SDK-Call. Default 400K chars (~110K tokens) — schiebt ein 138 KB Gmeet-Transcript noch knapp durch, eskaliert aber Outlier mit klarer Operator-Message statt 13 Minuten silent kind=unknown. Bei `len(source) >= 50_000` chars zusätzlich eine INFO-Zeile in compile.log mit der Source-Größe, damit timing-Anomalien auf die richtige Datei zeigen.
 
 **Was der Compiler macht pro Source:**
 
@@ -528,9 +530,11 @@ flowchart TD
 
 **Trigger:** `maybe_generate_curiosity_requests()` läuft nach jedem erfolgreichen Compile. Nur für Sources >500 Zeichen.
 
-**LLM:** Gemma4:e4b auf dem lokalen GPU-Server via `ollama_client.chat_schema(prompt, model, schema=...)` — nutzt Ollama native API (`/api/chat`) mit vollem JSON-Schema (constrained decoding). Schema's `folder`-Enum + `account`-Enum werden zur Laufzeit aus `CONFIG.personal.email_folders` und `CONFIG.personal.accounts.keys()` gebaut — single source of truth mit dem Curiosity-Prompt, der dieselbe Folder-Liste rendered. Kein Drift möglich. ~5s pro Request, keine Kosten.
+**LLM:** Gemma4:e4b auf dem lokalen GPU-Server via `ollama_client.chat_schema(prompt, model, schema=...)` — nutzt Ollama native API (`/api/chat`) mit vollem JSON-Schema (constrained decoding). Schema-Feld `folder_index: integer (1..N)` + `account: enum` werden zur Laufzeit aus `CONFIG.personal.email_folders` und `CONFIG.personal.accounts.keys()` gebaut — single source of truth mit dem Curiosity-Prompt, der dieselbe Folder-Liste numbered rendered. Der Producer mappt `folder_index → folder_path` deterministisch. Kein Drift möglich. ~5s pro Request, keine Kosten.
 
-**Limits:** Max 3 Requests pro Compile-Lauf. Requests mit leerem folder/topic/rationale werden verworfen.
+> **Warum integer statt enum?** gemma4:e4b (4B params) honoriert ein freies 26-entry string-enum nicht zuverlässig — von 2026-05-03 bis 2026-05-15 hat das Modell konsistent `folder=""` geliefert und der Producer hat jeden Gap dropped (ein 6-Wochen-Stillstand der gesamten Deep-Scan-Loop). Integer-range constraints sind für kleine Modelle die robuste Wahl. Siehe `.ytstack/KNOWLEDGE.md` "Small-model enum failure mode". Der Producer akzeptiert weiterhin den legacy `folder`-Schlüssel — falls eine alte Prompt-Version im Umlauf ist, bricht nichts.
+
+**Limits:** Max 3 Requests pro Compile-Lauf (`CONFIG.limits.curiosity_max_gaps`). Requests mit ungemapptem folder_index, leerem topic oder leerer rationale werden verworfen. Pro Source emittet der Producer eine aggregierte Telemetrie-Zeile (`Curiosity: N gen, K kept (dropped: folder_unmapped=X, empty_topic=Y, …)`) statt Per-Skip-Lines — systemische Failures (wie der 26-Folder-Enum-Bug) werden so im Compile-Log sofort sichtbar.
 
 **Request-Format:**
 

@@ -117,6 +117,17 @@ Second instance fixed in the same pass: `optimize-claude-md.py` still passed `wi
 
 Context overflow can't be classified *after* the fact — empty stderr, variable timing, no signal for `classify_failure` to match → it falls through to `kind=unknown`. The only reliable catch is *before* the SDK call. Added `sdk_helpers.assert_prompt_within_budget(prompt_chars, limit, label=, breakdown=)` — raises `PromptTooLargeError` with a clear, breakdown-carrying operator message. Wired into `query.py` against `CONFIG.limits.query_max_prompt_chars` (default 500K chars ≈ 167K tokens at German density). The other three LLM scripts (compile / optimize-claude-md / suggestions) don't use the guard yet — same helper, ~3 lines each, open follow-up.
 
+#### Follow-up (2026-05-15): tool-turn ballooning is the new overflow vector
+
+After `94c9d6b` shrank the *initial* prompt embed via the compact index, a fresh case appeared: lxw gmeet transcript at 138 KB. Initial prompt only 227 KB chars (~65K tokens) — well inside the budget. But `max_turns=30` plus a meaty source = the model keeps Reading/Grepping `knowledge/` articles to look for prior context, and each tool turn adds 5-20 KB of content to the context. After ~25 such turns the running context blows past 200K tokens and the bundled CLI exits with the same `kind=unknown` / 793 s / empty stderr signature.
+
+**Fix** (commit pending): two complementary caps wired in `compile.py`:
+- `CONFIG.limits.compile_max_prompt_chars` (default 400K, ≈ 110K tokens) — `assert_prompt_within_budget` pre-flight, parity with `query.py`. Aborts with a breakdown line *before* the SDK call.
+- `CONFIG.limits.compile_max_turns: 12` (down from 30) — matches the depth real compiles use (grep index → read 2-4 articles → write). Forces the model to commit instead of looping.
+- INFO line on sources ≥ 50K chars so the operator sees *which* file was big when timings get long.
+
+**Lesson:** A budget guard on the *initial* prompt only covers half the overflow surface. Tool-using agents accumulate context turn-by-turn — `max_turns` is the second axis. When the model has a huge source plus 30 turns of file-read freedom, it will use both. Pick `max_turns` against the depth real successful compiles need, not the worst-case theoretical exploration.
+
 #### Lesson
 
 In-context body embeds that grow linearly with the corpus (an index, a log, a catalogue) become a context-overflow ticking bomb. The Karpathy-style pattern is **pointer-first**: tell the LLM what file to look at, hand over Read/Grep/Glob, let it fetch on demand. Body-embed is fine for small fixed surfaces (facts, AGENTS schema) and bad for growth surfaces (index, log, daily archive). Apply this whenever a `${var}` substitution in a prompt template carries a linearly-growing artifact.
@@ -419,6 +430,17 @@ Stays under the 10s hook timeout but preserves massive signal.
 **Workaround for non-empty fields:** define an `enum` covering all expected values.
 
 **Defensive read pattern after `chat_schema`:** never assume the parsed structure matches the declared schema. Always shape-guard at the boundary — same principle as the `state.ingested[rel]` string-vs-dict gotcha further down. Constrained decoding is best-effort, not a contract.
+
+#### Small-model enum failure mode (2026-05-15): curiosity loop silently dropping every gap
+
+`compile_curiosity.md` asked `gemma4:e4b` to fill `folder: string (enum: [<26 email folder paths>])` per gap. From `2026-05-03` through `2026-05-15` every curiosity pass (~hundreds of compiles) returned gaps with `folder=""`, `rationale=""` — the producer dropped all of them as the schema validator on our side enforced the rule the model wouldn't. Net effect: the entire deep-scan loop produced **zero** requests for 6 weeks. The pattern was invisible in logs because the per-skip line looked innocuous (`Curiosity: skipping (folder='', topic='Project Timeline/Milestones', rationale='')`).
+
+Two-part lesson and fix:
+
+1. **A 4B-parameter model can't reliably honor a 26-entry string-enum.** Token-level enum constraints work for tight choice-sets (yes/no, type tags) but degrade as the enum grows — the model picks an empty fallback. Fix: pivot to an integer schema (`folder_index: integer, minimum: 1, maximum: N`). Producer maps `index → folder_path` deterministically. Numbered listing in the prompt (`1. INBOX — unsorted mail`) anchors the choice.
+2. **Per-skip logging at INFO loses the systemic-failure signal.** Each "skipping (folder='')" line read like a normal "we considered this and passed" — operator scanned past them. Fix: aggregate one summary line per source (`Curiosity: 3 gap(s) gen, 0 kept (dropped: folder_unmapped=3)`) so a stuck loop surfaces immediately. Same principle as audit-by-aggregate-log, not by per-event line.
+
+Producer accepts both the new `folder_index` and the legacy `folder` field during rollout, so a temporarily stale prompt template doesn't break parsing.
 
 #### Cache-buster needed at `temperature: 0`
 
