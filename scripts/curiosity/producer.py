@@ -1,9 +1,21 @@
 """Curiosity producer — post-compile pass that detects knowledge gaps.
 
-Runs after each compiled file. Reads the new article + recent compiled
-articles + a folder map, asks a local Gemma4 to point at concrete gaps,
-and writes structured `raw/requests/request-<slug>-<date>.json` files
+Runs after each compiled file. Reads the source, asks a local LLM to point
+at concrete gaps (with a verbatim quote from the source as anti-hallucination
+gate), and writes structured `raw/requests/request-<slug>-<date>.json` files
 for the consumer (`scripts/curiosity/cli.py` + `backends/`) to process.
+
+Design notes:
+  - The wiki index and "recently compiled articles" used to be in the prompt.
+    Both acted as **distractors** (Chroma/Vorstel research: topically-related
+    but factually-wrong context hurts more than no context). With them in
+    place, the LLM cross-pollinated topics — a Pixeltales/Docker source
+    produced an "Eisladen-Logistik case study" gap because that row existed
+    elsewhere in the index. Dropped 2026-05-15.
+  - `source_quote` is the gate. The schema asks the LLM to copy a verbatim
+    phrase from the source-content; the producer rejects gaps whose quote
+    isn't a substring of the source. Pattern: HuggingFace structured-RAG
+    cookbook, ACL 2024 "According-to" prompting, KRLabsOrg/verbatim-rag.
 """
 
 from __future__ import annotations
@@ -16,8 +28,8 @@ from pathlib import Path
 import httpx  # noqa: E402  exception types only; HTTP via ollama_client
 
 from core import ollama_client
-from core.paths import KNOWLEDGE_DIR, ROOT_DIR
-from core.utils import now_iso, read_wiki_index_compact, today_iso
+from core.paths import ROOT_DIR
+from core.utils import now_iso, today_iso
 from core.prompts import render
 from core.config import CONFIG
 
@@ -27,19 +39,15 @@ CURIOSITY_MODEL = CONFIG.models.curiosity_model
 RAW_REQUESTS_DIR = ROOT_DIR / "raw" / "requests"
 
 
-def _get_recently_compiled_articles() -> str:
-    """Get articles updated today (likely just compiled)."""
-    today = today_iso()
-    articles = []
-    for subdir in ["concepts", "connections", "people", "projects"]:
-        d = KNOWLEDGE_DIR / subdir
-        if not d.exists():
-            continue
-        for f in d.glob("*.md"):
-            content = f.read_text(encoding="utf-8")
-            if f"updated: {today}" in content or f"created: {today}" in content:
-                articles.append(f"### {f.relative_to(KNOWLEDGE_DIR)}\n\n{content[:500]}")
-    return "\n\n".join(articles) if articles else "(No articles updated today)"
+def _normalize_quote(s: str) -> str:
+    """Lower-case + collapse whitespace for the substring check.
+
+    The LLM occasionally tightens whitespace inside the quote (collapses two
+    spaces to one, drops a trailing newline) or changes the case of the
+    first character to fit grammar. We accept those small deviations as
+    long as the bag-of-characters matches a span of the source.
+    """
+    return re.sub(r"\s+", " ", s).strip().lower()
 
 
 async def maybe_generate_curiosity_requests(source: Path) -> None:
@@ -54,9 +62,6 @@ async def maybe_generate_curiosity_requests(source: Path) -> None:
     if len(source_content) < CONFIG.limits.curiosity_min_source_chars:
         return
 
-    index_md = read_wiki_index_compact()
-    compiled_articles = _get_recently_compiled_articles()
-
     folder_paths = [f["path"] for f in CONFIG.personal.email_folders if f.get("path")]
     if not folder_paths:
         log.info("  Curiosity: no personal.email_folders configured, skipping")
@@ -70,38 +75,28 @@ async def maybe_generate_curiosity_requests(source: Path) -> None:
         for i, f in enumerate(CONFIG.personal.email_folders)
     )
 
-    # Pre-flight: keep the prompt under the picked model's effective window.
-    # Different models silently degrade differently when oversized — phi4's
-    # 16k window truncated and hallucinated; gemma4 ignores the schema
-    # entirely. The compact-index portion grows linearly with the vault and
-    # is the only knob we can shrink without losing the source signal. If
-    # the assembled prompt would breach budget, truncate index_md in place,
-    # warn the operator, and continue — curiosity is opportunistic, not
-    # blocking.
+    # Cap source excerpt at 5k chars so the prompt fits any small-context
+    # model without truncation. Source is the *only* embedded artifact now —
+    # the wiki index and "recently compiled articles" were dropped as they
+    # acted as distractors (cross-source topic contamination).
     src_excerpt = source_content[:5000]
-    compiled_excerpt = compiled_articles[:3000]
-    budget = CONFIG.limits.curiosity_max_prompt_chars
-    # Reserve room for everything except index_md (template, source excerpt,
-    # folder listing, compiled excerpt, timestamp, slack).
-    non_index_chars = len(src_excerpt) + len(compiled_excerpt) + len(folder_listing) + 4_000
-    max_index_chars = max(10_000, budget - non_index_chars)
-    if len(index_md) > max_index_chars:
-        log.warning(
-            "  Curiosity: compact index (%d chars) exceeds budget — truncating to %d chars",
-            len(index_md), max_index_chars,
-        )
-        index_md = index_md[:max_index_chars] + "\n\n_[index truncated for curiosity budget]_\n"
 
     prompt = render(
         "compile_curiosity",
-        index_md=index_md,
         source_path=rel_path,
         source_content=src_excerpt,
-        compiled_articles=compiled_excerpt,
         timestamp=now_iso(),  # cache-buster
         primary_account=CONFIG.personal.primary_account,
         email_folders_listing=folder_listing,
     )
+
+    # Defense-in-depth: even without index_md, a pathological source could
+    # in theory push past budget. Warn (don't abort) so the operator sees it.
+    if len(prompt) > CONFIG.limits.curiosity_max_prompt_chars:
+        log.warning(
+            "  Curiosity: prompt %d chars exceeds budget %d — sending anyway",
+            len(prompt), CONFIG.limits.curiosity_max_prompt_chars,
+        )
 
     log.info("  Curiosity pass for %s (model=%s, prompt=%d chars)",
              rel_path, CURIOSITY_MODEL, len(prompt))
@@ -116,6 +111,10 @@ async def maybe_generate_curiosity_requests(source: Path) -> None:
                     "type": "object",
                     "properties": {
                         "topic": {"type": "string"},
+                        # source_quote is the anti-hallucination gate. Producer
+                        # validates it is a verbatim substring of source_content;
+                        # gaps that fail are dropped (dropped[unsourced]).
+                        "source_quote": {"type": "string"},
                         "folder_index": {
                             "type": "integer",
                             "minimum": 1,
@@ -124,12 +123,18 @@ async def maybe_generate_curiosity_requests(source: Path) -> None:
                         "account": {"type": "string", "enum": account_names},
                         "rationale": {"type": "string"},
                     },
-                    "required": ["topic", "folder_index", "account", "rationale"],
+                    "required": ["topic", "source_quote", "folder_index", "account", "rationale"],
                 },
             },
         },
         "required": ["gaps"],
     }
+
+    # Pre-compute the normalised source-excerpt once for the quote-validation
+    # gate. The LLM's quote needs to be a substring of WHAT IT SAW (the
+    # excerpt that went into the prompt), not the full file — otherwise a
+    # truncation past 5000 chars would falsely look like a verbatim match.
+    src_excerpt_norm = _normalize_quote(src_excerpt)
 
     try:
         content = ollama_client.chat_schema(
@@ -171,6 +176,7 @@ async def maybe_generate_curiosity_requests(source: Path) -> None:
         for gap in gaps[:CONFIG.limits.curiosity_max_gaps]:
             topic = gap.get("topic", "").strip()
             rationale = gap.get("rationale", "").strip()
+            source_quote = (gap.get("source_quote") or "").strip()
             # Accept both new (folder_index) and legacy (folder) shapes during
             # the rollout — Ollama JSON Schema enforcement is best-effort, so
             # the gap may carry either field even when only one is required.
@@ -189,6 +195,18 @@ async def maybe_generate_curiosity_requests(source: Path) -> None:
                 dropped["empty_rationale"] = dropped.get("empty_rationale", 0) + 1
                 continue
 
+            # Anti-hallucination gate: the quote must appear in the source
+            # excerpt the model actually saw. Whitespace + case are normalised
+            # to absorb the small formatting tweaks LLMs commonly make.
+            # Reject anything shorter than 8 chars — too short to be a
+            # meaningful anchor (matches stop-words like "the project").
+            if not source_quote or len(source_quote) < 8:
+                dropped["quote_missing"] = dropped.get("quote_missing", 0) + 1
+                continue
+            if _normalize_quote(source_quote) not in src_excerpt_norm:
+                dropped["quote_unsourced"] = dropped.get("quote_unsourced", 0) + 1
+                continue
+
             slug = re.sub(r"[^a-z0-9]+", "-", topic.lower())[:40].strip("-")
             request_path = RAW_REQUESTS_DIR / f"request-{slug}-{today_iso()}.json"
 
@@ -203,6 +221,7 @@ async def maybe_generate_curiosity_requests(source: Path) -> None:
                 "account": gap.get("account", CONFIG.personal.primary_account),
                 "model": gap.get("model", CURIOSITY_MODEL),
                 "topic": topic,
+                "source_quote": source_quote,  # provenance — verified-substring of source
                 "rationale": rationale,
                 "source": rel_path,
                 "created": now_iso(),

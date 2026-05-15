@@ -463,7 +463,23 @@ Not just empty `folder` — *the model invented its own field names* (`reasoning
 
 HTTP error handling tightened: dedicated branches for `httpx.TimeoutException`, `HTTPStatusError(404)` ("model not pulled — `ollama pull <name>`"), generic HTTP, and parse errors. Operator gets actionable warnings instead of stacktraces.
 
-**Four lessons:**
+**Quality follow-up (2026-05-15, same day):** Even with `llama3.1:8b` honoring schema and fitting context, the loop kept producing cross-source-contaminated topics (Pixeltales/Docker source → "Eisladen-Logistik case study" gap; warning-level-log source → "Eisladen logistics"). Online research (Chroma/Vorstel + LayerLens + ACL "According-to" 2024 + HuggingFace structured-RAG cookbook + KRLabsOrg/verbatim-rag + Deterministic Quoting for healthcare) converged on the diagnosis:
+
+> "topically related but factually wrong content cause **worse model degradation than irrelevant content** does"  
+> — Chroma study via Vorstel context-engineering guide
+
+Our `${index_md}` and `${compiled_articles}` blocks were exactly this — 700+ topically-related index rows feeding the model with "Eisladen", "Township", etc. when the source was about Docker or logging. The model latches onto distractors.
+
+**Final fix (commit pending):**
+
+1. **Drop the distractors.** Removed `${index_md}` + `${compiled_articles}` from the curiosity prompt. The producer no longer reads `read_wiki_index_compact()` or `_get_recently_compiled_articles()` for curiosity. Side-effect: prompt shrank from ~80 KB to ~5 KB. The pre-flight budget check is now defense-in-depth — pathological cases only.
+2. **Verbatim-quote gate.** Added `source_quote: str` to the schema as a required field. The prompt instructs: "MUST be an exact, verbatim, contiguous substring of the source content above — same wording, same casing, same punctuation. It is verified server-side: gaps whose quote does not appear literally in the source are dropped, no exceptions." Producer post-validates by normalising (lowercase + whitespace-collapse, to absorb the cosmetic edits LLMs make) and substring-checking against the source excerpt the model actually saw. Drops with `dropped[quote_unsourced]` or `dropped[quote_missing]` (for quotes < 8 chars). Pattern from KRLabsOrg/verbatim-rag + HuggingFace structured-RAG cookbook.
+
+**Fifth lesson:** **Schema-honor + context-fit + quote-gate is the three-layer cake.** Without the gate, both `phi4` (truncating) and `llama3.1` (full-context) could produce schema-valid topics anchored in distractor context. The substring-check is the only verifiable anti-hallucination test that doesn't require a second LLM call.
+
+---
+
+**Four lessons (pre-quote-gate):**
 1. **`format` JSON-Schema in Ollama is not a contract for small models.** Test the actual model against the actual prompt before assuming any schema is enforced — don't infer from docs or general assumption. The earlier "Ollama structured output" section in this file already warned that `minLength` is ignored and item-level `type: object` isn't always honored; this case extends that: a 4B model can ignore the entire schema and still get a 200 OK response.
 2. **Aggregate skip telemetry caught the systemic failure that 6 weeks of per-skip lines hid.** Audit-by-aggregate-log beats audit-by-per-event-log for failure-mode visibility.
 3. **A schema change does not fix a model that ignores schemas.** The 4844b26 commit pivoted from enum → integer-range to "make it easier for the model"; the real issue was that the model wasn't reading the schema at all. Always probe the model directly before reshaping the schema.
