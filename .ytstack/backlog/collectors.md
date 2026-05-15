@@ -36,6 +36,11 @@ The wiki engine is a **compiler** — it turns raw sources into wiki articles. G
 | **LLM transcripts** | Claude Code JSONL / Cursor / Claude.ai+ChatGPT exports | per-session distillates → `raw/transcripts/llm/` | daily | high — see `llm-transcripts-collector.md` |
 | **GitHub activity** | `gh` GraphQL / REST across orgs | own commits/PRs/comments → `raw/notes/github/` | daily | high — see `github-activity-collector.md` |
 | **SunoFlow** | sunoflow.up.railway.app REST (`sk-`) | own songs (Phase 1) + play-history (Phase 2, blocked on lx-0/SunoFlow#70) → `raw/notes/sunoflow/` | 12h piggyback | medium — see `sunoflow-collector.md` |
+| **Health (Oura + Apple Health)** | Oura REST + HealthKit XML export (Renpho via HealthKit) | daily biometric rollup → `raw/notes/health/<year>/` | daily | high — see `health-collector.md` |
+| **Calendar** | Google Calendar API (OAuth reuse) | daily rollup w/ gmeet/jamie cross-link → `raw/notes/calendar/` | daily | high — see `calendar-collector.md` |
+| **DMs** | Telegram API → Slack OAuth → iMessage SQLite → Discord export (per protocol) | per-protocol per-conversation files → `raw/transcripts/dms/<protocol>/` | varies | medium (Phase 1 Telegram only) — see `dms-collector.md` |
+| **Reading highlights** | Readwise API (or Kindle/Apple Books direct) | per-book highlights file → `raw/notes/highlights/<source>/` | daily | medium — see `reading-highlights-collector.md` |
+| **Music listening** | Last.fm scrobbles (Spotify bridge) | daily rollup w/ mood signal → `raw/notes/music/<year>/` | daily | low/correlation-channel — see `music-listening-collector.md` |
 
 ## Email ingest pattern (template for others)
 
