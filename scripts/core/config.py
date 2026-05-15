@@ -110,6 +110,22 @@ class Limits:
     # is model-specific: 16k-window models (phi4) silently truncate and
     # hallucinate; 128k-window models eventually OOM-stall on Ollama side.
     curiosity_max_prompt_chars: int = 250_000
+    # Curiosity quality gates (2026-05-15 quality arc).
+    # `curiosity_source_globs`: only run curiosity on sources matching one
+    # of these fnmatch patterns. Memories / knowledge / hard-facts get
+    # skipped — they're cognitive self-notes with no email-side context.
+    # Operator can override (e.g. empty list = run on everything).
+    curiosity_source_globs: list[str] = field(default_factory=lambda: [
+        "raw/transcripts/*",
+        "raw/articles/*",
+        "raw/notes/*",
+        "daily/*",
+    ])
+    # `curiosity_folder_confidence_min`: integer 1-5 self-reported by the
+    # LLM per gap. Below this threshold the producer drops the gap with
+    # `folder_low_confidence`. Forces the model to hedge openly instead
+    # of defaulting to a generic catch-all folder.
+    curiosity_folder_confidence_min: int = 3
     sparse_threshold_words: int = 200
     # YouTube ingest (scan-youtube.py — see also CONFIG.piggybacks.scan_youtube)
     youtube_max_frames: int = 30          # Tier-3 visual: cap frames per video
@@ -224,6 +240,13 @@ class Personal:
     # ordered list of {path, desc} dicts; drives both compile_curiosity.md
     # listing AND compile.py's schema enum (single source of truth)
     email_folders: list[dict] = field(default_factory=list)
+    # Optional subset of email_folder paths considered by the curiosity loop.
+    # Empty list (default) = use all email_folders. Operator-curated allowlist
+    # lets you exclude generic catch-alls (e.g. "INBOX/COMPANY/00 COMPANY")
+    # that the LLM otherwise picks as a fallback when no specific folder fits.
+    # Paths in this list must match a `path:` entry in email_folders; unknown
+    # paths are dropped silently with a one-time WARNING on load.
+    curiosity_folders: list[str] = field(default_factory=list)
     # short list of project / product names rendered into
     # scan_screenshots_vision.md as concrete examples
     project_examples: list[str] = field(default_factory=list)

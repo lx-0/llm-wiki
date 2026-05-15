@@ -110,6 +110,20 @@ limits:
   # if total exceeds this. Keep some headroom under the picked model's
   # context window (llama3.1:8b = 128k = ~430K chars).
   curiosity_max_prompt_chars: 250000
+  # Source-type allowlist for curiosity. Only sources whose path matches one
+  # of these fnmatch globs trigger a curiosity pass. Memories / knowledge /
+  # hard-facts get skipped — they're cognitive self-notes with no email
+  # correspondence to scan for. Empty list = run on all sources.
+  curiosity_source_globs:
+    - "raw/transcripts/*"
+    - "raw/articles/*"
+    - "raw/notes/*"
+    - "daily/*"
+  # Minimum self-reported folder-pick confidence (1-5). The LLM rates how
+  # confident it is that the picked folder actually contains relevant mail.
+  # Below this threshold the gap is dropped (telemetry: folder_low_confidence).
+  # Forces explicit abstention instead of "INBOX/COMPANY/00 COMPANY" hedging.
+  curiosity_folder_confidence_min: 3
   # Lint.
   sparse_threshold_words: 200
   # YouTube ingest (scan-youtube.py).
@@ -237,5 +251,11 @@ personal:
   # `path` strings also become the schema enum in compile.py — single
   # source of truth, no drift.
   email_folders: []
+  # Optional subset of email_folder paths for the curiosity loop. If empty,
+  # the loop uses all email_folders. Operator-curated allowlist lets you
+  # exclude generic catch-alls (e.g. "INBOX/COMPANY/00 COMPANY", "INBOX")
+  # that the LLM otherwise picks as a fallback when no specific folder fits.
+  # Each entry must match a `path:` value in email_folders above.
+  curiosity_folders: []
   # Concrete project/product names used as examples in scan_screenshots_vision.md.
   project_examples: []

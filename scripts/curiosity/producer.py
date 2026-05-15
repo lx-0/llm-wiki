@@ -20,6 +20,7 @@ Design notes:
 
 from __future__ import annotations
 
+import fnmatch
 import json
 import logging
 import re
@@ -62,17 +63,47 @@ async def maybe_generate_curiosity_requests(source: Path) -> None:
     if len(source_content) < CONFIG.limits.curiosity_min_source_chars:
         return
 
-    folder_paths = [f["path"] for f in CONFIG.personal.email_folders if f.get("path")]
+    # Source-type allowlist (quality gate #1). Curiosity-on-email only makes
+    # sense for sources that naturally have email-side correspondence:
+    # meeting transcripts (follow-ups), articles (vendor/author threads),
+    # notes (operational), daily logs (TODO trails). Memories and other
+    # cognitive self-notes don't have that surface, so the model defaults
+    # to generic catch-all folders. Empty allowlist = no filtering.
+    src_globs = CONFIG.limits.curiosity_source_globs
+    if src_globs and not any(fnmatch.fnmatch(rel_path, g) for g in src_globs):
+        log.debug("  Curiosity: skipping %s (no source-glob match)", rel_path)
+        return
+
+    # Folder allowlist (quality gate #2). Operator can subset the curiosity
+    # target pool to exclude generic catch-alls. Empty list = use all
+    # email_folders. Order preserved from operator's allowlist if set.
+    allowed = CONFIG.personal.curiosity_folders or []
+    if allowed:
+        allowed_set = set(allowed)
+        folders_used = [f for f in CONFIG.personal.email_folders
+                        if f.get("path") and f["path"] in allowed_set]
+        if not folders_used:
+            log.warning(
+                "  Curiosity: personal.curiosity_folders=%r matched zero "
+                "email_folders — falling back to full list",
+                allowed,
+            )
+            folders_used = [f for f in CONFIG.personal.email_folders if f.get("path")]
+    else:
+        folders_used = [f for f in CONFIG.personal.email_folders if f.get("path")]
+
+    folder_paths = [f["path"] for f in folders_used]
     if not folder_paths:
         log.info("  Curiosity: no personal.email_folders configured, skipping")
         return
     # Numbered listing — the schema constrains `folder_index` to an integer
     # range, but the prompt still has to spell out which integer maps to
     # which folder. Single source of truth: the same enumerate order is
-    # used to map `folder_index → folder_path` after parsing.
+    # used to map `folder_index → folder_path` after parsing. Uses
+    # `folders_used` (post-allowlist), NOT raw CONFIG.personal.email_folders.
     folder_listing = "\n".join(
         f"{i+1}. {f['path']} — {f.get('desc', '')}".rstrip(" —")
-        for i, f in enumerate(CONFIG.personal.email_folders)
+        for i, f in enumerate(folders_used)
     )
 
     # Cap source excerpt at 5k chars so the prompt fits any small-context
@@ -120,10 +151,22 @@ async def maybe_generate_curiosity_requests(source: Path) -> None:
                             "minimum": 1,
                             "maximum": len(folder_paths),
                         },
+                        # folder_confidence: 1-5 self-reported. Below
+                        # CONFIG.limits.curiosity_folder_confidence_min the
+                        # gap is dropped. Forces explicit abstention instead
+                        # of hedging on a generic catch-all folder.
+                        "folder_confidence": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 5,
+                        },
                         "account": {"type": "string", "enum": account_names},
                         "rationale": {"type": "string"},
                     },
-                    "required": ["topic", "source_quote", "folder_index", "account", "rationale"],
+                    "required": [
+                        "topic", "source_quote", "folder_index",
+                        "folder_confidence", "account", "rationale",
+                    ],
                 },
             },
         },
@@ -173,6 +216,7 @@ async def maybe_generate_curiosity_requests(source: Path) -> None:
         raw_count = len(gaps)
         kept = 0
         dropped: dict[str, int] = {}
+        confidence_min = CONFIG.limits.curiosity_folder_confidence_min
         for gap in gaps[:CONFIG.limits.curiosity_max_gaps]:
             topic = gap.get("topic", "").strip()
             rationale = gap.get("rationale", "").strip()
@@ -186,6 +230,18 @@ async def maybe_generate_curiosity_requests(source: Path) -> None:
                 folder = folder_paths[folder_index - 1]
             elif folder not in folder_paths:
                 dropped["folder_unmapped"] = dropped.get("folder_unmapped", 0) + 1
+                continue
+
+            # Quality gate #3: folder confidence threshold. The LLM self-rates
+            # 1-5 how confident the picked folder actually contains relevant
+            # mail. Below the threshold the gap is dropped — better to abstain
+            # than guess on a generic catch-all.
+            folder_confidence = gap.get("folder_confidence")
+            if not isinstance(folder_confidence, int):
+                dropped["folder_low_confidence"] = dropped.get("folder_low_confidence", 0) + 1
+                continue
+            if folder_confidence < confidence_min:
+                dropped["folder_low_confidence"] = dropped.get("folder_low_confidence", 0) + 1
                 continue
 
             if not topic:
@@ -218,6 +274,7 @@ async def maybe_generate_curiosity_requests(source: Path) -> None:
                 "type": "email-deep-scan",
                 "status": "pending",
                 "folder": folder,
+                "folder_confidence": folder_confidence,
                 "account": gap.get("account", CONFIG.personal.primary_account),
                 "model": gap.get("model", CURIOSITY_MODEL),
                 "topic": topic,

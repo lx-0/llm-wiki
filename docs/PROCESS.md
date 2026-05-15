@@ -540,6 +540,11 @@ flowchart TD
 
 **Distractor-Removal:** Der frühere `${index_md}` + `${compiled_articles}` Block ist aus dem Curiosity-Prompt entfernt — der wiki index und die heutigen compiled articles fungierten als Distractors (Chroma/Vorstel Research: "topically related but factually wrong content cause worse model degradation than irrelevant content does"). Die Curiosity-Loop sieht jetzt nur noch source + folder-listing — kein Cross-Pollination mehr zwischen Sources. Prompt schrumpft von ~80 KB auf ~5 KB. Plus saubere HTTP-Error-Branches: timeout / 404 model-not-pulled / generic HTTP / parse-error — Operator bekommt actionable Warnings, keine Stacktraces.
 
+**Drei-Stufen-Quality-Gate (2026-05-15 evening arc):**
+1. **Source-Type-Allowlist (`CONFIG.limits.curiosity_source_globs`):** Default `["raw/transcripts/*", "raw/articles/*", "raw/notes/*", "daily/*"]`. Curiosity läuft NUR auf Substrate die natürlich Email-Korrespondenz haben. `raw/memories/*`, `knowledge/*` werden geskipped (kognitive Self-Notes ohne Email-Spur).
+2. **Folder-Allowlist (`CONFIG.personal.curiosity_folders`):** Optional Subset von `email_folders` als Curiosity-Pool. Operator kann generic catch-alls (z.B. `INBOX/COMPANY/00 COMPANY`) entfernen. Empty list = alle Folders. Schema-Enum + Prompt-Listing nutzen den Subset einheitlich.
+3. **Folder-Confidence-Threshold (`CONFIG.limits.curiosity_folder_confidence_min: 3`):** Schema bekommt `folder_confidence: integer 1-5` (LLM self-rated 5=specific match, 1=guessing). Producer dropt confidence < threshold. Telemetrie: `folder_low_confidence=N`. Prompt enthält explizit Anti-Default-Regel gegen Hedging in Catch-All-Folder.
+
 **Limits:** Max 3 Requests pro Compile-Lauf (`CONFIG.limits.curiosity_max_gaps`). Requests mit ungemapptem folder_index, leerem topic oder leerer rationale werden verworfen. Pro Source emittet der Producer eine aggregierte Telemetrie-Zeile (`Curiosity: N gen, K kept (dropped: folder_unmapped=X, empty_topic=Y, …)`) statt Per-Skip-Lines — systemische Failures (wie der 26-Folder-Enum-Bug) werden so im Compile-Log sofort sichtbar.
 
 **Request-Format:**

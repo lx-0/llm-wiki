@@ -477,6 +477,14 @@ Our `${index_md}` and `${compiled_articles}` blocks were exactly this — 700+ t
 
 **Fifth lesson:** **Schema-honor + context-fit + quote-gate is the three-layer cake.** Without the gate, both `phi4` (truncating) and `llama3.1` (full-context) could produce schema-valid topics anchored in distractor context. The substring-check is the only verifiable anti-hallucination test that doesn't require a second LLM call.
 
+**Quality re-arc (2026-05-15 evening):** Even with the quote-gate active, llama3.1 was producing source-anchored topics that mapped to a single generic folder (`INBOX/COMPANY/00 COMPANY`) with hedging rationales ("likely contains... may include..."). Diagnosis: the source-types were wrong. `raw/memories/*` are cognitive self-notes (engineering preferences, lessons learned) — they don't have email-side context to scan for. The model was forced to pick *some* folder, defaulted to the catch-all. Three orthogonal quality gates added:
+
+1. **Source-type allowlist** (`CONFIG.limits.curiosity_source_globs`): only run curiosity on substrate that naturally has email correspondence — transcripts (meeting follow-ups), articles (vendor/author threads), notes (operational), daily logs (TODO trails). Memories / knowledge / hard-facts are skipped entirely. Default globs: `["raw/transcripts/*", "raw/articles/*", "raw/notes/*", "daily/*"]`.
+2. **Operator folder allowlist** (`CONFIG.personal.curiosity_folders`): optional subset of `email_folders` that the curiosity prompt + schema enum consider. Lets the operator exclude generic catch-alls. Empty list = use all.
+3. **Self-rated folder confidence** (`folder_confidence: integer 1-5` in schema + `CONFIG.limits.curiosity_folder_confidence_min: int = 3`): the LLM rates how likely the picked folder actually contains relevant mail; below threshold → dropped as `folder_low_confidence`. Plus an explicit anti-default rule in the prompt naming the hedging pattern.
+
+**Sixth lesson:** **Curiosity-on-email is substrate-specific.** Cognitive self-notes don't have email-side context — the LLM will hedge into a catch-all folder. The right answer is *don't run the loop on those source types in the first place*, not "improve the model". The substrate-allowlist is a config-level pre-filter, deterministic, free, and saves Ollama calls. The folder-confidence self-rating is a complementary fall-back for the substrate types that DO trigger curiosity but where no specific folder fits — better explicit abstention than generic-catch-all hedging.
+
 ---
 
 **Four lessons (pre-quote-gate):**
