@@ -585,6 +585,7 @@ def check_daily_consistency() -> list[dict]:
 
     Skips the current day's date (digest legitimately not run yet).
     """
+    import re
     from datetime import date as _date
     issues: list[dict] = []
     daily_root = ROOT_DIR / "daily"
@@ -622,6 +623,20 @@ def check_daily_consistency() -> list[dict]:
                 f"({', '.join(captures)}) but no root digest. Run "
                 f"`wiki agent daily-digest --var date={d}` to produce it.",
             ))
+        else:
+            # Root exists. Verify it's a real digest, not a legacy flat-daily
+            # left behind by the migration script (which copies, doesn't move).
+            root_fm = _read_frontmatter(daily_root / f"{d}.md")
+            if root_fm.get("type") != "daily-digest":
+                issues.append(issue(
+                    "warning", "daily_root_not_digest", f"daily/{d}.md",
+                    f"daily/{d}.md exists alongside daily/{d}/ but has "
+                    f"type={root_fm.get('type')!r} (not 'daily-digest'). "
+                    "Likely a legacy flat-daily preserved by the migration. "
+                    f"Run `wiki agent daily-digest --var date={d}` to "
+                    "regenerate it as a proper digest, OR delete it if the "
+                    "subfolder content is sufficient.",
+                ))
         # Unknown sources nudge
         for cap in captures:
             stem = cap[:-3] if cap.endswith(".md") else cap
