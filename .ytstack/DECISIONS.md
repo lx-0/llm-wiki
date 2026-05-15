@@ -702,3 +702,13 @@ These are companion-rules to [[Templates are load-bearing — never backlog temp
 **Decision.** Codified as a hard rule in the project's `CLAUDE.md` (commit `2e19037`): URLs handed to the operator are derived from authoritative local data before being stated, in the form the operator recognises (named project-ID, not numeric project-number), once, correctly. No probing with the operator's browser. If the data isn't locally available, say so — don't guess.
 
 **How to apply.** Before any URL appears in a response, read the appropriate local source: `<vault>/.claude/*-oauth-client.json` (`installed.project_id` + client_id prefix for project-number), error payloads, config.yaml. Build the URL with named project-ID. Never mix forms across messages — pick one and stick with it. Applies to all cloud-console / dashboard / OAuth-enable / vendor-portal URLs.
+
+## 2026-05-15: Global compile mutex via fcntl on compile.py entry
+
+**Context.** Operator-reported compile errors on 2026-05-15 evening: cascading `kind=unknown` / empty-stderr SDK failures across 9 calendar/daily files in 50 minutes, then 3× `kind=cli_crash` (1–2 s) that triggered consecutive-failure-abort. Live `ps` showed FOUR concurrent `compile.py` processes, three of them targeting the same `daily/2026-05-15/sessions.md` file. Root cause: `flush.py::maybe_trigger_compile()` (line 255–308) checks `state.json` hash to dedup, then spawns compile.py — non-atomic. Multiple `session-end.py` hooks (from parallel VS Code Claude sessions) each see the file as unchanged and each spawn their own compile.
+
+**Decision.** `scripts/compile.py main()` acquires an exclusive non-blocking `flock` on `STATE_DIR/compile.lock` at entry. On contention: log INFO + `return 0`. No manual unlock — kernel releases on process exit (or `kill -9`). Helper `_acquire_exclusive_lock(path)` inlined in compile.py near `main()`; mirrors the established `_dashboard_refresh_lock()` pattern in `flush.py:313` (2026-05-03 incident with the same race-class on dashboard refresh).
+
+**How to apply.** Any new background-spawn site that triggers a heavy LLM-call script + writes shared state should self-defend with a global mutex on the spawned-script side (not the spawn-site side). The spawn-site dedup is inherently racy (state-read happens before any side effect of "the work is now in flight"). Helper is short — extract to `core/proc_lock.py` only on 3rd use-site.
+
+**Touchpoints.** `scripts/compile.py:418-445` (helper + main()-entry call); `tests/test_compile_lock.py` (3 unit tests on uncontested / contended / recovers-after-release semantics). End-to-end smoke verified manually. Commit `8075270` (origin/main). Closely related: M003-S04-* and 2026-05-03 incident around `_dashboard_refresh_lock`.

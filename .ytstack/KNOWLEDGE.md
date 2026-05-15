@@ -1585,3 +1585,25 @@ M006 surfaced TWO orthogonal bugs that had been latent:
 2. **`migrate_additions` was dead code** — `scripts/migrations/migrate_config_keys.py` had defined the function but never called it from `migrate_config`. Every prior addition to `KEY_ADDITIONS` (the 2026-05-15 entries for `compile_force_long_context_types` + `compile_skip_on_long_context_unknown`) had been silently failing to land in operator configs. Discovered while extending the migration for M006's calendar keys and noticing the wiring was missing. Repaired in commit `734439a`.
 
 **Generalisable rule:** when adding a new helper to a maintenance-script-style file (migrations, lints, sweepers), grep for an actual call-site for the helper before considering the change complete. Defense-in-depth call sites only catch bugs if they're actually wired. A test would have caught this too (`test_migrate_config_file_round_trip` was tied to piggyback-rename changes and didn't exercise the additions path until after I rewired the function).
+
+## Concurrent compile-spawn storm (2026-05-15, fix in commit 8075270)
+
+`flush.py::maybe_trigger_compile()` checks a hash in `state.json` to skip already-compiled daily files, then spawns `compile.py --file <X>` as a detached process. The check + spawn are not atomic. When multiple `session-end.py` hooks fire close together (e.g. several VS Code Claude sessions ending in the same window), each `flush.py` reads the same pre-compile state and each spawns its own compile.py for the same daily file.
+
+Observed live 2026-05-15: 3 concurrent `compile.py --file daily/2026-05-15/sessions.md` plus a batch run = four bundled-CLI subprocesses competing for the Claude subscription quota and the same knowledge/ write-targets. Symptoms: cascade of `kind=unknown` / empty-stderr crashes after 80–250 s, plus a tail of `kind=cli_crash` (1–2 s) once enough quota was burned. Engine's consecutive-failure-abort tripped on the cli_crash trio and aborted the run.
+
+**Fix:** `compile.py main()` acquires an exclusive non-blocking `flock` on `STATE_DIR/compile.lock` at entry. Second invocation while the first holds the lock exits cleanly (exit 0, single INFO line). Kernel auto-releases on process exit. Same pattern as `_dashboard_refresh_lock()` in `flush.py:313` (2026-05-03 incident — 103 TimeoutExpired records from a similar storm in dashboard-refresh).
+
+**Generalisable rule:** any new background-spawn site that triggers a heavy LLM-call script + writes shared state needs a global mutex on the spawned-script side (not the spawn-site side). The spawn-site dedup is necessarily racy. Tests at `tests/test_compile_lock.py`. Helper inlined in `compile.py`; if it grows to a 3rd use-site, extract to `core/proc_lock.py`.
+
+## Excalidraw: extending an existing file is not the same as authoring fresh
+
+When adding elements to `docs/architecture.excalidraw` (or any large existing Excalidraw JSON), the skill's `references/element-templates.md` does NOT match the file's own conventions. Three pitfalls (cost ~1.5 h debugging in 2026-05-16 session):
+
+1. **`boundElements: []` not `null`.** Template says `null`; the file's working elements use empty array. Elements with `null` render in light mode but disappear under the dark-mode `exportToSvg` pipeline.
+2. **`index` field is required.** Excalidraw fractional-indexing keys; the file uses 'b3z', 'b30', 'b35' etc. Valid: ≥3 chars, lowercase 'a'/'b' bucket, alphanumeric tail. Invalid: 2-char keys, 'c'/'z' bucket prefixes. Use 'b8X' (sorts after the existing 'b3z' tail). After assigning indices, **sort `data["elements"]` by `index`** — the renderer treats array-order vs index-order divergence as a silent fatal drop.
+3. **Renderer default is `--theme dark`, but the production PNG is `--theme light`.** Check the existing PNG's background colour before rendering. Dark mode is a CSS `filter: invert(93%) hue-rotate(180deg)` on the SVG (`render_template.html:31`). Light-on-white designs look terrible under it.
+
+**Pattern:** before extending, dump 1–2 known-rendering elements with `json.dumps(e, indent=2)`, clone field-set verbatim (including `frameId`, `updated`, `version`, `roundness`, `autoResize`), only mutate id/coords/colors/text. Prefer rect + separate free-floating texts (with `containerId: null` and `boundElements: []`) over bound text-in-rect for multi-line content — bound text rendering is fragile.
+
+**Workflow:** (1) crop the existing PNG region you're modifying so you remember the visual context; (2) take a `.bak-HHMM` snapshot of the .excalidraw; (3) make changes; (4) render same theme as production; (5) crop the new band/section and Read it; (6) loop until clean. Light-mode render is a useful sanity check for "is the data there at all" before debugging dark-mode-specific issues.
