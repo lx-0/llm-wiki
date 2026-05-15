@@ -621,6 +621,16 @@ class JamieCollector:
             log.info("  [%s] wrote %s", acct.account_id, target.relative_to(ROOT_DIR))
             files_written.append(target)
 
+            # Mirror a one-liner into daily/<date>/meetings.md.
+            try:
+                from core import daily_capture
+                meet_date = str(started_at)[:10] if started_at else now_iso()[:10]
+                if re.match(r"^\d{4}-\d{2}-\d{2}$", meet_date):
+                    rollup_line = f"- **jamie** · {title} → [[{target.stem}]]"
+                    daily_capture.append(meet_date, "meetings", rollup_line)
+            except Exception:  # noqa: BLE001
+                log.exception("daily-rollup append failed for jamie meeting %s", mid)
+
             if started_at and (highest_started is None or str(started_at) > str(highest_started)):
                 highest_started = str(started_at)
 

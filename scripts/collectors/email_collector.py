@@ -222,6 +222,17 @@ class EmailCollector:
                     log.info("  wrote %d-msg delta → %s",
                              len(messages), report_path.relative_to(ROOT_DIR))
                     files_written.append(report_path)
+                    # Mirror a one-liner into daily/<today>/email.md per account.
+                    try:
+                        from core import daily_capture
+                        from datetime import date as _date
+                        rollup_line = (
+                            f"- **{account_id}** · {len(messages)} new "
+                            f"→ [[{report_path.stem}]]"
+                        )
+                        daily_capture.append(_date.today().isoformat(), "email", rollup_line)
+                    except Exception:  # noqa: BLE001
+                        log.exception("daily-rollup append failed for email delta %s", account_id)
             else:
                 log.info("  %s: 0 new messages since watermark", account_id)
                 skipped += 1

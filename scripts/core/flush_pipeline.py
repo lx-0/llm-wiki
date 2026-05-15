@@ -113,25 +113,34 @@ actions:
 
 
 def append_to_daily(content: str, session_id: str) -> Path:
-    """Append extracted content to today's daily log file. Returns the file path.
+    """Append extracted content to today's daily sessions log. Returns the file path.
 
-    On first creation of a daily file, also writes the per-day Summarize
-    button block right after the H1 — clicking it from inside that file
-    fires `agent-summarize-day-here`, which runs `wiki agent summarize-day
-    --var date={{file_basename}}` so the summary targets THAT day, not today.
+    Post-2026-05-15 (`daily/`-as-rollup arc, see
+    `.ytstack/AD-HOC-daily-as-rollup-PLAN.md`): writes go to
+    `daily/<date>/sessions.md` — one of five per-source append-only files
+    that together compose the day's capture. The root `daily/<date>.md`
+    becomes the compile-stage digest, written by `compile.py` (not here).
+
+    On first creation of the sessions file, also writes the per-day
+    Summarize button block right after the H1 — clicking it from inside
+    that file fires `agent-summarize-day-here`, which runs `wiki agent
+    summarize-day --var date={{file_basename}}` so the summary targets
+    THAT day, not today.
     """
-    DAILY_DIR.mkdir(parents=True, exist_ok=True)
-
     now = datetime.now(ZoneInfo(TIMEZONE))
     date_str = now.strftime("%Y-%m-%d")
     time_str = now.strftime("%H:%M:%S")
-    daily_file = DAILY_DIR / f"{date_str}.md"
+
+    # Per-source subfolder: daily/<date>/sessions.md (one writer per file).
+    date_dir = DAILY_DIR / date_str
+    date_dir.mkdir(parents=True, exist_ok=True)
+    daily_file = date_dir / "sessions.md"
 
     header = f"\n\n---\n\n### Session `{session_id}` — {time_str}\n\n"
     is_new = not daily_file.exists()
     with open(daily_file, "a", encoding="utf-8") as f:
         if is_new:
-            f.write(f"# Daily Log — {date_str}\n\n")
+            f.write(f"# Daily Sessions — {date_str}\n\n")
             f.write(_DAILY_BUTTON_BLOCK)
         f.write(header)
         f.write(content)

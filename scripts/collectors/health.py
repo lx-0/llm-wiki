@@ -24,6 +24,7 @@ import yaml
 
 from adapters.health.oura import DailySummary, OuraAPIError, OuraClient
 from collectors.base import CollectorSpec, RunResult, register
+from core import daily_capture
 from core.config import CONFIG
 from core.paths import ROOT_DIR, STATE_DIR
 from core.utils import load_json_state, save_json_state
@@ -268,6 +269,10 @@ class HealthCollector:
             log.info("  [%s] wrote %s", acct.account_id, target.relative_to(ROOT_DIR))
             files_written.append(target)
 
+            # Mirror the day's key metrics into daily/<date>/health.md — one
+            # line per (account, day), idempotent replace per account.
+            self._update_daily_rollup(summary, acct.account_id)
+
             if highest_day is None or summary.day > highest_day:
                 highest_day = summary.day
 
@@ -284,3 +289,35 @@ class HealthCollector:
             skipped,
             state_touched,
         )
+
+    @staticmethod
+    def _update_daily_rollup(summary: DailySummary, account_id: str) -> None:
+        """Mirror this summary's metrics into daily/<day>/health.md.
+
+        Per-(account,day) one-liner. Multiple accounts append; same-account
+        re-runs replace via the daily_capture KNOWN_SOURCES contract.
+
+        The `daily/<day>/` subfolder substrate is the post-2026-05-15
+        rollup layer — see `.ytstack/AD-HOC-daily-as-rollup-PLAN.md`.
+        """
+        bits: list[str] = []
+        if summary.sleep_hours is not None:
+            bits.append(f"sleep {summary.sleep_hours:.1f}h")
+        if summary.sleep_score is not None:
+            bits.append(f"score {summary.sleep_score}")
+        if summary.readiness_score is not None:
+            bits.append(f"readiness {summary.readiness_score}")
+        if summary.hrv_overnight is not None:
+            bits.append(f"hrv {summary.hrv_overnight}")
+        if summary.steps is not None:
+            bits.append(f"{summary.steps} steps")
+        if summary.resting_hr is not None:
+            bits.append(f"resting {summary.resting_hr}")
+        if not bits:
+            return
+        line = f"- **{account_id}** · {' · '.join(bits)}"
+        try:
+            daily_capture.append(summary.day, "health", line)
+        except Exception:  # noqa: BLE001
+            # Rollup is a side-effect; never let it break the primary write.
+            log.exception("daily-rollup append failed for %s/%s", summary.day, account_id)

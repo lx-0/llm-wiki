@@ -905,6 +905,15 @@ class GmeetCollector:
                      acct.account_id, target.relative_to(ROOT_DIR), len(exports))
             files_written.append(target)
 
+            # Mirror a one-liner into daily/<date>/meetings.md.
+            try:
+                from core import daily_capture as _daily_capture
+                if re.match(r"^\d{4}-\d{2}-\d{2}$", date_prefix):
+                    rollup_line = f"- **gmeet** · {_meeting_title(first_name)} → [[{target.stem}]]"
+                    _daily_capture.append(date_prefix, "meetings", rollup_line)
+            except Exception:  # noqa: BLE001
+                log.exception("daily-rollup append failed for gmeet meeting %s", key)
+
             # Register the newly-written file in the sibling_map so a later
             # group in this same run (or a later account in the multi-tenant
             # loop) merges into it instead of writing a duplicate.

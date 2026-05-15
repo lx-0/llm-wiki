@@ -23,6 +23,7 @@ from zoneinfo import ZoneInfo
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from collectors.base import Collector, CollectorSpec, RunResult, register
+from core import daily_capture
 from core.config import CONFIG, TIMEZONE
 from core.paths import RAW_DIR
 from core.utils import slugify
@@ -76,6 +77,26 @@ def _scan_inbox(inbox: Path) -> list[Path]:
             continue
         items.append(p)
     return sorted(items, key=lambda p: p.stat().st_mtime)
+
+
+def _append_daily_rollup(captured_at: datetime, content: str, out_path: Path) -> None:
+    """Append a voice-intake one-liner to daily/<date>/voice.md.
+
+    The daily/-rollup substrate (`.ytstack/AD-HOC-daily-as-rollup-PLAN.md`)
+    surfaces one line per voice note: time, first few words, link back to
+    the canonical raw/voice/ file. Failures are swallowed — the rollup is
+    side-effect, never break the primary write.
+    """
+    date_iso = captured_at.strftime("%Y-%m-%d")
+    time_label = captured_at.strftime("%H:%M")
+    first_line = content.splitlines()[0].strip() if content else "(empty)"
+    if len(first_line) > 80:
+        first_line = first_line[:77].rstrip() + "…"
+    line = f"- **{time_label}** · {first_line} → [[{out_path.stem}]]"
+    try:
+        daily_capture.append(date_iso, "voice", line)
+    except Exception:  # noqa: BLE001
+        log.exception("daily-rollup append failed for voice note %s", out_path.name)
 
 
 @register
@@ -150,6 +171,10 @@ class VoiceCollector:
                 encoding="utf-8",
             )
             written.append(out_path)
+
+            # Mirror a one-liner into daily/<date>/voice.md so the day's
+            # voice-intake activity surfaces in the rollup substrate.
+            _append_daily_rollup(captured_at, content, out_path)
 
             try:
                 # If archive already has a same-name file (re-run after manual

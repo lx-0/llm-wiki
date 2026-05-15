@@ -260,13 +260,19 @@ def maybe_trigger_compile(daily_file: Path) -> None:
         )
         return
 
-    # Check if daily log has changed since last compile
+    # Check if daily log has changed since last compile.
+    # Post-2026-05-15 rollup arc: daily files live at daily/<date>/<source>.md
+    # — `.name` alone collides (every day has a "sessions.md"), so the cache
+    # key uses the path relative to DAILY_DIR (e.g. "2026-05-14/sessions.md").
     state_file = STATE_DIR / "state.json"
     if state_file.exists():
         try:
             state = json.loads(state_file.read_text(encoding="utf-8"))
             ingested = state.get("ingested", {})
-            rel = daily_file.name
+            try:
+                rel = str(daily_file.relative_to(DAILY_DIR))
+            except ValueError:
+                rel = daily_file.name  # not under daily/ — preserve old key
             if rel in ingested:
                 current_hash = hashlib.sha256(daily_file.read_bytes()).hexdigest()[:16]
                 if ingested[rel].get("hash") == current_hash:
