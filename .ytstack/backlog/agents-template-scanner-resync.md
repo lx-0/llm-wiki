@@ -1,5 +1,11 @@
 # `templates/AGENTS.example.md` scanner-table resync
 
+**Status: RESOLVED 2026-05-15** by parallel session in commit `1df673c` (`feat(compile)+docs(voice): voice commitment extraction + final docu-sweep`). The Collect-section table at § 5 now lists all 10 Registry collectors (`email`, `jamie`, `gmeet`, `voice`, `health`, `screenshots`, `calendar`, `browser`, `tabs`, `youtube`) with per-row Source / Output / Trigger columns + a Registry-discovery pointer (`wiki collect --list`).
+
+**Lesson recorded:** I framed this work as "backlog vs do-now"; the operator pointed out (correctly) that templates have NO alternative because `wiki seed --force` overwrites any vault-side edits. Whenever a new collector ships, the template gets the new row in the SAME arc, never as a deferred item. See `feedback_template_resync_not_optional` for the memory rule.
+
+**Historical pitch (kept for grep-back):**
+
 **Priority:** P3 — informational, not load-bearing for compile pass (compile.py reads `raw/` directly, not via this table). But the table is the operator-orientation surface AND lands in every new vault's `AGENTS.md` via `wiki seed`, so freshly-installed instances start with a stale picture of the engine.
 
 **Origin:** 2026-05-15 Health Phase 1 doc-coverage audit. Stale-table gap surfaced when looking for "where should Health be mentioned in vault-AGENTS?"
