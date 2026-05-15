@@ -537,3 +537,36 @@ Fifth substrate-collector (`collectors/voice.py`) — shipped off-roadmap as a d
 - Tests: `tests/test_voice_collector.py` (8 cases — graceful agnostic, dry-run, real-run, dot/wrong-suffix ignore, idempotent re-run, empty-file archive, slug-collision seconds-suffix), `tests/test_compile_two_layer_prompt.py` + `tests/test_jamie_extraction_fixture.py` (wording update for "meeting + voice substrates").
 - Docs: `docs/setup-voice.md` (iOS Shortcut recipe + Mac alternatives + troubleshooting), `.ytstack/backlog/voice-intake.md` (research, tool landscape, deferred set), README/AGENTS/FEATURES/cli/concept/config/engine-layout (all swept to "ten collectors"), `docs/PROCESS.md` v1.4, `docs/overview.{excalidraw,png}`, `docs/architecture.{excalidraw,png}`.
 - Memory: `~/.claude/projects/.../memory/project_voice_intake.md`.
+
+## 2026-05-15: Health collector Phase 1 — Oura-only, ad-hoc out-of-milestone
+
+Sixth substrate-collector (`collectors/health.py`) — shipped as an ad-hoc execution arc per `.ytstack/AD-HOC-health-phase-1-PLAN.md` because the active milestone (M005, parallel-session-owned) had no room and starting M006 in parallel would have flipped `STATE.md current_milestone` mid-flight. Five commits: plan → impl → env-template → schema fix → docs (`c7aaef1` → `1fd1044` → `241ad4a` → `9a7f585` → `047c55d`). Live on the lxw vault with the operator's `default` account.
+
+**Decisions locked:**
+
+1. **Phase 1 = Oura REST only.** Apple HealthKit / Renpho weight / iPhone Health auto-export all deferred to Phase 2 (XML drop-folder) and Phase 3 (Health Auto Export). The Oura adapter alone clears the "new substrate this week" wedge; phase-gating prevents the macOS-HealthKit TCC mess from blocking the cheap part.
+
+2. **Four endpoints per pull, not three.** The original plan called for `/daily_sleep` + `/daily_readiness` + `/daily_activity`. Live-probe against the operator's actual account (2026-05-15) revealed `/daily_sleep` is score-only (5 keys: id/day/score/timestamp/contributors). The session-level metrics (`total_sleep_duration`, `average_hrv`, `lowest_heart_rate`) live on `/sleep` instead, where multiple rows per day are normal. Adapter picks the longest-duration session per day to extract overnight metrics — naps don't belong in a resting baseline. See [[KNOWLEDGE.md § Live-probe before TDD-ing a parser against an undocumented schema]] for the incident.
+
+3. **Per-(account, day) markdown file with numeric frontmatter.** Output shape `raw/notes/health/<year>/<date>--<account>.md`. Frontmatter carries all metrics as numeric YAML; None-valued fields are dropped (not emitted as `null`) so the prose body stays uncluttered. `sensitivity: high` flags every file for any future share-vault filter. compile.py is expected to read weekly rollups, not per-day files.
+
+4. **Multi-tenant from day one — `personal.accounts.<id>.health.oura` (kind: `oura-pat`).** No flat `personal.health` block ever; the multi-tenant policy ([[Architecture policy — account-bound collectors/adapters multi-tenant from day one]]) applies even though the Oura ring is a per-person device, because nothing prevents a partner's data landing on a shared wiki later or distinct work/personal sets.
+
+5. **Watermark-on-success-only.** `state['<acct>']['oura']['last_day']` advances only when the per-account scan finishes without an `OuraAPIError`. Failures leave the watermark untouched so the next run retries the same window (mirrors jamie/gmeet failure-vs-empty discipline).
+
+6. **Ad-hoc execution arc is documented like a milestone task.** When a small (~0.5d) well-defined feature ships outside the active milestone, the de-facto plan + summary docs live at `.ytstack/AD-HOC-<feature>-{PLAN,SUMMARY}.md`. This is the bridge between formal ytstack flow and operator-direct execution; if the arc grows or generalizes (e.g. a substrate-extension M006), formalize via `plan-milestone` later.
+
+**Follow-up backlog:** Phase 2 / Phase 3 + weekly digest prompt + `wiki health-auth` bootstrap CLI in `.ytstack/backlog/health-collector.md`.
+
+## 2026-05-15: Templates are load-bearing — never backlog template-resync
+
+After Health Phase 1 shipped, an operator-correction surfaced that I had framed `templates/AGENTS.example.md` resync as "backlog vs do-now" — when in fact the template has no alternative source. `wiki seed --force` overwrites any vault-side edits, so the template IS the canonical state every fresh install sees. The full scanner-table resync happened immediately (5 missing collectors added in `1df673c`), and the lesson is recorded as a hard memory rule.
+
+**Decision locked:** When a new collector / scanner / substrate-path / lint check / dashboard widget ships, the matching `templates/` updates land in the SAME commit as the implementation. Never as a follow-up. Never as backlog. Companion-rule to [[Engine vs vault version-skew during rollout]] — that one says "vault config edits depending on schema changes must wait for `wiki update`"; this one says "the engine-side template update is non-negotiable for the schema change to ship at all."
+
+Same logic governs:
+- `templates/.obsidian/*.json` (existing rule [[feedback_obsidian_config_via_template]])
+- `templates/.claude/.env.example`
+- any other `templates/` file copied into vaults via `wiki seed`.
+
+Memory recorded as [[feedback_template_resync_not_optional]].
