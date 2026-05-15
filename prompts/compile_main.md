@@ -115,7 +115,26 @@ ${source_content}
    - **`---` separator** between State and Timeline is mandatory -- it marks the boundary between compiled truth and append-only history.
    - **`## Timeline`** below `---` is append-only and reverse-chronological (newest first). One entry per substrate touch: `- **YYYY-MM-DD** | \`raw/...md\` — short note.` Cite the source file with backticks; one-line context.
    - **For all OTHER `type:` values** (`concept`, `connection`, `qa`, `moc`), use the existing flat atomic shape -- do NOT emit the two-layer structure.
-   - Action-Items extraction from jamie/gmeet/email substrates is handled by later prompt rules (M005-S03 scope); this instruction defines the schema only. If the current source has no concrete commitments for the entity, leave `## Action Items` empty (the section header still appears).
+   - If the current source has no concrete commitments for the entity, leave `## Action Items` empty (the section header still appears).
+
+   **Extracting commitments from meeting substrates.** When `${source_path}` matches `raw/transcripts/jamie/*.md` or `raw/transcripts/gmeet/*.md`, the source is a meeting transcript and you MUST scan it for commitments and route them to the right entity page's State block.
+
+   A commitment is a quartet:
+   - **Task** — verb phrase (what gets done)
+   - **Owner** — speaker name (resolves to a `knowledge/people/<slug>.md` entity)
+   - **Deadline** — explicit date if stated, mapped to `📅 YYYY-MM-DD`; omit if not stated
+   - **Context** — one-line substrate citation in the Owner's Timeline
+
+   Signals to extract a commitment: explicit phrases like "I'll send X by Friday", "Jane will follow up on Z", "we agreed to ship A on Monday", "I'll get back to you on B", "decided to do C". Ignore idle mentions, references, gossip, hypotheticals (`if we did X...`), and rhetorical questions.
+
+   Routing rules:
+   - **Owner is a known person.** Grep `knowledge/index.md` for the speaker name. If `knowledge/people/<slug>.md` exists, update its `## Action Items` section (append the new `- [ ] Task 📅 YYYY-MM-DD` line; do not duplicate existing items). Add a Timeline entry citing the transcript.
+   - **Owner is the operator (first-person commitments)** — "I'll send the deck". Treat as if owned by the project most discussed in the meeting: append to that project's `## Action Items`. If no project is identifiable, append to the meeting's other attendees' pages with the "we agreed" framing.
+   - **Commitment is blocked / waiting on someone else** — "I'm waiting for Bob's approval", "blocked on infra capacity". Route to the *Owner's* `## Open Threads` (not Action Items), prose-bullet form: `- Waiting on Bob's approval (mentioned YYYY-MM-DD)`.
+   - **Owner is mentioned but not a known person.** Create a stub `knowledge/people/<slug>.md` with the two-layer template, populate the executive-summary blockquote with what the transcript reveals (one line is fine), then route the commitment normally.
+   - **Always append a Timeline entry** to every entity page touched, one entry per substrate touch: `- **YYYY-MM-DD** | \`raw/transcripts/jamie/...md\` — short note.`
+
+   Quality bar: better to miss a fuzzy commitment than fabricate one. If you're unsure whether something is a real commitment, skip it. The operator can re-prompt for missed items; can't easily un-prompt for hallucinated ones.
 
 4. **Create connection articles** in `knowledge/connections/` when you identify meaningful relationships between concepts (patterns, contradictions, analogies). Use the same frontmatter format with `type: connection`.
 

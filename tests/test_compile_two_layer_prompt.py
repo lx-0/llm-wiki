@@ -39,3 +39,21 @@ def test_compile_prompt_includes_atomic_exception_for_other_types() -> None:
     rendered = render("compile_main", **_DUMMY_VARS)
     # Other types keep the existing atomic shape — explicit exception clause
     assert "do NOT emit the two-layer structure" in rendered
+
+
+def test_compile_prompt_carries_commitment_extraction_rule() -> None:
+    """M005-S03-T01: the meeting-substrate commitment-extraction rule (Task/
+    Owner/Deadline/Context quartet + entity routing + Timeline citation) must
+    reach the rendered prompt unchanged.
+    """
+    rendered = render("compile_main", **_DUMMY_VARS)
+    # Section headline
+    assert "Extracting commitments from meeting substrates" in rendered
+    # Quartet markers
+    for marker in ("**Task**", "**Owner**", "**Deadline**", "**Context**"):
+        assert marker in rendered, f"missing commitment-quartet marker: {marker}"
+    # Substrate scope (jamie + gmeet path patterns)
+    assert "raw/transcripts/jamie/" in rendered
+    assert "raw/transcripts/gmeet/" in rendered
+    # Quality-bar / anti-hallucination clause
+    assert "better to miss a fuzzy commitment than fabricate one" in rendered
