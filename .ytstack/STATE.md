@@ -1,7 +1,7 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-05-15T22:30:00Z
+last_updated: 2026-05-15T23:59:00Z
 current_milestone: M005
 active_slice: none
 active_task: none
@@ -9,9 +9,45 @@ active_task: none
 
 # State
 
-**Status:** **M005 COMPLETE + DEPLOYED.** All 5 slices, 20 tasks closed. Personal task management lives on the wiki: prompt rules for two-layer schema + commitment extraction + entity resolution + lifecycle (S01+S03+S04), lint enforcement (S02), dashboard pane + Inbox MOC + stat card (S05). 246/246 tests green. **lxw vault is on engine `a62c4b4` (latest); `wiki update` + `wiki seed --force` completed; dashboard "📌 Personal Tasks (Wiki)" pane + `knowledge/MOCs/inbox-tasks.md` + open_commitments stat-card live.** Existing 19 person-pages + 44 project-pages are still on the pre-M005 atomic shape — they migrate to two-layer lazily on the next compile pass that touches their substrate; full canary signal will surface naturally during normal compile runs (no separate canary step needed). Roadmap status: done.
+**Status:** **M005 COMPLETE + DEPLOYED. Late-evening post-M005 hardening arc shipped (graph-view + qa schema + domain-tag rule + compile-cascade fix + 5 domain MOCs).** All 5 slices, 20 tasks closed. Personal task management lives on the wiki: prompt rules for two-layer schema + commitment extraction + entity resolution + lifecycle (S01+S03+S04), lint enforcement (S02), dashboard pane + Inbox MOC + stat card (S05). 246/246 tests green. **lxw vault is on engine `a62c4b4` (latest); `wiki update` + `wiki seed --force` completed; dashboard "📌 Personal Tasks (Wiki)" pane + `knowledge/MOCs/inbox-tasks.md` + open_commitments stat-card live.** Existing 19 person-pages + 44 project-pages are still on the pre-M005 atomic shape — they migrate to two-layer lazily on the next compile pass that touches their substrate; full canary signal will surface naturally during normal compile runs (no separate canary step needed). Roadmap status: done.
 
 M005 plan: 5 slices, 20 tasks total (see `M005-ROADMAP.md`). Locked decisions: tasks live inside `knowledge/people/` + `knowledge/projects/` entity pages as `## Action Items` + `## Open Threads` sections (no top-level `tasks/` folder); Obsidian-Tasks-plugin syntax canonical; two shapes coexist (atomic for concepts/qa/facts/connections, State+Timeline only for people/projects); extraction priority jamie > gmeet > email; dashboard pane reuses M003-S01 infra. Conceptual groundwork: `.ytstack/backlog/entity-pages-state-timeline.md` + `.ytstack/backlog/gbrain-comparison.md`.
+
+---
+
+## 2026-05-15 late-evening — graph + qa + compile-cascade arc (post-M005 hardening)
+
+Session-long investigation triggered by "graph view shows no thematic clusters". Surfaced + closed five separate sub-arcs:
+
+**1. Graph-view multi-channel encoding** (commit `c7314d9`). Extended Graph community plugin (March-2025) configured for Multi-Channel: `type` → node shape (concept=circle / connection=diamond / project=square / person=hexagon / moc=star / fact=triangle / qa=pentagon); domain-tag → coloured concentric arcs (multi-domain notes show multiple rings). Native graph also got 9 domain tag-color-groups + 6 folder fallback + tuned forces (`centerStrength=0.1, repelStrength=30, linkStrength=0.2, linkDistance=250`, `showTags: true`). Templates synced (`templates/.obsidian/graph.json` + new `templates/.obsidian/plugins/extended-graph/data.json`) so `wiki seed --force` preserves the config across vault re-seeds. InfraNodus + Smart Graph evaluated and rejected (cloud subscription / privacy posture mismatch).
+
+**2. qa schema enforcement** (commit `11c2d27`). `wiki query --file-back` was shipping qa/-notes that missed `type: qa` in frontmatter, missed the index row, and missed the log entry, while reporting "Q&A-Artikel erstellt, Index und Log aktualisiert". Four fixes: prompt-hardening with Read-back verification clause; new `check_qa_schema` lint (type-required error + index-presence warning + domain-tag warning); `wiki query --brief` mode for short bullet answers; `--file-back` slug-dedup with `--force` opt-out. Documented in operator-facing `templates/AGENTS.example.md` + internal `AGENTS.md`.
+
+**3. Domain-tag rule for concepts/ and qa/** (commit `da23f2b`). Compile prompt now requires every concept/qa note to carry ≥1 domain tag from `CONFIG.graph_view.domain_tags` (engine default: `fleet, openclaw, claude-code, yesterday, llm-wiki, paperclip, ytstack, township, pixeltales, lxw`). Notes without a domain tag fall into the grey graph-view fallback bucket. New lint `check_concept_domain_tag` enforces. Generic shape-tags (`pattern`, `discipline`, `gotcha`, `workflow`, `architecture`) explicitly do NOT count as domain tags.
+
+**4. Lateral-linking arc — REJECTED after audit re-verify** (commit `796e97e`). The motivating audit ("0 lateral concept→concept wikilinks out of 6743") was buggy: the grep matched bare `[[slug]]` but missed `[[concepts/slug]]` (the form `compile.py` actually emits in `## Related Concepts` sections). Real count: **5392 lateral wikilinks, 77% of all concept-from links.** 686 of 873 concepts already carry curated Related sections. Working implementation discarded before commit. The cluster-perception "hairball" problem is force-layout dominance by 8-10 mega-hub notes (`projects/fleet`=150 backlinks, `agentisches-manifest`=69, …), not missing edges. **Standing acceptance: the knowledge base is genuinely dense-within AND dense-between because operator's disciplines apply across domains — themed-island visualisation would fight the data's truth.** Backlog `lateral-linking.md` preserved with REJECTED status + audit-bug forensics so the next agent doesn't re-derive the design.
+
+**5. Compile rate-limit cascade misclassified as cli_crash** (commit `919ff4e`). A health/ batch aborted after 3 "cli_crash" fast-fails. Single-file re-run worked 20 minutes later — proving it was a cascade, not a CLI bug. Real sequence: file 19 hit kind=unknown at 8.8s (tool-fanout context overflow on a 288-char source — agent over-explored for the new `type: health-rollup` substrate); immediate `[1m]` retry burst hit Anthropic per-minute rate-limit; subsequent batch files also caught in the rate-limit window; bundled CLI silently exited exit-1 / empty-stderr per its 429 behaviour. Three fixes: `CONFIG.limits.compile_failure_backoff_s: 60` (sleep before any retry); `CONFIG.limits.compile_retry_long_context_min_source_chars: 10240` (skip [1m] retry on small sources where over-exploration is the real cause); `hooks/session-start.py` got the `CLAUDE_INVOKED_BY` recursion guard that `session-end.py` + `pre-compact.py` already had.
+
+**6. Five domain MOCs scaffolded in lxw vault** (off-engine — vault content). `knowledge/MOCs/{llm-wiki, fleet, openclaw, claude-code, yesterday}.md`. Shape: Snapshot → Trunk Concepts (top-backlink-anchored) → thematic subsections → Active Projects → People (where relevant) → Dataview fallback. **Pattern NOT codified into engine command yet** — wait until 5 MOCs prove valuable in daily use before adding `wiki moc <domain>` subcommand. Remaining underused folders: `paperclip` (64 notes), `lxw` (47), `ytstack` (34), `township` (26), `pixeltales` (17).
+
+**Standing rules established by this arc:**
+
+- **Multi-step prompts need verification clauses.** Any prompt that instructs N artifact-mutations must end with explicit Read-back-and-confirm. Lint owes a structural check per LLM-emitted artifact shape (`check_qa_schema` is the template).
+- **Audit your premise before designing the fix.** Re-derive load-bearing metrics two ways before committing design to them. A single bad audit number cost ~3 hours of design + implementation that got discarded.
+- **Tags are domains, not types.** A `qa` tag is redundant with `type: qa`; shape-tags (`pattern`/`gotcha`/`discipline`) carry no clustering signal.
+- **Engine templates must persist operator-configured surfaces.** Any operator-facing config (`graph.json`, plugin data.json) that gets overwritten by `wiki seed --force` needs an updated engine template at the same time. Today's first symptom: lxw `graph.json` got reset by `wiki update` because the template still carried the pre-arc 6-folder palette.
+- **When an engine retries an API call within seconds of a failure, always backoff first.** The retry is exactly the time when rate-limit is most likely. Applies beyond compile.py — any engine path that auto-retries on the same backend.
+- **Hook recursion guards are mandatory for any hook that injects context.** session-end + pre-compact had them; session-start didn't. The miss caused (small) context pressure inside compile-spawned CLI subprocesses.
+
+**Commits this arc (mine, chronological):**
+- `11c2d27` — qa schema enforcement + brief mode + dedup
+- `da23f2b` — check_concept_domain_tag + lxw in defaults
+- `796e97e` — lateral-linking arc closed (rejected)
+- `c7314d9` — sync engine templates + AGENTS schema + DECISIONS entry
+- `919ff4e` — compile rate-limit-cascade fix
+
+**Status: all pushed. Tree clean.**
 
 ---
 
