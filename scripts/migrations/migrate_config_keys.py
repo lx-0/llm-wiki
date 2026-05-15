@@ -1,16 +1,30 @@
-"""Migrate renamed / removed config.yaml keys to current engine schema.
+"""Migrate renamed / removed / added config.yaml keys to current engine schema.
 
 The engine's config loader falls back to dataclass defaults for any key it
 doesn't recognise — so a *renamed* key in an operator's `config.yaml` is
 silently ignored and the operator's customisation stops applying without a
-warning. This one-shot migration renames the stale keys in place (preserving
-the operator's values) and drops keys for removed features.
+warning, and a *new* key never appears in the operator's file at all so they
+don't see that it's tunable. This one-shot migration renames stale keys in
+place (preserving operator values), drops keys for removed features, injects
+new keys under their parent block with the engine default, and prunes orphan
+keys whose backing dataclass entry was deleted (otherwise they linger as
+silent YAML cruft forever).
 
 Key changes covered (chronological):
-  piggybacks.follow_requests   → piggybacks.curiosity_followup   (curiosity rework)
-  piggybacks.scan_screenshots  → piggybacks.screenshots          (Collector port 2026-05-14)
-  piggybacks.email_incremental → piggybacks.email                (M002 — kept for old vaults)
-  piggybacks.sync_memories     → (removed — sync-memories deleted 2026-05-13)
+  piggybacks.follow_requests              → piggybacks.curiosity_followup   (curiosity rework)
+  piggybacks.scan_screenshots             → piggybacks.screenshots          (Collector port 2026-05-14)
+  piggybacks.email_incremental            → piggybacks.email                (M002 — kept for old vaults)
+  piggybacks.sync_memories                → (removed — sync-memories deleted 2026-05-13)
+  limits.compile_force_long_context_types     (added 2026-05-15, default ["daily-digest"])
+  limits.compile_skip_on_long_context_unknown (added 2026-05-15, default True)
+  limits.calendar_request_timeout_s       (added 2026-05-15 M006, default 30)
+  limits.calendar_max_per_run             (added 2026-05-15 M006, default 500)
+  limits.calendar_backfill_days           (added 2026-05-15 M006, default 90)
+  limits.calendar_future_days             (added 2026-05-15 M006, default 7)
+  piggybacks.calendar                     (added 2026-05-15 M006, cooldown 6h, max_per_run 500)
+  personal.calendar_work_keywords         → (dropped 2026-05-15 M006, scan_calendar-only legacy field)
+  personal.calendar_categories            → (dropped 2026-05-15 M006, scan_calendar-only legacy field)
+  personal.calendar_report_language       → (dropped 2026-05-15 M006, scan_calendar-only legacy field)
 
 Idempotent: a config already on the current schema produces no change.
 
@@ -45,6 +59,97 @@ PIGGYBACK_RENAMES: dict[str, str | None] = {
     "sync_memories": None,  # feature removed 2026-05-13
 }
 
+# Keys introduced in newer engine versions that should be injected into the
+# operator's config so they're visible/tunable. Structure: parent block name
+# → {key: default_value}. Missing parent blocks are created. Keys already
+# present (even with a different value) are left untouched.
+KEY_ADDITIONS: dict[str, dict[str, object]] = {
+    "limits": {
+        # Force [1m] up-front for substrates that fan out into many existing
+        # articles during compile. Daily-digest is the trigger case: <2 KB
+        # source references 6+ topics, the agent Reads each related article,
+        # context blows past 200K mid-stream → silent CLI exit-1.
+        "compile_force_long_context_types": ["daily-digest"],
+        # Treat kind=unknown failures with no further retry path (small
+        # source OR already on [1m]) as skips instead of hard failures.
+        # Preserves the consecutive-failure budget so the batch survives
+        # a structurally-unprocessable file.
+        "compile_skip_on_long_context_unknown": True,
+        # Google Calendar collector (M006, 2026-05-15). Per-HTTP-call timeout
+        # against calendar.googleapis.com / per-calendar event cap / past +
+        # future windows in days. Match the dataclass defaults in
+        # `scripts/core/config.py:Limits.calendar_*`.
+        "calendar_request_timeout_s": 30,
+        "calendar_max_per_run": 500,
+        "calendar_backfill_days": 90,
+        "calendar_future_days": 7,
+    },
+    "piggybacks": {
+        # M006 calendar collector — mirrors gmeet / jamie 6 h cadence.
+        # Per-account override lives in personal.accounts.<id>.calendar; the
+        # piggyback block here is the cooldown / batch-cap, not the auth
+        # state. An account without a kind=google-calendar sub-block silently
+        # skips the run.
+        "calendar": {"enabled": True, "cooldown_hours": 6, "max_per_run": 500},
+    },
+}
+
+# Fields whose backing dataclass entry was removed; their leftover entries
+# in operator configs are silently ignored on load but linger as YAML cruft
+# until pruned. Structure: parent block name → set of orphan field names.
+KEY_DROPS: dict[str, set[str]] = {
+    "personal": {
+        # Removed 2026-05-15 (M006) — calendar moved off Thunderbird-SQLite
+        # to Google Calendar v3. These three were scan_calendar-only knobs
+        # (year-counts report bucketing, work-keyword highlighting, output
+        # language). `calendar_skip_keywords` is KEPT — the new collector
+        # still consumes it for holiday-title filtering.
+        "calendar_work_keywords",
+        "calendar_categories",
+        "calendar_report_language",
+    },
+}
+
+
+def migrate_additions(data: dict) -> list[str]:
+    """Inject missing keys from KEY_ADDITIONS under their parent block.
+
+    Mutates `data` in place. Returns a list of human-readable change strings.
+    """
+    changes: list[str] = []
+    for parent, keys in KEY_ADDITIONS.items():
+        block = data.get(parent)
+        if block is None:
+            block = {}
+            data[parent] = block
+            changes.append(f"created empty {parent}: block")
+        if not isinstance(block, dict):
+            # Operator has something non-dict under this key — don't clobber.
+            continue
+        for key, default in keys.items():
+            if key in block:
+                continue
+            block[key] = default
+            changes.append(f"added {parent}.{key} = {default!r}")
+    return changes
+
+
+def migrate_drops(data: dict) -> list[str]:
+    """Remove orphan keys whose backing dataclass field is gone.
+
+    Mutates `data` in place. Returns a list of human-readable change strings.
+    """
+    changes: list[str] = []
+    for parent, orphans in KEY_DROPS.items():
+        block = data.get(parent)
+        if not isinstance(block, dict):
+            continue
+        for field in sorted(orphans):
+            if field in block:
+                block.pop(field)
+                changes.append(f"dropped orphan {parent}.{field} (dataclass field removed)")
+    return changes
+
 
 def migrate_piggybacks(piggybacks: dict) -> tuple[dict, list[str]]:
     """Return (new_piggybacks_dict, list_of_change_descriptions)."""
@@ -78,15 +183,28 @@ def migrate_config(config_path: Path) -> tuple[str | None, list[str]]:
     raw = config_path.read_text(encoding="utf-8")
     data = yaml.safe_load(raw) or {}
 
-    if "piggybacks" not in data or not isinstance(data["piggybacks"], dict):
-        log.info("No piggybacks block — nothing to migrate.")
-        return None, []
+    changes: list[str] = []
 
-    new_piggybacks, changes = migrate_piggybacks(data["piggybacks"])
+    # Piggyback renames / removals (only if the operator has a piggybacks
+    # block at all — fresh installs and pre-piggyback configs skip this).
+    if isinstance(data.get("piggybacks"), dict):
+        new_piggybacks, pb_changes = migrate_piggybacks(data["piggybacks"])
+        if pb_changes:
+            data["piggybacks"] = new_piggybacks
+            changes.extend(pb_changes)
+
+    # Key additions — backfill new knobs under their parent block so they're
+    # visible to the operator. Runs unconditionally; entries already present
+    # are left untouched.
+    changes.extend(migrate_additions(data))
+
+    # Orphan-field drops — prune entries whose backing dataclass field is
+    # gone, otherwise they live forever in operator YAML as silent cruft.
+    changes.extend(migrate_drops(data))
+
     if not changes:
         return None, []
 
-    data["piggybacks"] = new_piggybacks
     # PyYAML round-trip drops comments — config.yaml is operator-owned and
     # already documents this trade-off (see wiki config CLI note).
     new_text = yaml.safe_dump(data, default_flow_style=False, sort_keys=False, allow_unicode=True)
