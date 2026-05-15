@@ -2,9 +2,11 @@
 
 `collectors/gmeet.py` exports the Gemini-generated transcript + "Notes by Gemini"
 Google Docs from a Drive **"Meet Recordings"** folder into `raw/transcripts/gmeet/`,
-one Drive Doc → one `.md`. Multi-tenant: configure one or more accounts under
-`personal.accounts.<id>.gmeet`, run `wiki gmeet-auth <id>` once per account, then
-the 6-h piggyback (or `wiki collect gmeet`) keeps them flowing.
+**one meeting → one `.md`** with Notes + Transcript sections paired into one
+article (across runs, via a stable meeting-key derived from the title).
+Multi-tenant: configure one or more accounts under `personal.accounts.<id>.gmeet`,
+run `wiki gmeet-auth <id>` once per account, then the 6-h piggyback (or
+`wiki collect gmeet`) keeps them flowing.
 
 This is the operator walkthrough. For the architecture, see
 `.ytstack/backlog/gmeet-collector.md`; for hard-won learnings see
@@ -108,9 +110,12 @@ personal:
         # max_per_run: 50                 # optional; null = inherit CONFIG.limits.gmeet_max_per_run
 ```
 
-`drive_folder_id` is **optional** — gmeet's auto-resolve searches by name and
-under `drive.meet.readonly` actually tends to succeed (the folder itself is
-Meet-created, in scope). If auto-resolve fails, the dry-run will say:
+`drive_folder_id` is **optional but recommended for production**. Auto-resolve
+by name works (the folder is Meet-created and in scope) but is name-collision-
+prone — a Workspace user with a personal "Meet Recordings" + a shared-drive
+"Meet Recordings" gets unpredictable results. Every run with an unpinned id
+emits a `WARNING` log surfacing the resolved id so you can paste it back into
+config. If auto-resolve outright fails, the dry-run says:
 `folder 'Meet Recordings' not found — set personal.accounts.<id>.gmeet.drive_folder_id`.
 Get the id from the folder URL in your browser:
 `https://drive.google.com/drive/folders/<DRIVE_FOLDER_ID>`.
@@ -139,8 +144,16 @@ wiki collect gmeet                # full sweep (respects per-account `since:`)
 wiki collect gmeet --incremental  # delta since last `last_seen_ts` (what the piggyback does)
 ```
 
-Output lands in `<vault>/raw/transcripts/gmeet/<date>--<slug>--<short-id>.md`.
-Skip-existing is keyed on the Drive file id, so re-runs are safe.
+Output lands in `<vault>/raw/transcripts/gmeet/<date>--<slug>--<key>.md` where
+`<key>` is the meeting-key — a 12-char hash of the meeting title (with
+quote-glyph + whitespace variation normalised away). The same meeting's Notes
+Doc and Transcript Doc share a key, so they land in **one file with two
+sections** (`## Summary` from Notes, `## Transcript` from Transcript). If a
+Notes Doc arrives in run N and the Transcript Doc only shows up in run N+1
+(Gemini's generation timing varies), the second Doc is merged into the
+existing file rather than written as a duplicate. Skip-existing covers both
+filename suffix AND every `drive_docs[*].id` recorded in frontmatter, so
+re-runs are safe.
 
 The piggyback runs every 6 h after `compile_after_hour` (per
 `config.yaml:piggybacks.gmeet`). If you want to disable it for a particular
@@ -153,8 +166,11 @@ install, set `piggybacks.gmeet.enabled: false`.
   after each watermark.
 - A failed account leaves its watermark untouched — the next run retries the
   same window. Other accounts in the same run scan + advance normally.
-- Skip-existing is filename-based (Drive-file-id short suffix). Even with
-  no watermark and `since: ""`, you won't re-ingest a Doc.
+- Skip-existing is two-layered: filename suffix (meeting-key) AND every
+  `drive_docs[*].id` recorded inside each existing file's frontmatter. The
+  latter is what makes "Notes already merged, only Transcript is new" runs
+  idempotent. Even with no watermark and `since: ""`, you won't re-ingest a
+  Doc; you'll just merge a paired one if it arrived after the original.
 
 ## Troubleshooting
 
