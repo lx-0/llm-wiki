@@ -457,6 +457,79 @@ def check_two_layer_pages() -> list[dict]:
     return issues
 
 
+def check_action_item_syntax() -> list[dict]:
+    """Validate Obsidian-Tasks-plugin syntax inside `## Action Items` sections
+    of entity pages (knowledge/people/ + knowledge/projects/).
+
+    T01's `check_two_layer_pages` validates the `- [ ]` / `- [x]` prefix.
+    This check goes deeper: 📅 due-date format, ⏫ priority placement, 🔁
+    recurrence content. All issues are warnings (quality nudges, not
+    structural breaks). One issue per file per rule.
+    """
+    import re
+    issues: list[dict] = []
+    entity_folders = (("people", "person"), ("projects", "project"))
+    DATE_RE = re.compile(r"📅 (\d{4}-\d{2}-\d{2})(?:\s|$)")
+    DATE_PREFIX_RE = re.compile(r"📅 ")
+    PRIORITY_RE = re.compile(r"(?:^|\s)⏫(?:\s|$)")
+    PRIORITY_PREFIX_RE = re.compile(r"⏫")
+    RECURRENCE_RE = re.compile(r"🔁 \S")
+    RECURRENCE_PREFIX_RE = re.compile(r"🔁(?:\s|$)")
+    for folder, expected_type in entity_folders:
+        folder_path = KNOWLEDGE_DIR / folder
+        if not folder_path.exists():
+            continue
+        for article in sorted(folder_path.glob("*.md")):
+            if article.name in ("index.md", "log.md"):
+                continue
+            rel = str(article.relative_to(KNOWLEDGE_DIR))
+            fm = _read_yaml_frontmatter(article)
+            if fm.get("type") != expected_type:
+                continue
+            text = article.read_text(encoding="utf-8")
+            # Locate ## Action Items section
+            ai_match = re.search(r"^## Action Items\s*$", text, re.MULTILINE)
+            if not ai_match:
+                continue
+            after = text[ai_match.end():]
+            section_end = re.search(r"^(## |---\s*$)", after, re.MULTILINE)
+            section = after[:section_end.start()] if section_end else after
+
+            invalid_date = False
+            malformed_priority = False
+            empty_recurrence = False
+            for raw_line in section.splitlines():
+                line = raw_line.strip()
+                if not line.startswith("- ["):
+                    continue
+                if DATE_PREFIX_RE.search(line) and not DATE_RE.search(line):
+                    invalid_date = True
+                if PRIORITY_PREFIX_RE.search(line) and not PRIORITY_RE.search(line):
+                    malformed_priority = True
+                if RECURRENCE_PREFIX_RE.search(line) and not RECURRENCE_RE.search(line):
+                    empty_recurrence = True
+
+            if invalid_date:
+                issues.append(issue(
+                    "warning", "action_item_invalid_due_date", rel,
+                    "Action Items section contains `📅` without a valid `YYYY-MM-DD` date — "
+                    "Obsidian-Tasks-plugin syntax expects `📅 2026-05-20`",
+                ))
+            if malformed_priority:
+                issues.append(issue(
+                    "warning", "action_item_malformed_priority", rel,
+                    "Action Items section contains `⏫` not bounded by whitespace — "
+                    "must be standalone token, not concatenated to adjacent glyphs",
+                ))
+            if empty_recurrence:
+                issues.append(issue(
+                    "warning", "action_item_empty_recurrence", rel,
+                    "Action Items section contains `🔁` without recurrence content — "
+                    "Obsidian-Tasks-plugin syntax expects `🔁 every week` (or similar)",
+                ))
+    return issues
+
+
 def check_sparse_articles() -> list[dict]:
     """Find articles with fewer than SPARSE_THRESHOLD words."""
     issues = []
@@ -665,6 +738,7 @@ async def main() -> None:
         ("QA schema", check_qa_schema),
         ("Concept domain tag", check_concept_domain_tag),
         ("Two-layer pages", check_two_layer_pages),
+        ("Action item syntax", check_action_item_syntax),
         ("Sparse articles", check_sparse_articles),
         ("Facts violations", check_facts_violations),
     ]
