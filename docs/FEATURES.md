@@ -42,6 +42,8 @@ Living overview of every engine feature: what's documented, where it's implement
 |---|---|---|---|---|
 | `email` | 🟢 | `scripts/collectors/email_collector.py` + adapters in `scripts/adapters/mailbox/{thunderbird,gmail,allinkl,base}.py` | `raw/notes/email/<account>-<date>.md` | PROCESS §3 (scanners) |
 | `jamie` | 🟢 | `scripts/collectors/jamie.py` | `raw/transcripts/jamie/<date>--<slug>--<id>.md` | PROCESS §3, README jamie line |
+| `gmeet` | 🟢 | `scripts/collectors/gmeet.py` (Drive API via `core/google_oauth.py`) | `raw/transcripts/gmeet/<date>--<slug>--<meeting-key>.md` (paired Summary + Transcript) | `docs/setup-gmeet.md` |
+| `voice` | 🟢 | `scripts/collectors/voice.py` (folder-watch on `personal.voice_inbox`) | `raw/voice/voice-<date>-<HHMM>-<slug>.md` | `docs/setup-voice.md`, `.ytstack/backlog/voice-intake.md` |
 
 Dispatcher: `scripts/collectors/cli.py` (`wiki collect <name>` and `wiki collect --list`). Piggyback wiring: `flush.py:_build_piggyback_tasks` auto-discovers Collectors with `SPEC.piggyback_default=True`.
 
@@ -55,7 +57,7 @@ Dispatcher: `scripts/collectors/cli.py` (`wiki collect <name>` and `wiki collect
 | `screenshots` | 🟢 | `scripts/collectors/scan_screenshots.py:ScreenshotsCollector` (Registry, **piggyback**) + script-mode CLI | `~/Screenshots/<file>.md` (canonical) + `raw/notes/screenshots/thumb/<file>.png` + `raw/notes/screenshots/screenshots-<slug>.md` (batch report) |
 | `youtube` | 🟢 | `scripts/collectors/scan_youtube.py:YoutubeCollector` (Registry) + script-mode CLI | `raw/notes/youtube/<channel>--<title>--<vid>.md` |
 
-All seven collectors are Registry-discovered (`wiki collect --list`). `email` / `jamie` / `screenshots` carry `piggyback_default=True` (auto-run after compile); `tabs` / `calendar` / `browser` / `youtube` are operator-invoked via `wiki collect <name>`. The migrated scanners keep a rich direct-CLI entry for per-URL/-flag use — `youtube` via `wiki ingest-youtube`, the rest via `uv run python scripts/collectors/scan_<name>.py`. The Collector `run()` path handles the piggyback-shaped behaviour (full sweep / inbox-drain); CLI-only flags (`--year`, `--source`, `--url`, `--tier`) stay on the script entry.
+All nine collectors are Registry-discovered (`wiki collect --list`). `email` / `jamie` / `gmeet` / `voice` / `screenshots` carry `piggyback_default=True` (auto-run after compile); `tabs` / `calendar` / `browser` / `youtube` are operator-invoked via `wiki collect <name>`. The migrated scanners keep a rich direct-CLI entry for per-URL/-flag use — `youtube` via `wiki ingest-youtube`, the rest via `uv run python scripts/collectors/scan_<name>.py`. The Collector `run()` path handles the piggyback-shaped behaviour (full sweep / inbox-drain); CLI-only flags (`--year`, `--source`, `--url`, `--tier`) stay on the script entry.
 
 ### Drop-box / manual ingest
 

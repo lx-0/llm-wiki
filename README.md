@@ -24,7 +24,7 @@
 
 <table align="center">
   <tr>
-    <td align="center"><strong>3 + 5</strong><br/>collectors + legacy scanners</td>
+    <td align="center"><strong>9</strong><br/>substrate collectors</td>
     <td align="center"><strong>6</strong><br/>skills bundled</td>
     <td align="center"><strong>MIT</strong><br/>open source</td>
   </tr>
@@ -63,7 +63,7 @@ llm-wiki is the **compilation layer** between raw substrates and active consumpt
 
 ## What you get
 
-- **Two-path ingest** — automatic session capture (hooks → `daily/`) and substrate-source writers (Registry-discovered Collectors + legacy scanners + clipper + manual drop → `raw/`) converge at one compiler. Email, Jamie and Google Meet ride the formal Collector Protocol (`SPEC` + `@register` + `run()`); the remaining `scan-*.py` scripts are scheduled for the same migration.
+- **Two-path ingest** — automatic session capture (hooks → `daily/`) and substrate-source writers (Registry-discovered Collectors + legacy scanners + clipper + manual drop → `raw/`) converge at one compiler. All nine collectors ride the formal Collector Protocol (`SPEC` + `@register` + `run()`): email, jamie, gmeet, voice (named modules) plus calendar, browser, tabs, screenshots, youtube (migrated 2026-05-14 from `scan-*.py` scripts).
 - **Compile once, query fast** — knowledge is distilled into Markdown wikilinks at compile time. No embedding step, no retrieval per query.
 - **Multi-agent hooks** — `session-start` / `session-end` / `pre-compact` wired into Claude Code, Codex, Gemini, and Cursor. Every session ends as a structured daily-log entry.
 - **Curiosity loop** — a small local Ollama model spots gaps after each compile and queues deep-scan requests for the next cycle.

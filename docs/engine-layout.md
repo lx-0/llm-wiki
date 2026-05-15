@@ -43,6 +43,8 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 │   │   ├── cli.py                 ← `wiki collect` dispatcher (Registry lookup + run-one)
 │   │   ├── email_collector.py     ← email Collector (multi-backend via adapters/mailbox/)
 │   │   ├── jamie.py               ← Jamie AI meeting-notetaker
+│   │   ├── gmeet.py               ← Google Meet / Gemini transcripts (Drive API)
+│   │   ├── voice.py               ← inbox-watch dictation ingester (iOS Shortcuts / OpenWhispr / FluidVoice)
 │   │   ├── scan-browser.py        ← Firefox + Chrome bookmarks/history/tab-groups
 │   │   ├── scan-calendar.py       ← Thunderbird CalDAV cache → timeline overview
 │   │   ├── scan-screenshots.py    ← ~/Screenshots/ + Vision LLM (gemma4) → HOME sidecar + vault thumb (384px) + batch report

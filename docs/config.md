@@ -142,6 +142,8 @@ Recurring tasks spawned by `flush.py` after `compile_after_hour`. Each entry tak
 | `piggybacks.scan_screenshots` | `enabled: true, cooldown_hours: 24` | `max_per_run: 50` | Local-vision OCR of new screenshots. |
 | `piggybacks.scan_youtube` | `enabled: true, cooldown_hours: 24` | `max_per_run: 10` | Drains the YouTube inbox file. |
 | `piggybacks.jamie` | `enabled: true, cooldown_hours: 6` | `max_per_run: 20` | Pulls new meetings from the Jamie API. Tighter cooldown — meetings are time-sensitive. |
+| `piggybacks.gmeet` | `enabled: true, cooldown_hours: 6` | `max_per_run: 20` | Drive-API export of Gemini Meet transcripts. Tighter cooldown — meetings are time-sensitive. |
+| `piggybacks.voice` | `enabled: true, cooldown_hours: 1` | — | Folder-watch on `personal.voice_inbox`. Tight cooldown — voice notes are time-sensitive. |
 | `piggybacks.follow_requests` | `enabled: true, cooldown_hours: 24` | — | Acts on `raw/requests/` items from the curiosity loop. |
 | `piggybacks.retry_failed_flushes` | `enabled: true, cooldown_hours: 24` | `max_per_run: 5` | Re-processes archived flush contexts. |
 
