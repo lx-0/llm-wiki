@@ -16,6 +16,7 @@ import fcntl
 import io
 import json
 import logging
+import re
 import sys
 import time
 from pathlib import Path
@@ -55,11 +56,94 @@ from core.sdk_helpers import (
 _LOG_FORMAT = "%(asctime)s  %(levelname)s  %(message)s"
 _LOG_DATEFMT = "%Y-%m-%dT%H:%M:%S"
 
-logging.basicConfig(
-    level=logging.INFO,
-    format=_LOG_FORMAT,
-    datefmt=_LOG_DATEFMT,
-)
+# ANSI escape codes for the colored stderr handler. Empty strings when
+# stderr isn't a TTY (piped to a file, captured by CI, etc.) so the
+# escape sequences don't leak into log captures.
+_TTY = sys.stderr.isatty()
+_C_RESET = "\033[0m" if _TTY else ""
+_C_DIM = "\033[2m" if _TTY else ""
+_C_BOLD = "\033[1m" if _TTY else ""
+_C_RED = "\033[31m" if _TTY else ""
+_C_GREEN = "\033[32m" if _TTY else ""
+_C_YELLOW = "\033[33m" if _TTY else ""
+_C_CYAN = "\033[36m" if _TTY else ""
+
+
+class _ConsoleFormatter(logging.Formatter):
+    """Tighter, optionally-colored formatter for stderr console output.
+
+    File handlers keep the verbose ISO-timestamp format for grep-friendly
+    archival; this one trims to HH:MM:SS, colorizes the level word, and
+    highlights ✓ / ✗ / dollar amounts inline.
+    """
+
+    LEVEL_COLOR = {
+        "WARNING": _C_YELLOW,
+        "ERROR":   _C_RED,
+        "CRITICAL": _C_RED + _C_BOLD,
+    }
+
+    _COST_RE = re.compile(r"\(\$(\d+(?:\.\d+)?)\)")
+    _HEADER_RE = re.compile(r"^(\[\d+/\d+\]\s+\[[^\]]+\]\s+\S+)")
+
+    def format(self, record: logging.LogRecord) -> str:
+        # HH:MM:SS only (date elided — full ISO stays in the .log files).
+        ts = time.strftime("%H:%M:%S", time.localtime(record.created))
+        msg = record.getMessage()
+
+        # Colorize inline markers (only when TTY; otherwise the constants
+        # are empty strings and the str remains unchanged).
+        if _TTY:
+            msg = msg.replace("✓", f"{_C_GREEN}✓{_C_RESET}")
+            msg = msg.replace("✗", f"{_C_RED}✗{_C_RESET}")
+            # Highlight cost: yellow if > $0.50, dim if < $0.10.
+            def _color_cost(m: re.Match[str]) -> str:
+                amount = float(m.group(1))
+                color = _C_YELLOW if amount > 0.50 else (_C_DIM if amount < 0.10 else "")
+                return f"({color}${m.group(1)}{_C_RESET})" if color else m.group(0)
+            msg = self._COST_RE.sub(_color_cost, msg)
+            # Bold + cyan for the per-file header line `[N/M] [badge] path`.
+            msg = self._HEADER_RE.sub(f"{_C_BOLD}{_C_CYAN}▶ \\1{_C_RESET}", msg)
+
+        # Align all levels in a 7-char column so the message text starts
+        # at the same column regardless of WARNING vs INFO vs ERROR.
+        # INFO becomes blank (the visual signal is the absence of color).
+        level_color = self.LEVEL_COLOR.get(record.levelname, "")
+        level_text = "" if record.levelname == "INFO" else record.levelname
+        level = level_text.ljust(7)
+        if level_color and _TTY and level_text:
+            level = f"{level_color}{level_text}{_C_RESET}".ljust(7 + len(level_color) + len(_C_RESET))
+
+        return f"{_C_DIM}{ts}{_C_RESET}  {level}  {msg}"
+
+
+class _NoiseFilter(logging.Filter):
+    """Drop the high-volume noise lines from console (file handlers keep them).
+
+    The SDK prints "Using bundled Claude Code CLI: <path>" once per compile
+    call — at ~100 files/batch that's 100 useless full-path lines on stderr.
+    Keep them in the .log archive (the file handlers don't carry this
+    filter), drop from interactive console.
+    """
+
+    _DROP_SUBSTRINGS = (
+        "Using bundled Claude Code CLI:",
+    )
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        msg = record.getMessage()
+        return not any(s in msg for s in self._DROP_SUBSTRINGS)
+
+
+# Explicit handler setup (replaces basicConfig so we control the stderr
+# formatter + filter without competing with the default StreamHandler).
+_root = logging.getLogger()
+_root.setLevel(logging.INFO)
+_console_handler = logging.StreamHandler(sys.stderr)
+_console_handler.setFormatter(_ConsoleFormatter())
+_console_handler.addFilter(_NoiseFilter())
+_root.addHandler(_console_handler)
+
 log = logging.getLogger("compile")
 
 # Silence noisy library loggers — every Ollama curiosity call would otherwise
@@ -257,11 +341,13 @@ async def compile_file(
         source_type or "", ("compile_main", None, None),
     )
     if substrate_prompt != "compile_main":
-        log.info(
-            "  type=%s — using prompt=%s%s (tight-budget substrate-specific shape)",
-            source_type, substrate_prompt,
-            f", model={substrate_model}" if substrate_model else "",
-        )
+        # Truncate model id for readability: "claude-haiku-4-5-20251001"
+        # → "haiku-4-5". Keep the full id in the underlying records.
+        short_model = ""
+        if substrate_model:
+            m = re.match(r"claude-(haiku|sonnet|opus)-(\d+-\d+)", substrate_model)
+            short_model = f" @ {m.group(1)}-{m.group(2)}" if m else f" @ {substrate_model}"
+        log.info("  type=%s → %s%s", source_type, substrate_prompt, short_model)
     prompt = render(
         substrate_prompt,
         agents_md=agents_md,
