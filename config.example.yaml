@@ -192,7 +192,7 @@ limits:
   # kind=cost_exceeded and the BATCH ABORTS (not skips — operator must
   # intervene). Defense against substrate-prompt-mismatch loops that
   # quietly burn $5-10 per attempt. Set to 0 to disable.
-  compile_max_cost_per_file_usd: 2.0
+  compile_max_cost_per_file_usd: 2.5
   # Substrate types skipped entirely in batch mode (frontmatter
   # `type:` value). Operator can still force-compile single files via
   # `wiki compile --file <path>`. Empty by default — this is the

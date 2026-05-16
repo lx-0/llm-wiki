@@ -211,12 +211,13 @@ class Limits:
     # max_turns loops on substrate-prompt mismatches: at $5-10/loop a
     # full batch of 50 dense calendar files can quietly burn $300+. Set
     # to 0 to disable the guard. Per-file limit, not cumulative.
-    # Bumped from 1.0 to 2.0 after empirical probe 2026-05-16: lean
-    # calendar/daily compiles legitimately cost $0.95-$1.40 per file
-    # under the [1m] tier (caching + multi-turn tool fan-in), even with
-    # the dedicated lean prompts. $2.00 leaves headroom for occasional
-    # spikes while still aborting on the $5-10 max_turns-loop pattern.
-    compile_max_cost_per_file_usd: float = 2.0
+    # Bumped 2026-05-16: 1.0 → 2.0 → 2.5 across the same day.
+    # Final $2.50 chosen after Haiku migration of calendar+daily: dense
+    # calendar days that hit max_turns on Opus at $2.38 now finish on
+    # Haiku at $0.40-0.60, but the budget needs headroom for occasional
+    # Opus-routed files (compile_main.md substrates that get a bigger
+    # fan-out one-off). Aborts the genuine $5-10 max_turns-loop pattern.
+    compile_max_cost_per_file_usd: float = 2.5
     # Substrate types (frontmatter `type:` value) that compile.py skips
     # in batch mode. Operator can still force-compile a single file via
     # `wiki compile --file <path>`. DEFAULT IS EMPTY: this is the last-

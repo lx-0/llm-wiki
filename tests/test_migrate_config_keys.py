@@ -155,7 +155,7 @@ def test_migrate_config_no_change_when_fully_current(tmp_path):
             "calendar_backfill_days": 90,
             "calendar_future_days": 7,
             "compile_max_turns_long_context": 30,
-            "compile_max_cost_per_file_usd": 2.0,
+            "compile_max_cost_per_file_usd": 2.5,
             "compile_skip_substrate_types": [],
         },
     }), encoding="utf-8")
@@ -241,7 +241,7 @@ def test_migrate_additions_idempotent():
             "calendar_backfill_days": 90,
             "calendar_future_days": 7,
             "compile_max_turns_long_context": 30,
-            "compile_max_cost_per_file_usd": 2.0,
+            "compile_max_cost_per_file_usd": 2.5,
             "compile_skip_substrate_types": ["calendar-rollup"],
         },
         "piggybacks": {

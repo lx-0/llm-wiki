@@ -98,7 +98,7 @@ KEY_ADDITIONS: dict[str, dict[str, object]] = {
         # Per-file cost guard (USD); abort batch on overrun. Defense
         # against substrate-prompt-mismatch loops that burn $5-10/file
         # silently. See KNOWLEDGE.md "calendar-rollup max_turns trap".
-        "compile_max_cost_per_file_usd": 2.0,
+        "compile_max_cost_per_file_usd": 2.5,
         # Substrate-skip-list for batch mode (frontmatter `type:` values).
         # Empty default since 2026-05-16 P2 landed (calendar-rollup
         # moved out of the skip-list once compile_calendar.md prompt

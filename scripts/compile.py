@@ -134,13 +134,21 @@ def select_files(args: argparse.Namespace) -> list[Path]:
 # without dialog content. Add new entries when a substrate type
 # repeatedly hits max_turns / cost_exceeded under compile_main. The
 # prompt files live in `prompts/<name>.md` and are loaded via render().
-SUBSTRATE_PROMPTS: dict[str, tuple[str, int | None]] = {
-    "calendar-rollup": ("compile_calendar", 8),
+# SubstrateProfile: (prompt_name, max_turns, model_override or None)
+# model_override=None falls through to CONFIG.models.compile_model.
+SUBSTRATE_PROMPTS: dict[str, tuple[str, int, str | None]] = {
+    # Calendar + daily are mechanical Glob/Edit work — no reasoning depth
+    # required. Routing to Haiku 4.5 (~6× cheaper than Opus) drops cost
+    # from $2-3/file to $0.30-0.50 while keeping the same dispatch.
+    # Empirical: 2026-02-26 (dense, 37 link-signals) hit max_turns=8 at
+    # $2.38 on Opus → Haiku at 12 turns expected to finish under $0.60.
+    "calendar-rollup": ("compile_calendar", 12, "claude-haiku-4-5-20251001"),
     # Daily-digest references more entities than calendar (people +
     # projects + concepts, not just attendees + recurring-concepts).
-    # Empirical: 12-turn budget hit at $1.14 with 2 entities edited.
-    # 20 covers digests with up to ~6 mentioned entities.
-    "daily-digest":    ("compile_daily", 20),
+    # Empirical: 12-turn budget hit at $1.14 (Opus) with 2 entities
+    # edited. 20 + Haiku covers digests with up to ~6 mentioned entities
+    # well under budget.
+    "daily-digest":    ("compile_daily", 20, "claude-haiku-4-5-20251001"),
 }
 
 
@@ -245,13 +253,14 @@ async def compile_file(
     # to a (prompt_name, max_turns_override) tuple. Unmapped types fall
     # through to compile_main + default max_turns.
     source_type = _frontmatter_type(source_content)
-    substrate_prompt, substrate_max_turns = SUBSTRATE_PROMPTS.get(
-        source_type or "", ("compile_main", None),
+    substrate_prompt, substrate_max_turns, substrate_model = SUBSTRATE_PROMPTS.get(
+        source_type or "", ("compile_main", None, None),
     )
     if substrate_prompt != "compile_main":
         log.info(
-            "  type=%s — using prompt=%s (tight-budget substrate-specific shape)",
+            "  type=%s — using prompt=%s%s (tight-budget substrate-specific shape)",
             source_type, substrate_prompt,
+            f", model={substrate_model}" if substrate_model else "",
         )
     prompt = render(
         substrate_prompt,
@@ -297,7 +306,11 @@ async def compile_file(
     # references 6+ topics, agent Reads each related article, context
     # overflows mid-stream). Force [1m] up-front for those substrates
     # regardless of size (`compile_force_long_context_types`).
-    model = CONFIG.models.compile_model
+    # Substrate-specific model override (SUBSTRATE_PROMPTS) takes
+    # precedence over compile_model default. Used to route lean
+    # mechanical prompts (calendar, daily) to Haiku for 6× cost
+    # reduction — these don't need Opus reasoning depth.
+    model = substrate_model or CONFIG.models.compile_model
     # source_type was already resolved above for prompt dispatch — reuse.
     force_long_ctx = (
         source_type is not None
