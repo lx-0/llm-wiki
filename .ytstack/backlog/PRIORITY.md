@@ -31,6 +31,9 @@ Cheap to ship, no canary dependency, immediate quality-of-life lift.
 - **`compile-per-call-timeout.md`** — `compile.py` lacks per-call timeout on SDK `query()`. Sibling to the 60kb fail.
 - **`preflight-guard-rollout.md`** — extend the pre-flight prompt-size guard to remaining LLM call sites (small, mostly mechanical).
 - **`watermark-on-failure-fix.md`** — sibling to a recent fix; check if already absorbed by parallel work.
+- **`archives-flag.md`** — first-class cold state (`archived: true` frontmatter) for `knowledge/`. Real demand: shipped-feature concepts compete for dashboard space with active items. ~2 days. Lifted from lx-audit.
+- **`areas-bucket.md`** — 7th knowledge bucket for ongoing responsibilities (CEO-Hat, Maintenance, etc.). Today they force-fit into `projects/` and never close. ~2 days. Soft prerequisite for `lx-vault-merge.md` Phase 2.
+- **`lx-vault-merge.md`** — Phase 0+1 (cold-storage tarball + bulk import to engine-excluded `imported/lx/`) ready to execute on operator authorization, ~3 hours. Phase 2 blocked on archives-flag + areas-bucket + entity-pages.
 
 ## 🌱 Medium — entity-page-layer extensions (M006 or M007)
 
@@ -43,6 +46,7 @@ The gbrain-pattern cluster that complements M005. Re-evaluate after canary signa
 - **`curiosity-consumer-gap.md`** — close the curiosity-loop consumer side (producer alive, consumer missing).
 - **`curiosity-topic-as-search-query.md`** — use topic as IMAP/Gmail search-query, not blind folder dump.
 - **`curiosity-dashboard.md`** — surface curiosity loop in dashboard.
+- **`domain-frontmatter.md`** — optional `domain: company|personal|ai|meta` tag as cross-cutting filter axis. ~1.5 days. Lifted from lx-audit; lowest of the three lx-lessons cluster.
 
 ## 🐌 Long-tail — substrate expansion + tooling debt
 
