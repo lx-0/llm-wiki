@@ -107,12 +107,15 @@ def test_migrate_config_file_round_trip(tmp_path):
     assert new_text is not None
     # 2 piggyback (rename + drop)
     #  + 1 created-limits-block
-    #  + 9 limits additions (2 compile + 4 calendar + 1 max_turns_long_context
-    #    + 1 max_cost_per_file + 1 skip_substrate_types)
+    #  + 9 limits additions (compile_force_long_context_types,
+    #    compile_skip_on_long_context_unknown, 4 calendar_*,
+    #    compile_max_turns_long_context, compile_max_cost_per_file_usd,
+    #    compile_skip_substrate_types)
     #  + 1 piggybacks.calendar addition
-    #  + 1 list-extend (calendar-rollup appended to compile_force_long_context_types)
-    # = 14 changes (no drops here — operator has no orphan personal.* fields)
-    assert len(changes) == 14, f"got {len(changes)} changes: {changes}"
+    # (LIST_ADDITIONS currently empty; LIST_REMOVALS only fires when
+    # operator already has the entries to remove, not on greenfield.)
+    # = 13 changes (no drops here — operator has no orphan personal.* fields)
+    assert len(changes) == 13, f"got {len(changes)} changes: {changes}"
 
     reparsed = yaml.safe_load(new_text)
     # piggyback side
@@ -122,8 +125,9 @@ def test_migrate_config_file_round_trip(tmp_path):
     assert reparsed["piggybacks"]["lint_structural"] == {"enabled": True, "cooldown_hours": 24}
     # new piggyback injected
     assert reparsed["piggybacks"]["calendar"] == {"enabled": True, "cooldown_hours": 6, "max_per_run": 500}
-    # additions side
-    assert reparsed["limits"]["compile_force_long_context_types"] == ["daily-digest", "calendar-rollup"]
+    # additions side — both are empty defaults since 2026-05-16 P2
+    assert reparsed["limits"]["compile_force_long_context_types"] == []
+    assert reparsed["limits"]["compile_skip_substrate_types"] == []
     assert reparsed["limits"]["compile_skip_on_long_context_unknown"] is True
     assert reparsed["limits"]["calendar_request_timeout_s"] == 30
     assert reparsed["limits"]["calendar_max_per_run"] == 500
@@ -144,15 +148,15 @@ def test_migrate_config_no_change_when_fully_current(tmp_path):
             "calendar": {"enabled": True, "cooldown_hours": 6, "max_per_run": 500},
         },
         "limits": {
-            "compile_force_long_context_types": ["daily-digest", "calendar-rollup"],
+            "compile_force_long_context_types": [],
             "compile_skip_on_long_context_unknown": True,
             "calendar_request_timeout_s": 30,
             "calendar_max_per_run": 500,
             "calendar_backfill_days": 90,
             "calendar_future_days": 7,
             "compile_max_turns_long_context": 30,
-            "compile_max_cost_per_file_usd": 1.0,
-            "compile_skip_substrate_types": ["calendar-rollup"],
+            "compile_max_cost_per_file_usd": 2.0,
+            "compile_skip_substrate_types": [],
         },
     }), encoding="utf-8")
 
@@ -178,7 +182,7 @@ def test_migrate_config_no_piggybacks_block_still_runs_additions(tmp_path):
     new_text, changes = m.migrate_config(config_path)
     assert new_text is not None
     reparsed = yaml.safe_load(new_text)
-    assert reparsed["limits"]["compile_force_long_context_types"] == ["daily-digest", "calendar-rollup"]
+    assert reparsed["limits"]["compile_force_long_context_types"] == []
     assert reparsed["limits"]["compile_skip_on_long_context_unknown"] is True
     assert reparsed["scheduling"] == {"compile_after_hour": 18}
 
@@ -187,13 +191,13 @@ def test_migrate_config_no_piggybacks_block_still_runs_additions(tmp_path):
 
 
 def test_migrate_additions_creates_missing_parent_block():
-    """migrate_additions only injects MISSING keys with defaults; list-extend
-    (calendar-rollup) lives in migrate_list_additions and is not exercised here."""
+    """migrate_additions only injects MISSING keys with their defaults."""
     m = _mod()
     data: dict = {}
     changes = m.migrate_additions(data)
     assert "limits" in data
-    assert data["limits"]["compile_force_long_context_types"] == ["daily-digest"]
+    # Default for force-long-context is empty since 2026-05-16 P2.
+    assert data["limits"]["compile_force_long_context_types"] == []
     assert data["limits"]["compile_skip_on_long_context_unknown"] is True
     assert any("created empty limits" in c for c in changes)
     assert any("added limits.compile_force_long_context_types" in c for c in changes)
@@ -237,7 +241,7 @@ def test_migrate_additions_idempotent():
             "calendar_backfill_days": 90,
             "calendar_future_days": 7,
             "compile_max_turns_long_context": 30,
-            "compile_max_cost_per_file_usd": 1.0,
+            "compile_max_cost_per_file_usd": 2.0,
             "compile_skip_substrate_types": ["calendar-rollup"],
         },
         "piggybacks": {
@@ -262,6 +266,39 @@ def test_migrate_additions_adds_calendar_block_when_absent():
         "cooldown_hours": 6,
         "max_per_run": 500,
     }
+
+
+def test_migrate_list_removals_prunes_legacy_substrate_entries():
+    """2026-05-16 P2 cleanup: operator configs from the P1 hotfix window
+    had calendar-rollup in skip-list and force-long-context-types; both
+    move out when dedicated lean prompts ship."""
+    m = _mod()
+    data: dict = {
+        "limits": {
+            "compile_force_long_context_types": ["daily-digest", "calendar-rollup", "custom-type"],
+            "compile_skip_substrate_types": ["calendar-rollup", "operator-custom"],
+        },
+    }
+    changes = m.migrate_list_removals(data)
+    # Both legacy entries pruned; operator-custom entries preserved.
+    assert data["limits"]["compile_force_long_context_types"] == ["custom-type"]
+    assert data["limits"]["compile_skip_substrate_types"] == ["operator-custom"]
+    assert any("removed 'calendar-rollup' from limits.compile_force_long_context_types" in c for c in changes)
+    assert any("removed 'daily-digest' from limits.compile_force_long_context_types" in c for c in changes)
+    assert any("removed 'calendar-rollup' from limits.compile_skip_substrate_types" in c for c in changes)
+
+
+def test_migrate_list_removals_idempotent():
+    """Re-running on already-pruned config produces no changes."""
+    m = _mod()
+    data: dict = {
+        "limits": {
+            "compile_force_long_context_types": [],
+            "compile_skip_substrate_types": [],
+        },
+    }
+    changes = m.migrate_list_removals(data)
+    assert changes == []
 
 
 def test_migrate_additions_preserves_existing_calendar_piggyback():

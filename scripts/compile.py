@@ -124,6 +124,26 @@ def select_files(args: argparse.Namespace) -> list[Path]:
 
 # ── Compilation ──────────────────────────────────────────────────────
 
+# Substrate-aware prompt dispatch table. Maps frontmatter `type:` value
+# to a (prompt_name, max_turns_override) tuple. The default fall-through
+# is ("compile_main", None) which uses the heavy dialog-substrate prompt
+# at the standard turn budget (12). Per-substrate prompts are tighter
+# (calendar = pure metadata extraction, daily = cross-linking only) and
+# ship with their own turn budgets matched to the actual workload —
+# avoids the max_turns trap that loops compile_main.md on substrates
+# without dialog content. Add new entries when a substrate type
+# repeatedly hits max_turns / cost_exceeded under compile_main. The
+# prompt files live in `prompts/<name>.md` and are loaded via render().
+SUBSTRATE_PROMPTS: dict[str, tuple[str, int | None]] = {
+    "calendar-rollup": ("compile_calendar", 8),
+    # Daily-digest references more entities than calendar (people +
+    # projects + concepts, not just attendees + recurring-concepts).
+    # Empirical: 12-turn budget hit at $1.14 with 2 entities edited.
+    # 20 covers digests with up to ~6 mentioned entities.
+    "daily-digest":    ("compile_daily", 20),
+}
+
+
 def _category_badge(rel_path: str) -> str:
     """Short tag for the source category — first path segment after raw/, or 'daily'."""
     if rel_path.startswith("daily/"):
@@ -215,8 +235,26 @@ async def compile_file(
     now = now_iso()
 
     facts_md = read_hard_facts()
+
+    # Substrate-aware prompt dispatch. Different substrates need
+    # different compile shapes; routing them all through compile_main.md
+    # (designed for dialog-rich transcripts with State+Timeline carry-
+    # forward) burns money on max_turns loops for metadata-only or
+    # already-distilled substrates. See KNOWLEDGE.md "substrate-aware
+    # compile architecture (P2)". Each entry maps frontmatter `type:`
+    # to a (prompt_name, max_turns_override) tuple. Unmapped types fall
+    # through to compile_main + default max_turns.
+    source_type = _frontmatter_type(source_content)
+    substrate_prompt, substrate_max_turns = SUBSTRATE_PROMPTS.get(
+        source_type or "", ("compile_main", None),
+    )
+    if substrate_prompt != "compile_main":
+        log.info(
+            "  type=%s — using prompt=%s (tight-budget substrate-specific shape)",
+            source_type, substrate_prompt,
+        )
     prompt = render(
-        "compile_main",
+        substrate_prompt,
         agents_md=agents_md,
         facts_md=facts_md,
         index_md=index_md,
@@ -260,7 +298,7 @@ async def compile_file(
     # overflows mid-stream). Force [1m] up-front for those substrates
     # regardless of size (`compile_force_long_context_types`).
     model = CONFIG.models.compile_model
-    source_type = _frontmatter_type(source_content)
+    # source_type was already resolved above for prompt dispatch — reuse.
     force_long_ctx = (
         source_type is not None
         and source_type in CONFIG.limits.compile_force_long_context_types
@@ -283,17 +321,20 @@ async def compile_file(
             model, CONFIG.limits.compile_max_turns,
         )
 
-    # Force-long-context substrates (dense fan-out into knowledge/) need a
-    # bigger turn budget than the 12 that fits flat-atomic compiles. See
-    # KNOWLEDGE.md "max_turns trap on dense fan-out substrates" — each
-    # attendee on a calendar-rollup or topic on a daily-digest costs 2-3
-    # turns under the two-layer carry-forward shape; 12 runs out partway
-    # through and burns $3-4 per attempt at [1m] pricing for nothing.
-    max_turns_for_call = (
-        CONFIG.limits.compile_max_turns_long_context
-        if force_long_ctx
-        else CONFIG.limits.compile_max_turns
-    )
+    # Turn budget priority:
+    #   1. Per-substrate override from SUBSTRATE_PROMPTS (tight prompts
+    #      ship with their own budget — calendar=8, daily=12, etc.)
+    #   2. Long-context tier for fan-out substrates still on compile_main
+    #      (the old escape hatch — kept for substrates that haven't
+    #      gotten dedicated prompts yet but are listed in
+    #      compile_force_long_context_types)
+    #   3. Default compile_max_turns (12) for everything else
+    if substrate_max_turns is not None:
+        max_turns_for_call = substrate_max_turns
+    elif force_long_ctx:
+        max_turns_for_call = CONFIG.limits.compile_max_turns_long_context
+    else:
+        max_turns_for_call = CONFIG.limits.compile_max_turns
 
     async def _attempt(model_id: str) -> tuple[dict, FailureClass | None]:
         total_input_tokens = 0

@@ -28,7 +28,9 @@ Key changes covered (chronological):
   limits.compile_force_long_context_types ← list-extend with "calendar-rollup" (2026-05-16, M006 hardening)
   limits.compile_max_turns_long_context   (added 2026-05-16, default 30 — fixes max_turns trap on dense fan-out substrates)
   limits.compile_max_cost_per_file_usd    (added 2026-05-16, default 1.0 — per-file budget guard, aborts batch on overrun)
-  limits.compile_skip_substrate_types     (added 2026-05-16, default ["calendar-rollup"] — substrate-skip-list for batch mode)
+  limits.compile_skip_substrate_types     (added 2026-05-16, default [] — substrate-skip-list for batch mode)
+  limits.compile_force_long_context_types ← list-prune calendar-rollup AND daily-digest (2026-05-16 P2, dedicated prompts shipped)
+  limits.compile_skip_substrate_types     ← list-prune calendar-rollup (2026-05-16 P2, compile_calendar.md ships)
 
 Idempotent: a config already on the current schema produces no change.
 
@@ -69,11 +71,12 @@ PIGGYBACK_RENAMES: dict[str, str | None] = {
 # present (even with a different value) are left untouched.
 KEY_ADDITIONS: dict[str, dict[str, object]] = {
     "limits": {
-        # Force [1m] up-front for substrates that fan out into many existing
-        # articles during compile. Daily-digest is the trigger case: <2 KB
-        # source references 6+ topics, the agent Reads each related article,
-        # context blows past 200K mid-stream → silent CLI exit-1.
-        "compile_force_long_context_types": ["daily-digest"],
+        # Empty by default since 2026-05-16 P2: daily-digest and
+        # calendar-rollup moved to dedicated lean prompts in
+        # SUBSTRATE_PROMPTS (compile.py). No remaining substrate
+        # legitimately needs [1m] up-front; the 50 KB size-threshold
+        # is the right escape hatch for large sources.
+        "compile_force_long_context_types": [],
         # Treat kind=unknown failures with no further retry path (small
         # source OR already on [1m]) as skips instead of hard failures.
         # Preserves the consecutive-failure budget so the batch survives
@@ -95,12 +98,13 @@ KEY_ADDITIONS: dict[str, dict[str, object]] = {
         # Per-file cost guard (USD); abort batch on overrun. Defense
         # against substrate-prompt-mismatch loops that burn $5-10/file
         # silently. See KNOWLEDGE.md "calendar-rollup max_turns trap".
-        "compile_max_cost_per_file_usd": 1.0,
+        "compile_max_cost_per_file_usd": 2.0,
         # Substrate-skip-list for batch mode (frontmatter `type:` values).
-        # Operator can still force-compile single files via
-        # `wiki compile --file <path>`. calendar-rollup added 2026-05-16
-        # until a dedicated calendar prompt exists.
-        "compile_skip_substrate_types": ["calendar-rollup"],
+        # Empty default since 2026-05-16 P2 landed (calendar-rollup
+        # moved out of the skip-list once compile_calendar.md prompt
+        # shipped). Last-resort escape hatch for substrate types with
+        # no good prompt yet.
+        "compile_skip_substrate_types": [],
     },
     "piggybacks": {
         # M006 calendar collector — mirrors gmeet / jamie 6 h cadence.
@@ -121,10 +125,31 @@ KEY_ADDITIONS: dict[str, dict[str, object]] = {
 # elements are left untouched. Missing parent block / missing key falls
 # through to KEY_ADDITIONS for first-time injection.
 LIST_ADDITIONS: dict[str, list[object]] = {
-    # 2026-05-16 — calendar-rollup substrate has the same fan-out shape as
-    # daily-digest (small source, many wikilinks → 200K context overflow
-    # mid-stream → silent CLI exit-1). Force [1m] up-front for both.
-    "limits.compile_force_long_context_types": ["calendar-rollup"],
+    # No active list-additions right now. The 2026-05-16-morning entry
+    # adding `calendar-rollup` to `compile_force_long_context_types`
+    # was reverted later the same day after substrate-aware prompt
+    # dispatch landed — see LIST_REMOVALS for the cleanup migration.
+}
+
+# Elements to REMOVE from existing list-valued config entries. The
+# inverse of LIST_ADDITIONS — used when a list default narrows or an
+# entry's old position is no longer correct (e.g. a substrate type
+# moves out of compile_force_long_context_types because it got a
+# dedicated lean prompt). Structure: dotted parent.key path → list of
+# elements to ensure are NOT present. Idempotent.
+LIST_REMOVALS: dict[str, list[object]] = {
+    # 2026-05-16 — substrate-aware prompt dispatch landed
+    # (SUBSTRATE_PROMPTS in compile.py). Both daily-digest and
+    # calendar-rollup now have dedicated lean prompts that don't
+    # need [1m] up-front; the size-threshold escape hatch handles
+    # genuinely large sources. Clean these out of operator configs
+    # that picked them up during the brief P1 hotfix window.
+    "limits.compile_force_long_context_types": ["daily-digest", "calendar-rollup"],
+    # The P1 hotfix added calendar-rollup here to stop the burn;
+    # P2 ships the actual fix (compile_calendar.md), so the skip is
+    # no longer needed. Calendar files compile via the dedicated
+    # prompt under an 8-turn budget at <$0.10/file.
+    "limits.compile_skip_substrate_types": ["calendar-rollup"],
 }
 
 # Fields whose backing dataclass entry was removed; their leftover entries
@@ -202,6 +227,38 @@ def migrate_list_additions(data: dict) -> list[str]:
     return changes
 
 
+def migrate_list_removals(data: dict) -> list[str]:
+    """Remove specified elements from existing list-valued config entries.
+
+    Inverse of migrate_list_additions. Only acts when parent block AND
+    target key exist as a list. Missing parent/key is a no-op. Mutates
+    `data` in place; returns human-readable change strings.
+    """
+    changes: list[str] = []
+    for path, removals in LIST_REMOVALS.items():
+        parent_name, _, key = path.partition(".")
+        if not key:
+            continue
+        block = data.get(parent_name)
+        if not isinstance(block, dict):
+            continue
+        existing = block.get(key)
+        if not isinstance(existing, list):
+            continue
+        # Copy before mutating — same module-level-default-leak concern
+        # as migrate_list_additions.
+        new_list = list(existing)
+        run_changes: list[str] = []
+        for item in removals:
+            while item in new_list:
+                new_list.remove(item)
+                run_changes.append(f"removed {item!r} from {path}")
+        if run_changes:
+            block[key] = new_list
+            changes.extend(run_changes)
+    return changes
+
+
 def migrate_drops(data: dict) -> list[str]:
     """Remove orphan keys whose backing dataclass field is gone.
 
@@ -272,6 +329,13 @@ def migrate_config(config_path: Path) -> tuple[str | None, list[str]]:
     # any LIST_ADDITIONS for it (idempotent: already-present entries are
     # untouched).
     changes.extend(migrate_list_additions(data))
+
+    # List-element removals — narrow list-valued knobs (e.g. when a
+    # substrate type leaves the skip-list because its dedicated prompt
+    # landed). Runs after additions so a freshly-injected list with the
+    # NEW default gets pruned correctly if the operator's old config had
+    # extra entries.
+    changes.extend(migrate_list_removals(data))
 
     # Orphan-field drops — prune entries whose backing dataclass field is
     # gone, otherwise they live forever in operator YAML as silent cruft.

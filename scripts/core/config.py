@@ -211,16 +211,22 @@ class Limits:
     # max_turns loops on substrate-prompt mismatches: at $5-10/loop a
     # full batch of 50 dense calendar files can quietly burn $300+. Set
     # to 0 to disable the guard. Per-file limit, not cumulative.
-    compile_max_cost_per_file_usd: float = 1.0
+    # Bumped from 1.0 to 2.0 after empirical probe 2026-05-16: lean
+    # calendar/daily compiles legitimately cost $0.95-$1.40 per file
+    # under the [1m] tier (caching + multi-turn tool fan-in), even with
+    # the dedicated lean prompts. $2.00 leaves headroom for occasional
+    # spikes while still aborting on the $5-10 max_turns-loop pattern.
+    compile_max_cost_per_file_usd: float = 2.0
     # Substrate types (frontmatter `type:` value) that compile.py skips
     # in batch mode. Operator can still force-compile a single file via
-    # `wiki compile --file <path>`. Intended for substrates whose
-    # compile under the generic compile_main.md prompt loops on
-    # max_turns ($5-10 per attempt) until a dedicated prompt exists.
-    # 2026-05-16: calendar-rollup added — metadata-only substrate, the
-    # two-layer carry-forward audit per attendee burns money without
-    # producing dialog-derived knowledge. See ROADMAP M-followup.
-    compile_skip_substrate_types: tuple[str, ...] = ("calendar-rollup",)
+    # `wiki compile --file <path>`. DEFAULT IS EMPTY: this is the last-
+    # resort escape hatch for substrate types that have neither a
+    # dedicated prompt in SUBSTRATE_PROMPTS nor a reasonable shape under
+    # compile_main.md. Today: SUBSTRATE_PROMPTS covers both calendar-
+    # rollup and daily-digest, so the skip-list is empty. Migration
+    # LIST_REMOVALS clears legacy entries that were here during the
+    # 2026-05-16 P1 hotfix window.
+    compile_skip_substrate_types: tuple[str, ...] = ()
     # Threshold above which a source counts as "large" — surfaces one
     # extra INFO line so the operator can see *which* file was big when
     # the SDK call slows down. Pure logging signal, no behavior change.
@@ -258,11 +264,16 @@ class Limits:
     # CLI exit-1 / kind=unknown after 1-5 minutes. The size-threshold above
     # never catches it (source is small). Force the 1M variant for these
     # types regardless of size. Empty tuple disables the override.
-    # `calendar-rollup` joined the list 2026-05-16 after the same kind=unknown
-    # signature hit 7 KB / 3 KB calendar days: the agent Reads each attendee's
-    # knowledge/people/*.md page plus every recurring-concept page in the
-    # rollup, accumulating context until the 200K window dies mid-stream.
-    compile_force_long_context_types: tuple[str, ...] = ("daily-digest", "calendar-rollup")
+    # Substrates that should auto-upgrade to the 1M-context model when
+    # using compile_main.md (the dialog-substrate prompt). DEFAULT IS
+    # EMPTY: both `daily-digest` and `calendar-rollup` used to be here
+    # because compile_main.md fan-out blew their 200K window, but they
+    # now have dedicated lean prompts in SUBSTRATE_PROMPTS that don't
+    # need [1m] — the size-threshold (50 KB) is the right escape hatch
+    # for any large source. Operators on older configs get cleared via
+    # migration LIST_REMOVALS. Add an entry here only if a substrate
+    # remains on compile_main AND legitimately overflows 200K.
+    compile_force_long_context_types: tuple[str, ...] = ()
     # When a kind=unknown failure has no further retry path available
     # (small source skipping retry, OR already on the long-context model),
     # treat it as a skip rather than a hard failure: log WARNING, return
