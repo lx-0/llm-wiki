@@ -117,7 +117,7 @@ class StderrCapture:
 class FailureClass:
     """Classification of one failed SDK call."""
 
-    kind: str   # rate_limit | auth | model | network | oom | cli_crash | unknown
+    kind: str   # rate_limit | auth | model | network | oom | cli_crash | max_turns | unknown
     detail: str
 
     def __str__(self) -> str:  # pragma: no cover — formatting only

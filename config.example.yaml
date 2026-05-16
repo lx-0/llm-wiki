@@ -179,6 +179,14 @@ limits:
   # Tool-turn ceiling per compile run. Bumped down from 30 — large sources
   # otherwise loop on Read/Grep until they hit the 200K context window.
   compile_max_turns: 12
+  # Higher cap for substrates listed in compile_force_long_context_types.
+  # Two-layer person/project pages with carry-forward (Read-existing →
+  # Edit-State → maybe re-Edit) consume far more turns than the flat
+  # atomic shape; a dense calendar-rollup with 6 attendees needs ~20
+  # turns. Hitting max_turns burns ~$3-4/attempt at [1m] pricing for
+  # nothing and surfaces as `subtype=error_max_turns` on the
+  # ResultMessage — the bigger cap is the cheaper end of the trade-off.
+  compile_max_turns_long_context: 30
   # Surface an INFO line when source ≥ this many chars (logging signal only).
   compile_large_source_chars: 50000
   # Retry once with `models.compile_large_source_model` on kind=unknown

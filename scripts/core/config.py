@@ -193,6 +193,17 @@ class Limits:
     # suggestions/ already run with and matches the actual depth of
     # legitimate compiles (read index → grep → read 2-4 articles → write).
     compile_max_turns: int = 12
+    # Higher cap for substrates listed in `compile_force_long_context_types`.
+    # Two-layer person/project pages with carry-forward semantics
+    # (Read-existing → Edit-State → Verify → maybe re-Edit) consume far more
+    # turns per attendee than the flat-atomic shape that informed the 12
+    # default. A dense calendar-rollup with 6 attendees + recurring concept
+    # updates needs ~15-20 turns; daily-digest with 6 topics needs similar.
+    # Hitting max_turns surfaces as `subtype=error_max_turns` on the
+    # ResultMessage and burns ~$3-4/attempt at [1m] pricing — the bigger
+    # cap is the cheaper end of the trade-off. See KNOWLEDGE.md
+    # "max_turns trap on dense fan-out substrates".
+    compile_max_turns_long_context: int = 30
     # Threshold above which a source counts as "large" — surfaces one
     # extra INFO line so the operator can see *which* file was big when
     # the SDK call slows down. Pure logging signal, no behavior change.

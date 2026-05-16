@@ -253,10 +253,29 @@ async def compile_file(source: Path, dry_run: bool = False, prefix: str = "") ->
             model, CONFIG.limits.compile_max_turns,
         )
 
+    # Force-long-context substrates (dense fan-out into knowledge/) need a
+    # bigger turn budget than the 12 that fits flat-atomic compiles. See
+    # KNOWLEDGE.md "max_turns trap on dense fan-out substrates" — each
+    # attendee on a calendar-rollup or topic on a daily-digest costs 2-3
+    # turns under the two-layer carry-forward shape; 12 runs out partway
+    # through and burns $3-4 per attempt at [1m] pricing for nothing.
+    max_turns_for_call = (
+        CONFIG.limits.compile_max_turns_long_context
+        if force_long_ctx
+        else CONFIG.limits.compile_max_turns
+    )
+
     async def _attempt(model_id: str) -> tuple[dict, FailureClass | None]:
         total_input_tokens = 0
         total_output_tokens = 0
         result_text = ""
+        # Capture the final ResultMessage even when the bundled CLI then
+        # exit-1s (which it does on `subtype=error_max_turns` and a few
+        # other terminal-but-structured agent states). Without this, the
+        # exception-handler path below classifies the failure from
+        # exception text only and misreports `max_turns` as the opaque
+        # `kind=unknown`. See KNOWLEDGE.md.
+        final_result: "ResultMessage | None" = None
         started = time.time()
         capture = StderrCapture()
         try:
@@ -283,7 +302,7 @@ async def compile_file(source: Path, dry_run: bool = False, prefix: str = "") ->
                         "Edit(knowledge/**)",
                     ],
                     permission_mode="acceptEdits",
-                    max_turns=CONFIG.limits.compile_max_turns,
+                    max_turns=max_turns_for_call,
                     system_prompt=render("compile_main_system"),
                     # Pick up the vault's CLAUDE.md (if any) so operator
                     # scope-discipline rules reach the agent. Empty list
@@ -296,8 +315,37 @@ async def compile_file(source: Path, dry_run: bool = False, prefix: str = "") ->
                     total_input_tokens += message.usage.get("input_tokens", 0)
                     total_output_tokens += message.usage.get("output_tokens", 0)
                 if isinstance(message, ResultMessage):
-                    result_text = message.result
+                    final_result = message
+                    result_text = message.result or ""
         except Exception as exc:
+            # Bundled CLI exited non-zero. If a structured ResultMessage
+            # arrived just before the exception, it carries the actual
+            # terminal state (e.g. `subtype=error_max_turns`) and the cost
+            # already burned. Reclassify from that instead of the opaque
+            # exception so logs name the real failure kind.
+            elapsed = time.time() - started
+            if final_result is not None and final_result.is_error:
+                cost = final_result.total_cost_usd or 0.0
+                kind = "max_turns" if final_result.subtype == "error_max_turns" else "agent_error"
+                detail = (
+                    f"{final_result.subtype} after {final_result.num_turns} turns "
+                    f"({elapsed:.1f}s, ${cost:.4f} burned)"
+                )
+                if final_result.errors:
+                    detail += f" — errors: {'; '.join(final_result.errors)}"
+                failure = FailureClass(kind, detail)
+                log.error(
+                    "  compile_file ✗ %s · %s",
+                    f"failed after {elapsed:.1f}s — kind={kind}",
+                    detail,
+                )
+                log.error("    source:    %s", rel_path)
+                log.error("    model:     %s", model_id)
+                log.error("    input:     %d chars (%.1f KB)",
+                          len(source_content), len(source_content) / 1024)
+                log.error("    cost:      $%.4f burned despite failure", cost)
+                capture.dump_to(log)
+                return {}, failure
             failure = log_sdk_failure(
                 log,
                 label="compile_file",
@@ -376,35 +424,37 @@ async def compile_file(source: Path, dry_run: bool = False, prefix: str = "") ->
             len(source_content), min_for_retry,
         )
 
-    # Skip-and-flag: when a kind=unknown failure has no further retry
-    # path available — small source skipping the retry, OR we were already
-    # on the long-context model so there's nothing left to escalate to —
-    # treat it as a structural skip rather than a hard failure. The file
-    # genuinely cannot compile under the current architecture (tool-fanout
-    # overflow on too-rich substrate); making the operator's batch abort
-    # on it just punishes unrelated files via consecutive-failure budget.
-    if (
-        failure is not None
-        and failure.kind == "unknown"
-        and CONFIG.limits.compile_skip_on_long_context_unknown
-    ):
-        if model == long_ctx_model:
+    # Skip-and-flag: structural failures with no further retry path.
+    # Treats as a survivable skip rather than a hard failure so the batch
+    # makes progress; consecutive-failure budget is preserved for genuine
+    # systemic outages (rate_limit cascades, auth, network).
+    if failure is not None and CONFIG.limits.compile_skip_on_long_context_unknown:
+        if failure.kind == "max_turns":
             log.warning(
-                "  skipping: kind=unknown on long-context model %s "
-                "— tool-fanout overflow exceeds even the 1M window; "
-                "the source likely references too many existing articles. "
+                "  skipping: max_turns hit (%s) — agent didn't finish within "
+                "the turn budget. Bumping `compile_max_turns_long_context` for "
+                "this substrate may help; the file is left uncompiled. "
                 "Not counted toward consecutive-failure abort.",
-                model,
+                failure.detail,
             )
-            return {"_skipped": "kind_unknown_on_long_context"}
-        if len(source_content) < min_for_retry:
-            log.warning(
-                "  skipping: small-source kind=unknown with no retry path "
-                "(source %d chars < %d, long-context retry doesn't help here). "
-                "Not counted toward consecutive-failure abort.",
-                len(source_content), min_for_retry,
-            )
-            return {"_skipped": "kind_unknown_small_source"}
+            return {"_skipped": "max_turns_exhausted"}
+        if failure.kind == "unknown":
+            if model == long_ctx_model:
+                log.warning(
+                    "  skipping: kind=unknown on long-context model %s "
+                    "— bundled CLI exited 1 with no structured ResultMessage. "
+                    "Not counted toward consecutive-failure abort.",
+                    model,
+                )
+                return {"_skipped": "kind_unknown_on_long_context"}
+            if len(source_content) < min_for_retry:
+                log.warning(
+                    "  skipping: small-source kind=unknown with no retry path "
+                    "(source %d chars < %d, long-context retry doesn't help here). "
+                    "Not counted toward consecutive-failure abort.",
+                    len(source_content), min_for_retry,
+                )
+                return {"_skipped": "kind_unknown_small_source"}
 
     if failure is not None:
         return {"_failure": failure}

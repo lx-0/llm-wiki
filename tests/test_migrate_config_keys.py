@@ -106,10 +106,12 @@ def test_migrate_config_file_round_trip(tmp_path):
     new_text, changes = m.migrate_config(config_path)
     assert new_text is not None
     # 2 piggyback (rename + drop)
-    #  + 1 created-limits-block + 6 limits additions (2 compile + 4 calendar)
+    #  + 1 created-limits-block
+    #  + 7 limits additions (2 compile + 4 calendar + 1 max_turns_long_context)
     #  + 1 piggybacks.calendar addition
-    # = 10 changes (no drops here — operator has no orphan personal.* fields)
-    assert len(changes) == 10, f"got {len(changes)} changes: {changes}"
+    #  + 1 list-extend (calendar-rollup appended to compile_force_long_context_types)
+    # = 12 changes (no drops here — operator has no orphan personal.* fields)
+    assert len(changes) == 12, f"got {len(changes)} changes: {changes}"
 
     reparsed = yaml.safe_load(new_text)
     # piggyback side
@@ -120,7 +122,7 @@ def test_migrate_config_file_round_trip(tmp_path):
     # new piggyback injected
     assert reparsed["piggybacks"]["calendar"] == {"enabled": True, "cooldown_hours": 6, "max_per_run": 500}
     # additions side
-    assert reparsed["limits"]["compile_force_long_context_types"] == ["daily-digest"]
+    assert reparsed["limits"]["compile_force_long_context_types"] == ["daily-digest", "calendar-rollup"]
     assert reparsed["limits"]["compile_skip_on_long_context_unknown"] is True
     assert reparsed["limits"]["calendar_request_timeout_s"] == 30
     assert reparsed["limits"]["calendar_max_per_run"] == 500
@@ -141,12 +143,13 @@ def test_migrate_config_no_change_when_fully_current(tmp_path):
             "calendar": {"enabled": True, "cooldown_hours": 6, "max_per_run": 500},
         },
         "limits": {
-            "compile_force_long_context_types": ["daily-digest"],
+            "compile_force_long_context_types": ["daily-digest", "calendar-rollup"],
             "compile_skip_on_long_context_unknown": True,
             "calendar_request_timeout_s": 30,
             "calendar_max_per_run": 500,
             "calendar_backfill_days": 90,
             "calendar_future_days": 7,
+            "compile_max_turns_long_context": 30,
         },
     }), encoding="utf-8")
 
@@ -172,7 +175,7 @@ def test_migrate_config_no_piggybacks_block_still_runs_additions(tmp_path):
     new_text, changes = m.migrate_config(config_path)
     assert new_text is not None
     reparsed = yaml.safe_load(new_text)
-    assert reparsed["limits"]["compile_force_long_context_types"] == ["daily-digest"]
+    assert reparsed["limits"]["compile_force_long_context_types"] == ["daily-digest", "calendar-rollup"]
     assert reparsed["limits"]["compile_skip_on_long_context_unknown"] is True
     assert reparsed["scheduling"] == {"compile_after_hour": 18}
 
@@ -181,6 +184,8 @@ def test_migrate_config_no_piggybacks_block_still_runs_additions(tmp_path):
 
 
 def test_migrate_additions_creates_missing_parent_block():
+    """migrate_additions only injects MISSING keys with defaults; list-extend
+    (calendar-rollup) lives in migrate_list_additions and is not exercised here."""
     m = _mod()
     data: dict = {}
     changes = m.migrate_additions(data)
@@ -222,12 +227,13 @@ def test_migrate_additions_idempotent():
     m = _mod()
     data: dict = {
         "limits": {
-            "compile_force_long_context_types": ["daily-digest"],
+            "compile_force_long_context_types": ["daily-digest", "calendar-rollup"],
             "compile_skip_on_long_context_unknown": True,
             "calendar_request_timeout_s": 30,
             "calendar_max_per_run": 500,
             "calendar_backfill_days": 90,
             "calendar_future_days": 7,
+            "compile_max_turns_long_context": 30,
         },
         "piggybacks": {
             "calendar": {"enabled": True, "cooldown_hours": 6, "max_per_run": 500},

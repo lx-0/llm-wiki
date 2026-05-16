@@ -26,6 +26,7 @@ Key changes covered (chronological):
   personal.calendar_categories            → (dropped 2026-05-15 M006, scan_calendar-only legacy field)
   personal.calendar_report_language       → (dropped 2026-05-15 M006, scan_calendar-only legacy field)
   limits.compile_force_long_context_types ← list-extend with "calendar-rollup" (2026-05-16, M006 hardening)
+  limits.compile_max_turns_long_context   (added 2026-05-16, default 30 — fixes max_turns trap on dense fan-out substrates)
 
 Idempotent: a config already on the current schema produces no change.
 
@@ -84,6 +85,11 @@ KEY_ADDITIONS: dict[str, dict[str, object]] = {
         "calendar_max_per_run": 500,
         "calendar_backfill_days": 90,
         "calendar_future_days": 7,
+        # Higher max_turns for force-long-context substrates (2026-05-16).
+        # Default 12 ran out partway through dense calendar-rollup days
+        # with 6+ attendees, hit `subtype=error_max_turns` and burned
+        # ~$3-4/attempt at [1m] pricing. 30 covers the realistic depth.
+        "compile_max_turns_long_context": 30,
     },
     "piggybacks": {
         # M006 calendar collector — mirrors gmeet / jamie 6 h cadence.
@@ -168,11 +174,20 @@ def migrate_list_additions(data: dict) -> list[str]:
         existing = block.get(key)
         if not isinstance(existing, list):
             continue
+        # Copy before mutating: migrate_additions assigns KEY_ADDITIONS
+        # defaults by reference, so an in-place append here would mutate
+        # the module-level default and leak into the next migrate_config
+        # call (visible across pytest collection runs).
+        new_list = list(existing)
+        run_changes: list[str] = []
         for item in additions:
-            if item in existing:
+            if item in new_list:
                 continue
-            existing.append(item)
-            changes.append(f"appended {item!r} to {path}")
+            new_list.append(item)
+            run_changes.append(f"appended {item!r} to {path}")
+        if run_changes:
+            block[key] = new_list
+            changes.extend(run_changes)
     return changes
 
 
