@@ -16,7 +16,7 @@ ${source_content}
 
 A screenshot batch is a vision-LLM summary of 30-100 desktop captures from a single operator-session. Each screenshot has been tagged with App / Project / Summary / Tags by gemma4. Your job is **lean and additive**:
 
-You have **Read, Grep, Glob, Edit, Write** restricted to `knowledge/**`. Stay under **20 turns**. Prefer Glob over Read for existence checks; one Write per substantive concept beats three Reads of "maybe related" articles. No State rewrites, no carry-forward, no resolution-detection — that's transcript-substrate work, not screenshot-substrate work.
+You have **Read, Grep, Glob, Edit, Write** restricted to `knowledge/**`. Stay under **30 turns**. Prefer Glob over Read for existence checks; one Write per substantive concept beats three Reads of "maybe related" articles. No State rewrites, no carry-forward, no resolution-detection — that's transcript-substrate work, not screenshot-substrate work.
 
 ### 1. Identify 3-7 substantive concepts in the batch
 
@@ -73,7 +73,7 @@ Screenshot batches run frequently — logging each one bloats `knowledge/log.md`
 
 ## Anti-loop guard
 
-If after 20 turns you haven't finished:
+If after 25 turns you haven't finished:
 - STOP creating new stubs (remaining substantive concepts can wait for the next batch).
 - Finish any in-flight Edit.
 - Emit your final result; do not start new tool calls.
