@@ -21,6 +21,7 @@ os.environ["CLAUDE_INVOKED_BY"] = "dashboard_stats"
 import argparse
 import json
 import logging
+import re
 from datetime import datetime, timezone
 
 from core.paths import DAILY_DIR, KNOWLEDGE_DIR, ROOT_DIR, SESSIONS_DIR
@@ -117,6 +118,33 @@ def latest_compile_ts() -> str | None:
     return datetime.fromtimestamp(newest.stat().st_mtime, tz=timezone.utc).isoformat()
 
 
+def _is_final_only(article: Path) -> bool:
+    """True iff the article's frontmatter has ``compile_role: final-only``.
+
+    Files marked final-only are hand-curated archives — visible via grep + graph
+    + Obsidian search, but excluded from dashboard active surfaces (and from
+    MOC auto-includes + ``wiki query`` default scope). Regex-only to keep this
+    hot in the stats loop. (M007-S03-T01.)
+    """
+    try:
+        text = article.read_text(encoding="utf-8")
+    except OSError:
+        return False
+    if not text.startswith("---"):
+        return False
+    end = text.find("\n---", 3)
+    if end == -1:
+        return False
+    block = text[3:end]
+    return bool(
+        re.search(
+            r"^compile_role:\s*[\"']?final-only[\"']?\s*$",
+            block,
+            re.MULTILINE,
+        )
+    )
+
+
 def _open_action_items_in_entities(knowledge_dir: Path = KNOWLEDGE_DIR) -> tuple[int, int]:
     """Return (open_commitments_count, entities_with_action_items_count).
 
@@ -135,6 +163,8 @@ def _open_action_items_in_entities(knowledge_dir: Path = KNOWLEDGE_DIR) -> tuple
         for article in sorted(folder_path.glob("*.md")):
             if article.name in ("index.md", "log.md"):
                 continue
+            if _is_final_only(article):
+                continue  # archived entities don't contribute to active threads
             try:
                 text = article.read_text(encoding="utf-8")
             except OSError:
@@ -159,13 +189,21 @@ def _open_action_items_in_entities(knowledge_dir: Path = KNOWLEDGE_DIR) -> tuple
 def compute_stats() -> dict:
     pending = list_pending_compiles()
     open_commitments, entities_with_action_items = _open_action_items_in_entities()
+    # Active surfaces exclude compile_role: final-only (archived hand-curated
+    # articles still reachable via grep/graph/Obsidian search, just hidden from
+    # active counts). articles_final_only surfaces the count so operator sees
+    # how many are archived without their content polluting active panes.
+    all_articles = list_wiki_articles()
+    articles_final_only = sum(1 for a in all_articles if _is_final_only(a))
+    articles_active = len(all_articles) - articles_final_only
     return {
         "pending_compiles": len(pending),
         "pending_compile_paths": pending,
         "failed_flushes": count_failed_flushes(),
         "lint_warnings": count_lint_warnings(),
         "total_cost_lifetime": round(total_cost_lifetime(), 4),
-        "articles_total": len(list_wiki_articles()),
+        "articles_total": articles_active,
+        "articles_final_only": articles_final_only,
         "daily_logs_total": len(list(DAILY_DIR.glob("*.md"))) if DAILY_DIR.exists() else 0,
         "open_commitments": open_commitments,
         "entities_with_action_items": entities_with_action_items,
