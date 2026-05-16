@@ -142,6 +142,15 @@ KEY_ADDITIONS: dict[str, dict[str, object]] = {
         # block at all, so requests accumulate in raw/requests/ forever.
         "curiosity_followup": {"enabled": True, "cooldown_hours": 6, "max_per_run": 5},
     },
+    "personal": {
+        # 2026-05-16 author-attribution feature. Null default keeps the
+        # multi-tenant story intact — operators on single-tenant vaults set
+        # this to their own name (e.g. "alex") so compile.py routes
+        # unattributed beliefs/decisions to their `knowledge/people/<name>.md`
+        # page. Explicit `author:` frontmatter on a source file always
+        # overrides. See `.ytstack/backlog/author-attribution.md`.
+        "implicit_operator_author": None,
+    },
 }
 
 # Elements to add to existing list-valued config entries. Used when an

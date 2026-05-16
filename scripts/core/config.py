@@ -419,6 +419,13 @@ class Personal:
     # recommendation; FluidVoice / macOS dictation / Hammerspoon snippets
     # also work). Empty string disables collectors/voice.py.
     voice_inbox: str = ""
+    # Single-tenant fallback for author-attribution. When set (e.g. "alex"), the
+    # compile prompt treats source files lacking an explicit `author:` frontmatter
+    # key as operator-authored — beliefs/decisions/opinions get routed to that
+    # person's `knowledge/people/<implicit_operator_author>.md` page. Leave null
+    # for multi-tenant vaults: unattributed content stays generic. Explicit
+    # `author:` frontmatter always wins over the implicit default.
+    implicit_operator_author: str | None = None
     # Jamie AI + Google Meet + Google Calendar integrations are multi-tenant via
     # per-account `jamie:` / `gmeet:` / `calendar:` sub-blocks under
     # `personal.accounts.<id>` (kinds: `jamie-api`, `gmeet-api`,
