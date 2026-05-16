@@ -156,10 +156,20 @@ def _frontmatter_type(content: str) -> str | None:
     return m.group(1) if m else None
 
 
-async def compile_file(source: Path, dry_run: bool = False, prefix: str = "") -> dict | None:
+async def compile_file(
+    source: Path,
+    dry_run: bool = False,
+    prefix: str = "",
+    *,
+    force: bool = False,
+) -> dict | None:
     """Compile a single source file into wiki articles.
 
     Returns usage/cost info dict, or None on failure.
+
+    ``force=True`` bypasses the substrate-type skip-list (used when the
+    operator targets a single file via ``--file``; batch mode always
+    honors the skip-list).
     """
     rel_path = str(source.relative_to(ROOT_DIR))
     badge = _category_badge(rel_path)
@@ -174,6 +184,26 @@ async def compile_file(source: Path, dry_run: bool = False, prefix: str = "") ->
     if not source_content.strip():
         log.warning("  Skipping empty file: %s", rel_path)
         return {"_skipped": "empty"}
+
+    # Substrate-type skip: some substrates are structurally a poor fit for
+    # the generic compile_main.md prompt (calendar metadata has no dialog
+    # to extract commitments from, but each attendee still triggers the
+    # full two-layer carry-forward audit → max_turns loops at $5-10/file).
+    # Listed types are collected but not compiled until a dedicated
+    # substrate prompt exists. Operator can force-compile with
+    # `wiki compile --file <path>` to bypass.
+    skip_type = _frontmatter_type(source_content)
+    if (
+        not force
+        and skip_type is not None
+        and skip_type in CONFIG.limits.compile_skip_substrate_types
+    ):
+        log.info(
+            "  skipping: type=%s is in compile_skip_substrate_types "
+            "(use `wiki compile --file <path>` to force)",
+            skip_type,
+        )
+        return {"_skipped": f"substrate_type_excluded_{skip_type}"}
 
     # Read current wiki state
     agents_md = ""
@@ -333,10 +363,21 @@ async def compile_file(source: Path, dry_run: bool = False, prefix: str = "") ->
                 )
                 if final_result.errors:
                     detail += f" — errors: {'; '.join(final_result.errors)}"
-                failure = FailureClass(kind, detail)
+                # Cost guard takes precedence over the structural kind:
+                # a max_turns failure at $0.50 should skip-and-flag (cheap
+                # loop, batch survives), but at $9.65 should abort the
+                # batch so the next dense file doesn't repeat the burn.
+                budget = CONFIG.limits.compile_max_cost_per_file_usd
+                if budget > 0 and cost > budget:
+                    failure = FailureClass(
+                        "cost_exceeded",
+                        f"${cost:.4f} > budget ${budget:.4f} on {rel_path} (underlying {kind}: {detail})",
+                    )
+                else:
+                    failure = FailureClass(kind, detail)
                 log.error(
                     "  compile_file ✗ %s · %s",
-                    f"failed after {elapsed:.1f}s — kind={kind}",
+                    f"failed after {elapsed:.1f}s — kind={failure.kind}",
                     detail,
                 )
                 log.error("    source:    %s", rel_path)
@@ -344,6 +385,14 @@ async def compile_file(source: Path, dry_run: bool = False, prefix: str = "") ->
                 log.error("    input:     %d chars (%.1f KB)",
                           len(source_content), len(source_content) / 1024)
                 log.error("    cost:      $%.4f burned despite failure", cost)
+                if failure.kind == "cost_exceeded":
+                    log.error(
+                        "    BUDGET EXCEEDED — batch will abort (raise "
+                        "`compile_max_cost_per_file_usd` from $%.2f if you "
+                        "accept this burn, or add the substrate type to "
+                        "`compile_skip_substrate_types`).",
+                        budget,
+                    )
                 capture.dump_to(log)
                 return {}, failure
             failure = log_sdk_failure(
@@ -361,6 +410,38 @@ async def compile_file(source: Path, dry_run: bool = False, prefix: str = "") ->
         elapsed = time.time() - started
         # Claude Opus 4.7 pricing: $5/M input, $25/M output
         cost = (total_input_tokens * 5.0 + total_output_tokens * 25.0) / 1_000_000
+        # Prefer the ResultMessage's authoritative total_cost_usd if
+        # available — it accounts for cache reads + creation tiers that
+        # the simple input/output multiplication above ignores.
+        if final_result is not None and final_result.total_cost_usd is not None:
+            cost = float(final_result.total_cost_usd)
+        # Per-file cost guard. Fires on the SUCCESS path too: a "completed"
+        # compile that burned $5+ is still a structural smell (typically
+        # max_turns-completing-just-barely on a substrate-prompt mismatch).
+        # is_fatal()=True for cost_exceeded → batch aborts immediately so
+        # subsequent files don't repeat the burn. Operator can raise the
+        # knob or skip the substrate type to continue.
+        budget = CONFIG.limits.compile_max_cost_per_file_usd
+        if budget > 0 and cost > budget:
+            log.error(
+                "  compile_file ✗ cost_exceeded · $%.4f > budget $%.4f "
+                "(elapsed %.1fs, model=%s)",
+                cost, budget, elapsed, model_id,
+            )
+            log.error("    source:    %s", rel_path)
+            log.error(
+                "    hint:      this file burned beyond the per-file guard. "
+                "Likely substrate-prompt mismatch (e.g. dense calendar in "
+                "compile_main.md). Skip the type via "
+                "`compile_skip_substrate_types`, or raise "
+                "`compile_max_cost_per_file_usd` (current: $%.2f) if you "
+                "accept the burn.",
+                budget,
+            )
+            return {}, FailureClass(
+                "cost_exceeded",
+                f"${cost:.4f} > budget ${budget:.4f} on {rel_path}",
+            )
         log.info(
             "  ✓ %.1fs · in:%s out:%s ($%.4f)",
             elapsed,
@@ -548,9 +629,14 @@ async def main() -> None:
     for f in files:
         log.info("  %s", f.relative_to(ROOT_DIR))
 
+    # `--file` is an explicit operator target; respect their intent and
+    # bypass the substrate-type skip-list (which is for unattended batch
+    # runs). Batch mode always honors the skip-list.
+    force_compile = bool(args.file)
+
     if args.dry_run:
         for f in files:
-            await compile_file(f, dry_run=True)
+            await compile_file(f, dry_run=True, force=force_compile)
         return
 
     # Ensure knowledge directories exist
@@ -582,7 +668,7 @@ async def main() -> None:
             break
 
         prefix = f"[{compiled_count + failed_count + 1}/{cap}] "
-        result = await compile_file(source, prefix=prefix)
+        result = await compile_file(source, prefix=prefix, force=force_compile)
         if result is not None and "_skipped" in result:
             # Skipped (empty file, dry-run): neither success nor failure.
             # Don't touch counters — preserves the consecutive-failure streak

@@ -187,6 +187,17 @@ limits:
   # nothing and surfaces as `subtype=error_max_turns` on the
   # ResultMessage — the bigger cap is the cheaper end of the trade-off.
   compile_max_turns_long_context: 30
+  # Hard per-file cost guard (USD). When a single compile_file call
+  # reports total_cost_usd above this, the file is marked failed with
+  # kind=cost_exceeded and the BATCH ABORTS (not skips — operator must
+  # intervene). Defense against substrate-prompt-mismatch loops that
+  # quietly burn $5-10 per attempt. Set to 0 to disable.
+  compile_max_cost_per_file_usd: 1.0
+  # Substrate types skipped in batch mode (frontmatter `type:` value).
+  # Operator can still force-compile single files via
+  # `wiki compile --file <path>`. Listed here: substrates that loop
+  # under compile_main.md until a dedicated prompt exists.
+  compile_skip_substrate_types: ["calendar-rollup"]
   # Surface an INFO line when source ≥ this many chars (logging signal only).
   compile_large_source_chars: 50000
   # Retry once with `models.compile_large_source_model` on kind=unknown

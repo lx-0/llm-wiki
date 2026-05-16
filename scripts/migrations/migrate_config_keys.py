@@ -27,6 +27,8 @@ Key changes covered (chronological):
   personal.calendar_report_language       → (dropped 2026-05-15 M006, scan_calendar-only legacy field)
   limits.compile_force_long_context_types ← list-extend with "calendar-rollup" (2026-05-16, M006 hardening)
   limits.compile_max_turns_long_context   (added 2026-05-16, default 30 — fixes max_turns trap on dense fan-out substrates)
+  limits.compile_max_cost_per_file_usd    (added 2026-05-16, default 1.0 — per-file budget guard, aborts batch on overrun)
+  limits.compile_skip_substrate_types     (added 2026-05-16, default ["calendar-rollup"] — substrate-skip-list for batch mode)
 
 Idempotent: a config already on the current schema produces no change.
 
@@ -90,6 +92,15 @@ KEY_ADDITIONS: dict[str, dict[str, object]] = {
         # with 6+ attendees, hit `subtype=error_max_turns` and burned
         # ~$3-4/attempt at [1m] pricing. 30 covers the realistic depth.
         "compile_max_turns_long_context": 30,
+        # Per-file cost guard (USD); abort batch on overrun. Defense
+        # against substrate-prompt-mismatch loops that burn $5-10/file
+        # silently. See KNOWLEDGE.md "calendar-rollup max_turns trap".
+        "compile_max_cost_per_file_usd": 1.0,
+        # Substrate-skip-list for batch mode (frontmatter `type:` values).
+        # Operator can still force-compile single files via
+        # `wiki compile --file <path>`. calendar-rollup added 2026-05-16
+        # until a dedicated calendar prompt exists.
+        "compile_skip_substrate_types": ["calendar-rollup"],
     },
     "piggybacks": {
         # M006 calendar collector — mirrors gmeet / jamie 6 h cadence.

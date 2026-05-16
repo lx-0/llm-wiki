@@ -117,7 +117,7 @@ class StderrCapture:
 class FailureClass:
     """Classification of one failed SDK call."""
 
-    kind: str   # rate_limit | auth | model | network | oom | cli_crash | max_turns | unknown
+    kind: str   # rate_limit | auth | model | network | oom | cli_crash | max_turns | cost_exceeded | unknown
     detail: str
 
     def __str__(self) -> str:  # pragma: no cover — formatting only
@@ -248,6 +248,11 @@ def is_fatal(failure: FailureClass) -> bool:
     """True if continuing the run is pointless until operator fixes config.
 
     Auth + invalid-model errors will fail identically on the next call.
-    Rate-limit + network + cli_crash + unknown are potentially transient.
+    Cost-exceeded means the per-file budget guard fired — continuing the
+    batch would likely burn the same money on the next file (same prompt /
+    same substrate / same loop pattern). Operator must intervene
+    (increase the budget knob, or skip the offending substrate type).
+    Rate-limit + network + cli_crash + max_turns + unknown are potentially
+    transient and don't fail-fast.
     """
-    return failure.kind in {"auth", "model"}
+    return failure.kind in {"auth", "model", "cost_exceeded"}

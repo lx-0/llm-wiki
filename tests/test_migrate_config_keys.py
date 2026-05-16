@@ -107,11 +107,12 @@ def test_migrate_config_file_round_trip(tmp_path):
     assert new_text is not None
     # 2 piggyback (rename + drop)
     #  + 1 created-limits-block
-    #  + 7 limits additions (2 compile + 4 calendar + 1 max_turns_long_context)
+    #  + 9 limits additions (2 compile + 4 calendar + 1 max_turns_long_context
+    #    + 1 max_cost_per_file + 1 skip_substrate_types)
     #  + 1 piggybacks.calendar addition
     #  + 1 list-extend (calendar-rollup appended to compile_force_long_context_types)
-    # = 12 changes (no drops here — operator has no orphan personal.* fields)
-    assert len(changes) == 12, f"got {len(changes)} changes: {changes}"
+    # = 14 changes (no drops here — operator has no orphan personal.* fields)
+    assert len(changes) == 14, f"got {len(changes)} changes: {changes}"
 
     reparsed = yaml.safe_load(new_text)
     # piggyback side
@@ -150,6 +151,8 @@ def test_migrate_config_no_change_when_fully_current(tmp_path):
             "calendar_backfill_days": 90,
             "calendar_future_days": 7,
             "compile_max_turns_long_context": 30,
+            "compile_max_cost_per_file_usd": 1.0,
+            "compile_skip_substrate_types": ["calendar-rollup"],
         },
     }), encoding="utf-8")
 
@@ -234,6 +237,8 @@ def test_migrate_additions_idempotent():
             "calendar_backfill_days": 90,
             "calendar_future_days": 7,
             "compile_max_turns_long_context": 30,
+            "compile_max_cost_per_file_usd": 1.0,
+            "compile_skip_substrate_types": ["calendar-rollup"],
         },
         "piggybacks": {
             "calendar": {"enabled": True, "cooldown_hours": 6, "max_per_run": 500},

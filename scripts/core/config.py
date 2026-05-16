@@ -204,6 +204,23 @@ class Limits:
     # cap is the cheaper end of the trade-off. See KNOWLEDGE.md
     # "max_turns trap on dense fan-out substrates".
     compile_max_turns_long_context: int = 30
+    # Hard per-file cost guard (USD). When a single compile_file call's
+    # ResultMessage reports `total_cost_usd` above this, the file is
+    # marked failed with `kind=cost_exceeded` and the batch ABORTS (not
+    # skips — operator must intervene). Defense-in-depth against
+    # max_turns loops on substrate-prompt mismatches: at $5-10/loop a
+    # full batch of 50 dense calendar files can quietly burn $300+. Set
+    # to 0 to disable the guard. Per-file limit, not cumulative.
+    compile_max_cost_per_file_usd: float = 1.0
+    # Substrate types (frontmatter `type:` value) that compile.py skips
+    # in batch mode. Operator can still force-compile a single file via
+    # `wiki compile --file <path>`. Intended for substrates whose
+    # compile under the generic compile_main.md prompt loops on
+    # max_turns ($5-10 per attempt) until a dedicated prompt exists.
+    # 2026-05-16: calendar-rollup added — metadata-only substrate, the
+    # two-layer carry-forward audit per attendee burns money without
+    # producing dialog-derived knowledge. See ROADMAP M-followup.
+    compile_skip_substrate_types: tuple[str, ...] = ("calendar-rollup",)
     # Threshold above which a source counts as "large" — surfaces one
     # extra INFO line so the operator can see *which* file was big when
     # the SDK call slows down. Pure logging signal, no behavior change.
