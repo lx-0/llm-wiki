@@ -8,6 +8,10 @@ Each fact carries a **trust** tier and a **Sources** line. Tiers, in descending 
 
 ${facts_md}
 
+## Takes (third-party beliefs, informative — NOT authoritative)
+
+When the compiled entity is a `type: person` AND `knowledge/takes/<slug>.md` exists for that person (slug derived from their name via the same slugify rules as `knowledge/people/<slug>.md`), **Read** that takes file before rewriting the State block. Each line records a belief the person has held, anchored to a specific source and date, with a `[low|medium|high]` confidence tier. Cite specific takes by date when integrating them into the State block prose — e.g. "Believes GPT-5 will commoditize agent platforms within 12 months (high, 2026-04-15)." Facts override takes (existing rule above); takes inform character / opinion synthesis but do **not** override raw substrate claims. Do NOT write to `knowledge/takes/` from compile — that path is owned by `wiki take` + the post-compile extract-takes producer.
+
 ## AGENTS.md (wiki schema & conventions)
 
 ${agents_md}

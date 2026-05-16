@@ -138,6 +138,19 @@ KEY_ADDITIONS: dict[str, dict[str, object]] = {
         # 50 was chosen because anything shorter empirically just restates
         # the linked concepts without asserting a real mechanism.
         "connection_min_words": 50,
+        # M011 takes substrate (2026-05-16).
+        "extract_takes_source_globs": [
+            "raw/transcripts/*",
+            "raw/transcripts/**/*",
+            "raw/voice/*",
+            "daily/*",
+        ],
+        "extract_takes_timeout_s": 180,
+        "extract_takes_max_per_source": 12,
+    },
+    "features": {
+        # M011 master switch — default OFF, flip True after dogfooding.
+        "extract_takes": False,
     },
     "piggybacks": {
         # M006 calendar collector — mirrors gmeet / jamie 6 h cadence.

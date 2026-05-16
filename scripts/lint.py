@@ -207,6 +207,7 @@ FOLDER_TO_TYPE = {
     "MOCs": "moc",
     "facts": "fact",
     "areas": "area",
+    "takes": "takes",
 }
 
 
@@ -856,6 +857,63 @@ def check_facts_violations() -> list[dict]:
     return issues
 
 
+# ── Takes substrate (M011) ──────────────────────────────────────────
+
+import re as _re_takes
+
+_TAKE_LINE_RE = _re_takes.compile(
+    r"^- \*\*\d{4}-\d{2}-\d{2}\*\* \[(?:low|medium|high)\] · `[^`]+` — .+$"
+)
+
+
+def check_takes_consistency() -> list[dict]:
+    """Validate `knowledge/takes/*.md` shape (M011, v1 — shape-only).
+
+    Per-file checks:
+      - Frontmatter `type: takes` is present.
+      - Frontmatter `holder:` is present (non-empty).
+      - Every body line that starts with `- **` matches the canonical
+        take regex; malformed lines surface as warnings.
+    """
+    issues: list[dict] = []
+    takes_dir = KNOWLEDGE_DIR / "takes"
+    if not takes_dir.exists():
+        return issues
+
+    for md in sorted(takes_dir.glob("*.md")):
+        rel = str(md.relative_to(KNOWLEDGE_DIR))
+        fm = _read_yaml_frontmatter(md)
+        if fm.get("type") != "takes":
+            issues.append(issue(
+                "error", "takes_frontmatter_type", rel,
+                "Takes file must carry `type: takes` in frontmatter.",
+            ))
+        holder = fm.get("holder")
+        if not holder or not str(holder).strip():
+            issues.append(issue(
+                "error", "takes_frontmatter_holder_missing", rel,
+                "Takes file must carry a non-empty `holder:` field in frontmatter.",
+            ))
+        try:
+            text = md.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        body = text
+        if text.startswith("---"):
+            end = text.find("\n---", 3)
+            if end != -1:
+                body = text[end + 4 :]
+        for lineno, line in enumerate(body.splitlines(), start=1):
+            if not line.startswith("- **"):
+                continue
+            if not _TAKE_LINE_RE.match(line):
+                issues.append(issue(
+                    "warning", "takes_line_malformed", rel,
+                    f"Line {lineno} does not match canonical take shape: {line[:120]}",
+                ))
+    return issues
+
+
 # ── compile_role enum validation (M007-S01-T03) ─────────────────────
 
 from core.compile_role import VALID_ROLES as _COMPILE_ROLE_VALID  # noqa: E402
@@ -1065,6 +1123,7 @@ async def main() -> None:
         ("Facts violations", check_facts_violations),
         ("Compile role enum", check_compile_role),
         ("Domain value enum", check_domain_value),
+        ("Takes consistency", check_takes_consistency),
     ]
 
     for name, check_fn in checks:

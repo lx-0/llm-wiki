@@ -226,6 +226,7 @@ from core import ollama_client  # noqa: E402
 
 from suggestions.producer import maybe_generate_suggestions  # noqa: E402
 from curiosity.producer import maybe_generate_curiosity_requests  # noqa: E402
+from facts.takes_producer import maybe_extract_takes  # noqa: E402
 
 
 # ── File selection ───────────────────────────────────────────────────
@@ -1229,6 +1230,11 @@ async def main() -> None:
 
         # Curiosity pass — detect knowledge gaps, generate deep-scan requests
         await maybe_generate_curiosity_requests(source)
+
+        # Takes pass (M011) — extract third-party belief attribution into
+        # knowledge/takes/<holder-slug>.md. Gated by CONFIG.features.extract_takes
+        # and limits.extract_takes_source_globs. No-op when disabled.
+        await maybe_extract_takes(source)
 
         # Update state: mark file as ingested with its hash + persist immediately.
         # Per-file save (not just end-of-loop) so rate-limit aborts, kills, and

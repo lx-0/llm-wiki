@@ -146,6 +146,7 @@ knowledge/
 ├── projects/         # Project pages (one per project)      (type: project)
 ├── areas/            # Ongoing responsibilities (no end)    (type: area)
 ├── facts/            # Hard facts (human-owned, override sources)  (type: fact)
+├── takes/            # Third-party beliefs (WHO believes WHAT)     (type: takes)
 └── MOCs/             # Curated topic hubs (human-curated)   (type: moc)
 ```
 
@@ -154,7 +155,7 @@ Each article in `knowledge/` carries this YAML frontmatter:
 ```yaml
 ---
 title: "Article Title"
-type: concept | connection | qa | person | project | area | moc | fact
+type: concept | connection | qa | person | project | area | moc | fact | takes
 compiled_from: "raw/articles/some-source.md"   # or list[] for multi-source
 created: 2026-04-01
 updated: 2026-05-02
@@ -511,6 +512,41 @@ last_synthesized: 2026-05-16
 - **Picking project vs. area:** has a finish line → project; ongoing → area.
   If both apply, the area owns the long-term, the project owns the current
   push.
+
+### Takes Articles (`knowledge/takes/`)
+
+One file per **holder** (a named person OTHER than the operator). Append-only,
+one-belief-per-line. Records WHO believes WHAT, with confidence + date +
+source. The operator's own positions stay in `knowledge/facts/`; takes are
+the parallel substrate for third-party attribution.
+
+```markdown
+---
+title: "Takes — Jane Doe"
+type: takes
+holder: jane-doe
+created: 2026-05-13
+last_updated: 2026-05-13
+---
+
+# Takes — Jane Doe
+
+- **2026-04-15** [high] · `raw/transcripts/jamie/2026-04-15--review--abc.md` — GPT-5 commoditizes agent platforms within 12 months.
+- **2026-03-02** [medium] · `daily/2026-03-02.md` — Inference cost halves every 9 months, not 6.
+```
+
+**Rules:**
+
+- One file per holder, filename = slugified holder name.
+- Append-only, one take per line. Canonical shape (lint enforces):
+  `- **YYYY-MM-DD** [low|medium|high] · \`source-path\` — belief.`
+- Confidence rubric: `high` = stated multiple times consistently;
+  `medium` = stated once, explicit; `low` = offhand or hedged.
+- Writers: `wiki take add/remove` for operator-typed entries; the
+  post-compile extract-takes producer (gated by `features.extract_takes`).
+- Compile-side consumption: when distilling a `type: person` page,
+  compile reads `knowledge/takes/<slug>.md` and cites takes by date in
+  the State block. Facts override takes; takes inform.
 
 ---
 

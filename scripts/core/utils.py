@@ -29,6 +29,7 @@ from .paths import (
     RAW_DIR,
     STATE_DIR,
     STATE_FILE,
+    TAKES_DIR,
 )
 
 
@@ -143,7 +144,7 @@ def wiki_article_exists(link: str) -> bool:
 
 # ── Wiki content helpers ──────────────────────────────────────────────
 
-WIKI_SUBDIRS = [CONCEPTS_DIR, CONNECTIONS_DIR, QA_DIR, PEOPLE_DIR, PROJECTS_DIR, AREAS_DIR, FACTS_DIR]
+WIKI_SUBDIRS = [CONCEPTS_DIR, CONNECTIONS_DIR, QA_DIR, PEOPLE_DIR, PROJECTS_DIR, AREAS_DIR, FACTS_DIR, TAKES_DIR]
 
 
 def read_wiki_index() -> str:

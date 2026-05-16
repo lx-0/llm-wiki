@@ -43,6 +43,11 @@
 #   wiki correct remove SLUG   delete a hard fact
 #   wiki correct edit SLUG     open a hard fact in $EDITOR
 #   wiki correct apply SLUG    propagate a fact across knowledge/, daily/, raw/ (agentic, $$$)
+#   wiki take add HOLDER "BELIEF" --source PATH [--confidence low|medium|high]
+#                              record a third-party belief (M011 takes substrate)
+#   wiki take list             list all takes files
+#   wiki take show SLUG        show all takes for one holder
+#   wiki take remove SLUG --line N | --all   remove a take line or the whole file
 #   wiki pin <article>         pin an article to a Map-of-Content (no LLM, idempotent)
 #   wiki pin <article> --section "Name" --moc people --summary "X"
 #   wiki review-wiki           per-article quality-score sweep (local LLM, free)
@@ -495,6 +500,46 @@ EOF
   fi
   banner "wiki correct"
   _run_script facts/correct.py "$@"
+  local rc=$?
+  _refresh_dashboard_stats
+  _refresh_dashboard_lint
+  return $rc
+}
+
+cmd_take() {
+  case "${1:-}" in
+    ""|-h|--help|help)
+      cat <<EOF
+${C_BOLD}wiki take${C_RESET} — record third-party belief attribution (M011)
+
+${C_BOLD}USAGE${C_RESET}
+  wiki take add "HOLDER" "BELIEF" --source PATH \\
+      [--confidence low|medium|high] [--date YYYY-MM-DD] [--slug SLUG]
+                                              append a take to knowledge/takes/<slug>.md
+  wiki take list                              list all takes files
+  wiki take show SLUG                         list every take recorded for one holder
+  wiki take remove SLUG --line N              remove one line (1-based; use \`show\` first)
+  wiki take remove SLUG --all                 delete the whole file (.bak.<ts> kept)
+  wiki take path SLUG                         print absolute path
+
+${C_BOLD}EXAMPLES${C_RESET}
+  wiki take add "Jane Doe" \\
+      "GPT-5 commoditizes agent platforms within 12 months." \\
+      --confidence high \\
+      --source "raw/transcripts/jamie/2026-04-15--review--abc.md"
+
+${C_BOLD}NOTES${C_RESET}
+  Wraps \`scripts/facts/take.py\`. Takes live in \`knowledge/takes/<slug>.md\`,
+  one file per holder, append-only one-per-line. Operator's OWN positions
+  still go through \`wiki correct\` into \`knowledge/facts/\`; \`wiki take\`
+  is reserved for OTHER people's beliefs. Compile reads takes when
+  distilling a \`type: person\` page; facts override, takes inform.
+EOF
+      [[ "${1:-}" == "" ]] && return 1 || return 0
+      ;;
+  esac
+  banner "wiki take"
+  _run_script facts/take.py "$@"
   local rc=$?
   _refresh_dashboard_stats
   _refresh_dashboard_lint
@@ -1000,6 +1045,7 @@ case "${1:-}" in
   query)            shift; cmd_query "$@" ;;
   agent)            shift; cmd_agent "$@" ;;
   correct)          shift; cmd_correct "$@" ;;
+  take)             shift; cmd_take "$@" ;;
   pin)              shift; cmd_pin "$@" ;;
   review-wiki)      shift; cmd_review_wiki "$@" ;;
   process-inbox)    shift; cmd_process_inbox "$@" ;;

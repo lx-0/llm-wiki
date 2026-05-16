@@ -334,6 +334,21 @@ class Limits:
     # require explicit per-file frontmatter. Standard `wiki seed` layouts work
     # with the default on.
     compile_role_default_by_location: bool = True
+    # M011 takes substrate. fnmatch-style globs limiting which sources get an
+    # extract-takes pass after compile (gated by CONFIG.features.extract_takes).
+    # Default = transcripts + dailies + voice notes, since those are the
+    # substrates where third-party beliefs surface in attributed-speaker form.
+    extract_takes_source_globs: list[str] = field(default_factory=lambda: [
+        "raw/transcripts/*",
+        "raw/transcripts/**/*",
+        "raw/voice/*",
+        "daily/*",
+    ])
+    # Per-call timeout for the extract-takes SDK invocation (seconds).
+    extract_takes_timeout_s: int = 180
+    # Cap on takes emitted per source. Stops a noisy meeting from spawning
+    # 30 low-signal lines for the same holder.
+    extract_takes_max_per_source: int = 12
 
 
 @dataclass
@@ -346,6 +361,9 @@ class Features:
     # Clippings/ is empty or absent. Set false if you reconfigure the Web
     # Clipper extension to drop directly into raw/articles/.
     clippings_sweep: bool = True
+    # M011 takes substrate. Default OFF — flip True after dogfooding.
+    # Cost: +1 SDK call per gated compile (Claude, no Ollama fallback).
+    extract_takes: bool = False
 
 
 @dataclass

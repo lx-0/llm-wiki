@@ -246,6 +246,16 @@ limits:
   # → source-only). Set false to require explicit frontmatter on every file
   # (useful if you have non-standard top-level folders).
   compile_role_default_by_location: true
+  # M011 takes substrate (third-party belief attribution). fnmatch globs
+  # limiting which sources get an extract-takes pass after compile (gated
+  # by `features.extract_takes`).
+  extract_takes_source_globs:
+    - "raw/transcripts/*"
+    - "raw/transcripts/**/*"
+    - "raw/voice/*"
+    - "daily/*"
+  extract_takes_timeout_s: 180
+  extract_takes_max_per_source: 12
 
 features:
   # Master switches for entire capabilities.
@@ -256,6 +266,8 @@ features:
   # Set to false if you've reconfigured the Obsidian Web Clipper extension
   # to drop clippings directly into raw/articles/.
   clippings_sweep: true
+  # M011 master switch — default OFF; flip on after dogfooding.
+  extract_takes: false
 
 graph_view:
   # Mode: knowledge-only | full-vault | sources-only | custom
