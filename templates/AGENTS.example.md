@@ -159,6 +159,16 @@ compiled_from: "raw/articles/some-source.md"   # or list[] for multi-source
 created: 2026-04-01
 updated: 2026-05-02
 tags: [topic1, topic2]
+domain: company   # optional (M013) — one of CONFIG.personal.domains
+                  # (default enum: company | personal | ai | meta).
+                  # Cross-cutting life-domain axis, NOT a folder. Pure
+                  # filter — never required; untagged articles appear in
+                  # every view. `wiki query --domain <value>` filters
+                  # answers to articles whose `domain:` matches. Lint
+                  # `check_domain_value` warns on values outside the
+                  # configured enum. Extend by adding to
+                  # `personal.domains` in config.yaml. Spec:
+                  # `.ytstack/backlog/domain-frontmatter.md`.
 ---
 ```
 

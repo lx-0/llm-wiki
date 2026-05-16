@@ -82,6 +82,17 @@ async def main() -> None:
             "archived knowledge. (M007-S03-T03)"
         ),
     )
+    parser.add_argument(
+        "--domain",
+        type=str,
+        default=None,
+        help=(
+            "Restrict the answer to articles whose frontmatter `domain:` "
+            "matches this value (e.g. company | personal | ai | meta). "
+            "Untagged articles are excluded from the filtered set. "
+            "Configurable list lives in CONFIG.personal.domains. (M013)"
+        ),
+    )
     args = parser.parse_args()
 
     question = args.question
@@ -94,9 +105,24 @@ async def main() -> None:
         sys.exit(2)
 
     include_final_only = args.include_final_only
+    domain = args.domain
+    # M013: validate against the configured enum early. Unknown values would
+    # otherwise produce an empty answer (the LLM filter matches nothing) with
+    # no clear operator signal. An empty `personal.domains` disables the
+    # feature — accept any value without validating.
+    domains_cfg = getattr(CONFIG.personal, "domains", None) or []
+    valid_domains = [d for d in domains_cfg if isinstance(d, str)]
+    if domain is not None and valid_domains and domain not in valid_domains:
+        log.error(
+            "--domain %r is not in CONFIG.personal.domains (%s). "
+            "Add it to config.yaml under `personal.domains:` or pick one of "
+            "the configured values.",
+            domain, ", ".join(valid_domains),
+        )
+        sys.exit(2)
     log.info(
-        "Query: %s (brief=%s, file_back=%s, include_final_only=%s)",
-        question, brief, file_back, include_final_only,
+        "Query: %s (brief=%s, file_back=%s, include_final_only=%s, domain=%s)",
+        question, brief, file_back, include_final_only, domain,
     )
 
     # Embed only the compact article index (path + date); the agent pulls
@@ -128,6 +154,24 @@ async def main() -> None:
             "question. Source-only and source-and-final articles are in-scope.\n"
         )
     facts_md = facts_md + compile_role_filter_note
+
+    # M013: domain filter. When `--domain <value>` is provided, instruct the
+    # LLM to restrict its answer to articles whose frontmatter `domain:`
+    # matches the requested value. Untagged articles are excluded from the
+    # filtered set (operator opted into a filter — silent inclusion would
+    # mask the lack of tagging). No-op when --domain is not provided.
+    if domain is not None:
+        domain_filter_note = (
+            "\n\n## domain filter\n\n"
+            f"Restrict your answer to articles whose frontmatter `domain:` "
+            f"value is exactly `{domain}`. Read the frontmatter (top YAML "
+            f"block) of any candidate article before citing it. Articles "
+            f"without `domain:` set, or with a different value, are out of "
+            f"scope for this query — skip them. If no in-scope article "
+            f"answers the question, say so explicitly rather than falling "
+            f"back to untagged content.\n"
+        )
+        facts_md = facts_md + domain_filter_note
 
     if file_back:
         QA_DIR.mkdir(parents=True, exist_ok=True)

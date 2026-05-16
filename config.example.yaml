@@ -297,6 +297,19 @@ personal:
   # (unattributed content stays generic). Explicit `author:` always wins.
   # Example:  implicit_operator_author: "alex"
   implicit_operator_author: null
+  # M013 (2026-05-16): optional `domain:` frontmatter axis on knowledge/
+  # articles. Cross-cutting life-domain tag (NOT a folder). Extensible per
+  # vault. Lint `check_domain_value` warns when an article carries a
+  # `domain:` value outside this list (warning, not error — grace period
+  # for typos / new domains). `wiki query --domain <value>` filters answers
+  # to articles whose `domain:` matches. Empty list = feature off.
+  # Lifted from the lx-vault audit (Company / Personal / AI top-level
+  # split). See `.ytstack/backlog/domain-frontmatter.md`.
+  domains:
+    - company    # Yesterday-related, work, business strategy
+    - personal   # health, family, apartment, side-interests
+    - ai         # AI tooling, agent infra, prompt engineering
+    - meta       # the wiki engine itself, ytstack, llm-wiki maintenance
   # account-id → {email, label, reader?, filter?, gmeet?, jamie?, …}
   # `reader`, `filter`, `gmeet`, `jamie` are nested blocks with a `kind`
   # discriminator plus kind-specific fields. resolve_reader / resolve_filter /

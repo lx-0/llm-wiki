@@ -752,6 +752,41 @@ def check_facts_violations() -> list[dict]:
 from core.compile_role import VALID_ROLES as _COMPILE_ROLE_VALID  # noqa: E402
 
 
+def check_domain_value() -> list[dict]:
+    """Warn on `domain:` frontmatter values outside CONFIG.personal.domains.
+
+    Optional axis (M013). When `domain:` is set on a knowledge/ article, it
+    MUST be one of the configured values (default `["company", "personal",
+    "ai", "meta"]`, extensible per vault). Articles without `domain:` are
+    silently ignored — the feature is opt-in. WARNING (not error): the
+    operator gets a grace period to fix typos / introduce new domains via
+    config before drift becomes a hard fail. Empty `personal.domains` list
+    disables the check entirely (operator opted out).
+
+    Spec: `.ytstack/backlog/domain-frontmatter.md`.
+    """
+    issues: list[dict] = []
+    domains_cfg = getattr(CONFIG.personal, "domains", None) or []
+    valid = {d for d in domains_cfg if isinstance(d, str)}
+    if not valid:
+        return issues
+    for article in list_wiki_articles():
+        fm = _read_yaml_frontmatter(article)
+        value = fm.get("domain")
+        if value is None:
+            continue
+        if not isinstance(value, str) or value not in valid:
+            rel = str(article.relative_to(KNOWLEDGE_DIR))
+            allowed = ", ".join(sorted(valid))
+            issues.append(issue(
+                "warning", "domain_invalid_value", rel,
+                f"`domain: {value!r}` is not in CONFIG.personal.domains "
+                f"({allowed}). Fix the value, or add it to config.yaml "
+                f"under `personal.domains:`.",
+            ))
+    return issues
+
+
 def check_compile_role() -> list[dict]:
     """Reject frontmatter `compile_role:` values not in VALID_ROLES.
 
@@ -919,6 +954,7 @@ async def main() -> None:
         ("Sparse articles", check_sparse_articles),
         ("Facts violations", check_facts_violations),
         ("Compile role enum", check_compile_role),
+        ("Domain value enum", check_domain_value),
     ]
 
     for name, check_fn in checks:

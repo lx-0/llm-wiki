@@ -37,6 +37,7 @@ Key changes covered (chronological):
   limits.flush_tool_summary_budget_chars   (added 2026-05-16, default 10_000)
   limits.compile_per_call_timeout_s        (added 2026-05-16, default 600 — per-call timeout for compile SDK invocations)
   personal.implicit_operator_author        (added 2026-05-16, default None — author-attribution fallback for single-tenant vaults)
+  personal.domains                         (added 2026-05-16 M013, default [company, personal, ai, meta] — optional domain:-frontmatter enum)
 
 Idempotent: a config already on the current schema produces no change.
 
@@ -158,6 +159,13 @@ KEY_ADDITIONS: dict[str, dict[str, object]] = {
         # page. Explicit `author:` frontmatter on a source file always
         # overrides. See `.ytstack/backlog/author-attribution.md`.
         "implicit_operator_author": None,
+        # M013 (2026-05-16): optional `domain:` frontmatter axis on knowledge/
+        # articles. Cross-cutting life-domain tag (NOT a folder), extensible
+        # per vault. Lint warns on values outside this enum (grace period).
+        # `wiki query --domain X` filters to articles whose `domain:` matches.
+        # Default lifted from lx-vault audit (Company / Personal / AI top-
+        # level split). See `.ytstack/backlog/domain-frontmatter.md`.
+        "domains": ["company", "personal", "ai", "meta"],
     },
 }
 

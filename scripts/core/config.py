@@ -445,6 +445,15 @@ class Personal:
     # `personal.accounts.<id>` (kinds: `jamie-api`, `gmeet-api`,
     # `google-calendar`). No flat dataclass — resolved at run time by
     # `collectors/{jamie,gmeet,calendar}.py:_resolve_*_accounts()`.
+    # M013 (2026-05-16): optional `domain:` frontmatter axis on `knowledge/`
+    # articles. Cross-cutting life-domain filter (company/personal/ai/meta),
+    # extensible per vault. Lifted from lx-vault audit — captured as a tag,
+    # not a folder. Lint `check_domain_value` warns on values outside this
+    # enum (warning, not error — grace period for typos / new domains).
+    # `wiki query --domain X` filters answers to articles whose `domain:`
+    # matches. Empty list = feature off (lint check + CLI flag silently
+    # no-op). See `.ytstack/backlog/domain-frontmatter.md`.
+    domains: list[str] = field(default_factory=lambda: ["company", "personal", "ai", "meta"])
 
 
 # Default piggyback set — script names match flush.py's PIGGYBACK_TASKS keys.
