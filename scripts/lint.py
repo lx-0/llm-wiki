@@ -206,6 +206,7 @@ FOLDER_TO_TYPE = {
     "projects": "project",
     "MOCs": "moc",
     "facts": "fact",
+    "areas": "area",
 }
 
 
@@ -527,6 +528,47 @@ def check_action_item_syntax() -> list[dict]:
                     "Action Items section contains `🔁` without recurrence content — "
                     "Obsidian-Tasks-plugin syntax expects `🔁 every week` (or similar)",
                 ))
+    return issues
+
+
+_VALID_AREA_STATUS = ("active", "dormant", "retired")
+
+
+def check_area_status() -> list[dict]:
+    """Validate `status:` frontmatter on `knowledge/areas/` pages.
+
+    Areas (`type: area`) are ongoing responsibilities; they carry a
+    `status:` field that must be one of `active | dormant | retired`
+    (distinct from project status — areas don't `plan` or `done`).
+    Missing status is an error; an unknown enum value is also an error.
+    """
+    issues: list[dict] = []
+    areas_dir = KNOWLEDGE_DIR / "areas"
+    if not areas_dir.exists():
+        return issues
+    for article in sorted(areas_dir.glob("*.md")):
+        if article.name in ("index.md", "log.md"):
+            continue
+        rel = str(article.relative_to(KNOWLEDGE_DIR))
+        fm = _read_yaml_frontmatter(article)
+        if fm.get("type") != "area":
+            # type mismatch handled by check_article_type; don't double-report
+            continue
+        status = fm.get("status")
+        if not status:
+            issues.append(issue(
+                "error", "area_missing_status", rel,
+                f"`type: area` article missing `status:` frontmatter "
+                f"(must be one of {list(_VALID_AREA_STATUS)})",
+                auto_fixable=True,
+            ))
+            continue
+        if status not in _VALID_AREA_STATUS:
+            issues.append(issue(
+                "error", "area_invalid_status", rel,
+                f"`status: {status!r}` is not a valid area status. "
+                f"Allowed: {list(_VALID_AREA_STATUS)}.",
+            ))
     return issues
 
 
@@ -872,6 +914,7 @@ async def main() -> None:
         ("Concept domain tag", check_concept_domain_tag),
         ("Two-layer pages", check_two_layer_pages),
         ("Action item syntax", check_action_item_syntax),
+        ("Area status", check_area_status),
         ("Daily consistency", check_daily_consistency),
         ("Sparse articles", check_sparse_articles),
         ("Facts violations", check_facts_violations),
