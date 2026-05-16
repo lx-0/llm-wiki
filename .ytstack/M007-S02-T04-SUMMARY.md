@@ -3,32 +3,31 @@ milestone: M007
 slice: S02
 task: T04
 project: llm-wiki
-closed: draft
-verification: pending
-source: post-tool-use-bash-draft
+status: done
+completed: 2026-05-16T17:05:00Z
 ---
 
-# M007-S02-T04 -- Summary (draft)
-
-Auto-draft created by the `post-tool-use-bash` hook on first commit of this task. Run `/ytstack:summarize-task` to fill in Outcome / Deviations / Follow-ups / Verification.
-
-## Commits so far
-- `66b40c8` -- docs(architecture): codify 2-3y scaling direction — tiering + MOC-first, not numeric weighting (2026-05-16T15:57:01Z)
-
-- `343516d` -- docs(prompts): source-and-final reference rule in compile_main.md — M007-S02-T03 (2026-05-16T15:55:27Z)
+# M007-S02-T04 -- Summary
 
 ## Outcome
 
-(Fill in when task is done.)
+source-and-final branch in compile_file now updates state["ingested"][rel_path] = file_hash(source) + save_state after the index append. Lint's check_orphan_sources will no longer flag source-and-final files as "orphan_source". Re-runs of compile become true no-ops via the existing hash-skip in select_files.
 
 ## Deviations from plan
 
-(Fill in when task is done.)
+None.
 
 ## Follow-ups
 
-(Fill in when task is done.)
+T05: full pytest fixtures for end-to-end source-and-final roundtrip (write fixture, run compile_file, assert state + index + no SDK call). Now possible to assert state correctness too.
 
 ## Verification
 
-(Fill in when task is done.)
+```bash
+PYTHONPATH=scripts uv run python -c "from compile import compile_file"  # OK
+uv run pytest tests/test_compile_role.py tests/test_compile_lock.py -q  # 29 passed
+```
+
+## Commits
+
+- `<this>` — feat(compile): source-and-final marks ingested + saves state
