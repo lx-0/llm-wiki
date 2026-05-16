@@ -135,6 +135,8 @@ hostnames, mbox paths, project names mentioned in prompts, etc.
 
 Source files may carry an optional `author: <name>` (or `author: [name1, name2]`) frontmatter key. When present, `compile.py` routes distilled beliefs/decisions/opinions to that person's `knowledge/people/<slug>.md` page. When absent, the compile prompt falls back to `personal.implicit_operator_author` (single-tenant convenience; null by default — multi-tenant vaults leave unattributed content generic). Explicit `author:` always wins.
 
+`personal.implicit_operator_author` is also the **canonical vault-owner identifier**. When set, `compile.py:_build_owner_block()` renders a "## Operator / vault owner" section into every substrate compile prompt, naming the owner and pointing the agent at `knowledge/people/<slug>.md`. This lets the agent resolve self-references ("I", "we", "my company") and find connection targets without grepping AGENTS.md prose. Null = no section rendered, multi-tenant story unchanged.
+
 `knowledge/` articles may carry an optional `domain:` frontmatter key — a cross-cutting life-domain axis (default enum `company | personal | ai | meta`, extensible via `CONFIG.personal.domains`). Pure filter, never required: untagged articles appear in every view. Lint `check_domain_value` warns (not errors) on values outside the configured enum. `wiki query --domain <value>` restricts an answer to articles whose `domain:` matches. Lifted from the lx-vault audit; spec: `.ytstack/backlog/domain-frontmatter.md`.
 
 ### Frontmatter — `compile_role` axis (M007)

@@ -270,6 +270,8 @@ flowchart TD
 
 **Input:** AGENTS.md (Schema) + index.md (Katalog) + die neue Source. Der Compiler bekommt `Read`/`Grep`/`Glob` Tools und holt sich Detailartikel on-demand statt das ganze Wiki in den Prompt zu laden — das war der ursprüngliche Ansatz, hat aber TPM-Limits getriggert (siehe `.ytstack/KNOWLEDGE.md` "Compile prompt design"). Index-guided Retrieval funktioniert besser als RAG bei <500 Artikeln.
 
+**Owner-Block-Injection:** Wenn `personal.implicit_operator_author` gesetzt ist, baut `compile.py:_build_owner_block()` eine kleine `## Operator / vault owner`-Sektion (~6 Zeilen) und injiziert sie via `${owner_block}` direkt nach der Intro-Zeile in jedes Substrate-Prompt (`compile_main` / `compile_calendar` / `compile_daily` / `compile_health` / `compile_default`). Die Sektion nennt den Owner-Slug, zeigt auf `knowledge/people/<slug>.md` und gibt dem Agent einen Read-on-demand-Hint — Self-References ("I", "we", "my company") werden so auflösbar, Connection-Targets im Wiki findbar. Wenn der Knob `null` ist, returned der Helper `""` und die Sektion entfällt komplett (Multi-Tenant-Pfad). Page-Inhalt wird NICHT eingebettet — nur Pfad-Pointer, damit Substrate-Prompts budget-safe bleiben (~400 chars statt potentiell MB-große State+Timeline).
+
 **Agent SDK Config:** `allowed_tools=["Read", "Write", "Edit", "Glob", "Grep"]`, `permission_mode="acceptEdits"`, `max_turns=CONFIG.limits.compile_max_turns` (default 12, war 30 — siehe `.ytstack/KNOWLEDGE.md` "tool-turn ballooning"), `system_prompt=claude_code`. Der LLM hat volle Dateioperations-Rechte innerhalb von `knowledge/`.
 
 **Write/Edit Scope (HARD — 2026-05-15 nach Prompt-Injection-Incident):** Der Agent darf NUR unter `knowledge/` schreiben. Drei Layer enforcement:
