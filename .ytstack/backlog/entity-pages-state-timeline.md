@@ -93,4 +93,6 @@ Prose, with `[[wikilinks]]` into concepts/projects.
 
 ## Status
 
-Backlog. Sibling to `takes-substrate.md` and `dream-cycle.md` — the three form a coherent "entity-pages layer". One pitch should consider whether to bundle them as M005 or land independently.
+**SHIPPED via M005** (2026-05-15, commit `eb7da72`). Two-layer State+Timeline schema is live for `knowledge/people/` + `knowledge/projects/`. Compile prompt branches on `type:`, lint enforces `## State` + `---` + `## Timeline` structure (`scripts/lint.py::check_two_layer_pages`), Action Items use Obsidian-Tasks-plugin syntax. 19 person-pages + 44 project-pages migrated lazily on substrate-touch. 246 pytest tests green.
+
+File kept as historical / decision-context. Memory pointer: `project_m005_personal_tasks`. Sibling backlogs (`takes-substrate.md`, `dream-cycle.md`) remain pending.
