@@ -56,6 +56,49 @@ class ThunderbirdMboxReader:
                 names.add(folder_name)
         return sorted(names)
 
+    def _resolve_folder_alias(self, folder: str) -> str:
+        """Map a config-style folder path to the on-disk equivalent.
+
+        Thunderbird sometimes locally aliases an IMAP folder when the
+        same server-side name was subscribed twice or hit a namespace
+        collision: the subscribed-second instance gets a numeric
+        suffix on disk (`INBOX` → `INBOX-1`). Subfolders all live under
+        the suffixed parent (`INBOX-1.sbd/<sub>`), but server, IMAP
+        listings, and the operator's `email_folders` config still say
+        the canonical `INBOX/<sub>`.
+
+        Without this resolution, `scan_deep("INBOX/Vertraege")` finds
+        nothing because the actual mbox is at `INBOX-1.sbd/Vertraege`
+        (strict-equality folder match in `_find_mbox_files` after
+        substring filter). Symptom: every curiosity-loop deep-scan
+        returns 0 messages silently.
+
+        Resolution probes `<head>-N` for N=1..9 only when the canonical
+        head doesn't exist on disk; the canonical wins if both are
+        present. Logged at WARNING once per resolution so the alias is
+        observable without spamming on every request.
+        """
+        head, _, tail = folder.partition("/")
+        if not head:
+            return folder
+        # Canonical head present anywhere → no alias resolution needed.
+        for root in self._roots:
+            if (root / head).exists() or (root / f"{head}.sbd").exists():
+                return folder
+        # Probe numeric-suffix variants.
+        for n in range(1, 10):
+            alias_head = f"{head}-{n}"
+            for root in self._roots:
+                if (root / alias_head).exists() or (root / f"{alias_head}.sbd").exists():
+                    resolved = f"{alias_head}/{tail}" if tail else alias_head
+                    log.warning(
+                        "ThunderbirdMboxReader[%s]: folder %r → %r "
+                        "(local Thunderbird alias; canonical head %r not on disk)",
+                        self._account_id, folder, resolved, head,
+                    )
+                    return resolved
+        return folder  # no alias found; let downstream strict-match report the miss
+
     def _check_roots(self) -> None:
         """Raise if no configured mbox root is readable.
 
@@ -77,6 +120,8 @@ class ThunderbirdMboxReader:
         since: datetime | None = None,
     ) -> Iterator[MessageMeta]:
         self._check_roots()
+        if folder is not None:
+            folder = self._resolve_folder_alias(folder)
         for root in self._roots:
             if not root.exists():
                 continue
@@ -90,6 +135,7 @@ class ThunderbirdMboxReader:
         since: datetime | None = None,
     ) -> Iterator[Message]:
         self._check_roots()
+        folder = self._resolve_folder_alias(folder)
         emitted = 0
         for root in self._roots:
             if not root.exists():

@@ -241,3 +241,63 @@ def test_reader_skips_undated_messages_when_since_set(tmp_path: Path) -> None:
     # Delta mode: the undated message is dropped — only the dated one passes.
     recent = list(reader.scan_metadata(since=datetime(2026, 5, 1, tzinfo=timezone.utc)))
     assert {m.subject for m in recent} == {"dated"}
+
+
+# ── Folder-alias resolution (INBOX vs INBOX-N) ───────────────────────
+
+
+def test_resolve_folder_alias_finds_inbox_dash_n_when_canonical_missing(tmp_path: Path) -> None:
+    """Thunderbird locally aliases re-subscribed folders with -N suffix.
+
+    Reproduces the 2026-05-16 incident: kasserver vault config used
+    `INBOX/Vertraege` but on-disk layout had only `INBOX-1.sbd/Vertraege`
+    (canonical `INBOX.sbd/` directory did not exist). Pre-fix, scan_deep
+    silently returned 0 messages.
+    """
+    # Simulate Thunderbird's on-disk layout: INBOX-1 file + INBOX-1.sbd/
+    (tmp_path / "INBOX-1").touch()
+    (tmp_path / "INBOX-1.sbd").mkdir()
+    (tmp_path / "INBOX-1.sbd" / "Vertraege").touch()
+
+    reader = ThunderbirdMboxReader("testacct", [tmp_path])
+
+    # Canonical config-style path resolves to the on-disk alias.
+    assert reader._resolve_folder_alias("INBOX/Vertraege") == "INBOX-1/Vertraege"
+    assert reader._resolve_folder_alias("INBOX") == "INBOX-1"
+    # Unrelated path stays unchanged (no alias probing needed).
+    assert reader._resolve_folder_alias("Other/Folder") == "Other/Folder"
+
+
+def test_resolve_folder_alias_no_op_when_canonical_present(tmp_path: Path) -> None:
+    """When INBOX exists canonically, alias resolution is a pass-through."""
+    (tmp_path / "INBOX").touch()
+    (tmp_path / "INBOX.sbd").mkdir()
+    (tmp_path / "INBOX.sbd" / "Sub").touch()
+    # Even if INBOX-1 also exists (operator hasn't cleaned up), canonical wins.
+    (tmp_path / "INBOX-1").touch()
+    (tmp_path / "INBOX-1.sbd").mkdir()
+
+    reader = ThunderbirdMboxReader("testacct", [tmp_path])
+    assert reader._resolve_folder_alias("INBOX/Sub") == "INBOX/Sub"
+    assert reader._resolve_folder_alias("INBOX") == "INBOX"
+
+
+def test_scan_deep_finds_messages_via_alias(tmp_path: Path) -> None:
+    """End-to-end: scan_deep with canonical name actually retrieves
+    messages from the aliased on-disk location."""
+    import mailbox
+    (tmp_path / "INBOX-1.sbd").mkdir()
+    mbox_path = tmp_path / "INBOX-1.sbd" / "Vertraege"
+    box = mailbox.mbox(str(mbox_path))
+    msg = mailbox.mboxMessage()
+    msg["From"] = "contract@example.com"
+    msg["Subject"] = "Test contract"
+    msg["Date"] = "Mon, 11 May 2026 10:00:00 +0000"
+    msg.set_payload("body of the contract email")
+    box.add(msg)
+    box.flush()
+
+    reader = ThunderbirdMboxReader("testacct", [tmp_path])
+    messages = list(reader.scan_deep("INBOX/Vertraege"))
+    assert len(messages) == 1
+    assert messages[0].meta.subject == "Test contract"
