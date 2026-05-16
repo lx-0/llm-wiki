@@ -19,7 +19,7 @@ This is an operator-memory file synced from a project workspace:
 - **`type: memory-sync`** — a copy of a project's `AGENTS.md` / `CLAUDE.md` / per-file Claude memory. The frontmatter identifies the source project; the body is the verbatim memory content.
 - **`type: memory-seed`** — an aggregated dump of multiple per-file memories for a project. Each memory entry is a `##` section with a `Why:` and `How to apply:` line.
 
-Your job is **lean cross-linking**, not synthesis: identify the project + 1-3 substantive patterns, append Timeline entries to existing knowledge pages, optionally create a single concept stub if a recurring pattern across multiple memories deserves its own page. You have **Read, Grep, Glob, Edit, Write** restricted to `knowledge/**`. Stay under **15 turns**.
+Your job is **lean cross-linking**, not synthesis: identify the project + 1-3 substantive patterns, append Timeline entries to existing knowledge pages, optionally create a single concept stub if a recurring pattern across multiple memories deserves its own page. You have **Read, Grep, Glob, Edit, Write** restricted to `knowledge/**`. Stay under **25 turns**.
 
 ### 1. Identify the project context
 
@@ -82,7 +82,7 @@ Memory syncs run frequently (per session-end). Skip the log append step.
 
 ## Anti-loop guard
 
-If after 12 turns you haven't finished:
+If after 20 turns you haven't finished:
 - Skip stub creation (the next memory-sync of the same project will resurface the pattern).
 - Finish any in-flight Edit.
 - Emit your final result; do not start new tool calls.

@@ -323,8 +323,8 @@ SUBSTRATE_PROMPTS: dict[str, tuple[str, int, str | None]] = {
     # Both are substantive but formulaic — extract entities + cross-
     # link to existing concept/project pages, no State writes. Same
     # 15-turn budget as health-rollup since both follow a tight pattern.
-    "memory-sync":     ("compile_memories", 20, "claude-haiku-4-5-20251001"),
-    "memory-seed":     ("compile_memories", 20, "claude-haiku-4-5-20251001"),
+    "memory-sync":     ("compile_memories", 25, "claude-haiku-4-5-20251001"),
+    "memory-seed":     ("compile_memories", 25, "claude-haiku-4-5-20251001"),
 }
 
 # Default for any substrate-type NOT in SUBSTRATE_PROMPTS. Lean prompt
