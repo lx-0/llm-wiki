@@ -211,6 +211,13 @@ ${source_content}
    - Do NOT add the path to a `compiled_from:` frontmatter list — `compiled_from:` is reserved for substrate that was distilled. Source-and-final pages are *referenced as authoritative*, not consumed-and-distilled.
    - You MAY still create `knowledge/connections/` articles that link a source-and-final page with other concepts, since those connections are LLM-synthesized analysis layered on top of the operator's writing.
 
+   **Author-attribution for beliefs, decisions, and opinions.** When distilling first-person beliefs, decisions, opinions, or commitments from a source, attribute the position to a specific person rather than to a generic "the company" / "the team" / "the user".
+
+   - **Explicit author wins.** If the source file's frontmatter carries `author: <name>` (or `author: [name1, name2]`), the listed person(s) hold the belief. Route the distilled point to their `knowledge/people/<slug>.md` State / Open Threads section as appropriate, and cite the source in their Timeline.
+   - **Implicit-operator fallback.** If the source has NO `author:` frontmatter and the operator's engine config sets `personal.implicit_operator_author` to a non-empty name, treat the file as authored by that person (the engine surfaces the value to you on a per-call basis when present). Same routing.
+   - **Multi-tenant safety.** When neither an explicit `author:` nor an implicit-operator fallback is available, leave the belief unattributed (do NOT invent an owner). Distill it as a generic concept under `knowledge/concepts/` or `knowledge/connections/` as usual.
+   - **Complements, doesn't replace, mention-based aggregation.** Continue to populate `knowledge/people/<slug>.md` Timeline + State from people who are *mentioned* in any substrate — `author:` adds the file's authorship layer on top, it doesn't suppress aggregation of references to other people from the same file.
+
 8. Write in the same language as the source material (German or English).
 
 9. Be thorough but concise. Preserve technical details and specific decisions.

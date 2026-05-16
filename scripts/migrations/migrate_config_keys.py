@@ -35,6 +35,7 @@ Key changes covered (chronological):
   limits.flush_assistant_text_budget_chars (added 2026-05-16, default 50_000 — replaces MAX_CONTEXT_CHARS=15_000)
   limits.flush_user_text_budget_chars      (added 2026-05-16, default 10_000)
   limits.flush_tool_summary_budget_chars   (added 2026-05-16, default 10_000)
+  personal.implicit_operator_author        (added 2026-05-16, default None — author-attribution fallback for single-tenant vaults)
 
 Idempotent: a config already on the current schema produces no change.
 

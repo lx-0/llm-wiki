@@ -131,6 +131,10 @@ hostnames, mbox paths, project names mentioned in prompts, etc.
    from `CONFIG.personal.*` (e.g. `email_folders` drives `compile_curiosity.md` listing
    AND `compile.py`'s schema `enum`). No drift.
 
+### Frontmatter — author attribution
+
+Source files may carry an optional `author: <name>` (or `author: [name1, name2]`) frontmatter key. When present, `compile.py` routes distilled beliefs/decisions/opinions to that person's `knowledge/people/<slug>.md` page. When absent, the compile prompt falls back to `personal.implicit_operator_author` (single-tenant convenience; null by default — multi-tenant vaults leave unattributed content generic). Explicit `author:` always wins.
+
 ### Adding a prompt
 
 1. Drop `<name>.md` into `prompts/`.
