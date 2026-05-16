@@ -752,3 +752,28 @@ These are companion-rules to [[Templates are load-bearing — never backlog temp
 - `tests/test_transcript_budgets.py` — 9 behavioural tests pinning the asymmetric-truncation contract.
 - `tests/test_migrate_config_keys.py` — round-trip + idempotency updates for the 3 new keys.
 - `.ytstack/KNOWLEDGE.md` — extended "Flush context — Karpathy/Cole pattern" section with the gen-2 resolution.
+
+---
+
+## 2026-05-16: `knowledge/` scales via lifecycle-tiering + MOC-hierarchy, not numeric weighting
+
+**Context:** operator asked whether a deep-sleep / dream-mode is planned that would re-wire and re-weight knowledge. Dream-Cycle (`.ytstack/backlog/dream-cycle.md`) covers forward-synthesis only — there is no plan for re-weighting, decay, conflict-quarantine, or forgetting. At ~30-50 substrate-files/week × 1-3 knowledge-updates each, lxw is on track for 5-15K articles in 2-3 years. `knowledge/index.md` is already at the "don't load the full index" threshold today. Field-state research (SCM, FadeMem, MaRS, Letta/MemGPT, OpenClaw Dreaming, Karpathy LLM Wiki) showed the 2026 consensus is multi-phase consolidation + numeric importance scores + recall-telemetry-driven decay.
+
+**Options considered:** (A) adopt the field-consensus pattern — add per-article `confidence` + `access_count` + Ebbinghaus-decay, recall-telemetry via Obsidian plugin or query-log mining, conflict-quarantine on contradicting compile-writes; (B) reject numeric weighting entirely, scale via cheaper levers — subtype-axis split, MOC-first retrieval (index.md collapses to MOC-of-MOCs), lifecycle-tiering via mtime-cutoff into `knowledge/_archive/`, recursive Dream-Cycle for hierarchical compaction; (C) hybrid — start with (B) levers, layer (A) on top if (B) proves insufficient.
+
+**Chose:** B, with C as escape-valve.
+
+**Reason:** Numeric weighting is the lever you build when you didn't take lifecycle-tiering seriously — it adds telemetry-buildup (no recall-telemetry exists today, Obsidian plugin would be its own project), threshold-tuning, and a UI surface for marginal extra signal over what mtime + git-log already encode. The Karpathy thesis (flat list + LLM retrieval) scales further than the field assumes — **provided the index stops being one flat catalog**. MOC-first retrieval is the structural fix; numeric scoring is cosmetic on top of that. Letta/Mem0 style memory-store retrofitting is the wrong shape for a file-based operator-readable wiki where the operator reads the same files Claude reads.
+
+**Caveat (load-bearing):** MOC auto-maintenance does not exist today. lxw's 5 domain MOCs are 100% operator-curated. Compile prompt knows `type: moc` but does NOT update MOC linklists during compile. Lever 2 — the largest single scaling lever — is therefore unavailable until that gap closes. Recognized as the real bottleneck blocker, not papered over.
+
+**Supersedes:** —
+
+**Linked artifacts:** `.ytstack/backlog/architecture-scaling-2028.md` (full 4-lever sequence with trigger thresholds); `.ytstack/backlog/dream-cycle.md` (Lever 4 single-level); `.ytstack/backlog/subtype-axis.md` (Lever 1); memory `project_scaling_direction.md`. Field-research sources: SCM paper (emergentmind.com/papers/2604.20943), FadeMem (mem0.ai blog 2026), OpenClaw Dreaming guide, Letta/MemGPT virtual-memory architecture.
+
+**Trigger thresholds (when to act):**
+- Lever 1 (subtype-axis): already overdue, no hard threshold.
+- Lever 2 (MOC-first + MOC auto-maintenance): `index.md` >1500 rows OR operator reports "can't find article on X".
+- Lever 3 (lifecycle-tiering): `knowledge/` >2000 articles (excluding `_archive/`).
+- Lever 4 (recursive Dream-Cycle): ~3-6 months after Lever 3 is in place and tier-move volume becomes annoying.
+- Lever 5 (numeric weighting): only if Levers 1-4 prove insufficient. Likely never.

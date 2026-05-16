@@ -65,6 +65,7 @@ No urgency. Each adds capture surface; the wiki's value plateaus around 4-5 acti
 **Doc-only (reference, not actionable):**
 
 - `karpathy-comparison.md`, `gbrain-comparison.md` (architecture-comparison artifacts; keep)
+- `architecture-scaling-2028.md` — 4-lever scaling sequence for `knowledge/` over 2-3 years (subtype-axis → MOC-first → lifecycle-tier → recursive-dream-cycle); MOC auto-maintenance flagged as the real bottleneck blocker. Anchors any future "knowledge/ is getting too big" discussion.
 - `collectors.md` (meta doc)
 
 
