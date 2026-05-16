@@ -192,6 +192,19 @@ log = logging.getLogger("compile")
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
 
+# claude_agent_sdk's internal message reader emits a generic
+# `logger.error("Fatal error in message reader: ...")` line BEFORE the
+# exception bubbles up to our except block — every CLI exit-1 (max_turns,
+# context overflow, kind=unknown, etc.) produces two log records: the SDK's
+# alarming-but-uninformative "Fatal error / Check stderr output for details"
+# line first, then our own classifier's `kind=max_turns · ...` line with the
+# real diagnosis. Our classifier in `compile_file()` already extracts and
+# logs everything (final ResultMessage, classified kind, cost burned,
+# captured stderr lines), so silencing the SDK's pre-exception ERROR is
+# information-loss-free and makes the operator's first-seen error line the
+# actual diagnosis instead of generic CLI failure noise.
+logging.getLogger("claude_agent_sdk._internal.query").setLevel(logging.CRITICAL)
+
 LOGS_DIR.mkdir(parents=True, exist_ok=True)
 _compile_log_file = LOGS_DIR / "compile.log"
 _compile_errors_file = LOGS_DIR / "compile-errors.log"
@@ -281,8 +294,12 @@ SUBSTRATE_PROMPTS: dict[str, tuple[str, int, str | None]] = {
     # established `concepts/health-rollup-intake-format` policy
     # directly: append to compiled_from + emit one log entry. Operator
     # body-prose branch keeps Timeline-append shape (no State writes).
-    # 6 turns / Haiku is generous for the at-most-3-edits workload.
-    "health-rollup":   ("compile_health", 6, "claude-haiku-4-5-20251001"),
+    # 10 turns: 4 mandatory tool calls (Read+Edit policy article,
+    # Read+Edit log.md, dictated by Claude Code's Edit-after-Read
+    # safety rule) + final emit = 5 minimum, plus slack for Glob /
+    # re-Read / prose-branch Timeline appends. Empirical: budget=6
+    # consistently hit max_turns on 2026-05-16 batch.
+    "health-rollup":   ("compile_health", 10, "claude-haiku-4-5-20251001"),
 }
 
 
