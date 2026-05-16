@@ -513,6 +513,15 @@ async def compile_file(
             log.warning(
                 "  knowledge/index.md missing — cannot index source-and-final file",
             )
+        # Mark as ingested with its hash so `check_orphan_sources` lint doesn't
+        # flag this file (it IS the final form — not "uncompiled substrate") and
+        # re-runs of compile become true no-ops via the hash-skip in select_files.
+        # (M007-S02-T04. Mirrors the post-distill state update at line ~1130.)
+        state = load_state()
+        if "ingested" not in state:
+            state["ingested"] = {}
+        state["ingested"][rel_path] = file_hash(source)
+        save_state(state)
         return {"_skipped": "compile_role_source_and_final_indexed"}
     # source-only falls through to current distill behavior (unchanged).
 
@@ -585,6 +594,10 @@ async def compile_file(
         source_content=source_content,
         today=today,
         now=now,
+        # author-attribution fallback (2026-05-16) — null/empty when the
+        # operator hasn't set it, in which case the prompt's
+        # multi-tenant-safety branch leaves unattributed beliefs generic.
+        implicit_operator_author=CONFIG.personal.implicit_operator_author or "",
     )
 
     # Pre-flight guard: assembled prompt + later tool-turns must fit Opus's
