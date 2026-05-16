@@ -73,46 +73,87 @@ class _ConsoleFormatter(logging.Formatter):
     """Tighter, optionally-colored formatter for stderr console output.
 
     File handlers keep the verbose ISO-timestamp format for grep-friendly
-    archival; this one trims to HH:MM:SS, colorizes the level word, and
-    highlights ✓ / ✗ / dollar amounts inline.
+    archival; this one trims to HH:MM:SS and applies a consistent color
+    scheme per line type:
+
+      - per-file header `[N/M] [badge] path`           bold cyan, ▶ marker
+      - dispatch line   `  type=X → prompt @ model`    dim
+      - success line    `  ✓ Ns · in:N out:N ($X)`     green ✓, dim tokens
+      - failure line    `  ✗ ...`                       red ✗
+      - curiosity line  `  Curiosity*`                  magenta (different subsystem)
+      - section banner  `─── ... ───`                   bold
+      - cost in any line                                tiered: dim<$0.05 / plain / yellow>$0.50 / bold-yellow>$1.50
+      - badge `[name]` inside header                    yellow
+      - elapsed time `Ns`                               dim
     """
 
     LEVEL_COLOR = {
-        "WARNING": _C_YELLOW,
-        "ERROR":   _C_RED,
+        "WARNING":  _C_YELLOW,
+        "ERROR":    _C_RED,
         "CRITICAL": _C_RED + _C_BOLD,
     }
 
     _COST_RE = re.compile(r"\(\$(\d+(?:\.\d+)?)\)")
-    _HEADER_RE = re.compile(r"^(\[\d+/\d+\]\s+\[[^\]]+\]\s+\S+)")
+    _HEADER_RE = re.compile(r"^\[(\d+/\d+)\]\s+\[([^\]]+)\]\s+(\S+)$")
+    _DISPATCH_RE = re.compile(r"^\s+type=[\w-]+\s+→")
+    _CURIOSITY_RE = re.compile(r"^\s+Curiosity[: ]")
+    _SUCCESS_RE = re.compile(r"^\s+✓\s")
+    _FAILURE_RE = re.compile(r"^\s+✗\s")
+    _SECTION_RE = re.compile(r"^─── .+ ───$")
+    _ELAPSED_RE = re.compile(r"\b(\d+\.\d+s)\b")
+    _TOKENS_RE = re.compile(r"\b(in:[\w.,]+\s+out:[\w.,]+)")
+
+    def _colorize_cost(self, msg: str) -> str:
+        def _sub(m: re.Match[str]) -> str:
+            amount = float(m.group(1))
+            if amount >= 1.50:
+                color = _C_BOLD + _C_YELLOW
+            elif amount >= 0.50:
+                color = _C_YELLOW
+            elif amount < 0.05:
+                color = _C_DIM
+            else:
+                return m.group(0)
+            return f"({color}${m.group(1)}{_C_RESET})"
+        return self._COST_RE.sub(_sub, msg)
 
     def format(self, record: logging.LogRecord) -> str:
-        # HH:MM:SS only (date elided — full ISO stays in the .log files).
         ts = time.strftime("%H:%M:%S", time.localtime(record.created))
         msg = record.getMessage()
 
-        # Colorize inline markers (only when TTY; otherwise the constants
-        # are empty strings and the str remains unchanged).
         if _TTY:
-            msg = msg.replace("✓", f"{_C_GREEN}✓{_C_RESET}")
-            msg = msg.replace("✗", f"{_C_RED}✗{_C_RESET}")
-            # Highlight cost: yellow if > $0.50, dim if < $0.10.
-            def _color_cost(m: re.Match[str]) -> str:
-                amount = float(m.group(1))
-                color = _C_YELLOW if amount > 0.50 else (_C_DIM if amount < 0.10 else "")
-                return f"({color}${m.group(1)}{_C_RESET})" if color else m.group(0)
-            msg = self._COST_RE.sub(_color_cost, msg)
-            # Bold + cyan for the per-file header line `[N/M] [badge] path`.
-            msg = self._HEADER_RE.sub(f"{_C_BOLD}{_C_CYAN}▶ \\1{_C_RESET}", msg)
+            # Section banner — full bold (matches log.info("─── compiling N of M …"))
+            if self._SECTION_RE.match(msg.strip()):
+                msg = f"{_C_BOLD}{msg}{_C_RESET}"
+            # Per-file header — full cyan/bold with ▶ marker, badge tinted yellow.
+            elif (mh := self._HEADER_RE.match(msg.strip())):
+                pos, badge, path = mh.group(1), mh.group(2), mh.group(3)
+                msg = (
+                    f"{_C_BOLD}{_C_CYAN}▶ [{pos}] "
+                    f"{_C_YELLOW}[{badge}]{_C_CYAN} {path}{_C_RESET}"
+                )
+            # Dispatch line — dim (it's a routing note, not action).
+            elif self._DISPATCH_RE.match(msg):
+                msg = f"{_C_DIM}{msg}{_C_RESET}"
+            # Curiosity engine lines — magenta to distinguish from compile.
+            elif self._CURIOSITY_RE.match(msg):
+                msg = f"\033[35m{msg}{_C_RESET}"
+            # Success/failure inline markers + cost/elapsed/tokens tinting
+            # for all remaining lines (incl. ✓ summary lines).
+            else:
+                msg = msg.replace("✓", f"{_C_GREEN}✓{_C_RESET}")
+                msg = msg.replace("✗", f"{_C_RED}✗{_C_RESET}")
+                msg = self._colorize_cost(msg)
+                msg = self._ELAPSED_RE.sub(f"{_C_DIM}\\1{_C_RESET}", msg)
+                msg = self._TOKENS_RE.sub(f"{_C_DIM}\\1{_C_RESET}", msg)
 
-        # Align all levels in a 7-char column so the message text starts
-        # at the same column regardless of WARNING vs INFO vs ERROR.
-        # INFO becomes blank (the visual signal is the absence of color).
         level_color = self.LEVEL_COLOR.get(record.levelname, "")
         level_text = "" if record.levelname == "INFO" else record.levelname
         level = level_text.ljust(7)
         if level_color and _TTY and level_text:
-            level = f"{level_color}{level_text}{_C_RESET}".ljust(7 + len(level_color) + len(_C_RESET))
+            level = f"{level_color}{level_text}{_C_RESET}".ljust(
+                7 + len(level_color) + len(_C_RESET)
+            )
 
         return f"{_C_DIM}{ts}{_C_RESET}  {level}  {msg}"
 
