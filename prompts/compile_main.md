@@ -206,6 +206,11 @@ ${source_content}
 
 7. Use `[[wikilinks]]` to cross-reference between articles inside `knowledge/`, and to cite durable substrate sources (`daily/*.md`, `raw/notes/*`, `raw/articles/*`, `raw/transcripts/*`).
 
+   **`compile_role: source-and-final` pages** (e.g. `raw/notes/longform/yesterday-strategy-2026.md`) are operator-authored long-form documents that the engine indexes but does **not** distill. They appear in `knowledge/index.md` by their full pathname. When you reference one:
+   - **Cite by pathname** (`[[raw/notes/longform/yesterday-strategy-2026]]`) — do NOT create a separate `knowledge/concepts/yesterday-strategy.md` for the same content (the source-and-final page IS the final form).
+   - Do NOT add the path to a `compiled_from:` frontmatter list — `compiled_from:` is reserved for substrate that was distilled. Source-and-final pages are *referenced as authoritative*, not consumed-and-distilled.
+   - You MAY still create `knowledge/connections/` articles that link a source-and-final page with other concepts, since those connections are LLM-synthesized analysis layered on top of the operator's writing.
+
 8. Write in the same language as the source material (German or English).
 
 9. Be thorough but concise. Preserve technical details and specific decisions.
