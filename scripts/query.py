@@ -72,6 +72,16 @@ async def main() -> None:
         action="store_true",
         help="With --file-back: overwrite an existing qa/ note that matches the question slug",
     )
+    parser.add_argument(
+        "--include-final-only",
+        action="store_true",
+        help=(
+            "Include articles marked compile_role: final-only (archived, "
+            "hand-curated) in the answer. Default: skip them (they're hidden "
+            "from active surfaces). Use when you specifically want to query "
+            "archived knowledge. (M007-S03-T03)"
+        ),
+    )
     args = parser.parse_args()
 
     question = args.question
@@ -83,7 +93,11 @@ async def main() -> None:
         log.error("--brief and --file-back are mutually exclusive — brief mode answers in-line only")
         sys.exit(2)
 
-    log.info("Query: %s (brief=%s, file_back=%s)", question, brief, file_back)
+    include_final_only = args.include_final_only
+    log.info(
+        "Query: %s (brief=%s, file_back=%s, include_final_only=%s)",
+        question, brief, file_back, include_final_only,
+    )
 
     # Embed only the compact article index (path + date); the agent pulls
     # full article bodies on demand via Read/Grep/Glob. Embedding every
@@ -91,6 +105,29 @@ async def main() -> None:
     # vault grew large (4.4 MB / >1M tokens on the 850-article lxw vault).
     index_md = read_wiki_index_compact()
     facts_md = read_hard_facts()
+
+    # compile_role filter (M007-S03-T03). By default, instruct the LLM to
+    # skip articles with compile_role: final-only frontmatter — they're
+    # archived hand-curated reference, hidden from active surfaces. The
+    # --include-final-only flag re-enables them for queries that
+    # specifically want archived knowledge.
+    if include_final_only:
+        compile_role_filter_note = (
+            "\n\n## compile_role filter\n\n"
+            "Include articles regardless of compile_role (operator requested "
+            "via --include-final-only). Treat final-only and source-and-final "
+            "alongside source-only/compile-output articles.\n"
+        )
+    else:
+        compile_role_filter_note = (
+            "\n\n## compile_role filter\n\n"
+            "If any article you find has frontmatter `compile_role: final-only`, "
+            "SKIP it — it's archived hand-curated content the operator chose to "
+            "hide from active queries. Mention in your answer ONLY if directly "
+            "asked about archives or if no non-archived material answers the "
+            "question. Source-only and source-and-final articles are in-scope.\n"
+        )
+    facts_md = facts_md + compile_role_filter_note
 
     if file_back:
         QA_DIR.mkdir(parents=True, exist_ok=True)
