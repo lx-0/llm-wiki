@@ -30,7 +30,7 @@ from claude_agent_sdk import (
     query,
 )
 
-from core.paths import AGENTS_FILE, KNOWLEDGE_DIR, LOGS_DIR, LOG_FILE, ROOT_DIR, STATE_DIR, STATE_FILE
+from core.paths import AGENTS_FILE, INDEX_FILE, KNOWLEDGE_DIR, LOGS_DIR, LOG_FILE, ROOT_DIR, STATE_DIR, STATE_FILE
 from core.utils import (
     file_hash,
     list_raw_files,
