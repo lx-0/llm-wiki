@@ -1,0 +1,85 @@
+You are processing a daily Oura health rollup against the personal-wiki health-policy article.
+
+## Hard facts (override anything in the source material)
+
+${facts_md}
+
+## Source material
+
+**File:** `${source_path}`
+
+```
+${source_content}
+```
+
+## Your task — execute the established health-rollup policy
+
+A `type: health-rollup` source is a structured metric-only YAML stub: frontmatter carries the day's biometrics; the body is either an empty `(Add observations below as needed.)` placeholder or operator-written prose. The policy lives in `knowledge/concepts/health-rollup-intake-format.md` and has been in force for weeks — your job is to execute it cheaply, not re-derive it.
+
+You have **Read, Grep, Glob, Edit, Write** restricted to `knowledge/**`. Stay under **6 turns**. This is structured-substrate processing, not knowledge synthesis. The right output is small.
+
+### 1. Classify the body
+
+After the closing `---` of the frontmatter, the body is either:
+
+- **Stub-body** — whitespace, the literal `(Add observations below as needed.)` placeholder, or both. Operator has not annotated this day. **This is the common case.** Go to §2-A.
+- **Operator-prose** — anything else (sickness notes, training context, mood, travel, a sentence about why HRV crashed). Go to §2-B.
+
+Do not parse the frontmatter metrics for "anomalies" — single-day biometric snapshots are point-in-time data, not knowledge, per the policy article. Trend aggregation is a separate, future concern outside this pass.
+
+### 2-A. Stub-body branch
+
+Two edits, then stop:
+
+1. **Append `${source_path}` to the policy article's `compiled_from:` list.** Edit `knowledge/concepts/health-rollup-intake-format.md`. Find the YAML `compiled_from:` list in frontmatter, append a new `- "${source_path}"` line at the end of the list (preserve existing entries; do not reorder; do not deduplicate older entries, just check that the new one isn't already present).
+2. **Append one log entry to `knowledge/log.md`** at the very top (newest-first), in this exact shape:
+
+   ```markdown
+   ## [${now}] compile | Health rollup <date> (empty-body)
+   - Source: `${source_path}`
+   - Articles created: (none)
+   - Articles updated: [[concepts/health-rollup-intake-format]] (appended source to compiled_from)
+   - Metrics snapshot: sleep <sleep_hours> h, score <sleep_score>, readiness <readiness_score>, HRV <hrv_overnight> ms, <steps> steps, RHR <resting_hr> bpm, sensitivity <sensitivity>.
+   - Policy: per [[concepts/health-rollup-intake-format]], single-day metric snapshots without prose contribute only a log-line.
+   ```
+
+   Substitute the actual values from the frontmatter. If a metric is missing, omit that field from the snapshot line rather than writing "None".
+
+Do NOT touch `knowledge/index.md` (no new articles created). Do NOT create or modify person/project/concept pages. Do NOT do entity extraction — there's no body to extract from.
+
+### 2-B. Operator-prose branch
+
+The operator wrote actual content in the body. Treat it as a thin substrate pass:
+
+1. **Append `${source_path}` to the policy article's `compiled_from:` list** (same as §2-A step 1).
+2. **Scan the prose for entity mentions** — people (first names, full names), projects (`fleet`, `openclaw`, `paperclip`, `llm-wiki`, etc.), and existing `[[knowledge/concepts/<slug>]]` wikilinks. For each:
+   - Glob `knowledge/{people,projects,concepts}/<slug>.md`. If it does NOT exist: **SKIP** (do not stub from health-rollup mentions — wait for proper substrate introduction elsewhere).
+   - If it EXISTS: append ONE Timeline line (newest-first under `## Timeline`):
+     `- **${today}** | \`${source_path}\` — Mentioned in health rollup: <one-line context from the prose>.`
+   - Do NOT touch the State block above `---`. Do NOT add Action Items. Do NOT carry-forward or stale-flag. Append-only.
+3. **Append one log entry to `knowledge/log.md`** at the top (newest-first):
+
+   ```markdown
+   ## [${now}] compile | Health rollup <date> (with observations)
+   - Source: `${source_path}`
+   - Articles created: (none)
+   - Articles updated: [[concepts/health-rollup-intake-format]] (appended source to compiled_from)<append `, [[<entity-page>]] (Timeline +1)` for each entity whose Timeline you edited>
+   - Metrics snapshot: sleep <sleep_hours> h, score <sleep_score>, readiness <readiness_score>, HRV <hrv_overnight> ms, <steps> steps, RHR <resting_hr> bpm.
+   - Observations: <one-sentence summary of the operator's prose>.
+   ```
+
+Do NOT create new entity stubs. Do NOT touch `knowledge/index.md`. Do NOT escalate to full two-layer carry-forward — that's the dialog-substrate pass's shape, not health's.
+
+### 3. No new articles
+
+Health-rollup files NEVER create new wiki articles. The policy article (`concepts/health-rollup-intake-format`) is the only target that gets a frontmatter-list update. Everything else is append-only on existing pages or log.md.
+
+### 4. Stop at the first complete result
+
+This task is bounded: at most three Edits (policy article + log.md + maybe one Timeline). If you find yourself reading more than two files or about to start a fourth Edit, you've drifted — stop and emit your final result.
+
+## Anti-loop guard
+
+If after 4 turns you haven't finished:
+- STOP all entity-extraction. If you've made the `compiled_from:` edit and the log entry, you're done.
+- Emit your final result; do not start new tool calls.

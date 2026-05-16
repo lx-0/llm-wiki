@@ -38,6 +38,69 @@ The "Conventions" / "Workflow" / "Quick gotchas" sections are quick-reference. T
 
 Distilled from sessions 2026-04-11 → 2026-04-30 building this implementation. Each section is something that bit us in production — read before changing related code.
 
+### Every accumulating substrate type needs its own SUBSTRATE_PROMPTS entry (2026-05-16)
+
+#### Symptom
+
+Operator's compile batch aborted twice in a row with `cost_exceeded` on `raw/notes/health/2026/2026-03-26--default.md` — a 19-line, 288-byte file (frontmatter-only, stub body `(Add observations below as needed.)`). Cost: $3.28 then $2.20 on Opus, both over the $2.00 per-file guard. Second run reported `in:0 out:0` tokens despite the $2.20 — pure cache-read churn, no output written.
+
+#### Root cause
+
+`health-rollup` was not in `SUBSTRATE_PROMPTS` (`scripts/compile.py:264`) → fell through to the default `compile_main.md`, the dialog-substrate prompt that runs the heavy two-layer carry-forward audit. Opus tried to apply that shape to a metric-only YAML stub with literally no body content. It looped through tool-call fan-out (read index, glob for related people/projects/concepts, etc.) looking for context that doesn't exist, burning turns until the cost guard tripped.
+
+Health Phase 1 (Oura) shipped 2026-05-15. The collector writes ~1 health-rollup file per day per account. Compile was never calibrated for this substrate-type when the collector landed.
+
+The diagnostic message in `compile.py:615-617` already self-diagnosed correctly ("Likely substrate-prompt mismatch (e.g. dense calendar in compile_main.md)") — same pattern that bit calendar-rollup earlier (now fixed via `compile_calendar.md` + dedicated Haiku route).
+
+#### Why this can keep happening
+
+`compile_main.md` is the "process arbitrary dialog substrate" prompt. It assumes:
+- Body content carries first-person commitments, decisions, third-party announcements.
+- The two-layer State (Action Items / Open Threads / Timeline) shape is meaningful.
+- Entity extraction will hit several people/projects/concepts.
+
+A new substrate type lands. If body is mostly empty (health-rollup), or mechanical metadata (calendar-rollup), or already-distilled (daily-digest), the prompt's assumptions are all false. The agent doesn't "abort cleanly" — it tries to do its job anyway, fans out, hits max_turns or cost_exceeded.
+
+Existing knobs that don't help:
+- `compile_max_cost_per_file_usd` — guard, not fix; raising it just burns more money.
+- `compile_skip_substrate_types` — opt-out; works if you genuinely want to skip, useless if you want the substrate compiled (even minimally).
+- `compile_force_long_context_types` — same problem at 1M context, only more expensive.
+
+#### Fix pattern
+
+For each accumulating substrate type whose shape diverges from "dialog substrate", add a SUBSTRATE_PROMPTS row pointing at a lean dedicated prompt:
+
+```python
+"<type>": ("compile_<type>", <max_turns>, "claude-haiku-4-5-20251001"),
+```
+
+The dedicated prompt:
+- States the policy directly (look at `knowledge/log.md` entries for the type — operator has usually been running the policy manually, you're just codifying it).
+- Has at most 2-4 sections matching the actual workflow.
+- Bounds tool access to `knowledge/**`.
+- Has an explicit anti-loop guard ("if after N turns you haven't finished, emit final result").
+- Skips `knowledge/log.md` updates UNLESS the substrate-type genuinely produces no other audit trail (health-rollup does → log entries kept; calendar/daily skip log because Timeline appends are the trail).
+
+Existing examples:
+- `compile_calendar.md` (12 turns, Haiku) — recurring-concept stubs + attendee Timeline appends.
+- `compile_daily.md` (20 turns, Haiku) — cross-link entity Timelines from already-distilled digests.
+- `compile_health.md` (6 turns, Haiku) — append to policy article `compiled_from:` + emit log entry. New 2026-05-16.
+
+#### When NOT to add a SUBSTRATE_PROMPTS row
+
+If the substrate type genuinely produces no compileable artifact under any policy (point-in-time data, mechanical telemetry, transient state), add it to `compile_skip_substrate_types` instead. Skip is a permanent semantic statement, not a deferral. Per-day health-rollup *almost* qualified — the operator's established log-line + `compiled_from` policy was the deciding factor for "compile it cheaply" over "skip it".
+
+#### Checklist when shipping a new collector
+
+When you add a collector that emits a new `type:` value:
+
+1. Decide: is the substrate compileable into knowledge artifacts, or is it pure substrate (read-only by dashboard/aggregator)?
+2. If compileable → ship the SUBSTRATE_PROMPTS row + dedicated lean prompt in the *same commit* as the collector. Do not let it fall through to compile_main.md "for now".
+3. If non-compileable → add to `compile_skip_substrate_types` engine default in `core/config.py` + migration entry.
+4. Verify: a dry-run compile against a sample file routes to the expected prompt + completes under $0.20.
+
+The cost of forgetting is ~$2-3 per file × N days × M operators until someone notices.
+
 ### Compile prompt injection via substrate — agent treated session-rollups as code-change orders (2026-05-15)
 
 #### Symptom

@@ -274,6 +274,15 @@ SUBSTRATE_PROMPTS: dict[str, tuple[str, int, str | None]] = {
     # edited. 20 + Haiku covers digests with up to ~6 mentioned entities
     # well under budget.
     "daily-digest":    ("compile_daily", 20, "claude-haiku-4-5-20251001"),
+    # Health-rollup is metric-only frontmatter with a stub body ~99% of
+    # days. Falling through to compile_main.md spawned the heavy
+    # two-layer carry-forward audit on a file with no dialog → cost
+    # exceeded $2-3/file on 2026-05-16. The lean prompt executes the
+    # established `concepts/health-rollup-intake-format` policy
+    # directly: append to compiled_from + emit one log entry. Operator
+    # body-prose branch keeps Timeline-append shape (no State writes).
+    # 6 turns / Haiku is generous for the at-most-3-edits workload.
+    "health-rollup":   ("compile_health", 6, "claude-haiku-4-5-20251001"),
 }
 
 
