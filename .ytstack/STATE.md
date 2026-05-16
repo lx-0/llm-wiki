@@ -1,15 +1,17 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-05-16T15:01:00Z
+last_updated: 2026-05-16T15:20:18Z
 current_milestone: M007
-active_slice: none
-active_task: none
+active_slice: S01
+active_task: T01
 ---
 
 # State
 
-**Status:** M007 planned (M). Ready to slice. Goal: ship `compile_role` frontmatter axis (`source-only | source-and-final | final-only`) absorbing archives-flag concept and adding long-form-deliberate-writing slot. First Phase-2 prerequisite for `.ytstack/backlog/lx-vault-merge.md` (Phase 0+1 already shipped — tarball `~/Archive/lx-vault-2026-05-16.tar.gz` + commit `cf8db73` in lxw vault repo). Next action: `ytstack:slice-milestone` to break M007 into S01-S03.
+**Status:** M007 / S01 / T01 planned — ready to execute. Task: create `scripts/core/compile_role.py` (~60 LOC pure-function module: `CompileRole` Literal + `VALID_ROLES` + `LOCATION_DEFAULTS` + `infer_compile_role()` with explicit-override-wins semantics + `_location_class()` helper). Config-decoupled (T02 wires the knob). Plan at `.ytstack/M007-S01-T01-PLAN.md`. Verification = single uv-python smoke command exercising all 5 inference paths. T04 formalizes as pytest.
+
+**Previously:** M007 planned (M) + sliced into S01-S03 (15 tasks total). S01 = schema foundation (4 tasks). S02 = compile.py 3-way dispatch (5 tasks). S03 = active-surface filtering + lx longform validation + archives-flag retire (6 tasks). Goal: ship `compile_role` axis as first Phase-2 prerequisite for `.ytstack/backlog/lx-vault-merge.md` (Phase 0+1 already shipped — tarball `~/Archive/lx-vault-2026-05-16.tar.gz` + commit `cf8db73` in lxw vault repo).
 
 ---
 
