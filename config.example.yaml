@@ -12,6 +12,11 @@ scheduling:
   # and "reviewed" timestamps. Default "UTC" works on any install; override to
   # your local timezone (e.g. "Europe/Berlin", "America/New_York", "Asia/Tokyo").
   timezone: UTC
+  # M014 dream-cycle per-entity cooldown (days). Entities whose
+  # `last_synthesized_at:` frontmatter is younger than this are skipped by
+  # `wiki dream --all-entities` and the dream_cycle piggyback. Override per-run
+  # with `--ignore-cooldown` (CLI) or `--cooldown-days N`.
+  dream_cooldown_days: 7
 
 # Piggyback tasks spawned after compile_after_hour.
 # enabled: false → task never runs. cooldown_hours controls the frequency cap.
@@ -85,6 +90,15 @@ piggybacks:
     enabled: true
     cooldown_hours: 24
     max_per_run: 5
+  # M014 dream-cycle. Fires at most once-per-day; per-fire sweeps up to
+  # max_per_run entity pages (newest-overdue first). Per-entity cost cap
+  # AND per-run cumulative cap enforced inside dream.py — see
+  # limits.dream_entity_max_cost_usd / limits.dream_cycle_max_cost_per_run_usd.
+  # Per-entity cooldown lives on scheduling.dream_cooldown_days (default 7d).
+  dream_cycle:
+    enabled: true
+    cooldown_hours: 24
+    max_per_run: 3
 
 models:
   # Claude model used by compile.py + retry-failed-flushes.
@@ -256,6 +270,13 @@ limits:
     - "daily/*"
   extract_takes_timeout_s: 180
   extract_takes_max_per_source: 12
+  # M014 dream-cycle cost gates. Pre-flight per-entity USD cap (estimate
+  # derived from prompt-char count; SDK call is REJECTED when estimate >
+  # cap — no silent burn). Cumulative per-run cap stops the sweep once
+  # ResultMessage.total_cost_usd accumulates past it. Both apply to
+  # `wiki dream --all-entities` AND the dream_cycle piggyback.
+  dream_entity_max_cost_usd: 2.0
+  dream_cycle_max_cost_per_run_usd: 5.0
 
 features:
   # Master switches for entire capabilities.

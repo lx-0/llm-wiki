@@ -54,6 +54,13 @@ class Scheduling:
     # (compile_after_hour cutoff, daily-log filename, "reviewed" timestamps).
     # Default UTC keeps installs portable; override per-instance via config.yaml.
     timezone: str = "UTC"
+    # M014 dream-cycle (entity-page re-synthesis). An entity whose
+    # `last_synthesized_at:` frontmatter is newer than this many days is
+    # skipped by `wiki dream --all-entities` and by the dream_cycle
+    # piggyback. Per-entity `--ignore-cooldown` overrides. Default 7 —
+    # one weekly sweep keeps State fresh without burning Opus tokens on
+    # entities the operator hasn't generated new substrate for.
+    dream_cooldown_days: int = 7
 
 
 @dataclass
@@ -349,6 +356,22 @@ class Limits:
     # Cap on takes emitted per source. Stops a noisy meeting from spawning
     # 30 low-signal lines for the same holder.
     extract_takes_max_per_source: int = 12
+    # M014 dream-cycle (entity-page re-synthesis). Hard per-entity USD cap.
+    # `dream.py:dream_entity()` pre-flight estimates cost from prompt-char
+    # count; if estimate > cap, the SDK call is NEVER made (no silent
+    # burn). Operator must reduce corpus (archive old substrate) or raise
+    # the cap. Default $2.00 — a typical alex.md corpus on lxw is ~200
+    # files × 8 KB average truncation = ~1.6 MB ≈ ~$6 estimated. So
+    # default cap will actively gate the lxw `alex` resynthesis until the
+    # operator decides whether to raise it; emmett.md and most thinner
+    # entities fit comfortably under $2.
+    dream_entity_max_cost_usd: float = 2.0
+    # Cumulative per-run USD cap for `wiki dream --all-entities` and the
+    # dream_cycle piggyback. The sweeper picks the most-overdue entities
+    # first (oldest `last_synthesized_at`) and stops once cumulative
+    # ResultMessage.total_cost_usd crosses this cap. Default $5.00 — sized
+    # to cover 2-3 typical entity resyntheses per run.
+    dream_cycle_max_cost_per_run_usd: float = 5.0
 
 
 @dataclass
@@ -517,6 +540,13 @@ def _default_piggybacks() -> dict[str, PiggybackTask]:
         # in the morning after the per-collector piggybacks have settled.
         "daily_digest_yesterday": PiggybackTask(cooldown_hours=24),
         "retry_failed_flushes": PiggybackTask(cooldown_hours=24, max_per_run=5),
+        # M014 dream-cycle. Cooldown 24h means it fires at most once per day;
+        # per-run sweep is gated by limits.dream_cycle_max_cost_per_run_usd
+        # AND limits.dream_entity_max_cost_usd. max_per_run=3 keeps a single
+        # fire from sweeping the whole entity list in one go — the per-entity
+        # cooldown (scheduling.dream_cooldown_days, default 7d) ensures the
+        # entire fleet drains over the cooldown window.
+        "dream_cycle": PiggybackTask(cooldown_hours=24, max_per_run=3),
     }
 
 

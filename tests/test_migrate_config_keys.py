@@ -106,23 +106,26 @@ def test_migrate_config_file_round_trip(tmp_path):
     new_text, changes = m.migrate_config(config_path)
     assert new_text is not None
     # 2 piggyback (rename + drop)
-    #  + 1 created-limits-block + 17 limits additions:
+    #  + 1 created-limits-block + 19 limits additions:
     #    compile_force_long_context_types, compile_skip_on_long_context_unknown,
     #    compile_role_default_by_location (M007), 4 calendar_*,
     #    compile_max_turns_long_context, compile_max_cost_per_file_usd,
     #    compile_skip_substrate_types — default ["email-delta"],
     #    3 flush_*_budget_chars (2026-05-16),
     #    compile_per_call_timeout_s (M010), connection_min_words (M012),
-    #    3 extract_takes_* (M011)
-    #  + 2 piggybacks additions (calendar, curiosity_followup)
+    #    3 extract_takes_* (M011),
+    #    dream_entity_max_cost_usd + dream_cycle_max_cost_per_run_usd (M014)
+    #  + 3 piggybacks additions (calendar, curiosity_followup, dream_cycle — M014)
     #  + 1 created-features-block + 1 features addition (extract_takes — M011)
     #  + 1 created-personal-block + 2 personal additions
     #    (implicit_operator_author — M009, domains — M013)
+    #  + 1 scheduling addition (dream_cooldown_days — M014; the scheduling
+    #    block already exists in the test fixture, so no "created" event)
     # (LIST_ADDITIONS has one entry but operator's freshly-injected
     # skip-list already contains "email-delta" from KEY_ADDITIONS, so
     # the list-extend is a no-op on greenfield.)
-    # = 28 changes (no drops — operator has no orphan personal.* fields)
-    assert len(changes) == 28, f"got {len(changes)} changes: {changes}"
+    # = 32 changes (no drops — operator has no orphan personal.* fields)
+    assert len(changes) == 32, f"got {len(changes)} changes: {changes}"
 
     reparsed = yaml.safe_load(new_text)
     # piggyback side
@@ -141,8 +144,9 @@ def test_migrate_config_file_round_trip(tmp_path):
     assert reparsed["limits"]["calendar_max_per_run"] == 500
     assert reparsed["limits"]["calendar_backfill_days"] == 90
     assert reparsed["limits"]["calendar_future_days"] == 7
-    # unrelated section untouched
-    assert reparsed["scheduling"] == {"compile_after_hour": 18}
+    # scheduling block: operator's value preserved; M014 dream_cooldown_days added
+    assert reparsed["scheduling"]["compile_after_hour"] == 18
+    assert reparsed["scheduling"]["dream_cooldown_days"] == 7
 
 
 def test_migrate_config_no_change_when_fully_current(tmp_path):
@@ -151,10 +155,14 @@ def test_migrate_config_no_change_when_fully_current(tmp_path):
     config_path = tmp_path / ".wiki" / "config.yaml"
     config_path.parent.mkdir(parents=True)
     config_path.write_text(yaml.safe_dump({
+        "scheduling": {
+            "dream_cooldown_days": 7,
+        },
         "piggybacks": {
             "email": {"enabled": True, "cooldown_hours": 24},
             "calendar": {"enabled": True, "cooldown_hours": 6, "max_per_run": 500},
             "curiosity_followup": {"enabled": True, "cooldown_hours": 6, "max_per_run": 5},
+            "dream_cycle": {"enabled": True, "cooldown_hours": 24, "max_per_run": 3},
         },
         "limits": {
             "compile_force_long_context_types": [],
@@ -175,6 +183,8 @@ def test_migrate_config_no_change_when_fully_current(tmp_path):
             "extract_takes_source_globs": ["raw/transcripts/*", "raw/transcripts/**/*", "raw/voice/*", "daily/*"],
             "extract_takes_timeout_s": 180,
             "extract_takes_max_per_source": 12,
+            "dream_entity_max_cost_usd": 2.0,
+            "dream_cycle_max_cost_per_run_usd": 5.0,
         },
         "features": {
             "extract_takes": False,
@@ -209,7 +219,10 @@ def test_migrate_config_no_piggybacks_block_still_runs_additions(tmp_path):
     reparsed = yaml.safe_load(new_text)
     assert reparsed["limits"]["compile_force_long_context_types"] == []
     assert reparsed["limits"]["compile_skip_on_long_context_unknown"] is True
-    assert reparsed["scheduling"] == {"compile_after_hour": 18}
+    # M014 also injects scheduling.dream_cooldown_days under the existing
+    # scheduling block — operator's compile_after_hour stays untouched.
+    assert reparsed["scheduling"]["compile_after_hour"] == 18
+    assert reparsed["scheduling"]["dream_cooldown_days"] == 7
 
 
 # ── migrate_additions: key backfill logic ───────────────────────────
@@ -258,6 +271,9 @@ def test_migrate_additions_skips_non_dict_parent():
 def test_migrate_additions_idempotent():
     m = _mod()
     data: dict = {
+        "scheduling": {
+            "dream_cooldown_days": 7,
+        },
         "limits": {
             "compile_force_long_context_types": ["daily-digest", "calendar-rollup"],
             "compile_skip_on_long_context_unknown": True,
@@ -277,10 +293,13 @@ def test_migrate_additions_idempotent():
             "extract_takes_source_globs": ["raw/transcripts/*", "raw/transcripts/**/*", "raw/voice/*", "daily/*"],
             "extract_takes_timeout_s": 180,
             "extract_takes_max_per_source": 12,
+            "dream_entity_max_cost_usd": 2.0,
+            "dream_cycle_max_cost_per_run_usd": 5.0,
         },
         "piggybacks": {
             "calendar": {"enabled": True, "cooldown_hours": 6, "max_per_run": 500},
             "curiosity_followup": {"enabled": True, "cooldown_hours": 6, "max_per_run": 5},
+            "dream_cycle": {"enabled": True, "cooldown_hours": 24, "max_per_run": 3},
         },
         "features": {
             "extract_takes": False,

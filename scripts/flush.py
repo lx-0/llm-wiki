@@ -88,6 +88,12 @@ _LEGACY_PIGGYBACK_COMMANDS: dict[str, list[str]] = {
     # a tight ≤500-word digest at daily/<yesterday>.md. Runs morning-after so
     # all collector piggybacks have already landed their per-source files.
     "daily_digest_yesterday": ["daily_digest_runner.py", "--date", "yesterday"],
+    # M014 dream-cycle. Sweeps the N most-overdue entity pages (oldest
+    # last_synthesized_at first) and resynthesizes their State + Timeline
+    # from the full substrate corpus. Per-run cost cap is enforced inside
+    # dream.py via limits.dream_cycle_max_cost_per_run_usd; this template
+    # just hands over max_per_run as the entity-count ceiling.
+    "dream_cycle": ["dream.py", "piggyback", "--limit", "{max_per_run}"],
 }
 
 

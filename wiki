@@ -29,6 +29,8 @@
 #   wiki seed --force          overwrite existing vault templates with engine versions
 #   wiki compile               run compile.py — process all changed sources into knowledge/
 #   wiki compile --file PATH   compile a single source file
+#   wiki dream-entity SLUG     re-synthesize ONE entity page (people/projects/areas) — M014
+#   wiki dream --all-entities  sweep all entities (oldest-overdue first, respects cooldown)
 #   wiki flush                 capture current Claude Code context → daily/ (manual flush)
 #   wiki lint                  run lint.py — structural + LLM contradiction checks
 #   wiki lint --structural-only  cheap, no-LLM lint (used by piggyback)
@@ -348,6 +350,56 @@ EOF
   _refresh_dashboard_stats
   _refresh_dashboard_lint
   return $rc
+}
+
+cmd_dream_entity() {
+  case "${1:-}" in
+    ""|-h|--help|help)
+      cat <<EOF
+${C_BOLD}wiki dream-entity${C_RESET} — re-synthesize ONE entity page (M014)
+
+${C_BOLD}USAGE${C_RESET}
+  wiki dream-entity <slug>                resynthesize a single entity
+  wiki dream-entity <slug> --dry-run      print prompt size + estimated cost only
+  wiki dream-entity <slug> --ignore-cooldown   force-run despite last_synthesized_at
+  wiki dream-entity <slug> --cost-cap 5.0      override per-entity USD cap
+
+${C_BOLD}NOTES${C_RESET}
+  Slug must match \`knowledge/{people,projects,areas}/<slug>.md\` (without .md).
+  Greps all substrate (raw/**, daily/**) for slug mentions, builds a corpus
+  prompt, calls Claude Agent SDK to rewrite the entity's State block + append
+  to Timeline. Pre-flight cost cap REJECTS the SDK call if estimate exceeds
+  \`limits.dream_entity_max_cost_usd\` (default \$2.00). Cooldown defaults
+  to \`scheduling.dream_cooldown_days\` (default 7 days).
+EOF
+      return 0 ;;
+  esac
+  banner "wiki dream-entity"
+  _run_script dream.py entity "$@"
+}
+
+cmd_dream() {
+  case "${1:-}" in
+    -h|--help|help)
+      cat <<EOF
+${C_BOLD}wiki dream${C_RESET} — sweep all entity pages (M014)
+
+${C_BOLD}USAGE${C_RESET}
+  wiki dream --all-entities                sweep all entities, oldest-overdue first
+  wiki dream --all-entities --dry-run      print plan, no SDK calls
+  wiki dream --all-entities --limit N      hard cap on entity count this run
+
+${C_BOLD}NOTES${C_RESET}
+  Sweeps \`knowledge/{people,projects,areas}/*.md\` oldest-synthesized first,
+  skipping entities synthesized within the cooldown window. Per-entity AND
+  per-run cumulative cost caps are enforced — see \`wiki dream-entity help\`.
+EOF
+      return 0 ;;
+    --all-entities|sweep)
+      shift; banner "wiki dream sweep"; _run_script dream.py sweep "$@" ;;
+    *)
+      err "unknown: wiki dream $1 (try --all-entities or see 'wiki dream help')"; return 1 ;;
+  esac
 }
 
 cmd_flush() {
@@ -1040,6 +1092,8 @@ case "${1:-}" in
   update)           shift; cmd_update "$@" ;;
   seed)             shift; cmd_seed "$@" ;;
   compile)          shift; cmd_compile "$@" ;;
+  dream-entity)     shift; cmd_dream_entity "$@" ;;
+  dream)            shift; cmd_dream "$@" ;;
   flush)            shift; cmd_flush "$@" ;;
   lint)             shift; cmd_lint "$@" ;;
   query)            shift; cmd_query "$@" ;;

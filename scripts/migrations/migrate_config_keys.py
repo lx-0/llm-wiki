@@ -39,6 +39,10 @@ Key changes covered (chronological):
   personal.implicit_operator_author        (added 2026-05-16, default None — author-attribution fallback for single-tenant vaults)
   personal.domains                         (added 2026-05-16 M013, default [company, personal, ai, meta] — optional domain:-frontmatter enum)
   limits.connection_min_words              (added 2026-05-16 M012, default 50 — connection-article quality gate floor)
+  scheduling.dream_cooldown_days           (added 2026-05-16 M014, default 7 — dream-cycle per-entity cooldown)
+  limits.dream_entity_max_cost_usd         (added 2026-05-16 M014, default 2.0 — dream-cycle per-entity pre-flight USD cap)
+  limits.dream_cycle_max_cost_per_run_usd  (added 2026-05-16 M014, default 5.0 — dream-cycle per-run cumulative USD cap)
+  piggybacks.dream_cycle                   (added 2026-05-16 M014, cooldown 24h, max_per_run 3)
 
 Idempotent: a config already on the current schema produces no change.
 
@@ -147,6 +151,20 @@ KEY_ADDITIONS: dict[str, dict[str, object]] = {
         ],
         "extract_takes_timeout_s": 180,
         "extract_takes_max_per_source": 12,
+        # M014 dream-cycle cost gates (2026-05-16). Pre-flight per-entity
+        # USD cap (estimate from prompt-char count; reject SDK call if over)
+        # + cumulative per-run cap for `wiki dream --all-entities` and the
+        # dream_cycle piggyback sweep. Match Limits.dream_*_usd defaults
+        # in `scripts/core/config.py`.
+        "dream_entity_max_cost_usd": 2.0,
+        "dream_cycle_max_cost_per_run_usd": 5.0,
+    },
+    "scheduling": {
+        # M014 dream-cycle (2026-05-16). Per-entity cooldown — entities
+        # synthesized within this window are skipped by sweep + piggyback.
+        # Match Scheduling.dream_cooldown_days default in
+        # `scripts/core/config.py`.
+        "dream_cooldown_days": 7,
     },
     "features": {
         # M011 master switch — default OFF, flip True after dogfooding.
@@ -169,6 +187,11 @@ KEY_ADDITIONS: dict[str, dict[str, object]] = {
         # operator configs from before 2026-05-16 have NO curiosity_followup
         # block at all, so requests accumulate in raw/requests/ forever.
         "curiosity_followup": {"enabled": True, "cooldown_hours": 6, "max_per_run": 5},
+        # M014 dream-cycle piggyback (2026-05-16). Cooldown 24h means at
+        # most once-per-day fires; per-fire sweeps `max_per_run` entities
+        # (3 default) selected newest-overdue first. Per-entity cost cap
+        # AND per-run cumulative cost cap enforced inside dream.py.
+        "dream_cycle": {"enabled": True, "cooldown_hours": 24, "max_per_run": 3},
     },
     "personal": {
         # 2026-05-16 author-attribution feature. Null default keeps the
