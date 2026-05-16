@@ -459,12 +459,24 @@ class Personal:
     # recommendation; FluidVoice / macOS dictation / Hammerspoon snippets
     # also work). Empty string disables collectors/voice.py.
     voice_inbox: str = ""
-    # Single-tenant fallback for author-attribution. When set (e.g. "alex"), the
-    # compile prompt treats source files lacking an explicit `author:` frontmatter
-    # key as operator-authored — beliefs/decisions/opinions get routed to that
-    # person's `knowledge/people/<implicit_operator_author>.md` page. Leave null
-    # for multi-tenant vaults: unattributed content stays generic. Explicit
-    # `author:` frontmatter always wins over the implicit default.
+    # Canonical vault-owner identifier. The value (e.g. "alex") is the slug of
+    # the operator's own page at `knowledge/people/<value>.md` and drives two
+    # things at compile time:
+    #
+    #   1. Owner-block injection — `compile.py:_build_owner_block()` renders
+    #      a small "## Operator / vault owner" section into every substrate
+    #      compile prompt (compile_main / compile_calendar / compile_daily /
+    #      compile_health / compile_default). Lets the agent resolve self-
+    #      references ("I", "we", "my company") and find connection targets
+    #      without grepping AGENTS.md prose.
+    #   2. Author-attribution fallback — sources lacking an explicit `author:`
+    #      frontmatter key are treated as operator-authored;
+    #      beliefs/decisions/opinions route to that person's
+    #      `knowledge/people/<value>.md` State / Open Threads / Timeline.
+    #
+    # Leave null for multi-tenant vaults: the owner-block is then omitted
+    # entirely and unattributed content stays generic. An explicit `author:`
+    # frontmatter always wins over the implicit default.
     implicit_operator_author: str | None = None
     # Jamie AI + Google Meet + Google Calendar integrations are multi-tenant via
     # per-account `jamie:` / `gmeet:` / `calendar:` sub-blocks under

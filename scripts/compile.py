@@ -429,6 +429,41 @@ def _frontmatter_field(content: str, key: str) -> str | None:
     return m.group(1).strip() if m else None
 
 
+def _build_owner_block() -> str:
+    """Render the operator/vault-owner context block for substrate compile prompts.
+
+    Returns "" when `personal.implicit_operator_author` is unset (multi-tenant
+    vaults) — prompts that interpolate `${owner_block}` simply emit no
+    section. When set, returns a self-contained "## Operator / vault owner"
+    Markdown block with the operator's name, a pointer to
+    `knowledge/people/<slug>.md`, and a Read-on-demand hint. The page
+    contents are NOT embedded — keeps the block small (~400 chars) so
+    substrate prompts stay budget-safe; the agent Reads the page when it
+    needs more context (self-reference resolution, connection targets).
+    """
+    owner = (CONFIG.personal.implicit_operator_author or "").strip()
+    if not owner:
+        return ""
+    page_rel = f"knowledge/people/{owner}.md"
+    page_abs = KNOWLEDGE_DIR / "people" / f"{owner}.md"
+    if page_abs.exists():
+        existence = f"see `{page_rel}`"
+    else:
+        existence = (
+            f"`{page_rel}` does not yet exist — create it via the stub-rules "
+            "in §6 when substrate first introduces this person"
+        )
+    return (
+        "## Operator / vault owner\n\n"
+        f"This vault belongs to **{owner}** — {existence}.\n\n"
+        "When distilling first-person beliefs, commitments, or decisions from "
+        f"a source that has no explicit `author:` frontmatter, attribute them "
+        f"to **{owner}**. You MAY Read `{page_rel}` to resolve self-references "
+        "(\"I\", \"we\", \"my company\") and to find existing entries you "
+        "should connect new facts to.\n"
+    )
+
+
 async def compile_file(
     source: Path,
     dry_run: bool = False,
@@ -556,6 +591,7 @@ async def compile_file(
     now = now_iso()
 
     facts_md = read_hard_facts()
+    owner_block = _build_owner_block()
 
     # Substrate-aware prompt dispatch. Different substrates need
     # different compile shapes; routing them all through compile_main.md
@@ -590,6 +626,7 @@ async def compile_file(
         substrate_prompt,
         agents_md=agents_md,
         facts_md=facts_md,
+        owner_block=owner_block,
         index_md=index_md,
         source_path=rel_path,
         source_content=source_content,

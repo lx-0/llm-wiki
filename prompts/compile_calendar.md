@@ -1,5 +1,6 @@
 You are extracting recurring-meeting concepts and attendee-touch records from a Google Calendar day-rollup.
 
+${owner_block}
 ## Hard facts (override anything in the source material)
 
 ${facts_md}

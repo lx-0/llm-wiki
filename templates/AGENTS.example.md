@@ -18,7 +18,16 @@ You don't manually organize your knowledge. You have conversations and curate so
 
 ## Vault Owner
 
-> **EDIT THIS SECTION.** Replace with your own context — name, role, current projects, products, the people and entities you collaborate with. The compiler uses this to disambiguate references and maintain `knowledge/people/` + `knowledge/projects/` consistency.
+> **EDIT THIS SECTION.** Replace with your own context — role, current projects, products, the people and entities you collaborate with. The compiler uses this to disambiguate references and maintain `knowledge/people/` + `knowledge/projects/` consistency.
+
+**Wiring (do this first, before the prose below):**
+
+1. Set `personal.implicit_operator_author: <your-slug>` in `.wiki/config.yaml` (e.g. `alex`). The slug becomes the filename of your person page.
+2. Make sure `knowledge/people/<your-slug>.md` exists (`type: person`, with `aliases:`). The compile agent reads this on demand to resolve "I" / "we" / "my company" in source material and to attribute first-person beliefs from sources that have no explicit `author:` frontmatter.
+
+With those two in place, the engine auto-injects a short "## Operator / vault owner" block at the top of every substrate compile prompt — no manual maintenance needed. Leave `implicit_operator_author` as `null` for multi-tenant vaults; the block is then omitted and unattributed content stays generic.
+
+The freeform prose below is **additional** context (role, current projects, collaborators). It does not replace the wiring above — it complements it.
 
 Example shape (delete and rewrite):
 

@@ -1,5 +1,6 @@
 You are extracting durable knowledge from an arbitrary substrate file.
 
+${owner_block}
 ## Hard facts (override anything in the source material)
 
 ${facts_md}

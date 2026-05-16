@@ -1,5 +1,6 @@
 You are cross-referencing a daily digest into existing knowledge entities.
 
+${owner_block}
 ## Hard facts (override anything in the source material)
 
 ${facts_md}

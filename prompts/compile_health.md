@@ -1,5 +1,6 @@
 You are processing a daily Oura health rollup against the personal-wiki health-policy article.
 
+${owner_block}
 ## Hard facts (override anything in the source material)
 
 ${facts_md}
