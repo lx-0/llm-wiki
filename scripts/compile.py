@@ -262,17 +262,27 @@ def select_files(args: argparse.Namespace) -> list[Path]:
 
 # ── Compilation ──────────────────────────────────────────────────────
 
-# Substrate-aware prompt dispatch table. Maps frontmatter `type:` value
-# to a (prompt_name, max_turns_override) tuple. The default fall-through
-# is ("compile_main", None) which uses the heavy dialog-substrate prompt
-# at the standard turn budget (12). Per-substrate prompts are tighter
-# (calendar = pure metadata extraction, daily = cross-linking only) and
-# ship with their own turn budgets matched to the actual workload —
-# avoids the max_turns trap that loops compile_main.md on substrates
-# without dialog content. Add new entries when a substrate type
-# repeatedly hits max_turns / cost_exceeded under compile_main. The
-# prompt files live in `prompts/<name>.md` and are loaded via render().
-# SubstrateProfile: (prompt_name, max_turns, model_override or None)
+# Substrate-aware prompt dispatch.
+#
+# Maps frontmatter `type:` value to (prompt_name, max_turns, model_override).
+# Default fall-through (for ANY substrate-type not listed here) is
+# `_DEFAULT_DISPATCH` which routes to `compile_default.md` on Haiku
+# at a tight 12-turn budget. This is the "safe-by-default" posture:
+# new substrate types that nobody has profiled yet cost pennies, not
+# dollars. compile_main.md is the heavy dialog-substrate carry-forward
+# prompt and is EXPLICIT-ONLY — add an entry below to route a type to
+# it (e.g. for jamie/gmeet transcripts that legitimately need
+# State+Timeline rewrites + Action Item routing).
+#
+# Empirical history (2026-05-16): five substrate types hit max_turns
+# at $2-5/file when they implicitly fell through to compile_main —
+# calendar-rollup, daily-digest, health-rollup, screenshot-batch,
+# memory-sync. Each got a dedicated lean prompt and Haiku routing.
+# That whack-a-mole pattern is what motivates the safe-by-default
+# fallback: future unknown types route to compile_default first; if
+# they need richer treatment, profile them and add an explicit entry.
+#
+# SubstrateProfile: (prompt_name, max_turns, model_override or None).
 # model_override=None falls through to CONFIG.models.compile_model.
 SUBSTRATE_PROMPTS: dict[str, tuple[str, int, str | None]] = {
     # Calendar + daily are mechanical Glob/Edit work — no reasoning depth
@@ -316,6 +326,12 @@ SUBSTRATE_PROMPTS: dict[str, tuple[str, int, str | None]] = {
     "memory-sync":     ("compile_memories", 20, "claude-haiku-4-5-20251001"),
     "memory-seed":     ("compile_memories", 20, "claude-haiku-4-5-20251001"),
 }
+
+# Default for any substrate-type NOT in SUBSTRATE_PROMPTS. Lean prompt
+# + Haiku + tight budget — see comment above for the rationale.
+_DEFAULT_DISPATCH: tuple[str, int, str | None] = (
+    "compile_default", 12, "claude-haiku-4-5-20251001",
+)
 
 
 # Path-prefix → substrate_key fallback for legacy substrate files that
@@ -449,9 +465,12 @@ async def compile_file(
     source_type = _frontmatter_type(source_content)
     dispatch_key = _substrate_key(source_content, rel_path)
     substrate_prompt, substrate_max_turns, substrate_model = SUBSTRATE_PROMPTS.get(
-        dispatch_key or "", ("compile_main", None, None),
+        dispatch_key or "", _DEFAULT_DISPATCH,
     )
-    if substrate_prompt != "compile_main":
+    # Log the dispatch decision when it's an explicit SUBSTRATE_PROMPTS
+    # match (interesting routing) — skip the noise of "type=X → default"
+    # for the safe-by-default fallback.
+    if dispatch_key in SUBSTRATE_PROMPTS:
         # Truncate model id for readability: "claude-haiku-4-5-20251001"
         # → "haiku-4-5". Keep the full id in the underlying records.
         short_model = ""
