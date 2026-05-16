@@ -1156,6 +1156,13 @@ async def main() -> None:
             # the summary so "pending" doesn't lie when the operator's
             # skip-list quietly drained the batch.
             skipped_count += 1
+            # source-and-final files mutate state["ingested"] from inside
+            # compile_file (M007-S02-T04). The local `state` here is stale
+            # vs. disk after that mutation — reload so subsequent per-file
+            # saves at lines 1232-1237 + final save at 1241-1243 don't
+            # clobber the source-and-final ingest entry.
+            if result["_skipped"] == "compile_role_source_and_final_indexed":
+                state = load_state()
             continue
         if result is None or "_failure" in result:
             failed_count += 1
