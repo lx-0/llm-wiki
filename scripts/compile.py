@@ -307,6 +307,14 @@ SUBSTRATE_PROMPTS: dict[str, tuple[str, int, str | None]] = {
     # Haiku at 15 turns expected to fit comfortably; the source is
     # routinely 50-100 KB but Haiku 4.5 has 200K context.
     "screenshot-batch": ("compile_screenshots", 20, "claude-haiku-4-5-20251001"),
+    # Memory-sync = cross-project AGENTS/CLAUDE.md copies (~200 lines
+    # each, 820 in lxw queue → potential $1700+ burn on compile_main).
+    # Memory-seed = aggregated per-project memory dumps (~40 lines).
+    # Both are substantive but formulaic — extract entities + cross-
+    # link to existing concept/project pages, no State writes. Same
+    # 15-turn budget as health-rollup since both follow a tight pattern.
+    "memory-sync":     ("compile_memories", 20, "claude-haiku-4-5-20251001"),
+    "memory-seed":     ("compile_memories", 20, "claude-haiku-4-5-20251001"),
 }
 
 

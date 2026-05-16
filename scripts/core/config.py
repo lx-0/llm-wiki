@@ -220,14 +220,14 @@ class Limits:
     compile_max_cost_per_file_usd: float = 2.5
     # Substrate types (frontmatter `type:` value) that compile.py skips
     # in batch mode. Operator can still force-compile a single file via
-    # `wiki compile --file <path>`. DEFAULT IS EMPTY: this is the last-
-    # resort escape hatch for substrate types that have neither a
-    # dedicated prompt in SUBSTRATE_PROMPTS nor a reasonable shape under
-    # compile_main.md. Today: SUBSTRATE_PROMPTS covers both calendar-
-    # rollup and daily-digest, so the skip-list is empty. Migration
-    # LIST_REMOVALS clears legacy entries that were here during the
-    # 2026-05-16 P1 hotfix window.
-    compile_skip_substrate_types: tuple[str, ...] = ()
+    # `wiki compile --file <path>`. Last-resort escape hatch for
+    # substrate types that have neither a dedicated prompt in
+    # SUBSTRATE_PROMPTS nor any extraction value worth burning on. Today:
+    #   - `email-delta`: 14-line metadata noting "N new emails in folder
+    #     X" — the actual content comes via curiosity/email-deep-scan
+    #     separately. Compiling the delta wastes $2+ per file for
+    #     no extracted knowledge.
+    compile_skip_substrate_types: tuple[str, ...] = ("email-delta",)
     # Threshold above which a source counts as "large" — surfaces one
     # extra INFO line so the operator can see *which* file was big when
     # the SDK call slows down. Pure logging signal, no behavior change.

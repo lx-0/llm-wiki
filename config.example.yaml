@@ -200,7 +200,7 @@ limits:
   # SUBSTRATE_PROMPTS (in compile.py) covers calendar-rollup and
   # daily-digest with dedicated lean prompts, so neither needs to be
   # skipped.
-  compile_skip_substrate_types: []
+  compile_skip_substrate_types: ["email-delta"]
   # Surface an INFO line when source ≥ this many chars (logging signal only).
   compile_large_source_chars: 50000
   # Retry once with `models.compile_large_source_model` on kind=unknown

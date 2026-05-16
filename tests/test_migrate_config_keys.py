@@ -110,10 +110,11 @@ def test_migrate_config_file_round_trip(tmp_path):
     #  + 9 limits additions (compile_force_long_context_types,
     #    compile_skip_on_long_context_unknown, 4 calendar_*,
     #    compile_max_turns_long_context, compile_max_cost_per_file_usd,
-    #    compile_skip_substrate_types)
+    #    compile_skip_substrate_types — default ["email-delta"])
     #  + 2 piggybacks additions (calendar, curiosity_followup)
-    # (LIST_ADDITIONS currently empty; LIST_REMOVALS only fires when
-    # operator already has the entries to remove, not on greenfield.)
+    # (LIST_ADDITIONS has one entry but operator's freshly-injected
+    # skip-list already contains "email-delta" from KEY_ADDITIONS, so
+    # the list-extend is a no-op on greenfield.)
     # = 14 changes (no drops here — operator has no orphan personal.* fields)
     assert len(changes) == 14, f"got {len(changes)} changes: {changes}"
 
@@ -125,9 +126,10 @@ def test_migrate_config_file_round_trip(tmp_path):
     assert reparsed["piggybacks"]["lint_structural"] == {"enabled": True, "cooldown_hours": 24}
     # new piggyback injected
     assert reparsed["piggybacks"]["calendar"] == {"enabled": True, "cooldown_hours": 6, "max_per_run": 500}
-    # additions side — both are empty defaults since 2026-05-16 P2
+    # additions side — force-long-context empty, skip-substrate-types
+    # has email-delta from KEY_ADDITIONS default (2026-05-16-evening)
     assert reparsed["limits"]["compile_force_long_context_types"] == []
-    assert reparsed["limits"]["compile_skip_substrate_types"] == []
+    assert reparsed["limits"]["compile_skip_substrate_types"] == ["email-delta"]
     assert reparsed["limits"]["compile_skip_on_long_context_unknown"] is True
     assert reparsed["limits"]["calendar_request_timeout_s"] == 30
     assert reparsed["limits"]["calendar_max_per_run"] == 500
@@ -157,7 +159,7 @@ def test_migrate_config_no_change_when_fully_current(tmp_path):
             "calendar_future_days": 7,
             "compile_max_turns_long_context": 30,
             "compile_max_cost_per_file_usd": 2.5,
-            "compile_skip_substrate_types": [],
+            "compile_skip_substrate_types": ["email-delta"],
         },
     }), encoding="utf-8")
 
@@ -296,7 +298,7 @@ def test_migrate_list_removals_idempotent():
     data: dict = {
         "limits": {
             "compile_force_long_context_types": [],
-            "compile_skip_substrate_types": [],
+            "compile_skip_substrate_types": ["email-delta"],
         },
     }
     changes = m.migrate_list_removals(data)

@@ -105,7 +105,7 @@ KEY_ADDITIONS: dict[str, dict[str, object]] = {
         # moved out of the skip-list once compile_calendar.md prompt
         # shipped). Last-resort escape hatch for substrate types with
         # no good prompt yet.
-        "compile_skip_substrate_types": [],
+        "compile_skip_substrate_types": ["email-delta"],
     },
     "piggybacks": {
         # M006 calendar collector — mirrors gmeet / jamie 6 h cadence.
@@ -136,10 +136,13 @@ KEY_ADDITIONS: dict[str, dict[str, object]] = {
 # elements are left untouched. Missing parent block / missing key falls
 # through to KEY_ADDITIONS for first-time injection.
 LIST_ADDITIONS: dict[str, list[object]] = {
-    # No active list-additions right now. The 2026-05-16-morning entry
-    # adding `calendar-rollup` to `compile_force_long_context_types`
-    # was reverted later the same day after substrate-aware prompt
-    # dispatch landed — see LIST_REMOVALS for the cleanup migration.
+    # 2026-05-16: add `email-delta` to the skip-list. These 14-line
+    # metadata files have no compile-extractable knowledge (actual
+    # content arrives via curiosity/email-deep-scan); compile_main.md
+    # was burning $2+ per file. Both new vaults (greenfield default)
+    # and existing vaults (where the skip-list was emptied earlier
+    # today) get the entry via this list-extend.
+    "limits.compile_skip_substrate_types": ["email-delta"],
 }
 
 # Elements to REMOVE from existing list-valued config entries. The
