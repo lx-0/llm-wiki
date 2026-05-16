@@ -282,7 +282,18 @@ def generate_batch_report(results: list[dict]) -> str:
     keeps = [r for r in results if r["meta"].get("relevance") == "keep"]
     ephemerals = len(results) - len(keeps)
 
+    # Frontmatter `type: screenshot-batch` lets compile.py dispatch via
+    # SUBSTRATE_PROMPTS to the lean compile_screenshots prompt + Haiku,
+    # instead of falling through to compile_main.md (which hits max_turns
+    # at $5+/file on 50-screenshot batches — see KNOWLEDGE.md
+    # "substrate-prompt mismatch on screenshot batches" 2026-05-16).
     lines = [
+        "---",
+        "type: screenshot-batch",
+        f"generated: {now_iso()}",
+        f"screenshot_count: {len(results)}",
+        "---",
+        "",
         f"# Screenshot Batch — {now_iso()}",
         "",
         f"Processed {len(results)} screenshots with {MODEL} via {CONFIG.models.ollama_url}.",

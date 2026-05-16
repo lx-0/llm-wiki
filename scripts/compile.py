@@ -300,7 +300,37 @@ SUBSTRATE_PROMPTS: dict[str, tuple[str, int, str | None]] = {
     # re-Read / prose-branch Timeline appends. Empirical: budget=6
     # consistently hit max_turns on 2026-05-16 batch.
     "health-rollup":   ("compile_health", 10, "claude-haiku-4-5-20251001"),
+    # Screenshot batches: 50-screenshot reports with per-frame summaries
+    # + table-of-contents. compile_main.md hit max_turns at $5+/file
+    # on 2026-05-15 (49 screenshots → many concept-page Edits). Lean
+    # prompt focuses on concept-extraction + source_screenshots tagging.
+    # Haiku at 15 turns expected to fit comfortably; the source is
+    # routinely 50-100 KB but Haiku 4.5 has 200K context.
+    "screenshot-batch": ("compile_screenshots", 20, "claude-haiku-4-5-20251001"),
 }
+
+
+# Path-prefix → substrate_key fallback for legacy substrate files that
+# don't carry the new `type:` frontmatter yet. Producers SHOULD emit a
+# frontmatter type going forward (so SUBSTRATE_PROMPTS lookup hits the
+# direct path), but until every existing vault file is backfilled the
+# path-pattern fallback keeps compile-dispatch sane. Pattern: matched
+# against the source path with `startswith`. Longer-prefix wins on
+# overlap; iterate from most-specific to least-specific.
+_SUBSTRATE_PATH_FALLBACKS: tuple[tuple[str, str], ...] = (
+    ("raw/notes/screenshots/screenshots-", "screenshot-batch"),
+)
+
+
+def _substrate_key(source_content: str, rel_path: str) -> str | None:
+    """Dispatch key for SUBSTRATE_PROMPTS: frontmatter type, else path-pattern."""
+    t = _frontmatter_type(source_content)
+    if t:
+        return t
+    for prefix, key in _SUBSTRATE_PATH_FALLBACKS:
+        if rel_path.startswith(prefix):
+            return key
+    return None
 
 
 def _category_badge(rel_path: str) -> str:
@@ -403,9 +433,15 @@ async def compile_file(
     # compile architecture (P2)". Each entry maps frontmatter `type:`
     # to a (prompt_name, max_turns_override) tuple. Unmapped types fall
     # through to compile_main + default max_turns.
+    # Dispatch key: frontmatter `type:` if present, else path-pattern
+    # fallback for legacy substrates (e.g. screenshot batches that
+    # predate the type-frontmatter migration). source_type is also kept
+    # for downstream force-long-context checks (which still match on
+    # YAML type only).
     source_type = _frontmatter_type(source_content)
+    dispatch_key = _substrate_key(source_content, rel_path)
     substrate_prompt, substrate_max_turns, substrate_model = SUBSTRATE_PROMPTS.get(
-        source_type or "", ("compile_main", None, None),
+        dispatch_key or "", ("compile_main", None, None),
     )
     if substrate_prompt != "compile_main":
         # Truncate model id for readability: "claude-haiku-4-5-20251001"
@@ -463,14 +499,29 @@ async def compile_file(
     # precedence over compile_model default. Used to route lean
     # mechanical prompts (calendar, daily) to Haiku for 6× cost
     # reduction — these don't need Opus reasoning depth.
+    # Model precedence (high → low):
+    #   1. substrate_model from SUBSTRATE_PROMPTS — dedicated lean prompt
+    #      knows its workload, no escalation needed even for big sources.
+    #      Haiku 4.5 handles 100KB+ sources at 200K context.
+    #   2. force-long-context tier (substrates still on compile_main that
+    #      legitimately need [1m]; default list is empty).
+    #   3. size-based escalation (50KB+ → [1m]) — only for compile_main
+    #      route, since size-fan-out is what blew the 200K window for the
+    #      generic prompt.
+    #   4. CONFIG.models.compile_model default.
+    # Before 2026-05-16-evening, size-escalation overrode substrate_model
+    # and bumped lean-prompt files to Opus[1m] anyway → screenshot batch
+    # at 64KB hit max_turns at $5+/file with the wrong model.
     model = substrate_model or CONFIG.models.compile_model
-    # source_type was already resolved above for prompt dispatch — reuse.
     force_long_ctx = (
         source_type is not None
         and source_type in CONFIG.limits.compile_force_long_context_types
         and CONFIG.models.compile_large_source_model
     )
-    if force_long_ctx:
+    if substrate_model:
+        # Substrate-specific model wins; don't escalate.
+        pass
+    elif force_long_ctx:
         model = CONFIG.models.compile_large_source_model
         log.info(
             "  type=%s — forcing %s (substrate fans out into knowledge/ during compile)",
