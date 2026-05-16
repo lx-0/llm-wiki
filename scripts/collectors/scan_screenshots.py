@@ -53,11 +53,6 @@ TIMEOUT = float(CONFIG.limits.screenshot_timeout_seconds)
 
 TZ = ZoneInfo(TIMEZONE)
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s  %(levelname)s  %(message)s",
-    datefmt="%Y-%m-%dT%H:%M:%S",
-)
 log = logging.getLogger("scan-screenshots")
 
 from core.prompts import render  # noqa: E402
@@ -614,4 +609,14 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    # Module-level basicConfig was polluting the root logger whenever
+    # `collectors/__init__.py` import-chained into this module — flush.py's
+    # subsequent basicConfig became a no-op, silently shunting all its
+    # logging to stderr (and to DEVNULL when spawned as a piggyback). Keep
+    # logging setup local to the standalone-script entry point.
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s  %(levelname)s  %(message)s",
+        datefmt="%Y-%m-%dT%H:%M:%S",
+    )
     main()
