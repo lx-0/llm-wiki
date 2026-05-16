@@ -407,6 +407,27 @@ def _frontmatter_compile_role(content: str) -> str | None:
     return m.group(1) if m else None
 
 
+def _frontmatter_field(content: str, key: str) -> str | None:
+    """Extract a scalar frontmatter field value by key, or None.
+
+    Generic sibling to `_frontmatter_type`. Tolerates quoted values (`"`, `'`)
+    and trailing whitespace; matches first occurrence of `<key>:` inside the
+    leading `---` fence. Designed for title-like scalars — does NOT parse
+    nested structures or lists (use yaml.safe_load for those).
+    """
+    if not content.startswith("---"):
+        return None
+    end = content.find("\n---", 3)
+    if end == -1:
+        return None
+    block = content[3:end]
+    import re
+    # Allow any non-newline chars in the value (spaces, punctuation, etc.)
+    pattern = rf"^{re.escape(key)}:\s*[\"']?(.*?)[\"']?\s*$"
+    m = re.search(pattern, block, re.MULTILINE)
+    return m.group(1).strip() if m else None
+
+
 async def compile_file(
     source: Path,
     dry_run: bool = False,
@@ -460,8 +481,40 @@ async def compile_file(
             "  skipping: compile_role=final-only (hand-curated, engine-skip)",
         )
         return {"_skipped": "compile_role_final_only"}
-    # source-and-final + source-only fall through to current distill behavior;
-    # T02 changes source-and-final to the index-only branch.
+    if compile_role == "source-and-final":
+        # The page IS the final form. Index-only: extract wikilinks for
+        # discoverability, append a knowledge/index.md entry by pathname,
+        # NO SDK distill call, NO separate knowledge/concepts/<title>.md.
+        # (M007-S02-T02. Connections-build deferred — Obsidian Graph
+        # picks up the wikilinks natively in the meantime.)
+        from core.utils import build_index_entry, extract_wikilinks
+        wikilinks = extract_wikilinks(source_content)
+        log.info(
+            "  source-and-final: indexing only (no distill) — %d wikilinks discovered",
+            len(wikilinks),
+        )
+        title = (
+            _frontmatter_field(source_content, "title")
+            or source.stem.replace("-", " ").replace("_", " ").title()
+        )
+        new_entry = build_index_entry(
+            rel_path, title, "(source-and-final)", today_iso(),
+        )
+        if INDEX_FILE.exists():
+            existing = INDEX_FILE.read_text(encoding="utf-8")
+            link_marker = f"[[{rel_path.replace('.md', '')}]]"
+            if link_marker not in existing:
+                with INDEX_FILE.open("a", encoding="utf-8") as f:
+                    f.write(f"\n{new_entry}")
+                log.info("  added to knowledge/index.md")
+            else:
+                log.info("  already in knowledge/index.md (no-op)")
+        else:
+            log.warning(
+                "  knowledge/index.md missing — cannot index source-and-final file",
+            )
+        return {"_skipped": "compile_role_source_and_final_indexed"}
+    # source-only falls through to current distill behavior (unchanged).
 
     # Substrate-type skip: some substrates are structurally a poor fit for
     # the generic compile_main.md prompt (calendar metadata has no dialog
