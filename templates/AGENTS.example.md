@@ -144,6 +144,7 @@ knowledge/
 ├── qa/               # Filed query answers                  (type: qa)
 ├── people/           # Person pages (one per person)        (type: person)
 ├── projects/         # Project pages (one per project)      (type: project)
+├── areas/            # Ongoing responsibilities (no end)    (type: area)
 ├── facts/            # Hard facts (human-owned, override sources)  (type: fact)
 └── MOCs/             # Curated topic hubs (human-curated)   (type: moc)
 ```
@@ -153,7 +154,7 @@ Each article in `knowledge/` carries this YAML frontmatter:
 ```yaml
 ---
 title: "Article Title"
-type: concept | connection | qa | person | project | moc | fact
+type: concept | connection | qa | person | project | area | moc | fact
 compiled_from: "raw/articles/some-source.md"   # or list[] for multi-source
 created: 2026-04-01
 updated: 2026-05-02
@@ -431,6 +432,65 @@ updated: 2026-04-08
 
 Rules: same as People Articles (above) — see `prompts/compile_main.md` Instruction 3 for the canonical contract.
 
+### Area Articles (`knowledge/areas/`)
+
+One page per ongoing responsibility (CEO-Hat, llm-wiki Maintenance, Personal
+Health Tracking, Apartment Logistics, ...). Areas differ from Projects in
+that they have no finish line — they accrete Open Threads indefinitely and
+retire only when the role itself ends.
+
+```markdown
+---
+title: "Area Name"
+type: area
+status: active        # active | dormant | retired
+tags: [domain]
+created: 2026-05-16
+updated: 2026-05-16
+last_synthesized: 2026-05-16
+---
+
+# Area Name
+
+> One-paragraph: what this responsibility covers, why it exists, who else
+> (if anyone) shares it.
+
+## Current State
+- **Cadence:** ad-hoc / weekly / daily
+- **Active surfaces:** dashboard, daily digest, ...
+- **Health:** green | yellow | red
+
+## Open Threads
+- Long-running blocked / waiting items (areas accumulate these indefinitely;
+  projects close them).
+
+## Action Items
+- [ ] Owned commitment 📅 2026-06-01
+
+## Related
+- [[knowledge/projects/some-project]]
+- [[knowledge/people/some-collaborator]]
+
+---
+
+## Timeline
+- **2026-05-16** | Area created.
+```
+
+**Rules:**
+
+- **`status:` is mandatory** and must be one of `active | dormant | retired`
+  (enforced by lint `check_area_status`). Distinct from project status — no
+  `planning`, `in-progress`, or `done`.
+- **No `deadline:` frontmatter** — areas have no finish line by definition.
+- **Open Threads are first-class.** Areas are where long-running threads tied
+  to a *role* live (e.g. "as CEO, I'm waiting on..."). Projects close threads;
+  areas keep them.
+- **Retired** ≈ archived; the page stays as historical record.
+- **Picking project vs. area:** has a finish line → project; ongoing → area.
+  If both apply, the area owns the long-term, the project owns the current
+  push.
+
 ---
 
 ## Core Operations
@@ -659,7 +719,7 @@ All LLM prompts live as standalone `.md` files under `<vault>/.wiki/prompts/`. S
 ├── knowledge/                     # Compiled knowledge (LLM-owned)
 │   ├── index.md
 │   ├── log.md
-│   └── concepts/, connections/, qa/, people/, projects/
+│   └── concepts/, connections/, qa/, people/, projects/, areas/, facts/, MOCs/
 ├── inbox/                         # Transient: drop files here for classification
 └── .wiki/                         # Engine — installed by install.sh
     ├── wiki                       # CLI entry point

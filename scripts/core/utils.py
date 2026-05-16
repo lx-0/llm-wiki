@@ -15,6 +15,7 @@ from pathlib import Path
 import yaml
 
 from .paths import (
+    AREAS_DIR,
     CONCEPTS_DIR,
     CONNECTIONS_DIR,
     DAILY_DIR,
@@ -142,7 +143,7 @@ def wiki_article_exists(link: str) -> bool:
 
 # ── Wiki content helpers ──────────────────────────────────────────────
 
-WIKI_SUBDIRS = [CONCEPTS_DIR, CONNECTIONS_DIR, QA_DIR, PEOPLE_DIR, PROJECTS_DIR, FACTS_DIR]
+WIKI_SUBDIRS = [CONCEPTS_DIR, CONNECTIONS_DIR, QA_DIR, PEOPLE_DIR, PROJECTS_DIR, AREAS_DIR, FACTS_DIR]
 
 
 def read_wiki_index() -> str:

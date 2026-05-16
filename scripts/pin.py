@@ -13,6 +13,7 @@ The target MOC is auto-derived from the article's `type:` frontmatter:
     type: connection  → knowledge/MOCs/connections.md
     type: person      → knowledge/MOCs/people.md
     type: project     → knowledge/MOCs/projects.md
+    type: area        → knowledge/MOCs/areas.md
     type: qa          → knowledge/MOCs/qa.md
 Override with --moc.
 
@@ -41,6 +42,7 @@ TYPE_TO_MOC = {
     "connection": "connections",
     "person": "people",
     "project": "projects",
+    "area": "areas",
     "qa": "qa",
 }
 
