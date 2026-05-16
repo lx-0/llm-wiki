@@ -933,6 +933,7 @@ async def main() -> None:
     cost_at_start = total_cost  # for history-event cost_delta
     compiled_count = 0
     failed_count = 0
+    skipped_count = 0
     consecutive_failures = 0
     recent_failures: list[FailureClass] = []
     aborted = False
@@ -952,12 +953,15 @@ async def main() -> None:
             )
             break
 
-        prefix = f"[{compiled_count + failed_count + 1}/{cap}] "
+        prefix = f"[{idx}/{cap}] "
         result = await compile_file(source, prefix=prefix, force=force_compile)
         if result is not None and "_skipped" in result:
-            # Skipped (empty file, dry-run): neither success nor failure.
-            # Don't touch counters — preserves the consecutive-failure streak
-            # across legitimate skips so abort thresholds reflect real failures.
+            # Skipped (empty file, dry-run, substrate-type skip-list): neither
+            # success nor failure. Don't touch the failure-streak counter — it
+            # tracks real failures for abort thresholds. Count separately for
+            # the summary so "pending" doesn't lie when the operator's
+            # skip-list quietly drained the batch.
+            skipped_count += 1
             continue
         if result is None or "_failure" in result:
             failed_count += 1
@@ -1057,13 +1061,18 @@ async def main() -> None:
         )
 
     outcome = f"ABORTED ({abort_reason or 'unknown'})" if aborted else "complete"
-    pending = len(files) - compiled_count - failed_count
+    # `pending` = files the batch never reached (--max-files cutoff, abort, etc.).
+    # Skipped files were processed-and-intentionally-dropped (skip-list, empty,
+    # dry-run) and are NOT pending — surface them separately so the summary
+    # doesn't read "0 done · 10 pending" after a clean run that only saw
+    # skip-list hits.
+    pending = len(files) - compiled_count - failed_count - skipped_count
     elapsed_min, elapsed_sec = divmod(int(time.time() - run_started), 60)
     run_cost = (run_input_tokens * 5.0 + run_output_tokens * 25.0) / 1_000_000
     log.info("─── compilation %s ───", outcome)
     log.info(
-        "  files:   %d done · %d failed · %d pending of %d candidates",
-        compiled_count, failed_count, pending, len(files),
+        "  files:   %d done · %d failed · %d skipped · %d pending of %d candidates",
+        compiled_count, failed_count, skipped_count, pending, len(files),
     )
     log.info(
         "  tokens:  in:%s · out:%s · this run",
