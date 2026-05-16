@@ -192,6 +192,17 @@ def main() -> None:
     article = _resolve_article(args.article)
     fm = _parse_frontmatter(article.read_text(encoding="utf-8"))
 
+    # Refuse to pin archived (compile_role: final-only) articles. They're
+    # intentionally hidden from active surfaces (dashboard, MOC auto-include,
+    # `wiki query` default scope). Pinning would surface them anyway — operator
+    # should un-archive first if that's really what they want. (M007-S03-T02.)
+    if fm.get("compile_role") == "final-only":
+        sys.exit(
+            f"refuse to pin: {article.relative_to(ROOT_DIR)} has "
+            "compile_role: final-only (archived; hidden from active surfaces). "
+            "Edit the file's frontmatter to remove that role first."
+        )
+
     if args.moc:
         moc_name = args.moc.removesuffix(".md")
     else:

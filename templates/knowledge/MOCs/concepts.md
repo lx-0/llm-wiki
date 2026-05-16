@@ -12,5 +12,5 @@ everything in `knowledge/concepts/` automatically.
 ```dataview
 LIST
 FROM "knowledge/concepts"
-SORT file.name ASC
+WHERE compile_role != "final-only"SORT file.name ASC
 ```

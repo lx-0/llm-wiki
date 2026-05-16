@@ -12,5 +12,5 @@ pin active projects; the Dataview block below picks up everything in
 ```dataview
 LIST
 FROM "knowledge/projects"
-SORT file.name ASC
+WHERE compile_role != "final-only"SORT file.name ASC
 ```

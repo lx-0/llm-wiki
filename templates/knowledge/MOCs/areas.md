@@ -13,5 +13,5 @@ in `knowledge/areas/` automatically.
 ```dataview
 LIST
 FROM "knowledge/areas"
-SORT file.name ASC
+WHERE compile_role != "final-only"SORT file.name ASC
 ```
