@@ -594,10 +594,6 @@ async def compile_file(
         source_content=source_content,
         today=today,
         now=now,
-        # author-attribution fallback (2026-05-16) — null/empty when the
-        # operator hasn't set it, in which case the prompt's
-        # multi-tenant-safety branch leaves unattributed beliefs generic.
-        implicit_operator_author=CONFIG.personal.implicit_operator_author or "",
     )
 
     # Pre-flight guard: assembled prompt + later tool-turns must fit Opus's
@@ -691,6 +687,23 @@ async def compile_file(
     else:
         max_turns_for_call = CONFIG.limits.compile_max_turns
 
+    # Unconditional size-warning at 60 KB — independent of the model-escalation
+    # log line above (which only fires when compile_large_source_model is set
+    # AND the source crosses compile_large_source_chars). The 60 KB threshold
+    # matches the empirically-observed failure boundary in
+    # `.ytstack/backlog/compile-60kb-plus-silent-fail.md`: 35 KB compiles
+    # cleanly, 60 KB+ enters the silent-fail / kind=unknown class. Even when
+    # the source eventually compiles fine, the operator gets one ledger line
+    # naming the file before the multi-minute SDK call starts.
+    if len(source_content) >= 60_000:
+        log.info(
+            "  size warning: %d chars (%.1f KB) — entering known-fragile "
+            "size class; SDK call may take 5-15 min or fail kind=unknown "
+            "(per-call timeout: %ds)",
+            len(source_content), len(source_content) / 1024,
+            CONFIG.limits.compile_per_call_timeout_s,
+        )
+
     async def _attempt(model_id: str) -> tuple[dict, FailureClass | None]:
         total_input_tokens = 0
         total_output_tokens = 0
@@ -704,8 +717,15 @@ async def compile_file(
         final_result: "ResultMessage | None" = None
         started = time.time()
         capture = StderrCapture()
+        # Per-message stall timeout. Wrapping the whole `async for` in a
+        # single `asyncio.wait_for` would cut off legitimate long compiles
+        # (we've seen single files succeed at 13 min). Per-message timeout
+        # only triggers when the bundled CLI subprocess has actually gone
+        # silent — see `.ytstack/backlog/compile-per-call-timeout.md`
+        # and KNOWLEDGE.md "hang vs crash". Set 0 to disable.
+        per_call_timeout = CONFIG.limits.compile_per_call_timeout_s
         try:
-            async for message in query(
+            agen = query(
                 prompt=prompt,
                 options=ClaudeAgentOptions(
                     max_buffer_size=CONFIG.limits.sdk_max_buffer_size_mb * 1024 * 1024,
@@ -736,13 +756,60 @@ async def compile_file(
                     setting_sources=["project"],
                     stderr=capture.callback,
                 ),
-            ):
+            ).__aiter__()
+            while True:
+                try:
+                    if per_call_timeout and per_call_timeout > 0:
+                        message = await asyncio.wait_for(
+                            agen.__anext__(), timeout=per_call_timeout
+                        )
+                    else:
+                        message = await agen.__anext__()
+                except StopAsyncIteration:
+                    break
                 if isinstance(message, AssistantMessage) and message.usage:
                     total_input_tokens += message.usage.get("input_tokens", 0)
                     total_output_tokens += message.usage.get("output_tokens", 0)
                 if isinstance(message, ResultMessage):
                     final_result = message
                     result_text = message.result or ""
+        except asyncio.TimeoutError:
+            # Per-message stall — bundled CLI subprocess went silent for
+            # longer than compile_per_call_timeout_s. Treat as a hang
+            # (separate failure class from crash). Try to clean up the
+            # iterator so the subprocess gets SIGTERM'd; if the SDK
+            # doesn't honor cancel, the kernel reaps on process exit.
+            elapsed = time.time() - started
+            log.warning(
+                "  compile_file ⏱ per-call timeout after %.1fs (no messages "
+                "for %ds) — bundled CLI hung; skipping file (consecutive-"
+                "failure budget preserved). model=%s source=%s (%d chars).",
+                elapsed, per_call_timeout, model_id, rel_path, len(source_content),
+            )
+            try:
+                aclose = getattr(agen, "aclose", None)
+                if aclose is not None:
+                    await aclose()
+            except Exception:  # noqa: BLE001 — best-effort cleanup
+                pass
+            capture.dump_to(log)
+            # Log via the same SDK-failure path so *-errors.log still
+            # records the hang for forensics, but flag it as a non-fatal
+            # timeout so the outer skip-and-flag block routes to _skipped.
+            log_sdk_failure(
+                log,
+                label="compile_file",
+                source=rel_path,
+                model=model_id,
+                input_chars=len(source_content),
+                started=started,
+                capture=capture,
+                exc=TimeoutError(
+                    f"per-call timeout after {elapsed:.1f}s "
+                    f"(per_call_timeout={per_call_timeout}s)"
+                ),
+            )
+            return {}, FailureClass("timeout", f"per-call stall after {elapsed:.1f}s")
         except Exception as exc:
             # Bundled CLI exited non-zero. If a structured ResultMessage
             # arrived just before the exception, it carries the actual
@@ -890,6 +957,13 @@ async def compile_file(
             long_ctx_model,
         )
         success, failure = await _attempt(long_ctx_model)
+        # Update `model` so the downstream skip-and-flag block can detect
+        # "already on long-context model" and route to _skipped instead of
+        # _failure. Without this, the retry's kind=unknown falls through to
+        # a hard failure and burns the consecutive-failure budget on a
+        # structurally-unprocessable file — the exact pattern that motivated
+        # `.ytstack/backlog/compile-already-on-1m-fallback.md`.
+        model = long_ctx_model
     elif (
         failure is not None
         and failure.kind == "unknown"
@@ -905,6 +979,15 @@ async def compile_file(
     # Treats as a survivable skip rather than a hard failure so the batch
     # makes progress; consecutive-failure budget is preserved for genuine
     # systemic outages (rate_limit cascades, auth, network).
+    # Per-call timeout always converts to _skipped (independent of
+    # compile_skip_on_long_context_unknown). The timeout is a HANG signal —
+    # one stuck bundled CLI subprocess, not a structural unknown — and the
+    # operator opt-out for the kind=unknown skip semantics doesn't generalise:
+    # treating a timeout as a hard failure would burn the 3-strike consecutive-
+    # failure budget on a transient symptom.
+    if failure is not None and failure.kind == "timeout":
+        return {"_skipped": "compile_per_call_timeout"}
+
     if failure is not None and CONFIG.limits.compile_skip_on_long_context_unknown:
         if failure.kind == "max_turns":
             log.warning(

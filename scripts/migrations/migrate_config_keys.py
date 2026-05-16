@@ -35,6 +35,7 @@ Key changes covered (chronological):
   limits.flush_assistant_text_budget_chars (added 2026-05-16, default 50_000 — replaces MAX_CONTEXT_CHARS=15_000)
   limits.flush_user_text_budget_chars      (added 2026-05-16, default 10_000)
   limits.flush_tool_summary_budget_chars   (added 2026-05-16, default 10_000)
+  limits.compile_per_call_timeout_s        (added 2026-05-16, default 600 — per-call timeout for compile SDK invocations)
   personal.implicit_operator_author        (added 2026-05-16, default None — author-attribution fallback for single-tenant vaults)
 
 Idempotent: a config already on the current schema produces no change.
@@ -123,6 +124,13 @@ KEY_ADDITIONS: dict[str, dict[str, object]] = {
         "flush_assistant_text_budget_chars": 50_000,
         "flush_user_text_budget_chars": 10_000,
         "flush_tool_summary_budget_chars": 10_000,
+        # Per-compile-call timeout (seconds). Guards against bundled-CLI
+        # HANG (vs crash — crashes already retry/abort). One stuck file
+        # otherwise blocks every remaining file in the batch. On timeout:
+        # log WARNING, _skipped (preserves consecutive-failure budget).
+        # Match Limits.compile_per_call_timeout_s default in
+        # `scripts/core/config.py`.
+        "compile_per_call_timeout_s": 600,
     },
     "piggybacks": {
         # M006 calendar collector — mirrors gmeet / jamie 6 h cadence.

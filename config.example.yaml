@@ -210,6 +210,13 @@ limits:
   compile_skip_substrate_types: ["email-delta"]
   # Surface an INFO line when source ≥ this many chars (logging signal only).
   compile_large_source_chars: 50000
+  # Per-compile-call timeout (seconds). Guards against the bundled CLI
+  # subprocess HANGING (vs crashing — crashes already retry/abort). One
+  # stuck file otherwise blocks every remaining file in the batch. On
+  # timeout: log WARNING, skip the file (preserves consecutive-failure
+  # budget). 600 s = 10 min covers known legitimate long compiles; lower
+  # it if your sources are smaller. Set 0 to disable.
+  compile_per_call_timeout_s: 600
   # Retry once with `models.compile_large_source_model` on kind=unknown
   # (the silent exit-1 / empty-stderr signature of mid-stream context
   # overflow from tool-turn fan-out into knowledge/). Catches the

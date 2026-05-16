@@ -251,6 +251,20 @@ class Limits:
     # extra INFO line so the operator can see *which* file was big when
     # the SDK call slows down. Pure logging signal, no behavior change.
     compile_large_source_chars: int = 50_000
+    # Per-compile-call timeout (seconds). Wraps the `async for message in
+    # query(...)` iterator with `asyncio.wait_for`. When the bundled CLI
+    # subprocess hangs (vs crashes — see KNOWLEDGE.md "hang vs crash"),
+    # there is no upper bound without this guard: the parent waits forever
+    # and one stuck file blocks every remaining file in the batch.
+    # Observed 2026-05-10: PID 66620 sat in `SN` state for 2 h+ with the
+    # parent python waiting on its stdout, blocking 80 remaining files.
+    # 600 s (10 min) is generous enough for legitimate long compiles
+    # (largest known good case so far: ~13 min on a dense gmeet) and
+    # short enough to abort a true hang within an operator-noticeable
+    # window. On timeout: log WARNING, return `_skipped:
+    # compile_per_call_timeout`, preserve the consecutive-failure budget
+    # so a single hang doesn't kill the whole batch. Set to 0 to disable.
+    compile_per_call_timeout_s: int = 600
     # Retry once with `compile_large_source_model` (the 1M-context Opus
     # variant) when a compile call returns kind=unknown — the silent
     # exit-1 / empty-stderr signature of mid-stream context overflow from
