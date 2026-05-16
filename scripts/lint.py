@@ -705,6 +705,44 @@ def check_facts_violations() -> list[dict]:
     return issues
 
 
+# ── compile_role enum validation (M007-S01-T03) ─────────────────────
+
+from core.compile_role import VALID_ROLES as _COMPILE_ROLE_VALID  # noqa: E402
+
+
+def check_compile_role() -> list[dict]:
+    """Reject frontmatter `compile_role:` values not in VALID_ROLES.
+
+    Walks every `.md` under raw/, daily/, knowledge/, inbox/. Files that omit
+    `compile_role:` get no issue (default-by-location inference handles them
+    at compile time per `scripts.core.compile_role.infer_compile_role`).
+
+    Cross-location-move warning (slice plan mentions detecting renames across
+    top-level boundaries without explicit override) is deferred — needs
+    git-history walk, tracked as follow-up.
+    """
+    issues: list[dict] = []
+    inbox_dir = ROOT_DIR / "inbox"
+    roots = [RAW_DIR, DAILY_DIR, KNOWLEDGE_DIR, inbox_dir]
+    for root in roots:
+        if not root.exists():
+            continue
+        for md in root.rglob("*.md"):
+            fm = _read_frontmatter(md)
+            role = fm.get("compile_role")
+            if role is None:
+                continue
+            if role not in _COMPILE_ROLE_VALID:
+                rel = str(md.relative_to(ROOT_DIR))
+                valid_list = ", ".join(sorted(_COMPILE_ROLE_VALID))
+                issues.append(issue(
+                    "error", "compile_role_invalid", rel,
+                    f"`compile_role: {role!r}` is not a valid value. "
+                    f"Allowed: {valid_list}.",
+                ))
+    return issues
+
+
 # ── LLM contradiction check ─────────────────────────────────────────
 
 from core.prompts import render  # noqa: E402
@@ -837,6 +875,7 @@ async def main() -> None:
         ("Daily consistency", check_daily_consistency),
         ("Sparse articles", check_sparse_articles),
         ("Facts violations", check_facts_violations),
+        ("Compile role enum", check_compile_role),
     ]
 
     for name, check_fn in checks:
