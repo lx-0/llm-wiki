@@ -407,7 +407,12 @@ def _default_piggybacks() -> dict[str, PiggybackTask]:
         "review_wiki": PiggybackTask(cooldown_hours=168),
         "optimize_claude_md": PiggybackTask(cooldown_hours=24),
         "screenshots": PiggybackTask(cooldown_hours=24, max_per_run=50),
-        "curiosity_followup": PiggybackTask(cooldown_hours=24),
+        # Drain rate: max_per_run × (24/cooldown_hours) = 5 × 4 = 20/day.
+        # Producer can generate ~3 requests per compiled source; at typical
+        # batch sizes the consumer keeps up without falling behind.
+        # cooldown_hours=6 sized so 4 fires/day; max_per_run=5 batched per
+        # fire to amortize mailbox-scan overhead while staying observable.
+        "curiosity_followup": PiggybackTask(cooldown_hours=6, max_per_run=5),
         "jamie": PiggybackTask(cooldown_hours=6, max_per_run=20),
         "gmeet": PiggybackTask(cooldown_hours=6, max_per_run=20),
         "calendar": PiggybackTask(cooldown_hours=6, max_per_run=500),

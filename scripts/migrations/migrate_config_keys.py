@@ -31,6 +31,7 @@ Key changes covered (chronological):
   limits.compile_skip_substrate_types     (added 2026-05-16, default [] — substrate-skip-list for batch mode)
   limits.compile_force_long_context_types ← list-prune calendar-rollup AND daily-digest (2026-05-16 P2, dedicated prompts shipped)
   limits.compile_skip_substrate_types     ← list-prune calendar-rollup (2026-05-16 P2, compile_calendar.md ships)
+  piggybacks.curiosity_followup           (added 2026-05-16, default cooldown 6h / max 5 — never injected by original 2026-05-13 rollout, requests accumulated)
 
 Idempotent: a config already on the current schema produces no change.
 
@@ -113,6 +114,16 @@ KEY_ADDITIONS: dict[str, dict[str, object]] = {
         # state. An account without a kind=google-calendar sub-block silently
         # skips the run.
         "calendar": {"enabled": True, "cooldown_hours": 6, "max_per_run": 500},
+        # 2026-05-16: curiosity-consumer piggyback. Producer (compile.py)
+        # writes raw/requests/request-*.json after every compile;
+        # consumer (curiosity/cli.py --run-batch N) processes them via
+        # mailbox scan. Backlog-corrective default — drains 20/day
+        # (max_per_run × 4 fires) which beats the typical generation rate
+        # without thundering-herd on long backlogs.
+        # Was missed by the original P2 rollout of curiosity-consumer-gap;
+        # operator configs from before 2026-05-16 have NO curiosity_followup
+        # block at all, so requests accumulate in raw/requests/ forever.
+        "curiosity_followup": {"enabled": True, "cooldown_hours": 6, "max_per_run": 5},
     },
 }
 

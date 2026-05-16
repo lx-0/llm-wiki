@@ -80,7 +80,10 @@ _LEGACY_PIGGYBACK_COMMANDS: dict[str, list[str]] = {
     "review_wiki": ["review-wiki.py"],
     "optimize_claude_md": ["optimize-claude-md.py"],
     "retry_failed_flushes": ["retry-failed-flushes.py", "--limit", "{max_per_run}"],
-    "curiosity_followup": ["curiosity/cli.py", "--run-oldest"],
+    # Drain N oldest requests per fire (configurable via max_per_run).
+    # Steady-rate beats --run-oldest (1/fire) for keeping ahead of the
+    # producer when compile runs on many sources at once.
+    "curiosity_followup": ["curiosity/cli.py", "--run-batch", "{max_per_run}"],
     # Distills yesterday's per-source captures under daily/<yesterday>/ into
     # a tight ≤500-word digest at daily/<yesterday>.md. Runs morning-after so
     # all collector piggybacks have already landed their per-source files.

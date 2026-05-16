@@ -130,6 +130,31 @@ def _run_all(*, dry_run: bool) -> NoReturn:
     sys.exit(0 if fails == 0 else 2)
 
 
+def _run_batch(n: int, *, dry_run: bool) -> NoReturn:
+    """Process the N oldest pending requests in one invocation.
+
+    Used by the `curiosity_followup` flush-piggyback to drain the
+    backlog at a steady rate (cooldown × N per day) without the
+    thundering-herd risk of `--run-all` on accumulated backlogs.
+    """
+    pending = email_backend.list_pending(REQUESTS_DIR)
+    if not pending:
+        log.info("No pending curiosity requests.")
+        sys.exit(0)
+    batch = pending[:n]
+    log.info("Running batch of %d (of %d pending total)…", len(batch), len(pending))
+    fails = 0
+    for p in batch:
+        log.info("→ %s", p.name)
+        if not _dispatch(p, dry_run=dry_run):
+            fails += 1
+    log.info(
+        "Batch done. %d failed, %d processed, %d still pending.",
+        fails, len(batch) - fails, len(pending) - len(batch),
+    )
+    sys.exit(0 if fails == 0 else 2)
+
+
 def _clear_done() -> NoReturn:
     removed = 0
     for p in _all_requests():
@@ -152,6 +177,7 @@ def main() -> int:
     group.add_argument("--run-oldest", action="store_true", help="run the oldest pending request")
     group.add_argument("--run", metavar="SLUG", help="run one request by slug substring")
     group.add_argument("--run-all", action="store_true", help="run every pending request")
+    group.add_argument("--run-batch", metavar="N", type=int, help="run the N oldest pending requests (drain at steady rate)")
     group.add_argument("--clear-done", action="store_true", help="delete request files with status: done")
     parser.add_argument("--dry-run", action="store_true", help="plan only, do not touch the mailbox or write output")
     args = parser.parse_args()
@@ -164,6 +190,11 @@ def main() -> int:
         _run_oldest(dry_run=args.dry_run)
     if args.run_all:
         _run_all(dry_run=args.dry_run)
+    if args.run_batch is not None:
+        if args.run_batch < 1:
+            log.error("--run-batch N requires N >= 1, got %d", args.run_batch)
+            sys.exit(2)
+        _run_batch(args.run_batch, dry_run=args.dry_run)
     if args.run:
         _run_one(args.run, dry_run=args.dry_run)
     return 0

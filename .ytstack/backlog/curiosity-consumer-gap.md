@@ -3,10 +3,13 @@ created: 2026-05-13
 status: shipped
 priority: high
 resolved: 2026-05-13
+re-resolved: 2026-05-16
 related: .ytstack/backlog/curiosity-dashboard.md, .ytstack/backlog/architecture-deepening.md
 ---
 
 > **Resolved 2026-05-13:** Option B shipped. `scripts/curiosity/` Sub-Package mirrors `suggestions/`: `producer.py` (extrahiert aus `compile.py`), `cli.py` (Operator-CLI `wiki curiosity`), `backends/email.py` (verarbeitet `email-deep-scan` Requests via existing Mailbox-adapter `scan_deep`). Piggyback `curiosity_followup` (24h cooldown) ruft `--run-oldest` automatisch. Future request types plug in als `backends/<type>.py`. Siehe FEATURES.md Tabelle "Side loops" und PROCESS.md §7.
+>
+> **Re-resolved 2026-05-16 (false-shipped claim corrected):** Die 2026-05-13-Lösung war strukturell richtig aber operationell unvollständig. Drei zusammenhängende Gaps aufgedeckt nachdem ein lxw-compile-batch 176 pending requests angezeigt hat: (1) `curiosity_followup` Piggyback existierte als engine-default in `config.py`, wurde aber **nie über `KEY_ADDITIONS` in operator configs injiziert** — Vault-Configs hatten den Block einfach gar nicht, also fired der Piggyback nie. (2) Selbst wenn er gefired hätte, war die Cmd `--run-oldest` = 1 request/fire × 24h cooldown = 1/Tag drain — bei typical 3 requests pro compile-source-batch klar unter producer rate. (3) Bei akkumuliertem backlog würde ein `--run-all` thundering-herd-Risiko erzeugen (lange Mailbox-Scans, knock-on 176 neue raw/notes/email/deep-*.md → next compile-cycle). Fix in einem commit: neue cli flag `--run-batch N` (drain N oldest per fire), piggyback nutzt jetzt `--run-batch {max_per_run}` mit default `cooldown_hours=6, max_per_run=5` (= 20/Tag), KEY_ADDITIONS injiziert das in operator configs. Siehe commit-message für details.
 
 # Curiosity-Loop — Konsumenten-Lücke (Producer arbeitet, Executor fehlt)
 

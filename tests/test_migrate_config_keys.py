@@ -111,11 +111,11 @@ def test_migrate_config_file_round_trip(tmp_path):
     #    compile_skip_on_long_context_unknown, 4 calendar_*,
     #    compile_max_turns_long_context, compile_max_cost_per_file_usd,
     #    compile_skip_substrate_types)
-    #  + 1 piggybacks.calendar addition
+    #  + 2 piggybacks additions (calendar, curiosity_followup)
     # (LIST_ADDITIONS currently empty; LIST_REMOVALS only fires when
     # operator already has the entries to remove, not on greenfield.)
-    # = 13 changes (no drops here — operator has no orphan personal.* fields)
-    assert len(changes) == 13, f"got {len(changes)} changes: {changes}"
+    # = 14 changes (no drops here — operator has no orphan personal.* fields)
+    assert len(changes) == 14, f"got {len(changes)} changes: {changes}"
 
     reparsed = yaml.safe_load(new_text)
     # piggyback side
@@ -146,6 +146,7 @@ def test_migrate_config_no_change_when_fully_current(tmp_path):
         "piggybacks": {
             "email": {"enabled": True, "cooldown_hours": 24},
             "calendar": {"enabled": True, "cooldown_hours": 6, "max_per_run": 500},
+            "curiosity_followup": {"enabled": True, "cooldown_hours": 6, "max_per_run": 5},
         },
         "limits": {
             "compile_force_long_context_types": [],
@@ -246,6 +247,7 @@ def test_migrate_additions_idempotent():
         },
         "piggybacks": {
             "calendar": {"enabled": True, "cooldown_hours": 6, "max_per_run": 500},
+            "curiosity_followup": {"enabled": True, "cooldown_hours": 6, "max_per_run": 5},
         },
     }
     changes = m.migrate_additions(data)
