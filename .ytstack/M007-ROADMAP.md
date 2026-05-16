@@ -5,7 +5,7 @@ size: M
 created: 2026-05-16T15:01:00Z
 status: planned
 total_slices: 3
-completed_slices: 1
+completed_slices: 2
 ---
 
 # M007 Roadmap
@@ -24,7 +24,7 @@ completed_slices: 1
 Slice detail lives in per-slice `M007-S##-PLAN.md` files, created by `ytstack:slice-milestone`.
 
 - [x] S01 -- Schema foundation: compile_role enum + config knob + lint validation (4 tasks)
-- [ ] S02 -- compile.py 3-way dispatch: source-only / source-and-final / final-only (5 tasks)
+- [x] S02 -- compile.py 3-way dispatch: source-only / source-and-final / final-only (5 tasks)
 - [ ] S03 -- Active-surface filtering + lx longform validation + archives-flag retire (6 tasks)
 
 ## Run order
