@@ -51,3 +51,7 @@ uv run python -c "from scripts.core.compile_role import infer_compile_role, VALI
 
 - `ab37108` — docs(ytstack): plan M007-S01-T01 + author-attribution backlog
 - `76e24e4` — feat(compile-role): scripts/core/compile_role.py — M007-S01-T01
+
+## Commits so far
+
+- `1b6507a` -- docs(ytstack): M007-S01-T01 done — checkbox flip + summary (2026-05-16T15:38:06Z)
