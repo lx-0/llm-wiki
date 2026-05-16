@@ -73,4 +73,6 @@ Behavior:
 
 ## Status
 
-Backlog. Hot candidate for M006 or M007 — cheap, contained, no prerequisites. Sibling to `areas-bucket.md` and `domain-frontmatter.md` (the three "lessons from lx-audit" cluster). Order-independent from those two; can ship standalone.
+**Subsumed by `compile-role-axis.md`** (2026-05-16). That backlog file proposes a 3-value enum `compile_role: source-only | source-and-final | final-only` that covers archives-flag's binary case as `compile_role: final-only` plus the additional `source-and-final` case for long-form deliberate writing. Recommendation: ship compile-role-axis instead; archives-flag-as-separate-feature has been retired.
+
+File kept as historical artifact / decision-context (the simpler 80% framing was considered first, then absorbed into the more general axis after operator's own 2026-05-02 vault-architecture plan surfaced the long-form gap).

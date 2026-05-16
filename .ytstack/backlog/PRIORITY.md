@@ -31,7 +31,8 @@ Cheap to ship, no canary dependency, immediate quality-of-life lift.
 - **`compile-per-call-timeout.md`** — `compile.py` lacks per-call timeout on SDK `query()`. Sibling to the 60kb fail.
 - **`preflight-guard-rollout.md`** — extend the pre-flight prompt-size guard to remaining LLM call sites (small, mostly mechanical).
 - **`watermark-on-failure-fix.md`** — sibling to a recent fix; check if already absorbed by parallel work.
-- **`archives-flag.md`** — first-class cold state (`archived: true` frontmatter) for `knowledge/`. Real demand: shipped-feature concepts compete for dashboard space with active items. ~2 days. Lifted from lx-audit.
+- **`compile-role-axis.md`** — generic 3-value engine-treatment axis (`source-only | source-and-final | final-only`). **Absorbs `archives-flag.md`** + adds `source-and-final` slot for long-form deliberate writing (strategy workdocs, manifestos). ~3.5 days. Surfaced from operator's own 2026-05-02 vault-architecture plan during lx-audit.
+- ~~`archives-flag.md`~~ — subsumed by compile-role-axis; file kept as historical context.
 - **`areas-bucket.md`** — 7th knowledge bucket for ongoing responsibilities (CEO-Hat, Maintenance, etc.). Today they force-fit into `projects/` and never close. ~2 days. Soft prerequisite for `lx-vault-merge.md` Phase 2.
 - **`lx-vault-merge.md`** — Phase 0+1 (cold-storage tarball + bulk import to engine-excluded `imported/lx/`) ready to execute on operator authorization, ~3 hours. Phase 2 blocked on archives-flag + areas-bucket + entity-pages.
 

@@ -120,6 +120,20 @@ When all three shipped, run migration:
 5. **Tarball single point of failure** — Mitigation: after Phase 0, copy tarball to second location (NAS, external drive, B2). Operator preference.
 6. **Pre-tool-use hook conflicts with cross-vault writes** — llm-wiki has a pre-tool-use-edit hook that blocks Write/Edit in vault paths during certain agent contexts. Verify in Phase 0 before attempting Phase 1.
 
+## Prior-art findings (from operator's 2026-05-02 own plan)
+
+After Phase 1 shipped, operator's own pre-merge plan was discovered at `imported/lx/plan/vault/lx-lxw-merge.md` + `vault-architecture.md` + `vault-architecture.excalidraw`. Three operationally relevant findings absorbed back into this plan:
+
+1. **iCloud-sync xattr trick for `.wiki/.venv/`** — `xattr -w com.apple.fileprovider.ignore#P 1 .wiki/.venv` excludes the Python venv from iCloud sync. lxw's `.wiki/.venv/` is **395 MB** (verified 2026-05-16); without this xattr, every venv-internal file syncs to iCloud. Set 2026-05-16 during Phase 1 sweep; behavior verification (iCloud daemon actually stops upload) pending observation. Generalizes: any `.venv/` inside an iCloud-synced vault should get this xattr.
+
+2. **iCloud-sync discipline for Phase 3** — operator's plan explicitly said "1 Tag warten, parallel beide Vaults nicht öffnen" before final archive. iCloud Sync-Konflikte are real during multi-vault operations. Apply to Phase 3 (cleanup `rm -rf lx/`): close Obsidian on both vaults, wait for iCloud upload-status to settle, verify tarball one more time, then delete.
+
+3. **state.json migration warning** (DO NOT) — operator's plan flagged "wenn `state.json` nicht mit-übernommen wird: spurious Recompile aller 347+ Artikel = ~$3-5 + Stunden". Does NOT apply to current direction (lxw-as-host, we don't move state). DOES apply if direction ever reverses (lx-as-host) — operator already explored that path 2 weeks ago, premise (PARA stays active) was empirically falsified, but the warning stays valid as a hazard if revisited.
+
+Architectural observation: operator's plan was the **opposite direction** (lxw → lx, with `.wiki/` newly installed in lx as a layer on top of PARA). That direction was implicitly abandoned over the following 2 weeks as collector-driven capture (voice, jamie, gmeet, email, calendar, health) replaced PARA's filing-cabinet function. The fact that operator stopped maintaining lx is the empirical signal that the two-layer "PARA + Wiki" architecture lost to event-stream-driven capture. Current direction (lxw-as-host) is consistent with that signal.
+
+The one gap operator's plan implicitly covered (long-form deliberate human writing — strategy workdocs, manifestos, opinion essays) is NOT yet covered by lxw. Surfaced as new backlog item `compile-role-axis.md` (Phase 2 prerequisite, recommended replacement for `archives-flag.md`).
+
 ## Ripens when
 
 - Operator says "go" on Phase 0+1. Already validated demand.
@@ -127,6 +141,11 @@ When all three shipped, run migration:
 
 ## Status
 
-Backlog. Phase 0+1 ready to execute on operator authorization (cross-vault writes per REGEL #2). Phase 2 blocked on `archives-flag.md`, `areas-bucket.md`, `entity-pages-state-timeline.md`. Phase 3 blocked on Phase 2.
+Phase 0 ✓ (tarball `~/Archive/lx-vault-2026-05-16.tar.gz`, verified). Phase 1 ✓ (cold-storage commit `cf8db73` in lxw vault repo). Phase 2 blocked on prerequisites. Phase 3 blocked on Phase 2.
 
-Related: `archives-flag.md`, `areas-bucket.md`, `domain-frontmatter.md` (the three lessons-from-lx-audit), `entity-pages-state-timeline.md` (the gbrain pattern that does the heavy migration lift), `gbrain-comparison.md` (the broader comparison this slots into).
+**Prerequisites for Phase 2** (revised after compile-role-axis emerged):
+- `compile-role-axis.md` — generic engine-skip / index-only / distill axis; absorbs `archives-flag.md`
+- `areas-bucket.md` — 7th knowledge bucket for ongoing responsibilities
+- `entity-pages-state-timeline.md` — gbrain pattern for the bulk per-entity migration
+
+Related: `archives-flag.md` (subsumed by compile-role-axis; mark as historical), `areas-bucket.md`, `domain-frontmatter.md`, `entity-pages-state-timeline.md`, `gbrain-comparison.md`.
