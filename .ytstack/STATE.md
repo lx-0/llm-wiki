@@ -1,13 +1,15 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-05-16T15:20:18Z
+last_updated: 2026-05-16T17:42:00Z
 current_milestone: M007
 active_slice: S01
-active_task: T02
+active_task: T03
 ---
 
 # State
+
+**Ad-hoc shipped 2026-05-16 evening (before M007 execution starts):** flush-context gen-2 — `hooks/_transcript.py` replaced content-blind `MAX_TURNS=30 + MAX_CONTEXT_CHARS=15_000` with three per-class budgets (assistant 50K / user 10K / tool 10K), prefer-tail allocation, turn kept if any class survives. Compound fix: `prompts/flush_extract.md` gained `## Findings & Observations` section (narrative analytical output had no slot in the prior Decisions/Lessons/Actions template). Trigger: long ROM-preferences analysis session lost in the staged context; only auto-memories captured it indirectly. Research-driven option choice (A over B over C — Anthropic compaction-doc + OpenCode pattern vs recursive-summary vs hierarchical tree). 33/33 tests green; commit `9969f11` pushed to origin/main. Phase 2 (recursive summary) backlogged at `.ytstack/backlog/recursive-session-summary.md`. Full summary in `.ytstack/AD-HOC-flush-context-budgets-SUMMARY.md`. **NOT verified end-to-end:** new pipeline against an actual long-session JSONL replay — next real session-end fires the new code, observation will tell.
 
 **Status:** M007 / S01 / T01 planned — ready to execute. Task: create `scripts/core/compile_role.py` (~60 LOC pure-function module: `CompileRole` Literal + `VALID_ROLES` + `LOCATION_DEFAULTS` + `infer_compile_role()` with explicit-override-wins semantics + `_location_class()` helper). Config-decoupled (T02 wires the knob). Plan at `.ytstack/M007-S01-T01-PLAN.md`. Verification = single uv-python smoke command exercising all 5 inference paths. T04 formalizes as pytest.
 
