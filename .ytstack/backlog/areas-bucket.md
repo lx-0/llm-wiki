@@ -109,4 +109,4 @@ Key differences from `projects/`:
 
 ## Status
 
-Backlog. Hot candidate for M006/M007. Sibling to `archives-flag.md` and `domain-frontmatter.md`. Soft prerequisite for `lx-vault-merge.md` Phase 2 (entity-pages migration). Compose-friendly with `entity-pages-state-timeline.md` — Areas should adopt the same State+Timeline shape when entity-pages lands.
+**SHIPPED** via M008 (3a445b7, 2026-05-16, Agent A). See commit message + git log for implementation details. Backlog kept as decision-context.

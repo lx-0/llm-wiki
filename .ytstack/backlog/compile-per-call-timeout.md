@@ -81,3 +81,8 @@ If the SDK doesn't clean up cleanly, fallback: spawn the SDK call inside a dedic
 
 - Related: `KNOWLEDGE.md` entry on the `claude_code` preset crash (root-caused 2026-05-10). The preset-fix reduced *crash* frequency, but *hangs* are a separate failure mode that this backlog item addresses.
 - Sibling: `architecture-deepening.md` — any other SDK-call site (flush.py, lint.py, query.py, scan-screenshots.py) would benefit from the same treatment. Audit them when implementing.
+
+
+## Status
+
+**SHIPPED** via M010 (b16a406, 2026-05-16, Agent C — reliability bundle). See commit message + git log for implementation details. Backlog kept as decision-context.

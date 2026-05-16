@@ -69,4 +69,4 @@ Behavior:
 
 ## Status
 
-Backlog. Low-medium priority. Sibling to `archives-flag.md` and `areas-bucket.md` — the three "lessons from lx-audit" cluster. Cleanly independent; can defer indefinitely without blocking lx-merge or anything else.
+**SHIPPED** via M013 (04b4d6f, 2026-05-16, Agent F). See commit message + git log for implementation details. Backlog kept as decision-context.

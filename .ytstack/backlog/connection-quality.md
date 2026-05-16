@@ -229,3 +229,8 @@ Graph-view effect: the MOC becomes a high-betweenness bridge node, and the spoke
 - obsidianstats — Graph Link Types — `https://www.obsidianstats.com/plugins/graph-link-types`
 - `https://github.com/seqis/ObsidianMOC`
 - MakeUseOf — orphan notes — `https://www.makeuseof.com/orphan-notes-in-obsidian-linking-system/`
+
+
+## Status
+
+**SHIPPED** via M012 (a16a01e, 2026-05-16, Agent E). See commit message + git log for implementation details. Backlog kept as decision-context.

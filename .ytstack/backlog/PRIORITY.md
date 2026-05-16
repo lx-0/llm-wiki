@@ -14,6 +14,13 @@ Already shipped; their backlog files describe historical context, not future wor
 - `health-collector.md` — Oura Phase 1 shipped (`1fd1044`); future phases stay backlog
 - `dashboard-action-items.md` — subsumed by M005-S05's Personal Tasks pane (re-check before reopening)
 - `screenshots-intake.md`, `youtube-intake.md` — shipped previously
+- `compile-role-axis.md` — M007 entirely (`1022fd6`), 23 commits, all 5 exit criteria green
+- `areas-bucket.md` — M008 (`3a445b7`), Agent A in parallel worktree
+- `author-attribution.md` — M009 (`691d786`), Agent B
+- `compile-60kb-plus-silent-fail.md` + `compile-per-call-timeout.md` + `compile-already-on-1m-fallback.md` — M010 reliability bundle (`b16a406`), Agent C
+- `takes-substrate.md` — M011 (`ba63c1c`), Agent D; producer gated behind `features.extract_takes` until operator dogfoods
+- `connection-quality.md` — M012 (`a16a01e`), Agent E
+- `domain-frontmatter.md` — M013 (`04b4d6f`), Agent F
 
 ## ❌ Rejected — close
 
@@ -31,23 +38,17 @@ Cheap to ship, no canary dependency, immediate quality-of-life lift.
 - **`compile-per-call-timeout.md`** — `compile.py` lacks per-call timeout on SDK `query()`. Sibling to the 60kb fail.
 - **`preflight-guard-rollout.md`** — extend the pre-flight prompt-size guard to remaining LLM call sites (small, mostly mechanical).
 - **`watermark-on-failure-fix.md`** — sibling to a recent fix; check if already absorbed by parallel work.
-- **`compile-role-axis.md`** — generic 3-value engine-treatment axis (`source-only | source-and-final | final-only`). **Absorbs `archives-flag.md`** + adds `source-and-final` slot for long-form deliberate writing (strategy workdocs, manifestos). ~3.5 days. Surfaced from operator's own 2026-05-02 vault-architecture plan during lx-audit.
-- **`areas-bucket.md`** — 7th knowledge bucket for ongoing responsibilities (CEO-Hat, Maintenance, etc.). Today they force-fit into `projects/` and never close. ~2 days. Soft prerequisite for `lx-vault-merge.md` Phase 2.
 - **`lx-vault-merge.md`** — Phase 0+1 ✓ (tarball `~/Archive/lx-vault-2026-05-16.tar.gz` + commit `cf8db73` in lxw vault repo). Phase 2 blocked on compile-role-axis (M007 in flight) + areas-bucket + entity-pages + author-attribution.
-- **`author-attribution.md`** — operator-as-implicit-author for single-tenant content (`author:` frontmatter + `personal.implicit_operator_author` config). ~1.5 days. Prerequisite for lx-merge Phase-2 attribution fidelity.
 
 ## 🌱 Medium — entity-page-layer extensions (M006 or M007)
 
 The gbrain-pattern cluster that complements M005. Re-evaluate after canary signal — extraction quality on real substrate is the gating data.
 
-- **`takes-substrate.md`** [HOT for lx-merge Phase 2] — third-party belief attribution ("WHO believes WHAT, confidence + date"). Sibling category to Hard-Facts; covers operator's read of others' positions. Highest-leverage extension if entity-pages dogfood well.
 - **`dream-cycle.md`** — scheduled cross-time synthesis (vs. per-file compile). Different from compile in that it synthesizes *across* the timeline. Cheapest validation: schedule it as a piggyback, see what it produces over a week.
 - **`subtype-axis.md`** — split `concepts/` into 6 meaningful color groups for the graph view. Quality-of-life, not load-bearing.
-- **`connection-quality.md`** [HOT for lx-merge Phase 2] — improve `connections/` article quality at compile time.
 - **`curiosity-consumer-gap.md`** — close the curiosity-loop consumer side (producer alive, consumer missing).
 - **`curiosity-topic-as-search-query.md`** — use topic as IMAP/Gmail search-query, not blind folder dump.
 - **`curiosity-dashboard.md`** — surface curiosity loop in dashboard.
-- **`domain-frontmatter.md`** — optional `domain: company|personal|ai|meta` tag as cross-cutting filter axis. ~1.5 days. Lifted from lx-audit; lowest of the three lx-lessons cluster.
 
 ## 🐌 Long-tail — substrate expansion + tooling debt
 

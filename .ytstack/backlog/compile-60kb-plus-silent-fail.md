@@ -96,3 +96,8 @@ A 0.7 KB source failing after 111 s rules out raw-size as the discriminator — 
 **Added knob (this commit):** `compile_retry_long_context_on_unknown` (default `true`). After a `kind=unknown` failure, retry once with `compile_large_source_model` (1M-context Opus). Closes the gap left by the size-threshold auto-upgrade — the threshold catches deterministic overflows, the retry catches the stochastic ones. Hypothesis-1-confirming if the retry rate stays near the prior failure rate; falsifying if the 1M variant also fails on the same files.
 
 **Verifies on next lxw run.** Watch for `WARNING  retrying with long-context model …` lines and whether the second attempt succeeds.
+
+
+## Status
+
+**SHIPPED** via M010 (b16a406, 2026-05-16, Agent C — reliability bundle). See commit message + git log for implementation details. Backlog kept as decision-context.

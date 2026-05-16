@@ -52,4 +52,4 @@ Phase 2 migration tooling (separate task in lx-vault-merge follow-up):
 
 ## Status
 
-Backlog. Hot. Sibling to `takes-substrate.md` (different but related — author-of-content vs. holder-of-belief). Prerequisite for `lx-vault-merge.md` Phase 2's attribution fidelity.
+**SHIPPED** via M009 (691d786, 2026-05-16, Agent B). See commit message + git log for implementation details. Backlog kept as decision-context.

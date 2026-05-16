@@ -90,4 +90,4 @@ Probably all three, layered.
 
 ## Status
 
-Backlog. Sibling to `entity-pages-state-timeline.md` and `dream-cycle.md`. Strong coupling: takes are most useful when entity pages exist to consume them, and Dream-Cycle is a natural producer. Either bundle as M005 or land takes-second after entity-pages prove out.
+**SHIPPED** via M011 (ba63c1c, 2026-05-16, Agent D). See commit message + git log for implementation details. Backlog kept as decision-context.
