@@ -23,9 +23,9 @@ completed_slices: 0
 
 Slice detail lives in per-slice `M007-S##-PLAN.md` files, created by `ytstack:slice-milestone`.
 
-- [ ] S01 -- (to be planned)
-- [ ] S02 -- (to be planned)
-- [ ] S03 -- (to be planned)
+- [ ] S01 -- Schema foundation: compile_role enum + config knob + lint validation (4 tasks)
+- [ ] S02 -- compile.py 3-way dispatch: source-only / source-and-final / final-only (5 tasks)
+- [ ] S03 -- Active-surface filtering + lx longform validation + archives-flag retire (6 tasks)
 
 ## Run order
 
