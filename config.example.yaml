@@ -116,6 +116,13 @@ limits:
   # Flush-extraction retries.
   flush_max_retries: 3
   flush_retry_delay_seconds: 30
+  # Per-class budgets for the session/pre-compact context the flush extractor
+  # sees. Replaced the content-blind MAX_TURNS=30 / MAX_CONTEXT_CHARS=15_000
+  # globals on 2026-05-16 after a long ROM-analysis session lost all assistant
+  # prose into truncated tool dumps. Allocation is prefer-tail.
+  flush_assistant_text_budget_chars: 50000
+  flush_user_text_budget_chars: 10000
+  flush_tool_summary_budget_chars: 10000
   # Screenshot OCR.
   screenshot_resize_width: 512
   screenshot_timeout_seconds: 60

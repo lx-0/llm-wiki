@@ -579,6 +579,24 @@ Stays under the 10s hook timeout but preserves massive signal.
 
 `session-end.py` always had the rich summarizer. `pre-compact.py` shipped with the lossy mapping until both hooks were unified through `hooks/_transcript.py` — same `extract_text` / `read_transcript` / `build_context` for both. Adding a new hook = drop a file, import from `_transcript`. The lossy shape is no longer reachable.
 
+#### Gen-2 (2026-05-16): per-class budgets, content-blind caps removed
+
+The gen-1 resolution above fixed the *shape* of the tool stream but kept a content-blind global cap: `MAX_TURNS=30` + `MAX_CONTEXT_CHARS=15_000`. That cap is the wrong axis. A long analytical session (e.g. 2026-05-16 ROM-preferences incident — operator asked the assistant to analyse their library and report preferences) hits both limits cleanly with tool-heavy turns and pushes the actual prose out of the context the flush extractor sees. compile.py then has only memories to work with; the analysis itself never reaches `daily/<date>/sessions.md`.
+
+The 2026-05-16-evening fix replaces the two globals with three per-class budgets:
+
+- `flush_assistant_text_budget_chars: 50_000` — assistant prose, the high-signal stream
+- `flush_user_text_budget_chars: 10_000` — prompts, typically short
+- `flush_tool_summary_budget_chars: 10_000` — one-line tool summaries (the 300/150-char per-result trunc still applies underneath)
+
+Allocation is prefer-tail: when a class budget overflows, the oldest turns drop first, not the newest. A turn is kept if **any** of its content (text *or* tool stream) survives — so a budget-full text class doesn't suppress the tool sequence the compiler depends on, and vice versa.
+
+This is the asymmetric-truncation variant of the OpenCode / Anthropic-compaction pattern (cited in `docs/compaction.md` of platform.claude.com: tool outputs trim first, user + assistant prose preserved verbatim where possible). Recursive summarisation for >60-turn sessions (TaciTree / NexusSum / recursive-summary line of research) is the Phase-2 backlog candidate — see `.ytstack/backlog/recursive-session-summary.md`. We're not paying that complexity until the per-class budgets prove insufficient.
+
+The companion fix is in `prompts/flush_extract.md`: the previous template extracted only `Decisions / Lessons / Actions`, which silently dropped narrative analytical output (preferences, comparisons, qualitative claims) even when the prose reached the model. The new `## Findings & Observations` section makes that class explicit and instructs the extractor to preserve specificity.
+
+Pre-2026-05-16 the assistant_text budget was effectively ~5 KB (15K total minus user + tool). The 10× headroom is the right correction for what *typical* analysis sessions cost — we measured by scanning recent JSONL transcripts, not by guessing.
+
 ### Ollama structured output
 
 #### `format: "json"` is not enough

@@ -32,6 +32,9 @@ Key changes covered (chronological):
   limits.compile_force_long_context_types ← list-prune calendar-rollup AND daily-digest (2026-05-16 P2, dedicated prompts shipped)
   limits.compile_skip_substrate_types     ← list-prune calendar-rollup (2026-05-16 P2, compile_calendar.md ships)
   piggybacks.curiosity_followup           (added 2026-05-16, default cooldown 6h / max 5 — never injected by original 2026-05-13 rollout, requests accumulated)
+  limits.flush_assistant_text_budget_chars (added 2026-05-16, default 50_000 — replaces MAX_CONTEXT_CHARS=15_000)
+  limits.flush_user_text_budget_chars      (added 2026-05-16, default 10_000)
+  limits.flush_tool_summary_budget_chars   (added 2026-05-16, default 10_000)
 
 Idempotent: a config already on the current schema produces no change.
 
@@ -106,6 +109,13 @@ KEY_ADDITIONS: dict[str, dict[str, object]] = {
         # shipped). Last-resort escape hatch for substrate types with
         # no good prompt yet.
         "compile_skip_substrate_types": ["email-delta"],
+        # Per-class flush-context budgets (hooks/_transcript.py). Replaces
+        # the content-blind globals MAX_TURNS=30 + MAX_CONTEXT_CHARS=15_000
+        # that lost assistant analytical prose to tool-summary truncation.
+        # See KNOWLEDGE.md "Flush context — Karpathy/Cole pattern gen-2".
+        "flush_assistant_text_budget_chars": 50_000,
+        "flush_user_text_budget_chars": 10_000,
+        "flush_tool_summary_budget_chars": 10_000,
     },
     "piggybacks": {
         # M006 calendar collector — mirrors gmeet / jamie 6 h cadence.

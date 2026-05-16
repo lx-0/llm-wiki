@@ -95,6 +95,25 @@ class Limits:
     compile_max_consecutive_failures: int = 3
     flush_max_retries: int = 3
     flush_retry_delay_seconds: int = 30
+    # Per-class budgets for session/pre-compact flush context (hooks/_transcript.py).
+    # Replaces the pre-2026-05-16 globals MAX_TURNS=30 + MAX_CONTEXT_CHARS=15_000,
+    # which were content-blind: a tool-heavy session would push the entire 15 KB
+    # into truncated tool dumps and lose the assistant prose where the actual
+    # analytical findings live. Separate budgets per content class let us be
+    # generous with the high-signal stream (assistant prose) while keeping tool
+    # noise on a short leash. Allocation is prefer-tail (newest turns first),
+    # so a session that exceeds budget keeps the recent state and drops the
+    # opening warm-up. See KNOWLEDGE.md "Flush context — Karpathy/Cole pattern
+    # gen-2" and the 2026-05-16 ROM-session incident.
+    #
+    # 50K assistant-text was chosen by observing typical "long analysis" sessions
+    # (~30-50K chars of assistant prose); covers them whole. User-text 10K is
+    # generous for prompts. Tool-summary 10K caps how much one-line tool
+    # summaries can compete with prose — the per-result 300-char trunc still
+    # applies on top.
+    flush_assistant_text_budget_chars: int = 50_000
+    flush_user_text_budget_chars: int = 10_000
+    flush_tool_summary_budget_chars: int = 10_000
     screenshot_resize_width: int = 512
     screenshot_timeout_seconds: int = 60
     curiosity_max_gaps: int = 3

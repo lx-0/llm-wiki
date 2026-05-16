@@ -731,3 +731,24 @@ These are companion-rules to [[Templates are load-bearing — never backlog temp
 - compile_main.md changes: re-read this entry first. The prompt is no longer the default path — modifications are only seen by explicit SUBSTRATE_PROMPTS entries.
 
 **Touchpoints.** `scripts/compile.py` (SUBSTRATE_PROMPTS, _DEFAULT_DISPATCH, _substrate_key, _attempt model precedence, cost guard); `prompts/compile_{calendar,daily,health,screenshots,memories,default}.md`; `scripts/core/config.py` (compile_max_cost_per_file_usd, compile_skip_substrate_types); `scripts/migrations/migrate_config_keys.py` (KEY_ADDITIONS for new knobs); `scripts/core/sdk_helpers.py` (FailureClass kinds incl. `max_turns`, `cost_exceeded`, `agent_error`). KNOWLEDGE.md "Every accumulating substrate type needs its own SUBSTRATE_PROMPTS entry (2026-05-16)" has the full operational pattern.
+
+## 2026-05-16: Flush context — per-class budgets replace content-blind cap
+
+**Context.** A long ROM-preferences analysis session ran in lxw earlier today. The assistant produced ~30 KB of qualitative findings (genre breakdowns, format trade-offs, operator-preference inferences). At session-end the operator inspected the flush output and found only the auto-memories captured the analysis indirectly — the daily/sessions.md file had a thin Decisions/Lessons block with none of the substantive findings. Root cause: `hooks/_transcript.py` had two content-blind globals (`MAX_TURNS=30` keeps only last 30 turns; `MAX_CONTEXT_CHARS=15_000` caps the *total* staged context). On a tool-heavy session those 15 KB filled with truncated tool results before the assistant prose got a chance. compile.py downstream received nothing to compile. Compound bug: `prompts/flush_extract.md` extracted only Decisions/Lessons/Actions — even *given* the prose, narrative findings had no destination section.
+
+**Options considered.**
+- **A — Asymmetric per-class budgets** (Anthropic compaction doc + OpenCode pattern). Separate budgets for assistant text / user text / tool summaries; prefer-tail allocation; turn kept if any class survives. Plus a new `## Findings & Observations` section in the extractor prompt.
+- **B — Recursive summary + verbatim tail** (TaciTree / NexusSum / arxiv 2308.15022). Pre-compact summarises older turns into a rolling summary; SessionEnd preserves the last N turns verbatim. 3-5 days of work.
+- **C — Hierarchical session tree** (full TaciTree). Per-10-turn-block summaries with drill-down. 1-2 weeks; over-engineering without observation data that A is insufficient.
+
+**Decision.** A, shipped this commit. B deferred to `.ytstack/backlog/recursive-session-summary.md` — re-evaluate after operating with the new budgets and seeing whether long analytical sessions still lose tail material. C is not on the table.
+
+**Reason.** A fixes the 2026-05-16 incident at minimum architectural cost, follows the highest-pedigree reference (Anthropic's own compaction guidance is the closest match to our shape), and doesn't preclude B if data later justifies it. B/C would commit complexity ahead of evidence. The companion prompt change is non-optional: even infinite context budget can't help if the extractor template has no slot for the relevant content class.
+
+**Touchpoints.**
+- `hooks/_transcript.py` — rewrite around `Turn` dataclass + `Budgets`; legacy `extract_text()` removed (no external callers).
+- `scripts/core/config.py` + `config.example.yaml` + `scripts/migrations/migrate_config_keys.py` — 3 new `flush_*_budget_chars` keys, defaults 50_000 / 10_000 / 10_000.
+- `prompts/flush_extract.md` — new `## Findings & Observations` section; emphasises preservation of narrative analytical content.
+- `tests/test_transcript_budgets.py` — 9 behavioural tests pinning the asymmetric-truncation contract.
+- `tests/test_migrate_config_keys.py` — round-trip + idempotency updates for the 3 new keys.
+- `.ytstack/KNOWLEDGE.md` — extended "Flush context — Karpathy/Cole pattern" section with the gen-2 resolution.
