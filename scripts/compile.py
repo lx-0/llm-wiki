@@ -389,6 +389,24 @@ def _frontmatter_type(content: str) -> str | None:
     return m.group(1) if m else None
 
 
+def _frontmatter_compile_role(content: str) -> str | None:
+    """Extract `compile_role:` from leading YAML frontmatter, or None.
+
+    Sibling to `_frontmatter_type`; same regex-only rationale. Returns the
+    raw string value — caller passes it to `core.compile_role.infer_compile_role`
+    for enum validation and default-by-location inference (M007-S02-T01).
+    """
+    if not content.startswith("---"):
+        return None
+    end = content.find("\n---", 3)
+    if end == -1:
+        return None
+    block = content[3:end]
+    import re
+    m = re.search(r"^compile_role:\s*[\"']?([\w-]+)[\"']?\s*$", block, re.MULTILINE)
+    return m.group(1) if m else None
+
+
 async def compile_file(
     source: Path,
     dry_run: bool = False,
@@ -417,6 +435,33 @@ async def compile_file(
     if not source_content.strip():
         log.warning("  Skipping empty file: %s", rel_path)
         return {"_skipped": "empty"}
+
+    # compile_role dispatch (M007-S02-T01). The frontmatter axis decides how
+    # this file participates in compile:
+    #   - source-only       → distill into knowledge/ (today's behavior)
+    #   - source-and-final  → indexed-only; the page IS the final form (T02
+    #                         implements the real index-only branch; today
+    #                         it falls through to source-only distillation)
+    #   - final-only        → engine-skip; hand-curated; reachable via
+    #                         grep/graph/search but hidden from MOC + dashboard
+    # Inference (when frontmatter omits `compile_role:`) uses LOCATION_DEFAULTS
+    # from `core.compile_role` and is gated by
+    # `CONFIG.limits.compile_role_default_by_location` (M007-S01-T02 knob).
+    explicit_role = _frontmatter_compile_role(source_content)
+    fm_for_role = {"compile_role": explicit_role} if explicit_role else {}
+    from core.compile_role import infer_compile_role
+    compile_role = infer_compile_role(
+        source, fm_for_role,
+        default_by_location=CONFIG.limits.compile_role_default_by_location,
+        vault_root=ROOT_DIR,
+    )
+    if compile_role == "final-only":
+        log.warning(
+            "  skipping: compile_role=final-only (hand-curated, engine-skip)",
+        )
+        return {"_skipped": "compile_role_final_only"}
+    # source-and-final + source-only fall through to current distill behavior;
+    # T02 changes source-and-final to the index-only branch.
 
     # Substrate-type skip: some substrates are structurally a poor fit for
     # the generic compile_main.md prompt (calendar metadata has no dialog
