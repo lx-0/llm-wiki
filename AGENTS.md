@@ -135,6 +135,20 @@ hostnames, mbox paths, project names mentioned in prompts, etc.
 
 Source files may carry an optional `author: <name>` (or `author: [name1, name2]`) frontmatter key. When present, `compile.py` routes distilled beliefs/decisions/opinions to that person's `knowledge/people/<slug>.md` page. When absent, the compile prompt falls back to `personal.implicit_operator_author` (single-tenant convenience; null by default — multi-tenant vaults leave unattributed content generic). Explicit `author:` always wins.
 
+### Frontmatter — `compile_role` axis (M007)
+
+Any `.md` file in the vault may carry `compile_role:` with one of 3 values, controlling how `compile.py` treats it:
+
+- **`source-only`** (default for raw/, daily/, inbox/, knowledge/) — substrate; distilled into `knowledge/` articles. Today's behavior unchanged.
+- **`source-and-final`** — the page IS the final form. `compile.py` extracts wikilinks, appends an entry to `knowledge/index.md` by its full pathname, marks it ingested in state.json, but does NOT call the SDK and does NOT produce a separate `knowledge/concepts/<title>.md`. Use for operator-authored long-form: strategy workdocs, manifestos, opinion essays. Convention: place under `raw/notes/longform/`.
+- **`final-only`** — engine-skip; hand-curated; reachable via grep/Obsidian search/graph but hidden from MOC auto-includes, dashboard active panes (`articles_total` excludes; `articles_final_only` exposes count), and `wiki query` default scope (use `--include-final-only` to re-include). Use for archived knowledge that's still reference-worthy.
+
+Default inference: when frontmatter omits `compile_role:`, the role is inferred from the file's top-level segment per `core.compile_role.LOCATION_DEFAULTS`. Toggle via `CONFIG.limits.compile_role_default_by_location` (default true). Explicit frontmatter always wins. Lint (`check_compile_role`) rejects unknown enum values.
+
+When referencing a `source-and-final` page from compiled `knowledge/` articles: cite by pathname (`[[raw/notes/longform/<name>]]`), do NOT create a parallel `knowledge/concepts/<same>.md`, do NOT add the path to `compiled_from:` (that key is for distilled substrate). Connections-articles linking source-and-final to other concepts ARE allowed (operator-authored final form + LLM-synthesized analysis layered on top).
+
+MOC auto-include Dataview blocks in `templates/knowledge/MOCs/{concepts,people,projects,areas}.md` carry `WHERE compile_role != "final-only"`. `pin.py` refuses to manually pin a final-only article (operator must edit frontmatter first if they really want it back in active surfaces).
+
 ### Adding a prompt
 
 1. Drop `<name>.md` into `prompts/`.

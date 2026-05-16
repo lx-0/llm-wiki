@@ -32,7 +32,6 @@ Cheap to ship, no canary dependency, immediate quality-of-life lift.
 - **`preflight-guard-rollout.md`** — extend the pre-flight prompt-size guard to remaining LLM call sites (small, mostly mechanical).
 - **`watermark-on-failure-fix.md`** — sibling to a recent fix; check if already absorbed by parallel work.
 - **`compile-role-axis.md`** — generic 3-value engine-treatment axis (`source-only | source-and-final | final-only`). **Absorbs `archives-flag.md`** + adds `source-and-final` slot for long-form deliberate writing (strategy workdocs, manifestos). ~3.5 days. Surfaced from operator's own 2026-05-02 vault-architecture plan during lx-audit.
-- ~~`archives-flag.md`~~ — subsumed by compile-role-axis; file kept as historical context.
 - **`areas-bucket.md`** — 7th knowledge bucket for ongoing responsibilities (CEO-Hat, Maintenance, etc.). Today they force-fit into `projects/` and never close. ~2 days. Soft prerequisite for `lx-vault-merge.md` Phase 2.
 - **`lx-vault-merge.md`** — Phase 0+1 ✓ (tarball `~/Archive/lx-vault-2026-05-16.tar.gz` + commit `cf8db73` in lxw vault repo). Phase 2 blocked on compile-role-axis (M007 in flight) + areas-bucket + entity-pages + author-attribution.
 - **`author-attribution.md`** — operator-as-implicit-author for single-tenant content (`author:` frontmatter + `personal.implicit_operator_author` config). ~1.5 days. Prerequisite for lx-merge Phase-2 attribution fidelity.
