@@ -196,7 +196,30 @@ ${source_content}
 
    Anti-false-positive: never demote based on hypothetical or future-tense statements ("we should send the deck", "I'll send it next week"). Resolution requires past-tense + first-person OR explicit third-party confirmation in the substrate.
 
-4. **Create connection articles** in `knowledge/connections/` when you identify meaningful relationships between concepts (patterns, contradictions, analogies). Use the same frontmatter format with `type: connection`.
+4. **Create connection articles** in `knowledge/connections/` ONLY when you can make a non-trivial claim about the relationship between 2+ concepts. A connection article is NOT a co-occurrence note ("X and Y both relate to Z" → REJECT) and is NOT a side-by-side restatement of either concept ("see also X, see also Y" → REJECT). It MUST:
+
+   a. **Name a load-bearing mechanism, contrast, dependency, or causal claim** between the linked concepts. If you cannot write 3 sentences of genuine synthesis that don't already appear in either linked concept, do NOT create the connection — emit an inline `[[wikilink]]` from one concept to the other instead.
+   b. **Cite each linked concept by `[[wikilink]]`** in the body. At least 2 distinct `knowledge/`-tree wikilinks (substrate citations to `daily/` or `raw/` don't count toward the count — those are sources, not endpoints).
+   c. **Declare the kind of relationship** in frontmatter with exactly one of:
+      - `mechanism: <one-sentence summary>` — "X enables Y because Z" / causal or mechanistic chain
+      - `tension: <one-sentence summary>` — "X contradicts / pulls against Y" / contrast or contradiction
+      - `dependency: <one-sentence summary>` — "Y cannot exist without X" / hard prereq with no further mechanism claim
+   d. **Have a body ≥ 50 words** below the frontmatter. Shorter bodies almost always reduce to restatement.
+   e. **Carry a domain tag** (`tags: [<one of the configured domain tags>]`) — connections render in the graph view alongside concepts and need the same domain-anchor coloring.
+
+   Use the standard frontmatter format with `type: connection` plus the kind discriminator above. Example shape:
+
+   ```yaml
+   ---
+   title: "Connection: A2A Protocol enables Work Orchestration"
+   type: connection
+   mechanism: "A2A's task-state model provides the inter-agent dispatch primitive that the work-orchestration gap had identified as missing."
+   connects:
+     - "concepts/a2a-fleet-communication"
+     - "concepts/work-orchestration-gap"
+   tags: [fleet]
+   ---
+   ```
 
 5. **Update `knowledge/index.md`** — add or update the table row for each article you created or modified. Format:
    `| [[path/without/.md]] | one-line summary | source file(s) | ${today} |`

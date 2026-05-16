@@ -331,32 +331,141 @@ def check_qa_schema() -> list[dict]:
 
 
 def check_concept_domain_tag() -> list[dict]:
-    """Warn on knowledge/concepts/ notes whose tags miss any domain anchor.
+    """Warn on knowledge/concepts/ and knowledge/connections/ notes whose tags
+    miss any domain anchor.
 
-    Concepts/ is the largest folder (87% of lxw vault). Without a domain tag
-    in `graph_view.domain_tags`, a note paints into the grey-fallback color
-    group and disappears into the visual hairball. The compile prompt now
-    requires a domain tag at creation; this check surfaces pre-rule notes
-    and any future drift.
+    Concepts/ is the largest folder (87% of lxw vault). Connections/ — added
+    by M012 (2026-05-16) — sits in the same graph-coloring regime: without a
+    tag from `graph_view.domain_tags`, the note paints into the grey-fallback
+    color group and disappears into the visual hairball. The compile prompt
+    now requires a domain tag at creation for both article types; this check
+    surfaces pre-rule notes and any future drift.
+
+    Issue code stays `concept_no_domain_tag` for backwards compat (existing
+    operator dashboards filter on this code); the `detail` string names the
+    actual folder so the surface remains diagnosable.
     """
     issues = []
-    concepts_dir = KNOWLEDGE_DIR / "concepts"
-    if not concepts_dir.exists():
-        return issues
     domain_set = set(_domain_tags())
-    for article in sorted(concepts_dir.glob("*.md")):
+    for folder in ("concepts", "connections"):
+        folder_dir = KNOWLEDGE_DIR / folder
+        if not folder_dir.exists():
+            continue
+        for article in sorted(folder_dir.glob("*.md")):
+            if article.name in ("index.md", "log.md"):
+                continue
+            rel = str(article.relative_to(KNOWLEDGE_DIR))
+            fm = _read_yaml_frontmatter(article)
+            raw_tags = fm.get("tags") or []
+            tags = set(raw_tags) if isinstance(raw_tags, list) else set()
+            if not (tags & domain_set):
+                issues.append(issue(
+                    "warning", "concept_no_domain_tag", rel,
+                    f"{folder[:-1]} has no tag from {sorted(domain_set)} — "
+                    f"will render grey in graph view. Current tags: {sorted(tags)[:6]}",
+                ))
+    return issues
+
+
+# Frontmatter discriminator fields a `type: connection` article must carry to
+# declare what KIND of connection it is. At least one must be present and
+# non-empty. Names chosen to match the discourse-graph vocabulary from the
+# spec at `.ytstack/backlog/connection-quality.md`:
+#   - mechanism: "X enables Y because Z" (causal/dependency-via-mechanism)
+#   - tension:   "X contradicts / pulls against Y" (contrast/contradiction)
+#   - dependency: "Y cannot exist without X" (hard prereq, no mechanism claim)
+CONNECTION_KIND_FIELDS = ("tension", "mechanism", "dependency")
+
+
+def check_connection_depth() -> list[dict]:
+    """Quality gate for `knowledge/connections/` articles (M012).
+
+    A connection article MUST:
+      1. cite ≥2 distinct knowledge-tree wikilinks (a connection between only
+         one concept is just a tag);
+      2. carry exactly one of `tension|mechanism|dependency` frontmatter
+         fields (the discriminator for what kind of relationship is being
+         claimed);
+      3. have a body word-count ≥ `CONFIG.limits.connection_min_words`
+         (shorter bodies almost always restate the linked concepts instead
+         of asserting a real mechanism/contrast/dependency).
+
+    Each violation surfaces as its own issue code so dashboards can route
+    them independently:
+      - `connection_under_linked`      (rule 1)
+      - `connection_missing_kind`      (rule 2)
+      - `connection_shallow_body`      (rule 3)
+
+    Skips index.md / log.md. Notes that haven't been migrated to
+    `type: connection` yet (folder-only) are still checked — rule 1 + 3 hold
+    regardless of frontmatter, rule 2 fires the missing-kind warning.
+    """
+    issues: list[dict] = []
+    connections_dir = KNOWLEDGE_DIR / "connections"
+    if not connections_dir.exists():
+        return issues
+
+    min_words = CONFIG.limits.connection_min_words
+
+    for article in sorted(connections_dir.glob("*.md")):
         if article.name in ("index.md", "log.md"):
             continue
         rel = str(article.relative_to(KNOWLEDGE_DIR))
+        try:
+            text = article.read_text(encoding="utf-8")
+        except OSError:
+            continue
+
         fm = _read_yaml_frontmatter(article)
-        raw_tags = fm.get("tags") or []
-        tags = set(raw_tags) if isinstance(raw_tags, list) else set()
-        if not (tags & domain_set):
+
+        # Strip frontmatter for body-level checks
+        body = text
+        if text.startswith("---"):
+            end = text.find("\n---", 3)
+            if end != -1:
+                body = text[end + 4:]
+
+        # Rule 1: ≥2 distinct knowledge-tree wikilinks.
+        # Daily/raw links count as substrate citations, not concept endpoints,
+        # so they're excluded from the cardinality check.
+        knowledge_links: set[str] = set()
+        for link in extract_wikilinks(body):
+            target = link.split("|", 1)[0].strip()  # strip Obsidian alias `[[X|label]]`
+            if target.startswith(("daily/", "raw/")):
+                continue
+            knowledge_links.add(target)
+        if len(knowledge_links) < 2:
             issues.append(issue(
-                "warning", "concept_no_domain_tag", rel,
-                f"concept has no tag from {sorted(domain_set)} — "
-                f"will render grey in graph view. Current tags: {sorted(tags)[:6]}",
+                "warning", "connection_under_linked", rel,
+                f"connection article cites only {len(knowledge_links)} distinct "
+                f"knowledge wikilink(s) — a connection MUST name ≥2 endpoints "
+                f"(found: {sorted(knowledge_links)})",
             ))
+
+        # Rule 2: one of tension/mechanism/dependency must be present + non-empty.
+        present_kinds = [
+            k for k in CONNECTION_KIND_FIELDS
+            if k in fm and fm[k] not in (None, "", [])
+        ]
+        if not present_kinds:
+            issues.append(issue(
+                "warning", "connection_missing_kind", rel,
+                f"connection article missing a kind discriminator — exactly one of "
+                f"{list(CONNECTION_KIND_FIELDS)} must be present in frontmatter "
+                f"to declare whether this is a mechanism / contrast / hard-dependency",
+                auto_fixable=True,
+            ))
+
+        # Rule 3: body word-count ≥ floor.
+        body_word_count = len(body.split())
+        if body_word_count < min_words:
+            issues.append(issue(
+                "warning", "connection_shallow_body", rel,
+                f"connection article body is {body_word_count} words "
+                f"(minimum {min_words}) — too short to assert a real mechanism / "
+                f"contrast / dependency beyond restating the linked concepts",
+            ))
+
     return issues
 
 
@@ -947,6 +1056,7 @@ async def main() -> None:
         ("Article type", check_article_type),
         ("QA schema", check_qa_schema),
         ("Concept domain tag", check_concept_domain_tag),
+        ("Connection depth", check_connection_depth),
         ("Two-layer pages", check_two_layer_pages),
         ("Action item syntax", check_action_item_syntax),
         ("Area status", check_area_status),

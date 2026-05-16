@@ -156,6 +156,14 @@ class Limits:
     # genuinely citing the source.
     curiosity_quote_min_anchor_tokens: int = 5
     sparse_threshold_words: int = 200
+    # Connection-article quality gate (M012, 2026-05-16). A `type: connection`
+    # article below this body word-count fires `connection_shallow_body` in
+    # lint — connections that don't reach this floor almost always restate
+    # the linked concepts side-by-side instead of asserting a load-bearing
+    # mechanism/contrast/dependency between them. Companion check
+    # `check_connection_depth` also enforces ≥2 distinct wikilink targets
+    # and a `tension|mechanism|dependency` frontmatter field.
+    connection_min_words: int = 50
     # YouTube ingest (scan-youtube.py — see also CONFIG.piggybacks.scan_youtube)
     youtube_max_frames: int = 30          # Tier-3 visual: cap frames per video
     youtube_max_duration_s: int = 10800   # Tier-3: skip videos longer than this (3h default)

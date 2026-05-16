@@ -272,38 +272,49 @@ updated: 2026-04-03
 
 ### Connection Articles (`knowledge/connections/`)
 
-Cross-cutting synthesis linking 2+ concepts. Created when a source reveals a non-obvious relationship.
+Cross-cutting synthesis that asserts a non-trivial CLAIM about how 2+ concepts relate. NOT a co-occurrence note, NOT a side-by-side restatement of either concept.
+
+A connection article MUST:
+1. **Name a load-bearing mechanism, contrast, dependency, or causal claim** between the linked concepts. If you cannot write 3 sentences of genuine synthesis that don't already appear in either linked concept, prefer an inline `[[wikilink]]` between the concepts over a standalone connection article.
+2. **Cite each linked concept by `[[wikilink]]`** in the body. ≥2 distinct `knowledge/`-tree wikilinks (`daily/` and `raw/` references are sources, not endpoints).
+3. **Declare the kind of relationship** in frontmatter with exactly one of:
+   - `mechanism:` — "X enables Y because Z" / causal or mechanistic chain
+   - `tension:` — "X contradicts / pulls against Y" / contrast or contradiction
+   - `dependency:` — "Y cannot exist without X" / hard prereq with no further mechanism claim
+4. **Body ≥ 50 words** below the frontmatter.
+5. **Carry a domain tag** so the article anchors into the graph view's color groups (same rule as `type: concept`).
+
+Lint enforces all five (see `scripts/lint.py:check_connection_depth` + `check_concept_domain_tag`). Rejected examples:
+- `"X and Y both relate to AI"` → co-occurrence, REJECT.
+- `"See also [[X]], [[Y]]"` → no claim, REJECT.
+- 3-line body with just a `connects:` list → fails the word-count floor.
 
 ```markdown
 ---
-title: "Connection: X and Y"
+title: "Connection: A2A Protocol enables Work Orchestration"
+type: connection
+mechanism: "A2A's task-state model provides the inter-agent dispatch primitive that the work-orchestration gap had identified as missing."
 connects:
-  - "concepts/concept-x"
-  - "concepts/concept-y"
+  - "concepts/a2a-fleet-communication"
+  - "concepts/work-orchestration-gap"
 sources:
-  - "daily/2026-04-04.md"
-created: 2026-04-04
-updated: 2026-04-04
+  - "daily/2026-04-18.md"
+tags: [fleet]
+created: 2026-04-20
+updated: 2026-04-20
 ---
 
-# Connection: X and Y
+# Connection: A2A Protocol enables Work Orchestration
 
-## The Connection
+## The Claim
 
-[What links these concepts]
-
-## Key Insight
-
-[The non-obvious relationship discovered]
+The [[concepts/work-orchestration-gap]] surfaced on 2026-04-17 named "task dispatch between agents" as Fleet's missing primitive. One day later, [[concepts/a2a-fleet-communication]] adopted A2A, whose `a2a_tasks` table with 8 spec-defined states is exactly that dispatch primitive. The gap and the solution were discovered independently but the protocol's task model resolves the architectural hole the gap analysis predicted.
 
 ## Evidence
 
-[Specific examples]
-
-## Related Concepts
-
-- [[concepts/concept-x]]
-- [[concepts/concept-y]]
+- `a2a_sendMessage` provides the dispatch verb the gap analysis required.
+- 8 task states (`submitted`, `completed`, `failed`, ...) cover the review-and-retry cycle the gap had named as unhandled.
+- See `daily/2026-04-18.md` for the architecture-decision context.
 ```
 
 ### Q&A Articles (`knowledge/qa/`)

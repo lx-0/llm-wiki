@@ -38,6 +38,7 @@ Key changes covered (chronological):
   limits.compile_per_call_timeout_s        (added 2026-05-16, default 600 — per-call timeout for compile SDK invocations)
   personal.implicit_operator_author        (added 2026-05-16, default None — author-attribution fallback for single-tenant vaults)
   personal.domains                         (added 2026-05-16 M013, default [company, personal, ai, meta] — optional domain:-frontmatter enum)
+  limits.connection_min_words              (added 2026-05-16 M012, default 50 — connection-article quality gate floor)
 
 Idempotent: a config already on the current schema produces no change.
 
@@ -132,6 +133,11 @@ KEY_ADDITIONS: dict[str, dict[str, object]] = {
         # Match Limits.compile_per_call_timeout_s default in
         # `scripts/core/config.py`.
         "compile_per_call_timeout_s": 600,
+        # M012 (2026-05-16): connection-article quality gate. Body word
+        # count below this floor fires `connection_shallow_body` in lint;
+        # 50 was chosen because anything shorter empirically just restates
+        # the linked concepts without asserting a real mechanism.
+        "connection_min_words": 50,
     },
     "piggybacks": {
         # M006 calendar collector — mirrors gmeet / jamie 6 h cadence.

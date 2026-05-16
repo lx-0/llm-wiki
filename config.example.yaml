@@ -154,6 +154,11 @@ limits:
   curiosity_quote_min_anchor_tokens: 5
   # Lint.
   sparse_threshold_words: 200
+  # Connection-article quality gate (M012). type:connection bodies below
+  # this word count fire `connection_shallow_body` in lint — they almost
+  # always restate concepts side-by-side instead of asserting a real
+  # mechanism / contrast / dependency.
+  connection_min_words: 50
   # YouTube ingest (collectors/scan_youtube.py).
   youtube_max_frames: 30                 # Tier-3 visual: cap frames per video
   youtube_max_duration_s: 10800          # Tier-3: skip videos longer than this (default 3h)
