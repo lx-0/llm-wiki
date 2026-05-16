@@ -143,9 +143,40 @@ The one gap operator's plan implicitly covered (long-form deliberate human writi
 
 Phase 0 ✓ (tarball `~/Archive/lx-vault-2026-05-16.tar.gz`, verified). Phase 1 ✓ (cold-storage commit `cf8db73` in lxw vault repo). Phase 2 blocked on prerequisites. Phase 3 blocked on Phase 2.
 
-**Prerequisites for Phase 2** (revised after compile-role-axis emerged):
-- `compile-role-axis.md` — generic engine-skip / index-only / distill axis; absorbs `archives-flag.md`
-- `areas-bucket.md` — 7th knowledge bucket for ongoing responsibilities
-- `entity-pages-state-timeline.md` — gbrain pattern for the bulk per-entity migration
+**Prerequisites for Phase 2** (revised 2026-05-16 after import-quality survey — see "Phase 2 quality stack" below):
 
-Related: `archives-flag.md` (subsumed by compile-role-axis; mark as historical), `areas-bucket.md`, `domain-frontmatter.md`, `entity-pages-state-timeline.md`, `gbrain-comparison.md`.
+**Schema (must-have):**
+- `compile-role-axis.md` — generic engine-skip / index-only / distill axis; absorbs `archives-flag.md`. Required so longform strategy docs land as source-and-final (preserves form), not distilled away. **M007 in flight.**
+- `areas-bucket.md` — 7th knowledge bucket for ongoing responsibilities. Required so ~30 lx Personal/Company-Areas don't force-fit into `projects/`.
+- `entity-pages-state-timeline.md` — gbrain pattern for the bulk per-entity migration. 85% of lx content is entity-shaped (handovers, service-architecture per topic).
+- `author-attribution.md` — `author:` frontmatter + `personal.implicit_operator_author` config. Required so operator-authored strategy docs attribute to alex's perspective, not "the company".
+
+**Quality (should-have — significant attribution + cross-link uplift):**
+- `takes-substrate.md` — WHO-believes-WHAT (confidence + date). lx strategy docs encode positions of multiple stakeholders (alex / cidpartners / customers / partners). Without takes, attribution collapses to undifferentiated "the company thinks X". Sibling to author-attribution.
+- `connection-quality.md` — Improves compile-time connections quality. Without this, ~85% of entity-pages-migration ships with suboptimal cross-links to existing knowledge/people/* + knowledge/concepts/*.
+- `domain-frontmatter.md` (optional but cheap) — `domain: company|personal|ai` tag, captures lx's clear 3-way top-level split during migration so dashboard/graph filter by domain post-import.
+
+**Reliability (real risks for the migration run itself):**
+- `compile-60kb-plus-silent-fail.md` — `Yesterday Tech Company Bible.md` is 113 KB, `yesterday-strategy-workdoc.md` is 20 KB. Concrete risk hitting the >60KB silent-fail surface during bulk migration.
+- `compile-per-call-timeout.md` — Phase 2 runs many compile calls in sequence; a single hanger blocks the whole migration without timeout.
+- `compile-already-on-1m-fallback.md` — long-context failure on migrated content currently kills the file terminally; skip-and-flag would preserve batch survival.
+
+**Post-Phase-2 (optional re-synthesis pass):**
+- `dream-cycle.md` — cross-time synthesis re-evaluates imported content against current substrate ("alex 2025-03 thought X, jamie 2026-04 revised to Y"). Valuable ramp-up after migration; Phase 2 doesn't gate on it.
+
+## Phase 2 quality stack — recommended ship order
+
+1. `compile-role-axis` (M007 in flight) — engine-skip + longform slot
+2. `compile-60kb-plus-silent-fail` + `compile-per-call-timeout` + `compile-already-on-1m-fallback` (reliability bundle, ~2d combined) — survive the bulk run
+3. `areas-bucket` (~2d) — 7th bucket
+4. `entity-pages-state-timeline` (~3d) — 2-layer schema
+5. `author-attribution` (~1.5d) — operator-as-implicit-author
+6. `takes-substrate` (~2-3d) — third-party attribution
+7. `connection-quality` (~1-2d) — cross-link quality multiplier
+8. `domain-frontmatter` (~1.5d, parallel-shippable any time) — optional axis
+9. **Phase 2 migration** — entity-page-by-entity-page hand-curated walk through `imported/lx/**`
+10. `dream-cycle` (post-Phase-2 re-synthesis, optional)
+
+Total prerequisite lift: ~14 dev-days for a high-quality migration. Phase 2 itself is then operator-driven judgment work over ~65 entities.
+
+Related: `archives-flag.md` (subsumed by compile-role-axis; mark as historical), `areas-bucket.md`, `entity-pages-state-timeline.md`, `author-attribution.md`, `takes-substrate.md`, `connection-quality.md`, `domain-frontmatter.md`, `compile-60kb-plus-silent-fail.md`, `compile-per-call-timeout.md`, `compile-already-on-1m-fallback.md`, `dream-cycle.md`, `gbrain-comparison.md`.

@@ -41,10 +41,10 @@ Cheap to ship, no canary dependency, immediate quality-of-life lift.
 
 The gbrain-pattern cluster that complements M005. Re-evaluate after canary signal — extraction quality on real substrate is the gating data.
 
-- **`takes-substrate.md`** — third-party belief attribution ("WHO believes WHAT, confidence + date"). Sibling category to Hard-Facts; covers operator's read of others' positions. Highest-leverage extension if entity-pages dogfood well.
+- **`takes-substrate.md`** [HOT for lx-merge Phase 2] — third-party belief attribution ("WHO believes WHAT, confidence + date"). Sibling category to Hard-Facts; covers operator's read of others' positions. Highest-leverage extension if entity-pages dogfood well.
 - **`dream-cycle.md`** — scheduled cross-time synthesis (vs. per-file compile). Different from compile in that it synthesizes *across* the timeline. Cheapest validation: schedule it as a piggyback, see what it produces over a week.
 - **`subtype-axis.md`** — split `concepts/` into 6 meaningful color groups for the graph view. Quality-of-life, not load-bearing.
-- **`connection-quality.md`** — improve `connections/` article quality at compile time.
+- **`connection-quality.md`** [HOT for lx-merge Phase 2] — improve `connections/` article quality at compile time.
 - **`curiosity-consumer-gap.md`** — close the curiosity-loop consumer side (producer alive, consumer missing).
 - **`curiosity-topic-as-search-query.md`** — use topic as IMAP/Gmail search-query, not blind folder dump.
 - **`curiosity-dashboard.md`** — surface curiosity loop in dashboard.
@@ -66,6 +66,32 @@ No urgency. Each adds capture surface; the wiki's value plateaus around 4-5 acti
 
 - `karpathy-comparison.md`, `gbrain-comparison.md` (architecture-comparison artifacts; keep)
 - `collectors.md` (meta doc)
+
+
+## 📦 lx-vault-merge prerequisite stack (cross-references)
+
+Items already listed above, grouped here to make the import-quality stack visible. Order in `lx-vault-merge.md` "Phase 2 quality stack".
+
+**Schema (must-have):**
+- compile-role-axis (M007 in flight)
+- areas-bucket
+- entity-pages-state-timeline
+- author-attribution
+
+**Quality (should-have):**
+- takes-substrate — promoted from Medium → Hot for Phase 2 attribution fidelity
+- connection-quality — promoted from Medium → Hot for cross-link quality
+- domain-frontmatter (optional, parallel-shippable)
+
+**Reliability (real Phase-2-run risks):**
+- compile-60kb-plus-silent-fail
+- compile-per-call-timeout
+- compile-already-on-1m-fallback
+
+**Post-Phase-2 (optional):**
+- dream-cycle
+
+Total prerequisite lift: ~14 dev-days. See `lx-vault-merge.md` for the rationale + ship order.
 
 ## Re-triage cadence
 
