@@ -229,6 +229,11 @@ limits:
   # survives a structurally-unprocessable file. Set to false to surface
   # every kind=unknown as a failure (legacy pre-2026-05-15 behavior).
   compile_skip_on_long_context_unknown: true
+  # When true (default), files without explicit `compile_role:` frontmatter
+  # get a role inferred from their top-level segment (raw/daily/inbox/knowledge
+  # → source-only). Set false to require explicit frontmatter on every file
+  # (useful if you have non-standard top-level folders).
+  compile_role_default_by_location: true
 
 features:
   # Master switches for entire capabilities.

@@ -304,6 +304,14 @@ class Limits:
     # would just abort the batch on unrelated files. Off-switch surfaces
     # every kind=unknown as a failure (legacy behavior, pre-2026-05-15).
     compile_skip_on_long_context_unknown: bool = True
+    # When True (default), `infer_compile_role()` falls back to LOCATION_DEFAULTS
+    # (raw/daily/inbox/knowledge → source-only) for files that omit the
+    # `compile_role:` frontmatter key. When False, all files without explicit
+    # `compile_role:` short-circuit to source-only regardless of path. Operators
+    # with non-standard top-level layouts may want to disable the inference and
+    # require explicit per-file frontmatter. Standard `wiki seed` layouts work
+    # with the default on.
+    compile_role_default_by_location: bool = True
 
 
 @dataclass

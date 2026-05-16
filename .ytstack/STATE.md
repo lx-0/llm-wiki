@@ -4,7 +4,7 @@ slug: llm-wiki
 last_updated: 2026-05-16T15:20:18Z
 current_milestone: M007
 active_slice: S01
-active_task: T01
+active_task: T02
 ---
 
 # State

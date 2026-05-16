@@ -86,6 +86,12 @@ KEY_ADDITIONS: dict[str, dict[str, object]] = {
         # Preserves the consecutive-failure budget so the batch survives
         # a structurally-unprocessable file.
         "compile_skip_on_long_context_unknown": True,
+        # M007-S01-T02 (2026-05-16): When true (default), files without
+        # explicit `compile_role:` frontmatter get a role inferred from
+        # their top-level segment (raw/daily/inbox/knowledge → source-only).
+        # Set false to require explicit frontmatter on every file (useful
+        # if you have non-standard top-level folders).
+        "compile_role_default_by_location": True,
         # Google Calendar collector (M006, 2026-05-15). Per-HTTP-call timeout
         # against calendar.googleapis.com / per-calendar event cap / past +
         # future windows in days. Match the dataclass defaults in
