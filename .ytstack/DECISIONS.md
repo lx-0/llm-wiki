@@ -712,3 +712,22 @@ These are companion-rules to [[Templates are load-bearing — never backlog temp
 **How to apply.** Any new background-spawn site that triggers a heavy LLM-call script + writes shared state should self-defend with a global mutex on the spawned-script side (not the spawn-site side). The spawn-site dedup is inherently racy (state-read happens before any side effect of "the work is now in flight"). Helper is short — extract to `core/proc_lock.py` only on 3rd use-site.
 
 **Touchpoints.** `scripts/compile.py:418-445` (helper + main()-entry call); `tests/test_compile_lock.py` (3 unit tests on uncontested / contended / recovers-after-release semantics). End-to-end smoke verified manually. Commit `8075270` (origin/main). Closely related: M003-S04-* and 2026-05-03 incident around `_dashboard_refresh_lock`.
+
+## 2026-05-16: Substrate-aware compile dispatch — compile_main is EXPLICIT-ONLY, compile_default is safe-by-default
+
+**Context.** Single-day arc: five substrate types (calendar-rollup, daily-digest, health-rollup, screenshot-batch, memory-sync+seed) each independently hit `kind=max_turns` / `kind=cost_exceeded` when they implicitly fell through to `compile_main.md`. compile_main is the heavy dialog-substrate prompt (two-layer State+Timeline carry-forward, Action Item routing, resolution-detection). For metadata-only, distilled, or mechanical substrates, those operations have nothing to do — agent fans out, loops on max_turns at $2-5 per file. Empirical: ~$144 burned in pre-classification-fix `kind=unknown` failures alone on a single morning lxw batch.
+
+**Decision.** Three locks in compile.py (commits `feaa853`, `2bd618a`, `2246078`):
+
+1. **`SUBSTRATE_PROMPTS.get()` default fallback** is `_DEFAULT_DISPATCH = ("compile_default", 12, "claude-haiku-4-5-20251001")`. Any frontmatter `type:` (or path-pattern via `_substrate_key()`) not in the table routes to the lean default prompt on Haiku. compile_main.md is **EXPLICIT-ONLY** — currently no entries route to it (the dialog substrates that would legitimately need it are <5 files in queue and have not been profiled).
+
+2. **Per-file cost guard** `compile_max_cost_per_file_usd: 2.5` checks `ResultMessage.total_cost_usd` and returns `FailureClass("cost_exceeded", …)`. `is_fatal()=True` for cost_exceeded → batch ABORTS so the next file doesn't repeat the burn. Operator can raise the knob or add the substrate to `compile_skip_substrate_types`.
+
+3. **Model precedence in compile.py** (fixed `feaa853`): substrate_model from SUBSTRATE_PROMPTS wins over force-long-context tier and over size-based escalation (50KB+ → [1m]). Before this fix, a 64KB screenshot file routed to Haiku via SUBSTRATE_PROMPTS got re-bumped to Opus[1m] by the size threshold, defeating the dispatch entirely.
+
+**How to apply.**
+- Adding a new substrate-emitting collector: ship the SUBSTRATE_PROMPTS row + dedicated lean prompt **in the same commit**. Producer frontmatter SHOULD carry `type: <name>`; if it can't (legacy producer, no-frontmatter format), add a `_SUBSTRATE_PATH_FALLBACKS` entry.
+- Bespoke prompts beat the generic default when the substrate's compile workflow is known and bounded (calendar concept-stub creation, screenshot back-linking, etc.). Default is still safe but does less.
+- compile_main.md changes: re-read this entry first. The prompt is no longer the default path — modifications are only seen by explicit SUBSTRATE_PROMPTS entries.
+
+**Touchpoints.** `scripts/compile.py` (SUBSTRATE_PROMPTS, _DEFAULT_DISPATCH, _substrate_key, _attempt model precedence, cost guard); `prompts/compile_{calendar,daily,health,screenshots,memories,default}.md`; `scripts/core/config.py` (compile_max_cost_per_file_usd, compile_skip_substrate_types); `scripts/migrations/migrate_config_keys.py` (KEY_ADDITIONS for new knobs); `scripts/core/sdk_helpers.py` (FailureClass kinds incl. `max_turns`, `cost_exceeded`, `agent_error`). KNOWLEDGE.md "Every accumulating substrate type needs its own SUBSTRATE_PROMPTS entry (2026-05-16)" has the full operational pattern.

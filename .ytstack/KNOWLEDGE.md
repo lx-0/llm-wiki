@@ -81,10 +81,24 @@ The dedicated prompt:
 - Has an explicit anti-loop guard ("if after N turns you haven't finished, emit final result").
 - Skips `knowledge/log.md` updates UNLESS the substrate-type genuinely produces no other audit trail (health-rollup does → log entries kept; calendar/daily skip log because Timeline appends are the trail).
 
-Existing examples:
+Existing examples (state at end of 2026-05-16):
 - `compile_calendar.md` (12 turns, Haiku) — recurring-concept stubs + attendee Timeline appends.
 - `compile_daily.md` (20 turns, Haiku) — cross-link entity Timelines from already-distilled digests.
-- `compile_health.md` (6 turns, Haiku) — append to policy article `compiled_from:` + emit log entry. New 2026-05-16.
+- `compile_health.md` (10 turns, Haiku) — append to policy article `compiled_from:` + emit log entry.
+- `compile_screenshots.md` (30 turns, Haiku) — concept extraction + `source_screenshots:` back-linking; vision-LLM batch reports of 30-100 frames; for `type: screenshot-batch` (path-pattern fallback for legacy files without frontmatter).
+- `compile_memories.md` (25 turns, Haiku) — cross-link operator-memory copies (memory-sync / memory-seed) to existing project pages; one Timeline append + optional pattern stub.
+- `compile_default.md` (12 turns, Haiku) — **default fallback** for any type NOT in SUBSTRATE_PROMPTS. Lean concept extraction, cautious about creating stubs. Safe-by-default: unknown substrate types cost $0.20-0.30 worst-case instead of $2-5 on compile_main.
+
+#### Architectural shift (2026-05-16, evening) — safe-by-default dispatch
+
+After whack-a-moling 5 substrate types in one day (calendar / daily / health / screenshot / memory-sync+seed), the structural answer landed: `SUBSTRATE_PROMPTS.get()` no longer defaults to `("compile_main", …)`. The default is now `_DEFAULT_DISPATCH = ("compile_default", 12, Haiku)`. `compile_main.md` is **EXPLICIT-ONLY** — add an entry to route a substrate to it (currently no entries do; the dialog-rich substrates that would legitimately need it — jamie/gmeet/voice/transcript — are <5 files each in queue today and have not yet been profiled).
+
+What this prevents: a new substrate type lands tomorrow → no SUBSTRATE_PROMPTS entry → routes to compile_default + Haiku → costs pennies even if it max_turns. The whack-a-mole loop is broken at the architectural level. Future substrate prompts are still a good idea (lean and bespoke beats generic lean), but no longer URGENT — there's no $2-5/file fire to put out.
+
+Companion safety nets shipped same day:
+- `compile_max_cost_per_file_usd: 2.5` — per-file cost guard, ResultMessage.total_cost_usd checked; on overrun returns `kind=cost_exceeded` (is_fatal=True → batch aborts). Default raised twice today (1.0 → 2.0 → 2.5) as lean prompts revealed their real cost ceiling.
+- Model-precedence fix in compile.py: substrate_model from SUBSTRATE_PROMPTS now wins over size-based escalation (50KB+ → [1m]). Before this fix, a 64KB screenshot file routed to Haiku via SUBSTRATE_PROMPTS got re-bumped to Opus[1m] by the size threshold, defeating the dispatch.
+- `_substrate_key()` resolves dispatch by frontmatter `type:` first, then `_SUBSTRATE_PATH_FALLBACKS` (today: `raw/notes/screenshots/screenshots-*` → `screenshot-batch` for legacy files without the new frontmatter).
 
 #### When NOT to add a SUBSTRATE_PROMPTS row
 
@@ -100,6 +114,22 @@ When you add a collector that emits a new `type:` value:
 4. Verify: a dry-run compile against a sample file routes to the expected prompt + completes under $0.20.
 
 The cost of forgetting is ~$2-3 per file × N days × M operators until someone notices.
+
+### Curiosity-loop consumer was operationally broken end-to-end for ~3 days (2026-05-16)
+
+Three independent gaps stacked, each invisible alone, together produced 100% null-output:
+
+1. **Piggyback never injected into operator configs.** Engine default `core/config.py:_default_piggybacks()` had `curiosity_followup` from 2026-05-13, but `KEY_ADDITIONS` in `scripts/migrations/migrate_config_keys.py` never added it. Migration-via-`wiki update` happily preserved operator configs that simply didn't carry the block → `flush.py:maybe_run_piggyback_tasks` had no entry to fire. State file showed last_run on the day of the original rename migration; nothing after.
+2. **Even if the piggyback fired: `--run-oldest` drains 1 request per 24h cooldown.** Producer (compile.py:`maybe_generate_curiosity_requests`) emits ~3 requests per compiled source. Net drain rate is permanently underwater. 176 requests had accumulated on lxw before anyone noticed.
+3. **Even if drain rate were sane: the consumer always returned `messages_pulled: 0`.** `ThunderbirdMboxReader.scan_deep` does strict folder-name equality after a substring filter, but kasserver's local on-disk layout was `INBOX-1.sbd/<sub>` (canonical `INBOX.sbd/` directory did not exist — Thunderbird subscribed the folder twice and aliased the second instance with a `-N` suffix). Every request targeting `INBOX/<sub>` hit zero files because that's not what's on disk. 12/12 done requests had 0 messages → all 12 deep-*.md outputs were empty stubs.
+
+Repaired in commit chain:
+- `migrate_config_keys.KEY_ADDITIONS["piggybacks"]["curiosity_followup"]` added; auto-injects into existing vault configs on next `wiki update`.
+- `curiosity/cli.py --run-batch N` flag + flush wiring uses `--run-batch {max_per_run}`. Default `max_per_run=5, cooldown_hours=6` → 20/day drain rate.
+- `ThunderbirdMboxReader._resolve_folder_alias()` probes `<head>-N` for N=1..9 when canonical head doesn't exist on disk. Applies to both `scan_deep` and `scan_metadata(folder=…)`. Logged once at WARNING per resolution for observability.
+- `scripts/migrations/cleanup_empty_deep_scans.py` — one-shot: deletes empty curiosity deep-scan outputs (filter: `origin: curiosity/email-deep-scan` + `messages: 0`), flips status=done requests with messages_pulled=0 back to pending so the alias-fixed consumer reprocesses.
+
+Generalisable rule: when shipping a producer-consumer pair under a piggyback, verify all three points END-TO-END against a real vault: (a) piggyback config-block lands in operator config via migration, (b) drain rate exceeds producer rate, (c) consumer produces non-zero output on representative inputs. The 2026-05-13 backlog file falsely marked the work `status: shipped` after passing only (a) at engine-default-level, not (a-in-operator-config) and not (b) and not (c).
 
 ### Compile prompt injection via substrate — agent treated session-rollups as code-change orders (2026-05-15)
 
