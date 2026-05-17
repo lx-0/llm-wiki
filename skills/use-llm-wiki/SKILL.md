@@ -218,6 +218,17 @@ Heavy and/or costs real money. Confirm explicitly **and** state the cost.
 - **`wiki correct apply SLUG`** — agentically propagate a hard fact across the
   whole vault (strikes contaminated claims, fixes wikilinks, renames files).
   Agentic and `$$$` — the heaviest single command.
+- **`wiki dream <slug>` / `wiki dream --all-entities`** — agentic recursive
+  deepening of an entity page (people/projects/areas) by re-reading the most
+  recent substrate it appears in and rewriting `## State` / `## Timeline` /
+  `## Action Items` / `## Open Threads`. `$$$` per entity (Claude Opus). Run
+  `wiki dream list-candidates` first to see what would be selected. Per-entity
+  cooldown lives on `scheduling.dream_cooldown_days` (default 7d).
+- **`wiki produce <name> <source>`** — manually re-run one Producer (`curiosity`,
+  `suggestions`, `takes`) against a specific source file. `wiki produce --list`
+  enumerates registered Producers. Cheap-to-mid (Ollama for most; takes uses
+  Claude). Producers normally run automatically as a post-pass after each
+  successful compile.
 - **`wiki lint`** — structural + LLM contradiction checks. `wiki lint
   --structural-only` is the cheap, no-LLM variant.
 - **`wiki review-wiki`** — per-article quality-score sweep (local LLM, free but

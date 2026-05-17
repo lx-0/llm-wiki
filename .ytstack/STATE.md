@@ -1,7 +1,7 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-05-17T14:10:00Z
+last_updated: 2026-05-17T15:20:00Z
 current_milestone: M019
 active_slice: none
 active_task: none
@@ -10,7 +10,13 @@ parallel_milestones: [M021]
 
 # State
 
-**Status:** M019 planned (L). M018 SHIPPED 2026-05-17 (parallel session) — see entry below.
+**Status:** M019 planned (L). M018 SHIPPED 2026-05-17 (parallel session) — see entry below. M020 SHIPPED 2026-05-17 (this session) — backlinks footer.
+
+---
+
+**M020 SHIPPED 2026-05-17 — Backlinks footer (single-slice, S-size).** Commits `bb4c3f9` (feat + tests + skill-doc + migration) + `afa7b51` (architecture/overview diagram updates) + `f7f5b01` (test-suite cleanup, 720/720) — all on local main, **not pushed**. New module `scripts/core/backlinks.py` (extractor + writer + corpus-pass orchestrator) wired into `compile.py:main()` post per-source loop. Sentinel-managed `## Backlinks` block per `knowledge/<article>.md`, gated by `features.materialize_backlinks: bool = True`. Idempotent. Live-vault probe: 1131/1238 articles received footers, 220 ms full pass, byte-stable on re-run. Memory pointer `project_m020_backlinks_footer_shipped`. DECISIONS + KNOWLEDGE entries written. Open: end-to-end observation inside a real `wiki compile` run (REGEL-#1-bounded until next flush-trigger). The compile.py wiring landed via the parallel session's commit `50389c2` (attribution-slip via prepare-commit-msg hook, same incident class as `b173be5`); data integrity intact, message attribution wrong.
+
+**M020 side-effect cleanup (commit `f7f5b01`):** 720/720 test suite green for the first time in a while. Fixed 10 `${owner_block}` placeholder failures (owner-block injection arc had landed without updating test fixtures), 2 `last_run` datetime/string coercion failures (PyYAML auto-parses ISO-8601 stamps; added `_coerce_last_run()` in `core/agent_spec.py`), 1 boundary-arithmetic failure in `test_dream_sampling.py` (`strftime` truncates to midnight, widened assertion range), 3 migration-test count bumps (M019 had added 3 KEY_ADDITIONS without bumping the round-trip fixture).
 
 ---
 

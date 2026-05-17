@@ -70,6 +70,7 @@ Master switches for entire capabilities. Disable when the dependency (Ollama, we
 | `features.vision_screenshots` | `true` | Local vision OCR for `scan-screenshots`. |
 | `features.procmail_execution` | `true` | Allow `suggestions/cli.py` to call webmail Procmail APIs. Default off in `config.example.yaml` (kasserver-specific). |
 | `features.clippings_sweep` | `true` | Pre-compile sweep of `<vault>/Clippings/*.md` into `<vault>/raw/articles/`. Disable if Obsidian Web Clipper drops directly into `raw/articles/`. |
+| `features.materialize_backlinks` | `true` | Corpus-wide post-compile pass writes a sentinel-managed `## Backlinks` footer into every `knowledge/<article>.md`. Idempotent — unchanged corpus produces zero writes. Flip false to skip the sweep (compile-timing comparison, or operator wants to manage backlinks differently). |
 
 ## limits
 

@@ -118,8 +118,8 @@ def test_migrate_config_file_round_trip(tmp_path):
     #    dream_entity_max_cost_usd + dream_cycle_max_cost_per_run_usd (M014),
     #    dream_tier1_recent_count + dream_tier1_digest_days +
     #    dream_tier2_sample_count (M016)
-    #  + 4 piggybacks additions (calendar, curiosity_followup, dream_cycle — M014,
-    #    pictures — 2026-05-17)
+    #  + 6 piggybacks additions (calendar, curiosity_followup, dream_cycle — M014,
+    #    pictures — 2026-05-17, study_run_due + analyst_pass2 — M019-S05)
     #  + 1 created-features-block + 6 features additions
     #    (extract_takes — M011, voice_punctuate — 2026-05-17,
     #    suggestions_source_globs — Producer-seam arc,
@@ -134,8 +134,8 @@ def test_migrate_config_file_round_trip(tmp_path):
     # (LIST_ADDITIONS has one entry but operator's freshly-injected
     # skip-list already contains "email-delta" from KEY_ADDITIONS, so
     # the list-extend is a no-op on greenfield.)
-    # = 45 changes (no drops — operator has no orphan personal.* fields)
-    assert len(changes) == 45, f"got {len(changes)} changes: {changes}"
+    # = 47 changes (no drops — operator has no orphan personal.* fields)
+    assert len(changes) == 47, f"got {len(changes)} changes: {changes}"
 
     reparsed = yaml.safe_load(new_text)
     # piggyback side
@@ -175,6 +175,8 @@ def test_migrate_config_no_change_when_fully_current(tmp_path):
             "curiosity_followup": {"enabled": True, "cooldown_hours": 6, "max_per_run": 5},
             "dream_cycle": {"enabled": True, "cooldown_hours": 24, "max_per_run": 3},
             "pictures": {"enabled": True, "cooldown_hours": 6, "max_per_run": 20},
+            "study_run_due": {"enabled": False, "cooldown_hours": 6},
+            "analyst_pass2": {"enabled": False, "cooldown_hours": 168},
         },
         "limits": {
             "compile_force_long_context_types": [],
@@ -329,6 +331,8 @@ def test_migrate_additions_idempotent():
             "curiosity_followup": {"enabled": True, "cooldown_hours": 6, "max_per_run": 5},
             "dream_cycle": {"enabled": True, "cooldown_hours": 24, "max_per_run": 3},
             "pictures": {"enabled": True, "cooldown_hours": 6, "max_per_run": 20},
+            "study_run_due": {"enabled": False, "cooldown_hours": 6},
+            "analyst_pass2": {"enabled": False, "cooldown_hours": 168},
         },
         "features": {
             "extract_takes": False,

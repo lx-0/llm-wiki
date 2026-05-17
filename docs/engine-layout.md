@@ -35,6 +35,7 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 │   │   ├── ollama_client.py       ← single Ollama transport (chat / chat_schema / chat_vision)
 │   │   ├── sdk_helpers.py         ← StderrCapture + log_sdk_failure + assert_prompt_within_budget (Claude Agent SDK)
 │   │   ├── utils.py               ← shared helpers (article listing, JSON state, history) + now_iso/today_iso
+│   │   ├── backlinks.py           ← corpus-wide backlinks-footer materialization (post-compile global pass; sentinel-managed `## Backlinks` per article)
 │   │   ├── agent_spec.py          ← agent-task spec parser (prompts/agents/*.md → AgentSpec)
 │   │   ├── google_oauth.py        ← Gmail OAuth2 bootstrap (local-loopback consent flow)
 │   │   └── flush_pipeline.py      ← staged-flush state machine (stage / commit / archive / pending)

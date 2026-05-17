@@ -1991,3 +1991,37 @@ Substrate set for both: `daily/*.md`, `raw/notes/voice/`, `raw/notes/health/`, `
 
 **Implication for S02-T02 design:** the batched-by-subscale interface remains the right shape even though wedge fits as single-batch — the batching machinery is the migration path for personality instruments when pre-digestion lands. Skip the temptation to ship single-batch-only as a wedge shortcut.
 
+
+---
+
+## M020 — backlinks footer (2026-05-17)
+
+### Vault wikilink convention is path-relative, not bare-stem
+
+The lxw vault uses folder-prefixed wikilinks (`[[concepts/fleet-manager-patterns]]`) ~exclusively, not bare-stem (`[[fleet-manager-patterns]]`). The engine's `core.utils.wiki_article_exists` resolves `[[link]]` to `<knowledge>/<link>.md` — so the canonical slug for `knowledge/concepts/foo.md` is `concepts/foo`, NOT `foo`.
+
+**Trap caught in M020:** the first-pass `_article_slug()` returned `path.stem` (bare), producing 0/1491 index-key matches against the real vault. The fix was `path.relative_to(knowledge_dir).with_suffix("").as_posix()`. Cost: one Read-the-real-data cycle to discover the convention before TDD-design.
+
+**Implication for any future feature that resolves wikilinks → article paths:** match `wiki_article_exists`. Don't invent a parallel resolver. Don't assume Obsidian's case-insensitive bare-stem matching applies; this vault chose path-prefixed in practice.
+
+### Corpus-wide post-pass after per-source compile is a reusable hook
+
+`compile.py:main()` runs per-source `compile_source()` in a loop, then one global pass at the end. M020 added `run_backlinks_pass(KNOWLEDGE_DIR)` to that tail. The pattern is generic: **read whole corpus → build derived index → idempotent sentinel-managed write into each article's tail**.
+
+Future axes can ride the same hook:
+
+- `## Compiled From` block (currently lives in frontmatter only) — could be materialized into the body so non-Obsidian readers see it.
+- `## Related Concepts` (semantic neighbors) — derived per article, written via sentinel.
+- `## Type Family` (peers within `type: concept` or `type: people`) — useful for graph navigation.
+
+**Pattern requirements:**
+
+1. **Sentinel-managed region.** Mirror `collectors/calendar_collector.py` shape: `<!-- <feature>:begin -->` / `<!-- <feature>:end -->`. Operator-prose above/below survives.
+2. **Idempotency guard.** Byte-stable on unchanged input. M020's `write_backlinks_footer` returns `False` when the new computed content == existing file content.
+3. **Empty-state removal.** If the derived list is empty, REMOVE the sentinel region (no orphan empty heading). M020's contract: zero incoming = no footer at all.
+4. **No state mutation outside the corpus.** Don't write a sidecar JSON; the markdown IS the artifact.
+
+### `--scale 4` on excalidraw render hits the Chrome canvas-pixel ceiling silently
+
+Confirms earlier STATE.md note on `--scale 2` dropping content >12k pixels per side. M020's diagram subagent rendered at scale=4, producing 12132×11902 — at the ceiling. Visual content was preserved this time (lucky), but defensive re-render at `--scale 1` was needed to match production PNG dimensions (3033×2976) and avoid the bloat. **Default `--scale 1` for diagrams already >3k pixels per side; only bump to 2 for small diagrams where readability needs it.**
+

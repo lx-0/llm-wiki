@@ -39,4 +39,4 @@ Every `knowledge/<article>.md` carries a sentinel-managed `## Backlinks` footer 
 ## Risks
 
 - **Compile fan-out**: every compile run touches every article that gained an incoming link. Bounded by O(corpus) reads + writes (~1239 files today). Idempotency guard ensures no churn when no links change. Acceptable.
-- **`wiki correct apply` interaction**: agentic vault-wide rename pass walks knowledge/. Backlinks footer must survive its rewrites; verified by `grep -rn 'backlinks:' scripts/facts/correct.py` showing no sentinel-aware handling needed (the agent reads + rewrites whole articles).
+- **`wiki correct apply` interaction**: agentic vault-wide rename pass uses `Write/Edit` on `knowledge/` files. Empirically grepped `scripts/facts/correct.py`, `scripts/facts/correct_apply.py`, and `prompts/correct_apply*` 2026-05-17 — **zero** references to backlinks or the sentinel. Outcome: if the agent rewrites a file wholesale, the footer may be stripped; next `wiki compile` regenerates it idempotently. Footer is recoverable, not load-bearing data. Acceptable failure mode.

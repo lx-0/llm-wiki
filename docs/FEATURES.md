@@ -76,6 +76,7 @@ All eleven collectors are Registry-discovered (`wiki collect --list` is the auth
 | Feature | Status | Code | Trigger | Docs |
 |---|---|---|---|---|
 | Compile (raw + daily → knowledge) | 🟢 | `scripts/compile.py` | `wiki compile`, `wiki compile --all`, `wiki compile --file PATH`; auto-triggered by `flush.py` after `compile_after_hour` if daily/ changed | PROCESS §3, concept "Consolidation", README "Compile once, query fast" |
+| Backlinks footer (corpus-wide post-pass) | 🟢 | `scripts/core/backlinks.py` (`build_backlinks_index`, `write_backlinks_footer`, `run_backlinks_pass`) | Auto-runs at end of every `wiki compile` (after per-source loop), gated by `features.materialize_backlinks` (default `true`). Writes a sentinel-managed `## Backlinks` block (delimited by `<!-- backlinks:begin -->` / `<!-- backlinks:end -->`) into every `knowledge/<article>.md` that has at least one incoming wikilink. Idempotent — unchanged corpus = zero writes. ~220 ms on a 1200-article vault. | PROCESS §3, `skills/use-llm-wiki/SKILL.md` (Read-tier) |
 | Query (natural language → answer) | 🟢 | `scripts/query.py` | `wiki query "…"`, `wiki query --file-back "…"` (writes Q&A article) | PROCESS §5, concept "Retrieval" |
 | Lint (8 structural + 1 LLM) | 🟢 | `scripts/lint.py` | `wiki lint` (full); `wiki lint --structural-only` (cheap, piggyback) | PROCESS §5, concept "Self-healing", cli.md |
 

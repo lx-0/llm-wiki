@@ -1,4 +1,17 @@
-# M020 infographic update (deferred)
+# M020 infographic update — DONE 2026-05-17
+
+**Status**: shipped in commit `afa7b51` via subagent dispatch; defensive re-render at `--scale 1` to match production PNG dimensions (3033×2976), no element moved or removed. See `.ytstack/DECISIONS.md` 2026-05-17 M020 entry for the broader arc.
+
+**Edits landed**:
+
+- `docs/architecture.excalidraw`: `compile_text` element (line ~3065) extended with a 7th line `· post-pass writes ## Backlinks footer per article`. Fits the existing 140 px `compile_rect` (7 lines × 14 px × 1.25 line-height = 122.5 px). No geometry change.
+- `docs/overview.excalidraw`: `p2_resilience` (green caption under the compile.py pill) extended with `· articles carry ## Backlinks footer`. Free-floating, no container, no element moved.
+
+**Verify steps run**: visual diff of before/after PNGs (no other elements changed); `--scale 1` re-render of both files after defensive scale=4 rendering hit the Chrome canvas-pixel ceiling.
+
+---
+
+# Original briefing (kept for posterity)
 
 **Owed**: per memory `feedback_infographics_track_engine` ("reliability/fallback features must hit both `docs/architecture.excalidraw` + `docs/overview.excalidraw` in the same arc as code; 'wrong abstraction level' is rationalization, render it first").
 
