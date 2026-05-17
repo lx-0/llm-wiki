@@ -32,22 +32,27 @@ Bare `wiki` runs `scripts/menu_context.py` to probe the vault (~150ms cold,
 hard-capped at 500ms via `SIGALRM`) and renders four sections in order:
 
 ```
-  wiki — lxw vault (commit 1852029)
+  wiki — lxw vault (commit abc1234)
   384 articles · last compile 4h ago · ollama ✓     ← (1) status one-liner
 
-  ▸ Pending in your vault                            ← (2) ranked suggestions
-      1) 3 files in inbox/             → wiki process-inbox
-      2) 12 sources changed            → wiki compile
+  ▸ Actionable in your vault  (↑↓ Enter · 1-9 jump)  ← (2) unified actionable
+    ▸ ⚠ 1) no project-scope hooks installed   → wiki hooks install
+        2) 3 files in inbox/                  → wiki process-inbox
+        3) 12 sources changed                 → wiki compile
+
+  ▸ Heads-up  (read-only — fix manually)             ← (2b) info-only
+      ⚠ ollama unreachable at http://kcma-d8:11434
+        → check Ollama is running; or `wiki config set models.ollama_url ''`
 
   ▸ Quick actions                                    ← (3) fixed shortcuts
-      [q] query  [f] flush  [l] lint  [s] status
+      [c] compile  [q] query  [f] flush  [l] lint  [s] status
 
   ▸ Browse                                           ← (4) category sub-menus
-      [c] collectors  [i] ingest  [k] knowledge ops
-      [d] facts/takes [a] automation [g] setup
-      [h] full help   [x] exit  (type /foo to filter all commands)
+      [o] collectors+OAuth   [i] ingest    [k] knowledge ops
+      [d] facts/takes        [a] automation [g] setup
+      [h] full help          [x] exit  (type /foo to filter all commands)
 
-  Pick one:
+  Pick: _
 ```
 
 **(1) Status one-liner** — three fields rendered when available:
@@ -58,11 +63,16 @@ hard-capped at 500ms via `SIGALRM`) and renders four sections in order:
 | `last compile Nh ago` | humanized delta from `state.json["last_compile"]`   |
 | `ollama ✓` / `✗`   | TCP-connect probe at `models.ollama_url` (150ms cap)   |
 
-**(2) Pending suggestions** — seven probe signals, only non-zero rows
-shown, sorted by priority. When all probes return zero the section
-renders `✨ Nothing pending — vault is current.` instead.
+**(2) Actionable list** — unified row of:
 
-| # | Signal                                          | Suggested command            |
+- **Health checks** with a clean single-cmd auto-fix (currently:
+  setup-not-run → `wiki setup`; hooks-installed → `wiki hooks install`;
+  compile-state when 30d+ stale → `wiki compile`). Severity glyph
+  (✗ critical / ⚠ warning) in the gutter, position number for keyboard.
+- **Probe suggestions** from `menu_context.py` — seven signals, only
+  non-zero rows shown, in priority order:
+
+| # | Signal                                          | Dispatched command           |
 |---|-------------------------------------------------|------------------------------|
 | 1 | files in `inbox/`                               | `process-inbox`              |
 | 2 | sources newer than last compile                 | `compile`                    |
@@ -72,13 +82,22 @@ renders `✨ Nothing pending — vault is current.` instead.
 | 6 | today's `daily/sessions/<date>.md` missing      | `flush`                      |
 | 7 | knowledge edits newer than newest lint report   | `lint --structural-only`     |
 
-**(3) Quick actions** — `q` query / `f` flush / `l` lint (structural-only) /
-`s` status. Letter or number both work.
+`↑/↓` walks the whole list, `Enter` dispatches the cursor's row, `1-9`
+jumps directly. When everything passes the section renders
+`✨ Nothing pending — vault is current.` instead.
 
-**(4) Browse** — six category sub-menus (collectors / ingest / knowledge ops
-/ facts & takes / automation / setup) cover the 30+ subcommands. Each
-sub-menu uses inline letter shortcuts (`[l] list collectors`, `[r] run a
-collector`, `[b] back`).
+**(2b) Heads-up** — critical/warning health checks WITHOUT a clean auto-fix
+(`ollama-unreachable`, `claude-authed`, `compile-errors-recent`,
+`template-drift`). Read-only — operator runs the suggested fix manually.
+
+**(3) Quick actions** — `c` compile / `q` query / `f` flush / `l` lint
+(structural-only) / `s` status. Letter or number both work; compile is
+the daily verb, idempotent and ~50ms when nothing's changed.
+
+**(4) Browse** — six category sub-menus (collectors+OAuth / ingest /
+knowledge ops / facts & takes / automation / setup) cover the 30+
+subcommands. Letters: `o i k d a g`. Each sub-menu uses inline letter
+shortcuts (`[l] list collectors`, `[r] run a collector`, `[b] back`).
 
 **Fuzzy filter** — typing `/<substring>` at the home prompt matches against
 a hand-curated catalog of 49 commands (case-insensitive). One match
@@ -102,15 +121,14 @@ Python layer: the prior bash home screen trip-wired on bash-3.2 quirks once
 per feature (no `${var,,}`, empty array under `set -u`, fractional `read -t`
 unsupported). Background: `.ytstack/backlog/python-interactive-menu.md`.
 
-**Health banner:** Above the status line, the menu renders every
-critical + warning issue from `wiki doctor` (probes config + connectivity
-+ pipeline). Operator-facing fix-hint inline with each issue. Info-only
-issues stay out of the banner (live in `wiki doctor`). Per-issue render:
-
-```
-  ⚠ no project-scope hooks installed — session capture won't fire
-      → wiki hooks install
-```
+**Health integration:** Probes via `core/health.py` run alongside the
+suggestions probe. Each check returns a `CheckResult` with optional
+`dispatch_args: list[str]` — when set, the check is promoted into the
+navigable Actionable list (operator hits Enter, the menu shells out to
+`wiki <dispatch_args>`). Checks without dispatch_args (multi-step or
+shell-only fixes) render in the read-only Heads-up section below.
+Three checks ship dispatch_args today: setup-not-run, hooks-installed,
+compile-state (stale).
 
 ## Agent-facing surfaces
 
@@ -144,15 +162,19 @@ read vault state programmatically without parsing pretty output:
   "summary": {"critical": 0, "warning": 1, "info": 1, "ok": 6},
   "checks": [
     {"id": "hooks-installed", "category": "config", "severity": "ok",
-     "message": "hooks installed in project scope (claude, cursor)",
-     "fix": null, "details": {"agents": ["claude", "cursor"]}}
+     "message": "hooks installed (user: claude, cursor; project: claude)",
+     "fix": null, "dispatch_args": null,
+     "details": {"user": ["claude", "cursor"], "project": ["claude"]}}
   ]
 }
 ```
 
 Stable field names per check: `id`, `category`, `severity`, `message`,
-`fix?`, `details?`. Severity is one of `critical | warning | info | ok`.
-Exit code: `0` if no critical issues, `1` otherwise.
+`fix?`, `dispatch_args?`, `details?`. Severity is one of
+`critical | warning | info | ok`. Exit code: `0` if no critical issues,
+`1` otherwise. When `dispatch_args` is non-null the menu promotes the
+issue into the navigable Actionable list and Enter dispatches
+`wiki <dispatch_args>`.
 
 Agents pick a suggestion from `wiki menu --json` then dispatch via the
 regular bash subcommand (e.g. `wiki compile`). They never ask the menu
