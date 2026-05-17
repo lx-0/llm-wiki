@@ -72,6 +72,7 @@ CATEGORIES: dict[str, tuple[str, list[tuple[str, str, str, object]]]] = {
     ]),
     "k": ("knowledge ops", [
         ("compile",       "compile changed sources ($$)",   "incremental run",                        ["compile"]),
+        ("compile-10",    "compile up to 10 sources ($$)",  "small batch — cap via --max-files 10",   ["compile", "--max-files", "10"]),
         ("compile-file",  "compile one file ($$)",          "vault-relative path",                    ("prompt", "Path", ["compile", "--file", "{arg}"])),
         ("lint-struct",   "lint (structural only)",         "no LLM, cheap",                          ["lint", "--structural-only"]),
         ("lint-full",     "lint (full, costs $)",           "incl. contradiction check",              ["lint"]),
