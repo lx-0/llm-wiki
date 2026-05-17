@@ -1,101 +1,81 @@
-# Backlog Priority — post-M005
+# Backlog Priority — post-M020 snapshot
 
-Snapshot 2026-05-15 after M005 closure. **Heuristic, not formal commitment.** Re-run after canary findings (`docs/m005-s03-canary-procedure.md`) shape real-world priority signal.
+Last reset: 2026-05-17 after M020 (backlinks footer) closeout. Inventory: 50 open · 28 shipped (`shipped/`) · 2 rejected (`rejected/`).
 
-## ✅ Done — close these out
+**Heuristic, not formal commitment.** Re-evaluate after every milestone close. When a file ships, `git mv` it into `shipped/`; when explicitly rejected, into `rejected/`. Keep the working directory short — agents glance at this list to find the next move.
 
-Already shipped; their backlog files describe historical context, not future work. Safe to leave (project memory) or move to `.ytstack/backlog/shipped/` if the dir gets too noisy.
+## 🔥 Hot — small, contained, ready to ship
 
-- `entity-pages-state-timeline.md` — M005 entirely (`eb7da72`)
-- `gmeet-collector.md` — M004 close (`4762a99`)
-- `jamie-intake.md` — shipped via `scripts/collectors/jamie.py`
-- `jamie-multi-tenant-lift.md` — shipped 2026-05-15 (per memory)
-- `voice-intake.md` — recent parallel-session ship (`01b8dd3` + sibling commits)
-- `health-collector.md` — Oura Phase 1 shipped (`1fd1044`); future phases stay backlog
-- `dashboard-action-items.md` — subsumed by M005-S05's Personal Tasks pane (re-check before reopening)
-- `screenshots-intake.md`, `youtube-intake.md` — shipped previously
-- `compile-role-axis.md` — M007 entirely (`1022fd6`), 23 commits, all 5 exit criteria green
-- `areas-bucket.md` — M008 (`3a445b7`), Agent A in parallel worktree
-- `author-attribution.md` — M009 (`691d786`), Agent B
-- `compile-60kb-plus-silent-fail.md` + `compile-per-call-timeout.md` + `compile-already-on-1m-fallback.md` — M010 reliability bundle (`b16a406`), Agent C
-- `takes-substrate.md` — M011 (`ba63c1c`), Agent D; producer gated behind `features.extract_takes` until operator dogfoods
-- `connection-quality.md` — M012 (`a16a01e`), Agent E
-- `domain-frontmatter.md` — M013 (`04b4d6f`), Agent F
+Pick one when "next?" comes up and the operator wants a concrete tick.
 
-## ❌ Rejected — close
+- **`distribution-strip.md`** — strip `.ytstack/`, `tests/`, `.git/hooks/` from vault installs (`install.sh` + `wiki update`). ~1-2 h, single STRIP_LIST array. Stale `.ytstack/` no longer mutates (PR #17 fixed), but still clutters every vault.
+- **`m019-diagrams-update.md`** — parallel-session-owed diagram update for M019 (operator-self-reports). Same shape as the M020 infographic arc that just shipped: extend pillars, no badges/dates.
+- **`ytstack-hook-exit-code.md`** — `pre-tool-use-edit` hook exits 2 when intent was warn-only. Half-day fix or plan-task skill change.
+- **`voice-punctuate-followups.md`** — end-to-end test + optional pre-2026-05-17 backfill + quality observation window.
+- **`pictures-followups.md`** — HEIC ingest path untested, archive-policy decision deferred (iCloud footprint).
+- **`stg-glob-pattern.md`** — Firefox STG backup dir versions; glob support so engine doesn't pin a single version.
+- **`voice-openwhispr.md`** — OpenWhispr v1.7.0 stores transcripts in SQLite, not files. Reader-kind for voice collector.
+- **`flush-orphan-recovery.md`** — recovery for orphan flushes (check current state).
+- **`preflight-guard-rollout.md`** — extend pre-flight prompt-size guard to remaining LLM call sites.
 
-Explicitly rejected after audit; keep files as decision-context only.
+## 🌱 Medium — design clarified, blocked or waiting on signal
 
-- `lateral-linking.md` — Tag-Jaccard "Related" sections rejected after audit re-verify (`796e97e`)
-- `meetily-intake.md` — rejected during Jamie eval (per `project_meeting_intake_candidates`)
+Real value, real cost; needs canary data, parallel-session coordination, or operator green-light.
 
-## 🔥 Hot M006 candidates — small, contained, real value
+- **`compile-agent-no-filesystem-write.md`** — return structured payload via `ResultMessage`, write deterministically in `compile.py`. Was the M018-S03 vision before that slice got cancelled; full requirements in `commit-article-manifest.md`.
+- **`commit-article-manifest.md`** — re-arch plan for `commit_article` after M018-S03 cancel (knowledge-writes are agent-side via SDK tool-use, not pure I/O extractable).
+- **`search-tools.md`** — M020-deferred axis-aware `wiki search --type --domain --author` + temporal `wiki recent`. Re-evaluate when vault crosses ~3k articles or dream-cycle/curiosity surface a real query bottleneck.
+- **`recursive-session-summary.md`** — flush-context Phase 2 (hierarchical summarisation). Deferred 4-6 wks after gen-2 budgets prove out.
+- **`personality-substrate-predigestion.md`** — gating IPIP-NEO-120 / HEXACO-60 / PID-5 behind pre-digestion. M019 follow-up; not blocking the wedge.
+- **`lx-vault-merge.md`** — Phase 2 (longform import + cross-vault link reconciliation). Phase 0+1 ✓; Phase 2 unblocked by M007/M008/M009 ships.
+- **`interactive-cli.md`** — Python interactive-menu shipped (`scripts/menu.py`); this is the broader CLI UX vision.
+- **`m005-infographics-extension.md`** — deferred parts only after the 2026-05-15 wrapup doc-gap pass.
+- **`subtype-axis.md`** — split `concepts/` into ~6 color groups for the graph view. Quality-of-life, not load-bearing. Re-evaluate after dream-cycle output shape stabilises.
+- **`obsidian-app-json-smart-merge.md`** — concrete: smart-merge `.obsidian/app.json` so `wiki seed --force` doesn't overwrite operator preferences.
+- **`compiler-suggestions.md`** — suggestion sweep originating from compile-time observations (status TBD on re-read).
+- **`postcompact-only-injection.md`** — optional optimization on the 2026-05-05 pointer-block refactor.
+- **`prompt-aware-index-injection.md`** — optional/configurable feature, evaluate after SessionStart matures.
+- **`wiki-correct-deferred.md`** — `wiki correct` CLI followups.
+- **`curiosity-dashboard.md`** — dashboard pane for curiosity-loop output.
+- **`curiosity-topic-as-search-query.md`** — use curiosity-topic as IMAP/Gmail search-query, not blind folder dump.
+- **`dashboard-action-items.md`** — likely subsumed by M005's Personal Tasks pane (verify before reopening).
+- **`dashboard-upcoming-events.md`** — was blocked on calendar-collector; M006 shipped, so now unblocked.
 
-Cheap to ship, no canary dependency, immediate quality-of-life lift.
+## 🌾 Collector ideas — large pool, pick when capacity allows
 
-- **`ytstack-hook-exit-code.md`** — `pre-tool-use-edit` hook bug surfaced during M005 (exit 2 blocks when intent was warn-only). Fix: hook returns exit 0 + stderr warning, OR `plan-task` skill auto-injects SUMMARY paths into Files section. ~half a day.
-- **`compile-60kb-plus-silent-fail.md`** — real silent-failure surface in compile.py at ≥60 KB sources. Real bug, not aspirational.
-- **`compile-per-call-timeout.md`** — `compile.py` lacks per-call timeout on SDK `query()`. Sibling to the 60kb fail.
-- **`preflight-guard-rollout.md`** — extend the pre-flight prompt-size guard to remaining LLM call sites (small, mostly mechanical).
-- **`watermark-on-failure-fix.md`** — sibling to a recent fix; check if already absorbed by parallel work.
-- **`lx-vault-merge.md`** — Phase 0+1 ✓ (tarball `~/Archive/lx-vault-2026-05-16.tar.gz` + commit `cf8db73` in lxw vault repo). Phase 2 blocked on compile-role-axis (M007 in flight) + areas-bucket + entity-pages + author-attribution.
+Each one is a substrate collector; same shape as the 11 already shipped. None is hot; ship when the substrate's input grows enough to be worth wiring.
 
-## 🌱 Medium — entity-page-layer extensions (M006 or M007)
+- **`screenshots-intake.md`** — Tier 3+4 still open (Tier 0-2 shipped).
+- **`youtube-intake.md`** — T3-cloud + curiosity-loop + dashboard open (T0-T3-local shipped).
+- **`imap-reader-and-gmail-strategy.md`** — generic IMAP shipped; internal-OAuth-app strategy doc.
+- **`browser-history-collector.md`** — Firefox/Chrome history → raw/notes/browser/.
+- **`github-activity-collector.md`** — issues/PRs/comments → raw/notes/github/.
+- **`reading-highlights-collector.md`** — Readwise/Kindle/Pocket → raw/notes/highlights/.
+- **`music-listening-collector.md`** — Spotify/Apple Music → raw/notes/music/.
+- **`llm-transcripts-collector.md`** — Claude/ChatGPT export → raw/transcripts/llm/.
+- **`dms-collector.md`** — Slack/iMessage/WhatsApp → raw/notes/dms/.
+- **`nas-ingest.md`** — local NAS file-tree as substrate.
+- **`sunoflow-collector.md`** — Suno music-generation history (2026-05-15 self-cartography arc).
 
-The gbrain-pattern cluster that complements M005. Re-evaluate after canary signal — extraction quality on real substrate is the gating data.
+## 📚 Research / cluster / forward-looking
 
-- **`dream-cycle.md`** — scheduled cross-time synthesis (vs. per-file compile). Different from compile in that it synthesizes *across* the timeline. Cheapest validation: schedule it as a piggyback, see what it produces over a week.
-- **`subtype-axis.md`** — split `concepts/` into 6 meaningful color groups for the graph view. Quality-of-life, not load-bearing.
-- **`curiosity-consumer-gap.md`** — close the curiosity-loop consumer side (producer alive, consumer missing).
-- **`curiosity-topic-as-search-query.md`** — use topic as IMAP/Gmail search-query, not blind folder dump.
-- **`curiosity-dashboard.md`** — surface curiosity loop in dashboard.
+Living docs, not actionable wedges. Read when adjacent work surfaces them.
 
-## 🐌 Long-tail — substrate expansion + tooling debt
+- **`architecture-deepening.md`** — 13 candidates + 6 M003 framings (do NOT re-run `improve-codebase-architecture`).
+- **`architecture-scaling-2028.md`** — 4-lever sequence for 5k+ articles (subtype-axis → MOC-first → lifecycle-tier → recursive-dream-cycle).
+- **`gbrain-comparison.md`** — gbrain pattern lift (entity-pages + takes + dream-cycle all shipped from this cluster; remaining ideas live here).
+- **`karpathy-comparison.md`** — Karpathy-pattern comparison cluster.
+- **`collectors.md`** — parent collector-pattern doc.
+- **`vault-dashboard.md`** — original vault-UX design doc; M003 dashboard shipped most of it.
+- **`obsidian-plugin.md`** — engine-as-plugin idea (ready, not actionable now).
+- **`seed-semantic-diff.md`** — semantic-diff for `wiki seed` operator-preference preservation.
+- **`readme-polish.md`** — deferred README polish items pending engine stability.
+- **`cleanup-followups.md`** — accumulated cleanup notes.
 
-No urgency. Each adds capture surface; the wiki's value plateaus around 4-5 active substrates. Pick when an existing substrate becomes saturated and a real demand signal appears for one of these.
+## ✅ Done — in `shipped/`
 
-**Second-wave substrates:**
+29 files moved 2026-05-17. M005-M020 + ad-hoc arcs: areas-bucket, author-attribution, calendar-collector, compile-{60kb, 1m-fallback, per-call-timeout, role-axis, scope-allowlist}, connection-quality, curiosity-consumer-gap, domain-frontmatter, dream-{cycle, priority-config, sampled-activation}, entity-pages-state-timeline, gmeet-collector, health-collector, jamie-intake + multi-tenant-lift, m020-infographic-update, operator-self-reports, producer-seam, python-interactive-menu, takes-substrate, use-llm-wiki-skill, vault-health-doctor, watermark-on-failure-fix, agents-template-scanner-resync.
 
-- `browser-history-collector.md`, `github-activity-collector.md`, `llm-transcripts-collector.md`, `calendar-collector.md` (note: `scan_calendar.py` exists; might be re-shape), `dms-collector.md`, `reading-highlights-collector.md`, `music-listening-collector.md`, `sunoflow-collector.md`, `nas-ingest.md`
+## ❌ Rejected — in `rejected/`
 
-**Tooling / docs / polish:**
-
-- `architecture-deepening.md` (saturated walk per memory), `obsidian-plugin.md`, `use-llm-wiki-skill.md`, `vault-dashboard.md`, `dashboard-upcoming-events.md`, `distribution-strip.md`, `compiler-suggestions.md`, `collectors.md` (meta), `cleanup-followups.md`, `flush-orphan-recovery.md`, `imap-reader-and-gmail-strategy.md`, `prompt-aware-index-injection.md`, `postcompact-only-injection.md`, `readme-polish.md`, `seed-semantic-diff.md`, `wiki-correct-deferred.md`
-
-**Doc-only (reference, not actionable):**
-
-- `karpathy-comparison.md`, `gbrain-comparison.md` (architecture-comparison artifacts; keep)
-- `architecture-scaling-2028.md` — 4-lever scaling sequence for `knowledge/` over 2-3 years (subtype-axis → MOC-first → lifecycle-tier → recursive-dream-cycle); MOC auto-maintenance flagged as the real bottleneck blocker. Anchors any future "knowledge/ is getting too big" discussion.
-- `collectors.md` (meta doc)
-
-
-## 📦 lx-vault-merge prerequisite stack (cross-references)
-
-Items already listed above, grouped here to make the import-quality stack visible. Order in `lx-vault-merge.md` "Phase 2 quality stack".
-
-**Schema (must-have):**
-- compile-role-axis (M007 in flight)
-- areas-bucket
-- entity-pages-state-timeline
-- author-attribution
-
-**Quality (should-have):**
-- takes-substrate — promoted from Medium → Hot for Phase 2 attribution fidelity
-- connection-quality — promoted from Medium → Hot for cross-link quality
-- domain-frontmatter (optional, parallel-shippable)
-
-**Reliability (real Phase-2-run risks):**
-- compile-60kb-plus-silent-fail
-- compile-per-call-timeout
-- compile-already-on-1m-fallback
-
-**Post-Phase-2 (optional):**
-- dream-cycle
-
-Total prerequisite lift: ~14 dev-days. See `lx-vault-merge.md` for the rationale + ship order.
-
-## Re-triage cadence
-
-- After every milestone closes
-- When a parallel session ships a feature whose backlog file says "deferred" (close the file)
-- When a Hot candidate doesn't make a milestone for 2+ cycles (downgrade to Medium or reject explicitly)
+`lateral-linking.md` (Tag-Jaccard "Related" rejected after audit re-verify) · `meetily-intake.md` (rejected during Jamie eval).
