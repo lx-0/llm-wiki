@@ -477,6 +477,17 @@ class Features:
     # extra Ollama call per ingest. Graceful fallback: Ollama unreachable
     # → body = raw, no error.
     voice_punctuate: bool = True
+    # Path-scope enforcement for compile + dream agent Write/Edit calls
+    # via a `can_use_tool` callback (Python-side gate). Replaces the
+    # `Write(knowledge/**)` / `Edit(knowledge/**)` syntax in
+    # `--allowedTools`, which the bundled Claude Code CLI treats as
+    # bare `Write` / `Edit` (the parenthesised glob is decoration, not
+    # enforcement — verified by `scripts/probe_compile_scope.py`,
+    # 2026-05-17). When True the agent runs in streaming mode with the
+    # callback as the actual gate; when False the engine reverts to the
+    # decorative allowlist for one-line rollback if the streaming-mode
+    # rewrite surfaces edge cases under production load. Default True.
+    compile_callback_gate: bool = True
 
 
 @dataclass

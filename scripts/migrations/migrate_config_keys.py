@@ -47,6 +47,7 @@ Key changes covered (chronological):
   personal.picture_inbox                   (added 2026-05-17, default "" — camera/phone-photo inbox for collectors/pictures.py)
   piggybacks.pictures                      (added 2026-05-17, cooldown 6h, max_per_run 20 — vision-LLM-driven, lighter cadence than screenshots)
   features.voice_punctuate                 (added 2026-05-17, default True — Ollama-driven punctuation pass on voice transcripts at ingest)
+  features.compile_callback_gate           (added 2026-05-17, default True — `can_use_tool` callback as the real path-scope gate for compile + dream; replaces decorative `Write(knowledge/**)` syntax)
   limits.dream_tier1_recent_count          (added 2026-05-17 M016, default 20 — Tier 1 most-recent substrate count)
   limits.dream_tier1_digest_days           (added 2026-05-17 M016, default 7 — Tier 1 daily-digest day count)
   limits.dream_tier2_sample_count          (added 2026-05-17 M016, default 50 — Tier 2 weighted-sample size)
@@ -208,6 +209,16 @@ KEY_ADDITIONS: dict[str, dict[str, object]] = {
         # `_is_email_source` filter; widening the list enables suggestions
         # for additional substrates without code changes.
         "suggestions_source_globs": ["raw/email/*.md"],
+        # 2026-05-17 Path-scope enforcement via `can_use_tool` callback.
+        # Replaces the decorative `Write(knowledge/**)` /
+        # `Edit(knowledge/**)` syntax in `--allowedTools` (bundled CLI
+        # parses it as bare Write/Edit, verified by
+        # `scripts/probe_compile_scope.py`). When True the compile + dream
+        # agents run in streaming mode with a Python-side gate; when False
+        # they use the legacy decorative allowlist (kept as a one-line
+        # rollback path while the streaming-mode rewrite proves itself
+        # under production load). Default True.
+        "compile_callback_gate": True,
     },
     "piggybacks": {
         # M006 calendar collector — mirrors gmeet / jamie 6 h cadence.

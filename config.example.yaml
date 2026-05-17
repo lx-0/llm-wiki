@@ -352,6 +352,16 @@ features:
   # enable suggestions for other substrates.
   suggestions_source_globs:
     - "raw/email/*.md"
+  # Path-scope enforcement for compile + dream agent Write/Edit calls via a
+  # `can_use_tool` callback (Python-side gate). The previous defense —
+  # `"Write(knowledge/**)"` / `"Edit(knowledge/**)"` in `--allowedTools` —
+  # is decorative: the bundled Claude Code CLI parses it as bare Write/Edit
+  # and ignores the path glob (verified empirically by
+  # `scripts/probe_compile_scope.py` on 2026-05-17). When true the agent
+  # runs in streaming mode with the callback as the actual gate; when
+  # false the engine reverts to the decorative allowlist for one-line
+  # rollback if streaming-mode surfaces edge cases under production load.
+  compile_callback_gate: true
 
 graph_view:
   # Mode: knowledge-only | full-vault | sources-only | custom
