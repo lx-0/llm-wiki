@@ -22,7 +22,8 @@ POINTER_BLOCK = """# Knowledge base
 - Index: `knowledge/index.md` — flat catalog of all wiki articles. One row per article (link, summary, sources, date). Grep by topic, then Read the matched article(s). Don't try to load the full index — it's large.
 - Articles by type: `knowledge/concepts/`, `knowledge/projects/`, `knowledge/people/`, `knowledge/facts/`, `knowledge/MOCs/`, `knowledge/connections/`, `knowledge/qa/`.
 - Raw substrate (read-only, never write): `raw/notes/`, `raw/articles/`, `raw/transcripts/`, `raw/papers/`, `daily/`.
-- Schema + conventions: `AGENTS.md` at vault root."""
+- Schema + conventions: `AGENTS.md` at vault root.
+- Outside the vault (other projects): invoke the `use-llm-wiki` skill to query, contribute, or diagnose the wiki via its `wiki` CLI."""
 
 
 def read_recent_daily(max_lines: int = 30) -> str:
