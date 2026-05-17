@@ -574,11 +574,11 @@ last_updated: 2026-05-13
 
 ## Where to look next
 
-This file is the agent-facing schema reference — loaded into every compile prompt as `${agents_md}`, so it stays lean on purpose. Operator-side detail lives in the engine repo's `docs/`:
+This file is the agent-facing schema reference — loaded into every compile prompt as `${agents_md}`, so it stays lean on purpose. The full operator-side reference ships into the vault on every `wiki update` and lives at `<vault>/.wiki/docs/`. Read locally — no network round-trip:
 
-- **Operations** (`compile` / `query` / `lint` / `ingest` / `collect` commands, the curiosity loop, audio-ingest fallback chain) — [`docs/cli.md`](https://github.com/lx-0/llm-wiki/blob/main/docs/cli.md) and [`docs/PROCESS.md`](https://github.com/lx-0/llm-wiki/blob/main/docs/PROCESS.md).
-- **Collector inventory** (which substrate sources, what they read, where they write, piggyback cadence) — [`docs/FEATURES.md`](https://github.com/lx-0/llm-wiki/blob/main/docs/FEATURES.md) "Registry-discovered Collectors" table. Authoritative runtime enumeration: `wiki collect --list`.
-- **Configuration** (every `<vault>/.wiki/config.yaml` key with its dataclass default and rationale) — [`docs/config.md`](https://github.com/lx-0/llm-wiki/blob/main/docs/config.md).
-- **Engine layout** (`<vault>/.wiki/` directory map — `scripts/`, `prompts/`, `hooks/`, `lib/`) — [`docs/engine-layout.md`](https://github.com/lx-0/llm-wiki/blob/main/docs/engine-layout.md).
-- **Per-collector setup recipes** — [`docs/setup-voice.md`](https://github.com/lx-0/llm-wiki/blob/main/docs/setup-voice.md), [`docs/setup-pictures.md`](https://github.com/lx-0/llm-wiki/blob/main/docs/setup-pictures.md), [`docs/setup-gmeet.md`](https://github.com/lx-0/llm-wiki/blob/main/docs/setup-gmeet.md), [`docs/setup-obsidian.md`](https://github.com/lx-0/llm-wiki/blob/main/docs/setup-obsidian.md).
-- **Article-shape rationale** (two-layer State+Timeline pages, takes substrate, dream cycle) — the relevant `prompts/compile_*.md` in the engine repo carries the compile-time semantics.
+- **Operations** (`compile` / `query` / `lint` / `ingest` / `collect` commands, the curiosity loop, audio-ingest fallback chain) — [`.wiki/docs/cli.md`](.wiki/docs/cli.md) and [`.wiki/docs/PROCESS.md`](.wiki/docs/PROCESS.md).
+- **Collector inventory** (which substrate sources, what they read, where they write, piggyback cadence) — [`.wiki/docs/FEATURES.md`](.wiki/docs/FEATURES.md) "Registry-discovered Collectors" table. Authoritative runtime enumeration: `wiki collect --list`.
+- **Configuration** (every `<vault>/.wiki/config.yaml` key with its dataclass default and rationale) — [`.wiki/docs/config.md`](.wiki/docs/config.md).
+- **Engine layout** (`<vault>/.wiki/` directory map — `scripts/`, `prompts/`, `hooks/`, `lib/`) — [`.wiki/docs/engine-layout.md`](.wiki/docs/engine-layout.md).
+- **Per-collector setup recipes** — [`.wiki/docs/setup-voice.md`](.wiki/docs/setup-voice.md), [`.wiki/docs/setup-pictures.md`](.wiki/docs/setup-pictures.md), [`.wiki/docs/setup-gmeet.md`](.wiki/docs/setup-gmeet.md), [`.wiki/docs/setup-obsidian.md`](.wiki/docs/setup-obsidian.md).
+- **Article-shape rationale** (two-layer State+Timeline pages, takes substrate, dream cycle) — the relevant `.wiki/prompts/compile_*.md` carries the compile-time semantics.
