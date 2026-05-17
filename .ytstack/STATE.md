@@ -1,17 +1,17 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-05-17T13:45:00Z
+last_updated: 2026-05-17T13:55:00Z
 current_milestone: M022
 active_slice: S01
-active_task: T02
+active_task: T05
 last_completed_milestone: M020
 parallel_milestones: [M021]
 ---
 
 # State
 
-**Status:** M022 / S01 / T02 planned (T01 already implemented, will commit atomic with T02). Inbox-intake-Schema-Unifizierung: zwei-Zonen-Modell (`raw/inbox-<channel>/` = audit-archive, `raw/<category>/` = derived substrate), `.processed/`-Archive ausserhalb des Vaults werden eliminiert. T01-PLAN flaggt: T01+T02 müssen atomic ein Commit (zwischenzeitlich rote Tests sonst).
+**Status:** M022 / S01 — T01+T02 SHIPPED in commit `c51494a`. Two-zone intake live for process-inbox.py (HTML/binary/md+txt all archive original to raw/inbox-wiki/, artifact in raw/<cat>/). 824/824 tests + 6/6 smoke-invariants green. Next: T05 (integration tests for the two-zone invariants). T03+T04 rolled into T02 — see M022-S01-PLAN.md. Inbox-intake-Schema-Unifizierung: zwei-Zonen-Modell (`raw/inbox-<channel>/` = audit-archive, `raw/<category>/` = derived substrate), `.processed/`-Archive ausserhalb des Vaults werden eliminiert. T01-PLAN flaggt: T01+T02 müssen atomic ein Commit (zwischenzeitlich rote Tests sonst).
 
 ---
 

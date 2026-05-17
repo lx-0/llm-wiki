@@ -5,7 +5,7 @@ project: llm-wiki
 created: 2026-05-17T13:30:37Z
 status: planned
 task_count: 5
-completed_tasks: 0
+completed_tasks: 4
 ---
 
 # M022-S01 — Slice Plan
@@ -14,10 +14,10 @@ completed_tasks: 0
 
 ## Tasks
 
-- [ ] T01 — `INBOX_ARCHIVE_DIR = RAW_DIR / "inbox-wiki"` Constant einführen; `EXTENSION_MAP` neutralisieren (audio/pdf produzieren kein Artifact mehr, nur Original-Archive); CATEGORY_DIRS reduzieren auf Pfade, die echte derived artifacts erzeugen (article, note, transcript).
-- [ ] T02 — `process_inbox()` umbauen: pro File zuerst `shutil.copy2(file_path, INBOX_ARCHIVE_DIR / file_path.name)`; danach je nach Pfad das Artifact erzeugen. Source-File aus `inbox/` entfernen erst NACHDEM Archive + Artifact erfolgreich geschrieben sind (atomar-ish).
-- [ ] T03 — HTML-Pfad: `ingest-html.py`-Aufruf weiter über `--mode both`, aber `file_path.unlink()` ersetzen durch Move nach `INBOX_ARCHIVE_DIR` (Original-HTML bleibt erhalten, kein Datenverlust mehr).
-- [ ] T04 — Binary-Pfad (audio/pdf/sonstiges nicht-classifiziertes): Move nach `INBOX_ARCHIVE_DIR`, kein zweiter Schreibvorgang. Frontmatter-Stamping nur für md/txt-Artifacts.
+- [x] T01 — `INBOX_ARCHIVE_DIR = RAW_DIR / "inbox-wiki"` Constant einführen; `EXTENSION_MAP` neutralisieren (audio/pdf produzieren kein Artifact mehr, nur Original-Archive); CATEGORY_DIRS reduzieren auf Pfade, die echte derived artifacts erzeugen (article, note, transcript).
+- [x] T02 — `process_inbox()` umbauen: pro File zuerst `shutil.copy2(file_path, INBOX_ARCHIVE_DIR / file_path.name)`; danach je nach Pfad das Artifact erzeugen. Source-File aus `inbox/` entfernen erst NACHDEM Archive + Artifact erfolgreich geschrieben sind (atomar-ish).
+- [x] T03 — ~~HTML-Pfad: `file_path.unlink()` durch Move nach INBOX_ARCHIVE_DIR ersetzen.~~ **Rolled into T02** (die HTML-Branch des process_inbox()-Rewrites). Kein eigener Commit.
+- [x] T04 — ~~Binary-Pfad: Move nach INBOX_ARCHIVE_DIR, kein zweiter Schreibvorgang.~~ **Rolled into T02** (die Binary-Branch des process_inbox()-Rewrites). Kein eigener Commit.
 - [ ] T05 — Tests in `tests/test_process_inbox.py` (oder neu): je 1 Test pro Pfad (md/txt klassifiziert, html extract, mp3 binary, pdf binary) verifiziert Original landet in `raw/inbox-wiki/` UND (falls applicable) Artifact in `raw/<cat>/`.
 
 ## Done when
