@@ -77,4 +77,4 @@ tweaken und dann ggf auf woechentlich umstellen". Nicht ignorierbar.
 
 ## Status
 
-**PENDING** — checkpoint scheduled via `/schedule` 7d from 2026-05-17.
+**PENDING** — fires when fresh session on or after 2026-05-24 reads this file. Forcing function = the dated heading + hard deadline above. Operator can prompt any session with "m019 week 1 review" to trigger.
