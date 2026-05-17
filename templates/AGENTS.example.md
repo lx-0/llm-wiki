@@ -204,6 +204,62 @@ The schema that tells the LLM how to compile and maintain the knowledge base. Th
 
 ---
 
+## Analytical Surface — Operator Self-Reports (Air-Gapped from Compile)
+
+Parallel to the Layer-1→4 ingest→compile→knowledge pipeline, the engine
+ships a `reports/` surface for psychometric self-tracking. This is
+**air-gapped** from the compile loop — analyst-agent output never
+flows back into `knowledge/`, preventing a self-observation-bias
+feedback. Reports use a different scope, different scoring layer,
+different agents.
+
+**CLI surfaces:**
+
+```
+wiki study list                                # show studies + status
+wiki study run <study-id>                      # run all instruments + Pass-1 analyst
+wiki study run <study-id> --instrument SLUG    # narrow to one
+wiki study new <id> [--fork-from OTHER]        # create / clone
+wiki study answer <study-id> <instrument> <item-id> <value>
+                                               # operator answer for substrate-null items
+wiki analyze                                   # Pass-1 all studies + Pass-2 cross-study
+wiki analyze --study <id>                      # Pass-1 only on one study
+wiki analyze --cross-study-only                # Pass-2 only (cross-study synthesis)
+```
+
+**Layout (vault-root sibling of `knowledge/`):**
+
+```
+reports/
+  studies/<id>/
+    manifest.yaml             # immutable spec (schedule, instruments)
+    state.yaml                # engine-managed last_run_at + run_count
+    operator_answers.yaml     # populated by `wiki study answer` — operator-supplied items
+    runs/<UTC-ts>/
+      instruments/<slug>.md   # per-instrument deterministic report with embedded methodology
+      _summary.md             # cross-instrument meta-report (radar + sparkline + timelines)
+      _analysis.md            # Pass-1 analyst — substrate-grounded prose
+      charts/*.svg            # radar / coverage-sparkline / per-instrument-timeline
+  analyses/<UTC-ts>.md        # Pass-2 cross-study synthesis output
+```
+
+**Key invariants:**
+
+- Reports are **Informant Report**, not self-report — the LLM observer
+  scores items from substrate. Use `wiki study answer` to provide
+  explicit self-report for items marked `substrate_inferable: false`
+  in their instrument's items.yaml (interior states the substrate
+  can't reach).
+- Air-gapped: `reports/` is excluded from compile.py's substrate
+  scope via `COMPILE_SUBSTRATE_EXCLUDED_PREFIXES`. Agents reading
+  `daily/` / `raw/` / `knowledge/` MUST NOT also read `reports/` —
+  feeds self-observation-bias.
+- Every per-instrument report embeds its full methodology (items,
+  cutoffs, prompt-version, model-id, scope-spec, evidence paths)
+  inline. Reports are durable independent of the engine.
+
+---
+
 ## Structural Files
 
 ### `knowledge/index.md` — Master Catalog
