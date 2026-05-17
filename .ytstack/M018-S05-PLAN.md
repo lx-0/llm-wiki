@@ -3,12 +3,20 @@ milestone: M018
 slice: S05
 project: llm-wiki
 created: 2026-05-17T13:00:00Z
-status: planned
+status: cancelled
+cancelled_on: 2026-05-17T13:25:00Z
+cancelled_reason: ROADMAP renumbered after S01 fixture-vault drop. Post-pass-lift content moved to M018-S04-PLAN.md. This file is the historical placeholder.
 task_count: 5
 completed_tasks: 0
 ---
 
-# M018-S05 — Slice Plan
+# M018-S05 — Slice Plan (CANCELLED 2026-05-17)
+
+**Cancellation rationale:** When S01 fixture-vault was dropped, ROADMAP compressed 6 → 4 slices. Post-pass-lift content (was S05) is now S04. This file is preserved as a historical placeholder per the never-delete-ytstack-artifacts rule.
+
+The content below describes the post-pass-lift work — see `.ytstack/M018-S04-PLAN.md` for the live version.
+
+---
 
 **Goal:** `run_post_passes(source_path, compile_result, state) → list[ProducerResult]` lives in `scripts/compile_stages/post_passes.py` and replaces the inline post-pass call site that Phase 1 wired into `compile.py:main()` (commit `e730d26`). After this slice, no producer logic remains inline in `compile.py`.
 

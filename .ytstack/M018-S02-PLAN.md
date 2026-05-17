@@ -4,25 +4,26 @@ slice: S02
 project: llm-wiki
 created: 2026-05-17T12:50:00Z
 status: planned
-task_count: 4
+task_count: 5
 completed_tasks: 0
 ---
 
 # M018-S02 — Slice Plan
 
-**Goal:** Pure I/O function `select_sources(criteria) → list[Path]` lives in `scripts/compile_stages/select.py` and replaces the scattered selection logic in `compile.py:main()`. No LLM, no state writes, no SDK imports.
+**Goal:** Pure LLM-call function `compile_source(content, metadata) → CompileResult` lives in `scripts/compile_stages/compile.py` and owns prompt-assembly + owner-block + pre-flight 60kb gate + kind-unknown retry-ladder + SDK call + failure classification. No file I/O, no state writes, no `knowledge/` writes.
 
 ## Tasks
 
-- [ ] T01 -- Identify all selection logic in `compile.py:main()` (mtime-skip, hash-skip via state.json, role-axis filter from M007, `--dry-run`, `--file <path>` explicit mode, `compile_after_hour` cutoff, lock acquisition). Map each branch to where it'll live in the new pure function.
-- [ ] T02 -- Create `scripts/compile_stages/` package + `select.py` module. Define `SelectCriteria` dataclass (mtime_threshold, role_filter, explicit_files, dry_run, after_hour_cutoff). Move pure selection logic into `select_sources(criteria, state) → list[Path]`. State arg is read-only.
-- [ ] T03 -- Add `tests/test_select_sources.py` with ≥3 cases: (a) mtime-skip honors state.json hashes, (b) role-axis filter excludes `final-only` per M007, (c) `--dry-run` returns same list without side effects. Plus edge: empty vault returns `[]`.
-- [ ] T04 -- Wire `compile.py:main()` to call `select_sources()` instead of inlined logic. Run the S01 regression test — must stay green. Lock-acquisition stays in `main()` for now (orchestrator scope is S05's call).
+- [ ] T01 -- Define `CompileResult` dataclass in `scripts/compile_stages/types.py`: `status: Literal["ok", "skipped", "failed"]`, `article: str | None` (markdown body), `frontmatter_extra: dict`, `cost_usd: float`, `skip_reason: str | None`, `failure_kind: str | None`. Plus `CompileMetadata` for the input side (source_path, compile_role, model_id, max_turns, substrate_type).
+- [ ] T02 -- Create `scripts/compile_stages/compile.py:compile_source(content, metadata) → CompileResult`. Move the SDK call body from `compile.py` (lines ~789-960) into the new function. Owner-block helper, render(), preflight (`assert_prompt_within_budget`), retry ladder, classify_failure, can_use_tool gate construction — all called from within this function.
+- [ ] T03 -- Move the kind-unknown skip-and-flag branches (M010, `compile.py:1049-1078`) into the new function. Skip statuses become `CompileResult(status="skipped", skip_reason=...)`. Cost accumulation moves with them.
+- [ ] T04 -- Add `tests/test_compile_source.py` with ≥4 cases mocking SDK ResultMessage: (a) success returns CompileResult.status=ok + body + cost, (b) `kind=unknown` on long-context model returns status=skipped, (c) `kind=max_turns` returns status=skipped, (d) pre-flight 60kb fail returns status=failed before SDK call. Use existing `tests/conftest.py` SDK mocks.
+- [ ] T05 -- Wire `compile.py:main()` per-file loop to call `compile_source()`. The loop reads result + branches on status — does NOT inline the SDK call. Smoke check: `wiki compile <one-source>` on lxw still produces a knowledge/ article. State-save logic stays in `main()` until S03 lifts the write-side concerns.
 
 ## Done when
 
-All tasks marked `[x]` and verified via `ytstack:summarize-task`. `select_sources()` is independently importable, ≥3 unit tests, regression vault byte-identical.
+All tasks marked `[x]` and verified via `ytstack:summarize-task`. `compile_source()` is independently importable, ≥4 unit tests covering happy path + 2 skip paths + 1 fail path, lxw smoke run produces an article.
 
 ## Notes
 
-This is the easiest extraction — pure I/O, no SDK coupling. Sets the pattern (dataclass criteria + pure function + tests) for S03 and S04. Resist the urge to extract `compile_source()` in the same slice — bundling regresses the regression-test signal.
+This is the load-bearing slice — `compile_source()` carries the most logic. Resist re-architecting the retry ladder during extraction (mechanical move only). Owner-block injection (M009) and pre-flight (M010) come along verbatim. The `can_use_tool` gate construction (M017-day-1 hardening) stays — `compile_source` builds the agent_options including the gate.
