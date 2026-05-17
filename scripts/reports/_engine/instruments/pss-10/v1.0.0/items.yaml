@@ -1,0 +1,48 @@
+# PSS-10 items, verbatim from Cohen & Williamson 1988.
+# Stem: "In the last month, how often have you ..."
+# Scale: 0=Never, 1=Almost Never, 2=Sometimes, 3=Fairly Often, 4=Very Often.
+# Items 4, 5, 7, 8 are positively-worded → reverse-coded.
+
+- id: "1"
+  text: "been upset because of something that happened unexpectedly?"
+  substrate_inferable: true     # voice/sessions mention surprise disruptions, incidents, unexpected blockers
+
+- id: "2"
+  text: "felt that you were unable to control the important things in your life?"
+  substrate_inferable: false    # interior control-perception, not externally observable from text
+
+- id: "3"
+  text: "felt nervous and 'stressed'?"
+  substrate_inferable: true     # explicit stress-language in voice + session frustration mentions
+
+- id: "4"
+  text: "felt confident about your ability to handle your personal problems?"
+  reverse_coded: true
+  substrate_inferable: false    # interior self-assessment
+
+- id: "5"
+  text: "felt that things were going your way?"
+  reverse_coded: true
+  substrate_inferable: false    # interior valence-judgment about life-flow
+
+- id: "6"
+  text: "found that you could not cope with all the things that you had to do?"
+  substrate_inferable: true     # sessions show task-abandons under load, voice mentions of overwhelm
+
+- id: "7"
+  text: "been able to control irritations in your life?"
+  reverse_coded: true
+  substrate_inferable: false    # interior emotional regulation outcome
+
+- id: "8"
+  text: "felt that you were on top of things?"
+  reverse_coded: true
+  substrate_inferable: false    # interior self-assessment
+
+- id: "9"
+  text: "been angered because of things that happened that were outside of your control?"
+  substrate_inferable: true     # voice tone + session-frustration with external blockers (infra, incidents, PR mishaps)
+
+- id: "10"
+  text: "felt difficulties were piling up so high that you could not overcome them?"
+  substrate_inferable: true     # sessions show work-pile growth, voice mentions of piling up tasks

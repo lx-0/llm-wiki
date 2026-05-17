@@ -74,10 +74,52 @@ def _read_inference_config(instrument_dir: Path) -> dict:
     return dict(raw.get("inference") or {})
 
 
+def _load_operator_answers(
+    study_dir: Path | None,
+    instrument_slug: str,
+) -> dict[str, int]:
+    """Load operator-supplied answers for one instrument from a study's
+    `operator_answers.yaml`. Returns {item_id: int} or empty dict.
+
+    The yaml file shape:
+
+      <instrument-slug>:
+        "<item_id>":
+          value: <int in instrument scale>
+          answered_at: <iso timestamp>
+          note: <optional free-form>
+
+    Operator-supplied answers take precedence over inferred answers
+    in scoring. Items present here are also excluded from the
+    inference prompt's items_block so the SDK call doesn't waste
+    tokens guessing items the operator has already answered.
+    """
+    if study_dir is None:
+        return {}
+    fp = study_dir / "operator_answers.yaml"
+    if not fp.is_file():
+        return {}
+    raw = yaml.safe_load(fp.read_text(encoding="utf-8")) or {}
+    if not isinstance(raw, dict):
+        return {}
+    instr_section = raw.get(instrument_slug) or {}
+    if not isinstance(instr_section, dict):
+        return {}
+    out: dict[str, int] = {}
+    for item_id, entry in instr_section.items():
+        if isinstance(entry, dict) and "value" in entry:
+            try:
+                out[str(item_id)] = int(entry["value"])
+            except (TypeError, ValueError):
+                continue
+    return out
+
+
 def _render_items_block(
     instrument_dir: Path,
     *,
     only_ids: set[str] | None = None,
+    exclude_ids: set[str] | None = None,
 ) -> str:
     """Render the items block for the prompt, including substrate_inferable
     flag so the agent honours the curation. Reads items.yaml directly
@@ -94,6 +136,8 @@ def _render_items_block(
     lines: list[str] = []
     for item in raw:
         if only_ids is not None and str(item["id"]) not in only_ids:
+            continue
+        if exclude_ids is not None and str(item["id"]) in exclude_ids:
             continue
         flag = item.get("substrate_inferable", True)
         flag_str = "true" if flag else "false"
@@ -295,6 +339,7 @@ def run_inference(
     vault_root: Path,
     instruments_root: Path | None = None,
     output_dir: Path | None = None,
+    study_dir: Path | None = None,
 ) -> Path:
     """Run one full inference + persistence cycle. Returns report path."""
     if instruments_root is None:
@@ -319,9 +364,31 @@ def run_inference(
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     items_block = _render_items_block(instrument_dir)
 
-    # Determine batches (single batch for PHQ-9 no-subscales).
-    batches = default_batches(instrument)
-    print(f"  batches: {len(batches)} ({', '.join(b.label for b in batches)})", flush=True)
+    # Load operator-supplied answers (subset of items the operator
+    # filled in via `wiki study answer …`). These items are excluded
+    # from the SDK prompt + take precedence over inferred answers at
+    # scoring time. Empty dict when no operator_answers.yaml present.
+    operator_answers = _load_operator_answers(study_dir, instrument.meta.slug)
+    omit_ids = set(operator_answers.keys())
+    if operator_answers:
+        print(
+            f"  operator-supplied answers: {len(operator_answers)} item(s) — "
+            f"{sorted(operator_answers.keys())} (excluded from inference)",
+            flush=True,
+        )
+
+    # Determine batches; drop operator-answered items per batch + skip
+    # batches that become empty.
+    raw_batches = default_batches(instrument)
+    batches = []
+    for b in raw_batches:
+        filtered = tuple(it for it in b.items if it.id not in omit_ids)
+        if filtered:
+            batches.append(type(b)(label=b.label, items=filtered))
+    if not batches:
+        print("  all items operator-answered — skipping SDK call entirely.", flush=True)
+    else:
+        print(f"  batches: {len(batches)} ({', '.join(b.label for b in batches)})", flush=True)
 
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M-%S")
     output_dir = output_dir or (vault_root / "reports" / "_adhoc" / timestamp)
@@ -379,8 +446,9 @@ def run_inference(
               f"cost=${result.cost_usd:.4f}  elapsed={dt:.1f}s", flush=True)
         run.batches.append(result)
 
-    # Score deterministically
-    answers = run.answers
+    # Score deterministically — merge operator-supplied answers
+    # over inferred. Operator wins where both exist.
+    answers = {**run.answers, **operator_answers}
     scored = score_instrument(instrument_dir, answers)
     print(f"\nScore: total={scored.score.total}  band={scored.band}  "
           f"coverage={scored.coverage_pct}%  bandable={scored.bandable}", flush=True)

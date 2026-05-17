@@ -1,0 +1,6 @@
+# PSS-10 standard interpretation bands (Cohen 1988, broadly cited).
+# 10 items × 5-point scale (0-4), 4 reverse-coded items normalised
+# → total range 0-40.
+- {min: 0,  max: 13, band: "low"}
+- {min: 14, max: 26, band: "moderate"}
+- {min: 27, max: 40, band: "high"}

@@ -47,13 +47,14 @@ from scripts.core.paths import STATE_DIR  # noqa: E402
 _SLUG_OK_CHARS = set("abcdefghijklmnopqrstuvwxyz0123456789-")
 
 
-SUPPORTED_SCHEDULES: tuple[str, ...] = ("manual", "weekly", "monthly", "quarterly")
+SUPPORTED_SCHEDULES: tuple[str, ...] = ("manual", "daily", "weekly", "monthly", "quarterly")
 
 # Mapping schedule → cooldown in days. `manual` returns None (never
 # auto-due). flush.py piggyback checks `is_due(now)` to decide whether
 # to dispatch a scheduled study run.
 SCHEDULE_COOLDOWN_DAYS: dict[str, int | None] = {
     "manual": None,
+    "daily": 1,
     "weekly": 7,
     "monthly": 30,
     "quarterly": 90,

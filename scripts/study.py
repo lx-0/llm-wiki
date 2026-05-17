@@ -158,6 +158,7 @@ def cmd_run(args: argparse.Namespace) -> int:
                     ref.version,
                     ROOT_DIR,
                     output_dir=run_dir.instruments_dir,
+                    study_dir=study.study_dir,
                 )
                 # run_inference names the file <slug>.md; rename if
                 # alias differs.
@@ -357,6 +358,61 @@ def cmd_piggyback(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_answer(args: argparse.Namespace) -> int:
+    """Store an operator-supplied answer for one instrument item.
+
+    Operator-supplied answers persist across runs in
+    `<study>/operator_answers.yaml`. They take precedence over
+    inferred answers at scoring time and are excluded from the
+    inference prompt's items_block so the SDK doesn't waste tokens
+    on items the operator has already filled.
+
+    Use to close coverage on items marked `substrate_inferable: false`
+    (interior states like PHQ-9 Q9 suicidal ideation, GAD-7 Q2/Q7
+    interior cognitive states, etc.) — these are structurally
+    unanswerable from substrate alone, so operator input is the
+    only path to bandable coverage.
+    """
+    studies_root = _studies_root()
+    study_dir = studies_root / args.study_id
+    if not study_dir.is_dir():
+        print(f"ERROR: study not found: {study_dir}", file=sys.stderr)
+        return 2
+
+    answers_path = study_dir / "operator_answers.yaml"
+    import yaml as yaml_mod
+    if answers_path.is_file():
+        data = yaml_mod.safe_load(answers_path.read_text(encoding="utf-8")) or {}
+        if not isinstance(data, dict):
+            data = {}
+    else:
+        data = {}
+
+    instr_section = data.setdefault(args.instrument, {})
+    if not isinstance(instr_section, dict):
+        instr_section = {}
+        data[args.instrument] = instr_section
+
+    entry = {
+        "value": args.value,
+        "answered_at": datetime.now(timezone.utc).isoformat(),
+    }
+    if args.note:
+        entry["note"] = args.note
+    instr_section[str(args.item)] = entry
+
+    answers_path.write_text(
+        yaml_mod.safe_dump(data, sort_keys=False, allow_unicode=True),
+        encoding="utf-8",
+    )
+    print(
+        f"✓ recorded operator answer: {args.study_id} / {args.instrument} / "
+        f"item {args.item} = {args.value}"
+    )
+    print(f"  → {answers_path.relative_to(studies_root.parent)}")
+    return 0
+
+
 def cmd_diff(args: argparse.Namespace) -> int:
     # S04 will implement: read two run-dirs, diff per-instrument scores,
     # render a markdown table of deltas. For S03 wedge, stubbed.
@@ -404,6 +460,17 @@ def main() -> int:
     p_diff.add_argument("run_a")
     p_diff.add_argument("run_b")
     p_diff.set_defaults(func=cmd_diff)
+
+    p_ans = sub.add_parser(
+        "answer",
+        help="Store an operator-supplied answer for one item (for substrate_inferable:false items).",
+    )
+    p_ans.add_argument("study_id")
+    p_ans.add_argument("instrument", help="instrument slug, e.g. phq-9")
+    p_ans.add_argument("item", help="item id from items.yaml, e.g. 9")
+    p_ans.add_argument("value", type=int, help="integer answer within the instrument's Likert scale")
+    p_ans.add_argument("--note", default=None, help="optional free-form note (timestamp logged automatically)")
+    p_ans.set_defaults(func=cmd_answer)
 
     p_pb = sub.add_parser(
         "piggyback",

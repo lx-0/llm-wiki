@@ -1,0 +1,16 @@
+slug: pss-10
+version: 1.0.0
+title: "Perceived Stress Scale 10-item (PSS-10)"
+domain: stress
+likert: 0-4
+scoring: standard-sum
+licence: public-domain
+licence-source: "Cohen, S., Kamarck, T., & Mermelstein, R. (1983). 'A global measure of perceived stress.' J Health Soc Behav 24:385-396; Cohen & Williamson (1988) PSS-10 revision. Cohen states PSS items may be used in research without his explicit permission; widely treated as public domain."
+construct: "Subjective perception of life as unpredictable / uncontrollable / overloading, last-30-days window. Substitutes for K6 in the wedge — K6 sits at 33% substrate-inferable coverage; PSS-10 reaches ~50% because more items target externally-observable patterns (overwhelm, stress, anger at uncontrollable events) rather than purely interior states."
+
+inference:
+  enabled: true
+  min_confidence: 0.75
+  bandable_coverage_pct: 80
+  default_lookback_days: 30
+  max_curiosity_per_run: 3
