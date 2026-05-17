@@ -401,6 +401,8 @@ EOF
       return 0 ;;
     --all-entities|sweep)
       shift; banner "wiki dream sweep"; _run_script dream.py sweep "$@" ;;
+    list-candidates|--list-candidates)
+      shift; banner "wiki dream list-candidates"; _run_script dream.py list-candidates "$@" ;;
     *)
       err "unknown: wiki dream $1 (try --all-entities or see 'wiki dream help')"; return 1 ;;
   esac
