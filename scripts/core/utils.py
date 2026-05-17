@@ -301,6 +301,27 @@ def list_wiki_articles() -> list[Path]:
     return articles
 
 
+def is_compile_excluded_path(rel_path: str | Path) -> bool:
+    """True if `rel_path` falls under a compile-excluded vault-prefix.
+
+    Rel-path is interpreted relative to vault root, POSIX-form. Match
+    is segment-anchored startswith() against
+    `COMPILE_SUBSTRATE_EXCLUDED_PREFIXES` (each entry ends in '/' so a
+    rel-path like 'reports/studies/x.md' matches 'reports/' but
+    'raw/reports/y.md' does NOT — the prefix is segment-anchored from
+    the root, not a contains() match anywhere in the path).
+
+    Single source of truth for the compile air-gap: any walker / scope-
+    checker that wants to honour the policy calls this. Tests live in
+    `tests/reports/test_compile_substrate_scope.py`.
+    """
+    from .config import COMPILE_SUBSTRATE_EXCLUDED_PREFIXES
+
+    rel_s = str(rel_path).replace("\\", "/")
+    rel_s = rel_s.lstrip("/")
+    return any(rel_s.startswith(pre) for pre in COMPILE_SUBSTRATE_EXCLUDED_PREFIXES)
+
+
 def list_raw_files() -> list[Path]:
     """List all daily log files AND raw source files, newest first by mtime.
 
@@ -308,12 +329,30 @@ def list_raw_files() -> list[Path]:
     before old backlog. Rate-limit aborts (5h Opus window) hit the tail of
     the queue rather than starving newest content. The compile path is the
     only order-sensitive caller; lint and dashboard_stats are order-agnostic.
+
+    Air-gap discipline: belt-and-braces filter via
+    `is_compile_excluded_path()`. Today's walker only enters `daily/`
+    and `raw/` so a `reports/` rel-path can't appear at vault-root —
+    the filter is structurally redundant. It exists to defend against
+    future walker expansion (e.g. a vault-root `*.md` sweep) silently
+    letting `reports/` into compile.
     """
     files: list[Path] = []
     if DAILY_DIR.exists():
         files.extend(DAILY_DIR.glob("*.md"))
     if RAW_DIR.exists():
         files.extend(RAW_DIR.rglob("*.md"))
+
+    vault_root = DAILY_DIR.parent.resolve()
+
+    def _allowed(p: Path) -> bool:
+        try:
+            rel = p.resolve().relative_to(vault_root)
+        except ValueError:
+            return True  # outside vault — let through; not our concern
+        return not is_compile_excluded_path(rel)
+
+    files = [f for f in files if _allowed(f)]
     files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
     return files
 
