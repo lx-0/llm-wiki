@@ -204,14 +204,30 @@ def backfill_study(
                 run_rewrites += 1
         if rerender_summary and run_rewrites > 0:
             try:
-                timeline = load_timeline(study_dir)
+                # Trim timeline to runs up to (and including) THIS one.
+                # render_summary uses timeline.latest for per-instrument
+                # radar — without trimming, an older run's _summary would
+                # render the NEWEST run's data, not its own. Live runs
+                # don't hit this because the runner constructs the
+                # timeline incrementally; backfill loops over historic
+                # runs so must subset explicitly.
+                from scripts.reports._engine.lib.timeline import Timeline
+                full_timeline = load_timeline(study_dir)
+                trimmed_runs = [
+                    r for r in full_timeline.runs
+                    if r.timestamp <= run_dir.name
+                ]
+                trimmed = Timeline(
+                    study_id=full_timeline.study_id,
+                    runs=trimmed_runs,
+                )
                 render_summary(
                     study_id=study_dir.name,
-                    timeline=timeline,
+                    timeline=trimmed,
                     summary_path=run_dir / "_summary.md",
                     charts_dir=run_dir / "charts",
                 )
-                log.info("  → re-rendered _summary.md + charts/")
+                log.info("  → re-rendered _summary.md + charts/ (timeline trimmed to ≤ this run)")
                 runs_rendered += 1
             except Exception as exc:
                 log.warning("  re-render failed: %s", exc)
