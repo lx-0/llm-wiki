@@ -3,9 +3,9 @@ milestone: M019
 slice: S02
 project: llm-wiki
 created: 2026-05-17T11:05:00Z
-status: planned
+status: in-progress
 task_count: 5
-completed_tasks: 0
+completed_tasks: 1
 ---
 
 # M019-S02 — Slice Plan
@@ -14,7 +14,7 @@ completed_tasks: 0
 
 ## Tasks
 
-- [ ] T01 — **R2 token-budget audit (mandatory).** Probe-script `scripts/reports/_engine/audit_scope.py` that, for each instrument's declared scope (lookback windows + source-type filters + keyword filters), resolves the substrate-file list against current lxw substrate, sums tokens via `len(text)/4` heuristic + opt-in `tiktoken` for accuracy, reports per-instrument total + delta-vs-200K-budget. Run against the 5 wedge instruments (small scope, expected pass) AND against a stub IPIP-NEO-120-scope (large scope, expected fail) to confirm the audit catches overflow. Document outcomes in KNOWLEDGE.md under "M019 R2 audit 2026-05-17". If any wedge-instrument scope exceeds 200K → narrow lookback or split substrate before T02.
+- [x] T01 — **R2 token-budget audit.** ✓ Done 2026-05-17. Audit-script at `scripts/reports/_engine/audit_scope.py` walks lxw substrate over instrument's declared lookback, sums tokens via 4-char/token heuristic, compares against 160K budget (200K × 80%). Results on lxw: **PHQ-9 (real, 14d) = 191 files / ~106K tokens / 33.8% headroom PASS**. **IPIP-NEO-120 synthetic stub (180d, +people-pages +takes) = 133 files / ~147K tokens / 7.8% headroom WARN** — confirms empirically that personality instruments will overflow when substrate grows another 1-2 months OR scope widens; pre-digestion layer is mandatory before they land. Outcomes documented in `.ytstack/KNOWLEDGE.md` under "M019 R2 audit". Architecture implication: batched-by-subscale interface stays in S02-T02 even though wedge fits as single-batch — it's the migration path for personality.
 
 - [ ] T02 — **`lib/inference.py` batched-by-subscale interface (R3 design).** Accepts `(instrument, scope_resolution, batching_strategy)`. Default batching for single-subscale instruments = one batch (all items in one call). For multi-subscale: caller-provided batch-grouping (e.g. IPIP-NEO Big Five domains → 5 batches). Wraps `claude_agent_sdk.ClaudeSDKClient` with `StderrCapture` + `classify_failure` mirror of `scripts/compile.py`. Uses `core.sdk_helpers.make_path_scope_gate(['reports/'])` + `prompt_stream(...)` per the 2026-05-17 callback-gate decision (DECISIONS.md). Respects the three constraints: Write/Edit NOT in `allowed_tools`, `permission_mode != 'acceptEdits'`, AsyncIterable prompt. Returns `BatchResult{items: dict[item_id, ItemInference], elapsed_ms, model_id, prompt_version}`. Unit-tests with mock SDK client + golden JSON outputs (5 items happy path + degraded confidence + null-answer for `substrate_inferable: false`).
 

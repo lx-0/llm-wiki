@@ -1955,3 +1955,39 @@ help, makes it less actionable.
 prefer fully-inline rendering over count-summary. Add count-summary
 mode only when you have evidence of users hitting large N in practice.
 Premature collapse hides actionable detail.
+
+---
+
+## M019 R2 audit — PHQ-9 fits comfortably, personality already at the edge (2026-05-17)
+
+**Context:** M019-S02-T01 token-budget verification before the inference contract gels. Audit-script at `scripts/reports/_engine/audit_scope.py` walks lxw substrate over each instrument's declared lookback window, sums tokens via `len(text)/4` heuristic, compares against 160K budget (Opus 4.7 200K × 80% — leaves 40K for system prompt + response + scaffolding).
+
+**Results on lxw substrate, 2026-05-17:**
+
+| Instrument | Lookback | Files | ~Tokens | Headroom | Status |
+|---|---|---|---|---|---|
+| phq-9 v1.0.0 (real) | 14d | 191 | 105,959 | 33.8% | PASS |
+| ipip-neo-120 (synthetic stub) | 180d | 133 | 147,516 | 7.8% | WARN |
+
+Substrate set for both: `daily/*.md`, `raw/notes/voice/`, `raw/notes/health/`, `raw/transcripts/`, `raw/notes/sessions/` for the clinical scope; personality stub adds `knowledge/people/`, `knowledge/takes/` and widens lookback to 180d.
+
+**Operationally important findings:**
+
+1. **PHQ-9 fits with comfortable headroom.** The wedge clinical-screen architecture (single SDK call per instrument with substrate inline) is viable for PHQ-9 and the four siblings (GAD-7, ASRS-v1.1, WHO-5, MEQ-19) which all use similar 2-week clinical windows over the same substrate-set. Headroom of 33.8% leaves room for the system prompt + items + response without [1m] mode.
+
+2. **Personality is already near the limit, not safely over.** The synthetic 180-day Big-Five-scope stub came in at 92% of budget — **WARN, not FAIL**. Important nuance: the audit caught the architectural concern empirically (R2 was a real risk) BUT the stub doesn't blow the budget today. The risk is realised when substrate grows another 1-2 months (~+10K tokens/month observed on lxw) OR when the personality scope-spec widens beyond what the stub modelled (e.g. follow-citations into linked concept pages, takes-substrate adoption, second meeting cadence).
+
+3. **Pre-digestion layer becomes necessary BEFORE personality instruments ship, not after.** The Migration plan should treat IPIP-NEO-120 / HEXACO-60 / PID-5 as gated behind a pre-digestion layer (RAG via embedding-similarity, per-substrate summarisation pass with classify_model first, or per-subscale call-batching). Captured in `.ytstack/backlog/personality-substrate-predigestion.md` to be written at S05 closeout (per M019-S05-T06 plan).
+
+4. **Per-instrument scope-spec stays in items.yaml.** The audit uses a default scope-set for clinical screens (single substrate union across all items of an instrument). Personality instruments will need richer per-item scope — e.g. "item N about extraversion reads only people-pages with mentions of social events." Per-item scope-spec lives in `items.yaml`'s optional `scope:` block; audit will read it when present and fall back to instrument-default otherwise.
+
+**Calibration notes for future audit runs:**
+
+- 4-chars-per-token is conservative for English/German prose. Real Claude tokenisation is closer to 3.5; the 4 figure under-counts tokens by ~12%. The audit therefore **overestimates** headroom slightly. PHQ-9's real headroom is ~30%, not 33.8%. Personality stub's real headroom is closer to 4-5%, not 7.8%. Re-calibrate with `tiktoken` (optional dep) before deploying personality instruments.
+
+- The audit walks file-mtime. A substrate file edited within the lookback window counts even if its content is older. False-positive direction (over-counts budget); fail-safe.
+
+- Audit runtime was 40ms on lxw (324 files). Cheap enough to run before every study to surface unexpected substrate growth.
+
+**Implication for S02-T02 design:** the batched-by-subscale interface remains the right shape even though wedge fits as single-batch — the batching machinery is the migration path for personality instruments when pre-digestion lands. Skip the temptation to ship single-batch-only as a wedge shortcut.
+
