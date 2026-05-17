@@ -212,6 +212,14 @@ def is_within_cooldown(entity: EntityRef, *, cooldown_days: int | None = None) -
 
 _SUBSTRATE_ROOTS: tuple[Path, ...] = (RAW_DIR, DAILY_DIR)
 
+# Knowledge subfolders that hold operator-authored content (compile_role:
+# source-and-final). Dream-cycle walks these too — operator's hand-curated
+# concepts, areas, etc. ARE part of the entity's corpus even though they live
+# in knowledge/ (which is engine-output otherwise). Amplification-loop guard:
+# only files with `author:` matching the entity slug (or compiled_from match)
+# are included — the regular compile-output concepts (no author) are skipped.
+_OPERATOR_AUTHORED_ROOTS: tuple[str, ...] = ("concepts", "areas", "people", "projects")
+
 
 def _is_substrate_file(path: Path) -> bool:
     if path.suffix.lower() != ".md":
@@ -241,10 +249,21 @@ def collect_corpus(entity: EntityRef, *, vault_root: Path | None = None) -> list
     """
     root = vault_root or ROOT_DIR
     found: list[tuple[float, Path]] = []
-    for sub in (root / "raw", root / "daily"):
+    # Substrate roots: raw/ + daily/ (regular substrate)
+    # PLUS knowledge/{concepts,areas,people,projects}/ for operator-authored
+    # content with author=slug (drowning-protection per M015 — operator's
+    # personal-* concepts must be visible to dream-cycle even though they live
+    # in knowledge/ rather than raw/)
+    scan_dirs = [root / "raw", root / "daily"]
+    for sub in _OPERATOR_AUTHORED_ROOTS:
+        scan_dirs.append(root / "knowledge" / sub)
+    for sub in scan_dirs:
         if not sub.exists():
             continue
         for path in sub.rglob("*.md"):
+            # Don't scan the entity's own page (avoid self-reading)
+            if path.resolve() == entity.page.resolve():
+                continue
             try:
                 text = path.read_text(encoding="utf-8")
             except (OSError, UnicodeDecodeError):
