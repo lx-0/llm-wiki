@@ -153,6 +153,60 @@ def _render_per_instrument_timelines(
     return out
 
 
+def _per_item_likert_hi(snap: InstrumentSnapshot) -> int:
+    """Best-effort likert.hi recovery: max_total / total_items. Works
+    for instruments where every item has the same scale (current wedge
+    + post-wedge). Falls back to 4 (most common) if division fails."""
+    if snap.total_items <= 0:
+        return 4
+    return max(1, _instrument_max(snap) // snap.total_items)
+
+
+def _render_per_instrument_radars(
+    timeline: Timeline,
+    charts_dir: Path,
+) -> dict[str, Path]:
+    """Write per-item radar SVG per instrument; return slug → path map.
+
+    Axis = item id, vertex distance from center = item's normalised
+    value (0..1). Previous-run polygon overlaid as dashed when
+    available. Only renders for instruments whose latest snapshot has
+    per_item data (older runs predating the per_item frontmatter
+    addition produce placeholder)."""
+    out: dict[str, Path] = {}
+    latest = timeline.latest
+    previous = timeline.previous
+    if latest is None:
+        return out
+    for slug, snap in latest.instruments.items():
+        out_path = charts_dir / f"radar-{slug}.svg"
+        if not snap.per_item:
+            # No per_item data — predates the runner extension.
+            # Render placeholder so the link works.
+            from scripts.reports._engine.lib.charts import _placeholder
+            _placeholder(out_path, 360, 360,
+                         f"{slug}: per-item data unavailable (older run schema)")
+            out[slug] = out_path
+            continue
+        hi = _per_item_likert_hi(snap)
+        current_data = {
+            iid: max(0.0, min(1.0, val / hi))
+            for iid, val in snap.per_item.items()
+        }
+        previous_data = None
+        if previous and slug in previous.instruments:
+            prev_snap = previous.instruments[slug]
+            if prev_snap.per_item:
+                prev_hi = _per_item_likert_hi(prev_snap)
+                previous_data = {
+                    iid: max(0.0, min(1.0, val / prev_hi))
+                    for iid, val in prev_snap.per_item.items()
+                }
+        render_radar(current_data, out_path, previous=previous_data)
+        out[slug] = out_path
+    return out
+
+
 def render_summary(
     *,
     study_id: str,
@@ -201,6 +255,9 @@ def render_summary(
 
     # 3. Per-instrument timelines
     per_inst_timelines = _render_per_instrument_timelines(timeline, charts_dir)
+
+    # 4. Per-instrument radars (item-level breakdown — each axis is one item)
+    per_inst_radars = _render_per_instrument_radars(timeline, charts_dir)
 
     # 4. Frontmatter
     bandable_count = sum(1 for s in latest.instruments.values() if s.bandable)
@@ -284,19 +341,25 @@ def render_summary(
             f"({bandable_count} of {len(latest.instruments)} bandable).\n"
         )
 
-    # Per-instrument timelines (only meaningful from run 2)
+    # Per-instrument trajectories: timeline (over runs) + radar (over items)
     lines.append("## Per-instrument trajectories\n")
-    if timeline.n_runs >= 2:
-        for key in sorted(per_inst_timelines.keys()):
+    for key in sorted(set(per_inst_timelines.keys()) | set(per_inst_radars.keys())):
+        lines.append(f"### {key}\n")
+        # Item-level radar (always renders from latest snapshot's per_item)
+        if key in per_inst_radars:
+            rel = per_inst_radars[key].relative_to(summary_path.parent)
+            lines.append(f"**Item-level breakdown** — each axis is one item, "
+                         f"vertex distance from center = item's normalised value "
+                         f"(0..1). Dashed overlay = previous run when available.\n")
+            lines.append(f"![{key} per-item radar]({rel})\n")
+        # Run-over-run timeline (activates from run 2)
+        if key in per_inst_timelines:
             rel = per_inst_timelines[key].relative_to(summary_path.parent)
-            lines.append(f"### {key}\n")
+            label = "Run-over-run timeline"
+            if timeline.n_runs < 2:
+                label += " (activates by run 2)"
+            lines.append(f"**{label}**\n")
             lines.append(f"![{key} timeline]({rel})\n")
-    else:
-        lines.append(
-            "Per-instrument timelines activate by run 2 — they show "
-            "score + coverage trends over time once a baseline is "
-            "established.\n"
-        )
 
     # Convergence / discrepancy stub for S05 enrichment.
     lines.append("## Convergence / discrepancy flags\n")

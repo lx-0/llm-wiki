@@ -38,6 +38,7 @@ class InstrumentSnapshot:
     coverage_pct: float
     answered: int
     total_items: int
+    per_item: dict[str, int] = field(default_factory=dict)
 
 
 @dataclass
@@ -127,6 +128,17 @@ def _snapshot_from_report(report_path: Path) -> InstrumentSnapshot | None:
     coverage = fm.get("coverage") or {}
     if not isinstance(coverage, dict):
         coverage = {}
+    per_item_raw = fm.get("per_item") or {}
+    if not isinstance(per_item_raw, dict):
+        per_item_raw = {}
+    per_item: dict[str, int] = {}
+    for k, v in per_item_raw.items():
+        if v is None:
+            continue
+        try:
+            per_item[str(k)] = int(v)
+        except (TypeError, ValueError):
+            continue
     try:
         return InstrumentSnapshot(
             slug=instrument_key,
@@ -138,6 +150,7 @@ def _snapshot_from_report(report_path: Path) -> InstrumentSnapshot | None:
             coverage_pct=float(coverage.get("coverage_pct", 0.0)),
             answered=int(coverage.get("answered_at_high_confidence", 0)),
             total_items=int(coverage.get("total_items", 0)),
+            per_item=per_item,
         )
     except (TypeError, ValueError):
         return None

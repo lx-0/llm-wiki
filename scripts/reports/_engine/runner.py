@@ -212,6 +212,11 @@ def _persist_report(
             "file_count": len(substrate_paths),
             "globs": list(CLINICAL_DEFAULT_SUBSTRATE_GLOBS),
         },
+        # Per-item normalised values for downstream per-instrument
+        # radar rendering. Reverse-coded items already flipped so
+        # higher = more burden uniformly. Items not in this dict were
+        # null (substrate_inferable:false OR confidence below threshold).
+        "per_item": dict(score.per_item_normalised),
         "model_id": run.batches[0].model_id if run.batches else "",
         "prompt_version": prompt_version,
         "cost_usd": round(run.total_cost_usd, 4),
