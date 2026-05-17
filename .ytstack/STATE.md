@@ -1,17 +1,17 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-05-17T14:15:00Z
+last_updated: 2026-05-17T14:30:00Z
 current_milestone: M022
-active_slice: S02
-active_task: T03
+active_slice: none
+active_task: none
 last_completed_milestone: M020
 parallel_milestones: [M021]
 ---
 
 # State
 
-**Status:** M022 / S02 starting — voice + pictures archive-relocation. T01+T02+T03 plans drafted (mechanically similar to S01, ships atomic because existing tests would go RED on T01 alone). S01 DONE in 4 commits (`c51494a`, `5b2a7f7`, `330f9f7`, `0a06bcd`). Inbox-intake-Schema-Unifizierung: zwei-Zonen-Modell (`raw/inbox-<channel>/` = audit-archive, `raw/<category>/` = derived substrate), `.processed/`-Archive ausserhalb des Vaults werden eliminiert. T01-PLAN flaggt: T01+T02 müssen atomic ein Commit (zwischenzeitlich rote Tests sonst).
+**Status:** M022 / S02 DONE 2026-05-17. Voice + pictures collectors archive to `raw/inbox-mobile/<source>/` (commit `87a631b`). 835/835 tests + 8 voice cases + 1 pictures case verify routing. Next: S03 migration script + templates + lxw live-run. S01+S02 DONE. Inbox-intake-Schema-Unifizierung: zwei-Zonen-Modell (`raw/inbox-<channel>/` = audit-archive, `raw/<category>/` = derived substrate), `.processed/`-Archive ausserhalb des Vaults werden eliminiert. T01-PLAN flaggt: T01+T02 müssen atomic ein Commit (zwischenzeitlich rote Tests sonst).
 
 ---
 

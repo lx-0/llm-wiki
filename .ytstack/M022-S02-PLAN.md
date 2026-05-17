@@ -3,9 +3,9 @@ milestone: M022
 slice: S02
 project: llm-wiki
 created: 2026-05-17T13:30:37Z
-status: planned
+status: done
 task_count: 3
-completed_tasks: 0
+completed_tasks: 3
 ---
 
 # M022-S02 — Slice Plan
@@ -14,9 +14,9 @@ completed_tasks: 0
 
 ## Tasks
 
-- [ ] T01 — `scripts/collectors/voice.py`: `ARCHIVE_SUBDIR = ".processed"` (line 35) entfernen; neuen Konstant `MOBILE_ARCHIVE_DIR = RAW_DIR / "inbox-mobile" / "voice"` einführen; alle Stellen, die `archive = inbox / ARCHIVE_SUBDIR` bauen, auf `MOBILE_ARCHIVE_DIR` umschreiben (inkl. Dedup-Skip in `_list_inbox`-Pendant und Move in line 211 + 249).
-- [ ] T02 — `scripts/collectors/pictures.py`: analog. `ARCHIVE_SUBDIR` (line 47) entfernen; `MOBILE_ARCHIVE_DIR = RAW_DIR / "inbox-mobile" / "pictures"`; Move-Site (line 429) umschreiben.
-- [ ] T03 — Tests in `tests/test_collectors_voice.py` und `tests/test_collectors_pictures.py`: verifizieren dass Original im Vault-Archive landet UND `<inbox>/.processed/` während des Test-Runs nicht angefasst wird (assert nicht-existent).
+- [x] T01 — `scripts/collectors/voice.py`: `ARCHIVE_SUBDIR = ".processed"` (line 35) entfernen; neuen Konstant `MOBILE_ARCHIVE_DIR = RAW_DIR / "inbox-mobile" / "voice"` einführen; alle Stellen, die `archive = inbox / ARCHIVE_SUBDIR` bauen, auf `MOBILE_ARCHIVE_DIR` umschreiben (inkl. Dedup-Skip in `_list_inbox`-Pendant und Move in line 211 + 249).
+- [x] T02 — `scripts/collectors/pictures.py`: analog. `ARCHIVE_SUBDIR` (line 47) entfernen; `MOBILE_ARCHIVE_DIR = RAW_DIR / "inbox-mobile" / "pictures"`; Move-Site (line 429) umschreiben.
+- [x] T03 — Tests in `tests/test_collectors_voice.py` und `tests/test_collectors_pictures.py`: verifizieren dass Original im Vault-Archive landet UND `<inbox>/.processed/` während des Test-Runs nicht angefasst wird (assert nicht-existent).
 
 ## Done when
 

@@ -5,7 +5,7 @@ size: M
 created: 2026-05-17T13:30:37Z
 status: planned
 total_slices: 3
-completed_slices: 1
+completed_slices: 2
 ---
 
 # M022 Roadmap
@@ -26,7 +26,7 @@ completed_slices: 1
 Slice detail lives in per-slice `M022-S##-PLAN.md` files, created by `ytstack:slice-milestone`.
 
 - [x] S01 — `process-inbox.py` Zwei-Zonen-Refactor (inbox-wiki original + category artifact, HTML-unlink raus)
-- [ ] S02 — voice + pictures collectors: Archive-Location nach `raw/inbox-mobile/<source>/`
+- [x] S02 — voice + pictures collectors: Archive-Location nach `raw/inbox-mobile/<source>/`
 - [ ] S03 — Migration-Script + Templates + lxw-Live-Run
 
 ## Slice intent (rough sketch)
