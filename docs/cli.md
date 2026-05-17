@@ -6,7 +6,7 @@ Operational layer for an LLM Wiki vault. The `.wiki/` directory is hidden from O
 
 - [Quick start](#quick-start) — top-level commands at a glance
 - [Subcommand cheat sheet](#subcommand-cheat-sheet) — every `wiki <subcommand>`
-- [Setup wizard — what's asked](#setup-wizard--whats-asked) — the 5 questions
+- [Setup wizard — what's asked](#setup-wizard--whats-asked) — the 6 questions
 - [Config keys](#config-keys) — pointer to the full reference in [config.md](config.md)
 - [Hook targets](#hook-targets) — which agents are wired, with what scope
 
@@ -192,7 +192,7 @@ Grouped by purpose. Run `wiki <cmd> --help` for the full per-command help block.
 | `wiki menu` | same home screen, forced regardless of TTY. |
 | `wiki menu --json` | emit suggestions + status payload as JSON, exit. Agent-facing read of "what's pending". |
 | `wiki doctor [--quick] [--json]` | vault-health audit: config + connectivity + pipeline checks. `--quick` skips network + subprocess probes (~50ms). `--json` for agents. Exit code 1 if any critical issue. |
-| `wiki setup [--help]` | first-time wizard (5 questions) + hook install |
+| `wiki setup [--help]` | first-time wizard (6 questions) + hook install |
 | `wiki status` | config summary, hook install table, Ollama probe |
 | `wiki update [--no-skills]` | `git pull --ff-only` the engine checkout + sync skill symlinks; never touches `config.yaml` or `.venv/` content. `--no-skills` skips the skill sync step. |
 | `wiki seed` | additive: drop in missing vault templates (`AGENTS.md`, `dashboard.md`, `.obsidian/*.json`, plugin `data.json`); merge `community-plugins.json` without dropping yours. |
@@ -208,7 +208,7 @@ Grouped by purpose. Run `wiki <cmd> --help` for the full per-command help block.
 | `wiki config set KEY VALUE` | write back to `config.yaml` |
 | `wiki config keys` | list every settable key (dot-notation) |
 | `wiki config path` | absolute path to `config.yaml` |
-| `wiki config wizard` | re-run the 5-question wizard |
+| `wiki config wizard` | re-run the 6-question wizard |
 | `wiki config status` | summary table |
 
 ### Hooks & skills
@@ -343,13 +343,14 @@ These scripts are not exposed via `wiki <cmd>` — they're explicit one-shots ru
 
 ## Setup wizard — what's asked
 
-The 5 questions, in order:
+The 6 questions, in order:
 
 1. **Ollama base URL** — probed live; if unreachable the next question gets a warning.
 2. **Compile model** — `claude-opus-4-7` / `claude-sonnet-4-6` / `claude-haiku-4-5`. Used by `compile.py` and `retry-failed-flushes.py`.
 3. **Auto-compile starts at hour** (`0`–`23`, local time) — `scheduling.compile_after_hour`.
 4. **Procmail execution** (default OFF) — only enable if `suggestions/cli.py` should call a webmail-procmail provider API.
 5. **Local-LLM features** (curiosity loop + vision screenshots, bundled) — only offered when Ollama probed successfully.
+6. **Global skill install** — link `use-llm-wiki` into `~/.claude/skills/` and register this vault in `~/.config/llm-wiki/vaults`, so agents in any project can query it. Sets `skills.global_install: true` (survives `wiki update`).
 
 Re-run anytime via `./.wiki/wiki config wizard`.
 
@@ -358,7 +359,7 @@ Re-run anytime via `./.wiki/wiki config wizard`.
 Full reference with defaults, grouped tables, and the `personal.accounts` schema lives in **[`docs/config.md`](config.md)**. Quick pointers:
 
 - `./.wiki/wiki config get KEY` / `set KEY VALUE` / `keys` / `path` — runtime introspection
-- `./.wiki/wiki config wizard` — re-run the 5-question setup
+- `./.wiki/wiki config wizard` — re-run the 6-question setup
 - Secrets go in `<vault>/.claude/.env` (loaded automatically at import; see [config.md § Secrets](config.md#secrets--claudeenv))
 
 Run `./.wiki/wiki config keys` for the live enumeration of every settable leaf.

@@ -24,8 +24,8 @@
 
 <table align="center">
   <tr>
-    <td align="center"><strong>10</strong><br/>substrate collectors</td>
-    <td align="center"><strong>6</strong><br/>skills bundled</td>
+    <td align="center"><strong>11</strong><br/>substrate collectors</td>
+    <td align="center"><strong>8</strong><br/>psychometric instruments</td>
     <td align="center"><strong>MIT</strong><br/>open source</td>
   </tr>
 </table>
@@ -63,11 +63,11 @@ llm-wiki is the **compilation layer** between raw substrates and active consumpt
 
 ## What you get
 
-- **Two-path ingest + per-day rollup** — automatic session capture (hooks → `daily/<date>/sessions.md`) and substrate-source writers (Registry-discovered Collectors + legacy scanners + clipper + manual drop → `raw/`, plus per-day mirror one-liners into `daily/<date>/{health,meetings,voice,email}.md`) converge at one compiler. A daily-digest pass distills the five per-source captures into a single `daily/<date>.md` (~500 words). All ten collectors ride the formal Collector Protocol (`SPEC` + `@register` + `run()`): email, jamie, gmeet, voice, health (named modules) plus calendar, browser, tabs, screenshots, youtube (migrated 2026-05-14 from `scan-*.py` scripts).
+- **Two-path ingest + per-day rollup** — automatic session capture (hooks → `daily/<date>/sessions.md`) and substrate-source writers (Registry-discovered Collectors + clipper + manual drop → `raw/`, plus per-day mirror one-liners into `daily/<date>/{health,meetings,voice,email}.md`) converge at one compiler. A daily-digest pass distills the per-source captures into a single `daily/<date>.md` (~500 words). All eleven collectors ride the formal Collector Protocol (`SPEC` + `@register` + `run()`): email, jamie, gmeet, voice, health, calendar, pictures, browser, tabs, screenshots, youtube.
 - **Compile once, query fast** — knowledge is distilled into Markdown wikilinks at compile time. No embedding step, no retrieval per query.
 - **Multi-agent hooks** — `session-start` / `session-end` / `pre-compact` wired into Claude Code, Codex, Gemini, and Cursor. Every session ends as a structured daily-log entry.
 - **Curiosity loop** — a small local Ollama model spots gaps after each compile and queues deep-scan requests for the next cycle.
-- **Personal-task layer** (M005) — the compiler extracts commitments from jamie + gmeet transcripts (Task / Owner / Deadline / Context quartet) and routes them into `knowledge/people/<slug>.md` + `knowledge/projects/<slug>.md` entity pages as `## Action Items` (Obsidian-Tasks-plugin syntax) and `## Open Threads`. Resolved items demote to Timeline on the next compile. Dashboard pane + cross-entity Inbox MOC surface the layer.
+- **Personal-task layer** — the compiler extracts commitments from jamie + gmeet transcripts (Task / Owner / Deadline / Context quartet) and routes them into `knowledge/people/<slug>.md` + `knowledge/projects/<slug>.md` entity pages as `## Action Items` (Obsidian-Tasks-plugin syntax) and `## Open Threads`. Resolved items demote to Timeline on the next compile. Dashboard pane + cross-entity Inbox MOC surface the layer.
 - **Optimization suggestions** — the compiler proposes YAML automations (e.g. mail-filter rules) with per-action approval before execution.
 - **Operator self-reports** — air-gapped analytical surface at `<vault>/reports/`. Validated clinical screens (PHQ-9, GAD-7, WHO-5, PSS-10, ISI, OLBI) scored by an informant agent reading the operator's own substrate. Deterministic Likert + cutoffs; the LLM only fills in raw answers. Two-pass analyst (per-study + cross-study). `wiki study run <id>` + `wiki analyze`. See [`docs/cli.md`](docs/cli.md#operator-self-reports-analytical-surface).
 - **Self-healing wiki** — `lint.py` runs 8 structural checks plus an LLM contradiction scan, so the wiki stays consistent as it grows.
@@ -89,14 +89,16 @@ The sidebar is the data layout — `raw/`, `daily/`, `knowledge/` — exactly th
 ```text
 PATH A — Automatic capture                PATH B — Curated sources
 ─────────────────────────────             ──────────────────────────────────
-session-start / session-end /             Collectors (Registry):
+session-start / session-end /             Collectors (Registry — all eleven):
 pre-compact hooks attach to every         · email            (multi-backend mailboxes)
 Claude Code / Codex / Gemini /            · jamie            (Jamie AI meetings)
-Cursor session.  flush.py extracts        · gmeet            (Google Meet / Gemini transcripts)
+Cursor session. flush.py extracts         · gmeet            (Google Meet / Gemini transcripts)
 the conversation transcript and           · calendar         (Google Calendar v3, per-date rollups)
-appends a structured entry to             Scanners (Registry, ported 2026-05-14):
-daily/YYYY-MM-DD.md.                      · scan-browser     (Firefox + Chrome)
-                                          · scan-screenshots (Vision LLM)
+appends a structured entry to             · voice            (iOS Shortcuts / OpenWhispr dictation)
+daily/<date>/sessions.md, then a          · health           (Oura biometric daily rollup)
+daily-digest agent distils all            · pictures         (phone-photo inbox + gemma4 vision)
+per-source captures into                  · scan-browser     (Firefox + Chrome)
+daily/<date>.md (~500 words).             · scan-screenshots (Vision LLM)
                                           · scan-tabs        (Firefox STG)
                                           · scan-youtube     (yt-dlp + gemma4 visual)
 
@@ -105,9 +107,9 @@ daily/YYYY-MM-DD.md.                      · scan-browser     (Firefox + Chrome)
                                           · ingest-html      (file or URL)
                                           · process-inbox    (LLM-classified drop)
             ▼                                          │
-     daily/YYYY-MM-DD.md                               ▼
-                                          raw/{articles,papers,notes,transcripts,
-                                              audio,requests,suggestions}/
+   daily/<date>/{sessions,health,                      ▼
+      meetings,voice,email}.md +          raw/{articles,papers,notes,transcripts,
+   daily/<date>.md (compile digest)           voice,audio,requests,suggestions}/
             │                                          │
             └──────────────┐    ┌──────────────────────┘
                            ▼    ▼
@@ -127,6 +129,7 @@ daily/YYYY-MM-DD.md.                      · scan-browser     (Firefox + Chrome)
                   │  people/           │
                   │  qa/               │
                   │  facts/            │   ← human-owned hard facts (override sources)
+                  │  MOCs/             │   ← curated topic hubs (Maps of Content)
                   │  index.md          │   ← master catalogue
                   └────────────────────┘
 ```
@@ -213,6 +216,7 @@ Inspired by [Andrej Karpathy's LLM Wiki](https://gist.github.com/karpathy/442a6b
 ├── raw/                   ← immutable curated sources (LLM reads, never writes)
 ├── daily/                 ← per-day rollup: <date>/{sessions,health,meetings,voice,email}.md per-source captures + <date>.md compile-stage digest
 ├── knowledge/             ← LLM-compiled wiki (LLM owns, you and agents read)
+├── reports/               ← operator self-reports (air-gapped from compile): studies/<id>/runs/<ts>/instruments/*.md + _summary.md + _analysis.md, plus analyses/ for Pass-2
 ├── inbox/                 ← transient — process-inbox.py classifies + moves to raw/
 ├── Clippings/             ← optional — Obsidian Web Clipper drop point
 ├── .obsidian/             ← Obsidian config (community-plugins, core-plugins seeded)
@@ -238,7 +242,7 @@ The installer clones into `<target>/.wiki/`, seeds `config.yaml` from `config.ex
 | `<vault>/dashboard.md` | `templates/dashboard.md` | Obsidian Dataview home (recently-compiled / wiki stats / recent daily logs). |
 | `<vault>/.obsidian/community-plugins.json` | `templates/.obsidian/` | Lists `dataview` + `obsidian-excalidraw-plugin` for first-launch approval. |
 | `<vault>/.obsidian/core-plugins.json` | `templates/.obsidian/` | Sensible defaults (daily-notes, properties, graph on; sync/publish off). |
-| `<vault>/.claude/skills/<name>` | symlink to `.wiki/skills/<name>` | Claude Code auto-discovers engine skills (`engine-pr`, `excalidraw-diagram`, `ingest-audio`, `use-llm-wiki`, `vault-health-check`, `vault-triage`). New skills shipped via `wiki update` are picked up automatically. `use-llm-wiki` is also *global-eligible* — `wiki skills install --global` links it into `~/.claude/skills/` so agents in any project can query this wiki. |
+| `<vault>/.claude/skills/use-llm-wiki` | symlink to `.wiki/skills/use-llm-wiki` | The one bundled engine-side skill — lets agents query, contribute, or diagnose this wiki via the `wiki` CLI from any project. *Global-eligible*: `wiki skills install --global` links it into `~/.claude/skills/` so agents anywhere can reach it. The other operator skills (`engine-pr`, `excalidraw-diagram`, `ingest-audio`, `vault-health-check`, `vault-triage`) ship via the Claude Code plugin marketplace `yesterday-public-plugins`, not as repo-bundled skills. |
 
 **Prerequisites:** `bash` ≥ 4, `git`, `jq`, `uv` (Python package manager). Optional but recommended: a local [Ollama](https://ollama.com) — the curiosity loop, screenshot vision, inbox classification, HTML visual analysis, and per-article review all run on local models. The Claude paths (compile, query, lint contradiction check, flush) work without it.
 
