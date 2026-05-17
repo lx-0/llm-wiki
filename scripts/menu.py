@@ -49,15 +49,16 @@ WIKI_BIN = WIKI_DIR / "wiki"
 
 
 QUICK_ACTIONS: list[tuple[str, str, str, object]] = [
-    ("q", "query",  "ask the wiki ($$)",            ("special", "query")),
-    ("f", "flush",  "capture current session",      ["flush"]),
-    ("l", "lint",   "cheap structural lint",        ["lint", "--structural-only"]),
-    ("s", "status", "config + hooks + ollama",      ["status"]),
+    ("c", "compile", "recompile changed sources ($$)", ["compile"]),
+    ("q", "query",   "ask the wiki ($$)",            ("special", "query")),
+    ("f", "flush",   "capture current session",      ["flush"]),
+    ("l", "lint",    "cheap structural lint",        ["lint", "--structural-only"]),
+    ("s", "status",  "config + hooks + ollama",      ["status"]),
 ]
 
 
 CATEGORIES: dict[str, tuple[str, list[tuple[str, str, str, object]]]] = {
-    "c": ("collectors", [
+    "o": ("collectors + OAuth", [
         ("list",          "list collectors",                "see what's registered",                  ["collect", "--list"]),
         ("run",           "run a collector",                "by name (see 'list' first)",             ("prompt", "Collector name", ["collect", "{arg}"])),
         ("gmail",         "gmail OAuth bootstrap",          "one-time per account",                   ("prompt", "Account id",     ["gmail-auth", "{arg}"])),
@@ -405,18 +406,18 @@ def _build_screen_html(state: HomeState) -> str:
 
     lines.append("  <b>▸ Quick actions</b>")
     lines.append(
-        "      [<b>q</b>] query     [<b>f</b>] flush     "
-        "[<b>l</b>] lint     [<b>s</b>] status"
+        "      [<b>c</b>] compile  [<b>q</b>] query  "
+        "[<b>f</b>] flush  [<b>l</b>] lint  [<b>s</b>] status"
     )
     lines.append("")
 
     lines.append("  <b>▸ Browse</b>")
     lines.append(
-        "      [<b>c</b>] collectors    [<b>i</b>] ingest    "
+        "      [<b>o</b>] collectors+OAuth   [<b>i</b>] ingest    "
         "[<b>k</b>] knowledge ops"
     )
     lines.append(
-        "      [<b>d</b>] facts/takes   [<b>a</b>] automation "
+        "      [<b>d</b>] facts/takes        [<b>a</b>] automation "
         "[<b>g</b>] setup"
     )
     lines.append("")
@@ -471,13 +472,13 @@ def _run_home_picker(state: HomeState) -> None:
         state.selected = ("filter",)
         event.app.exit()
 
-    for q in ("q", "f", "l", "s"):
+    for q in ("c", "q", "f", "l", "s"):
         @kb.add(q)
         def _(event, q=q):
             state.selected = ("quick", q)
             event.app.exit()
 
-    for c in ("c", "i", "k", "d", "a", "g"):
+    for c in ("o", "i", "k", "d", "a", "g"):
         @kb.add(c)
         def _(event, c=c):
             state.selected = ("category", c)
