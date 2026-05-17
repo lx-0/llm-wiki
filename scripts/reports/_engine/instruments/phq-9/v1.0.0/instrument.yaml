@@ -1,0 +1,19 @@
+slug: phq-9
+version: 1.0.0
+title: "Patient Health Questionnaire-9"
+domain: depression
+likert: 0-3
+scoring: standard-sum
+licence: public-domain
+licence-source: "Kroenke, Spitzer & Williams (2001). 'The PHQ-9: validity of a brief depression severity measure.' J Gen Intern Med 16(9):606-613. Pfizer Inc. PHQ-9 is in the public domain and may be reproduced without permission."
+construct: "Major Depression severity per DSM-IV criteria, last-2-weeks window."
+
+# Inference defaults — consumed by S02+ inference contract. Loader
+# ignores unknown keys today; section locked here so the file is
+# canonical from day 1.
+inference:
+  enabled: true
+  min_confidence: 0.75
+  bandable_coverage_pct: 80
+  default_lookback_days: 14
+  max_curiosity_per_run: 3

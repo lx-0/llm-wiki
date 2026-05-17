@@ -1,0 +1,46 @@
+# PHQ-9 items, verbatim from Kroenke et al 2001 (public domain).
+# Standard stem: "Over the last 2 weeks, how often have you been
+# bothered by any of the following problems?"
+# Scale: 0=Not at all, 1=Several days, 2=More than half the days,
+# 3=Nearly every day.
+#
+# substrate_inferable per item: curated 2026-05-17 by operator/agent.
+# Principle: when in doubt, mark FALSE so the curiosity-bridge asks
+# rather than the inference-agent guesses (Q1/Q9 are especially
+# sensitive and should always be operator-input).
+
+- id: "1"
+  text: "Little interest or pleasure in doing things."
+  substrate_inferable: true        # voice/session mentions of engagement, abandoned activities
+
+- id: "2"
+  text: "Feeling down, depressed, or hopeless."
+  substrate_inferable: false       # interior emotional state — fragile signal
+
+- id: "3"
+  text: "Trouble falling or staying asleep, or sleeping too much."
+  substrate_inferable: true        # Oura sleep_score, voice mentions ("waking 4am", "couldn't fall asleep")
+
+- id: "4"
+  text: "Feeling tired or having little energy."
+  substrate_inferable: true        # Oura readiness/HRV, voice mentions of fatigue
+
+- id: "5"
+  text: "Poor appetite or overeating."
+  substrate_inferable: false       # rarely surfaces in current substrate
+
+- id: "6"
+  text: "Feeling bad about yourself — or that you are a failure or have let yourself or your family down."
+  substrate_inferable: false       # high over-extraction risk; ask via curiosity
+
+- id: "7"
+  text: "Trouble concentrating on things, such as reading the newspaper or watching television."
+  substrate_inferable: true        # sessions show task-switching frequency, dropped threads
+
+- id: "8"
+  text: "Moving or speaking so slowly that other people could have noticed. Or the opposite — being so fidgety or restless that you have been moving around a lot more than usual."
+  substrate_inferable: false       # third-party observation by design; not in text substrate
+
+- id: "9"
+  text: "Thoughts that you would be better off dead, or of hurting yourself in some way."
+  substrate_inferable: false       # NEVER auto-infer; suicidal ideation must be operator-input

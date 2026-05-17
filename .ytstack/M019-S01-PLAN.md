@@ -5,7 +5,7 @@ project: llm-wiki
 created: 2026-05-17T11:05:00Z
 status: in-progress
 task_count: 5
-completed_tasks: 3
+completed_tasks: 4
 ---
 
 # M019-S01 — Slice Plan
@@ -20,7 +20,7 @@ completed_tasks: 3
 
 - [x] T03 — **Scaffold + air-gap.** ✓ Done 2026-05-17. `scripts/reports/_engine/`: `instrument.py` (yaml schema + loader, validates 8 required meta keys, item-id uniqueness, scoring strategy whitelist, achievable-range vs cutoffs match), `lib/likert.py` (LikertScale parse/validate/reverse + score_answers with reverse-coding + subscale aggregation + coverage_pct), `lib/cutoffs.py` (Band + Cutoffs.from_list + validate enforces contiguous-non-overlapping bands sorted by min + band_for lookup with out-of-range guard). Air-gap: `COMPILE_SUBSTRATE_EXCLUDED_PREFIXES` constant in `core/config.py` (single source of truth), `is_compile_excluded_path()` helper in `core/utils.py`, applied as filter in `list_raw_files()` (belt-and-braces, redundant today since walker only enters daily/+raw/), `reports/**` added to `prompts/compile_main_system.md` SCOPE block as MUST NOT Read/Write/Edit. Tests: 61 pass (test_likert 21, test_cutoffs 17, test_instrument_yaml 7, test_compile_substrate_scope 16). No regressions in broader test suite from my changes (16 pre-existing failures from parallel-session prompt-template churn, unrelated).
 
-- [ ] T04 — **PHQ-9 instrument end-to-end (scoring only, no inference yet):** `scripts/reports/_engine/instruments/phq-9/v1.0.0/instrument.yaml` + `items.yaml` (9 PD items + `substrate_inferable` curated per-item) + `cutoffs.yaml` (5 bands per DSM-IV). Helper `score_instrument(instrument_id, version, answers_dict) -> Score` returns `total + band + per_item + coverage`. Unit-test with hand-filled answer arrays covering each band. Verification: `uv run pytest tests/reports/test_phq9_scoring.py -v` green.
+- [x] T04 — **PHQ-9 v1.0.0 end-to-end (scoring only).** ✓ Done 2026-05-17. Instrument files at `scripts/reports/_engine/instruments/phq-9/v1.0.0/`: `instrument.yaml` (8 required meta keys + `inference` section pre-locked for S02), `items.yaml` (9 PD items verbatim from Kroenke et al 2001 with `substrate_inferable` curated per-item — Q2/Q5/Q6/Q8/Q9 false, Q1/Q3/Q4/Q7 true), `cutoffs.yaml` (5 DSM-IV bands 0-4/5-9/10-14/15-19/20-27). Helper `score_instrument(instrument_dir, answers, bandable_threshold=80)` in `scripts/reports/_engine/score.py` returns `ScoredInstrument{meta, score: ScoreResult, band, bandable_threshold}`. Band emitted only when `coverage_pct >= bandable_threshold`. 14 unit-tests: 4 uniform-band cases (0/9/18/27), 3 boundary cases (top-of-minimal, bottom-of-mild, bottom-of-moderate), partial-coverage gating (77.8% blocked, 88.9% bandable), custom threshold override, zero-answers not-bandable, substrate_inferable curation completeness, Q9-never-inferable hard-rule pin.
 
 - [ ] T05 — **Migration entry + config keys:** extend `scripts/migrations/migrate_config_keys.py` with `features.operator_reports: bool = False`, `personal.reports.studies_dir: str = "reports"` (relative to vault root per T02 decision), `personal.reports.weekly_window_days: int = 14` (initial schedule cadence). Add to `scripts/core/config.py` dataclass + `config.example.yaml` in same commit (per `feedback_config_change_requires_migration` memory). Verification: `wiki update` on a fresh vault writes the new keys with correct defaults.
 
