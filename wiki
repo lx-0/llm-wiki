@@ -2,7 +2,10 @@
 # wiki — single entry-point CLI for the wiki/ system.
 #
 # Subcommands:
-#   wiki                       interactive top-level menu
+#   wiki                       interactive home screen (TTY) — context-sensitive
+#                              suggestions + quick actions + category browse.
+#                              Non-TTY callers (CI, hooks, pipes) get `wiki help`.
+#   wiki menu                  same home screen, forced regardless of TTY.
 #   wiki setup                 first-time setup (config wizard + hooks install)
 #   wiki status                full system status (config + hooks)
 #   wiki config                interactive config editor
@@ -1055,22 +1058,215 @@ cmd_version() {
   fi
 }
 
-# ── Top-level interactive menu ───────────────────────────────────────
-top_menu() {
-  banner "wiki" "$(printf "Type %swiki help%s for the non-interactive form." "$C_DIM" "$C_RESET")"
+# ── Top-level interactive home screen ────────────────────────────────
+#
+# Bare `wiki` (or `wiki menu`) drops into home_screen(). The screen has
+# three sections:
+#   1. "Pending in your vault" — numbered list of context-sensitive
+#      suggestions emitted as JSON by scripts/menu_context.py. Each is
+#      picked by its number.
+#   2. "Quick actions" — fixed letter shortcuts for the daily-driver
+#      commands (q query, f flush, l lint, s status).
+#   3. "Browse" — letter shortcuts into category sub-menus that wrap the
+#      30+ subcommands via select_one_keyed.
+#
+# Non-TTY callers (CI, hooks, pipes) never reach this — the entry-point
+# at the bottom of this file routes them to cmd_help.
+
+home_query() {
+  local q; q="$(ask "Question")"
+  [[ -z "$q" ]] && { info "no question; cancelled"; return 0; }
+  local mode; mode="$(select_one_keyed "Mode" \
+    "default|d|brief (cheapest)|b|file-back (persist as qa/)|f" "d")"
+  case "$mode" in
+    "default")                            cmd_query "$q" ;;
+    "brief (cheapest)")                   cmd_query "$q" --brief ;;
+    "file-back (persist as qa/)")         cmd_query "$q" --file-back ;;
+  esac
+}
+
+home_dispatch_suggestion() {
+  # Parse a suggestion's cmd string ("compile" / "curiosity --run-oldest")
+  # and route to the matching cmd_* function. Avoids `eval`.
+  local cmd_str="$1"
+  # shellcheck disable=SC2206
+  local -a parts=($cmd_str)
+  local sub="${parts[0]}"
+  local -a rest=("${parts[@]:1}")
+  case "$sub" in
+    process-inbox)    cmd_process_inbox "${rest[@]}" ;;
+    compile)          cmd_compile "${rest[@]}" ;;
+    curiosity)        cmd_curiosity "${rest[@]}" ;;
+    suggestions)      cmd_suggestions "${rest[@]}" ;;
+    dream)            cmd_dream "${rest[@]}" ;;
+    flush)            cmd_flush "${rest[@]}" ;;
+    lint)             cmd_lint "${rest[@]}" ;;
+    *)                err "no dispatcher for suggested cmd: $sub"; return 1 ;;
+  esac
+}
+
+category_menu() {
+  local bucket="$1"
+  local choice
+  case "$bucket" in
+    collectors)
+      choice="$(select_one_keyed "collectors" \
+        "list collectors|l|run a collector|r|gmail OAuth bootstrap|m|gmeet OAuth bootstrap|t|calendar OAuth bootstrap|c|back|b" "l")"
+      case "$choice" in
+        "list collectors")           cmd_collect --list ;;
+        "run a collector")           local n; n="$(ask "Collector name (see 'list' first)")"; [[ -n "$n" ]] && cmd_collect "$n" ;;
+        "gmail OAuth bootstrap")     local i; i="$(ask "Account id")"; [[ -n "$i" ]] && cmd_gmail_auth "$i" ;;
+        "gmeet OAuth bootstrap")     local i; i="$(ask "Account id")"; [[ -n "$i" ]] && cmd_gmeet_auth "$i" ;;
+        "calendar OAuth bootstrap")  local i; i="$(ask "Account id")"; [[ -n "$i" ]] && cmd_calendar_auth "$i" ;;
+        "back")                      return 0 ;;
+      esac ;;
+    ingest)
+      choice="$(select_one_keyed "ingest" \
+        "process inbox/ folder|p|ingest one URL or HTML file|h|ingest YouTube|y|back|b" "p")"
+      case "$choice" in
+        "process inbox/ folder")        cmd_process_inbox ;;
+        "ingest one URL or HTML file")  local u; u="$(ask "URL or path")"; [[ -n "$u" ]] && cmd_ingest_html "$u" ;;
+        "ingest YouTube")               local u; u="$(ask "Video or playlist URL")"; [[ -n "$u" ]] && cmd_ingest_youtube --url "$u" ;;
+        "back")                         return 0 ;;
+      esac ;;
+    knowledge)
+      choice="$(select_one_keyed "knowledge ops" \
+        "compile changed sources|c|compile a single file|f|lint (structural only)|l|lint (full, costs \$)|L|query the wiki|q|review-wiki (local LLM)|r|dream — sweep all entities|d|dream — one entity|e|pin article to MOC|p|back|b" "c")"
+      case "$choice" in
+        "compile changed sources")      cmd_compile ;;
+        "compile a single file")        local f; f="$(ask "Path (vault-relative)")"; [[ -n "$f" ]] && cmd_compile --file "$f" ;;
+        "lint (structural only)")       cmd_lint --structural-only ;;
+        "lint (full, costs \$)")        cmd_lint ;;
+        "query the wiki")               home_query ;;
+        "review-wiki (local LLM)")      cmd_review_wiki ;;
+        "dream — sweep all entities")   cmd_dream --all-entities ;;
+        "dream — one entity")           local s; s="$(ask "Entity slug")"; [[ -n "$s" ]] && cmd_dream_entity "$s" ;;
+        "pin article to MOC")           local a; a="$(ask "Article name or path")"; [[ -n "$a" ]] && cmd_pin "$a" ;;
+        "back")                         return 0 ;;
+      esac ;;
+    facts)
+      choice="$(select_one_keyed "facts & takes" \
+        "list hard facts|l|add a hard fact|a|edit a hard fact|e|remove a hard fact|r|apply a hard fact (\$\$\$)|A|list takes|L|show takes for one holder|s|back|b" "l")"
+      case "$choice" in
+        "list hard facts")              cmd_correct list ;;
+        "add a hard fact")
+          local t; t="$(ask "Title")"
+          local u; u="$(ask "Truth (one sentence)")"
+          [[ -n "$t" && -n "$u" ]] && cmd_correct add "$t" "$u" ;;
+        "edit a hard fact")             local s; s="$(ask "Slug")"; [[ -n "$s" ]] && cmd_correct edit "$s" ;;
+        "remove a hard fact")           local s; s="$(ask "Slug")"; [[ -n "$s" ]] && cmd_correct remove "$s" ;;
+        "apply a hard fact (\$\$\$)")   local s; s="$(ask "Slug")"; [[ -n "$s" ]] && cmd_correct apply "$s" ;;
+        "list takes")                   cmd_take list ;;
+        "show takes for one holder")    local s; s="$(ask "Holder slug")"; [[ -n "$s" ]] && cmd_take show "$s" ;;
+        "back")                         return 0 ;;
+      esac ;;
+    automation)
+      choice="$(select_one_keyed "automation" \
+        "curiosity — list requests|l|curiosity — run oldest|o|curiosity — run all|a|curiosity — clear done|c|suggestions — list|L|suggestions — review one|R|suggestions — execute approved|x|flush session now|f|run an agent task|g|list agent tasks|G|back|b" "l")"
+      case "$choice" in
+        "curiosity — list requests")     cmd_curiosity --list ;;
+        "curiosity — run oldest")        cmd_curiosity --run-oldest ;;
+        "curiosity — run all")           cmd_curiosity --run-all ;;
+        "curiosity — clear done")        cmd_curiosity --clear-done ;;
+        "suggestions — list")            cmd_suggestions --list ;;
+        "suggestions — review one")      local i; i="$(ask "Suggestion id")"; [[ -n "$i" ]] && cmd_suggestions --review "$i" ;;
+        "suggestions — execute approved") cmd_suggestions ;;
+        "flush session now")             cmd_flush ;;
+        "run an agent task")             local i; i="$(ask "Task id")"; [[ -n "$i" ]] && cmd_agent "$i" ;;
+        "list agent tasks")              cmd_agent --list ;;
+        "back")                          return 0 ;;
+      esac ;;
+    setup)
+      choice="$(select_one_keyed "setup" \
+        "status|s|run setup wizard|w|edit config|c|hooks status|h|install hooks|H|skills status|k|update engine (git pull)|u|seed templates (audit)|d|seed templates (apply)|D|version|v|back|b" "s")"
+      case "$choice" in
+        "status")                       cmd_status ;;
+        "run setup wizard")             cmd_setup ;;
+        "edit config")                  config_cmd_edit ;;
+        "hooks status")                 hooks_cmd_status ;;
+        "install hooks")                hooks_cmd_install ;;
+        "skills status")                skills_cmd_status ;;
+        "update engine (git pull)")     cmd_update ;;
+        "seed templates (audit)")       cmd_seed --check ;;
+        "seed templates (apply)")       cmd_seed ;;
+        "version")                      cmd_version ;;
+        "back")                         return 0 ;;
+      esac ;;
+    *)
+      err "unknown bucket: $bucket"
+      return 1 ;;
+  esac
+}
+
+home_screen() {
+  local revision vault_name
+  revision="$(git -C "$WIKI_DIR" rev-parse --short HEAD 2>/dev/null || echo unknown)"
+  vault_name="$(basename "$ROOT_DIR")"
   while :; do
     echo
-    local action
-    action="$(select_one "What now?" \
-      "show status|run setup wizard|edit config|install hooks|uninstall hooks|update from git|exit" 1)"
-    case "$action" in
-      "show status")        echo; cmd_status ;;
-      "run setup wizard")   echo; cmd_setup ;;
-      "edit config")        echo; config_cmd_edit ;;
-      "install hooks")      echo; hooks_cmd_install ;;
-      "uninstall hooks")    echo; hooks_cmd_uninstall ;;
-      "update from git")    echo; cmd_update ;;
-      "exit")               break ;;
+    printf "  %s%swiki%s — %s vault (commit %s)\n" \
+      "$C_BOLD" "$C_CYAN" "$C_RESET" "$vault_name" "$revision"
+    echo
+
+    # Probe the vault. Hard timeout lives inside menu_context.py; here we
+    # only guard against the process itself failing.
+    local suggestions_json
+    suggestions_json="$(uv run --quiet --project "$WIKI_DIR" \
+      python "$WIKI_DIR/scripts/menu_context.py" 2>/dev/null)"
+    [[ -z "$suggestions_json" ]] && suggestions_json='[]'
+    local n_suggestions
+    n_suggestions="$(jq 'length' <<<"$suggestions_json" 2>/dev/null || echo 0)"
+
+    if (( n_suggestions > 0 )); then
+      printf "  %s▸ Pending in your vault%s\n" "$C_BOLD" "$C_RESET"
+      while IFS=$'\t' read -r key label cmd; do
+        printf "      %s%s)%s %-44s %s→ wiki %s%s\n" \
+          "$C_GREEN" "$key" "$C_RESET" "$label" "$C_DIM" "$cmd" "$C_RESET"
+      done < <(jq -r '.[] | [.key, .label, .cmd] | @tsv' <<<"$suggestions_json")
+      echo
+    fi
+
+    printf "  %s▸ Quick actions%s\n" "$C_BOLD" "$C_RESET"
+    printf "      [%sq%s] query     [%sf%s] flush     [%sl%s] lint     [%ss%s] status\n" \
+      "$C_BOLD" "$C_RESET" "$C_BOLD" "$C_RESET" "$C_BOLD" "$C_RESET" "$C_BOLD" "$C_RESET"
+    echo
+    printf "  %s▸ Browse%s\n" "$C_BOLD" "$C_RESET"
+    printf "      [%sc%s] collectors    [%si%s] ingest    [%sk%s] knowledge ops\n" \
+      "$C_BOLD" "$C_RESET" "$C_BOLD" "$C_RESET" "$C_BOLD" "$C_RESET"
+    printf "      [%sd%s] facts/takes   [%sa%s] automation [%sg%s] setup\n" \
+      "$C_BOLD" "$C_RESET" "$C_BOLD" "$C_RESET" "$C_BOLD" "$C_RESET"
+    echo
+    printf "      [%sh%s] full help     [%sx%s] exit\n" \
+      "$C_BOLD" "$C_RESET" "$C_BOLD" "$C_RESET"
+    echo
+    printf "  Pick one: "
+    local choice
+    # EOF (Ctrl-D, closed pipe) exits the menu cleanly.
+    if ! read -r choice; then echo; break; fi
+
+    # Numeric → dispatch a suggestion.
+    if [[ "$choice" =~ ^[0-9]+$ ]] && (( choice >= 1 && choice <= n_suggestions )); then
+      local cmd_str
+      cmd_str="$(jq -r ".[$((choice-1))].cmd" <<<"$suggestions_json")"
+      echo
+      home_dispatch_suggestion "$cmd_str" || true
+      echo; pause; continue
+    fi
+
+    case "$choice" in
+      q)                    echo; home_query ;;
+      f)                    echo; cmd_flush ;;
+      l)                    echo; cmd_lint --structural-only ;;
+      s)                    echo; cmd_status ;;
+      c)                    echo; category_menu collectors ;;
+      i)                    echo; category_menu ingest ;;
+      k)                    echo; category_menu knowledge ;;
+      d)                    echo; category_menu facts ;;
+      a)                    echo; category_menu automation ;;
+      g)                    echo; category_menu setup ;;
+      h)                    echo; cmd_help ;;
+      x|"")                 break ;;
+      *)                    warn "unknown choice: $choice" ;;
     esac
     echo
     pause
@@ -1078,8 +1274,18 @@ top_menu() {
 }
 
 # ── Entry point ──────────────────────────────────────────────────────
+# Bare `wiki` opens the interactive home screen ONLY when stdin/stdout are
+# both TTYs. Non-TTY callers (CI, pipes, hooks, cron) get the help dump
+# and exit 0 — they never block waiting for input.
 case "${1:-}" in
-  "")               top_menu ;;
+  "")
+    if [[ -t 0 && -t 1 ]]; then
+      home_screen
+    else
+      cmd_help
+    fi
+    ;;
+  menu)             home_screen ;;
   setup)            shift; cmd_setup "$@" ;;
   status)           shift; cmd_status "$@" ;;
   config)           shift; cmd_config "$@" ;;

@@ -249,6 +249,8 @@ cd ~/path/to/vault
                           #   compile-after hour, procmail execution, local-LLM
                           #   bundle, global skill install
 ./.wiki/wiki status       # config + hook install table + Ollama probe
+./.wiki/wiki              # interactive home screen — context-sensitive
+                          #   "what's pending" + browse categories
 ```
 
 ## Update
@@ -319,7 +321,11 @@ If you find a leak in history, rotate the secret immediately, then file an issue
 
 ## CLI Reference
 
-Top-level: `./.wiki/wiki [setup|status|update|config|hooks]`. Full reference — every subcommand, every config key, every hook target — lives in [docs/cli.md](docs/cli.md).
+Bare `./.wiki/wiki` opens an **interactive home screen** with context-sensitive
+suggestions (`3 files in inbox/ → process-inbox`, `12 sources changed → compile`,
+etc.) plus a 6-bucket category browse. Non-TTY callers (CI, hooks, pipes) get
+the help dump and exit. Full reference — every subcommand, every config key,
+every hook target — lives in [docs/cli.md](docs/cli.md).
 
 ## For contributors
 

@@ -13,14 +13,37 @@ Operational layer for an LLM Wiki vault. The `.wiki/` directory is hidden from O
 ## Quick start
 
 ```bash
-./.wiki/wiki                  # interactive top-level menu
+./.wiki/wiki                  # interactive home screen — context-sensitive
+                              #   suggestions ("3 files in inbox/ → process-inbox"),
+                              #   quick actions, browse categories. Non-TTY callers
+                              #   (CI, hooks, pipes) get `wiki help` instead.
+./.wiki/wiki menu             # same home screen, forced regardless of TTY
 ./.wiki/wiki setup            # first-time: config wizard + hooks install
 ./.wiki/wiki status           # config + hooks + Ollama probe
-./.wiki/wiki help             # top-level usage
+./.wiki/wiki help             # top-level usage (printed verbatim, no prompts)
 ./.wiki/wiki config --help    # config subcommands
 ./.wiki/wiki hooks --help     # hooks subcommands
 ./.wiki/wiki update           # git pull + uv sync, preserves config.yaml
 ```
+
+### Home-screen anatomy
+
+Bare `wiki` runs `scripts/menu_context.py` to probe the vault (~150ms cold,
+hard-capped at 500ms via `SIGALRM`) and emits a ranked suggestion list. The
+seven probe signals:
+
+| # | Signal                                          | Suggested command            |
+|---|-------------------------------------------------|------------------------------|
+| 1 | files in `inbox/`                               | `process-inbox`              |
+| 2 | sources newer than last compile                 | `compile`                    |
+| 3 | `raw/requests/*.json` with `status != done`     | `curiosity --run-oldest`     |
+| 4 | `raw/suggestions/*.yaml` `status: approved`     | `suggestions`                |
+| 5 | entity pages past `dream_cooldown_days`         | `dream --all-entities`       |
+| 6 | today's `daily/sessions/<date>.md` missing      | `flush`                      |
+| 7 | knowledge edits newer than newest lint report   | `lint --structural-only`     |
+
+Probe is pure-Python, no network, no LLM. On error the home screen renders
+the browse section only.
 
 ## Subcommand cheat sheet
 
@@ -30,7 +53,8 @@ Grouped by purpose. Run `wiki <cmd> --help` for the full per-command help block.
 
 | Command | What it does |
 |---|---|
-| `wiki` | interactive top-level menu |
+| `wiki` | interactive home screen (TTY only) — context-sensitive suggestions + browse menu. Non-TTY → `wiki help`. |
+| `wiki menu` | same home screen, forced regardless of TTY. |
 | `wiki setup [--help]` | first-time wizard (5 questions) + hook install |
 | `wiki status` | config summary, hook install table, Ollama probe |
 | `wiki update [--no-skills]` | `git pull --ff-only` the engine checkout + sync skill symlinks; never touches `config.yaml` or `.venv/` content. `--no-skills` skips the skill sync step. |
