@@ -55,6 +55,7 @@ def fake_vault(tmp_path, monkeypatch):
     monkeypatch.setattr(menu_context, "AREAS_DIR", areas)
     monkeypatch.setattr(menu_context, "REPORTS_DIR", reports)
     monkeypatch.setattr(menu_context, "STATE_FILE", state / "state.json")
+    monkeypatch.setattr(menu_context, "KNOWLEDGE_DIR", knowledge)
     return tmp_path
 
 
@@ -206,8 +207,8 @@ def test_build_suggestions_returns_only_nonzero_counts_sorted(fake_vault):
     assert [r["key"] for r in results] == [str(i + 1) for i in range(len(results))]
 
 
-def test_cli_emits_valid_json_array():
-    """End-to-end: subprocess call returns a parseable JSON list."""
+def test_cli_emits_valid_json_object():
+    """End-to-end: subprocess call returns a parseable {status, suggestions}."""
     proc = subprocess.run(
         [sys.executable, str(MENU_CONTEXT_PY)],
         capture_output=True,
@@ -216,4 +217,47 @@ def test_cli_emits_valid_json_array():
     )
     assert proc.returncode == 0
     data = json.loads(proc.stdout)
-    assert isinstance(data, list)
+    assert isinstance(data, dict)
+    assert set(data.keys()) == {"status", "suggestions"}
+    assert isinstance(data["status"], dict)
+    assert isinstance(data["suggestions"], list)
+
+
+# ── Status one-liner probes ─────────────────────────────────────────
+
+
+def test_articles_counts_md_excluding_index_and_log(fake_vault):
+    import menu_context
+
+    (fake_vault / "knowledge" / "concepts").mkdir(parents=True, exist_ok=True)
+    (fake_vault / "knowledge" / "concepts" / "a.md").write_text("x")
+    (fake_vault / "knowledge" / "concepts" / "b.md").write_text("x")
+    (fake_vault / "knowledge" / "index.md").write_text("x")
+    (fake_vault / "knowledge" / "log.md").write_text("x")
+    assert menu_context.probe_articles() == 2
+
+
+def test_last_compile_ago_humanizes_delta(fake_vault):
+    import menu_context
+
+    # 90 minutes ago.
+    past = datetime.now() - timedelta(minutes=90)
+    menu_context.STATE_FILE.write_text(json.dumps({"last_compile": past.isoformat()}))
+    ago = menu_context.probe_last_compile_ago()
+    assert ago == "1h"
+
+
+def test_last_compile_ago_none_when_never_compiled(fake_vault):
+    import menu_context
+
+    assert menu_context.probe_last_compile_ago() is None
+
+
+def test_build_status_returns_dict_with_articles_at_minimum(fake_vault):
+    import menu_context
+
+    (fake_vault / "knowledge" / "concepts").mkdir(parents=True, exist_ok=True)
+    (fake_vault / "knowledge" / "concepts" / "a.md").write_text("x")
+    status = menu_context.build_status()
+    assert isinstance(status, dict)
+    assert status.get("articles") == 1

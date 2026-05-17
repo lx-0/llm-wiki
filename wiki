@@ -1198,6 +1198,136 @@ category_menu() {
   esac
 }
 
+home_render_status() {
+  # Compose the one-liner from a status JSON object. Renders nothing if
+  # all fields absent. Uses jq-extracted scalars.
+  local status_json="$1"
+  local articles ollama_ok last_compile
+  articles="$(jq -r '.articles // empty' <<<"$status_json" 2>/dev/null)"
+  ollama_ok="$(jq -r '.ollama_reachable // empty' <<<"$status_json" 2>/dev/null)"
+  last_compile="$(jq -r '.last_compile_ago // empty' <<<"$status_json" 2>/dev/null)"
+  local -a parts=()
+  if [[ -n "$articles" ]]; then
+    parts+=("${articles} article$([[ $articles == 1 ]] || echo s)")
+  fi
+  if [[ -n "$last_compile" ]]; then
+    parts+=("last compile ${last_compile} ago")
+  fi
+  if [[ "$ollama_ok" == "true" ]]; then
+    parts+=("ollama ${C_GREEN}✓${C_RESET}")
+  elif [[ "$ollama_ok" == "false" ]]; then
+    parts+=("ollama ${C_RED}✗${C_RESET}")
+  fi
+  (( ${#parts[@]} == 0 )) && return 0
+  local line=""
+  local sep=""
+  for p in "${parts[@]}"; do
+    line+="${sep}${p}"
+    sep=" ${C_DIM}·${C_RESET} "
+  done
+  printf "  %s%s%s\n" "$C_DIM" "$line" "$C_RESET"
+}
+
+# Flat command catalog used by the `/` fuzzy filter. One row per line:
+# "command-name|short description|dispatcher". Dispatcher is a bash
+# function (or function + arg-prompt sentinel) the filter routes to.
+# Kept hand-curated rather than reflectively generated — explicit beats
+# magic, and the list churns slowly.
+_home_command_catalog() {
+  cat <<'EOF'
+compile|recompile changed sources|cmd_compile
+flush|capture current session to daily/|cmd_flush
+lint|knowledge-base health check|cmd_lint
+lint-structural|cheap structural lint (no LLM)|cmd_lint --structural-only
+query|ask the wiki in natural language|home_query
+status|config + hooks + ollama probe|cmd_status
+collect|run a collector (--list to enumerate)|prompt:Collector name:cmd_collect
+process-inbox|classify and route inbox/ files|cmd_process_inbox
+ingest-html|ingest a URL or HTML file|prompt:URL or path:cmd_ingest_html
+ingest-youtube|ingest a YouTube URL|prompt:Video or playlist URL:cmd_ingest_youtube --url
+dream|sweep all entity pages|cmd_dream --all-entities
+dream-entity|re-synthesize one entity|prompt:Entity slug:cmd_dream_entity
+pin|pin article to a MOC|prompt:Article name or path:cmd_pin
+review-wiki|per-article quality score (local)|cmd_review_wiki
+correct|list hard facts|cmd_correct list
+take|list takes|cmd_take list
+curiosity|list curiosity requests|cmd_curiosity --list
+suggestions|list optimization suggestions|cmd_suggestions --list
+agent|list agent tasks|cmd_agent --list
+setup|first-time setup wizard|cmd_setup
+config|edit config interactively|config_cmd_edit
+hooks|hooks install table|hooks_cmd_status
+skills|skills install table|skills_cmd_status
+update|git pull --ff-only + sync skills|cmd_update
+seed|audit vault templates|cmd_seed --check
+version|engine git revision|cmd_version
+EOF
+}
+
+home_fuzzy_filter() {
+  # User typed "/foo". Find every catalog row whose name contains "foo"
+  # (case-insensitive), present a picker, dispatch via the encoded fn.
+  # NB: avoids ${var,,} for bash 3.2 compat (macOS default shell).
+  local query; query="$(printf "%s" "${1:-}" | tr '[:upper:]' '[:lower:]')"
+  [[ -z "$query" ]] && { info "type '/something' to filter"; return 0; }
+  local -a matches=()
+  while IFS='|' read -r name desc dispatcher; do
+    [[ -z "$name" ]] && continue
+    local lname; lname="$(printf "%s" "$name" | tr '[:upper:]' '[:lower:]')"
+    if [[ "$lname" == *"$query"* ]]; then
+      matches+=("$name|$desc|$dispatcher")
+    fi
+  done < <(_home_command_catalog)
+
+  if (( ${#matches[@]} == 0 )); then
+    warn "no command matches '/$query'"
+    return 0
+  fi
+  local picked=""
+  if (( ${#matches[@]} == 1 )); then
+    picked="${matches[0]}"
+    local name="${picked%%|*}"
+    info "one match: ${C_BOLD}${name}${C_RESET}"
+  else
+    echo
+    printf "  Matches for ${C_BOLD}/%s${C_RESET}:\n" "$query"
+    local i=1
+    for row in "${matches[@]}"; do
+      local name="${row%%|*}"
+      local rest="${row#*|}"
+      local desc="${rest%%|*}"
+      printf "    %2d) %s%-22s%s %s%s%s\n" \
+        "$i" "$C_BOLD" "$name" "$C_RESET" "$C_DIM" "$desc" "$C_RESET"
+      i=$((i+1))
+    done
+    printf "  Pick a number (Enter to cancel): "
+    local pick; if ! read -r pick; then echo; return 0; fi
+    [[ -z "$pick" ]] && return 0
+    [[ "$pick" =~ ^[0-9]+$ ]] || { warn "not a number"; return 0; }
+    if (( pick < 1 || pick > ${#matches[@]} )); then
+      warn "out of range"; return 0
+    fi
+    picked="${matches[$((pick-1))]}"
+  fi
+
+  local dispatcher="${picked##*|}"
+  echo
+  # Dispatcher may be "prompt:Label:cmd args" (needs one arg) or plain
+  # function call (e.g. "cmd_compile" / "cmd_lint --structural-only").
+  if [[ "$dispatcher" == prompt:* ]]; then
+    local rest="${dispatcher#prompt:}"
+    local label="${rest%%:*}"
+    local cmd_str="${rest#*:}"
+    local arg; arg="$(ask "$label")"
+    [[ -z "$arg" ]] && { info "cancelled"; return 0; }
+    # shellcheck disable=SC2086
+    eval "$cmd_str \"\$arg\""
+  else
+    # shellcheck disable=SC2086
+    eval "$dispatcher"
+  fi
+}
+
 home_screen() {
   local revision vault_name
   revision="$(git -C "$WIKI_DIR" rev-parse --short HEAD 2>/dev/null || echo unknown)"
@@ -1206,14 +1336,20 @@ home_screen() {
     echo
     printf "  %s%swiki%s — %s vault (commit %s)\n" \
       "$C_BOLD" "$C_CYAN" "$C_RESET" "$vault_name" "$revision"
-    echo
 
     # Probe the vault. Hard timeout lives inside menu_context.py; here we
     # only guard against the process itself failing.
-    local suggestions_json
-    suggestions_json="$(uv run --quiet --project "$WIKI_DIR" \
+    local payload_json
+    payload_json="$(uv run --quiet --project "$WIKI_DIR" \
       python "$WIKI_DIR/scripts/menu_context.py" 2>/dev/null)"
-    [[ -z "$suggestions_json" ]] && suggestions_json='[]'
+    [[ -z "$payload_json" ]] && payload_json='{"status":{},"suggestions":[]}'
+    local status_json suggestions_json
+    status_json="$(jq -c '.status' <<<"$payload_json" 2>/dev/null || echo '{}')"
+    suggestions_json="$(jq -c '.suggestions' <<<"$payload_json" 2>/dev/null || echo '[]')"
+
+    home_render_status "$status_json"
+    echo
+
     local n_suggestions
     n_suggestions="$(jq 'length' <<<"$suggestions_json" 2>/dev/null || echo 0)"
 
@@ -1236,13 +1372,20 @@ home_screen() {
     printf "      [%sd%s] facts/takes   [%sa%s] automation [%sg%s] setup\n" \
       "$C_BOLD" "$C_RESET" "$C_BOLD" "$C_RESET" "$C_BOLD" "$C_RESET"
     echo
-    printf "      [%sh%s] full help     [%sx%s] exit\n" \
-      "$C_BOLD" "$C_RESET" "$C_BOLD" "$C_RESET"
+    printf "      [%sh%s] full help     [%sx%s] exit     %s(type %s/foo%s to filter all commands)%s\n" \
+      "$C_BOLD" "$C_RESET" "$C_BOLD" "$C_RESET" \
+      "$C_DIM" "$C_BOLD" "$C_RESET$C_DIM" "$C_RESET"
     echo
     printf "  Pick one: "
     local choice
     # EOF (Ctrl-D, closed pipe) exits the menu cleanly.
     if ! read -r choice; then echo; break; fi
+
+    # `/foo` → fuzzy filter across the full command catalog.
+    if [[ "$choice" == /* ]]; then
+      home_fuzzy_filter "${choice#/}" || true
+      echo; pause; continue
+    fi
 
     # Numeric → dispatch a suggestion.
     if [[ "$choice" =~ ^[0-9]+$ ]] && (( choice >= 1 && choice <= n_suggestions )); then

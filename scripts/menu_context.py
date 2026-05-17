@@ -12,14 +12,22 @@ Design constraints:
     * Per-probe try/except so a single broken signal never kills the rest.
 
 Output schema (stdout, one line):
-    [
-      {"key": "1", "count": 3, "label": "3 files in inbox/",
-       "cmd": "process-inbox", "priority": 1},
-      ...
-    ]
+    {
+      "status": {
+        "articles": 384,
+        "last_compile_ago": "4h",
+        "ollama_reachable": true
+      },
+      "suggestions": [
+        {"key": "1", "count": 3, "label": "3 files in inbox/",
+         "cmd": "process-inbox", "priority": 1},
+        ...
+      ]
+    }
 
 Errors and warnings go to stderr. Exit code is always 0 — the bash layer
-treats parse failure / empty array as "no suggestions, render browse only".
+treats parse failure / empty object as "no status + no suggestions, render
+browse only".
 """
 
 from __future__ import annotations
@@ -38,6 +46,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from core.paths import (
     DAILY_DIR,
     INBOX_DIR,
+    KNOWLEDGE_DIR,
     PEOPLE_DIR,
     PROJECTS_DIR,
     AREAS_DIR,
@@ -258,6 +267,86 @@ def build_suggestions() -> list[dict]:
     return results
 
 
+# ── Status one-liner probes ──────────────────────────────────────────
+
+
+def probe_articles() -> int:
+    """Total knowledge/ articles (any .md, excluding index.md / log.md)."""
+    if not KNOWLEDGE_DIR.exists():
+        return 0
+    return sum(
+        1
+        for p in KNOWLEDGE_DIR.rglob("*.md")
+        if p.name not in ("index.md", "log.md")
+    )
+
+
+def probe_last_compile_ago() -> str | None:
+    """Humanized delta from now since `state.json["last_compile"]`.
+
+    Returns None when no compile has ever run. Format: '4h' / '2d' / '15m'.
+    """
+    mtime = _last_compile_mtime()
+    if mtime is None:
+        return None
+    delta = time.time() - mtime
+    if delta < 60:
+        return "just now"
+    if delta < 3600:
+        return f"{int(delta / 60)}m"
+    if delta < 86400:
+        return f"{int(delta / 3600)}h"
+    return f"{int(delta / 86400)}d"
+
+
+def probe_ollama_reachable() -> bool | None:
+    """Cheap TCP-connect probe at the configured Ollama URL.
+
+    Returns None if no URL is configured (don't render). 150ms per-call cap.
+    """
+    try:
+        from core.config import CONFIG
+
+        url = (CONFIG.models.ollama_url or "").strip()
+    except Exception:
+        return None
+    if not url:
+        return None
+    try:
+        from urllib.parse import urlparse
+        import socket
+
+        parsed = urlparse(url)
+        host = parsed.hostname or "localhost"
+        port = parsed.port or (443 if parsed.scheme == "https" else 80)
+        with socket.create_connection((host, port), timeout=0.15):
+            return True
+    except (OSError, ValueError):
+        return False
+
+
+def build_status() -> dict:
+    """Cheap stats for the home-screen one-liner above the suggestions."""
+    out: dict = {}
+    try:
+        out["articles"] = probe_articles()
+    except Exception as e:
+        log.warning("articles probe failed: %s", e)
+    try:
+        ago = probe_last_compile_ago()
+        if ago is not None:
+            out["last_compile_ago"] = ago
+    except Exception as e:
+        log.warning("last_compile_ago probe failed: %s", e)
+    try:
+        ok = probe_ollama_reachable()
+        if ok is not None:
+            out["ollama_reachable"] = ok
+    except Exception as e:
+        log.warning("ollama probe failed: %s", e)
+    return out
+
+
 # ── Entry point ──────────────────────────────────────────────────────
 
 
@@ -267,23 +356,26 @@ def _timeout_handler(signum, frame):
 
 def main() -> int:
     start = time.monotonic()
+    status: dict = {}
     suggestions: list[dict] = []
     # SIGALRM only exists on POSIX; this script doesn't ship to Windows.
     signal.signal(signal.SIGALRM, _timeout_handler)
     signal.setitimer(signal.ITIMER_REAL, WALL_CLOCK_BUDGET_S)
     try:
+        status = build_status()
         suggestions = build_suggestions()
     except TimeoutError:
-        log.warning("hit %.0fms cap, returning empty list", WALL_CLOCK_BUDGET_S * 1000)
-        suggestions = []
+        log.warning("hit %.0fms cap, returning partial payload", WALL_CLOCK_BUDGET_S * 1000)
     except Exception as e:
         log.warning("unexpected probe failure: %s", e)
-        suggestions = []
     finally:
         signal.setitimer(signal.ITIMER_REAL, 0)
     elapsed_ms = int((time.monotonic() - start) * 1000)
-    log.debug("menu_context produced %d suggestions in %dms", len(suggestions), elapsed_ms)
-    json.dump(suggestions, sys.stdout)
+    log.debug(
+        "menu_context produced %d suggestions + %d status fields in %dms",
+        len(suggestions), len(status), elapsed_ms,
+    )
+    json.dump({"status": status, "suggestions": suggestions}, sys.stdout)
     sys.stdout.write("\n")
     return 0
 
