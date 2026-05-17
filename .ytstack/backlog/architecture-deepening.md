@@ -1,8 +1,17 @@
 # Architecture Deepening — M003+ Candidates
 
-Surfaced via `/improve-codebase-architecture` walk (2026-05-02), after M002 closed. Four candidates ranked HIGH/MEDIUM. Three explicitly skipped as false positives. Use this file as input to a future `ytstack:plan-milestone`.
+Surfaced via `/improve-codebase-architecture` walk (2026-05-02), after M002 closed. **Refreshed 2026-05-17** after the codebase ~2×'d in size (compile.py 511→1340, dream.py 0→1091, lint.py 326→1214, new subpackages facts/, suggestions/, curiosity/, dashboard/, sessions/, and new collectors pictures/voice/gmeet/jamie/health/calendar).
 
 Vocabulary: domain terms from `CONTEXT.md`, architecture terms from improve-codebase-architecture's LANGUAGE.md (module / interface / depth / seam / adapter / leverage / locality / deletion-test).
+
+## Refresh summary (2026-05-17)
+
+- **2 fully resolved:** #1 Scan→Collector, #2 Config split.
+- **1 partially resolved:** #4 Linter seam — lint.py absorbed the LLM-contradiction phase internally. Defer until a 3rd semantic-check shape appears.
+- **9 unchanged carry-forwards:** #3, #5–#13 from the original walk (priorities held).
+- **4 new:** #14 Producer seam, #15 Dashboard consolidation, #16 dream.py phase extraction, #17 rename `_LEGACY_PIGGYBACK_COMMANDS`.
+- **1 graduated MEDIUM → HIGH:** #3 Model seam (was 2 LLM call sites in 2026-05-02 → 7+ today).
+- **Active design grilled out:** **#14 (Producer seam) + #5 (compile.py orchestration)** were grilled into a two-milestone arc; design lives in `.ytstack/backlog/producer-seam.md`. Pick up there at next `ytstack:plan-milestone`.
 
 ---
 
@@ -39,37 +48,37 @@ The old circular import (`config.py` ↔ `wiki_config.py` for `TIMEZONE`) is eli
 
 ---
 
-## #3 — Model seam (MEDIUM — interface not yet stable)
+## #3 — Model seam (HIGH — graduated from MEDIUM 2026-05-17)
 
-**Files:** `scripts/ollama_client.py` (160), direct `query()` calls (claude-agent-sdk) and `ollama_client.chat()` calls scattered across `compile.py` (511), `lint.py` (326), `review-wiki.py` (226), `optimize-claude-md.py` (149), `scan-screenshots.py` (366).
+**Files:** `core/sdk_helpers.py` (258), `core/ollama_client.py` (160); 7+ LLM call sites today: `compile.py`, `curiosity/producer.py`, `suggestions/producer.py`, `facts/takes_producer.py`, `review-wiki.py`, `ingest-html.py`, `scan_screenshots.py`, `scan_youtube.py`, `pictures.py`, `voice.py`.
 
-**Problem:** Two-LLM architecture (Claude SDK for synthesis, Ollama for classify / curiosity / vision-OCR) with no unifying seam. Temperature defaults, retry logic, schema handling, gotcha-knowledge (`format:json is not enough`, see `.ytstack/KNOWLEDGE.md`) live as copy-paste fragments across five scripts.
+**Problem:** Two-LLM architecture (Claude SDK async for synthesis, Ollama sync for classify / curiosity / vision-OCR) with no unifying seam. Temperature defaults, retry logic, schema handling, gotcha-knowledge (Ollama `format:json` insufficient, schema variants, vision-OCR quirks — all in `.ytstack/KNOWLEDGE.md`) live as copy-paste fragments. `core/sdk_helpers.py` addresses **one side** (Claude SDK error classification + stderr capture); the other side (Ollama wrapping, schema unification, async-sync bridging) is still scattered.
 
-**Shape after deepening:** A `scripts/model.py` (or `scripts/adapters/model/`) with `generate_text()`, `generate_structured(schema)`, `generate_vision(image)`. Dispatcher resolves backend from CONFIG or explicit `model_kind=` param. Centralized retry / temperature / schema-validation. Each consumer becomes thinner.
+**Shape after deepening:** A `scripts/llm.py` (or `scripts/adapters/llm/`) with `generate_text(prompt, model=None, temperature=None, timeout=None)`, `generate_structured(prompt, schema, model=None)`, `generate_vision(image_path, prompt, model=None)`. Dispatcher resolves backend from CONFIG or explicit `model_kind=` hint. Centralized retry + cost estimation + failure classification. Wraps Ollama with `asyncio.to_thread()` so the async/sync mismatch stops blocking the event loop in curiosity calls.
 
-**Why MEDIUM, not HIGH:** Interface still forming. Async-vs-sync gap (Claude SDK is async, ollama_client is sync). Schema-shape diverges (Ollama JSON schema vs. Claude tool-use schema). Vision is Ollama-only today. Two clients aren't a real seam yet — three or four would be.
+**Why HIGH (graduated 2026-05-17):** Old walk said "two clients aren't a real seam yet — three or four would be." Now there are 7+. Threshold crossed. Couples to old #10 (async/sync boundary), which is subsumed by this seam.
 
-**Pre-work before this can be a milestone:** decide async-vs-sync (or explicit dual-shape), inventory the schema variants, list every gotcha that should consolidate.
+**Sequencing:** If sequenced **after** the Producer seam (`.ytstack/backlog/producer-seam.md`), the Model seam swaps into a single Producer-orchestrator wrapper instead of touching all three producer bodies + compile.py + 4 collectors. Strong case for ordering Producer-seam → compile-orchestration → Model-seam.
 
----
-
-## #4 — Linter seam (MEDIUM — shapes diverge more than mailbox)
-
-**Files:** `scripts/lint.py` (326), `scripts/review-wiki.py` (226), `scripts/optimize-claude-md.py` (149).
-
-**Problem:** Three scripts with the same shape: gather input → LLM call → report → output. Each reimplements its own issue-aggregation, its own report-format, its own backup-pattern. Locality of "what does a check look like?" is dispersed.
-
-**Shape after deepening:** A `Linter` `Protocol` with `run() → LintReport`. `LintReport` is a shared dataclass (issues, fixes, metrics). Checks are pluggable. Three scripts become thin CLI wrappers calling the linter with different check factories.
-
-**Why MEDIUM, not HIGH:** lint is structural+semantic, review-wiki is quality-only, optimize-claude-md is mutation-focused. Shapes diverge more than `Reader`/`Filter` did. Could end up forcing a fake unified interface.
-
-**Pre-work:** read all three scripts and decide whether their *outputs* are similar enough that one `LintReport` shape works, or whether the seam fights back.
+**Pre-work:** inventory schema variants (Claude tool-use vs. Ollama JSON-schema vs. Ollama structured-output), enumerate every gotcha in KNOWLEDGE.md that should consolidate, decide single async interface (recommend yes — wrap Ollama via `asyncio.to_thread()`).
 
 ---
 
-## #5 — `compile.py` orchestration vs. I/O separation (HIGH)
+## #4 — Linter seam (PARTIALLY RESOLVED — defer 2026-05-17)
 
-**Files:** `scripts/compile.py` (511 lines).
+**Status:** lint.py grew 326 → 1214 LOC and absorbed the LLM-contradiction phase internally (guarded by `--structural-only`). One of the three "gather → LLM → report" clients moved inside lint.py rather than reaching for a shared seam. The remaining two (`review-wiki.py` 226, `optimize-claude-md.py` 163) are now 2 adapters = hypothetical seam.
+
+Lint.py now has its own shallow-interface problem (two linters in a trench coat, leaky `--structural-only` flag), but that's a within-file refactor, not a seam.
+
+**Defer until:** a third semantic-check shape appears (e.g. a schema-compliance lint, a citation-validation lint). Then reopen with three real adapters.
+
+---
+
+## #5 — `compile.py` orchestration vs. I/O separation (HIGH — got WORSE since 2026-05-02)
+
+**Status (2026-05-17):** Grilled into a design doc at `.ytstack/backlog/producer-seam.md` as **Milestone-B** of the two-milestone arc (Producer seam first, then this).
+
+**Files:** `scripts/compile.py` — **1340 LOC** (was 511; ~2.6× growth).
 
 **Problem:** Three phases (select source files → extract via LLM → commit wiki article) plus two post-passes (curiosity loop, suggestion generation) live in one tangled loop. File I/O is woven *inside* the LLM-orchestration; retrying a failed extraction without re-reading source, batching extractions across many files, or testing extraction without file-ops all require surgical cuts into the function. Lines 463–486 already show the post-passes spawning as separate async tasks — but they're triggered from the same loop with implicit state-threading.
 
@@ -254,6 +263,64 @@ Audit all `datetime.*` callsites and migrate. Intent becomes explicit at the typ
 
 ---
 
+## #14 — Producer seam (HIGH — NEW 2026-05-17)
+
+**Status:** Grilled into a design doc at `.ytstack/backlog/producer-seam.md` as **Milestone-A** of the two-milestone arc (this seam first, then `compile.py` orchestration from #5). CONTEXT.md updated with Producer / ProducerSpec / ProducerResult / ProducerRegistry vocab in the same arc.
+
+**Files:** `scripts/suggestions/producer.py` (83), `scripts/curiosity/producer.py` (348), `scripts/facts/takes_producer.py` (230); call site `scripts/compile.py:1272-1281`.
+
+**Problem:** Three independent post-compile modules with identical async shape (`async def maybe_X(source: Path) -> None`). Cost guards, retry logic, error classification, gate checks all duplicated. Returns `None` — orchestrator can't aggregate results. **Latent bug:** any producer raising silently skips the per-file state save (state save at line 1288 is *after* all three awaits), so the next compile run re-spends Claude SDK tokens.
+
+Three different gate-shapes today: suggestions has zero CONFIG gate + hardcoded `_is_email_source()` filter; curiosity has `features.curiosity_loop` only; takes has `features.extract_takes` + `limits.extract_takes_source_globs`.
+
+**Shape after deepening:** `ProducerSpec` Protocol + `ProducerRegistry` parallel to `CollectorSpec`/`Registry`. `ProducerResult` dataclass replaces `None` return. Two declarative gates on Spec (`enabled_config_key`, `source_glob_config_key`), both evaluated by the orchestrator — eliminates in-method gate code. Failure-contract α: orchestrator wraps + logs, never blocks state-save.
+
+**Deletion test:** Passes — cost guards, retry policy, error classification, and the state-save bug all reappear if the seam is removed.
+
+**Subsumes:** `.ytstack/backlog/preflight-guard-rollout.md` (the missing `assert_prompt_within_budget` calls land naturally in the orchestrator wrapper).
+
+---
+
+## #15 — Dashboard suite consolidation (MEDIUM — NEW 2026-05-17)
+
+**Files:** `scripts/dashboard/dashboard_stats.py` (327), `scripts/dashboard/dashboard_lint.py` (206), `scripts/dashboard/inject_daily_button.py` (112), `scripts/dashboard/agent_buttons.py` (185).
+
+**Problem:** Four scripts independently read, mutate, and write the YAML dashboard file. Each has its own state-loading + merging. No shared "update dashboard section" helper.
+
+**Shape after deepening:** `scripts/dashboard/base.py` with `DashboardSection(title, content, metadata)`, `load_dashboard()`, `update_section(dashboard, section_name, content)`, `save_dashboard()` with atomic-replace + frontmatter preservation. Each script becomes thin: compute → `update_section()` → save.
+
+**Deletion test:** Passes — YAML mutation logic scatters across 4 scripts if removed.
+
+**Coupling:** Same pattern as #6 (Markdown rendering helper). If both land in one milestone, the dashboard cache files and the markdown reports can share the same renderer for tables.
+
+---
+
+## #16 — `dream.py` phase extraction (MEDIUM — NEW 2026-05-17)
+
+**Files:** `scripts/dream.py` (1091).
+
+**Problem:** Five internal phases (entity resolution, corpus collection, prompt assembly, SDK call, orchestration) are clear in code but not in the public interface. Corpus collection + cost estimation are deterministic but can't be unit-tested without mocking the SDK call. Orchestration logic (cooldown, cost caps) is mixed with loop control.
+
+**Shape after deepening:** Extract three top-level functions: `resolve_entity(slug)`, `collect_dream_corpus(entity)` (encapsulates collection + tiering), `estimate_dream_cost(corpus)`. Keep `dream_entity()` and `dream_all_entities()` as orchestrator entry points; they call the extracted helpers.
+
+**Why MEDIUM (not HIGH):** Deletion test is marginal — the phases become inline if removed; the coupling doesn't vanish, just becomes less visible. The payoff is testability + future dashboard reach-widget reuse. No API consumer exists yet.
+
+**Defer until:** dashboard or API work needs entity-reach metrics, OR cost-estimation grows complex enough to merit isolation.
+
+---
+
+## #17 — Rename `_LEGACY_PIGGYBACK_COMMANDS` (LOW — NEW 2026-05-17 — 5-min polish)
+
+**Files:** `scripts/flush.py:78-97`.
+
+**Problem:** Misnomer. The dict contains `dream_cycle` (M014, brand-new) alongside legacy tasks. Name suggests "to-be-deleted" but the list is a permanent fixture alongside Registry-discovered Collectors.
+
+**Solution:** Rename to `_BUILTIN_PIGGYBACK_TASKS`. No logic change. Clarifies intent for future maintainers — and prepares for an eventual world where the Producer seam discovers more piggyback tasks via Registry, leaving this dict as the irreducible non-Collector / non-Producer remainder.
+
+**Deletion test:** N/A — pure naming polish.
+
+---
+
 ## Skipped (false positives, recorded so future walks don't re-suggest)
 
 - **`flush.py` + `flush_pipeline.py` boundary smear.** Re-export-pattern is a polish, not a deepening. Deletion test fails: removing the re-export just moves the import.
@@ -266,18 +333,23 @@ Audit all `datetime.*` callsites and migrate. Intent becomes explicit at the typ
 
 ---
 
-## Suggested milestone framing
+## Suggested milestone framing (refreshed 2026-05-17)
 
-**Option M003-A — "Config split + Collectors" (Pattern roll-out).** Slice S01 = #2 (config split, mechanical), S02 = #1 (Collector migration). Sequential because S01 touches every script's import header, S02 touches the same scripts' bodies.
+The 2026-05-02 M003 options (now historical — see git for the original list) are obsolete: #1 + #2 shipped, #4 partially resolved. New framings against the current backlog:
 
-**Option M003-B — "Just config split."** Only #2. Smallest scope, locks the import story before anything else moves. #1 becomes M004.
+**Option Engine-Core arc — "Producer seam + compile.py + Model seam."** Three milestones in sequence, fully grilled in `.ytstack/backlog/producer-seam.md`:
+- M-A: #14 Producer seam (4 slices)
+- M-B: #5 compile.py orchestration (6 slices)
+- M-C: #3 Model seam (graduated to HIGH, ready when M-A+B settled)
 
-**Option M003-C — "Just Collectors."** Only #1. Bigger code-reduction win, leaves config-split for later when its motivation gets sharper.
+Highest leverage, biggest regression surface. Recommended path.
 
-**Option M003-D — "Pre-compile cleanup."** S01 = #2 (config split), S02 = #6 (Preprocessor seam). Hits both shallow-import friction and pre-compile inconsistency in one milestone before touching the Collector epic.
+**Option Hygiene pass — "Cross-cutting MEDIUMs."** S01 = #13 (datetime/tz helpers), S02 = #10 (logging config), S03 = #6 (Markdown helper). Three cross-cutting MEDIUMs that each shrink the surface area for future bugs without touching the engine's hot path. Low-risk foundation milestone before engine refactors.
 
-**Option M003-E — "Engine core."** Only #5 (compile.py orchestration). Highest-leverage module gets the cleanest cut. Risky because it touches the engine's hottest path; requires a regression-fixture vault to verify byte-identical wiki output.
+**Option Dashboard-and-render — "Output-layer consolidation."** S01 = #15 (Dashboard suite), S02 = #6 (Markdown helper). Two output-side renderers consolidating onto shared rendering primitives. Independent of engine refactors; safe to interleave.
 
-**Option M003-F — "Hygiene pass."** S01 = #13 (datetime helpers, prevent latent tz-bugs), S02 = #9 (logging config consolidation), S03 = #11 (markdown helper). Three cross-cutting MEDIUMs that each shrink the surface area for future bugs without touching core engine logic. Low-risk foundation milestone before engine refactors.
+**Option Pre-compile cleanup — "Preprocessor seam."** Only #11 (process-inbox / ingest-html / clippings_sweep). Single-milestone Preprocessor Protocol parallel to Collector. CONTEXT.md gets a Preprocessor entry. Cheaper than the Producer seam (singleton scripts, no Reader/Filter sub-split).
 
-Pick at the next `ytstack:plan-milestone` invocation.
+**Option Quick-win — "Rename + dream extraction."** S01 = #17 (rename `_LEGACY_PIGGYBACK_COMMANDS`, 5-min), S02 = #16 (dream.py helper extraction, ~1 day). Two cheap polishes. Useful filler between engine milestones.
+
+Pick at the next `ytstack:plan-milestone` invocation. Operator already steered toward Engine-Core arc on 2026-05-17 (grilled #14+#5 into `.ytstack/backlog/producer-seam.md`).

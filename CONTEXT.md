@@ -49,6 +49,51 @@ The Python types that flow through the engine — neither adapter-specific nor c
 
 Adapters import from `domain/`; the reverse import is forbidden.
 
+### Producer
+
+A module that consumes a *compiled* knowledge source (a file under `<vault>/raw/` that has already been turned into a wiki article by `compile.py`) and emits **derived material** somewhere else — suggestion notes, knowledge-gap requests, third-party belief extractions. Mirrors [Collector](#collector) but operates on the **opposite side** of the engine:
+
+| | Collector | Producer |
+|---|---|---|
+| Reads from | outside the vault (mailbox, browser, calendar, …) | inside the vault (a just-compiled source file) |
+| Writes to | `<vault>/raw/<subfolder>/` | `<vault>/raw/requests/`, `<vault>/raw/suggestions/`, `<vault>/knowledge/takes/` |
+| Trigger | `wiki collect` / piggyback after flush | per-source post-pass inside compile.py's loop |
+| CLI verb | `wiki collect <name>` | `wiki produce <name> <source>` |
+
+Today's Producers: `suggestions` (email-source action items via Claude SDK), `curiosity` (knowledge-gap requests via Ollama gemma4), `takes` (third-party belief extraction via Claude SDK, M011). Implementation: `scripts/producers/<name>.py`. Discovered at runtime via [ProducerRegistry](#producerregistry).
+
+Disambiguation: DECISIONS.md occasionally uses lowercase "producer" loosely (e.g. "dashboard_stats.py is the producer of the dashboard cache"). The capitalized term is the concept defined here.
+
+### ProducerSpec
+
+The static declaration on each Producer class — `name`, `enabled_config_key`, `source_glob_config_key`. Drives ProducerRegistry queries + per-source gate checks + CLI dispatch. Parallel to [CollectorSpec](#collectorspec).
+
+```python
+@dataclass(frozen=True)
+class ProducerSpec:
+    name: str
+    enabled_config_key: str | None       # e.g. "features.extract_takes"; None = always on
+    source_glob_config_key: str | None   # e.g. "limits.extract_takes_source_globs"; None = every source
+```
+
+Both gates are evaluated by the **orchestrator** (compile.py's post-pass loop), not by the Producer. Producers do not duplicate gate-check code internally — they assume that if `run()` is called, the gates passed.
+
+### ProducerResult
+
+What `Producer.run()` returns. Replaces today's `None`-returning shape so per-source aggregation, cost reporting, and end-of-run summaries become possible.
+
+```python
+@dataclass(frozen=True)
+class ProducerResult:
+    producer: str                        # SPEC.name
+    status: Literal["ok", "skipped", "failed"]
+    reason: str | None                   # why skipped/failed (None when ok)
+    cost_usd: float                      # 0.0 for local-only producers (curiosity)
+    outputs: tuple[Path, ...]            # files written
+```
+
+Failure contract: a `failed` Producer **never blocks** the compile-source state save. The orchestrator wraps each `Producer.run()` in a try/except, logs the result, marks the Producer failed for this source, and proceeds. Quiet bug it prevents: a curiosity-pass crash today silently skips the per-file state save (state save is after all three `await`s), causing the next compile run to re-spend Claude SDK tokens recompiling the same source.
+
 ## Architecture
 
 This codebase uses the [improve-codebase-architecture skill's vocabulary](https://skills.gooseworks.ai). Key terms below; full reference in that skill's `LANGUAGE.md`.
@@ -86,6 +131,12 @@ The Read and Filter seams are **independent** — a Reader and a Filter for the 
 ### Registry
 
 The auto-discovery layer for [Collectors](#collector). `scripts/collectors/base.py` exports a `@register` decorator; each `scripts/collectors/<name>.py` registers its Collector class on import. `scripts/collectors/__init__.py` imports all submodules to trigger registration. `flush.py:piggyback_collectors()` and the `wiki collect` CLI both consume `Registry.all_collectors()`.
+
+### ProducerRegistry
+
+The auto-discovery layer for [Producers](#producer). Same shape as [Registry](#registry) but parallel — Producers live in `scripts/producers/`, register via their own `@register` decorator, and are consumed by `compile.py`'s post-pass loop + the `wiki produce` CLI. Kept separate (not merged into Registry) because Collectors and Producers have different lifecycles, different config trees, and different CLI verbs — conflating them creates the same misnomer trap as `flush.py:_LEGACY_PIGGYBACK_COMMANDS`.
+
+Registration order **is** run order. Today's order is preserved across the refactor: suggestions → curiosity → takes (matches the historical `await` sequence in `compile.py:1272-1281`).
 
 ### CollectorSpec
 
