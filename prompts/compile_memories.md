@@ -1,4 +1,4 @@
-You are extracting cross-project knowledge from an operator-memory file.
+You are back-linking a memory file to its project page. Lean, mechanical, fast.
 
 ## Hard facts (override anything in the source material)
 
@@ -12,79 +12,40 @@ ${facts_md}
 ${source_content}
 ```
 
-## Your task — cross-link memory content into existing knowledge
+## What you do — exactly 3 steps, max 5 turns
 
-This is an operator-memory file synced from a project workspace:
+This is an operator-memory excerpt synced from a project workspace (`type: memory-sync` = single file copy; `type: memory-seed` = aggregated section). Each invocation receives ONE excerpt (already chunked by the caller for memory-seed). Your job is **one Timeline append, nothing else**.
 
-- **`type: memory-sync`** — a copy of a project's `AGENTS.md` / `CLAUDE.md` / per-file Claude memory. The frontmatter identifies the source project; the body is the verbatim memory content.
-- **`type: memory-seed`** — an aggregated dump of multiple per-file memories for a project. Each memory entry is a `##` section with a `Why:` and `How to apply:` line.
+### Step 1 — derive the project slug
 
-Your job is **lean cross-linking**, not synthesis: identify the project + 1-3 substantive patterns, append Timeline entries to existing knowledge pages, optionally create a single concept stub if a recurring pattern across multiple memories deserves its own page. You have **Read, Grep, Glob, Edit, Write** restricted to `knowledge/**`. Stay under **25 turns**.
+The filename stem of `${source_path}` IS the project slug (e.g. `raw/memories/yesterday-ai-openclaw.md` → `yesterday-ai-openclaw`). Use exactly that — do not normalize, dehyphenate, or guess variants.
 
-### 1. Identify the project context
+### Step 2 — Glob ONCE
 
-The frontmatter has `project:` (memory-sync) or the filename slug (memory-seed). Slugify and search `knowledge/projects/`:
+Run `Glob` with pattern `knowledge/projects/<slug>.md` using the slug from Step 1.
 
-- Glob `knowledge/projects/<slug>.md` — exists?
-- If yes → that's the entity to back-link to.
-- If no → check `## See also` / wikilinks in the memory body for an alternative project mention. Slugify those + Glob.
-- If still no match → SKIP entity routing entirely (don't create a project stub from memory alone — wait for substrate that introduces the project as the subject, not as a reference).
+- **Match** → go to Step 3.
+- **No match** → emit `{"status": "no_project_page", "slug": "<slug>"}` and STOP. Do NOT search alternative slugs. Do NOT create a project stub. Do NOT touch any other file. The next memory-sync will resurface this; that is fine.
 
-### 2. Append a Timeline entry to the matched project page
+### Step 3 — Edit-append one Timeline line
 
-If you matched a project page in step 1, Edit-append one Timeline line under its `## Timeline` heading (newest-first):
+Read the matched project page, then Edit-append a single line to its existing `## Timeline` section (newest-first; insert directly under the heading):
 
-`- **${today}** | \`${source_path}\` — Memory sync: <one-line summary of the most distinctive pattern in this file>.`
-
-Do NOT touch the project's State block. Do NOT extract Action Items (operator memories aren't commitments). Append-only.
-
-### 3. Substantive recurring-pattern stub (optional, max 1 per file)
-
-For memory-seed files specifically (which aggregate many memory entries), if you spot a recurring pattern across **multiple** entries that isn't already in `knowledge/concepts/`, create ONE concept stub:
-
-```markdown
----
-title: "<Pattern Name>"
-type: concept
-compiled_from: "${source_path}"
-created: "${today}"
-updated: "${today}"
-tags: [operator-pattern, <inferred-domain-tag>]
----
-
-# <Pattern Name>
-
-> Distilled from operator's project memories (${source_path}) on ${today}. The pattern recurs across N+ memory entries in this project.
-
-## Description
-
-<2-3 sentence distillation of the pattern>.
-
-## Why operator captured it
-
-<one-line from the memory's "Why:" field, distilled across the entries>.
-
-## See also
-- [[knowledge/projects/<matched-project>]]
+```
+- **${today}** | `${source_path}` — Memory sync: <one-line summary of the most distinctive pattern in this excerpt>.
 ```
 
-The `operator-pattern` tag lets the operator grep for memory-derived articles vs substrate-derived ones.
+Then emit `{"status": "ok", "project": "<slug>"}` and STOP.
 
-**Anti-noise**: skip stub creation if you're not certain the pattern is durable. Most memories are project-specific feedback that doesn't deserve its own concept page; just the Timeline append is enough.
+## Hard prohibitions
 
-### 4. Index update (only for new stubs)
+- ❌ No concept-stub creation. Even if you spot a recurring pattern. Memories alone do not justify concept pages; the next substrate-driven compile will surface it organically.
+- ❌ No `knowledge/index.md` edits.
+- ❌ No `daily/log.md` edits. Memory syncs run per session-end; logging each one is noise.
+- ❌ No State-block edits on the project page. Memories are not commitments.
+- ❌ No additional Glob / Grep / Read after Step 3. Done is done.
+- ❌ No retry with a different slug if Step 2 misses. One Glob, that's the contract.
 
-If you created a stub in step 3, append a row to `knowledge/index.md`. Timeline-only updates to existing project pages: no index touch.
+## Turn-budget contract
 
-### 5. No log.md update
-
-Memory syncs run frequently (per session-end). Skip the log append step.
-
-## Anti-loop guard
-
-If after 20 turns you haven't finished:
-- Skip stub creation (the next memory-sync of the same project will resurface the pattern).
-- Finish any in-flight Edit.
-- Emit your final result; do not start new tool calls.
-
-Memory-sync extraction is back-linking, not deep synthesis. The right output is small: 1 Timeline append + maybe 1 stub per file.
+5 turns is the upper bound. Realistic finish: 2-3 turns (Glob → Read → Edit). If you find yourself on turn 4 still searching, STOP and emit `{"status": "no_project_page", "slug": "<slug>"}` — the safety branch is always available.

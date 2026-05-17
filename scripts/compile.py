@@ -313,20 +313,28 @@ SUBSTRATE_PROMPTS: dict[str, tuple[str, int, str | None]] = {
     # knowledge entries. 20 turns + Haiku covers the rare actionable
     # batch (whiteboard captures, receipts, document scans).
     "picture-batch":    ("compile_pictures", 20, "claude-haiku-4-5-20251001"),
-    # Memory-sync = cross-project AGENTS/CLAUDE.md copies (~200 lines
-    # each, 820 in lxw queue → potential $1700+ burn on compile_main).
-    # Memory-seed = aggregated per-project memory dumps (~40 lines).
-    # Both are substantive but formulaic — extract entities + cross-
-    # link to existing concept/project pages, no State writes. Same
-    # 15-turn budget as health-rollup since both follow a tight pattern.
-    "memory-sync":     ("compile_memories", 25, "claude-haiku-4-5-20251001"),
-    "memory-seed":     ("compile_memories", 25, "claude-haiku-4-5-20251001"),
+    # Memory-sync = cross-project AGENTS/CLAUDE.md copies. Memory-seed =
+    # aggregated per-project memory dumps, split per-section by classify.py.
+    # Either way: ONE excerpt per compile call. The rewritten compile_memories.md
+    # (2026-05-17) is a tight 3-step contract — Glob → Read → Edit-append
+    # Timeline — with a hard 5-turn budget in-prompt. 8 here is the CLI-level
+    # safety cap (~60% over budget); the prompt's anti-loop branch emits
+    # `{"status": "no_project_page"}` before reaching the CLI cap.
+    # Previously 25 turns: Haiku ignored the prompt's anti-loop guard and
+    # burned $0.35 per chunk hitting max_turns. See KNOWLEDGE.md and
+    # commits f289a43 (circuit-breaker) + this commit (prompt rewrite).
+    "memory-sync":     ("compile_memories", 8, "claude-haiku-4-5-20251001"),
+    "memory-seed":     ("compile_memories", 8, "claude-haiku-4-5-20251001"),
 }
 
 # Default for any substrate-type NOT in SUBSTRATE_PROMPTS. Lean prompt
-# + Haiku + tight budget — see comment above for the rationale.
+# + Haiku + operator-tunable budget. The max_turns is read from CONFIG
+# at module-import time so a vault-side bump to
+# `limits.compile_max_turns` actually changes the fall-through routing —
+# the previous hardcoded `12` made the config knob dead code (operator
+# couldn't tune the default via config; only by editing this module).
 _DEFAULT_DISPATCH: tuple[str, int, str | None] = (
-    "compile_default", 12, "claude-haiku-4-5-20251001",
+    "compile_default", CONFIG.limits.compile_max_turns, "claude-haiku-4-5-20251001",
 )
 
 
