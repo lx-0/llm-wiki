@@ -1760,3 +1760,23 @@ Pictures collector took option 2 (`_make_thumbnail` lives in `pictures.py`) — 
 `core/daily_capture.py:KNOWN_SOURCES = {"sessions", "health", "meetings", "voice", "email"}` is a frozenset used by `_validate_source()` to fail-fast on typos. The pictures collector was shipped without extending the set; first live run swallowed the `ValueError` via the `try/except Exception` in `_append_daily_rollup`, primary write succeeded, but `daily/<date>/pictures.md` silently never landed.
 
 **Generalisable rule:** when adding a new substrate-source that calls `daily_capture.append(date, <source>, line)`, extend `KNOWN_SOURCES` in the same commit. The allow-list is the public schema of the daily-rollup substrate — adding a new collector without extending it is the same shape of bug as adding a new substrate-type without registering it in `SUBSTRATE_PROMPTS`. Future safeguard: when a new collector ships with daily-capture wiring, search for `KNOWN_SOURCES` in the same PR diff; if absent, the wiring is half-done.
+
+## AGENTS.md is loaded into every compile prompt — trim cost is per-call (2026-05-17)
+
+`scripts/compile.py:592-594` reads `<vault>/AGENTS.md` (resolved by `core.paths.AGENTS_FILE = ROOT_DIR / "AGENTS.md"`) and passes the full text as `agents_md=...` to `render(<substrate-prompt>)`. Every `compile_main` / `compile_calendar` / `compile_daily` / `compile_health` / `compile_default` / `compile_screenshots` / `compile_pictures` invocation embeds the full body verbatim. The agent has to attend to all of it before doing useful work.
+
+The template-seeded vault file had grown to 798 lines (mix of agent-essential schema + operator-facing CLI tables + full project structure + engine operational layout). Trim 2026-05-17 to 584 lines (-27%) kept agent-essential sections (Compiler analogy, vault owner, language, 4-layer architecture, structural files, all 7 article-format templates, conventions) and replaced everything below "Core Operations" with a compact "Where to look next" pointer section.
+
+**Generalisable rule:** when adding content to `templates/AGENTS.example.md`, ask "does the COMPILE AGENT need this every call?" If the answer is "no, this is operator-facing" — it belongs in `docs/` (the vault gets a mirror via `wiki update`) and AGENTS.md references it. If "yes, this is article-shape or routing-rule" — inline. Trim audit triggered by the operator's question "warum ist dort die full project structure etc drin? wofuer braucht der agent das?" — a sound prompt to apply to any future AGENTS.md edit.
+
+## AGENTS.md doc-pointers must be vault-local relative paths, not github.com URLs (2026-05-17)
+
+First cut of the trim pointer section used `https://github.com/lx-0/llm-wiki/blob/main/docs/cli.md` style URLs. Wrong for three reasons:
+
+1. **Vault has a local mirror.** `wiki update` ships `<engine>/docs/` into `<vault>/.wiki/docs/` (and `<engine>/prompts/` into `<vault>/.wiki/prompts/`). GitHub round-trip is unnecessary.
+2. **Compile-agent CWD is vault root.** `compile.py:777` spawns the SDK with `cwd=str(ROOT_DIR)`. Agent sees `.wiki/docs/cli.md` and Reads it directly — same shell-relative path resolves.
+3. **Forks / private vaults break.** Public github.com URLs assume `lx-0/llm-wiki` is the upstream. Operators with private forks (or rebased branches) get 404s.
+
+**Fix:** point at `.wiki/docs/<file>` and `.wiki/prompts/<file>` from AGENTS.md. Verified by running `head -1` on each pointer target from the vault root — all 10 resolve. Both markdown-link click in Obsidian AND agent Read tool follow the same relative path.
+
+**Generalisable rule:** any cross-doc reference inside `<vault>/AGENTS.md` (or `<vault>/.wiki/`) must use vault-relative paths, never external URLs. Templates that seed into vaults inherit the same rule — `templates/AGENTS.example.md` is the source of truth for what new vaults get on first install.
