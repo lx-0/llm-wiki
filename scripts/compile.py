@@ -589,18 +589,6 @@ async def compile_file(
         )
         return {"_skipped": f"substrate_type_excluded_{skip_type}"}
 
-    # Read current wiki state
-    agents_md = ""
-    if AGENTS_FILE.exists():
-        agents_md = AGENTS_FILE.read_text(encoding="utf-8")
-
-    index_md = read_wiki_index_compact()
-    today = today_iso()
-    now = now_iso()
-
-    facts_md = read_hard_facts()
-    owner_block = _build_owner_block()
-
     # Substrate-aware prompt dispatch. Different substrates need
     # different compile shapes; routing them all through compile_main.md
     # (designed for dialog-rich transcripts with State+Timeline carry-
@@ -630,38 +618,6 @@ async def compile_file(
             m = re.match(r"claude-(haiku|sonnet|opus)-(\d+-\d+)", substrate_model)
             short_model = f" @ {m.group(1)}-{m.group(2)}" if m else f" @ {substrate_model}"
         log.info("  type=%s → %s%s", source_type, substrate_prompt, short_model)
-    prompt = render(
-        substrate_prompt,
-        agents_md=agents_md,
-        facts_md=facts_md,
-        owner_block=owner_block,
-        index_md=index_md,
-        source_path=rel_path,
-        source_content=source_content,
-        today=today,
-        now=now,
-    )
-
-    # Pre-flight guard: assembled prompt + later tool-turns must fit Opus's
-    # 200K-token window. Without this a 138 KB gmeet transcript loops on
-    # Read/Grep until the SDK dies silently with exit-1 / empty stderr after
-    # 13 minutes of kind=unknown (see KNOWLEDGE.md). Surfaces the bloated
-    # component to the operator instead.
-    try:
-        assert_prompt_within_budget(
-            len(prompt),
-            CONFIG.limits.compile_max_prompt_chars,
-            label=f"compile_file {rel_path}",
-            breakdown={
-                "compact index": len(index_md),
-                "AGENTS.md": len(agents_md),
-                "hard facts": len(facts_md),
-                "source": len(source_content),
-            },
-        )
-    except PromptTooLargeError as exc:
-        log.error("  %s", exc)
-        return {"_skipped": "prompt_too_large"}
 
     # Pick the model. Large sources auto-upgrade to the 1M-context variant
     # because the standard 200K window dies silently mid-stream once the
@@ -733,353 +689,50 @@ async def compile_file(
     else:
         max_turns_for_call = CONFIG.limits.compile_max_turns
 
-    # Unconditional size-warning at 60 KB — independent of the model-escalation
-    # log line above (which only fires when compile_large_source_model is set
-    # AND the source crosses compile_large_source_chars). The 60 KB threshold
-    # matches the empirically-observed failure boundary in
-    # `.ytstack/backlog/compile-60kb-plus-silent-fail.md`: 35 KB compiles
-    # cleanly, 60 KB+ enters the silent-fail / kind=unknown class. Even when
-    # the source eventually compiles fine, the operator gets one ledger line
-    # naming the file before the multi-minute SDK call starts.
-    if len(source_content) >= 60_000:
-        log.info(
-            "  size warning: %d chars (%.1f KB) — entering known-fragile "
-            "size class; SDK call may take 5-15 min or fail kind=unknown "
-            "(per-call timeout: %ds)",
-            len(source_content), len(source_content) / 1024,
-            CONFIG.limits.compile_per_call_timeout_s,
-        )
+    # Dispatch the LLM call to compile_stages.compile.compile_source. That
+    # function owns prompt assembly, owner-block, 60kb pre-flight, size
+    # warning, the SDK call (callback-gate + legacy-allowed_tools branches),
+    # per-message stall timeout, failure classification, one-shot retry-on-
+    # kind-unknown, and skip-and-flag for timeout / max_turns / kind=unknown.
+    # main() decided substrate_prompt + model_id + max_turns above and packs
+    # them into CompileMetadata; compile_source does not re-infer.
+    from compile_stages.compile import compile_source
+    from compile_stages.types import CompileMetadata
+    metadata = CompileMetadata(
+        source_path=source,
+        compile_role=compile_role,
+        model_id=model,
+        max_turns=max_turns_for_call,
+        substrate_type=source_type,
+        substrate_prompt=substrate_prompt,
+    )
+    result = await compile_source(source_content, metadata)
 
-    async def _attempt(model_id: str) -> tuple[dict, FailureClass | None]:
-        total_input_tokens = 0
-        total_output_tokens = 0
-        result_text = ""
-        # Capture the final ResultMessage even when the bundled CLI then
-        # exit-1s (which it does on `subtype=error_max_turns` and a few
-        # other terminal-but-structured agent states). Without this, the
-        # exception-handler path below classifies the failure from
-        # exception text only and misreports `max_turns` as the opaque
-        # `kind=unknown`. See KNOWLEDGE.md.
-        final_result: "ResultMessage | None" = None
-        started = time.time()
-        capture = StderrCapture()
-        # Per-message stall timeout. Wrapping the whole `async for` in a
-        # single `asyncio.wait_for` would cut off legitimate long compiles
-        # (we've seen single files succeed at 13 min). Per-message timeout
-        # only triggers when the bundled CLI subprocess has actually gone
-        # silent — see `.ytstack/backlog/compile-per-call-timeout.md`
-        # and KNOWLEDGE.md "hang vs crash". Set 0 to disable.
-        per_call_timeout = CONFIG.limits.compile_per_call_timeout_s
-        # PATH-SCOPE ENFORCEMENT (rewritten 2026-05-17). The earlier shape
-        # — `Write(knowledge/**)` + `Edit(knowledge/**)` in `allowed_tools`
-        # plus `permission_mode="acceptEdits"` — was empirically broken
-        # (see `scripts/probe_compile_scope.py`): the bundled Claude Code
-        # CLI parses the parenthesised path glob as decoration and treats
-        # the entry as the bare `Write` / `Edit` tool, leaving the agent
-        # with unrestricted write access under cwd. The fix uses a
-        # `can_use_tool` callback as a Python-side gate. Three constraints
-        # are baked into the gated branch:
-        #   - Write/Edit must NOT appear in allowed_tools (else the CLI
-        #     fast-paths them and the callback never fires).
-        #   - permission_mode must NOT be acceptEdits (else auto-allow).
-        #   - prompt must be AsyncIterable[dict] in streaming mode.
-        # The else-branch keeps the legacy decorative shape as a one-line
-        # rollback under `features.compile_callback_gate=false`. See
-        # `.ytstack/backlog/compile-scope-allowlist-broken.md`.
-        common_options = dict(
-            max_buffer_size=CONFIG.limits.sdk_max_buffer_size_mb * 1024 * 1024,
-            cwd=str(ROOT_DIR),
-            model=model_id,
-            max_turns=max_turns_for_call,
-            system_prompt=render("compile_main_system"),
-            # Pick up the vault's CLAUDE.md so operator scope-discipline
-            # rules reach the agent.
-            setting_sources=["project"],
-            stderr=capture.callback,
-        )
-        if CONFIG.features.compile_callback_gate:
-            agent_options = ClaudeAgentOptions(
-                **common_options,
-                allowed_tools=["Read", "Glob", "Grep"],
-                can_use_tool=make_path_scope_gate([ROOT_DIR / "knowledge"]),
-                permission_mode="default",
-            )
-            query_prompt = prompt_stream(prompt)
-        else:
-            agent_options = ClaudeAgentOptions(
-                **common_options,
-                allowed_tools=[
-                    "Read", "Glob", "Grep",
-                    "Write(knowledge/**)",
-                    "Edit(knowledge/**)",
-                ],
-                permission_mode="acceptEdits",
-            )
-            query_prompt = prompt
-        try:
-            agen = query(prompt=query_prompt, options=agent_options).__aiter__()
-            while True:
-                try:
-                    if per_call_timeout and per_call_timeout > 0:
-                        message = await asyncio.wait_for(
-                            agen.__anext__(), timeout=per_call_timeout
-                        )
-                    else:
-                        message = await agen.__anext__()
-                except StopAsyncIteration:
-                    break
-                if isinstance(message, AssistantMessage) and message.usage:
-                    total_input_tokens += message.usage.get("input_tokens", 0)
-                    total_output_tokens += message.usage.get("output_tokens", 0)
-                if isinstance(message, ResultMessage):
-                    final_result = message
-                    result_text = message.result or ""
-        except asyncio.TimeoutError:
-            # Per-message stall — bundled CLI subprocess went silent for
-            # longer than compile_per_call_timeout_s. Treat as a hang
-            # (separate failure class from crash). Try to clean up the
-            # iterator so the subprocess gets SIGTERM'd; if the SDK
-            # doesn't honor cancel, the kernel reaps on process exit.
-            elapsed = time.time() - started
-            log.warning(
-                "  compile_file ⏱ per-call timeout after %.1fs (no messages "
-                "for %ds) — bundled CLI hung; skipping file (consecutive-"
-                "failure budget preserved). model=%s source=%s (%d chars).",
-                elapsed, per_call_timeout, model_id, rel_path, len(source_content),
-            )
-            try:
-                aclose = getattr(agen, "aclose", None)
-                if aclose is not None:
-                    await aclose()
-            except Exception:  # noqa: BLE001 — best-effort cleanup
-                pass
-            capture.dump_to(log)
-            # Log via the same SDK-failure path so *-errors.log still
-            # records the hang for forensics, but flag it as a non-fatal
-            # timeout so the outer skip-and-flag block routes to _skipped.
-            log_sdk_failure(
-                log,
-                label="compile_file",
-                source=rel_path,
-                model=model_id,
-                input_chars=len(source_content),
-                started=started,
-                capture=capture,
-                exc=TimeoutError(
-                    f"per-call timeout after {elapsed:.1f}s "
-                    f"(per_call_timeout={per_call_timeout}s)"
-                ),
-            )
-            return {}, FailureClass("timeout", f"per-call stall after {elapsed:.1f}s")
-        except Exception as exc:
-            # Bundled CLI exited non-zero. If a structured ResultMessage
-            # arrived just before the exception, it carries the actual
-            # terminal state (e.g. `subtype=error_max_turns`) and the cost
-            # already burned. Reclassify from that instead of the opaque
-            # exception so logs name the real failure kind.
-            elapsed = time.time() - started
-            if final_result is not None and final_result.is_error:
-                cost = final_result.total_cost_usd or 0.0
-                kind = "max_turns" if final_result.subtype == "error_max_turns" else "agent_error"
-                detail = (
-                    f"{final_result.subtype} after {final_result.num_turns} turns "
-                    f"({elapsed:.1f}s, ${cost:.4f} burned)"
-                )
-                if final_result.errors:
-                    detail += f" — errors: {'; '.join(final_result.errors)}"
-                # Cost guard takes precedence over the structural kind:
-                # a max_turns failure at $0.50 should skip-and-flag (cheap
-                # loop, batch survives), but at $9.65 should abort the
-                # batch so the next dense file doesn't repeat the burn.
-                budget = CONFIG.limits.compile_max_cost_per_file_usd
-                if budget > 0 and cost > budget:
-                    failure = FailureClass(
-                        "cost_exceeded",
-                        f"${cost:.4f} > budget ${budget:.4f} on {rel_path} (underlying {kind}: {detail})",
-                    )
-                else:
-                    failure = FailureClass(kind, detail)
-                log.error(
-                    "  compile_file ✗ %s · %s",
-                    f"failed after {elapsed:.1f}s — kind={failure.kind}",
-                    detail,
-                )
-                log.error("    source:    %s", rel_path)
-                log.error("    model:     %s", model_id)
-                log.error("    input:     %d chars (%.1f KB)",
-                          len(source_content), len(source_content) / 1024)
-                log.error("    cost:      $%.4f burned despite failure", cost)
-                if failure.kind == "cost_exceeded":
-                    log.error(
-                        "    BUDGET EXCEEDED — batch will abort (raise "
-                        "`compile_max_cost_per_file_usd` from $%.2f if you "
-                        "accept this burn, or add the substrate type to "
-                        "`compile_skip_substrate_types`).",
-                        budget,
-                    )
-                capture.dump_to(log)
-                return {}, failure
-            failure = log_sdk_failure(
-                log,
-                label="compile_file",
-                source=rel_path,
-                model=model_id,
-                input_chars=len(source_content),
-                started=started,
-                capture=capture,
-                exc=exc,
-            )
-            return {}, failure
+    if result.status == "skipped":
+        # Map compile_source's skip_reason to the legacy compile_file _skipped
+        # tags. The two values differ only for the long-context kind=unknown
+        # case — the rest are identical strings.
+        legacy_reason = {
+            "long_context_kind_unknown": "kind_unknown_on_long_context",
+        }.get(result.skip_reason or "", result.skip_reason or "unknown")
+        return {"_skipped": legacy_reason}
 
-        elapsed = time.time() - started
-        # Claude Opus 4.7 pricing: $5/M input, $25/M output
-        cost = (total_input_tokens * 5.0 + total_output_tokens * 25.0) / 1_000_000
-        # Prefer the ResultMessage's authoritative total_cost_usd if
-        # available — it accounts for cache reads + creation tiers that
-        # the simple input/output multiplication above ignores.
-        if final_result is not None and final_result.total_cost_usd is not None:
-            cost = float(final_result.total_cost_usd)
-        # Per-file cost guard. Fires on the SUCCESS path too: a "completed"
-        # compile that burned $5+ is still a structural smell (typically
-        # max_turns-completing-just-barely on a substrate-prompt mismatch).
-        # is_fatal()=True for cost_exceeded → batch aborts immediately so
-        # subsequent files don't repeat the burn. Operator can raise the
-        # knob or skip the substrate type to continue.
-        budget = CONFIG.limits.compile_max_cost_per_file_usd
-        if budget > 0 and cost > budget:
-            log.error(
-                "  compile_file ✗ cost_exceeded · $%.4f > budget $%.4f "
-                "(elapsed %.1fs, model=%s)",
-                cost, budget, elapsed, model_id,
-            )
-            log.error("    source:    %s", rel_path)
-            log.error(
-                "    hint:      this file burned beyond the per-file guard. "
-                "Likely substrate-prompt mismatch (e.g. dense calendar in "
-                "compile_main.md). Skip the type via "
-                "`compile_skip_substrate_types`, or raise "
-                "`compile_max_cost_per_file_usd` (current: $%.2f) if you "
-                "accept the burn.",
-                budget,
-            )
-            return {}, FailureClass(
-                "cost_exceeded",
-                f"${cost:.4f} > budget ${budget:.4f} on {rel_path}",
-            )
-        log.info(
-            "  ✓ %.1fs · in:%s out:%s ($%.4f)",
-            elapsed,
-            f"{total_input_tokens:,}",
-            f"{total_output_tokens:,}",
-            cost,
-        )
-        return (
-            {
-                "input_tokens": total_input_tokens,
-                "output_tokens": total_output_tokens,
-                "cost_usd": cost,
-                "result": result_text,
-            },
-            None,
-        )
+    if result.status == "failed":
+        # CompileResult only carries the failure kind, not the detail string
+        # the legacy FailureClass shipped to main()'s abort log. The detail
+        # has already been logged inside compile_source's _attempt; the
+        # synthetic FailureClass here keeps main()'s is_fatal() check + abort
+        # formatting working without re-plumbing the dataclass shape.
+        return {"_failure": FailureClass(result.failure_kind or "unknown", "(see logs)")}
 
-    success, failure = await _attempt(model)
+    return {
+        "input_tokens": result.input_tokens,
+        "output_tokens": result.output_tokens,
+        "cost_usd": result.cost_usd,
+        "result": result.article or "",
+    }
 
-    # Retry once with the 1M-context variant on the kind=unknown signature
-    # of mid-stream context overflow from tool-turn fan-out. Two guards
-    # added 2026-05-15 after a rate-limit cascade was misclassified as
-    # `cli_crash` (see KNOWLEDGE.md):
-    #   - Source-size gate: small sources fail kind=unknown for non-context
-    #     reasons (over-eager tool fan-out for new substrate types). The
-    #     1M variant doesn't help there and the retry burns an API rate
-    #     limit slot.
-    #   - Backoff: the immediate retry is what triggered the cascade; the
-    #     original call + retry + next file's call inside a 3-second
-    #     window all landed in the same rate-limit minute. Sleep clears it.
-    long_ctx_model = CONFIG.models.compile_large_source_model
-    min_for_retry = CONFIG.limits.compile_retry_long_context_min_source_chars
-    if (
-        failure is not None
-        and failure.kind == "unknown"
-        and CONFIG.limits.compile_retry_long_context_on_unknown
-        and long_ctx_model
-        and model != long_ctx_model
-        and len(source_content) >= min_for_retry
-    ):
-        backoff = CONFIG.limits.compile_failure_backoff_s
-        if backoff > 0:
-            log.warning(
-                "  sleeping %ds before long-context retry (rate-limit cushion)",
-                backoff,
-            )
-            await asyncio.sleep(backoff)
-        log.warning(
-            "  retrying with long-context model %s after kind=unknown",
-            long_ctx_model,
-        )
-        success, failure = await _attempt(long_ctx_model)
-        # Update `model` so the downstream skip-and-flag block can detect
-        # "already on long-context model" and route to _skipped instead of
-        # _failure. Without this, the retry's kind=unknown falls through to
-        # a hard failure and burns the consecutive-failure budget on a
-        # structurally-unprocessable file — the exact pattern that motivated
-        # `.ytstack/backlog/compile-already-on-1m-fallback.md`.
-        model = long_ctx_model
-    elif (
-        failure is not None
-        and failure.kind == "unknown"
-        and len(source_content) < min_for_retry
-    ):
-        log.info(
-            "  skipping long-context retry (source %d chars < %d) — "
-            "small-source kind=unknown is typically tool-fanout, not context overflow",
-            len(source_content), min_for_retry,
-        )
 
-    # Skip-and-flag: structural failures with no further retry path.
-    # Treats as a survivable skip rather than a hard failure so the batch
-    # makes progress; consecutive-failure budget is preserved for genuine
-    # systemic outages (rate_limit cascades, auth, network).
-    # Per-call timeout always converts to _skipped (independent of
-    # compile_skip_on_long_context_unknown). The timeout is a HANG signal —
-    # one stuck bundled CLI subprocess, not a structural unknown — and the
-    # operator opt-out for the kind=unknown skip semantics doesn't generalise:
-    # treating a timeout as a hard failure would burn the 3-strike consecutive-
-    # failure budget on a transient symptom.
-    if failure is not None and failure.kind == "timeout":
-        return {"_skipped": "compile_per_call_timeout"}
-
-    if failure is not None and CONFIG.limits.compile_skip_on_long_context_unknown:
-        if failure.kind == "max_turns":
-            log.warning(
-                "  skipping: max_turns hit (%s) — agent didn't finish within "
-                "the turn budget. Bumping `compile_max_turns_long_context` for "
-                "this substrate may help; the file is left uncompiled. "
-                "Not counted toward consecutive-failure abort.",
-                failure.detail,
-            )
-            return {"_skipped": "max_turns_exhausted"}
-        if failure.kind == "unknown":
-            if model == long_ctx_model:
-                log.warning(
-                    "  skipping: kind=unknown on long-context model %s "
-                    "— bundled CLI exited 1 with no structured ResultMessage. "
-                    "Not counted toward consecutive-failure abort.",
-                    model,
-                )
-                return {"_skipped": "kind_unknown_on_long_context"}
-            if len(source_content) < min_for_retry:
-                log.warning(
-                    "  skipping: small-source kind=unknown with no retry path "
-                    "(source %d chars < %d, long-context retry doesn't help here). "
-                    "Not counted toward consecutive-failure abort.",
-                    len(source_content), min_for_retry,
-                )
-                return {"_skipped": "kind_unknown_small_source"}
-
-    if failure is not None:
-        return {"_failure": failure}
-    return success
 
 
 # ── Process-level mutex ──────────────────────────────────────────────

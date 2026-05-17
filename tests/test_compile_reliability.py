@@ -34,23 +34,37 @@ def vault(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     assert_prompt_within_budget).
     """
     import compile as compile_mod
+    from compile_stages import compile as cs_mod
 
     raw = tmp_path / "raw" / "notes"
     raw.mkdir(parents=True)
     (tmp_path / "knowledge").mkdir()
     (tmp_path / "AGENTS.md").write_text("# agents\n", encoding="utf-8")
 
-    # Redirect path constants the function reads at call time.
+    # Redirect path constants the function reads at call time. After M018-S02
+    # the LLM-call body lives in compile_stages.compile; compile.py's
+    # compile_file calls it via compile_source(). Patch both modules so the
+    # tests still mock the read sites regardless of which file owns them.
     monkeypatch.setattr(compile_mod, "ROOT_DIR", tmp_path)
     monkeypatch.setattr(compile_mod, "AGENTS_FILE", tmp_path / "AGENTS.md")
+    monkeypatch.setattr(cs_mod, "ROOT_DIR", tmp_path)
+    monkeypatch.setattr(cs_mod, "AGENTS_FILE", tmp_path / "AGENTS.md")
+    monkeypatch.setattr(cs_mod, "KNOWLEDGE_DIR", tmp_path / "knowledge")
 
     # Stub the heavy collaborators so the function reaches _attempt fast.
     monkeypatch.setattr(compile_mod, "read_wiki_index_compact", lambda: "")
     monkeypatch.setattr(compile_mod, "read_hard_facts", lambda: "")
     monkeypatch.setattr(compile_mod, "render", lambda *a, **kw: "STUB-PROMPT")
+    monkeypatch.setattr(cs_mod, "read_wiki_index_compact", lambda: "")
+    monkeypatch.setattr(cs_mod, "read_hard_facts", lambda: "")
+    monkeypatch.setattr(cs_mod, "render", lambda *a, **kw: "STUB-PROMPT")
     # Bypass the prompt-budget pre-flight (we feed huge sources deliberately).
     monkeypatch.setattr(
         compile_mod, "assert_prompt_within_budget",
+        lambda *a, **kw: None,
+    )
+    monkeypatch.setattr(
+        cs_mod, "assert_prompt_within_budget",
         lambda *a, **kw: None,
     )
 
@@ -87,6 +101,8 @@ def test_size_warning_fires_at_60kb_threshold(
         )
 
     monkeypatch.setattr(compile_mod, "query", fake_query)
+    from compile_stages import compile as _cs_mod
+    monkeypatch.setattr(_cs_mod, "query", fake_query)
 
     caplog.set_level(logging.INFO, logger="compile")
     asyncio.run(compile_mod.compile_file(source, force=True))
@@ -123,6 +139,8 @@ def test_size_warning_silent_below_60kb(
         )
 
     monkeypatch.setattr(compile_mod, "query", fake_query)
+    from compile_stages import compile as _cs_mod
+    monkeypatch.setattr(_cs_mod, "query", fake_query)
     caplog.set_level(logging.INFO, logger="compile")
     asyncio.run(compile_mod.compile_file(source, force=True))
 
@@ -152,6 +170,8 @@ def test_per_call_timeout_returns_skipped(
         yield  # pragma: no cover
 
     monkeypatch.setattr(compile_mod, "query", hanging_query)
+    from compile_stages import compile as _cs_mod
+    monkeypatch.setattr(_cs_mod, "query", hanging_query)
 
     caplog.set_level(logging.WARNING, logger="compile")
     result = asyncio.run(compile_mod.compile_file(source, force=True))
@@ -190,6 +210,8 @@ def test_per_call_timeout_disabled_with_zero(
         )
 
     monkeypatch.setattr(compile_mod, "query", fast_query)
+    from compile_stages import compile as _cs_mod
+    monkeypatch.setattr(_cs_mod, "query", fast_query)
     result = asyncio.run(compile_mod.compile_file(source, force=True))
     # Success path: dict with cost_usd, NOT _skipped.
     assert result is not None
@@ -254,6 +276,8 @@ def test_kind_unknown_on_long_context_skips(
         yield  # pragma: no cover
 
     monkeypatch.setattr(compile_mod, "query", crashing_query)
+    from compile_stages import compile as _cs_mod
+    monkeypatch.setattr(_cs_mod, "query", crashing_query)
     caplog.set_level(logging.WARNING, logger="compile")
     result = asyncio.run(compile_mod.compile_file(source, force=True))
 
