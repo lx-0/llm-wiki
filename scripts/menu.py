@@ -49,7 +49,7 @@ WIKI_BIN = WIKI_DIR / "wiki"
 
 
 QUICK_ACTIONS: list[tuple[str, str, str, object]] = [
-    ("c", "compile", "recompile changed sources ($$)", ["compile"]),
+    ("c", "compile", "compile up to 10 changed sources ($$)", ["compile", "--max-files", "10"]),
     ("q", "query",   "ask the wiki ($$)",            ("special", "query")),
     ("f", "flush",   "capture current session",      ["flush"]),
     ("l", "lint",    "cheap structural lint",        ["lint", "--structural-only"]),
