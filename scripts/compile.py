@@ -325,6 +325,15 @@ SUBSTRATE_PROMPTS: dict[str, tuple[str, int, str | None]] = {
     # commits f289a43 (circuit-breaker) + this commit (prompt rewrite).
     "memory-sync":     ("compile_memories", 8, "claude-haiku-4-5-20251001"),
     "memory-seed":     ("compile_memories", 8, "claude-haiku-4-5-20251001"),
+    # Longform notes — entity-dense narrative content (strategy docs,
+    # design memos, multi-section essays) routinely 15-25 KB with 15-25
+    # concept references. compile_default (the lean fallback prompt) +
+    # CONFIG.limits.compile_max_turns = 20 was hitting max_turns on
+    # outliers; lx-yesterday-strategy-workdoc.md (19.4 KB) burned $0.21
+    # on max_turns 2026-05-17. Routed here to compile_main (rich prompt)
+    # with 25-turn budget — matches the memory-sync legacy budget and
+    # the daily-digest tier for many-entity Haiku substrates.
+    "longform":        ("compile_main", 25, "claude-haiku-4-5-20251001"),
 }
 
 # Default for any substrate-type NOT in SUBSTRATE_PROMPTS. Lean prompt
