@@ -224,6 +224,14 @@ class Limits:
     # `check_connection_depth` also enforces ≥2 distinct wikilink targets
     # and a `tension|mechanism|dependency` frontmatter field.
     connection_min_words: int = 50
+    # M019 default lookback for clinical-screen instruments (PHQ-9, GAD-7,
+    # ASRS-v1.1, WHO-5, MEQ-19). The instrument-yaml's `inference.default_
+    # lookback_days` overrides this per-instrument; this is the engine-level
+    # fallback when the instrument doesn't specify. 14 = "last 2 weeks", the
+    # standard clinical reference window for the PHQ-/GAD- family. Bigger
+    # windows pull more substrate (more cost, more recall, more risk of
+    # mixing periods); smaller windows reduce signal.
+    reports_default_lookback_days: int = 14
     # YouTube ingest (scan-youtube.py — see also CONFIG.piggybacks.scan_youtube)
     youtube_max_frames: int = 30          # Tier-3 visual: cap frames per video
     youtube_max_duration_s: int = 10800   # Tier-3: skip videos longer than this (3h default)
@@ -495,6 +503,16 @@ class Features:
     # Flip false to skip the sweep (e.g. to compare compile timing without
     # the O(corpus) extra read/write). Default True. M020, 2026-05-17.
     materialize_backlinks: bool = True
+    # M019 master switch — operator-self-reports surface. When True,
+    # `wiki study run` / `wiki analyze` subcommands are wired and the
+    # piggyback orchestration (Pass-1 per-study after each run; Pass-2
+    # cross-study on its own schedule, lands in S05) fires. Default OFF
+    # — flip True after S05 dogfooding lands. Reports live at vault-root
+    # `<personal.reports_dir>/` (default "reports"), STRUCTURALLY
+    # air-gapped from the compile loop (`COMPILE_SUBSTRATE_EXCLUDED_PREFIXES`
+    # in this module). See `.ytstack/DECISIONS.md` 2026-05-17 entries on
+    # the M019 architecture + air-gap.
+    operator_reports: bool = False
 
 
 @dataclass
@@ -598,6 +616,16 @@ class Personal:
     # but sources from a separate, mobile-friendly inbox (iCloud Shortcut
     # target etc.). Empty string disables collectors/pictures.py.
     picture_inbox: str = ""
+    # M019 operator-self-reports surface. Directory under vault root where
+    # `reports/studies/<id>/runs/<ts>/*.md` (deterministic study output) and
+    # `reports/analyses/<ts>.md` (analyst-agent output, S05) accumulate. Lives
+    # at vault root sibling of `knowledge/` per DECISIONS 2026-05-17 — same
+    # lifecycle properties as knowledge (operator data, version-controllable
+    # in the operator's git, durable across engine reinstalls). NOT under
+    # `.wiki/` (engine state). Operator may rename to "analyses" or any
+    # other slug; the `COMPILE_SUBSTRATE_EXCLUDED_PREFIXES` air-gap is
+    # path-anchored to the actual value at engine init time.
+    reports_dir: str = "reports"
     # Canonical vault-owner identifier. The value (e.g. "alex") is the slug of
     # the operator's own page at `knowledge/people/<value>.md` and drives two
     # things at compile time:

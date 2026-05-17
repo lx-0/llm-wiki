@@ -3,9 +3,9 @@ milestone: M019
 slice: S01
 project: llm-wiki
 created: 2026-05-17T11:05:00Z
-status: in-progress
+status: done
 task_count: 5
-completed_tasks: 4
+completed_tasks: 5
 ---
 
 # M019-S01 — Slice Plan
@@ -22,7 +22,7 @@ completed_tasks: 4
 
 - [x] T04 — **PHQ-9 v1.0.0 end-to-end (scoring only).** ✓ Done 2026-05-17. Instrument files at `scripts/reports/_engine/instruments/phq-9/v1.0.0/`: `instrument.yaml` (8 required meta keys + `inference` section pre-locked for S02), `items.yaml` (9 PD items verbatim from Kroenke et al 2001 with `substrate_inferable` curated per-item — Q2/Q5/Q6/Q8/Q9 false, Q1/Q3/Q4/Q7 true), `cutoffs.yaml` (5 DSM-IV bands 0-4/5-9/10-14/15-19/20-27). Helper `score_instrument(instrument_dir, answers, bandable_threshold=80)` in `scripts/reports/_engine/score.py` returns `ScoredInstrument{meta, score: ScoreResult, band, bandable_threshold}`. Band emitted only when `coverage_pct >= bandable_threshold`. 14 unit-tests: 4 uniform-band cases (0/9/18/27), 3 boundary cases (top-of-minimal, bottom-of-mild, bottom-of-moderate), partial-coverage gating (77.8% blocked, 88.9% bandable), custom threshold override, zero-answers not-bandable, substrate_inferable curation completeness, Q9-never-inferable hard-rule pin.
 
-- [ ] T05 — **Migration entry + config keys:** extend `scripts/migrations/migrate_config_keys.py` with `features.operator_reports: bool = False`, `personal.reports.studies_dir: str = "reports"` (relative to vault root per T02 decision), `personal.reports.weekly_window_days: int = 14` (initial schedule cadence). Add to `scripts/core/config.py` dataclass + `config.example.yaml` in same commit (per `feedback_config_change_requires_migration` memory). Verification: `wiki update` on a fresh vault writes the new keys with correct defaults.
+- [x] T05 — **Config keys + migration.** ✓ Done 2026-05-17. Three keys added with matching defaults across all three load-bearing surfaces (dataclass + example yaml + migration KEY_ADDITIONS): `Features.operator_reports: bool = False` (master switch, flip True post-S05 dogfooding), `Personal.reports_dir: str = "reports"` (vault-root sibling of knowledge/), `Limits.reports_default_lookback_days: int = 14` (clinical PHQ/GAD reference window). Verified end-to-end with synthetic minimal config — migration injects all three with correct defaults. The originally-planned `personal.reports.weekly_window_days` collapsed into `reports_default_lookback_days` at Limits level (engine concern, not personal preference — schedule cadence is in piggybacks, not lookback).
 
 ## Done when
 

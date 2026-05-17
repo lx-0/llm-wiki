@@ -212,6 +212,11 @@ limits:
   # always restate concepts side-by-side instead of asserting a real
   # mechanism / contrast / dependency.
   connection_min_words: 50
+  # M019 default lookback window for operator-self-report instruments (PHQ-9,
+  # GAD-7, ASRS-v1.1, WHO-5, MEQ-19 in the wedge). 14 = "last 2 weeks", the
+  # standard clinical reference window. Per-instrument override via the
+  # `inference.default_lookback_days` field in `instrument.yaml`.
+  reports_default_lookback_days: 14
   # YouTube ingest (collectors/scan_youtube.py).
   youtube_max_frames: 30                 # Tier-3 visual: cap frames per video
   youtube_max_duration_s: 10800          # Tier-3: skip videos longer than this (default 3h)
@@ -369,6 +374,13 @@ features:
   # Flip false to skip the sweep (e.g. to compare compile timing without
   # the O(corpus) extra read/write).
   materialize_backlinks: true
+  # M019 operator-self-reports surface master switch. When true, `wiki study
+  # run` and `wiki analyze` are wired and the flush.py piggyback orchestration
+  # (per-study Pass-1 after each run; cross-study Pass-2 on its own schedule,
+  # lands in S05) fires. Default OFF — flip true after the S05 analyst-agent
+  # layer lands and dogfooding completes. Air-gapped from the compile loop;
+  # see `.ytstack/DECISIONS.md` 2026-05-17 entries.
+  operator_reports: false
 
 graph_view:
   # Mode: knowledge-only | full-vault | sources-only | custom
@@ -416,6 +428,12 @@ personal:
   # <picture_inbox>/.processed/. Typical setup: iOS Shortcut writing into
   # an iCloud Drive folder. Empty = disabled.
   picture_inbox: ""
+  # M019 operator-self-reports surface. Directory under vault root where
+  # `reports/studies/<id>/runs/<ts>/*.md` (deterministic study output) and
+  # `reports/analyses/<ts>.md` (analyst-agent output, lands in S05) accumulate.
+  # Sibling of `knowledge/`. Operator may rename to "analyses" or any slug;
+  # the COMPILE_SUBSTRATE_EXCLUDED_PREFIXES air-gap pins the actual value.
+  reports_dir: "reports"
   # Single-tenant fallback for author-attribution. When set (e.g. "alex"), the
   # compile prompt treats files lacking an explicit `author:` frontmatter key
   # as operator-authored — beliefs/decisions/opinions get routed to that

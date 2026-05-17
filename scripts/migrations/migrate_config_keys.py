@@ -147,6 +147,12 @@ KEY_ADDITIONS: dict[str, dict[str, object]] = {
         # Match Limits.compile_per_call_timeout_s default in
         # `scripts/core/config.py`.
         "compile_per_call_timeout_s": 600,
+        # M019 (2026-05-17): default lookback window for operator-self-report
+        # instruments (PHQ-9, GAD-7, ASRS-v1.1, WHO-5, MEQ-19 in the wedge).
+        # 14 days = standard clinical reference window for the PHQ/GAD family.
+        # Per-instrument override via `inference.default_lookback_days` field
+        # in instrument.yaml.
+        "reports_default_lookback_days": 14,
         # M012 (2026-05-16): connection-article quality gate. Body word
         # count below this floor fires `connection_shallow_body` in lint;
         # 50 was chosen because anything shorter empirically just restates
@@ -226,6 +232,11 @@ KEY_ADDITIONS: dict[str, dict[str, object]] = {
         # without a corpus-wide ripgrep. Idempotent. Flip false to skip the
         # sweep. Default True.
         "materialize_backlinks": True,
+        # M019 operator-self-reports master switch (2026-05-17). When True,
+        # `wiki study run` + `wiki analyze` are wired and flush.py piggybacks
+        # for Pass-1 / Pass-2 fire. Default OFF — flip True after S05 lands
+        # and dogfooding completes. Air-gapped from the compile loop.
+        "operator_reports": False,
     },
     "piggybacks": {
         # M006 calendar collector — mirrors gmeet / jamie 6 h cadence.
@@ -269,6 +280,10 @@ KEY_ADDITIONS: dict[str, dict[str, object]] = {
         # archives the source under <picture_inbox>/.processed/. Empty
         # default keeps the multi-tenant story intact.
         "picture_inbox": "",
+        # M019 (2026-05-17) operator-self-reports surface location. Directory
+        # under vault root where reports/studies/ + reports/analyses/ live.
+        # Sibling of knowledge/, separate from .wiki/ (engine state).
+        "reports_dir": "reports",
         # M013 (2026-05-16): optional `domain:` frontmatter axis on knowledge/
         # articles. Cross-cutting life-domain tag (NOT a folder), extensible
         # per vault. Lint warns on values outside this enum (grace period).
