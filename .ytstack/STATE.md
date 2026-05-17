@@ -1,7 +1,7 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-05-17T21:00:00Z
+last_updated: 2026-05-17T22:00:00Z
 current_milestone: none
 active_slice: none
 active_task: none
@@ -11,7 +11,11 @@ parallel_milestones: [M021]
 
 # State
 
-**Status (this session, ad-hoc):** M019 post-wedge doc-sync + drift-sweep + priority-sweep arc. End-user-facing docs were silent on the entire `reports/` surface despite engineering closeout; cross-checked + synced. Per-instrument model override mechanism shipped + ISI Sonnet override marked **provisional** (verification anchored to 2026-05-24 week-1 review). Three new study-arc backlog entries created. Local main 1 commit ahead of origin (`2eb1452` — the new backlog batch); parallel session pushed `c0bd39d` (gmail-personal-consumer-account-gap backlog, not mine). Earlier session commits (`a3e32ae` drift sweep, `767aa1b` priority sweep, `769785a` per-instrument-model + stale-chart fix, `17dfec6` doc-sync) all already on origin via parallel-session push.
+**Status (this session, ad-hoc 2026-05-17 night — Health Phase 3a kickoff):** Operator picked iOS-Shortcut → iCloud-Drive drop over Phase 2 (manual XML) and Phase 3b (paid app). Drafted `docs/setup-health.md` (~250 lines, `setup-voice.md` structure) with JSON contract `{date, source: "healthkit-shortcut", weight_kg, body_fat_pct, lean_body_mass_kg, steps}` and 11-action Shortcut spec for iOS 26.4.2. Operator's iPhone screenshot revealed `Get Latest Health Sample` no longer exists in iOS 26 — pivoted spec to `Find Health Samples` + Sort=Date-desc + Limit=1 + `Get Details of Health Sample` (Detail: **Value** / **Wert**). Bilingual action labels (English / Deutsch). Web-researched via Apple official docs + 9to5Mac + Apple Variable-Types + Will-Murphy/Mac-O'Clock — confirmed `value` is the canonical Detail property; Apple's "What's new" pages only list additions, NOT removals (new memory `feedback_apple_shortcuts_release_notes_omit_removals.md`). Doc has 6 pre-staged Troubleshooting entries for likely failure modes. **Untested per REGEL #1; operator is test harness on iPhone next session.** Adapter (`scripts/collectors/health*.py` learning `kind: healthkit-shortcut-inbox`) NOT yet written — doc Section 6 marked "after adapter ships, don't wire config yet." No commits yet (doc + memories + KNOWLEDGE.md insight). The two previously-queued hot threads (compile-allowlist verify + skip-on-long-context-kind=unknown) + M006 are deferred behind Phase 3a per operator sequence-decision. Memory: `project_health_phase_3a_drafted.md`.
+
+---
+
+**Status (prev):** M019 post-wedge doc-sync + drift-sweep + priority-sweep arc. End-user-facing docs were silent on the entire `reports/` surface despite engineering closeout; cross-checked + synced. Per-instrument model override mechanism shipped + ISI Sonnet override marked **provisional** (verification anchored to 2026-05-24 week-1 review). Three new study-arc backlog entries created. Local main 1 commit ahead of origin (`2eb1452` — the new backlog batch); parallel session pushed `c0bd39d` (gmail-personal-consumer-account-gap backlog, not mine). Earlier session commits (`a3e32ae` drift sweep, `767aa1b` priority sweep, `769785a` per-instrument-model + stale-chart fix, `17dfec6` doc-sync) all already on origin via parallel-session push.
 
 - **Per-instrument model override mechanism** (commit `769785a`, on origin) — `inference.model:` key in `instrument.yaml` flows through `_read_inference_config()` → `infer_batch(model=…)`. Currently set on ISI to `claude-sonnet-4-6`. **Provisional, not a fix** — Haiku scored ISI 4/7 in run-7 same session, undercutting the "deterministic-0%" premise. Decision tree locked in DECISIONS.md 2026-05-17 "M019 post-wedge tuning"; resolution belongs in 2026-05-24 week-1 review.
 - **Stale-chart fix in `render_summary.py`** (same commit) — `_render_per_instrument_timelines` uses `timeline.latest.instruments` not union-of-keys, so instruments dropped from the manifest (K6, ASRS-v1.1) don't have stale timelines re-rendered.

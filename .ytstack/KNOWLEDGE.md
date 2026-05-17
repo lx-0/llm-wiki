@@ -2094,3 +2094,28 @@ Symptom: `wiki <foo>` runs from inside the engine repo silently mkdir + write `c
 Generalization for similar tools: any CLI whose path-math derives from `__file__` and writes into a "containing" directory (a vault, a project root, a workspace) needs a positive marker check at the entry point. Cleanup-cost ratio (one if-statement at dispatch vs. months of confused operators trying to figure out what created `<repo>/state/`) is overwhelming.
 
 **What this does NOT cover.** Direct python invocations (`uv run python scripts/<x>.py`) bypass the bash dispatcher and recreate the dirs. Acceptable cost: the bash CLI is the operator surface; raw python entry is a dev-shell concern. `.wiki/` is deliberately NOT in `.gitignore` (see DECISIONS 2026-05-17) — it acts as a tripwire surfacing any code path that defensively mkdirs `<repo>/.wiki/` past the guard.
+
+## iOS Shortcuts: operator-screenshot beats Apple's release notes (2026-05-17, Health Phase 3a draft)
+
+Drafting `docs/setup-health.md` for Phase 3a of the health collector (iOS Shortcut → iCloud-Drive JSON drop) surfaced a documentation-truth-vs-runtime-truth gap on iOS 26.4.2:
+
+- Apple's [What's new in Shortcuts](https://support.apple.com/en-us/125148) page enumerates additions and updates per iOS version. It does **NOT** enumerate removals, renames, or consolidations. The page for iOS 26 framed itself as "No removals documented" — but that's framing, not a guarantee. Operator's iPhone screenshot of the Health-action search results showed `Get Latest Health Sample` is gone in iOS 26 even though Apple's release notes are silent on it.
+- Third-party action-list articles (9to5Mac, MacObserver, Cassinelli) are publication-date-bound — reflect the iOS version current at write time, not the operator's installed iOS.
+- Older blog posts have outdated claims about output types. Maxime Heckel's "Find Health Samples returns newline-separated text strings" was true ~iOS 17 but no longer in iOS 26 — Apple's [Variable Types](https://support.apple.com/guide/shortcuts/variable-types-apdd2b316022/ios) doc confirms structured Sample objects with chevron-pickable properties.
+
+**Empirical truth = operator's iPhone.** Before writing a step-by-step Shortcut doc, ask for a screenshot of the action library search for the relevant category. The screenshot is the only authoritative state-of-iOS-on-this-device source.
+
+**Canonical iOS 26 patterns confirmed via this research:**
+
+| What | How |
+|---|---|
+| "Latest sample of type X" | `Find Health Samples` (Health-Messungen suchen) + Sort=Date desc + Limit=1. No standalone `Get Latest Health Sample` action in iOS 26. |
+| Extract numeric value from a sample | `Get Details of Health Sample` (Details von Health-Messung abrufen) → Detail: **Value** (Wert). NOT `Quantity` — that was an older property name. |
+| Sum of samples in a date range | `Find Health Samples` + `Calculate Statistics over Health Samples` (Statistik über Health-Messungen berechnen) → Operation: Sum. |
+| Build a JSON object | `Dictionary` action with typed entries (Text / Number) |
+| Serialize to JSON file | `Save File` with filename ending `.json` — Apple's [JSON guide](https://support.apple.com/guide/shortcuts/intro-to-using-json-apd0f2e057df/ios) confirms Dictionary→`.json` Save File produces valid JSON. |
+| Shortcut → Mac inbox | iCloud Drive folder `~/Library/Mobile Documents/com~apple~CloudDocs/<InboxName>/`. Sync latency 30 s – 2 min; force-download via `brctl download`. |
+
+**Caveat: the magic-variable chevron picker** (per Apple Variable-Types docs) MAY expose `Value` directly on a `Find Health Samples` output, eliminating the Get-Details step. Whether the chevron-short-path works is per-iOS-build behavior — document both paths in any Shortcut spec, let operator pick the shorter one if available.
+
+**Memory pointers:** [[project_health_phase_3a_drafted]], [[feedback_apple_shortcuts_release_notes_omit_removals]]. **Doc:** `docs/setup-health.md`.
