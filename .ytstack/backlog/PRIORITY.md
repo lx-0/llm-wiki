@@ -1,6 +1,6 @@
 # Backlog Priority — post-M020 snapshot
 
-Last reset: 2026-05-17 after M020 (backlinks footer) closeout. Inventory: 50 open · 28 shipped (`shipped/`) · 2 rejected (`rejected/`).
+Last reset: 2026-05-17 after M020 (backlinks footer) closeout, refreshed same day after the M019 doc-sync + drift-sweep + diagrams-badge-cleanup arc. Inventory: 49 open · 29 shipped (`shipped/`) · 2 rejected (`rejected/`).
 
 **Heuristic, not formal commitment.** Re-evaluate after every milestone close. When a file ships, `git mv` it into `shipped/`; when explicitly rejected, into `rejected/`. Keep the working directory short — agents glance at this list to find the next move.
 
@@ -9,7 +9,6 @@ Last reset: 2026-05-17 after M020 (backlinks footer) closeout. Inventory: 50 ope
 Pick one when "next?" comes up and the operator wants a concrete tick.
 
 - **`distribution-strip.md`** — strip `.ytstack/`, `tests/`, `.git/hooks/` from vault installs (`install.sh` + `wiki update`). ~1-2 h, single STRIP_LIST array. Stale `.ytstack/` no longer mutates (PR #17 fixed), but still clutters every vault.
-- **`m019-diagrams-update.md`** — parallel-session-owed diagram update for M019 (operator-self-reports). Same shape as the M020 infographic arc that just shipped: extend pillars, no badges/dates.
 - **`ytstack-hook-exit-code.md`** — `pre-tool-use-edit` hook exits 2 when intent was warn-only. Half-day fix or plan-task skill change.
 - **`voice-punctuate-followups.md`** — end-to-end test + optional pre-2026-05-17 backfill + quality observation window.
 - **`pictures-followups.md`** — HEIC ingest path untested, archive-policy decision deferred (iCloud footprint).
@@ -74,7 +73,7 @@ Living docs, not actionable wedges. Read when adjacent work surfaces them.
 
 ## ✅ Done — in `shipped/`
 
-29 files moved 2026-05-17. M005-M020 + ad-hoc arcs: areas-bucket, author-attribution, calendar-collector, compile-{60kb, 1m-fallback, per-call-timeout, role-axis, scope-allowlist}, connection-quality, curiosity-consumer-gap, domain-frontmatter, dream-{cycle, priority-config, sampled-activation}, entity-pages-state-timeline, gmeet-collector, health-collector, jamie-intake + multi-tenant-lift, m020-infographic-update, operator-self-reports, producer-seam, python-interactive-menu, takes-substrate, use-llm-wiki-skill, vault-health-doctor, watermark-on-failure-fix, agents-template-scanner-resync.
+29 files moved 2026-05-17. M005-M020 + ad-hoc arcs: areas-bucket, author-attribution, calendar-collector, compile-{60kb, 1m-fallback, per-call-timeout, role-axis, scope-allowlist}, connection-quality, curiosity-consumer-gap, domain-frontmatter, dream-{cycle, priority-config, sampled-activation}, entity-pages-state-timeline, gmeet-collector, health-collector, jamie-intake + multi-tenant-lift, m019-diagrams-update, m020-infographic-update, operator-self-reports, producer-seam, python-interactive-menu, takes-substrate, use-llm-wiki-skill, vault-health-doctor, watermark-on-failure-fix, agents-template-scanner-resync.
 
 ## ❌ Rejected — in `rejected/`
 
