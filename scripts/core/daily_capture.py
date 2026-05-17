@@ -51,6 +51,7 @@ KNOWN_SOURCES: frozenset[str] = frozenset({
     "meetings",  # collectors/{gmeet,jamie}.py (append per meeting)
     "voice",     # collectors/voice.py (append per intake)
     "email",     # collectors/email_collector.py (replace per delta-run)
+    "pictures",  # collectors/pictures.py (append per intake)
 })
 
 _ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
