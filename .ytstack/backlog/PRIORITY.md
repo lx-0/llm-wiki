@@ -1,6 +1,6 @@
 # Backlog Priority — post-M020 snapshot
 
-Last reset: 2026-05-17 after M020 (backlinks footer) closeout, refreshed same day after the M019 doc-sync + drift-sweep + diagrams-badge-cleanup arc. Inventory: 49 open · 29 shipped (`shipped/`) · 2 rejected (`rejected/`).
+Last reset: 2026-05-17 after M020 (backlinks footer) closeout, refreshed same day after the M019 doc-sync + drift-sweep + diagrams-badge-cleanup arc + 3 new study-arc backlog entries (+ 1 parallel-session entry, not mine). Inventory: 53 open · 29 shipped (`shipped/`) · 2 rejected (`rejected/`).
 
 **Heuristic, not formal commitment.** Re-evaluate after every milestone close. When a file ships, `git mv` it into `shipped/`; when explicitly rejected, into `rejected/`. Keep the working directory short — agents glance at this list to find the next move.
 
@@ -9,6 +9,7 @@ Last reset: 2026-05-17 after M020 (backlinks footer) closeout, refreshed same da
 Pick one when "next?" comes up and the operator wants a concrete tick.
 
 - **`distribution-strip.md`** — strip `.ytstack/`, `tests/`, `.git/hooks/` from vault installs (`install.sh` + `wiki update`). ~1-2 h, single STRIP_LIST array. Stale `.ytstack/` no longer mutates (PR #17 fixed), but still clutters every vault.
+- **`study-run-due-piggyback-audit.md`** — verify the M019 daily-schedule piggyback actually fires on lxw (enabled in vault, default-off in engine). 30-min audit; ripens 2026-05-19 to 2026-05-23 so week-1 review has clean data.
 - **`ytstack-hook-exit-code.md`** — `pre-tool-use-edit` hook exits 2 when intent was warn-only. Half-day fix or plan-task skill change.
 - **`voice-punctuate-followups.md`** — end-to-end test + optional pre-2026-05-17 backfill + quality observation window.
 - **`pictures-followups.md`** — HEIC ingest path untested, archive-policy decision deferred (iCloud footprint).
@@ -25,7 +26,9 @@ Real value, real cost; needs canary data, parallel-session coordination, or oper
 - **`commit-article-manifest.md`** — re-arch plan for `commit_article` after M018-S03 cancel (knowledge-writes are agent-side via SDK tool-use, not pure I/O extractable).
 - **`search-tools.md`** — M020-deferred axis-aware `wiki search --type --domain --author` + temporal `wiki recent`. Re-evaluate when vault crosses ~3k articles or dream-cycle/curiosity surface a real query bottleneck.
 - **`recursive-session-summary.md`** — flush-context Phase 2 (hierarchical summarisation). Deferred 4-6 wks after gen-2 budgets prove out.
-- **`personality-substrate-predigestion.md`** — gating IPIP-NEO-120 / HEXACO-60 / PID-5 behind pre-digestion. M019 follow-up; not blocking the wedge.
+- **`personality-substrate-predigestion.md`** — gating IPIP-NEO-120 / HEXACO-60 / PID-5 behind pre-digestion. M019 follow-up; not blocking the wedge. **The natural next M019-arc milestone** once the week-1 review confirms the wedge is operationally useful.
+- **`olbi-coverage-optimization.md`** — OLBI is the highest-cost ($0.28) + lowest-coverage (37.5%) instrument on the manifest. Three mitigation paths laid out (operator-input / Exhaustion-only fork / Sonnet override). Decision belongs in the 2026-05-24 week-1 review.
+- **`pass2-dashboard-widget.md`** — dashboard pane surfacing the latest Pass-2 cross-study finding. DECISIONS.md flagged as M019 closeout deferred. Ripens after first Pass-2 cycle (~within a week of 2026-05-24).
 - **`lx-vault-merge.md`** — Phase 2 (longform import + cross-vault link reconciliation). Phase 0+1 ✓; Phase 2 unblocked by M007/M008/M009 ships.
 - **`interactive-cli.md`** — Python interactive-menu shipped (`scripts/menu.py`); this is the broader CLI UX vision.
 - **`m005-infographics-extension.md`** — deferred parts only after the 2026-05-15 wrapup doc-gap pass.
