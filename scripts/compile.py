@@ -21,38 +21,17 @@ import sys
 import time
 from pathlib import Path
 
-import httpx  # noqa: E402  exception types only; HTTP via ollama_client
-
-from claude_agent_sdk import (
-    AssistantMessage,
-    ClaudeAgentOptions,
-    ResultMessage,
-    query,
-)
-
-from core.paths import AGENTS_FILE, INDEX_FILE, KNOWLEDGE_DIR, LOGS_DIR, LOG_FILE, ROOT_DIR, STATE_DIR, STATE_FILE
+from core.paths import INDEX_FILE, KNOWLEDGE_DIR, LOGS_DIR, LOG_FILE, ROOT_DIR, STATE_DIR, STATE_FILE
 from core.utils import (
     file_hash,
     list_raw_files,
     list_wiki_articles,
     load_state,
     now_iso,
-    read_hard_facts,
-    read_wiki_index,
-    read_wiki_index_compact,
     save_state,
     today_iso,
 )
-from core.sdk_helpers import (
-    FailureClass,
-    PromptTooLargeError,
-    StderrCapture,
-    assert_prompt_within_budget,
-    is_fatal,
-    log_sdk_failure,
-    make_path_scope_gate,
-    prompt_stream,
-)
+from core.sdk_helpers import FailureClass, is_fatal
 
 # ── Logging ──────────────────────────────────────────────────────────
 _LOG_FORMAT = "%(asctime)s  %(levelname)s  %(message)s"
