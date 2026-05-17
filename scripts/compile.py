@@ -224,9 +224,8 @@ from core.config import CONFIG  # noqa: E402
 from core.prompts import render  # noqa: E402
 from core import ollama_client  # noqa: E402
 
-from suggestions.producer import maybe_generate_suggestions  # noqa: E402
-from curiosity.producer import maybe_generate_curiosity_requests  # noqa: E402
-from facts.takes_producer import maybe_extract_takes  # noqa: E402
+from producers import all_producers  # noqa: E402
+from producers.orchestrate import evaluate_and_run as _run_producer  # noqa: E402
 
 
 # ── File selection ───────────────────────────────────────────────────
@@ -1269,16 +1268,15 @@ async def main() -> None:
         run_input_tokens += result.get("input_tokens", 0)
         run_output_tokens += result.get("output_tokens", 0)
 
-        # Suggestion pass for email sources
-        await maybe_generate_suggestions(source)
-
-        # Curiosity pass — detect knowledge gaps, generate deep-scan requests
-        await maybe_generate_curiosity_requests(source)
-
-        # Takes pass (M011) — extract third-party belief attribution into
-        # knowledge/takes/<holder-slug>.md. Gated by CONFIG.features.extract_takes
-        # and limits.extract_takes_source_globs. No-op when disabled.
-        await maybe_extract_takes(source)
+        # Post-pass producers (Producer-seam arc, .ytstack/backlog/producer-seam.md).
+        # Each Producer's SPEC declares its gate keys; evaluate_and_run consults
+        # CONFIG + source path, short-circuits non-matching sources to a `skipped`
+        # ProducerResult, otherwise delegates to the wrapper. Wrapper-side
+        # try/except converts unexpected exceptions into `failed` results
+        # (contract α) so the per-source state save below is never blocked.
+        # Run order = registration order: suggestions → curiosity → takes.
+        for _producer in all_producers():
+            await _run_producer(_producer, source)
 
         # Update state: mark file as ingested with its hash + persist immediately.
         # Per-file save (not just end-of-loop) so rate-limit aborts, kills, and

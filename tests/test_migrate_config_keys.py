@@ -119,8 +119,9 @@ def test_migrate_config_file_round_trip(tmp_path):
     #    dream_tier2_sample_count (M016)
     #  + 4 piggybacks additions (calendar, curiosity_followup, dream_cycle — M014,
     #    pictures — 2026-05-17)
-    #  + 1 created-features-block + 2 features additions
-    #    (extract_takes — M011, voice_punctuate — 2026-05-17)
+    #  + 1 created-features-block + 3 features additions
+    #    (extract_takes — M011, voice_punctuate — 2026-05-17,
+    #    suggestions_source_globs — Producer-seam arc)
     #  + 1 created-personal-block + 3 personal additions
     #    (implicit_operator_author — M009, picture_inbox — 2026-05-17, domains — M013)
     #  + 1 scheduling addition (dream_cooldown_days — M014; the scheduling
@@ -128,8 +129,8 @@ def test_migrate_config_file_round_trip(tmp_path):
     # (LIST_ADDITIONS has one entry but operator's freshly-injected
     # skip-list already contains "email-delta" from KEY_ADDITIONS, so
     # the list-extend is a no-op on greenfield.)
-    # = 38 changes (no drops — operator has no orphan personal.* fields)
-    assert len(changes) == 39, f"got {len(changes)} changes: {changes}"
+    # = 40 changes (no drops — operator has no orphan personal.* fields)
+    assert len(changes) == 40, f"got {len(changes)} changes: {changes}"
 
     reparsed = yaml.safe_load(new_text)
     # piggyback side
@@ -198,6 +199,7 @@ def test_migrate_config_no_change_when_fully_current(tmp_path):
         "features": {
             "extract_takes": False,
             "voice_punctuate": True,
+            "suggestions_source_globs": ["raw/email/*.md"],
         },
         "personal": {
             "implicit_operator_author": None,
@@ -320,6 +322,7 @@ def test_migrate_additions_idempotent():
         "features": {
             "extract_takes": False,
             "voice_punctuate": True,
+            "suggestions_source_globs": ["raw/email/*.md"],
         },
         "personal": {
             "implicit_operator_author": None,
