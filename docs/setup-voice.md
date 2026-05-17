@@ -48,6 +48,36 @@ piggybacks:
     enabled: false
 ```
 
+## 2a. Punctuation pre-process (default on)
+
+Dictation tools emit stream-of-consciousness text without punctuation
+or capitalization. Since 2026-05-17 the voice collector runs every
+ingest through Ollama `classify_model` (gemma4:e4b by default) to add
+sentence-case, German-noun-case, and end-of-sentence marks. The original
+is preserved verbatim under `raw_transcript:` in the `.md` frontmatter
+so the cleaned body remains auditable.
+
+```yaml
+features:
+  voice_punctuate: true    # default — set false to skip the LLM call
+```
+
+The pass is fallback-safe: if Ollama is unreachable or the model emits
+something suspicious (empty, or >3× the source length, indicating
+hallucinated commentary), the collector writes the raw transcript as
+body and omits the `raw_transcript:` frontmatter key. Voice ingest
+never fails because of an LLM hiccup.
+
+Example diff (live probe against gemma4:e4b):
+
+```
+in :  hallo wie geht es dir hörst du mich
+out:  Hallo, wie geht es dir? Hörst du mich?
+
+in :  warum verklagt lego die ganzen llm anbieter
+out:  Warum verklagt Lego die ganzen LLM Anbieter?
+```
+
 ## 3. Point a dictation tool at the inbox
 
 ### iOS Shortcut — Action Button → dictate → save (mobile primary)

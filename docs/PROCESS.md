@@ -24,7 +24,7 @@ Zwei fundamental getrennte Ingest-Pfade konvergieren bei `compile.py`:
 | [1](#1-inbox-processing) | Inbox Processing | Klassifiziert Drops in `inbox/`, verschiebt in `raw/<typ>/` | Manueller Drop |
 | [2](#2-automatic-session-capture-hooks) | Automatic Session Capture | Session-Hook → `daily/YYYY-MM-DD/sessions.md`; Collectors → `daily/YYYY-MM-DD/{health,meetings,voice,email}.md`; `daily-digest` agent → distilled `daily/YYYY-MM-DD.md` (≤500 words) | session-start / session-end / pre-compact / `daily_digest_yesterday` piggyback |
 | [3](#3-compilation) | Compilation | Claude Agent SDK liest `raw/` + `daily/`, schreibt Articles in `knowledge/` | manuell oder cron-after-hour |
-| [4](#4-scanners) | Scanners | Email · Calendar · Browser · Screenshots · Tabs · YouTube · Jamie · Google Meet · Voice · Health → `raw/notes/` + `raw/transcripts/` + `raw/voice/` | per-Scanner Cron oder piggyback |
+| [4](#4-scanners) | Scanners | Email · Calendar · Browser · Screenshots · Pictures · Tabs · YouTube · Jamie · Google Meet · Voice · Health → `raw/notes/` + `raw/transcripts/` + `raw/voice/` | per-Scanner Cron oder piggyback |
 | [5](#5-query--lint) | Query + Lint | NL-Query gegen Wiki · 8 strukturelle Checks · 1 LLM-Contradiction-Scan | manuell |
 | [6](#6-wiki-review-lokal-kostenlos) | Wiki Review | Per-Article Quality-Score via lokales LLM | piggyback |
 | [7](#7-curiosity-loop) | Curiosity Loop | Gap-Detection → JSON-Requests in `raw/requests/` | nach jedem Compile |
@@ -213,7 +213,8 @@ flowchart TD
 | `email` | Collector Registry | `collectors/cli.py email --incremental` | 24h | $0 (lokal) |
 | `jamie` | Collector Registry | `collectors/cli.py jamie --incremental` | 6h | $0 (Jamie API) |
 | `gmeet` | Collector Registry | `collectors/cli.py gmeet --incremental` | 6h | $0 (Drive API) |
-| `voice` | Collector Registry | `collectors/cli.py voice` | 1h | $0 (folder-watch) |
+| `voice` | Collector Registry | `collectors/cli.py voice` | 1h | $0 (folder-watch + optional Ollama-Punktation) |
+| `pictures` | Collector Registry | `collectors/cli.py pictures` | 6h, max 20/run | $0 (Ollama/Gemma4 Vision) |
 | `health` | Collector Registry | `collectors/cli.py health` | 24h | $0 (Oura REST) |
 | `screenshots` | Collector Registry | `collectors/cli.py screenshots` | 24h | $0 (Ollama/Gemma4) |
 | `lint_structural` | Legacy | `lint.py --structural-only` | 24h | $0 (kein LLM) |

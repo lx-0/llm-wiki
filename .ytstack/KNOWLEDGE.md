@@ -1728,3 +1728,35 @@ When adding elements to `docs/architecture.excalidraw` (or any large existing Ex
 **Fix:** `_build_owner_block()` helper in `compile.py` reads `CONFIG.personal.implicit_operator_author`, renders a small `## Operator / vault owner` section (~400 chars) when set, or `""` when null. Passed as `owner_block=` to `render()` for `compile_main` + `compile_calendar` + `compile_daily` + `compile_health` + `compile_default`. `${owner_block}` placeholder added to all five prompts between the intro line and `## Hard facts`. `render()` ignores unused kwargs, so prompts without the placeholder are unaffected. Multi-tenant story preserved: null owner → empty string → no section → existing "Multi-tenant safety" branch fires.
 
 **Generalisable rule (corollary):** prompt-injected context blocks should be self-contained Markdown sections (heading + body) emitted by the engine, not bare values the prompt has to wrap with its own heading. Self-contained blocks degrade cleanly to "" when the data isn't available — the prompt doesn't need to know whether the section is present.
+
+## Substrate-prompt mismatch caught a 4th time (2026-05-17, pictures collector)
+
+Same class of bug as calendar-rollup / daily-digest / health-rollup: a new substrate (camera photos via `collectors/pictures.py`) was wired to reuse `scan_screenshots_vision.md` because "it's a vision-LLM batch report, same shape." First live run on lxw classified a real-world lego-model photo as `ephemeral` with all-null fields — because the screenshot prompt asks for `app` / `project` / `key_text` (screen-capture-shaped fields) and a camera photo has none of them. The model correctly returned all-null and `relevance: ephemeral`, the batch report's `## Details` filtered out ephemerals, the operator saw an empty report and asked "what was extracted?"
+
+**Generalisable rule:** a vision prompt is not a vision substrate. "Same model, same JSON-extract machinery" does NOT mean "same prompt is OK." Screenshots ≠ phone photos ≠ document scans ≠ whiteboard captures — each has a different field shape and a different relevance heuristic. When adding a new image substrate:
+
+1. Write a dedicated `prompts/scan_<substrate>_vision.md` with substrate-shaped fields BEFORE wiring the collector.
+2. Give the batch report its own frontmatter `type: <substrate>-batch` AND its own `SUBSTRATE_PROMPTS` entry in `compile.py`. Don't share `screenshot-batch` "to save a prompt file."
+3. Path-prefix fallback in `_SUBSTRATE_PATH_FALLBACKS` covers legacy reports written before the dedicated type lands.
+
+**Field shape for camera/phone photos** (validated against gemma4:e4b, picture-batch shipped 2026-05-17):
+`scene_description`, `setting`, `objects` (list), `action`, `text_visible`, `people_present` (bool), `tags`, `relevance`. `text_visible` is the strongest "keep" signal — whiteboards / receipts / signage / document scans always score `keep` with rich downstream value.
+
+**Anti-noise corollary:** the picture compile prompt has a tighter filter than the screenshot one. Most camera photos are NOT knowledge artifacts. The typical batch produces 0 new wiki entries — and that's correct, not a bug. `compile_pictures.md` filters again on the agent side (drop ephemerals + drop keeps with null `text_visible` AND no matching `knowledge/` entity) so the noise floor is held even when gemma is generous with `keep`.
+
+## Imported helper bound to its own module's THUMB_DIR (2026-05-17, pictures collector)
+
+`scripts/collectors/pictures.py` first cut imported `make_thumbnail` from `scripts/collectors/scan_screenshots.py`. The function uses `THUMB_DIR = REPORT_DIR / "thumb"` defined at module import time, where `REPORT_DIR = RAW_DIR / "notes" / "screenshots"` is also a module constant. Result: pictures thumbs landed in `raw/notes/screenshots/thumb/` while the pictures batch report's `![[thumb/<file>]]` wikilink pointed at `raw/notes/pictures/thumb/`. Embed broken in Obsidian, error invisible (sips returned 0, thumb file existed — just in the wrong vault folder).
+
+**Generalisable rule:** before importing a helper across collector modules, check what module-level constants it closes over. If the helper reads `THUMB_DIR` / `STATE_FILE` / `OUTPUT_DIR` from its own module scope, importing it from a sibling silently uses the SOURCE module's paths, not the IMPORTER's. Either:
+
+1. Refactor the helper to take its target dir as a parameter (cheap if you control both).
+2. Duplicate the small helper locally with the importer's constants (acceptable when divergence is likely — picture thumbs may want different resize widths / filename conventions over time).
+
+Pictures collector took option 2 (`_make_thumbnail` lives in `pictures.py`) — the two collectors will diverge on thumb behaviour (HEIC handling, size tiers).
+
+## KNOWN_SOURCES allow-list is an export, not an internal detail (2026-05-17)
+
+`core/daily_capture.py:KNOWN_SOURCES = {"sessions", "health", "meetings", "voice", "email"}` is a frozenset used by `_validate_source()` to fail-fast on typos. The pictures collector was shipped without extending the set; first live run swallowed the `ValueError` via the `try/except Exception` in `_append_daily_rollup`, primary write succeeded, but `daily/<date>/pictures.md` silently never landed.
+
+**Generalisable rule:** when adding a new substrate-source that calls `daily_capture.append(date, <source>, line)`, extend `KNOWN_SOURCES` in the same commit. The allow-list is the public schema of the daily-rollup substrate — adding a new collector without extending it is the same shape of bug as adding a new substrate-type without registering it in `SUBSTRATE_PROMPTS`. Future safeguard: when a new collector ships with daily-capture wiring, search for `KNOWN_SOURCES` in the same PR diff; if absent, the wiring is half-done.

@@ -64,12 +64,13 @@ raw/
 │   ├── browser/     # Collector: browser bookmarks/history/tabs
 │   ├── tabs/        # Collector: Firefox Simple Tab Groups snapshots
 │   ├── screenshots/ # Collector: screenshot Vision-LLM descriptions
+│   ├── pictures/    # Collector: camera/phone-photo Vision-LLM batches (folder-watch on personal.picture_inbox)
 │   ├── youtube/     # Collector: video metadata + transcript + comments (per-video markdown)
 │   └── health/      # Collector: daily biometric rollup (Oura) — `<year>/<date>--<account>.md`
 ├── transcripts/     # PERMANENT: meeting + audio transcripts
 │   ├── jamie/       # Collector: Jamie AI meeting-notetaker (paired summary + diarised transcript)
 │   └── gmeet/       # Collector: Gemini Meet Notes + Transcript Docs (Drive API; paired sections)
-├── voice/           # PERMANENT: dictation transcripts (collectors/voice.py — folder-watch on personal.voice_inbox)
+├── voice/           # PERMANENT: dictation transcripts (collectors/voice.py — folder-watch on personal.voice_inbox; punctuation pre-process via Ollama, raw text preserved in frontmatter `raw_transcript:`)
 ├── audio/           # PERMANENT: original audio files (referenced by transcripts)
 ├── memories/        # PERMANENT: seeded Claude Code memories
 ├── requests/        # MUTABLE: compiler-generated ingest requests (status changes)
