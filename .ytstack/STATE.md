@@ -1,13 +1,17 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-05-17T12:25:00Z
-current_milestone: none
+last_updated: 2026-05-17T12:45:00Z
+current_milestone: M018
 active_slice: none
 active_task: none
 ---
 
 # State
+
+**Status:** M018 planned (L). Ready to slice. Goal: split `compile.py` into three pure stages (`select_sources` / `compile_source` / `commit_article`) + `run_post_passes()` orchestrator consuming the ProducerRegistry from Phase 1. CONTEXT.md + ROADMAP.md at `.ytstack/M018-{CONTEXT,ROADMAP}.md`; 4-slice skeleton seeded (operator may grow to 5–6 during `ytstack:slice-milestone`). 5 open questions parked in CONTEXT.md, must close before S05 starts. Numbering note: jumped from M007 → M018 because M008–M017 shipped ad-hoc (no ROADMAPs); the IDs are preserved in commit history + memory. Next action: run `ytstack:slice-milestone`.
+
+---
 
 **Ad-hoc shipped 2026-05-17 midday (lxw inbox wiring — pictures collector + voice-punctuate + AGENTS-md trim).** Operator added an iOS Shortcut writing photos + dictation transcripts into `~/Library/Mobile Documents/com~apple~CloudDocs/inbox/{pictures,voice-notes}/`. Three-tier ship to wire them in:
 
