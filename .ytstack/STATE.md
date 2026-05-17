@@ -1,17 +1,21 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-05-17T15:25:00Z
-current_milestone: none
-active_slice: none
-active_task: none
-last_completed_milestone: M019
+last_updated: 2026-05-17T13:45:00Z
+current_milestone: M022
+active_slice: S01
+active_task: T02
+last_completed_milestone: M020
 parallel_milestones: [M021]
 ---
 
 # State
 
-**Status:** M019 SHIPPED 2026-05-17 (this session) — operator-self-reports wedge (5 slices, 27 tasks, 179 tests, $0.92/full-weekly-run live-verified, two-pass analyst layer + meta-report + 5 wedge instruments + air-gapped surface). DECISIONS milestone-closeout at line 1023+ of `.ytstack/DECISIONS.md` locks 17 architectural commitments. **Operator-dogfooding now gates exit criteria #4 (6 weekly runs) + #8 (one quoted observation)** — engineering deliverable done; consumption-pattern proof lands when operator runs `wiki study run longitudinal-baseline` weekly for ~2 months. Recipe in M019-closeout DECISIONS entry. Backlog parked: `personality-substrate-predigestion.md` (R2 mitigation gating IPIP-NEO/HEXACO/PID-5/PVQ-RR post-wedge).
+**Status:** M022 / S01 / T02 planned (T01 already implemented, will commit atomic with T02). Inbox-intake-Schema-Unifizierung: zwei-Zonen-Modell (`raw/inbox-<channel>/` = audit-archive, `raw/<category>/` = derived substrate), `.processed/`-Archive ausserhalb des Vaults werden eliminiert. T01-PLAN flaggt: T01+T02 müssen atomic ein Commit (zwischenzeitlich rote Tests sonst).
+
+---
+
+**Status (prev):** M019 SHIPPED 2026-05-17 (this session) — operator-self-reports wedge (5 slices, 27 tasks, 179 tests, $0.92/full-weekly-run live-verified, two-pass analyst layer + meta-report + 5 wedge instruments + air-gapped surface). DECISIONS milestone-closeout at line 1023+ of `.ytstack/DECISIONS.md` locks 17 architectural commitments. **Operator-dogfooding now gates exit criteria #4 (6 weekly runs) + #8 (one quoted observation)** — engineering deliverable done; consumption-pattern proof lands when operator runs `wiki study run longitudinal-baseline` weekly for ~2 months. Recipe in M019-closeout DECISIONS entry. Backlog parked: `personality-substrate-predigestion.md` (R2 mitigation gating IPIP-NEO/HEXACO/PID-5/PVQ-RR post-wedge).
 
 M018 SHIPPED 2026-05-17 (parallel session) — see entry below. M020 SHIPPED 2026-05-17 (this session) — backlinks footer.
 

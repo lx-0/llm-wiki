@@ -15,11 +15,12 @@ import logging
 import shutil
 import subprocess
 import sys
+from datetime import datetime
 from pathlib import Path
 
 from core import ollama_client
 
-from core.paths import RAW_ARTICLES_DIR, RAW_AUDIO_DIR, RAW_DIR, RAW_NOTES_DIR, RAW_PAPERS_DIR, RAW_TRANSCRIPTS_DIR, ROOT_DIR
+from core.paths import RAW_ARTICLES_DIR, RAW_DIR, RAW_INBOX_WIKI_DIR, RAW_NOTES_DIR, RAW_TRANSCRIPTS_DIR, ROOT_DIR
 from core.utils import today_iso
 
 logging.basicConfig(
@@ -34,24 +35,23 @@ from core.config import CONFIG
 INBOX_DIR = ROOT_DIR / "inbox"
 DEFAULT_MODEL = CONFIG.models.classify_model
 
-# File extension → default category (no LLM needed)
+# File extension → marker for binary-only intake (no LLM classify, no artifact —
+# original wandert in T02 nach RAW_INBOX_WIKI_DIR und das war's).
 EXTENSION_MAP = {
-    ".mp3": "audio",
-    ".m4a": "audio",
-    ".wav": "audio",
-    ".ogg": "audio",
-    ".webm": "audio",
-    ".pdf": "papers",
+    ".mp3": "binary",
+    ".m4a": "binary",
+    ".wav": "binary",
+    ".ogg": "binary",
+    ".webm": "binary",
+    ".pdf": "binary",
 }
 
-# Target directories per category
+# Target directories for derived artifacts (Substrat-Zone). Original geht
+# IMMER nach RAW_INBOX_WIKI_DIR — wird in T02 verdrahtet.
 CATEGORY_DIRS = {
     "article": RAW_ARTICLES_DIR,
-    "paper": RAW_PAPERS_DIR,
     "note": RAW_NOTES_DIR,
     "transcript": RAW_TRANSCRIPTS_DIR,
-    "audio": RAW_AUDIO_DIR,
-    "papers": RAW_PAPERS_DIR,
 }
 
 from core.prompts import render  # noqa: E402
@@ -111,8 +111,23 @@ language: {lang}
     file_path.write_text(frontmatter + content, encoding="utf-8")
 
 
+def _archive_to_inbox_wiki(file_path: Path) -> Path:
+    """Move file (unmodified) to raw/inbox-wiki/ — the audit-zone archive.
+
+    Filename collision → suffix with file's mtime-iso (deterministic, idempotent
+    when the same file is re-dropped after edits).
+    """
+    RAW_INBOX_WIKI_DIR.mkdir(parents=True, exist_ok=True)
+    dest = RAW_INBOX_WIKI_DIR / file_path.name
+    if dest.exists():
+        mtime = datetime.fromtimestamp(file_path.stat().st_mtime).strftime("%Y%m%dT%H%M%S")
+        dest = RAW_INBOX_WIKI_DIR / f"{file_path.stem}-{mtime}{file_path.suffix}"
+    shutil.move(str(file_path), str(dest))
+    return dest
+
+
 def process_inbox(model: str, dry_run: bool = False) -> list[dict]:
-    """Process all files in inbox/."""
+    """Two-zone intake: original → raw/inbox-wiki/ (audit), artifact → raw/<cat>/ (substrate)."""
     if not INBOX_DIR.exists():
         log.info("No inbox directory at %s", INBOX_DIR)
         return []
@@ -129,11 +144,11 @@ def process_inbox(model: str, dry_run: bool = False) -> list[dict]:
         ext = file_path.suffix.lower()
         log.info("Processing: %s", file_path.name)
 
-        # ── HTML files → delegate to ingest-html.py ──
+        # ── HTML files → delegate to ingest-html.py, then archive original ──
         if ext in (".html", ".htm"):
             log.info("  HTML detected → delegating to ingest-html.py (--mode both)")
             if dry_run:
-                print(f"  {file_path.name} → ingest-html.py --mode both")
+                print(f"  {file_path.name} → raw/articles/ (extract) + raw/inbox-wiki/ (original)")
                 results.append({"source": file_path.name, "category": "html-ingest", "target": "raw/articles/", "classification": {}})
                 continue
 
@@ -144,42 +159,38 @@ def process_inbox(model: str, dry_run: bool = False) -> list[dict]:
                 capture_output=True, text=True,
             )
             if ret.returncode == 0:
-                # ingest-html.py handled everything — remove from inbox
-                file_path.unlink(missing_ok=True)
-                log.info("  Done (ingest-html handled it)")
+                archived = _archive_to_inbox_wiki(file_path)
+                log.info("  Done (ingest-html handled artifact; original → %s)", archived.relative_to(ROOT_DIR))
                 results.append({"source": file_path.name, "category": "html-ingest", "target": "raw/articles/", "classification": {}})
             else:
                 log.error("  ingest-html.py failed: %s", ret.stderr[:200])
             continue
 
-        # ── Extension-based shortcut (audio etc.) ──
+        # ── Binary intake (audio/pdf/etc.) → archive-only, no artifact ──
         if ext in EXTENSION_MAP:
-            category = EXTENSION_MAP[ext]
-            classification = {
-                "category": category,
-                "suggested_name": file_path.stem.lower().replace(" ", "-"),
-            }
-            log.info("  Classified by extension: %s → %s", ext, category)
+            log.info("  Binary intake (%s) → archive-only", ext)
+            if dry_run:
+                print(f"  {file_path.name} → raw/inbox-wiki/ (binary-only, no artifact)")
+                results.append({"source": file_path.name, "category": "binary", "target": "raw/inbox-wiki/", "classification": {}})
+                continue
+            archived = _archive_to_inbox_wiki(file_path)
+            log.info("  Archived → %s", archived.relative_to(ROOT_DIR))
+            results.append({"source": file_path.name, "category": "binary", "target": str(archived.relative_to(ROOT_DIR)), "classification": {}})
+            continue
+
+        # ── md/txt → LLM classify, write artifact, archive original ──
+        log.info("  Classifying with %s...", model)
+        classification = classify_file(file_path, model)
+        if not classification:
+            classification = {"category": "note", "suggested_name": file_path.stem.lower().replace(" ", "-")}
+            log.info("  LLM failed, defaulting to 'note'")
         else:
-            # ── LLM classification for text files ──
-            log.info("  Classifying with %s...", model)
-            classification = classify_file(file_path, model)
-            if not classification:
-                classification = {"category": "note", "suggested_name": file_path.stem.lower().replace(" ", "-")}
-                log.info("  LLM failed, defaulting to 'note'")
-            else:
-                log.info("  → %s (%s)", classification.get("category"), classification.get("summary", "")[:60])
+            log.info("  → %s (%s)", classification.get("category"), classification.get("summary", "")[:60])
 
         category = classification.get("category", "note")
         target_dir = CATEGORY_DIRS.get(category, RAW_NOTES_DIR)
         suggested_name = classification.get("suggested_name", file_path.stem)
-
-        # Determine target filename
-        if ext in (".md", ".txt"):
-            target_name = f"{suggested_name}.md"
-        else:
-            target_name = file_path.name
-
+        target_name = f"{suggested_name}.md"
         target_path = target_dir / target_name
 
         result = {
@@ -190,23 +201,23 @@ def process_inbox(model: str, dry_run: bool = False) -> list[dict]:
         }
 
         if dry_run:
-            print(f"  {file_path.name} → {target_path.relative_to(ROOT_DIR)}")
+            print(f"  {file_path.name} → {target_path.relative_to(ROOT_DIR)} + raw/inbox-wiki/{file_path.name}")
             results.append(result)
             continue
 
-        # Add frontmatter if needed
-        if ext in (".md", ".txt"):
-            add_frontmatter(file_path, classification)
-
-        # Move file
+        # Write derived artifact: copy original, then stamp with frontmatter
         target_dir.mkdir(parents=True, exist_ok=True)
         if target_path.exists():
-            # Avoid overwriting — add timestamp
-            target_name = f"{suggested_name}-{today_iso()}{target_path.suffix}"
+            target_name = f"{suggested_name}-{today_iso()}.md"
             target_path = target_dir / target_name
+        shutil.copy2(str(file_path), str(target_path))
+        add_frontmatter(target_path, classification)
 
-        shutil.move(str(file_path), str(target_path))
-        log.info("  Moved → %s", target_path.relative_to(ROOT_DIR))
+        # Archive original (unmodified) to inbox-wiki
+        archived = _archive_to_inbox_wiki(file_path)
+
+        log.info("  Artifact → %s; original → %s", target_path.relative_to(ROOT_DIR), archived.relative_to(ROOT_DIR))
+        result["target"] = str(target_path.relative_to(ROOT_DIR))
         results.append(result)
 
     return results

@@ -38,6 +38,7 @@ ROOT_DIR = WIKI_DIR.parent
 # ── Vault content (user-visible) ───────────────────────────────────────
 DAILY_DIR = ROOT_DIR / "daily"
 RAW_DIR = ROOT_DIR / "raw"
+RAW_INBOX_WIKI_DIR = RAW_DIR / "inbox-wiki"
 RAW_ARTICLES_DIR = RAW_DIR / "articles"
 RAW_PAPERS_DIR = RAW_DIR / "papers"
 RAW_NOTES_DIR = RAW_DIR / "notes"
