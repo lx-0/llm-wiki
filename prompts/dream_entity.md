@@ -56,7 +56,11 @@ Dream-cycle is not just deepening — it's the time to **reconsider whether the 
 
 On every dream-cycle for `type: person|project`, evaluate:
 
-1. **Theme clusters in substrate.** Walk the corpus. Are there ≥3 substrate files that all touch the same non-default-section theme (e.g. 4 substrate mentions of music/concerts, 5 mentions of gaming, 3 of travel)? If yes, the theme deserves its own `## <Theme>` H2 section above `---`, named clearly (`## Music`, `## Games`, `## Travel`, `## Deep Thoughts`, etc.). Promote.
+1. **Theme promotion — TWO triggers.** Walk the corpus. Promote a theme to its own `## <Theme>` H2 section above `---` if EITHER:
+   - **(a) substrate-scatter trigger**: ≥3 substrate files all touch the same non-default-section theme (e.g. 4 substrate mentions of concerts, 5 mentions of gaming sessions, 3 of trips).
+   - **(b) Tier-1 author-authored page trigger** — **THIS IS THE OPERATOR-PERSONAL CASE, MANDATORY**: any Tier-1 page with `author: <entity-slug>` AND `compile_role: source-and-final` whose subject is a coherent personal theme (e.g. `personal-bands-n-music.md`, `personal-deep-thoughts-universe.md`, `personal-retro-games.md`, `personal-toread.md`) → promote it to its own H2 section. The operator deliberately wrote a whole page about this theme — it has earned its own section in the entity page.
+   - Name the section per the operator's page title (drop the `personal-` prefix, title-case the rest): `personal-bands-n-music.md` → `## Music`, `personal-deep-thoughts-universe.md` → `## Deep Thoughts (Universe)`, `personal-retro-games.md` → `## Retro Games`, `personal-toread.md` → `## Reading`. Stay close to the operator's chosen title; don't invent novel names.
+   - **Body of an emerged section**: 1-3 sentence summary in operator-voice + a `→ [[knowledge/concepts/personal-<slug>]]` wikilink for full content + optionally 2-3 representative bullets pulled from the linked page (NOT a full copy — the wikilink is the source-of-truth, the section is an index pointer). Goal: the entity page surfaces "this person cares about <theme>, see [link]" not "this person's full <theme> content lives inline here".
 
 2. **Existing custom section decay.** Does an existing custom section (one of the operator's or your prior dream-cycle's additions) have <2 substrate citations now? Merge its content back into `State` or a sibling section. Sections are not free — they cost reader cognitive load.
 
