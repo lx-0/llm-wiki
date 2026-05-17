@@ -70,6 +70,10 @@ When you DO restructure, note it in your final summary: `restructured: added ## 
 
 ### Step 2 — synthesize the State block
 
+**Conflict-aware reshape (NOT append-only).** When new substrate in this corpus contradicts or refines claims in the existing State block, **RE-EVALUATE the existing State** — don't merely append the new info as a contradiction. Example: existing State says "X works at A on AI"; new substrate says "X was promoted to Y, now runs Z portfolio" → reshape State to reflect the new role + cite both substrates in Timeline. Stale claims that the new corpus contradicts should be REMOVED from State (the operator's understanding evolved) and their original substrate-citation appended to Timeline as `_(superseded YYYY-MM-DD by [new substrate])_`. This is the cross-time-synthesis premise of dream-cycle — appending without reshaping is just bigger compile, not dreaming.
+
+The corpus block below is split into **Tier 1** (operator-authored content + recent daily digests + most-recent substrate mentioning this entity) and **Tier 2** (weighted-sample of older substrate). When Tier 1 and Tier 2 evidence conflict, **Tier 1 wins** — it's the freshest signal and the operator-deliberate content. Tier 2 is sampled to surface recurring older themes that flat-recent collection would miss; use it to find patterns, not to override recent reality.
+
 The State block lives above the `---` separator. Rewrite it from the corpus, observing these rules:
 
 1. **Carry forward operator-touched lines verbatim.** Anything inside `<!-- agent-button:* -->` markers, any line the operator has manually checked (`- [x]`), any explicit operator-edit you can detect from the existing page (lines that quote operator-specific reasoning, hand-written prose paragraphs in `## What they're building` / `## See also`). When in doubt, preserve. The compile-time anti-loss guard applies here too: if your rewrite would emit FEWER Action Items than the existing page had, re-read the existing page before you commit.

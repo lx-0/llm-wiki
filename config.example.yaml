@@ -287,6 +287,18 @@ limits:
   # `wiki dream --all-entities` AND the dream_cycle piggyback.
   dream_entity_max_cost_usd: 2.0
   dream_cycle_max_cost_per_run_usd: 5.0
+  # M016 dream-cycle sampled-activation. Bounds corpus size per dream by
+  # construction (~600 KB total regardless of vault size). Tier 1 always
+  # includes the N most-recent substrate files mentioning the entity + the
+  # last M daily digests + the entity page itself + any operator-authored
+  # content (author: slug, compile_role: source-and-final). Tier 2 samples K
+  # older substrate files via importance × recency × dreams_since_last_seen
+  # weighting. Files cycle through Tier 2 over time via a `last_dreamed_at:`
+  # frontmatter stamp written after each dream. See
+  # `.ytstack/backlog/dream-sampled-activation.md` for the full architecture.
+  dream_tier1_recent_count: 20
+  dream_tier1_digest_days: 7
+  dream_tier2_sample_count: 50
 
 features:
   # Pre-process voice transcripts through Ollama (classify_model = gemma4:e4b

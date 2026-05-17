@@ -106,7 +106,7 @@ def test_migrate_config_file_round_trip(tmp_path):
     new_text, changes = m.migrate_config(config_path)
     assert new_text is not None
     # 2 piggyback (rename + drop)
-    #  + 1 created-limits-block + 19 limits additions:
+    #  + 1 created-limits-block + 22 limits additions:
     #    compile_force_long_context_types, compile_skip_on_long_context_unknown,
     #    compile_role_default_by_location (M007), 4 calendar_*,
     #    compile_max_turns_long_context, compile_max_cost_per_file_usd,
@@ -114,18 +114,22 @@ def test_migrate_config_file_round_trip(tmp_path):
     #    3 flush_*_budget_chars (2026-05-16),
     #    compile_per_call_timeout_s (M010), connection_min_words (M012),
     #    3 extract_takes_* (M011),
-    #    dream_entity_max_cost_usd + dream_cycle_max_cost_per_run_usd (M014)
-    #  + 3 piggybacks additions (calendar, curiosity_followup, dream_cycle — M014)
-    #  + 1 created-features-block + 1 features addition (extract_takes — M011)
-    #  + 1 created-personal-block + 2 personal additions
-    #    (implicit_operator_author — M009, domains — M013)
+    #    dream_entity_max_cost_usd + dream_cycle_max_cost_per_run_usd (M014),
+    #    dream_tier1_recent_count + dream_tier1_digest_days +
+    #    dream_tier2_sample_count (M016)
+    #  + 4 piggybacks additions (calendar, curiosity_followup, dream_cycle — M014,
+    #    pictures — 2026-05-17)
+    #  + 1 created-features-block + 2 features additions
+    #    (extract_takes — M011, voice_punctuate — 2026-05-17)
+    #  + 1 created-personal-block + 3 personal additions
+    #    (implicit_operator_author — M009, picture_inbox — 2026-05-17, domains — M013)
     #  + 1 scheduling addition (dream_cooldown_days — M014; the scheduling
     #    block already exists in the test fixture, so no "created" event)
     # (LIST_ADDITIONS has one entry but operator's freshly-injected
     # skip-list already contains "email-delta" from KEY_ADDITIONS, so
     # the list-extend is a no-op on greenfield.)
-    # = 32 changes (no drops — operator has no orphan personal.* fields)
-    assert len(changes) == 32, f"got {len(changes)} changes: {changes}"
+    # = 38 changes (no drops — operator has no orphan personal.* fields)
+    assert len(changes) == 38, f"got {len(changes)} changes: {changes}"
 
     reparsed = yaml.safe_load(new_text)
     # piggyback side
@@ -163,6 +167,7 @@ def test_migrate_config_no_change_when_fully_current(tmp_path):
             "calendar": {"enabled": True, "cooldown_hours": 6, "max_per_run": 500},
             "curiosity_followup": {"enabled": True, "cooldown_hours": 6, "max_per_run": 5},
             "dream_cycle": {"enabled": True, "cooldown_hours": 24, "max_per_run": 3},
+            "pictures": {"enabled": True, "cooldown_hours": 6, "max_per_run": 20},
         },
         "limits": {
             "compile_force_long_context_types": [],
@@ -185,12 +190,17 @@ def test_migrate_config_no_change_when_fully_current(tmp_path):
             "extract_takes_max_per_source": 12,
             "dream_entity_max_cost_usd": 2.0,
             "dream_cycle_max_cost_per_run_usd": 5.0,
+            "dream_tier1_recent_count": 20,
+            "dream_tier1_digest_days": 7,
+            "dream_tier2_sample_count": 50,
         },
         "features": {
             "extract_takes": False,
+            "voice_punctuate": True,
         },
         "personal": {
             "implicit_operator_author": None,
+            "picture_inbox": "",
             "domains": ["company", "personal", "ai", "meta"],
         },
     }), encoding="utf-8")
@@ -295,17 +305,23 @@ def test_migrate_additions_idempotent():
             "extract_takes_max_per_source": 12,
             "dream_entity_max_cost_usd": 2.0,
             "dream_cycle_max_cost_per_run_usd": 5.0,
+            "dream_tier1_recent_count": 20,
+            "dream_tier1_digest_days": 7,
+            "dream_tier2_sample_count": 50,
         },
         "piggybacks": {
             "calendar": {"enabled": True, "cooldown_hours": 6, "max_per_run": 500},
             "curiosity_followup": {"enabled": True, "cooldown_hours": 6, "max_per_run": 5},
             "dream_cycle": {"enabled": True, "cooldown_hours": 24, "max_per_run": 3},
+            "pictures": {"enabled": True, "cooldown_hours": 6, "max_per_run": 20},
         },
         "features": {
             "extract_takes": False,
+            "voice_punctuate": True,
         },
         "personal": {
             "implicit_operator_author": None,
+            "picture_inbox": "",
             "domains": ["company", "personal", "ai", "meta"],
         },
     }

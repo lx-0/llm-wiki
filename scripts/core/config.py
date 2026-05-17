@@ -372,6 +372,26 @@ class Limits:
     # ResultMessage.total_cost_usd crosses this cap. Default $5.00 — sized
     # to cover 2-3 typical entity resyntheses per run.
     dream_cycle_max_cost_per_run_usd: float = 5.0
+    # M016 dream-cycle sampled-activation knobs (2026-05-17). Replaces the
+    # M014 "load all mentioning files" approach that hit 2.3 MB context
+    # overflow on the operator's own page. 4-tier corpus assembly bounded
+    # by construction at ~600 KB per dream regardless of vault size.
+    # See `.ytstack/backlog/dream-sampled-activation.md` for the full
+    # architecture + research grounding (SCM, SleepGate, A-Mem, MemGPT/Letta).
+    # Tier 1 — most-recent substrate always-included. 20 is enough to cover
+    # ~2 weeks of typical entity-mentioning substrate; older items rotate
+    # through Tier 2's weighted sampling.
+    dream_tier1_recent_count: int = 20
+    # Tier 1 — last N `daily/<date>.md` rollups always-included. 7 = one
+    # week of the M001 compressed-substrate digests, which pack high signal
+    # per KB. Drop to 0 to skip daily-digest inclusion.
+    dream_tier1_digest_days: int = 7
+    # Tier 2 — weighted-sample size from substrate older than Tier 1 covers.
+    # 50 is the operating point: at a vault of ~1000 older mentioning files
+    # per entity, mean re-sampling interval is ~140 days (20 dreams × 7d
+    # cooldown). Bigger K = more coverage per dream + bigger prompt; smaller
+    # K = faster individual dreams + longer cycle for any one file.
+    dream_tier2_sample_count: int = 50
 
 
 @dataclass

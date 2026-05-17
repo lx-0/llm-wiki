@@ -43,6 +43,7 @@ os.environ.setdefault("CLAUDE_INVOKED_BY", "dream")
 import argparse
 import asyncio
 import logging
+import random
 import re
 import sys
 import time
@@ -208,6 +209,27 @@ def is_within_cooldown(entity: EntityRef, *, cooldown_days: int | None = None) -
 
 
 # ── Corpus assembly ──────────────────────────────────────────────────
+#
+# M016 sampled-activation: a 4-tier corpus assembly that bounds prompt size
+# by construction (target ~600 KB total, independent of vault size). Replaces
+# the M014 "load every mentioning file" approach that hit context overflow
+# on the operator's own entity page (~475 files / 2.3 MB → SDK kind=unknown).
+#
+# Tier 1 (always-in, ~200 KB):
+#   - entity page itself
+#   - operator-authored content (author: slug, compile_role: source-and-final)
+#   - last N most-recent substrate files mentioning slug
+#   - last M daily/<date>.md digests
+# Tier 2 (weighted-sample older substrate, ~400 KB):
+#   - score = importance × recency_decay × dreams_since_last_seen × (1+noise)
+#   - top-K by score
+# Tier 3 (conflict-aware reshape — prompt-side, not code-side):
+#   - see prompts/dream_entity.md Step 2 mandate
+# Tier 4 (hierarchical digest):
+#   - daily/<date>.md is the M001 digest substrate; covered by Tier 1's
+#     digest-day inclusion. Recursive weekly/monthly building deferred to M017.
+#
+# See `.ytstack/backlog/dream-sampled-activation.md` for the full design.
 
 
 _SUBSTRATE_ROOTS: tuple[Path, ...] = (RAW_DIR, DAILY_DIR)
@@ -219,6 +241,30 @@ _SUBSTRATE_ROOTS: tuple[Path, ...] = (RAW_DIR, DAILY_DIR)
 # only files with `author:` matching the entity slug (or compiled_from match)
 # are included — the regular compile-output concepts (no author) are skipped.
 _OPERATOR_AUTHORED_ROOTS: tuple[str, ...] = ("concepts", "areas", "people", "projects")
+
+# Importance weights for Tier-2 scoring. Path-prefix-keyed (matched in order,
+# longest prefix wins). Default fallback 1.0. See research grounding in the
+# spec doc — these are heuristics, not learned weights (A-Mem MoE gating
+# is future work). Calibrated by operator-eye on lxw substrate.
+_IMPORTANCE_RULES: tuple[tuple[str, float], ...] = (
+    ("raw/memories/",                3.0),
+    ("raw/transcripts/jamie/",       2.0),
+    ("raw/transcripts/gmeet/",       2.0),
+    ("raw/notes/longform/",          1.5),
+    ("raw/notes/email/",             1.0),
+    ("raw/notes/calendar/",          1.0),
+    ("raw/notes/screenshots/",       0.8),
+)
+
+# Sentinel for "this file has never been dreamed" — large enough that any
+# never-stamped file beats any stamped one on the dreams_since_last_seen term.
+_NEVER_DREAMED_DAYS = 1_000_000.0
+
+# Tier-1 / Tier-2 per-file truncation cap. Big enough to carry the load-bearing
+# content of typical substrate (meeting transcripts run 5-15 KB; longform
+# articles 10-30 KB) without letting one pathological 500 KB file dominate
+# the budget alone.
+_PER_FILE_TRUNCATION_CHARS = 8_000
 
 
 def _is_substrate_file(path: Path) -> bool:
@@ -240,28 +286,134 @@ def _mentions_entity(text: str, slug: str) -> bool:
     return bool(pattern.search(text))
 
 
-def collect_corpus(entity: EntityRef, *, vault_root: Path | None = None) -> list[Path]:
-    """Greps every substrate file under raw/** and daily/** for slug mentions.
+def _importance_for(rel_path: str) -> float:
+    """Look up the importance weight for a substrate path (rel to vault root).
 
-    Returns sorted-newest-first list of absolute paths. Walks the filesystem
-    directly rather than shelling out to grep so it's deterministic in tests
-    and works on any platform.
+    Path-prefix match; longest prefix wins via _IMPORTANCE_RULES ordering
+    (the tuple is hand-ordered most-specific first, so the first hit wins).
+    Returns 1.0 if no rule matches.
     """
-    root = vault_root or ROOT_DIR
+    norm = rel_path.replace("\\", "/")
+    for prefix, weight in _IMPORTANCE_RULES:
+        if norm.startswith(prefix):
+            return weight
+    return 1.0
+
+
+def _recency_decay(mtime: float, *, now: float | None = None) -> float:
+    """Soft 90-day half-life decay: 1 / (1 + days_since_mtime / 90).
+
+    Older content competes but doesn't vanish — at 90 days, weight = 0.5;
+    at 180, 0.33; at 365, 0.20.
+    """
+    ref = now if now is not None else time.time()
+    days = max(0.0, (ref - mtime) / 86400.0)
+    return 1.0 / (1.0 + days / 90.0)
+
+
+def _get_last_dreamed_at(path: Path) -> datetime | None:
+    """Read `last_dreamed_at:` from a substrate file's frontmatter.
+
+    Returns None if the file has no frontmatter, no key, or an unparseable
+    value. Tolerant — broken frontmatter means "treat as never dreamed".
+    """
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return None
+    fm, _body = _parse_frontmatter(text)
+    return _parse_iso_date(fm.get("last_dreamed_at"))
+
+
+def _dreams_since_last_seen_days(path: Path, *, now: datetime | None = None) -> float:
+    """Return days since the file's last_dreamed_at, or sentinel if never."""
+    stamp = _get_last_dreamed_at(path)
+    if stamp is None:
+        return _NEVER_DREAMED_DAYS
+    ref = now or datetime.now(timezone.utc)
+    days = (ref - stamp).total_seconds() / 86400.0
+    return max(1.0, days)
+
+
+def _compute_sampling_score(
+    path: Path,
+    *,
+    vault_root: Path,
+    rng: random.Random,
+    now: float | None = None,
+) -> float:
+    """Tier-2 activation score: importance × recency × dreams_since × noise.
+
+    `rng` is passed explicitly so tests can pin determinism via a seeded
+    Random instance; production uses the module-global random module.
+    """
+    try:
+        rel = str(path.relative_to(vault_root))
+    except ValueError:
+        rel = str(path)
+    try:
+        mtime = path.stat().st_mtime
+    except OSError:
+        mtime = 0.0
+    importance = _importance_for(rel)
+    recency = _recency_decay(mtime, now=now)
+    dreams_since = _dreams_since_last_seen_days(path)
+    noise = rng.uniform(0.85, 1.15)
+    return importance * recency * dreams_since * noise
+
+
+def _write_last_dreamed_at(path: Path, when: datetime | None = None) -> bool:
+    """Stamp `last_dreamed_at: <iso>` into a substrate file's frontmatter.
+
+    Returns True if the write happened. Idempotent — same-day stamp is a
+    no-op (avoids churning mtime on every dream of every entity). Tolerant
+    of missing frontmatter (synthesises a fresh `---`/`---` block at file
+    top if needed). Never raises — write failure logs and returns False so
+    a single problematic file doesn't abort the rest of a dream.
+    """
+    stamp = (when or datetime.now(timezone.utc)).strftime("%Y-%m-%d")
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return False
+    fm, body = _parse_frontmatter(text)
+    existing = fm.get("last_dreamed_at")
+    if isinstance(existing, str) and existing.startswith(stamp):
+        return False  # already stamped today — skip
+    fm["last_dreamed_at"] = stamp
+    try:
+        new_fm_text = yaml.safe_dump(fm, sort_keys=False, allow_unicode=True)
+        new_text = f"---\n{new_fm_text}---\n{body}"
+        path.write_text(new_text, encoding="utf-8")
+        return True
+    except (OSError, yaml.YAMLError) as exc:
+        log.warning("  could not stamp last_dreamed_at on %s: %s", path, exc)
+        return False
+
+
+# ── Tiered corpus collection ────────────────────────────────────────
+
+
+def _scan_mentioning_files(
+    entity: EntityRef, *, vault_root: Path, include_authored: bool = True,
+) -> list[tuple[float, Path]]:
+    """Walk all substrate roots once, return (mtime, path) for matches.
+
+    Returns absolute paths sorted newest-first. Includes:
+      - raw/** + daily/** where the text body mentions the slug
+      - knowledge/{concepts,areas,people,projects}/** when include_authored
+        AND the file matches (author: slug or compiled_from contains slug)
+    Excludes the entity page itself.
+    """
     found: list[tuple[float, Path]] = []
-    # Substrate roots: raw/ + daily/ (regular substrate)
-    # PLUS knowledge/{concepts,areas,people,projects}/ for operator-authored
-    # content with author=slug (drowning-protection per M015 — operator's
-    # personal-* concepts must be visible to dream-cycle even though they live
-    # in knowledge/ rather than raw/)
-    scan_dirs = [root / "raw", root / "daily"]
-    for sub in _OPERATOR_AUTHORED_ROOTS:
-        scan_dirs.append(root / "knowledge" / sub)
+    scan_dirs: list[Path] = [vault_root / "raw", vault_root / "daily"]
+    if include_authored:
+        for sub in _OPERATOR_AUTHORED_ROOTS:
+            scan_dirs.append(vault_root / "knowledge" / sub)
     for sub in scan_dirs:
         if not sub.exists():
             continue
         for path in sub.rglob("*.md"):
-            # Don't scan the entity's own page (avoid self-reading)
             if path.resolve() == entity.page.resolve():
                 continue
             try:
@@ -275,11 +427,197 @@ def collect_corpus(entity: EntityRef, *, vault_root: Path | None = None) -> list
                     mtime = 0.0
                 found.append((mtime, path))
     found.sort(key=lambda t: t[0], reverse=True)
-    return [p for _ts, p in found]
+    return found
+
+
+def _is_operator_authored_for(path: Path, entity: EntityRef, *, vault_root: Path) -> bool:
+    """True if this file's frontmatter declares the entity as author or
+    compiled_from contains the entity slug. Hard-included by Tier 1 — these
+    are load-bearing operator-deliberate writings that can never be evicted.
+    """
+    try:
+        rel = path.relative_to(vault_root)
+    except ValueError:
+        return False
+    if not str(rel).startswith("knowledge/"):
+        return False
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return False
+    fm, _body = _parse_frontmatter(text)
+    author = fm.get("author")
+    if isinstance(author, str) and author.strip().lower() == entity.slug.lower():
+        return True
+    if isinstance(author, list) and any(
+        isinstance(a, str) and a.strip().lower() == entity.slug.lower() for a in author
+    ):
+        return True
+    compiled_from = fm.get("compiled_from")
+    if isinstance(compiled_from, list):
+        for cf in compiled_from:
+            if isinstance(cf, str) and entity.slug.lower() in cf.lower():
+                return True
+    return False
+
+
+def _recent_daily_digest_paths(vault_root: Path, *, days: int) -> list[Path]:
+    """Return absolute paths to the last N daily/<date>.md rollup digests.
+
+    The M001 daily-as-rollup architecture stores per-source captures under
+    daily/<date>/ subdirs AND a digest at daily/<date>.md. We only want the
+    digest (it's the compressed signal), not the per-source raw captures.
+    Sorted newest-first.
+    """
+    if days <= 0:
+        return []
+    daily = vault_root / "daily"
+    if not daily.exists():
+        return []
+    found: list[tuple[str, Path]] = []
+    for path in daily.glob("*.md"):
+        # daily/<YYYY-MM-DD>.md — stem is the date string; sorts lexicographically
+        if re.fullmatch(r"\d{4}-\d{2}-\d{2}", path.stem):
+            found.append((path.stem, path))
+    found.sort(reverse=True)
+    return [p for _date, p in found[:days]]
+
+
+@dataclass
+class CorpusBreakdown:
+    """What landed in each tier — surfaced for logging + tests."""
+
+    tier1_entity_page: Path | None
+    tier1_authored: list[Path]
+    tier1_recent: list[Path]
+    tier1_digests: list[Path]
+    tier2_sampled: list[Path]
+    tier2_pool_size: int  # how many older-substrate files were available to sample from
+
+    @property
+    def all_paths(self) -> list[Path]:
+        """Combined dedup'd path list, Tier-1 ordered first then Tier-2.
+
+        Order within Tier 1 is determined per-section (digests then authored
+        then recent), but the entity page is excluded from the corpus paths
+        (it's rendered as `current_page` in the prompt, not the corpus block).
+        """
+        seen: set[Path] = set()
+        out: list[Path] = []
+        for group in (self.tier1_authored, self.tier1_recent, self.tier1_digests, self.tier2_sampled):
+            for p in group:
+                rp = p.resolve()
+                if rp in seen:
+                    continue
+                seen.add(rp)
+                out.append(p)
+        return out
+
+    @property
+    def tier1_count(self) -> int:
+        seen: set[Path] = set()
+        for group in (self.tier1_authored, self.tier1_recent, self.tier1_digests):
+            for p in group:
+                seen.add(p.resolve())
+        return len(seen)
+
+    @property
+    def tier2_count(self) -> int:
+        return len(self.tier2_sampled)
+
+
+def collect_corpus_tiered(
+    entity: EntityRef,
+    *,
+    vault_root: Path | None = None,
+    tier1_recent_count: int | None = None,
+    tier1_digest_days: int | None = None,
+    tier2_sample_count: int | None = None,
+    rng_seed: int | None = None,
+) -> CorpusBreakdown:
+    """4-tier corpus assembly (M016 sampled-activation).
+
+    Bounded by construction: Tier 1 ≤ ~200 KB, Tier 2 ≤ ~400 KB.
+
+    `rng_seed` is for test determinism. Production callers omit it; the
+    score noise term uses the module-default Random instance.
+    """
+    root = vault_root or ROOT_DIR
+    recent_n = tier1_recent_count if tier1_recent_count is not None else CONFIG.limits.dream_tier1_recent_count
+    digest_days = tier1_digest_days if tier1_digest_days is not None else CONFIG.limits.dream_tier1_digest_days
+    sample_k = tier2_sample_count if tier2_sample_count is not None else CONFIG.limits.dream_tier2_sample_count
+    rng = random.Random(rng_seed) if rng_seed is not None else random.Random()
+
+    # One filesystem walk; classify the hits.
+    all_hits = _scan_mentioning_files(entity, vault_root=root, include_authored=True)
+    all_paths = [p for _ts, p in all_hits]
+
+    # Partition: operator-authored knowledge vs regular substrate.
+    authored: list[Path] = []
+    substrate: list[tuple[float, Path]] = []
+    for mtime, path in all_hits:
+        if _is_operator_authored_for(path, entity, vault_root=root):
+            authored.append(path)
+        else:
+            # Only count files that are substrate (raw/ or daily/) for the
+            # recent/sampled buckets; knowledge/ matches without author=slug
+            # are dropped (they're compile outputs — risk of amplification loop).
+            try:
+                rel = str(path.relative_to(root))
+            except ValueError:
+                continue
+            if rel.startswith("raw/") or rel.startswith("daily/"):
+                substrate.append((mtime, path))
+
+    # Tier 1 — recent substrate (most-recent N).
+    substrate_paths_newest_first = [p for _ts, p in substrate]
+    tier1_recent = substrate_paths_newest_first[:recent_n]
+    tier1_recent_set = {p.resolve() for p in tier1_recent}
+
+    # Tier 1 — daily digests (last M days; pulled by date-on-name regardless
+    # of whether the digest mentions the slug — digests are compressed
+    # cross-substrate signal worth always-including in their own right).
+    tier1_digests = _recent_daily_digest_paths(root, days=digest_days)
+    tier1_digests_set = {p.resolve() for p in tier1_digests}
+
+    # Tier 1 — operator-authored (always-include).
+    authored_set = {p.resolve() for p in authored}
+
+    # Tier 2 — sample from older substrate (substrate not already in Tier 1's
+    # recent OR digest set, and not already in authored).
+    tier1_all_set = tier1_recent_set | tier1_digests_set | authored_set
+    older_pool = [p for _ts, p in substrate if p.resolve() not in tier1_all_set]
+    if sample_k <= 0 or not older_pool:
+        tier2_sampled: list[Path] = []
+    else:
+        scored: list[tuple[float, Path]] = [
+            (_compute_sampling_score(p, vault_root=root, rng=rng), p) for p in older_pool
+        ]
+        scored.sort(key=lambda t: t[0], reverse=True)
+        tier2_sampled = [p for _score, p in scored[:sample_k]]
+
+    return CorpusBreakdown(
+        tier1_entity_page=entity.page if entity.page.exists() else None,
+        tier1_authored=authored,
+        tier1_recent=tier1_recent,
+        tier1_digests=tier1_digests,
+        tier2_sampled=tier2_sampled,
+        tier2_pool_size=len(older_pool),
+    )
+
+
+def collect_corpus(entity: EntityRef, *, vault_root: Path | None = None) -> list[Path]:
+    """Back-compat shim — returns the deduped path list from the tiered build.
+
+    Kept so existing tests / callers (M014) that grab `collect_corpus()` and
+    inspect the result list continue to work. New code should call
+    `collect_corpus_tiered()` directly to get the tier breakdown.
+    """
+    return collect_corpus_tiered(entity, vault_root=vault_root).all_paths
 
 
 def render_corpus_block(
-    paths: list[Path], *, vault_root: Path | None = None, max_chars_per_file: int = 8000
+    paths: list[Path], *, vault_root: Path | None = None, max_chars_per_file: int = _PER_FILE_TRUNCATION_CHARS
 ) -> str:
     """Render the corpus as a single markdown block for prompt embedding.
 
@@ -299,6 +637,48 @@ def render_corpus_block(
             text = text[:max_chars_per_file] + f"\n\n[... truncated at {max_chars_per_file} chars ...]\n"
         chunks.append(f"### `{rel}`\n\n```markdown\n{text}\n```\n")
     return "\n".join(chunks)
+
+
+def render_corpus_block_tiered(
+    breakdown: CorpusBreakdown,
+    *,
+    vault_root: Path | None = None,
+    max_chars_per_file: int = _PER_FILE_TRUNCATION_CHARS,
+) -> str:
+    """Render the tiered corpus with section headers (Tier 1 / Tier 2 split).
+
+    Surfacing the tier boundary to the LLM via prompt structure helps the
+    reshape rule (Tier 3) — the model can weight Tier 1 (recent + digest +
+    authored) higher than Tier 2 (sampled older substrate) when adjudicating
+    conflicts.
+    """
+    root = vault_root or ROOT_DIR
+
+    def _render_group(group_paths: list[Path], label: str) -> str:
+        if not group_paths:
+            return ""
+        body = render_corpus_block(group_paths, vault_root=root, max_chars_per_file=max_chars_per_file)
+        return f"\n## {label} ({len(group_paths)} files)\n\n{body}"
+
+    # Dedup for display: a file in both authored and recent shows once under
+    # authored (the more-specific role).
+    seen: set[Path] = set()
+    def _dedup(paths: list[Path]) -> list[Path]:
+        out: list[Path] = []
+        for p in paths:
+            rp = p.resolve()
+            if rp in seen:
+                continue
+            seen.add(rp)
+            out.append(p)
+        return out
+
+    parts: list[str] = []
+    parts.append(_render_group(_dedup(breakdown.tier1_authored), "Tier 1 — operator-authored content"))
+    parts.append(_render_group(_dedup(breakdown.tier1_digests), "Tier 1 — recent daily digests"))
+    parts.append(_render_group(_dedup(breakdown.tier1_recent), "Tier 1 — most-recent substrate mentioning entity"))
+    parts.append(_render_group(_dedup(breakdown.tier2_sampled), "Tier 2 — weighted-sampled older substrate"))
+    return "\n".join(p for p in parts if p)
 
 
 # ── Cost estimation ─────────────────────────────────────────────────
@@ -348,10 +728,24 @@ def _build_owner_block() -> str:
     return _from_compile()
 
 
-def _build_prompt(entity: EntityRef, corpus_paths: list[Path], *, max_turns: int) -> tuple[str, int]:
-    """Render dream_entity.md with the entity + corpus. Returns (prompt, total_chars)."""
+def _build_prompt(
+    entity: EntityRef,
+    corpus_paths: list[Path],
+    *,
+    max_turns: int,
+    breakdown: CorpusBreakdown | None = None,
+) -> tuple[str, int]:
+    """Render dream_entity.md with the entity + corpus. Returns (prompt, total_chars).
+
+    If `breakdown` is provided, the corpus is rendered with per-tier section
+    headers so the LLM sees the Tier 1 / Tier 2 split (M016). Otherwise
+    falls back to the flat M014-style render (used by legacy tests / paths).
+    """
     current_page = entity.page.read_text(encoding="utf-8") if entity.page.exists() else "(file does not exist yet — create it from the two-layer template)"
-    corpus_block = render_corpus_block(corpus_paths)
+    if breakdown is not None:
+        corpus_block = render_corpus_block_tiered(breakdown)
+    else:
+        corpus_block = render_corpus_block(corpus_paths)
     corpus_chars = len(corpus_block)
     title = current_page_title(current_page) or entity.title
     prompt = render(
@@ -397,10 +791,21 @@ async def dream_entity(
     cap = cost_cap_usd if cost_cap_usd is not None else CONFIG.limits.dream_entity_max_cost_usd
     turns = max_turns if max_turns is not None else 20
 
-    corpus_paths = collect_corpus(entity)
+    # M016: tiered corpus. Bounded by construction at ~600 KB total
+    # regardless of vault size (the M014 flat-collect path hit context
+    # overflow on 475-file alex.md → 2.3 MB).
+    breakdown = collect_corpus_tiered(entity)
+    corpus_paths = breakdown.all_paths
     log.info(
-        "  entity=%s kind=%s — %d substrate files mention this slug",
-        entity.slug, entity.kind, len(corpus_paths),
+        "  entity=%s kind=%s — corpus: T1=%d (auth=%d/recent=%d/digests=%d) "
+        "T2=%d sampled of %d-file older pool",
+        entity.slug, entity.kind,
+        breakdown.tier1_count,
+        len(breakdown.tier1_authored),
+        len(breakdown.tier1_recent),
+        len(breakdown.tier1_digests),
+        breakdown.tier2_count,
+        breakdown.tier2_pool_size,
     )
 
     if not corpus_paths:
@@ -415,7 +820,7 @@ async def dream_entity(
             skipped="no_substrate", elapsed_s=time.time() - started,
         )
 
-    prompt, prompt_chars = _build_prompt(entity, corpus_paths, max_turns=turns)
+    prompt, prompt_chars = _build_prompt(entity, corpus_paths, max_turns=turns, breakdown=breakdown)
     estimate = estimate_cost_usd(prompt_chars)
     log.info(
         "  prompt: %d chars (%.1f KB) — estimated cost $%.3f (cap $%.2f)",
@@ -508,6 +913,30 @@ async def dream_entity(
         "  done: %d input + %d output tokens, actual cost $%.4f, elapsed %.1fs",
         input_tokens, output_tokens, actual_cost, elapsed,
     )
+
+    # M016 — stamp last_dreamed_at on every substrate file that appeared in
+    # this dream's corpus. This is the activation-tracking mechanism that
+    # cycles files through Tier 2 sampling over time. Per-file write
+    # failures log and continue — the entity-page Write is the deliverable.
+    stamped = 0
+    for path in corpus_paths:
+        # Skip the entity page itself (its own last_synthesized_at is
+        # written by the prompt's housekeeping rule). Skip daily/<date>.md
+        # digests — they're not entity-specific substrate and would churn
+        # mtime on every dream of every entity.
+        if path.resolve() == entity.page.resolve():
+            continue
+        try:
+            rel = str(path.relative_to(ROOT_DIR))
+        except ValueError:
+            continue
+        if re.fullmatch(r"daily/\d{4}-\d{2}-\d{2}\.md", rel):
+            continue
+        if _write_last_dreamed_at(path):
+            stamped += 1
+    if stamped:
+        log.info("  stamped last_dreamed_at on %d substrate file(s)", stamped)
+
     return DreamResult(
         entity=entity, corpus_count=len(corpus_paths),
         corpus_chars=prompt_chars, estimated_cost_usd=estimate,

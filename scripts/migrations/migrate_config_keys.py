@@ -46,6 +46,9 @@ Key changes covered (chronological):
   personal.picture_inbox                   (added 2026-05-17, default "" — camera/phone-photo inbox for collectors/pictures.py)
   piggybacks.pictures                      (added 2026-05-17, cooldown 6h, max_per_run 20 — vision-LLM-driven, lighter cadence than screenshots)
   features.voice_punctuate                 (added 2026-05-17, default True — Ollama-driven punctuation pass on voice transcripts at ingest)
+  limits.dream_tier1_recent_count          (added 2026-05-17 M016, default 20 — Tier 1 most-recent substrate count)
+  limits.dream_tier1_digest_days           (added 2026-05-17 M016, default 7 — Tier 1 daily-digest day count)
+  limits.dream_tier2_sample_count          (added 2026-05-17 M016, default 50 — Tier 2 weighted-sample size)
 
 Idempotent: a config already on the current schema produces no change.
 
@@ -161,6 +164,13 @@ KEY_ADDITIONS: dict[str, dict[str, object]] = {
         # in `scripts/core/config.py`.
         "dream_entity_max_cost_usd": 2.0,
         "dream_cycle_max_cost_per_run_usd": 5.0,
+        # M016 dream-cycle sampled-activation knobs (2026-05-17). Bound the
+        # per-dream corpus by construction (~600 KB) regardless of vault size.
+        # See `.ytstack/backlog/dream-sampled-activation.md` for the full
+        # 4-tier architecture + research grounding.
+        "dream_tier1_recent_count": 20,
+        "dream_tier1_digest_days": 7,
+        "dream_tier2_sample_count": 50,
     },
     "scheduling": {
         # M014 dream-cycle (2026-05-16). Per-entity cooldown — entities
