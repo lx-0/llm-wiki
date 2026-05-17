@@ -90,6 +90,7 @@ def _instrument_max(snap: InstrumentSnapshot) -> int:
         "asrs-v1.1": 72,
         "who-5": 25,
         "k6": 24,
+        "pss-10": 40,  # 10 items × 0-4 scale; M019+ rebalance
         "meq-19": 86,  # placeholder for future MEQ wiring
     }
     # Snapshot's `slug` is alias-or-filename — match the wedge canonical
