@@ -31,7 +31,7 @@ import html2text
 import httpx
 
 from core import ollama_client
-from core.paths import RAW_ARTICLES_DIR, RAW_DIR, RAW_NOTES_DIR, ROOT_DIR
+from core.paths import RAW_ARTICLES_DIR, RAW_DIR, RAW_NOTES_DIR, ROOT_DIR, SCRIPTS_DIR, WIKI_DIR
 from core.utils import today_iso
 from core.config import CONFIG
 
@@ -248,12 +248,14 @@ def ingest(source: str, mode: str, model: str, compile: bool) -> Path | None:
     log.info("Saved: %s", output_path.relative_to(ROOT_DIR))
 
     # ── Compile ──
+    # compile.py lives in the engine (WIKI_DIR/scripts), not the vault
+    # (ROOT_DIR/scripts). Use sys.executable so we stay in the current venv.
     if compile:
         log.info("Triggering compilation...")
-        compile_script = ROOT_DIR / "scripts" / "compile.py"
+        compile_script = SCRIPTS_DIR / "compile.py"
         subprocess.run(
-            ["uv", "run", "python", str(compile_script)],
-            cwd=str(ROOT_DIR),
+            [sys.executable, str(compile_script)],
+            cwd=str(WIKI_DIR),
         )
 
     return output_path

@@ -20,7 +20,7 @@ from pathlib import Path
 
 from core import ollama_client
 
-from core.paths import RAW_ARTICLES_DIR, RAW_DIR, RAW_INBOX_WIKI_DIR, RAW_NOTES_DIR, RAW_TRANSCRIPTS_DIR, ROOT_DIR
+from core.paths import RAW_ARTICLES_DIR, RAW_DIR, RAW_INBOX_WIKI_DIR, RAW_NOTES_DIR, RAW_TRANSCRIPTS_DIR, ROOT_DIR, SCRIPTS_DIR, WIKI_DIR
 from core.utils import today_iso
 
 logging.basicConfig(
@@ -242,12 +242,14 @@ def main():
     if args.dry_run or args.no_compile:
         return
 
-    # Trigger compilation
+    # Trigger compilation. compile.py lives in the engine (WIKI_DIR/scripts),
+    # not in the vault (ROOT_DIR/scripts). Reuse the current venv's interpreter
+    # via sys.executable so we don't depend on uv being on PATH.
     print("\nTriggering compilation...")
-    compile_script = ROOT_DIR / "scripts" / "compile.py"
+    compile_script = SCRIPTS_DIR / "compile.py"
     subprocess.run(
-        ["uv", "run", "python", str(compile_script)],
-        cwd=str(ROOT_DIR),
+        [sys.executable, str(compile_script)],
+        cwd=str(WIKI_DIR),
     )
 
 
