@@ -284,10 +284,14 @@ class Limits:
     compile_max_prompt_chars: int = 400_000
     # Tool-turn ceiling per compile run. 30 was generous enough to let
     # the model loop on a huge source until it hit the context window
-    # (see KNOWLEDGE.md: gmeet 138 KB transcript). 12 is what lint.py /
-    # suggestions/ already run with and matches the actual depth of
-    # legitimate compiles (read index → grep → read 2-4 articles → write).
-    compile_max_turns: int = 12
+    # (see KNOWLEDGE.md: gmeet 138 KB transcript). Bumped 12 → 20 on
+    # 2026-05-17 after a 1.2 KB planning-bullet note (yesterday-marketing-
+    # initiative-plan.md) hit max_turns on Haiku — many-entity bullet
+    # outlines legitimately need ~15-20 turns to extract+link each
+    # bullet's referenced concepts. 20 matches `daily-digest`'s tier
+    # (the closest many-entity shape); per-file cost guard
+    # (compile_max_cost_per_file_usd, $2.50) still bounds runaway burns.
+    compile_max_turns: int = 20
     # Higher cap for substrates listed in `compile_force_long_context_types`.
     # Two-layer person/project pages with carry-forward semantics
     # (Read-existing → Edit-State → Verify → maybe re-Edit) consume far more

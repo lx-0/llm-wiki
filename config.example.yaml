@@ -259,9 +259,12 @@ limits:
   # Pre-flight cap for `wiki compile` prompts (same overflow class — source
   # size is the variable bit, gmeet transcripts can hit 100+ KB).
   compile_max_prompt_chars: 400000
-  # Tool-turn ceiling per compile run. Bumped down from 30 — large sources
-  # otherwise loop on Read/Grep until they hit the 200K context window.
-  compile_max_turns: 12
+  # Tool-turn ceiling per compile run. 12 was too tight for many-entity
+  # bullet outlines (planning notes routinely need ~15-20 turns to
+  # extract+link each bullet's concepts); 30 was high enough that large
+  # sources looped on Read/Grep until hitting the 200K context window.
+  # 20 lands in the daily-digest tier; per-file $ guard still bounds it.
+  compile_max_turns: 20
   # Higher cap for substrates listed in compile_force_long_context_types.
   # Two-layer person/project pages with carry-forward (Read-existing →
   # Edit-State → maybe re-Edit) consume far more turns than the flat
