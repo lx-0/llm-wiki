@@ -53,6 +53,7 @@ from scripts.reports._engine.lib.inference import (  # noqa: E402
     default_batches,
     infer_batch,
 )
+from scripts.reports._engine.lib.verify_report import verify_report  # noqa: E402
 from scripts.reports._engine.score import score_instrument  # noqa: E402
 
 
@@ -397,6 +398,16 @@ def run_inference(
         substrate_paths=paths,
         vault_root=vault_root,
     )
+    # M019-S04-T05: verify embedded-methodology contract on the freshly-
+    # written report. Wedge philosophy = warn, don't abort: a single
+    # bad report shouldn't block the rest of a multi-instrument run.
+    verification = verify_report(report_path)
+    if not verification.ok:
+        print(
+            f"  ⚠ embedded-methodology check FAILED: {verification.summary}",
+            flush=True,
+        )
+
     print(f"\nReport persisted: {report_path}", flush=True)
     return report_path
 

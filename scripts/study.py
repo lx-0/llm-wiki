@@ -33,6 +33,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from scripts.core.config import CONFIG  # noqa: E402
 from scripts.core.paths import ROOT_DIR  # noqa: E402
+from scripts.reports._engine.lib.render_summary import render_summary  # noqa: E402
+from scripts.reports._engine.lib.timeline import (  # noqa: E402
+    load_timeline,
+    snapshot_from_dir,
+)
 from scripts.reports._engine.runner import run_inference  # noqa: E402
 from scripts.reports._engine.study import (  # noqa: E402
     RunDirectory,
@@ -162,11 +167,31 @@ def cmd_run(args: argparse.Namespace) -> int:
                 per_inst_results.append((ref.alias or ref.slug, report_path))
                 print(f"      → {report_path.relative_to(run_dir.tmp_dir)}", flush=True)
 
-            # S04 will populate _summary.md + charts/.
+            # S04 — render the deterministic meta-report inside the
+            # tmp dir before atomic commit. Builds the in-progress
+            # snapshot from the tmp dir, appends to the cross-run
+            # timeline (which already includes prior finalised runs),
+            # writes _summary.md + chart SVGs.
+            timeline = load_timeline(study.study_dir)
+            new_snap = snapshot_from_dir(run_dir.tmp_dir, timestamp=timestamp)
+            timeline.runs.append(new_snap)
+            try:
+                summary_path = render_summary(
+                    study_id=study.manifest.study_id,
+                    timeline=timeline,
+                    summary_path=run_dir.tmp_dir / "_summary.md",
+                    charts_dir=run_dir.charts_dir,
+                )
+                print(f"      → meta-report: {summary_path.relative_to(run_dir.tmp_dir)}",
+                      flush=True)
+            except Exception as exc:
+                # Failure here MUST not poison the run — per-instrument
+                # reports are the source of truth. Log + continue, the
+                # operator can re-render meta later by re-running
+                # render_summary against the finalised run.
+                print(f"      ! meta-report render failed: {exc}", flush=True)
+
             # S05 will populate _analysis.md.
-            # S03 wedge leaves both as TODO markers; the run-dir
-            # still atomically commits with just the per-instrument
-            # reports inside.
 
         elapsed = time.perf_counter() - wall_start
         # Persist state — only after the RunDirectory atomically renamed.
