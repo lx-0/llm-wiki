@@ -50,6 +50,24 @@ Many existing pages predate M005 and are in the **atomic shape** (`## Key Facts`
 
 The 200-line existing-page-is-atomic case is the highest-value dream-cycle outcome — it's exactly the lazy-migration M005 promised. Don't skip this step because the page "already has content".
 
+### Step 1.7 — STRUCTURAL RECONSIDERATION (every dream — apply or skip per evidence)
+
+Dream-cycle is not just deepening — it's the time to **reconsider whether the page's section structure still fits the substrate**. The two-layer M005 template (`State / Action Items / Open Threads / What they're building / See also / --- / Timeline`) is the **default backbone**, not a cap. Personal entity pages especially accumulate substrate across domains (music, games, reading, films, hardware, travel, deep-thoughts, work, family, places) that the default flat `State` section flattens into noise.
+
+On every dream-cycle for `type: person|project`, evaluate:
+
+1. **Theme clusters in substrate.** Walk the corpus. Are there ≥3 substrate files that all touch the same non-default-section theme (e.g. 4 substrate mentions of music/concerts, 5 mentions of gaming, 3 of travel)? If yes, the theme deserves its own `## <Theme>` H2 section above `---`, named clearly (`## Music`, `## Games`, `## Travel`, `## Deep Thoughts`, etc.). Promote.
+
+2. **Existing custom section decay.** Does an existing custom section (one of the operator's or your prior dream-cycle's additions) have <2 substrate citations now? Merge its content back into `State` or a sibling section. Sections are not free — they cost reader cognitive load.
+
+3. **Section overlap/rename.** Did you (or prior runs) emit `## Films` AND `## Streaming` and `## Movies` for what's now clearly one theme? Pick ONE canonical name and merge. Same for `## Music` vs `## Tunes` vs `## Concerts`. **Stability over novelty** — if a section name worked last run, keep it unless a clearly better one emerged.
+
+4. **Default M005 sections stay** unless they're completely empty AND would stay empty after this run. Don't drop `## Action Items` just because there happen to be 0 right now — the operator expects that section in entity pages.
+
+5. **Conservatism gate.** Restructuring is heavy and creates churn. If nothing in this dream-run clearly justifies a new section or a merge, **do nothing structurally** — proceed to Step 2 with the existing structure. The goal is NOT "every dream produces a new section". It's "every dream considers it; most do not act on it; occasional ones do".
+
+When you DO restructure, note it in your final summary: `restructured: added ## Music (4 substrate citations), merged ## Streaming into ## Films (was 2 vs 6 entries).`
+
 ### Step 2 — synthesize the State block
 
 The State block lives above the `---` separator. Rewrite it from the corpus, observing these rules:
