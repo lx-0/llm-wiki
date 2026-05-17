@@ -61,7 +61,9 @@ class _ConsoleFormatter(logging.Formatter):
       - dispatch line   `  type=X → prompt @ model`    dim
       - success line    `  ✓ Ns · in:N out:N ($X)`     green ✓, dim tokens
       - failure line    `  ✗ ...`                       red ✗
-      - curiosity line  `  Curiosity*`                  magenta (different subsystem)
+      - curiosity line  `  Curiosity*`                  dim cyan + `?` prefix
+                                                        (info, not action; magenta
+                                                        read as error in dark terminals)
       - section banner  `─── ... ───`                   bold
       - cost in any line                                tiered: dim<$0.05 / plain / yellow>$0.50 / bold-yellow>$1.50
       - badge `[name]` inside header                    yellow
@@ -116,9 +118,17 @@ class _ConsoleFormatter(logging.Formatter):
             # Dispatch line — dim (it's a routing note, not action).
             elif self._DISPATCH_RE.match(msg):
                 msg = f"{_C_DIM}{msg}{_C_RESET}"
-            # Curiosity engine lines — magenta to distinguish from compile.
+            # Curiosity engine lines — dim cyan + `?` glyph prefix.
+            # Curiosity is informational (the gap-detection loop wrote N
+            # requests for the next compile to pick up); it's NOT a
+            # compile failure. Earlier magenta choice read as red/error
+            # in dark terminals and competed with the actual red ✗
+            # failure marker. Dim cyan parks the lines in the ambient-
+            # log register (same weight as dispatch / elapsed / tokens);
+            # the `?` glyph signals "inquiry", matching the loop's name.
             elif self._CURIOSITY_RE.match(msg):
-                msg = f"\033[35m{msg}{_C_RESET}"
+                marked = re.sub(r"^(\s+)Curiosity", r"\1? Curiosity", msg, count=1)
+                msg = f"{_C_DIM}{_C_CYAN}{marked}{_C_RESET}"
             # Success/failure inline markers + cost/elapsed/tokens tinting
             # for all remaining lines (incl. ✓ summary lines).
             else:
