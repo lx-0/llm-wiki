@@ -307,9 +307,21 @@ async def infer_batch_async(
             )
         except InferenceError as exc:
             last_exc = exc
-            # Only retry on opaque CLI failures. The exception text
-            # carries the FailureClass output from log_sdk_failure.
-            retryable = ("unknown:" in str(exc)) or ("cli_crash:" in str(exc))
+            # Retry on: (1) opaque CLI failures (kind=unknown / cli_crash),
+            # (2) schema-validation failures (agent omitted items / extra
+            # items / non-JSON output). Haiku occasionally drops one item
+            # despite the prompt's "every item MUST appear" instruction;
+            # re-roll usually produces the full set. Auth/rate-limit
+            # errors are explicitly NOT retried.
+            msg = str(exc)
+            retryable = (
+                "unknown:" in msg or "cli_crash:" in msg
+                or "agent omitted items" in msg
+                or "agent returned unknown items" in msg
+                or "agent output JSON failed to parse" in msg
+                or "agent output had unbalanced JSON braces" in msg
+                or "agent output contained no JSON object" in msg
+            )
             if attempt == 0 and retryable:
                 log.warning(
                     "  inference batch=%s failed with retryable error; "
