@@ -3,9 +3,9 @@ milestone: M019
 slice: S01
 project: llm-wiki
 created: 2026-05-17T11:05:00Z
-status: planned
+status: in-progress
 task_count: 5
-completed_tasks: 0
+completed_tasks: 1
 ---
 
 # M019-S01 — Slice Plan
@@ -14,7 +14,7 @@ completed_tasks: 0
 
 ## Tasks
 
-- [ ] T01 — **R1 scope-lock wiring + verification probe.** The R1 pivot from eng-review is already resolved (DECISIONS.md 2026-05-17 entry on compile path-scope): `--allowedTools` parens-syntax is decorative, use `core.sdk_helpers.make_path_scope_gate([roots])` + `prompt_stream(...)` callback pattern. This task therefore wires the inference-agent against `make_path_scope_gate(['reports/'])` (note: `reports/` is the only Write target during inference — agent writes per-instrument report markdown there) with `disallowed_tools=[Write,Edit,NotebookEdit]` NOT containing Write/Edit (else CLI fast-paths them), `permission_mode != 'acceptEdits'`, and AsyncIterable prompt via `prompt_stream`. Verification probe-script at `scripts/reports/_engine/verify_scope_lock.py`: invokes the gate with a deliberate "Write a test file to `<vault>/outside.md`" stimulus, asserts the callback denied the call. Captures behaviour in `.ytstack/KNOWLEDGE.md` under "M019 R1 wiring 2026-05-17". Kept post-verification as regression-probe.
+- [x] T01 — **R1 scope-lock wiring + verification probe.** ✓ Done 2026-05-17. Architecture refinement during execution: agents (inference + analyst) never write files themselves — output flows via TextBlock/ResultMessage and the engine persists deterministically. Scope-lock composition: `allowed_tools=["Read","Glob","Grep"]` + `disallowed_tools=["Write","Edit","NotebookEdit"]` + `permission_mode="default"` + `make_path_scope_gate([])` (empty-roots deny-all-writes, defense-in-depth). Probe at `scripts/reports/_engine/verify_scope_lock.py` ran 3 sub-probes (CONTROL-READ + WRITE-ATTEMPT + EDIT-ATTEMPT), all PASS, total cost $0.08. **Surprising finding:** model unprompted-escalated to `Bash sed` when Edit was denied — caught by `allowed_tools` whitelist not the scope-gate. Outcome documented in `.ytstack/KNOWLEDGE.md` ("M019 R1 wiring verified", 2026-05-17). Probe kept as regression. S02 + S05 use this exact composition verbatim.
 
 - [ ] T02 — **DECISIONS.md entries:** (a) `reports/` filesystem location decided as vault root sibling of `knowledge/` (operator-visible, version-controllable in operator's git, separate from engine state in `.wiki/`). (b) Air-gap from compile-loop structurally enforced via hard-coded `disallowed_paths=["reports/"]` in compile.py substrate-scope-spec, not lint-warn. (c) Inference = Claude SDK only, curiosity = Ollama only, no cross-fallback. Both entries append-only in `.ytstack/DECISIONS.md`.
 

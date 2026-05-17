@@ -34,8 +34,8 @@ scripts/failed-flushes/
 scripts/session-flush-*.md
 scripts/flush-context-*.md
 
-# Reports
-reports/
+# Reports (vault-root operator data only — engine code under scripts/reports/ and templates/reports/ is committed)
+/reports/
 
 # Python
 __pycache__/
