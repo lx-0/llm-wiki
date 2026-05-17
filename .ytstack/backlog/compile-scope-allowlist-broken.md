@@ -1,8 +1,9 @@
 # Compile-scope allowlist is broken — empirically verified
 
-**Status:** finding (Phase 1 awaiting fix decision)
+**Status:** IMPLEMENTED — gate live behind `features.compile_callback_gate=true` (default). Production-verify pending on lxw vault.
+**Commits:** `fd3a814` (finding + probe), `478a127` (gate helpers + config + migration + tests), `d8a0de5` (compile.py + dream.py wiring)
 **Date:** 2026-05-17
-**Severity:** real but bounded — only the path-scope LAYER 2 defense is broken; LAYER 1 (prompt SCOPE block) still holds
+**Severity:** real but bounded — only the path-scope LAYER 2 defense was broken; LAYER 1 (prompt SCOPE block) still holds
 
 ## TL;DR
 

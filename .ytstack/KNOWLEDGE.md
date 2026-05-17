@@ -1780,3 +1780,45 @@ First cut of the trim pointer section used `https://github.com/lx-0/llm-wiki/blo
 **Fix:** point at `.wiki/docs/<file>` and `.wiki/prompts/<file>` from AGENTS.md. Verified by running `head -1` on each pointer target from the vault root — all 10 resolve. Both markdown-link click in Obsidian AND agent Read tool follow the same relative path.
 
 **Generalisable rule:** any cross-doc reference inside `<vault>/AGENTS.md` (or `<vault>/.wiki/`) must use vault-relative paths, never external URLs. Templates that seed into vaults inherit the same rule — `templates/AGENTS.example.md` is the source of truth for what new vaults get on first install.
+
+## `Write(<path-glob>)` in `--allowedTools` is decorative, not enforcement (2026-05-17)
+
+The bundled Claude Code CLI (2.1.97) parses `Write(knowledge/**)` /
+`Edit(knowledge/**)` in `--allowedTools` as the bare `Write` / `Edit` tool —
+the parenthesised path glob is ignored. Verified empirically by
+`scripts/probe_compile_scope.py`: three SDK calls against a tmp vault show
+the production allowlist permits Write to `<cwd>/outside.md` just as readily
+as to `<cwd>/knowledge/inside.md`, even though only the latter is
+"in scope" per the declared pattern.
+
+CLI `--help` confirms the parenthesised syntax is only documented for
+`Bash(<shell-pattern>)`. The extension to `Write(<path-glob>)` was wishful
+extrapolation when commit `57fc0d4` shipped on 2026-05-15 ("UNTESTED" was
+honestly flagged in the commit message).
+
+**Enforcement that actually works:** `can_use_tool` callback (Python-side
+gate, async). Three constraints to wire it correctly:
+
+1. **Write/Edit must NOT appear in `allowed_tools`.** If they do, the CLI
+   fast-paths them as pre-approved and the callback never fires. Use
+   `allowed_tools=["Read","Glob","Grep"]` and rely on the callback as the
+   sole permission decision for Write/Edit.
+2. **`permission_mode` must NOT be `"acceptEdits"`.** That mode auto-allows
+   the very tools we're trying to gate. Use `"default"`.
+3. **`prompt` must be `AsyncIterable[dict]`, not `str`.** The SDK raises
+   `ValueError: can_use_tool callback requires streaming mode` for string
+   prompts when a callback is wired. Wrap with
+   `core.sdk_helpers.prompt_stream(text)`.
+
+Engine implementation: `core.sdk_helpers.make_path_scope_gate([roots])` —
+factory returns the callback; resolves each `Write`/`Edit` `file_path` via
+`Path.resolve()` and checks against the permitted roots. Used by
+`scripts/compile.py` + `scripts/dream.py` since 2026-05-17. Operator
+rollback via `features.compile_callback_gate = false` keeps the legacy
+decorative allowlist available as a one-line escape hatch.
+
+**Generalisable rule:** any tool-permission shape in `--allowedTools` that
+isn't `Bash(...)` is unverified-extrapolation territory. If the security
+posture matters, gate via `can_use_tool` callback — that's the only path
+the SDK lets you control from Python rather than depending on the CLI's
+internal parser.

@@ -796,3 +796,26 @@ These are companion-rules to [[Templates are load-bearing — never backlog temp
 
 **Multi-tenant story preserved:** `implicit_operator_author: null` (default) → helper returns `""` → no section rendered → existing §7 "Multi-tenant safety" branch fires (leave unattributed beliefs generic).
 
+
+---
+
+## 2026-05-17: Compile path-scope via `can_use_tool` callback, not `--allowedTools` parens-syntax
+
+**Context:** Commit `57fc0d4` (2026-05-15) added `Write(knowledge/**)` + `Edit(knowledge/**)` to the compile agent's `allowed_tools` to constrain Write/Edit to the `knowledge/` subtree after a prompt-injection-via-substrate incident. The commit message honestly flagged the syntax as an UNTESTED extrapolation from the documented `Bash(<shell-pattern>)` shape.
+
+Empirical probe 2026-05-17 (`scripts/probe_compile_scope.py`) confirmed the extrapolation is wrong: the bundled Claude Code CLI 2.1.97 parses `Write(knowledge/**)` as the bare `Write` tool and ignores the parenthesised path glob. Writes to `<cwd>/outside.md` succeed identically to writes inside `knowledge/`. The shipped LAYER 2 defense (path-scope) was entirely decorative; LAYER 1 (prompt SCOPE block in `compile_main_system.md`) was the only thing actually keeping the agent in scope, and only because the model voluntarily obeys.
+
+**Options considered:** (A) Revert to the pre-`57fc0d4` denylist (`disallowed_tools=[".wiki/**", ".ytstack/**", ...]`). (B) Switch to `can_use_tool` callback as a Python-side gate. (C) Long-term: stop letting the agent write at all — return structured payload via `ResultMessage` and have `compile.py` write deterministically (backlog: `compile-agent-no-filesystem-write.md`).
+
+**Chose:** B — `can_use_tool` callback via `core.sdk_helpers.make_path_scope_gate([roots])`. Behind a `features.compile_callback_gate: bool = True` config flag so a single-line config flip falls back to the legacy decorative shape if production load surfaces edge cases.
+
+**Reason:** the denylist (A) was abandoned in `57fc0d4` for legitimate fail-open reasons — new engine subtree = silent hole, no compile-time error when developers add new top-level dirs. Allowlist is fail-closed; the callback is allowlist-in-spirit (only `knowledge/` permitted) but enforced at the right layer. The long-term refactor (C) removes the injection surface entirely but is a much bigger rewrite; the callback fix is the right wedge. Cost: ~30 LOC of helpers + 2 call-site rewrites + 1 config flag with migration.
+
+**Constraints baked in:** three rules for any future call site that wants the gate (also documented in `.ytstack/KNOWLEDGE.md`):
+1. `Write` / `Edit` must NOT appear in `allowed_tools` (else CLI fast-paths them, bypassing the callback).
+2. `permission_mode` must NOT be `acceptEdits` (else auto-allow, bypassing the callback).
+3. `prompt` must be `AsyncIterable[dict]` in streaming mode (SDK requirement when callback wired). Use `core.sdk_helpers.prompt_stream(text)` to wrap a plain string.
+
+**Engine impl:** `core.sdk_helpers.make_path_scope_gate` + `prompt_stream` (commit `478a127`); compile.py + dream.py call-site wiring (commit `d8a0de5`); feature flag added with config migration (same `478a127`). Finding doc + probe in `fd3a814`. Backlog: `compile-scope-allowlist-broken.md` status flipped to implemented.
+
+**Production verification status:** mechanism verified empirically by the probe (Haiku, 3-turn, tmp vault). Production code path with Opus + 500KB prompts + 20-turn iteration has NOT been exercised end-to-end yet — operator must verify on lxw vault. Rollback flag exists for safety.
