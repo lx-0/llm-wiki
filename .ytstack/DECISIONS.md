@@ -878,3 +878,33 @@ hooks installer, seed prompts) stay bash — bash is fine for one-shot
 yes/no/single-line. Migrate only if they grow scrollable TUI
 ambitions. See `.ytstack/backlog/python-interactive-menu.md` for the
 full design + "what stays out" list.
+
+---
+
+## 2026-05-17: Reports — two-pass analyst-agent layer (per-study + cross-study)
+
+**Context:** M019 (operator-self-reports) is shipping a `reports/` surface that runs validated psychometric instruments against the operator's substrate. Initial pitch had `_summary.md` as the primary consumption surface — purely deterministic aggregation. During plan-milestone the operator pushed back: an agent-harness gives more flexibility than a deterministic pipeline for interpretation. Sub-question that surfaced: one overall analyst-agent vs. per-study agents.
+
+**Operator framing locked:** Studies remain mechanical/deterministic (item-by-item LLM-inference + likert + cutoffs + JSON-schema). **Analysis is its own layer, run by agents.** Two passes:
+
+- **Pass-1 (per-study).** Agent reads one study's deterministic results + relevant substrate-scope (lookback windows, keyword filters per instrument). Writes `_analysis.md` next to the study-run's `_summary.md`. Fires automatically after every `wiki study run <id>` via flush.py piggyback.
+- **Pass-2 (cross-study synthesis).** Agent reads all latest Pass-1 outputs (`_analysis.md` files) + their `_summary.md` siblings — does NOT re-read raw substrate. Writes `reports/analyses/<ts>.md` (sibling of `studies/`, not nested). Runs on `personal.reports.cross_study_schedule` (default `weekly`).
+
+**Why two passes and not one:** (a) Token-economy — Pass-2 reads pre-aggregated Pass-1 outputs instead of all substrate. (b) Reusability — `wiki analyze --study X` reruns Pass-1 alone; `wiki analyze --cross-study` reruns Pass-2 alone. (c) Drift-isolation — Pass-2 persona iterations don't force Pass-1 re-computation. (d) Domain-pluggability post-wedge — Pass-1 persona can be pinned per-study in `manifest.yaml`; Pass-2 persona is always one broad synthesist.
+
+**Why agents and not deterministic interpretation:** scoring + banding are table-lookup (deterministic correct per memory `feedback_no_agent_for_deterministic`). Cross-substrate interpretive reading + writing prose summaries is content-extraction + multi-step reasoning (agent correct per same memory). The split lines up exactly with the memory's rule.
+
+**Why one persona for the wedge, not per-study:** the 5 wedge instruments (PHQ-9 / GAD-7 / ASRS-v1.1 / WHO-5 / MEQ-19) all sit within clinical-screen territory. A single "operator self-cartography research analyst" persona is broad enough. Per-study persona-pinning lands post-wedge when personality / values / behavioral-derived studies arrive (each may want its own framing).
+
+**Pass-2 on single-study (wedge state) is intentionally redundant.** Option chosen during planning was (b) — Pass-2 fully ships even though wedge has only one study. Persona acknowledges N=1 honestly and writes thinner synthesis ("only `longitudinal-baseline` available in current scope; cross-study patterns activate when a second study reports"). Cost: minor compute redundancy. Benefit: Migration to N≥2 studies post-wedge is zero-friction; Pass-1/Pass-2 interface contract gets stress-tested in wedge.
+
+**Scope-lock for analyst agents:** uses `core.sdk_helpers.make_path_scope_gate(['reports/', 'knowledge/', 'daily/', 'raw/'])` per the 2026-05-17 callback-gate decision (this DECISIONS.md, earlier entry). Agents have Read + Grep only — Write/Edit/NotebookEdit explicitly `disallowed_tools`. The three constraints baked in there apply: no Write/Edit in `allowed_tools`, no `acceptEdits` permission_mode, `prompt_stream(...)` for streaming.
+
+**Embedded methodology persists in analyst outputs too:** Pass-1 and Pass-2 markdown files carry frontmatter (`pass`, `persona_version` SHA256 of prompt file, `prompt_version`, `model_id`, `evidence_paths`, `studies_synthesized` for Pass-2) plus inline citation of every substrate path read. Per Q6 future-fit posture: analyst outputs are durable self-contained artifacts; the engine is replaceable.
+
+**Engine impl (M019-S05):** `lib/analyst.py` agent-harness wrapper; `prompts/reports/analyst_per_study.md` + `prompts/reports/analyst_cross_study.md` personas; `wiki analyze --study <id>` + `wiki analyze --cross-study` CLI subcommands; flush.py piggyback for Pass-1 after every study-run + Pass-2 on `cross_study_schedule`. ~6 tasks in S05.
+
+**Air-gap from compile-loop:** `reports/` (both `studies/` and `analyses/`) is excluded from compile.py substrate-scope structurally (S01-T02 decision recorded separately). Analyst-agent outputs flow back ONLY into operator's eyeballs and into Pass-2 input, never into `knowledge/`. Self-observation-bias feedback loop prevented.
+
+**Per-study agent rejected as over-engineering:** considered briefly but dropped. For N=1 with one persona-frame across multiple studies, the cross-study synthesist needs to integrate over domains anyway; having different Pass-1 personas for different studies would force the Pass-2 persona to mediate between conflicting framings. Cleaner: one persona-stance applied at two scopes (within-study + cross-study).
+
