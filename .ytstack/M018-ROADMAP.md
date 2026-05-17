@@ -4,7 +4,7 @@ project: llm-wiki
 size: L
 created: 2026-05-17T12:45:00Z
 status: planned
-total_slices: 4
+total_slices: 6
 completed_slices: 0
 ---
 
@@ -23,10 +23,12 @@ completed_slices: 0
 
 Slice detail lives in per-slice `M018-S##-PLAN.md` files, created by `ytstack:slice-milestone`.
 
-- [ ] S01 -- (to be planned)
-- [ ] S02 -- (to be planned)
-- [ ] S03 -- (to be planned)
-- [ ] S04 -- (to be planned)
+- [ ] S01 -- Fixture vault for regression check (4 tasks)
+- [ ] S02 -- Extract select_sources() — pure I/O (4 tasks)
+- [ ] S03 -- Extract compile_source() — pure LLM call (5 tasks)
+- [ ] S04 -- Extract commit_article() — pure file I/O (3 tasks)
+- [ ] S05 -- (to be planned, after open questions close — post-pass lift via run_post_passes)
+- [ ] S06 -- (to be planned — scheduling-policy decision + regression closeout)
 
 Suggested framing (from `.ytstack/backlog/producer-seam.md` lines 136–141, may grow to 5–6 slices during `slice-milestone`):
 
