@@ -1228,38 +1228,70 @@ home_render_status() {
   printf "  %s%s%s\n" "$C_DIM" "$line" "$C_RESET"
 }
 
+# Two-prompt helper for `/correct-add` (title + truth).
+home_correct_add() {
+  local t; t="$(ask "Title (one sentence)")"
+  [[ -z "$t" ]] && { info "cancelled"; return 0; }
+  local u; u="$(ask "Truth (one sentence)")"
+  [[ -z "$u" ]] && { info "cancelled"; return 0; }
+  cmd_correct add "$t" "$u"
+}
+
 # Flat command catalog used by the `/` fuzzy filter. One row per line:
 # "command-name|short description|dispatcher". Dispatcher is a bash
-# function (or function + arg-prompt sentinel) the filter routes to.
-# Kept hand-curated rather than reflectively generated — explicit beats
-# magic, and the list churns slowly.
+# function (or `prompt:<label>:<cmd>` sentinel) the filter routes to.
+# Hand-curated — explicit beats magic, and the list churns slowly.
+# Cost markers: ($) = local LLM cheap, ($$) = Claude SDK, ($$$) = expensive.
 _home_command_catalog() {
   cat <<'EOF'
-compile|recompile changed sources|cmd_compile
+compile|recompile changed sources ($$)|cmd_compile
+compile-all|force-recompile every source ($$$)|cmd_compile --all
+compile-file|compile one file ($$)|prompt:Path (vault-relative):cmd_compile --file
 flush|capture current session to daily/|cmd_flush
-lint|knowledge-base health check|cmd_lint
+lint|full lint with contradiction check ($$)|cmd_lint
 lint-structural|cheap structural lint (no LLM)|cmd_lint --structural-only
-query|ask the wiki in natural language|home_query
+query|ask the wiki in natural language ($$)|home_query
 status|config + hooks + ollama probe|cmd_status
-collect|run a collector (--list to enumerate)|prompt:Collector name:cmd_collect
-process-inbox|classify and route inbox/ files|cmd_process_inbox
-ingest-html|ingest a URL or HTML file|prompt:URL or path:cmd_ingest_html
-ingest-youtube|ingest a YouTube URL|prompt:Video or playlist URL:cmd_ingest_youtube --url
-dream|sweep all entity pages|cmd_dream --all-entities
-dream-entity|re-synthesize one entity|prompt:Entity slug:cmd_dream_entity
+collect-list|list registered collectors|cmd_collect --list
+collect-run|run one collector|prompt:Collector name:cmd_collect
+gmail-auth|OAuth bootstrap for Gmail|prompt:Account id:cmd_gmail_auth
+gmeet-auth|OAuth bootstrap for Google Meet|prompt:Account id:cmd_gmeet_auth
+calendar-auth|OAuth bootstrap for Google Calendar|prompt:Account id:cmd_calendar_auth
+process-inbox|classify+route inbox/ files (local LLM)|cmd_process_inbox
+ingest-html|ingest a URL or HTML file (local)|prompt:URL or path:cmd_ingest_html
+ingest-youtube|ingest a YouTube URL (local)|prompt:Video or playlist URL:cmd_ingest_youtube --url
+dream|sweep all entity pages ($$$)|cmd_dream --all-entities
+dream-entity|re-synthesize one entity ($$)|prompt:Entity slug:cmd_dream_entity
 pin|pin article to a MOC|prompt:Article name or path:cmd_pin
 review-wiki|per-article quality score (local)|cmd_review_wiki
-correct|list hard facts|cmd_correct list
-take|list takes|cmd_take list
-curiosity|list curiosity requests|cmd_curiosity --list
-suggestions|list optimization suggestions|cmd_suggestions --list
-agent|list agent tasks|cmd_agent --list
+correct-add|add a hard fact|home_correct_add
+correct-list|list hard facts|cmd_correct list
+correct-edit|edit a hard fact in $EDITOR|prompt:Slug:cmd_correct edit
+correct-remove|remove a hard fact|prompt:Slug:cmd_correct remove
+correct-apply|propagate a hard fact ($$$)|prompt:Slug:cmd_correct apply
+take-list|list takes|cmd_take list
+take-show|show takes for one holder|prompt:Holder slug:cmd_take show
+curiosity-list|list pending curiosity requests|cmd_curiosity --list
+curiosity-oldest|run oldest curiosity request (local)|cmd_curiosity --run-oldest
+curiosity-all|run every pending request (local)|cmd_curiosity --run-all
+curiosity-clear|delete done request files|cmd_curiosity --clear-done
+suggestions-list|list optimization suggestions|cmd_suggestions --list
+suggestions-review|review one suggestion|prompt:Suggestion id:cmd_suggestions --review
+suggestions-execute|execute approved suggestions|cmd_suggestions
+agent-list|list agent tasks|cmd_agent --list
+agent-run|run an agent task|prompt:Task id:cmd_agent
 setup|first-time setup wizard|cmd_setup
 config|edit config interactively|config_cmd_edit
-hooks|hooks install table|hooks_cmd_status
-skills|skills install table|skills_cmd_status
-update|git pull --ff-only + sync skills|cmd_update
-seed|audit vault templates|cmd_seed --check
+config-get|print one config value|prompt:Key (dot-notation):config_get
+hooks-status|hooks install table|hooks_cmd_status
+hooks-install|install hooks into agents|hooks_cmd_install
+hooks-uninstall|remove wiki hooks|hooks_cmd_uninstall
+skills-status|skills install table|skills_cmd_status
+skills-install|install engine skills|skills_cmd_install
+skills-sync|install missing + prune stale|skills_cmd_sync
+update|git pull + sync skills|cmd_update
+seed-audit|read-only template drift report|cmd_seed --check
+seed-apply|seed missing vault templates|cmd_seed
 version|engine git revision|cmd_version
 EOF
 }
@@ -1360,6 +1392,9 @@ home_screen() {
           "$C_GREEN" "$key" "$C_RESET" "$label" "$C_DIM" "$cmd" "$C_RESET"
       done < <(jq -r '.[] | [.key, .label, .cmd] | @tsv' <<<"$suggestions_json")
       echo
+    else
+      printf "  %s✨ Nothing pending — vault is current.%s\n\n" \
+        "$C_DIM" "$C_RESET"
     fi
 
     printf "  %s▸ Quick actions%s\n" "$C_BOLD" "$C_RESET"
