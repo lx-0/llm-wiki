@@ -1,5 +1,7 @@
 # M017 — Dream-priority config: rules-based weighted entity selection
 
+**Status: SHIPPED 2026-05-17.** Commits `4a621fa` (DreamPriority dataclass + selection algo + 16 tests) + `cf70698` (`wiki dream list-candidates` CLI route) + `b2da172` (sort fix: priority first, weight tiebreak). Operator-facing docs in `AGENTS.md` § "Tuning dream-cycle entity selection (M017)". `config.example.yaml` carries the empty defaults + commented examples. Migration entry added to `scripts/migrations/migrate_config_keys.py` so operator vaults pick up the key. lxw vault `.wiki/config.yaml` configured with sinnvolle rules (operator-anchor `alex` at 5.0, work-active projects at 2.5–3.0, archive/stale tags at 0.05–0.4).
+
 Operator-controlled selection priority for dream-cycle entities, declared as rules in `config.yaml` (centralized) with optional per-entity frontmatter override. Replaces the M014 default of "pick N most-overdue" with operator-shaped weighted-selection.
 
 ## Problem this solves

@@ -154,6 +154,20 @@ When referencing a `source-and-final` page from compiled `knowledge/` articles: 
 
 MOC auto-include Dataview blocks in `templates/knowledge/MOCs/{concepts,people,projects,areas}.md` carry `WHERE compile_role != "final-only"`. `pin.py` refuses to manually pin a final-only article (operator must edit frontmatter first if they really want it back in active surfaces).
 
+### Tuning dream-cycle entity selection (M017)
+
+The `dream_cycle` piggyback periodically re-synthesizes entity pages (`knowledge/people/`, `knowledge/projects/`, …). By default every overdue entity has equal weight (greedy, oldest first). To bias which entities get auto-dreamed more often, set rules under `scheduling.dream_priority` in `config.yaml`:
+
+- **`default`** (float, default 1.0) — baseline weight for entities no rule matches.
+- **`paths`** (dict glob→float) — first-match-wins; `0` excludes from auto-sweep entirely (operator can still `wiki dream <slug>` manually).
+- **`domain`** (dict, M013 `domain:` frontmatter → float multiplier).
+- **`tags`** + **`tag_strategy`** (`max | sum | first`) — multiplier from page tags.
+- **`status`** (dict, e.g. `active: 1.0`, `dormant: 0.3`, `retired: 0.05`).
+
+Resolution order: per-entity frontmatter `dream_priority: <float>` (absolute override) → config `paths:` first-match → formula `default × domain × tag(max|sum|first) × status`. Selection mode for `wiki dream --all-entities` is `--selection-mode {probabilistic, greedy}` (default greedy).
+
+Debug current ranking with `wiki dream list-candidates --limit 15` — prints rank/weight/priority/age/slug/source-trace per entity. Spec: `.ytstack/backlog/dream-priority-config.md`.
+
 ### Adding a prompt
 
 1. Drop `<name>.md` into `prompts/`.
