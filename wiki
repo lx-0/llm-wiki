@@ -949,6 +949,38 @@ cmd_collect() {
   uv run --quiet --project "$WIKI_DIR" python "$WIKI_DIR/scripts/collectors/cli.py" "$@"
 }
 
+help_produce() {
+  cat <<EOF
+${C_BOLD}wiki produce${C_RESET} — run a Producer (post-compile derivative-material extractor)
+
+${C_BOLD}USAGE${C_RESET}
+  wiki produce --list                  list registered Producers
+  wiki produce <name> <source>         run one Producer on one source
+
+${C_BOLD}WHAT IS A PRODUCER?${C_RESET}
+  Producers consume a compiled source file under raw/ and emit derived
+  material (suggestion notes, knowledge-gap requests, third-party belief
+  extractions). Mirrors Collectors but for the post-compile side.
+  Production driver: compile.py's per-file loop. This CLI is for manual
+  re-run / debug / replay.
+
+${C_BOLD}EXAMPLES${C_RESET}
+  wiki produce --list                                       show all registered producers with gates
+  wiki produce takes raw/transcripts/2026-05-17-meeting.md  re-run takes for one source
+  wiki produce curiosity raw/email/inbox-2026-05-17.md      manual curiosity pass
+EOF
+}
+
+cmd_produce() {
+  case "${1:-}" in
+    -h|--help|help)
+      help_produce
+      return 0
+      ;;
+  esac
+  uv run --quiet --project "$WIKI_DIR" python "$WIKI_DIR/scripts/producers/cli.py" "$@"
+}
+
 cmd_gmail_auth() {
   local account_id="${1:-}"
   if [[ -z "$account_id" || "$account_id" == "-h" || "$account_id" == "--help" ]]; then
@@ -1257,6 +1289,7 @@ query|ask the wiki in natural language ($$)|home_query
 status|config + hooks + ollama probe|cmd_status
 collect-list|list registered collectors|cmd_collect --list
 collect-run|run one collector|prompt:Collector name:cmd_collect
+produce-list|list registered producers|cmd_produce --list
 gmail-auth|OAuth bootstrap for Gmail|prompt:Account id:cmd_gmail_auth
 gmeet-auth|OAuth bootstrap for Google Meet|prompt:Account id:cmd_gmeet_auth
 calendar-auth|OAuth bootstrap for Google Calendar|prompt:Account id:cmd_calendar_auth
@@ -1473,6 +1506,7 @@ case "${1:-}" in
   hooks)            shift; cmd_hooks "$@" ;;
   skills)           shift; cmd_skills "$@" ;;
   collect)          shift; cmd_collect "$@" ;;
+  produce)          shift; cmd_produce "$@" ;;
   gmail-auth)       shift; cmd_gmail_auth "$@" ;;
   gmeet-auth)       shift; cmd_gmeet_auth "$@" ;;
   calendar-auth)    shift; cmd_calendar_auth "$@" ;;
