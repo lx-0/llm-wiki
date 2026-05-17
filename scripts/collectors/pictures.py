@@ -2,33 +2,43 @@
 
 Operator drops images (iOS Shortcut, AirDrop, manual copy) into the
 configured `personal.picture_inbox` directory. This collector picks them
-up, runs the gemma4 vision pipeline on each, writes a batch report under
-`raw/notes/pictures/` (plus a 384px thumbnail per image), and archives
-the source under `<picture_inbox>/.processed/` next to a per-image
-sidecar `.md` so the operator can re-find the analysis from the archive
-without grepping batch reports.
+up, runs the gemma4 vision pipeline on each (using a photo-shaped prompt
+distinct from the screenshot prompt — scenes / objects / action /
+text_visible instead of app / project / key_text), writes a batch report
+under `raw/notes/pictures/` with `type: picture-batch` frontmatter, and
+archives the source under `<picture_inbox>/.processed/` next to a
+per-image sidecar `.md`.
 
-Same archive-as-dedup pattern as `voice.py`; same vision pipeline as
-`scan_screenshots.py` (`describe_screenshot` is imported, not duplicated).
+The batch report shows ALL processed pictures (keep + ephemeral) so the
+operator can review the vision pass; only `keep`-rated rows reach the
+compile pipeline (compile.py dispatches `picture-batch` →
+`compile_pictures.md`). Same archive-as-dedup pattern as voice.py.
 """
 
 from __future__ import annotations
 
+import base64
 import json
 import logging
 import shutil
+import subprocess
 import sys
+import tempfile
+import time
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+import httpx  # noqa: E402
+
 from collectors.base import Collector, CollectorSpec, RunResult, register
-from collectors.scan_screenshots import describe_screenshot, make_thumbnail
+from collectors.scan_screenshots import make_thumbnail
 from core import daily_capture, ollama_client
 from core.config import CONFIG, TIMEZONE
 from core.paths import RAW_DIR
+from core.prompts import render
 from core.utils import now_iso
 
 log = logging.getLogger(__name__)
@@ -37,6 +47,10 @@ OUTPUT_DIR = RAW_DIR / "notes" / "pictures"
 THUMB_DIR = OUTPUT_DIR / "thumb"
 ARCHIVE_SUBDIR = ".processed"
 ACCEPTED_SUFFIXES = (".jpeg", ".jpg", ".png", ".heic")
+
+MODEL = CONFIG.models.vision_model
+RESIZE_WIDTH = CONFIG.limits.screenshot_resize_width
+TIMEOUT = float(CONFIG.limits.screenshot_timeout_seconds)
 
 
 def _inbox_path() -> Path | None:
@@ -51,9 +65,94 @@ def _max_per_run() -> int:
     return (pb.max_per_run if pb else None) or 20
 
 
+def _resize_image(path: Path) -> Path:
+    """Resize to RESIZE_WIDTH via macOS sips; sips also transcodes HEIC →
+    PNG en passant, which is what makes .heic acceptable in the inbox.
+    Returns a temp PNG path."""
+    tmp = Path(tempfile.mktemp(suffix=".png"))
+    subprocess.run(
+        ["sips", "--resampleWidth", str(RESIZE_WIDTH), str(path), "--out", str(tmp)],
+        capture_output=True,
+    )
+    return tmp
+
+
+def describe_picture(path: Path) -> dict | None:
+    """Send a camera photo through gemma4 vision with the photo-shaped
+    prompt. Returns the parsed metadata dict (scene_description / objects /
+    action / text_visible / setting / people_present / tags / relevance)
+    + vision metadata (model, tokens, duration_s, raw_response). None on
+    timeout / HTTP error / unrecoverable parse failure."""
+    resized = _resize_image(path)
+    try:
+        img_b64 = base64.b64encode(resized.read_bytes()).decode()
+        size_kb = resized.stat().st_size // 1024
+
+        t0 = time.time()
+        try:
+            content, stats = ollama_client.chat_vision(
+                render("scan_pictures_vision"),
+                model=MODEL,
+                image_b64=img_b64,
+                timeout=TIMEOUT,
+            )
+        except httpx.HTTPStatusError as e:
+            log.error("Ollama error %d: %s", e.response.status_code, e.response.text[:200])
+            return None
+        dt = time.time() - t0
+
+        eval_count = stats.get("eval_count", 0)
+
+        try:
+            parsed = ollama_client.parse_json_lenient(content)
+        except json.JSONDecodeError:
+            log.warning("  Failed to parse JSON: %s", content[:200])
+            parsed = None
+        if not parsed:
+            log.warning("  Falling back to raw text")
+            parsed = {
+                "scene_description": content[:300],
+                "setting": None,
+                "objects": [],
+                "action": None,
+                "text_visible": None,
+                "people_present": False,
+                "tags": [],
+                "relevance": "ephemeral",
+            }
+
+        # Normalize shape
+        tags = parsed.get("tags") or []
+        parsed["tags"] = [str(t).lower().strip() for t in tags if t][:5]
+        objects = parsed.get("objects") or []
+        parsed["objects"] = [str(o).lower().strip() for o in objects if o][:7]
+        rel = (parsed.get("relevance") or "ephemeral").lower()
+        parsed["relevance"] = rel if rel in ("keep", "ephemeral") else "ephemeral"
+        people = parsed.get("people_present")
+        parsed["people_present"] = bool(people) if people is not None else False
+
+        log.info("  %dKB -> %d tokens in %.1fs [%s] %s",
+                 size_kb, eval_count, dt, parsed["relevance"],
+                 (parsed.get("setting") or parsed.get("scene_description") or "?")[:60])
+
+        return {
+            **parsed,
+            "duration_s": round(dt, 1),
+            "tokens": eval_count,
+            "model": MODEL,
+            "raw_response": content,
+        }
+    except httpx.TimeoutException:
+        log.warning("  Timeout after %.0fs", TIMEOUT)
+        return None
+    except Exception as e:  # noqa: BLE001
+        log.error("  Vision error: %s", e)
+        return None
+    finally:
+        resized.unlink(missing_ok=True)
+
+
 def _scan_inbox(inbox: Path) -> list[Path]:
-    """List eligible images in the inbox. Sorted by mtime so the oldest
-    drops get processed first when a batch cap kicks in."""
     if not inbox.exists():
         return []
     items: list[Path] = []
@@ -69,27 +168,28 @@ def _scan_inbox(inbox: Path) -> list[Path]:
 
 
 def _write_archive_sidecar(archive_path: Path, captured_at: datetime, meta: dict) -> None:
-    """Write a per-image .md sidecar next to the archived source.
-
-    Mirrors `scan_screenshots.write_home_sidecar` shape so the operator can
-    re-find the analysis from the archive folder without grepping batch
-    reports. Lives in `<picture_inbox>/.processed/` next to the JPEG.
-    """
+    """Write a per-image sidecar next to the archived source so the
+    operator can re-find the analysis from the archive folder without
+    grepping batch reports. Picture-shaped fields."""
     sidecar = archive_path.with_suffix(".md")
     if sidecar.exists():
         return
-    tags_str = ", ".join(meta.get("tags", []))
     ts_str = captured_at.strftime("%Y-%m-%d %H:%M")
-    project = meta.get("project") or ""
+    tags_str = ", ".join(meta.get("tags", []))
+    objects_str = ", ".join(meta.get("objects", []))
+    setting = meta.get("setting") or ""
+    action = meta.get("action") or ""
+    text_visible = meta.get("text_visible") or ""
     raw_response = (meta.get("raw_response") or "").strip()
-    app = meta.get("app", "unknown")
 
     fm = [
         "---",
-        f"app: {json.dumps(app)}",
-        f"project: {json.dumps(project) if project else 'null'}",
+        f"setting: {json.dumps(setting) if setting else 'null'}",
+        f"action: {json.dumps(action) if action else 'null'}",
+        f"objects: [{objects_str}]",
         f"tags: [{tags_str}]",
-        f"relevance: {meta.get('relevance', 'keep')}",
+        f"people_present: {str(meta.get('people_present', False)).lower()}",
+        f"relevance: {meta.get('relevance', 'ephemeral')}",
         f"scanned: {now_iso()}",
         f"vision_model: {json.dumps(meta.get('model', ''))}",
         f"vision_tokens: {int(meta.get('tokens', 0) or 0)}",
@@ -97,9 +197,9 @@ def _write_archive_sidecar(archive_path: Path, captured_at: datetime, meta: dict
         "",
         f"# Picture {ts_str}",
         "",
-        meta.get("summary", "") or "_(no summary)_",
+        meta.get("scene_description", "") or "_(no description)_",
         "",
-        f"**Key Text**: {meta.get('key_text', '') or '_(none)_'}",
+        f"**Text visible**: {text_visible or '_(none)_'}",
     ]
     if raw_response:
         fm.extend([
@@ -116,58 +216,68 @@ def _write_archive_sidecar(archive_path: Path, captured_at: datetime, meta: dict
 
 
 def _build_batch_report(results: list[dict], thumb_lookup: dict[str, str]) -> str:
-    """Render the vault-side batch report. Same `type: screenshot-batch`
-    frontmatter as `scan_screenshots` so compile.py dispatches via the
-    existing lean prompt (no separate prompt needed for pictures yet)."""
+    """Render the vault-side batch report. `type: picture-batch` is
+    dispatched by compile.py to `compile_pictures.md` (Haiku, 20 turns).
+
+    All rows are shown in the report — keep + ephemeral — so the operator
+    can review the vision pass without opening archive sidecars. compile
+    consumes only the `keep` rows (per the compile prompt's filter step)."""
     keeps = [r for r in results if r["meta"].get("relevance") == "keep"]
-    ephemerals = len(results) - len(keeps)
+    ephemerals = [r for r in results if r["meta"].get("relevance") != "keep"]
 
     lines = [
         "---",
-        "type: screenshot-batch",
+        "type: picture-batch",
         f"generated: {now_iso()}",
-        f"screenshot_count: {len(results)}",
-        "source: pictures-inbox",
+        f"picture_count: {len(results)}",
+        f"keep_count: {len(keeps)}",
+        f"ephemeral_count: {len(ephemerals)}",
         "---",
         "",
         f"# Pictures Batch — {now_iso()}",
         "",
-        f"Processed {len(results)} pictures with {CONFIG.models.vision_model} via {CONFIG.models.ollama_url}.",
-    ]
-    if ephemerals:
-        lines.append(f"Skipped {ephemerals} ephemeral picture(s) from wiki report.")
-    lines.extend([
+        f"Processed {len(results)} picture(s) with {CONFIG.models.vision_model} via {CONFIG.models.ollama_url}.",
+        f"Vision pass: {len(keeps)} keep · {len(ephemerals)} ephemeral.",
         "",
-        "| Time | App | Project | Summary | Tags |",
-        "|------|-----|---------|---------|------|",
-    ])
-    for r in keeps:
+        "| Time | Setting | Scene | Text visible | Tags | Relevance |",
+        "|------|---------|-------|--------------|------|-----------|",
+    ]
+    for r in results:
         ts_str = r["timestamp"].strftime("%H:%M")
         m = r["meta"]
-        project = m.get("project") or "-"
+        setting = (m.get("setting") or "-")[:30]
+        scene = (m.get("scene_description") or "")[:60]
+        text = (m.get("text_visible") or "")[:40]
         tags = ", ".join(m.get("tags", []))
-        summary = (m.get("summary", "") or "")[:50]
-        lines.append(f"| {ts_str} | {m.get('app', '?')} | {project} | {summary} | {tags} |")
+        rel = m.get("relevance", "?")
+        lines.append(f"| {ts_str} | {setting} | {scene} | {text} | {tags} | {rel} |")
 
+    # Detail blocks for keeps only — these are the rows compile_pictures
+    # will look at. Ephemerals are summarized in the table for operator
+    # awareness but get no detail block (matches the compile filter step).
     if keeps:
-        lines.extend(["", "## Details", ""])
+        lines.extend(["", "## Details (keep)", ""])
         for r in keeps:
             ts_str = r["timestamp"].strftime("%Y-%m-%d %H:%M")
             m = r["meta"]
-            project = m.get("project") or "-"
-            raw_response = (m.get("raw_response") or "").strip()
             archive_name = r["archive_name"]
+            raw_response = (m.get("raw_response") or "").strip()
             lines.append(f"### {ts_str} — `{archive_name}`")
             lines.append("")
             thumb_name = thumb_lookup.get(archive_name)
             if thumb_name:
                 lines.append(f"![[thumb/{thumb_name}]]")
                 lines.append("")
-            lines.append(f"- **App**: {m.get('app', '?')}")
-            if project != "-":
-                lines.append(f"- **Project**: {project}")
-            lines.append(f"- **Summary**: {m.get('summary', '')}")
-            lines.append(f"- **Key Text**: {m.get('key_text', '')}")
+            lines.append(f"- **Scene**: {m.get('scene_description', '')}")
+            if m.get("setting"):
+                lines.append(f"- **Setting**: {m.get('setting')}")
+            if m.get("action"):
+                lines.append(f"- **Action**: {m.get('action')}")
+            if m.get("objects"):
+                lines.append(f"- **Objects**: {', '.join(m['objects'])}")
+            if m.get("text_visible"):
+                lines.append(f"- **Text visible**: {m['text_visible']}")
+            lines.append(f"- **People present**: {m.get('people_present', False)}")
             lines.append(f"- **Tags**: {', '.join(m.get('tags', []))}")
             lines.append(f"- **Vision**: {m.get('model', '?')} · {m.get('tokens', 0)} tokens · {m.get('duration_s', '?')}s")
             if raw_response:
@@ -187,13 +297,12 @@ def _build_batch_report(results: list[dict], thumb_lookup: dict[str, str]) -> st
     return "\n".join(lines)
 
 
-def _append_daily_rollup(captured_at: datetime, summary: str, archive_name: str) -> None:
-    """Mirror a one-liner into daily/<date>/pictures.md so the day's
-    picture-intake activity surfaces in the daily-rollup substrate.
-    Failures are swallowed — never break the primary write."""
+def _append_daily_rollup(captured_at: datetime, scene: str, archive_name: str) -> None:
+    """Mirror a one-liner into daily/<date>/pictures.md. Failures are
+    swallowed — never break the primary write."""
     date_iso = captured_at.strftime("%Y-%m-%d")
     time_label = captured_at.strftime("%H:%M")
-    first_line = (summary or "(no summary)").strip()
+    first_line = (scene or "(no description)").strip()
     if len(first_line) > 80:
         first_line = first_line[:77].rstrip() + "…"
     line = f"- **{time_label}** · {first_line} · `{archive_name}`"
@@ -208,15 +317,14 @@ class PicturesCollector:
     """Pictures intake — inbox-watching camera/phone-photo ingester.
 
     Reads accepted-suffix files from `personal.picture_inbox`, runs the
-    gemma4 vision pipeline on each (via `describe_screenshot`), writes a
-    `raw/notes/pictures/<batch>.md` aggregate plus per-image archive
-    sidecars under `<picture_inbox>/.processed/`. No state file — the
-    archive move is the dedup mechanism.
+    photo-shaped vision pipeline on each (via `describe_picture`), writes
+    a `raw/notes/pictures/<batch>.md` aggregate (`type: picture-batch`)
+    + per-image archive sidecars under `<picture_inbox>/.processed/`. No
+    state file — the archive move is the dedup mechanism.
 
-    The batch report uses `type: screenshot-batch` frontmatter on purpose:
-    compile.py dispatches both screenshot- and picture-batches through the
-    same lean prompt (`compile_screenshots.md`). Dedicated prompts can land
-    later if the substrates diverge.
+    compile.py dispatches `picture-batch` → `compile_pictures.md` (Haiku,
+    20 turns) — picture-shaped extraction rules, ruthless anti-noise
+    filter (most camera photos do NOT become knowledge entries).
     """
 
     SPEC = CollectorSpec(
@@ -272,20 +380,17 @@ class PicturesCollector:
         errors: list[str] = []
         for i, src in enumerate(sources, 1):
             log.info("[%d/%d] %s", i, len(sources), src.name)
-            meta = describe_screenshot(src)
+            meta = describe_picture(src)
             if not meta:
                 errors.append(f"{src.name}: vision call failed")
                 continue
 
             captured_at = datetime.fromtimestamp(src.stat().st_mtime, tz=tz)
 
-            # Vault thumbnail (384px) before the move so make_thumbnail sees
-            # the original path. Skips silently on sips errors.
             thumb = make_thumbnail(src)
             if thumb is not None:
                 thumb_lookup[src.name] = thumb.name
 
-            # Archive: source + sidecar live side-by-side under .processed/.
             archive_name = src.name
             dest = archive / archive_name
             if dest.exists():
@@ -300,7 +405,7 @@ class PicturesCollector:
                 continue
 
             _write_archive_sidecar(dest, captured_at, meta)
-            _append_daily_rollup(captured_at, meta.get("summary", ""), archive_name)
+            _append_daily_rollup(captured_at, meta.get("scene_description", ""), archive_name)
 
             results.append({
                 "archive_name": archive_name,
@@ -315,7 +420,6 @@ class PicturesCollector:
                 errors=tuple(errors),
             )
 
-        # Vault batch report. Slug-by-minute so concurrent fires don't clash.
         slug = datetime.now(tz).strftime("%Y-%m-%dT%H%M")
         report_path = OUTPUT_DIR / f"pictures-{slug}.md"
         report_path.write_text(_build_batch_report(results, thumb_lookup), encoding="utf-8")
