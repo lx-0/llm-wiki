@@ -1076,7 +1076,12 @@ def list_candidates(*, cooldown_days: int | None = None) -> list[dict]:
             "cooldown_active": cooldown,
             "excluded": priority <= 0,
         })
-    rows.sort(key=lambda r: (-r["weight"], r["slug"]))
+    # Sort by priority (descending), then by weight (descending), then by slug.
+    # Operator wants to see high-priority entities at top regardless of recent
+    # synthesis — debug view of WHAT RULES FIRE, not WHAT GOT PICKED THIS RUN.
+    # (Selection-this-run weight = priority × age × jitter, with cooldown
+    # filter; that's `wiki dream piggyback --dry-run`, not list-candidates.)
+    rows.sort(key=lambda r: (-r["priority"], -r["weight"], r["slug"]))
     return rows
 
 
