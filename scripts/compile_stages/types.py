@@ -59,3 +59,4 @@ class CompileMetadata:
     model_id: str
     max_turns: int
     substrate_type: str | None
+    substrate_prompt: str = "compile_main"
