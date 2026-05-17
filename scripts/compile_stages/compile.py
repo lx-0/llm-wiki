@@ -478,6 +478,7 @@ async def compile_source(
         return CompileResult(
             status="failed",
             failure_kind=failure.kind,
+            failure_detail=failure.detail,
             cost_usd=total_cost,
         )
 

@@ -43,6 +43,11 @@ class CompileResult:
     output_tokens: int = 0
     skip_reason: str | None = None
     failure_kind: str | None = None
+    failure_detail: str | None = None
+    """Free-form description from `FailureClass.detail` — surfaced in
+    main()'s fatal-abort log line. Without this the operator sees
+    `kind=X | (see logs)` and must hunt the stderr archive for the
+    actual cause."""
 
 
 @dataclass(frozen=True)

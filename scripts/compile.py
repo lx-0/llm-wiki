@@ -718,12 +718,10 @@ async def compile_file(
         return {"_skipped": legacy_reason}
 
     if result.status == "failed":
-        # CompileResult only carries the failure kind, not the detail string
-        # the legacy FailureClass shipped to main()'s abort log. The detail
-        # has already been logged inside compile_source's _attempt; the
-        # synthetic FailureClass here keeps main()'s is_fatal() check + abort
-        # formatting working without re-plumbing the dataclass shape.
-        return {"_failure": FailureClass(result.failure_kind or "unknown", "(see logs)")}
+        return {"_failure": FailureClass(
+            result.failure_kind or "unknown",
+            result.failure_detail or "(see logs)",
+        )}
 
     return {
         "input_tokens": result.input_tokens,
