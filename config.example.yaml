@@ -145,6 +145,12 @@ piggybacks:
   study_run_due:
     enabled: false
     cooldown_hours: 6
+  # M019-S05 Pass-2 analyst — cross-study synthesist. Pass-1 runs
+  # automatically inside `wiki study run`; Pass-2 runs weekly on its
+  # own cadence. Default OFF.
+  analyst_pass2:
+    enabled: false
+    cooldown_hours: 168
 
 models:
   # Claude model used by compile.py + retry-failed-flushes.

@@ -569,6 +569,31 @@ EOF
   return $rc
 }
 
+cmd_analyze() {
+  case "${1:-}" in
+    -h|--help|help)
+      cat <<EOF
+${C_BOLD}wiki analyze${C_RESET} — operator-self-reports analyst layer (M019-S05)
+
+${C_BOLD}USAGE${C_RESET}
+  wiki analyze                          Pass-1 over all studies, then Pass-2
+  wiki analyze --study <id>             Pass-1 on one study's latest run
+  wiki analyze --cross-study-only       Pass-2 cross-study synthesis only
+  wiki analyze --no-pass2               Pass-1 only, skip cross-study
+  wiki analyze --rerun                  Overwrite existing _analysis.md files
+
+${C_BOLD}NOTES${C_RESET}
+  Two-pass design: Pass-1 reads each study's results + substrate, writes
+  per-study _analysis.md. Pass-2 reads all Pass-1 outputs, writes
+  reports/analyses/<ts>.md (cross-study synthesis). Air-gapped from
+  compile-loop; analyst-agent has Read/Glob/Grep only, no Write/Edit/Bash.
+EOF
+      return 0 ;;
+  esac
+  banner "wiki analyze"
+  _run_script analyze.py "$@"
+}
+
 cmd_study() {
   case "${1:-}" in
     ""|-h|--help|help)
@@ -1237,6 +1262,7 @@ case "${1:-}" in
   agent)            shift; cmd_agent "$@" ;;
   correct)          shift; cmd_correct "$@" ;;
   study)            shift; cmd_study "$@" ;;
+  analyze)          shift; cmd_analyze "$@" ;;
   take)             shift; cmd_take "$@" ;;
   pin)              shift; cmd_pin "$@" ;;
   review-wiki)      shift; cmd_review_wiki "$@" ;;

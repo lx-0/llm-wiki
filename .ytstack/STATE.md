@@ -1,16 +1,19 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-05-17T15:20:00Z
-current_milestone: M019
+last_updated: 2026-05-17T15:25:00Z
+current_milestone: none
 active_slice: none
 active_task: none
+last_completed_milestone: M019
 parallel_milestones: [M021]
 ---
 
 # State
 
-**Status:** M019 planned (L). M018 SHIPPED 2026-05-17 (parallel session) — see entry below. M020 SHIPPED 2026-05-17 (this session) — backlinks footer.
+**Status:** M019 SHIPPED 2026-05-17 (this session) — operator-self-reports wedge (5 slices, 27 tasks, 179 tests, $0.92/full-weekly-run live-verified, two-pass analyst layer + meta-report + 5 wedge instruments + air-gapped surface). DECISIONS milestone-closeout at line 1023+ of `.ytstack/DECISIONS.md` locks 17 architectural commitments. **Operator-dogfooding now gates exit criteria #4 (6 weekly runs) + #8 (one quoted observation)** — engineering deliverable done; consumption-pattern proof lands when operator runs `wiki study run longitudinal-baseline` weekly for ~2 months. Recipe in M019-closeout DECISIONS entry. Backlog parked: `personality-substrate-predigestion.md` (R2 mitigation gating IPIP-NEO/HEXACO/PID-5/PVQ-RR post-wedge).
+
+M018 SHIPPED 2026-05-17 (parallel session) — see entry below. M020 SHIPPED 2026-05-17 (this session) — backlinks footer.
 
 ---
 

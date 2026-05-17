@@ -191,7 +191,12 @@ def cmd_run(args: argparse.Namespace) -> int:
                 # render_summary against the finalised run.
                 print(f"      ! meta-report render failed: {exc}", flush=True)
 
-            # S05 will populate _analysis.md.
+            # S05: Pass-1 analyst runs OUTSIDE the RunDirectory tmp envelope.
+            # Reason: Pass-1 wants to read the per-instrument reports +
+            # _summary.md from their FINALISED paths (so absolute paths
+            # in the analyst's prompt resolve correctly when it uses
+            # Read tool to chase citations). Atomic-rename happens at
+            # RunDirectory.__exit__; we trigger Pass-1 right after.
 
         elapsed = time.perf_counter() - wall_start
         # Persist state — only after the RunDirectory atomically renamed.
@@ -204,6 +209,48 @@ def cmd_run(args: argparse.Namespace) -> int:
             f"  state updated: last_run_at={study.state.last_run_at} "
             f"run_count={study.state.run_count}"
         )
+
+        # S05: trigger Pass-1 analyst on this freshly-finalised run.
+        # Soft-fail policy: a Pass-1 error doesn't undo the run (per-
+        # instrument reports + _summary.md are the source of truth).
+        if not args.no_analyze:
+            try:
+                from scripts.reports._engine.lib.analyst import (
+                    AnalystError, run_analyst,
+                )
+                from scripts.analyze import (
+                    PERSONA_PER_STUDY,
+                    _build_pass1_user_prompt,
+                    _persist_pass1,
+                )
+
+                final_run_dir = study.runs_dir / timestamp
+                user_prompt = _build_pass1_user_prompt(study, final_run_dir)
+                print(
+                    f"\n→ Pass-1 analyst on this run "
+                    f"(prompt_chars={len(user_prompt):,}) …",
+                    flush=True,
+                )
+                result = run_analyst(
+                    system_prompt_path=PERSONA_PER_STUDY,
+                    user_prompt=user_prompt,
+                    vault_cwd=ROOT_DIR,
+                    pass_label="per-study",
+                )
+                analysis_path = _persist_pass1(study, final_run_dir, result)
+                print(
+                    f"  → {analysis_path.relative_to(study.runs_dir.parent.parent)}  "
+                    f"cost=${result.cost_usd:.4f}  "
+                    f"elapsed={result.elapsed_ms / 1000:.1f}s"
+                )
+            except AnalystError as exc:
+                print(
+                    f"  ! Pass-1 analyst failed: {exc} "
+                    f"(per-instrument reports unaffected; "
+                    f"`wiki analyze --study {study.manifest.study_id}` "
+                    f"to retry)",
+                    file=sys.stderr,
+                )
         return 0
     finally:
         lock.close()
@@ -298,7 +345,9 @@ def cmd_piggyback(args: argparse.Namespace) -> int:
     failures = 0
     for s in due:
         # Re-use cmd_run by faking the args namespace.
-        run_args = argparse.Namespace(study_id=s.manifest.study_id, instrument=None)
+        run_args = argparse.Namespace(
+            study_id=s.manifest.study_id, instrument=None, no_analyze=False,
+        )
         rc = cmd_run(run_args)
         if rc != 0:
             failures += 1
@@ -338,6 +387,11 @@ def main() -> int:
         "--instrument",
         default=None,
         help="Limit to one instrument alias from the manifest.",
+    )
+    p_run.add_argument(
+        "--no-analyze",
+        action="store_true",
+        help="Skip Pass-1 analyst after the run (deterministic study output only).",
     )
     p_run.set_defaults(func=cmd_run)
 

@@ -270,6 +270,10 @@ KEY_ADDITIONS: dict[str, dict[str, object]] = {
         # (weekly/monthly/quarterly) gates the actual run. Default OFF
         # until S05 ships and operator flips features.operator_reports.
         "study_run_due": {"enabled": False, "cooldown_hours": 6},
+        # M019-S05 Pass-2 analyst — cross-study synthesist. Pass-1 runs
+        # automatically inside `wiki study run`; Pass-2 runs weekly on
+        # its own cadence (or on-demand via `wiki analyze --cross-study-only`).
+        "analyst_pass2": {"enabled": False, "cooldown_hours": 168},
     },
     "personal": {
         # 2026-05-16 author-attribution feature. Null default keeps the

@@ -1046,3 +1046,63 @@ tokens), pipeline trend metrics, persistent health history. See
 **Open follow-up:** `correct_apply` agent is sentinel-unaware (grep verified). If it rewrites an article wholesale, it may strip the footer; next compile regenerates idempotent. Footer is not load-bearing data — recoverable, not data-loss.
 
 **Pitch:** `.ytstack/OFFICE-HOURS-backlinks-footer.md`. Roadmap: `.ytstack/M020-{CONTEXT,ROADMAP}.md`.
+
+---
+
+## 2026-05-17: M019 closeout — operator-self-reports wedge architecture locked
+
+**Milestone:** M019 operator-self-reports wedge. 5 slices, 27 tasks, 179 unit tests, ~$0.92 per full weekly run (5 instruments inferred + Pass-1 + Pass-2). Single-session arc from office-hours → plan-milestone → 5 slices → live verification on lxw substrate.
+
+**What got locked architecturally (each row is a structural commitment the wedge ships with):**
+
+| Layer | Decision | Mechanism |
+|---|---|---|
+| Surface location | Vault root, sibling of `knowledge/` | `personal.reports_dir = "reports"` config-knob |
+| Air-gap from compile | Structural, not lint-warn | `COMPILE_SUBSTRATE_EXCLUDED_PREFIXES` constant; `is_compile_excluded_path()` helper; `list_raw_files()` filter; `compile_main_system.md` SCOPE block lists `reports/**` |
+| Agent capabilities | Never write — Read/Glob/Grep only | `allowed_tools=[Read,Glob,Grep]` + `disallowed_tools=[Write,Edit,NotebookEdit]` + `make_path_scope_gate([])` + `permission_mode=default` + `prompt_stream()`. Composition empirically verified in S01-T01 probe ($0.08 cost). |
+| Bash escalation | Blocked at `allowed_tools` whitelist | Empirical S01-T01 finding: model unprompted-tries `Bash sed` when Edit denied; whitelist absence is the defense, not the scope-gate. Documented in KNOWLEDGE.md as defense-relevant. |
+| Scoring | Deterministic — Claude SDK answers items as JSON, engine sums + bands | `lib/likert.py` + `lib/cutoffs.py` + `lib/inference.py` + `score.py`. Reproducibility preserved (same inputs → same band). |
+| Inference batching | Batched-by-subscale from day 1 | Even though wedge runs trivially as one batch (clinical screens have one subscale or two), the architecture supports per-facet batching from S02-T02. Personality post-wedge migrates with zero contract change. |
+| Substrate scope ceiling | 160K-token budget (200K × 80%) | R2 audit script at `scripts/reports/_engine/audit_scope.py` runs against any vault, reports per-instrument headroom. Wedge passes with 33.8% headroom on PHQ-9; personality stub at 7.8% (overflow risk realised; pre-digestion layer mandatory before personality lands). |
+| Methodology | Embedded inline in every report | Verifier at `lib/verify_report.py` checks 8 required frontmatter keys + 4 required sections + 5 required `<details>` blocks. Soft-warn (not abort) on failure — single bad report doesn't poison full run. |
+| Future-fit | Reports survive engine deletion | Q6 office-hours posture: items + scoring + cutoffs + model-ID + prompt-version + scope-spec + evidence paths embedded inline as collapsible `<details>` blocks. A 2029 reader can interpret a 2026 report without the engine running. |
+| Per-instrument output | One markdown per instrument, atomic-renamed | `RunDirectory` writes into `.<ts>.tmp/`, atomic renames to `<ts>/` on success. Partial runs leave tmp dir for forensics; final dir never poisoned by half-run state. |
+| Meta-report | Deterministic aggregate in `_summary.md` | `lib/render_summary.py` writes: cross-instrument table (with Δ-vs-previous when ≥2 runs), inline radar SVG, coverage sparkline, per-instrument timelines, crosscheck flags. No agent involved at this layer. |
+| Charts | Pure-Python SVG, NOT matplotlib | `lib/charts.py` ~400 LOC. SVG embeds in Obsidian + GitHub markdown directly; matplotlib's +30 MB transitive weight rejected as unjustified for three geometrically-simple plots. |
+| Analyst layer | Two-pass: per-study Pass-1 + cross-study Pass-2 | Pass-1 fires automatically inside `wiki study run` after each completed run. Pass-2 runs on its own weekly schedule via `analyst_pass2` piggyback. Architecture rationale in 2026-05-17 "two-pass analyst-agent" decision (this DECISIONS.md). |
+| Analyst persona | One overall "operator self-cartography research analyst" for wedge | Pass-1 + Pass-2 share a single persona-family. Per-study persona-pinning deferred to post-wedge when domain-specific framings (clinical vs personality vs values vs behavioral) become valuable. |
+| Provider policy | Claude SDK only — no Ollama fallback | M019 inference + analyst use Claude SDK only. Curiosity-question-wording is the only legitimate Ollama site (post-wedge feature). Reproducibility depends on consistent model. |
+| Schedule semantics | Per-study schedule (weekly/monthly/quarterly/manual) | `is_due(now)` honours `SCHEDULE_COOLDOWN_DAYS` map. `study_run_due` piggyback (6h cooldown) checks 4×/day; each study's own schedule gates actual run. |
+| Concurrency | Per-study flock | `acquire_study_lock(study_id)` uses `fcntl.flock(LOCK_EX|LOCK_NB)` on `STATE_DIR/study-<id>.lock`. Cross-study runs proceed in parallel. Mirrors compile.py's `_acquire_exclusive_lock` pattern. |
+
+**Cost projection at wedge scope:**
+- 5 instruments × ~$0.17 per inference call = $0.85
+- Pass-1 analyst: ~$0.05 (one synthesis per study-run)
+- Pass-2 analyst: ~$0.03 (cross-study, weekly cadence)
+- Total per full weekly run: ~$0.92 × 52 = $48/year. Trivial.
+
+**What's explicitly deferred to post-wedge:**
+
+- Personality instruments (IPIP-NEO-120, HEXACO-PI-R-60, PID-5-BF, PVQ-RR) — gated behind pre-digestion layer per the R2 audit finding. Backlog: `.ytstack/backlog/personality-substrate-predigestion.md`.
+- MEQ-19 chronotype instrument — requires per-item heterogeneous-scale support (likert.py extension). K6 substituted as the 5th wedge clinical screen.
+- ASRS-v1.1 published Part-A-threshold scoring — wedge uses continuous-sum bands flagged as extrapolation; custom `scoring.py` implementation deferred.
+- `wiki study diff <run_a> <run_b>` — stub in CLI, waiting for richer Pass-2 cross-run analytics.
+- Per-study analyst persona-pinning — single broad persona suffices at N=1 wedge state.
+- Form-source instruments (`source: form`) — only `inferred` path implemented; form-input for `substrate_inferable: false` items will route via curiosity-bridge integration post-wedge.
+- Operator dashboard widget surfacing the latest Pass-2 output in Obsidian — current pattern is "operator opens `reports/analyses/<latest>.md` directly".
+
+**Wedge success criteria status (from M019-CONTEXT.md):**
+
+1. ✓ R1 scope-lock probe verified empirically — agent cannot Write/Edit/Bash.
+2. ✓ R2 token-budget audit run — wedge instruments fit with 33.8% headroom; personality flagged as needing pre-digestion before landing.
+3. ✓ R3 batched-by-subscale interface implemented from day 1.
+4. ◎ 6 weekly study runs against real lxw substrate — **pending operator dogfooding**. Architecture is built + live-verified once (PHQ-9 against lxw, $0.17, 95s); operator now needs to flip `features.operator_reports` + run weekly for 6+ runs to validate the consumption pattern.
+5. ✓ Meta-report renders with all elements (radar / sparkline / timeline / coverage / table / flags).
+6. ✓ Embedded methodology in every report verified by `verify_report.py`.
+7. ✓ Air-gap structurally enforced.
+8. ◎ "Operator can quote one concrete observation from the meta-report they wouldn't otherwise have known" — pending operator's first real weekly cycle.
+
+The two unfilled criteria (#4 and #8) are **operator-consumption** dependencies, not engineering deliverables. The wedge ships with the architecture validated; the **consumption-pattern proof** lands when the operator actually runs `wiki study run longitudinal-baseline` weekly for ~2 months and reports back.
+
+**M019 STATUS: DONE.**
+

@@ -102,6 +102,13 @@ _LEGACY_PIGGYBACK_COMMANDS: dict[str, list[str]] = {
     # cooldown here gates how often we CHECK for due studies; the
     # study's own schedule gates when it actually runs.
     "study_run_due": ["study.py", "piggyback"],
+    # M019-S05 Pass-2 analyst — cross-study synthesis. Reads all
+    # latest Pass-1 outputs + their _summary.md siblings, writes
+    # reports/analyses/<ts>.md. Pass-1 fires automatically inside
+    # `wiki study run` (per-study); Pass-2 runs on its own cadence
+    # because it's a different layer of integration. Default OFF
+    # until operator flips features.operator_reports.
+    "analyst_pass2": ["analyze.py", "--cross-study-only"],
 }
 
 

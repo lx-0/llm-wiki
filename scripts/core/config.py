@@ -699,6 +699,12 @@ def _default_piggybacks() -> dict[str, PiggybackTask]:
         # schedule (weekly/monthly/quarterly) gates actual run. Default
         # OFF until S05 ships and operator flips features.operator_reports.
         "study_run_due": PiggybackTask(cooldown_hours=6, enabled=False),
+        # M019-S05 Pass-2 analyst — cross-study synthesist. Reads Pass-1
+        # outputs (which `wiki study run` writes automatically per-study)
+        # and emits reports/analyses/<ts>.md. Weekly default — operator
+        # consumes the latest one; longer cadence is fine since per-study
+        # Pass-1 already fires per-run. Default OFF.
+        "analyst_pass2": PiggybackTask(cooldown_hours=168, enabled=False),
     }
 
 
