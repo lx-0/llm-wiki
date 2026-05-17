@@ -17,19 +17,12 @@ parallel-with: M018
 
 ## Slices
 
-Slice detail lives in per-slice `M019-S##-PLAN.md` files, created by `ytstack:slice-milestone`.
+Detailed slice plans at `M019-S##-PLAN.md`. Task counts: 5 / 5 / 5 / 6 = 21 total (L milestone, at the upper edge of skill's 11–20 rubric — accepted because 3 of those tasks are mandatory verification gates from eng-review).
 
-- [ ] S01 — Engine skeleton + scope-lock probe + first instrument end-to-end (to be planned)
-- [ ] S02 — Inference contract batched + token-budget audit + 4 more instruments (to be planned)
-- [ ] S03 — Studies manifest + flock + schedule + per-run persistence (to be planned)
-- [ ] S04 — Meta-report layer with radar + sparkline + timeline + embedded-methodology rendering (to be planned)
-
-## Suggested slice scope (refined during slice-milestone)
-
-- **S01** — `reports/_engine/` skeleton, instrument-yaml schema, `lib/likert.py` + `lib/cutoffs.py`, first instrument PHQ-9 inferred end-to-end. **R1 probe** (3-layer scope-lock verification) runs in this slice before `lib/inference.py` is written. Air-gap recorded in DECISIONS.md. Q1 (filesystem location) resolved.
-- **S02** — `lib/inference.py` with batched-by-subscale interface (R3 design from day 1), `lib/provenance.py`, scope-resolver, JSON-schema validator. **R2 token-budget audit** runs in this slice. 4 additional wedge instruments added (GAD-7, ASRS-v1.1, WHO-5, MEQ-19).
-- **S03** — Studies manifest schema, `runs/` directory layout, flock at `STATE_DIR/study-<id>.lock`, schedule semantics (Q4 resolved), `wiki study run` + `wiki study list` CLI subcommands.
-- **S04** — Meta-report layer: cross-instrument radar (matplotlib polar) with previous-run-overlay activating by run 2, coverage-sparkline, per-instrument timeline double-plots, embedded-methodology rendering. PNG pipeline established (Q2 resolved). Informant-report banner (Q3 resolved).
+- [ ] S01 — Engine skeleton + R1 scope-lock probe + DECISIONS.md entries + PHQ-9 scoring backbone (5 tasks)
+- [ ] S02 — Inference contract batched (R3) + R2 token-budget audit + first PHQ-9 inference run + 4 more instruments (5 tasks)
+- [ ] S03 — Studies manifest + atomic per-run persistence + flock + schedule + CLI subcommands + baseline study seed (5 tasks)
+- [ ] S04 — Meta-report renderer + matplotlib charts (sparkline/radar/timeline) + embedded-methodology rendering + closeout (6 tasks)
 
 ## Run order
 
