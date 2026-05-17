@@ -1,24 +1,31 @@
 study_id: longitudinal-baseline
-title: "Longitudinal baseline — 5 clinical-screen instruments"
+title: "Longitudinal baseline — 4 substrate-tuned clinical screens"
 created: 2026-05-17T00:00:00+00:00
 schedule: weekly
 instruments:
-  - {slug: phq-9,    version: 1.0.0, source: inferred}
-  - {slug: gad-7,    version: 1.0.0, source: inferred}
-  - {slug: asrs-v1.1, version: 1.0.0, source: inferred}
-  - {slug: who-5,    version: 1.0.0, source: inferred}
-  - {slug: k6,       version: 1.0.0, source: inferred}
+  - {slug: phq-9,  version: 1.0.0, source: inferred}
+  - {slug: gad-7,  version: 1.0.0, source: inferred}
+  - {slug: who-5,  version: 1.0.0, source: inferred}
+  - {slug: pss-10, version: 1.0.0, source: inferred}
 notes: |
-  Baseline study seeded by `wiki seed`. Five clinical-screen
-  instruments running on a 14-day lookback window (`limits.reports_default_lookback_days`).
+  Baseline study seeded by `wiki seed`. Four instruments tuned for
+  substrate-alone screening (selected after the 2026-05-17 first run
+  showed coverage-tier reality):
 
-  Initial schedule = `weekly` so the second run lands within ~7 days
-  and change-visualization activates by run 2 (Layer-4 meta-report,
-  ships in S04). Settle to `quarterly` once you have 4–8 runs.
+    WHO-5  — 80% inferable (wellbeing, bandable in 1 run)
+    GAD-7  — 57% inferable (anxiety, needs 1-2 curiosity items)
+    PHQ-9  — 44% inferable (depression, needs 3 curiosity items)
+    PSS-10 — ~50% inferable (stress, substitute for K6)
 
-  Edit / fork to taste:
-    wiki study new my-study --fork-from longitudinal-baseline
-    # then edit the new manifest's `instruments` or `schedule`.
+  Dropped from the original wedge (run 1 findings):
+    K6  — 33% inferable, redundant with WHO-5 wellbeing signal.
+    ASRS-v1.1 — 33% inferable; revisit if ADHD-tracking explicit.
 
-  Not running yet? Flip `features.operator_reports: true` first, OR
-  invoke `wiki study run longitudinal-baseline` ad-hoc.
+  Schedule: weekly default. Switch to `daily` for iteration-mode
+  tweaking; quarterly once trends stabilise. Pass-1 analyst fires
+  automatically inside `wiki study run`; Pass-2 cross-study via
+  `analyst_pass2` piggyback.
+
+  To close coverage on structurally-null items (PHQ-9 Q2/Q5/Q6/Q8/Q9,
+  GAD-7 Q2/Q5/Q7, PSS-10 Q2/Q4/Q5/Q7/Q8), use:
+    wiki study answer longitudinal-baseline <instrument> <item> <value>
