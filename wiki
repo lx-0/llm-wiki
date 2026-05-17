@@ -1403,94 +1403,233 @@ home_fuzzy_filter() {
   fi
 }
 
-home_screen() {
+# Render the home screen with a (possibly negative) cursor position on
+# the suggestions list. cursor=-1 → no cursor highlight (used when there
+# are no suggestions). Always re-runs `git rev-parse` for the commit
+# line; cheap enough not to cache.
+home_render_screen() {
+  local status_json="$1" suggestions_json="$2" n_suggestions="$3" cursor="$4"
+  echo
   local revision vault_name
   revision="$(git -C "$WIKI_DIR" rev-parse --short HEAD 2>/dev/null || echo unknown)"
   vault_name="$(basename "$ROOT_DIR")"
-  while :; do
-    echo
-    printf "  %s%swiki%s — %s vault (commit %s)\n" \
-      "$C_BOLD" "$C_CYAN" "$C_RESET" "$vault_name" "$revision"
+  printf "  %s%swiki%s — %s vault (commit %s)\n" \
+    "$C_BOLD" "$C_CYAN" "$C_RESET" "$vault_name" "$revision"
+  home_render_status "$status_json"
+  echo
 
-    # Probe the vault. Hard timeout lives inside menu_context.py; here we
-    # only guard against the process itself failing.
+  if (( n_suggestions > 0 )); then
+    printf "  %s▸ Pending in your vault%s  %s(↑↓ Enter, or number)%s\n" \
+      "$C_BOLD" "$C_RESET" "$C_DIM" "$C_RESET"
+    local i=0
+    while IFS=$'\t' read -r key label cmd; do
+      if [[ "$i" == "$cursor" ]]; then
+        printf "   %s▸%s  %s%s)%s %-43s %s→ wiki %s%s\n" \
+          "$C_GREEN" "$C_RESET" "$C_GREEN" "$key" "$C_RESET" \
+          "$label" "$C_DIM" "$cmd" "$C_RESET"
+      else
+        printf "      %s%s)%s %-43s %s→ wiki %s%s\n" \
+          "$C_GREEN" "$key" "$C_RESET" "$label" "$C_DIM" "$cmd" "$C_RESET"
+      fi
+      i=$((i+1))
+    done < <(jq -r '.[] | [.key, .label, .cmd] | @tsv' <<<"$suggestions_json")
+    echo
+  else
+    printf "  %s✨ Nothing pending — vault is current.%s\n\n" \
+      "$C_DIM" "$C_RESET"
+  fi
+
+  printf "  %s▸ Quick actions%s\n" "$C_BOLD" "$C_RESET"
+  printf "      [%sq%s] query     [%sf%s] flush     [%sl%s] lint     [%ss%s] status\n" \
+    "$C_BOLD" "$C_RESET" "$C_BOLD" "$C_RESET" "$C_BOLD" "$C_RESET" "$C_BOLD" "$C_RESET"
+  echo
+  printf "  %s▸ Browse%s\n" "$C_BOLD" "$C_RESET"
+  printf "      [%sc%s] collectors    [%si%s] ingest    [%sk%s] knowledge ops\n" \
+    "$C_BOLD" "$C_RESET" "$C_BOLD" "$C_RESET" "$C_BOLD" "$C_RESET"
+  printf "      [%sd%s] facts/takes   [%sa%s] automation [%sg%s] setup\n" \
+    "$C_BOLD" "$C_RESET" "$C_BOLD" "$C_RESET" "$C_BOLD" "$C_RESET"
+  echo
+  printf "      [%sh%s] full help     [%sx%s] exit     %s(type %s/foo%s to filter all commands)%s\n" \
+    "$C_BOLD" "$C_RESET" "$C_BOLD" "$C_RESET" \
+    "$C_DIM" "$C_BOLD" "$C_RESET$C_DIM" "$C_RESET"
+  echo
+  printf "  Pick: "
+}
+
+# Read one keystroke from raw-mode stdin and emit a normalised token
+# on stdout. Tokens: EOF / ENTER / UP / DOWN / ESC / a single character.
+# Caller is responsible for putting the terminal into raw mode first
+# (stty -echo -icanon) and restoring it afterwards.
+home_read_key() {
+  local c seq rc
+  IFS= read -rsn1 c
+  rc=$?
+  if (( rc != 0 )); then
+    printf "EOF"
+    return 0
+  fi
+  if [[ -z "$c" ]]; then
+    printf "ENTER"
+    return 0
+  fi
+  if [[ "$c" == $'\e' ]]; then
+    # Read up to two more bytes for the ESC sequence — short timeout
+    # so a bare ESC press doesn't hang.
+    IFS= read -rsn2 -t 0.05 seq 2>/dev/null || seq=""
+    case "$seq" in
+      '[A') printf "UP" ;;
+      '[B') printf "DOWN" ;;
+      *)    printf "ESC" ;;
+    esac
+    return 0
+  fi
+  printf "%s" "$c"
+}
+
+home_screen() {
+  # Non-TTY fallback — raw mode is meaningless, plain `read` is fine.
+  # This path is what `wiki menu < /dev/null` or non-interactive callers
+  # hit; keeps test scripts and pipe-driven usage working.
+  if [[ ! -t 0 || ! -t 1 ]]; then
+    home_screen_plain
+    return $?
+  fi
+
+  # Save the terminal state once; restore on RETURN / signal so a crash
+  # mid-menu doesn't leave the operator's shell in -echo / -icanon mode.
+  local saved_stty
+  saved_stty="$(stty -g 2>/dev/null || echo "")"
+  local _restore_stty='[[ -n "$saved_stty" ]] && stty "$saved_stty" 2>/dev/null'
+  trap "$_restore_stty" RETURN INT TERM
+
+  while :; do
+    # Probe ONCE per outer iteration so cursor moves don't re-trigger
+    # the python startup. State refreshes after any dispatched action.
     local payload_json
     payload_json="$(uv run --quiet --project "$WIKI_DIR" \
       python "$WIKI_DIR/scripts/menu_context.py" 2>/dev/null)"
     [[ -z "$payload_json" ]] && payload_json='{"status":{},"suggestions":[]}'
-    local status_json suggestions_json
+    local status_json suggestions_json n_suggestions
     status_json="$(jq -c '.status' <<<"$payload_json" 2>/dev/null || echo '{}')"
     suggestions_json="$(jq -c '.suggestions' <<<"$payload_json" 2>/dev/null || echo '[]')"
-
-    home_render_status "$status_json"
-    echo
-
-    local n_suggestions
     n_suggestions="$(jq 'length' <<<"$suggestions_json" 2>/dev/null || echo 0)"
 
-    if (( n_suggestions > 0 )); then
-      printf "  %s▸ Pending in your vault%s\n" "$C_BOLD" "$C_RESET"
-      while IFS=$'\t' read -r key label cmd; do
-        printf "      %s%s)%s %-44s %s→ wiki %s%s\n" \
-          "$C_GREEN" "$key" "$C_RESET" "$label" "$C_DIM" "$cmd" "$C_RESET"
-      done < <(jq -r '.[] | [.key, .label, .cmd] | @tsv' <<<"$suggestions_json")
-      echo
-    else
-      printf "  %s✨ Nothing pending — vault is current.%s\n\n" \
-        "$C_DIM" "$C_RESET"
-    fi
+    local cursor=0
+    (( n_suggestions == 0 )) && cursor=-1
 
-    printf "  %s▸ Quick actions%s\n" "$C_BOLD" "$C_RESET"
-    printf "      [%sq%s] query     [%sf%s] flush     [%sl%s] lint     [%ss%s] status\n" \
-      "$C_BOLD" "$C_RESET" "$C_BOLD" "$C_RESET" "$C_BOLD" "$C_RESET" "$C_BOLD" "$C_RESET"
-    echo
-    printf "  %s▸ Browse%s\n" "$C_BOLD" "$C_RESET"
-    printf "      [%sc%s] collectors    [%si%s] ingest    [%sk%s] knowledge ops\n" \
-      "$C_BOLD" "$C_RESET" "$C_BOLD" "$C_RESET" "$C_BOLD" "$C_RESET"
-    printf "      [%sd%s] facts/takes   [%sa%s] automation [%sg%s] setup\n" \
-      "$C_BOLD" "$C_RESET" "$C_BOLD" "$C_RESET" "$C_BOLD" "$C_RESET"
-    echo
-    printf "      [%sh%s] full help     [%sx%s] exit     %s(type %s/foo%s to filter all commands)%s\n" \
-      "$C_BOLD" "$C_RESET" "$C_BOLD" "$C_RESET" \
-      "$C_DIM" "$C_BOLD" "$C_RESET$C_DIM" "$C_RESET"
-    echo
-    printf "  Pick one: "
+    while :; do
+      printf '\e[H\e[2J'   # cursor home + clear screen, then redraw
+      home_render_screen "$status_json" "$suggestions_json" "$n_suggestions" "$cursor"
+
+      stty -echo -icanon 2>/dev/null
+      local key
+      key="$(home_read_key)"
+      stty echo icanon 2>/dev/null
+
+      case "$key" in
+        EOF)
+          echo
+          return 0
+          ;;
+        UP)
+          (( cursor > 0 )) && cursor=$((cursor - 1))
+          ;;
+        DOWN)
+          (( cursor < n_suggestions - 1 )) && cursor=$((cursor + 1))
+          ;;
+        ENTER)
+          if (( cursor >= 0 && cursor < n_suggestions )); then
+            local cmd_str
+            cmd_str="$(jq -r ".[$cursor].cmd" <<<"$suggestions_json")"
+            echo
+            home_dispatch_suggestion "$cmd_str" || true
+            echo; pause
+            break
+          fi
+          ;;
+        '/')
+          # Switch out of raw mode so the operator can type + see + edit
+          # the filter substring with normal line editing.
+          stty "$saved_stty" 2>/dev/null
+          printf "/"
+          local query
+          if ! read -r query; then echo; return 0; fi
+          home_fuzzy_filter "$query" || true
+          echo; pause
+          break
+          ;;
+        [1-9])
+          if (( key <= n_suggestions )); then
+            local cmd_str
+            cmd_str="$(jq -r ".[$((key-1))].cmd" <<<"$suggestions_json")"
+            echo
+            home_dispatch_suggestion "$cmd_str" || true
+            echo; pause
+            break
+          fi
+          ;;
+        q)  echo; home_query;                       echo; pause; break ;;
+        f)  echo; cmd_flush;                        echo; pause; break ;;
+        l)  echo; cmd_lint --structural-only;       echo; pause; break ;;
+        s)  echo; cmd_status;                       echo; pause; break ;;
+        c)  echo; category_menu collectors;         echo; pause; break ;;
+        i)  echo; category_menu ingest;             echo; pause; break ;;
+        k)  echo; category_menu knowledge;          echo; pause; break ;;
+        d)  echo; category_menu facts;              echo; pause; break ;;
+        a)  echo; category_menu automation;         echo; pause; break ;;
+        g)  echo; category_menu setup;              echo; pause; break ;;
+        h)  echo; cmd_help;                         echo; pause; break ;;
+        x)  echo; return 0 ;;
+        ESC|*)
+          # Unknown key — silently redraw (cursor unchanged).
+          ;;
+      esac
+    done
+  done
+}
+
+# Plain (non-raw) fallback for non-TTY callers. Same dispatch surface
+# but uses `read -r choice` and accepts only number / letter / `/foo`,
+# never arrow keys. Mirrors the pre-arrow-nav behaviour exactly so
+# pipe-driven and CI usage stays identical.
+home_screen_plain() {
+  while :; do
+    local payload_json status_json suggestions_json n_suggestions
+    payload_json="$(uv run --quiet --project "$WIKI_DIR" \
+      python "$WIKI_DIR/scripts/menu_context.py" 2>/dev/null)"
+    [[ -z "$payload_json" ]] && payload_json='{"status":{},"suggestions":[]}'
+    status_json="$(jq -c '.status' <<<"$payload_json" 2>/dev/null || echo '{}')"
+    suggestions_json="$(jq -c '.suggestions' <<<"$payload_json" 2>/dev/null || echo '[]')"
+    n_suggestions="$(jq 'length' <<<"$suggestions_json" 2>/dev/null || echo 0)"
+    home_render_screen "$status_json" "$suggestions_json" "$n_suggestions" -1
     local choice
-    # EOF (Ctrl-D, closed pipe) exits the menu cleanly.
     if ! read -r choice; then echo; break; fi
-
-    # `/foo` → fuzzy filter across the full command catalog.
     if [[ "$choice" == /* ]]; then
       home_fuzzy_filter "${choice#/}" || true
       echo; pause; continue
     fi
-
-    # Numeric → dispatch a suggestion.
     if [[ "$choice" =~ ^[0-9]+$ ]] && (( choice >= 1 && choice <= n_suggestions )); then
       local cmd_str
       cmd_str="$(jq -r ".[$((choice-1))].cmd" <<<"$suggestions_json")"
-      echo
-      home_dispatch_suggestion "$cmd_str" || true
+      echo; home_dispatch_suggestion "$cmd_str" || true
       echo; pause; continue
     fi
-
     case "$choice" in
-      q)                    echo; home_query ;;
-      f)                    echo; cmd_flush ;;
-      l)                    echo; cmd_lint --structural-only ;;
-      s)                    echo; cmd_status ;;
-      c)                    echo; category_menu collectors ;;
-      i)                    echo; category_menu ingest ;;
-      k)                    echo; category_menu knowledge ;;
-      d)                    echo; category_menu facts ;;
-      a)                    echo; category_menu automation ;;
-      g)                    echo; category_menu setup ;;
-      h)                    echo; cmd_help ;;
-      x|"")                 break ;;
-      *)                    warn "unknown choice: $choice" ;;
+      q)     echo; home_query ;;
+      f)     echo; cmd_flush ;;
+      l)     echo; cmd_lint --structural-only ;;
+      s)     echo; cmd_status ;;
+      c)     echo; category_menu collectors ;;
+      i)     echo; category_menu ingest ;;
+      k)     echo; category_menu knowledge ;;
+      d)     echo; category_menu facts ;;
+      a)     echo; category_menu automation ;;
+      g)     echo; category_menu setup ;;
+      h)     echo; cmd_help ;;
+      x|"")  break ;;
+      *)     warn "unknown choice: $choice" ;;
     esac
-    echo
-    pause
+    echo; pause
   done
 }
 
