@@ -67,7 +67,10 @@ async def run_post_passes(
         results.append(result)
         cost_delta += result.cost_usd
 
-    if cost_delta:
+    # Write the key whenever at least one producer was invoked — even at
+    # cost_delta=0 — so the operator can distinguish "post-passes ran,
+    # all skipped" from "no producers registered" (key absent / None).
+    if results:
         state["producer_cost_total"] = round(
             state.get("producer_cost_total", 0.0) + cost_delta, 4
         )

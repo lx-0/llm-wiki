@@ -33,6 +33,7 @@ def _list() -> NoReturn:
 
 
 def _run_one(name: str, source: Path) -> NoReturn:
+    from core.paths import ROOT_DIR
     from producers import get_producer
     from producers.orchestrate import evaluate_and_run
 
@@ -41,6 +42,14 @@ def _run_one(name: str, source: Path) -> NoReturn:
         print(f"error: no producer registered with name {name!r}", file=sys.stderr)
         print("       try: wiki produce --list", file=sys.stderr)
         sys.exit(1)
+
+    # Producers' internal logic computes `source.relative_to(ROOT_DIR)`.
+    # That requires an absolute path; operator-supplied vault-relative
+    # paths (`raw/memories/x.md`) would otherwise raise ValueError. The
+    # production compile loop hands absolute paths via `list_raw_files()`;
+    # the CLI normalizes to the same shape.
+    if not source.is_absolute():
+        source = (ROOT_DIR / source).resolve()
 
     if not source.exists():
         print(f"error: source path does not exist: {source}", file=sys.stderr)
