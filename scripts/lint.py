@@ -987,6 +987,44 @@ def check_compile_role() -> list[dict]:
     return issues
 
 
+def check_author_required_on_source_and_final() -> list[dict]:
+    """`compile_role: source-and-final` pages MUST carry `author:` frontmatter.
+
+    Provenance protection: when operator-personal content sits in
+    knowledge/concepts/ alongside compile-output concepts, the only thing
+    distinguishing them is the frontmatter author + compile_role pair. If a
+    source-and-final page loses its `author:` field, the page becomes
+    indistinguishable from a regular compile-output concept and can drown in
+    the noise. This check makes that loss detectable at lint time.
+
+    (Operator-feedback after M014 dream-cycle: "ich will nicht, dass meine
+    persoenlichen texte irgendwann einfach rausgefiltert werden oder
+    unbedeutend werden". Lint is the enforcement surface.)
+    """
+    issues: list[dict] = []
+    inbox_dir = ROOT_DIR / "inbox"
+    roots = [RAW_DIR, DAILY_DIR, KNOWLEDGE_DIR, inbox_dir]
+    for root in roots:
+        if not root.exists():
+            continue
+        for md in root.rglob("*.md"):
+            fm = _read_frontmatter(md)
+            if fm.get("compile_role") != "source-and-final":
+                continue
+            if not fm.get("author"):
+                rel = str(md.relative_to(ROOT_DIR))
+                issues.append(issue(
+                    "error", "source_and_final_missing_author", rel,
+                    "`compile_role: source-and-final` requires an `author:` "
+                    "frontmatter field. Without it, operator-authored content "
+                    "is indistinguishable from compile-output and can drown "
+                    "in the noise. Add `author: <name>` (or set "
+                    "`personal.implicit_operator_author` and operator-author "
+                    "files inherit it).",
+                ))
+    return issues
+
+
 # ── LLM contradiction check ─────────────────────────────────────────
 
 from core.prompts import render  # noqa: E402
@@ -1122,6 +1160,7 @@ async def main() -> None:
         ("Sparse articles", check_sparse_articles),
         ("Facts violations", check_facts_violations),
         ("Compile role enum", check_compile_role),
+        ("Source-and-final author required", check_author_required_on_source_and_final),
         ("Domain value enum", check_domain_value),
         ("Takes consistency", check_takes_consistency),
     ]
