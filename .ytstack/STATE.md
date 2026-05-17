@@ -1,7 +1,7 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-05-17T14:30:00Z
+last_updated: 2026-05-17T15:30:00Z
 current_milestone: M019
 active_slice: none
 active_task: none
@@ -11,6 +11,22 @@ parallel_milestones: []
 # State
 
 **Status:** M019 planned (L). M018 SHIPPED 2026-05-17 (parallel session) — see entry below.
+
+---
+
+**Ad-hoc shipped 2026-05-17 afternoon (infographics rework — changelog strip + overflow pass + review policy).** Commit `eabb882` on local main (NOT pushed). Both diagrams stripped of changelog-style content + all overlaps/overflows resolved + two new hard rules in CLAUDE.md.
+
+- **Changelog strip.** Removed the "SHIPPED MAY 2026 · M007 — M013 / Seven milestones added in one week" band from `docs/architecture.excalidraw` (39 `m713_*` elements) and `docs/overview.excalidraw` (25 `m713_ovw_*` elements). Stripped `(2026-05-15)` date stamps from the compile.py pill and `(M003)` / `(M005)` milestone tags from operator-interface card titles. Memory `feedback_infographics_track_engine.md` rewritten to forbid all date stamps + milestone-id badges + "SHIPPED" bands; capability-claims belong next to the box that owns them in present tense.
+
+- **Overlap/overflow pass.** Overview: pill text shrunk to single line "compile.py" (was 4 lines that crashed through 3 siblings); sandbox-claim folded into the orange resilience caption; substrate-list wrapped to 2 lines (was 13 substrates as single 765-px monospace line overflowing a 460-px card). Architecture: all right-column scanner cards relabeled to fit interior width; new `scanner_health` rect created at y=632 with proper `containerId` re-binding (scanner_health_t was an orphan text overlapping siblings since b9d3c89); episodic + buffer + digest headers wrapped; compile_text shrunk 8→6 lines to fit card; reliability_caption + arrow label moved below compile_rect. Final state: 0 text-on-text bbox overlaps (was 4); 0 in-card glyph overflows (was 23). 7 minor (<60 px) free-floating annotation overflows remain in negative space — no visual conflict.
+
+- **Review policy codified in CLAUDE.md.** Two new hard rules: (1) infographics are steady-state portraits, not changelogs; (2) three-gate review (bbox overlap + glyph-width estimate via `max_line_chars × fontSize × 0.6` for monospace / `× 0.55` non-monospace + zoom-crop ≥1600 px wide) is mandatory before any "done" claim on an excalidraw edit. Renderer caveat documented: `--scale 2` silently drops content on diagrams >~12 k pixels per side (Chrome canvas-pixel ceiling); fall back to `--scale 1`.
+
+- **New tactical memory** `feedback_excalidraw_container_id_binding.md` — text elements with `containerId` ignore x/y moves; full re-bind requires updating containerId + boundElements on both old/new rects + originalText (the gotcha that initially produced an empty scanner_health card after I moved the text).
+
+- **Working-tree leftovers (NOT mine, parallel arc):** `config.example.yaml`, `scripts/core/config.py`, `scripts/migrations/migrate_config_keys.py`, `.ytstack/M019-S01-PLAN.md`. Looks like a config-knob migration in progress from another session. Left untouched per explicit-staging discipline.
+
+---
 
 - **M019 (this session, current_milestone):** operator-self-reports wedge — 4 slices, ships inference-contract + 5 clinical-screen instruments + studies manifest + meta-report with radar/sparkline/timeline. Goal-driven by `.ytstack/OFFICE-HOURS-operator-self-reports.md` (eng-review verdict: GO with rescope; R1/R2/R3 verification gates baked into S01/S02). CONTEXT + ROADMAP at `.ytstack/M019-{CONTEXT,ROADMAP}.md`. Next action: run `ytstack:slice-milestone` (within this session) to refine S01–S04.
 
