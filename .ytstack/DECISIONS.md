@@ -908,3 +908,69 @@ full design + "what stays out" list.
 
 **Per-study agent rejected as over-engineering:** considered briefly but dropped. For N=1 with one persona-frame across multiple studies, the cross-study synthesist needs to integrate over domains anyway; having different Pass-1 personas for different studies would force the Pass-2 persona to mediate between conflicting framings. Cleaner: one persona-stance applied at two scopes (within-study + cross-study).
 
+
+---
+
+## 2026-05-17: Vault-health surface = three-part stack (banner + `wiki doctor` + JSON for agents)
+
+**Context:** Configuration health was scattered across four commands
+that didn't compose (`wiki status`, `wiki hooks status`, `wiki skills
+status`, `wiki seed --check`). Home screen said nothing when setup
+wasn't run, hooks were missing, Ollama was unreachable, or compile
+errors were accumulating. Agents had no documented way to read vault
+health without parsing pretty output.
+
+**Options considered:** (A) Just add a banner to the home screen
+referencing existing commands. (B) Add `wiki doctor` as standalone
+audit, no banner. (C) Three-part stack: banner in home screen + `wiki
+doctor` standalone + JSON surfaces for both menu (`wiki menu --json`)
+and doctor (`wiki doctor --json`).
+
+**Chose:** C — three layers in one arc. Banner forces visibility of
+critical/warning issues without operator action; `wiki doctor` is the
+deep-dive when operator wants the full picture; JSON surfaces let
+agents read state without parsing pretty output.
+
+**Reason:** the three layers serve three distinct operator workflows
+that don't overlap. Banner = "I'm using the wiki and just noticed
+something's flagged". Doctor = "let me audit before I trust this".
+JSON = "agent automation needs structured state". Building only the
+banner (A) leaves agents stuck parsing pretty output; building only
+doctor (B) loses the auto-surfacing of issues during normal use.
+
+**Banner verbosity:** all critical + warning issues rendered inline,
+no count-summary collapse. Operator picked over (B) compact-summary
+and (C) collapse-when-many. Justification: typical issue count is 0-3,
+all-inline costs ~3 lines and eliminates "go run another command to
+see what's broken" tax. See `.ytstack/KNOWLEDGE.md` "Banner verbosity:
+all-inline beats count-summary in low-issue regimes".
+
+**Three diagnose surfaces preserved, not merged:** `wiki status` (what's
+configured?), `wiki doctor` (is what's configured WORKING?), and the
+existing vault-stats dashboard via `scripts/health.py` (what's IN the
+vault?). Each has a distinct trigger word from the operator. Merging
+would dilute each answer. Documented in `skills/use-llm-wiki/SKILL.md`
+so agents pick the right one. See KNOWLEDGE entry "Three 'is this OK?'
+surfaces".
+
+**`--quick` flag included now** despite YAGNI risk: operator wants
+PreToolUse-hook compatibility (~50ms cap), one extra arg parser branch
+is cheaper than a second arc later. Skips TCP probes (ollama) and
+subprocess calls (claude --version, wiki seed --check).
+
+**Engine impl:**
+- `scripts/core/health.py` (~330 LOC) — 8 per-check fns + build_health +
+  summary + to_json
+- `scripts/doctor.py` (~150 LOC) — CLI surface with pretty/--json/--quick
+- `scripts/menu.py` — banner render in `_build_screen_html`, build_health
+  call in main loop
+- `wiki` bash — `cmd_doctor` + `cmd_menu` (now subcommand with --json
+  flag) + dispatch case for `doctor`
+- `skills/use-llm-wiki/SKILL.md` — three-surfaces explanation in Diagnose
+  tier, JSON shapes documented
+- 29 new tests (23 health unit + 6 doctor smoke), 73 total green in
+  touched-area suite
+
+**Backlog deferred:** per-account auth status (gmail/gmeet/calendar
+tokens), pipeline trend metrics, persistent health history. See
+`.ytstack/backlog/vault-health-doctor.md` "what stays out".

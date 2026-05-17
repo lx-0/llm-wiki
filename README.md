@@ -326,11 +326,16 @@ Bare `./.wiki/wiki` opens an **interactive home screen** (rendered by
 status one-liner (`384 articles · last compile 4h ago · ollama ✓`),
 context-sensitive suggestions (`3 files in inbox/ → process-inbox`, `12
 sources changed → compile`), 4 quick-action letter shortcuts, a 6-bucket
-category browse, and a `/<substring>` fuzzy filter across 49 commands. The
-menu shells back to `wiki <subcommand>` for every dispatch — bash stays the
-single source of truth for what each subcommand does. Non-TTY callers (CI,
-hooks, pipes) get the help dump and exit. Full reference — every subcommand,
-every config key, every hook target — lives in [docs/cli.md](docs/cli.md).
+category browse, and a `/<substring>` fuzzy filter across 49 commands. Plus a
+**health banner** at the top when something's broken (missing hooks,
+unreachable Ollama, recent compile errors) with inline fix hints. The menu
+shells back to `wiki <subcommand>` for every dispatch — bash stays the single
+source of truth for what each subcommand does. Non-TTY callers (CI, hooks,
+pipes) get the help dump and exit. Two agent-facing JSON surfaces:
+`wiki menu --json` (what's pending) and `wiki doctor --json` (config +
+connectivity + pipeline audit, with `--quick` for sub-50ms hook usage). Full
+reference — every subcommand, every config key, every hook target — lives in
+[docs/cli.md](docs/cli.md).
 
 ## For contributors
 

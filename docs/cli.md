@@ -102,6 +102,62 @@ Python layer: the prior bash home screen trip-wired on bash-3.2 quirks once
 per feature (no `${var,,}`, empty array under `set -u`, fractional `read -t`
 unsupported). Background: `.ytstack/backlog/python-interactive-menu.md`.
 
+**Health banner:** Above the status line, the menu renders every
+critical + warning issue from `wiki doctor` (probes config + connectivity
++ pipeline). Operator-facing fix-hint inline with each issue. Info-only
+issues stay out of the banner (live in `wiki doctor`). Per-issue render:
+
+```
+  ⚠ no project-scope hooks installed — session capture won't fire
+      → wiki hooks install
+```
+
+## Agent-facing surfaces
+
+Two JSON commands let agents (via the `use-llm-wiki` skill or directly)
+read vault state programmatically without parsing pretty output:
+
+```bash
+./.wiki/wiki menu --json     # context-sensitive suggestions + status
+./.wiki/wiki doctor --json   # full config/connectivity/pipeline health
+./.wiki/wiki doctor --quick --json   # skip TCP + subprocess probes (~50ms)
+```
+
+`wiki menu --json` payload:
+
+```json
+{
+  "status": {"articles": 384, "last_compile_ago": "4h", "ollama_reachable": true},
+  "suggestions": [
+    {"key": "1", "count": 3, "label": "3 files in inbox/",
+     "cmd": "process-inbox", "priority": 1}
+  ]
+}
+```
+
+`wiki doctor --json` payload:
+
+```json
+{
+  "vault": "lxw",
+  "engine_revision": "abc1234",
+  "summary": {"critical": 0, "warning": 1, "info": 1, "ok": 6},
+  "checks": [
+    {"id": "hooks-installed", "category": "config", "severity": "ok",
+     "message": "hooks installed in project scope (claude, cursor)",
+     "fix": null, "details": {"agents": ["claude", "cursor"]}}
+  ]
+}
+```
+
+Stable field names per check: `id`, `category`, `severity`, `message`,
+`fix?`, `details?`. Severity is one of `critical | warning | info | ok`.
+Exit code: `0` if no critical issues, `1` otherwise.
+
+Agents pick a suggestion from `wiki menu --json` then dispatch via the
+regular bash subcommand (e.g. `wiki compile`). They never ask the menu
+to dispatch — bash stays single source of truth.
+
 ## Subcommand cheat sheet
 
 Grouped by purpose. Run `wiki <cmd> --help` for the full per-command help block.
@@ -112,6 +168,8 @@ Grouped by purpose. Run `wiki <cmd> --help` for the full per-command help block.
 |---|---|
 | `wiki` | interactive home screen (TTY only) — context-sensitive suggestions + browse menu. Non-TTY → `wiki help`. |
 | `wiki menu` | same home screen, forced regardless of TTY. |
+| `wiki menu --json` | emit suggestions + status payload as JSON, exit. Agent-facing read of "what's pending". |
+| `wiki doctor [--quick] [--json]` | vault-health audit: config + connectivity + pipeline checks. `--quick` skips network + subprocess probes (~50ms). `--json` for agents. Exit code 1 if any critical issue. |
 | `wiki setup [--help]` | first-time wizard (5 questions) + hook install |
 | `wiki status` | config summary, hook install table, Ollama probe |
 | `wiki update [--no-skills]` | `git pull --ff-only` the engine checkout + sync skill symlinks; never touches `config.yaml` or `.venv/` content. `--no-skills` skips the skill sync step. |

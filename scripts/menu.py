@@ -26,6 +26,7 @@ from typing import Callable
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from core.health import CheckResult, build_health
 from core.paths import ROOT_DIR, WIKI_DIR
 from menu_context import build_status, build_suggestions
 
@@ -258,6 +259,7 @@ class HomeState:
     def __init__(self):
         self.status: dict = {}
         self.suggestions: list[dict] = []
+        self.health: list[CheckResult] = []
         self.cursor: int = 0
         self.selected: tuple | None = None
         # selected is one of:
@@ -270,6 +272,15 @@ class HomeState:
 
     def n_suggestions(self) -> int:
         return len(self.suggestions)
+
+    def banner_issues(self) -> list[CheckResult]:
+        """Issues to render in the home-screen banner.
+
+        Operator decision (2026-05-17): all critical + warning issues
+        rendered inline, no collapse to count. Info entries stay out of
+        the banner — they live in `wiki doctor`.
+        """
+        return [r for r in self.health if r.severity in ("critical", "warning")]
 
 
 def _build_screen_html(state: HomeState) -> str:
@@ -285,6 +296,30 @@ def _build_screen_html(state: HomeState) -> str:
         f"  <ansibrightblack>{escape(status_line)}</ansibrightblack>",
         "",
     ]
+
+    # Banner — every critical + warning issue inline (operator picked
+    # full-inline over count-summary). Info stays out (lives in
+    # `wiki doctor`).
+    issues = state.banner_issues()
+    if issues:
+        for r in issues:
+            if r.severity == "critical":
+                glyph = "<ansired>✗</ansired>"
+                msg_open, msg_close = "<ansired>", "</ansired>"
+            else:  # warning
+                glyph = "<ansiyellow>⚠</ansiyellow>"
+                msg_open, msg_close = "<ansiyellow>", "</ansiyellow>"
+            lines.append(
+                f"  {glyph} {msg_open}{escape(r.message)}{msg_close}"
+            )
+            if r.fix:
+                lines.append(
+                    f"      <ansibrightblack>→ {escape(r.fix)}</ansibrightblack>"
+                )
+        lines.append(
+            f"      <ansibrightblack>(run `wiki doctor` for the full audit)</ansibrightblack>"
+        )
+        lines.append("")
 
     if state.suggestions:
         lines.append(
@@ -506,6 +541,7 @@ def main() -> int:
         while True:
             state.status = build_status()
             state.suggestions = build_suggestions()
+            state.health = build_health()
             if state.n_suggestions() == 0:
                 state.cursor = 0  # safe even when there's nothing to highlight
             elif state.cursor >= state.n_suggestions():

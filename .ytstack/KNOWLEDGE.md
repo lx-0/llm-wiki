@@ -1907,3 +1907,51 @@ ClaudeAgentOptions(
 
 **Cost note:** $0.08 for full 3-probe verification. Cheap enough to run as a smoke-test before any agent shipping. Not wired into pytest because it needs the real CLI + network; manual `uv run python scripts/reports/_engine/verify_scope_lock.py` is the contract.
 
+
+## Three "is this OK?" surfaces, each a different question (2026-05-17)
+
+The engine ships three commands in the diagnose space — `wiki status`,
+`wiki doctor`, and the vault stats dashboard via `scripts/health.py`.
+They answer three different questions and should not be conflated:
+
+- **`wiki status`** — "is anything wired up?" — config summary, hook
+  install table, Ollama probe. The fastest sanity check; ~50ms. Read
+  by operators as a quick "what does the engine think it has".
+- **`wiki doctor`** — "is what's configured WORKING?" — config +
+  connectivity + pipeline health checks. Probes config-not-default,
+  hooks-actually-in-files, ollama-reachable, claude-authed, recent
+  errors, template-drift. `--quick` skips network + subprocess
+  (~50ms, for hooks); `--json` for agents. Exit code 1 if any
+  critical issue.
+- **`scripts/health.py` (vault stats dashboard)** — "what's IN the
+  vault?" — article counts, raw-source distribution, compile backlog,
+  graph density, pipeline cadence. Read-only snapshot of content;
+  doesn't probe config.
+
+**Generalisable rule:** if you're tempted to merge two of these (e.g.
+"why have both status and doctor?"), don't. The three questions are
+genuinely separate and each has a distinct trigger word from the
+operator ("what's configured?" / "what's broken?" / "what's in there?").
+Merging dilutes each answer and produces a noisier surface. Document
+this in `skills/use-llm-wiki/SKILL.md` so agents pick the right one.
+
+## Banner verbosity: all-inline beats count-summary in low-issue regimes (2026-05-17)
+
+Designed `wiki menu`'s health banner with three options:
+(A) compact count-summary "⚠ 2 issues — wiki doctor",
+(B) collapse-warnings-when-many ("⚠ 1 critical, 2 warnings — wiki
+    doctor; ✗ critical inline"),
+(C) all-issues-inline regardless of count.
+
+Operator picked (C) explicitly. Reasoning: with the engine's typical
+issue count (0-3 simultaneous warnings, 0-1 critical), all-inline costs
+~3 visible lines but eliminates the "operator has to run another
+command to see what's broken" tax. Count-summary protects against
+overwhelming output in vaults with 10+ issues — but vaults with 10+
+issues are already in trouble; making the banner more compact doesn't
+help, makes it less actionable.
+
+**Generalisable rule:** in surfaces where the typical N is small (<5),
+prefer fully-inline rendering over count-summary. Add count-summary
+mode only when you have evidence of users hitting large N in practice.
+Premature collapse hides actionable detail.

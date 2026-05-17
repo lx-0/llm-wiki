@@ -8,6 +8,10 @@
 #                              actions, category browse, `/<substring>` fuzzy
 #                              filter. Non-TTY callers fall back to this help.
 #   wiki menu                  same home screen, forced regardless of TTY.
+#   wiki menu --json           emit suggestions + status JSON, exit (for agents)
+#   wiki doctor                vault-health audit (config + connectivity + pipeline)
+#   wiki doctor --quick        skip TCP + subprocess probes (~50ms; for hooks)
+#   wiki doctor --json         machine-readable health output (for agents)
 #   wiki setup                 first-time setup (config wizard + hooks install)
 #   wiki status                full system status (config + hooks)
 #   wiki config                interactive config editor
@@ -1114,6 +1118,65 @@ home_screen_python() {
     python "$WIKI_DIR/scripts/menu.py"
 }
 
+cmd_menu() {
+  # `wiki menu` — open the interactive home screen (TTY).
+  # `wiki menu --json` — agent-facing read of suggestions + status payload.
+  case "${1:-}" in
+    --json)
+      exec uv run --quiet --project "$WIKI_DIR" \
+        python "$WIKI_DIR/scripts/menu_context.py"
+      ;;
+    -h|--help|help)
+      cat <<EOF
+${C_BOLD}wiki menu${C_RESET} — interactive home screen + agent-facing JSON
+
+${C_BOLD}USAGE${C_RESET}
+  wiki menu                interactive home screen (prompt_toolkit-driven)
+  wiki menu --json         emit suggestions + status JSON, exit
+                           (consumed by use-llm-wiki skill)
+EOF
+      return 0
+      ;;
+    "")
+      home_screen_python
+      ;;
+    *)
+      err "unknown: wiki menu ${1:-}"
+      return 1
+      ;;
+  esac
+}
+
+cmd_doctor() {
+  # `wiki doctor` — full vault-health audit (config + connectivity + pipeline).
+  # `wiki doctor --json` — machine-readable for agents.
+  # `wiki doctor --quick` — skip TCP + subprocess probes (sub-50ms, for hooks).
+  case "${1:-}" in
+    -h|--help|help)
+      cat <<EOF
+${C_BOLD}wiki doctor${C_RESET} — vault-health audit
+
+${C_BOLD}USAGE${C_RESET}
+  wiki doctor              full pretty report (config / connectivity / pipeline)
+  wiki doctor --json       machine-readable (for agents)
+  wiki doctor --quick      skip TCP + subprocess probes (~50ms; for hooks)
+  wiki doctor --quick --json   both
+
+${C_BOLD}EXIT CODE${C_RESET}
+  0   no critical issues
+  1   at least one critical issue
+
+${C_BOLD}CHECKS${C_RESET}
+  Config + setup: setup-wizard-ran, hooks-installed, template-drift
+  Connectivity: ollama-reachable, claude-authed
+  Pipeline: compile-errors-recent, no-knowledge-articles, compile-state
+EOF
+      return 0
+      ;;
+  esac
+  uv run --quiet --project "$WIKI_DIR" python "$WIKI_DIR/scripts/doctor.py" "$@"
+}
+
 # ── Entry point ──────────────────────────────────────────────────────
 # Bare `wiki` opens the interactive home screen ONLY when stdin/stdout are
 # both TTYs. Non-TTY callers (CI, pipes, hooks, cron) get the help dump
@@ -1126,7 +1189,8 @@ case "${1:-}" in
       cmd_help
     fi
     ;;
-  menu)             home_screen_python ;;
+  menu)             shift; cmd_menu "$@" ;;
+  doctor)           shift; cmd_doctor "$@" ;;
   setup)            shift; cmd_setup "$@" ;;
   status)           shift; cmd_status "$@" ;;
   config)           shift; cmd_config "$@" ;;

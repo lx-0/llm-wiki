@@ -126,20 +126,59 @@ If the index-grep already answers it, don't run `wiki query`.
 Read-only operational snapshot. No mutations, no fixes — the operator decides
 what to act on.
 
-- **`wiki status`** — quick config + hook state. One-liner sanity check.
-- **Vault health dashboard** — when the operator asks "wiki status", "vault
-  status", "compile backlog", "is the pipeline healthy", "wie geht's der wiki",
-  "health check":
+Three commands cover three different "is this OK?" angles. Use the
+right one for the question; don't conflate them.
+
+- **`wiki status`** — quick config + hook install state. One-liner
+  sanity check ("is anything wired up?").
+
+- **`wiki doctor`** — config + connectivity + pipeline health checks.
+  Answers "is what's configured WORKING?" — flags missing hooks,
+  unreachable Ollama, missing Claude auth, recent compile errors,
+  template drift. Agent-facing JSON:
+
+  ```sh
+  wiki doctor --json           # full audit, machine-readable
+  wiki doctor --quick --json   # skip network + subprocess probes (~50ms)
+  ```
+
+  JSON shape: `{vault, engine_revision, summary: {critical, warning,
+  info, ok}, checks: [{id, category, severity, message, fix?, details?}]}`.
+  Exit code 1 if any critical issue, else 0.
+
+  When operator asks "wiki health", "is the wiki set up", "is the
+  pipeline broken": invoke `wiki doctor` (no --json) and surface
+  stdout verbatim. Add one sentence of plain-language diagnosis after.
+
+- **Vault stats dashboard** (`scripts/health.py`) — answers "what's IN
+  the vault?" — article counts, raw-source distribution, compile
+  backlog, graph density, pipeline cadence. Use when operator asks
+  "compile backlog", "wie geht's der wiki", "vault stats":
 
   ```sh
   uv run --project .wiki python .wiki/scripts/health.py --vault .
   ```
 
-  Surface the script's stdout verbatim, then add **one** sentence of
-  plain-language diagnosis at the bottom. Don't paraphrase the dashboard.
+  Surface stdout verbatim, then **one** sentence of plain-language
+  diagnosis. Don't paraphrase the dashboard.
 
-  If `health.py` fails or you need to interpret the output (graph density,
-  silent failures, manual fallback flow): **Read `references/health-check.md`**.
+  If `health.py` fails or you need to interpret graph density / silent
+  failures / manual fallback: **Read `references/health-check.md`**.
+
+- **`wiki menu --json`** — agent-facing read of context-sensitive
+  suggestions ("3 files in inbox/ → process-inbox", "12 sources
+  changed → compile") + status one-liner. Use when deciding what to
+  ACT on (vs. `wiki doctor` which decides what's BROKEN):
+
+  ```sh
+  wiki menu --json
+  # → {"status": {"articles", "last_compile_ago", "ollama_reachable"},
+  #    "suggestions": [{"key", "count", "label", "cmd", "priority"}, …]}
+  ```
+
+  Pick a suggestion by reading `cmd`, then invoke `wiki <cmd>`
+  directly. Don't ask the menu to dispatch — bash is single source of
+  truth for what each subcommand does.
 
 ## Contribute tier
 
