@@ -456,6 +456,40 @@ In result handling: `if message.subtype == "success" and message.result:` — ne
 
 **Verified:** what previously failed at 7 turns now succeeds at 2 turns with 2,909 chars of clean output.
 
+### Claude Agent SDK — `Write(knowledge/**)` path-scope in `allowed_tools` is decorative (2026-05-17)
+
+#### Symptom
+
+Compile shipped `allowed_tools=["Read","Glob","Grep","Write(knowledge/**)","Edit(knowledge/**)"]` plus `permission_mode="acceptEdits"` (commit `57fc0d4`) intended to block prompt-injected writes outside `knowledge/`. Whether this *actually* path-scoped was untested.
+
+#### Diagnosis
+
+`scripts/probe_compile_scope.py` ran three SDK calls against a throwaway vault:
+
+1. **INSIDE-SCOPE** (Write to `knowledge/inside.md`): file appeared. ✓
+2. **OUTSIDE-SCOPE** with production allowlist (Write to `<vault>/outside.md`): **file appeared.** ✗ — agent's `Write` call returned `File created successfully`. The parenthesised suffix is ignored; the bundled CLI parses `Write(knowledge/**)` as "Write tool, allowed unconditionally."
+3. **OUTSIDE-SCOPE** with `can_use_tool=make_path_scope_gate([vault/"knowledge"])` and `Write`/`Edit` *absent* from `allowed_tools`: callback fired, returned `PermissionResultDeny`, on-disk state empty. ✓
+
+#### Fix
+
+Real path-scope requires three things together:
+
+```python
+ClaudeAgentOptions(
+    allowed_tools=["Read", "Glob", "Grep"],  # Write/Edit ABSENT — required
+    can_use_tool=make_path_scope_gate([ROOT_DIR / "knowledge"]),
+    permission_mode="default",               # NOT acceptEdits (would auto-allow Write/Edit and bypass the callback)
+)
+```
+
+With `Write`/`Edit` in `allowed_tools`, the CLI fast-paths them as pre-approved and never consults the callback. The streaming-mode envelope (`prompt_stream(text)`) is also mandatory because `can_use_tool` requires an AsyncIterable prompt.
+
+#### Wired
+
+- `scripts/core/sdk_helpers.py:296` — `make_path_scope_gate` + `prompt_stream`
+- `scripts/compile_stages/compile.py:135` and `scripts/dream.py:883` — gated behind `CONFIG.features.compile_callback_gate` (default `True`)
+- Probe stays in `scripts/probe_compile_scope.py` as the regression artifact; cost ~$0.07 per run
+
 ### Compile abort-counter — empty-file skip is not a failure
 
 #### Anti-pattern (fixed 2026-05-07)
