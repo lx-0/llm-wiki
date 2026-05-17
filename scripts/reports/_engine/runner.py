@@ -74,15 +74,27 @@ def _read_inference_config(instrument_dir: Path) -> dict:
     return dict(raw.get("inference") or {})
 
 
-def _render_items_block(instrument_dir: Path) -> str:
+def _render_items_block(
+    instrument_dir: Path,
+    *,
+    only_ids: set[str] | None = None,
+) -> str:
     """Render the items block for the prompt, including substrate_inferable
     flag so the agent honours the curation. Reads items.yaml directly
     rather than going through the loader because we want the raw
     `text` and `substrate_inferable` keys verbatim.
+
+    Args:
+        only_ids: when set, render only items whose id is in this set —
+            scopes the prompt to one batch's items for multi-subscale
+            instruments (ASRS Part-A / Part-B). If None, render all
+            items (single-batch case).
     """
     raw = yaml.safe_load((instrument_dir / "items.yaml").read_text(encoding="utf-8"))
     lines: list[str] = []
     for item in raw:
+        if only_ids is not None and str(item["id"]) not in only_ids:
+            continue
         flag = item.get("substrate_inferable", True)
         flag_str = "true" if flag else "false"
         sub = item.get("subscale")
@@ -327,6 +339,15 @@ def run_inference(
         # every batch since the substrate-set is instrument-level.
         substrate_block = _render_substrate_block(paths, vault_root)
 
+        # Render items_block scoped to THIS batch's item-ids so the
+        # agent's JSON output naturally constrains to just that subset.
+        # Earlier design relied on `batch_label` alone — Haiku ignored
+        # it and returned all items, tripping JSON-schema validation
+        # (failure surfaced on first ASRS-v1.1 run, 2026-05-17).
+        batch_items_block = _render_items_block(
+            instrument_dir,
+            only_ids={it.id for it in batch.items},
+        )
         rendered_prompt = render(
             "reports/infer_instrument",
             instrument_slug=instrument.meta.slug,
@@ -338,7 +359,7 @@ def run_inference(
             lookback_days=lookback_days,
             today=today,
             batch_label=batch.label,
-            items_block=items_block,  # full block; agent honours batch_label
+            items_block=batch_items_block,
             substrate_block=substrate_block,
         )
         prompt_version = hashlib.sha256(rendered_prompt.encode("utf-8")).hexdigest()[:16]
