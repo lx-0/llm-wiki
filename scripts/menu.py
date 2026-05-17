@@ -50,6 +50,7 @@ WIKI_BIN = WIKI_DIR / "wiki"
 
 QUICK_ACTIONS: list[tuple[str, str, str, object]] = [
     ("c", "compile", "compile up to 10 changed sources ($$)", ["compile", "--max-files", "10"]),
+    ("C", "compile-all", "force-recompile every source ($$$)", ["compile", "--all"]),
     ("q", "query",   "ask the wiki ($$)",            ("special", "query")),
     ("f", "flush",   "capture current session",      ["flush"]),
     ("l", "lint",    "cheap structural lint",        ["lint", "--structural-only"]),
@@ -407,7 +408,7 @@ def _build_screen_html(state: HomeState) -> str:
 
     lines.append("  <b>▸ Quick actions</b>")
     lines.append(
-        "      [<b>c</b>] compile  [<b>q</b>] query  "
+        "      [<b>c</b>] compile-10  [<b>C</b>] compile-all  [<b>q</b>] query  "
         "[<b>f</b>] flush  [<b>l</b>] lint  [<b>s</b>] status"
     )
     lines.append("")
@@ -473,7 +474,7 @@ def _run_home_picker(state: HomeState) -> None:
         state.selected = ("filter",)
         event.app.exit()
 
-    for q in ("c", "q", "f", "l", "s"):
+    for q in ("c", "C", "q", "f", "l", "s"):
         @kb.add(q)
         def _(event, q=q):
             state.selected = ("quick", q)
