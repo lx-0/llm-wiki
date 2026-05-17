@@ -1,11 +1,11 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-05-17T15:30:00Z
+last_updated: 2026-05-17T14:10:00Z
 current_milestone: M019
 active_slice: none
 active_task: none
-parallel_milestones: []
+parallel_milestones: [M021]
 ---
 
 # State
@@ -29,6 +29,8 @@ parallel_milestones: []
 ---
 
 - **M019 (this session, current_milestone):** operator-self-reports wedge — 4 slices, ships inference-contract + 5 clinical-screen instruments + studies manifest + meta-report with radar/sparkline/timeline. Goal-driven by `.ytstack/OFFICE-HOURS-operator-self-reports.md` (eng-review verdict: GO with rescope; R1/R2/R3 verification gates baked into S01/S02). CONTEXT + ROADMAP at `.ytstack/M019-{CONTEXT,ROADMAP}.md`. Next action: run `ytstack:slice-milestone` (within this session) to refine S01–S04.
+
+- **M021 planned (parallel, 2026-05-17):** Model seam — unify 7+ LLM call sites (Claude SDK + Ollama) behind `scripts/llm.py` interface. L-sized, 5 slices. Graduated from architecture-deepening backlog #3 (MEDIUM → HIGH this session after Producer-seam shipped, crossing the 7-call-sites threshold). CONTEXT + ROADMAP at `.ytstack/M021-{CONTEXT,ROADMAP}.md`. 5 open questions parked (module location, schema shape, FailureClass unification, cost shape, migration order) — close before respective slice. Sequenced after M018 in the architecture-deepening arc; orthogonal to M019/M020. Next action: `ytstack:slice-milestone` when M019 work yields the working tree.
 
 ---
 
