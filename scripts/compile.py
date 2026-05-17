@@ -677,13 +677,27 @@ async def compile_file(
     else:
         max_turns_for_call = CONFIG.limits.compile_max_turns
 
-    # Dispatch the LLM call to compile_stages.compile.compile_source. That
-    # function owns prompt assembly, owner-block, 60kb pre-flight, size
-    # warning, the SDK call (callback-gate + legacy-allowed_tools branches),
-    # per-message stall timeout, failure classification, one-shot retry-on-
-    # kind-unknown, and skip-and-flag for timeout / max_turns / kind=unknown.
-    # main() decided substrate_prompt + model_id + max_turns above and packs
-    # them into CompileMetadata; compile_source does not re-infer.
+    # Pre-compile classifier (compile_stages.classify) decides whether the
+    # substrate shape needs special handling BEFORE the LLM call:
+    #   - aggregated-memory  -> split-at-H2 in memory, compile per-chunk
+    #     (raw file untouched). Fixes the cross-link fanout that blows the
+    #     25-turn budget on substrates carrying N memories.
+    #   - instructions       -> AGENTS.md/CLAUDE.md/README.md accidentally
+    #     ingested into raw/memories/. Routed to compile_instructions.md
+    #     for single-pass project-doc handling, no fanout.
+    #   - single             -> unchanged single compile call.
+    # raw/ is RAW: chunking rebuilds substrate strings in memory only.
+    from compile_stages.classify import classify
+    classification = classify(source_content, source)
+
+    if classification.kind == "instructions":
+        substrate_prompt = "compile_instructions"
+        max_turns_for_call = max(max_turns_for_call, 20)
+        log.info(
+            "  classified as instructions-doc -> routing to %s @ %d turns",
+            substrate_prompt, max_turns_for_call,
+        )
+
     from compile_stages.compile import compile_source
     from compile_stages.types import CompileMetadata
     metadata = CompileMetadata(
@@ -694,6 +708,41 @@ async def compile_file(
         substrate_type=source_type,
         substrate_prompt=substrate_prompt,
     )
+
+    if classification.kind == "aggregated-memory":
+        log.info(
+            "  classified as aggregated-memory -> splitting into %d "
+            "per-section compile calls (raw file untouched)",
+            len(classification.chunks),
+        )
+        chunk_results = []
+        any_ok = False
+        for i, chunk in enumerate(classification.chunks, 1):
+            log.info("  chunk %d/%d (%d chars)", i, len(classification.chunks), len(chunk))
+            chunk_result = await compile_source(chunk, metadata)
+            chunk_results.append(chunk_result)
+            if chunk_result.status == "ok":
+                any_ok = True
+        total_in = sum(r.input_tokens or 0 for r in chunk_results)
+        total_out = sum(r.output_tokens or 0 for r in chunk_results)
+        total_cost = sum(r.cost_usd or 0 for r in chunk_results)
+        ok_count = sum(1 for r in chunk_results if r.status == "ok")
+        skip_count = sum(1 for r in chunk_results if r.status == "skipped")
+        fail_count = sum(1 for r in chunk_results if r.status == "failed")
+        log.info(
+            "  aggregated-memory result: %d ok / %d skipped / %d failed "
+            "(total in:%d out:%d $%.4f)",
+            ok_count, skip_count, fail_count, total_in, total_out, total_cost,
+        )
+        if not any_ok:
+            return {"_skipped": "aggregated_memory_all_chunks_failed"}
+        return {
+            "input_tokens": total_in,
+            "output_tokens": total_out,
+            "cost_usd": total_cost,
+            "result": f"aggregated-memory: {ok_count}/{len(chunk_results)} chunks compiled",
+        }
+
     result = await compile_source(source_content, metadata)
 
     if result.status == "skipped":
