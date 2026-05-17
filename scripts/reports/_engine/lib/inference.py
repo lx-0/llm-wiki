@@ -283,7 +283,58 @@ async def infer_batch_async(
     model: str = DEFAULT_INFERENCE_MODEL,
     max_turns: int = DEFAULT_MAX_TURNS,
 ) -> BatchResult:
-    """Run one inference batch end-to-end."""
+    """Run one inference batch end-to-end with one-shot retry on
+    bundled-CLI silent crashes (kind=unknown / cli_crash).
+
+    Mirrors compile.py's retry-on-kind=unknown pattern. Random
+    bundled-CLI exit-1-empty-stderr is unfortunately common on the
+    happy path; a single retry usually succeeds. Auth/rate-limit/
+    cost-cap failures are NOT retried — those need operator
+    intervention.
+    """
+    import logging
+    log = logging.getLogger("reports.inference")
+    last_exc: Exception | None = None
+    for attempt in range(2):
+        try:
+            return await _infer_batch_once_async(
+                rendered_prompt,
+                batch,
+                vault_cwd=vault_cwd,
+                prompt_version=prompt_version,
+                model=model,
+                max_turns=max_turns,
+            )
+        except InferenceError as exc:
+            last_exc = exc
+            # Only retry on opaque CLI failures. The exception text
+            # carries the FailureClass output from log_sdk_failure.
+            retryable = ("unknown:" in str(exc)) or ("cli_crash:" in str(exc))
+            if attempt == 0 and retryable:
+                log.warning(
+                    "  inference batch=%s failed with retryable error; "
+                    "retrying once after 2s …",
+                    batch.label,
+                )
+                import asyncio
+                await asyncio.sleep(2.0)
+                continue
+            raise
+    assert last_exc is not None
+    raise last_exc
+
+
+async def _infer_batch_once_async(
+    rendered_prompt: str,
+    batch: InferenceBatch,
+    *,
+    vault_cwd: Path,
+    prompt_version: str,
+    model: str = DEFAULT_INFERENCE_MODEL,
+    max_turns: int = DEFAULT_MAX_TURNS,
+) -> BatchResult:
+    """One attempt of an inference batch. Internal — callers use
+    `infer_batch_async` which wraps this with retry-once-on-unknown."""
     import logging
 
     log = logging.getLogger("reports.inference")
