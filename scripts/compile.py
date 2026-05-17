@@ -313,18 +313,14 @@ SUBSTRATE_PROMPTS: dict[str, tuple[str, int, str | None]] = {
     # knowledge entries. 20 turns + Haiku covers the rare actionable
     # batch (whiteboard captures, receipts, document scans).
     "picture-batch":    ("compile_pictures", 20, "claude-haiku-4-5-20251001"),
-    # Memory-sync = cross-project AGENTS/CLAUDE.md copies. Memory-seed =
-    # aggregated per-project memory dumps, split per-section by classify.py.
-    # Either way: ONE excerpt per compile call. The rewritten compile_memories.md
-    # (2026-05-17) is a tight 3-step contract — Glob → Read → Edit-append
-    # Timeline — with a hard 5-turn budget in-prompt. 8 here is the CLI-level
-    # safety cap (~60% over budget); the prompt's anti-loop branch emits
-    # `{"status": "no_project_page"}` before reaching the CLI cap.
-    # Previously 25 turns: Haiku ignored the prompt's anti-loop guard and
-    # burned $0.35 per chunk hitting max_turns. See KNOWLEDGE.md and
-    # commits f289a43 (circuit-breaker) + this commit (prompt rewrite).
-    "memory-sync":     ("compile_memories", 8, "claude-haiku-4-5-20251001"),
-    "memory-seed":     ("compile_memories", 8, "claude-haiku-4-5-20251001"),
+    # Memory-sync / memory-seed: engine pre-resolves project_slug +
+    # bootstraps `## Timeline` section before SDK (compile_stages.memory),
+    # so the prompt is purely mechanical: Read → Edit-append, 2 turns.
+    # 5-turn CLI cap = 2 expected + 3-turn safety; no-project-page case
+    # short-circuits in Python and never invokes the SDK. Pre-pre-pass
+    # arc (2026-05-17): 25 → 8 → 5 as the contract tightened.
+    "memory-sync":     ("compile_memories", 5, "claude-haiku-4-5-20251001"),
+    "memory-seed":     ("compile_memories", 5, "claude-haiku-4-5-20251001"),
     # Longform notes — entity-dense narrative content (strategy docs,
     # design memos, multi-section essays) routinely 15-25 KB with 15-25
     # concept references. compile_default (the lean fallback prompt) +
@@ -419,6 +415,27 @@ def _frontmatter_compile_role(content: str) -> str | None:
     import re
     m = re.search(r"^compile_role:\s*[\"']?([\w-]+)[\"']?\s*$", block, re.MULTILINE)
     return m.group(1) if m else None
+
+
+def _parse_frontmatter(content: str) -> dict:
+    """Parse leading YAML frontmatter into a dict. Tolerant; returns {} on
+    missing or malformed front-matter. Sibling to the regex-based
+    `_frontmatter_type`/`_frontmatter_field` helpers, used for the memory
+    pre-pass where we need the full `tags:` list + `project:` scalar
+    together (regex would need two passes + list parsing).
+    """
+    if not content.startswith("---\n"):
+        return {}
+    end = content.find("\n---\n", 4)
+    if end == -1:
+        return {}
+    block = content[4:end]
+    import yaml  # local import keeps module-load cost minimal
+    try:
+        fm = yaml.safe_load(block) or {}
+    except yaml.YAMLError:
+        return {}
+    return fm if isinstance(fm, dict) else {}
 
 
 def _frontmatter_field(content: str, key: str) -> str | None:
@@ -715,6 +732,39 @@ async def compile_file(
             substrate_prompt, max_turns_for_call,
         )
 
+    # Memory-substrate pre-pass: resolve target project page + bootstrap
+    # `## Timeline` section deterministically so the SDK call can be
+    # purely mechanical (Read → Edit-append, 2-3 turns). Without this the
+    # prompt either burned turns on fuzzy slug-search (loose) or emitted
+    # no_project_page on 80% of files (strict). Slug-resolution is a
+    # tabellensuche, not LLM reasoning — fits the same pre-pass shape as
+    # `_substrate_key()` and `infer_compile_role()` (2026-05-17).
+    project_slug: str | None = None
+    project_page_rel: str | None = None
+    if source_type in ("memory-sync", "memory-seed"):
+        from compile_stages.memory import (
+            ensure_timeline_section,
+            resolve_project_slug,
+        )
+        fm = _parse_frontmatter(source_content)
+        project_slug = resolve_project_slug(source, fm, ROOT_DIR)
+        if project_slug is None:
+            log.info(
+                "  skipping: type=%s — no matching knowledge/projects/<slug>.md "
+                "page found (filename stem, frontmatter project:, tags all "
+                "unresolved). Next sync re-checks; create the project page "
+                "to enable back-linking.",
+                source_type,
+            )
+            return {"_skipped": "memory_no_project_page"}
+        project_page = KNOWLEDGE_DIR / "projects" / f"{project_slug}.md"
+        ensure_timeline_section(project_page)
+        project_page_rel = str(project_page.relative_to(ROOT_DIR))
+        log.info(
+            "  memory pre-pass: project=%s page=%s (Timeline bootstrapped if absent)",
+            project_slug, project_page_rel,
+        )
+
     from compile_stages.compile import compile_source
     from compile_stages.types import CompileMetadata
     metadata = CompileMetadata(
@@ -724,6 +774,8 @@ async def compile_file(
         max_turns=max_turns_for_call,
         substrate_type=source_type,
         substrate_prompt=substrate_prompt,
+        project_slug=project_slug,
+        project_page_rel=project_page_rel,
     )
 
     if classification.kind == "aggregated-memory":

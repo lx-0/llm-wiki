@@ -343,6 +343,11 @@ async def compile_source(
         source_content=content,
         today=today,
         now=now,
+        # Memory pre-pass results (populated by `compile.py` for memory-*
+        # substrates). Empty string when not applicable so `${project_slug}`
+        # / `${project_page}` in non-memory prompts substitute cleanly.
+        project_slug=metadata.project_slug or "",
+        project_page=metadata.project_page_rel or "",
     )
 
     try:

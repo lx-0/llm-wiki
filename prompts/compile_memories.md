@@ -1,51 +1,52 @@
-You are back-linking a memory file to its project page. Lean, mechanical, fast.
+You append one Timeline line to a project page. Mechanical, 2-3 turns.
 
 ## Hard facts (override anything in the source material)
 
 ${facts_md}
 
-## Source material
+## Pre-resolved inputs
 
-**File:** `${source_path}`
+The engine has already resolved the target page for you. Trust these values.
+
+- **Source file:** `${source_path}` (this is the memory excerpt — a memory-sync single file OR one chunk of a memory-seed aggregate)
+- **Project slug:** `${project_slug}`
+- **Target project page:** `${project_page}`
+- **Date:** `${today}`
+
+A `## Timeline` section is guaranteed to exist on the target page (engine bootstrapped it if missing).
+
+## Source material
 
 ```
 ${source_content}
 ```
 
-## What you do — exactly 3 steps, max 5 turns
+## Your task — 2 turns
 
-This is an operator-memory excerpt synced from a project workspace (`type: memory-sync` = single file copy; `type: memory-seed` = aggregated section). Each invocation receives ONE excerpt (already chunked by the caller for memory-seed). Your job is **one Timeline append, nothing else**.
+### Turn 1 — Read
 
-### Step 1 — derive the project slug
+Read `${project_page}` once. You need to see the file to make a valid Edit.
 
-The filename stem of `${source_path}` IS the project slug (e.g. `raw/memories/yesterday-ai-openclaw.md` → `yesterday-ai-openclaw`). Use exactly that — do not normalize, dehyphenate, or guess variants.
+### Turn 2 — Edit-append one Timeline line
 
-### Step 2 — Glob ONCE
-
-Run `Glob` with pattern `knowledge/projects/<slug>.md` using the slug from Step 1.
-
-- **Match** → go to Step 3.
-- **No match** → emit `{"status": "no_project_page", "slug": "<slug>"}` and STOP. Do NOT search alternative slugs. Do NOT create a project stub. Do NOT touch any other file. The next memory-sync will resurface this; that is fine.
-
-### Step 3 — Edit-append one Timeline line
-
-Read the matched project page, then Edit-append a single line to its existing `## Timeline` section (newest-first; insert directly under the heading):
+Edit `${project_page}`. Insert ONE new line directly under the existing `## Timeline` heading (newest-first ordering — your line goes ABOVE any existing entries that follow the heading):
 
 ```
-- **${today}** | `${source_path}` — Memory sync: <one-line summary of the most distinctive pattern in this excerpt>.
+- **${today}** | `${source_path}` — Memory sync: <one-line summary of the most distinctive pattern or fact in the excerpt>.
 ```
 
-Then emit `{"status": "ok", "project": "<slug>"}` and STOP.
+Replace `<one-line summary…>` with a single-sentence distillation drawn from the excerpt. Lean factual, not interpretive. ≤120 chars including the date prefix.
+
+Then emit `{"status": "ok", "project": "${project_slug}"}` and STOP.
 
 ## Hard prohibitions
 
-- ❌ No concept-stub creation. Even if you spot a recurring pattern. Memories alone do not justify concept pages; the next substrate-driven compile will surface it organically.
-- ❌ No `knowledge/index.md` edits.
-- ❌ No `daily/log.md` edits. Memory syncs run per session-end; logging each one is noise.
-- ❌ No State-block edits on the project page. Memories are not commitments.
-- ❌ No additional Glob / Grep / Read after Step 3. Done is done.
-- ❌ No retry with a different slug if Step 2 misses. One Glob, that's the contract.
+- ❌ No Glob, Grep, or Bash. The engine pre-resolved the page; do not search.
+- ❌ No edits to ANY file other than `${project_page}`.
+- ❌ No new sections, no concept stubs, no `knowledge/index.md` edits, no log.md edits.
+- ❌ No State-block edits on the project page. Memories are not commitments — Timeline append only.
+- ❌ No multi-line Timeline entries. One line per memory excerpt.
 
-## Turn-budget contract
+## Failure branch
 
-5 turns is the upper bound. Realistic finish: 2-3 turns (Glob → Read → Edit). If you find yourself on turn 4 still searching, STOP and emit `{"status": "no_project_page", "slug": "<slug>"}` — the safety branch is always available.
+If Read returns content that does not contain `## Timeline` (engine bootstrap should have prevented this — flag it as a real bug), emit `{"status": "timeline_missing", "page": "${project_page}"}` and STOP. Do not attempt to create the section yourself.

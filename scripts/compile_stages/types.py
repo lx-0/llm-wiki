@@ -65,3 +65,13 @@ class CompileMetadata:
     max_turns: int
     substrate_type: str | None
     substrate_prompt: str = "compile_main"
+    # Memory-substrate pre-pass results (compile_stages.memory). Resolved
+    # by `compile.py` before SDK call so the prompt stays mechanical:
+    # `project_slug` populates the prompt's `${project_slug}` var,
+    # `project_page_rel` populates `${project_page}` (vault-relative path
+    # the agent can Read directly). Both None for non-memory substrates
+    # OR memory substrates whose project page couldn't be resolved (those
+    # short-circuit to `_skipped: memory_no_project_page` upstream and
+    # never reach compile_source).
+    project_slug: str | None = None
+    project_page_rel: str | None = None
