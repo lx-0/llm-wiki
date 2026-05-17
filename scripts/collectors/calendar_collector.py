@@ -123,8 +123,6 @@ _OUTPUT_SUBFOLDER = "raw/notes/calendar"
 _STATE_FILE = STATE_DIR / "calendar-state.json"
 _SLUG_RE = re.compile(r"[^a-z0-9]+")
 
-_OAUTH_CLIENT_PRIMARY = ROOT_DIR / ".claude" / "google-oauth-client.json"
-_OAUTH_CLIENT_FALLBACK = ROOT_DIR / ".claude" / "gmail-oauth-client.json"
 
 # Region inside the per-date file that the collector owns. Operator-typed
 # prose ABOVE or BELOW these sentinels is preserved across regenerations.
@@ -236,19 +234,14 @@ def _resolve_calendar_accounts() -> list[_CalendarAccount]:
 
 # ── OAuth ───────────────────────────────────────────────────────────
 
-def _resolve_oauth_client() -> Path:
-    """Prefer the neutral google-oauth-client.json; fall back to gmail's
-    (same GCP installed-app client works for any scope set)."""
-    if _OAUTH_CLIENT_PRIMARY.exists():
-        return _OAUTH_CLIENT_PRIMARY
-    if _OAUTH_CLIENT_FALLBACK.exists():
-        return _OAUTH_CLIENT_FALLBACK
-    return _OAUTH_CLIENT_PRIMARY
 
 
-def _app() -> OAuthApp:
+def _app(account_id: str) -> OAuthApp:
     return OAuthApp(
-        client_file=_resolve_oauth_client(),
+        client_file=google_oauth.resolve_client_file(
+            account_id,
+            integration_legacy=ROOT_DIR / ".claude" / "gmail-oauth-client.json",
+        ),
         scopes=(_GOOGLE_CAL_SCOPE,),
         token_prefix="calendar-token",
         bootstrap_cmd="wiki calendar-auth",
@@ -259,7 +252,7 @@ def _app() -> OAuthApp:
 def calendar_auth_bootstrap(account_id: str) -> tuple[bool, str]:
     """Run the installed-app OAuth flow once for one account. Called from
     ``wiki calendar-auth <account-id>``. Persists the token under that id."""
-    return google_oauth.bootstrap(_app(), account_id)
+    return google_oauth.bootstrap(_app(account_id), account_id)
 
 
 # ── Event filtering ─────────────────────────────────────────────────
@@ -607,7 +600,7 @@ class CalendarCollector:
         if not self._accounts:
             return False
         return any(
-            google_oauth.token_path(_app(), a.account_id).exists()
+            google_oauth.token_path(_app(a.account_id), a.account_id).exists()
             for a in self._accounts
         )
 
@@ -708,7 +701,7 @@ class CalendarCollector:
 
         ``new_concepts`` is the list of recurring-series slugs that need a
         canonical concept page written (first sighting only)."""
-        sess, err = google_oauth.session(_app(), acct.account_id)
+        sess, err = google_oauth.session(_app(acct.account_id), acct.account_id)
         if err:
             return f"auth: {err}", [], [], False
         client = GoogleCalendarClient(session=sess, timeout_s=self._timeout_s)

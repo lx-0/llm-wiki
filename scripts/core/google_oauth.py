@@ -131,6 +131,36 @@ def credentials(app: OAuthApp, account_id: str):
     return creds, None
 
 
+def resolve_client_file(account_id: str, *, integration_legacy: Path | None = None) -> Path:
+    """Resolve which OAuth client JSON to use for an `account_id` + integration.
+
+    Precedence:
+      1. `<vault>/.claude/oauth-client-<account_id>.json` — per-account
+         override. Operator drops their OWN GCP project's OAuth client
+         here when the account must NOT be coupled to the shared
+         project (e.g. consumer Gmail not in any Workspace).
+      2. `<vault>/.claude/google-oauth-client.json` — shared global
+         client. Used by accounts that DO live in the same Workspace
+         as the global project's owner.
+      3. `integration_legacy` — kind-specific legacy file (e.g.
+         pre-consolidation `gmail-oauth-client.json`). Optional.
+
+    Returns the first existing file. If none exists, returns the
+    per-account path so the downstream bootstrap error message points
+    the operator at the per-account convention (which is what they
+    almost certainly want when no shared client is set up either).
+    """
+    per_account = ROOT_DIR / ".claude" / f"oauth-client-{account_id}.json"
+    if per_account.exists():
+        return per_account
+    global_shared = ROOT_DIR / ".claude" / "google-oauth-client.json"
+    if global_shared.exists():
+        return global_shared
+    if integration_legacy is not None and integration_legacy.exists():
+        return integration_legacy
+    return per_account
+
+
 def session(app: OAuthApp, account_id: str):
     """Returns (AuthorizedSession, None) or (None, error_msg)."""
     try:

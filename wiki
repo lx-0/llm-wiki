@@ -1078,8 +1078,13 @@ ${C_BOLD}USAGE${C_RESET}
   wiki gmail-auth <account-id>
 
 ${C_BOLD}WHAT IT DOES${C_RESET}
-  Reads .claude/gmail-oauth-client.json (you provide this — create
-  an installed-app OAuth client at console.cloud.google.com),
+  Reads the OAuth client JSON via this precedence (first-existing wins):
+    1. .claude/oauth-client-<account-id>.json   ← per-account override
+       (account-owned Cloud project — strict separation)
+    2. .claude/google-oauth-client.json         ← shared cross-account client
+    3. .claude/gmail-oauth-client.json          ← legacy fallback
+  You provide the file — create an installed-app OAuth client at
+  console.cloud.google.com.
   opens a local-loopback browser for consent, persists the token to
   .wiki/state/gmail-token-<id>.json. Re-running re-issues consent.
 

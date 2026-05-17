@@ -88,8 +88,6 @@ _SCOPES = ("https://www.googleapis.com/auth/drive.meet.readonly",)
 
 # Client secret — prefer a neutral filename, fall back to gmail's (same GCP
 # installed-app client works for any scope set).
-_OAUTH_CLIENT_PRIMARY = ROOT_DIR / ".claude" / "google-oauth-client.json"
-_OAUTH_CLIENT_FALLBACK = ROOT_DIR / ".claude" / "gmail-oauth-client.json"
 
 
 # ── Output shape ─────────────────────────────────────────────────────
@@ -267,19 +265,14 @@ def _scan_siblings(output_root: Path) -> tuple[dict[str, _Sibling], set[str]]:
     return key_map, short_ids
 
 
-def _resolve_oauth_client() -> Path:
-    """Prefer the neutral client file; fall back to gmail's. Returns the primary
-    path even when neither exists — `google_oauth.bootstrap` reports it clearly."""
-    if _OAUTH_CLIENT_PRIMARY.exists():
-        return _OAUTH_CLIENT_PRIMARY
-    if _OAUTH_CLIENT_FALLBACK.exists():
-        return _OAUTH_CLIENT_FALLBACK
-    return _OAUTH_CLIENT_PRIMARY
 
 
-def _app() -> OAuthApp:
+def _app(account_id: str) -> OAuthApp:
     return OAuthApp(
-        client_file=_resolve_oauth_client(),
+        client_file=google_oauth.resolve_client_file(
+            account_id,
+            integration_legacy=ROOT_DIR / ".claude" / "gmail-oauth-client.json",
+        ),
         scopes=_SCOPES,
         token_prefix="gmeet-token",
         bootstrap_cmd="wiki gmeet-auth",
@@ -293,7 +286,7 @@ def gmeet_auth_bootstrap(account_id: str) -> tuple[bool, str]:
     `personal.accounts.<id>` whose body has a `gmeet:` sub-block — but the
     bootstrap itself is config-agnostic; it just persists a token under
     that id. Opens a local-loopback browser for the consent screen."""
-    return google_oauth.bootstrap(_app(), account_id)
+    return google_oauth.bootstrap(_app(account_id), account_id)
 
 
 # ── Per-account resolution ───────────────────────────────────────────
@@ -640,7 +633,7 @@ class GmeetCollector:
         if not self._accounts:
             return False
         return any(
-            google_oauth.token_path(_app(), a.account_id).exists()
+            google_oauth.token_path(_app(a.account_id), a.account_id).exists()
             for a in self._accounts
         )
 
@@ -716,7 +709,7 @@ class GmeetCollector:
         """Run one account's scan. Returns (one-line message, files, skipped, state_touched).
         Mutates `state[acct.account_id]['last_seen_ts']` only on a successful scan
         that wrote files — failures leave the watermark untouched."""
-        sess, err = google_oauth.session(_app(), acct.account_id)
+        sess, err = google_oauth.session(_app(acct.account_id), acct.account_id)
         if err:
             return f"auth: {err}", [], 0, False
 
