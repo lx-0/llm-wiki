@@ -601,7 +601,7 @@ Dateiname: `raw/requests/request-{slug}-{date}.json`
 
 **Konsument (2026-05-13):** Das `scripts/curiosity/` Sub-Package spiegelt das `suggestions/`-Pattern: `producer.py` (extrahiert aus `compile.py`), `cli.py` (Operator-CLI `wiki curiosity`), `backends/email.py` (verarbeitet `type: "email-deep-scan"` Requests).
 
-**Producer:** `scripts/curiosity/producer.py:maybe_generate_curiosity_requests` (von `compile.py:639` per file aufgerufen).
+**Producer:** `scripts/producers/curiosity.py:CuriosityProducer` (Protocol-conforming wrapper), delegiert an `scripts/curiosity/producer.py:maybe_generate_curiosity_requests`. Dispatch via `compile_stages/post_passes.py:run_post_passes` aus `compile.py:main()` nach jedem erfolgreichen Compile; Gate `features.curiosity_loop` auf `SPEC.enabled_config_key`. Manueller Re-run: `wiki produce curiosity <source>`.
 
 **Consumer:** `scripts/curiosity/cli.py` mit `--list / --run-oldest / --run <slug> / --run-all / --clear-done`. Piggyback `curiosity_followup` (24h Cooldown) ruft `--run-oldest` automatisch.
 
@@ -672,7 +672,7 @@ Jede Action innerhalb einer Suggestion hat ein eigenes `status` Feld. Der User a
 
 Der Suggestion-Producer prüft VOR dem Generieren: bestehende Procmail-Config (für Accounts mit `has_procmail: true`). Wenn ein Sender bereits abgedeckt ist, wird keine Suggestion generiert. Safety-Net in `suggestions/cli.py` blockt Duplikate bei Execution.
 
-> **Code-Topologie (M003 follow-up, 2026-05-13):** Die ehemals in `compile.py` lebende Producer-Logik (`maybe_generate_suggestions` + `_is_email_source` + `_read_rules_overview` + `_read_procmail_config`) wurde nach `scripts/suggestions/producer.py` extrahiert. compile.py importiert nur noch die Top-Level-Funktion. Die historische `scripts/thunderbird-rules.py` (Regel-Export für Compile-Input) existiert nicht mehr — TB-Regeln werden derzeit nicht aktiv eingespeist.
+> **Code-Topologie:** Die Producer-Logik (`maybe_generate_suggestions` + `_is_email_source` + `_read_rules_overview` + `_read_procmail_config`) lebt in `scripts/suggestions/producer.py`. Dispatch erfolgt über `scripts/producers/suggestions.py:SuggestionsProducer` (Protocol-conforming Wrapper); `compile_stages/post_passes.py:run_post_passes` ruft den Wrapper nach jedem erfolgreichen Compile. Source-Glob-Gate via `features.suggestions_source_globs` auf `SPEC.source_glob_config_key` (default `["raw/email/*.md"]`). Manueller Re-run: `wiki produce suggestions <source>`. Die historische `scripts/thunderbird-rules.py` (Regel-Export für Compile-Input) existiert nicht mehr — TB-Regeln werden derzeit nicht aktiv eingespeist.
 
 ### Procmail (All-Inkl Webmail API)
 

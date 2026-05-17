@@ -61,15 +61,27 @@ llm-wiki/
 │   │   ├── scan_browser.py     ← BrowserCollector (Registry; migrated 2026-05-14)
 │   │   ├── scan_screenshots.py ← ScreenshotsCollector (Registry, piggyback; migrated 2026-05-14)
 │   │   └── scan_youtube.py     ← YoutubeCollector (Registry; migrated 2026-05-14 — Phase 2 complete)
-│   ├── facts/              ← hard-fact subsystem (knowledge/facts/<slug>.md consumers)
+│   ├── facts/              ← hard-fact subsystem (knowledge/facts/<slug>.md consumers) + takes producer
 │   │   ├── correct.py          ← CRUD CLI: add/list/remove/edit/path
-│   │   └── correct_apply.py    ← agent-driven propagation across vault
-│   ├── suggestions/        ← email-suggestion pipeline (raw/suggestions/ producer + executor)
-│   │   ├── producer.py         ← maybe_generate_suggestions (called from compile.py)
+│   │   ├── correct_apply.py    ← agent-driven propagation across vault
+│   │   └── takes_producer.py   ← maybe_extract_takes legacy free function (delegated-to by producers/takes.py)
+│   ├── producers/          ← post-compile derivative-material extractors (Registry + orchestrator + CLI)
+│   │   ├── base.py             ← Producer Protocol + ProducerSpec + ProducerResult + Registry (@register, all_producers, get_producer)
+│   │   ├── orchestrate.py      ← evaluate_and_run(producer, source) — gate evaluation + dispatch
+│   │   ├── cli.py              ← `wiki produce` dispatcher (--list / <name> <source>)
+│   │   ├── suggestions.py      ← SuggestionsProducer (delegates to suggestions/producer.py)
+│   │   ├── curiosity.py        ← CuriosityProducer   (delegates to curiosity/producer.py)
+│   │   └── takes.py            ← TakesProducer       (delegates to facts/takes_producer.py)
+│   ├── compile_stages/     ← pure-ish stages extracted from compile.py's per-file loop
+│   │   ├── types.py            ← CompileResult + CompileMetadata dataclasses
+│   │   ├── compile.py          ← compile_source(content, metadata) → CompileResult (LLM-call boundary)
+│   │   └── post_passes.py      ← run_post_passes(source, compile_result, state) → list[ProducerResult] (serial ProducerRegistry iterator)
+│   ├── suggestions/        ← email-suggestion pipeline (legacy producer body + executor)
+│   │   ├── producer.py         ← maybe_generate_suggestions legacy free function (delegated-to by producers/suggestions.py)
 │   │   ├── cli.py              ← interactive approve/review/reject/execute
 │   │   └── backends/imap.py    ← IMAP move/tag/set-flags executor
-│   ├── curiosity/          ← gap-detection loop (raw/requests/ producer + consumer)
-│   │   ├── producer.py         ← maybe_generate_curiosity_requests (called from compile.py)
+│   ├── curiosity/          ← gap-detection loop (legacy producer body + consumer CLI + backends)
+│   │   ├── producer.py         ← maybe_generate_curiosity_requests legacy free function (delegated-to by producers/curiosity.py)
 │   │   ├── cli.py              ← wiki curiosity: list / run-oldest / run / run-all / clear-done
 │   │   └── backends/email.py   ← email-deep-scan: scan_deep via Mailbox-adapter → raw/notes/email/deep-*.md
 │   ├── dashboard/          ← Obsidian dashboard helpers
@@ -80,7 +92,7 @@ llm-wiki/
 │   ├── migrations/         ← one-shot schema/data migrations (not active CLI surface)
 │   ├── adapters/           ← Mailbox Reader/Filter adapters (thunderbird, gmail, imap; allinkl = filter)
 │   ├── domain/             ← pure domain types (mail message, etc.)
-│   ├── compile.py          ← Claude Agent SDK compiler (raw/daily → knowledge/)
+│   ├── compile.py          ← Claude Agent SDK compiler (raw/daily → knowledge/); per-file loop calls compile_stages.compile_source for the LLM call, then compile_stages.run_post_passes for the producer post-pass
 │   ├── flush.py            ← session-end → daily/ append + piggyback spawner
 │   ├── lint.py             ← 8 structural checks + 1 LLM contradiction check
 │   ├── query.py            ← Claude Agent SDK query (read-only or file-back)

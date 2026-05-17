@@ -248,6 +248,23 @@ Grouped by purpose. Run `wiki <cmd> --help` for the full per-command help block.
 | `wiki suggestions [flags]` | review + execute YAML optimization suggestions in `raw/suggestions/`. Modes: `--list` (overview), `--review ID` (interactive), `--approve ID N` / `--reject ID N` (per-action), `--dry-run` (preview approved), no-args (execute). IMAP backend uses `.claude/.env` credentials. |
 | `wiki curiosity [flags]` | process raw/requests/ deep-scan requests (curiosity-loop consumer). Modes: `--list` (overview), `--run-oldest` (single), `--run SLUG` (substring match), `--run-all` (all pending), `--clear-done` (cleanup), `--dry-run` (plan only). Email backend uses the configured Mailbox adapters via `scan_deep`. Auto-runs as 24h piggyback (`curiosity_followup`). |
 
+### Producers (post-compile derivative material)
+
+Producers consume a *compiled* source file under `raw/` and emit derived material — suggestion notes, knowledge-gap requests, third-party belief extractions. They run automatically as a serial post-pass after each successful compile (`compile.py:main()` → `compile_stages.post_passes.run_post_passes`). The `wiki produce` CLI is for manual re-run / debug / replay against a single source.
+
+| Command | What it does |
+|---|---|
+| `wiki produce --list` | enumerate registered Producers with their declared gates (`SPEC.enabled_config_key`, `SPEC.source_glob_config_key`) |
+| `wiki produce <name> <source>` | run one Producer on one source path; gate evaluation + dispatch via `producers.orchestrate.evaluate_and_run`. Exit code 1 on `failed`. |
+
+Registered Producers (run order = registration order):
+
+| Name | Enabled key | Source-glob key | What it emits |
+|---|---|---|---|
+| `suggestions` | (always) | `features.suggestions_source_globs` (default `["raw/email/*.md"]`) | `raw/suggestions/<id>.yaml` — pattern-driven email-action proposals (consumed by `wiki suggestions`) |
+| `curiosity` | `features.curiosity_loop` | (any source) | `raw/requests/request-<slug>-<date>.json` — knowledge-gap requests (consumed by `wiki curiosity`) |
+| `takes` | `features.extract_takes` | `limits.extract_takes_source_globs` | `knowledge/people/<slug>.md` `## Takes` blocks — third-party beliefs/claims extracted from meeting + email substrate |
+
 ### Agentic tasks
 
 | Command | What it does |

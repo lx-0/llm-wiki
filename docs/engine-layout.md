@@ -55,13 +55,29 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 │   │   ├── calendar/google.py     ← Google Calendar v3 REST wrapper (list_calendars / list_events / get_event)
 │   │   └── mailbox/{gmail,thunderbird,allinkl,imap,base}.py
 │   ├── domain/                ← pure domain types (mail message, filter rule)
-│   ├── facts/                 ← hard-fact subsystem (knowledge/facts/<slug>.md consumers)
+│   ├── facts/                 ← hard-fact subsystem (knowledge/facts/<slug>.md consumers) + takes producer
 │   │   ├── correct.py             ← CRUD CLI: add/list/remove/edit/path
-│   │   └── correct_apply.py       ← agent-driven propagation across vault
-│   ├── suggestions/           ← email-suggestion pipeline (raw/suggestions/ producer + executor)
-│   │   ├── producer.py            ← maybe_generate_suggestions (called from compile.py)
+│   │   ├── correct_apply.py       ← agent-driven propagation across vault
+│   │   └── takes_producer.py      ← maybe_extract_takes legacy free function (delegated-to by producers/takes.py)
+│   ├── producers/             ← post-compile derivative-material extractors (Registry + orchestrator + CLI)
+│   │   ├── base.py                ← Producer Protocol, ProducerSpec, ProducerResult, Registry (`@register`, `all_producers`, `get_producer`)
+│   │   ├── orchestrate.py         ← `evaluate_and_run(producer, source)` — gate evaluation + dispatch
+│   │   ├── cli.py                 ← `wiki produce` dispatcher (`--list` / `<name> <source>`)
+│   │   ├── suggestions.py         ← SuggestionsProducer (delegates to `suggestions/producer.py:maybe_generate_suggestions`)
+│   │   ├── curiosity.py           ← CuriosityProducer   (delegates to `curiosity/producer.py:maybe_generate_curiosity_requests`)
+│   │   └── takes.py               ← TakesProducer       (delegates to `facts/takes_producer.py:maybe_extract_takes`)
+│   ├── compile_stages/        ← pure-ish stages extracted from compile.py's per-file loop
+│   │   ├── types.py               ← CompileResult + CompileMetadata dataclasses
+│   │   ├── compile.py             ← `compile_source(content, metadata) → CompileResult` (LLM-call boundary: prompt assembly, owner-block, pre-flight gate, SDK call, retry-on-kind-unknown, failure classification)
+│   │   └── post_passes.py         ← `run_post_passes(source, compile_result, state) → list[ProducerResult]` (iterates ProducerRegistry serially, accumulates `producer_cost_total` into state)
+│   ├── suggestions/           ← email-suggestion pipeline (legacy producer body + executor)
+│   │   ├── producer.py            ← `maybe_generate_suggestions` legacy free function (delegated-to by producers/suggestions.py)
 │   │   ├── cli.py                 ← interactive approve/review/reject/execute
 │   │   └── backends/imap.py       ← IMAP move/tag/set-flags executor
+│   ├── curiosity/             ← gap-detection loop (legacy producer body + consumer CLI + backends)
+│   │   ├── producer.py            ← `maybe_generate_curiosity_requests` legacy free function (delegated-to by producers/curiosity.py)
+│   │   ├── cli.py                 ← `wiki curiosity` consumer: list / run-oldest / run / run-all / clear-done
+│   │   └── backends/email.py      ← email-deep-scan dispatch via Mailbox-adapter `scan_deep`
 │   ├── dashboard/             ← Obsidian dashboard helpers (post-flush + seed-time)
 │   │   ├── dashboard_stats.py     ← _dashboard-stats.md generator
 │   │   ├── dashboard_lint.py      ← _dashboard-lint.md generator
@@ -69,7 +85,7 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 │   │   └── inject_daily_button.py ← idempotent Summarize-button injection into daily/<date>/sessions.md
 │   ├── migrations/            ← one-shot schema/data migrations
 │   │   └── migrate_add_type.py    ← backfill type: frontmatter
-│   ├── compile.py             ← Claude Agent SDK compiler (raw/ + daily/<date>/* + daily/<date>.md → knowledge/)
+│   ├── compile.py             ← Claude Agent SDK compiler (raw/ + daily/<date>/* + daily/<date>.md → knowledge/); per-file loop delegates the LLM call to `compile_stages/compile.py:compile_source` and the post-pass loop to `compile_stages/post_passes.py:run_post_passes`
 │   ├── flush.py               ← session-end → daily/<date>/sessions.md append + piggyback spawner
 │   ├── migrate_daily_to_rollup.py   ← one-shot: legacy daily/<date>.md → daily/<date>/sessions.md
 │   ├── backfill_daily_rollup.py     ← one-shot: raw/{health,voice,transcripts/{jamie,gmeet}} → daily/<date>/{health,voice,meetings}.md
