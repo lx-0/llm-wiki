@@ -50,6 +50,8 @@ from core.sdk_helpers import (
     assert_prompt_within_budget,
     is_fatal,
     log_sdk_failure,
+    make_path_scope_gate,
+    prompt_stream,
 )
 
 # ── Logging ──────────────────────────────────────────────────────────
@@ -768,39 +770,54 @@ async def compile_file(
         # silent — see `.ytstack/backlog/compile-per-call-timeout.md`
         # and KNOWLEDGE.md "hang vs crash". Set 0 to disable.
         per_call_timeout = CONFIG.limits.compile_per_call_timeout_s
+        # PATH-SCOPE ENFORCEMENT (rewritten 2026-05-17). The earlier shape
+        # — `Write(knowledge/**)` + `Edit(knowledge/**)` in `allowed_tools`
+        # plus `permission_mode="acceptEdits"` — was empirically broken
+        # (see `scripts/probe_compile_scope.py`): the bundled Claude Code
+        # CLI parses the parenthesised path glob as decoration and treats
+        # the entry as the bare `Write` / `Edit` tool, leaving the agent
+        # with unrestricted write access under cwd. The fix uses a
+        # `can_use_tool` callback as a Python-side gate. Three constraints
+        # are baked into the gated branch:
+        #   - Write/Edit must NOT appear in allowed_tools (else the CLI
+        #     fast-paths them and the callback never fires).
+        #   - permission_mode must NOT be acceptEdits (else auto-allow).
+        #   - prompt must be AsyncIterable[dict] in streaming mode.
+        # The else-branch keeps the legacy decorative shape as a one-line
+        # rollback under `features.compile_callback_gate=false`. See
+        # `.ytstack/backlog/compile-scope-allowlist-broken.md`.
+        common_options = dict(
+            max_buffer_size=CONFIG.limits.sdk_max_buffer_size_mb * 1024 * 1024,
+            cwd=str(ROOT_DIR),
+            model=model_id,
+            max_turns=max_turns_for_call,
+            system_prompt=render("compile_main_system"),
+            # Pick up the vault's CLAUDE.md so operator scope-discipline
+            # rules reach the agent.
+            setting_sources=["project"],
+            stderr=capture.callback,
+        )
+        if CONFIG.features.compile_callback_gate:
+            agent_options = ClaudeAgentOptions(
+                **common_options,
+                allowed_tools=["Read", "Glob", "Grep"],
+                can_use_tool=make_path_scope_gate([ROOT_DIR / "knowledge"]),
+                permission_mode="default",
+            )
+            query_prompt = prompt_stream(prompt)
+        else:
+            agent_options = ClaudeAgentOptions(
+                **common_options,
+                allowed_tools=[
+                    "Read", "Glob", "Grep",
+                    "Write(knowledge/**)",
+                    "Edit(knowledge/**)",
+                ],
+                permission_mode="acceptEdits",
+            )
+            query_prompt = prompt
         try:
-            agen = query(
-                prompt=prompt,
-                options=ClaudeAgentOptions(
-                    max_buffer_size=CONFIG.limits.sdk_max_buffer_size_mb * 1024 * 1024,
-                    cwd=str(ROOT_DIR),
-                    model=model_id,
-                    # PATH-SCOPED ALLOWLIST (locked 2026-05-15). Write/Edit
-                    # are restricted to `knowledge/**` by tool-pattern. Any
-                    # other target path is default-denied by the bundled CLI
-                    # without needing a corresponding entry in `disallowed_tools`.
-                    # This is a tighter posture than the denylist that
-                    # preceded it: substrate (daily/, raw/) routinely
-                    # contains literal change-descriptions of engine files
-                    # (`.ytstack/*`, `docs/*`, `AGENTS.md`, ...) which the
-                    # agent otherwise treated as instructions and executed
-                    # against `<vault>/.wiki/`. See KNOWLEDGE.md "Compile
-                    # prompt injection via substrate".
-                    allowed_tools=[
-                        "Read", "Glob", "Grep",
-                        "Write(knowledge/**)",
-                        "Edit(knowledge/**)",
-                    ],
-                    permission_mode="acceptEdits",
-                    max_turns=max_turns_for_call,
-                    system_prompt=render("compile_main_system"),
-                    # Pick up the vault's CLAUDE.md (if any) so operator
-                    # scope-discipline rules reach the agent. Empty list
-                    # killed that signal previously.
-                    setting_sources=["project"],
-                    stderr=capture.callback,
-                ),
-            ).__aiter__()
+            agen = query(prompt=query_prompt, options=agent_options).__aiter__()
             while True:
                 try:
                     if per_call_timeout and per_call_timeout > 0:

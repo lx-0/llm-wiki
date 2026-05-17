@@ -73,7 +73,12 @@ from core.paths import (
     DAILY_DIR,
 )
 from core.prompts import render
-from core.sdk_helpers import StderrCapture, log_sdk_failure
+from core.sdk_helpers import (
+    StderrCapture,
+    log_sdk_failure,
+    make_path_scope_gate,
+    prompt_stream,
+)
 from core.utils import now_iso, today_iso
 
 
@@ -864,25 +869,39 @@ async def dream_entity(
     actual_cost = 0.0
     capture = StderrCapture()
 
+    # Path-scope: see compile.py for the full design comment. Same shape
+    # here — flag-branched to keep the rollback path one config flip away.
+    common_options = dict(
+        max_buffer_size=CONFIG.limits.sdk_max_buffer_size_mb * 1024 * 1024,
+        cwd=str(ROOT_DIR),
+        model=model,
+        max_turns=turns,
+        system_prompt=render("dream_entity_system"),
+        setting_sources=["project"],
+        stderr=capture.callback,
+    )
+    if CONFIG.features.compile_callback_gate:
+        agent_options = ClaudeAgentOptions(
+            **common_options,
+            allowed_tools=["Read", "Glob", "Grep"],
+            can_use_tool=make_path_scope_gate([ROOT_DIR / "knowledge"]),
+            permission_mode="default",
+        )
+        query_prompt = prompt_stream(prompt)
+    else:
+        agent_options = ClaudeAgentOptions(
+            **common_options,
+            allowed_tools=[
+                "Read", "Glob", "Grep",
+                "Write(knowledge/**)",
+                "Edit(knowledge/**)",
+            ],
+            permission_mode="acceptEdits",
+        )
+        query_prompt = prompt
+
     try:
-        async for message in query(
-            prompt=prompt,
-            options=ClaudeAgentOptions(
-                max_buffer_size=CONFIG.limits.sdk_max_buffer_size_mb * 1024 * 1024,
-                cwd=str(ROOT_DIR),
-                model=model,
-                allowed_tools=[
-                    "Read", "Glob", "Grep",
-                    "Write(knowledge/**)",
-                    "Edit(knowledge/**)",
-                ],
-                permission_mode="acceptEdits",
-                max_turns=turns,
-                system_prompt=render("dream_entity_system"),
-                setting_sources=["project"],
-                stderr=capture.callback,
-            ),
-        ):
+        async for message in query(prompt=query_prompt, options=agent_options):
             if isinstance(message, AssistantMessage) and message.usage:
                 input_tokens += message.usage.get("input_tokens", 0)
                 output_tokens += message.usage.get("output_tokens", 0)
