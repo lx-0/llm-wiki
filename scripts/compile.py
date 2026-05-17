@@ -982,7 +982,13 @@ async def main() -> None:
     # skip-list hits.
     pending = len(files) - compiled_count - failed_count - skipped_count
     elapsed_min, elapsed_sec = divmod(int(time.time() - run_started), 60)
-    run_cost = (run_input_tokens * 5.0 + run_output_tokens * 25.0) / 1_000_000
+    # Use the SDK-reported per-file cost deltas (already summed into
+    # total_cost in the per-file loop) rather than re-deriving from
+    # token counts. The token formula assumed Opus pricing on raw input
+    # tokens, but Haiku/Sonnet-routed substrates use different rates and
+    # SDK reports cache-discounted token counts — both biases compounded
+    # to a 50-80× under-report on Haiku-heavy runs.
+    run_cost = round(total_cost - cost_at_start, 4)
     log.info("─── compilation %s ───", outcome)
     log.info(
         "  files:   %d done · %d failed · %d skipped · %d pending of %d candidates",

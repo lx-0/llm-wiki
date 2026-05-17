@@ -74,5 +74,28 @@ async def run_post_passes(
         state["producer_cost_total"] = round(
             state.get("producer_cost_total", 0.0) + cost_delta, 4
         )
+        _log_summary(results, cost_delta)
 
     return results
+
+
+def _log_summary(results: list[ProducerResult], cost_delta: float) -> None:
+    """One-line operator-facing summary of which producers ran for this source.
+
+    Without this line a compile with all-skipped producers looks like
+    post-passes never ran. Format mirrors the compile per-file ✓ line
+    so it visually parents under the source it relates to.
+    """
+    ok = sum(1 for r in results if r.status == "ok")
+    skipped = sum(1 for r in results if r.status == "skipped")
+    failed = sum(1 for r in results if r.status == "failed")
+    parts = []
+    for r in results:
+        marker = {"ok": "✓", "skipped": "·", "failed": "✗"}[r.status]
+        parts.append(f"{marker}{r.producer}")
+    breakdown = " ".join(parts)
+    cost_tail = f" (${cost_delta:.4f})" if cost_delta else ""
+    log.info(
+        "  post-pass: %d ok · %d skipped · %d failed — %s%s",
+        ok, skipped, failed, breakdown, cost_tail,
+    )
