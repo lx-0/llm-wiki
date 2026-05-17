@@ -147,21 +147,32 @@ def cmd_run(args: argparse.Namespace) -> int:
                     f"source={ref.source}; running …",
                     flush=True,
                 )
-                # run_inference writes the per-instrument report.
-                # Override output_dir to point inside the run-dir's
-                # instruments/ subdir.
                 target_path = run_dir.instruments_dir / ref.report_filename
-                # Use the slug for instrument lookup (the canonical
-                # filesystem name); alias is just for output naming.
-                report_path = run_inference(
-                    ref.slug,
-                    ref.version,
-                    ROOT_DIR,
-                    output_dir=run_dir.instruments_dir,
-                    study_dir=study.study_dir,
-                )
-                # run_inference names the file <slug>.md; rename if
-                # alias differs.
+                try:
+                    report_path = run_inference(
+                        ref.slug,
+                        ref.version,
+                        ROOT_DIR,
+                        output_dir=run_dir.instruments_dir,
+                        study_dir=study.study_dir,
+                    )
+                except Exception as exc:
+                    # Skip-and-flag: one bad instrument should not kill
+                    # the whole run. After retries are exhausted (handled
+                    # inside infer_batch_async), surface the failure +
+                    # continue with remaining instruments. The run-summary
+                    # will reflect the missing instrument.
+                    print(
+                        f"      ✗ {ref.alias or ref.slug} failed terminally "
+                        f"after retries: {type(exc).__name__}: {exc}",
+                        flush=True,
+                    )
+                    print(
+                        f"        skipping this instrument; other instruments "
+                        f"+ meta-report will still complete.",
+                        flush=True,
+                    )
+                    continue
                 if report_path.name != ref.report_filename:
                     report_path.rename(target_path)
                     report_path = target_path

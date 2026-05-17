@@ -295,7 +295,13 @@ async def infer_batch_async(
     import logging
     log = logging.getLogger("reports.inference")
     last_exc: Exception | None = None
-    for attempt in range(2):
+    # 3 attempts total: original + 2 retries with backoff 2s, then 5s.
+    # Bundled-CLI flakiness sometimes persists across one retry
+    # (PSS-10 hit kind=unknown twice in a row 2026-05-17); the second
+    # retry usually clears it. Cost ceiling: 3× single-call cost on
+    # the worst failing instrument.
+    RETRY_BACKOFFS = (2.0, 5.0)
+    for attempt in range(3):
         try:
             return await _infer_batch_once_async(
                 rendered_prompt,
@@ -307,12 +313,6 @@ async def infer_batch_async(
             )
         except InferenceError as exc:
             last_exc = exc
-            # Retry on: (1) opaque CLI failures (kind=unknown / cli_crash),
-            # (2) schema-validation failures (agent omitted items / extra
-            # items / non-JSON output). Haiku occasionally drops one item
-            # despite the prompt's "every item MUST appear" instruction;
-            # re-roll usually produces the full set. Auth/rate-limit
-            # errors are explicitly NOT retried.
             msg = str(exc)
             retryable = (
                 "unknown:" in msg or "cli_crash:" in msg
@@ -322,14 +322,15 @@ async def infer_batch_async(
                 or "agent output had unbalanced JSON braces" in msg
                 or "agent output contained no JSON object" in msg
             )
-            if attempt == 0 and retryable:
+            if attempt < len(RETRY_BACKOFFS) and retryable:
+                backoff = RETRY_BACKOFFS[attempt]
                 log.warning(
-                    "  inference batch=%s failed with retryable error; "
-                    "retrying once after 2s …",
-                    batch.label,
+                    "  inference batch=%s failed (attempt %d/3) with retryable "
+                    "error; retrying after %.1fs …",
+                    batch.label, attempt + 1, backoff,
                 )
                 import asyncio
-                await asyncio.sleep(2.0)
+                await asyncio.sleep(backoff)
                 continue
             raise
     assert last_exc is not None
