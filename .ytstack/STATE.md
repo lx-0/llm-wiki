@@ -1,7 +1,7 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-05-17T15:44:00Z
+last_updated: 2026-05-17T17:50:00Z
 current_milestone: none
 active_slice: none
 active_task: none
@@ -11,7 +11,11 @@ parallel_milestones: [M021]
 
 # State
 
-**Status:** M022 DONE 2026-05-17. Two-zone intake live across all channels (process-inbox.py + voice + pictures collectors). T04 lxw migration executed: 47 files moved (29 voice + 18 pictures), both iCloud .processed/ folders rmdir-ed. Mobile-collectors now write archive directly into vault. 841/841 tests green. Inbox-intake-Schema-Unifizierung: zwei-Zonen-Modell (`raw/inbox-<channel>/` = audit-archive, `raw/<category>/` = derived substrate), `.processed/`-Archive ausserhalb des Vaults werden eliminiert. T01-PLAN flaggt: T01+T02 müssen atomic ein Commit (zwischenzeitlich rote Tests sonst).
+**Status (this session, ad-hoc):** Engine-repo hygiene arc. `wiki` bash dispatcher gained `require_vault()` fail-closed guard (`.obsidian/` positive marker at `ROOT_DIR`; exempt `help`/`version`). Working-tree dev debris cleaned (`config.yaml`, `logs/`, `state/`, `reports/`, `.pytest_cache/`, `.ruff_cache/`, `.wiki/`). `.pytest_cache/` / `.ruff_cache/` / `.mypy_cache/` added to `.gitignore`. `.wiki/` deliberately left out — tripwire for any code path that mkdirs past the guard. Five paths live-verified. Commits `e8d21eb` (guard) + `0075090` (gitignore caches) on local main, **not pushed**. DECISIONS + KNOWLEDGE updated. Root cause: `paths.py` derives `WIKI_DIR/ROOT_DIR` from `__file__` with no environment sanity check — bare engine-repo checkouts get treated as vaults.
+
+---
+
+**Status (prev):** M022 DONE 2026-05-17. Two-zone intake live across all channels (process-inbox.py + voice + pictures collectors). T04 lxw migration executed: 47 files moved (29 voice + 18 pictures), both iCloud .processed/ folders rmdir-ed. Mobile-collectors now write archive directly into vault. 841/841 tests green. Inbox-intake-Schema-Unifizierung: zwei-Zonen-Modell (`raw/inbox-<channel>/` = audit-archive, `raw/<category>/` = derived substrate), `.processed/`-Archive ausserhalb des Vaults werden eliminiert. T01-PLAN flaggt: T01+T02 müssen atomic ein Commit (zwischenzeitlich rote Tests sonst).
 
 ---
 

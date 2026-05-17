@@ -2048,3 +2048,15 @@ Shipped 2026-05-17 in `b6cadaa` to fix the compile-memories cross-link-fanout th
 - `[[no-data-loss-no-ignore]]` — don't pawn off broken substrates as "operator can delete." Engine adapts.
 
 The three rules above were each violated during the diagnose-then-propose phase before the right architectural answer (classifier seam) landed. Cost: ~5 operator-frustration cycles. The classifier is now the right answer for this whole bug-class.
+
+## `__file__`-derived paths need an environment sanity check (2026-05-17)
+
+`scripts/core/paths.py` resolves every engine path from `Path(__file__).resolve().parent...` — pure, dependency-free, no side effects at import. Right shape for path math, but silent failure mode: **the resolved layout is structurally indistinguishable between "I am installed at `<vault>/.wiki/`" and "I am a bare git checkout sitting next to a sibling directory that happens to have `daily/` + `knowledge/`."** The latter held in this repo for years because the engine sits at `lx-0/llm-wiki/` and `lx-0/` has its own `daily/` + `knowledge/` subdirs (collection-dir pattern from the WebDev workspace CLAUDE.md).
+
+Symptom: `wiki <foo>` runs from inside the engine repo silently mkdir + write `config.yaml`, `logs/`, `state/`, `sessions/`, `reports/` into the engine source tree. All gitignored, all invisible to `git status`, but visible in `ls` and confusing for the operator who later wonders why the engine repo has runtime debris.
+
+**Pattern: positive vault-marker check at CLI entry.** `wiki` bash dispatcher (`./wiki`) now runs `require_vault()` before every subcommand except `help` / `version`. The marker is `.obsidian/` at `ROOT_DIR` — the canonical user-facing definition of "this is a vault." Engine-repo heuristics (`pyproject.toml` + `.git/` present at `WIKI_DIR`) are deliberately NOT used: that's a negative test, prone to false negatives in unusual install layouts. Positive markers don't have that failure mode.
+
+Generalization for similar tools: any CLI whose path-math derives from `__file__` and writes into a "containing" directory (a vault, a project root, a workspace) needs a positive marker check at the entry point. Cleanup-cost ratio (one if-statement at dispatch vs. months of confused operators trying to figure out what created `<repo>/state/`) is overwhelming.
+
+**What this does NOT cover.** Direct python invocations (`uv run python scripts/<x>.py`) bypass the bash dispatcher and recreate the dirs. Acceptable cost: the bash CLI is the operator surface; raw python entry is a dev-shell concern. `.wiki/` is deliberately NOT in `.gitignore` (see DECISIONS 2026-05-17) — it acts as a tripwire surfacing any code path that defensively mkdirs `<repo>/.wiki/` past the guard.
