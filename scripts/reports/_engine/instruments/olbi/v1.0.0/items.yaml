@@ -1,0 +1,98 @@
+# OLBI items, verbatim from Demerouti et al 2003 (English version).
+# Subscales: D = Disengagement (8 items), E = Exhaustion (8 items).
+# Stem: rate agreement on a 5-point Likert scale
+# (1 = strongly agree, 5 = strongly disagree).
+# Items marked `reverse_coded: true` reverse the scoring so that
+# higher = more burnout uniformly across all 16 items.
+
+# === Disengagement subscale ===
+
+- id: "D1"
+  subscale: "Disengagement"
+  reverse_coded: true
+  text: "I always find new and interesting aspects in my work."
+  substrate_inferable: true     # sessions document novelty + discovery patterns (new project explorations); voice mentions
+
+- id: "D2"
+  subscale: "Disengagement"
+  text: "It happens more and more often that I talk about my work in a negative way."
+  substrate_inferable: true     # voice tone + session frustration mentions (PR#17 ultra gestresst etc.)
+
+- id: "D3"
+  subscale: "Disengagement"
+  text: "Lately, I tend to think less at work and do my job almost mechanically."
+  substrate_inferable: false    # interior cognitive depth-of-engagement
+
+- id: "D4"
+  subscale: "Disengagement"
+  reverse_coded: true
+  text: "I find my work to be a positive challenge."
+  substrate_inferable: true     # sessions show challenge engagement (architectural decisions, complex problem-solving)
+
+- id: "D5"
+  subscale: "Disengagement"
+  text: "Over time, one can become disconnected from this type of work."
+  substrate_inferable: false    # interior identity-shift / professional-future-orientation
+
+- id: "D6"
+  subscale: "Disengagement"
+  text: "Sometimes I feel sickened by my work tasks."
+  substrate_inferable: false    # visceral interior; substrate doesn't surface this strength of aversion
+
+- id: "D7"
+  subscale: "Disengagement"
+  reverse_coded: true
+  text: "This is the only type of work that I can imagine myself doing."
+  substrate_inferable: false    # interior identity / counterfactual self-imagination
+
+- id: "D8"
+  subscale: "Disengagement"
+  reverse_coded: true
+  text: "I feel more and more engaged in my work."
+  substrate_inferable: true     # session frequency + project breadth-growth pattern documents this
+
+# === Exhaustion subscale ===
+
+- id: "E1"
+  subscale: "Exhaustion"
+  text: "There are days when I feel tired before I arrive at work."
+  substrate_inferable: true     # Oura morning readiness; daily-log mentions of morning fatigue
+
+- id: "E2"
+  subscale: "Exhaustion"
+  text: "After work, I tend to need more time than in the past in order to relax and feel better."
+  substrate_inferable: true     # Oura HRV recovery patterns; voice mentions of slow unwinding
+
+- id: "E3"
+  subscale: "Exhaustion"
+  reverse_coded: true
+  text: "I can tolerate the pressure of my work very well."
+  substrate_inferable: false    # interior coping-perception
+
+- id: "E4"
+  subscale: "Exhaustion"
+  text: "During my work, I often feel emotionally drained."
+  substrate_inferable: false    # interior emotional state during work
+
+- id: "E5"
+  subscale: "Exhaustion"
+  reverse_coded: true
+  text: "After working, I have enough energy for my leisure activities."
+  substrate_inferable: true     # Oura activity scores evening; voice mentions of leisure-energy
+
+- id: "E6"
+  subscale: "Exhaustion"
+  text: "After my work, I usually feel worn out and weary."
+  substrate_inferable: true     # Oura evening readiness; voice tone end-of-day; daily-log fatigue mentions
+
+- id: "E7"
+  subscale: "Exhaustion"
+  reverse_coded: true
+  text: "Usually, I can manage the amount of my work well."
+  substrate_inferable: false    # interior self-assessment of workload-management
+
+- id: "E8"
+  subscale: "Exhaustion"
+  reverse_coded: true
+  text: "When I work, I usually feel energized."
+  substrate_inferable: false    # interior energy-during-task perception

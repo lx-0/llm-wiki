@@ -1,0 +1,16 @@
+slug: olbi
+version: 1.0.0
+title: "Oldenburg Burnout Inventory (OLBI)"
+domain: burnout
+likert: 1-5
+scoring: standard-sum
+licence: free-for-research
+licence-source: "Demerouti, E., Bakker, A.B., Vardakou, I., & Kantas, A. (2003). 'The convergent validity of two burnout instruments: A multitrait-multimethod analysis.' European J Psychological Assessment 19(1):12-23. Original: Demerouti (1999). OLBI is free for academic research per Demerouti's stated terms; widely used as a Maslach-MBI alternative without licensing fees."
+construct: "Work burnout via two subscales: Disengagement (8 items, distancing from work) + Exhaustion (8 items, physical/cognitive depletion). 16 items, balanced reverse-coded design (half-reverse) for response-bias correction. Selected for the M019+ wedge after run-1's 'engagement-vs-recovery sustainability risk' pattern emerged from the cross-instrument analyst synthesis."
+
+inference:
+  enabled: true
+  min_confidence: 0.75
+  bandable_coverage_pct: 80
+  default_lookback_days: 14
+  max_curiosity_per_run: 3

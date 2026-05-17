@@ -91,6 +91,8 @@ def _instrument_max(snap: InstrumentSnapshot) -> int:
         "who-5": 25,
         "k6": 24,
         "pss-10": 40,  # 10 items × 0-4 scale; M019+ rebalance
+        "isi": 28,     # 7 items × 0-4 scale; M019+ sleep-screen expansion
+        "olbi": 80,    # 16 items × 1-5 scale; M019+ burnout-screen expansion (range 16-80)
         "meq-19": 86,  # placeholder for future MEQ wiring
     }
     # Snapshot's `slug` is alias-or-filename — match the wedge canonical

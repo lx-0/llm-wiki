@@ -29,6 +29,9 @@ WEDGE_INSTRUMENTS = [
     ("asrs-v1.1", "1.0.0", 18, 72),
     ("who-5", "1.0.0", 5, 25),
     ("k6", "1.0.0", 6, 24),
+    ("pss-10", "1.0.0", 10, 40),
+    ("isi", "1.0.0", 7, 28),
+    ("olbi", "1.0.0", 16, 80),
 ]
 
 
@@ -36,36 +39,75 @@ WEDGE_INSTRUMENTS = [
 def test_wedge_instrument_loads(
     slug: str, version: str, n_items: int, max_total: int
 ) -> None:
-    """Each wedge instrument loads + has the expected item count + total range."""
+    """Each wedge instrument loads + has the expected item count + total range.
+
+    Achievable range = (n_items * likert.lo, n_items * likert.hi).
+    For 0-scale instruments (PHQ-9 / GAD-7 / ASRS / WHO-5 / K6 /
+    PSS-10 / ISI) this is (0, max_total). For 1-scale instruments
+    (OLBI) this is (n_items, max_total) because the lowest literal
+    score is 1, not 0.
+    """
     instr = load_instrument(INSTRUMENTS_ROOT / slug / f"v{version}")
     assert instr.meta.slug == slug
     assert instr.meta.version == version
     assert instr.total_items == n_items
-    expected_total = n_items * instr.meta.likert.hi
-    assert expected_total == max_total
-    assert instr.cutoffs.range == (0, max_total)
+    expected_max = n_items * instr.meta.likert.hi
+    expected_min = n_items * instr.meta.likert.lo
+    assert expected_max == max_total
+    assert instr.cutoffs.range == (expected_min, expected_max)
+
+
+def _direction_answer_set(slug: str, version: str, direction: str) -> dict:
+    """Build the answer dict that yields min (direction='min') or max
+    (direction='max') score for an instrument, accounting for reverse-
+    coded items. For instruments WITHOUT reverse-coding this is the
+    naive 'all lo' / 'all hi'; with reverse-coding items get the
+    opposite literal value so post-reverse they contribute min/max.
+    """
+    import yaml as yaml_mod
+    items_path = INSTRUMENTS_ROOT / slug / f"v{version}" / "items.yaml"
+    instr_path = INSTRUMENTS_ROOT / slug / f"v{version}" / "instrument.yaml"
+    raw_instr = yaml_mod.safe_load(instr_path.read_text(encoding="utf-8"))
+    lo, hi = (int(x) for x in str(raw_instr["likert"]).split("-"))
+    items = yaml_mod.safe_load(items_path.read_text(encoding="utf-8"))
+    out = {}
+    for item in items:
+        is_rev = bool(item.get("reverse_coded", False))
+        if direction == "min":
+            out[str(item["id"])] = hi if is_rev else lo
+        else:  # max
+            out[str(item["id"])] = lo if is_rev else hi
+    return out
 
 
 @pytest.mark.parametrize("slug,version,n_items,max_total", WEDGE_INSTRUMENTS)
-def test_wedge_uniform_zero_minimal_band(
+def test_wedge_min_direction_bottom_band(
     slug: str, version: str, n_items: int, max_total: int
 ) -> None:
-    """All-zero answers → total 0 → bottom band (label varies by instrument)."""
-    answers = {str(i + 1): 0 for i in range(n_items)}
+    """min-direction answer set → score = 0 → bottom band.
+
+    For instruments with reverse-coded items, 'min-direction' means
+    `lo` for forward items + `hi` for reverse items (so post-reverse
+    they contribute the literal `lo` value). Total = 0 for all wedge
+    instruments by construction (cutoffs.range starts at 0)."""
+    answers = _direction_answer_set(slug, version, "min")
     result = score_instrument(INSTRUMENTS_ROOT / slug / f"v{version}", answers)
-    assert result.score.total == 0
+    instr = load_instrument(INSTRUMENTS_ROOT / slug / f"v{version}")
+    # Total = 0 for instruments whose cutoffs start at 0 (PHQ-9 / GAD-7 /
+    # ASRS / WHO-5 / K6 / PSS-10 / ISI), or = cutoffs.range[0] for
+    # OLBI (16 because 16 items × likert.lo=1).
+    expected_min = instr.cutoffs.range[0]
+    assert result.score.total == expected_min
     assert result.coverage_pct == 100.0
     assert result.band is not None
-    # Bottom band exists for every wedge instrument; label is per-instrument.
 
 
 @pytest.mark.parametrize("slug,version,n_items,max_total", WEDGE_INSTRUMENTS)
-def test_wedge_uniform_max_top_band(
+def test_wedge_max_direction_top_band(
     slug: str, version: str, n_items: int, max_total: int
 ) -> None:
-    """All-max answers → total = max_total → top band."""
-    instr = load_instrument(INSTRUMENTS_ROOT / slug / f"v{version}")
-    answers = {str(i + 1): instr.meta.likert.hi for i in range(n_items)}
+    """max-direction answer set → score = max_total → top band."""
+    answers = _direction_answer_set(slug, version, "max")
     result = score_instrument(INSTRUMENTS_ROOT / slug / f"v{version}", answers)
     assert result.score.total == max_total
     assert result.band is not None
@@ -188,8 +230,11 @@ class TestSubstrateInferableCuration:
             "phq-9": 4,        # of 9 items = 44%
             "gad-7": 4,        # of 7 items = 57%
             "asrs-v1.1": 6,    # of 18 items = 33%
-            "who-5": 4,        # of 5 items = 80% — highest
-            "k6": 2,           # of 6 items = 33% — lowest
+            "who-5": 4,        # of 5 items = 80% — highest single-screen
+            "k6": 2,           # of 6 items = 33% — lowest (dropped from wedge)
+            "pss-10": 5,       # of 10 items = 50%
+            "isi": 4,          # of 7 items = 57% — Oura items 1-3, item 7 sessions
+            "olbi": 8,         # of 16 items = 50% — 4 each per subscale
         }
         for slug, expected in expected_inferable.items():
             items_path = INSTRUMENTS_ROOT / slug / "v1.0.0" / "items.yaml"

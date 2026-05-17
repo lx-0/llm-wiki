@@ -1,0 +1,16 @@
+slug: isi
+version: 1.0.0
+title: "Insomnia Severity Index (ISI)"
+domain: sleep
+likert: 0-4
+scoring: standard-sum
+licence: public-domain
+licence-source: "Morin, C.M. (1993). Insomnia: Psychological assessment and management. Guilford Press. Updated psychometric: Morin et al (2011) Sleep 34:601-608. ISI is in the public domain for research per Morin's stated terms; widely used in clinical research without license."
+construct: "Sleep-onset / maintenance / early-waking insomnia severity over the last 2 weeks. Items 1-3 directly observable from sleep-tracker data (Oura's sleep_onset_latency, awakenings, sleep_end); items 4-7 capture subjective satisfaction + interference (mostly substrate-locked)."
+
+inference:
+  enabled: true
+  min_confidence: 0.75
+  bandable_coverage_pct: 80
+  default_lookback_days: 14
+  max_curiosity_per_run: 3

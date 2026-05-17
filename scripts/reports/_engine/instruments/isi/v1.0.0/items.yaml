@@ -1,0 +1,43 @@
+# ISI items, verbatim from Morin (1993) Insomnia: Psychological
+# assessment and management.
+# Stem for items 1-3: "Please rate the CURRENT (i.e., LAST 2 WEEKS)
+# SEVERITY of your insomnia problem(s)."
+# Scale: 0=None, 1=Mild, 2=Moderate, 3=Severe, 4=Very Severe.
+
+- id: "1"
+  text: "Difficulty falling asleep."
+  substrate_inferable: true     # Oura sleep_onset_latency; voice "konnte nicht einschlafen"
+
+- id: "2"
+  text: "Difficulty staying asleep."
+  substrate_inferable: true     # Oura sleep_continuity / awakening count; voice "bin um 3 wach geworden"
+
+- id: "3"
+  text: "Problem waking up too early."
+  substrate_inferable: true     # Oura sleep_end timestamp vs. typical; voice "war um 4 wach"
+
+# Item 4 stem: "How SATISFIED/DISSATISFIED are you with your current
+# sleep pattern?" Scale: 0=Very Satisfied .. 4=Very Dissatisfied.
+- id: "4"
+  text: "How satisfied/dissatisfied are you with your current sleep pattern?"
+  substrate_inferable: false    # interior valence-judgment — voice mentions are sparse
+
+# Item 5 stem: "How NOTICEABLE to others do you think your sleep
+# problem is in terms of impairing the quality of your life?"
+- id: "5"
+  text: "How noticeable to others do you think your sleep problem is in terms of impairing the quality of your life?"
+  substrate_inferable: false    # third-party-observation framing; substrate is first-person
+
+# Item 6 stem: "How WORRIED/DISTRESSED are you about your current
+# sleep problem?"
+- id: "6"
+  text: "How worried/distressed are you about your current sleep problem?"
+  substrate_inferable: false    # interior worry-state
+
+# Item 7 stem: "To what extent do you consider your sleep problem to
+# INTERFERE with your daily functioning (e.g. daytime fatigue, mood,
+# ability to function at work/daily chores, concentration, memory,
+# mood etc.) CURRENTLY?"
+- id: "7"
+  text: "To what extent do you consider your sleep problem to interfere with your daily functioning (daytime fatigue, mood, ability to function, concentration, etc.)?"
+  substrate_inferable: true     # sessions show concentration patterns; voice mentions of daytime fatigue; daily logs report energy
