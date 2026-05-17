@@ -1,0 +1,7 @@
+# GAD-7 severity bands per Spitzer et al 2006.
+# 7 items × 4-point scale (0-3) = total range 0-21.
+# Bands inclusive on both bounds.
+- {min: 0,  max: 4,  band: "minimal"}
+- {min: 5,  max: 9,  band: "mild"}
+- {min: 10, max: 14, band: "moderate"}
+- {min: 15, max: 21, band: "severe"}

@@ -1,0 +1,98 @@
+# ASRS-v1.1 items, verbatim from Kessler et al 2005 (public domain via WHO).
+# Stem: "Please answer the questions below, rating yourself on each of
+# the criteria shown using the scale on the right side of the page. As
+# you answer each question, refer to the past 6 months that best
+# describes how you have felt and conducted yourself."
+# Scale: 0=Never, 1=Rarely, 2=Sometimes, 3=Often, 4=Very Often.
+#
+# subscale: Part-A (items 1-6, screening) or Part-B (items 7-18).
+
+- id: "1"
+  text: "How often do you have trouble wrapping up the final details of a project, once the challenging parts have been done?"
+  subscale: "Part-A"
+  substrate_inferable: true        # sessions show stalled tail-of-project patterns
+
+- id: "2"
+  text: "How often do you have difficulty getting things in order when you have to do a task that requires organization?"
+  subscale: "Part-A"
+  substrate_inferable: true        # sessions show fragmented start-stop, task-juggling
+
+- id: "3"
+  text: "How often do you have problems remembering appointments or obligations?"
+  subscale: "Part-A"
+  substrate_inferable: false       # would need calendar-no-show signal; absence-of-event is unreliable
+
+- id: "4"
+  text: "When you have a task that requires a lot of thought, how often do you avoid or delay getting started?"
+  subscale: "Part-A"
+  substrate_inferable: true        # sessions show procrastination + voice mentions
+
+- id: "5"
+  text: "How often do you fidget or squirm with your hands or feet when you have to sit down for a long time?"
+  subscale: "Part-A"
+  substrate_inferable: false       # psychomotor — third-party observation
+
+- id: "6"
+  text: "How often do you feel overly active and compelled to do things, like you were driven by a motor?"
+  subscale: "Part-A"
+  substrate_inferable: false       # psychomotor + felt-sense, hard to substrate
+
+- id: "7"
+  text: "How often do you make careless mistakes when you have to work on a boring or difficult project?"
+  subscale: "Part-B"
+  substrate_inferable: true        # sessions show bug-introduction during routine work
+
+- id: "8"
+  text: "How often do you have difficulty keeping your attention when you are doing boring or repetitive work?"
+  subscale: "Part-B"
+  substrate_inferable: true        # sessions show topic-switching during routine
+
+- id: "9"
+  text: "How often do you have difficulty concentrating on what people say to you, even when they are speaking to you directly?"
+  subscale: "Part-B"
+  substrate_inferable: false       # conversation-context, not in text substrate
+
+- id: "10"
+  text: "How often do you misplace or have difficulty finding things at home or at work?"
+  subscale: "Part-B"
+  substrate_inferable: false       # physical environment
+
+- id: "11"
+  text: "How often are you distracted by activity or noise around you?"
+  subscale: "Part-B"
+  substrate_inferable: false       # environment-context
+
+- id: "12"
+  text: "How often do you leave your seat in meetings or other situations in which you are expected to remain seated?"
+  subscale: "Part-B"
+  substrate_inferable: false       # psychomotor
+
+- id: "13"
+  text: "How often do you feel restless or fidgety?"
+  subscale: "Part-B"
+  substrate_inferable: false       # interior + psychomotor
+
+- id: "14"
+  text: "How often do you have difficulty unwinding and relaxing when you have time to yourself?"
+  subscale: "Part-B"
+  substrate_inferable: true        # voice mentions of inability to relax; Oura sleep-onset
+
+- id: "15"
+  text: "How often do you find yourself talking too much when you are in social situations?"
+  subscale: "Part-B"
+  substrate_inferable: false       # social, third-party
+
+- id: "16"
+  text: "When you're in a conversation, how often do you find yourself finishing the sentences of the people you are talking to, before they can finish them themselves?"
+  subscale: "Part-B"
+  substrate_inferable: false       # conversation, third-party
+
+- id: "17"
+  text: "How often do you have difficulty waiting your turn in situations when turn taking is required?"
+  subscale: "Part-B"
+  substrate_inferable: false       # social, third-party
+
+- id: "18"
+  text: "How often do you interrupt others when they are busy?"
+  subscale: "Part-B"
+  substrate_inferable: false       # social, third-party

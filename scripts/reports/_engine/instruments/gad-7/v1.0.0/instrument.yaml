@@ -1,0 +1,16 @@
+slug: gad-7
+version: 1.0.0
+title: "Generalized Anxiety Disorder 7-item"
+domain: anxiety
+likert: 0-3
+scoring: standard-sum
+licence: public-domain
+licence-source: "Spitzer, Kroenke, Williams & Löwe (2006). 'A brief measure for assessing generalized anxiety disorder: the GAD-7.' Arch Intern Med 166(10):1092-1097. Pfizer Inc. GAD-7 is public domain."
+construct: "Generalized anxiety severity per DSM-IV criteria, last-2-weeks window."
+
+inference:
+  enabled: true
+  min_confidence: 0.75
+  bandable_coverage_pct: 80
+  default_lookback_days: 14
+  max_curiosity_per_run: 3

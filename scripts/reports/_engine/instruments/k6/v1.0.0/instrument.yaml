@@ -1,0 +1,16 @@
+slug: k6
+version: 1.0.0
+title: "Kessler Psychological Distress Scale (K6)"
+domain: distress
+likert: 0-4
+scoring: standard-sum
+licence: public-domain
+licence-source: "Kessler, Andrews, Colpe, Hiripi, Mroczek, Normand, Walters & Zaslavsky (2002). 'Short screening scales to monitor population prevalences and trends in non-specific psychological distress.' Psychol Med 32(6):959-976. K6 is in the public domain."
+construct: "Non-specific psychological distress, last-30-days window. Substitute for MEQ-19 in the M019 wedge — MEQ-19 has heterogeneous per-item scales that the wedge likert architecture does not yet support; K6 fills the same wedge role (single-scale clinical screen) with sound psychometrics. MEQ-19 deferred to post-wedge after per-item-scale support lands."
+
+inference:
+  enabled: true
+  min_confidence: 0.75
+  bandable_coverage_pct: 80
+  default_lookback_days: 30          # K6 uses a 30-day reference window
+  max_curiosity_per_run: 3

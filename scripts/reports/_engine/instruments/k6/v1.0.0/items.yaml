@@ -1,0 +1,28 @@
+# K6 items, verbatim from Kessler et al 2002 (public domain).
+# Stem: "During the last 30 days, about how often did you feel..."
+# Scale: 0=None of the time, 1=A little of the time, 2=Some of the
+# time, 3=Most of the time, 4=All of the time.
+
+- id: "1"
+  text: "nervous?"
+  substrate_inferable: true        # voice tone, session-frustration mentions
+
+- id: "2"
+  text: "hopeless?"
+  substrate_inferable: false       # interior cognitive state
+
+- id: "3"
+  text: "restless or fidgety?"
+  substrate_inferable: false       # psychomotor / interior
+
+- id: "4"
+  text: "so depressed that nothing could cheer you up?"
+  substrate_inferable: false       # mood interior
+
+- id: "5"
+  text: "that everything was an effort?"
+  substrate_inferable: true        # voice mentions of effort/struggle; work-pace decline
+
+- id: "6"
+  text: "worthless?"
+  substrate_inferable: false       # interior self-evaluation; over-extraction risk

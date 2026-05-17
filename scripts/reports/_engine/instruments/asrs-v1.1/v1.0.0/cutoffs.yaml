@@ -1,0 +1,12 @@
+# ASRS-v1.1 continuous-sum bands.
+# 18 items × 5-point scale (0-4) = total range 0-72.
+# NOTE: these are LINEAR EXTRAPOLATIONS, NOT published thresholds.
+# Published ASRS scoring uses Part-A symptom-positive counting (4+
+# positive on items 1-6 = ADHD-likely). The standard-sum interpretation
+# below is informative for tracking only; do not use it as a clinical
+# screen. Post-wedge: custom scoring.py implements published Part-A
+# threshold logic.
+- {min: 0,  max: 17, band: "minimal"}
+- {min: 18, max: 35, band: "mild"}
+- {min: 36, max: 53, band: "moderate"}
+- {min: 54, max: 72, band: "severe"}

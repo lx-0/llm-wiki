@@ -1,0 +1,26 @@
+# WHO-5 items, verbatim from WHO Regional Office for Europe (1998).
+# Stem: "Please indicate for each of the five statements which is
+# closest to how you have been feeling over the last two weeks."
+# Scale: 0=At no time, 1=Some of the time, 2=Less than half of the
+# time, 3=More than half of the time, 4=Most of the time, 5=All of
+# the time.
+
+- id: "1"
+  text: "I have felt cheerful and in good spirits."
+  substrate_inferable: false       # mood interior; voice tone overreads
+
+- id: "2"
+  text: "I have felt calm and relaxed."
+  substrate_inferable: true        # Oura HRV, sleep-onset; voice mentions of relaxation / tension
+
+- id: "3"
+  text: "I have felt active and vigorous."
+  substrate_inferable: true        # Oura activity / steps; voice mentions of energy / fatigue
+
+- id: "4"
+  text: "I woke up feeling fresh and rested."
+  substrate_inferable: true        # Oura sleep_score; voice mentions of waking quality
+
+- id: "5"
+  text: "My daily life has been filled with things that interest me."
+  substrate_inferable: true        # sessions show diversity of engagement; project-switching breadth

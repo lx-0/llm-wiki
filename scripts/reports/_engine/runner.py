@@ -1,0 +1,432 @@
+"""M019-S02-T04 — end-to-end inference runner for one instrument.
+
+Glues together everything from S01 + S02-T01..T03:
+
+  1. Load instrument (id, items.yaml, cutoffs.yaml, instrument.yaml).
+  2. Resolve substrate scope (files within instrument's lookback,
+     filtered to CLINICAL_DEFAULT_SUBSTRATE_GLOBS for the wedge).
+  3. Render the inference prompt (`prompts/reports/infer_instrument.md`)
+     with items inline and substrate listed as paths (agent reads on
+     demand — keeps prompt small + matches the audit's headroom story).
+  4. SHA256-hash the rendered prompt → prompt_version (immutable
+     identifier of which prompt version produced this run).
+  5. Run each `InferenceBatch` through `infer_batch()` (single batch
+     for PHQ-9 since no subscales).
+  6. Compose into `InferenceRun`, hand answers to `score_instrument()`
+     for deterministic banding.
+  7. Persist the report markdown under
+     `<vault>/reports/_adhoc/<ts>/<slug>.md` with embedded methodology.
+
+Wedge target: PHQ-9. T05 will add 4 more instruments without touching
+this file (instrument-yaml only).
+
+Usage:
+    uv run python scripts/reports/_engine/runner.py \\
+        --vault ~/Library/Mobile\\ Documents/.../lxw \\
+        --instrument phq-9 \\
+        --version 1.0.0
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import sys
+import textwrap
+import time
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+
+import yaml  # noqa: E402
+
+from scripts.core.prompts import render  # noqa: E402
+from scripts.reports._engine.audit_scope import (  # noqa: E402
+    CLINICAL_DEFAULT_SUBSTRATE_GLOBS,
+    FALLBACK_LOOKBACK_DAYS,
+    _resolve_substrate_files,
+)
+from scripts.reports._engine.instrument import load_instrument  # noqa: E402
+from scripts.reports._engine.lib.inference import (  # noqa: E402
+    InferenceRun,
+    default_batches,
+    infer_batch,
+)
+from scripts.reports._engine.score import score_instrument  # noqa: E402
+
+
+def _read_lookback_days(instrument_dir: Path) -> int:
+    """Pull `inference.default_lookback_days` from instrument.yaml."""
+    raw = yaml.safe_load(
+        (instrument_dir / "instrument.yaml").read_text(encoding="utf-8")
+    )
+    inference = raw.get("inference") or {}
+    return int(inference.get("default_lookback_days", FALLBACK_LOOKBACK_DAYS))
+
+
+def _read_inference_config(instrument_dir: Path) -> dict:
+    """Extract inference defaults from instrument.yaml for run frontmatter."""
+    raw = yaml.safe_load(
+        (instrument_dir / "instrument.yaml").read_text(encoding="utf-8")
+    )
+    return dict(raw.get("inference") or {})
+
+
+def _render_items_block(instrument_dir: Path) -> str:
+    """Render the items block for the prompt, including substrate_inferable
+    flag so the agent honours the curation. Reads items.yaml directly
+    rather than going through the loader because we want the raw
+    `text` and `substrate_inferable` keys verbatim.
+    """
+    raw = yaml.safe_load((instrument_dir / "items.yaml").read_text(encoding="utf-8"))
+    lines: list[str] = []
+    for item in raw:
+        flag = item.get("substrate_inferable", True)
+        flag_str = "true" if flag else "false"
+        sub = item.get("subscale")
+        sub_suffix = f"  [subscale: {sub}]" if sub else ""
+        rev = " [REVERSE-CODED]" if item.get("reverse_coded") else ""
+        lines.append(
+            f"- **{item['id']}** (substrate_inferable: {flag_str}){sub_suffix}{rev}\n"
+            f"    \"{item['text']}\""
+        )
+    return "\n".join(lines)
+
+
+def _render_substrate_block(paths: list[Path], vault_root: Path) -> str:
+    """Render substrate paths as a bulleted list the agent can read
+    on demand. Paths are relative to vault root so the agent's Read
+    calls don't leak absolute paths into evidence citations.
+    """
+    if not paths:
+        return "  (no substrate files matched the lookback window — answers will be `null` across the board)"
+    rels = sorted(
+        str(p.relative_to(vault_root)) for p in paths if p.is_relative_to(vault_root)
+    )
+    return "\n".join(f"- `{r}`" for r in rels)
+
+
+def _persist_report(
+    *,
+    output_dir: Path,
+    timestamp: str,
+    instrument_slug: str,
+    instrument_version: str,
+    scored,
+    run: InferenceRun,
+    rendered_prompt: str,
+    prompt_version: str,
+    instrument_dir: Path,
+    lookback_days: int,
+    substrate_paths: list[Path],
+    vault_root: Path,
+) -> Path:
+    """Write the run's report markdown with embedded methodology."""
+    output_dir.mkdir(parents=True, exist_ok=True)
+    report_path = output_dir / f"{instrument_slug}.md"
+
+    meta = scored.meta
+    score = scored.score
+    inference_cfg = _read_inference_config(instrument_dir)
+
+    # Frontmatter — embedded provenance fields per the Q6 durability
+    # posture: a future AI reader must be able to interpret this
+    # report without the engine.
+    fm = {
+        "instrument": meta.slug,
+        "version": meta.version,
+        "title": meta.title,
+        "domain": meta.domain,
+        "run_timestamp": timestamp,
+        "run_kind": "ad-hoc",
+        "informant_report": True,
+        "total_score": score.total,
+        "band": scored.band,
+        "bandable": scored.bandable,
+        "coverage": {
+            "answered_at_high_confidence": score.answered,
+            "total_items": score.total_items,
+            "coverage_pct": score.coverage_pct,
+            "bandable_threshold": scored.bandable_threshold,
+        },
+        "scope": {
+            "lookback_days": lookback_days,
+            "file_count": len(substrate_paths),
+            "globs": list(CLINICAL_DEFAULT_SUBSTRATE_GLOBS),
+        },
+        "model_id": run.batches[0].model_id if run.batches else "",
+        "prompt_version": prompt_version,
+        "cost_usd": round(run.total_cost_usd, 4),
+        "elapsed_ms": run.total_elapsed_ms,
+        "engine_version": "M019-S02-T04",
+    }
+
+    lines: list[str] = []
+    lines.append("---")
+    lines.append(yaml.safe_dump(fm, sort_keys=False, allow_unicode=True).strip())
+    lines.append("---\n")
+
+    lines.append(f"# {meta.title} — {timestamp}\n")
+    lines.append(
+        "> **Informant Report.** This score was inferred by an LLM "
+        "observer reading the operator's substrate (daily logs, voice "
+        "notes, health data, transcripts) over the lookback window — "
+        "NOT self-reported. Methodology is embedded below; the report "
+        "is durable independent of the engine.\n"
+    )
+
+    # Score block
+    band_str = scored.band if scored.band else "*partial, not bandable*"
+    lines.append("## Score\n")
+    lines.append(
+        f"- **Total:** {score.total} / {meta.likert.hi * score.total_items}"
+    )
+    lines.append(f"- **Band:** {band_str}")
+    lines.append(
+        f"- **Coverage:** {score.answered} / {score.total_items} items "
+        f"({score.coverage_pct}%) at confidence ≥ "
+        f"{inference_cfg.get('min_confidence', 0.75)}"
+    )
+    lines.append(f"- **Bandable threshold:** {scored.bandable_threshold}%\n")
+
+    # Per-item table
+    lines.append("## Items\n")
+    lines.append("| ID | Answer | Confidence | Evidence count | Reasoning |")
+    lines.append("|---|---|---|---|---|")
+    for item_id, inf in sorted(run.per_item.items(), key=lambda kv: kv[0]):
+        ans = "—" if inf.answer is None else str(inf.answer)
+        conf = f"{inf.confidence:.2f}"
+        ev_count = len(inf.evidence)
+        # Truncate reasoning to one line in the table; full text below.
+        reasoning_short = inf.reasoning.replace("\n", " ").strip()
+        if len(reasoning_short) > 100:
+            reasoning_short = reasoning_short[:97] + "..."
+        lines.append(f"| {item_id} | {ans} | {conf} | {ev_count} | {reasoning_short} |")
+    lines.append("")
+
+    # Per-item details (expandable)
+    lines.append("## Per-item detail\n")
+    for item_id, inf in sorted(run.per_item.items(), key=lambda kv: kv[0]):
+        lines.append(f"### Item {item_id}\n")
+        lines.append(f"- Answer: `{inf.answer}`")
+        lines.append(f"- Confidence: `{inf.confidence:.2f}`")
+        if inf.reasoning:
+            lines.append(f"- Reasoning: {inf.reasoning}")
+        if inf.evidence:
+            lines.append("- Evidence:")
+            for ev in inf.evidence:
+                line_str = f":{ev.line}" if ev.line else ""
+                lines.append(f"  - `{ev.file}{line_str}`")
+                if ev.quote:
+                    quote = ev.quote.replace("\n", " ").strip()
+                    if len(quote) > 240:
+                        quote = quote[:237] + "..."
+                    lines.append(f"    > {quote}")
+        lines.append("")
+
+    # Embedded methodology — durable record
+    lines.append("## Embedded methodology\n")
+    lines.append(
+        "<details><summary>Items (verbatim from items.yaml)</summary>\n"
+    )
+    lines.append("```yaml")
+    lines.append(
+        (instrument_dir / "items.yaml").read_text(encoding="utf-8").strip()
+    )
+    lines.append("```\n</details>\n")
+
+    lines.append(
+        "<details><summary>Cutoffs (verbatim from cutoffs.yaml)</summary>\n"
+    )
+    lines.append("```yaml")
+    lines.append(
+        (instrument_dir / "cutoffs.yaml").read_text(encoding="utf-8").strip()
+    )
+    lines.append("```\n</details>\n")
+
+    lines.append(
+        "<details><summary>Instrument meta (verbatim from instrument.yaml)</summary>\n"
+    )
+    lines.append("```yaml")
+    lines.append(
+        (instrument_dir / "instrument.yaml").read_text(encoding="utf-8").strip()
+    )
+    lines.append("```\n</details>\n")
+
+    lines.append(
+        "<details><summary>Prompt rendered for this run</summary>\n"
+    )
+    lines.append("```")
+    lines.append(rendered_prompt)
+    lines.append("```\n</details>\n")
+
+    lines.append(
+        "<details><summary>Scope-resolved substrate paths</summary>\n"
+    )
+    for p in sorted(substrate_paths):
+        try:
+            rel = p.relative_to(vault_root)
+        except ValueError:
+            rel = p
+        lines.append(f"- `{rel}`")
+    lines.append("\n</details>\n")
+
+    report_path.write_text("\n".join(lines), encoding="utf-8")
+    return report_path
+
+
+def run_inference(
+    instrument_slug: str,
+    instrument_version: str,
+    vault_root: Path,
+    instruments_root: Path | None = None,
+    output_dir: Path | None = None,
+) -> Path:
+    """Run one full inference + persistence cycle. Returns report path."""
+    if instruments_root is None:
+        instruments_root = Path(__file__).resolve().parent / "instruments"
+    instrument_dir = instruments_root / instrument_slug / f"v{instrument_version}"
+    if not instrument_dir.is_dir():
+        raise FileNotFoundError(f"Instrument not found: {instrument_dir}")
+
+    print(f"Loading instrument: {instrument_dir}", flush=True)
+    instrument = load_instrument(instrument_dir)
+    lookback_days = _read_lookback_days(instrument_dir)
+    print(f"  slug={instrument.meta.slug} v{instrument.meta.version}  "
+          f"items={instrument.total_items}  lookback={lookback_days}d", flush=True)
+
+    print("Resolving substrate scope...", flush=True)
+    paths = _resolve_substrate_files(
+        vault_root, CLINICAL_DEFAULT_SUBSTRATE_GLOBS, lookback_days
+    )
+    print(f"  {len(paths)} files matched.", flush=True)
+
+    # Build prompt vars
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    items_block = _render_items_block(instrument_dir)
+
+    # Determine batches (single batch for PHQ-9 no-subscales).
+    batches = default_batches(instrument)
+    print(f"  batches: {len(batches)} ({', '.join(b.label for b in batches)})", flush=True)
+
+    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M-%S")
+    output_dir = output_dir or (vault_root / "reports" / "_adhoc" / timestamp)
+
+    run = InferenceRun(
+        instrument_slug=instrument.meta.slug,
+        instrument_version=instrument.meta.version,
+    )
+
+    # For multi-batch instruments we'd subset items_block per batch.
+    # Wedge instruments are single-batch — items_block covers the
+    # whole instrument. Post-wedge: render only this batch's items.
+    for batch in batches:
+        # Per-batch substrate block — wedge uses the same scope for
+        # every batch since the substrate-set is instrument-level.
+        substrate_block = _render_substrate_block(paths, vault_root)
+
+        rendered_prompt = render(
+            "reports/infer_instrument",
+            instrument_slug=instrument.meta.slug,
+            instrument_version=instrument.meta.version,
+            instrument_title=instrument.meta.title,
+            instrument_domain=instrument.meta.domain,
+            likert_lo=instrument.meta.likert.lo,
+            likert_hi=instrument.meta.likert.hi,
+            lookback_days=lookback_days,
+            today=today,
+            batch_label=batch.label,
+            items_block=items_block,  # full block; agent honours batch_label
+            substrate_block=substrate_block,
+        )
+        prompt_version = hashlib.sha256(rendered_prompt.encode("utf-8")).hexdigest()[:16]
+        print(f"  batch={batch.label}  prompt_chars={len(rendered_prompt):,}  "
+              f"prompt_version={prompt_version}", flush=True)
+
+        t0 = time.perf_counter()
+        result = infer_batch(
+            rendered_prompt,
+            batch,
+            vault_cwd=vault_root,
+            prompt_version=prompt_version,
+        )
+        dt = time.perf_counter() - t0
+        print(f"    → answered={sum(1 for inf in result.items.values() if inf.answer is not None)}"
+              f"/{len(result.items)}  "
+              f"cost=${result.cost_usd:.4f}  elapsed={dt:.1f}s", flush=True)
+        run.batches.append(result)
+
+    # Score deterministically
+    answers = run.answers
+    scored = score_instrument(instrument_dir, answers)
+    print(f"\nScore: total={scored.score.total}  band={scored.band}  "
+          f"coverage={scored.coverage_pct}%  bandable={scored.bandable}", flush=True)
+
+    # Persist
+    # Use first batch's prompt_version + first model_id as canonical
+    # for the report frontmatter. Per-batch values are preserved in
+    # the embedded prompt block.
+    first_pv = run.batches[0].prompt_version if run.batches else ""
+    rendered_prompt_for_doc = render(
+        "reports/infer_instrument",
+        instrument_slug=instrument.meta.slug,
+        instrument_version=instrument.meta.version,
+        instrument_title=instrument.meta.title,
+        instrument_domain=instrument.meta.domain,
+        likert_lo=instrument.meta.likert.lo,
+        likert_hi=instrument.meta.likert.hi,
+        lookback_days=lookback_days,
+        today=today,
+        batch_label=batches[0].label if batches else "all",
+        items_block=items_block,
+        substrate_block=_render_substrate_block(paths, vault_root),
+    )
+
+    report_path = _persist_report(
+        output_dir=output_dir,
+        timestamp=timestamp,
+        instrument_slug=instrument.meta.slug,
+        instrument_version=instrument.meta.version,
+        scored=scored,
+        run=run,
+        rendered_prompt=rendered_prompt_for_doc,
+        prompt_version=first_pv,
+        instrument_dir=instrument_dir,
+        lookback_days=lookback_days,
+        substrate_paths=paths,
+        vault_root=vault_root,
+    )
+    print(f"\nReport persisted: {report_path}", flush=True)
+    return report_path
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__.split("\n", 1)[0])
+    parser.add_argument("--vault", type=Path, required=True)
+    parser.add_argument("--instrument", required=True, help="slug, e.g. phq-9")
+    parser.add_argument("--version", default="1.0.0")
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=None,
+        help="Override output dir (defaults to <vault>/reports/_adhoc/<ts>/)",
+    )
+    args = parser.parse_args()
+    try:
+        run_inference(
+            args.instrument,
+            args.version,
+            args.vault.expanduser().resolve(),
+            output_dir=args.output_dir,
+        )
+    except Exception as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        import traceback
+        traceback.print_exc()
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

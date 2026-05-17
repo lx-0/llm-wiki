@@ -1,0 +1,33 @@
+# GAD-7 items, verbatim from Spitzer et al 2006 (public domain).
+# Stem: "Over the last 2 weeks, how often have you been bothered by
+# the following problems?"
+# Scale: 0=Not at all, 1=Several days, 2=More than half the days,
+# 3=Nearly every day.
+
+- id: "1"
+  text: "Feeling nervous, anxious, or on edge."
+  substrate_inferable: true        # voice tone, session-frustration mentions
+
+- id: "2"
+  text: "Not being able to stop or control worrying."
+  substrate_inferable: false       # interior cognitive state
+
+- id: "3"
+  text: "Worrying too much about different things."
+  substrate_inferable: true        # voice/sessions mention worry topics, diversity of concerns
+
+- id: "4"
+  text: "Trouble relaxing."
+  substrate_inferable: true        # voice mentions of tension; Oura HRV; sleep-onset patterns
+
+- id: "5"
+  text: "Being so restless that it is hard to sit still."
+  substrate_inferable: false       # psychomotor — requires third-party observation
+
+- id: "6"
+  text: "Becoming easily annoyed or irritable."
+  substrate_inferable: true        # voice tone, session frustration mentions
+
+- id: "7"
+  text: "Feeling afraid as if something awful might happen."
+  substrate_inferable: false       # interior anticipatory fear — not observable in text substrate

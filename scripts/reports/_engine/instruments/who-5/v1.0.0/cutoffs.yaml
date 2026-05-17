@@ -1,0 +1,7 @@
+# WHO-5 bands on RAW score 0-25 (× 4 for the standard 0-100 percentage).
+# Clinical screening cutoff: <50% (= ≤12 raw) suggests depression risk.
+# 5 items × 6-point scale (0-5) = total range 0-25.
+- {min: 0,  max: 7,  band: "poor"}            # 0-28%   — strong screen-positive for depression
+- {min: 8,  max: 12, band: "low"}             # 32-48%  — below WHO recommended-threshold
+- {min: 13, max: 18, band: "moderate"}        # 52-72%
+- {min: 19, max: 25, band: "good"}            # 76-100%

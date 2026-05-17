@@ -1,0 +1,24 @@
+slug: asrs-v1.1
+version: 1.0.0
+title: "Adult ADHD Self-Report Scale v1.1 (WHO)"
+domain: adhd
+likert: 0-4
+scoring: standard-sum
+licence: public-domain
+licence-source: "Kessler, Adler, Ames, Demler, Faraone, Hiripi, Mroczek, Ustun & Walters (2005). 'The World Health Organization Adult ADHD Self-Report Scale (ASRS): a short screening scale for use in the general population.' Psychol Med 35(2):245-256. Public domain via WHO."
+construct: "Adult ADHD symptom screen, last-6-months window (DSM-IV). Two subscales: Part A (6 screening items, items 1-6) + Part B (12 additional validating items, items 7-18)."
+
+# Note on scoring: published ASRS-v1.1 uses a symptom-positive-threshold
+# scheme on Part A (items 1-6: response at-or-above per-item cutoff
+# counts as 1 positive; 4+ positive = ADHD-likely). This module uses
+# `standard-sum` for wedge consistency; the symptom-positive scoring
+# is a post-wedge enhancement via custom scoring.py. Continuous total
+# is informative for tracking but DOES NOT replace the published cutoff.
+# Bands below are linear extrapolation, not validated thresholds.
+
+inference:
+  enabled: true
+  min_confidence: 0.75
+  bandable_coverage_pct: 80
+  default_lookback_days: 180        # ASRS uses a 6-month window per DSM-IV
+  max_curiosity_per_run: 3

@@ -1,0 +1,21 @@
+slug: who-5
+version: 1.0.0
+title: "WHO Well-Being Index (WHO-5)"
+domain: wellbeing
+likert: 0-5
+scoring: standard-sum
+licence: public-domain
+licence-source: "World Health Organization Regional Office for Europe (1998). Wellbeing Measures in Primary Health Care/the DepCare Project. WHO-5 is in the public domain; reproduce freely with acknowledgement."
+construct: "Subjective psychological wellbeing, last-2-weeks window."
+
+# WHO-5 standard reporting converts raw 0-25 → percentage 0-100 (× 4).
+# The screening cutoff for depression-likelihood is < 50 percentage
+# (= ≤ 12 raw). Bands below use raw scores; the % equivalents are
+# noted in cutoffs.yaml comments.
+
+inference:
+  enabled: true
+  min_confidence: 0.75
+  bandable_coverage_pct: 80
+  default_lookback_days: 14
+  max_curiosity_per_run: 3

@@ -1,0 +1,9 @@
+# K6 distress bands per Kessler et al 2003 + Prochaska 2012 follow-up.
+# 6 items × 5-point scale (0-4) = total range 0-24.
+# Two-band screening (low / high) per the originally published cutoff;
+# expanded to four for trend visibility while keeping the 13+ clinical
+# threshold visible.
+- {min: 0,  max: 4,  band: "minimal"}
+- {min: 5,  max: 12, band: "moderate"}
+- {min: 13, max: 18, band: "high"}             # 13+ = published screen-positive
+- {min: 19, max: 24, band: "very-high"}
