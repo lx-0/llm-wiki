@@ -1123,19 +1123,26 @@ home_query() {
 home_dispatch_suggestion() {
   # Parse a suggestion's cmd string ("compile" / "curiosity --run-oldest")
   # and route to the matching cmd_* function. Avoids `eval`.
+  # Bash 3.2 + `set -u` treats an empty-slice `${rest[@]:1}` of a single-
+  # element array as an unbound variable when expanded with `"${rest[@]}"`.
+  # `${rest[@]+"${rest[@]}"}` expands to nothing when unset/empty and to
+  # the quoted array when populated — safe on every bash version.
   local cmd_str="$1"
   # shellcheck disable=SC2206
   local -a parts=($cmd_str)
   local sub="${parts[0]}"
-  local -a rest=("${parts[@]:1}")
+  local -a rest=()
+  if (( ${#parts[@]} > 1 )); then
+    rest=("${parts[@]:1}")
+  fi
   case "$sub" in
-    process-inbox)    cmd_process_inbox "${rest[@]}" ;;
-    compile)          cmd_compile "${rest[@]}" ;;
-    curiosity)        cmd_curiosity "${rest[@]}" ;;
-    suggestions)      cmd_suggestions "${rest[@]}" ;;
-    dream)            cmd_dream "${rest[@]}" ;;
-    flush)            cmd_flush "${rest[@]}" ;;
-    lint)             cmd_lint "${rest[@]}" ;;
+    process-inbox)    cmd_process_inbox ${rest[@]+"${rest[@]}"} ;;
+    compile)          cmd_compile       ${rest[@]+"${rest[@]}"} ;;
+    curiosity)        cmd_curiosity     ${rest[@]+"${rest[@]}"} ;;
+    suggestions)      cmd_suggestions   ${rest[@]+"${rest[@]}"} ;;
+    dream)            cmd_dream         ${rest[@]+"${rest[@]}"} ;;
+    flush)            cmd_flush         ${rest[@]+"${rest[@]}"} ;;
+    lint)             cmd_lint          ${rest[@]+"${rest[@]}"} ;;
     *)                err "no dispatcher for suggested cmd: $sub"; return 1 ;;
   esac
 }
