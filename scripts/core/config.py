@@ -387,6 +387,15 @@ class Features:
     # M011 takes substrate. Default OFF — flip True after dogfooding.
     # Cost: +1 SDK call per gated compile (Claude, no Ollama fallback).
     extract_takes: bool = False
+    # Pre-process voice transcripts through the local classify_model (Ollama)
+    # to add punctuation, sentence-case, and German-noun capitalization. The
+    # raw transcript is preserved verbatim under `raw_transcript:` in the
+    # voice-note frontmatter so the cleaned body remains auditable. Default
+    # ON; flip false if your dictation tool already produces punctuated
+    # output (macOS dictation, modern Whisper) or if you don't want the
+    # extra Ollama call per ingest. Graceful fallback: Ollama unreachable
+    # → body = raw, no error.
+    voice_punctuate: bool = True
 
 
 @dataclass

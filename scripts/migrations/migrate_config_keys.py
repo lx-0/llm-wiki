@@ -45,6 +45,7 @@ Key changes covered (chronological):
   piggybacks.dream_cycle                   (added 2026-05-16 M014, cooldown 24h, max_per_run 3)
   personal.picture_inbox                   (added 2026-05-17, default "" — camera/phone-photo inbox for collectors/pictures.py)
   piggybacks.pictures                      (added 2026-05-17, cooldown 6h, max_per_run 20 — vision-LLM-driven, lighter cadence than screenshots)
+  features.voice_punctuate                 (added 2026-05-17, default True — Ollama-driven punctuation pass on voice transcripts at ingest)
 
 Idempotent: a config already on the current schema produces no change.
 
@@ -171,6 +172,13 @@ KEY_ADDITIONS: dict[str, dict[str, object]] = {
     "features": {
         # M011 master switch — default OFF, flip True after dogfooding.
         "extract_takes": False,
+        # 2026-05-17 voice-punctuation pre-process. Calls Ollama
+        # classify_model on every voice ingest to add punctuation +
+        # German-noun-case to dictation transcripts. Raw text preserved
+        # in `raw_transcript:` frontmatter. Default True; flip False if
+        # your dictation tool already punctuates or you want to skip
+        # the extra LLM call.
+        "voice_punctuate": True,
     },
     "piggybacks": {
         # M006 calendar collector — mirrors gmeet / jamie 6 h cadence.

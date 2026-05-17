@@ -47,6 +47,10 @@ def voice_env(tmp_path, monkeypatch):
 
     monkeypatch.setattr(CONFIG.personal, "voice_inbox", str(inbox))
     monkeypatch.setattr(paths_mod, "RAW_DIR", vault_raw)
+    # Disable the LLM punctuation pre-process for these tests so they
+    # don't depend on a reachable Ollama. Frontmatter/body assertions
+    # below were written against the raw-passthrough shape.
+    monkeypatch.setattr(CONFIG.features, "voice_punctuate", False)
 
     from collectors import voice as voice_mod
     importlib.reload(voice_mod)

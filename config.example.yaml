@@ -289,6 +289,12 @@ limits:
   dream_cycle_max_cost_per_run_usd: 5.0
 
 features:
+  # Pre-process voice transcripts through Ollama (classify_model = gemma4:e4b
+  # by default) to add punctuation, sentence-case, and German-noun
+  # capitalization. The original is preserved in the voice-note's
+  # `raw_transcript:` frontmatter. Set false to skip the LLM call and store
+  # the raw transcript as-is.
+  voice_punctuate: true
   # Master switches for entire capabilities.
   curiosity_loop: true
   vision_screenshots: true

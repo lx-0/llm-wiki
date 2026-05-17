@@ -23,9 +23,10 @@ from zoneinfo import ZoneInfo
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from collectors.base import Collector, CollectorSpec, RunResult, register
-from core import daily_capture
+from core import daily_capture, ollama_client
 from core.config import CONFIG, TIMEZONE
 from core.paths import RAW_DIR
+from core.prompts import render
 from core.utils import slugify
 
 log = logging.getLogger(__name__)
@@ -34,6 +35,39 @@ OUTPUT_DIR = RAW_DIR / "voice"
 ARCHIVE_SUBDIR = ".processed"
 ACCEPTED_SUFFIXES = (".txt", ".md")
 MAX_SLUG_WORDS = 6
+PUNCTUATE_TIMEOUT_S = 30.0
+
+
+def _punctuate(raw_transcript: str) -> str | None:
+    """Send a voice transcript through the local classify_model to add
+    punctuation + German-noun-case. Returns the cleaned text, or None on
+    any failure (caller falls back to raw). Skip-and-fallback rather than
+    raise: voice ingest must never fail because of an Ollama hiccup.
+    """
+    try:
+        prompt = render("voice_punctuate", raw_transcript=raw_transcript)
+        cleaned = ollama_client.chat(
+            prompt,
+            model=CONFIG.models.classify_model,
+            temperature=0.0,
+            timeout=PUNCTUATE_TIMEOUT_S,
+        )
+        cleaned = cleaned.strip()
+        # Sanity: if model returned empty or absurdly longer text (>3× source),
+        # assume it hallucinated commentary — fall back to raw.
+        if not cleaned:
+            log.warning("voice punctuation returned empty, falling back to raw")
+            return None
+        if len(cleaned) > 3 * max(len(raw_transcript), 40):
+            log.warning(
+                "voice punctuation returned %d chars from %d-char source — likely hallucination, falling back to raw",
+                len(cleaned), len(raw_transcript),
+            )
+            return None
+        return cleaned
+    except Exception as exc:  # noqa: BLE001
+        log.warning("voice punctuation failed (%s) — falling back to raw", exc)
+        return None
 
 
 def _inbox_path() -> Path | None:
@@ -50,16 +84,34 @@ def _build_filename(captured_at: datetime, content: str) -> str:
     return f"voice-{stamp}-{slug}.md"
 
 
-def _build_frontmatter(captured_at: datetime, source: Path) -> str:
-    return (
-        "---\n"
-        "type: voice-note\n"
-        "origin: voice-intake\n"
-        f"captured_at: {captured_at.isoformat()}\n"
-        f"source: {source.name}\n"
-        "tags: [voice]\n"
-        "---\n\n"
-    )
+def _build_frontmatter(
+    captured_at: datetime,
+    source: Path,
+    raw_transcript: str | None = None,
+) -> str:
+    """Frontmatter for a raw/voice/*.md note.
+
+    When `raw_transcript` is provided, the punctuation pre-process ran and
+    the body holds the cleaned version — we preserve the verbatim raw text
+    under `raw_transcript:` for audit. When None, body == raw and the key
+    is omitted.
+    """
+    lines = [
+        "---",
+        "type: voice-note",
+        "origin: voice-intake",
+        f"captured_at: {captured_at.isoformat()}",
+        f"source: {source.name}",
+        "tags: [voice]",
+    ]
+    if raw_transcript is not None:
+        # YAML block-literal preserves newlines + non-ASCII verbatim.
+        lines.append("raw_transcript: |")
+        for raw_line in raw_transcript.splitlines() or [raw_transcript]:
+            lines.append(f"  {raw_line}")
+    lines.append("---")
+    lines.append("")
+    return "\n".join(lines) + "\n"
 
 
 def _scan_inbox(inbox: Path) -> list[Path]:
@@ -144,21 +196,31 @@ class VoiceCollector:
         archive = inbox / ARCHIVE_SUBDIR
         archive.mkdir(exist_ok=True)
 
+        punctuate_enabled = CONFIG.features.voice_punctuate
+
         written: list[Path] = []
         errors: list[str] = []
         for src in sources:
             try:
-                content = src.read_text(encoding="utf-8").strip()
+                raw = src.read_text(encoding="utf-8").strip()
             except (UnicodeDecodeError, OSError) as exc:
                 errors.append(f"{src.name}: read failed ({exc})")
                 continue
-            if not content:
+            if not raw:
                 errors.append(f"{src.name}: empty file, archived without ingest")
                 shutil.move(str(src), str(archive / src.name))
                 continue
 
+            # Punctuation pre-process. Cleaned body + raw preserved in FM.
+            # Fallback (Ollama down, hallucination guard tripped, feature
+            # off): body = raw, no raw_transcript frontmatter key.
+            cleaned: str | None = None
+            if punctuate_enabled:
+                cleaned = _punctuate(raw)
+            body = cleaned if cleaned is not None else raw
+
             captured_at = datetime.fromtimestamp(src.stat().st_mtime, tz=tz)
-            out_name = _build_filename(captured_at, content)
+            out_name = _build_filename(captured_at, body)
             out_path = OUTPUT_DIR / out_name
             # Same-minute slug collision: append seconds.
             if out_path.exists():
@@ -166,15 +228,17 @@ class VoiceCollector:
                     ".md", f"-{captured_at.strftime('%S')}.md"
                 )
 
-            out_path.write_text(
-                _build_frontmatter(captured_at, src) + content + "\n",
-                encoding="utf-8",
+            frontmatter = _build_frontmatter(
+                captured_at,
+                src,
+                raw_transcript=raw if cleaned is not None else None,
             )
+            out_path.write_text(frontmatter + body + "\n", encoding="utf-8")
             written.append(out_path)
 
             # Mirror a one-liner into daily/<date>/voice.md so the day's
             # voice-intake activity surfaces in the rollup substrate.
-            _append_daily_rollup(captured_at, content, out_path)
+            _append_daily_rollup(captured_at, body, out_path)
 
             try:
                 # If archive already has a same-name file (re-run after manual
