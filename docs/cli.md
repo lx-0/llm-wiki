@@ -29,8 +29,38 @@ Operational layer for an LLM Wiki vault. The `.wiki/` directory is hidden from O
 ### Home-screen anatomy
 
 Bare `wiki` runs `scripts/menu_context.py` to probe the vault (~150ms cold,
-hard-capped at 500ms via `SIGALRM`) and emits a ranked suggestion list. The
-seven probe signals:
+hard-capped at 500ms via `SIGALRM`) and renders four sections in order:
+
+```
+  wiki — lxw vault (commit 1852029)
+  384 articles · last compile 4h ago · ollama ✓     ← (1) status one-liner
+
+  ▸ Pending in your vault                            ← (2) ranked suggestions
+      1) 3 files in inbox/             → wiki process-inbox
+      2) 12 sources changed            → wiki compile
+
+  ▸ Quick actions                                    ← (3) fixed shortcuts
+      [q] query  [f] flush  [l] lint  [s] status
+
+  ▸ Browse                                           ← (4) category sub-menus
+      [c] collectors  [i] ingest  [k] knowledge ops
+      [d] facts/takes [a] automation [g] setup
+      [h] full help   [x] exit  (type /foo to filter all commands)
+
+  Pick one:
+```
+
+**(1) Status one-liner** — three fields rendered when available:
+
+| Field              | Source                                                 |
+|--------------------|--------------------------------------------------------|
+| `N articles`       | `find knowledge/ -name '*.md'` minus `index.md/log.md` |
+| `last compile Nh ago` | humanized delta from `state.json["last_compile"]`   |
+| `ollama ✓` / `✗`   | TCP-connect probe at `models.ollama_url` (150ms cap)   |
+
+**(2) Pending suggestions** — seven probe signals, only non-zero rows
+shown, sorted by priority. When all probes return zero the section
+renders `✨ Nothing pending — vault is current.` instead.
 
 | # | Signal                                          | Suggested command            |
 |---|-------------------------------------------------|------------------------------|
@@ -42,8 +72,25 @@ seven probe signals:
 | 6 | today's `daily/sessions/<date>.md` missing      | `flush`                      |
 | 7 | knowledge edits newer than newest lint report   | `lint --structural-only`     |
 
-Probe is pure-Python, no network, no LLM. On error the home screen renders
-the browse section only.
+**(3) Quick actions** — `q` query / `f` flush / `l` lint (structural-only) /
+`s` status. Letter or number both work.
+
+**(4) Browse** — six category sub-menus (collectors / ingest / knowledge ops
+/ facts & takes / automation / setup) cover the 30+ subcommands. Each
+sub-menu uses inline letter shortcuts (`[l] list collectors`, `[r] run a
+collector`, `[b] back`).
+
+**Fuzzy filter** — typing `/<substring>` at the home prompt matches against
+a hand-curated catalog of 49 commands (case-insensitive). One match
+auto-dispatches; multiple opens a numbered picker. Catalog covers every
+flag variant (`compile-all`, `compile-file`, `lint-structural`, all
+OAuth flows, full `correct`/`take` lifecycles, all `curiosity` and
+`suggestions` actions, hooks + skills + seed). Cost markers (`$`,
+`$$`, `$$$`) appear in descriptions so the operator sees what a
+one-keystroke match will actually charge.
+
+Probe is pure-Python, no network beyond the Ollama TCP probe, no LLM. On
+error the home screen renders the browse section only.
 
 ## Subcommand cheat sheet
 

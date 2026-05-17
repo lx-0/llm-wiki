@@ -2,9 +2,10 @@
 # wiki — single entry-point CLI for the wiki/ system.
 #
 # Subcommands:
-#   wiki                       interactive home screen (TTY) — context-sensitive
-#                              suggestions + quick actions + category browse.
-#                              Non-TTY callers (CI, hooks, pipes) get `wiki help`.
+#   wiki                       interactive home screen (TTY) — status one-liner,
+#                              context-sensitive suggestions, quick actions,
+#                              category browse, and `/<substring>` fuzzy filter
+#                              across all 49 commands. Non-TTY callers get help.
 #   wiki menu                  same home screen, forced regardless of TTY.
 #   wiki setup                 first-time setup (config wizard + hooks install)
 #   wiki status                full system status (config + hooks)

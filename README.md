@@ -321,11 +321,13 @@ If you find a leak in history, rotate the secret immediately, then file an issue
 
 ## CLI Reference
 
-Bare `./.wiki/wiki` opens an **interactive home screen** with context-sensitive
-suggestions (`3 files in inbox/ → process-inbox`, `12 sources changed → compile`,
-etc.) plus a 6-bucket category browse. Non-TTY callers (CI, hooks, pipes) get
-the help dump and exit. Full reference — every subcommand, every config key,
-every hook target — lives in [docs/cli.md](docs/cli.md).
+Bare `./.wiki/wiki` opens an **interactive home screen** with: a status
+one-liner (`384 articles · last compile 4h ago · ollama ✓`), context-sensitive
+suggestions (`3 files in inbox/ → process-inbox`, `12 sources changed →
+compile`), 4 quick-action letter shortcuts, a 6-bucket category browse, and
+a `/<substring>` fuzzy filter across all 49 commands. Non-TTY callers (CI,
+hooks, pipes) get the help dump and exit. Full reference — every subcommand,
+every config key, every hook target — lives in [docs/cli.md](docs/cli.md).
 
 ## For contributors
 
