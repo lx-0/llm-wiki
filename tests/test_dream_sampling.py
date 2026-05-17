@@ -359,7 +359,9 @@ def test_dreams_since_last_seen_reads_stamp(vault: Path) -> None:
         frontmatter={"last_dreamed_at": five_days_ago},
     )
     days = dream._dreams_since_last_seen_days(p, now=now)
-    assert 4.5 <= days <= 5.5
+    # strftime("%Y-%m-%d") truncates to midnight, so the gap can be anywhere in
+    # [5.0, 6.0) depending on time-of-day at test runtime.
+    assert 5.0 <= days < 6.0
 
     unstamped = _write_substrate(vault, "raw/notes/email/y.md", "Body.\n")
     days_un = dream._dreams_since_last_seen_days(unstamped, now=now)

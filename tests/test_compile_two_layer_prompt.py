@@ -17,6 +17,7 @@ _DUMMY_VARS = {
     "agents_md": "",
     "facts_md": "",
     "index_md": "",
+    "owner_block": "",
     "source_path": "raw/transcripts/jamie/test.md",
     "source_content": "dummy content",
     "today": "2026-05-15",

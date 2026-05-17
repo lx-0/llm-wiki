@@ -49,6 +49,7 @@ def test_rendered_prompt_for_after_substrate_carries_resolution_rules() -> None:
         agents_md="",
         facts_md="",
         index_md="",
+        owner_block="",
         source_path="raw/transcripts/jamie/2026-04-22--followup-deck--xyz.md",
         source_content=body,
         today="2026-04-22",

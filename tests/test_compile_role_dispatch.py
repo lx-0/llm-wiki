@@ -88,6 +88,7 @@ _DUMMY_VARS = {
     "agents_md": "",
     "facts_md": "",
     "index_md": "",
+    "owner_block": "",
     "source_path": "raw/notes/longform/yesterday-strategy-2026.md",
     "source_content": "dummy content",
     "today": "2026-05-16",

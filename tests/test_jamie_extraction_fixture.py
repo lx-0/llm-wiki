@@ -42,6 +42,7 @@ def test_rendered_prompt_carries_substrate_and_extraction_rule() -> None:
         agents_md="",
         facts_md="",
         index_md="",
+        owner_block="",
         source_path="raw/transcripts/jamie/2026-04-15--canary-q1-review--abc.md",
         source_content=body,
         today="2026-04-15",

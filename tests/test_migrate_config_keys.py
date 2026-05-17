@@ -106,33 +106,36 @@ def test_migrate_config_file_round_trip(tmp_path):
     new_text, changes = m.migrate_config(config_path)
     assert new_text is not None
     # 2 piggyback (rename + drop)
-    #  + 1 created-limits-block + 22 limits additions:
+    #  + 1 created-limits-block + 23 limits additions:
     #    compile_force_long_context_types, compile_skip_on_long_context_unknown,
     #    compile_role_default_by_location (M007), 4 calendar_*,
     #    compile_max_turns_long_context, compile_max_cost_per_file_usd,
     #    compile_skip_substrate_types — default ["email-delta"],
     #    3 flush_*_budget_chars (2026-05-16),
-    #    compile_per_call_timeout_s (M010), connection_min_words (M012),
+    #    compile_per_call_timeout_s (M010), reports_default_lookback_days (M019),
+    #    connection_min_words (M012),
     #    3 extract_takes_* (M011),
     #    dream_entity_max_cost_usd + dream_cycle_max_cost_per_run_usd (M014),
     #    dream_tier1_recent_count + dream_tier1_digest_days +
     #    dream_tier2_sample_count (M016)
     #  + 4 piggybacks additions (calendar, curiosity_followup, dream_cycle — M014,
     #    pictures — 2026-05-17)
-    #  + 1 created-features-block + 5 features additions
+    #  + 1 created-features-block + 6 features additions
     #    (extract_takes — M011, voice_punctuate — 2026-05-17,
     #    suggestions_source_globs — Producer-seam arc,
     #    compile_callback_gate — 2026-05-17 compile-scope fix,
-    #    materialize_backlinks — M020 backlinks-footer)
-    #  + 1 created-personal-block + 3 personal additions
-    #    (implicit_operator_author — M009, picture_inbox — 2026-05-17, domains — M013)
+    #    materialize_backlinks — M020 backlinks-footer,
+    #    operator_reports — M019 operator-self-reports master switch)
+    #  + 1 created-personal-block + 4 personal additions
+    #    (implicit_operator_author — M009, picture_inbox — 2026-05-17,
+    #    reports_dir — M019, domains — M013)
     #  + 1 scheduling addition (dream_cooldown_days — M014; the scheduling
     #    block already exists in the test fixture, so no "created" event)
     # (LIST_ADDITIONS has one entry but operator's freshly-injected
     # skip-list already contains "email-delta" from KEY_ADDITIONS, so
     # the list-extend is a no-op on greenfield.)
-    # = 42 changes (no drops — operator has no orphan personal.* fields)
-    assert len(changes) == 42, f"got {len(changes)} changes: {changes}"
+    # = 45 changes (no drops — operator has no orphan personal.* fields)
+    assert len(changes) == 45, f"got {len(changes)} changes: {changes}"
 
     reparsed = yaml.safe_load(new_text)
     # piggyback side
@@ -188,6 +191,7 @@ def test_migrate_config_no_change_when_fully_current(tmp_path):
             "flush_user_text_budget_chars": 10000,
             "flush_tool_summary_budget_chars": 10000,
             "compile_per_call_timeout_s": 600,
+            "reports_default_lookback_days": 14,
             "connection_min_words": 50,
             "extract_takes_source_globs": ["raw/transcripts/*", "raw/transcripts/**/*", "raw/voice/*", "daily/*"],
             "extract_takes_timeout_s": 180,
@@ -204,10 +208,12 @@ def test_migrate_config_no_change_when_fully_current(tmp_path):
             "suggestions_source_globs": ["raw/email/*.md"],
             "compile_callback_gate": True,
             "materialize_backlinks": True,
+            "operator_reports": False,
         },
         "personal": {
             "implicit_operator_author": None,
             "picture_inbox": "",
+            "reports_dir": "reports",
             "domains": ["company", "personal", "ai", "meta"],
         },
     }), encoding="utf-8")
@@ -307,6 +313,7 @@ def test_migrate_additions_idempotent():
             "flush_user_text_budget_chars": 10000,
             "flush_tool_summary_budget_chars": 10000,
             "compile_per_call_timeout_s": 600,
+            "reports_default_lookback_days": 14,
             "connection_min_words": 50,
             "extract_takes_source_globs": ["raw/transcripts/*", "raw/transcripts/**/*", "raw/voice/*", "daily/*"],
             "extract_takes_timeout_s": 180,
@@ -329,10 +336,12 @@ def test_migrate_additions_idempotent():
             "suggestions_source_globs": ["raw/email/*.md"],
             "compile_callback_gate": True,
             "materialize_backlinks": True,
+            "operator_reports": False,
         },
         "personal": {
             "implicit_operator_author": None,
             "picture_inbox": "",
+            "reports_dir": "reports",
             "domains": ["company", "personal", "ai", "meta"],
         },
     }

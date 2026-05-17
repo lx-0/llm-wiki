@@ -50,6 +50,7 @@ def test_rendered_prompt_for_after_substrate_carries_preservation_rule() -> None
         agents_md="",
         facts_md="",
         index_md="",
+        owner_block="",
         source_path="raw/notes/email/personal-2026-04-10.md",
         source_content=body,
         today="2026-04-10",
