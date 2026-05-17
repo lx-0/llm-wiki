@@ -374,41 +374,74 @@ def render_summary(
     lines.append("## Per-instrument trajectories\n")
     for key in sorted(set(per_inst_timelines.keys()) | set(per_inst_radars.keys())):
         lines.append(f"### {key}\n")
-        # Item-level radar (always renders from latest snapshot's per_item)
+        # Item-level radar + side-by-side axis legend (HTML flex layout).
+        # Radar on the left (fixed width matching SVG), legend table
+        # on the right (flexible). Obsidian + most markdown renderers
+        # support inline HTML with style attrs; GitHub strips style
+        # but this is a vault-internal surface so that's irrelevant.
         if key in per_inst_radars:
             rel = per_inst_radars[key].relative_to(summary_path.parent)
             lines.append(f"**Item-level breakdown** — each axis is one item, "
                          f"vertex distance from center = item's normalised value "
-                         f"(0..1). Dashed overlay = previous run when available.\n")
-            lines.append(f"![{key} per-item radar]({rel})\n")
-            # Axis legend — operator-readable mapping of item-id → text.
-            # Latest snapshot drives instrument version; for OLDER runs
-            # the version may differ but legend semantics are the same.
+                         f"(0..1). Dashed overlay = previous run when available. "
+                         f"Legend on the right of the radar.\n")
             latest_snap = (
                 latest.instruments.get(key) if latest else None
             )
-            if latest_snap and latest_snap.version:
-                item_meta = _load_item_meta(latest_snap.slug, latest_snap.version)
-                if item_meta:
-                    lines.append("<details><summary>Axis legend — what each item asks</summary>\n")
-                    lines.append("| ID | Item | Reverse | Inferable | Subscale |")
-                    lines.append("|---|---|---|---|---|")
-                    # Sort by id (numeric where possible, fall back lexical)
-                    def _sort_key(iid):
-                        try:
-                            return (0, int(iid))
-                        except (ValueError, TypeError):
-                            return (1, str(iid))
-                    for iid in sorted(item_meta.keys(), key=_sort_key):
-                        m = item_meta[iid]
-                        text_short = m["text"].replace("|", "·")
-                        if len(text_short) > 90:
-                            text_short = text_short[:87] + "…"
-                        rev = "↩︎" if m["reverse_coded"] else ""
-                        inf = "yes" if m["substrate_inferable"] else "no"
-                        sub = m["subscale"] or ""
-                        lines.append(f"| {iid} | {text_short} | {rev} | {inf} | {sub} |")
-                    lines.append("\n</details>\n")
+            item_meta = (
+                _load_item_meta(latest_snap.slug, latest_snap.version)
+                if (latest_snap and latest_snap.version)
+                else {}
+            )
+            if item_meta:
+                def _sort_key(iid):
+                    try:
+                        return (0, int(iid))
+                    except (ValueError, TypeError):
+                        return (1, str(iid))
+                # Build the legend table as HTML (markdown table inside
+                # flex container can be brittle in some renderers).
+                rows_html: list[str] = []
+                rows_html.append(
+                    '<tr><th style="text-align:left;">ID</th>'
+                    '<th style="text-align:left;">Item</th>'
+                    '<th style="text-align:center;">↩︎</th>'
+                    '<th style="text-align:center;">Inf</th>'
+                    '<th style="text-align:left;">Subscale</th></tr>'
+                )
+                for iid in sorted(item_meta.keys(), key=_sort_key):
+                    m = item_meta[iid]
+                    text_short = (m["text"].replace("<", "&lt;").replace(">", "&gt;"))
+                    if len(text_short) > 110:
+                        text_short = text_short[:107] + "…"
+                    rev = "↩︎" if m["reverse_coded"] else ""
+                    inf = "✓" if m["substrate_inferable"] else "—"
+                    inf_color = "#1B7340" if m["substrate_inferable"] else "#9ca3af"
+                    sub = (m["subscale"] or "").replace("<", "&lt;")
+                    rows_html.append(
+                        f'<tr>'
+                        f'<td style="white-space:nowrap;padding-right:0.6em;font-family:ui-monospace,monospace;">{iid}</td>'
+                        f'<td style="padding-right:0.6em;">{text_short}</td>'
+                        f'<td style="text-align:center;padding-right:0.4em;">{rev}</td>'
+                        f'<td style="text-align:center;color:{inf_color};padding-right:0.6em;">{inf}</td>'
+                        f'<td style="white-space:nowrap;color:#6b7280;">{sub}</td>'
+                        f'</tr>'
+                    )
+                table_html = (
+                    '<table style="border-collapse:collapse;font-size:0.85em;line-height:1.4;">'
+                    + "".join(rows_html)
+                    + '</table>'
+                )
+                lines.append(
+                    '<div style="display:flex;gap:1.2em;align-items:flex-start;flex-wrap:wrap;margin:0.6em 0;">'
+                    f'<div style="flex:0 0 360px;"><img src="{rel}" alt="{key} per-item radar" '
+                    'style="width:100%;height:auto;"></div>'
+                    f'<div style="flex:1 1 280px;min-width:280px;">{table_html}</div>'
+                    '</div>\n'
+                )
+            else:
+                # No item-meta — fall back to plain radar image.
+                lines.append(f"![{key} per-item radar]({rel})\n")
         # Run-over-run timeline (activates from run 2)
         if key in per_inst_timelines:
             rel = per_inst_timelines[key].relative_to(summary_path.parent)
