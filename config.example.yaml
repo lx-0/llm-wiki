@@ -362,6 +362,13 @@ features:
   # false the engine reverts to the decorative allowlist for one-line
   # rollback if streaming-mode surfaces edge cases under production load.
   compile_callback_gate: true
+  # Corpus-wide post-compile pass that writes a sentinel-managed
+  # `## Backlinks` footer into every knowledge/<article>.md so AI agents
+  # reading the markdown directly get backlink information without a
+  # corpus-wide ripgrep. Idempotent — unchanged corpus produces zero writes.
+  # Flip false to skip the sweep (e.g. to compare compile timing without
+  # the O(corpus) extra read/write).
+  materialize_backlinks: true
 
 graph_view:
   # Mode: knowledge-only | full-vault | sources-only | custom

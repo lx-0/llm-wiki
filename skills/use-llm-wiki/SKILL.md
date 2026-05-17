@@ -112,6 +112,14 @@ grep -i "<topic>" "<vault-root>/knowledge/index.md"   # flat catalog: link · su
 Then `Read` the matched article file(s). The index is large — always grep it
 by topic, never load it whole.
 
+**Backlinks come for free.** Every `knowledge/<article>.md` carries a
+sentinel-managed `## Backlinks` footer at its tail (block delimited by
+`<!-- backlinks:begin -->` / `<!-- backlinks:end -->`) listing every article
+that links *into* it. A normal `Read` returns the footer — no separate tool,
+no corpus-wide ripgrep. When the question is "what cites this concept?", read
+the article and look at the bottom. Articles with zero incoming links have no
+footer at all (the sentinel pair is omitted, not empty).
+
 Reserve **`wiki query`** for questions that need *synthesis across articles* —
 it spends one LLM call (the configured compile model):
 

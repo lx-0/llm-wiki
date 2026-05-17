@@ -488,6 +488,13 @@ class Features:
     # decorative allowlist for one-line rollback if the streaming-mode
     # rewrite surfaces edge cases under production load. Default True.
     compile_callback_gate: bool = True
+    # Corpus-wide post-compile pass that writes a sentinel-managed
+    # `## Backlinks` footer into every knowledge/<article>.md so AI agents
+    # reading the markdown directly get backlink information without
+    # corpus-wide ripgrep. Idempotent — unchanged corpus = zero writes.
+    # Flip false to skip the sweep (e.g. to compare compile timing without
+    # the O(corpus) extra read/write). Default True. M020, 2026-05-17.
+    materialize_backlinks: bool = True
 
 
 @dataclass
@@ -791,6 +798,35 @@ def load() -> WikiConfig:
 
 
 CONFIG: WikiConfig = load()
+
+
+# ── Compile substrate scope policy ────────────────────────────────────
+#
+# Directories that the compile pipeline (substrate-walker AND
+# compile-agent prompt scope) MUST NOT touch — as either Read or Write.
+# Single source of truth referenced by every compile-walker so the
+# air-gap policy lives in one place.
+#
+# `reports/` is hard-excluded per M019 DECISIONS.md (2026-05-17): the
+# operator-self-reports surface must never flow back into compile, else
+# a self-observation-bias feedback loop forms. The other entries are
+# infrastructure paths that compile has never touched but listing them
+# explicitly catches the case of a future walker that sweeps vault-root
+# `*.md` blindly.
+#
+# Path-form is "<segment>/" with trailing slash — matched against the
+# first path segment of a substrate-relative rel_path via startswith().
+# `compile_main_system.md` SCOPE block lists the same set verbatim;
+# operator-prompts and prompts must stay in sync.
+COMPILE_SUBSTRATE_EXCLUDED_PREFIXES: tuple[str, ...] = (
+    "reports/",
+    ".wiki/",
+    ".ytstack/",
+    ".obsidian/",
+    ".git/",
+    ".claude/",
+    "templates/",
+)
 
 
 # ── CLI helpers (used by the bash `wiki` entry point) ────────────────
