@@ -40,8 +40,9 @@ def test_gmail_auth_bootstrap_missing_client_secret(
     """Without an OAuth client_secret.json, bootstrap fails clearly without crashing."""
     from adapters.mailbox import gmail as gmail_mod
 
-    # Point the OAuth client path at a non-existent location.
-    monkeypatch.setattr(gmail_mod, "_OAUTH_CLIENT", tmp_path / "definitely-not-here.json")
+    # Point both PRIMARY + FALLBACK paths at non-existent locations.
+    monkeypatch.setattr(gmail_mod, "_OAUTH_CLIENT_PRIMARY", tmp_path / "primary-missing.json")
+    monkeypatch.setattr(gmail_mod, "_OAUTH_CLIENT_FALLBACK", tmp_path / "fallback-missing.json")
     ok, msg = gmail_mod.gmail_auth_bootstrap("test")
     assert not ok
     assert "Missing OAuth client config" in msg

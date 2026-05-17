@@ -5,7 +5,9 @@ S03 adds GmailReader (read-side label/message scanning) plus an OAuth
 bootstrap UX via `wiki gmail-auth <account-id>` and a JSON token cache
 at `<.wiki>/state/gmail-token-<id>.json`.
 
-OAuth client secret lives at `<vault>/.claude/gmail-oauth-client.json`
+OAuth client secret resolved by `_resolve_oauth_client()`: prefers
+`<vault>/.claude/google-oauth-client.json` (shared with gmeet +
+calendar), falls back to `<vault>/.claude/gmail-oauth-client.json`
 (per-install, gitignored). Operator places the file once after creating
 an OAuth client at https://console.cloud.google.com.
 """
@@ -26,7 +28,25 @@ from domain.mail import FilterRule, Message, MessageMeta
 log = logging.getLogger(__name__)
 
 
-_OAUTH_CLIENT = ROOT_DIR / ".claude" / "gmail-oauth-client.json"
+# Primary OAuth client = the neutral `google-oauth-client.json` (the same
+# project that gmeet + calendar already use; their OAuth flow is verified
+# and the operator has Test users + scopes set up there). Fallback to the
+# legacy `gmail-oauth-client.json` for installs that haven't consolidated
+# yet. Mirrors `collectors.calendar_collector._resolve_oauth_client`.
+_OAUTH_CLIENT_PRIMARY = ROOT_DIR / ".claude" / "google-oauth-client.json"
+_OAUTH_CLIENT_FALLBACK = ROOT_DIR / ".claude" / "gmail-oauth-client.json"
+
+
+def _resolve_oauth_client() -> Path:
+    """Prefer the neutral google-oauth-client.json; fall back to the
+    legacy gmail-only client (same GCP installed-app client works for
+    any scope set — Gmail scopes just need to be added to the consent
+    screen of whichever project owns the chosen client)."""
+    if _OAUTH_CLIENT_PRIMARY.exists():
+        return _OAUTH_CLIENT_PRIMARY
+    if _OAUTH_CLIENT_FALLBACK.exists():
+        return _OAUTH_CLIENT_FALLBACK
+    return _OAUTH_CLIENT_PRIMARY  # caller errors out on missing file
 _SCOPES = [
     "https://mail.google.com/",
     "https://www.googleapis.com/auth/gmail.settings.basic",
@@ -300,7 +320,7 @@ class GmailFilter:
 
 def _app() -> OAuthApp:
     return OAuthApp(
-        client_file=_OAUTH_CLIENT,
+        client_file=_resolve_oauth_client(),
         scopes=tuple(_SCOPES),
         token_prefix="gmail-token",
         bootstrap_cmd="wiki gmail-auth",
@@ -322,7 +342,7 @@ def gmail_auth_bootstrap(account_id: str) -> tuple[bool, str]:
     """Run the installed-app OAuth flow once. Persist token + return (ok, message).
 
     Operator pre-condition: place OAuth client_secret.json at the path
-    reported by `_OAUTH_CLIENT`. The flow opens a local-loopback browser
+    reported by `_resolve_oauth_client()`. The flow opens a local-loopback browser
     for the consent screen. Called from `wiki gmail-auth <id>`.
     """
     return google_oauth.bootstrap(_app(), account_id)
