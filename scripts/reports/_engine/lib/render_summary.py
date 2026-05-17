@@ -131,9 +131,16 @@ def _render_per_instrument_timelines(
     timeline: Timeline,
     charts_dir: Path,
 ) -> dict[str, Path]:
-    """Write one timeline SVG per instrument; return slug → path map."""
+    """Write one timeline SVG per instrument that's in the latest run;
+    return slug → path map. Instruments dropped from the manifest
+    between runs (K6, ASRS-v1.1 after the 2026-05-17 rebalance) are
+    NOT rendered — their stale timelines would otherwise persist in
+    older runs' charts/ dirs forever via the union-of-keys."""
     out: dict[str, Path] = {}
-    for key in timeline.all_instrument_keys():
+    if timeline.latest is None:
+        return out
+    keys_in_latest = set(timeline.latest.instruments.keys())
+    for key in sorted(keys_in_latest):
         snapshots = timeline.series_for(key)
         if not snapshots:
             continue

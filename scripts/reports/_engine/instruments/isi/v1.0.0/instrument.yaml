@@ -14,3 +14,11 @@ inference:
   bandable_coverage_pct: 80
   default_lookback_days: 14
   max_curiosity_per_run: 3
+  # Override default model: ISI hit 0% coverage 3 runs in a row on
+  # claude-haiku-4-5 because items 1-3 are theoretically substrate-
+  # inferable from Oura data (sleep onset / awakenings / early waking)
+  # but Haiku played ultra-conservative on severity-scale interpretation.
+  # Sonnet's richer reasoning may reach the confidence threshold; if
+  # still 0%, the ISI subjective experience is genuinely substrate-
+  # locked and items need operator-input via curiosity-bridge.
+  model: claude-sonnet-4-6

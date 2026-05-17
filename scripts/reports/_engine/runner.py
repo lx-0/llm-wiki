@@ -382,6 +382,14 @@ def run_inference(
             flush=True,
         )
 
+    # Optional per-instrument model override from instrument.yaml's
+    # `inference.model:` field. Defaults to the engine-default model
+    # (claude-haiku-4-5) when not set. Used for instruments where
+    # Haiku's confidence-conservativism caps coverage at 0% despite
+    # substrate evidence (ISI sleep items 1-3 = Oura observable).
+    inference_cfg = _read_inference_config(instrument_dir)
+    instrument_model = inference_cfg.get("model")
+
     # Determine batches; drop operator-answered items per batch + skip
     # batches that become empty.
     raw_batches = default_batches(instrument)
@@ -439,11 +447,16 @@ def run_inference(
               f"prompt_version={prompt_version}", flush=True)
 
         t0 = time.perf_counter()
+        infer_kwargs = {
+            "vault_cwd": vault_root,
+            "prompt_version": prompt_version,
+        }
+        if instrument_model:
+            infer_kwargs["model"] = instrument_model
         result = infer_batch(
             rendered_prompt,
             batch,
-            vault_cwd=vault_root,
-            prompt_version=prompt_version,
+            **infer_kwargs,
         )
         dt = time.perf_counter() - t0
         print(f"    → answered={sum(1 for inf in result.items.values() if inf.answer is not None)}"
