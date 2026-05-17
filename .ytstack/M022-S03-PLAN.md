@@ -3,9 +3,9 @@ milestone: M022
 slice: S03
 project: llm-wiki
 created: 2026-05-17T13:30:37Z
-status: planned
+status: done
 task_count: 4
-completed_tasks: 3
+completed_tasks: 4
 ---
 
 # M022-S03 — Slice Plan
@@ -17,7 +17,7 @@ completed_tasks: 3
 - [x] T01 — `scripts/migrations/migrate_inbox_archive.py` schreiben: liest `CONFIG.personal.voice_inbox` + `CONFIG.personal.picture_inbox`, moved `<voice_inbox>/.processed/*` → `<vault>/raw/inbox-mobile/voice/`, `<picture_inbox>/.processed/*` → `<vault>/raw/inbox-mobile/pictures/`. Conflict-Resolution: Filename-collision → suffix mit `-<mtime-iso>`. Nach Move: `rmdir()` auf die leeren `.processed/`-Folder (try/except OSError für falls noch was drin liegt).
 - [~] T02 — ~~Templates~~ **CANCELLED** (`lib/seed.sh` doesn't walk `templates/raw/`; collectors do on-demand mkdir). See T02-PLAN/SUMMARY. `templates/raw/inbox-wiki/.gitkeep`, `templates/raw/inbox-mobile/voice/.gitkeep`, `templates/raw/inbox-mobile/pictures/.gitkeep` anlegen. `wiki seed --force` lokal gegen einen tmp-Vault testen, verifizieren dass die 3 Folder angelegt werden.
 - [x] T03 — Migration-Test in `tests/test_migrations.py`: fixture mit fake `<voice_inbox>/.processed/foo.txt` + `<picture_inbox>/.processed/bar.png` → Script läuft → assert Files in Vault-Location, alte Folder weg.
-- [ ] T04 — Live-Run auf lxw (operator-action, engine cannot self-verify) (operator-getriggert via `wiki update` oder direkt `uv run python scripts/migrations/migrate_inbox_archive.py`). Verify: `<voice_inbox>/.processed/` und `<picture_inbox>/.processed/` existieren nicht mehr; `raw/inbox-mobile/voice/` + `raw/inbox-mobile/pictures/` enthalten die migrierten Files. **REGEL #1**: kein "fertig"-Claim bis die Live-Folder-Probe gemacht ist.
+- [x] T04 — Live-Run auf lxw — 47 files migrated, both .processed/ rmdir-ed (2026-05-17T15:44Z) (operator-getriggert via `wiki update` oder direkt `uv run python scripts/migrations/migrate_inbox_archive.py`). Verify: `<voice_inbox>/.processed/` und `<picture_inbox>/.processed/` existieren nicht mehr; `raw/inbox-mobile/voice/` + `raw/inbox-mobile/pictures/` enthalten die migrierten Files. **REGEL #1**: kein "fertig"-Claim bis die Live-Folder-Probe gemacht ist.
 
 ## Done when
 

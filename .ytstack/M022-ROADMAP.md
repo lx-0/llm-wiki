@@ -3,9 +3,9 @@ milestone: M022
 project: llm-wiki
 size: M
 created: 2026-05-17T13:30:37Z
-status: planned
+status: done
 total_slices: 3
-completed_slices: 2
+completed_slices: 3
 ---
 
 # M022 Roadmap
@@ -27,7 +27,7 @@ Slice detail lives in per-slice `M022-S##-PLAN.md` files, created by `ytstack:sl
 
 - [x] S01 — `process-inbox.py` Zwei-Zonen-Refactor (inbox-wiki original + category artifact, HTML-unlink raus)
 - [x] S02 — voice + pictures collectors: Archive-Location nach `raw/inbox-mobile/<source>/`
-- [~] S03 — Migration-Script + lxw-Live-Run (engineering done; T04 operator-pending)
+- [x] S03 — Migration-Script + lxw-Live-Run (T04 verified 2026-05-17T15:44Z, 47 files migrated)
 
 ## Slice intent (rough sketch)
 
@@ -43,4 +43,4 @@ Slices execute sequentially. After each slice, `ytstack:reassess-roadmap` checks
 
 - Flip slice checkbox `[ ]` → `[x]` when its tasks are all `summarize-task`-confirmed
 - Update `completed_slices` count
-- On milestone completion, flip `status: planned` → `status: done` and update global ROADMAP.md
+- On milestone completion, flip `status: done` → `status: done` and update global ROADMAP.md

@@ -1,17 +1,17 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-05-17T14:50:00Z
-current_milestone: M022
-active_slice: S03
-active_task: T04
-last_completed_milestone: M020
+last_updated: 2026-05-17T15:44:00Z
+current_milestone: none
+active_slice: none
+active_task: none
+last_completed_milestone: M022
 parallel_milestones: [M021]
 ---
 
 # State
 
-**Status:** M022 engineering-DONE — S01+S02 shipped, S03-T01+T03 shipped + T02 cancelled (`d776e35`). 841/841 tests green. **T04 = operator-action pending**: on lxw run `wiki update` then `uv run --project .wiki python scripts/migrations/migrate_inbox_archive.py`, verify-checklist in M022-S03-T04-PLAN.md. M022 not flipped to DONE until operator reports T04 success — REGEL #1. Inbox-intake-Schema-Unifizierung: zwei-Zonen-Modell (`raw/inbox-<channel>/` = audit-archive, `raw/<category>/` = derived substrate), `.processed/`-Archive ausserhalb des Vaults werden eliminiert. T01-PLAN flaggt: T01+T02 müssen atomic ein Commit (zwischenzeitlich rote Tests sonst).
+**Status:** M022 DONE 2026-05-17. Two-zone intake live across all channels (process-inbox.py + voice + pictures collectors). T04 lxw migration executed: 47 files moved (29 voice + 18 pictures), both iCloud .processed/ folders rmdir-ed. Mobile-collectors now write archive directly into vault. 841/841 tests green. Inbox-intake-Schema-Unifizierung: zwei-Zonen-Modell (`raw/inbox-<channel>/` = audit-archive, `raw/<category>/` = derived substrate), `.processed/`-Archive ausserhalb des Vaults werden eliminiert. T01-PLAN flaggt: T01+T02 müssen atomic ein Commit (zwischenzeitlich rote Tests sonst).
 
 ---
 
