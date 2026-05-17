@@ -106,8 +106,9 @@ def test_migrate_config_file_round_trip(tmp_path):
     new_text, changes = m.migrate_config(config_path)
     assert new_text is not None
     # 2 piggyback (rename + drop)
-    #  + 1 created-limits-block + 23 limits additions:
+    #  + 1 created-limits-block + 24 limits additions:
     #    compile_force_long_context_types, compile_skip_on_long_context_unknown,
+    #    compile_aggregated_max_consecutive_failures (2026-05-17 circuit-breaker),
     #    compile_role_default_by_location (M007), 4 calendar_*,
     #    compile_max_turns_long_context, compile_max_cost_per_file_usd,
     #    compile_skip_substrate_types — default ["email-delta"],
@@ -134,8 +135,8 @@ def test_migrate_config_file_round_trip(tmp_path):
     # (LIST_ADDITIONS has one entry but operator's freshly-injected
     # skip-list already contains "email-delta" from KEY_ADDITIONS, so
     # the list-extend is a no-op on greenfield.)
-    # = 47 changes (no drops — operator has no orphan personal.* fields)
-    assert len(changes) == 47, f"got {len(changes)} changes: {changes}"
+    # = 48 changes (no drops — operator has no orphan personal.* fields)
+    assert len(changes) == 48, f"got {len(changes)} changes: {changes}"
 
     reparsed = yaml.safe_load(new_text)
     # piggyback side
@@ -181,6 +182,7 @@ def test_migrate_config_no_change_when_fully_current(tmp_path):
         "limits": {
             "compile_force_long_context_types": [],
             "compile_skip_on_long_context_unknown": True,
+            "compile_aggregated_max_consecutive_failures": 3,
             "compile_role_default_by_location": True,
             "calendar_request_timeout_s": 30,
             "calendar_max_per_run": 500,
@@ -303,6 +305,7 @@ def test_migrate_additions_idempotent():
         "limits": {
             "compile_force_long_context_types": ["daily-digest", "calendar-rollup"],
             "compile_skip_on_long_context_unknown": True,
+            "compile_aggregated_max_consecutive_failures": 3,
             "compile_role_default_by_location": True,
             "calendar_request_timeout_s": 30,
             "calendar_max_per_run": 500,

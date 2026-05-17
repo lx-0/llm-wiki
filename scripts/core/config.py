@@ -398,6 +398,18 @@ class Limits:
     # would just abort the batch on unrelated files. Off-switch surfaces
     # every kind=unknown as a failure (legacy behavior, pre-2026-05-15).
     compile_skip_on_long_context_unknown: bool = True
+    # Circuit-breaker for aggregated-memory chunked compiles. The
+    # memory-seed/memory-sync substrate splits an aggregated dump into
+    # N ~1-KB chunks (one per `## section`) and compiles each as its own
+    # `compile_source` call. Pre-guard, a broken substrate-prompt would
+    # burn N × $0.30-0.40 (observed 2026-05-17: 46-chunk memory-seed file
+    # hit max_turns on every chunk at $0.35 each — potential $16/file
+    # before the outer loop ever sees a result). The per-file cost guard
+    # (compile_max_cost_per_file_usd) fires per-chunk, not cumulatively,
+    # so it can't catch this pattern. Aborts the chunk-loop after N
+    # consecutive failures (skipped OR failed); already-successful
+    # chunks are preserved. Set to 0 to disable the breaker.
+    compile_aggregated_max_consecutive_failures: int = 3
     # When True (default), `infer_compile_role()` falls back to LOCATION_DEFAULTS
     # (raw/daily/inbox/knowledge → source-only) for files that omit the
     # `compile_role:` frontmatter key. When False, all files without explicit

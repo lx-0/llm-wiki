@@ -53,6 +53,7 @@ Key changes covered (chronological):
   limits.dream_tier1_digest_days           (added 2026-05-17 M016, default 7 — Tier 1 daily-digest day count)
   limits.dream_tier2_sample_count          (added 2026-05-17 M016, default 50 — Tier 2 weighted-sample size)
   features.suggestions_source_globs        (added 2026-05-17 Producer-seam, default ["raw/email/*.md"] — lifts legacy hardcoded _is_email_source filter onto Spec)
+  limits.compile_aggregated_max_consecutive_failures (added 2026-05-17, default 3 — circuit-breaker on memory-seed chunked compiles; aborts loop after N consecutive chunk failures to stop $-bleed on substrate-prompt mismatch)
 
 Idempotent: a config already on the current schema produces no change.
 
@@ -104,6 +105,12 @@ KEY_ADDITIONS: dict[str, dict[str, object]] = {
         # Preserves the consecutive-failure budget so the batch survives
         # a structurally-unprocessable file.
         "compile_skip_on_long_context_unknown": True,
+        # Circuit-breaker for aggregated-memory chunked compiles (2026-05-17).
+        # When N consecutive chunks fail (skipped OR failed), abort the
+        # rest of the chunk loop. Stops runaway $-burn on broken
+        # substrate-prompt × N-chunk fan-out (per-file cost guard fires
+        # per-chunk, not cumulatively). Set 0 to disable.
+        "compile_aggregated_max_consecutive_failures": 3,
         # M007-S01-T02 (2026-05-16): When true (default), files without
         # explicit `compile_role:` frontmatter get a role inferred from
         # their top-level segment (raw/daily/inbox/knowledge → source-only).

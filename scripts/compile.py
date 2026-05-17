@@ -717,12 +717,36 @@ async def compile_file(
         )
         chunk_results = []
         any_ok = False
+        # Circuit-breaker: aborts after N consecutive chunk failures
+        # (skipped OR failed) to stop runaway $-burn on a substrate-prompt
+        # mismatch. Per-file cost guard fires per-chunk, not cumulatively,
+        # so a 46-chunk file with broken prompt could burn $16+ without
+        # this. Counter resets on each ok chunk.
+        abort_after = CONFIG.limits.compile_aggregated_max_consecutive_failures
+        consecutive_failures = 0
+        aborted_at: int | None = None
         for i, chunk in enumerate(classification.chunks, 1):
+            if abort_after and consecutive_failures >= abort_after:
+                log.warning(
+                    "  aggregated-memory: aborting chunk loop after %d "
+                    "consecutive failures (%d/%d chunks processed). "
+                    "Substrate-prompt mismatch likely; revise "
+                    "`prompts/compile_memories.md` or add `%s` to "
+                    "`compile_skip_substrate_types`. Already-ok chunks "
+                    "preserved.",
+                    consecutive_failures, i - 1, len(classification.chunks),
+                    source_type,
+                )
+                aborted_at = i - 1
+                break
             log.info("  chunk %d/%d (%d chars)", i, len(classification.chunks), len(chunk))
             chunk_result = await compile_source(chunk, metadata)
             chunk_results.append(chunk_result)
             if chunk_result.status == "ok":
                 any_ok = True
+                consecutive_failures = 0
+            else:
+                consecutive_failures += 1
         total_in = sum(r.input_tokens or 0 for r in chunk_results)
         total_out = sum(r.output_tokens or 0 for r in chunk_results)
         total_cost = sum(r.cost_usd or 0 for r in chunk_results)
@@ -731,16 +755,26 @@ async def compile_file(
         fail_count = sum(1 for r in chunk_results if r.status == "failed")
         log.info(
             "  aggregated-memory result: %d ok / %d skipped / %d failed "
-            "(total in:%d out:%d $%.4f)",
+            "(total in:%d out:%d $%.4f)%s",
             ok_count, skip_count, fail_count, total_in, total_out, total_cost,
+            f" — ABORTED at chunk {aborted_at}/{len(classification.chunks)}"
+            if aborted_at is not None else "",
         )
         if not any_ok:
-            return {"_skipped": "aggregated_memory_all_chunks_failed"}
+            return {
+                "_skipped": "aggregated_memory_circuit_breaker"
+                if aborted_at is not None
+                else "aggregated_memory_all_chunks_failed"
+            }
         return {
             "input_tokens": total_in,
             "output_tokens": total_out,
             "cost_usd": total_cost,
-            "result": f"aggregated-memory: {ok_count}/{len(chunk_results)} chunks compiled",
+            "result": (
+                f"aggregated-memory: {ok_count}/{len(classification.chunks)} "
+                f"chunks compiled"
+                + (f" (aborted at {aborted_at})" if aborted_at is not None else "")
+            ),
         }
 
     result = await compile_source(source_content, metadata)

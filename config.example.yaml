@@ -315,6 +315,13 @@ limits:
   # survives a structurally-unprocessable file. Set to false to surface
   # every kind=unknown as a failure (legacy pre-2026-05-15 behavior).
   compile_skip_on_long_context_unknown: true
+  # Circuit-breaker for memory-seed/memory-sync chunked compiles. When the
+  # substrate splits an aggregated dump into N per-section chunks and the
+  # first few all hit max_turns at $0.30-0.40 each (substrate-prompt
+  # mismatch), the chunk loop is aborted to stop the $-bleed. Cumulative
+  # cost guard — the per-file cost cap fires per-chunk and can't see the
+  # total. Set 0 to disable.
+  compile_aggregated_max_consecutive_failures: 3
   # When true (default), files without explicit `compile_role:` frontmatter
   # get a role inferred from their top-level segment (raw/daily/inbox/knowledge
   # → source-only). Set false to require explicit frontmatter on every file
