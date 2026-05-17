@@ -3,14 +3,18 @@ milestone: M018
 slice: S06
 project: llm-wiki
 created: 2026-05-17T13:00:00Z
-status: planned
+status: cancelled
+cancelled_on: 2026-05-17T13:20:00Z
+cancelled_reason: depended on S01 fixture-vault premise (LLM non-determinism makes byte-identical regression flaky-by-design). Closeout work (docs, backlog flip, memory) moves into S05 wrap-up or a fresh closeout commit. Integration signal = operator smoke on lxw post-S05.
 task_count: 5
 completed_tasks: 0
 ---
 
-# M018-S06 — Slice Plan
+# M018-S06 — Slice Plan (CANCELLED 2026-05-17)
 
-**Goal:** M018 closes: all 5 exit criteria green, documentation reflects the new `scripts/compile_stages/` shape, backlog flipped to shipped, memory pointer written. Q1's serial-after-file decision means scheduling-policy is already decided (no work in this slice); this is the regression + closeout slice.
+**Goal:** ~~M018 closes: all 5 exit criteria green, documentation reflects the new `scripts/compile_stages/` shape, backlog flipped to shipped, memory pointer written. Q1's serial-after-file decision means scheduling-policy is already decided (no work in this slice); this is the regression + closeout slice.~~
+
+**Cancellation rationale:** byte-identical regression against `knowledge/` output is structurally impossible because Claude SDK responses are non-deterministic. The closeout work that this slice carried (docs, backlog flip, memory pointer, STATE update) is small and folds into S05's wrap-up or a dedicated closeout commit after S05 lands. End-to-end verification reduces to: operator runs `wiki compile` once on the live lxw vault post-S05 and confirms (a) no crash, (b) producer output still lands in raw/suggestions/ + raw/requests/ + knowledge/takes/, (c) per-source state save still occurs.
 
 ## Tasks
 

@@ -4,7 +4,7 @@ project: llm-wiki
 size: L
 created: 2026-05-17T12:45:00Z
 status: planned
-total_slices: 6
+total_slices: 4
 completed_slices: 0
 ---
 
@@ -14,34 +14,27 @@ completed_slices: 0
 
 **Exit criteria:**
 1. `compile.py`'s `main()` per-file loop body fits in <40 LOC and contains zero LLM calls, zero file writes, zero state-save logic.
-2. `select_sources()`, `compile_source()`, `commit_article()` exist as independently unit-testable functions; each ≥3 tests; first two are pure.
+2. `select_sources()`, `compile_source()`, `commit_article()` exist as independently unit-testable functions; each ≥3 tests; first two are pure (LLM mocked).
 3. Post-passes lift out of the per-file loop into `run_post_passes(source, compile_result)` consuming `ProducerRegistry.all()`.
-4. Regression: `wiki compile` on the curated fixture vault produces byte-identical `knowledge/` output BEFORE vs. AFTER.
+4. End-to-end smoke: operator runs `wiki compile` on lxw post-Phase-2 and observes no crash + producer output still lands as before.
 5. The 5 open questions in CONTEXT.md are CLOSED before S05 starts.
 
 ## Slices
 
-Slice detail lives in per-slice `M018-S##-PLAN.md` files, created by `ytstack:slice-milestone`.
+(Filenames preserved from parallel-session slicing; S01 + S06 cancelled below.)
 
-- [ ] S01 -- Fixture vault for regression check (4 tasks)
-- [ ] S02 -- Extract select_sources() — pure I/O (4 tasks)
-- [ ] S03 -- Extract compile_source() — pure LLM call (5 tasks)
-- [ ] S04 -- Extract commit_article() — pure file I/O (3 tasks)
-- [ ] S05 -- Post-pass lift via run_post_passes() — orchestrator owns post-passes (5 tasks)
-- [ ] S06 -- Regression + closeout: docs + diagram + backlog + memory + STATE (5 tasks)
+- [~] S01 -- ~~Fixture vault for regression check~~ — CANCELLED 2026-05-17 (premise-broken; LLM output non-deterministic, byte-identical diff is flaky-by-design)
+- [ ] S02 -- Extract `select_sources()` — pure I/O (mtime / hash-skip / role-axis filter / dry-run). No LLM.
+- [ ] S03 -- Extract `compile_source()` — LLM call with SDK mocked in tests. Owns prompt assembly + owner-block + pre-flight gate + kind-unknown retry + SDK call + failure classification.
+- [ ] S04 -- Extract `commit_article()` — pure I/O. Writes to `knowledge/<bucket>/`, frontmatter merge, atomic-replace.
+- [ ] S05 -- Lift post-passes via `run_post_passes()` consuming ProducerRegistry. Requires the 5 open questions closed.
+- [~] S06 -- ~~Regression + closeout via fixture-vault comparison~~ — CANCELLED 2026-05-17 (depended on S01's fixture-vault premise; integration signal = manual operator smoke on lxw)
 
-Suggested framing (from `.ytstack/backlog/producer-seam.md` lines 136–141, may grow to 5–6 slices during `slice-milestone`):
-
-1. **Fixture vault for regression check** — curated 20-source set covering each role-axis value + each substrate-type. Locks the byte-identical comparison baseline.
-2. **Extract `select_sources()`** — pure I/O (mtime / hash-skip / role-axis filter / dry-run). No LLM.
-3. **Extract `compile_source()`** — pure LLM call. Owns prompt assembly + owner-block + pre-flight gate + kind-unknown retry + SDK call + failure classification. No file ops, no state I/O.
-4. **Extract `commit_article()`** — pure I/O. Writes to `knowledge/<bucket>/`, frontmatter, atomic-replace.
-5. **Lift post-passes out of per-file loop** — `run_post_passes()` orchestrator consumes ProducerRegistry. Requires the 5 open questions closed first.
-6. **Scheduling-policy decision + regression verification** — fixture vault comparison; flip back the feature flags if dev-disabled.
+Active slices: S02 → S03 → S04 → S05.
 
 ## Run order
 
-Slices execute sequentially. After each slice, `ytstack:reassess-roadmap` checks if the plan still fits reality. The fixture-vault slice MUST land before any extraction slice so we can detect regressions immediately.
+Slices execute sequentially. After each slice, `ytstack:reassess-roadmap` checks if the plan still fits reality.
 
 ## How to update this file
 
