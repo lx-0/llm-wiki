@@ -269,9 +269,63 @@ def test_to_json_serializable(fake_vault):
     out = health.to_json(sample)
     assert out == [{
         "id": "a", "category": "config", "severity": "ok",
-        "message": "x", "fix": "y", "details": {"k": 1},
+        "message": "x", "fix": "y", "dispatch_args": None, "details": {"k": 1},
     }]
     json.dumps(out)  # round-trips through json
+
+
+def test_to_json_includes_dispatch_args():
+    sample = [health.CheckResult(
+        "a", "config", "warning", "x",
+        fix="wiki setup", dispatch_args=["setup"],
+    )]
+    out = health.to_json(sample)
+    assert out[0]["dispatch_args"] == ["setup"]
+
+
+def test_check_setup_run_carries_dispatch_args(fake_vault, monkeypatch):
+    """The promoted-to-actionable checks set both `fix` (human-readable)
+    and `dispatch_args` (concrete invocation)."""
+    class _Models:
+        ollama_url = ""
+        compile_model = "claude-opus-4-7"
+
+    class _CONFIG:
+        models = _Models()
+
+    monkeypatch.setitem(__import__("sys").modules, "core.config",
+                        type("M", (), {"CONFIG": _CONFIG})())
+    result = health.check_setup_run()
+    assert result.severity == "critical"
+    assert result.dispatch_args == ["setup"]
+
+
+def test_check_hooks_dispatch_args_when_missing(fake_vault):
+    result = health.check_hooks_installed()
+    assert result.severity == "warning"
+    assert result.dispatch_args == ["hooks", "install"]
+
+
+def test_unactionable_checks_have_no_dispatch_args(fake_vault, monkeypatch):
+    """Multi-step / external / shell-only fixes have fix= set but dispatch_args=None
+    so the banner doesn't try to auto-run them."""
+    # ollama-unreachable
+    class _Models:
+        ollama_url = "http://nonexistent-host-12345:11434"
+
+    class _CONFIG:
+        models = _Models()
+
+    monkeypatch.setitem(__import__("sys").modules, "core.config",
+                        type("M", (), {"CONFIG": _CONFIG})())
+
+    def _refuse(*_a, **_kw):
+        raise OSError("test: unreachable")
+
+    monkeypatch.setattr(socket, "create_connection", _refuse)
+    result = health.check_ollama_reachable()
+    assert result.severity == "warning"
+    assert result.dispatch_args is None  # not auto-runnable
 
 
 def test_probe_failed_returns_warning_with_exception_text(fake_vault):

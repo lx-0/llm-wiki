@@ -263,24 +263,66 @@ class HomeState:
         self.cursor: int = 0
         self.selected: tuple | None = None
         # selected is one of:
-        #   ("suggestion", index)
+        #   ("action", index)   — unified actionable list (health + suggestions)
         #   ("quick", key)
         #   ("category", letter)
         #   ("filter",)
         #   ("help",)
         #   ("exit",)
 
-    def n_suggestions(self) -> int:
-        return len(self.suggestions)
+    def actionable_health(self) -> list[CheckResult]:
+        """Health entries severity critical|warning with a dispatch_args.
+        These are the ones the cursor can run via Enter."""
+        return [
+            r for r in self.health
+            if r.severity in ("critical", "warning") and r.dispatch_args
+        ]
 
-    def banner_issues(self) -> list[CheckResult]:
-        """Issues to render in the home-screen banner.
+    def info_health(self) -> list[CheckResult]:
+        """Health entries severity critical|warning WITHOUT dispatch_args.
+        Rendered as a read-only Heads-up section below the actionable list
+        — operator runs the fix manually (e.g. `tail …`, `claude /login`)."""
+        return [
+            r for r in self.health
+            if r.severity in ("critical", "warning") and not r.dispatch_args
+        ]
 
-        Operator decision (2026-05-17): all critical + warning issues
-        rendered inline, no collapse to count. Info entries stay out of
-        the banner — they live in `wiki doctor`.
+    def actions(self) -> list[dict]:
+        """Unified actionable list: actionable-health first, then probe
+        suggestions. Each entry is a dict with stable keys so the renderer
+        + key handlers don't need isinstance() dispatch.
+
+        Shape:
+            {
+              "kind": "health" | "suggestion",
+              "severity": "critical" | "warning" | "probe",
+              "label": str,           # human-readable
+              "dispatch_args": list[str],  # passed to `wiki <args>`
+              "cmd_display": str,     # what to render after "→ wiki "
+            }
         """
-        return [r for r in self.health if r.severity in ("critical", "warning")]
+        items: list[dict] = []
+        for r in self.actionable_health():
+            items.append({
+                "kind": "health",
+                "severity": r.severity,
+                "label": r.message,
+                "dispatch_args": list(r.dispatch_args),
+                "cmd_display": " ".join(r.dispatch_args),
+            })
+        for s in self.suggestions:
+            cmd_str = s.get("cmd", "")
+            items.append({
+                "kind": "suggestion",
+                "severity": "probe",
+                "label": s.get("label", ""),
+                "dispatch_args": cmd_str.split(),
+                "cmd_display": cmd_str,
+            })
+        return items
+
+    def n_actions(self) -> int:
+        return len(self.actions())
 
 
 def _build_screen_html(state: HomeState) -> str:
@@ -297,54 +339,67 @@ def _build_screen_html(state: HomeState) -> str:
         "",
     ]
 
-    # Banner — every critical + warning issue inline (operator picked
-    # full-inline over count-summary). Info stays out (lives in
-    # `wiki doctor`).
-    issues = state.banner_issues()
-    if issues:
-        for r in issues:
-            if r.severity == "critical":
-                glyph = "<ansired>✗</ansired>"
-                msg_open, msg_close = "<ansired>", "</ansired>"
-            else:  # warning
-                glyph = "<ansiyellow>⚠</ansiyellow>"
-                msg_open, msg_close = "<ansiyellow>", "</ansiyellow>"
-            lines.append(
-                f"  {glyph} {msg_open}{escape(r.message)}{msg_close}"
-            )
-            if r.fix:
-                lines.append(
-                    f"      <ansibrightblack>→ {escape(r.fix)}</ansibrightblack>"
-                )
+    # ── Unified actionable list ─────────────────────────────────────
+    # Health issues with `dispatch_args` set + every probe suggestion,
+    # in priority order (health first by severity). Cursor + Enter +
+    # 1-9 all index into this single list.
+    actions = state.actions()
+    if actions:
         lines.append(
-            f"      <ansibrightblack>(run `wiki doctor` for the full audit)</ansibrightblack>"
+            "  <b>▸ Actionable in your vault</b>  "
+            "<ansibrightblack>(↑↓ Enter · 1-9 jump)</ansibrightblack>"
         )
-        lines.append("")
-
-    if state.suggestions:
-        lines.append(
-            "  <b>▸ Pending in your vault</b>  "
-            "<ansibrightblack>(↑↓ Enter, or number)</ansibrightblack>"
-        )
-        for i, s in enumerate(state.suggestions):
-            label = escape(s["label"])
-            cmd = escape(s["cmd"])
-            key = escape(str(s["key"]))
-            if i == state.cursor:
-                lines.append(
-                    f"   <ansigreen>▸</ansigreen>  "
-                    f"<ansigreen>{key})</ansigreen> {label:<43}"
-                    f"  <ansibrightblack>→ wiki {cmd}</ansibrightblack>"
-                )
+        for i, act in enumerate(actions):
+            sev = act["severity"]
+            label = escape(act["label"])
+            cmd_display = escape(act["cmd_display"])
+            # Severity glyph in the gutter — colored health icon for
+            # promoted health checks, blank space for probe suggestions
+            # (their "actionable" status is implied by being in the list).
+            if sev == "critical":
+                gutter_glyph = "<ansired>✗</ansired>"
+            elif sev == "warning":
+                gutter_glyph = "<ansiyellow>⚠</ansiyellow>"
             else:
-                lines.append(
-                    f"      <ansigreen>{key})</ansigreen> {label:<43}"
-                    f"  <ansibrightblack>→ wiki {cmd}</ansibrightblack>"
-                )
+                gutter_glyph = " "
+            # Cursor marker
+            cursor_mark = "<ansigreen>▸</ansigreen>" if i == state.cursor else " "
+            # Position number (1-9 keyboard shortcut)
+            num = i + 1
+            num_html = f"<ansigreen>{num})</ansigreen>" if num <= 9 else f"{num})"
+            lines.append(
+                f"   {cursor_mark} {gutter_glyph} {num_html} {label:<43}"
+                f"  <ansibrightblack>→ wiki {cmd_display}</ansibrightblack>"
+            )
         lines.append("")
     else:
         lines.append(
             "  <ansibrightblack>✨ Nothing pending — vault is current.</ansibrightblack>"
+        )
+        lines.append("")
+
+    # ── Heads-up: warnings without auto-fix ─────────────────────────
+    # Critical/warning health entries that DON'T have a `dispatch_args`
+    # (multi-step fix, shell-only, external — e.g. tail log, claude
+    # /login, manual ollama check). Read-only — operator runs them.
+    info_issues = state.info_health()
+    if info_issues:
+        lines.append(
+            "  <b>▸ Heads-up</b>  "
+            "<ansibrightblack>(read-only — fix manually)</ansibrightblack>"
+        )
+        for r in info_issues:
+            if r.severity == "critical":
+                glyph = "<ansired>✗</ansired>"
+            else:
+                glyph = "<ansiyellow>⚠</ansiyellow>"
+            lines.append(f"      {glyph} {escape(r.message)}")
+            if r.fix:
+                lines.append(
+                    f"        <ansibrightblack>→ {escape(r.fix)}</ansibrightblack>"
+                )
+        lines.append(
+            "      <ansibrightblack>(`wiki doctor` for the full audit)</ansibrightblack>"
         )
         lines.append("")
 
@@ -402,13 +457,13 @@ def _run_home_picker(state: HomeState) -> None:
 
     @kb.add("down")
     def _(event):
-        if state.cursor < state.n_suggestions() - 1:
+        if state.cursor < state.n_actions() - 1:
             state.cursor += 1
 
     @kb.add("enter")
     def _(event):
-        if 0 <= state.cursor < state.n_suggestions():
-            state.selected = ("suggestion", state.cursor)
+        if 0 <= state.cursor < state.n_actions():
+            state.selected = ("action", state.cursor)
             event.app.exit()
 
     @kb.add("/")
@@ -448,8 +503,8 @@ def _run_home_picker(state: HomeState) -> None:
         @kb.add(digit)
         def _(event, d=digit):
             idx = int(d) - 1
-            if 0 <= idx < state.n_suggestions():
-                state.selected = ("suggestion", idx)
+            if 0 <= idx < state.n_actions():
+                state.selected = ("action", idx)
                 event.app.exit()
 
     body = pt.Window(
@@ -542,10 +597,11 @@ def main() -> int:
             state.status = build_status()
             state.suggestions = build_suggestions()
             state.health = build_health()
-            if state.n_suggestions() == 0:
+            n = state.n_actions()
+            if n == 0:
                 state.cursor = 0  # safe even when there's nothing to highlight
-            elif state.cursor >= state.n_suggestions():
-                state.cursor = state.n_suggestions() - 1
+            elif state.cursor >= n:
+                state.cursor = n - 1
 
             _run_home_picker(state)
 
@@ -556,12 +612,13 @@ def main() -> int:
             tag = state.selected[0]
             if tag == "exit":
                 return 0
-            if tag == "suggestion":
+            if tag == "action":
                 idx = state.selected[1]
-                cmd_str = state.suggestions[idx]["cmd"]
-                print()
-                dispatch_subprocess(cmd_str.split())
-                _pause()
+                actions = state.actions()
+                if 0 <= idx < len(actions):
+                    print()
+                    dispatch_subprocess(actions[idx]["dispatch_args"])
+                    _pause()
             elif tag == "quick":
                 key = state.selected[1]
                 spec = next(d for k, _l, _d, d in QUICK_ACTIONS if k == key)

@@ -226,8 +226,7 @@ from core.config import CONFIG  # noqa: E402
 from core.prompts import render  # noqa: E402
 from core import ollama_client  # noqa: E402
 
-from producers import all_producers  # noqa: E402
-from producers.orchestrate import evaluate_and_run as _run_producer  # noqa: E402
+from compile_stages.post_passes import run_post_passes  # noqa: E402
 
 
 # ── File selection ───────────────────────────────────────────────────
@@ -937,14 +936,20 @@ async def main() -> None:
         run_output_tokens += result.get("output_tokens", 0)
 
         # Post-pass producers (Producer-seam arc, .ytstack/backlog/producer-seam.md).
-        # Each Producer's SPEC declares its gate keys; evaluate_and_run consults
-        # CONFIG + source path, short-circuits non-matching sources to a `skipped`
-        # ProducerResult, otherwise delegates to the wrapper. Wrapper-side
-        # try/except converts unexpected exceptions into `failed` results
-        # (contract α) so the per-source state save below is never blocked.
-        # Run order = registration order: suggestions → curiosity → takes.
-        for _producer in all_producers():
-            await _run_producer(_producer, source)
+        # `run_post_passes` iterates every registered Producer serially (Q1
+        # decision), absorbs per-producer raises into `ProducerResult(status="failed")`
+        # via the orchestrator's contract-α wrapper, and accumulates
+        # `cost_usd` into `state["producer_cost_total"]` so the save below
+        # persists it alongside total_cost / last_compile.
+        from compile_stages.types import CompileResult
+        _compile_result = CompileResult(
+            status="ok",
+            cost_usd=result.get("cost_usd", 0.0),
+            input_tokens=result.get("input_tokens", 0),
+            output_tokens=result.get("output_tokens", 0),
+            article=result.get("result"),
+        )
+        await run_post_passes(source, _compile_result, state)
 
         # Update state: mark file as ingested with its hash + persist immediately.
         # Per-file save (not just end-of-loop) so rate-limit aborts, kills, and

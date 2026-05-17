@@ -127,13 +127,58 @@ def test_flatten_for_fuzzy_covers_all_entries():
     assert len(set(ids)) == len(ids), "duplicate catalog ids in fuzzy flatten"
 
 
-def test_home_state_n_suggestions_tracks_list():
+def test_home_state_actions_combines_health_and_suggestions():
+    """The unified actions list = actionable health + probe suggestions,
+    in that order. Cursor + Enter + 1-9 all navigate over this."""
+    import menu
+    from core.health import CheckResult
+
+    state = menu.HomeState()
+    assert state.n_actions() == 0
+
+    state.health = [
+        CheckResult("a", "config", "critical", "fix me",
+                    fix="wiki setup", dispatch_args=["setup"]),
+        CheckResult("b", "config", "warning", "no auto-fix",
+                    fix="run something manually", dispatch_args=None),
+    ]
+    state.suggestions = [{"key": "1", "label": "3 files in inbox/", "cmd": "process-inbox"}]
+    actions = state.actions()
+    assert len(actions) == 2  # one actionable health + one suggestion (the dispatchless health stays out)
+    assert actions[0]["kind"] == "health"
+    assert actions[0]["dispatch_args"] == ["setup"]
+    assert actions[1]["kind"] == "suggestion"
+    assert actions[1]["dispatch_args"] == ["process-inbox"]
+
+
+def test_home_state_info_health_excludes_actionable():
+    """Health entries with dispatch_args are NOT in info_health (they're
+    in actions). Info_health only contains warnings without auto-fix."""
+    import menu
+    from core.health import CheckResult
+
+    state = menu.HomeState()
+    state.health = [
+        CheckResult("a", "config", "warning", "actionable",
+                    fix="wiki x", dispatch_args=["x"]),
+        CheckResult("b", "config", "warning", "manual only",
+                    fix="manual step", dispatch_args=None),
+        CheckResult("c", "config", "info", "informational",
+                    fix=None, dispatch_args=None),  # never in either
+    ]
+    assert len(state.actionable_health()) == 1
+    assert len(state.info_health()) == 1
+    assert state.info_health()[0].id == "b"
+
+
+def test_home_state_actions_empty_when_nothing_pending():
     import menu
 
     state = menu.HomeState()
-    assert state.n_suggestions() == 0
-    state.suggestions = [{"key": "1"}, {"key": "2"}, {"key": "3"}]
-    assert state.n_suggestions() == 3
+    state.health = []
+    state.suggestions = []
+    assert state.actions() == []
+    assert state.n_actions() == 0
 
 
 # ── helpers ────────────────────────────────────────────────────────

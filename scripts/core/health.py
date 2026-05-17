@@ -50,7 +50,12 @@ class CheckResult:
     category: str           # "config" / "connectivity" / "pipeline"
     severity: str           # "critical" / "warning" / "info" / "ok"
     message: str
-    fix: str | None = None
+    fix: str | None = None  # human-readable suggestion (shell or prose)
+    # When set, the home-screen banner promotes this check into the
+    # navigable Actionable list — Enter dispatches `wiki <dispatch_args>`
+    # via subprocess. Leave None for checks whose fix is multi-step,
+    # shell-only, or external (e.g. "claude /login", "tail …").
+    dispatch_args: list[str] | None = None
     details: dict | None = field(default=None)
 
 
@@ -78,6 +83,7 @@ def check_setup_run() -> CheckResult:
                 severity="critical",
                 message="config has default values and no compile state — setup not run",
                 fix="wiki setup",
+                dispatch_args=["setup"],
             )
         return CheckResult(
             id="setup-not-run",
@@ -127,6 +133,7 @@ def check_hooks_installed() -> CheckResult:
             severity="warning",
             message="no project-scope hooks installed — session capture won't fire",
             fix="wiki hooks install",
+            dispatch_args=["hooks", "install"],
         )
     except Exception as exc:
         return _probe_failed("hooks-installed", "config", exc)
@@ -425,6 +432,7 @@ def check_compile_state() -> CheckResult:
                 severity="info",
                 message=f"last compile {int(delta / 86400)}d ago (consider `wiki compile`)",
                 fix="wiki compile",
+                dispatch_args=["compile"],
             )
         return CheckResult(
             id="compile-state",
