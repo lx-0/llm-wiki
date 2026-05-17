@@ -4,7 +4,8 @@ Operator dictates with any tool (OpenWhispr / FluidVoice / macOS
 dictation), the tool writes the transcript as a .txt or .md into the
 configured `personal.voice_inbox` directory. This collector picks them
 up, writes a frontmatter-stamped copy into `raw/voice/`, and archives
-the source under `<voice_inbox>/.processed/`.
+the source under `raw/inbox-mobile/voice/` (vault-internal audit zone,
+M022 two-zone intake — was `<voice_inbox>/.processed/` pre-M022).
 
 Substrate-agnostic on the capture side, opinionated on the storage side
 — same pattern as jamie / gmeet. See `.ytstack/backlog/voice-intake.md`
@@ -32,7 +33,7 @@ from core.utils import slugify
 log = logging.getLogger(__name__)
 
 OUTPUT_DIR = RAW_DIR / "voice"
-ARCHIVE_SUBDIR = ".processed"
+MOBILE_ARCHIVE_DIR = RAW_DIR / "inbox-mobile" / "voice"
 ACCEPTED_SUFFIXES = (".txt", ".md")
 MAX_SLUG_WORDS = 6
 PUNCTUATE_TIMEOUT_S = 30.0
@@ -157,8 +158,8 @@ class VoiceCollector:
 
     Reads any `*.txt` / `*.md` from `personal.voice_inbox`, writes a
     frontmatter-stamped copy to `raw/voice/`, then archives the source
-    under `<voice_inbox>/.processed/`. No state file — the archive move
-    is the dedup mechanism.
+    under `raw/inbox-mobile/voice/` (vault-internal). No state file —
+    the archive move is the dedup mechanism.
     """
 
     SPEC = CollectorSpec(
@@ -193,8 +194,7 @@ class VoiceCollector:
             )
 
         OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-        archive = inbox / ARCHIVE_SUBDIR
-        archive.mkdir(exist_ok=True)
+        MOBILE_ARCHIVE_DIR.mkdir(parents=True, exist_ok=True)
 
         punctuate_enabled = CONFIG.features.voice_punctuate
 
@@ -208,7 +208,7 @@ class VoiceCollector:
                 continue
             if not raw:
                 errors.append(f"{src.name}: empty file, archived without ingest")
-                shutil.move(str(src), str(archive / src.name))
+                shutil.move(str(src), str(MOBILE_ARCHIVE_DIR / src.name))
                 continue
 
             # Punctuation pre-process. Cleaned body + raw preserved in FM.
@@ -243,9 +243,9 @@ class VoiceCollector:
             try:
                 # If archive already has a same-name file (re-run after manual
                 # restore), suffix the archive copy with mtime to avoid clobber.
-                dest = archive / src.name
+                dest = MOBILE_ARCHIVE_DIR / src.name
                 if dest.exists():
-                    dest = archive / f"{src.stem}-{int(src.stat().st_mtime)}{src.suffix}"
+                    dest = MOBILE_ARCHIVE_DIR / f"{src.stem}-{int(src.stat().st_mtime)}{src.suffix}"
                 shutil.move(str(src), str(dest))
             except OSError as exc:
                 errors.append(f"{src.name}: archive failed ({exc})")

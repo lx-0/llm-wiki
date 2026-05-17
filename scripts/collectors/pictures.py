@@ -6,7 +6,7 @@ up, runs the gemma4 vision pipeline on each (using a photo-shaped prompt
 distinct from the screenshot prompt — scenes / objects / action /
 text_visible instead of app / project / key_text), writes a batch report
 under `raw/notes/pictures/` with `type: picture-batch` frontmatter, and
-archives the source under `<picture_inbox>/.processed/` next to a
+archives the source under `raw/inbox-mobile/pictures/` next to a
 per-image sidecar `.md`.
 
 The batch report shows ALL processed pictures (keep + ephemeral) so the
@@ -44,7 +44,7 @@ log = logging.getLogger(__name__)
 
 OUTPUT_DIR = RAW_DIR / "notes" / "pictures"
 THUMB_DIR = OUTPUT_DIR / "thumb"
-ARCHIVE_SUBDIR = ".processed"
+MOBILE_ARCHIVE_DIR = RAW_DIR / "inbox-mobile" / "pictures"
 ACCEPTED_SUFFIXES = (".jpeg", ".jpg", ".png", ".heic")
 
 MODEL = CONFIG.models.vision_model
@@ -346,7 +346,7 @@ class PicturesCollector:
     Reads accepted-suffix files from `personal.picture_inbox`, runs the
     photo-shaped vision pipeline on each (via `describe_picture`), writes
     a `raw/notes/pictures/<batch>.md` aggregate (`type: picture-batch`)
-    + per-image archive sidecars under `<picture_inbox>/.processed/`. No
+    + per-image archive sidecars under `raw/inbox-mobile/pictures/`. No
     state file — the archive move is the dedup mechanism.
 
     compile.py dispatches `picture-batch` → `compile_pictures.md` (Haiku,
@@ -399,8 +399,7 @@ class PicturesCollector:
 
         OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
         THUMB_DIR.mkdir(parents=True, exist_ok=True)
-        archive = inbox / ARCHIVE_SUBDIR
-        archive.mkdir(exist_ok=True)
+        MOBILE_ARCHIVE_DIR.mkdir(parents=True, exist_ok=True)
 
         results: list[dict] = []
         thumb_lookup: dict[str, str] = {}
@@ -419,12 +418,12 @@ class PicturesCollector:
                 thumb_lookup[src.name] = thumb.name
 
             archive_name = src.name
-            dest = archive / archive_name
+            dest = MOBILE_ARCHIVE_DIR / archive_name
             if dest.exists():
                 stem = src.stem
                 suffix = src.suffix
                 archive_name = f"{stem}-{int(src.stat().st_mtime)}{suffix}"
-                dest = archive / archive_name
+                dest = MOBILE_ARCHIVE_DIR / archive_name
             try:
                 shutil.move(str(src), str(dest))
             except OSError as exc:

@@ -6,7 +6,8 @@ Covers the four operator-facing invariants of the durchstich:
   False, `run()` returns a clear message, no error.
 - **Dry-run**: counts files, writes nothing, leaves inbox untouched.
 - **Real run**: writes `raw/voice/voice-YYYY-MM-DD-HHMM-<slug>.md` with
-  the expected frontmatter, archives sources under `.processed/`,
+  the expected frontmatter, archives sources under
+  `raw/inbox-mobile/voice/` (M022 two-zone intake, vault-internal),
   ignores dot-files and wrong-suffix files.
 - **Idempotent re-run**: after one run, a second run finds nothing
   (archive move is the dedup mechanism, no state file).
@@ -128,12 +129,16 @@ def test_real_run_writes_frontmatter_and_archives_sources(voice_env):
     assert "source: note-" in content_a
     assert "captured_at: 20" in content_a  # ISO-ish, decade-stable
 
-    # Sources moved into .processed/
-    archive = inbox / ".processed"
+    # Sources moved into vault audit zone (M022: raw/inbox-mobile/voice/),
+    # NOT into <inbox>/.processed/ (the pre-M022 location).
+    from collectors import voice as voice_mod
+    archive = voice_mod.MOBILE_ARCHIVE_DIR
     assert archive.is_dir()
     assert sorted(p.name for p in archive.iterdir()) == ["note-a.txt", "note-b.md"]
-    # Inbox root only contains the archive folder now
-    assert [p.name for p in inbox.iterdir() if not p.name.startswith(".")] == []
+    # Inbox is now empty — no archive subdir lives there anymore.
+    assert list(inbox.iterdir()) == []
+    # Regression guard: the legacy `.processed/` subdir must not be recreated.
+    assert not (inbox / ".processed").exists()
 
 
 def test_dotfiles_and_wrong_suffix_are_ignored(voice_env):
@@ -145,8 +150,9 @@ def test_dotfiles_and_wrong_suffix_are_ignored(voice_env):
     result = coll.run()
 
     assert len(result.files_written) == 1
-    # Ignored files stay in the inbox root, untouched
-    leftover = sorted(p.name for p in inbox.iterdir() if not p.name == ".processed")
+    # Ignored files stay in the inbox root, untouched. Archive lives in the
+    # vault, not the inbox — no filter needed.
+    leftover = sorted(p.name for p in inbox.iterdir())
     assert leftover == [".hidden", "photo.jpg"]
 
 
@@ -177,8 +183,11 @@ def test_empty_source_file_is_archived_without_ingest(voice_env):
 
     assert len(result.files_written) == 1  # only the non-empty one
     assert any("empty.txt" in e for e in result.errors)
-    # Empty file still archived so re-runs don't keep retrying
-    assert (inbox / ".processed" / "empty.txt").exists()
+    # Empty file still archived so re-runs don't keep retrying — but now
+    # in the vault audit zone, not <inbox>/.processed/.
+    from collectors import voice as voice_mod
+    assert (voice_mod.MOBILE_ARCHIVE_DIR / "empty.txt").exists()
+    assert not (inbox / ".processed").exists()
 
 
 def test_same_minute_slug_collision_gets_seconds_suffix(voice_env, monkeypatch):
