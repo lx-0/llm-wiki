@@ -142,3 +142,105 @@ def test_slugify_collapses_multiple_separators(ingest_html_mod):
 def test_slugify_caps_at_80_chars(ingest_html_mod):
     long_input = "a" * 200
     assert len(ingest_html_mod.slugify(long_input)) == 80
+
+
+# ── process_inbox two-zone routing (M022-S01-T05) ─────────────────
+
+
+def _isolated_inbox(tmp_path: Path, mod):
+    """Redirect every path constant in the process_inbox module to tmp_path.
+
+    Returns a dict of the redirected dirs for assertion convenience.
+    """
+    inbox = tmp_path / "inbox"
+    raw = tmp_path / "raw"
+    inbox.mkdir()
+    raw.mkdir()
+    dirs = {
+        "inbox": inbox,
+        "raw_inbox_wiki": raw / "inbox-wiki",
+        "raw_articles": raw / "articles",
+        "raw_notes": raw / "notes",
+        "raw_transcripts": raw / "transcripts",
+        "root": tmp_path,
+    }
+    mod.INBOX_DIR = inbox
+    mod.RAW_DIR = raw
+    mod.RAW_INBOX_WIKI_DIR = dirs["raw_inbox_wiki"]
+    mod.RAW_ARTICLES_DIR = dirs["raw_articles"]
+    mod.RAW_NOTES_DIR = dirs["raw_notes"]
+    mod.RAW_TRANSCRIPTS_DIR = dirs["raw_transcripts"]
+    mod.ROOT_DIR = tmp_path
+    mod.CATEGORY_DIRS = {
+        "article": dirs["raw_articles"],
+        "note": dirs["raw_notes"],
+        "transcript": dirs["raw_transcripts"],
+    }
+    return dirs
+
+
+def test_process_inbox_md_writes_artifact_and_archives_original(process_inbox_mod, tmp_path, monkeypatch):
+    dirs = _isolated_inbox(tmp_path, process_inbox_mod)
+    original = "# Hello\nThis is a test note body.\n"
+    (dirs["inbox"] / "test.md").write_text(original)
+
+    monkeypatch.setattr(process_inbox_mod, "classify_file", lambda fp, m: {"category": "note", "suggested_name": "test"})
+    process_inbox_mod.process_inbox(model="stub", dry_run=False)
+
+    artifact = dirs["raw_notes"] / "test.md"
+    archive = dirs["raw_inbox_wiki"] / "test.md"
+    assert artifact.exists(), "md artifact missing from raw/notes/"
+    assert archive.exists(), "md original missing from raw/inbox-wiki/"
+    assert artifact.read_text().startswith("---\n"), "artifact lacks frontmatter"
+    assert archive.read_text() == original, "original was mutated"
+    assert list(dirs["inbox"].iterdir()) == [], "inbox not drained"
+
+
+def test_process_inbox_html_archives_original_not_unlinked(process_inbox_mod, tmp_path, monkeypatch):
+    import subprocess as _sub
+    dirs = _isolated_inbox(tmp_path, process_inbox_mod)
+    html_body = "<html><body><h1>Title</h1></body></html>"
+    (dirs["inbox"] / "page.html").write_text(html_body)
+
+    fake_completed = type("R", (), {"returncode": 0, "stderr": ""})()
+    monkeypatch.setattr(process_inbox_mod.subprocess, "run", lambda *a, **k: fake_completed)
+    process_inbox_mod.process_inbox(model="stub", dry_run=False)
+
+    archive = dirs["raw_inbox_wiki"] / "page.html"
+    assert archive.exists(), "HTML original missing from raw/inbox-wiki/ (regression: unlinked again?)"
+    assert archive.read_text() == html_body, "HTML original was mutated"
+    assert list(dirs["inbox"].iterdir()) == [], "inbox not drained"
+
+
+def test_process_inbox_mp3_archives_only_no_artifact(process_inbox_mod, tmp_path, monkeypatch):
+    dirs = _isolated_inbox(tmp_path, process_inbox_mod)
+    audio_bytes = b"FAKE_MP3_HEADER\x00\x01\x02"
+    (dirs["inbox"] / "memo.mp3").write_bytes(audio_bytes)
+
+    classify_calls = []
+    monkeypatch.setattr(process_inbox_mod, "classify_file", lambda fp, m: classify_calls.append(fp) or None)
+    process_inbox_mod.process_inbox(model="stub", dry_run=False)
+
+    archive = dirs["raw_inbox_wiki"] / "memo.mp3"
+    assert archive.exists(), "mp3 original missing from raw/inbox-wiki/"
+    assert archive.read_bytes() == audio_bytes, "mp3 original was mutated"
+    assert not dirs["raw_notes"].exists() or list(dirs["raw_notes"].iterdir()) == [], "binary should produce no artifact"
+    assert classify_calls == [], "binary path should skip LLM classify"
+    assert list(dirs["inbox"].iterdir()) == [], "inbox not drained"
+
+
+def test_process_inbox_pdf_archives_only_no_artifact(process_inbox_mod, tmp_path, monkeypatch):
+    dirs = _isolated_inbox(tmp_path, process_inbox_mod)
+    pdf_bytes = b"%PDF-1.4\n%fake"
+    (dirs["inbox"] / "paper.pdf").write_bytes(pdf_bytes)
+
+    classify_calls = []
+    monkeypatch.setattr(process_inbox_mod, "classify_file", lambda fp, m: classify_calls.append(fp) or None)
+    process_inbox_mod.process_inbox(model="stub", dry_run=False)
+
+    archive = dirs["raw_inbox_wiki"] / "paper.pdf"
+    assert archive.exists(), "pdf original missing from raw/inbox-wiki/"
+    assert archive.read_bytes() == pdf_bytes
+    assert not dirs["raw_notes"].exists() or list(dirs["raw_notes"].iterdir()) == []
+    assert classify_calls == [], "binary path should skip LLM classify"
+    assert list(dirs["inbox"].iterdir()) == [], "inbox not drained"
