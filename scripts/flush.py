@@ -94,6 +94,14 @@ _LEGACY_PIGGYBACK_COMMANDS: dict[str, list[str]] = {
     # dream.py via limits.dream_cycle_max_cost_per_run_usd; this template
     # just hands over max_per_run as the entity-count ceiling.
     "dream_cycle": ["dream.py", "piggyback", "--limit", "{max_per_run}"],
+    # M019 operator-self-reports surface. Fires N hours per cooldown,
+    # walks `<vault>/<personal.reports_dir>/studies/*/`, runs each study
+    # whose schedule (weekly / monthly / quarterly) says it's due. Each
+    # study takes its own per-study flock so concurrent piggyback fires
+    # don't double-score and cross-study runs proceed in parallel. The
+    # cooldown here gates how often we CHECK for due studies; the
+    # study's own schedule gates when it actually runs.
+    "study_run_due": ["study.py", "piggyback"],
 }
 
 

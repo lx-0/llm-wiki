@@ -138,6 +138,13 @@ piggybacks:
     enabled: true
     cooldown_hours: 24
     max_per_run: 3
+  # M019 operator-self-reports schedule dispatcher. 6h cooldown checks
+  # 4×/day for studies whose schedule (weekly/monthly/quarterly) is due.
+  # Default OFF — flip true after features.operator_reports lands and
+  # S05 analyst layer dogfooded.
+  study_run_due:
+    enabled: false
+    cooldown_hours: 6
 
 models:
   # Claude model used by compile.py + retry-failed-flushes.

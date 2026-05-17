@@ -265,6 +265,11 @@ KEY_ADDITIONS: dict[str, dict[str, object]] = {
         # because iCloud-Shortcut drops arrive throughout the day. Silently
         # skipped when personal.picture_inbox is empty (graceful agnostic).
         "pictures": {"enabled": True, "cooldown_hours": 6, "max_per_run": 20},
+        # M019 operator-self-reports schedule dispatcher. 6h cooldown
+        # checks 4×/day for due studies; the study's own schedule
+        # (weekly/monthly/quarterly) gates the actual run. Default OFF
+        # until S05 ships and operator flips features.operator_reports.
+        "study_run_due": {"enabled": False, "cooldown_hours": 6},
     },
     "personal": {
         # 2026-05-16 author-attribution feature. Null default keeps the

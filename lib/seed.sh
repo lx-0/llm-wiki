@@ -298,6 +298,23 @@ seed_vault_templates() {
     fi
   fi
 
+  # 8b. M019 operator-self-reports — seed any study templates under
+  #     templates/reports/studies/<id>/manifest.yaml into the vault's
+  #     reports/studies/<id>/ subtree. Hardcoded "reports" path here:
+  #     the wedge ships personal.reports_dir default = "reports" and
+  #     operators who override the slug (e.g. to "analyses") will need
+  #     to move the seeded manifest manually — an edge case acceptable
+  #     for the wedge until S05 closeout documents the override path.
+  if [[ -d "$templates_dir/reports/studies" ]]; then
+    local manifest study_id rel_dir
+    for manifest in "$templates_dir/reports/studies"/*/manifest.yaml; do
+      [[ -f "$manifest" ]] || continue
+      study_id="$(basename "$(dirname "$manifest")")"
+      rel_dir="reports/studies/$study_id"
+      _seed_file "$manifest" "$target/$rel_dir/manifest.yaml" "$force" "$rel_dir/manifest.yaml" "$check"
+    done
+  fi
+
   # 9. .claude/.env.example — secrets template (catalogue of recognised env vars).
   _seed_file "$templates_dir/.claude/.env.example" "$target/.claude/.env.example" "$force" ".claude/.env.example" "$check"
 

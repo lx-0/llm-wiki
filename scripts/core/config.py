@@ -694,6 +694,11 @@ def _default_piggybacks() -> dict[str, PiggybackTask]:
         # cooldown (scheduling.dream_cooldown_days, default 7d) ensures the
         # entire fleet drains over the cooldown window.
         "dream_cycle": PiggybackTask(cooldown_hours=24, max_per_run=3),
+        # M019 operator-self-reports schedule-dispatch. Cooldown 6h means
+        # we check 4×/day if any study is schedule-due; the study's own
+        # schedule (weekly/monthly/quarterly) gates actual run. Default
+        # OFF until S05 ships and operator flips features.operator_reports.
+        "study_run_due": PiggybackTask(cooldown_hours=6, enabled=False),
     }
 
 

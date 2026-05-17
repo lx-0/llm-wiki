@@ -5,7 +5,7 @@ size: L
 created: 2026-05-17T11:04:00Z
 status: planned
 total_slices: 5
-completed_slices: 2
+completed_slices: 3
 parallel-with: M018
 ---
 
@@ -21,7 +21,7 @@ Detailed slice plans at `M019-S##-PLAN.md`. Task counts: 5 / 5 / 5 / 6 / 6 = 27 
 
 - [x] S01 — Engine skeleton + R1 scope-lock wiring + DECISIONS.md entries + PHQ-9 scoring backbone (5 tasks) ✓ shipped 2026-05-17
 - [x] S02 — Inference contract batched (R3) + R2 token-budget audit + first PHQ-9 inference run + 4 more instruments (5 tasks) ✓ shipped 2026-05-17
-- [ ] S03 — Studies manifest + atomic per-run persistence + flock + schedule + CLI subcommands + baseline study seed (5 tasks)
+- [x] S03 — Studies manifest + atomic per-run persistence + flock + schedule + CLI subcommands + baseline study seed (5 tasks) ✓ shipped 2026-05-17
 - [ ] S04 — Deterministic meta-report (`_summary.md`) + matplotlib charts (sparkline/radar/timeline) + embedded-methodology rendering + closeout-prep (6 tasks)
 - [ ] S05 — Two-pass analyst-agent layer: Pass-1 per-study (`_analysis.md`) + Pass-2 cross-study (`reports/analyses/<ts>.md`) + flush.py piggyback + live verification + milestone-closeout (6 tasks)
 

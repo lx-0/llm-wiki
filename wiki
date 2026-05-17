@@ -569,6 +569,31 @@ EOF
   return $rc
 }
 
+cmd_study() {
+  case "${1:-}" in
+    ""|-h|--help|help)
+      cat <<EOF
+${C_BOLD}wiki study${C_RESET} — operator-self-reports surface (M019)
+
+${C_BOLD}USAGE${C_RESET}
+  wiki study list                           list all studies + run status
+  wiki study run <id>                       run a study (all instruments)
+  wiki study run <id> --instrument SLUG     limit to one instrument
+  wiki study new <id>                       create a stub study (manual schedule, 1 instrument)
+  wiki study new <id> --fork-from OTHER     clone an existing study
+  wiki study diff <run_a> <run_b>           compare two runs (S04 stub for now)
+
+${C_BOLD}NOTES${C_RESET}
+  Studies live at <vault>/<personal.reports_dir>/studies/<id>/.
+  Each run produces a timestamped dir with per-instrument reports.
+  Air-gapped from the compile loop — reports never feed back into knowledge/.
+EOF
+      return 0 ;;
+  esac
+  banner "wiki study"
+  _run_script study.py "$@"
+}
+
 cmd_take() {
   case "${1:-}" in
     ""|-h|--help|help)
@@ -1211,6 +1236,7 @@ case "${1:-}" in
   query)            shift; cmd_query "$@" ;;
   agent)            shift; cmd_agent "$@" ;;
   correct)          shift; cmd_correct "$@" ;;
+  study)            shift; cmd_study "$@" ;;
   take)             shift; cmd_take "$@" ;;
   pin)              shift; cmd_pin "$@" ;;
   review-wiki)      shift; cmd_review_wiki "$@" ;;

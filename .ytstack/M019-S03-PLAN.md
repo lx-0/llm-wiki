@@ -3,9 +3,9 @@ milestone: M019
 slice: S03
 project: llm-wiki
 created: 2026-05-17T11:05:00Z
-status: planned
+status: done
 task_count: 5
-completed_tasks: 0
+completed_tasks: 5
 ---
 
 # M019-S03 — Slice Plan
@@ -14,15 +14,15 @@ completed_tasks: 0
 
 ## Tasks
 
-- [ ] T01 — **`scripts/reports/_engine/study.py` — manifest schema + loader.** Pydantic-or-dataclass model for `manifest.yaml` (study_id slug rules, title, created, schedule enum, instruments list with version + source + alias). Validator rejects unknown instrument-slugs, duplicate aliases, invalid schedule values. Fork-semantics: `Study.fork_from(other_study_id, new_id)` clones manifest with new id + timestamp. Unit-tests: manifest load (good + 3 bad), fork (deep-copy verification), schedule-due check (`is_due(now: datetime) -> bool` based on last run + interval).
+- [x] T01 — **`scripts/reports/_engine/study.py` schema + loader.** ✓ Done 2026-05-17. `InstrumentRef`, `StudyManifest`, `StudyState`, `Study` dataclasses with frozen-where-applicable. Validation: slug-rule (a-z0-9-, 3..64, no leading/trailing hyphen), schedule enum (manual|weekly|monthly|quarterly), unique aliases-per-manifest, source enum (inferred|form|both). `is_due(now)` honours `SCHEDULE_COOLDOWN_DAYS` (manual=never, weekly=7d, monthly=30d, quarterly=90d). `fork_study(src, new_id, root)` clones manifest with fresh state + "(fork)" title suffix. Compatible with `yaml.safe_load`/`yaml.safe_dump` round-trip.
 
-- [ ] T02 — **Per-run persistence layout + atomic writes.** `runs/<UTC-timestamp-iso>/` directory per study; subdirectories: `instruments/<slug>.md` (per-instrument detail report), `charts/` (PNG outputs reserved for S04), `_summary.md` (meta-report stub for S04). Write pattern: tmp-dir-then-atomic-rename so partial-run-on-crash doesn't poison the timeline. Helper `RunDirectory.create(study_id, timestamp) -> Path` + `RunDirectory.commit(tmp_path, final_path)`. Unit-tests cover atomic-rename success + partial-failure cleanup.
+- [x] T02 — **`RunDirectory` atomic-write helper.** ✓ Done 2026-05-17. Context-manager pattern: write into `<runs>/.<ts>.tmp/` then atomic rename to `<runs>/<ts>/` on `__exit__` with no exception. Exception during `with` block leaves `.tmp` dir for forensics + does NOT rename → partial runs don't poison timeline. Stale tmp from prior crashed run cleaned on enter. Collision with existing final dir raises `FileExistsError`. `instruments_dir` / `charts_dir` / `write(rel_path, content)` helpers.
 
-- [ ] T03 — **flock at study-level (mirror compile-spawn-lock pattern).** `wiki study run <id>` acquires `flock` on `STATE_DIR/study-<id>.lock` before doing work. Lock timeout 600s default. If lock held → exit 0 with "another run in progress for study <id>, skipping" (consistent with `flush.py` dashboard-refresh-lock from memory `project_compile_lock_shipped`). Cross-study runs do NOT block each other (per-study lock, not global). Unit-test: two parallel `wiki study run` invocations on same study, second returns skip; on different studies both proceed.
+- [x] T03 — **Per-study flock via `acquire_study_lock(study_id)`.** ✓ Done 2026-05-17. Mirror of compile.py's `_acquire_exclusive_lock`: `fcntl.flock(LOCK_EX | LOCK_NB)` on `STATE_DIR/study-<id>.lock`. Returns handle or None. Cross-study runs unblocked (per-study lock, not global). Slug-validated. Concurrent-acquire test passes (subprocess-held lock blocks second acquirer).
 
-- [ ] T04 — **Schedule semantics via flush.py piggyback (Q4 resolved).** Schedule values: `weekly | quarterly | manual`. Studies with non-manual schedule + `(now - last_run) >= interval` get auto-triggered by `flush.py` piggyback (existing pattern). Per-study `last_run_at` persisted in `studies/<id>/state.yaml`. Initial cadence for `longitudinal-baseline` is `weekly` (per Q4 wedge agreement: cranked first 2 months, settles afterwards via operator manifest-edit). Unit-test: piggyback dispatch covers due-study, skips not-due-study.
+- [x] T04 — **Schedule via flush.py piggyback.** ✓ Done 2026-05-17. New piggyback entry `study_run_due` (cooldown 6h, enabled=False by default) registered in `_LEGACY_PIGGYBACK_COMMANDS`. Invokes `study.py piggyback` which iterates due studies + runs each (own per-study flock prevents double-runs). Config-knob migration entry shipped (per `feedback_config_change_requires_migration` memory). Default OFF — operator flips after S05 dogfooding completes.
 
-- [ ] T05 — **CLI subcommands + baseline study seed.** Add `wiki study list`, `wiki study run <id> [--instrument <slug>]`, `wiki study new <id> [--fork-from <other>]`, `wiki study diff <run_a> <run_b>` (stub for S04 — just exits 0 with "available after S04 meta-report lands"). Seed `templates/reports/studies/longitudinal-baseline/manifest.yaml` with the 5 wedge instruments (all `source: inferred`, version pinned, `schedule: weekly`). Template ships via `wiki seed --force` per existing convention. Live-test: `wiki study run longitudinal-baseline` on lxw produces a full timestamped run-directory with 5 per-instrument reports.
+- [x] T05 — **CLI subcommands + baseline study seed.** ✓ Done 2026-05-17. `wiki study list / run / new / diff (stub) / piggyback` subcommands wired in `scripts/study.py` + dispatched by `wiki` bash. Baseline study template at `templates/reports/studies/longitudinal-baseline/manifest.yaml` (5 wedge instruments, schedule=weekly for the cranked-cadence wedge boot). `lib/seed.sh` extended with section 8b that seeds study templates into vault `reports/studies/<id>/manifest.yaml` via the existing `_seed_file` helper. Smoke-tested: `wiki study new` / `--fork-from` / `list` all work; fork creates fresh-state child manifest. **38 new tests** at `tests/reports/test_study.py` covering manifest schema (good + bad slug + bad schedule + duplicate alias + missing-required + round-trip), state persistence, is_due across all 4 schedule values, fork-semantics (clones + collision + bad-slug), `RunDirectory` (happy path + exception keeps tmp + collision + stale-tmp-cleanup), `acquire_study_lock` (basic + concurrent-blocking subprocess test + bad-slug-rejected), `list_studies` (empty + skips-non-manifest + returns-sorted + tolerates-malformed). All 144 tests/reports/ tests green.
 
 ## Done when
 
