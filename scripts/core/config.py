@@ -47,6 +47,55 @@ load_dotenv(DOTENV_FILE, override=False)
 
 
 @dataclass
+class DreamPriority:
+    """M017 — config-driven dream-cycle entity priority weighting.
+
+    Operator-shaped selection priority for the dream-cycle piggyback (and
+    `wiki dream --all-entities` sweeps). Replaces M014's "pick N most-overdue"
+    greedy default with operator-tunable rules-based weighted-selection.
+
+    Resolution order (most-precise wins):
+      1. Per-entity frontmatter `dream_priority:` (absolute precedence)
+      2. `paths:` glob/exact match (first-match wins via fnmatch)
+      3. Formula: default × domain_multiplier × tag_multiplier_via_strategy
+         × status_multiplier  (each multiplier defaults to 1.0 when axis
+         isn't configured or entity doesn't have that axis value)
+
+    Selection weight = priority × age_days_since_last_synth × jitter(0.85, 1.15).
+    Entities with computed priority of 0 are excluded from auto-selection
+    (operator must run them manually). Cooldown still applies independently.
+
+    Full spec: `.ytstack/backlog/dream-priority-config.md`.
+    """
+
+    # Base weight when nothing more-specific matches
+    default: float = 1.0
+
+    # Path/glob → weight overrides. First match wins (fnmatch semantics).
+    # Vault-relative paths (e.g. "knowledge/people/alex.md",
+    # "knowledge/areas/personal-*-archived.md"). Use weight 0 to exclude
+    # an entity (or path-glob of entities) from auto-selection entirely.
+    paths: dict[str, float] = field(default_factory=dict)
+
+    # Domain-axis multipliers (M013 `domain:` frontmatter).
+    # Applied multiplicatively to the resolved base weight.
+    domain: dict[str, float] = field(default_factory=dict)
+
+    # Tag-axis multipliers. Strategy below controls multi-tag handling.
+    tags: dict[str, float] = field(default_factory=dict)
+
+    # How to combine multiple tag-matches on one entity:
+    #   "max"   — take highest matching tag's multiplier (default)
+    #   "sum"   — sum all matching tag-multipliers
+    #   "first" — take first tag in frontmatter order that has a config entry
+    tag_strategy: str = "max"
+
+    # Status-axis multipliers (M008 areas `status:` frontmatter +
+    # similar status-bearing pages).
+    status: dict[str, float] = field(default_factory=dict)
+
+
+@dataclass
 class Scheduling:
     compile_after_hour: int = 18
     dedup_window_seconds: int = 60
@@ -61,6 +110,10 @@ class Scheduling:
     # one weekly sweep keeps State fresh without burning Opus tokens on
     # entities the operator hasn't generated new substrate for.
     dream_cooldown_days: int = 7
+    # M017 — config-driven entity priority for dream-cycle selection.
+    # Default empty = behave like M014 (greedy by age, all entities equal).
+    # See DreamPriority docstring + `.ytstack/backlog/dream-priority-config.md`.
+    dream_priority: DreamPriority = field(default_factory=DreamPriority)
 
 
 @dataclass

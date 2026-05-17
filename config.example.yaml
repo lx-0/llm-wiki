@@ -17,6 +17,35 @@ scheduling:
   # `wiki dream --all-entities` and the dream_cycle piggyback. Override per-run
   # with `--ignore-cooldown` (CLI) or `--cooldown-days N`.
   dream_cooldown_days: 7
+  # M017 — config-driven entity priority for dream-cycle selection. Default
+  # behavior (empty config below) is "all entities equal weight, greedy by
+  # age" (M014). Set rules to bias which entities get auto-dreamed more
+  # often by the piggyback. Resolution: per-entity frontmatter
+  # `dream_priority:` overrides config; then paths first-match-wins; else
+  # multiplier formula (default × domain × tag × status).
+  # See `wiki dream list-candidates` to debug current ranking.
+  dream_priority:
+    default: 1.0
+    # Highest config-precedence — explicit path/glob → weight.
+    # Use 0 to exclude (auto-dream skip; operator can still run manually).
+    paths: {}
+    #   "knowledge/people/alex.md": 5.0           # operator-anchor
+    #   "knowledge/areas/personal-*-archived.md": 0   # never auto-dream
+    # Domain-axis multipliers (M013 `domain:` frontmatter).
+    domain: {}
+    #   personal: 1.5
+    #   company: 1.8
+    # Tag-axis multipliers. tag_strategy = max | sum | first.
+    tag_strategy: max
+    tags: {}
+    #   operator-anchor: 5.0
+    #   work-active: 2.5
+    #   archive: 0.1
+    # Status-axis (M008 areas `status:` etc.).
+    status: {}
+    #   active: 1.0
+    #   dormant: 0.3
+    #   retired: 0.05
 
 # Piggyback tasks spawned after compile_after_hour.
 # enabled: false → task never runs. cooldown_hours controls the frequency cap.

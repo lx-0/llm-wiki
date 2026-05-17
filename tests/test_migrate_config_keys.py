@@ -129,7 +129,7 @@ def test_migrate_config_file_round_trip(tmp_path):
     # skip-list already contains "email-delta" from KEY_ADDITIONS, so
     # the list-extend is a no-op on greenfield.)
     # = 38 changes (no drops — operator has no orphan personal.* fields)
-    assert len(changes) == 38, f"got {len(changes)} changes: {changes}"
+    assert len(changes) == 39, f"got {len(changes)} changes: {changes}"
 
     reparsed = yaml.safe_load(new_text)
     # piggyback side
@@ -161,6 +161,7 @@ def test_migrate_config_no_change_when_fully_current(tmp_path):
     config_path.write_text(yaml.safe_dump({
         "scheduling": {
             "dream_cooldown_days": 7,
+            "dream_priority": {"default": 1.0, "paths": {}, "domain": {}, "tag_strategy": "max", "tags": {}, "status": {}},
         },
         "piggybacks": {
             "email": {"enabled": True, "cooldown_hours": 24},
@@ -283,6 +284,7 @@ def test_migrate_additions_idempotent():
     data: dict = {
         "scheduling": {
             "dream_cooldown_days": 7,
+            "dream_priority": {"default": 1.0, "paths": {}, "domain": {}, "tag_strategy": "max", "tags": {}, "status": {}},
         },
         "limits": {
             "compile_force_long_context_types": ["daily-digest", "calendar-rollup"],

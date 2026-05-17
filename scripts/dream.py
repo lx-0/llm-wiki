@@ -949,6 +949,137 @@ async def dream_entity(
 # ── Sweep across entities ─────────────────────────────────────────
 
 
+# ── M017 dream-priority resolution ──────────────────────────────────
+
+
+from fnmatch import fnmatch as _fnmatch
+
+
+def compute_entity_priority(entity: EntityRef) -> tuple[float, str]:
+    """Resolve M017 weighted-priority for one entity. Returns (weight, source).
+
+    Resolution order:
+      1. entity frontmatter `dream_priority:` (absolute precedence — even 0)
+      2. config `paths:` glob match (first-match wins via fnmatch)
+      3. config formula: default × domain_mul × tag_mul × status_mul
+
+    The `source` string describes which rule fired (for `--list-candidates`).
+    """
+    cfg = CONFIG.scheduling.dream_priority
+    fm, _ = _parse_frontmatter(entity.page.read_text(encoding="utf-8"))
+
+    # Layer 1 — per-entity frontmatter override (absolute)
+    fm_priority = fm.get("dream_priority")
+    if fm_priority is not None:
+        try:
+            return float(fm_priority), f"frontmatter:{fm_priority}"
+        except (TypeError, ValueError):
+            pass  # fall through to config rules
+
+    # Layer 2 — explicit path/glob match (first wins)
+    rel_path = str(entity.page.relative_to(ROOT_DIR))
+    for pattern, weight in cfg.paths.items():
+        if _fnmatch(rel_path, pattern):
+            return float(weight), f"paths:{pattern}={weight}"
+
+    # Layer 3 — multiplier formula
+    base = float(cfg.default)
+    breakdown = [f"default:{base}"]
+
+    domain = fm.get("domain")
+    if isinstance(domain, str) and domain in cfg.domain:
+        m = float(cfg.domain[domain])
+        base *= m
+        breakdown.append(f"domain.{domain}:{m}")
+
+    tags = fm.get("tags") or []
+    if not isinstance(tags, list):
+        tags = [tags]
+    tag_matches = [(str(t), float(cfg.tags[str(t)])) for t in tags if str(t) in cfg.tags]
+    if tag_matches:
+        if cfg.tag_strategy == "sum":
+            m = sum(w for _, w in tag_matches)
+            base *= m
+            breakdown.append(f"tags.sum:{m}")
+        elif cfg.tag_strategy == "first":
+            t, m = tag_matches[0]
+            base *= m
+            breakdown.append(f"tags.first.{t}:{m}")
+        else:  # max (default)
+            t, m = max(tag_matches, key=lambda x: x[1])
+            base *= m
+            breakdown.append(f"tags.max.{t}:{m}")
+
+    status = fm.get("status")
+    if isinstance(status, str) and status in cfg.status:
+        m = float(cfg.status[status])
+        base *= m
+        breakdown.append(f"status.{status}:{m}")
+
+    return base, " × ".join(breakdown)
+
+
+def _select_for_sweep(
+    candidates: list[tuple[float, EntityRef, str]],
+    N: int,
+    mode: str,
+) -> list[tuple[float, EntityRef, str]]:
+    """Pick N entities from weighted candidates. Mode = probabilistic | greedy.
+
+    Filters out zero-weight entities (priority:0 means excluded).
+    Probabilistic = weighted-random sample (diverse over time).
+    Greedy = top-N by weight (deterministic).
+    """
+    eligible = [t for t in candidates if t[0] > 0]
+    if not eligible:
+        return []
+    if mode == "greedy":
+        return sorted(eligible, key=lambda t: t[0], reverse=True)[:N]
+    # probabilistic (default): weighted-random-sample without replacement
+    weights = [w for w, _, _ in eligible]
+    picked: list[tuple[float, EntityRef, str]] = []
+    pool = list(zip(weights, eligible))
+    for _ in range(min(N, len(eligible))):
+        if not pool:
+            break
+        total = sum(w for w, _ in pool)
+        if total <= 0:
+            break
+        r = random.uniform(0, total)
+        cum = 0.0
+        for i, (w, item) in enumerate(pool):
+            cum += w
+            if r <= cum:
+                picked.append(item)
+                pool.pop(i)
+                break
+    return picked
+
+
+def list_candidates(*, cooldown_days: int | None = None) -> list[dict]:
+    """Return ranked candidate list for `wiki dream --list-candidates` UI."""
+    cd = cooldown_days if cooldown_days is not None else CONFIG.scheduling.dream_cooldown_days
+    rows: list[dict] = []
+    for ent in _list_all_entities():
+        priority, source = compute_entity_priority(ent)
+        age_days = _last_synth_age_days(ent)
+        cooldown = age_days is not None and age_days < cd
+        weight = priority * (age_days if age_days is not None else 365.0)
+        rows.append({
+            "slug": ent.slug,
+            "kind": ent.kind,
+            "rel_path": str(ent.page.relative_to(ROOT_DIR)),
+            "priority": round(priority, 3),
+            "age_days": round(age_days, 1) if age_days is not None else None,
+            "weight": round(weight, 2),
+            "source": source,
+            "cooldown_active": cooldown,
+            "excluded": priority <= 0,
+        })
+    rows.sort(key=lambda r: (-r["weight"], r["slug"]))
+    return rows
+
+
 async def dream_all_entities(
     *,
     cooldown_days: int | None = None,
@@ -956,31 +1087,44 @@ async def dream_all_entities(
     per_run_cap: float | None = None,
     limit: int | None = None,
     dry_run: bool = False,
+    selection_mode: str | None = None,
 ) -> list[DreamResult]:
-    """Sweep all entities, oldest-synthesized first, respecting caps + cooldown."""
+    """Sweep all entities respecting caps + cooldown + M017 priority weighting.
+
+    Selection mode (M017):
+      - "probabilistic" (default): weighted-random by priority × age — diverse
+      - "greedy": top-N by weight — deterministic, predictable
+    """
     cd = cooldown_days if cooldown_days is not None else CONFIG.scheduling.dream_cooldown_days
     run_cap = per_run_cap if per_run_cap is not None else CONFIG.limits.dream_cycle_max_cost_per_run_usd
+    mode = selection_mode or "probabilistic"
 
     all_entities = _list_all_entities()
-    # Filter out cooldown'd entities + sort by age (oldest synthesis first;
-    # never-synthesized counts as infinity).
-    ranked: list[tuple[float, EntityRef]] = []
+    # Build (weight, entity, source) candidates: filter cooldown, compute weight via priority × age.
+    candidates: list[tuple[float, EntityRef, str]] = []
     for ent in all_entities:
         if is_within_cooldown(ent, cooldown_days=cd):
             continue
+        priority, source = compute_entity_priority(ent)
         age = _last_synth_age_days(ent)
-        score = age if age is not None else float("inf")
-        ranked.append((score, ent))
-    ranked.sort(key=lambda t: t[0], reverse=True)
+        # Never-synthesized = high age signal (365d default cap so it doesn't dominate)
+        age_for_weight = age if age is not None else 365.0
+        weight = priority * age_for_weight * random.uniform(0.85, 1.15)
+        candidates.append((weight, ent, source))
+
+    # M017 selection
+    N = limit if limit is not None else len(candidates)
+    ranked = _select_for_sweep(candidates, N, mode)
 
     log.info(
-        "Dream sweep: %d entities total, %d after cooldown filter (cooldown=%dd, run_cap=$%.2f)",
-        len(all_entities), len(ranked), cd, run_cap,
+        "Dream sweep: %d entities total, %d candidates after cooldown+priority filter, "
+        "mode=%s, run_cap=$%.2f",
+        len(all_entities), len(ranked), mode, run_cap,
     )
 
     results: list[DreamResult] = []
     cumulative = 0.0
-    for idx, (_age, ent) in enumerate(ranked, 1):
+    for idx, (_weight, ent, _source) in enumerate(ranked, 1):
         if limit is not None and idx > limit:
             log.info("Reached --limit=%d; stopping", limit)
             break
@@ -1024,9 +1168,22 @@ async def _async_main() -> int:
     p_all.add_argument("--per-entity-cap", type=float, default=None)
     p_all.add_argument("--per-run-cap", type=float, default=None)
     p_all.add_argument("--limit", type=int, default=None, help="Hard cap on entity count this run")
+    p_all.add_argument(
+        "--selection-mode",
+        choices=["probabilistic", "greedy"],
+        default=None,
+        help="M017: probabilistic (weighted-random) | greedy (top-N by weight). "
+             "Default reads from piggybacks.dream_cycle.selection_mode config.",
+    )
 
     p_pb = sub.add_parser("piggyback", help="Piggyback wrapper — runs sweep with config defaults")
     p_pb.add_argument("--limit", type=int, default=None)
+
+    p_lc = sub.add_parser("list-candidates",
+        help="M017: show ranked candidate list with priority + age + source breakdown")
+    p_lc.add_argument("--cooldown-days", type=int, default=None)
+    p_lc.add_argument("--limit", type=int, default=30, help="Top N rows (default 30)")
+    p_lc.add_argument("--json", action="store_true", help="Emit machine-readable JSON")
 
     args = parser.parse_args()
 
@@ -1065,6 +1222,7 @@ async def _async_main() -> int:
             per_run_cap=args.per_run_cap,
             limit=args.limit,
             dry_run=args.dry_run,
+            selection_mode=args.selection_mode,
         )
         # Non-zero exit if any entity hit a real failure (cost-cap or SDK)
         for r in results:
@@ -1073,10 +1231,31 @@ async def _async_main() -> int:
         return 0
 
     if args.cmd == "piggyback":
-        results = await dream_all_entities(limit=args.limit)
+        # M017: piggyback uses probabilistic mode by default (diversity over
+        # time, every eligible entity eventually selected, biased toward
+        # high-weight). Operator can override per-invocation via `sweep
+        # --selection-mode greedy`.
+        results = await dream_all_entities(limit=args.limit, selection_mode="probabilistic")
         for r in results:
             if r.skipped == "sdk_failure":
                 return 5
+        return 0
+
+    if args.cmd == "list-candidates":
+        import json as _json
+        rows = list_candidates(cooldown_days=args.cooldown_days)
+        if args.json:
+            print(_json.dumps(rows, indent=2))
+            return 0
+        # Pretty table
+        print(f"{'Rank':<5} {'Weight':>8}  {'Prio':>6}  {'Age':>7}  {'Slug':<40} Source")
+        print("-" * 110)
+        for i, r in enumerate(rows[:args.limit], 1):
+            age = f"{r['age_days']}d" if r['age_days'] is not None else "never"
+            flag = " (cooldown)" if r["cooldown_active"] else (" EXCLUDED" if r["excluded"] else "")
+            print(f"{i:<5} {r['weight']:>8.2f}  {r['priority']:>6.2f}  {age:>7}  {r['slug']:<40} {r['source']}{flag}")
+        if len(rows) > args.limit:
+            print(f"... and {len(rows) - args.limit} more (raise --limit to see)")
         return 0
 
     parser.print_help()

@@ -40,6 +40,7 @@ Key changes covered (chronological):
   personal.domains                         (added 2026-05-16 M013, default [company, personal, ai, meta] — optional domain:-frontmatter enum)
   limits.connection_min_words              (added 2026-05-16 M012, default 50 — connection-article quality gate floor)
   scheduling.dream_cooldown_days           (added 2026-05-16 M014, default 7 — dream-cycle per-entity cooldown)
+  scheduling.dream_priority                (added 2026-05-17 M017, dict — config-driven entity priority weighting)
   limits.dream_entity_max_cost_usd         (added 2026-05-16 M014, default 2.0 — dream-cycle per-entity pre-flight USD cap)
   limits.dream_cycle_max_cost_per_run_usd  (added 2026-05-16 M014, default 5.0 — dream-cycle per-run cumulative USD cap)
   piggybacks.dream_cycle                   (added 2026-05-16 M014, cooldown 24h, max_per_run 3)
@@ -178,6 +179,18 @@ KEY_ADDITIONS: dict[str, dict[str, object]] = {
         # Match Scheduling.dream_cooldown_days default in
         # `scripts/core/config.py`.
         "dream_cooldown_days": 7,
+        # M017 (2026-05-17): config-driven entity priority for dream-cycle
+        # selection. Empty defaults preserve M014 behavior (greedy by age).
+        # Operator populates paths/domain/tags/status to bias selection.
+        # See `.ytstack/backlog/dream-priority-config.md` for full spec.
+        "dream_priority": {
+            "default": 1.0,
+            "paths": {},
+            "domain": {},
+            "tag_strategy": "max",
+            "tags": {},
+            "status": {},
+        },
     },
     "features": {
         # M011 master switch — default OFF, flip True after dogfooding.
