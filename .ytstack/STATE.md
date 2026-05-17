@@ -1,7 +1,7 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-05-17T17:50:00Z
+last_updated: 2026-05-17T21:00:00Z
 current_milestone: none
 active_slice: none
 active_task: none
@@ -11,7 +11,22 @@ parallel_milestones: [M021]
 
 # State
 
-**Status (this session, ad-hoc):** Engine-repo hygiene arc. `wiki` bash dispatcher gained `require_vault()` fail-closed guard (`.obsidian/` positive marker at `ROOT_DIR`; exempt `help`/`version`). Working-tree dev debris cleaned (`config.yaml`, `logs/`, `state/`, `reports/`, `.pytest_cache/`, `.ruff_cache/`, `.wiki/`). `.pytest_cache/` / `.ruff_cache/` / `.mypy_cache/` added to `.gitignore`. `.wiki/` deliberately left out — tripwire for any code path that mkdirs past the guard. Five paths live-verified. Commits `e8d21eb` (guard) + `0075090` (gitignore caches) on local main, **not pushed**. DECISIONS + KNOWLEDGE updated. Root cause: `paths.py` derives `WIKI_DIR/ROOT_DIR` from `__file__` with no environment sanity check — bare engine-repo checkouts get treated as vaults.
+**Status (this session, ad-hoc):** M019 post-wedge doc-sync + drift-sweep + priority-sweep arc. End-user-facing docs were silent on the entire `reports/` surface despite engineering closeout; cross-checked + synced. Per-instrument model override mechanism shipped + ISI Sonnet override marked **provisional** (verification anchored to 2026-05-24 week-1 review). Three new study-arc backlog entries created. Local main 1 commit ahead of origin (`2eb1452` — the new backlog batch); parallel session pushed `c0bd39d` (gmail-personal-consumer-account-gap backlog, not mine). Earlier session commits (`a3e32ae` drift sweep, `767aa1b` priority sweep, `769785a` per-instrument-model + stale-chart fix, `17dfec6` doc-sync) all already on origin via parallel-session push.
+
+- **Per-instrument model override mechanism** (commit `769785a`, on origin) — `inference.model:` key in `instrument.yaml` flows through `_read_inference_config()` → `infer_batch(model=…)`. Currently set on ISI to `claude-sonnet-4-6`. **Provisional, not a fix** — Haiku scored ISI 4/7 in run-7 same session, undercutting the "deterministic-0%" premise. Decision tree locked in DECISIONS.md 2026-05-17 "M019 post-wedge tuning"; resolution belongs in 2026-05-24 week-1 review.
+- **Stale-chart fix in `render_summary.py`** (same commit) — `_render_per_instrument_timelines` uses `timeline.latest.instruments` not union-of-keys, so instruments dropped from the manifest (K6, ASRS-v1.1) don't have stale timelines re-rendered.
+- **Full doc-sync across 7 files** (commit `17dfec6`, on origin) — README + AGENTS root + docs/cli.md + docs/FEATURES.md + docs/concept.md + docs/engine-layout.md + docs/overview.excalidraw + overview.png. Added the "Operator self-reports (analytical surface)" section to cli.md (full `wiki study list/run/new/answer` + `wiki analyze` + storage layout), 8-row analytical-surface table to FEATURES.md, Informant-Report-inversion section to concept.md, `reports/_engine/` subtree to engine-layout.md, 6 instrument pills to overview.excalidraw (K6 already soft-deleted, ISI + OLBI added).
+- **README drift cross-check** (commit `a3e32ae`, on origin) — 10 drift items swept: 10→11 collectors, "6 skills bundled" replaced with "8 psychometric instruments" (only 1 skill actually repo-bundled; 5 externals from yesterday-public-plugins), removed `(M005)` badge, ingest-diagram added voice/health/pictures + fixed daily-rollup output node + added MOCs/ subfolder, engine/vault tree gained `reports/` row, install table clarified. `docs/cli.md` setup-wizard count corrected 5→6 in 4 places.
+- **Architecture diagram badge cleanup** (commit `767aa1b`, on origin) — stripped 3 slice-ID badges from M19 titles (`(S02-T02)` / `(S04)` / `(S05)` violations of "steady-state portrait" rule). Re-rendered at scale=1 (auto-downgrade by renderer). `m019-diagrams-update.md` → `shipped/`. PRIORITY.md inventory 50→49→53 open after the new entries.
+- **3 new study-arc backlog entries** (commit `2eb1452`, local-only) — `olbi-coverage-optimization.md` (highest-cost + lowest-coverage instrument, 3 mitigation paths), `pass2-dashboard-widget.md` (DECISIONS-flagged M019 deferral), `study-run-due-piggyback-audit.md` (lxw has piggyback `enabled: true`; XS audit 2026-05-19 to 2026-05-23 so 2026-05-24 review reads clean data). All ripen-dates anchored to the week-1 review.
+- **Memory updates** — `project_dream_cycle_next_pass` rewritten (queue COMPLETE not pending; parallel session executed all 4 entries on 2026-05-17; cooldown gates re-runs). New `feedback_doc_sync_as_explicit_closeout` captures the recurring lesson that end-user docs lag silently after milestone ships and need to be treated as an explicit closeout sub-step.
+- **Dream-cycle piggyback verified working** — operator asked "ist das dreaming nicht piggibacked?"; reality: yes, `piggybacks.dream_cycle.enabled: true`, last fire 2026-05-17T18:01:07+02:00, `max_per_run: 3`, cooldown 24h. System rotates through entities by weight automatically — manual `wiki dream-entity <slug>` only needed for force-prioritization.
+
+**Recommended next session start point:** wait for 2026-05-24 week-1 review (hard deadline). Forcing-functions in place: `.ytstack/backlog/m019-week-1-review.md` + `<lxw>/REVIEW-2026-05-24-m019-week1.md` will surface the decision points. Between now and then, the engine-repo can park unless `study-run-due-piggyback-audit.md` (ripens 2026-05-19) surfaces a piggyback wiring bug.
+
+---
+
+**Status (prev, M022 / engine-repo hygiene):** Engine-repo hygiene arc. `wiki` bash dispatcher gained `require_vault()` fail-closed guard (`.obsidian/` positive marker at `ROOT_DIR`; exempt `help`/`version`). Working-tree dev debris cleaned (`config.yaml`, `logs/`, `state/`, `reports/`, `.pytest_cache/`, `.ruff_cache/`, `.wiki/`). `.pytest_cache/` / `.ruff_cache/` / `.mypy_cache/` added to `.gitignore`. `.wiki/` deliberately left out — tripwire for any code path that mkdirs past the guard. Five paths live-verified. Commits `e8d21eb` (guard) + `0075090` (gitignore caches) on local main, **not pushed**. DECISIONS + KNOWLEDGE updated. Root cause: `paths.py` derives `WIKI_DIR/ROOT_DIR` from `__file__` with no environment sanity check — bare engine-repo checkouts get treated as vaults.
 
 ---
 
