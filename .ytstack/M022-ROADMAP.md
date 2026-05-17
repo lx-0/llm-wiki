@@ -27,7 +27,7 @@ Slice detail lives in per-slice `M022-S##-PLAN.md` files, created by `ytstack:sl
 
 - [x] S01 — `process-inbox.py` Zwei-Zonen-Refactor (inbox-wiki original + category artifact, HTML-unlink raus)
 - [x] S02 — voice + pictures collectors: Archive-Location nach `raw/inbox-mobile/<source>/`
-- [ ] S03 — Migration-Script + Templates + lxw-Live-Run
+- [~] S03 — Migration-Script + lxw-Live-Run (engineering done; T04 operator-pending)
 
 ## Slice intent (rough sketch)
 

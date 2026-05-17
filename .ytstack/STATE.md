@@ -1,17 +1,17 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-05-17T14:35:00Z
+last_updated: 2026-05-17T14:50:00Z
 current_milestone: M022
 active_slice: S03
-active_task: T03
+active_task: T04
 last_completed_milestone: M020
 parallel_milestones: [M021]
 ---
 
 # State
 
-**Status:** M022 / S03 starting — migration script + tests + lxw live-run. T02 (templates) cancelled (collectors on-demand mkdir handles it). 2/3 slices done; S03 closes M022. Inbox-intake-Schema-Unifizierung: zwei-Zonen-Modell (`raw/inbox-<channel>/` = audit-archive, `raw/<category>/` = derived substrate), `.processed/`-Archive ausserhalb des Vaults werden eliminiert. T01-PLAN flaggt: T01+T02 müssen atomic ein Commit (zwischenzeitlich rote Tests sonst).
+**Status:** M022 engineering-DONE — S01+S02 shipped, S03-T01+T03 shipped + T02 cancelled (`d776e35`). 841/841 tests green. **T04 = operator-action pending**: on lxw run `wiki update` then `uv run --project .wiki python scripts/migrations/migrate_inbox_archive.py`, verify-checklist in M022-S03-T04-PLAN.md. M022 not flipped to DONE until operator reports T04 success — REGEL #1. Inbox-intake-Schema-Unifizierung: zwei-Zonen-Modell (`raw/inbox-<channel>/` = audit-archive, `raw/<category>/` = derived substrate), `.processed/`-Archive ausserhalb des Vaults werden eliminiert. T01-PLAN flaggt: T01+T02 müssen atomic ein Commit (zwischenzeitlich rote Tests sonst).
 
 ---
 
