@@ -96,42 +96,70 @@ def check_setup_run() -> CheckResult:
 
 
 def check_hooks_installed() -> CheckResult:
-    """Warning if no project-scope hook installs across known agents.
+    """Warning if no wiki-managed hook installs in EITHER scope.
 
-    Reads each agent config in `<vault>/.<agent>/{settings,hooks}.json`
-    directly and looks for any wiki-managed entry (command contains
-    `.wiki/hooks/`). One install in any project scope is sufficient.
+    Both scopes are valid for vault-session capture:
+      - USER scope (`~/.<agent>/{settings,hooks}.json`) — fires for
+        every agent session machine-wide. Cheapest install, covers
+        cwd inside the vault as a side-effect.
+      - PROJECT scope (`<vault>/.<agent>/{settings,hooks}.json`) —
+        fires only when the agent runs from the vault root. Needed
+        when the operator runs the same agent in other projects and
+        doesn't want hooks firing there.
+
+    Either is sufficient. Warning fires only when NEITHER scope has
+    any wiki-managed entry. Reads each candidate file directly and
+    looks for `.wiki/hooks/` in the command text.
     """
+    # Match both wiki-hook command styles (parity with lib/agents.sh
+    # `hooks_installed`): the current `--project .wiki python
+    # .wiki/hooks/session-start.py` form AND the cd-anchored
+    # `cd '<abs>/.wiki' && uv run python hooks/session-start.py` form
+    # used by earlier engine versions + user-scope installs.
+    wiki_hook_re = re.compile(
+        r"\.wiki['\"/ ].*hooks/(session-(start|end)|pre-compact|_transcript)"
+    )
     try:
-        candidates = [
-            ROOT_DIR / ".claude" / "settings.json",
-            ROOT_DIR / ".codex" / "hooks.json",
-            ROOT_DIR / ".gemini" / "settings.json",
-            ROOT_DIR / ".cursor" / "hooks.json",
+        agent_files = [
+            (".claude", "settings.json"),
+            (".codex", "hooks.json"),
+            (".gemini", "settings.json"),
+            (".cursor", "hooks.json"),
         ]
-        installed: list[str] = []
-        for path in candidates:
-            if not path.exists():
-                continue
-            try:
-                text = path.read_text(encoding="utf-8")
-            except OSError:
-                continue
-            if ".wiki/hooks/" in text:
-                installed.append(path.parent.name.lstrip("."))
-        if installed:
+        installed_user: list[str] = []
+        installed_project: list[str] = []
+        for agent_dir, filename in agent_files:
+            for scope, root, target in (
+                ("user", Path.home(), installed_user),
+                ("project", ROOT_DIR, installed_project),
+            ):
+                path = root / agent_dir / filename
+                if not path.exists():
+                    continue
+                try:
+                    text = path.read_text(encoding="utf-8", errors="replace")
+                except OSError:
+                    continue
+                if wiki_hook_re.search(text):
+                    target.append(agent_dir.lstrip("."))
+        if installed_user or installed_project:
+            parts = []
+            if installed_user:
+                parts.append(f"user: {', '.join(installed_user)}")
+            if installed_project:
+                parts.append(f"project: {', '.join(installed_project)}")
             return CheckResult(
                 id="hooks-installed",
                 category="config",
                 severity="ok",
-                message=f"hooks installed in project scope ({', '.join(installed)})",
-                details={"agents": installed},
+                message=f"hooks installed ({'; '.join(parts)})",
+                details={"user": installed_user, "project": installed_project},
             )
         return CheckResult(
             id="hooks-installed",
             category="config",
             severity="warning",
-            message="no project-scope hooks installed — session capture won't fire",
+            message="no wiki hooks installed in user or project scope — session capture won't fire",
             fix="wiki hooks install",
             dispatch_args=["hooks", "install"],
         )

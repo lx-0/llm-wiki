@@ -73,7 +73,11 @@ def test_setup_run_ok_when_state_exists(fake_vault, monkeypatch):
 # ── check_hooks_installed ──────────────────────────────────────────
 
 
-def test_hooks_warning_when_no_wiki_hooks(fake_vault):
+def test_hooks_warning_when_no_wiki_hooks(fake_vault, monkeypatch):
+    # Isolate Path.home() so the operator's real ~/.claude/ doesn't bleed in.
+    fake_home = fake_vault / "_fake_home"
+    fake_home.mkdir()
+    monkeypatch.setattr(Path, "home", classmethod(lambda cls: fake_home))
     (fake_vault / ".claude").mkdir()
     (fake_vault / ".claude" / "settings.json").write_text('{"hooks": {}}')
     result = health.check_hooks_installed()
@@ -81,7 +85,11 @@ def test_hooks_warning_when_no_wiki_hooks(fake_vault):
     assert "wiki hooks install" in result.fix
 
 
-def test_hooks_ok_when_wiki_managed_entry_present(fake_vault):
+def test_hooks_ok_for_project_scope_direct_path(fake_vault, monkeypatch):
+    """Current install format: `--project .wiki python .wiki/hooks/<name>.py`."""
+    fake_home = fake_vault / "_fake_home"
+    fake_home.mkdir()
+    monkeypatch.setattr(Path, "home", classmethod(lambda cls: fake_home))
     (fake_vault / ".claude").mkdir()
     (fake_vault / ".claude" / "settings.json").write_text(
         '{"hooks": {"SessionStart": [{"hooks": [{"command": "uv run --project '
@@ -89,19 +97,48 @@ def test_hooks_ok_when_wiki_managed_entry_present(fake_vault):
     )
     result = health.check_hooks_installed()
     assert result.severity == "ok"
-    assert "claude" in result.details["agents"]
+    assert "claude" in result.details["project"]
+    assert result.details["user"] == []
 
 
-def test_hooks_detects_multiple_agents(fake_vault):
-    for agent in ("claude", "cursor"):
-        d = fake_vault / f".{agent}"
-        d.mkdir()
-        (d / ("settings.json" if agent == "claude" else "hooks.json")).write_text(
-            '{"hooks": {"x": [".wiki/hooks/session-start.py"]}}'
-        )
+def test_hooks_ok_for_user_scope_cd_form(fake_vault, monkeypatch):
+    """Operator real-world style: cd-anchored absolute path in user scope
+    (~/.claude/settings.json points at one specific vault). Project-scope
+    file may exist without wiki entries (= 'detected' in `wiki hooks status`)."""
+    fake_home = fake_vault / "_fake_home"
+    (fake_home / ".claude").mkdir(parents=True)
+    monkeypatch.setattr(Path, "home", classmethod(lambda cls: fake_home))
+    (fake_home / ".claude" / "settings.json").write_text(
+        '{"hooks": {"SessionStart": [{"hooks": [{"command": '
+        "\"cd '/Users/alex/.../lxw/.wiki' && uv run python hooks/session-start.py\""
+        "}]}]}}"
+    )
+    # Project-scope file exists but has no wiki entries — the "detected" case.
+    (fake_vault / ".claude").mkdir()
+    (fake_vault / ".claude" / "settings.json").write_text('{"hooks": {}}')
     result = health.check_hooks_installed()
     assert result.severity == "ok"
-    assert set(result.details["agents"]) == {"claude", "cursor"}
+    assert "claude" in result.details["user"]
+    assert result.details["project"] == []
+
+
+def test_hooks_detects_multiple_agents_across_scopes(fake_vault, monkeypatch):
+    fake_home = fake_vault / "_fake_home"
+    (fake_home / ".claude").mkdir(parents=True)
+    monkeypatch.setattr(Path, "home", classmethod(lambda cls: fake_home))
+    # claude in user scope (cd-style)
+    (fake_home / ".claude" / "settings.json").write_text(
+        '{"x": "cd \'/v/.wiki\' && uv run python hooks/session-start.py"}'
+    )
+    # cursor in project scope (direct-path style)
+    (fake_vault / ".cursor").mkdir()
+    (fake_vault / ".cursor" / "hooks.json").write_text(
+        '{"x": ".wiki/hooks/session-end.py"}'
+    )
+    result = health.check_hooks_installed()
+    assert result.severity == "ok"
+    assert result.details["user"] == ["claude"]
+    assert result.details["project"] == ["cursor"]
 
 
 # ── check_claude_authed ────────────────────────────────────────────
@@ -300,7 +337,11 @@ def test_check_setup_run_carries_dispatch_args(fake_vault, monkeypatch):
     assert result.dispatch_args == ["setup"]
 
 
-def test_check_hooks_dispatch_args_when_missing(fake_vault):
+def test_check_hooks_dispatch_args_when_missing(fake_vault, monkeypatch):
+    # Isolate Path.home so the operator's real ~/.claude/ doesn't bleed in.
+    fake_home = fake_vault / "_fake_home"
+    fake_home.mkdir()
+    monkeypatch.setattr(Path, "home", classmethod(lambda cls: fake_home))
     result = health.check_hooks_installed()
     assert result.severity == "warning"
     assert result.dispatch_args == ["hooks", "install"]
