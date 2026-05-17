@@ -1,15 +1,21 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-05-17T12:45:00Z
-current_milestone: M018
+last_updated: 2026-05-17T11:04:00Z
+current_milestone: M019
 active_slice: none
 active_task: none
+parallel_milestones: [M018]
 ---
 
 # State
 
-**Status:** M018 planned (L). Ready to slice. Goal: split `compile.py` into three pure stages (`select_sources` / `compile_source` / `commit_article`) + `run_post_passes()` orchestrator consuming the ProducerRegistry from Phase 1. CONTEXT.md + ROADMAP.md at `.ytstack/M018-{CONTEXT,ROADMAP}.md`; 4-slice skeleton seeded (operator may grow to 5–6 during `ytstack:slice-milestone`). 5 open questions parked in CONTEXT.md, must close before S05 starts. Numbering note: jumped from M007 → M018 because M008–M017 shipped ad-hoc (no ROADMAPs); the IDs are preserved in commit history + memory. Next action: run `ytstack:slice-milestone`.
+**Status:** M019 planned (L) + M018 concurrent (L). Two milestones running in parallel — non-overlapping code paths.
+
+- **M019 (this session, current_milestone):** operator-self-reports wedge — 4 slices, ships inference-contract + 5 clinical-screen instruments + studies manifest + meta-report with radar/sparkline/timeline. Goal-driven by `.ytstack/OFFICE-HOURS-operator-self-reports.md` (eng-review verdict: GO with rescope; R1/R2/R3 verification gates baked into S01/S02). CONTEXT + ROADMAP at `.ytstack/M019-{CONTEXT,ROADMAP}.md`. Next action: run `ytstack:slice-milestone` (within this session) to refine S01–S04.
+- **M018 (parallel session):** split `compile.py` into three pure stages (`select_sources` / `compile_source` / `commit_article`) + `run_post_passes()` orchestrator consuming the ProducerRegistry from Phase 1. 6-slice plan at `.ytstack/M018-{CONTEXT,ROADMAP}.md` + `M018-S01..S06-PLAN.md`. Parallel session owns execution.
+
+Numbering note: jumped from M007 → M018 → M019. M008–M017 shipped ad-hoc (no ROADMAPs); IDs preserved in commit history + memory.
 
 ---
 
