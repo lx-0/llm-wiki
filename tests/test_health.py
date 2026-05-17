@@ -534,3 +534,46 @@ def test_build_health_flattens_multi_result_checks(fake_vault, monkeypatch):
         assert isinstance(r, health.CheckResult), f"non-CheckResult in results: {r!r}"
     account_results = [r for r in results if r.id.startswith("account-auth-")]
     assert len(account_results) == 1
+
+
+# ── check_wiki_on_path ─────────────────────────────────────────────
+
+
+def test_wiki_on_path_warning_when_missing(fake_vault, monkeypatch):
+    import shutil
+    (fake_vault / ".wiki").mkdir(exist_ok=True)
+    (fake_vault / ".wiki" / "wiki").write_text("#!/bin/sh")
+    monkeypatch.setattr(shutil, "which", lambda _name: None)
+    result = health.check_wiki_on_path()
+    assert result.severity == "warning"
+    assert result.dispatch_args == ["install-shortcut"]
+    assert "not on $PATH" in result.message
+
+
+def test_wiki_on_path_ok_when_resolves_to_this_vault(tmp_path, monkeypatch):
+    import shutil
+    wiki_dir = tmp_path / ".wiki"
+    wiki_dir.mkdir()
+    own = wiki_dir / "wiki"
+    own.write_text("#!/bin/sh")
+    monkeypatch.setattr(health, "WIKI_DIR", wiki_dir)
+    monkeypatch.setattr(shutil, "which", lambda _name: str(own))
+    result = health.check_wiki_on_path()
+    assert result.severity == "ok"
+    assert str(own) in result.message
+
+
+def test_wiki_on_path_warning_when_resolves_elsewhere(tmp_path, monkeypatch):
+    import shutil
+    own = tmp_path / "vault-a" / ".wiki" / "wiki"
+    own.parent.mkdir(parents=True)
+    own.write_text("#!/bin/sh")
+    other = tmp_path / "vault-b" / ".wiki" / "wiki"
+    other.parent.mkdir(parents=True)
+    other.write_text("#!/bin/sh")
+    monkeypatch.setattr(health, "WIKI_DIR", own.parent)
+    monkeypatch.setattr(shutil, "which", lambda _name: str(other))
+    result = health.check_wiki_on_path()
+    assert result.severity == "warning"
+    assert "different vault" in result.message
+    assert result.dispatch_args == ["install-shortcut"]

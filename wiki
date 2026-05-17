@@ -12,6 +12,7 @@
 #   wiki doctor                vault-health audit (config + connectivity + pipeline)
 #   wiki doctor --quick        skip TCP + subprocess probes (~50ms; for hooks)
 #   wiki doctor --json         machine-readable health output (for agents)
+#   wiki install-shortcut      symlink ~/.local/bin/wiki → this vault (so `wiki` works from any cwd)
 #   wiki setup                 first-time setup (config wizard + hooks install)
 #   wiki status                full system status (config + hooks)
 #   wiki config                interactive config editor
@@ -1242,6 +1243,78 @@ EOF
   uv run --quiet --project "$WIKI_DIR" python "$WIKI_DIR/scripts/doctor.py" "$@"
 }
 
+cmd_install_shortcut() {
+  # Create a `wiki` shortcut in `~/.local/bin/wiki` → vault's `.wiki/wiki`.
+  # Operator-asked: typing `wiki` from any cwd should Just Work, not require
+  # `./.wiki/wiki` or the iCloud-path expansion. Idempotent — replaces an
+  # existing symlink if it points elsewhere; no-op if it already points here.
+  case "${1:-}" in
+    -h|--help|help)
+      cat <<EOF
+${C_BOLD}wiki install-shortcut${C_RESET} — create \`wiki\` symlink on PATH
+
+${C_BOLD}USAGE${C_RESET}
+  wiki install-shortcut         create ~/.local/bin/wiki → this vault's wiki
+  wiki install-shortcut --print-only   show what would happen, don't write
+
+Idempotent. Replaces a stale symlink pointing at a different vault.
+Reports if ~/.local/bin isn't on PATH and prints the one-line shell-rc
+edit needed.
+EOF
+      return 0
+      ;;
+  esac
+
+  local print_only=0
+  [[ "${1:-}" == "--print-only" ]] && print_only=1
+
+  local bin_dir="$HOME/.local/bin"
+  local link="$bin_dir/wiki"
+  local target="$WIKI_DIR/wiki"
+
+  banner "wiki install-shortcut"
+
+  if [[ ! -x "$target" ]]; then
+    err "target $target is not executable (engine install broken?)"
+    return 1
+  fi
+
+  if (( print_only )); then
+    info "would create: $link → $target"
+  else
+    mkdir -p "$bin_dir"
+    if [[ -L "$link" || -e "$link" ]]; then
+      local current; current="$(readlink "$link" 2>/dev/null || echo)"
+      if [[ "$current" == "$target" ]]; then
+        ok "already linked: $link → $target"
+      else
+        info "replacing existing: $link → $current"
+        rm -f "$link"
+        ln -s "$target" "$link"
+        ok "linked: $link → $target"
+      fi
+    else
+      ln -s "$target" "$link"
+      ok "linked: $link → $target"
+    fi
+  fi
+
+  # Probe whether ~/.local/bin is on PATH for the operator's current shell.
+  case ":$PATH:" in
+    *":$bin_dir:"*)
+      ok "$bin_dir is on PATH — typing \`wiki\` from any cwd will work"
+      ;;
+    *)
+      warn "$bin_dir is NOT on PATH"
+      echo
+      info "Add this line to your shell rc (~/.zshrc on macOS default):"
+      printf "  ${C_BOLD}export PATH="\$HOME/.local/bin:\$PATH"${C_RESET}
+"
+      info "Then reload: \`source ~/.zshrc\` (or open a new terminal)."
+      ;;
+  esac
+}
+
 # ── Entry point ──────────────────────────────────────────────────────
 # Bare `wiki` opens the interactive home screen ONLY when stdin/stdout are
 # both TTYs. Non-TTY callers (CI, pipes, hooks, cron) get the help dump
@@ -1250,7 +1323,7 @@ EOF
 # Guard before dispatch: every subcommand except help/version touches vault
 # state, so demand a vault. Help + version must work in a bare checkout.
 case "${1:-}" in
-  help|-h|--help|version) ;;
+  help|-h|--help|version|install-shortcut) ;;
   *) require_vault ;;
 esac
 
@@ -1264,6 +1337,7 @@ case "${1:-}" in
     ;;
   menu)             shift; cmd_menu "$@" ;;
   doctor)           shift; cmd_doctor "$@" ;;
+  install-shortcut) shift; cmd_install_shortcut "$@" ;;
   setup)            shift; cmd_setup "$@" ;;
   status)           shift; cmd_status "$@" ;;
   config)           shift; cmd_config "$@" ;;

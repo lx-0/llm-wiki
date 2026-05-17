@@ -569,6 +569,62 @@ def _check_one_token(
     )
 
 
+
+def check_wiki_on_path() -> CheckResult:
+    """Warning when `wiki` isn't on the operator's $PATH, or when it is
+    on PATH but resolves to a DIFFERENT vault's wiki binary than the
+    one we're currently running in.
+
+    Without the shortcut, every invocation needs `./.wiki/wiki` or the
+    full vault path (especially painful with iCloud-Mobile-Documents
+    paths). `wiki install-shortcut` creates `~/.local/bin/wiki` → this
+    vault's wiki. The health-check is the discoverability layer for
+    operators who never realized the shortcut command exists.
+    """
+    try:
+        import shutil
+
+        own_wiki = WIKI_DIR / "wiki"
+        resolved = shutil.which("wiki")
+        if resolved is None:
+            return CheckResult(
+                id="wiki-on-path",
+                category="config",
+                severity="warning",
+                message="`wiki` not on $PATH — every call needs ./.wiki/wiki or full path",
+                fix="wiki install-shortcut",
+                dispatch_args=["install-shortcut"],
+            )
+        # `wiki` IS on PATH — but does it point at THIS vault?
+        try:
+            resolved_target = Path(resolved).resolve()
+        except OSError:
+            resolved_target = Path(resolved)
+        try:
+            own_target = own_wiki.resolve()
+        except OSError:
+            own_target = own_wiki
+        if resolved_target == own_target:
+            return CheckResult(
+                id="wiki-on-path",
+                category="config",
+                severity="ok",
+                message=f"`wiki` on PATH → this vault ({resolved})",
+                details={"resolved": resolved, "target": str(own_target)},
+            )
+        return CheckResult(
+            id="wiki-on-path",
+            category="config",
+            severity="warning",
+            message=f"`wiki` on PATH points at a different vault ({resolved_target})",
+            fix="wiki install-shortcut",
+            dispatch_args=["install-shortcut"],
+            details={"resolved": resolved, "this_vault": str(own_target)},
+        )
+    except Exception as exc:
+        return _probe_failed("wiki-on-path", "config", exc)
+
+
 # ── Orchestration ───────────────────────────────────────────────────
 
 
@@ -579,6 +635,7 @@ def _check_one_token(
 _ALL_CHECKS: list[Callable[..., CheckResult | list[CheckResult]]] = [
     check_setup_run,
     check_hooks_installed,
+    check_wiki_on_path,
     check_ollama_reachable,
     check_claude_authed,
     check_account_auths,
