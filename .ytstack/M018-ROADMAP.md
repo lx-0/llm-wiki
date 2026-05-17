@@ -27,8 +27,8 @@ Slice detail lives in per-slice `M018-S##-PLAN.md` files, created by `ytstack:sl
 - [ ] S02 -- Extract select_sources() — pure I/O (4 tasks)
 - [ ] S03 -- Extract compile_source() — pure LLM call (5 tasks)
 - [ ] S04 -- Extract commit_article() — pure file I/O (3 tasks)
-- [ ] S05 -- (to be planned, after open questions close — post-pass lift via run_post_passes)
-- [ ] S06 -- (to be planned — scheduling-policy decision + regression closeout)
+- [ ] S05 -- Post-pass lift via run_post_passes() — orchestrator owns post-passes (5 tasks)
+- [ ] S06 -- Regression + closeout: docs + diagram + backlog + memory + STATE (5 tasks)
 
 Suggested framing (from `.ytstack/backlog/producer-seam.md` lines 136–141, may grow to 5–6 slices during `slice-milestone`):
 
