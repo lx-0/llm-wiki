@@ -99,6 +99,21 @@ source "$WIKI_DIR/lib/seed.sh"
 require_cmd jq "needed to merge agent hook configs"
 require_cmd uv "needed to run the python config helper"
 
+# ── Vault guard ──────────────────────────────────────────────────────
+# Engine refuses to run outside an Obsidian vault. Without this, a bare
+# checkout of the engine repo gets treated as a vault by paths.py
+# (WIKI_DIR=<repo>, ROOT_DIR=<parent>) and `wiki <foo>` scribbles
+# logs/, state/, reports/, config.yaml into the engine source tree.
+# Marker: `.obsidian/` at ROOT_DIR — the canonical user-facing vault signal.
+require_vault() {
+  if [[ ! -d "$ROOT_DIR/.obsidian" ]]; then
+    >&2 echo "wiki: $ROOT_DIR is not an Obsidian vault (no .obsidian/ directory)."
+    >&2 echo "    The engine only runs against real vaults — install it as <vault>/.wiki/"
+    >&2 echo "    and invoke \`wiki\` from there."
+    exit 1
+  fi
+}
+
 # ── Subcommand dispatchers ───────────────────────────────────────────
 cmd_status() {
   banner "wiki status"
@@ -1231,6 +1246,14 @@ EOF
 # Bare `wiki` opens the interactive home screen ONLY when stdin/stdout are
 # both TTYs. Non-TTY callers (CI, pipes, hooks, cron) get the help dump
 # and exit 0 — they never block waiting for input.
+
+# Guard before dispatch: every subcommand except help/version touches vault
+# state, so demand a vault. Help + version must work in a bare checkout.
+case "${1:-}" in
+  help|-h|--help|version) ;;
+  *) require_vault ;;
+esac
+
 case "${1:-}" in
   "")
     if [[ -t 0 && -t 1 ]]; then
