@@ -34,7 +34,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import httpx  # noqa: E402
 
 from collectors.base import Collector, CollectorSpec, RunResult, register
-from collectors.scan_screenshots import make_thumbnail
 from core import daily_capture, ollama_client
 from core.config import CONFIG, TIMEZONE
 from core.paths import RAW_DIR
@@ -51,6 +50,7 @@ ACCEPTED_SUFFIXES = (".jpeg", ".jpg", ".png", ".heic")
 MODEL = CONFIG.models.vision_model
 RESIZE_WIDTH = CONFIG.limits.screenshot_resize_width
 TIMEOUT = float(CONFIG.limits.screenshot_timeout_seconds)
+THUMB_WIDTH = 384  # px; matches scan_screenshots — Retina-source compromise
 
 
 def _inbox_path() -> Path | None:
@@ -63,6 +63,33 @@ def _inbox_path() -> Path | None:
 def _max_per_run() -> int:
     pb = CONFIG.piggybacks.get("pictures")
     return (pb.max_per_run if pb else None) or 20
+
+
+def _make_thumbnail(src: Path) -> Path | None:
+    """Generate a 384px-wide thumbnail under `raw/notes/pictures/thumb/`.
+
+    Local copy of `scan_screenshots.make_thumbnail` — necessary because
+    THE OTHER one is bound to the screenshots THUMB_DIR via its module
+    constants, so importing it writes thumbs to the wrong vault folder.
+    Idempotent: skips if the target exists. Returns None on sips failure
+    so the batch report can omit the wikilink gracefully.
+    """
+    THUMB_DIR.mkdir(parents=True, exist_ok=True)
+    dst = THUMB_DIR / src.name
+    if dst.exists():
+        return dst
+    try:
+        proc = subprocess.run(
+            ["sips", "--resampleWidth", str(THUMB_WIDTH), str(src), "--out", str(dst)],
+            capture_output=True, text=True,
+        )
+        if proc.returncode != 0:
+            log.warning("  thumbnail failed (%d): %s", proc.returncode, proc.stderr.strip()[:200])
+            return None
+        return dst
+    except FileNotFoundError:
+        log.warning("  sips not available — skipping thumbnail for %s", src.name)
+        return None
 
 
 def _resize_image(path: Path) -> Path:
@@ -387,7 +414,7 @@ class PicturesCollector:
 
             captured_at = datetime.fromtimestamp(src.stat().st_mtime, tz=tz)
 
-            thumb = make_thumbnail(src)
+            thumb = _make_thumbnail(src)
             if thumb is not None:
                 thumb_lookup[src.name] = thumb.name
 
