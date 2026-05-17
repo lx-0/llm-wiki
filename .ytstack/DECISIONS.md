@@ -1106,3 +1106,58 @@ The two unfilled criteria (#4 and #8) are **operator-consumption** dependencies,
 
 **M019 STATUS: DONE.**
 
+## 2026-05-17: M022 two-zone intake — `raw/inbox-<channel>/` audit vs `raw/<category>/` substrate
+
+**Context:** Pre-M022, three intake paths had inconsistent original-disposition: `process-inbox.py` UNLINKED HTML originals after `ingest-html.py` succeeded (silent data loss path); md/txt drops moved AS the substrate into `raw/<cat>/` (no audit copy); audio/pdf routed to `raw/audio/`/`raw/papers/` with no derived artifact. Mobile collectors (`voice.py`, `pictures.py`) archived to `<voice_inbox>/.processed/` and `<picture_inbox>/.processed/` — OUTSIDE the vault, in iCloud Drive — invisible to vault sync/git/backup and orphaned from the "Rohdaten sind geil" principle. Operator surfaced the asymmetry 2026-05-17 via screenshot probe.
+
+**Options considered:**
+
+- (A) Status quo + HTML-symmetry fix only: `inbox/.processed/` for HTML, leave mobile alone. Cheapest, closes one asymmetry, ignores the cross-substrate inconsistency.
+- (B) Two strict zones: `raw/inbox-<channel>/[<source>/]<file>` = as-arrived audit (never compiled), `raw/<category>/<name>.md` = derived substrate (compile.py reads only here). Every channel archives its original to the audit zone; derivation produces an artifact when the source is not already substrate-shaped. **(CHOSEN)**
+- (C) Variant B with provenance INSIDE the category folder (`raw/<cat>/inbox/<name>.md`). Mixes audit + substrate at the same tree level, complicates compile-scope and lint rules.
+
+**Decision:** Option B.
+
+**Channels + sources today:**
+- `inbox-wiki/` — desktop `<vault>/inbox/` drops (md/txt/html/mp3/m4a/wav/ogg/webm/pdf)
+- `inbox-mobile/voice/` — iOS Shortcut + dictation tool transcripts (`.txt`/`.md`, NOT audio)
+- `inbox-mobile/pictures/` — iOS Shortcut + AirDrop images (`.jpeg`/`.jpg`/`.png`/`.heic`)
+
+**Per-pathway behaviour:**
+- md/txt → original to `raw/inbox-wiki/` (unmodified), artifact (with frontmatter) to `raw/<cat>/` via copy2 + `add_frontmatter()` on the artifact.
+- html → ingest-html.py writes extracted artifact to `raw/articles/<slug>.md`, original moves to `raw/inbox-wiki/` (was: `unlink()` — eliminated).
+- binary (mp3/pdf/etc.) → archive-only to `raw/inbox-wiki/`, no LLM call, no artifact. `raw/audio/` + `raw/papers/` are no longer written from the inbox path.
+- voice mobile → archive transcript to `raw/inbox-mobile/voice/`, punctuated artifact stays in `raw/voice/<slug>.md`.
+- pictures mobile → archive PNG + per-image vision sidecar to `raw/inbox-mobile/pictures/`, batch report stays in `raw/notes/pictures/<batch>.md`.
+
+**Consequences:**
+- `compile.py` unchanged — still reads only `raw/<category>/`, never `raw/inbox-<channel>/`. Existing 3-layer scope-lock from `[[feedback_substrate_is_subject_not_instruction]]` applies unchanged.
+- `_archive_to_inbox_wiki()` helper in `process-inbox.py` + `MOBILE_ARCHIVE_DIR` constants in voice/pictures handle on-demand mkdir + mtime-iso collision-suffix.
+- `migrate_inbox_archive.py` one-shot moves pre-M022 iCloud `.processed/*` into the vault, rmdir-s the emptied folders. Idempotent, supports `--dry-run`. Lxw live-run 2026-05-17T15:44Z migrated 47 files (29 voice + 18 pictures) without collision.
+- Diagrams: `docs/architecture.excalidraw` `process-inbox.py` pill updated from stale "Audio -> raw/audio" to two-zone wording.
+- Tests: 841/841 green (4 new process_inbox cases + 8 voice updated + 1 pictures new + 6 migration cases).
+
+**Cancelled in scope:**
+- S01-T03/T04 (HTML + binary branches) — rolled into S01-T02's atomic `process_inbox()` rewrite (over-decomposition).
+- S03-T02 `.gitkeep` templates — `lib/seed.sh` doesn't walk `templates/raw/`, collectors do on-demand mkdir.
+
+**Commits:** `c51494a` `5b2a7f7` `330f9f7` `0a06bcd` `87a631b` `0b7e27f` `d776e35` `eabac90` `bbf49de` `cecc6db`.
+
+---
+
+## 2026-05-17: Fail-closed vault guard — `wiki` refuses to run outside an Obsidian vault
+
+**Root cause.** `scripts/core/paths.py` derives every path constant from `__file__`:
+`WIKI_DIR = <repo>/`, `ROOT_DIR = <parent-of-repo>`, `STATE_DIR = WIKI_DIR/state/`, `LOGS_DIR = WIKI_DIR/logs/`, `REPORTS_DIR = WIKI_DIR/reports/`. In a real operator install (`<vault>/.wiki/`) those resolve correctly. In a bare engine-repo checkout, `paths.py` has no idea it's looking at a code-checkout instead of a vault `.wiki/`, so `wiki <subcommand>` silently scribbles `config.yaml`, `logs/`, `state/`, `sessions/`, `reports/` into the engine source tree — scanning whatever `daily/` + `knowledge/` happens to sit next to the checkout (e.g. `lx-0/` collection-dir's own subdirs).
+
+**Decision.** `wiki` bash dispatcher (`./wiki`) runs `require_vault()` before every subcommand except `help` / `version`. The marker is **positive-only**: `.obsidian/` directory at `ROOT_DIR`. No engine-repo heuristics (which would be a negative test prone to false negatives in unusual layouts).
+
+Failure mode: stderr message naming the resolved `ROOT_DIR` + actionable hint ("install it as `<vault>/.wiki/` and invoke `wiki` from there"), exit 1. Five paths live-verified post-edit: bare `./wiki` (refuse), `./wiki help` (pass), `./wiki version` (pass), `./wiki lint` (refuse), `./wiki status` (refuse).
+
+**What this does NOT solve.** Direct python invocations (`uv run python scripts/<x>.py`) still bypass the guard — they don't go through the bash dispatcher. The cleanup-trail still surfaces those (`.wiki/` directory at repo root reappears = some script defensively mkdir-ed past the guard). Acceptable cost: the bash CLI is the operator-facing surface; raw python entry is a dev-shell concern.
+
+**`.wiki/` deliberately NOT gitignored.** An engine-repo containing its own `.wiki/` is a structural anomaly (the engine IS `.wiki/` when installed). Keeping it visible in `git status` is a tripwire: if any code path defensively creates `<repo>/.wiki/` past the guard, we want to see it. `.pytest_cache/` / `.ruff_cache/` / `.mypy_cache/` ARE gitignored (standard dev-tool caches, no surveillance value).
+
+**Cleanup performed in same arc:** removed `config.yaml`, `logs/`, `state/`, `reports/`, `.pytest_cache/`, `.ruff_cache/`, `.wiki/` from engine-repo working tree. All were dev-time debris from running `wiki <foo>` in-place against the `lx-0/` collection-dir.
+
+Commits: `e8d21eb` (guard) + `0075090` (gitignore tool caches).
