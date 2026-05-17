@@ -39,6 +39,17 @@ You have **Read, Glob, Grep, Edit, Write** restricted to `knowledge/**`. Stay un
 
 The page text is embedded above, but you SHOULD also Read it directly to confirm nothing has changed since this prompt was assembled (operator may have edited it). If the file does NOT exist on disk, you will be creating it from scratch — use the two-layer template from AGENTS.md / compile_main rules.
 
+### Step 1.5 — SCHEMA MIGRATION (MANDATORY for type:person|project)
+
+Many existing pages predate M005 and are in the **atomic shape** (`## Key Facts` + `## Interactions` + `## Related`). For `type: person|project` entities, the canonical shape is **two-layer State + Timeline** per `compile_main.md` Instruction 3. If the existing page is atomic, your re-synthesis MUST migrate it:
+
+- **`## Key Facts` content** → distribute into `## State`, `## Action Items`, `## Open Threads`, `## What they're building` (or project-body) per the two-layer template. Drop the `## Key Facts` header.
+- **`## Interactions` content** → move all entries below the `---` separator into `## Timeline`. Drop the `## Interactions` header. Preserve every existing entry verbatim.
+- **`## Related` content** → renamed to `## See also` and moved into the State block (above `---`).
+- After migration, the page MUST have: `## State`, `## Action Items`, `## Open Threads`, body section, `## See also`, `---`, `## Timeline`. In that order.
+
+The 200-line existing-page-is-atomic case is the highest-value dream-cycle outcome — it's exactly the lazy-migration M005 promised. Don't skip this step because the page "already has content".
+
 ### Step 2 — synthesize the State block
 
 The State block lives above the `---` separator. Rewrite it from the corpus, observing these rules:
@@ -51,7 +62,7 @@ The State block lives above the `---` separator. Rewrite it from the corpus, obs
 
 3. **Reject generic filler.** Phrases like "important contributor", "active in the community", "interested in AI", "working on various projects" are BANNED. If you can't make a specific claim from corpus evidence, do not write a generic one as filler. Empty sections (`## Open Threads` with no entries) are fine.
 
-4. **Cross-link to emerged concepts.** Grep `knowledge/concepts/` for concept slugs that recur in the corpus (e.g. a strategy framework discussed in 3 meetings) and link them via `[[knowledge/concepts/<slug>]]`. If the corpus repeatedly references a concept that does NOT have a page yet, do NOT stub it from here (dream-cycle is read-only for substrate; stubs come from per-file compile). Just cite the substrate that introduces it.
+4. **Cross-link to emerged concepts — MANDATORY.** When the body of your State or `## What they're building` section names a concept-by-phrase that has a `knowledge/concepts/<slug>.md` page, you MUST emit it as `[[knowledge/concepts/<slug>]]` not as bare prose. Before writing the final State block, **Grep `knowledge/concepts/` for every multi-word noun phrase in your draft**. Example: a sentence saying "Yesterday uses a micro-venture-studio model" when `knowledge/concepts/micro-venture-studio-operational-model.md` exists MUST be rewritten as "Yesterday uses a [[knowledge/concepts/micro-venture-studio-operational-model|micro-venture-studio]] model". This is the cross-link the operator pays for — without it, dream-cycle produces text but not graph density. Reject your own draft if it mentions a concept-slug in prose without the wikilink. If the corpus repeatedly references a concept that does NOT have a page yet, do NOT stub it from here (dream-cycle is read-only for substrate; stubs come from per-file compile). Just cite the substrate that introduces it.
 
 5. **State sections (for `type: person|project`):**
    - `## State` — current facts (role, status, stack, ownership, etc.)
