@@ -131,6 +131,7 @@ def cmd_run(args: argparse.Namespace) -> int:
 
         with RunDirectory(study.runs_dir, timestamp) as run_dir:
             per_inst_results: list[tuple[str, Path]] = []
+            deferred_instruments: list = []
             for ref in instruments:
                 if ref.source == "form":
                     # form-source instruments are operator-input only;
@@ -157,27 +158,79 @@ def cmd_run(args: argparse.Namespace) -> int:
                         study_dir=study.study_dir,
                     )
                 except Exception as exc:
-                    # Skip-and-flag: one bad instrument should not kill
-                    # the whole run. After retries are exhausted (handled
-                    # inside infer_batch_async), surface the failure +
-                    # continue with remaining instruments. The run-summary
-                    # will reflect the missing instrument.
+                    # Skip-and-flag PHASE 1: collect for end-of-run
+                    # retry. After 6+ minutes of running OTHER instruments,
+                    # the API may have recovered from the transient
+                    # pathology that broke this one. Defer-and-resume
+                    # catches that recovery window without restarting
+                    # the whole run from scratch.
                     print(
-                        f"      ✗ {ref.alias or ref.slug} failed terminally "
-                        f"after retries: {type(exc).__name__}: {exc}",
+                        f"      ✗ {ref.alias or ref.slug} failed after retries: "
+                        f"{type(exc).__name__}: {exc}",
                         flush=True,
                     )
                     print(
-                        f"        skipping this instrument; other instruments "
-                        f"+ meta-report will still complete.",
+                        f"        queued for end-of-run retry attempt.",
                         flush=True,
                     )
+                    deferred_instruments.append(ref)
                     continue
                 if report_path.name != ref.report_filename:
                     report_path.rename(target_path)
                     report_path = target_path
                 per_inst_results.append((ref.alias or ref.slug, report_path))
                 print(f"      → {report_path.relative_to(run_dir.tmp_dir)}", flush=True)
+
+            # PHASE 2 defer-and-resume: retry failed instruments once
+            # more after a 60s pause. The 6+ min of other-instrument
+            # work between original-failure and this retry usually
+            # gives transient API pathologies time to clear (observed
+            # 2026-05-17 — GAD-7 failed 3× in a multi-instrument run
+            # but cleared on isolation-rerun 15 min later).
+            if deferred_instruments:
+                print(
+                    f"\n→ {len(deferred_instruments)} deferred instrument(s); "
+                    f"60s pause then end-of-run retry pass …",
+                    flush=True,
+                )
+                import time as _time_mod
+                _time_mod.sleep(60.0)
+                still_failed: list = []
+                for ref in deferred_instruments:
+                    print(
+                        f"  - {ref.alias or ref.slug} v{ref.version}: "
+                        f"deferred retry …",
+                        flush=True,
+                    )
+                    try:
+                        report_path = run_inference(
+                            ref.slug, ref.version, ROOT_DIR,
+                            output_dir=run_dir.instruments_dir,
+                            study_dir=study.study_dir,
+                        )
+                        target_path = run_dir.instruments_dir / ref.report_filename
+                        if report_path.name != ref.report_filename:
+                            report_path.rename(target_path)
+                            report_path = target_path
+                        per_inst_results.append((ref.alias or ref.slug, report_path))
+                        print(
+                            f"      ✓ recovered → {report_path.relative_to(run_dir.tmp_dir)}",
+                            flush=True,
+                        )
+                    except Exception as exc:
+                        print(
+                            f"      ✗ still failing: {type(exc).__name__}: "
+                            f"{exc}",
+                            flush=True,
+                        )
+                        still_failed.append(ref)
+                if still_failed:
+                    print(
+                        f"  {len(still_failed)}/{len(deferred_instruments)} "
+                        f"instrument(s) terminally failed: "
+                        f"{[r.alias or r.slug for r in still_failed]}",
+                        flush=True,
+                    )
 
             # S04 — render the deterministic meta-report inside the
             # tmp dir before atomic commit. Builds the in-progress

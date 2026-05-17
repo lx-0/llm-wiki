@@ -300,7 +300,12 @@ async def infer_batch_async(
     # (PSS-10 hit kind=unknown twice in a row 2026-05-17); the second
     # retry usually clears it. Cost ceiling: 3× single-call cost on
     # the worst failing instrument.
-    RETRY_BACKOFFS = (2.0, 5.0)
+    # Backoffs tuned for two failure regimes:
+    # - 5s catches transient API blips that clear quickly
+    # - 30s catches longer burst-failures (observed 10-15 min API
+    #   pathologies on 2026-05-17 where GAD-7 failed 3× consecutively
+    #   but cleared on isolation-rerun 15 min later)
+    RETRY_BACKOFFS = (5.0, 30.0)
     for attempt in range(3):
         try:
             return await _infer_batch_once_async(
