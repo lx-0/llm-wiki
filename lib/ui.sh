@@ -93,51 +93,6 @@ select_many() {
   printf "%s\n" "${chosen[@]}"
 }
 
-# select_one_keyed "Prompt" "label1|key1|label2|key2|..." [default_key]
-# Like select_one, but each option has a one-char letter shortcut shown
-# inline. The user can pick by typing the letter OR the option number.
-# Echoes the chosen label (not the key). Default key is highlighted *.
-select_one_keyed() {
-  local prompt="$1" pairs_str="$2" default_key="${3:-}"
-  local IFS='|'
-  read -r -a pairs <<< "$pairs_str"
-  local n=$(( ${#pairs[@]} / 2 ))
-  local i j=0
-  local -a labels=() keys=()
-  for (( i=0; i<n; i++ )); do
-    labels+=("${pairs[$((i*2))]}")
-    keys+=("${pairs[$((i*2+1))]}")
-  done
-  local default_idx=1
-  for (( i=0; i<n; i++ )); do
-    if [[ "${keys[$i]}" == "$default_key" ]]; then
-      default_idx=$((i+1))
-      break
-    fi
-  done
-  for (( i=0; i<n; i++ )); do
-    local marker="  "
-    [[ $((i+1)) == "$default_idx" ]] && marker="${C_GREEN}*${C_RESET} "
-    printf "  %s%d) [%s%s%s] %s\n" \
-      "$marker" "$((i+1))" "$C_BOLD" "${keys[$i]}" "$C_RESET" "${labels[$i]}" >&2
-  done
-  printf "%s [%s]: " "$prompt" "$default_key" >&2
-  local input; read -r input
-  input="${input:-$default_key}"
-  # Letter match first, then numeric fallback.
-  for (( i=0; i<n; i++ )); do
-    if [[ "${keys[$i]}" == "$input" ]]; then
-      printf "%s" "${labels[$i]}"
-      return 0
-    fi
-  done
-  if [[ "$input" =~ ^[0-9]+$ ]] && (( input >= 1 && input <= n )); then
-    printf "%s" "${labels[$((input-1))]}"
-    return 0
-  fi
-  printf "%s" "${labels[$((default_idx-1))]}"
-}
-
 # pause "Press Enter to continue"
 pause() {
   printf "%s%s%s " "$C_DIM" "${1:-Press Enter to continue}" "$C_RESET"

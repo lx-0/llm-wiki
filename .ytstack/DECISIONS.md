@@ -819,3 +819,62 @@ Empirical probe 2026-05-17 (`scripts/probe_compile_scope.py`) confirmed the extr
 **Engine impl:** `core.sdk_helpers.make_path_scope_gate` + `prompt_stream` (commit `478a127`); compile.py + dream.py call-site wiring (commit `d8a0de5`); feature flag added with config migration (same `478a127`). Finding doc + probe in `fd3a814`. Backlog: `compile-scope-allowlist-broken.md` status flipped to implemented.
 
 **Production verification status:** mechanism verified empirically by the probe (Haiku, 3-turn, tmp vault). Production code path with Opus + 500KB prompts + 20-turn iteration has NOT been exercised end-to-end yet — operator must verify on lxw vault. Rollback flag exists for safety.
+
+---
+
+## 2026-05-17: Interactive home-screen migrated from bash to Python (prompt_toolkit)
+
+**Context:** The bash interactive home_screen this engine shipped on
+2026-05-17 morning (commits 6504ab6 → acae830 → 1852029 → dd21549 →
+1b4ea5e) hit a chain of bash 3.2 quirks (macOS default shell) — one
+fresh quirk per feature. The terminal bug was fractional `read -t`
+(needed for ESC-sequence timeout in arrow handling) — bash 3.2 only
+accepts integer seconds, so the arrow-key implementation was broken
+end-to-end with no clean workaround.
+
+**Options considered:** (A) Workaround the bash 3.2 quirk via `dd` or
+named pipe with kernel-level timeout. (B) Add `gum` (Charmbracelet)
+as a system dep — beautiful shell TUI lib, but new Homebrew install
+for every operator. (C) Move the interactive layer into Python via
+`questionary` (high-level wrapper). (D) Move into Python via
+`prompt_toolkit` directly (lower-level, more code, smaller dep).
+
+**Chose:** D — `prompt_toolkit` direct dependency. Bash `wiki` stays
+the dispatcher for `wiki <subcommand>` (compile / flush / lint / …),
+unchanged. Bare `wiki` and `wiki menu` exec `scripts/menu.py`. The
+Python menu shells back to `wiki <subcommand>` for every dispatch.
+
+**Reason:** workarounds (A) trade one bash quirk for the next; gum (B)
+requires per-operator install + Go binary; questionary (C) wraps
+prompt_toolkit anyway and adds a layer we don't need. Direct
+prompt_toolkit gives us full control over the multi-section layout
+(status one-liner + suggestions + quick actions + browse + footer
+hint) without fighting library opinions about modal dialogs. The
+shell-back-to-bash dispatch keeps `cmd_*` implementations as the
+single source of truth — Python adds a render layer, doesn't fork the
+behaviour.
+
+**Subprocess-back design:** dispatch is `subprocess.run([wiki_bin,
+"compile"])` etc. Inherits stdio so the operator sees the bash
+command's output directly. The menu pauses on "Press Enter to
+continue" after each dispatch, then re-probes and re-renders.
+
+**Engine impl:** `scripts/menu.py` (~480 LOC including hand-curated
+49-entry catalog); `pyproject.toml` adds `prompt_toolkit>=3.0`; bash
+deletes `home_screen` + `category_menu` + `home_fuzzy_filter` +
+helpers (~430 LOC removed); `lib/ui.sh` drops `select_one_keyed` (only
+caller was the deleted bash menu). Test surface: 13 catalog-integrity
+tests covering dispatch-spec shape + special-handler resolution +
+status-line rendering. Tests for the interactive flow itself are
+deferred — would need a pty fake.
+
+**Cold-start cost:** bare `wiki` is ~190ms slower (200ms python
+startup + 150ms probe vs prior 10ms bash + 150ms probe). Acceptable
+for once-per-session interactive entry-point. All non-interactive
+`wiki <subcommand>` paths stay ~10ms bash.
+
+**Backlog deferred:** `lib/ui.sh` one-shot wizards (config wizard,
+hooks installer, seed prompts) stay bash — bash is fine for one-shot
+yes/no/single-line. Migrate only if they grow scrollable TUI
+ambitions. See `.ytstack/backlog/python-interactive-menu.md` for the
+full design + "what stays out" list.

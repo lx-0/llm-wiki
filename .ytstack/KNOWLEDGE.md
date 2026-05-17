@@ -1822,3 +1822,42 @@ isn't `Bash(...)` is unverified-extrapolation territory. If the security
 posture matters, gate via `can_use_tool` callback — that's the only path
 the SDK lets you control from Python rather than depending on the CLI's
 internal parser.
+
+## Bash is the wrong tool for multi-line interactive menus on macOS (2026-05-17)
+
+The bash home_screen this engine shipped on 2026-05-17 morning trip-wired
+on a sequence of bash 3.2 quirks (macOS default), one per feature added:
+
+- `${var,,}` lowercase missing — bash 4+ only; needed `tr '[:upper:]'
+  '[:lower:]'` workaround in the fuzzy filter.
+- Empty `${arr[@]}` under `set -u` raises `unbound variable` — bash 4+
+  treats empty-array as just empty; bash 3.2 needs `${arr[@]+...}`
+  pattern at every expansion site. Hit dispatching 4 out of 7
+  suggestions (anything with no args).
+- `read -t 0.05` rejected — fractional timeouts are bash 4+ only.
+  Killed arrow-key handling: ESC sequence needs a short timeout for
+  byte 2-3 read, can't be done in bash 3.2 without blocking on a lone
+  ESC press.
+
+Each fix cost a commit + a session. The pattern made the cost-curve
+explicit: bash one-shot wizards (confirm / ask / single-line input) are
+fine; bash multi-line scrollable menus with cursor / arrow nav / raw
+mode are a treadmill of compat workarounds.
+
+**Decided:** scope-split the CLI. Bash `wiki` stays the dispatcher for
+all `wiki <subcommand>` calls (~10ms cold, scriptable, hook-compatible)
+and for the existing one-shot wizards in `lib/ui.sh`. The interactive
+home screen + category browse + fuzzy filter moved to
+`scripts/menu.py` using `prompt_toolkit` (real arrow keys + redraw +
+raw mode handled natively). The Python menu shells back to `wiki
+<subcommand>` for every dispatch — bash stays single source of truth
+for what each subcommand does. Cold-start cost: bare `wiki` is ~190ms
+slower (200ms python startup + 150ms probe vs 10ms bash + 150ms probe);
+acceptable for once-per-session interactive entry.
+
+**Generalisable rule:** when the next CLI feature would need raw mode,
+multi-byte ESC sequence parsing, full-screen redraw, or cursor
+positioning, write it in Python with prompt_toolkit. Stick with bash
+for argv dispatch and yes/no/single-line prompts. The break-even is
+around "do I need to read individual keystrokes" — if yes, switch
+languages.
