@@ -35,17 +35,15 @@ Milestone IDs M008–M017 were used in commits + memory pointers for ad-hoc arcs
 
 ## Decisions locked in discuss phase
 
-(Append decisions here as they're made during slicing + execution. Format: "YYYY-MM-DD: decided X because Y.")
+- **2026-05-17: Q1 — Post-pass scheduling = serial-after-file.** Reason: Phase 1 preserved this shape; introducing `defer` / `fanout` modes now is YAGNI (no producer needs them today). Locks the operator-experience: a slow curiosity Ollama call still delays the next file, but cost gates + per-file state-save semantics stay intact. Future spec-level `defer: bool` is a strictly-additive escape hatch when a real-world producer demands it.
+- **2026-05-17: Q2 — Pre-flight 60kb gate (`PromptTooLargeError`) lives inside `compile_source()`.** Reason: the gate is a "can this LLM call succeed?" check on the prompt about to be built — that's `compile_source()`'s domain. The orchestrator catches the raised exception → marks the file failed → moves on. Keeps `compile_source()` the single owner of LLM-call viability.
+- **2026-05-17: Q3 — Compile lock = orchestrator entry only.** Reason: per-stage locks would slow execution without preventing real races (the engine runs serially within one process; cross-process is what `STATE_DIR/compile.lock` already covers). Confirmed.
+- **2026-05-17: Q4 — `_ConsoleFormatter` stays in the orchestrator module** (top of `compile.py`, alongside `main()` + the per-file loop). Reason: presentation concern, not stage concern. The stages emit raw `log.info`/`log.error` lines; the formatter shapes them. Confirmed.
+- **2026-05-17: Q5 — Curiosity + takes stay live throughout the refactor.** Reason: Phase 1 preserved exact behavior; M018's stage extractions are byte-identical or they don't ship. Toggling feature flags during dev would mask regressions in producer output instead of surfacing them. Operator daily compile keeps producing knowledge-gap requests + takes during M018 work. (M011-style ship-gated flag was for a feature-new substrate; this is a refactor of code that already produces material.)
 
 ## Open questions
 
-Lifted verbatim from `.ytstack/backlog/producer-seam.md` lines 110–116. All must close before slice S05 (post-pass lift) starts; the answers shape the orchestrator's structure.
-
-1. **Post-pass scheduling policy.** Serial-after-file (current behavior, Phase 1's preserved shape)? Deferred-batch (run all producers after the whole compile loop)? Per-source async-fanout? Per-producer choice declared on Spec?
-2. **Cost-gate location.** The pre-flight 60kb gate (`PromptTooLargeError`) currently couples to dispatch — should it live inside `compile_source()` or before it as an orchestrator policy?
-3. **Lock acquisition scope.** Global compile lock (`STATE_DIR/compile.lock`, exists today) at orchestrator entry only, or per-stage? Default assumption: orchestrator-only; confirm.
-4. **`_ConsoleFormatter` placement.** 90 lines of colored per-file output — stays in the orchestrator (presentation concern), not pushed into stages. Confirm + lock.
-5. **Curiosity + takes feature-flag flip during refactor.** Disabled-by-default during dev, then flipped on at end of regression testing — same operator-experience pattern as M011's `features.extract_takes`? Or kept live throughout?
+All 5 closed 2026-05-17 (see "Decisions locked" above). `ytstack:slice-milestone` is now unblocked.
 
 ## Out of scope (explicitly)
 
