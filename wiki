@@ -78,7 +78,23 @@
 
 set -euo pipefail
 
-WIKI_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Resolve symlinks so `wiki` invoked via ~/.local/bin/wiki (created by
+# `wiki install-shortcut`) still finds lib/* relative to the real script
+# location, not relative to the symlink path. macOS `readlink -f` lives
+# in coreutils (greadlink) and isn't guaranteed; use a portable Python
+# fallback via the script's own dirname loop.
+_resolve_self() {
+  local src="${BASH_SOURCE[0]}"
+  while [ -L "$src" ]; do
+    local target; target="$(readlink "$src")"
+    case "$target" in
+      /*) src="$target" ;;
+      *)  src="$(cd "$(dirname "$src")" && pwd)/$target" ;;
+    esac
+  done
+  cd "$(dirname "$src")" && pwd
+}
+WIKI_DIR="$(_resolve_self)"
 ROOT_DIR="$(cd "$WIKI_DIR/.." && pwd)"
 export WIKI_DIR ROOT_DIR
 
