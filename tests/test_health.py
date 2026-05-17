@@ -373,3 +373,164 @@ def test_probe_failed_returns_warning_with_exception_text(fake_vault):
     result = health._probe_failed("test-id", "config", RuntimeError("boom"))
     assert result.severity == "warning"
     assert "boom" in result.message
+
+
+# ── check_account_auths (multi-result probe) ─────────────────────────
+
+
+def test_account_auths_empty_when_no_accounts(fake_vault, monkeypatch):
+    class _Personal: accounts = {}
+    class _CONFIG: personal = _Personal()
+    monkeypatch.setitem(__import__("sys").modules, "core.config",
+                        type("M", (), {"CONFIG": _CONFIG})())
+    out = health.check_account_auths()
+    assert out == []
+
+
+def test_account_auths_emits_ok_when_token_exists(fake_vault, monkeypatch):
+    class _Personal:
+        accounts = {"work": {"calendar": {"kind": "google-calendar"}}}
+    class _CONFIG: personal = _Personal()
+    monkeypatch.setitem(__import__("sys").modules, "core.config",
+                        type("M", (), {"CONFIG": _CONFIG})())
+    state = fake_vault / ".wiki" / "state"
+    monkeypatch.setattr(health, "STATE_DIR", state)
+    (state / "calendar-token-work.json").write_text('{"token": "x"}')
+
+    out = health.check_account_auths()
+    assert len(out) == 1
+    assert out[0].id == "account-auth-work-calendar"
+    assert out[0].severity == "ok"
+    assert out[0].dispatch_args is None
+
+
+def test_account_auths_emits_warning_with_dispatch_args_when_missing(fake_vault, monkeypatch):
+    class _Personal:
+        accounts = {"work": {"gmeet": {"kind": "gmeet-api"}}}
+    class _CONFIG: personal = _Personal()
+    monkeypatch.setitem(__import__("sys").modules, "core.config",
+                        type("M", (), {"CONFIG": _CONFIG})())
+    state = fake_vault / ".wiki" / "state"
+    monkeypatch.setattr(health, "STATE_DIR", state)
+    # no token file present
+
+    out = health.check_account_auths()
+    assert len(out) == 1
+    assert out[0].severity == "warning"
+    assert out[0].dispatch_args == ["gmeet-auth", "work"]
+    assert "wiki gmeet-auth work" in out[0].fix
+
+
+def test_account_auths_handles_multi_account_multi_integration(fake_vault, monkeypatch):
+    class _Personal:
+        accounts = {
+            "work": {
+                "calendar": {"kind": "google-calendar"},
+                "gmeet": {"kind": "gmeet-api"},
+            },
+            "home": {
+                "calendar": {"kind": "google-calendar"},
+            },
+        }
+    class _CONFIG: personal = _Personal()
+    monkeypatch.setitem(__import__("sys").modules, "core.config",
+                        type("M", (), {"CONFIG": _CONFIG})())
+    state = fake_vault / ".wiki" / "state"
+    monkeypatch.setattr(health, "STATE_DIR", state)
+    # work calendar has token; the other two don't
+    (state / "calendar-token-work.json").write_text("{}")
+
+    out = health.check_account_auths()
+    ids = sorted(r.id for r in out)
+    assert ids == [
+        "account-auth-home-calendar",
+        "account-auth-work-calendar",
+        "account-auth-work-gmeet",
+    ]
+    by_id = {r.id: r for r in out}
+    assert by_id["account-auth-work-calendar"].severity == "ok"
+    assert by_id["account-auth-work-gmeet"].severity == "warning"
+    assert by_id["account-auth-home-calendar"].severity == "warning"
+
+
+def test_account_auths_gmail_detected_via_filter_subblock(fake_vault, monkeypatch):
+    """Real-world lxw shape: reader is thunderbird-mbox (no OAuth),
+    filter is gmail-api (uses OAuth for label/move push). gmail-token
+    is required even though the reader doesn't touch the Gmail API."""
+    class _Personal:
+        accounts = {
+            "work": {
+                "reader": {"kind": "thunderbird-mbox"},
+                "filter": {"kind": "gmail-api"},
+            },
+        }
+    class _CONFIG: personal = _Personal()
+    monkeypatch.setitem(__import__("sys").modules, "core.config",
+                        type("M", (), {"CONFIG": _CONFIG})())
+    state = fake_vault / ".wiki" / "state"
+    monkeypatch.setattr(health, "STATE_DIR", state)
+
+    out = health.check_account_auths()
+    assert len(out) == 1
+    assert out[0].id == "account-auth-work-gmail"
+    assert out[0].severity == "warning"
+    assert out[0].dispatch_args == ["gmail-auth", "work"]
+
+
+def test_account_auths_gmail_detected_via_reader_subblock(fake_vault, monkeypatch):
+    """Alternative shape: reader.kind=gmail-api (mailbox itself is
+    Gmail API), no separate filter. Same gmail-token needed."""
+    class _Personal:
+        accounts = {"work": {"reader": {"kind": "gmail-api"}}}
+    class _CONFIG: personal = _Personal()
+    monkeypatch.setitem(__import__("sys").modules, "core.config",
+                        type("M", (), {"CONFIG": _CONFIG})())
+    state = fake_vault / ".wiki" / "state"
+    monkeypatch.setattr(health, "STATE_DIR", state)
+
+    out = health.check_account_auths()
+    assert len(out) == 1
+    assert out[0].id == "account-auth-work-gmail"
+
+
+def test_account_auths_ignores_non_oauth_integrations(fake_vault, monkeypatch):
+    """jamie-api uses an api key (env var), not OAuth — no token cache
+    to probe. thunderbird-mbox + imap don't need OAuth either. The
+    check must skip them silently rather than emit confusing warnings."""
+    class _Personal:
+        accounts = {
+            "kasserver": {
+                "reader": {"kind": "thunderbird-mbox"},
+                "filter": {"kind": "all-inkl-procmail"},
+            },
+            "default": {"jamie": {"kind": "jamie-api"}},
+        }
+    class _CONFIG: personal = _Personal()
+    monkeypatch.setitem(__import__("sys").modules, "core.config",
+                        type("M", (), {"CONFIG": _CONFIG})())
+    state = fake_vault / ".wiki" / "state"
+    monkeypatch.setattr(health, "STATE_DIR", state)
+
+    out = health.check_account_auths()
+    assert out == []
+
+
+def test_build_health_flattens_multi_result_checks(fake_vault, monkeypatch):
+    """The orchestrator must handle list-returning probes by extending
+    the results, not appending the list as a nested value."""
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "x")  # noise; force claude ok
+
+    class _Personal:
+        accounts = {"a": {"calendar": {"kind": "google-calendar"}}}
+    class _CONFIG: personal = _Personal()
+    monkeypatch.setitem(__import__("sys").modules, "core.config",
+                        type("M", (), {"CONFIG": _CONFIG})())
+    state = fake_vault / ".wiki" / "state"
+    monkeypatch.setattr(health, "STATE_DIR", state)
+
+    results = health.build_health(quick=True)
+    # Every entry must be a CheckResult, never a nested list.
+    for r in results:
+        assert isinstance(r, health.CheckResult), f"non-CheckResult in results: {r!r}"
+    account_results = [r for r in results if r.id.startswith("account-auth-")]
+    assert len(account_results) == 1

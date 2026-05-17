@@ -36,6 +36,7 @@ from core.paths import (
     KNOWLEDGE_DIR,
     LOGS_DIR,
     ROOT_DIR,
+    STATE_DIR,
     STATE_FILE,
     WIKI_DIR,
 )
@@ -472,14 +473,115 @@ def check_compile_state() -> CheckResult:
         return _probe_failed("compile-state", "pipeline", exc)
 
 
+
+def check_account_auths(*, quick: bool = False) -> list[CheckResult]:
+    """One CheckResult per (account, OAuth-integration) pair declared
+    under `personal.accounts.<id>.<block>`.
+
+    Probes for the token cache in `STATE_DIR/<kind>-token-<account-id>.json`.
+    Missing token → severity=warning with `dispatch_args=["<kind>-auth",
+    "<account-id>"]` so the home-screen banner can run the OAuth bootstrap
+    in one keystroke. Token present → severity=ok.
+
+    Three integrations covered today (matches the engine's `<kind>-auth`
+    bootstrap commands + `state/<kind>-token-<id>.json` convention):
+
+        block_key       expected `kind`        token prefix       auth cmd
+        ──────────      ────────────────────   ───────────────    ───────────────
+        calendar        google-calendar        calendar-token-    calendar-auth
+        gmeet           gmeet-api              gmeet-token-       gmeet-auth
+        reader (sub)    gmail-api              gmail-token-       gmail-auth
+
+    Quick mode is a no-op cost-wise (file-existence probes are sub-ms);
+    kept as a kwarg for protocol parity with the other gated checks.
+
+    Returns an empty list when `personal.accounts` is unset / empty —
+    multi-tenant story preserved (no account = no auth checks to run).
+    """
+    try:
+        from core.config import CONFIG
+
+        accounts = getattr(CONFIG.personal, "accounts", None) or {}
+        # block_key, expected_kind, token_prefix, auth_cmd
+        oauth_integrations = [
+            ("calendar", "google-calendar", "calendar-token-", "calendar-auth"),
+            ("gmeet",    "gmeet-api",       "gmeet-token-",    "gmeet-auth"),
+        ]
+        results: list[CheckResult] = []
+        for account_id, account_data in accounts.items():
+            if not isinstance(account_data, dict):
+                continue
+            for block_key, expected_kind, token_prefix, auth_cmd in oauth_integrations:
+                block = account_data.get(block_key)
+                if not isinstance(block, dict) or block.get("kind") != expected_kind:
+                    continue
+                results.append(_check_one_token(
+                    account_id, block_key, token_prefix, auth_cmd,
+                ))
+            # gmail is special: the `gmail-token-<id>.json` cache is
+            # consumed by EITHER the reader (mailbox adapter; reads
+            # messages via Gmail REST API) OR the filter (suggestions
+            # backend; pushes label/move actions via Gmail REST API).
+            # An account that declares `kind: gmail-api` on either
+            # sub-block needs the OAuth token bootstrapped once.
+            reader = account_data.get("reader") or {}
+            filt = account_data.get("filter") or {}
+            uses_gmail_api = (
+                reader.get("kind") == "gmail-api"
+                or filt.get("kind") == "gmail-api"
+            )
+            if uses_gmail_api:
+                results.append(_check_one_token(
+                    account_id, "gmail", "gmail-token-", "gmail-auth",
+                ))
+        return results
+    except Exception as exc:
+        return [_probe_failed("account-auths", "connectivity", exc)]
+
+
+def _check_one_token(
+    account_id: str, kind_label: str, token_prefix: str, auth_cmd: str,
+) -> CheckResult:
+    """Per-account-integration token-presence probe. Caller is the
+    iterator in `check_account_auths`; not registered as a standalone
+    check (would require knowing which accounts exist at registration time)."""
+    token_file = STATE_DIR / f"{token_prefix}{account_id}.json"
+    check_id = f"account-auth-{account_id}-{kind_label}"
+    if token_file.exists():
+        return CheckResult(
+            id=check_id,
+            category="connectivity",
+            severity="ok",
+            message=f"{kind_label} OAuth ready for account `{account_id}`",
+            details={"account": account_id, "kind": kind_label,
+                     "token_path": str(token_file)},
+        )
+    return CheckResult(
+        id=check_id,
+        category="connectivity",
+        severity="warning",
+        message=f"{kind_label} OAuth not bootstrapped for account "
+                f"`{account_id}` — the {kind_label} collector will skip it",
+        fix=f"wiki {auth_cmd} {account_id}",
+        dispatch_args=[auth_cmd, account_id],
+        details={"account": account_id, "kind": kind_label,
+                 "expected_token": str(token_file)},
+    )
+
+
 # ── Orchestration ───────────────────────────────────────────────────
 
 
-_ALL_CHECKS: list[Callable[..., CheckResult]] = [
+# Checks return either a single CheckResult or a list[CheckResult]
+# (for multi-result probes like per-account auth — one CheckResult per
+# account-integration pair, count knowable only at probe time).
+# `build_health` flattens both cases into a single list.
+_ALL_CHECKS: list[Callable[..., CheckResult | list[CheckResult]]] = [
     check_setup_run,
     check_hooks_installed,
     check_ollama_reachable,
     check_claude_authed,
+    check_account_auths,
     check_compile_errors_recent,
     check_template_drift,
     check_no_knowledge_articles,
@@ -488,7 +590,13 @@ _ALL_CHECKS: list[Callable[..., CheckResult]] = [
 
 
 def build_health(*, quick: bool = False) -> list[CheckResult]:
-    """Run every check, return results sorted by severity (criticals first)."""
+    """Run every check, return results sorted by severity (criticals first).
+
+    Per-check return type is `CheckResult | list[CheckResult]`. Single
+    results are appended; lists are extended. Multi-result probes
+    (e.g. per-account auth: N accounts × M integrations) handle their
+    own iteration internally.
+    """
     results: list[CheckResult] = []
     for fn in _ALL_CHECKS:
         try:
@@ -496,9 +604,13 @@ def build_health(*, quick: bool = False) -> list[CheckResult]:
             from inspect import signature
 
             if "quick" in signature(fn).parameters:
-                results.append(fn(quick=quick))
+                produced = fn(quick=quick)
             else:
-                results.append(fn())
+                produced = fn()
+            if isinstance(produced, list):
+                results.extend(produced)
+            else:
+                results.append(produced)
         except Exception as exc:
             results.append(_probe_failed(fn.__name__, "unknown", exc))
     results.sort(key=lambda r: (SEVERITY_ORDER.get(r.severity, 99), r.id))
