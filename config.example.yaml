@@ -346,6 +346,12 @@ features:
   clippings_sweep: true
   # M011 master switch — default OFF; flip on after dogfooding.
   extract_takes: false
+  # Source-glob allowlist for the suggestions post-pass (Producer-seam arc).
+  # fnmatch patterns matched against source paths relative to ROOT_DIR.
+  # Default mirrors the legacy hardcoded `_is_email_source` filter; widen to
+  # enable suggestions for other substrates.
+  suggestions_source_globs:
+    - "raw/email/*.md"
 
 graph_view:
   # Mode: knowledge-only | full-vault | sources-only | custom

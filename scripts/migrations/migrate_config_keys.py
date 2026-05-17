@@ -50,6 +50,7 @@ Key changes covered (chronological):
   limits.dream_tier1_recent_count          (added 2026-05-17 M016, default 20 — Tier 1 most-recent substrate count)
   limits.dream_tier1_digest_days           (added 2026-05-17 M016, default 7 — Tier 1 daily-digest day count)
   limits.dream_tier2_sample_count          (added 2026-05-17 M016, default 50 — Tier 2 weighted-sample size)
+  features.suggestions_source_globs        (added 2026-05-17 Producer-seam, default ["raw/email/*.md"] — lifts legacy hardcoded _is_email_source filter onto Spec)
 
 Idempotent: a config already on the current schema produces no change.
 
@@ -202,6 +203,11 @@ KEY_ADDITIONS: dict[str, dict[str, object]] = {
         # your dictation tool already punctuates or you want to skip
         # the extra LLM call.
         "voice_punctuate": True,
+        # 2026-05-17 Producer-seam arc. Source-glob allowlist for the
+        # suggestions post-pass. Default mirrors the legacy hardcoded
+        # `_is_email_source` filter; widening the list enables suggestions
+        # for additional substrates without code changes.
+        "suggestions_source_globs": ["raw/email/*.md"],
     },
     "piggybacks": {
         # M006 calendar collector — mirrors gmeet / jamie 6 h cadence.

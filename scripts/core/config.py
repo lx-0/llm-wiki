@@ -460,6 +460,14 @@ class Features:
     # M011 takes substrate. Default OFF — flip True after dogfooding.
     # Cost: +1 SDK call per gated compile (Claude, no Ollama fallback).
     extract_takes: bool = False
+    # Source-glob allowlist for the suggestions post-pass. fnmatch patterns
+    # matched against source paths relative to ROOT_DIR. Default mirrors the
+    # legacy hardcoded `_is_email_source` filter; widen the list to enable
+    # suggestions for other substrates (e.g. raw/transcripts/*). Evaluated by
+    # producers.orchestrate at compile time (Producer-seam arc, S03).
+    suggestions_source_globs: list[str] = field(default_factory=lambda: [
+        "raw/email/*.md",
+    ])
     # Pre-process voice transcripts through the local classify_model (Ollama)
     # to add punctuation, sentence-case, and German-noun capitalization. The
     # raw transcript is preserved verbatim under `raw_transcript:` in the
