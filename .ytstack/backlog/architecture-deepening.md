@@ -12,6 +12,8 @@ Vocabulary: domain terms from `CONTEXT.md`, architecture terms from improve-code
 - **4 new:** #14 Producer seam, #15 Dashboard consolidation, #16 dream.py phase extraction, #17 rename `_LEGACY_PIGGYBACK_COMMANDS`.
 - **1 graduated MEDIUM → HIGH:** #3 Model seam (was 2 LLM call sites in 2026-05-02 → 7+ today).
 - **Active design grilled out:** **#14 (Producer seam) + #5 (compile.py orchestration)** were grilled into a two-milestone arc; design lives in `.ytstack/backlog/producer-seam.md`. Pick up there at next `ytstack:plan-milestone`.
+- **Shipped 2026-05-17:** #14 (Producer seam, Milestone-A) ✓ + #5 (compile.py orchestration, M018) ✓ — see `project-producer-seam-arc-shipped` memory. M018-S03 commit_article cancelled (re-architecture not extraction; deferred in `.ytstack/backlog/commit-article-manifest.md`).
+- **Next ready:** #3 (Model seam, **M021**) — planned, not started. CONTEXT + ROADMAP at `.ytstack/M021-{CONTEXT,ROADMAP}.md`. 5 open questions parked; close Q1+Q4 before slice-milestone.
 
 ---
 
@@ -48,7 +50,13 @@ The old circular import (`config.py` ↔ `wiki_config.py` for `TIMEZONE`) is eli
 
 ---
 
-## #3 — Model seam (HIGH — graduated from MEDIUM 2026-05-17)
+## #3 — Model seam (HIGH — planned as M021 2026-05-17)
+
+**Status:** Planned via `ytstack:plan-milestone` 2026-05-17 as **M021** (L-sized, 5 slices). CONTEXT + ROADMAP at `.ytstack/M021-{CONTEXT,ROADMAP}.md`. 5 open questions parked in M021-CONTEXT.md (module location, schema shape, FailureClass unification, cost shape, migration order); Q1+Q4 close before S01, Q3 before S02, Q2+Q5 before S03. **Not started.** Sequenced after Producer-seam Phase 1 ✓ + M018 ✓.
+
+---
+
+(Original entry from refresh:)
 
 **Files:** `core/sdk_helpers.py` (258), `core/ollama_client.py` (160); 7+ LLM call sites today: `compile.py`, `curiosity/producer.py`, `suggestions/producer.py`, `facts/takes_producer.py`, `review-wiki.py`, `ingest-html.py`, `scan_screenshots.py`, `scan_youtube.py`, `pictures.py`, `voice.py`.
 
