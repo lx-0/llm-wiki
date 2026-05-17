@@ -153,6 +153,35 @@ def _render_per_instrument_timelines(
     return out
 
 
+def _load_item_meta(slug: str, version: str) -> dict[str, dict]:
+    """Load items.yaml for one instrument-version and return
+    {item_id: {text, reverse_coded, substrate_inferable, subscale}}.
+    Empty dict if not found. Used for radar-axis legends in the
+    meta-report.
+    """
+    engine_root = Path(__file__).resolve().parent.parent  # _engine/
+    items_path = engine_root / "instruments" / slug / f"v{version}" / "items.yaml"
+    if not items_path.is_file():
+        return {}
+    try:
+        raw = yaml.safe_load(items_path.read_text(encoding="utf-8"))
+    except yaml.YAMLError:
+        return {}
+    if not isinstance(raw, list):
+        return {}
+    out: dict[str, dict] = {}
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        out[str(item.get("id"))] = {
+            "text": str(item.get("text", "")),
+            "reverse_coded": bool(item.get("reverse_coded", False)),
+            "substrate_inferable": bool(item.get("substrate_inferable", True)),
+            "subscale": item.get("subscale"),
+        }
+    return out
+
+
 def _per_item_likert_hi(snap: InstrumentSnapshot) -> int:
     """Best-effort likert.hi recovery: max_total / total_items. Works
     for instruments where every item has the same scale (current wedge
@@ -352,6 +381,34 @@ def render_summary(
                          f"vertex distance from center = item's normalised value "
                          f"(0..1). Dashed overlay = previous run when available.\n")
             lines.append(f"![{key} per-item radar]({rel})\n")
+            # Axis legend — operator-readable mapping of item-id → text.
+            # Latest snapshot drives instrument version; for OLDER runs
+            # the version may differ but legend semantics are the same.
+            latest_snap = (
+                latest.instruments.get(key) if latest else None
+            )
+            if latest_snap and latest_snap.version:
+                item_meta = _load_item_meta(latest_snap.slug, latest_snap.version)
+                if item_meta:
+                    lines.append("<details><summary>Axis legend — what each item asks</summary>\n")
+                    lines.append("| ID | Item | Reverse | Inferable | Subscale |")
+                    lines.append("|---|---|---|---|---|")
+                    # Sort by id (numeric where possible, fall back lexical)
+                    def _sort_key(iid):
+                        try:
+                            return (0, int(iid))
+                        except (ValueError, TypeError):
+                            return (1, str(iid))
+                    for iid in sorted(item_meta.keys(), key=_sort_key):
+                        m = item_meta[iid]
+                        text_short = m["text"].replace("|", "·")
+                        if len(text_short) > 90:
+                            text_short = text_short[:87] + "…"
+                        rev = "↩︎" if m["reverse_coded"] else ""
+                        inf = "yes" if m["substrate_inferable"] else "no"
+                        sub = m["subscale"] or ""
+                        lines.append(f"| {iid} | {text_short} | {rev} | {inf} | {sub} |")
+                    lines.append("\n</details>\n")
         # Run-over-run timeline (activates from run 2)
         if key in per_inst_timelines:
             rel = per_inst_timelines[key].relative_to(summary_path.parent)
