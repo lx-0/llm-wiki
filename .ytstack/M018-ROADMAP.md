@@ -3,9 +3,9 @@ milestone: M018
 project: llm-wiki
 size: L
 created: 2026-05-17T12:45:00Z
-status: planned
+status: done
 total_slices: 2
-completed_slices: 1
+completed_slices: 2
 ---
 
 # M018 Roadmap
@@ -26,7 +26,7 @@ completed_slices: 1
 - [~] S01 -- ~~Fixture vault for regression check~~ — CANCELLED 2026-05-17 (LLM non-determinism; byte-identical diff is flaky-by-design)
 - [x] S02 -- Extract `compile_source()` — SHIPPED 2026-05-17 (commits `3cd57bf` types, `b4f6c7b` extraction, `44a5dad` rewire, `5fa2aae` failure_detail fix)
 - [~] S03 -- ~~Extract `commit_article()`~~ — CANCELLED 2026-05-17 (premise-broken: knowledge/-writes are agent-side via SDK tool-use, not in Python; full rationale in M018-CONTEXT.md + S03-PLAN.md cancellation block; deferred concept in `.ytstack/backlog/commit-article-manifest.md`)
-- [ ] S04 -- Lift post-passes via `run_post_passes()` consuming ProducerRegistry.
+- [x] S04 -- Lift post-passes via `run_post_passes()` consuming ProducerRegistry. SHIPPED 2026-05-17 (post_passes.py + 4 tests in commit `a013ccb`; compile.py wire-up in T04 commit).
 - [~] S05 -- ~~(was post-pass lift)~~ — CANCELLED 2026-05-17 (folded into S04)
 - [~] S06 -- ~~Regression + closeout via fixture-vault comparison~~ — CANCELLED 2026-05-17 (depended on S01)
 

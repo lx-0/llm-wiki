@@ -88,6 +88,8 @@ Remove the seam → cost guards, retry policy, error classification, and gate ev
 
 ## Milestone-B — compile.py orchestration
 
+**SHIPPED 2026-05-17** as M018. S02 (`compile_source()` extraction) + S04 (`run_post_passes()` lift) landed; S01 (fixture vault), S03 (`commit_article` — re-architecture not extraction), S05+S06 cancelled. See memory `project_m018_shipped` + `.ytstack/M018-ROADMAP.md` (`status: done`). The deferred `commit_article` work is now its own backlog item at `.ytstack/backlog/commit-article-manifest.md`.
+
 Detailed grilling deferred. Skeleton decisions:
 
 ### Three pure stages (as originally planned)

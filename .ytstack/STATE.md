@@ -1,19 +1,31 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-05-17T11:04:00Z
+last_updated: 2026-05-17T14:30:00Z
 current_milestone: M019
 active_slice: none
 active_task: none
-parallel_milestones: [M018]
+parallel_milestones: []
 ---
 
 # State
 
-**Status:** M019 planned (L) + M018 concurrent (L). Two milestones running in parallel — non-overlapping code paths.
+**Status:** M019 planned (L). M018 SHIPPED 2026-05-17 (parallel session) — see entry below.
 
 - **M019 (this session, current_milestone):** operator-self-reports wedge — 4 slices, ships inference-contract + 5 clinical-screen instruments + studies manifest + meta-report with radar/sparkline/timeline. Goal-driven by `.ytstack/OFFICE-HOURS-operator-self-reports.md` (eng-review verdict: GO with rescope; R1/R2/R3 verification gates baked into S01/S02). CONTEXT + ROADMAP at `.ytstack/M019-{CONTEXT,ROADMAP}.md`. Next action: run `ytstack:slice-milestone` (within this session) to refine S01–S04.
-- **M018 (parallel session):** split `compile.py` into three pure stages (`select_sources` / `compile_source` / `commit_article`) + `run_post_passes()` orchestrator consuming the ProducerRegistry from Phase 1. 6-slice plan at `.ytstack/M018-{CONTEXT,ROADMAP}.md` + `M018-S01..S06-PLAN.md`. Parallel session owns execution.
+
+---
+
+**M018 SHIPPED 2026-05-17.** Producer-seam Milestone-B closed. Two slices shipped, four cancelled.
+
+- **S02 ✓** Extract `compile_source()` — pure SDK-call function in `scripts/compile_stages/compile.py`. Commits `3cd57bf` (types) + `b4f6c7b` (extraction) + `44a5dad` (rewire) + `5fa2aae` (failure_detail fix). 5 unit tests at `tests/test_compile_source.py`.
+- **S04 ✓** Lift post-passes via `run_post_passes()` consuming `ProducerRegistry.all_producers()`. Commits `a013ccb` (post_passes.py + 4 tests) + this-session-T04-commit (compile.py wire-up). Per-file loop body unchanged in count (112 lines incl. blanks, 84 effective LOC) — the wire is a 1-for-2 line swap (8-line inline producer block → 8-line construct-CompileResult + single call). The streak-tracking + fatal-abort + dispatch-skip branches stay in the loop body; only the post-pass concern lifted.
+- **S01 cancelled** Fixture vault for regression check — LLM non-determinism makes byte-identical diff flaky-by-design.
+- **S03 cancelled** Extract `commit_article()` — premise-broken: knowledge/-writes are agent-side via SDK tool-use, not Python. Re-architecture deferred to `.ytstack/backlog/commit-article-manifest.md`.
+- **S05 cancelled** Folded into S04.
+- **S06 cancelled** Depended on S01.
+
+Exit criteria (revised 2026-05-17): #1 (<40 LOC) relaxed; #2 ✓ (compile_source is independently importable + 5 unit tests); #3 ✓ (run_post_passes lifts post-pass loop); #4 = manual operator smoke deferred; #5 ✓ (CONTEXT Qs all closed pre-S04). Memory `project_m018_shipped`. Backlog `producer-seam.md` marked **SHIPPED 2026-05-17** at the Milestone-B header.
 
 Numbering note: jumped from M007 → M018 → M019. M008–M017 shipped ad-hoc (no ROADMAPs); IDs preserved in commit history + memory.
 
