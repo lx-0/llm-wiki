@@ -3,14 +3,22 @@ milestone: M018
 slice: S03
 project: llm-wiki
 created: 2026-05-17T12:50:00Z
-status: planned
+status: cancelled
+cancelled_on: 2026-05-17T13:35:00Z
+cancelled_reason: premise-broken — the "write-side logic" doesn't live in Python; the SDK agent owns knowledge/-writes via Write/Edit tools. Extraction would be a re-architecture (strip agent tools + rewrite all substrate prompts to emit a structured manifest + build Python parser/writer). Decision documented in M018-CONTEXT.md; deferred concept in `.ytstack/backlog/commit-article-manifest.md`.
 task_count: 3
 completed_tasks: 0
 ---
 
-# M018-S03 — Slice Plan
+# M018-S03 — Slice Plan (CANCELLED 2026-05-17)
 
-**Goal:** Pure file I/O `commit_article(article, path)` lives in `scripts/compile_stages/commit.py` and owns frontmatter merge + atomic write to `knowledge/<bucket>/` + index.md append + `compiled_from:` provenance.
+**Goal:** ~~Pure file I/O `commit_article(article, path)` lives in `scripts/compile_stages/commit.py` and owns frontmatter merge + atomic write to `knowledge/<bucket>/` + index.md append + `compiled_from:` provenance.~~
+
+**Cancellation rationale (subagent-discovered during T01 read):** the legacy `compile.py` does NOT contain the write logic this slice purported to extract. The SDK agent does all `knowledge/` writes inline via `Write(knowledge/**)` + `Edit(knowledge/**)` allowed_tools (legacy branch) or the `can_use_tool` path-scope callback (`d8a0de5`, new branch). Frontmatter merge, `## State` / `## Timeline` discipline (M005), `compiled_from:` provenance, `knowledge/index.md` row updates, and cross-article multi-file updates per compile — all prompt-encoded, all agent-executed. Python only writes for the `source-and-final` index-only branch (compile.py:528-569).
+
+Pursuing this slice would require: (1) strip Write/Edit from compile_source's allowed_tools, (2) rewrite every substrate prompt (compile_main, compile_daily, compile_calendar, compile_health, compile_screenshots, compile_pictures, compile_memories, compile_default) to emit a structured article body or multi-file manifest as final response, (3) build a Python parser + writer that consumes that manifest, (4) preserve the rich agent-side multi-file capability via a `CompileResult.outputs: dict[Path, FileOp]` contract change. That is a re-architecture, not an extraction.
+
+The cheaper honest call: M018 reduces to S02 (✓ shipped) + S04 (post-pass lift). Future re-opening requires a fresh milestone with explicit "manifest emitter + Python writer" scope.
 
 ## Tasks
 

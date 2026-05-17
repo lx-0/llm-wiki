@@ -90,11 +90,25 @@ Remove the seam → cost guards, retry policy, error classification, and gate ev
 
 Detailed grilling deferred. Skeleton decisions:
 
-### Three pure stages
+### Three pure stages (as originally planned)
 
 - `select_sources(criteria) → list[Path]` — pure I/O (mtime / hash-skip / role-axis filter / dry-run). No LLM.
 - `compile_source(content: str, metadata: dict) → CompileResult` — pure LLM call. Owns: prompt assembly, owner-block injection, pre-flight 60kb gate, kind-unknown retry, SDK call, failure classification. No file ops, no state I/O.
 - `commit_article(article: CompileResult, path: Path) → None` — pure I/O. Writes to `knowledge/<bucket>/`, updates frontmatter, atomic-replace.
+
+### Correction (2026-05-17, post-execution) — `commit_article` is not an extraction
+
+The "pure I/O `commit_article`" shape above was written without auditing whether the legacy code actually executes the writes Python-side. **It does not.** The SDK agent does all `knowledge/` writes inline via `Write(knowledge/**)` / `Edit(knowledge/**)` allowed_tools (or via the path-scope `can_use_tool` callback in the post-`d8a0de5` branch). Frontmatter merge, `## State` overwrite + `## Timeline` append (M005), `compiled_from:` provenance, cross-article multi-file updates per compile — all prompt-encoded, all agent-executed. Python's only knowledge/ write today is the `source-and-final` index-only branch.
+
+A real `commit_article(article, path)` Python function would require:
+1. Strip Write/Edit from `compile_source`'s allowed_tools.
+2. Rewrite every substrate prompt (compile_main, compile_daily, compile_calendar, compile_health, compile_screenshots, compile_pictures, compile_memories, compile_default) to emit a structured article body — OR a multi-file manifest — as final response, not as inline tool-use side effects.
+3. Build a Python parser + writer that consumes the manifest.
+4. Preserve the rich multi-file capability via `CompileResult.outputs: dict[Path, FileOp]` (the single-target shape above doesn't survive).
+
+That is a **re-architecture**, not an extraction. M018-S03 was cancelled 2026-05-17 on this finding; the deferred concept lives in `.ytstack/backlog/commit-article-manifest.md`.
+
+**Net effect on Milestone-B:** S01 fixture-vault dropped (LLM non-determinism), S03 commit_article dropped (re-architecture), S05+S06 collapsed. M018 shipped as S02 (compile_source extraction, ✓) + S04 (post-pass lift). Future re-opening of the write-side architecture needs a fresh milestone with explicit "manifest emitter + Python writer" scope.
 
 ### Orchestrator
 
