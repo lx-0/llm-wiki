@@ -186,6 +186,20 @@ The mechanics:
 
 LLM-emission quality cannot be CI-tested. The plumbing (prompt rules + lint + fixtures) is CI-covered; real extraction quality lives in `docs/m005-s03-canary-procedure.md` — three canaries (synthetic fixture → live jamie → live gmeet) with grep verification and pass/fail/caveat decisions.
 
+## Operator self-reports (analytical surface)
+
+The knowledge wiki captures what the operator **knows** and **owes**. A separate analytical surface — `<vault>/reports/` — captures what the substrate **shows** about the operator: validated psychometric screens (PHQ-9 depression, GAD-7 anxiety, WHO-5 wellbeing, PSS-10 stress, ISI insomnia, OLBI burnout — plus K6 + ASRS-v1.1 available off-manifest) scored by an informant agent reading the operator's own daily / raw / health substrate. Self-cartography: turn the substrate into a longitudinal portrait.
+
+**The key inversion.** These are not self-administered questionnaires. They are **Informant Reports** — an outside observer (the LLM) reads what the operator wrote, did, and felt across the lookback window, then answers the validated instrument's items on the operator's behalf. Items the substrate cannot answer (interior states with no behavioural fingerprint, e.g. PHQ-9 Q9 suicidal ideation) carry `substrate_inferable: false` and can only be filled in by the operator via `wiki study answer`. The LLM never guesses them.
+
+**Why this is not the compile pipeline.** The reports surface is structurally air-gapped: engine code lives under `scripts/reports/_engine/` (not `scripts/`), output lives in `<vault>/reports/` (not `knowledge/`), and `COMPILE_SUBSTRATE_EXCLUDED_PREFIXES` keeps `reports/` invisible to `compile.py`. Reports are not knowledge — they are measurements of the knowledge-producing operator. Mixing them would corrupt both.
+
+**Determinism + LLM blended.** Scoring is pure-Python (Likert + reverse-coding + cutoffs from published norms). The LLM is restricted to filling in raw item answers from substrate evidence. Each per-instrument report includes the instrument source, the citation, the scoring formula, the substrate sources used, and the coverage percentage (Q6 future-fit posture — every report is self-explaining).
+
+**Two-pass analyst.** Pass-1 fires inside `wiki study run` after the run succeeds: a Read+Grep-scope-locked agent writes `_analysis.md` next to `_summary.md` in the same run dir. Pass-2 runs on demand via `wiki analyze`: synthesises across all studies into `reports/analyses/<UTC-ts>.md`. Both passes use the same scope-lock pattern as inference (`make_path_scope_gate([])` — no writes anywhere).
+
+**Charts.** Cross-instrument radar, coverage sparkline, per-instrument item-level radar with axis legend, per-instrument timeline — all pure-Python SVG (no matplotlib), embedded side-by-side via HTML flex in `_summary.md`. Stale charts auto-prune when an instrument is dropped from the manifest.
+
 ## Design rationale
 
 See [.ytstack/KNOWLEDGE.md](../.ytstack/KNOWLEDGE.md) for the hard-won learnings: Ollama gotchas, rate-limit debugging, why Karpathy/Cole's flush-context pattern is wrong for agentic workflows, why we use file-per-memory instead of bundles, why SMB beats SSH for NAS access.

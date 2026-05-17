@@ -108,6 +108,22 @@ Lint check inventory (in execution order in `lint.py`):
 | CLAUDE.md optimizer | 🟢 | `scripts/optimize-claude-md.py` | `uv run python scripts/optimize-claude-md.py`; piggyback `piggybacks.optimize_claude_md` (24h cooldown) | PROCESS §9 |
 | Wiki review (per-article quality) | 🟢 | `scripts/review-wiki.py` | `wiki review-wiki`; piggyback `piggybacks.review_wiki` (168h / weekly) | PROCESS §6 |
 
+## Analytical surface — operator self-reports
+
+Air-gapped psychometric layer. Validated clinical screens (PHQ-9 / GAD-7 / WHO-5 / PSS-10 / ISI / OLBI on the live manifest, plus K6 + ASRS-v1.1 available off-manifest) scored by an informant agent reading the operator's own substrate. Engine lives under `scripts/reports/_engine/` and is structurally excluded from compile via `COMPILE_SUBSTRATE_EXCLUDED_PREFIXES`.
+
+| Feature | Status | Code | Trigger | Docs |
+|---|---|---|---|---|
+| Study runner — per-instrument inference + scoring | 🟢 | `scripts/reports/_engine/runner.py:run_inference`, `scripts/reports/_engine/lib/inference.py` | `wiki study run <study-id> [--instrument SLUG]`; per-study fcntl-lock on `state/study-<id>.lock`; 3-attempt SDK retry with (5s, 30s) backoffs | cli.md "Operator self-reports", templates/AGENTS.example.md |
+| Instrument loader + Likert scorer | 🟢 | `scripts/reports/_engine/instrument.py`, `scripts/reports/_engine/score.py` | Pure-Python deterministic; reverse-coding + cutoffs from `instruments/<slug>/v<x>/{instrument,items,cutoffs}.yaml` | tests/reports/test_instrument_validity.py pins published clinical thresholds |
+| Operator-input override (`operator_answers.yaml`) | 🟢 | `scripts/study.py:cmd_answer`, `runner.py:_load_operator_answers` | `wiki study answer <study> <instrument> <item-id> <value> [--note "…"]`; operator answers excluded from SDK prompt, take precedence at scoring | Only legal path for `substrate_inferable: false` items (PHQ-9 Q9 suicidal ideation never auto-inferred) |
+| Per-instrument model override | 🟢 | `runner.py:_read_inference_config().get('model')` → `infer_batch(model=…)` | `inference.model:` key in `instrument.yaml` overrides `DEFAULT_INFERENCE_MODEL` (claude-haiku-4-5). Currently set on ISI → claude-sonnet-4-6 (unverified — Haiku scored 57% in one run, so the "deterministic-0%" premise is open) | — |
+| Pass-1 per-study analyst | 🟢 | `scripts/reports/_engine/lib/analyst.py`, `prompts/reports/analyst_per_study.md` | Auto-fires inside `wiki study run` after the run succeeds; writes `runs/<ts>/_analysis.md`. Scope-locked Read+Grep only (same `make_path_scope_gate([])` pattern as inference) | cli.md, templates/AGENTS.example.md |
+| Pass-2 cross-study synthesis | 🟢 | `prompts/reports/analyst_cross_study.md`, `scripts/analyze.py` | `wiki analyze` (P1 fresh-run + P2) / `wiki analyze --study <id>` (P1 only) / `wiki analyze --cross-study-only` (P2 only). Output: `reports/analyses/<UTC-ts>.md` | cli.md |
+| Cross-instrument meta-report (radar + sparkline + per-instrument item-radar + timelines) | 🟢 | `scripts/reports/_engine/lib/render_summary.py`, `lib/charts.py` (pure-Python SVG, no matplotlib) | Auto-rendered per run into `runs/<ts>/charts/*.svg` + side-by-side flex-layout block in `_summary.md` | overview.png pills + architecture.png M19 block |
+| Backfill per-item from body table | 🟢 | `scripts/reports/_engine/backfill_per_item.py` | `uv run python scripts/reports/_engine/backfill_per_item.py --study-dir <path> [--rerender-summary]`. Re-parses pre-2026-05-17T16-14 reports' body `## Items` table, applies reverse-coding, writes `per_item:` into frontmatter, trims timeline to runs ≤ self when re-rendering | — |
+| Schedule-driven runs (manual / daily / weekly / monthly / quarterly) | 🟢 | `manifest.yaml:schedule` field, study state-driven | Operator invokes `wiki study run` (today manual; piggyback hookup planned). Schedule semantics documented in `templates/reports/studies/longitudinal-baseline/manifest.yaml`. Currently daily for tweaking; week-1 review 2026-05-24 decides daily→weekly flip | `.ytstack/backlog/m019-week-1-review.md` |
+
 ## Vault UX layer
 
 | Feature | Status | Code | Trigger | Docs |

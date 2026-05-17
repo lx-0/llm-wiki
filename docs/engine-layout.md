@@ -84,6 +84,20 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 │   │   ├── dashboard_lint.py      ← _dashboard-lint.md generator
 │   │   ├── agent_buttons.py       ← agent-button discovery + dashboard.md rewriter
 │   │   └── inject_daily_button.py ← idempotent Summarize-button injection into daily/<date>/sessions.md
+│   ├── reports/_engine/       ← operator-self-reports surface (air-gapped from compile)
+│   │   ├── runner.py              ← `run_inference()` — substrate-scope resolve + batched SDK calls + persist `runs/<ts>/instruments/<slug>.md`
+│   │   ├── instrument.py          ← yaml loader for `instruments/<slug>/v<x>/{instrument,items,cutoffs}.yaml`
+│   │   ├── score.py               ← deterministic Likert + reverse-coding + band lookup
+│   │   ├── backfill_per_item.py   ← one-shot: re-parse pre-2026-05-17T16-14 reports' body `## Items` table → frontmatter `per_item:`
+│   │   ├── lib/inference.py       ← `infer_batch_async` SDK wrapper (3-attempt retry + scope-lock + StderrCapture)
+│   │   ├── lib/analyst.py         ← Pass-1 / Pass-2 analyst SDK wrapper (Read+Grep scope-locked)
+│   │   ├── lib/render_summary.py  ← cross-instrument meta-report (radar + sparkline + per-instrument item-radar + timelines)
+│   │   ├── lib/charts.py          ← pure-Python SVG renderers (no matplotlib)
+│   │   ├── lib/timeline.py        ← cross-run aggregator → `Timeline` of `RunSnapshot[InstrumentSnapshot]`
+│   │   ├── lib/{cutoffs,likert,verify_report}.py  ← scoring + band-lookup + post-write integrity check
+│   │   └── instruments/<slug>/v<x>/  ← curated instrument definitions (currently 8: phq-9, gad-7, who-5, k6, asrs-v1.1, pss-10, isi, olbi; 6 on the live longitudinal-baseline manifest)
+│   ├── study.py               ← `wiki study list / run / new / answer` CLI (drives `scripts/reports/_engine/runner.py`)
+│   ├── analyze.py             ← `wiki analyze` CLI — Pass-1 per-study + Pass-2 cross-study synthesis
 │   ├── migrations/            ← one-shot schema/data migrations
 │   │   └── migrate_add_type.py    ← backfill type: frontmatter
 │   ├── compile.py             ← Claude Agent SDK compiler (raw/ + daily/<date>/* + daily/<date>.md → knowledge/); per-file loop delegates the LLM call to `compile_stages/compile.py:compile_source` and the post-pass loop to `compile_stages/post_passes.py:run_post_passes`

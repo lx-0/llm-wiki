@@ -89,6 +89,16 @@ llm-wiki/
 │   │   ├── dashboard_lint.py   ← _dashboard-lint.md generator (post-flush refresh)
 │   │   ├── agent_buttons.py    ← agent-button discovery + dashboard.md rewriter
 │   │   └── inject_daily_button.py ← idempotent Summarize-button injection into daily/*.md
+│   ├── reports/_engine/    ← operator-self-reports surface (air-gapped from compile via COMPILE_SUBSTRATE_EXCLUDED_PREFIXES)
+│   │   ├── runner.py          ← run_inference(): substrate-scope resolve + batched SDK calls + persist runs/<ts>/instruments/<slug>.md
+│   │   ├── instrument.py + score.py ← yaml loader + deterministic Likert / reverse-coding / cutoff band-lookup
+│   │   ├── lib/inference.py   ← infer_batch_async SDK wrapper (3-attempt retry on kind=unknown, scope-locked via make_path_scope_gate([]))
+│   │   ├── lib/analyst.py     ← Pass-1 / Pass-2 analyst SDK wrapper (Read+Grep only)
+│   │   ├── lib/render_summary.py + lib/charts.py ← cross-instrument radar + per-instrument item-radar + timelines (pure-Python SVG)
+│   │   ├── backfill_per_item.py ← one-shot: parse pre-2026-05-17 reports' body `## Items` table → frontmatter `per_item:`
+│   │   └── instruments/<slug>/v<x>/{instrument,items,cutoffs}.yaml ← 8 curated instruments (phq-9, gad-7, who-5, k6, asrs-v1.1, pss-10, isi, olbi)
+│   ├── study.py            ← wiki study list/run/new/answer CLI (drives reports/_engine/runner.py; per-study fcntl-lock; Pass-1 analyst auto-fires after run)
+│   ├── analyze.py          ← wiki analyze CLI (Pass-1 per-study + Pass-2 cross-study synthesis → reports/analyses/<ts>.md)
 │   ├── migrations/         ← one-shot schema/data migrations (not active CLI surface)
 │   ├── adapters/           ← Mailbox Reader/Filter adapters (thunderbird, gmail, imap; allinkl = filter)
 │   ├── domain/             ← pure domain types (mail message, etc.)

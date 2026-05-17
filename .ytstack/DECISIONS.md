@@ -1106,6 +1106,21 @@ The two unfilled criteria (#4 and #8) are **operator-consumption** dependencies,
 
 **M019 STATUS: DONE.**
 
+## 2026-05-17: M019 post-wedge tuning — ISI Sonnet override is provisional, not a fix
+
+**Context:** Within the same M019 dogfooding session, ISI scored 0% coverage three consecutive runs on `claude-haiku-4-5`. Hypothesis: Haiku's confidence-conservatism caps coverage on subjective sleep-severity items even when items 1-3 are Oura-observable. Mitigation shipped: per-instrument `inference.model:` override in `instrument.yaml`, plumbed through `_read_inference_config()` → `infer_batch(model=…)`. ISI set to `claude-sonnet-4-6`.
+
+**Decision:** the override mechanism stays (general infrastructure — useful for any future instrument where the default model under-performs). The specific ISI → Sonnet assignment is provisional and **not** a verified fix.
+
+**Why provisional:** run-7 (executed the same session, before the override was actually live) showed ISI Haiku scoring 4/7 = 57% coverage. That single data point undermines the "deterministic-0%" premise the override was built on. The earlier 0% streak might have been variance, not Haiku-conservatism.
+
+**Verification path:** observe the next 2-3 ISI runs (now actually using Sonnet). Decision tree:
+- Sonnet ≥ Haiku-variance ceiling AND coverage stable → keep override, mark closed.
+- Sonnet ≈ Haiku variance OR Sonnet worse → revert override (Haiku is cheaper, fewer 1M-context CLI quirks).
+- Haiku still hits 0% on some runs but Sonnet stable → keep override as floor-raiser.
+
+**How to apply:** never quote the override as a "Haiku-conservatism fix" until the 2-3 follow-up runs land. In the 2026-05-24 week-1 review, surface this as one of the explicit decision points.
+
 ## 2026-05-17: M022 two-zone intake — `raw/inbox-<channel>/` audit vs `raw/<category>/` substrate
 
 **Context:** Pre-M022, three intake paths had inconsistent original-disposition: `process-inbox.py` UNLINKED HTML originals after `ingest-html.py` succeeded (silent data loss path); md/txt drops moved AS the substrate into `raw/<cat>/` (no audit copy); audio/pdf routed to `raw/audio/`/`raw/papers/` with no derived artifact. Mobile collectors (`voice.py`, `pictures.py`) archived to `<voice_inbox>/.processed/` and `<picture_inbox>/.processed/` — OUTSIDE the vault, in iCloud Drive — invisible to vault sync/git/backup and orphaned from the "Rohdaten sind geil" principle. Operator surfaced the asymmetry 2026-05-17 via screenshot probe.

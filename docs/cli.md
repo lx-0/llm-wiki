@@ -287,6 +287,40 @@ Registered Producers (run order = registration order):
 | `curiosity` | `features.curiosity_loop` | (any source) | `raw/requests/request-<slug>-<date>.json` — knowledge-gap requests (consumed by `wiki curiosity`) |
 | `takes` | `features.extract_takes` | `limits.extract_takes_source_globs` | `knowledge/people/<slug>.md` `## Takes` blocks — third-party beliefs/claims extracted from meeting + email substrate |
 
+### Operator self-reports (analytical surface)
+
+Air-gapped psychometric layer at `<vault>/reports/`. Validated clinical screens (PHQ-9, GAD-7, WHO-5, PSS-10, ISI, OLBI; plus K6 + ASRS-v1.1 available but currently off-manifest) scored by an informant agent reading the operator's own substrate. Deterministic Likert scoring + cutoffs; LLM only fills in raw answers. Engine code under `scripts/reports/_engine/` (lives outside compile pipeline; `COMPILE_SUBSTRATE_EXCLUDED_PREFIXES` enforces the air-gap structurally).
+
+| Command | What it does |
+|---|---|
+| `wiki study list` | enumerate studies under `<vault>/reports/studies/` with schedule + last_run_at + run_count from each `state.json`. |
+| `wiki study run <study-id>` | run all manifested instruments for one study, atomic-write into `runs/<UTC-ts>/`, then auto-fire the Pass-1 per-study analyst (`prompts/reports/analyst_per_study.md`) which writes `_analysis.md` alongside `_summary.md`. Each instrument is one or more batched SDK calls (subscale-batched for ASRS / OLBI), 3-attempt retry on transient kind=unknown with backoffs (5s, 30s). Per-instrument fcntl-lock on `state/study-<id>.lock` prevents concurrent storms. |
+| `wiki study run <study-id> --instrument SLUG` | narrow to one instrument (debug / forced re-run). |
+| `wiki study new <id> [--fork-from OTHER]` | scaffold a new study from `templates/reports/studies/` or clone an existing one. |
+| `wiki study answer <study-id> <instrument-slug> <item-id> <value> [--note "…"]` | operator-supplied answer for one item — written to `<study>/operator_answers.yaml`, takes precedence over inferred answers on the next run, and is excluded from the SDK prompt entirely. The only legal path for items where `substrate_inferable: false` (notably PHQ-9 Q9 suicidal ideation — never auto-inferred). |
+| `wiki analyze` | Pass-1 analyst on every study with a fresh run + Pass-2 cross-study synthesis (`prompts/reports/analyst_cross_study.md`) — output to `<vault>/reports/analyses/<UTC-ts>.md`. |
+| `wiki analyze --study <id>` | Pass-1 only on one study. |
+| `wiki analyze --cross-study-only` | Pass-2 only — synthesise without re-running Pass-1. |
+
+Storage layout for one study (`<vault>/reports/studies/<id>/`):
+
+```text
+manifest.yaml             # immutable spec (schedule, instruments, lookback windows)
+state.json                # last_run_at, run_count
+operator_answers.yaml     # populated by `wiki study answer`
+runs/<UTC-ts>/
+  instruments/<slug>.md   # per-instrument deterministic report (frontmatter:
+                          # total_score, band, coverage_pct, per_item dict, …;
+                          # body: ## Items table, ## Methodology, ## Sources)
+  _summary.md             # cross-instrument meta-report (cross-radar +
+                          # coverage-sparkline + per-instrument timelines &
+                          # per-instrument item-level radars, all SVG)
+  _analysis.md            # Pass-1 analyst commentary (auto-fired after run)
+  charts/*.svg            # pure-Python SVG renderers — no matplotlib
+```
+
+Pass-2 output: `<vault>/reports/analyses/<UTC-ts>.md`. Methodology is embedded in every report (Q6 future-fit posture: each per-instrument report is self-contained — instrument source, citation, scoring formula, cutoffs, substrate sources, coverage percentage).
+
 ### Agentic tasks
 
 | Command | What it does |

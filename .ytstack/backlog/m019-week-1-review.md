@@ -54,6 +54,13 @@ Operator-Entscheidung am 2026-05-24:
   oder Wertproblem?
 - **Analyst-Quality:** Pass-1 outputs lesen — sind die Befunde
   operationally useful, oder repetitiv/generisch?
+- **ISI Sonnet override (provisional):** läuft ISI nach Sonnet-
+  Switch stabiler als Haiku? Pre-switch hatte ISI 0% (3×) auf
+  Haiku, dann 57% (1×) auf Haiku, dann Sonnet. Decision tree
+  (siehe DECISIONS.md 2026-05-17 "M019 post-wedge tuning"):
+  Sonnet ≥ Haiku-Ceiling + stabil → keep. Sonnet ≈ Haiku → revert
+  (cheaper). Haiku weiter 0%-Bursts + Sonnet stabil → keep as
+  floor-raiser. **Decision belongs in this review, not earlier.**
 
 ## Files zu reviewen
 
