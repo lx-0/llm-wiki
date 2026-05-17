@@ -970,6 +970,19 @@ async def main() -> None:
     state["last_compile"] = now_iso()
     save_state(state)
 
+    # Corpus-wide backlinks footer pass (M020). Runs after every compile so
+    # newly-created articles or renamed targets propagate into incoming-link
+    # footers across the corpus. Idempotent — unchanged corpus produces zero
+    # writes. Gated by features.materialize_backlinks so an operator can flip
+    # it off if the per-compile read-sweep ever becomes a load concern.
+    if CONFIG.features.materialize_backlinks:
+        from core.backlinks import run_backlinks_pass
+        bl_stats = run_backlinks_pass(KNOWLEDGE_DIR)
+        log.info(
+            "  backlinks pass: %d articles seen · %d rewritten",
+            bl_stats["articles_seen"], bl_stats["articles_written"],
+        )
+
     # Append-only history event so Dashboard P2 charts can render time series.
     if compiled_count > 0:
         from core.utils import append_history
