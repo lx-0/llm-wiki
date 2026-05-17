@@ -6,6 +6,41 @@ stage: greenfield-feature
 date: 2026-05-17
 parent-project: llm-wiki
 backlog-stub: .ytstack/backlog/operator-self-reports.md
+eng-review-date: 2026-05-17
+eng-review-verdict: go-with-rescope
+---
+
+## ENG REVIEW — concept-mode, 2026-05-17
+
+**Verdict: GO with rescope.** Wedge (c) (4 slices, 5 clinical-screen instruments, meta-report) is technically buildable. Three blockers must be addressed *within* S01–S02; otherwise the implementation ships honest-but-untested per REGEL #1.
+
+### Top 3 risks
+
+**R1 — 3-Layer scope-lock pattern is itself unverified (confidence 10/10).** The inference-agent inherits the compile-scope-allowlist pattern from commit `57fc0d4`, which is **already an open hot-thread** in STATE.md — never empirically verified. If the allowlist does not honor path-scope, the inference-agent can Write/Edit anywhere in the vault, and the architectural air-gap collapses to a programming-rule rather than an enforceable boundary.
+
+- **Mitigation (S01):** Before `lib/inference.py` exists, run a verification probe with the exact `ClaudeAgentOptions` config the inference-agent will use, against a deliberately-engine-targeted Write stimulus. Record outcome in `KNOWLEDGE.md`.
+- If allowlist holds → proceed.
+- If allowlist does not hold → pivot to `can_use_tool` callback (SDK type `CanUseTool = Callable[...]`, `claude_agent_sdk/types.py:210`) *before* any inference-run touches real substrate.
+- This probe is already on the M006-blocker list — operator-self-reports just makes it acute.
+
+**R2 — Personality-instrument substrate scope will overflow context window (confidence 7/10).** Pitch claims "30–80K token input" for IPIP-NEO-120 reading people-pages + voice + sessions + takes. Reality on lxw today: ~300 people-pages × 1–2 KB = 300–600 KB raw, plus accumulating voice + sessions. Conservatively 200–500K tokens for full personality-scope. Clearly exceeds 200K context window even on Opus 4.7 [1m]. Wedge is safe (clinical screens only read 2-week window) but the "single SDK call" architecture does not scale to personality instruments without a pre-digestion layer.
+
+- **Mitigation (S02 verification step):** Token-budget audit on real lxw substrate against IPIP-NEO-120's declared scope. If overflow likely, add `backlog/personality-substrate-predigestion.md` entry covering options (i) RAG via embedding-similarity, (ii) per-substrate summarization pass with classify_model first, (iii) per-subscale call-batching.
+- Wedge does not contain personality instruments, so this is a pre-S06 gating issue, not a wedge blocker.
+
+**R3 — 120-item single-pass JSON output is unproven (confidence 7/10).** Architecture commits in S02 to "single SDK call returns structured JSON for all items in instrument." Known stumbling blocks: output-token-cap pressure (120 × 70 tokens ≈ 8.4K, close to comfortable ceiling), JSON-mode reliability degradation at deep-nested >50 items, attention-decay in long structured outputs. Wedge tests with max 19 items (MEQ-19) — safe. But the inference-contract schema and helpers gel in S02 and migration cost later is high.
+
+- **Mitigation (S02 design):** Design `lib/inference.py` as "batched per subscale" from day 1. PHQ-9 = 1 batch (9 items). IPIP-NEO-120 = 30 batches × 4 items (one facet per call) OR 5 batches × 24 items (one Big-Five-domain per call). Trade more API calls for robust JSON. Wedge runs as single-batch trivially (all 5 instruments are ≤19 items); the batching machinery exists from start so personality instruments don't require rework.
+
+### Secondary concerns (not blockers)
+
+- **Embedded-methodology + cross-version change-vis** — when instrument-yaml updates from v1.0.0 → v1.0.1, old reports keep v1.0.0 methodology embedded (per Q6 future-fit posture, correct). Meta-report change-vis across version boundaries needs explicit "items 3–7 changed wording between v1.0.0 and v1.0.1; comparison from this date forward is honest" annotation. Documentation issue, captured in S04.
+- **Air-gap enforcement** — pitch's "lint check warns if any prompt references reports/" is the weakest mitigation. Structural sperre is stronger: hard-coded `disallowed_paths=["reports/"]` in compile-scope-spec + reports/ explicitly outside the substrate-scope walked by compile.py. Upgrade in S01 along with the scope-lock probe.
+
+### Net effect on milestone shape
+
+Wedge stays 4 slices. S01 and S02 each pick up one explicit verification step (R1 probe in S01, R2 token audit in S02, R3 batched-from-day-1 in S02). No additional slices needed for the wedge; pre-S06 gets a new backlog entry from R2.
+
 ---
 
 # operator-self-reports — Office Hours pitch
