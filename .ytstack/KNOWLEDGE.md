@@ -2025,3 +2025,26 @@ Future axes can ride the same hook:
 
 Confirms earlier STATE.md note on `--scale 2` dropping content >12k pixels per side. M020's diagram subagent rendered at scale=4, producing 12132×11902 — at the ceiling. Visual content was preserved this time (lucky), but defensive re-render at `--scale 1` was needed to match production PNG dimensions (3033×2976) and avoid the bloat. **Default `--scale 1` for diagrams already >3k pixels per side; only bump to 2 for small diagrams where readability needs it.**
 
+
+---
+
+### Pre-compile substrate classifier — generic seam for producer/consumer-mismatch fixes
+
+Shipped 2026-05-17 in `b6cadaa` to fix the compile-memories cross-link-fanout that aborted operator's compile run on 4 consecutive max_turns failures (~$0.93 burned).
+
+`scripts/compile_stages/classify.py:classify(content, source) → (kind, chunks)` runs on every substrate BEFORE `compile_source()`. Three shapes today:
+
+- `aggregated-memory` — substrate has `type: memory-seed|memory-sync` AND H2-section count ≥ 4. Compile.py loops one call per H2-chunk (frontmatter re-attached in memory, raw byte-identical). Each chunk inherits the existing `compile_memories.md` prompt + 25-turn budget. 25-turn budget binds per memory not per aggregate.
+- `instructions` — filename ends `__AGENTS.md|__CLAUDE.md|__README.md` OR origin frontmatter path ends in those OR first 500 chars contain `# AGENTS.md` H1 hint. Compile.py overrides `substrate_prompt = "compile_instructions"` for a single-pass project-doc handler (max 2 Edits, no cross-link fanout).
+- `single` — every other substrate; unchanged path.
+
+**Generalisation:** any future producer/consumer mismatch (substrate shape doesn't match its prompt's iteration model) gets a new `ClassifyKind` enum value + a branch in `compile_file`. Single seam, single place to update. Don't bump prompt budgets — fix the shape.
+
+**raw/ is RAW.** Chunking + re-attached frontmatter happen in memory; no migration of source files. Compile-state tracks per-source success/skip just like before (per-chunk success aggregates to source-level ok if any chunk succeeded).
+
+**Operator-trigger rules** (see `~/.claude/projects/.../memory/`):
+- `[[never-offer-quick-fixes]]` — don't propose bump-the-knob as Option 1.
+- `[[raw-is-immutable]]` — don't propose migrating/splitting/deleting raw/ files.
+- `[[no-data-loss-no-ignore]]` — don't pawn off broken substrates as "operator can delete." Engine adapts.
+
+The three rules above were each violated during the diagnose-then-propose phase before the right architectural answer (classifier seam) landed. Cost: ~5 operator-frustration cycles. The classifier is now the right answer for this whole bug-class.
