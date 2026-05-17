@@ -1,13 +1,17 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-05-16T17:42:00Z
+last_updated: 2026-05-17T00:00:00Z
 current_milestone: M007
 active_slice: none
 active_task: none
 ---
 
 # State
+
+**Ad-hoc shipped 2026-05-17 (owner-block injection — wires up M009 fully).** `_build_owner_block()` helper in `scripts/compile.py:432` renders a `## Operator / vault owner` section into 5 substrate compile prompts (`compile_main`, `compile_calendar`, `compile_daily`, `compile_health`, `compile_default`) from `personal.implicit_operator_author`. Closes the gap M009 left: the config knob existed but `compile.py` rendered prompts WITHOUT injecting the value, even though `compile_main.md` §7 documented an implicit-operator fallback the engine "surfaces on a per-call basis when present" — which the engine did not actually do. Multi-tenant safety preserved: null knob → `""` → no section. Engine commits `9b33456` (feat) + `2996b10` (docs) + `c7dccbf` (excalidraw M009 card body) all on origin/main + propagated to lxw vault checkout. End-to-end render against a real lxw substrate verified (`daily/2026-05-16/sessions.md` → 27,422-char prompt with owner section at lines 3-7). LLM-side empirical behavior (does the agent actually use the section?) observable on next real `wiki compile` run in lxw. DECISIONS entry written 2026-05-17. Memory `project_owner_block_shipped`. Same arc surfaced an lxw config drift audit — 7 keys set/surfaced in `<lxw>/.wiki/config.yaml` (implicit_operator_author=alex + firefox_profile + voice_inbox + stg_backup_dir + domains + connection_min_words + extract_takes_*); memory `project_lxw_config_audit_2026-05-16`. Two backlog entries spun out: `.ytstack/backlog/voice-openwhispr.md` (OpenWhispr SQLite reader-kind for voice collector — OpenWhispr v1.7.0 stores transcripts in SQLite not files; voice collector flat-folder scan incompatible without export bridge) + `.ytstack/backlog/stg-glob-pattern.md` (glob support for version-bumped Firefox STG backup dirs).
+
+---
 
 **Ad-hoc shipped 2026-05-16 evening (before M007 execution starts):** flush-context gen-2 — `hooks/_transcript.py` replaced content-blind `MAX_TURNS=30 + MAX_CONTEXT_CHARS=15_000` with three per-class budgets (assistant 50K / user 10K / tool 10K), prefer-tail allocation, turn kept if any class survives. Compound fix: `prompts/flush_extract.md` gained `## Findings & Observations` section (narrative analytical output had no slot in the prior Decisions/Lessons/Actions template). Trigger: long ROM-preferences analysis session lost in the staged context; only auto-memories captured it indirectly. Research-driven option choice (A over B over C — Anthropic compaction-doc + OpenCode pattern vs recursive-summary vs hierarchical tree). 33/33 tests green; commit `9969f11` pushed to origin/main. Phase 2 (recursive summary) backlogged at `.ytstack/backlog/recursive-session-summary.md`. Full summary in `.ytstack/AD-HOC-flush-context-budgets-SUMMARY.md`. **NOT verified end-to-end:** new pipeline against an actual long-session JSONL replay — next real session-end fires the new code, observation will tell.
 

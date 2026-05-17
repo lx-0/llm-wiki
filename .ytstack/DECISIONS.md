@@ -777,3 +777,22 @@ These are companion-rules to [[Templates are load-bearing — never backlog temp
 - Lever 3 (lifecycle-tiering): `knowledge/` >2000 articles (excluding `_archive/`).
 - Lever 4 (recursive Dream-Cycle): ~3-6 months after Lever 3 is in place and tier-move volume becomes annoying.
 - Lever 5 (numeric weighting): only if Levers 1-4 prove insufficient. Likely never.
+
+---
+
+## 2026-05-17: Owner-block injection — `implicit_operator_author` drives compile-prompt context block
+
+**Context:** M009 added `personal.implicit_operator_author` as the author-attribution fallback knob and `compile_main.md` §7 documented "the engine surfaces the value to you on a per-call basis when present" — but `compile.py` rendered the substrate prompts WITHOUT injecting this value anywhere. The only consumer was `facts/takes_producer.py` (self-take filter). The compile agent had no formal way to know who "I" / "we" / "my company" was in source material; the §7 fallback rule was honest-but-untested.
+
+**Options considered:** (A) Add a new explicit `personal.owner_person_id` knob distinct from `implicit_operator_author`; (B) Use `implicit_operator_author` for both author-attribution AND a new compile-time owner-block; (C) Force-stamp `owner: true` frontmatter on the operator's person page at compile time, agent reads it on demand; (D) Embed the operator's full person-page content into every substrate prompt header.
+
+**Chose:** B — single config key, two consumers, compile.py emits a self-contained `## Operator / vault owner` Markdown section via `_build_owner_block()` and injects it via `${owner_block}` placeholder in 5 substrate prompts.
+
+**Reason:** the slug in `implicit_operator_author` is already the filename of the operator's person page (by construction in M009). Introducing a parallel knob (A) would duplicate the truth source. Stamping frontmatter (C) requires write-on-read semantics on `knowledge/people/<slug>.md` which the compile pipeline doesn't otherwise do; the agent would also have to discover the page via grep. Full-content embedding (D) blows the prompt budget on every call — owner pages can grow MB-large via Timeline accumulation. The self-contained-section block (B) emits ~400 chars per call, agent Reads the page on-demand when it needs more, multi-tenant safety preserved by emitting `""` when the knob is null. Self-contained-section also degrades cleanly through `render()`'s extra-kwargs-ignored semantics — prompts without `${owner_block}` are unaffected.
+
+**Generalisable rule:** prompt-injected context blocks should be self-contained Markdown sections (heading + body) emitted by the engine, not bare values the prompt has to wrap with its own heading. Self-contained blocks degrade cleanly to `""` when data isn't available; the prompt doesn't need to know whether the section is present. Codified in `.ytstack/KNOWLEDGE.md` ("Prompt-doc declared an injected variable the engine never injected").
+
+**Engine impl:** `_build_owner_block()` in `scripts/compile.py:432`. Called once per compile_file at line 594, passed as `owner_block=` to `render()` at line 629. `${owner_block}` placeholder in `compile_main.md`, `compile_calendar.md`, `compile_daily.md`, `compile_health.md`, `compile_default.md` — between intro line and `## Hard facts`. `compile_main.md` §7 author-attribution rules now reference the injected section instead of hand-waving about per-call surfacing. `templates/AGENTS.example.md` "Vault Owner" section documents the wiring (set the config key + create the page) before the freeform prose. Engine commits `9b33456` (feat) + `2996b10` (docs) + `c7dccbf` (excalidraw) all on origin/main; verified live in lxw 2026-05-17.
+
+**Multi-tenant story preserved:** `implicit_operator_author: null` (default) → helper returns `""` → no section rendered → existing §7 "Multi-tenant safety" branch fires (leave unattributed beliefs generic).
+
