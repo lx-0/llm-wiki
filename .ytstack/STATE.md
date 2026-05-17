@@ -26,6 +26,8 @@ parallel_milestones: [M021]
 
 - **Working-tree leftovers (NOT mine, parallel arc):** `config.example.yaml`, `scripts/core/config.py`, `scripts/migrations/migrate_config_keys.py`, `.ytstack/M019-S01-PLAN.md`. Looks like a config-knob migration in progress from another session. Left untouched per explicit-staging discipline.
 
+- **Upstream skill follow-up (cross-project, pushed 2026-05-17):** four learnings distilled upstream into `Yesterday-AI/skills@7e8968e` (`excalidraw-diagram` v1.1) — steady-state-not-changelog section, containerId footgun, static-checks (bbox-overlap + glyph-width estimate), `--scale` auto-downgrade in renderer when projected PNG > 10 000 px (Chrome canvas-ceiling). Operator pushed back on framing "infographics ≠ changelog" as project-opinion — it's global, lives in the skill now. Plugin cache at `~/.claude/plugins/marketplaces/yesterday-public-plugins/` needs `/plugin update` to pick up auto-scale-fallback in this machine's local installs. llm-wiki CLAUDE.md hard rules unchanged (intentional redundancy: CLAUDE.md is always loaded; skill SKILL.md only on invocation). Two new memories: `project_excalidraw_skill_v11_upstream`, `feedback_global_vs_project_principle`.
+
 ---
 
 - **M019 (this session, current_milestone):** operator-self-reports wedge — 4 slices, ships inference-contract + 5 clinical-screen instruments + studies manifest + meta-report with radar/sparkline/timeline. Goal-driven by `.ytstack/OFFICE-HOURS-operator-self-reports.md` (eng-review verdict: GO with rescope; R1/R2/R3 verification gates baked into S01/S02). CONTEXT + ROADMAP at `.ytstack/M019-{CONTEXT,ROADMAP}.md`. Next action: run `ytstack:slice-milestone` (within this session) to refine S01–S04.
