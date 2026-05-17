@@ -482,6 +482,14 @@ class Personal:
     # recommendation; FluidVoice / macOS dictation / Hammerspoon snippets
     # also work). Empty string disables collectors/voice.py.
     voice_inbox: str = ""
+    # Path to a directory the operator drops camera / phone photos into for
+    # ingest. Same shape as `voice_inbox` (folder-watch + archive-as-dedup),
+    # but the per-file pipeline runs a vision LLM (gemma4 via Ollama) and
+    # writes a HOME-side sidecar next to the source + a vault-side batch
+    # report under `raw/notes/pictures/`. Mirrors the screenshot collector
+    # but sources from a separate, mobile-friendly inbox (iCloud Shortcut
+    # target etc.). Empty string disables collectors/pictures.py.
+    picture_inbox: str = ""
     # Canonical vault-owner identifier. The value (e.g. "alex") is the slug of
     # the operator's own page at `knowledge/people/<value>.md` and drives two
     # things at compile time:
@@ -535,6 +543,9 @@ def _default_piggybacks() -> dict[str, PiggybackTask]:
         "gmeet": PiggybackTask(cooldown_hours=6, max_per_run=20),
         "calendar": PiggybackTask(cooldown_hours=6, max_per_run=500),
         "voice": PiggybackTask(cooldown_hours=1),
+        # Camera/phone-photo inbox. Vision-LLM step makes this heavier than
+        # voice — same cadence as screenshots (4×/day with a per-run cap).
+        "pictures": PiggybackTask(cooldown_hours=6, max_per_run=20),
         # Distill yesterday's per-source captures (daily/<yesterday>/*.md)
         # into a single ≤500-word digest at daily/<yesterday>.md. Runs once
         # in the morning after the per-collector piggybacks have settled.

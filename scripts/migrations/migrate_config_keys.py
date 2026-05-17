@@ -43,6 +43,8 @@ Key changes covered (chronological):
   limits.dream_entity_max_cost_usd         (added 2026-05-16 M014, default 2.0 — dream-cycle per-entity pre-flight USD cap)
   limits.dream_cycle_max_cost_per_run_usd  (added 2026-05-16 M014, default 5.0 — dream-cycle per-run cumulative USD cap)
   piggybacks.dream_cycle                   (added 2026-05-16 M014, cooldown 24h, max_per_run 3)
+  personal.picture_inbox                   (added 2026-05-17, default "" — camera/phone-photo inbox for collectors/pictures.py)
+  piggybacks.pictures                      (added 2026-05-17, cooldown 6h, max_per_run 20 — vision-LLM-driven, lighter cadence than screenshots)
 
 Idempotent: a config already on the current schema produces no change.
 
@@ -192,6 +194,11 @@ KEY_ADDITIONS: dict[str, dict[str, object]] = {
         # (3 default) selected newest-overdue first. Per-entity cost cap
         # AND per-run cumulative cost cap enforced inside dream.py.
         "dream_cycle": {"enabled": True, "cooldown_hours": 24, "max_per_run": 3},
+        # 2026-05-17 pictures collector. Vision-LLM-driven, mirrors the
+        # screenshots cadence shape (max_per_run cap) but lighter cooldown
+        # because iCloud-Shortcut drops arrive throughout the day. Silently
+        # skipped when personal.picture_inbox is empty (graceful agnostic).
+        "pictures": {"enabled": True, "cooldown_hours": 6, "max_per_run": 20},
     },
     "personal": {
         # 2026-05-16 author-attribution feature. Null default keeps the
@@ -201,6 +208,12 @@ KEY_ADDITIONS: dict[str, dict[str, object]] = {
         # page. Explicit `author:` frontmatter on a source file always
         # overrides. See `.ytstack/backlog/author-attribution.md`.
         "implicit_operator_author": None,
+        # 2026-05-17 pictures collector. Mirrors voice_inbox shape — operator
+        # sets to a folder iOS Shortcut (or similar) drops photos into; the
+        # collector folder-watches it, runs gemma4 vision on each file, and
+        # archives the source under <picture_inbox>/.processed/. Empty
+        # default keeps the multi-tenant story intact.
+        "picture_inbox": "",
         # M013 (2026-05-16): optional `domain:` frontmatter axis on knowledge/
         # articles. Cross-cutting life-domain tag (NOT a folder), extensible
         # per vault. Lint warns on values outside this enum (grace period).

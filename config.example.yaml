@@ -80,6 +80,16 @@ piggybacks:
   voice:
     enabled: true
     cooldown_hours: 1                    # voice is time-sensitive
+  # Inbox-watch for camera / phone photos (collectors/pictures.py). Reads
+  # *.jpeg / *.jpg / *.png / *.heic from `personal.picture_inbox`, runs the
+  # gemma4 vision pipeline on each, writes a HOME sidecar + 384px vault
+  # thumbnail + a per-batch report under `raw/notes/pictures/`, then
+  # archives the source under `<picture_inbox>/.processed/`. Silently
+  # skipped when picture_inbox is empty (graceful agnostic).
+  pictures:
+    enabled: true
+    cooldown_hours: 6                    # vision-LLM step — keep below screenshots' 24h but above voice
+    max_per_run: 20
   # Curiosity-loop consumer (scripts/curiosity/cli.py --run-oldest). Producer
   # in compile.py writes raw/requests/*.json; this task picks the oldest pending
   # one and runs the matching backend (email-deep-scan today).
@@ -328,6 +338,14 @@ personal:
   # collector scans this directory, ingests new files into raw/voice/, then
   # moves the source under <voice_inbox>/.processed/. Empty = disabled.
   voice_inbox: ""
+  # Directory the operator drops camera / phone photos into for ingest.
+  # Mirrors `voice_inbox` (folder-watch + archive-as-dedup) but each file
+  # goes through the gemma4 vision pipeline before write. Accepts .jpeg /
+  # .jpg / .png / .heic. Writes a HOME sidecar + a batch report under
+  # raw/notes/pictures/, then moves the source under
+  # <picture_inbox>/.processed/. Typical setup: iOS Shortcut writing into
+  # an iCloud Drive folder. Empty = disabled.
+  picture_inbox: ""
   # Single-tenant fallback for author-attribution. When set (e.g. "alex"), the
   # compile prompt treats files lacking an explicit `author:` frontmatter key
   # as operator-authored — beliefs/decisions/opinions get routed to that

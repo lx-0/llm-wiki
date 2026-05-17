@@ -29,6 +29,7 @@ from collectors import scan_browser  # noqa: F401,E402
 from collectors import scan_screenshots  # noqa: F401,E402
 from collectors import scan_tabs  # noqa: F401,E402
 from collectors import scan_youtube  # noqa: F401,E402
+from collectors import pictures  # noqa: F401,E402
 from collectors import voice  # noqa: F401,E402
 
 __all__ = [
