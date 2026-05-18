@@ -19,8 +19,12 @@ loop iterations reuse the already-imported module.
 from __future__ import annotations
 
 import os
+import re
+import select
 import subprocess
 import sys
+import termios
+import tty
 from pathlib import Path
 from typing import Callable
 
@@ -447,85 +451,147 @@ def _git_revision() -> str:
         return "unknown"
 
 
+# ── Raw-mode single-key home picker ─────────────────────────────────
+#
+# prompt_toolkit's Application setup (full_screen=False + FormattedTextControl)
+# turned out to be fragile in operator terminals — single keypresses got
+# line-buffered (had to press Enter) and ANSI HTML didn't always render
+# colors. Both symptoms point at pt's input/output autodetection mis-firing
+# in real iTerm2 sessions despite the right TERM. The home picker is small
+# enough to own directly: termios+tty.setcbreak gives bulletproof single-key
+# input, and ANSI escape sequences guarantee colors in any vt100-compatible
+# terminal (which iTerm2/Terminal.app/VS Code-terminal all are).
+#
+# prompt_toolkit stays for line-input subprompts (_pt_ask, _pick_query_mode)
+# where its history + editing pay off; the home loop owns its own input.
+
+_ANSI_TAGS = {
+    "<b>": "\x1b[1m", "</b>": "\x1b[22m",
+    "<ansicyan>": "\x1b[36m", "</ansicyan>": "\x1b[39m",
+    "<ansired>": "\x1b[31m", "</ansired>": "\x1b[39m",
+    "<ansigreen>": "\x1b[32m", "</ansigreen>": "\x1b[39m",
+    "<ansiyellow>": "\x1b[33m", "</ansiyellow>": "\x1b[39m",
+    "<ansibrightblack>": "\x1b[90m", "</ansibrightblack>": "\x1b[39m",
+}
+_TAG_RE = re.compile("|".join(re.escape(k) for k in _ANSI_TAGS))
+
+
+def _html_to_ansi(s: str) -> str:
+    """Convert the prompt_toolkit HTML subset used by _build_screen_html
+    into raw ANSI. Also un-escapes the three named entities html.escape()
+    can produce (`&amp;`, `&lt;`, `&gt;`)."""
+    out = _TAG_RE.sub(lambda m: _ANSI_TAGS[m.group(0)], s)
+    return out.replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&")
+
+
+def _read_key(fd: int) -> str:
+    """Read one keypress from `fd` in cbreak mode. Returns:
+        - 'up'/'down'/'left'/'right' for arrow keys (ESC [ A/B/D/C)
+        - 'enter' for newline/CR
+        - 'esc' for bare ESC
+        - 'c-c' for Ctrl-C, 'c-d' for Ctrl-D
+        - the literal char otherwise (e.g. 'c', '3', '/').
+    """
+    old = termios.tcgetattr(fd)
+    try:
+        tty.setcbreak(fd)
+        ch = os.read(fd, 1)
+        if not ch:
+            return "c-d"  # EOF
+        b = ch[0]
+        if b == 0x03:
+            return "c-c"
+        if b == 0x04:
+            return "c-d"
+        if b in (0x0A, 0x0D):
+            return "enter"
+        if b == 0x1B:
+            # ESC — could be bare ESC or an arrow sequence.
+            # Arrow keys send ESC[A/B/C/D within ~milliseconds. Give it 50ms
+            # to arrive before falling back to bare ESC.
+            r, _, _ = select.select([fd], [], [], 0.05)
+            if not r:
+                return "esc"
+            seq = os.read(fd, 2)
+            if seq.startswith(b"[") and len(seq) >= 2:
+                return {b"A": "up", b"B": "down", b"C": "right", b"D": "left"}.get(
+                    seq[1:2], "esc"
+                )
+            return "esc"
+        # Printable byte — decode as utf-8 (single-byte ASCII is the
+        # common case for our shortcuts; multi-byte is fine to pass through
+        # since we only match exact strings below).
+        return ch.decode("utf-8", errors="replace")
+    finally:
+        termios.tcsetattr(fd, termios.TCSADRAIN, old)
+
+
+# Sentinel used by _run_home_picker to signal "redraw" without leaving the
+# loop. Lets pressing an unbound key just re-render rather than exit.
+_REDRAW = object()
+
+
 def _run_home_picker(state: HomeState) -> None:
-    """Single iteration of the home screen. Sets state.selected via key
-    bindings, then exits the app."""
-    pt = _import_pt()
+    """Single iteration of the home screen. Sets state.selected then returns.
 
-    kb = pt.KeyBindings()
-
-    @kb.add("up")
-    def _(event):
-        if state.cursor > 0:
-            state.cursor -= 1
-
-    @kb.add("down")
-    def _(event):
-        if state.cursor < state.n_actions() - 1:
-            state.cursor += 1
-
-    @kb.add("enter")
-    def _(event):
-        if 0 <= state.cursor < state.n_actions():
-            state.selected = ("action", state.cursor)
-            event.app.exit()
-
-    @kb.add("/")
-    def _(event):
-        state.selected = ("filter",)
-        event.app.exit()
-
-    for q in ("c", "C", "q", "f", "l", "s"):
-        @kb.add(q)
-        def _(event, q=q):
-            state.selected = ("quick", q)
-            event.app.exit()
-
-    for c in ("o", "i", "k", "d", "a", "g"):
-        @kb.add(c)
-        def _(event, c=c):
-            state.selected = ("category", c)
-            event.app.exit()
-
-    @kb.add("h")
-    def _(event):
-        state.selected = ("help",)
-        event.app.exit()
-
-    @kb.add("x")
-    def _(event):
+    Renders directly to stdout with ANSI; reads keys with termios in cbreak
+    mode (one byte at a time). Single key fires immediately — no Enter."""
+    fd = sys.stdin.fileno()
+    if not os.isatty(fd):
         state.selected = ("exit",)
-        event.app.exit()
+        return
 
-    @kb.add("c-c")
-    @kb.add("c-d")
-    def _(event):
-        state.selected = ("exit",)
-        event.app.exit()
+    state.selected = None
+    while state.selected is None:
+        # Clear screen + home cursor. Avoids ghosting between iterations
+        # and keeps the rendered region anchored at the top.
+        sys.stdout.write("\x1b[2J\x1b[H")
+        sys.stdout.write(_html_to_ansi(_build_screen_html(state)))
+        sys.stdout.write("\n")
+        sys.stdout.flush()
 
-    for digit in "123456789":
-        @kb.add(digit)
-        def _(event, d=digit):
-            idx = int(d) - 1
+        try:
+            key = _read_key(fd)
+        except (KeyboardInterrupt, OSError):
+            state.selected = ("exit",)
+            return
+
+        if key in ("c-c", "c-d", "esc"):
+            state.selected = ("exit",)
+            return
+        if key == "up":
+            if state.cursor > 0:
+                state.cursor -= 1
+            continue
+        if key == "down":
+            if state.cursor < state.n_actions() - 1:
+                state.cursor += 1
+            continue
+        if key == "enter":
+            if 0 <= state.cursor < state.n_actions():
+                state.selected = ("action", state.cursor)
+            continue
+        if key == "/":
+            state.selected = ("filter",)
+            continue
+        if key in ("c", "C", "q", "f", "l", "s"):
+            state.selected = ("quick", key)
+            continue
+        if key in ("o", "i", "k", "d", "a", "g"):
+            state.selected = ("category", key)
+            continue
+        if key == "h":
+            state.selected = ("help",)
+            continue
+        if key == "x":
+            state.selected = ("exit",)
+            continue
+        if key in "123456789":
+            idx = int(key) - 1
             if 0 <= idx < state.n_actions():
                 state.selected = ("action", idx)
-                event.app.exit()
-
-    body = pt.Window(
-        content=pt.FormattedTextControl(
-            text=lambda: pt.HTML(_build_screen_html(state)),
-            focusable=True,
-        ),
-        wrap_lines=False,
-    )
-    app = pt.Application(
-        layout=pt.Layout(pt.HSplit([body])),
-        key_bindings=kb,
-        full_screen=False,
-        mouse_support=False,
-    )
-    state.selected = None
-    app.run()
+            continue
+        # Unbound key — silently redraw.
 
 
 def _open_category(letter: str) -> None:
