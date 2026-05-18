@@ -358,8 +358,15 @@ LIST_REMOVALS: dict[str, list[object]] = {
     # P2 ships the actual fix (compile_calendar.md), so the skip is
     # no longer needed. Calendar files compile via the dedicated
     # prompt under an 8-turn budget at <$0.10/file.
-    "limits.compile_skip_substrate_types": ["calendar-rollup"],
-}
+    # 2026-05-18: memory-sync + memory-seed removed from skip-list as
+    # part of the 2026-05-13 reversal (see DECISIONS). Memories are
+    # first-class substrate again, distilled into knowledge/concepts/
+    # via the two-mode compile_memories.md prompt. Skip-list entries
+    # in operator vaults (added at some point during the wind-down)
+    # short-circuited the dispatch BEFORE the substrate-handler ran.
+    "limits.compile_skip_substrate_types": [
+        "calendar-rollup", "memory-sync", "memory-seed",
+    ],
 
 # Fields whose backing dataclass entry was removed; their leftover entries
 # in operator configs are silently ignored on load but linger as YAML cruft
