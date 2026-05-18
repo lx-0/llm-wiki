@@ -191,7 +191,7 @@ def list_pending(requests_dir: Path | None = None) -> list[Path]:
             continue
         if r.get("type") != "email-deep-scan":
             continue
-        if r.get("status") == "done":
+        if r.get("status") in ("done", "rejected"):
             continue
         pending.append(p)
     return pending

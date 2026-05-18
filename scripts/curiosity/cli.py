@@ -1,8 +1,9 @@
 """CLI entry-point for `wiki curiosity`.
 
 Usage:
+    uv run python scripts/curiosity/cli.py                        interactive walk (default)
     uv run python scripts/curiosity/cli.py --list                 list pending requests
-    uv run python scripts/curiosity/cli.py --run-oldest           run the oldest pending request
+    uv run python scripts/curiosity/cli.py --run-oldest           run the oldest pending request (non-interactive)
     uv run python scripts/curiosity/cli.py --run <slug>           run one by slug or filename
     uv run python scripts/curiosity/cli.py --run-all              run every pending request
     uv run python scripts/curiosity/cli.py --dry-run --run-oldest plan only, no scan
@@ -25,6 +26,7 @@ from typing import NoReturn
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from core.paths import ROOT_DIR
+from core.utils import now_iso
 from curiosity.backends import email as email_backend
 
 REQUESTS_DIR = ROOT_DIR / "raw" / "requests"
@@ -155,6 +157,96 @@ def _run_batch(n: int, *, dry_run: bool) -> NoReturn:
     sys.exit(0 if fails == 0 else 2)
 
 
+def _print_request_card(idx: int, total: int, path: Path, r: dict) -> None:
+    """Pretty-print one pending request for the walk prompt."""
+    bar = "─" * 78
+    print()
+    print(bar)
+    print(f"  [{idx}/{total}]  {path.name}")
+    print(bar)
+    print(f"  Topic       : {r.get('topic', '?')}")
+    print(f"  Folder      : {r.get('folder', '?')}   (confidence {r.get('folder_confidence', '?')}/5)")
+    print(f"  Account     : {r.get('account', '?')}")
+    print(f"  Source      : {r.get('source', '?')}")
+    print(f"  Created     : {r.get('created', '?')}")
+    print(f"  Model       : {r.get('model', '?')}")
+    print()
+    quote = r.get("source_quote", "").strip()
+    if quote:
+        print("  Source quote:")
+        for line in quote.splitlines() or [quote]:
+            print(f"    > {line}")
+    rationale = r.get("rationale", "").strip()
+    if rationale:
+        print()
+        print("  Why this folder:")
+        for line in rationale.splitlines() or [rationale]:
+            print(f"    {line}")
+    print()
+
+
+def _mark_rejected(path: Path, r: dict) -> None:
+    r["status"] = "rejected"
+    r["rejected_at"] = now_iso()
+    path.write_text(json.dumps(r, indent=2), encoding="utf-8")
+
+
+def _walk(*, dry_run: bool) -> NoReturn:
+    """Interactive walk over pending requests.
+
+    Per item shows the full context (topic, source quote, rationale, folder,
+    source) and prompts [a]ccept / [s]kip / [r]eject / [q]uit. Skip leaves
+    the request pending (it shows up again next walk). Reject sets
+    status=rejected so the producer's persistent-rejection check drops
+    future re-emissions of the same slug.
+    """
+    pending = email_backend.list_pending(REQUESTS_DIR)
+    if not pending:
+        log.info("No pending curiosity requests.")
+        sys.exit(0)
+
+    total = len(pending)
+    accepted = skipped = rejected = 0
+    fails = 0
+    for idx, path in enumerate(pending, start=1):
+        r = _read(path)
+        if r is None:
+            log.error("Skipping unreadable %s", path.name)
+            continue
+        _print_request_card(idx, total, path, r)
+
+        while True:
+            try:
+                choice = input("  [a]ccept · [s]kip · [r]eject · [q]uit › ").strip().lower()
+            except (EOFError, KeyboardInterrupt):
+                print()
+                log.info("Walk aborted. %d accepted, %d skipped, %d rejected, %d remain.",
+                         accepted, skipped, rejected, total - idx + 1)
+                sys.exit(0)
+            if choice in ("a", "accept"):
+                ok = _dispatch(path, dry_run=dry_run)
+                accepted += 1
+                if not ok:
+                    fails += 1
+                break
+            if choice in ("s", "skip", ""):
+                skipped += 1
+                break
+            if choice in ("r", "reject"):
+                _mark_rejected(path, r)
+                rejected += 1
+                log.info("Rejected: %s (producer will skip this slug)", r.get("topic", path.name))
+                break
+            if choice in ("q", "quit", "exit"):
+                log.info("Walk ended. %d accepted, %d skipped, %d rejected, %d remain.",
+                         accepted, skipped, rejected, total - idx + 1)
+                sys.exit(0 if fails == 0 else 2)
+            print("  ?  type a/s/r/q")
+    log.info("Walk complete. %d accepted, %d skipped, %d rejected (of %d).",
+             accepted, skipped, rejected, total)
+    sys.exit(0 if fails == 0 else 2)
+
+
 def _clear_done() -> NoReturn:
     removed = 0
     for p in _all_requests():
@@ -172,9 +264,10 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         description="Curiosity request consumer — list / run / clear pending requests."
     )
-    group = parser.add_mutually_exclusive_group(required=True)
+    group = parser.add_mutually_exclusive_group(required=False)
+    group.add_argument("--walk", action="store_true", help="interactive walk: accept/skip/reject each pending (default)")
     group.add_argument("--list", action="store_true", help="list all requests + statuses")
-    group.add_argument("--run-oldest", action="store_true", help="run the oldest pending request")
+    group.add_argument("--run-oldest", action="store_true", help="run the oldest pending request (non-interactive)")
     group.add_argument("--run", metavar="SLUG", help="run one request by slug substring")
     group.add_argument("--run-all", action="store_true", help="run every pending request")
     group.add_argument("--run-batch", metavar="N", type=int, help="run the N oldest pending requests (drain at steady rate)")
@@ -197,6 +290,8 @@ def main() -> int:
         _run_batch(args.run_batch, dry_run=args.dry_run)
     if args.run:
         _run_one(args.run, dry_run=args.dry_run)
+    # No subcommand selected → walk
+    _walk(dry_run=args.dry_run)
     return 0
 
 

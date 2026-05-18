@@ -236,7 +236,7 @@ def build_suggestions() -> list[dict]:
         ("compile",     probe_compile_changed,      2,
          lambda n: f"{n} source{'s' if n != 1 else ''} changed since compile", "compile"),
         ("curiosity",   probe_curiosity_pending,    3,
-         lambda n: f"{n} curiosity request{'s' if n != 1 else ''} pending",    "curiosity --run-oldest"),
+         lambda n: f"{n} curiosity request{'s' if n != 1 else ''} pending",    "curiosity"),
         ("suggestions", probe_suggestions_approved, 4,
          lambda n: f"{n} approved suggestion{'s' if n != 1 else ''} to execute", "suggestions"),
         ("dream",       probe_dream_overdue,        5,

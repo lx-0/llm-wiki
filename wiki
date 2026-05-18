@@ -69,8 +69,8 @@
 #   wiki ingest-youtube --url URL [--tier 0|1|2] [--limit N] [--dry-run]
 #   wiki ingest-youtube --inbox PATH [--tier 0|1|2] [--limit N] [--dry-run]
 #                              ingest YouTube videos / playlists into raw/notes/youtube/
-#   wiki curiosity [--list|--run-oldest|--run SLUG|--run-all|--clear-done]
-#                              process raw/requests/ deep-scan requests (consumer side)
+#   wiki curiosity [--walk|--list|--run-oldest|--run SLUG|--run-all|--clear-done]
+#                              walk pending requests (default) or run them in bulk
 #   wiki suggestions [--list|--review ID|--approve ID N|--reject ID N|--dry-run]
 #                              review + execute YAML optimization suggestions
 #   wiki version               print installed git revision
@@ -845,12 +845,19 @@ cmd_curiosity() {
 ${C_BOLD}wiki curiosity${C_RESET} — review + run curiosity-loop deep-scan requests
 
 ${C_BOLD}USAGE${C_RESET}
+  wiki curiosity                                 interactive walk: accept/skip/reject each pending (default)
   wiki curiosity --list                          list all pending + done requests
-  wiki curiosity --run-oldest                    run the oldest pending request
+  wiki curiosity --run-oldest                    run the oldest pending request (non-interactive)
   wiki curiosity --run <slug>                    run one request by slug substring
   wiki curiosity --run-all                       run every pending request
-  wiki curiosity --dry-run --run-oldest          plan only (no mailbox access)
+  wiki curiosity --dry-run                       walk without touching mailbox
   wiki curiosity --clear-done                    delete request files with status: done
+
+${C_BOLD}WALK ACTIONS${C_RESET}
+  [a]ccept   dispatch the request (pull email bodies, write deep-scan)
+  [s]kip     leave as pending — comes back next walk
+  [r]eject   persist status=rejected; producer skips this slug forever
+  [q]uit     end the walk
 
 ${C_BOLD}WHAT IT DOES${C_RESET}
   After each compile, \`compile.py\` writes JSON gap-requests into

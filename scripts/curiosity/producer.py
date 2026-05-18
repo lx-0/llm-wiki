@@ -40,6 +40,26 @@ CURIOSITY_MODEL = CONFIG.models.curiosity_model
 RAW_REQUESTS_DIR = ROOT_DIR / "raw" / "requests"
 
 
+def _slug_previously_rejected(slug: str) -> bool:
+    """True if any past request-<slug>-*.json carries status=rejected.
+
+    Operator marks a request rejected via `wiki curiosity` (walk mode).
+    The rejected file stays in `raw/requests/` and acts as a tombstone —
+    the producer reads it to suppress future re-emissions of the same
+    topic-slug. Different-day filenames don't matter; the slug is the key.
+    """
+    if not RAW_REQUESTS_DIR.exists():
+        return False
+    for past in RAW_REQUESTS_DIR.glob(f"request-{slug}-*.json"):
+        try:
+            data = json.loads(past.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            continue
+        if data.get("status") == "rejected":
+            return True
+    return False
+
+
 def _normalize_quote(s: str) -> str:
     """Lower-case + collapse whitespace for the substring check.
 
@@ -299,6 +319,12 @@ async def maybe_generate_curiosity_requests(source: Path) -> None:
 
             if request_path.exists():
                 dropped["duplicate"] = dropped.get("duplicate", 0) + 1
+                continue
+
+            # Persistent rejection: operator rejected this slug in a prior walk.
+            # Any past request-<slug>-*.json with status=rejected blocks re-emission.
+            if _slug_previously_rejected(slug):
+                dropped["rejected_persistent"] = dropped.get("rejected_persistent", 0) + 1
                 continue
 
             request = {

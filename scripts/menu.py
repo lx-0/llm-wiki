@@ -93,8 +93,9 @@ CATEGORIES: dict[str, tuple[str, list[tuple[str, str, str, object]]]] = {
         ("take-show",     "show takes for one holder",      "by slug",                                ("prompt", "Holder slug", ["take", "show", "{arg}"])),
     ]),
     "a": ("automation", [
+        ("curio-walk",    "curiosity — walk pending",       "accept/skip/reject each (interactive)",  ["curiosity"]),
         ("curio-list",    "curiosity — list requests",      "raw/requests/*.json",                    ["curiosity", "--list"]),
-        ("curio-oldest",  "curiosity — run oldest",         "local LLM (free)",                       ["curiosity", "--run-oldest"]),
+        ("curio-oldest",  "curiosity — run oldest",         "non-interactive, local LLM (free)",      ["curiosity", "--run-oldest"]),
         ("curio-all",     "curiosity — run all",            "all pending",                            ["curiosity", "--run-all"]),
         ("curio-clear",   "curiosity — clear done",         "delete done files",                      ["curiosity", "--clear-done"]),
         ("sugg-list",     "suggestions — list",             "raw/suggestions/*.yaml",                 ["suggestions", "--list"]),
