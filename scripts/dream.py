@@ -819,8 +819,18 @@ def _read_facts_md() -> str:
 
 
 def _build_owner_block() -> str:
-    """Same owner-block rendering as compile.py."""
-    from compile import _build_owner_block as _from_compile
+    """Same owner-block rendering as compile.py.
+
+    Imports from `compile_stages.compile` (the pure-library producer-seam
+    module) rather than `compile` (the CLI script). Importing the CLI script
+    triggers its module-level `setup_console_logging("compile", ...)` call,
+    which adds a SECOND stderr handler to root in the running dream process
+    — every subsequent log line then double-emits (incident 2026-05-18:
+    operator screenshot at 08:02:43 showed `prompt:` and `invoking` lines
+    doubled because they fired AFTER the lazy import; earlier lines fired
+    BEFORE and stayed single).
+    """
+    from compile_stages.compile import _build_owner_block as _from_compile
 
     return _from_compile()
 

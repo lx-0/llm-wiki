@@ -203,3 +203,57 @@ class TestSetupHelper:
         finally:
             root.handlers = existing_handlers
             logging.shutdown()
+
+    def test_second_call_is_idempotent_on_stderr_handler(self, monkeypatch):
+        """Regression for incident 2026-05-18: dream.py lazy-imported compile.py,
+        triggering a second setup_console_logging call that stacked a second
+        stderr handler. Every log line afterwards double-emitted on stderr.
+        Setup must reuse the existing stderr handler instead of adding another."""
+        root = logging.getLogger()
+        existing_handlers = list(root.handlers)
+        monkeypatch.setattr(root, "handlers", [])
+        try:
+            console.setup_console_logging("first-cli")
+            stderr_handlers_after_first = [
+                h for h in root.handlers
+                if isinstance(h, logging.StreamHandler)
+                and not isinstance(h, logging.FileHandler)
+            ]
+            assert len(stderr_handlers_after_first) == 1
+            first_formatter = stderr_handlers_after_first[0].formatter
+
+            # Second call (simulates the lazy cross-import that caused the bug)
+            console.setup_console_logging(
+                "second-cli", formatter=console.ConsoleFormatter()
+            )
+            stderr_handlers_after_second = [
+                h for h in root.handlers
+                if isinstance(h, logging.StreamHandler)
+                and not isinstance(h, logging.FileHandler)
+            ]
+            # No new stderr handler — would have been the bug.
+            assert len(stderr_handlers_after_second) == 1
+            # First-call's formatter still wins (importing CLI's style stays).
+            assert stderr_handlers_after_second[0].formatter is first_formatter
+        finally:
+            root.handlers = existing_handlers
+            logging.shutdown()
+
+    def test_second_call_dedupes_file_handlers_by_path(self, tmp_path, monkeypatch):
+        """Same file_path on a second call must not pile a second FileHandler."""
+        root = logging.getLogger()
+        existing_handlers = list(root.handlers)
+        monkeypatch.setattr(root, "handlers", [])
+        try:
+            log_path = tmp_path / "shared.log"
+            console.setup_console_logging("first-cli", log_file=log_path)
+            console.setup_console_logging("second-cli", log_file=log_path)
+            file_handlers = [
+                h for h in root.handlers
+                if isinstance(h, logging.FileHandler)
+                and h.baseFilename == str(log_path.resolve())
+            ]
+            assert len(file_handlers) == 1
+        finally:
+            root.handlers = existing_handlers
+            logging.shutdown()

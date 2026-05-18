@@ -203,20 +203,41 @@ def setup_console_logging(
     """
     root = logging.getLogger()
     root.setLevel(logging.INFO)
-    console_handler = logging.StreamHandler(sys.stderr)
-    console_handler.setFormatter(formatter or ConsoleFormatter())
-    console_handler.addFilter(SdkNoiseFilter())
-    root.addHandler(console_handler)
+
+    # Idempotent stderr-handler setup. When a CLI module lazy-imports
+    # another CLI module at run-time (incident 2026-05-18: dream.py
+    # lazy-imported compile.py for `_build_owner_block`, triggering
+    # compile's module-level setup_console_logging call and stacking a
+    # second StreamHandler on root), every log line afterwards would
+    # double-emit on stderr — once per formatter. Guard against this
+    # by reusing any existing stderr StreamHandler (FIRST-call's
+    # formatter wins; the importing CLI's style stays). File handlers
+    # are deduped by path so the second module's compile.log handler
+    # doesn't pile on either.
+    have_console = any(
+        isinstance(h, logging.StreamHandler)
+        and not isinstance(h, logging.FileHandler)
+        and getattr(h, "stream", None) is sys.stderr
+        for h in root.handlers
+    )
+    if not have_console:
+        console_handler = logging.StreamHandler(sys.stderr)
+        console_handler.setFormatter(formatter or ConsoleFormatter())
+        console_handler.addFilter(SdkNoiseFilter())
+        root.addHandler(console_handler)
 
     archive_fmt = logging.Formatter(_LOG_FORMAT, datefmt=_LOG_DATEFMT)
-    if log_file is not None:
+    existing_file_paths = {
+        h.baseFilename for h in root.handlers if isinstance(h, logging.FileHandler)
+    }
+    if log_file is not None and str(log_file.resolve()) not in existing_file_paths:
         log_file.parent.mkdir(parents=True, exist_ok=True)
         h = logging.FileHandler(log_file, encoding="utf-8")
         h.setFormatter(archive_fmt)
         h.setLevel(logging.INFO)
         root.addHandler(h)
 
-    if error_file is not None:
+    if error_file is not None and str(error_file.resolve()) not in existing_file_paths:
         error_file.parent.mkdir(parents=True, exist_ok=True)
         h = logging.FileHandler(error_file, encoding="utf-8")
         h.setFormatter(archive_fmt)
