@@ -36,6 +36,8 @@ Provider: Claude Agent SDK only — never Ollama. (See feedback memory
 
 from __future__ import annotations
 
+import json
+
 import os
 
 os.environ.setdefault("CLAUDE_INVOKED_BY", "dream")
@@ -70,6 +72,7 @@ from core.paths import (
     PROJECTS_DIR,
     RAW_DIR,
     ROOT_DIR,
+    STATE_DIR,
     DAILY_DIR,
 )
 from core.prompts import render
@@ -312,12 +315,49 @@ def _recency_decay(mtime: float, *, now: float | None = None) -> float:
     return 1.0 / (1.0 + days / 90.0)
 
 
-def _get_last_dreamed_at(path: Path) -> datetime | None:
-    """Read `last_dreamed_at:` from a substrate file's frontmatter.
+# Side-state file for dream-cycle activation tracking. Keyed by
+# vault-relative path -> ISO date. Kept OUT of substrate frontmatter so
+# raw/ stays byte-identical (raw-is-immutable rule).
+_DREAM_ACTIVATION_FILE = STATE_DIR / "dream-activation.json"
 
-    Returns None if the file has no frontmatter, no key, or an unparseable
-    value. Tolerant — broken frontmatter means "treat as never dreamed".
+
+def _load_dream_activation() -> dict[str, str]:
+    try:
+        return json.loads(_DREAM_ACTIVATION_FILE.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def _save_dream_activation(data: dict[str, str]) -> None:
+    """Atomic-replace write so a crash mid-write can't corrupt the file."""
+    _DREAM_ACTIVATION_FILE.parent.mkdir(parents=True, exist_ok=True)
+    tmp = _DREAM_ACTIVATION_FILE.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(data, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+    tmp.replace(_DREAM_ACTIVATION_FILE)
+
+
+def _get_last_dreamed_at(path: Path) -> datetime | None:
+    """Read `last_dreamed_at` for a substrate file.
+
+    Lookup order:
+      1. Side-state file (state/dream-activation.json) — canonical since
+         the raw-is-immutable fix.
+      2. Legacy frontmatter `last_dreamed_at:` — back-compat for files
+         polluted before the fix landed. Never written; orphan keys in
+         raw/ frontmatter are left untouched by design.
+    Returns None if neither source has a parseable value.
     """
+    try:
+        rel = str(path.relative_to(ROOT_DIR))
+    except ValueError:
+        rel = str(path)
+    activation = _load_dream_activation()
+    state_value = activation.get(rel)
+    if state_value:
+        parsed = _parse_iso_date(state_value)
+        if parsed is not None:
+            return parsed
+    # Legacy frontmatter fall-back (read-only).
     try:
         text = path.read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError):
@@ -364,31 +404,30 @@ def _compute_sampling_score(
 
 
 def _write_last_dreamed_at(path: Path, when: datetime | None = None) -> bool:
-    """Stamp `last_dreamed_at: <iso>` into a substrate file's frontmatter.
+    """Record `last_dreamed_at` for a substrate file in the side-state
+    file (`state/dream-activation.json`). NEVER touches the substrate
+    file itself — raw/ is immutable (engine reads, never writes).
 
-    Returns True if the write happened. Idempotent — same-day stamp is a
-    no-op (avoids churning mtime on every dream of every entity). Tolerant
-    of missing frontmatter (synthesises a fresh `---`/`---` block at file
-    top if needed). Never raises — write failure logs and returns False so
-    a single problematic file doesn't abort the rest of a dream.
+    Returns True if the side-state was updated. Idempotent — same-day
+    stamp is a no-op (avoids churning the JSON on every dream of every
+    entity). Tolerant — write failure logs and returns False so a single
+    problematic file doesn't abort the rest of a dream.
     """
     stamp = (when or datetime.now(timezone.utc)).strftime("%Y-%m-%d")
     try:
-        text = path.read_text(encoding="utf-8")
-    except (OSError, UnicodeDecodeError):
-        return False
-    fm, body = _parse_frontmatter(text)
-    existing = fm.get("last_dreamed_at")
-    if isinstance(existing, str) and existing.startswith(stamp):
-        return False  # already stamped today — skip
-    fm["last_dreamed_at"] = stamp
+        rel = str(path.relative_to(ROOT_DIR))
+    except ValueError:
+        rel = str(path)
     try:
-        new_fm_text = yaml.safe_dump(fm, sort_keys=False, allow_unicode=True)
-        new_text = f"---\n{new_fm_text}---\n{body}"
-        path.write_text(new_text, encoding="utf-8")
+        activation = _load_dream_activation()
+        existing = activation.get(rel)
+        if isinstance(existing, str) and existing.startswith(stamp):
+            return False  # already stamped today
+        activation[rel] = stamp
+        _save_dream_activation(activation)
         return True
-    except (OSError, yaml.YAMLError) as exc:
-        log.warning("  could not stamp last_dreamed_at on %s: %s", path, exc)
+    except OSError as exc:
+        log.warning("  could not stamp last_dreamed_at for %s: %s", rel, exc)
         return False
 
 
