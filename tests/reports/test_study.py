@@ -269,8 +269,17 @@ class TestRunDirectory:
         assert rd.final_dir.is_dir()
 
 
-def _hold_lock_subprocess(study_id: str, hold_seconds: float, signal_path: str) -> None:
-    """Helper: take a lock, signal we got it, hold for N seconds."""
+def _hold_lock_subprocess(
+    study_id: str, hold_seconds: float, signal_path: str, state_dir_str: str
+) -> None:
+    """Helper: take a lock, signal we got it, hold for N seconds.
+
+    Subprocess (`spawn` on macOS) doesn't inherit the parent's monkeypatched
+    module attrs, so we redirect STATE_DIR here too before acquiring.
+    """
+    from scripts.reports._engine import study as study_mod
+
+    study_mod.STATE_DIR = Path(state_dir_str)
     lock = acquire_study_lock(study_id)
     if lock is None:
         Path(signal_path).write_text("failed-to-acquire", encoding="utf-8")
@@ -281,6 +290,14 @@ def _hold_lock_subprocess(study_id: str, hold_seconds: float, signal_path: str) 
 
 
 class TestStudyLock:
+    @pytest.fixture(autouse=True)
+    def _isolated_state_dir(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+        """Redirect STATE_DIR so lock files land in tmp_path, not engine state/."""
+        from scripts.reports._engine import study as study_mod
+
+        monkeypatch.setattr(study_mod, "STATE_DIR", tmp_path)
+        return tmp_path
+
     def test_acquire_returns_handle(self) -> None:
         lock = acquire_study_lock("test-lock-basic")
         assert lock is not None
@@ -291,7 +308,7 @@ class TestStudyLock:
         # Spawn a subprocess that takes the lock and holds for 2s.
         proc = multiprocessing.Process(
             target=_hold_lock_subprocess,
-            args=("test-lock-concurrent", 2.0, str(signal)),
+            args=("test-lock-concurrent", 2.0, str(signal), str(tmp_path)),
         )
         proc.start()
         # Wait for the child to acquire.
