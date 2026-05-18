@@ -1,5 +1,5 @@
 study_id: longitudinal-baseline
-title: "Longitudinal baseline — 4 substrate-tuned clinical screens"
+title: "Longitudinal baseline — 6 substrate-tuned screens"
 created: 2026-05-17T00:00:00+00:00
 schedule: weekly
 instruments:
@@ -7,25 +7,40 @@ instruments:
   - {slug: gad-7,  version: 1.0.0, source: inferred}
   - {slug: who-5,  version: 1.0.0, source: inferred}
   - {slug: pss-10, version: 1.0.0, source: inferred}
+  - {slug: isi,    version: 1.0.0, source: inferred}
+  - {slug: olbi,   version: 1.0.0, source: inferred}
 notes: |
-  Baseline study seeded by `wiki seed`. Four instruments tuned for
-  substrate-alone screening (selected after the 2026-05-17 first run
-  showed coverage-tier reality):
+  Baseline study seeded by `wiki seed`. Six instruments tuned for
+  substrate-alone screening — composition locked 2026-05-17 after
+  dogfooding runs surfaced coverage-tier reality:
 
     WHO-5  — 80% inferable (wellbeing, bandable in 1 run)
-    GAD-7  — 57% inferable (anxiety, needs 1-2 curiosity items)
-    PHQ-9  — 44% inferable (depression, needs 3 curiosity items)
+    GAD-7  — 57% inferable (anxiety, 1-2 curiosity items)
+    ISI    — 57% inferable (insomnia, Oura items 1-3 observable)
+    PHQ-9  — 44% inferable (depression, 3 curiosity items)
     PSS-10 — ~50% inferable (stress, substitute for K6)
+    OLBI   — 37.5% inferable (burnout, Disengagement + Exhaustion
+             subscales; lowest coverage on the manifest, see
+             `.ytstack/backlog/olbi-coverage-optimization.md`)
 
-  Dropped from the original wedge (run 1 findings):
-    K6  — 33% inferable, redundant with WHO-5 wellbeing signal.
-    ASRS-v1.1 — 33% inferable; revisit if ADHD-tracking explicit.
+  Off-manifest but available (in `instruments/`, not in default
+  longitudinal-baseline):
+    K6        — 33% inferable, redundant with WHO-5 wellbeing signal.
+    ASRS-v1.1 — 33% inferable; revisit if ADHD-tracking is explicit.
 
   Schedule: weekly default. Switch to `daily` for iteration-mode
   tweaking; quarterly once trends stabilise. Pass-1 analyst fires
-  automatically inside `wiki study run`; Pass-2 cross-study via
+  automatically inside `wiki study run`; Pass-2 cross-study via the
   `analyst_pass2` piggyback.
 
-  To close coverage on structurally-null items (PHQ-9 Q2/Q5/Q6/Q8/Q9,
-  GAD-7 Q2/Q5/Q7, PSS-10 Q2/Q4/Q5/Q7/Q8), use:
+  ISI is set to `claude-sonnet-4-6` via `inference.model:` in its
+  `instrument.yaml`. Provisional override — Haiku scored 4/7 (57%)
+  in one run, undercutting the deterministic-0% premise. Decision
+  belongs in the week-1 review (see
+  `.ytstack/backlog/m019-week-1-review.md`).
+
+  To close coverage on `substrate_inferable: false` items (PHQ-9 Q9
+  suicidal ideation; ISI satisfaction self-report; OLBI Disengagement
+  attitudinal items; PHQ-9 Q2/Q5/Q6/Q8; GAD-7 Q2/Q5/Q7;
+  PSS-10 Q2/Q4/Q5/Q7/Q8), use:
     wiki study answer longitudinal-baseline <instrument> <item> <value>

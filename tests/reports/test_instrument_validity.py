@@ -1,10 +1,17 @@
-"""Cross-instrument validity test for the 5 wedge instruments.
+"""Cross-instrument validity test for all 8 engine-defined instruments.
 
 Pins each instrument's load + score-against-synthetic-answers and
 asserts the band-lookup at the published clinical cutoff. The
 embedded-methodology contract requires items.yaml + cutoffs.yaml to
 stay stable across versions; the next file-edit that breaks an
 instrument's load surfaces here.
+
+Currently 8 instruments live in `scripts/reports/_engine/instruments/`:
+PHQ-9, GAD-7, ASRS-v1.1, WHO-5, K6, PSS-10, ISI, OLBI. Six of these
+are on the default longitudinal-baseline manifest (PHQ-9, GAD-7,
+WHO-5, PSS-10, ISI, OLBI); K6 + ASRS-v1.1 are off-manifest opt-in.
+This test asserts the full 8 — manifest membership is a separate
+concern.
 """
 
 from __future__ import annotations
