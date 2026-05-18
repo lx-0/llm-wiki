@@ -78,7 +78,7 @@ hard-capped at 500ms via `SIGALRM`) and renders four sections in order:
 | 2 | sources newer than last compile                 | `compile`                    |
 | 3 | `raw/requests/*.json` with `status != done`     | `curiosity --run-oldest`     |
 | 4 | `raw/suggestions/*.yaml` `status: approved`     | `suggestions`                |
-| 5 | entity pages past `dream_cooldown_days`         | `dream --all-entities`       |
+| 5 | entity pages past `dream_cooldown_days`         | `dream`                      |
 | 6 | today's `daily/sessions/<date>.md` missing      | `flush`                      |
 | 7 | knowledge edits newer than newest lint report   | `lint --structural-only`     |
 
@@ -89,6 +89,8 @@ jumps directly. When everything passes the section renders
 **(2b) Heads-up** — critical/warning health checks WITHOUT a clean auto-fix
 (`ollama-unreachable`, `claude-authed`, `compile-errors-recent`,
 `template-drift`). Read-only — operator runs the suggested fix manually.
+(`engine-update-available` lives in the actionable list, not here, because
+its fix is the single command `wiki update`.)
 
 **(3) Quick actions** — `c` compile / `q` query / `f` flush / `l` lint
 (structural-only) / `s` status. Letter or number both work; compile is
@@ -127,8 +129,8 @@ suggestions probe. Each check returns a `CheckResult` with optional
 navigable Actionable list (operator hits Enter, the menu shells out to
 `wiki <dispatch_args>`). Checks without dispatch_args (multi-step or
 shell-only fixes) render in the read-only Heads-up section below.
-Three checks ship dispatch_args today: setup-not-run, hooks-installed,
-compile-state (stale).
+Four checks ship dispatch_args today: setup-not-run, hooks-installed,
+compile-state (stale), engine-update-available (N commits behind upstream).
 
 ## Agent-facing surfaces
 

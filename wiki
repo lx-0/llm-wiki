@@ -1260,7 +1260,7 @@ ${C_BOLD}EXIT CODE${C_RESET}
   1   at least one critical issue
 
 ${C_BOLD}CHECKS${C_RESET}
-  Config + setup: setup-wizard-ran, hooks-installed, template-drift
+  Config + setup: setup-wizard-ran, hooks-installed, template-drift, engine-update-available
   Connectivity: ollama-reachable, claude-authed
   Pipeline: compile-errors-recent, no-knowledge-articles, compile-state
 EOF
