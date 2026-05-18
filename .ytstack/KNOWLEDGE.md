@@ -2122,3 +2122,28 @@ Drafting `docs/setup-health.md` for Phase 3a of the health collector (iOS Shortc
 **Caveat: the magic-variable chevron picker** (per Apple Variable-Types docs) MAY expose `Value` directly on a `Find Health Samples` output, eliminating the Get-Details step. Whether the chevron-short-path works is per-iOS-build behavior — document both paths in any Shortcut spec, let operator pick the shorter one if available.
 
 **Memory pointers:** [[project_health_phase_3a_drafted]], [[feedback_apple_shortcuts_release_notes_omit_removals]]. **Doc:** `docs/setup-health.md`.
+
+### Compile-skip layers fire in a specific order — substrate-dispatch is LAST
+
+The compile pipeline has three layers that can short-circuit a file before the actual substrate-prompt runs:
+
+1. **`compile_role` axis** (`compile.py:511`): `final-only` → engine-skip; `source-and-final` → Python-side index-only.
+2. **`compile_skip_substrate_types`** (`compile.py:567`): frontmatter `type:` in the operator-config skip-list → `_skipped: substrate_type_excluded_<type>`. This is OPERATOR-CONFIG-driven (`limits.compile_skip_substrate_types`).
+3. **Classifier** (`compile.py:611`, `compile_stages/classify.py`): substrate-shape detection. Aggregated-memory chunking, etc.
+4. **SUBSTRATE_PROMPTS dispatch** (`compile.py:508`): the actual prompt + max_turns + model pick.
+5. **Memory pre-pass** (`compile.py:621`, for memory-sync/seed only): `resolve_project_slug` → Mode A (project page found) or Mode B (no project, free-distill).
+
+Layers 1-3 can each ABORT the file before any substrate-handler runs. When debugging "why is X skipped?", check ALL layers — not just the substrate-prompt dispatch.
+
+Hit 2026-05-18 twice in one arc:
+
+- Memory files were skipped at layer 2 (operator config had `memory-sync` + `memory-seed` in `compile_skip_substrate_types` — wind-down legacy from 2026-05-13/16). Even after the 2026-05-18 Mode A/B reversal landed in the memory pre-pass + prompt, the skip-list at layer 2 short-circuited everything. Fix: migration `LIST_REMOVALS` cleaned the operator vault on `wiki update`.
+- AGENTS.md/CLAUDE.md memory files were re-routed at layer 3 (classifier's `"instructions"` kind → `compile_instructions.md` with max-2-Edits-no-stubs). The substrate-handler never saw them. Fix: dropped the `"instructions"` ClassifyKind entirely.
+
+**Pattern:** when a fix lands in a deep layer (substrate-prompt, pre-pass) but doesn't take effect end-to-end, walk the shallower layers first. Migration entries + classifier kinds often outlive their original purpose.
+
+### Memory substrates are first-class (2026-05-18 reversal)
+
+The 2026-05-13 "memories are not a substrate" decision was reversed 2026-05-18 after research showed (a) memories are non-deterministic LLM-distillations (not regenerable from daily/), (b) Karpathy's gist doesn't endorse exclusion (silence ≠ endorsement; commenters proposed provenance-tracking), (c) Cole Medin treats curated memory.md as first-class. Implementation: `compile_memories.md` now has Mode A (existing project → Timeline-append) + Mode B (no project → distill to `knowledge/concepts/<slug>.md` with `compiled_from_distilled: true` provenance frontmatter). Full research summary in `.ytstack/backlog/memories-decision-doubt.md`, DECISIONS entry 2026-05-18.
+
+**`compiled_from_distilled: true`** is the new frontmatter convention — signals "derived from LLM-distillation, not first-hand evidence" so future compile passes (and operator) can distinguish second-order from first-hand knowledge. Compounding-distortion risk handled via metadata, not exclusion.

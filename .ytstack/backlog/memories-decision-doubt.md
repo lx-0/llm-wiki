@@ -81,3 +81,38 @@ The broken-link symptom (502/584 dangling) was already addressed by the 2026-05-
 ## Status
 
 Recommendation: REVERSE 2026-05-13 decision. Awaiting operator decision to formalize a new DECISIONS.md entry that supersedes 2026-05-13.
+
+---
+
+## SHIPPED 2026-05-18 14:27 — live-verified on lxw
+
+Full implementation arc:
+
+| Commit | Change |
+|---|---|
+| `1cf23b0` | Reversal core: pre-pass drops `_skipped: memory_no_project_page`, falls through to Mode B. `prompts/compile_memories.md` rewritten with Mode A (project page → Timeline-append, 2 turns) + Mode B (no project → distill to `knowledge/concepts/<slug>.md`, max 5 Edits + 3 Writes, with `compiled_from_distilled: true` frontmatter). `SUBSTRATE_PROMPTS` memory max_turns 5 → 20. DECISIONS supersede entry. |
+| `8918d21` + `dd6c00d` | Migration `LIST_REMOVALS` extended: `memory-sync` + `memory-seed` removed from `limits.compile_skip_substrate_types`. Operator vaults had these in the skip-list (added during 2026-05-13 → 2026-05-16 wind-down/band-aid). The skip fired in `compile.py:567` BEFORE the substrate-dispatch could reach the new Mode A/B logic. `wiki update` migrates operator config on next pull. |
+| `f4865b3` | Drop `"instructions"` ClassifyKind. The classifier from 2026-05-18 morning routed AGENTS.md/CLAUDE.md/README.md memory files to `compile_instructions.md` (max 2 Edits, no concept stubs). After the Mode B path landed, the classifier intercepted those same files and dropped them into a 0-writes path. Removed the routing; AGENTS/CLAUDE/README memory files now flow through `compile_memories.md` Mode B naturally. The `compile_instructions.md` prompt file stays in `prompts/` (no deletion of historical artefacts) but is no longer reachable from dispatch. |
+
+**Live verification (lxw, 14:27):**
+
+```
+file:    raw/memories/home-alex-Code-WebDev-projects-yesterday-ai-company-orga__AGENTS.md
+shape:   6 H2 sections → aggregated-memory chunking
+calls:   6 chunks × ~30s each → all ok
+cost:    $0.28 total
+output:  5 new knowledge/concepts/ articles
+         - company-documentation-hierarchy.md
+         - numbered-kebab-case-convention.md
+         - yesterday-ai-company-orga-repos.md
+         - cross-repo-naming-convention-divergence.md
+         - (+1)
+```
+
+All five concepts carry `compiled_from_distilled: true` frontmatter (per the new convention).
+
+**Open follow-ups (low-priority):**
+
+- ~33 other memory files in `raw/memories/` (no project page, never compiled) will Mode-B-distill on the next compile run. Signal-to-noise review after that pass decides whether the 3-concepts-per-memory cap is right.
+- Architecture diagram (`docs/architecture.excalidraw`): `raw/memories/` was removed from the substrate row in the 2026-05-13 phase-out; should be re-promoted to first-class substrate position alongside email/jamie/etc. Deferred until next docs-sync pass.
+- Snapshot-pattern for `raw/memories/` (content-hash paths, never delete) is still an open future option if operator re-introduces auto-syncing — was 2026-05-04 variant B, rejected then, worth re-evaluating with current architecture.
