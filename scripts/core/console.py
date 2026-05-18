@@ -75,7 +75,12 @@ class ConsoleFormatter(logging.Formatter):
     # Computing at format-time is the difference between a clean test
     # surface and a "frozen first import" footgun.
 
-    _COST_RE = re.compile(r"\(\$(\d+(?:\.\d+)?)\)")
+    # Matches `$X` or `$X.XX` anywhere in the message — whether wrapped in
+    # parens like `($0.50)` (compile.py shape) or bare like `cap $5.00`
+    # (dream.py shape). Each match gets tier-colored on its own; surrounding
+    # parens, prefixes, suffixes stay plain so operators see the amount
+    # highlighted without losing the surrounding context.
+    _COST_RE = re.compile(r"\$(\d+(?:\.\d+)?)")
     _SECTION_RE = re.compile(r"^─── .+ ───$")
     _ELAPSED_RE = re.compile(r"\b(\d+\.\d+s)\b")
     _TOKENS_RE = re.compile(r"\b(in:[\w.,]+\s+out:[\w.,]+)")
@@ -101,7 +106,7 @@ class ConsoleFormatter(logging.Formatter):
                 color = C_DIM
             else:
                 return m.group(0)
-            return f"({color}${m.group(1)}{C_RESET})"
+            return f"{color}${m.group(1)}{C_RESET}"
         return self._COST_RE.sub(_sub, msg)
 
     def _format_message_extras(self, msg: str) -> str | None:

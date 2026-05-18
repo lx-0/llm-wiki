@@ -874,7 +874,7 @@ async def dream_entity(
             "Reduce corpus by archiving old substrate, raise CONFIG.limits.dream_entity_max_cost_usd, "
             "or run with --no-cost-cap (not yet implemented — file the request)."
         )
-        log.error("  %s", msg)
+        log.error("  ✗ %s", msg)
         return DreamResult(
             entity=entity, corpus_count=len(corpus_paths),
             corpus_chars=sum(len(p.read_text(encoding="utf-8", errors="replace")) for p in corpus_paths),
@@ -964,8 +964,11 @@ async def dream_entity(
 
     elapsed = time.time() - started
     log.info(
-        "  done: %d input + %d output tokens, actual cost $%.4f, elapsed %.1fs",
-        input_tokens, output_tokens, actual_cost, elapsed,
+        "  ✓ done in %.1fs · in:%s out:%s ($%.4f)",
+        elapsed,
+        f"{input_tokens:,}",
+        f"{output_tokens:,}",
+        actual_cost,
     )
 
     # M016 — stamp last_dreamed_at on every substrate file that appeared in
@@ -1176,8 +1179,8 @@ async def dream_all_entities(
     ranked = _select_for_sweep(candidates, N, mode)
 
     log.info(
-        "Dream sweep: %d entities total, %d candidates after cooldown+priority filter, "
-        "mode=%s, run_cap=$%.2f",
+        "─── dream sweep: %d entities total, %d candidates after cooldown+priority filter "
+        "(mode=%s, run_cap=$%.2f) ───",
         len(all_entities), len(ranked), mode, run_cap,
     )
 
@@ -1193,7 +1196,7 @@ async def dream_all_entities(
                 cumulative, run_cap, idx - 1,
             )
             break
-        log.info("[%d/%d] dream-entity %s", idx, len(ranked), ent.slug)
+        log.info("▶ [%d/%d] dream-entity %s", idx, len(ranked), ent.slug)
         res = await dream_entity(
             ent, dry_run=dry_run, cost_cap_usd=per_entity_cap,
         )
@@ -1201,7 +1204,7 @@ async def dream_all_entities(
         cumulative += res.actual_cost_usd
 
     log.info(
-        "Dream sweep finished: %d entities processed, cumulative cost $%.4f",
+        "─── dream sweep finished: %d entities processed, cumulative cost $%.4f ───",
         len(results), cumulative,
     )
     return results

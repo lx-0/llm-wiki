@@ -127,13 +127,14 @@ class TestCostTiering:
             _make_record(f"cost: (${amount}) reported")
         )
         if expected_color is None:
-            # No color wrap — just the literal substring stays plain.
-            assert f"(${amount})" in out
-            # Should NOT contain a color escape adjacent to this cost.
+            # Mid-tier ($0.10–$0.49): no color wrap.
+            assert f"${amount}" in out
+            # Should NOT contain a yellow/dim color escape adjacent to this cost.
             assert f"\033[33m${amount}" not in out
             assert f"\033[2m${amount}" not in out
         else:
-            assert f"({expected_color}${amount}\033[0m)" in out
+            # Surrounding parens stay plain; the dollar amount itself is colored.
+            assert f"{expected_color}${amount}\033[0m" in out
 
 
 class TestSdkNoiseFilter:
