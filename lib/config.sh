@@ -27,7 +27,7 @@ _validate_compile_hour() { [[ "$1" =~ ^([0-9]|1[0-9]|2[0-3])$ ]] || { warn "Hour
 _validate_url()          { [[ "$1" =~ ^https?:// ]] || { warn "Must start with http:// or https://"; return 1; }; }
 
 # ── Setup wizard (first-time) ────────────────────────────────────────
-# Asks the 5 questions worth asking, writes answers to config.yaml.
+# Asks the 6 questions worth asking, writes answers to config.yaml.
 config_cmd_setup_wizard() {
   banner "wiki config — setup wizard" \
     "6 questions. Skip with Enter to keep the current value."
