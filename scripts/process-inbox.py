@@ -23,12 +23,8 @@ from core import ollama_client
 from core.paths import RAW_ARTICLES_DIR, RAW_DIR, RAW_INBOX_WIKI_DIR, RAW_NOTES_DIR, RAW_TRANSCRIPTS_DIR, ROOT_DIR, SCRIPTS_DIR, WIKI_DIR
 from core.utils import today_iso
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s  %(levelname)s  %(message)s",
-    datefmt="%Y-%m-%dT%H:%M:%S",
-)
-log = logging.getLogger("inbox")
+from core.console import setup_console_logging
+log = setup_console_logging("inbox")
 
 from core.config import CONFIG
 

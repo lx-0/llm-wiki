@@ -166,22 +166,17 @@ def _build_piggyback_tasks() -> list[dict]:
 PIGGYBACK_TASKS = _build_piggyback_tasks()
 
 # ── Logging ──────────────────────────────────────────────────────────
-_LOG_FORMAT = "%(asctime)s  %(levelname)s  %(message)s"
-_LOG_DATEFMT = "%Y-%m-%dT%H:%M:%S"
-
-logging.basicConfig(
-    filename=str(LOG_FILE),
-    level=logging.INFO,
-    format=_LOG_FORMAT,
-    datefmt=_LOG_DATEFMT,
+# Shared console setup: TTY-detected colors on stderr, INFO+ archive to
+# LOG_FILE, WARNING+ archive to ERRORS_LOG_FILE. Hook invocations are
+# non-TTY → plain stderr (silently captured by the hook); manual
+# `wiki flush` from a TTY gets the colorized output (matches compile /
+# dream / lint / etc. — same UX language across the CLI).
+from core.console import setup_console_logging
+log = setup_console_logging(
+    "flush",
+    log_file=LOG_FILE,
+    error_file=ERRORS_LOG_FILE,
 )
-log = logging.getLogger("flush")
-
-_log_formatter = logging.Formatter(_LOG_FORMAT, datefmt=_LOG_DATEFMT)
-_error_handler = logging.FileHandler(ERRORS_LOG_FILE, encoding="utf-8")
-_error_handler.setFormatter(_log_formatter)
-_error_handler.setLevel(logging.WARNING)
-logging.getLogger().addHandler(_error_handler)
 
 
 # ── Dedup helpers ────────────────────────────────────────────────────

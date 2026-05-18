@@ -34,12 +34,8 @@ from core.utils import (
 )
 
 # ── Logging ──────────────────────────────────────────────────────────
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s  %(levelname)s  %(message)s",
-    datefmt="%Y-%m-%dT%H:%M:%S",
-)
-log = logging.getLogger("query")
+from core.console import setup_console_logging  # noqa: E402
+log = setup_console_logging("query")
 
 from core.prompts import render  # noqa: E402
 from core.sdk_helpers import (  # noqa: E402

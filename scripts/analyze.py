@@ -348,11 +348,8 @@ def cmd_default(args: argparse.Namespace) -> int:
 
 
 def main() -> int:
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s  %(levelname)-7s %(message)s",
-        datefmt="%Y-%m-%dT%H:%M:%S",
-    )
+    from core.console import setup_console_logging
+    setup_console_logging("analyze")
     parser = argparse.ArgumentParser(description="Operator-self-reports analyst layer")
     parser.add_argument("--vault", default=None, type=Path,
                         help="Override vault root (defaults to engine ROOT_DIR).")

@@ -82,12 +82,8 @@ from core.sdk_helpers import (
 from core.utils import now_iso, today_iso
 
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s  %(levelname)s  %(message)s",
-    datefmt="%Y-%m-%dT%H:%M:%S",
-)
-log = logging.getLogger("dream")
+from core.console import setup_console_logging  # noqa: E402
+log = setup_console_logging("dream")
 
 
 # ── Constants ─────────────────────────────────────────────────────────

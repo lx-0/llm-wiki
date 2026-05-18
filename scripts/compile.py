@@ -34,182 +34,61 @@ from core.utils import (
 from core.sdk_helpers import FailureClass, is_fatal
 
 # ── Logging ──────────────────────────────────────────────────────────
-_LOG_FORMAT = "%(asctime)s  %(levelname)s  %(message)s"
-_LOG_DATEFMT = "%Y-%m-%dT%H:%M:%S"
+# Generic console formatting + file handlers come from `core.console`.
+# compile-specific colorization (per-file header, dispatch, curiosity)
+# lives in `_CompileFormatter` below as a thin subclass.
 
-# ANSI escape codes for the colored stderr handler. Empty strings when
-# stderr isn't a TTY (piped to a file, captured by CI, etc.) so the
-# escape sequences don't leak into log captures.
-_TTY = sys.stderr.isatty()
-_C_RESET = "\033[0m" if _TTY else ""
-_C_DIM = "\033[2m" if _TTY else ""
-_C_BOLD = "\033[1m" if _TTY else ""
-_C_RED = "\033[31m" if _TTY else ""
-_C_GREEN = "\033[32m" if _TTY else ""
-_C_YELLOW = "\033[33m" if _TTY else ""
-_C_CYAN = "\033[36m" if _TTY else ""
+from core.console import (  # noqa: E402
+    C_BOLD,
+    C_CYAN,
+    C_DIM,
+    C_RESET,
+    C_YELLOW,
+    ConsoleFormatter,
+    setup_console_logging,
+)
 
 
-class _ConsoleFormatter(logging.Formatter):
-    """Tighter, optionally-colored formatter for stderr console output.
+class _CompileFormatter(ConsoleFormatter):
+    """compile.py-specific layers on top of the generic formatter.
 
-    File handlers keep the verbose ISO-timestamp format for grep-friendly
-    archival; this one trims to HH:MM:SS and applies a consistent color
-    scheme per line type:
+    Patterns owned here (subclass hook overrides them before the generic
+    ✓/✗/cost/elapsed/tokens pass runs):
 
-      - per-file header `[N/M] [badge] path`           bold cyan, ▶ marker
-      - dispatch line   `  type=X → prompt @ model`    dim
-      - success line    `  ✓ Ns · in:N out:N ($X)`     green ✓, dim tokens
-      - failure line    `  ✗ ...`                       red ✗
-      - curiosity line  `  Curiosity*`                  dim cyan + `?` prefix
-                                                        (info, not action; magenta
-                                                        read as error in dark terminals)
-      - section banner  `─── ... ───`                   bold
-      - cost in any line                                tiered: dim<$0.05 / plain / yellow>$0.50 / bold-yellow>$1.50
-      - badge `[name]` inside header                    yellow
-      - elapsed time `Ns`                               dim
+      - per-file header `[N/M] [badge] path`  → bold cyan, ▶ marker, badge yellow
+      - dispatch line   `  type=X → prompt @ model`  → dim
+      - curiosity line  `  Curiosity*`  → dim cyan + `?` prefix
+                                          (info, not action; magenta read as
+                                          error in dark terminals; the `?`
+                                          glyph signals "inquiry")
     """
 
-    LEVEL_COLOR = {
-        "WARNING":  _C_YELLOW,
-        "ERROR":    _C_RED,
-        "CRITICAL": _C_RED + _C_BOLD,
-    }
-
-    _COST_RE = re.compile(r"\(\$(\d+(?:\.\d+)?)\)")
     _HEADER_RE = re.compile(r"^\[(\d+/\d+)\]\s+\[([^\]]+)\]\s+(\S+)$")
     _DISPATCH_RE = re.compile(r"^\s+type=[\w-]+\s+→")
     _CURIOSITY_RE = re.compile(r"^\s+Curiosity[: ]")
-    _SUCCESS_RE = re.compile(r"^\s+✓\s")
-    _FAILURE_RE = re.compile(r"^\s+✗\s")
-    _SECTION_RE = re.compile(r"^─── .+ ───$")
-    _ELAPSED_RE = re.compile(r"\b(\d+\.\d+s)\b")
-    _TOKENS_RE = re.compile(r"\b(in:[\w.,]+\s+out:[\w.,]+)")
 
-    def _colorize_cost(self, msg: str) -> str:
-        def _sub(m: re.Match[str]) -> str:
-            amount = float(m.group(1))
-            if amount >= 1.50:
-                color = _C_BOLD + _C_YELLOW
-            elif amount >= 0.50:
-                color = _C_YELLOW
-            elif amount < 0.05:
-                color = _C_DIM
-            else:
-                return m.group(0)
-            return f"({color}${m.group(1)}{_C_RESET})"
-        return self._COST_RE.sub(_sub, msg)
-
-    def format(self, record: logging.LogRecord) -> str:
-        ts = time.strftime("%H:%M:%S", time.localtime(record.created))
-        msg = record.getMessage()
-
-        if _TTY:
-            # Section banner — full bold (matches log.info("─── compiling N of M …"))
-            if self._SECTION_RE.match(msg.strip()):
-                msg = f"{_C_BOLD}{msg}{_C_RESET}"
-            # Per-file header — full cyan/bold with ▶ marker, badge tinted yellow.
-            elif (mh := self._HEADER_RE.match(msg.strip())):
-                pos, badge, path = mh.group(1), mh.group(2), mh.group(3)
-                msg = (
-                    f"{_C_BOLD}{_C_CYAN}▶ [{pos}] "
-                    f"{_C_YELLOW}[{badge}]{_C_CYAN} {path}{_C_RESET}"
-                )
-            # Dispatch line — dim (it's a routing note, not action).
-            elif self._DISPATCH_RE.match(msg):
-                msg = f"{_C_DIM}{msg}{_C_RESET}"
-            # Curiosity engine lines — dim cyan + `?` glyph prefix.
-            # Curiosity is informational (the gap-detection loop wrote N
-            # requests for the next compile to pick up); it's NOT a
-            # compile failure. Earlier magenta choice read as red/error
-            # in dark terminals and competed with the actual red ✗
-            # failure marker. Dim cyan parks the lines in the ambient-
-            # log register (same weight as dispatch / elapsed / tokens);
-            # the `?` glyph signals "inquiry", matching the loop's name.
-            elif self._CURIOSITY_RE.match(msg):
-                marked = re.sub(r"^(\s+)Curiosity", r"\1? Curiosity", msg, count=1)
-                msg = f"{_C_DIM}{_C_CYAN}{marked}{_C_RESET}"
-            # Success/failure inline markers + cost/elapsed/tokens tinting
-            # for all remaining lines (incl. ✓ summary lines).
-            else:
-                msg = msg.replace("✓", f"{_C_GREEN}✓{_C_RESET}")
-                msg = msg.replace("✗", f"{_C_RED}✗{_C_RESET}")
-                msg = self._colorize_cost(msg)
-                msg = self._ELAPSED_RE.sub(f"{_C_DIM}\\1{_C_RESET}", msg)
-                msg = self._TOKENS_RE.sub(f"{_C_DIM}\\1{_C_RESET}", msg)
-
-        level_color = self.LEVEL_COLOR.get(record.levelname, "")
-        level_text = "" if record.levelname == "INFO" else record.levelname
-        level = level_text.ljust(7)
-        if level_color and _TTY and level_text:
-            level = f"{level_color}{level_text}{_C_RESET}".ljust(
-                7 + len(level_color) + len(_C_RESET)
+    def _format_message_extras(self, msg: str) -> str | None:
+        if (mh := self._HEADER_RE.match(msg.strip())):
+            pos, badge, path = mh.group(1), mh.group(2), mh.group(3)
+            return (
+                f"{C_BOLD}{C_CYAN}▶ [{pos}] "
+                f"{C_YELLOW}[{badge}]{C_CYAN} {path}{C_RESET}"
             )
+        if self._DISPATCH_RE.match(msg):
+            return f"{C_DIM}{msg}{C_RESET}"
+        if self._CURIOSITY_RE.match(msg):
+            marked = re.sub(r"^(\s+)Curiosity", r"\1? Curiosity", msg, count=1)
+            return f"{C_DIM}{C_CYAN}{marked}{C_RESET}"
+        return None
 
-        return f"{_C_DIM}{ts}{_C_RESET}  {level}  {msg}"
-
-
-class _NoiseFilter(logging.Filter):
-    """Drop the high-volume noise lines from console (file handlers keep them).
-
-    The SDK prints "Using bundled Claude Code CLI: <path>" once per compile
-    call — at ~100 files/batch that's 100 useless full-path lines on stderr.
-    Keep them in the .log archive (the file handlers don't carry this
-    filter), drop from interactive console.
-    """
-
-    _DROP_SUBSTRINGS = (
-        "Using bundled Claude Code CLI:",
-    )
-
-    def filter(self, record: logging.LogRecord) -> bool:
-        msg = record.getMessage()
-        return not any(s in msg for s in self._DROP_SUBSTRINGS)
-
-
-# Explicit handler setup (replaces basicConfig so we control the stderr
-# formatter + filter without competing with the default StreamHandler).
-_root = logging.getLogger()
-_root.setLevel(logging.INFO)
-_console_handler = logging.StreamHandler(sys.stderr)
-_console_handler.setFormatter(_ConsoleFormatter())
-_console_handler.addFilter(_NoiseFilter())
-_root.addHandler(_console_handler)
-
-log = logging.getLogger("compile")
-
-# Silence noisy library loggers — every Ollama curiosity call would otherwise
-# spam an INFO-level "HTTP Request: POST ..." line into compile.log.
-logging.getLogger("httpx").setLevel(logging.WARNING)
-logging.getLogger("httpcore").setLevel(logging.WARNING)
-
-# claude_agent_sdk's internal message reader emits a generic
-# `logger.error("Fatal error in message reader: ...")` line BEFORE the
-# exception bubbles up to our except block — every CLI exit-1 (max_turns,
-# context overflow, kind=unknown, etc.) produces two log records: the SDK's
-# alarming-but-uninformative "Fatal error / Check stderr output for details"
-# line first, then our own classifier's `kind=max_turns · ...` line with the
-# real diagnosis. Our classifier in `compile_file()` already extracts and
-# logs everything (final ResultMessage, classified kind, cost burned,
-# captured stderr lines), so silencing the SDK's pre-exception ERROR is
-# information-loss-free and makes the operator's first-seen error line the
-# actual diagnosis instead of generic CLI failure noise.
-logging.getLogger("claude_agent_sdk._internal.query").setLevel(logging.CRITICAL)
 
 LOGS_DIR.mkdir(parents=True, exist_ok=True)
-_compile_log_file = LOGS_DIR / "compile.log"
-_compile_errors_file = LOGS_DIR / "compile-errors.log"
-_log_formatter = logging.Formatter(_LOG_FORMAT, datefmt=_LOG_DATEFMT)
-
-_file_handler = logging.FileHandler(_compile_log_file, encoding="utf-8")
-_file_handler.setFormatter(_log_formatter)
-_file_handler.setLevel(logging.INFO)
-logging.getLogger().addHandler(_file_handler)
-
-_error_handler = logging.FileHandler(_compile_errors_file, encoding="utf-8")
-_error_handler.setFormatter(_log_formatter)
-_error_handler.setLevel(logging.WARNING)
-logging.getLogger().addHandler(_error_handler)
+log = setup_console_logging(
+    "compile",
+    formatter=_CompileFormatter(),
+    log_file=LOGS_DIR / "compile.log",
+    error_file=LOGS_DIR / "compile-errors.log",
+)
 
 from core.config import CONFIG  # noqa: E402
 from core.prompts import render  # noqa: E402

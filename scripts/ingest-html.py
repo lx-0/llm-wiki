@@ -35,12 +35,8 @@ from core.paths import RAW_ARTICLES_DIR, RAW_DIR, RAW_NOTES_DIR, ROOT_DIR, SCRIP
 from core.utils import today_iso
 from core.config import CONFIG
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s  %(levelname)s  %(message)s",
-    datefmt="%Y-%m-%dT%H:%M:%S",
-)
-log = logging.getLogger("ingest-html")
+from core.console import setup_console_logging
+log = setup_console_logging("ingest-html")
 
 DEFAULT_MODEL = CONFIG.models.vision_model
 

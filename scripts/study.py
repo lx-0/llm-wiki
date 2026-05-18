@@ -489,11 +489,8 @@ def cmd_diff(args: argparse.Namespace) -> int:
 
 
 def main() -> int:
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s  %(levelname)-7s %(message)s",
-        datefmt="%Y-%m-%dT%H:%M:%S",
-    )
+    from core.console import setup_console_logging
+    setup_console_logging("study")
 
     parser = argparse.ArgumentParser(description="Study lifecycle commands")
     sub = parser.add_subparsers(dest="cmd", required=True)

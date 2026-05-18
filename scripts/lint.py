@@ -34,12 +34,8 @@ from core.utils import (
 )
 
 # ── Logging ──────────────────────────────────────────────────────────
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s  %(levelname)s  %(message)s",
-    datefmt="%Y-%m-%dT%H:%M:%S",
-)
-log = logging.getLogger("lint")
+from core.console import setup_console_logging  # noqa: E402
+log = setup_console_logging("lint")
 
 from core.config import CONFIG  # noqa: E402
 
