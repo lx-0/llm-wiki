@@ -186,7 +186,7 @@ The `dream_cycle` piggyback periodically re-synthesizes entity pages (`knowledge
 - **`tags`** + **`tag_strategy`** (`max | sum | first`) — multiplier from page tags.
 - **`status`** (dict, e.g. `active: 1.0`, `dormant: 0.3`, `retired: 0.05`).
 
-Resolution order: per-entity frontmatter `dream_priority: <float>` (absolute override) → config `paths:` first-match → formula `default × domain × tag(max|sum|first) × status`. Selection mode for `wiki dream --all-entities` is `--selection-mode {probabilistic, greedy}` (default greedy).
+Resolution order: per-entity frontmatter `dream_priority: <float>` (absolute override) → config `paths:` first-match → formula `default × domain × tag(max|sum|first) × status`. Selection mode for `wiki dream` is `--selection-mode {probabilistic, greedy}` (default greedy). `wiki dream` defaults to a full sweep; `--all-entities` and `sweep` are accepted as legacy aliases.
 
 Debug current ranking with `wiki dream list-candidates --limit 15` — prints rank/weight/priority/age/slug/source-trace per entity. Spec: `.ytstack/backlog/dream-priority-config.md`.
 
