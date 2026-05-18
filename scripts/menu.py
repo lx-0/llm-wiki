@@ -30,6 +30,16 @@ from typing import Callable
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from core.console import (
+    C_BOLD,
+    C_CYAN,
+    C_DIM,
+    C_GREEN,
+    C_RED,
+    C_RESET,
+    C_YELLOW,
+    is_tty,
+)
 from core.health import CheckResult, build_health
 from core.paths import ROOT_DIR, WIKI_DIR
 from menu_context import build_status, build_suggestions
@@ -465,17 +475,18 @@ def _git_revision() -> str:
 # prompt_toolkit stays for line-input subprompts (_pt_ask, _pick_query_mode)
 # where its history + editing pay off; the home loop owns its own input.
 
-# Mirrors `core.console`: every close tag emits full reset `\033[0m`, every
-# open tag is a single SGR. Same bytes compile.py / lib/common.sh emit —
-# guaranteed parity with the rest of the engine's colored output regardless
-# of which partial-reset codes a given terminal config drops.
+# Tag→ANSI table sourced from `core.console`'s C_* constants — exactly the
+# same byte sequences compile.py / dream.py / lib/common.sh emit, all
+# gated by the same `is_tty()` (stderr.isatty()) flag. If compile's colors
+# render in the operator's terminal, the menu's render too — they are now
+# literally the same bytes on the same stream.
 _ANSI_TAGS = {
-    "<b>": "\x1b[1m", "</b>": "\x1b[0m",
-    "<ansicyan>": "\x1b[36m", "</ansicyan>": "\x1b[0m",
-    "<ansired>": "\x1b[31m", "</ansired>": "\x1b[0m",
-    "<ansigreen>": "\x1b[32m", "</ansigreen>": "\x1b[0m",
-    "<ansiyellow>": "\x1b[33m", "</ansiyellow>": "\x1b[0m",
-    "<ansibrightblack>": "\x1b[90m", "</ansibrightblack>": "\x1b[0m",
+    "<b>": C_BOLD, "</b>": C_RESET,
+    "<ansicyan>": C_CYAN, "</ansicyan>": C_RESET,
+    "<ansired>": C_RED, "</ansired>": C_RESET,
+    "<ansigreen>": C_GREEN, "</ansigreen>": C_RESET,
+    "<ansiyellow>": C_YELLOW, "</ansiyellow>": C_RESET,
+    "<ansibrightblack>": C_DIM, "</ansibrightblack>": C_RESET,
 }
 _TAG_RE = re.compile("|".join(re.escape(k) for k in _ANSI_TAGS))
 
@@ -547,19 +558,24 @@ def _run_home_picker(state: HomeState) -> None:
 
     state.selected = None
     # Emit to stderr to match compile.py / core.console / lib/common.sh —
-    # every other colored-output channel in the engine uses stderr, and the
-    # operator's iTerm2 only renders ANSI on the stderr stream in this
-    # session (stdout colors were silently dropped). Stderr is also
-    # unbuffered by default, so each redraw is atomic.
+    # every other colored-output channel in the engine uses stderr.
     out = sys.stderr
+    # Track the height of the previous render so we can step the cursor
+    # back over it and overwrite (instead of `\x1b[2J` clear-screen,
+    # which compile never uses — the engine's convention is scroll, not
+    # alt-screen). 0 == nothing to step over yet.
+    prev_lines = 0
     while state.selected is None:
-        # Full SGR reset → clear screen → home cursor. The leading reset
-        # discards any leftover bold/color from a previous dispatched
-        # subcommand so the menu renders against a known-clean state.
-        out.write("\x1b[0m\x1b[2J\x1b[H")
-        out.write(_html_to_ansi(_build_screen_html(state)))
+        screen = _html_to_ansi(_build_screen_html(state))
+        if prev_lines and is_tty():
+            # Move cursor to the start of the line `prev_lines` rows up,
+            # then erase from cursor to end of screen. This overwrites
+            # the previous render in-place without nuking scrollback.
+            out.write(f"\x1b[{prev_lines}F\x1b[J")
+        out.write(screen)
         out.write("\n")
         out.flush()
+        prev_lines = screen.count("\n") + 1
 
         try:
             key = _read_key(fd)
