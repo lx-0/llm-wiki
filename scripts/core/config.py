@@ -355,6 +355,15 @@ class Limits:
     # compile_per_call_timeout`, preserve the consecutive-failure budget
     # so a single hang doesn't kill the whole batch. Set to 0 to disable.
     compile_per_call_timeout_s: int = 600
+    # Dream-cycle per-message stall timeout (M014). Mirrors
+    # compile_per_call_timeout_s: a single SDK message that doesn't
+    # arrive within this window converts the call to kind=timeout
+    # instead of hanging until the bundled CLI subprocess crashes
+    # silently with kind=unknown. Default 300s — dream-entity calls
+    # typically complete in 30-180s; anything past 5min is a stall.
+    # Set to 0 to disable per-message timeout (use whole-call timeout
+    # only — current pre-fix behavior).
+    dream_per_call_timeout_s: int = 300
     # Retry once with `compile_large_source_model` (the 1M-context Opus
     # variant) when a compile call returns kind=unknown — the silent
     # exit-1 / empty-stderr signature of mid-stream context overflow from

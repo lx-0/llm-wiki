@@ -1015,15 +1015,64 @@ async def dream_entity(
         )
         query_prompt = prompt
 
+    # Per-message stall timeout (ports compile_stages/compile.py:155-200).
+    # The bare `async for message in query(...)` pattern in dream's pre-fix
+    # code would block indefinitely while the bundled CLI subprocess hung
+    # or crashed silently — exactly the failure mode that took 339s on
+    # paperclip-companies/[1m] with empty stderr. Per-message timeout
+    # surfaces stalls as kind=timeout with a clear elapsed-time log,
+    # AND gives us message-count visibility so we can see WHERE in the
+    # stream the call dies.
+    per_call_timeout = CONFIG.limits.dream_per_call_timeout_s
+    message_count = 0
     try:
-        async for message in query(prompt=query_prompt, options=agent_options):
+        agen = query(prompt=query_prompt, options=agent_options).__aiter__()
+        while True:
+            try:
+                if per_call_timeout and per_call_timeout > 0:
+                    message = await asyncio.wait_for(
+                        agen.__anext__(), timeout=per_call_timeout
+                    )
+                else:
+                    message = await agen.__anext__()
+            except StopAsyncIteration:
+                break
+            message_count += 1
             if isinstance(message, AssistantMessage) and message.usage:
                 input_tokens += message.usage.get("input_tokens", 0)
                 output_tokens += message.usage.get("output_tokens", 0)
             if isinstance(message, ResultMessage):
                 result_text = message.result or ""
                 actual_cost = float(getattr(message, "total_cost_usd", 0.0) or 0.0)
+    except asyncio.TimeoutError:
+        elapsed = time.time() - started
+        log.warning(
+            "  dream_entity ⏱ per-call timeout after %.1fs (no message "
+            "for %ds, last_message_count=%d) — bundled CLI hung. "
+            "model=%s slug=%s (%d chars).",
+            elapsed, per_call_timeout, message_count, model, entity.slug, prompt_chars,
+        )
+        try:
+            aclose = getattr(agen, "aclose", None)
+            if aclose is not None:
+                await aclose()
+        except Exception:  # noqa: BLE001 — best-effort cleanup
+            pass
+        capture.dump_to(log)
+        elapsed = time.time() - started
+        return DreamResult(
+            entity=entity, corpus_count=len(corpus_paths),
+            corpus_chars=prompt_chars, estimated_cost_usd=estimate,
+            actual_cost_usd=actual_cost, input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            sdk_result_text=f"per-call timeout after {elapsed:.1f}s (msg_count={message_count})",
+            skipped="per_call_timeout", elapsed_s=elapsed,
+        )
     except Exception as exc:  # noqa: BLE001 — classifier handles all paths
+        log.error(
+            "  dream_entity ✗ failed after %.1fs (last_message_count=%d): %s",
+            time.time() - started, message_count, type(exc).__name__,
+        )
         log_sdk_failure(
             log,
             label=f"dream_entity:{entity.slug}",

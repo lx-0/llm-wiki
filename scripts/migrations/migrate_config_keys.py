@@ -101,6 +101,11 @@ KEY_ADDITIONS: dict[str, dict[str, object]] = {
         "dream_model": "claude-opus-4-7[1m]",
     },
     "limits": {
+        # M014 dream-cycle per-message stall timeout. Added 2026-05-18
+        # after paperclip-companies crashed at 339s on [1m] with empty
+        # stderr — diagnostic instrumentation + structural alignment
+        # with compile_per_call_timeout_s. See KNOWLEDGE.md.
+        "dream_per_call_timeout_s": 300,
         # Empty by default since 2026-05-16 P2: daily-digest and
         # calendar-rollup moved to dedicated lean prompts in
         # SUBSTRATE_PROMPTS (compile.py). No remaining substrate
