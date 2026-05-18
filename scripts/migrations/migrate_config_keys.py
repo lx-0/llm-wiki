@@ -93,6 +93,13 @@ PIGGYBACK_RENAMES: dict[str, str | None] = {
 # → {key: default_value}. Missing parent blocks are created. Keys already
 # present (even with a different value) are left untouched.
 KEY_ADDITIONS: dict[str, dict[str, object]] = {
+    "models": {
+        # M014 dream-cycle model. Default [1m] up-front — dream-entity is
+        # a fan-out workload that blows standard 200K Opus context mid-stream
+        # (see KNOWLEDGE.md "tool-turn ballooning"). Set to "" to fall back
+        # to models.compile_model. Added 2026-05-18.
+        "dream_model": "claude-opus-4-7[1m]",
+    },
     "limits": {
         # Empty by default since 2026-05-16 P2: daily-digest and
         # calendar-rollup moved to dedicated lean prompts in

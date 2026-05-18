@@ -133,6 +133,16 @@ class Models:
     # The 1M variant absorbs both. Set to "" to disable the auto-upgrade and
     # stay on `compile_model` regardless of source size.
     compile_large_source_model: str = "claude-opus-4-7[1m]"
+    # Dream-cycle entity re-synthesis (M014). dream-entity is a kanonical
+    # fan-out workload: 1 entity-page Edit on top of N substrate Reads from
+    # its corpus (T1=10-30 files typical) + Grep/Glob exploration of
+    # knowledge/. Tool-turn ballooning blows the 200K Opus window mid-stream
+    # the same way compile.py did pre-M010 (see KNOWLEDGE.md "tool-turn
+    # ballooning is the new overflow vector"). Default to [1m] up-front so
+    # dream-entity calls have headroom for the inherent fan-out, just like
+    # `compile_force_long_context_types` does for compile's fan-out
+    # substrates (daily-digest, etc). Set "" to fall back to compile_model.
+    dream_model: str = "claude-opus-4-7[1m]"
     ollama_url: str = "http://localhost:11434"
     vision_model: str = "gemma4:e4b"
     # Curiosity gap-detection. Needs *both* schema-honoring AND enough context

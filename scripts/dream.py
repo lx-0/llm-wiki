@@ -960,7 +960,13 @@ async def dream_entity(
 
     # Real SDK call. Single attempt — dream is a periodic pass; if it fails,
     # the next pass picks the entity up again.
-    model = CONFIG.models.compile_model
+    # Model pick: prefer the 1M-context variant because dream-entity is
+    # inherently a fan-out workload (Reads N corpus files + Grep/Glob into
+    # knowledge/ → tool-turn ballooning blows the standard 200K window
+    # mid-stream, surfacing as the silent kind=unknown exit-1 documented
+    # in KNOWLEDGE.md "tool-turn ballooning". Fall back to compile_model
+    # if dream_model is explicitly disabled by setting it to "".
+    model = CONFIG.models.dream_model or CONFIG.models.compile_model
     # Snapshot entity page mtime + size so we can detect a "no vault write"
     # outcome (agent ran but decided no changes needed, OR was silently
     # blocked from writing). Compared post-SDK below.
