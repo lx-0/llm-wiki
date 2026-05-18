@@ -277,8 +277,8 @@ LIMIT 10
 
 > [!info]- 🤖 Agents
 > <!-- agent-buttons:begin -->
-> `BUTTON[btn-daily-digest]` `BUTTON[btn-summarize-day]`
-> <!-- agent-buttons:end -->
+`BUTTON[btn-daily-digest]` `BUTTON[btn-dream-cycle]` `BUTTON[btn-summarize-day]`
+<!-- agent-buttons:end -->
 
 ---
 
