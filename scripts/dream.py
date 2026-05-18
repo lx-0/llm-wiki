@@ -60,6 +60,7 @@ from claude_agent_sdk import (
     ClaudeAgentOptions,
     ResultMessage,
     query,
+    HookMatcher,
 )
 
 from core.config import CONFIG
@@ -80,6 +81,7 @@ from core.sdk_helpers import (
     StderrCapture,
     log_sdk_failure,
     make_path_scope_gate,
+    make_path_scope_hook,
     prompt_stream,
 )
 from core.utils import now_iso, today_iso, append_history
@@ -996,13 +998,21 @@ async def dream_entity(
         stderr=capture.callback,
     )
     if CONFIG.features.compile_callback_gate:
+        # See compile_stages/compile.py for the rationale — same swap, same fix.
         agent_options = ClaudeAgentOptions(
             **common_options,
-            allowed_tools=["Read", "Glob", "Grep"],
-            can_use_tool=make_path_scope_gate([ROOT_DIR / "knowledge"]),
+            allowed_tools=["Read", "Glob", "Grep", "Write", "Edit"],
+            hooks={
+                "PreToolUse": [
+                    HookMatcher(
+                        matcher="Write|Edit",
+                        hooks=[make_path_scope_hook([ROOT_DIR / "knowledge"])],
+                    ),
+                ],
+            },
             permission_mode="default",
         )
-        query_prompt = prompt_stream(prompt)
+        query_prompt = prompt
     else:
         agent_options = ClaudeAgentOptions(
             **common_options,
@@ -1119,6 +1129,17 @@ async def dream_entity(
             "substrate to incorporate (auth/recent both 0) OR agent "
             "decided no changes needed. Page byte-identical to pre-run.",
             str(entity.page.relative_to(ROOT_DIR)),
+        )
+        # Log the agent's final-message text so we can see WHY it didn't
+        # write. Three distinct signals operator might find here:
+        #   - "no changes needed" / "page already accurate" -> legit no-op
+        #   - prose describing changes the agent "would" make -> Write
+        #     tool wasn't actually exposed (callback-gate config bug)
+        #   - error/refusal text -> agent saw a constraint we don't expect
+        log.warning(
+            "  agent final-message text (%d chars): %s",
+            len(result_text or ""),
+            (result_text or "(empty)")[:1500].replace("\n", " | "),
         )
     # Suspiciously-low token-count signal. A 489 KB prompt should report
     # 100k+ input tokens; in:12 means the SDK never actually processed

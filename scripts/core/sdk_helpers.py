@@ -346,3 +346,71 @@ def make_path_scope_gate(allowed_write_roots):
         )
 
     return gate
+
+
+def make_path_scope_hook(allowed_write_roots):
+    """Build a PreToolUse hook callback that path-scopes Write/Edit.
+
+    Used as the working alternative to ``can_use_tool``: while
+    ``make_path_scope_gate`` correctly denies OUTSIDE-scope Write/Edit,
+    the bundled CLI exposes neither Write nor Edit to the agent when they
+    are absent from ``allowed_tools`` — INSIDE-scope writes were silently
+    blocked too (verified empirically against compile + dream on
+    2026-05-18, ~16 hours of silent write-failure before discovery).
+
+    The hook architecture works because Write/Edit STAY in
+    ``allowed_tools`` (so the CLI exposes them to the agent) but a
+    PreToolUse hook fires BEFORE each invocation. The hook returns
+    ``permissionDecision: "deny"`` for paths outside ``allowed_write_roots``.
+
+    Args:
+        allowed_write_roots: iterable of ``pathlib.Path``. A Write/Edit is
+            allowed iff its ``file_path`` resolves (after ``Path.resolve()``)
+            inside one of these roots.
+
+    Returns:
+        An async callback compatible with the
+        ``hooks={"PreToolUse": [HookMatcher(matcher="Write|Edit", hooks=[...])]}``
+        wiring on ``ClaudeAgentOptions``.
+    """
+    resolved_roots = [Path(r).resolve() for r in allowed_write_roots]
+
+    async def hook(hook_input, _tool_use_id, _context):
+        tool_input = hook_input.get("tool_input") or {}
+        raw_path = tool_input.get("file_path", "")
+        if not raw_path:
+            return {"hookSpecificOutput": {
+                "hookEventName": "PreToolUse",
+                "permissionDecision": "deny",
+                "permissionDecisionReason": (
+                    f"{hook_input.get('tool_name', '?')} missing file_path"
+                ),
+            }}
+        try:
+            resolved = Path(raw_path).resolve()
+        except (OSError, ValueError) as exc:
+            return {"hookSpecificOutput": {
+                "hookEventName": "PreToolUse",
+                "permissionDecision": "deny",
+                "permissionDecisionReason": (
+                    f"path could not be resolved: {exc}"
+                ),
+            }}
+        for root in resolved_roots:
+            try:
+                resolved.relative_to(root)
+                return {"hookSpecificOutput": {
+                    "hookEventName": "PreToolUse",
+                    "permissionDecision": "allow",
+                }}
+            except ValueError:
+                continue
+        return {"hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "permissionDecision": "deny",
+            "permissionDecisionReason": (
+                f"{resolved} not under any permitted root "
+                f"({', '.join(str(r) for r in resolved_roots)})"
+            ),
+        }}
+    return hook

@@ -44,6 +44,7 @@ from claude_agent_sdk import (
     ClaudeAgentOptions,
     ResultMessage,
     query,
+    HookMatcher,
 )
 
 from core.config import CONFIG
@@ -56,6 +57,7 @@ from core.sdk_helpers import (
     assert_prompt_within_budget,
     log_sdk_failure,
     make_path_scope_gate,
+    make_path_scope_hook,
     prompt_stream,
 )
 from core.utils import (
@@ -133,10 +135,27 @@ async def _attempt(
         stderr=capture.callback,
     )
     if CONFIG.features.compile_callback_gate:
+        # Path-scoped Write/Edit via PreToolUse hook (2026-05-18). The
+        # previous ``can_use_tool=make_path_scope_gate(...)`` approach
+        # combined with ``allowed_tools=[Read,Glob,Grep]`` (Write/Edit
+        # absent) silently blocked writes INSIDE knowledge/ too — the
+        # bundled CLI does not expose tools to the agent when absent from
+        # allowed_tools, regardless of callback Allow. ~16h of silent
+        # write-failure across compile + dream before discovery. The hook
+        # path keeps Write/Edit IN allowed_tools (exposed) but path-scopes
+        # them via PreToolUse hook — empirically INSIDE-allow + OUTSIDE-deny
+        # both work. See KNOWLEDGE.md for the probe transcript.
         agent_options = ClaudeAgentOptions(
             **common_options,
-            allowed_tools=["Read", "Glob", "Grep"],
-            can_use_tool=make_path_scope_gate([ROOT_DIR / "knowledge"]),
+            allowed_tools=["Read", "Glob", "Grep", "Write", "Edit"],
+            hooks={
+                "PreToolUse": [
+                    HookMatcher(
+                        matcher="Write|Edit",
+                        hooks=[make_path_scope_hook([ROOT_DIR / "knowledge"])],
+                    ),
+                ],
+            },
             permission_mode="default",
         )
         query_prompt = prompt_stream(prompt)
