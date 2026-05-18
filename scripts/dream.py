@@ -82,9 +82,7 @@ from core.sdk_helpers import (
     make_path_scope_gate,
     prompt_stream,
 )
-from core.utils import now_iso, today_iso
-
-
+from core.utils import now_iso, today_iso, append_history
 from core.console import (  # noqa: E402
     C_BOLD,
     C_CYAN,
@@ -1096,13 +1094,41 @@ async def dream_entity(
             rel = str(path.relative_to(ROOT_DIR))
         except ValueError:
             continue
+        # Skip BOTH the legacy flat daily file (`daily/2026-05-18.md`) AND
+        # the per-source rollup captures (`daily/2026-05-18/sessions.md`,
+        # `daily/2026-05-18/health.md`, etc — daily/-as-rollup migration
+        # 2026-05-15). All are stage-3 distillations or per-source captures
+        # that re-rollup every day, so stamping them would churn the state
+        # file on every dream run for no informational value.
         if re.fullmatch(r"daily/\d{4}-\d{2}-\d{2}\.md", rel):
+            continue
+        if re.fullmatch(r"daily/\d{4}-\d{2}-\d{2}/[^/]+\.md", rel):
             continue
         if _write_last_dreamed_at(path):
             stamped += 1
     if stamped:
         log.info("  stamped last_dreamed_at on %d substrate file(s)", stamped)
 
+    # Per-entity history event so dashboard + grep can answer
+    # "what happened on the last dream of entity X?".
+    try:
+        append_history(
+            "dream_entity",
+            slug=entity.slug,
+            kind=entity.kind,
+            corpus_count=len(corpus_paths),
+            corpus_chars=prompt_chars,
+            cost_usd=round(actual_cost, 4),
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            elapsed_s=round(elapsed, 1),
+            no_vault_write=(
+                _entity_post_mtime == _entity_pre_mtime
+                and _entity_post_size == _entity_pre_size
+            ),
+        )
+    except Exception:
+        pass
     return DreamResult(
         entity=entity, corpus_count=len(corpus_paths),
         corpus_chars=prompt_chars, estimated_cost_usd=estimate,
@@ -1189,13 +1215,18 @@ def _select_for_sweep(
     candidates: list[tuple[float, EntityRef, str]],
     N: int,
     mode: str,
+    *,
+    seed: int | None = None,
 ) -> list[tuple[float, EntityRef, str]]:
     """Pick N entities from weighted candidates. Mode = probabilistic | greedy.
 
     Filters out zero-weight entities (priority:0 means excluded).
     Probabilistic = weighted-random sample (diverse over time).
     Greedy = top-N by weight (deterministic).
+    `seed` pins the RNG so probabilistic runs are reproducible for
+    debugging "why was X picked over Y?" investigations.
     """
+    _rng = random.Random(seed) if seed is not None else random
     eligible = [t for t in candidates if t[0] > 0]
     if not eligible:
         return []
@@ -1211,7 +1242,7 @@ def _select_for_sweep(
         total = sum(w for w, _ in pool)
         if total <= 0:
             break
-        r = random.uniform(0, total)
+        r = _rng.uniform(0, total)
         cum = 0.0
         for i, (w, item) in enumerate(pool):
             cum += w
@@ -1259,6 +1290,7 @@ async def dream_all_entities(
     limit: int | None = None,
     dry_run: bool = False,
     selection_mode: str | None = None,
+    seed: int | None = None,
 ) -> list[DreamResult]:
     """Sweep all entities respecting caps + cooldown + M017 priority weighting.
 
@@ -1273,6 +1305,7 @@ async def dream_all_entities(
     all_entities = _list_all_entities()
     # Build (weight, entity, source) candidates: filter cooldown, compute weight via priority × age.
     candidates: list[tuple[float, EntityRef, str]] = []
+    _sweep_rng = random.Random(seed) if seed is not None else random
     for ent in all_entities:
         if is_within_cooldown(ent, cooldown_days=cd):
             continue
@@ -1280,17 +1313,18 @@ async def dream_all_entities(
         age = _last_synth_age_days(ent)
         # Never-synthesized = high age signal (365d default cap so it doesn't dominate)
         age_for_weight = age if age is not None else 365.0
-        weight = priority * age_for_weight * random.uniform(0.85, 1.15)
+        weight = priority * age_for_weight * _sweep_rng.uniform(0.85, 1.15)
         candidates.append((weight, ent, source))
 
     # M017 selection
     N = limit if limit is not None else len(candidates)
-    ranked = _select_for_sweep(candidates, N, mode)
+    ranked = _select_for_sweep(candidates, N, mode, seed=seed)
 
+    seed_label = f" · seed={seed}" if seed is not None else ""
     log.info(
         "─── dream sweep: %d entities total, %d candidates after cooldown+priority filter "
-        "(mode=%s, run_cap=$%.2f) ───",
-        len(all_entities), len(ranked), mode, run_cap,
+        "(mode=%s, run_cap=$%.2f%s) ───",
+        len(all_entities), len(ranked), mode, run_cap, seed_label,
     )
 
     results: list[DreamResult] = []
@@ -1319,6 +1353,25 @@ async def dream_all_entities(
         "─── dream sweep finished: %d entities processed, cumulative cost $%.4f ───",
         len(results), cumulative,
     )
+    # Append-only history event so dashboard + grep can answer
+    # "when did dream-cycle last run, for which entities, at what cost?"
+    # Mirrors compile/flush event shape (see core.utils.append_history).
+    try:
+        skipped_count = sum(1 for r in results if r.skipped)
+        no_write_count = 0  # detectable per-entity but not aggregated here
+        append_history(
+            "dream_sweep",
+            entities_processed=len(results),
+            entities_total=len(all_entities),
+            candidates_after_filter=len(ranked),
+            mode=mode,
+            seed=seed,
+            cost_delta=round(cumulative, 4),
+            skipped=skipped_count,
+            picked_slugs=[r.entity.slug for r in results],
+        )
+    except Exception:
+        pass  # observability is best-effort, never block the dream
     return results
 
 
@@ -1342,6 +1395,10 @@ async def _async_main() -> int:
     p_all.add_argument("--per-entity-cap", type=float, default=None)
     p_all.add_argument("--per-run-cap", type=float, default=None)
     p_all.add_argument("--limit", type=int, default=None, help="Hard cap on entity count this run")
+    p_all.add_argument(
+        "--seed", type=int, default=None,
+        help="Pin RNG seed for reproducible probabilistic selection (debug aid).",
+    )
     p_all.add_argument(
         "--selection-mode",
         choices=["probabilistic", "greedy"],
@@ -1397,6 +1454,7 @@ async def _async_main() -> int:
             limit=args.limit,
             dry_run=args.dry_run,
             selection_mode=args.selection_mode,
+            seed=getattr(args, "seed", None),
         )
         # Non-zero exit if any entity hit a real failure (cost-cap or SDK)
         for r in results:
