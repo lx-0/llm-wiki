@@ -1176,3 +1176,57 @@ Failure mode: stderr message naming the resolved `ROOT_DIR` + actionable hint ("
 **Cleanup performed in same arc:** removed `config.yaml`, `logs/`, `state/`, `reports/`, `.pytest_cache/`, `.ruff_cache/`, `.wiki/` from engine-repo working tree. All were dev-time debris from running `wiki <foo>` in-place against the `lx-0/` collection-dir.
 
 Commits: `e8d21eb` (guard) + `0075090` (gitignore tool caches).
+
+## 2026-05-18: Reverse 2026-05-13 — memories ARE substrate, distill not exclude
+
+**Context:** Operator pushback on the 2026-05-13 "Memories are not a substrate — hard-remove" decision. Three claims in the original decision-body did not hold up under scrutiny:
+
+1. **"Memories are downstream of sessions, already captured via daily/, therefore double-counting":** False for memories as a class. Memory files are non-deterministic LLM-distillations — Claude's editorial choice of *what 3 patterns* to keep, in *what wording*, with *what Why/How-to-apply structure*. Re-deriving the memory from the daily/ session log would produce a *different* artefact. The "regenerable" premise the double-counting claim rests on is wrong.
+
+2. **"Karpathy + Cole Medin don't mirror auto-memory":** Technically true but read as endorsement of exclusion. Karpathy's gist does NOT address whether LLM-derived artefacts feed back as substrate (silence ≠ endorsement); multiple gist commenters identified the gap and proposed provenance-tracking + source-taxonomy as the answer, NOT exclusion. Cole Medin has a SEPARATE `memory.md` that's LLM-promoted from daily logs — treating LLM-distilled memory as a first-class durable artefact, exactly the pattern the 2026-05-13 decision rejected.
+
+3. **"Broken-link rate (502/584 dangling) means the substrate is wrong":** False causation. Broken-link rate was a *symptom* of mirror-pruning (sync-memories.py deleted files when upstream disappeared). The 2026-05-04 "Distill, don't cite" decision had already addressed the broken-link problem via body-wikilinks ban + `compiled_from:` frontmatter — a separate, sufficient fix. Layering substrate-exclusion on top was over-rotation.
+
+Additionally, hand-curated `AGENTS.md` / `CLAUDE.md` / `README.md` files under `~/.claude/projects/<encoded>/memory/` are NOT session-distillates at all — they're operator-curated documents iterated over weeks. The 2026-05-13 decision treated them as auto-rewrites, blind to the hand-curated portion.
+
+**Industry research (2026-05-18, in `.ytstack/backlog/memories-decision-doubt.md`):** Dominant pattern for LLM-derived content mixed with original sources is **provenance-tracking + frontmatter-tagging** (e.g. `compiled_from_distilled: true`). Compounding-distortion risk is addressed via metadata + lifecycle rules, never via substrate-exclusion.
+
+**Options considered:**
+
+A. Keep 2026-05-13 status quo — engine excludes `raw/memories/` from compile candidates, operators delete leftover data if they want.
+B. Revert fully — re-enable `sync-memories.py` (the mirror-prune source of the original broken-link problem).
+C. Re-include `raw/memories/` as substrate + drop the "Timeline-append-on-existing-project-only" constraint + add provenance frontmatter (`compiled_from_distilled: true`) on compiled outputs. Operator still controls whether to run any sync — engine does NOT auto-create memory files, but DOES distill any that exist in the vault.
+
+**Chose:** C.
+
+**Reason:**
+
+- Operator's doubt is empirically valid: memories are non-deterministic distillates, not regenerable from daily/.
+- Karpathy's "anything you ingest" principle (per the gist's raw-as-source-of-truth section) supports inclusion; he does NOT prescribe exclusion.
+- Cole Medin's architecture has the dual-class shape (raw logs + curated `memory.md`); aligns with our `daily/` + `raw/memories/` split.
+- Provenance-tracking handles the compounding-distortion risk that motivated the original exclusion, without throwing away durable operator-curated content.
+- Operator escape hatch preserved: engine never auto-syncs memories from `~/.claude/projects/*/memory/`. Vault content under `raw/memories/` is operator-owned (whether placed manually or by an opt-in sync script). Engine handles whatever it finds.
+
+**Implementation:**
+
+1. `scripts/compile.py`: pre-pass for `memory-sync`/`memory-seed` no longer returns `_skipped: memory_no_project_page`. When `resolve_project_slug` returns None, the agent runs with `project_slug=None` and falls through to "Mode B" of the prompt.
+2. `prompts/compile_memories.md`: rewritten with two-mode branching. Mode A = existing project page → 2-turn Timeline-append (unchanged). Mode B = no project page → distill the memory into 1–3 `knowledge/concepts/<slug>.md` articles with `compiled_from_distilled: true` frontmatter. Max 5 Edits + 3 Writes per call.
+3. `compile_stages/memory.py:resolve_project_slug` still used — its None-return now means "Mode B" not "skip".
+4. `SUBSTRATE_PROMPTS["memory-sync"/"memory-seed"]` budget bumped 5 → 20 turns (Mode B needs more agent moves: Glob existing concepts, decide Edit-vs-Write, optional cross-links).
+5. `select_files` in `scripts/compile.py` was never changed to exclude `raw/memories/` (the 2026-05-13 commit didn't add an exclusion either — it removed the sync-memories.py source, leaving any operator-placed files in raw/memories/ as candidates). No change needed.
+6. 2026-05-04 "Distill, don't cite" stays unchanged — body-wikilinks ban + `compiled_from:` frontmatter remain the broken-link defense.
+
+**Linked artifacts:**
+
+- `.ytstack/backlog/memories-decision-doubt.md` — operator pushback + AI opinion + Karpathy/Cole research + industry PKM research + final recommendation (this entry's source material)
+- `scripts/compile.py` — pre-pass no-skip change + max_turns bump
+- `prompts/compile_memories.md` — two-mode rewrite
+- `compile_stages/memory.py:resolve_project_slug` — semantics changed: None = Mode B, not skip
+
+**Supersedes:** 2026-05-13 "Memories are not a substrate — hard-remove sync-memories + seed + raw/memories/ wiring". The hard-removal of the auto-sync scripts (`sync-memories.py`, `seed.py`) is NOT reversed — those tools stay deleted; if memory-syncing comes back, it'll be a fresh substrate decision with its own lifecycle rules. What IS reversed: the engine's *handling* of memory files that exist in the vault. They are first-class substrate going forward.
+
+**Open follow-ups:**
+
+- Verify Mode B in lxw — first compile pass on the 33 currently-unresolved memories will produce concept-stubs. Operator review of those stubs (signal-to-noise) decides whether the 1–3-concepts-per-memory cap is right.
+- Consider snapshot-pattern (content-hash paths in `raw/memories/`, never delete) if operator re-introduces auto-syncing later. Was 2026-05-04 variant B, rejected then — re-evaluate with current architecture.
+- Architecture diagram refresh: `raw/memories/` re-promoted to first-class substrate position alongside email/jamie/etc.

@@ -198,8 +198,13 @@ SUBSTRATE_PROMPTS: dict[str, tuple[str, int, str | None]] = {
     # 5-turn CLI cap = 2 expected + 3-turn safety; no-project-page case
     # short-circuits in Python and never invokes the SDK. Pre-pre-pass
     # arc (2026-05-17): 25 → 8 → 5 as the contract tightened.
-    "memory-sync":     ("compile_memories", 5, "claude-haiku-4-5-20251001"),
-    "memory-seed":     ("compile_memories", 5, "claude-haiku-4-5-20251001"),
+    # 2026-05-18: 5 → 20 turns when reversing 2026-05-13 memory-exclusion.
+    # The 5-turn budget assumed a pre-resolved project-page Timeline append.
+    # The new prompt also handles "no project page → distill to concepts/"
+    # which needs more agent moves (Glob existing concepts, Edit-append or
+    # Write-new, plus optional connection-article creation).
+    "memory-sync":     ("compile_memories", 20, "claude-haiku-4-5-20251001"),
+    "memory-seed":     ("compile_memories", 20, "claude-haiku-4-5-20251001"),
     # Longform notes — entity-dense narrative content (strategy docs,
     # design memos, multi-section essays) routinely 15-25 KB with 15-25
     # concept references. compile_default (the lean fallback prompt) +
@@ -628,21 +633,27 @@ async def compile_file(
         fm = _parse_frontmatter(source_content)
         project_slug = resolve_project_slug(source, fm, ROOT_DIR)
         if project_slug is None:
+            # 2026-05-18 reversal of 2026-05-13's exclusion: when no project
+            # page anchors the memory, the agent distills the memory's
+            # patterns into knowledge/concepts/ articles directly. This is
+            # the concept-aligned path per Karpathy's "anything you ingest"
+            # principle + industry provenance-tracking pattern. The
+            # backlog/memories-decision-doubt.md doc carries the research.
             log.info(
-                "  skipping: type=%s — no matching knowledge/projects/<slug>.md "
-                "page found (filename stem, frontmatter project:, tags all "
-                "unresolved). Next sync re-checks; create the project page "
-                "to enable back-linking.",
+                "  memory pre-pass: type=%s — no matching knowledge/projects/<slug>.md "
+                "(filename stem, frontmatter project:, tags all unresolved). "
+                "Falling through to free-distill mode — agent will produce "
+                "concept stubs from the memory body.",
                 source_type,
             )
-            return {"_skipped": "memory_no_project_page"}
-        project_page = KNOWLEDGE_DIR / "projects" / f"{project_slug}.md"
-        ensure_timeline_section(project_page)
-        project_page_rel = str(project_page.relative_to(ROOT_DIR))
-        log.info(
-            "  memory pre-pass: project=%s page=%s (Timeline bootstrapped if absent)",
-            project_slug, project_page_rel,
-        )
+        else:
+            project_page = KNOWLEDGE_DIR / "projects" / f"{project_slug}.md"
+            ensure_timeline_section(project_page)
+            project_page_rel = str(project_page.relative_to(ROOT_DIR))
+            log.info(
+                "  memory pre-pass: project=%s page=%s (Timeline bootstrapped if absent)",
+                project_slug, project_page_rel,
+            )
 
     from compile_stages.compile import compile_source
     from compile_stages.types import CompileMetadata
