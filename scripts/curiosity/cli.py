@@ -25,6 +25,7 @@ from typing import NoReturn
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from core.console import read_key
 from core.paths import ROOT_DIR
 from core.utils import now_iso
 from curiosity.backends import email as email_backend
@@ -215,33 +216,41 @@ def _walk(*, dry_run: bool) -> NoReturn:
             continue
         _print_request_card(idx, total, path, r)
 
+        # Single-keypress prompt — same DRY mechanism the home menu uses
+        # (core.console.read_key in cbreak mode). No Enter required.
+        print("  [a]ccept · [s]kip · [r]eject · [q]uit › ", end="", flush=True)
         while True:
             try:
-                choice = input("  [a]ccept · [s]kip · [r]eject · [q]uit › ").strip().lower()
-            except (EOFError, KeyboardInterrupt):
+                key = read_key()
+            except (OSError, KeyboardInterrupt):
                 print()
                 log.info("Walk aborted. %d accepted, %d skipped, %d rejected, %d remain.",
                          accepted, skipped, rejected, total - idx + 1)
                 sys.exit(0)
-            if choice in ("a", "accept"):
+            if key in ("a", "A"):
+                print("a")
                 ok = _dispatch(path, dry_run=dry_run)
                 accepted += 1
                 if not ok:
                     fails += 1
                 break
-            if choice in ("s", "skip", ""):
+            if key in ("s", "S", "enter"):
+                print("s")
                 skipped += 1
                 break
-            if choice in ("r", "reject"):
+            if key in ("r", "R"):
+                print("r")
                 _mark_rejected(path, r)
                 rejected += 1
                 log.info("Rejected: %s (producer will skip this slug)", r.get("topic", path.name))
                 break
-            if choice in ("q", "quit", "exit"):
+            if key in ("q", "Q", "c-c", "c-d", "esc"):
+                print("q")
                 log.info("Walk ended. %d accepted, %d skipped, %d rejected, %d remain.",
                          accepted, skipped, rejected, total - idx + 1)
                 sys.exit(0 if fails == 0 else 2)
-            print("  ?  type a/s/r/q")
+            # Unknown key — beep / hint, keep prompting on same line.
+            print("\r  [a]ccept · [s]kip · [r]eject · [q]uit › ", end="", flush=True)
     log.info("Walk complete. %d accepted, %d skipped, %d rejected (of %d).",
              accepted, skipped, rejected, total)
     sys.exit(0 if fails == 0 else 2)

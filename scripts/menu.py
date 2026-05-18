@@ -20,11 +20,8 @@ from __future__ import annotations
 
 import os
 import re
-import select
 import subprocess
 import sys
-import termios
-import tty
 from pathlib import Path
 from typing import Callable
 
@@ -39,6 +36,7 @@ from core.console import (
     C_RESET,
     C_YELLOW,
     is_tty,
+    read_key,
 )
 from core.health import CheckResult, build_health
 from core.paths import ROOT_DIR, WIKI_DIR
@@ -499,53 +497,6 @@ def _html_to_ansi(s: str) -> str:
     return out.replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&")
 
 
-def _read_key(fd: int) -> str:
-    """Read one keypress from `fd` in cbreak mode. Returns:
-        - 'up'/'down'/'left'/'right' for arrow keys (ESC [ A/B/D/C)
-        - 'enter' for newline/CR
-        - 'esc' for bare ESC
-        - 'c-c' for Ctrl-C, 'c-d' for Ctrl-D
-        - the literal char otherwise (e.g. 'c', '3', '/').
-    """
-    old = termios.tcgetattr(fd)
-    try:
-        tty.setcbreak(fd)
-        ch = os.read(fd, 1)
-        if not ch:
-            return "c-d"  # EOF
-        b = ch[0]
-        if b == 0x03:
-            return "c-c"
-        if b == 0x04:
-            return "c-d"
-        if b in (0x0A, 0x0D):
-            return "enter"
-        if b == 0x1B:
-            # ESC — could be bare ESC or an arrow sequence.
-            # Arrow keys send ESC[A/B/C/D within ~milliseconds. Give it 50ms
-            # to arrive before falling back to bare ESC.
-            r, _, _ = select.select([fd], [], [], 0.05)
-            if not r:
-                return "esc"
-            seq = os.read(fd, 2)
-            if seq.startswith(b"[") and len(seq) >= 2:
-                return {b"A": "up", b"B": "down", b"C": "right", b"D": "left"}.get(
-                    seq[1:2], "esc"
-                )
-            return "esc"
-        # Printable byte — decode as utf-8 (single-byte ASCII is the
-        # common case for our shortcuts; multi-byte is fine to pass through
-        # since we only match exact strings below).
-        return ch.decode("utf-8", errors="replace")
-    finally:
-        termios.tcsetattr(fd, termios.TCSADRAIN, old)
-
-
-# Sentinel used by _run_home_picker to signal "redraw" without leaving the
-# loop. Lets pressing an unbound key just re-render rather than exit.
-_REDRAW = object()
-
-
 def _run_home_picker(state: HomeState) -> None:
     """Single iteration of the home screen. Sets state.selected then returns.
 
@@ -578,7 +529,7 @@ def _run_home_picker(state: HomeState) -> None:
         prev_lines = screen.count("\n") + 1
 
         try:
-            key = _read_key(fd)
+            key = read_key(fd)
         except (KeyboardInterrupt, OSError):
             state.selected = ("exit",)
             return

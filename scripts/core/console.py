@@ -29,9 +29,13 @@ grew the same need.
 from __future__ import annotations
 
 import logging
+import os
 import re
+import select
 import sys
+import termios
 import time
+import tty
 from pathlib import Path
 
 
@@ -52,6 +56,58 @@ C_CYAN = "\033[36m" if _TTY else ""
 def is_tty() -> bool:
     """Whether stderr is an interactive terminal at module-import time."""
     return _TTY
+
+
+# ── Single-keypress input ──────────────────────────────────────────────────
+# Used by every interactive picker / prompt in the engine (home menu,
+# curiosity walk, future review flows). cbreak mode + os.read(1) gives
+# bulletproof single-byte input — no Enter required — and works wherever a
+# POSIX terminal does. Shared here next to the C_* constants so input +
+# output share one console-substrate module.
+
+def read_key(fd: int | None = None) -> str:
+    """Read one keypress from `fd` (default stdin) in cbreak mode.
+
+    Returns:
+        - ``'up'`` / ``'down'`` / ``'left'`` / ``'right'`` for arrow keys
+        - ``'enter'`` for newline / carriage-return
+        - ``'esc'`` for bare Escape
+        - ``'c-c'`` / ``'c-d'`` for Ctrl-C / Ctrl-D
+        - the literal character otherwise (e.g. ``'c'``, ``'3'``, ``'/'``).
+
+    The terminal state is restored before return regardless of how the
+    function exits — callers can safely wrap repeated calls in a loop.
+    """
+    if fd is None:
+        fd = sys.stdin.fileno()
+    old = termios.tcgetattr(fd)
+    try:
+        tty.setcbreak(fd)
+        ch = os.read(fd, 1)
+        if not ch:
+            return "c-d"
+        b = ch[0]
+        if b == 0x03:
+            return "c-c"
+        if b == 0x04:
+            return "c-d"
+        if b in (0x0A, 0x0D):
+            return "enter"
+        if b == 0x1B:
+            # ESC — bare or arrow-sequence (ESC [ A/B/C/D). Give the
+            # rest of the sequence ~50 ms to arrive before deciding.
+            r, _, _ = select.select([fd], [], [], 0.05)
+            if not r:
+                return "esc"
+            seq = os.read(fd, 2)
+            if seq.startswith(b"[") and len(seq) >= 2:
+                return {
+                    b"A": "up", b"B": "down", b"C": "right", b"D": "left",
+                }.get(seq[1:2], "esc")
+            return "esc"
+        return ch.decode("utf-8", errors="replace")
+    finally:
+        termios.tcsetattr(fd, termios.TCSADRAIN, old)
 
 
 # ── Generic formatter ──────────────────────────────────────────────────────
