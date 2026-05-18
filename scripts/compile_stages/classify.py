@@ -23,7 +23,7 @@ from pathlib import Path
 from typing import Literal
 
 
-ClassifyKind = Literal["aggregated-memory", "instructions", "single"]
+ClassifyKind = Literal["aggregated-memory", "single"]
 
 
 @dataclass
@@ -40,8 +40,6 @@ _AGGREGATED_MEMORY_TYPES = ("memory-seed", "memory-sync")
 
 
 def classify(content: str, source: Path) -> ClassifyResult:
-    if _looks_like_instructions(content, source):
-        return ClassifyResult(kind="instructions", chunks=[content])
     fm_type = _frontmatter_type(content)
     if fm_type in _AGGREGATED_MEMORY_TYPES:
         sections = _split_at_h2(content)

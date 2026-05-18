@@ -608,13 +608,6 @@ async def compile_file(
     from compile_stages.classify import classify
     classification = classify(source_content, source)
 
-    if classification.kind == "instructions":
-        substrate_prompt = "compile_instructions"
-        max_turns_for_call = max(max_turns_for_call, 20)
-        log.info(
-            "  classified as instructions-doc -> routing to %s @ %d turns",
-            substrate_prompt, max_turns_for_call,
-        )
 
     # Memory-substrate pre-pass: resolve target project page + bootstrap
     # `## Timeline` section deterministically so the SDK call can be
