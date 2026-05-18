@@ -208,7 +208,7 @@ SUBSTRATE_PROMPTS: dict[str, tuple[str, int, str | None]] = {
     # on max_turns 2026-05-17. Routed here to compile_main (rich prompt)
     # with 25-turn budget — matches the memory-sync legacy budget and
     # the daily-digest tier for many-entity Haiku substrates.
-    "longform":        ("compile_main", 25, "claude-haiku-4-5-20251001"),
+    "longform":        ("compile_main", 60, "claude-haiku-4-5-20251001"),
 }
 
 # Default for any substrate-type NOT in SUBSTRATE_PROMPTS. Lean prompt
