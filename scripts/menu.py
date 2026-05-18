@@ -465,13 +465,17 @@ def _git_revision() -> str:
 # prompt_toolkit stays for line-input subprompts (_pt_ask, _pick_query_mode)
 # where its history + editing pay off; the home loop owns its own input.
 
+# Mirrors `core.console`: every close tag emits full reset `\033[0m`, every
+# open tag is a single SGR. Same bytes compile.py / lib/common.sh emit —
+# guaranteed parity with the rest of the engine's colored output regardless
+# of which partial-reset codes a given terminal config drops.
 _ANSI_TAGS = {
-    "<b>": "\x1b[1m", "</b>": "\x1b[22m",
-    "<ansicyan>": "\x1b[36m", "</ansicyan>": "\x1b[39m",
-    "<ansired>": "\x1b[31m", "</ansired>": "\x1b[39m",
-    "<ansigreen>": "\x1b[32m", "</ansigreen>": "\x1b[39m",
-    "<ansiyellow>": "\x1b[33m", "</ansiyellow>": "\x1b[39m",
-    "<ansibrightblack>": "\x1b[90m", "</ansibrightblack>": "\x1b[39m",
+    "<b>": "\x1b[1m", "</b>": "\x1b[0m",
+    "<ansicyan>": "\x1b[36m", "</ansicyan>": "\x1b[0m",
+    "<ansired>": "\x1b[31m", "</ansired>": "\x1b[0m",
+    "<ansigreen>": "\x1b[32m", "</ansigreen>": "\x1b[0m",
+    "<ansiyellow>": "\x1b[33m", "</ansiyellow>": "\x1b[0m",
+    "<ansibrightblack>": "\x1b[90m", "</ansibrightblack>": "\x1b[0m",
 }
 _TAG_RE = re.compile("|".join(re.escape(k) for k in _ANSI_TAGS))
 
@@ -542,13 +546,20 @@ def _run_home_picker(state: HomeState) -> None:
         return
 
     state.selected = None
+    # Emit to stderr to match compile.py / core.console / lib/common.sh —
+    # every other colored-output channel in the engine uses stderr, and the
+    # operator's iTerm2 only renders ANSI on the stderr stream in this
+    # session (stdout colors were silently dropped). Stderr is also
+    # unbuffered by default, so each redraw is atomic.
+    out = sys.stderr
     while state.selected is None:
-        # Clear screen + home cursor. Avoids ghosting between iterations
-        # and keeps the rendered region anchored at the top.
-        sys.stdout.write("\x1b[2J\x1b[H")
-        sys.stdout.write(_html_to_ansi(_build_screen_html(state)))
-        sys.stdout.write("\n")
-        sys.stdout.flush()
+        # Full SGR reset → clear screen → home cursor. The leading reset
+        # discards any leftover bold/color from a previous dispatched
+        # subcommand so the menu renders against a known-clean state.
+        out.write("\x1b[0m\x1b[2J\x1b[H")
+        out.write(_html_to_ansi(_build_screen_html(state)))
+        out.write("\n")
+        out.flush()
 
         try:
             key = _read_key(fd)
