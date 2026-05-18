@@ -40,7 +40,7 @@
 #   wiki compile               run compile.py — process all changed sources into knowledge/
 #   wiki compile --file PATH   compile a single source file
 #   wiki dream-entity SLUG     re-synthesize ONE entity page (people/projects/areas) — M014
-#   wiki dream --all-entities  sweep all entities (oldest-overdue first, respects cooldown)
+#   wiki dream                 sweep all entities (oldest-overdue first, respects cooldown)
 #   wiki flush                 capture current Claude Code context → daily/ (manual flush)
 #   wiki lint                  run lint.py — structural + LLM contradiction checks
 #   wiki lint --structural-only  cheap, no-LLM lint (used by piggyback)
@@ -420,28 +420,34 @@ EOF
 }
 
 cmd_dream() {
-  case "${1:-}" in
+  case "${1:-sweep}" in
     -h|--help|help)
       cat <<EOF
 ${C_BOLD}wiki dream${C_RESET} — sweep all entity pages (M014)
 
 ${C_BOLD}USAGE${C_RESET}
-  wiki dream --all-entities                sweep all entities, oldest-overdue first
-  wiki dream --all-entities --dry-run      print plan, no SDK calls
-  wiki dream --all-entities --limit N      hard cap on entity count this run
+  wiki dream                               sweep all entities, oldest-overdue first (default)
+  wiki dream --dry-run                     print plan, no SDK calls
+  wiki dream --limit N                     hard cap on entity count this run
+  wiki dream list-candidates               debug: print scored candidate list, no run
 
 ${C_BOLD}NOTES${C_RESET}
   Sweeps \`knowledge/{people,projects,areas}/*.md\` oldest-synthesized first,
   skipping entities synthesized within the cooldown window. Per-entity AND
   per-run cumulative cost caps are enforced — see \`wiki dream-entity help\`.
+  \`--all-entities\` / \`sweep\` are accepted as legacy aliases.
 EOF
       return 0 ;;
     --all-entities|sweep)
-      shift; banner "wiki dream sweep"; _run_script dream.py sweep "$@" ;;
+      [ $# -gt 0 ] && shift
+      banner "wiki dream sweep"; _run_script dream.py sweep "$@" ;;
     list-candidates|--list-candidates)
       shift; banner "wiki dream list-candidates"; _run_script dream.py list-candidates "$@" ;;
+    --*)
+      # Bare flags (e.g. `wiki dream --dry-run --limit 3`) → implicit sweep
+      banner "wiki dream sweep"; _run_script dream.py sweep "$@" ;;
     *)
-      err "unknown: wiki dream $1 (try --all-entities or see 'wiki dream help')"; return 1 ;;
+      err "unknown: wiki dream $1 (try 'wiki dream help')"; return 1 ;;
   esac
 }
 
