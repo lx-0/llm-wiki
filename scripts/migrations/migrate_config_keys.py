@@ -367,6 +367,7 @@ LIST_REMOVALS: dict[str, list[object]] = {
     "limits.compile_skip_substrate_types": [
         "calendar-rollup", "memory-sync", "memory-seed",
     ],
+}
 
 # Fields whose backing dataclass entry was removed; their leftover entries
 # in operator configs are silently ignored on load but linger as YAML cruft
