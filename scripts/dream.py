@@ -85,8 +85,65 @@ from core.sdk_helpers import (
 from core.utils import now_iso, today_iso
 
 
-from core.console import setup_console_logging  # noqa: E402
-log = setup_console_logging("dream")
+from core.console import (  # noqa: E402
+    C_BOLD,
+    C_CYAN,
+    C_DIM,
+    C_RESET,
+    C_YELLOW,
+    ConsoleFormatter,
+    setup_console_logging,
+)
+
+
+class _DreamFormatter(ConsoleFormatter):
+    """dream.py-specific colorization on top of the generic formatter.
+
+    Mirrors the per-CLI subclass pattern compile.py uses. Patterns dream owns:
+
+      - per-entity header `▶ [N/M] dream-entity <slug>` → bold cyan, slug yellow
+      - contextual info lines (dim, like compile's dispatch tier):
+          `  entity=X kind=Y — corpus: T1=...`     (corpus breakdown)
+          `  prompt: N chars (X KB) — estimated …`  (pre-flight)
+          `  invoking <model> (max_turns=…)`         (execution start)
+          `  stamped last_dreamed_at on …`           (housekeeping)
+      - termination notes:
+          `Reached --limit=N; stopping`              (dim, soft signal)
+          `Per-run cost cap reached …`               (yellow-ish, soft warn)
+
+    Everything else falls through to the generic colorization (✓/✗,
+    bare/parenthesised costs, elapsed, tokens, section banners,
+    WARNING/ERROR level labels).
+    """
+
+    _HEADER_RE = re.compile(r"^▶\s+\[(\d+/\d+)\]\s+(dream-entity)\s+(\S+)$")
+    _DIM_INFO_RES = (
+        re.compile(r"^\s+entity=\S+\s+kind="),
+        re.compile(r"^\s+prompt:\s+\d+\s+chars"),
+        re.compile(r"^\s+invoking\s+claude-"),
+        re.compile(r"^\s+stamped\s+last_dreamed_at\s+on\s+\d+"),
+    )
+    _LIMIT_RE = re.compile(r"^(Reached --limit=\d+|Per-run cost cap reached)")
+
+    def _format_message_extras(self, msg: str) -> str | None:
+        if (mh := self._HEADER_RE.match(msg.strip())):
+            pos, action, slug = mh.group(1), mh.group(2), mh.group(3)
+            return (
+                f"{C_BOLD}{C_CYAN}▶ [{pos}] {action} "
+                f"{C_YELLOW}{slug}{C_RESET}"
+            )
+        for rx in self._DIM_INFO_RES:
+            if rx.match(msg):
+                # Dim the whole line but keep cost-amount tier colors inside —
+                # apply generic cost regex AFTER the dim wrap.
+                dimmed = f"{C_DIM}{msg}{C_RESET}"
+                return self._colorize_cost(dimmed)
+        if self._LIMIT_RE.match(msg):
+            return f"{C_DIM}{msg}{C_RESET}"
+        return None
+
+
+log = setup_console_logging("dream", formatter=_DreamFormatter())
 
 
 # ── Constants ─────────────────────────────────────────────────────────
