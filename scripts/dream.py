@@ -963,6 +963,15 @@ async def dream_entity(
     # Real SDK call. Single attempt — dream is a periodic pass; if it fails,
     # the next pass picks the entity up again.
     model = CONFIG.models.compile_model
+    # Snapshot entity page mtime + size so we can detect a "no vault write"
+    # outcome (agent ran but decided no changes needed, OR was silently
+    # blocked from writing). Compared post-SDK below.
+    try:
+        _entity_pre_mtime = entity.page.stat().st_mtime
+        _entity_pre_size = entity.page.stat().st_size
+    except OSError:
+        _entity_pre_mtime = 0.0
+        _entity_pre_size = 0
     log.info("  invoking %s (max_turns=%d, system=dream_entity_system)", model, turns)
 
     input_tokens = 0
@@ -1037,6 +1046,39 @@ async def dream_entity(
         f"{output_tokens:,}",
         actual_cost,
     )
+    # Diagnostic: did the agent actually write to the entity page?
+    # Compares mtime+size against the pre-SDK snapshot. False positives
+    # are harmless (operator manually touched the page mid-run); false
+    # negatives matter (silent agent no-op was the surface the operator
+    # asked about — "dream nichts in vault schreibt").
+    try:
+        _entity_post_mtime = entity.page.stat().st_mtime
+        _entity_post_size = entity.page.stat().st_size
+    except OSError:
+        _entity_post_mtime = _entity_pre_mtime
+        _entity_post_size = _entity_pre_size
+    if (
+        _entity_post_mtime == _entity_pre_mtime
+        and _entity_post_size == _entity_pre_size
+    ):
+        log.warning(
+            "  agent finished without modifying %s — corpus had no new "
+            "substrate to incorporate (auth/recent both 0) OR agent "
+            "decided no changes needed. Page byte-identical to pre-run.",
+            str(entity.page.relative_to(ROOT_DIR)),
+        )
+    # Suspiciously-low token-count signal. A 489 KB prompt should report
+    # 100k+ input tokens; in:12 means the SDK never actually processed
+    # the substrate (CLI early-exit, max_buffer truncation, or a tool-use
+    # short-circuit). Worth surfacing so operator notices the mismatch.
+    if prompt_chars >= 5000 and input_tokens < 1000:
+        log.warning(
+            "  SDK reported only %d input tokens for a %d-char prompt — "
+            "expected substrate-processing did not happen (CLI early-exit, "
+            "buffer truncation, or tool-use short-circuit). Check the SDK "
+            "result text for clues.",
+            input_tokens, prompt_chars,
+        )
 
     # M016 — stamp last_dreamed_at on every substrate file that appeared in
     # this dream's corpus. This is the activation-tracking mechanism that
@@ -1263,7 +1305,10 @@ async def dream_all_entities(
                 cumulative, run_cap, idx - 1,
             )
             break
-        log.info("▶ [%d/%d] dream-entity %s", idx, len(ranked), ent.slug)
+        log.info(
+            "▶ [%d/%d] dream-entity %s — weight=%.2f · source: %s",
+            idx, len(ranked), ent.slug, _weight, _source or "(default)",
+        )
         res = await dream_entity(
             ent, dry_run=dry_run, cost_cap_usd=per_entity_cap,
         )
