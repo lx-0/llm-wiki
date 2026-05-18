@@ -390,6 +390,87 @@ def check_template_drift(*, quick: bool = False) -> CheckResult:
         return _probe_failed("template-drift", "config", exc)
 
 
+def check_engine_update_available(*, quick: bool = False) -> CheckResult:
+    """Warning if local engine HEAD is behind its upstream tracking branch.
+
+    Hits the network (`git fetch`) so skipped under `--quick`. Graceful
+    degradation when the engine isn't a git checkout, has no upstream,
+    or the fetch fails (offline). When behind, surfaces in the
+    home-screen Actionable list with `wiki update` as the dispatch.
+    """
+    if quick:
+        return CheckResult(
+            id="engine-update-available",
+            category="config",
+            severity="info",
+            message="(skipped in --quick mode)",
+        )
+    try:
+        if not (WIKI_DIR / ".git").exists():
+            return CheckResult(
+                id="engine-update-available",
+                category="config",
+                severity="info",
+                message="engine not a git checkout — update via your install method",
+            )
+        ups = subprocess.run(
+            ["git", "-C", str(WIKI_DIR), "rev-parse", "--abbrev-ref", "@{u}"],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=2, text=True,
+        )
+        if ups.returncode != 0:
+            return CheckResult(
+                id="engine-update-available",
+                category="config",
+                severity="info",
+                message="no upstream tracking branch — skipping update check",
+            )
+        upstream = ups.stdout.strip()
+        fetch = subprocess.run(
+            ["git", "-C", str(WIKI_DIR), "fetch", "--quiet", "--no-tags"],
+            stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, timeout=8, text=True,
+        )
+        if fetch.returncode != 0:
+            return CheckResult(
+                id="engine-update-available",
+                category="config",
+                severity="info",
+                message="git fetch failed (offline?) — could not check for updates",
+            )
+        count = subprocess.run(
+            ["git", "-C", str(WIKI_DIR), "rev-list", "--count", f"HEAD..{upstream}"],
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=2, text=True,
+        )
+        n = int((count.stdout or "0").strip() or "0")
+        if n == 0:
+            return CheckResult(
+                id="engine-update-available",
+                category="config",
+                severity="ok",
+                message=f"engine up to date with {upstream}",
+            )
+        latest = subprocess.run(
+            ["git", "-C", str(WIKI_DIR), "log", "-1", "--format=%h %s", upstream],
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=2, text=True,
+        )
+        head = (latest.stdout or "").strip()[:80]
+        msg = f"{n} engine commit{'s' if n != 1 else ''} behind {upstream}"
+        if head:
+            msg += f" (latest: {head})"
+        return CheckResult(
+            id="engine-update-available",
+            category="config",
+            severity="warning",
+            message=msg,
+            fix="wiki update",
+            dispatch_args=["update"],
+            details={"behind": n, "upstream": upstream, "latest": head},
+        )
+    except (subprocess.TimeoutExpired, OSError) as exc:
+        return _probe_failed("engine-update-available", "config", exc)
+    except Exception as exc:
+        return _probe_failed("engine-update-available", "config", exc)
+
+
 def check_no_knowledge_articles() -> CheckResult:
     """Info if knowledge/ has no .md files (fresh vault)."""
     try:
@@ -641,6 +722,7 @@ _ALL_CHECKS: list[Callable[..., CheckResult | list[CheckResult]]] = [
     check_account_auths,
     check_compile_errors_recent,
     check_template_drift,
+    check_engine_update_available,
     check_no_knowledge_articles,
     check_compile_state,
 ]
