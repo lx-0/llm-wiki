@@ -35,9 +35,33 @@ from core.console import (
     C_RED,
     C_RESET,
     C_YELLOW,
+    ConsoleFormatter,
     is_tty,
     read_key,
+    setup_console_logging,
 )
+
+
+class _MenuFormatter(ConsoleFormatter):
+    """No timestamp + no level prefix. The screen render is the entire
+    output line; the timestamp/level columns that compile uses would
+    just produce visual noise around what is already a full TUI frame.
+
+    Inherits from ConsoleFormatter so the menu uses literally the same
+    formatter class as compile.py — guaranteed identical color-emit path
+    end-to-end through Python's logging.StreamHandler."""
+
+    def format(self, record):
+        return record.getMessage()
+
+
+# Set up the logging stream-handler before any module-level imports below
+# could pull in something that grabs root.handlers. setup_console_logging
+# is idempotent — if another CLI already set up a stderr StreamHandler,
+# this no-ops and reuses it (so the menu inherits whatever formatter is
+# already on root). Calling it here also guarantees the menu's stderr
+# emit path is wired through the SAME mechanism compile uses.
+_log = setup_console_logging("menu", formatter=_MenuFormatter())
 from core.health import CheckResult, build_health
 from core.paths import ROOT_DIR, WIKI_DIR
 from menu_context import build_status, build_suggestions
@@ -508,24 +532,18 @@ def _run_home_picker(state: HomeState) -> None:
         return
 
     state.selected = None
-    # Emit to stderr to match compile.py / core.console / lib/common.sh —
-    # every other colored-output channel in the engine uses stderr.
-    out = sys.stderr
-    # Track the height of the previous render so we can step the cursor
-    # back over it and overwrite (instead of `\x1b[2J` clear-screen,
-    # which compile never uses — the engine's convention is scroll, not
-    # alt-screen). 0 == nothing to step over yet.
+    # Track height of previous render so we can step the cursor back over
+    # it on redraw (compile never clears the screen — same convention here).
     prev_lines = 0
     while state.selected is None:
         screen = _html_to_ansi(_build_screen_html(state))
-        if prev_lines and is_tty():
-            # Move cursor to the start of the line `prev_lines` rows up,
-            # then erase from cursor to end of screen. This overwrites
-            # the previous render in-place without nuking scrollback.
-            out.write(f"\x1b[{prev_lines}F\x1b[J")
-        out.write(screen)
-        out.write("\n")
-        out.flush()
+        # Cursor-up + erase prefix lives on the same logged record as the
+        # screen body so they reach the terminal via one StreamHandler
+        # write — identical emit path to compile.py's per-line log records.
+        # Empty separator string here so logging.StreamHandler appends only
+        # ONE terminator at the end of the whole frame.
+        prefix = f"\x1b[{prev_lines}F\x1b[J" if (prev_lines and is_tty()) else ""
+        _log.info("%s%s", prefix, screen)
         prev_lines = screen.count("\n") + 1
 
         try:
