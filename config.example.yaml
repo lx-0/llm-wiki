@@ -528,6 +528,25 @@ personal:
   #         kind: oura-pat                               # collectors/health.py — Oura Ring daily biometrics
   #         api_key_env: OURA_PRIVATE_PAT                # env var holding the Bearer PAT (free at cloud.ouraring.com/personal-access-tokens)
   #         backfill_days: null                          # null = inherit CONFIG.limits.oura_max_backfill_days (90)
+  #       healthkit:
+  #         kind: healthkit-xml-export                   # collectors/health.py Phase 2 (M023) — Apple Health bulk-ingest
+  #         inbox_dir: ~/Library/Mobile Documents/com~apple~CloudDocs/inbox/health-export
+  #                                                      # folder holding Export.xml (operator drops Health → Export All here)
+  #                                                      # empty string = feature off for this account
+  #         filename: Export.xml                         # default Export.xml; override for non-standard exports
+  #
+  # HealthKit notes (M023, 2026-05-19):
+  #   - Streaming parser handles multi-GB Export.xml without OOM (iterparse + el.clear).
+  #   - Records sourced from "Oura" are dropped to avoid double-counting against
+  #     the Oura API path; Renpho weight, iPhone steps, Apple Watch workouts, and
+  #     pre-Oura history flow in cleanly.
+  #   - Re-ingest is hash-gated: unchanged Export.xml = no-op. Drop a fresh
+  #     export into inbox_dir and run `wiki collect health` (or wait for the
+  #     piggyback) to merge the long-tail timeline.
+  #   - Per-day files at `raw/notes/health/<YYYY>/<date>--<account>.md` get
+  #     HealthKit keys merged into existing Oura frontmatter; Oura keys win on
+  #     overlap (sleep / hrv / scores), HealthKit adds weight, body composition,
+  #     steps_total, distance, energy, flights climbed, workouts.
   #
   #   personal-gmail:                                    # no local client, no GCP project
   #     email: you@gmail.com

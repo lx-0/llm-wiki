@@ -502,3 +502,73 @@ def test_migrate_config_round_trip_with_drops(tmp_path):
     assert reparsed["piggybacks"]["calendar"]["cooldown_hours"] == 6
     # unrelated piggyback untouched
     assert reparsed["piggybacks"]["email"] == {"enabled": True, "cooldown_hours": 24}
+
+
+# ── migrate_account_additions: per-account placeholder injection ────
+
+
+def test_migrate_account_additions_injects_healthkit_into_oura_account():
+    """M023: any account with health.oura gets a healthkit placeholder."""
+    m = _mod()
+    data = {
+        "personal": {
+            "accounts": {
+                "default": {
+                    "email": "alex@example.com",
+                    "health": {
+                        "oura": {"kind": "oura-pat", "api_key_env": "OURA_PRIVATE_PAT"},
+                    },
+                },
+            },
+        },
+    }
+    changes = m.migrate_account_additions(data)
+    hk = data["personal"]["accounts"]["default"]["health"]["healthkit"]
+    assert hk == {
+        "kind": "healthkit-xml-export",
+        "inbox_dir": "",
+        "filename": "Export.xml",
+    }
+    assert any("healthkit" in c for c in changes)
+
+
+def test_migrate_account_additions_skips_account_without_oura():
+    """Accounts that never opted into health get no second-source nudge."""
+    m = _mod()
+    data = {
+        "personal": {
+            "accounts": {
+                "work": {"email": "work@example.com"},
+            },
+        },
+    }
+    changes = m.migrate_account_additions(data)
+    assert changes == []
+    assert "health" not in data["personal"]["accounts"]["work"]
+
+
+def test_migrate_account_additions_idempotent_when_healthkit_present():
+    """Operator-set values must not be overwritten on re-run."""
+    m = _mod()
+    data = {
+        "personal": {
+            "accounts": {
+                "default": {
+                    "health": {
+                        "oura": {"kind": "oura-pat"},
+                        "healthkit": {
+                            "kind": "healthkit-xml-export",
+                            "inbox_dir": "/operator/path",
+                            "filename": "Custom.xml",
+                        },
+                    },
+                },
+            },
+        },
+    }
+    changes = m.migrate_account_additions(data)
+    assert changes == []
+    assert (
+        data["personal"]["accounts"]["default"]["health"]["healthkit"]["inbox_dir"]
+        == "/operator/path"
+    )

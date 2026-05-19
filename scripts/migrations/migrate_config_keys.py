@@ -54,6 +54,10 @@ Key changes covered (chronological):
   limits.dream_tier2_sample_count          (added 2026-05-17 M016, default 50 — Tier 2 weighted-sample size)
   features.suggestions_source_globs        (added 2026-05-17 Producer-seam, default ["raw/email/*.md"] — lifts legacy hardcoded _is_email_source filter onto Spec)
   limits.compile_aggregated_max_consecutive_failures (added 2026-05-17, default 3 — circuit-breaker on memory-seed chunked compiles; aborts loop after N consecutive chunk failures to stop $-bleed on substrate-prompt mismatch)
+  personal.accounts.<id>.health.healthkit    (added 2026-05-19 M023 — Apple HealthKit XML export ingest;
+                                              injected as a placeholder into any account already carrying
+                                              `health.oura`, kind: healthkit-xml-export, empty inbox_dir
+                                              = opt-out; operator fills in the iCloud / vault path)
 
 Idempotent: a config already on the current schema produces no change.
 
@@ -493,6 +497,52 @@ def migrate_drops(data: dict) -> list[str]:
     return changes
 
 
+def migrate_account_additions(data: dict) -> list[str]:
+    """Inject discoverable placeholders into per-account sub-blocks.
+
+    The generic KEY_ADDITIONS table operates on top-level dataclass blocks
+    (`limits`, `features`, …). Per-account additions live under
+    `personal.accounts.<id>.…` and need bespoke walking; this function is
+    the catch-all for that.
+
+    Current additions:
+      - M023 (2026-05-19): inject `health.healthkit` placeholder into any
+        account that already carries `health.oura`. Operator opted into the
+        health substrate when they configured Oura; the placeholder makes
+        the second source discoverable without auto-enabling (empty
+        `inbox_dir` keeps the collector silent for that account).
+    """
+    changes: list[str] = []
+    personal = data.get("personal")
+    if not isinstance(personal, dict):
+        return changes
+    accounts = personal.get("accounts")
+    if not isinstance(accounts, dict):
+        return changes
+    for aid, body in accounts.items():
+        if not isinstance(body, dict):
+            continue
+        health = body.get("health")
+        if not isinstance(health, dict):
+            continue
+        if "oura" not in health:
+            # Operator hasn't opted into the health substrate at all on this
+            # account — don't auto-add the second source either.
+            continue
+        if "healthkit" in health:
+            continue
+        health["healthkit"] = {
+            "kind": "healthkit-xml-export",
+            "inbox_dir": "",       # operator fills in (empty = feature off)
+            "filename": "Export.xml",
+        }
+        changes.append(
+            f"injected personal.accounts.{aid}.health.healthkit "
+            f"(M023, empty inbox_dir = opt-out)"
+        )
+    return changes
+
+
 def migrate_piggybacks(piggybacks: dict) -> tuple[dict, list[str]]:
     """Return (new_piggybacks_dict, list_of_change_descriptions)."""
     changes: list[str] = []
@@ -539,6 +589,11 @@ def migrate_config(config_path: Path) -> tuple[str | None, list[str]]:
     # visible to the operator. Runs unconditionally; entries already present
     # are left untouched.
     changes.extend(migrate_additions(data))
+
+    # Per-account additions — inject discoverable placeholders into
+    # `personal.accounts.<id>` sub-blocks (these aren't top-level keys, so
+    # the generic KEY_ADDITIONS path can't reach them).
+    changes.extend(migrate_account_additions(data))
 
     # List-element additions — widen existing list-valued knobs (e.g. when
     # a new substrate type joins compile_force_long_context_types). Must
