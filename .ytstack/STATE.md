@@ -1,21 +1,29 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-05-21T19:23:37+02:00
-current_milestone: M024
+last_updated: 2026-05-21T19:54:18+02:00
+current_milestone: none
 active_slice: none
 active_task: none
-last_completed_milestone: M023
+last_completed_milestone: M024
 parallel_milestones: [M021]
 ---
 
 # State
 
-**Status:** M024 planned (M). Ready to slice.
+**Status (this session, 2026-05-21 — M024 SHIPPED, gmeet email-discovery).** gmeet collector gained a second discovery source: `discovery = folder-scan ∪ email-link-scan`. Triggered by `gemini-notes@google.com` mails, it ingests colleague-owned / org-shared Gemini Meet docs the own-Drive folder-scan structurally can't see. 3 slices, 20 new tests, commits `f35cce0` (S01 UTF-8 export fix + doc-id extractor + reader HTML body) · `f294e51` (S02 dual-discovery in run loop + config knob + migration) · `e313eab` (S03 docs) — all on origin/main.
 
-**Next action:** Run `ytstack:slice-milestone` to break M024 into concrete slices (S01 UTF-8-fix + doc-id extraction · S02 email-discovery wired into run loop + config knob + migration · S03 template-resync + config.example + docs/PROCESS + lxw E2E).
+Architecture: folder-scan + `_discover_via_email` are independent producers feeding one stub list (folder failure no longer aborts the account); reuses `resolve_reader` + windowed `scan_deep` + `extract_drive_doc_ids` over `body_html`; downstream export/pair/render/dedup unchanged; windowed re-scan (`backfill_days`) + Drive-file-id dedup → idempotent, no email watermark; only own-folder docs advance the folder watermark. Config: per-account `gmeet.email_discovery` (enabled/senders/folder/backfill_days, default on); `migrate_account_additions` injects it (same-commit migration). Found+fixed en route: `export_doc` mojibake (`r.text` Latin-1 on charset-less markdown) — corrupted the operator's own German notes too.
 
-M024 = gmeet collector email-discovery: trigger on `gemini-notes@google.com` mails to ingest colleague-owned / org-shared Gemini Meet docs the own-Drive folder-scan can never see. `discovery = folder-scan ∪ email-link-scan`; downstream export/pair/render/dedup reused unchanged. Feasibility proven empirically 2026-05-21 (read-only probe: alex's `gmail-yesterday` `drive.meet.readonly` token read + exported a doc owned by chris@yesterday-ai.de, `shared:True`). One-off ingest of the triggering meeting already done outside the milestone (`raw/transcripts/gmeet/2026-05-21--weekly-sync-retro-2026-05-21-13-30-cest--6398b694441e.md`, clean UTF-8). M024 makes it recurring + sanctioned + ships the `export_doc` UTF-8 fix found during the probe. Context: `M024-CONTEXT.md`.
+**E2E live on lxw 2026-05-21:** `wiki update` ran the migration (injected `personal.accounts.gmail-yesterday.gmeet.email_discovery`). `wiki collect gmeet` → `email: 4 linked / 2 new · wrote 2` (Weekly Sync 04-30 + Team-Tech-Session 05-07, clean UTF-8 incl. 🚀/🛠️/umlauts); idempotent re-run `0 new`; Chris's colleague doc (chris@yesterday-ai.de, shared) deduped against the pre-milestone one-off; 211 KB export ReadTimeout recovered via retry. Feasibility had been proven up front by a read-only probe (alex's `drive.meet.readonly` token exported a doc owned by chris — scope is per-Meet-origin, not per-owner).
+
+**Open / deferred:** infographic touch (gmeet box, email-discovery) → `.ytstack/backlog/gmeet-email-discovery-infographic.md` (deferred to respect excalidraw render-review gates). drive_folder_id still unpinned on lxw (recurring auto-resolve WARNING — pre-existing, not M024). imap.py reader still text/plain-only (no imap account has a gmeet block, so moot today).
+
+**Next action:** Pre-existing arc unchanged — M006 calendar redesign + two hot threads (compile-allowlist verify, compile skip-on-long-context-kind=unknown) remain queued. Pre-existing test failures (dream_sampling time-drift + migrate_additions dream_model, M014/M016 dataclass drift) predate M024 and want a separate cleanup.
+
+---
+
+**Status (prev, 2026-05-21 — M024 planned).** gmeet collector email-discovery. Context: `M024-CONTEXT.md`.
 
 ---
 

@@ -13,7 +13,7 @@ watermark) → idempotent via file-id dedup.
 
 ## Tasks
 
-- [ ] T01 — `_GmeetAccount` + resolver read the `email_discovery` sub-block
+- [x] T01 — `_GmeetAccount` + resolver read the `email_discovery` sub-block
   - `scripts/collectors/gmeet.py` `_GmeetAccount`: add `email_discovery_enabled:
     bool`, `email_senders: tuple[str, ...]`, `email_folder: str`,
     `email_backfill_days: int`. `_resolve_gmeet_accounts` reads
@@ -21,7 +21,7 @@ watermark) → idempotent via file-id dedup.
     ("gemini-notes@google.com",), folder="INBOX", backfill_days=30).
   - Test: resolver picks up the block + defaults.
 
-- [ ] T02 — email-discovery producer in `_run_one_account`
+- [x] T02 — email-discovery producer in `_run_one_account`
   - After folder-scan stubs, if `email_discovery_enabled`: `resolve_reader`
     (from the account body via `CONFIG.personal.accounts[id]`); `scan_deep(folder,
     since=now-backfill_days)`; filter `meta.from_addr` against `email_senders`;
@@ -34,7 +34,7 @@ watermark) → idempotent via file-id dedup.
   - Test: fake reader + fake Drive client → email-only account ingests; dedup
     against a doc already in `already_present` skips the `files.get`.
 
-- [ ] T03 — config field + example + migration
+- [x] T03 — config field + example + migration
   - `config.example.yaml`: document `gmeet.email_discovery` under the example
     account (enabled/senders/folder/backfill_days + comment).
   - `scripts/migrations/migrate_config_keys.py` `migrate_account_additions`:

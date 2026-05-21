@@ -9,7 +9,7 @@ created: 2026-05-21
 
 ## Tasks
 
-- [ ] T01 — template + docs resync
+- [x] T01 — template + docs resync
   - `templates/` config template (if it carries a gmeet example) gains the
     `email_discovery` block. `docs/PROCESS.md` (and `docs/cli.md`/`FEATURES.md`
     if they enumerate gmeet) document email-discovery as a second discovery
@@ -18,7 +18,7 @@ created: 2026-05-21
     into the existing gmeet box caption only if it earns a slot; otherwise
     PROCESS.md only. Decide against `docs/architecture.excalidraw`.
 
-- [ ] T02 — lxw live E2E
+- [x] T02 — lxw live E2E
   - Push first (engine→origin), then `wiki update` on lxw, then
     `wiki collect gmeet`. Verify: colleague-owned meetings (the 4 gemini-notes
     mails in INBOX, incl. chris@yesterday-ai.de) land in `raw/transcripts/gmeet/`

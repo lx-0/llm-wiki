@@ -3,9 +3,9 @@ milestone: M024
 project: llm-wiki
 size: M
 created: 2026-05-21T19:23:37+02:00
-status: planned
+status: done
 total_slices: 3
-completed_slices: 0
+completed_slices: 3
 ---
 
 # M024 Roadmap
@@ -32,9 +32,9 @@ export/pair/render/dedup pipeline.
 Slice detail lives in per-slice `M024-S##-PLAN.md` files, created by
 `ytstack:slice-milestone`.
 
-- [ ] S01 -- (to be planned) — UTF-8 export fix + doc-id extraction (pure, tested)
-- [ ] S02 -- (to be planned) — email discovery wired into the run loop + config knob + migration
-- [ ] S03 -- (to be planned) — template resync + config.example + docs/PROCESS + lxw E2E
+- [x] S01 — UTF-8 export fix + doc-id extraction + reader HTML body (pure, tested) — commit f35cce0
+- [x] S02 — email discovery wired into the run loop + config knob + migration — commit f294e51
+- [x] S03 — docs (PROCESS + setup-gmeet) + lxw E2E (infographic deferred to backlog) — commit e313eab
 
 ## Run order
 
