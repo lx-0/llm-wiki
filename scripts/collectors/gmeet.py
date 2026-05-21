@@ -58,11 +58,13 @@ import logging
 import re
 import time
 from dataclasses import dataclass, field
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Iterator
 
 import yaml
 
+from adapters.mailbox import MailboxReadError, resolve_reader
 from collectors.base import CollectorSpec, RunResult, register
 from core import google_oauth
 from core.config import CONFIG
@@ -323,6 +325,16 @@ class _GmeetAccount:
     drive_folder_name: str
     since: str | None
     max_per_run: int
+    # Email-discovery (second discovery source — colleague-shared meetings
+    # announced via gemini-notes mails the own-Drive folder-scan never sees).
+    email_discovery: bool
+    email_senders: tuple[str, ...]
+    email_folder: str
+    email_backfill_days: int
+
+
+_DEFAULT_NOTES_SENDER = "gemini-notes@google.com"
+_DEFAULT_EMAIL_BACKFILL_DAYS = 30
 
 
 def _resolve_gmeet_accounts() -> list[_GmeetAccount]:
@@ -340,12 +352,25 @@ def _resolve_gmeet_accounts() -> list[_GmeetAccount]:
         if not isinstance(block, dict) or block.get("kind") != "gmeet-api":
             continue
         per_acct_max = block.get("max_per_run")
+        ed = block.get("email_discovery")
+        if not isinstance(ed, dict):
+            ed = {}
+        senders = ed.get("senders")
+        if not isinstance(senders, (list, tuple)) or not senders:
+            senders = (_DEFAULT_NOTES_SENDER,)
+        backfill = ed.get("backfill_days")
         out.append(_GmeetAccount(
             account_id=aid,
             drive_folder_id=block.get("drive_folder_id") or "",
             drive_folder_name=block.get("drive_folder_name") or "Meet Recordings",
             since=block.get("since") or None,
             max_per_run=per_acct_max if per_acct_max is not None else default_max,
+            email_discovery=bool(ed.get("enabled", True)),
+            email_senders=tuple(str(s) for s in senders),
+            email_folder=ed.get("folder") or "INBOX",
+            email_backfill_days=(
+                int(backfill) if backfill is not None else _DEFAULT_EMAIL_BACKFILL_DAYS
+            ),
         ))
     return out
 
@@ -745,6 +770,13 @@ class GmeetCollector:
 
         client = _DriveClient(session=sess, timeout_s=self._timeout_s)
 
+        per_acct_state = state.get(acct.account_id) or {}
+
+        # ── Discovery source 1: own-Drive "Meet Recordings" folder scan ──
+        # Meetings the operator's own account recorded. A folder problem must
+        # NOT abort the account — email-discovery below is an independent source.
+        folder_stubs: list[dict] = []
+        folder_note = ""
         folder_id = acct.drive_folder_id
         if not folder_id:
             folder_id = client.resolve_folder_id(acct.drive_folder_name)
@@ -759,29 +791,41 @@ class GmeetCollector:
                     "for collision-safe runs.",
                     acct.account_id, folder_id, acct.account_id,
                 )
-        if not folder_id:
-            return (
-                f"folder {acct.drive_folder_name!r} not found — set "
-                f"personal.accounts.{acct.account_id}.gmeet.drive_folder_id "
-                "(copy it from the folder URL)"
-            ), [], 0, False
+        if folder_id:
+            since = per_acct_state.get("last_seen_ts") if incremental else acct.since
+            log.info(
+                "GmeetCollector[%s]: listing Docs (folder=%s, since=%s, limit=%d)",
+                acct.account_id, folder_id, since or "—", acct.max_per_run,
+            )
+            try:
+                folder_stubs = list(client.list_docs(folder_id, since=since, limit=acct.max_per_run))
+            except GmeetAPIError as e:
+                log.error("GmeetCollector[%s]: folder list failed: %s", acct.account_id, e)
+                folder_note = f"folder-list failed: {e}"
+        else:
+            folder_note = (
+                f"folder {acct.drive_folder_name!r} not found "
+                f"(set personal.accounts.{acct.account_id}.gmeet.drive_folder_id)"
+            )
 
-        per_acct_state = state.get(acct.account_id) or {}
-        since = per_acct_state.get("last_seen_ts") if incremental else acct.since
+        # ── Discovery source 2: gemini-notes email links ──
+        # Meetings a colleague recorded + auto-shared org-wide; these never land
+        # in the operator's own Drive folder, but the notification email carries
+        # the (org-readable) Drive doc-id. Reuses the account's configured
+        # mailbox reader; windowed scan + Drive-file-id dedup is idempotent
+        # without a separate email watermark.
+        email_stubs, email_note = self._discover_via_email(acct, client, already_present)
 
-        log.info(
-            "GmeetCollector[%s]: listing Docs (folder=%s, since=%s, limit=%d)",
-            acct.account_id, folder_id, since or "—", acct.max_per_run,
-        )
+        # Union by Drive file-id (a doc seen by both sources ingests once).
+        folder_ids = {s.get("id") for s in folder_stubs if s.get("id")}
+        stubs: list[dict] = list(folder_stubs)
+        for s in email_stubs:
+            if s.get("id") and s["id"] not in folder_ids:
+                stubs.append(s)
 
-        try:
-            stubs = list(client.list_docs(folder_id, since=since, limit=acct.max_per_run))
-        except GmeetAPIError as e:
-            log.error("GmeetCollector[%s]: list failed: %s", acct.account_id, e)
-            return f"list failed: {e}", [], 0, False
-
+        notes = " · ".join(n for n in (folder_note, email_note) if n)
         if not stubs:
-            return f"no-op (0 docs in window since={since or '—'})", [], 0, False
+            return f"no-op{(' · ' + notes) if notes else ''}", [], 0, False
 
         # Group the listed Docs by `meeting_key`. Notes-Doc + Transcript-Doc
         # for the same meeting share a key and ingest as one file (combined or
@@ -889,8 +933,14 @@ class GmeetCollector:
                         drive_doc_ids={d.get("id") for d in (new_front.get("drive_docs") or []) if isinstance(d, dict) and d.get("id")},
                     )
                     target.write_text(text, encoding="utf-8")
+                    # Only own-folder docs advance the folder watermark; email-
+                    # discovered docs are deduped by file-id, not by createdTime.
                     created = stub.get("createdTime") or ""
-                    if created and (highest_created is None or str(created) > str(highest_created)):
+                    if (
+                        created
+                        and stub.get("id") in folder_ids
+                        and (highest_created is None or str(created) > str(highest_created))
+                    ):
                         highest_created = str(created)
                     short = _short_id(stub.get("id") or "")
                     if short:
@@ -956,7 +1006,11 @@ class GmeetCollector:
 
             for stub, _exported in exports:
                 created = stub.get("createdTime") or ""
-                if created and (highest_created is None or str(created) > str(highest_created)):
+                if (
+                    created
+                    and stub.get("id") in folder_ids
+                    and (highest_created is None or str(created) > str(highest_created))
+                ):
                     highest_created = str(created)
 
         state_touched = False
@@ -965,9 +1019,79 @@ class GmeetCollector:
             state[acct.account_id] = per_acct_state
             state_touched = True
 
+        summary = f"wrote {len(files_written)} · skipped {skipped}"
         return (
-            f"listed {len(stubs)} · wrote {len(files_written)} · skipped {skipped}",
+            f"{notes} · {summary}" if notes else f"listed {len(stubs)} · {summary}",
             files_written,
             skipped,
             state_touched,
         )
+
+    def _discover_via_email(
+        self,
+        acct: _GmeetAccount,
+        client: _DriveClient,
+        already_present: set[str],
+    ) -> tuple[list[dict], str]:
+        """Find Drive Doc-ids announced in gemini-notes emails for this account.
+
+        Reuses the account's configured mailbox reader (`resolve_reader`), scans
+        a bounded recent window of `email_folder`, keeps messages from
+        `email_senders`, and pulls `docs.google.com/document/d/<id>` out of the
+        message body (HTML part preferred — the plaintext alternative drops the
+        link). Returns Drive `files.get` metadata stubs for ids not already
+        ingested, plus a one-line note. Any reader / permission failure degrades
+        to `([], note)` so the folder-scan results still ship.
+        """
+        if not acct.email_discovery:
+            return [], ""
+        account_body = (CONFIG.personal.accounts or {}).get(acct.account_id)
+        if not isinstance(account_body, dict):
+            return [], "email: no account body"
+        body = dict(account_body)
+        body.setdefault("account_id", acct.account_id)
+        try:
+            reader = resolve_reader(body)
+        except Exception as e:  # noqa: BLE001
+            log.warning("GmeetCollector[%s]: email reader resolve failed: %s", acct.account_id, e)
+            return [], "email: reader-resolve error"
+        if reader is None:
+            return [], "email: no reader configured"
+
+        since = datetime.now(timezone.utc) - timedelta(days=acct.email_backfill_days)
+        senders = tuple(s.lower() for s in acct.email_senders)
+        doc_ids: list[str] = []
+        seen: set[str] = set()
+        try:
+            for msg in reader.scan_deep(folder=acct.email_folder, since=since):
+                frm = (msg.meta.from_addr or "").lower()
+                if not any(s in frm for s in senders):
+                    continue
+                blob = f"{msg.body_html or ''}\n{msg.body_text or ''}"
+                for did in extract_drive_doc_ids(blob):
+                    if did not in seen:
+                        seen.add(did)
+                        doc_ids.append(did)
+        except MailboxReadError as e:
+            log.warning("GmeetCollector[%s]: email scan failed: %s", acct.account_id, e)
+            return [], f"email-scan failed: {e}"
+        except Exception as e:  # noqa: BLE001
+            log.exception("GmeetCollector[%s]: email scan crashed", acct.account_id)
+            return [], f"email-scan error: {type(e).__name__}"
+
+        # Skip ids already ingested (filename short-id / frontmatter) before
+        # spending a files.get — the same dedup key the write loop uses.
+        new_ids = [d for d in doc_ids if _short_id(d) not in already_present]
+        stubs: list[dict] = []
+        for did in new_ids:
+            try:
+                meta = client._get(
+                    f"{_DRIVE_BASE}/files/{did}",
+                    params={"fields": "id,name,createdTime,modifiedTime,webViewLink"},
+                )
+            except GmeetAPIError as e:
+                log.warning("GmeetCollector[%s]: files.get %s failed: %s", acct.account_id, did, e)
+                continue
+            if isinstance(meta, dict) and meta.get("id"):
+                stubs.append(meta)
+        return stubs, f"email: {len(doc_ids)} linked / {len(stubs)} new"

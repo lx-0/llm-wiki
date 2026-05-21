@@ -511,6 +511,11 @@ def migrate_account_additions(data: dict) -> list[str]:
         health substrate when they configured Oura; the placeholder makes
         the second source discoverable without auto-enabling (empty
         `inbox_dir` keeps the collector silent for that account).
+      - M024 (2026-05-21): inject `gmeet.email_discovery` (enabled / senders /
+        folder / backfill_days) into any account with a `gmeet` block (kind
+        gmeet-api) lacking it. Unlike healthkit this ships enabled — it's
+        functional with defaults and bounded by the gemini-notes sender
+        allowlist + the account's configured reader.
     """
     changes: list[str] = []
     personal = data.get("personal")
@@ -540,6 +545,30 @@ def migrate_account_additions(data: dict) -> list[str]:
             f"injected personal.accounts.{aid}.health.healthkit "
             f"(M023, empty inbox_dir = opt-out)"
         )
+
+    # M024 (2026-05-21): inject `gmeet.email_discovery` into any account with a
+    # gmeet block (kind gmeet-api) lacking it. Email-discovery is the second
+    # discovery source (colleague-shared meetings the own-Drive scan can't see);
+    # it ships on-by-default for accounts that already opted into gmeet, gated by
+    # the gemini-notes sender allowlist + each account's configured reader.
+    for aid, body in accounts.items():
+        if not isinstance(body, dict):
+            continue
+        gmeet_block = body.get("gmeet")
+        if not isinstance(gmeet_block, dict) or gmeet_block.get("kind") != "gmeet-api":
+            continue
+        if "email_discovery" in gmeet_block:
+            continue
+        gmeet_block["email_discovery"] = {
+            "enabled": True,
+            "senders": ["gemini-notes@google.com"],
+            "folder": "INBOX",
+            "backfill_days": 30,
+        }
+        changes.append(
+            f"injected personal.accounts.{aid}.gmeet.email_discovery (M024)"
+        )
+
     return changes
 
 

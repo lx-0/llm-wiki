@@ -572,3 +572,58 @@ def test_migrate_account_additions_idempotent_when_healthkit_present():
         data["personal"]["accounts"]["default"]["health"]["healthkit"]["inbox_dir"]
         == "/operator/path"
     )
+
+
+# ── migrate_account_additions: M024 gmeet.email_discovery ───────────────
+
+
+def test_migrate_account_additions_injects_email_discovery_into_gmeet_account():
+    """M024: any account with a gmeet block gains an email_discovery block."""
+    m = _mod()
+    data = {
+        "personal": {
+            "accounts": {
+                "work": {
+                    "email": "alex@example.com",
+                    "gmeet": {"kind": "gmeet-api", "drive_folder_name": "Meet Recordings"},
+                },
+            },
+        },
+    }
+    changes = m.migrate_account_additions(data)
+    ed = data["personal"]["accounts"]["work"]["gmeet"]["email_discovery"]
+    assert ed == {
+        "enabled": True,
+        "senders": ["gemini-notes@google.com"],
+        "folder": "INBOX",
+        "backfill_days": 30,
+    }
+    assert any("email_discovery" in c for c in changes)
+
+
+def test_migrate_account_additions_skips_account_without_gmeet():
+    m = _mod()
+    data = {"personal": {"accounts": {"plain": {"email": "x@y.de"}}}}
+    changes = m.migrate_account_additions(data)
+    assert changes == []
+    assert "gmeet" not in data["personal"]["accounts"]["plain"]
+
+
+def test_migrate_account_additions_idempotent_when_email_discovery_present():
+    """Operator-set email_discovery values must not be overwritten on re-run."""
+    m = _mod()
+    data = {
+        "personal": {
+            "accounts": {
+                "work": {
+                    "gmeet": {
+                        "kind": "gmeet-api",
+                        "email_discovery": {"enabled": False, "senders": ["x@y.de"]},
+                    },
+                },
+            },
+        },
+    }
+    changes = m.migrate_account_additions(data)
+    assert changes == []
+    assert data["personal"]["accounts"]["work"]["gmeet"]["email_discovery"]["enabled"] is False

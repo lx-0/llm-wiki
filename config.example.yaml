@@ -510,6 +510,11 @@ personal:
   #       drive_folder_name: "Meet Recordings"           # auto-resolve fallback name
   #       since: ""                                      # ISO date "2026-01-01"; empty = no backfill cap
   #       max_per_run: null                              # null = inherit CONFIG.limits.gmeet_max_per_run
+  #       email_discovery:                               # 2nd discovery source: colleague-shared meetings announced by email
+  #         enabled: true                                # scan this account's mailbox for gemini-notes links the own-Drive scan can't see
+  #         senders: ["gemini-notes@google.com"]         # only follow Drive links in mails from these senders
+  #         folder: "INBOX"                              # reader folder to scan (uses the account's configured reader)
+  #         backfill_days: 30                            # windowed re-scan; Drive-file-id dedup makes it idempotent (raise once to backfill history)
   #     jamie:
   #       kind: jamie-api                                # collectors/jamie.py — Jamie AI meeting-notetaker
   #       api_key_env: JAMIE_PRIVATE_API_KEY             # env var holding the jk_... key; empty/unset disables this account
