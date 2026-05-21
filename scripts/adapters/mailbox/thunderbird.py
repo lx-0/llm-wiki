@@ -291,28 +291,48 @@ def _iter_deep(
             in_reply_to=msg.get("In-Reply-To"),
             message_id=msg.get("Message-ID"),
         )
-        body_text = _extract_body(msg)
+        body_text, body_html = _extract_body(msg)
         attachments = tuple(_attachment_filenames(msg))
-        yield Message(meta=meta, body_text=body_text, attachment_filenames=attachments)
-
-
-def _extract_body(msg: mailbox.mboxMessage) -> str:
-    if msg.is_multipart():
-        for part in msg.walk():
-            if part.get_content_type() == "text/plain":
-                try:
-                    return part.get_payload(decode=True).decode(
-                        part.get_content_charset() or "utf-8", errors="replace"
-                    )
-                except Exception:
-                    return ""
-        return ""
-    try:
-        return msg.get_payload(decode=True).decode(
-            msg.get_content_charset() or "utf-8", errors="replace"
+        yield Message(
+            meta=meta,
+            body_text=body_text,
+            body_html=body_html,
+            attachment_filenames=attachments,
         )
+
+
+def _decode_part(part: mailbox.mboxMessage) -> str:
+    try:
+        payload = part.get_payload(decode=True)
+        if payload is None:
+            return ""
+        return payload.decode(part.get_content_charset() or "utf-8", errors="replace")
     except Exception:
         return ""
+
+
+def _extract_body(msg: mailbox.mboxMessage) -> tuple[str, str | None]:
+    """Return `(plain_text, html_or_None)`.
+
+    multipart/alternative carries both a text/plain and a text/html part. Some
+    senders (e.g. Gemini meeting-notes mails) put links ONLY in the HTML
+    alternative, so we surface it alongside the plain text rather than dropping
+    it. First part of each kind wins; a singlepart text/html message returns
+    `("", html)`.
+    """
+    if msg.is_multipart():
+        text, html = "", None
+        for part in msg.walk():
+            ct = part.get_content_type()
+            if ct == "text/plain" and not text:
+                text = _decode_part(part)
+            elif ct == "text/html" and html is None:
+                html = _decode_part(part)
+        return text, html
+    body = _decode_part(msg)
+    if msg.get_content_type() == "text/html":
+        return "", body
+    return body, None
 
 
 def _attachment_filenames(msg: mailbox.mboxMessage) -> Iterator[str]:

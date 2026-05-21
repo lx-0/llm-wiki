@@ -137,6 +137,30 @@ def _short_id(file_id: str) -> str:
     return alnum[:_SHORT_ID_LEN] or file_id[:_SHORT_ID_LEN]
 
 
+# Google Docs URLs in a Gemini-notes email body: the doc-id is the path segment
+# after `/document/d/`. The id charset is `[A-Za-z0-9_-]`; the trailing
+# `/edit?usp=...` or `/view` is ignored by the capture group.
+_DOC_URL_RE = re.compile(r"docs\.google\.com/document/d/([A-Za-z0-9_-]+)")
+
+
+def extract_drive_doc_ids(text: str) -> list[str]:
+    """Order-preserving, deduplicated Drive Doc ids found in a text/HTML blob.
+
+    Used by email-discovery to pull the linked Doc out of a
+    `gemini-notes@google.com` notification. The doc-url only reliably appears
+    in the HTML part of the mail (the plaintext alternative drops it), so
+    callers pass `body_html` (falling back to `body_text`).
+    """
+    out: list[str] = []
+    seen: set[str] = set()
+    for m in _DOC_URL_RE.finditer(text or ""):
+        doc_id = m.group(1)
+        if doc_id not in seen:
+            seen.add(doc_id)
+            out.append(doc_id)
+    return out
+
+
 def _classify_doc(name: str) -> str:
     """`transcript` | `notes` | `unknown` — best-effort, by title suffix."""
     if _KIND_TRANSCRIPT_RE.search(name):
@@ -379,7 +403,13 @@ class _DriveClient:
             if r.status_code != 200:
                 raise GmeetAPIError(f"unexpected {r.status_code} on GET {url}: {r.text[:200]}")
 
-            return r.json() if expect_json else r.text
+            if expect_json:
+                return r.json()
+            # Drive's files.export returns charset-less `text/markdown`, which
+            # requests decodes as Latin-1 by default → `Ã¤` for `ä`. The bytes
+            # are always UTF-8; pin the encoding before reading `.text`.
+            r.encoding = "utf-8"
+            return r.text
 
         raise GmeetAPIError(f"unreachable: exhausted retries on GET {url}")
 
