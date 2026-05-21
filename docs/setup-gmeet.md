@@ -159,6 +159,43 @@ The piggyback runs every 6 h after `compile_after_hour` (per
 `config.yaml:piggybacks.gmeet`). If you want to disable it for a particular
 install, set `piggybacks.gmeet.enabled: false`.
 
+## Email-discovery — colleague-shared meetings
+
+The folder-scan above only sees meetings **your own** account recorded (the docs
+in *your* "Meet Recordings" folder). When a colleague records a meeting you were
+invited to, Gemini auto-shares the notes Doc org-wide and emails every attendee
+a `gemini-notes@google.com` notification — but that Doc lives in *their* Drive,
+so the folder-scan never finds it.
+
+Email-discovery is the second source. It scans this account's mailbox (using the
+same `reader` you already configured for the email-collector — Thunderbird mbox /
+IMAP / Gmail), follows the `docs.google.com/document/d/<id>` link in each
+`gemini-notes@google.com` mail, and exports that Doc through the same pipeline.
+The `drive.meet.readonly` scope reads the colleague's Doc because the file is
+Meet-origin and shared with you — no extra consent.
+
+It's **on by default** for any account with a `gmeet` block, gated by the sender
+allowlist + your configured reader:
+
+```yaml
+personal:
+  accounts:
+    <id>:
+      gmeet:
+        kind: gmeet-api
+        email_discovery:
+          enabled: true                       # set false to opt out
+          senders: ["gemini-notes@google.com"]
+          folder: "INBOX"                      # reader folder to scan
+          backfill_days: 30                    # windowed re-scan; raise once to backfill history
+```
+
+Discovery is a **windowed re-scan** (last `backfill_days`) deduped by Drive
+file-id — idempotent, no separate watermark. To pull in older colleague
+meetings once, bump `backfill_days` for a single run, then lower it again.
+Requires a working `reader` for the account; with no reader it logs and skips
+(folder-scan results still ship).
+
 ## State + idempotency
 
 - `state/gmeet-state.json` carries `{<account-id>: {last_seen_ts: …}}` —
