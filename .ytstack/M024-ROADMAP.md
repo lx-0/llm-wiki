@@ -1,0 +1,48 @@
+---
+milestone: M024
+project: llm-wiki
+size: M
+created: 2026-05-21T19:23:37+02:00
+status: planned
+total_slices: 3
+completed_slices: 0
+---
+
+# M024 Roadmap
+
+**Goal:** The gmeet collector ingests Gemini Meet docs announced via
+`gemini-notes@google.com` emails -- colleague-owned, org-shared meetings the
+own-Drive folder-scan can never see -- through the existing
+export/pair/render/dedup pipeline.
+
+**Exit criteria:**
+- `wiki collect gmeet` discovers docs from `gemini-notes@google.com` emails (per
+  account, since watermark) and ingests them into `raw/transcripts/gmeet/`,
+  deduplicated against folder-scan results by Drive file-id.
+- Doc-id extraction is a tested pure function (regex over the doc-URL form),
+  robust at 0 / 1 / N links per mail.
+- `export_doc` returns correct UTF-8 (umlauts intact) -- regression covered.
+- New config knob in `config.example.yaml` + `templates/` + `migrate_config_keys.py`
+  in the same commit; documented in `docs/PROCESS.md`.
+- E2E on lxw: a real `gemini-notes@google.com` mail -> ingested file, clean
+  content, deduped on re-run.
+
+## Slices
+
+Slice detail lives in per-slice `M024-S##-PLAN.md` files, created by
+`ytstack:slice-milestone`.
+
+- [ ] S01 -- (to be planned) — UTF-8 export fix + doc-id extraction (pure, tested)
+- [ ] S02 -- (to be planned) — email discovery wired into the run loop + config knob + migration
+- [ ] S03 -- (to be planned) — template resync + config.example + docs/PROCESS + lxw E2E
+
+## Run order
+
+Slices execute sequentially. After each slice, `ytstack:reassess-roadmap` checks
+if the plan still fits reality.
+
+## How to update this file
+
+- Flip slice checkbox `[ ]` → `[x]` when its tasks are all `summarize-task`-confirmed
+- Update `completed_slices` count
+- On milestone completion, flip `status: planned` → `status: done` and update global ROADMAP.md
