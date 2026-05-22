@@ -17,7 +17,7 @@ Zwei fundamental getrennte Ingest-Pfade konvergieren bei `compile.py`:
 - **Path A** — Automatische Session-Capture (Hooks → daily/ → compile)
 - **Path B** — Kuratierte Quellen (Scanners/Manual/Inbox → raw/ → compile)
 
-## Übersicht — die 13 Prozesse
+## Übersicht — die 14 Prozesse
 
 | # | Process | Was passiert | Trigger |
 |---|---|---|---|
@@ -34,6 +34,7 @@ Zwei fundamental getrennte Ingest-Pfade konvergieren bei `compile.py`:
 | [11](#11-vault-ux-layer-dashboard--mocs) | Vault UX Layer | Dashboard.md (Auto-Open) + `_dashboard-stats.md` Refresh + MOCs (in Arbeit) | nach jedem Flush (synchron) |
 | [12](#12-hard-facts-corrections) | Hard Facts (Corrections) | `wiki correct` schreibt `knowledge/facts/<slug>.md` → injected in compile/query/lint; `apply` propagiert agentisch über `knowledge/`+`daily/` | manuell (`wiki correct add` / `wiki correct apply`) |
 | [13](#13-agent-tasks) | Agent Tasks | `prompts/agents/<id>.md` declares Claude Agent SDK config (model + tools + permission + button) per task. `wiki agent <id>` runs it. Dashboard buttons auto-wired via `wiki seed`. | manuell oder per Dashboard-Button |
+| [14](#14-concept-reconciliation) | Concept Reconciliation | Signal-driven autonomous loop: consumes lint fact-violations, auto-reconciles `knowledge/concepts/` against the hard facts they contradict via strict scoped `correct_apply`. Contradictions/quality propose-only. | `wiki reconcile` / `concept_reconcile` piggyback (double-gated OFF) |
 
 ---
 
@@ -1193,3 +1194,36 @@ Idempotent — zweiter Lauf produziert keinen Diff.
 - **Marker fehlen in dashboard.md** — `update_dashboard()` warned und skippt; safe für custom-edited dashboards.
 - **Operator löscht Spec-File** — Auto-pruning ist NICHT Default. Buttons bleiben in shell-commands data.json + dashboard.md zurück, bis manuell entfernt. `--prune-agent-buttons` Flag deferred ins Backlog.
 
+
+---
+
+## 14. Concept Reconciliation
+
+Autonomous, signal-driven loop that keeps `knowledge/concepts/` consistent with the hard facts and adapts them. Sibling to Hard Facts (§12, operator-driven, whole-vault) and dream-cycle (§ entity re-synthesis): reconcile is *concept*-scoped and *autonomous*.
+
+```mermaid
+flowchart TD
+    TRIG["wiki reconcile  OR  concept_reconcile piggyback"] --> SIG["lint.check_facts_violations()<br/>(no new detection)"]
+    SIG --> GRP["group by fact slug<br/>concepts/ only · absolute paths"]
+    GRP --> COOL{"fact within<br/>cooldown?"}
+    COOL -->|yes| SKIP["skip"]
+    COOL -->|no| CAP{"per-run cost<br/>cap reached?"}
+    CAP -->|yes| STOP["stop sweep"]
+    CAP -->|no| REC["correct_apply.reconcile_fact()<br/>STRICT: PreToolUse scope-lock to<br/>knowledge/concepts/ · no Bash ·<br/>bounded turns · per-fact cost cap"]
+    REC --> STAMP["stamp fact last_reconciled:<br/>+ knowledge/log.md summary"]
+```
+
+**Tiered autonomy (strict policy):** AUTO only `fact_violation` (the fact is the authority, fix direction unambiguous). Concept↔concept `contradiction` + quality are PROPOSE-ONLY — left in the lint/dashboard surface, never auto-rewritten.
+
+**Gating:** double-gated OFF — needs `features.concept_reconciliation: true` AND a `piggybacks.concept_reconcile` block. `wiki reconcile` is dry-run by default; `--apply` self-downgrades to dry-run when the flag is off.
+
+**Reuse:** `lint` (signals) + `facts/correct_apply.py::reconcile_fact` (strict sibling of `apply()`, which is unchanged) + the flush piggyback machinery. Knobs: `scheduling.concept_reconcile_cooldown_days` (14), `limits.concept_reconcile_{per_fact_max_cost_usd, max_cost_per_run_usd, max_turns}`.
+
+### Edge Cases
+
+- **Concept↔concept contradiction with no arbitrating fact** — propose-only; never auto-resolved (risk of erasing the correct side).
+- **Non-concept fact-violations** (people/projects/qa) — filtered out; the write hook only allows `knowledge/concepts/` anyway.
+- **Process cwd ≠ ROOT_DIR** (piggyback spawn) — violating files are passed as ABSOLUTE paths so the resolve-based scope hook can't mis-deny them (the compile max_turns lesson).
+- **Cost runaway** — per-fact pre-flight estimate skips, per-run cumulative cap stops the sweep.
+- **Churn / oscillation** — per-fact cooldown (`last_reconciled:`) + the fact-stamp prevent re-processing within the window.
+- **Bad rewrite** — git-reversible + `correct_apply._backup`; auto-class limited to the unambiguous fact-authority case; dry-run-first rollout.

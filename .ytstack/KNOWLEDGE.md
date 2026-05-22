@@ -2211,3 +2211,14 @@ A metric-only stub (body = `# Health — <date>` heading + the `(Add observation
 
 #### Lesson
 Per-file provenance must not accumulate in a single article's frontmatter for high-volume daily substrates (health = ~365/yr × 11 yr). One shared article's `compiled_from:` is not a log — provenance lives in the per-file source + the state hash-map. And: "append a path + write a log line" is deterministic — it should never have been an SDK agent call (project rule: no agent for deterministic actions).
+
+### Autonomous concept-reconciliation — design lessons (2026-05-22)
+
+`wiki reconcile` keeps `knowledge/concepts/` consistent with the hard facts and adapts them autonomously. Three lessons baked into the design:
+
+- **Signal-driven, not blind-sweep.** It does NOT detect anything new — it consumes `lint.check_facts_violations()` and only touches concepts a detector already flagged. "No signal → no edit" is the cheapest, safest selection policy and means the routine cost scales with *drift*, not corpus size.
+- **Reuse the write primitive, tighten the scope.** `facts/correct_apply.py::apply()` already does fact→article reconciliation, but BROAD (whole vault, acceptEdits, Bash, 50 turns). The autonomous routine needs the opposite, so `reconcile_fact()` is a sibling with a STRICT envelope: PreToolUse `make_path_scope_hook([CONCEPTS_DIR])`, no Bash, bounded turns, per-fact + per-run cost caps, cooldown. `apply()` was left 100% untouched (the broad operator path still exists).
+- **Pass targets as ABSOLUTE paths.** The PreToolUse scope hook resolves `Path(file_path).resolve()` against the *reconcile process* cwd, which (via the flush piggyback) is not ROOT_DIR. A relative `knowledge/concepts/x.md` would resolve wrong → deny → the agent loops → max_turns (exactly the compile-health failure class from earlier the same day). Handing the agent absolute paths sidesteps it. **Any scoped-write SDK call spawned from a piggyback must give the agent absolute paths or resolve the hook against a fixed root.**
+- **Tiered autonomy by issue class.** AUTO only the unambiguous `fact_violation` class (fact is the authority). Concept↔concept contradictions and quality stay PROPOSE-ONLY in the lint/dashboard surface — auto-rewriting them risks erasing the correct side. Strict policy ≠ full autonomy; it's *bounded* autonomy where the fix direction is unambiguous.
+
+Double-gated OFF: `features.concept_reconciliation` (default False) AND a `piggybacks.concept_reconcile` block must both exist; `wiki reconcile` is dry-run by default and `--apply` self-downgrades to dry-run when the flag is off.

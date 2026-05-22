@@ -143,6 +143,8 @@ After every compile, two side loops run on the new article:
 
 When raw sources contradict reality — a Slack thread that calls a project by its old name, an old memo that claims a never-won award — `wiki correct` lets you write a **hard fact** to `knowledge/facts/<slug>.md`. Hard facts inject into compile + query prompts at the highest authority, so future compilations honour them automatically. `wiki correct apply <slug>` then spawns an agent that walks the existing wiki, strikes contaminated claims, fixes wikilinks, and — for disambiguation facts — renames files. Raw sources stay immutable; only `knowledge/` (and minimal correction notes in `daily/`) are touched.
 
+`wiki reconcile` is the autonomous, signal-driven version of that loop: it reads the lint fact-violations (concepts that contradict a hard fact) and reconciles them under a strict envelope — writes scope-locked to `knowledge/concepts/`, per-fact + per-run cost caps, a per-fact cooldown, and tiered autonomy (only unambiguous fact-violations are auto-fixed; concept↔concept contradictions stay propose-only in the lint surface). It is dry-run by default and double-gated OFF (`features.concept_reconciliation` + a `piggybacks.concept_reconcile` block) so it only runs autonomously once you opt in.
+
 ## What a compiled article looks like
 
 A real `knowledge/concepts/agent-config-staleness.md` from a working vault — illustrative excerpt:

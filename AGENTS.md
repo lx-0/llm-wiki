@@ -190,6 +190,12 @@ Resolution order: per-entity frontmatter `dream_priority: <float>` (absolute ove
 
 Debug current ranking with `wiki dream list-candidates --limit 15` — prints rank/weight/priority/age/slug/source-trace per entity. Spec: `.ytstack/backlog/dream-priority-config.md`.
 
+### Concept-reconciliation routine (`wiki reconcile`)
+
+Autonomous consistency loop for `knowledge/concepts/`. Signal-driven: it consumes `lint.check_facts_violations()` (it does NOT detect anything new), groups violations by hard fact, and auto-reconciles the flagged concepts via the STRICT `facts/correct_apply.py::reconcile_fact()` — writes scope-locked to `knowledge/concepts/` (PreToolUse hook, no Bash), per-fact + per-run cost caps, and a per-fact cooldown stamped as `last_reconciled:` in the fact's frontmatter. Tiered autonomy: only `fact_violation` is auto-fixed (the fact is authority); concept↔concept contradictions + quality are PROPOSE-ONLY, left in the lint/dashboard surface. `correct_apply.apply()` (the broad operator-driven whole-vault propagation) is unchanged.
+
+Double-gated OFF: needs `features.concept_reconciliation: true` AND a `piggybacks.concept_reconcile` block. `wiki reconcile` is dry-run by default; `--apply` self-downgrades to dry-run when the flag is off. Spec: `.ytstack/backlog/concept-consistency-routine.md`.
+
 ### Adding a prompt
 
 1. Drop `<name>.md` into `prompts/`.
