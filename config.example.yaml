@@ -17,6 +17,9 @@ scheduling:
   # `wiki dream --all-entities` and the dream_cycle piggyback. Override per-run
   # with `--ignore-cooldown` (CLI) or `--cooldown-days N`.
   dream_cooldown_days: 7
+  # Concept-reconciliation routine: a hard fact reconciled within this many
+  # days is skipped by `wiki reconcile` + the concept_reconcile piggyback.
+  concept_reconcile_cooldown_days: 14
   # M017 — config-driven entity priority for dream-cycle selection. Default
   # behavior (empty config below) is "all entities equal weight, greedy by
   # age" (M014). Set rules to bias which entities get auto-dreamed more
@@ -344,6 +347,12 @@ limits:
   # `wiki dream --all-entities` AND the dream_cycle piggyback.
   dream_entity_max_cost_usd: 2.0
   dream_cycle_max_cost_per_run_usd: 5.0
+  # Concept-reconciliation routine (`wiki reconcile`). Per-fact pre-flight cost
+  # cap (reject a too-expensive reconciliation), cumulative per-run cap (stop
+  # the sweep), and the turn budget for the strict scoped agent.
+  concept_reconcile_per_fact_max_cost_usd: 0.10
+  concept_reconcile_max_cost_per_run_usd: 0.50
+  concept_reconcile_max_turns: 15
   # M016 dream-cycle sampled-activation. Bounds corpus size per dream by
   # construction (~600 KB total regardless of vault size). Tier 1 always
   # includes the N most-recent substrate files mentioning the entity + the
@@ -404,6 +413,13 @@ features:
   # layer lands and dogfooding completes. Air-gapped from the compile loop;
   # see `.ytstack/DECISIONS.md` 2026-05-17 entries.
   operator_reports: false
+  # Autonomous concept-consistency routine (`wiki reconcile`). When true, the
+  # concept_reconcile piggyback (and `wiki reconcile --apply`) may make scoped
+  # autonomous edits to knowledge/concepts/ — reconciling concepts against the
+  # hard facts they contradict. Default OFF: review `wiki reconcile` (dry-run)
+  # first, then flip. Also needs a `piggybacks.concept_reconcile` block to run
+  # automatically. Spec: `.ytstack/backlog/concept-consistency-routine.md`.
+  concept_reconciliation: false
 
 graph_view:
   # Mode: knowledge-only | full-vault | sources-only | custom

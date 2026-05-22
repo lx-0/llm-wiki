@@ -17,6 +17,8 @@ import argparse
 import asyncio
 import logging
 import sys
+import time as _time
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
@@ -27,15 +29,16 @@ import yaml
 from claude_agent_sdk import (
     AssistantMessage,
     ClaudeAgentOptions,
+    HookMatcher,
     ResultMessage,
     query,
 )
 
-from core.paths import FACTS_DIR, ROOT_DIR
+from core.paths import CONCEPTS_DIR, FACTS_DIR, ROOT_DIR
 from core.utils import now_iso, today_iso
 from core.config import CONFIG  # noqa: E402
 from core.prompts import render  # noqa: E402
-from core.sdk_helpers import StderrCapture, log_sdk_failure  # noqa: E402
+from core.sdk_helpers import StderrCapture, log_sdk_failure, make_path_scope_hook  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO,
@@ -162,6 +165,128 @@ async def apply(slug: str, dry_run: bool) -> int:
         log.warning("Could not parse fact frontmatter after run; not updating `applied:`.")
 
     return 0
+
+
+# ── Strict concept-reconciliation path (concept-consistency-routine) ──
+# Separate from apply(): same module + helpers, but a TIGHT scope. apply()
+# is the broad operator-driven "propagate one fact across the whole vault"
+# (acceptEdits + Bash + 50 turns). reconcile_fact() is the autonomous-routine
+# primitive: writes locked to knowledge/concepts/ via a PreToolUse hook, no
+# Bash, bounded turns, pre-flight cost cap. apply() is left untouched.
+
+
+@dataclass
+class ReconcileResult:
+    slug: str
+    status: str            # ok | skipped | failed | dry_run
+    cost_usd: float = 0.0
+    files: list[str] = field(default_factory=list)
+    detail: str = ""
+
+
+def _estimate_cost_usd(prompt_chars: int) -> float:
+    """Conservative pre-flight estimate: input @ ~$15/Mtok + ~1.5k output tokens
+    @ ~$75/Mtok (Opus-class). Gates the call BEFORE spend; real cost is read
+    from ResultMessage.total_cost_usd after."""
+    input_cost = (prompt_chars / 4) * 15 / 1_000_000.0
+    output_cost = 1500 * 75 / 1_000_000.0
+    return round(input_cost + output_cost, 4)
+
+
+async def reconcile_fact(
+    slug: str,
+    violating_files: list[str],
+    *,
+    dry_run: bool,
+    per_fact_cap_usd: float,
+) -> ReconcileResult:
+    """Reconcile the given concept files against one hard fact, strict-scoped.
+
+    `violating_files` are vault-relative paths the caller (reconcile.py, from
+    lint.check_facts_violations) already identified. The agent may only edit
+    files under knowledge/concepts/ (enforced by the PreToolUse hook); the
+    prompt forbids touching anything else, deleting, renaming, or editing
+    provenance frontmatter. On success the fact is stamped `last_reconciled:`.
+    """
+    fact_path = FACTS_DIR / f"{slug}.md"
+    if not fact_path.exists():
+        return ReconcileResult(slug, "failed", detail=f"no such fact: {slug}")
+    if not violating_files:
+        return ReconcileResult(slug, "skipped", detail="no violating files")
+
+    fact_text = fact_path.read_text(encoding="utf-8")
+    files_block = "\n".join(f"- `{f}`" for f in violating_files)
+    prompt = render(
+        "reconcile_concept",
+        fact_content=fact_text,
+        fact_path=str(fact_path.relative_to(ROOT_DIR)),
+        slug=slug,
+        today=today_iso(),
+        now=now_iso(),
+        violating_files=files_block,
+    )
+
+    est = _estimate_cost_usd(len(prompt))
+    if est > per_fact_cap_usd:
+        return ReconcileResult(
+            slug, "skipped", detail=f"pre-flight est ${est} > per-fact cap ${per_fact_cap_usd}",
+        )
+    if dry_run:
+        return ReconcileResult(
+            slug, "dry_run", files=violating_files,
+            detail=f"would reconcile {len(violating_files)} file(s) (est ${est})",
+        )
+
+    started = _time.time()
+    capture = StderrCapture()
+    cost = 0.0
+    try:
+        async for message in query(
+            prompt=prompt,
+            options=ClaudeAgentOptions(
+                max_buffer_size=CONFIG.limits.sdk_max_buffer_size_mb * 1024 * 1024,
+                cwd=str(ROOT_DIR),
+                model=CONFIG.models.compile_model,
+                allowed_tools=["Read", "Glob", "Grep", "Write", "Edit"],
+                hooks={
+                    "PreToolUse": [
+                        HookMatcher(
+                            matcher="Write|Edit",
+                            hooks=[make_path_scope_hook([CONCEPTS_DIR])],
+                        ),
+                    ],
+                },
+                permission_mode="default",
+                max_turns=CONFIG.limits.concept_reconcile_max_turns,
+                system_prompt={"type": "preset", "preset": "claude_code"},
+                stderr=capture.callback,
+            ),
+        ):
+            if isinstance(message, ResultMessage):
+                cost = message.total_cost_usd or 0.0
+    except Exception as exc:
+        log_sdk_failure(
+            log,
+            label=f"reconcile_fact:{slug}",
+            source=f"fact:{slug}",
+            model=CONFIG.models.compile_model,
+            input_chars=len(prompt),
+            started=started,
+            capture=capture,
+            exc=exc,
+        )
+        return ReconcileResult(slug, "failed", files=violating_files, detail="SDK call failed")
+
+    # Stamp the fact as reconciled (cooldown key). Re-read to avoid stomping.
+    current_text = fact_path.read_text(encoding="utf-8")
+    fm_now, _, body_now = _split_frontmatter(current_text)
+    if fm_now:
+        _backup(fact_path)
+        fm_now["last_reconciled"] = now_iso()
+        fm_now["updated"] = today_iso()
+        _write_frontmatter(fact_path, fm_now, body_now)
+
+    return ReconcileResult(slug, "ok", cost_usd=cost, files=violating_files, detail="reconciled")
 
 
 def main() -> int:

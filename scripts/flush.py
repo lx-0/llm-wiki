@@ -109,6 +109,13 @@ _LEGACY_PIGGYBACK_COMMANDS: dict[str, list[str]] = {
     # because it's a different layer of integration. Default OFF
     # until operator flips features.operator_reports.
     "analyst_pass2": ["analyze.py", "--cross-study-only"],
+    # Autonomous concept-reconciliation routine (2026-05-22). Double-gated:
+    # this legacy piggyback only runs if the operator adds a
+    # `piggybacks.concept_reconcile: {enabled: true, ...}` block (default
+    # absent → skipped), AND `--apply` is self-gated inside reconcile.py by
+    # `features.concept_reconciliation` (off → it falls back to a no-op
+    # dry-run). See `.ytstack/backlog/concept-consistency-routine.md`.
+    "concept_reconcile": ["reconcile.py", "--apply", "--limit", "{max_per_run}"],
 }
 
 

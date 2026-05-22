@@ -501,6 +501,32 @@ EOF
   return $rc
 }
 
+cmd_reconcile() {
+  case "${1:-}" in
+    -h|--help|help)
+      cat <<EOF
+${C_BOLD}wiki reconcile${C_RESET} — autonomous concept-consistency routine
+
+${C_BOLD}USAGE${C_RESET}
+  wiki reconcile                     dry-run plan (default, no writes)
+  wiki reconcile --apply             apply (requires features.concept_reconciliation)
+  wiki reconcile --limit N           cap facts processed this run
+
+${C_BOLD}NOTES${C_RESET}
+  Signal-driven: consumes \`lint.check_facts_violations\` and auto-reconciles
+  knowledge/concepts/ articles against the hard facts they contradict, via a
+  strict scope-locked \`correct_apply\` (per-fact + per-run cost caps,
+  per-fact cooldown). Concept↔concept contradictions + quality are
+  PROPOSE-ONLY (left in \`wiki lint\` / the dashboard). Default OFF + dry-run;
+  flip \`features.concept_reconciliation\` to enable --apply.
+  Spec: \`.ytstack/backlog/concept-consistency-routine.md\`.
+EOF
+      return 0 ;;
+  esac
+  banner "wiki reconcile"
+  _run_script reconcile.py "$@"
+}
+
 cmd_query() {
   case "${1:-}" in
     ""|-h|--help|help)
@@ -1389,6 +1415,7 @@ case "${1:-}" in
   dream)            shift; cmd_dream "$@" ;;
   flush)            shift; cmd_flush "$@" ;;
   lint)             shift; cmd_lint "$@" ;;
+  reconcile)        shift; cmd_reconcile "$@" ;;
   query)            shift; cmd_query "$@" ;;
   agent)            shift; cmd_agent "$@" ;;
   correct)          shift; cmd_correct "$@" ;;

@@ -135,8 +135,13 @@ def test_migrate_config_file_round_trip(tmp_path):
     # (LIST_ADDITIONS has one entry but operator's freshly-injected
     # skip-list already contains "email-delta" from KEY_ADDITIONS, so
     # the list-extend is a no-op on greenfield.)
-    # = 48 changes (no drops — operator has no orphan personal.* fields)
-    assert len(changes) == 48, f"got {len(changes)} changes: {changes}"
+    #  + 1 created-models-block + 1 models.dream_model (M014/M018 — fixture
+    #    sync was missing; pre-existing red until 2026-05-22)
+    #  + 1 limits.dream_per_call_timeout_s (M014 — same pre-existing gap)
+    #  + 3 limits.concept_reconcile_* + 1 scheduling.concept_reconcile_cooldown_days
+    #    + 1 features.concept_reconciliation (2026-05-22 concept-consistency-routine)
+    # = 56 changes (no drops — operator has no orphan personal.* fields)
+    assert len(changes) == 56, f"got {len(changes)} changes: {changes}"
 
     reparsed = yaml.safe_load(new_text)
     # piggyback side
@@ -166,9 +171,13 @@ def test_migrate_config_no_change_when_fully_current(tmp_path):
     config_path = tmp_path / ".wiki" / "config.yaml"
     config_path.parent.mkdir(parents=True)
     config_path.write_text(yaml.safe_dump({
+        "models": {
+            "dream_model": "claude-opus-4-7[1m]",
+        },
         "scheduling": {
             "dream_cooldown_days": 7,
             "dream_priority": {"default": 1.0, "paths": {}, "domain": {}, "tag_strategy": "max", "tags": {}, "status": {}},
+            "concept_reconcile_cooldown_days": 14,
         },
         "piggybacks": {
             "email": {"enabled": True, "cooldown_hours": 24},
@@ -202,9 +211,13 @@ def test_migrate_config_no_change_when_fully_current(tmp_path):
             "extract_takes_max_per_source": 12,
             "dream_entity_max_cost_usd": 2.0,
             "dream_cycle_max_cost_per_run_usd": 5.0,
+            "dream_per_call_timeout_s": 300,
             "dream_tier1_recent_count": 20,
             "dream_tier1_digest_days": 7,
             "dream_tier2_sample_count": 50,
+            "concept_reconcile_per_fact_max_cost_usd": 0.10,
+            "concept_reconcile_max_cost_per_run_usd": 0.50,
+            "concept_reconcile_max_turns": 15,
         },
         "features": {
             "extract_takes": False,
@@ -213,6 +226,7 @@ def test_migrate_config_no_change_when_fully_current(tmp_path):
             "compile_callback_gate": True,
             "materialize_backlinks": True,
             "operator_reports": False,
+            "concept_reconciliation": False,
         },
         "personal": {
             "implicit_operator_author": None,
@@ -298,9 +312,13 @@ def test_migrate_additions_skips_non_dict_parent():
 def test_migrate_additions_idempotent():
     m = _mod()
     data: dict = {
+        "models": {
+            "dream_model": "claude-opus-4-7[1m]",
+        },
         "scheduling": {
             "dream_cooldown_days": 7,
             "dream_priority": {"default": 1.0, "paths": {}, "domain": {}, "tag_strategy": "max", "tags": {}, "status": {}},
+            "concept_reconcile_cooldown_days": 14,
         },
         "limits": {
             "compile_force_long_context_types": ["daily-digest", "calendar-rollup"],
@@ -325,9 +343,13 @@ def test_migrate_additions_idempotent():
             "extract_takes_max_per_source": 12,
             "dream_entity_max_cost_usd": 2.0,
             "dream_cycle_max_cost_per_run_usd": 5.0,
+            "dream_per_call_timeout_s": 300,
             "dream_tier1_recent_count": 20,
             "dream_tier1_digest_days": 7,
             "dream_tier2_sample_count": 50,
+            "concept_reconcile_per_fact_max_cost_usd": 0.10,
+            "concept_reconcile_max_cost_per_run_usd": 0.50,
+            "concept_reconcile_max_turns": 15,
         },
         "piggybacks": {
             "calendar": {"enabled": True, "cooldown_hours": 6, "max_per_run": 500},
@@ -344,6 +366,7 @@ def test_migrate_additions_idempotent():
             "compile_callback_gate": True,
             "materialize_backlinks": True,
             "operator_reports": False,
+            "concept_reconciliation": False,
         },
         "personal": {
             "implicit_operator_author": None,

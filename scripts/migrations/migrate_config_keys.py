@@ -204,6 +204,12 @@ KEY_ADDITIONS: dict[str, dict[str, object]] = {
         "dream_tier1_recent_count": 20,
         "dream_tier1_digest_days": 7,
         "dream_tier2_sample_count": 50,
+        # Concept-reconciliation routine (2026-05-22). Cost caps + turn budget
+        # for the autonomous `wiki reconcile` strict correct_apply.
+        # See `.ytstack/backlog/concept-consistency-routine.md`.
+        "concept_reconcile_per_fact_max_cost_usd": 0.10,
+        "concept_reconcile_max_cost_per_run_usd": 0.50,
+        "concept_reconcile_max_turns": 15,
     },
     "scheduling": {
         # M014 dream-cycle (2026-05-16). Per-entity cooldown — entities
@@ -223,10 +229,18 @@ KEY_ADDITIONS: dict[str, dict[str, object]] = {
             "tags": {},
             "status": {},
         },
+        # Concept-reconciliation routine (2026-05-22). Per-fact cooldown —
+        # facts reconciled within this window are skipped. Match
+        # Scheduling.concept_reconcile_cooldown_days in config.py.
+        "concept_reconcile_cooldown_days": 14,
     },
     "features": {
         # M011 master switch — default OFF, flip True after dogfooding.
         "extract_takes": False,
+        # Concept-reconciliation routine (2026-05-22) — default OFF. Makes
+        # scoped autonomous writes to knowledge/concepts/; opt in after a
+        # `wiki reconcile --dry-run` review. See backlog doc.
+        "concept_reconciliation": False,
         # 2026-05-17 voice-punctuation pre-process. Calls Ollama
         # classify_model on every voice ingest to add punctuation +
         # German-noun-case to dictation transcripts. Raw text preserved

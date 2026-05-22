@@ -114,6 +114,11 @@ class Scheduling:
     # Default empty = behave like M014 (greedy by age, all entities equal).
     # See DreamPriority docstring + `.ytstack/backlog/dream-priority-config.md`.
     dream_priority: DreamPriority = field(default_factory=DreamPriority)
+    # Autonomous concept-reconciliation routine (concept-consistency-routine).
+    # A hard fact whose `last_reconciled:` frontmatter is newer than this many
+    # days is skipped by `wiki reconcile` + the concept_reconcile piggyback.
+    # Default 14 — concepts drift slower than entities; conservative.
+    concept_reconcile_cooldown_days: int = 14
 
 
 @dataclass
@@ -468,6 +473,17 @@ class Limits:
     # ResultMessage.total_cost_usd crosses this cap. Default $5.00 — sized
     # to cover 2-3 typical entity resyntheses per run.
     dream_cycle_max_cost_per_run_usd: float = 5.0
+    # Autonomous concept-reconciliation routine (concept-consistency-routine).
+    # Per-fact pre-flight cost cap: reject a strict `correct_apply` if its
+    # estimated cost exceeds this. Default $0.10 — concepts are small + the
+    # strict prompt is tight; gates against a runaway reconciliation.
+    concept_reconcile_per_fact_max_cost_usd: float = 0.10
+    # Cumulative per-run USD cap for `wiki reconcile` + the concept_reconcile
+    # piggyback. Stops sweeping once cumulative cost crosses it. Default $0.50.
+    concept_reconcile_max_cost_per_run_usd: float = 0.50
+    # Turn budget for the strict concept-reconciliation agent. Tight: the task
+    # is "edit one flagged concept to match one fact", not corpus synthesis.
+    concept_reconcile_max_turns: int = 15
     # M016 dream-cycle sampled-activation knobs (2026-05-17). Replaces the
     # M014 "load all mentioning files" approach that hit 2.3 MB context
     # overflow on the operator's own page. 4-tier corpus assembly bounded
@@ -495,6 +511,12 @@ class Features:
     curiosity_loop: bool = True
     vision_screenshots: bool = True
     procmail_execution: bool = True
+    # Autonomous concept-reconciliation routine (concept-consistency-routine).
+    # OFF by default: the routine makes scoped autonomous writes to
+    # knowledge/concepts/, so it ships dry-run-first and the operator opts in
+    # after reviewing a `wiki reconcile --dry-run` diff. When False, the
+    # `concept_reconcile` piggyback skips and `wiki reconcile` warns.
+    concept_reconciliation: bool = False
     # Pre-compile sweep of <vault>/Clippings/*.md into <vault>/raw/articles/
     # so Obsidian Web Clipper output reaches the source-glob. Cheap no-op when
     # Clippings/ is empty or absent. Set false if you reconfigure the Web
