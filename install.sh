@@ -66,6 +66,23 @@ printf "%scloning %s into %s …%s\n" "$D" "$REPO_URL" "$DEST" "$N"
 git clone --depth 1 "$REPO_URL" "$DEST" >/dev/null 2>&1 \
   || die "git clone failed. Check URL: $REPO_URL"
 
+# ── Strip engine-dev artifacts ───────────────────────────────────────
+# Keep the engine's own dev-tracking out of the operator's vault tree.
+# These paths stay git-tracked (so `wiki update`'s `git pull --ff-only`
+# never hits a dirty working tree — a plain `rm -rf` would, since git
+# would try to restore the deleted tracked files on the next pull and
+# abort). git's sparse-checkout omits them from the *checkout* instead,
+# and the setting persists in .git/, so every future `wiki update`
+# honours it automatically — no update-side step required.
+STRIP_LIST=( ".ytstack" "tests" )   # engine dev-tracking + pytest suite
+sparse_patterns=( '/*' )
+for p in "${STRIP_LIST[@]}"; do sparse_patterns+=( "!/$p/" ); done
+if git -C "$DEST" sparse-checkout set --no-cone "${sparse_patterns[@]}" 2>/dev/null; then
+  ok "stripped engine-dev artifacts from vault (${STRIP_LIST[*]})"
+else
+  warn "sparse-checkout unavailable — ${STRIP_LIST[*]} remain in $DEST (cosmetic only)"
+fi
+
 # ── Seed config ──────────────────────────────────────────────────────
 if [[ -f "$DEST/config.example.yaml" && ! -f "$DEST/config.yaml" ]]; then
   cp "$DEST/config.example.yaml" "$DEST/config.yaml"

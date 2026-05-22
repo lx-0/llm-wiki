@@ -1,5 +1,7 @@
 # Distribution-strip: keep engine-dev artifacts out of vault installs
 
+**SHIPPED 2026-05-22** (commit on `install.sh`). Implemented via git **sparse-checkout**, not the `rm -rf` sketch below — see "What actually shipped".
+
 **Captured:** 2026-05-02
 **Surfaced from:** SessionEnd-hook mutation bug in lxw vault (`<vault>/.wiki/.ytstack/STATE.md` getting rewritten on every Claude Code session). Root cause split into two layers:
 
@@ -46,6 +48,31 @@ STRIP_LIST=(
 - After `wiki update`: same check still empty
 - Engine maintainer workflow unaffected: cloning the engine repo standalone (not via install.sh) keeps `.ytstack/` etc.
 
+## What actually shipped (2026-05-22)
+
+The `rm -rf` sketch above is **broken** for this repo's update path: `.ytstack/` + `tests/` are git-tracked, and `wiki update` runs `git pull --ff-only`. A working-tree deletion of tracked files makes the next pull abort (`Your local changes would be overwritten`) the moment those paths change upstream — which `.ytstack/` does every milestone. The "self-healing re-strip" idea would have bricked `wiki update`.
+
+Shipped instead: **git sparse-checkout** in `install.sh`, right after the clone:
+
+```bash
+STRIP_LIST=( ".ytstack" "tests" )
+sparse_patterns=( '/*' )
+for p in "${STRIP_LIST[@]}"; do sparse_patterns+=( "!/$p/" ); done
+git -C "$DEST" sparse-checkout set --no-cone "${sparse_patterns[@]}"
+```
+
+Why this is correct: the paths stay **tracked** (so `git pull --ff-only` never sees a dirty tree) but are omitted from the **checkout**. The setting persists in `.git/info/sparse-checkout` + `core.sparseCheckout=true`, so **every future `wiki update` honours it automatically** — no update-side change needed (the doc's biggest worry evaporates). `.git/hooks` dropped from scope: a `git clone` only carries `*.sample` hooks, never the maintainer's active local hooks, so there's nothing to strip.
+
+**Verified** (isolated /tmp clone + full edited-`install.sh` run): strip applied, `git pull --ff-only` survives an upstream `.ytstack/` change with the strip intact, kept paths update normally, sparse config persists.
+
+**Existing installs are not auto-stripped** (sparse-checkout only configured for new clones). To strip an already-installed vault once (safe when `git -C <vault>/.wiki status` is clean):
+
+```bash
+git -C "<vault>/.wiki" sparse-checkout set --no-cone '/*' '!/.ytstack/' '!/tests/'
+```
+
+lxw still carries `.wiki/.ytstack` + `.wiki/tests` (installed pre-change); operator can run the one-liner above when convenient.
+
 ## Priority
 
-LOW. Cosmetic cleanup, not a bug. Defer until after ytstack 0.1.4 lands and we have an excuse to touch `install.sh` anyway. Not blocking M003.
+~~LOW~~ — DONE.

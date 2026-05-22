@@ -1,6 +1,6 @@
 # Backlog Priority — post-M020 snapshot
 
-Last reset: 2026-05-17 after M020 (backlinks footer) closeout, refreshed same day after the M019 doc-sync + drift-sweep + diagrams-badge-cleanup arc + 3 new study-arc backlog entries (+ 1 parallel-session entry, not mine). Inventory: 53 open · 29 shipped (`shipped/`) · 2 rejected (`rejected/`).
+Last reset: 2026-05-17 after M020 (backlinks footer) closeout, refreshed same day after the M019 doc-sync + drift-sweep + diagrams-badge-cleanup arc + 3 new study-arc backlog entries (+ 1 parallel-session entry, not mine). Inventory: 52 open · 30 shipped (`shipped/`) · 2 rejected (`rejected/`). (2026-05-22: distribution-strip shipped via sparse-checkout; study-piggyback-audit done — wiring OK.)
 
 **Heuristic, not formal commitment.** Re-evaluate after every milestone close. When a file ships, `git mv` it into `shipped/`; when explicitly rejected, into `rejected/`. Keep the working directory short — agents glance at this list to find the next move.
 
@@ -8,8 +8,7 @@ Last reset: 2026-05-17 after M020 (backlinks footer) closeout, refreshed same da
 
 Pick one when "next?" comes up and the operator wants a concrete tick.
 
-- **`distribution-strip.md`** — strip `.ytstack/`, `tests/`, `.git/hooks/` from vault installs (`install.sh` + `wiki update`). ~1-2 h, single STRIP_LIST array. Stale `.ytstack/` no longer mutates (PR #17 fixed), but still clutters every vault.
-- **`study-run-due-piggyback-audit.md`** — verify the M019 daily-schedule piggyback actually fires on lxw (enabled in vault, default-off in engine). 30-min audit; ripens 2026-05-19 to 2026-05-23 so week-1 review has clean data.
+- **`study-run-due-piggyback-audit.md`** — verify the M019 daily-schedule piggyback actually fires on lxw (enabled in vault, default-off in engine). 30-min audit; ripens 2026-05-19 to 2026-05-23 so week-1 review has clean data. **Audited 2026-05-22: wiring works (fires/spawns/cooldown OK, run_count=8); the doc's "daily" premise was wrong — manifest is `schedule: weekly`, so the runs-gap is expected. No fix needed; close it.**
 - **`ytstack-hook-exit-code.md`** — `pre-tool-use-edit` hook exits 2 when intent was warn-only. Half-day fix or plan-task skill change.
 - **`voice-punctuate-followups.md`** — end-to-end test + optional pre-2026-05-17 backfill + quality observation window.
 - **`pictures-followups.md`** — HEIC ingest path untested, archive-policy decision deferred (iCloud footprint).
