@@ -1230,3 +1230,58 @@ C. Re-include `raw/memories/` as substrate + drop the "Timeline-append-on-existi
 - Verify Mode B in lxw — first compile pass on the 33 currently-unresolved memories will produce concept-stubs. Operator review of those stubs (signal-to-noise) decides whether the 1–3-concepts-per-memory cap is right.
 - Consider snapshot-pattern (content-hash paths in `raw/memories/`, never delete) if operator re-introduces auto-syncing later. Was 2026-05-04 variant B, rejected then — re-evaluate with current architecture.
 - Architecture diagram refresh: `raw/memories/` re-promoted to first-class substrate position alongside email/jamie/etc.
+
+## 2026-05-21: M024 — gmeet email-discovery (second discovery source for colleague-shared meetings)
+
+**Context:** The gmeet collector's folder-scan only sees meetings the operator's
+OWN account recorded (Docs in *their* "Meet Recordings" folder). When a colleague
+records a Gemini meeting the operator attended, the notes Doc lives in the
+colleague's Drive and is announced via a `gemini-notes@google.com` email — the
+folder-scan structurally never finds it. Trigger: a real such mail arrived at
+alex@yesterday-ai.de (`chris@yesterday-ai.de`'s Weekly Sync).
+
+**Make-or-break, proven empirically BEFORE any code (read-only probe):** the
+`drive.meet.readonly` scope reads docs **by Meet-origin, not by owner** — alex's
+existing `gmail-yesterday` token exported a Doc owned by chris (`shared: True`).
+No new OAuth scope / consent needed for colleague meetings.
+
+**Options considered:**
+- (A) Custom Gmail-MCP parser outside the engine — rejected; operator steered to
+  "use the vault intake tooling," and a parallel path duplicates the collector.
+- (B) Gmail-API message reader using the gmail token — rejected; new code, only
+  works for Gmail accounts.
+- (C) **Reuse the account's configured mailbox reader (`resolve_reader`)** to scan
+  for gemini-notes mails, extract the Drive doc-id from the body, and feed it into
+  the existing gmeet export/pair/render/dedup pipeline. Chosen — backend-agnostic,
+  composes with the per-account reader already used by the email-collector.
+
+**Locked decisions:**
+1. **`discovery = folder-scan ∪ email-link-scan`.** Two independent producers feed
+   one stub list in `_run_one_account`; a folder problem no longer aborts the
+   account. Everything downstream (export → pair-by-meeting_key → render/merge →
+   skip-by-Drive-file-id) is reused unchanged.
+2. **Windowed scan, NO email watermark.** Email-discovery re-scans the last
+   `backfill_days` (default 30) every run and dedups by Drive file-id — idempotent,
+   no "lost doc" risk from a watermark advancing past a failed export. Only
+   own-folder docs advance the folder watermark.
+3. **On by default.** Unlike the M023 healthkit placeholder (which needs an
+   operator-supplied path), email-discovery is functional with defaults and bounded
+   by the gemini-notes sender allowlist + the account's configured reader. The
+   `migrate_account_additions` injection ships `enabled: true`.
+4. **Doc-url is HTML-only.** The gemini-notes plaintext alternative drops the link;
+   the Thunderbird (and IMAP) reader was text/plain-only. Fix: reader now surfaces
+   `body_html`; extractor scans HTML first. (See KNOWLEDGE.md.)
+
+**Linked artifacts:** commits `f35cce0` (S01: export UTF-8 fix + `extract_drive_doc_ids`
++ thunderbird `body_html`), `f294e51` (S02: dual-discovery + `gmeet.email_discovery`
+config + `migrate_account_additions`), `e313eab` (S03: docs). `M024-CONTEXT.md`,
+per-slice `M024-S0*-SUMMARY.md`. Live E2E on lxw: 2 + 6 (backfill) colleague/team
+meetings ingested, idempotent, clean UTF-8. Infographic deferred:
+`.ytstack/backlog/gmeet-email-discovery-infographic.md`.
+
+**Open / follow-ups:**
+- imap.py reader still text/plain-only (no imap account carries a gmeet block, so
+  moot today — fix if one ever does).
+- drive_folder_id unpinned on lxw (recurring auto-resolve WARNING, pre-existing).
+- Pre-existing M014/M016 test failures (dream_sampling time-drift +
+  migrate_additions dream_model) predate M024 and want a separate cleanup.

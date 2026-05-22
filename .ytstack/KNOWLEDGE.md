@@ -2147,3 +2147,37 @@ Hit 2026-05-18 twice in one arc:
 The 2026-05-13 "memories are not a substrate" decision was reversed 2026-05-18 after research showed (a) memories are non-deterministic LLM-distillations (not regenerable from daily/), (b) Karpathy's gist doesn't endorse exclusion (silence ≠ endorsement; commenters proposed provenance-tracking), (c) Cole Medin treats curated memory.md as first-class. Implementation: `compile_memories.md` now has Mode A (existing project → Timeline-append) + Mode B (no project → distill to `knowledge/concepts/<slug>.md` with `compiled_from_distilled: true` provenance frontmatter). Full research summary in `.ytstack/backlog/memories-decision-doubt.md`, DECISIONS entry 2026-05-18.
 
 **`compiled_from_distilled: true`** is the new frontmatter convention — signals "derived from LLM-distillation, not first-hand evidence" so future compile passes (and operator) can distinguish second-order from first-hand knowledge. Compounding-distortion risk handled via metadata, not exclusion.
+
+### gmeet email-discovery — three gotchas the live-probe caught (2026-05-21, M024)
+
+Building the gmeet email-discovery source (trigger on `gemini-notes@google.com`
+mails → ingest colleague-shared meetings) surfaced three things training-memory
+would have gotten wrong; the live-probe-before-parser discipline caught all three:
+
+1. **`drive.meet.readonly` is per-Meet-origin, not per-owner.** It reads a Doc
+   *created by Meet* even when owned by someone else and merely shared with you.
+   A read-only probe with alex's existing token exported a Doc owned by
+   `chris@yesterday-ai.de` (`shared: True`). So colleague meetings are reachable
+   with the token already in the vault — no new scope/consent. Don't assume a
+   "readonly" Meet scope is scoped to *your* files.
+
+2. **The gemini-notes Drive link is HTML-only.** The mail is `multipart/alternative`;
+   the `text/plain` part has "Besprechungsnotizen öffnen" with **no URL** — the
+   `docs.google.com/document/d/<id>` link lives only in the `text/html` part. The
+   Thunderbird reader's `_extract_body` (and imap.py's) returned `text/plain` only,
+   so `Message.body_html` was always None and a plaintext regex finds zero links.
+   Fix: reader now surfaces `body_html`; extractor scans HTML first. **General
+   lesson:** when parsing email for links, the URL may be in the HTML alternative
+   the reader silently dropped — probe the raw MIME parts, don't trust `body_text`.
+
+3. **`export_doc` mojibaked German.** Drive's `files.export` returns charset-less
+   `text/markdown`; `requests` then decodes `.text` as Latin-1 (`Ã¤` for `ä`),
+   corrupting every German transcript — including the operator's OWN notes, latent
+   for months. Fix: pin `r.encoding = "utf-8"` before reading `.text`.
+
+**Design choice that fell out:** windowed re-scan (`backfill_days`, default 30) +
+Drive-file-id dedup instead of an email watermark. A watermark that advances past
+a failed export loses the doc forever; a windowed scan + idempotent file-id dedup
+has no such failure mode and re-running is free. "Raise `backfill_days` once to
+backfill history, then lower it" is the documented operator workflow (verified on
+lxw: bumping to 200 pulled 6 historical colleague meetings, then back to 30).
