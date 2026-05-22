@@ -174,6 +174,19 @@ async def maybe_generate_curiosity_requests(source: Path) -> None:
             len(prompt), CONFIG.limits.curiosity_max_prompt_chars,
         )
 
+    # Ollama reachability pre-check (mirrors scan_youtube / scan_screenshots /
+    # pictures / review-wiki — this was the one Ollama call site missing it).
+    # Without it an offline GPU server makes every curiosity pass wait the full
+    # curiosity_timeout_s (240s) before failing — ~4 min wasted per compiled
+    # file. The check costs ~5s and fast-skips instead. Placed after the cheap
+    # size/glob/folder gates so it only runs when a real pass would happen.
+    if not ollama_client.is_reachable():
+        log.warning(
+            "  Curiosity: Ollama not reachable at %s — skipping (server down?)",
+            CONFIG.models.ollama_url,
+        )
+        return
+
     log.info("  Curiosity pass for %s (model=%s, prompt=%d chars)",
              rel_path, CURIOSITY_MODEL, len(prompt))
 
