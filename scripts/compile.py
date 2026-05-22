@@ -929,7 +929,12 @@ async def main() -> None:
             )
             break
 
-        prefix = f"[{idx}/{cap}] "
+        # Denominator is the full candidate count, not `cap`: deterministic
+        # skips (health-rollup stubs, substrate-skip-list) don't increment
+        # compiled_count, so the --max-files break only fires after `cap` REAL
+        # compiles while idx runs through every candidate. Using `cap` here
+        # produced a nonsensical `[1516/100]` when a big skip-backlog drained.
+        prefix = f"[{idx}/{len(files)}] "
         result = await compile_file(source, prefix=prefix, force=force_compile)
         if result is not None and "_skipped" in result:
             # Skipped (empty file, dry-run, substrate-type skip-list): neither
