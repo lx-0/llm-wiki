@@ -5,6 +5,7 @@ Usage:
     uv run python compile.py --all            # recompile everything
     uv run python compile.py --file daily/X.md
     uv run python compile.py --dry-run        # show what would be compiled
+    uv run python compile.py --max-files=250  # compile at most 250 files, then stop (for large backlogs; default: 100)
 """
 
 import os
