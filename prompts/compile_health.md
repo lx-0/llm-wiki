@@ -30,41 +30,24 @@ Do not parse the frontmatter metrics for "anomalies" — single-day biometric sn
 
 ### 2-A. Stub-body branch
 
-Two edits, then stop:
-
-1. **Append `${source_path}` to the policy article's `compiled_from:` list.** Edit `knowledge/concepts/health-rollup-intake-format.md`. Find the YAML `compiled_from:` list in frontmatter, append a new `- "${source_path}"` line at the end of the list (preserve existing entries; do not reorder; do not deduplicate older entries, just check that the new one isn't already present).
-2. **Append one log entry to `knowledge/log.md`** at the very top (newest-first), in this exact shape:
-
-   ```markdown
-   ## [${now}] compile | Health rollup <date> (empty-body)
-   - Source: `${source_path}`
-   - Articles created: (none)
-   - Articles updated: [[concepts/health-rollup-intake-format]] (appended source to compiled_from)
-   - Metrics snapshot: sleep <sleep_hours> h, score <sleep_score>, readiness <readiness_score>, HRV <hrv_overnight> ms, <steps> steps, RHR <resting_hr> bpm, sensitivity <sensitivity>.
-   - Policy: per [[concepts/health-rollup-intake-format]], single-day metric snapshots without prose contribute only a log-line.
-   ```
-
-   Substitute the actual values from the frontmatter. If a metric is missing, omit that field from the snapshot line rather than writing "None".
-
-Do NOT touch `knowledge/index.md` (no new articles created). Do NOT create or modify person/project/concept pages. Do NOT do entity extraction — there's no body to extract from.
+Stub-bodies are normally recorded **deterministically upstream** — a Python pre-pass in `compile.py` state-marks them with no agent and no `knowledge/` writes, so they never reach you. If one reaches you anyway: make **no edits at all**. A metric-only stub is point-in-time biometrics, not knowledge. In particular do **NOT** append it to any `compiled_from:` list — that list's unbounded growth previously broke the Read-tool token limit and stalled every health compile. Emit your final result directly with no tool calls.
 
 ### 2-B. Operator-prose branch
 
-The operator wrote actual content in the body. Treat it as a thin substrate pass:
+The operator wrote actual content in the body. Treat it as a thin substrate pass. Do **NOT** append to any `compiled_from:` list (see §2-A — it broke the Read limit). Two steps:
 
-1. **Append `${source_path}` to the policy article's `compiled_from:` list** (same as §2-A step 1).
-2. **Scan the prose for entity mentions** — people (first names, full names), projects (`fleet`, `openclaw`, `paperclip`, `llm-wiki`, etc.), and existing `[[knowledge/concepts/<slug>]]` wikilinks. For each:
+1. **Scan the prose for entity mentions** — people (first names, full names), projects (`fleet`, `openclaw`, `paperclip`, `llm-wiki`, etc.), and existing `[[knowledge/concepts/<slug>]]` wikilinks. For each:
    - Glob `knowledge/{people,projects,concepts}/<slug>.md`. If it does NOT exist: **SKIP** (do not stub from health-rollup mentions — wait for proper substrate introduction elsewhere).
    - If it EXISTS: append ONE Timeline line (newest-first under `## Timeline`):
      `- **${today}** | \`${source_path}\` — Mentioned in health rollup: <one-line context from the prose>.`
    - Do NOT touch the State block above `---`. Do NOT add Action Items. Do NOT carry-forward or stale-flag. Append-only.
-3. **Append one log entry to `knowledge/log.md`** at the top (newest-first):
+2. **Append one log entry to `knowledge/log.md`** at the top (newest-first):
 
    ```markdown
    ## [${now}] compile | Health rollup <date> (with observations)
    - Source: `${source_path}`
    - Articles created: (none)
-   - Articles updated: [[concepts/health-rollup-intake-format]] (appended source to compiled_from)<append `, [[<entity-page>]] (Timeline +1)` for each entity whose Timeline you edited>
+   - Articles updated: (none, or `[[<entity-page>]] (Timeline +1)` for each entity whose Timeline you edited)
    - Metrics snapshot: sleep <sleep_hours> h, score <sleep_score>, readiness <readiness_score>, HRV <hrv_overnight> ms, <steps> steps, RHR <resting_hr> bpm.
    - Observations: <one-sentence summary of the operator's prose>.
    ```
@@ -73,14 +56,14 @@ Do NOT create new entity stubs. Do NOT touch `knowledge/index.md`. Do NOT escala
 
 ### 3. No new articles
 
-Health-rollup files NEVER create new wiki articles. The policy article (`concepts/health-rollup-intake-format`) is the only target that gets a frontmatter-list update. Everything else is append-only on existing pages or log.md.
+Health-rollup files NEVER create new wiki articles, and NEVER edit the policy article (`concepts/health-rollup-intake-format`) — do not read it, do not append to its `compiled_from:`. Everything is append-only on existing entity pages (Timeline) or log.md.
 
 ### 4. Stop at the first complete result
 
-This task is bounded: at most three Edits (policy article + log.md + maybe one Timeline). If you find yourself reading more than two files or about to start a fourth Edit, you've drifted — stop and emit your final result.
+This task is bounded: at most log.md + maybe one Timeline line per mentioned entity. If you find yourself reading the policy article or about to make a third kind of edit, you've drifted — stop and emit your final result.
 
 ## Anti-loop guard
 
 If after 4 turns you haven't finished:
-- STOP all entity-extraction. If you've made the `compiled_from:` edit and the log entry, you're done.
+- STOP all entity-extraction. If you've written the log entry, you're done.
 - Emit your final result; do not start new tool calls.

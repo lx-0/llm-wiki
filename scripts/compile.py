@@ -344,6 +344,30 @@ def _frontmatter_field(content: str, key: str) -> str | None:
     return m.group(1).strip() if m else None
 
 
+def _health_rollup_body_is_stub(content: str) -> bool:
+    """True if a ``type: health-rollup`` body carries no operator prose.
+
+    Bulk-ingested historical days — and the daily Oura rollup before the
+    operator annotates it — have a body that is just the ``# Health — <date>``
+    heading plus the ``(Add observations below as needed.)`` placeholder. Such
+    a metric-only stub is point-in-time biometrics, not knowledge: it is
+    recorded deterministically (state mark, no ``knowledge/`` writes) rather
+    than spawned through an SDK agent. An operator-prose body returns False and
+    falls through to the agent for entity/Timeline extraction.
+    """
+    if content.startswith("---"):
+        end = content.find("\n---", 3)
+        body = content[end + 4:] if end != -1 else content
+    else:
+        body = content
+    for line in body.splitlines():
+        s = line.strip()
+        if not s or s.startswith("# ") or s == "(Add observations below as needed.)":
+            continue
+        return False
+    return True
+
+
 def _build_owner_block() -> str:
     """Render the operator/vault-owner context block for substrate compile prompts.
 
@@ -495,6 +519,28 @@ async def compile_file(
             skip_type,
         )
         return {"_skipped": f"substrate_type_excluded_{skip_type}"}
+
+    # Deterministic fast-path: health-rollup metric stubs (the common case,
+    # and every M023 bulk-ingested historical day) carry only point-in-time
+    # biometrics — no knowledge to synthesize. Routing them through the SDK
+    # agent meant reading the policy article and appending to its
+    # `compiled_from:` list; once that list grew past the Read-tool token
+    # limit (~1200 entries / 64 KB) the agent could no longer finish within
+    # max_turns and EVERY health file failed (kind=max_turns, ~$0.08/file,
+    # escalating to 135/day). Record the stub in Python instead: mark
+    # ingested (satisfies check_orphan_sources + makes re-runs no-ops via the
+    # hash-skip), no `knowledge/` writes, no cost. Operator-prose health days
+    # return False here and fall through to the agent (§2-B of compile_health
+    # needs reasoning for entity/Timeline extraction). 2026-05-22 root-cause.
+    if skip_type == "health-rollup" and _health_rollup_body_is_stub(source_content):
+        log.info(
+            "  health-rollup stub-body — deterministic record "
+            "(no agent, no knowledge writes, $0)"
+        )
+        state = load_state()
+        state.setdefault("ingested", {})[rel_path] = file_hash(source)
+        save_state(state)
+        return {"_skipped": "health_rollup_stub_deterministic"}
 
     # Substrate-aware prompt dispatch. Different substrates need
     # different compile shapes; routing them all through compile_main.md

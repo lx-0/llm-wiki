@@ -292,3 +292,94 @@ def test_compile_per_call_timeout_in_migration_additions():
     from migrations.migrate_config_keys import KEY_ADDITIONS
     assert "compile_per_call_timeout_s" in KEY_ADDITIONS["limits"]
     assert KEY_ADDITIONS["limits"]["compile_per_call_timeout_s"] == 600
+
+
+# ── Fix 4: health-rollup stub → deterministic (no agent) ──────────────
+# Root cause 2026-05-22: compile_health appended every compiled health file
+# to one policy article's `compiled_from:` list; once that list grew past the
+# Read-tool token limit the Haiku agent could no longer finish within
+# max_turns and every health file failed (kind=max_turns, ~$0.08/file). The
+# fix routes metric-only stubs through a deterministic Python pre-pass.
+
+_HEALTH_STUB = (
+    "---\ntitle: Health — 2017-07-30\ntype: health-rollup\ndate: '2017-07-30'\n"
+    "account: default\nsources:\n- healthkit\ndistance_km: 2.96\nflights_climbed: 11\n"
+    "---\n\n# Health — 2017-07-30\n\n(Add observations below as needed.)\n"
+)
+_HEALTH_PROSE = (
+    "---\ntitle: Health — 2017-07-30\ntype: health-rollup\ndate: '2017-07-30'\n"
+    "sources:\n- healthkit\ndistance_km: 2.96\n---\n\n# Health — 2017-07-30\n\n"
+    "Felt awful, slept badly after the fleet incident. HRV crashed.\n"
+)
+
+
+def test_health_rollup_stub_detector():
+    """The deterministic detector: stub bodies True, operator prose False."""
+    import compile as compile_mod
+    f = compile_mod._health_rollup_body_is_stub
+    assert f(_HEALTH_STUB) is True
+    # placeholder + extra blank lines + heading only → still stub
+    assert f("---\ntype: health-rollup\n---\n\n# Health — x\n\n\n") is True
+    assert f("---\ntype: health-rollup\n---\n") is True  # no body at all
+    assert f(_HEALTH_PROSE) is False
+    assert f("---\ntype: health-rollup\n---\n\n# Health — x\n\nWent for a run.\n") is False
+
+
+def test_health_rollup_stub_takes_deterministic_path(
+    vault, monkeypatch: pytest.MonkeyPatch
+):
+    """A stub-body health rollup is recorded WITHOUT spawning the SDK agent,
+    and its hash is written to state so re-runs are no-ops."""
+    import compile as compile_mod
+
+    _, raw = vault
+    source = _write_source(raw, "2017-07-30--default.md", _HEALTH_STUB)
+
+    def boom_query(*a, **kw):  # the agent must NOT be spawned
+        raise AssertionError("SDK query() was called for a health-rollup stub")
+
+    from compile_stages import compile as _cs_mod
+    monkeypatch.setattr(_cs_mod, "query", boom_query)
+
+    captured = {}
+    monkeypatch.setattr(compile_mod, "load_state", lambda: {})
+    monkeypatch.setattr(compile_mod, "save_state", lambda s: captured.update(s))
+
+    result = asyncio.run(compile_mod.compile_file(source, force=True))
+
+    assert result == {"_skipped": "health_rollup_stub_deterministic"}
+    rel = str(source.relative_to(vault[0]))
+    assert rel in captured.get("ingested", {}), "stub not marked ingested in state"
+    # no knowledge/ writes
+    assert not list((vault[0] / "knowledge").rglob("*.md"))
+
+
+def test_health_rollup_prose_falls_through_to_agent(
+    vault, monkeypatch: pytest.MonkeyPatch
+):
+    """Operator-prose health days still reach the SDK agent (entity extraction
+    needs reasoning) — the deterministic short-circuit must NOT swallow them."""
+    import compile as compile_mod
+    from claude_agent_sdk import ResultMessage
+
+    _, raw = vault
+    source = _write_source(raw, "2017-07-30--prose.md", _HEALTH_PROSE)
+
+    called = {"n": 0}
+
+    async def fake_query(*, prompt, options):  # noqa: ARG001
+        called["n"] += 1
+        yield ResultMessage(
+            subtype="success", duration_ms=1, duration_api_ms=1,
+            is_error=False, num_turns=1, session_id="t",
+            total_cost_usd=0.0, usage={"input_tokens": 1, "output_tokens": 1},
+            result="ok",
+        )
+
+    from compile_stages import compile as _cs_mod
+    monkeypatch.setattr(_cs_mod, "query", fake_query)
+    monkeypatch.setattr(compile_mod, "load_state", lambda: {})
+    monkeypatch.setattr(compile_mod, "save_state", lambda s: None)
+
+    asyncio.run(compile_mod.compile_file(source, force=True))
+    assert called["n"] >= 1, "prose health rollup did not reach the SDK agent"

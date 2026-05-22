@@ -2194,3 +2194,20 @@ a failed export loses the doc forever; a windowed scan + idempotent file-id dedu
 has no such failure mode and re-running is free. "Raise `backfill_days` once to
 backfill history, then lower it" is the documented operator workflow (verified on
 lxw: bumping to 200 pulled 6 historical colleague meetings, then back to 30).
+
+### Health-rollup stub compile — deterministic, not agentic (root cause 2026-05-22)
+
+#### Symptom
+`compile-errors.log`: `compile_file ✗ kind=max_turns` on tiny (~0.2 KB) `raw/notes/health/<yr>/<date>--default.md` files — "Reached maximum number of turns (10)", ~$0.08 burned/file, escalating to 135/day after the M023 HealthKit bulk-ingest (~2599 files).
+
+#### Root cause (reproduced)
+`compile_health` instructed the agent to append each compiled file's path to ONE policy article's `compiled_from:` list (`knowledge/concepts/health-rollup-intake-format.md`). The bulk-ingest drove that list to ~1203 entries / 64 KB. The **Read tool caps a single read at 25000 tokens**; once the article crossed it, the Haiku agent could no longer read it in one shot — it paged with offset/limit Reads + Greps and exhausted `max_turns=10` BEFORE making the append. Every occasional success grew the list further (vicious cycle). Idempotency is via the state hash-map, NOT `compiled_from`, so failures never advanced the watermark → the same files re-processed every run. Unbounded-accumulation-in-one-file-breaks-a-tool-limit. The PreToolUse path-scope hook was **ruled out** by direct probe (ABS path + REL-from-cwd=ROOT both `allow`).
+
+#### Diagnosis technique
+Reproduce the agent with the exact compile options (model + max_turns + hook) and log every `ToolUseBlock`/`ToolResultBlock`. The smoking gun: `RESULT [IS_ERROR]: File content (29662 tokens) exceeds maximum allowed tokens (25000)` followed by repeated offset/limit Reads → `error_max_turns`.
+
+#### Fix
+A metric-only stub (body = `# Health — <date>` heading + the `(Add observations below as needed.)` placeholder) is point-in-time biometrics, not knowledge. `compile.py::compile_file` routes it through a deterministic Python pre-pass (`_health_rollup_body_is_stub`): mark ingested, no `knowledge/` writes, no SDK agent, $0. Operator-prose health days fall through to the agent (entity/Timeline extraction needs reasoning). `compile_health.md` no longer appends to `compiled_from:` in either branch.
+
+#### Lesson
+Per-file provenance must not accumulate in a single article's frontmatter for high-volume daily substrates (health = ~365/yr × 11 yr). One shared article's `compiled_from:` is not a log — provenance lives in the per-file source + the state hash-map. And: "append a path + write a log line" is deterministic — it should never have been an SDK agent call (project rule: no agent for deterministic actions).
