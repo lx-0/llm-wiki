@@ -1045,7 +1045,11 @@ async def check_contradictions() -> list[dict]:
             options=ClaudeAgentOptions(
                 max_buffer_size=CONFIG.limits.sdk_max_buffer_size_mb * 1024 * 1024,
                 system_prompt=render("lint_contradiction_system"),
-                allowed_tools=[],
+                # `tools=[]` (-> --tools "") truly disables tools. `allowed_tools=[]`
+                # is falsy and skipped by the SDK transport, leaving the default
+                # toolset active -> agentic loop over the corpus. See the flush.py
+                # fix + KNOWLEDGE "to disable tools use tools=[]".
+                tools=[],
                 max_turns=3,
                 setting_sources=[],
                 stderr=capture.callback,
