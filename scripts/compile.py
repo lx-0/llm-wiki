@@ -837,6 +837,18 @@ def _acquire_exclusive_lock(lock_path: Path) -> io.IOBase | None:
 
 # ── Main ─────────────────────────────────────────────────────────────
 
+# Skip reasons whose branch mutates state["ingested"] on DISK from inside
+# compile_file (source-and-final indexing; the deterministic health-rollup
+# stub path). After such a skip the main loop's in-memory `state` is stale, so
+# it MUST reload before its per-file/final save_state — otherwise that save
+# clobbers the on-disk mark and the file is re-selected every run. Any future
+# skip branch that writes state from inside compile_file must be added here.
+_STATE_MUTATING_SKIPS = frozenset({
+    "compile_role_source_and_final_indexed",
+    "health_rollup_stub_deterministic",
+})
+
+
 async def main() -> None:
     parser = argparse.ArgumentParser(description="Compile sources into wiki articles")
     parser.add_argument("--all", action="store_true", help="Recompile all files")
@@ -943,12 +955,11 @@ async def main() -> None:
             # the summary so "pending" doesn't lie when the operator's
             # skip-list quietly drained the batch.
             skipped_count += 1
-            # source-and-final files mutate state["ingested"] from inside
-            # compile_file (M007-S02-T04). The local `state` here is stale
-            # vs. disk after that mutation — reload so subsequent per-file
-            # saves at lines 1232-1237 + final save at 1241-1243 don't
-            # clobber the source-and-final ingest entry.
-            if result["_skipped"] == "compile_role_source_and_final_indexed":
+            # Reload after a skip branch that wrote state from inside
+            # compile_file (see _STATE_MUTATING_SKIPS) so the per-file/final
+            # save_state below doesn't clobber the on-disk mark — otherwise the
+            # file is re-selected every run (it never sticks → re-process loop).
+            if result["_skipped"] in _STATE_MUTATING_SKIPS:
                 state = load_state()
             continue
         if result is None or "_failure" in result:

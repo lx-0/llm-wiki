@@ -383,3 +383,15 @@ def test_health_rollup_prose_falls_through_to_agent(
 
     asyncio.run(compile_mod.compile_file(source, force=True))
     assert called["n"] >= 1, "prose health rollup did not reach the SDK agent"
+
+
+def test_state_mutating_skips_includes_health_and_source_and_final():
+    """Clobber guard (live regression 2026-05-22): a skip branch that writes
+    state["ingested"] from inside compile_file MUST be listed in
+    _STATE_MUTATING_SKIPS so the main loop reloads before its final save_state.
+    Paired with test_health_rollup_stub_takes_deterministic_path (which asserts
+    the branch returns exactly this reason), this guarantees the mark sticks —
+    without it the health stub is re-selected every run."""
+    import compile as compile_mod
+    assert "health_rollup_stub_deterministic" in compile_mod._STATE_MUTATING_SKIPS
+    assert "compile_role_source_and_final_indexed" in compile_mod._STATE_MUTATING_SKIPS
