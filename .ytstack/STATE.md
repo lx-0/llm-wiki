@@ -1,7 +1,7 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-05-21T19:54:18+02:00
+last_updated: 2026-05-22T13:42:38+02:00
 current_milestone: none
 active_slice: none
 active_task: none
@@ -11,7 +11,13 @@ parallel_milestones: [M021]
 
 # State
 
-**Status (this session, 2026-05-21 — M024 SHIPPED, gmeet email-discovery).** gmeet collector gained a second discovery source: `discovery = folder-scan ∪ email-link-scan`. Triggered by `gemini-notes@google.com` mails, it ingests colleague-owned / org-shared Gemini Meet docs the own-Drive folder-scan structurally can't see. 3 slices, 20 new tests, commits `f35cce0` (S01 UTF-8 export fix + doc-id extractor + reader HTML body) · `f294e51` (S02 dual-discovery in run loop + config knob + migration) · `e313eab` (S03 docs) — all on origin/main.
+**Status (this session, 2026-05-22 — intake-priority policy capture, no code).** Conceptual session on whether entertainment/consumption channels (Spotify, YouTube watch-history, browser content, Suno) are sensible intake or just clutter. Outcome: a locked design policy — **intake is valued by persona/blindspot coverage, not per-source signal-density.** Self-cartography optimizes for completeness-of-portrait; work-substrate (mail/calendar/docs) systematically misses the non-work persona (curiosity/leisure/mood), so a low-yield consumption channel covering that dark axis can outrank a high-yield redundant one. Clutter is already solved engine-side (`compile-role: source-only` + `daily/`-aggregation). Two guardrails: value scales per *axis covered* (not per channel), and ingest only when a synthesis consumer (dream-cycle / persona entity-page) will actually weave it in. Suno stays on the *production* axis, not consumption — corrected a criterion-switch error mid-conversation. Captured in: `.ytstack/DECISIONS.md` 2026-05-22 (canonical), CLAUDE.md Hard rules, AGENTS.md "Evaluating a new intake channel", `docs/concept.md` Design rationale, new backlog cluster `.ytstack/backlog/consumption-curiosity-axis.md` (groups music-listening/youtube-watch-history/browser-history/reading-highlights + sequencing; supersedes `music-listening-collector.md`'s "weight-low correlation-ribbon" framing), PRIORITY.md collector-pool note. Commit `(this session)` — local main, **not pushed**. No engine code touched. Open follow-up surfaced: the real prerequisite for this whole cluster is likely a **persona entity-page / synthesis consumer**, not the collectors themselves.
+
+**Next action (unchanged):** Pre-existing arc still queued — M006 calendar redesign + two hot threads (compile-allowlist verify, compile skip-on-long-context-kind=unknown). M014/M016 pre-existing test failures (dream_sampling time-drift + migrate_additions dream_model) want a separate cleanup. This session was orthogonal (policy/docs only).
+
+---
+
+**Status (prev session, 2026-05-21 — M024 SHIPPED, gmeet email-discovery).** gmeet collector gained a second discovery source: `discovery = folder-scan ∪ email-link-scan`. Triggered by `gemini-notes@google.com` mails, it ingests colleague-owned / org-shared Gemini Meet docs the own-Drive folder-scan structurally can't see. 3 slices, 20 new tests, commits `f35cce0` (S01 UTF-8 export fix + doc-id extractor + reader HTML body) · `f294e51` (S02 dual-discovery in run loop + config knob + migration) · `e313eab` (S03 docs) — all on origin/main.
 
 Architecture: folder-scan + `_discover_via_email` are independent producers feeding one stub list (folder failure no longer aborts the account); reuses `resolve_reader` + windowed `scan_deep` + `extract_drive_doc_ids` over `body_html`; downstream export/pair/render/dedup unchanged; windowed re-scan (`backfill_days`) + Drive-file-id dedup → idempotent, no email watermark; only own-folder docs advance the folder watermark. Config: per-account `gmeet.email_discovery` (enabled/senders/folder/backfill_days, default on); `migrate_account_additions` injects it (same-commit migration). Found+fixed en route: `export_doc` mojibake (`r.text` Latin-1 on charset-less markdown) — corrupted the operator's own German notes too.
 

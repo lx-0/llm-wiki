@@ -202,4 +202,10 @@ The knowledge wiki captures what the operator **knows** and **owes**. A separate
 
 ## Design rationale
 
+### What intake optimizes for: persona-coverage, not signal-density
+
+This is a *self*-cartography engine, so its target is **completeness-of-portrait, not knowledge-yield**. A substrate is valued by how much of the operator's persona it covers — not by how much knowledge it yields per row. Work-substrate (mail, calendar, gmeet, docs) systematically captures the intentional, professional self and misses the non-work persona: curiosity, leisure, cultural consumption, mood. A low-yield consumption channel (music listening, watch-history, reading highlights) that covers that otherwise-dark axis can be worth more than a high-yield source redundant with what's already ingested.
+
+"It will clutter the knowledge base" is not an argument against ingesting an uncovered axis — clutter is handled upstream: `compile-role: source-only` plus `daily/`-aggregation keep low-signal sources out of per-item `knowledge/` articles. Two guardrails keep this from collapsing into firehose-maximalism: value scales per *persona-axis newly covered* (not per channel — several music/video/podcast feeds are mostly one axis), and a new channel only earns its place when the synthesis side (curiosity loop, dream-cycle, a persona entity-page) will actually weave it into a portrait rather than just grow `raw/`. Full reasoning: [.ytstack/DECISIONS.md](../.ytstack/DECISIONS.md) 2026-05-22.
+
 See [.ytstack/KNOWLEDGE.md](../.ytstack/KNOWLEDGE.md) for the hard-won learnings: Ollama gotchas, rate-limit debugging, why Karpathy/Cole's flush-context pattern is wrong for agentic workflows, why we use file-per-memory instead of bundles, why SMB beats SSH for NAS access.
