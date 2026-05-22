@@ -421,43 +421,56 @@ A sub-package directory that contains both **importable modules** and **directly
 
 Renamed `scripts/collectors/email.py` → `scripts/collectors/email_collector.py`. All importers updated (`collectors/__init__.py:from collectors import email_collector`, `tests/test_email_collector_fakereader.py`). The Collector's `SPEC.name = "email"` is unchanged — the rename is purely about the Python module name, not the Registry key, so `wiki collect email` still works verbatim.
 
-### Claude Agent SDK — `query()` with `allowed_tools=[]` is not enough
+### Claude Agent SDK — to disable tools use `tools=[]`, NOT `allowed_tools=[]` (root cause corrected 2026-05-22)
+
+> **2026-05-22 correction.** The original entry below claimed `allowed_tools=[]` + a "you have no tools" system_prompt fixed this. **It did not.** The failures persisted (lxw `flush-errors.log`: 18 on 05-04 → 27 on 05-22, getting worse). The real root cause is an SDK-transport detail the prior analysis missed; the real fix is `tools=[]`. Corrected version first, original (wrong) analysis preserved underneath for the record.
 
 #### Symptom
 
-`flush.log` showed 130× `Fatal error in message reader: Command failed with exit code 1`. Five sessions ended up in `failed-flushes/` and were never recovered. The SDK's stderr is a placeholder, not the real CLI stderr.
+`flush.log` / `flush-errors.log`: repeated `flush_extract attempt N/3 ✗ kind=unknown · Command failed with exit code 1`, empty CLI stderr, **variable** durations (15–113 s). Same shape for `lint.py::check_contradictions`. `kind=unknown` is the classifier's catch-all (`classify_failure`: elapsed ≥5 s + no stderr keyword → "unknown"), not a diagnosis.
 
-#### Root cause
+#### Root cause (verified by reproduction 2026-05-22)
 
-`query()` with `ClaudeAgentOptions(allowed_tools=[], max_turns=2)` still loads:
+`allowed_tools=[]` does **not** disable tools. In `claude_agent_sdk/_internal/transport/subprocess_cli.py`:
 
-- the full Claude-Code default system prompt (which encourages tool use)
-- CLAUDE.md auto-discovery from user/project/local settings
-- five `SystemMessage`s with tool definitions
+```python
+if self._options.allowed_tools:          # [] is FALSY → skipped entirely
+    cmd.extend(["--allowedTools", ...])   # flag never passed → DEFAULT toolset active
+```
 
-The model **tries** to call tools (especially when the input contains `[tool: Read]` markers from prior session transcripts). `allowed_tools=[]` blocks each call but every attempt costs a turn. With `max_turns=2`, after two failed tool attempts: `result.subtype=error_max_turns`, `stop=tool_use`, exit code 1, empty `result` string.
+So the agent gets the full default toolset (Read/Grep/Glob/Bash/Write/Edit/…). When the prompt is a conversation transcript, the model reads it as a **task** and actually runs an agentic tool loop — reproduced live: with `allowed_tools=[]` the agent ran `Grep`/`Read` over the repo, took 5 turns, cost **$0.45**. It is the same prompt-injection-via-substrate class as the 2026-05-15 compile incident. On lxw the loop dies (max_turns / a blocked or erroring tool / CLI non-interactive exit) → exit 1, empty stderr, kind=unknown. The duration varies because the amount of tool work varies. (`max_turns=3` is *not* a reliable cap — a 5-turn run completed despite it.)
 
 #### Diagnosis technique
 
-Set `stderr=callback` in `ClaudeAgentOptions`. Log every message with `type(msg).__name__`. The fields that matter on `ResultMessage`: `subtype` (`success` vs `error_max_turns`), `stop_reason`, `result` (can be `None`).
+Set `stderr=callback` and log every message with `type(msg).__name__`. The smoking gun is `ToolUseBlock` messages appearing at all in a call that's supposed to be tool-free — that proves the tools weren't disabled.
 
 #### Fix
 
+Use the `tools` field (the *base* toolset), not `allowed_tools` (an allow-filter on top of the base set). An explicit empty list emits `--tools ""`:
+
 ```python
 ClaudeAgentOptions(
-    system_prompt="You are a text-only X. Reply with markdown only. Do NOT call tools — you have none.",
-    allowed_tools=[],
-    max_turns=3,           # safety buffer
-    setting_sources=[],    # skips CLAUDE.md auto-discovery
-    stderr=log_callback,   # forward to our log
+    system_prompt=render("..._system"),
+    tools=[],              # → --tools "" → NO tools exist. The real fix.
+    max_turns=3,
+    setting_sources=[],    # still skip CLAUDE.md auto-discovery
+    stderr=log_callback,
 )
 ```
 
-In result handling: `if message.subtype == "success" and message.result:` — never persist empty strings.
+`subprocess_cli.py:185-189`: `tools=[]` (explicit empty list) → `cmd.extend(["--tools", ""])` → empty base toolset → the model literally has no tools to call.
 
-**Why it works:** `system_prompt` as a string **replaces** the default entirely. `setting_sources=[]` skips CLAUDE.md. The model sees only the text-only instruction and stops trying to call tools.
+**Why the old "fix" failed:** it relied on the *system_prompt* to talk the model out of using tools ("you have none available") — a soft mitigation that (a) lied to the model, which DID have tools, and (b) collapses whenever the substrate contains tool-shaped instructions.
 
-**Verified:** what previously failed at 7 turns now succeeds at 2 turns with 2,909 chars of clean output.
+**Verified 2026-05-22:** real `extract_from_context` with `tools=[]` → `num_turns=1`, zero `ToolUseBlock`, clean extraction, single-shot. 35/35 flush+sdk tests green.
+
+**Sibling site with the same latent bug:** `lint.py::check_contradictions` (`allowed_tools=[]`) — same fix applies.
+
+<details><summary>Original (incorrect) analysis — preserved for the record</summary>
+
+The model **tries** to call tools; `allowed_tools=[]` blocks each call but every attempt costs a turn; with `max_turns=2` two blocked attempts → `error_max_turns` → exit 1. *(Wrong: the calls were not blocked — the flag was never passed, so the tools ran.)* The claimed fix was `system_prompt` string + `allowed_tools=[]` + `setting_sources=[]`, "verified succeeds at 2 turns." That reduced but never eliminated the failures.
+
+</details>
 
 ### Claude Agent SDK — `Write(knowledge/**)` path-scope in `allowed_tools` is decorative (2026-05-17)
 

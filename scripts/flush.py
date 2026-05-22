@@ -235,7 +235,13 @@ async def extract_from_context(context: str) -> str | None:
                 options=ClaudeAgentOptions(
                     max_buffer_size=CONFIG.limits.sdk_max_buffer_size_mb * 1024 * 1024,
                     system_prompt=render("flush_extract_system"),
-                    allowed_tools=[],
+                    # `tools=[]` emits `--tools ""` (empty base toolset) so the agent
+                    # has NO tools. `allowed_tools=[]` is falsy and gets skipped by the
+                    # SDK transport, leaving the default toolset active — which turned
+                    # this summarization call into an agentic Grep/Read loop over the
+                    # substrate (treating the conversation as a task), causing the
+                    # kind=unknown failures + ~$0.4/call cost.
+                    tools=[],
                     max_turns=3,
                     setting_sources=[],
                     stderr=capture.callback,
