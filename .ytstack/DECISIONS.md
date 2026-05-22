@@ -1285,3 +1285,19 @@ meetings ingested, idempotent, clean UTF-8. Infographic deferred:
 - drive_folder_id unpinned on lxw (recurring auto-resolve WARNING, pre-existing).
 - Pre-existing M014/M016 test failures (dream_sampling time-drift +
   migrate_additions dream_model) predate M024 and want a separate cleanup.
+
+---
+
+## 2026-05-22: Intake is valued by persona/blindspot coverage, not per-source signal-density
+
+**Context:** Substrate-landscape conversation about whether entertainment/consumption channels (Spotify listening, YouTube watch-history, browser content, Suno) belong in the engine or clutter the knowledge base with junk. The implicit working stance — see `.ytstack/backlog/music-listening-collector.md`: "never primary substrate, weight low in distillation, correlation-ribbon only" — evaluated intake by *signal-density per row*, and on that axis passive consumption reads as junk. The operator reframed: self-cartography is about a faithful portrait of the *person*, and work-substrate (mail/calendar/gmeet/docs) has a systematic bias toward the intentional/professional self. Curiosity, leisure, cultural consumption, mood — the non-work persona — falls through that net. Omitting it is itself a blindspot.
+
+**Options considered:** (A) keep the signal-density framing — prioritize high-yield knowledge sources, treat passive consumption as low-weight correlation ribbon. (B) prioritize blindspot/persona coverage — value an intake channel by how much of the operator's persona it *newly covers*, not by yield-per-row.
+
+**Chose:** B.
+**Reason:** The product is a *self*-cartography engine; its target is completeness-of-portrait, not knowledge-yield. A low-signal-per-row source that covers an otherwise-dark region of the persona (what occupies you outside work) is worth more than a high-yield source redundant with existing substrate. Clutter is already a solved problem engine-side (`compile-role: source-only` + `daily/`-aggregation keep low-signal sources out of per-item `knowledge/`), so "it'll clutter" is not a valid objection to ingesting an uncovered axis. Two guardrails keep B from collapsing into firehose-maximalism:
+  - **Axes, not channels.** Value scales per *persona-axis newly covered*, not per source added. Spotify + YouTube-history + podcasts largely measure one "cultural/curiosity-consumption" axis — strong case for the first, steep diminishing returns stacking more. (Browser-history already crudely covers leisure *attention* at domain granularity; the real gap these fill is *content* granularity — turning "200 youtube.com visits" into "3-week deep-dive on topic X".)
+  - **Synthesis is the real gate.** The bottleneck is not intake (14 substrates already) but whether the dream-cycle / a persona entity-page actually *weaves* a new channel into a "what occupies the operator" portrait. A channel that only grows `raw/` without a consumer adds noise, not coverage. Ingest only when the synthesis side will consume it.
+
+**Supersedes:** the implicit "weight-low passive consumption" stance in `.ytstack/backlog/music-listening-collector.md` — consumption substrate is re-valued as blindspot-coverage, not as a low-weight correlation ribbon. Suno stays distinct: it is operator *output/creation*, relevant to the portrait but on the production axis, not the consumption/curiosity axis — so it is NOT the better candidate just because the operator authors it (that was a criterion-switch error during the conversation).
+**Linked artifacts:** `.ytstack/backlog/consumption-curiosity-axis.md` (thematic grouping of candidate collectors + this reasoning); CLAUDE.md "Hard rules" + AGENTS.md "Evaluating a new intake channel" (agent-facing restatement); per-collector files `music-listening-collector.md`, `youtube-intake.md`, `browser-history-collector.md`, `reading-highlights-collector.md`, `sunoflow-collector.md`.

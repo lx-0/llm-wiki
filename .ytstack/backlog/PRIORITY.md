@@ -47,6 +47,8 @@ Real value, real cost; needs canary data, parallel-session coordination, or oper
 
 Each one is a substrate collector; same shape as the 11 already shipped. None is hot; ship when the substrate's input grows enough to be worth wiring.
 
+> **Consumption/curiosity axis (2026-05-22 reframe):** `music-listening`, `youtube-intake` (watch-history), `browser-history`, `reading-highlights` cover one persona-axis — the non-work self that work-substrate misses. Per `.ytstack/DECISIONS.md` 2026-05-22, value them by *blindspot-coverage*, not signal-density; `music-listening-collector.md`'s "weight-low correlation-ribbon" framing is superseded. Pick by axis-coverage (steep diminishing returns stacking channels) and gate on a synthesis consumer existing. Cluster doc + sequencing: `consumption-curiosity-axis.md`. (Suno = production axis, not this one.)
+
 - **`screenshots-intake.md`** — Tier 3+4 still open (Tier 0-2 shipped).
 - **`youtube-intake.md`** — T3-cloud + curiosity-loop + dashboard open (T0-T3-local shipped).
 - **`imap-reader-and-gmail-strategy.md`** — generic IMAP shipped; internal-OAuth-app strategy doc.

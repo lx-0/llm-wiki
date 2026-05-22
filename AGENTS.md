@@ -227,6 +227,17 @@ The Python venv lives at `<vault>/.wiki/.venv/` (inside the engine, NOT at the v
 - Hooks run in **<10s** budget — no API calls, only file I/O. Heavy work goes to spawned background processes (`flush.py`, piggybacks).
 - `compile.py` and `query.py` use the Claude Agent SDK with `model=CONFIG.models.compile_model`. Other scripts use Ollama (configurable via `models.ollama_url`).
 
+### Evaluating a new intake channel (substrate priority, locked 2026-05-22)
+
+Value a candidate substrate/collector by **persona-coverage, not signal-density per row.** This is a *self*-cartography engine: it optimizes for completeness-of-portrait, not knowledge-yield. Work-substrate (mail/calendar/gmeet/docs) systematically captures the intentional/professional self and misses the non-work persona (curiosity, leisure, cultural consumption, mood). A low-yield consumption channel that covers that otherwise-dark axis can outrank a high-yield source redundant with existing substrate.
+
+- "It'll clutter the knowledge base" is **not** a valid objection — `compile-role: source-only` + `daily/`-aggregation already keep low-signal sources out of per-item `knowledge/`. Clutter is solved engine-side; coverage is the open question.
+- **Axes, not channels.** Value scales per persona-axis newly covered, not per source added. Spotify + YouTube-watch-history + podcasts are mostly one "cultural/curiosity-consumption" axis — strong case for the first, steep diminishing returns stacking more. Browser-history already covers leisure *attention* at domain granularity; the gap these fill is *content* granularity.
+- **Synthesis is the gate.** Don't add a channel that only grows `raw/`. Ingest only when the synthesis side (dream-cycle / a persona entity-page) will actually weave it into a "what occupies the operator" portrait — otherwise it adds noise, not coverage.
+- **Consumption ≠ production.** Suno-style operator *output* is on the production axis, not the consumption/curiosity axis; it belongs to the portrait but is not the better candidate merely because the operator authored it.
+
+Full rationale: `.ytstack/DECISIONS.md` 2026-05-22; candidate grouping: `.ytstack/backlog/consumption-curiosity-axis.md`.
+
 ### Spawning Claude Agent SDK with substrate input (HARD rule, locked 2026-05-15)
 
 Any script that feeds substrate (`daily/**`, `raw/**`, operator-supplied prompts) into the Claude Agent SDK with Write/Edit tools MUST apply three layers of write-scope enforcement, no exceptions:
