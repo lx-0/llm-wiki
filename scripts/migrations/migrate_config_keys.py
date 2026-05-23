@@ -55,6 +55,7 @@ Key changes covered (chronological):
   features.suggestions_source_globs        (added 2026-05-17 Producer-seam, default ["raw/email/*.md"] — lifts legacy hardcoded _is_email_source filter onto Spec)
   limits.compile_aggregated_max_consecutive_failures (added 2026-05-17, default 3 — circuit-breaker on memory-seed chunked compiles; aborts loop after N consecutive chunk failures to stop $-bleed on substrate-prompt mismatch)
   personal.capture_inbox                   (added 2026-05-23 M025, default "" — quick-capture inbox for collectors/capture_collector.py)
+  piggybacks.capture                       (added 2026-05-23 M025, cooldown 1h — operator override for the capture collector piggyback)
   limits.daily_email_top_senders           (added 2026-05-23, default 5 — email daily-rollup top-senders cap)
   limits.daily_email_sample_subjects       (added 2026-05-23, default 12 — email daily-rollup recent-subject sample cap)
   personal.accounts.<id>.health.healthkit    (added 2026-05-19 M023 — Apple HealthKit XML export ingest;
@@ -319,6 +320,11 @@ KEY_ADDITIONS: dict[str, dict[str, object]] = {
         # because iCloud-Shortcut drops arrive throughout the day. Silently
         # skipped when personal.picture_inbox is empty (graceful agnostic).
         "pictures": {"enabled": True, "cooldown_hours": 6, "max_per_run": 20},
+        # M025 (2026-05-23) quick-capture collector. Folder-watch like voice,
+        # 1h cadence, no per-run cap. Registry auto-discovers the collector;
+        # this block is the operator-overridable enabled/cooldown knob. Silently
+        # skipped when personal.capture_inbox is empty.
+        "capture": {"enabled": True, "cooldown_hours": 1},
         # M019 operator-self-reports schedule dispatcher. 6h cooldown
         # checks 4×/day for due studies; the study's own schedule
         # (weekly/monthly/quarterly) gates the actual run. Default OFF

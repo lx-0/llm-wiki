@@ -758,6 +758,10 @@ def _default_piggybacks() -> dict[str, PiggybackTask]:
         "gmeet": PiggybackTask(cooldown_hours=6, max_per_run=20),
         "calendar": PiggybackTask(cooldown_hours=6, max_per_run=500),
         "voice": PiggybackTask(cooldown_hours=1),
+        # M025 quick-capture inbox. Folder-watch like voice (content-IDs each
+        # capture, idempotent re-drop); 1h cadence, no per-run cap — drains the
+        # inbox each fire. Silently skipped when personal.capture_inbox is empty.
+        "capture": PiggybackTask(cooldown_hours=1),
         # Camera/phone-photo inbox. Vision-LLM step makes this heavier than
         # voice — same cadence as screenshots (4×/day with a per-run cap).
         "pictures": PiggybackTask(cooldown_hours=6, max_per_run=20),

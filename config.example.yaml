@@ -112,6 +112,14 @@ piggybacks:
   voice:
     enabled: true
     cooldown_hours: 1                    # voice is time-sensitive
+  # M025 quick-capture inbox-watch (collectors/capture_collector.py). Reads
+  # *.txt / *.md / *.html from `personal.capture_inbox`, content-IDs each
+  # capture, writes raw/captures/capture-<id>.md (idempotent re-drop), and
+  # two-zone-archives the source under raw/inbox-mobile/captures/. Silently
+  # skipped when capture_inbox is empty (graceful agnostic).
+  capture:
+    enabled: true
+    cooldown_hours: 1                    # captures are time-sensitive, like voice
   # Inbox-watch for camera / phone photos (collectors/pictures.py). Reads
   # *.jpeg / *.jpg / *.png / *.heic from `personal.picture_inbox`, runs the
   # gemma4 vision pipeline on each, writes a HOME sidecar + 384px vault
@@ -484,6 +492,13 @@ personal:
   # <picture_inbox>/.processed/. Typical setup: iOS Shortcut writing into
   # an iCloud Drive folder. Empty = disabled.
   picture_inbox: ""
+  # M025 quick-capture inbox. Directory the operator one-taps cryptic notes
+  # into (iOS Shortcut → iCloud Drive is the mobile-primary path). The capture
+  # collector folder-watches it, content-IDs each capture, writes
+  # raw/captures/capture-<id>.md, and two-zone-archives the source under
+  # raw/inbox-mobile/captures/. The capture-ID is the join-key the correction
+  # back-channel (S03) keys on. Empty = disabled (graceful agnostic).
+  capture_inbox: ""
   # M019 operator-self-reports surface. Directory under vault root where
   # `reports/studies/<id>/runs/<ts>/*.md` (deterministic study output) and
   # `reports/analyses/<ts>.md` (analyst-agent output, lands in S05) accumulate.

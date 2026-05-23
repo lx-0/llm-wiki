@@ -71,6 +71,7 @@ raw/
 │   ├── jamie/       # Collector: Jamie AI meeting-notetaker (paired summary + diarised transcript)
 │   └── gmeet/       # Collector: Gemini Meet Notes + Transcript Docs (Drive API; paired sections)
 ├── voice/           # PERMANENT: dictation transcripts (collectors/voice.py — folder-watch on personal.voice_inbox; punctuation pre-process via Ollama, raw text preserved in frontmatter `raw_transcript:`)
+├── captures/        # PERMANENT: quick-capture notes (collectors/capture_collector.py — folder-watch on personal.capture_inbox; content-hash capture-ID in frontmatter, idempotent re-drop; file `capture-<id>.md`)
 ├── audio/           # PERMANENT: original audio files (referenced by transcripts)
 ├── memories/        # PERMANENT: seeded Claude Code memories
 ├── requests/        # MUTABLE: compiler-generated ingest requests (status changes)
@@ -108,10 +109,11 @@ daily/
     ├── health.md              ← collectors/health.py — Oura daily one-liners
     ├── meetings.md            ← collectors/{gmeet,jamie}.py — meeting one-liners
     ├── voice.md               ← collectors/voice.py — dictation intakes
+    ├── captures.md            ← collectors/capture_collector.py — quick-capture one-liners
     └── email.md               ← collectors/email_collector.py — delta links
 ```
 
-**Subfolder (`daily/<date>/<source>.md`)** — append-only captures owned by exactly one writer each. All five writers go through `core.daily_capture` (fcntl-flocked, source-name validated against `KNOWN_SOURCES`). Failures in the rollup write never break the primary substrate write — they're side-effects on top.
+**Subfolder (`daily/<date>/<source>.md`)** — append-only captures owned by exactly one writer each. All six writers go through `core.daily_capture` (fcntl-flocked, source-name validated against `KNOWN_SOURCES`). Failures in the rollup write never break the primary substrate write — they're side-effects on top.
 
 **Root file (`daily/<date>.md`)** — the compile-stage digest. Written by the `daily-digest` agent (`prompts/agents/daily-digest.md`) or the `daily_digest_yesterday` piggyback (`scripts/daily_digest_runner.py`). Hard length cap (~500 words) so the digest stays a digest. Refuses to overwrite if the file already has non-digest frontmatter (operator-edit protection).
 

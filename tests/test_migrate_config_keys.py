@@ -143,8 +143,9 @@ def test_migrate_config_file_round_trip(tmp_path):
     #    + 1 features.concept_reconciliation (2026-05-22 concept-consistency-routine)
     # +3 health_trends (2 limits + 1 features), 2026-05-23
     # +1 personal.capture_inbox (M025 quick-capture loop), 2026-05-23
-    # = 62 changes (no drops — operator has no orphan personal.* fields)
-    assert len(changes) == 62, f"got {len(changes)} changes: {changes}"
+    # +1 piggybacks.capture (M025 capture piggyback knob), 2026-05-23
+    # = 63 changes (no drops — operator has no orphan personal.* fields)
+    assert len(changes) == 63, f"got {len(changes)} changes: {changes}"
 
     reparsed = yaml.safe_load(new_text)
     # piggyback side
@@ -188,6 +189,7 @@ def test_migrate_config_no_change_when_fully_current(tmp_path):
             "curiosity_followup": {"enabled": True, "cooldown_hours": 6, "max_per_run": 5},
             "dream_cycle": {"enabled": True, "cooldown_hours": 24, "max_per_run": 3},
             "pictures": {"enabled": True, "cooldown_hours": 6, "max_per_run": 20},
+            "capture": {"enabled": True, "cooldown_hours": 1},
             "study_run_due": {"enabled": False, "cooldown_hours": 6},
             "analyst_pass2": {"enabled": False, "cooldown_hours": 168},
         },
@@ -369,6 +371,7 @@ def test_migrate_additions_idempotent():
             "curiosity_followup": {"enabled": True, "cooldown_hours": 6, "max_per_run": 5},
             "dream_cycle": {"enabled": True, "cooldown_hours": 24, "max_per_run": 3},
             "pictures": {"enabled": True, "cooldown_hours": 6, "max_per_run": 20},
+            "capture": {"enabled": True, "cooldown_hours": 1},
             "study_run_due": {"enabled": False, "cooldown_hours": 6},
             "analyst_pass2": {"enabled": False, "cooldown_hours": 168},
         },
