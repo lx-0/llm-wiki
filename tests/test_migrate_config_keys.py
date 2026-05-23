@@ -106,12 +106,13 @@ def test_migrate_config_file_round_trip(tmp_path):
     new_text, changes = m.migrate_config(config_path)
     assert new_text is not None
     # 2 piggyback (rename + drop)
-    #  + 1 created-limits-block + 24 limits additions:
+    #  + 1 created-limits-block + 26 limits additions:
     #    compile_force_long_context_types, compile_skip_on_long_context_unknown,
     #    compile_aggregated_max_consecutive_failures (2026-05-17 circuit-breaker),
     #    compile_role_default_by_location (M007), 4 calendar_*,
     #    compile_max_turns_long_context, compile_max_cost_per_file_usd,
     #    compile_skip_substrate_types — default ["email-delta"],
+    #    daily_email_top_senders + daily_email_sample_subjects (2026-05-23 email rollup beta),
     #    3 flush_*_budget_chars (2026-05-16),
     #    compile_per_call_timeout_s (M010), reports_default_lookback_days (M019),
     #    connection_min_words (M012),
@@ -142,8 +143,8 @@ def test_migrate_config_file_round_trip(tmp_path):
     #    + 1 features.concept_reconciliation (2026-05-22 concept-consistency-routine)
     # +3 health_trends (2 limits + 1 features), 2026-05-23
     # +1 personal.capture_inbox (M025 quick-capture loop), 2026-05-23
-    # = 60 changes (no drops — operator has no orphan personal.* fields)
-    assert len(changes) == 60, f"got {len(changes)} changes: {changes}"
+    # = 62 changes (no drops — operator has no orphan personal.* fields)
+    assert len(changes) == 62, f"got {len(changes)} changes: {changes}"
 
     reparsed = yaml.safe_load(new_text)
     # piggyback side
@@ -202,6 +203,8 @@ def test_migrate_config_no_change_when_fully_current(tmp_path):
             "compile_max_turns_long_context": 30,
             "compile_max_tokens_per_file": 500_000,
             "compile_skip_substrate_types": ["email-delta"],
+            "daily_email_top_senders": 5,
+            "daily_email_sample_subjects": 12,
             "flush_assistant_text_budget_chars": 50000,
             "flush_user_text_budget_chars": 10000,
             "flush_tool_summary_budget_chars": 10000,
@@ -338,6 +341,8 @@ def test_migrate_additions_idempotent():
             "compile_max_turns_long_context": 30,
             "compile_max_tokens_per_file": 500_000,
             "compile_skip_substrate_types": ["calendar-rollup"],
+            "daily_email_top_senders": 5,
+            "daily_email_sample_subjects": 12,
             "flush_assistant_text_budget_chars": 50000,
             "flush_user_text_budget_chars": 10000,
             "flush_tool_summary_budget_chars": 10000,
@@ -432,6 +437,8 @@ def test_migrate_list_removals_idempotent():
         "limits": {
             "compile_force_long_context_types": [],
             "compile_skip_substrate_types": ["email-delta"],
+            "daily_email_top_senders": 5,
+            "daily_email_sample_subjects": 12,
         },
     }
     changes = m.migrate_list_removals(data)
