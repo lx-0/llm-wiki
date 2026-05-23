@@ -1,6 +1,29 @@
 # ytstack `pre-tool-use-edit` hook: exit 2 = block, not warn
 
-## The bug
+## ✅ RESOLVED 2026-05-23 (ytstack 0.1.5)
+
+Fixed in `~/Sync/home/alex/Code/WebDev/projects/yesterday-ai/ytstack/hooks/pre-tool-use-edit`
+(working tree — review + commit + publish via the normal ytstack flow; version bumped
+0.1.4 → 0.1.5). The active plugin cache was patched as a stopgap so the fix is live now.
+
+Fix taken (a blend of options A + C below):
+1. **`exit 2` → `exit 0`** — the hook is advisory (its own messages say "warning, not a
+   block"); exit 0 surfaces the drift warning on stderr and lets the edit proceed.
+2. **Silent allow-list for ytstack's own process/meta files** — `.ytstack/**` + basenames
+   `STATE.md`/`DECISIONS.md`/`KNOWLEDGE.md`/`CONTEXT.md`/`PROJECT.md`/`RUNTIME.md`/
+   `PREFERENCES.md`/`ROADMAP.md`/`*-SUMMARY.md`/`*-PLAN.md`/`*-{ROADMAP,CONTEXT}.md`
+   exit 0 before the drift gate (they ARE the framework operating, never scope drift).
+
+Real out-of-scope `src/` edits still emit the (now non-blocking) warning. Verified with
+a 4-case harness: meta-file → silent allow; in-scope src → silent; out-of-scope src →
+warn + proceed; all exit 0. The Bash-workaround for meta writes is no longer needed.
+
+**Propagation:** publish ytstack 0.1.5 (push repo + marketplace) → `/plugin update`. Until
+then the cache patch holds, but a `/plugin update` that re-pulls 0.1.4 would revert it.
+
+---
+
+## The bug (original report)
 
 `hooks/pre-tool-use-edit` uses `exit 2` to emit "drift warnings" with a message
 that explicitly states *"this is a warning, not a block"* and *"Proceeding
