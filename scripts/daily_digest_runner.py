@@ -70,7 +70,7 @@ def main() -> int:
     log.info("daily-digest: distilling %d capture(s) for %s (%s)",
              len(captures), target_date, ", ".join(captures))
 
-    wiki_bin = WIKI_DIR.parent / "wiki"
+    wiki_bin = WIKI_DIR / "wiki"
     if not wiki_bin.is_file():
         log.error("daily-digest: wiki CLI not found at %s", wiki_bin)
         return 2
