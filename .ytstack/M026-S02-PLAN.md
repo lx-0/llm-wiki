@@ -5,7 +5,7 @@ project: llm-wiki
 created: 2026-05-23T14:25:00+0200
 status: planned
 task_count: 2
-completed_tasks: 1
+completed_tasks: 2
 ---
 
 # M026-S02 -- Slice Plan
@@ -24,7 +24,7 @@ function. No behavior change.
   re-imports them (existing uses + `test_compile_role_dispatch`'s `from compile import …`
   keep working). Implement `decide_route` (pure: no logging, no I/O, no state).
   **Nothing calls it yet** → provably zero behavior change. Table-tests.
-- [ ] T02 -- Wire `compile_file` to `decide_route` + `match`, executing each branch
+- [x] T02 -- Wire `compile_file` to `decide_route` + `match`, executing each branch
   inline exactly as today. Logging reconstructed in `compile_file` from the `Route` +
   content. Behavior identical. Full suite green + `wiki compile --dry-run` smoke.
 
