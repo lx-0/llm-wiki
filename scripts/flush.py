@@ -91,7 +91,7 @@ _LEGACY_PIGGYBACK_COMMANDS: dict[str, list[str]] = {
     # M014 dream-cycle. Sweeps the N most-overdue entity pages (oldest
     # last_synthesized_at first) and resynthesizes their State + Timeline
     # from the full substrate corpus. Per-run cost cap is enforced inside
-    # dream.py via limits.dream_cycle_max_cost_per_run_usd; this template
+    # dream.py via limits.dream_cycle_max_tokens_per_run; this template
     # just hands over max_per_run as the entity-count ceiling.
     "dream_cycle": ["dream.py", "piggyback", "--limit", "{max_per_run}"],
     # M019 operator-self-reports surface. Fires N hours per cooldown,

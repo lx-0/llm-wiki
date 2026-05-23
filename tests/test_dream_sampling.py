@@ -472,7 +472,7 @@ def test_dream_entity_stamps_last_dreamed_at_after_sdk(
 
     ent = dream._resolve_entity("alex")
     assert ent is not None
-    res = asyncio.run(dream.dream_entity(ent, cost_cap_usd=10.0))
+    res = asyncio.run(dream.dream_entity(ent, max_prompt_chars=0))
     assert res.skipped is None, f"unexpected skip: {res.skipped} ({res.sdk_result_text!r})"
 
     # Both substrate files were stamped
@@ -508,7 +508,7 @@ def test_dream_entity_skips_stamp_on_daily_digest(
     monkeypatch.setattr(dream, "query", _fake_query)
     ent = dream._resolve_entity("alex")
     assert ent is not None
-    asyncio.run(dream.dream_entity(ent, cost_cap_usd=10.0))
+    asyncio.run(dream.dream_entity(ent, max_prompt_chars=0))
 
     fm, _ = dream._parse_frontmatter(digest.read_text())
     assert "last_dreamed_at" not in fm, "daily digest must not be stamped"

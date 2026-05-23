@@ -149,7 +149,7 @@ KEY_ADDITIONS: dict[str, dict[str, object]] = {
         # Per-file cost guard (USD); abort batch on overrun. Defense
         # against substrate-prompt-mismatch loops that burn $5-10/file
         # silently. See KNOWLEDGE.md "calendar-rollup max_turns trap".
-        "compile_max_cost_per_file_usd": 2.5,
+        "compile_max_tokens_per_file": 500_000,
         # Substrate-skip-list for batch mode (frontmatter `type:` values).
         # Empty default since 2026-05-16 P2 landed (calendar-rollup
         # moved out of the skip-list once compile_calendar.md prompt
@@ -195,8 +195,8 @@ KEY_ADDITIONS: dict[str, dict[str, object]] = {
         # + cumulative per-run cap for `wiki dream --all-entities` and the
         # dream_cycle piggyback sweep. Match Limits.dream_*_usd defaults
         # in `scripts/core/config.py`.
-        "dream_entity_max_cost_usd": 2.0,
-        "dream_cycle_max_cost_per_run_usd": 5.0,
+        "dream_entity_max_prompt_chars": 415_000,
+        "dream_cycle_max_tokens_per_run": 2_000_000,
         # M016 dream-cycle sampled-activation knobs (2026-05-17). Bound the
         # per-dream corpus by construction (~600 KB) regardless of vault size.
         # See `.ytstack/backlog/dream-sampled-activation.md` for the full
@@ -405,6 +405,9 @@ KEY_DROPS: dict[str, set[str]] = {
         # core/usage.py, never gated in dollars).
         "concept_reconcile_per_fact_max_cost_usd",
         "concept_reconcile_max_cost_per_run_usd",
+        "compile_max_cost_per_file_usd",
+        "dream_entity_max_cost_usd",
+        "dream_cycle_max_cost_per_run_usd",
     },
     "personal": {
         # Removed 2026-05-15 (M006) — calendar moved off Thunderbird-SQLite

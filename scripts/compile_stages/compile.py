@@ -222,19 +222,20 @@ async def _attempt(
         elapsed = time.time() - started
         if final_result is not None and final_result.is_error:
             cost = final_result.total_cost_usd or 0.0
+            tokens = total_input_tokens + total_output_tokens
             LEDGER.record(model=model_id, input_tokens=total_input_tokens, output_tokens=total_output_tokens)
             kind = "max_turns" if final_result.subtype == "error_max_turns" else "agent_error"
             detail = (
                 f"{final_result.subtype} after {final_result.num_turns} turns "
-                f"({elapsed:.1f}s, ${cost:.4f} burned)"
+                f"({elapsed:.1f}s, {tokens:,} tok)"
             )
             if final_result.errors:
                 detail += f" — errors: {'; '.join(final_result.errors)}"
-            budget = CONFIG.limits.compile_max_cost_per_file_usd
-            if budget > 0 and cost > budget:
+            budget = CONFIG.limits.compile_max_tokens_per_file
+            if budget > 0 and tokens > budget:
                 failure = FailureClass(
-                    "cost_exceeded",
-                    f"${cost:.4f} > budget ${budget:.4f} on {rel_path} (underlying {kind}: {detail})",
+                    "tokens_exceeded",
+                    f"{tokens:,} tok > budget {budget:,} on {rel_path} (underlying {kind}: {detail})",
                 )
             else:
                 failure = FailureClass(kind, detail)
@@ -247,14 +248,14 @@ async def _attempt(
             log.error("    model:     %s", model_id)
             log.error("    input:     %d chars (%.1f KB)",
                       len(source_content), len(source_content) / 1024)
-            log.error("    cost:      $%.4f burned despite failure", cost)
-            if failure.kind == "cost_exceeded":
+            log.error("    tokens:    %s in / %s out burned despite failure",
+                      f"{total_input_tokens:,}", f"{total_output_tokens:,}")
+            if failure.kind == "tokens_exceeded":
                 log.error(
-                    "    BUDGET EXCEEDED — batch will abort (raise "
-                    "`compile_max_cost_per_file_usd` from $%.2f if you "
-                    "accept this burn, or add the substrate type to "
-                    "`compile_skip_substrate_types`).",
-                    budget,
+                    "    TOKEN BUDGET EXCEEDED — batch will abort (raise "
+                    "`compile_max_tokens_per_file` from %s if you accept this, "
+                    "or add the substrate type to `compile_skip_substrate_types`).",
+                    f"{budget:,}",
                 )
             capture.dump_to(log)
             return {}, failure
@@ -271,38 +272,37 @@ async def _attempt(
         return {}, failure
 
     elapsed = time.time() - started
-    # Claude Opus 4.7 pricing: $5/M input, $25/M output
-    cost = (total_input_tokens * 5.0 + total_output_tokens * 25.0) / 1_000_000
-    if final_result is not None and final_result.total_cost_usd is not None:
-        cost = float(final_result.total_cost_usd)
-    budget = CONFIG.limits.compile_max_cost_per_file_usd
-    if budget > 0 and cost > budget:
+    cost = float(final_result.total_cost_usd) if (
+        final_result is not None and final_result.total_cost_usd is not None
+    ) else 0.0
+    tokens = total_input_tokens + total_output_tokens
+    LEDGER.record(model=model_id, input_tokens=total_input_tokens, output_tokens=total_output_tokens)
+    budget = CONFIG.limits.compile_max_tokens_per_file
+    if budget > 0 and tokens > budget:
         log.error(
-            "  compile_file ✗ cost_exceeded · $%.4f > budget $%.4f "
+            "  compile_file ✗ tokens_exceeded · %s tok > budget %s "
             "(elapsed %.1fs, model=%s)",
-            cost, budget, elapsed, model_id,
+            f"{tokens:,}", f"{budget:,}", elapsed, model_id,
         )
         log.error("    source:    %s", rel_path)
         log.error(
-            "    hint:      this file burned beyond the per-file guard. "
+            "    hint:      this file burned beyond the per-file token guard. "
             "Likely substrate-prompt mismatch (e.g. dense calendar in "
             "compile_main.md). Skip the type via "
             "`compile_skip_substrate_types`, or raise "
-            "`compile_max_cost_per_file_usd` (current: $%.2f) if you "
-            "accept the burn.",
-            budget,
+            "`compile_max_tokens_per_file` (current: %s) if you accept it.",
+            f"{budget:,}",
         )
         return {}, FailureClass(
-            "cost_exceeded",
-            f"${cost:.4f} > budget ${budget:.4f} on {rel_path}",
+            "tokens_exceeded",
+            f"{tokens:,} tok > budget {budget:,} on {rel_path}",
         )
-    LEDGER.record(model=model_id, input_tokens=total_input_tokens, output_tokens=total_output_tokens)
     log.info(
-        "  ✓ %.1fs · in:%s out:%s ($%.4f)",
+        "  ✓ %.1fs · in:%s out:%s (%s tok)",
         elapsed,
         f"{total_input_tokens:,}",
         f"{total_output_tokens:,}",
-        cost,
+        f"{tokens:,}",
     )
     return (
         {

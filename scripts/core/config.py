@@ -305,7 +305,7 @@ class Limits:
     # outlines legitimately need ~15-20 turns to extract+link each
     # bullet's referenced concepts. 20 matches `daily-digest`'s tier
     # (the closest many-entity shape); per-file cost guard
-    # (compile_max_cost_per_file_usd, $2.50) still bounds runaway burns.
+    # (compile_max_tokens_per_file) still bounds runaway burns.
     compile_max_turns: int = 20
     # Higher cap for substrates listed in `compile_force_long_context_types`.
     # Two-layer person/project pages with carry-forward semantics
@@ -318,20 +318,16 @@ class Limits:
     # cap is the cheaper end of the trade-off. See KNOWLEDGE.md
     # "max_turns trap on dense fan-out substrates".
     compile_max_turns_long_context: int = 30
-    # Hard per-file cost guard (USD). When a single compile_file call's
-    # ResultMessage reports `total_cost_usd` above this, the file is
-    # marked failed with `kind=cost_exceeded` and the batch ABORTS (not
-    # skips — operator must intervene). Defense-in-depth against
-    # max_turns loops on substrate-prompt mismatches: at $5-10/loop a
-    # full batch of 50 dense calendar files can quietly burn $300+. Set
-    # to 0 to disable the guard. Per-file limit, not cumulative.
-    # Bumped 2026-05-16: 1.0 → 2.0 → 2.5 across the same day.
-    # Final $2.50 chosen after Haiku migration of calendar+daily: dense
-    # calendar days that hit max_turns on Opus at $2.38 now finish on
-    # Haiku at $0.40-0.60, but the budget needs headroom for occasional
-    # Opus-routed files (compile_main.md substrates that get a bigger
-    # fan-out one-off). Aborts the genuine $5-10 max_turns-loop pattern.
-    compile_max_cost_per_file_usd: float = 2.5
+    # Hard per-file TOKEN guard. When a single compile_file call's total token
+    # use (input+output, summed from AssistantMessage.usage) exceeds this, the
+    # file is marked failed with `kind=tokens_exceeded` and the batch ABORTS
+    # (not skips — operator must intervene). Defense-in-depth against max_turns
+    # loops on substrate-prompt mismatches: a dense-fan-out file re-reads
+    # articles every turn and balloons token use. Set to 0 to disable.
+    # Default 500_000 — a faithful translation of the prior $2.50 USD cap at
+    # the documented Opus rates; re-tune from state/usage.json once real per-
+    # file token data accrues (DECISIONS 2026-05-23: tokens, not dollars).
+    compile_max_tokens_per_file: int = 500_000
     # Substrate types (frontmatter `type:` value) that compile.py skips
     # in batch mode. Operator can still force-compile a single file via
     # `wiki compile --file <path>`. Last-resort escape hatch for
@@ -429,7 +425,7 @@ class Limits:
     # burn N × $0.30-0.40 (observed 2026-05-17: 46-chunk memory-seed file
     # hit max_turns on every chunk at $0.35 each — potential $16/file
     # before the outer loop ever sees a result). The per-file cost guard
-    # (compile_max_cost_per_file_usd) fires per-chunk, not cumulatively,
+    # (compile_max_tokens_per_file) fires per-chunk, not cumulatively,
     # so it can't catch this pattern. Aborts the chunk-loop after N
     # consecutive failures (skipped OR failed); already-successful
     # chunks are preserved. Set to 0 to disable the breaker.
@@ -457,22 +453,19 @@ class Limits:
     # Cap on takes emitted per source. Stops a noisy meeting from spawning
     # 30 low-signal lines for the same holder.
     extract_takes_max_per_source: int = 12
-    # M014 dream-cycle (entity-page re-synthesis). Hard per-entity USD cap.
-    # `dream.py:dream_entity()` pre-flight estimates cost from prompt-char
-    # count; if estimate > cap, the SDK call is NEVER made (no silent
-    # burn). Operator must reduce corpus (archive old substrate) or raise
-    # the cap. Default $2.00 — a typical alex.md corpus on lxw is ~200
-    # files × 8 KB average truncation = ~1.6 MB ≈ ~$6 estimated. So
-    # default cap will actively gate the lxw `alex` resynthesis until the
-    # operator decides whether to raise it; emmett.md and most thinner
-    # entities fit comfortably under $2.
-    dream_entity_max_cost_usd: float = 2.0
-    # Cumulative per-run USD cap for `wiki dream --all-entities` and the
-    # dream_cycle piggyback. The sweeper picks the most-overdue entities
-    # first (oldest `last_synthesized_at`) and stops once cumulative
-    # ResultMessage.total_cost_usd crosses this cap. Default $5.00 — sized
-    # to cover 2-3 typical entity resyntheses per run.
-    dream_cycle_max_cost_per_run_usd: float = 5.0
+    # M014 dream-cycle (entity-page re-synthesis). Per-entity prompt-SIZE guard
+    # (chars). dream_entity() builds the corpus prompt; if it exceeds this the
+    # SDK call is NEVER made (skipped="prompt_too_large") — a context-overflow
+    # guard, NOT a cost gate (DECISIONS 2026-05-23). The M016 tiered collector
+    # already bounds the corpus to ~600 KB; this is defense-in-depth. Default
+    # 415_000 chars ≈ the prior $2.0 estimate at 4 chars/token.
+    dream_entity_max_prompt_chars: int = 415_000
+    # Cumulative per-run TOKEN ceiling for `wiki dream --all-entities` and the
+    # dream_cycle piggyback: the sweeper stops once cumulative real tokens
+    # (input+output) cross this. The per-run entity count (piggyback
+    # max_per_run) is the primary structural bound; this catches a runaway.
+    # Default 2_000_000; re-tune from state/usage.json (tokens, not dollars).
+    dream_cycle_max_tokens_per_run: int = 2_000_000
     # Autonomous concept-reconciliation routine (concept-consistency-routine).
     # Structural gates, NOT dollars (DECISIONS 2026-05-23 — usage is tracked in
     # tokens per provider/model via core/usage.py, never gated in USD). A fact
@@ -756,8 +749,8 @@ def _default_piggybacks() -> dict[str, PiggybackTask]:
         "daily_digest_yesterday": PiggybackTask(cooldown_hours=24),
         "retry_failed_flushes": PiggybackTask(cooldown_hours=24, max_per_run=5),
         # M014 dream-cycle. Cooldown 24h means it fires at most once per day;
-        # per-run sweep is gated by limits.dream_cycle_max_cost_per_run_usd
-        # AND limits.dream_entity_max_cost_usd. max_per_run=3 keeps a single
+        # per-run sweep is gated by limits.dream_cycle_max_tokens_per_run
+        # AND limits.dream_entity_max_prompt_chars. max_per_run=3 keeps a single
         # fire from sweeping the whole entity list in one go — the per-entity
         # cooldown (scheduling.dream_cooldown_days, default 7d) ensures the
         # entire fleet drains over the cooldown window.

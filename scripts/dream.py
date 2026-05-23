@@ -20,12 +20,12 @@ Piggyback wiring: see `flush.py:_LEGACY_PIGGYBACK_COMMANDS["dream_cycle"]`.
 The piggyback shells out to `dream.py --piggyback`, which sweeps the N
 most-overdue entities under the per-run cost cap.
 
-Cost gates (real, hard, no silent skips):
+Resource gates (real, hard, no silent skips):
 
-  - Per-entity cap: `CONFIG.limits.dream_entity_max_cost_usd`. Pre-flight
-    estimate from prompt-char count; reject if estimate > cap.
-  - Per-run cap (piggyback / --all): `CONFIG.limits.dream_cycle_max_cost_per_run_usd`.
-    Stop sweeping once cumulative cost crosses the cap.
+  - Per-entity size: `CONFIG.limits.dream_entity_max_prompt_chars`. Pre-flight
+    prompt-char check; reject if the prompt exceeds it (context-overflow guard).
+  - Per-run tokens (piggyback / --all): `CONFIG.limits.dream_cycle_max_tokens_per_run`.
+    Stop sweeping once cumulative real tokens cross the cap.
 
 Cooldown: `CONFIG.scheduling.dream_cooldown_days` (default 7). Entities with
 `last_synthesized_at:` newer than that are skipped.
@@ -110,7 +110,7 @@ class _DreamFormatter(ConsoleFormatter):
           `  stamped last_dreamed_at on …`           (housekeeping)
       - termination notes:
           `Reached --limit=N; stopping`              (dim, soft signal)
-          `Per-run cost cap reached …`               (yellow-ish, soft warn)
+          `Per-run token cap reached …`              (yellow-ish, soft warn)
 
     Everything else falls through to the generic colorization (✓/✗,
     bare/parenthesised costs, elapsed, tokens, section banners,
@@ -124,7 +124,7 @@ class _DreamFormatter(ConsoleFormatter):
         re.compile(r"^\s+invoking\s+claude-"),
         re.compile(r"^\s+stamped\s+last_dreamed_at\s+on\s+\d+"),
     )
-    _LIMIT_RE = re.compile(r"^(Reached --limit=\d+|Per-run cost cap reached)")
+    _LIMIT_RE = re.compile(r"^(Reached --limit=\d+|Per-run token cap reached)")
 
     def _format_message_extras(self, msg: str) -> str | None:
         if (mh := self._HEADER_RE.match(msg.strip())):
@@ -153,10 +153,6 @@ log = setup_console_logging("dream", formatter=_DreamFormatter())
 # Dream-cycle prompts are input-dominated (large corpus, small output).
 # Estimate: input_chars / 4 chars/token × $15/Mtok + small fixed output budget.
 # Conservative — actual cost can be 1.5-2× higher with tool-turn fan-out.
-_INPUT_USD_PER_MTOK = 15.0
-_OUTPUT_USD_PER_MTOK = 75.0
-_OUTPUT_BUDGET_TOKENS = 6000  # generous ceiling for a State+Timeline rewrite
-_CHARS_PER_TOKEN = 4.0  # English/German mix; conservative
 
 # Map entity-kind (the folder slug) to the kind's directory + type-frontmatter
 # value. Areas use the M005 areas-bucket folder (knowledge/areas/) and a
@@ -782,19 +778,6 @@ def render_corpus_block_tiered(
 # ── Cost estimation ─────────────────────────────────────────────────
 
 
-def estimate_cost_usd(prompt_chars: int) -> float:
-    """Rough pre-flight cost estimate from prompt size + fixed output budget.
-
-    Conservative — actual cost can run 1.5-2× higher when tool-turn fan-out
-    re-reads articles. The estimate gates the SDK call BEFORE spend; the
-    real cost is measured via ResultMessage.total_cost_usd after.
-    """
-    input_tokens = prompt_chars / _CHARS_PER_TOKEN
-    input_cost = input_tokens * _INPUT_USD_PER_MTOK / 1_000_000.0
-    output_cost = _OUTPUT_BUDGET_TOKENS * _OUTPUT_USD_PER_MTOK / 1_000_000.0
-    return round(input_cost + output_cost, 4)
-
-
 # ── Main entity-pass ──────────────────────────────────────────────
 
 
@@ -803,7 +786,6 @@ class DreamResult:
     entity: EntityRef
     corpus_count: int
     corpus_chars: int
-    estimated_cost_usd: float
     actual_cost_usd: float
     input_tokens: int
     output_tokens: int
@@ -886,17 +868,17 @@ async def dream_entity(
     entity: EntityRef,
     *,
     dry_run: bool = False,
-    cost_cap_usd: float | None = None,
+    max_prompt_chars: int | None = None,
     max_turns: int | None = None,
 ) -> DreamResult:
     """Re-synthesize ONE entity page from the substrate corpus.
 
-    Cost gate: pre-flight estimate; on overrun returns a DreamResult with
-    `skipped="cost_cap_exceeded"` and zero spend (the SDK is NEVER called
-    when the cap fires — no silent burn).
+    Size gate: pre-flight prompt-char check; on overrun returns a DreamResult
+    with `skipped="prompt_too_large"` and zero spend (the SDK is NEVER called
+    when the prompt exceeds the cap — context-overflow guard, not cost).
     """
     started = time.time()
-    cap = cost_cap_usd if cost_cap_usd is not None else CONFIG.limits.dream_entity_max_cost_usd
+    max_chars = max_prompt_chars if max_prompt_chars is not None else CONFIG.limits.dream_entity_max_prompt_chars
     turns = max_turns if max_turns is not None else 20
 
     # M016: tiered corpus. Bounded by construction at ~600 KB total
@@ -923,39 +905,38 @@ async def dream_entity(
         )
         return DreamResult(
             entity=entity, corpus_count=0, corpus_chars=0,
-            estimated_cost_usd=0.0, actual_cost_usd=0.0,
+            actual_cost_usd=0.0,
             input_tokens=0, output_tokens=0, sdk_result_text="",
             skipped="no_substrate", elapsed_s=time.time() - started,
         )
 
     prompt, prompt_chars = _build_prompt(entity, corpus_paths, max_turns=turns, breakdown=breakdown)
-    estimate = estimate_cost_usd(prompt_chars)
     log.info(
-        "  prompt: %d chars (%.1f KB) — estimated cost $%.3f (cap $%.2f)",
-        prompt_chars, prompt_chars / 1024, estimate, cap,
+        "  prompt: %d chars (%.1f KB) — max %s chars",
+        prompt_chars, prompt_chars / 1024, f"{max_chars:,}" if max_chars > 0 else "unlimited",
     )
 
-    if cap > 0 and estimate > cap:
+    if max_chars > 0 and prompt_chars > max_chars:
         msg = (
-            f"COST_CAP_EXCEEDED: entity={entity.slug} estimate=${estimate:.3f} "
-            f"> cap=${cap:.2f} (prompt={prompt_chars} chars, corpus={len(corpus_paths)} files). "
-            "Reduce corpus by archiving old substrate, raise CONFIG.limits.dream_entity_max_cost_usd, "
-            "or run with --no-cost-cap (not yet implemented — file the request)."
+            f"PROMPT_TOO_LARGE: entity={entity.slug} prompt={prompt_chars} chars "
+            f"> max={max_chars} (corpus={len(corpus_paths)} files). "
+            "Reduce corpus by archiving old substrate or raise "
+            "CONFIG.limits.dream_entity_max_prompt_chars."
         )
         log.error("  ✗ %s", msg)
         return DreamResult(
             entity=entity, corpus_count=len(corpus_paths),
             corpus_chars=sum(len(p.read_text(encoding="utf-8", errors="replace")) for p in corpus_paths),
-            estimated_cost_usd=estimate, actual_cost_usd=0.0,
+            actual_cost_usd=0.0,
             input_tokens=0, output_tokens=0, sdk_result_text=msg,
-            skipped="cost_cap_exceeded", elapsed_s=time.time() - started,
+            skipped="prompt_too_large", elapsed_s=time.time() - started,
         )
 
     if dry_run:
         log.info("  --dry-run: would invoke SDK with %d-char prompt", prompt_chars)
         return DreamResult(
             entity=entity, corpus_count=len(corpus_paths),
-            corpus_chars=prompt_chars, estimated_cost_usd=estimate,
+            corpus_chars=prompt_chars,
             actual_cost_usd=0.0, input_tokens=0, output_tokens=0,
             sdk_result_text="(dry-run)", skipped="dry_run",
             elapsed_s=time.time() - started,
@@ -1073,7 +1054,7 @@ async def dream_entity(
         elapsed = time.time() - started
         return DreamResult(
             entity=entity, corpus_count=len(corpus_paths),
-            corpus_chars=prompt_chars, estimated_cost_usd=estimate,
+            corpus_chars=prompt_chars,
             actual_cost_usd=actual_cost, input_tokens=input_tokens,
             output_tokens=output_tokens,
             sdk_result_text=f"per-call timeout after {elapsed:.1f}s (msg_count={message_count})",
@@ -1096,7 +1077,7 @@ async def dream_entity(
         )
         return DreamResult(
             entity=entity, corpus_count=len(corpus_paths),
-            corpus_chars=prompt_chars, estimated_cost_usd=estimate,
+            corpus_chars=prompt_chars,
             actual_cost_usd=0.0, input_tokens=input_tokens, output_tokens=output_tokens,
             sdk_result_text=str(exc), skipped="sdk_failure",
             elapsed_s=time.time() - started,
@@ -1210,7 +1191,7 @@ async def dream_entity(
         pass
     return DreamResult(
         entity=entity, corpus_count=len(corpus_paths),
-        corpus_chars=prompt_chars, estimated_cost_usd=estimate,
+        corpus_chars=prompt_chars,
         actual_cost_usd=actual_cost, input_tokens=input_tokens,
         output_tokens=output_tokens, sdk_result_text=result_text,
         skipped=None, elapsed_s=elapsed,
@@ -1364,8 +1345,8 @@ def list_candidates(*, cooldown_days: int | None = None) -> list[dict]:
 async def dream_all_entities(
     *,
     cooldown_days: int | None = None,
-    per_entity_cap: float | None = None,
-    per_run_cap: float | None = None,
+    per_entity_max_chars: int | None = None,
+    per_run_max_tokens: int | None = None,
     limit: int | None = None,
     dry_run: bool = False,
     selection_mode: str | None = None,
@@ -1378,7 +1359,7 @@ async def dream_all_entities(
       - "greedy": top-N by weight — deterministic, predictable
     """
     cd = cooldown_days if cooldown_days is not None else CONFIG.scheduling.dream_cooldown_days
-    run_cap = per_run_cap if per_run_cap is not None else CONFIG.limits.dream_cycle_max_cost_per_run_usd
+    run_cap = per_run_max_tokens if per_run_max_tokens is not None else CONFIG.limits.dream_cycle_max_tokens_per_run
     mode = selection_mode or "probabilistic"
 
     all_entities = _list_all_entities()
@@ -1402,20 +1383,20 @@ async def dream_all_entities(
     seed_label = f" · seed={seed}" if seed is not None else ""
     log.info(
         "─── dream sweep: %d entities total, %d candidates after cooldown+priority filter "
-        "(mode=%s, run_cap=$%.2f%s) ───",
-        len(all_entities), len(ranked), mode, run_cap, seed_label,
+        "(mode=%s, run_cap=%s tok%s) ───",
+        len(all_entities), len(ranked), mode, f"{run_cap:,}", seed_label,
     )
 
     results: list[DreamResult] = []
-    cumulative = 0.0
+    cumulative = 0
     for idx, (_weight, ent, _source) in enumerate(ranked, 1):
         if limit is not None and idx > limit:
             log.info("Reached --limit=%d; stopping", limit)
             break
         if run_cap > 0 and cumulative >= run_cap:
             log.info(
-                "Per-run cost cap reached ($%.2f >= $%.2f) — stopping after %d entities",
-                cumulative, run_cap, idx - 1,
+                "Per-run token cap reached (%s >= %s tok) — stopping after %d entities",
+                f"{cumulative:,}", f"{run_cap:,}", idx - 1,
             )
             break
         log.info(
@@ -1423,14 +1404,14 @@ async def dream_all_entities(
             idx, len(ranked), ent.slug, _weight, _source or "(default)",
         )
         res = await dream_entity(
-            ent, dry_run=dry_run, cost_cap_usd=per_entity_cap,
+            ent, dry_run=dry_run, max_prompt_chars=per_entity_max_chars,
         )
         results.append(res)
-        cumulative += res.actual_cost_usd
+        cumulative += res.input_tokens + res.output_tokens
 
     log.info(
-        "─── dream sweep finished: %d entities processed, cumulative cost $%.4f ───",
-        len(results), cumulative,
+        "─── dream sweep finished: %d entities processed, cumulative %s tok ───",
+        len(results), f"{cumulative:,}",
     )
     # Append-only history event so dashboard + grep can answer
     # "when did dream-cycle last run, for which entities, at what cost?"
@@ -1464,15 +1445,15 @@ async def _async_main() -> int:
     p_one = sub.add_parser("entity", help="Re-synthesize one entity by slug")
     p_one.add_argument("slug", help="Entity slug (e.g. alex, emmett, yesterday-os)")
     p_one.add_argument("--dry-run", action="store_true", help="Print prompt + estimate, no SDK call")
-    p_one.add_argument("--cost-cap", type=float, default=None, help="Override per-entity USD cap")
+    p_one.add_argument("--max-chars", type=int, default=None, help="Override per-entity prompt-char cap")
     p_one.add_argument("--max-turns", type=int, default=20, help="SDK max_turns budget")
     p_one.add_argument("--ignore-cooldown", action="store_true", help="Skip the last_synthesized_at gate")
 
     p_all = sub.add_parser("sweep", help="Sweep all entities (--all-entities)")
     p_all.add_argument("--dry-run", action="store_true")
     p_all.add_argument("--cooldown-days", type=int, default=None)
-    p_all.add_argument("--per-entity-cap", type=float, default=None)
-    p_all.add_argument("--per-run-cap", type=float, default=None)
+    p_all.add_argument("--per-entity-max-chars", type=int, default=None)
+    p_all.add_argument("--per-run-max-tokens", type=int, default=None)
     p_all.add_argument("--limit", type=int, default=None, help="Hard cap on entity count this run")
     p_all.add_argument(
         "--seed", type=int, default=None,
@@ -1516,10 +1497,10 @@ async def _async_main() -> int:
             )
             return 0
         res = await dream_entity(
-            ent, dry_run=args.dry_run, cost_cap_usd=args.cost_cap,
+            ent, dry_run=args.dry_run, max_prompt_chars=args.max_chars,
             max_turns=args.max_turns,
         )
-        if res.skipped == "cost_cap_exceeded":
+        if res.skipped == "prompt_too_large":
             return 3
         if res.skipped == "sdk_failure":
             return 4
@@ -1528,8 +1509,8 @@ async def _async_main() -> int:
     if args.cmd == "sweep":
         results = await dream_all_entities(
             cooldown_days=args.cooldown_days,
-            per_entity_cap=args.per_entity_cap,
-            per_run_cap=args.per_run_cap,
+            per_entity_max_chars=args.per_entity_max_chars,
+            per_run_max_tokens=args.per_run_max_tokens,
             limit=args.limit,
             dry_run=args.dry_run,
             selection_mode=args.selection_mode,
@@ -1537,7 +1518,7 @@ async def _async_main() -> int:
         )
         # Non-zero exit if any entity hit a real failure (cost-cap or SDK)
         for r in results:
-            if r.skipped in ("cost_cap_exceeded", "sdk_failure"):
+            if r.skipped in ("prompt_too_large", "sdk_failure"):
                 return 5
         return 0
 

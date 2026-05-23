@@ -133,9 +133,9 @@ piggybacks:
     cooldown_hours: 24
     max_per_run: 5
   # M014 dream-cycle. Fires at most once-per-day; per-fire sweeps up to
-  # max_per_run entity pages (newest-overdue first). Per-entity cost cap
-  # AND per-run cumulative cap enforced inside dream.py — see
-  # limits.dream_entity_max_cost_usd / limits.dream_cycle_max_cost_per_run_usd.
+  # max_per_run entity pages (newest-overdue first). Per-entity prompt-size cap
+  # AND per-run cumulative token cap enforced inside dream.py — see
+  # limits.dream_entity_max_prompt_chars / limits.dream_cycle_max_tokens_per_run.
   # Per-entity cooldown lives on scheduling.dream_cooldown_days (default 7d).
   dream_cycle:
     enabled: true
@@ -276,12 +276,13 @@ limits:
   # nothing and surfaces as `subtype=error_max_turns` on the
   # ResultMessage — the bigger cap is the cheaper end of the trade-off.
   compile_max_turns_long_context: 30
-  # Hard per-file cost guard (USD). When a single compile_file call
-  # reports total_cost_usd above this, the file is marked failed with
-  # kind=cost_exceeded and the BATCH ABORTS (not skips — operator must
-  # intervene). Defense against substrate-prompt-mismatch loops that
-  # quietly burn $5-10 per attempt. Set to 0 to disable.
-  compile_max_cost_per_file_usd: 2.5
+  # Hard per-file TOKEN guard. When a single compile_file call's total token
+  # use (input+output) exceeds this, the file is marked failed with
+  # kind=tokens_exceeded and the BATCH ABORTS (not skips — operator must
+  # intervene). Defense against substrate-prompt-mismatch fan-out loops. Set
+  # to 0 to disable. Usage is tracked in tokens per provider/model, never USD
+  # (see state/usage.json). Re-tune from that ledger once real data accrues.
+  compile_max_tokens_per_file: 500000
   # Substrate types skipped entirely in batch mode (frontmatter
   # `type:` value). Operator can still force-compile single files via
   # `wiki compile --file <path>`. Empty by default — this is the
@@ -340,18 +341,19 @@ limits:
     - "daily/*"
   extract_takes_timeout_s: 180
   extract_takes_max_per_source: 12
-  # M014 dream-cycle cost gates. Pre-flight per-entity USD cap (estimate
-  # derived from prompt-char count; SDK call is REJECTED when estimate >
-  # cap — no silent burn). Cumulative per-run cap stops the sweep once
-  # ResultMessage.total_cost_usd accumulates past it. Both apply to
-  # `wiki dream --all-entities` AND the dream_cycle piggyback.
-  dream_entity_max_cost_usd: 2.0
-  dream_cycle_max_cost_per_run_usd: 5.0
-  # Concept-reconciliation routine (`wiki reconcile`). Per-fact pre-flight cost
-  # cap (reject a too-expensive reconciliation), cumulative per-run cap (stop
-  # the sweep), and the turn budget for the strict scoped agent.
-  concept_reconcile_per_fact_max_cost_usd: 0.10
-  concept_reconcile_max_cost_per_run_usd: 0.50
+  # M014 dream-cycle resource gates (tokens, not dollars). Per-entity prompt-
+  # SIZE cap in chars (SDK call REJECTED when the corpus prompt exceeds it — a
+  # context-overflow guard). Cumulative per-run TOKEN cap stops the sweep once
+  # real input+output tokens cross it. Both apply to `wiki dream
+  # --all-entities` AND the dream_cycle piggyback.
+  dream_entity_max_prompt_chars: 415000
+  dream_cycle_max_tokens_per_run: 2000000
+  # Concept-reconciliation routine (`wiki reconcile`). Structural gates, not
+  # dollars: skip a fact violating more than max_files_per_fact concepts (too
+  # broad — manual review), cap facts per run, and the turn budget for the
+  # strict scoped agent. Token usage is recorded to state/usage.json.
+  concept_reconcile_max_files_per_fact: 25
+  concept_reconcile_max_facts_per_run: 10
   concept_reconcile_max_turns: 15
   # Health-trend synthesis (`wiki health-trends`). Recent-window (months) for the
   # trend arrow + "recent avg"; min coverage (days) for a metric to be shown.

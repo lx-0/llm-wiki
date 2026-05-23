@@ -117,7 +117,7 @@ class StderrCapture:
 class FailureClass:
     """Classification of one failed SDK call."""
 
-    kind: str   # rate_limit | auth | model | network | oom | cli_crash | max_turns | cost_exceeded | unknown
+    kind: str   # rate_limit | auth | model | network | oom | cli_crash | max_turns | tokens_exceeded | unknown
     detail: str
 
     def __str__(self) -> str:  # pragma: no cover — formatting only
@@ -255,7 +255,7 @@ def is_fatal(failure: FailureClass) -> bool:
     Rate-limit + network + cli_crash + max_turns + unknown are potentially
     transient and don't fail-fast.
     """
-    return failure.kind in {"auth", "model", "cost_exceeded"}
+    return failure.kind in {"auth", "model", "tokens_exceeded"}
 
 
 # ── Path-scope permission gate ──────────────────────────────────────────

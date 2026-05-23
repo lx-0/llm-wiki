@@ -175,15 +175,12 @@ def test_prompt_render_explains_state_above_timeline_below(vault: Path) -> None:
 # ── 2. Cost-cap enforcement ──────────────────────────────────────────
 
 
-def test_cost_cap_rejects_sdk_call(vault: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """When pre-flight estimate > cap, dream_entity must NOT call the SDK."""
+def test_size_cap_rejects_sdk_call(vault: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """When the prompt exceeds the size cap, dream_entity must NOT call the SDK."""
     import dream
 
     _write_entity_page(vault, "people", "alex")
-    # Pile up substrate to push the estimate over a tight cap.
-    big = "alex " * 5000  # ~25 KB, enough that estimate exceeds $0.01
-    for i in range(5):
-        _write_substrate(vault, f"raw/notes/big-{i}.md", big)
+    _write_substrate(vault, "raw/notes/n.md", "alex appears here.\n")
 
     sdk_called = {"n": 0}
 
@@ -196,12 +193,13 @@ def test_cost_cap_rejects_sdk_call(vault: Path, monkeypatch: pytest.MonkeyPatch)
 
     ent = dream._resolve_entity("alex")
     assert ent is not None
-    result = asyncio.run(dream.dream_entity(ent, cost_cap_usd=0.0001))
+    # max_prompt_chars=1 → any real prompt exceeds it → gated pre-SDK.
+    result = asyncio.run(dream.dream_entity(ent, max_prompt_chars=1))
 
-    assert result.skipped == "cost_cap_exceeded", f"expected cost_cap_exceeded, got {result.skipped!r}"
+    assert result.skipped == "prompt_too_large", f"expected prompt_too_large, got {result.skipped!r}"
     assert result.actual_cost_usd == 0.0
-    assert sdk_called["n"] == 0, "SDK was invoked despite cost-cap rejection — silent burn!"
-    assert "COST_CAP_EXCEEDED" in result.sdk_result_text
+    assert sdk_called["n"] == 0, "SDK was invoked despite size-cap rejection — silent burn!"
+    assert "PROMPT_TOO_LARGE" in result.sdk_result_text
 
 
 # ── 3. Cooldown ──────────────────────────────────────────────────────
@@ -259,7 +257,7 @@ def test_sweep_skips_cooldown_entities(vault: Path, monkeypatch: pytest.MonkeyPa
         invocations.append(entity.slug)
         return dream.DreamResult(
             entity=entity, corpus_count=1, corpus_chars=100,
-            estimated_cost_usd=0.01, actual_cost_usd=0.01,
+            actual_cost_usd=0.01,
             input_tokens=10, output_tokens=10, sdk_result_text="ok",
             skipped=None, elapsed_s=0.0,
         )
@@ -272,8 +270,8 @@ def test_sweep_skips_cooldown_entities(vault: Path, monkeypatch: pytest.MonkeyPa
     assert len(results) == 1
 
 
-def test_sweep_respects_per_run_cost_cap(vault: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Cumulative actual_cost_usd > per_run_cap stops the sweep."""
+def test_sweep_respects_per_run_token_cap(vault: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Cumulative real tokens >= per_run_max_tokens stops the sweep."""
     import dream
 
     # Three stale entities, all eligible.
@@ -284,17 +282,17 @@ def test_sweep_respects_per_run_cost_cap(vault: Path, monkeypatch: pytest.Monkey
     async def _fake_dream_entity(entity, **kwargs):
         return dream.DreamResult(
             entity=entity, corpus_count=1, corpus_chars=100,
-            estimated_cost_usd=0.5, actual_cost_usd=0.5,
+            actual_cost_usd=0.0,
             input_tokens=10, output_tokens=10, sdk_result_text="ok",
             skipped=None, elapsed_s=0.0,
         )
 
     monkeypatch.setattr(dream, "dream_entity", _fake_dream_entity)
 
-    # cap = 0.6: first run costs 0.5 (cumulative 0.5 < 0.6, OK), second pushes
-    # cumulative to 1.0 > 0.6 so it gates BEFORE the third. Result: 2 ran.
-    results = asyncio.run(dream.dream_all_entities(per_run_cap=0.6, cooldown_days=7))
-    assert len(results) == 2, f"expected 2 entities under per-run cap, got {len(results)}"
+    # cap = 30 tok: entity1 -> cumulative 20 (<30, ok), entity2 -> 40 (>=30)
+    # gates BEFORE the third. Result: 2 ran (20 tok/entity).
+    results = asyncio.run(dream.dream_all_entities(per_run_max_tokens=30, cooldown_days=7))
+    assert len(results) == 2, f"expected 2 entities under per-run token cap, got {len(results)}"
 
 
 # ── 5. Two-layer shape preserved (corpus / collection sanity) ───────
@@ -359,16 +357,7 @@ def test_prompt_carries_existing_state_and_timeline(vault: Path) -> None:
     assert "OPERATOR-CHECKED-ITEM" in prompt
 
 
-# ── 6. Cost estimator ──────────────────────────────────────────────
 
-
-def test_estimate_cost_monotone() -> None:
-    import dream
-    small = dream.estimate_cost_usd(10_000)
-    big = dream.estimate_cost_usd(500_000)
-    assert big > small
-    # Sanity: 500K-char prompt is non-trivial.
-    assert big >= 1.0, f"500K-char estimate seems too low: ${big}"
 
 
 # ── 7. Agent-task spec parses & defaults make sense ─────────────────
