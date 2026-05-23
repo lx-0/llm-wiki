@@ -17,7 +17,6 @@ button:
   style: primary
   tooltip: "Run dream-cycle on one entity — picks all substrate that mentions it and rewrites the page."
   shell_command_id: agent-dream-cycle
-last_run: false
 ---
 
 You are a dream-cycle entity-page re-synthesizer.

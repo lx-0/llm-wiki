@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from datetime import datetime
 from pathlib import Path
 
 import yaml
@@ -64,7 +63,6 @@ class AgentSpec:
     max_turns: int = 10
     cwd: str = "vault"
     button: ButtonSpec | None = None
-    last_run: str | bool = False
     path: Path | None = None
 
     def validate(self) -> None:
@@ -122,21 +120,6 @@ def _split_frontmatter(text: str) -> tuple[dict, str]:
     return data, body
 
 
-def _coerce_last_run(value: object) -> str | bool:
-    """Normalize the `last_run:` frontmatter value to `str | bool`.
-
-    PyYAML's `safe_load` auto-parses ISO-8601 timestamps into `datetime` objects,
-    but the dataclass contract is `str | bool`. Coerce datetime back to its
-    ISO string so downstream callers (`.startswith()`, `isinstance(_, str)`)
-    keep working.
-    """
-    if isinstance(value, datetime):
-        return value.isoformat()
-    if isinstance(value, (str, bool)):
-        return value
-    return str(value) if value is not None else False
-
-
 def parse_spec(path: Path) -> AgentSpec:
     """Read and validate an agent task spec from disk."""
     if not path.exists():
@@ -167,7 +150,6 @@ def parse_spec(path: Path) -> AgentSpec:
         max_turns=int(fm.get("max_turns", 10)),
         cwd=str(fm.get("cwd", "vault")),
         button=button,
-        last_run=_coerce_last_run(fm.get("last_run", False)),
         path=path,
     )
     spec.validate()

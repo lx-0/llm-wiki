@@ -15,7 +15,6 @@ button:
   style: primary
   tooltip: "Run summarize-day agent — appends/refreshes today's Summary block in daily/."
   shell_command_id: agent-summarize-day
-last_run: false
 ---
 
 You are a daily-log summarizer. Read `daily/${today}.md` (today's auto-captured Claude Code session log).

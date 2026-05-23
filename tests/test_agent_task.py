@@ -4,7 +4,7 @@ Covers:
 - agent_spec.parse_spec — happy + sad paths
 - agent_spec.list_specs — discovery + ordering
 - agent_task.cmd_list — empty + populated + invalid spec mix
-- agent_task._update_last_run — writes back without clobbering body
+- agent_task._record_last_run — records to state/, never touches the prompt
 """
 
 from __future__ import annotations
@@ -52,7 +52,6 @@ def test_parse_spec_minimal_valid(tmp_path: Path) -> None:
     assert spec.max_turns == 10  # default
     assert spec.cwd == "vault"  # default
     assert spec.button is None
-    assert spec.last_run is False
     assert spec.body.strip() == "Body"
 
 
@@ -250,12 +249,17 @@ def test_render_body_substitutes() -> None:
     assert spec.render_body(who="alex", day="2026-05-02") == "hello alex on 2026-05-02"
 
 
-# ── _update_last_run integration ──────────────────────────────────────
+# ── _record_last_run integration ──────────────────────────────────────
 
 
-def test_update_last_run_preserves_body(tmp_path: Path) -> None:
-    """Writing last_run: <iso> back to frontmatter must not damage the prompt body."""
-    from agent_task import _update_last_run
+def test_record_last_run_writes_state_not_prompt(tmp_path: Path, monkeypatch) -> None:
+    """last_run goes to state/agent-runs.json -- the tracked prompt is NEVER touched.
+
+    Regression guard for the 2026-05-23 bug: the previous _update_last_run wrote
+    the timestamp into the prompt frontmatter, dirtying the vault .wiki/ checkout
+    and breaking `wiki update` (git pull) on every agent run.
+    """
+    import agent_task
 
     path = _write_spec(
         tmp_path, "demo",
@@ -266,14 +270,14 @@ def test_update_last_run_preserves_body(tmp_path: Path) -> None:
             """),
         body="Multi-line\nprompt body\n\nwith blank lines.",
     )
-    spec = parse_spec(path)
-    _update_last_run(spec)
+    before = path.read_text(encoding="utf-8")
 
-    text = path.read_text(encoding="utf-8")
-    assert "last_run:" in text
-    assert "Multi-line" in text
-    assert "with blank lines." in text
-    # Re-parse, frontmatter still valid:
-    spec2 = parse_spec(path)
-    assert isinstance(spec2.last_run, str)
-    assert spec2.last_run.startswith("20")
+    runs_file = tmp_path / "agent-runs.json"
+    monkeypatch.setattr(agent_task, "AGENT_RUNS_FILE", runs_file)
+    agent_task._record_last_run("demo")
+
+    # state carries the timestamp, readable via _last_run_for
+    assert runs_file.exists()
+    assert agent_task._last_run_for("demo").startswith("20")
+    # the tracked prompt is byte-for-byte unchanged
+    assert path.read_text(encoding="utf-8") == before

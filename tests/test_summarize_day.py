@@ -42,7 +42,7 @@ def test_summarize_day_body_renders_with_today() -> None:
 def test_summarize_day_runs_against_fixture(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """End-to-end smoke: spec resolution → mocked SDK → log persistence → last_run update."""
+    """End-to-end smoke: spec resolution → mocked SDK → log persistence → last_run recorded in state."""
     import agent_task
 
     spec_src = (AGENT_SPECS_DIR / "summarize-day.md").read_text(encoding="utf-8")
@@ -65,6 +65,7 @@ def test_summarize_day_runs_against_fixture(
 
     monkeypatch.setattr(agent_task, "query", fake_query)
     monkeypatch.setattr(agent_task, "LOGS_DIR", fake_logs_dir)
+    monkeypatch.setattr(agent_task, "AGENT_RUNS_FILE", tmp_path / "agent-runs.json")
 
     rc = asyncio.run(agent_task.run(spec, dry_run=False, extra_vars={}))
     assert rc == 0
@@ -77,7 +78,6 @@ def test_summarize_day_runs_against_fixture(
     assert "agent: summarize-day" in log_text
     assert "tokens: input=" in log_text  # value depends on AssistantMessage emission
 
-    # Frontmatter `last_run` got written back
-    spec2 = parse_spec(spec_copy)
-    assert isinstance(spec2.last_run, str)
-    assert spec2.last_run.startswith("20")
+    # last_run recorded in state/agent-runs.json -- the tracked prompt is untouched
+    assert agent_task._last_run_for("summarize-day").startswith("20")
+    assert spec_copy.read_text(encoding="utf-8") == spec_src

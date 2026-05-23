@@ -15,7 +15,6 @@ button:
   style: primary
   tooltip: "Distill per-source captures (sessions/health/meetings/voice/email) into a single short digest."
   shell_command_id: agent-daily-digest
-last_run: false
 ---
 
 You produce **one short daily digest** from the per-source captures under `daily/${date}/`.

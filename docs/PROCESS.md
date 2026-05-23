@@ -1130,7 +1130,7 @@ flowchart TD
     CLICK --> RUNNER["scripts/agent_task.py\nliest Spec, render body,\nspawn Claude Agent SDK"]
     RUNNER --> EXEC["Agent läuft mit\ndeklariertem Model + Tools\n+ Permission + cwd"]
     EXEC --> LOG[".wiki/logs/\nagent-<id>-<ts>.log"]
-    EXEC --> FRONT["frontmatter.last_run\n= <iso-ts>"]
+    EXEC --> RUNS["state/agent-runs.json\n{<id>: <iso-ts>} (gitignored)"]
 
     style DROP fill:#FFECB9,stroke:#92610F
     style RUNNER fill:#FFD8CB,stroke:#FC4E14,stroke-width:3px
@@ -1156,7 +1156,6 @@ button:                              # optional — drop to omit Dashboard wirin
   style: primary                     # primary | default | destructive | plain
   tooltip: "..."
   shell_command_id: agent-summarize-day  # optional, defaults to agent-<id>
-last_run: false                      # written back by runner; do not author
 ---
 
 You are a daily-log summarizer. Read `daily/${today}.md`. ...
@@ -1174,10 +1173,10 @@ Operator-bereitgestellt via `wiki agent <id> --var key=value` (repeatable).
 
 | Befehl | Wirkung |
 |--------|---------|
-| `wiki agent <id>` | Task ausführen, Log + last_run schreiben |
+| `wiki agent <id>` | Task ausführen, Log schreiben + last_run nach `state/agent-runs.json` |
 | `wiki agent <id> --dry-run` | Resolved Spec ausgeben, kein SDK-Aufruf |
 | `wiki agent <id> --var k=v --var k2=v2` | Body-Substitution |
-| `wiki agent --list` | Alle Tasks mit Title + Button-Marker + last_run |
+| `wiki agent --list` | Alle Tasks mit Title + Button-Marker + last_run (aus `state/agent-runs.json`) |
 
 ### Auto-Wiring durch `wiki seed`
 

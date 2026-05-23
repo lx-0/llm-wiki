@@ -2,7 +2,7 @@
 
 Reads `prompts/agents/<id>.md`, parses the task spec, spawns Claude Agent SDK
 with declared model + tools + permissions, persists the result to a log,
-and updates the spec's `last_run:` frontmatter on success.
+and records the run timestamp in state/agent-runs.json on success.
 
 Usage:
     uv run python agent_task.py <id>                         # run task
@@ -16,8 +16,8 @@ os.environ["CLAUDE_INVOKED_BY"] = "agent_task"
 
 import argparse
 import asyncio
+import json
 import logging
-import re
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -33,7 +33,7 @@ from claude_agent_sdk import (
 import time
 
 from core.agent_spec import AgentSpec, SpecError, list_specs, parse_spec
-from core.paths import AGENT_SPECS_DIR, LOGS_DIR
+from core.paths import AGENT_SPECS_DIR, LOGS_DIR, STATE_DIR
 from core.utils import now_iso, today_iso
 from core.config import CONFIG  # noqa: E402
 from core.sdk_helpers import StderrCapture, log_sdk_failure  # noqa: E402
@@ -59,40 +59,34 @@ def _bake_vars(extra_vars: dict[str, str]) -> dict[str, str]:
     }
 
 
-def _update_last_run(spec: AgentSpec) -> None:
-    """Write `last_run: <iso>` back to the spec's frontmatter, preserving the
-    rest of the frontmatter byte-for-byte.
+AGENT_RUNS_FILE = STATE_DIR / "agent-runs.json"
 
-    Previous implementation used `yaml.safe_dump` over the full parsed dict
-    — that round-trip drops quoted-string markers, re-wraps long values,
-    re-indents list items, and otherwise normalises the operator's chosen
-    formatting. Every agent run produced a noisy diff against the engine-
-    committed prompt file. Fix: surgical line-replace on the `last_run:`
-    key only. Append the line if missing.
+
+def _load_agent_runs() -> dict[str, str]:
+    try:
+        return json.loads(AGENT_RUNS_FILE.read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+
+
+def _last_run_for(agent_id: str) -> str | None:
+    return _load_agent_runs().get(agent_id)
+
+
+def _record_last_run(agent_id: str) -> None:
+    """Record an agent's successful-run timestamp in state/agent-runs.json.
+
+    Runtime state lives in the gitignored state/ dir -- NEVER in the tracked
+    prompts/agents/<id>.md frontmatter. Writing it into the prompt dirtied the
+    vault .wiki/ checkout and broke `wiki update` (git pull) on every run that
+    happened since the last update. See KNOWLEDGE.md.
     """
-    if spec.path is None:
-        return
-    text = spec.path.read_text(encoding="utf-8")
-    if not text.startswith("---\n"):
-        return
-    end = text.find("\n---\n", 4)
-    if end == -1:
-        return
-    block = text[4:end]
-    body_after = text[end + 5 :]
-
-    new_line = f"last_run: {now_iso()}"
-    # ^last_run: <anything-up-to-end-of-line>$ at the frontmatter top level
-    # (no leading whitespace — nested keys with the same name are out of scope).
-    pattern = re.compile(r"^last_run:.*$", re.MULTILINE)
-    if pattern.search(block):
-        new_block = pattern.sub(new_line, block, count=1)
-    else:
-        # Append at the end of the frontmatter block, trimming any trailing
-        # newline first so we don't end up with `\n\nlast_run:`.
-        new_block = block.rstrip("\n") + "\n" + new_line
-
-    spec.path.write_text(f"---\n{new_block}\n---\n{body_after}", encoding="utf-8")
+    runs = _load_agent_runs()
+    runs[agent_id] = now_iso()
+    AGENT_RUNS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    AGENT_RUNS_FILE.write_text(
+        json.dumps(runs, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
 
 
 async def run(spec: AgentSpec, dry_run: bool, extra_vars: dict[str, str]) -> int:
@@ -108,7 +102,7 @@ async def run(spec: AgentSpec, dry_run: bool, extra_vars: dict[str, str]) -> int
         log.info("  permission_mode: %s", spec.permission_mode)
         log.info("  max_turns:       %d", spec.max_turns)
         log.info("  cwd:             %s -> %s", spec.cwd, spec.cwd_path())
-        log.info("  last_run:        %s", spec.last_run)
+        log.info("  last_run:        %s", _last_run_for(spec.id) or "—")
         if spec.button:
             log.info(
                 "  button:          %s (style=%s, shell_id=%s)",
@@ -170,7 +164,7 @@ async def run(spec: AgentSpec, dry_run: bool, extra_vars: dict[str, str]) -> int
     )
     log.info("Result logged to %s", log_file)
 
-    _update_last_run(spec)
+    _record_last_run(spec.id)
     return 0
 
 
@@ -190,7 +184,7 @@ def cmd_list() -> int:
     width = max((len(s.id) for s in specs), default=20)
     for s in specs:
         btn = "✓" if s.button else " "
-        last = s.last_run if isinstance(s.last_run, str) else "—"
+        last = _last_run_for(s.id) or "—"
         print(f"  {s.id:<{width}}  {btn} {s.title}  (last_run={last})")
 
     if errors:
