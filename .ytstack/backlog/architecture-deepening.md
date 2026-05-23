@@ -82,9 +82,11 @@ Lint.py now has its own shallow-interface problem (two linters in a trench coat,
 
 ---
 
-## #5 — `compile.py` orchestration vs. I/O separation (HIGH — got WORSE since 2026-05-02)
+## #5 — `compile.py` orchestration vs. I/O separation (PARTIALLY RESOLVED — residual re-designed 2026-05-23)
 
-**Status (2026-05-17):** Grilled into a design doc at `.ytstack/backlog/producer-seam.md` as **Milestone-B** of the two-milestone arc (Producer seam first, then this).
+**Status (2026-05-23):** Original framing OBSOLETE. M018 already extracted the LLM stage (`compile_source`) + Producer post-passes (`run_post_passes`); `commit_article` was correctly cancelled (agent-side writes, not Python I/O — `commit-article-manifest.md`). The residual is just `compile_file` (404 LOC) being a monolithic dispatcher (route-decision + deterministic-execution + dispatch-precedence interleaved). Re-graded HIGH→**MEDIUM** ("make routing a testable decision"). Re-designed via `improve-codebase-architecture` grilling into a coarse pure `decide_route` + typed `CompileOutcome` (single state-save, kills `_STATE_MUTATING_SKIPS` + the magic-key dict). Full design + 4-slice breakdown: **`.ytstack/backlog/compile-dispatch-seam.md`**. Pick up there at next `ytstack:plan-milestone`.
+
+**Status (2026-05-17, historical):** Grilled into a design doc at `.ytstack/backlog/producer-seam.md` as **Milestone-B** of the two-milestone arc (Producer seam first, then this).
 
 **Files:** `scripts/compile.py` — **1340 LOC** (was 511; ~2.6× growth).
 
