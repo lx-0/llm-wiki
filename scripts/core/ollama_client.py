@@ -24,6 +24,7 @@ from typing import Any
 import httpx
 
 from .config import CONFIG
+from .usage import LEDGER
 
 
 _FENCE_LEADING = re.compile(r"^```[a-zA-Z]*\s*", flags=re.MULTILINE)
@@ -97,7 +98,9 @@ def chat(
         timeout=timeout,
     )
     r.raise_for_status()
-    return r.json()["choices"][0]["message"]["content"].strip()
+    data = r.json()
+    LEDGER.record_openai_usage(model, data.get("usage", {}))
+    return data["choices"][0]["message"]["content"].strip()
 
 
 def chat_schema(
@@ -125,7 +128,9 @@ def chat_schema(
         timeout=timeout,
     )
     r.raise_for_status()
-    return r.json().get("message", {}).get("content", "").strip()
+    data = r.json()
+    LEDGER.record_ollama(model, data)
+    return data.get("message", {}).get("content", "").strip()
 
 
 def chat_vision(
@@ -157,4 +162,5 @@ def chat_vision(
     data = r.json()
     content = data.get("message", {}).get("content", "")
     stats = {k: v for k, v in data.items() if k != "message"}
+    LEDGER.record_ollama(model, stats)
     return content, stats
