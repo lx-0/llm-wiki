@@ -291,6 +291,13 @@ limits:
   # daily-digest with dedicated lean prompts, so neither needs to be
   # skipped.
   compile_skip_substrate_types: ["email-delta"]
+  # Email daily-rollup signal (beta). The per-account block in
+  # daily/<date>/email.md carries top-N senders + a sample of recent subjects
+  # beyond the bare count, so the daily-digest agent can lift correspondents +
+  # themes into the portrait. Set either to 0 to drop that part. Bodies stay
+  # curiosity-on-request.
+  daily_email_top_senders: 5
+  daily_email_sample_subjects: 12
   # Surface an INFO line when source ≥ this many chars (logging signal only).
   compile_large_source_chars: 50000
   # Per-compile-call timeout (seconds). Guards against the bundled CLI

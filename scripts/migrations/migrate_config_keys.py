@@ -55,6 +55,8 @@ Key changes covered (chronological):
   features.suggestions_source_globs        (added 2026-05-17 Producer-seam, default ["raw/email/*.md"] — lifts legacy hardcoded _is_email_source filter onto Spec)
   limits.compile_aggregated_max_consecutive_failures (added 2026-05-17, default 3 — circuit-breaker on memory-seed chunked compiles; aborts loop after N consecutive chunk failures to stop $-bleed on substrate-prompt mismatch)
   personal.capture_inbox                   (added 2026-05-23 M025, default "" — quick-capture inbox for collectors/capture_collector.py)
+  limits.daily_email_top_senders           (added 2026-05-23, default 5 — email daily-rollup top-senders cap)
+  limits.daily_email_sample_subjects       (added 2026-05-23, default 12 — email daily-rollup recent-subject sample cap)
   personal.accounts.<id>.health.healthkit    (added 2026-05-19 M023 — Apple HealthKit XML export ingest;
                                               injected as a placeholder into any account already carrying
                                               `health.oura`, kind: healthkit-xml-export, empty inbox_dir
@@ -157,6 +159,12 @@ KEY_ADDITIONS: dict[str, dict[str, object]] = {
         # shipped). Last-resort escape hatch for substrate types with
         # no good prompt yet.
         "compile_skip_substrate_types": ["email-delta"],
+        # Email daily-rollup signal (beta, 2026-05-23). Top-N senders + sample
+        # of recent subjects in the per-account daily/<date>/email.md block, so
+        # the daily-digest agent extracts correspondents + themes. Match
+        # Limits.daily_email_* defaults in scripts/core/config.py.
+        "daily_email_top_senders": 5,
+        "daily_email_sample_subjects": 12,
         # Per-class flush-context budgets (hooks/_transcript.py). Replaces
         # the content-blind globals MAX_TURNS=30 + MAX_CONTEXT_CHARS=15_000
         # that lost assistant analytical prose to tool-summary truncation.

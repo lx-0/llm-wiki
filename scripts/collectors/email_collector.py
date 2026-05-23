@@ -226,11 +226,12 @@ class EmailCollector:
                     try:
                         from core import daily_capture
                         from datetime import date as _date
-                        rollup_line = (
-                            f"- **{account_id}** · {len(messages)} new "
-                            f"→ [[{report_path.stem}]]"
+                        rollup_block = _email_rollup_block(
+                            account_id, messages, report_path.stem,
+                            top_senders=CONFIG.limits.daily_email_top_senders,
+                            sample_subjects=CONFIG.limits.daily_email_sample_subjects,
                         )
-                        daily_capture.append(_date.today().isoformat(), "email", rollup_line)
+                        daily_capture.append(_date.today().isoformat(), "email", rollup_block)
                     except Exception:  # noqa: BLE001
                         log.exception("daily-rollup append failed for email delta %s", account_id)
             else:
@@ -350,6 +351,35 @@ def _render_delta_report(
             lines.append(f"- `{m.date:%m-%d %H:%M}` {sender} — {subject}")
         lines.append("")
 
+    return "\n".join(lines)
+
+
+def _email_rollup_block(
+    account_id: str,
+    messages: list[MessageMeta],
+    stem: str,
+    *,
+    top_senders: int,
+    sample_subjects: int,
+) -> str:
+    """Compact per-account block for `daily/<date>/email.md` (beta, 2026-05-23).
+
+    Beyond the bare count + delta-link, surface the top senders by volume and a
+    sample of the most-recent subjects, so the daily-digest agent can extract
+    correspondents + themes for the portrait. Deterministic -- no LLM; synthesis
+    happens downstream in the digest. Bodies stay curiosity-on-request.
+    """
+    lines = [f"- **{account_id}** · {len(messages):,} new → [[{stem}]]"]
+    if top_senders > 0:
+        senders = Counter(m.from_addr or "(unbekannt)" for m in messages)
+        top = ", ".join(f"`{s}` ({n})" for s, n in senders.most_common(top_senders))
+        if top:
+            lines.append(f"  - Top senders: {top}")
+    if sample_subjects > 0:
+        recent = sorted(messages, key=lambda m: m.date, reverse=True)[:sample_subjects]
+        subjects = [" ".join(m.subject.split()) or "(kein Betreff)" for m in recent]
+        if subjects:
+            lines.append("  - Recent subjects: " + " · ".join(subjects))
     return "\n".join(lines)
 
 

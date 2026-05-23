@@ -31,7 +31,7 @@ You produce **one short daily digest** from the per-source captures under `daily
    - `health.md` — Oura daily one-liner per account (sleep / readiness / HRV / steps / resting HR).
    - `meetings.md` — gmeet + jamie meeting one-liners.
    - `voice.md` — operator dictation intakes of the day.
-   - `email.md` — email-delta-report links (count + per-account).
+   - `email.md` — per-account email summary: count + delta-link, top senders, and a sample of recent subjects.
 
 2. Read each file that exists. Skip silently if a source has no file.
 
@@ -71,7 +71,7 @@ Bullet list from `voice.md` if any. Use the existing one-liner form. If none →
 
 ## Email
 
-Single line from `email.md` if there was a delta-run. Skip otherwise.
+From `email.md` if there was a delta-run (skip otherwise). Don't just restate the counts -- read the per-account top-senders and recent-subject samples and surface the **correspondents and themes** of the day: who the operator is hearing from and what it's about (a recurring sender, a notable thread, a newsletter-heavy inbox). 1-3 lines; keep [[wikilinks]] to the delta files. If the block carries only counts (no senders/subjects), fall back to the one-line count form.
 ```
 
 ## Rules

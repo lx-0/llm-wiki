@@ -338,6 +338,15 @@ class Limits:
     #     separately. Compiling the delta wastes $2+ per file for
     #     no extracted knowledge.
     compile_skip_substrate_types: tuple[str, ...] = ("email-delta",)
+    # Email daily-rollup signal (beta, 2026-05-23). The per-account block the
+    # EmailCollector appends to daily/<date>/email.md carries -- beyond the bare
+    # count + delta-link -- the top-N senders by volume and a sample of the
+    # most-recent subjects, so the daily-digest agent can lift correspondents +
+    # themes into the portrait instead of "N new messages". Deterministic; the
+    # synthesis happens downstream in the digest. Bodies stay
+    # curiosity-on-request. Set either to 0 to drop that part of the block.
+    daily_email_top_senders: int = 5
+    daily_email_sample_subjects: int = 12
     # Threshold above which a source counts as "large" — surfaces one
     # extra INFO line so the operator can see *which* file was big when
     # the SDK call slows down. Pure logging signal, no behavior change.
