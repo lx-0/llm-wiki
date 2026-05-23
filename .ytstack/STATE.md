@@ -1,17 +1,19 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-05-23T14:25:00+0200
-current_milestone: M026
-active_slice: S03
+last_updated: 2026-05-23T15:45:00+0200
+current_milestone: M025
+active_slice: S01
 active_task: none
-last_completed_milestone: M024
-parallel_milestones: [M021, M025]
+last_completed_milestone: M026
+parallel_milestones: [M021]
 ---
 
 # State
 
-**Status:** M026 planned (M, 4 slices). Compile-dispatch seam — split `compile_file`'s 404-LOC dispatcher into a pure `decide_route` + typed `CompileOutcome` (routing + substrate→model/max_turns precedence become table-testable; **no behavior change**). Designed via `improve-codebase-architecture` 2026-05-23; full design + slice breakdown `.ytstack/backlog/compile-dispatch-seam.md` (committed `1510986`). CONTEXT + ROADMAP at `.ytstack/M026-{CONTEXT,ROADMAP}.md`.
+**Status:** ✅ **M026 SHIPPED** (compile-dispatch seam, 4 slices, commits 4647d47 / 2c4335c+aad8541 / e6c04df / e9a44e5). `compile_file` 404→62 LOC pure dispatch; pure table-tested `decide_route`; typed `CompileOutcome`; `_STATE_MUTATING_SKIPS` + magic-key dict + dead `_build_owner_block` deleted. 126 compile tests green. Real-SDK lxw E2E left to operator (cost + live-vault). **Current milestone restored to M025** (capture-correction-loop, parked at S01 1/3 — resume T02).
+
+**Status (M026 planning, historical):** M026 planned (M, 4 slices). Compile-dispatch seam — split `compile_file`'s 404-LOC dispatcher into a pure `decide_route` + typed `CompileOutcome` (routing + substrate→model/max_turns precedence become table-testable; **no behavior change**). Designed via `improve-codebase-architecture` 2026-05-23; full design + slice breakdown `.ytstack/backlog/compile-dispatch-seam.md` (committed `1510986`). CONTEXT + ROADMAP at `.ytstack/M026-{CONTEXT,ROADMAP}.md`.
 
 **Next action:** S01 complete (T01 `CompileOutcome` + `Route` shipped, commit `4647d47`). Proceeding to S02 (decide_route extraction) — `M026-S02-PLAN.md`, T01 = build `decide_route` + relocate helpers into `route.py` (unused → zero behavior change), T02 = wire `compile_file`.
 
