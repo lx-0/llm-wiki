@@ -246,51 +246,66 @@ async def compile_file(
         return {"_skipped": route.reason}
 
     if isinstance(route, IndexOnly):
-        # The page IS the final form. Index-only: append a knowledge/index.md
-        # entry by pathname, NO SDK distill call, NO separate concept article.
-        from core.utils import build_index_entry
-        log.info(
-            "  source-and-final: indexing only (no distill) — %d wikilinks discovered",
-            len(route.wikilinks),
-        )
-        new_entry = build_index_entry(
-            rel_path, route.title, "(source-and-final)", today_iso(),
-        )
-        if INDEX_FILE.exists():
-            existing = INDEX_FILE.read_text(encoding="utf-8")
-            link_marker = f"[[{rel_path.replace('.md', '')}]]"
-            if link_marker not in existing:
-                with INDEX_FILE.open("a", encoding="utf-8") as f:
-                    f.write(f"\n{new_entry}")
-                log.info("  added to knowledge/index.md")
-            else:
-                log.info("  already in knowledge/index.md (no-op)")
-        else:
-            log.warning(
-                "  knowledge/index.md missing — cannot index source-and-final file",
-            )
-        # Mark ingested so check_orphan_sources doesn't flag it and re-runs no-op.
-        state = load_state()
-        if "ingested" not in state:
-            state["ingested"] = {}
-        state["ingested"][rel_path] = file_hash(source)
-        save_state(state)
-        return {"_skipped": "compile_role_source_and_final_indexed"}
+        return _run_index_only(source, rel_path, route)
 
     if isinstance(route, HealthStub):
-        # Deterministic fast-path: health-rollup metric stubs carry only
-        # point-in-time biometrics — no knowledge to synthesize. Record in
-        # Python (mark ingested), no `knowledge/` writes, no cost. 2026-05-22.
-        log.info(
-            "  health-rollup stub-body — deterministic record "
-            "(no agent, no knowledge writes, $0)"
-        )
-        state = load_state()
-        state.setdefault("ingested", {})[rel_path] = file_hash(source)
-        save_state(state)
-        return {"_skipped": "health_rollup_stub_deterministic"}
+        return _run_health_stub(source, rel_path)
 
-    # ── Compile route: an LLM call is needed. ────────────────────────────
+    return await _run_compile_route(source, source_content, rel_path, route)
+
+
+def _run_index_only(source: Path, rel_path: str, route) -> dict:
+    """Execute the source-and-final IndexOnly route: append a knowledge/index.md
+    entry by pathname (no SDK distill, no separate concept article), then mark the
+    file ingested so re-runs no-op and check_orphan_sources doesn't flag it."""
+    from core.utils import build_index_entry
+    log.info(
+        "  source-and-final: indexing only (no distill) — %d wikilinks discovered",
+        len(route.wikilinks),
+    )
+    new_entry = build_index_entry(
+        rel_path, route.title, "(source-and-final)", today_iso(),
+    )
+    if INDEX_FILE.exists():
+        existing = INDEX_FILE.read_text(encoding="utf-8")
+        link_marker = f"[[{rel_path.replace('.md', '')}]]"
+        if link_marker not in existing:
+            with INDEX_FILE.open("a", encoding="utf-8") as f:
+                f.write(f"\n{new_entry}")
+            log.info("  added to knowledge/index.md")
+        else:
+            log.info("  already in knowledge/index.md (no-op)")
+    else:
+        log.warning(
+            "  knowledge/index.md missing — cannot index source-and-final file",
+        )
+    state = load_state()
+    if "ingested" not in state:
+        state["ingested"] = {}
+    state["ingested"][rel_path] = file_hash(source)
+    save_state(state)
+    return {"_skipped": "compile_role_source_and_final_indexed"}
+
+
+def _run_health_stub(source: Path, rel_path: str) -> dict:
+    """Execute the HealthStub route: record the metric-only stub deterministically
+    (mark ingested), no agent, no knowledge writes, $0. 2026-05-22 root-cause."""
+    log.info(
+        "  health-rollup stub-body — deterministic record "
+        "(no agent, no knowledge writes, $0)"
+    )
+    state = load_state()
+    state.setdefault("ingested", {})[rel_path] = file_hash(source)
+    save_state(state)
+    return {"_skipped": "health_rollup_stub_deterministic"}
+
+
+async def _run_compile_route(
+    source: Path, source_content: str, rel_path: str, route
+) -> dict | None:
+    """Execute the Compile route: dispatch-decision log, memory pre-pass (I/O —
+    bootstraps a Timeline section + enriches metadata), then the chunk/single
+    compile_source call(s). Returns the legacy usage/skip/failure dict."""
     metadata = route.metadata
     classification = route.classification
     source_type = metadata.substrate_type
@@ -433,7 +448,6 @@ async def compile_file(
         "cost_usd": result.cost_usd,
         "result": result.article or "",
     }
-
 
 
 # ── Process-level mutex ──────────────────────────────────────────────
