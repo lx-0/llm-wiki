@@ -50,14 +50,16 @@ def test_empty_file_skips(vault):
     _, raw, _ = vault
     src = raw / "empty.md"
     src.write_text("   \n", encoding="utf-8")
-    assert _run(src) == {"_skipped": "empty"}
+    o = _run(src)
+    assert o.status == "skipped" and o.skip_reason == "empty" and o.ingest_hash is False
 
 
 def test_final_only_skips(vault):
     _, raw, _ = vault
     src = raw / "curated.md"
     src.write_text("---\ncompile_role: final-only\n---\nhand-curated", encoding="utf-8")
-    assert _run(src) == {"_skipped": "compile_role_final_only"}
+    o = _run(src)
+    assert o.status == "skipped" and o.skip_reason == "compile_role_final_only"
 
 
 def test_health_rollup_stub_records_deterministically(vault):
@@ -68,9 +70,11 @@ def test_health_rollup_stub_records_deterministically(vault):
         "(Add observations below as needed.)",
         encoding="utf-8",
     )
-    assert _run(src) == {"_skipped": "health_rollup_stub_deterministic"}
-    # deterministic record marks the file ingested (no agent, no knowledge writes)
-    assert saved["ingested"]["raw/notes/health.md"] == "HASH"
+    o = _run(src)
+    assert o.status == "skipped" and o.skip_reason == "health_rollup_stub_deterministic"
+    # handler signals ingest_hash; main() (not compile_file) persists -> saved empty
+    assert o.ingest_hash is True
+    assert saved == {}
 
 
 def test_plain_note_routes_to_compile_source(vault, monkeypatch):
@@ -92,10 +96,12 @@ def test_plain_note_routes_to_compile_source(vault, monkeypatch):
 
     src = raw / "note.md"
     src.write_text("---\ntype: random-unmapped\n---\njust a note", encoding="utf-8")
-    result = _run(src)
+    outcome = _run(src)
 
-    assert result["cost_usd"] == 0.5
-    assert result["input_tokens"] == 3
-    assert result["result"] == "A"
+    assert outcome.status == "compiled"
+    assert outcome.cost_usd == 0.5
+    assert outcome.input_tokens == 3
+    assert outcome.article == "A"
+    assert outcome.ingest_hash is True
     assert seen["substrate_prompt"] == "compile_default"
     assert seen["content"] == "---\ntype: random-unmapped\n---\njust a note"

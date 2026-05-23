@@ -166,7 +166,7 @@ def test_per_call_timeout_returns_skipped(
     caplog.set_level(logging.WARNING, logger="compile")
     result = asyncio.run(compile_mod.compile_file(source, force=True))
 
-    assert result == {"_skipped": "compile_per_call_timeout"}, result
+    assert result.status == "skipped" and result.skip_reason == "compile_per_call_timeout", result
     # WARNING line surfaces the hang for the operator.
     assert any(
         "per-call timeout" in r.getMessage() and r.levelname == "WARNING"
@@ -202,9 +202,8 @@ def test_per_call_timeout_disabled_with_zero(
     from compile_stages import compile as _cs_mod
     monkeypatch.setattr(_cs_mod, "query", fast_query)
     result = asyncio.run(compile_mod.compile_file(source, force=True))
-    # Success path: dict with cost_usd, NOT _skipped.
-    assert result is not None
-    assert "_skipped" not in result, result
+    # Success path: compiled, NOT skipped.
+    assert result.status == "compiled", result
 
 
 # ── Fix 3: kind=unknown already-on-[1m] survives as _skipped ─────────
@@ -269,7 +268,7 @@ def test_kind_unknown_on_long_context_skips(
     caplog.set_level(logging.WARNING, logger="compile")
     result = asyncio.run(compile_mod.compile_file(source, force=True))
 
-    assert result == {"_skipped": "kind_unknown_on_long_context"}, result
+    assert result.status == "skipped" and result.skip_reason == "kind_unknown_on_long_context", result
     # Operator-visible WARNING explains the skip.
     assert any(
         "kind=unknown on long-context model" in r.getMessage()
@@ -349,9 +348,11 @@ def test_health_rollup_stub_takes_deterministic_path(
 
     result = asyncio.run(compile_mod.compile_file(source, force=True))
 
-    assert result == {"_skipped": "health_rollup_stub_deterministic"}
-    rel = str(source.relative_to(vault[0]))
-    assert rel in captured.get("ingested", {}), "stub not marked ingested in state"
+    assert result.status == "skipped"
+    assert result.skip_reason == "health_rollup_stub_deterministic"
+    # compile_file no longer self-persists — it signals ingest_hash; main() saves.
+    assert result.ingest_hash is True
+    assert captured == {}, "handler must not write state directly (main owns the save)"
     # no knowledge/ writes
     assert not list((vault[0] / "knowledge").rglob("*.md"))
 
@@ -387,13 +388,30 @@ def test_health_rollup_prose_falls_through_to_agent(
     assert called["n"] >= 1, "prose health rollup did not reach the SDK agent"
 
 
-def test_state_mutating_skips_includes_health_and_source_and_final():
-    """Clobber guard (live regression 2026-05-22): a skip branch that writes
-    state["ingested"] from inside compile_file MUST be listed in
-    _STATE_MUTATING_SKIPS so the main loop reloads before its final save_state.
-    Paired with test_health_rollup_stub_takes_deterministic_path (which asserts
-    the branch returns exactly this reason), this guarantees the mark sticks —
-    without it the health stub is re-selected every run."""
+def test_deterministic_skip_routes_signal_ingest_hash(
+    vault, monkeypatch: pytest.MonkeyPatch
+):
+    """New contract (M026-S04): deterministic skip routes do NOT self-persist
+    state — they return CompileOutcome(ingest_hash=True) and main() owns the single
+    save. Replaces the old _STATE_MUTATING_SKIPS reload-dance guard."""
     import compile as compile_mod
-    assert "health_rollup_stub_deterministic" in compile_mod._STATE_MUTATING_SKIPS
-    assert "compile_role_source_and_final_indexed" in compile_mod._STATE_MUTATING_SKIPS
+
+    _, raw = vault
+    source = _write_source(raw, "2017-07-30--default.md", _HEALTH_STUB)
+
+    def boom_query(*a, **kw):
+        raise AssertionError("SDK query() was called for a health-rollup stub")
+
+    from compile_stages import compile as _cs_mod
+    monkeypatch.setattr(_cs_mod, "query", boom_query)
+
+    captured = {}
+    monkeypatch.setattr(compile_mod, "load_state", lambda: {})
+    monkeypatch.setattr(compile_mod, "save_state", lambda s: captured.update(s))
+
+    outcome = asyncio.run(compile_mod.compile_file(source, force=True))
+
+    assert outcome.status == "skipped"
+    assert outcome.ingest_hash is True
+    assert captured == {}, "deterministic route must not self-persist; main() saves"
+    assert not hasattr(compile_mod, "_STATE_MUTATING_SKIPS"), "leak registry should be gone"

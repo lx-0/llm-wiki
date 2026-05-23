@@ -103,3 +103,4 @@ class CompileOutcome:
     cost_usd: float = 0.0
     input_tokens: int = 0
     output_tokens: int = 0
+    article: str | None = None

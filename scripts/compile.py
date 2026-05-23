@@ -96,6 +96,7 @@ from core.prompts import render  # noqa: E402
 from core import ollama_client  # noqa: E402
 
 from compile_stages.post_passes import run_post_passes  # noqa: E402
+from compile_stages.types import CompileOutcome  # noqa: E402
 from compile_stages.route import (  # noqa: E402
     SUBSTRATE_PROMPTS,
     _DEFAULT_DISPATCH,
@@ -156,48 +157,13 @@ def _category_badge(rel_path: str) -> str:
     return "?"
 
 
-def _build_owner_block() -> str:
-    """Render the operator/vault-owner context block for substrate compile prompts.
-
-    Returns "" when `personal.implicit_operator_author` is unset (multi-tenant
-    vaults) — prompts that interpolate `${owner_block}` simply emit no
-    section. When set, returns a self-contained "## Operator / vault owner"
-    Markdown block with the operator's name, a pointer to
-    `knowledge/people/<slug>.md`, and a Read-on-demand hint. The page
-    contents are NOT embedded — keeps the block small (~400 chars) so
-    substrate prompts stay budget-safe; the agent Reads the page when it
-    needs more context (self-reference resolution, connection targets).
-    """
-    owner = (CONFIG.personal.implicit_operator_author or "").strip()
-    if not owner:
-        return ""
-    page_rel = f"knowledge/people/{owner}.md"
-    page_abs = KNOWLEDGE_DIR / "people" / f"{owner}.md"
-    if page_abs.exists():
-        existence = f"see `{page_rel}`"
-    else:
-        existence = (
-            f"`{page_rel}` does not yet exist — create it via the stub-rules "
-            "in §6 when substrate first introduces this person"
-        )
-    return (
-        "## Operator / vault owner\n\n"
-        f"This vault belongs to **{owner}** — {existence}.\n\n"
-        "When distilling first-person beliefs, commitments, or decisions from "
-        f"a source that has no explicit `author:` frontmatter, attribute them "
-        f"to **{owner}**. You MAY Read `{page_rel}` to resolve self-references "
-        "(\"I\", \"we\", \"my company\") and to find existing entries you "
-        "should connect new facts to.\n"
-    )
-
-
 async def compile_file(
     source: Path,
     dry_run: bool = False,
     prefix: str = "",
     *,
     force: bool = False,
-) -> dict | None:
+) -> CompileOutcome:
     """Compile a single source file into wiki articles.
 
     Returns usage/cost info dict, or None on failure.
@@ -212,7 +178,7 @@ async def compile_file(
 
     if dry_run:
         log.info("  [dry-run] Would compile %s", rel_path)
-        return {"_skipped": "dry_run"}
+        return CompileOutcome(status="skipped", skip_reason="dry_run")
 
     source_content = source.read_text(encoding="utf-8")
 
@@ -243,7 +209,7 @@ async def compile_file(
                 "(use `wiki compile --file <path>` to force)",
                 route.reason[len("substrate_type_excluded_"):],
             )
-        return {"_skipped": route.reason}
+        return CompileOutcome(status="skipped", skip_reason=route.reason)
 
     if isinstance(route, IndexOnly):
         return _run_index_only(source, rel_path, route)
@@ -279,12 +245,11 @@ def _run_index_only(source: Path, rel_path: str, route) -> dict:
         log.warning(
             "  knowledge/index.md missing — cannot index source-and-final file",
         )
-    state = load_state()
-    if "ingested" not in state:
-        state["ingested"] = {}
-    state["ingested"][rel_path] = file_hash(source)
-    save_state(state)
-    return {"_skipped": "compile_role_source_and_final_indexed"}
+    return CompileOutcome(
+        status="skipped",
+        skip_reason="compile_role_source_and_final_indexed",
+        ingest_hash=True,
+    )
 
 
 def _run_health_stub(source: Path, rel_path: str) -> dict:
@@ -294,10 +259,11 @@ def _run_health_stub(source: Path, rel_path: str) -> dict:
         "  health-rollup stub-body — deterministic record "
         "(no agent, no knowledge writes, $0)"
     )
-    state = load_state()
-    state.setdefault("ingested", {})[rel_path] = file_hash(source)
-    save_state(state)
-    return {"_skipped": "health_rollup_stub_deterministic"}
+    return CompileOutcome(
+        status="skipped",
+        skip_reason="health_rollup_stub_deterministic",
+        ingest_hash=True,
+    )
 
 
 async def _run_compile_route(
@@ -409,45 +375,52 @@ async def _run_compile_route(
             if aborted_at is not None else "",
         )
         if not any_ok:
-            return {
-                "_skipped": "aggregated_memory_circuit_breaker"
-                if aborted_at is not None
-                else "aggregated_memory_all_chunks_failed"
-            }
-        return {
-            "input_tokens": total_in,
-            "output_tokens": total_out,
-            "cost_usd": total_cost,
-            "result": (
+            return CompileOutcome(
+                status="skipped",
+                skip_reason=(
+                    "aggregated_memory_circuit_breaker"
+                    if aborted_at is not None
+                    else "aggregated_memory_all_chunks_failed"
+                ),
+            )
+        return CompileOutcome(
+            status="compiled",
+            input_tokens=total_in,
+            output_tokens=total_out,
+            cost_usd=total_cost,
+            article=(
                 f"aggregated-memory: {ok_count}/{len(classification.chunks)} "
                 f"chunks compiled"
                 + (f" (aborted at {aborted_at})" if aborted_at is not None else "")
             ),
-        }
+            ingest_hash=True,
+        )
 
     result = await compile_source(source_content, metadata)
 
     if result.status == "skipped":
-        # Map compile_source's skip_reason to the legacy compile_file _skipped
-        # tags. The two values differ only for the long-context kind=unknown
-        # case — the rest are identical strings.
+        # Map compile_source's skip_reason to the legacy skip tags; they differ
+        # only for the long-context kind=unknown case.
         legacy_reason = {
             "long_context_kind_unknown": "kind_unknown_on_long_context",
         }.get(result.skip_reason or "", result.skip_reason or "unknown")
-        return {"_skipped": legacy_reason}
+        return CompileOutcome(status="skipped", skip_reason=legacy_reason)
 
     if result.status == "failed":
-        return {"_failure": FailureClass(
-            result.failure_kind or "unknown",
-            result.failure_detail or "(see logs)",
-        )}
+        return CompileOutcome(
+            status="failed",
+            failure_kind=result.failure_kind or "unknown",
+            failure_detail=result.failure_detail or "(see logs)",
+        )
 
-    return {
-        "input_tokens": result.input_tokens,
-        "output_tokens": result.output_tokens,
-        "cost_usd": result.cost_usd,
-        "result": result.article or "",
-    }
+    return CompileOutcome(
+        status="compiled",
+        cost_usd=result.cost_usd,
+        input_tokens=result.input_tokens,
+        output_tokens=result.output_tokens,
+        article=result.article or "",
+        ingest_hash=True,
+    )
 
 
 # ── Process-level mutex ──────────────────────────────────────────────
@@ -490,12 +463,6 @@ def _acquire_exclusive_lock(lock_path: Path) -> io.IOBase | None:
 # it MUST reload before its per-file/final save_state — otherwise that save
 # clobbers the on-disk mark and the file is re-selected every run. Any future
 # skip branch that writes state from inside compile_file must be added here.
-_STATE_MUTATING_SKIPS = frozenset({
-    "compile_role_source_and_final_indexed",
-    "health_rollup_stub_deterministic",
-})
-
-
 async def main() -> None:
     parser = argparse.ArgumentParser(description="Compile sources into wiki articles")
     parser.add_argument("--all", action="store_true", help="Recompile all files")
@@ -594,38 +561,40 @@ async def main() -> None:
         # compiles while idx runs through every candidate. Using `cap` here
         # produced a nonsensical `[1516/100]` when a big skip-backlog drained.
         prefix = f"[{idx}/{len(files)}] "
-        result = await compile_file(source, prefix=prefix, force=force_compile)
-        if result is not None and "_skipped" in result:
-            # Skipped (empty file, dry-run, substrate-type skip-list): neither
-            # success nor failure. Don't touch the failure-streak counter — it
-            # tracks real failures for abort thresholds. Count separately for
-            # the summary so "pending" doesn't lie when the operator's
-            # skip-list quietly drained the batch.
+        outcome = await compile_file(source, prefix=prefix, force=force_compile)
+
+        if outcome.status == "skipped":
+            # Skipped (empty / dry-run / skip-list / source-and-final / health-stub /
+            # compile_source pre-flight skip): neither success nor failure. Don't touch
+            # the failure-streak counter. Persist the ingested-hash here iff the route
+            # asked for it (source-and-final + health-stub) — main() is now the SINGLE
+            # state-save site (replaces the old _STATE_MUTATING_SKIPS reload dance).
             skipped_count += 1
-            # Reload after a skip branch that wrote state from inside
-            # compile_file (see _STATE_MUTATING_SKIPS) so the per-file/final
-            # save_state below doesn't clobber the on-disk mark — otherwise the
-            # file is re-selected every run (it never sticks → re-process loop).
-            if result["_skipped"] in _STATE_MUTATING_SKIPS:
-                state = load_state()
+            if outcome.ingest_hash:
+                rel = str(source.relative_to(ROOT_DIR))
+                state.setdefault("ingested", {})[rel] = file_hash(source)
+                save_state(state)
             continue
-        if result is None or "_failure" in result:
+
+        if outcome.status == "failed":
             failed_count += 1
             consecutive_failures += 1
-            failure = result.get("_failure") if result else None
-            if failure is not None:
-                recent_failures.append(failure)
-                # Fail-fast on auth/model errors — they will repeat identically
-                # for every remaining file. Operator must fix config first.
-                if is_fatal(failure):
-                    log.error(
-                        "Fatal failure (kind=%s): %s. Aborting before wasting "
-                        "more attempts on the same misconfiguration.",
-                        failure.kind, failure.detail,
-                    )
-                    aborted = True
-                    abort_reason = f"fatal/{failure.kind}"
-                    break
+            failure = FailureClass(
+                outcome.failure_kind or "unknown",
+                outcome.failure_detail or "(see logs)",
+            )
+            recent_failures.append(failure)
+            # Fail-fast on auth/model errors — they will repeat identically for
+            # every remaining file. Operator must fix config first.
+            if is_fatal(failure):
+                log.error(
+                    "Fatal failure (kind=%s): %s. Aborting before wasting "
+                    "more attempts on the same misconfiguration.",
+                    failure.kind, failure.detail,
+                )
+                aborted = True
+                abort_reason = f"fatal/{failure.kind}"
+                break
             if consecutive_failures >= args.max_consecutive_failures:
                 window = recent_failures[-consecutive_failures:]
                 kinds = [f.kind for f in window]
@@ -662,38 +631,32 @@ async def main() -> None:
                 break
             continue
 
-        # Success — reset failure streak
+        # Success (status == "compiled") — reset failure streak
         consecutive_failures = 0
         compiled_count += 1
-        total_cost += result.get("cost_usd", 0.0)
-        run_input_tokens += result.get("input_tokens", 0)
-        run_output_tokens += result.get("output_tokens", 0)
+        total_cost += outcome.cost_usd
+        run_input_tokens += outcome.input_tokens
+        run_output_tokens += outcome.output_tokens
 
         # Post-pass producers (Producer-seam arc, .ytstack/backlog/producer-seam.md).
-        # `run_post_passes` iterates every registered Producer serially (Q1
-        # decision), absorbs per-producer raises into `ProducerResult(status="failed")`
-        # via the orchestrator's contract-α wrapper. Per-producer LLM usage
-        # is recorded centrally by the token ledger (core/usage.py); the old
-        # dollar-shaped producer_cost_total accumulator was removed (2026-05-23).
+        # `run_post_passes` iterates every registered Producer serially, absorbing
+        # per-producer raises into ProducerResult(status="failed"). Per-producer LLM
+        # usage is recorded centrally by the token ledger (core/usage.py).
         from compile_stages.types import CompileResult
         _compile_result = CompileResult(
             status="ok",
-            cost_usd=result.get("cost_usd", 0.0),
-            input_tokens=result.get("input_tokens", 0),
-            output_tokens=result.get("output_tokens", 0),
-            article=result.get("result"),
+            cost_usd=outcome.cost_usd,
+            input_tokens=outcome.input_tokens,
+            output_tokens=outcome.output_tokens,
+            article=outcome.article,
         )
         await run_post_passes(source, _compile_result, state)
 
-        # Update state: mark file as ingested with its hash + persist immediately.
-        # Per-file save (not just end-of-loop) so rate-limit aborts, kills, and
-        # crashes don't lose the compile work that already succeeded — otherwise
-        # the next run would re-compile the same files and re-spend tokens.
-        # Iron rule from KNOWLEDGE.md: "no gap between capture and persist".
+        # Single state-save site: mark file ingested + persist immediately. Per-file
+        # save (not just end-of-loop) so rate-limit aborts / kills / crashes don't lose
+        # work already done. Iron rule: "no gap between capture and persist".
         rel = str(source.relative_to(ROOT_DIR))
-        if "ingested" not in state:
-            state["ingested"] = {}
-        state["ingested"][rel] = file_hash(source)
+        state.setdefault("ingested", {})[rel] = file_hash(source)
         state["total_cost"] = round(total_cost, 4)
         state["last_compile"] = now_iso()
         save_state(state)

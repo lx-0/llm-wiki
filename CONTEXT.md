@@ -124,6 +124,7 @@ class CompileOutcome:
     cost_usd: float = 0.0
     input_tokens: int = 0
     output_tokens: int = 0
+    article: str | None = None   # agent's final text, forwarded to run_post_passes
 ```
 
 `failure_kind`/`failure_detail` are strings (not a `FailureClass` object) — same choice as `CompileResult`, keeping the type free of a `core.sdk_helpers` import; `main()` reconstructs `FailureClass` when it needs the consecutive-failure abort heuristic. `ingest_hash` replaces the `_STATE_MUTATING_SKIPS` registry: execution handlers no longer self-persist state. `main()` is the **single state-save site**, persisting the ingested-hash iff the outcome asks for it — the same way the LLM success path already works.
