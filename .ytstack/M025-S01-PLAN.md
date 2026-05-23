@@ -5,7 +5,7 @@ project: llm-wiki
 created: 2026-05-23T08:53:30+0200
 status: planned
 task_count: 3
-completed_tasks: 0
+completed_tasks: 1
 ---
 
 # M025-S01 -- Slice Plan
@@ -16,7 +16,7 @@ capture-ID to its source path. Pure capture-side spine -- no compile/agent chang
 
 ## Tasks
 
-- [ ] T01 -- `scripts/collectors/capture_collector.py` modeled on `voice.py`:
+- [x] T01 -- `scripts/collectors/capture_collector.py` modeled on `voice.py`:
   folder-watch on `personal.capture_inbox`; assign a deterministic stable
   capture-ID per capture (content+timestamp hash, idempotent on re-drop); write a
   frontmatter-stamped note (`capture_id:`, `type: capture`) into `raw/captures/`;

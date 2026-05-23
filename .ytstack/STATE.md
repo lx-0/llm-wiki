@@ -1,17 +1,17 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-05-23T08:53:30+02:00
+last_updated: 2026-05-23T10:46:00+02:00
 current_milestone: M025
 active_slice: S01
-active_task: T01
+active_task: none
 last_completed_milestone: M024
 parallel_milestones: [M021]
 ---
 
 # State
 
-**Status:** M025 / S01 / T01 planned — ready to execute. (M, 3 slices / 10 tasks.) Capture-correction-loop — operator
+**Status:** M025 / S01 — 1/3 tasks done (T01 capture-collector shipped, commit `f869398`). (M, 3 slices / 10 tasks.) Capture-correction-loop — operator
 overturns a wrong reading of a cryptic quick-capture by capture-ID; brain marks the
 old interpretation superseded and regenerates the affected article on its next
 compile cycle. Validated via office-hours (two premise-challenge rounds: capture
@@ -23,9 +23,11 @@ digest+correction-ingest+supersede / compile-honours-marker E2E). Open eng-seam 
 S03 slicing: does compile have a clean "regenerate article from capture-ID X" path
 or only full-corpus/per-source-file.
 
-**Next action:** Execute M025-S01-T01 (capture collector) via
-`ytstack:test-driven-development`, then `ytstack:verification-before-completion` +
-`ytstack:summarize-task`. Task plan: `.ytstack/M025-S01-T01-PLAN.md`.
+**Next action:** M025-S01-T02 — config.example.yaml docs for `personal.capture_inbox`
++ `piggybacks.capture` override knob + `templates/` sync (template-resync rule;
+HARD-rule migration already shipped in T01). Run `ytstack:plan-task` to flesh it
+out, then TDD. After: T03 `state/capture_index.json`. Slice plan:
+`.ytstack/M025-S01-PLAN.md`.
 
 
 **Status (this session, 2026-05-22 — intake-priority policy capture, no code).** Conceptual session on whether entertainment/consumption channels (Spotify, YouTube watch-history, browser content, Suno) are sensible intake or just clutter. Outcome: a locked design policy — **intake is valued by persona/blindspot coverage, not per-source signal-density.** Self-cartography optimizes for completeness-of-portrait; work-substrate (mail/calendar/docs) systematically misses the non-work persona (curiosity/leisure/mood), so a low-yield consumption channel covering that dark axis can outrank a high-yield redundant one. Clutter is already solved engine-side (`compile-role: source-only` + `daily/`-aggregation). Two guardrails: value scales per *axis covered* (not per channel), and ingest only when a synthesis consumer (dream-cycle / persona entity-page) will actually weave it in. Suno stays on the *production* axis, not consumption — corrected a criterion-switch error mid-conversation. Captured in: `.ytstack/DECISIONS.md` 2026-05-22 (canonical), CLAUDE.md Hard rules, AGENTS.md "Evaluating a new intake channel", `docs/concept.md` Design rationale, new backlog cluster `.ytstack/backlog/consumption-curiosity-axis.md` (groups music-listening/youtube-watch-history/browser-history/reading-highlights + sequencing; supersedes `music-listening-collector.md`'s "weight-low correlation-ribbon" framing), PRIORITY.md collector-pool note. Commit `(this session)` — local main, **not pushed**. No engine code touched. Open follow-up surfaced: the real prerequisite for this whole cluster is likely a **persona entity-page / synthesis consumer**, not the collectors themselves.
