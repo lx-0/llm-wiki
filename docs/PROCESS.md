@@ -17,7 +17,7 @@ Zwei fundamental getrennte Ingest-Pfade konvergieren bei `compile.py`:
 - **Path A** — Automatische Session-Capture (Hooks → daily/ → compile)
 - **Path B** — Kuratierte Quellen (Scanners/Manual/Inbox → raw/ → compile)
 
-## Übersicht — die 14 Prozesse
+## Übersicht — die 15 Prozesse
 
 | # | Process | Was passiert | Trigger |
 |---|---|---|---|
@@ -35,6 +35,7 @@ Zwei fundamental getrennte Ingest-Pfade konvergieren bei `compile.py`:
 | [12](#12-hard-facts-corrections) | Hard Facts (Corrections) | `wiki correct` schreibt `knowledge/facts/<slug>.md` → injected in compile/query/lint; `apply` propagiert agentisch über `knowledge/`+`daily/` | manuell (`wiki correct add` / `wiki correct apply`) |
 | [13](#13-agent-tasks) | Agent Tasks | `prompts/agents/<id>.md` declares Claude Agent SDK config (model + tools + permission + button) per task. `wiki agent <id>` runs it. Dashboard buttons auto-wired via `wiki seed`. | manuell oder per Dashboard-Button |
 | [14](#14-concept-reconciliation) | Concept Reconciliation | Signal-driven autonomous loop: consumes lint fact-violations, auto-reconciles `knowledge/concepts/` against the hard facts they contradict via strict scoped `correct_apply`. Contradictions/quality propose-only. | `wiki reconcile` / `concept_reconcile` piggyback (double-gated OFF) |
+| [15](#15-health-trend-synthesis) | Health-Trend Synthesis | Deterministic ($0, no LLM): aggregates numeric metrics across `raw/notes/health/**` into a sentinel-managed `## Trends` block in `concepts/health.md` (coverage-aware monthly stats + trend arrows). The synthesis consumer per-day stubs lack. | `wiki health-trends` / `health_trends` piggyback (default OFF) |
 
 ---
 
@@ -1227,3 +1228,31 @@ flowchart TD
 - **Cost runaway** — per-fact pre-flight estimate skips, per-run cumulative cap stops the sweep.
 - **Churn / oscillation** — per-fact cooldown (`last_reconciled:`) + the fact-stamp prevent re-processing within the window.
 - **Bad rewrite** — git-reversible + `correct_apply._backup`; auto-class limited to the unambiguous fact-authority case; dry-run-first rollout.
+
+---
+
+## 15. Health-Trend Synthesis
+
+Deterministic synthesis consumer for the health metric corpus. Per-day health stubs are correctly NOT knowledge (§3 skips them deterministically, per `concepts/health-rollup-intake-format.md`); trends across many days ARE. This pass closes that gap — without an LLM.
+
+```mermaid
+flowchart TD
+    TRIG["wiki health-trends  OR  health_trends piggyback"] --> SCAN["walk raw/notes/health/** frontmatter<br/>(pure Python, no SDK)"]
+    SCAN --> AGG["per numeric metric: group by month<br/>range · all-time avg · recent-window avg<br/>coverage-aware trend arrow (recent vs prior)"]
+    AGG --> FILTER["drop metrics under min-coverage<br/>(no fake trends over data gaps)"]
+    FILTER --> WRITE["upsert ONE sentinel block<br/>&lt;!-- health-trends:begin/end --&gt;<br/>in concepts/health.md (create if absent)"]
+```
+
+**Deterministic, $0, idempotent.** No LLM — the math is exact. A narrative/LLM layer (e.g. "HRV trended down through Q1") is a deliberate later addition on top of this foundation. The block is regenerated wholesale each run (sentinel-managed, like the backlinks footer §3) so it never accumulates.
+
+**Coverage-aware:** a metric appears only with ≥ `limits.health_trends_min_coverage_days` (10) data points; the trend arrow needs ≥3 points in both the recent and prior `health_trends_recent_months` (6) window, else `·`. This prevents drawing a "sleep trend" across years that have no sleep data (HealthKit 2014-2018 has only distance/flights/weight; Oura adds sleep/hrv 2022+; 2019-2021 gap).
+
+**Gating:** double-gated OFF — needs `features.health_trends: true` AND a `piggybacks.health_trends` block. `wiki health-trends` falls back to dry-run (prints, writes nothing) when the flag is off.
+
+### Edge Cases
+
+- **No health corpus** → no-op (logs, exits 0).
+- **concepts/health.md absent** → created with minimal `type: concept` frontmatter + the block.
+- **Existing backlinks footer** → the trends block is inserted before it; both sentinel blocks coexist.
+- **Non-numeric frontmatter** (sensitivity, sources, date) → ignored; only real numbers aggregate.
+- **Anti-bloat** → ONE sentinel block replaced in place each run — the opposite of the per-file compiled_from bloat that motivated the per-day deterministic skip.

@@ -145,6 +145,8 @@ When raw sources contradict reality — a Slack thread that calls a project by i
 
 `wiki reconcile` is the autonomous, signal-driven version of that loop: it reads the lint fact-violations (concepts that contradict a hard fact) and reconciles them under a strict envelope — writes scope-locked to `knowledge/concepts/`, per-fact + per-run cost caps, a per-fact cooldown, and tiered autonomy (only unambiguous fact-violations are auto-fixed; concept↔concept contradictions stay propose-only in the lint surface). It is dry-run by default and double-gated OFF (`features.concept_reconciliation` + a `piggybacks.concept_reconcile` block) so it only runs autonomously once you opt in.
 
+`wiki health-trends` is the deterministic synthesis consumer for the health corpus. A single day's biometrics aren't knowledge, but trends across years are — so this pass ($0, no LLM) aggregates every numeric metric in `raw/notes/health/**` into a coverage-aware `## Trends` block (range, all-time vs recent average, trend arrow) inside `knowledge/concepts/health.md`. Default OFF; safe to enable.
+
 ## What a compiled article looks like
 
 A real `knowledge/concepts/agent-config-staleness.md` from a working vault — illustrative excerpt:

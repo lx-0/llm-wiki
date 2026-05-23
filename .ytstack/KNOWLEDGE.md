@@ -2222,3 +2222,15 @@ Per-file provenance must not accumulate in a single article's frontmatter for hi
 - **Tiered autonomy by issue class.** AUTO only the unambiguous `fact_violation` class (fact is the authority). Concept↔concept contradictions and quality stay PROPOSE-ONLY in the lint/dashboard surface — auto-rewriting them risks erasing the correct side. Strict policy ≠ full autonomy; it's *bounded* autonomy where the fix direction is unambiguous.
 
 Double-gated OFF: `features.concept_reconciliation` (default False) AND a `piggybacks.concept_reconcile` block must both exist; `wiki reconcile` is dry-run by default and `--apply` self-downgrades to dry-run when the flag is off.
+
+### Health-trend synthesis — deterministic consumer, not per-file compile (2026-05-23)
+
+The fix for "the 1500 health days just get skipped — shouldn't they be compiled?". Two separable jobs that were conflated:
+
+- **Per-day intake is not knowledge.** A single day's "distance 2.96 km, 11 flights" is point-in-time data (the operator's own `concepts/health-rollup-intake-format.md` says so). Compiling it per-file only ever produced a log-line + the `compiled_from` bloat that broke the Read-tool limit. Correct move: deterministic skip (mark ingested, no knowledge writes).
+- **Trends across many days ARE knowledge** — and that's a *separate, deterministic* pass, not the per-file compile. `wiki health-trends` (`scripts/health_trends.py`) aggregates the corpus into one sentinel block. No LLM: the math (mean/range/slope) is exact; an LLM here would only add cost + non-determinism. The narrative layer ("HRV fell in Q1") is a deliberate later addition *on top of* the exact aggregates.
+
+Reusable lessons:
+- **A high-volume substrate's value is its aggregate, not its rows.** Don't route per-row through an LLM compile; skip the rows deterministically + add a deterministic aggregation consumer. (Generalizes beyond health: any metric/event stream.)
+- **Coverage-aware aggregation is mandatory** when a corpus spans eras with different schemas (HealthKit 2014-2018: distance/flights/weight; Oura 2022+: sleep/hrv; 2019-2021 gap). Gate metrics on min-coverage + require ≥3 points in both trend windows, else `·` — never draw a trend across a data gap.
+- **Sentinel-managed block, regenerated wholesale** (`<!-- health-trends:begin/end -->`, mirroring the backlinks footer) — the anti-bloat opposite of the unbounded `compiled_from` list that started this whole arc.

@@ -196,6 +196,10 @@ Autonomous consistency loop for `knowledge/concepts/`. Signal-driven: it consume
 
 Double-gated OFF: needs `features.concept_reconciliation: true` AND a `piggybacks.concept_reconcile` block. `wiki reconcile` is dry-run by default; `--apply` self-downgrades to dry-run when the flag is off. Spec: `.ytstack/backlog/concept-consistency-routine.md`.
 
+### Health-trend synthesis (`wiki health-trends`)
+
+Deterministic ($0, no LLM) synthesis consumer for the health corpus. Per-day `type: health-rollup` stubs are correctly not knowledge (compile skips them deterministically); trends are. `scripts/health_trends.py` walks `raw/notes/health/**` frontmatter, aggregates every numeric metric by month (range, all-time avg, recent-window avg, coverage-aware trend arrow), and upserts ONE sentinel-managed `## Trends` block (`<!-- health-trends:begin/end -->`) into `knowledge/concepts/health.md` (created if absent; mirrors the backlinks-footer sentinel). Idempotent, regenerated wholesale each run. Knobs: `limits.health_trends_recent_months` (6), `limits.health_trends_min_coverage_days` (10). Double-gated OFF: `features.health_trends` + a `piggybacks.health_trends` block; `wiki health-trends` falls back to dry-run when off. A narrative/LLM layer is a deliberate later addition. Spec: `.ytstack/backlog/health-trend-synthesis.md`.
+
 ### Adding a prompt
 
 1. Drop `<name>.md` into `prompts/`.
