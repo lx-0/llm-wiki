@@ -36,6 +36,7 @@ Zwei fundamental getrennte Ingest-Pfade konvergieren bei `compile.py`:
 | [13](#13-agent-tasks) | Agent Tasks | `prompts/agents/<id>.md` declares Claude Agent SDK config (model + tools + permission + button) per task. `wiki agent <id>` runs it. Dashboard buttons auto-wired via `wiki seed`. | manuell oder per Dashboard-Button |
 | [14](#14-concept-reconciliation) | Concept Reconciliation | Signal-driven autonomous loop: consumes lint fact-violations, auto-reconciles `knowledge/concepts/` against the hard facts they contradict via strict scoped `correct_apply`. Contradictions/quality propose-only. | `wiki reconcile` / `concept_reconcile` piggyback (double-gated OFF) |
 | [15](#15-health-trend-synthesis) | Health-Trend Synthesis | Deterministic ($0, no LLM): aggregates numeric metrics across `raw/notes/health/**` into a sentinel-managed `## Trends` block in `concepts/health.md` (coverage-aware monthly stats + trend arrows). The synthesis consumer per-day stubs lack. | `wiki health-trends` / `health_trends` piggyback (default OFF) |
+| [16](#16-usage-accounting-tokens-per-providermodel) | Usage Accounting | Tokens per `(provider, model)` ledger — every LLM call (Ollama + Claude SDK) records to `state/usage.json`; gates are token/structural, never dollars (Claude subscription + local Ollama). | `core/usage.py` · `wiki usage` |
 
 ---
 
@@ -1208,9 +1209,11 @@ flowchart TD
     SIG --> GRP["group by fact slug<br/>concepts/ only · absolute paths"]
     GRP --> COOL{"fact within<br/>cooldown?"}
     COOL -->|yes| SKIP["skip"]
-    COOL -->|no| CAP{"per-run cost<br/>cap reached?"}
+    COOL -->|no| BROAD{"files &gt; max_files<br/>per fact?"}
+    BROAD -->|yes| MANUAL["skip — too broad,<br/>manual review"]
+    BROAD -->|no| CAP{"max facts/run<br/>reached?"}
     CAP -->|yes| STOP["stop sweep"]
-    CAP -->|no| REC["correct_apply.reconcile_fact()<br/>STRICT: PreToolUse scope-lock to<br/>knowledge/concepts/ · no Bash ·<br/>bounded turns · per-fact cost cap"]
+    CAP -->|no| REC["correct_apply.reconcile_fact()<br/>STRICT: PreToolUse scope-lock to<br/>knowledge/concepts/ · no Bash ·<br/>bounded turns · tokens recorded to ledger"]
     REC --> STAMP["stamp fact last_reconciled:<br/>+ knowledge/log.md summary"]
 ```
 
@@ -1218,14 +1221,14 @@ flowchart TD
 
 **Gating:** double-gated OFF — needs `features.concept_reconciliation: true` AND a `piggybacks.concept_reconcile` block. `wiki reconcile` is dry-run by default; `--apply` self-downgrades to dry-run when the flag is off.
 
-**Reuse:** `lint` (signals) + `facts/correct_apply.py::reconcile_fact` (strict sibling of `apply()`, which is unchanged) + the flush piggyback machinery. Knobs: `scheduling.concept_reconcile_cooldown_days` (14), `limits.concept_reconcile_{per_fact_max_cost_usd, max_cost_per_run_usd, max_turns}`.
+**Reuse:** `lint` (signals) + `facts/correct_apply.py::reconcile_fact` (strict sibling of `apply()`, which is unchanged) + the flush piggyback machinery. Knobs: `scheduling.concept_reconcile_cooldown_days` (14), `limits.concept_reconcile_{max_files_per_fact, max_facts_per_run, max_turns}`. Gates are structural, not USD — token usage is recorded to `state/usage.json` (§16).
 
 ### Edge Cases
 
 - **Concept↔concept contradiction with no arbitrating fact** — propose-only; never auto-resolved (risk of erasing the correct side).
 - **Non-concept fact-violations** (people/projects/qa) — filtered out; the write hook only allows `knowledge/concepts/` anyway.
 - **Process cwd ≠ ROOT_DIR** (piggyback spawn) — violating files are passed as ABSOLUTE paths so the resolve-based scope hook can't mis-deny them (the compile max_turns lesson).
-- **Cost runaway** — per-fact pre-flight estimate skips, per-run cumulative cap stops the sweep.
+- **Over-broad fact** — a fact violating > `max_files_per_fact` concepts is skipped for manual review (never auto-rewritten en masse); `max_facts_per_run` bounds the sweep.
 - **Churn / oscillation** — per-fact cooldown (`last_reconciled:`) + the fact-stamp prevent re-processing within the window.
 - **Bad rewrite** — git-reversible + `correct_apply._backup`; auto-class limited to the unambiguous fact-authority case; dry-run-first rollout.
 

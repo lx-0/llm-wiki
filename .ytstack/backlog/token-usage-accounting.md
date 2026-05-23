@@ -69,6 +69,11 @@ This is M021's **"cost shape"** open question, answered: usage = tokens per prov
 
 Usage accounting is cross-cutting infra (every LLM call), not a new pillar with a single steady-state box, so it has no clean fold-in slot — and the hard rule forbids shipping an `.excalidraw` edit without the full 3-gate render review (bbox-overlap + glyph-width + zoom-crop). Deferred to do it properly: a small annotation near the SDK/compile region — "all LLM calls → token ledger (state/usage.json)" — done with the render-review, OR folded into the eventual M021 model-seam diagram update. Tracked here so it is not lost. (Mirrors the gmeet-email-discovery-infographic deferral pattern.)
 
+## Follow-ups (surfaced by the 2026-05-23 doc-audit)
+
+- **Dashboard "Cumulative LLM cost ($)" chart** (PROCESS §10, `dashboard/dashboard_stats.py`, `cost_total` from compile events) still renders a dollar figure — informational/API-equivalent, but semantically off under a subscription. Switch to a token chart (or label it "API-equivalent $") once the ledger has run-history. Code, not docs.
+- **Producer `cost_usd` field** (`producers/base.py`, CONTEXT.md interface) kept as informational; producers make no direct SDK calls (their Ollama calls auto-record to the central ledger), so no token-capture gap — but the field is dollar-shaped. Low priority.
+
 ## Related
 
 - `.ytstack/M021-CONTEXT.md` (model seam; cost-shape question)

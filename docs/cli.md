@@ -241,6 +241,15 @@ Grouped by purpose. Run `wiki <cmd> --help` for the full per-command help block.
 | `wiki query "QUESTION"` | ask the knowledge base — picks relevant articles via `knowledge/index.md`, answers via configured query model (LLM cost). |
 | `wiki review-wiki` | per-article quality-score sweep via local Ollama ($0). Output → `.wiki/reports/review-YYYY-MM-DD.md`. Runs as weekly piggyback by default. |
 
+### Synthesis & maintenance
+
+| Command | What it does |
+|---|---|
+| `wiki dream [SLUG]` | re-synthesize entity pages (people/projects/areas) from their substrate corpus (LLM via `models.dream_model`). No slug = full priority-weighted sweep; `wiki dream sweep` / `wiki dream list-candidates` for the sweep + ranking debug. Per-entity prompt-size gate `limits.dream_entity_max_prompt_chars`; piggyback `dream_cycle` (24h). |
+| `wiki reconcile [--apply] [--limit N]` | autonomous concept↔fact reconciliation — reads `lint` fact-violations and fixes flagged `knowledge/concepts/` under a strict envelope. Dry-run by default; structural gates (skip a fact touching > `limits.concept_reconcile_max_files_per_fact` concepts → manual review; ≤ `_max_facts_per_run` per sweep). Double-gated OFF (`features.concept_reconciliation` + a `piggybacks.concept_reconcile` block). |
+| `wiki health-trends [--dry-run]` | deterministic ($0, no LLM) health-metric aggregation → sentinel `## Trends` block in `knowledge/concepts/health.md`. Double-gated OFF (`features.health_trends` + a `piggybacks.health_trends` block). |
+| `wiki usage [--days N] [--json]` | read back the token-usage ledger (`state/usage.json`) — tokens per `(provider, model)`, bucketed by date with totals. LLM usage is metered in tokens, never dollars (Claude is a subscription, Ollama is local). |
+
 ### Hard facts (`correct`)
 
 | Command | What it does |
