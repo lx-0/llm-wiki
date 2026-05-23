@@ -91,19 +91,37 @@ def collect_metrics(health_dir: Path) -> tuple[dict[str, list[tuple[str, float]]
     return series, len(dates), span
 
 
-def _trend_arrow(values_by_date: list[tuple[str, float]], recent_months: int) -> str:
-    """Compare the recent window's mean against the equal-length prior window.
+def _months_back(anchor: str, count: int, skip: int = 0) -> set[str]:
+    """The `count` calendar months (`YYYY-MM`) ending `skip` months before `anchor`.
 
-    Coverage-aware: needs ≥3 points in each window, else '·' (not enough data).
+    skip=0 → the `count` months up to and including anchor's month (the recent
+    window). skip=count → the `count` months immediately before that (the prior
+    window). Calendar-based, not data-based: a month with no data is still part
+    of the window, so a metric that stopped logging shows up as empty/recent='—'.
     """
-    if len(values_by_date) < 6:
+    y, m = int(anchor[:4]), int(anchor[5:7])
+    out: set[str] = set()
+    for i in range(skip, skip + count):
+        yy, mm = y, m - i
+        while mm <= 0:
+            mm += 12
+            yy -= 1
+        out.add(f"{yy:04d}-{mm:02d}")
+    return out
+
+
+def _trend_arrow(values_by_date: list[tuple[str, float]], recent_months: int, anchor: str) -> str:
+    """Compare the recent calendar window's mean against the equal-length prior one.
+
+    Both windows are anchored at `anchor` (the corpus max month) so EVERY metric
+    is judged on the same wall-clock window. A metric with <3 points in the recent
+    window yields '·' (no recent signal) — never a stale 'trend' built from data
+    that happens to be the metric's most recent logging but is years old.
+    """
+    if not anchor:
         return "·"
-    # window = last `recent_months` calendar months present in the series
-    months = sorted({d[:7] for d, _ in values_by_date})
-    if len(months) < 2:
-        return "·"
-    recent_set = set(months[-recent_months:])
-    prior_set = set(months[-2 * recent_months:-recent_months]) or set(months[:-recent_months])
+    recent_set = _months_back(anchor, recent_months)
+    prior_set = _months_back(anchor, recent_months, recent_months)
     recent = [v for d, v in values_by_date if d[:7] in recent_set]
     prior = [v for d, v in values_by_date if d[:7] in prior_set]
     if len(recent) < 3 or len(prior) < 3:
@@ -127,6 +145,7 @@ def render_block(health_dir: Path) -> str:
     series, days, (lo, hi) = collect_metrics(health_dir)
     recent_months = CONFIG.limits.health_trends_recent_months
     min_days = CONFIG.limits.health_trends_min_coverage_days
+    anchor = hi[:7] if hi else ""  # corpus-wide recent-window reference (max data month)
 
     rows = []
     for metric in sorted(series, key=lambda m: -len(series[m])):
@@ -134,12 +153,12 @@ def render_block(health_dir: Path) -> str:
         if len(vals) < min_days:
             continue
         nums = [v for _, v in vals]
-        recent_set = sorted({d[:7] for d, _ in vals})[-recent_months:]
-        recent_nums = [v for d, v in vals if d[:7] in set(recent_set)]
+        recent_set = _months_back(anchor, recent_months) if anchor else set()
+        recent_nums = [v for d, v in vals if d[:7] in recent_set]
         recent_avg = _fmt(mean(recent_nums)) if recent_nums else "—"
         rows.append(
             f"| `{metric}` | {len(vals)} | {_fmt(min(nums))}–{_fmt(max(nums))} "
-            f"| {_fmt(mean(nums))} | {recent_avg} | {_trend_arrow(vals, recent_months)} |"
+            f"| {_fmt(mean(nums))} | {recent_avg} | {_trend_arrow(vals, recent_months, anchor)} |"
         )
 
     body = [

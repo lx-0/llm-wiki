@@ -69,9 +69,35 @@ def test_upsert_block_creates_replaces_and_preserves_backlinks(tmp_path):
 
 def test_trend_arrow_direction(tmp_path, monkeypatch):
     import health_trends as ht
-    # rising series across two 1-month windows (recent_months=1)
+    # rising series across two 1-month windows (recent_months=1), anchored at the recent month
     vals = [(f"2026-01-0{i+1}", 10.0) for i in range(3)] + [(f"2026-02-0{i+1}", 20.0) for i in range(3)]
-    assert ht._trend_arrow(vals, recent_months=1) == "↑"
+    assert ht._trend_arrow(vals, recent_months=1, anchor="2026-02") == "↑"
     falling = [(f"2026-01-0{i+1}", 20.0) for i in range(3)] + [(f"2026-02-0{i+1}", 10.0) for i in range(3)]
-    assert ht._trend_arrow(falling, recent_months=1) == "↓"
-    assert ht._trend_arrow([("2026-01-01", 1.0)], recent_months=6) == "·"  # too little data
+    assert ht._trend_arrow(falling, recent_months=1, anchor="2026-02") == "↓"
+    assert ht._trend_arrow([("2026-01-01", 1.0)], recent_months=6, anchor="2026-01") == "·"  # too little data
+    # data exists but predates the recent calendar window → '·', not a stale trend
+    stale = [(f"2022-03-0{i+1}", 50.0) for i in range(6)]
+    assert ht._trend_arrow(stale, recent_months=6, anchor="2026-05") == "·"
+
+
+def test_render_block_stale_metric_shows_no_recent(tmp_path, monkeypatch):
+    """A metric whose last data predates the recent calendar window must show '—'
+    in 'Last Nmo' (and '·' trend), not a stale all-time fallback — the sparse-Oura
+    bug where 'last 6 logged months' silently meant 'years ago'."""
+    import health_trends as ht
+    monkeypatch.setattr(ht.CONFIG.limits, "health_trends_min_coverage_days", 3)
+    monkeypatch.setattr(ht.CONFIG.limits, "health_trends_recent_months", 6)
+    h = tmp_path / "health"; h.mkdir()
+    for i in range(6):  # current metric: data right up to the corpus max month
+        _day(h, f"2026-05-0{i+1}", distance_km=float(i + 1))
+    for i in range(6):  # stale metric: only 2022 data, nothing in last 6 months
+        _day(h, f"2022-03-0{i+1}", sleep_score=60.0 + i)
+    block = ht.render_block(h)
+
+    def cells(metric):
+        row = next(l for l in block.splitlines() if f"`{metric}`" in l)
+        return [c.strip() for c in row.strip("|").split("|")]
+
+    sleep = cells("sleep_score")   # metric, days, range, all-time, last6mo, trend
+    assert sleep[4] == "—" and sleep[5] == "·"
+    assert cells("distance_km")[4] != "—"  # recent metric keeps a real recent avg
