@@ -1,17 +1,23 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-05-23T10:46:00+02:00
-current_milestone: M025
+last_updated: 2026-05-23T14:09:59+0200
+current_milestone: M026
 active_slice: S01
-active_task: none
+active_task: T01
 last_completed_milestone: M024
-parallel_milestones: [M021]
+parallel_milestones: [M021, M025]
 ---
 
 # State
 
-**Status:** M025 / S01 — 1/3 tasks done (T01 capture-collector shipped, commit `f869398`). (M, 3 slices / 10 tasks.) Capture-correction-loop — operator
+**Status:** M026 planned (M, 4 slices). Compile-dispatch seam — split `compile_file`'s 404-LOC dispatcher into a pure `decide_route` + typed `CompileOutcome` (routing + substrate→model/max_turns precedence become table-testable; **no behavior change**). Designed via `improve-codebase-architecture` 2026-05-23; full design + slice breakdown `.ytstack/backlog/compile-dispatch-seam.md` (committed `1510986`). CONTEXT + ROADMAP at `.ytstack/M026-{CONTEXT,ROADMAP}.md`.
+
+**Next action:** M026-S01 (types: `CompileOutcome` + `Route` union in `compile_stages/types.py` + `route.py` scaffold). Write `M026-S01-PLAN.md` directly from the design doc (the `slice-milestone` gate aborts on named slices — documented workaround), then `ytstack:plan-task` → TDD.
+
+---
+
+**Parked 2026-05-23 (switched to M026; tracked in `parallel_milestones`):** M025 / S01 — 1/3 tasks done (T01 capture-collector shipped, commit `f869398`). (M, 3 slices / 10 tasks.) Capture-correction-loop — operator
 overturns a wrong reading of a cryptic quick-capture by capture-ID; brain marks the
 old interpretation superseded and regenerates the affected article on its next
 compile cycle. Validated via office-hours (two premise-challenge rounds: capture

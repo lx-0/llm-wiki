@@ -118,14 +118,15 @@ What `compile_file()` returns — one typed result per source, replacing the leg
 class CompileOutcome:
     status: Literal["compiled", "skipped", "failed"]
     skip_reason: str | None = None
-    failure: FailureClass | None = None
-    ingest_hash: bool = False   # main() persists state[ingested][rel]=hash iff True
+    failure_kind: str | None = None     # string (not a FailureClass object), like CompileResult
+    failure_detail: str | None = None
+    ingest_hash: bool = False           # main() persists state[ingested][rel]=hash iff True
     cost_usd: float = 0.0
     input_tokens: int = 0
     output_tokens: int = 0
 ```
 
-`ingest_hash` replaces the `_STATE_MUTATING_SKIPS` registry: execution handlers no longer self-persist state. `main()` is the **single state-save site**, persisting the ingested-hash iff the outcome asks for it — the same way the LLM success path already works.
+`failure_kind`/`failure_detail` are strings (not a `FailureClass` object) — same choice as `CompileResult`, keeping the type free of a `core.sdk_helpers` import; `main()` reconstructs `FailureClass` when it needs the consecutive-failure abort heuristic. `ingest_hash` replaces the `_STATE_MUTATING_SKIPS` registry: execution handlers no longer self-persist state. `main()` is the **single state-save site**, persisting the ingested-hash iff the outcome asks for it — the same way the LLM success path already works.
 
 ## Architecture
 
