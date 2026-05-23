@@ -203,7 +203,7 @@ def test_both_gates_pass_returns_producer_result(monkeypatch, tmp_path, mocker_r
         ),
     )
 
-    expected = ProducerResult(producer="x", status="ok", cost_usd=0.42)
+    expected = ProducerResult(producer="x", status="ok")
     P = _stub_producer("x", enabled_key="features.on", glob_key="features.globs", on_run=expected)
 
     src = mocker_root / "any.md"

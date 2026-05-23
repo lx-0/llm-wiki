@@ -12,10 +12,10 @@ producers nor the caller's state-save. ``evaluate_and_run`` already
 wraps each ``Producer.run()`` and returns a ``ProducerResult(status="failed")``
 on raise; this caller propagates results without re-raising.
 
-State accumulation: ``state["producer_cost_total"]`` is incremented by
-the sum of ``cost_usd`` across all results in this call. It is initialized
-to 0.0 on first encounter. The caller persists ``state`` to disk; this
-function only mutates the dict.
+State: ``run_post_passes`` does NOT mutate ``state`` — per-producer LLM
+usage is recorded centrally by the token ledger (``core/usage.py``), so the
+old dollar-shaped ``producer_cost_total`` accumulator was removed (DECISIONS
+2026-05-23). ``state`` is still accepted for API symmetry and future use.
 
 What stays UPSTREAM in compile.py's per-file loop:
 
@@ -46,40 +46,30 @@ log = logging.getLogger("compile")
 async def run_post_passes(
     source_path: Path,
     compile_result: CompileResult,  # noqa: ARG001 — reserved for future producers that key off compile output
-    state: dict,
+    state: dict,  # noqa: ARG001 — reserved; usage now recorded centrally via core/usage.py
 ) -> list[ProducerResult]:
     """Run every registered Producer against ``source_path`` serially.
 
     Returns one ``ProducerResult`` per registered Producer in registration
     order (today: suggestions → curiosity → takes). Skip/fail outcomes are
-    represented in the result, never raised. Mutates ``state`` by adding
-    each result's ``cost_usd`` into ``state["producer_cost_total"]``.
+    represented in the result, never raised. Does not mutate ``state`` (token
+    usage is recorded centrally via ``core/usage.py``).
 
     ``compile_result`` is accepted for API symmetry with the other
     compile_stages and for future producers that may want to key off the
     compiled article shape; current producers consume the source path only.
     """
     results: list[ProducerResult] = []
-    cost_delta = 0.0
-
     for producer in all_producers():
-        result = await evaluate_and_run(producer, source_path)
-        results.append(result)
-        cost_delta += result.cost_usd
+        results.append(await evaluate_and_run(producer, source_path))
 
-    # Write the key whenever at least one producer was invoked — even at
-    # cost_delta=0 — so the operator can distinguish "post-passes ran,
-    # all skipped" from "no producers registered" (key absent / None).
     if results:
-        state["producer_cost_total"] = round(
-            state.get("producer_cost_total", 0.0) + cost_delta, 4
-        )
-        _log_summary(results, cost_delta)
+        _log_summary(results)
 
     return results
 
 
-def _log_summary(results: list[ProducerResult], cost_delta: float) -> None:
+def _log_summary(results: list[ProducerResult]) -> None:
     """One-line operator-facing summary of which producers ran for this source.
 
     Without this line a compile with all-skipped producers looks like
@@ -94,8 +84,7 @@ def _log_summary(results: list[ProducerResult], cost_delta: float) -> None:
         marker = {"ok": "✓", "skipped": "·", "failed": "✗"}[r.status]
         parts.append(f"{marker}{r.producer}")
     breakdown = " ".join(parts)
-    cost_tail = f" (${cost_delta:.4f})" if cost_delta else ""
     log.info(
-        "  post-pass: %d ok · %d skipped · %d failed — %s%s",
-        ok, skipped, failed, breakdown, cost_tail,
+        "  post-pass: %d ok · %d skipped · %d failed — %s",
+        ok, skipped, failed, breakdown,
     )

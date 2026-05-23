@@ -88,11 +88,44 @@ class ProducerResult:
     producer: str                        # SPEC.name
     status: Literal["ok", "skipped", "failed"]
     reason: str | None                   # why skipped/failed (None when ok)
-    cost_usd: float                      # 0.0 for local-only producers (curiosity)
     outputs: tuple[Path, ...]            # files written
 ```
 
 Failure contract: a `failed` Producer **never blocks** the compile-source state save. The orchestrator wraps each `Producer.run()` in a try/except, logs the result, marks the Producer failed for this source, and proceeds. Quiet bug it prevents: a curiosity-pass crash today silently skips the per-file state save (state save is after all three `await`s), causing the next compile run to re-spend Claude SDK tokens recompiling the same source.
+
+### Compile route
+
+The discriminated decision `decide_route(source, content) → Route` makes about a single source **before any I/O or LLM call**. Pure: depends only on source path + content + CONFIG, so the substrate→model/max_turns precedence ladder (the engine's most bug-prone block) becomes one table-testable function. Variants:
+
+```python
+Route = (
+    Skip(reason: str)                              # empty / final-only / substrate-skip-list
+    | IndexOnly(title: str, wikilinks: list[str])  # source-and-final: indexed, not distilled
+    | HealthStub()                                 # health-rollup metric stub: recorded deterministically, no agent
+    | Compile(metadata: CompileMetadata,           # needs an LLM call
+              classification: Classification)      # single vs aggregated-memory chunking, from classify()
+)
+```
+
+`decide_route` runs all the *pure* pre-LLM logic — `infer_compile_role`, skip-list check, the dispatch-table precedence (`SUBSTRATE_PROMPTS` / `_DEFAULT_DISPATCH`), and `classify()`. The **memory pre-pass** (`resolve_project_slug` + `ensure_timeline_section`, which writes a `## Timeline` section) is *not* part of the decision — it does I/O, so it lives on the execution side inside the `Compile` handler.
+
+### CompileOutcome
+
+What `compile_file()` returns — one typed result per source, replacing the legacy magic-key dict (`{"_skipped": …}` / `{"_failure": …}` / usage-dict). Mirrors CompileResult and ProducerResult so end-of-run aggregation reads uniformly.
+
+```python
+@dataclass(frozen=True)
+class CompileOutcome:
+    status: Literal["compiled", "skipped", "failed"]
+    skip_reason: str | None = None
+    failure: FailureClass | None = None
+    ingest_hash: bool = False   # main() persists state[ingested][rel]=hash iff True
+    cost_usd: float = 0.0
+    input_tokens: int = 0
+    output_tokens: int = 0
+```
+
+`ingest_hash` replaces the `_STATE_MUTATING_SKIPS` registry: execution handlers no longer self-persist state. `main()` is the **single state-save site**, persisting the ingested-hash iff the outcome asks for it — the same way the LLM success path already works.
 
 ## Architecture
 

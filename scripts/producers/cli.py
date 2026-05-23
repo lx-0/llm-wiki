@@ -60,8 +60,6 @@ def _run_one(name: str, source: Path) -> NoReturn:
     print(f"{result.producer}: {result.status}")
     if result.reason:
         print(f"  reason: {result.reason}")
-    if result.cost_usd:
-        print(f"  cost:   ${result.cost_usd:.4f}")
     if result.outputs:
         print(f"  outputs ({len(result.outputs)}):")
         for out in result.outputs:

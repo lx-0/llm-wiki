@@ -952,7 +952,7 @@ Auto-injizierte Felder: `ts` (ISO timestamp), `type`. Schema ist forward-only �
 **Dashboard P2-Charts** (`dashboard.md` Section "## 📈 History") liest die JSONL via `app.vault.adapter.read(".wiki/state/history.jsonl")`, parsed JSON-per-Line in dataviewjs, rendert 3 Charts via `window.renderChart` (Charts-Plugin, gleicher idiom wie S01-T07's Vault-Stats):
 
 1. **Cumulative articles** — Line, x=Datum, y=`articles_total` aus compile-events.
-2. **Cumulative LLM cost** — Line, x=Datum, y=`cost_total` ($-formatted).
+2. **LLM token usage** — Line, x=Datum, y=`tokens_this_run` per compile event (the lifetime callout `🔢 LLM tokens` is sourced from the `state/usage.json` ledger, §16). Usage is tracked in tokens, not dollars (DECISIONS 2026-05-23).
 3. **Compile throughput** — Bar, x=Datum, y=Summe `compiled_this_run` pro Tag.
 
 **Edge Cases**:

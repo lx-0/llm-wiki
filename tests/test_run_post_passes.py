@@ -5,10 +5,10 @@ each case starts with an empty Registry and the real producers (the live
 suggestions/curiosity/takes) don't bleed in.
 
 The post-pass loop's contract is thin: iterate Registry, call
-``evaluate_and_run`` for each, collect results, accumulate cost into
-state. Tests assert exactly those four things, mocking the orchestrator
-where it lets us test the loop's behavior without dragging in real
-producer bodies.
+``evaluate_and_run`` for each, collect results. It does NOT mutate state
+(per-producer usage is recorded centrally via the token ledger). Tests
+assert ordering, failure-isolation, and gate-skip, mocking the orchestrator
+where it lets us test the loop's behavior without real producer bodies.
 """
 
 from __future__ import annotations
@@ -31,7 +31,7 @@ def _isolate_registry():
     producers_base._PRODUCERS.update(saved)
 
 
-def _make_fake_producer(name: str, cost: float = 0.0, raises: bool = False,
+def _make_fake_producer(name: str, raises: bool = False,
                        enabled_key: str | None = None):
     """Build a Producer class that records each run() call site-effectfully.
 
@@ -53,7 +53,7 @@ def _make_fake_producer(name: str, cost: float = 0.0, raises: bool = False,
             type(self).calls.append(source)
             if raises:
                 raise RuntimeError(f"{name} blew up")
-            return ProducerResult(producer=name, status="ok", cost_usd=cost)
+            return ProducerResult(producer=name, status="ok")
 
     _P.__qualname__ = f"_Fake_{name}"
     _P.calls = []
@@ -95,9 +95,9 @@ def test_run_post_passes_all_three_run(monkeypatch: pytest.MonkeyPatch):
 
     _stub_orchestrate_failed_on_raise(monkeypatch)
 
-    p1 = _make_fake_producer("p1", cost=0.01)
-    p2 = _make_fake_producer("p2", cost=0.02)
-    p3 = _make_fake_producer("p3", cost=0.03)
+    p1 = _make_fake_producer("p1")
+    p2 = _make_fake_producer("p2")
+    p3 = _make_fake_producer("p3")
 
     state: dict = {}
     source = Path("/tmp/raw/notes/x.md")
@@ -111,7 +111,7 @@ def test_run_post_passes_all_three_run(monkeypatch: pytest.MonkeyPatch):
     assert p1.calls == [source]
     assert p2.calls == [source]
     assert p3.calls == [source]
-    assert state["producer_cost_total"] == pytest.approx(0.06)
+    assert state == {}  # run_post_passes no longer mutates state (usage → ledger)
 
 
 # ── (2) Raising producer surfaces as failed; subsequent producers run ──
@@ -123,11 +123,11 @@ def test_run_post_passes_raise_does_not_block(monkeypatch: pytest.MonkeyPatch):
 
     _stub_orchestrate_failed_on_raise(monkeypatch)
 
-    p1 = _make_fake_producer("p1", cost=0.01)
-    p2 = _make_fake_producer("p2", cost=0.02, raises=True)
-    p3 = _make_fake_producer("p3", cost=0.04)
+    p1 = _make_fake_producer("p1")
+    p2 = _make_fake_producer("p2", raises=True)
+    p3 = _make_fake_producer("p3")
 
-    state: dict = {"producer_cost_total": 1.0}
+    state: dict = {}
     source = Path("/tmp/raw/notes/y.md")
     cr = CompileResult(status="ok", article="body")
 
@@ -137,8 +137,6 @@ def test_run_post_passes_raise_does_not_block(monkeypatch: pytest.MonkeyPatch):
     assert [r.producer for r in results] == ["p1", "p2", "p3"]
     # Third producer was still called despite the second raising.
     assert p3.calls == [source]
-    # Cost accumulator only counts the ok results' costs (failed has cost_usd=0).
-    assert state["producer_cost_total"] == pytest.approx(1.0 + 0.01 + 0.04)
 
 
 # ── (3) Gate-skipped producer returns skipped without invoking run() ──
@@ -150,10 +148,10 @@ def test_run_post_passes_gate_skip_does_not_call_run(monkeypatch: pytest.MonkeyP
 
     _stub_orchestrate_failed_on_raise(monkeypatch)
 
-    p1 = _make_fake_producer("p1", cost=0.01)
+    p1 = _make_fake_producer("p1")
     # CONFIG.features.nope does not exist → orchestrator gates this out as skipped.
-    p2 = _make_fake_producer("p2", cost=0.02, enabled_key="features.nope")
-    p3 = _make_fake_producer("p3", cost=0.04)
+    p2 = _make_fake_producer("p2", enabled_key="features.nope")
+    p3 = _make_fake_producer("p3")
 
     state: dict = {}
     source = Path("/tmp/raw/notes/z.md")
@@ -165,8 +163,6 @@ def test_run_post_passes_gate_skip_does_not_call_run(monkeypatch: pytest.MonkeyP
     assert p1.calls == [source]
     assert p2.calls == [], "gate-skipped producer's run() must NOT be called"
     assert p3.calls == [source]
-    # Skipped producer contributes 0 to the cost accumulator.
-    assert state["producer_cost_total"] == pytest.approx(0.05)
 
 
 # ── (4) Empty Registry → empty result, no state mutation ──────────────

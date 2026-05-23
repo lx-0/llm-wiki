@@ -109,6 +109,26 @@ def total_cost_lifetime() -> float:
     return float(state.get("total_cost", 0.0))
 
 
+def total_tokens_lifetime() -> int:
+    """Sum input+output tokens across the whole usage ledger (state/usage.json).
+
+    The honest lifetime usage figure (tokens per provider/model), replacing the
+    dollar `LLM spend` surface (DECISIONS 2026-05-23). 0 when the ledger is
+    absent (no LLM run yet)."""
+    from core.usage import USAGE_FILE
+    if not USAGE_FILE.exists():
+        return 0
+    try:
+        data = json.loads(USAGE_FILE.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return 0
+    total = 0
+    for day in data.values():
+        for u in day.values():
+            total += int(u.get("input_tokens", 0)) + int(u.get("output_tokens", 0))
+    return total
+
+
 def latest_compile_ts() -> str | None:
     """Mtime (ISO) of the newest article in `knowledge/`, or None if empty."""
     articles = list_wiki_articles()
@@ -202,6 +222,7 @@ def compute_stats() -> dict:
         "failed_flushes": count_failed_flushes(),
         "lint_warnings": count_lint_warnings(),
         "total_cost_lifetime": round(total_cost_lifetime(), 4),
+        "total_tokens_lifetime": total_tokens_lifetime(),
         "articles_total": articles_active,
         "articles_final_only": articles_final_only,
         "daily_logs_total": len(list(DAILY_DIR.glob("*.md"))) if DAILY_DIR.exists() else 0,
@@ -219,7 +240,7 @@ def render_callout(stats: dict) -> str:
     pending = stats["pending_compiles"]
     failed = stats["failed_flushes"]
     lint = stats["lint_warnings"]
-    cost = stats["total_cost_lifetime"]
+    tokens = stats.get("total_tokens_lifetime", 0)
     articles = stats["articles_total"]
     daily = stats["daily_logs_total"]
     last = stats["last_compile_ts"] or "never"
@@ -246,7 +267,7 @@ def render_callout(stats: dict) -> str:
         f"> {pending_icon} **Pending compiles:** {pending}\n"
         f"> {failed_icon} **Failed flushes:** {failed}\n"
         f"> {lint_icon} **Lint warnings:** {lint}\n"
-        f"> 💰 **LLM spend (lifetime):** ${cost:.2f}\n"
+        f"> 🔢 **LLM tokens (lifetime):** {tokens:,}\n"
         f"> 📚 **Articles:** {articles} · **Daily logs:** {daily}\n"
         f"{commitments_line}"
         f"> 🕐 **Last compile:** {last}\n"
@@ -275,6 +296,7 @@ def write_dashboard_stats(stats: dict, callout: str) -> Path:
         "failed_flushes",
         "lint_warnings",
         "total_cost_lifetime",
+        "total_tokens_lifetime",
         "articles_total",
         "daily_logs_total",
         "open_commitments",
@@ -312,12 +334,12 @@ def main() -> int:
 
     out = write_dashboard_stats(stats, callout)
     log.info(
-        "Wrote %s — pending=%d failed=%d lint=%d cost=$%.2f articles=%d",
+        "Wrote %s — pending=%d failed=%d lint=%d tokens=%s articles=%d",
         out,
         stats["pending_compiles"],
         stats["failed_flushes"],
         stats["lint_warnings"],
-        stats["total_cost_lifetime"],
+        f"{stats.get('total_tokens_lifetime', 0):,}",
         stats["articles_total"],
     )
     return 0

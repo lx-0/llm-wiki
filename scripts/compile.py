@@ -1025,9 +1025,9 @@ async def main() -> None:
         # Post-pass producers (Producer-seam arc, .ytstack/backlog/producer-seam.md).
         # `run_post_passes` iterates every registered Producer serially (Q1
         # decision), absorbs per-producer raises into `ProducerResult(status="failed")`
-        # via the orchestrator's contract-α wrapper, and accumulates
-        # `cost_usd` into `state["producer_cost_total"]` so the save below
-        # persists it alongside total_cost / last_compile.
+        # via the orchestrator's contract-α wrapper. Per-producer LLM usage
+        # is recorded centrally by the token ledger (core/usage.py); the old
+        # dollar-shaped producer_cost_total accumulator was removed (2026-05-23).
         from compile_stages.types import CompileResult
         _compile_result = CompileResult(
             status="ok",
@@ -1080,6 +1080,7 @@ async def main() -> None:
             failed_this_run=failed_count,
             cost_delta=round(total_cost - cost_at_start, 4),
             cost_total=state["total_cost"],
+            tokens_this_run=run_input_tokens + run_output_tokens,
         )
 
     outcome = f"ABORTED ({abort_reason or 'unknown'})" if aborted else "complete"

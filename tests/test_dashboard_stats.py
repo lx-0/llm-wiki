@@ -20,6 +20,7 @@ def _base_stats(**overrides) -> dict:
         "failed_flushes": 0,
         "lint_warnings": 12,
         "total_cost_lifetime": 3.4567,
+        "total_tokens_lifetime": 1234567,
         "articles_total": 263,
         "daily_logs_total": 47,
         "open_commitments": 0,
@@ -39,7 +40,7 @@ def test_render_callout_includes_all_fields() -> None:
     assert "**Pending compiles:** 5" in callout
     assert "**Failed flushes:** 0" in callout
     assert "**Lint warnings:** 12" in callout
-    assert "$3.46" in callout
+    assert "**LLM tokens (lifetime):** 1,234,567" in callout
     assert "**Articles:** 263" in callout
     assert "**Daily logs:** 47" in callout
 
@@ -82,6 +83,7 @@ def test_write_dashboard_stats_frontmatter_shape(
     assert "failed_flushes: 0" in content
     assert "lint_warnings: 12" in content
     assert "total_cost_lifetime: 3.4567" in content
+    assert "total_tokens_lifetime: 1234567" in content
     assert "articles_total: 263" in content
     assert "daily_logs_total: 47" in content
     assert "last_compile_ts: 2026-05-02T16:00:00+00:00" in content

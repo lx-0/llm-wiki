@@ -54,7 +54,6 @@ def test_producer_result_defaults():
     assert result.producer == "x"
     assert result.status == "ok"
     assert result.reason is None
-    assert result.cost_usd == 0.0
     assert result.outputs == ()
 
 
@@ -66,11 +65,9 @@ def test_producer_result_full():
         producer="suggestions",
         status="ok",
         reason=None,
-        cost_usd=0.0123,
         outputs=out,
     )
     assert result.outputs == out
-    assert result.cost_usd == 0.0123
 
 
 def test_producer_result_is_frozen():

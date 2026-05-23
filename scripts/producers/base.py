@@ -71,7 +71,6 @@ class ProducerResult:
     producer: str  # SPEC.name
     status: ProducerStatus
     reason: str | None = None
-    cost_usd: float = 0.0
     outputs: tuple[Path, ...] = ()
 
 
