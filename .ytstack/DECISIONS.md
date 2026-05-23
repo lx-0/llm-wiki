@@ -1345,3 +1345,38 @@ meetings ingested, idempotent, clean UTF-8. Infographic deferred:
 **Reason:** (A) is rejected because `reconcile` is fact-violation-only and never fires for free-text corrections. (B) carries the M018-class agent-side-write re-architecture risk. B-minus eliminates that risk rather than mitigating it; the operator corrects async via the digest anyway, so an instant patch is not required; and the ID-keyed supersede-marker is the substrate-agnostic primitive that generalizes toward the longer-term "all interpretations correctable + brain learns priors" direction, whereas a surgical patch would be bespoke and less on-trajectory.
 **Supersedes:** —
 **Linked artifacts:** `.ytstack/OFFICE-HOURS-capture-correction-loop.md`, `.ytstack/M025-CONTEXT.md`. Reaffirms the M018 agent-side-write constraint (`.ytstack/backlog/commit-article-manifest.md`).
+
+
+## 2026-05-23: compile_file split into pure decide_route + typed CompileOutcome (M026)
+
+`compile_file` went from a 404-LOC dispatcher to a 62-LOC thin dispatcher. The routing
+decision — compile_role inference, substrate skip-list, the substrate→model/max_turns
+precedence ladder, and `classify()` — now lives in a pure
+`compile_stages/route.py:decide_route(source, content) → Route` (`Skip | IndexOnly |
+HealthStub | Compile`), table-testable with no SDK/state/filesystem mocking.
+
+Locked:
+- **Coarse route taxonomy** (NOT distinct Single/Chunked LLM variants): single-vs-chunked
+  is `classify()`'s output, already its own tested module; a separate variant would
+  duplicate that test surface. `Compile` carries the `ClassifyResult`.
+- **Single state-save site in `main()`**: handlers no longer self-persist; they return
+  `CompileOutcome(ingest_hash=True)` and `main()` owns the one `save_state`. Deletes the
+  `_STATE_MUTATING_SKIPS` registry + its reload-after-skip dance (the leaky split-persist).
+- **`CompileOutcome` typed return** replaces the magic-key dict
+  (`{"_skipped"}`/`{"_failure"}`/usage-dict): status / skip_reason / failure_kind+detail /
+  ingest_hash / cost / tokens / article.
+- **Execution handlers stay in `compile.py`** (not a separate `execute.py`): they use
+  compile.py's I/O constants, and co-locating avoids a second round of test-monkeypatch churn.
+- **`commit_article` stays cancelled**: the agent writes `knowledge/**` itself via
+  path-scoped tool-use; there is no pure-I/O commit stage to extract.
+
+Surfaced, not acted on: model size-escalation / force-long-context branches are DEAD CODE
+for current data — every dispatch entry pins `claude-haiku-4-5-20251001`, so `substrate_model`
+always wins. Ported faithfully; re-enabling escalation (some entries → `model=None`) is a
+separate decision.
+
+Verification: pure refactor, behavior-identical — proven by characterization tests that pass
+on the legacy AND refactored `compile_file` + 126 green compile tests. No steady-state
+behavior change → architecture diagram + `docs/PROCESS.md` deliberately untouched (internal
+structure → `CONTEXT.md` vocab instead). Design: `.ytstack/backlog/compile-dispatch-seam.md`.
+Commits 4647d47 / 2c4335c+aad8541 / e6c04df / e9a44e5.
