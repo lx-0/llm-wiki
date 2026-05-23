@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-05-23T14:09:59+0200
+last_updated: 2026-05-23T14:25:00+0200
 current_milestone: M026
 active_slice: S01
-active_task: T01
+active_task: none
 last_completed_milestone: M024
 parallel_milestones: [M021, M025]
 ---
@@ -13,7 +13,7 @@ parallel_milestones: [M021, M025]
 
 **Status:** M026 planned (M, 4 slices). Compile-dispatch seam — split `compile_file`'s 404-LOC dispatcher into a pure `decide_route` + typed `CompileOutcome` (routing + substrate→model/max_turns precedence become table-testable; **no behavior change**). Designed via `improve-codebase-architecture` 2026-05-23; full design + slice breakdown `.ytstack/backlog/compile-dispatch-seam.md` (committed `1510986`). CONTEXT + ROADMAP at `.ytstack/M026-{CONTEXT,ROADMAP}.md`.
 
-**Next action:** M026-S01 (types: `CompileOutcome` + `Route` union in `compile_stages/types.py` + `route.py` scaffold). Write `M026-S01-PLAN.md` directly from the design doc (the `slice-milestone` gate aborts on named slices — documented workaround), then `ytstack:plan-task` → TDD.
+**Next action:** S01 complete (T01 `CompileOutcome` + `Route` shipped, commit `4647d47`). Proceeding to S02 (decide_route extraction) — `M026-S02-PLAN.md`, T01 = build `decide_route` + relocate helpers into `route.py` (unused → zero behavior change), T02 = wire `compile_file`.
 
 ---
 

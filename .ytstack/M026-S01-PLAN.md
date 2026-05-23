@@ -5,7 +5,7 @@ project: llm-wiki
 created: 2026-05-23T14:09:59+0200
 status: planned
 task_count: 1
-completed_tasks: 0
+completed_tasks: 1
 ---
 
 # M026-S01 -- Slice Plan
@@ -17,7 +17,7 @@ in `compile.py` calls them yet. A pure, safe, additive foundation slice.
 
 ## Tasks
 
-- [ ] T01 -- Add `CompileOutcome` to `compile_stages/types.py` (mirrors
+- [x] T01 -- Add `CompileOutcome` to `compile_stages/types.py` (mirrors
   `CompileResult` — string `failure_kind`/`failure_detail`, keeps `types.py`
   dependency-light) and the `Route` union to a new `compile_stages/route.py`
   (`Skip`/`IndexOnly`/`HealthStub`/`Compile` frozen dataclasses; `Compile` carries

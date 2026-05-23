@@ -5,7 +5,7 @@ size: M
 created: 2026-05-23T14:09:59+0200
 status: planned
 total_slices: 4
-completed_slices: 0
+completed_slices: 1
 ---
 
 # M026 Roadmap
@@ -24,7 +24,7 @@ Slice detail lives in per-slice `M026-S##-PLAN.md` files. Full pre-grilled break
 
 Pure refactor — each slice ends green + the engine still compiles a fixture identically (modulo LLM non-determinism).
 
-- [ ] S01 -- Types: `CompileOutcome` + `Route` union in `compile_stages/types.py` + `route.py` scaffold (1-2 tasks)
+- [x] S01 -- Types: `CompileOutcome` + `Route` union in `compile_stages/types.py` + `route.py` scaffold (1-2 tasks) — shipped `4647d47`
 - [ ] S02 -- `decide_route` extraction: relocate `SUBSTRATE_PROMPTS`/`_DEFAULT_DISPATCH`/`_substrate_key`/`_frontmatter_*` + role/skip/dispatch/classify into pure `route.py:decide_route`; table-test route + precedence. `compile_file` calls it but still executes inline (behavior identical). (2-3 tasks)
 - [ ] S03 -- Execution handlers: extract `index_source_and_final` / `record_health_stub` / `run_compile` (incl. memory pre-pass + chunk-loop) into `execute.py`; `compile_file` becomes the `match` dispatcher returning `CompileOutcome`. (2-3 tasks)
 - [ ] S04 -- `main()` rewire: loop consumes `CompileOutcome`, single `save_state` via `ingest_hash`; delete `_STATE_MUTATING_SKIPS` + magic-key dict + dead `_build_owner_block`; lxw E2E smoke. (2 tasks)
