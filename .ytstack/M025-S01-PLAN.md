@@ -5,7 +5,7 @@ project: llm-wiki
 created: 2026-05-23T08:53:30+0200
 status: planned
 task_count: 3
-completed_tasks: 2
+completed_tasks: 3
 ---
 
 # M025-S01 -- Slice Plan
@@ -28,7 +28,7 @@ capture-ID to its source path. Pure capture-side spine -- no compile/agent chang
   `config.example.yaml`; register the collector in the Registry with
   `piggyback_default`; add the keys to `scripts/migrations/migrate_config_keys.py`;
   sync `templates/`. Unit test: migration injects the new keys.
-- [ ] T03 -- Capture index: deterministic `state/capture_index.json` mapping
+- [x] T03 -- Capture index: deterministic `state/capture_index.json` mapping
   `capture_id → {source_path, created, status: "open"}`, written at ingest. This is
   the bridge S02 (forward link) and S03 (supersede) both consume. Unit tests: index
   updated on ingest, idempotent re-run, entry survives source re-ingest.

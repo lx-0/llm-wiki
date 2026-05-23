@@ -3,9 +3,9 @@ milestone: M025
 project: llm-wiki
 size: M
 created: 2026-05-23T08:42:54+0200
-status: planned
+status: in-progress
 total_slices: 3
-completed_slices: 0
+completed_slices: 1
 ---
 
 # M025 Roadmap
@@ -27,7 +27,7 @@ superseded and regenerates the affected article on its next compile cycle.
 Slice detail lives in per-slice `M025-S##-PLAN.md` files, created by
 `ytstack:slice-milestone`. Suggested framing (refine in slice-milestone):
 
-- [ ] S01 -- Capture spine: collector + stable capture-ID + capture index (3 tasks)
+- [x] S01 -- Capture spine: collector + stable capture-ID + capture index (3 tasks)
 - [ ] S02 -- Observable loop: capture→article resolution + digest section + correction recognition (3 tasks)
 - [ ] S03 -- Correction write-back: supersede-marker + compile regenerate, E2E (4 tasks)
 

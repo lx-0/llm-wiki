@@ -1,7 +1,7 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-05-23T17:42:00+0200
+last_updated: 2026-05-23T18:58:00+0200
 current_milestone: M025
 active_slice: S01
 active_task: none
@@ -17,7 +17,7 @@ parallel_milestones: [M021]
 
 **Status (M026 planning, historical):** M026 planned (M, 4 slices). Compile-dispatch seam — split `compile_file`'s 404-LOC dispatcher into a pure `decide_route` + typed `CompileOutcome` (routing + substrate→model/max_turns precedence become table-testable; **no behavior change**). Designed via `improve-codebase-architecture` 2026-05-23; full design + slice breakdown `.ytstack/backlog/compile-dispatch-seam.md` (committed `1510986`). CONTEXT + ROADMAP at `.ytstack/M026-{CONTEXT,ROADMAP}.md`.
 
-**Next action (LIVE):** M025 / S01 — **2/3 tasks done** (T01 capture-collector `f869398`; T02 operator-expose knob+migration+docs `6debfbe`). Next: **T03** — `state/capture_index.json` (`capture_id → {source_path, created, status: "open"}`), the bridge S02 forward-link + S03 supersede both consume. Run `/ytstack:plan-task`. Deferred S01 follow-up: `docs/setup-capture.md` operator recipe (mirror setup-voice.md). All M025 commits local — push gated.
+**Next action (LIVE):** M025 / **S01 COMPLETE — 3/3 tasks done** (T01 collector `f869398`; T02 knob+migration+docs `6debfbe`; T03 capture-index `f25abe5`). The capture-side spine (collector + content-ID + `state/capture_index.json`) is shipped. Next: run `/ytstack:reassess-roadmap` to check the plan still fits, then `/ytstack:slice-milestone` for **S02 (forward link** — daily-digest surfaces captures by ID + the brain's interpretation, consumes `capture_index.load()`). S03 then adds the supersede writer (`status: superseded`). Deferred S01 follow-up: `docs/setup-capture.md` operator recipe. All M025 commits local — push gated.
 
 **Next action (M026, historical):** S01 complete (T01 `CompileOutcome` + `Route` shipped, commit `4647d47`). Proceeding to S02 (decide_route extraction) — `M026-S02-PLAN.md`, T01 = build `decide_route` + relocate helpers into `route.py` (unused → zero behavior change), T02 = wire `compile_file`.
 
