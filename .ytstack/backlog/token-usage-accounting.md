@@ -65,9 +65,9 @@ All config changes carry a same-commit `migrate_config_keys.py` extension (hard 
 
 This is M021's **"cost shape"** open question, answered: usage = tokens per provider/model. `core/usage.py` is the accounting half of the seam; `scripts/llm.py` (the call-wrapping half, M021) will fold the per-site `LEDGER.record(...)` calls into the wrapper. Built standalone now so it doesn't block on M021's slicing (parallel-owned).
 
-## Phase 5 (Visualize) — diagram deferred, NOT skipped
+## Phase 5 (Visualize) — DONE 2026-05-23
 
-Usage accounting is cross-cutting infra (every LLM call), not a new pillar with a single steady-state box, so it has no clean fold-in slot — and the hard rule forbids shipping an `.excalidraw` edit without the full 3-gate render review (bbox-overlap + glyph-width + zoom-crop). Deferred to do it properly: a small annotation near the SDK/compile region — "all LLM calls → token ledger (state/usage.json)" — done with the render-review, OR folded into the eventual M021 model-seam diagram update. Tracked here so it is not lost. (Mirrors the gmeet-email-discovery-infographic deferral pattern.)
+`docs/architecture.excalidraw`: folded the token model into the existing cost stat-card (steady-state, not a new box) — `~$3 / total compile cost` → `tokens / per provider · model`. Re-rendered `architecture.png` (auto-scale-1, diagram >10k px); 3 gates passed (bbox-overlap clean, glyph-width clean, zoom-crop + full-composition review clean). `docs/overview.excalidraw`: intentionally unchanged — it carries NO dollar/cost surface and usage-accounting is sub-hero internal infra with no natural fold-in slot; per the steady-state rule a feature with no slot is documented elsewhere, not forced into the hero. (If a future M021 model-seam diagram pass wants it, that's the place.)
 
 ## Follow-ups (surfaced by the 2026-05-23 doc-audit) — DONE
 
