@@ -551,6 +551,28 @@ EOF
   _run_script health_trends.py "$@"
 }
 
+cmd_usage() {
+  case "${1:-}" in
+    -h|--help|help)
+      cat <<EOF
+${C_BOLD}wiki usage${C_RESET} — token-usage ledger (tokens per provider/model)
+
+${C_BOLD}USAGE${C_RESET}
+  wiki usage                  last 7 days, per provider/model
+  wiki usage --days N         last N days (0 = all)
+  wiki usage --json           raw state/usage.json
+
+${C_BOLD}NOTES${C_RESET}
+  Usage is tracked in TOKENS per (provider, model), never dollars — Claude runs
+  on a subscription, Ollama is local. Recorded by every LLM call site into
+  \`state/usage.json\` (see core/usage.py). Read-only.
+EOF
+      return 0 ;;
+  esac
+  banner "wiki usage"
+  _run_script usage_report.py "$@"
+}
+
 cmd_query() {
   case "${1:-}" in
     ""|-h|--help|help)
@@ -1441,6 +1463,7 @@ case "${1:-}" in
   lint)             shift; cmd_lint "$@" ;;
   reconcile)        shift; cmd_reconcile "$@" ;;
   health-trends)    shift; cmd_health_trends "$@" ;;
+  usage)            shift; cmd_usage "$@" ;;
   query)            shift; cmd_query "$@" ;;
   agent)            shift; cmd_agent "$@" ;;
   correct)          shift; cmd_correct "$@" ;;

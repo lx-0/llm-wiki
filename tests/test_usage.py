@@ -88,3 +88,27 @@ def test_summary_line():
     L.record(model="claude-opus-4-7", input_tokens=1500, output_tokens=300)
     s = L.summary_line()
     assert "claude/claude-opus-4-7" in s and "1.5K in" in s and "300 out" in s
+
+
+def test_usage_report_renders(tmp_path, monkeypatch, capsys):
+    from core import usage
+    import usage_report
+    p = tmp_path / "usage.json"
+    L = usage.UsageLedger()
+    L.record(model="claude-opus-4-7", input_tokens=12000, output_tokens=3400)
+    L.record(model="gemma4:e4b", input_tokens=800, output_tokens=200)
+    L.persist(p, day="2026-05-23")
+    monkeypatch.setattr(usage_report, "USAGE_FILE", p)
+    monkeypatch.setattr("sys.argv", ["usage_report", "--days", "7"])
+    assert usage_report.main() == 0
+    out = capsys.readouterr().out
+    assert "claude:claude-opus-4-7" in out and "12.0K in" in out
+    assert "ollama:gemma4:e4b" in out and "Totals" in out
+
+
+def test_usage_report_absent_is_graceful(tmp_path, monkeypatch, capsys):
+    import usage_report
+    monkeypatch.setattr(usage_report, "USAGE_FILE", tmp_path / "nope.json")
+    monkeypatch.setattr("sys.argv", ["usage_report"])
+    assert usage_report.main() == 0
+    assert "No usage recorded" in capsys.readouterr().out
