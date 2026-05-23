@@ -1336,3 +1336,12 @@ meetings ingested, idempotent, clean UTF-8. Infographic deferred:
 **Relation to M021:** this answers M021's open "cost shape" question (usage = tokens per provider/model). `core/usage.py` is the accounting half of the model seam; the M021 `scripts/llm.py` wrapper will later fold the per-site `record()` calls into the wrapper. Built standalone now to avoid blocking on M021's slicing (parallel-owned).
 
 **Linked artifacts:** `.ytstack/backlog/token-usage-accounting.md` (concept + blast radius); `scripts/core/usage.py` (ledger); `scripts/core/ollama_client.py` + `compile_stages/compile.py` + `dream.py` + `facts/correct_apply.py` + `reports/_engine/lib/{inference,analyst}.py` (capture sites); `scripts/core/config.py` + `migrations/migrate_config_keys.py` (USD caps -> token/structural); `scripts/reconcile.py` (structural gate).
+
+## 2026-05-23: M025 correction back-channel uses a supersede-marker + next-compile regeneration, not a surgical patch
+
+**Context:** M025 (capture-correction-loop) lets the operator overturn the brain's wrong reading of a cryptic quick-capture. The obvious "instant" design patches just the affected `knowledge/` article in place. But `knowledge/` writes are agent-side via SDK tool-use (the M018 / `commit_article` finding), so a targeted single-item Python-side patch is re-architecture, not a small feature.
+**Options considered:** (A) recapture + `reconcile`; (B) full instant targeted surgical patch; (B-minus) supersede-marker honoured by the next normal compile cycle.
+**Chose:** B-minus.
+**Reason:** (A) is rejected because `reconcile` is fact-violation-only and never fires for free-text corrections. (B) carries the M018-class agent-side-write re-architecture risk. B-minus eliminates that risk rather than mitigating it; the operator corrects async via the digest anyway, so an instant patch is not required; and the ID-keyed supersede-marker is the substrate-agnostic primitive that generalizes toward the longer-term "all interpretations correctable + brain learns priors" direction, whereas a surgical patch would be bespoke and less on-trajectory.
+**Supersedes:** —
+**Linked artifacts:** `.ytstack/OFFICE-HOURS-capture-correction-loop.md`, `.ytstack/M025-CONTEXT.md`. Reaffirms the M018 agent-side-write constraint (`.ytstack/backlog/commit-article-manifest.md`).
