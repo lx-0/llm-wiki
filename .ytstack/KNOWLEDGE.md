@@ -2234,3 +2234,15 @@ Reusable lessons:
 - **A high-volume substrate's value is its aggregate, not its rows.** Don't route per-row through an LLM compile; skip the rows deterministically + add a deterministic aggregation consumer. (Generalizes beyond health: any metric/event stream.)
 - **Coverage-aware aggregation is mandatory** when a corpus spans eras with different schemas (HealthKit 2014-2018: distance/flights/weight; Oura 2022+: sleep/hrv; 2019-2021 gap). Gate metrics on min-coverage + require ≥3 points in both trend windows, else `·` — never draw a trend across a data gap.
 - **Sentinel-managed block, regenerated wholesale** (`<!-- health-trends:begin/end -->`, mirroring the backlinks footer) — the anti-bloat opposite of the unbounded `compiled_from` list that started this whole arc.
+
+## Usage accounting is tokens per provider/model, never a dollar currency (2026-05-23)
+
+**Symptom:** `wiki reconcile` (default-off) skipped every fact pre-flight even when enabled — it could never reconcile anything.
+
+**Root cause:** `correct_apply._estimate_cost_usd` had a FIXED output floor (`1500 × $75/Mtok = $0.1125`) that already exceeded the `$0.10` per-fact cap, so `est > cap` was true for every fact regardless of size. A `prompt_chars → $` pre-estimate is also structurally wrong for an agentic loop: it ignores the dominant cost (the agent reading/editing N files over many turns), so it simultaneously over-shot the cap on its floor AND under-counted broad facts (it pegged a 124-file fact at $0.18; real cost would be several dollars).
+
+**Deeper root cause:** dollars are the wrong unit here. Claude runs on a subscription (SDK `total_cost_usd` reflects an API rate-card that does not apply); Ollama is local/free. One USD currency conflates non-commensurable billing.
+
+**Fix / standing rule:** usage is tracked in TOKENS per `(provider, model)` via `core/usage.py` (`UsageLedger`, process-global `LEDGER`, `atexit`-flushed to `state/usage.json`, surfaced by `wiki usage`). The Ollama client records automatically; Claude SDK sites record `AssistantMessage.usage` after their loop. Gates are token ceilings (from real usage) or structural (file-count, fact-count, turns) — never dollars. Pre-flight `prompt_chars → $` estimates were removed; prompt-**size** (chars) preflight is kept ONLY as a context-overflow guard, a distinct concern from cost. A dollar figure may appear only for a provider explicitly registered as pay-per-token.
+
+**Two transferable lessons:** (1) a fixed floor in a pre-flight estimate that exceeds the cap silently disables the gated feature — assert floor < cap, or don't floor. (2) a cost model must match the provider's actual billing; gating on a rate-card that doesn't apply (subscription) is gating on a fiction. Full rationale: DECISIONS 2026-05-23; spec `.ytstack/backlog/token-usage-accounting.md`.

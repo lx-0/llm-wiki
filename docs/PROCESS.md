@@ -1254,5 +1254,30 @@ flowchart TD
 - **No health corpus** → no-op (logs, exits 0).
 - **concepts/health.md absent** → created with minimal `type: concept` frontmatter + the block.
 - **Existing backlinks footer** → the trends block is inserted before it; both sentinel blocks coexist.
+
+
+## 16. Usage Accounting (tokens per provider/model)
+
+Every LLM call — Claude (subscription) and Ollama (local) — is metered in TOKENS, keyed by `(provider, model)`. There is no dollar currency in the engine: `total_cost_usd` is meaningless under a Claude subscription and Ollama is free, so one USD figure would conflate non-commensurable billing (DECISIONS 2026-05-23).
+
+```mermaid
+flowchart TD
+    OLL["ollama_client.chat / chat_schema / chat_vision"] -->|/v1 usage OR<br/>prompt_eval_count and eval_count| LED["core/usage.LEDGER<br/>(provider, model) maps to in / out / calls"]
+    CLA["compile, dream, reconcile, study-inference, analyst<br/>(Claude SDK message loop)"] -->|AssistantMessage.usage| LED
+    LED -->|atexit flush, fcntl-locked| FILE["state/usage.json<br/>date maps to provider:model maps to in/out/calls"]
+    FILE --> REP["wiki usage  — read-only report"]
+```
+
+**Capture** is centralized: the Ollama client records automatically (no caller changes); Claude sites record their accumulated `input_tokens`/`output_tokens` after each query. **Persistence** is an `atexit` flush of the process-global ledger, so every process (compile, dream, reconcile, collect, hooks) writes its run totals with no per-entrypoint wiring. **Gates** are token or structural, never dollars: `compile_max_tokens_per_file` (batch-abort on overrun, `kind=tokens_exceeded`), `dream_entity_max_prompt_chars` (a context-size guard) + `dream_cycle_max_tokens_per_run`, and reconcile's `concept_reconcile_max_files_per_fact` + `_max_facts_per_run`. Defaults are faithful translations of the prior USD caps — re-tune from `state/usage.json` once real data accrues.
+
+A dollar figure may appear ONLY for a provider explicitly registered as pay-per-token with a rate-card (none today). This is the accounting half of the planned M021 model seam; `scripts/llm.py` will later fold the per-site `LEDGER.record()` calls into the call wrapper.
+
+### Edge Cases
+
+- **`total_cost_usd` absent/zero** (subscription) → never read; the ledger uses token counts only.
+- **Ollama unreachable** → nothing recorded for that key; the ledger stays empty. Fine.
+- **Parallel writers** to `state/usage.json` → fcntl lock + read-merge-write.
+- **Unknown model id** → defaults to the `ollama` (local) provider; a real pay-per-token provider must be added to `provider_for_model` explicitly.
+- **Best-effort** — a missed/double record degrades the report, never correctness (observability, not control flow).
 - **Non-numeric frontmatter** (sensitivity, sources, date) → ignored; only real numbers aggregate.
 - **Anti-bloat** → ONE sentinel block replaced in place each run — the opposite of the per-file compiled_from bloat that motivated the per-day deterministic skip.

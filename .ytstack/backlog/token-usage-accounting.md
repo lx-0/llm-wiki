@@ -1,6 +1,6 @@
 # Token-usage accounting — tokens per (provider, model), not a dollar currency
 
-**Status:** BUILDING 2026-05-23 (operator-directed pull-forward of M021's "cost shape" question). Concept->Verify done; implementing the ledger + wiring. Follows the `llm-wiki-change` 5-phase process, NOT a ytstack milestone (M021/M025 are parallel-owned -- this is a focused arc that *feeds* M021's model seam, doesn't re-slice it).
+**Status:** SHIPPED 2026-05-23 (operator-directed pull-forward of M021's "cost shape" question). Ledger + all call sites + USD-cap migration + `wiki usage` + docs all landed; full suite green (4 pre-existing dream_sampling time-drift failures unrelated). Follows the `llm-wiki-change` 5-phase process, NOT a ytstack milestone (M021/M025 are parallel-owned -- this is a focused arc that *feeds* M021's model seam, doesn't re-slice it).
 
 ## Why (the premise the operator challenged)
 
@@ -64,6 +64,10 @@ All config changes carry a same-commit `migrate_config_keys.py` extension (hard 
 ## Relation to M021 (model seam)
 
 This is M021's **"cost shape"** open question, answered: usage = tokens per provider/model. `core/usage.py` is the accounting half of the seam; `scripts/llm.py` (the call-wrapping half, M021) will fold the per-site `LEDGER.record(...)` calls into the wrapper. Built standalone now so it doesn't block on M021's slicing (parallel-owned).
+
+## Phase 5 (Visualize) — diagram deferred, NOT skipped
+
+Usage accounting is cross-cutting infra (every LLM call), not a new pillar with a single steady-state box, so it has no clean fold-in slot — and the hard rule forbids shipping an `.excalidraw` edit without the full 3-gate render review (bbox-overlap + glyph-width + zoom-crop). Deferred to do it properly: a small annotation near the SDK/compile region — "all LLM calls → token ledger (state/usage.json)" — done with the render-review, OR folded into the eventual M021 model-seam diagram update. Tracked here so it is not lost. (Mirrors the gmeet-email-discovery-infographic deferral pattern.)
 
 ## Related
 
