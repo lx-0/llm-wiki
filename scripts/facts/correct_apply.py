@@ -174,7 +174,8 @@ async def apply(slug: str, dry_run: bool) -> int:
 # is the broad operator-driven "propagate one fact across the whole vault"
 # (acceptEdits + Bash + 50 turns). reconcile_fact() is the autonomous-routine
 # primitive: writes locked to knowledge/concepts/ via a PreToolUse hook, no
-# Bash, bounded turns, pre-flight cost cap. apply() is left untouched.
+# Bash, bounded turns; structural file-count gate lives in reconcile.py.
+# apply() is left untouched.
 
 
 @dataclass
@@ -186,21 +187,11 @@ class ReconcileResult:
     detail: str = ""
 
 
-def _estimate_cost_usd(prompt_chars: int) -> float:
-    """Conservative pre-flight estimate: input @ ~$15/Mtok + ~1.5k output tokens
-    @ ~$75/Mtok (Opus-class). Gates the call BEFORE spend; real cost is read
-    from ResultMessage.total_cost_usd after."""
-    input_cost = (prompt_chars / 4) * 15 / 1_000_000.0
-    output_cost = 1500 * 75 / 1_000_000.0
-    return round(input_cost + output_cost, 4)
-
-
 async def reconcile_fact(
     slug: str,
     violating_files: list[str],
     *,
     dry_run: bool,
-    per_fact_cap_usd: float,
 ) -> ReconcileResult:
     """Reconcile the given concept files against one hard fact, strict-scoped.
 
@@ -228,15 +219,10 @@ async def reconcile_fact(
         violating_files=files_block,
     )
 
-    est = _estimate_cost_usd(len(prompt))
-    if est > per_fact_cap_usd:
-        return ReconcileResult(
-            slug, "skipped", detail=f"pre-flight est ${est} > per-fact cap ${per_fact_cap_usd}",
-        )
     if dry_run:
         return ReconcileResult(
             slug, "dry_run", files=violating_files,
-            detail=f"would reconcile {len(violating_files)} file(s) (est ${est})",
+            detail=f"would reconcile {len(violating_files)} file(s)",
         )
 
     started = _time.time()

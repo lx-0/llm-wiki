@@ -44,6 +44,7 @@ import yaml
 from core.paths import FACTS_DIR, LOG_FILE, ROOT_DIR
 from core.config import CONFIG  # noqa: E402
 from core.utils import now_iso  # noqa: E402
+from core.usage import LEDGER  # noqa: E402
 
 import lint  # noqa: E402
 from facts.correct_apply import ReconcileResult, reconcile_fact  # noqa: E402
@@ -137,52 +138,51 @@ async def run(*, apply: bool, limit: int | None) -> int:
         return 0
 
     cooldown_days = CONFIG.scheduling.concept_reconcile_cooldown_days
-    per_fact_cap = CONFIG.limits.concept_reconcile_per_fact_max_cost_usd
-    per_run_cap = CONFIG.limits.concept_reconcile_max_cost_per_run_usd
+    max_files = CONFIG.limits.concept_reconcile_max_files_per_fact
+    max_facts = limit if limit is not None else CONFIG.limits.concept_reconcile_max_facts_per_run
 
     # Deterministic order: most-violating facts first.
     candidates = sorted(by_slug.items(), key=lambda kv: len(kv[1]), reverse=True)
     total_facts = len(candidates)
     n_files = sum(len(v) for v in by_slug.values())
     log.info(
-        "%d fact(s) violated across %d concept file(s). mode=%s caps: per-fact $%.2f / per-run $%.2f",
-        total_facts, n_files, "DRY-RUN" if dry_run else "APPLY", per_fact_cap, per_run_cap,
+        "%d fact(s) violated across %d concept file(s). mode=%s gates: <=%d files/fact, <=%d facts/run",
+        total_facts, n_files, "DRY-RUN" if dry_run else "APPLY", max_files, max_facts,
     )
 
     results: list[ReconcileResult] = []
-    spent = 0.0
     processed = 0
     for slug, files in candidates:
-        if limit is not None and processed >= limit:
-            log.info("  --limit %d reached; stopping.", limit)
+        if processed >= max_facts:
+            log.info("  reached %d facts this run — stopping sweep.", max_facts)
             break
+        if len(files) > max_files:
+            log.info("  %s: %d files > max_files_per_fact (%d) — skipping (too broad, manual review)",
+                     slug, len(files), max_files)
+            continue
         if _within_cooldown(slug, cooldown_days=cooldown_days):
             log.info("  %s: within cooldown (%dd) — skipping", slug, cooldown_days)
             continue
-        if not dry_run and spent >= per_run_cap:
-            log.warning("  per-run cap $%.2f reached ($%.4f spent) — stopping sweep", per_run_cap, spent)
-            break
         log.info("  reconciling fact %s → %d concept file(s)", slug, len(files))
-        res = await reconcile_fact(slug, files, dry_run=dry_run, per_fact_cap_usd=per_fact_cap)
+        res = await reconcile_fact(slug, files, dry_run=dry_run)
         results.append(res)
-        spent += res.cost_usd
         processed += 1
-        log.info("    %s — %s (%s)%s", slug, res.status, res.detail,
-                 f" ${res.cost_usd:.4f}" if res.cost_usd else "")
+        log.info("    %s — %s (%s)", slug, res.status, res.detail)
 
     ok = [r for r in results if r.status == "ok"]
     skipped = [r for r in results if r.status in ("skipped", "dry_run")]
     failed = [r for r in results if r.status == "failed"]
     log.info(
-        "reconcile done: %d ok · %d skipped/dry · %d failed · $%.4f spent",
-        len(ok), len(skipped), len(failed), spent,
+        "reconcile done: %d ok · %d skipped/dry · %d failed",
+        len(ok), len(skipped), len(failed),
     )
+    log.info("  %s", LEDGER.summary_line())
 
     if apply and ok:
         _append_log_summary([
             f"- Facts auto-reconciled: {len(ok)} ({', '.join(r.slug for r in ok)})",
             f"- Concept files touched: {sum(len(r.files) for r in ok)}",
-            f"- Cost: ${spent:.4f}",
+            f"- {LEDGER.summary_line()}",
             "- Propose-only (contradictions / quality): see `wiki lint` / the lint dashboard — not auto-applied.",
         ])
     return 0

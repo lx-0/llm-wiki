@@ -207,8 +207,8 @@ KEY_ADDITIONS: dict[str, dict[str, object]] = {
         # Concept-reconciliation routine (2026-05-22). Cost caps + turn budget
         # for the autonomous `wiki reconcile` strict correct_apply.
         # See `.ytstack/backlog/concept-consistency-routine.md`.
-        "concept_reconcile_per_fact_max_cost_usd": 0.10,
-        "concept_reconcile_max_cost_per_run_usd": 0.50,
+        "concept_reconcile_max_files_per_fact": 25,
+        "concept_reconcile_max_facts_per_run": 10,
         "concept_reconcile_max_turns": 15,
         # Health-trend synthesis (2026-05-23). Recent-window + min-coverage for
         # `wiki health-trends`. See `.ytstack/backlog/health-trend-synthesis.md`.
@@ -399,6 +399,13 @@ LIST_REMOVALS: dict[str, list[object]] = {
 # in operator configs are silently ignored on load but linger as YAML cruft
 # until pruned. Structure: parent block name → set of orphan field names.
 KEY_DROPS: dict[str, set[str]] = {
+    "limits": {
+        # Removed 2026-05-23 — USD cost caps replaced by token/structural gates
+        # (DECISIONS 2026-05-23; usage tracked in tokens per provider/model via
+        # core/usage.py, never gated in dollars).
+        "concept_reconcile_per_fact_max_cost_usd",
+        "concept_reconcile_max_cost_per_run_usd",
+    },
     "personal": {
         # Removed 2026-05-15 (M006) — calendar moved off Thunderbird-SQLite
         # to Google Calendar v3. These three were scan_calendar-only knobs

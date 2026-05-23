@@ -102,32 +102,56 @@ def test_reconcile_fact_dry_run_makes_no_sdk_call(monkeypatch, tmp_path):
 
     res = asyncio.run(correct_apply.reconcile_fact(
         "no-x", [str(tmp_path / "knowledge/concepts/foo.md")],
-        dry_run=True, per_fact_cap_usd=1.0,
+        dry_run=True,
     ))
     assert res.status == "dry_run"
     assert res.cost_usd == 0.0
 
 
-def test_reconcile_fact_cost_cap_skips(monkeypatch, tmp_path):
-    from facts import correct_apply
+def test_run_skips_facts_exceeding_max_files(monkeypatch):
+    """Structural gate (replaces the old USD pre-flight): a fact violating more
+    than max_files_per_fact concept files is skipped for manual review and
+    reconcile_fact is never called for it."""
+    import reconcile
 
-    facts = tmp_path / "facts"
-    facts.mkdir()
-    monkeypatch.setattr(correct_apply, "FACTS_DIR", facts)
-    monkeypatch.setattr(correct_apply, "ROOT_DIR", tmp_path)
-    (facts / "no-x.md").write_text("---\ntype: fact\nstatus: negation\nnegation_terms: [x]\n---\n\nX is false.\n")
+    monkeypatch.setattr(reconcile, "_fact_violations_by_slug",
+                        lambda: {"broad": [f"/c/{i}.md" for i in range(50)],
+                                 "narrow": ["/c/a.md"]})
+    monkeypatch.setattr(reconcile.CONFIG.limits, "concept_reconcile_max_files_per_fact", 25)
+    monkeypatch.setattr(reconcile.CONFIG.limits, "concept_reconcile_max_facts_per_run", 10)
+    monkeypatch.setattr(reconcile, "_within_cooldown", lambda *a, **k: False)
 
-    def boom(*a, **kw):
-        raise AssertionError("query() must not be called when over cost cap")
+    called: list[str] = []
 
-    monkeypatch.setattr(correct_apply, "query", boom)
+    async def fake_reconcile_fact(slug, files, *, dry_run):
+        from facts.correct_apply import ReconcileResult
+        called.append(slug)
+        return ReconcileResult(slug, "dry_run", files=files)
 
-    res = asyncio.run(correct_apply.reconcile_fact(
-        "no-x", [str(tmp_path / "knowledge/concepts/foo.md")],
-        dry_run=False, per_fact_cap_usd=0.0,  # impossible cap → must skip pre-flight
-    ))
-    assert res.status == "skipped"
-    assert "cap" in res.detail.lower()
+    monkeypatch.setattr(reconcile, "reconcile_fact", fake_reconcile_fact)
+    asyncio.run(reconcile.run(apply=False, limit=None))
+    assert called == ["narrow"]  # broad (50 files > 25) skipped
+
+
+def test_run_respects_max_facts_per_run(monkeypatch):
+    import reconcile
+
+    monkeypatch.setattr(reconcile, "_fact_violations_by_slug",
+                        lambda: {f"f{i}": ["/c/a.md"] for i in range(5)})
+    monkeypatch.setattr(reconcile.CONFIG.limits, "concept_reconcile_max_files_per_fact", 25)
+    monkeypatch.setattr(reconcile.CONFIG.limits, "concept_reconcile_max_facts_per_run", 2)
+    monkeypatch.setattr(reconcile, "_within_cooldown", lambda *a, **k: False)
+
+    called: list[str] = []
+
+    async def fake_reconcile_fact(slug, files, *, dry_run):
+        from facts.correct_apply import ReconcileResult
+        called.append(slug)
+        return ReconcileResult(slug, "dry_run", files=files)
+
+    monkeypatch.setattr(reconcile, "reconcile_fact", fake_reconcile_fact)
+    asyncio.run(reconcile.run(apply=False, limit=None))
+    assert len(called) == 2  # capped at max_facts_per_run
 
 
 def test_reconcile_fact_missing_fact_fails(monkeypatch, tmp_path):
@@ -137,6 +161,6 @@ def test_reconcile_fact_missing_fact_fails(monkeypatch, tmp_path):
     facts.mkdir()
     monkeypatch.setattr(correct_apply, "FACTS_DIR", facts)
     res = asyncio.run(correct_apply.reconcile_fact(
-        "ghost", ["/x/concepts/foo.md"], dry_run=True, per_fact_cap_usd=1.0,
+        "ghost", ["/x/concepts/foo.md"], dry_run=True,
     ))
     assert res.status == "failed"

@@ -474,13 +474,15 @@ class Limits:
     # to cover 2-3 typical entity resyntheses per run.
     dream_cycle_max_cost_per_run_usd: float = 5.0
     # Autonomous concept-reconciliation routine (concept-consistency-routine).
-    # Per-fact pre-flight cost cap: reject a strict `correct_apply` if its
-    # estimated cost exceeds this. Default $0.10 — concepts are small + the
-    # strict prompt is tight; gates against a runaway reconciliation.
-    concept_reconcile_per_fact_max_cost_usd: float = 0.10
-    # Cumulative per-run USD cap for `wiki reconcile` + the concept_reconcile
-    # piggyback. Stops sweeping once cumulative cost crosses it. Default $0.50.
-    concept_reconcile_max_cost_per_run_usd: float = 0.50
+    # Structural gates, NOT dollars (DECISIONS 2026-05-23 — usage is tracked in
+    # tokens per provider/model via core/usage.py, never gated in USD). A fact
+    # violating more than this many concept files is "too broad to auto-
+    # reconcile" and is skipped for manual review rather than letting one agent
+    # rewrite a large swath of the corpus unattended. Default 25.
+    concept_reconcile_max_files_per_fact: int = 25
+    # Max facts reconciled per `wiki reconcile` run / concept_reconcile piggyback.
+    # Bounds a sweep structurally; `--limit` overrides. Default 10.
+    concept_reconcile_max_facts_per_run: int = 10
     # Turn budget for the strict concept-reconciliation agent. Tight: the task
     # is "edit one flagged concept to match one fact", not corpus synthesis.
     concept_reconcile_max_turns: int = 15
