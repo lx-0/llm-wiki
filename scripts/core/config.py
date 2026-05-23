@@ -484,6 +484,11 @@ class Limits:
     # Turn budget for the strict concept-reconciliation agent. Tight: the task
     # is "edit one flagged concept to match one fact", not corpus synthesis.
     concept_reconcile_max_turns: int = 15
+    # Health-trend synthesis (`wiki health-trends`). Recent-window length (months)
+    # for the trend arrow + "recent avg" column; min coverage (days) for a metric
+    # to appear (drops near-empty series so no fake trends over data gaps).
+    health_trends_recent_months: int = 6
+    health_trends_min_coverage_days: int = 10
     # M016 dream-cycle sampled-activation knobs (2026-05-17). Replaces the
     # M014 "load all mentioning files" approach that hit 2.3 MB context
     # overflow on the operator's own page. 4-tier corpus assembly bounded
@@ -517,6 +522,10 @@ class Features:
     # after reviewing a `wiki reconcile --dry-run` diff. When False, the
     # `concept_reconcile` piggyback skips and `wiki reconcile` warns.
     concept_reconciliation: bool = False
+    # Health-trend synthesis (`wiki health-trends`). When False, `wiki
+    # health-trends` falls back to dry-run (prints, writes nothing) and the
+    # health_trends piggyback skips. Deterministic + $0 — safe to enable.
+    health_trends: bool = False
     # Pre-compile sweep of <vault>/Clippings/*.md into <vault>/raw/articles/
     # so Obsidian Web Clipper output reaches the source-glob. Cheap no-op when
     # Clippings/ is empty or absent. Set false if you reconfigure the Web

@@ -210,6 +210,10 @@ KEY_ADDITIONS: dict[str, dict[str, object]] = {
         "concept_reconcile_per_fact_max_cost_usd": 0.10,
         "concept_reconcile_max_cost_per_run_usd": 0.50,
         "concept_reconcile_max_turns": 15,
+        # Health-trend synthesis (2026-05-23). Recent-window + min-coverage for
+        # `wiki health-trends`. See `.ytstack/backlog/health-trend-synthesis.md`.
+        "health_trends_recent_months": 6,
+        "health_trends_min_coverage_days": 10,
     },
     "scheduling": {
         # M014 dream-cycle (2026-05-16). Per-entity cooldown — entities
@@ -241,6 +245,10 @@ KEY_ADDITIONS: dict[str, dict[str, object]] = {
         # scoped autonomous writes to knowledge/concepts/; opt in after a
         # `wiki reconcile --dry-run` review. See backlog doc.
         "concept_reconciliation": False,
+        # Health-trend synthesis (2026-05-23) — deterministic + $0, default OFF.
+        # When True, `wiki health-trends` writes the trends block + the
+        # health_trends piggyback runs. See health-trend-synthesis.md.
+        "health_trends": False,
         # 2026-05-17 voice-punctuation pre-process. Calls Ollama
         # classify_model on every voice ingest to add punctuation +
         # German-noun-case to dictation transcripts. Raw text preserved

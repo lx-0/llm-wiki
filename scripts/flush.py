@@ -116,6 +116,10 @@ _LEGACY_PIGGYBACK_COMMANDS: dict[str, list[str]] = {
     # `features.concept_reconciliation` (off → it falls back to a no-op
     # dry-run). See `.ytstack/backlog/concept-consistency-routine.md`.
     "concept_reconcile": ["reconcile.py", "--apply", "--limit", "{max_per_run}"],
+    # Health-trend synthesis (2026-05-23). Deterministic ($0). Double-gated:
+    # needs a `piggybacks.health_trends` block (default absent → skipped) AND
+    # `features.health_trends` (off → health_trends.py falls back to dry-run).
+    "health_trends": ["health_trends.py"],
 }
 
 

@@ -353,6 +353,10 @@ limits:
   concept_reconcile_per_fact_max_cost_usd: 0.10
   concept_reconcile_max_cost_per_run_usd: 0.50
   concept_reconcile_max_turns: 15
+  # Health-trend synthesis (`wiki health-trends`). Recent-window (months) for the
+  # trend arrow + "recent avg"; min coverage (days) for a metric to be shown.
+  health_trends_recent_months: 6
+  health_trends_min_coverage_days: 10
   # M016 dream-cycle sampled-activation. Bounds corpus size per dream by
   # construction (~600 KB total regardless of vault size). Tier 1 always
   # includes the N most-recent substrate files mentioning the entity + the
@@ -420,6 +424,10 @@ features:
   # first, then flip. Also needs a `piggybacks.concept_reconcile` block to run
   # automatically. Spec: `.ytstack/backlog/concept-consistency-routine.md`.
   concept_reconciliation: false
+  # Health-trend synthesis (`wiki health-trends`). Deterministic + $0. When true,
+  # writes a `## Trends` block into concepts/health.md + the health_trends
+  # piggyback runs. Safe to enable. Spec: health-trend-synthesis.md.
+  health_trends: false
 
 graph_view:
   # Mode: knowledge-only | full-vault | sources-only | custom

@@ -140,8 +140,9 @@ def test_migrate_config_file_round_trip(tmp_path):
     #  + 1 limits.dream_per_call_timeout_s (M014 — same pre-existing gap)
     #  + 3 limits.concept_reconcile_* + 1 scheduling.concept_reconcile_cooldown_days
     #    + 1 features.concept_reconciliation (2026-05-22 concept-consistency-routine)
-    # = 56 changes (no drops — operator has no orphan personal.* fields)
-    assert len(changes) == 56, f"got {len(changes)} changes: {changes}"
+    # +3 health_trends (2 limits + 1 features), 2026-05-23
+    # = 59 changes (no drops — operator has no orphan personal.* fields)
+    assert len(changes) == 59, f"got {len(changes)} changes: {changes}"
 
     reparsed = yaml.safe_load(new_text)
     # piggyback side
@@ -218,6 +219,8 @@ def test_migrate_config_no_change_when_fully_current(tmp_path):
             "concept_reconcile_per_fact_max_cost_usd": 0.10,
             "concept_reconcile_max_cost_per_run_usd": 0.50,
             "concept_reconcile_max_turns": 15,
+            "health_trends_recent_months": 6,
+            "health_trends_min_coverage_days": 10,
         },
         "features": {
             "extract_takes": False,
@@ -227,6 +230,7 @@ def test_migrate_config_no_change_when_fully_current(tmp_path):
             "materialize_backlinks": True,
             "operator_reports": False,
             "concept_reconciliation": False,
+            "health_trends": False,
         },
         "personal": {
             "implicit_operator_author": None,
@@ -350,6 +354,8 @@ def test_migrate_additions_idempotent():
             "concept_reconcile_per_fact_max_cost_usd": 0.10,
             "concept_reconcile_max_cost_per_run_usd": 0.50,
             "concept_reconcile_max_turns": 15,
+            "health_trends_recent_months": 6,
+            "health_trends_min_coverage_days": 10,
         },
         "piggybacks": {
             "calendar": {"enabled": True, "cooldown_hours": 6, "max_per_run": 500},
@@ -367,6 +373,7 @@ def test_migrate_additions_idempotent():
             "materialize_backlinks": True,
             "operator_reports": False,
             "concept_reconciliation": False,
+            "health_trends": False,
         },
         "personal": {
             "implicit_operator_author": None,
