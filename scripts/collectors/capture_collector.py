@@ -22,9 +22,11 @@ divergences:
   (voice keys on timestamp+slug and lets identical notes coexist). No
   punctuation pass — captures may be article snippets; the body stays raw.
 
-`state/capture_index.json` (the ID→source/article map) is T03, not here.
-The piggyback override knob, `config.example.yaml` docs and `templates/`
-sync are T02. See `.ytstack/M025-S01-PLAN.md`.
+`state/capture_index.json` (the ID→source/article map) is written here at
+ingest via `core.capture_index.record()` (T03) — the bridge the correction
+loop consumes (S02 forward-link, S03 supersede). The piggyback override knob,
+`config.example.yaml` docs and `templates/` sync shipped in T02.
+See `.ytstack/M025-S01-PLAN.md`.
 """
 
 from __future__ import annotations
@@ -40,7 +42,7 @@ from zoneinfo import ZoneInfo
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from collectors.base import CollectorSpec, RunResult, register
-from core import daily_capture
+from core import capture_index, daily_capture
 from core.config import CONFIG, TIMEZONE
 from core.paths import RAW_DIR
 
@@ -194,6 +196,19 @@ class CaptureCollector:
                 encoding="utf-8",
             )
             written.append(out_path)
+
+            # Register in the capture index (the correction-loop bridge). The
+            # article is already on disk — an index miss is degraded, not fatal,
+            # so surface it via errors and keep the batch alive.
+            try:
+                capture_index.record(
+                    capture_id,
+                    source_path=str(out_path.relative_to(RAW_DIR.parent)),
+                    created=captured_at.isoformat(),
+                )
+            except Exception:  # noqa: BLE001
+                errors.append(f"{src.name}: capture-index write failed")
+                log.exception("capture-index record failed for %s", out_path.name)
 
             _append_daily_rollup(capture_id, captured_at, raw, out_path)
             self._archive(src, errors)

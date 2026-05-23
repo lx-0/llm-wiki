@@ -50,6 +50,13 @@ def capture_env(tmp_path, monkeypatch):
     monkeypatch.setattr(CONFIG.personal, "capture_inbox", str(inbox))
     monkeypatch.setattr(paths_mod, "RAW_DIR", vault_raw)
 
+    # Isolate the capture-index path so a real run doesn't touch vault state.
+    from core import capture_index as ci_mod
+
+    state_dir = tmp_path / "vault" / ".wiki" / "state"
+    monkeypatch.setattr(ci_mod, "CAPTURE_INDEX_FILE", state_dir / "capture_index.json")
+    monkeypatch.setattr(ci_mod, "_LOCK_FILE", state_dir / "capture_index.lock")
+
     from collectors import capture_collector as cap_mod
     importlib.reload(cap_mod)
 
@@ -236,6 +243,51 @@ def test_empty_source_file_is_archived_without_ingest(capture_env):
     from collectors import capture_collector as cap_mod
     assert (cap_mod.MOBILE_ARCHIVE_DIR / "empty.txt").exists()
     assert not (inbox / ".processed").exists()
+
+
+# ── Capture index integration (T03) ──────────────────────────────────
+
+
+def test_real_run_records_capture_in_index(capture_env):
+    from core import capture_index
+
+    coll, inbox, raw_captures = capture_env
+    (inbox / "note.txt").write_text("remember the thing")
+
+    result = coll.run()
+
+    assert result.errors == ()
+    idx = capture_index.load()
+    assert len(idx) == 1
+    (cid, entry), = idx.items()
+    assert entry["source_path"] == f"raw/captures/capture-{cid}.md"
+    assert entry["status"] == capture_index.STATUS_OPEN
+    assert entry["created"]  # iso timestamp recorded
+
+
+def test_redrop_does_not_reset_superseded_index_entry(capture_env):
+    """The end-to-end guarantee: a re-ingest of identical content must not undo
+    a correction (S03) recorded against the same capture-ID."""
+    from core import capture_index
+    from core.utils import save_json_state
+
+    coll, inbox, raw_captures = capture_env
+    content = "a cryptic note the brain will misread"
+
+    (inbox / "first.txt").write_text(content)
+    coll.run()
+    (cid, _), = capture_index.load().items()
+
+    # Simulate S03 flipping the interpretation to superseded.
+    idx = capture_index.load()
+    idx[cid]["status"] = capture_index.STATUS_SUPERSEDED
+    save_json_state(capture_index.CAPTURE_INDEX_FILE, idx)
+
+    # Operator re-drops identical content.
+    (inbox / "second.txt").write_text(content)
+    coll.run()
+
+    assert capture_index.load()[cid]["status"] == capture_index.STATUS_SUPERSEDED
 
 
 # ── Daily rollup actually lands (KNOWN_SOURCES extended) ─────────────
