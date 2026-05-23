@@ -54,6 +54,7 @@ Key changes covered (chronological):
   limits.dream_tier2_sample_count          (added 2026-05-17 M016, default 50 — Tier 2 weighted-sample size)
   features.suggestions_source_globs        (added 2026-05-17 Producer-seam, default ["raw/email/*.md"] — lifts legacy hardcoded _is_email_source filter onto Spec)
   limits.compile_aggregated_max_consecutive_failures (added 2026-05-17, default 3 — circuit-breaker on memory-seed chunked compiles; aborts loop after N consecutive chunk failures to stop $-bleed on substrate-prompt mismatch)
+  personal.capture_inbox                   (added 2026-05-23 M025, default "" — quick-capture inbox for collectors/capture_collector.py)
   personal.accounts.<id>.health.healthkit    (added 2026-05-19 M023 — Apple HealthKit XML export ingest;
                                               injected as a placeholder into any account already carrying
                                               `health.oura`, kind: healthkit-xml-export, empty inbox_dir
@@ -334,6 +335,12 @@ KEY_ADDITIONS: dict[str, dict[str, object]] = {
         # archives the source under <picture_inbox>/.processed/. Empty
         # default keeps the multi-tenant story intact.
         "picture_inbox": "",
+        # M025 (2026-05-23) quick-capture-correction loop. Operator one-taps
+        # cryptic notes into this folder; collectors/capture_collector.py
+        # folder-watches it, content-IDs each capture, and writes
+        # raw/captures/capture-<id>.md. Empty default keeps the multi-tenant
+        # story intact (collector silently skips).
+        "capture_inbox": "",
         # M019 (2026-05-17) operator-self-reports surface location. Directory
         # under vault root where reports/studies/ + reports/analyses/ live.
         # Sibling of knowledge/, separate from .wiki/ (engine state).

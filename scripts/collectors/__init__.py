@@ -32,6 +32,10 @@ from collectors import scan_youtube  # noqa: F401,E402
 from collectors import pictures  # noqa: F401,E402
 from collectors import voice  # noqa: F401,E402
 
+# capture_collector.py uses the `_collector` suffix (same defensive naming as
+# calendar_collector / email_collector). The SPEC name stays clean ("capture").
+from collectors import capture_collector  # noqa: F401,E402
+
 __all__ = [
     "Collector",
     "CollectorSpec",

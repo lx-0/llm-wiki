@@ -677,6 +677,15 @@ class Personal:
     # but sources from a separate, mobile-friendly inbox (iCloud Shortcut
     # target etc.). Empty string disables collectors/pictures.py.
     picture_inbox: str = ""
+    # M025 quick-capture-correction loop. Path to a directory the operator
+    # one-taps cryptic notes / article snippets into (any tool that writes
+    # .txt / .md / .html — WhatsApp-self-group export, Notion quick-note sync,
+    # a shortcut). collectors/capture_collector.py folder-watches it, assigns a
+    # deterministic content-derived capture-ID, writes raw/captures/capture-<id>.md,
+    # and archives the source under raw/inbox-mobile/captures/. The capture-ID is
+    # the join-key the digest + correction back-channel use. Empty string disables
+    # the collector (graceful agnostic).
+    capture_inbox: str = ""
     # M019 operator-self-reports surface. Directory under vault root where
     # `reports/studies/<id>/runs/<ts>/*.md` (deterministic study output) and
     # `reports/analyses/<ts>.md` (analyst-agent output, S05) accumulate. Lives

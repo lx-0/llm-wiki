@@ -127,9 +127,9 @@ def test_migrate_config_file_round_trip(tmp_path):
     #    compile_callback_gate — 2026-05-17 compile-scope fix,
     #    materialize_backlinks — M020 backlinks-footer,
     #    operator_reports — M019 operator-self-reports master switch)
-    #  + 1 created-personal-block + 4 personal additions
+    #  + 1 created-personal-block + 5 personal additions
     #    (implicit_operator_author — M009, picture_inbox — 2026-05-17,
-    #    reports_dir — M019, domains — M013)
+    #    reports_dir — M019, domains — M013, capture_inbox — M025)
     #  + 1 scheduling addition (dream_cooldown_days — M014; the scheduling
     #    block already exists in the test fixture, so no "created" event)
     # (LIST_ADDITIONS has one entry but operator's freshly-injected
@@ -141,8 +141,9 @@ def test_migrate_config_file_round_trip(tmp_path):
     #  + 3 limits.concept_reconcile_* + 1 scheduling.concept_reconcile_cooldown_days
     #    + 1 features.concept_reconciliation (2026-05-22 concept-consistency-routine)
     # +3 health_trends (2 limits + 1 features), 2026-05-23
-    # = 59 changes (no drops — operator has no orphan personal.* fields)
-    assert len(changes) == 59, f"got {len(changes)} changes: {changes}"
+    # +1 personal.capture_inbox (M025 quick-capture loop), 2026-05-23
+    # = 60 changes (no drops — operator has no orphan personal.* fields)
+    assert len(changes) == 60, f"got {len(changes)} changes: {changes}"
 
     reparsed = yaml.safe_load(new_text)
     # piggyback side
@@ -235,6 +236,7 @@ def test_migrate_config_no_change_when_fully_current(tmp_path):
         "personal": {
             "implicit_operator_author": None,
             "picture_inbox": "",
+            "capture_inbox": "",
             "reports_dir": "reports",
             "domains": ["company", "personal", "ai", "meta"],
         },
@@ -378,6 +380,7 @@ def test_migrate_additions_idempotent():
         "personal": {
             "implicit_operator_author": None,
             "picture_inbox": "",
+            "capture_inbox": "",
             "reports_dir": "reports",
             "domains": ["company", "personal", "ai", "meta"],
         },
