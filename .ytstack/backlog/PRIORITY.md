@@ -21,7 +21,7 @@ Pick one when "next?" comes up and the operator wants a concrete tick.
 
 Real value, real cost; needs canary data, parallel-session coordination, or operator green-light.
 
-- **`health-trend-synthesis.md`** — the missing synthesis consumer for the 2602-day health corpus. Per-day stubs are correctly skipped (not knowledge); trends/baselines/anomalies are. Deterministic aggregation (no LLM) + thin narrative layer into `concepts/health.md`. Surfaced 2026-05-23 from "shouldn't the 1500 health days be compiled?".
+- **`health-trend-synthesis.md`** — MVP SHIPPED 2026-05-23 (`wiki health-trends`, deterministic $0 aggregation → `## Trends` block in `concepts/health.md`). Deferred future layers: LLM narrative, cross-substrate correlation, MOC hub, charts.
 - **`concept-consistency-routine.md`** — SHIPPED all 5 phases (`wiki reconcile`, autonomous fact-violation reconciliation; folded into the architecture.excalidraw Hard-Facts band). Default-off; awaiting operator opt-in + first live `--apply` run.
 - **`compile-agent-no-filesystem-write.md`** — return structured payload via `ResultMessage`, write deterministically in `compile.py`. Was the M018-S03 vision before that slice got cancelled; full requirements in `commit-article-manifest.md`.
 - **`commit-article-manifest.md`** — re-arch plan for `commit_article` after M018-S03 cancel (knowledge-writes are agent-side via SDK tool-use, not pure I/O extractable).

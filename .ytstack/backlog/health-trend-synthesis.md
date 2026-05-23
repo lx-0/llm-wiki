@@ -1,6 +1,8 @@
 # Health trend-synthesis — turn 11 years of metrics into knowledge
 
-**Status:** CANDIDATE (sketch, not planned). Surfaced 2026-05-23 when the operator asked "the 1500 health days just get skipped — shouldn't they be compiled?".
+**Status:** MVP SHIPPED 2026-05-23 — deterministic layer (`wiki health-trends`, `scripts/health_trends.py`). Surfaced when the operator asked "the 1500 health days just get skipped — shouldn't they be compiled?". Phases Concept→Verify→Implement→Document (PROCESS §15 + AGENTS + README + KNOWLEDGE). **Phase 5 (Visualize): no diagram edit** — per CLAUDE.md steady-state rule, a default-off niche routine with no existing synthesis cluster to fold into (dream-cycle isn't depicted either) lives in PROCESS.md, not architecture.excalidraw. If the synthesis layer ever earns a slot, do it as ONE synthesis/aggregation cluster (dream-cycle + health-trends + entity-pages), not a one-off box.
+
+**Deferred (future, not built):** LLM narrative ("HRV fell in Q1…"); cross-substrate correlation (health × calendar/voice/mood); `MOCs/health.md` hub; sparkline charts.
 
 ## Why
 
