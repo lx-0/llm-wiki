@@ -35,6 +35,7 @@ def vault(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     """
     import compile as compile_mod
     from compile_stages import compile as cs_mod
+    from compile_stages import route as route_mod
 
     raw = tmp_path / "raw" / "notes"
     raw.mkdir(parents=True)
@@ -47,6 +48,7 @@ def vault(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     # branch); everything else is patched on cs_mod.
     monkeypatch.setattr(compile_mod, "ROOT_DIR", tmp_path)
     monkeypatch.setattr(cs_mod, "ROOT_DIR", tmp_path)
+    monkeypatch.setattr(route_mod, "ROOT_DIR", tmp_path)  # decide_route reads route.ROOT_DIR (M026-S02)
     monkeypatch.setattr(cs_mod, "AGENTS_FILE", tmp_path / "AGENTS.md")
     monkeypatch.setattr(cs_mod, "KNOWLEDGE_DIR", tmp_path / "knowledge")
 

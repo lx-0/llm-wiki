@@ -214,54 +214,47 @@ async def compile_file(
         log.info("  [dry-run] Would compile %s", rel_path)
         return {"_skipped": "dry_run"}
 
-    # Read source content
     source_content = source.read_text(encoding="utf-8")
-    if not source_content.strip():
-        log.warning("  Skipping empty file: %s", rel_path)
-        return {"_skipped": "empty"}
 
-    # compile_role dispatch (M007-S02-T01). The frontmatter axis decides how
-    # this file participates in compile:
-    #   - source-only       → distill into knowledge/ (today's behavior)
-    #   - source-and-final  → indexed-only; the page IS the final form (T02
-    #                         implements the real index-only branch; today
-    #                         it falls through to source-only distillation)
-    #   - final-only        → engine-skip; hand-curated; reachable via
-    #                         grep/graph/search but hidden from MOC + dashboard
-    # Inference (when frontmatter omits `compile_role:`) uses LOCATION_DEFAULTS
-    # from `core.compile_role` and is gated by
-    # `CONFIG.limits.compile_role_default_by_location` (M007-S01-T02 knob).
-    explicit_role = _frontmatter_compile_role(source_content)
-    fm_for_role = {"compile_role": explicit_role} if explicit_role else {}
-    from core.compile_role import infer_compile_role
-    compile_role = infer_compile_role(
-        source, fm_for_role,
-        default_by_location=CONFIG.limits.compile_role_default_by_location,
-        vault_root=ROOT_DIR,
+    # Routing decision (compile_stages.route.decide_route) — pure: compile_role
+    # inference, substrate skip-list, dispatch precedence, classify. compile_file
+    # only EXECUTES the route below. The memory pre-pass (writes a Timeline
+    # section) is I/O, so it stays here in the Compile arm, not in decide_route.
+    from compile_stages.route import (
+        Compile,
+        HealthStub,
+        IndexOnly,
+        Skip,
+        decide_route,
     )
-    if compile_role == "final-only":
-        log.warning(
-            "  skipping: compile_role=final-only (hand-curated, engine-skip)",
-        )
-        return {"_skipped": "compile_role_final_only"}
-    if compile_role == "source-and-final":
-        # The page IS the final form. Index-only: extract wikilinks for
-        # discoverability, append a knowledge/index.md entry by pathname,
-        # NO SDK distill call, NO separate knowledge/concepts/<title>.md.
-        # (M007-S02-T02. Connections-build deferred — Obsidian Graph
-        # picks up the wikilinks natively in the meantime.)
-        from core.utils import build_index_entry, extract_wikilinks
-        wikilinks = extract_wikilinks(source_content)
+
+    route = decide_route(source, source_content, force=force)
+
+    if isinstance(route, Skip):
+        if route.reason == "empty":
+            log.warning("  Skipping empty file: %s", rel_path)
+        elif route.reason == "compile_role_final_only":
+            log.warning(
+                "  skipping: compile_role=final-only (hand-curated, engine-skip)",
+            )
+        elif route.reason.startswith("substrate_type_excluded_"):
+            log.info(
+                "  skipping: type=%s is in compile_skip_substrate_types "
+                "(use `wiki compile --file <path>` to force)",
+                route.reason[len("substrate_type_excluded_"):],
+            )
+        return {"_skipped": route.reason}
+
+    if isinstance(route, IndexOnly):
+        # The page IS the final form. Index-only: append a knowledge/index.md
+        # entry by pathname, NO SDK distill call, NO separate concept article.
+        from core.utils import build_index_entry
         log.info(
             "  source-and-final: indexing only (no distill) — %d wikilinks discovered",
-            len(wikilinks),
-        )
-        title = (
-            _frontmatter_field(source_content, "title")
-            or source.stem.replace("-", " ").replace("_", " ").title()
+            len(route.wikilinks),
         )
         new_entry = build_index_entry(
-            rel_path, title, "(source-and-final)", today_iso(),
+            rel_path, route.title, "(source-and-final)", today_iso(),
         )
         if INDEX_FILE.exists():
             existing = INDEX_FILE.read_text(encoding="utf-8")
@@ -276,51 +269,18 @@ async def compile_file(
             log.warning(
                 "  knowledge/index.md missing — cannot index source-and-final file",
             )
-        # Mark as ingested with its hash so `check_orphan_sources` lint doesn't
-        # flag this file (it IS the final form — not "uncompiled substrate") and
-        # re-runs of compile become true no-ops via the hash-skip in select_files.
-        # (M007-S02-T04. Mirrors the post-distill state update at line ~1130.)
+        # Mark ingested so check_orphan_sources doesn't flag it and re-runs no-op.
         state = load_state()
         if "ingested" not in state:
             state["ingested"] = {}
         state["ingested"][rel_path] = file_hash(source)
         save_state(state)
         return {"_skipped": "compile_role_source_and_final_indexed"}
-    # source-only falls through to current distill behavior (unchanged).
 
-    # Substrate-type skip: some substrates are structurally a poor fit for
-    # the generic compile_main.md prompt (calendar metadata has no dialog
-    # to extract commitments from, but each attendee still triggers the
-    # full two-layer carry-forward audit → max_turns loops at $5-10/file).
-    # Listed types are collected but not compiled until a dedicated
-    # substrate prompt exists. Operator can force-compile with
-    # `wiki compile --file <path>` to bypass.
-    skip_type = _frontmatter_type(source_content)
-    if (
-        not force
-        and skip_type is not None
-        and skip_type in CONFIG.limits.compile_skip_substrate_types
-    ):
-        log.info(
-            "  skipping: type=%s is in compile_skip_substrate_types "
-            "(use `wiki compile --file <path>` to force)",
-            skip_type,
-        )
-        return {"_skipped": f"substrate_type_excluded_{skip_type}"}
-
-    # Deterministic fast-path: health-rollup metric stubs (the common case,
-    # and every M023 bulk-ingested historical day) carry only point-in-time
-    # biometrics — no knowledge to synthesize. Routing them through the SDK
-    # agent meant reading the policy article and appending to its
-    # `compiled_from:` list; once that list grew past the Read-tool token
-    # limit (~1200 entries / 64 KB) the agent could no longer finish within
-    # max_turns and EVERY health file failed (kind=max_turns, ~$0.08/file,
-    # escalating to 135/day). Record the stub in Python instead: mark
-    # ingested (satisfies check_orphan_sources + makes re-runs no-ops via the
-    # hash-skip), no `knowledge/` writes, no cost. Operator-prose health days
-    # return False here and fall through to the agent (§2-B of compile_health
-    # needs reasoning for entity/Timeline extraction). 2026-05-22 root-cause.
-    if skip_type == "health-rollup" and _health_rollup_body_is_stub(source_content):
+    if isinstance(route, HealthStub):
+        # Deterministic fast-path: health-rollup metric stubs carry only
+        # point-in-time biometrics — no knowledge to synthesize. Record in
+        # Python (mark ingested), no `knowledge/` writes, no cost. 2026-05-22.
         log.info(
             "  health-rollup stub-body — deterministic record "
             "(no agent, no knowledge writes, $0)"
@@ -330,130 +290,28 @@ async def compile_file(
         save_state(state)
         return {"_skipped": "health_rollup_stub_deterministic"}
 
-    # Substrate-aware prompt dispatch. Different substrates need
-    # different compile shapes; routing them all through compile_main.md
-    # (designed for dialog-rich transcripts with State+Timeline carry-
-    # forward) burns money on max_turns loops for metadata-only or
-    # already-distilled substrates. See KNOWLEDGE.md "substrate-aware
-    # compile architecture (P2)". Each entry maps frontmatter `type:`
-    # to a (prompt_name, max_turns_override) tuple. Unmapped types fall
-    # through to compile_main + default max_turns.
-    # Dispatch key: frontmatter `type:` if present, else path-pattern
-    # fallback for legacy substrates (e.g. screenshot batches that
-    # predate the type-frontmatter migration). source_type is also kept
-    # for downstream force-long-context checks (which still match on
-    # YAML type only).
-    source_type = _frontmatter_type(source_content)
-    dispatch_key = _substrate_key(source_content, rel_path)
-    substrate_prompt, substrate_max_turns, substrate_model = SUBSTRATE_PROMPTS.get(
-        dispatch_key or "", _DEFAULT_DISPATCH,
-    )
-    # Log the dispatch decision when it's an explicit SUBSTRATE_PROMPTS
-    # match (interesting routing) — skip the noise of "type=X → default"
-    # for the safe-by-default fallback.
-    if dispatch_key in SUBSTRATE_PROMPTS:
-        # Truncate model id for readability: "claude-haiku-4-5-20251001"
-        # → "haiku-4-5". Keep the full id in the underlying records.
+    # ── Compile route: an LLM call is needed. ────────────────────────────
+    metadata = route.metadata
+    classification = route.classification
+    source_type = metadata.substrate_type
+
+    # Dispatch decision log (only for explicit SUBSTRATE_PROMPTS matches — skip
+    # the noise of "type=X → default" for the safe-by-default fallback).
+    if _substrate_key(source_content, rel_path) in SUBSTRATE_PROMPTS:
         short_model = ""
-        if substrate_model:
-            m = re.match(r"claude-(haiku|sonnet|opus)-(\d+-\d+)", substrate_model)
-            short_model = f" @ {m.group(1)}-{m.group(2)}" if m else f" @ {substrate_model}"
-        log.info("  type=%s → %s%s", source_type, substrate_prompt, short_model)
+        if metadata.model_id:
+            m = re.match(r"claude-(haiku|sonnet|opus)-(\d+-\d+)", metadata.model_id)
+            short_model = (
+                f" @ {m.group(1)}-{m.group(2)}" if m else f" @ {metadata.model_id}"
+            )
+        log.info("  type=%s → %s%s", source_type, metadata.substrate_prompt, short_model)
 
-    # Pick the model. Large sources auto-upgrade to the 1M-context variant
-    # because the standard 200K window dies silently mid-stream once the
-    # source + tool-turn reads exceed the window (see KNOWLEDGE.md
-    # "tool-turn ballooning"). Operator can pin to the small variant by
-    # setting `compile_large_source_model: ""` in config.yaml.
-    #
-    # The size threshold is necessary but not sufficient: some substrates
-    # are small on the surface yet fan out heavily into existing knowledge
-    # during compile (daily-digest is the canonical case — <2 KB source
-    # references 6+ topics, agent Reads each related article, context
-    # overflows mid-stream). Force [1m] up-front for those substrates
-    # regardless of size (`compile_force_long_context_types`).
-    # Substrate-specific model override (SUBSTRATE_PROMPTS) takes
-    # precedence over compile_model default. Used to route lean
-    # mechanical prompts (calendar, daily) to Haiku for 6× cost
-    # reduction — these don't need Opus reasoning depth.
-    # Model precedence (high → low):
-    #   1. substrate_model from SUBSTRATE_PROMPTS — dedicated lean prompt
-    #      knows its workload, no escalation needed even for big sources.
-    #      Haiku 4.5 handles 100KB+ sources at 200K context.
-    #   2. force-long-context tier (substrates still on compile_main that
-    #      legitimately need [1m]; default list is empty).
-    #   3. size-based escalation (50KB+ → [1m]) — only for compile_main
-    #      route, since size-fan-out is what blew the 200K window for the
-    #      generic prompt.
-    #   4. CONFIG.models.compile_model default.
-    # Before 2026-05-16-evening, size-escalation overrode substrate_model
-    # and bumped lean-prompt files to Opus[1m] anyway → screenshot batch
-    # at 64KB hit max_turns at $5+/file with the wrong model.
-    model = substrate_model or CONFIG.models.compile_model
-    force_long_ctx = (
-        source_type is not None
-        and source_type in CONFIG.limits.compile_force_long_context_types
-        and CONFIG.models.compile_large_source_model
-    )
-    if substrate_model:
-        # Substrate-specific model wins; don't escalate.
-        pass
-    elif force_long_ctx:
-        model = CONFIG.models.compile_large_source_model
-        log.info(
-            "  type=%s — forcing %s (substrate fans out into knowledge/ during compile)",
-            source_type, model,
-        )
-    elif (
-        len(source_content) >= CONFIG.limits.compile_large_source_chars
-        and CONFIG.models.compile_large_source_model
-    ):
-        model = CONFIG.models.compile_large_source_model
-        log.info(
-            "  large source: %d chars (%.1f KB) — using %s (max_turns=%d)",
-            len(source_content), len(source_content) / 1024,
-            model, CONFIG.limits.compile_max_turns,
-        )
-
-    # Turn budget priority:
-    #   1. Per-substrate override from SUBSTRATE_PROMPTS (tight prompts
-    #      ship with their own budget — calendar=8, daily=12, etc.)
-    #   2. Long-context tier for fan-out substrates still on compile_main
-    #      (the old escape hatch — kept for substrates that haven't
-    #      gotten dedicated prompts yet but are listed in
-    #      compile_force_long_context_types)
-    #   3. Default compile_max_turns (12) for everything else
-    if substrate_max_turns is not None:
-        max_turns_for_call = substrate_max_turns
-    elif force_long_ctx:
-        max_turns_for_call = CONFIG.limits.compile_max_turns_long_context
-    else:
-        max_turns_for_call = CONFIG.limits.compile_max_turns
-
-    # Pre-compile classifier (compile_stages.classify) decides whether the
-    # substrate shape needs special handling BEFORE the LLM call:
-    #   - aggregated-memory  -> split-at-H2 in memory, compile per-chunk
-    #     (raw file untouched). Fixes the cross-link fanout that blows the
-    #     25-turn budget on substrates carrying N memories.
-    #   - instructions       -> AGENTS.md/CLAUDE.md/README.md accidentally
-    #     ingested into raw/memories/. Routed to compile_instructions.md
-    #     for single-pass project-doc handling, no fanout.
-    #   - single             -> unchanged single compile call.
-    # raw/ is RAW: chunking rebuilds substrate strings in memory only.
-    from compile_stages.classify import classify
-    classification = classify(source_content, source)
-
-
-    # Memory-substrate pre-pass: resolve target project page + bootstrap
-    # `## Timeline` section deterministically so the SDK call can be
-    # purely mechanical (Read → Edit-append, 2-3 turns). Without this the
-    # prompt either burned turns on fuzzy slug-search (loose) or emitted
-    # no_project_page on 80% of files (strict). Slug-resolution is a
-    # tabellensuche, not LLM reasoning — fits the same pre-pass shape as
-    # `_substrate_key()` and `infer_compile_role()` (2026-05-17).
-    project_slug: str | None = None
-    project_page_rel: str | None = None
+    # Memory-substrate pre-pass: resolve target project page + bootstrap the
+    # `## Timeline` section deterministically so the SDK call is mechanical.
+    # I/O (writes Timeline) — stays here, not in pure decide_route. Enriches the
+    # route's metadata via dataclasses.replace.
     if source_type in ("memory-sync", "memory-seed"):
+        import dataclasses
         from compile_stages.memory import (
             ensure_timeline_section,
             resolve_project_slug,
@@ -461,12 +319,6 @@ async def compile_file(
         fm = _parse_frontmatter(source_content)
         project_slug = resolve_project_slug(source, fm, ROOT_DIR)
         if project_slug is None:
-            # 2026-05-18 reversal of 2026-05-13's exclusion: when no project
-            # page anchors the memory, the agent distills the memory's
-            # patterns into knowledge/concepts/ articles directly. This is
-            # the concept-aligned path per Karpathy's "anything you ingest"
-            # principle + industry provenance-tracking pattern. The
-            # backlog/memories-decision-doubt.md doc carries the research.
             log.info(
                 "  memory pre-pass: type=%s — no matching knowledge/projects/<slug>.md "
                 "(filename stem, frontmatter project:, tags all unresolved). "
@@ -482,19 +334,13 @@ async def compile_file(
                 "  memory pre-pass: project=%s page=%s (Timeline bootstrapped if absent)",
                 project_slug, project_page_rel,
             )
+            metadata = dataclasses.replace(
+                metadata,
+                project_slug=project_slug,
+                project_page_rel=project_page_rel,
+            )
 
     from compile_stages.compile import compile_source
-    from compile_stages.types import CompileMetadata
-    metadata = CompileMetadata(
-        source_path=source,
-        compile_role=compile_role,
-        model_id=model,
-        max_turns=max_turns_for_call,
-        substrate_type=source_type,
-        substrate_prompt=substrate_prompt,
-        project_slug=project_slug,
-        project_page_rel=project_page_rel,
-    )
 
     if classification.kind == "aggregated-memory":
         log.info(
@@ -587,7 +433,6 @@ async def compile_file(
         "cost_usd": result.cost_usd,
         "result": result.article or "",
     }
-
 
 
 
