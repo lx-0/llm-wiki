@@ -48,6 +48,7 @@ from claude_agent_sdk import (
 )
 
 from core.config import CONFIG
+from core.usage import LEDGER
 from core.paths import AGENTS_FILE, KNOWLEDGE_DIR, ROOT_DIR
 from core.prompts import render
 from core.sdk_helpers import (
@@ -221,6 +222,7 @@ async def _attempt(
         elapsed = time.time() - started
         if final_result is not None and final_result.is_error:
             cost = final_result.total_cost_usd or 0.0
+            LEDGER.record(model=model_id, input_tokens=total_input_tokens, output_tokens=total_output_tokens)
             kind = "max_turns" if final_result.subtype == "error_max_turns" else "agent_error"
             detail = (
                 f"{final_result.subtype} after {final_result.num_turns} turns "
@@ -294,6 +296,7 @@ async def _attempt(
             "cost_exceeded",
             f"${cost:.4f} > budget ${budget:.4f} on {rel_path}",
         )
+    LEDGER.record(model=model_id, input_tokens=total_input_tokens, output_tokens=total_output_tokens)
     log.info(
         "  ✓ %.1fs · in:%s out:%s ($%.4f)",
         elapsed,

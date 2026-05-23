@@ -14,6 +14,7 @@ bucketed `date -> "<provider>:<model>" -> {...}`, under an fcntl lock.
 
 from __future__ import annotations
 
+import atexit
 import fcntl
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -156,3 +157,17 @@ class UsageLedger:
 
 # Process-global default ledger. Call sites import and record into this.
 LEDGER = UsageLedger()
+
+
+def _flush_on_exit() -> None:
+    """Best-effort persist of the process-global ledger at exit (no-op if empty).
+
+    Centralizes the run-boundary flush so no entrypoint needs its own persist
+    call. Won't fire on SIGKILL/os._exit — acceptable: this is observability."""
+    try:
+        LEDGER.persist()
+    except Exception:  # noqa: BLE001 — never let accounting break a run
+        pass
+
+
+atexit.register(_flush_on_exit)

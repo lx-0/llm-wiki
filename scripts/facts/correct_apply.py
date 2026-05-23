@@ -37,6 +37,7 @@ from claude_agent_sdk import (
 from core.paths import CONCEPTS_DIR, FACTS_DIR, ROOT_DIR
 from core.utils import now_iso, today_iso
 from core.config import CONFIG  # noqa: E402
+from core.usage import LEDGER  # noqa: E402
 from core.prompts import render  # noqa: E402
 from core.sdk_helpers import StderrCapture, log_sdk_failure, make_path_scope_hook  # noqa: E402
 
@@ -148,6 +149,7 @@ async def apply(slug: str, dry_run: bool) -> int:
         return 2
 
     log.info("Agent done. Tokens — input: %d, output: %d", total_input_tokens, total_output_tokens)
+    LEDGER.record(model=CONFIG.models.compile_model, input_tokens=total_input_tokens, output_tokens=total_output_tokens)
     if result_text:
         print("\n" + result_text + "\n")
 
@@ -240,6 +242,7 @@ async def reconcile_fact(
     started = _time.time()
     capture = StderrCapture()
     cost = 0.0
+    in_tok = out_tok = 0
     try:
         async for message in query(
             prompt=prompt,
@@ -262,6 +265,9 @@ async def reconcile_fact(
                 stderr=capture.callback,
             ),
         ):
+            if isinstance(message, AssistantMessage) and message.usage:
+                in_tok += message.usage.get("input_tokens", 0)
+                out_tok += message.usage.get("output_tokens", 0)
             if isinstance(message, ResultMessage):
                 cost = message.total_cost_usd or 0.0
     except Exception as exc:
@@ -276,6 +282,8 @@ async def reconcile_fact(
             exc=exc,
         )
         return ReconcileResult(slug, "failed", files=violating_files, detail="SDK call failed")
+
+    LEDGER.record(model=CONFIG.models.compile_model, input_tokens=in_tok, output_tokens=out_tok)
 
     # Stamp the fact as reconciled (cooldown key). Re-read to avoid stomping.
     current_text = fact_path.read_text(encoding="utf-8")

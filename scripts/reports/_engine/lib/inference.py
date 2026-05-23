@@ -46,6 +46,7 @@ from claude_agent_sdk import (  # noqa: E402
     query,
 )
 
+from scripts.core.usage import LEDGER  # noqa: E402
 from scripts.core.sdk_helpers import (  # noqa: E402
     StderrCapture,
     classify_failure,
@@ -360,6 +361,7 @@ async def _infer_batch_once_async(
     start = time.perf_counter()
     text_chunks: list[str] = []
     cost = 0.0
+    in_tok = out_tok = 0
     capture = StderrCapture()
 
     options = ClaudeAgentOptions(
@@ -379,6 +381,9 @@ async def _infer_batch_once_async(
             prompt=prompt_stream(rendered_prompt), options=options
         ):
             if isinstance(message, AssistantMessage):
+                if message.usage:
+                    in_tok += message.usage.get("input_tokens", 0)
+                    out_tok += message.usage.get("output_tokens", 0)
                 for block in message.content:
                     if type(block).__name__ == "TextBlock":
                         text_chunks.append(getattr(block, "text", ""))
@@ -412,6 +417,8 @@ async def _infer_batch_once_async(
     items: dict[str, ItemInference] = {}
     for item in batch.items:
         items[item.id] = ItemInference.from_json(item.id, parsed["items"][item.id])
+
+    LEDGER.record(model=model, input_tokens=in_tok, output_tokens=out_tok)
 
     return BatchResult(
         items=items,

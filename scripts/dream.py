@@ -64,6 +64,7 @@ from claude_agent_sdk import (
 )
 
 from core.config import CONFIG
+from core.usage import LEDGER
 from core.paths import (
     AREAS_DIR,
     INDEX_FILE,
@@ -1184,6 +1185,8 @@ async def dream_entity(
             stamped += 1
     if stamped:
         log.info("  stamped last_dreamed_at on %d substrate file(s)", stamped)
+
+    LEDGER.record(model=model, input_tokens=input_tokens, output_tokens=output_tokens)
 
     # Per-entity history event so dashboard + grep can answer
     # "what happened on the last dream of entity X?".
