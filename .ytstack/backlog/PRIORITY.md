@@ -22,7 +22,7 @@ Pick one when "next?" comes up and the operator wants a concrete tick.
 Real value, real cost; needs canary data, parallel-session coordination, or operator green-light.
 
 - **`health-trend-synthesis.md`** — the missing synthesis consumer for the 2602-day health corpus. Per-day stubs are correctly skipped (not knowledge); trends/baselines/anomalies are. Deterministic aggregation (no LLM) + thin narrative layer into `concepts/health.md`. Surfaced 2026-05-23 from "shouldn't the 1500 health days be compiled?".
-- **`concept-consistency-routine.md`** — SHIPPED Phases 1-4 (`wiki reconcile`, autonomous fact-violation reconciliation); Phase 5 (architecture.excalidraw) still open.
+- **`concept-consistency-routine.md`** — SHIPPED all 5 phases (`wiki reconcile`, autonomous fact-violation reconciliation; folded into the architecture.excalidraw Hard-Facts band). Default-off; awaiting operator opt-in + first live `--apply` run.
 - **`compile-agent-no-filesystem-write.md`** — return structured payload via `ResultMessage`, write deterministically in `compile.py`. Was the M018-S03 vision before that slice got cancelled; full requirements in `commit-article-manifest.md`.
 - **`commit-article-manifest.md`** — re-arch plan for `commit_article` after M018-S03 cancel (knowledge-writes are agent-side via SDK tool-use, not pure I/O extractable).
 - **`search-tools.md`** — M020-deferred axis-aware `wiki search --type --domain --author` + temporal `wiki recent`. Re-evaluate when vault crosses ~3k articles or dream-cycle/curiosity surface a real query bottleneck.

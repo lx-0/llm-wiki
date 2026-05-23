@@ -1,6 +1,6 @@
 # Autonomous concept-consistency routine ("concept dream-cycle")
 
-**Status:** CONCEPT (Phase 1 of `llm-wiki-change`) — awaiting operator review. No code yet.
+**Status:** SHIPPED 2026-05-23 — all 5 `llm-wiki-change` phases (Concept → Verify → Implement → Document → Visualize). `wiki reconcile` live (default-off); folded into the architecture.excalidraw Hard-Facts band. Awaiting operator opt-in + first live `--apply`.
 **Captured:** 2026-05-22
 
 ## Why
