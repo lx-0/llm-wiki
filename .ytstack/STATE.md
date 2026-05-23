@@ -11,6 +11,8 @@ parallel_milestones: [M021]
 
 # State
 
+**Recent ad-hoc (2026-05-23):** daily-digest chain repaired + live-verified in lxw — path bug (`d268b8a`), email subject-signal β (`e32d466`), agent `last_run`→`state/agent-runs.json` (`119d4c9`). 8 digests backfilled (`05-16…05-23`). Detail: `.ytstack/AD-HOC-daily-digest-chain-fix-SUMMARY.md`.
+
 **Status:** ✅ **M026 SHIPPED** (compile-dispatch seam, 4 slices, commits 4647d47 / 2c4335c+aad8541 / e6c04df / e9a44e5). `compile_file` 404→62 LOC pure dispatch; pure table-tested `decide_route`; typed `CompileOutcome`; `_STATE_MUTATING_SKIPS` + magic-key dict + dead `_build_owner_block` deleted. 126 compile tests green. Real-SDK lxw E2E left to operator (cost + live-vault). **Current milestone restored to M025** (capture-correction-loop, parked at S01 1/3 — resume T02).
 
 **Status (M026 planning, historical):** M026 planned (M, 4 slices). Compile-dispatch seam — split `compile_file`'s 404-LOC dispatcher into a pure `decide_route` + typed `CompileOutcome` (routing + substrate→model/max_turns precedence become table-testable; **no behavior change**). Designed via `improve-codebase-architecture` 2026-05-23; full design + slice breakdown `.ytstack/backlog/compile-dispatch-seam.md` (committed `1510986`). CONTEXT + ROADMAP at `.ytstack/M026-{CONTEXT,ROADMAP}.md`.

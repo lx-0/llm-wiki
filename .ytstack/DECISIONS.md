@@ -1380,3 +1380,22 @@ on the legacy AND refactored `compile_file` + 126 green compile tests. No steady
 behavior change → architecture diagram + `docs/PROCESS.md` deliberately untouched (internal
 structure → `CONTEXT.md` vocab instead). Design: `.ytstack/backlog/compile-dispatch-seam.md`.
 Commits 4647d47 / 2c4335c+aad8541 / e6c04df / e9a44e5.
+
+
+## 2026-05-23: Email metadata reaches the portrait via daily/-aggregation, not per-item compile or systematic deep-scan
+
+**Context:** Email is a referenced substrate (bodies stay in IMAP; only metadata reaches `raw/` as delta files). The delta's subject/sender signal reached no synthesis surface — per-item compile correctly skips `type: email-delta` (a generic-prompt run on a subject list burns ~$2 for no article), and the `daily/<date>/email.md` mirror carried only a count + a dangling wikilink to the never-compiled delta.
+**Options considered:** (A) enrich the `daily/`-aggregation rollup with bounded sender/subject signal the `daily-digest` already consumes; (B) a dedicated cheap `email-delta` compile prompt; (C) systematic deep-scan of all new mail.
+**Chose:** A (β: top-N senders + sample of recent subjects, config-capped, deterministic in the collector).
+**Reason:** Concept-canonical — the clutter rule is "low-signal metadata → `compile-role: source-only` + `daily/`-aggregation, not per-item `knowledge/`". (C) contradicts the design (bodies are curiosity-on-request; deep-scan is gap-triggered, not a sweep). (B) duplicates the `daily-digest` synthesis agent. A reuses the existing daily→digest→dream chain at zero per-item compile cost; the digest LLM lifts correspondents + themes into the portrait. The per-item compile-skip of `email-delta` is correct and stays.
+**Supersedes:** —
+**Linked artifacts:** `scripts/collectors/email_collector.py` (`_email_rollup_block`), `prompts/agents/daily-digest.md`, `limits.daily_email_{top_senders,sample_subjects}`, `.ytstack/AD-HOC-daily-digest-chain-fix-SUMMARY.md`.
+
+## 2026-05-23: Engine runtime state lives in gitignored state/, never in a git-tracked file inside the vault checkout
+
+**Context:** The vault's `.wiki/` is a git checkout of the engine; `wiki update` is `git pull`. `agent_task.py:_update_last_run` wrote `last_run:<ts>` into the tracked `prompts/agents/<id>.md` frontmatter on every successful agent run, dirtying the working tree and aborting the next `wiki update` ("local changes would be overwritten"). Masked for weeks: most agent prompts lack the field, and the one that had it (`daily-digest`) never ran due to the path bug fixed the same day.
+**Options considered:** (A) keep `last_run` in the prompt and have `wiki update` auto-discard the diff; (B) move runtime state to gitignored `state/`.
+**Chose:** B — `state/agent-runs.json` (mirrors `piggyback-state.json`); `AgentSpec.last_run` field + `_coerce_last_run` removed; display reads from state.
+**Reason:** Any code that mutates a tracked file with run-derived state will recur this class of breakage. Rule of thumb: if a value changes when the engine RUNS (not when the operator EDITS), it belongs in `state/`, never in `prompts/`, `templates/`, or any tracked path.
+**Supersedes:** —
+**Linked artifacts:** `scripts/agent_task.py`, `scripts/core/agent_spec.py`, KNOWLEDGE.md "Runtime state never goes in a git-tracked file", `.ytstack/AD-HOC-daily-digest-chain-fix-SUMMARY.md`.
