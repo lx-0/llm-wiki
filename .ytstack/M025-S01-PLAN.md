@@ -5,7 +5,7 @@ project: llm-wiki
 created: 2026-05-23T08:53:30+0200
 status: planned
 task_count: 3
-completed_tasks: 1
+completed_tasks: 2
 ---
 
 # M025-S01 -- Slice Plan
@@ -22,7 +22,7 @@ capture-ID to its source path. Pure capture-side spine -- no compile/agent chang
   frontmatter-stamped note (`capture_id:`, `type: capture`) into `raw/captures/`;
   two-zone archive of the source (voice.py `MOBILE_ARCHIVE_DIR` pattern). Unit
   tests: ID determinism + idempotent re-run + frontmatter shape + archive move.
-- [ ] T02 -- Config + registration + migration + template sync (HARD rule:
+- [x] T02 -- Config + registration + migration + template sync (HARD rule:
   config change ⇒ migration same commit). Add `personal.capture_inbox` +
   `piggybacks.capture` (enabled/cooldown) to `scripts/core/config.py` +
   `config.example.yaml`; register the collector in the Registry with
