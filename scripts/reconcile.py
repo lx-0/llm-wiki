@@ -55,7 +55,11 @@ logging.basicConfig(
 )
 log = logging.getLogger("reconcile")
 
-_FACT_SLUG_RE = re.compile(r"facts/([A-Za-z0-9_-]+)")
+# lint emits the slug backtick-wrapped as `facts/<slug>` (lint.check_facts_violations).
+# Anchor on the backticks, not an ASCII char class: fact slugs can carry non-ASCII
+# (e.g. `sidney-wach-ist-männlich`), and an `ä` stored NFD-decomposed (a + U+0308)
+# silently truncates an `[A-Za-z0-9_-]+` capture mid-slug → "no such fact".
+_FACT_SLUG_RE = re.compile(r"`facts/([^`]+)`")
 
 
 def _fact_violations_by_slug() -> dict[str, list[str]]:

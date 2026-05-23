@@ -45,6 +45,28 @@ def test_fact_violations_by_slug_groups_filters_and_absolutizes(monkeypatch, tmp
     assert out["no-y"] == [str((tmp_path / "knowledge/concepts/baz.md").resolve())]
 
 
+def test_fact_violations_slug_handles_non_ascii(monkeypatch, tmp_path):
+    """Fact slugs with non-ASCII (umlauts, incl. NFD-decomposed) must survive
+    extraction. Regression: `sidney-wach-ist-männlich` with NFD `ä` (a + U+0308)
+    truncated to `sidney-wach-ist-ma` under the old ASCII-only regex → no such fact."""
+    import unicodedata
+
+    import reconcile
+
+    monkeypatch.setattr(reconcile, "ROOT_DIR", tmp_path)
+    nfd = unicodedata.normalize("NFD", "sidney-wach-ist-männlich")  # ä → a + U+0308
+    issues = [{
+        "file": "concepts/sidney.md",
+        "detail": (
+            f"Article contains negation term 'weiblich' from hard fact `facts/{nfd}` "
+            f"(status: negation). Reconcile manually or via `wiki correct apply {nfd}`."
+        ),
+    }]
+    monkeypatch.setattr(reconcile.lint, "check_facts_violations", lambda: issues)
+    out = reconcile._fact_violations_by_slug()
+    assert list(out.keys()) == [nfd]  # full slug captured, not truncated at the umlaut
+
+
 def test_within_cooldown(monkeypatch, tmp_path):
     import reconcile
 
