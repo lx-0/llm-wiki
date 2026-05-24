@@ -1,7 +1,7 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-05-23T18:58:00+0200
+last_updated: 2026-05-24T00:00:00+0200
 current_milestone: M025
 active_slice: S01
 active_task: none
@@ -10,6 +10,8 @@ parallel_milestones: [M021]
 ---
 
 # State
+
+**Recent ad-hoc (2026-05-24):** `wiki update` now offers to stash a dirty `.wiki/` tree before the `--ff-only` pull and re-applies it only on a clean merge (`git apply --check` pre-flight; conflict → left unpopped). TTY-gated. Commit `ecdce09`. Decision 2026-05-24, KNOWLEDGE "`git apply --check`…".
 
 **Recent ad-hoc (2026-05-23):** daily-digest chain repaired + live-verified in lxw — path bug (`d268b8a`), email subject-signal β (`e32d466`), agent `last_run`→`state/agent-runs.json` (`119d4c9`). 8 digests backfilled (`05-16…05-23`). Detail: `.ytstack/AD-HOC-daily-digest-chain-fix-SUMMARY.md`.
 

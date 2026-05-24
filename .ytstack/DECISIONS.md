@@ -1399,3 +1399,12 @@ Commits 4647d47 / 2c4335c+aad8541 / e6c04df / e9a44e5.
 **Reason:** Any code that mutates a tracked file with run-derived state will recur this class of breakage. Rule of thumb: if a value changes when the engine RUNS (not when the operator EDITS), it belongs in `state/`, never in `prompts/`, `templates/`, or any tracked path.
 **Supersedes:** —
 **Linked artifacts:** `scripts/agent_task.py`, `scripts/core/agent_spec.py`, KNOWLEDGE.md "Runtime state never goes in a git-tracked file", `.ytstack/AD-HOC-daily-digest-chain-fix-SUMMARY.md`.
+
+## 2026-05-24: `wiki update` offers to stash a dirty `.wiki/` tree, re-applies only on a clean merge
+
+**Context:** `git pull --ff-only` in `cmd_update` aborts with a generic "resolve manually" when tracked engine files have local edits (the zombie-modified case — direct edits inside `<vault>/.wiki/`; same class the 2026-05-23 `state/` decision eliminates at the source, but operator/agent edits can still produce it). The operator had no offered recovery path.
+**Options considered:** (A) leave the stash in place always, no auto-pop; (B) auto-pop after pull unconditionally; (C) auto-pop only if it merges cleanly, else leave unpopped.
+**Chose:** C. Detect via `git diff --quiet || git diff --cached --quiet`; offer stash (TTY-gated); pull; re-apply only if `git stash show -p stash@{0} | git apply --check -` passes, otherwise leave the stash unpopped with a recovery hint.
+**Reason:** B leaves a half-merged checkout (conflict markers + kept stash) on conflict, recoverable only via the banned `reset --hard`. `git apply --check` pre-flights the pop without touching the tree and errs safe (stricter than the 3-way merge, so a near-miss leaves the stash for manual `stash pop`) — never produces a conflicted tree. Operator chose auto-pop-if-clean over plain leave-in-place (A) for convenience. TTY-gate because `wiki update` is also dispatched non-interactively (dashboard health-fix). On pull failure after a stash, pop it straight back (HEAD didn't move) so a failed update never hides changes.
+**Supersedes:** —
+**Linked artifacts:** `wiki` (`cmd_update`), `README.md` Update section, KNOWLEDGE.md "`git apply --check` is the safe pre-flight for stash re-apply", commit `ecdce09`.
