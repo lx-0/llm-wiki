@@ -76,7 +76,7 @@ def find_new_screenshots(since: datetime | None = None) -> list[Path]:
         log.warning("Screenshots dir not found: %s", SCREENSHOTS_DIR)
         return []
 
-    files = sorted(SCREENSHOTS_DIR.glob("Screenshot *.png"))
+    files = sorted(SCREENSHOTS_DIR.glob("*.png"))
 
     if since:
         since_ts = since.timestamp()
