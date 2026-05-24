@@ -278,6 +278,8 @@ cd ~/path/to/vault
 
 `wiki update` pulls into `.wiki/` (preserves `config.yaml` + `.venv/`), then runs `wiki skills sync` so newly-shipped engine skills land in `<vault>/.claude/skills/` automatically. Foreign entries (your own skills, other tools' symlinks) are never touched. When `skills.global_install` is on, the sync also refreshes the global `~/.claude/skills/` symlink — the opt-in survives updates with no re-flagging.
 
+If the `.wiki/` checkout has uncommitted changes to **tracked** engine files (direct edits inside `<vault>/.wiki/` — which a `--ff-only` pull would otherwise refuse), `wiki update` lists them and offers to `git stash` them so the pull can proceed. After pulling it re-applies the stash automatically, but only if it merges cleanly onto the new engine; if it would conflict, the stash is left unpopped (recover with `git -C <.wiki> stash pop`). Run it from a terminal — non-interactively (e.g. dashboard button) it refuses rather than touching your changes. (`config.yaml`, `state/`, `logs/` are gitignored and never trigger this.)
+
 `wiki seed` re-applies engine templates to the vault root after an update — adds missing files (`dashboard.md`, `_dashboard-stats.md`, `.obsidian/plugins/<name>/data.json`) and **merges** `community-plugins.json` (additive — never drops your own plugins). Default mode never overwrites your existing files; use `--force` to replace customisations of `dashboard.md` / `AGENTS.md` with the engine version.
 
 ## Running scripts manually

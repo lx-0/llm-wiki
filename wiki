@@ -1050,6 +1050,15 @@ ${C_BOLD}wiki update${C_RESET} — git pull --ff-only the .wiki/ checkout
 ${C_BOLD}USAGE${C_RESET}
   wiki update                   pull + sync skill symlinks
   wiki update --no-skills       pull only, skip skill sync
+
+${C_BOLD}NOTES${C_RESET}
+  If the .wiki/ checkout has uncommitted changes to tracked engine files
+  (a --ff-only pull would abort on them), \`wiki update\` shows them and
+  offers to \`git stash\` them so the pull can proceed. After the pull the
+  stash is re-applied automatically — but only if it merges cleanly onto the
+  new engine. If it would conflict, it's left unpopped (recover with
+  \`git -C <.wiki> stash pop\`). Run from a terminal: non-interactively the
+  command refuses rather than touching your changes.
 EOF
         return 0 ;;
       *)                        err "unknown flag: $1"; exit 1 ;;
@@ -1058,10 +1067,65 @@ EOF
   if [[ ! -d "$WIKI_DIR/.git" ]]; then
     die "Not a git checkout — wiki/ wasn't installed via install.sh. Manual update required."
   fi
+
+  # Dirty-tree guard. `git pull --ff-only` aborts if tracked engine files have
+  # local modifications (the "zombie-modified" case from direct edits inside
+  # <vault>/.wiki/). config.yaml, state/, logs/ are gitignored, so a dirty tree
+  # here means real engine-file edits — offer to stash them out of the way so
+  # the pull can proceed, instead of failing with a generic "resolve manually".
+  # Untracked files are left untouched (no `stash -u`).
+  local stashed=0
+  if ! git -C "$WIKI_DIR" diff --quiet || ! git -C "$WIKI_DIR" diff --cached --quiet; then
+    warn "Uncommitted changes in $WIKI_DIR (tracked engine files):"
+    git -C "$WIKI_DIR" status --short --untracked-files=no
+    if [[ ! -t 0 ]]; then
+      die "Refusing to touch them non-interactively. Run \`wiki update\` from a terminal to stash, or commit/stash manually in $WIKI_DIR."
+    fi
+    if confirm "Stash these changes, update, then re-apply them?" n; then
+      local stash_msg="wiki-update auto-stash $(date +%Y-%m-%d-%H%M%S)"
+      if git -C "$WIKI_DIR" stash push -m "$stash_msg"; then
+        stashed=1
+        ok "Stashed local changes (will re-apply after the pull if they merge cleanly)."
+      else
+        die "git stash failed. Resolve manually in $WIKI_DIR."
+      fi
+    else
+      die "Update aborted — uncommitted changes left in place. Commit or stash them, then re-run \`wiki update\`."
+    fi
+  fi
+
   local before; before="$(git -C "$WIKI_DIR" rev-parse --short HEAD 2>/dev/null || echo unknown)"
   info "Pulling latest into $WIKI_DIR …"
   if ! git -C "$WIKI_DIR" pull --ff-only; then
+    # Pull failed (non-ff / network). HEAD didn't move, so a stash we just made
+    # pops cleanly back onto the unchanged base — restore it so the operator's
+    # changes aren't left hidden by a failed update.
+    if (( stashed == 1 )); then
+      git -C "$WIKI_DIR" stash pop >/dev/null 2>&1 \
+        && warn "Restored your stashed changes (pull did not run)." \
+        || warn "Could not auto-restore stash — recover with: git -C \"$WIKI_DIR\" stash pop"
+    fi
     die "git pull failed (non-fast-forward or network). Resolve manually in $WIKI_DIR."
+  fi
+
+  # Re-apply stashed local changes onto the freshly-pulled engine — but only if
+  # they merge cleanly. Test with `git apply --check` against the new tree
+  # FIRST: if the patch would conflict we leave the stash unpopped (recoverable)
+  # rather than dropping conflict markers into the checkout mid-update. The
+  # check errs safe — a near-miss leaves the stash for manual resolution.
+  if (( stashed == 1 )); then
+    if git -C "$WIKI_DIR" stash show -p stash@{0} 2>/dev/null \
+         | git -C "$WIKI_DIR" apply --check - 2>/dev/null; then
+      if git -C "$WIKI_DIR" stash pop >/dev/null 2>&1; then
+        ok "Re-applied your stashed changes cleanly."
+      else
+        warn "Stash re-apply failed unexpectedly — your changes are still stashed."
+        warn "  recover with: git -C \"$WIKI_DIR\" stash pop"
+      fi
+    else
+      warn "Stashed changes would conflict with the update — left unpopped."
+      warn "  recover with: git -C \"$WIKI_DIR\" stash pop  (then resolve conflicts)"
+    fi
   fi
   local after; after="$(git -C "$WIKI_DIR" rev-parse --short HEAD)"
   if [[ "$before" == "$after" ]]; then

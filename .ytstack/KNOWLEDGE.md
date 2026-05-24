@@ -2249,3 +2249,15 @@ Reusable lessons:
 **Fix / standing rule:** usage is tracked in TOKENS per `(provider, model)` via `core/usage.py` (`UsageLedger`, process-global `LEDGER`, `atexit`-flushed to `state/usage.json`, surfaced by `wiki usage`). The Ollama client records automatically; Claude SDK sites record `AssistantMessage.usage` after their loop. Gates are token ceilings (from real usage) or structural (file-count, fact-count, turns) — never dollars. Pre-flight `prompt_chars → $` estimates were removed; prompt-**size** (chars) preflight is kept ONLY as a context-overflow guard, a distinct concern from cost. A dollar figure may appear only for a provider explicitly registered as pay-per-token.
 
 **Two transferable lessons:** (1) a fixed floor in a pre-flight estimate that exceeds the cap silently disables the gated feature — assert floor < cap, or don't floor. (2) a cost model must match the provider's actual billing; gating on a rate-card that doesn't apply (subscription) is gating on a fiction. Full rationale: DECISIONS 2026-05-23; spec `.ytstack/backlog/token-usage-accounting.md`.
+
+### `git apply --check` is the safe pre-flight for stash re-apply (2026-05-24)
+
+**Context:** `wiki update` (`cmd_update` in `wiki`) does `git pull --ff-only` on the `.wiki/` checkout. A dirty tree (direct edits to *tracked* engine files — the "zombie-modified" case) aborts the pull. New behavior: detect via `git diff --quiet || git diff --cached --quiet`, offer to stash, pull, then re-apply.
+
+**The footgun avoided:** the obvious "re-apply" is `git stash pop`. But `stash pop` on conflict applies the changes WITH conflict markers into the working tree AND keeps the stash — leaving the checkout half-merged mid-update. Cleaning that up means `git reset --hard` (globally banned here; and even though the stash preserves the data, it's a fragile path).
+
+**The pattern:** pre-flight the pop without touching the tree —
+`git -C <dir> stash show -p stash@{0} | git -C <dir> apply --check -`.
+Pop *only* if the check passes; otherwise leave the stash unpopped and print the recovery hint. `git apply` is stricter than the 3-way merge `stash pop` would do, so the check errs **safe** (occasionally refuses a pop that would have worked → leaves it for manual `stash pop`), and it NEVER produces a conflicted tree. Verified empirically across no-overlap (clean re-apply), overlapping-hunk (left unpopped, tree clean, stash intact), staged-only (detected via `diff --cached`), and clean-tree (no false positive).
+
+**Two more guards in the same flow:** (1) the stash offer is TTY-gated (`[[ ! -t 0 ]]` → die, never `read`) because `wiki update` is also dispatched non-interactively (dashboard health-fix button, `core/health.py`); a bare `confirm` would block on EOF semantics. (2) if the pull itself fails after a stash (network / non-ff), pop it straight back — HEAD didn't move so it re-applies cleanly — so a failed update never leaves the operator's changes hidden.
