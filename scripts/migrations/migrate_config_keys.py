@@ -76,7 +76,7 @@ import argparse
 import logging
 import shutil
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 import yaml
@@ -704,6 +704,38 @@ def migrate_config(config_path: Path) -> tuple[str | None, list[str]]:
     return new_text, changes
 
 
+# Mirror of scripts/core/config.py's round-robin backup. The migration is
+# standalone (vault-parametrised via --vault) and must NOT import config.py —
+# that module runs `load()` at import time against the global CONFIG_FILE, which
+# need not be the vault we're migrating. So we replicate the location + naming +
+# keep-count here so migration backups land in the SAME place as engine writes.
+_CONFIG_BACKUP_KEEP_LAST = 10
+
+
+def _backup_config(config_path: Path) -> str | None:
+    """Snapshot config_path into <.wiki>/state/config-backups/ before overwrite.
+
+    Matches scripts/core/config.py: `config-<UTC-ts>.yaml`, keeps the last
+    _CONFIG_BACKUP_KEEP_LAST, prunes older. Returns the backup name or None.
+    """
+    bdir = config_path.parent / "state" / "config-backups"
+    bdir.mkdir(parents=True, exist_ok=True)
+    ts = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+    out = bdir / f"config-{ts}.yaml"
+    if out.exists():
+        out = bdir / f"config-{ts}-{datetime.now(timezone.utc).microsecond:06d}.yaml"
+    shutil.copy2(config_path, out)
+
+    existing = sorted(bdir.glob("config-*.yaml"))
+    if len(existing) > _CONFIG_BACKUP_KEEP_LAST:
+        for stale in existing[: -_CONFIG_BACKUP_KEEP_LAST]:
+            try:
+                stale.unlink()
+            except OSError:
+                pass
+    return str(out.relative_to(config_path.parent))
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n", 1)[0])
     parser.add_argument("--vault", type=str, required=True,
@@ -729,10 +761,8 @@ def main() -> int:
         log.info("Preview only. Re-run with --apply to write.")
         return 0
 
-    ts = datetime.now().strftime("%Y%m%d-%H%M%S")
-    backup = config_path.with_suffix(config_path.suffix + f".bak.{ts}")
-    shutil.copy2(config_path, backup)
-    log.info("Backed up → %s", backup.name)
+    backup = _backup_config(config_path)
+    log.info("Backed up → %s", backup)
 
     config_path.write_text(new_text, encoding="utf-8")
     log.info("Wrote migrated config.yaml (%d change(s)).", len(changes))
