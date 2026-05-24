@@ -104,12 +104,42 @@ def test_calendar_rollup_dispatch():
     assert r.metadata.max_turns == 12
 
 
+def test_transcript_dispatch_routes_to_compile_main():
+    """Issue #1: jamie/gmeet/youtube transcripts (type: transcript) must hit
+    compile_main — the rich dialog prompt that owns person-stub creation +
+    State/Timeline + Action-Item routing — not the lean compile_default that
+    explicitly refuses person/project state work."""
+    from compile_stages.route import Compile
+
+    content = (
+        "---\ntype: transcript\nsource: jamie\n"
+        "participants:\n  - name: Alice\n  - name: Bob\n---\n"
+        "Alice: shipping Friday.\nBob: I'll review the PR."
+    )
+    r = _route(content, path="raw/transcripts/jamie/2026-05-24-standup.md")
+    assert isinstance(r, Compile)
+    assert r.metadata.substrate_prompt == "compile_main"
+    assert r.metadata.model_id == "claude-haiku-4-5-20251001"
+    assert r.metadata.max_turns == 60
+    assert r.metadata.substrate_type == "transcript"
+
+
 def test_path_fallback_screenshot_batch():
     from compile_stages.route import Compile
 
     r = _route("no frontmatter here", path="raw/notes/screenshots/screenshots-2026.md")
     assert isinstance(r, Compile)
     assert r.metadata.substrate_prompt == "compile_screenshots"
+
+
+def test_path_fallback_legacy_transcript():
+    """Issue #1: legacy transcripts under raw/transcripts/ without a `type:`
+    frontmatter still route to compile_main via the path fallback."""
+    from compile_stages.route import Compile
+
+    r = _route("Alice: hi\nBob: hey", path="raw/transcripts/gmeet/2026-old-meeting.md")
+    assert isinstance(r, Compile)
+    assert r.metadata.substrate_prompt == "compile_main"
 
 
 def test_compile_carries_single_classification():

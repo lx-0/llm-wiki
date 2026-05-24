@@ -87,6 +87,19 @@ SUBSTRATE_PROMPTS: dict[str, tuple[str, int, str | None]] = {
     # with 25-turn budget — matches the memory-sync legacy budget and
     # the daily-digest tier for many-entity Haiku substrates.
     "longform":        ("compile_main", 60, "claude-haiku-4-5-20251001"),
+    # Transcripts (jamie/gmeet meetings, youtube videos) carry attributed
+    # dialog + named participants. compile_main owns the two-layer
+    # person-stub creation + State/Timeline carry-forward + Action-Item
+    # routing that this substrate needs (compile_main.md instruction 4);
+    # the lean compile_default explicitly refuses person/project state
+    # work, so without this entry every transcript fell through to the
+    # default and *no* person pages were ever created (issue #1). Same
+    # tier as longform: rich prompt, Haiku 4.5 (200K ctx for 60-270 KB
+    # transcripts), 60-turn budget for the multi-participant stub fan-out.
+    # compile_main self-gates person-stub creation on attributed dialog,
+    # so single-speaker youtube transcripts extract concepts without
+    # spawning spurious people pages.
+    "transcript":      ("compile_main", 60, "claude-haiku-4-5-20251001"),
 }
 
 # Default for any substrate-type NOT in SUBSTRATE_PROMPTS. Lean prompt
@@ -110,6 +123,11 @@ _DEFAULT_DISPATCH: tuple[str, int, str | None] = (
 _SUBSTRATE_PATH_FALLBACKS: tuple[tuple[str, str], ...] = (
     ("raw/notes/screenshots/screenshots-", "screenshot-batch"),
     ("raw/notes/pictures/pictures-",       "picture-batch"),
+    # Legacy meeting transcripts dropped under raw/transcripts/ without a
+    # `type:` frontmatter still need the rich dialog prompt (issue #1).
+    # Current collectors (jamie/gmeet) always emit `type: transcript`, so
+    # this only matters for hand-placed / pre-frontmatter files.
+    ("raw/transcripts/",                   "transcript"),
 )
 
 
