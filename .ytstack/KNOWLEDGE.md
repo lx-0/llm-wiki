@@ -128,7 +128,7 @@ The 2026-05-16 safe-by-default shift (above) deliberately left the *opposite* ga
 
 Fix (commit `158fc6d`): `"transcript": ("compile_main", 60, haiku-4.5)` + `raw/transcripts/` path fallback. jamie/gmeet/youtube all emit `type: transcript`; compile_main self-gates person-stub creation on attributed dialog, so single-speaker youtube transcripts don't spawn spurious people pages.
 
-**Still open from that same line:** `voice` emits `type: voice-note`, NOT `transcript` (`collectors/voice.py`), so voice notes still fall through to `compile_default` and get no first-person Action-Item / State treatment — same bug class, different type key. Not bundled into the #1 fix (out of issue scope); decide whether voice-note also routes to compile_main (it carries first-person commitments → probably yes) before the next fresh-vault compile.
+**Not the same bug for voice:** `voice` emits `type: voice-note`, NOT `transcript` (`collectors/voice.py`), and that is correct — a voice-note is already plain text (a dictated single-author note), not attributed multi-participant dialog. No participants to stub, no two-layer State to carry forward, so `compile_default` (lean concept extraction) is the right route. The 2026-05-16 line lumped "voice" in with jamie/gmeet/transcript, but only the meeting/video transcripts carry the dialog shape compile_main is built for. Leave voice-note on the default. (The "voice transcripts" wording in `compile_main.md` instruction 4 predates this distinction and is just imprecise — not load-bearing.)
 
 ### Curiosity-loop consumer was operationally broken end-to-end for ~3 days (2026-05-16)
 
