@@ -11,6 +11,8 @@ parallel_milestones: [M021]
 
 # State
 
+**Recent ad-hoc (2026-05-24):** GitHub issue #1 fixed + closed — `type: transcript` (jamie/gmeet/youtube) had no `SUBSTRATE_PROMPTS` entry, fell through to `compile_default` (which refuses person/state work) → 0 person articles on a 139-transcript vault. Added `"transcript": (compile_main, 60, haiku-4.5)` + `raw/transcripts/` path fallback. Commit `158fc6d` (on origin/main; auto-closed via `closes #1`). voice-note stays on default (plain text, not dialog — not a bug). Detail: `.ytstack/AD-HOC-issue-1-transcript-routing-SUMMARY.md`; KNOWLEDGE "The deferred half came due".
+
 **Recent ad-hoc (2026-05-24):** `wiki update` now offers to stash a dirty `.wiki/` tree before the `--ff-only` pull and re-applies it only on a clean merge (`git apply --check` pre-flight; conflict → left unpopped). TTY-gated. Commit `ecdce09`. Decision 2026-05-24, KNOWLEDGE "`git apply --check`…".
 
 **Recent ad-hoc (2026-05-23):** daily-digest chain repaired + live-verified in lxw — path bug (`d268b8a`), email subject-signal β (`e32d466`), agent `last_run`→`state/agent-runs.json` (`119d4c9`). 8 digests backfilled (`05-16…05-23`). Detail: `.ytstack/AD-HOC-daily-digest-chain-fix-SUMMARY.md`.
