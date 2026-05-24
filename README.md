@@ -45,7 +45,9 @@ An opinionated **knowledge-compilation engine** for personal substrates. Drop ra
 
 The vault holds **data**. The `.wiki/` directory holds the **engine**. They never mix on disk.
 
-**What this isn't.** Not a vector database, not a RAG service, not a Notion / Logseq / Mem replacement, not a docs-site generator, not a team wiki. It is a *compile loop* for one operator's substrates, output as plain Markdown that any tool can read.
+**A map, not an agent.** The wiki is a *map of the operator* — a compiled, always-current, descriptive portrait of what you know, did, and committed to, read daily by you and your agents. It describes; it doesn't act. That's why it's a *self-cartography engine*, not a "second brain": "brain" implies the part that thinks and does, which is deliberately out of scope. Anything that *acts* on the map — automating a task, syncing a commitment to an external tool — is an operator-gated consumer **downstream** of the compiler, never the compiler itself.
+
+**What this isn't.** Not a vector database, not a RAG service, not a Notion / Logseq / Mem replacement, not a docs-site generator, not a team wiki — and not a task manager, executive/agent layer, or "second brain." It is a *compile loop* for one operator's substrates, output as plain Markdown that any tool can read.
 
 ## Why it exists
 
@@ -63,14 +65,22 @@ llm-wiki is the **compilation layer** between raw substrates and active consumpt
 
 ## What you get
 
+**The map** — substrates in, a compiled wiki out:
+
 - **Two-path ingest + per-day rollup** — automatic session capture (hooks → `daily/<date>/sessions.md`) and substrate-source writers (Registry-discovered Collectors + clipper + manual drop → `raw/`, plus per-day mirror summaries into `daily/<date>/{health,meetings,voice,email}.md` — email carries top senders + recent subjects, not just a count) converge at one compiler. A daily-digest pass distills the per-source captures into a single `daily/<date>.md` (~500 words). All eleven collectors ride the formal Collector Protocol (`SPEC` + `@register` + `run()`): email, jamie, gmeet, voice, health, calendar, pictures, browser, tabs, screenshots, youtube.
 - **Compile once, query fast** — knowledge is distilled into Markdown wikilinks at compile time. No embedding step, no retrieval per query.
 - **Multi-agent hooks** — `session-start` / `session-end` / `pre-compact` wired into Claude Code, Codex, Gemini, and Cursor. Every session ends as a structured daily-log entry.
 - **Curiosity loop** — a small local Ollama model spots gaps after each compile and queues deep-scan requests for the next cycle.
-- **Personal-task layer** — the compiler extracts commitments from jamie + gmeet transcripts (Task / Owner / Deadline / Context quartet) and routes them into `knowledge/people/<slug>.md` + `knowledge/projects/<slug>.md` entity pages as `## Action Items` (Obsidian-Tasks-plugin syntax) and `## Open Threads`. Resolved items demote to Timeline on the next compile. Dashboard pane + cross-entity Inbox MOC surface the layer.
+- **Self-healing wiki** — `lint.py` runs 8 structural checks plus an LLM contradiction scan, so the wiki stays consistent as it grows.
+
+**Consumers of the map** — operator-gated layers that *read* the compiled wiki; where they act, only with explicit approval, downstream of the compiler:
+
+- **Surfaced commitments** — the compiler *reads back* the commitments your substrate reveals (jamie + gmeet transcripts; Task / Owner / Deadline / Context quartet) and surfaces them on the relevant `knowledge/people/<slug>.md` + `knowledge/projects/<slug>.md` entity pages as `## Action Items` (Obsidian-Tasks-plugin syntax) and `## Open Threads`. Resolved items demote to Timeline on the next compile; a dashboard pane + cross-entity Inbox MOC make them legible. This *surfaces* commitments as part of the portrait — it does **not** manage them: reminders, completion-as-workflow, and syncing to an external task tool are out of scope (a downstream consumer's job).
 - **Optimization suggestions** — the compiler proposes YAML automations (e.g. mail-filter rules) with per-action approval before execution.
 - **Operator self-reports** — air-gapped analytical surface at `<vault>/reports/`. Validated clinical screens (PHQ-9, GAD-7, WHO-5, PSS-10, ISI, OLBI) scored by an informant agent reading the operator's own substrate. Deterministic Likert + cutoffs; the LLM only fills in raw answers. Two-pass analyst (per-study + cross-study). `wiki study run <id>` + `wiki analyze`. See [`docs/cli.md`](docs/cli.md#operator-self-reports-analytical-surface).
-- **Self-healing wiki** — `lint.py` runs 8 structural checks plus an LLM contradiction scan, so the wiki stays consistent as it grows.
+
+**Foundations**:
+
 - **Engine / vault split** — engine code, prompts, hooks, runtime state, and venv all live under `<vault>/.wiki/`. The vault root stays clean.
 - **One install, one CLI, one venv** — `wiki setup` + `wiki update` + `wiki status` cover the full lifecycle.
 
