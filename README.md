@@ -63,21 +63,6 @@ Existing tools either solve a slice or solve a different problem:
 
 llm-wiki is the **compilation layer** between raw substrates and active consumption — by humans reading and by agents prompting. It is not an archive to be left behind; it is a working surface that gets refined by being used.
 
-## Core rules
-
-Ten rules define how the wiki behaves. Most come straight from [Andrej Karpathy's LLM Wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f); a few are this project's own. Each is explained in plain terms here; the precise, sourced version — with the exact quotes behind every rule — is in [docs/PRINCIPLES.md](docs/PRINCIPLES.md).
-
-1. **Collect for a fuller picture of you, not for sheer volume.** *(Intake)* A quiet source that captures a side of you nothing else does — what you read for fun, how you sleep — is worth more than another pile of work email.
-2. **Never change the originals.** *(Source)* Your raw material is read-only. The system reads from it but never edits or deletes it, so your record of what actually happened stays intact.
-3. **The AI writes the wiki; you steer it.** *(Authorship)* You don't hand-write or file pages. You add sources and ask questions; the AI writes every page and keeps it up to date.
-4. **Fixes go through proper channels, not hand-editing.** *(Authorship)* When a page is wrong, it's corrected through a defined path — not by manually rewriting a finished page — so everything stays consistent and undoable.
-5. **Write it down once, read it instantly.** *(Mechanic)* The system does the thinking once and saves the answer as a page. Asking again later is just opening a document — no waiting, no re-searching.
-6. **Stay flat and simple, not a maze of folders.** *(Structure)* No deep folder trees to keep tidy. Pages are short and single-topic, tied together by one catalog and one timeline. Fussy filing is what kills most note systems — here the AI handles it.
-7. **The tool and your data stay separate.** *(Isolation)* The program lives in its own hidden folder; your knowledge lives in yours. Updating the tool never touches your data.
-8. **Old, untouched pages quietly fade.** *(Lifecycle)* Pages nothing has referenced in a long time drift to the background on their own, so the active wiki stays current without you pruning it.
-9. **Your notes are information, never commands.** *(Integrity)* The AI treats everything you feed it as material about you, never as instructions — a stray "do X" buried in an old note can't make it act.
-10. **It maps what is; it doesn't act for you.** *(Scope)* The wiki describes your world. It doesn't run your to-dos or change other apps — anything that acts on the map is a separate step you approve.
-
 ## What you get
 
 **The map** — substrates in, a compiled wiki out:
