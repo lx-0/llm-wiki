@@ -121,6 +121,14 @@ When you add a collector that emits a new `type:` value:
 
 The cost of forgetting is ~$2-3 per file × N days × M operators until someone notices.
 
+#### The deferred half came due — transcript routing (2026-05-24, issue #1)
+
+The 2026-05-16 safe-by-default shift (above) deliberately left the *opposite* gap open: it noted "the dialog-rich substrates that would legitimately need [compile_main] — jamie/gmeet/voice/transcript — are <5 files each in queue today and have not yet been profiled." That deferral became a bug on a fresh vault: @Sidwach ran `wiki compile` over 139 jamie/gmeet transcripts (`type: transcript`) and got **0 person articles** — every transcript fell through to `compile_default`, which explicitly refuses person/project state work. The safe-by-default change protected against runaway *cost*, but the same un-enumerated-type mechanism silently *under-processes* substrate that genuinely needs the rich prompt. Two failure directions, one root mechanism (`SUBSTRATE_PROMPTS.get(key, _DEFAULT_DISPATCH)`).
+
+Fix (commit `158fc6d`): `"transcript": ("compile_main", 60, haiku-4.5)` + `raw/transcripts/` path fallback. jamie/gmeet/youtube all emit `type: transcript`; compile_main self-gates person-stub creation on attributed dialog, so single-speaker youtube transcripts don't spawn spurious people pages.
+
+**Still open from that same line:** `voice` emits `type: voice-note`, NOT `transcript` (`collectors/voice.py`), so voice notes still fall through to `compile_default` and get no first-person Action-Item / State treatment — same bug class, different type key. Not bundled into the #1 fix (out of issue scope); decide whether voice-note also routes to compile_main (it carries first-person commitments → probably yes) before the next fresh-vault compile.
+
 ### Curiosity-loop consumer was operationally broken end-to-end for ~3 days (2026-05-16)
 
 Three independent gaps stacked, each invisible alone, together produced 100% null-output:
