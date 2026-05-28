@@ -22,7 +22,7 @@ from pathlib import Path
 
 from claude_agent_sdk import ClaudeAgentOptions, ResultMessage, query
 
-from core.paths import KNOWLEDGE_DIR, ROOT_DIR
+from core.paths import KNOWLEDGE_DIR, LOG_FILE, ROOT_DIR
 from core.utils import now_iso, read_wiki_index_compact
 from core.config import CONFIG
 
@@ -30,7 +30,6 @@ from core.config import CONFIG
 
 CLAUDE_MD = Path.home() / ".claude" / "CLAUDE.md"
 BACKUP_DIR = ROOT_DIR / "raw" / "notes" / "claude-md-backups"
-LOG_FILE = KNOWLEDGE_DIR / "log.md"
 
 logging.basicConfig(
     level=logging.INFO,
@@ -149,7 +148,7 @@ async def optimize(dry_run: bool = False) -> None:
     # Apply: copy staged version to CLAUDE.md
     CLAUDE_MD.write_text(updated, encoding="utf-8")
     log.info("Applied to %s", CLAUDE_MD)
-    log.info("Done. Diff logged to knowledge/log.md")
+    log.info("Done. Diff logged to %s", LOG_FILE)
 
 
 async def main() -> None:

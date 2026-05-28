@@ -71,9 +71,9 @@ For each newly created concept stub, append a row to `knowledge/index.md`:
 
 Existing entity rows do NOT need touching (Timeline appends don't bump `updated:` on the row — that's reserved for State changes).
 
-### 5. No log.md update
+### 5. No operations log update
 
-Daily compiles run for every day's digest. Logging each one bloats `knowledge/log.md`. Skip the log append step.
+Daily compiles run for every day's digest. Logging each one bloats `.wiki/logs/operations.md`. Skip the log append step.
 
 ## Anti-loop guard
 

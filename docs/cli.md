@@ -59,7 +59,7 @@ hard-capped at 500ms via `SIGALRM`) and renders four sections in order:
 
 | Field              | Source                                                 |
 |--------------------|--------------------------------------------------------|
-| `N articles`       | `find knowledge/ -name '*.md'` minus `index.md/log.md` |
+| `N articles`       | `find knowledge/ -name '*.md'` minus `index.md`        |
 | `last compile Nh ago` | humanized delta from `state.json["last_compile"]`   |
 | `ollama ✓` / `✗`   | TCP-connect probe at `models.ollama_url` (150ms cap)   |
 

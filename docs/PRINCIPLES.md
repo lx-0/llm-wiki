@@ -78,17 +78,19 @@ no per-query retrieval. (*"compile, don't retrieve"* is our shorthand for Karpat
 
 ## 6 · Structure — flat, atomic, index-navigated
 
-**Keep it flat and atomic; navigate by `index.md` + `log.md`; minimize bookkeeping.**
+**Keep it flat and atomic; navigate by `index.md`; minimize bookkeeping.**
 
 No deep folder hierarchies — pages are small and single-topic, organized by article
-*type*, tied together by one catalog (`index.md`) and one chronological record
-(`log.md`). Deep filing systems die because the maintenance burden outgrows the value;
-flat + LLM-maintained index avoids that.
+*type*, tied together by one catalog (`index.md`). A chronological operations record
+lives outside the vault at `.wiki/logs/operations.md` so it can grow without dragging
+Obsidian's index along. Deep filing systems die because the maintenance burden outgrows
+the value; flat + LLM-maintained index avoids that.
 
 > "The wiki is just a git repo of markdown files." "index.md … a catalog of everything
 > in the wiki — each page listed with a link, a one-line summary, and optionally
 > metadata." "log.md is chronological … an append-only record of what happened and when
-> — ingests, queries, lint passes." — **Karpathy**
+> — ingests, queries, lint passes." — **Karpathy** (this engine keeps the log but hosts
+> it under `.wiki/logs/operations.md` instead of `knowledge/`.)
 
 ## 7 · Isolation — engine ≠ data
 

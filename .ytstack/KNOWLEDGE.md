@@ -82,11 +82,11 @@ For each accumulating substrate type whose shape diverges from "dialog substrate
 ```
 
 The dedicated prompt:
-- States the policy directly (look at `knowledge/log.md` entries for the type — operator has usually been running the policy manually, you're just codifying it).
+- States the policy directly (look at `.wiki/logs/operations.md` entries for the type — operator has usually been running the policy manually, you're just codifying it).
 - Has at most 2-4 sections matching the actual workflow.
-- Bounds tool access to `knowledge/**`.
+- Bounds tool access to `knowledge/**` (plus the operations log file).
 - Has an explicit anti-loop guard ("if after N turns you haven't finished, emit final result").
-- Skips `knowledge/log.md` updates UNLESS the substrate-type genuinely produces no other audit trail (health-rollup does → log entries kept; calendar/daily skip log because Timeline appends are the trail).
+- Skips operations-log updates UNLESS the substrate-type genuinely produces no other audit trail (health-rollup does → log entries kept; calendar/daily skip log because Timeline appends are the trail).
 
 Existing examples (state at end of 2026-05-16):
 - `compile_calendar.md` (12 turns, Haiku) — recurring-concept stubs + attendee Timeline appends.
@@ -1110,13 +1110,13 @@ When a user-action looks like "click button → fill form → write a markdown l
 
 Engine perspective: any file under `templates/.obsidian/` that Obsidian also writes to is racing. Seeding is best-effort while the app is live.
 
-### Graph View filter — `knowledge/index.md` and `knowledge/log.md` are excluded by template default
+### Graph View filter — `knowledge/index.md` is excluded by template default
 
-These two top-level files are flat-overview hubs (`index.md` is the auto-generated article table written by `compile.py`; `log.md` is the chronological roll-up). They link to every article by definition → in the Graph View they form a hairball where every node connects to both, dwarfing real semantic edges.
+`index.md` is the auto-generated article table written by `compile.py` — it links to every article by definition, so in the Graph View it forms a hairball where every node connects to it, dwarfing real semantic edges. (Until 2026-05-28 the same hairball existed for `knowledge/log.md`; that file was relocated to `.wiki/logs/operations.md` after a 2 MB instance crashed Obsidian on lxw — see DECISIONS.md 2026-05-28.)
 
-**Filter:** `templates/.obsidian/graph.json` ships `search: "path:knowledge -path:knowledge/index -path:knowledge/log"`. Exclusion works because both are top-level files (not folders) — there's no risk of accidentally hiding a `knowledge/index/*.md` subtree.
+**Filter:** `templates/.obsidian/graph.json` ships `search: "path:knowledge -path:knowledge/index"`. Exclusion works because `index.md` is a top-level file (not a folder) — there's no risk of accidentally hiding a `knowledge/index/*.md` subtree.
 
-**Reports/Dashboard/Lint are already correct** — `WIKI_SUBDIRS` in `scripts/utils.py` only iterates `concepts/`, `connections/`, `qa/`, `people/`, `projects/`, `facts/`, so `list_wiki_articles()` excludes `index.md` / `log.md` from connection-counting, orphan-detection, and missing-backlink scans. The Graph View was the only surface that needed an explicit filter.
+**Reports/Dashboard/Lint are already correct** — `WIKI_SUBDIRS` in `scripts/utils.py` only iterates `concepts/`, `connections/`, `qa/`, `people/`, `projects/`, `facts/`, so `list_wiki_articles()` excludes `index.md` (and the historical `log.md`) from connection-counting, orphan-detection, and missing-backlink scans. The Graph View was the only surface that needed an explicit filter.
 
 The single intentional exception: `lint.py:check_orphan_pages` reads `read_wiki_index()` and treats articles listed in `index.md` as "not orphan". That's by design — the auto-generated index is the canonical reachability list.
 
@@ -1448,7 +1448,7 @@ Meanwhile the "dumber" path — exporting the Gemini-generated Docs from the Dri
 
 ### Multi-step prompts need verification clauses (qa/ schema drift, 2026-05-15)
 
-`prompts/query_file_back.md` told the agent to do three things after answering: (1) write `knowledge/qa/<slug>.md`, (2) append a row to `knowledge/index.md`, (3) append an entry to `knowledge/log.md`. The first live run wrote the qa/ note (without `type: qa` in frontmatter) and then reported "Q&A-Artikel erstellt, Index und Log aktualisiert" — but steps 2 and 3 never landed. Schema-violating frontmatter (missing `type:`, redundant `qa` tag) plus orphaned-from-index plus untraceable-in-log, all silent.
+`prompts/query_file_back.md` told the agent to do three things after answering: (1) write `knowledge/qa/<slug>.md`, (2) append a row to `knowledge/index.md`, (3) append an entry to the operations log (`knowledge/log.md` pre-2026-05-28, `.wiki/logs/operations.md` after). The first live run wrote the qa/ note (without `type: qa` in frontmatter) and then reported "Q&A-Artikel erstellt, Index und Log aktualisiert" — but steps 2 and 3 never landed. Schema-violating frontmatter (missing `type:`, redundant `qa` tag) plus orphaned-from-index plus untraceable-in-log, all silent.
 
 Two patterns came out of the fix:
 

@@ -79,7 +79,7 @@ Decide: existing article OR new stub?
 
 For every NEW stub: append a row to `knowledge/index.md`. For existing articles you only added `source_pictures:` to, do NOT touch the index row.
 
-### 4. No log.md update
+### 4. No operations log update
 
 Picture batches are routine — skip the log append.
 

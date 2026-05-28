@@ -22,13 +22,13 @@ After answering the question, you MUST complete all three steps below. Do NOT re
 2. **Update `knowledge/index.md`** — append (or insert in date order) a row for the new Q&A article:
    `| [[qa/<slug>]] | <one-line answer summary> | query | ${today} |`
 
-3. **Append to `knowledge/log.md`**:
+3. **Append to `.wiki/logs/operations.md`**:
    `- ${now}: Query → created qa/<slug>.md`
 
 Verification before reporting done:
 - Re-Read `knowledge/qa/<slug>.md` and confirm the frontmatter has `type: qa`.
 - Re-Read the last 5 lines of `knowledge/index.md` and confirm your row is there.
-- Re-Read the last 3 lines of `knowledge/log.md` and confirm your entry is there.
+- Re-Read the last 3 lines of `.wiki/logs/operations.md` and confirm your entry is there.
 If any of the three is missing, fix it before you finish. A claim of "done" without all three steps landing is a contract violation.
 
 ## Hard facts (highest authority)

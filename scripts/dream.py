@@ -988,7 +988,7 @@ async def dream_entity(
                 "PreToolUse": [
                     HookMatcher(
                         matcher="Write|Edit",
-                        hooks=[make_path_scope_hook([ROOT_DIR / "knowledge"])],
+                        hooks=[make_path_scope_hook([ROOT_DIR / "knowledge", LOG_FILE])],
                     ),
                 ],
             },

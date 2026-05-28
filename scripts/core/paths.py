@@ -25,7 +25,7 @@ from pathlib import Path
 #   │   ├── config.yaml     ← (loaded by core/config.py)
 #   │   ├── .claude/.env    ← DOTENV_FILE (loaded by core/config.py at import)
 #   │   ├── state/          ← STATE_DIR (json hash trackers / cooldowns / dedup)
-#   │   ├── logs/           ← LOGS_DIR (flush + compile log output)
+#   │   ├── logs/           ← LOGS_DIR (flush + compile log output; LOG_FILE = operations.md)
 #   │   ├── sessions/       ← SESSIONS_DIR (session-flush staging + failed-flushes/)
 #   │   └── reports/        ← REPORTS_DIR (lint + review-wiki output)
 #   ├── daily/, raw/, knowledge/, inbox/   ← user-visible content
@@ -57,7 +57,6 @@ AREAS_DIR = KNOWLEDGE_DIR / "areas"
 FACTS_DIR = KNOWLEDGE_DIR / "facts"
 TAKES_DIR = KNOWLEDGE_DIR / "takes"
 INDEX_FILE = KNOWLEDGE_DIR / "index.md"
-LOG_FILE = KNOWLEDGE_DIR / "log.md"
 AGENTS_FILE = ROOT_DIR / "AGENTS.md"
 
 # ── Engine internals (under .wiki/) ────────────────────────────────────
@@ -73,3 +72,8 @@ LOGS_DIR = WIKI_DIR / "logs"          # *.log  — flush + compile output
 SESSIONS_DIR = WIKI_DIR / "sessions"  # session-flush staging + failed-flushes/
 STATE_FILE = STATE_DIR / "state.json"
 EMAIL_STATE_FILE = STATE_DIR / "email-state.json"
+# Operations audit log (engine + agent-side append). Lives under .wiki/logs/
+# (not knowledge/) so it's invisible to Obsidian indexing — a 2 MB log.md
+# inside knowledge/ crashed the vault on 2026-05-28 (lxw). Agents reach it
+# via the path-scope hook in compile_stages/compile.py + dream.py.
+LOG_FILE = LOGS_DIR / "operations.md"

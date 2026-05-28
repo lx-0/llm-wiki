@@ -34,7 +34,7 @@ from claude_agent_sdk import (
     query,
 )
 
-from core.paths import CONCEPTS_DIR, FACTS_DIR, ROOT_DIR
+from core.paths import CONCEPTS_DIR, FACTS_DIR, LOG_FILE, ROOT_DIR
 from core.utils import now_iso, today_iso
 from core.config import CONFIG  # noqa: E402
 from core.usage import LEDGER  # noqa: E402
@@ -241,7 +241,7 @@ async def reconcile_fact(
                     "PreToolUse": [
                         HookMatcher(
                             matcher="Write|Edit",
-                            hooks=[make_path_scope_hook([CONCEPTS_DIR])],
+                            hooks=[make_path_scope_hook([CONCEPTS_DIR, LOG_FILE])],
                         ),
                     ],
                 },

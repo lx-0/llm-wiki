@@ -33,7 +33,7 @@ The vault has three substrate layers under the current working directory:
    ```
    Do NOT rewrite the historical content underneath. Daily logs are append-only history; the note tells future compilations to disregard the contaminated assertions.
 
-4. **Update `knowledge/index.md` and `knowledge/log.md`** to reflect every rename, deletion, or substantive edit. Append a log line:
+4. **Update `knowledge/index.md` and `.wiki/logs/operations.md`** to reflect every rename, deletion, or substantive edit. Append a log line:
    ```
    - ${now}: Applied fact `facts/${slug}` → <list of files touched>
    ```

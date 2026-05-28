@@ -67,9 +67,9 @@ Decide: existing article OR new stub?
 
 For every NEW stub you created in step 2, append a row to `knowledge/index.md`. For existing articles you only added `source_screenshots:` to, do NOT touch the index row — the back-link doesn't bump the `updated:` semantic.
 
-### 4. No log.md update
+### 4. No operations log update
 
-Screenshot batches run frequently — logging each one bloats `knowledge/log.md`. Skip the log append step.
+Screenshot batches run frequently — logging each one bloats `.wiki/logs/operations.md`. Skip the log append step.
 
 ## Anti-loop guard
 

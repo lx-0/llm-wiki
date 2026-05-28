@@ -32,7 +32,7 @@ When invoked via this agent-task surface (rather than `wiki dream-entity <slug>`
 3. Renders `prompts/dream_entity.md` with the corpus + existing page.
 4. Invokes the SDK with this spec's tools / model / max_turns / system prompt.
 
-The deliverable is an Edit/Write on `knowledge/{people,projects,areas}/${slug}.md` plus updates to `knowledge/index.md` and `knowledge/log.md`.
+The deliverable is an Edit/Write on `knowledge/{people,projects,areas}/${slug}.md` plus updates to `knowledge/index.md` and `.wiki/logs/operations.md`.
 
 Pre-flight: this spec rejects the run if the estimated prompt cost would exceed `CONFIG.limits.dream_entity_max_cost_usd` (default $2.00). On cost cap, the runner prints `COST_CAP_EXCEEDED: estimate=$X.XX > cap=$Y.YY` and exits non-zero.
 

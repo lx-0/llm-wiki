@@ -150,7 +150,6 @@ The LLM owns this directory entirely. Humans read it but rarely edit it directly
 ```
 knowledge/
 ├── index.md          # Master catalog — every article with one-line summary
-├── log.md            # Append-only chronological build log
 ├── concepts/         # Atomic knowledge articles            (type: concept)
 ├── connections/      # Cross-cutting insights linking 2+    (type: connection)
 ├── qa/               # Filed query answers                  (type: qa)
@@ -280,9 +279,11 @@ Format:
 | [[people/alice]] | Collaborator on project foo | raw/notes/foo-spec.md | 2026-04-08 |
 ```
 
-### `knowledge/log.md` — Build Log
+### `.wiki/logs/operations.md` — Build Log
 
-Append-only chronological record of every operation.
+Append-only chronological record of every operation. Lives under `.wiki/`
+so Obsidian doesn't index it (a 2 MB log inside `knowledge/` crashed the
+vault on 2026-05-28).
 
 ```markdown
 # Operations Log
@@ -622,7 +623,7 @@ last_updated: 2026-05-13
 
 - **Wikilinks:** `[[path/to/article]]` without `.md` extension, relative to `knowledge/`.
 - **Writing style:** encyclopedia-style, factual, third-person where appropriate.
-- **Dates:** ISO 8601 (`YYYY-MM-DD` for dates, full ISO for timestamps in `log.md`).
+- **Dates:** ISO 8601 (`YYYY-MM-DD` for dates, full ISO for timestamps in the operations log).
 - **File naming:** lowercase, hyphens for spaces (e.g. `auth-jwt-gotchas.md`).
 - **Frontmatter:** every article has at minimum `title`, `sources`, `created`, `updated`.
 - **Sources:** always link back to the `daily/` or `raw/` files that contributed.

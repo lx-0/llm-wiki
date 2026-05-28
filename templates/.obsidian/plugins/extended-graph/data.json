@@ -117,7 +117,7 @@
   "additionalProperties": {},
   "backupGraphOptions": {
     "collapse-filter": true,
-    "search": "path:knowledge -path:knowledge/index -path:knowledge/log",
+    "search": "path:knowledge -path:knowledge/index",
     "showTags": true,
     "showAttachments": false,
     "hideUnresolved": true,

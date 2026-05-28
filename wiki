@@ -1147,6 +1147,16 @@ EOF
     warn "Config migration reported errors — inspect $ROOT_DIR/.wiki/config.yaml manually."
   fi
 
+  # Relocate knowledge/log.md → .wiki/logs/operations.md (idempotent).
+  # Pre-2026-05-28 vaults carry a 2 MB audit log inside knowledge/ that
+  # crashes Obsidian on open. The log is engine telemetry, not knowledge.
+  info "Relocating operations log out of knowledge/ (idempotent) …"
+  if ! uv run --quiet --project "$WIKI_DIR" python \
+        "$WIKI_DIR/scripts/migrations/migrate_log_md_path.py" \
+        --vault "$ROOT_DIR"; then
+    warn "Operations-log migration reported errors — inspect $ROOT_DIR/knowledge/log.md manually."
+  fi
+
   if (( sync_skills == 1 )); then
     skills_cmd_sync
   else

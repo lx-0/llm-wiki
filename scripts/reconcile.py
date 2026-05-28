@@ -119,8 +119,9 @@ def _within_cooldown(slug: str, *, cooldown_days: int) -> bool:
 
 
 def _append_log_summary(lines: list[str]) -> None:
-    """Prepend one newest-first block to knowledge/log.md."""
+    """Prepend one newest-first block to the operations log (.wiki/logs/operations.md)."""
     block = f"## [{now_iso()}] reconcile | concept-consistency pass\n" + "\n".join(lines) + "\n\n"
+    LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
     existing = LOG_FILE.read_text(encoding="utf-8") if LOG_FILE.exists() else "# Operations Log\n\n"
     if existing.startswith("# "):
         head, _, rest = existing.partition("\n")

@@ -186,7 +186,7 @@ LIMIT 10
 
 ## 🔗 Quick access
 
-[[knowledge/index|Index]] · [[knowledge/log|Compile log]] · [[knowledge.base|Browse knowledge]] · [[AGENTS|Schema]] · [[knowledge/people/alex|Self]]
+[[knowledge/index|Index]] · [[knowledge.base|Browse knowledge]] · [[AGENTS|Schema]] · [[knowledge/people/alex|Self]]
 
 ---
 

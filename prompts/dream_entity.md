@@ -147,11 +147,11 @@ When done, your final output text should be a one-paragraph summary: how many St
 - **NO `git push`-equivalent side effects.** You operate inside `knowledge/**` only. The Operator's vault structure is your boundary.
 - **NO new substrate writes.** Don't create files under `raw/` or `daily/`. Dream-cycle synthesizes; it does not generate new substrate.
 - **NO new entity stubs from corpus mentions.** If the corpus mentions a person/project without an existing page, cite them in the Timeline but DO NOT create their page. Stubbing is per-file-compile's job.
-- **NO writes outside this single entity page** (except `knowledge/index.md` and `knowledge/log.md` updates per below).
+- **NO writes outside this single entity page** (except `knowledge/index.md` and `.wiki/logs/operations.md` updates per below).
 
 ## Bookkeeping (small)
 
 After the entity-page Write succeeds:
 
 1. **`knowledge/index.md`** — update the existing row for this entity (refresh the `updated` column to `${today}`). Do NOT add a new row.
-2. **`knowledge/log.md`** — append: `- ${now}: Dream-cycle resynthesized [[${entity_link}]] from ${corpus_count} sources.`
+2. **`.wiki/logs/operations.md`** — append: `- ${now}: Dream-cycle resynthesized [[${entity_link}]] from ${corpus_count} sources.`

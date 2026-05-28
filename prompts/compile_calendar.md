@@ -60,9 +60,9 @@ If you created any new concept stub files in step 1, append one row per new file
 
 If you didn't create anything new (only appended Timeline entries to existing person pages): **skip this step entirely**. Existing rows don't need touching.
 
-### 4. No log.md update
+### 4. No operations log update
 
-Calendar compiles run for every day's rollup — logging each one bloats `knowledge/log.md`. Skip the log append step.
+Calendar compiles run for every day's rollup — logging each one bloats `.wiki/logs/operations.md`. Skip the log append step.
 
 ## Anti-loop guard
 

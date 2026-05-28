@@ -67,9 +67,9 @@ For each concept:
 
 For each new stub you created, append one row to `knowledge/index.md`. Existing articles you only appended a paragraph to: do NOT touch the index row (the paragraph isn't significant enough to bump the index summary).
 
-### 4. No log.md update
+### 4. No operations log update
 
-The default prompt runs on many substrate types per batch. Logging each one bloats `knowledge/log.md`.
+The default prompt runs on many substrate types per batch. Logging each one bloats `.wiki/logs/operations.md`.
 
 ## Anti-loop guard
 

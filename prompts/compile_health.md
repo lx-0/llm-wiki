@@ -41,7 +41,7 @@ The operator wrote actual content in the body. Treat it as a thin substrate pass
    - If it EXISTS: append ONE Timeline line (newest-first under `## Timeline`):
      `- **${today}** | \`${source_path}\` — Mentioned in health rollup: <one-line context from the prose>.`
    - Do NOT touch the State block above `---`. Do NOT add Action Items. Do NOT carry-forward or stale-flag. Append-only.
-2. **Append one log entry to `knowledge/log.md`** at the top (newest-first):
+2. **Append one log entry to `.wiki/logs/operations.md`** at the top (newest-first):
 
    ```markdown
    ## [${now}] compile | Health rollup <date> (with observations)
@@ -56,11 +56,11 @@ Do NOT create new entity stubs. Do NOT touch `knowledge/index.md`. Do NOT escala
 
 ### 3. No new articles
 
-Health-rollup files NEVER create new wiki articles, and NEVER edit the policy article (`concepts/health-rollup-intake-format`) — do not read it, do not append to its `compiled_from:`. Everything is append-only on existing entity pages (Timeline) or log.md.
+Health-rollup files NEVER create new wiki articles, and NEVER edit the policy article (`concepts/health-rollup-intake-format`) — do not read it, do not append to its `compiled_from:`. Everything is append-only on existing entity pages (Timeline) or operations log.
 
 ### 4. Stop at the first complete result
 
-This task is bounded: at most log.md + maybe one Timeline line per mentioned entity. If you find yourself reading the policy article or about to make a third kind of edit, you've drifted — stop and emit your final result.
+This task is bounded: at most operations log + maybe one Timeline line per mentioned entity. If you find yourself reading the policy article or about to make a third kind of edit, you've drifted — stop and emit your final result.
 
 ## Anti-loop guard
 

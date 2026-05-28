@@ -304,7 +304,7 @@ Background: Substrate enthält routinemäßig wortwörtliche Beschreibungen von 
 5. Personen erwähnt? → `people/` Artikel
 6. Projekt diskutiert? → `projects/` Artikel
 7. Updated `index.md` mit neuen/geänderten Einträgen
-8. Appended an `log.md`
+8. Appended an die Operations-Log (`.wiki/logs/operations.md`)
 
 **Kosten:** ~$0.02-0.15 pro Source (abhängig von Größe und Anzahl bestehender Artikel). 1 Source updated typisch 5-15 Artikel, was den Per-Source-Preis vs. Per-Artikel-Wert sehr günstig macht.
 
@@ -725,7 +725,7 @@ flowchart TD
     READ --> ANALYZE["Erkennt Cross-Project Patterns:\nToolchain, Conventions, Pitfalls"]
     ANALYZE --> EDIT["Surgical Edits an CLAUDE.md\n(Add/Update/Remove)"]
     EDIT --> CHECK{"< 200 Zeilen?"}
-    CHECK -->|Ja| DONE["Backup + Diff in log.md"]
+    CHECK -->|Ja| DONE["Backup + Diff in .wiki/logs/operations.md"]
     CHECK -->|Nein| REVERT["Revert aus Backup"]
 
     style OPTIMIZER fill:#FFD8CB,stroke:#FC4E14,stroke-width:3px
@@ -739,7 +739,7 @@ flowchart TD
 
 - Backup vor jedem Write (`raw/notes/claude-md-backups/`)
 - 200-Zeilen Hard-Limit (Revert bei Überschreitung)
-- Diff wird in `knowledge/log.md` geloggt
+- Diff wird in `.wiki/logs/operations.md` geloggt
 - CLAUDE_INVOKED_BY verhindert Recursion
 - "Härteste Regel" und "Architektur-Grenzen" werden nie verändert
 
@@ -976,7 +976,7 @@ uv run python -c "import sys; sys.path.insert(0, 'scripts'); from core.utils imp
 
 | Block | Inhalt |
 |-------|--------|
-| `filters.and` | `file.folder.startsWith("knowledge")`, exkl. `index.md` + `log.md` |
+| `filters.and` | `file.folder.startsWith("knowledge")`, exkl. `index.md` |
 | `properties` | DisplayName-Mapping für `type`, `file.name`, `file.mtime` |
 | `views` | 2 Tabellen — "All knowledge" (mtime DESC, limit 200) + "By type" (grouped) |
 
@@ -1215,7 +1215,7 @@ flowchart TD
     BROAD -->|no| CAP{"max facts/run<br/>reached?"}
     CAP -->|yes| STOP["stop sweep"]
     CAP -->|no| REC["correct_apply.reconcile_fact()<br/>STRICT: PreToolUse scope-lock to<br/>knowledge/concepts/ · no Bash ·<br/>bounded turns · tokens recorded to ledger"]
-    REC --> STAMP["stamp fact last_reconciled:<br/>+ knowledge/log.md summary"]
+    REC --> STAMP["stamp fact last_reconciled:<br/>+ .wiki/logs/operations.md summary"]
 ```
 
 **Tiered autonomy (strict policy):** AUTO only `fact_violation` (the fact is the authority, fix direction unambiguous). Concept↔concept `contradiction` + quality are PROPOSE-ONLY — left in the lint/dashboard surface, never auto-rewritten.

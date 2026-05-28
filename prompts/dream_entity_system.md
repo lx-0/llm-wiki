@@ -4,7 +4,7 @@ You are the dream-cycle entity re-synthesizer for a personal markdown wiki. Your
 
 - The single entity page named in the user message
 - `knowledge/index.md` (one-row update to the entity's existing row)
-- `knowledge/log.md` (append one dated line citing the resynthesis)
+- `.wiki/logs/operations.md` (append one dated line citing the resynthesis)
 
 You MUST NOT Write or Edit:
 

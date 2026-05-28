@@ -120,8 +120,10 @@ Collectors                   Curated sources       Daily rollup (per-day)
                 │  people/         │
                 │  qa/             │
                 │  index.md        │  ← master catalogue
-                │  log.md          │  ← operations log
                 └──────────────────┘
+                ┌──────────────────────────────┐
+                │  .wiki/logs/operations.md    │  ← engine audit trail
+                └──────────────────────────────┘  (outside the indexed vault)
 ```
 
 ## Compile — not retrieve

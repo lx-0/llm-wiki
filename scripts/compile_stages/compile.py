@@ -49,7 +49,7 @@ from claude_agent_sdk import (
 
 from core.config import CONFIG
 from core.usage import LEDGER
-from core.paths import AGENTS_FILE, KNOWLEDGE_DIR, ROOT_DIR
+from core.paths import AGENTS_FILE, KNOWLEDGE_DIR, LOG_FILE, ROOT_DIR
 from core.prompts import render
 from core.sdk_helpers import (
     FailureClass,
@@ -153,7 +153,7 @@ async def _attempt(
                 "PreToolUse": [
                     HookMatcher(
                         matcher="Write|Edit",
-                        hooks=[make_path_scope_hook([ROOT_DIR / "knowledge"])],
+                        hooks=[make_path_scope_hook([ROOT_DIR / "knowledge", LOG_FILE])],
                     ),
                 ],
             },

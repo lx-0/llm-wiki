@@ -229,7 +229,7 @@ ${source_content}
 5. **Update `knowledge/index.md`** — add or update the table row for each article you created or modified. Format:
    `| [[path/without/.md]] | one-line summary | source file(s) | ${today} |`
 
-6. **Append to `knowledge/log.md`** — add a dated entry summarizing what was compiled:
+6. **Append to `.wiki/logs/operations.md`** — add a dated entry summarizing what was compiled:
    `- ${now}: Compiled `${source_path}` → [list of articles created/updated]`
 
 7. Use `[[wikilinks]]` to cross-reference between articles inside `knowledge/`, and to cite durable substrate sources (`daily/*.md`, `raw/notes/*`, `raw/articles/*`, `raw/transcripts/*`).
