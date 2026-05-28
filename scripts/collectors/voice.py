@@ -51,7 +51,6 @@ AUDIO_SUFFIXES = (".m4a", ".mp4", ".mp3", ".wav", ".flac", ".ogg", ".aac")
 ACCEPTED_SUFFIXES = TEXT_SUFFIXES + AUDIO_SUFFIXES
 _WHISPER_NATIVE_SUFFIXES = (".mp3", ".wav", ".flac", ".ogg")
 MAX_SLUG_WORDS = 6
-PUNCTUATE_TIMEOUT_S = 30.0
 TRANSCRIBE_TIMEOUT_S = 600.0
 FFMPEG_TIMEOUT_S = 120.0
 
@@ -68,7 +67,7 @@ def _punctuate(raw_transcript: str) -> str | None:
             prompt,
             model=CONFIG.models.classify_model,
             temperature=0.0,
-            timeout=PUNCTUATE_TIMEOUT_S,
+            timeout=float(CONFIG.limits.voice_punctuate_timeout_s),
         )
         cleaned = cleaned.strip()
         # Sanity: if model returned empty or absurdly longer text (>3× source),

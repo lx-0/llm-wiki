@@ -203,6 +203,10 @@ limits:
   # Screenshot OCR.
   screenshot_resize_width: 512
   screenshot_timeout_seconds: 60
+  # Voice-punctuate Ollama timeout (collectors/voice.py). gemma4:e4b
+  # cold-call into VRAM takes 30–40 s; warm run ~5–15 s. 120 s default
+  # absorbs the cold-start; lower it if the operator's Ollama always-on.
+  voice_punctuate_timeout_s: 120
   # Curiosity-loop: max requests per compile run.
   curiosity_max_gaps: 3
   curiosity_min_source_chars: 500

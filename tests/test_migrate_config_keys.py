@@ -145,8 +145,9 @@ def test_migrate_config_file_round_trip(tmp_path):
     # +1 personal.capture_inbox (M025 quick-capture loop), 2026-05-23
     # +1 piggybacks.capture (M025 capture piggyback knob), 2026-05-23
     # +5 personal.voice_transcribe_* (M026 audio ingest), 2026-05-28
-    # = 68 changes (no drops — operator has no orphan personal.* fields)
-    assert len(changes) == 68, f"got {len(changes)} changes: {changes}"
+    # +1 limits.voice_punctuate_timeout_s (M026 hotfix), 2026-05-28
+    # = 69 changes (no drops — operator has no orphan personal.* fields)
+    assert len(changes) == 69, f"got {len(changes)} changes: {changes}"
 
     reparsed = yaml.safe_load(new_text)
     # piggyback side
@@ -228,6 +229,7 @@ def test_migrate_config_no_change_when_fully_current(tmp_path):
             "concept_reconcile_max_turns": 15,
             "health_trends_recent_months": 6,
             "health_trends_min_coverage_days": 10,
+            "voice_punctuate_timeout_s": 120,
         },
         "features": {
             "extract_takes": False,
@@ -371,6 +373,7 @@ def test_migrate_additions_idempotent():
             "concept_reconcile_max_turns": 15,
             "health_trends_recent_months": 6,
             "health_trends_min_coverage_days": 10,
+            "voice_punctuate_timeout_s": 120,
         },
         "piggybacks": {
             "calendar": {"enabled": True, "cooldown_hours": 6, "max_per_run": 500},

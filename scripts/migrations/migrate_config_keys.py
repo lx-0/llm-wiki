@@ -63,6 +63,7 @@ Key changes covered (chronological):
   personal.voice_transcribe_threads          (added 2026-05-28 M026, default 4)
   personal.voice_transcribe_binary           (added 2026-05-28 M026, default "" — override whisper-cli path; empty = $PATH lookup)
   personal.voice_transcribe_ffmpeg           (added 2026-05-28 M026, default "" — override ffmpeg path; empty = $PATH lookup; only used for m4a/mp4/aac pre-conversion)
+  limits.voice_punctuate_timeout_s           (added 2026-05-28 M026, default 120 — gemma4:e4b cold-call routinely >30s; absorbs model-load latency)
   personal.accounts.<id>.health.healthkit    (added 2026-05-19 M023 — Apple HealthKit XML export ingest;
                                               injected as a placeholder into any account already carrying
                                               `health.oura`, kind: healthkit-xml-export, empty inbox_dir
@@ -229,6 +230,11 @@ KEY_ADDITIONS: dict[str, dict[str, object]] = {
         # `wiki health-trends`. See `.ytstack/backlog/health-trend-synthesis.md`.
         "health_trends_recent_months": 6,
         "health_trends_min_coverage_days": 10,
+        # M026 voice-punctuate Ollama timeout (2026-05-28). gemma4:e4b
+        # cold-call into VRAM regularly hits 30–40 s; pre-2026-05-28
+        # hardcoded 30 s tripped on every first call after a quiet
+        # period. 120 s mirrors the chat() default.
+        "voice_punctuate_timeout_s": 120,
     },
     "scheduling": {
         # M014 dream-cycle (2026-05-16). Per-entity cooldown — entities

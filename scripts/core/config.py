@@ -191,6 +191,11 @@ class Limits:
     flush_tool_summary_budget_chars: int = 10_000
     screenshot_resize_width: int = 512
     screenshot_timeout_seconds: int = 60
+    # Voice punctuation Ollama-chat timeout (collectors/voice.py). gemma4:e4b
+    # cold-call (model-load into VRAM) routinely hits 30–40 s; warm runs are
+    # ~5–15 s. Hardcoded 30 s pre-2026-05-28 tripped on every first call after
+    # a quiet period. 120 s mirrors the chat() default in ollama_client.py.
+    voice_punctuate_timeout_s: int = 120
     curiosity_max_gaps: int = 3
     curiosity_min_source_chars: int = 500
     curiosity_timeout_s: int = 240         # ollama chat_schema timeout for curiosity gap-detection
