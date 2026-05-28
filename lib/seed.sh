@@ -154,6 +154,68 @@ _merge_appearance_json() {
 }
 
 
+# ── Internal: merge meta-bind data.json (buttonTemplates union by id) ──
+# Engine ships canonical button templates referenced from dashboard.md as
+# `BUTTON[btn-*]`. In Meta-Bind v1.4.x, IDs are resolved against the plugin's
+# buttonTemplates registry — buttons defined in transcluded .md files no
+# longer leak across files. We merge so operator's other settings (devMode,
+# preferredDateFormat, firstWeekday, ...) and any user-added buttonTemplates
+# with non-conflicting ids are preserved. Engine ids overwrite same-id user
+# entries (engine is canonical for those).
+_merge_meta_bind_data() {
+  local src="$1" dst="$2" check="${3:-0}"
+  if [[ ! -f "$src" ]]; then
+    return 0
+  fi
+  if [[ ! -f "$dst" ]]; then
+    if [[ "$check" == "1" ]]; then
+      warn "missing obsidian-meta-bind-plugin/data.json"
+      return 0
+    fi
+    mkdir -p "$(dirname "$dst")"
+    cp "$src" "$dst"
+    ok "seeded obsidian-meta-bind-plugin/data.json"
+    return 0
+  fi
+  if ! command -v jq >/dev/null 2>&1; then
+    warn "jq not available — skipping obsidian-meta-bind-plugin/data.json merge"
+    return 0
+  fi
+  local before merged after
+  before="$(jq -r '(.buttonTemplates // []) | map(.id) | join(",")' "$dst" 2>/dev/null || echo '')"
+  merged="$(jq -s '
+    .[0] as $cur | .[1] as $eng |
+    ($eng.buttonTemplates // []) as $eb |
+    ($eb | map(.id)) as $eids |
+    $cur + {
+      buttonTemplates: (
+        $eb +
+        (($cur.buttonTemplates // []) | map(select(.id as $id | $eids | index($id) | not)))
+      )
+    }
+  ' "$dst" "$src" 2>/dev/null || echo '')"
+  if [[ -z "$merged" ]]; then
+    warn "obsidian-meta-bind-plugin/data.json — merge failed (malformed JSON?)"
+    return 0
+  fi
+  after="$(printf '%s\n' "$merged" | jq -r '(.buttonTemplates // []) | map(.id) | join(",")')"
+  if [[ "$check" == "1" ]]; then
+    if [[ "$before" != "$after" ]]; then
+      info "drifted obsidian-meta-bind-plugin/data.json (buttonTemplates [$before] → would merge to [$after])"
+    else
+      ok "up-to-date obsidian-meta-bind-plugin/data.json"
+    fi
+    return 0
+  fi
+  printf '%s\n' "$merged" > "$dst.tmp" && mv "$dst.tmp" "$dst"
+  if [[ "$before" != "$after" ]]; then
+    ok "obsidian-meta-bind-plugin/data.json — buttonTemplates [$before] → [$after]"
+  else
+    info "obsidian-meta-bind-plugin/data.json — buttonTemplates already up to date"
+  fi
+}
+
+
 # ── Internal: merge agent-task buttons into shell-commands data.json ──
 # For every prompts/agents/*.md declaring a `button:` block, ensure a matching
 # entry exists in <vault>/.obsidian/plugins/obsidian-shellcommands/data.json
@@ -288,12 +350,18 @@ seed_vault_templates() {
     fi
 
     # 8. .obsidian/plugins/*/data.json — per-plugin defaults (recursive).
+    #    Meta-Bind data.json is merged (buttonTemplates by id) to preserve
+    #    operator settings; everything else is copy-if-absent / --force.
     if [[ -d "$templates_dir/.obsidian/plugins" ]]; then
       local src rel dst
       while IFS= read -r src; do
         rel="${src#"$templates_dir/.obsidian/"}"
         dst="$target/.obsidian/$rel"
-        _seed_file "$src" "$dst" "$force" ".obsidian/$rel" "$check"
+        if [[ "$rel" == "plugins/obsidian-meta-bind-plugin/data.json" ]]; then
+          _merge_meta_bind_data "$src" "$dst" "$check"
+        else
+          _seed_file "$src" "$dst" "$force" ".obsidian/$rel" "$check"
+        fi
       done < <(find "$templates_dir/.obsidian/plugins" -type f -name '*.json')
     fi
   fi
