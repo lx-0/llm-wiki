@@ -64,6 +64,7 @@ Key changes covered (chronological):
   personal.voice_transcribe_binary           (added 2026-05-28 M026, default "" — override whisper-cli path; empty = $PATH lookup)
   personal.voice_transcribe_ffmpeg           (added 2026-05-28 M026, default "" — override ffmpeg path; empty = $PATH lookup; only used for m4a/mp4/aac pre-conversion)
   limits.voice_punctuate_timeout_s           (added 2026-05-28 M026, default 120 — gemma4:e4b cold-call routinely >30s; absorbs model-load latency)
+  personal.inbox_bridges                     (added 2026-05-28, default [] — rsync-based mirror for sandbox-restricted intake folders; see scripts/bridge/drive_sync.py)
   personal.accounts.<id>.health.healthkit    (added 2026-05-19 M023 — Apple HealthKit XML export ingest;
                                               injected as a placeholder into any account already carrying
                                               `health.oura`, kind: healthkit-xml-export, empty inbox_dir
@@ -386,6 +387,11 @@ KEY_ADDITIONS: dict[str, dict[str, object]] = {
         "voice_transcribe_threads": 4,
         "voice_transcribe_binary": "",
         "voice_transcribe_ffmpeg": "",
+        # 2026-05-28 inbox-bridge. Empty default keeps the feature off — operator
+        # populates with {remote, local, mode?, enabled?, name?} dicts to mirror
+        # network-mounted / sandbox-restricted intake folders into local paths
+        # the substrate collectors then folder-watch. See `wiki bridge --help`.
+        "inbox_bridges": [],
     },
 }
 

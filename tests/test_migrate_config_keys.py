@@ -146,8 +146,9 @@ def test_migrate_config_file_round_trip(tmp_path):
     # +1 piggybacks.capture (M025 capture piggyback knob), 2026-05-23
     # +5 personal.voice_transcribe_* (M026 audio ingest), 2026-05-28
     # +1 limits.voice_punctuate_timeout_s (M026 hotfix), 2026-05-28
-    # = 69 changes (no drops — operator has no orphan personal.* fields)
-    assert len(changes) == 69, f"got {len(changes)} changes: {changes}"
+    # +1 personal.inbox_bridges (inbox-bridge rsync mirror), 2026-05-28
+    # = 70 changes (no drops — operator has no orphan personal.* fields)
+    assert len(changes) == 70, f"got {len(changes)} changes: {changes}"
 
     reparsed = yaml.safe_load(new_text)
     # piggyback side
@@ -252,6 +253,7 @@ def test_migrate_config_no_change_when_fully_current(tmp_path):
             "voice_transcribe_threads": 4,
             "voice_transcribe_binary": "",
             "voice_transcribe_ffmpeg": "",
+            "inbox_bridges": [],
         },
     }), encoding="utf-8")
 
@@ -405,6 +407,7 @@ def test_migrate_additions_idempotent():
             "voice_transcribe_threads": 4,
             "voice_transcribe_binary": "",
             "voice_transcribe_ffmpeg": "",
+            "inbox_bridges": [],
         },
     }
     changes = m.migrate_additions(data)

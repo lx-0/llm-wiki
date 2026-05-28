@@ -719,6 +719,28 @@ class Personal:
     # but sources from a separate, mobile-friendly inbox (iCloud Shortcut
     # target etc.). Empty string disables collectors/pictures.py.
     picture_inbox: str = ""
+    # 2026-05-28 inbox-bridge. List of {remote, local, mode?, enabled?} dicts
+    # describing folders to mirror from network-mounted / sandbox-restricted
+    # paths (e.g. `~/Library/CloudStorage/GoogleDrive-…/wiki-inbox/pictures/`)
+    # into local non-restricted paths the substrate collectors then folder-
+    # watch as their `<substrate>_inbox`. Solves macOS-TCC: Claude Code's
+    # sandboxed subprocesses can't read CloudStorage, but a user-shell-spawned
+    # or LaunchAgent-spawned bridge can; the engine collectors then see a
+    # stable local mirror. Substrate-agnostic by design — operator wires each
+    # mapping's `local` into the matching `*_inbox` key separately.
+    #
+    # Schema per entry:
+    #   remote:  str (required) absolute path, ~-expanded; missing → warn + skip
+    #   local:   str (required) absolute path, ~-expanded; auto-created
+    #   mode:    str (optional) "move" (default, rsync --remove-source-files) or "copy"
+    #   enabled: bool (optional) default True
+    #   name:    str (optional) report label; defaults to basename of `local`
+    #
+    # Empty list = bridge disabled (graceful no-op). See `wiki bridge --help`
+    # and `templates/.launchd/com.llm-wiki.bridge.plist.template` for the
+    # LaunchAgent install path. Drive-mode "move" means the source folder is
+    # drained on every sync — operator accepts: drop is one-shot, not a mirror.
+    inbox_bridges: list[dict] = field(default_factory=list)
     # M025 quick-capture-correction loop. Path to a directory the operator
     # one-taps cryptic notes / article snippets into (any tool that writes
     # .txt / .md / .html — WhatsApp-self-group export, Notion quick-note sync,

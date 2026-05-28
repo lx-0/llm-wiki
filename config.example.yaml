@@ -517,6 +517,25 @@ personal:
   # <picture_inbox>/.processed/. Typical setup: iOS Shortcut writing into
   # an iCloud Drive folder. Empty = disabled.
   picture_inbox: ""
+  # 2026-05-28 inbox-bridge. Mirror folders from network-mounted / sandbox-
+  # restricted paths (e.g. ~/Library/CloudStorage/GoogleDrive-…) into local
+  # paths the substrate collectors can read freely. Solves macOS-TCC:
+  # Claude-Code-spawned subprocesses can't open CloudStorage, but user-shell
+  # + LaunchAgent processes can. The bridge runs `rsync -rt` per mapping;
+  # mode=move (default) drains the remote on every sync via
+  # `--remove-source-files` (prevents re-ingestion when the downstream
+  # collector archives the file out of `local`). Substrate-agnostic — wire
+  # each mapping's `local` into the matching `*_inbox` key separately.
+  # Empty list = bridge off. Run `wiki bridge sync` (or via the LaunchAgent
+  # template at templates/.launchd/com.llm-wiki.bridge.plist.template).
+  # Example:
+  #   inbox_bridges:
+  #     - name:   screenshots-tablet
+  #       remote: "/Users/alex/Library/CloudStorage/GoogleDrive-you@gmail.com/My Drive/wiki-inbox/pictures/screenshots-tablet"
+  #       local:  "~/wiki-inbox-local/screenshots-tablet"
+  #       mode:   move          # move (default) or copy
+  #       enabled: true         # optional, defaults true
+  inbox_bridges: []
   # M025 quick-capture inbox. Directory the operator one-taps cryptic notes
   # into (iOS Shortcut → iCloud Drive is the mobile-primary path). The capture
   # collector folder-watches it, content-IDs each capture, writes

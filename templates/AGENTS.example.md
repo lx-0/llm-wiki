@@ -640,4 +640,5 @@ This file is the agent-facing schema reference — loaded into every compile pro
 - **Configuration** (every `<vault>/.wiki/config.yaml` key with its dataclass default and rationale) — [`.wiki/docs/config.md`](.wiki/docs/config.md).
 - **Engine layout** (`<vault>/.wiki/` directory map — `scripts/`, `prompts/`, `hooks/`, `lib/`) — [`.wiki/docs/engine-layout.md`](.wiki/docs/engine-layout.md).
 - **Per-collector setup recipes** — [`.wiki/docs/setup-voice.md`](.wiki/docs/setup-voice.md), [`.wiki/docs/setup-pictures.md`](.wiki/docs/setup-pictures.md), [`.wiki/docs/setup-gmeet.md`](.wiki/docs/setup-gmeet.md), [`.wiki/docs/setup-obsidian.md`](.wiki/docs/setup-obsidian.md).
+- **Inbox bridge** (rsync mirror for Google Drive / iCloud Drive / other CloudStorage inboxes, working around macOS TCC) — [`.wiki/docs/setup-bridge.md`](.wiki/docs/setup-bridge.md).
 - **Article-shape rationale** (two-layer State+Timeline pages, takes substrate, dream cycle) — the relevant `.wiki/prompts/compile_*.md` carries the compile-time semantics.

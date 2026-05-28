@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  LaunchAgent template for `wiki bridge sync`.
+
+  Why a LaunchAgent and not a piggyback on `wiki collect`:
+  the bridge needs the user-shell TCC grant for Google Drive /
+  CloudStorage — Claude Code's hook-spawned subprocesses don't have it.
+  LaunchAgents run as the user via launchd and DO have TCC.
+
+  Install (replace placeholders inline first):
+    1. Copy this file to
+         ~/Library/LaunchAgents/com.llm-wiki.bridge.plist
+    2. Replace `__WIKI_BINARY__` with the absolute path to your wiki
+       binary (the bash dispatcher, e.g. /Users/<you>/llm-wiki/wiki).
+    3. Replace `__WIKI_DIR__` with the engine repo path (parent of the
+       wiki binary).
+    4. Replace `__LOG_DIR__` with an absolute path for stdout/stderr
+       (e.g. /Users/<you>/Library/Logs/llm-wiki).
+    5. Adjust `StartInterval` (seconds between runs). 1800 = 30 min.
+    6. Load it:
+         launchctl load ~/Library/LaunchAgents/com.llm-wiki.bridge.plist
+    7. Verify:
+         launchctl list | grep com.llm-wiki.bridge
+         tail -f __LOG_DIR__/bridge.stderr
+
+  Uninstall:
+    launchctl unload ~/Library/LaunchAgents/com.llm-wiki.bridge.plist
+
+  TCC reality check: the first time launchd fires this, macOS may
+  prompt for Files-and-Folders access on the CloudStorage path.
+  Approve in System Settings → Privacy & Security if so.
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.llm-wiki.bridge</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>__WIKI_BINARY__</string>
+        <string>bridge</string>
+        <string>sync</string>
+    </array>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>WIKI_DIR</key>
+        <string>__WIKI_DIR__</string>
+    </dict>
+
+    <key>StartInterval</key>
+    <integer>1800</integer>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>__LOG_DIR__/bridge.stdout</string>
+
+    <key>StandardErrorPath</key>
+    <string>__LOG_DIR__/bridge.stderr</string>
+
+    <key>ProcessType</key>
+    <string>Background</string>
+</dict>
+</plist>

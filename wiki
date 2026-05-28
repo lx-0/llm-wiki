@@ -1227,6 +1227,52 @@ cmd_produce() {
   uv run --quiet --project "$WIKI_DIR" python "$WIKI_DIR/scripts/producers/cli.py" "$@"
 }
 
+help_bridge() {
+  cat <<EOF
+${C_BOLD}wiki bridge${C_RESET} — rsync-based mirror for sandbox-restricted intake folders
+
+${C_BOLD}USAGE${C_RESET}
+  wiki bridge list                    show configured mappings
+  wiki bridge sync                    mirror every mapping
+  wiki bridge sync --dry-run          show what rsync would do
+
+${C_BOLD}WHY${C_RESET}
+  macOS TCC blocks Claude-Code-spawned subprocesses from reading
+  \`~/Library/CloudStorage/…\` (Google Drive, iCloud Drive). The bridge
+  runs as the user (manually or via LaunchAgent) — TCC is satisfied —
+  and pre-mirrors a Drive folder into a local path the substrate
+  collectors can then folder-watch freely.
+
+${C_BOLD}CONFIG${C_RESET}
+  Edit \`<vault>/.wiki/config.yaml\`:
+
+    personal:
+      inbox_bridges:
+        - name:   screenshots-tablet
+          remote: "/Users/<you>/Library/CloudStorage/GoogleDrive-<addr>/My Drive/wiki-inbox/pictures/screenshots-tablet"
+          local:  "~/wiki-inbox-local/screenshots-tablet"
+          mode:   move    # move (default, drains remote) or copy
+
+  Then point the matching substrate (e.g. \`personal.picture_inbox\`)
+  at the local mirror path. The bridge is substrate-agnostic — operator
+  wires routing per mapping.
+
+${C_BOLD}AUTOMATION${C_RESET}
+  See \`templates/.launchd/com.llm-wiki.bridge.plist.template\` for a
+  LaunchAgent that runs \`wiki bridge sync\` on a schedule.
+EOF
+}
+
+cmd_bridge() {
+  case "${1:-}" in
+    -h|--help|help)
+      help_bridge
+      return 0
+      ;;
+  esac
+  uv run --quiet --project "$WIKI_DIR" python "$WIKI_DIR/scripts/bridge/cli.py" "$@"
+}
+
 cmd_gmail_auth() {
   local account_id="${1:-}"
   if [[ -z "$account_id" || "$account_id" == "-h" || "$account_id" == "--help" ]]; then
@@ -1525,6 +1571,7 @@ case "${1:-}" in
   skills)           shift; cmd_skills "$@" ;;
   collect)          shift; cmd_collect "$@" ;;
   produce)          shift; cmd_produce "$@" ;;
+  bridge)           shift; cmd_bridge "$@" ;;
   gmail-auth)       shift; cmd_gmail_auth "$@" ;;
   gmeet-auth)       shift; cmd_gmeet_auth "$@" ;;
   calendar-auth)    shift; cmd_calendar_auth "$@" ;;
