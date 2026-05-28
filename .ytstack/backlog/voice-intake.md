@@ -110,16 +110,26 @@ path-agnostic; iCloud Drive just happens to be a folder.
 - Aiko (iOS): free, MIT-spirit, on-device Whisper — better quality than
   Apple's native dictation for proper-noun-heavy domains.
 
+## Shipped 2026-05-28 (M026)
+
+- **Audio-file ingestion via whisper.cpp** — `.m4a` / `.mp4` / `.mp3` /
+  `.wav` / `.flac` / `.ogg` / `.aac` files dropped into voice_inbox are
+  transcribed locally by `collectors/voice.py:_transcribe_audio()`.
+  Operator pre-reqs: `brew install whisper-cpp` + a ggml model file
+  (`~/whisper-models/ggml-base.bin` from
+  https://huggingface.co/ggerganov/whisper.cpp/tree/main). m4a/mp4/aac
+  routes through ffmpeg → 16 kHz mono PCM wav first; native formats
+  (mp3/wav/flac/ogg) go straight to whisper-cli. Fail-soft: missing
+  binary or model leaves the file in inbox and surfaces as a health
+  warning rather than an error — text dictation keeps working. Five
+  new config knobs under `personal.voice_transcribe_*`; health check
+  `voice-audio-setup` flags the half-installed state. The launchd
+  watcher on Voice Memos' Group Container is still on the table as a
+  separate piece (no inbox involvement — would need its own folder
+  watcher or post-process script writing into voice_inbox).
+
 ## Deferred (not in durchstich)
 
-- **Audio-file ingestion (next-up after the Shortcut path lands)** —
-  pass `.m4a` / `.wav` through whisper.cpp / Parakeet ourselves. The
-  iOS Shortcut path caps out around 60 s of silence-triggered cutoff,
-  so long-form capture (5–30 min commute / walks) needs Voice Memos +
-  a Mac-side launchd watcher transcribing `.m4a`s out of
-  `~/Library/Group Containers/group.com.apple.VoiceMemos.shared/Recordings/`.
-  Was "doubles the surface; wait for daily-use to prove" pre-2026-05-15;
-  the mobile-first pivot makes this the natural next slice.
 - **Voice-note → daily-log pairing** — append short voice notes to the
   current `daily/YYYY-MM-DD.md` instead of a standalone raw file. Wait
   for compile feedback on the first batch before committing.

@@ -706,6 +706,98 @@ def check_wiki_on_path() -> CheckResult:
         return _probe_failed("wiki-on-path", "config", exc)
 
 
+def check_voice_audio_setup() -> CheckResult:
+    """Warning when audio files are queued in voice_inbox but the
+    transcription pipeline isn't reachable.
+
+    Three failure shapes the operator cares about:
+      1. audio files present + voice_transcribe_model empty → operator
+         hasn't enabled audio ingest yet.
+      2. audio files present + model configured but path missing →
+         setup half-done, file points at a non-existent .bin.
+      3. audio files present + model OK but whisper-cli not on PATH →
+         brew install whisper-cpp wasn't run.
+
+    Returns `ok` when audio ingest isn't relevant (no audio files
+    queued, or no voice_inbox configured at all) — silent on the
+    happy-path-without-audio.
+    """
+    try:
+        import shutil
+
+        from core.config import CONFIG
+
+        inbox_raw = (CONFIG.personal.voice_inbox or "").strip()
+        if not inbox_raw:
+            return CheckResult(
+                id="voice-audio-setup", category="config", severity="ok",
+                message="voice_inbox not configured — audio ingest n/a",
+            )
+        inbox = Path(inbox_raw).expanduser()
+        if not inbox.exists():
+            return CheckResult(
+                id="voice-audio-setup", category="config", severity="ok",
+                message=f"voice_inbox not found ({inbox}) — audio ingest n/a",
+            )
+        # Only the audio half — leave dictation-text alone.
+        audio_exts = {".m4a", ".mp4", ".mp3", ".wav", ".flac", ".ogg", ".aac"}
+        audio_files = [
+            p for p in inbox.iterdir()
+            if p.is_file() and not p.name.startswith(".") and p.suffix.lower() in audio_exts
+        ]
+        if not audio_files:
+            return CheckResult(
+                id="voice-audio-setup", category="config", severity="ok",
+                message="no audio files queued in voice_inbox",
+            )
+
+        model_raw = (CONFIG.personal.voice_transcribe_model or "").strip()
+        if not model_raw:
+            return CheckResult(
+                id="voice-audio-setup", category="config", severity="warning",
+                message=(
+                    f"{len(audio_files)} audio file(s) queued but "
+                    f"personal.voice_transcribe_model is empty"
+                ),
+                fix="set personal.voice_transcribe_model to your ggml model path; see config.example.yaml",
+            )
+        model_path = Path(model_raw).expanduser()
+        if not model_path.is_file():
+            return CheckResult(
+                id="voice-audio-setup", category="config", severity="warning",
+                message=f"voice_transcribe_model {model_path} does not exist",
+                fix="download a ggml model from https://huggingface.co/ggerganov/whisper.cpp/tree/main",
+            )
+
+        whisper_cfg = (CONFIG.personal.voice_transcribe_binary or "").strip()
+        whisper = whisper_cfg or shutil.which("whisper-cli")
+        if not whisper or (whisper_cfg and not Path(whisper_cfg).expanduser().is_file()):
+            return CheckResult(
+                id="voice-audio-setup", category="config", severity="warning",
+                message="whisper-cli not on $PATH",
+                fix="brew install whisper-cpp",
+            )
+
+        # ffmpeg only required for non-native formats (m4a/mp4/aac).
+        needs_ffmpeg = any(p.suffix.lower() in {".m4a", ".mp4", ".aac"} for p in audio_files)
+        if needs_ffmpeg:
+            ffmpeg_cfg = (CONFIG.personal.voice_transcribe_ffmpeg or "").strip()
+            ffmpeg = ffmpeg_cfg or shutil.which("ffmpeg")
+            if not ffmpeg or (ffmpeg_cfg and not Path(ffmpeg_cfg).expanduser().is_file()):
+                return CheckResult(
+                    id="voice-audio-setup", category="config", severity="warning",
+                    message="ffmpeg not on $PATH (required for m4a/mp4/aac pre-conversion)",
+                    fix="brew install ffmpeg",
+                )
+
+        return CheckResult(
+            id="voice-audio-setup", category="config", severity="ok",
+            message=f"{len(audio_files)} audio file(s) queued, transcription pipeline ready",
+        )
+    except Exception as exc:
+        return _probe_failed("voice-audio-setup", "config", exc)
+
+
 # ── Orchestration ───────────────────────────────────────────────────
 
 
@@ -725,6 +817,7 @@ _ALL_CHECKS: list[Callable[..., CheckResult | list[CheckResult]]] = [
     check_engine_update_available,
     check_no_knowledge_articles,
     check_compile_state,
+    check_voice_audio_setup,
 ]
 
 

@@ -1,11 +1,18 @@
-"""Voice intake — folder-watching collector for dictated text notes.
+"""Voice intake — folder-watching collector for dictated text + audio notes.
 
-Operator dictates with any tool (OpenWhispr / FluidVoice / macOS
-dictation), the tool writes the transcript as a .txt or .md into the
-configured `personal.voice_inbox` directory. This collector picks them
-up, writes a frontmatter-stamped copy into `raw/voice/`, and archives
-the source under `raw/inbox-mobile/voice/` (vault-internal audit zone,
-M022 two-zone intake — was `<voice_inbox>/.processed/` pre-M022).
+Operator dictates with any tool (OpenWhispr / FluidVoice / macOS dictation
+/ Voice Memos), the tool writes a transcript (.txt / .md) or audio file
+(.m4a / .mp4 / .mp3 / .wav / .flac / .ogg / .aac) into the configured
+`personal.voice_inbox` directory. This collector picks them up, writes a
+frontmatter-stamped copy into `raw/voice/`, and archives the source under
+`raw/inbox-mobile/voice/` (vault-internal audit zone, M022 two-zone intake).
+
+Audio files are transcribed locally via whisper.cpp (M026, 2026-05-28).
+Operator pre-reqs: `brew install whisper-cpp` plus a ggml model file
+(e.g. `~/whisper-models/ggml-base.bin`), pointed at by the config keys
+`personal.voice_transcribe_model` + friends. Without setup, audio files
+are left in the inbox and surface as `errors[]` — text dictation keeps
+working regardless.
 
 Substrate-agnostic on the capture side, opinionated on the storage side
 — same pattern as jamie / gmeet. See `.ytstack/backlog/voice-intake.md`
@@ -16,7 +23,9 @@ from __future__ import annotations
 
 import logging
 import shutil
+import subprocess
 import sys
+import tempfile
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -34,9 +43,17 @@ log = logging.getLogger(__name__)
 
 OUTPUT_DIR = RAW_DIR / "voice"
 MOBILE_ARCHIVE_DIR = RAW_DIR / "inbox-mobile" / "voice"
-ACCEPTED_SUFFIXES = (".txt", ".md")
+TEXT_SUFFIXES = (".txt", ".md")
+# Audio formats accepted by the inbox. whisper-cli natively reads
+# mp3 / wav / flac / ogg; m4a / mp4 / aac go through ffmpeg first
+# (16 kHz mono PCM s16 — whisper's preferred input shape).
+AUDIO_SUFFIXES = (".m4a", ".mp4", ".mp3", ".wav", ".flac", ".ogg", ".aac")
+ACCEPTED_SUFFIXES = TEXT_SUFFIXES + AUDIO_SUFFIXES
+_WHISPER_NATIVE_SUFFIXES = (".mp3", ".wav", ".flac", ".ogg")
 MAX_SLUG_WORDS = 6
 PUNCTUATE_TIMEOUT_S = 30.0
+TRANSCRIBE_TIMEOUT_S = 600.0
+FFMPEG_TIMEOUT_S = 120.0
 
 
 def _punctuate(raw_transcript: str) -> str | None:
@@ -78,6 +95,130 @@ def _inbox_path() -> Path | None:
     return Path(raw).expanduser()
 
 
+def _resolve_binary(configured: str, fallback_name: str) -> str | None:
+    """Resolve a binary path: explicit config value wins, else PATH lookup.
+
+    Returns the resolved path string, or None if neither yields a callable
+    binary (the caller logs a warning + falls back to skip).
+    """
+    configured = (configured or "").strip()
+    if configured:
+        p = Path(configured).expanduser()
+        if p.is_file():
+            return str(p)
+        log.warning("configured %s path %s does not exist — falling back to $PATH", fallback_name, p)
+    found = shutil.which(fallback_name)
+    return found  # None if not on PATH
+
+
+def _transcribe_audio(src: Path) -> str | None:
+    """Run whisper.cpp on an audio file and return the cleaned transcript.
+
+    Pipeline:
+      1. Resolve model path from `personal.voice_transcribe_model`. Empty
+         or missing → log + return None (file stays in inbox).
+      2. Resolve whisper-cli binary (explicit override → $PATH lookup).
+      3. For non-native formats (m4a / mp4 / aac), shell out to ffmpeg
+         first to produce a 16 kHz mono PCM s16 WAV — whisper's preferred
+         input shape. Native formats (mp3 / wav / flac / ogg) skip this.
+      4. Invoke whisper-cli with `-nt -np` so stdout carries just the
+         transcript text. Stderr (Metal/CPU init noise + a duplicate
+         transcript echo) is discarded to DEBUG.
+
+    Any step failing returns None — the caller leaves the source in the
+    inbox so the operator can retry once setup is healthy. We never
+    raise from here: voice ingest must not break the collector loop.
+    """
+    model_raw = (CONFIG.personal.voice_transcribe_model or "").strip()
+    if not model_raw:
+        log.warning(
+            "audio file %s in voice_inbox but personal.voice_transcribe_model is empty — leaving in inbox",
+            src.name,
+        )
+        return None
+    model_path = Path(model_raw).expanduser()
+    if not model_path.is_file():
+        log.warning(
+            "voice_transcribe_model %s does not exist — leaving audio file %s in inbox",
+            model_path, src.name,
+        )
+        return None
+
+    whisper = _resolve_binary(CONFIG.personal.voice_transcribe_binary, "whisper-cli")
+    if not whisper:
+        log.warning(
+            "whisper-cli not on $PATH (install: brew install whisper-cpp) — leaving audio file %s in inbox",
+            src.name,
+        )
+        return None
+
+    suffix = src.suffix.lower()
+    language = (CONFIG.personal.voice_transcribe_language or "auto").strip() or "auto"
+    threads = max(1, int(CONFIG.personal.voice_transcribe_threads))
+
+    with tempfile.TemporaryDirectory(prefix="voice-transcribe-") as tmp:
+        if suffix in _WHISPER_NATIVE_SUFFIXES:
+            audio_path = src
+        else:
+            ffmpeg = _resolve_binary(CONFIG.personal.voice_transcribe_ffmpeg, "ffmpeg")
+            if not ffmpeg:
+                log.warning(
+                    "ffmpeg not on $PATH (needed for %s; native whisper formats are mp3/wav/flac/ogg) — leaving %s in inbox",
+                    suffix, src.name,
+                )
+                return None
+            audio_path = Path(tmp) / "audio.wav"
+            try:
+                subprocess.run(
+                    [
+                        ffmpeg, "-hide_banner", "-loglevel", "error", "-y",
+                        "-i", str(src),
+                        "-ar", "16000", "-ac", "1", "-c:a", "pcm_s16le",
+                        str(audio_path),
+                    ],
+                    check=True, capture_output=True, timeout=FFMPEG_TIMEOUT_S,
+                )
+            except subprocess.TimeoutExpired:
+                log.warning("ffmpeg timed out after %ds converting %s — leaving in inbox",
+                            int(FFMPEG_TIMEOUT_S), src.name)
+                return None
+            except subprocess.CalledProcessError as exc:
+                stderr = (exc.stderr or b"").decode("utf-8", errors="replace").strip()
+                log.warning("ffmpeg failed (%s) on %s: %s — leaving in inbox",
+                            exc.returncode, src.name, stderr[:200])
+                return None
+
+        try:
+            result = subprocess.run(
+                [
+                    whisper,
+                    "-m", str(model_path),
+                    "-l", language,
+                    "-t", str(threads),
+                    "-nt", "-np",
+                    "-f", str(audio_path),
+                ],
+                check=True, capture_output=True, text=True, timeout=TRANSCRIBE_TIMEOUT_S,
+            )
+        except subprocess.TimeoutExpired:
+            log.warning("whisper-cli timed out after %ds on %s — leaving in inbox",
+                        int(TRANSCRIBE_TIMEOUT_S), src.name)
+            return None
+        except subprocess.CalledProcessError as exc:
+            stderr = (exc.stderr or "").strip()
+            log.warning("whisper-cli failed (%s) on %s: %s — leaving in inbox",
+                        exc.returncode, src.name, stderr[-200:])
+            return None
+
+    text = (result.stdout or "").strip()
+    if not text:
+        log.warning("whisper-cli returned empty transcript for %s — leaving in inbox", src.name)
+        return None
+    log.info("transcribed %s (%d chars, lang=%s, model=%s)",
+             src.name, len(text), language, model_path.name)
+    return text
+
+
 def _build_filename(captured_at: datetime, content: str) -> str:
     stamp = captured_at.strftime("%Y-%m-%d-%H%M")
     first_words = " ".join(content.split()[:MAX_SLUG_WORDS])
@@ -116,8 +257,9 @@ def _build_frontmatter(
 
 
 def _scan_inbox(inbox: Path) -> list[Path]:
-    """List inbox files eligible for ingest. Skips dot-files, .processed/,
-    and anything whose suffix isn't .txt / .md."""
+    """List inbox files eligible for ingest. Skips dot-files and anything
+    whose suffix isn't in ACCEPTED_SUFFIXES (text: .txt / .md; audio:
+    .m4a / .mp4 / .mp3 / .wav / .flac / .ogg / .aac)."""
     if not inbox.exists():
         return []
     items: list[Path] = []
@@ -201,13 +343,24 @@ class VoiceCollector:
         written: list[Path] = []
         errors: list[str] = []
         for src in sources:
-            try:
-                raw = src.read_text(encoding="utf-8").strip()
-            except (UnicodeDecodeError, OSError) as exc:
-                errors.append(f"{src.name}: read failed ({exc})")
-                continue
+            is_audio = src.suffix.lower() in AUDIO_SUFFIXES
+            if is_audio:
+                raw = _transcribe_audio(src)
+                if raw is None:
+                    # Transcription disabled/failed — leave the file in
+                    # the inbox so a re-run picks it up once setup is
+                    # healthy (model installed, binary on PATH, etc.).
+                    errors.append(f"{src.name}: transcription unavailable, left in inbox")
+                    continue
+                raw = raw.strip()
+            else:
+                try:
+                    raw = src.read_text(encoding="utf-8").strip()
+                except (UnicodeDecodeError, OSError) as exc:
+                    errors.append(f"{src.name}: read failed ({exc})")
+                    continue
             if not raw:
-                errors.append(f"{src.name}: empty file, archived without ingest")
+                errors.append(f"{src.name}: empty content, archived without ingest")
                 shutil.move(str(src), str(MOBILE_ARCHIVE_DIR / src.name))
                 continue
 

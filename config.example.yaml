@@ -480,10 +480,31 @@ personal:
   stg_backup_dir: ""
   # Directory the operator dumps dictation transcripts into. Any tool that
   # writes a .txt or .md works (OpenWhispr is the default recommendation;
-  # FluidVoice, macOS dictation, Hammerspoon snippets also work). The voice
-  # collector scans this directory, ingests new files into raw/voice/, then
-  # moves the source under <voice_inbox>/.processed/. Empty = disabled.
+  # FluidVoice, macOS dictation, Hammerspoon snippets also work). Audio
+  # files (.m4a / .wav / .mp3 / .flac / .ogg / .aac / .mp4) are transcribed
+  # via whisper.cpp when `voice_transcribe_model` is set; see knobs below.
+  # The voice collector scans this directory, ingests new files into
+  # raw/voice/, then moves the source under raw/inbox-mobile/voice/.
+  # Empty = disabled.
   voice_inbox: ""
+  # Audio-transcription via whisper.cpp. Operator pre-reqs:
+  #   brew install whisper-cpp
+  #   mkdir -p ~/whisper-models && cd ~/whisper-models && \
+  #     curl -LO https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin
+  # Then point `voice_transcribe_model` at the .bin file. Empty = audio
+  # ingest disabled (audio files dropped into voice_inbox are left in
+  # place; text dictation continues to work).
+  voice_transcribe_model: ""
+  # Language hint for whisper-cli. "auto" detects per-file (slightly
+  # slower); "de" / "en" / etc. skip detection.
+  voice_transcribe_language: "auto"
+  # whisper-cli -t N. Default 4 is sane on current Apple Silicon.
+  voice_transcribe_threads: 4
+  # Override binary path. Empty = `whisper-cli` from $PATH.
+  voice_transcribe_binary: ""
+  # Override ffmpeg path. Empty = `ffmpeg` from $PATH. Only required for
+  # audio formats whisper-cli doesn't natively read (m4a/mp4/aac).
+  voice_transcribe_ffmpeg: ""
   # Directory the operator drops camera / phone photos into for ingest.
   # Mirrors `voice_inbox` (folder-watch + archive-as-dedup) but each file
   # goes through the gemma4 vision pipeline before write. Accepts .jpeg /

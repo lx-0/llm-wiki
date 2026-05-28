@@ -70,7 +70,7 @@ raw/
 ├── transcripts/     # PERMANENT: meeting + audio transcripts
 │   ├── jamie/       # Collector: Jamie AI meeting-notetaker (paired summary + diarised transcript)
 │   └── gmeet/       # Collector: Gemini Meet Notes + Transcript Docs (Drive API; paired sections)
-├── voice/           # PERMANENT: dictation transcripts (collectors/voice.py — folder-watch on personal.voice_inbox; punctuation pre-process via Ollama, raw text preserved in frontmatter `raw_transcript:`)
+├── voice/           # PERMANENT: dictation transcripts + audio transcriptions (collectors/voice.py — folder-watch on personal.voice_inbox. Text (.txt/.md) ingests as-is; audio (.m4a/.wav/.mp3/.flac/.ogg/.aac/.mp4) transcribes via whisper.cpp when personal.voice_transcribe_model is set. Punctuation pre-process via Ollama; raw text preserved in frontmatter `raw_transcript:`.)
 ├── captures/        # PERMANENT: quick-capture notes (collectors/capture_collector.py — folder-watch on personal.capture_inbox; content-hash capture-ID in frontmatter, idempotent re-drop; file `capture-<id>.md`)
 ├── audio/           # PERMANENT: original audio files (referenced by transcripts)
 ├── memories/        # PERMANENT: seeded Claude Code memories

@@ -676,8 +676,36 @@ class Personal:
     # Path to a directory the operator dumps dictation transcripts into
     # (any tool that writes .txt or .md works — OpenWhispr is the default
     # recommendation; FluidVoice / macOS dictation / Hammerspoon snippets
-    # also work). Empty string disables collectors/voice.py.
+    # also work). Audio files (.m4a/.wav/.mp3/.flac/.ogg/.aac/.mp4) are
+    # transcribed via whisper.cpp when `voice_transcribe_model` is set;
+    # see the next four knobs. Empty string disables collectors/voice.py.
     voice_inbox: str = ""
+    # Audio-transcription via whisper.cpp (M026, 2026-05-28). When set,
+    # audio files dropped into `voice_inbox` are transcribed locally and
+    # the transcript follows the same pipeline as text dictation (optional
+    # voice_punctuate pass, daily/-rollup, raw/voice/ canonical file).
+    # Operator pre-reqs: `brew install whisper-cpp` and a ggml model file
+    # (e.g. ~/whisper-models/ggml-base.bin from
+    # https://huggingface.co/ggerganov/whisper.cpp/tree/main). `.m4a`/`.mp4`/
+    # `.aac` go through ffmpeg pre-conversion to 16 kHz mono WAV — ffmpeg
+    # ships with macOS via brew but is also widely pre-installed.
+    #
+    # voice_transcribe_model: absolute or ~-expanded path to the ggml model
+    # file. Empty = audio ingest disabled; audio files left in inbox.
+    voice_transcribe_model: str = ""
+    # Language hint passed to whisper-cli. "auto" auto-detects (slightly
+    # slower); language code like "de" or "en" skips detection.
+    voice_transcribe_language: str = "auto"
+    # Threads passed to whisper-cli (-t N). 4 is a sensible default on
+    # current Apple Silicon; raise for big models on M-series Max chips.
+    voice_transcribe_threads: int = 4
+    # Override path to the whisper.cpp binary. Empty = auto-detect
+    # `whisper-cli` from $PATH (brew installs to /opt/homebrew/bin).
+    voice_transcribe_binary: str = ""
+    # Override path to ffmpeg. Empty = auto-detect from $PATH. Only used
+    # for audio formats whisper-cli doesn't natively read (m4a/mp4/aac);
+    # mp3/wav/flac/ogg go straight to whisper-cli.
+    voice_transcribe_ffmpeg: str = ""
     # Path to a directory the operator drops camera / phone photos into for
     # ingest. Same shape as `voice_inbox` (folder-watch + archive-as-dedup),
     # but the per-file pipeline runs a vision LLM (gemma4 via Ollama) and

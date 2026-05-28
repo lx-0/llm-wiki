@@ -144,8 +144,9 @@ def test_migrate_config_file_round_trip(tmp_path):
     # +3 health_trends (2 limits + 1 features), 2026-05-23
     # +1 personal.capture_inbox (M025 quick-capture loop), 2026-05-23
     # +1 piggybacks.capture (M025 capture piggyback knob), 2026-05-23
-    # = 63 changes (no drops — operator has no orphan personal.* fields)
-    assert len(changes) == 63, f"got {len(changes)} changes: {changes}"
+    # +5 personal.voice_transcribe_* (M026 audio ingest), 2026-05-28
+    # = 68 changes (no drops — operator has no orphan personal.* fields)
+    assert len(changes) == 68, f"got {len(changes)} changes: {changes}"
 
     reparsed = yaml.safe_load(new_text)
     # piggyback side
@@ -244,6 +245,11 @@ def test_migrate_config_no_change_when_fully_current(tmp_path):
             "capture_inbox": "",
             "reports_dir": "reports",
             "domains": ["company", "personal", "ai", "meta"],
+            "voice_transcribe_model": "",
+            "voice_transcribe_language": "auto",
+            "voice_transcribe_threads": 4,
+            "voice_transcribe_binary": "",
+            "voice_transcribe_ffmpeg": "",
         },
     }), encoding="utf-8")
 
@@ -391,6 +397,11 @@ def test_migrate_additions_idempotent():
             "capture_inbox": "",
             "reports_dir": "reports",
             "domains": ["company", "personal", "ai", "meta"],
+            "voice_transcribe_model": "",
+            "voice_transcribe_language": "auto",
+            "voice_transcribe_threads": 4,
+            "voice_transcribe_binary": "",
+            "voice_transcribe_ffmpeg": "",
         },
     }
     changes = m.migrate_additions(data)

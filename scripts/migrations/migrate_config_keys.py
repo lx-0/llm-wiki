@@ -58,6 +58,11 @@ Key changes covered (chronological):
   piggybacks.capture                       (added 2026-05-23 M025, cooldown 1h — operator override for the capture collector piggyback)
   limits.daily_email_top_senders           (added 2026-05-23, default 5 — email daily-rollup top-senders cap)
   limits.daily_email_sample_subjects       (added 2026-05-23, default 12 — email daily-rollup recent-subject sample cap)
+  personal.voice_transcribe_model            (added 2026-05-28 M026, default "" — whisper.cpp ggml model path; empty disables audio ingest)
+  personal.voice_transcribe_language         (added 2026-05-28 M026, default "auto")
+  personal.voice_transcribe_threads          (added 2026-05-28 M026, default 4)
+  personal.voice_transcribe_binary           (added 2026-05-28 M026, default "" — override whisper-cli path; empty = $PATH lookup)
+  personal.voice_transcribe_ffmpeg           (added 2026-05-28 M026, default "" — override ffmpeg path; empty = $PATH lookup; only used for m4a/mp4/aac pre-conversion)
   personal.accounts.<id>.health.healthkit    (added 2026-05-19 M023 — Apple HealthKit XML export ingest;
                                               injected as a placeholder into any account already carrying
                                               `health.oura`, kind: healthkit-xml-export, empty inbox_dir
@@ -366,6 +371,15 @@ KEY_ADDITIONS: dict[str, dict[str, object]] = {
         # Default lifted from lx-vault audit (Company / Personal / AI top-
         # level split). See `.ytstack/backlog/domain-frontmatter.md`.
         "domains": ["company", "personal", "ai", "meta"],
+        # M026 (2026-05-28) audio transcription via whisper.cpp. Empty model
+        # path keeps audio-ingest off; text dictation continues to work
+        # regardless. Operator pre-reqs: brew install whisper-cpp + download
+        # a ggml model file. See AGENTS.md voice-intake section.
+        "voice_transcribe_model": "",
+        "voice_transcribe_language": "auto",
+        "voice_transcribe_threads": 4,
+        "voice_transcribe_binary": "",
+        "voice_transcribe_ffmpeg": "",
     },
 }
 
