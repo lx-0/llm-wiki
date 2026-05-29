@@ -12,6 +12,10 @@ dependencies = [
     "claude-agent-sdk>=0.1.29",
     "html2text>=2025.4.15",
     "imapclient>=3.0.0",
+    # Required by collectors/_picture_metadata.py for EXIF parsing on
+    # JPEG/PNG sources. Used to be a transitive dep of yt-dlp on some
+    # platforms but not reliably resolved across uv environments.
+    "pillow>=10.0.0",
     "google-auth>=2.0.0",
     "google-auth-oauthlib>=1.0.0",
     "prompt-toolkit>=3.0",
