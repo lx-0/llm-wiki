@@ -1,7 +1,7 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-05-24T00:00:00+0200
+last_updated: 2026-05-29T00:00:00+0200
 current_milestone: M025
 active_slice: S01
 active_task: none
@@ -10,6 +10,10 @@ parallel_milestones: [M021]
 ---
 
 # State
+
+**Recent ad-hoc (2026-05-28):** Voice collector grows **audio transcription via whisper.cpp** — m4a / mp4 / mp3 / wav / flac / ogg / aac dropped into `voice_inbox` are transcribed locally by `_transcribe_audio()` (whisper-cli via subprocess; m4a/mp4/aac route through ffmpeg first → 16 kHz mono PCM s16). Transcript flows downstream same as text dictation (optional `voice_punctuate` Ollama pass, daily rollup, canonical raw/voice/*.md). 5 new `personal.voice_transcribe_*` knobs + `limits.voice_punctuate_timeout_s=120` (lifted from hardcoded 30 s — gemma4:e4b cold-call routinely hits 36 s). Fail-soft: missing binary / model / ffmpeg leaves the file in inbox and surfaces as health-check `voice-audio-setup` WARNING. Commits `0b147bb` + `adf5fcd` (on origin; lxw operator-set + live-verified — two queued m4a → two raw/voice/*.md with `raw_transcript:` audit trail). Detail: `.ytstack/AD-HOC-voice-audio-ingest-SUMMARY.md`; DECISIONS 2026-05-28; backlog/voice-intake.md "Shipped" block.
+
+**Recent ad-hoc (2026-05-28):** Operations log relocated **out of `knowledge/`** to `.wiki/logs/operations.md`. `knowledge/log.md` had grown to 2 MB / ~15k lines on lxw → Obsidian crashed on vault open (operator had quarantined the file as `.log.md.disabled-test`). The log is engine telemetry, not knowledge; `.wiki/logs/` is Obsidian-invisible (`.`-prefixed top-level folder). Path-scope hooks in compile / dream / correct_apply extended to allow the new file path (file-as-root = exact-file restriction via `Path.relative_to`). 8 prompts re-pointed (`compile_main` / `compile_health` / `query_file_back` / `correct_apply` / `dream_entity` / `dream_entity_system` / `agents/dream-cycle`). New `scripts/migrations/migrate_log_md_path.py` wired into `wiki update` — moves both `log.md` and the `.log.md.disabled-test` quarantine into the new home, idempotent. Commit `ce8314b` (on origin; lxw `wiki update` round done). Detail: `.ytstack/AD-HOC-operations-log-relocation-SUMMARY.md`; DECISIONS 2026-05-28; KNOWLEDGE Graph-View-filter section.
 
 **Recent ad-hoc (2026-05-29):** Wikilinks now stored **relative to their containing article** — clicking cross-article links in Obsidian created empty stubs because `[[concepts/foo]]` is relative to `knowledge/`, not the nested article, and Obsidian resolves slash-links source-relative + vault-absolute (both miss from `knowledge/<type>/x.md`). New `scripts/core/links.py` (single resolver: `resolve_link`/`canonical_slug`/`relativize_text`), `backlinks.py` relative footers, `lint` + `count_inbound_links` resolve source-relative, relativize post-compile pass wired into `compile.py` (`features.relativize_wikilinks`, default on). Corpus migrated on lxw: 17.346 links → relative (idempotent). Plus `wiki links` + `wiki links --fix` (broken-link report + approval-gated fixer, ≡ bucket / ~ fuzzy tiers). Commits `4b4eb5b` + `09d2097` (on origin; `wiki update` + `--fix` round done on lxw). Detail: `.ytstack/AD-HOC-relativize-wikilinks-SUMMARY.md`; DECISIONS + KNOWLEDGE 2026-05-29. Follow-ups: `.ytstack/backlog/relativize-wikilinks-followups.md`.
 

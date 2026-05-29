@@ -2281,3 +2281,24 @@ Obsidian does NOT resolve `[[concepts/foo]]` "against any indexed dir" (the fals
 That dual behavior reconciles every observation: from a nested `knowledge/<type>/x.md`, `[[concepts/foo]]` missed both bases (→ empty stub — the reported bug); `[[daily/d.md]]` hit vault-absolute (daily/ is a real top-level folder); `[[../people/alex]]` hits source-relative; and `index.md`'s `[[concepts/foo]]` hits source-relative because index.md sits directly in `knowledge/`. **Therefore the only form that resolves from every location is relative-to-the-file** — which is why links are now stored relative (`core.links`). When matching links in code, never literal-string-match a canonical form (`f"[[concepts/foo]]" in content`) — it misses `[[foo]]` and `[[../concepts/foo]]`; resolve via `core.links.resolve_link` + compare `canonical_slug` (fixed `count_inbound_links`, the lint checks, the backlinks index this way).
 
 **Verification trap avoided:** the relative-`../`-resolves-in-Obsidian fact is the one thing un-testable from the engine side — confirmed by operator click before migrating 17k links, not assumed. The migration's own idempotency (second pass = 0 rewrites) is the proof that every rewritten link resolves engine-side: `relativize_text` only rewrites a link whose target it located on disk.
+
+## whisper.cpp via `brew install whisper-cpp`: stdout = transcript, m4a needs ffmpeg, cold-start ~30 s (2026-05-28)
+
+Empirical learnings from shipping `_transcribe_audio()` in `scripts/collectors/voice.py`:
+
+- **Binary name is `whisper-cli`** (post-1.7.x rename from `main`). brew formula installs it at `/opt/homebrew/bin/whisper-cli`.
+- **`-nt -np` is the no-noise invocation.** `-nt` (no-timestamps) gives clean prose; `-np` (no-prints) keeps stdout transcript-only. ggml-metal/CPU init lines still hit stderr and end with a duplicate transcript echo — discard stderr to DEBUG; the source of truth is stdout.
+- **`whisper-cli`'s native input formats are mp3 / wav / flac / ogg.** `.m4a`, `.mp4`, `.aac` need pre-conversion via `ffmpeg -ar 16000 -ac 1 -c:a pcm_s16le` (whisper's preferred input shape — 16 kHz mono PCM s16). Native formats skip the conversion step. Help text lies a little: the binary errors with "failed to read audio data as wav" on m4a input even though the help line says "supported audio formats: flac, mp3, ogg, wav" — easy to miss until you try.
+- **Cold-call latency is operator-painful.** `gemma4:e4b` on the home Ollama (`kcma-d8`, M-series) measured 36 s for a 2-token reply when the model wasn't loaded; warm calls landed ~11 s for 70 tokens. Punctuate timeout was hardcoded at 30 s and tripped on every first call after a quiet period; lifted to `limits.voice_punctuate_timeout_s=120` (mirrors `chat()`'s default). Sister knobs in the file already encoded this latency reality — `curiosity_timeout_s=240` (comment: "gemma4:e4b on long YT-notes regularly hits >90 s"), `screenshot_timeout_seconds=60`. 30 s was the outlier.
+- **Stop overthinking deps.** The trade-off between whisper.cpp-via-subprocess and faster-whisper-as-Python-dep felt close (`pyproject.toml` lift vs. an extra brew step), but the dep size (CTranslate2 + ONNX runtime + HuggingFace-Hub auto-download at runtime, ~150 MB) violated the engine's "thin orchestrator" posture. brew + a one-time model curl is cheap; mid-pipeline network for first-run model downloads is not.
+
+Full rationale + benchmarks: DECISIONS 2026-05-28; `.ytstack/AD-HOC-voice-audio-ingest-SUMMARY.md`.
+
+## `make_path_scope_hook` accepts a file path as a "root" — exact-file write restriction (2026-05-28)
+
+`scripts/core/sdk_helpers.py:make_path_scope_hook` builds a PreToolUse hook for Write/Edit that allow-lists an iterable of `allowed_write_roots`. Each root goes through `Path.resolve()` and is compared via `target.relative_to(root)`. **Roots don't have to be directories** — passing a file path like `LOG_FILE = .wiki/logs/operations.md` works:
+
+- `Path('/x/y/z').relative_to('/x/y/z')` returns `PosixPath('.')` (no exception) → allow.
+- `Path('/x/y/zz').relative_to('/x/y/z')` raises `ValueError` → continue / deny.
+
+So a file-as-root behaves as **"this exact file is writable, nothing else under the same dir"**. Used in 2026-05-28's log relocation: `[ROOT_DIR / "knowledge", LOG_FILE]` lets agents Write/Edit anywhere under `knowledge/` AND specifically `.wiki/logs/operations.md`, while keeping `.wiki/state/` / `.wiki/sessions/` / `.wiki/logs/flush.log` denied. Cheaper than carving out a sub-directory just for the audit trail.

@@ -693,7 +693,7 @@ class Personal:
     # transcribed via whisper.cpp when `voice_transcribe_model` is set;
     # see the next four knobs. Empty string disables collectors/voice.py.
     voice_inbox: str = ""
-    # Audio-transcription via whisper.cpp (M026, 2026-05-28). When set,
+    # Audio-transcription via whisper.cpp (ad-hoc, 2026-05-28). When set,
     # audio files dropped into `voice_inbox` are transcribed locally and
     # the transcript follows the same pipeline as text dictation (optional
     # voice_punctuate pass, daily/-rollup, raw/voice/ canonical file).

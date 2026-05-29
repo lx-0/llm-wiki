@@ -48,7 +48,60 @@ piggybacks:
     enabled: false
 ```
 
-## 2a. Punctuation pre-process (default on)
+## 2a. Audio transcription via whisper.cpp (optional; m4a / wav / mp3 / …)
+
+Since 2026-05-28 the voice collector also accepts audio files —
+`.m4a`, `.mp4`, `.mp3`, `.wav`, `.flac`, `.ogg`, `.aac` — dropped into
+the same inbox. They get transcribed locally with whisper.cpp and then
+flow through the same downstream pipeline (punctuation pass + daily
+rollup + canonical `raw/voice/*.md`). Pre-2026-05-28 audio files were
+silently filtered out.
+
+One-time setup:
+
+```sh
+brew install whisper-cpp
+mkdir -p ~/whisper-models && cd ~/whisper-models
+curl -LO https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin
+```
+
+Model picks: `ggml-base.bin` (~141 MB, fast, good for short captures)
+or `ggml-small.bin` (~466 MB, noticeably better on accents). The
+larger `medium` / `large-v3` are 1.5 GB+; only worth it for tough
+audio.
+
+Wire it in `<vault>/.wiki/config.yaml`:
+
+```yaml
+personal:
+  voice_inbox: "<existing path from §2>"
+  voice_transcribe_model: "~/whisper-models/ggml-base.bin"   # empty = audio ingest off
+  voice_transcribe_language: "auto"   # or "de" / "en" / … to skip detection
+  voice_transcribe_threads: 4
+  voice_transcribe_binary: ""         # empty = `whisper-cli` from $PATH
+  voice_transcribe_ffmpeg: ""         # empty = `ffmpeg` from $PATH
+```
+
+Engine native whisper formats are `mp3 / wav / flac / ogg` — they go
+straight to `whisper-cli`. The container formats `m4a / mp4 / aac` are
+pre-converted by `ffmpeg` to 16 kHz mono PCM s16 (whisper's preferred
+input shape) into a TemporaryDirectory wav, then transcribed. ffmpeg
+ships via brew or is pre-installed on most Macs.
+
+**Fail-soft.** Empty `voice_transcribe_model`, missing model file,
+`whisper-cli` not on PATH, ffmpeg missing for an m4a, subprocess error
+— each returns `None` from the transcription step, the source is
+**left in the inbox** so a re-run picks it up once setup is healthy,
+and the per-file error surfaces in the collector report. Audio support
+never breaks text dictation; the entire path is opt-in (empty model
+default).
+
+A dedicated health check `voice-audio-setup` (run via `wiki health`)
+flags the half-installed states as warnings — empty model knob with
+queued audio, model knob set but file missing, model OK but no
+whisper-cli on PATH, native formats fine but m4a queued without ffmpeg.
+
+## 2b. Punctuation pre-process (default on)
 
 Dictation tools emit stream-of-consciousness text without punctuation
 or capitalization. Since 2026-05-17 the voice collector runs every

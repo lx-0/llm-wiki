@@ -110,7 +110,7 @@ path-agnostic; iCloud Drive just happens to be a folder.
 - Aiko (iOS): free, MIT-spirit, on-device Whisper — better quality than
   Apple's native dictation for proper-noun-heavy domains.
 
-## Shipped 2026-05-28 (M026)
+## Shipped 2026-05-28 (ad-hoc)
 
 - **Audio-file ingestion via whisper.cpp** — `.m4a` / `.mp4` / `.mp3` /
   `.wav` / `.flac` / `.ogg` / `.aac` files dropped into voice_inbox are

@@ -1418,7 +1418,7 @@ Commits 4647d47 / 2c4335c+aad8541 / e6c04df / e9a44e5.
 **Supersedes:** —
 **Linked artifacts:** `scripts/core/paths.py` (LOG_FILE → `LOGS_DIR / "operations.md"`), `scripts/compile_stages/compile.py` + `scripts/dream.py` + `scripts/facts/correct_apply.py` (path-scope hook roots extended), `scripts/migrations/migrate_log_md_path.py`, `wiki` (cmd_update wires the migration), `templates/dashboard.md` + `templates/AGENTS.example.md` + `docs/PRINCIPLES.md` + `docs/PROCESS.md` + `docs/cli.md` + `docs/concept.md` (operator-facing path references), prompt path rewrites across `prompts/compile_*.md` + `prompts/dream_entity*.md` + `prompts/correct_apply.md` + `prompts/query_file_back.md` + `prompts/agents/dream-cycle.md`.
 
-## 2026-05-28: Voice collector grows audio transcription via whisper.cpp (M026)
+## 2026-05-28: Voice collector grows audio transcription via whisper.cpp (ad-hoc)
 
 **Context:** Operator reported m4a files showing up in `voice_inbox` (iOS Voice Memos, third-party recorders) — current collector silently filters them out (only `.txt` / `.md` accepted). `.ytstack/backlog/voice-intake.md` had this as the "natural next slice" with two unresolved questions: which transcription engine, and where to draw the engine-deps line.
 **Options considered:** (A) **whisper.cpp via subprocess** — operator `brew install whisper-cpp` once + downloads a ggml model, engine shells out. (B) **faster-whisper as a Python dep** — added to `pyproject.toml`, models auto-download from HuggingFace at first use, no operator-side install. (C) **mlx-whisper / WhisperKit** — Apple-Silicon-only, smaller community. (D) **Remote LLM gateway** — none of the available endpoints (Ollama, llm.yester.cloud, Voxtral) currently expose STT.
