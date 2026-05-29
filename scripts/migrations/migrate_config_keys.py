@@ -66,6 +66,7 @@ Key changes covered (chronological):
   personal.voice_transcribe_ffmpeg           (added 2026-05-28, default "" — override ffmpeg path; empty = $PATH lookup; only used for m4a/mp4/aac pre-conversion)
   limits.voice_punctuate_timeout_s           (added 2026-05-28, default 120 — gemma4:e4b cold-call routinely >30s; absorbs model-load latency)
   personal.inbox_bridges                     (added 2026-05-28, default [] — rsync-based mirror for sandbox-restricted intake folders; see scripts/bridge/drive_sync.py)
+  features.extract_picture_metadata          (added 2026-05-29, default True — EXIF + Android-screenshot-filename metadata extraction in pictures collector)
   personal.accounts.<id>.health.healthkit    (added 2026-05-19 M023 — Apple HealthKit XML export ingest;
                                               injected as a placeholder into any account already carrying
                                               `health.oura`, kind: healthkit-xml-export, empty inbox_dir
@@ -305,6 +306,12 @@ KEY_ADDITIONS: dict[str, dict[str, object]] = {
         # article, so Obsidian resolves cross-article links from nested
         # folders instead of creating empty stubs. Idempotent. Default True.
         "relativize_wikilinks": True,
+        # Per-picture deterministic metadata extraction (2026-05-29) — EXIF
+        # via Pillow + Android-screenshot filename pattern. Adds
+        # captured_at / device / location / shot / app_context frontmatter
+        # to each pictures-collector sidecar. Default True; graceful no-op
+        # when source carries no EXIF and isn't an Android screenshot.
+        "extract_picture_metadata": True,
         # M019 operator-self-reports master switch (2026-05-17). When True,
         # `wiki study run` + `wiki analyze` are wired and flush.py piggybacks
         # for Pass-1 / Pass-2 fire. Default OFF — flip True after S05 lands

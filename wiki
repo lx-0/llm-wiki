@@ -1301,6 +1301,41 @@ cmd_bridge() {
   uv run --quiet --project "$WIKI_DIR" python "$WIKI_DIR/scripts/bridge/cli.py" "$@"
 }
 
+help_backfill() {
+  cat <<EOF
+${C_BOLD}wiki backfill${C_RESET} — one-shot data-shape upgrades on existing vault artifacts
+
+${C_BOLD}USAGE${C_RESET}
+  wiki backfill picture-metadata [--dry-run]   add EXIF + Android filename
+                                               metadata to existing pictures
+                                               archive sidecars
+
+${C_BOLD}WHAT IT DOES${C_RESET}
+  Each subcommand walks the relevant substrate and adds net-new keys to
+  existing artifacts that were written before a feature shipped. Idempotent:
+  re-runs only write keys that aren't already present, and existing
+  operator-added keys are never overwritten.
+EOF
+}
+
+cmd_backfill() {
+  case "${1:-}" in
+    -h|--help|help|"")
+      help_backfill
+      return 0
+      ;;
+    picture-metadata)
+      shift
+      banner "wiki backfill picture-metadata"
+      _run_script backfill_picture_metadata.py "$@"
+      ;;
+    *)
+      err "unknown: wiki backfill $1 (try 'wiki backfill help')"
+      return 1
+      ;;
+  esac
+}
+
 cmd_gmail_auth() {
   local account_id="${1:-}"
   if [[ -z "$account_id" || "$account_id" == "-h" || "$account_id" == "--help" ]]; then
@@ -1600,6 +1635,7 @@ case "${1:-}" in
   collect)          shift; cmd_collect "$@" ;;
   produce)          shift; cmd_produce "$@" ;;
   bridge)           shift; cmd_bridge "$@" ;;
+  backfill)         shift; cmd_backfill "$@" ;;
   gmail-auth)       shift; cmd_gmail_auth "$@" ;;
   gmeet-auth)       shift; cmd_gmeet_auth "$@" ;;
   calendar-auth)    shift; cmd_calendar_auth "$@" ;;

@@ -571,6 +571,19 @@ class Features:
     # decorative allowlist for one-line rollback if the streaming-mode
     # rewrite surfaces edge cases under production load. Default True.
     compile_callback_gate: bool = True
+    # Deterministic per-picture metadata extraction (EXIF + Android
+    # screenshot filename pattern). When True, the pictures collector
+    # adds `captured_at`, `device`, `location`, `shot`, `app_context`
+    # frontmatter keys (where available) to each archive sidecar before
+    # the gemma4 vision pass — orthogonal to the LLM output. EXIF read
+    # via Pillow (already a transitive dep). HEIC sources fall through
+    # without EXIF (Pillow needs the pillow-heif plugin for HEIC, which
+    # is not in the engine's deps yet); JPEG/PNG cover Android screenshots
+    # and the dominant iCloud / iOS-Shortcut JPEG path. Default True;
+    # flip false if EXIF / location data should never enter the vault
+    # (privacy-conscious operators, multi-tenant). Graceful no-op when
+    # the source file carries no EXIF and isn't an Android-screenshot.
+    extract_picture_metadata: bool = True
     # Corpus-wide post-compile pass that writes a sentinel-managed
     # `## Backlinks` footer into every knowledge/<article>.md so AI agents
     # reading the markdown directly get backlink information without

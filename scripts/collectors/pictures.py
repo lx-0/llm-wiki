@@ -33,6 +33,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import httpx  # noqa: E402
 
+from collectors._picture_metadata import extract_metadata
 from collectors.base import Collector, CollectorSpec, RunResult, register
 from core import daily_capture, ollama_client
 from core.config import CONFIG, TIMEZONE
@@ -213,7 +214,42 @@ def _scan_inbox(inbox: Path) -> list[Path]:
     return sorted(items, key=lambda p: p.stat().st_mtime)
 
 
-def _write_archive_sidecar(archive_path: Path, captured_at: datetime, meta: dict) -> None:
+def _render_picture_metadata_block(picture_metadata: dict) -> list[str]:
+    """Render the optional deterministic-metadata frontmatter keys
+    (`device`, `location`, `shot`, `app_context`) as YAML lines. Empty
+    sub-dicts and missing keys are skipped so the sidecar only carries
+    fields that are actually populated for the source file."""
+    lines: list[str] = []
+    device = picture_metadata.get("device") or {}
+    if device:
+        lines.append("device:")
+        for k, v in device.items():
+            lines.append(f"  {k}: {json.dumps(v)}")
+    location = picture_metadata.get("location") or {}
+    if location:
+        lines.append("location:")
+        for k, v in location.items():
+            lines.append(f"  {k}: {v}")
+    shot = picture_metadata.get("shot") or {}
+    if shot:
+        lines.append("shot:")
+        for k, v in shot.items():
+            if isinstance(v, str):
+                lines.append(f"  {k}: {json.dumps(v)}")
+            else:
+                lines.append(f"  {k}: {v}")
+    app_context = picture_metadata.get("app_context")
+    if isinstance(app_context, str) and app_context.strip():
+        lines.append(f"app_context: {json.dumps(app_context.strip())}")
+    return lines
+
+
+def _write_archive_sidecar(
+    archive_path: Path,
+    captured_at: datetime,
+    meta: dict,
+    picture_metadata: dict | None = None,
+) -> None:
     """Write a per-image sidecar next to the archived source so the
     operator can re-find the analysis from the archive folder without
     grepping batch reports. Picture-shaped fields."""
@@ -230,6 +266,7 @@ def _write_archive_sidecar(archive_path: Path, captured_at: datetime, meta: dict
 
     fm = [
         "---",
+        f"captured_at: {captured_at.strftime('%Y-%m-%dT%H:%M:%S')}",
         f"setting: {json.dumps(setting) if setting else 'null'}",
         f"action: {json.dumps(action) if action else 'null'}",
         f"objects: [{objects_str}]",
@@ -239,6 +276,9 @@ def _write_archive_sidecar(archive_path: Path, captured_at: datetime, meta: dict
         f"scanned: {now_iso()}",
         f"vision_model: {json.dumps(meta.get('model', ''))}",
         f"vision_tokens: {int(meta.get('tokens', 0) or 0)}",
+    ]
+    fm.extend(_render_picture_metadata_block(picture_metadata or {}))
+    fm.extend([
         "---",
         "",
         f"# Picture {ts_str}",
@@ -246,7 +286,7 @@ def _write_archive_sidecar(archive_path: Path, captured_at: datetime, meta: dict
         meta.get("scene_description", "") or "_(no description)_",
         "",
         f"**Text visible**: {text_visible or '_(none)_'}",
-    ]
+    ])
     if raw_response:
         fm.extend([
             "",
@@ -435,14 +475,38 @@ class PicturesCollector:
         results: list[dict] = []
         thumb_lookup: dict[str, str] = {}
         errors: list[str] = []
+        extract_picture_metadata = getattr(
+            CONFIG.features, "extract_picture_metadata", True
+        )
+
         for i, src in enumerate(sources, 1):
             log.info("[%d/%d] %s", i, len(sources), src.name)
+
+            # Deterministic metadata first — captured_at from EXIF /
+            # filename pattern is more accurate than the source's mtime
+            # (which is post-Drive-sync / post-bridge-copy time).
+            picture_metadata: dict = {}
+            if extract_picture_metadata:
+                try:
+                    picture_metadata = extract_metadata(src)
+                except Exception:  # noqa: BLE001
+                    log.exception("metadata extraction failed for %s", src.name)
+                    picture_metadata = {}
+
             meta = describe_picture(src)
             if not meta:
                 errors.append(f"{src.name}: vision call failed")
                 continue
 
-            captured_at = datetime.fromtimestamp(src.stat().st_mtime, tz=tz)
+            captured_at_dt = picture_metadata.get("captured_at")
+            if isinstance(captured_at_dt, datetime):
+                # EXIF / filename timestamps are naive — attach the engine
+                # timezone so downstream daily/-rollup bucketing is correct.
+                if captured_at_dt.tzinfo is None:
+                    captured_at_dt = captured_at_dt.replace(tzinfo=tz)
+                captured_at = captured_at_dt
+            else:
+                captured_at = datetime.fromtimestamp(src.stat().st_mtime, tz=tz)
 
             thumb = _make_thumbnail(src)
             if thumb is not None:
@@ -461,7 +525,7 @@ class PicturesCollector:
                 errors.append(f"{src.name}: archive failed ({exc})")
                 continue
 
-            _write_archive_sidecar(dest, captured_at, meta)
+            _write_archive_sidecar(dest, captured_at, meta, picture_metadata)
             _append_daily_rollup(captured_at, meta.get("scene_description", ""), archive_name)
 
             results.append({

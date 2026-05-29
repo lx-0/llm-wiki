@@ -58,6 +58,68 @@ report (ordered chronologically by file mtime across sources). Paths
 that don't exist (Drive offline, bridge hasn't run yet) log a WARNING
 and are skipped without aborting the others.
 
+## Deterministic metadata (EXIF + filename)
+
+As of 2026-05-29, the collector also extracts deterministic per-file
+metadata before the vision pass. Two orthogonal sources:
+
+- **EXIF** (via Pillow) on JPEG/PNG sources. Surfaces `DateTimeOriginal`,
+  `Make`/`Model`/`Software`, GPS coordinates as decimal degrees, and
+  shot parameters (aperture / exposure / ISO / focal length). Camera
+  photos and iPhone JPEGs typically carry the full set; Android
+  screenshots usually only have `Software` with a device-code hint.
+- **Filename pattern** for Android screenshots
+  (`Screenshot_YYYYMMDD_HHMMSS_<AppContext>.jpg`). Extracts the capture
+  timestamp (more accurate than mtime, which is post-sync time) and the
+  `<AppContext>` — what the user was viewing when the screenshot was
+  taken, which is a knowledge signal on its own.
+
+These flow into the archive sidecar as optional frontmatter keys:
+
+```yaml
+captured_at: 2024-09-05T17:17:58
+device:
+  software: "Android UP1A.231005.007.X200XXS3DXD5"
+  make: "Apple"            # camera photos only
+  model: "iPhone 15 Pro"   # camera photos only
+location:                  # only when EXIF GPS is present
+  lat: 51.507400
+  lon: -0.127800
+  alt: 35.0
+shot:                      # camera photos only
+  aperture: 1.8
+  exposure: "1/120"
+  iso: 100
+  focal_length_mm: 28
+app_context: "O'Reilly"    # Android-screenshot filename only
+```
+
+Empty sub-dicts / missing keys are omitted so the sidecar only carries
+what was actually extractable for that file. Source files that yield
+no metadata (HEIC without `pillow-heif`, plain camera JPEGs without
+EXIF, non-Android-pattern filenames) fall through to the legacy
+mtime-derived `captured_at` and no other deterministic keys.
+
+Toggle: `features.extract_picture_metadata` (default `true`). Flip to
+`false` if location data should never enter the vault — the extractor
+shorts out, sidecars only carry the LLM vision output.
+
+### Backfilling existing sidecars
+
+Sidecars written before this feature shipped don't carry the
+metadata keys. A one-shot backfill walks
+`raw/inbox-mobile/pictures/*.md`, finds each one's matching original
+image, and adds the net-new keys without touching existing ones.
+
+```bash
+wiki backfill picture-metadata --dry-run    # preview
+wiki backfill picture-metadata              # apply
+```
+
+Idempotent — a re-run only writes keys that aren't already present.
+Sidecars whose original image was deleted from `raw/inbox-mobile/pictures/`
+log a WARNING and are skipped.
+
 The piggyback is on by default with a 6 h cooldown and a 20-images-per-run
 cap. To tune or disable:
 
