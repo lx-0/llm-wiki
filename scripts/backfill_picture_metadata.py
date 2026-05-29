@@ -7,10 +7,12 @@ same `collectors._picture_metadata.extract_metadata()` the live
 collector now calls on ingest, and merges the new keys into the
 sidecar's frontmatter — *without* touching existing keys.
 
-Idempotent: a sidecar that already carries any of {device, location,
-shot, app_context} is treated as already-backfilled and skipped. A
-re-run only writes net-new keys; if the operator manually added a
-field, it's preserved.
+Idempotent per-key: the merge writes only frontmatter keys that aren't
+already present. Existing keys (operator-edited or filled by an earlier
+backfill pass) are preserved verbatim. A re-run after a missing
+dependency (e.g. Pillow) gets installed picks up the previously-skipped
+EXIF fields without disturbing the keys filename parsing already
+provided.
 
 Body (everything after the closing `---` of frontmatter) is preserved
 byte-for-byte. The frontmatter YAML is re-serialised via yaml.safe_dump
@@ -41,13 +43,6 @@ log = logging.getLogger("backfill-picture-metadata")
 
 ACCEPTED_SUFFIXES = (".jpg", ".jpeg", ".png", ".heic")
 PICTURES_ARCHIVE = RAW_DIR / "inbox-mobile" / "pictures"
-
-# Keys that mark a sidecar as already-backfilled (any one present →
-# skip). `captured_at` is intentionally NOT here — older sidecars
-# already carry a captured_at the collector wrote from mtime, and we
-# want backfill to upgrade it when EXIF / filename has a better value.
-BACKFILL_MARKER_KEYS = ("device", "location", "shot", "app_context")
-
 
 def _split_frontmatter(text: str) -> tuple[dict | None, str]:
     """Return (parsed FM dict, body). (None, text) if no FM block found."""
@@ -101,9 +96,6 @@ def _backfill_one(sidecar: Path, *, dry_run: bool) -> str:
     fm, body = _split_frontmatter(text)
     if fm is None:
         return "skipped:no_frontmatter"
-
-    if any(k in fm for k in BACKFILL_MARKER_KEYS):
-        return "skipped:already_backfilled"
 
     original = _find_original(sidecar)
     if original is None:
