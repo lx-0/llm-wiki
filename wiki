@@ -44,6 +44,8 @@
 #   wiki flush                 capture current Claude Code context → daily/ (manual flush)
 #   wiki lint                  run lint.py — structural + LLM contradiction checks
 #   wiki lint --structural-only  cheap, no-LLM lint (used by piggyback)
+#   wiki links                 broken-wikilink report (media/placeholder/dangling)
+#   wiki links --fix           interactively rewrite high-confidence dangling refs
 #   wiki query "QUESTION"      ask the knowledge base via the configured model
 #   wiki query "Q" --brief     5-10 line bullet answer (cheapest)
 #   wiki query "Q" --file-back full answer, persisted as knowledge/qa/<slug>.md
@@ -499,6 +501,32 @@ EOF
   _refresh_dashboard_stats
   _refresh_dashboard_lint
   return $rc
+}
+
+cmd_links() {
+  case "${1:-}" in
+    -h|--help|help)
+      cat <<EOF
+${C_BOLD}wiki links${C_RESET} — analyze (and optionally fix) broken wikilinks
+
+${C_BOLD}USAGE${C_RESET}
+  wiki links                         categorized report (read-only)
+  wiki links --fix                   interactively rewrite high-confidence dangling refs
+  wiki links --fix --yes             non-interactive: apply bucket-tier corrections only
+
+${C_BOLD}NOTES${C_RESET}
+  Wraps \`scripts/links_audit.py\`. Three classes: media embeds (asset missing),
+  doc placeholders (examples, left alone), and dangling article refs. The fixer
+  only rewrites dangling refs with a high-confidence correction — an exact
+  basename in a different bucket (≡, near-certain) or a very-close string match
+  (~, eyeball it). Each is approved per-item; \`--yes\` auto-applies only the ≡
+  tier. Missing-article refs are reported but never auto-fixed (create via
+  compile/dream, or drop the link).
+EOF
+      return 0 ;;
+  esac
+  banner "wiki links"
+  _run_script links_audit.py "$@"
 }
 
 cmd_reconcile() {
@@ -1582,6 +1610,7 @@ case "${1:-}" in
   dream)            shift; cmd_dream "$@" ;;
   flush)            shift; cmd_flush "$@" ;;
   lint)             shift; cmd_lint "$@" ;;
+  links)            shift; cmd_links "$@" ;;
   reconcile)        shift; cmd_reconcile "$@" ;;
   health-trends)    shift; cmd_health_trends "$@" ;;
   usage)            shift; cmd_usage "$@" ;;

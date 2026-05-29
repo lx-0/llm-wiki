@@ -238,6 +238,8 @@ Grouped by purpose. Run `wiki <cmd> --help` for the full per-command help block.
 | `wiki agent daily-digest --var date=YYYY-MM-DD` | run the `daily-digest` agent: read all `daily/<date>/*.md` per-source captures and write a ≤500-word distillation into `daily/<date>.md`. Also runs once-daily as the `daily_digest_yesterday` piggyback. |
 | `wiki lint` | full health check — structural + LLM contradiction sweep ($ cost). Report → `.wiki/reports/lint-YYYY-MM-DD.md`. |
 | `wiki lint --structural-only` | cheap, no-LLM lint — 8 checks (`broken_links`, `orphan_pages`, `orphan_sources`, `stale_articles`, `missing_backlinks`, `article_type`, `sparse_articles`, `facts_violations`). Used by piggyback. |
+| `wiki links` | broken-wikilink report — categorizes into media embeds (asset missing), doc placeholders (examples, left alone), and dangling article refs (with fuzzy correction suggestions). Read-only ($0). |
+| `wiki links --fix` | interactively rewrite high-confidence dangling refs (per-item approval): exact basename in a different bucket (≡) or close string match (~). `--yes` auto-applies the ≡ tier only. Missing-article refs are never auto-fixed. |
 | `wiki query "QUESTION"` | ask the knowledge base — picks relevant articles via `knowledge/index.md`, answers via configured query model (LLM cost). |
 | `wiki review-wiki` | per-article quality-score sweep via local Ollama ($0). Output → `.wiki/reports/review-YYYY-MM-DD.md`. Runs as weekly piggyback by default. |
 
