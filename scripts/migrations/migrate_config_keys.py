@@ -49,6 +49,7 @@ Key changes covered (chronological):
   features.voice_punctuate                 (added 2026-05-17, default True — Ollama-driven punctuation pass on voice transcripts at ingest)
   features.compile_callback_gate           (added 2026-05-17, default True — `can_use_tool` callback as the real path-scope gate for compile + dream; replaces decorative `Write(knowledge/**)` syntax)
   features.materialize_backlinks           (added 2026-05-17 M020, default True — corpus-wide post-compile pass writes a sentinel-managed `## Backlinks` footer into every knowledge/<article>)
+  features.relativize_wikilinks            (added 2026-05-29, default True — corpus-wide post-compile pass rewrites every wikilink relative to its containing article so Obsidian resolves cross-article links from nested folders)
   limits.dream_tier1_recent_count          (added 2026-05-17 M016, default 20 — Tier 1 most-recent substrate count)
   limits.dream_tier1_digest_days           (added 2026-05-17 M016, default 7 — Tier 1 daily-digest day count)
   limits.dream_tier2_sample_count          (added 2026-05-17 M016, default 50 — Tier 2 weighted-sample size)
@@ -299,6 +300,11 @@ KEY_ADDITIONS: dict[str, dict[str, object]] = {
         # without a corpus-wide ripgrep. Idempotent. Flip false to skip the
         # sweep. Default True.
         "materialize_backlinks": True,
+        # Relativize-wikilinks pass (2026-05-29) — corpus-wide post-compile
+        # rewrite of every wikilink to a path relative to its containing
+        # article, so Obsidian resolves cross-article links from nested
+        # folders instead of creating empty stubs. Idempotent. Default True.
+        "relativize_wikilinks": True,
         # M019 operator-self-reports master switch (2026-05-17). When True,
         # `wiki study run` + `wiki analyze` are wired and flush.py piggybacks
         # for Pass-1 / Pass-2 fire. Default OFF — flip True after S05 lands

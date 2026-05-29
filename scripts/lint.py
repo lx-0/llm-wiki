@@ -30,8 +30,9 @@ from core.utils import (
     read_wiki_index,
     save_state,
     today_iso,
-    wiki_article_exists,
 )
+from core.links import canonical_slug, link_target, resolve_link  # noqa: E402
+from core.paths import ROOT_DIR  # noqa: E402  — vault root
 
 # ── Logging ──────────────────────────────────────────────────────────
 from core.console import setup_console_logging  # noqa: E402
@@ -57,25 +58,14 @@ def issue(severity: str, check: str, file: str, detail: str, auto_fixable: bool 
 
 # ── Structural checks ───────────────────────────────────────────────
 
-def _wikilink_target_exists(link: str) -> bool:
+def _wikilink_target_exists(link: str, source: Path) -> bool:
     """Resolve an Obsidian-style wikilink target against the vault.
 
-    Obsidian resolves `[[daily/2026-04-25.md]]` against vault root and
-    `[[concepts/foo]]` against any indexed dir. We mirror that:
-    in-knowledge bare names go through `wiki_article_exists`; substrate
-    paths (daily/, raw/) resolve as-given against `ROOT_DIR`.
+    A link in a markdown file is relative to that file (the relativize-wikilinks
+    convention). `core.links.resolve_link` is the single resolver: it tries the
+    target relative to ``source``, the vault root, and ``<vault>/knowledge/``.
     """
-    from core.paths import ROOT_DIR
-    if link.startswith(("daily/", "raw/")):
-        # Substrate path — resolve verbatim against vault root.
-        # Tolerate both with-suffix (`daily/X.md`) and without (`daily/X`).
-        candidate = ROOT_DIR / link
-        if candidate.exists():
-            return True
-        if not link.endswith(".md") and (ROOT_DIR / f"{link}.md").exists():
-            return True
-        return False
-    return wiki_article_exists(link)
+    return resolve_link(link_target(link), source, ROOT_DIR) is not None
 
 
 def check_broken_links() -> list[dict]:
@@ -89,7 +79,7 @@ def check_broken_links() -> list[dict]:
         content = article.read_text(encoding="utf-8")
         rel = str(article.relative_to(KNOWLEDGE_DIR))
         for link in extract_wikilinks(content):
-            if not _wikilink_target_exists(link):
+            if not _wikilink_target_exists(link, article):
                 issues.append(issue(
                     "error", "broken_link", rel,
                     f"Broken link: [[{link}]] — target does not exist",
@@ -169,28 +159,53 @@ def check_stale_articles() -> list[dict]:
     return issues
 
 
+def _outgoing_knowledge_slugs(article: Path) -> set[str]:
+    """Canonical knowledge-slugs an article links to, links resolved relative
+    to the article. Substrate (daily/raw) and dangling links are dropped."""
+    try:
+        content = article.read_text(encoding="utf-8")
+    except OSError:
+        return set()
+    slugs: set[str] = set()
+    for link in extract_wikilinks(content):
+        resolved = resolve_link(link_target(link), article, ROOT_DIR)
+        if resolved is None:
+            continue
+        slug = canonical_slug(resolved, KNOWLEDGE_DIR)
+        if slug:
+            slugs.add(slug)
+    return slugs
+
+
 def check_missing_backlinks() -> list[dict]:
     """Find articles that link to X but X doesn't link back."""
     issues = []
+    cache: dict[Path, set[str]] = {}
     for article in list_wiki_articles():
         if _is_fact(article):
             continue  # facts override; reciprocity not expected
-        content = article.read_text(encoding="utf-8")
         rel = str(article.relative_to(KNOWLEDGE_DIR))
-        source_link = rel.replace(".md", "").replace("\\", "/")
+        src_slug = canonical_slug(article, KNOWLEDGE_DIR)
+        if src_slug is None:
+            continue
 
-        for link in extract_wikilinks(content):
-            if link.startswith("daily/") or link.startswith("raw/"):
+        for link in extract_wikilinks(article.read_text(encoding="utf-8")):
+            resolved = resolve_link(link_target(link), article, ROOT_DIR)
+            if resolved is None:
                 continue
-            target_path = KNOWLEDGE_DIR / f"{link}.md"
-            if target_path.exists():
-                target_content = target_path.read_text(encoding="utf-8")
-                if f"[[{source_link}]]" not in target_content:
-                    issues.append(issue(
-                        "suggestion", "missing_backlink", rel,
-                        f"[[{source_link}]] links to [[{link}]] but not vice versa",
-                        auto_fixable=True,
-                    ))
+            tgt_slug = canonical_slug(resolved, KNOWLEDGE_DIR)
+            if tgt_slug is None or tgt_slug == src_slug:
+                continue  # substrate citation or self-link
+            back = cache.get(resolved)
+            if back is None:
+                back = _outgoing_knowledge_slugs(resolved)
+                cache[resolved] = back
+            if src_slug not in back:
+                issues.append(issue(
+                    "suggestion", "missing_backlink", rel,
+                    f"[[{src_slug}]] links to [[{tgt_slug}]] but not vice versa",
+                    auto_fixable=True,
+                ))
     return issues
 
 
@@ -422,13 +437,15 @@ def check_connection_depth() -> list[dict]:
             if end != -1:
                 body = text[end + 4:]
 
-        # Rule 1: ≥2 distinct knowledge-tree wikilinks.
-        # Daily/raw links count as substrate citations, not concept endpoints,
-        # so they're excluded from the cardinality check.
+        # Rule 1: ≥2 distinct knowledge-tree wikilinks. Endpoint cardinality is
+        # a structural property, not an existence one (broken_link owns that),
+        # so count lexically without resolving to disk. Substrate citations
+        # (daily/raw) are excluded regardless of relative depth — strip any
+        # leading `./` / `../` before testing the prefix (`../../daily/…`).
         knowledge_links: set[str] = set()
         for link in extract_wikilinks(body):
-            target = link.split("|", 1)[0].strip()  # strip Obsidian alias `[[X|label]]`
-            if target.startswith(("daily/", "raw/")):
+            target = link_target(link)
+            if target.lstrip("./").startswith(("daily/", "raw/")):
                 continue
             knowledge_links.add(target)
         if len(knowledge_links) < 2:

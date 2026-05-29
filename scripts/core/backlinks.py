@@ -5,77 +5,30 @@ Walks `<vault>/knowledge/`, builds the inverse-wikilink index
 ``## Backlinks`` footer into each article so AI agents reading the markdown
 directly get backlink information without a corpus-wide ripgrep.
 
+Links are stored relative to each article (a link in a markdown file is
+relative to that file — see `core.links`). The inverse index is keyed on
+*canonical* knowledge-slugs (`concepts/foo`); the footer renderer converts
+each incoming canonical slug back to a link relative to the article it is
+written into.
+
 Design intent: see `.ytstack/OFFICE-HOURS-backlinks-footer.md` (Approach B,
 chosen 2026-05-17). Sentinel pattern mirrors `collectors/calendar_collector.py`.
 """
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
+
+from core.links import (
+    canonical_slug,
+    outgoing_canonical_slugs,
+    relative_link_for_slug,
+)
 
 # Region the pass owns. Content above/below is operator-or-compiler territory
 # and must survive across runs.
 BACKLINKS_BEGIN = "<!-- backlinks:begin -->"
 BACKLINKS_END = "<!-- backlinks:end -->"
-
-# `[[slug]]`, `[[slug|alias]]`, `[[slug#heading]]`, `[[slug#heading|alias]]`.
-# The capture group keeps only the slug portion (before `#` or `|`).
-_WIKILINK_RE = re.compile(r"\[\[([^\]#|]+)(?:#[^\]|]*)?(?:\|[^\]]*)?\]\]")
-
-# Match fenced code blocks (``` or ~~~) so wikilinks inside are ignored.
-_FENCE_RE = re.compile(r"^(```|~~~)", re.MULTILINE)
-
-
-def _strip_frontmatter(text: str) -> str:
-    """Remove a leading YAML frontmatter block (``--- … ---``) if present."""
-    if not text.startswith("---\n"):
-        return text
-    end = text.find("\n---\n", 4)
-    if end < 0:
-        return text
-    return text[end + len("\n---\n"):]
-
-
-def _strip_code_fences(text: str) -> str:
-    """Drop content inside ``` or ~~~ fenced blocks (links there are illustrative)."""
-    out: list[str] = []
-    in_fence = False
-    for line in text.splitlines():
-        stripped = line.lstrip()
-        if stripped.startswith("```") or stripped.startswith("~~~"):
-            in_fence = not in_fence
-            continue
-        if not in_fence:
-            out.append(line)
-    return "\n".join(out)
-
-
-def _outgoing_slugs(text: str) -> set[str]:
-    """Return the set of slugs this article links to.
-
-    Skips frontmatter, code-fences, and the backlinks footer itself (so a
-    rewrite of an existing footer doesn't double-count the slugs inside it)."""
-    # Strip the managed region first — its content is computed output, not source.
-    begin = text.find(BACKLINKS_BEGIN)
-    end = text.find(BACKLINKS_END)
-    if begin >= 0 and end > begin:
-        text = text[:begin] + text[end + len(BACKLINKS_END):]
-    body = _strip_frontmatter(text)
-    body = _strip_code_fences(body)
-    return {m.group(1).strip() for m in _WIKILINK_RE.finditer(body) if m.group(1).strip()}
-
-
-def _article_slug(path: Path, knowledge_dir: Path) -> str:
-    """Path-relative slug as engine wikilinks see it.
-
-    Convention (matches `core.utils.wiki_article_exists`): a wikilink
-    `[[concepts/foo]]` resolves to `<knowledge>/concepts/foo.md`. So the
-    canonical slug of `knowledge/concepts/foo.md` is `concepts/foo`.
-    Articles directly under `knowledge/` (e.g. `index.md`) become bare
-    stems."""
-    rel = path.relative_to(knowledge_dir).with_suffix("")
-    return rel.as_posix()
 
 
 def _iter_articles(knowledge_dir: Path):
@@ -93,27 +46,37 @@ def build_backlinks_index(knowledge_dir: Path) -> dict[str, list[str]]:
     """Return ``{target_slug: sorted([source_slug, …])}`` for every article
     in ``knowledge_dir`` that has at least one incoming link.
 
-    Outgoing-edge extraction strips frontmatter + fenced code blocks. Self-links
-    are dropped. Multiple links from the same source to the same target collapse
-    to one entry. Stable ordering: incoming lists are alphabetically sorted."""
+    Outgoing links are resolved against each source article and canonicalized
+    to knowledge-slugs; only knowledge→knowledge edges count (daily/raw
+    substrate citations are dropped). Self-links are dropped; duplicates
+    collapse; incoming lists are alphabetically sorted."""
+    vault = knowledge_dir.parent
     incoming: dict[str, set[str]] = {}
     for path in _iter_articles(knowledge_dir):
-        src = _article_slug(path, knowledge_dir)
+        src = canonical_slug(path, knowledge_dir)
+        if src is None:
+            continue
         try:
             text = path.read_text(encoding="utf-8")
         except OSError:
             continue
-        for tgt in _outgoing_slugs(text):
+        for tgt in outgoing_canonical_slugs(
+            text, path, vault, knowledge_dir, BACKLINKS_BEGIN, BACKLINKS_END
+        ):
             if tgt == src:
                 continue
             incoming.setdefault(tgt, set()).add(src)
     return {tgt: sorted(srcs) for tgt, srcs in incoming.items()}
 
 
-def _render_footer(incoming_slugs: list[str]) -> str:
-    """Render the sentinel-managed `## Backlinks` block."""
+def _render_footer(incoming_slugs: list[str], article: Path, knowledge_dir: Path) -> str:
+    """Render the sentinel-managed `## Backlinks` block, each incoming
+    canonical slug as a link relative to ``article``."""
     lines = [BACKLINKS_BEGIN, "", "## Backlinks", ""]
-    lines.extend(f"- [[{slug}]]" for slug in incoming_slugs)
+    lines.extend(
+        f"- [[{relative_link_for_slug(slug, article, knowledge_dir)}]]"
+        for slug in incoming_slugs
+    )
     lines.append("")
     lines.append(BACKLINKS_END)
     return "\n".join(lines)
@@ -135,7 +98,9 @@ def _strip_existing_footer(text: str) -> str:
     return head + tail.lstrip("\n")
 
 
-def write_backlinks_footer(article_path: Path, incoming_slugs: list[str]) -> bool:
+def write_backlinks_footer(
+    article_path: Path, incoming_slugs: list[str], knowledge_dir: Path
+) -> bool:
     """Update (or remove) the sentinel-managed `## Backlinks` block in
     ``article_path``.
 
@@ -156,7 +121,7 @@ def write_backlinks_footer(article_path: Path, incoming_slugs: list[str]) -> boo
         return True
 
     body = stripped.rstrip()
-    footer = _render_footer(incoming_slugs)
+    footer = _render_footer(incoming_slugs, article_path, knowledge_dir)
     new_text = (body + "\n\n" + footer + "\n") if body else (footer + "\n")
     if new_text == original:
         return False
@@ -178,8 +143,10 @@ def run_backlinks_pass(knowledge_dir: Path) -> dict[str, int]:
     written = 0
     for path in _iter_articles(knowledge_dir):
         seen += 1
-        slug = _article_slug(path, knowledge_dir)
+        slug = canonical_slug(path, knowledge_dir)
+        if slug is None:
+            continue
         incoming = index.get(slug, [])
-        if write_backlinks_footer(path, incoming):
+        if write_backlinks_footer(path, incoming, knowledge_dir):
             written += 1
     return {"articles_seen": seen, "articles_written": written}

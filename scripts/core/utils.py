@@ -136,12 +136,6 @@ def extract_wikilinks(content: str) -> list[str]:
     return re.findall(r"\[\[([^\]]+)\]\]", content)
 
 
-def wiki_article_exists(link: str) -> bool:
-    """Check if a wikilinked article exists on disk."""
-    path = KNOWLEDGE_DIR / f"{link}.md"
-    return path.exists()
-
-
 # ── Wiki content helpers ──────────────────────────────────────────────
 
 WIKI_SUBDIRS = [CONCEPTS_DIR, CONNECTIONS_DIR, QA_DIR, PEOPLE_DIR, PROJECTS_DIR, AREAS_DIR, FACTS_DIR, TAKES_DIR]
@@ -360,14 +354,23 @@ def list_raw_files() -> list[Path]:
 # ── Index helpers ─────────────────────────────────────────────────────
 
 def count_inbound_links(target: str, exclude_file: Path | None = None) -> int:
-    """Count how many wiki articles link to a given target."""
+    """Count how many wiki articles link to a given canonical target slug
+    (``concepts/foo``). Links are relative to their source file, so a literal
+    string match would miss `[[foo]]` / `[[../concepts/foo]]`; resolve each
+    link and compare canonical slugs instead."""
+    from core.links import canonical_slug, link_target, resolve_link
+    from core.paths import ROOT_DIR
+
     count = 0
     for article in list_wiki_articles():
         if article == exclude_file:
             continue
         content = article.read_text(encoding="utf-8")
-        if f"[[{target}]]" in content:
-            count += 1
+        for link in extract_wikilinks(content):
+            resolved = resolve_link(link_target(link), article, ROOT_DIR)
+            if resolved is not None and canonical_slug(resolved, KNOWLEDGE_DIR) == target:
+                count += 1
+                break
     return count
 
 

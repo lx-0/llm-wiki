@@ -431,6 +431,12 @@ features:
   # Flip false to skip the sweep (e.g. to compare compile timing without
   # the O(corpus) extra read/write).
   materialize_backlinks: true
+  # Corpus-wide post-compile pass that rewrites every wikilink to a path
+  # relative to its containing article. Obsidian resolves a slash-bearing
+  # link against the vault root, so the legacy `[[concepts/foo]]` form
+  # (relative to knowledge/) created empty stubs when clicked from a nested
+  # article. Idempotent — already-relative links produce zero writes.
+  relativize_wikilinks: true
   # M019 operator-self-reports surface master switch. When true, `wiki study
   # run` and `wiki analyze` are wired and the flush.py piggyback orchestration
   # (per-study Pass-1 after each run; cross-study Pass-2 on its own schedule,

@@ -147,8 +147,9 @@ def test_migrate_config_file_round_trip(tmp_path):
     # +5 personal.voice_transcribe_* (M026 audio ingest), 2026-05-28
     # +1 limits.voice_punctuate_timeout_s (M026 hotfix), 2026-05-28
     # +1 personal.inbox_bridges (inbox-bridge rsync mirror), 2026-05-28
-    # = 70 changes (no drops — operator has no orphan personal.* fields)
-    assert len(changes) == 70, f"got {len(changes)} changes: {changes}"
+    # +1 features.relativize_wikilinks (relativize-wikilinks pass), 2026-05-29
+    # = 71 changes (no drops — operator has no orphan personal.* fields)
+    assert len(changes) == 71, f"got {len(changes)} changes: {changes}"
 
     reparsed = yaml.safe_load(new_text)
     # piggyback side
@@ -238,6 +239,7 @@ def test_migrate_config_no_change_when_fully_current(tmp_path):
             "suggestions_source_globs": ["raw/email/*.md"],
             "compile_callback_gate": True,
             "materialize_backlinks": True,
+            "relativize_wikilinks": True,
             "operator_reports": False,
             "concept_reconciliation": False,
             "health_trends": False,
@@ -392,6 +394,7 @@ def test_migrate_additions_idempotent():
             "suggestions_source_globs": ["raw/email/*.md"],
             "compile_callback_gate": True,
             "materialize_backlinks": True,
+            "relativize_wikilinks": True,
             "operator_reports": False,
             "concept_reconciliation": False,
             "health_trends": False,

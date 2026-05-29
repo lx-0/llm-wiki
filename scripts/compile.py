@@ -680,6 +680,19 @@ async def main() -> None:
             bl_stats["articles_seen"], bl_stats["articles_written"],
         )
 
+    # Relativize wikilinks corpus-wide so cross-article links resolve in
+    # Obsidian from nested folders (a link in a markdown file is relative to
+    # that file). Runs after backlinks so freshly-written footers are
+    # normalized too. Idempotent — already-relative links produce zero writes.
+    if CONFIG.features.relativize_wikilinks:
+        from core.links import run_relativize_pass
+        rl_stats = run_relativize_pass(KNOWLEDGE_DIR, ROOT_DIR)
+        log.info(
+            "  relativize pass: %d articles seen · %d rewritten · %d links",
+            rl_stats["articles_seen"], rl_stats["articles_written"],
+            rl_stats["links_rewritten"],
+        )
+
     # Append-only history event so Dashboard P2 charts can render time series.
     if compiled_count > 0:
         from core.utils import append_history

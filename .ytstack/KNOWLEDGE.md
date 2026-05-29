@@ -2270,3 +2270,14 @@ Reusable lessons:
 Pop *only* if the check passes; otherwise leave the stash unpopped and print the recovery hint. `git apply` is stricter than the 3-way merge `stash pop` would do, so the check errs **safe** (occasionally refuses a pop that would have worked → leaves it for manual `stash pop`), and it NEVER produces a conflicted tree. Verified empirically across no-overlap (clean re-apply), overlapping-hunk (left unpopped, tree clean, stash intact), staged-only (detected via `diff --cached`), and clean-tree (no false positive).
 
 **Two more guards in the same flow:** (1) the stash offer is TTY-gated (`[[ ! -t 0 ]]` → die, never `read`) because `wiki update` is also dispatched non-interactively (dashboard health-fix button, `core/health.py`); a bare `confirm` would block on EOF semantics. (2) if the pull itself fails after a stash (network / non-ff), pop it straight back — HEAD didn't move so it re-applies cleanly — so a failed update never leaves the operator's changes hidden.
+
+## Obsidian wikilink resolution: bare = shortest-path, slash = source-relative AND vault-absolute (2026-05-29)
+
+Obsidian does NOT resolve `[[concepts/foo]]` "against any indexed dir" (the false assumption that was baked into `lint.py` + `backlinks.py` + `utils.wiki_article_exists`). The real rule:
+
+- **Bare name** `[[foo]]` → shortest-path basename match anywhere in the vault.
+- **Slash-bearing** `[[a/b]]` → treated as a **path**, tried both source-relative (`<source-dir>/a/b`) and vault-absolute (`<vault>/a/b`, vault root = where `.obsidian/` lives). First hit wins; miss → offers to create an empty stub on click.
+
+That dual behavior reconciles every observation: from a nested `knowledge/<type>/x.md`, `[[concepts/foo]]` missed both bases (→ empty stub — the reported bug); `[[daily/d.md]]` hit vault-absolute (daily/ is a real top-level folder); `[[../people/alex]]` hits source-relative; and `index.md`'s `[[concepts/foo]]` hits source-relative because index.md sits directly in `knowledge/`. **Therefore the only form that resolves from every location is relative-to-the-file** — which is why links are now stored relative (`core.links`). When matching links in code, never literal-string-match a canonical form (`f"[[concepts/foo]]" in content`) — it misses `[[foo]]` and `[[../concepts/foo]]`; resolve via `core.links.resolve_link` + compare `canonical_slug` (fixed `count_inbound_links`, the lint checks, the backlinks index this way).
+
+**Verification trap avoided:** the relative-`../`-resolves-in-Obsidian fact is the one thing un-testable from the engine side — confirmed by operator click before migrating 17k links, not assumed. The migration's own idempotency (second pass = 0 rewrites) is the proof that every rewritten link resolves engine-side: `relativize_text` only rewrites a link whose target it located on disk.

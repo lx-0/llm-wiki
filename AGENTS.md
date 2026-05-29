@@ -217,6 +217,12 @@ Every LLM call is metered in TOKENS, keyed by `(provider, model)` — never doll
 3. Wire it into `agent_payload()`'s case statement.
 4. Status table, install/uninstall flows, and detection logic pick it up automatically.
 
+### Wikilinks (relative-to-file convention)
+
+A link in a markdown file is relative to that file. Obsidian resolves a slash-bearing wikilink against the **vault root** (`<vault>/`, where `.obsidian/` lives), so the historic `[[concepts/foo]]` form — relative to `knowledge/`, not the article — pointed at the non-existent `<vault>/concepts/foo.md` and Obsidian offered to create an empty stub when clicked from a nested article. Links are now stored **relative to their containing article**: same-bucket `[[foo]]`, cross-bucket `[[../people/alex]]`, substrate `[[../../daily/2026-05-15.md]]`.
+
+`core.links` is the single resolver (`resolve_link`, `canonical_slug`, `relativize_text`). When **authoring** links (prompts, `wiki pin`, hand-edits) use the unambiguous full-path form `[[knowledge/<type>/<slug>]]` or `[[daily/…]]`/`[[raw/…]]` — the `relativize_wikilinks` post-compile pass (gated by `features.relativize_wikilinks`, default on) rewrites every link to the correct relative path. Don't hand-compute `../`. `core.backlinks` renders footers relative; `lint` resolves source-relative. `index.md` is exempt (its links already resolve source-relative from `knowledge/`). One-off corpus migration: `scripts/migrations/relativize_wikilinks.py --vault <vault> --apply`.
+
 ### Path handling
 
 Scripts use `Path(__file__).resolve().parent` for `SCRIPTS_DIR`, `.parent.parent` for `WIKI_DIR`, `.parent.parent.parent` for the vault root. After `install.sh` clones the repo into `<vault>/.wiki/`, this resolves correctly. Don't hardcode absolute paths.

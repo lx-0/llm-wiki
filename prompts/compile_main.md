@@ -232,7 +232,7 @@ ${source_content}
 6. **Append to `.wiki/logs/operations.md`** — add a dated entry summarizing what was compiled:
    `- ${now}: Compiled `${source_path}` → [list of articles created/updated]`
 
-7. Use `[[wikilinks]]` to cross-reference between articles inside `knowledge/`, and to cite durable substrate sources (`daily/*.md`, `raw/notes/*`, `raw/articles/*`, `raw/transcripts/*`).
+7. Use `[[wikilinks]]` to cross-reference between articles inside `knowledge/`, and to cite durable substrate sources (`daily/*.md`, `raw/notes/*`, `raw/articles/*`, `raw/transcripts/*`). **Write the full-path form** `[[knowledge/<type>/<slug>]]` (e.g. `[[knowledge/concepts/foo]]`, `[[knowledge/people/alex]]`) — do not hand-compute relative `../` paths. A deterministic post-compile pass rewrites every link to a path relative to its containing article (Obsidian resolves a slash-bearing link against the vault root, so the relative form is what actually resolves from a nested article). You author the unambiguous absolute form; the engine relativizes it.
 
    **`compile_role: source-and-final` pages** (e.g. `raw/notes/longform/yesterday-strategy-2026.md`) are operator-authored long-form documents that the engine indexes but does **not** distill. They appear in `knowledge/index.md` by their full pathname. When you reference one:
    - **Cite by pathname** (`[[raw/notes/longform/yesterday-strategy-2026]]`) — do NOT create a separate `knowledge/concepts/yesterday-strategy.md` for the same content (the source-and-final page IS the final form).

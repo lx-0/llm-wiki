@@ -578,6 +578,14 @@ class Features:
     # Flip false to skip the sweep (e.g. to compare compile timing without
     # the O(corpus) extra read/write). Default True. M020, 2026-05-17.
     materialize_backlinks: bool = True
+    # Corpus-wide post-compile pass that rewrites every wikilink to a path
+    # relative to its containing article (a link in a markdown file is
+    # relative to that file). Obsidian resolves a slash-bearing link against
+    # the vault root, so the legacy `[[concepts/foo]]` form (relative to
+    # knowledge/) created empty stubs when clicked from a nested article.
+    # Idempotent — already-relative links produce zero writes. Runs right
+    # after the backlinks pass. Default True. 2026-05-29.
+    relativize_wikilinks: bool = True
     # M019 master switch — operator-self-reports surface. When True,
     # `wiki study run` / `wiki analyze` subcommands are wired and the
     # piggyback orchestration (Pass-1 per-study after each run; Pass-2
