@@ -1164,6 +1164,21 @@ EOF
     info "  wiki hooks install      ${C_DIM}# to refresh agent hook configs${C_RESET}"
   fi
 
+  # Sync Python deps so pyproject.toml changes (new dependency, version bump)
+  # actually land in the vault's venv. Without this, an engine pull that adds
+  # a new `dependencies = [...]` entry is invisible to runtime: the venv stays
+  # on the prior resolution, imports of the new package silently fail through
+  # whatever ImportError-fallback the calling code has, and operators see
+  # features that "work in the engine repo but not in their vault".
+  # Incident 2026-05-29: pillow was added to pyproject.toml so the pictures
+  # collector's EXIF extractor could read JPEG metadata; vault venvs synced
+  # before that update returned `{}` from `_parse_exif()` because PIL wasn't
+  # installed, and the device.software field silently never landed.
+  info "Syncing Python dependencies (uv sync, idempotent) …"
+  if ! uv sync --project "$WIKI_DIR" --quiet; then
+    warn "uv sync reported errors — runtime imports may fail. Run 'uv sync --project $WIKI_DIR' manually."
+  fi
+
   # Run config-schema migration unconditionally — idempotent, prints
   # "no change" when the vault is already on the current schema, prints
   # the rename/add/drop diff and applies it otherwise. Keeps the vault's
