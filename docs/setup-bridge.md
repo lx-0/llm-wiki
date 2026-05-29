@@ -77,6 +77,21 @@ personal:
   voice_inbox:   "~/wiki-inbox-local/voice"               # ← bridge target
 ```
 
+If you already have an `*_inbox` configured (e.g. an iCloud-Drive folder)
+and want the bridge mirror to feed into the same collector without
+displacing the existing source, use the multi-path list form (available
+on `picture_inbox` as of 2026-05-28):
+
+```yaml
+personal:
+  picture_inbox:
+    - "~/Library/Mobile Documents/com~apple~CloudDocs/inbox/pictures"   # existing iCloud
+    - "~/wiki-inbox-local/screenshots-tablet"                            # new bridge target
+```
+
+The pictures collector scans both paths each run and aggregates them
+into one batch report.
+
 > Note on substrate classification: the example folder name above is
 > `screenshots-tablet`, but Android-style screenshots
 > (`Screenshot_YYYYMMDD_HHMMSS_<app>.jpg`) match the **screenshots**

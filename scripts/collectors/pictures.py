@@ -53,11 +53,30 @@ TIMEOUT = float(CONFIG.limits.screenshot_timeout_seconds)
 THUMB_WIDTH = 384  # px; matches scan_screenshots — Retina-source compromise
 
 
-def _inbox_path() -> Path | None:
-    raw = (CONFIG.personal.picture_inbox or "").strip()
-    if not raw:
-        return None
-    return Path(raw).expanduser()
+def _inbox_paths() -> list[Path]:
+    """Resolve `personal.picture_inbox` to a list of Path objects.
+
+    Accepts either the legacy single-string form or the multi-path list
+    form (2026-05-28+). Empty strings / blanks / missing entries are
+    skipped silently — the operator can leave dead entries in the list
+    without breaking the scan.
+    """
+    raw = CONFIG.personal.picture_inbox
+    if isinstance(raw, str):
+        items = [raw]
+    elif isinstance(raw, list):
+        items = raw
+    else:
+        return []
+    out: list[Path] = []
+    for entry in items:
+        if not isinstance(entry, str):
+            continue
+        stripped = entry.strip()
+        if not stripped:
+            continue
+        out.append(Path(stripped).expanduser())
+    return out
 
 
 def _max_per_run() -> int:
@@ -364,22 +383,33 @@ class PicturesCollector:
     )
 
     def is_configured(self) -> bool:
-        inbox = _inbox_path()
-        return inbox is not None and inbox.exists()
+        return any(p.exists() for p in _inbox_paths())
 
     def run(self, *, dry_run: bool = False, incremental: bool = False) -> RunResult:
-        inbox = _inbox_path()
-        if inbox is None:
+        inboxes = _inbox_paths()
+        if not inboxes:
             return RunResult(
                 message="picture_inbox not configured (personal.picture_inbox is empty)"
             )
-        if not inbox.exists():
-            return RunResult(message=f"picture_inbox not found: {inbox}")
 
         tz = ZoneInfo(TIMEZONE)
-        sources = _scan_inbox(inbox)
+        sources: list[Path] = []
+        missing: list[Path] = []
+        for inbox in inboxes:
+            if not inbox.exists():
+                missing.append(inbox)
+                continue
+            sources.extend(_scan_inbox(inbox))
+        # Re-sort across inboxes by mtime so the batch report reads
+        # chronologically regardless of which inbox a file came from.
+        sources.sort(key=lambda p: p.stat().st_mtime)
+
+        if missing:
+            log.warning("picture_inbox: %d configured path(s) not found: %s",
+                        len(missing), ", ".join(str(p) for p in missing))
         if not sources:
-            return RunResult(message=f"no new pictures in {inbox}")
+            label = inboxes[0] if len(inboxes) == 1 else f"{len(inboxes)} configured inbox(es)"
+            return RunResult(message=f"no new pictures in {label}")
 
         limit = _max_per_run()
         if limit and len(sources) > limit:
@@ -387,9 +417,10 @@ class PicturesCollector:
             sources = sources[:limit]
 
         if dry_run:
+            label = inboxes[0] if len(inboxes) == 1 else f"{len(inboxes)} inbox(es)"
             return RunResult(
                 files_skipped=len(sources),
-                message=f"[dry-run] would ingest {len(sources)} picture(s) from {inbox}",
+                message=f"[dry-run] would ingest {len(sources)} picture(s) from {label}",
             )
 
         if not ollama_client.is_reachable():

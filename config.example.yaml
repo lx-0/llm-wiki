@@ -514,8 +514,18 @@ personal:
   # goes through the gemma4 vision pipeline before write. Accepts .jpeg /
   # .jpg / .png / .heic. Writes a HOME sidecar + a batch report under
   # raw/notes/pictures/, then moves the source under
-  # <picture_inbox>/.processed/. Typical setup: iOS Shortcut writing into
+  # raw/inbox-mobile/pictures/. Typical setup: iOS Shortcut writing into
   # an iCloud Drive folder. Empty = disabled.
+  #
+  # Also accepts a list of paths (2026-05-28+) — operator points the
+  # collector at multiple source folders at once (e.g. an iCloud-Drive
+  # folder + an `inbox_bridges`-mirrored Google Drive folder). Per-run
+  # scan walks every configured path; results aggregate into one batch
+  # report; missing paths log a WARNING and are skipped without aborting
+  # the others. Example multi-path:
+  #   picture_inbox:
+  #     - "~/Library/Mobile Documents/com~apple~CloudDocs/inbox/pictures"
+  #     - "~/wiki-inbox-local/screenshots-tablet"
   picture_inbox: ""
   # 2026-05-28 inbox-bridge. Mirror folders from network-mounted / sandbox-
   # restricted paths (e.g. ~/Library/CloudStorage/GoogleDrive-…) into local

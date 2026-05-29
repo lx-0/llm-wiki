@@ -42,6 +42,22 @@ personal:
   # or: picture_inbox: "~/Pictures/llm-wiki-inbox"
 ```
 
+As of 2026-05-28 `picture_inbox` also accepts a **list** of paths —
+useful when combining an iCloud-Drive folder with an
+[`inbox_bridges`](setup-bridge.md)-mirrored Google Drive folder:
+
+```yaml
+personal:
+  picture_inbox:
+    - "~/Library/Mobile Documents/com~apple~CloudDocs/inbox/pictures"
+    - "~/wiki-inbox-local/screenshots-tablet"
+```
+
+Every path is scanned per run, results aggregate into a single batch
+report (ordered chronologically by file mtime across sources). Paths
+that don't exist (Drive offline, bridge hasn't run yet) log a WARNING
+and are skipped without aborting the others.
+
 The piggyback is on by default with a 6 h cooldown and a 20-images-per-run
 cap. To tune or disable:
 

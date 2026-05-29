@@ -718,7 +718,14 @@ class Personal:
     # report under `raw/notes/pictures/`. Mirrors the screenshot collector
     # but sources from a separate, mobile-friendly inbox (iCloud Shortcut
     # target etc.). Empty string disables collectors/pictures.py.
-    picture_inbox: str = ""
+    #
+    # As of 2026-05-28 also accepts a list[str] of paths — operator points
+    # at multiple inbox directories simultaneously (e.g. iCloud Drive +
+    # an inbox_bridges-mirrored Google Drive folder). All paths are
+    # scanned per run, results aggregate into one batch report. Empty
+    # list / empty string / list of empty strings all disable the
+    # collector (graceful agnostic).
+    picture_inbox: str | list[str] = ""
     # 2026-05-28 inbox-bridge. List of {remote, local, mode?, enabled?} dicts
     # describing folders to mirror from network-mounted / sandbox-restricted
     # paths (e.g. `~/Library/CloudStorage/GoogleDrive-…/wiki-inbox/pictures/`)
