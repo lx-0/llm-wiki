@@ -16,6 +16,7 @@ Pick one when "next?" comes up and the operator wants a concrete tick.
 - **`voice-openwhispr.md`** — OpenWhispr v1.7.0 stores transcripts in SQLite, not files. Reader-kind for voice collector.
 - **`flush-orphan-recovery.md`** — recovery for orphan flushes (check current state).
 - **`preflight-guard-rollout.md`** — extend pre-flight prompt-size guard to remaining LLM call sites.
+- **`system-level-scheduler.md`** — piggybacks fire from Claude-Code SessionEnd today; a day without Claude Code = no pipeline activity. LaunchAgent / systemd-timer-driven scheduler so vault stays current even when operator doesn't open Claude Code. Surfaced via inbox-bridge wedge 2026-05-29. M-shaped (touches flush.py + new CLI verbs + per-platform install scripts).
 
 ## 🌱 Medium — design clarified, blocked or waiting on signal
 
