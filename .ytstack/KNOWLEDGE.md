@@ -2302,3 +2302,48 @@ Full rationale + benchmarks: DECISIONS 2026-05-28; `.ytstack/AD-HOC-voice-audio-
 - `Path('/x/y/zz').relative_to('/x/y/z')` raises `ValueError` → continue / deny.
 
 So a file-as-root behaves as **"this exact file is writable, nothing else under the same dir"**. Used in 2026-05-28's log relocation: `[ROOT_DIR / "knowledge", LOG_FILE]` lets agents Write/Edit anywhere under `knowledge/` AND specifically `.wiki/logs/operations.md`, while keeping `.wiki/state/` / `.wiki/sessions/` / `.wiki/logs/flush.log` denied. Cheaper than carving out a sub-directory just for the audit trail.
+
+## macOS TCC blocks Claude-Code-spawned subprocesses on `~/Library/CloudStorage/` (2026-05-29, bridge slice)
+
+Anything Claude Code spawns — Bash tool subprocesses, SessionEnd-piggyback collectors, `wiki collect` runs fired from a hook — inherits Claude Code's TCC scope. On macOS that scope by default excludes `~/Library/CloudStorage/` (Google Drive, iCloud Drive, Dropbox, OneDrive mounts), `~/Library/Mail/`, `~/Library/Messages/`, and TimeMachine volumes. The operator's user shell has a different (usually wider) TCC scope. So `ls "/Users/<u>/Library/CloudStorage/GoogleDrive-<addr>/My Drive/wiki-inbox/pictures/screenshots-tablet"` works fine when the operator types it in iTerm but fails with `Operation not permitted` when Claude Code's Bash invokes the same command, and the same with `rsync` etc.
+
+Implication for the engine: every collector / pipeline step that needs to read from CloudStorage must run via the operator's shell or a LaunchAgent (which also runs as the user via launchd and gets TCC-permitted scope). Piggyback-from-Claude-Code is structurally TCC-blocked on those paths. That's the architectural premise behind the `inbox_bridges` mirror: do the TCC-permitted file move in a separate process (operator-shell or LaunchAgent), then let TCC-blocked piggybacks read from the post-mirror local path.
+
+Diagnostic: `rsync exit 23` with `error: open <path>: Operation not permitted` from a subprocess that runs fine in the user terminal = TCC denial, not auth / network / disk issue.
+
+## `Path.exists()` and `rsync open()` can disagree on TCC (2026-05-29)
+
+`Path.exists()` returned True on the lxw Drive folder when called from Claude Code; the subsequent `rsync open()` on the same path returned EACCES. The TCC system grants directory-entry stat (so the dir "exists") but blocks read open() on its contents. The bridge code's `if not remote.exists(): return skipped:remote_missing` therefore passes the gate and the rsync call gets the actual denial — which is the correct surfacing (`failed: rsync_exit_23` is more informative than a generic "skipped because remote missing"). Don't try to "fix" the apparent inconsistency by replacing `exists()` with `os.access(R_OK)` — that's a worse heuristic; let rsync produce the real error.
+
+## `wiki update` skipped `uv sync` — silent feature-disable on dep changes (2026-05-29, fix in `fd47c5f`)
+
+`cmd_update` pulled the engine git but never refreshed the venv. New entries in `dependencies = [...]` therefore landed in the vault's `pyproject.toml` without ever installing into `.wiki/.venv/`. Calling code that imported the missing package fell through whatever ImportError fallback it had; runtime appeared healthy, the feature silently never ran.
+
+How it surfaced: pictures-EXIF extraction was off on lxw despite the live extractor wired in. `_parse_exif()` returns `{}` on `ImportError: PIL` — designed for the case where Pillow is genuinely unavailable, but indistinguishable from "Pillow is declared but vault venv is stale."
+
+Lesson: a graceful-fallback `try/except ImportError → return empty` is fine when the dep is truly optional, but is a footgun for "engine declares a dep + ships a feature that depends on it" — the operator can't tell from runtime behavior whether the feature is off-because-knob, off-because-bug, or off-because-stale-venv. Two-part fix shipped:
+
+1. Engine `pyproject.toml` MUST declare any package the engine imports (no relying on transitive availability — uv resolutions differ between engine and vault venvs). Pillow was the smoking gun; audit other graceful-import-fallback sites if they show silent-off behavior on lxw.
+2. `wiki update` MUST `uv sync` between pull and migration so pyproject changes actually land.
+
+Reproduce: `grep -rn "except ImportError" scripts/` is the surface to audit for the same pattern.
+
+## Bridge per-key idempotence beats coarse marker check (2026-05-29, fix in `2e45954`)
+
+`scripts/backfill_picture_metadata.py` originally short-circuited any sidecar that had ANY of `{device, location, shot, app_context}` keys, on the assumption "if one is there, backfill ran." Wrong for the case where the first backfill ran without Pillow installed: only filename-derived `app_context` landed, EXIF `device` did not, and a re-run after Pillow ships would skip the file because `app_context` was already present.
+
+The per-key merge `if key in fm: continue` does the right thing on its own — present keys preserved, missing keys added — without needing a coarse early-skip. The early-skip was a redundant performance optimisation that broke convergence.
+
+General pattern: backfill scripts should be idempotent per-key, not per-file, when extraction is multi-source and any source can be transiently unavailable.
+
+## Picture-metadata extraction split: EXIF + filename are orthogonal, both belong in the sidecar (2026-05-29)
+
+Android tablet screenshots carry almost no EXIF (only `Software` with a device-code hint — `Android UP1A.231005.007.X200XXS3DXD5` for a Samsung Galaxy Tab S9 FE; no `DateTimeOriginal`, no GPS). Their **filename** carries the capture timestamp AND the app context: `Screenshot_YYYYMMDD_HHMMSS_<AppContext>.jpg` ("O'Reilly", "ReVanced Extended", "Netflix", "Markor"). For real camera photos (iPhone JPEGs, dedicated cameras) the inverse is true: filenames are opaque (`IMG_1234.JPG`), EXIF is rich (GPS, Make/Model, FNumber/ExposureTime/ISO/FocalLength).
+
+Build the extractor as two orthogonal helpers (`_parse_exif` + `_parse_android_filename`) and merge with a clear priority order (EXIF DateTimeOriginal > filename > mtime). Don't try to make one source carry both; let each shine where it shines. This means HEIC (no EXIF without `pillow-heif`) still gets useful metadata if the iOS Shortcut writes a filename pattern, and Android screenshots get useful metadata even though EXIF is bare. iCloud-Pictures sidecars (`2026-05-17-*.jpeg`) yield empty extraction in practice — iOS Shortcut / AirDrop pipeline strips EXIF and the filename pattern is just a date. That's correct fail-soft.
+
+## Bridge-LaunchAgent is the first instance of a general "session-decoupled scheduler" pattern (2026-05-29, backlog `system-level-scheduler.md`)
+
+The bridge ships a LaunchAgent template because the bridge can't piggyback (Claude Code spawned, TCC-blocked). But the bridge is only the FIRST hop of an N-hop pipeline — the substrate collectors that consume the mirror, the lint/dream/optimize-claude-md piggybacks downstream, all still depend on Claude Code SessionEnd to fire. Operator observation: "wenn ich nicht mit claude code einen tag arbeite, wird auch nichts gepiggybacked." Pipeline silently stops on idle days.
+
+Generalised fix is a system-level scheduler (LaunchAgent / systemd-timer) that fires `wiki flush --piggybacks-only` (new flag, doesn't exist yet) on a cadence independent of Claude Code session boundary. Three shape options surfaced in the backlog (single sweep / per-piggyback fan-out / wiki-managed daemon); single-sweep is the leanest first slice. M-shaped, not ad-hoc. Pending operator green-light.

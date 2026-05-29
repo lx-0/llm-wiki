@@ -1,7 +1,7 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-05-29T00:00:00+0200
+last_updated: 2026-05-29T19:30:00+0200
 current_milestone: M025
 active_slice: S01
 active_task: none
@@ -10,6 +10,8 @@ parallel_milestones: [M021]
 ---
 
 # State
+
+**Recent ad-hoc (2026-05-29):** Three-arc Drive-intake slice + two infra fixes. **(1) Inbox bridge** (`9e544bb`): `wiki bridge sync` rsync-mirrors files from sandbox-restricted source paths (`~/Library/CloudStorage/GoogleDrive-…`) into local non-restricted paths the substrate collectors then folder-watch. Substrate-agnostic per-mapping config under `personal.inbox_bridges` ({remote, local, mode?, enabled?, name?}). mode=move drains the remote on every sync (`rsync --remove-source-files`) so downstream archive-move dedup doesn't re-ingest. LaunchAgent template ships at `templates/.launchd/com.llm-wiki.bridge.plist.template`. Solves the macOS-TCC trap where Claude-Code-spawned piggybacks silently fail on CloudStorage paths. **(2) `picture_inbox: str \| list[str]`** (`e9a7fe9`): type-relaxation, single-source ops untouched, multi-source ops scan all paths per run, missing paths log WARNING + are skipped without aborting the others — unblocks bridge consumers that already had a wired `picture_inbox`. **(3) Picture metadata extraction** (`d083b45` + `5024f1d` + `2e45954` + `fd47c5f`): new `scripts/collectors/_picture_metadata.py` combines Pillow EXIF (JPEG/PNG: GPS as decimal degrees, Make/Model/Software, shot params) + Android-screenshot filename regex (`Screenshot_YYYYMMDD_HHMMSS_<App>.jpg` → captured_at + app_context). Lands in sidecar frontmatter as `captured_at`/`device`/`location`/`shot`/`app_context`. captured_at priority: EXIF DateTimeOriginal > filename > mtime. `wiki backfill picture-metadata` upgrades existing sidecars, per-key idempotent. Surfaced two pre-existing footguns: pillow was a transitive dep of yt-dlp in the engine venv but not declared (vault venv missed it → `_parse_exif` silently returned `{}`) — now explicit; AND `wiki update` git-pulled but never `uv sync`'d, so pyproject changes silently never reached vault venvs — now syncs after pull. Backlog: `system-level-scheduler.md` — piggybacks fire from Claude Code SessionEnd, so idle days = silent pipeline stop; LaunchAgent / systemd-timer-driven scheduler is M-shaped follow-up. Detail: `.ytstack/AD-HOC-drive-inbox-bridge-SUMMARY.md` + `.ytstack/AD-HOC-pictures-multi-path-and-metadata-SUMMARY.md`; DECISIONS 2026-05-29 (4 entries); KNOWLEDGE.md TCC/wiki-update/per-key-idempotence sections.
 
 **Recent ad-hoc (2026-05-28):** Voice collector grows **audio transcription via whisper.cpp** — m4a / mp4 / mp3 / wav / flac / ogg / aac dropped into `voice_inbox` are transcribed locally by `_transcribe_audio()` (whisper-cli via subprocess; m4a/mp4/aac route through ffmpeg first → 16 kHz mono PCM s16). Transcript flows downstream same as text dictation (optional `voice_punctuate` Ollama pass, daily rollup, canonical raw/voice/*.md). 5 new `personal.voice_transcribe_*` knobs + `limits.voice_punctuate_timeout_s=120` (lifted from hardcoded 30 s — gemma4:e4b cold-call routinely hits 36 s). Fail-soft: missing binary / model / ffmpeg leaves the file in inbox and surfaces as health-check `voice-audio-setup` WARNING. Commits `0b147bb` + `adf5fcd` (on origin; lxw operator-set + live-verified — two queued m4a → two raw/voice/*.md with `raw_transcript:` audit trail). Detail: `.ytstack/AD-HOC-voice-audio-ingest-SUMMARY.md`; DECISIONS 2026-05-28; backlog/voice-intake.md "Shipped" block.
 

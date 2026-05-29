@@ -1435,3 +1435,75 @@ Commits 4647d47 / 2c4335c+aad8541 / e6c04df / e9a44e5.
 **Reason:** A link in a markdown file is relative to that file — the renderer-independent semantic, and the one the operator wants. C risks cross-bucket basename collisions (`fleet`, `ytstack` exist in both concepts/ and projects/); relative paths disambiguate for free. B is unambiguous but not "relative to the file." D can't apply uniformly (would break the working `daily/`+`raw/` vault-absolute links) and assumes Obsidian resolves `../` (verified it does — operator clicked). LLMs compute relative paths unreliably, so authors still write the absolute `[[knowledge/<type>/<slug>]]` form and a deterministic post-compile pass relativizes — decoupling LLM fallibility from on-disk correctness. The migration resolves every link against the real filesystem and only rewrites ones whose target exists, so "all links resolve" is true by construction (236 left untouched = pre-existing dangling refs + bare image embeds, not regressions).
 **Supersedes:** the implicit "`[[concepts/foo]]` resolves against any indexed dir" assumption baked into `lint.py` + `backlinks.py` + `utils.wiki_article_exists`.
 **Linked artifacts:** `scripts/core/links.py` (new — single resolver: `resolve_link` / `canonical_slug` / `relativize_text` / `run_relativize_pass`), `scripts/core/backlinks.py` (canonical-slug index + relative footers), `scripts/lint.py` (source-relative `check_broken_links` / `check_missing_backlinks` / connection-endpoint count), `scripts/core/utils.py` (`count_inbound_links` resolves instead of literal-matching), `scripts/compile.py` (relativize pass wired after backlinks), `scripts/core/config.py` + `config.example.yaml` + `scripts/migrations/migrate_config_keys.py` (`features.relativize_wikilinks`, default True), `scripts/migrations/relativize_wikilinks.py` (one-shot corpus migration CLI), `prompts/compile_main.md` + `AGENTS.md` (authoring convention), `tests/test_links.py` + `tests/test_backlinks.py`.
+
+---
+
+## 2026-05-29: Inbox bridge as TCC workaround for sandbox-restricted intake folders
+
+**Context:** macOS TCC blocks Claude-Code-spawned subprocesses (collectors fired by SessionEnd piggyback hooks) from reading `~/Library/CloudStorage/…` paths. The operator's iOS/Android intake workflow drops files into a Google-Drive-synced folder, which the user shell can read fine but the piggyback collectors can't — substrate routing into the engine silently never happens. Operator asked for "rsync bridge" treatment so the engine doesn't have to be granted Full Disk Access.
+
+**Options considered:**
+A) Grant Claude Code Full Disk Access (FDA) globally — one-click, but binary-wide; gives Claude Code read access to `~/Library/Mail/`, `~/Library/Messages/`, every other CloudStorage mount.
+B) Hand-symlink each Drive folder into a non-TCC path — collector reads the symlink, but TCC is path-anchored (the link's TARGET is what gets evaluated), so a symlink into CloudStorage stays blocked.
+C) rsync bridge running as the user (operator shell on demand + LaunchAgent for cadence) — pre-mirrors files from sandbox-restricted source paths into local non-restricted paths the substrate collectors then folder-watch as their `*_inbox`. Substrate-agnostic.
+D) Per-collector engine-side TCC bypass — would need entitlement signing, not realistic for an operator-installed engine.
+
+**Chose:** C — rsync bridge with substrate-agnostic per-mapping config under `personal.inbox_bridges`. Mode = move (default) drains the remote on every sync via `rsync --remove-source-files` so the downstream substrate collector's archive-move-as-dedup doesn't re-ingest from Drive; copy mode is the escape hatch for operators wanting a phone-side backup.
+
+**Reason:** A's blast radius is the whole user library. B doesn't actually work — TCC denial follows symlinks. D requires entitlements only Apple grants to signed apps. C is the minimum-blast-radius solution that respects the operator's existing capture workflow and decouples engine-runtime TCC scope from operator-shell TCC scope. The move-vs-copy axis is operator-tunable per mapping. The bridge ships a LaunchAgent template so the same TCC-permitted execution context that works for manual sync also drives automation.
+
+**Linked artifacts:** `scripts/bridge/{drive_sync.py,cli.py}` (new), `wiki:cmd_bridge` + `bridge)` dispatcher, `scripts/core/config.py:Personal.inbox_bridges`, `scripts/migrations/migrate_config_keys.py`, `templates/.launchd/com.llm-wiki.bridge.plist.template`, `docs/setup-bridge.md`, `.ytstack/AD-HOC-drive-inbox-bridge-SUMMARY.md`.
+
+---
+
+## 2026-05-29: `picture_inbox` accepts `str | list[str]` (multi-source intake)
+
+**Context:** Inbox-bridge slice landed a Drive→local mirror, but `Personal.picture_inbox` was a single string — operators with an existing iCloud-Drive picture inbox couldn't add a second source without choosing between them. Substrate collectors generally take one folder; the bridge ships N mappings.
+
+**Options considered:**
+A) Force-route all sources through one folder (operator symlinks Drive mirror into iCloud-Drive folder). Operator must own a merge layer that doesn't exist on macOS.
+B) Add a separate `picture_inbox_2: str` etc. — ugly fan-out, doesn't generalize.
+C) Relax `picture_inbox` type to `str | list[str]` — single-string ops untouched, list ops scan all configured paths per run, results aggregate in one batch report ordered by mtime across sources. Missing paths log WARNING + are skipped without aborting the others. Back-compat at the YAML layer.
+
+**Chose:** C — `Personal.picture_inbox: str | list[str]`. `_inbox_path()` → `_inbox_paths() -> list[Path]`; collector's `run()` iterates all, archives into single `raw/inbox-mobile/pictures/` zone.
+
+**Reason:** Single-source operators keep their existing config verbatim — no migration. Multi-source operators get the obvious shape. The union type works through `_merge_dataclass` (YAML deserialised value passed through as-is, no type enforcement at the loader). Subset of collectors (`voice_inbox`, `capture_inbox`) carry the same shape concern but are out of scope until an operator hits the second-source need on them — easy follow-up using the same pattern.
+
+**Linked artifacts:** `scripts/core/config.py:Personal.picture_inbox`, `scripts/collectors/pictures.py:_inbox_paths`, `tests/test_pictures_multi_inbox.py`, `docs/setup-pictures.md`, `docs/setup-bridge.md`.
+
+---
+
+## 2026-05-29: EXIF + filename-pattern as orthogonal deterministic metadata layer for pictures
+
+**Context:** Operator asked the picture sidecars to carry camera coordinates, location, device info — currently they only had gemma4 vision output and an mtime-derived `captured_at`. Vision is non-deterministic and yields the wrong thing for screenshots (UI shots through a scene/objects prompt go ephemeral); deterministic metadata is a different axis.
+
+**Options considered:**
+A) Run `exiftool` subprocess — most comprehensive, but adds a CLI dep operators must `brew install`.
+B) Pillow's `Image.getexif()` for JPEG/PNG nativ; defer HEIC to a `pillow-heif` extra; combine with filename-pattern parser for Android `Screenshot_YYYYMMDD_HHMMSS_<App>.jpg`.
+C) Vision-LLM-only — ask gemma4 to extract device / location / time from the image content. Not deterministic; doesn't see EXIF.
+D) Skip metadata entirely.
+
+**Chose:** B — `scripts/collectors/_picture_metadata.py` combines Pillow EXIF (JPEG/PNG) + Android filename regex. EXIF wins on `captured_at` when both present; filename wins when EXIF has no `DateTimeOriginal` (Android-screenshot case); mtime is the last fallback. GPS rendered as decimal degrees; shot params humanised (`exposure: "1/120"`). Empty sub-dicts and missing keys are omitted from the frontmatter so each sidecar carries only what was extractable.
+
+**Reason:** Pillow handles the dominant operator-side surface (Android screenshots — almost-empty EXIF + filename-rich; iPhone JPEGs — full EXIF; PNG screenshots — same as JPEG) with one already-transitive dep. exiftool would force a `brew install` step that operators forget. Vision LLMs can't see EXIF. Filename parsing is the bigger metadata source for Android screenshots specifically: `app_context` ("O'Reilly", "ReVanced Extended", "Netflix", "Markor") is what the user was looking at — usable knowledge signal on its own. HEIC deferred to `pillow-heif` extra because most operator pipelines (iCloud sync, iOS Shortcuts) emit JPEG anyway. Knob `features.extract_picture_metadata` (default True) for privacy-conscious operators.
+
+**Supersedes:** the implicit "vision output IS the picture metadata" assumption in the pre-2026-05-29 pictures collector.
+
+**Linked artifacts:** `scripts/collectors/_picture_metadata.py` (new), `scripts/collectors/pictures.py:_render_picture_metadata_block` + `run()` wiring, `scripts/backfill_picture_metadata.py` (new), `wiki:cmd_backfill picture-metadata`, `scripts/core/config.py:Features.extract_picture_metadata`, `scripts/migrations/migrate_config_keys.py`, `pyproject.toml` (`pillow>=10.0.0` declared), `tests/test_picture_metadata.py`, `docs/setup-pictures.md`.
+
+---
+
+## 2026-05-29: `wiki update` runs `uv sync` after git pull
+
+**Context:** `wiki update` git-pulled the engine into the vault but never refreshed the venv. Pyproject changes that added a new `dependencies` entry stayed invisible to runtime — imports of the new package silently failed through whatever `ImportError` fallback the calling code had. Surfaced when picture-metadata's Pillow dep landed: vault venvs synced before that update returned `{}` from `_parse_exif()` and the `device.software` field never landed despite the live extractor running. The graceful-fallback pattern was correct on principle but turned a feature into a silent always-off.
+
+**Options considered:**
+A) Document `uv sync` as a manual post-update step. Operator forgets, features silently disabled.
+B) Lock dependency versions hard so transitive availability stops mattering. Doesn't fix the "engine adds a new dep" case.
+C) Add `uv sync --project "$WIKI_DIR" --quiet` to `cmd_update()` right after the git pull, before the config migration. Idempotent; runs even when the engine git revision didn't move (in case `uv.lock` got hand-edited).
+
+**Chose:** C — `cmd_update` now syncs deps unconditionally between pull and migration.
+
+**Reason:** Operator mental model is "update brings everything new." A relies on the operator to remember an out-of-band step. B doesn't generalize. C closes the gap with one shell line. Catch-22 during initial bootstrap (the running `wiki update` invocation predates the patch) — operator handles it manually one shot, then future updates self-heal.
+
+**Linked artifacts:** `wiki:cmd_update`, `pyproject.toml` (explicit `pillow>=10.0.0` so the lesson has an exemplar), `.ytstack/AD-HOC-pictures-multi-path-and-metadata-SUMMARY.md`.
