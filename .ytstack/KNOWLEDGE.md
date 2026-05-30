@@ -905,6 +905,33 @@ Plus: timeout 30 s → 120 s, and a structured logger (`_run_dashboard_script`) 
 
 The refresh is idempotent: every flush re-derives the dashboard from scratch. Skipping a contended refresh costs nothing — the next flush, microseconds later, picks up the latest state. Retry would just amplify the storm.
 
+### Dashboard lint orphan-check is accidentally O(N²) — hangs the `wiki compile` tail for ~99 min (2026-05-30)
+
+#### Symptom
+
+`wiki compile` prints `─── compilation complete ───` (compile itself finished in 44m), then the terminal sits on that line indefinitely. Operator `^C` lands the traceback in `dashboard_lint.py → collect_orphans → check_orphan_pages → count_inbound_links → resolve_link → vault.rglob → os.scandir`. The hang is NOT the compile and NOT asyncio teardown — it is the post-compile dashboard-lint refresh the `wiki` shell wrapper runs (`wiki:365 _refresh_dashboard_lint`, a **bare subprocess with no timeout** — the 120 s guard from the 2026-05-03 storm fix lives only in `flush.py:_run_dashboard_script`, a different call path).
+
+#### Root cause
+
+`check_orphan_pages` (`lint.py:104`) loops over all N wiki articles and calls `count_inbound_links` (`utils.py:356`) per article. `count_inbound_links` itself re-reads and re-parses **all N articles** to resolve their wikilinks → the orphan check is O(N²) file-reads-and-parses. Secondary multiplier: `resolve_link` (`links.py:83`) falls back to a **full-vault `vault.rglob(name)`** for any link that doesn't hit the fast `.is_file()` path — a complete recursive walk per unresolved link, amplified by iCloud on-demand materialisation.
+
+#### Measurement (`tmp/probe_lint_cost.py`, 2026-05-30)
+
+```
+N (wiki articles)             = 1703
+1x count_inbound_links        = 3.49s   (one full N-scan, read+parse all 1703)
+PROJECTED orphan check (N*t1) = 5949s = 99.1 min
+1x resolve_link rglob fallback= 0.04s   (warm — secondary, latent iCloud risk when cold)
+```
+
+The O(N²) re-read dominates (~99 min); rglob is cheap when warm. For contrast the compile's own backlinks + relativize passes iterate the same 1703 articles in ~3 s because they make a single pass with no inner loop.
+
+#### Fix direction (not yet landed)
+
+1. **O(N²) → O(N):** build all inbound-link counts in one pass (`dict[slug → count]`), resolving each link once; drop the per-article `count_inbound_links` re-scan. The compile already builds such a backlink map in ~3 s — reuse it.
+2. **Memoize/eliminate the rglob fallback:** one-time `{filename → [paths]}` vault index, O(1) lookup (iCloud-critical).
+3. **Defense-in-depth:** add a timeout to the `wiki`-wrapper `_refresh_dashboard_lint` so a slow lint never blocks the operator terminal.
+
 ### NAS connectivity: SMB > WebDAV > SSH
 
 - **SSH** would bypass QTS shared-folder permissions (POSIX root) — security gone.
