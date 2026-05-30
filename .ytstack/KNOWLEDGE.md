@@ -932,6 +932,26 @@ The O(N²) re-read dominates (~99 min); rglob is cheap when warm. For contrast t
 2. **Memoize/eliminate the rglob fallback:** one-time `{filename → [paths]}` vault index, O(1) lookup (iCloud-critical).
 3. **Defense-in-depth:** add a timeout to the `wiki`-wrapper `_refresh_dashboard_lint` so a slow lint never blocks the operator terminal.
 
+### Ollama half-open socket hung review-wiki for 19h47m — httpx float timeout doesn't break it (2026-05-30)
+
+#### Symptom
+
+The weekly `review-wiki` piggyback (spawned 2026-05-29 18:23) was still "running" ~19h later. `ps` showed PID 4410 (PPID=1, orphaned), STAT `Ss`, **ELAPSED 19:46:52 but CPU TIME 0:17.47** — i.e. doing nothing. `lsof -p 4410` showed one socket: `TCP <mac>:52970 → 192.168.2.42:11434 (ESTABLISHED)`. Near-zero CPU + a live socket = blocked in a single `recv()`, not computing. (Diagnosis tip: `ps -o etime,time` — when ELAPSED ≫ TIME the process is blocked, not busy. `ps` COMMAND truncation hid it from name-greps because the iCloud path prefix `…/Documents/lxw/…` ran past the column cutoff before `review-wiki.py`; `lsof` shows full paths.)
+
+#### Root cause
+
+`ollama_client.chat(timeout=300)` passed a single float to `httpx.post`, which sets connect == read == 300 s. kcma (LAN GPU box) is flaky — it slept mid-request after the connection was ESTABLISHED, sending no FIN/RST, so the local socket stayed `ESTABLISHED` and `recv()` blocked. **httpx's userspace read timeout did NOT fire** over 19h — empirically a single-float timeout does not break a half-open socket whose peer vanished silently. macOS default TCP keepalive is effectively absent, so the kernel never probed the dead peer either.
+
+Compounders: (1) flush.py spawns piggybacks detached → DEVNULL and writes `status:"spawned"` at `Popen` time, never updating outcome — so a hung/failed piggyback is invisible (same class as the daily-digest-8-days silent failure). (2) `review-wiki.py` sweeps **all** `list_wiki_articles()` (1703) at one Ollama call each, report written only at end-of-sweep, no fail-fast → a mid-sweep kcma outage means 1700×timeout of grinding and total loss of partial work.
+
+#### Fix landed (2026-05-30)
+
+1. **`ollama_client` — TCP keepalive + explicit phase timeouts.** All four call sites route through `_client(read_timeout)` → `httpx.Client(timeout=httpx.Timeout(connect=…, read=…, write=…, pool=…), transport=httpx.HTTPTransport(socket_options=_keepalive_socket_options()))`. Keepalive (`SO_KEEPALIVE` + macOS `TCP_KEEPALIVE`/Linux `TCP_KEEPIDLE` idle 60 s, intvl 15 s, count 4) makes the kernel detect a dead peer in ~120 s and raise, independent of httpx's timer. Connect cap is a config knob so a down host fails connect in seconds instead of burning the read budget. Tests patch `_client` (not `httpx.post`) now.
+2. **`core/piggyback_runner.py` — outcome + hard timeout.** flush spawns piggybacks *through* the runner: `python piggyback_runner.py <name> <timeout_s> -- <cmd…>`. It records `status` running → `ok`|`failed:<rc>`|`timeout`|`error:<Type>` via a locked per-key RMW (no clobber with other writers), and on timeout kills the child's whole process group (SIGTERM→grace→SIGKILL, falls back to direct `proc.kill()` on EPERM in sandboxes). This backstop bounds the hang class even if a collector forgets its own timeouts. flush's old in-memory `state[name]=…` + bulk `_save_piggyback_state` was removed (it raced a fast runner's outcome back to "spawned").
+3. **`review-wiki.py` — fail-fast + checkpoint.** `review_article` tags failures `error_kind=ollama` (transport) vs `parse` (kcma up, bad output); the sweep aborts after N consecutive `ollama` failures (kcma down) instead of grinding, resets the streak on any success/parse, and `_write_reports` checkpoints every N articles so an aborted/killed sweep keeps its work.
+
+Knobs (all `limits.*`, migration-injected): `ollama_connect_timeout_s=10`, `piggyback_max_runtime_s=14400`, `review_ollama_timeout_s=300`, `review_consecutive_failure_abort=5`, `review_checkpoint_every=25`.
+
 ### NAS connectivity: SMB > WebDAV > SSH
 
 - **SSH** would bypass QTS shared-folder permissions (POSIX root) — security gone.

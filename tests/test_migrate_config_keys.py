@@ -149,8 +149,11 @@ def test_migrate_config_file_round_trip(tmp_path):
     # +1 personal.inbox_bridges (inbox-bridge rsync mirror), 2026-05-28
     # +1 features.relativize_wikilinks (relativize-wikilinks pass), 2026-05-29
     # +1 features.extract_picture_metadata (EXIF + Android filename pattern), 2026-05-29
-    # = 72 changes (no drops — operator has no orphan personal.* fields)
-    assert len(changes) == 72, f"got {len(changes)} changes: {changes}"
+    # +5 limits.{ollama_connect_timeout_s, piggyback_max_runtime_s,
+    #    review_ollama_timeout_s, review_consecutive_failure_abort,
+    #    review_checkpoint_every} (Ollama/piggyback/review reliability), 2026-05-30
+    # = 77 changes (no drops — operator has no orphan personal.* fields)
+    assert len(changes) == 77, f"got {len(changes)} changes: {changes}"
 
     reparsed = yaml.safe_load(new_text)
     # piggyback side
@@ -233,6 +236,11 @@ def test_migrate_config_no_change_when_fully_current(tmp_path):
             "health_trends_recent_months": 6,
             "health_trends_min_coverage_days": 10,
             "voice_punctuate_timeout_s": 120,
+            "ollama_connect_timeout_s": 10,
+            "piggyback_max_runtime_s": 14400,
+            "review_ollama_timeout_s": 300,
+            "review_consecutive_failure_abort": 5,
+            "review_checkpoint_every": 25,
         },
         "features": {
             "extract_takes": False,
@@ -380,6 +388,11 @@ def test_migrate_additions_idempotent():
             "health_trends_recent_months": 6,
             "health_trends_min_coverage_days": 10,
             "voice_punctuate_timeout_s": 120,
+            "ollama_connect_timeout_s": 10,
+            "piggyback_max_runtime_s": 14400,
+            "review_ollama_timeout_s": 300,
+            "review_consecutive_failure_abort": 5,
+            "review_checkpoint_every": 25,
         },
         "piggybacks": {
             "calendar": {"enabled": True, "cooldown_hours": 6, "max_per_run": 500},

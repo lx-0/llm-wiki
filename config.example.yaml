@@ -203,6 +203,21 @@ limits:
   # Screenshot OCR.
   screenshot_resize_width: 512
   screenshot_timeout_seconds: 60
+  # TCP connect cap for every Ollama call. A single httpx timeout makes
+  # connect == read, so a down/sleeping LAN GPU would burn the full read
+  # budget just failing to connect. Keepalive (engine constant) is what
+  # bounds a half-open ESTABLISHED socket — review-wiki 19h-hang fix 2026-05-30.
+  ollama_connect_timeout_s: 10
+  # Hard cap the piggyback runner enforces on every detached piggyback task.
+  # Backstop against a hung child (the review-wiki hang ran 19h47m unbounded).
+  # 4h is generous for a full review-wiki sweep.
+  piggyback_max_runtime_s: 14400
+  # review-wiki.py: per-article Ollama read timeout, consecutive-failure abort
+  # (stop grinding 1700×timeout when kcma is down), and incremental-report
+  # checkpoint cadence (don't lose a multi-hour partial sweep).
+  review_ollama_timeout_s: 300
+  review_consecutive_failure_abort: 5
+  review_checkpoint_every: 25
   # Voice-punctuate Ollama timeout (collectors/voice.py). gemma4:e4b
   # cold-call into VRAM takes 30–40 s; warm run ~5–15 s. 120 s default
   # absorbs the cold-start; lower it if the operator's Ollama always-on.

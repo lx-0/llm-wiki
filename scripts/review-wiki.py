@@ -42,18 +42,28 @@ def review_article(article_path: Path, model: str) -> dict | None:
     prompt = render("review_wiki", article_content=content)
 
     try:
-        raw = ollama_client.chat(prompt, model=model, timeout=300)
+        raw = ollama_client.chat(
+            prompt, model=model, timeout=CONFIG.limits.review_ollama_timeout_s
+        )
         review = ollama_client.parse_json_lenient(raw)
         review["article"] = rel
         review["word_count"] = word_count
         return review
 
     except json.JSONDecodeError:
+        # kcma responded — the model just emitted unparseable output. NOT a
+        # connectivity failure, so `error_kind=parse` does not count toward the
+        # consecutive-failure abort (which is meant to catch a down server).
         log.warning("Failed to parse JSON for %s: %s", rel, raw[:200])
-        return {"article": rel, "word_count": word_count, "error": "JSON parse failed", "raw": raw[:300]}
+        return {"article": rel, "word_count": word_count,
+                "error": "JSON parse failed", "error_kind": "parse", "raw": raw[:300]}
     except Exception as e:
+        # Connection refused / read timeout / HTTP error — a transport-level
+        # failure. `error_kind=ollama` so the caller can fail-fast when kcma is
+        # down instead of grinding 1700×timeout.
         log.error("Failed to review %s: %s", rel, e)
-        return {"article": rel, "word_count": word_count, "error": str(e)}
+        return {"article": rel, "word_count": word_count,
+                "error": str(e), "error_kind": "ollama"}
 
 
 def generate_report(reviews: list[dict], model: str) -> str:
@@ -164,6 +174,20 @@ def generate_report(reviews: list[dict], model: str) -> str:
     return "\n".join(lines)
 
 
+def _write_reports(reviews: list[dict], model: str) -> tuple[Path, Path]:
+    """Write the markdown + raw-JSON report for `reviews`. Idempotent within a
+    run (same dated filenames), so checkpoint calls overwrite the prior partial
+    with the latest. Returns (md_path, json_path)."""
+    REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+    md_path = REPORTS_DIR / f"wiki-review-{today_iso()}.md"
+    md_path.write_text(generate_report(reviews, model), encoding="utf-8")
+    json_path = REPORTS_DIR / f"wiki-review-{today_iso()}.json"
+    json_path.write_text(
+        json.dumps(reviews, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
+    return md_path, json_path
+
+
 def main():
     parser = argparse.ArgumentParser(description="Review wiki articles with local LLM")
     parser.add_argument("--model", default=DEFAULT_MODEL, help=f"Ollama model (default: {DEFAULT_MODEL})")
@@ -190,36 +214,62 @@ def main():
         print("Is the Ollama server reachable? Check `ollama serve` locally or your remote endpoint.")
         sys.exit(1)
 
-    reviews = []
+    abort_n = CONFIG.limits.review_consecutive_failure_abort
+    checkpoint_every = CONFIG.limits.review_checkpoint_every
+
+    reviews: list[dict] = []
+    consecutive_ollama_failures = 0
+    aborted = False
+
     for i, article in enumerate(articles, 1):
         rel = article.relative_to(KNOWLEDGE_DIR)
         print(f"[{i}/{len(articles)}] Reviewing {rel}...", end=" ", flush=True)
         review = review_article(article, args.model)
-        if review:
-            overall = review.get("overall", "?")
-            verdict = review.get("verdict", "?")
-            print(f"{overall}/5 ({verdict})")
-            reviews.append(review)
+        reviews.append(review)
+
+        if "error" in review:
+            print(f"FAILED ({review.get('error_kind', '?')})")
+            # Only transport-level (ollama) failures count toward fail-fast;
+            # a parse failure means kcma IS up, so it resets the streak.
+            if review.get("error_kind") == "ollama":
+                consecutive_ollama_failures += 1
+                if abort_n and consecutive_ollama_failures >= abort_n:
+                    log.error(
+                        "Aborting sweep after %d consecutive Ollama failures "
+                        "(kcma down?). %d/%d articles reviewed.",
+                        consecutive_ollama_failures, i, len(articles),
+                    )
+                    print(
+                        f"\nABORTED: {consecutive_ollama_failures} consecutive "
+                        f"Ollama failures — is kcma reachable? Partial report saved."
+                    )
+                    aborted = True
+                    break
+            else:
+                consecutive_ollama_failures = 0
         else:
-            print("FAILED")
+            print(f"{review.get('overall', '?')}/5 ({review.get('verdict', '?')})")
+            consecutive_ollama_failures = 0
 
-    # Generate and save report
-    report = generate_report(reviews, args.model)
-    REPORTS_DIR.mkdir(parents=True, exist_ok=True)
-    report_path = REPORTS_DIR / f"wiki-review-{today_iso()}.md"
-    report_path.write_text(report, encoding="utf-8")
-    print(f"\nReport saved: {report_path}")
+        # Incremental checkpoint so a later abort / kill / crash doesn't lose
+        # the multi-hour partial sweep (report was previously written only at
+        # end-of-loop).
+        if checkpoint_every and i % checkpoint_every == 0:
+            _write_reports(reviews, args.model)
+            log.info("checkpoint: %d reviews persisted", len(reviews))
 
-    # Also save raw JSON for further analysis
-    json_path = REPORTS_DIR / f"wiki-review-{today_iso()}.json"
-    json_path.write_text(json.dumps(reviews, indent=2, ensure_ascii=False), encoding="utf-8")
+    md_path, json_path = _write_reports(reviews, args.model)
+    print(f"\nReport saved: {md_path}")
     print(f"Raw data: {json_path}")
 
     # Summary
     valid = [r for r in reviews if "overall" in r]
     if valid:
         avg = sum(r["overall"] for r in valid) / len(valid)
-        print(f"\nAverage quality: {avg:.1f}/5 across {len(valid)} articles")
+        suffix = " (partial — sweep aborted)" if aborted else ""
+        print(f"\nAverage quality: {avg:.1f}/5 across {len(valid)} articles{suffix}")
+    if aborted:
+        sys.exit(1)
 
 
 if __name__ == "__main__":

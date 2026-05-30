@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json
 import re
+import socket
 from typing import Any
 
 import httpx
@@ -31,6 +32,77 @@ _FENCE_LEADING = re.compile(r"^```[a-zA-Z]*\s*", flags=re.MULTILINE)
 _FENCE_TRAILING = re.compile(r"\s*```\s*$", flags=re.MULTILINE)
 
 
+# ── Connection hardening ──────────────────────────────────────────────
+#
+# TCP keepalive on every Ollama socket. The server is typically a LAN GPU
+# box that sleeps / wakes / drops mid-request; when it goes away WITHOUT
+# sending FIN/RST the local socket stays ESTABLISHED and a blocking recv()
+# never returns. httpx's userspace read timeout did NOT break this — the
+# review-wiki piggyback hung for 19h47m on one such half-open socket with
+# `timeout=300` set (incident 2026-05-30, see KNOWLEDGE.md). Kernel-level
+# keepalive probes detect the dead peer in ~_KEEPALIVE_IDLE + interval*count
+# (≈120 s) and make recv() raise, independent of httpx timer behaviour.
+#
+# Built defensively: macOS exposes TCP_KEEPALIVE (idle), Linux TCP_KEEPIDLE.
+# Interval/count are present on both but guarded via getattr just in case.
+_KEEPALIVE_IDLE_S = 60       # idle seconds before the first probe
+_KEEPALIVE_INTERVAL_S = 15   # seconds between probes
+_KEEPALIVE_COUNT = 4         # peer declared dead after this many unacked probes
+_WRITE_TIMEOUT_S = 30.0
+_POOL_TIMEOUT_S = 10.0
+
+
+def _keepalive_socket_options() -> list[tuple[int, int, int]]:
+    """Socket options enabling TCP keepalive with bounded dead-peer detection.
+
+    Passed to ``httpx.HTTPTransport(socket_options=...)``. Only includes
+    options the running platform actually exposes, so it's a no-op-safe
+    superset across macOS / Linux.
+    """
+    opts: list[tuple[int, int, int]] = [(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)]
+    idle_opt = getattr(socket, "TCP_KEEPALIVE", None)
+    if idle_opt is None:
+        idle_opt = getattr(socket, "TCP_KEEPIDLE", None)  # Linux name
+    if idle_opt is not None:
+        opts.append((socket.IPPROTO_TCP, idle_opt, _KEEPALIVE_IDLE_S))
+    intvl = getattr(socket, "TCP_KEEPINTVL", None)
+    if intvl is not None:
+        opts.append((socket.IPPROTO_TCP, intvl, _KEEPALIVE_INTERVAL_S))
+    cnt = getattr(socket, "TCP_KEEPCNT", None)
+    if cnt is not None:
+        opts.append((socket.IPPROTO_TCP, cnt, _KEEPALIVE_COUNT))
+    return opts
+
+
+def _timeout(read_timeout: float) -> httpx.Timeout:
+    """Explicit per-phase timeout. Connect is a short LAN-sane cap (config),
+    read is the caller's budget, write/pool are engine constants. A single
+    float would make connect == read, so a down host would burn the full read
+    budget just failing to connect."""
+    return httpx.Timeout(
+        connect=float(CONFIG.limits.ollama_connect_timeout_s),
+        read=read_timeout,
+        write=_WRITE_TIMEOUT_S,
+        pool=_POOL_TIMEOUT_S,
+    )
+
+
+def _client(read_timeout: float) -> httpx.Client:
+    """httpx client with explicit phase timeouts + TCP keepalive transport.
+
+    Every call site routes through this so the half-open-socket hardening is
+    uniform. ``retries=0`` keeps a transient connect failure fast rather than
+    silently retrying under the connect budget.
+    """
+    return httpx.Client(
+        timeout=_timeout(read_timeout),
+        transport=httpx.HTTPTransport(
+            socket_options=_keepalive_socket_options(),
+            retries=0,
+        ),
+    )
+
+
 def _base_url() -> str:
     return CONFIG.models.ollama_url.rstrip("/")
 
@@ -40,7 +112,8 @@ def _base_url() -> str:
 def is_reachable(timeout: float = 5.0) -> bool:
     """Quick GET /api/tags. Used before kicking off long batches."""
     try:
-        r = httpx.get(f"{_base_url()}/api/tags", timeout=timeout)
+        with _client(timeout) as c:
+            r = c.get(f"{_base_url()}/api/tags")
         return r.status_code == 200
     except Exception:
         return False
@@ -88,15 +161,15 @@ def chat(
     Returns the assistant message content (stripped). Pair with
     `parse_json_lenient` when the prompt asks for JSON.
     """
-    r = httpx.post(
-        f"{_base_url()}/v1/chat/completions",
-        json={
-            "model": model,
-            "messages": [{"role": "user", "content": prompt}],
-            "temperature": temperature,
-        },
-        timeout=timeout,
-    )
+    with _client(timeout) as c:
+        r = c.post(
+            f"{_base_url()}/v1/chat/completions",
+            json={
+                "model": model,
+                "messages": [{"role": "user", "content": prompt}],
+                "temperature": temperature,
+            },
+        )
     r.raise_for_status()
     data = r.json()
     LEDGER.record_openai_usage(model, data.get("usage", {}))
@@ -116,17 +189,17 @@ def chat_schema(
     `schema` is the JSON-Schema-shaped dict Ollama expects in `format`.
     Returns the assistant message content; pair with `parse_json_lenient`.
     """
-    r = httpx.post(
-        f"{_base_url()}/api/chat",
-        json={
-            "model": model,
-            "messages": [{"role": "user", "content": prompt}],
-            "format": schema,
-            "stream": False,
-            "options": {"temperature": temperature},
-        },
-        timeout=timeout,
-    )
+    with _client(timeout) as c:
+        r = c.post(
+            f"{_base_url()}/api/chat",
+            json={
+                "model": model,
+                "messages": [{"role": "user", "content": prompt}],
+                "format": schema,
+                "stream": False,
+                "options": {"temperature": temperature},
+            },
+        )
     r.raise_for_status()
     data = r.json()
     LEDGER.record_ollama(model, data)
@@ -145,19 +218,19 @@ def chat_vision(
     `stats` carries the raw response fields callers want for logging
     (e.g. `eval_count`).
     """
-    r = httpx.post(
-        f"{_base_url()}/api/chat",
-        json={
-            "model": model,
-            "messages": [{
-                "role": "user",
-                "content": prompt,
-                "images": [image_b64],
-            }],
-            "stream": False,
-        },
-        timeout=timeout,
-    )
+    with _client(timeout) as c:
+        r = c.post(
+            f"{_base_url()}/api/chat",
+            json={
+                "model": model,
+                "messages": [{
+                    "role": "user",
+                    "content": prompt,
+                    "images": [image_b64],
+                }],
+                "stream": False,
+            },
+        )
     r.raise_for_status()
     data = r.json()
     content = data.get("message", {}).get("content", "")

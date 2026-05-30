@@ -191,6 +191,35 @@ class Limits:
     flush_tool_summary_budget_chars: int = 10_000
     screenshot_resize_width: int = 512
     screenshot_timeout_seconds: int = 60
+    # TCP connect timeout for every Ollama HTTP call (ollama_client.py). A
+    # single httpx float timeout makes connect == read, so a sleeping/down LAN
+    # GPU box could cost the full read budget (e.g. 300 s) just to fail the
+    # connect. 10 s is generous on a LAN. The read timeout stays per-call
+    # (each caller passes its own); write/pool/keepalive are engine constants
+    # in ollama_client.py. Keepalive is what actually bounds a half-open
+    # ESTABLISHED socket (review-wiki 19h-hang incident 2026-05-30).
+    ollama_connect_timeout_s: int = 10
+    # Hard wall-clock cap the piggyback runner (core/piggyback_runner.py)
+    # enforces on every spawned piggyback. flush.py spawns piggybacks detached
+    # (fire-and-forget, DEVNULL) and can't wait on them, so without this a hung
+    # child runs unbounded — review-wiki sat on a half-open socket for 19h47m
+    # (incident 2026-05-30). On timeout the runner kills the child and records
+    # status="timeout". 4h is generous for a full review-wiki sweep; lower it
+    # once per-task overrides exist.
+    piggyback_max_runtime_s: int = 14_400
+    # review-wiki.py per-article Ollama read timeout (was a hardcoded 300 in
+    # the script). Generous because the quality-review prompt is large and
+    # gemma cold-calls are slow; the connect cap + keepalive above prevent a
+    # dead host from blocking this whole budget.
+    review_ollama_timeout_s: int = 300
+    # review-wiki.py fail-fast: abort the full-vault sweep after this many
+    # CONSECUTIVE per-article Ollama failures. Without it a mid-sweep kcma
+    # outage means 1700 × read-timeout of pointless grinding. Set 0 to disable.
+    review_consecutive_failure_abort: int = 5
+    # review-wiki.py incremental checkpoint: flush the partial JSON report
+    # every N reviewed articles so an aborted/killed sweep keeps its work
+    # (the report was previously written only at end-of-sweep).
+    review_checkpoint_every: int = 25
     # Voice punctuation Ollama-chat timeout (collectors/voice.py). gemma4:e4b
     # cold-call (model-load into VRAM) routinely hits 30–40 s; warm runs are
     # ~5–15 s. Hardcoded 30 s pre-2026-05-28 tripped on every first call after

@@ -67,6 +67,11 @@ Key changes covered (chronological):
   limits.voice_punctuate_timeout_s           (added 2026-05-28, default 120 — gemma4:e4b cold-call routinely >30s; absorbs model-load latency)
   personal.inbox_bridges                     (added 2026-05-28, default [] — rsync-based mirror for sandbox-restricted intake folders; see scripts/bridge/drive_sync.py)
   features.extract_picture_metadata          (added 2026-05-29, default True — EXIF + Android-screenshot-filename metadata extraction in pictures collector)
+  limits.ollama_connect_timeout_s            (added 2026-05-30, default 10 — TCP connect cap for Ollama calls; prevents a down LAN GPU from burning the full read budget on connect)
+  limits.piggyback_max_runtime_s             (added 2026-05-30, default 14400 — hard wall-clock cap the piggyback runner enforces on each spawned task; backstop against the review-wiki 19h half-open-socket hang)
+  limits.review_ollama_timeout_s             (added 2026-05-30, default 300 — per-article Ollama read timeout for review-wiki.py, lifted from a module constant)
+  limits.review_consecutive_failure_abort    (added 2026-05-30, default 5 — review-wiki aborts the sweep after N consecutive Ollama failures instead of grinding 1700×timeout when kcma is down)
+  limits.review_checkpoint_every             (added 2026-05-30, default 25 — review-wiki writes the partial report every N articles so an aborted/killed sweep isn't lost)
   personal.accounts.<id>.health.healthkit    (added 2026-05-19 M023 — Apple HealthKit XML export ingest;
                                               injected as a placeholder into any account already carrying
                                               `health.oura`, kind: healthkit-xml-export, empty inbox_dir
@@ -238,6 +243,15 @@ KEY_ADDITIONS: dict[str, dict[str, object]] = {
         # hardcoded 30 s tripped on every first call after a quiet
         # period. 120 s mirrors the chat() default.
         "voice_punctuate_timeout_s": 120,
+        # Reliability bundle (2026-05-30) — bounds the half-open-socket hang
+        # class that left review-wiki running 19h47m on a slept LAN GPU.
+        # See KNOWLEDGE.md "Ollama half-open socket". Match Limits defaults in
+        # scripts/core/config.py.
+        "ollama_connect_timeout_s": 10,
+        "piggyback_max_runtime_s": 14_400,
+        "review_ollama_timeout_s": 300,
+        "review_consecutive_failure_abort": 5,
+        "review_checkpoint_every": 25,
     },
     "scheduling": {
         # M014 dream-cycle (2026-05-16). Per-entity cooldown — entities

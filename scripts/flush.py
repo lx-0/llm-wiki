@@ -443,10 +443,6 @@ def _load_piggyback_state() -> dict:
     return {}
 
 
-def _save_piggyback_state(state: dict) -> None:
-    PIGGYBACK_STATE_FILE.write_text(json.dumps(state, indent=2), encoding="utf-8")
-
-
 def maybe_run_piggyback_tasks() -> None:
     """Spawn piggyback tasks if it's after COMPILE_AFTER_HOUR and cooldown has elapsed."""
     now = datetime.now(ZoneInfo(TIMEZONE))
@@ -481,8 +477,18 @@ def maybe_run_piggyback_tasks() -> None:
             log.warning("Piggyback %s: script not found: %s", name, script)
             continue
 
+        # Wrap the command in piggyback_runner so the child runs under a hard
+        # wall-clock cap and its real outcome (ok/failed/timeout) lands in
+        # piggyback-state.json. flush spawns detached and can't wait, so without
+        # the runner `status` froze at "spawned" forever and a hung child (e.g.
+        # review-wiki on a half-open socket) ran unbounded. See KNOWLEDGE.md.
+        from core.piggyback_runner import record_status  # late import — avoid cycles
+
         cmd = [sys.executable, str(script)] + task["cmd"][1:]
-        log.info("Piggyback %s: spawning %s", name, " ".join(task["cmd"]))
+        timeout_s = CONFIG.limits.piggyback_max_runtime_s
+        runner = SCRIPTS_DIR / "core" / "piggyback_runner.py"
+        wrapped = [sys.executable, str(runner), name, str(timeout_s), "--", *cmd]
+        log.info("Piggyback %s: spawning %s (cap %ds)", name, " ".join(task["cmd"]), timeout_s)
 
         kwargs: dict = {}
         if sys.platform == "win32":
@@ -490,26 +496,23 @@ def maybe_run_piggyback_tasks() -> None:
         else:
             kwargs["start_new_session"] = True
 
+        # Record initial state under the SAME lock the runner uses for its
+        # running→outcome updates, so neither clobbers the other. (Replaces the
+        # old in-memory state[name] + bulk _save_piggyback_state, which raced a
+        # fast-completing runner's outcome back to "spawned".)
+        record_status(name, {"last_run": now.isoformat(timespec="seconds"), "status": "spawned"})
+
         try:
             subprocess.Popen(
-                cmd,
+                wrapped,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
                 stdin=subprocess.DEVNULL,
                 **kwargs,
             )
-            state[name] = {
-                "last_run": now.isoformat(timespec="seconds"),
-                "status": "spawned",
-            }
         except Exception:
             log.exception("Piggyback %s: failed to spawn", name)
-            state[name] = {
-                "last_run": now.isoformat(timespec="seconds"),
-                "status": "error",
-            }
-
-    _save_piggyback_state(state)
+            record_status(name, {"status": "error:spawn"})
 
 
 # ── Main ─────────────────────────────────────────────────────────────
