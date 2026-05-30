@@ -1507,3 +1507,43 @@ C) Add `uv sync --project "$WIKI_DIR" --quiet` to `cmd_update()` right after the
 **Reason:** Operator mental model is "update brings everything new." A relies on the operator to remember an out-of-band step. B doesn't generalize. C closes the gap with one shell line. Catch-22 during initial bootstrap (the running `wiki update` invocation predates the patch) — operator handles it manually one shot, then future updates self-heal.
 
 **Linked artifacts:** `wiki:cmd_update`, `pyproject.toml` (explicit `pillow>=10.0.0` so the lesson has an exemplar), `.ytstack/AD-HOC-pictures-multi-path-and-metadata-SUMMARY.md`.
+
+## 2026-05-30: All Ollama HTTP calls go through a keepalive-hardened httpx client
+
+**Context:** The review-wiki piggyback hung 19h47m blocked in a single `recv()` on an ESTABLISHED-but-dead socket to the LAN GPU (kcma slept mid-request, no FIN/RST). `ollama_client.chat(timeout=300)` passed a single httpx float, which sets connect == read and — verified empirically — does NOT break a half-open socket whose peer vanished silently. macOS default TCP keepalive is effectively absent.
+
+**Options considered:**
+A) Raise/lower the float timeout. Doesn't help — the timeout never fired at all over 19h.
+B) Per-call watchdog thread that kills the call. Can't interrupt a blocked C-level `recv()` from another thread cleanly; leaks the thread.
+C) Route every call through a shared `_client(read_timeout)` with explicit `httpx.Timeout(connect/read/write/pool)` + an `HTTPTransport(socket_options=…)` enabling TCP keepalive (SO_KEEPALIVE + macOS `TCP_KEEPALIVE`/Linux `TCP_KEEPIDLE`, idle 60s / intvl 15s / count 4 ≈ 120s dead-peer detection).
+
+**Chose:** C. Keepalive params are engine constants in `ollama_client.py`; the connect cap is `limits.ollama_connect_timeout_s` (LAN-tunable).
+
+**Reason:** Kernel-level keepalive detects the dead peer independent of httpx's userspace timer, so the half-open hang class is bounded regardless of the exact httpx behaviour that let the read timeout fail. Single seam = uniform hardening for chat / chat_schema / chat_vision / is_reachable. Tests patch `_client`, not the module-level `httpx.post`.
+
+**Linked artifacts:** `scripts/core/ollama_client.py` (`_client`, `_keepalive_socket_options`, `_timeout`), `tests/test_ollama_client_hardening.py`, KNOWLEDGE.md "Ollama half-open socket" (2026-05-30).
+
+## 2026-05-30: Every flush-spawned piggyback runs under piggyback_runner (hard timeout + recorded outcome)
+
+**Context:** flush spawns piggybacks detached → DEVNULL and wrote `status:"spawned"` at `Popen` time, never updating the outcome. A hung/failed piggyback was invisible (the 19h review-wiki hang surfaced no evidence; same class as the daily-digest-8-day silent failure).
+
+**Options considered:**
+A) Have flush `wait()` on the child. Can't — SessionEnd flush must not block on a multi-hour sweep.
+B) Each piggyback script self-reports status. Spreads the same boilerplate across every collector; easy to forget in new ones.
+C) A single `core/piggyback_runner.py` wrapper: `python piggyback_runner.py <name> <timeout_s> -- <cmd…>`. Enforces a hard wall-clock cap (process-group kill, EPERM-safe), records `running → ok|failed:<rc>|timeout|error:<Type>` via locked per-key RMW on `piggyback-state.json`.
+
+**Chose:** C. Global cap `limits.piggyback_max_runtime_s` (default 14400s/4h). flush's racy bulk `_save_piggyback_state` removed; both flush (initial `spawned`) and the runner write via the same locked RMW.
+
+**Reason:** One wrapper hardens ALL piggybacks (present + future) uniformly, gives the operator real outcome telemetry, and is the backstop that bounds the half-open-hang class even if a collector forgets its own timeouts. Process-group kill reaps grandchildren (ffmpeg/whisper/SDK CLIs).
+
+**Linked artifacts:** `scripts/core/piggyback_runner.py`, `scripts/flush.py` (`maybe_run_piggyback_tasks`), `tests/test_piggyback_runner.py`.
+
+## 2026-05-30: Corpus-wide lint counts (orphan inbound-links) must be one O(N) pass, never per-article
+
+**Context:** `check_orphan_pages` called `count_inbound_links` once per article; each call re-read + re-parsed all N articles → O(N²). ~99min on 1713 articles, hanging every compile-tail / `wiki review-wiki` / flush dashboard-lint (timed out at 120s, freezing the lint panel).
+
+**Decision:** Production corpus-aggregate counts go through a single-pass builder (`utils.build_inbound_count_map()` → `{slug: {sources}}`); callers look up `len(map[name] - {self})`. The O(N)-per-call `count_inbound_links` is retained ONLY as the parity oracle for `tests/test_orphan_inbound_parity.py` (golden-diff), never in a hot loop. General rule: any "for each article, scan all articles" shape in lint/maintenance is a latent O(N²) hang on a real-sized vault — build the index once.
+
+**Reason:** Behaviour-identical (golden-diff: fixture edge cases + 25-target real-vault subset, 0 mismatches), 99min → 3.8s on the real corpus. The map deliberately mirrors the oracle's full-content read (footer links included) rather than reusing `build_backlinks_index` (footer-aware), because switching to footer-aware would *change* orphan verdicts — that's the separately-backlogged footer-masking bug, kept out of a perf fix.
+
+**Linked artifacts:** `scripts/core/utils.py` (`build_inbound_count_map`), `scripts/lint.py` (`check_orphan_pages`), `tests/test_orphan_inbound_parity.py`, `.ytstack/backlog/orphan-check-footer-masking.md`, KNOWLEDGE.md "Dashboard lint orphan-check is accidentally O(N²)".
