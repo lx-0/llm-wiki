@@ -18,12 +18,16 @@ WIKI_DIR = Path(__file__).resolve().parent.parent  # .wiki/
 ROOT = WIKI_DIR.parent
 DAILY_DIR = ROOT / "daily"
 
-POINTER_BLOCK = """# Knowledge base
-- Index: `knowledge/index.md` — flat catalog of all wiki articles. One row per article (link, summary, sources, date). Grep by topic, then Read the matched article(s). Don't try to load the full index — it's large.
-- Articles by type: `knowledge/concepts/`, `knowledge/projects/`, `knowledge/people/`, `knowledge/facts/`, `knowledge/MOCs/`, `knowledge/connections/`, `knowledge/qa/`.
-- Raw substrate (read-only, never write): `raw/notes/`, `raw/articles/`, `raw/transcripts/`, `raw/papers/`, `daily/`.
-- Schema + conventions: `AGENTS.md` at vault root.
-- Outside the vault (other projects): invoke the `use-llm-wiki` skill to query, contribute, or diagnose the wiki via its `wiki` CLI."""
+POINTER_BLOCK = """<knowledge-base>
+This vault is the operator's own compiled knowledge base — their projects, the people they work with, prior decisions, preferences and notes, distilled into linked articles. Treat it as authoritative ground truth about *this operator*: it outranks your general priors and a guess. When a task touches the operator's work, the people they know, prior decisions, or how they like things done, consult the wiki BEFORE answering from memory or asking.
+
+How to reach it:
+- Start at `knowledge/index.md` — a flat catalog (one row per article: link, summary, sources, date). Grep by topic, then Read the matched article(s). Don't load the whole index — it's large.
+- Browse by type (under `knowledge/`): `concepts/`, `projects/`, `people/`, `facts/`, `MOCs/`, `connections/`, `qa/`.
+- `raw/notes/`, `raw/articles/`, `raw/transcripts/`, `raw/papers/`, `daily/` are read-only source substrate — read to verify, never write.
+- Schema + conventions: `AGENTS.md` at the vault root.
+- From another project (CWD outside the vault): invoke the `use-llm-wiki` skill to query, contribute, or diagnose via the `wiki` CLI.
+</knowledge-base>"""
 
 
 def read_recent_daily(max_lines: int = 30) -> str:
@@ -35,7 +39,12 @@ def read_recent_daily(max_lines: int = 30) -> str:
         if daily_file.exists():
             lines = daily_file.read_text(encoding="utf-8").splitlines()
             snippet = "\n".join(lines[-max_lines:])
-            return f"# Recent Daily Log ({day.strftime('%Y-%m-%d')})\n\n{snippet}"
+            return (
+                f"# Recent Daily Log ({day.strftime('%Y-%m-%d')})\n\n"
+                "Recent operator activity — what they've been working on lately. "
+                "Read it to ground answers in current context, not as decoration.\n\n"
+                f"{snippet}"
+            )
     return ""
 
 

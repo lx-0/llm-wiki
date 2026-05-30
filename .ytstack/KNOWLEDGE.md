@@ -615,6 +615,20 @@ SessionStart now injects a small constant **pointer block** (paths to `knowledge
 
 **Companion future work:** deterministic per-prompt grep injection via `UserPromptSubmit` hook is captured in `.ytstack/backlog/prompt-aware-index-injection.md`. Conditional `source: "compaction"` SessionStart firing (ClawMem's `postcompact-inject` pattern) is captured in `.ytstack/backlog/postcompact-only-injection.md`. Both opt-in, both wait for observation data on the current pointer-block implementation.
 
+#### Refinement 2026-05-30: a path-list alone doesn't get consulted — frame it
+
+The 2026-05-05 pointer block was a pure **path map** (nouns: "here is where index.md / the type folders / raw live"). Observed problem: agents don't reliably reach for it — a path list reads as reference material, not as a behavioral instruction. Web survey of comparable systems (ClawMem, `rohitg00/agentmemory`, Karpathy-LLM-Wiki-v2) converged on three things our block lacked, all pure prompt-wording, no new infrastructure:
+
+1. **Named wrapper tag.** ClawMem wraps in `<vault-context>` + `<vault-routing>`, agentmemory in `<agentmemory-context>`. The tag gives the model an addressable handle so the injection doesn't dissolve into the surrounding system prompt. We adopted `<knowledge-base>…</knowledge-base>`.
+2. **Explicit "use this" instruction.** agentmemory's own troubleshooting: *if the agent isn't using the knowledge base, check that the SessionStart prompt explicitly instructs it to reference the injected context.* A trigger sentence was added: when a task touches the operator's work/people/decisions/preferences → consult the wiki **before** answering from memory.
+3. **Authority framing.** ClawMem frames surfaced facts as *"already-known background knowledge"*; the RAG consensus is *"authoritative data so the LLM doesn't guess."* An identity line was added: this is the operator's own compiled knowledge, ground truth, outranks the model's priors.
+
+**Self-gating side benefit:** the trigger is scoped to operator-touching tasks, so engine-dev sessions (editing `scripts/`, `hooks/`) — which fire the same global hook — are not pushed toward the wiki for irrelevant work. The old pure-path-dump had no such gate.
+
+**Honesty bound (REGEL #1):** "agents now consult it more" is **not** unit-testable. The Phase-3 test was only that the hook still emits valid JSON with the new block (verified) + the recursion guard still empties under `CLAUDE_INVOKED_BY` (verified). The behavioral effect is observational over time — same evaluation posture the two backlog items require.
+
+**Scale caveat surfaced during research:** Karpathy-LLM-Wiki-v2 reports `index.md`-grep degrades past ~100-200 articles; our index already holds 567 concepts. "Grep the index" is sound today but has a known ceiling — that ceiling is exactly what `prompt-aware-index-injection.md` (deterministic per-prompt retrieval) exists to address. Not in scope for this wording change; just confirmed the backlog item is justified.
+
 ### Flush context — Karpathy/Cole's pattern is wrong for agentic workflows
 
 #### Anti-pattern (Cole Medin's `claude-memory-compiler`)
