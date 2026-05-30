@@ -926,11 +926,17 @@ PROJECTED orphan check (N*t1) = 5949s = 99.1 min
 
 The O(N²) re-read dominates (~99 min); rglob is cheap when warm. For contrast the compile's own backlinks + relativize passes iterate the same 1703 articles in ~3 s because they make a single pass with no inner loop.
 
-#### Fix direction (not yet landed)
+#### Fix landed (2026-05-30)
 
-1. **O(N²) → O(N):** build all inbound-link counts in one pass (`dict[slug → count]`), resolving each link once; drop the per-article `count_inbound_links` re-scan. The compile already builds such a backlink map in ~3 s — reuse it.
-2. **Memoize/eliminate the rglob fallback:** one-time `{filename → [paths]}` vault index, O(1) lookup (iCloud-critical).
-3. **Defense-in-depth:** add a timeout to the `wiki`-wrapper `_refresh_dashboard_lint` so a slow lint never blocks the operator terminal.
+`utils.build_inbound_count_map()` — one O(N) pass building `{target_slug: {source_articles}}` for ALL targets; `check_orphan_pages` looks up `len(map[name] − {self})` instead of calling `count_inbound_links` per article. **Real-data: full 1713-article corpus 3.8 s** (was ~99 min; the old per-target oracle measured 3.4 s × 1713 ≈ 97 min, confirming the diagnosis). `count_inbound_links` is retained as the parity oracle; `tests/test_orphan_inbound_parity.py` golden-diffs the map against it (fixture edge cases + a 25-target real-vault subset diff returned **0 mismatches — identical**).
+
+Behaviour-preserving: the map deliberately uses the SAME `extract_wikilinks` over **full** article content as the oracle (footer links included), NOT `core.backlinks.build_backlinks_index` (which excludes the `## Backlinks` sentinel region). Reusing the backlinks index would have *changed* orphan results — see the latent bug below.
+
+The rglob memoization (fix-direction #2) was unnecessary: the single pass already cuts rglob calls from N²×L to N×L, and rglob only fires for extension-bearing links that miss the direct `.is_file()` path (a minority). Not done. The `wiki`-wrapper `_refresh_dashboard_lint` timeout (#3) is still open — with the O(N) fix the lint completes in seconds so it no longer matters in practice, but the wrapper still has no timeout guard (flush's path does, 120 s).
+
+#### Latent bug surfaced, NOT fixed here (deferred)
+
+`count_inbound_links` (and now the map, by design-parity) reads **full** article content including the materialized `## Backlinks` footer. So article B's footer `[[A]]` is counted as B→A inbound, giving A a "free" backlink from every article it links to. With `materialize_backlinks` default-on, this neuters the orphan check — almost nothing reads as orphan. Fixing it (exclude the footer region from inbound counting, e.g. via `build_backlinks_index`'s sentinel-aware resolver) is a behaviour change, deliberately kept out of this performance fix. Backlog: `.ytstack/backlog/orphan-check-footer-masking.md`.
 
 ### Ollama half-open socket hung review-wiki for 19h47m — httpx float timeout doesn't break it (2026-05-30)
 

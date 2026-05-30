@@ -357,7 +357,14 @@ def count_inbound_links(target: str, exclude_file: Path | None = None) -> int:
     """Count how many wiki articles link to a given canonical target slug
     (``concepts/foo``). Links are relative to their source file, so a literal
     string match would miss `[[foo]]` / `[[../concepts/foo]]`; resolve each
-    link and compare canonical slugs instead."""
+    link and compare canonical slugs instead.
+
+    NOTE: O(N) per call — calling this once per article (as the orphan check
+    once did) is O(N²) and hung the lint for ~99 min on 1700 articles
+    (incident 2026-05-30, KNOWLEDGE.md). Production now uses
+    ``build_inbound_count_map`` (one O(N) pass for ALL targets). This function
+    is retained as the parity oracle that ``tests/test_orphan_inbound_parity``
+    asserts the map against — keep the two semantically identical."""
     from core.links import canonical_slug, link_target, resolve_link
     from core.paths import ROOT_DIR
 
@@ -372,6 +379,49 @@ def count_inbound_links(target: str, exclude_file: Path | None = None) -> int:
                 count += 1
                 break
     return count
+
+
+def build_inbound_count_map() -> dict[str, set[str]]:
+    """One O(N) pass over the corpus → ``{target_slug: {source_article_path}}``.
+
+    The single-pass replacement for calling ``count_inbound_links`` once per
+    article (which was O(N²) — N article-reads × N source-scans). For any
+    target slug, the inbound count is ``len(map.get(slug, set()) - {self})``,
+    where ``self`` is ``str(target_article)`` — exactly mirroring
+    ``count_inbound_links(slug, exclude_file=target_article)``:
+
+      * one entry per SOURCE article (a ``set``), matching the per-source
+        ``break`` (a source linking to a target N times still counts once);
+      * same resolver (``resolve_link``) on the same per-source content read
+        via ``extract_wikilinks`` over the FULL article text — so footer /
+        body links are treated identically to the per-target scan;
+      * only knowledge→knowledge edges survive (``canonical_slug`` returns
+        None for daily/raw citations).
+
+    Self-exclusion is the caller's job (subtract ``{str(article)}``), mirroring
+    ``exclude_file``. Verified byte-for-byte equal to the oracle in
+    ``tests/test_orphan_inbound_parity``."""
+    from core.links import canonical_slug, link_target, resolve_link
+    from core.paths import ROOT_DIR
+
+    inbound: dict[str, set[str]] = {}
+    for article in list_wiki_articles():
+        src_id = str(article)
+        try:
+            content = article.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        targets_for_src: set[str] = set()
+        for link in extract_wikilinks(content):
+            resolved = resolve_link(link_target(link), article, ROOT_DIR)
+            if resolved is None:
+                continue
+            slug = canonical_slug(resolved, KNOWLEDGE_DIR)
+            if slug is not None:
+                targets_for_src.add(slug)
+        for slug in targets_for_src:
+            inbound.setdefault(slug, set()).add(src_id)
+    return inbound
 
 
 def get_article_word_count(path: Path) -> int:

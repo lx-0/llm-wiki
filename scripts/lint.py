@@ -18,7 +18,7 @@ from claude_agent_sdk import ClaudeAgentOptions, ResultMessage, query
 
 from core.paths import DAILY_DIR, KNOWLEDGE_DIR, RAW_DIR, REPORTS_DIR, ROOT_DIR
 from core.utils import (
-    count_inbound_links,
+    build_inbound_count_map,
     extract_wikilinks,
     file_hash,
     get_article_word_count,
@@ -100,13 +100,19 @@ def check_orphan_pages() -> list[dict]:
     """Find wiki articles that no other article links to."""
     issues = []
     index_content = read_wiki_index()
+    # One O(N) pass for ALL targets, replacing the per-article
+    # count_inbound_links() that made this O(N²) and hung the lint ~99 min on
+    # 1700 articles (incident 2026-05-30, KNOWLEDGE.md). Behaviour-identical:
+    # inbound count = sources of `name` minus self (parity-tested against the
+    # count_inbound_links oracle).
+    inbound_map = build_inbound_count_map()
 
     for article in list_wiki_articles():
         if _is_fact(article):
             continue  # facts are authoritative; orphan-by-design
         rel = str(article.relative_to(KNOWLEDGE_DIR))
         name = rel.replace(".md", "")
-        inbound = count_inbound_links(name, exclude_file=article)
+        inbound = len(inbound_map.get(name, set()) - {str(article)})
         in_index = f"[[{name}]]" in index_content
 
         if inbound == 0 and not in_index:
