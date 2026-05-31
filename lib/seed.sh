@@ -464,7 +464,7 @@ _merge_meta_bind_data() {
 # under the spec's shell_command_id. Additive merge — operator's other shell
 # commands are preserved, never modified. Idempotent.
 _merge_agent_shell_commands() {
-  local target="$1" wiki_dir="$2"
+  local target="$1" wiki_dir="$2" check="${3:-0}"
   local data="$target/.obsidian/plugins/obsidian-shellcommands/data.json"
   if [[ ! -f "$data" ]]; then
     return 0  # base seed didn't run yet; nothing to merge into
@@ -477,6 +477,7 @@ _merge_agent_shell_commands() {
   local entries
   entries="$(uv run --quiet --project "$wiki_dir" python "$wiki_dir/scripts/dashboard/agent_buttons.py" shell-commands 2>/dev/null || echo '{}')"
   if [[ -z "$entries" ]] || [[ "$entries" == "{}" ]]; then
+    [[ "$check" == "1" ]] && ok "up-to-date .obsidian/plugins/obsidian-shellcommands/data.json"
     return 0
   fi
   # The obsidian-shellcommands plugin stores `shell_commands` as an ARRAY of
@@ -500,13 +501,25 @@ _merge_agent_shell_commands() {
     warn "agent shell-commands merge failed"
     return 0
   fi
+  # Up-to-date iff the merged form is byte-equal (canonically) to the current.
+  local same=0
+  [[ "$(jq -S . "$data" 2>/dev/null)" == "$(printf '%s' "$merged" | jq -S . 2>/dev/null)" ]] && same=1
+  if [[ "$check" == "1" ]]; then
+    if [[ "$same" == 1 ]]; then
+      ok "up-to-date .obsidian/plugins/obsidian-shellcommands/data.json"
+    else
+      after="$(printf '%s' "$merged" | jq -r '.shell_commands | length')"
+      info "drifted .obsidian/plugins/obsidian-shellcommands/data.json (agent buttons would merge: $before → $after entries)"
+    fi
+    return 0
+  fi
+  if [[ "$same" == 1 ]]; then
+    info "agent shell-commands — already up to date"
+    return 0
+  fi
   printf '%s\n' "$merged" > "$data.tmp" && mv "$data.tmp" "$data"
   after="$(jq -r '.shell_commands | length' "$data")"
-  if [[ "$before" != "$after" ]]; then
-    ok "agent shell-commands — $before → $after entries"
-  else
-    info "agent shell-commands — already up to date"
-  fi
+  ok "agent shell-commands — $before → $after entries"
 }
 
 
@@ -627,6 +640,9 @@ seed_vault_templates() {
         dst="$target/.obsidian/$rel"
         if [[ "$rel" == "plugins/obsidian-meta-bind-plugin/data.json" ]]; then
           _merge_meta_bind_data "$src" "$dst" "$check"
+        elif [[ "$rel" == "plugins/obsidian-shellcommands/data.json" ]]; then
+          # Has its own additive-merge-by-id (agent buttons) — NOT overlay-managed.
+          _merge_agent_shell_commands "$target" "$wiki_dir" "$check"
         else
           # extended-graph / quickadd / dataview / … — engine base ⊕ operator overlay.
           _seed_json_overlay "$src" "$dst" ".obsidian/$rel" "$force" "$check" "$target"
@@ -658,10 +674,11 @@ seed_vault_templates() {
   #    (e.g. EXA_API_KEY) becomes discoverable without a destructive --force.
   _merge_env_example "$templates_dir/.claude/.env.example" "$target/.claude/.env.example" "$force" "$check"
 
-  # 10. Agent-task auto-wiring — discovered from prompts/agents/*.md `button:` frontmatter.
-  #     Skipped in check mode (these are destructive merges + dashboard rewrites).
+  # 10. Agent-button dashboard rewrite — discovered from prompts/agents/*.md
+  #     `button:` frontmatter. (The shell-commands data.json half is merged in
+  #     the plugin loop above, in both check + write modes.) Dashboard marker
+  #     rewrite is a write, so it's check-gated.
   if [[ "$check" != "1" ]]; then
-    _merge_agent_shell_commands "$target" "$wiki_dir"
     _rewrite_dashboard_agent_buttons "$target" "$wiki_dir"
   fi
 

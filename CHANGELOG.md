@@ -18,6 +18,16 @@ every operator's `wiki update` → `uv sync` regenerate `uv.lock` and dirty thei
 config keys must also be wired into `scripts/migrations/migrate_config_keys.py`
 in the same commit.
 
+## [0.1.5] — 2026-05-31
+
+### Fixed
+
+- **`obsidian-shellcommands/data.json` falsely reported as "drifted — extract-custom"
+  in `wiki seed --check`.** It has its own additive-merge-by-id (agent buttons),
+  but the overlay routing double-handled it through `_seed_json_overlay`. It's now
+  excluded from the overlay loop and its merge reports state correctly in check
+  mode (read-only) — no misleading overlay hint.
+
 ## [0.1.4] — 2026-05-31
 
 ### Fixed
@@ -143,6 +153,7 @@ operator-visible capabilities shipped up to this point:
   `review-wiki` resilience; O(N²)→O(N) lint orphan-link counting.
 - `wiki update` runs `uv sync` so `pyproject.toml` changes reach the vault venv.
 
+[0.1.5]: https://github.com/lx-0/llm-wiki/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/lx-0/llm-wiki/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/lx-0/llm-wiki/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/lx-0/llm-wiki/compare/v0.1.1...v0.1.2
