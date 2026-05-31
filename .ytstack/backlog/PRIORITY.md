@@ -8,8 +8,6 @@ Last reset: 2026-05-17 after M020 (backlinks footer) closeout, refreshed same da
 
 Pick one when "next?" comes up and the operator wants a concrete tick.
 
-- **`entity-dedup.md`** — `wiki dedup` interactive entity-dedup for STT-noise duplicates (issue #3, @Sidwach). $0 deterministic detection (difflib + German-aware phonetic key + shared `compiled_from`), operator-guided merge, corpus-wide wikilink rewrite via `core/links.py`, canonical-name hard fact. **In flight 2026-05-31** (ad-hoc arc — both #2/#3 backlogged then implemented same session).
-- **`dream-web-research.md`** — `features.dream_web_research` Exa-AI public-entity enrichment as a dream POST-PASS (NOT a compile producer — see backlog for the placement note), sentinel `## Public Profile` block, double opt-in + 30d cooldown, air-gapped from `raw/` (issue #2, @Sidwach). **In flight 2026-05-31.**
 - **`study-run-due-piggyback-audit.md`** — verify the M019 daily-schedule piggyback actually fires on lxw (enabled in vault, default-off in engine). 30-min audit; ripens 2026-05-19 to 2026-05-23 so week-1 review has clean data. **Audited 2026-05-22: wiring works (fires/spawns/cooldown OK, run_count=8); the doc's "daily" premise was wrong — manifest is `schedule: weekly`, so the runs-gap is expected. No fix needed; close it.**
 - **`ytstack-hook-exit-code.md`** — `pre-tool-use-edit` hook exits 2 when intent was warn-only. Half-day fix or plan-task skill change.
 - **`voice-punctuate-followups.md`** — end-to-end test + optional pre-2026-05-17 backfill + quality observation window.
@@ -83,6 +81,8 @@ Living docs, not actionable wedges. Read when adjacent work surfaces them.
 ## ✅ Done — in `shipped/`
 
 29 files moved 2026-05-17. M005-M020 + ad-hoc arcs: areas-bucket, author-attribution, calendar-collector, compile-{60kb, 1m-fallback, per-call-timeout, role-axis, scope-allowlist}, connection-quality, curiosity-consumer-gap, domain-frontmatter, dream-{cycle, priority-config, sampled-activation}, entity-pages-state-timeline, gmeet-collector, health-collector, jamie-intake + multi-tenant-lift, m019-diagrams-update, m020-infographic-update, operator-self-reports, producer-seam, python-interactive-menu, takes-substrate, use-llm-wiki-skill, vault-health-doctor, watermark-on-failure-fix, agents-template-scanner-resync.
+
+**2026-05-31:** `entity-dedup` (#3) + `dream-web-research` (#2) shipped + live-verified on lxw (issues CLOSED) → `shipped/`. Same session: a seed-robustness / config-overlay arc (engine v0.1.1→0.1.6) — targeted seed, JSON-order-aware drift, `.env` additive merge, shell-commands array-merge fix, **config overlays** (`template ⊕ untracked operator overlay`; DECISIONS 2026-05-31), uv.lock-sync rule. Full arc: `.ytstack/AD-HOC-issues-2-3-and-seed-overlay-SUMMARY.md`.
 
 ## ❌ Rejected — in `rejected/`
 

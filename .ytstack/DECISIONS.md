@@ -1547,3 +1547,41 @@ C) A single `core/piggyback_runner.py` wrapper: `python piggyback_runner.py <nam
 **Reason:** Behaviour-identical (golden-diff: fixture edge cases + 25-target real-vault subset, 0 mismatches), 99min → 3.8s on the real corpus. The map deliberately mirrors the oracle's full-content read (footer links included) rather than reusing `build_backlinks_index` (footer-aware), because switching to footer-aware would *change* orphan verdicts — that's the separately-backlogged footer-masking bug, kept out of a perf fix.
 
 **Linked artifacts:** `scripts/core/utils.py` (`build_inbound_count_map`), `scripts/lint.py` (`check_orphan_pages`), `tests/test_orphan_inbound_parity.py`, `.ytstack/backlog/orphan-check-footer-masking.md`, KNOWLEDGE.md "Dashboard lint orphan-check is accidentally O(N²)".
+
+---
+
+## 2026-05-31: Customisable seeded configs use engine-base ⊕ untracked operator-overlay
+
+**Context:** `wiki seed` applies `templates/` into the vault. Configs an operator
+customises (`graph.json`, `app.json`, plugin `data.json`) faced a force-vs-drift
+dilemma: if the customisation lives in the live file, an engine update is either
+`--force` (loses the operator's edits) or `keep` (operator never gets the new
+feature's keys). Whole-file `_seed_file` only ever said "drifted, kept existing".
+
+**Options considered:** (A) classify these files "operator-owned, seed-once,
+never touch" — REJECTED: they must stay engine-updatable when new features add
+keys, which seed-once forbids. (B) always `--force` them — destroys operator
+work. (C) **overlay**: engine owns the template (base); operator delta lives in an
+UNTRACKED `<vault>/.wiki/custom/<rel>`; the live file is DERIVED as
+`template ⊕ overlay` (element-wise deep-merge, overlay wins). Operator edits the
+overlay, never the live file; `--force` re-derives non-destructively; engine
+keys flow into the base half, customisations persist in the overlay.
+
+**Decision:** (C). `_seed_json_overlay` for `.obsidian/*.json` + plugin
+`data.json`; `wiki seed --extract-custom <rel>` bootstraps an overlay from a
+file's current drift (deep-diff live vs template). Markdown/YAML
+(`AGENTS.md`, `dashboard.md`, `knowledge.base`) stay engine-owned (targeted
+`--force`); accumulating-list plugins (community-plugins, shell-commands,
+meta-bind) keep their bespoke additive-merge-by-id (operator entries preserved,
+engine-managed entries updated). Overlay is JSON-only (jq); YAML would need yq
+(deferred). The merge MUST be element-wise, not jq `*` — see KNOWLEDGE
+2026-05-31.
+
+**Reason:** The only model that keeps a file simultaneously engine-migratable
+AND operator-customisable. Verified live: a template gaining a new key + `--force`
+preserves the operator override AND lands the new engine key. Convention recorded
+in the repo `AGENTS.md` ("Adding a seedable config").
+
+**Linked artifacts:** `lib/seed.sh` (`_seed_json_overlay` / `_apply_overlay` /
+`_compute_overlay` / `_extract_overlay`), `wiki` (`cmd_seed`), `AGENTS.md`,
+CHANGELOG 0.1.3–0.1.6, `.ytstack/AD-HOC-issues-2-3-and-seed-overlay-SUMMARY.md`.

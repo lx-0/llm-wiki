@@ -2414,3 +2414,44 @@ Build the extractor as two orthogonal helpers (`_parse_exif` + `_parse_android_f
 The bridge ships a LaunchAgent template because the bridge can't piggyback (Claude Code spawned, TCC-blocked). But the bridge is only the FIRST hop of an N-hop pipeline — the substrate collectors that consume the mirror, the lint/dream/optimize-claude-md piggybacks downstream, all still depend on Claude Code SessionEnd to fire. Operator observation: "wenn ich nicht mit claude code einen tag arbeite, wird auch nichts gepiggybacked." Pipeline silently stops on idle days.
 
 Generalised fix is a system-level scheduler (LaunchAgent / systemd-timer) that fires `wiki flush --piggybacks-only` (new flag, doesn't exist yet) on a cadence independent of Claude Code session boundary. Three shape options surfaced in the backlog (single sweep / per-piggyback fan-out / wiki-managed daemon); single-sweep is the leanest first slice. M-shaped, not ad-hoc. Pending operator green-light.
+
+## jq `*` replaces arrays wholesale — overlay/config deep-merge must be element-wise (2026-05-31)
+
+The config-overlay system (DECISIONS 2026-05-31) derives `template ⊕ overlay`.
+v0.1.3 implemented the merge as `jq -s '.[0] * .[1]'`. jq's `*` deep-merges
+**objects** recursively but **replaces arrays wholesale** (right operand wins).
+`_compute_overlay` produces a SPARSE overlay — only the leaf paths where the
+operator's file differs from the template, so for an array element it carries
+only the changed fields (a quickadd choice's tuned `format`, with `name`/`id`
+omitted because they matched the template). `template * overlay` therefore
+replaced the template's full `choices` array with the sparse one → every field
+that matched the template (names, ids, ~330 fields) was zeroed.
+
+**Symptom:** `wiki seed <plugin>/data.json --force` silently nulls array-element
+fields. Hit live on lxw's QuickAdd (choice names/ids → null). Object-only
+configs (graph.json) round-tripped fine, which masked it.
+
+**Fix:** element-wise recursive deep-merge (descend into arrays by index):
+```
+def deepmerge($x;$y):
+  if $y==null then $x
+  elif ($x|type)=="object" and ($y|type)=="object" then
+    reduce ($y|keys_unsorted[]) as $k ($x; .[$k]=deepmerge($x[$k];$y[$k]))
+  elif ($x|type)=="array" and ($y|type)=="array" then
+    [ range(0;([$x,$y]|map(length)|max)) as $i | deepmerge($x[$i];$y[$i]) ]
+  else $y end;
+```
+Limitation: index-based, so an operator who reorders/mid-inserts array elements
+can misalign; deletions aren't expressed (override-only). Acceptable for plugin
+configs (stable element order). Recovery for a corrupted live file:
+`deepmerge(template, overlay)` reconstructs it (the overlay still holds the diff).
+
+**Process lesson:** I ran the destructive `--force` against the operator's LIVE
+config before round-tripping the brand-new merge on the real data SHAPE
+(array-containing) in a fixture. A new merge/transform path must be round-trip
+tested on representative real data BEFORE it touches a live operator file — the
+object-only fixture passing was a false green. (REGEL #1 adjacent: verify on the
+actual shape, not a convenient one.)
+
+**Linked artifacts:** `lib/seed.sh` (`_apply_overlay`), CHANGELOG 0.1.4,
+`.ytstack/AD-HOC-issues-2-3-and-seed-overlay-SUMMARY.md`.
