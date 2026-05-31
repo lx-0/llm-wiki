@@ -2,6 +2,8 @@
 
 **Status:** backlog, optional / configurable feature. Evaluate **after** the SessionStart pointer-block refactor (shipped 2026-05-05) lands and we have observation data on whether the pointer alone is sufficient.
 
+> Update 2026-05-30 (`3f1da92`): the pointer block was reworded from a bare path-list to a framed `<knowledge-base>` block (named tag + authority line + "consult BEFORE answering" trigger) precisely because the bare list wasn't being consulted reliably. The observation clock for "is push-at-session-start enough?" restarts on the new wording. The web survey behind that change also confirmed this item's premise: Karpathy-LLM-Wiki-v2 reports `index.md`-grep degrades past ~100-200 articles and the vault already holds 567 concepts — so deterministic per-prompt retrieval is the right next lever once the framed pointer has been observed.
+
 **Origin:** 2026-05 conversation comparing this project's `session-start.py` injection pattern against Karpathy's pull-based index reading and Cole Medin's curated single-file `memory.md`. Conclusion: the SessionStart full-index-embed is an own-project extrapolation (cognitive-functions table in `docs/concept.md`, "Working memory" framing) that neither inspiration source actually does. The first refactor strips the body-embed and injects only a pointer-block. **This file** captures the optional next step: deterministic per-prompt retrieval as a hybrid of Karpathy's index-shape + Medin's query-time-retrieval (he does it for daily logs via SQLite — same shape, different substrate).
 
 ## Prior art — read before reinventing

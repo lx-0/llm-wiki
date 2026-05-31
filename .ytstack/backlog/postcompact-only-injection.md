@@ -1,6 +1,6 @@
 # Postcompact-Only SessionStart Injection
 
-**Status:** backlog, optional optimization on top of the 2026-05-05 pointer-block refactor. Evaluate after ≥2 weeks of pointer-block-as-shipped observation.
+**Status:** backlog, optional optimization on top of the 2026-05-05 pointer-block refactor (further reworded 2026-05-30, `3f1da92`, into a framed `<knowledge-base>` block with authority + trigger). Evaluate after ≥2 weeks of pointer-block-as-shipped observation — the observation window restarts on the 2026-05-30 wording.
 
 **Origin:** 2026-05-05 prior-art audit found `yoloshii/ClawMem` runs SessionStart injection **only after compaction** (`source: "compaction"`), not on every session start. Their stated reasoning: *"context-surfacing on first prompt is more precise"* than unconditional SessionStart bootstrapping. Compaction-recovery is the actual failure mode worth fixing; fresh sessions can read `AGENTS.md` (when CWD is the vault) or pull on demand (when CWD is anywhere else).
 
