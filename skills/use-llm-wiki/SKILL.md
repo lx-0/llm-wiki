@@ -92,9 +92,9 @@ cross a tier boundary.
 | Tier | What | Gate |
 |---|---|---|
 | **Read** | grep `knowledge/index.md` → `Read` the article; `wiki query` for synthesis | None — but prefer the index-grep path |
-| **Diagnose** | `wiki status`; full vault health dashboard via `.wiki/scripts/health.py` | None — read-only |
+| **Diagnose** | `wiki status`; full vault health dashboard via `.wiki/scripts/health.py`; `wiki dedup --suggest-only` (list duplicate-entity candidates) | None — read-only |
 | **Contribute** | `wiki flush`, `wiki correct add`, `wiki ingest-html`, `wiki ingest-youtube`, `wiki collect <name>` | Confirm with the operator first — these write to the vault |
-| **Maintain** | `wiki compile`, `wiki lint`, `wiki review-wiki`, `wiki curiosity`, `wiki suggestions`, `wiki process-inbox`, `wiki correct apply` | Explicit confirmation **and** name the cost |
+| **Maintain** | `wiki compile`, `wiki lint`, `wiki review-wiki`, `wiki curiosity`, `wiki suggestions`, `wiki process-inbox`, `wiki correct apply`, `wiki dedup` (merge), `wiki dream web-research` | Explicit confirmation **and** name the cost |
 
 A separate, off-tier operation: **Report a problem** to the engine repo
 (`gh issue create` against `lx-0/llm-wiki`) — operators report, they don't PR.
@@ -235,6 +235,16 @@ Heavy and/or costs real money. Confirm explicitly **and** state the cost.
   slow).
 - **`wiki curiosity`**, **`wiki suggestions`**, **`wiki process-inbox`** — the
   consumer-side loops. Local-LLM, but still slow; confirm before running.
+- **`wiki dedup`** — find + merge transcription-noise duplicate entity pages
+  (`josefine-bartsch`/`josephine-bartc`). `wiki dedup --suggest-only` is the read-only
+  candidate listing (Diagnose tier — safe to run unprompted). The bare command
+  is interactive and **destructive on confirm** (merges + deletes the duplicate,
+  backed up); never auto-confirm a merge — surface the candidates and let the
+  operator decide. $0, deterministic.
+- **`wiki dream web-research <slug>`** — public-entity enrichment via Exa AI
+  (writes a `## Public Profile` block). **External, paid API call**; doubly
+  gated OFF (`features.dream_web_research` + per-entity `web_research: true` /
+  `public-person` tag) and needs an Exa key. Confirm and name the cost.
 
 ## Report a problem to the engine
 

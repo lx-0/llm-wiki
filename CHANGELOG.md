@@ -1,0 +1,78 @@
+# Changelog
+
+All notable user-facing changes to the LLM-Wiki engine are recorded here.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+This project does not yet cut tagged releases — changes land on `main` and reach
+operator vaults via `wiki update`. The blow-by-blow engineering history lives in
+git and in `.ytstack/` (DECISIONS.md, KNOWLEDGE.md, per-milestone SUMMARY files);
+this file is the curated, capability-level view.
+
+Because pushing to `main` *is* releasing (operators pull via `wiki update`), there
+is no `[Unreleased]` bucket — when you ship an operator-visible change, add a new
+dated `## [x.y.z] — YYYY-MM-DD` section at the top, bump `version` in
+`pyproject.toml` to match, and group the entries (Added / Changed / Fixed /
+Removed). New config keys must also be wired into
+`scripts/migrations/migrate_config_keys.py` in the same commit.
+
+## [0.1.1] — 2026-05-31
+
+### Added
+
+- **`wiki dedup` — interactive entity deduplication** (issue #3). Finds and
+  merges transcription-noise duplicate entity pages (`josefine-bartsch` vs
+  `josephine-bartc`, `veltari` vs phantom `veltary`). Detection is deterministic and
+  $0 — `difflib` fuzzy + a German-aware phonetic key + shared `compiled_from`
+  (boost-only). Every merge is operator-confirmed: B's Timeline / Action Items /
+  Open Threads + aliases + sources fold into A, every `[[wikilink]]` B→A is
+  rewritten across `knowledge/`, B is backed up (`.bak.<ts>`) and deleted, and a
+  canonical-name hard fact is recorded. Flags: `--suggest-only`, `--dry-run`,
+  `--threshold`, and `wiki dedup merge B --into A`. Config:
+  `limits.dedup_fuzzy_threshold` (default 0.85).
+- **Dream web-research — public-entity enrichment via Exa AI** (issue #2). A
+  post-pass to `wiki dream <slug>` that researches PUBLIC people (founders,
+  execs, speakers) on the open web and writes a sentinel-managed
+  `## Public Profile` block into the page. Doubly gated
+  (`features.dream_web_research` + per-entity `web_research: true` / the
+  `public-person` tag), air-gapped from `raw/`, with its own 30-day cooldown
+  (`scheduling.web_research_cooldown_days`). Standalone forced refresh:
+  `wiki dream web-research <slug> [--dry-run]`. Config keys:
+  `features.dream_web_research`, `personal.exa_api_key` (or env `EXA_API_KEY`),
+  `scheduling.web_research_cooldown_days`.
+  _Note: the live Exa HTTP call is built to the `exa-search-api` skill's
+  authoritative shape but is unverified against the live API (no key at build
+  time); v1 writes a deterministic link-list block, with LLM distillation
+  deferred to a documented Phase 2._
+
+## [0.1.0] — 2026-05-31
+
+The engine snapshot at the time this changelog was introduced. Selected
+operator-visible capabilities shipped up to this point:
+
+### Added
+
+- **Substrate collectors** (11): email/IMAP, Google Meet, Jamie meetings, Google
+  Calendar, Oura health, voice notes (text + `whisper.cpp` audio for
+  m4a/wav/mp3), screenshots, pictures (with EXIF + Android-filename metadata),
+  YouTube intake, quick-capture, and an rsync `wiki bridge` for
+  sandbox-restricted intake folders.
+- **Knowledge maintenance**: `wiki compile`, `wiki dream` entity re-synthesis
+  (sampled-activation tiered corpus), `wiki lint`, `wiki links` (broken-wikilink
+  report + approval-gated fixer), `wiki reconcile` (autonomous concept
+  consistency), `wiki health-trends`, `wiki correct` hard facts, `wiki take`
+  third-party beliefs, `wiki query`, `wiki pin` MOCs.
+- **Operator surface**: interactive `wiki` home screen, `wiki doctor` health
+  audit, `wiki config`, Obsidian dashboard, `use-llm-wiki` skill for cross-project
+  access.
+- **Knowledge schema**: areas bucket, author attribution, compile-role axis,
+  optional `domain:` frontmatter, connection-quality gate, backlinks footer,
+  relativized wikilinks.
+
+### Fixed
+
+- Route `type: transcript` sources to `compile_main` (closes #1).
+- Reliability: bound Ollama half-open-socket hangs, per-piggyback wall-clock cap,
+  `review-wiki` resilience; O(N²)→O(N) lint orphan-link counting.
+- `wiki update` runs `uv sync` so `pyproject.toml` changes reach the vault venv.
+
+[0.1.1]: https://github.com/lx-0/llm-wiki/compare/v0.1.0...v0.1.1

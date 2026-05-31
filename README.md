@@ -157,6 +157,10 @@ When raw sources contradict reality — a Slack thread that calls a project by i
 
 `wiki health-trends` is the deterministic synthesis consumer for the health corpus. A single day's biometrics aren't knowledge, but trends across years are — so this pass ($0, no LLM) aggregates every numeric metric in `raw/notes/health/**` into a coverage-aware `## Trends` block (range, all-time vs recent average, trend arrow) inside `knowledge/concepts/health.md`. Default OFF; safe to enable.
 
+`wiki dedup` cleans up the silent duplicates that speech-to-text leaves behind. Transcribers garble names consistently — `josefine-bartsch` vs `josephine-bartc`, a real company vs a phantom the model invented — splitting one entity across two pages. Detection is $0 and deterministic (fuzzy + a German-aware phonetic key + shared sources); every merge is operator-confirmed, folds the duplicate's timeline/action-items/aliases into the survivor, rewrites all wikilinks, backs up + deletes the duplicate, and records a canonical-name hard fact so it can't silently come back.
+
+`wiki dream web-research` enriches **public** people (founders, execs, speakers) the way you'd reflexively google a new contact — a targeted Exa search at dream time writes a clearly-labelled `## Public Profile` block, kept structurally separate from compiled content and never fed back into `raw/`. Opt-in per vault *and* per entity; default OFF (it makes an external paid API call).
+
 `wiki usage` shows where the model budget actually goes. Every LLM call — Claude (subscription) and Ollama (local) — is metered in **tokens per provider/model**, not dollars (a single USD figure would conflate non-commensurable billing). Usage lands in `state/usage.json`; `wiki usage --days N` prints it per day with totals.
 
 ## What a compiled article looks like
