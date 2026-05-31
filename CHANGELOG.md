@@ -15,6 +15,20 @@ dated `## [x.y.z] — YYYY-MM-DD` section at the top, bump `version` in
 Removed). New config keys must also be wired into
 `scripts/migrations/migrate_config_keys.py` in the same commit.
 
+## [0.1.4] — 2026-05-31
+
+### Fixed
+
+- **Config-overlay deep-merge corrupted arrays** (regression in 0.1.3). The
+  overlay apply used jq's `*`, which merges objects but replaces arrays
+  wholesale — so a sparse overlay array (only the operator's differing fields)
+  obliterated the template's array, dropping every field that matched the
+  template. `wiki seed <plugin/data.json> --force` could zero out e.g. QuickAdd
+  choice names + ids. Now uses an element-wise recursive deep-merge. If you ran
+  `--extract-custom` + `--force` on a plugin `data.json` under 0.1.3, the live
+  file is recoverable as `deepmerge(template, .wiki/custom/<path>)` — the overlay
+  still holds your diff.
+
 ## [0.1.3] — 2026-05-31
 
 ### Added
@@ -126,6 +140,7 @@ operator-visible capabilities shipped up to this point:
   `review-wiki` resilience; O(N²)→O(N) lint orphan-link counting.
 - `wiki update` runs `uv sync` so `pyproject.toml` changes reach the vault venv.
 
+[0.1.4]: https://github.com/lx-0/llm-wiki/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/lx-0/llm-wiki/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/lx-0/llm-wiki/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/lx-0/llm-wiki/compare/v0.1.0...v0.1.1
