@@ -154,6 +154,79 @@ _merge_appearance_json() {
 }
 
 
+# ── Internal: merge .env.example (additive per-var stanza append) ──────
+# `.env.example` is a catalogue of recognised env-vars (reference, not the
+# live secrets). It drifts the moment an operator uncomments / annotates a
+# line, so whole-file _seed_file would only ever say "kept existing (drifted)"
+# — a NEW engine env-var (e.g. EXA_API_KEY) would never become discoverable
+# without a destructive --force. This merge appends only the stanzas for
+# active `KEY=` vars the operator's file is MISSING (matching either `KEY=`
+# or a commented `# KEY=`), preserving everything they already have. Each
+# appended stanza carries its contiguous doc-comment block from the template.
+# Idempotent; check=1 reports what would be appended without writing; force=1
+# overwrites wholesale (delegates to the caller's intent via cp).
+_merge_env_example() {
+  local src="$1" dst="$2" force="${3:-0}" check="${4:-0}"
+  if [[ ! -f "$src" ]]; then
+    return 0
+  fi
+  if [[ ! -f "$dst" ]]; then
+    if [[ "$check" == "1" ]]; then
+      warn "missing .claude/.env.example (run \`wiki seed\` to install)"
+      return 0
+    fi
+    mkdir -p "$(dirname "$dst")"
+    cp "$src" "$dst"
+    ok "seeded .claude/.env.example"
+    return 0
+  fi
+  if [[ "$force" == "1" ]]; then
+    mkdir -p "$(dirname "$dst")"
+    cp "$src" "$dst"
+    ok "overwrote .claude/.env.example (--force)"
+    return 0
+  fi
+
+  # Active vars in the template = uncommented `KEY=` lines.
+  local missing=() key
+  while IFS= read -r key; do
+    [[ -z "$key" ]] && continue
+    # Present already if the operator has `KEY=` OR a commented `# KEY=`.
+    if ! grep -qE "^[[:space:]]*#?[[:space:]]*${key}=" "$dst"; then
+      missing+=("$key")
+    fi
+  done < <(grep -oE '^[A-Z_][A-Z0-9_]*=' "$src" | sed 's/=$//' | sort -u)
+
+  if [[ ${#missing[@]} -eq 0 ]]; then
+    info "kept existing .claude/.env.example (up-to-date — all engine vars present)"
+    return 0
+  fi
+
+  if [[ "$check" == "1" ]]; then
+    info "drifted .claude/.env.example (engine adds: ${missing[*]} — would append ${#missing[@]} stanza(s))"
+    return 0
+  fi
+
+  # Append each missing var's stanza (its contiguous doc-comment block + the
+  # `KEY=` line) from the template, preserving the operator's file verbatim.
+  local appended=0
+  for key in "${missing[@]}"; do
+    local stanza
+    stanza="$(awk -v key="$key" '
+      /^[[:space:]]*$/ { buf=""; next }
+      /^#/             { buf = buf $0 "\n"; next }
+      $0 ~ "^" key "=" { printf "%s%s\n", buf, $0; found=1; exit }
+      { buf="" }
+      END { if (!found) exit 1 }
+    ' "$src")"
+    [[ -z "$stanza" ]] && stanza="$key="
+    printf '\n\n%s\n' "$stanza" >> "$dst"
+    appended=$((appended + 1))
+  done
+  ok ".claude/.env.example — appended ${appended} engine var(s): ${missing[*]}"
+}
+
+
 # ── Internal: merge meta-bind data.json (buttonTemplates union by id) ──
 # Engine ships canonical button templates referenced from dashboard.md as
 # `BUTTON[btn-*]`. In Meta-Bind v1.4.x, IDs are resolved against the plugin's
@@ -384,7 +457,10 @@ seed_vault_templates() {
   fi
 
   # 9. .claude/.env.example — secrets template (catalogue of recognised env vars).
-  _seed_file "$templates_dir/.claude/.env.example" "$target/.claude/.env.example" "$force" ".claude/.env.example" "$check"
+  #    Additive per-var merge (not whole-file _seed_file): appends only the
+  #    stanzas for engine vars the operator's file is missing, so a new var
+  #    (e.g. EXA_API_KEY) becomes discoverable without a destructive --force.
+  _merge_env_example "$templates_dir/.claude/.env.example" "$target/.claude/.env.example" "$force" "$check"
 
   # 10. Agent-task auto-wiring — discovered from prompts/agents/*.md `button:` frontmatter.
   #     Skipped in check mode (these are destructive merges + dashboard rewrites).
