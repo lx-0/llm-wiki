@@ -309,18 +309,29 @@ _merge_agent_shell_commands() {
   if [[ -z "$entries" ]] || [[ "$entries" == "{}" ]]; then
     return 0
   fi
+  # The obsidian-shellcommands plugin stores `shell_commands` as an ARRAY of
+  # `{id, ...}` objects; `agent_buttons.py` emits an OBJECT keyed by agent-id
+  # with the `id` field omitted. Convert the generated map to array entries
+  # (injecting `id` from the key), then replace-or-append into the operator's
+  # array BY id — preserving every non-engine command the operator added.
+  # (Pre-2026-05-31 this did `array + object`, which jq rejects → silent
+  # "merge failed" + stale agent buttons.)
   local before after merged
-  before="$(jq -r '.shell_commands | keys | length' "$data" 2>/dev/null || echo 0)"
+  before="$(jq -r '.shell_commands | length' "$data" 2>/dev/null || echo 0)"
   merged="$(jq --argjson agents "$entries" '
-    .shell_commands = (.shell_commands + ($agents | with_entries(select(.key as $k | (input_filename | "ignored") and ($k | tostring)))))
-    | .shell_commands = (.shell_commands + $agents)
+    ($agents | to_entries | map(.value + {id: .key})) as $new
+    | ($new | map(.id)) as $newids
+    | .shell_commands = (
+        [ (.shell_commands // [])[] | select(.id as $i | ($newids | index($i)) | not) ]
+        + $new
+      )
   ' "$data" 2>/dev/null || echo '')"
   if [[ -z "$merged" ]]; then
     warn "agent shell-commands merge failed"
     return 0
   fi
   printf '%s\n' "$merged" > "$data.tmp" && mv "$data.tmp" "$data"
-  after="$(jq -r '.shell_commands | keys | length' "$data")"
+  after="$(jq -r '.shell_commands | length' "$data")"
   if [[ "$before" != "$after" ]]; then
     ok "agent shell-commands — $before → $after entries"
   else
