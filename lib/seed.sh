@@ -9,6 +9,41 @@
 __WIKI_SEED_LOADED=1
 
 
+# ── Internal: targeted-seed filter ─────────────────────────────────
+# When `wiki seed <path>` targets one file, `_SEED_ONLY_DST` holds the
+# absolute target path. Every file op asks this guard first: skip (return 0)
+# unless its destination is the targeted one. Returns 1 (= don't skip) when
+# not targeting, or when this IS the target — and marks `_SEED_ONLY_HIT` so
+# the caller can warn if the requested path matched nothing seedable.
+_seed_only_skip() {
+  [[ -z "${_SEED_ONLY_DST:-}" ]] && return 1   # not targeting → never skip
+  if [[ "$1" == "$_SEED_ONLY_DST" ]]; then
+    _SEED_ONLY_HIT=1
+    return 1
+  fi
+  return 0
+}
+
+# ── Internal: equivalence test (byte-equal, or JSON-equal ignoring key order) ──
+# `cmp -s` flags a `.json` config as "drifted" whenever Obsidian rewrites it
+# with reordered keys — a false positive that buries the real drifts in noise.
+# For `.json` files, fall back to a canonical (`jq -S`) compare so only a
+# genuine value/shape difference counts as drift. Returns 0 when equivalent.
+_files_equivalent() {
+  local a="$1" b="$2"
+  cmp -s "$a" "$b" && return 0
+  case "$a" in
+    *.json)
+      command -v jq >/dev/null 2>&1 || return 1
+      local ca cb
+      ca="$(jq -S . "$a" 2>/dev/null)" || return 1
+      cb="$(jq -S . "$b" 2>/dev/null)" || return 1
+      [[ "$ca" == "$cb" ]]
+      ;;
+    *) return 1 ;;
+  esac
+}
+
 # ── Internal: copy if absent / overwrite if --force ────────────────
 # Modes:
 #   force=0 check=0   normal seed: copy when missing, keep + report drift if exists
@@ -20,11 +55,12 @@ _seed_file() {
   if [[ ! -f "$src" ]]; then
     return 0  # template missing — silently skip
   fi
+  _seed_only_skip "$dst" && return 0
 
   if [[ "$check" == "1" ]]; then
     if [[ ! -f "$dst" ]]; then
       warn "missing $label (run \`wiki seed\` to install)"
-    elif cmp -s "$src" "$dst"; then
+    elif _files_equivalent "$src" "$dst"; then
       ok "up-to-date $label"
     else
       info "drifted $label (engine template differs; \`wiki seed --force\` overwrites)"
@@ -44,7 +80,7 @@ _seed_file() {
     ok "overwrote $label (--force)"
     return 0
   fi
-  if cmp -s "$src" "$dst"; then
+  if _files_equivalent "$src" "$dst"; then
     info "kept existing $label (up-to-date)"
   else
     info "kept existing $label (drifted from engine; rerun with --force to overwrite, or \`wiki seed --check\` to audit)"
@@ -61,6 +97,7 @@ _merge_community_plugins() {
   if [[ ! -f "$src" ]]; then
     return 0
   fi
+  _seed_only_skip "$dst" && return 0
   if [[ ! -f "$dst" ]]; then
     if [[ "$check" == "1" ]]; then
       warn "missing community-plugins.json"
@@ -110,6 +147,7 @@ _merge_appearance_json() {
   if [[ ! -f "$src" ]]; then
     return 0
   fi
+  _seed_only_skip "$dst" && return 0
   if [[ ! -f "$dst" ]]; then
     if [[ "$check" == "1" ]]; then
       warn "missing appearance.json"
@@ -170,6 +208,7 @@ _merge_env_example() {
   if [[ ! -f "$src" ]]; then
     return 0
   fi
+  _seed_only_skip "$dst" && return 0
   if [[ ! -f "$dst" ]]; then
     if [[ "$check" == "1" ]]; then
       warn "missing .claude/.env.example (run \`wiki seed\` to install)"
@@ -240,6 +279,7 @@ _merge_meta_bind_data() {
   if [[ ! -f "$src" ]]; then
     return 0
   fi
+  _seed_only_skip "$dst" && return 0
   if [[ ! -f "$dst" ]]; then
     if [[ "$check" == "1" ]]; then
       warn "missing obsidian-meta-bind-plugin/data.json"
@@ -300,6 +340,7 @@ _merge_agent_shell_commands() {
   if [[ ! -f "$data" ]]; then
     return 0  # base seed didn't run yet; nothing to merge into
   fi
+  _seed_only_skip "$data" && return 0
   if ! command -v jq >/dev/null 2>&1; then
     warn "jq not available — skipping agent shell-commands merge"
     return 0
@@ -350,6 +391,7 @@ _rewrite_dashboard_agent_buttons() {
   if [[ ! -f "$dashboard" ]]; then
     return 0
   fi
+  _seed_only_skip "$dashboard" && return 0
   local result
   result="$(uv run --quiet --project "$wiki_dir" python "$wiki_dir/scripts/dashboard/agent_buttons.py" update-dashboard "$dashboard" 2>&1 || echo unchanged)"
   if [[ "$result" == "changed" ]]; then
@@ -361,11 +403,23 @@ _rewrite_dashboard_agent_buttons() {
 
 
 # ── Public: seed all vault templates ───────────────────────────────
-# Args: <target-vault-root> <wiki-dir> [force=0|1] [check=0|1]
+# Args: <target-vault-root> <wiki-dir> [force=0|1] [check=0|1] [only=<vault-rel-path>]
 # check=1 reports drift without writing anything (read-only audit).
+# only=<path> restricts the whole run to a single vault-relative file
+#   (e.g. "AGENTS.md" or ".obsidian/app.json") — every other file op is
+#   skipped via _seed_only_skip. Lets an operator surgically refresh one
+#   stale file with --force without clobbering unrelated customizations.
 seed_vault_templates() {
-  local target="$1" wiki_dir="$2" force="${3:-0}" check="${4:-0}"
+  local target="$1" wiki_dir="$2" force="${3:-0}" check="${4:-0}" only="${5:-}"
   local templates_dir="$wiki_dir/templates"
+
+  # Targeted-seed setup: resolve the requested path to an absolute dst and
+  # arm the per-file guard. _SEED_ONLY_HIT flips when a file op matches it.
+  _SEED_ONLY_DST=""
+  _SEED_ONLY_HIT=0
+  if [[ -n "$only" ]]; then
+    _SEED_ONLY_DST="$target/${only#/}"
+  fi
 
   if [[ ! -d "$templates_dir" ]]; then
     warn "no templates dir at $templates_dir"
@@ -479,4 +533,15 @@ seed_vault_templates() {
     _merge_agent_shell_commands "$target" "$wiki_dir"
     _rewrite_dashboard_agent_buttons "$target" "$wiki_dir"
   fi
+
+  # Targeted run that matched nothing: tell the operator instead of silently
+  # doing nothing (likely a typo or a non-seedable path).
+  if [[ -n "$_SEED_ONLY_DST" && "$_SEED_ONLY_HIT" == "0" ]]; then
+    warn "no seedable template matches '$only' — nothing done."
+    warn "seedable paths: README.md, AGENTS.md, dashboard.md, knowledge.base,"
+    warn "  .claude/.env.example, .obsidian/*.json, .obsidian/plugins/<p>/data.json,"
+    warn "  Templates/*.md, knowledge/MOCs/*.md, reports/studies/<id>/manifest.yaml"
+  fi
+  _SEED_ONLY_DST=""
+  _SEED_ONLY_HIT=0
 }

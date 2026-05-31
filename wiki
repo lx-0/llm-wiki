@@ -1062,7 +1062,7 @@ EOF
 
 
 cmd_seed() {
-  local force=0 check=0
+  local force=0 check=0 only=""
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --force)                  force=1; shift ;;
@@ -1075,6 +1075,7 @@ ${C_BOLD}USAGE${C_RESET}
   wiki seed                     additive: add missing files, merge community-plugins
   wiki seed --check             read-only audit: report which templates have drifted
   wiki seed --force             overwrite existing vault templates with engine versions
+  wiki seed <path> [--force|--check]   restrict to ONE file (surgical refresh)
 
 ${C_BOLD}WHAT IT DOES${C_RESET}
   - Seeds missing files: README.md, AGENTS.md, dashboard.md, knowledge.base, .claude/.env.example
@@ -1082,18 +1083,33 @@ ${C_BOLD}WHAT IT DOES${C_RESET}
   - Merges community-plugins.json (additive — adds engine plugins, never drops yours)
   - Cache files (_dashboard-*.md) are NOT seeded — first \`wiki flush\` writes them.
 
+${C_BOLD}TARGETED (single file)${C_RESET}
+  Pass a vault-relative path to act on just that file — every other template is
+  left untouched. Lets you refresh ONE stale file with --force without clobbering
+  unrelated customisations (e.g. your QuickAdd macros or graph palette):
+    wiki seed AGENTS.md --check          # audit just AGENTS.md
+    wiki seed AGENTS.md --force          # refresh just AGENTS.md
+    wiki seed .obsidian/app.json --check
+
 ${C_BOLD}DRIFT REPORTING${C_RESET}
   Default mode tags each kept-existing file as either ${C_DIM}up-to-date${C_RESET} or
   ${C_DIM}drifted from engine${C_RESET}. \`--check\` runs the same audit without writing
   anything — use it after \`wiki update\` to see what would change before
-  deciding whether to \`--force\` or merge manually.
+  deciding whether to \`--force\` or merge manually. JSON files that differ only
+  in key order are reported up-to-date, not drifted.
 
 ${C_BOLD}SAFETY${C_RESET}
   Default mode never overwrites your edits. Use --force only if you want to
-  discard your customisations and pick up the latest engine version.
+  discard your customisations and pick up the latest engine version. Combine
+  --force with a <path> to scope the overwrite to a single file.
 EOF
         return 0 ;;
-      *)                        err "unknown flag: $1"; exit 1 ;;
+      --*)                      err "unknown flag: $1"; exit 1 ;;
+      *)
+        if [[ -n "$only" ]]; then
+          err "wiki seed takes at most one path (got '$only' and '$1')"; exit 1
+        fi
+        only="$1"; shift ;;
     esac
   done
   if (( check == 1 && force == 1 )); then
@@ -1104,8 +1120,9 @@ EOF
   elif (( force == 1 )); then mode='overwrite mode'
   else mode='additive mode'
   fi
+  [[ -n "$only" ]] && mode="$mode · only: $only"
   banner "wiki seed" "$mode"
-  seed_vault_templates "$ROOT_DIR" "$WIKI_DIR" "$force" "$check"
+  seed_vault_templates "$ROOT_DIR" "$WIKI_DIR" "$force" "$check" "$only"
   # In audit mode we don't refresh dashboards — that's a side-effect of seeding.
   if (( check == 0 )); then
     _refresh_dashboard_stats
