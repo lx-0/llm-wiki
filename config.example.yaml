@@ -20,6 +20,10 @@ scheduling:
   # Concept-reconciliation routine: a hard fact reconciled within this many
   # days is skipped by `wiki reconcile` + the concept_reconcile piggyback.
   concept_reconcile_cooldown_days: 14
+  # Dream web-research (issue #2). `## Public Profile` refresh cooldown (days).
+  # Public profiles change slowly; much longer than the dream cooldown.
+  # `wiki dream web-research <slug>` forces a refresh regardless.
+  web_research_cooldown_days: 30
   # M017 — config-driven entity priority for dream-cycle selection. Default
   # behavior (empty config below) is "all entities equal weight, greedy by
   # age" (M014). Set rules to bias which entities get auto-dreamed more
@@ -405,6 +409,10 @@ limits:
   dream_tier1_recent_count: 20
   dream_tier1_digest_days: 7
   dream_tier2_sample_count: 50
+  # `wiki dedup` (entity-dedup, issue #3). Fuzzy-title match floor 0..1 for a
+  # pair to be proposed as a duplicate candidate. Phonetic-key collisions +
+  # shared `compiled_from` sources are proposed regardless of this floor.
+  dedup_fuzzy_threshold: 0.85
 
 features:
   # Pre-process voice transcripts through Ollama (classify_model = gemma4:e4b
@@ -423,6 +431,12 @@ features:
   clippings_sweep: true
   # M011 master switch — default OFF; flip on after dogfooding.
   extract_takes: false
+  # Dream web-research (issue #2) — default OFF. When on, `wiki dream <slug>`
+  # researches PUBLIC entities (founders/execs/speakers) via Exa AI and writes
+  # a sentinel-managed `## Public Profile` block. Makes an EXTERNAL paid API
+  # call; doubly gated by this flag AND per-entity opt-in (`web_research: true`
+  # frontmatter or the `public-person` tag). Never feeds back into raw/.
+  dream_web_research: false
   # Source-glob allowlist for the suggestions post-pass (Producer-seam arc).
   # fnmatch patterns matched against source paths relative to ROOT_DIR.
   # Default mirrors the legacy hardcoded `_is_email_source` filter; widen to
@@ -500,6 +514,11 @@ personal:
   #   Linux:   ~/.mozilla/firefox/<id>.default-release
   # Empty string disables the Firefox half of the browser collector.
   firefox_profile: ""
+  # Dream web-research (issue #2). Exa AI API key. Prefer setting it in the
+  # vault's .claude/.env as `EXA_API_KEY=...` (this field falls back to that
+  # env var when blank). Empty = the web-research post-pass stays inert even
+  # with `features.dream_web_research: true`.
+  exa_api_key: ""
   # Path to a Simple Tab Groups (STG) backup directory (where the extension
   # writes its periodic *.json snapshots). Empty string disables STG imports.
   stg_backup_dir: ""

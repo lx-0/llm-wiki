@@ -72,6 +72,10 @@ Key changes covered (chronological):
   limits.review_ollama_timeout_s             (added 2026-05-30, default 300 — per-article Ollama read timeout for review-wiki.py, lifted from a module constant)
   limits.review_consecutive_failure_abort    (added 2026-05-30, default 5 — review-wiki aborts the sweep after N consecutive Ollama failures instead of grinding 1700×timeout when kcma is down)
   limits.review_checkpoint_every             (added 2026-05-30, default 25 — review-wiki writes the partial report every N articles so an aborted/killed sweep isn't lost)
+  limits.dedup_fuzzy_threshold               (added 2026-05-31, default 0.85 — `wiki dedup` fuzzy-title match floor for duplicate-candidate proposal)
+  features.dream_web_research                (added 2026-05-31, default False — Exa-AI public-entity enrichment dream post-pass; issue #2)
+  scheduling.web_research_cooldown_days      (added 2026-05-31, default 30 — `## Public Profile` refresh cooldown)
+  personal.exa_api_key                       (added 2026-05-31, default "" — Exa AI key; falls back to env EXA_API_KEY)
   personal.accounts.<id>.health.healthkit    (added 2026-05-19 M023 — Apple HealthKit XML export ingest;
                                               injected as a placeholder into any account already carrying
                                               `health.oura`, kind: healthkit-xml-export, empty inbox_dir
@@ -252,6 +256,10 @@ KEY_ADDITIONS: dict[str, dict[str, object]] = {
         "review_ollama_timeout_s": 300,
         "review_consecutive_failure_abort": 5,
         "review_checkpoint_every": 25,
+        # `wiki dedup` (entity-dedup, issue #3, 2026-05-31). Fuzzy-title match
+        # floor for duplicate-candidate proposal. Match Limits.dedup_fuzzy_threshold
+        # default in scripts/core/config.py.
+        "dedup_fuzzy_threshold": 0.85,
     },
     "scheduling": {
         # M014 dream-cycle (2026-05-16). Per-entity cooldown — entities
@@ -275,10 +283,17 @@ KEY_ADDITIONS: dict[str, dict[str, object]] = {
         # facts reconciled within this window are skipped. Match
         # Scheduling.concept_reconcile_cooldown_days in config.py.
         "concept_reconcile_cooldown_days": 14,
+        # Dream web-research (issue #2, 2026-05-31). Per-entity `## Public
+        # Profile` refresh cooldown. Match Scheduling.web_research_cooldown_days.
+        "web_research_cooldown_days": 30,
     },
     "features": {
         # M011 master switch — default OFF, flip True after dogfooding.
         "extract_takes": False,
+        # Dream web-research (issue #2, 2026-05-31) — default OFF. Makes an
+        # EXTERNAL paid Exa API call; doubly gated by this flag + per-entity
+        # opt-in. Match Features.dream_web_research in config.py.
+        "dream_web_research": False,
         # Concept-reconciliation routine (2026-05-22) — default OFF. Makes
         # scoped autonomous writes to knowledge/concepts/; opt in after a
         # `wiki reconcile --dry-run` review. See backlog doc.
@@ -419,6 +434,11 @@ KEY_ADDITIONS: dict[str, dict[str, object]] = {
         # network-mounted / sandbox-restricted intake folders into local paths
         # the substrate collectors then folder-watch. See `wiki bridge --help`.
         "inbox_bridges": [],
+        # Dream web-research (issue #2, 2026-05-31). Exa AI key — empty default
+        # keeps the feature inert; falls back to env EXA_API_KEY. Prefer setting
+        # it in the vault's .claude/.env, not config.yaml. Match
+        # Personal.exa_api_key in config.py.
+        "exa_api_key": "",
     },
 }
 

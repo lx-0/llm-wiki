@@ -152,8 +152,12 @@ def test_migrate_config_file_round_trip(tmp_path):
     # +5 limits.{ollama_connect_timeout_s, piggyback_max_runtime_s,
     #    review_ollama_timeout_s, review_consecutive_failure_abort,
     #    review_checkpoint_every} (Ollama/piggyback/review reliability), 2026-05-30
-    # = 77 changes (no drops — operator has no orphan personal.* fields)
-    assert len(changes) == 77, f"got {len(changes)} changes: {changes}"
+    # +1 limits.dedup_fuzzy_threshold (wiki dedup, issue #3), 2026-05-31
+    # +3 dream web-research (issue #2), 2026-05-31:
+    #    features.dream_web_research, scheduling.web_research_cooldown_days,
+    #    personal.exa_api_key
+    # = 81 changes (no drops — operator has no orphan personal.* fields)
+    assert len(changes) == 81, f"got {len(changes)} changes: {changes}"
 
     reparsed = yaml.safe_load(new_text)
     # piggyback side
@@ -190,6 +194,7 @@ def test_migrate_config_no_change_when_fully_current(tmp_path):
             "dream_cooldown_days": 7,
             "dream_priority": {"default": 1.0, "paths": {}, "domain": {}, "tag_strategy": "max", "tags": {}, "status": {}},
             "concept_reconcile_cooldown_days": 14,
+            "web_research_cooldown_days": 30,
         },
         "piggybacks": {
             "email": {"enabled": True, "cooldown_hours": 24},
@@ -241,9 +246,11 @@ def test_migrate_config_no_change_when_fully_current(tmp_path):
             "review_ollama_timeout_s": 300,
             "review_consecutive_failure_abort": 5,
             "review_checkpoint_every": 25,
+            "dedup_fuzzy_threshold": 0.85,
         },
         "features": {
             "extract_takes": False,
+            "dream_web_research": False,
             "voice_punctuate": True,
             "suggestions_source_globs": ["raw/email/*.md"],
             "compile_callback_gate": True,
@@ -266,6 +273,7 @@ def test_migrate_config_no_change_when_fully_current(tmp_path):
             "voice_transcribe_binary": "",
             "voice_transcribe_ffmpeg": "",
             "inbox_bridges": [],
+            "exa_api_key": "",
         },
     }), encoding="utf-8")
 
@@ -352,6 +360,7 @@ def test_migrate_additions_idempotent():
             "dream_cooldown_days": 7,
             "dream_priority": {"default": 1.0, "paths": {}, "domain": {}, "tag_strategy": "max", "tags": {}, "status": {}},
             "concept_reconcile_cooldown_days": 14,
+            "web_research_cooldown_days": 30,
         },
         "limits": {
             "compile_force_long_context_types": ["daily-digest", "calendar-rollup"],
@@ -393,6 +402,7 @@ def test_migrate_additions_idempotent():
             "review_ollama_timeout_s": 300,
             "review_consecutive_failure_abort": 5,
             "review_checkpoint_every": 25,
+            "dedup_fuzzy_threshold": 0.85,
         },
         "piggybacks": {
             "calendar": {"enabled": True, "cooldown_hours": 6, "max_per_run": 500},
@@ -405,6 +415,7 @@ def test_migrate_additions_idempotent():
         },
         "features": {
             "extract_takes": False,
+            "dream_web_research": False,
             "voice_punctuate": True,
             "suggestions_source_globs": ["raw/email/*.md"],
             "compile_callback_gate": True,
@@ -427,6 +438,7 @@ def test_migrate_additions_idempotent():
             "voice_transcribe_binary": "",
             "voice_transcribe_ffmpeg": "",
             "inbox_bridges": [],
+            "exa_api_key": "",
         },
     }
     changes = m.migrate_additions(data)

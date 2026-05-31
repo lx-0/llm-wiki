@@ -119,6 +119,12 @@ class Scheduling:
     # days is skipped by `wiki reconcile` + the concept_reconcile piggyback.
     # Default 14 — concepts drift slower than entities; conservative.
     concept_reconcile_cooldown_days: int = 14
+    # Dream web-research (issue #2). An entity whose `## Public Profile` block
+    # was refreshed within this many days is skipped by the web-research
+    # post-pass. Separate from dream_cooldown_days — public profiles change
+    # slowly, so the default is much longer (30 d). `wiki dream web-research
+    # <slug>` ignores this for a forced refresh.
+    web_research_cooldown_days: int = 30
 
 
 @dataclass
@@ -547,6 +553,13 @@ class Limits:
     # cooldown). Bigger K = more coverage per dream + bigger prompt; smaller
     # K = faster individual dreams + longer cycle for any one file.
     dream_tier2_sample_count: int = 50
+    # `wiki dedup` (entity-dedup, issue #3). Fuzzy-title match floor 0..1 for a
+    # pair to be proposed as a duplicate candidate. 0.85 catches STT spelling
+    # noise (`josefine-bartsch`/`josephine-bartc`) without flooding the operator with
+    # unrelated near-misses; lower it to widen the net, raise to tighten.
+    # Phonetic-key collisions + shared `compiled_from` sources are proposed
+    # regardless of this floor. See `.ytstack/backlog/entity-dedup.md`.
+    dedup_fuzzy_threshold: float = 0.85
 
 
 @dataclass
@@ -572,6 +585,14 @@ class Features:
     # M011 takes substrate. Default OFF — flip True after dogfooding.
     # Cost: +1 SDK call per gated compile (Claude, no Ollama fallback).
     extract_takes: bool = False
+    # Dream web-research (issue #2). When True, `wiki dream <slug>` runs a
+    # post-pass that researches PUBLIC entities (founders, execs, speakers)
+    # via Exa AI and writes a sentinel-managed `## Public Profile` block.
+    # Default OFF — it makes an EXTERNAL, paid API call (Exa). Doubly gated:
+    # this flag AND per-entity opt-in (`web_research: true` frontmatter or the
+    # `public-person` tag). Never feeds back into raw/ (compile-loop
+    # contamination guard). See `.ytstack/backlog/dream-web-research.md`.
+    dream_web_research: bool = False
     # Source-glob allowlist for the suggestions post-pass. fnmatch patterns
     # matched against source paths relative to ROOT_DIR. Default mirrors the
     # legacy hardcoded `_is_email_source` filter; widen the list to enable
@@ -798,6 +819,13 @@ class Personal:
     # LaunchAgent install path. Drive-mode "move" means the source folder is
     # drained on every sync — operator accepts: drop is one-shot, not a mirror.
     inbox_bridges: list[dict] = field(default_factory=list)
+    # Dream web-research (issue #2). Exa AI API key for the public-entity
+    # enrichment post-pass. Empty default = feature inert even when
+    # `features.dream_web_research` is on (the post-pass skips with
+    # reason "no_api_key"). Falls back to env `EXA_API_KEY` when blank. Lives
+    # in Personal (per-instance secret, never committed) — set it in the
+    # vault's `.claude/.env` as `EXA_API_KEY=...` rather than config.yaml.
+    exa_api_key: str = ""
     # M025 quick-capture-correction loop. Path to a directory the operator
     # one-taps cryptic notes / article snippets into (any tool that writes
     # .txt / .md / .html — WhatsApp-self-group export, Notion quick-note sync,

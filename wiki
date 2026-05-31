@@ -62,6 +62,9 @@
 #   wiki take list             list all takes files
 #   wiki take show SLUG        show all takes for one holder
 #   wiki take remove SLUG --line N | --all   remove a take line or the whole file
+#   wiki dedup                 find + merge STT-noise duplicate entity pages (interactive)
+#   wiki dedup --suggest-only  print duplicate candidates without merging
+#   wiki dedup merge B --into A   standalone merge of a known duplicate pair
 #   wiki pin <article>         pin an article to a Map-of-Content (no LLM, idempotent)
 #   wiki pin <article> --section "Name" --moc people --summary "X"
 #   wiki review-wiki           per-article quality-score sweep (local LLM, free)
@@ -432,6 +435,8 @@ ${C_BOLD}USAGE${C_RESET}
   wiki dream --dry-run                     print plan, no SDK calls
   wiki dream --limit N                     hard cap on entity count this run
   wiki dream list-candidates               debug: print scored candidate list, no run
+  wiki dream web-research <slug>           public-entity web enrichment (issue #2, Exa)
+  wiki dream web-research <slug> --dry-run print the Public Profile block, write nothing
 
 ${C_BOLD}NOTES${C_RESET}
   Sweeps \`knowledge/{people,projects,areas}/*.md\` oldest-synthesized first,
@@ -445,6 +450,8 @@ EOF
       banner "wiki dream sweep"; _run_script dream.py sweep "$@" ;;
     list-candidates|--list-candidates)
       shift; banner "wiki dream list-candidates"; _run_script dream.py list-candidates "$@" ;;
+    web-research|--web-research-only)
+      shift; banner "wiki dream web-research"; _run_script dream.py web-research "$@" ;;
     --*)
       # Bare flags (e.g. `wiki dream --dry-run --limit 3`) → implicit sweep
       banner "wiki dream sweep"; _run_script dream.py sweep "$@" ;;
@@ -701,6 +708,47 @@ EOF
   fi
   banner "wiki correct"
   _run_script facts/correct.py "$@"
+  local rc=$?
+  _refresh_dashboard_stats
+  _refresh_dashboard_lint
+  return $rc
+}
+
+cmd_dedup() {
+  case "${1:-}" in
+    -h|--help|help)
+      cat <<EOF
+${C_BOLD}wiki dedup${C_RESET} — find + merge transcription-noise duplicate entity pages
+
+${C_BOLD}USAGE${C_RESET}
+  wiki dedup                         detect candidates, walk them interactively
+  wiki dedup --suggest-only          print the candidate list, no merge loop
+  wiki dedup --dry-run               walk + merge without writing anything
+  wiki dedup --threshold 0.9         override fuzzy match floor (0..1)
+  wiki dedup merge B --into A        standalone merge of a known pair
+  wiki dedup merge B --into A --name "Correct Name"
+
+${C_BOLD}WHAT IT DOES${C_RESET}
+  Wraps \`scripts/dedup.py\`. STT transcribers (Jamie, voice) garble names
+  consistently — \`sephora-tunsch\` vs \`sefora-tunc\`, \`maytoni\` vs phantom
+  \`mytony\` — splitting one entity across two pages. Detection is \$0 +
+  deterministic (difflib fuzzy + German-aware phonetic key + shared
+  \`compiled_from\`). Every merge is operator-confirmed (never automatic):
+  B's Timeline / Action Items / Open Threads + aliases + sources fold into A,
+  every \`[[wikilink]]\` B→A is rewritten across knowledge/, B is backed up
+  (\`.bak.<ts>\`) + deleted, and a canonical-name hard fact is recorded so
+  lint flags any reappearance.
+
+${C_BOLD}NOTES${C_RESET}
+  Operates on knowledge/{people,projects,areas}/. Cross-kind pairs are never
+  proposed. Fuzzy floor: \`limits.dedup_fuzzy_threshold\` (default 0.85);
+  phonetic + shared-source matches are proposed regardless. Spec:
+  \`.ytstack/backlog/entity-dedup.md\`.
+EOF
+      return 0 ;;
+  esac
+  banner "wiki dedup"
+  _run_script dedup.py "$@"
   local rc=$?
   _refresh_dashboard_stats
   _refresh_dashboard_lint
@@ -1668,6 +1716,7 @@ case "${1:-}" in
   query)            shift; cmd_query "$@" ;;
   agent)            shift; cmd_agent "$@" ;;
   correct)          shift; cmd_correct "$@" ;;
+  dedup)            shift; cmd_dedup "$@" ;;
   study)            shift; cmd_study "$@" ;;
   analyze)          shift; cmd_analyze "$@" ;;
   take)             shift; cmd_take "$@" ;;
