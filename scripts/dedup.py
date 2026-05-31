@@ -697,7 +697,14 @@ def main(argv: list[str] | None = None) -> int:
     p_merge.add_argument("drop", help="entity to merge away (slug | kind/slug | path)")
     p_merge.add_argument("--into", required=True, help="entity to keep (slug | kind/slug | path)")
     p_merge.add_argument("--name", default=None, help="canonical name (default: the kept page's title)")
+    # Accept --dry-run AFTER `merge` too (operators type it last). A separate
+    # dest avoids the argparse quirk where the subparser default clobbers the
+    # top-level value; the two are OR-ed below.
+    p_merge.add_argument("--dry-run", action="store_true", dest="merge_dry_run",
+                         help="show the merge without writing")
     args = parser.parse_args(argv)
+    # Honour --dry-run in either position (top-level or after `merge`).
+    args.dry_run = args.dry_run or getattr(args, "merge_dry_run", False)
 
     from core.paths import KNOWLEDGE_DIR, ROOT_DIR
 

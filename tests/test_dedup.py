@@ -249,7 +249,26 @@ def test_main_merge_subcommand_dry_run(tmp_path: Path, monkeypatch, capsys):
     import dedup
     monkeypatch.setattr(dedup, "_ask", lambda *_: "y")  # auto-confirm
 
+    # --dry-run BEFORE the subcommand (argparse top-level position).
     rc = dedup.main(["--dry-run", "merge", "drop", "--into", "keep"])
+    assert rc == 0
+    assert (v / "knowledge/people/drop.md").exists()  # dry-run wrote nothing
+
+
+def test_main_merge_dry_run_after_subcommand(tmp_path: Path, monkeypatch):
+    """Operators type `merge B --into A --dry-run` — --dry-run AFTER the
+    subcommand must also be honoured (not error / not write)."""
+    v = _vault(tmp_path, {
+        "knowledge/people/keep.md": _page("Keep"),
+        "knowledge/people/drop.md": _page("Drop"),
+    })
+    import core.paths as paths
+    monkeypatch.setattr(paths, "KNOWLEDGE_DIR", v / "knowledge", raising=False)
+    monkeypatch.setattr(paths, "ROOT_DIR", v, raising=False)
+    import dedup
+    monkeypatch.setattr(dedup, "_ask", lambda *_: "y")
+
+    rc = dedup.main(["merge", "drop", "--into", "keep", "--dry-run"])
     assert rc == 0
     assert (v / "knowledge/people/drop.md").exists()  # dry-run wrote nothing
 

@@ -18,6 +18,15 @@ every operator's `wiki update` → `uv sync` regenerate `uv.lock` and dirty thei
 config keys must also be wired into `scripts/migrations/migrate_config_keys.py`
 in the same commit.
 
+## [0.1.6] — 2026-05-31
+
+### Fixed
+
+- **`wiki dedup merge B --into A --dry-run` errored** ("unrecognized arguments:
+  --dry-run") because `--dry-run` was argparse-top-level-only, so it had to
+  precede the `merge` subcommand. Operators naturally append it — now accepted
+  in either position.
+
 ## [0.1.5] — 2026-05-31
 
 ### Fixed
@@ -153,6 +162,7 @@ operator-visible capabilities shipped up to this point:
   `review-wiki` resilience; O(N²)→O(N) lint orphan-link counting.
 - `wiki update` runs `uv sync` so `pyproject.toml` changes reach the vault venv.
 
+[0.1.6]: https://github.com/lx-0/llm-wiki/compare/v0.1.5...v0.1.6
 [0.1.5]: https://github.com/lx-0/llm-wiki/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/lx-0/llm-wiki/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/lx-0/llm-wiki/compare/v0.1.2...v0.1.3
