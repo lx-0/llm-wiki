@@ -8,6 +8,8 @@ Last reset: 2026-05-17 after M020 (backlinks footer) closeout, refreshed same da
 
 Pick one when "next?" comes up and the operator wants a concrete tick.
 
+- **`entity-dedup.md`** — `wiki dedup` interactive entity-dedup for STT-noise duplicates (issue #3, @Sidwach). $0 deterministic detection (difflib + German-aware phonetic key + shared `compiled_from`), operator-guided merge, corpus-wide wikilink rewrite via `core/links.py`, canonical-name hard fact. **In flight 2026-05-31** (ad-hoc arc — both #2/#3 backlogged then implemented same session).
+- **`dream-web-research.md`** — `features.dream_web_research` Exa-AI public-entity enrichment as a dream POST-PASS (NOT a compile producer — see backlog for the placement note), sentinel `## Public Profile` block, double opt-in + 30d cooldown, air-gapped from `raw/` (issue #2, @Sidwach). **In flight 2026-05-31.**
 - **`study-run-due-piggyback-audit.md`** — verify the M019 daily-schedule piggyback actually fires on lxw (enabled in vault, default-off in engine). 30-min audit; ripens 2026-05-19 to 2026-05-23 so week-1 review has clean data. **Audited 2026-05-22: wiring works (fires/spawns/cooldown OK, run_count=8); the doc's "daily" premise was wrong — manifest is `schedule: weekly`, so the runs-gap is expected. No fix needed; close it.**
 - **`ytstack-hook-exit-code.md`** — `pre-tool-use-edit` hook exits 2 when intent was warn-only. Half-day fix or plan-task skill change.
 - **`voice-punctuate-followups.md`** — end-to-end test + optional pre-2026-05-17 backfill + quality observation window.
