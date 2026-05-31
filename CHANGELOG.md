@@ -15,6 +15,24 @@ dated `## [x.y.z] — YYYY-MM-DD` section at the top, bump `version` in
 Removed). New config keys must also be wired into
 `scripts/migrations/migrate_config_keys.py` in the same commit.
 
+## [0.1.3] — 2026-05-31
+
+### Added
+
+- **Config overlays — engine-owned base ⊕ operator-owned delta.** Customisable
+  JSON configs (`graph.json`, `app.json`, `core-plugins.json`, plugin
+  `data.json`) are now derived as `engine-template ⊕ overlay`: the engine owns
+  the base (so new-feature keys flow in on `wiki update`), and the operator's
+  customisations live in an **untracked** overlay at `<vault>/.wiki/custom/<path>`.
+  You edit the overlay, never the live file — so `--force` re-derives
+  **non-destructively** (your edits persist, the engine's new keys land). This
+  resolves the force-vs-drift dilemma: previously customising a seeded config
+  meant either `--force` (lose edits) or `keep` (never get new-feature settings).
+- **`wiki seed --extract-custom <path>`** — bootstrap an overlay from a file's
+  current drift (deep-diff of live vs engine template). Run it once to migrate an
+  already-customised config into the overlay model; afterwards edit
+  `.wiki/custom/<path>` and `wiki seed <path> --force` re-derives.
+
 ## [0.1.2] — 2026-05-31
 
 Seeding robustness, surfaced while shipping web-research (#2).
@@ -108,5 +126,6 @@ operator-visible capabilities shipped up to this point:
   `review-wiki` resilience; O(N²)→O(N) lint orphan-link counting.
 - `wiki update` runs `uv sync` so `pyproject.toml` changes reach the vault venv.
 
+[0.1.3]: https://github.com/lx-0/llm-wiki/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/lx-0/llm-wiki/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/lx-0/llm-wiki/compare/v0.1.0...v0.1.1

@@ -212,6 +212,16 @@ STT transcribers (Jamie, voice) garble names consistently, planting silent dupli
 
 Every LLM call is metered in TOKENS, keyed by `(provider, model)` — never dollars (Claude is a subscription, Ollama is local; `total_cost_usd` is meaningless / conflates billing). `core/usage.py` (`UsageLedger`, process-global `LEDGER`) records at each call site (the Ollama client auto-records; Claude SDK sites record `AssistantMessage.usage` after their loop) and `atexit`-flushes per-run totals to `state/usage.json` (fcntl-locked, `date → provider:model → {input,output,calls}`). `wiki usage [--days N] [--json]` reads it back. Gates are token/structural, not USD: `compile_max_tokens_per_file` (batch-abort, `kind=tokens_exceeded`), `dream_entity_max_prompt_chars` (size guard) + `dream_cycle_max_tokens_per_run`, reconcile's file/fact-count gates. A dollar figure may appear only for a provider explicitly registered as pay-per-token (none today). Accounting half of the M021 model seam. Spec: `.ytstack/backlog/token-usage-accounting.md`; DECISIONS 2026-05-23.
 
+### Adding a seedable config (drift + overlay rules)
+
+`wiki seed` applies `templates/` into the vault. How a template file is handled depends on whether operators customise it:
+
+- **Engine-owned (markdown/YAML — `AGENTS.md`, `dashboard.md`, `knowledge.base`):** whole-file via `_seed_file`. Seed-if-missing, keep-if-exists, refresh with a targeted `wiki seed <path> --force`. Operators shouldn't hand-edit these; they're regenerated.
+- **Customisable JSON configs (`graph.json`, `app.json`, plugin `data.json`):** route through `_seed_json_overlay`. The engine owns the template (base); the operator's delta lives in an **untracked** overlay at `<vault>/.wiki/custom/<rel>`; the live file is derived as `template ⊕ overlay` (jq deep-merge). This keeps the file engine-updatable (new keys flow in) while preserving customisations — operators edit the overlay, `--force` re-derives non-destructively, `wiki seed --extract-custom <rel>` bootstraps an overlay from existing drift. NEVER make a customisable config keep-or-`--force` whole-file — that recreates the force-vs-drift dilemma.
+- **Accumulating lists (community-plugins, shell-commands, meta-bind buttons):** bespoke additive-merge-by-id/union (`_merge_*`), preserving operator entries while adding/updating engine-managed ones.
+
+Drift detection is JSON-key-order-insensitive (`_files_equivalent` / canonical `jq -S`), so don't worry about Obsidian re-serialising key order.
+
 ### Adding a prompt
 
 1. Drop `<name>.md` into `prompts/`.
