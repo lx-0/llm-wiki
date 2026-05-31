@@ -518,6 +518,10 @@ With `Write`/`Edit` in `allowed_tools`, the CLI fast-paths them as pre-approved 
 - `scripts/compile_stages/compile.py:135` and `scripts/dream.py:883` — gated behind `CONFIG.features.compile_callback_gate` (default `True`)
 - Probe stays in `scripts/probe_compile_scope.py` as the regression artifact; cost ~$0.07 per run
 
+#### Verified end-to-end (2026-05-31)
+
+The **PreToolUse hook** (`make_path_scope_hook`, the actual production gate — Write/Edit IN `allowed_tools` + hook deny, since the `can_use_tool` variant silently blocked inside-scope) is now covered at both levels: 5 unit tests in `tests/test_sdk_helpers.py` (allow-inside / deny-outside-engine-target / deny-edit / deny-missing-path / multi-root LOG_FILE) **and** a fresh SDK probe of the exact compile config (`allowed_tools=[Read,Glob,Grep,Write,Edit]` + the hook scoped to `[knowledge/, LOG_FILE]`): an engine-targeted Write was **blocked** (CLI honored `permissionDecision: deny`) while an inside-`knowledge/` Write **succeeded**. Closes the long-standing "57fc0d4 allowlist UNTESTED" debt — the allowlist was decorative, superseded by the callback, then by this hook; the hook is what runs and it's now empirically confirmed for both compile + dream.
+
 ### Compile abort-counter — empty-file skip is not a failure
 
 #### Anti-pattern (fixed 2026-05-07)

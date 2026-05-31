@@ -65,11 +65,69 @@ def test_breakdown_optional() -> None:
 import asyncio
 from pathlib import Path
 
-from core.sdk_helpers import make_path_scope_gate, prompt_stream
+from core.sdk_helpers import make_path_scope_gate, make_path_scope_hook, prompt_stream
 
 
 def _run(coro):
     return asyncio.run(coro)
+
+
+# ── make_path_scope_hook — the production compile/dream gate (PreToolUse) ──
+# This is the path actually wired when `features.compile_callback_gate` is True
+# (compile.py + dream.py). It returns the PreToolUse hookSpecificOutput shape,
+# NOT the can_use_tool PermissionResult shape — different contract, so it needs
+# its own coverage. (The can_use_tool gate above silently blocked inside-scope
+# writes in production, which is why the hook superseded it — 2026-05-18.)
+
+def _hook_decision(hook, *, tool, file_path):
+    out = _run(hook({"tool_name": tool, "tool_input": {"file_path": file_path}}, "tid", None))
+    return out["hookSpecificOutput"]
+
+
+def test_hook_allows_write_inside_scope(tmp_path):
+    knowledge = tmp_path / "knowledge"
+    knowledge.mkdir()
+    hook = make_path_scope_hook([knowledge])
+    d = _hook_decision(hook, tool="Write", file_path=str(knowledge / "foo.md"))
+    assert d["permissionDecision"] == "allow"
+    assert d["hookEventName"] == "PreToolUse"
+
+
+def test_hook_denies_write_outside_scope(tmp_path):
+    knowledge = tmp_path / "knowledge"
+    knowledge.mkdir()
+    hook = make_path_scope_hook([knowledge])
+    target = str(tmp_path / ".wiki" / "config.yaml")  # engine-targeted write
+    d = _hook_decision(hook, tool="Write", file_path=target)
+    assert d["permissionDecision"] == "deny"
+    assert "not under any permitted root" in d["permissionDecisionReason"]
+
+
+def test_hook_denies_edit_outside_scope(tmp_path):
+    knowledge = tmp_path / "knowledge"
+    knowledge.mkdir()
+    hook = make_path_scope_hook([knowledge])
+    d = _hook_decision(hook, tool="Edit", file_path=str(tmp_path / "outside.md"))
+    assert d["permissionDecision"] == "deny"
+
+
+def test_hook_denies_missing_file_path(tmp_path):
+    hook = make_path_scope_hook([tmp_path / "knowledge"])
+    out = _run(hook({"tool_name": "Write", "tool_input": {}}, "tid", None))
+    assert out["hookSpecificOutput"]["permissionDecision"] == "deny"
+
+
+def test_hook_multi_root_allows_log_file(tmp_path):
+    """Production scopes to [knowledge/, LOG_FILE] — both roots must allow."""
+    knowledge = tmp_path / "knowledge"
+    knowledge.mkdir()
+    log_file = tmp_path / ".wiki" / "logs" / "operations.md"
+    hook = make_path_scope_hook([knowledge, log_file])
+    # The operations log (a second permitted root) is writable…
+    assert _hook_decision(hook, tool="Write", file_path=str(log_file))["permissionDecision"] == "allow"
+    # …but a sibling engine file is not.
+    sibling = str(tmp_path / ".wiki" / "config.yaml")
+    assert _hook_decision(hook, tool="Write", file_path=sibling)["permissionDecision"] == "deny"
 
 
 def test_gate_allows_write_inside_scope(tmp_path):
