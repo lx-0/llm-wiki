@@ -11,9 +11,12 @@ this file is the curated, capability-level view.
 Because pushing to `main` *is* releasing (operators pull via `wiki update`), there
 is no `[Unreleased]` bucket — when you ship an operator-visible change, add a new
 dated `## [x.y.z] — YYYY-MM-DD` section at the top, bump `version` in
-`pyproject.toml` to match, and group the entries (Added / Changed / Fixed /
-Removed). New config keys must also be wired into
-`scripts/migrations/migrate_config_keys.py` in the same commit.
+`pyproject.toml` to match, re-run `uv lock` and commit the `uv.lock` change in
+the same commit (the lockfile records the project version, so skipping it makes
+every operator's `wiki update` → `uv sync` regenerate `uv.lock` and dirty their
+`.wiki/` tree), and group the entries (Added / Changed / Fixed / Removed). New
+config keys must also be wired into `scripts/migrations/migrate_config_keys.py`
+in the same commit.
 
 ## [0.1.4] — 2026-05-31
 
