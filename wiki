@@ -1062,11 +1062,12 @@ EOF
 
 
 cmd_seed() {
-  local force=0 check=0 only=""
+  local force=0 check=0 only="" extract=0
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --force)                  force=1; shift ;;
       --check)                  check=1; shift ;;
+      --extract-custom)         extract=1; shift ;;
       -h|--help|help)
         cat <<EOF
 ${C_BOLD}wiki seed${C_RESET} — re-apply engine templates to the vault root
@@ -1076,6 +1077,7 @@ ${C_BOLD}USAGE${C_RESET}
   wiki seed --check             read-only audit: report which templates have drifted
   wiki seed --force             overwrite existing vault templates with engine versions
   wiki seed <path> [--force|--check]   restrict to ONE file (surgical refresh)
+  wiki seed --extract-custom <path>    capture a JSON config's drift into an overlay
 
 ${C_BOLD}WHAT IT DOES${C_RESET}
   - Seeds missing files: README.md, AGENTS.md, dashboard.md, knowledge.base, .claude/.env.example
@@ -1090,6 +1092,18 @@ ${C_BOLD}TARGETED (single file)${C_RESET}
     wiki seed AGENTS.md --check          # audit just AGENTS.md
     wiki seed AGENTS.md --force          # refresh just AGENTS.md
     wiki seed .obsidian/app.json --check
+
+${C_BOLD}CONFIG OVERLAYS (JSON configs — graph.json, app.json, plugin data.json)${C_RESET}
+  These are derived as ${C_DIM}engine-template ⊕ your overlay${C_RESET}: the engine owns the
+  base (so new-feature keys flow in on update), your customisations live in an
+  untracked overlay at ${C_DIM}<vault>/.wiki/custom/<path>${C_RESET}. Edit the overlay, not
+  the live file — then \`--force\` re-derives non-destructively. To migrate an
+  already-customised file, capture its current drift into an overlay once:
+    wiki seed --extract-custom .obsidian/graph.json   # drift → .wiki/custom/...
+    # …then edit .wiki/custom/.obsidian/graph.json going forward
+    wiki seed .obsidian/graph.json --force            # re-derive base ⊕ overlay
+  Markdown/YAML files (AGENTS.md, dashboard.md) are engine-owned — no overlay;
+  refresh them with a targeted --force.
 
 ${C_BOLD}DRIFT REPORTING${C_RESET}
   Default mode tags each kept-existing file as either ${C_DIM}up-to-date${C_RESET} or
@@ -1114,6 +1128,12 @@ EOF
   done
   if (( check == 1 && force == 1 )); then
     err "--check and --force are mutually exclusive"; exit 1
+  fi
+  if (( extract == 1 )); then
+    [[ -n "$only" ]] || { err "usage: wiki seed --extract-custom <vault-relative-path>"; exit 1; }
+    banner "wiki seed --extract-custom" "$only"
+    seed_extract_custom "$ROOT_DIR" "$WIKI_DIR" "$only"
+    return $?
   fi
   local mode
   if (( check == 1 )); then mode='audit (read-only)'

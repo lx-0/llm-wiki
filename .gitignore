@@ -13,6 +13,10 @@ config.yaml
 state/
 logs/
 sessions/
+# custom/  — operator config overlays (deltas merged onto seeded templates;
+#            see lib/seed.sh _seed_json_overlay). Per-instance + operator-owned,
+#            so never part of the engine checkout.
+custom/
 # Round-robin config backups (every `wiki config set` snapshots the prior
 # state into state/config-backups/, last 10 kept). state/ already covers
 # this — listed explicitly for grep-ability.

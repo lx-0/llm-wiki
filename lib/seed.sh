@@ -44,6 +44,118 @@ _files_equivalent() {
   esac
 }
 
+# ── Config overlays — engine-owned base ⊕ operator-owned delta ─────
+# The drift problem: a seeded config file (graph.json, app.json, a plugin's
+# data.json) must stay engine-updatable when new features add keys, BUT the
+# operator also customises it. If the customisation lives in the file itself,
+# every engine change is a force-vs-drift dilemma. The fix: the operator's
+# delta lives in a SEPARATE untracked overlay at `<vault>/.wiki/custom/<rel>`
+# and the live file is DERIVED as `template ⊕ overlay` (jq deep-merge, overlay
+# wins). The operator edits the overlay, never the live file; `--force`
+# re-derives, so it's non-destructive for overlay-managed files. Engine
+# updates flow into the template half; customisations persist in the overlay.
+_custom_root() { echo "$1/.wiki/custom"; }   # $1 = vault target
+
+# Echo `base ⊕ overlay` (recursive merge, overlay wins). No overlay → base.
+_apply_overlay() {  # $1 = base file, $2 = overlay file
+  if [[ -f "$2" ]] && command -v jq >/dev/null 2>&1; then
+    jq -s '.[0] * .[1]' "$1" "$2" 2>/dev/null && return 0
+  fi
+  cat "$1"
+}
+
+# Echo the minimal overlay: every leaf path where `cur` differs from `base`
+# (new keys + changed values; leaf-level, so nested objects merge cleanly).
+# Deletions aren't expressed — overlays are override-only by design.
+_compute_overlay() {  # $1 = base file, $2 = cur file
+  jq -n --slurpfile b "$1" --slurpfile c "$2" '
+    ($b[0]) as $base | ($c[0]) as $cur
+    | reduce ($cur | paths(scalars)) as $p ({};
+        if ($base | getpath($p)) != ($cur | getpath($p))
+        then setpath($p; $cur | getpath($p)) else . end)
+  ' 2>/dev/null
+}
+
+_json_canon() { jq -S . "$1" 2>/dev/null; }              # canonical form of a file
+_json_canon_str() { printf '%s' "$1" | jq -S . 2>/dev/null; }  # …of a string
+
+# Seed a JSON config as `template ⊕ overlay`. Re-derive on --force or when
+# missing; never clobber a drifted live file silently (operator may have
+# edits not yet captured into an overlay — tell them how to make it durable).
+_seed_json_overlay() {  # $1=src $2=dst $3=rel $4=force $5=check $6=target
+  local src="$1" dst="$2" rel="$3" force="$4" check="${5:-0}" target="$6"
+  [[ -f "$src" ]] || return 0
+  _seed_only_skip "$dst" && return 0
+  if ! command -v jq >/dev/null 2>&1; then
+    _seed_file "$src" "$dst" "$force" "$rel" "$check"; return 0
+  fi
+  local overlay desired has_overlay=0
+  overlay="$(_custom_root "$target")/$rel"
+  [[ -f "$overlay" ]] && has_overlay=1
+  desired="$(_apply_overlay "$src" "$overlay")"
+  local ov_tag=""; [[ "$has_overlay" == 1 ]] && ov_tag=" (overlay applied)"
+
+  if [[ "$check" == "1" ]]; then
+    if [[ ! -f "$dst" ]]; then
+      warn "missing $rel (run \`wiki seed\` to install)"
+    elif [[ "$(_json_canon "$dst")" == "$(_json_canon_str "$desired")" ]]; then
+      ok "up-to-date $rel$ov_tag"
+    elif [[ "$has_overlay" == 1 ]]; then
+      info "drifted $rel (live ≠ template⊕overlay — \`wiki seed $rel --force\` re-derives; or \`wiki seed --extract-custom $rel\` to capture new edits)"
+    else
+      info "drifted $rel (uncaptured edits — \`wiki seed --extract-custom $rel\` makes them survive engine updates)"
+    fi
+    return 0
+  fi
+
+  if [[ ! -f "$dst" ]]; then
+    mkdir -p "$(dirname "$dst")"; printf '%s\n' "$desired" > "$dst"
+    ok "seeded $rel$([[ "$has_overlay" == 1 ]] && echo ' (+overlay)')"
+    return 0
+  fi
+  if [[ "$(_json_canon "$dst")" == "$(_json_canon_str "$desired")" ]]; then
+    info "kept existing $rel (up-to-date$ov_tag)"
+    return 0
+  fi
+  if [[ "$force" == "1" ]]; then
+    mkdir -p "$(dirname "$dst")"; printf '%s\n' "$desired" > "$dst"
+    ok "re-derived $rel from template$([[ "$has_overlay" == 1 ]] && echo '⊕overlay') (--force)"
+    return 0
+  fi
+  if [[ "$has_overlay" == 1 ]]; then
+    info "kept existing $rel (drifted from template⊕overlay; \`wiki seed $rel --force\` re-derives)"
+  else
+    info "kept existing $rel (drifted; \`wiki seed --extract-custom $rel\` captures your edits, then \`--force\` is safe)"
+  fi
+}
+
+# Bootstrap an overlay from a file's CURRENT drift: delta(live, template) →
+# `<vault>/.wiki/custom/<rel>`. After this, the live file == template⊕overlay,
+# so seed/--force are non-destructive and engine updates flow in.
+_extract_overlay() {  # $1=rel $2=target $3=templates_dir
+  local rel="$1" target="$2" templates_dir="$3"
+  local base="$templates_dir/$rel" dst="$target/$rel"
+  local overlay; overlay="$(_custom_root "$target")/$rel"
+  command -v jq >/dev/null 2>&1 || { err "jq required for --extract-custom"; return 1; }
+  [[ -f "$base" ]] || { err "no engine template for '$rel' (not an overlay-managed file)"; return 1; }
+  [[ -f "$dst" ]]  || { err "no live file at $dst"; return 1; }
+  local delta; delta="$(_compute_overlay "$base" "$dst")"
+  if [[ -z "$delta" || "$(_json_canon_str "$delta")" == "{}" ]]; then
+    info "$rel already matches the engine template — no overlay needed"
+    return 0
+  fi
+  mkdir -p "$(dirname "$overlay")"; printf '%s\n' "$delta" > "$overlay"
+  local n; n="$(printf '%s' "$delta" | jq '[paths(scalars)] | length' 2>/dev/null)"
+  ok "extracted overlay → .wiki/custom/$rel ($n override(s))"
+  info "from now on edit .wiki/custom/$rel (not the live file); \`wiki seed $rel --force\` re-derives"
+}
+
+# Public: extract one file's overlay (used by `wiki seed --extract-custom <rel>`).
+seed_extract_custom() {  # $1=target $2=wiki_dir $3=rel
+  local templates_dir="$2/templates"
+  _extract_overlay "$3" "$1" "$templates_dir"
+}
+
 # ── Internal: copy if absent / overwrite if --force ────────────────
 # Modes:
 #   force=0 check=0   normal seed: copy when missing, keep + report drift if exists
@@ -473,7 +585,8 @@ seed_vault_templates() {
       elif [[ "$base" == "appearance.json" ]]; then
         _merge_appearance_json "$f" "$target/.obsidian/$base" "$check"
       else
-        _seed_file "$f" "$target/.obsidian/$base" "$force" ".obsidian/$base" "$check"
+        # graph.json / app.json / core-plugins.json — engine base ⊕ operator overlay.
+        _seed_json_overlay "$f" "$target/.obsidian/$base" ".obsidian/$base" "$force" "$check" "$target"
       fi
     done
 
@@ -498,7 +611,8 @@ seed_vault_templates() {
         if [[ "$rel" == "plugins/obsidian-meta-bind-plugin/data.json" ]]; then
           _merge_meta_bind_data "$src" "$dst" "$check"
         else
-          _seed_file "$src" "$dst" "$force" ".obsidian/$rel" "$check"
+          # extended-graph / quickadd / dataview / … — engine base ⊕ operator overlay.
+          _seed_json_overlay "$src" "$dst" ".obsidian/$rel" "$force" "$check" "$target"
         fi
       done < <(find "$templates_dir/.obsidian/plugins" -type f -name '*.json')
     fi
