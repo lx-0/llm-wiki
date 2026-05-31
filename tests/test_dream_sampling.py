@@ -104,6 +104,15 @@ def vault(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Path]:
             "areas":    (tmp_path / "knowledge" / "areas",    "area"),
         },
     )
+    # last_dreamed_at lives in a side-state JSON (commit 3f35ab3 — raw/ is
+    # immutable, never frontmatter). Without this the tests read/write the
+    # REAL engine state/dream-activation.json, keyed by a rel-path identical
+    # across runs → first run of the day stamps it, later runs see "already
+    # stamped today" and return False (stateful cross-run pollution).
+    monkeypatch.setattr(
+        dream, "_DREAM_ACTIVATION_FILE",
+        tmp_path / ".wiki" / "state" / "dream-activation.json",
+    )
     yield tmp_path
 
 
@@ -310,21 +319,26 @@ def test_never_dreamed_file_dominates_score(vault: Path) -> None:
 # ── last_dreamed_at write-back ─────────────────────────────────────
 
 
-def test_write_last_dreamed_at_creates_frontmatter(vault: Path) -> None:
-    """File without frontmatter gets one synthesized at the top."""
+def test_write_last_dreamed_at_records_side_state(vault: Path) -> None:
+    """The stamp lands in the side-state JSON, NOT in the substrate file —
+    raw/ is immutable (commit 3f35ab3, moved out of frontmatter)."""
     import dream
     p = _write_substrate(vault, "raw/notes/email/no-fm.md", "Body only — no frontmatter.\n")
+    before = p.read_text()
     when = datetime(2026, 5, 17, tzinfo=timezone.utc)
     assert dream._write_last_dreamed_at(p, when=when) is True
-    text = p.read_text()
-    assert text.startswith("---\n")
-    fm_end = text.find("\n---\n", 4)
-    assert fm_end != -1
-    fm = yaml.safe_load(text[4:fm_end])
-    assert fm["last_dreamed_at"] == "2026-05-17"
+    # Substrate file is byte-identical — no frontmatter synthesised.
+    assert p.read_text() == before
+    assert not p.read_text().startswith("---\n")
+    # The raw side-state holds the stamp, keyed by the vault-relative path.
+    activation = dream._load_dream_activation()
+    assert activation.get("raw/notes/email/no-fm.md") == "2026-05-17"
+    # …and the lookup resolves it (None-check is timezone-safe).
+    assert dream._get_last_dreamed_at(p) is not None
 
 
-def test_write_last_dreamed_at_preserves_existing_fm(vault: Path) -> None:
+def test_write_last_dreamed_at_leaves_substrate_untouched(vault: Path) -> None:
+    """A file with its own frontmatter is never polluted with last_dreamed_at."""
     import dream
     p = _write_substrate(
         vault, "raw/notes/email/with-fm.md", "Body here.\n",
@@ -333,21 +347,19 @@ def test_write_last_dreamed_at_preserves_existing_fm(vault: Path) -> None:
     when = datetime(2026, 5, 17, tzinfo=timezone.utc)
     dream._write_last_dreamed_at(p, when=when)
     fm, body = dream._parse_frontmatter(p.read_text())
-    assert fm["title"] == "x"
-    assert fm["author"] == "alex"
-    assert fm["last_dreamed_at"] == "2026-05-17"
+    assert fm == {"title": "x", "author": "alex"}   # unchanged, no last_dreamed_at
     assert "Body here." in body
+    # The stamp lives in the side-state, keyed by the vault-relative path.
+    assert dream._load_dream_activation().get("raw/notes/email/with-fm.md") == "2026-05-17"
 
 
 def test_write_last_dreamed_at_idempotent_same_day(vault: Path) -> None:
-    """Re-stamping with the same date is a no-op (don't churn mtime)."""
+    """Re-stamping with the same date is a no-op (don't churn the side-state)."""
     import dream
-    p = _write_substrate(
-        vault, "raw/notes/email/x.md", "Body.\n",
-        frontmatter={"last_dreamed_at": "2026-05-17"},
-    )
+    p = _write_substrate(vault, "raw/notes/email/x.md", "Body.\n")
     when = datetime(2026, 5, 17, 12, 0, tzinfo=timezone.utc)
-    assert dream._write_last_dreamed_at(p, when=when) is False  # no-op
+    assert dream._write_last_dreamed_at(p, when=when) is True   # first stamp writes
+    assert dream._write_last_dreamed_at(p, when=when) is False  # same day → no-op
 
 
 def test_dreams_since_last_seen_reads_stamp(vault: Path) -> None:
@@ -440,7 +452,8 @@ def test_corpus_stays_bounded_on_large_substrate_pool(vault: Path) -> None:
 def test_dream_entity_stamps_last_dreamed_at_after_sdk(
     vault: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """A successful dream must write last_dreamed_at: to every corpus file."""
+    """A successful dream must stamp every corpus file — in the side-state,
+    not by mutating the raw/ files."""
     import asyncio
     import dream
     from claude_agent_sdk import ResultMessage
@@ -475,11 +488,12 @@ def test_dream_entity_stamps_last_dreamed_at_after_sdk(
     res = asyncio.run(dream.dream_entity(ent, max_prompt_chars=0))
     assert res.skipped is None, f"unexpected skip: {res.skipped} ({res.sdk_result_text!r})"
 
-    # Both substrate files were stamped
-    fm1, _ = dream._parse_frontmatter(p1.read_text())
-    fm2, _ = dream._parse_frontmatter(p2.read_text())
-    assert fm1.get("last_dreamed_at"), f"p1 not stamped: {fm1}"
-    assert fm2.get("last_dreamed_at"), f"p2 not stamped: {fm2}"
+    # Both substrate files were stamped — in the side-state, NOT in raw/.
+    assert dream._get_last_dreamed_at(p1) is not None, "p1 not stamped"
+    assert dream._get_last_dreamed_at(p2) is not None, "p2 not stamped"
+    # The raw/ files themselves are untouched (no frontmatter pollution).
+    assert dream._parse_frontmatter(p1.read_text())[0] == {}
+    assert dream._parse_frontmatter(p2.read_text())[0] == {}
 
 
 def test_dream_entity_skips_stamp_on_daily_digest(
