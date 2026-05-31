@@ -1438,6 +1438,50 @@ async def dream_all_entities(
 # ── CLI ───────────────────────────────────────────────────────────
 
 
+def _maybe_web_research(ent: EntityRef) -> None:
+    """Fail-soft web-research post-pass after a successful dream. Gated
+    internally (feature flag + per-entity opt-in + cooldown). Never raises —
+    a web hiccup must not break the dream flow."""
+    try:
+        from core.paths import KNOWLEDGE_DIR
+        from web_research import run_web_research
+
+        res = run_web_research(
+            ent.page, config=CONFIG, knowledge_dir=KNOWLEDGE_DIR, force=False,
+        )
+        if res.status == "ok" and res.wrote:
+            log.info("  web-research: wrote Public Profile block for %s", ent.slug)
+        elif res.status == "failed":
+            log.warning("  web-research failed for %s: %s", ent.slug, res.reason)
+        else:
+            log.debug("  web-research skipped for %s: %s", ent.slug, res.reason)
+    except Exception:  # noqa: BLE001 — post-pass must never break dream
+        log.exception("  web-research post-pass crashed for %s (ignored)", ent.slug)
+
+
+def _run_web_research_standalone(ent: EntityRef, *, dry_run: bool) -> int:
+    """`wiki dream web-research <slug>` — forced refresh (bypasses feature
+    flag + opt-in + cooldown; still needs an Exa key)."""
+    from core.paths import KNOWLEDGE_DIR
+    from web_research import run_web_research
+
+    res = run_web_research(
+        ent.page, config=CONFIG, knowledge_dir=KNOWLEDGE_DIR,
+        force=True, dry_run=dry_run,
+    )
+    if res.status == "ok":
+        if dry_run and res.block:
+            print(res.block)
+        else:
+            log.info("Wrote Public Profile block for %s", ent.slug)
+        return 0
+    if res.status == "failed":
+        log.error("web-research failed for %s: %s", ent.slug, res.reason)
+        return 4
+    log.warning("web-research skipped for %s: %s", ent.slug, res.reason)
+    return 0
+
+
 async def _async_main() -> int:
     parser = argparse.ArgumentParser(description="Dream-cycle entity re-synthesis (M014)")
     sub = parser.add_subparsers(dest="cmd")
@@ -1448,6 +1492,12 @@ async def _async_main() -> int:
     p_one.add_argument("--max-chars", type=int, default=None, help="Override per-entity prompt-char cap")
     p_one.add_argument("--max-turns", type=int, default=20, help="SDK max_turns budget")
     p_one.add_argument("--ignore-cooldown", action="store_true", help="Skip the last_synthesized_at gate")
+
+    p_wr = sub.add_parser("web-research",
+        help="Public-entity web enrichment for ONE entity (issue #2)")
+    p_wr.add_argument("slug", help="Entity slug (a public person)")
+    p_wr.add_argument("--dry-run", action="store_true",
+        help="Print the Public Profile block, write nothing")
 
     p_all = sub.add_parser("sweep", help="Sweep all entities (--all-entities)")
     p_all.add_argument("--dry-run", action="store_true")
@@ -1504,7 +1554,18 @@ async def _async_main() -> int:
             return 3
         if res.skipped == "sdk_failure":
             return 4
+        # Web-research post-pass (issue #2) — gated internally by the feature
+        # flag + per-entity opt-in + cooldown; fail-soft (never breaks dream).
+        if not args.dry_run and res.skipped is None:
+            _maybe_web_research(ent)
         return 0
+
+    if args.cmd == "web-research":
+        ent = _resolve_entity(args.slug)
+        if ent is None:
+            log.error("No entity page found for slug %r.", args.slug)
+            return 2
+        return _run_web_research_standalone(ent, dry_run=args.dry_run)
 
     if args.cmd == "sweep":
         results = await dream_all_entities(
