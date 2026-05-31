@@ -57,9 +57,26 @@ _files_equivalent() {
 _custom_root() { echo "$1/.wiki/custom"; }   # $1 = vault target
 
 # Echo `base ⊕ overlay` (recursive merge, overlay wins). No overlay → base.
+# Uses an ELEMENT-WISE deep merge, NOT jq's `*`: `*` merges objects but
+# REPLACES arrays wholesale (right wins), so a sparse overlay array (only the
+# operator's differing fields, e.g. a quickadd choice's tuned format) would
+# obliterate the template's array — dropping every field that matched the
+# template (names, ids, …). The recursive descent into arrays by index keeps
+# template fields the overlay didn't touch. (Limitation: index-based, so an
+# operator who REORDERS or mid-inserts array elements can misalign — documented
+# as override-only; deletions aren't expressed either.)
 _apply_overlay() {  # $1 = base file, $2 = overlay file
   if [[ -f "$2" ]] && command -v jq >/dev/null 2>&1; then
-    jq -s '.[0] * .[1]' "$1" "$2" 2>/dev/null && return 0
+    jq -n --slurpfile a "$1" --slurpfile b "$2" '
+      def deepmerge($x; $y):
+        if   $y == null then $x
+        elif ($x|type) == "object" and ($y|type) == "object" then
+          reduce ($y | keys_unsorted[]) as $k ($x; .[$k] = deepmerge($x[$k]; $y[$k]))
+        elif ($x|type) == "array" and ($y|type) == "array" then
+          [ range(0; ([$x, $y] | map(length) | max)) as $i | deepmerge($x[$i]; $y[$i]) ]
+        else $y end;
+      deepmerge($a[0]; $b[0])
+    ' 2>/dev/null && return 0
   fi
   cat "$1"
 }
