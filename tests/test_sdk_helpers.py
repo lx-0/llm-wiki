@@ -217,3 +217,40 @@ def test_prompt_stream_yields_one_user_message():
         return out
     msgs = _run(collect())
     assert msgs == [{"type": "user", "message": {"role": "user", "content": "hello world"}}]
+
+
+# ── extract_usage_tokens (cache-aware token accounting) ───────────────
+
+from core.sdk_helpers import UsageTokens, extract_usage_tokens
+
+
+def test_extract_usage_none_and_empty_returns_zeros():
+    assert extract_usage_tokens(None) == UsageTokens()
+    assert extract_usage_tokens({}) == UsageTokens()
+    assert extract_usage_tokens(None).total_input == 0
+
+
+def test_extract_usage_folds_cache_into_total_input():
+    """The bundled CLI caches the prompt, so a 40 KB prompt reports a tiny
+    uncached `input_tokens` while the real bulk lands in the cache fields.
+    total_input must fold all three together."""
+    usage = {
+        "input_tokens": 12,
+        "cache_creation_input_tokens": 38000,
+        "cache_read_input_tokens": 1500,
+        "output_tokens": 90,
+    }
+    u = extract_usage_tokens(usage)
+    assert u.input_tokens == 12
+    assert u.cache_creation_tokens == 38000
+    assert u.cache_read_tokens == 1500
+    assert u.output_tokens == 90
+    # The headline number that the low-token warning must judge against:
+    assert u.total_input == 12 + 38000 + 1500 == 39512
+
+
+def test_extract_usage_tolerates_missing_and_bad_values():
+    u = extract_usage_tokens({"input_tokens": None, "output_tokens": "x"})
+    assert u.input_tokens == 0
+    assert u.output_tokens == 0
+    assert u.total_input == 0

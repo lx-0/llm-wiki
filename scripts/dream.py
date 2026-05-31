@@ -49,7 +49,7 @@ import random
 import re
 import sys
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -80,6 +80,8 @@ from core.paths import (
 from core.prompts import render
 from core.sdk_helpers import (
     StderrCapture,
+    UsageTokens,
+    extract_usage_tokens,
     log_sdk_failure,
     make_path_scope_gate,
     make_path_scope_hook,
@@ -858,6 +860,59 @@ def _build_prompt(
     return prompt, len(prompt)
 
 
+def _build_prompt_within_budget(
+    entity: EntityRef,
+    breakdown: CorpusBreakdown,
+    *,
+    max_turns: int,
+    max_chars: int,
+) -> tuple[str, int, CorpusBreakdown, int]:
+    """Build the prompt; if it overruns ``max_chars``, trim the corpus to fit.
+
+    The corpus is bounded by *file count* (tier caps) but not by *chars*, so a
+    high-file-count entity (e.g. ytstack: 52 Tier-1 + 50 Tier-2) can assemble a
+    prompt past the budget and previously failed terminally (PROMPT_TOO_LARGE →
+    entity never synthesized). Instead, drop the lowest-value substrate until it
+    fits: Tier 2 first (sampled older substrate, already score-sorted so the
+    tail is least valuable), then the oldest of Tier-1-recent. Tier-1 authored +
+    daily digests are load-bearing and never dropped — if the prompt is *still*
+    over budget after exhausting the droppable tiers, the caller hard-fails.
+
+    Returns ``(prompt, prompt_chars, trimmed_breakdown, dropped_count)``.
+    """
+    prompt, prompt_chars = _build_prompt(
+        entity, breakdown.all_paths, max_turns=max_turns, breakdown=breakdown
+    )
+    if max_chars <= 0 or prompt_chars <= max_chars:
+        return prompt, prompt_chars, breakdown, 0
+
+    tier2 = list(breakdown.tier2_sampled)
+    recent = list(breakdown.tier1_recent)
+    dropped = 0
+    work = breakdown
+    while prompt_chars > max_chars and (tier2 or recent):
+        # Adaptive batch: estimate how many trailing files to drop to cover the
+        # overrun in one rebuild. avg overestimates per-file corpus chars (it
+        # folds in fixed prompt overhead), so the batch is conservative and
+        # never over-drops; converges in a handful of rebuilds.
+        droppable = len(tier2) + len(recent)
+        avg = max(1, prompt_chars // max(1, droppable))
+        batch = max(1, min(droppable, (prompt_chars - max_chars) // avg + 1))
+        for _ in range(batch):
+            if tier2:
+                tier2.pop()
+            elif recent:
+                recent.pop()
+            else:
+                break
+            dropped += 1
+        work = replace(breakdown, tier2_sampled=tier2, tier1_recent=recent)
+        prompt, prompt_chars = _build_prompt(
+            entity, work.all_paths, max_turns=max_turns, breakdown=work
+        )
+    return prompt, prompt_chars, work, dropped
+
+
 def current_page_title(page_text: str) -> str | None:
     fm, _body = _parse_frontmatter(page_text)
     val = fm.get("title")
@@ -910,7 +965,44 @@ async def dream_entity(
             skipped="no_substrate", elapsed_s=time.time() - started,
         )
 
-    prompt, prompt_chars = _build_prompt(entity, corpus_paths, max_turns=turns, breakdown=breakdown)
+    # Pre-flight no-op skip: when the corpus carries ZERO entity-specific
+    # substrate (authored + recent + tier-2 all empty) the only files are
+    # date-pulled daily digests. Since the mention-scan found 0 hits, those
+    # digests provably do NOT mention the entity → the agent's quality gate
+    # will return INSUFFICIENT_CORPUS without writing, but the SDK call still
+    # bills a full prompt-cache write (~$0.80). Skip it for $0. (Guarded by a
+    # config flag so the operator can force a digests-only attempt.)
+    entity_substrate_count = (
+        len(breakdown.tier1_authored)
+        + len(breakdown.tier1_recent)
+        + len(breakdown.tier2_sampled)
+    )
+    if CONFIG.features.dream_require_entity_substrate and entity_substrate_count == 0:
+        log.info(
+            "  no entity-specific substrate for %s (only %d non-mentioning "
+            "daily digest(s) in corpus) — guaranteed no-op, skipping SDK call "
+            "($0 instead of a prompt-cache write). Set "
+            "features.dream_require_entity_substrate=false to force.",
+            entity.slug, len(breakdown.tier1_digests),
+        )
+        return DreamResult(
+            entity=entity, corpus_count=len(corpus_paths), corpus_chars=0,
+            actual_cost_usd=0.0,
+            input_tokens=0, output_tokens=0, sdk_result_text="",
+            skipped="no_entity_substrate", elapsed_s=time.time() - started,
+        )
+
+    prompt, prompt_chars, breakdown, dropped = _build_prompt_within_budget(
+        entity, breakdown, max_turns=turns, max_chars=max_chars
+    )
+    corpus_paths = breakdown.all_paths  # reflect any budget trim downstream
+    if dropped:
+        log.warning(
+            "  corpus over budget — dropped %d lowest-value Tier-2/recent "
+            "file(s) to fit the %s-char cap (now %d files, %d chars). "
+            "Authored + digests preserved.",
+            dropped, f"{max_chars:,}", len(corpus_paths), prompt_chars,
+        )
     log.info(
         "  prompt: %d chars (%.1f KB) — max %s chars",
         prompt_chars, prompt_chars / 1024, f"{max_chars:,}" if max_chars > 0 else "unlimited",
@@ -919,9 +1011,10 @@ async def dream_entity(
     if max_chars > 0 and prompt_chars > max_chars:
         msg = (
             f"PROMPT_TOO_LARGE: entity={entity.slug} prompt={prompt_chars} chars "
-            f"> max={max_chars} (corpus={len(corpus_paths)} files). "
-            "Reduce corpus by archiving old substrate or raise "
-            "CONFIG.limits.dream_entity_max_prompt_chars."
+            f"> max={max_chars} (corpus={len(corpus_paths)} files, "
+            "non-droppable: authored + daily digests alone exceed the cap). "
+            "Raise CONFIG.limits.dream_entity_max_prompt_chars or prune "
+            "operator-authored substrate."
         )
         log.error("  ✗ %s", msg)
         return DreamResult(
@@ -962,8 +1055,14 @@ async def dream_entity(
         _entity_pre_size = 0
     log.info("  invoking %s (max_turns=%d, system=dream_entity_system)", model, turns)
 
+    # input_tokens here is the TRUE input (uncached + cache-creation +
+    # cache-read), not the raw `usage["input_tokens"]` delta. The bundled CLI
+    # caches the prompt by default, so the uncached delta is a misleading ~12
+    # for a 40 KB prompt; summing only that made healthy calls look like
+    # no-ops and false-fired the low-token warning below (see UsageTokens).
     input_tokens = 0
     output_tokens = 0
+    result_usage: UsageTokens | None = None
     result_text = ""
     actual_cost = 0.0
     capture = StderrCapture()
@@ -1031,11 +1130,16 @@ async def dream_entity(
                 break
             message_count += 1
             if isinstance(message, AssistantMessage) and message.usage:
-                input_tokens += message.usage.get("input_tokens", 0)
-                output_tokens += message.usage.get("output_tokens", 0)
+                # Per-turn fallback accumulation (used only if the ResultMessage
+                # carries no usage). total_input folds in the cache fields.
+                u = extract_usage_tokens(message.usage)
+                input_tokens += u.total_input
+                output_tokens += u.output_tokens
             if isinstance(message, ResultMessage):
                 result_text = message.result or ""
                 actual_cost = float(getattr(message, "total_cost_usd", 0.0) or 0.0)
+                if message.usage:
+                    result_usage = extract_usage_tokens(message.usage)
     except asyncio.TimeoutError:
         elapsed = time.time() - started
         log.warning(
@@ -1083,6 +1187,13 @@ async def dream_entity(
             elapsed_s=time.time() - started,
         )
 
+    # Prefer the ResultMessage's authoritative cumulative usage over the
+    # per-turn AssistantMessage sum (which double-counts cache_read across
+    # turns). Falls back to the running sum when the CLI omits result usage.
+    if result_usage is not None:
+        input_tokens = result_usage.total_input
+        output_tokens = result_usage.output_tokens
+
     elapsed = time.time() - started
     log.info(
         "  ✓ done in %.1fs · in:%s out:%s ($%.4f)",
@@ -1123,17 +1234,20 @@ async def dream_entity(
             len(result_text or ""),
             (result_text or "(empty)")[:1500].replace("\n", " | "),
         )
-    # Suspiciously-low token-count signal. A 489 KB prompt should report
-    # 100k+ input tokens; in:12 means the SDK never actually processed
-    # the substrate (CLI early-exit, max_buffer truncation, or a tool-use
-    # short-circuit). Worth surfacing so operator notices the mismatch.
-    if prompt_chars >= 5000 and input_tokens < 1000:
+    # Suspiciously-low token-count signal. A 60 KB prompt should report tens
+    # of thousands of TRUE input tokens. `input_tokens` here already folds in
+    # cache_creation + cache_read (see UsageTokens) — the pre-fix gate compared
+    # only the uncached `usage["input_tokens"]` delta (~12 under prompt caching)
+    # and false-fired on every healthy call. A genuine early-exit / buffer
+    # truncation shows near-zero TRUE input AND ~$0 billed cost; require both so
+    # the diagnostic keeps its teeth without crying wolf.
+    if prompt_chars >= 5000 and input_tokens < 1000 and actual_cost < 0.01:
         log.warning(
-            "  SDK reported only %d input tokens for a %d-char prompt — "
-            "expected substrate-processing did not happen (CLI early-exit, "
-            "buffer truncation, or tool-use short-circuit). Check the SDK "
-            "result text for clues.",
-            input_tokens, prompt_chars,
+            "  SDK reported only %d true input tokens (incl. cache) and $%.4f "
+            "cost for a %d-char prompt — substrate-processing did not happen "
+            "(CLI early-exit, buffer truncation, or tool-use short-circuit). "
+            "Check the SDK result text for clues.",
+            input_tokens, actual_cost, prompt_chars,
         )
 
     # M016 — stamp last_dreamed_at on every substrate file that appeared in

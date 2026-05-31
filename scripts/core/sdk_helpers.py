@@ -161,6 +161,59 @@ def assert_prompt_within_budget(
     )
 
 
+@dataclass(frozen=True)
+class UsageTokens:
+    """Token counts extracted from one SDK message's ``usage`` dict.
+
+    The bundled CLI enables prompt caching by default, so for any non-trivial
+    prompt the bulk of the *real* input lands in ``cache_creation_input_tokens``
+    (first turn that writes the cache) + ``cache_read_input_tokens`` (every
+    subsequent turn that re-reads it) — NOT in ``input_tokens``, which holds
+    only the small uncached delta. Summing ``input_tokens`` alone undercounts
+    true input by orders of magnitude and makes a healthy cached call look like
+    a no-op (``in:12`` for a 40 KB prompt while the API bills $0.79 of cache
+    tokens). Use ``total_input`` for any "did the substrate actually get
+    processed?" heuristic and for ledger accounting.
+    """
+
+    input_tokens: int = 0
+    cache_creation_tokens: int = 0
+    cache_read_tokens: int = 0
+    output_tokens: int = 0
+
+    @property
+    def total_input(self) -> int:
+        """Uncached input + cache-creation + cache-read — the true input size."""
+        return self.input_tokens + self.cache_creation_tokens + self.cache_read_tokens
+
+
+def extract_usage_tokens(usage: dict | None) -> UsageTokens:
+    """Pull input/cache/output token counts from an SDK message ``usage`` dict.
+
+    Tolerant of ``None`` / missing keys / non-int values (returns zeros). The
+    ``usage`` payload is a raw API passthrough (``dict[str, Any]``), so the
+    cache keys are present only when prompt caching was active for that turn.
+    Prefer the ``ResultMessage.usage`` (authoritative cumulative session total)
+    over summing per-turn ``AssistantMessage.usage`` — the latter double-counts
+    ``cache_read_input_tokens`` across turns.
+    """
+    if not usage:
+        return UsageTokens()
+
+    def _g(key: str) -> int:
+        try:
+            return int(usage.get(key, 0) or 0)
+        except (TypeError, ValueError):
+            return 0
+
+    return UsageTokens(
+        input_tokens=_g("input_tokens"),
+        cache_creation_tokens=_g("cache_creation_input_tokens"),
+        cache_read_tokens=_g("cache_read_input_tokens"),
+        output_tokens=_g("output_tokens"),
+    )
+
+
 def classify_failure(
     elapsed_s: float,
     captured_text: str,

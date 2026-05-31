@@ -156,8 +156,9 @@ def test_migrate_config_file_round_trip(tmp_path):
     # +3 dream web-research (issue #2), 2026-05-31:
     #    features.dream_web_research, scheduling.web_research_cooldown_days,
     #    personal.exa_api_key
-    # = 81 changes (no drops — operator has no orphan personal.* fields)
-    assert len(changes) == 81, f"got {len(changes)} changes: {changes}"
+    # +1 features.dream_require_entity_substrate (dream no-op skip), 2026-05-31
+    # = 82 changes (no drops — operator has no orphan personal.* fields)
+    assert len(changes) == 82, f"got {len(changes)} changes: {changes}"
 
     reparsed = yaml.safe_load(new_text)
     # piggyback side
@@ -260,6 +261,7 @@ def test_migrate_config_no_change_when_fully_current(tmp_path):
             "operator_reports": False,
             "concept_reconciliation": False,
             "health_trends": False,
+            "dream_require_entity_substrate": True,
         },
         "personal": {
             "implicit_operator_author": None,
@@ -425,6 +427,7 @@ def test_migrate_additions_idempotent():
             "operator_reports": False,
             "concept_reconciliation": False,
             "health_trends": False,
+            "dream_require_entity_substrate": True,
         },
         "personal": {
             "implicit_operator_author": None,

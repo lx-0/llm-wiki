@@ -484,6 +484,13 @@ features:
   # writes a `## Trends` block into concepts/health.md + the health_trends
   # piggyback runs. Safe to enable. Spec: health-trend-synthesis.md.
   health_trends: false
+  # Pre-flight no-op skip for dream-entity passes whose corpus carries ZERO
+  # entity-specific substrate — only date-pulled daily digests that don't
+  # mention the entity. Such a pass is a guaranteed INSUFFICIENT_CORPUS no-op
+  # but still bills a full prompt-cache write (~$0.80/entity). True → skip the
+  # SDK call for $0 (the entity is picked up again once real substrate
+  # accumulates). Set false to force a digests-only synthesis attempt.
+  dream_require_entity_substrate: true
 
 graph_view:
   # Mode: knowledge-only | full-vault | sources-only | custom

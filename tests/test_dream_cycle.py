@@ -374,3 +374,179 @@ def test_dream_cycle_agent_spec_parses() -> None:
     assert "Write" in spec.allowed_tools
     assert spec.button is not None
     assert spec.button.shell_command_id == "agent-dream-cycle"
+
+
+# ── A/B/C: 2026-05-31 dream-diagnostics fixes ────────────────────────
+
+
+def _make_fake_query(monkeypatch, *, usage, cost, result_text="done"):
+    """Install a fake SDK query yielding one AssistantMessage + ResultMessage
+    carrying the given usage dict + cost. Returns a call-counter dict."""
+    import dream
+    from claude_agent_sdk import AssistantMessage, ResultMessage, TextBlock
+
+    calls = {"n": 0}
+
+    async def _fake_query(*args, **kwargs):
+        calls["n"] += 1
+        yield AssistantMessage(content=[TextBlock(text=result_text)], model="m", usage=usage)
+        yield ResultMessage(
+            subtype="success", duration_ms=1, duration_api_ms=1, is_error=False,
+            num_turns=1, session_id="s", total_cost_usd=cost, usage=usage,
+            result=result_text,
+        )
+
+    monkeypatch.setattr(dream, "query", _fake_query)
+    return calls
+
+
+def test_low_token_warning_does_not_fire_on_cached_call(
+    vault: Path, monkeypatch: pytest.MonkeyPatch, caplog
+) -> None:
+    """A: a healthy cached call reports a tiny uncached input_tokens but huge
+    cache tokens + real cost. The low-token warning must NOT false-fire, and
+    the reported input must be the cache-inclusive total."""
+    import logging
+    import dream
+
+    _write_entity_page(vault, "people", "cached")
+    _write_substrate(vault, "raw/notes/n.md", "cached appears here in substrate.\n")
+
+    usage = {
+        "input_tokens": 12,
+        "cache_creation_input_tokens": 40000,
+        "cache_read_input_tokens": 0,
+        "output_tokens": 90,
+    }
+    _make_fake_query(monkeypatch, usage=usage, cost=0.79)
+
+    ent = dream._resolve_entity("cached")
+    assert ent is not None
+    with caplog.at_level(logging.WARNING):
+        result = asyncio.run(dream.dream_entity(ent))
+
+    assert "SDK reported only" not in caplog.text, "false-positive low-token warning fired on a cached call"
+    assert result.input_tokens == 40012, f"expected cache-inclusive total, got {result.input_tokens}"
+
+
+def test_low_token_warning_still_fires_on_genuine_early_exit(
+    vault: Path, monkeypatch: pytest.MonkeyPatch, caplog
+) -> None:
+    """A: a genuine early-exit reports near-zero TRUE input AND ~$0 cost —
+    the diagnostic must keep its teeth."""
+    import logging
+    import dream
+
+    _write_entity_page(vault, "people", "early")
+    _write_substrate(vault, "raw/notes/n.md", "early appears here in substrate.\n")
+
+    usage = {"input_tokens": 12, "cache_creation_input_tokens": 0,
+             "cache_read_input_tokens": 0, "output_tokens": 3}
+    _make_fake_query(monkeypatch, usage=usage, cost=0.0)
+
+    ent = dream._resolve_entity("early")
+    assert ent is not None
+    with caplog.at_level(logging.WARNING):
+        asyncio.run(dream.dream_entity(ent))
+
+    assert "substrate-processing did not happen" in caplog.text
+
+
+def test_skips_sdk_when_no_entity_specific_substrate(
+    vault: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """B: an entity whose only corpus is non-mentioning daily digests is a
+    guaranteed no-op — dream_entity must skip the SDK call for $0."""
+    import dream
+
+    _write_entity_page(vault, "people", "lonely")
+    # A recent daily digest that does NOT mention "lonely".
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    _write_substrate(vault, f"daily/{today}.md", "# Daily\n\nUnrelated topics only.\n")
+
+    calls = _make_fake_query(
+        monkeypatch,
+        usage={"input_tokens": 5, "output_tokens": 5},
+        cost=0.0,
+    )
+
+    ent = dream._resolve_entity("lonely")
+    assert ent is not None
+    result = asyncio.run(dream.dream_entity(ent))
+
+    assert result.skipped == "no_entity_substrate", f"got {result.skipped!r}"
+    assert result.actual_cost_usd == 0.0
+    assert calls["n"] == 0, "SDK invoked despite zero entity-specific substrate — wasted spend"
+
+
+def test_does_not_skip_when_entity_substrate_present(
+    vault: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """B negative control: real mentioning substrate → SDK is invoked."""
+    import dream
+
+    _write_entity_page(vault, "people", "popular")
+    _write_substrate(vault, "raw/notes/n.md", "popular shows up in this note.\n")
+
+    calls = _make_fake_query(
+        monkeypatch,
+        usage={"input_tokens": 12, "cache_creation_input_tokens": 9000, "output_tokens": 50},
+        cost=0.2,
+    )
+
+    ent = dream._resolve_entity("popular")
+    assert ent is not None
+    result = asyncio.run(dream.dream_entity(ent))
+
+    assert result.skipped is None, f"unexpected skip: {result.skipped!r}"
+    assert calls["n"] == 1
+
+
+def test_build_prompt_within_budget_trims_to_fit(vault: Path) -> None:
+    """C: an over-budget corpus is trimmed (lowest-value first) until it fits,
+    instead of failing terminally with PROMPT_TOO_LARGE."""
+    import dream
+
+    _write_entity_page(vault, "people", "trim")
+    # Several mentioning substrate files, each non-trivial.
+    for i in range(6):
+        _write_substrate(
+            vault, f"raw/notes/n{i}.md",
+            f"trim is discussed here, entry {i}. " + ("filler content. " * 80),
+        )
+
+    ent = dream._resolve_entity("trim")
+    assert ent is not None
+    breakdown = dream.collect_corpus_tiered(ent)
+
+    # Full prompt size with everything in.
+    full_prompt, full_chars = dream._build_prompt(
+        ent, breakdown.all_paths, max_turns=20, breakdown=breakdown
+    )
+    assert full_chars > 0
+
+    # Force a budget just under the full size → must drop at least one file.
+    budget = full_chars - 500
+    prompt, prompt_chars, trimmed, dropped = dream._build_prompt_within_budget(
+        ent, breakdown, max_turns=20, max_chars=budget
+    )
+    assert dropped >= 1, "expected at least one file dropped to fit the budget"
+    assert prompt_chars <= budget, f"trim did not reach budget: {prompt_chars} > {budget}"
+    assert len(trimmed.all_paths) < len(breakdown.all_paths)
+
+
+def test_build_prompt_within_budget_noop_when_under_cap(vault: Path) -> None:
+    """C: a comfortably-fitting corpus is returned untrimmed."""
+    import dream
+
+    _write_entity_page(vault, "people", "small")
+    _write_substrate(vault, "raw/notes/n.md", "small mention here.\n")
+
+    ent = dream._resolve_entity("small")
+    assert ent is not None
+    breakdown = dream.collect_corpus_tiered(ent)
+    prompt, prompt_chars, trimmed, dropped = dream._build_prompt_within_budget(
+        ent, breakdown, max_turns=20, max_chars=10_000_000
+    )
+    assert dropped == 0
+    assert trimmed is breakdown

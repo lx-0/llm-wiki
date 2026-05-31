@@ -659,6 +659,17 @@ class Features:
     # in this module). See `.ytstack/DECISIONS.md` 2026-05-17 entries on
     # the M019 architecture + air-gap.
     operator_reports: bool = False
+    # Pre-flight skip for dream-entity passes whose corpus carries ZERO
+    # entity-specific substrate — i.e. the only files are date-pulled daily
+    # digests that (provably, since the mention-scan found 0 recent/authored/
+    # tier-2 hits) do not mention the entity. Such a pass is a guaranteed
+    # INSUFFICIENT_CORPUS no-op, yet still bills a full prompt-cache write
+    # (~$0.80/entity). When True, dream_entity() returns
+    # skipped="no_entity_substrate" with $0 spend instead of invoking the SDK.
+    # Flip false to force a synthesis attempt on digests alone (e.g. when the
+    # entity name never appears verbatim but the digests are topically
+    # relevant). Default True. 2026-05-31.
+    dream_require_entity_substrate: bool = True
 
 
 @dataclass

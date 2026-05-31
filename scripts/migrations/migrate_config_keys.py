@@ -346,6 +346,13 @@ KEY_ADDITIONS: dict[str, dict[str, object]] = {
         # for Pass-1 / Pass-2 fire. Default OFF — flip True after S05 lands
         # and dogfooding completes. Air-gapped from the compile loop.
         "operator_reports": False,
+        # Pre-flight no-op skip for dream-entity passes with ZERO
+        # entity-specific substrate (2026-05-31). When the corpus is only
+        # date-pulled daily digests that don't mention the entity, the
+        # synthesis is a guaranteed INSUFFICIENT_CORPUS no-op yet still bills a
+        # full prompt-cache write (~$0.80). True → skip the SDK call for $0.
+        # Match Features.dream_require_entity_substrate in config.py.
+        "dream_require_entity_substrate": True,
     },
     "piggybacks": {
         # M006 calendar collector — mirrors gmeet / jamie 6 h cadence.

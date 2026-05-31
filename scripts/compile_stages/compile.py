@@ -56,6 +56,7 @@ from core.sdk_helpers import (
     PromptTooLargeError,
     StderrCapture,
     assert_prompt_within_budget,
+    extract_usage_tokens,
     log_sdk_failure,
     make_path_scope_gate,
     make_path_scope_hook,
@@ -221,9 +222,17 @@ async def _attempt(
     except Exception as exc:
         elapsed = time.time() - started
         if final_result is not None and final_result.is_error:
+            # Ledger gets the TRUE input (uncached + cache-creation + cache-read)
+            # for an accurate cost picture; the budget `tokens` check below stays
+            # on the uncached per-turn sum so its tuned threshold keeps its
+            # meaning (cache_read is re-counted per turn and would explode it —
+            # see UsageTokens / sdk_helpers).
+            _usage = extract_usage_tokens(final_result.usage)
+            ledger_input = _usage.total_input or total_input_tokens
+            ledger_output = _usage.output_tokens or total_output_tokens
             cost = final_result.total_cost_usd or 0.0
             tokens = total_input_tokens + total_output_tokens
-            LEDGER.record(model=model_id, input_tokens=total_input_tokens, output_tokens=total_output_tokens)
+            LEDGER.record(model=model_id, input_tokens=ledger_input, output_tokens=ledger_output)
             kind = "max_turns" if final_result.subtype == "error_max_turns" else "agent_error"
             detail = (
                 f"{final_result.subtype} after {final_result.num_turns} turns "
@@ -275,8 +284,13 @@ async def _attempt(
     cost = float(final_result.total_cost_usd) if (
         final_result is not None and final_result.total_cost_usd is not None
     ) else 0.0
+    # TRUE input (cache-inclusive) for ledger + reporting; budget `tokens`
+    # stays on the uncached per-turn sum (see error-path comment above).
+    _usage = extract_usage_tokens(final_result.usage if final_result is not None else None)
+    true_input_tokens = _usage.total_input or total_input_tokens
+    true_output_tokens = _usage.output_tokens or total_output_tokens
     tokens = total_input_tokens + total_output_tokens
-    LEDGER.record(model=model_id, input_tokens=total_input_tokens, output_tokens=total_output_tokens)
+    LEDGER.record(model=model_id, input_tokens=true_input_tokens, output_tokens=true_output_tokens)
     budget = CONFIG.limits.compile_max_tokens_per_file
     if budget > 0 and tokens > budget:
         log.error(
@@ -300,14 +314,14 @@ async def _attempt(
     log.info(
         "  ✓ %.1fs · in:%s out:%s (%s tok)",
         elapsed,
-        f"{total_input_tokens:,}",
-        f"{total_output_tokens:,}",
+        f"{true_input_tokens:,}",
+        f"{true_output_tokens:,}",
         f"{tokens:,}",
     )
     return (
         {
-            "input_tokens": total_input_tokens,
-            "output_tokens": total_output_tokens,
+            "input_tokens": true_input_tokens,
+            "output_tokens": true_output_tokens,
             "cost_usd": cost,
             "result": result_text,
         },
