@@ -15,6 +15,39 @@ dated `## [x.y.z] — YYYY-MM-DD` section at the top, bump `version` in
 Removed). New config keys must also be wired into
 `scripts/migrations/migrate_config_keys.py` in the same commit.
 
+## [0.1.2] — 2026-05-31
+
+Seeding robustness, surfaced while shipping web-research (#2).
+
+### Added
+
+- **`wiki seed <path> [--force|--check]`** — targeted single-file re-seed.
+  Restricts the whole run to one vault-relative file, so a stale file (e.g. an
+  `AGENTS.md` still pointing at the relocated `knowledge/log.md`) can be
+  refreshed with `--force` **without** clobbering unrelated operator
+  customisations (QuickAdd macros, graph palette, …). An unmatched path warns
+  instead of silently doing nothing.
+- **`EXA_API_KEY`** entry in the `.claude/.env.example` template (web-research, #2).
+
+### Changed
+
+- **`wiki seed` `.claude/.env.example` is now an additive per-var merge** — it
+  appends only the stanzas for engine vars the operator is missing (with their
+  doc-comment blocks), preserving their file, instead of the whole-file
+  keep-or-`--force`. A newly introduced env-var becomes discoverable without a
+  destructive overwrite.
+- **Drift detection ignores JSON key order** — `.json` configs that differ only
+  in key order (Obsidian re-serialises `app.json` / `core-plugins.json`) report
+  *up-to-date* instead of *drifted*, removing false-positive noise.
+
+### Fixed
+
+- **`agent shell-commands merge failed` on every `wiki seed`** — the
+  obsidian-shellcommands plugin stores `shell_commands` as an array of `{id,…}`,
+  but the merge treated it as an object (`array + object` → jq error → silent
+  failure + stale agent buttons). Now converts + merges by `id`, preserving the
+  operator's own commands.
+
 ## [0.1.1] — 2026-05-31
 
 ### Added
@@ -75,4 +108,5 @@ operator-visible capabilities shipped up to this point:
   `review-wiki` resilience; O(N²)→O(N) lint orphan-link counting.
 - `wiki update` runs `uv sync` so `pyproject.toml` changes reach the vault venv.
 
+[0.1.2]: https://github.com/lx-0/llm-wiki/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/lx-0/llm-wiki/compare/v0.1.0...v0.1.1
