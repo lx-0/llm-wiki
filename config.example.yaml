@@ -24,6 +24,14 @@ scheduling:
   # Public profiles change slowly; much longer than the dream cooldown.
   # `wiki dream web-research <slug>` forces a refresh regardless.
   web_research_cooldown_days: 30
+  # Insufficient-corpus backoff cap (days). When a dream runs but the agent
+  # returns INSUFFICIENT_CORPUS (no synthesizable claims — common on generic-
+  # noun slugs whose mention-scan false-matches), the entity is backed off the
+  # sweep with an exponential window (dream_cooldown_days × 2^(no_ops-1)) capped
+  # here. A successful synthesis clears it. Caps worst-case re-spend on a junk/
+  # dormant entity at ~one SDK call per this many days instead of one per sweep.
+  # 0 disables. `wiki dream <slug>` always ignores it.
+  dream_insufficient_corpus_backoff_max_days: 30
   # M017 — config-driven entity priority for dream-cycle selection. Default
   # behavior (empty config below) is "all entities equal weight, greedy by
   # age" (M014). Set rules to bias which entities get auto-dreamed more

@@ -1,6 +1,29 @@
 # Dream: stop re-spending on repeat INSUFFICIENT_CORPUS entities
 
-**Status:** open · **Logged:** 2026-06-02 · **Size:** S–M
+**Status:** option (1) SHIPPED 2026-06-02 (commit follows) · **Logged:** 2026-06-02 · **Size:** S–M
+
+## Shipped (option 1 — insufficient-corpus backoff)
+
+`DreamResult.insufficient_corpus` is set when the agent runs and prints the
+sentinel. Side-state `state/dream-insufficient-corpus.json` (slug → {count,
+last_at}) records consecutive no-ops; the sweep filter skips entities inside an
+exponential window (`dream_cooldown_days × 2^(count-1)`, capped at
+`scheduling.dream_insufficient_corpus_backoff_max_days`, default 30). A
+successful synthesis clears the entry. `wiki dream <slug>` bypasses it. Worst-
+case re-spend on a junk/dormant entity drops from ~$1/sweep to ~$1/30d.
+
+**Deferred to v2:** fast-reset on new substrate. Today the backoff is purely
+time-based + cleared on synthesis; if real substrate lands mid-window the entity
+waits up to the capped window before retrying. A cheap signal (store the
+mention-count at backoff time, clear when it grows) would cut that latency —
+but it needs a corpus walk in the sweep filter, so it's deferred until the
+staleness is observed to matter.
+
+Option (2) mention-scan precision remains unbuilt (lower priority, fragile).
+
+---
+
+## Original problem (kept for context)
 
 ## Problem
 

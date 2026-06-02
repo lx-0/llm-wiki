@@ -392,6 +392,104 @@ def _save_dream_activation(data: dict[str, str]) -> None:
     tmp.replace(_DREAM_ACTIVATION_FILE)
 
 
+# ── Insufficient-corpus backoff ─────────────────────────────────────
+#
+# When a dream RUNS but the agent returns the `INSUFFICIENT_CORPUS` sentinel
+# (no synthesizable claims for the entity in the current corpus — common on
+# generic-noun slugs whose mention-scan false-matches unrelated text, e.g.
+# `kontakte` hitting the German word "Kontakte" in email metadata), the entity
+# would otherwise be re-selected on EVERY sweep and re-burn a full SDK call
+# (~$1) on a guaranteed no-op. We record each consecutive no-op and back the
+# entity off with an exponential window (base = dream_cooldown_days, doubling
+# per consecutive no-op, capped at scheduling.dream_insufficient_corpus_backoff_max_days).
+# A successful synthesis clears the entry, so the entity returns to the normal
+# cadence the moment real substrate lands. Applies to the SWEEP only — an
+# explicit `wiki dream <slug>` bypasses it, same as cooldown. Keyed by slug.
+_DREAM_INSUFFICIENT_FILE = STATE_DIR / "dream-insufficient-corpus.json"
+
+
+def _load_insufficient_state() -> dict[str, dict]:
+    try:
+        data = json.loads(_DREAM_INSUFFICIENT_FILE.read_text(encoding="utf-8"))
+        return data if isinstance(data, dict) else {}
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def _save_insufficient_state(data: dict[str, dict]) -> None:
+    """Atomic-replace write (mirrors _save_dream_activation)."""
+    _DREAM_INSUFFICIENT_FILE.parent.mkdir(parents=True, exist_ok=True)
+    tmp = _DREAM_INSUFFICIENT_FILE.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(data, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+    tmp.replace(_DREAM_INSUFFICIENT_FILE)
+
+
+def _record_insufficient_corpus(slug: str, *, when: datetime | None = None) -> int:
+    """Bump the consecutive-INSUFFICIENT_CORPUS counter for `slug`, stamp the
+    time, and return the new count. Tolerant — state-write failure logs and
+    returns 0 so a backoff-bookkeeping hiccup never aborts a dream."""
+    ref = when or datetime.now(timezone.utc)
+    try:
+        data = _load_insufficient_state()
+        entry = data.get(slug) if isinstance(data.get(slug), dict) else {}
+        count = int(entry.get("count", 0)) + 1
+        data[slug] = {"count": count, "last_at": ref.isoformat()}
+        _save_insufficient_state(data)
+        return count
+    except OSError as exc:
+        log.warning("  could not record insufficient-corpus backoff for %s: %s", slug, exc)
+        return 0
+
+
+def _clear_insufficient_corpus(slug: str) -> bool:
+    """Drop any backoff entry for `slug` (called after a successful synthesis).
+    Returns True if an entry was removed."""
+    try:
+        data = _load_insufficient_state()
+        if slug in data:
+            del data[slug]
+            _save_insufficient_state(data)
+            return True
+    except OSError as exc:
+        log.warning("  could not clear insufficient-corpus backoff for %s: %s", slug, exc)
+    return False
+
+
+def _insufficient_backoff_days(count: int, *, base_days: int, max_days: int) -> float:
+    """Exponential backoff window in days: base * 2^(count-1), capped at max_days."""
+    if count <= 0:
+        return 0.0
+    window = base_days * (2 ** (count - 1))
+    return float(min(window, max_days))
+
+
+def is_within_insufficient_backoff(
+    entity: EntityRef,
+    *,
+    now: datetime | None = None,
+    base_days: int | None = None,
+    max_days: int | None = None,
+) -> bool:
+    """True iff `entity` is inside its insufficient-corpus backoff window.
+
+    `max_days <= 0` disables the mechanism entirely (every entity passes)."""
+    base = base_days if base_days is not None else CONFIG.scheduling.dream_cooldown_days
+    cap = max_days if max_days is not None else CONFIG.scheduling.dream_insufficient_corpus_backoff_max_days
+    if cap <= 0:
+        return False
+    entry = _load_insufficient_state().get(entity.slug)
+    if not isinstance(entry, dict):
+        return False
+    count = int(entry.get("count", 0))
+    last = _parse_iso_date(entry.get("last_at"))
+    if count <= 0 or last is None:
+        return False
+    window = _insufficient_backoff_days(count, base_days=max(1, base), max_days=cap)
+    ref = now or datetime.now(timezone.utc)
+    age_days = (ref - last).total_seconds() / 86400.0
+    return age_days < window
+
+
 def _get_last_dreamed_at(path: Path) -> datetime | None:
     """Read `last_dreamed_at` for a substrate file.
 
@@ -794,6 +892,10 @@ class DreamResult:
     sdk_result_text: str
     skipped: str | None = None  # None = success
     elapsed_s: float = 0.0
+    # True when the agent ran but returned the INSUFFICIENT_CORPUS sentinel —
+    # a designed no-op that feeds the per-entity backoff (see
+    # is_within_insufficient_backoff).
+    insufficient_corpus: bool = False
 
 
 def _read_facts_md() -> str:
@@ -1217,6 +1319,7 @@ async def dream_entity(
     except OSError:
         _entity_post_mtime = _entity_pre_mtime
         _entity_post_size = _entity_pre_size
+    insufficient_corpus = False
     if (
         _entity_post_mtime == _entity_pre_mtime
         and _entity_post_size == _entity_pre_size
@@ -1230,12 +1333,12 @@ async def dream_entity(
         # errors-only triage log. A byte-identical page WITHOUT that sentinel is
         # the case this diagnostic was built for — a silent write-failure
         # (callback-gate bug) or "would-change" prose — and stays at WARNING.
-        no_op_expected = "INSUFFICIENT_CORPUS" in (result_text or "")
-        level = logging.INFO if no_op_expected else logging.WARNING
+        insufficient_corpus = "INSUFFICIENT_CORPUS" in (result_text or "")
+        level = logging.INFO if insufficient_corpus else logging.WARNING
         reason = (
             "agent declared INSUFFICIENT_CORPUS — designed no-op (no "
             "synthesizable claims for this entity in the current corpus)"
-            if no_op_expected else
+            if insufficient_corpus else
             "corpus had no new substrate to incorporate OR agent decided no "
             "changes needed — UNEXPECTED (no INSUFFICIENT_CORPUS sentinel; "
             "possible silent write-failure or 'would-change' prose)"
@@ -1252,6 +1355,21 @@ async def dream_entity(
             len(result_text or ""),
             (result_text or "(empty)")[:1500].replace("\n", " | "),
         )
+        if insufficient_corpus:
+            # Back this entity off so the next sweep doesn't re-burn ~$1 on the
+            # same guaranteed no-op (exponential window; cleared on the first
+            # successful synthesis). Bookkeeping only — never aborts the run.
+            count = _record_insufficient_corpus(entity.slug)
+            if count:
+                log.info(
+                    "  insufficient-corpus backoff for %s → consecutive no-op #%d "
+                    "(will be deprioritized in the sweep until new substrate lands).",
+                    entity.slug, count,
+                )
+    else:
+        # Real synthesis happened — clear any prior backoff so the entity
+        # returns to the normal cadence immediately.
+        _clear_insufficient_corpus(entity.slug)
     # Suspiciously-low token-count signal. A 60 KB prompt should report tens
     # of thousands of TRUE input tokens. `input_tokens` here already folds in
     # cache_creation + cache_read (see UsageTokens) — the pre-fix gate compared
@@ -1327,6 +1445,7 @@ async def dream_entity(
         actual_cost_usd=actual_cost, input_tokens=input_tokens,
         output_tokens=output_tokens, sdk_result_text=result_text,
         skipped=None, elapsed_s=elapsed,
+        insufficient_corpus=insufficient_corpus,
     )
 
 
@@ -1498,8 +1617,17 @@ async def dream_all_entities(
     # Build (weight, entity, source) candidates: filter cooldown, compute weight via priority × age.
     candidates: list[tuple[float, EntityRef, str]] = []
     _sweep_rng = random.Random(seed) if seed is not None else random
+    backed_off = 0
     for ent in all_entities:
         if is_within_cooldown(ent, cooldown_days=cd):
+            continue
+        # Skip entities still inside their insufficient-corpus backoff window —
+        # they returned INSUFFICIENT_CORPUS recently and re-running now would
+        # re-burn a full SDK call on a guaranteed no-op. A successful synthesis
+        # (once real substrate lands) clears the backoff. Bypassed by explicit
+        # `wiki dream <slug>`, same as cooldown.
+        if is_within_insufficient_backoff(ent):
+            backed_off += 1
             continue
         priority, source = compute_entity_priority(ent)
         age = _last_synth_age_days(ent)
@@ -1513,10 +1641,11 @@ async def dream_all_entities(
     ranked = _select_for_sweep(candidates, N, mode, seed=seed)
 
     seed_label = f" · seed={seed}" if seed is not None else ""
+    backoff_label = f", {backed_off} in insufficient-corpus backoff" if backed_off else ""
     log.info(
-        "─── dream sweep: %d entities total, %d candidates after cooldown+priority filter "
-        "(mode=%s, run_cap=%s tok%s) ───",
-        len(all_entities), len(ranked), mode, f"{run_cap:,}", seed_label,
+        "─── dream sweep: %d entities total, %d candidates after cooldown+priority filter"
+        "%s (mode=%s, run_cap=%s tok%s) ───",
+        len(all_entities), len(ranked), backoff_label, mode, f"{run_cap:,}", seed_label,
     )
 
     results: list[DreamResult] = []

@@ -101,6 +101,9 @@ def vault(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Path]:
     monkeypatch.setattr(dream, "INDEX_FILE", tmp_path / "knowledge" / "index.md")
     monkeypatch.setattr(dream, "LOG_FILE", tmp_path / "knowledge" / "log.md")
     monkeypatch.setattr(dream, "_SUBSTRATE_ROOTS", (tmp_path / "raw", tmp_path / "daily"))
+    # Isolate the dream side-state files so tests never touch the real STATE_DIR.
+    monkeypatch.setattr(dream, "_DREAM_ACTIVATION_FILE", tmp_path / "state" / "dream-activation.json")
+    monkeypatch.setattr(dream, "_DREAM_INSUFFICIENT_FILE", tmp_path / "state" / "dream-insufficient-corpus.json")
     # _ENTITY_KINDS holds Path values captured at module-import time — rebuild
     # so the test's monkeypatched dirs are visible to _resolve_entity / _list_all_entities.
     monkeypatch.setattr(
@@ -607,3 +610,110 @@ def test_unexplained_noop_still_warns(
         if r.levelno >= logging.WARNING and "finished without modifying" in r.getMessage()
     ]
     assert warned, "unexplained no-op should still warn (silent write-failure surface)"
+
+
+# ── Insufficient-corpus backoff (2026-06-02) ─────────────────────────
+
+
+def test_backoff_window_is_exponential_capped():
+    import dream
+    f = dream._insufficient_backoff_days
+    assert f(0, base_days=7, max_days=30) == 0.0
+    assert f(1, base_days=7, max_days=30) == 7.0
+    assert f(2, base_days=7, max_days=30) == 14.0
+    assert f(3, base_days=7, max_days=30) == 28.0
+    assert f(4, base_days=7, max_days=30) == 30.0   # 56 capped to 30
+    assert f(9, base_days=7, max_days=30) == 30.0
+
+
+def test_insufficient_corpus_run_records_and_backs_off(
+    vault: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An INSUFFICIENT_CORPUS run records backoff state; the next sweep skips
+    the entity instead of re-spending."""
+    import dream
+
+    _write_entity_page(vault, "people", "kontakte")
+    _write_substrate(vault, "raw/notes/n.md", "kontakte appears generically.\n")
+    _make_fake_query(
+        monkeypatch,
+        usage={"input_tokens": 12, "cache_creation_input_tokens": 80000, "output_tokens": 1800},
+        cost=1.04,
+        result_text="INSUFFICIENT_CORPUS: 0 specific claims could be cited from 8 sources",
+    )
+
+    ent = dream._resolve_entity("kontakte")
+    assert ent is not None
+    result = asyncio.run(dream.dream_entity(ent))
+
+    assert result.insufficient_corpus is True
+    # State recorded → entity is now inside its backoff window.
+    assert is_within_backoff(dream, ent)
+    # And the sweep filter would skip it.
+    assert dream.is_within_insufficient_backoff(ent) is True
+
+
+def is_within_backoff(dream_mod, ent):
+    state = dream_mod._load_insufficient_state()
+    return ent.slug in state and state[ent.slug]["count"] == 1
+
+
+def test_successful_synthesis_clears_backoff(
+    vault: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Once a real synthesis lands, the backoff entry is cleared so the entity
+    returns to normal cadence."""
+    import dream
+
+    page = _write_entity_page(vault, "people", "recovers")
+    _write_substrate(vault, "raw/notes/n.md", "recovers is mentioned here.\n")
+
+    # Seed a pre-existing backoff entry.
+    dream._record_insufficient_corpus("recovers")
+    assert dream.is_within_insufficient_backoff(dream._resolve_entity("recovers"))
+
+    # A fake that actually writes the page → counts as a successful synthesis.
+    import dream as _d
+    from claude_agent_sdk import AssistantMessage, ResultMessage, TextBlock
+
+    async def _writing_query(*args, **kwargs):
+        page.write_text(page.read_text(encoding="utf-8") + "\n- new line\n", encoding="utf-8")
+        yield AssistantMessage(content=[TextBlock(text="updated")], model="m",
+                               usage={"input_tokens": 12, "cache_creation_input_tokens": 9000, "output_tokens": 60})
+        yield ResultMessage(subtype="success", duration_ms=1, duration_api_ms=1,
+                            is_error=False, num_turns=1, session_id="s",
+                            total_cost_usd=0.3, usage={"input_tokens": 12, "cache_creation_input_tokens": 9000, "output_tokens": 60},
+                            result="updated")
+    monkeypatch.setattr(_d, "query", _writing_query)
+
+    ent = dream._resolve_entity("recovers")
+    result = asyncio.run(dream.dream_entity(ent))
+
+    assert result.insufficient_corpus is False
+    assert "recovers" not in dream._load_insufficient_state(), "backoff not cleared after synthesis"
+
+
+def test_sweep_skips_backed_off_entity(
+    vault: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """dream_all_entities must not select an entity inside its backoff window."""
+    import dream
+
+    _write_entity_page(vault, "people", "dormant")
+    _write_substrate(vault, "raw/notes/n.md", "dormant is named here.\n")
+    dream._record_insufficient_corpus("dormant")
+
+    invoked: list[str] = []
+
+    async def _fake_dream_entity(entity, **kwargs):
+        invoked.append(entity.slug)
+        return dream.DreamResult(
+            entity=entity, corpus_count=0, corpus_chars=0, actual_cost_usd=0.0,
+            input_tokens=0, output_tokens=0, sdk_result_text="", skipped=None,
+            elapsed_s=0.0,
+        )
+
+    monkeypatch.setattr(dream, "dream_entity", _fake_dream_entity)
+    asyncio.run(dream.dream_all_entities(cooldown_days=0))
+
+    assert "dormant" not in invoked, "backed-off entity was selected by the sweep"

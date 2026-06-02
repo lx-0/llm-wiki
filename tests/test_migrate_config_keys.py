@@ -157,8 +157,9 @@ def test_migrate_config_file_round_trip(tmp_path):
     #    features.dream_web_research, scheduling.web_research_cooldown_days,
     #    personal.exa_api_key
     # +1 features.dream_require_entity_substrate (dream no-op skip), 2026-05-31
-    # = 82 changes (no drops — operator has no orphan personal.* fields)
-    assert len(changes) == 82, f"got {len(changes)} changes: {changes}"
+    # +1 scheduling.dream_insufficient_corpus_backoff_max_days (backoff), 2026-06-02
+    # = 83 changes (no drops — operator has no orphan personal.* fields)
+    assert len(changes) == 83, f"got {len(changes)} changes: {changes}"
 
     reparsed = yaml.safe_load(new_text)
     # piggyback side
@@ -196,6 +197,7 @@ def test_migrate_config_no_change_when_fully_current(tmp_path):
             "dream_priority": {"default": 1.0, "paths": {}, "domain": {}, "tag_strategy": "max", "tags": {}, "status": {}},
             "concept_reconcile_cooldown_days": 14,
             "web_research_cooldown_days": 30,
+            "dream_insufficient_corpus_backoff_max_days": 30,
         },
         "piggybacks": {
             "email": {"enabled": True, "cooldown_hours": 24},
@@ -363,6 +365,7 @@ def test_migrate_additions_idempotent():
             "dream_priority": {"default": 1.0, "paths": {}, "domain": {}, "tag_strategy": "max", "tags": {}, "status": {}},
             "concept_reconcile_cooldown_days": 14,
             "web_research_cooldown_days": 30,
+            "dream_insufficient_corpus_backoff_max_days": 30,
         },
         "limits": {
             "compile_force_long_context_types": ["daily-digest", "calendar-rollup"],

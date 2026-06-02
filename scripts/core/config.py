@@ -125,6 +125,16 @@ class Scheduling:
     # slowly, so the default is much longer (30 d). `wiki dream web-research
     # <slug>` ignores this for a forced refresh.
     web_research_cooldown_days: int = 30
+    # Insufficient-corpus backoff (2026-06-02). When a dream RUNS but the agent
+    # returns the INSUFFICIENT_CORPUS sentinel (no synthesizable claims — common
+    # on generic-noun slugs whose mention-scan false-matches, e.g. `kontakte`
+    # hitting the German word "Kontakte"), the entity is backed off the sweep
+    # with an exponential window: dream_cooldown_days × 2^(consecutive_no_ops-1),
+    # capped at this many days. A successful synthesis clears the backoff. This
+    # caps the worst-case re-spend on a junk/dormant entity at ~one SDK call per
+    # this many days instead of one per sweep. 0 disables the mechanism.
+    # `wiki dream <slug>` ignores it (explicit runs always proceed).
+    dream_insufficient_corpus_backoff_max_days: int = 30
 
 
 @dataclass

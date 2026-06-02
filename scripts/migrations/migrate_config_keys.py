@@ -286,6 +286,9 @@ KEY_ADDITIONS: dict[str, dict[str, object]] = {
         # Dream web-research (issue #2, 2026-05-31). Per-entity `## Public
         # Profile` refresh cooldown. Match Scheduling.web_research_cooldown_days.
         "web_research_cooldown_days": 30,
+        # Insufficient-corpus backoff cap (2026-06-02). Match
+        # Scheduling.dream_insufficient_corpus_backoff_max_days in config.py.
+        "dream_insufficient_corpus_backoff_max_days": 30,
     },
     "features": {
         # M011 master switch — default OFF, flip True after dogfooding.
