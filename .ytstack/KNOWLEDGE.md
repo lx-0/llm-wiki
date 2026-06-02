@@ -536,6 +536,14 @@ The **PreToolUse hook** (`make_path_scope_hook`, the actual production gate — 
 
 **Adjacent observation:** the underlying bundled-CLI silent-crash bug ("Fatal error in message reader: Command failed with exit code 1, [CLI-STDERR] empty") is a known class — `claude-agent-sdk-python` hardcodes the stderr placeholder in `subprocess_cli.py:626` (issue #515). Same crash signature appears for chronic flush-failure files. Content-dependent, not size-dependent. Captured separately; not addressed by this fix.
 
+### Deterministic skips must record the ingested-hash or they re-list forever (fixed 2026-06-02)
+
+`select_files` re-lists any candidate whose hash isn't in `state["ingested"]`. A file leaves the candidate set only when its hash is persisted — which `main()` does for `status=="compiled"` outcomes and for `status=="skipped"` outcomes carrying `ingest_hash=True`. The `IndexOnly` (source-and-final) and `HealthStub` routes set `ingest_hash=True` precisely so re-runs no-op. The plain `Skip` route (empty / `compile_role=final-only` / `substrate_type_excluded_*`) was the outlier: it returned the `ingest_hash=False` default, so every Skip-routed file was re-selected on **every** compile run forever — never producing knowledge, just inflating "Files to compile: N".
+
+On lxw this immortalised 34 `type=email-delta` deltas + 3 `compile_role=final-only` imported-inbox pages (operator: "diese 57 files kommen IMMER WIEDER"). email-delta is doubly safe to mark-and-skip: the collector already writes its daily rollup via `daily_capture.append()` at collection time, so the compile skip is purely redundant — no consumer depends on the un-ingested state.
+
+**Rule:** any deterministic "never compile this content as-is" verdict in `compile_file` must return `ingest_hash=True`. The skip is keyed on the content-hash, so a later body edit still re-evaluates the file. Characterization tests that snapshot a skip's `ingest_hash` must assert `True`, not freeze the old re-listing bug.
+
 ### Compile silent CLI crash — the `claude_code` preset spec was the trigger
 
 #### Symptom
