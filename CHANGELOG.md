@@ -18,6 +18,21 @@ every operator's `wiki update` → `uv sync` regenerate `uv.lock` and dirty thei
 config keys must also be wired into `scripts/migrations/migrate_config_keys.py`
 in the same commit.
 
+## [0.1.7] — 2026-06-02
+
+### Fixed
+
+- **`wiki compile` re-listed the same source files as "to compile" on every run,
+  forever.** Deterministic skips — empty files, `compile_role: final-only` pages,
+  and `compile_skip_substrate_types` members (e.g. `type: email-delta`) — were
+  skipped without recording their content-hash in compile state, so `select_files`
+  re-selected them every run. On a real vault this immortalised 34 email-delta
+  rollup sources + 3 hand-curated final-only notes, perpetually inflating
+  "Files to compile: N" with work that is intentionally never compiled (email
+  deltas are already digested into `daily/` at collection time). These skips now
+  record their hash and drop out of the candidate list until their body changes —
+  matching the existing source-and-final and health-rollup skip behaviour.
+
 ## [0.1.6] — 2026-05-31
 
 ### Fixed
