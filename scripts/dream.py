@@ -997,7 +997,11 @@ async def dream_entity(
     )
     corpus_paths = breakdown.all_paths  # reflect any budget trim downstream
     if dropped:
-        log.warning(
+        # By-design graceful degrade (M016 sampled-activation already rotates
+        # Tier-2 across runs), not an anomaly — INFO so it stays out of the
+        # errors-only triage log. Large entities (e.g. the operator's own page)
+        # legitimately exceed one context window and trim every run.
+        log.info(
             "  corpus over budget — dropped %d lowest-value Tier-2/recent "
             "file(s) to fit the %s-char cap (now %d files, %d chars). "
             "Authored + digests preserved.",
@@ -1217,19 +1221,33 @@ async def dream_entity(
         _entity_post_mtime == _entity_pre_mtime
         and _entity_post_size == _entity_pre_size
     ):
-        log.warning(
-            "  agent finished without modifying %s — corpus had no new "
-            "substrate to incorporate (auth/recent both 0) OR agent "
-            "decided no changes needed. Page byte-identical to pre-run.",
-            str(entity.page.relative_to(ROOT_DIR)),
+        # Distinguish the EXPECTED no-op from the SUSPICIOUS one. The prompt's
+        # quality gate makes the agent print the `INSUFFICIENT_CORPUS` sentinel
+        # when the corpus has no synthesizable claims for the entity (common on
+        # generic-noun slugs whose mention-scan matches unrelated text — e.g.
+        # `kontakte` hitting the German word "Kontakte" in email metadata). That
+        # is a designed, correct no-op → INFO, so it stays out of the
+        # errors-only triage log. A byte-identical page WITHOUT that sentinel is
+        # the case this diagnostic was built for — a silent write-failure
+        # (callback-gate bug) or "would-change" prose — and stays at WARNING.
+        no_op_expected = "INSUFFICIENT_CORPUS" in (result_text or "")
+        level = logging.INFO if no_op_expected else logging.WARNING
+        reason = (
+            "agent declared INSUFFICIENT_CORPUS — designed no-op (no "
+            "synthesizable claims for this entity in the current corpus)"
+            if no_op_expected else
+            "corpus had no new substrate to incorporate OR agent decided no "
+            "changes needed — UNEXPECTED (no INSUFFICIENT_CORPUS sentinel; "
+            "possible silent write-failure or 'would-change' prose)"
         )
-        # Log the agent's final-message text so we can see WHY it didn't
-        # write. Three distinct signals operator might find here:
-        #   - "no changes needed" / "page already accurate" -> legit no-op
-        #   - prose describing changes the agent "would" make -> Write
-        #     tool wasn't actually exposed (callback-gate config bug)
-        #   - error/refusal text -> agent saw a constraint we don't expect
-        log.warning(
+        log.log(
+            level,
+            "  agent finished without modifying %s — %s. Page byte-identical "
+            "to pre-run.",
+            str(entity.page.relative_to(ROOT_DIR)), reason,
+        )
+        log.log(
+            level,
             "  agent final-message text (%d chars): %s",
             len(result_text or ""),
             (result_text or "(empty)")[:1500].replace("\n", " | "),

@@ -550,3 +550,60 @@ def test_build_prompt_within_budget_noop_when_under_cap(vault: Path) -> None:
     )
     assert dropped == 0
     assert trimmed is breakdown
+
+
+def test_insufficient_corpus_noop_logs_at_info_not_warning(
+    vault: Path, monkeypatch: pytest.MonkeyPatch, caplog
+) -> None:
+    """A designed INSUFFICIENT_CORPUS no-op must log at INFO, staying out of
+    the errors-only triage stream (e.g. generic-noun slug false-positives)."""
+    import logging
+    import dream
+
+    _write_entity_page(vault, "people", "kontakte")
+    _write_substrate(vault, "raw/notes/n.md", "kontakte appears generically here.\n")
+    _make_fake_query(
+        monkeypatch,
+        usage={"input_tokens": 12, "cache_creation_input_tokens": 80000, "output_tokens": 1800},
+        cost=1.04,
+        result_text="INSUFFICIENT_CORPUS: 0 specific claims could be cited from 8 sources",
+    )
+
+    ent = dream._resolve_entity("kontakte")
+    assert ent is not None
+    with caplog.at_level(logging.INFO):
+        asyncio.run(dream.dream_entity(ent))
+
+    noop_lines = [r for r in caplog.records if "finished without modifying" in r.getMessage()]
+    assert noop_lines, "expected the no-op diagnostic line"
+    warned = [r for r in noop_lines if r.levelno >= logging.WARNING]
+    assert not warned, "INSUFFICIENT_CORPUS no-op must not hit WARNING/errors-log"
+
+
+def test_unexplained_noop_still_warns(
+    vault: Path, monkeypatch: pytest.MonkeyPatch, caplog
+) -> None:
+    """A byte-identical page with NO sentinel (possible silent write-failure)
+    must keep its WARNING — that's the diagnostic this check exists for."""
+    import logging
+    import dream
+
+    _write_entity_page(vault, "people", "silent")
+    _write_substrate(vault, "raw/notes/n.md", "silent appears in this note.\n")
+    _make_fake_query(
+        monkeypatch,
+        usage={"input_tokens": 12, "cache_creation_input_tokens": 9000, "output_tokens": 50},
+        cost=0.2,
+        result_text="I would update the State section with the new role, but ...",
+    )
+
+    ent = dream._resolve_entity("silent")
+    assert ent is not None
+    with caplog.at_level(logging.INFO):
+        asyncio.run(dream.dream_entity(ent))
+
+    warned = [
+        r for r in caplog.records
+        if r.levelno >= logging.WARNING and "finished without modifying" in r.getMessage()
+    ]
+    assert warned, "unexplained no-op should still warn (silent write-failure surface)"
