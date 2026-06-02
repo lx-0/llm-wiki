@@ -51,7 +51,9 @@ def test_empty_file_skips(vault):
     src = raw / "empty.md"
     src.write_text("   \n", encoding="utf-8")
     o = _run(src)
-    assert o.status == "skipped" and o.skip_reason == "empty" and o.ingest_hash is False
+    # Deterministic skips record the ingested-hash so they drop out of the
+    # candidate list (until the body changes), instead of re-listing forever.
+    assert o.status == "skipped" and o.skip_reason == "empty" and o.ingest_hash is True
 
 
 def test_final_only_skips(vault):
@@ -60,6 +62,24 @@ def test_final_only_skips(vault):
     src.write_text("---\ncompile_role: final-only\n---\nhand-curated", encoding="utf-8")
     o = _run(src)
     assert o.status == "skipped" and o.skip_reason == "compile_role_final_only"
+    assert o.ingest_hash is True
+
+
+def test_substrate_excluded_skip_records_hash(vault, monkeypatch):
+    """email-delta (and any compile_skip_substrate_types member) must record its
+    ingested-hash on skip — otherwise the collector's write-once delta files
+    re-list as compile candidates on every run forever (lxw, 2026-06-02)."""
+    from core.config import CONFIG
+    monkeypatch.setattr(
+        CONFIG.limits, "compile_skip_substrate_types", ("email-delta",)
+    )
+    _, raw, _ = vault
+    src = raw / "delta-2026-06-02.md"
+    src.write_text("---\ntype: email-delta\n---\n- new mail summary", encoding="utf-8")
+    o = _run(src)
+    assert o.status == "skipped"
+    assert o.skip_reason == "substrate_type_excluded_email-delta"
+    assert o.ingest_hash is True
 
 
 def test_health_rollup_stub_records_deterministically(vault):

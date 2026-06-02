@@ -209,7 +209,17 @@ async def compile_file(
                 "(use `wiki compile --file <path>` to force)",
                 route.reason[len("substrate_type_excluded_"):],
             )
-        return CompileOutcome(status="skipped", skip_reason=route.reason)
+        # Record the ingested-hash on deterministic skips (empty / final-only /
+        # substrate-excluded), mirroring the IndexOnly + HealthStub routes. The
+        # route decision is a stable "never compile this content as-is" verdict,
+        # so without this the file is re-selected as a candidate on EVERY run
+        # forever — `select_files` re-lists any file whose hash isn't in
+        # `state["ingested"]`. That polluted "Files to compile: N" with immortal
+        # email-delta + final-only sources (34 + 3 on lxw, 2026-06-02). If the
+        # body later changes, the hash mismatch correctly re-evaluates it.
+        return CompileOutcome(
+            status="skipped", skip_reason=route.reason, ingest_hash=True,
+        )
 
     if isinstance(route, IndexOnly):
         return _run_index_only(source, rel_path, route)
