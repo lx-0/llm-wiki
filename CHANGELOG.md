@@ -20,7 +20,42 @@ in the same commit.
 
 ## [0.1.7] — 2026-06-02
 
+### Added
+
+- **`features.dream_require_entity_substrate`** (default `true`) — skips the
+  dream-entity SDK call for `$0` when the corpus carries zero entity-specific
+  substrate (only date-pulled daily digests that don't mention the entity). Such
+  a pass is a guaranteed `INSUFFICIENT_CORPUS` no-op that otherwise bills a full
+  prompt-cache write (~$0.80/entity). Set `false` to force a digests-only attempt.
+- **`scheduling.dream_insufficient_corpus_backoff_max_days`** (default `30`) —
+  when a dream runs but the agent returns `INSUFFICIENT_CORPUS` (common on
+  generic-noun slugs like `kontakte` whose mention-scan false-matches unrelated
+  text), the entity is backed off the sweep with an exponential window
+  (`dream_cooldown_days × 2^(consecutive_no_ops-1)`, capped here). A successful
+  synthesis clears it; `0` disables; `wiki dream <slug>` always bypasses it.
+
 ### Fixed
+
+- **Dream-cycle threw a false "SDK reported only N input tokens" warning on
+  every healthy call.** The bundled CLI caches the prompt, so `usage.input_tokens`
+  is only the tiny *uncached* delta (~12 for a 40 KB prompt) — the real input
+  lands in `cache_creation_input_tokens` + `cache_read_input_tokens`. New
+  `core.sdk_helpers.UsageTokens` / `extract_usage_tokens()` fold the cache fields
+  into the true input; the warning now gates on cache-inclusive tokens AND ~$0
+  cost (a genuine early-exit still surfaces). Token ledger + displayed `in:`
+  counts for both compile and dream are now cache-accurate; the per-file /
+  per-run runaway budgets deliberately stay on the uncached basis so `cache_read`
+  (re-counted per turn) can't falsely trip them.
+- **Dream-cycle hard-failed `PROMPT_TOO_LARGE` on high-file-count entities** (e.g.
+  the ytstack project page at 482 KB). The corpus was bounded by file *count*,
+  never by *chars*. It now trims the lowest-value Tier-2 (then oldest Tier-1
+  recent) substrate to fit the budget — authored content + daily digests are
+  preserved — and only hard-fails if that non-droppable core alone exceeds the cap.
+- **Designed dream no-ops flooded the errors-only triage log.** A legit
+  `INSUFFICIENT_CORPUS` no-op and an over-budget corpus trim are expected
+  outcomes → now logged at INFO; a byte-identical page *without* the
+  `INSUFFICIENT_CORPUS` sentinel (the silent-write-failure surface this check
+  exists for) still warns.
 
 - **`wiki compile` re-listed the same source files as "to compile" on every run,
   forever.** Deterministic skips — empty files, `compile_role: final-only` pages,

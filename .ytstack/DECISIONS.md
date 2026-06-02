@@ -1585,3 +1585,57 @@ in the repo `AGENTS.md` ("Adding a seedable config").
 **Linked artifacts:** `lib/seed.sh` (`_seed_json_overlay` / `_apply_overlay` /
 `_compute_overlay` / `_extract_overlay`), `wiki` (`cmd_seed`), `AGENTS.md`,
 CHANGELOG 0.1.3–0.1.6, `.ytstack/AD-HOC-issues-2-3-and-seed-overlay-SUMMARY.md`.
+
+## 2026-06-02: Token accounting is cache-inclusive; runaway budgets are not
+
+**Decision:** SDK token accounting splits into two numbers with different bases.
+(1) **Cost/reporting** (LEDGER, displayed `in:` counts, "did substrate get
+processed?" heuristics) uses the *cache-inclusive* total —
+`input_tokens + cache_creation_input_tokens + cache_read_input_tokens` — via
+`core.sdk_helpers.extract_usage_tokens()`, preferring `ResultMessage.usage`
+(authoritative cumulative) over the per-turn `AssistantMessage.usage` sum.
+(2) **Runaway-budget guards** (`limits.compile_max_tokens_per_file`,
+`limits.dream_cycle_max_tokens_per_run`) deliberately stay on the *uncached*
+basis and are NOT migrated to cache-inclusive cumulative.
+
+**Reason:** The bundled CLI caches the prompt by default, so `input_tokens` is a
+misleading uncached delta (~12 for a 40 KB prompt). Counting only it
+undercounted the ledger and false-fired dream's low-token warning on every
+healthy call. BUT `cache_read_input_tokens` is re-counted every turn — a
+multi-turn call's cumulative cache_read reaches millions — so feeding it into a
+per-file/per-run guard would blow tuned thresholds and fail files that
+previously succeeded. The two concerns need opposite treatments; conflating
+them regresses one or the other. Accounting wants the truth; guards want a
+stable, non-exploding proxy.
+
+**Linked artifacts:** `core/sdk_helpers.py` (`UsageTokens`,
+`extract_usage_tokens`), `dream.py`, `compile_stages/compile.py`,
+KNOWLEDGE 2026-06-02 (caching gotcha), CHANGELOG 0.1.7.
+
+## 2026-06-02: Repeat-INSUFFICIENT_CORPUS entities are backed off the sweep, not blocked or deleted
+
+**Decision:** When a dream RUNS but the agent returns the `INSUFFICIENT_CORPUS`
+sentinel, record it in `state/dream-insufficient-corpus.json` (slug → {count,
+last_at}) and skip the entity in the sweep for an exponential window
+(`scheduling.dream_cooldown_days × 2^(consecutive_no_ops-1)`, capped at
+`scheduling.dream_insufficient_corpus_backoff_max_days`, default 30). A
+successful synthesis clears the entry; `wiki dream <slug>` always bypasses it.
+The cheaper pre-flight skip (`features.dream_require_entity_substrate`, default
+true) handles the zero-substrate case for $0; the backoff handles the case the
+skip can't catch — a *false-positive* mention (generic-noun slug) that makes the
+corpus look non-empty.
+
+**Reason:** Selection re-picks entities regardless of whether fresh substrate
+exists, and a generic-noun slug (`kontakte` → German "Kontakte") false-matches
+the mention-scan, so a junk/dormant entity re-burned ~$1 of cache-write on a
+guaranteed no-op every sweep. Backoff (not hard-block) keeps the entity
+self-healing — it returns to normal cadence the instant real substrate lands and
+a synthesis succeeds — and never deletes operator data. Rejected: tightening
+`_mentions_entity` precision (fragile, risks dropping legit matches); deleting
+the junk stub (operator data, and doesn't generalise). v2 fast-reset on new
+substrate deferred (needs a per-candidate corpus walk in the sweep filter).
+
+**Linked artifacts:** `dream.py` (`_record_insufficient_corpus`,
+`_clear_insufficient_corpus`, `is_within_insufficient_backoff`,
+`_insufficient_backoff_days`), `core/config.py` (Scheduling), migrate_config_keys,
+`.ytstack/backlog/dream-insufficient-corpus-backoff.md`, CHANGELOG 0.1.7.
