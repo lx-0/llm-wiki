@@ -10,6 +10,33 @@ branch: main
 
 # Design: Watched-Folder Curiosity
 
+## CEO review 2026-06-07 — PROCEED · HOLD SCOPE (full breadth, one milestone)
+
+Decision: build the **full system** (index + curiosity-folder-backend + dream
+synthesis + NAS + scheduler) as a single milestone. Operator chose full breadth
+over the sequenced/local-first boundary. Scope is accepted, not reduced.
+
+HOLD-SCOPE rigor (bulletproofing — these become milestone exit-criteria, NOT
+optional):
+
+- **Build-order de-risks the irreversible surface.** Even at full breadth, the 3
+  gates ship FIRST, before any broad `raw/index/` write or NAS read:
+  1. Filename/path-PII sanitization rule (non-opt-in, every build).
+  2. Derived-facts sensitivity policy (`sensitivity:` frontmatter).
+  3. Answer-landing contract (re-distill vs. direct-knowledge-write both fight
+     existing contracts — pin it before the backend exists).
+- **Edge-case coverage required for "bulletproof":** re-index/staleness
+  invalidation (carry source mtime), failure/quarantine on the in-place read
+  (SMB timeout / file-gone), out-of-sandbox reader for CloudStorage/NAS (TCC
+  wall hits the backend, not just the index), per-request cost/confidence gate.
+- **Complexity is acknowledged, not cut:** XL milestone (new collector + new
+  backend + producer extension + 2 request types + out-of-sandbox reader + SMB
+  + scheduler). Tamed via slicing, not scope reduction. Expect 5-7 slices.
+
+Concern was raised once at mode-selection and overridden by operator choice;
+executing HOLD SCOPE faithfully from here. The slice plan must front-load the
+gates regardless of breadth.
+
 ## Problem Statement
 
 The wiki's knowledge of the operator is bounded by what the collectors ingest
