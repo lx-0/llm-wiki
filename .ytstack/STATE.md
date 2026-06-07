@@ -1,9 +1,9 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-06-07T13:10:00+0200
+last_updated: 2026-06-07T13:20:00+0200
 current_milestone: M027
-active_slice: none
+active_slice: S02
 active_task: none
 last_completed_milestone: M026
 parked_milestone: M025
@@ -34,9 +34,12 @@ T02 answer-landing contract = **option (a)** locked (commit `7aa12ed`, DECISIONS
 `raw/notes/folder/answer-<slug>.md` (email-deep-scan shape), next `compile`
 ingests it → `knowledge/`; compile is the single knowledge-writer. **Carry into
 S02:** the metadata index is compile-skip, but `raw/notes/folder/` answers are
-compile SOURCES (must be distilled) — don't exclude them. **Next action:**
-`ytstack:reassess-roadmap` (S01 done = slice boundary), then S02
-(`ytstack:plan-task`). 1/6 slices done.
+compile SOURCES (must be distilled) — don't exclude them. **Reassessed after S01 (2026-06-07, outcome B):** 6-slice structure holds; one
+refinement recorded in CONTEXT — answer-landing (a) makes **compile the primary
+consumer** (answer = raw source compile auto-distils), so **S05 refocuses to
+compile-primary + likely lighter**; S02 compile-skip must not exclude
+`raw/notes/folder/`; S04 landing concrete. **Next action:** `ytstack:plan-task`
+for **S02-T01** (local body-blind folder-index → `raw/index/`). active_slice=S02.
 
 **Parked:** **M025** (capture-correction-loop) parked at S01 1/3 — resume T02
 when M027 work permits. Not abandoned; deferred for M027.

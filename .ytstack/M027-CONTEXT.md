@@ -121,3 +121,27 @@ config + answer-landing and the index can be built freely.
   `curiosity-topic-as-search-query.md`, `curiosity-dashboard.md`.
 - Constraint: `feedback_macos_tcc_cloudstorage` (CloudStorage/NAS unreadable from
   Claude-Code subprocess), config-knob migration rule, `feedback_no_silent_provider_fallback`.
+
+## Reassessment 2026-06-07 (after S01)
+
+Roadmap structure (6 slices) holds. The answer-landing decision (a) shifts one
+framing for the downstream slices -- recorded so a later session/teammate plans
+them correctly:
+
+- **S05 refocus: compile is the PRIMARY consumer, not dream.** Because the
+  answer artifact lands in `raw/notes/folder/` (a normal compile source),
+  `compile` already distils it into `knowledge/` with no new producer code --
+  the substrate walker just needs to include `raw/notes/folder/` (verify it
+  isn't excluded) plus maybe a dedicated answer-shaped prompt + the optional
+  `sensitivity:` tag + the e2e "what do you know about X" check. Dream becomes
+  the SECONDARY, over-time cross-source synthesis. **S05 is therefore likely
+  lighter than its original "Dream/compile fold" framing** -- re-scope it when
+  it's planned (possibly fewer tasks).
+- **S02 carry-constraint:** when S02 marks the body-blind metadata index
+  compile-skip, it MUST NOT also exclude `raw/notes/folder/` -- index = skip,
+  answers = distil. Two different `raw/` subtrees, opposite compile treatment.
+- **S04 landing is concrete now:** `raw/notes/folder/answer-<slug>.md` with
+  provenance frontmatter (source path, topic, request id, as-of mtime), mirroring
+  `curiosity/backends/email.py`'s `DEEP_SCAN_DIR`.
+
+No slices added / split / removed.
