@@ -750,6 +750,13 @@ class Personal:
     # Paths in this list must match a `path:` entry in email_folders; unknown
     # paths are dropped silently with a one-time WARNING on load.
     curiosity_folders: list[str] = field(default_factory=list)
+    # M027: folders the curiosity loop may scan as substrate (local + NAS). A
+    # body-blind metadata index is built from these (S02); the producer proposes
+    # reads, the operator approves per-request in the walk (the content/cloud
+    # gate). Each entry: {id, kind: local|smb, path|share, include?, exclude?}.
+    # Empty default keeps the feature off. Validated by
+    # _validate_watched_folders_schema on load; nothing scans until S02.
+    watched_folders: list[dict] = field(default_factory=list)
     # short list of project / product names rendered into
     # scan_screenshots_vision.md as concrete examples
     project_examples: list[str] = field(default_factory=list)
@@ -1057,6 +1064,50 @@ def _validate_accounts_schema(personal_raw: dict) -> None:
     raise ConfigError("\n".join(lines))
 
 
+_WATCHED_FOLDER_KINDS = {"local", "smb"}
+
+
+def _validate_watched_folders_schema(personal_raw: dict) -> None:
+    """Validate personal.watched_folders entries (M027-S01).
+
+    Each entry needs a non-empty `id` and `kind in {local, smb}`; `local`
+    requires `path`, `smb` requires `share`. Raises ConfigError listing every
+    offending entry. Validation only — no filesystem / SMB access here.
+    """
+    folders = (personal_raw or {}).get("watched_folders") or []
+    if not isinstance(folders, list):
+        raise ConfigError(
+            "personal.watched_folders must be a list of "
+            "{id, kind, path|share} entries."
+        )
+    offenders: list[str] = []
+    for i, entry in enumerate(folders):
+        if not isinstance(entry, dict):
+            offenders.append(f"  - entry #{i}: not a mapping")
+            continue
+        fid = entry.get("id")
+        label = fid if isinstance(fid, str) and fid.strip() else f"#{i}"
+        if not isinstance(fid, str) or not fid.strip():
+            offenders.append(f"  - entry {label}: missing required `id`")
+            continue
+        kind = entry.get("kind")
+        if kind not in _WATCHED_FOLDER_KINDS:
+            offenders.append(
+                f"  - entry {label}: `kind` must be one of "
+                f"{sorted(_WATCHED_FOLDER_KINDS)}, got {kind!r}"
+            )
+            continue
+        if kind == "local" and not entry.get("path"):
+            offenders.append(f"  - entry {label}: kind=local requires `path`")
+        if kind == "smb" and not entry.get("share"):
+            offenders.append(f"  - entry {label}: kind=smb requires `share`")
+    if not offenders:
+        return
+    raise ConfigError(
+        "\n".join(["personal.watched_folders has invalid entries:", ""] + offenders)
+    )
+
+
 def load() -> WikiConfig:
     cfg = WikiConfig()
     if not CONFIG_FILE.exists():
@@ -1069,6 +1120,7 @@ def load() -> WikiConfig:
     if not isinstance(raw, dict):
         return cfg
     _validate_accounts_schema(raw.get("personal") or {})
+    _validate_watched_folders_schema(raw.get("personal") or {})
     cfg.scheduling = _merge_dataclass(cfg.scheduling, raw.get("scheduling") or {})
     cfg.piggybacks = _merge_piggybacks(cfg.piggybacks, raw.get("piggybacks"))
     cfg.models = _merge_dataclass(cfg.models, raw.get("models") or {})

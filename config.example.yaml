@@ -601,6 +601,24 @@ personal:
   #       mode:   move          # move (default) or copy
   #       enabled: true         # optional, defaults true
   inbox_bridges: []
+  # M027 watched-folder curiosity. Folders the curiosity loop may scan as
+  # substrate (local dirs + remote NAS shares). A body-blind METADATA index is
+  # built from these — filenames / folder structure / size / mtime — so the
+  # agent knows what's available. The producer then PROPOSES reading specific
+  # files; the operator approves each read in the curiosity walk (that approval
+  # is the content/cloud gate — real file bodies are only loaded on accept).
+  # Each entry: id (stable handle), kind (local|smb), path (local) or share
+  # (smb), optional include/exclude globs. Empty list = feature off.
+  # Example:
+  #   watched_folders:
+  #     - id:   docs-private
+  #       kind: local
+  #       path: "~/Sync/Private/Documents"
+  #       exclude: ["**/.git/**"]
+  #     - id:    nas-multimedia
+  #       kind:  smb
+  #       share: Multimedia
+  watched_folders: []
   # M025 quick-capture inbox. Directory the operator one-taps cryptic notes
   # into (iOS Shortcut → iCloud Drive is the mobile-primary path). The capture
   # collector folder-watches it, content-IDs each capture, writes

@@ -444,6 +444,11 @@ KEY_ADDITIONS: dict[str, dict[str, object]] = {
         # network-mounted / sandbox-restricted intake folders into local paths
         # the substrate collectors then folder-watch. See `wiki bridge --help`.
         "inbox_bridges": [],
+        # M027 (2026-06-07) watched-folder curiosity. Empty default keeps the
+        # feature off — operator populates with {id, kind: local|smb, path|share}
+        # dicts naming folders the curiosity loop may index + (on per-request
+        # approval) read. Validated by config._validate_watched_folders_schema.
+        "watched_folders": [],
         # Dream web-research (issue #2, 2026-05-31). Exa AI key — empty default
         # keeps the feature inert; falls back to env EXA_API_KEY. Prefer setting
         # it in the vault's .claude/.env, not config.yaml. Match

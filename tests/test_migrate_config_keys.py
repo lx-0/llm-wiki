@@ -158,8 +158,9 @@ def test_migrate_config_file_round_trip(tmp_path):
     #    personal.exa_api_key
     # +1 features.dream_require_entity_substrate (dream no-op skip), 2026-05-31
     # +1 scheduling.dream_insufficient_corpus_backoff_max_days (backoff), 2026-06-02
-    # = 83 changes (no drops — operator has no orphan personal.* fields)
-    assert len(changes) == 83, f"got {len(changes)} changes: {changes}"
+    # +1 personal.watched_folders (M027 watched-folder curiosity), 2026-06-07
+    # = 84 changes (no drops — operator has no orphan personal.* fields)
+    assert len(changes) == 84, f"got {len(changes)} changes: {changes}"
 
     reparsed = yaml.safe_load(new_text)
     # piggyback side
@@ -277,6 +278,7 @@ def test_migrate_config_no_change_when_fully_current(tmp_path):
             "voice_transcribe_binary": "",
             "voice_transcribe_ffmpeg": "",
             "inbox_bridges": [],
+            "watched_folders": [],
             "exa_api_key": "",
         },
     }), encoding="utf-8")
@@ -444,6 +446,7 @@ def test_migrate_additions_idempotent():
             "voice_transcribe_binary": "",
             "voice_transcribe_ffmpeg": "",
             "inbox_bridges": [],
+            "watched_folders": [],
             "exa_api_key": "",
         },
     }
