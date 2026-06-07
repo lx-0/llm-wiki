@@ -19,14 +19,16 @@ Source pitch (validated + CEO-reviewed): `OFFICE-HOURS-watched-folder-curiosity.
 
 ## Exit criteria
 
-1. **GATE** Filename/path-PII sanitization rule implemented + enforced BEFORE
-   any index is written to `raw/index/` or fed into a prompt (non-opt-in;
-   fires on every build).
-2. **GATE** Derived-facts sensitivity policy defined + applied (`sensitivity:`
-   frontmatter); decided what may persist vs. stay out.
-3. **GATE** Answer-landing contract pinned + implemented (where the backend's
-   distilled answer goes -- re-distill vs. direct-knowledge-write both fight
-   existing contracts).
+1. Metadata index is **unmasked** (filenames, folder structure, size/mtime/type)
+   -- the agent sees all of it; no sanitization. Content is NEVER in the index.
+2. **The human-approval walk is the content/cloud gate**: real file content is
+   loaded + processed only after per-request operator accept in
+   `curiosity/cli.py:_walk`; the walk card states "file X will be loaded and
+   sent to <backend> to answer Y" (informed consent). (Optional `sensitivity:`
+   tag on a resulting fact -- nice-to-have, not blocking.)
+3. Answer-landing contract pinned + implemented (where the backend's distilled
+   answer goes -- re-distill vs. direct-knowledge-write both fight existing
+   contracts). Technical decision, not a PII gate.
 4. `personal.watched_folders` (local + smb) lands via `config.py` +
    `config.example.yaml` + migration (same commit); periodic body-blind index
    written to `raw/index/<root>.md` for >=1 local and >=1 NAS root.
@@ -42,10 +44,10 @@ Source pitch (validated + CEO-reviewed): `OFFICE-HOURS-watched-folder-curiosity.
 
 ## Size
 
-L -- see `M027-ROADMAP.md` for slice breakdown. Likely 5-7 slices in practice
-(CEO review sized it XL); slicing will expand the L lower-bound skeleton. The
-slice order MUST front-load the three GATE exit-criteria before any broad
-`raw/index/` write or NAS read.
+L -- see `M027-ROADMAP.md` for slice breakdown. 6 slices. Earlier framing
+required front-loading "three irreversible gates"; superseded 2026-06-07 (see
+Decisions) -- the human-approval walk is the content gate, so S01 slimmed to
+config + answer-landing and the index can be built freely.
 
 ## Decisions locked in discuss phase
 
@@ -59,9 +61,16 @@ slice order MUST front-load the three GATE exit-criteria before any broad
   control for bodies.
 - 2026-06-07: Split-provider, like email -- producer = Ollama (gap detection),
   backend = Claude SDK (content extraction). No cross-provider fallback.
-- 2026-06-07: Index is body-blind but NOT PII-blind (filenames carry sensitive
-  facts + are an injection surface) -> the filename-sanitization gate (exit #1)
-  is the FIRST PII control, ahead of the derived-facts policy.
+- 2026-06-07 (SUPERSEDES the "3 gates" framing -- see DECISIONS 2026-06-07):
+  **The human-approval walk is the content/cloud gate.** Metadata index is
+  unmasked (the agent should see filenames/structure -- that's the triage
+  signal); content is loaded + processed only after per-request operator accept
+  in `_walk`. No upfront PII-sanitization gate. Filename-masking dropped;
+  derived-facts policy demoted to an optional `sensitivity:` tag.
+- 2026-06-07: **Backend provider is a swappable seam** -- Claude SDK now, a
+  local LLM/agent is the long-term target (then content never leaves the
+  machine). Design the backend behind a provider seam; not hard-coupled to
+  Claude, not a silent fallback.
 
 ## Open questions
 
@@ -72,10 +81,14 @@ slice order MUST front-load the three GATE exit-criteria before any broad
   risk), (b) agent writes derived fact directly to entity/fact page (collides
   with 3-layer agent-scope rule for `knowledge/` writes), (c) `daily/` rollup
   the dream-cycle folds in. Must be pinned before the backend is built.
-- **Q2 (blocking) Filename-PII rule:** what masks/strips sensitive filenames
-  before `raw/index/` + prompt. Non-opt-in, irreversible.
-- **Q3 (blocking) Derived-facts sensitivity policy:** what distilled facts may
-  persist; `sensitivity:` frontmatter as health.
+- ~~**Q2 Filename-PII rule**~~ -- CLOSED 2026-06-07: dropped. Metadata index is
+  unmasked; the human-approval walk gates content, not the index.
+- **Q3 (non-blocking) Derived-facts sensitivity tag:** optional `sensitivity:`
+  frontmatter on a persisted fact. Nice-to-have, not a gate (human approved the
+  read). Decide during S05 if wanted.
+- **Q9 Backend provider seam:** how to abstract the agentic read+answer so a
+  local LLM/agent can replace Claude SDK later (config-selected provider; same
+  request/answer contract). Shapes S04.
 - **Q4 Index form + size caps:** one MD digest per root (single consumer);
   depth/top-N caps that stay prompt-injectable at 1000s of files. Minimum index
   = whatever lets the producer name a real file; richer views deferred.

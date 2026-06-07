@@ -17,9 +17,9 @@ body-blind index feeds curiosity requests that read selected files in-place
 troves, not just the narrative layer.
 
 **Exit criteria:**
-1. GATE -- filename/path-PII sanitization enforced before any index hits `raw/index/` or a prompt.
-2. GATE -- derived-facts sensitivity policy defined + applied (`sensitivity:` frontmatter).
-3. GATE -- answer-landing contract pinned + implemented.
+1. Metadata index unmasked (filenames/structure/size/mtime); content never in the index.
+2. Human-approval walk is the content/cloud gate -- content loaded + processed only after per-request accept; walk card shows informed-consent text.
+3. Answer-landing contract pinned + implemented (technical decision, not a PII gate).
 4. `personal.watched_folders` (local + smb) via config + migration; body-blind index for >=1 local and >=1 NAS root.
 5. Producer `folder-deep-scan` (file-exists anchor) + `backends/folder.py` read-in-place, answer-only, verified on a real trove.
 6. Dream/compile folds >=1 folder-derived fact into `knowledge/` live on lxw; trove-topic query returns a folder-sourced fact.
@@ -28,12 +28,11 @@ troves, not just the narrative layer.
 ## Slices
 
 Slice detail lives in per-slice `M027-S##-PLAN.md` files, created by
-`ytstack:slice-milestone`. **Slice order MUST front-load the three GATE
-exit-criteria (filename-PII rule, sensitivity policy, answer-landing contract)
-before any broad `raw/index/` write or NAS read.** L is the lower-bound
-skeleton; slicing will likely expand to 5-7.
+`ytstack:slice-milestone`. (The earlier "front-load the 3 gates" rule is
+superseded -- see DECISIONS 2026-06-07; the human-approval walk is the content
+gate, so the index can be built freely and S01 is slimmed.)
 
-- [ ] S01 -- Gates & contracts: filename-PII rule + sensitivity policy + answer-landing contract + watched_folders config
+- [ ] S01 -- Config + answer-landing contract: `watched_folders` schema + decide where the backend's distilled answer persists
 - [ ] S02 -- Body-blind folder-index collector for local roots -> sanitized delta-aware `raw/index/<root>.md`
 - [ ] S03 -- Curiosity producer emits `folder-deep-scan` (file-exists anchor) + dispatch branch
 - [ ] S04 -- Folder-backend: read named local files in-place, persist answer-only (no raw body)

@@ -1639,3 +1639,49 @@ substrate deferred (needs a per-candidate corpus walk in the sweep filter).
 `_clear_insufficient_corpus`, `is_within_insufficient_backoff`,
 `_insufficient_backoff_days`), `core/config.py` (Scheduling), migrate_config_keys,
 `.ytstack/backlog/dream-insufficient-corpus-backoff.md`, CHANGELOG 0.1.7.
+
+## 2026-06-07: M027 — human-approval walk is the content/cloud gate; metadata index is unmasked; backend provider is swappable
+
+**Decision:** The Watched-Folder Curiosity loop (M027) has NO upfront PII policy
+gating file-content access. The gate is procedural and already exists: the
+curiosity **human-approval walk** (`curiosity/cli.py:_walk`, accept/skip/reject
+per request). Flow: (1) a body-blind **metadata index** (filenames, folder
+structure, size/mtime/type) is built freely — **no masking, no sanitization**;
+the agent should see all of it, it's the operator's own vault. (2) The producer
+triages off the metadata and *proposes* "read file X to answer topic Y" as a
+pending request — content untouched. (3) The operator approves per-request in
+the walk; only on accept does the backend load + process the real content. So
+the decision "do sensitive contents leave the machine / does a derived fact get
+stored" is made per-request by the human at approval time, not as a blanket
+policy.
+
+**Consequence:** the three "irreversible gates" from the office-hours/CEO-review
+framing dissolve. (a) Filename-PII sanitization — **dropped**; metadata is fine.
+(b) Derived-facts sensitivity policy — **not a blocking gate**; the human
+approved the read knowing its output (optional `sensitivity:` tag on the fact is
+nice-to-have, not blocking). (c) Answer-landing contract — **kept**, but as a
+normal technical design decision (where the distilled answer persists), not a
+PII gate. UX requirement: the walk card must state "file X will be loaded and
+sent to <backend> to answer Y" so approval is informed.
+
+**Backend provider is a swappable seam.** The agentic read+answer backend uses
+the Claude SDK now (quality), but the long-term target is a **local LLM/agent**
+taking over that role — at which point file content never leaves the machine and
+the cloud-egress concern is gone entirely (the human-approval gate stays). So
+the backend MUST be designed behind a provider seam, not hard-coupled to Claude.
+This is an explicit configurable provider for the folder-backend, not a silent
+cross-provider fallback (which remains banned per the no-silent-fallback rule).
+
+**Reason:** the earlier "filename = PII leak" framing applied a generic PII
+checklist instead of the actual threat model — a single-user private vault whose
+whole purpose is for the agent to learn the operator's file metadata. The
+operator corrected it: metadata is the triage signal the loop needs; real-data
+access is what gets gated, and the existing human-in-the-loop walk already gates
+it. Rejected: opaque-file-id indirection + real-path map outside the vault
+(over-engineering for a single-user vault); upfront per-folder cloud-allow policy
+(subsumed by per-request human approval).
+
+**Linked artifacts:** `M027-CONTEXT.md`, `M027-S01-PLAN.md` (slimmed to config +
+answer-landing), `M027-S04-PLAN.md` (provider seam + informed-consent walk card),
+`curiosity/cli.py:_walk`, `OFFICE-HOURS-watched-folder-curiosity.md` (the 3-gate
+framing there is superseded by this entry).

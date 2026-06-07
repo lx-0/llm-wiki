@@ -12,18 +12,21 @@ parallel_milestones: [M021]
 
 # State
 
-**Status:** M027 planned (L). Ready to slice. **Watched-Folder Curiosity** —
-the wiki learns from watched local + NAS folders: body-blind index → curiosity
-`folder-deep-scan` reads files in-place (answer-only, no raw copy) → dream folds
-derived facts into `knowledge/`. HOLD SCOPE full-breadth (operator-chosen); the
-three irreversible GATES (filename-PII rule, derived-facts sensitivity policy,
-answer-landing contract) MUST be front-loaded slices. Pitch +
-CEO-review: `OFFICE-HOURS-watched-folder-curiosity.md`; CONTEXT/ROADMAP:
-`M027-{CONTEXT,ROADMAP}.md`. **Sliced into 6 (gate-first):** S01 gates &
-contracts → S02 local index → S03 producer+dispatch → S04 backend (read-in-place,
-answer-only) → S05 dream/compile fold → S06 NAS+out-of-sandbox+scheduler
-(`M027-S0{1..6}-PLAN.md`). **Next action:** run `ytstack:plan-task` for S01-T01,
-or `ytstack:spawn-milestone-team`. Build S01 (gates) before any index write.
+**Status:** M027 planned + sliced (L, 6 slices). **Watched-Folder Curiosity** —
+the wiki learns from watched local + NAS folders: **unmasked metadata index** →
+producer proposes `folder-deep-scan` → **operator approves per-request in the
+walk** (THE content/cloud gate) → backend reads files in-place (answer-only, no
+raw copy) → dream folds derived facts into `knowledge/`. HOLD SCOPE full-breadth.
+**Reframed 2026-06-07** (DECISIONS): the earlier "3 irreversible PII gates" are
+superseded — metadata is fine to index, the human-approval walk gates content,
+so S01 slimmed to config + answer-landing. Backend provider is a swappable seam
+(Claude SDK now, local LLM/agent long-term). Pitch + CEO-review:
+`OFFICE-HOURS-watched-folder-curiosity.md`; CONTEXT/ROADMAP/plans:
+`M027-{CONTEXT,ROADMAP}.md` + `M027-S0{1..6}-PLAN.md`. **6 slices:** S01 config +
+answer-landing → S02 unmasked metadata index → S03 producer+dispatch → S04
+backend (read-in-place, answer-only, provider seam, informed-consent walk card) →
+S05 dream/compile fold → S06 NAS+out-of-sandbox+scheduler. **Next action:** run
+`ytstack:plan-task` for S01-T01 (`watched_folders` config).
 
 **Parked:** **M025** (capture-correction-loop) parked at S01 1/3 — resume T02
 when M027 work permits. Not abandoned; deferred for M027.
