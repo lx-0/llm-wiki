@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-06-07T13:00:00+0200
+last_updated: 2026-06-07T13:10:00+0200
 current_milestone: M027
-active_slice: S01
-active_task: T02
+active_slice: none
+active_task: none
 last_completed_milestone: M026
 parked_milestone: M025
 parallel_milestones: [M021]
@@ -28,12 +28,15 @@ backend (read-in-place, answer-only, provider seam, informed-consent walk card) 
 S05 dream/compile fold → S06 NAS+out-of-sandbox+scheduler. **S01: 1/2 tasks done.** T01 ✅ `personal.watched_folders` config-key shipped
 (schema + `_validate_watched_folders_schema` wired into load(), KEY_ADDITIONS
 migration, example; validation-only, suite 1207 green; commit `add19eb`,
-`M027-S01-T01-SUMMARY.md`). **S01-T02 planned + decided** (`M027-S01-T02-PLAN.md`): answer-landing contract =
-**option (a)** — backend writes a topic-focused answer-extract to `raw/` (like
-email-deep-scan), next `compile` ingests it as a source and writes `knowledge/`;
-compile is the single knowledge-writer (it generates the request AND consumes the
-answer). **Next action:** execute S01-T02 (write the DECISIONS entry + close
-CONTEXT Q1), then `ytstack:summarize-task`.
+`M027-S01-T01-SUMMARY.md`). **✅ S01 COMPLETE (2/2).** T01 `watched_folders` config (commit `add19eb`) +
+T02 answer-landing contract = **option (a)** locked (commit `7aa12ed`, DECISIONS
+2026-06-07): backend writes a topic-focused answer-extract to
+`raw/notes/folder/answer-<slug>.md` (email-deep-scan shape), next `compile`
+ingests it → `knowledge/`; compile is the single knowledge-writer. **Carry into
+S02:** the metadata index is compile-skip, but `raw/notes/folder/` answers are
+compile SOURCES (must be distilled) — don't exclude them. **Next action:**
+`ytstack:reassess-roadmap` (S01 done = slice boundary), then S02
+(`ytstack:plan-task`). 1/6 slices done.
 
 **Parked:** **M025** (capture-correction-loop) parked at S01 1/3 — resume T02
 when M027 work permits. Not abandoned; deferred for M027.

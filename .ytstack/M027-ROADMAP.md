@@ -5,7 +5,7 @@ size: L
 created: 2026-06-07T12:21:47+0200
 status: planned
 total_slices: 6
-completed_slices: 0
+completed_slices: 1
 ---
 
 # M027 Roadmap
@@ -32,7 +32,7 @@ Slice detail lives in per-slice `M027-S##-PLAN.md` files, created by
 superseded -- see DECISIONS 2026-06-07; the human-approval walk is the content
 gate, so the index can be built freely and S01 is slimmed.)
 
-- [ ] S01 -- Config + answer-landing contract: `watched_folders` schema + decide where the backend's distilled answer persists
+- [x] S01 -- Config + answer-landing contract: `watched_folders` schema + decide where the backend's distilled answer persists
 - [ ] S02 -- Body-blind folder-index collector for local roots -> sanitized delta-aware `raw/index/<root>.md`
 - [ ] S03 -- Curiosity producer emits `folder-deep-scan` (file-exists anchor) + dispatch branch
 - [ ] S04 -- Folder-backend: read named local files in-place, persist answer-only (no raw body)
