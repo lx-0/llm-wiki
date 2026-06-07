@@ -4,7 +4,7 @@ project: llm-wiki
 size: L
 created: 2026-06-07T12:21:47+0200
 status: planned
-total_slices: 4
+total_slices: 6
 completed_slices: 0
 ---
 
@@ -33,10 +33,12 @@ exit-criteria (filename-PII rule, sensitivity policy, answer-landing contract)
 before any broad `raw/index/` write or NAS read.** L is the lower-bound
 skeleton; slicing will likely expand to 5-7.
 
-- [ ] S01 -- (to be planned)
-- [ ] S02 -- (to be planned)
-- [ ] S03 -- (to be planned)
-- [ ] S04 -- (to be planned)
+- [ ] S01 -- Gates & contracts: filename-PII rule + sensitivity policy + answer-landing contract + watched_folders config
+- [ ] S02 -- Body-blind folder-index collector for local roots -> sanitized delta-aware `raw/index/<root>.md`
+- [ ] S03 -- Curiosity producer emits `folder-deep-scan` (file-exists anchor) + dispatch branch
+- [ ] S04 -- Folder-backend: read named local files in-place, persist answer-only (no raw body)
+- [ ] S05 -- Dream/compile fold folder-derived facts into `knowledge/` with sensitivity applied
+- [ ] S06 -- NAS (SMB) + out-of-sandbox reader + periodic scheduler
 
 ## Run order
 

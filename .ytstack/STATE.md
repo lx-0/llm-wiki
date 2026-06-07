@@ -19,8 +19,11 @@ derived facts into `knowledge/`. HOLD SCOPE full-breadth (operator-chosen); the
 three irreversible GATES (filename-PII rule, derived-facts sensitivity policy,
 answer-landing contract) MUST be front-loaded slices. Pitch +
 CEO-review: `OFFICE-HOURS-watched-folder-curiosity.md`; CONTEXT/ROADMAP:
-`M027-{CONTEXT,ROADMAP}.md`. **Next action:** run `ytstack:slice-milestone`
-(slice order must front-load the gates).
+`M027-{CONTEXT,ROADMAP}.md`. **Sliced into 6 (gate-first):** S01 gates &
+contracts → S02 local index → S03 producer+dispatch → S04 backend (read-in-place,
+answer-only) → S05 dream/compile fold → S06 NAS+out-of-sandbox+scheduler
+(`M027-S0{1..6}-PLAN.md`). **Next action:** run `ytstack:plan-task` for S01-T01,
+or `ytstack:spawn-milestone-team`. Build S01 (gates) before any index write.
 
 **Parked:** **M025** (capture-correction-loop) parked at S01 1/3 — resume T02
 when M027 work permits. Not abandoned; deferred for M027.
