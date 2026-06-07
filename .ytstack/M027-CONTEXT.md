@@ -55,10 +55,14 @@ config + answer-landing and the index can be built freely.
   curiosity-folder-backend + dream synthesis + NAS + scheduler). Operator chose
   full breadth over the sequenced/local-first boundary; concern raised once at
   CEO mode-selection and overridden. (CEO review block in the pitch.)
-- 2026-06-07: P2 contract -- indexed files are read transiently in-place,
-  answer-only; **no raw body copy enters the vault**. The index + request
-  artifacts are metadata under `raw/` (not bodies). This is the structural PII
-  control for bodies.
+- 2026-06-07: P2 contract -- indexed files are read transiently in-place; **no
+  raw file BODY copy enters the vault**. REFINED by the answer-landing decision
+  (S01-T02): the derived, topic-focused answer-EXTRACT DOES land in
+  `raw/notes/folder/answer-<slug>.md` as a compile source (same shape as
+  email-deep-scan), and compile distills it into `knowledge/`. So "answer-only"
+  = no full body persists, not "nothing persists"; the index + request artifacts
+  are metadata under `raw/`. The human-approval walk gates whether the
+  read+extract happens at all.
 - 2026-06-07: Split-provider, like email -- producer = Ollama (gap detection),
   backend = Claude SDK (content extraction). No cross-provider fallback.
 - 2026-06-07 (SUPERSEDES the "3 gates" framing -- see DECISIONS 2026-06-07):
@@ -76,11 +80,13 @@ config + answer-landing and the index can be built freely.
 
 (Resolve before/during slicing; close as decisions land above.)
 
-- **Q1 (blocking) Answer-landing target:** (a) curiosity-answer artifact
-  re-distilled by compile (but compile distills *raw* sources -> double-distill
-  risk), (b) agent writes derived fact directly to entity/fact page (collides
-  with 3-layer agent-scope rule for `knowledge/` writes), (c) `daily/` rollup
-  the dream-cycle folds in. Must be pinned before the backend is built.
+- ~~**Q1 Answer-landing target**~~ -- CLOSED 2026-06-07 (S01-T02, see DECISIONS
+  2026-06-07 answer-landing). Option **(a)**: backend writes a topic-focused
+  answer-extract to `raw/notes/folder/answer-<slug>.md` (sibling of email's
+  `raw/notes/email/deep-<slug>.md`); next `compile` ingests it as a normal
+  source -> `knowledge/`. compile is the single knowledge-writer (it generates
+  the request AND consumes the answer). The "double-distill" worry dissolves:
+  the backend extracts source material, it does not finalize knowledge.
 - ~~**Q2 Filename-PII rule**~~ -- CLOSED 2026-06-07: dropped. Metadata index is
   unmasked; the human-approval walk gates content, not the index.
 - **Q3 (non-blocking) Derived-facts sensitivity tag:** optional `sensitivity:`

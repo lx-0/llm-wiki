@@ -1685,3 +1685,49 @@ it. Rejected: opaque-file-id indirection + real-path map outside the vault
 answer-landing), `M027-S04-PLAN.md` (provider seam + informed-consent walk card),
 `curiosity/cli.py:_walk`, `OFFICE-HOURS-watched-folder-curiosity.md` (the 3-gate
 framing there is superseded by this entry).
+
+## 2026-06-07: M027 answer-landing contract — backend writes a raw/ source-extract, compile distills it into knowledge/ (mirrors email-deep-scan)
+
+**Decision (M027-S01-T02):** The folder-backend's output lands in `raw/` as a
+**new source**, and the next `compile` pass distills it into `knowledge/`. The
+backend does NOT write `knowledge/` itself.
+
+Concretely:
+- The backend (S04) reads the request's named file(s) in-place and produces a
+  **topic-focused answer-extract** — the content relevant to the curiosity
+  topic, NOT a copy of the full file body, and NOT a finished knowledge article.
+- It writes that extract to **`raw/notes/folder/answer-<slug>.md`** (sibling of
+  the email backend's `raw/notes/email/deep-<slug>.md` — `DEEP_SCAN_DIR =
+  RAW_DIR/"notes"/"email"` in `curiosity/backends/email.py`; the folder backend
+  uses `RAW_DIR/"notes"/"folder"`). Provenance frontmatter: source file path,
+  topic, request id, and as-of = the source file's mtime (staleness handle).
+- It is a **normal compile source** — NOT compile-skip (contrast the metadata
+  index, which IS body-blind compile-skip). On the next `compile` pass, compile
+  ingests it like any `raw/notes/` source and writes `knowledge/` (entity/fact
+  pages, wikilinks, dedup) via the established compile knowledge-writer.
+
+**Why (a), not (b)/(c):** The operator's framing: compile already *generates*
+the curiosity request (the producer is a post-compile pass), so compile should
+also *see and consume* the answer on the next pass — one engine owns the
+knowledge integration. This makes compile the **single knowledge-writer** (no
+direct backend→`knowledge/` write, so no 3-layer agent-scope collision; no
+parallel writer racing compile's dedup/wikilink machinery). The "double-distill"
+worry does not apply: the backend **extracts source material**, it does not
+finalize knowledge — there is exactly one distill-to-knowledge step (compile).
+Rejected (b) direct knowledge-write (backend becomes a second knowledge-writer,
+bypasses the synthesis the operator wants) and (c) daily/→dream-fold (dream is
+cross-source synthesis, not the primary `raw/`→`knowledge/` path; adds latency
+without the reuse benefit).
+
+**Refines P2** (DECISIONS 2026-06-07 above): "answer-only, no raw body copy"
+means **no full file BODY persists** — but the derived, topic-focused
+answer-extract DOES land in `raw/notes/folder/` as a compile source. The
+folder-backend's landing is therefore the SAME shape as email-deep-scan
+(`raw/notes/*` → compile distills), not a separate answer-only-bypass-compile
+contract. The human-approval walk still gates whether the read+extract happens
+at all.
+
+**Linked artifacts:** `M027-S01-T02-PLAN.md`, `M027-CONTEXT.md` (Q1 closed),
+`curiosity/backends/email.py` (`DEEP_SCAN_DIR` precedent), `M027-S03/S04/S05`
+plans (request shape / backend write / compile-consume build against this),
+`compile.py` (the single knowledge-writer).
