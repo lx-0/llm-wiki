@@ -1,15 +1,29 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-05-31T15:00:00+0200
-current_milestone: M025
-active_slice: S01
+last_updated: 2026-06-07T12:21:47+0200
+current_milestone: M027
+active_slice: none
 active_task: none
 last_completed_milestone: M026
+parked_milestone: M025
 parallel_milestones: [M021]
 ---
 
 # State
+
+**Status:** M027 planned (L). Ready to slice. **Watched-Folder Curiosity** —
+the wiki learns from watched local + NAS folders: body-blind index → curiosity
+`folder-deep-scan` reads files in-place (answer-only, no raw copy) → dream folds
+derived facts into `knowledge/`. HOLD SCOPE full-breadth (operator-chosen); the
+three irreversible GATES (filename-PII rule, derived-facts sensitivity policy,
+answer-landing contract) MUST be front-loaded slices. Pitch +
+CEO-review: `OFFICE-HOURS-watched-folder-curiosity.md`; CONTEXT/ROADMAP:
+`M027-{CONTEXT,ROADMAP}.md`. **Next action:** run `ytstack:slice-milestone`
+(slice order must front-load the gates).
+
+**Parked:** **M025** (capture-correction-loop) parked at S01 1/3 — resume T02
+when M027 work permits. Not abandoned; deferred for M027.
 
 **Recent ad-hoc (2026-06-02, dream diagnostics):** Operator reported the dream sweep still throwing frequent WARNINGs + wasting spend. Four-part arc (`b27bd02`→`a77d184`→`fcdad80`→`adeb5dc`, **on `main`, UNPUSHED — push gated**; folded into the parallel 0.1.7 release via CHANGELOG only). **(A) cache-aware token accounting:** the bundled CLI caches the prompt, so `usage["input_tokens"]` is just the uncached delta (~12 for a 40 KB prompt) while the real bulk is `cache_creation_input_tokens` + `cache_read_input_tokens` (`total_cost_usd` is the ground-truth signal — $0.79 for in:12/out:90 ⇒ tens of thousands of cache tokens). New `core.sdk_helpers.UsageTokens` + `extract_usage_tokens()`; dream low-token warning now gates on cache-inclusive input AND ~$0 cost; compile + dream LEDGER/`in:` display made cache-accurate. **Load-bearing caveat:** runaway budgets (`compile_max_tokens_per_file`, `dream_cycle_max_tokens_per_run`) deliberately stay on the uncached basis — `cache_read` is re-counted per turn and would explode them → false `tokens_exceeded`. **(B) no-op skip** `features.dream_require_entity_substrate` (default true): authored+recent+tier2==0 ⇒ corpus is only non-mentioning digests ⇒ skip SDK for $0 (`skipped="no_entity_substrate"`). **(C) char-budget trim** `_build_prompt_within_budget`: ytstack (482 KB) no longer hard-fails `PROMPT_TOO_LARGE` — drops lowest-value Tier-2 then oldest Tier-1-recent to fit, authored+digests preserved. **Log-levels:** designed `INSUFFICIENT_CORPUS` no-ops + over-budget trims → INFO; byte-identical page WITHOUT the sentinel (silent write-failure) stays WARNING. **Backoff** `scheduling.dream_insufficient_corpus_backoff_max_days` (default 30): generic-noun slug `kontakte` false-matches `_mentions_entity` (German word "Kontakte" in email metadata) → recent=1 defeats B-skip → ~$1/sweep no-op; side-state `state/dream-insufficient-corpus.json` (slug→{count,last_at}), exponential window (`dream_cooldown_days × 2^(count-1)` capped), cleared on synthesis, `wiki dream <slug>` bypasses → worst-case ~$1/30d. **2 config knobs, migration-wired same-commit** (round-trip 82→83). Suite **1197 green**. v2 (backoff fast-reset on new substrate) deferred — backlog `dream-insufficient-corpus-backoff.md`. KNOWLEDGE + DECISIONS 2026-06-02; memory `project_dream_diagnostics_2026-06-02`. ⚠️ Logic verified via tests (mocked SDK) — NOT end-to-end against live SDK; lxw effect lands after `wiki update`.
 
