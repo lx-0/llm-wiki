@@ -5,7 +5,7 @@ project: llm-wiki
 created: 2026-06-07T12:21:47+0200
 status: planned
 task_count: 2
-completed_tasks: 0
+completed_tasks: 1
 ---
 
 # M027-S01 -- Slice Plan
@@ -22,7 +22,7 @@ contract -- the two upfront decisions the rest of the milestone depends on.
 
 ## Tasks
 
-- [ ] T01 -- Add `personal.watched_folders` config schema (`config.py` + `config.example.yaml` + `migrations/migrate_config_keys.py`, same commit per the config-knob rule): list of `{id, kind: local|smb, path|share, include/exclude globs}`. Validation only, no scanning yet.
+- [x] T01 -- Add `personal.watched_folders` config schema (`config.py` + `config.example.yaml` + `migrations/migrate_config_keys.py`, same commit per the config-knob rule): list of `{id, kind: local|smb, path|share, include/exclude globs}`. Validation only, no scanning yet.
 - [ ] T02 -- Decide + document the answer-landing contract (where the backend's distilled answer persists: curiosity-answer artifact vs. direct knowledge-write vs. daily rollup), with the reasoning on why the chosen path doesn't fight the compile-distill contract or the 3-layer agent-scope rule for `knowledge/` writes. Record in DECISIONS.md.
 
 ## Done when

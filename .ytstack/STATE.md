@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-06-07T12:35:00+0200
+last_updated: 2026-06-07T12:55:00+0200
 current_milestone: M027
 active_slice: S01
-active_task: T01
+active_task: none
 last_completed_milestone: M026
 parked_milestone: M025
 parallel_milestones: [M021]
@@ -25,9 +25,11 @@ so S01 slimmed to config + answer-landing. Backend provider is a swappable seam
 `M027-{CONTEXT,ROADMAP}.md` + `M027-S0{1..6}-PLAN.md`. **6 slices:** S01 config +
 answer-landing → S02 unmasked metadata index → S03 producer+dispatch → S04
 backend (read-in-place, answer-only, provider seam, informed-consent walk card) →
-S05 dream/compile fold → S06 NAS+out-of-sandbox+scheduler. **S01-T01 planned**
-(`M027-S01-T01-PLAN.md`: `watched_folders` config-key, validation-only, inbox_bridges
-precedent). **Next action:** execute S01-T01 (TDD), then `ytstack:summarize-task`.
+S05 dream/compile fold → S06 NAS+out-of-sandbox+scheduler. **S01: 1/2 tasks done.** T01 ✅ `personal.watched_folders` config-key shipped
+(schema + `_validate_watched_folders_schema` wired into load(), KEY_ADDITIONS
+migration, example; validation-only, suite 1207 green; commit `add19eb`,
+`M027-S01-T01-SUMMARY.md`). **Next action:** `ytstack:plan-task` for S01-T02
+(answer-landing contract — the one remaining upfront design decision).
 
 **Parked:** **M025** (capture-correction-loop) parked at S01 1/3 — resume T02
 when M027 work permits. Not abandoned; deferred for M027.
