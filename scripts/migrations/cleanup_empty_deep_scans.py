@@ -90,9 +90,10 @@ def reset_to_pending(path: Path) -> None:
     for k in ("processed_at", "output", "messages_pulled"):
         data.pop(k, None)
     data["reprocess_reason"] = (
-        "2026-05-16: previous run hit the INBOX-N alias bug in "
-        "ThunderbirdMboxReader and wrote an empty deep-scan; "
-        "alias resolution shipped, retry."
+        "2026-06-10: previous run hit the head-only/case-insensitive "
+        "folder check in ThunderbirdMboxReader (legacy POP root vetoed "
+        "INBOX-N alias resolution) and wrote an empty deep-scan; "
+        "full-path case-sensitive resolution shipped, retry."
     )
     path.write_text(json.dumps(data, indent=2), encoding="utf-8")
 

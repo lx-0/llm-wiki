@@ -2477,3 +2477,44 @@ actual shape, not a convenient one.)
 
 **Linked artifacts:** `lib/seed.sh` (`_apply_overlay`), CHANGELOG 0.1.4,
 `.ytstack/AD-HOC-issues-2-3-and-seed-overlay-SUMMARY.md`.
+
+## Curiosity deep-scans 100% empty — head-only + case-insensitive folder check (2026-06-10)
+
+**Symptom:** 761/761 curiosity email-deep-scan requests since 2026-05-15 wrote
+`_No messages matched._` (`messages_pulled: 0`, status flipped to `done`) — even
+AFTER the 2026-05-16 INBOX-N alias fix (`3d313e0`) shipped to lxw.
+
+**Root cause (two layers):**
+1. `_resolve_folder_alias` checked only the folder HEAD (`(root/"INBOX").exists()`)
+   across ALL mbox roots. kasserver reads TWO roots; the legacy POP root
+   (`Mail/<server>/`) contains a bare `Inbox` mbox. On case-insensitive APFS,
+   `Path("…/INBOX").exists()` matches `Inbox` → resolver concluded "canonical
+   present", skipped the `INBOX-1` probe, and `scan_deep`'s strict string match
+   found zero on-disk folders. Silent: no error, request marked done.
+2. Even a literal exact-case head-named file fails the same way: head-exists-in-
+   SOME-root says nothing about whether the REQUESTED path materializes there.
+
+**Fix (`3cedfc4`):** resolver now checks the FULL Thunderbird path
+(`head.sbd/…/leaf` or `leaf.sbd`) per root, case-SENSITIVELY (`os.listdir`
+compare), both for the canonical name and each `-N` alias candidate.
+
+**Cascading bug found during live verify:** multipart messages with raw 8-bit
+`Content-Disposition` headers come back from compat32 as `email.header.Header`
+objects; `.lower()` raised AttributeError and killed the whole scan. `str()`
+coercion fixed in the same commit.
+
+**Generalizable lessons:**
+- `Path.exists()` on macOS lies about case; any code that later compares names
+  as exact strings must check existence case-sensitively (`name in listdir(parent)`).
+- "Head/prefix exists" is not "path exists" — existence probes must mirror what
+  the downstream matcher actually compares.
+- The 05-16 fix was verified only on a single-root fixture; prod config has two
+  roots. Fixtures must reproduce the PROD topology (multi-root), not the minimal
+  one. Folders with only `.msf` (no mbox body) legitimately yield 0 — Thunderbird
+  materializes mbox files only for offline-synced folders.
+
+**Deployment path:** push → `wiki update` on lxw → re-run
+`scripts/migrations/cleanup_empty_deep_scans.py --apply` (deletes empty
+`deep-*.md`, resets done-with-0 requests to pending). NOTE: resetting 761
+requests makes the consumer re-pull up to 50 bodies each and compile then
+distills the lot — operator cost decision, do not auto-run.
