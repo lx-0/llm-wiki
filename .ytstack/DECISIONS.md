@@ -1764,3 +1764,28 @@ slicing S03's prompt scaffold.
 **Linked artifacts:** `scripts/collectors/folder_index.py` (`render_index`
 docstring), `M027-S02-T0{2,3,4}-SUMMARY.md`, KEY_DROPS entry in
 `scripts/migrations/migrate_config_keys.py`.
+
+## 2026-06-10: Q3 closed — sensitivity tag: FULL build (config → answer → compile carry)
+
+**Context:** M027 open question Q3 — optional `sensitivity:` frontmatter
+on folder-derived facts. CONTEXT had demoted it to nice-to-have (the
+human-approval walk is the content gate); no engine code consumes the
+field yet (the policy consumer lives in the
+`operator-financial-operational-fact-layer` backlog).
+
+**Chose (operator, over drop / minimal):** full build, marking-only.
+(1) `personal.watched_folders` entries take an optional free-vocabulary
+`sensitivity: <string>` (validation-only; no migration — operator-
+authored sub-field like include/exclude). (2) The folder backend stamps
+the root's value into every answer artifact's frontmatter. (3)
+`prompts/compile_main.md` rule 11 carries the tag substrate-agnostically
+onto every `knowledge/` article created/updated from a tagged source —
+never invented for untagged sources, never stripped on update from one.
+
+**Boundaries:** no enforcement anywhere — the walk approval remains the
+gate; readers/policies come with the financial-fact-layer consumer.
+Carry is prompt-level: empirically verified in S05-T03's lxw e2e, not by
+unit test.
+
+**Linked artifacts:** `M027-S05-T02-{PLAN,SUMMARY}.md`, commit `f948145`,
+`prompts/compile_main.md` rule 11, `.ytstack/backlog/operator-financial-operational-fact-layer.md`.
