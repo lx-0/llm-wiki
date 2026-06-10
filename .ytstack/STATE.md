@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-06-10T19:35:00+0200
+last_updated: 2026-06-10T19:55:00+0200
 current_milestone: M027
-active_slice: S03
-active_task: T04
+active_slice: none
+active_task: none
 last_completed_milestone: M026
 parked_milestone: M025
 parallel_milestones: [M021]
@@ -12,7 +12,20 @@ parallel_milestones: [M021]
 
 # State
 
-**Status:** M027 / S03 -- 1/4 tasks done. **T01 SHIPPED** (commit `8db9909`,
+**Status:** ✅ **M027 / S03 COMPLETE — 4/4 tasks** (one session, 2026-06-10,
+commits `8db9909` T01 producer / `aff144a` T02 prompt / `39299b1` T03
+dispatch+registration / `b421fed` T04 true-chain integration tests; suite
+1230 → **1246 green**). The folder-curiosity pass is code-complete:
+producer turns a compiled source + the body-blind digest into
+`folder-deep-scan` requests with a FILE-EXISTS anchor (invented paths
+dropped) + confidence gate; real prompt template; dispatch routes to the
+honest S04 backend skeleton (dry-run incl. informed-consent line, real
+run leaves requests pending). ⚠️ lxw activates the producer on next
+`wiki update` (Q7 tuning loop: watch `file_not_indexed`/
+`file_low_confidence` drop rates). **Next: `/ytstack:reassess-roadmap`**
+(slice boundary) — then S04 (folder backend: provider seam Q9,
+answer-landing `raw/notes/folder/answer-<slug>.md`, approval walk).
+**T01 SHIPPED** (commit `8db9909`,
 `M027-S03-T01-SUMMARY.md`): `maybe_generate_folder_requests` in
 curiosity/producer.py — digests in-context with consumer-side budget trim,
 FILE-EXISTS anchor (invented paths drop as `file_not_indexed`), reused
