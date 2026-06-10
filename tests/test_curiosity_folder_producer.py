@@ -162,6 +162,25 @@ def test_no_digests_skips_before_llm(env, monkeypatch):
     assert _requests(root) == []
 
 
+def test_real_prompt_template_renders_with_t01_kwargs():
+    """T02: the actual prompts/compile_curiosity_folder.md must render with
+    exactly the kwargs the producer passes — no missing/unresolved vars."""
+    from core.prompts import render as real_render
+
+    out = real_render(
+        "compile_curiosity_folder",
+        source_path="raw/notes/note.md",
+        source_content="Operator erwähnt den Steuerbescheid 2024.",
+        folder_digests=DIGEST,
+        timestamp="2026-06-10T12:00:00+00:00",
+    )
+    assert "raw/notes/note.md" in out
+    assert "Steuerbescheid-2024.pdf" in out  # digest block embedded
+    for field in ("root_id", "file_path", "file_confidence", "rationale"):
+        assert f'"{field}"' in out  # JSON contract spelled out
+    assert "${" not in out  # nothing unsubstituted
+
+
 def test_over_budget_digest_is_trimmed_not_dropped(env, monkeypatch):
     root, src, rendered = env
     # inflate the digest with many file lines; keep one dir + Recent intact
