@@ -125,6 +125,10 @@ KEY_ADDITIONS: dict[str, dict[str, object]] = {
         # (see KNOWLEDGE.md "tool-turn ballooning"). Set to "" to fall back
         # to models.compile_model. Added 2026-05-18.
         "dream_model": "claude-opus-4-7[1m]",
+        # M027-S04 folder-scan answer provider (Q9 seam). claude-sdk is
+        # the only provider today; local LLM/agent later. Unknown values
+        # raise loudly — no silent fallback. Added 2026-06-10.
+        "folder_scan_provider": "claude-sdk",
     },
     "limits": {
         # M014 dream-cycle per-message stall timeout. Added 2026-05-18

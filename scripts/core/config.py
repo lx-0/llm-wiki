@@ -164,6 +164,13 @@ class Models:
     # `compile_force_long_context_types` does for compile's fan-out
     # substrates (daily-digest, etc). Set "" to fall back to compile_model.
     dream_model: str = "claude-opus-4-7[1m]"
+    # Folder-scan answer provider (M027-S04, Q9 seam). The curiosity
+    # folder backend reads an operator-approved file in-place and
+    # distills an answer-extract. "claude-sdk" is the only provider
+    # today; a local LLM/agent provider is the long-term target (then
+    # content never leaves the machine). Unknown values raise loudly —
+    # never a silent fallback.
+    folder_scan_provider: str = "claude-sdk"
     ollama_url: str = "http://localhost:11434"
     vision_model: str = "gemma4:e4b"
     # Curiosity gap-detection. Needs *both* schema-honoring AND enough context

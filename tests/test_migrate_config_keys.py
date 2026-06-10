@@ -165,8 +165,9 @@ def test_migrate_config_file_round_trip(tmp_path):
     # +2 limits.folder_index_{max_depth,recent_n} (M027-S02-T04 `wiki
     #    index`; max_tree_entries shipped+removed same day — write-time
     #    cap reversal 2026-06-10, never in this greenfield fixture)
-    # = 86 changes (no drops — operator has no orphan personal.* fields)
-    assert len(changes) == 86, f"got {len(changes)} changes: {changes}"
+    # +1 models.folder_scan_provider (M027-S04-T01 Q9 seam), 2026-06-10
+    # = 87 changes (no drops — operator has no orphan personal.* fields)
+    assert len(changes) == 87, f"got {len(changes)} changes: {changes}"
 
     reparsed = yaml.safe_load(new_text)
     # piggyback side
@@ -202,6 +203,7 @@ def test_migrate_config_no_change_when_fully_current(tmp_path):
     config_path.write_text(yaml.safe_dump({
         "models": {
             "dream_model": "claude-opus-4-7[1m]",
+            "folder_scan_provider": "claude-sdk",
         },
         "scheduling": {
             "dream_cooldown_days": 7,
@@ -373,6 +375,7 @@ def test_migrate_additions_idempotent():
     data: dict = {
         "models": {
             "dream_model": "claude-opus-4-7[1m]",
+            "folder_scan_provider": "claude-sdk",
         },
         "scheduling": {
             "dream_cooldown_days": 7,

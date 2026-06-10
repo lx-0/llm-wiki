@@ -183,6 +183,11 @@ models:
   # variant absorbs both the source and tool-turn reads. Set to empty string
   # to disable the auto-upgrade.
   compile_large_source_model: claude-opus-4-7[1m]
+  # Folder-scan answer provider (watched-folder curiosity). The backend
+  # reads an operator-approved file in-place and distills an
+  # answer-extract. "claude-sdk" is the only provider today; a local
+  # LLM/agent provider is the long-term target. Unknown values raise.
+  folder_scan_provider: claude-sdk
   # Ollama endpoint (used by all local LLM calls).
   ollama_url: http://localhost:11434
   # Vision model for screenshot OCR.
