@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-06-07T13:20:00+0200
+last_updated: 2026-06-10T11:20:49+0200
 current_milestone: M027
 active_slice: S02
-active_task: none
+active_task: T01
 last_completed_milestone: M026
 parked_milestone: M025
 parallel_milestones: [M021]
@@ -12,7 +12,7 @@ parallel_milestones: [M021]
 
 # State
 
-**Status:** M027 planned + sliced (L, 6 slices). **Watched-Folder Curiosity** —
+**Status:** M027 / S02 / T01 planned -- ready to execute. **Watched-Folder Curiosity** —
 the wiki learns from watched local + NAS folders: **unmasked metadata index** →
 producer proposes `folder-deep-scan` → **operator approves per-request in the
 walk** (THE content/cloud gate) → backend reads files in-place (answer-only, no
