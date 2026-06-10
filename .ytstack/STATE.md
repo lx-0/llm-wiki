@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-06-10T20:20:00+0200
+last_updated: 2026-06-10T21:05:00+0200
 current_milestone: M027
 active_slice: S04
-active_task: T01
+active_task: T02
 last_completed_milestone: M026
 parked_milestone: M025
 parallel_milestones: [M021]
@@ -12,17 +12,19 @@ parallel_milestones: [M021]
 
 # State
 
-**Status:** M027 / S04 / T01 planned -- ready to execute
-(`M027-S04-T01-PLAN.md`, **closes Q9**): provider seam
-`backends/folder_providers.py` — `ScanAnswer` dataclass (answer_md +
-as_of_mtime staleness carry) + `FolderScanProvider` Protocol +
-`get_provider()` registry keyed by NEW knob `models.folder_scan_provider`
-(default "claude-sdk", unknown → ConfigError, NO silent fallback) +
-ClaudeSdkProvider per compile_source template: `allowed_tools=["Read"]`
-only, PreToolUse `make_path_scope_hook([file_abs])` file-as-root,
-cwd=file parent, prompts `folder_scan_answer{,_system}.md`
-("NOT ANSWERED" sentinel). Knob migration same-commit. Persistence=T02,
-quarantine=T03, e2e=T04, walk card=T05. S04 slice: 0/5. ✅ **M027 / S03 COMPLETE —
+**Status:** M027 / S04 -- 1/5 done; **T02 planned, executing**. **T01
+SHIPPED, Q9 CLOSED** (commit `221fb33`, `M027-S04-T01-SUMMARY.md`):
+provider seam `backends/folder_providers.py` (`ScanAnswer` +
+`FolderScanProvider` + `get_provider()` over new knob
+`models.folder_scan_provider`, unknown → ConfigError, no fallback);
+ClaudeSdkProvider read-only exact-file-scoped (allowed_tools=[Read] +
+PreToolUse hook, cwd=parent); prompts with NOT-ANSWERED sentinel; knob
+migration same-commit (round-trip 87). Suite **1252 green**; SDK path
+mock-verified, first live read = T04. **T02** (`M027-S04-T02-PLAN.md`):
+persist answer-only → `raw/notes/folder/answer-<slug>.md`
+(email-deep-scan shape + as_of_mtime provenance), request flip
+pending→processed, sentinel/no-persist, **P2 vault-sweep test** (raw
+body marker appears nowhere). Quarantine=T03, e2e=T04, walk card=T05. ✅ **M027 / S03 COMPLETE —
 4/4 tasks** (one session, 2026-06-10,
 commits `8db9909` T01 producer / `aff144a` T02 prompt / `39299b1` T03
 dispatch+registration / `b421fed` T04 true-chain integration tests; suite
