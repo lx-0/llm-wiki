@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-06-10T22:45:00+0200
+last_updated: 2026-06-10T23:05:00+0200
 current_milestone: M027
-active_slice: S04
-active_task: T05
+active_slice: none
+active_task: none
 last_completed_milestone: M026
 parked_milestone: M025
 parallel_milestones: [M021]
@@ -12,7 +12,20 @@ parallel_milestones: [M021]
 
 # State
 
-**Status:** M027 / S04 -- 2/5 done. **T02 SHIPPED** (commit `f4051fd`,
+**Status:** ✅ **M027 / S04 COMPLETE — 5/5 tasks** (one session, 2026-06-10,
+commits `221fb33` T01 Q9-seam / `f4051fd` T02 persistence+P2 / `7650bd7`
+T03 quarantine / `ae60994` T04 LIVE e2e / `5f9e04d` T05 consent card;
+suite 1252 → **1262 green + 1 gated live**). The folder backend is
+code-complete AND live-verified: provider seam (claude-sdk, no silent
+fallback), exact-file path-scoped SDK read, answer-only persistence to
+`raw/notes/folder/` with as_of_mtime provenance (P2 vault-sweep pinned +
+held live), quarantine states with staleness-gated retry, informed-
+consent walk card (**exit criteria #2, #3, #5-local, #7-local closed**).
+Live e2e first-run pass: fact KX-4711-2024 extracted with line
+attribution. lxw: S04 goes live on next `wiki update`. **Next:
+`/ytstack:reassess-roadmap`** (slice boundary) — S05 compile-fold
+pre-marked "likely lighter" (compile-primary), then S06 NAS+scheduler.
+**T02 SHIPPED** (commit `f4051fd`,
 `M027-S04-T02-SUMMARY.md`): answer-only persistence live — provider →
 `raw/notes/folder/answer-<slug>.md` (provenance incl. as_of_mtime +
 provider), request flip to `done` (email symmetry), sentinel/error =

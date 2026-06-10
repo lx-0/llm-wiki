@@ -5,7 +5,7 @@ project: llm-wiki
 created: 2026-06-07T12:21:47+0200
 status: planned
 task_count: 5
-completed_tasks: 4
+completed_tasks: 5
 ---
 
 # M027-S04 -- Slice Plan
@@ -20,7 +20,7 @@ behind a swappable provider seam.
 - [x] T02 -- Persist the result **answer-only** per the S01 answer-landing contract; assert in a test that no raw file body is written anywhere under the vault (P2). Tag the answer with the source file's mtime.
 - [x] T03 -- Failure/quarantine path (file gone between index and read, read error) -- mark the request failed without aborting the batch (email's `MailboxReadError`/watermark-on-failure is the template); staleness carried so a later source change can invalidate.
 - [x] T04 -- e2e test on a real local trove: gap -> `folder-deep-scan` -> in-place read -> answer artifact; assert the answer captures the fact AND no raw body landed in the vault.
-- [ ] T05 -- Informed-consent walk card: extend `curiosity/cli.py:_walk`'s request card for `folder-deep-scan` to state which file(s) will be loaded and which backend/provider they'll be sent to ("file X -> <provider> to answer Y"), so the operator's accept is informed. This is the content/cloud gate UX (DECISIONS 2026-06-07).
+- [x] T05 -- Informed-consent walk card: extend `curiosity/cli.py:_walk`'s request card for `folder-deep-scan` to state which file(s) will be loaded and which backend/provider they'll be sent to ("file X -> <provider> to answer Y"), so the operator's accept is informed. This is the content/cloud gate UX (DECISIONS 2026-06-07).
 
 ## Done when
 
