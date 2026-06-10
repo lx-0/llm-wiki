@@ -43,41 +43,70 @@ screenpipe aside *for meetings* as "different category, desktop app paid". The
 (`npx screenpipe` / `npm i -g screenpipe`). Meetings remain Jamie's job; this is
 the broad screen-memory axis, not a meeting-notetaker.
 
-## Capture setup — SHIPPED 2026-06-09 (operator machine)
+## Capture setup — SHIPPED & VERIFIED 2026-06-10 (operator machine)
 
-The recording layer is live-tested on the operator's Mac. Reproducible elsewhere
-(Sid / a third machine) by adjusting only **three machine-specific values**:
-the Node/binary path, the audio-device names (`screenpipe audio list`), and
-`$HOME`/username.
+24/7 capture is live and end-to-end verified on the operator's Mac. Reproducible
+elsewhere (Sid / a third machine) by adjusting only the **machine-specific
+values**: the source binary path, the audio-device names (`screenpipe audio
+list`), and `$HOME`/username.
 
-1. **Install CLI** (free MIT, no self-compile — Sid self-compiles only because he
-   dev's on the source): `npm i -g screenpipe` → native binary lands at
-   `…/node_modules/@screenpipe/cli-darwin-arm64/bin/screenpipe`.
-2. **LaunchAgent** `~/Library/LaunchAgents/com.alex.screenpipe.plist`
-   (KeepAlive + RunAtLoad, 24/7). Key choices, all verified against 0.4.12
-   `record --help`:
-   - References the **native binary path directly** (not the asdf shim / a shell
-     wrapper) → no asdf/PATH dependency at boot **and** a clean TCC identity
-     (the recording process is screenpipe itself, not vscode/Terminal).
+### The load-bearing macOS gotcha — a bare CLI binary under launchd gets NO Mic/Screen
+
+This cost the most time, so it's the headline. On macOS, TCC permissions
+(Screen Recording, Microphone, Accessibility) attribute to the **launching GUI
+process**, not to a bare CLI binary. Consequences observed:
+
+- A LaunchAgent pointing straight at the npm binary → `microphone: waiting →
+  timed out waiting for permissions`, KeepAlive respawns in a loop, **0 captured**.
+- `screenpipe doctor` showed `mic ok` — but only because doctor ran inside the
+  VS Code context, which had the grant. The launchd process is a *different* TCC
+  identity and inherits nothing.
+- Granting Mic via an interactive Terminal start binds the grant to **Terminal**,
+  not to the binary → the launchd service still gets nothing.
+- `screenpipe` never appears in System Settings → Microphone (Mic has no "+"
+  button, and a bare binary can't register itself there).
+
+This is exactly the problem the **paid signed desktop app** solves out of the box.
+
+### The fix — wrap the binary in a signed .app bundle
+
+1. **Install CLI** (free MIT, no self-compile): `npm i -g screenpipe` (v0.4.12)
+   → native binary at `…/node_modules/@screenpipe/cli-darwin-arm64/bin/screenpipe`.
+2. **Build `~/Applications/Screenpipe.app`:**
+   - `Contents/MacOS/screenpipe` = a **copy** of the native binary (after
+     `npm update -g screenpipe`, re-copy + re-codesign).
+   - `Contents/Info.plist` with `CFBundleIdentifier=com.alex.screenpipe`,
+     `CFBundleExecutable=screenpipe`, `LSUIElement=true`, and crucially
+     `NSMicrophoneUsageDescription` — the usage string is what makes macOS
+     attribute the Mic prompt to **the bundle id**, which is a stable TCC subject.
+   - `codesign --force --sign - --identifier com.alex.screenpipe Screenpipe.app`
+     (ad-hoc is fine) + `lsregister -f Screenpipe.app`.
+3. **LaunchAgent** `~/Library/LaunchAgents/com.alex.screenpipe.plist`
+   (`KeepAlive` + `RunAtLoad`) → `ProgramArguments[0]` =
+   `…/Screenpipe.app/Contents/MacOS/screenpipe`, then `record` with:
    - `--language german` + `--audio-transcription-engine whisper-large-v3-turbo`
-     — the default engine `parakeet` is English-centric and would mangle German.
-     Fallback if 24/7 is too CPU/battery-hungry: `whisper-large-v3-turbo-quantized`.
+     (default `parakeet` is English-centric; fallback `…-turbo-quantized` if 24/7
+     is too CPU/battery-hungry).
    - `--audio-device "MacBook Pro Microphone (input)"` + `"System Audio (output)"`
-     (mic + meeting counterpart), `--disable-telemetry`,
+     (own voice + meeting counterpart), `--disable-telemetry`,
      `--data-dir /Users/alex/.screenpipe`.
-   - `EnvironmentVariables.PATH` includes `/opt/homebrew/bin` — the minimal
-     LaunchAgent PATH has no Homebrew, and screenpipe needs system `ffmpeg`
-     (it bundles none) for audio transcription. Silent-crash trap if omitted.
-3. **TCC permissions** must be granted to the screenpipe binary *as its own
-   process* — run it once interactively from **Terminal.app** (not VS Code, or
-   the grant attaches to vscode) so macOS prompts for Screen Recording + Mic
-   against screenpipe, then `launchctl load -w`.
+   - `EnvironmentVariables.PATH` includes `/opt/homebrew/bin` — minimal launchd
+     PATH has no Homebrew, and screenpipe needs system `ffmpeg` (bundles none).
+     Silent-crash trap if omitted.
+4. **Grant TCC to the bundle once** (cannot be scripted — SIP):
+   - **Screen & System Audio Recording** → "+" → `Screenpipe.app` → on.
+   - **Accessibility** → "+" → `Screenpipe.app` → on (for UI-element capture).
+   - **Microphone** → appears as `Screenpipe` once the bundle has requested it
+     (start it once via `open Screenpipe.app --args record …`) → on.
+   - Then `launchctl load -w …`. The launchd run inherits all three via the
+     bundle id.
 
-**Verified today (REGEL #1):** native binary runs (0.4.12, Mach-O arm64),
-18s screen-only smoke capture wrote `db.sqlite` with 10 frames across 3 monitors,
-plist passes `plutil -lint`. **Not yet verified:** the standalone 24/7 agent run
-+ German whisper transcription (both gated on the operator's TCC grant + first
-model download).
+**Verified 2026-06-10 (REGEL #1), under the real launchd service (PPID 1):**
+`permission monitor started screen=true mic=true accessibility=true`,
+`VisionManager started with 1/1 monitor(s)`, recording on both mic + System Audio,
+and growing data: frames 24, ocr_text 19, audio_chunks 11, **audio_transcriptions
+10** with a correct **German** transcript from system audio. `db.sqlite` at
+`~/.screenpipe/`.
 
 ## Collector design — OPEN
 
