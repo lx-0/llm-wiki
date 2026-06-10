@@ -19,12 +19,19 @@ slice-plan `M027-S03-PLAN.md` exists from slicing; run `/ytstack:plan-task`
 for S03-T01. S03 carries: producer consumes the `raw/index/` digest
 (in-context delivery = open Q6, scheduling is S06); reuse email producer
 scaffold + `_dispatch` seam; expect weak filename-signal precision (Q7
-confidence gate). ✅ **lxw E2E DONE 2026-06-10:** operator ran `wiki update`
-(migration landed: 3 knobs + skip-list append), session configured 2
-watched_folders (`private-documents` 1770 files/257 dirs, `work-company`
-494/230, excludes .backup/.stfolder/*.DS_Store), `wiki index` wrote both
-digests (544 lines each, truncated:true — cap works), second run both
-`unchanged — skipped` (delta live), state/folder-index.json correct. ✅ **M027 / S02 COMPLETE — 4/4 tasks** (one session, 2026-06-10,
+confidence gate). ✅ **lxw E2E DONE 2026-06-10:** 2 watched_folders
+configured (`private-documents` + `work-company`, the Sparkasse-demand
+troves; excludes .backup/.stfolder/*.DS_Store), `wiki index` live, delta
+verified, state/folder-index.json correct. **Same-day design reversal
+(`ad7f01d`, DECISIONS 2026-06-10):** first live run exposed that the
+write-time tree cap hid 75% of a trove from the producer (operator
+called it) — caps REMOVED: digest is always the COMPLETE inventory,
+prompt budget moved to the consumer (S03 trims/greps), `max_tree_entries`
+knob dropped via KEY_DROPS, `max_depth` default 4→0 (=unlimited; knob
+stays as NAS walk-cost bound for S06). lxw re-rolled: full digests
+`private-documents` 3407 files/3767 lines, `work-company` 2001/2561,
+skipped_depth 0, no truncation. Suite **1231 green**. S03 carry: producer
+access = full-inject if it fits, else grep/search over the digest. ✅ **M027 / S02 COMPLETE — 4/4 tasks** (one session, 2026-06-10,
 commits `24d2134` T01 walker / `770c68f` T02 render+write / `7d03314` T03
 delta+compile-skip / `bacb1f3` T04 `wiki index` CLI+knobs; suite 1207 →
 **1230 green**). The body-blind folder-index collector is code-complete:
