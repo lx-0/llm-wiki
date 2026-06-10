@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-06-10T17:40:00+0200
+last_updated: 2026-06-10T18:20:00+0200
 current_milestone: M027
 active_slice: S03
-active_task: T01
+active_task: none
 last_completed_milestone: M026
 parked_milestone: M025
 parallel_milestones: [M021]
@@ -12,14 +12,19 @@ parallel_milestones: [M021]
 
 # State
 
-**Status:** M027 / S03 / T01 planned -- ready to execute
-(`M027-S03-T01-PLAN.md`: `maybe_generate_folder_requests` sibling of the
-email pass — digest in-context with consumer-side budget-trim, schema
-{topic, root_id, file_path, file_confidence, rationale}, FILE-EXISTS
-anchor replaces source_quote, reused `curiosity_folder_confidence_min`
-knob, no migration; **prereq amendment:** digest tree lines become full
-rel_paths (grep-able + quotable). Prompt = T02, producers/-registration +
-dispatch = T03, fixture-integration tests = T04.) S03 carries: producer consumes the `raw/index/` digest
+**Status:** M027 / S03 -- 1/4 tasks done. **T01 SHIPPED** (commit `8db9909`,
+`M027-S03-T01-SUMMARY.md`): `maybe_generate_folder_requests` in
+curiosity/producer.py — digests in-context with consumer-side budget trim,
+FILE-EXISTS anchor (invented paths drop as `file_not_indexed`), reused
+confidence knob, requests as `type: folder-deep-scan` JSONs. Digest
+amendment live on lxw: full rel_paths + created/modified per file line
+(operator mid-task request; ctime=st_birthtime, NOT in delta signature;
+caveat: created = LOCAL birthtime, sync tools reset it). Suite **1237
+green**. Producer not yet wired (render template = T02, registration +
+dispatch = T03, fixture-integration tests = T04). Next:
+`/ytstack:plan-task` for **S03-T02** (prompt
+`compile_curiosity_folder.md` — render() kwargs already live:
+source_path/source_content/folder_digests/timestamp). S03 carries: producer consumes the `raw/index/` digest
 (in-context delivery = open Q6, scheduling is S06); reuse email producer
 scaffold + `_dispatch` seam; expect weak filename-signal precision (Q7
 confidence gate). ✅ **lxw E2E DONE 2026-06-10:** 2 watched_folders

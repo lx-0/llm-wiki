@@ -5,7 +5,7 @@ project: llm-wiki
 created: 2026-06-07T12:21:47+0200
 status: planned
 task_count: 4
-completed_tasks: 0
+completed_tasks: 1
 ---
 
 # M027-S03 -- Slice Plan
@@ -16,7 +16,7 @@ them.
 
 ## Tasks
 
-- [ ] T01 -- Extend `curiosity/producer.py`: inject the folder-index digest in-context (mirror the numbered `email_folders` listing), emit a `folder-deep-scan` request schema. Replace the `source_quote` gate (no body to quote) with a verifiable file-exists anchor: the named path must be present in the current index. Keep a confidence gate analogous to email's `folder_confidence`.
+- [x] T01 -- Extend `curiosity/producer.py`: inject the folder-index digest in-context (mirror the numbered `email_folders` listing), emit a `folder-deep-scan` request schema. Replace the `source_quote` gate (no body to quote) with a verifiable file-exists anchor: the named path must be present in the current index. Keep a confidence gate analogous to email's `folder_confidence`.
 - [ ] T02 -- New prompt `prompts/compile_curiosity_folder.md` (folder-gap detection over the index digest); register it; Ollama-only (producer stays local, split-provider like email).
 - [ ] T03 -- `curiosity/cli.py:_dispatch`: add the `folder-deep-scan` branch (skeleton call into the S04 backend; clean "unsupported" removal).
 - [ ] T04 -- Tests: producer emits valid file-targeted requests against a fixture index; a request naming a non-indexed file is rejected (anchor works); confidence gate drops low-confidence gaps.
