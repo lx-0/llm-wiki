@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-06-10T19:00:00+0200
+last_updated: 2026-06-10T19:25:00+0200
 current_milestone: M027
 active_slice: S03
-active_task: T03
+active_task: none
 last_completed_milestone: M026
 parked_milestone: M025
 parallel_milestones: [M021]
@@ -27,11 +27,16 @@ contract, folder-adapted confidence scale, created-sync caveat,
 abstention-preferred; render-smoke test pins the kwargs. Suite **1238
 green**. Prompt QUALITY vs the real local LLM deliberately unverified
 until T03 wires the producer (Q7 tuning loop expected). 2/4 done.
-**T03 planned** (`M027-S03-T03-PLAN.md`): backends/folder.py SKELETON
-(dry-run shows would-be read + informed-consent line; real run = honest
-not-implemented, request stays pending, no mutation), `_dispatch`
-folder-deep-scan branch, FolderCuriosityProducer registration
-(failure-contract α, appended after takes). Execute T03 next. S03 carries: producer consumes the `raw/index/` digest
+**T03 SHIPPED** (commit `39299b1`, `M027-S03-T03-SUMMARY.md`):
+backends/folder.py S04-skeleton (dry-run incl. informed-consent line;
+real run honest not-implemented, request stays pending untouched),
+`_dispatch` folder-deep-scan branch, FolderCuriosityProducer registered —
+**folder pass now runs in the post-compile loop**. Suite **1242 green**.
+⚠️ lxw: next `wiki update` activates the producer on real compiles
+(llama3.1:8b, $0) — pending requests may accumulate; Q7 tuning loop
+starts (watch `file_not_indexed`/`file_low_confidence` drop rates). 3/4
+done. Next: `/ytstack:plan-task` for **S03-T04** (LAST: fixture-
+integration tests — walk→write→produce with only the LLM mocked). S03 carries: producer consumes the `raw/index/` digest
 (in-context delivery = open Q6, scheduling is S06); reuse email producer
 scaffold + `_dispatch` seam; expect weak filename-signal precision (Q7
 confidence gate). ✅ **lxw E2E DONE 2026-06-10:** 2 watched_folders
