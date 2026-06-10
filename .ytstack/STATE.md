@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-06-10T16:15:00+0200
+last_updated: 2026-06-10T16:50:00+0200
 current_milestone: M027
-active_slice: S02
-active_task: T04
+active_slice: none
+active_task: none
 last_completed_milestone: M026
 parked_milestone: M025
 parallel_milestones: [M021]
@@ -12,12 +12,18 @@ parallel_milestones: [M021]
 
 # State
 
-**Status:** M027 / S02 / T04 planned -- ready to execute
-(`M027-S02-T04-PLAN.md`: `wiki index` verb → `folder_index.main()`;
-3 Limits knobs `folder_index_{max_depth,recent_n,max_tree_entries}` =
-4/20/500 + KEY_ADDITIONS migration same-commit; smb entries INFO-skipped
-until S06; fail-soft per root, exit 1 if any failed). LAST task in S02 —
-after closing run `/ytstack:reassess-roadmap`. 3/4 done. **T03 SHIPPED**
+**Status:** ✅ **M027 / S02 COMPLETE — 4/4 tasks** (one session, 2026-06-10,
+commits `24d2134` T01 walker / `770c68f` T02 render+write / `7d03314` T03
+delta+compile-skip / `bacb1f3` T04 `wiki index` CLI+knobs; suite 1207 →
+**1230 green**). The body-blind folder-index collector is code-complete:
+`wiki index` walks watched local roots (scandir+stat, never open()),
+writes unmasked digests to `raw/index/<root-id>.md` (type: folder-index,
+compile-skipped via skip-list + migration), delta-skips unchanged trees
+via `state/folder-index.json`, caps via 3 `limits.folder_index_*` knobs.
+⚠️ lxw E2E outstanding (`wiki update` + watched_folders entry + real
+`wiki index` run). **Next: `/ytstack:reassess-roadmap`** (slice boundary)
+— check S03 (producer + dispatch) still fits; carry: producer needs the
+digest in-context (Q6 scheduling is S06). **T03 SHIPPED**
 (commit `7d03314`,
 `M027-S02-T03-SUMMARY.md`): delta-skip (`index_signature` modulo
 frontmatter, side-state `state/folder-index.json`, `sync_root` with
