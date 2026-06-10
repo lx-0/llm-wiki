@@ -168,6 +168,40 @@ load-bearing for the collector design:
    the persona framing; don't let downstream synthesis read absence-of-frames as
    idleness.
 
+### Prior art #2 — Sid's production sp-skills (reviewed 2026-06-10)
+
+Sid shared the three agent-skills he runs daily on his screenpipe capture
+(sp-live / sp-protokoll / sp-coaching). Classification: **consumer/synthesis
+layer, not producers** — in our terms they map to `wiki query` / compile /
+dream-cycle, done agentically on-demand instead of by a pipeline. Not worth
+porting wholesale, but they encode battle-tested answers to design questions our
+collector still has open (full technical extraction preserved in project memory
+`project_screenpipe_sid_skills_extraction`; the downloaded skill files
+themselves are deleted):
+
+1. **Episodes are the unit of ingest.** Continuous capture must be segmented
+   into episodes (`id, date, start, end, title, kind, people, projects, status,
+   summary`) before any distillation. Stable IDs derived from local-date +
+   start-time + normalized context; derived artifacts win over raw slots on
+   conflict; data gaps get an explicit `gap` status — **never hallucinated
+   over**. This answers our "what is *one item* for compile?" question:
+   episodes, not frames or 30s chunks.
+2. **Whisper noise filter** (production-tuned): drop segments <15 chars,
+   hallucination one-liners ("Okay.", "Danke.", "I'm sorry"), and stutter
+   repetitions, before anything reaches a prompt.
+3. **Device semantics = author attribution.** Mic/AirPods device = operator's
+   own voice (or their side of a call); `System Audio` = the counterpart /
+   played content. Maps directly onto the M009 `author:` axis.
+4. **REST API is a viable read path** alongside direct SQLite:
+   `GET :3030/search?content_type=audio|all|ocr&start_time=&end_time=&q=&app_name=&min_length=&limit=`
+   (transcripts at `data[].content.{transcription,timestamp,device_name}`) and
+   `GET :3030/activity-summary?start_time=&end_time=`. More schema-drift-stable
+   than SQL, but requires the daemon up; SQLite works offline. Decide at
+   collector-design time.
+5. **Time-window heuristics** for episode bounding ("gerade" = 30–60 min,
+   "Session" = 2–4 h, "der Tag" = 06:00–now) — useful defaults for episode
+   segmentation and for any on-demand query verb.
+
 ## Next step
 
 Not a milestone yet — operator is collecting test data first. When enough has
