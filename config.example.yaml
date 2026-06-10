@@ -328,8 +328,10 @@ limits:
   # last-resort hatch for substrate types with no good prompt yet.
   # SUBSTRATE_PROMPTS (in compile.py) covers calendar-rollup and
   # daily-digest with dedicated lean prompts, so neither needs to be
-  # skipped.
-  compile_skip_substrate_types: ["email-delta"]
+  # skipped. `folder-index` = body-blind watched-folder digests under
+  # raw/index/ (M027) — metadata for the curiosity producer, nothing to
+  # distil (the raw/notes/folder/ answers stay compile sources).
+  compile_skip_substrate_types: ["email-delta", "folder-index"]
   # Email daily-rollup signal (beta). The per-account block in
   # daily/<date>/email.md carries top-N senders + a sample of recent subjects
   # beyond the bare count, so the daily-digest agent can lift correspondents +

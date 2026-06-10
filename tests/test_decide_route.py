@@ -67,6 +67,22 @@ def test_skip_list_type_skips_and_force_bypasses(monkeypatch):
     assert isinstance(_route(content, force=True), Compile)  # force bypasses skip-list
 
 
+def test_folder_index_default_skips_but_folder_answers_compile():
+    """M027-S02-T03 carry-constraint: index = compile-skip (via the DEFAULT
+    skip-list, no monkeypatch), `raw/notes/folder/` answers = compile SOURCES."""
+    from compile_stages.route import Compile, Skip
+
+    digest = "---\ntype: folder-index\nroot_id: nas-docs\n---\n## Tree\n- `x.txt`"
+    r = _route(digest, path="raw/index/nas-docs.md")
+    assert isinstance(r, Skip)
+    assert r.reason == "substrate_type_excluded_folder-index"
+
+    answer = "---\ntype: note\nkind: folder-deep-scan\n---\nDistilled answer body."
+    assert isinstance(
+        _route(answer, path="raw/notes/folder/answer-tax-2025.md"), Compile
+    )
+
+
 def test_health_rollup_stub_is_healthstub_but_prose_compiles():
     from compile_stages.route import Compile, HealthStub
 

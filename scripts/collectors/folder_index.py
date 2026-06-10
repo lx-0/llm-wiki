@@ -29,6 +29,7 @@ migration, and the `folder-index` compile-skip entry) is T03/T04.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 from dataclasses import dataclass
@@ -36,11 +37,14 @@ from datetime import datetime, timezone
 from fnmatch import fnmatch
 from pathlib import Path
 
-from core.paths import RAW_DIR
+from core.paths import RAW_DIR, STATE_DIR
 
 # One MD digest per watched root (single consumer: the S03 producer).
 # Local convention, sibling of curiosity/backends/email.py's DEEP_SCAN_DIR.
 INDEX_DIR = RAW_DIR / "index"
+
+# Delta side-state: {root_id: {"signature": str, "last_indexed_at": iso}}.
+STATE_FILE = STATE_DIR / "folder-index.json"
 
 
 @dataclass
@@ -242,3 +246,78 @@ def write_index(index: FolderIndex, *, max_tree_entries: int) -> Path:
     path.write_text(render_index(index, max_tree_entries=max_tree_entries),
                     encoding="utf-8")
     return path
+
+
+@dataclass
+class SyncResult:
+    written: bool
+    path: Path | None
+    reason: str | None
+    signature: str
+
+
+def index_signature(index: FolderIndex) -> str:
+    """Content signature of the walked tree — mtime/size/structure only.
+
+    Deliberately EXCLUDES generated_at and counts (T02 carry: the digest
+    frontmatter varies per walk; the delta must not). Same tree state in,
+    same signature out.
+    """
+    h = hashlib.sha256()
+    for e in sorted(index.tree, key=lambda e: e.rel_path):
+        h.update(
+            f"{e.rel_path}\x00{int(e.is_dir)}\x00{e.size}\x00{e.mtime}\n".encode()
+        )
+    return h.hexdigest()
+
+
+def _load_state() -> dict:
+    try:
+        data = json.loads(STATE_FILE.read_text(encoding="utf-8"))
+        return data if isinstance(data, dict) else {}
+    except (OSError, ValueError):
+        return {}  # missing/corrupt -> full rebuild, fail-soft
+
+
+def _save_state(state: dict) -> None:
+    STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    STATE_FILE.write_text(
+        json.dumps(state, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
+
+
+def sync_root(
+    entry: dict,
+    *,
+    max_depth: int,
+    recent_n: int,
+    max_tree_entries: int,
+    force: bool = False,
+) -> SyncResult:
+    """Walk one root and write its digest only when the tree changed.
+
+    Skip requires BOTH an unchanged signature AND the digest file still on
+    disk — an operator-deleted digest is re-written even when unchanged.
+    `force=True` always re-writes (escape hatch, also for changed walk
+    params over an identical tree).
+    """
+    index = walk_root(entry, max_depth=max_depth, recent_n=recent_n)
+    signature = index_signature(index)
+    digest_path = INDEX_DIR / f"{index.root_id}.md"
+    state = _load_state()
+    previous = state.get(index.root_id) or {}
+    if (
+        not force
+        and previous.get("signature") == signature
+        and digest_path.exists()
+    ):
+        return SyncResult(
+            written=False, path=digest_path, reason="unchanged", signature=signature
+        )
+    path = write_index(index, max_tree_entries=max_tree_entries)
+    state[index.root_id] = {
+        "signature": signature,
+        "last_indexed_at": index.generated_at.isoformat(),
+    }
+    _save_state(state)
+    return SyncResult(written=True, path=path, reason=None, signature=signature)

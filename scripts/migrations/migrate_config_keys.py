@@ -176,8 +176,9 @@ KEY_ADDITIONS: dict[str, dict[str, object]] = {
         # Empty default since 2026-05-16 P2 landed (calendar-rollup
         # moved out of the skip-list once compile_calendar.md prompt
         # shipped). Last-resort escape hatch for substrate types with
-        # no good prompt yet.
-        "compile_skip_substrate_types": ["email-delta"],
+        # no good prompt yet. folder-index added 2026-06-10 (M027-S02
+        # body-blind watched-folder digests — metadata, nothing to distil).
+        "compile_skip_substrate_types": ["email-delta", "folder-index"],
         # Email daily-rollup signal (beta, 2026-05-23). Top-N senders + sample
         # of recent subjects in the per-account daily/<date>/email.md block, so
         # the daily-digest agent extracts correspondents + themes. Match
@@ -472,7 +473,12 @@ LIST_ADDITIONS: dict[str, list[object]] = {
     # was burning $2+ per file. Both new vaults (greenfield default)
     # and existing vaults (where the skip-list was emptied earlier
     # today) get the entry via this list-extend.
-    "limits.compile_skip_substrate_types": ["email-delta"],
+    # 2026-06-10 (M027-S02-T03): add `folder-index` — body-blind
+    # watched-folder digests under raw/index/ are producer metadata,
+    # nothing to distil; the 0.1.7 Skip route hash-records them so they
+    # never re-list. raw/notes/folder/ answers stay compile sources
+    # (NOT in this list).
+    "limits.compile_skip_substrate_types": ["email-delta", "folder-index"],
 }
 
 # Elements to REMOVE from existing list-valued config entries. The

@@ -18,7 +18,13 @@ import unicodedata
 import pytest
 
 import collectors.folder_index as folder_index
-from collectors.folder_index import render_index, walk_root, write_index
+from collectors.folder_index import (
+    index_signature,
+    render_index,
+    sync_root,
+    walk_root,
+    write_index,
+)
 
 
 def _entry(root, **kw):
@@ -216,6 +222,68 @@ def test_render_index_names_unmasked(tree):
     out = unicodedata.normalize("NFC", render_index(idx, max_tree_entries=1000))
     assert "ümlaut file ä.txt" in out
     assert ".dotfile" in out
+
+
+# --- T03: delta-awareness -------------------------------------------------
+
+
+def _sync_env(monkeypatch, tmp_path):
+    """Isolate INDEX_DIR + STATE_FILE so sync tests never touch the repo."""
+    index_dir = tmp_path / "raw-index"
+    state_file = tmp_path / "state" / "folder-index.json"
+    monkeypatch.setattr(folder_index, "INDEX_DIR", index_dir)
+    monkeypatch.setattr(folder_index, "STATE_FILE", state_file)
+    return index_dir, state_file
+
+
+def test_index_signature_stable_then_changes_on_mtime(tree):
+    sig_a = index_signature(walk_root(_entry(tree), max_depth=10, recent_n=3))
+    sig_b = index_signature(walk_root(_entry(tree), max_depth=10, recent_n=3))
+    assert sig_a == sig_b  # generated_at differs between walks — must not matter
+    os.utime(tree / "afile.txt", (2000, 2000))
+    sig_c = index_signature(walk_root(_entry(tree), max_depth=10, recent_n=3))
+    assert sig_c != sig_a
+
+
+def test_sync_root_writes_first_then_skips_unchanged(tree, tmp_path, monkeypatch):
+    import json
+
+    index_dir, state_file = _sync_env(monkeypatch, tmp_path)
+    first = sync_root(_entry(tree), max_depth=10, recent_n=3, max_tree_entries=100)
+    assert first.written is True
+    assert first.path == index_dir / "test-root.md"
+    assert first.path.exists()
+    state = json.loads(state_file.read_text(encoding="utf-8"))
+    assert state["test-root"]["signature"] == first.signature
+
+    second = sync_root(_entry(tree), max_depth=10, recent_n=3, max_tree_entries=100)
+    assert second.written is False
+    assert second.reason == "unchanged"
+
+
+def test_sync_root_rewrites_on_force_and_on_deleted_digest(
+    tree, tmp_path, monkeypatch
+):
+    _sync_env(monkeypatch, tmp_path)
+    first = sync_root(_entry(tree), max_depth=10, recent_n=3, max_tree_entries=100)
+    # operator deleted the digest — unchanged signature must NOT mask that
+    first.path.unlink()
+    rewrite = sync_root(_entry(tree), max_depth=10, recent_n=3, max_tree_entries=100)
+    assert rewrite.written is True
+    assert rewrite.path.exists()
+    forced = sync_root(
+        _entry(tree), max_depth=10, recent_n=3, max_tree_entries=100, force=True
+    )
+    assert forced.written is True
+
+
+def test_sync_root_corrupt_state_fails_soft(tree, tmp_path, monkeypatch):
+    _sync_env(monkeypatch, tmp_path)
+    state_file = tmp_path / "state" / "folder-index.json"
+    state_file.parent.mkdir(parents=True, exist_ok=True)
+    state_file.write_text("{not valid json", encoding="utf-8")
+    result = sync_root(_entry(tree), max_depth=10, recent_n=3, max_tree_entries=100)
+    assert result.written is True  # corrupt state -> full rebuild, no crash
 
 
 def test_write_index_one_digest_per_root(tree, tmp_path, monkeypatch):

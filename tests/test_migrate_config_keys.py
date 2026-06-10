@@ -160,6 +160,9 @@ def test_migrate_config_file_round_trip(tmp_path):
     # +1 scheduling.dream_insufficient_corpus_backoff_max_days (backoff), 2026-06-02
     # +1 personal.watched_folders (M027 watched-folder curiosity), 2026-06-07
     # = 84 changes (no drops — operator has no orphan personal.* fields)
+    # KEY_ADDITIONS injects the skip-list with BOTH defaults in one change;
+    # the LIST_ADDITIONS extend is a no-op on greenfield (folder-index
+    # already present), 2026-06-10 M027-S02-T03.
     assert len(changes) == 84, f"got {len(changes)} changes: {changes}"
 
     reparsed = yaml.safe_load(new_text)
@@ -172,8 +175,12 @@ def test_migrate_config_file_round_trip(tmp_path):
     assert reparsed["piggybacks"]["calendar"] == {"enabled": True, "cooldown_hours": 6, "max_per_run": 500}
     # additions side — force-long-context empty, skip-substrate-types
     # has email-delta from KEY_ADDITIONS default (2026-05-16-evening)
+    # + folder-index (2026-06-10 M027-S02-T03)
     assert reparsed["limits"]["compile_force_long_context_types"] == []
-    assert reparsed["limits"]["compile_skip_substrate_types"] == ["email-delta"]
+    assert reparsed["limits"]["compile_skip_substrate_types"] == [
+        "email-delta",
+        "folder-index",
+    ]
     assert reparsed["limits"]["compile_skip_on_long_context_unknown"] is True
     assert reparsed["limits"]["calendar_request_timeout_s"] == 30
     assert reparsed["limits"]["calendar_max_per_run"] == 500
@@ -221,7 +228,7 @@ def test_migrate_config_no_change_when_fully_current(tmp_path):
             "calendar_future_days": 7,
             "compile_max_turns_long_context": 30,
             "compile_max_tokens_per_file": 500_000,
-            "compile_skip_substrate_types": ["email-delta"],
+            "compile_skip_substrate_types": ["email-delta", "folder-index"],
             "daily_email_top_senders": 5,
             "daily_email_sample_subjects": 12,
             "flush_assistant_text_budget_chars": 50000,
@@ -468,6 +475,26 @@ def test_migrate_additions_adds_calendar_block_when_absent():
         "cooldown_hours": 6,
         "max_per_run": 500,
     }
+
+
+def test_migrate_list_additions_appends_to_existing_operator_list():
+    """M027-S02-T03: an operator vault that already pinned the skip-list to
+    the old default `["email-delta"]` must pick up `folder-index` via the
+    list-extend (KEY_ADDITIONS only injects MISSING keys). This is the exact
+    path live vaults take on `wiki update`."""
+    m = _mod()
+    data: dict = {"limits": {"compile_skip_substrate_types": ["email-delta"]}}
+    changes = m.migrate_list_additions(data)
+    assert data["limits"]["compile_skip_substrate_types"] == [
+        "email-delta",
+        "folder-index",
+    ]
+    assert any("folder-index" in c for c in changes)
+    # idempotent on re-run; operator-custom entries untouched
+    assert m.migrate_list_additions(data) == []
+    data["limits"]["compile_skip_substrate_types"].append("operator-custom")
+    assert m.migrate_list_additions(data) == []
+    assert "operator-custom" in data["limits"]["compile_skip_substrate_types"]
 
 
 def test_migrate_list_removals_prunes_legacy_substrate_entries():

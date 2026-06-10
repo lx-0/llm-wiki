@@ -387,7 +387,11 @@ class Limits:
     #     X" — the actual content comes via curiosity/email-deep-scan
     #     separately. Compiling the delta wastes $2+ per file for
     #     no extracted knowledge.
-    compile_skip_substrate_types: tuple[str, ...] = ("email-delta",)
+    #   - `folder-index`: body-blind watched-folder digests under
+    #     raw/index/ (M027) — pure metadata for the curiosity producer;
+    #     the distillable artifacts are the raw/notes/folder/ answers,
+    #     which stay compile sources.
+    compile_skip_substrate_types: tuple[str, ...] = ("email-delta", "folder-index")
     # Email daily-rollup signal (beta, 2026-05-23). The per-account block the
     # EmailCollector appends to daily/<date>/email.md carries -- beyond the bare
     # count + delta-link -- the top-N senders by volume and a sample of the
