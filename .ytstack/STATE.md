@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-06-10T11:20:49+0200
+last_updated: 2026-06-10T15:05:00+0200
 current_milestone: M027
 active_slice: S02
-active_task: T01
+active_task: none
 last_completed_milestone: M026
 parked_milestone: M025
 parallel_milestones: [M021]
@@ -12,7 +12,17 @@ parallel_milestones: [M021]
 
 # State
 
-**Status:** M027 / S02 / T01 planned -- ready to execute. **Watched-Folder Curiosity** —
+**Status:** M027 / S02 -- 1/4 tasks done. **T01 SHIPPED** (commit `24d2134`,
+`M027-S02-T01-SUMMARY.md`): body-blind folder-index walker
+`scripts/collectors/folder_index.py` (scandir+stat only, never open();
+`FolderIndex`/`IndexEntry`; depth cap + include/exclude fnmatch with
+exclude-wins; symlinks never followed; fail-soft errors; names unmasked
+as-is per DECISIONS 2026-06-07; deterministic ordering — the T02/T03
+delta-hash contract). 7 new tests, suite **1214 green**. Spec note: the
+slice-plan's "sanitization primitive" clause was stale (superseded) — index
+is UNMASKED; same applies to the slice "Done when" wording at T02/T04.
+Next: `/ytstack:plan-task` for **S02-T02** (render+write digest to
+`raw/index/<root-id>.md`, size caps for prompt-injectability). **Watched-Folder Curiosity** —
 the wiki learns from watched local + NAS folders: **unmasked metadata index** →
 producer proposes `folder-deep-scan` → **operator approves per-request in the
 walk** (THE content/cloud gate) → backend reads files in-place (answer-only, no
