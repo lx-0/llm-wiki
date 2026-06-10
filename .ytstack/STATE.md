@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-06-11T00:40:00+0200
+last_updated: 2026-06-11T00:50:00+0200
 current_milestone: M027
 active_slice: S05
-active_task: none
+active_task: T03
 last_completed_milestone: M026
 parked_milestone: M025
 parallel_milestones: [M021]
@@ -28,11 +28,13 @@ green +1 gated**. 2/3 done. **T02 SHIPPED** (commit `f948145`, DECISIONS
 `sensitivity:` config → answer-frontmatter stamp → compile_main rule 11
 carry onto derived knowledge/ articles; marking-only, walk stays gate.
 Suite **1271 green +1 gated** (incl. +3 from parallel 0.1.8 session,
-zero overlap verified). Next: `/ytstack:plan-task` for **S05-T03**
-(LAST: lxw e2e, exit criterion #6 — folder answer → compile →
-knowledge/ fact → `wiki query` returns it; also verifies the
-sensitivity carry empirically). NOTE: parallel session shipped 0.1.8
-(thunderbird folder-resolution fix) on main mid-task.
+zero overlap verified). **T03 planned** (`M027-S05-T03-PLAN.md`, LAST in
+S05): lxw operations e2e for exit #6 — wiki update → tag
+private-documents with sensitivity → index --force → real producer run
+(`wiki produce folder_curiosity`) or operator-consented seed → walk/run
+dispatch → compile the answer → `wiki query` returns the folder fact;
+verifies T02 carry empirically. ~3 paid calls, go = approval. NOTE:
+parallel session shipped 0.1.8 (thunderbird fix) on main mid-task.
 ✅ **M027 / S04 COMPLETE — 5/5 tasks** (one session, 2026-06-10,
 commits `221fb33` T01 Q9-seam / `f4051fd` T02 persistence+P2 / `7650bd7`
 T03 quarantine / `ae60994` T04 LIVE e2e / `5f9e04d` T05 consent card;
