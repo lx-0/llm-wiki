@@ -5,7 +5,7 @@ project: llm-wiki
 created: 2026-06-07T12:21:47+0200
 status: planned
 task_count: 4
-completed_tasks: 2
+completed_tasks: 3
 ---
 
 # M027-S02 -- Slice Plan
@@ -17,7 +17,7 @@ sanitized, delta-aware metadata digest to `raw/index/<root>.md`.
 
 - [x] T01 -- `scripts/collectors/folder_index.py`: walk a local root body-blind (no content reads), build the minimum-viable digest (depth-capped directory tree + recent-change list). (Sanitization clause superseded by DECISIONS 2026-06-07 — index is unmasked; see T01-SUMMARY.)
 - [x] T02 -- Render + write the digest to `raw/index/<root-id>.md` (one MD digest per root, single consumer); enforce size caps so it stays prompt-injectable at 1000s of files.
-- [ ] T03 -- Delta-awareness: mtime/size diff so unchanged trees are skipped; ingest-hash/skip-record discipline (mirror the 0.1.7 fix) so the index isn't rebuilt-then-re-listed forever.
+- [x] T03 -- Delta-awareness: mtime/size diff so unchanged trees are skipped; ingest-hash/skip-record discipline (mirror the 0.1.7 fix) so the index isn't rebuilt-then-re-listed forever.
 - [ ] T04 -- Wire into the `wiki` CLI (`wiki index` verb) + unit tests on a fixture tree (sanitization applied, caps respected, delta skip works).
 
 ## Done when

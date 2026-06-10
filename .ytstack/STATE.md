@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-06-10T15:45:00+0200
+last_updated: 2026-06-10T16:05:00+0200
 current_milestone: M027
 active_slice: S02
-active_task: T03
+active_task: none
 last_completed_milestone: M026
 parked_milestone: M025
 parallel_milestones: [M021]
@@ -12,14 +12,18 @@ parallel_milestones: [M021]
 
 # State
 
-**Status:** M027 / S02 / T03 planned -- ready to execute
-(`M027-S02-T03-PLAN.md`: (A) delta-skip — `index_signature` sha256 over
-(rel_path,is_dir,size,mtime) modulo frontmatter, side-state
-`state/folder-index.json`, `sync_root` orchestrator with force +
-deleted-digest re-write; (B) compile-skip — `folder-index` into
-`compile_skip_substrate_types` default + `migrate_list_additions` SAME
-commit, carry-regression: `raw/notes/folder/` answers must NOT skip).
-2/4 tasks done in slice. **T02 SHIPPED** (commit `770c68f`,
+**Status:** M027 / S02 -- 3/4 tasks done. **T03 SHIPPED** (commit `7d03314`,
+`M027-S02-T03-SUMMARY.md`): delta-skip (`index_signature` modulo
+frontmatter, side-state `state/folder-index.json`, `sync_root` with
+force/deleted-digest re-write, fail-soft state) + compile-skip
+(`folder-index` in `compile_skip_substrate_types`: config.py +
+example-yaml + KEY_ADDITIONS + LIST_ADDITIONS append, migration
+same-commit; carry-regression pinned — `raw/notes/folder/` answers still
+Compile). Bonus: first-ever coverage for the `migrate_list_additions`
+append path. Suite **1225 green**. ⚠️ lxw effect after `wiki update`.
+Next: `/ytstack:plan-task` for **S02-T04** (LAST slice task: `wiki index`
+CLI verb + registry wiring + lift max_depth/recent_n/max_tree_entries to
+config knobs + migration same-commit). **T02 SHIPPED** (commit `770c68f`,
 `M027-S02-T02-SUMMARY.md`): `render_index` (pure, deterministic, unmasked;
 frontmatter `type: folder-index` + counts + truncated-flag; Recent-changes +
 depth-indented Tree, `max_tree_entries` cap + omitted-marker) + `write_index`
