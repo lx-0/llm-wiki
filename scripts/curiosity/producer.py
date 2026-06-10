@@ -38,6 +38,7 @@ log = logging.getLogger("compile")
 
 CURIOSITY_MODEL = CONFIG.models.curiosity_model
 RAW_REQUESTS_DIR = ROOT_DIR / "raw" / "requests"
+RAW_INDEX_DIR = ROOT_DIR / "raw" / "index"  # body-blind folder digests (M027-S02)
 
 
 def _slug_previously_rejected(slug: str) -> bool:
@@ -94,6 +95,261 @@ def _quote_anchored_in_source(quote_norm: str, source_norm: str, min_tokens: int
         if window in source_norm:
             return True
     return False
+
+
+_BACKTICKED_PATH = re.compile(r"`([^`\n]+)`")
+
+
+def _indexed_paths(digest_text: str) -> set[str]:
+    """Every backticked path in a digest (Tree + Recent lines).
+
+    Trailing `/` (dir markers) stripped; absolute paths (the frontmatter
+    `root_path` echo) excluded — anchors are rel_paths only.
+    """
+    paths: set[str] = set()
+    for m in _BACKTICKED_PATH.finditer(digest_text):
+        p = m.group(1).rstrip("/")
+        if p and not p.startswith("/"):
+            paths.add(p)
+    return paths
+
+
+def _trim_digest_tree_files(digest_text: str) -> str:
+    """Consumer-side budget trim (DECISIONS 2026-06-10): drop file lines
+    from the Tree section, keep frontmatter + Recent + dir skeleton."""
+    head, sep, tree = digest_text.partition("\n## Tree")
+    if not sep:
+        return digest_text
+    kept = [
+        ln for ln in tree.splitlines()
+        if not ln.lstrip().startswith("- `") or ln.rstrip().endswith("`/")
+    ]
+    return head + "\n## Tree" + "\n".join(kept) + "\n"
+
+
+def _load_folder_digests(budget_chars: int) -> tuple[str, dict[str, set[str]]]:
+    """Read raw/index/*.md → (prompt block, {root_id: indexed rel_paths}).
+
+    The block is the full digests when they fit `budget_chars`; otherwise
+    each digest's Tree file-lines are dropped (dir skeleton + Recent
+    survive) and the trim is logged — never a silent cap.
+    """
+    digests: dict[str, str] = {}
+    if RAW_INDEX_DIR.exists():
+        for f in sorted(RAW_INDEX_DIR.glob("*.md")):
+            digests[f.stem] = f.read_text(encoding="utf-8")
+    if not digests:
+        return "", {}
+    paths = {root_id: _indexed_paths(text) for root_id, text in digests.items()}
+    block = "\n\n".join(digests.values())
+    if len(block) > budget_chars:
+        trimmed = "\n\n".join(
+            _trim_digest_tree_files(text) for text in digests.values()
+        )
+        log.info(
+            "  Curiosity(folder): digests %d chars > budget %d — trimmed "
+            "Tree file-lines to %d chars (dir skeleton + Recent kept)",
+            len(block), budget_chars, len(trimmed),
+        )
+        block = trimmed
+    return block, paths
+
+
+async def maybe_generate_folder_requests(source: Path) -> None:
+    """Detect gaps a watched-folder file could answer → folder-deep-scan
+    requests in raw/requests/ (M027-S03).
+
+    Sibling of the email pass below: same split-provider posture
+    (Ollama-only), same drop-counter discipline. The anti-hallucination
+    gate is a FILE-EXISTS anchor — the named path must be present in the
+    current index (which is exactly what the model saw) — instead of
+    email's `source_quote`; the candidate files have no body in context
+    to quote. Dispatch + backend are S03-T03/S04; until then requests
+    accumulate as pending.
+    """
+    if not CONFIG.features.curiosity_loop:
+        return
+    if not (CONFIG.personal.watched_folders or []):
+        return
+
+    rel_path = str(source.relative_to(ROOT_DIR))
+    source_content = source.read_text(encoding="utf-8")
+    if len(source_content) < CONFIG.limits.curiosity_min_source_chars:
+        return
+    src_globs = CONFIG.limits.curiosity_source_globs
+    if src_globs and not any(fnmatch.fnmatch(rel_path, g) for g in src_globs):
+        return
+
+    src_excerpt = source_content[:5000]
+    digest_budget = max(
+        1000,
+        CONFIG.limits.curiosity_max_prompt_chars - len(src_excerpt) - 1500,
+    )
+    digest_block, indexed = _load_folder_digests(digest_budget)
+    if not digest_block:
+        log.info("  Curiosity(folder): no digests under raw/index/ — run `wiki index`")
+        return
+
+    if not ollama_client.is_reachable():
+        log.warning(
+            "  Curiosity(folder): Ollama not reachable at %s — skipping",
+            CONFIG.models.ollama_url,
+        )
+        return
+
+    prompt = render(
+        "compile_curiosity_folder",
+        source_path=rel_path,
+        source_content=src_excerpt,
+        folder_digests=digest_block,
+        timestamp=now_iso(),  # cache-buster
+    )
+    if len(prompt) > CONFIG.limits.curiosity_max_prompt_chars:
+        log.warning(
+            "  Curiosity(folder): prompt %d chars exceeds budget %d — sending anyway",
+            len(prompt), CONFIG.limits.curiosity_max_prompt_chars,
+        )
+
+    log.info("  Curiosity(folder) pass for %s (model=%s, prompt=%d chars)",
+             rel_path, CURIOSITY_MODEL, len(prompt))
+
+    root_ids = sorted(indexed.keys())
+    schema = {
+        "type": "object",
+        "properties": {
+            "gaps": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "topic": {"type": "string"},
+                        "root_id": {"type": "string", "enum": root_ids},
+                        # file_path: must be a rel_path present in the
+                        # digest — validated below (file-exists anchor).
+                        "file_path": {"type": "string"},
+                        # file_confidence: 1-5 self-reported, same
+                        # abstain-over-guess semantics as email's
+                        # folder_confidence (shared threshold knob).
+                        "file_confidence": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 5,
+                        },
+                        "rationale": {"type": "string"},
+                    },
+                    "required": [
+                        "topic", "root_id", "file_path",
+                        "file_confidence", "rationale",
+                    ],
+                },
+            },
+        },
+        "required": ["gaps"],
+    }
+
+    try:
+        content = ollama_client.chat_schema(
+            prompt,
+            model=CURIOSITY_MODEL,
+            schema=schema,
+            timeout=CONFIG.limits.curiosity_timeout_s,
+        )
+        try:
+            parsed = ollama_client.parse_json_lenient(content)
+        except json.JSONDecodeError:
+            log.warning("  Curiosity(folder): invalid JSON: %s", content[:200])
+            return
+        gaps = parsed if isinstance(parsed, list) else (
+            parsed.get("gaps", []) if isinstance(parsed, dict) else []
+        )
+        gaps = [g for g in gaps if isinstance(g, dict)]
+        if not gaps:
+            log.info("  Curiosity(folder): no gaps found")
+            return
+
+        RAW_REQUESTS_DIR.mkdir(parents=True, exist_ok=True)
+        raw_count = len(gaps)
+        kept = 0
+        dropped: dict[str, int] = {}
+        confidence_min = CONFIG.limits.curiosity_folder_confidence_min
+        for gap in gaps[:CONFIG.limits.curiosity_max_gaps]:
+            topic = (gap.get("topic") or "").strip()
+            rationale = (gap.get("rationale") or "").strip()
+            root_id = (gap.get("root_id") or "").strip()
+            file_path = (gap.get("file_path") or "").strip().lstrip("./")
+
+            if root_id not in indexed:
+                dropped["root_unmapped"] = dropped.get("root_unmapped", 0) + 1
+                continue
+            file_confidence = gap.get("file_confidence")
+            if not isinstance(file_confidence, int) or file_confidence < confidence_min:
+                dropped["file_low_confidence"] = dropped.get("file_low_confidence", 0) + 1
+                continue
+            if not topic:
+                dropped["empty_topic"] = dropped.get("empty_topic", 0) + 1
+                continue
+            if not rationale:
+                dropped["empty_rationale"] = dropped.get("empty_rationale", 0) + 1
+                continue
+            # FILE-EXISTS anchor: the named path must be present in the
+            # index the model saw. Invented paths are dropped — this is
+            # the folder-pass equivalent of email's verbatim source_quote.
+            if file_path.rstrip("/") not in indexed[root_id]:
+                dropped["file_not_indexed"] = dropped.get("file_not_indexed", 0) + 1
+                continue
+
+            slug = re.sub(r"[^a-z0-9]+", "-", topic.lower())[:40].strip("-")
+            request_path = RAW_REQUESTS_DIR / f"request-{slug}-{today_iso()}.json"
+            if request_path.exists():
+                dropped["duplicate"] = dropped.get("duplicate", 0) + 1
+                continue
+            if _slug_previously_rejected(slug):
+                dropped["rejected_persistent"] = dropped.get("rejected_persistent", 0) + 1
+                continue
+
+            request = {
+                "type": "folder-deep-scan",
+                "status": "pending",
+                "root_id": root_id,
+                "file_path": file_path,
+                "file_confidence": file_confidence,
+                "model": CURIOSITY_MODEL,
+                "topic": topic,
+                "rationale": rationale,
+                "source": rel_path,
+                "created": now_iso(),
+            }
+            request_path.write_text(json.dumps(request, indent=2), encoding="utf-8")
+            kept += 1
+            log.info("  Curiosity(folder) request: %s → %s/%s",
+                     topic, root_id, file_path)
+
+        if dropped or kept != raw_count:
+            drop_str = ", ".join(f"{k}={v}" for k, v in dropped.items()) or "none"
+            log.info(
+                "  Curiosity(folder): %d gap(s) gen, %d kept (dropped: %s)",
+                raw_count, kept, drop_str,
+            )
+
+    except httpx.TimeoutException:
+        log.warning("  Curiosity(folder): Ollama timeout (model=%s, %ds)",
+                    CURIOSITY_MODEL, CONFIG.limits.curiosity_timeout_s)
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 404:
+            log.warning(
+                "  Curiosity(folder): Ollama model %r not available — pull it "
+                "(`ollama pull %s`) or change CONFIG.models.curiosity_model",
+                CURIOSITY_MODEL, CURIOSITY_MODEL,
+            )
+        else:
+            log.warning("  Curiosity(folder): Ollama HTTP %s — %s",
+                        e.response.status_code, e.response.text[:200])
+    except httpx.HTTPError as e:
+        log.warning("  Curiosity(folder): Ollama connection error: %s", e)
+    except (json.JSONDecodeError, KeyError) as e:
+        log.warning("  Curiosity(folder): parse error: %s", e)
+    except Exception:
+        log.exception("  Curiosity(folder) pass failed")
 
 
 async def maybe_generate_curiosity_requests(source: Path) -> None:

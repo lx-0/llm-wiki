@@ -62,6 +62,10 @@ class IndexEntry:
     size: int | None  # files only
     mtime: float
     ext: str  # lowercased suffix incl. dot, "" for dirs
+    # creation time (st_birthtime — macOS/BSD; None where the platform
+    # doesn't expose it). Triage signal alongside mtime, NOT part of the
+    # delta signature (immutable, mtime/size already carry change).
+    ctime: float | None = None
 
 
 @dataclass
@@ -139,7 +143,12 @@ def walk_root(entry: dict, *, max_depth: int, recent_n: int) -> FolderIndex:
                 continue
             tree.append(
                 IndexEntry(
-                    rel_path=rel, is_dir=True, size=None, mtime=st.st_mtime, ext=""
+                    rel_path=rel,
+                    is_dir=True,
+                    size=None,
+                    mtime=st.st_mtime,
+                    ext="",
+                    ctime=getattr(st, "st_birthtime", None),
                 )
             )
             counts["dirs"] += 1
@@ -166,6 +175,7 @@ def walk_root(entry: dict, *, max_depth: int, recent_n: int) -> FolderIndex:
                 size=st.st_size,
                 mtime=st.st_mtime,
                 ext=os.path.splitext(child.name)[1].lower(),
+                ctime=getattr(st, "st_birthtime", None),
             )
             tree.append(ie)
             files.append(ie)
@@ -196,6 +206,17 @@ def _human_size(size: int | None) -> str:
 
 def _mtime_date(mtime: float) -> str:
     return datetime.fromtimestamp(mtime, tz=timezone.utc).strftime("%Y-%m-%d")
+
+
+def _file_line(e: IndexEntry, indent: str = "") -> str:
+    """One digest line per file: full rel_path (quotable + grep-able) +
+    size + created/modified dates (operator 2026-06-10: timestamps are
+    triage signal). `created` omitted on platforms without st_birthtime."""
+    parts = [f"{indent}- `{e.rel_path}`", _human_size(e.size)]
+    if e.ctime is not None:
+        parts.append(f"created {_mtime_date(e.ctime)}")
+    parts.append(f"modified {_mtime_date(e.mtime)}")
+    return " · ".join(parts)
 
 
 def render_index(index: FolderIndex) -> str:
@@ -231,19 +252,18 @@ def render_index(index: FolderIndex) -> str:
     lines.append("")
     if index.recent:
         for e in index.recent:
-            lines.append(
-                f"- `{e.rel_path}` — {_mtime_date(e.mtime)} · {_human_size(e.size)}"
-            )
+            lines.append(_file_line(e))
     else:
         lines.append("_No files._")
     lines.append("")
     lines.append("## Tree")
     lines.append("")
     for e in index.tree:
-        depth = e.rel_path.count(os.sep)
-        name = os.path.basename(e.rel_path)
-        suffix = "/" if e.is_dir else f" · {_human_size(e.size)}"
-        lines.append(f"{'  ' * depth}- `{name}`{suffix}")
+        indent = "  " * e.rel_path.count(os.sep)
+        if e.is_dir:
+            lines.append(f"{indent}- `{e.rel_path}`/")
+        else:
+            lines.append(_file_line(e, indent))
     return "\n".join(lines) + "\n"
 
 

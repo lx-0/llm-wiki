@@ -224,6 +224,19 @@ def test_render_index_always_full_tree(tree):
     assert tree_section.count("- `") == total  # every entry rendered
     assert "omitted" not in out
     assert "truncated" not in out  # frontmatter flag gone with the cap
+    # tree lines carry the FULL rel_path (quotable by the S03 producer for
+    # the file-exists anchor + grep-able by any consumer), not basenames
+    assert f"`{os.path.join('b-dir', 'nested', 'mid.txt')}`" in tree_section
+    assert f"`{os.path.join('b-dir', 'nested')}`/" in tree_section
+    # file lines carry created + modified dates (operator 2026-06-10:
+    # timestamps are triage signal, size alone is not enough)
+    os.utime(tree / "afile.txt", (86400, 86400))  # 1970-01-02
+    out2 = render_index(walk_root(_entry(tree), max_depth=10, recent_n=3))
+    afile_line = next(
+        ln for ln in out2.splitlines() if "`afile.txt`" in ln and "- " in ln
+    )
+    assert "modified 1970-01-02" in afile_line
+    assert "created" in afile_line
 
 
 def test_render_index_names_unmasked(tree):
