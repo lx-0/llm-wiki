@@ -173,3 +173,10 @@ load-bearing for the collector design:
 Not a milestone yet — operator is collecting test data first. When enough has
 accumulated, run `office-hours` / `plan-milestone` on the collector with the
 real DB schema in hand.
+
+**User-facing docs deferred by decision (operator, 2026-06-10):** no
+`docs/setup-screenpipe.md` until the collector ships — a setup doc in the
+`docs/setup-*` family would present screenpipe as an active substrate
+(FEATURES/cli linkage), which it is not yet. The collector milestone MUST
+include `docs/setup-screenpipe.md` (capture recipe lives in this file, §"The
+fix") + the FEATURES.md / cli.md listings in the same arc.
