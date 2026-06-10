@@ -179,11 +179,12 @@ KEY_ADDITIONS: dict[str, dict[str, object]] = {
         # no good prompt yet. folder-index added 2026-06-10 (M027-S02
         # body-blind watched-folder digests — metadata, nothing to distil).
         "compile_skip_substrate_types": ["email-delta", "folder-index"],
-        # Watched-folder index caps (M027-S02-T04, `wiki index`). Match
+        # Watched-folder index knobs (M027-S02-T04, `wiki index`). Match
         # Limits.folder_index_* defaults in scripts/core/config.py.
-        "folder_index_max_depth": 4,
+        # max_depth 0 = unlimited (2026-06-10 reversal — complete
+        # inventory; raise per-install only for huge NAS roots).
+        "folder_index_max_depth": 0,
         "folder_index_recent_n": 20,
-        "folder_index_max_tree_entries": 500,
         # Email daily-rollup signal (beta, 2026-05-23). Top-N senders + sample
         # of recent subjects in the per-account daily/<date>/email.md block, so
         # the daily-digest agent extracts correspondents + themes. Match
@@ -528,6 +529,10 @@ KEY_DROPS: dict[str, set[str]] = {
         "compile_max_cost_per_file_usd",
         "dream_entity_max_cost_usd",
         "dream_cycle_max_cost_per_run_usd",
+        # Removed 2026-06-10 (same-day amendment to M027-S02-T04) — the
+        # write-time tree cap is gone; the digest is always the complete
+        # inventory, prompt budget lives at the consumer (S03).
+        "folder_index_max_tree_entries",
     },
     "personal": {
         # Removed 2026-05-15 (M006) — calendar moved off Thunderbird-SQLite

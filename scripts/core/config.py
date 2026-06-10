@@ -392,13 +392,14 @@ class Limits:
     #     the distillable artifacts are the raw/notes/folder/ answers,
     #     which stay compile sources.
     compile_skip_substrate_types: tuple[str, ...] = ("email-delta", "folder-index")
-    # Watched-folder index caps (M027-S02, `wiki index`). Tuned so one
-    # digest stays prompt-injectable at 1000s of files: depth cap on the
-    # walk, top-N recent-changes list, hard line cap on the rendered tree
-    # (omitted-count marker when exceeded).
-    folder_index_max_depth: int = 4
+    # Watched-folder index knobs (M027-S02, `wiki index`). The digest is
+    # always the COMPLETE inventory — prompt budget is the consumer's
+    # concern (trim/grep at the producer), never the artifact's
+    # (2026-06-10 reversal: a write-time cap hid 75% of a real trove).
+    # max_depth=0 = unlimited; set per-install only as a walk-cost bound
+    # for huge NAS roots (S06). recent_n = top-N recent-changes view.
+    folder_index_max_depth: int = 0
     folder_index_recent_n: int = 20
-    folder_index_max_tree_entries: int = 500
     # Email daily-rollup signal (beta, 2026-05-23). The per-account block the
     # EmailCollector appends to daily/<date>/email.md carries -- beyond the bare
     # count + delta-link -- the top-N senders by volume and a sample of the

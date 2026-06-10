@@ -1339,13 +1339,15 @@ ${C_BOLD}USAGE${C_RESET}
 ${C_BOLD}WHAT IT DOES${C_RESET}
   Walks each watched root WITHOUT reading any file body (scandir + stat
   only) and writes one markdown digest per root to raw/index/<root-id>.md:
-  depth-capped tree + top-N recent changes, names unmasked. The curiosity
-  producer reads these digests to propose folder-deep-scans; content is
+  the COMPLETE tree + top-N recent changes, names unmasked. The curiosity
+  producer reads these digests to propose folder-deep-scans (trimming or
+  grepping as needed — the digest itself is never truncated); content is
   only ever loaded after per-request operator approval in the walk.
   Unchanged trees are delta-skipped via state/folder-index.json. Digests
   carry type: folder-index and are compile-skipped (nothing to distil).
 
-  Caps: limits.folder_index_max_depth / _recent_n / _max_tree_entries.
+  Knobs: limits.folder_index_max_depth (0 = unlimited; raise only as a
+  walk-cost bound for huge NAS roots) / folder_index_recent_n.
   kind=smb (NAS) entries are skipped — NAS indexing lands in S06.
 EOF
       return 0

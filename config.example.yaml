@@ -332,12 +332,12 @@ limits:
   # raw/index/ (M027) — metadata for the curiosity producer, nothing to
   # distil (the raw/notes/folder/ answers stay compile sources).
   compile_skip_substrate_types: ["email-delta", "folder-index"]
-  # Watched-folder index caps (`wiki index`). Keep one digest
-  # prompt-injectable at 1000s of files: walk depth cap, top-N
-  # recent-changes list, hard line cap on the rendered tree.
-  folder_index_max_depth: 4
+  # Watched-folder index knobs (`wiki index`). The digest is always the
+  # complete inventory (no write-time truncation — the producer trims or
+  # greps at consumption). max_depth 0 = unlimited; raise only as a
+  # walk-cost bound for huge NAS roots. recent_n = top-N recent changes.
+  folder_index_max_depth: 0
   folder_index_recent_n: 20
-  folder_index_max_tree_entries: 500
   # Email daily-rollup signal (beta). The per-account block in
   # daily/<date>/email.md carries top-N senders + a sample of recent subjects
   # beyond the bare count, so the daily-digest agent can lift correspondents +

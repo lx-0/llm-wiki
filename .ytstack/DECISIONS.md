@@ -1731,3 +1731,36 @@ at all.
 `curiosity/backends/email.py` (`DEEP_SCAN_DIR` precedent), `M027-S03/S04/S05`
 plans (request shape / backend write / compile-consume build against this),
 `compile.py` (the single knowledge-writer).
+
+## 2026-06-10: Folder-index digest is the complete inventory — no write-time caps
+
+**Context:** S02 shipped with `folder_index_max_tree_entries=500` (write-time
+tree truncation + `truncated:` flag) and `folder_index_max_depth=4`, following
+Q4's "prompt-injectable at 1000s of files" framing. First live run on lxw cut
+75% of `private-documents` (1527 of 2027 entries omitted) and never descended
+66/135 dirs — the producer could only ever propose files it happened to see.
+Operator called it out same-day: "der sollte die ganze fileliste bekommen und
+selbst auswählen können was gelesen wird, oder per grep/search tools."
+
+**Chose:** The digest on disk is ALWAYS the complete inventory. Prompt budget
+is enforced at the CONSUMER, never the artifact: the S03 producer trims,
+greps, or searches `raw/index/<root-id>.md` as needed (full-inject when it
+fits; tool-based selection when it doesn't). `folder_index_max_tree_entries`
+removed outright (no soft deprecation; KEY_DROPS prunes operator vaults).
+`folder_index_max_depth` default flipped 4 → 0 (= unlimited); the knob remains
+solely as an opt-in walk-COST bound for huge NAS roots (S06), not an
+information filter. `recent_n` stays (additive view, no information loss).
+
+**Why this layer:** write-time truncation destroys information in the only
+artifact, and the consumer can't recover what the writer dropped. The inverse
+(full artifact, consumer-side budget) loses nothing and lets every consumer
+pick its own access pattern. Supersedes the Q4 "size caps" framing in
+`M027-CONTEXT.md` / `OFFICE-HOURS-watched-folder-curiosity.md`.
+
+**S03 carry:** producer access pattern = full-inject if digest fits the model
+context, else grep/search over the digest file — decide concretely when
+slicing S03's prompt scaffold.
+
+**Linked artifacts:** `scripts/collectors/folder_index.py` (`render_index`
+docstring), `M027-S02-T0{2,3,4}-SUMMARY.md`, KEY_DROPS entry in
+`scripts/migrations/migrate_config_keys.py`.

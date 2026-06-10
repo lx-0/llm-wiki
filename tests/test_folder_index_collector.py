@@ -90,6 +90,15 @@ def test_depth_cap_honored_and_counted(tree):
     assert idx3.counts["skipped_depth"] == 1  # deep not descended
 
 
+def test_depth_zero_means_unlimited(tree):
+    """max_depth=0 walks everything — the new default (2026-06-10 reversal:
+    the digest is the complete inventory; the knob remains for NAS/S06)."""
+    idx = walk_root(_entry(tree), max_depth=0, recent_n=5)
+    rels = _rels(idx.tree)
+    assert os.path.join("b-dir", "nested", "deep", "toodeep.txt") in rels
+    assert idx.counts["skipped_depth"] == 0
+
+
 def test_include_exclude_globs_exclude_wins(tree):
     # Excluded dir: absent from tree, not descended, counted.
     idx = walk_root(
@@ -182,11 +191,10 @@ def test_nonexistent_root_raises_value_error(tmp_path):
 
 def test_render_index_frontmatter_and_sections(tree):
     idx = walk_root(_entry(tree), max_depth=10, recent_n=3)
-    out = render_index(idx, max_tree_entries=1000)
+    out = render_index(idx)
     assert out.startswith("---\n")
     assert "type: folder-index" in out
     assert "root_id: test-root" in out
-    assert "truncated: false" in out
     # counts flattened into frontmatter
     assert f"files: {idx.counts['files']}" in out
     assert f"errors: {idx.counts['errors']}" in out
@@ -200,26 +208,27 @@ def test_render_index_frontmatter_and_sections(tree):
 
 def test_render_index_deterministic(tree):
     idx = walk_root(_entry(tree), max_depth=10, recent_n=3)
-    assert render_index(idx, max_tree_entries=50) == render_index(
-        idx, max_tree_entries=50
-    )
+    assert render_index(idx) == render_index(idx)
 
 
-def test_render_index_tree_size_cap(tree):
+def test_render_index_always_full_tree(tree):
+    """2026-06-10 design reversal: the digest is the COMPLETE inventory.
+    Write-time truncation destroyed 75% of a real trove for the producer;
+    prompt budget is the consumer's concern (trim/grep at S03), never the
+    artifact's."""
     idx = walk_root(_entry(tree), max_depth=10, recent_n=3)
     total = len(idx.tree)  # fixture: 5 dirs + 8 files = 13
     assert total == 13
-    out = render_index(idx, max_tree_entries=3)
-    assert "truncated: true" in out
-    assert f"{total - 3} more entries omitted" in out
-    # recent section unaffected by the tree cap
-    recent_section = out.split("## Recent changes", 1)[1].split("## Tree", 1)[0]
-    assert recent_section.count("- `") == 3
+    out = render_index(idx)
+    tree_section = out.split("## Tree", 1)[1]
+    assert tree_section.count("- `") == total  # every entry rendered
+    assert "omitted" not in out
+    assert "truncated" not in out  # frontmatter flag gone with the cap
 
 
 def test_render_index_names_unmasked(tree):
     idx = walk_root(_entry(tree), max_depth=10, recent_n=3)
-    out = unicodedata.normalize("NFC", render_index(idx, max_tree_entries=1000))
+    out = unicodedata.normalize("NFC", render_index(idx))
     assert "ümlaut file ä.txt" in out
     assert ".dotfile" in out
 
@@ -249,14 +258,14 @@ def test_sync_root_writes_first_then_skips_unchanged(tree, tmp_path, monkeypatch
     import json
 
     index_dir, state_file = _sync_env(monkeypatch, tmp_path)
-    first = sync_root(_entry(tree), max_depth=10, recent_n=3, max_tree_entries=100)
+    first = sync_root(_entry(tree), max_depth=10, recent_n=3)
     assert first.written is True
     assert first.path == index_dir / "test-root.md"
     assert first.path.exists()
     state = json.loads(state_file.read_text(encoding="utf-8"))
     assert state["test-root"]["signature"] == first.signature
 
-    second = sync_root(_entry(tree), max_depth=10, recent_n=3, max_tree_entries=100)
+    second = sync_root(_entry(tree), max_depth=10, recent_n=3)
     assert second.written is False
     assert second.reason == "unchanged"
 
@@ -265,14 +274,14 @@ def test_sync_root_rewrites_on_force_and_on_deleted_digest(
     tree, tmp_path, monkeypatch
 ):
     _sync_env(monkeypatch, tmp_path)
-    first = sync_root(_entry(tree), max_depth=10, recent_n=3, max_tree_entries=100)
+    first = sync_root(_entry(tree), max_depth=10, recent_n=3)
     # operator deleted the digest — unchanged signature must NOT mask that
     first.path.unlink()
-    rewrite = sync_root(_entry(tree), max_depth=10, recent_n=3, max_tree_entries=100)
+    rewrite = sync_root(_entry(tree), max_depth=10, recent_n=3)
     assert rewrite.written is True
     assert rewrite.path.exists()
     forced = sync_root(
-        _entry(tree), max_depth=10, recent_n=3, max_tree_entries=100, force=True
+        _entry(tree), max_depth=10, recent_n=3, force=True
     )
     assert forced.written is True
 
@@ -282,7 +291,7 @@ def test_sync_root_corrupt_state_fails_soft(tree, tmp_path, monkeypatch):
     state_file = tmp_path / "state" / "folder-index.json"
     state_file.parent.mkdir(parents=True, exist_ok=True)
     state_file.write_text("{not valid json", encoding="utf-8")
-    result = sync_root(_entry(tree), max_depth=10, recent_n=3, max_tree_entries=100)
+    result = sync_root(_entry(tree), max_depth=10, recent_n=3)
     assert result.written is True  # corrupt state -> full rebuild, no crash
 
 
@@ -377,11 +386,9 @@ def test_write_index_one_digest_per_root(tree, tmp_path, monkeypatch):
     index_dir = tmp_path / "raw-index"
     monkeypatch.setattr(folder_index, "INDEX_DIR", index_dir)
     idx = walk_root(_entry(tree), max_depth=10, recent_n=3)
-    path = write_index(idx, max_tree_entries=1000)
+    path = write_index(idx)
     assert path == index_dir / "test-root.md"
-    assert path.read_text(encoding="utf-8") == render_index(
-        idx, max_tree_entries=1000
-    )
+    assert path.read_text(encoding="utf-8") == render_index(idx)
     # re-write overwrites: still exactly one digest for this root
-    write_index(idx, max_tree_entries=1000)
+    write_index(idx)
     assert [p.name for p in index_dir.iterdir()] == ["test-root.md"]

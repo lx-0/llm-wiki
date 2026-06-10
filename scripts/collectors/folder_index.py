@@ -85,7 +85,9 @@ def walk_root(entry: dict, *, max_depth: int, recent_n: int) -> FolderIndex:
     nested matches are reachable); `exclude` wins over `include` and an
     excluded dir is not descended into. Depth counts root children as 1;
     a dir at depth == max_depth is enumerated but not descended
-    (`counts["skipped_depth"]` per such dir).
+    (`counts["skipped_depth"]` per such dir); max_depth=0 = unlimited
+    (the default — the index is the complete inventory; the knob remains
+    as a walk-cost bound for NAS roots, S06).
     """
     root = Path(os.path.expanduser(str(entry.get("path") or "")))
     if not root.is_dir():
@@ -141,7 +143,7 @@ def walk_root(entry: dict, *, max_depth: int, recent_n: int) -> FolderIndex:
                 )
             )
             counts["dirs"] += 1
-            if depth + 1 >= max_depth:
+            if max_depth and depth + 1 >= max_depth:  # 0 = unlimited
                 counts["skipped_depth"] += 1
             else:
                 _walk(child.path, depth + 1)
@@ -196,15 +198,18 @@ def _mtime_date(mtime: float) -> str:
     return datetime.fromtimestamp(mtime, tz=timezone.utc).strftime("%Y-%m-%d")
 
 
-def render_index(index: FolderIndex, *, max_tree_entries: int) -> str:
+def render_index(index: FolderIndex) -> str:
     """Render one FolderIndex as the markdown digest the producer consumes.
 
+    The digest is the COMPLETE inventory — no write-time truncation
+    (2026-06-10 reversal of the Q4 "size cap" framing: capping at write
+    destroyed 75% of a real trove for the producer; prompt budget is the
+    CONSUMER's concern — trim/grep/search at S03 — never the artifact's).
     Pure function of the dataclass — same index in, byte-same markdown out
     (T03's delta-skip compares content; note `generated_at` varies per walk,
     so T03 must hash modulo frontmatter or reuse walk-level signals).
     Names land verbatim — unmasked per DECISIONS 2026-06-07.
     """
-    truncated = len(index.tree) > max_tree_entries
     lines: list[str] = []
     lines.append("---")
     lines.append("type: folder-index")
@@ -213,7 +218,6 @@ def render_index(index: FolderIndex, *, max_tree_entries: int) -> str:
     lines.append(f'generated_at: "{index.generated_at.isoformat()}"')
     for key in ("files", "dirs", "skipped_excluded", "skipped_depth", "errors"):
         lines.append(f"{key}: {index.counts.get(key, 0)}")
-    lines.append(f"truncated: {'true' if truncated else 'false'}")
     lines.append("---")
     lines.append("")
     lines.append(f"# Folder index — {index.root_id}")
@@ -235,24 +239,19 @@ def render_index(index: FolderIndex, *, max_tree_entries: int) -> str:
     lines.append("")
     lines.append("## Tree")
     lines.append("")
-    for e in index.tree[:max_tree_entries]:
+    for e in index.tree:
         depth = e.rel_path.count(os.sep)
         name = os.path.basename(e.rel_path)
         suffix = "/" if e.is_dir else f" · {_human_size(e.size)}"
         lines.append(f"{'  ' * depth}- `{name}`{suffix}")
-    if truncated:
-        omitted = len(index.tree) - max_tree_entries
-        lines.append("")
-        lines.append(f"_… {omitted} more entries omitted (size cap)_")
     return "\n".join(lines) + "\n"
 
 
-def write_index(index: FolderIndex, *, max_tree_entries: int) -> Path:
+def write_index(index: FolderIndex) -> Path:
     """Render and write the digest to `raw/index/<root-id>.md` (overwrite)."""
     INDEX_DIR.mkdir(parents=True, exist_ok=True)
     path = INDEX_DIR / f"{index.root_id}.md"
-    path.write_text(render_index(index, max_tree_entries=max_tree_entries),
-                    encoding="utf-8")
+    path.write_text(render_index(index), encoding="utf-8")
     return path
 
 
@@ -299,7 +298,6 @@ def sync_root(
     *,
     max_depth: int,
     recent_n: int,
-    max_tree_entries: int,
     force: bool = False,
 ) -> SyncResult:
     """Walk one root and write its digest only when the tree changed.
@@ -322,7 +320,7 @@ def sync_root(
         return SyncResult(
             written=False, path=digest_path, reason="unchanged", signature=signature
         )
-    path = write_index(index, max_tree_entries=max_tree_entries)
+    path = write_index(index)
     state[index.root_id] = {
         "signature": signature,
         "last_indexed_at": index.generated_at.isoformat(),
@@ -384,7 +382,6 @@ def main(argv: list[str] | None = None) -> int:
                 e,
                 max_depth=CONFIG.limits.folder_index_max_depth,
                 recent_n=CONFIG.limits.folder_index_recent_n,
-                max_tree_entries=CONFIG.limits.folder_index_max_tree_entries,
                 force=args.force,
             )
         except (ValueError, OSError) as exc:
