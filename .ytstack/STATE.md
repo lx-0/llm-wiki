@@ -1,9 +1,9 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-06-10T23:05:00+0200
+last_updated: 2026-06-10T23:15:00+0200
 current_milestone: M027
-active_slice: none
+active_slice: S05
 active_task: none
 last_completed_milestone: M026
 parked_milestone: M025
@@ -12,7 +12,16 @@ parallel_milestones: [M021]
 
 # State
 
-**Status:** ✅ **M027 / S04 COMPLETE — 5/5 tasks** (one session, 2026-06-10,
+**Status:** M027 — slice S04 complete, **roadmap reassessed (outcome A,
+2026-06-10): S05–S06 unchanged** (4/6 slices done). Next slice: **S05**
+(compile-fold) — pre-marked "likely lighter" CONFIRMED by S04 reality:
+answers in `raw/notes/folder/` are normal compile sources, so S05 =
+verify compile consumes them (substrate dispatch for `type: note` under
+raw/notes/), optional `sensitivity:` tag (Q3, decide there), and exit
+criterion #6 live on lxw (folder-derived fact in `knowledge/`, trove-
+topic query returns it). Run `/ytstack:plan-task` for S05-T01 — re-scope
+the slice-plan's task list first if it still reads "dream-primary".
+✅ **M027 / S04 COMPLETE — 5/5 tasks** (one session, 2026-06-10,
 commits `221fb33` T01 Q9-seam / `f4051fd` T02 persistence+P2 / `7650bd7`
 T03 quarantine / `ae60994` T04 LIVE e2e / `5f9e04d` T05 consent card;
 suite 1252 → **1262 green + 1 gated live**). The folder backend is
