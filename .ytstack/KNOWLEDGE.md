@@ -2518,3 +2518,25 @@ coercion fixed in the same commit.
 `deep-*.md`, resets done-with-0 requests to pending). NOTE: resetting 761
 requests makes the consumer re-pull up to 50 bodies each and compile then
 distills the lot — operator cost decision, do not auto-run.
+
+## "Done + ingested" beweist keinen Knowledge-Write — und neue Substrate erben still compile_default (2026-06-10)
+
+Zwei Compile-Läufe auf einem operator-approved Folder-Answer endeten "✓ done"
+(Hash ingested, Kosten gebucht) mit NULL `knowledge/`-Writes und ohne
+Ops-Log-Zeile. Zwei gestapelte Ursachen: (1) `compile_main` Regel 1 ("not
+trivial facts") verwirft einen einzelnen Rechnungsbetrag korrekt — explizit
+angefragte Antworten brauchen eine Ausnahme (Regel 12). (2) Tiefer: die
+Ausnahme war wirkungslos, weil `type: note` über `_DEFAULT_DISPATCH` auf
+**compile_default** läuft, nicht compile_main — Prompt-Regeln im falschen
+File sind unsichtbar, kein Test warnt. Lehren: (a) bei jedem NEUEN
+Substrat-Artefakt den Dispatch EXPLIZIT setzen (eigener `type:` +
+`SUBSTRATE_PROMPTS`-Eintrag), nie den note-Fallback erben; (b) "files: 1
+done" im Compile-Summary heißt nur "Agent lief durch" — der Beweis ist ein
+modifiziertes knowledge/-File bzw. der Ops-Log-Eintrag; (c) Verifikation
+nach Prompt-Änderungen muss den DISPATCH-Logbeweis lesen
+(`type=X → <prompt> @ <model>`), nicht nur Exit-Status. Drittlauf mit
+`type: folder-answer → compile_main @ haiku` schrieb den Fakt korrekt
+(State + Timeline + Provenance). Design-Nebenfund: per-Artikel
+`sensitivity:`-Vererbung aus Mixed-Source-Artikeln ist semantisch
+ill-defined — der deterministische Carrier ist das Answer-Artefakt selbst
+(Tag gestempelt), der Artikel-Fakt verlinkt darauf.
