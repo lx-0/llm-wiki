@@ -231,7 +231,10 @@ def _render_answer(
     topic = request.get("topic", "")
     lines: list[str] = []
     lines.append("---")
-    lines.append("type: note")
+    # type: folder-answer = dedicated compile dispatch (route.py
+    # SUBSTRATE_PROMPTS) — `note` rides compile_default, which dismisses
+    # single explicitly-requested facts (2026-06-10 live finding).
+    lines.append("type: folder-answer")
     lines.append("kind: folder-deep-scan")
     lines.append(f"topic: {json.dumps(topic, ensure_ascii=False)}")
     lines.append(f"root_id: {request.get('root_id', '')}")

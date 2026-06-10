@@ -52,6 +52,13 @@ SUBSTRATE_PROMPTS: dict[str, tuple[str, int, str | None]] = {
     # re-Read / prose-branch Timeline appends. Empirical: budget=6
     # consistently hit max_turns on 2026-05-16 batch.
     "health-rollup":   ("compile_health", 10, "claude-haiku-4-5-20251001"),
+    # Folder-deep-scan answer extracts (M027-S05). The operator
+    # explicitly requested + approved these facts, so they must hit
+    # compile_main's rule 12 (record-the-fact exemption from the
+    # "not trivial facts" bar) — the compile_default fallback dismissed
+    # a real invoice answer to zero writes twice on 2026-06-10. Small,
+    # focused sources: Haiku at 20 turns covers grep + augment + log.
+    "folder-answer":   ("compile_main", 20, "claude-haiku-4-5-20251001"),
     # Screenshot batches: 50-screenshot reports with per-frame summaries
     # + table-of-contents. compile_main.md hit max_turns at $5+/file
     # on 2026-05-15 (49 screenshots → many concept-page Edits). Lean

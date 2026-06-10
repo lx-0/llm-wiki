@@ -181,26 +181,22 @@ def test_answer_artifact_is_compile_candidate_and_routes_like_email(
     monkeypatch.setattr(cu, "DAILY_DIR", tmp_path / "daily")
     assert answer_path in cu.list_raw_files()
 
-    # (b) routing-parity pin — same lane as email deep-scans
+    # (b) routing pin — DEDICATED dispatch (conscious folder decision,
+    # 2026-06-10 live finding: type:note rides compile_default, which
+    # never saw the folder-answer rules in compile_main; two zero-write
+    # runs on a real invoice answer). Answers carry type: folder-answer
+    # and route explicitly to compile_main.
     from pathlib import Path as P
 
     from compile_stages.route import Compile, decide_route
 
+    answer_text = answer_path.read_text(encoding="utf-8")
+    assert "type: folder-answer" in answer_text
     answer_route = decide_route(
-        P("raw/notes/folder") / answer_path.name,
-        answer_path.read_text(encoding="utf-8"),
-    )
-    email_route = decide_route(
-        P("raw/notes/email/deep-projectx-2026-06-10.md"),
-        "---\ntype: note\nkind: email-deep-scan\ntopic: \"x\"\n---\n\nbody",
+        P("raw/notes/folder") / answer_path.name, answer_text
     )
     assert isinstance(answer_route, Compile)
-    assert isinstance(email_route, Compile)
-    assert (
-        answer_route.metadata.substrate_prompt
-        == email_route.metadata.substrate_prompt
-    )
-    assert answer_route.metadata.model_id == email_route.metadata.model_id
+    assert answer_route.metadata.substrate_prompt == "compile_main"
 
 
 def test_e2e_dispatch_dry_run_and_stale_file_branch(vault, monkeypatch, caplog):
