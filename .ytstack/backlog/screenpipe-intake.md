@@ -112,10 +112,36 @@ and growing data: frames 24, ocr_text 19, audio_chunks 11, **audio_transcription
 
 The actual llm-wiki feature. Unbuilt. Open questions before a milestone:
 
-- **SQLite schema.** Confirmed a `frames` table exists (OCR/vision). Need to map
-  the audio-transcription tables + how mic vs system-audio + speaker labels are
-  stored. Live-probe the real DB before writing any parser (per
-  `feedback_live_probe_before_parser` — don't trust docs/memory on schema).
+- **SQLite schema — PROBED 2026-06-10 against the live DB** (v0.4.12, schema
+  migration `20260603120000`; collector must record the `_sqlx_migrations`
+  version it was built against). Key findings, all verified with real rows:
+  - **Multi-screen artifact mitigation is built in:** `frames` carries
+    `device_name` (= `monitor_N`), `focused` (bool), `app_name`, `window_name`,
+    `browser_url`, `capture_trigger` (click/visual_change/window_focus) and
+    `content_hash`/`simhash`. The collector reasons over focused+window, never
+    raw frame order — prior-art trap #2 is solved at the source.
+  - **Author attribution is a clean boolean:** `audio_transcriptions.
+    is_input_device` (1 = mic = operator voice, 0 = System Audio = counterpart)
+    + `device`, `start_time`/`end_time`. Maps 1:1 onto M009 `author:`.
+  - **Diarization is live:** `speakers` table with 512-dim centroids +
+    `hallucination` flag; `speaker_id` populated on ~100 % of transcripts
+    (5 unnamed speakers after half a day). Naming/merging is open — possible
+    tie-in with `wiki dedup`'s entity-merge.
+  - **Watermark + retention hooks exist:** `audio_chunks.transcription_status`
+    (pending/transcribed/silent/failed) and `evicted_at`; FTS5 mirrors
+    (`*_fts`) for search.
+  - **Built-in meeting detector:** `meetings` + `meeting_transcript_segments`
+    (meeting_app, attendees, speaker_name, per-segment provider). 0 rows so far
+    on this install — observe over real meetings; overlaps Jamie's territory
+    (Jamie stays the meeting substrate per DECISIONS 2026-05-13; screenpipe
+    meetings are at most a fallback signal).
+  - **⚠️ `ui_events` is a keystroke log:** `event_type='text'` rows carry
+    `text_content` = literally typed text (passwords/DMs land here). HARD RULE
+    for the collector: **never ingest `ui_events.text_content`** — app/window
+    switch events at most, for episode segmentation.
+  - Volume reality: ~670 MB per ~4 h active use ≈ 3–4 GB/day — far above the
+    docs' 5–10 GB/month. Retention via `screenpipe db` cleanup / `evicted_at`
+    must be part of the operating posture, not an afterthought.
 - **What to ingest, and at what compile-role.** This is the load-bearing
   decision. Screenpipe produces ~5–10 GB/month and *enormous* OCR volume —
   ingesting raw frames as per-item `knowledge/` would bury the vault. Almost
