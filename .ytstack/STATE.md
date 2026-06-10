@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-06-10T20:05:00+0200
+last_updated: 2026-06-10T20:20:00+0200
 current_milestone: M027
 active_slice: S04
-active_task: none
+active_task: T01
 last_completed_milestone: M026
 parked_milestone: M025
 parallel_milestones: [M021]
@@ -12,18 +12,17 @@ parallel_milestones: [M021]
 
 # State
 
-**Status:** M027 — slice S03 complete, **roadmap reassessed (outcome A,
-2026-06-10): S04–S06 unchanged** (3/6 slices done). Next slice: **S04**
-(folder backend: read named local files in-place after per-request
-operator approval, persist answer-only to
-`raw/notes/folder/answer-<slug>.md`) — slice-plan `M027-S04-PLAN.md`
-(5 tasks) exists from slicing; run `/ytstack:plan-task` for S04-T01.
-S04 carries: **close Q9 (provider seam) at planning** (Claude SDK now,
-local LLM later — DECISIONS 2026-06-07, no silent fallback); landing
-shape = email-deep-scan sibling with provenance frontmatter incl. as-of
-mtime (CONTEXT reassessment); walk card text already prototyped in the
-T03 skeleton dry-run; `make_path_scope_hook` for the backend write;
-answers are compile SOURCES (carry since S01). ✅ **M027 / S03 COMPLETE —
+**Status:** M027 / S04 / T01 planned -- ready to execute
+(`M027-S04-T01-PLAN.md`, **closes Q9**): provider seam
+`backends/folder_providers.py` — `ScanAnswer` dataclass (answer_md +
+as_of_mtime staleness carry) + `FolderScanProvider` Protocol +
+`get_provider()` registry keyed by NEW knob `models.folder_scan_provider`
+(default "claude-sdk", unknown → ConfigError, NO silent fallback) +
+ClaudeSdkProvider per compile_source template: `allowed_tools=["Read"]`
+only, PreToolUse `make_path_scope_hook([file_abs])` file-as-root,
+cwd=file parent, prompts `folder_scan_answer{,_system}.md`
+("NOT ANSWERED" sentinel). Knob migration same-commit. Persistence=T02,
+quarantine=T03, e2e=T04, walk card=T05. S04 slice: 0/5. ✅ **M027 / S03 COMPLETE —
 4/4 tasks** (one session, 2026-06-10,
 commits `8db9909` T01 producer / `aff144a` T02 prompt / `39299b1` T03
 dispatch+registration / `b421fed` T04 true-chain integration tests; suite
