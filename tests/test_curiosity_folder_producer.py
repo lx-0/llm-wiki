@@ -356,6 +356,19 @@ def test_compile_main_prompt_carries_sensitivity_propagation_rule():
     assert "sensitivity" in prompt
 
 
+def test_compile_main_prompt_records_folder_answer_facts():
+    """S05-T03 live finding: rule 1's 'not trivial facts' bar made the agent
+    dismiss an operator-approved invoice extract (run 2026-06-10 23:15 —
+    done, 0 writes). folder-deep-scan answers are explicitly requested
+    facts: the prompt must instruct recording them despite the bar."""
+    prompt = (
+        __import__("pathlib").Path("prompts/compile_main.md")
+        .read_text(encoding="utf-8")
+    )
+    assert "folder-deep-scan" in prompt
+    assert "raw/notes/folder/" in prompt
+
+
 def test_p2_no_raw_body_anywhere_under_the_vault(tmp_path, monkeypatch):
     fb, root, request_path = _persist_env(tmp_path, monkeypatch)
     _fake_provider(monkeypatch, fb, "## Answer\n\ndistilled only")
