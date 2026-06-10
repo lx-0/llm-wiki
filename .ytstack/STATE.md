@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-06-11T00:05:00+0200
+last_updated: 2026-06-11T00:40:00+0200
 current_milestone: M027
 active_slice: S05
-active_task: T02
+active_task: none
 last_completed_milestone: M026
 parked_milestone: M025
 parallel_milestones: [M021]
@@ -23,13 +23,16 @@ topic query returns it). **T01 SHIPPED** (commit `c6922f6`,
 `M027-S05-T01-SUMMARY.md`): chain already existed — pinned selection
 (`list_raw_files`) + routing-parity vs email deep-scans, added
 human-readable `as_of: YYYY-MM-DD` to answer frontmatter. Suite **1263
-green +1 gated**. 1/3 done. **Q3 CLOSED by operator (2026-06-10): FULL
-sensitivity build** — per-root `sensitivity:` config (validation-only,
-no migration: optional sub-field like include/exclude), backend stamps
-it into the answer frontmatter, compile_main gets a substrate-agnostic
-propagation rule onto derived knowledge/ articles. Marking only, walk
-stays the gate. **T02 planned** (`M027-S05-T02-PLAN.md`) — execute next.
-Then T03 lxw e2e (exit #6, verifies the carry empirically).
+green +1 gated**. 2/3 done. **T02 SHIPPED** (commit `f948145`, DECISIONS
+`c9f8df0`, `M027-S05-T02-SUMMARY.md`): Q3 full build live — per-root
+`sensitivity:` config → answer-frontmatter stamp → compile_main rule 11
+carry onto derived knowledge/ articles; marking-only, walk stays gate.
+Suite **1271 green +1 gated** (incl. +3 from parallel 0.1.8 session,
+zero overlap verified). Next: `/ytstack:plan-task` for **S05-T03**
+(LAST: lxw e2e, exit criterion #6 — folder answer → compile →
+knowledge/ fact → `wiki query` returns it; also verifies the
+sensitivity carry empirically). NOTE: parallel session shipped 0.1.8
+(thunderbird folder-resolution fix) on main mid-task.
 ✅ **M027 / S04 COMPLETE — 5/5 tasks** (one session, 2026-06-10,
 commits `221fb33` T01 Q9-seam / `f4051fd` T02 persistence+P2 / `7650bd7`
 T03 quarantine / `ae60994` T04 LIVE e2e / `5f9e04d` T05 consent card;
