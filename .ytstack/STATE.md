@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-06-10T21:40:00+0200
+last_updated: 2026-06-10T22:05:00+0200
 current_milestone: M027
 active_slice: S04
-active_task: T03
+active_task: none
 last_completed_milestone: M026
 parked_milestone: M025
 parallel_milestones: [M021]
@@ -17,12 +17,14 @@ parallel_milestones: [M021]
 `raw/notes/folder/answer-<slug>.md` (provenance incl. as_of_mtime +
 provider), request flip to `done` (email symmetry), sentinel/error =
 persist nothing + request untouched, **P2 vault-sweep test-pinned**.
-Suite **1256 green**. **T03 planned** (`M027-S04-T03-PLAN.md`): 3 failure
-states (stale/error/not-answered) via `_mark_failed` with
-`failed_as_of_mtime` staleness anchor + re-dispatch gate (retry only when
-the file changed/reappeared — "later source change invalidates"); batch
-survival structural (`list_pending` = pending only). Execute T03 next.
-Then T04 e2e (first LIVE SDK read), T05 walk card. **T01 SHIPPED, Q9 CLOSED** (commit `221fb33`,
+Suite 1256 → **1259 green**. **T03 SHIPPED** (commit `7650bd7`,
+`M027-S04-T03-SUMMARY.md`): quarantine states stale/error/not-answered
+via `_mark_failed` (+failed_as_of_mtime anchor, last_error/last_attempt),
+re-dispatch gate (`already_*`/`still_missing`/`unchanged_since_failure` —
+provider never constructed on skip, test-pinned; retry e2e on touched/
+reappeared file), dry-run ungated. 3/5 done. Next: `/ytstack:plan-task`
+for **S04-T04** (e2e on a real trove — FIRST LIVE SDK READ, operator
+cost ~1 compile_model call). Then T05 walk card. **T01 SHIPPED, Q9 CLOSED** (commit `221fb33`,
 `M027-S04-T01-SUMMARY.md`):
 provider seam `backends/folder_providers.py` (`ScanAnswer` +
 `FolderScanProvider` + `get_provider()` over new knob
