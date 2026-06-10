@@ -18,6 +18,7 @@ Until then this skeleton:
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
@@ -25,8 +26,22 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from core.config import CONFIG
+from core.paths import RAW_DIR, ROOT_DIR
+from core.utils import now_iso
+
+from .folder_providers import ScanAnswer, get_provider
 
 log = logging.getLogger("curiosity")
+
+# Answer artifacts land here as normal compile SOURCES (S01 answer-landing
+# option (a)) — sibling of email's DEEP_SCAN_DIR. compile distils them into
+# knowledge/ on its next run; this backend never writes knowledge/.
+ANSWER_DIR = RAW_DIR / "notes" / "folder"
+
+# Provider sentinel: the named file exists but does not answer the topic
+# (prompts/folder_scan_answer.md contract). A non-answer is NOT persisted —
+# it is not a compile source. Retarget/quarantine semantics land in T03.
+NOT_ANSWERED_SENTINEL = "NOT ANSWERED IN THIS FILE"
 
 
 @dataclass
@@ -79,11 +94,87 @@ def process_request(request_path: Path, *, dry_run: bool) -> RunResult:
         )
         return RunResult(success=True)
 
-    log.info(
-        "  Folder backend lands in S04 — request %s left pending "
-        "(file %s, %s)", request_path.name, candidate,
-        "exists" if exists else "MISSING",
+    # ── Real run: provider read → answer-only persist → request flip ──
+    if not exists:
+        # Stale index — fail soft without mutating the request (T03 owns
+        # the quarantine/invalidation semantics).
+        log.warning(
+            "  Folder backend: %s MISSING (stale index?) — request %s "
+            "left pending", candidate, request_path.name,
+        )
+        return RunResult(success=False, error=f"file missing: {candidate}")
+
+    provider = get_provider()
+    try:
+        answer: ScanAnswer = asyncio.run(
+            provider.answer(
+                topic=topic,
+                rationale=(request.get("rationale") or "").strip(),
+                file_abs=candidate,
+                file_rel=file_path,
+            )
+        )
+    except FileNotFoundError as exc:
+        log.warning("  Folder backend: file vanished mid-read: %s", exc)
+        return RunResult(success=False, error=f"file missing: {exc}")
+
+    if answer.error:
+        log.warning(
+            "  Folder backend: provider failed for %s — %s",
+            request_path.name, answer.error,
+        )
+        return RunResult(success=False, error=answer.error)
+    if NOT_ANSWERED_SENTINEL in answer.answer_md:
+        log.info(
+            "  Folder backend: %s does not answer %r — nothing persisted "
+            "(request stays pending)", file_path, topic,
+        )
+        return RunResult(success=False, error="not_answered_in_file")
+
+    ANSWER_DIR.mkdir(parents=True, exist_ok=True)
+    slug = request_path.stem.removeprefix("request-")  # request-{slug}-{date}
+    output_path = ANSWER_DIR / f"answer-{slug}.md"
+    output_path.write_text(
+        _render_answer(request, answer), encoding="utf-8"
     )
-    return RunResult(
-        success=False, error="folder backend not implemented (S04)"
+    log.info("  Wrote %s (answer-only, %d chars)",
+             output_path, len(answer.answer_md))
+
+    request["status"] = "done"
+    request["processed_at"] = now_iso()
+    request["output"] = str(output_path.relative_to(ROOT_DIR))
+    request["as_of_mtime"] = answer.as_of_mtime
+    request_path.write_text(json.dumps(request, indent=2), encoding="utf-8")
+
+    return RunResult(success=True)
+
+
+def _render_answer(request: dict, answer: ScanAnswer) -> str:
+    """Answer artifact — email-deep-scan shape + S04 provenance.
+
+    A normal compile source: frontmatter provenance (incl. the as-of
+    mtime staleness tag), then the provider's distilled answer verbatim.
+    NEVER the raw file body (P2 — test-pinned).
+    """
+    topic = request.get("topic", "")
+    lines: list[str] = []
+    lines.append("---")
+    lines.append("type: note")
+    lines.append("kind: folder-deep-scan")
+    lines.append(f"topic: {json.dumps(topic, ensure_ascii=False)}")
+    lines.append(f"root_id: {request.get('root_id', '')}")
+    lines.append(
+        f"file_path: {json.dumps(answer.file_path, ensure_ascii=False)}"
     )
+    lines.append(f"as_of_mtime: {answer.as_of_mtime}")
+    lines.append(f"provider: {CONFIG.models.folder_scan_provider}")
+    lines.append('origin: "curiosity/folder-deep-scan"')
+    lines.append(f"request_source: \"{request.get('source', '')}\"")
+    lines.append(f"request_created: \"{request.get('created', '')}\"")
+    lines.append(f'processed_at: "{now_iso()}"')
+    lines.append("---")
+    lines.append("")
+    lines.append(f"# Folder scan — {topic}")
+    lines.append("")
+    lines.append(answer.answer_md.strip())
+    return "\n".join(lines) + "\n"

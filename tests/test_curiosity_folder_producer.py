@@ -211,7 +211,9 @@ def test_dispatch_routes_folder_deep_scan_to_folder_backend(tmp_path, monkeypatc
     assert cli._dispatch(bogus, dry_run=True) is False
 
 
-def test_skeleton_real_run_leaves_request_pending(tmp_path, monkeypatch):
+def test_real_run_on_missing_file_leaves_request_pending(tmp_path, monkeypatch):
+    """Stale index (file gone since indexing): fail soft, request file
+    byte-untouched — quarantine/invalidation semantics are T03's."""
     from curiosity.backends import folder as folder_backend
 
     monkeypatch.setattr(
@@ -223,7 +225,7 @@ def test_skeleton_real_run_leaves_request_pending(tmp_path, monkeypatch):
     before = p.read_text(encoding="utf-8")
     res = folder_backend.process_request(p, dry_run=False)
     assert res.success is False
-    assert "S04" in (res.error or "")
+    assert "missing" in (res.error or "")
     assert p.read_text(encoding="utf-8") == before  # untouched -> stays pending
 
 
@@ -245,6 +247,111 @@ def test_skeleton_dry_run_resolves_path_and_reports_exists(tmp_path, monkeypatch
     bad = _request_file(tmp_path, name="request-bad-root-2026-06-10.json",
                         root_id="nope")
     assert folder_backend.process_request(bad, dry_run=True).success is False
+
+
+# --- S04-T02: answer-only persistence --------------------------------------
+
+RAW_BODY_MARKER = "RAWBODY-7f3a-must-never-persist"
+
+
+def _persist_env(tmp_path, monkeypatch):
+    """Vault + trove + pending request; provider mocked at the seam."""
+    from curiosity.backends import folder as folder_backend
+
+    trove = tmp_path / "trove" / "11 Steuern"
+    trove.mkdir(parents=True)
+    (trove / "Steuerbescheid-2024.pdf").write_text(
+        f"intro {RAW_BODY_MARKER} outro", encoding="utf-8"
+    )
+    monkeypatch.setattr(
+        CONFIG.personal,
+        "watched_folders",
+        [{"id": "docs", "kind": "local", "path": str(tmp_path / "trove")}],
+    )
+    monkeypatch.setattr(folder_backend, "ROOT_DIR", tmp_path)
+    monkeypatch.setattr(
+        folder_backend, "ANSWER_DIR", tmp_path / "raw" / "notes" / "folder"
+    )
+    p = _request_file(tmp_path)
+    return folder_backend, tmp_path, p
+
+
+def _fake_provider(monkeypatch, folder_backend, answer_md, error=None):
+    from curiosity.backends.folder_providers import ScanAnswer
+
+    class _Fake:
+        async def answer(self, *, topic, rationale, file_abs, file_rel):
+            return ScanAnswer(
+                answer_md=answer_md,
+                file_path=file_rel,
+                as_of_mtime=1234.5,
+                error=error,
+            )
+
+    monkeypatch.setattr(folder_backend, "get_provider", lambda: _Fake())
+
+
+def test_persist_answer_only_and_flip_request(tmp_path, monkeypatch):
+    fb, root, request_path = _persist_env(tmp_path, monkeypatch)
+    _fake_provider(
+        monkeypatch, fb, "## Answer\n\nFinal amount: 1234 EUR (page 2)."
+    )
+    res = fb.process_request(request_path, dry_run=False)
+    assert res.success is True
+
+    answer = root / "raw" / "notes" / "folder" / (
+        "answer-" + request_path.stem.removeprefix("request-") + ".md"
+    )
+    assert answer.exists()
+    text = answer.read_text(encoding="utf-8")
+    assert "kind: folder-deep-scan" in text
+    assert "as_of_mtime: 1234.5" in text
+    assert "Final amount: 1234 EUR" in text
+
+    req = json.loads(request_path.read_text(encoding="utf-8"))
+    assert req["status"] == "done"
+    assert req["output"].endswith(answer.name)
+
+
+def test_p2_no_raw_body_anywhere_under_the_vault(tmp_path, monkeypatch):
+    fb, root, request_path = _persist_env(tmp_path, monkeypatch)
+    _fake_provider(monkeypatch, fb, "## Answer\n\ndistilled only")
+    assert fb.process_request(request_path, dry_run=False).success is True
+    # P2: walk EVERY file under the vault root (except the trove itself,
+    # which is outside the vault in production but inside tmp here) and
+    # assert the raw body marker persisted nowhere.
+    offenders = [
+        f for f in root.rglob("*")
+        if f.is_file()
+        and "trove" not in f.parts
+        and RAW_BODY_MARKER in f.read_text(encoding="utf-8", errors="ignore")
+    ]
+    assert offenders == []
+
+
+def test_sentinel_answer_is_not_persisted(tmp_path, monkeypatch):
+    fb, root, request_path = _persist_env(tmp_path, monkeypatch)
+    _fake_provider(
+        monkeypatch, fb,
+        "NOT ANSWERED IN THIS FILE\nIt is a phone contract, not a tax doc.",
+    )
+    res = fb.process_request(request_path, dry_run=False)
+    assert res.success is False
+    assert "not_answered" in (res.error or "")
+    assert not (root / "raw" / "notes" / "folder").exists()
+    req = json.loads(request_path.read_text(encoding="utf-8"))
+    assert req["status"] == "pending"  # untouched — retarget/quarantine is T03
+
+
+def test_provider_error_leaves_request_untouched(tmp_path, monkeypatch):
+    fb, root, request_path = _persist_env(tmp_path, monkeypatch)
+    _fake_provider(monkeypatch, fb, "", error="empty_result")
+    before = request_path.read_text(encoding="utf-8")
+    res = fb.process_request(request_path, dry_run=False)
+    assert res.success is False
+    assert res.error == "empty_result"
+    assert request_path.read_text(encoding="utf-8") == before
+    assert not (root / "raw" / "notes" / "folder").exists()
 
 
 def test_real_prompt_template_renders_with_t01_kwargs():
