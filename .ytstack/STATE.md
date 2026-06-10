@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-06-11T00:50:00+0200
+last_updated: 2026-06-11T01:35:00+0200
 current_milestone: M027
-active_slice: S05
-active_task: T03
+active_slice: none
+active_task: none
 last_completed_milestone: M026
 parked_milestone: M025
 parallel_milestones: [M021]
@@ -12,14 +12,20 @@ parallel_milestones: [M021]
 
 # State
 
-**Status:** M027 — slice S04 complete, **roadmap reassessed (outcome A,
-2026-06-10): S05–S06 unchanged** (4/6 slices done). Next slice: **S05**
-(compile-fold) — pre-marked "likely lighter" CONFIRMED by S04 reality:
-answers in `raw/notes/folder/` are normal compile sources, so S05 =
-verify compile consumes them (substrate dispatch for `type: note` under
-raw/notes/), optional `sensitivity:` tag (Q3, decide there), and exit
-criterion #6 live on lxw (folder-derived fact in `knowledge/`, trove-
-topic query returns it). **T01 SHIPPED** (commit `c6922f6`,
+**Status:** ✅ **M027 / S05 COMPLETE — 3/3, EXIT CRITERION #6 LIVE**
+(suite **1272 green +1 gated**). Live on lxw: consented Hetzner-invoice
+read → answer artifact (sensitivity stamped) → compile → fact in
+`projects/yesterday-ai-cloud.md` with provenance → `wiki query` returns
+it cross-linked to the narrative layer. T03 found+fixed 2 real bugs:
+(1) compile_main "not trivial facts" bar dismissed the requested fact →
+rule 12 exemption; (2) `type: note` silently rides compile_default →
+dedicated `type: folder-answer` + SUBSTRATE_PROMPTS entry
+(compile_main @ haiku, 20 turns). KNOWLEDGE entry written. Design
+finding: article-level sensitivity carry on mixed-source articles is
+ill-defined — artifact stamp + per-fact provenance is the honest
+carrier (revisit with financial-fact-layer consumer). **Next:
+`/ytstack:reassess-roadmap`** — only S06 (NAS/SMB + out-of-sandbox
+reader + scheduler) remains in M027. **T01 SHIPPED** (commit `c6922f6`,
 `M027-S05-T01-SUMMARY.md`): chain already existed — pinned selection
 (`list_raw_files`) + routing-parity vs email deep-scans, added
 human-readable `as_of: YYYY-MM-DD` to answer frontmatter. Suite **1263
