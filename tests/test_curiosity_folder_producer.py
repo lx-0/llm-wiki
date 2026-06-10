@@ -427,6 +427,80 @@ def test_done_request_is_never_redispatched(tmp_path, monkeypatch):
     assert request_path.read_text(encoding="utf-8") == before
 
 
+# --- S04-T05: informed-consent walk card -----------------------------------
+
+
+def _card_env(tmp_path, monkeypatch, create_file=True):
+    trove = tmp_path / "trove" / "11 Steuern"
+    trove.mkdir(parents=True)
+    if create_file:
+        (trove / "Steuerbescheid-2024.pdf").write_text("x", encoding="utf-8")
+    monkeypatch.setattr(
+        CONFIG.personal,
+        "watched_folders",
+        [{"id": "docs", "kind": "local", "path": str(tmp_path / "trove")}],
+    )
+
+
+def test_walk_card_folder_request_shows_informed_consent(
+    tmp_path, monkeypatch, capsys
+):
+    import curiosity.cli as cli
+
+    _card_env(tmp_path, monkeypatch)
+    r = json.loads(_request_file(tmp_path).read_text(encoding="utf-8"))
+    cli._print_request_card(1, 1, tmp_path / "request-x.json", r)
+    out = capsys.readouterr().out
+    # file + confidence
+    assert "docs/11 Steuern/Steuerbescheid-2024.pdf" in out
+    assert "confidence 5/5" in out
+    # resolved absolute path + staleness marker
+    assert str(tmp_path / "trove" / "11 Steuern" / "Steuerbescheid-2024.pdf") in out
+    assert "exists" in out
+    # the consent line: what gets loaded, sent WHERE, to answer WHAT
+    assert "LOAD this file" in out
+    assert "claude-sdk" in out
+    assert "Steuerbescheid 2024" in out  # the topic
+    assert "Why this file:" in out
+    # no email-card leftovers
+    assert "Account" not in out
+
+
+def test_walk_card_folder_request_marks_missing_file(
+    tmp_path, monkeypatch, capsys
+):
+    import curiosity.cli as cli
+
+    _card_env(tmp_path, monkeypatch, create_file=False)
+    r = json.loads(_request_file(tmp_path).read_text(encoding="utf-8"))
+    cli._print_request_card(1, 1, tmp_path / "request-x.json", r)
+    out = capsys.readouterr().out
+    assert "MISSING" in out  # informed staleness BEFORE approving
+
+
+def test_walk_card_email_request_unchanged(tmp_path, capsys):
+    import curiosity.cli as cli
+
+    r = {
+        "type": "email-deep-scan",
+        "status": "pending",
+        "topic": "ProjectX delivery timeline",
+        "folder": "INBOX/Work",
+        "folder_confidence": 4,
+        "account": "kasserver",
+        "source": "raw/notes/note.md",
+        "created": "2026-06-10T20:00:00+00:00",
+        "model": "llama3.1:8b",
+        "source_quote": "the delivery slipped",
+        "rationale": "Work folder holds the thread.",
+    }
+    cli._print_request_card(1, 1, tmp_path / "request-email.json", r)
+    out = capsys.readouterr().out
+    assert "Folder      : INBOX/Work" in out
+    assert "Account     : kasserver" in out
+    assert "LOAD this file" not in out  # consent line is folder-only
+
+
 def test_real_prompt_template_renders_with_t01_kwargs():
     """T02: the actual prompts/compile_curiosity_folder.md must render with
     exactly the kwargs the producer passes — no missing/unresolved vars."""

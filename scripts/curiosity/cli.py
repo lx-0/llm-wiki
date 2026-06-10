@@ -25,6 +25,7 @@ from typing import NoReturn
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from core.config import CONFIG
 from core.console import read_key
 from core.paths import ROOT_DIR
 from core.utils import now_iso
@@ -163,13 +164,21 @@ def _run_batch(n: int, *, dry_run: bool) -> NoReturn:
 
 
 def _print_request_card(idx: int, total: int, path: Path, r: dict) -> None:
-    """Pretty-print one pending request for the walk prompt."""
+    """Pretty-print one pending request for the walk prompt.
+
+    For `folder-deep-scan` requests the card IS the content/cloud gate UX
+    (DECISIONS 2026-06-07): it states which file will be loaded and which
+    provider its content goes to, so the operator's accept is informed.
+    """
     bar = "─" * 78
     print()
     print(bar)
     print(f"  [{idx}/{total}]  {path.name}")
     print(bar)
     print(f"  Topic       : {r.get('topic', '?')}")
+    if r.get("type") == "folder-deep-scan":
+        _print_folder_card_body(r)
+        return
     print(f"  Folder      : {r.get('folder', '?')}   (confidence {r.get('folder_confidence', '?')}/5)")
     print(f"  Account     : {r.get('account', '?')}")
     print(f"  Source      : {r.get('source', '?')}")
@@ -185,6 +194,34 @@ def _print_request_card(idx: int, total: int, path: Path, r: dict) -> None:
     if rationale:
         print()
         print("  Why this folder:")
+        for line in rationale.splitlines() or [rationale]:
+            print(f"    {line}")
+    print()
+
+
+def _print_folder_card_body(r: dict) -> None:
+    """folder-deep-scan card body — the informed-consent gate."""
+    root_id = r.get("root_id", "?")
+    file_path = r.get("file_path", "?")
+    print(f"  File        : {root_id}/{file_path}   "
+          f"(confidence {r.get('file_confidence', '?')}/5)")
+    candidate = folder_backend._resolve(root_id, file_path)
+    if candidate is not None:
+        marker = "exists" if candidate.exists() else "MISSING — stale index?"
+        print(f"  Resolves to : {candidate}   ({marker})")
+    else:
+        print(f"  Resolves to : (root {root_id!r} not in personal.watched_folders)")
+    print(f"  Source      : {r.get('source', '?')}")
+    print(f"  Created     : {r.get('created', '?')}")
+    print()
+    provider = CONFIG.models.folder_scan_provider
+    print(f"  ⚠ Accept will LOAD this file and send its content to "
+          f"'{provider}'")
+    print(f"    to answer: \"{r.get('topic', '?')}\"")
+    rationale = (r.get("rationale") or "").strip()
+    if rationale:
+        print()
+        print("  Why this file:")
         for line in rationale.splitlines() or [rationale]:
             print(f"    {line}")
     print()
