@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-06-10T18:30:00+0200
+last_updated: 2026-06-10T18:50:00+0200
 current_milestone: M027
 active_slice: S03
-active_task: T02
+active_task: none
 last_completed_milestone: M026
 parked_milestone: M025
 parallel_milestones: [M021]
@@ -20,12 +20,16 @@ confidence knob, requests as `type: folder-deep-scan` JSONs. Digest
 amendment live on lxw: full rel_paths + created/modified per file line
 (operator mid-task request; ctime=st_birthtime, NOT in delta signature;
 caveat: created = LOCAL birthtime, sync tools reset it). Suite **1237
-green**. Producer not yet wired (registration + dispatch = T03,
-fixture-integration tests = T04). **T02 planned** (`M027-S03-T02-PLAN.md`):
-`prompts/compile_curiosity_folder.md` sibling of compile_curiosity.md —
-metadata-only honesty rules, verbatim-path contract, adapted 1-5
-confidence scale; + render-smoke test against the real template.
-Execute T02 next. S03 carries: producer consumes the `raw/index/` digest
+green**. **T02 SHIPPED** (commit `aff144a`, `M027-S03-T02-SUMMARY.md`):
+`prompts/compile_curiosity_folder.md` — metadata-only honesty rules,
+verbatim-path contract (anchor spelled out to the model), T01-schema JSON
+contract, folder-adapted confidence scale, created-sync caveat,
+abstention-preferred; render-smoke test pins the kwargs. Suite **1238
+green**. Prompt QUALITY vs the real local LLM deliberately unverified
+until T03 wires the producer (Q7 tuning loop expected). 2/4 done. Next:
+`/ytstack:plan-task` for **S03-T03** (`producers/folder_curiosity.py`
+registration + `producers/__init__.py` import + `_dispatch` branch in
+`curiosity/cli.py`). S03 carries: producer consumes the `raw/index/` digest
 (in-context delivery = open Q6, scheduling is S06); reuse email producer
 scaffold + `_dispatch` seam; expect weak filename-signal precision (Q7
 confidence gate). ✅ **lxw E2E DONE 2026-06-10:** 2 watched_folders
