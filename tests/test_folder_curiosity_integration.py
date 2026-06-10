@@ -126,6 +126,83 @@ def test_confidence_gate_over_real_chain(vault, monkeypatch):
     assert _requests(root) == []
 
 
+def test_answer_artifact_is_compile_candidate_and_routes_like_email(
+    tmp_path, monkeypatch
+):
+    """S05-T01 pins: a persisted folder answer (a) appears in compile's
+    candidate list (`list_raw_files` walks raw/) and (b) routes through
+    the SAME dispatch lane as the proven email deep-scans — parity-
+    asserted, so a future dedicated `note` dispatch forces a conscious
+    folder decision."""
+    from curiosity.backends import folder as fb
+    from curiosity.backends.folder_providers import ScanAnswer
+
+    # persist a real answer via the real backend (provider stubbed)
+    trove = tmp_path / "trove" / "11 Steuern"
+    trove.mkdir(parents=True)
+    (trove / "Steuerbescheid-2024.pdf").write_text("x", encoding="utf-8")
+    monkeypatch.setattr(
+        CONFIG.personal,
+        "watched_folders",
+        [{"id": "docs", "kind": "local", "path": str(tmp_path / "trove")}],
+    )
+    monkeypatch.setattr(fb, "ROOT_DIR", tmp_path)
+    monkeypatch.setattr(fb, "ANSWER_DIR", tmp_path / "raw" / "notes" / "folder")
+
+    class _Stub:
+        async def answer(self, *, topic, rationale, file_abs, file_rel):
+            return ScanAnswer(
+                answer_md="## Answer\n\ndistilled",
+                file_path=file_rel,
+                as_of_mtime=file_abs.stat().st_mtime,
+            )
+
+    monkeypatch.setattr(fb, "get_provider", lambda: _Stub())
+    request_path = tmp_path / "request-steuer-2026-06-10.json"
+    request_path.write_text(
+        json.dumps({
+            "type": "folder-deep-scan", "status": "pending",
+            "root_id": "docs",
+            "file_path": "11 Steuern/Steuerbescheid-2024.pdf",
+            "file_confidence": 5, "topic": "Steuerbescheid 2024",
+            "rationale": "r", "source": "raw/notes/note.md",
+            "created": "2026-06-10T20:00:00+00:00",
+        }, indent=2),
+        encoding="utf-8",
+    )
+    assert fb.process_request(request_path, dry_run=False).success is True
+    answer_path = tmp_path / "raw" / "notes" / "folder" / "answer-steuer-2026-06-10.md"
+    assert answer_path.exists()
+
+    # (a) selection pin — compile's walker lists the artifact
+    import core.utils as cu
+
+    monkeypatch.setattr(cu, "RAW_DIR", tmp_path / "raw")
+    monkeypatch.setattr(cu, "DAILY_DIR", tmp_path / "daily")
+    assert answer_path in cu.list_raw_files()
+
+    # (b) routing-parity pin — same lane as email deep-scans
+    from pathlib import Path as P
+
+    from compile_stages.route import Compile, decide_route
+
+    answer_route = decide_route(
+        P("raw/notes/folder") / answer_path.name,
+        answer_path.read_text(encoding="utf-8"),
+    )
+    email_route = decide_route(
+        P("raw/notes/email/deep-projectx-2026-06-10.md"),
+        "---\ntype: note\nkind: email-deep-scan\ntopic: \"x\"\n---\n\nbody",
+    )
+    assert isinstance(answer_route, Compile)
+    assert isinstance(email_route, Compile)
+    assert (
+        answer_route.metadata.substrate_prompt
+        == email_route.metadata.substrate_prompt
+    )
+    assert answer_route.metadata.model_id == email_route.metadata.model_id
+
+
 def test_e2e_dispatch_dry_run_and_stale_file_branch(vault, monkeypatch, caplog):
     root, trove, src = vault
     _run_with_gaps(monkeypatch, src, [GAP])

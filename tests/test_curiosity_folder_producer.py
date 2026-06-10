@@ -308,6 +308,9 @@ def test_persist_answer_only_and_flip_request(tmp_path, monkeypatch):
     text = answer.read_text(encoding="utf-8")
     assert "kind: folder-deep-scan" in text
     assert "as_of_mtime: 1234.5" in text
+    # human-readable date next to the float (S05-T01): the compile agent
+    # and the operator read a date, the staleness machinery keeps the float
+    assert "as_of: 1970-01-01" in text  # 1234.5 epoch -> 1970-01-01 UTC
     assert "Final amount: 1234 EUR" in text
 
     req = json.loads(request_path.read_text(encoding="utf-8"))
