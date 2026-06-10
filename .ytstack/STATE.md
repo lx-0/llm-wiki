@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-06-10T16:05:00+0200
+last_updated: 2026-06-10T16:15:00+0200
 current_milestone: M027
 active_slice: S02
-active_task: none
+active_task: T04
 last_completed_milestone: M026
 parked_milestone: M025
 parallel_milestones: [M021]
@@ -12,7 +12,13 @@ parallel_milestones: [M021]
 
 # State
 
-**Status:** M027 / S02 -- 3/4 tasks done. **T03 SHIPPED** (commit `7d03314`,
+**Status:** M027 / S02 / T04 planned -- ready to execute
+(`M027-S02-T04-PLAN.md`: `wiki index` verb → `folder_index.main()`;
+3 Limits knobs `folder_index_{max_depth,recent_n,max_tree_entries}` =
+4/20/500 + KEY_ADDITIONS migration same-commit; smb entries INFO-skipped
+until S06; fail-soft per root, exit 1 if any failed). LAST task in S02 —
+after closing run `/ytstack:reassess-roadmap`. 3/4 done. **T03 SHIPPED**
+(commit `7d03314`,
 `M027-S02-T03-SUMMARY.md`): delta-skip (`index_signature` modulo
 frontmatter, side-state `state/folder-index.json`, `sync_root` with
 force/deleted-digest re-write, fail-soft state) + compile-skip
