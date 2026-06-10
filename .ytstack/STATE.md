@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-06-10T18:20:00+0200
+last_updated: 2026-06-10T18:30:00+0200
 current_milestone: M027
 active_slice: S03
-active_task: none
+active_task: T02
 last_completed_milestone: M026
 parked_milestone: M025
 parallel_milestones: [M021]
@@ -20,11 +20,12 @@ confidence knob, requests as `type: folder-deep-scan` JSONs. Digest
 amendment live on lxw: full rel_paths + created/modified per file line
 (operator mid-task request; ctime=st_birthtime, NOT in delta signature;
 caveat: created = LOCAL birthtime, sync tools reset it). Suite **1237
-green**. Producer not yet wired (render template = T02, registration +
-dispatch = T03, fixture-integration tests = T04). Next:
-`/ytstack:plan-task` for **S03-T02** (prompt
-`compile_curiosity_folder.md` — render() kwargs already live:
-source_path/source_content/folder_digests/timestamp). S03 carries: producer consumes the `raw/index/` digest
+green**. Producer not yet wired (registration + dispatch = T03,
+fixture-integration tests = T04). **T02 planned** (`M027-S03-T02-PLAN.md`):
+`prompts/compile_curiosity_folder.md` sibling of compile_curiosity.md —
+metadata-only honesty rules, verbatim-path contract, adapted 1-5
+confidence scale; + render-smoke test against the real template.
+Execute T02 next. S03 carries: producer consumes the `raw/index/` digest
 (in-context delivery = open Q6, scheduling is S06); reuse email producer
 scaffold + `_dispatch` seam; expect weak filename-signal precision (Q7
 confidence gate). ✅ **lxw E2E DONE 2026-06-10:** 2 watched_folders
