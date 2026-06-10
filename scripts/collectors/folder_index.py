@@ -21,18 +21,26 @@ Hard invariants:
   that entry and increments `counts["errors"]`; a nonexistent root
   raises ValueError (caller's config problem, loud).
 
-Scope: walker + data model ONLY. Rendering/writing is T02, delta logic
-T03, CLI/registry wiring (incl. lifting `max_depth`/`recent_n` to config
-knobs + migration) is T04.
+Scope: walker + data model (T01) + digest render/write to
+`raw/index/<root-id>.md` (T02). Delta logic is T03; CLI/registry wiring
+(incl. lifting `max_depth`/`recent_n`/`max_tree_entries` to config knobs +
+migration, and the `folder-index` compile-skip entry) is T03/T04.
 """
 
 from __future__ import annotations
 
+import json
 import os
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from fnmatch import fnmatch
 from pathlib import Path
+
+from core.paths import RAW_DIR
+
+# One MD digest per watched root (single consumer: the S03 producer).
+# Local convention, sibling of curiosity/backends/email.py's DEEP_SCAN_DIR.
+INDEX_DIR = RAW_DIR / "index"
 
 
 @dataclass
@@ -159,3 +167,78 @@ def walk_root(entry: dict, *, max_depth: int, recent_n: int) -> FolderIndex:
         counts=counts,
         generated_at=datetime.now(timezone.utc),
     )
+
+
+def _human_size(size: int | None) -> str:
+    if size is None:
+        return ""
+    value = float(size)
+    for unit in ("B", "KB", "MB", "GB", "TB"):
+        if value < 1024 or unit == "TB":
+            return f"{int(value)} {unit}" if unit == "B" else f"{value:.1f} {unit}"
+        value /= 1024
+    return f"{int(size)} B"  # pragma: no cover - unreachable
+
+
+def _mtime_date(mtime: float) -> str:
+    return datetime.fromtimestamp(mtime, tz=timezone.utc).strftime("%Y-%m-%d")
+
+
+def render_index(index: FolderIndex, *, max_tree_entries: int) -> str:
+    """Render one FolderIndex as the markdown digest the producer consumes.
+
+    Pure function of the dataclass — same index in, byte-same markdown out
+    (T03's delta-skip compares content; note `generated_at` varies per walk,
+    so T03 must hash modulo frontmatter or reuse walk-level signals).
+    Names land verbatim — unmasked per DECISIONS 2026-06-07.
+    """
+    truncated = len(index.tree) > max_tree_entries
+    lines: list[str] = []
+    lines.append("---")
+    lines.append("type: folder-index")
+    lines.append(f"root_id: {index.root_id}")
+    lines.append(f"root_path: {json.dumps(index.root_path, ensure_ascii=False)}")
+    lines.append(f'generated_at: "{index.generated_at.isoformat()}"')
+    for key in ("files", "dirs", "skipped_excluded", "skipped_depth", "errors"):
+        lines.append(f"{key}: {index.counts.get(key, 0)}")
+    lines.append(f"truncated: {'true' if truncated else 'false'}")
+    lines.append("---")
+    lines.append("")
+    lines.append(f"# Folder index — {index.root_id}")
+    lines.append("")
+    lines.append(
+        f"**Root:** `{index.root_path}` · {index.counts.get('files', 0)} files · "
+        f"{index.counts.get('dirs', 0)} dirs · {index.counts.get('errors', 0)} errors"
+    )
+    lines.append("")
+    lines.append("## Recent changes")
+    lines.append("")
+    if index.recent:
+        for e in index.recent:
+            lines.append(
+                f"- `{e.rel_path}` — {_mtime_date(e.mtime)} · {_human_size(e.size)}"
+            )
+    else:
+        lines.append("_No files._")
+    lines.append("")
+    lines.append("## Tree")
+    lines.append("")
+    for e in index.tree[:max_tree_entries]:
+        depth = e.rel_path.count(os.sep)
+        name = os.path.basename(e.rel_path)
+        suffix = "/" if e.is_dir else f" · {_human_size(e.size)}"
+        lines.append(f"{'  ' * depth}- `{name}`{suffix}")
+    if truncated:
+        omitted = len(index.tree) - max_tree_entries
+        lines.append("")
+        lines.append(f"_… {omitted} more entries omitted (size cap)_")
+    return "\n".join(lines) + "\n"
+
+
+def write_index(index: FolderIndex, *, max_tree_entries: int) -> Path:
+    """Render and write the digest to `raw/index/<root-id>.md` (overwrite)."""
+    INDEX_DIR.mkdir(parents=True, exist_ok=True)
+    path = INDEX_DIR / f"{index.root_id}.md"
+    path.write_text(render_index(index, max_tree_entries=max_tree_entries),
+                    encoding="utf-8")
+    return path

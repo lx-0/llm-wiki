@@ -17,7 +17,8 @@ import unicodedata
 
 import pytest
 
-from collectors.folder_index import walk_root
+import collectors.folder_index as folder_index
+from collectors.folder_index import render_index, walk_root, write_index
 
 
 def _entry(root, **kw):
@@ -168,3 +169,64 @@ def test_filenames_land_unmasked(tree):
 def test_nonexistent_root_raises_value_error(tmp_path):
     with pytest.raises(ValueError):
         walk_root(_entry(tmp_path / "does-not-exist"), max_depth=2, recent_n=5)
+
+
+# --- T02: render + write -------------------------------------------------
+
+
+def test_render_index_frontmatter_and_sections(tree):
+    idx = walk_root(_entry(tree), max_depth=10, recent_n=3)
+    out = render_index(idx, max_tree_entries=1000)
+    assert out.startswith("---\n")
+    assert "type: folder-index" in out
+    assert "root_id: test-root" in out
+    assert "truncated: false" in out
+    # counts flattened into frontmatter
+    assert f"files: {idx.counts['files']}" in out
+    assert f"errors: {idx.counts['errors']}" in out
+    assert "## Recent changes" in out
+    assert "## Tree" in out
+    # a recent line carries the backticked rel_path
+    recent_section = out.split("## Recent changes", 1)[1].split("## Tree", 1)[0]
+    assert "`" in recent_section
+    assert len(idx.recent) == 3
+
+
+def test_render_index_deterministic(tree):
+    idx = walk_root(_entry(tree), max_depth=10, recent_n=3)
+    assert render_index(idx, max_tree_entries=50) == render_index(
+        idx, max_tree_entries=50
+    )
+
+
+def test_render_index_tree_size_cap(tree):
+    idx = walk_root(_entry(tree), max_depth=10, recent_n=3)
+    total = len(idx.tree)  # fixture: 5 dirs + 8 files = 13
+    assert total == 13
+    out = render_index(idx, max_tree_entries=3)
+    assert "truncated: true" in out
+    assert f"{total - 3} more entries omitted" in out
+    # recent section unaffected by the tree cap
+    recent_section = out.split("## Recent changes", 1)[1].split("## Tree", 1)[0]
+    assert recent_section.count("- `") == 3
+
+
+def test_render_index_names_unmasked(tree):
+    idx = walk_root(_entry(tree), max_depth=10, recent_n=3)
+    out = unicodedata.normalize("NFC", render_index(idx, max_tree_entries=1000))
+    assert "ümlaut file ä.txt" in out
+    assert ".dotfile" in out
+
+
+def test_write_index_one_digest_per_root(tree, tmp_path, monkeypatch):
+    index_dir = tmp_path / "raw-index"
+    monkeypatch.setattr(folder_index, "INDEX_DIR", index_dir)
+    idx = walk_root(_entry(tree), max_depth=10, recent_n=3)
+    path = write_index(idx, max_tree_entries=1000)
+    assert path == index_dir / "test-root.md"
+    assert path.read_text(encoding="utf-8") == render_index(
+        idx, max_tree_entries=1000
+    )
+    # re-write overwrites: still exactly one digest for this root
+    write_index(idx, max_tree_entries=1000)
+    assert [p.name for p in index_dir.iterdir()] == ["test-root.md"]
