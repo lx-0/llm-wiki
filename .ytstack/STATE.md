@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-06-10T18:50:00+0200
+last_updated: 2026-06-10T19:00:00+0200
 current_milestone: M027
 active_slice: S03
-active_task: none
+active_task: T03
 last_completed_milestone: M026
 parked_milestone: M025
 parallel_milestones: [M021]
@@ -26,10 +26,12 @@ verbatim-path contract (anchor spelled out to the model), T01-schema JSON
 contract, folder-adapted confidence scale, created-sync caveat,
 abstention-preferred; render-smoke test pins the kwargs. Suite **1238
 green**. Prompt QUALITY vs the real local LLM deliberately unverified
-until T03 wires the producer (Q7 tuning loop expected). 2/4 done. Next:
-`/ytstack:plan-task` for **S03-T03** (`producers/folder_curiosity.py`
-registration + `producers/__init__.py` import + `_dispatch` branch in
-`curiosity/cli.py`). S03 carries: producer consumes the `raw/index/` digest
+until T03 wires the producer (Q7 tuning loop expected). 2/4 done.
+**T03 planned** (`M027-S03-T03-PLAN.md`): backends/folder.py SKELETON
+(dry-run shows would-be read + informed-consent line; real run = honest
+not-implemented, request stays pending, no mutation), `_dispatch`
+folder-deep-scan branch, FolderCuriosityProducer registration
+(failure-contract α, appended after takes). Execute T03 next. S03 carries: producer consumes the `raw/index/` digest
 (in-context delivery = open Q6, scheduling is S06); reuse email producer
 scaffold + `_dispatch` seam; expect weak filename-signal precision (Q7
 confidence gate). ✅ **lxw E2E DONE 2026-06-10:** 2 watched_folders
