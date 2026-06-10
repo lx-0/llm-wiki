@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-06-10T17:00:00+0200
+last_updated: 2026-06-10T17:40:00+0200
 current_milestone: M027
 active_slice: S03
-active_task: none
+active_task: T01
 last_completed_milestone: M026
 parked_milestone: M025
 parallel_milestones: [M021]
@@ -12,11 +12,14 @@ parallel_milestones: [M021]
 
 # State
 
-**Status:** M027 — slice S02 complete, **roadmap reassessed (outcome A,
-2026-06-10): S03–S06 unchanged**. Next slice: **S03** (curiosity producer
-emits `folder-deep-scan` with file-exists anchor + dispatch branch) —
-slice-plan `M027-S03-PLAN.md` exists from slicing; run `/ytstack:plan-task`
-for S03-T01. S03 carries: producer consumes the `raw/index/` digest
+**Status:** M027 / S03 / T01 planned -- ready to execute
+(`M027-S03-T01-PLAN.md`: `maybe_generate_folder_requests` sibling of the
+email pass — digest in-context with consumer-side budget-trim, schema
+{topic, root_id, file_path, file_confidence, rationale}, FILE-EXISTS
+anchor replaces source_quote, reused `curiosity_folder_confidence_min`
+knob, no migration; **prereq amendment:** digest tree lines become full
+rel_paths (grep-able + quotable). Prompt = T02, producers/-registration +
+dispatch = T03, fixture-integration tests = T04.) S03 carries: producer consumes the `raw/index/` digest
 (in-context delivery = open Q6, scheduling is S06); reuse email producer
 scaffold + `_dispatch` seam; expect weak filename-signal precision (Q7
 confidence gate). ✅ **lxw E2E DONE 2026-06-10:** 2 watched_folders
