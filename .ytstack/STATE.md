@@ -19,8 +19,12 @@ slice-plan `M027-S03-PLAN.md` exists from slicing; run `/ytstack:plan-task`
 for S03-T01. S03 carries: producer consumes the `raw/index/` digest
 (in-context delivery = open Q6, scheduling is S06); reuse email producer
 scaffold + `_dispatch` seam; expect weak filename-signal precision (Q7
-confidence gate). ⚠️ lxw E2E for S02 outstanding (`wiki update` +
-watched_folders entry + real `wiki index`). ✅ **M027 / S02 COMPLETE — 4/4 tasks** (one session, 2026-06-10,
+confidence gate). ✅ **lxw E2E DONE 2026-06-10:** operator ran `wiki update`
+(migration landed: 3 knobs + skip-list append), session configured 2
+watched_folders (`private-documents` 1770 files/257 dirs, `work-company`
+494/230, excludes .backup/.stfolder/*.DS_Store), `wiki index` wrote both
+digests (544 lines each, truncated:true — cap works), second run both
+`unchanged — skipped` (delta live), state/folder-index.json correct. ✅ **M027 / S02 COMPLETE — 4/4 tasks** (one session, 2026-06-10,
 commits `24d2134` T01 walker / `770c68f` T02 render+write / `7d03314` T03
 delta+compile-skip / `bacb1f3` T04 `wiki index` CLI+knobs; suite 1207 →
 **1230 green**). The body-blind folder-index collector is code-complete:
