@@ -1120,6 +1120,15 @@ def _validate_watched_folders_schema(personal_raw: dict) -> None:
             offenders.append(f"  - entry {label}: kind=local requires `path`")
         if kind == "smb" and not entry.get("share"):
             offenders.append(f"  - entry {label}: kind=smb requires `share`")
+        # Optional per-root sensitivity tag (M027-S05, Q3 full build):
+        # free operator vocabulary, stamped into answer artifacts and
+        # propagated by compile. Marking only — the walk is the gate.
+        sens = entry.get("sensitivity")
+        if sens is not None and (not isinstance(sens, str) or not sens.strip()):
+            offenders.append(
+                f"  - entry {label}: `sensitivity` must be a non-empty "
+                f"string when present, got {sens!r}"
+            )
     if not offenders:
         return
     raise ConfigError(

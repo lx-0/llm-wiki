@@ -628,6 +628,11 @@ personal:
   #       kind: local
   #       path: "~/Sync/Private/Documents"
   #       exclude: ["**/.git/**"]
+  #       # optional free-vocabulary tag, stamped into every answer
+  #       # artifact from this root and propagated by compile onto
+  #       # derived knowledge/ articles. Marking only — the per-request
+  #       # approval walk remains the content gate.
+  #       sensitivity: private
   #     - id:    nas-multimedia
   #       kind:  smb
   #       share: Multimedia

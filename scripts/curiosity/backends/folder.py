@@ -56,13 +56,21 @@ class RunResult:
     error: str | None = None
 
 
-def _resolve(root_id: str, file_path: str) -> Path | None:
-    """root_id → watched_folders entry → absolute candidate path."""
+def _resolve_entry(root_id: str) -> dict | None:
+    """root_id → its `personal.watched_folders` entry (local only)."""
     for entry in CONFIG.personal.watched_folders or []:
         if entry.get("id") == root_id and entry.get("kind") == "local":
-            root = Path(os.path.expanduser(str(entry.get("path") or "")))
-            return root / file_path
+            return entry
     return None
+
+
+def _resolve(root_id: str, file_path: str) -> Path | None:
+    """root_id → watched_folders entry → absolute candidate path."""
+    entry = _resolve_entry(root_id)
+    if entry is None:
+        return None
+    root = Path(os.path.expanduser(str(entry.get("path") or "")))
+    return root / file_path
 
 
 def process_request(request_path: Path, *, dry_run: bool) -> RunResult:
@@ -169,8 +177,10 @@ def process_request(request_path: Path, *, dry_run: bool) -> RunResult:
     ANSWER_DIR.mkdir(parents=True, exist_ok=True)
     slug = request_path.stem.removeprefix("request-")  # request-{slug}-{date}
     output_path = ANSWER_DIR / f"answer-{slug}.md"
+    entry = _resolve_entry(root_id) or {}
     output_path.write_text(
-        _render_answer(request, answer), encoding="utf-8"
+        _render_answer(request, answer, sensitivity=entry.get("sensitivity")),
+        encoding="utf-8",
     )
     log.info("  Wrote %s (answer-only, %d chars)",
              output_path, len(answer.answer_md))
@@ -209,7 +219,9 @@ def _mark_failed(
     return RunResult(success=False, error=error)
 
 
-def _render_answer(request: dict, answer: ScanAnswer) -> str:
+def _render_answer(
+    request: dict, answer: ScanAnswer, *, sensitivity: str | None = None
+) -> str:
     """Answer artifact — email-deep-scan shape + S04 provenance.
 
     A normal compile source: frontmatter provenance (incl. the as-of
@@ -234,6 +246,10 @@ def _render_answer(request: dict, answer: ScanAnswer) -> str:
     ).strftime("%Y-%m-%d")
     lines.append(f"as_of: {as_of_date}")
     lines.append(f"provider: {CONFIG.models.folder_scan_provider}")
+    if sensitivity:
+        # Q3 full build (2026-06-10): the root's tag travels with the
+        # answer; compile_main propagates it onto derived articles.
+        lines.append(f"sensitivity: {sensitivity}")
     lines.append('origin: "curiosity/folder-deep-scan"')
     lines.append(f"request_source: \"{request.get('source', '')}\"")
     lines.append(f"request_created: \"{request.get('created', '')}\"")

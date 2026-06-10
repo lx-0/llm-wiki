@@ -111,3 +111,36 @@ def test_load_accepts_valid_watched_folders(tmp_path: Path, monkeypatch: pytest.
     assert cfg.personal.watched_folders == [
         {"id": "docs", "kind": "local", "path": "~/Sync/Private"}
     ]
+
+def test_validate_accepts_optional_sensitivity_string():
+    """M027-S05-T02 (Q3 full build): optional per-root sensitivity tag."""
+    from core.config import _validate_watched_folders_schema
+
+    _validate_watched_folders_schema(
+        {
+            "watched_folders": [
+                {
+                    "id": "docs",
+                    "kind": "local",
+                    "path": "/p",
+                    "sensitivity": "private",
+                },
+            ]
+        }
+    )  # must not raise
+
+
+def test_validate_rejects_non_string_sensitivity():
+    import pytest
+
+    from core.config import ConfigError, _validate_watched_folders_schema
+
+    with pytest.raises(ConfigError) as exc:
+        _validate_watched_folders_schema(
+            {
+                "watched_folders": [
+                    {"id": "docs", "kind": "local", "path": "/p", "sensitivity": 5},
+                ]
+            }
+        )
+    assert "sensitivity" in str(exc.value)

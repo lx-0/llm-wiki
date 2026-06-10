@@ -318,6 +318,44 @@ def test_persist_answer_only_and_flip_request(tmp_path, monkeypatch):
     assert req["output"].endswith(answer.name)
 
 
+def test_sensitivity_stamped_into_answer_when_root_carries_it(
+    tmp_path, monkeypatch
+):
+    """Q3 full build: the root's sensitivity value travels into the answer
+    frontmatter; compile propagates it from there (prompt rule)."""
+    fb, root, request_path = _persist_env(tmp_path, monkeypatch)
+    monkeypatch.setattr(
+        CONFIG.personal,
+        "watched_folders",
+        [{
+            "id": "docs", "kind": "local",
+            "path": str(tmp_path / "trove"),
+            "sensitivity": "private",
+        }],
+    )
+    _fake_provider(monkeypatch, fb, "## Answer\n\ndistilled")
+    assert fb.process_request(request_path, dry_run=False).success is True
+    answer = next((root / "raw" / "notes" / "folder").glob("answer-*.md"))
+    assert "sensitivity: private" in answer.read_text(encoding="utf-8")
+
+
+def test_no_sensitivity_line_when_root_has_none(tmp_path, monkeypatch):
+    fb, root, request_path = _persist_env(tmp_path, monkeypatch)
+    _fake_provider(monkeypatch, fb, "## Answer\n\ndistilled")
+    assert fb.process_request(request_path, dry_run=False).success is True
+    answer = next((root / "raw" / "notes" / "folder").glob("answer-*.md"))
+    assert "sensitivity" not in answer.read_text(encoding="utf-8")
+
+
+def test_compile_main_prompt_carries_sensitivity_propagation_rule():
+    """The substrate-agnostic carry rule lives in the main compile prompt."""
+    prompt = (
+        __import__("pathlib").Path("prompts/compile_main.md")
+        .read_text(encoding="utf-8")
+    )
+    assert "sensitivity" in prompt
+
+
 def test_p2_no_raw_body_anywhere_under_the_vault(tmp_path, monkeypatch):
     fb, root, request_path = _persist_env(tmp_path, monkeypatch)
     _fake_provider(monkeypatch, fb, "## Answer\n\ndistilled only")

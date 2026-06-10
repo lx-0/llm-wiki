@@ -257,3 +257,5 @@ ${source_content}
      - Screenshot 2026-05-02 at 22.41.05.png
    ```
    This lets a reader jump from the article back to the original visual evidence: the batch report embeds each screenshot via Obsidian wikilink `![[thumb/<filename>.png]]` (384px preview that lives in `raw/notes/screenshots/thumb/`) and carries the per-screenshot raw vision response in a `<details>` block. The canonical analysis (full summary, key_text, raw response) lives next to the original PNG at `~/Screenshots/<filename>.md` — the filename in `source_screenshots:` is enough to locate either surface.
+
+11. **Sensitivity carry** — if the source's frontmatter carries a `sensitivity:` value (e.g. answers from the operator's watched folders), set the SAME `sensitivity:` frontmatter on every `knowledge/` article you create or update from this source. Do not invent a value when the source has none; do not remove an existing `sensitivity:` from an article when updating it from a non-sensitive source.
