@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-06-10T15:05:00+0200
+last_updated: 2026-06-10T15:20:00+0200
 current_milestone: M027
 active_slice: S02
-active_task: none
+active_task: T02
 last_completed_milestone: M026
 parked_milestone: M025
 parallel_milestones: [M021]
@@ -12,7 +12,11 @@ parallel_milestones: [M021]
 
 # State
 
-**Status:** M027 / S02 -- 1/4 tasks done. **T01 SHIPPED** (commit `24d2134`,
+**Status:** M027 / S02 / T02 planned -- ready to execute (`M027-S02-T02-PLAN.md`:
+`render_index`/`write_index` → `raw/index/<root-id>.md`, frontmatter
+`type: folder-index`, tree/recent sections, `max_tree_entries` cap +
+truncated-marker; compile-skip wiring deliberately deferred to T03 with the
+migration). 1/4 tasks done in slice. **T01 SHIPPED** (commit `24d2134`,
 `M027-S02-T01-SUMMARY.md`): body-blind folder-index walker
 `scripts/collectors/folder_index.py` (scandir+stat only, never open();
 `FolderIndex`/`IndexEntry`; depth cap + include/exclude fnmatch with
