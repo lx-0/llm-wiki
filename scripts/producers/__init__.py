@@ -25,11 +25,12 @@ from .base import (
 )
 
 # Import order = run order. Today's order matches the historical await
-# sequence in compile.py: suggestions → curiosity → takes. Each import
-# triggers @register at module load.
+# sequence in compile.py: suggestions → curiosity → takes; folder_curiosity
+# (M027-S03) appended last. Each import triggers @register at module load.
 from . import suggestions as _suggestions  # noqa: E402, F401
 from . import curiosity as _curiosity  # noqa: E402, F401
 from . import takes as _takes  # noqa: E402, F401
+from . import folder_curiosity as _folder_curiosity  # noqa: E402, F401
 
 __all__ = [
     "Producer",

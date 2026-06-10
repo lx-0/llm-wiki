@@ -162,6 +162,91 @@ def test_no_digests_skips_before_llm(env, monkeypatch):
     assert _requests(root) == []
 
 
+# --- T03: dispatch branch + registration + backend skeleton ---------------
+
+
+def _request_file(dir_path, name="request-steuerbescheid-2024-2026-06-10.json", **kw):
+    body = {
+        "type": "folder-deep-scan",
+        "status": "pending",
+        "root_id": "docs",
+        "file_path": "11 Steuern/Steuerbescheid-2024.pdf",
+        "file_confidence": 5,
+        "topic": "Steuerbescheid 2024",
+        "rationale": "The note asks questions the assessment PDF answers.",
+        "source": "raw/notes/note.md",
+        "created": "2026-06-10T12:00:00+00:00",
+    }
+    body.update(kw)
+    p = dir_path / name
+    p.write_text(json.dumps(body, indent=2), encoding="utf-8")
+    return p
+
+
+def test_folder_curiosity_producer_is_registered():
+    from producers import all_producers
+
+    names = [p.SPEC.name for p in all_producers()]
+    assert "folder_curiosity" in names
+
+
+def test_dispatch_routes_folder_deep_scan_to_folder_backend(tmp_path, monkeypatch):
+    import curiosity.cli as cli
+    from curiosity.backends import folder as folder_backend
+
+    called = {}
+
+    def _fake(request_path, *, dry_run):
+        called["path"] = request_path
+        called["dry_run"] = dry_run
+        return folder_backend.RunResult(success=True)
+
+    monkeypatch.setattr(cli.folder_backend, "process_request", _fake)
+    p = _request_file(tmp_path)
+    assert cli._dispatch(p, dry_run=True) is True
+    assert called == {"path": p, "dry_run": True}
+    # a genuinely unknown type still hits the unsupported error path
+    bogus = _request_file(tmp_path, name="request-bogus-2026-06-10.json",
+                          type="weird-scan")
+    assert cli._dispatch(bogus, dry_run=True) is False
+
+
+def test_skeleton_real_run_leaves_request_pending(tmp_path, monkeypatch):
+    from curiosity.backends import folder as folder_backend
+
+    monkeypatch.setattr(
+        CONFIG.personal,
+        "watched_folders",
+        [{"id": "docs", "kind": "local", "path": str(tmp_path / "trove")}],
+    )
+    p = _request_file(tmp_path)
+    before = p.read_text(encoding="utf-8")
+    res = folder_backend.process_request(p, dry_run=False)
+    assert res.success is False
+    assert "S04" in (res.error or "")
+    assert p.read_text(encoding="utf-8") == before  # untouched -> stays pending
+
+
+def test_skeleton_dry_run_resolves_path_and_reports_exists(tmp_path, monkeypatch):
+    from curiosity.backends import folder as folder_backend
+
+    target_dir = tmp_path / "trove" / "11 Steuern"
+    target_dir.mkdir(parents=True)
+    (target_dir / "Steuerbescheid-2024.pdf").write_text("x", encoding="utf-8")
+    monkeypatch.setattr(
+        CONFIG.personal,
+        "watched_folders",
+        [{"id": "docs", "kind": "local", "path": str(tmp_path / "trove")}],
+    )
+    p = _request_file(tmp_path)
+    res = folder_backend.process_request(p, dry_run=True)
+    assert res.success is True
+    # unknown root_id is a shape error even in dry-run
+    bad = _request_file(tmp_path, name="request-bad-root-2026-06-10.json",
+                        root_id="nope")
+    assert folder_backend.process_request(bad, dry_run=True).success is False
+
+
 def test_real_prompt_template_renders_with_t01_kwargs():
     """T02: the actual prompts/compile_curiosity_folder.md must render with
     exactly the kwargs the producer passes — no missing/unresolved vars."""

@@ -29,6 +29,7 @@ from core.console import read_key
 from core.paths import ROOT_DIR
 from core.utils import now_iso
 from curiosity.backends import email as email_backend
+from curiosity.backends import folder as folder_backend
 
 REQUESTS_DIR = ROOT_DIR / "raw" / "requests"
 
@@ -85,6 +86,9 @@ def _dispatch(request_path: Path, *, dry_run: bool) -> bool:
     kind = r.get("type")
     if kind == "email-deep-scan":
         result = email_backend.process_request(request_path, dry_run=dry_run)
+        return result.success
+    if kind == "folder-deep-scan":
+        result = folder_backend.process_request(request_path, dry_run=dry_run)
         return result.success
     log.error("Unsupported request type %r in %s — no backend wired", kind, request_path.name)
     return False
