@@ -1,9 +1,9 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-06-10T16:50:00+0200
+last_updated: 2026-06-10T17:00:00+0200
 current_milestone: M027
-active_slice: none
+active_slice: S03
 active_task: none
 last_completed_milestone: M026
 parked_milestone: M025
@@ -12,7 +12,15 @@ parallel_milestones: [M021]
 
 # State
 
-**Status:** ✅ **M027 / S02 COMPLETE — 4/4 tasks** (one session, 2026-06-10,
+**Status:** M027 — slice S02 complete, **roadmap reassessed (outcome A,
+2026-06-10): S03–S06 unchanged**. Next slice: **S03** (curiosity producer
+emits `folder-deep-scan` with file-exists anchor + dispatch branch) —
+slice-plan `M027-S03-PLAN.md` exists from slicing; run `/ytstack:plan-task`
+for S03-T01. S03 carries: producer consumes the `raw/index/` digest
+(in-context delivery = open Q6, scheduling is S06); reuse email producer
+scaffold + `_dispatch` seam; expect weak filename-signal precision (Q7
+confidence gate). ⚠️ lxw E2E for S02 outstanding (`wiki update` +
+watched_folders entry + real `wiki index`). ✅ **M027 / S02 COMPLETE — 4/4 tasks** (one session, 2026-06-10,
 commits `24d2134` T01 walker / `770c68f` T02 render+write / `7d03314` T03
 delta+compile-skip / `bacb1f3` T04 `wiki index` CLI+knobs; suite 1207 →
 **1230 green**). The body-blind folder-index collector is code-complete:

@@ -5,7 +5,7 @@ size: L
 created: 2026-06-07T12:21:47+0200
 status: planned
 total_slices: 6
-completed_slices: 1
+completed_slices: 2
 ---
 
 # M027 Roadmap
@@ -33,7 +33,7 @@ superseded -- see DECISIONS 2026-06-07; the human-approval walk is the content
 gate, so the index can be built freely and S01 is slimmed.)
 
 - [x] S01 -- Config + answer-landing contract: `watched_folders` schema + decide where the backend's distilled answer persists
-- [ ] S02 -- Body-blind folder-index collector for local roots -> sanitized delta-aware `raw/index/<root>.md`
+- [x] S02 -- Body-blind folder-index collector for local roots -> unmasked delta-aware `raw/index/<root>.md` (`wiki index`; "sanitized" wording superseded by DECISIONS 2026-06-07)
 - [ ] S03 -- Curiosity producer emits `folder-deep-scan` (file-exists anchor) + dispatch branch
 - [ ] S04 -- Folder-backend: read named local files in-place, persist answer-only (no raw body)
 - [ ] S05 -- Dream/compile fold folder-derived facts into `knowledge/` with sensitivity applied
