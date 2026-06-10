@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-06-10T21:05:00+0200
+last_updated: 2026-06-10T21:30:00+0200
 current_milestone: M027
 active_slice: S04
-active_task: T02
+active_task: none
 last_completed_milestone: M026
 parked_milestone: M025
 parallel_milestones: [M021]
@@ -12,8 +12,17 @@ parallel_milestones: [M021]
 
 # State
 
-**Status:** M027 / S04 -- 1/5 done; **T02 planned, executing**. **T01
-SHIPPED, Q9 CLOSED** (commit `221fb33`, `M027-S04-T01-SUMMARY.md`):
+**Status:** M027 / S04 -- 2/5 done. **T02 SHIPPED** (commit `f4051fd`,
+`M027-S04-T02-SUMMARY.md`): answer-only persistence live — provider →
+`raw/notes/folder/answer-<slug>.md` (provenance incl. as_of_mtime +
+provider), request flip to `done` (email symmetry), sentinel/error =
+persist nothing + request untouched, **P2 vault-sweep test-pinned**.
+Suite **1256 green**. Next: `/ytstack:plan-task` for **S04-T03**
+(failure/quarantine: explicit request states so failures don't
+re-dispatch forever — email `_mark_error` template — + staleness
+invalidation via as_of_mtime). Then T04 e2e (first LIVE SDK read),
+T05 walk card. **T01 SHIPPED, Q9 CLOSED** (commit `221fb33`,
+`M027-S04-T01-SUMMARY.md`):
 provider seam `backends/folder_providers.py` (`ScanAnswer` +
 `FolderScanProvider` + `get_provider()` over new knob
 `models.folder_scan_provider`, unknown → ConfigError, no fallback);
