@@ -179,6 +179,11 @@ KEY_ADDITIONS: dict[str, dict[str, object]] = {
         # no good prompt yet. folder-index added 2026-06-10 (M027-S02
         # body-blind watched-folder digests — metadata, nothing to distil).
         "compile_skip_substrate_types": ["email-delta", "folder-index"],
+        # Watched-folder index caps (M027-S02-T04, `wiki index`). Match
+        # Limits.folder_index_* defaults in scripts/core/config.py.
+        "folder_index_max_depth": 4,
+        "folder_index_recent_n": 20,
+        "folder_index_max_tree_entries": 500,
         # Email daily-rollup signal (beta, 2026-05-23). Top-N senders + sample
         # of recent subjects in the per-account daily/<date>/email.md block, so
         # the daily-digest agent extracts correspondents + themes. Match

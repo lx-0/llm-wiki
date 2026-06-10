@@ -159,11 +159,13 @@ def test_migrate_config_file_round_trip(tmp_path):
     # +1 features.dream_require_entity_substrate (dream no-op skip), 2026-05-31
     # +1 scheduling.dream_insufficient_corpus_backoff_max_days (backoff), 2026-06-02
     # +1 personal.watched_folders (M027 watched-folder curiosity), 2026-06-07
-    # = 84 changes (no drops — operator has no orphan personal.* fields)
     # KEY_ADDITIONS injects the skip-list with BOTH defaults in one change;
     # the LIST_ADDITIONS extend is a no-op on greenfield (folder-index
     # already present), 2026-06-10 M027-S02-T03.
-    assert len(changes) == 84, f"got {len(changes)} changes: {changes}"
+    # +3 limits.folder_index_{max_depth,recent_n,max_tree_entries}
+    #    (M027-S02-T04 `wiki index` caps), 2026-06-10
+    # = 87 changes (no drops — operator has no orphan personal.* fields)
+    assert len(changes) == 87, f"got {len(changes)} changes: {changes}"
 
     reparsed = yaml.safe_load(new_text)
     # piggyback side
@@ -229,6 +231,9 @@ def test_migrate_config_no_change_when_fully_current(tmp_path):
             "compile_max_turns_long_context": 30,
             "compile_max_tokens_per_file": 500_000,
             "compile_skip_substrate_types": ["email-delta", "folder-index"],
+            "folder_index_max_depth": 4,
+            "folder_index_recent_n": 20,
+            "folder_index_max_tree_entries": 500,
             "daily_email_top_senders": 5,
             "daily_email_sample_subjects": 12,
             "flush_assistant_text_budget_chars": 50000,
@@ -388,6 +393,9 @@ def test_migrate_additions_idempotent():
             "compile_max_turns_long_context": 30,
             "compile_max_tokens_per_file": 500_000,
             "compile_skip_substrate_types": ["calendar-rollup"],
+            "folder_index_max_depth": 4,
+            "folder_index_recent_n": 20,
+            "folder_index_max_tree_entries": 500,
             "daily_email_top_senders": 5,
             "daily_email_sample_subjects": 12,
             "flush_assistant_text_budget_chars": 50000,

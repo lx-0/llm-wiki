@@ -31,6 +31,8 @@
 #   wiki skills status         per-skill linked/collision/missing table + global state
 #   wiki collect --list        list registered Collectors
 #   wiki collect <name>        run one Collector (--dry-run | --incremental | --account ID)
+#   wiki index                 body-blind folder-index digests for watched local roots
+#   wiki index <root-id>       sync one watched_folders entry (--force re-writes unchanged)
 #   wiki gmail-auth <id>       OAuth bootstrap for a Gmail account-id (one-time)
 #   wiki gmeet-auth <id>       OAuth bootstrap for Google Meet transcripts (one-time)
 #   wiki calendar-auth <id>    OAuth bootstrap for Google Calendar events (one-time)
@@ -1323,6 +1325,36 @@ cmd_collect() {
   uv run --quiet --project "$WIKI_DIR" python "$WIKI_DIR/scripts/collectors/cli.py" "$@"
 }
 
+cmd_index() {
+  case "${1:-}" in
+    -h|--help|help)
+      cat <<EOF
+${C_BOLD}wiki index${C_RESET} — body-blind folder-index digests for watched local roots
+
+${C_BOLD}USAGE${C_RESET}
+  wiki index                 sync every kind=local personal.watched_folders entry
+  wiki index <root-id>       sync exactly one entry
+  wiki index --force         re-write digests even when the tree is unchanged
+
+${C_BOLD}WHAT IT DOES${C_RESET}
+  Walks each watched root WITHOUT reading any file body (scandir + stat
+  only) and writes one markdown digest per root to raw/index/<root-id>.md:
+  depth-capped tree + top-N recent changes, names unmasked. The curiosity
+  producer reads these digests to propose folder-deep-scans; content is
+  only ever loaded after per-request operator approval in the walk.
+  Unchanged trees are delta-skipped via state/folder-index.json. Digests
+  carry type: folder-index and are compile-skipped (nothing to distil).
+
+  Caps: limits.folder_index_max_depth / _recent_n / _max_tree_entries.
+  kind=smb (NAS) entries are skipped — NAS indexing lands in S06.
+EOF
+      return 0
+      ;;
+  esac
+  banner "wiki index"
+  uv run --quiet --project "$WIKI_DIR" python "$WIKI_DIR/scripts/collectors/folder_index.py" "$@"
+}
+
 help_produce() {
   cat <<EOF
 ${C_BOLD}wiki produce${C_RESET} — run a Producer (post-compile derivative-material extractor)
@@ -1733,6 +1765,7 @@ case "${1:-}" in
   hooks)            shift; cmd_hooks "$@" ;;
   skills)           shift; cmd_skills "$@" ;;
   collect)          shift; cmd_collect "$@" ;;
+  index)            shift; cmd_index "$@" ;;
   produce)          shift; cmd_produce "$@" ;;
   bridge)           shift; cmd_bridge "$@" ;;
   backfill)         shift; cmd_backfill "$@" ;;

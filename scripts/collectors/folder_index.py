@@ -29,15 +29,23 @@ migration, and the `folder-index` compile-skip entry) is T03/T04.
 
 from __future__ import annotations
 
+import argparse
 import hashlib
 import json
+import logging
 import os
+import sys
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from fnmatch import fnmatch
 from pathlib import Path
 
+if __package__ in (None, ""):  # direct execution via `wiki index`
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 from core.paths import RAW_DIR, STATE_DIR
+
+log = logging.getLogger(__name__)
 
 # One MD digest per watched root (single consumer: the S03 producer).
 # Local convention, sibling of curiosity/backends/email.py's DEEP_SCAN_DIR.
@@ -321,3 +329,75 @@ def sync_root(
     }
     _save_state(state)
     return SyncResult(written=True, path=path, reason=None, signature=signature)
+
+
+def main(argv: list[str] | None = None) -> int:
+    """`wiki index` entry-point — sync digests for watched local roots.
+
+    CONFIG is imported lazily so the walker stays importable without
+    config-load side effects (tests, future S03 producer use).
+    """
+    parser = argparse.ArgumentParser(
+        prog="wiki index",
+        description="Body-blind folder-index digests for personal.watched_folders.",
+    )
+    parser.add_argument(
+        "root_id", nargs="?", help="sync only this watched_folders entry"
+    )
+    parser.add_argument(
+        "--force", action="store_true", help="re-write even when unchanged"
+    )
+    args = parser.parse_args(argv)
+
+    from core.config import CONFIG
+
+    entries = list(CONFIG.personal.watched_folders or [])
+    local = [e for e in entries if e.get("kind") == "local"]
+    smb = [e for e in entries if e.get("kind") == "smb"]
+
+    if args.root_id:
+        if any(e.get("id") == args.root_id for e in smb):
+            log.error(
+                "root %r is kind=smb — NAS indexing lands in S06.", args.root_id
+            )
+            return 1
+        local = [e for e in local if e.get("id") == args.root_id]
+        if not local:
+            known = ", ".join(str(e.get("id")) for e in entries) or "(none)"
+            log.error("unknown watched_folders id %r — known: %s", args.root_id, known)
+            return 1
+        smb = []
+
+    for e in smb:
+        log.info("skipping %s (kind=smb — NAS indexing lands in S06)", e.get("id"))
+    if not local:
+        log.info(
+            "no kind=local watched_folders configured — add entries under "
+            "personal.watched_folders (see config.example.yaml)."
+        )
+        return 0
+
+    failed = 0
+    for e in local:
+        try:
+            result = sync_root(
+                e,
+                max_depth=CONFIG.limits.folder_index_max_depth,
+                recent_n=CONFIG.limits.folder_index_recent_n,
+                max_tree_entries=CONFIG.limits.folder_index_max_tree_entries,
+                force=args.force,
+            )
+        except (ValueError, OSError) as exc:
+            log.warning("root %s failed: %s", e.get("id"), exc)
+            failed += 1
+            continue
+        if result.written:
+            log.info("%s: written %s", e.get("id"), result.path)
+        else:
+            log.info("%s: unchanged — skipped", e.get("id"))
+    return 1 if failed else 0
+
+
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+    raise SystemExit(main())

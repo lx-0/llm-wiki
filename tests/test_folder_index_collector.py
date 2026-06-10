@@ -286,6 +286,93 @@ def test_sync_root_corrupt_state_fails_soft(tree, tmp_path, monkeypatch):
     assert result.written is True  # corrupt state -> full rebuild, no crash
 
 
+# --- T04: CLI entry (`wiki index`) ----------------------------------------
+
+
+def _patch_watched(monkeypatch, entries):
+    from core.config import CONFIG
+
+    monkeypatch.setattr(CONFIG.personal, "watched_folders", entries)
+
+
+def _second_tree(tmp_path):
+    root = tmp_path / "second"
+    root.mkdir()
+    (root / "f.txt").write_text("f")
+    return root
+
+
+def test_cli_syncs_local_roots_and_skips_smb(tree, tmp_path, monkeypatch):
+    index_dir, _ = _sync_env(monkeypatch, tmp_path)
+    second = _second_tree(tmp_path)
+    _patch_watched(
+        monkeypatch,
+        [
+            _entry(tree),
+            {"id": "second-root", "kind": "local", "path": str(second)},
+            {"id": "nas-docs", "kind": "smb", "share": "//nas1/docs"},
+        ],
+    )
+    assert folder_index.main([]) == 0
+    assert (index_dir / "test-root.md").exists()
+    assert (index_dir / "second-root.md").exists()
+    assert not (index_dir / "nas-docs.md").exists()  # smb deferred to S06
+    # second run takes the unchanged path and still exits 0
+    assert folder_index.main([]) == 0
+
+
+def test_cli_single_root_selection_and_unknown_id(tree, tmp_path, monkeypatch):
+    index_dir, _ = _sync_env(monkeypatch, tmp_path)
+    second = _second_tree(tmp_path)
+    _patch_watched(
+        monkeypatch,
+        [
+            _entry(tree),
+            {"id": "second-root", "kind": "local", "path": str(second)},
+        ],
+    )
+    assert folder_index.main(["second-root"]) == 0
+    assert (index_dir / "second-root.md").exists()
+    assert not (index_dir / "test-root.md").exists()
+    assert folder_index.main(["no-such-root"]) == 1
+
+
+def test_cli_force_rewrites_unchanged_tree(tree, tmp_path, monkeypatch):
+    import json
+
+    _, state_file = _sync_env(monkeypatch, tmp_path)
+    _patch_watched(monkeypatch, [_entry(tree)])
+    assert folder_index.main([]) == 0
+    before = json.loads(state_file.read_text(encoding="utf-8"))
+    assert folder_index.main(["--force"]) == 0
+    after = json.loads(state_file.read_text(encoding="utf-8"))
+    assert (
+        after["test-root"]["last_indexed_at"]
+        != before["test-root"]["last_indexed_at"]
+    )
+
+
+def test_cli_failing_root_fails_soft_but_exits_nonzero(
+    tree, tmp_path, monkeypatch
+):
+    index_dir, _ = _sync_env(monkeypatch, tmp_path)
+    _patch_watched(
+        monkeypatch,
+        [
+            {"id": "ghost", "kind": "local", "path": str(tmp_path / "missing")},
+            _entry(tree),
+        ],
+    )
+    assert folder_index.main([]) == 1  # one root failed
+    assert (index_dir / "test-root.md").exists()  # ...but the good one synced
+
+
+def test_cli_no_local_roots_is_friendly_noop(tmp_path, monkeypatch):
+    _sync_env(monkeypatch, tmp_path)
+    _patch_watched(monkeypatch, [])
+    assert folder_index.main([]) == 0
+
+
 def test_write_index_one_digest_per_root(tree, tmp_path, monkeypatch):
     index_dir = tmp_path / "raw-index"
     monkeypatch.setattr(folder_index, "INDEX_DIR", index_dir)
