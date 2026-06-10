@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-06-10T23:30:00+0200
+last_updated: 2026-06-10T23:55:00+0200
 current_milestone: M027
 active_slice: S05
-active_task: T01
+active_task: none
 last_completed_milestone: M026
 parked_milestone: M025
 parallel_milestones: [M021]
@@ -19,12 +19,14 @@ answers in `raw/notes/folder/` are normal compile sources, so S05 =
 verify compile consumes them (substrate dispatch for `type: note` under
 raw/notes/), optional `sensitivity:` tag (Q3, decide there), and exit
 criterion #6 live on lxw (folder-derived fact in `knowledge/`, trove-
-topic query returns it). **T01 planned** (`M027-S05-T01-PLAN.md`,
-compile-primary spec correction recorded): code-reality check showed the
-chain ALREADY works (list_raw_files walks raw/, type:note → email-deep-
-scan dispatch lane) — T01 = pin selection + routing-parity vs email
-deep-scans + add human-readable `as_of:` date to the answer frontmatter.
-Execute T01 next. T02 = Q3 sensitivity decision, T03 = lxw e2e (exit #6).
+topic query returns it). **T01 SHIPPED** (commit `c6922f6`,
+`M027-S05-T01-SUMMARY.md`): chain already existed — pinned selection
+(`list_raw_files`) + routing-parity vs email deep-scans, added
+human-readable `as_of: YYYY-MM-DD` to answer frontmatter. Suite **1263
+green +1 gated**. 1/3 done. Next: `/ytstack:plan-task` for **S05-T02** —
+the Q3 DECISION point (optional `sensitivity:` tag; CONTEXT says
+nice-to-have, plan must open with want-it-at-all). Then T03 lxw e2e
+(exit #6).
 ✅ **M027 / S04 COMPLETE — 5/5 tasks** (one session, 2026-06-10,
 commits `221fb33` T01 Q9-seam / `f4051fd` T02 persistence+P2 / `7650bd7`
 T03 quarantine / `ae60994` T04 LIVE e2e / `5f9e04d` T05 consent card;

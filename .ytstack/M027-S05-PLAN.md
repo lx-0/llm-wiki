@@ -5,7 +5,7 @@ project: llm-wiki
 created: 2026-06-07T12:21:47+0200
 status: planned
 task_count: 3
-completed_tasks: 0
+completed_tasks: 1
 ---
 
 # M027-S05 -- Slice Plan
@@ -16,7 +16,7 @@ fact -- not just the narrative layer.
 
 ## Tasks
 
-- [ ] T01 -- Wire the folder-scan answer artifacts into compile/dream synthesis per the S01 answer-landing contract; derived facts land in the right `knowledge/` article (entity page / fact node) with as-of dates.
+- [x] T01 -- Wire the folder-scan answer artifacts into compile/dream synthesis per the S01 answer-landing contract; derived facts land in the right `knowledge/` article (entity page / fact node) with as-of dates. (Chain already existed — pinned selection + email-dispatch parity, added human-readable `as_of:`; see T01-SUMMARY.)
 - [ ] T02 -- Apply the S01 derived-facts sensitivity policy at persist time (`sensitivity:` frontmatter; suppress what the policy excludes).
 - [ ] T03 -- e2e on an lxw-shaped fixture: a folder-scan answer becomes a `knowledge/` fact; a trove-topic query (e.g. via `wiki query`) returns the folder-sourced fact with provenance.
 
