@@ -18,6 +18,29 @@ every operator's `wiki update` → `uv sync` regenerate `uv.lock` and dirty thei
 config keys must also be wired into `scripts/migrations/migrate_config_keys.py`
 in the same commit.
 
+## [0.1.8] — 2026-06-10
+
+### Fixed
+
+- **Curiosity email-deep-scans returned 0 messages on every request** (761/761
+  on the reference vault since 2026-05-15, reports all `_No messages matched._`).
+  `ThunderbirdMboxReader._resolve_folder_alias` checked only the folder *head*
+  via `Path.exists()` across all mbox roots: a legacy POP root's bare `Inbox`
+  file satisfied the canonical-`INBOX` probe (case-insensitively on APFS) and
+  vetoed the `INBOX-N` alias resolution the 2026-05-16 fix introduced — silently,
+  since a zero-folder match is not an error. The resolver now checks the **full
+  Thunderbird path** (`head.sbd/…/leaf`) per root, **case-sensitively**
+  (`os.listdir` compare), for the canonical name and each `-N` candidate.
+  Recovery: re-run `scripts/migrations/cleanup_empty_deep_scans.py --apply`
+  after `wiki update` — it deletes the empty reports and resets the affected
+  requests to `pending`. Note: folders synced without offline bodies (`.msf`
+  only, no mbox) still legitimately yield 0.
+- **Deep-scans crashed on multipart messages with raw 8-bit
+  `Content-Disposition` headers** (`AttributeError: 'Header' object has no
+  attribute 'lower'`) — the email package's compat32 policy returns a `Header`
+  object instead of `str` for undecodable header bytes. Now coerced via `str()`
+  before matching; the affected scan survives instead of erroring the request.
+
 ## [0.1.7] — 2026-06-02
 
 ### Added
