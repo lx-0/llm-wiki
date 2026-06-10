@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-06-10T19:25:00+0200
+last_updated: 2026-06-10T19:35:00+0200
 current_milestone: M027
 active_slice: S03
-active_task: none
+active_task: T04
 last_completed_milestone: M026
 parked_milestone: M025
 parallel_milestones: [M021]
@@ -35,8 +35,10 @@ real run honest not-implemented, request stays pending untouched),
 ⚠️ lxw: next `wiki update` activates the producer on real compiles
 (llama3.1:8b, $0) — pending requests may accumulate; Q7 tuning loop
 starts (watch `file_not_indexed`/`file_low_confidence` drop rates). 3/4
-done. Next: `/ytstack:plan-task` for **S03-T04** (LAST: fixture-
-integration tests — walk→write→produce with only the LLM mocked). S03 carries: producer consumes the `raw/index/` digest
+done. **T04 planned** (`M027-S03-T04-PLAN.md`): true-chain integration
+tests — walk→write_index→producer with REAL template/render→request→
+_dispatch dry-run, only chat_schema mocked (prompt captured); incl.
+stale-file MISSING branch. Execute T04 next (LAST in S03). S03 carries: producer consumes the `raw/index/` digest
 (in-context delivery = open Q6, scheduling is S06); reuse email producer
 scaffold + `_dispatch` seam; expect weak filename-signal precision (Q7
 confidence gate). ✅ **lxw E2E DONE 2026-06-10:** 2 watched_folders
