@@ -40,8 +40,13 @@ ANSWER_DIR = RAW_DIR / "notes" / "folder"
 
 # Provider sentinel: the named file exists but does not answer the topic
 # (prompts/folder_scan_answer.md contract). A non-answer is NOT persisted —
-# it is not a compile source. Retarget/quarantine semantics land in T03.
+# it is not a compile source; the request is quarantined as `not-answered`.
 NOT_ANSWERED_SENTINEL = "NOT ANSWERED IN THIS FILE"
+
+# Terminal failure states (T03 quarantine). Batches never re-dispatch them
+# (`list_pending` selects status=pending only); an explicit re-dispatch
+# retries ONLY when the staleness gate says the source changed.
+_FAIL_STATES = ("stale", "error", "not-answered")
 
 
 @dataclass
@@ -94,15 +99,33 @@ def process_request(request_path: Path, *, dry_run: bool) -> RunResult:
         )
         return RunResult(success=True)
 
-    # ── Real run: provider read → answer-only persist → request flip ──
+    # ── Real run ──────────────────────────────────────────────────────
+    # Re-dispatch gate (T03). Terminal states retry ONLY when the source
+    # changed since the failure — an unchanged file never burns provider
+    # spend twice. Dry-run above stays ungated (it is the preview).
+    status = request.get("status", "pending")
+    if status in ("done", "rejected"):
+        return RunResult(success=False, error=f"already_{status}")
+    if status == "stale" and not exists:
+        return RunResult(success=False, error="still_missing")
+    if status in ("error", "not-answered"):
+        anchor = request.get("failed_as_of_mtime")
+        if exists and anchor is not None and candidate.stat().st_mtime == anchor:
+            return RunResult(success=False, error="unchanged_since_failure")
+    if status not in ("pending", *_FAIL_STATES):
+        return RunResult(success=False, error=f"already_{status}")
+
     if not exists:
-        # Stale index — fail soft without mutating the request (T03 owns
-        # the quarantine/invalidation semantics).
+        # Stale index — file gone between indexing and read. Quarantine
+        # so batches stop re-dispatching; reappearance re-eligibles it.
         log.warning(
             "  Folder backend: %s MISSING (stale index?) — request %s "
-            "left pending", candidate, request_path.name,
+            "marked stale", candidate, request_path.name,
         )
-        return RunResult(success=False, error=f"file missing: {candidate}")
+        return _mark_failed(
+            request, request_path,
+            status="stale", error=f"file missing: {candidate}",
+        )
 
     provider = get_provider()
     try:
@@ -116,20 +139,31 @@ def process_request(request_path: Path, *, dry_run: bool) -> RunResult:
         )
     except FileNotFoundError as exc:
         log.warning("  Folder backend: file vanished mid-read: %s", exc)
-        return RunResult(success=False, error=f"file missing: {exc}")
+        return _mark_failed(
+            request, request_path,
+            status="stale", error=f"file missing: {exc}",
+        )
 
     if answer.error:
         log.warning(
             "  Folder backend: provider failed for %s — %s",
             request_path.name, answer.error,
         )
-        return RunResult(success=False, error=answer.error)
+        return _mark_failed(
+            request, request_path,
+            status="error", error=answer.error,
+            failed_as_of_mtime=answer.as_of_mtime,
+        )
     if NOT_ANSWERED_SENTINEL in answer.answer_md:
         log.info(
-            "  Folder backend: %s does not answer %r — nothing persisted "
-            "(request stays pending)", file_path, topic,
+            "  Folder backend: %s does not answer %r — nothing persisted, "
+            "request marked not-answered", file_path, topic,
         )
-        return RunResult(success=False, error="not_answered_in_file")
+        return _mark_failed(
+            request, request_path,
+            status="not-answered", error="not_answered_in_file",
+            failed_as_of_mtime=answer.as_of_mtime,
+        )
 
     ANSWER_DIR.mkdir(parents=True, exist_ok=True)
     slug = request_path.stem.removeprefix("request-")  # request-{slug}-{date}
@@ -147,6 +181,31 @@ def process_request(request_path: Path, *, dry_run: bool) -> RunResult:
     request_path.write_text(json.dumps(request, indent=2), encoding="utf-8")
 
     return RunResult(success=True)
+
+
+def _mark_failed(
+    request: dict,
+    request_path: Path,
+    *,
+    status: str,
+    error: str,
+    failed_as_of_mtime: float | None = None,
+) -> RunResult:
+    """Quarantine a request (email `_mark_error` template + staleness anchor).
+
+    `failed_as_of_mtime` records the source mtime the failure happened
+    against — the re-dispatch gate retries only when the file's current
+    mtime differs (or, for `stale`, when the file exists again).
+    """
+    request["status"] = status
+    request["last_error"] = error
+    request["last_attempt_at"] = now_iso()
+    if failed_as_of_mtime is not None:
+        request["failed_as_of_mtime"] = failed_as_of_mtime
+    request_path.write_text(json.dumps(request, indent=2), encoding="utf-8")
+    log.warning("  Folder backend: request %s -> %s (%s)",
+                request_path.name, status, error)
+    return RunResult(success=False, error=error)
 
 
 def _render_answer(request: dict, answer: ScanAnswer) -> str:

@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 
 import pytest
 
@@ -211,9 +212,9 @@ def test_dispatch_routes_folder_deep_scan_to_folder_backend(tmp_path, monkeypatc
     assert cli._dispatch(bogus, dry_run=True) is False
 
 
-def test_real_run_on_missing_file_leaves_request_pending(tmp_path, monkeypatch):
-    """Stale index (file gone since indexing): fail soft, request file
-    byte-untouched — quarantine/invalidation semantics are T03's."""
+def test_real_run_on_missing_file_marks_stale(tmp_path, monkeypatch):
+    """Stale index (file gone since indexing): fail soft, request marked
+    `stale` (T03) so batches stop re-dispatching until it reappears."""
     from curiosity.backends import folder as folder_backend
 
     monkeypatch.setattr(
@@ -222,11 +223,12 @@ def test_real_run_on_missing_file_leaves_request_pending(tmp_path, monkeypatch):
         [{"id": "docs", "kind": "local", "path": str(tmp_path / "trove")}],
     )
     p = _request_file(tmp_path)
-    before = p.read_text(encoding="utf-8")
     res = folder_backend.process_request(p, dry_run=False)
     assert res.success is False
     assert "missing" in (res.error or "")
-    assert p.read_text(encoding="utf-8") == before  # untouched -> stays pending
+    req = json.loads(p.read_text(encoding="utf-8"))
+    assert req["status"] == "stale"
+    assert req["last_error"]
 
 
 def test_skeleton_dry_run_resolves_path_and_reports_exists(tmp_path, monkeypatch):
@@ -329,7 +331,9 @@ def test_p2_no_raw_body_anywhere_under_the_vault(tmp_path, monkeypatch):
     assert offenders == []
 
 
-def test_sentinel_answer_is_not_persisted(tmp_path, monkeypatch):
+def test_sentinel_marks_request_not_answered(tmp_path, monkeypatch):
+    """T03: a non-answer quarantines the request (status not-answered +
+    staleness anchor) so batches stop re-dispatching; nothing persisted."""
     fb, root, request_path = _persist_env(tmp_path, monkeypatch)
     _fake_provider(
         monkeypatch, fb,
@@ -340,18 +344,87 @@ def test_sentinel_answer_is_not_persisted(tmp_path, monkeypatch):
     assert "not_answered" in (res.error or "")
     assert not (root / "raw" / "notes" / "folder").exists()
     req = json.loads(request_path.read_text(encoding="utf-8"))
-    assert req["status"] == "pending"  # untouched — retarget/quarantine is T03
+    assert req["status"] == "not-answered"
+    assert req["failed_as_of_mtime"] == 1234.5  # anchor = answer's as-of
+    assert req["last_error"]
 
 
-def test_provider_error_leaves_request_untouched(tmp_path, monkeypatch):
+def test_provider_error_marks_request_error(tmp_path, monkeypatch):
     fb, root, request_path = _persist_env(tmp_path, monkeypatch)
     _fake_provider(monkeypatch, fb, "", error="empty_result")
-    before = request_path.read_text(encoding="utf-8")
     res = fb.process_request(request_path, dry_run=False)
     assert res.success is False
     assert res.error == "empty_result"
-    assert request_path.read_text(encoding="utf-8") == before
     assert not (root / "raw" / "notes" / "folder").exists()
+    req = json.loads(request_path.read_text(encoding="utf-8"))
+    assert req["status"] == "error"
+    assert req["last_error"] == "empty_result"
+    assert req["failed_as_of_mtime"] == 1234.5
+
+
+def test_error_request_retries_only_after_file_change(tmp_path, monkeypatch):
+    """The staleness gate: unchanged file -> skip without constructing a
+    provider; touched file -> retry proceeds and can succeed."""
+    fb, root, request_path = _persist_env(tmp_path, monkeypatch)
+    trove_file = tmp_path / "trove" / "11 Steuern" / "Steuerbescheid-2024.pdf"
+    os.utime(trove_file, (1234.5, 1234.5))  # current mtime == failure anchor
+    _fake_provider(monkeypatch, fb, "", error="empty_result")
+    assert fb.process_request(request_path, dry_run=False).success is False
+
+    def _boom():  # pragma: no cover - must never fire
+        raise AssertionError("provider constructed despite unchanged file")
+
+    monkeypatch.setattr(fb, "get_provider", _boom)
+    res = fb.process_request(request_path, dry_run=False)
+    assert res.success is False
+    assert res.error == "unchanged_since_failure"
+
+    os.utime(trove_file, (9999.0, 9999.0))  # the source changed
+    _fake_provider(monkeypatch, fb, "## Answer\n\nnow it works")
+    res2 = fb.process_request(request_path, dry_run=False)
+    assert res2.success is True
+    assert json.loads(request_path.read_text(encoding="utf-8"))["status"] == "done"
+
+
+def test_missing_file_marks_stale_and_retries_on_reappearance(
+    tmp_path, monkeypatch
+):
+    fb, root, request_path = _persist_env(tmp_path, monkeypatch)
+    trove_file = tmp_path / "trove" / "11 Steuern" / "Steuerbescheid-2024.pdf"
+    trove_file.unlink()
+    res = fb.process_request(request_path, dry_run=False)
+    assert res.success is False
+    assert json.loads(request_path.read_text(encoding="utf-8"))["status"] == "stale"
+
+    # still missing -> skip without provider
+    def _boom():  # pragma: no cover
+        raise AssertionError("provider constructed despite missing file")
+
+    monkeypatch.setattr(fb, "get_provider", _boom)
+    res2 = fb.process_request(request_path, dry_run=False)
+    assert res2.error == "still_missing"
+
+    # file reappears -> retry proceeds
+    trove_file.write_text("back again", encoding="utf-8")
+    _fake_provider(monkeypatch, fb, "## Answer\n\nrecovered")
+    assert fb.process_request(request_path, dry_run=False).success is True
+
+
+def test_done_request_is_never_redispatched(tmp_path, monkeypatch):
+    fb, root, request_path = _persist_env(tmp_path, monkeypatch)
+    req = json.loads(request_path.read_text(encoding="utf-8"))
+    req["status"] = "done"
+    request_path.write_text(json.dumps(req, indent=2), encoding="utf-8")
+    before = request_path.read_text(encoding="utf-8")
+
+    def _boom():  # pragma: no cover
+        raise AssertionError("provider constructed for a done request")
+
+    monkeypatch.setattr(fb, "get_provider", _boom)
+    res = fb.process_request(request_path, dry_run=False)
+    assert res.success is False
+    assert res.error == "already_done"
+    assert request_path.read_text(encoding="utf-8") == before
 
 
 def test_real_prompt_template_renders_with_t01_kwargs():
