@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-06-10T22:35:00+0200
+last_updated: 2026-06-10T22:45:00+0200
 current_milestone: M027
 active_slice: S04
-active_task: none
+active_task: T05
 last_completed_milestone: M026
 parked_milestone: M025
 parallel_milestones: [M021]
@@ -27,9 +27,13 @@ reappeared file), dry-run ungated. **T04 SHIPPED + LIVE-VERIFIED**
 first run (13.7s, 1 call) — fact KX-4711-2024 extracted with line-level
 attribution, **P2 held live** (raw marker nowhere), as_of_mtime exact,
 request done. The whole T01–T03 chain is now real-SDK-verified. 4/5
-done. Next: `/ytstack:plan-task` for **S04-T05** (LAST: informed-consent
-walk card in `_walk` — the content/cloud-gate UX; operator path must
-always go through the card). **T01 SHIPPED, Q9 CLOSED** (commit `221fb33`,
+done. **T05 planned** (`M027-S04-T05-PLAN.md`, closes exit criterion #2):
+`_print_request_card` folder-deep-scan branch — File+confidence line,
+resolved abs path with exists/MISSING staleness marker, consent line
+"Accept will LOAD this file and send its content to <provider> to
+answer <topic>"; email cards regression-pinned. Execute T05 next (LAST
+in S04). Note: lxw ran `wiki update` again — `folder_scan_provider:
+claude-sdk` already live in the vault config. **T01 SHIPPED, Q9 CLOSED** (commit `221fb33`,
 `M027-S04-T01-SUMMARY.md`):
 provider seam `backends/folder_providers.py` (`ScanAnswer` +
 `FolderScanProvider` + `get_provider()` over new knob
