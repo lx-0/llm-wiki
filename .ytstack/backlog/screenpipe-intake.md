@@ -135,6 +135,39 @@ The actual llm-wiki feature. Unbuilt. Open questions before a milestone:
   OCRs ad-hoc screenshots; screenpipe's continuous frames overlap. Decide whether
   screenpipe supersedes or complements it.
 
+### Prior art — Alex×Sid strategy talks 2026-05-08 (compiled in the operator wiki)
+
+Screenpipe integration was discussed at length before this backlog existed — in
+the **Yesterday product context**, compiled into the operator's wiki from the
+Jamie transcripts (`raw/transcripts/jamie/2026-05-08--alex-x-sid-{1,2}-3--*.md`).
+Wiki articles: `concepts/screenpipe-automation-screening-service` (planned
+*customer*-facing automation-audit service — adjacent product, NOT this
+collector), `concepts/feature-extraction-multi-channel-correlation`,
+`concepts/screenpipe-multi-screen-artifact-bias`,
+`concepts/mobile-tracking-gap-agentic-automation`. Three of those learnings are
+load-bearing for the collector design:
+
+1. **Features over raw frames** (Sid's data-science framing, explicitly brought
+   into the LLM-wiki discussion). Raw screenpipe rows are not an analysis
+   substrate — extract computed features first (his Claude run: Days-Since-
+   Commitment, External Visibility 88 %, Manager- vs Creator-days). For the
+   collector this strengthens the source-only/daily-rollup posture and suggests
+   the daily rollup should carry *derived metrics* (app-time breakdown,
+   meeting/focus blocks), not OCR dumps. Cross-channel timestamp-join
+   (screenpipe + calendar + email + jamie) is exactly llm-wiki's substrate set —
+   the dream-cycle is the natural consumer.
+2. **Multi-screen capture artifact** — known LLM trap. With N monitors
+   screenpipe stores N frames per tick; a naive time-sorted frame sequence made
+   Claude hallucinate "thousands of app switches per day" in Sid's analysis.
+   Collector/prompt must correlate by window-title/monitor-id and carry
+   confidence fields, never reason over raw frame order. (Engine-side mirror of
+   `feedback_audit_premise_before_designing`.)
+3. **Mobile blindspot is structural.** ≥30 % of a mobile-heavy operator's
+   productive time never touches the laptop (calls, WhatsApp, podcasts-as-work).
+   Screenpipe covers the desktop axis only — document the coverage boundary in
+   the persona framing; don't let downstream synthesis read absence-of-frames as
+   idleness.
+
 ## Next step
 
 Not a milestone yet — operator is collecting test data first. When enough has
