@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-06-10T15:20:00+0200
+last_updated: 2026-06-10T15:35:00+0200
 current_milestone: M027
 active_slice: S02
-active_task: T02
+active_task: none
 last_completed_milestone: M026
 parked_milestone: M025
 parallel_milestones: [M021]
@@ -12,11 +12,17 @@ parallel_milestones: [M021]
 
 # State
 
-**Status:** M027 / S02 / T02 planned -- ready to execute (`M027-S02-T02-PLAN.md`:
-`render_index`/`write_index` → `raw/index/<root-id>.md`, frontmatter
-`type: folder-index`, tree/recent sections, `max_tree_entries` cap +
-truncated-marker; compile-skip wiring deliberately deferred to T03 with the
-migration). 1/4 tasks done in slice. **T01 SHIPPED** (commit `24d2134`,
+**Status:** M027 / S02 -- 2/4 tasks done. **T02 SHIPPED** (commit `770c68f`,
+`M027-S02-T02-SUMMARY.md`): `render_index` (pure, deterministic, unmasked;
+frontmatter `type: folder-index` + counts + truncated-flag; Recent-changes +
+depth-indented Tree, `max_tree_entries` cap + omitted-marker) + `write_index`
+→ `raw/index/<root-id>.md` overwrite, `INDEX_DIR = raw/index/`. 5 new tests,
+suite **1219 green**. **Two T03 carries:** (1) delta-hash must be modulo
+frontmatter (`generated_at` varies per walk); (2) compile-skip wiring =
+`folder-index` into `compile_skip_substrate_types` default + migration
+same-commit — index = skip, `raw/notes/folder/` answers = compile SOURCES.
+Next: `/ytstack:plan-task` for **S02-T03** (delta-awareness + skip-record
+discipline). **T01 SHIPPED** (commit `24d2134`,
 `M027-S02-T01-SUMMARY.md`): body-blind folder-index walker
 `scripts/collectors/folder_index.py` (scandir+stat only, never open();
 `FolderIndex`/`IndexEntry`; depth cap + include/exclude fnmatch with
