@@ -282,6 +282,49 @@ def test_resolve_folder_alias_no_op_when_canonical_present(tmp_path: Path) -> No
     assert reader._resolve_folder_alias("INBOX") == "INBOX"
 
 
+def test_resolve_folder_alias_ignores_head_only_match_in_other_root(tmp_path: Path) -> None:
+    """A bare `INBOX` mbox in a second root must not veto alias resolution.
+
+    Reproduces the 2026-06-10 incident: kasserver reads two roots — the
+    IMAP root (only `INBOX-1` + `INBOX-1.sbd/` on disk) and a legacy POP
+    root (`Mail/...`) containing a bare `Inbox` mbox file with no
+    subfolders. The head-only existence check saw `INBOX` "present" in
+    the POP root (case-insensitively on APFS, but a literal `INBOX` file
+    fails the same way) and skipped alias probing, so every deep-scan of
+    `INBOX/<sub>` matched zero on-disk folders. 761/761 curiosity
+    requests returned 0 messages despite the 2026-05-16 alias fix.
+    """
+    imap_root = tmp_path / "ImapMail" / "server"
+    pop_root = tmp_path / "Mail" / "server"
+    (imap_root / "INBOX-1.sbd").mkdir(parents=True)
+    (imap_root / "INBOX-1").touch()
+    (imap_root / "INBOX-1.sbd" / "Server").touch()
+    pop_root.mkdir(parents=True)
+    # Bare head-named mbox file, exact case — no .sbd, no subfolders.
+    (pop_root / "INBOX").touch()
+
+    reader = ThunderbirdMboxReader("testacct", [imap_root, pop_root])
+    assert reader._resolve_folder_alias("INBOX/Server") == "INBOX-1/Server"
+
+
+def test_resolve_folder_alias_case_variant_head_does_not_veto(tmp_path: Path) -> None:
+    """`Inbox` (case variant, as Thunderbird writes POP inboxes) must not
+    satisfy the canonical-`INBOX` check on case-insensitive filesystems
+    (macOS APFS default). Folder-name matching downstream is
+    case-SENSITIVE string comparison, so a case-insensitive existence
+    check lies about what scan_deep will find."""
+    imap_root = tmp_path / "ImapMail" / "server"
+    pop_root = tmp_path / "Mail" / "server"
+    (imap_root / "INBOX-1.sbd").mkdir(parents=True)
+    (imap_root / "INBOX-1").touch()
+    (imap_root / "INBOX-1.sbd" / "Server").touch()
+    pop_root.mkdir(parents=True)
+    (pop_root / "Inbox").touch()
+
+    reader = ThunderbirdMboxReader("testacct", [imap_root, pop_root])
+    assert reader._resolve_folder_alias("INBOX/Server") == "INBOX-1/Server"
+
+
 def test_scan_deep_finds_messages_via_alias(tmp_path: Path) -> None:
     """End-to-end: scan_deep with canonical name actually retrieves
     messages from the aliased on-disk location."""
@@ -301,3 +344,35 @@ def test_scan_deep_finds_messages_via_alias(tmp_path: Path) -> None:
     messages = list(reader.scan_deep("INBOX/Vertraege"))
     assert len(messages) == 1
     assert messages[0].meta.subject == "Test contract"
+
+
+def test_scan_deep_survives_header_object_content_disposition(tmp_path: Path) -> None:
+    """Real mboxes contain Content-Disposition headers with raw 8-bit
+    bytes (legacy senders, no RFC2047 encoding). The email package's
+    compat32 policy surfaces those as `Header` objects, not str —
+    `.lower()` on them raised AttributeError and killed the whole
+    deep-scan (found live in INBOX/COMPANY/01 Mentoring, 2026-06-10)."""
+    (tmp_path / "INBOX.sbd").mkdir()
+    raw = (
+        b"From - Mon May 11 10:00:00 2026\n"
+        b"From: a@example.com\n"
+        b"Subject: raw 8-bit disposition\n"
+        b"Date: Mon, 11 May 2026 10:00:00 +0000\n"
+        b'Content-Type: multipart/mixed; boundary="BOUND"\n'
+        b"\n"
+        b"--BOUND\n"
+        b"Content-Type: text/plain\n"
+        b"\n"
+        b"body\n"
+        b"--BOUND\n"
+        b"Content-Type: application/pdf\n"
+        b'Content-Disposition: attachment; filename="Beschlu\xdfvorlage.pdf"\n'
+        b"\n"
+        b"%PDF-fake\n"
+        b"--BOUND--\n\n"
+    )
+    (tmp_path / "INBOX.sbd" / "Sub").write_bytes(raw)
+
+    reader = ThunderbirdMboxReader("testacct", [tmp_path])
+    messages = list(reader.scan_deep("INBOX/Sub"))
+    assert len(messages) == 1

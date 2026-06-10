@@ -19,6 +19,7 @@ import email.header
 import email.utils
 import logging
 import mailbox
+import os
 import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -74,23 +75,30 @@ class ThunderbirdMboxReader:
         returns 0 messages silently.
 
         Resolution probes `<head>-N` for N=1..9 only when the canonical
-        head doesn't exist on disk; the canonical wins if both are
-        present. Logged at WARNING once per resolution so the alias is
-        observable without spamming on every request.
+        FULL folder path doesn't exist on disk; the canonical wins if
+        both are present. Head-only checks are not enough: a legacy POP
+        root with a bare `Inbox` mbox (no subfolders) made the head look
+        "present" and vetoed resolution for every `INBOX/<sub>` request
+        (case-insensitively on APFS — but a literal head-named file in a
+        root that lacks the subfolder fails the same way). Existence is
+        checked case-SENSITIVELY because downstream folder matching is
+        case-sensitive string comparison. Logged at WARNING once per
+        resolution so the alias is observable without spamming on every
+        request.
         """
         head, _, tail = folder.partition("/")
         if not head:
             return folder
-        # Canonical head present anywhere → no alias resolution needed.
+        # Canonical full path present anywhere → no alias resolution needed.
         for root in self._roots:
-            if (root / head).exists() or (root / f"{head}.sbd").exists():
+            if _folder_on_disk(root, folder):
                 return folder
         # Probe numeric-suffix variants.
         for n in range(1, 10):
             alias_head = f"{head}-{n}"
+            resolved = f"{alias_head}/{tail}" if tail else alias_head
             for root in self._roots:
-                if (root / alias_head).exists() or (root / f"{alias_head}.sbd").exists():
-                    resolved = f"{alias_head}/{tail}" if tail else alias_head
+                if _folder_on_disk(root, resolved):
                     log.warning(
                         "ThunderbirdMboxReader[%s]: folder %r → %r "
                         "(local Thunderbird alias; canonical head %r not on disk)",
@@ -148,6 +156,30 @@ class ThunderbirdMboxReader:
                     emitted += 1
                     if limit and emitted >= limit:
                         return
+
+
+def _folder_on_disk(root: Path, folder: str) -> bool:
+    """True if `folder` materialises under `root` in Thunderbird's layout.
+
+    `A/B/C` lives at `root/A.sbd/B.sbd/C` (mbox file); a folder that only
+    has children (no own mbox) appears as `root/A.sbd/.../C.sbd`. Checks
+    are case-sensitive — macOS APFS `.exists()` matches case-insensitively,
+    but `_find_mbox_files` folder names are compared as exact strings.
+    """
+    parts = folder.split("/")
+    parent = root
+    for part in parts[:-1]:
+        parent = parent / f"{part}.sbd"
+    leaf = parts[-1]
+    return _exists_exact(parent / leaf) or _exists_exact(parent / f"{leaf}.sbd")
+
+
+def _exists_exact(path: Path) -> bool:
+    """Case-sensitive existence check (APFS/HFS+ default is case-insensitive)."""
+    try:
+        return path.name in os.listdir(path.parent)
+    except OSError:
+        return False
 
 
 def _find_mbox_files(
@@ -339,7 +371,9 @@ def _attachment_filenames(msg: mailbox.mboxMessage) -> Iterator[str]:
     if not msg.is_multipart():
         return
     for part in msg.walk():
-        disp = part.get("Content-Disposition", "")
+        # compat32 returns a Header object (not str) for raw 8-bit header
+        # values — str() first or .lower() raises AttributeError.
+        disp = str(part.get("Content-Disposition", "") or "")
         if "attachment" in disp.lower():
             name = part.get_filename()
             if name:
