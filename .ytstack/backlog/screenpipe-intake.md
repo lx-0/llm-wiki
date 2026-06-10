@@ -140,8 +140,29 @@ The actual llm-wiki feature. Unbuilt. Open questions before a milestone:
     for the collector: **never ingest `ui_events.text_content`** — app/window
     switch events at most, for episode segmentation.
   - Volume reality: ~670 MB per ~4 h active use ≈ 3–4 GB/day — far above the
-    docs' 5–10 GB/month. Retention via `screenpipe db` cleanup / `evicted_at`
-    must be part of the operating posture, not an afterthought.
+    docs' 5–10 GB/month (confirmed end-of-day: 1.1 GB / ~7 h). Retention via
+    `screenpipe db` cleanup / `evicted_at` must be part of the operating
+    posture, not an afterthought.
+
+  **Day-1 longitudinal observations (2026-06-10, full working day):**
+  - **`speaker_id` is a raw cluster, NOT a person identity.** Diarization went
+    5 → 41 speakers in one day (mostly tiny fragments). The collector must
+    treat speaker ids as merge candidates, never as entities — naming/merging
+    is operator-side, natural tie-in with `wiki dedup`'s confirm-merge flow.
+  - **`silent` status is the ingest cut.** A quiet afternoon produced 1276
+    `silent` vs 313 `transcribed` chunks; transcription is voice-gated by
+    design, with a self-healing reconciliation pass (`transcribed N orphaned
+    chunks`). Collector filters on `transcription_status='transcribed'` —
+    no transcript-content heuristics needed to skip silence.
+  - **Not every frame has OCR.** Only ~38 % of frames had `ocr_text` rows
+    (event-driven capture + a noisy upstream `frame_linker: stale entries
+    expired without pairing` WARN, ~2.5 k evicted pairings/day, `failed=0`).
+    Collector must LEFT-JOIN frames→ocr, never assume pairing; the WARN spam
+    is a known upstream wart, not a local misconfig.
+  - **Built-in meeting detector found 0 meetings** despite a real call
+    (~13:03) — detection is meeting-app-keyed, a plain call doesn't register.
+    Reinforces: Jamie stays the meeting substrate; screenpipe `meetings` is
+    opportunistic extra signal at best.
 - **What to ingest, and at what compile-role.** This is the load-bearing
   decision. Screenpipe produces ~5–10 GB/month and *enormous* OCR volume —
   ingesting raw frames as per-item `knowledge/` would bury the vault. Almost
