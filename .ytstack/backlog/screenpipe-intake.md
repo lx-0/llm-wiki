@@ -163,6 +163,29 @@ The actual llm-wiki feature. Unbuilt. Open questions before a milestone:
     (~13:03) — detection is meeting-app-keyed, a plain call doesn't register.
     Reinforces: Jamie stays the meeting substrate; screenpipe `meetings` is
     opportunistic extra signal at best.
+
+  **Day-2 observations (2026-06-11/12):**
+  - **🐛 Upstream bug: System-Audio stream dies on sleep/wake.** After the
+    first overnight sleep, the unlock handler rebuilds ONLY the mic stream
+    (`rebuilding stream for MacBook Pro Microphone (input)` — no System-Audio
+    counterpart in the log); the output stream stays a zombie. Evidence: last
+    System-Audio chunk 06-11 00:25, mic uninterrupted through 06-12; a full
+    lost capture day for the call/meeting counterpart. Recovery:
+    `launchctl kickstart -k gui/$UID/com.alex.screenpipe` (verified 06-12:
+    both devices restart). **Operating posture needs a freshness check** —
+    alert when `max(timestamp)` of System-Audio chunks lags mic by hours while
+    the service is up. Route the bug to Sid (he devs on screenpipe source) or
+    file upstream.
+  - **Mic channel = room audio, not operator speech.** A TV documentary
+    playing in the room was transcribed in full as `is_input_device=1`
+    (screen showed only Code/webmail at the time — external source, not Mac
+    playback). `is_input_device` only says which capture path; author
+    attribution additionally needs diarization (and the speaker clusters
+    fragment hard: 41 → 120 in day 2). M009 `author:` mapping must be
+    mic ∧ diarization-consistent, never mic alone.
+  - Service robustness otherwise good: one uninterrupted process across
+    2 days incl. multiple sleep/lock cycles, RSS stable ~370 MB; OCR pairing
+    ratio rose to ~47 %; disk ~2 GB/day averaged incl. idle night.
 - **What to ingest, and at what compile-role.** This is the load-bearing
   decision. Screenpipe produces ~5–10 GB/month and *enormous* OCR volume —
   ingesting raw frames as per-item `knowledge/` would bury the vault. Almost
