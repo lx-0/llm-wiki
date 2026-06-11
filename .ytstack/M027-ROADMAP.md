@@ -5,7 +5,7 @@ size: L
 created: 2026-06-07T12:21:47+0200
 status: planned
 total_slices: 6
-completed_slices: 4
+completed_slices: 5
 ---
 
 # M027 Roadmap
@@ -36,7 +36,7 @@ gate, so the index can be built freely and S01 is slimmed.)
 - [x] S02 -- Body-blind folder-index collector for local roots -> unmasked delta-aware `raw/index/<root>.md` (`wiki index`; "sanitized" wording superseded by DECISIONS 2026-06-07)
 - [x] S03 -- Curiosity producer emits `folder-deep-scan` (file-exists anchor) + dispatch branch
 - [x] S04 -- Folder-backend: read named local files in-place, persist answer-only (no raw body) — LIVE-verified e2e; exit criteria #2/#3 closed, #5/#7 local-half closed
-- [ ] S05 -- Dream/compile fold folder-derived facts into `knowledge/` with sensitivity applied
+- [x] S05 -- Dream/compile fold folder-derived facts into `knowledge/` with sensitivity applied — EXIT #6 LIVE (Hetzner-invoice fact queryable with provenance); compile-primary confirmed; dedicated `folder-answer` dispatch shipped en route
 - [ ] S06 -- NAS (SMB) + out-of-sandbox reader + periodic scheduler
 
 ## Run order

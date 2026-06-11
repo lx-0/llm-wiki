@@ -1,9 +1,9 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-06-11T01:35:00+0200
+last_updated: 2026-06-11T01:45:00+0200
 current_milestone: M027
-active_slice: none
+active_slice: S06
 active_task: none
 last_completed_milestone: M026
 parked_milestone: M025
@@ -12,7 +12,17 @@ parallel_milestones: [M021]
 
 # State
 
-**Status:** ✅ **M027 / S05 COMPLETE — 3/3, EXIT CRITERION #6 LIVE**
+**Status:** M027 — slice S05 complete, **roadmap reassessed (outcome A,
+2026-06-11): S06 unchanged** (5/6 slices done — LAST slice ahead). Next:
+**S06** (NAS/SMB index + out-of-sandbox reader for the TCC wall + periodic
+scheduler) — slice-plan `M027-S06-PLAN.md` (4 tasks) exists; run
+`/ytstack:plan-task` for S06-T01. S06 carries: Q5 (LaunchAgent reader
+emits artifacts the in-session loop consumes; plain-local stays
+in-session — proven), Q6 (scheduler: `system-level-scheduler.md` backlog
+is the design source), smb entries already validate in config + are
+INFO-skipped everywhere; producer-precision lever (weak filename signal
+after digest trim) is S06-adjacent tuning, not structural.
+✅ **M027 / S05 COMPLETE — 3/3, EXIT CRITERION #6 LIVE**
 (suite **1272 green +1 gated**). Live on lxw: consented Hetzner-invoice
 read → answer artifact (sensitivity stamped) → compile → fact in
 `projects/yesterday-ai-cloud.md` with provenance → `wiki query` returns
