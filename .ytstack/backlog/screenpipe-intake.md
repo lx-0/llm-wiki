@@ -172,10 +172,18 @@ The actual llm-wiki feature. Unbuilt. Open questions before a milestone:
     System-Audio chunk 06-11 00:25, mic uninterrupted through 06-12; a full
     lost capture day for the call/meeting counterpart. Recovery:
     `launchctl kickstart -k gui/$UID/com.alex.screenpipe` (verified 06-12:
-    both devices restart). **Operating posture needs a freshness check** —
-    alert when `max(timestamp)` of System-Audio chunks lags mic by hours while
-    the service is up. Route the bug to Sid (he devs on screenpipe source) or
-    file upstream.
+    both devices restart). **Reproduced on the very next sleep cycle**
+    (06-12: 08:36 wake rebuilt mic only, sys dead 08:36→14:07 until a Mac
+    reboot revived it via RunAtLoad — boot-autostart thereby also verified).
+    Pattern: EVERY overnight sleep kills the channel. **Watchdog shipped
+    2026-06-12:** `~/.screenpipe/watchdog.sh` + LaunchAgent
+    `com.alex.screenpipe-watchdog` (StartInterval 600 s, fires right after
+    wake) — detects "mic chunks fresh ≤10 min AND zero sys chunks ≥20 min"
+    (silent chunks still produce rows ~120/h, so absence = dead stream, not
+    quiet) and kickstarts with a 30-min cooldown; logs to
+    `~/.screenpipe/watchdog.log`. Both branches unit-tested (healthy no-op +
+    forced detection); real overnight trigger pending first sleep cycle.
+    Route the bug to Sid (he devs on screenpipe source) or file upstream.
   - **Mic channel = room audio, not operator speech.** A TV documentary
     playing in the room was transcribed in full as `is_input_device=1`
     (screen showed only Code/webmail at the time — external source, not Mac
