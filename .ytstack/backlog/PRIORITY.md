@@ -72,6 +72,7 @@ Living docs, not actionable wedges. Read when adjacent work surfaces them.
 - **`architecture-scaling-2028.md`** — 4-lever sequence for 5k+ articles (subtype-axis → MOC-first → lifecycle-tier → recursive-dream-cycle).
 - **`gbrain-comparison.md`** — gbrain pattern lift (entity-pages + takes + dream-cycle all shipped from this cluster; remaining ideas live here).
 - **`karpathy-comparison.md`** — Karpathy-pattern comparison cluster.
+- **`company-brain-federation.md`** — pre-office-hours findings (Alex+Sid, 2026-06-13): llm-wiki as a *company* wiki via federation (personal vaults ⊕ fail-closed channel ⊕ company reconciliation brain) + critique of Suh's single-timeline thesis. **Feeds the planned company-brain office-hours.** Condensed open work: scope-as-compile-axis · fail-closed promote channel (reuse M027) · cross-vault entity identity + multi-author reconciliation (Takes/Connections seed).
 - **`collectors.md`** — parent collector-pattern doc.
 - **`vault-dashboard.md`** — original vault-UX design doc; M003 dashboard shipped most of it.
 - **`obsidian-plugin.md`** — engine-as-plugin idea (ready, not actionable now).
