@@ -114,25 +114,70 @@ def _indexed_paths(digest_text: str) -> set[str]:
     return paths
 
 
-def _trim_digest_tree_files(digest_text: str) -> str:
-    """Consumer-side budget trim (DECISIONS 2026-06-10): drop file lines
-    from the Tree section, keep frontmatter + Recent + dir skeleton."""
+# Frequent German + English function words that carry no topic signal —
+# excluded from the relevance grep so they don't match half the vault.
+_STOPWORDS = frozenset({
+    "aber", "auch", "dass", "dann", "denn", "doch", "eine", "einen", "einem",
+    "einer", "haben", "hatte", "hier", "ist", "kann", "mehr", "nicht", "noch",
+    "oder", "schon", "sehr", "sind", "über", "und", "von", "vom", "war",
+    "waren", "weil", "werden", "wie", "wird", "wurde", "diese", "dieser",
+    "dieses", "alle", "also", "beim", "durch", "gibt", "habe", "wenn",
+    "with", "that", "this", "from", "have", "has", "the", "and", "for",
+    "are", "was", "were", "will", "would", "there", "their", "they", "been",
+    "what", "when", "which", "into", "than", "then", "them", "some", "such",
+    "about", "after", "also", "just", "only", "more", "most", "other",
+})
+
+_WORD_RE = re.compile(r"[a-z0-9äöüß]+")
+
+
+def _source_keywords(text: str) -> set[str]:
+    """Topic keywords from a compiled source — the relevance signal the
+    producer greps the digest with (consumer-side selection, DECISIONS
+    2026-06-10). Lowercased content words ≥4 chars, no stopwords, no
+    pure-numeric tokens (date stamps would match every dated filename)."""
+    out: set[str] = set()
+    for tok in _WORD_RE.findall(text.lower()):
+        if len(tok) >= 4 and not tok.isdigit() and tok not in _STOPWORDS:
+            out.add(tok)
+    return out
+
+
+def _select_relevant_digest(digest_text: str, keywords: set[str]) -> str:
+    """Keep frontmatter + Recent + dir skeleton, plus Tree FILE lines whose
+    path matches any source keyword. The body-blind index stays the
+    complete inventory on disk; the producer (the consumer) selects what to
+    inject — replaces the blind size-trim that hid every non-recent
+    filename and caused 100% organic abstention (lxw 2026-06-10/11)."""
     head, sep, tree = digest_text.partition("\n## Tree")
     if not sep:
         return digest_text
-    kept = [
-        ln for ln in tree.splitlines()
-        if not ln.lstrip().startswith("- `") or ln.rstrip().endswith("`/")
-    ]
+    kept: list[str] = []
+    for ln in tree.splitlines():
+        stripped = ln.lstrip()
+        is_file_line = stripped.startswith("- `") and not ln.rstrip().endswith("`/")
+        if not is_file_line:
+            kept.append(ln)  # header / blank / dir skeleton — always
+            continue
+        m = _BACKTICKED_PATH.search(ln)
+        path_l = (m.group(1).lower() if m else ln.lower())
+        if any(kw in path_l for kw in keywords):
+            kept.append(ln)
     return head + "\n## Tree" + "\n".join(kept) + "\n"
 
 
-def _load_folder_digests(budget_chars: int) -> tuple[str, dict[str, set[str]]]:
+def _load_folder_digests(
+    budget_chars: int, source_excerpt: str = ""
+) -> tuple[str, dict[str, set[str]]]:
     """Read raw/index/*.md → (prompt block, {root_id: indexed rel_paths}).
 
-    The block is the full digests when they fit `budget_chars`; otherwise
-    each digest's Tree file-lines are dropped (dir skeleton + Recent
-    survive) and the trim is logged — never a silent cap.
+    Full digests when they fit `budget_chars`; otherwise the producer
+    greps each digest for file-lines matching the source's topic keywords
+    and injects only those (+ frontmatter, Recent, dir skeleton). The
+    `indexed` anchor set is ALWAYS built from the complete on-disk digest,
+    independent of what's injected — so the file-exists gate stays sound.
+    Never a silent cap: selection stats are logged; if even the selected
+    set overflows, it is hard-capped with a WARNING.
     """
     digests: dict[str, str] = {}
     if RAW_INDEX_DIR.exists():
@@ -142,17 +187,26 @@ def _load_folder_digests(budget_chars: int) -> tuple[str, dict[str, set[str]]]:
         return "", {}
     paths = {root_id: _indexed_paths(text) for root_id, text in digests.items()}
     block = "\n\n".join(digests.values())
-    if len(block) > budget_chars:
-        trimmed = "\n\n".join(
-            _trim_digest_tree_files(text) for text in digests.values()
+    if len(block) <= budget_chars:
+        return block, paths
+
+    keywords = _source_keywords(source_excerpt)
+    selected = "\n\n".join(
+        _select_relevant_digest(text, keywords) for text in digests.values()
+    )
+    log.info(
+        "  Curiosity(folder): digests %d chars > budget %d — selected %d "
+        "chars relevant to %d source keyword(s)",
+        len(block), budget_chars, len(selected), len(keywords),
+    )
+    if len(selected) > budget_chars:
+        log.warning(
+            "  Curiosity(folder): relevant selection %d chars still > budget "
+            "%d — hard-capped (some matching files omitted)",
+            len(selected), budget_chars,
         )
-        log.info(
-            "  Curiosity(folder): digests %d chars > budget %d — trimmed "
-            "Tree file-lines to %d chars (dir skeleton + Recent kept)",
-            len(block), budget_chars, len(trimmed),
-        )
-        block = trimmed
-    return block, paths
+        selected = selected[:budget_chars]
+    return selected, paths
 
 
 async def maybe_generate_folder_requests(source: Path) -> None:
@@ -185,7 +239,7 @@ async def maybe_generate_folder_requests(source: Path) -> None:
         1000,
         CONFIG.limits.curiosity_max_prompt_chars - len(src_excerpt) - 1500,
     )
-    digest_block, indexed = _load_folder_digests(digest_budget)
+    digest_block, indexed = _load_folder_digests(digest_budget, src_excerpt)
     if not digest_block:
         log.info("  Curiosity(folder): no digests under raw/index/ — run `wiki index`")
         return

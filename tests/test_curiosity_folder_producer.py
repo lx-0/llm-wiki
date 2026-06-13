@@ -574,19 +574,61 @@ def test_real_prompt_template_renders_with_t01_kwargs():
     assert "${" not in out  # nothing unsubstituted
 
 
-def test_over_budget_digest_is_trimmed_not_dropped(env, monkeypatch):
-    root, src, rendered = env
-    # inflate the digest with many file lines; keep one dir + Recent intact
-    filler = "\n".join(
-        f"- `bulk/file-{i:04d}.txt` · 1.0 KB" for i in range(400)
+def test_over_budget_digest_selects_source_relevant_files(env, monkeypatch):
+    """Over budget, the producer injects file-lines whose path matches a
+    SOURCE keyword (consumer-side relevance grep, DECISIONS 2026-06-10) —
+    not a blind position-trim. The mentioned file survives even when it's
+    deep in the Tree and absent from Recent; an unmentioned deep file does
+    not (proves selection, not full-inject). This is the fix for the 100%
+    organic abstention: the blind trim hid every non-recent filename, so
+    the model could never name one with confidence (lxw 2026-06-10/11)."""
+    root, _, _ = env
+    big = (
+        "---\ntype: folder-index\nroot_id: work\n"
+        'root_path: "/troves/work"\nfiles: 3\ndirs: 2\n'
+        "skipped_excluded: 0\nskipped_depth: 0\nerrors: 0\n---\n\n"
+        "## Recent changes\n\n- `Admin/recent.txt` · 2026-06-09 · 0 B\n\n"
+        "## Tree\n\n- `Admin`/\n"
+        "  - `Admin/Rechnungen/Hetzner_2026-05.pdf` · 60 KB · created "
+        "2026-05-15 · modified 2026-05-15\n"
+        "  - `Admin/Vertraege/Supabase-DPA.pdf` · 900 KB · created "
+        "2026-05-19 · modified 2026-05-19\n"
+        + "\n".join(f"- `bulk/file-{i:04d}.txt` · 1 KB" for i in range(500))
+        + "\n"
     )
-    (root / "raw" / "index" / "docs.md").write_text(
-        DIGEST + filler + "\n", encoding="utf-8"
+    (root / "raw" / "index" / "docs.md").unlink()
+    (root / "raw" / "index" / "work.md").write_text(big, encoding="utf-8")
+
+    block, indexed = producer._load_folder_digests(
+        budget_chars=700,
+        source_excerpt="Wir haben die Hetzner-Rechnung vom Mai noch nicht abgelegt.",
     )
-    monkeypatch.setattr(CONFIG.limits, "curiosity_max_prompt_chars", 4000)
-    _run(monkeypatch, src, [])
-    digests_block = rendered["folder_digests"]
-    assert len(digests_block) < 4000
-    assert "Steuerbescheid-2024.pdf" in digests_block  # Recent line survives
-    assert "`11 Steuern`/" in digests_block  # dir skeleton survives
-    assert "file-0399" not in digests_block  # bulk file lines trimmed
+    assert len(block) <= 700
+    assert "Hetzner_2026-05.pdf" in block         # source-mentioned → kept
+    assert "Supabase-DPA.pdf" not in block        # unmentioned → dropped
+    assert "file-0250" not in block               # bulk noise → dropped
+    assert "Admin`/" in block                     # dir skeleton survives
+    assert "Admin/recent.txt" in block            # Recent survives
+    # anchor set stays COMPLETE regardless of what was injected
+    assert "Admin/Rechnungen/Hetzner_2026-05.pdf" in indexed["work"]
+    assert "Admin/Vertraege/Supabase-DPA.pdf" in indexed["work"]
+
+
+def test_under_budget_digest_is_full_injected(env):
+    """Small vaults still get the complete digest — relevance-selection
+    only kicks in when over budget."""
+    block, _ = producer._load_folder_digests(
+        budget_chars=100_000, source_excerpt="anything"
+    )
+    assert "vertrag-handy.pdf" in block  # a non-recent Tree file, full-inject
+
+
+def test_source_keywords_drop_stopwords_short_and_numeric():
+    kw = producer._source_keywords(
+        "Wir haben die Hetzner-Rechnung 2026 vom Mai noch nicht abgelegt."
+    )
+    assert "hetzner" in kw
+    assert "rechnung" in kw
+    assert "2026" not in kw   # pure numeric dropped
+    assert "die" not in kw    # stopword
+    assert "mai" not in kw    # too short (<4)
