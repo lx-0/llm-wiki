@@ -125,6 +125,79 @@ def append(date_iso: str, source: str, content: str) -> Path:
     return target
 
 
+_FRONTMATTER_RE = re.compile(r"\A---\n(.*?\n)---\n?(.*)\Z", re.DOTALL)
+
+
+def _read_sources_and_body(text: str) -> tuple[list[str], str]:
+    """Split a daily-source file into (existing `sources:` list, body).
+
+    Only the `sources:` block is understood; any other frontmatter keys are
+    preserved verbatim by being re-emitted around the merged list. Files with
+    no frontmatter return ([], full-text-as-body).
+    """
+    m = _FRONTMATTER_RE.match(text)
+    if not m:
+        return [], text
+    fm_raw, body = m.group(1), m.group(2)
+    sources: list[str] = []
+    in_sources = False
+    other_lines: list[str] = []
+    for line in fm_raw.splitlines():
+        if line.strip() == "sources:" or line.rstrip() == "sources:":
+            in_sources = True
+            continue
+        if in_sources and line.lstrip().startswith("- "):
+            sources.append(line.lstrip()[2:].strip())
+            continue
+        in_sources = False
+        if line.strip():
+            other_lines.append(line)
+    # Re-attach non-sources frontmatter to the body so it survives the rewrite.
+    if other_lines:
+        body = "---\n" + "\n".join(other_lines) + "\n---\n" + body
+    return sources, body
+
+
+def append_with_source(
+    date_iso: str, source: str, line: str, source_ref: str
+) -> Path:
+    """Append a body `line` AND record `source_ref` in the file's frontmatter.
+
+    For substrates that want provenance to the canonical `raw/` file without
+    a body wikilink (Obsidian ignores `raw/`, so an in-body `[[…]]` renders
+    dead). The reference lives in a frontmatter `sources:` list — not a graph
+    edge, no `raw/`-index cost, machine-readable provenance.
+
+    Read-modify-write under the same flock as `append()`: reads the current
+    file, merges `source_ref` into the `sources:` list (dedup, append order),
+    appends the body line, rewrites the whole file. Per-day volume is small
+    (one file per source per day) so the rewrite cost is negligible.
+    """
+    target = _resolve_path(date_iso, source)
+    if not line.endswith("\n"):
+        line = line + "\n"
+
+    with open(target, "a+", encoding="utf-8") as fh:
+        fcntl.flock(fh.fileno(), fcntl.LOCK_EX)
+        try:
+            fh.seek(0)
+            current = fh.read()
+            sources, body = _read_sources_and_body(current)
+            if source_ref not in sources:
+                sources.append(source_ref)
+            if body and not body.endswith("\n"):
+                body += "\n"
+            fm = "---\nsources:\n" + "".join(f"  - {s}\n" for s in sources) + "---\n"
+            new_text = fm + body + line
+            fh.seek(0)
+            fh.truncate()
+            fh.write(new_text)
+            fh.flush()
+        finally:
+            fcntl.flock(fh.fileno(), fcntl.LOCK_UN)
+    return target
+
+
 def replace_section(date_iso: str, source: str, content: str) -> Path:
     """Atomically replace `daily/<date>/<source>.md` with `content`.
 

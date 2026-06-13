@@ -35,7 +35,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from collectors.base import Collector, CollectorSpec, RunResult, register
 from core import daily_capture, ollama_client
 from core.config import CONFIG, TIMEZONE
-from core.paths import RAW_DIR
+from core.paths import RAW_DIR, ROOT_DIR
 from core.prompts import render
 from core.utils import slugify
 
@@ -286,9 +286,16 @@ def _append_daily_rollup(captured_at: datetime, content: str, out_path: Path) ->
     first_line = content.splitlines()[0].strip() if content else "(empty)"
     if len(first_line) > 80:
         first_line = first_line[:77].rstrip() + "…"
-    line = f"- **{time_label}** · {first_line} → [[{out_path.stem}]]"
+    # No in-body wikilink: Obsidian ignores `raw/`, so `[[…]]` would render
+    # dead. The source path goes into the file's `sources:` frontmatter
+    # instead (machine-readable provenance, no graph edge, no raw/-index cost).
+    line = f"- **{time_label}** · {first_line}"
     try:
-        daily_capture.append(date_iso, "voice", line)
+        source_ref = out_path.resolve().relative_to(ROOT_DIR.resolve()).as_posix()
+    except (ValueError, OSError):
+        source_ref = out_path.name
+    try:
+        daily_capture.append_with_source(date_iso, "voice", line, source_ref)
     except Exception:  # noqa: BLE001
         log.exception("daily-rollup append failed for voice note %s", out_path.name)
 

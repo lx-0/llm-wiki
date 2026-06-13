@@ -1447,6 +1447,10 @@ ${C_BOLD}USAGE${C_RESET}
   wiki backfill picture-metadata [--dry-run]   add EXIF + Android filename
                                                metadata to existing pictures
                                                archive sidecars
+  wiki backfill voice-source-frontmatter [--dry-run]
+                                               move legacy in-body voice
+                                               source wikilinks into the
+                                               daily voice.md sources: frontmatter
 
 ${C_BOLD}WHAT IT DOES${C_RESET}
   Each subcommand walks the relevant substrate and adds net-new keys to
@@ -1466,6 +1470,11 @@ cmd_backfill() {
       shift
       banner "wiki backfill picture-metadata"
       _run_script backfill_picture_metadata.py "$@"
+      ;;
+    voice-source-frontmatter)
+      shift
+      banner "wiki backfill voice-source-frontmatter"
+      _run_script backfill_voice_source_frontmatter.py "$@"
       ;;
     *)
       err "unknown: wiki backfill $1 (try 'wiki backfill help')"
