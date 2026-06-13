@@ -1789,3 +1789,44 @@ unit test.
 
 **Linked artifacts:** `M027-S05-T02-{PLAN,SUMMARY}.md`, commit `f948145`,
 `prompts/compile_main.md` rule 11, `.ytstack/backlog/operator-financial-operational-fact-layer.md`.
+
+## 2026-06-13: Folder-curiosity producer selects the digest by source-relevance grep, not blind size-trim
+
+**Context:** Live audit of lxw — the folder-curiosity producer had run
+organically 5+ times since the M027-S03 rollout and abstained EVERY time
+(`1 gap gen, 0 kept, file_low_confidence`). 100% abstention: the feature
+produced nothing without manual seeding (the only artifact on lxw was the
+T03 e2e hand-seed). Root cause: the 2026-06-10 cap-removal correctly made
+`raw/index/<root>.md` the complete inventory (880 KB / 5450 files on lxw),
+but the producer still full-injected with a budget size-trim
+(`_trim_digest_tree_files`) that dropped ALL Tree file-lines, leaving only
+dir-skeleton + the 20 recent files per root. A non-agentic Ollama producer
+that can name only 40 of 5450 files can never rate a non-recent file ≥
+`curiosity_folder_confidence_min`.
+
+**Chose:** consumer-side relevance grep — the implementation the cap-removal
+DECISIONS entry ("the producer trims, greps, or searches … tool-based
+selection") promised but never built. Over budget, the producer derives
+topic keywords from the compiled source (`_source_keywords`: lowercased
+content words ≥4 chars, stopword-filtered, no pure-numeric) and injects
+only Tree file-lines whose path matches a keyword (+ frontmatter, Recent,
+dir skeleton). "Tool-based selection" for a non-agentic local producer =
+Python does the grep before the single Ollama call — no agentic-tool
+fragility, stays $0/one call. The `indexed` file-exists anchor set is
+always built from the COMPLETE on-disk digest, never the injected subset,
+so the anti-hallucination gate stays sound.
+
+**Rejected:** (B) per-root injection — still full-injects + trims, only
+delays the wall. (C) lower the confidence threshold — symptom patch; the
+files stay invisible so the model still guesses.
+
+**Boundaries:** keyword grep is substring-on-lowercased-path (forgiving for
+German morphology: "rechnung" hits "Rechnungen"); budget hard-cap stays as
+the backstop (WARNING, never silent). Precision tuning (over/under-match)
+is observe-on-lxw. The digest stays the complete inventory on disk — this
+is purely a consumer-injection change.
+
+**Linked artifacts:** commit `294d5c2`,
+`scripts/curiosity/producer.py` (`_source_keywords` / `_select_relevant_digest`
+/ `_load_folder_digests`), supersedes the blind-trim in the 2026-06-10
+cap-removal entry.
