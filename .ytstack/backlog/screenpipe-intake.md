@@ -316,6 +316,16 @@ Not a milestone yet — operator is collecting test data first. When enough has
 accumulated, run `office-hours` / `plan-milestone` on the collector with the
 real DB schema in hand.
 
+**Two halves, likely one milestone:** the *collector* (screenpipe DB →
+`knowledge/`) and the *listener lifecycle* (install autostart / start / stop /
+status of the screenpipe daemon, surfaced in the `wiki` menu) are separate
+concerns — the latter is now its own concept in `listener-lifecycle.md`
+(operator wants it generic across future listeners). The hand-built
+`~/.screenpipe/sp` + watchdog are **disposable operator-local prototypes**, NOT
+the engine path: the engine subsystem must ship its own LaunchAgent templates +
+provisioning + CLI verbs inside the repo (distributed via `wiki update`), never
+depend on a hand-placed script. See `listener-lifecycle.md`.
+
 **User-facing docs deferred by decision (operator, 2026-06-10):** no
 `docs/setup-screenpipe.md` until the collector ships — a setup doc in the
 `docs/setup-*` family would present screenpipe as an active substrate
