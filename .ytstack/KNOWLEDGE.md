@@ -14,6 +14,12 @@ The "Conventions" / "Workflow" / "Quick gotchas" sections are quick-reference. T
 ## Workflow
 
 - **uv invocation has three patterns** — humans `cd .wiki/ && uv run python scripts/<X>.py`; hooks `uv run --project <vault>/.wiki python <vault>/.wiki/scripts/<X>.py` (because Claude Code launches them with arbitrary CWD); engine-internal subprocess spawns use `[sys.executable, str(SCRIPT)]` (parent already in venv).
+- **Test suite runs from the ENGINE REPO ROOT, not `.wiki/`** — `uv run pytest`
+  at the repo root (venv `./.venv`, `pythonpath = ["scripts"]`, `conftest.py`
+  adds `scripts/` to `sys.path`). `.wiki/` is the *vault-side* install path and
+  has no test tree — a task-plan verification command of `cd .wiki && uv run
+  pytest …` is wrong (bit M028-S01-T01). Single-file: `uv run pytest
+  tests/test_<x>.py -q`.
 - **--project flag wired in** `lib/agents.sh`, `lib/config.sh`, `hooks/session-end.py`, `hooks/pre-compact.py`. Don't spawn engine scripts from a hook via `uv run` without `--project`.
 - **Verify after deps changes:** `cd <vault> && uv run --project .wiki python -c "import flush_pipeline; print('ok')"` should succeed.
 

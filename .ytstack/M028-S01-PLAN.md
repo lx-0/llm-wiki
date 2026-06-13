@@ -6,7 +6,7 @@ created: 2026-06-13T15:56:13+0200
 revised: 2026-06-13T16:10:00+0200
 status: planned
 task_count: 6
-completed_tasks: 0
+completed_tasks: 1
 ---
 
 # M028-S01 -- Slice Plan
@@ -24,7 +24,7 @@ delta. Trust model: **agent proposes, engine disposes.**
 
 ## Tasks
 
-- [ ] T01 -- Sandbox `apply()` in `correct_apply.py` (L120-131) by mirroring
+- [x] T01 -- Sandbox `apply()` in `correct_apply.py` (L120-131) by mirroring
   `reconcile_fact()` (L233-252): drop `Bash` from `allowed_tools`
   (`["Read","Glob","Grep","Write","Edit"]`), add a `PreToolUse`
   `HookMatcher(matcher="Write|Edit", hooks=[make_path_scope_hook(...)])` scoping

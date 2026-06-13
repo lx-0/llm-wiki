@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-06-13T16:16:37+0200
+last_updated: 2026-06-13T16:27:12+0200
 current_milestone: M028
 active_slice: S01
-active_task: T01
+active_task: none
 last_completed_milestone: M026
 parked_milestone: M025
 parallel_milestones: [M021, M027]
@@ -35,7 +35,16 @@ blast radius + broad-term warning at `correct add`; **S04** (4) first-class
 issue-#5 close. Grounded against HEAD: `reconcile_fact()` `correct_apply.py:190-283`
 is the sandbox pattern; destructive instruction `prompts/correct_apply.md:26`;
 `make_path_scope_hook` `sdk_helpers.py:404` is allow-list-only (needs exclude).
-Next: `/ytstack:plan-task` for S01-T01.
+
+**S01 progress: 1/6 tasks done.** ✅ **T01 SHIPPED** (commit `db60226`,
+`M028-S01-T01-SUMMARY.md`): `apply()` sandboxed via extracted
+`_apply_agent_options()` — Bash dropped, PreToolUse path-scope hook over
+knowledge/+daily/+index.md+log, `permission_mode=default`, `max_turns` →
+new `limits.correct_apply_max_turns` knob (migration same-commit). Suite
+**1320 green**. NOT yet: `knowledge/facts/` still writable (hook is
+allow-list-only → S01-T02 adds `denied_subpaths`); e2e "deletes nothing" is
+S01-T06's golden repro. Next: `/ytstack:plan-task` for **S01-T02**
+(hook `denied_subpaths` param + facts/ write-protection).
 **Parked/parallel (not abandoned):** M027/S06 (NAS-SMB index + out-of-sandbox
 reader + scheduler — LAST M027 slice, `M027-S06-PLAN.md` exists) and the M006
 calendar-collector redesign remain open; pick back up after M028 or in parallel.
