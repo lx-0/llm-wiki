@@ -2,7 +2,7 @@
 id: orchestrate-tasks
 title: "Execute pending tasks from the tasks/ queue"
 description: "Reads tasks/ records with status: pending, executes each one, marks it done. Operator-gated — run manually after reviewing the queue."
-model: claude-opus-4-7
+model: claude-opus-4-8
 allowed_tools:
   - Read
   - Edit

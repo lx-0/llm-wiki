@@ -232,7 +232,7 @@ def test_migrate_config_no_change_when_fully_current(tmp_path):
     config_path.parent.mkdir(parents=True)
     config_path.write_text(yaml.safe_dump({
         "models": {
-            "dream_model": "claude-opus-4-7[1m]",
+            "dream_model": "claude-opus-4-8[1m]",
             "folder_scan_provider": "claude-sdk",
         },
         "scheduling": {
@@ -415,7 +415,7 @@ def test_migrate_additions_idempotent():
     m = _mod()
     data: dict = {
         "models": {
-            "dream_model": "claude-opus-4-7[1m]",
+            "dream_model": "claude-opus-4-8[1m]",
             "folder_scan_provider": "claude-sdk",
         },
         "scheduling": {
@@ -816,3 +816,43 @@ def test_migrate_account_additions_idempotent_when_email_discovery_present():
     changes = m.migrate_account_additions(data)
     assert changes == []
     assert data["personal"]["accounts"]["work"]["gmeet"]["email_discovery"]["enabled"] is False
+
+
+# ── migrate_model_upgrades: superseded-default value bumps ──────────
+
+
+def test_model_upgrade_bumps_retired_default():
+    m = _mod()
+    data = {"models": {
+        "compile_model": "claude-opus-4-7",
+        "compile_large_source_model": "claude-opus-4-7[1m]",
+        "dream_model": "claude-opus-4-7[1m]",
+    }}
+    changes = m.migrate_model_upgrades(data)
+    assert data["models"]["compile_model"] == "claude-opus-4-8"
+    assert data["models"]["compile_large_source_model"] == "claude-opus-4-8[1m]"
+    assert data["models"]["dream_model"] == "claude-opus-4-8[1m]"
+    assert len(changes) == 3
+
+
+def test_model_upgrade_preserves_pinned_other_model():
+    """A deliberately-pinned non-default model is left untouched."""
+    m = _mod()
+    data = {"models": {"compile_model": "claude-sonnet-4-6"}}
+    changes = m.migrate_model_upgrades(data)
+    assert data["models"]["compile_model"] == "claude-sonnet-4-6"
+    assert changes == []
+
+
+def test_model_upgrade_idempotent_on_current():
+    m = _mod()
+    data = {"models": {
+        "compile_model": "claude-opus-4-8",
+        "dream_model": "claude-opus-4-8[1m]",
+    }}
+    assert m.migrate_model_upgrades(data) == []
+
+
+def test_model_upgrade_noop_without_models_block():
+    m = _mod()
+    assert m.migrate_model_upgrades({}) == []

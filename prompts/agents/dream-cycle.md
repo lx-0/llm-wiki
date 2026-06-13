@@ -2,7 +2,7 @@
 id: dream-cycle
 title: "Resynthesize an entity page from all mentioning substrate"
 description: "Cross-time synthesis pass — picks an entity (people/projects/areas), greps all substrate mentioning them, rewrites the page's State + appends to Timeline. Distinct from per-file compile."
-model: claude-opus-4-7
+model: claude-opus-4-8
 allowed_tools:
   - Read
   - Glob

@@ -85,6 +85,7 @@ Key changes covered (chronological):
   limits.intent_source_globs                  (added 2026-06-13, default ["raw/voice/*"] — intake substrates the intent pass runs on)
   limits.intent_classify_timeout_s            (added 2026-06-13, default 120 — per-call timeout for intent classification SDK invocation)
   limits.intent_min_confidence                (added 2026-06-13, default "high" — confidence floor below which an intent is logged but not dispatched)
+  models.{compile_model,compile_large_source_model,dream_model}  (value upgrade 2026-06-13: opus 4-7 → 4-8; only exact old-default values are bumped, pinned models preserved)
   personal.accounts.<id>.health.healthkit    (added 2026-05-19 M023 — Apple HealthKit XML export ingest;
                                               injected as a placeholder into any account already carrying
                                               `health.oura`, kind: healthkit-xml-export, empty inbox_dir
@@ -134,6 +135,17 @@ PIGGYBACK_RENAMES: dict[str, str | None] = {
 #   dropping hand-built global rules). Code kept; default off.
 PIGGYBACK_FORCE_DISABLE: set[str] = {"optimize_claude_md"}
 
+# Engine-policy model-version upgrades: an operator config still pinned to a
+# SUPERSEDED engine default is bumped to the current default. Only an EXACT
+# match of the old default is upgraded — a deliberately-pinned other model is
+# preserved untouched. Keyed by models.<key> → {old_value: new_value}.
+#   2026-06-13: opus 4-7 → 4-8 across compile / large-source / dream.
+MODEL_UPGRADES: dict[str, dict[str, str]] = {
+    "compile_model": {"claude-opus-4-7": "claude-opus-4-8"},
+    "compile_large_source_model": {"claude-opus-4-7[1m]": "claude-opus-4-8[1m]"},
+    "dream_model": {"claude-opus-4-7[1m]": "claude-opus-4-8[1m]"},
+}
+
 # Keys introduced in newer engine versions that should be injected into the
 # operator's config so they're visible/tunable. Structure: parent block name
 # → {key: default_value}. Missing parent blocks are created. Keys already
@@ -144,7 +156,7 @@ KEY_ADDITIONS: dict[str, dict[str, object]] = {
         # a fan-out workload that blows standard 200K Opus context mid-stream
         # (see KNOWLEDGE.md "tool-turn ballooning"). Set to "" to fall back
         # to models.compile_model. Added 2026-05-18.
-        "dream_model": "claude-opus-4-7[1m]",
+        "dream_model": "claude-opus-4-8[1m]",
         # M027-S04 folder-scan answer provider (Q9 seam). claude-sdk is
         # the only provider today; local LLM/agent later. Unknown values
         # raise loudly — no silent fallback. Added 2026-06-10.
@@ -834,6 +846,26 @@ def migrate_piggybacks(piggybacks: dict) -> tuple[dict, list[str]]:
     return out, changes
 
 
+def migrate_model_upgrades(data: dict) -> list[str]:
+    """Bump model values still pinned to a superseded engine default.
+
+    Inverse intent of KEY_ADDITIONS (which only injects MISSING keys): this
+    rewrites an EXISTING `models.<key>` whose value exactly equals a retired
+    default. A model the operator deliberately pinned to something else is
+    preserved — only the exact old-default string is touched.
+    """
+    models = data.get("models")
+    if not isinstance(models, dict):
+        return []
+    changes: list[str] = []
+    for key, mapping in MODEL_UPGRADES.items():
+        cur = models.get(key)
+        if isinstance(cur, str) and cur in mapping:
+            models[key] = mapping[cur]
+            changes.append(f"upgraded models.{key} {cur!r} → {mapping[cur]!r}")
+    return changes
+
+
 def migrate_config(config_path: Path) -> tuple[str | None, list[str]]:
     """Return (new_yaml_text_or_None, changes). None text → no change needed."""
     if not config_path.exists():
@@ -880,6 +912,10 @@ def migrate_config(config_path: Path) -> tuple[str | None, list[str]]:
     # Orphan-field drops — prune entries whose backing dataclass field is
     # gone, otherwise they live forever in operator YAML as silent cruft.
     changes.extend(migrate_drops(data))
+
+    # Model-version upgrades — bump models.* values still on a retired default
+    # (opus 4-7 → 4-8) so existing vaults don't stay frozen on the old default.
+    changes.extend(migrate_model_upgrades(data))
 
     if not changes:
         return None, []

@@ -154,14 +154,14 @@ class PiggybackTask:
 
 @dataclass
 class Models:
-    compile_model: str = "claude-opus-4-7"
+    compile_model: str = "claude-opus-4-8"
     # Compile fallback for sources >= CONFIG.limits.compile_large_source_chars.
     # The standard 200K-token Opus window dies silently (exit-1, empty stderr)
     # on 100+ KB transcripts even with max_turns capped — Read-tool fan-out into
     # knowledge/ articles plus the source itself blow past the window mid-stream.
     # The 1M variant absorbs both. Set to "" to disable the auto-upgrade and
     # stay on `compile_model` regardless of source size.
-    compile_large_source_model: str = "claude-opus-4-7[1m]"
+    compile_large_source_model: str = "claude-opus-4-8[1m]"
     # Dream-cycle entity re-synthesis (M014). dream-entity is a kanonical
     # fan-out workload: 1 entity-page Edit on top of N substrate Reads from
     # its corpus (T1=10-30 files typical) + Grep/Glob exploration of
@@ -171,7 +171,7 @@ class Models:
     # dream-entity calls have headroom for the inherent fan-out, just like
     # `compile_force_long_context_types` does for compile's fan-out
     # substrates (daily-digest, etc). Set "" to fall back to compile_model.
-    dream_model: str = "claude-opus-4-7[1m]"
+    dream_model: str = "claude-opus-4-8[1m]"
     # Folder-scan answer provider (M027-S04, Q9 seam). The curiosity
     # folder backend reads an operator-approved file in-place and
     # distills an answer-extract. "claude-sdk" is the only provider

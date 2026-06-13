@@ -189,12 +189,12 @@ piggybacks:
 
 models:
   # Claude model used by compile.py + retry-failed-flushes.
-  compile_model: claude-opus-4-7
+  compile_model: claude-opus-4-8
   # Compile fallback for sources >= limits.compile_large_source_chars.
   # Standard 200K Opus window dies silently on 100+ KB transcripts. The 1M
   # variant absorbs both the source and tool-turn reads. Set to empty string
   # to disable the auto-upgrade.
-  compile_large_source_model: claude-opus-4-7[1m]
+  compile_large_source_model: claude-opus-4-8[1m]
   # Folder-scan answer provider (watched-folder curiosity). The backend
   # reads an operator-approved file in-place and distills an
   # answer-extract. "claude-sdk" is the only provider today; a local
