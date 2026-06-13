@@ -94,6 +94,7 @@ log = setup_console_logging(
 from core.config import CONFIG  # noqa: E402
 from core.prompts import render  # noqa: E402
 from core import ollama_client  # noqa: E402
+from core.piggybacks import run_due_piggybacks  # noqa: E402
 
 from compile_stages.post_passes import run_post_passes  # noqa: E402
 from compile_stages.types import CompileOutcome  # noqa: E402
@@ -467,6 +468,29 @@ def _acquire_exclusive_lock(lock_path: Path) -> io.IOBase | None:
 
 # ── Main ─────────────────────────────────────────────────────────────
 
+def _spawn_maintenance() -> None:
+    """Drain due piggybacks at the end of a real compile.
+
+    The operator's loop is `wiki update && wiki compile`; the piggyback trigger
+    used to live only in `flush.py` behind the `compile_after_hour` evening
+    gate, so for a daytime-compile-only workflow none of dream-cycle / lint /
+    curiosity-drain / daily-digest ever fired and their queues piled up. Here we
+    spawn whatever is due (cooldown-gated, hour-gate bypassed), detached and
+    non-blocking. Never let a spawn failure abort the compile that triggered it.
+    """
+    if not CONFIG.scheduling.piggybacks_on_compile:
+        return
+    try:
+        spawned = run_due_piggybacks(ignore_hour_gate=True, log=log)
+        if spawned:
+            log.info(
+                "  maintenance: spawned %d due piggyback(s): %s",
+                len(spawned), ", ".join(spawned),
+            )
+    except Exception:  # noqa: BLE001 — maintenance must never break compile
+        log.warning("  maintenance: piggyback spawn failed (continuing)", exc_info=True)
+
+
 # Skip reasons whose branch mutates state["ingested"] on DISK from inside
 # compile_file (source-and-final indexing; the deterministic health-rollup
 # stub path). After such a skip the main loop's in-memory `state` is stale, so
@@ -520,6 +544,10 @@ async def main() -> None:
     files = select_files(args)
     if not files:
         log.info("Nothing to compile — all files up to date.")
+        # A no-op compile still keeps maintenance current — dream/lint/etc.
+        # backlogs are independent of whether new sources landed this run.
+        if not args.dry_run:
+            _spawn_maintenance()
         return
 
     log.info("Files to compile: %d", len(files))
@@ -745,6 +773,14 @@ async def main() -> None:
         run_cost, total_cost,
     )
     log.info("  time:    %dm %ds", elapsed_min, elapsed_sec)
+
+    # Drain due maintenance (dream/lint/curiosity/digests) now that the corpus
+    # reflects this run. Detached + cooldown-gated; the dry-run path returned
+    # earlier so this only fires on real compiles. Skipped after an abort —
+    # a consecutive-failure abort is a rate-limit signal, and piling cloud
+    # piggybacks (dream-cycle) onto that window only deepens the hole.
+    if not aborted:
+        _spawn_maintenance()
 
 
 if __name__ == "__main__":

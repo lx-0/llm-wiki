@@ -16,7 +16,7 @@ CLI surface:
     wiki dream --all-entities           # sweep everyone, respecting cooldown
     wiki dream-entity <slug> --dry-run  # print corpus + estimated cost, no SDK call
 
-Piggyback wiring: see `flush.py:_LEGACY_PIGGYBACK_COMMANDS["dream_cycle"]`.
+Piggyback wiring: see `core/piggybacks.py:_LEGACY_PIGGYBACK_COMMANDS["dream_cycle"]`.
 The piggyback shells out to `dream.py --piggyback`, which sweeps the N
 most-overdue entities under the per-run cost cap.
 

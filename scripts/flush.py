@@ -33,6 +33,7 @@ from core.config import CONFIG  # noqa: E402
 from core.sdk_helpers import StderrCapture, log_sdk_failure  # noqa: E402
 
 from core import flush_pipeline  # noqa: E402
+from core.piggybacks import PIGGYBACK_STATE_FILE, run_due_piggybacks  # noqa: E402
 
 DAILY_DIR = ROOT_DIR / "daily"
 STATE_DIR = WIKI_DIR / "state"     # *.json runtime artifacts (hash trackers, cooldowns)
@@ -56,125 +57,15 @@ DASHBOARD_REFRESH_TIMEOUT_S = 120
 TIMEZONE = CONFIG.scheduling.timezone
 COMPILE_AFTER_HOUR = CONFIG.scheduling.compile_after_hour
 DEDUP_WINDOW_SECONDS = CONFIG.scheduling.dedup_window_seconds
-PIGGYBACK_STATE_FILE = STATE_DIR / "piggyback-state.json"
+# PIGGYBACK_STATE_FILE + the task table + spawn logic now live in
+# core/piggybacks.py so compile.py can drain due maintenance without importing
+# this module (which pulls the Claude SDK + sets CLAUDE_INVOKED_BY at load).
 
 # Re-exports — kept so retry-failed-flushes.py and any other importers
 # continue to find the canonical paths/funcs at familiar names.
 SESSIONS_DIR = flush_pipeline.SESSIONS_DIR
 FAILED_FLUSHES_DIR = flush_pipeline.FAILED_DIR
 append_to_daily = flush_pipeline.append_to_daily
-
-# Piggyback tasks — spawned after compile_after_hour if cooldown elapsed and
-# the task is enabled in wiki/config.yaml. Two sources of truth, merged at
-# build time:
-#
-# 1. Registry-discovered Collectors with `SPEC.piggyback_default=True` —
-#    spawned as `collectors/cli.py <name>` (the canonical CLI for collectors).
-# 2. Legacy commands not yet ported to the Collector pattern — listed
-#    explicitly below until they get migrated (M003 candidate).
-#
-# Cooldown + enabled flag come from CONFIG.piggybacks.<name> for both.
-
-_LEGACY_PIGGYBACK_COMMANDS: dict[str, list[str]] = {
-    "lint_structural": ["lint.py", "--structural-only"],
-    "review_wiki": ["review-wiki.py"],
-    "optimize_claude_md": ["optimize-claude-md.py"],
-    "retry_failed_flushes": ["retry-failed-flushes.py", "--limit", "{max_per_run}"],
-    # Drain N oldest requests per fire (configurable via max_per_run).
-    # Steady-rate beats --run-oldest (1/fire) for keeping ahead of the
-    # producer when compile runs on many sources at once.
-    "curiosity_followup": ["curiosity/cli.py", "--run-batch", "{max_per_run}"],
-    # Distills yesterday's per-source captures under daily/<yesterday>/ into
-    # a tight ≤500-word digest at daily/<yesterday>.md. Runs morning-after so
-    # all collector piggybacks have already landed their per-source files.
-    "daily_digest_yesterday": ["daily_digest_runner.py", "--date", "yesterday"],
-    # M014 dream-cycle. Sweeps the N most-overdue entity pages (oldest
-    # last_synthesized_at first) and resynthesizes their State + Timeline
-    # from the full substrate corpus. Per-run cost cap is enforced inside
-    # dream.py via limits.dream_cycle_max_tokens_per_run; this template
-    # just hands over max_per_run as the entity-count ceiling.
-    "dream_cycle": ["dream.py", "piggyback", "--limit", "{max_per_run}"],
-    # M019 operator-self-reports surface. Fires N hours per cooldown,
-    # walks `<vault>/<personal.reports_dir>/studies/*/`, runs each study
-    # whose schedule (weekly / monthly / quarterly) says it's due. Each
-    # study takes its own per-study flock so concurrent piggyback fires
-    # don't double-score and cross-study runs proceed in parallel. The
-    # cooldown here gates how often we CHECK for due studies; the
-    # study's own schedule gates when it actually runs.
-    "study_run_due": ["study.py", "piggyback"],
-    # M019-S05 Pass-2 analyst — cross-study synthesis. Reads all
-    # latest Pass-1 outputs + their _summary.md siblings, writes
-    # reports/analyses/<ts>.md. Pass-1 fires automatically inside
-    # `wiki study run` (per-study); Pass-2 runs on its own cadence
-    # because it's a different layer of integration. Default OFF
-    # until operator flips features.operator_reports.
-    "analyst_pass2": ["analyze.py", "--cross-study-only"],
-    # Autonomous concept-reconciliation routine (2026-05-22). Double-gated:
-    # this legacy piggyback only runs if the operator adds a
-    # `piggybacks.concept_reconcile: {enabled: true, ...}` block (default
-    # absent → skipped), AND `--apply` is self-gated inside reconcile.py by
-    # `features.concept_reconciliation` (off → it falls back to a no-op
-    # dry-run). See `.ytstack/backlog/concept-consistency-routine.md`.
-    "concept_reconcile": ["reconcile.py", "--apply", "--limit", "{max_per_run}"],
-    # Health-trend synthesis (2026-05-23). Deterministic ($0). Double-gated:
-    # needs a `piggybacks.health_trends` block (default absent → skipped) AND
-    # `features.health_trends` (off → health_trends.py falls back to dry-run).
-    "health_trends": ["health_trends.py"],
-}
-
-
-def _build_piggyback_tasks() -> list[dict]:
-    tasks: list[dict] = []
-
-    # 1. Registry-discovered Collectors.
-    try:
-        from collectors import piggyback_collectors  # noqa: WPS433  late import to avoid cycles
-    except ImportError:
-        piggyback_collectors = lambda: []  # type: ignore[assignment]
-
-    for collector in piggyback_collectors():
-        name = collector.SPEC.name
-        task_cfg = CONFIG.piggybacks.get(name)
-        if task_cfg is not None and not task_cfg.enabled:
-            continue
-        cooldown = task_cfg.cooldown_hours if task_cfg else collector.SPEC.piggyback_cooldown_hours
-        cmd = ["collectors/cli.py", name]
-        if collector.SPEC.supports_incremental:
-            cmd.append("--incremental")
-        tasks.append({
-            "name": name,
-            "cmd": cmd,
-            "cooldown_hours": cooldown,
-        })
-
-    # 2. Legacy commands not yet on the Registry.
-    for name, cmd_template in _LEGACY_PIGGYBACK_COMMANDS.items():
-        task_cfg = CONFIG.piggybacks.get(name)
-        if task_cfg is None or not task_cfg.enabled:
-            continue
-        # Avoid double-add if a Collector already claims this name.
-        if any(t["name"] == name for t in tasks):
-            continue
-        cmd = []
-        for arg in cmd_template:
-            if arg == "{max_per_run}":
-                if task_cfg.max_per_run is None:
-                    if cmd and cmd[-1] in ("--limit", "-n"):
-                        cmd.pop()
-                    continue
-                cmd.append(str(task_cfg.max_per_run))
-            else:
-                cmd.append(arg)
-        tasks.append({
-            "name": name.replace("_", "-"),
-            "cmd": cmd,
-            "cooldown_hours": task_cfg.cooldown_hours,
-        })
-
-    return tasks
-
-
-PIGGYBACK_TASKS = _build_piggyback_tasks()
 
 # ── Logging ──────────────────────────────────────────────────────────
 # Shared console setup: TTY-detected colors on stderr, INFO+ archive to
@@ -434,85 +325,15 @@ def refresh_dashboard_lint() -> None:
 
 # ── Piggyback tasks ─────────────────────────────────────────────────
 
-def _load_piggyback_state() -> dict:
-    if PIGGYBACK_STATE_FILE.exists():
-        try:
-            return json.loads(PIGGYBACK_STATE_FILE.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, OSError):
-            return {}
-    return {}
-
-
 def maybe_run_piggyback_tasks() -> None:
-    """Spawn piggyback tasks if it's after COMPILE_AFTER_HOUR and cooldown has elapsed."""
-    now = datetime.now(ZoneInfo(TIMEZONE))
-    if now.hour < COMPILE_AFTER_HOUR:
-        return
+    """Spawn due piggyback tasks (evening-only, cooldown-gated).
 
-    state = _load_piggyback_state()
-
-    for task in PIGGYBACK_TASKS:
-        name = task["name"]
-        cooldown_hours = task["cooldown_hours"]
-
-        # Check cooldown
-        entry = state.get(name, {})
-        last_run = entry.get("last_run")
-        if last_run:
-            try:
-                last_dt = datetime.fromisoformat(last_run)
-                elapsed_hours = (now - last_dt).total_seconds() / 3600
-                if elapsed_hours < cooldown_hours:
-                    log.info(
-                        "Piggyback %s: cooldown (%.1fh / %dh), skipping",
-                        name, elapsed_hours, cooldown_hours,
-                    )
-                    continue
-            except (ValueError, TypeError):
-                pass  # corrupt timestamp, run anyway
-
-        # Build command
-        script = SCRIPTS_DIR / task["cmd"][0]
-        if not script.exists():
-            log.warning("Piggyback %s: script not found: %s", name, script)
-            continue
-
-        # Wrap the command in piggyback_runner so the child runs under a hard
-        # wall-clock cap and its real outcome (ok/failed/timeout) lands in
-        # piggyback-state.json. flush spawns detached and can't wait, so without
-        # the runner `status` froze at "spawned" forever and a hung child (e.g.
-        # review-wiki on a half-open socket) ran unbounded. See KNOWLEDGE.md.
-        from core.piggyback_runner import record_status  # late import — avoid cycles
-
-        cmd = [sys.executable, str(script)] + task["cmd"][1:]
-        timeout_s = CONFIG.limits.piggyback_max_runtime_s
-        runner = SCRIPTS_DIR / "core" / "piggyback_runner.py"
-        wrapped = [sys.executable, str(runner), name, str(timeout_s), "--", *cmd]
-        log.info("Piggyback %s: spawning %s (cap %ds)", name, " ".join(task["cmd"]), timeout_s)
-
-        kwargs: dict = {}
-        if sys.platform == "win32":
-            kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
-        else:
-            kwargs["start_new_session"] = True
-
-        # Record initial state under the SAME lock the runner uses for its
-        # running→outcome updates, so neither clobbers the other. (Replaces the
-        # old in-memory state[name] + bulk _save_piggyback_state, which raced a
-        # fast-completing runner's outcome back to "spawned".)
-        record_status(name, {"last_run": now.isoformat(timespec="seconds"), "status": "spawned"})
-
-        try:
-            subprocess.Popen(
-                wrapped,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                stdin=subprocess.DEVNULL,
-                **kwargs,
-            )
-        except Exception:
-            log.exception("Piggyback %s: failed to spawn", name)
-            record_status(name, {"status": "error:spawn"})
+    Thin wrapper over `core.piggybacks.run_due_piggybacks` — the flush path
+    keeps the `compile_after_hour` gate. The compile path calls
+    `run_due_piggybacks(ignore_hour_gate=True)` directly so daytime compiles
+    still drain maintenance. Logic + task table live in core/piggybacks.py.
+    """
+    run_due_piggybacks(ignore_hour_gate=False, log=log)
 
 
 # ── Main ─────────────────────────────────────────────────────────────

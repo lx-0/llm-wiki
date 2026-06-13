@@ -99,6 +99,14 @@ class DreamPriority:
 class Scheduling:
     compile_after_hour: int = 18
     dedup_window_seconds: int = 60
+    # When true, a real (non-dry-run) `wiki compile` drains any due piggybacks
+    # (dream-cycle, lint, curiosity, daily-digest, …) at the end of the run,
+    # bypassing the `compile_after_hour` evening gate (per-task cooldowns still
+    # rate-limit). This keeps maintenance current for operators who live in
+    # `wiki update && wiki compile` and rarely `wiki flush` — the flush path was
+    # the only other trigger, so their queues otherwise piled up unworked. Set
+    # false to keep maintenance evening-/flush-only.
+    piggybacks_on_compile: bool = True
     # IANA timezone name used for human-friendly local-time decisions
     # (compile_after_hour cutoff, daily-log filename, "reviewed" timestamps).
     # Default UTC keeps installs portable; override per-instance via config.yaml.
@@ -935,7 +943,7 @@ class Personal:
     domains: list[str] = field(default_factory=lambda: ["company", "personal", "ai", "meta"])
 
 
-# Default piggyback set — script names match flush.py's PIGGYBACK_TASKS keys.
+# Default piggyback set — names match core/piggybacks.py's task-table keys.
 def _default_piggybacks() -> dict[str, PiggybackTask]:
     return {
         "email_incremental": PiggybackTask(cooldown_hours=24),

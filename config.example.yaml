@@ -8,6 +8,12 @@ scheduling:
   compile_after_hour: 18
   # Dedup window (seconds) for repeated session-flushes of the same session id.
   dedup_window_seconds: 60
+  # When true, a real `wiki compile` drains any due piggybacks (dream-cycle,
+  # lint, curiosity, daily-digest, …) at the end of the run, bypassing the
+  # compile_after_hour evening gate above (per-task cooldowns still rate-limit).
+  # Keeps maintenance current for `wiki update && wiki compile`-only workflows
+  # that rarely flush. Set false to keep maintenance evening-/flush-only.
+  piggybacks_on_compile: true
   # IANA timezone name. Used for compile_after_hour cutoff, daily-log filenames,
   # and "reviewed" timestamps. Default "UTC" works on any install; override to
   # your local timezone (e.g. "Europe/Berlin", "America/New_York", "Asia/Tokyo").

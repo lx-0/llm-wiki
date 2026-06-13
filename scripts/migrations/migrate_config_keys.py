@@ -75,6 +75,7 @@ Key changes covered (chronological):
   limits.dedup_fuzzy_threshold               (added 2026-05-31, default 0.85 — `wiki dedup` fuzzy-title match floor for duplicate-candidate proposal)
   features.dream_web_research                (added 2026-05-31, default False — Exa-AI public-entity enrichment dream post-pass; issue #2)
   scheduling.web_research_cooldown_days      (added 2026-05-31, default 30 — `## Public Profile` refresh cooldown)
+  scheduling.piggybacks_on_compile           (added 2026-06-13, default True — `wiki compile` drains due piggybacks at run-end, bypassing the evening hour-gate so update+compile-only operators keep maintenance current)
   personal.exa_api_key                       (added 2026-05-31, default "" — Exa AI key; falls back to env EXA_API_KEY)
   personal.accounts.<id>.health.healthkit    (added 2026-05-19 M023 — Apple HealthKit XML export ingest;
                                               injected as a placeholder into any account already carrying
@@ -278,6 +279,12 @@ KEY_ADDITIONS: dict[str, dict[str, object]] = {
         "dedup_fuzzy_threshold": 0.85,
     },
     "scheduling": {
+        # 2026-06-13: `wiki compile` drains due piggybacks at run-end,
+        # bypassing the compile_after_hour evening gate (cooldowns still
+        # rate-limit) so operators who live in `wiki update && wiki compile`
+        # and rarely flush keep maintenance current. Match
+        # Scheduling.piggybacks_on_compile default in `scripts/core/config.py`.
+        "piggybacks_on_compile": True,
         # M014 dream-cycle (2026-05-16). Per-entity cooldown — entities
         # synthesized within this window are skipped by sweep + piggyback.
         # Match Scheduling.dream_cooldown_days default in

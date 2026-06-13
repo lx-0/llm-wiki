@@ -550,8 +550,9 @@ class ScreenshotsCollector:
     degrades gracefully (returns a no-op result, never crashes).
 
     This Collector REPLACES the legacy `_LEGACY_PIGGYBACK_COMMANDS`
-    "scan_screenshots" entry — `piggyback_default=True` makes flush.py
-    auto-discover it via the Registry walk. The piggyback config key is
+    "scan_screenshots" entry (now in `core/piggybacks.py`) —
+    `piggyback_default=True` makes the Registry walk auto-discover it. The
+    piggyback config key is
     `piggybacks.screenshots` (renamed from `scan_screenshots` for naming
     consistency with the other Registry collectors).
     """
