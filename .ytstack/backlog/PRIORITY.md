@@ -45,6 +45,7 @@ Real value, real cost; needs canary data, parallel-session coordination, or oper
 - **`curiosity-topic-as-search-query.md`** — use curiosity-topic as IMAP/Gmail search-query, not blind folder dump.
 - **`dashboard-action-items.md`** — likely subsumed by M005's Personal Tasks pane (verify before reopening).
 - **`dashboard-upcoming-events.md`** — was blocked on calendar-collector; M006 shipped, so now unblocked.
+- **`../OFFICE-HOURS-wiki-desktop-app.md`** — 🅿️ PARKED (NEW INITIATIVE, 2026-06-13). Desktop GUI fronting llm-wiki: accessibility for non-technical keyusers (Sid won't touch the CLI → ~50% of keyusers don't engage) + always-on health/status overview for technical users. Premise validated via office-hours (accessibility = product-survival gate; multi-user is a wiki *quality* driver → ties to `company-brain-federation`). **Parked on open architecture questions:** Electron vs Tauri; reuse Obsidian/M003 dashboard vs new app; likely its own repo, not an llm-wiki milestone. Narrowest wedge = read-only health window first. Resume at `plan-ceo-review` (concept-mode) once architecture is settled. Folds in `listener-lifecycle` (listener toggle) as a feature; screenpipe **collector** stays separate + unvalidated.
 
 ## 🌾 Collector ideas — large pool, pick when capacity allows
 

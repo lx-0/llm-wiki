@@ -1,7 +1,7 @@
 ---
 name: llm-wiki Desktop App
 one-liner: A desktop app for llm-wiki's technical and non-technical users that makes the whole wiki usable without the CLI and shows its health at a glance.
-status: pitch (office-hours done; plan-ceo-review next)
+status: PARKED 2026-06-13 (office-hours done; blocked on open architecture questions before plan-ceo-review)
 captured: 2026-06-13
 related: [[screenpipe-intake]], [[listener-lifecycle]], [[interactive-cli]], M003 Obsidian dashboard
 ---
@@ -103,8 +103,12 @@ expansion AFTER the read-only shell proves the desktop-app direction.
 
 ## Next step
 
-`plan-ceo-review` (concept mode) to stress-test scope + ambition before any
-scaffolding — this initiative is big and scope-control is the main risk. Then
+**PARKED 2026-06-13 by operator** — open architecture questions remain (see
+"Architecture" above: Electron vs Tauri, reuse Obsidian/M003 vs new app). Listed
+in `backlog/PRIORITY.md` (🌱 Medium). Resume below once those are settled.
+
+When unparked: `plan-ceo-review` (concept mode) to stress-test scope + ambition
+before any scaffolding — this initiative is big and scope-control is the main risk. Then
 optionally `plan-eng-review` (concept mode) for the Electron-vs-Tauri /
 reuse-vs-rebuild call, then `init-project` (likely its own project, not an
 llm-wiki milestone — the app is a separate codebase fronting the engine).
