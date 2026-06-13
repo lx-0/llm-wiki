@@ -314,3 +314,61 @@ def test_execute_deletes_skips_outside_knowledge(tmp_path, monkeypatch) -> None:
 
     executed = mod._execute_deletes(actions, vault, allowed=True)
     assert executed == []                           # never delete outside knowledge/
+
+
+# ── deletion gate (M028-S02-T02) ──
+
+
+def test_deletion_allowed_resolution() -> None:
+    from facts import correct_apply
+
+    assert correct_apply._deletion_allowed({}, True) is True            # CLI flag
+    assert correct_apply._deletion_allowed({"disposition": "delete"}, False) is True  # fact field
+    assert correct_apply._deletion_allowed({}, False) is False          # neither
+    assert correct_apply._deletion_allowed({"disposition": "supersede"}, False) is False
+
+
+def test_apply_allow_delete_trashes_nominated(tmp_path, monkeypatch) -> None:
+    """End-to-end: with the gate ON, a nominated factually-false article is trashed."""
+    import asyncio
+    from facts import correct_apply
+    from claude_agent_sdk import ResultMessage
+
+    vault = tmp_path
+    knowledge = vault / "knowledge"
+    facts = knowledge / "facts"
+    facts.mkdir(parents=True)
+    (knowledge / "concepts").mkdir()
+    bogus = knowledge / "concepts" / "bogus.md"
+    bogus.write_text("# Bogus event that never happened\n", encoding="utf-8")
+    (knowledge / "index.md").write_text("- [[concepts/bogus]] — x\n", encoding="utf-8")
+    fact = facts / "neverhappened.md"
+    fact.write_text("---\ntype: fact\nstatus: negation\napplied: false\n---\n\nThat never happened.\n", encoding="utf-8")
+
+    monkeypatch.setattr(correct_apply, "ROOT_DIR", vault)
+    monkeypatch.setattr(correct_apply, "FACTS_DIR", facts)
+    monkeypatch.setattr(correct_apply, "KNOWLEDGE_DIR", knowledge)
+    monkeypatch.setattr(correct_apply, "INDEX_FILE", knowledge / "index.md")
+    monkeypatch.setattr(correct_apply.LEDGER, "record", lambda **k: None)
+
+    agent_out = (
+        "## Proposed actions\n```json\n"
+        '{"superseded": [], "edited": [], "renamed": [],'
+        ' "deleted": ["knowledge/concepts/bogus.md"]}\n```\n'
+    )
+
+    async def fake_query(*, prompt, options):  # noqa: ARG001
+        # the gate must reach the prompt
+        assert "Deletion permitted: true" in prompt
+        yield ResultMessage(
+            subtype="success", duration_ms=1, duration_api_ms=1, is_error=False,
+            num_turns=1, session_id="t", total_cost_usd=0.0,
+            usage={"input_tokens": 1, "output_tokens": 1}, result=agent_out,
+        )
+
+    monkeypatch.setattr(correct_apply, "query", fake_query)
+
+    rc = asyncio.run(correct_apply.apply("neverhappened", dry_run=False, allow_delete=True))
+    assert rc == 0
+    assert not bogus.exists()
+    assert list((vault / ".trash").rglob("bogus.md")), "must be recoverable in .trash"

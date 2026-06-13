@@ -158,6 +158,13 @@ def _execute_renames(actions: dict, vault: Path) -> list:
     return executed
 
 
+def _deletion_allowed(fm: dict, allow_delete_flag: bool) -> bool:
+    """Whether `apply` may execute deletions: the per-run CLI flag OR a per-fact
+    `disposition: delete` field. Default (neither) → False → supersede only.
+    """
+    return bool(allow_delete_flag) or fm.get("disposition") == "delete"
+
+
 def _clear_index_rows(index_file: Path, doomed: set, vault: Path) -> int:
     """Drop `index.md` rows whose wikilink resolves to a to-be-deleted file.
 
@@ -378,7 +385,7 @@ def _apply_agent_options(capture: StderrCapture) -> ClaudeAgentOptions:
     )
 
 
-async def apply(slug: str, dry_run: bool) -> int:
+async def apply(slug: str, dry_run: bool, allow_delete: bool = False) -> int:
     fact_path = FACTS_DIR / f"{slug}.md"
     if not fact_path.exists():
         log.error("No such fact: %s (looked at %s)", slug, fact_path)
@@ -389,6 +396,8 @@ async def apply(slug: str, dry_run: bool) -> int:
     if fm.get("type") != "fact":
         log.warning("File %s does not have type: fact — proceeding anyway.", fact_path)
 
+    deletion_allowed = _deletion_allowed(fm, allow_delete)
+
     rel_fact_path = fact_path.relative_to(ROOT_DIR)
     prompt = render(
         "correct_apply",
@@ -397,9 +406,7 @@ async def apply(slug: str, dry_run: bool) -> int:
         slug=slug,
         today=today_iso(),
         now=now_iso(),
-        # S01 has no engine-side delete executor yet — deletion is never
-        # permitted. S02-T03 wires the real `--allow-delete` / disposition gate.
-        deletion_allowed="false",
+        deletion_allowed="true" if deletion_allowed else "false",
     )
 
     if dry_run:
@@ -456,8 +463,7 @@ async def apply(slug: str, dry_run: bool) -> int:
     # Renames here; deletions are deferred to S02's `.trash` executor.
     actions = _parse_proposed_actions(result_text)
     executed_renames = _execute_renames(actions, ROOT_DIR)
-    # Deletion gate is wired in S02-T02; off here so S01 stays deletion-free.
-    executed_deletes = _execute_deletes(actions, ROOT_DIR, allowed=False)
+    executed_deletes = _execute_deletes(actions, ROOT_DIR, allowed=deletion_allowed)
 
     # Ground-truth reporting: what ACTUALLY changed on disk, and a warning when
     # it contradicts the agent's declared actions (issue #5: claimed 6, did 17).
@@ -607,8 +613,15 @@ def main() -> int:
         action="store_true",
         help="show what would happen without spawning the agent",
     )
+    parser.add_argument(
+        "--allow-delete",
+        action="store_true",
+        help="permit deletion of factually-false articles (default: supersede only). "
+        "Deleted files go to .trash/, never rm. A fact's `disposition: delete` "
+        "frontmatter opens the gate per-fact without this flag.",
+    )
     args = parser.parse_args()
-    return asyncio.run(apply(args.slug, args.dry_run))
+    return asyncio.run(apply(args.slug, args.dry_run, args.allow_delete))
 
 
 if __name__ == "__main__":
