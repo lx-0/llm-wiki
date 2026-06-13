@@ -439,3 +439,65 @@ def test_apply_refuses_deletion_on_unsafe_tree(tmp_path, monkeypatch) -> None:
     # …but --force bypasses the guard (will spawn; we only assert it gets past the gate)
     rc2 = asyncio.run(correct_apply.apply("f", dry_run=False, allow_delete=True, force=True))
     assert called["spawned"] is True
+
+
+# ── S02 slice acceptance (M028-S02-T04) ──
+
+
+def test_divergence_silent_for_declared_deletion() -> None:
+    from facts import correct_apply
+
+    actions = {"superseded": [], "edited": [], "renamed": [],
+               "deleted": ["knowledge/concepts/bogus.md"]}
+    delta = {"created": [], "modified": [], "renamed": [],
+             "deleted": ["knowledge/concepts/bogus.md"]}
+    assert correct_apply._divergence(actions, delta, executed_renames=[]) == []
+
+
+def test_apply_deletion_e2e_clean_git(tmp_path, monkeypatch, caplog) -> None:
+    """Full S02 path on a CLEAN git vault: gate on, guard passes (no --force),
+    article trashed + recoverable, rc 0, no false deletion alarm."""
+    import asyncio
+    import logging as _logging
+    from facts import correct_apply
+    from claude_agent_sdk import ResultMessage
+
+    vault = tmp_path
+    knowledge = vault / "knowledge"
+    facts = knowledge / "facts"
+    facts.mkdir(parents=True)
+    (knowledge / "concepts").mkdir()
+    bogus = knowledge / "concepts" / "bogus.md"
+    bogus.write_text("# Bogus that never happened\n", encoding="utf-8")
+    (knowledge / "index.md").write_text("- [[concepts/bogus]] — x\n", encoding="utf-8")
+    _git_init(vault)  # commit the articles → clean tree
+    fact = facts / "nh.md"
+    fact.write_text("---\ntype: fact\nstatus: negation\napplied: false\n---\n\nNever happened.\n", encoding="utf-8")
+
+    monkeypatch.setattr(correct_apply, "ROOT_DIR", vault)
+    monkeypatch.setattr(correct_apply, "FACTS_DIR", facts)
+    monkeypatch.setattr(correct_apply, "KNOWLEDGE_DIR", knowledge)
+    monkeypatch.setattr(correct_apply, "INDEX_FILE", knowledge / "index.md")
+    monkeypatch.setattr(correct_apply.LEDGER, "record", lambda **k: None)
+
+    agent_out = (
+        "## Proposed actions\n```json\n"
+        '{"superseded": [], "edited": [], "renamed": [],'
+        ' "deleted": ["knowledge/concepts/bogus.md"]}\n```\n'
+    )
+
+    async def fake_query(*, prompt, options):  # noqa: ARG001
+        yield ResultMessage(
+            subtype="success", duration_ms=1, duration_api_ms=1, is_error=False,
+            num_turns=1, session_id="t", total_cost_usd=0.0,
+            usage={"input_tokens": 1, "output_tokens": 1}, result=agent_out,
+        )
+
+    monkeypatch.setattr(correct_apply, "query", fake_query)
+    caplog.set_level(_logging.WARNING, logger="correct-apply")
+
+    rc = asyncio.run(correct_apply.apply("nh", dry_run=False, allow_delete=True))  # no --force
+    assert rc == 0                                        # clean tree → guard passes
+    assert not bogus.exists()
+    assert list((vault / ".trash").rglob("bogus.md"))     # recoverable
+    assert "vanished with no accounting" not in caplog.text  # declared+executed → no alarm
