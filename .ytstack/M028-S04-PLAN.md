@@ -5,7 +5,7 @@ project: llm-wiki
 created: 2026-06-13T15:56:13+0200
 status: planned
 task_count: 4
-completed_tasks: 2
+completed_tasks: 3
 ---
 
 # M028-S04 -- Slice Plan
@@ -26,7 +26,7 @@ conflating *false* with *outdated*, and M028 is documented + issue #5 closed.
   handle `supersession`: surface articles that should carry the superseded
   banner/frontmatter but don't, as annotation gaps — not as deletion candidates.
   Keep `negation` lint behaviour intact.
-- [ ] T03 -- Docs + release: update `AGENTS.md` (fact schema + the supersede-default
+- [x] T03 -- Docs + release: update `AGENTS.md` (fact schema + the supersede-default
   behaviour), `docs/PROCESS.md` (`correct apply` flow), the operator config
   reference for any new knob (S02 max-turns, S03 broad-term threshold), `CHANGELOG`
   + version bump; DECISIONS.md entry for the supersede-default decision; KNOWLEDGE.md
