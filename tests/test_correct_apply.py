@@ -256,3 +256,61 @@ def test_apply_golden_supersede_renames_deletes_nothing(tmp_path, monkeypatch, c
     # Fact stamped applied (no longer False).
     stamped = fact.read_text(encoding="utf-8")
     assert "applied: false" not in stamped.lower()
+
+
+# ── delete executor (M028-S02-T01): nominated → .trash, never unlink ──
+
+
+def _delete_vault(tmp_path, monkeypatch):
+    from facts import correct_apply
+
+    vault = tmp_path
+    knowledge = vault / "knowledge"
+    (knowledge / "concepts").mkdir(parents=True)
+    doomed = knowledge / "concepts" / "false-claim.md"
+    doomed.write_text("# False claim\n", encoding="utf-8")
+    index = knowledge / "index.md"
+    index.write_text(
+        "- [[concepts/false-claim]] — bogus\n- [[concepts/keep]] — real\n", encoding="utf-8"
+    )
+    monkeypatch.setattr(correct_apply, "ROOT_DIR", vault)
+    monkeypatch.setattr(correct_apply, "KNOWLEDGE_DIR", knowledge)
+    monkeypatch.setattr(correct_apply, "INDEX_FILE", index)
+    return correct_apply, vault, knowledge, doomed, index
+
+
+def test_execute_deletes_moves_to_trash_when_allowed(tmp_path, monkeypatch) -> None:
+    mod, vault, knowledge, doomed, index = _delete_vault(tmp_path, monkeypatch)
+    actions = {"superseded": [], "edited": [], "renamed": [],
+               "deleted": ["knowledge/concepts/false-claim.md"]}
+
+    executed = mod._execute_deletes(actions, vault, allowed=True)
+
+    assert executed == ["knowledge/concepts/false-claim.md"]
+    assert not doomed.exists()                      # gone from original location
+    trashed = list((vault / ".trash").rglob("false-claim.md"))
+    assert trashed, "file must be recoverable under .trash/"
+    # index row dropped, sibling kept
+    idx = index.read_text(encoding="utf-8")
+    assert "false-claim" not in idx
+    assert "concepts/keep" in idx
+
+
+def test_execute_deletes_noop_when_gate_off(tmp_path, monkeypatch) -> None:
+    mod, vault, knowledge, doomed, index = _delete_vault(tmp_path, monkeypatch)
+    actions = {"superseded": [], "edited": [], "renamed": [],
+               "deleted": ["knowledge/concepts/false-claim.md"]}
+
+    executed = mod._execute_deletes(actions, vault, allowed=False)
+
+    assert executed == []
+    assert doomed.exists()                          # gate off → nothing deleted
+    assert not (vault / ".trash").exists()
+
+
+def test_execute_deletes_skips_outside_knowledge(tmp_path, monkeypatch) -> None:
+    mod, vault, knowledge, doomed, index = _delete_vault(tmp_path, monkeypatch)
+    actions = {"superseded": [], "edited": [], "renamed": [], "deleted": ["raw/notes/x.md"]}
+
+    executed = mod._execute_deletes(actions, vault, allowed=True)
+    assert executed == []                           # never delete outside knowledge/

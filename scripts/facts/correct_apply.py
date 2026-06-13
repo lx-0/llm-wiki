@@ -51,7 +51,12 @@ from core.usage import LEDGER  # noqa: E402
 from core.prompts import render  # noqa: E402
 from core.sdk_helpers import StderrCapture, log_sdk_failure, make_path_scope_hook  # noqa: E402
 from core.ollama_client import parse_json_lenient  # noqa: E402
-from core.links import rename_article  # noqa: E402
+from core.links import (  # noqa: E402
+    WIKILINK_RE,
+    rename_article,
+    resolve_link,
+    strip_table_escape,
+)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -150,6 +155,80 @@ def _execute_renames(actions: dict, vault: Path) -> list:
             executed.append(entry)
         except Exception as exc:  # noqa: BLE001 — a bad rename must not abort the run
             log.warning("rename failed %s → %s: %s", entry["from"], entry["to"], exc)
+    return executed
+
+
+def _clear_index_rows(index_file: Path, doomed: set, vault: Path) -> int:
+    """Drop `index.md` rows whose wikilink resolves to a to-be-deleted file.
+
+    Runs BEFORE the files move to `.trash` (resolution needs them present).
+    """
+    if not index_file.exists():
+        return 0
+    kept, dropped = [], 0
+    for line in index_file.read_text(encoding="utf-8").split("\n"):
+        drop = False
+        for m in WIKILINK_RE.finditer(line):
+            target, _ = strip_table_escape(m.group(2), m.group(4))
+            resolved = resolve_link(target, index_file, vault)
+            if resolved is not None and resolved.resolve() in doomed:
+                drop = True
+                break
+        if drop:
+            dropped += 1
+        else:
+            kept.append(line)
+    if dropped:
+        index_file.write_text("\n".join(kept), encoding="utf-8")
+    return dropped
+
+
+def _execute_deletes(actions: dict, vault: Path, *, allowed: bool) -> list:
+    """Move agent-nominated articles to `.trash/<ts>/` (never `unlink`), gated.
+
+    The move IS the backup — deletions stay recoverable. Off by default
+    (`allowed=False`): a nomination is logged and ignored, the article is kept
+    (superseded instead). Only files under `knowledge/` are eligible. Returns the
+    executed rel-paths so reporting treats them as accounted-for.
+    """
+    nominated = actions.get("deleted", [])
+    if not allowed:
+        if nominated:
+            log.info(
+                "deletion gate off — %d nominated file(s) kept (superseded, not deleted)",
+                len(nominated),
+            )
+        return []
+
+    knowledge = KNOWLEDGE_DIR.resolve()
+    doomed: set = set()
+    targets: list[tuple[str, Path]] = []
+    for rel in nominated:
+        path = (vault / rel).resolve()
+        if not path.exists():
+            log.warning("delete skipped — missing: %s", rel)
+            continue
+        try:
+            path.relative_to(knowledge)
+        except ValueError:
+            log.warning("delete skipped — outside knowledge/: %s", rel)
+            continue
+        doomed.add(path)
+        targets.append((rel, path))
+
+    if not targets:
+        return []
+
+    _clear_index_rows(INDEX_FILE, doomed, vault)
+
+    trash_root = vault / ".trash" / datetime.now().strftime("%Y%m%d-%H%M%S")
+    executed = []
+    for rel, path in targets:
+        dest = trash_root / rel
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        path.rename(dest)
+        log.info("Trashed %s → %s", rel, dest)
+        executed.append(rel)
     return executed
 
 
@@ -377,13 +456,18 @@ async def apply(slug: str, dry_run: bool) -> int:
     # Renames here; deletions are deferred to S02's `.trash` executor.
     actions = _parse_proposed_actions(result_text)
     executed_renames = _execute_renames(actions, ROOT_DIR)
+    # Deletion gate is wired in S02-T02; off here so S01 stays deletion-free.
+    executed_deletes = _execute_deletes(actions, ROOT_DIR, allowed=False)
 
     # Ground-truth reporting: what ACTUALLY changed on disk, and a warning when
     # it contradicts the agent's declared actions (issue #5: claimed 6, did 17).
+    # Engine-executed deletes are accounted-for (not a surprise).
+    accounted = dict(actions)
+    accounted["deleted"] = list(actions.get("deleted", [])) + executed_deletes
     delta = _git_delta(ROOT_DIR)
     if delta is None:
         delta = _delta_from_snapshot(before_snapshot or {}, _snapshot([KNOWLEDGE_DIR, INDEX_FILE]))
-    _report_filesystem_delta(delta, _divergence(actions, delta, executed_renames))
+    _report_filesystem_delta(delta, _divergence(accounted, delta, executed_renames))
 
     # Mark fact as applied. Re-read to avoid stomping if the agent edited it
     # (it shouldn't — the prompt forbids it — but be safe).
