@@ -1,7 +1,7 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-06-11T01:45:00+0200
+last_updated: 2026-06-13T12:30:00+0200
 current_milestone: M027
 active_slice: S06
 active_task: none
@@ -11,6 +11,25 @@ parallel_milestones: [M021]
 ---
 
 # State
+
+**Ad-hoc 2026-06-13 (folder-curiosity producer made organically usable):**
+Live audit found the M027 folder producer at **100% organic abstention** (5+
+runs since rollout, every one `0 kept`; the only artifact was the T03 e2e
+hand-seed). Multi-step fix, each step learned from live lxw data, ALL committed
++ suite green (1275, +1 gated): blind-trim hid all non-recent files → relevance
+grep → discriminance (dropped central term + skeleton-bloat 240s timeout) →
+candidate retrieval (small prompt) → **coverage+recency ranking** (right file
+rank-0 on the real 5450-file archive; rarity 1/df backfired — operator has 65
+Hetzner files) → 8B placeholder-paths under verbatim-copy → **numbered
+candidate, model picks an integer** (mirrors email's `folder_index`). **LIVE
+RESULT:** a real Hetzner source → 3 organic requests, all conf=5, all anchored
+to the exact `Hetzner_2026-05-15_…pdf`. The producer half now works; the
+dispatch→compile→query half was already proven (S05-T03). Commits
+`294d5c2`→`d9413c3`; DECISIONS + KNOWLEDGE 2026-06-13; knobs:
+`curiosity_folder_max_candidates` (40; `curiosity_folder_keyword_max_matches`
+added-then-dropped same day). New helpers `_folder_candidates`/
+`_rank_candidates` in `curiosity/producer.py`; prompt rewritten to number-pick.
+**Unpushed** (push gated). S06 (NAS+scheduler) still the only open M027 slice.
 
 **Status:** M027 — slice S05 complete, **roadmap reassessed (outcome A,
 2026-06-11): S06 unchanged** (5/6 slices done — LAST slice ahead). Next:
