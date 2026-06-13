@@ -280,6 +280,17 @@ class Limits:
         "raw/notes/*",
         "daily/*",
     ])
+    # `curiosity_exclude_globs`: denylist subtracted from the allowlist above.
+    # Both curiosity passes (regular + folder) skip a source matching any of
+    # these BEFORE the Ollama call. Default excludes the email-deep-scan
+    # substrate (`raw/notes/email/deep-*.md`): those files are themselves
+    # outputs of the email-curiosity deep-scan, so running curiosity on them is
+    # circular — on lxw it yielded 58% "no gaps" + 79% duplicate-drops while
+    # adding ~10-25 s of Ollama latency to every compile. Operator-extensible;
+    # empty list = no exclusions.
+    curiosity_exclude_globs: list[str] = field(default_factory=lambda: [
+        "raw/notes/email/deep-*",
+    ])
     # `curiosity_folder_confidence_min`: integer 1-5 self-reported by the
     # LLM per gap. Below this threshold the producer drops the gap with
     # `folder_low_confidence`. Forces the model to hedge openly instead

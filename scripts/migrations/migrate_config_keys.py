@@ -73,6 +73,7 @@ Key changes covered (chronological):
   limits.review_consecutive_failure_abort    (added 2026-05-30, default 5 — review-wiki aborts the sweep after N consecutive Ollama failures instead of grinding 1700×timeout when kcma is down)
   limits.review_checkpoint_every             (added 2026-05-30, default 25 — review-wiki writes the partial report every N articles so an aborted/killed sweep isn't lost)
   limits.dedup_fuzzy_threshold               (added 2026-05-31, default 0.85 — `wiki dedup` fuzzy-title match floor for duplicate-candidate proposal)
+  limits.curiosity_exclude_globs             (added 2026-06-13, default ["raw/notes/email/deep-*"] — denylist: both curiosity passes skip circular email-deep-scan substrate before the Ollama call)
   features.dream_web_research                (added 2026-05-31, default False — Exa-AI public-entity enrichment dream post-pass; issue #2)
   scheduling.web_research_cooldown_days      (added 2026-05-31, default 30 — `## Public Profile` refresh cooldown)
   scheduling.piggybacks_on_compile           (added 2026-06-13, default True — `wiki compile` drains due piggybacks at run-end, bypassing the evening hour-gate so update+compile-only operators keep maintenance current)
@@ -133,6 +134,11 @@ KEY_ADDITIONS: dict[str, dict[str, object]] = {
         "folder_scan_provider": "claude-sdk",
     },
     "limits": {
+        # Curiosity denylist (2026-06-13). Both curiosity passes skip a source
+        # matching any of these globs before the Ollama call. Default excludes
+        # the circular email-deep-scan substrate. Match
+        # Limits.curiosity_exclude_globs default in `scripts/core/config.py`.
+        "curiosity_exclude_globs": ["raw/notes/email/deep-*"],
         # M027 watched-folder candidate retrieval: over budget, inject the
         # top-N rarity-ranked candidate files (not the folder tree). Added
         # 2026-06-13 — the full dir-skeleton bloated the prompt and timed

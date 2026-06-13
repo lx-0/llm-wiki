@@ -37,6 +37,17 @@ from core.config import CONFIG
 log = logging.getLogger("compile")
 
 CURIOSITY_MODEL = CONFIG.models.curiosity_model
+
+
+def _curiosity_excluded(rel_path: str) -> bool:
+    """True if `rel_path` matches a `curiosity_exclude_globs` denylist pattern.
+
+    Consulted by BOTH curiosity passes after the source-glob allowlist, before
+    the Ollama call — keeps circular/low-value substrates (default: the
+    email-deep-scan outputs) out of the loop. Empty denylist = nothing excluded.
+    """
+    excl = CONFIG.limits.curiosity_exclude_globs
+    return bool(excl) and any(fnmatch.fnmatch(rel_path, g) for g in excl)
 RAW_REQUESTS_DIR = ROOT_DIR / "raw" / "requests"
 RAW_INDEX_DIR = ROOT_DIR / "raw" / "index"  # body-blind folder digests (M027-S02)
 
@@ -270,6 +281,9 @@ async def maybe_generate_folder_requests(source: Path) -> None:
     src_globs = CONFIG.limits.curiosity_source_globs
     if src_globs and not any(fnmatch.fnmatch(rel_path, g) for g in src_globs):
         return
+    if _curiosity_excluded(rel_path):
+        log.debug("  Curiosity(folder): skipping %s (exclude-glob)", rel_path)
+        return
 
     src_excerpt = source_content[:5000]
     digest_block, candidates = _folder_candidates(
@@ -468,6 +482,9 @@ async def maybe_generate_curiosity_requests(source: Path) -> None:
     src_globs = CONFIG.limits.curiosity_source_globs
     if src_globs and not any(fnmatch.fnmatch(rel_path, g) for g in src_globs):
         log.debug("  Curiosity: skipping %s (no source-glob match)", rel_path)
+        return
+    if _curiosity_excluded(rel_path):
+        log.debug("  Curiosity: skipping %s (exclude-glob)", rel_path)
         return
 
     # Folder allowlist (quality gate #2). Operator can subset the curiosity

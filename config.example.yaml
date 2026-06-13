@@ -262,6 +262,14 @@ limits:
     - "raw/articles/*"
     - "raw/notes/*"
     - "daily/*"
+  # Denylist subtracted from the allowlist above — both curiosity passes
+  # (regular + folder) skip a matching source BEFORE the Ollama call. Default
+  # excludes email-deep-scan outputs (`raw/notes/email/deep-*.md`): they're
+  # themselves curiosity outputs, so re-scanning them is circular (58% "no
+  # gaps" + 79% duplicate-drops on lxw) and adds ~10-25 s Ollama per compile.
+  # Empty list = no exclusions.
+  curiosity_exclude_globs:
+    - "raw/notes/email/deep-*"
   # Minimum self-reported folder-pick confidence (1-5). The LLM rates how
   # confident it is that the picked folder actually contains relevant mail.
   # Below this threshold the gap is dropped (telemetry: folder_low_confidence).

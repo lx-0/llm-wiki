@@ -169,8 +169,9 @@ def test_migrate_config_file_round_trip(tmp_path):
     # +1 limits.curiosity_folder_max_candidates (candidate retrieval), 2026-06-13
     # +1 scheduling.piggybacks_on_compile (compile drains due piggybacks), 2026-06-13
     # +1 personal.output_language (issue #4 compiled-prose language), 2026-06-13
+    # +1 limits.curiosity_exclude_globs (curiosity substrate denylist), 2026-06-13
     # = 90 changes (no drops — operator has no orphan personal.* fields)
-    assert len(changes) == 90, f"got {len(changes)} changes: {changes}"
+    assert len(changes) == 91, f"got {len(changes)} changes: {changes}"
 
     reparsed = yaml.safe_load(new_text)
     # piggyback side
@@ -255,6 +256,7 @@ def test_migrate_config_no_change_when_fully_current(tmp_path):
             "dream_cycle_max_tokens_per_run": 2_000_000,
             "dream_per_call_timeout_s": 300,
             "curiosity_folder_max_candidates": 40,
+            "curiosity_exclude_globs": ["raw/notes/email/deep-*"],
             "dream_tier1_recent_count": 20,
             "dream_tier1_digest_days": 7,
             "dream_tier2_sample_count": 50,
@@ -420,6 +422,7 @@ def test_migrate_additions_idempotent():
             "dream_cycle_max_tokens_per_run": 2_000_000,
             "dream_per_call_timeout_s": 300,
             "curiosity_folder_max_candidates": 40,
+            "curiosity_exclude_globs": ["raw/notes/email/deep-*"],
             "dream_tier1_recent_count": 20,
             "dream_tier1_digest_days": 7,
             "dream_tier2_sample_count": 50,

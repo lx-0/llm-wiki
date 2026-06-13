@@ -667,3 +667,18 @@ def test_source_keywords_drop_stopwords_short_and_numeric():
     assert "2026" not in kw   # pure numeric dropped
     assert "die" not in kw    # stopword
     assert "mai" not in kw    # too short (<4)
+
+
+def test_curiosity_excluded_skips_email_deep_scans():
+    """Both curiosity passes skip the circular email-deep-scan substrate
+    (`raw/notes/email/deep-*.md` — itself a curiosity output) BEFORE the Ollama
+    call. The default exclude-glob covers it; ordinary notes/transcripts pass."""
+    assert producer._curiosity_excluded("raw/notes/email/deep-foo-2026-05-30.md") is True
+    assert producer._curiosity_excluded("raw/notes/operational.md") is False
+    assert producer._curiosity_excluded("raw/transcripts/meeting.md") is False
+
+
+def test_curiosity_exclude_globs_empty_excludes_nothing(monkeypatch):
+    """An operator who clears the denylist re-enables curiosity everywhere."""
+    monkeypatch.setattr(CONFIG.limits, "curiosity_exclude_globs", [])
+    assert producer._curiosity_excluded("raw/notes/email/deep-foo-2026-05-30.md") is False
