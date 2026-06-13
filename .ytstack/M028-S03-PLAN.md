@@ -22,7 +22,7 @@ per-file action) before any paid call, and over-broad terms get caught at
   candidate file with its planned action (supersede / edit / delete-if-opt-in /
   rename), distinguishing "primarily about" vs "one of many mentions" by a simple
   heuristic (term in title/H1/slug vs body-only). Print counts. No agent spawned.
-- [ ] T02 -- Over-broad-term warning at `correct add` time in
+- [x] T02 -- Over-broad-term warning at `correct add` time in
   `scripts/facts/correct.py` `cmd_add()`: after writing the fact, grep
   `knowledge/` for each `negation_term`; when a term matches more than
   `correct_broad_term_threshold` articles (new config knob, default ~15,
