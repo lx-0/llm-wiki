@@ -86,6 +86,27 @@ def test_preserves_unrelated_keys():
     assert "screenshots" in out
 
 
+def test_force_disables_optimize_claude_md_keeping_block():
+    """Engine policy 2026-06-13: optimize_claude_md is the only piggyback that
+    writes OUTSIDE the vault (autonomously LLM-rewrites the operator's global
+    ~/.claude/CLAUDE.md). It's force-disabled. The block is kept (visible +
+    re-enable-able), only `enabled` flips true→false; other fields preserved."""
+    m = _mod()
+    src = {"optimize_claude_md": {"enabled": True, "cooldown_hours": 24}}
+    out, changes = m.migrate_piggybacks(src)
+    assert out["optimize_claude_md"]["enabled"] is False
+    assert out["optimize_claude_md"]["cooldown_hours"] == 24
+    assert any("optimize_claude_md" in c and "disabled" in c.lower() for c in changes)
+
+
+def test_force_disable_idempotent_when_already_false():
+    m = _mod()
+    src = {"optimize_claude_md": {"enabled": False, "cooldown_hours": 24}}
+    out, changes = m.migrate_piggybacks(src)
+    assert changes == []
+    assert out["optimize_claude_md"]["enabled"] is False
+
+
 # ── migrate_config: file-level round-trip ───────────────────────────
 
 

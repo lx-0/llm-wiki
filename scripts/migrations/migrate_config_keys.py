@@ -15,6 +15,7 @@ Key changes covered (chronological):
   piggybacks.scan_screenshots             → piggybacks.screenshots          (Collector port 2026-05-14)
   piggybacks.email_incremental            → piggybacks.email                (M002 — kept for old vaults)
   piggybacks.sync_memories                → (removed — sync-memories deleted 2026-05-13)
+  piggybacks.optimize_claude_md           → force-disabled 2026-06-13 (only piggyback writing outside the vault — autonomously LLM-rewrites global ~/.claude/CLAUDE.md; block kept, enabled flipped true→false)
   limits.compile_force_long_context_types     (added 2026-05-15, default ["daily-digest"])
   limits.compile_skip_on_long_context_unknown (added 2026-05-15, default True)
   limits.calendar_request_timeout_s       (added 2026-05-15 M006, default 30)
@@ -116,6 +117,17 @@ PIGGYBACK_RENAMES: dict[str, str | None] = {
     "email_incremental": "email",
     "sync_memories": None,  # feature removed 2026-05-13
 }
+
+# Piggybacks the engine force-disables on existing operator configs (an explicit
+# `enabled: true` is flipped to false; the block is KEPT so the operator can see
+# it and opt back in). Use when an engine-policy decision deprecates a piggyback
+# that operators may have already enabled — distinct from RENAMES (which drops/
+# renames the block) because the feature still exists.
+#   optimize_claude_md: the only piggyback that writes OUTSIDE the vault — it
+#   autonomously LLM-rewrites the operator's GLOBAL ~/.claude/CLAUDE.md. Disabled
+#   by operator decision 2026-06-13 (vault-boundary violation + risk of silently
+#   dropping hand-built global rules). Code kept; default off.
+PIGGYBACK_FORCE_DISABLE: set[str] = {"optimize_claude_md"}
 
 # Keys introduced in newer engine versions that should be injected into the
 # operator's config so they're visible/tunable. Structure: parent block name
@@ -788,6 +800,14 @@ def migrate_piggybacks(piggybacks: dict) -> tuple[dict, list[str]]:
         else:
             out[new_key] = old_value
             changes.append(f"renamed piggybacks.{old_key} → piggybacks.{new_key}")
+
+    # Engine-policy force-disable: flip an existing `enabled: true` to false,
+    # keeping the rest of the block so the operator can see it + opt back in.
+    for key in PIGGYBACK_FORCE_DISABLE:
+        block = out.get(key)
+        if isinstance(block, dict) and block.get("enabled") is True:
+            block["enabled"] = False
+            changes.append(f"disabled piggybacks.{key} (engine policy — was enabled)")
 
     return out, changes
 

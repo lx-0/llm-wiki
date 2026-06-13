@@ -980,7 +980,10 @@ def _default_piggybacks() -> dict[str, PiggybackTask]:
         "email_incremental": PiggybackTask(cooldown_hours=24),
         "lint_structural": PiggybackTask(cooldown_hours=24),
         "review_wiki": PiggybackTask(cooldown_hours=168),
-        "optimize_claude_md": PiggybackTask(cooldown_hours=24),
+        # Disabled by default (operator decision 2026-06-13). The ONLY piggyback
+        # that writes outside the vault — it autonomously LLM-rewrites the global
+        # ~/.claude/CLAUDE.md. Code kept; opt back in with enabled: true.
+        "optimize_claude_md": PiggybackTask(cooldown_hours=24, enabled=False),
         "screenshots": PiggybackTask(cooldown_hours=24, max_per_run=50),
         # Drain rate: max_per_run × (24/cooldown_hours) = 5 × 4 = 20/day.
         # Producer can generate ~3 requests per compiled source; at typical

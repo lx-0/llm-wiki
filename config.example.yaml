@@ -82,8 +82,14 @@ piggybacks:
   review_wiki:
     enabled: true
     cooldown_hours: 168  # weekly
+  # The ONLY piggyback that writes OUTSIDE the vault — it autonomously
+  # LLM-rewrites the global ~/.claude/CLAUDE.md from compiled cross-project
+  # knowledge. Disabled by default (operator decision 2026-06-13): a vault
+  # engine shouldn't auto-edit your global agent rules, and an LLM "optimizing
+  # for leanness" can silently drop hand-built rules within the 200-line cap.
+  # Code is kept — set enabled: true to opt back in.
   optimize_claude_md:
-    enabled: true
+    enabled: false
     cooldown_hours: 24
   # The 'screenshots' key matches ScreenshotsCollector.SPEC.name — it's a
   # Registry-discovered collector (was the hardcoded 'scan_screenshots'
