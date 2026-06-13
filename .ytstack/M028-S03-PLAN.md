@@ -3,9 +3,9 @@ milestone: M028
 slice: S03
 project: llm-wiki
 created: 2026-06-13T15:56:13+0200
-status: planned
+status: done
 task_count: 3
-completed_tasks: 2
+completed_tasks: 3
 ---
 
 # M028-S03 -- Slice Plan
@@ -28,7 +28,7 @@ per-file action) before any paid call, and over-broad terms get caught at
   `correct_broad_term_threshold` articles (new config knob, default ~15,
   migration same-commit), print "term X matches N articles — narrow it?". Warn,
   don't block.
-- [ ] T03 -- Tests: dry-run lists candidate files + per-file action without
+- [x] T03 -- Tests: dry-run lists candidate files + per-file action without
   constructing the SDK client (assert `query` never called); the broad-term
   warning fires above threshold and stays silent below it.
 

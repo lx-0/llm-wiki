@@ -1,9 +1,9 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-06-13T18:20:00+0200
+last_updated: 2026-06-13T18:28:00+0200
 current_milestone: M028
-active_slice: S03
+active_slice: none
 active_task: none
 last_completed_milestone: M026
 parked_milestone: M025
@@ -35,6 +35,8 @@ blast radius + broad-term warning at `correct add`; **S04** (4) first-class
 issue-#5 close. Grounded against HEAD: `reconcile_fact()` `correct_apply.py:190-283`
 is the sandbox pattern; destructive instruction `prompts/correct_apply.md:26`;
 `make_path_scope_hook` `sdk_helpers.py:404` is allow-list-only (needs exclude).
+
+**✅ S03 COMPLETE — 3/3 (2026-06-13).** Informative `--dry-run` blast radius (`_scan_candidates`, H1/slug heuristic) + over-broad-term warning at `correct add` (`correct_broad_term_threshold` knob + migration) + dry-run never refused by the deletion guard. Commits `2ca4a44`→`0153c00`. Suite **1351 green**. **Reassess (S03 boundary): S04 unchanged** (supersession status + lint + docs + closeout). Next: `/ytstack:plan-task` for **S04-T01**.
 
 **✅ S02 COMPLETE — 4/4 (2026-06-13).** Safe opt-in deletion: `_execute_deletes` → `.trash/<ts>/` (move-as-backup) + index-row clear; gate = `--allow-delete` flag OR fact `disposition: delete`; clean-git-tree guard (rc 3 unless `--force`). Commits `5c0a9c7`→`363801d`. Suite **1346 green**. **Reassess (S02 boundary): S03 unchanged** (dry-run blast radius + broad-term warning — no overlap with S02). Next: `/ytstack:plan-task` for **S03-T01**.
 
