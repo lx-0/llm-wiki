@@ -59,3 +59,5 @@ RULES:
 ${folder_digests}
 
 Analysis timestamp: ${timestamp}
+
+${output_language_instruction}

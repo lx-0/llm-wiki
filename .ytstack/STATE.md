@@ -1,7 +1,7 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-06-13T18:54:00+0200
+last_updated: 2026-06-13T19:30:00+0200
 current_milestone: M028
 active_slice: S04
 active_task: none
@@ -11,6 +11,23 @@ parallel_milestones: [M021, M027]
 ---
 
 # State
+
+**Ad-hoc 2026-06-13e (output_language → curiosity + dream, 0.2.1):** Follow-up to
+issue #4 (the `personal.output_language` knob, shipped 0.1.9 — pins compiled-prose
+language; `auto`=byte-identical, forced=`## Output language` override section).
+Extended the same `${output_language_instruction}` placeholder to the curiosity
+producer (`compile_curiosity` + `compile_curiosity_folder` via
+`curiosity/producer.py`) and the dream-entity re-synthesizer (`dream_entity` via
+`dream.py`) — the two prose-producers that render OUTSIDE the central
+compile-stages render. Now a `de` vault gets German gap-questions + German entity
+pages too. Released **0.2.1** (CHANGELOG + pyproject + uv.lock). Suite **1366
+green** (+6 new `TestCuriosityDreamWiring`) + manual auto/forced render diff on all
+3 new prompts. DECISIONS 2026-06-13 follow-up entry supersedes the issue-#4 "Scope:
+curiosity/dream NOT covered" clause; backlog doc moved to `backlog/shipped/`.
+**Still UNVERIFIED (inherited):** live SDK run honoring the directive end-to-end
+(English source → German output). **Uncommitted/unpushed at wrapup** — operator to
+push. NOTE: 0.2.0 (M028/issue #5) came from a parallel session; this 0.2.1 builds
+on top, main was synced + clean before I started.
 
 **M028 planned (L) — issue #5: `correct apply` non-destructive + truthful
 (2026-06-13).** New current milestone, scaffolded from Sid's bug report

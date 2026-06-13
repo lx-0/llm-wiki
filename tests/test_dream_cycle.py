@@ -165,6 +165,7 @@ def test_prompt_render_explains_state_above_timeline_below(vault: Path) -> None:
         today="2026-05-16",
         now="2026-05-16T12:00:00+00:00",
         entity_link="knowledge/people/alice",
+        output_language_instruction="",
     )
     # The shape rules:
     assert "State block lives above the `---` separator" in body or "State block above" in body

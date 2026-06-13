@@ -31,7 +31,7 @@ import httpx  # noqa: E402  exception types only; HTTP via ollama_client
 from core import ollama_client
 from core.paths import ROOT_DIR
 from core.utils import now_iso, today_iso
-from core.prompts import render
+from core.prompts import build_output_language_instruction, render
 from core.config import CONFIG
 
 log = logging.getLogger("compile")
@@ -310,6 +310,9 @@ async def maybe_generate_folder_requests(source: Path) -> None:
         source_content=src_excerpt,
         folder_digests=digest_block,
         timestamp=now_iso(),  # cache-buster
+        output_language_instruction=build_output_language_instruction(
+            CONFIG.personal.output_language
+        ),
     )
     if len(prompt) > CONFIG.limits.curiosity_max_prompt_chars:
         log.warning(
@@ -532,6 +535,9 @@ async def maybe_generate_curiosity_requests(source: Path) -> None:
         timestamp=now_iso(),  # cache-buster
         primary_account=CONFIG.personal.primary_account,
         email_folders_listing=folder_listing,
+        output_language_instruction=build_output_language_instruction(
+            CONFIG.personal.output_language
+        ),
     )
 
     # Defense-in-depth: even without index_md, a pathological source could

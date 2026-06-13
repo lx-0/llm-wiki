@@ -1863,3 +1863,12 @@ cap-removal entry.
 
 ## 2026-06-13: M028 SHIPPED (0.2.0)
 All 4 slices of the issue-#5 correct-apply hardening shipped; suite 1356 green. Live-agent prompt quality unverified (mocked SDK).
+
+## 2026-06-13: Extend `output_language` to curiosity + dream render paths (0.2.1)
+
+**Context:** The issue-#4 `output_language` knob (shipped 0.1.9) was injected only at the central compile-stages render, covering the 8 substrate prompts. The 2026-06-13 issue-#4 entry's **Scope** explicitly left curiosity (`curiosity/producer.py` → `compile_curiosity` + `compile_curiosity_folder`) and dream (`dream.py` → `dream_entity`) uncovered, because they render on separate paths — flagged as a follow-up in `.ytstack/backlog/output-language-curiosity-dream.md` behind a "ask before building" gate. Operator chose to build it.
+**Options considered:** (A) leave curiosity/dream in source-language — a German vault then gets German articles but English gap-questions + English entity pages (inconsistent); (B) extend the same `${output_language_instruction}` placeholder to the three additional prompts, reusing the existing pure `build_output_language_instruction` helper.
+**Chose:** B.
+**Reason:** Consistency — a vault on `output_language: "de"` should get German everywhere the engine writes operator-facing prose, not just in `knowledge/**` articles. The helper is already pure (takes the config value), so the extension is three prompt tail-anchors + three `render()` kwargs, no new abstraction. `"auto"` stays byte-identical on every path (empty injection — verified empirically + per-prompt unit tests on all three new prompts). No new config key, so no migration. Released 0.2.1.
+**Supersedes:** the **Scope** clause of the 2026-06-13 issue-#4 entry (curiosity + dream are now covered).
+**Linked artifacts:** `prompts/{compile_curiosity,compile_curiosity_folder,dream_entity}.md` (tail anchor), `scripts/curiosity/producer.py` (2 render calls), `scripts/dream.py` (dream_entity render), `tests/test_output_language.py::TestCuriosityDreamWiring`, CHANGELOG 0.2.1. Suite 1366 green + manual auto/forced render diff on all three. UNVERIFIED (inherited): live SDK run honoring the directive end-to-end.

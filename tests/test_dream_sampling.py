@@ -396,6 +396,7 @@ def test_prompt_carries_conflict_aware_reshape_mandate() -> None:
         max_turns=20, today="2026-05-17",
         now="2026-05-17T00:00:00Z",
         entity_link="knowledge/people/x",
+        output_language_instruction="",
     )
     # Tier 3 keywords MUST be present (mandate is in dream_entity.md Step 2):
     assert "Conflict-aware reshape" in body

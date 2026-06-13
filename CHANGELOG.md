@@ -18,6 +18,19 @@ every operator's `wiki update` → `uv sync` regenerate `uv.lock` and dirty thei
 config keys must also be wired into `scripts/migrations/migrate_config_keys.py`
 in the same commit.
 
+## [0.2.1] — 2026-06-13
+
+### Changed
+
+- **`personal.output_language` now also covers curiosity + dream output.** The
+  knob (issue #4, shipped 0.1.9) previously only reached the 8 compile substrate
+  prompts. It now also injects into the curiosity gap-detector
+  (`compile_curiosity` + `compile_curiosity_folder`, via `curiosity/producer.py`)
+  and the dream-cycle entity re-synthesizer (`dream_entity`, via `dream.py`), so
+  a vault with `output_language: "de"` gets German gap-questions and German
+  resynthesized entity pages too — not just German compiled articles. `"auto"`
+  (default) stays byte-identical on every path. No new config key; no migration.
+
 ## [0.2.0] — 2026-06-13
 
 ### Changed

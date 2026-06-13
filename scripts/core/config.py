@@ -979,7 +979,11 @@ class Personal:
     # `## Timeline`, …) verbatim so downstream parsing / dedup don't break.
     # Distinct from `voice_transcribe_language` (that's INPUT transcription;
     # this is OUTPUT prose). Injected via `${output_language_instruction}`,
-    # built by `core.prompts.build_output_language_instruction`.
+    # built by `core.prompts.build_output_language_instruction`. Reaches the 8
+    # compile substrate prompts (central `compile_stages` render) AND — since
+    # 0.2.1 — the curiosity (`curiosity/producer.py`) + dream-entity
+    # (`dream.py`) render paths, so forced language also covers gap-questions
+    # and resynthesized entity pages.
     output_language: str = "auto"
 
 

@@ -88,3 +88,46 @@ class TestPlaceholderWiring:
         assert "## Output language" in rendered
         # appended at the tail, not buried mid-prompt
         assert rendered.rstrip().endswith(instruction.rstrip())
+
+
+class TestCuriosityDreamWiring:
+    """The knob also reaches the curiosity (producer.py) + dream (dream.py)
+    render paths, which carry their own placeholder sets. Same contract:
+    auto = no override section, forced = section appended at the tail."""
+
+    _CASES = {
+        "compile_curiosity": dict(
+            source_path="raw/notes/x.md",
+            source_content="dummy",
+            timestamp="2026-06-13T12:00:00Z",
+            primary_account="work",
+            email_folders_listing="1. INBOX",
+        ),
+        "compile_curiosity_folder": dict(
+            source_path="raw/notes/x.md",
+            source_content="dummy",
+            folder_digests="1. file.pdf",
+            timestamp="2026-06-13T12:00:00Z",
+        ),
+        "dream_entity": dict(
+            entity_slug="x", entity_title="X", entity_type="person",
+            entity_page="knowledge/people/x.md",
+            current_page="(none)",
+            corpus_block="(empty)", corpus_count=0, corpus_chars=0,
+            owner_block="", facts_md="",
+            max_turns=20, today="2026-06-13", now="2026-06-13T12:00:00Z",
+            entity_link="knowledge/people/x",
+        ),
+    }
+
+    @pytest.mark.parametrize("name", list(_CASES))
+    def test_auto_mode_has_no_override_section(self, name):
+        rendered = render(name, output_language_instruction="", **self._CASES[name])
+        assert "## Output language" not in rendered
+
+    @pytest.mark.parametrize("name", list(_CASES))
+    def test_forced_mode_appends_override_section(self, name):
+        instruction = build_output_language_instruction("de")
+        rendered = render(name, output_language_instruction=instruction, **self._CASES[name])
+        assert "## Output language" in rendered
+        assert rendered.rstrip().endswith(instruction.rstrip())

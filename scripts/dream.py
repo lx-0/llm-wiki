@@ -77,7 +77,7 @@ from core.paths import (
     STATE_DIR,
     DAILY_DIR,
 )
-from core.prompts import render
+from core.prompts import build_output_language_instruction, render
 from core.sdk_helpers import (
     StderrCapture,
     UsageTokens,
@@ -958,6 +958,9 @@ def _build_prompt(
         today=today_iso(),
         now=now_iso(),
         entity_link=entity.link,
+        output_language_instruction=build_output_language_instruction(
+            CONFIG.personal.output_language
+        ),
     )
     return prompt, len(prompt)
 

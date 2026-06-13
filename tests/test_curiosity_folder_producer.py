@@ -570,6 +570,7 @@ def test_real_prompt_template_renders_with_t01_kwargs():
         source_content="Operator erwähnt den Steuerbescheid 2024.",
         folder_digests=DIGEST,
         timestamp="2026-06-10T12:00:00+00:00",
+        output_language_instruction="",
     )
     assert "raw/notes/note.md" in out
     assert "Steuerbescheid-2024.pdf" in out  # candidate block embedded

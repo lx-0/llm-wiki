@@ -155,3 +155,5 @@ After the entity-page Write succeeds:
 
 1. **`knowledge/index.md`** — update the existing row for this entity (refresh the `updated` column to `${today}`). Do NOT add a new row.
 2. **`.wiki/logs/operations.md`** — append: `- ${now}: Dream-cycle resynthesized [[${entity_link}]] from ${corpus_count} sources.`
+
+${output_language_instruction}

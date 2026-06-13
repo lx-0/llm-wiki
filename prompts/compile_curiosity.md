@@ -62,3 +62,5 @@ Available email folders (${primary_account} account) — pick by number:
 ${email_folders_listing}
 
 Analysis timestamp: ${timestamp}
+
+${output_language_instruction}

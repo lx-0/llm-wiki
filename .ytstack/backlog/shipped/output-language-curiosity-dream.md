@@ -1,6 +1,6 @@
 # Backlog: extend `personal.output_language` to curiosity + dream render paths
 
-**Status:** open (follow-up to issue #4, shipped 2026-06-13 in 0.1.9)
+**Status:** SHIPPED 2026-06-13 in **0.2.1** (curiosity + dream render paths now carry `${output_language_instruction}`; see DECISIONS 2026-06-13 follow-up entry). Live e2e still unverified (inherited from issue #4).
 **Size:** S
 
 ## Context
