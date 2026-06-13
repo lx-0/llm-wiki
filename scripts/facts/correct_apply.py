@@ -142,6 +142,9 @@ async def apply(slug: str, dry_run: bool) -> int:
         slug=slug,
         today=today_iso(),
         now=now_iso(),
+        # S01 has no engine-side delete executor yet — deletion is never
+        # permitted. S02-T03 wires the real `--allow-delete` / disposition gate.
+        deletion_allowed="false",
     )
 
     if dry_run:
