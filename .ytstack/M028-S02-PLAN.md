@@ -6,7 +6,7 @@ created: 2026-06-13T15:56:13+0200
 revised: 2026-06-13T16:10:00+0200
 status: planned
 task_count: 4
-completed_tasks: 2
+completed_tasks: 3
 ---
 
 # M028-S02 -- Slice Plan
@@ -39,7 +39,7 @@ explicit signal.
   S01's hardcoded "false") AND guard `_execute_deletes` so nominations are ignored
   when the gate is off. Default off → supersede. Reserved for *factually false*
   content, not *outdated*.
-- [ ] T03 -- Tree guard + backup: refuse a deletion-enabled run when `ROOT_DIR` is
+- [x] T03 -- Tree guard + backup: refuse a deletion-enabled run when `ROOT_DIR` is
   a dirty or non-git tree unless `--force` (reuse the `_git_delta`/git probe from
   S01-T05 — a clean git tree is what makes `.trash` + recovery trustworthy). Back
   up each article to `.trash/<ts>/` before it is removed (the move IS the backup);
