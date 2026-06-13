@@ -132,3 +132,84 @@ Future outcome-kind handlers are documented extension points, not built.
 5. **B — extensibility.** Intent-dispatch handler registry, not task-only. `task` handler ships now;
    other outcome kinds (fact/research/idea/question/event) are additive handler modules. Intake
    substrates extend via the source-glob list.
+
+---
+
+## Vault information model — the `workspace/` layer (locked 2026-06-13)
+
+The operator pushed past "where does the task queue go?" to the real question: **how do you
+classify the *nature* of information in a knowledge base?** Two orthogonal axes, not topic.
+
+### Axis 1 — cognitive nature (Tulving, adapted by every PKM system)
+
+| Type | Essence | Vault layer |
+|---|---|---|
+| **Episodic** | events, time-indexed: "what happened when" | `daily/` |
+| **Semantic** | timeless distilled concepts/facts | `knowledge/` |
+| **Procedural** | "how to do X" | (within `knowledge/`) |
+| **Intentional / operational** | open loops, intentions, commitments — carries a **state** | `workspace/` ← was missing |
+
+`raw/`, `daily/`, `knowledge/` are all **descriptive** — they assert *what is / was / is known*.
+A todo, an idea, a triage item is **operational**: it carries a lifecycle status
+(`pending → done/dismissed`), not a claim about the world. That is the category the vault lacked a home for.
+
+### Axis 2 — lifecycle & authority (the data-structures / CQRS reading)
+
+| Layer | Data-structure analogue | Mutability | Owner |
+|---|---|---|---|
+| `raw/` | append-only event/source log (write-once) | immutable | collector |
+| `daily/` | time-series / partitioned event log | append-only | collector/hook |
+| `knowledge/` | materialized view / read-model (projection over sources; `compile` = the materialization job) | derived, regenerable | LLM |
+| `workspace/` | operational/transactional store with a state-machine | **mutable, lifecycle** | **operator (+ their agent)** |
+
+`raw/` + `daily/` are the write-model (fact stream); `knowledge/` is the denormalized read-projection;
+`workspace/` is the **only layer with mutable lifecycle state**. The intent classifier is a **router**:
+it takes a capture event and decides which structure it belongs to.
+
+### `kind` taxonomy — the sharp consequence
+
+The dividing line is **"does this carry an open loop / a state?"**, NOT the topic:
+
+- **`task`** → operational, has a defined done-state → `workspace/` ✅
+- **`idea`** → GTD "incubate / someday-maybe" — not yet actionable, *might* become a project; has a
+  status (raw → maturing → promoted/dropped) → operational → `workspace/` ✅
+- **`note`** → a pure **reference** note (factual, no open loop) is by definition **not** working
+  state but **semantic** → belongs toward `knowledge/`, not the inbox.
+- **`none`** → genuine noise only (mic-checks, "hallo hallo", test) → dropped.
+
+Practically (GTD: don't sort at the door): the inbox captures *everything substantive* with
+frontmatter `kind` + `status`; **triage** is where a `note`-reference promotes to `knowledge/`,
+`task`/`idea` stay as operational loops in `workspace/` until done/dismissed. The classifier only
+has to coarsely split loop-vs-reference-vs-noise.
+
+### Structure
+
+```
+workspace/
+  inbox/        ← detected intents awaiting triage (kind: task|idea|note, status: pending)
+  todo.md       ← the operator's running next-actions list (general TODO)
+```
+The intent producer (voice + pictures) writes into `workspace/inbox/`. `tasks/` (shipped earlier
+this arc) is renamed → `workspace/inbox/` (too narrow a name for idea/note too).
+
+### Policy — `workspace/` hygiene + agent access (operator, 2026-06-13)
+
+- **Kept clear, current, tidy.** `workspace/` is a working desk, not an archive. Stale/done/
+  dismissed items get cleared; on user or agent request it may be **distilled** (summarised,
+  promoted to `knowledge/`, pruned) to stay legible. An overgrown inbox defeats the GTD "trusted
+  system" property.
+- **The vault owner's agent may work *in* `workspace/`** — read AND write. This is the one
+  content layer agents operate inside by design (unlike `raw/`/`daily/` = read-only source, and
+  `knowledge/` = compile-owned). Agents triage, distil, append to `todo.md`, flip statuses.
+- Intake substrates feed it identically: voice + **pictures** (photographed tasks/ideas/notes)
+  run through the same intent pass → `workspace/inbox/` (extend `intent_source_globs`).
+
+### Build delta vs what shipped earlier this arc
+
+- Rename `tasks/` → `workspace/inbox/` (paths, handler, seed, dashboard, AGENTS.md).
+- Broaden classifier prompt: `none` = noise only; question/"macht das Sinn?" → `idea`; add `note`.
+- Add `idea` + `note` handlers (registry already supports it).
+- Add `intent_classify_model` knob (default `claude-haiku-4-5` — classification ≠ reasoning,
+  opus is overkill + 10× slower/costlier; mirrors `route.py`'s haiku tiers).
+- Add pictures to `intent_source_globs`.
+- Seed `workspace/` + a starter `todo.md` via templates so the layer always exists.
