@@ -17,7 +17,16 @@ bypassed, cooldown-gated, abort-skipped). The queues now self-drain inside the
 operator's loop, so the screen quiets on its own over the following compiles.
 See DECISIONS 2026-06-13.
 
-## Lever 2 — the "Actionable" list mixes 4 intent-classes as one flat list
+## Lever 2 — group the list by intent-class — ✅ SHIPPED 2026-06-13 (commit `38249c5`)
+
+`build_suggestions` now tags each entry with `group` (do/auto/review);
+`menu.HomeState.actions()` sorts by group then in-group order (actionable-health
+is always `do`); `_build_screen_html` emits a dim sub-header per group. Numbering
+stays continuous 1..N so 1-9 jumps + cursor still index `actions()`. Headers:
+"Needs you" / "Running automatically" / "Optional review". Original analysis
+below.
+
+## Lever 2 (original analysis) — the "Actionable" list mixes 4 intent-classes as one flat list
 
 Everything reads as "I should be doing this," but the items are really:
 - **Core loop** — `compile` (the one thing only the operator drives).
