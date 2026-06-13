@@ -6,7 +6,7 @@ created: 2026-06-13T15:56:13+0200
 revised: 2026-06-13T16:10:00+0200
 status: planned
 task_count: 6
-completed_tasks: 3
+completed_tasks: 4
 ---
 
 # M028-S01 -- Slice Plan
@@ -48,7 +48,7 @@ delta. Trust model: **agent proposes, engine disposes.**
   **proposal block** for any rename it judges necessary (consumed by T04).
   Deletion is NOT available in S01 — state that explicitly (deferred to S02's
   safe executor).
-- [ ] T04 -- Engine-side rename helper for the disambiguation path (replaces the
+- [x] T04 -- Engine-side rename helper for the disambiguation path (replaces the
   removed Bash `git mv`): parse the agent's structured rename proposal, perform
   the file move + rewrite every `[[wikilink]]` via the `core.links` resolver,
   update `index.md`/title frontmatter. Without this, disambiguation `apply` would
