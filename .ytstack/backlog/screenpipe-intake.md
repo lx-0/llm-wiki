@@ -194,13 +194,43 @@ The actual llm-wiki feature. Unbuilt. Open questions before a milestone:
   - Service robustness otherwise good: one uninterrupted process across
     2 days incl. multiple sleep/lock cycles, RSS stable ~370 MB; OCR pairing
     ratio rose to ~47 %; disk ~2 GB/day averaged incl. idle night.
+
+  **Day-3 CONTENT review — the load-bearing finding (2026-06-13).** Read the
+  actual mic transcripts (684 / 3366 / 1449 segments on 06-10/11/12). The mic
+  stream is **two utterly different things, undifferentiated**, and this
+  reframes the whole ingest design:
+  - **Mostly ambient media playing in the room**, not the operator. Long
+    coherent passages are a survival TV show ("Shelter verbessern",
+    "Naturmaterialien", "du kämpfst gegen fünf andere", "Palmenblätter") and
+    podcast consumption ("simply podcast … seit über einem Jahr") — captured
+    while the screen showed only Code/Terminal (`Review cloud repo
+    infrastructure`), i.e. background noise, not work.
+  - **A smaller but high-value slice is real operator work speech:**
+    "Definition of Done", "Kanban Board", "was machen wir innerhalb der
+    nächsten zwei Wochen, was können wir realistisch vornehmen".
+  - **Whisper hallucinates heavily on silence/noise:** "Vielen Dank", "Ich
+    habe auch einen Kuss", and a 493-char `eine eine eine…` garbage run.
+    Exactly the class Sid's noise filter (<15 chars, "Danke."-one-liners,
+    repetitions) targets — confirms that filter is mandatory, not optional.
+  - **Design consequence (hard):** `is_input_device=1` means "was audible in
+    the room", NOT "the operator said this". Before ANY mic content reaches
+    `knowledge/`, the collector needs a three-stage gate: (1) Sid's noise
+    filter, (2) diarization-based speaker separation (operator vs foreign/
+    media voices), (3) ideally a media-vs-conversation classifier. Without it
+    the wiki would cartograph the operator's bushcraft TV as persona signal.
+    This is the single biggest collector-design takeaway from the test-data
+    run — mic is the *lowest*-trust substrate yet, inverting the day-1
+    assumption that "audio = what the operator said" is higher-signal than OCR.
 - **What to ingest, and at what compile-role.** This is the load-bearing
   decision. Screenpipe produces ~5–10 GB/month and *enormous* OCR volume —
   ingesting raw frames as per-item `knowledge/` would bury the vault. Almost
   certainly `compile-role: source-only` + `daily/`-rollup aggregation (same
-  posture as low-signal consumption sources), NOT per-frame articles. The
-  audio-transcript side is higher-signal (what the operator actually said) and
-  may warrant finer treatment than the OCR-frame side.
+  posture as low-signal consumption sources), NOT per-frame articles. ~~The
+  audio-transcript side is higher-signal~~ — **corrected by the Day-3 content
+  review (below): the raw mic side is the LOWEST-trust substrate** (mostly
+  ambient room media), and only becomes signal after noise-filter +
+  diarization + media/conversation classification. Do not treat audio as the
+  high-signal channel a priori.
 - **Privacy / PII.** 24/7 capture is the most sensitive substrate by far —
   passwords, DMs, banking, private screens all pass through. screenpipe has
   `--use-pii-removal` / `--ignored-windows` / `--ignored-urls` capture-side
