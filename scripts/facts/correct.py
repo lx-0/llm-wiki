@@ -52,7 +52,7 @@ logging.basicConfig(
 )
 log = logging.getLogger("correct")
 
-VALID_STATUS = {"negation", "disambiguation", "clarification"}
+VALID_STATUS = {"negation", "disambiguation", "clarification", "supersession"}
 VALID_TRUST = ("confirmed", "asserted", "provisional")
 DEFAULT_TRUST = "asserted"
 
@@ -264,7 +264,9 @@ def main() -> int:
         "--status",
         default="negation",
         choices=sorted(VALID_STATUS),
-        help="negation = strike a false claim; disambiguation = clarify a name; clarification = anything else",
+        help="negation = a possibly-false claim (the only delete-eligible status); "
+        "supersession = was true, now outdated (annotate, never delete history); "
+        "disambiguation = clarify a name; clarification = anything else",
     )
     p_add.add_argument(
         "--term",

@@ -585,3 +585,18 @@ def test_apply_deletion_e2e_clean_git(tmp_path, monkeypatch, caplog) -> None:
     assert not bogus.exists()
     assert list((vault / ".trash").rglob("bogus.md"))     # recoverable
     assert "vanished with no accounting" not in caplog.text  # declared+executed → no alarm
+
+
+# ── supersession status (M028-S04-T01) ──
+
+
+def test_deletion_never_allowed_for_supersession() -> None:
+    from facts import correct_apply
+
+    # supersession = was true, now outdated → annotate only, never delete,
+    # even with the CLI flag or disposition: delete.
+    assert correct_apply._deletion_allowed({"status": "supersession"}, True) is False
+    assert correct_apply._deletion_allowed(
+        {"status": "supersession", "disposition": "delete"}, False) is False
+    # negation stays delete-eligible behind the gate
+    assert correct_apply._deletion_allowed({"status": "negation"}, True) is True

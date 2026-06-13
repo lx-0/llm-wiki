@@ -222,7 +222,12 @@ def _tree_safe_for_deletion(vault: Path) -> tuple[bool, str]:
 def _deletion_allowed(fm: dict, allow_delete_flag: bool) -> bool:
     """Whether `apply` may execute deletions: the per-run CLI flag OR a per-fact
     `disposition: delete` field. Default (neither) → False → supersede only.
+
+    A `supersession` fact (was true, now outdated) is annotate-only — neither the
+    flag nor `disposition` can open the gate; only `negation` is delete-eligible.
     """
+    if fm.get("status") == "supersession":
+        return False
     return bool(allow_delete_flag) or fm.get("disposition") == "delete"
 
 

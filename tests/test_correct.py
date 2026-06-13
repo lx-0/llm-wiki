@@ -224,3 +224,8 @@ def test_warn_broad_terms_fires_above_threshold(tmp_path, monkeypatch, caplog) -
     monkeypatch.setattr(correct.CONFIG.limits, "correct_broad_term_threshold", 5)
     correct._warn_broad_terms(["euro price"], knowledge)
     assert "narrow it" not in caplog.text
+
+
+def test_supersession_is_valid_status() -> None:
+    from facts import correct
+    assert "supersession" in correct.VALID_STATUS
