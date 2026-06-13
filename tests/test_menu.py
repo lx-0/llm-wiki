@@ -181,6 +181,63 @@ def test_home_state_actions_empty_when_nothing_pending():
     assert state.n_actions() == 0
 
 
+def test_actions_ordered_do_then_auto_then_review():
+    """Lever 2: the unified list is grouped by intent-class so the operator can
+    see what needs THEM (do) vs what drains itself (auto) vs opt-in (review).
+    Actionable health is always a `do` (needs the operator). Within a group the
+    prior order holds (health before suggestions, suggestions by priority)."""
+    import menu
+    from core.health import CheckResult
+
+    state = menu.HomeState()
+    state.health = [
+        CheckResult("oauth", "config", "warning", "gmail oauth not bootstrapped",
+                    fix="wiki gmail-auth", dispatch_args=["gmail-auth", "gmail-personal"]),
+    ]
+    state.suggestions = [
+        {"key": "1", "label": "101 overdue for dream", "cmd": "dream --all-entities",
+         "priority": 5, "group": "auto"},
+        {"key": "2", "label": "1 document-scan to review",
+         "cmd": "curiosity --type folder-deep-scan", "priority": 3, "group": "review"},
+        {"key": "3", "label": "149 changed since compile", "cmd": "compile",
+         "priority": 2, "group": "do"},
+    ]
+    actions = state.actions()
+    assert [a["group"] for a in actions] == ["do", "do", "auto", "review"]
+    # within `do`: actionable health first, then the compile suggestion
+    assert actions[0]["kind"] == "health"
+    assert actions[1]["cmd_display"] == "compile"
+
+
+def test_screen_renders_group_subheaders_in_order_with_continuous_numbering():
+    """The rendered home screen labels each group and keeps a single 1..N
+    numbering across groups so the 1-9 jump shortcuts still index `actions()`."""
+    import menu
+    from core.health import CheckResult
+
+    state = menu.HomeState()
+    state.health = [
+        CheckResult("oauth", "config", "warning", "gmail oauth not bootstrapped",
+                    fix="wiki gmail-auth", dispatch_args=["gmail-auth", "gmail-personal"]),
+    ]
+    state.suggestions = [
+        {"key": "1", "label": "149 changed since compile", "cmd": "compile",
+         "priority": 2, "group": "do"},
+        {"key": "2", "label": "101 overdue for dream", "cmd": "dream --all-entities",
+         "priority": 5, "group": "auto"},
+        {"key": "3", "label": "1 document-scan to review",
+         "cmd": "curiosity --type folder-deep-scan", "priority": 3, "group": "review"},
+    ]
+    html = menu._build_screen_html(state)
+    i_do = html.find("Needs you")
+    i_auto = html.find("Running automatically")
+    i_review = html.find("Optional review")
+    assert -1 < i_do < i_auto < i_review, f"group headers out of order: {i_do},{i_auto},{i_review}"
+    # 4 items (oauth, compile, dream, folder) numbered continuously 1..4
+    for token in ("1)", "2)", "3)", "4)"):
+        assert token in html, f"missing position number {token}"
+
+
 # ── helpers ────────────────────────────────────────────────────────
 
 

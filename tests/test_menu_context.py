@@ -126,6 +126,21 @@ def test_curiosity_probes_split_folder_from_email(fake_vault):
     assert menu_context._count_pending_requests() == 3         # all pending, any type
 
 
+def test_suggestions_carry_intent_group(fake_vault):
+    """Lever 2: every suggestion is tagged with an intent-class so the home
+    screen can group what needs the operator (do) vs what self-drains (auto) vs
+    opt-in review. inbox-processing is a `do`; a folder-scan is `review`."""
+    import menu_context
+
+    (fake_vault / "inbox" / "a.md").write_text("x")
+    (fake_vault / "raw" / "requests" / "request-r.json").write_text(
+        json.dumps({"type": "folder-deep-scan", "status": "pending"}))
+
+    by_cmd = {r["cmd"]: r for r in menu_context.build_suggestions()}
+    assert by_cmd["process-inbox"]["group"] == "do"
+    assert by_cmd["curiosity --type folder-deep-scan"]["group"] == "review"
+
+
 def test_suggestions_counts_approved_lines(fake_vault):
     import menu_context
 
@@ -211,7 +226,7 @@ def test_build_suggestions_returns_only_nonzero_counts_sorted(fake_vault):
     assert "process-inbox" in keys
     # All entries have the right schema.
     for r in results:
-        assert set(r.keys()) == {"count", "label", "cmd", "priority", "key"}
+        assert set(r.keys()) == {"count", "label", "cmd", "priority", "key", "group"}
         assert r["count"] > 0
     # Sorted by ascending priority + auto-numbered keys.
     priorities = [r["priority"] for r in results]

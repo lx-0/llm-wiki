@@ -245,31 +245,37 @@ def probe_lint_stale() -> int:
 def build_suggestions() -> list[dict]:
     """Run all probes, return list of dicts ordered by declared priority.
 
-    Each entry has: key, count, label, cmd, priority. Only entries with
+    Each entry has: key, count, label, cmd, priority, group. Only entries with
     count > 0 are returned. Keys are auto-numbered "1".."N" after sort.
     """
+    # `group` is the intent-class the home screen renders under (lever 2):
+    #   do     — only the operator drives it (process inbox, compile, flush,
+    #            execute approved suggestions)
+    #   auto   — self-draining via piggybacks now (dream/lint/email-curiosity);
+    #            shown as status, not an imperative
+    #   review — opt-in review queue (document-scan requests need consent)
     raw = [
-        ("inbox",       probe_inbox,                1,
+        ("inbox",       probe_inbox,                1, "do",
          lambda n: f"{n} file{'s' if n != 1 else ''} in inbox/",          "process-inbox"),
-        ("compile",     probe_compile_changed,      2,
+        ("compile",     probe_compile_changed,      2, "do",
          lambda n: f"{n} source{'s' if n != 1 else ''} changed since compile", "compile"),
-        ("folder-scan", probe_folder_curiosity_pending, 3,
+        ("folder-scan", probe_folder_curiosity_pending, 3, "review",
          lambda n: f"{n} document-scan request{'s' if n != 1 else ''} to review",
          "curiosity --type folder-deep-scan"),
-        ("curiosity",   probe_curiosity_pending,    8,
+        ("curiosity",   probe_curiosity_pending,    8, "auto",
          lambda n: f"{n} email-scan request{'s' if n != 1 else ''} pending",
          "curiosity --type email-deep-scan"),
-        ("suggestions", probe_suggestions_approved, 4,
+        ("suggestions", probe_suggestions_approved, 4, "do",
          lambda n: f"{n} approved suggestion{'s' if n != 1 else ''} to execute", "suggestions"),
-        ("dream",       probe_dream_overdue,        5,
+        ("dream",       probe_dream_overdue,        5, "auto",
          lambda n: f"{n} entit{'ies' if n != 1 else 'y'} overdue for dream",    "dream --all-entities"),
-        ("flush",       probe_flush_missing,        6,
+        ("flush",       probe_flush_missing,        6, "do",
          lambda _: "today's session has not been flushed",                       "flush"),
-        ("lint",        probe_lint_stale,           7,
+        ("lint",        probe_lint_stale,           7, "auto",
          lambda _: "knowledge edits since last lint sweep",                      "lint --structural-only"),
     ]
     results = []
-    for name, probe, priority, label_fn, cmd in raw:
+    for name, probe, priority, group, label_fn, cmd in raw:
         try:
             n = probe()
         except Exception as e:
@@ -282,6 +288,7 @@ def build_suggestions() -> list[dict]:
             "label": label_fn(n),
             "cmd": cmd,
             "priority": priority,
+            "group": group,
         })
     results.sort(key=lambda r: r["priority"])
     for i, r in enumerate(results, start=1):

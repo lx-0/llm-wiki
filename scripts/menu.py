@@ -294,6 +294,15 @@ def _pick_query_mode() -> str:
 
 # ── Home screen ─────────────────────────────────────────────────────
 
+# Intent-classes for the actionable list (lever 2). The operator's confusion was
+# "what must I do vs what's automatic"; grouping answers it at a glance.
+_GROUP_RANK = {"do": 0, "auto": 1, "review": 2}
+_GROUP_HEADERS = {
+    "do": "Needs you",
+    "auto": "Running automatically",
+    "review": "Optional review",
+}
+
 
 class HomeState:
     def __init__(self):
@@ -341,24 +350,34 @@ class HomeState:
               "cmd_display": str,     # what to render after "→ wiki "
             }
         """
+        _SEV_RANK = {"critical": 0, "warning": 1}
         items: list[dict] = []
         for r in self.actionable_health():
             items.append({
                 "kind": "health",
                 "severity": r.severity,
+                # Actionable health always needs the operator → `do` group.
+                "group": "do",
                 "label": r.message,
                 "dispatch_args": list(r.dispatch_args),
                 "cmd_display": " ".join(r.dispatch_args),
+                # Sort within a group: health (0) before suggestions (1), then
+                # by severity / priority.
+                "_sort": (0, _SEV_RANK.get(r.severity, 9)),
             })
         for s in self.suggestions:
             cmd_str = s.get("cmd", "")
             items.append({
                 "kind": "suggestion",
                 "severity": "probe",
+                "group": s.get("group", "do"),
                 "label": s.get("label", ""),
                 "dispatch_args": cmd_str.split(),
                 "cmd_display": cmd_str,
+                "_sort": (1, s.get("priority", 99)),
             })
+        # Group by intent-class (do → auto → review), preserving in-group order.
+        items.sort(key=lambda it: (_GROUP_RANK.get(it["group"], 0), it["_sort"]))
         return items
 
     def n_actions(self) -> int:
@@ -389,7 +408,16 @@ def _build_screen_html(state: HomeState) -> str:
             "  <b>▸ Actionable in your vault</b>  "
             "<ansibrightblack>(↑↓ Enter · 1-9 jump)</ansibrightblack>"
         )
+        current_group: str | None = None
         for i, act in enumerate(actions):
+            # Emit a group sub-header when the intent-class changes. Numbering
+            # stays continuous 1..N across groups so 1-9 jumps still index
+            # `actions()` directly.
+            group = act.get("group", "do")
+            if group != current_group:
+                current_group = group
+                header = _GROUP_HEADERS.get(group, group)
+                lines.append(f"    <ansibrightblack>{escape(header)}</ansibrightblack>")
             sev = act["severity"]
             label = escape(act["label"])
             cmd_display = escape(act["cmd_display"])
