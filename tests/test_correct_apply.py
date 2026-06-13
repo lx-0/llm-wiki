@@ -444,6 +444,63 @@ def test_apply_refuses_deletion_on_unsafe_tree(tmp_path, monkeypatch) -> None:
 # ── S02 slice acceptance (M028-S02-T04) ──
 
 
+def test_scan_candidates_classifies_primary_vs_mention(tmp_path) -> None:
+    from facts import correct_apply
+
+    knowledge = tmp_path / "knowledge"
+    (knowledge / "concepts").mkdir(parents=True)
+    # title hit → primary (supersede/delete-eligible)
+    (knowledge / "concepts" / "senkrechtstarter-award.md").write_text(
+        "# Senkrechtstarter Award\n\nwe won it\n", encoding="utf-8")
+    # body-only mention → edit
+    (knowledge / "concepts" / "timeline.md").write_text(
+        "# 2026 timeline\n\nIn April the senkrechtstarter award was mentioned.\n", encoding="utf-8")
+    # no hit
+    (knowledge / "concepts" / "unrelated.md").write_text("# Other\n\nnothing\n", encoding="utf-8")
+    (knowledge / "index.md").write_text("- [[concepts/senkrechtstarter-award]]\n", encoding="utf-8")
+
+    cands = correct_apply._scan_candidates(["senkrechtstarter award"], [knowledge])
+    by_path = {c["path"].split("/")[-1]: c for c in cands}
+    assert by_path["senkrechtstarter-award.md"]["primary"] is True
+    assert by_path["senkrechtstarter-award.md"]["action"].startswith("supersede")
+    assert by_path["timeline.md"]["primary"] is False
+    assert by_path["timeline.md"]["action"] == "edit"
+    assert "unrelated.md" not in by_path
+    assert "index.md" not in by_path
+
+
+def test_dry_run_lists_candidates_without_agent(tmp_path, monkeypatch, caplog) -> None:
+    import asyncio
+    import logging as _logging
+    from facts import correct_apply
+
+    knowledge = tmp_path / "knowledge"
+    facts = knowledge / "facts"
+    facts.mkdir(parents=True)
+    (knowledge / "concepts").mkdir()
+    (knowledge / "concepts" / "foo.md").write_text("# Foo\n\nthe widget term\n", encoding="utf-8")
+    fact = facts / "w.md"
+    fact.write_text("---\ntype: fact\nstatus: negation\nnegation_terms:\n  - widget\n---\n\nno widget\n", encoding="utf-8")
+
+    monkeypatch.setattr(correct_apply, "ROOT_DIR", tmp_path)
+    monkeypatch.setattr(correct_apply, "FACTS_DIR", facts)
+    monkeypatch.setattr(correct_apply, "KNOWLEDGE_DIR", knowledge)
+    monkeypatch.setattr(correct_apply, "DAILY_DIR", tmp_path / "daily")
+    spawned = {"v": False}
+
+    async def fake_query(*, prompt, options):  # noqa: ARG001
+        spawned["v"] = True
+        yield None
+
+    monkeypatch.setattr(correct_apply, "query", fake_query)
+    caplog.set_level(_logging.INFO, logger="correct-apply")
+
+    rc = asyncio.run(correct_apply.apply("w", dry_run=True))
+    assert rc == 0
+    assert spawned["v"] is False
+    assert "foo.md" in caplog.text          # blast radius surfaced
+
+
 def test_divergence_silent_for_declared_deletion() -> None:
     from facts import correct_apply
 

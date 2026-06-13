@@ -158,6 +158,45 @@ def _execute_renames(actions: dict, vault: Path) -> list:
     return executed
 
 
+def _scan_candidates(terms: list, roots: list) -> list:
+    """Files matching any negation term, with a planned per-file action.
+
+    Files outer, terms inner — one read per file, not an O(terms·files) re-scan.
+    A term in the title/H1/slug → "primary" (supersede, delete-eligible); a
+    body-only hit → "mention" (edit). Skips `index.md`. Vault-relative paths.
+    """
+    lowered = [t.lower() for t in terms if t]
+    if not lowered:
+        return []
+    out = []
+    for base in roots:
+        base = Path(base)
+        if not base.exists():
+            continue
+        vault = base.parent
+        for path in sorted(base.rglob("*.md")):
+            if path.name == "index.md" and path.parent == base:
+                continue
+            try:
+                text = path.read_text(encoding="utf-8").lower()
+            except OSError:
+                continue
+            hits = [t for t in lowered if t in text]
+            if not hits:
+                continue
+            # "primarily about" = the term is in the H1 title or the slug, not
+            # merely somewhere in the body (a short file's body must not fool us).
+            title_line = next((ln for ln in text.split("\n") if ln.startswith("# ")), "")
+            head = title_line + " " + path.stem.lower()
+            primary = any(t in head for t in hits)
+            out.append({
+                "path": path.relative_to(vault).as_posix(),
+                "action": "supersede (delete-eligible)" if primary else "edit",
+                "primary": primary,
+            })
+    return out
+
+
 def _tree_safe_for_deletion(vault: Path) -> tuple[bool, str]:
     """A deletion run is only safe on a clean git tree — that is what makes
     `.trash` + `git restore` recovery trustworthy. The just-created fact under
@@ -444,7 +483,15 @@ async def apply(slug: str, dry_run: bool, allow_delete: bool = False, force: boo
         log.info("  model=%s", CONFIG.models.compile_model)
         log.info("  fact=%s", rel_fact_path)
         log.info("  status=%s", fm.get("status"))
-        log.info("  negation_terms=%s", fm.get("negation_terms") or [])
+        terms = fm.get("negation_terms") or []
+        log.info("  negation_terms=%s", terms)
+        log.info("  deletion permitted=%s", deletion_allowed)
+        candidates = _scan_candidates(terms, [KNOWLEDGE_DIR, DAILY_DIR])
+        log.info("[dry-run] Blast radius — %d candidate file(s):", len(candidates))
+        for c in candidates:
+            log.info("  %s — %s", c["path"], c["action"])
+        if not candidates and terms:
+            log.info("  (no files match the negation terms)")
         return 0
 
     log.info("Spawning agent over vault root %s for fact %s", ROOT_DIR, slug)
