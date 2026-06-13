@@ -5,43 +5,49 @@ project: llm-wiki
 created: 2026-06-13T15:56:13+0200
 revised: 2026-06-13T16:10:00+0200
 status: planned
-task_count: 5
+task_count: 4
 completed_tasks: 0
 ---
 
 # M028-S02 -- Slice Plan
 
 **Goal:** Re-enable deletion as a safe, recoverable, opt-in operation owned by
-the engine — `.trash/` instead of `rm`, per-article backup, dirty-tree guard,
-gated behind an explicit signal.
+the engine — `.trash/` instead of `rm`, dirty-tree guard, gated behind an
+explicit signal.
 
 > Revised after plan-eng-review (2026-06-13): the sandbox itself moved to S01.
 > S02 is now purely the safe destructive-op executor — the only part that needs
-> `.trash`/backup. Deletion is engine-side (the agent proposes, never deletes),
-> which is what makes the safety net guaranteeable.
+> `.trash`. Deletion is engine-side (the agent proposes, never deletes), which is
+> what makes the safety net guaranteeable.
+> Reassessed at the S01 boundary (2026-06-13): the original T01 ("extend the
+> proposal contract with a delete list") is ALREADY DONE — T03 designed the
+> contract holistically with a `deleted` key and T04's `_parse_proposed_actions`
+> already extracts + shape-guards it. S02 collapses 5→4 tasks: executor, gate,
+> safety guard, tests.
 
 ## Tasks
 
-- [ ] T01 -- Extend the structured-proposal contract from S01-T03 with a **delete
-  list**: the agent emits the files it judges *factually false and primarily
-  about* the false claim into a parseable block; `correct_apply.py` consumes it.
-  The agent never deletes — it only nominates.
-- [ ] T02 -- Engine-side delete executor: move each nominated file (and its
-  `index.md` row) to `.trash/<ts>/` (preserve relative path under the timestamp
-  dir), never `unlink`. Runs only when the deletion gate (T03) is on. Record the
-  moves so S01-T05's reporting accounts for them.
-- [ ] T03 -- Deletion gate: `--allow-delete` flag on `correct_apply.py` `main()`
-  + an optional fact frontmatter field `disposition: delete` read in `apply()`;
-  pass `deletion_allowed: bool` into the prompt render so the agent only nominates
-  deletions when permitted. Default off → supersede. Reserved for *factually
-  false* content (never happened), not *outdated*.
-- [ ] T04 -- Per-article backup + tree guard: `_backup_article(path)` before any
-  edit (not just the fact file as today at L73/L161); refuse a deletion-enabled
-  run when `ROOT_DIR` is a dirty or non-git tree unless `--force` (reuse the git
-  probe from S01-T05).
-- [ ] T05 -- Tests: a gated-on deletion lands the file under `.trash/<ts>/` and
-  not gone; gate-off → 0 deletions even when the agent nominates; dirty-tree run
-  aborts without `--force` and proceeds with it; backup exists before edit.
+- [ ] T01 -- Engine-side delete executor: a `_execute_deletes(actions, vault)` that
+  moves each nominated file (and clears its `index.md` row) to `.trash/<ts>/`
+  (preserving the vault-relative path under the timestamp dir), never `unlink`.
+  Returns the executed list so `_divergence` accounts for it (declared+executed
+  deletions are not a surprise). Runs only when the gate (T02) is on. Mirrors
+  `_execute_renames`. The `deleted` list + parser already exist (S01-T03/T04).
+- [ ] T02 -- Deletion gate: `--allow-delete` flag on `correct_apply.py` `main()` +
+  an optional fact frontmatter field `disposition: delete` read in `apply()`; pass
+  the real `deletion_allowed` ("true"/"false") into the prompt render (replacing
+  S01's hardcoded "false") AND guard `_execute_deletes` so nominations are ignored
+  when the gate is off. Default off → supersede. Reserved for *factually false*
+  content, not *outdated*.
+- [ ] T03 -- Tree guard + backup: refuse a deletion-enabled run when `ROOT_DIR` is
+  a dirty or non-git tree unless `--force` (reuse the `_git_delta`/git probe from
+  S01-T05 — a clean git tree is what makes `.trash` + recovery trustworthy). Back
+  up each article to `.trash/<ts>/` before it is removed (the move IS the backup);
+  for edits, the existing git tree is the safety net under the clean-tree precondition.
+- [ ] T04 -- Tests: a gated-on deletion lands the file under `.trash/<ts>/` (not
+  gone, index row cleared); gate-off → 0 deletions even when the agent nominates;
+  dirty-tree run aborts without `--force` and proceeds with it; `_divergence` stays
+  silent for a declared+executed deletion.
 
 ## Done when
 
