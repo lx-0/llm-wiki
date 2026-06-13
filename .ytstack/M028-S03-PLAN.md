@@ -5,7 +5,7 @@ project: llm-wiki
 created: 2026-06-13T15:56:13+0200
 status: planned
 task_count: 3
-completed_tasks: 0
+completed_tasks: 2
 ---
 
 # M028-S03 -- Slice Plan
@@ -16,7 +16,7 @@ per-file action) before any paid call, and over-broad terms get caught at
 
 ## Tasks
 
-- [ ] T01 -- Make `--dry-run` informative in `correct_apply.py` (today L101-108
+- [x] T01 -- Make `--dry-run` informative in `correct_apply.py` (today L101-108
   only logs model + negation_terms): run the same greps the agent would —
   `negation_terms` (case-insensitive) across `knowledge/` + `daily/` — list each
   candidate file with its planned action (supersede / edit / delete-if-opt-in /
