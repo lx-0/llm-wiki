@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-06-13T17:33:00+0200
+last_updated: 2026-06-13T17:40:00+0200
 current_milestone: M028
 active_slice: S02
-active_task: T01
+active_task: none
 last_completed_milestone: M026
 parked_milestone: M025
 parallel_milestones: [M021, M027]
@@ -35,6 +35,14 @@ blast radius + broad-term warning at `correct add`; **S04** (4) first-class
 issue-#5 close. Grounded against HEAD: `reconcile_fact()` `correct_apply.py:190-283`
 is the sandbox pattern; destructive instruction `prompts/correct_apply.md:26`;
 `make_path_scope_hook` `sdk_helpers.py:404` is allow-list-only (needs exclude).
+
+**S02 progress: 1/4.** ✅ **T01 SHIPPED** (commit `5c0a9c7`,
+`M028-S02-T01-SUMMARY.md`): `_execute_deletes` → `.trash/<ts>/` (move-as-backup,
+never unlink) + index-row clearing, gated off in `apply()` until T02. Executed
+deletes folded into divergence accounting. Suite **1339 green**. Next:
+`/ytstack:plan-task` for **S02-T02** (deletion gate: `--allow-delete` +
+`disposition: delete` + real `deletion_allowed` into prompt). Reassess at S01
+boundary collapsed S02 5→4 (old T01 contract-extend already done in S01-T03/T04).
 
 **✅ S01 COMPLETE — 6/6 (2026-06-13).** `wiki correct apply` is now structurally
 non-destructive: sandboxed (no Bash, path-hook, facts/ write-protected), negation

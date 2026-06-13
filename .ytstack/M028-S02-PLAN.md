@@ -6,7 +6,7 @@ created: 2026-06-13T15:56:13+0200
 revised: 2026-06-13T16:10:00+0200
 status: planned
 task_count: 4
-completed_tasks: 0
+completed_tasks: 1
 ---
 
 # M028-S02 -- Slice Plan
@@ -27,7 +27,7 @@ explicit signal.
 
 ## Tasks
 
-- [ ] T01 -- Engine-side delete executor: a `_execute_deletes(actions, vault)` that
+- [x] T01 -- Engine-side delete executor: a `_execute_deletes(actions, vault)` that
   moves each nominated file (and clears its `index.md` row) to `.trash/<ts>/`
   (preserving the vault-relative path under the timestamp dir), never `unlink`.
   Returns the executed list so `_divergence` accounts for it (declared+executed
