@@ -18,6 +18,43 @@ every operator's `wiki update` → `uv sync` regenerate `uv.lock` and dirty thei
 config keys must also be wired into `scripts/migrations/migrate_config_keys.py`
 in the same commit.
 
+## [0.2.0] — 2026-06-13
+
+### Changed
+
+- **`wiki correct apply` is now non-destructive by default** (issue #5). The
+  apply-agent had been wide-open (Bash + `acceptEdits` + 50 turns, no hook) and
+  once **deleted 17 `knowledge/` articles** applying a single `negation` fact while
+  reporting only 6. The new model is **agent proposes, engine disposes**:
+  - **`negation` supersedes by default** — the matching article is annotated
+    (`status: superseded` + `superseded_by:` + `outdated_since:` + a banner under
+    the H1), its history kept. *Outdated is not false.* Deletion is the rare opt-in.
+  - **The agent is sandboxed** like the reconcile loop: no Bash, a PreToolUse
+    path-scope hook (writes confined to `knowledge/` minus `facts/`, `daily/`,
+    `index.md`, the operations log), `permission_mode="default"`, a config-bounded
+    turn count. It can no longer shell out or delete — it annotates via Write/Edit
+    and proposes renames/deletions in a JSON block the engine executes.
+  - **Deletion is opt-in + recoverable:** `--allow-delete` (per run) or a fact
+    `disposition: delete` (per fact) opens the gate, reserved for factually-false
+    content; deleted files move to `.trash/<ts>/` (never `rm`). A deletion-enabled
+    run is **refused on a dirty / non-git tree** unless `--force` — a clean git
+    tree is what makes `.trash` recovery trustworthy.
+  - **Reporting is ground-truth:** the engine logs the real filesystem delta (git
+    porcelain / mtime snapshot) and **warns** when more files vanished than were
+    accounted for — never the agent's free-text summary again.
+  - **`--dry-run` shows the blast radius** (candidate files + planned per-file
+    action + the deletion-gate state) without spending; `wiki correct add` warns
+    when a `negation_term` is over-broad.
+
+### Added
+
+- **First-class `supersession` fact status** — "was true, now outdated" (e.g. an
+  order volume that grew 174k → 256k). Annotate-only: never delete-eligible, even
+  with `--allow-delete`. Distinct from `negation` (possibly *false*). Lint no
+  longer re-flags an article already annotated `superseded` by the fact.
+- New knobs `limits.correct_apply_max_turns` (50) and
+  `limits.correct_broad_term_threshold` (15).
+
 ## [0.1.9] — 2026-06-13
 
 ### Added

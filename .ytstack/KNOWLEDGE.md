@@ -2590,3 +2590,27 @@ maps it (mirrors the email pass's `folder_index`). Producer architecture lesson:
 for a non-agentic local model + 1000s-file index, the producer is a RETRIEVAL
 problem — rank in Python, present a short NUMBERED list, let the model judge by
 index. Do not stuff the tree into the prompt.
+
+## Agent proposes, engine disposes (M028, issue #5)
+
+When an LLM agent must mutate the vault destructively, do NOT give it Bash +
+`acceptEdits` and trust its self-report. `wiki correct apply` once deleted 17
+articles applying one fact and reported 6. The safe pattern (now used by both
+`reconcile_fact()` and `apply()`):
+
+- **Agent annotates only** — `allowed_tools` without Bash, a PreToolUse
+  `make_path_scope_hook` (now with a `denied_subpaths` exclusion so
+  `knowledge/facts/` stays read-only inside an otherwise-writable `knowledge/`),
+  `permission_mode="default"`, a config-bounded `max_turns`. The agent CANNOT
+  shell out or delete — that is a structural guarantee, not prompt-compliance.
+- **Engine executes destruction** — the agent emits a fenced-JSON `## Proposed
+  actions` block (`superseded`/`edited`/`renamed`/`deleted`, parsed leniently +
+  shape-guarded, never raises); the engine performs renames (move +
+  `core.links.rename_article` wikilink rewrite) and deletions (move to
+  `.trash/<ts>/`, never `rm`), gated + on a clean-git precondition.
+- **Report ground-truth** — diff the real filesystem (git porcelain / mtime
+  snapshot) and WARN when more vanished than the engine accounts for. Subtract
+  engine-executed renames first: an unstaged `Path.rename` shows as
+  delete+create and would otherwise false-alarm.
+- A `--dry-run` is non-destructive and must NEVER be refused by a destructive-op
+  guard — it is exactly the preview you run before deciding to clean the tree.

@@ -1859,3 +1859,7 @@ cap-removal entry.
 **Two implementation constraints surfaced at review:** `make_path_scope_hook` (`sdk_helpers.py:404`) is allow-list-only — needs a new `denied_subpaths` param to keep `knowledge/facts/` write-protected while the rest of `knowledge/` is writable (S01-T02). Dropping Bash breaks the disambiguation `git mv` path — the engine-side rename helper must land in the same slice as the Bash-drop (S01-T04), else disambiguation half-applies.
 **Supersedes:** the destructive default in `prompts/correct_apply.md:25-26` and the unverified-print reporting in `correct_apply.py:153-154`.
 **Linked artifacts:** `.ytstack/M028-CONTEXT.md`, `M028-ROADMAP.md`, `M028-S01..S04-PLAN.md`; github.com/lx-0/llm-wiki/issues/5. PLANNED — no code yet; eng-review locked the architecture, S01 implementation pending.
+
+
+## 2026-06-13: M028 SHIPPED (0.2.0)
+All 4 slices of the issue-#5 correct-apply hardening shipped; suite 1356 green. Live-agent prompt quality unverified (mocked SDK).

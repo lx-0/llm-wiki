@@ -1025,8 +1025,9 @@ flowchart TD
 ---
 title: "Senkrechtstarter award (NOT won)"
 type: fact
-status: negation              # negation | disambiguation | clarification
+status: negation              # negation | supersession | disambiguation | clarification
 trust: confirmed              # confirmed | asserted | provisional
+# disposition: delete         # optional, negation only — opt-in to deletion of factually-false content (default: supersede)
 sources:                      # ≥1 required at creation (CLI rejects empty)
   - "https://handelsblatt.de/..."
   - "raw/clippings/2026-04-12-mail.md"
@@ -1079,8 +1080,9 @@ Im Prompt-Block sortiert `read_hard_facts()` Facts nach Tier (`confirmed` > `ass
 
 | Status | Wofür | Lint-Verhalten |
 |--------|-------|---------------|
-| `negation` | Falsche Behauptung streichen ("X gewinnt Award" wenn nicht passiert) | grep `negation_terms` über alle Non-Facts → warning pro Hit |
-| `disambiguation` | Namen-Konflikt klären ("township" → Fleet, nicht Township-X) | structural lint überspringt; der `apply`-Schritt erledigt File-Renames + Wikilink-Fixes |
+| `negation` | Möglicherweise **falsche** Behauptung (nie passiert). Beim `apply` **superseded** per Default; Löschen nur opt-in (`--allow-delete` / `disposition: delete`) — der einzige delete-eligible Status. | grep `negation_terms` über alle Non-Facts → warning pro Hit; bereits-`superseded` Artikel werden übersprungen |
+| `supersession` | **War wahr, jetzt veraltet** (ADN 174k→256k). Annotate-only: nie löschbar, auch nicht mit `--allow-delete`. | wie `negation` (grep `negation_terms`), superseded Artikel übersprungen |
+| `disambiguation` | Namen-Konflikt klären ("township" → Fleet) | structural lint überspringt; `apply` schlägt Renames vor → Engine führt Move + Wikilink-Rewrite aus (kein `git mv` mehr) |
 | `clarification` | Faktische Korrektur ohne Negation/Renaming | structural lint überspringt; Compile/Query nutzen den Fact als Kontext |
 
 ### Integration mit anderen Prozessen
@@ -1099,12 +1101,17 @@ wiki correct apply senkrechtstarter-award-not-won           # full agent run
 wiki correct apply township-project-fleet --dry-run         # plan only
 ```
 
-Was passiert:
+Was passiert (M028 — **agent proposes, engine disposes**, issue #5):
 
 1. `scripts/facts/correct_apply.py` liest das Fact-File und rendert `prompts/correct_apply.md`.
-2. Spawned Claude Agent SDK mit `cwd=<vault-root>`, `permission_mode=acceptEdits`, allowed_tools = `Read, Write, Edit, Glob, Grep, Bash`. Model = `CONFIG.models.compile_model` (Opus by default — Apply ist selten und teuer).
-3. Der Agent grept den ganzen Vault, editiert/strikes Claims in `knowledge/`, prepended Correction-Notes in `daily/`, lässt `raw/` unangetastet (Layer-Konvention: raw ist immutable). Bei Disambiguation darf er via `git mv` umbenennen und Wikilinks sweepen.
-4. Nach Erfolg setzt `correct_apply.py` das Fact-Frontmatter auf `applied: <iso-ts>` (mit `.bak.<ts>` Backup).
+2. **Deletion-Gate + Tree-Guard:** `deletion_allowed` = `--allow-delete` ODER fact `disposition: delete` (nie für `supersession`). Ist Löschen erlaubt und der Vault dirty/non-git, wird der Run **vor dem Agent** verweigert (rc 3) — `--force` überschreibt. Ein `--dry-run` wird nie verweigert.
+3. **Gesandboxter Agent** (mirror von `reconcile_fact`): `cwd=<vault-root>`, `permission_mode="default"`, allowed_tools = `Read, Glob, Grep, Write, Edit` (**kein Bash**), PreToolUse-Path-Hook scoped auf `knowledge/` (minus `facts/`) + `daily/` + `index.md` + Log, `max_turns` = `limits.correct_apply_max_turns`. Model = `CONFIG.models.compile_model`. Der Agent kann strukturell **nicht** löschen/shellen.
+4. Der Agent **annotiert** via Write/Edit: `negation`/`supersession` → `status: superseded` + `superseded_by:` + `outdated_since:` + H1-Banner (History bleibt; "outdated != false"). Renames/Deletions werden nur in einem fenced-JSON `## Proposed actions` Block **vorgeschlagen**.
+5. **Engine führt destruktive Ops aus:** `_execute_renames` (Move + Wikilink-Rewrite via `core.links.rename_article`) und — nur wenn `deletion_allowed` — `_execute_deletes` (Move nach `.trash/<ts>/`, nie `rm`; index-Row geräumt).
+6. **Ground-truth Reporting:** echter Filesystem-Delta (git porcelain / mtime-Snapshot) wird geloggt; `_divergence` WARNt wenn mehr Files verschwanden als deklariert+engine-ausgeführt (genau der issue-#5-Fehler: 6 gemeldet, 17 gelöscht).
+7. Nach Erfolg setzt `correct_apply.py` das Fact-Frontmatter auf `applied: <iso-ts>` (mit `.bak.<ts>` Backup).
+
+`--dry-run` zeigt den Blast Radius (Kandidaten-Files + geplante Aktion supersede/edit + Deletion-Gate-State) ohne Agent-Spawn. `wiki correct add` warnt wenn ein `negation_term` mehr als `limits.correct_broad_term_threshold` Artikel matcht.
 
 ### Edge Cases
 
