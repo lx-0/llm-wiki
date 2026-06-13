@@ -479,14 +479,19 @@ def _spawn_maintenance() -> None:
     non-blocking. Never let a spawn failure abort the compile that triggered it.
     """
     if not CONFIG.scheduling.piggybacks_on_compile:
+        log.info("  maintenance: skipped (piggybacks_on_compile=false)")
         return
     try:
         spawned = run_due_piggybacks(ignore_hour_gate=True, log=log)
+        # Always log — a silent path made it impossible to tell "ran, nothing
+        # due" from "never ran" when verifying the compile→maintenance trigger.
         if spawned:
             log.info(
                 "  maintenance: spawned %d due piggyback(s): %s",
                 len(spawned), ", ".join(spawned),
             )
+        else:
+            log.info("  maintenance: 0 due — queues current")
     except Exception:  # noqa: BLE001 — maintenance must never break compile
         log.warning("  maintenance: piggyback spawn failed (continuing)", exc_info=True)
 
