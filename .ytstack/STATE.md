@@ -1,7 +1,7 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-06-13T12:30:00+0200
+last_updated: 2026-06-13T14:30:00+0200
 current_milestone: M027
 active_slice: S06
 active_task: none
@@ -11,6 +11,24 @@ parallel_milestones: [M021]
 ---
 
 # State
+
+**Ad-hoc 2026-06-13d (issue #4 — operator-overridable output language):**
+Shipped `personal.output_language` (default `"auto"`), released as **0.1.9**
+(commits `07f6c9a` feat, `328ca85` docs, `5fdae6f` release/CHANGELOG+lock).
+`"auto"` → empty `${output_language_instruction}` → byte-identical compile;
+any language (`"de"`, `"German"`, …) renders a new `prompts/compile_output_language.md`
+`## Output language` override section appended to all 8 substrate prompts via the
+single central render in `compile_stages/compile.py`. Carve-out keeps code /
+identifiers / proper names / canonical structural headers verbatim. Migration +
+config.example + AGENTS.md + PROCESS.md + config.md + DECISIONS (2026-06-13) all
+updated. **Premise correction:** the source-language rule lived in ONE prompt
+(`compile_main` §8), not the assumed family — single injection point made it
+clean. Suite **1315 green** + manual auto/forced render diff. **NOT verified:**
+live end-to-end (English source → German prose via a real SDK compile) — code
+path only. **NOT covered:** curiosity (`producer.py`) + dream (`dream_entity`)
+render on separate paths → backlog `output-language-curiosity-dream.md`. Issue
+#4 closed at operator's instruction. `07f6c9a` pushed by operator; `328ca85` +
+`5fdae6f` local-unpushed at wrapup.
 
 **Ad-hoc 2026-06-13c (curiosity home-screen split + type-agnostic walk):** Found
 the REAL reason folder requests were invisible in the operator's workflow:
