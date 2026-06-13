@@ -2564,3 +2564,23 @@ verbatim-copy entirely — the proven mechanism. Also clarifies why the email
 pass uses an integer there in the first place. Producer architecture + retrieval
 are correct; this is the last gap to a working organic request. Backlog:
 `.ytstack/backlog/folder-curiosity-candidate-index.md`.
+
+## Numbered-candidate-index SHIPPED — folder-curiosity producer works organically (2026-06-13)
+
+The integer-index fix (above) shipped (commit `1ddd080`) and is live-verified on
+lxw: a real source mentioning the Hetzner invoice → the producer organically
+wrote 3 folder-deep-scan requests, ALL confidence 5, ALL anchored to the exact
+`Admin/Rechnungen/2026-Q2/Hetzner/Hetzner_2026-05-15_084000874799.pdf`. The full
+arc that got there (each step learned from live lxw data, not theory):
+blind-trim → 100% abstention (files invisible) → relevance grep → over-match →
+discriminance → dropped the central term + skeleton-bloat timeout → candidate
+retrieval (small prompt, model engages) → rarity ranking buried the central
+"hetzner" (operator has 65) → **coverage+recency ranking** (right file rank-0) →
+8B emits placeholder paths under verbatim-copy → **numbered candidate, model
+picks an integer**. The retrieval signal that works on a large personal archive:
+coverage (distinct source keywords a file matches) primary, modified-date
+recency tiebreak. The model never copies a path — it returns a number, Python
+maps it (mirrors the email pass's `folder_index`). Producer architecture lesson:
+for a non-agentic local model + 1000s-file index, the producer is a RETRIEVAL
+problem — rank in Python, present a short NUMBERED list, let the model judge by
+index. Do not stuff the tree into the prompt.

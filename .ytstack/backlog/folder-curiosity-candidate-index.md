@@ -1,7 +1,10 @@
 # Folder-curiosity producer: numbered-candidate-index gap schema
 
-**Status:** designed, not built (2026-06-13). The last gap to an organic
-folder-deep-scan request on lxw.
+**Status:** ✅ SHIPPED + LIVE-VERIFIED 2026-06-13 (commit `1ddd080`). The
+producer now organically generates correctly-anchored folder-deep-scan
+requests on lxw — 3 requests, all conf=5, all pointing at the exact
+`Hetzner_2026-05-15_…pdf` (final amount / Umsatzsteuer / project split).
+The 8B model picks a candidate NUMBER, Python maps it to the path.
 
 ## Problem
 
