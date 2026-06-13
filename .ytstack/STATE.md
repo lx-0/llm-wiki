@@ -1,7 +1,7 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-06-13T16:27:12+0200
+last_updated: 2026-06-13T16:35:00+0200
 current_milestone: M028
 active_slice: S01
 active_task: none
@@ -36,7 +36,14 @@ issue-#5 close. Grounded against HEAD: `reconcile_fact()` `correct_apply.py:190-
 is the sandbox pattern; destructive instruction `prompts/correct_apply.md:26`;
 `make_path_scope_hook` `sdk_helpers.py:404` is allow-list-only (needs exclude).
 
-**S01 progress: 1/6 tasks done.** ✅ **T01 SHIPPED** (commit `db60226`,
+**S01 progress: 2/6 tasks done.** ✅ **T02 SHIPPED** (commit `b114408`,
+`M028-S01-T02-SUMMARY.md`): `make_path_scope_hook` gained optional
+`denied_subpaths` (deny precedence over allowed roots); `apply()` passes
+`denied_subpaths=[FACTS_DIR]` → `knowledge/facts/` structurally write-protected.
+Default None → compile/dream/folder-provider callers byte-identical. Suite
+**1322 green** (+2 hook tests). facts/-protection open item from T01 now closed.
+Next: `/ytstack:plan-task` for **S01-T03** (rewrite `prompts/correct_apply.md`
+supersede-by-default + structured-proposal contract). ✅ **T01 SHIPPED** (commit `db60226`,
 `M028-S01-T01-SUMMARY.md`): `apply()` sandboxed via extracted
 `_apply_agent_options()` — Bash dropped, PreToolUse path-scope hook over
 knowledge/+daily/+index.md+log, `permission_mode=default`, `max_turns` →

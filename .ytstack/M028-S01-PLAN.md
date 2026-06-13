@@ -6,7 +6,7 @@ created: 2026-06-13T15:56:13+0200
 revised: 2026-06-13T16:10:00+0200
 status: planned
 task_count: 6
-completed_tasks: 1
+completed_tasks: 2
 ---
 
 # M028-S01 -- Slice Plan
@@ -32,7 +32,7 @@ delta. Trust model: **agent proposes, engine disposes.**
   operations log; switch `permission_mode` to `default`; bound `max_turns` via a
   new config knob (`correct_apply_max_turns`, migration same-commit). This is the
   HARD non-destructive guarantee — the agent can no longer delete or shell out.
-- [ ] T02 -- Extend `make_path_scope_hook` in `scripts/core/sdk_helpers.py:404`
+- [x] T02 -- Extend `make_path_scope_hook` in `scripts/core/sdk_helpers.py:404`
   with an optional `denied_subpaths` param (deny a write even when it resolves
   inside an allowed root) so `knowledge/facts/` stays write-protected while the
   rest of `knowledge/` is writable. Today the hook is allow-list-only — there is
