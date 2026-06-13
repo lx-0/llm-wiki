@@ -1,7 +1,7 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-06-13T17:40:00+0200
+last_updated: 2026-06-13T17:48:00+0200
 current_milestone: M028
 active_slice: S02
 active_task: none
@@ -36,7 +36,9 @@ issue-#5 close. Grounded against HEAD: `reconcile_fact()` `correct_apply.py:190-
 is the sandbox pattern; destructive instruction `prompts/correct_apply.md:26`;
 `make_path_scope_hook` `sdk_helpers.py:404` is allow-list-only (needs exclude).
 
-**S02 progress: 1/4.** ✅ **T01 SHIPPED** (commit `5c0a9c7`,
+**S02 progress: 2/4.** ✅ **T02 SHIPPED** (commit `5b0a60a`, `M028-S02-T02-SUMMARY.md`): deletion gate — `--allow-delete` flag + fact `disposition: delete`; real `deletion_allowed` into prompt + `_execute_deletes`. Default supersede-only. Suite **1341 green**. Next: `/ytstack:plan-task` for **S02-T03** (dirty/non-git tree guard unless `--force`).
+
+✅ **T01 SHIPPED** (commit `5c0a9c7`,
 `M028-S02-T01-SUMMARY.md`): `_execute_deletes` → `.trash/<ts>/` (move-as-backup,
 never unlink) + index-row clearing, gated off in `apply()` until T02. Executed
 deletes folded into divergence accounting. Suite **1339 green**. Next:

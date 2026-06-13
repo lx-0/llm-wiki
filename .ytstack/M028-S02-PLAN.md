@@ -6,7 +6,7 @@ created: 2026-06-13T15:56:13+0200
 revised: 2026-06-13T16:10:00+0200
 status: planned
 task_count: 4
-completed_tasks: 1
+completed_tasks: 2
 ---
 
 # M028-S02 -- Slice Plan
@@ -33,7 +33,7 @@ explicit signal.
   Returns the executed list so `_divergence` accounts for it (declared+executed
   deletions are not a surprise). Runs only when the gate (T02) is on. Mirrors
   `_execute_renames`. The `deleted` list + parser already exist (S01-T03/T04).
-- [ ] T02 -- Deletion gate: `--allow-delete` flag on `correct_apply.py` `main()` +
+- [x] T02 -- Deletion gate: `--allow-delete` flag on `correct_apply.py` `main()` +
   an optional fact frontmatter field `disposition: delete` read in `apply()`; pass
   the real `deletion_allowed` ("true"/"false") into the prompt render (replacing
   S01's hardcoded "false") AND guard `_execute_deletes` so nominations are ignored
