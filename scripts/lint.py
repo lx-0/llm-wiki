@@ -832,12 +832,27 @@ def check_daily_consistency() -> list[dict]:
     return issues
 
 
+def _superseded_by_fact(art_fm: dict, slug: str) -> bool:
+    """True if the article is already annotated as superseded BY this fact.
+
+    Such an article keeps the negated term in its historical body on purpose
+    (M028 supersede-default), so it must not be re-flagged as a violation —
+    the annotation IS the resolution. An article superseded by a *different*
+    fact still violates this one.
+    """
+    if art_fm.get("status") != "superseded":
+        return False
+    ref = str(art_fm.get("superseded_by") or "")
+    return ref.rsplit("/", 1)[-1].removesuffix(".md") == slug
+
+
 def check_facts_violations() -> list[dict]:
     """For each hard fact with negation_terms, grep all non-facts knowledge files for hits.
 
     Each hit is a `warning` issue: an article asserts something a hard fact negates.
     Disambiguation/clarification facts contribute no structural lint hits — those drift
     cases need the LLM contradiction check (or the agentic correct-apply processor).
+    An article already annotated `status: superseded` by the fact is not re-flagged.
     """
     issues: list[dict] = []
     if not (KNOWLEDGE_DIR / "facts").exists():
@@ -866,7 +881,10 @@ def check_facts_violations() -> list[dict]:
             content_lower = article.read_text(encoding="utf-8").lower()
         except OSError:
             continue
+        art_fm = _read_yaml_frontmatter(article)
         for slug, status, terms in facts_with_terms:
+            if _superseded_by_fact(art_fm, slug):
+                continue  # already annotated as superseded by this fact
             for term in terms:
                 if term.lower() in content_lower:
                     issues.append(issue(
