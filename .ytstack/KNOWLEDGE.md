@@ -51,6 +51,14 @@ The "Conventions" / "Workflow" / "Quick gotchas" sections are quick-reference. T
 
 Distilled from sessions 2026-04-11 → 2026-04-30 building this implementation. Each section is something that bit us in production — read before changing related code.
 
+### A wikilink into an Obsidian-excluded folder is a silent dead link (2026-06-13)
+
+`.obsidian/app.json` `userIgnoreFilters: ["raw/"]` (the mobile-perf exclusion) means Obsidian never indexes `raw/`. A `[[stem]]` link whose target lives there renders unresolved — the markdown still *contains* a reference, but it's non-navigable in the UI. The daily voice rollup did exactly this (`→ [[voice-…]]` into `raw/voice/`). Lesson: provenance into an excluded tree belongs in **frontmatter** (`sources:` list — machine-readable, not a graph edge, no index cost), not a body wikilink. The `distill-don't-cite` rule already bans body links from compiled `knowledge/` to `raw/`; this extends it to source-substrate rollups. See `daily_capture.append_with_source`.
+
+### agent_task specs are static templates, not per-instance work items (2026-06-13)
+
+`prompts/agents/<id>.md` specs are enumerated by `list_specs()` (every `.md` is parsed) and run by `agent_task.py <id>` with `${var}` substitution. They are reusable templates, NOT a place to drop one file per detected work item — N per-instance specs would pollute the dir and break `list_specs`. When detection produces many instances (the `intents` producer detecting tasks from voice notes), the right shape is: **detection writes records to a queue (`tasks/`), and ONE static orchestrator spec drains the queue.** Detection (producer) ≠ routing (handler registry) ≠ execution (operator-gated agent spec) — three separate layers. The intent-dispatch handler registry (`intents/`) mirrors the Producer/Collector registry so new outcome kinds are additive, not edits to the producer.
+
 ### Every accumulating substrate type needs its own SUBSTRATE_PROMPTS entry (2026-05-16)
 
 #### Symptom
