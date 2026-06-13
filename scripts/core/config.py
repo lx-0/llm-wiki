@@ -584,6 +584,10 @@ class Limits:
     # Turn budget for the strict concept-reconciliation agent. Tight: the task
     # is "edit one flagged concept to match one fact", not corpus synthesis.
     concept_reconcile_max_turns: int = 15
+    # Turn budget for the operator-driven `wiki correct apply` agent (M028).
+    # Broader than concept_reconcile (propagates one fact across the whole
+    # vault), so a larger bound. Was hardcoded 50 pre-M028.
+    correct_apply_max_turns: int = 50
     # Health-trend synthesis (`wiki health-trends`). Recent-window length (months)
     # for the trend arrow + "recent avg" column; min coverage (days) for a metric
     # to appear (drops near-empty series so no fake trends over data gaps).

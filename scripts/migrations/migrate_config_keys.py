@@ -262,6 +262,9 @@ KEY_ADDITIONS: dict[str, dict[str, object]] = {
         "concept_reconcile_max_files_per_fact": 25,
         "concept_reconcile_max_facts_per_run": 10,
         "concept_reconcile_max_turns": 15,
+        # `wiki correct apply` turn budget (M028, issue #5). Lifted from a
+        # hardcoded 50 when apply() was sandboxed.
+        "correct_apply_max_turns": 50,
         # Health-trend synthesis (2026-05-23). Recent-window + min-coverage for
         # `wiki health-trends`. See `.ytstack/backlog/health-trend-synthesis.md`.
         "health_trends_recent_months": 6,

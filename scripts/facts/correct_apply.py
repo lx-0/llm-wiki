@@ -34,7 +34,15 @@ from claude_agent_sdk import (
     query,
 )
 
-from core.paths import CONCEPTS_DIR, FACTS_DIR, LOG_FILE, ROOT_DIR
+from core.paths import (
+    CONCEPTS_DIR,
+    DAILY_DIR,
+    FACTS_DIR,
+    INDEX_FILE,
+    KNOWLEDGE_DIR,
+    LOG_FILE,
+    ROOT_DIR,
+)
 from core.utils import now_iso, today_iso
 from core.config import CONFIG  # noqa: E402
 from core.usage import LEDGER  # noqa: E402
@@ -75,6 +83,41 @@ def _backup(path: Path) -> Path:
     bak = path.with_suffix(path.suffix + f".bak.{ts}")
     bak.write_bytes(path.read_bytes())
     return bak
+
+
+def _apply_agent_options(capture: StderrCapture) -> ClaudeAgentOptions:
+    """Sandboxed SDK options for the `apply()` agent (M028, issue #5).
+
+    Non-destructive by construction: no `Bash` (the agent cannot `rm`/`git mv`),
+    a PreToolUse path-scope hook constraining Write/Edit to the wiki's editable
+    surfaces, `permission_mode="default"`, and a config-knob turn bound. Mirrors
+    the safe `reconcile_fact()` pattern. Destructive ops (delete, rename) are
+    engine-owned post-steps in later S01/S02 tasks, not agent actions.
+
+    Scope note: `make_path_scope_hook` is allow-list-only today, so
+    `knowledge/facts/` is still writable here — M028-S01-T02 adds the
+    `denied_subpaths` exclusion that closes it.
+    """
+    return ClaudeAgentOptions(
+        max_buffer_size=CONFIG.limits.sdk_max_buffer_size_mb * 1024 * 1024,
+        cwd=str(ROOT_DIR),
+        model=CONFIG.models.compile_model,
+        allowed_tools=["Read", "Glob", "Grep", "Write", "Edit"],
+        hooks={
+            "PreToolUse": [
+                HookMatcher(
+                    matcher="Write|Edit",
+                    hooks=[make_path_scope_hook(
+                        [KNOWLEDGE_DIR, DAILY_DIR, INDEX_FILE, LOG_FILE]
+                    )],
+                ),
+            ],
+        },
+        permission_mode="default",
+        max_turns=CONFIG.limits.correct_apply_max_turns,
+        system_prompt={"type": "preset", "preset": "claude_code"},
+        stderr=capture.callback,
+    )
 
 
 async def apply(slug: str, dry_run: bool) -> int:
@@ -119,16 +162,7 @@ async def apply(slug: str, dry_run: bool) -> int:
     try:
         async for message in query(
             prompt=prompt,
-            options=ClaudeAgentOptions(
-                max_buffer_size=CONFIG.limits.sdk_max_buffer_size_mb * 1024 * 1024,
-                cwd=str(ROOT_DIR),
-                model=CONFIG.models.compile_model,
-                allowed_tools=["Read", "Write", "Edit", "Glob", "Grep", "Bash"],
-                permission_mode="acceptEdits",
-                max_turns=50,
-                system_prompt={"type": "preset", "preset": "claude_code"},
-                stderr=capture.callback,
-            ),
+            options=_apply_agent_options(capture),
         ):
             if isinstance(message, AssistantMessage) and message.usage:
                 total_input_tokens += message.usage.get("input_tokens", 0)
