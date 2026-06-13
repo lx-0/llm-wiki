@@ -1153,6 +1153,23 @@ def generate_report(all_issues: list[dict]) -> str:
 
 # ── Main ─────────────────────────────────────────────────────────────
 
+def _lint_exit_code(errors: int, structural_only: bool) -> int:
+    """Exit code for the lint run.
+
+    `--structural-only` is the cheap piggyback path: it ran successfully and the
+    findings live in the lint report + the home-screen lint probe — finding
+    content issues is DATA, not a task failure, so it returns 0. (Otherwise the
+    piggyback runner stamps a healthy sweep `failed:1` and false-alarms the
+    dashboard — the actual lxw symptom.) Interactive full lint keeps exit 1 on
+    errors so an operator / CI gate still sees a non-zero "issues present"
+    signal; a non-zero from the structural path then unambiguously means lint
+    itself failed to run.
+    """
+    if structural_only:
+        return 0
+    return 1 if errors > 0 else 0
+
+
 async def main() -> None:
     parser = argparse.ArgumentParser(description="Lint the knowledge base")
     parser.add_argument(
@@ -1230,7 +1247,7 @@ async def main() -> None:
 
     if errors > 0:
         print("\nErrors found — knowledge base needs attention!")
-        sys.exit(1)
+    sys.exit(_lint_exit_code(errors, args.structural_only))
 
 
 if __name__ == "__main__":
