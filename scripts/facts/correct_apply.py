@@ -17,6 +17,7 @@ import argparse
 import asyncio
 import json
 import logging
+import subprocess
 import sys
 import time as _time
 from dataclasses import dataclass, field
@@ -147,6 +148,108 @@ def _execute_renames(actions: dict, vault: Path) -> None:
             log.warning("rename failed %s → %s: %s", entry["from"], entry["to"], exc)
 
 
+# ── Ground-truth filesystem-delta reporting (issue #5) ──
+# The engine records what ACTUALLY changed on disk — never the agent's free-text
+# summary, which under-reported 17 deletions as 6. git porcelain when the vault
+# is a repo, else a pre/post mtime snapshot.
+
+def _parse_porcelain(out: str) -> dict:
+    """Classify `git status --porcelain` lines into created/modified/deleted/renamed."""
+    delta = {"created": [], "modified": [], "deleted": [], "renamed": []}
+    for line in out.splitlines():
+        if not line.strip():
+            continue
+        code, rest = line[:2], line[3:]
+        if "R" in code:
+            delta["renamed"].append(rest)
+        elif "D" in code:
+            delta["deleted"].append(rest)
+        elif code == "??" or "A" in code:
+            delta["created"].append(rest)
+        elif "M" in code:
+            delta["modified"].append(rest)
+    return delta
+
+
+def _git_delta(vault: Path) -> dict | None:
+    """Real delta via git porcelain (scoped to knowledge/), or None if not a repo."""
+    try:
+        proc = subprocess.run(
+            ["git", "-C", str(vault), "status", "--porcelain", "--", "knowledge"],
+            capture_output=True, text=True, timeout=30,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if proc.returncode != 0:
+        return None
+    return _parse_porcelain(proc.stdout)
+
+
+def _snapshot(roots) -> dict:
+    """`{path: (mtime_ns, size)}` for every file under the given roots."""
+    snap: dict[str, tuple[int, int]] = {}
+    for root in roots:
+        root = Path(root)
+        if not root.exists():
+            continue
+        paths = [root] if root.is_file() else [p for p in root.rglob("*") if p.is_file()]
+        for p in paths:
+            try:
+                st = p.stat()
+                snap[str(p)] = (st.st_mtime_ns, st.st_size)
+            except OSError:
+                continue
+    return snap
+
+
+def _delta_from_snapshot(before: dict, after: dict) -> dict:
+    """created/modified/deleted from two `_snapshot` dicts (non-git fallback)."""
+    delta = {"created": [], "modified": [], "deleted": [], "renamed": []}
+    for path, sig in after.items():
+        if path not in before:
+            delta["created"].append(path)
+        elif before[path] != sig:
+            delta["modified"].append(path)
+    for path in before:
+        if path not in after:
+            delta["deleted"].append(path)
+    return delta
+
+
+def _divergence(actions: dict, delta: dict) -> list:
+    """Warnings where the real filesystem delta contradicts the agent's proposal.
+
+    Load-bearing check: more files deleted than the agent declared — the exact
+    issue-#5 failure (declared 6, deleted 17).
+    """
+    warnings = []
+    real_del, declared_del = len(delta.get("deleted", [])), len(actions.get("deleted", []))
+    if real_del > declared_del:
+        warnings.append(
+            f"Filesystem shows {real_del} file(s) deleted but the agent declared "
+            f"{declared_del} — investigate before trusting this run (issue #5)."
+        )
+    real_ren, declared_ren = len(delta.get("renamed", [])), len(actions.get("renamed", []))
+    if real_ren != declared_ren:
+        warnings.append(
+            f"Filesystem shows {real_ren} rename(s) but the agent declared {declared_ren}."
+        )
+    return warnings
+
+
+def _report_filesystem_delta(delta: dict, divergences: list) -> None:
+    log.info(
+        "Filesystem delta — created: %d, modified: %d, renamed: %d, deleted: %d",
+        len(delta["created"]), len(delta["modified"]),
+        len(delta["renamed"]), len(delta["deleted"]),
+    )
+    for category in ("created", "modified", "renamed", "deleted"):
+        for path in delta[category]:
+            log.info("  %s: %s", category, path)
+    for warning in divergences:
+        log.warning(warning)
+
+
 def _apply_agent_options(capture: StderrCapture) -> ClaudeAgentOptions:
     """Sandboxed SDK options for the `apply()` agent (M028, issue #5).
 
@@ -220,6 +323,10 @@ async def apply(slug: str, dry_run: bool) -> int:
 
     log.info("Spawning agent over vault root %s for fact %s", ROOT_DIR, slug)
 
+    # Snapshot before the agent runs — the non-git fallback for delta reporting.
+    is_git = (ROOT_DIR / ".git").exists()
+    before_snapshot = None if is_git else _snapshot([KNOWLEDGE_DIR, INDEX_FILE])
+
     total_input_tokens = 0
     total_output_tokens = 0
     result_text = ""
@@ -259,6 +366,13 @@ async def apply(slug: str, dry_run: bool) -> int:
     # Renames here; deletions are deferred to S02's `.trash` executor.
     actions = _parse_proposed_actions(result_text)
     _execute_renames(actions, ROOT_DIR)
+
+    # Ground-truth reporting: what ACTUALLY changed on disk, and a warning when
+    # it contradicts the agent's declared actions (issue #5: claimed 6, did 17).
+    delta = _git_delta(ROOT_DIR)
+    if delta is None:
+        delta = _delta_from_snapshot(before_snapshot or {}, _snapshot([KNOWLEDGE_DIR, INDEX_FILE]))
+    _report_filesystem_delta(delta, _divergence(actions, delta))
 
     # Mark fact as applied. Re-read to avoid stomping if the agent edited it
     # (it shouldn't — the prompt forbids it — but be safe).

@@ -121,3 +121,59 @@ def test_parse_proposed_actions_shape_guards_nonlist() -> None:
     a = correct_apply._parse_proposed_actions('{"deleted": "oops", "renamed": [{"bad": 1}]}')
     assert a["deleted"] == []          # scalar → []
     assert a["renamed"] == []          # malformed {from,to} dropped
+
+
+# ── ground-truth reporting (M028-S01-T05) ──
+
+
+def test_parse_porcelain_classifies_codes() -> None:
+    from facts import correct_apply
+
+    out = (
+        " M knowledge/concepts/foo.md\n"
+        " D knowledge/concepts/gone.md\n"
+        "?? knowledge/concepts/new.md\n"
+        "R  knowledge/projects/old.md -> knowledge/projects/new.md\n"
+    )
+    d = correct_apply._parse_porcelain(out)
+    assert d["modified"] == ["knowledge/concepts/foo.md"]
+    assert d["deleted"] == ["knowledge/concepts/gone.md"]
+    assert d["created"] == ["knowledge/concepts/new.md"]
+    assert d["renamed"] == ["knowledge/projects/old.md -> knowledge/projects/new.md"]
+
+
+def test_delta_from_snapshot(tmp_path) -> None:
+    from facts import correct_apply
+
+    keep = tmp_path / "keep.md"
+    gone = tmp_path / "gone.md"
+    keep.write_text("a", encoding="utf-8")
+    gone.write_text("b", encoding="utf-8")
+    before = correct_apply._snapshot([tmp_path])
+    gone.unlink()
+    keep.write_text("a-changed-longer", encoding="utf-8")
+    (tmp_path / "new.md").write_text("c", encoding="utf-8")
+    after = correct_apply._snapshot([tmp_path])
+
+    d = correct_apply._delta_from_snapshot(before, after)
+    assert str(gone) in d["deleted"]
+    assert str(keep) in d["modified"]
+    assert str(tmp_path / "new.md") in d["created"]
+
+
+def test_divergence_fires_when_real_deletes_exceed_declared() -> None:
+    from facts import correct_apply
+
+    actions = {"superseded": [], "edited": [], "renamed": [], "deleted": ["a.md"]}
+    delta = {"created": [], "modified": [], "deleted": ["a.md", "b.md", "c.md"], "renamed": []}
+    warnings = correct_apply._divergence(actions, delta)
+    assert warnings, "must warn when more files were deleted than declared"
+    assert any("deleted" in w.lower() for w in warnings)
+
+
+def test_divergence_silent_when_counts_match() -> None:
+    from facts import correct_apply
+
+    actions = {"superseded": ["a.md"], "edited": [], "renamed": [], "deleted": []}
+    delta = {"created": [], "modified": ["a.md"], "deleted": [], "renamed": []}
+    assert correct_apply._divergence(actions, delta) == []
