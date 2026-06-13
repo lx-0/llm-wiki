@@ -436,6 +436,9 @@ limits:
   # Turn budget for operator-driven `wiki correct apply` (propagates one fact
   # across the whole vault — broader than concept_reconcile, so larger).
   correct_apply_max_turns: 50
+  # `wiki correct add` warns when a negation_term matches more than this many
+  # articles (over-broad terms → lint noise / large apply blast radius).
+  correct_broad_term_threshold: 15
   # Health-trend synthesis (`wiki health-trends`). Recent-window (months) for the
   # trend arrow + "recent avg"; min coverage (days) for a metric to be shown.
   health_trends_recent_months: 6

@@ -265,6 +265,8 @@ KEY_ADDITIONS: dict[str, dict[str, object]] = {
         # `wiki correct apply` turn budget (M028, issue #5). Lifted from a
         # hardcoded 50 when apply() was sandboxed.
         "correct_apply_max_turns": 50,
+        # `wiki correct add` over-broad-term warning threshold (M028, issue #5).
+        "correct_broad_term_threshold": 15,
         # Health-trend synthesis (2026-05-23). Recent-window + min-coverage for
         # `wiki health-trends`. See `.ytstack/backlog/health-trend-synthesis.md`.
         "health_trends_recent_months": 6,

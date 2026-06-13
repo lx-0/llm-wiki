@@ -106,7 +106,7 @@ def test_migrate_config_file_round_trip(tmp_path):
     new_text, changes = m.migrate_config(config_path)
     assert new_text is not None
     # 2 piggyback (rename + drop)
-    #  + 1 created-limits-block + 27 limits additions:
+    #  + 1 created-limits-block + 28 limits additions:
     #    compile_force_long_context_types, compile_skip_on_long_context_unknown,
     #    compile_aggregated_max_consecutive_failures (2026-05-17 circuit-breaker),
     #    compile_role_default_by_location (M007), 4 calendar_*,
@@ -120,7 +120,7 @@ def test_migrate_config_file_round_trip(tmp_path):
     #    dream_entity_max_cost_usd + dream_cycle_max_cost_per_run_usd (M014),
     #    dream_tier1_recent_count + dream_tier1_digest_days +
     #    dream_tier2_sample_count (M016),
-    #    correct_apply_max_turns (M028 sandbox apply, issue #5)
+    #    correct_apply_max_turns + correct_broad_term_threshold (M028, issue #5)
     #  + 6 piggybacks additions (calendar, curiosity_followup, dream_cycle — M014,
     #    pictures — 2026-05-17, study_run_due + analyst_pass2 — M019-S05)
     #  + 1 created-features-block + 6 features additions
@@ -172,7 +172,8 @@ def test_migrate_config_file_round_trip(tmp_path):
     # +1 personal.output_language (issue #4 compiled-prose language), 2026-06-13
     # +1 limits.curiosity_exclude_globs (curiosity substrate denylist), 2026-06-13
     # +1 limits.correct_apply_max_turns (M028 sandbox apply, issue #5), 2026-06-13
-    assert len(changes) == 92, f"got {len(changes)} changes: {changes}"
+    # +1 limits.correct_broad_term_threshold (M028 broad-term warning, issue #5), 2026-06-13
+    assert len(changes) == 93, f"got {len(changes)} changes: {changes}"
 
     reparsed = yaml.safe_load(new_text)
     # piggyback side
@@ -265,6 +266,7 @@ def test_migrate_config_no_change_when_fully_current(tmp_path):
             "concept_reconcile_max_facts_per_run": 10,
             "concept_reconcile_max_turns": 15,
             "correct_apply_max_turns": 50,
+            "correct_broad_term_threshold": 15,
             "health_trends_recent_months": 6,
             "health_trends_min_coverage_days": 10,
             "voice_punctuate_timeout_s": 120,
@@ -432,6 +434,7 @@ def test_migrate_additions_idempotent():
             "concept_reconcile_max_facts_per_run": 10,
             "concept_reconcile_max_turns": 15,
             "correct_apply_max_turns": 50,
+            "correct_broad_term_threshold": 15,
             "health_trends_recent_months": 6,
             "health_trends_min_coverage_days": 10,
             "voice_punctuate_timeout_s": 120,

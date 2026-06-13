@@ -41,7 +41,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import yaml
 
-from core.paths import FACTS_DIR
+from core.paths import FACTS_DIR, KNOWLEDGE_DIR
+from core.config import CONFIG
 from core.utils import slugify, today_iso
 
 logging.basicConfig(
@@ -97,6 +98,39 @@ def _list_facts() -> list[Path]:
     if not FACTS_DIR.exists():
         return []
     return sorted(FACTS_DIR.glob("*.md"))
+
+
+def _count_term_matches(term: str, knowledge_dir: Path) -> int:
+    """Knowledge articles (excluding index.md) containing `term`, case-insensitive.
+
+    One read per file. Used to warn at add-time about over-broad negation terms.
+    """
+    if not term or not knowledge_dir.exists():
+        return 0
+    needle = term.lower()
+    count = 0
+    for path in knowledge_dir.rglob("*.md"):
+        if path.name == "index.md" and path.parent == knowledge_dir:
+            continue
+        try:
+            if needle in path.read_text(encoding="utf-8").lower():
+                count += 1
+        except OSError:
+            continue
+    return count
+
+
+def _warn_broad_terms(terms: list, knowledge_dir: Path) -> None:
+    """Warn for each term matching more than the configured threshold."""
+    threshold = CONFIG.limits.correct_broad_term_threshold
+    for term in terms:
+        n = _count_term_matches(term, knowledge_dir)
+        if n > threshold:
+            log.warning(
+                "negation_term %r matches %d articles (> %d) — narrow it? "
+                "Broad terms turn into lint noise or a large apply blast radius.",
+                term, n, threshold,
+            )
 
 
 def cmd_add(args: argparse.Namespace) -> int:
@@ -160,6 +194,8 @@ def cmd_add(args: argparse.Namespace) -> int:
         "negation_terms": list(args.term or []),
     }
     _write_fact(path, frontmatter, body)
+    if status == "negation":
+        _warn_broad_terms(list(args.term or []), KNOWLEDGE_DIR)
     print(str(path))
     return 0
 

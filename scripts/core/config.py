@@ -588,6 +588,10 @@ class Limits:
     # Broader than concept_reconcile (propagates one fact across the whole
     # vault), so a larger bound. Was hardcoded 50 pre-M028.
     correct_apply_max_turns: int = 50
+    # `wiki correct add` warns when a negation_term matches more than this many
+    # existing articles — over-broad terms become lint noise / large apply blast
+    # radii (M028 issue #5). Warn-only, never blocks.
+    correct_broad_term_threshold: int = 15
     # Health-trend synthesis (`wiki health-trends`). Recent-window length (months)
     # for the trend arrow + "recent avg" column; min coverage (days) for a metric
     # to appear (drops near-empty series so no fake trends over data gaps).

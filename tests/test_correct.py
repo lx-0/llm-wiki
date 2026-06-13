@@ -188,3 +188,39 @@ def test_read_hard_facts_empty(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) 
     from core import utils
 
     assert utils.read_hard_facts() == "(no hard facts recorded)"
+
+
+# ── over-broad-term warning (M028-S03-T02) ──
+
+
+def test_count_term_matches(tmp_path) -> None:
+    from facts import correct
+
+    knowledge = tmp_path / "knowledge"
+    (knowledge / "concepts").mkdir(parents=True)
+    (knowledge / "concepts" / "a.md").write_text("the Widget here", encoding="utf-8")
+    (knowledge / "concepts" / "b.md").write_text("WIDGET again", encoding="utf-8")
+    (knowledge / "concepts" / "c.md").write_text("nothing", encoding="utf-8")
+    (knowledge / "index.md").write_text("widget in index", encoding="utf-8")  # excluded
+
+    assert correct._count_term_matches("widget", knowledge) == 2
+
+
+def test_warn_broad_terms_fires_above_threshold(tmp_path, monkeypatch, caplog) -> None:
+    import logging
+    from facts import correct
+
+    knowledge = tmp_path / "knowledge"
+    knowledge.mkdir(parents=True)
+    for i in range(3):
+        (knowledge / f"f{i}.md").write_text("euro price", encoding="utf-8")
+
+    monkeypatch.setattr(correct.CONFIG.limits, "correct_broad_term_threshold", 2)
+    caplog.set_level(logging.WARNING, logger="correct")
+    correct._warn_broad_terms(["euro price"], knowledge)
+    assert "narrow it" in caplog.text
+
+    caplog.clear()
+    monkeypatch.setattr(correct.CONFIG.limits, "correct_broad_term_threshold", 5)
+    correct._warn_broad_terms(["euro price"], knowledge)
+    assert "narrow it" not in caplog.text
