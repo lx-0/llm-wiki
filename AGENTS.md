@@ -162,6 +162,8 @@ Source files may carry an optional `author: <name>` (or `author: [name1, name2]`
 
 `knowledge/` articles may carry an optional `domain:` frontmatter key — a cross-cutting life-domain axis (default enum `company | personal | ai | meta`, extensible via `CONFIG.personal.domains`). Pure filter, never required: untagged articles appear in every view. Lint `check_domain_value` warns (not errors) on values outside the configured enum. `wiki query --domain <value>` restricts an answer to articles whose `domain:` matches. Lifted from the lx-vault audit; spec: `.ytstack/backlog/domain-frontmatter.md`.
 
+`personal.output_language` (default `"auto"`) pins the **output prose language** of compiled `knowledge/**` articles. `"auto"` keeps today's behavior (write in the source material's language; byte-identical compile). Any other value (`"de"`, `"German"`, `"fr"`, …) forces all compiled prose into that language regardless of source, while keeping code, technical identifiers, proper names, and the canonical structural section headers (`## State`, `## Timeline`, …) verbatim. Injected into every substrate compile prompt via `${output_language_instruction}` (built by `core.prompts.build_output_language_instruction`). Distinct from `personal.voice_transcribe_language` (input transcription vs. output prose). Issue #4.
+
 ### Frontmatter — `compile_role` axis (M007)
 
 Any `.md` file in the vault may carry `compile_role:` with one of 3 values, controlling how `compile.py` treats it:

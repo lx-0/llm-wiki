@@ -54,6 +54,7 @@ def test_rendered_prompt_for_after_substrate_carries_resolution_rules() -> None:
         source_content=body,
         today="2026-04-22",
         now="2026-04-22T11:00:00Z",
+        output_language_instruction="",
     )
     # Resolution-detection rule is in the prompt
     assert "Resolution detection and demotion" in rendered

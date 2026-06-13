@@ -48,3 +48,22 @@ def render(name: str, **vars: object) -> str:
         return str(value) if value is not None else ""
 
     return _PLACEHOLDER_RE.sub(_sub, text)
+
+
+def build_output_language_instruction(output_language: str) -> str:
+    """Render the `${output_language_instruction}` fragment for compile prompts.
+
+    Pure (takes the configured value, not CONFIG) so it's trivially testable and
+    free of import cycles. `"auto"` (or empty / unset) returns the empty string,
+    so the substrate prompts render byte-identically to their pre-issue-#4 form —
+    today's "write in the source material's language" behavior. Any other value
+    (`"de"`, `"German"`, `"fr"`, …) renders the `compile_output_language.md`
+    section, which forces all compiled prose into that language while keeping
+    code, identifiers, proper names, and the canonical structural headers
+    verbatim. Injected once for every substrate prompt at the central
+    `compile_source` render site. See issue #4.
+    """
+    value = (output_language or "").strip()
+    if not value or value.lower() == "auto":
+        return ""
+    return render("compile_output_language", output_language=value)

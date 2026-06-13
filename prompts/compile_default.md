@@ -83,3 +83,5 @@ The right output for the default prompt is small: 0-2 article touches per file. 
 ## Anti-noise guard
 
 When in doubt, do nothing. Better to miss a fuzzy concept than create a noise stub that pollutes the wiki forever. The operator can re-prompt or write the article manually if needed.
+
+${output_language_instruction}

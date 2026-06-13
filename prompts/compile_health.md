@@ -67,3 +67,5 @@ This task is bounded: at most operations log + maybe one Timeline line per menti
 If after 4 turns you haven't finished:
 - STOP all entity-extraction. If you've written the log entry, you're done.
 - Emit your final result; do not start new tool calls.
+
+${output_language_instruction}

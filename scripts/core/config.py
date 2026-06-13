@@ -941,6 +941,18 @@ class Personal:
     # matches. Empty list = feature off (lint check + CLI flag silently
     # no-op). See `.ytstack/backlog/domain-frontmatter.md`.
     domains: list[str] = field(default_factory=lambda: ["company", "personal", "ai", "meta"])
+    # Issue #4 (2026-06-13): pin the OUTPUT prose language of compiled
+    # `knowledge/**` articles. "auto" (default) keeps today's behavior — write
+    # in the source material's language — and renders every compile substrate
+    # prompt byte-identically. Any other value (`"de"`, `"German"`, `"fr"`, …)
+    # forces all compiled prose (titles, body, summaries) into that language
+    # regardless of source, while keeping code, technical identifiers, proper
+    # names, and the canonical structural section headers (`## State`,
+    # `## Timeline`, …) verbatim so downstream parsing / dedup don't break.
+    # Distinct from `voice_transcribe_language` (that's INPUT transcription;
+    # this is OUTPUT prose). Injected via `${output_language_instruction}`,
+    # built by `core.prompts.build_output_language_instruction`.
+    output_language: str = "auto"
 
 
 # Default piggyback set — names match core/piggybacks.py's task-table keys.

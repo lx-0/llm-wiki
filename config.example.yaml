@@ -681,6 +681,16 @@ personal:
     - personal   # health, family, apartment, side-interests
     - ai         # AI tooling, agent infra, prompt engineering
     - meta       # the wiki engine itself, ytstack, llm-wiki maintenance
+  # Issue #4: output prose language of compiled `knowledge/**` articles.
+  # "auto" (default) = write in the source material's language (today's
+  # behavior, byte-identical compile). Set to a language ("de", "German",
+  # "fr", …) to force ALL compiled prose — titles, body, summaries — into
+  # that language regardless of source, while keeping code, technical
+  # identifiers, proper names, and the canonical structural section headers
+  # (## State, ## Timeline, …) verbatim. Distinct from voice_transcribe_language
+  # (that's input transcription; this is output prose).
+  # Example:  output_language: "de"
+  output_language: "auto"
   # account-id → {email, label, reader?, filter?, gmeet?, jamie?, …}
   # `reader`, `filter`, `gmeet`, `jamie` are nested blocks with a `kind`
   # discriminator plus kind-specific fields. resolve_reader / resolve_filter /

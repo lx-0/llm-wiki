@@ -83,3 +83,5 @@ Screenshot extraction is back-linking, not deep synthesis. The right output is s
 ## Anti-noise guard
 
 Be ruthless about substantiveness. Bad pattern: creating a stub for every distinct app that appeared in any screenshot. Good pattern: only create/update articles when the screenshots reveal something durable about the operator's work. A passing glance at a website is not a knowledge artifact.
+
+${output_language_instruction}

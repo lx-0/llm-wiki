@@ -93,3 +93,5 @@ If after 15 turns you haven't finished:
 ## Anti-noise guard
 
 Camera photos are noisier than screenshots. **When in doubt, skip.** A photo of hands working on a puzzle is not a knowledge artifact; a photo of a whiteboard with three named architecture components IS. Be ruthless. Zero stubs is a valid output for a 5-photo ephemeral-heavy batch.
+
+${output_language_instruction}

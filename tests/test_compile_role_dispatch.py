@@ -93,6 +93,7 @@ _DUMMY_VARS = {
     "source_content": "dummy content",
     "today": "2026-05-16",
     "now": "2026-05-16T17:00:00Z",
+    "output_language_instruction": "",
 }
 
 

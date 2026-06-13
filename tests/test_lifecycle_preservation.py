@@ -55,6 +55,7 @@ def test_rendered_prompt_for_after_substrate_carries_preservation_rule() -> None
         source_content=body,
         today="2026-04-10",
         now="2026-04-10T09:00:00Z",
+        output_language_instruction="",
     )
     # Preservation rule (T01) is in the prompt
     assert "Preserve manual `- [x]`" in rendered

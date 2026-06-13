@@ -83,3 +83,5 @@ If after 9 turns you haven't finished:
 - Emit your final result; do not start new tool calls.
 
 This is cross-linking, not synthesis. The right output is small.
+
+${output_language_instruction}

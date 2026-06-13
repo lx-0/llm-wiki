@@ -72,3 +72,5 @@ If after 6 turns you haven't finished:
 - Emit your final result; do not start new tool calls.
 
 This is metadata extraction, not knowledge synthesis. The right output is small.
+
+${output_language_instruction}

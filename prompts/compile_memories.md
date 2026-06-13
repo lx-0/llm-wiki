@@ -76,3 +76,5 @@ Max 5 Edits + 3 Writes total (≤ 8 file mods). If the source has more than 3 su
 ## Failure branch
 
 If Mode A's Read returns content that does not contain `## Timeline` (engine bootstrap should have prevented this), emit `{"status": "timeline_missing", "page": "${project_page}"}` and STOP. Do not attempt to create the section yourself.
+
+${output_language_instruction}

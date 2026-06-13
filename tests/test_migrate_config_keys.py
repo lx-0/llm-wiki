@@ -168,8 +168,9 @@ def test_migrate_config_file_round_trip(tmp_path):
     # +1 models.folder_scan_provider (M027-S04-T01 Q9 seam), 2026-06-10
     # +1 limits.curiosity_folder_max_candidates (candidate retrieval), 2026-06-13
     # +1 scheduling.piggybacks_on_compile (compile drains due piggybacks), 2026-06-13
-    # = 89 changes (no drops — operator has no orphan personal.* fields)
-    assert len(changes) == 89, f"got {len(changes)} changes: {changes}"
+    # +1 personal.output_language (issue #4 compiled-prose language), 2026-06-13
+    # = 90 changes (no drops — operator has no orphan personal.* fields)
+    assert len(changes) == 90, f"got {len(changes)} changes: {changes}"
 
     reparsed = yaml.safe_load(new_text)
     # piggyback side
@@ -298,6 +299,7 @@ def test_migrate_config_no_change_when_fully_current(tmp_path):
             "inbox_bridges": [],
             "watched_folders": [],
             "exa_api_key": "",
+            "output_language": "auto",
         },
     }), encoding="utf-8")
 
@@ -471,6 +473,7 @@ def test_migrate_additions_idempotent():
             "inbox_bridges": [],
             "watched_folders": [],
             "exa_api_key": "",
+            "output_language": "auto",
         },
     }
     changes = m.migrate_additions(data)

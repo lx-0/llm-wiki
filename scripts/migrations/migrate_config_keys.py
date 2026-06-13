@@ -77,6 +77,7 @@ Key changes covered (chronological):
   scheduling.web_research_cooldown_days      (added 2026-05-31, default 30 — `## Public Profile` refresh cooldown)
   scheduling.piggybacks_on_compile           (added 2026-06-13, default True — `wiki compile` drains due piggybacks at run-end, bypassing the evening hour-gate so update+compile-only operators keep maintenance current)
   personal.exa_api_key                       (added 2026-05-31, default "" — Exa AI key; falls back to env EXA_API_KEY)
+  personal.output_language                    (added 2026-06-13 issue #4, default "auto" — pin compiled-prose language; non-"auto" forces target language across compile prompts)
   personal.accounts.<id>.health.healthkit    (added 2026-05-19 M023 — Apple HealthKit XML export ingest;
                                               injected as a placeholder into any account already carrying
                                               `health.oura`, kind: healthkit-xml-export, empty inbox_dir
@@ -477,6 +478,12 @@ KEY_ADDITIONS: dict[str, dict[str, object]] = {
         # it in the vault's .claude/.env, not config.yaml. Match
         # Personal.exa_api_key in config.py.
         "exa_api_key": "",
+        # Issue #4 (2026-06-13) operator-overridable compiled-prose language.
+        # "auto" = today's behavior (write in the source material's language);
+        # byte-identical compile, so every existing vault is a no-op on update.
+        # Set to e.g. "de" / "German" to force all compiled prose into that
+        # language. Match Personal.output_language in config.py.
+        "output_language": "auto",
     },
 }
 

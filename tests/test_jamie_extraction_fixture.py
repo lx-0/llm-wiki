@@ -47,6 +47,7 @@ def test_rendered_prompt_carries_substrate_and_extraction_rule() -> None:
         source_content=body,
         today="2026-04-15",
         now="2026-04-15T10:00:00Z",
+        output_language_instruction="",
     )
     # Extraction rule reaches the prompt
     assert "Extracting commitments from meeting + voice substrates" in rendered
