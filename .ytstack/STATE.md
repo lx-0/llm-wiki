@@ -12,6 +12,24 @@ parallel_milestones: [M021]
 
 # State
 
+**Ad-hoc 2026-06-13b (curiosity accept-all — operator workflow integration):**
+Operator workflow is `wiki update && wiki compile` + glancing at the `wiki`
+home screen's "todos" (menu.py suggestions). Curiosity IS surfaced there
+("N curiosity requests pending", priority 3) but the interactive walk only
+offered per-item `[a]/[s]/[r]/[q]` — no accept-all — and the operator had 777
+LEGITIMATE pending email-deep-scan requests they wanted to process in bulk.
+Built `[A]ccept-ALL` in the walk (commit `889a314`): dispatches this + every
+remaining; for cloud-bound folder-deep-scans it lists the files sent to the
+provider + asks ONE bulk confirmation (content/cloud gate as a single y/N, not
+removed); email (local mbox) dispatches directly. accept-one is now `a`-only.
+`wiki curiosity --run-all` documented as the unattended equivalent (better for
+777 email = local, free). Walk-level wiring tests + helpers
+`_accept_all`/`_folder_consent_lines`. Suite **1279 green**, live on lxw.
+NOT done by me: running --run-all on the operator's 777 (their action). Noted
+follow-up if wanted: split the home-screen suggestion into folder-scan
+(high-value, few) vs email (the pile) so high-value folder requests aren't
+buried — operator steered to accept-all instead, not built.
+
 **Ad-hoc 2026-06-13 (folder-curiosity producer made organically usable):**
 Live audit found the M027 folder producer at **100% organic abstention** (5+
 runs since rollout, every one `0 kept`; the only artifact was the T03 e2e
