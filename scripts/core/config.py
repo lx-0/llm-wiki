@@ -567,6 +567,20 @@ class Limits:
     # Cap on takes emitted per source. Stops a noisy meeting from spawning
     # 30 low-signal lines for the same holder.
     extract_takes_max_per_source: int = 12
+    # Intent-dispatch (gated by CONFIG.features.extract_intents). fnmatch globs
+    # limiting which sources get an intent-classification pass after compile.
+    # Default = voice notes only; widen the list to add intake substrates
+    # (raw/captures/*, raw/notes/*, …) — no code change needed.
+    intent_source_globs: list[str] = field(default_factory=lambda: [
+        "raw/voice/*",
+    ])
+    # Per-call timeout for the intent-classification SDK invocation (seconds).
+    intent_classify_timeout_s: int = 120
+    # Confidence floor (low|medium|high). An intent classified below this is
+    # logged but NOT dispatched to a handler — keeps the borderline
+    # idea/question out of `tasks/`. "high" = only act on unambiguous
+    # instructions; "medium" = also act on probable ones.
+    intent_min_confidence: str = "high"
     # M014 dream-cycle (entity-page re-synthesis). Per-entity prompt-SIZE guard
     # (chars). dream_entity() builds the corpus prompt; if it exceeds this the
     # SDK call is NEVER made (skipped="prompt_too_large") — a context-overflow
@@ -658,6 +672,14 @@ class Features:
     # M011 takes substrate. Default OFF — flip True after dogfooding.
     # Cost: +1 SDK call per gated compile (Claude, no Ollama fallback).
     extract_takes: bool = False
+    # Intent extraction (intent-dispatch). Post-compile pass that classifies an
+    # intake note (voice first) into an intent {kind, summary, confidence} and
+    # routes it to a per-kind handler (the `task` handler writes an operator-
+    # facing record to `tasks/`). Default OFF — makes +1 Claude SDK call per
+    # gated source and produces actionable artifacts the operator must review.
+    # Flip True after dogfooding. See `.ytstack/backlog/voice-source-ref-and-
+    # intent-producer.md`.
+    extract_intents: bool = False
     # Dream web-research (issue #2). When True, `wiki dream <slug>` runs a
     # post-pass that researches PUBLIC entities (founders, execs, speakers)
     # via Exa AI and writes a sentinel-managed `## Public Profile` block.

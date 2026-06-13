@@ -31,6 +31,7 @@ from . import suggestions as _suggestions  # noqa: E402, F401
 from . import curiosity as _curiosity  # noqa: E402, F401
 from . import takes as _takes  # noqa: E402, F401
 from . import folder_curiosity as _folder_curiosity  # noqa: E402, F401
+from . import intents as _intents  # noqa: E402, F401
 
 __all__ = [
     "Producer",

@@ -81,6 +81,10 @@ Key changes covered (chronological):
   scheduling.piggybacks_on_compile           (added 2026-06-13, default True — `wiki compile` drains due piggybacks at run-end, bypassing the evening hour-gate so update+compile-only operators keep maintenance current)
   personal.exa_api_key                       (added 2026-05-31, default "" — Exa AI key; falls back to env EXA_API_KEY)
   personal.output_language                    (added 2026-06-13 issue #4, default "auto" — pin compiled-prose language; non-"auto" forces target language across compile prompts)
+  features.extract_intents                    (added 2026-06-13, default False — intent-dispatch master switch; post-compile classifies intake notes → tasks/)
+  limits.intent_source_globs                  (added 2026-06-13, default ["raw/voice/*"] — intake substrates the intent pass runs on)
+  limits.intent_classify_timeout_s            (added 2026-06-13, default 120 — per-call timeout for intent classification SDK invocation)
+  limits.intent_min_confidence                (added 2026-06-13, default "high" — confidence floor below which an intent is logged but not dispatched)
   personal.accounts.<id>.health.healthkit    (added 2026-05-19 M023 — Apple HealthKit XML export ingest;
                                               injected as a placeholder into any account already carrying
                                               `health.oura`, kind: healthkit-xml-export, empty inbox_dir
@@ -306,6 +310,13 @@ KEY_ADDITIONS: dict[str, dict[str, object]] = {
         # floor for duplicate-candidate proposal. Match Limits.dedup_fuzzy_threshold
         # default in scripts/core/config.py.
         "dedup_fuzzy_threshold": 0.85,
+        # Intent-dispatch (2026-06-13). Source globs + per-call timeout +
+        # confidence floor for the intent-classification post-pass (gated by
+        # features.extract_intents). Match Limits defaults in
+        # scripts/core/config.py.
+        "intent_source_globs": ["raw/voice/*"],
+        "intent_classify_timeout_s": 120,
+        "intent_min_confidence": "high",
     },
     "scheduling": {
         # 2026-06-13: `wiki compile` drains due piggybacks at run-end,
@@ -408,6 +419,12 @@ KEY_ADDITIONS: dict[str, dict[str, object]] = {
         # full prompt-cache write (~$0.80). True → skip the SDK call for $0.
         # Match Features.dream_require_entity_substrate in config.py.
         "dream_require_entity_substrate": True,
+        # Intent-dispatch master switch (2026-06-13). When True, a post-compile
+        # pass classifies intake notes (voice first) into intents and routes
+        # actionable ones to tasks/. Default OFF — +1 Claude SDK call per gated
+        # source + produces operator-review artifacts. Match
+        # Features.extract_intents in config.py.
+        "extract_intents": False,
     },
     "piggybacks": {
         # M006 calendar collector — mirrors gmeet / jamie 6 h cadence.

@@ -47,6 +47,7 @@ RAW_AUDIO_DIR = RAW_DIR / "audio"
 RAW_REQUESTS_DIR = RAW_DIR / "requests"
 RAW_SUGGESTIONS_DIR = RAW_DIR / "suggestions"
 INBOX_DIR = ROOT_DIR / "inbox"
+TASKS_DIR = ROOT_DIR / "tasks"  # actionable working items detected from intake (intent-dispatch)
 KNOWLEDGE_DIR = ROOT_DIR / "knowledge"
 CONCEPTS_DIR = KNOWLEDGE_DIR / "concepts"
 CONNECTIONS_DIR = KNOWLEDGE_DIR / "connections"

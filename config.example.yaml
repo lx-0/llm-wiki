@@ -431,6 +431,14 @@ limits:
     - "daily/*"
   extract_takes_timeout_s: 180
   extract_takes_max_per_source: 12
+  # Intent-dispatch (gated by `features.extract_intents`). Which intake
+  # substrates get an intent-classification pass after compile; per-call
+  # timeout; and the confidence floor below which an intent is logged but not
+  # dispatched to a handler (keeps borderline ideas/questions out of tasks/).
+  intent_source_globs:
+    - "raw/voice/*"
+  intent_classify_timeout_s: 120
+  intent_min_confidence: high
   # M014 dream-cycle resource gates (tokens, not dollars). Per-entity prompt-
   # SIZE cap in chars (SDK call REJECTED when the corpus prompt exceeds it — a
   # context-overflow guard). Cumulative per-run TOKEN cap stops the sweep once
@@ -489,6 +497,11 @@ features:
   clippings_sweep: true
   # M011 master switch — default OFF; flip on after dogfooding.
   extract_takes: false
+  # Intent-dispatch master switch — default OFF. When on, a post-compile pass
+  # classifies intake notes (voice first) into intents and routes actionable
+  # ones to tasks/ for operator-gated execution via the `orchestrate-tasks`
+  # agent spec. +1 Claude SDK call per gated source.
+  extract_intents: false
   # Dream web-research (issue #2) — default OFF. When on, `wiki dream <slug>`
   # researches PUBLIC entities (founders/execs/speakers) via Exa AI and writes
   # a sentinel-managed `## Public Profile` block. Makes an EXTERNAL paid API

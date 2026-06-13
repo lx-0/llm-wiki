@@ -195,7 +195,9 @@ def test_migrate_config_file_round_trip(tmp_path):
     # +1 limits.review_max_sweep_runtime_s (review-wiki soft deadline), 2026-06-13
     # +1 limits.correct_apply_max_turns (M028 sandbox apply, issue #5), 2026-06-13
     # +1 limits.correct_broad_term_threshold (M028 broad-term warning, issue #5), 2026-06-13
-    assert len(changes) == 94, f"got {len(changes)} changes: {changes}"
+    # +4 intent-dispatch (features.extract_intents + limits.intent_source_globs
+    #    + limits.intent_classify_timeout_s + limits.intent_min_confidence), 2026-06-13
+    assert len(changes) == 98, f"got {len(changes)} changes: {changes}"
 
     reparsed = yaml.safe_load(new_text)
     # piggyback side
@@ -299,9 +301,13 @@ def test_migrate_config_no_change_when_fully_current(tmp_path):
             "review_consecutive_failure_abort": 5,
             "review_checkpoint_every": 25,
             "dedup_fuzzy_threshold": 0.85,
+            "intent_source_globs": ["raw/voice/*"],
+            "intent_classify_timeout_s": 120,
+            "intent_min_confidence": "high",
         },
         "features": {
             "extract_takes": False,
+            "extract_intents": False,
             "dream_web_research": False,
             "voice_punctuate": True,
             "suggestions_source_globs": ["raw/email/*.md"],
@@ -468,6 +474,9 @@ def test_migrate_additions_idempotent():
             "review_consecutive_failure_abort": 5,
             "review_checkpoint_every": 25,
             "dedup_fuzzy_threshold": 0.85,
+            "intent_source_globs": ["raw/voice/*"],
+            "intent_classify_timeout_s": 120,
+            "intent_min_confidence": "high",
         },
         "piggybacks": {
             "calendar": {"enabled": True, "cooldown_hours": 6, "max_per_run": 500},
@@ -480,6 +489,7 @@ def test_migrate_additions_idempotent():
         },
         "features": {
             "extract_takes": False,
+            "extract_intents": False,
             "dream_web_research": False,
             "voice_punctuate": True,
             "suggestions_source_globs": ["raw/email/*.md"],
