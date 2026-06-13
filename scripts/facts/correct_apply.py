@@ -158,6 +158,28 @@ def _execute_renames(actions: dict, vault: Path) -> list:
     return executed
 
 
+def _tree_safe_for_deletion(vault: Path) -> tuple[bool, str]:
+    """A deletion run is only safe on a clean git tree — that is what makes
+    `.trash` + `git restore` recovery trustworthy. The just-created fact under
+    `knowledge/facts/` is expected to be uncommitted, so it is excluded.
+    """
+    if not (vault / ".git").exists():
+        return False, "vault is not a git repository — deletions would be unrecoverable"
+    try:
+        proc = subprocess.run(
+            ["git", "-C", str(vault), "status", "--porcelain",
+             "--", "knowledge", ":(exclude)knowledge/facts"],
+            capture_output=True, text=True, timeout=30,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return False, "git status failed — cannot verify a clean tree"
+    if proc.returncode != 0:
+        return False, "git status failed — cannot verify a clean tree"
+    if proc.stdout.strip():
+        return False, "knowledge/ has uncommitted changes — commit or stash before a deletion run"
+    return True, ""
+
+
 def _deletion_allowed(fm: dict, allow_delete_flag: bool) -> bool:
     """Whether `apply` may execute deletions: the per-run CLI flag OR a per-fact
     `disposition: delete` field. Default (neither) → False → supersede only.
@@ -385,7 +407,7 @@ def _apply_agent_options(capture: StderrCapture) -> ClaudeAgentOptions:
     )
 
 
-async def apply(slug: str, dry_run: bool, allow_delete: bool = False) -> int:
+async def apply(slug: str, dry_run: bool, allow_delete: bool = False, force: bool = False) -> int:
     fact_path = FACTS_DIR / f"{slug}.md"
     if not fact_path.exists():
         log.error("No such fact: %s (looked at %s)", slug, fact_path)
@@ -397,6 +419,13 @@ async def apply(slug: str, dry_run: bool, allow_delete: bool = False) -> int:
         log.warning("File %s does not have type: fact — proceeding anyway.", fact_path)
 
     deletion_allowed = _deletion_allowed(fm, allow_delete)
+    if deletion_allowed and not force:
+        safe, reason = _tree_safe_for_deletion(ROOT_DIR)
+        if not safe:
+            log.error(
+                "Refusing deletion-enabled run: %s. Re-run with --force to override.", reason
+            )
+            return 3
 
     rel_fact_path = fact_path.relative_to(ROOT_DIR)
     prompt = render(
@@ -620,8 +649,13 @@ def main() -> int:
         "Deleted files go to .trash/, never rm. A fact's `disposition: delete` "
         "frontmatter opens the gate per-fact without this flag.",
     )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="bypass the clean-git-tree precondition for deletion runs (use with care)",
+    )
     args = parser.parse_args()
-    return asyncio.run(apply(args.slug, args.dry_run, args.allow_delete))
+    return asyncio.run(apply(args.slug, args.dry_run, args.allow_delete, args.force))
 
 
 if __name__ == "__main__":

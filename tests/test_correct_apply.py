@@ -368,7 +368,74 @@ def test_apply_allow_delete_trashes_nominated(tmp_path, monkeypatch) -> None:
 
     monkeypatch.setattr(correct_apply, "query", fake_query)
 
-    rc = asyncio.run(correct_apply.apply("neverhappened", dry_run=False, allow_delete=True))
+    # force=True bypasses the clean-git-tree guard (tested separately) — this test
+    # exercises the gate + executor on a non-git tmp vault.
+    rc = asyncio.run(correct_apply.apply("neverhappened", dry_run=False, allow_delete=True, force=True))
     assert rc == 0
     assert not bogus.exists()
     assert list((vault / ".trash").rglob("bogus.md")), "must be recoverable in .trash"
+
+
+# ── dirty/non-git tree guard (M028-S02-T03) ──
+
+
+def _git_init(path) -> None:
+    import subprocess
+    subprocess.run(["git", "init", "-q", str(path)], check=True)
+    subprocess.run(["git", "-C", str(path), "add", "-A"], check=True)
+    subprocess.run(
+        ["git", "-C", str(path), "-c", "user.email=t@t", "-c", "user.name=t",
+         "commit", "-q", "-m", "init"], check=True,
+    )
+
+
+def test_tree_safe_non_git(tmp_path, monkeypatch) -> None:
+    from facts import correct_apply
+    monkeypatch.setattr(correct_apply, "KNOWLEDGE_DIR", tmp_path / "knowledge")
+    safe, reason = correct_apply._tree_safe_for_deletion(tmp_path)
+    assert safe is False and "git" in reason.lower()
+
+
+def test_tree_safe_clean_then_dirty(tmp_path, monkeypatch) -> None:
+    from facts import correct_apply
+    knowledge = tmp_path / "knowledge"
+    (knowledge / "concepts").mkdir(parents=True)
+    (knowledge / "concepts" / "a.md").write_text("# A\n", encoding="utf-8")
+    (knowledge / "facts").mkdir()
+    monkeypatch.setattr(correct_apply, "KNOWLEDGE_DIR", knowledge)
+    _git_init(tmp_path)
+
+    assert correct_apply._tree_safe_for_deletion(tmp_path)[0] is True
+    # an uncommitted FACT is fine (excluded) …
+    (knowledge / "facts" / "f.md").write_text("x", encoding="utf-8")
+    assert correct_apply._tree_safe_for_deletion(tmp_path)[0] is True
+    # … an uncommitted ARTICLE is not
+    (knowledge / "concepts" / "a.md").write_text("# A changed\n", encoding="utf-8")
+    assert correct_apply._tree_safe_for_deletion(tmp_path)[0] is False
+
+
+def test_apply_refuses_deletion_on_unsafe_tree(tmp_path, monkeypatch) -> None:
+    import asyncio
+    from facts import correct_apply
+
+    facts = tmp_path / "knowledge" / "facts"
+    facts.mkdir(parents=True)
+    (facts / "f.md").write_text("---\ntype: fact\nstatus: negation\n---\n\nx\n", encoding="utf-8")
+    monkeypatch.setattr(correct_apply, "ROOT_DIR", tmp_path)        # not a git repo
+    monkeypatch.setattr(correct_apply, "FACTS_DIR", facts)
+    monkeypatch.setattr(correct_apply, "KNOWLEDGE_DIR", tmp_path / "knowledge")
+
+    called = {"spawned": False}
+
+    async def fake_query(*, prompt, options):  # noqa: ARG001
+        called["spawned"] = True
+        yield None
+
+    monkeypatch.setattr(correct_apply, "query", fake_query)
+
+    rc = asyncio.run(correct_apply.apply("f", dry_run=False, allow_delete=True))
+    assert rc == 3                          # refused
+    assert called["spawned"] is False       # no paid agent run
+    # …but --force bypasses the guard (will spawn; we only assert it gets past the gate)
+    rc2 = asyncio.run(correct_apply.apply("f", dry_run=False, allow_delete=True, force=True))
+    assert called["spawned"] is True
