@@ -15,6 +15,7 @@ os.environ["CLAUDE_INVOKED_BY"] = "correct_apply"
 
 import argparse
 import asyncio
+import json
 import logging
 import sys
 import time as _time
@@ -48,6 +49,8 @@ from core.config import CONFIG  # noqa: E402
 from core.usage import LEDGER  # noqa: E402
 from core.prompts import render  # noqa: E402
 from core.sdk_helpers import StderrCapture, log_sdk_failure, make_path_scope_hook  # noqa: E402
+from core.ollama_client import parse_json_lenient  # noqa: E402
+from core.links import rename_article  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO,
@@ -83,6 +86,65 @@ def _backup(path: Path) -> Path:
     bak = path.with_suffix(path.suffix + f".bak.{ts}")
     bak.write_bytes(path.read_bytes())
     return bak
+
+
+_ACTION_KEYS = ("superseded", "edited", "renamed", "deleted")
+
+
+def _parse_proposed_actions(text: str) -> dict:
+    """Extract the agent's `## Proposed actions` JSON block, shape-guarded.
+
+    Never raises — a malformed or absent block yields all-empty lists, so a bad
+    agent run degrades to "nothing to execute" rather than crashing the apply.
+    LLM output lies about types (CLAUDE.md), so every value is `isinstance`-
+    guarded and malformed `renamed` entries are dropped.
+    """
+    empty = {k: [] for k in _ACTION_KEYS}
+    try:
+        data = parse_json_lenient(text)
+    except (json.JSONDecodeError, ValueError):
+        return empty
+    if not isinstance(data, dict):
+        return empty
+    out = {k: [] for k in _ACTION_KEYS}
+    for key in _ACTION_KEYS:
+        value = data.get(key)
+        if not isinstance(value, list):
+            continue
+        if key == "renamed":
+            out[key] = [
+                {"from": e["from"], "to": e["to"]}
+                for e in value
+                if isinstance(e, dict) and "from" in e and "to" in e
+            ]
+        else:
+            out[key] = [x for x in value if isinstance(x, str)]
+    return out
+
+
+def _execute_renames(actions: dict, vault: Path) -> None:
+    """Perform the agent's proposed renames engine-side (move + wikilink rewrite).
+
+    The agent never renames files itself (no shell); it nominates {from,to} in
+    the proposal block and the engine executes here, skipping unsafe entries.
+    """
+    for entry in actions.get("renamed", []):
+        old = (vault / entry["from"]).resolve()
+        new = (vault / entry["to"]).resolve()
+        if not old.exists():
+            log.warning("rename skipped — source missing: %s", entry["from"])
+            continue
+        if new.exists():
+            log.warning("rename skipped — target exists: %s", entry["to"])
+            continue
+        try:
+            counts = rename_article(old, new, KNOWLEDGE_DIR, vault)
+            log.info(
+                "Renamed %s → %s (%d ref(s) rewritten)",
+                entry["from"], entry["to"], counts["articles_rewritten"],
+            )
+        except Exception as exc:  # noqa: BLE001 — a bad rename must not abort the run
+            log.warning("rename failed %s → %s: %s", entry["from"], entry["to"], exc)
 
 
 def _apply_agent_options(capture: StderrCapture) -> ClaudeAgentOptions:
@@ -192,6 +254,11 @@ async def apply(slug: str, dry_run: bool) -> int:
     LEDGER.record(model=CONFIG.models.compile_model, input_tokens=total_input_tokens, output_tokens=total_output_tokens)
     if result_text:
         print("\n" + result_text + "\n")
+
+    # Execute engine-owned destructive ops the agent proposed (it has no shell).
+    # Renames here; deletions are deferred to S02's `.trash` executor.
+    actions = _parse_proposed_actions(result_text)
+    _execute_renames(actions, ROOT_DIR)
 
     # Mark fact as applied. Re-read to avoid stomping if the agent edited it
     # (it shouldn't — the prompt forbids it — but be safe).

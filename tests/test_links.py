@@ -195,3 +195,43 @@ def test_iter_articles_skips_index(vault: Path) -> None:
     names = {p.name for p in iter_articles(kn)}
     assert "index.md" not in names
     assert "foo.md" in names
+
+
+# ── rename_article (M028-S01-T04): move + rewrite referencing wikilinks ──
+
+
+def test_rename_article_moves_file_and_rewrites_refs(vault: Path) -> None:
+    from core.links import rename_article
+
+    knowledge = vault / "knowledge"
+    old = knowledge / "projects" / "township.md"
+    new = knowledge / "projects" / "fleet.md"
+    old.parent.mkdir(parents=True, exist_ok=True)
+    old.write_text("# Township\n\nbody\n", encoding="utf-8")
+    # A referencing article links to the old slug (relative form).
+    ref = knowledge / "concepts" / "foo.md"
+    ref.write_text("See [[../projects/township]] for details.\n", encoding="utf-8")
+
+    counts = rename_article(old, new, knowledge, vault)
+
+    assert not old.exists()
+    assert new.exists()
+    rewritten = ref.read_text(encoding="utf-8")
+    assert "township" not in rewritten
+    assert "[[../projects/fleet]]" in rewritten
+    assert counts["renamed"] == 1
+
+
+def test_rename_article_leaves_unrelated_links(vault: Path) -> None:
+    from core.links import rename_article
+
+    knowledge = vault / "knowledge"
+    old = knowledge / "projects" / "township.md"
+    new = knowledge / "projects" / "fleet.md"
+    old.parent.mkdir(parents=True, exist_ok=True)
+    old.write_text("# Township\n", encoding="utf-8")
+    ref = knowledge / "concepts" / "foo.md"
+    ref.write_text("Link to [[bar]] only.\n", encoding="utf-8")
+
+    rename_article(old, new, knowledge, vault)
+    assert ref.read_text(encoding="utf-8") == "Link to [[bar]] only.\n"

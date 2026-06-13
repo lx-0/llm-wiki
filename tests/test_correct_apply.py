@@ -74,3 +74,50 @@ def test_apply_prompt_renders_deletion_gate() -> None:
     """`${deletion_allowed}` is threaded so S02 can gate deletion nomination."""
     assert "Deletion permitted: false" in _render_apply_prompt("false")
     assert "Deletion permitted: true" in _render_apply_prompt("true")
+
+
+# ── _parse_proposed_actions (M028-S01-T04): the JSON proposal contract ──
+
+_AGENT_OUTPUT = """## Applied summary
+
+Superseded `knowledge/concepts/foo.md` (was true, now outdated).
+
+## Proposed actions
+
+```json
+{
+  "superseded": ["knowledge/concepts/foo.md"],
+  "edited": [],
+  "renamed": [{"from": "knowledge/projects/township.md", "to": "knowledge/projects/fleet.md"}],
+  "deleted": []
+}
+```
+"""
+
+
+def test_parse_proposed_actions_extracts_json_block() -> None:
+    from facts import correct_apply
+
+    a = correct_apply._parse_proposed_actions(_AGENT_OUTPUT)
+    assert a["superseded"] == ["knowledge/concepts/foo.md"]
+    assert a["renamed"] == [
+        {"from": "knowledge/projects/township.md", "to": "knowledge/projects/fleet.md"}
+    ]
+    assert a["deleted"] == []
+
+
+def test_parse_proposed_actions_defaults_on_garbage() -> None:
+    """No parseable JSON → all-empty, never raises (a bad agent run must not crash)."""
+    from facts import correct_apply
+
+    a = correct_apply._parse_proposed_actions("no json here, just prose")
+    assert a == {"superseded": [], "edited": [], "renamed": [], "deleted": []}
+
+
+def test_parse_proposed_actions_shape_guards_nonlist() -> None:
+    """LLM lies about types — a scalar where a list is expected is coerced empty."""
+    from facts import correct_apply
+
+    a = correct_apply._parse_proposed_actions('{"deleted": "oops", "renamed": [{"bad": 1}]}')
+    assert a["deleted"] == []          # scalar → []
+    assert a["renamed"] == []          # malformed {from,to} dropped

@@ -242,3 +242,62 @@ def run_relativize_pass(knowledge_dir: Path, vault: Path) -> dict[str, int]:
             written += 1
             total += n
     return {"articles_seen": seen, "articles_written": written, "links_rewritten": total}
+
+
+def rename_article(old: Path, new: Path, knowledge_dir: Path, vault: Path) -> dict[str, int]:
+    """Move ``old`` → ``new`` and rewrite every wikilink (across knowledge
+    articles + ``index.md``) that resolves to ``old`` so it points at ``new``.
+
+    Engine-side replacement for the removed Bash ``git mv`` in `correct apply`
+    (M028). Resolution happens BEFORE the move (it needs the file present). The
+    moved file's own outgoing links are left as-is — a cross-dir move makes them
+    stale-relative, which the compile-time relativize pass + `wiki links` audit
+    repair. Returns ``{"renamed", "articles_rewritten"}``.
+    """
+    old_resolved = old.resolve()
+    new_resolved = new.resolve()
+
+    # index.md participates (iter_articles excludes it) — its rows link to articles.
+    sources = list(iter_articles(knowledge_dir))
+    index = knowledge_dir / "index.md"
+    if index.exists():
+        sources.append(index)
+
+    pending: list[tuple[Path, str]] = []
+    for src in sources:
+        try:
+            text = src.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        changed = False
+        out: list[str] = []
+        for _, line, live in _strip_frontmatter_and_fences(text.split("\n")):
+            if not live:
+                out.append(line)
+                continue
+
+            def _sub(m: re.Match, _src: Path = src) -> str:
+                nonlocal changed
+                bang, target, heading, alias = m.groups()
+                t, esc = strip_table_escape(target, alias)
+                resolved = resolve_link(t, _src, vault)
+                if resolved is not None and resolved.resolve() == old_resolved:
+                    changed = True
+                    new_target = relative_target(new_resolved, _src, has_ext(t))
+                    return f"{bang}[[{new_target}{heading or ''}{esc}{alias or ''}]]"
+                return m.group(0)
+
+            out.append(WIKILINK_RE.sub(_sub, line))
+        if changed:
+            pending.append((src, "\n".join(out)))
+
+    new.parent.mkdir(parents=True, exist_ok=True)
+    old.rename(new)
+
+    rewritten = 0
+    for src, new_text in pending:
+        dest = new if src.resolve() == old_resolved else src
+        dest.write_text(new_text, encoding="utf-8")
+        rewritten += 1
+
+    return {"renamed": 1, "articles_rewritten": rewritten}
