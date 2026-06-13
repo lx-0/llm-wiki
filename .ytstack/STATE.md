@@ -1,16 +1,47 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-06-13T14:30:00+0200
-current_milestone: M027
-active_slice: S06
-active_task: none
+last_updated: 2026-06-13T16:16:37+0200
+current_milestone: M028
+active_slice: S01
+active_task: T01
 last_completed_milestone: M026
 parked_milestone: M025
-parallel_milestones: [M021]
+parallel_milestones: [M021, M027]
 ---
 
 # State
+
+**M028 planned (L) — issue #5: `correct apply` non-destructive + truthful
+(2026-06-13).** New current milestone, scaffolded from Sid's bug report
+(github.com/lx-0/llm-wiki/issues/5): `wiki correct apply` deleted 17 `knowledge/`
+articles applying ONE `negation` fact and reported only 6 deletions. Operator
+chose **full scope L** (all 6 of Sid's prioritized fixes incl. the optional
+first-class `supersession` status) and **supersede-by-default** semantics
+(negation annotates + keeps history; deletion is rare opt-in for factually-false
+content). **Sliced + eng-reviewed (2026-06-13):** 4 slice-plans, architecture LOCKED via
+`plan-eng-review` (DECISIONS 2026-06-13). Trust model: **agent proposes, engine
+disposes.** Eng-review [P0] (operator-approved): pull the sandbox FORWARD into
+S01 — stopping data loss via prompt alone is prompt-compliance; the structural
+stop is removing `Bash` so the agent *cannot* `rm`/`git mv`. Revised slicing:
+**S01** (6 tasks) sandbox `apply()` (drop Bash + path-hook + `denied_subpaths`
+param on `make_path_scope_hook` for facts/, bounded turns) + supersede-default
+prompt + engine-side rename helper (`core.links`) + ground-truth filesystem-delta
+reporting + golden repro — deletion UNAVAILABLE in S01; **S02** (5) safe opt-in
+deletion (engine `.trash/<ts>/` executor + per-article backup + dirty-tree guard,
+`--allow-delete`/`disposition: delete` gate); **S03** (3) informative `--dry-run`
+blast radius + broad-term warning at `correct add`; **S04** (4) first-class
+`supersession` status (enum `correct.py:54` + lint + prompt) + docs + closeout +
+issue-#5 close. Grounded against HEAD: `reconcile_fact()` `correct_apply.py:190-283`
+is the sandbox pattern; destructive instruction `prompts/correct_apply.md:26`;
+`make_path_scope_hook` `sdk_helpers.py:404` is allow-list-only (needs exclude).
+Next: `/ytstack:plan-task` for S01-T01.
+**Parked/parallel (not abandoned):** M027/S06 (NAS-SMB index + out-of-sandbox
+reader + scheduler — LAST M027 slice, `M027-S06-PLAN.md` exists) and the M006
+calendar-collector redesign remain open; pick back up after M028 or in parallel.
+Working-tree note at switch: `.ytstack/OFFICE-HOURS-evolving-fact-ssot.md`
+(separate evolving-fact-SSOT pitch, untracked) — unrelated to M028's surface
+(prompts + `scripts/facts/` vs. collectors).
 
 **Ad-hoc 2026-06-13d (issue #4 — operator-overridable output language):**
 Shipped `personal.output_language` (default `"auto"`), released as **0.1.9**
