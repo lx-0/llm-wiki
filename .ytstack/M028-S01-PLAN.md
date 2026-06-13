@@ -6,7 +6,7 @@ created: 2026-06-13T15:56:13+0200
 revised: 2026-06-13T16:10:00+0200
 status: planned
 task_count: 6
-completed_tasks: 4
+completed_tasks: 5
 ---
 
 # M028-S01 -- Slice Plan
@@ -53,7 +53,7 @@ delta. Trust model: **agent proposes, engine disposes.**
   the file move + rewrite every `[[wikilink]]` via the `core.links` resolver,
   update `index.md`/title frontmatter. Without this, disambiguation `apply` would
   silently half-work once Bash is gone.
-- [ ] T05 -- Ground-truth reporting in `correct_apply.py` (replace the bare
+- [x] T05 -- Ground-truth reporting in `correct_apply.py` (replace the bare
   `print(result_text)` at L153-154): compute the real delta — `git status
   --porcelain` when `ROOT_DIR` is a git repo, else a pre/post mtime+hash snapshot
   of `knowledge/` + `index.md` + the renames the engine performed — print
