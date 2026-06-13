@@ -3,9 +3,9 @@ milestone: M028
 slice: S04
 project: llm-wiki
 created: 2026-06-13T15:56:13+0200
-status: planned
+status: done
 task_count: 4
-completed_tasks: 3
+completed_tasks: 4
 ---
 
 # M028-S04 -- Slice Plan
@@ -31,7 +31,7 @@ conflating *false* with *outdated*, and M028 is documented + issue #5 closed.
   reference for any new knob (S02 max-turns, S03 broad-term threshold), `CHANGELOG`
   + version bump; DECISIONS.md entry for the supersede-default decision; KNOWLEDGE.md
   for the no-Bash/engine-post-step pattern.
-- [ ] T04 -- Closeout: full suite green; the S01-T04 golden repro passes; comment on
+- [x] T04 -- Closeout: full suite green; the S01-T04 golden repro passes; comment on
   + close issue #5 with the shipped-fixes summary (operator-gated per REGEL); fold
   the new behaviour into the infographics only if portrait-worthy (likely a caption
   on the existing facts/correct box, not a new element — apply the steady-state +

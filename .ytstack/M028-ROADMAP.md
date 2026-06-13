@@ -3,9 +3,9 @@ milestone: M028
 project: llm-wiki
 size: L
 created: 2026-06-13T15:51:29+0200
-status: in_progress
+status: done
 total_slices: 4
-completed_slices: 3
+completed_slices: 4
 source_issue: https://github.com/lx-0/llm-wiki/issues/5
 ---
 
@@ -32,7 +32,7 @@ Slice detail lives in per-slice `M028-S##-PLAN.md` files, created by
 - [x] S01 -- Structural non-destructive guarantee (sandbox + supersede + engine rename) + truthful reporting
 - [x] S02 -- Safe opt-in deletion (engine .trash executor + per-article backup + dirty-tree guard)
 - [x] S03 -- Informative --dry-run (blast radius) + over-broad-term warning at add-time
-- [ ] S04 -- First-class supersession status + lint + docs + closeout
+- [x] S04 -- First-class supersession status + lint + docs + closeout
 
 ### Suggested slicing (input for slice-milestone, not binding)
 
