@@ -131,12 +131,6 @@ KEY_ADDITIONS: dict[str, dict[str, object]] = {
         "folder_scan_provider": "claude-sdk",
     },
     "limits": {
-        # M027 watched-folder relevance grep: drop source keywords that
-        # match more than N file-paths (structural noise, not topic
-        # selectors). Only rare/discriminative keywords select which
-        # file-lines get injected. Added 2026-06-13 after lxw showed the
-        # producer over-matching generic keywords (admin/kosten/cloud).
-        "curiosity_folder_keyword_max_matches": 30,
         # M027 watched-folder candidate retrieval: over budget, inject the
         # top-N rarity-ranked candidate files (not the folder tree). Added
         # 2026-06-13 — the full dir-skeleton bloated the prompt and timed
@@ -548,6 +542,12 @@ KEY_DROPS: dict[str, set[str]] = {
         # write-time tree cap is gone; the digest is always the complete
         # inventory, prompt budget lives at the consumer (S03).
         "folder_index_max_tree_entries",
+        # Removed 2026-06-13 (same day) — the relevance grep moved to
+        # coverage+recency candidate ranking, which needs no structural
+        # keyword pre-filter (a keyword matching all files adds uniform
+        # coverage, no distortion). Transitional knob from the drop-based
+        # selection that briefly shipped earlier today.
+        "curiosity_folder_keyword_max_matches",
     },
     "personal": {
         # Removed 2026-05-15 (M006) — calendar moved off Thunderbird-SQLite

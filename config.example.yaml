@@ -261,12 +261,6 @@ limits:
   # Below this threshold the gap is dropped (telemetry: folder_low_confidence).
   # Forces explicit abstention instead of "INBOX/COMPANY/00 COMPANY" hedging.
   curiosity_folder_confidence_min: 3
-  # Watched-folder relevance grep: a source keyword matching more than this
-  # many file-paths across the folder digests is structural noise (a top
-  # folder name), not a topic selector, and is dropped when choosing which
-  # file-lines to inject. Only rare/discriminative keywords select. Lower =
-  # stricter; 0 disables (every match selects — over-matches large vaults).
-  curiosity_folder_keyword_max_matches: 30
   # When the digests overflow the prompt budget, inject the top-N
   # rarity-ranked candidate files (not the folder tree) — the model
   # judges a short candidate list. Keep small so a local 8B model

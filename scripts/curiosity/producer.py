@@ -161,42 +161,55 @@ def _digest_head(digest_text: str) -> str:
     return head if sep else digest_text
 
 
+_MODIFIED_RE = re.compile(r"modified (\d{4}-\d{2}-\d{2})")
+
+
+def _modified_date(line: str) -> str:
+    """The `modified YYYY-MM-DD` stamp of a digest file-line (sortable
+    string; '0000-00-00' when absent) — the recency tiebreak."""
+    m = _MODIFIED_RE.search(line)
+    return m.group(1) if m else "0000-00-00"
+
+
 def _rank_candidate_lines(
-    digests: dict[str, str], keywords: set[str], max_matches: int, top_k: int
+    digests: dict[str, str], keywords: set[str], top_k: int
 ) -> tuple[dict[str, list[str]], int]:
     """Retrieve the top-K candidate file-lines for the source, per root.
 
     Deterministic Python retrieval over the COMPLETE on-disk index — the
-    model judges a short candidate list, it never browses the tree. Each
-    file-line scores `sum(1/df[kw])` over the source keywords it matches,
-    where `df` = corpus document-frequency of the keyword: rarer keyword =
-    stronger signal (TF-IDF in spirit, so a folder-name term like "admin"
-    contributes ~nothing while "hetzner" dominates). A pre-filter drops
-    purely-structural terms (df > `max_matches`) before scoring; the top-K
-    by score are returned, grouped by root. Returns ({root: lines}, n_kw_used).
+    model judges a short candidate list, never browses the tree. Ranking
+    (validated on lxw 2026-06-13):
+
+    - **coverage** (primary): how many DISTINCT source keywords a file
+      matches. A file the source cares about on several axes
+      (`hetzner` + `rechnung` + `admin`) beats one matching a single
+      incidental word (`kopf` from "im Kopf"). Robust where rarity
+      backfires — a central topic the operator has *many* files about
+      ("hetzner", 65 files) would be down-weighted by 1/df, but coverage
+      rewards it.
+    - **recency** (tiebreak): newest `modified` date first. The source is
+      usually a current concern, so among 50 monthly Hetzner invoices the
+      latest one surfaces ("Mai 2026" can't be a keyword — too short /
+      numeric — so recency carries the temporal signal).
+
+    No structural pre-filter is needed: a keyword matching every file adds
+    +1 coverage uniformly and does not distort the order. Returns
+    ({root: lines}, n_keywords).
     """
-    lines = [
-        (root, ln)
-        for root, text in digests.items()
-        for ln in text.splitlines()
-        if _is_tree_file_line(ln)
-    ]
-    df = {kw: sum(1 for _, ln in lines if kw in _file_line_path(ln)) for kw in keywords}
-    useful = {
-        kw for kw, n in df.items()
-        if n >= 1 and (max_matches <= 0 or n <= max_matches)
-    }
-    scored: list[tuple[float, str, str]] = []
-    for root, ln in lines:
-        path = _file_line_path(ln)
-        score = sum(1.0 / df[kw] for kw in useful if kw in path)
-        if score > 0:
-            scored.append((score, root, ln))
-    scored.sort(key=lambda t: (-t[0], t[2]))
+    scored: list[tuple[int, str, str, str]] = []  # (coverage, mod, root, line)
+    for root, text in digests.items():
+        for ln in text.splitlines():
+            if not _is_tree_file_line(ln):
+                continue
+            path = _file_line_path(ln)
+            coverage = sum(1 for kw in keywords if kw in path)
+            if coverage:
+                scored.append((coverage, _modified_date(ln), root, ln))
+    scored.sort(key=lambda t: (t[0], t[1]), reverse=True)
     by_root: dict[str, list[str]] = {}
-    for _, root, ln in scored[:top_k]:
+    for _cov, _mod, root, ln in scored[:top_k]:
         by_root.setdefault(root, []).append(ln)
-    return by_root, len(useful)
+    return by_root, len(keywords)
 
 
 def _load_folder_digests(
@@ -225,10 +238,7 @@ def _load_folder_digests(
 
     keywords = _source_keywords(source_excerpt)
     by_root, n_used = _rank_candidate_lines(
-        digests,
-        keywords,
-        CONFIG.limits.curiosity_folder_keyword_max_matches,
-        CONFIG.limits.curiosity_folder_max_candidates,
+        digests, keywords, CONFIG.limits.curiosity_folder_max_candidates
     )
     parts = []
     for root_id, text in digests.items():

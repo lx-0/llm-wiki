@@ -277,15 +277,6 @@ class Limits:
     # `folder_low_confidence`. Forces the model to hedge openly instead
     # of defaulting to a generic catch-all folder.
     curiosity_folder_confidence_min: int = 3
-    # `curiosity_folder_keyword_max_matches`: a source keyword that matches
-    # MORE than this many file-paths across the watched-folder digests is
-    # structural noise (a top folder name like "admin"/"projekt"), not a
-    # topic selector, and is dropped when picking which file-lines to inject
-    # (M027, relevance grep). Only rare/discriminative keywords select —
-    # the TF-IDF insight: a good file-selector term is rare in the corpus.
-    # Lower = stricter (fewer, more-relevant files injected). 0 disables the
-    # filter (every matching keyword selects — over-matches large vaults).
-    curiosity_folder_keyword_max_matches: int = 30
     # `curiosity_folder_max_candidates`: when the digests overflow the prompt
     # budget, the producer does NOT inject the folder structure — it injects
     # the top-N candidate files retrieved by rarity-weighted keyword match

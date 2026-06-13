@@ -622,37 +622,47 @@ def test_under_budget_digest_is_full_injected(env):
     assert "vertrag-handy.pdf" in block  # a non-recent Tree file, full-inject
 
 
-def test_overcommon_keyword_is_not_a_selector(env, monkeypatch):
-    """A keyword that matches too many files (structural — a top folder
-    name like 'admin') carries no selection signal and is dropped; only
-    rare/topical keywords select. Without this the grep over-matches and
-    still drowns the model (lxw 2026-06-13: 'admin/kosten/cloud' matched
-    373 KB, hard-capped, still abstained)."""
+def test_candidate_ranking_coverage_then_recency(env, monkeypatch):
+    """Candidates rank by coverage (distinct source keywords matched) then
+    recency. A file the source cares about on several axes outranks one
+    matching a single incidental word; among same-coverage files the newest
+    surfaces. This is the lxw 2026-06-13 finding: rarity (1/df) buried the
+    central 'hetzner' (the operator has 65 Hetzner files); coverage+recency
+    puts the *current* Hetzner invoice at the top."""
     root, _, _ = env
-    generic = "\n".join(
-        f"  - `Admin/file-{i:03d}.txt` · 1 KB" for i in range(60)
-    )
     big = (
         "---\ntype: folder-index\nroot_id: work\n"
-        'root_path: "/troves/work"\nfiles: 61\ndirs: 1\n'
+        'root_path: "/troves/work"\nfiles: 4\ndirs: 1\n'
         "skipped_excluded: 0\nskipped_depth: 0\nerrors: 0\n---\n\n"
-        "## Recent changes\n\n- `Admin/recent.txt` · 2026-06-09 · 0 B\n\n"
-        "## Tree\n\n- `Admin`/\n" + generic
-        + "\n  - `Admin/Hetzner-Mai-Rechnung.pdf` · 1 KB\n"
+        "## Recent changes\n\n- `recent.txt` · 2026-06-09 · 0 B\n\n"
+        "## Tree\n\n- `Admin`/\n"
+        # incidental single-keyword match ('kopf')
+        "  - `Admin/kopfblatt.doc` · 1 KB · modified 2026-06-01\n"
+        # old Hetzner invoice: coverage 2 (hetzner+rechnung), older
+        "  - `Admin/Rechnungen/Hetzner-2020.pdf` · 1 KB · modified 2020-01-01\n"
+        # current Hetzner invoice: coverage 2, newest → must rank first
+        "  - `Admin/Rechnungen/Hetzner-Mai.pdf` · 1 KB · modified 2026-05-15\n"
+        # dir-skeleton filler — bloats the digest well past budget without
+        # adding candidates (only file lines are candidates)
+        + "".join(f"- `filler-dir-{i:03d}`/\n" for i in range(60))
     )
     (root / "raw" / "index" / "docs.md").unlink()
     (root / "raw" / "index" / "work.md").write_text(big, encoding="utf-8")
-    monkeypatch.setattr(CONFIG.limits, "curiosity_folder_keyword_max_matches", 25)
+    monkeypatch.setattr(CONFIG.limits, "curiosity_folder_max_candidates", 2)
 
     block, _ = producer._load_folder_digests(
-        budget_chars=500,
-        source_excerpt="Wo liegt die Admin-Ablage der Hetzner-Rechnung vom Mai?",
+        budget_chars=600,  # < digest (~1.4 KB) → retrieval; > candidate block → no cap
+        source_excerpt="Wo liegt die Hetzner-Rechnung? Hab die Zahlen nicht im Kopf.",
     )
-    # 'admin' matches 61 files (> 25) → not discriminative → its 60 generic
-    # files are NOT injected ...
-    assert "file-030.txt" not in block
-    # ... but 'hetzner' matches 1 → discriminative → injected.
-    assert "Hetzner-Mai-Rechnung.pdf" in block
+    assert "## Candidate files" in block  # retrieval ran (not full-inject)
+    # the two Hetzner files (coverage 2) beat kopfblatt (coverage 1) for the
+    # 2 candidate slots → kopfblatt dropped ...
+    assert "kopfblatt.doc" not in block
+    # ... and both Hetzner files made it, the current one present.
+    assert "Hetzner-Mai.pdf" in block
+    # recency ordering: the current invoice precedes the 2020 one.
+    cands = block.split("## Candidate files", 1)[1]
+    assert cands.index("Hetzner-Mai.pdf") < cands.index("Hetzner-2020.pdf")
 
 
 def test_source_keywords_drop_stopwords_short_and_numeric():
