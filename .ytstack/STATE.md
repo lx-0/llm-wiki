@@ -1,9 +1,9 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-06-13T17:56:00+0200
+last_updated: 2026-06-13T18:02:00+0200
 current_milestone: M028
-active_slice: S02
+active_slice: none
 active_task: none
 last_completed_milestone: M026
 parked_milestone: M025
@@ -36,7 +36,9 @@ issue-#5 close. Grounded against HEAD: `reconcile_fact()` `correct_apply.py:190-
 is the sandbox pattern; destructive instruction `prompts/correct_apply.md:26`;
 `make_path_scope_hook` `sdk_helpers.py:404` is allow-list-only (needs exclude).
 
-**S02 progress: 3/4.** ✅ **T03 SHIPPED** (commit `033eebd`, `M028-S02-T03-SUMMARY.md`): `_tree_safe_for_deletion` refuses deletion runs on dirty/non-git tree unless `--force` (facts/ excluded); apply rc 3 before agent spawn. Suite **1344 green**. Next: `/ytstack:plan-task` for **S02-T04** (consolidated slice tests / acceptance).
+**✅ S02 COMPLETE — 4/4 (2026-06-13).** Safe opt-in deletion: `_execute_deletes` → `.trash/<ts>/` (move-as-backup) + index-row clear; gate = `--allow-delete` flag OR fact `disposition: delete`; clean-git-tree guard (rc 3 unless `--force`). Commits `5c0a9c7`→`363801d`. Suite **1346 green**. **Reassess (S02 boundary): S03 unchanged** (dry-run blast radius + broad-term warning — no overlap with S02). Next: `/ytstack:plan-task` for **S03-T01**.
+
+✅ **T03 SHIPPED** (commit `033eebd`, `M028-S02-T03-SUMMARY.md`): `_tree_safe_for_deletion` refuses deletion runs on dirty/non-git tree unless `--force` (facts/ excluded); apply rc 3 before agent spawn. Suite **1344 green**. Next: `/ytstack:plan-task` for **S02-T04** (consolidated slice tests / acceptance).
 
 ✅ **T02 SHIPPED** (commit `5b0a60a`, `M028-S02-T02-SUMMARY.md`): deletion gate — `--allow-delete` flag + fact `disposition: delete`; real `deletion_allowed` into prompt + `_execute_deletes`. Default supersede-only. Suite **1341 green**. Next: `/ytstack:plan-task` for **S02-T03** (dirty/non-git tree guard unless `--force`).
 

@@ -4,9 +4,9 @@ slice: S02
 project: llm-wiki
 created: 2026-06-13T15:56:13+0200
 revised: 2026-06-13T16:10:00+0200
-status: planned
+status: done
 task_count: 4
-completed_tasks: 3
+completed_tasks: 4
 ---
 
 # M028-S02 -- Slice Plan
@@ -44,7 +44,7 @@ explicit signal.
   S01-T05 — a clean git tree is what makes `.trash` + recovery trustworthy). Back
   up each article to `.trash/<ts>/` before it is removed (the move IS the backup);
   for edits, the existing git tree is the safety net under the clean-tree precondition.
-- [ ] T04 -- Tests: a gated-on deletion lands the file under `.trash/<ts>/` (not
+- [x] T04 -- Tests: a gated-on deletion lands the file under `.trash/<ts>/` (not
   gone, index row cleared); gate-off → 0 deletions even when the agent nominates;
   dirty-tree run aborts without `--force` and proceeds with it; `_divergence` stays
   silent for a declared+executed deletion.

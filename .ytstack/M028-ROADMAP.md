@@ -5,7 +5,7 @@ size: L
 created: 2026-06-13T15:51:29+0200
 status: in_progress
 total_slices: 4
-completed_slices: 1
+completed_slices: 2
 source_issue: https://github.com/lx-0/llm-wiki/issues/5
 ---
 
@@ -30,7 +30,7 @@ Slice detail lives in per-slice `M028-S##-PLAN.md` files, created by
 `ytstack:slice-milestone`.
 
 - [x] S01 -- Structural non-destructive guarantee (sandbox + supersede + engine rename) + truthful reporting
-- [ ] S02 -- Safe opt-in deletion (engine .trash executor + per-article backup + dirty-tree guard)
+- [x] S02 -- Safe opt-in deletion (engine .trash executor + per-article backup + dirty-tree guard)
 - [ ] S03 -- Informative --dry-run (blast radius) + over-broad-term warning at add-time
 - [ ] S04 -- First-class supersession status + lint + docs + closeout
 
