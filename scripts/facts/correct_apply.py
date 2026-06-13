@@ -458,7 +458,10 @@ async def apply(slug: str, dry_run: bool, allow_delete: bool = False, force: boo
         log.warning("File %s does not have type: fact — proceeding anyway.", fact_path)
 
     deletion_allowed = _deletion_allowed(fm, allow_delete)
-    if deletion_allowed and not force:
+    # The guard blocks only a REAL deletion run — a --dry-run is non-destructive
+    # and must always reach the blast-radius preview (it is the run you make to
+    # decide whether to clean the tree first).
+    if deletion_allowed and not force and not dry_run:
         safe, reason = _tree_safe_for_deletion(ROOT_DIR)
         if not safe:
             log.error(

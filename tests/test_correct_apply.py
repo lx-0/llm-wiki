@@ -501,6 +501,33 @@ def test_dry_run_lists_candidates_without_agent(tmp_path, monkeypatch, caplog) -
     assert "foo.md" in caplog.text          # blast radius surfaced
 
 
+def test_dry_run_never_refused_even_with_allow_delete(tmp_path, monkeypatch, caplog) -> None:
+    """A --dry-run is non-destructive: the clean-tree guard must NOT refuse it,
+    even with --allow-delete on a non-git vault. It previews, returns 0."""
+    import asyncio
+    import logging as _logging
+    from facts import correct_apply
+
+    knowledge = tmp_path / "knowledge"
+    facts = knowledge / "facts"
+    facts.mkdir(parents=True)
+    (knowledge / "concepts").mkdir()
+    (knowledge / "concepts" / "foo.md").write_text("# Foo widget\n", encoding="utf-8")
+    fact = facts / "w.md"
+    fact.write_text("---\ntype: fact\nstatus: negation\nnegation_terms:\n  - widget\n---\n\nx\n", encoding="utf-8")
+
+    monkeypatch.setattr(correct_apply, "ROOT_DIR", tmp_path)   # not a git repo → unsafe for a REAL delete run
+    monkeypatch.setattr(correct_apply, "FACTS_DIR", facts)
+    monkeypatch.setattr(correct_apply, "KNOWLEDGE_DIR", knowledge)
+    monkeypatch.setattr(correct_apply, "DAILY_DIR", tmp_path / "daily")
+    caplog.set_level(_logging.INFO, logger="correct-apply")
+
+    rc = asyncio.run(correct_apply.apply("w", dry_run=True, allow_delete=True))
+    assert rc == 0                               # previewed, not refused
+    assert "Refusing deletion-enabled run" not in caplog.text
+    assert "foo.md" in caplog.text               # blast radius shown
+
+
 def test_divergence_silent_for_declared_deletion() -> None:
     from facts import correct_apply
 
