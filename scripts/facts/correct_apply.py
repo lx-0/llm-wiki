@@ -123,12 +123,15 @@ def _parse_proposed_actions(text: str) -> dict:
     return out
 
 
-def _execute_renames(actions: dict, vault: Path) -> None:
+def _execute_renames(actions: dict, vault: Path) -> list:
     """Perform the agent's proposed renames engine-side (move + wikilink rewrite).
 
     The agent never renames files itself (no shell); it nominates {from,to} in
     the proposal block and the engine executes here, skipping unsafe entries.
+    Returns the list of renames actually performed (so reporting can tell an
+    engine rename apart from an unexplained deletion).
     """
+    executed = []
     for entry in actions.get("renamed", []):
         old = (vault / entry["from"]).resolve()
         new = (vault / entry["to"]).resolve()
@@ -144,8 +147,10 @@ def _execute_renames(actions: dict, vault: Path) -> None:
                 "Renamed %s → %s (%d ref(s) rewritten)",
                 entry["from"], entry["to"], counts["articles_rewritten"],
             )
+            executed.append(entry)
         except Exception as exc:  # noqa: BLE001 — a bad rename must not abort the run
             log.warning("rename failed %s → %s: %s", entry["from"], entry["to"], exc)
+    return executed
 
 
 # ── Ground-truth filesystem-delta reporting (issue #5) ──
@@ -216,23 +221,29 @@ def _delta_from_snapshot(before: dict, after: dict) -> dict:
     return delta
 
 
-def _divergence(actions: dict, delta: dict) -> list:
-    """Warnings where the real filesystem delta contradicts the agent's proposal.
+def _divergence(actions: dict, delta: dict, executed_renames: list) -> list:
+    """Warnings where the real filesystem delta contradicts what the engine did.
 
-    Load-bearing check: more files deleted than the agent declared — the exact
-    issue-#5 failure (declared 6, deleted 17).
+    Load-bearing check: a file vanished that neither a declared deletion nor an
+    engine-executed rename explains — the issue-#5 failure (an article gone with
+    no accounting). Renames look like delete(old)+create(new) in a snapshot or an
+    unstaged git tree, so engine-executed renames are subtracted first; otherwise
+    every rename would false-alarm. Basename-normalized because porcelain paths
+    (repo-relative) and snapshot paths (absolute) differ by mode.
     """
+    def _base(p: str) -> str:
+        return Path(p).name
+
+    rename_froms = {_base(r["from"]) for r in executed_renames}
+    declared_del = {_base(d) for d in actions.get("deleted", [])}
+    real_del = {_base(d) for d in delta.get("deleted", [])}
+    surprise = real_del - rename_froms - declared_del
     warnings = []
-    real_del, declared_del = len(delta.get("deleted", [])), len(actions.get("deleted", []))
-    if real_del > declared_del:
+    if surprise:
         warnings.append(
-            f"Filesystem shows {real_del} file(s) deleted but the agent declared "
-            f"{declared_del} — investigate before trusting this run (issue #5)."
-        )
-    real_ren, declared_ren = len(delta.get("renamed", [])), len(actions.get("renamed", []))
-    if real_ren != declared_ren:
-        warnings.append(
-            f"Filesystem shows {real_ren} rename(s) but the agent declared {declared_ren}."
+            f"{len(surprise)} file(s) vanished with no accounting "
+            f"({', '.join(sorted(surprise))}) — not a declared deletion or an "
+            f"engine rename. Investigate before trusting this run (issue #5)."
         )
     return warnings
 
@@ -365,14 +376,14 @@ async def apply(slug: str, dry_run: bool) -> int:
     # Execute engine-owned destructive ops the agent proposed (it has no shell).
     # Renames here; deletions are deferred to S02's `.trash` executor.
     actions = _parse_proposed_actions(result_text)
-    _execute_renames(actions, ROOT_DIR)
+    executed_renames = _execute_renames(actions, ROOT_DIR)
 
     # Ground-truth reporting: what ACTUALLY changed on disk, and a warning when
     # it contradicts the agent's declared actions (issue #5: claimed 6, did 17).
     delta = _git_delta(ROOT_DIR)
     if delta is None:
         delta = _delta_from_snapshot(before_snapshot or {}, _snapshot([KNOWLEDGE_DIR, INDEX_FILE]))
-    _report_filesystem_delta(delta, _divergence(actions, delta))
+    _report_filesystem_delta(delta, _divergence(actions, delta, executed_renames))
 
     # Mark fact as applied. Re-read to avoid stomping if the agent edited it
     # (it shouldn't — the prompt forbids it — but be safe).

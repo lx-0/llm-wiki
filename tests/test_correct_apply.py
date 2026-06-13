@@ -166,9 +166,9 @@ def test_divergence_fires_when_real_deletes_exceed_declared() -> None:
 
     actions = {"superseded": [], "edited": [], "renamed": [], "deleted": ["a.md"]}
     delta = {"created": [], "modified": [], "deleted": ["a.md", "b.md", "c.md"], "renamed": []}
-    warnings = correct_apply._divergence(actions, delta)
-    assert warnings, "must warn when more files were deleted than declared"
-    assert any("deleted" in w.lower() for w in warnings)
+    warnings = correct_apply._divergence(actions, delta, executed_renames=[])
+    assert warnings, "must warn when files vanished beyond what was declared"
+    assert any("vanish" in w.lower() or "deleted" in w.lower() for w in warnings)
 
 
 def test_divergence_silent_when_counts_match() -> None:
@@ -176,4 +176,83 @@ def test_divergence_silent_when_counts_match() -> None:
 
     actions = {"superseded": ["a.md"], "edited": [], "renamed": [], "deleted": []}
     delta = {"created": [], "modified": ["a.md"], "deleted": [], "renamed": []}
-    assert correct_apply._divergence(actions, delta) == []
+    assert correct_apply._divergence(actions, delta, executed_renames=[]) == []
+
+
+def test_divergence_does_not_flag_engine_rename_as_deletion() -> None:
+    """A rename shows as delete(old)+create(new) in a snapshot/unstaged tree —
+    the engine knows it renamed, so it must NOT raise a deletion alarm."""
+    from facts import correct_apply
+
+    actions = {"superseded": [], "edited": [], "renamed":
+               [{"from": "knowledge/projects/township.md", "to": "knowledge/projects/fleet.md"}],
+               "deleted": []}
+    delta = {"created": ["knowledge/projects/fleet.md"], "modified": [],
+             "deleted": ["knowledge/projects/township.md"], "renamed": []}
+    executed = [{"from": "knowledge/projects/township.md", "to": "knowledge/projects/fleet.md"}]
+    assert correct_apply._divergence(actions, delta, executed_renames=executed) == []
+
+
+def test_apply_golden_supersede_renames_deletes_nothing(tmp_path, monkeypatch, caplog) -> None:
+    """Issue-#5 golden: a sandboxed apply over a fixture vault annotates/renames
+    via the engine but deletes ZERO articles, and stamps the fact applied."""
+    import asyncio
+    from facts import correct_apply
+    from claude_agent_sdk import ResultMessage
+
+    vault = tmp_path
+    knowledge = vault / "knowledge"
+    facts = knowledge / "facts"
+    facts.mkdir(parents=True)
+    (knowledge / "projects").mkdir()
+    (knowledge / "concepts").mkdir()
+    old = knowledge / "projects" / "township.md"
+    old.write_text("# Township\n\nold strategy\n", encoding="utf-8")
+    ref = knowledge / "concepts" / "foo.md"
+    ref.write_text("See [[../projects/township]] for details.\n", encoding="utf-8")
+    index = knowledge / "index.md"
+    index.write_text("- [[projects/township]] — the project\n", encoding="utf-8")
+    fact = facts / "ssot.md"
+    fact.write_text(
+        "---\ntype: fact\nstatus: disambiguation\napplied: false\n---\n\nTownship is now Fleet.\n",
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(correct_apply, "ROOT_DIR", vault)
+    monkeypatch.setattr(correct_apply, "FACTS_DIR", facts)
+    monkeypatch.setattr(correct_apply, "KNOWLEDGE_DIR", knowledge)
+    monkeypatch.setattr(correct_apply, "INDEX_FILE", index)
+    monkeypatch.setattr(correct_apply.LEDGER, "record", lambda **k: None)
+
+    agent_out = (
+        "## Applied summary\nRenamed township → fleet.\n\n"
+        "## Proposed actions\n```json\n"
+        '{"superseded": [], "edited": [],'
+        ' "renamed": [{"from": "knowledge/projects/township.md", "to": "knowledge/projects/fleet.md"}],'
+        ' "deleted": []}\n```\n'
+    )
+
+    async def fake_query(*, prompt, options):  # noqa: ARG001
+        yield ResultMessage(
+            subtype="success", duration_ms=1, duration_api_ms=1, is_error=False,
+            num_turns=1, session_id="t", total_cost_usd=0.0,
+            usage={"input_tokens": 1, "output_tokens": 1}, result=agent_out,
+        )
+
+    monkeypatch.setattr(correct_apply, "query", fake_query)
+
+    import logging as _logging
+    caplog.set_level(_logging.WARNING, logger="correct-apply")
+    rc = asyncio.run(correct_apply.apply("ssot", dry_run=False))
+    assert rc == 0
+    # The engine rename must NOT trip the issue-#5 deletion alarm.
+    assert "vanished with no accounting" not in caplog.text
+    # Engine performed the rename.
+    assert not old.exists()
+    assert (knowledge / "projects" / "fleet.md").exists()
+    assert "[[../projects/fleet]]" in ref.read_text(encoding="utf-8")
+    # ZERO deletions — the article that merely *mentions* the term survives.
+    assert ref.exists()
+    # Fact stamped applied (no longer False).
+    stamped = fact.read_text(encoding="utf-8")
+    assert "applied: false" not in stamped.lower()
