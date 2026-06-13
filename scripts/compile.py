@@ -599,7 +599,20 @@ async def main() -> None:
         # compiles while idx runs through every candidate. Using `cap` here
         # produced a nonsensical `[1516/100]` when a big skip-backlog drained.
         prefix = f"[{idx}/{len(files)}] "
-        outcome = await compile_file(source, prefix=prefix, force=force_compile)
+        try:
+            outcome = await compile_file(source, prefix=prefix, force=force_compile)
+        except Exception as exc:  # noqa: BLE001 — one file's crash must not kill the whole batch
+            # An unhandled exception in compile_file used to propagate out of
+            # main(), aborting the entire run AND skipping the end-of-run
+            # maintenance drain. Demote it to a per-file failure so the batch
+            # continues; the consecutive-failure abort still catches a systemic
+            # problem. (CancelledError is a BaseException and intentionally not
+            # caught — it's a real task/process cancellation that must propagate.)
+            log.exception("  ✗ unhandled exception compiling %s", source.relative_to(ROOT_DIR))
+            outcome = CompileOutcome(
+                status="failed", failure_kind="exception",
+                failure_detail=str(exc) or repr(exc),
+            )
 
         if outcome.status == "skipped":
             # Skipped (empty / dry-run / skip-list / source-and-final / health-stub /
