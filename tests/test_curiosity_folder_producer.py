@@ -88,10 +88,11 @@ def env(tmp_path, monkeypatch):
 
 
 def _gap(**kw):
+    # The model returns a candidate NUMBER, not a path. For the env DIGEST
+    # the source mentions "Steuerbescheid 2024" → its file is candidate 1.
     g = {
         "topic": "Steuerbescheid 2024",
-        "root_id": "docs",
-        "file_path": "11 Steuern/Steuerbescheid-2024.pdf",
+        "candidate": 1,
         "file_confidence": 5,
         "rationale": "The note asks questions the assessment PDF answers.",
     }
@@ -127,9 +128,12 @@ def test_indexed_file_gap_writes_folder_deep_scan_request(env, monkeypatch):
     assert body["source"] == "raw/notes/note.md"
 
 
-def test_invented_path_is_dropped_by_file_exists_anchor(env, monkeypatch):
+def test_out_of_range_candidate_is_dropped(env, monkeypatch):
+    """The model can only pick a candidate NUMBER; an out-of-range pick
+    (more than the candidate count) is dropped — the integer-index
+    equivalent of the old file-exists anchor."""
     root, src, _ = env
-    _run(monkeypatch, src, [_gap(file_path="11 Steuern/erfundene-datei.pdf")])
+    _run(monkeypatch, src, [_gap(candidate=99)])
     assert _requests(root) == []
 
 
@@ -568,9 +572,10 @@ def test_real_prompt_template_renders_with_t01_kwargs():
         timestamp="2026-06-10T12:00:00+00:00",
     )
     assert "raw/notes/note.md" in out
-    assert "Steuerbescheid-2024.pdf" in out  # digest block embedded
-    for field in ("root_id", "file_path", "file_confidence", "rationale"):
-        assert f'"{field}"' in out  # JSON contract spelled out
+    assert "Steuerbescheid-2024.pdf" in out  # candidate block embedded
+    for field in ("topic", "candidate", "file_confidence", "rationale"):
+        assert f'"{field}"' in out  # JSON contract spelled out (number pick)
+    assert '"file_path"' not in out  # no verbatim-path copy anymore
     assert "${" not in out  # nothing unsubstituted
 
 
@@ -599,70 +604,58 @@ def test_over_budget_digest_selects_source_relevant_files(env, monkeypatch):
     (root / "raw" / "index" / "docs.md").unlink()
     (root / "raw" / "index" / "work.md").write_text(big, encoding="utf-8")
 
-    block, indexed = producer._load_folder_digests(
-        budget_chars=700,
+    block, candidates = producer._folder_candidates(
         source_excerpt="Wir haben die Hetzner-Rechnung vom Mai noch nicht abgelegt.",
+        top_k=40,
     )
     assert "Hetzner_2026-05.pdf" in block         # source-mentioned → candidate
     assert "Supabase-DPA.pdf" not in block        # unmentioned → not retrieved
     assert "file-0250" not in block               # bulk noise → not retrieved
-    assert "Admin/recent.txt" in block            # Recent survives (in head)
-    assert "## Candidate files" in block          # candidate list, not the tree
-    # anchor set stays COMPLETE regardless of what was injected
-    assert "Admin/Rechnungen/Hetzner_2026-05.pdf" in indexed["work"]
-    assert "Admin/Vertraege/Supabase-DPA.pdf" in indexed["work"]
+    assert "## Candidate files" in block          # numbered candidate list
+    assert "[1] (root `work`)" in block           # numbered + root-tagged
+    # the candidate map resolves the number back to (root, path)
+    assert ("work", "Admin/Rechnungen/Hetzner_2026-05.pdf") in candidates.values()
 
 
-def test_under_budget_digest_is_full_injected(env):
-    """Small vaults still get the complete digest — relevance-selection
-    only kicks in when over budget."""
-    block, _ = producer._load_folder_digests(
-        budget_chars=100_000, source_excerpt="anything"
+def test_no_keyword_match_yields_no_candidates(env):
+    """A source mentioning nothing in the folders → empty block → the
+    producer abstains (no candidates to judge)."""
+    block, candidates = producer._folder_candidates(
+        source_excerpt="völlig unzusammenhängendes thema xyzzy quux", top_k=40
     )
-    assert "vertrag-handy.pdf" in block  # a non-recent Tree file, full-inject
+    assert block == "" and candidates == {}
 
 
-def test_candidate_ranking_coverage_then_recency(env, monkeypatch):
+def test_candidate_ranking_coverage_then_recency(env):
     """Candidates rank by coverage (distinct source keywords matched) then
     recency. A file the source cares about on several axes outranks one
     matching a single incidental word; among same-coverage files the newest
-    surfaces. This is the lxw 2026-06-13 finding: rarity (1/df) buried the
-    central 'hetzner' (the operator has 65 Hetzner files); coverage+recency
-    puts the *current* Hetzner invoice at the top."""
+    surfaces. lxw 2026-06-13: rarity (1/df) buried the central 'hetzner'
+    (the operator has 65 Hetzner files); coverage+recency puts the
+    *current* Hetzner invoice at the top, candidate [1]."""
     root, _, _ = env
     big = (
         "---\ntype: folder-index\nroot_id: work\n"
-        'root_path: "/troves/work"\nfiles: 4\ndirs: 1\n'
+        'root_path: "/troves/work"\nfiles: 3\ndirs: 1\n'
         "skipped_excluded: 0\nskipped_depth: 0\nerrors: 0\n---\n\n"
-        "## Recent changes\n\n- `recent.txt` · 2026-06-09 · 0 B\n\n"
         "## Tree\n\n- `Admin`/\n"
-        # incidental single-keyword match ('kopf')
         "  - `Admin/kopfblatt.doc` · 1 KB · modified 2026-06-01\n"
-        # old Hetzner invoice: coverage 2 (hetzner+rechnung), older
         "  - `Admin/Rechnungen/Hetzner-2020.pdf` · 1 KB · modified 2020-01-01\n"
-        # current Hetzner invoice: coverage 2, newest → must rank first
         "  - `Admin/Rechnungen/Hetzner-Mai.pdf` · 1 KB · modified 2026-05-15\n"
-        # dir-skeleton filler — bloats the digest well past budget without
-        # adding candidates (only file lines are candidates)
-        + "".join(f"- `filler-dir-{i:03d}`/\n" for i in range(60))
     )
     (root / "raw" / "index" / "docs.md").unlink()
     (root / "raw" / "index" / "work.md").write_text(big, encoding="utf-8")
-    monkeypatch.setattr(CONFIG.limits, "curiosity_folder_max_candidates", 2)
 
-    block, _ = producer._load_folder_digests(
-        budget_chars=600,  # < digest (~1.4 KB) → retrieval; > candidate block → no cap
+    block, candidates = producer._folder_candidates(
         source_excerpt="Wo liegt die Hetzner-Rechnung? Hab die Zahlen nicht im Kopf.",
+        top_k=40,
     )
-    assert "## Candidate files" in block  # retrieval ran (not full-inject)
-    # the two Hetzner files (coverage 2) beat kopfblatt (coverage 1) for the
-    # 2 candidate slots → kopfblatt dropped ...
-    assert "kopfblatt.doc" not in block
-    # ... and both Hetzner files made it, the current one present.
-    assert "Hetzner-Mai.pdf" in block
-    # recency ordering: the current invoice precedes the 2020 one.
-    cands = block.split("## Candidate files", 1)[1]
-    assert cands.index("Hetzner-Mai.pdf") < cands.index("Hetzner-2020.pdf")
+    # coverage 2 (hetzner+rechnung) beats kopfblatt (coverage 1 'kopf'),
+    # recency puts the current invoice at candidate [1].
+    assert candidates[1] == ("work", "Admin/Rechnungen/Hetzner-Mai.pdf")
+    assert candidates[2] == ("work", "Admin/Rechnungen/Hetzner-2020.pdf")
+    # kopfblatt (lowest coverage) ranks last, after the two Hetzner files
+    assert candidates[3] == ("work", "Admin/kopfblatt.doc")
 
 
 def test_source_keywords_drop_stopwords_short_and_numeric():

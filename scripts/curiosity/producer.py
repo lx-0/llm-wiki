@@ -154,11 +154,17 @@ def _file_line_path(ln: str) -> str:
     return m.group(1).lower() if m else ln.lower()
 
 
-def _digest_head(digest_text: str) -> str:
-    """Everything before the `## Tree` section: frontmatter + Recent +
-    title. Always shown — orientation + the recency signal."""
-    head, sep, _ = digest_text.partition("\n## Tree")
-    return head if sep else digest_text
+def _file_line_realpath(ln: str) -> str:
+    """Backticked path of a Tree file line, ORIGINAL case (for the request)."""
+    m = _BACKTICKED_PATH.search(ln)
+    return m.group(1).rstrip("/") if m else ln.strip()
+
+
+def _file_line_meta(ln: str) -> str:
+    """The `· size · created … · modified …` tail of a file line (everything
+    after the backticked path) — the metadata the model judges by."""
+    parts = ln.split("`", 2)
+    return parts[2].strip().lstrip("·").strip() if len(parts) >= 3 else ""
 
 
 _MODIFIED_RE = re.compile(r"modified (\d{4}-\d{2}-\d{2})")
@@ -171,59 +177,52 @@ def _modified_date(line: str) -> str:
     return m.group(1) if m else "0000-00-00"
 
 
-def _rank_candidate_lines(
+def _rank_candidates(
     digests: dict[str, str], keywords: set[str], top_k: int
-) -> tuple[dict[str, list[str]], int]:
-    """Retrieve the top-K candidate file-lines for the source, per root.
-
-    Deterministic Python retrieval over the COMPLETE on-disk index — the
-    model judges a short candidate list, never browses the tree. Ranking
-    (validated on lxw 2026-06-13):
+) -> list[tuple[str, str, str]]:
+    """Top-K candidate files for the source: ordered list of
+    (root_id, path, meta). Deterministic retrieval over the COMPLETE
+    on-disk index — the model judges a short NUMBERED list, never browses
+    the tree. Ranking (validated on lxw 2026-06-13):
 
     - **coverage** (primary): how many DISTINCT source keywords a file
       matches. A file the source cares about on several axes
       (`hetzner` + `rechnung` + `admin`) beats one matching a single
       incidental word (`kopf` from "im Kopf"). Robust where rarity
       backfires — a central topic the operator has *many* files about
-      ("hetzner", 65 files) would be down-weighted by 1/df, but coverage
+      ("hetzner", 65 files) would be down-weighted by 1/df; coverage
       rewards it.
-    - **recency** (tiebreak): newest `modified` date first. The source is
-      usually a current concern, so among 50 monthly Hetzner invoices the
-      latest one surfaces ("Mai 2026" can't be a keyword — too short /
-      numeric — so recency carries the temporal signal).
-
-    No structural pre-filter is needed: a keyword matching every file adds
-    +1 coverage uniformly and does not distort the order. Returns
-    ({root: lines}, n_keywords).
+    - **recency** (tiebreak): newest `modified` date first — among 50
+      monthly Hetzner invoices the latest surfaces ("Mai 2026" can't be a
+      keyword: too short / numeric, so recency carries the temporal axis).
     """
-    scored: list[tuple[int, str, str, str]] = []  # (coverage, mod, root, line)
+    scored: list[tuple[int, str, str, str, str]] = []  # cov, mod, root, path, meta
     for root, text in digests.items():
         for ln in text.splitlines():
             if not _is_tree_file_line(ln):
                 continue
-            path = _file_line_path(ln)
-            coverage = sum(1 for kw in keywords if kw in path)
+            coverage = sum(1 for kw in keywords if kw in _file_line_path(ln))
             if coverage:
-                scored.append((coverage, _modified_date(ln), root, ln))
+                scored.append((
+                    coverage, _modified_date(ln), root,
+                    _file_line_realpath(ln), _file_line_meta(ln),
+                ))
     scored.sort(key=lambda t: (t[0], t[1]), reverse=True)
-    by_root: dict[str, list[str]] = {}
-    for _cov, _mod, root, ln in scored[:top_k]:
-        by_root.setdefault(root, []).append(ln)
-    return by_root, len(keywords)
+    return [(root, path, meta) for _c, _m, root, path, meta in scored[:top_k]]
 
 
-def _load_folder_digests(
-    budget_chars: int, source_excerpt: str = ""
-) -> tuple[str, dict[str, set[str]]]:
-    """Read raw/index/*.md → (prompt block, {root_id: indexed rel_paths}).
+def _folder_candidates(
+    source_excerpt: str, top_k: int
+) -> tuple[str, dict[int, tuple[str, str]]]:
+    """Read raw/index/*.md → a NUMBERED candidate-file block + the
+    {number: (root_id, file_path)} map the producer resolves the model's
+    pick through.
 
-    Full digests when they fit `budget_chars`; otherwise the producer
-    RETRIEVES the top-N candidate files (rarity-weighted keyword match over
-    the complete index) and injects only those + each root's
-    frontmatter/Recent — NOT the folder tree (the dir-skeleton alone
-    bloated the prompt and timed out the local model; lxw 2026-06-13). The
-    `indexed` anchor set is ALWAYS built from the complete on-disk digest,
-    independent of what's injected — so the file-exists gate stays sound.
+    The model picks a candidate NUMBER, never copies a path: llama3.1:8b
+    fills a verbatim-copy `file_path` field with placeholders under schema
+    (`/path/to/file.pdf`, lxw 2026-06-13). The email curiosity pass avoids
+    exactly this with an integer `folder_index`; this mirrors it. Empty
+    when no digests exist or nothing matches the source (→ abstain).
     """
     digests: dict[str, str] = {}
     if RAW_INDEX_DIR.exists():
@@ -231,34 +230,20 @@ def _load_folder_digests(
             digests[f.stem] = f.read_text(encoding="utf-8")
     if not digests:
         return "", {}
-    paths = {root_id: _indexed_paths(text) for root_id, text in digests.items()}
-    block = "\n\n".join(digests.values())
-    if len(block) <= budget_chars:
-        return block, paths
-
-    keywords = _source_keywords(source_excerpt)
-    by_root, n_used = _rank_candidate_lines(
-        digests, keywords, CONFIG.limits.curiosity_folder_max_candidates
+    ranked = _rank_candidates(digests, _source_keywords(source_excerpt), top_k)
+    if not ranked:
+        return "", {}
+    candidates: dict[int, tuple[str, str]] = {}
+    lines: list[str] = []
+    for i, (root_id, path, meta) in enumerate(ranked, start=1):
+        candidates[i] = (root_id, path)
+        tail = f" · {meta}" if meta else ""
+        lines.append(f"[{i}] (root `{root_id}`) `{path}`{tail}")
+    block = (
+        "## Candidate files (ranked by relevance to this source)\n\n"
+        + "\n".join(lines) + "\n"
     )
-    parts = []
-    for root_id, text in digests.items():
-        cands = by_root.get(root_id, [])
-        body = "\n".join(cands) if cands else "_(no candidate files matched this source)_"
-        parts.append(f"{_digest_head(text)}\n## Candidate files\n\n{body}\n")
-    selected = "\n\n".join(parts)
-    n_cands = sum(len(v) for v in by_root.values())
-    log.info(
-        "  Curiosity(folder): digests %d chars > budget %d — retrieved %d "
-        "candidate file(s) via %d/%d keyword(s) → %d chars",
-        len(block), budget_chars, n_cands, n_used, len(keywords), len(selected),
-    )
-    if len(selected) > budget_chars:  # backstop (huge candidate paths)
-        log.warning(
-            "  Curiosity(folder): candidate block %d chars > budget %d — capped",
-            len(selected), budget_chars,
-        )
-        selected = selected[:budget_chars]
-    return selected, paths
+    return block, candidates
 
 
 async def maybe_generate_folder_requests(source: Path) -> None:
@@ -287,13 +272,15 @@ async def maybe_generate_folder_requests(source: Path) -> None:
         return
 
     src_excerpt = source_content[:5000]
-    digest_budget = max(
-        1000,
-        CONFIG.limits.curiosity_max_prompt_chars - len(src_excerpt) - 1500,
+    digest_block, candidates = _folder_candidates(
+        src_excerpt, CONFIG.limits.curiosity_folder_max_candidates
     )
-    digest_block, indexed = _load_folder_digests(digest_budget, src_excerpt)
     if not digest_block:
-        log.info("  Curiosity(folder): no digests under raw/index/ — run `wiki index`")
+        log.info(
+            "  Curiosity(folder): no candidate files matched %s "
+            "(no digests, or source mentions nothing in the watched folders)",
+            rel_path,
+        )
         return
 
     if not ollama_client.is_reachable():
@@ -319,7 +306,6 @@ async def maybe_generate_folder_requests(source: Path) -> None:
     log.info("  Curiosity(folder) pass for %s (model=%s, prompt=%d chars)",
              rel_path, CURIOSITY_MODEL, len(prompt))
 
-    root_ids = sorted(indexed.keys())
     schema = {
         "type": "object",
         "properties": {
@@ -329,10 +315,15 @@ async def maybe_generate_folder_requests(source: Path) -> None:
                     "type": "object",
                     "properties": {
                         "topic": {"type": "string"},
-                        "root_id": {"type": "string", "enum": root_ids},
-                        # file_path: must be a rel_path present in the
-                        # digest — validated below (file-exists anchor).
-                        "file_path": {"type": "string"},
+                        # candidate: the NUMBER of a listed candidate file.
+                        # Integer pick, not a copied path — llama3.1:8b
+                        # placeholder-fills a verbatim path field (lxw
+                        # 2026-06-13). Python maps it back via `candidates`.
+                        "candidate": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": len(candidates),
+                        },
                         # file_confidence: 1-5 self-reported, same
                         # abstain-over-guess semantics as email's
                         # folder_confidence (shared threshold knob).
@@ -344,8 +335,7 @@ async def maybe_generate_folder_requests(source: Path) -> None:
                         "rationale": {"type": "string"},
                     },
                     "required": [
-                        "topic", "root_id", "file_path",
-                        "file_confidence", "rationale",
+                        "topic", "candidate", "file_confidence", "rationale",
                     ],
                 },
             },
@@ -381,12 +371,17 @@ async def maybe_generate_folder_requests(source: Path) -> None:
         for gap in gaps[:CONFIG.limits.curiosity_max_gaps]:
             topic = (gap.get("topic") or "").strip()
             rationale = (gap.get("rationale") or "").strip()
-            root_id = (gap.get("root_id") or "").strip()
-            file_path = (gap.get("file_path") or "").strip().lstrip("./")
 
-            if root_id not in indexed:
-                dropped["root_unmapped"] = dropped.get("root_unmapped", 0) + 1
+            # Candidate-number anchor: the pick must be a listed candidate.
+            # The model can only return a number 1..N; an out-of-range or
+            # non-int pick is dropped. This replaces the verbatim file-path
+            # anchor — the candidates map IS the validated index subset.
+            candidate = gap.get("candidate")
+            if not isinstance(candidate, int) or candidate not in candidates:
+                dropped["candidate_invalid"] = dropped.get("candidate_invalid", 0) + 1
                 continue
+            root_id, file_path = candidates[candidate]
+
             file_confidence = gap.get("file_confidence")
             if not isinstance(file_confidence, int) or file_confidence < confidence_min:
                 dropped["file_low_confidence"] = dropped.get("file_low_confidence", 0) + 1
@@ -396,12 +391,6 @@ async def maybe_generate_folder_requests(source: Path) -> None:
                 continue
             if not rationale:
                 dropped["empty_rationale"] = dropped.get("empty_rationale", 0) + 1
-                continue
-            # FILE-EXISTS anchor: the named path must be present in the
-            # index the model saw. Invented paths are dropped — this is
-            # the folder-pass equivalent of email's verbatim source_quote.
-            if file_path.rstrip("/") not in indexed[root_id]:
-                dropped["file_not_indexed"] = dropped.get("file_not_indexed", 0) + 1
                 continue
 
             slug = re.sub(r"[^a-z0-9]+", "-", topic.lower())[:40].strip("-")

@@ -26,10 +26,11 @@ import curiosity.cli as cli
 import curiosity.producer as producer
 from core.config import CONFIG
 
+# The model returns a candidate NUMBER, not a path. The real retrieval over
+# the fixture digest puts the source-matched Steuerbescheid file at [1].
 GAP = {
     "topic": "Steuerbescheid 2024",
-    "root_id": "docs",
-    "file_path": "11 Steuern/Steuerbescheid-2024.pdf",
+    "candidate": 1,
     "file_confidence": 5,
     "rationale": "Filename names the tax assessment exactly.",
 }
@@ -109,12 +110,9 @@ def test_happy_chain_walk_index_produce_request(vault, monkeypatch):
     assert body["status"] == "pending"
 
 
-def test_anchor_rejects_unwalked_path_over_real_digest(vault, monkeypatch):
+def test_out_of_range_candidate_rejected_over_real_digest(vault, monkeypatch):
     root, _, src = vault
-    captured = _run_with_gaps(
-        monkeypatch, src,
-        [dict(GAP, file_path="11 Steuern/plausibel-aber-erfunden.pdf")],
-    )
+    captured = _run_with_gaps(monkeypatch, src, [dict(GAP, candidate=99)])
     assert "prompt" in captured  # producer really ran — gate, not no-op
     assert _requests(root) == []
 
