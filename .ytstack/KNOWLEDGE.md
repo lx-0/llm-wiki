@@ -2540,3 +2540,27 @@ nach Prompt-Änderungen muss den DISPATCH-Logbeweis lesen
 `sensitivity:`-Vererbung aus Mixed-Source-Artikeln ist semantisch
 ill-defined — der deterministische Carrier ist das Answer-Artefakt selbst
 (Tag gestempelt), der Artikel-Fakt verlinkt darauf.
+
+## llama3.1:8b emits placeholder file_paths under schema — number the candidates, don't ask for verbatim copy (2026-06-13)
+
+After the folder-curiosity producer was fixed to RETRIEVE the right candidates
+(coverage+recency ranking surfaces the exact target file at rank 0, verified on
+lxw), the producer still keeps 0 gaps. Root cause, isolated via a raw Ollama
+probe: the model READS the candidates (its `topic` values name real folders it
+saw — "Hetzner", "AIC Invoices") but fills `file_path` with placeholders
+(`/path/to/file.pdf`, `/path/to/file2.pdf`), conf=1. The "copy the path
+VERBATIM from a backticked entry" instruction is not reliably followed by an 8B
+model under JSON-schema-constrained decoding — it substitutes a schema-shaped
+placeholder. The file-exists anchor correctly rejects them, so the loop is
+sound but produces nothing.
+
+The engine ALREADY has the fix pattern: the EMAIL curiosity pass never asks the
+model to copy a folder path — it gives a NUMBERED folder list and the model
+returns `folder_index` (an integer), then Python maps index→path. The folder
+pass abandoned that for `file_path` string-copy and inherited this exact
+failure. Fix: number the retrieved candidate files, have the model return
+`candidate_index` (int, enum-bounded), map index→path in Python. Sidesteps
+verbatim-copy entirely — the proven mechanism. Also clarifies why the email
+pass uses an integer there in the first place. Producer architecture + retrieval
+are correct; this is the last gap to a working organic request. Backlog:
+`.ytstack/backlog/folder-curiosity-candidate-index.md`.
