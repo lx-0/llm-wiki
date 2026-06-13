@@ -12,6 +12,19 @@ parallel_milestones: [M021]
 
 # State
 
+**Ad-hoc 2026-06-13c (curiosity home-screen split + type-agnostic walk):** Found
+the REAL reason folder requests were invisible in the operator's workflow:
+`email_backend.list_pending` hard-filters to `email-deep-scan`, so the walk /
+run-* paths NEVER surfaced folder-deep-scan requests (the home-screen counted
+them, the walk couldn't reach them). Fixed (commit `61749f0`): type-agnostic
+`curiosity/cli._pending(type?)` + `--type` flag threaded through
+walk/run-oldest/run-all/run-batch; `menu_context` split into
+`probe_folder_curiosity_pending` (priority 3, "N document-scan requests to
+review", cmd `curiosity --type folder-deep-scan`) vs the email pile (priority 8,
+"N email-scan requests pending", `--type email-deep-scan`). Live-verified on
+lxw: a folder request surfaces at prio 3 + the type-filtered walk reaches it;
+email (629) pushed to the bottom. Suite **1280 green**.
+
 **Ad-hoc 2026-06-13b (curiosity accept-all — operator workflow integration):**
 Operator workflow is `wiki update && wiki compile` + glancing at the `wiki`
 home screen's "todos" (menu.py suggestions). Curiosity IS surfaced there
