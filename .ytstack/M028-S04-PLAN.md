@@ -5,7 +5,7 @@ project: llm-wiki
 created: 2026-06-13T15:56:13+0200
 status: planned
 task_count: 4
-completed_tasks: 0
+completed_tasks: 2
 ---
 
 # M028-S04 -- Slice Plan
@@ -15,14 +15,14 @@ conflating *false* with *outdated*, and M028 is documented + issue #5 closed.
 
 ## Tasks
 
-- [ ] T01 -- Add `supersession` to `VALID_STATUS` in `scripts/facts/correct.py:54`
+- [x] T01 -- Add `supersession` to `VALID_STATUS` in `scripts/facts/correct.py:54`
   + the `--status` `choices` (L228-232) + help text; semantics = "was true, now
   outdated → annotate, never delete." Wire it through `prompts/correct_apply.md`:
   `supersession` always annotates (never delete-eligible, even with
   `--allow-delete`); `negation` keeps the false-claim meaning and remains the only
   delete-eligible status (still opt-in per S01). Resolve the CONTEXT open-question
   (distinct status value, not a modifier).
-- [ ] T02 -- Extend lint in `scripts/facts/lint.py` (`check_facts_violations`) to
+- [x] T02 -- Extend lint in `scripts/facts/lint.py` (`check_facts_violations`) to
   handle `supersession`: surface articles that should carry the superseded
   banner/frontmatter but don't, as annotation gaps — not as deletion candidates.
   Keep `negation` lint behaviour intact.
