@@ -182,6 +182,7 @@ Per-instance data — operator-specific. **Never committed** (lives in `config.y
 | Key | Default | Meaning |
 |---|---|---|
 | `personal.primary_account` | `""` | Account id used as default in prompts + fallback in `compile.py`. |
+| `personal.output_language` | `"auto"` | Output **prose** language of compiled `knowledge/**` articles. `"auto"` = write in the source material's language (today's behavior, byte-identical compile). A language (`"de"`, `"German"`, `"fr"`, …) forces **all** compiled prose — titles, body, summaries — into that language regardless of source, while keeping code, technical identifiers, proper names, and the canonical structural headers (`## State`, `## Timeline`, …) verbatim. Distinct from `personal.voice_transcribe_language` (input transcription vs. output prose). |
 | `personal.thunderbird_profile` | `""` | Absolute path to local Thunderbird profile. Empty disables the Thunderbird-mbox reader + `thunderbird-rules`. |
 | `personal.firefox_profile` | `""` | Absolute path to Firefox profile (`Library/Application Support/Firefox/Profiles/<id>.default-release` on macOS). Drives the browser collector. |
 | `personal.stg_backup_dir` | `""` | Simple Tab Groups backup dir. Drives the tabs collector STG import path. |
