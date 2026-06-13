@@ -101,19 +101,37 @@ def _last_compile_mtime() -> float | None:
         return None
 
 
-def probe_curiosity_pending() -> int:
-    """Count `raw/requests/*.json` whose status != 'done'."""
+def _count_pending_requests(type_filter: str | None = None) -> int:
+    """Count pending (status not done/rejected) `raw/requests/*.json`,
+    optionally one type. Mirrors curiosity/cli._pending's selection."""
     if not RAW_REQUESTS_DIR.exists():
         return 0
     n = 0
     for p in RAW_REQUESTS_DIR.glob("request-*.json"):
         try:
             data = json.loads(p.read_text(encoding="utf-8"))
-            if data.get("status") != "done":
-                n += 1
         except (OSError, json.JSONDecodeError):
             continue
+        if data.get("status") in ("done", "rejected"):
+            continue
+        if type_filter and data.get("type") != type_filter:
+            continue
+        n += 1
     return n
+
+
+def probe_folder_curiosity_pending() -> int:
+    """Pending folder-deep-scan requests — high-value, few: each points at a
+    specific file in the operator's watched folders that could answer a gap.
+    Surfaced separately (and above) the email pile so it isn't buried."""
+    return _count_pending_requests("folder-deep-scan")
+
+
+def probe_curiosity_pending() -> int:
+    """Pending EMAIL-deep-scan requests — the background pile. Folder
+    requests are counted separately by probe_folder_curiosity_pending so
+    the two don't double-count."""
+    return _count_pending_requests("email-deep-scan")
 
 
 def probe_suggestions_approved() -> int:
@@ -235,8 +253,12 @@ def build_suggestions() -> list[dict]:
          lambda n: f"{n} file{'s' if n != 1 else ''} in inbox/",          "process-inbox"),
         ("compile",     probe_compile_changed,      2,
          lambda n: f"{n} source{'s' if n != 1 else ''} changed since compile", "compile"),
-        ("curiosity",   probe_curiosity_pending,    3,
-         lambda n: f"{n} curiosity request{'s' if n != 1 else ''} pending",    "curiosity"),
+        ("folder-scan", probe_folder_curiosity_pending, 3,
+         lambda n: f"{n} document-scan request{'s' if n != 1 else ''} to review",
+         "curiosity --type folder-deep-scan"),
+        ("curiosity",   probe_curiosity_pending,    8,
+         lambda n: f"{n} email-scan request{'s' if n != 1 else ''} pending",
+         "curiosity --type email-deep-scan"),
         ("suggestions", probe_suggestions_approved, 4,
          lambda n: f"{n} approved suggestion{'s' if n != 1 else ''} to execute", "suggestions"),
         ("dream",       probe_dream_overdue,        5,

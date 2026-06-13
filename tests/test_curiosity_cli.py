@@ -148,7 +148,6 @@ def test_walk_accept_all_key_dispatches_every_remaining(tmp_path, monkeypatch, c
         "type": "email-deep-scan", "status": "pending",
         "topic": "t2", "folder": "INBOX", "account": "kasserver", "rationale": "r"})
     monkeypatch.setattr(cli, "REQUESTS_DIR", tmp_path)
-    monkeypatch.setattr(cli.email_backend, "list_pending", lambda d: [p1, p2])
 
     dispatched = []
     monkeypatch.setattr(cli, "_dispatch",
@@ -174,7 +173,6 @@ def test_walk_accept_all_cancelled_on_no(tmp_path, monkeypatch):
         "type": "folder-deep-scan", "status": "pending",
         "topic": "t1", "file_path": "a/x.pdf", "rationale": "r"})
     monkeypatch.setattr(cli, "REQUESTS_DIR", tmp_path)
-    monkeypatch.setattr(cli.email_backend, "list_pending", lambda d: [p1])
     dispatched = []
     monkeypatch.setattr(cli, "_dispatch",
                         lambda p, *, dry_run: dispatched.append(p) or True)
@@ -184,3 +182,20 @@ def test_walk_accept_all_cancelled_on_no(tmp_path, monkeypatch):
     with pytest.raises(SystemExit):
         cli._walk(dry_run=False)
     assert dispatched == []  # nothing sent — consent declined
+
+
+def test_pending_filters_by_type_and_excludes_done(tmp_path, monkeypatch):
+    """_pending lists all pending types by default (fixing the email-only
+    hard-filter that hid folder requests) and filters by type on request."""
+    from curiosity import cli
+
+    monkeypatch.setattr(cli, "REQUESTS_DIR", tmp_path)
+    _write(tmp_path / "request-1.json", {"type": "folder-deep-scan", "status": "pending"})
+    _write(tmp_path / "request-2.json", {"type": "email-deep-scan", "status": "pending"})
+    _write(tmp_path / "request-3.json", {"type": "folder-deep-scan", "status": "done"})
+    _write(tmp_path / "request-4.json", {"type": "email-deep-scan", "status": "rejected"})
+
+    names = lambda paths: sorted(p.name for p in paths)
+    assert names(cli._pending()) == ["request-1.json", "request-2.json"]
+    assert names(cli._pending("folder-deep-scan")) == ["request-1.json"]
+    assert names(cli._pending("email-deep-scan")) == ["request-2.json"]

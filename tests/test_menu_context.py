@@ -103,15 +103,27 @@ def test_compile_changed_with_state_counts_only_newer(fake_vault):
     assert menu_context.probe_compile_changed() == 1
 
 
-def test_curiosity_counts_only_non_done(fake_vault):
+def test_curiosity_probes_split_folder_from_email(fake_vault):
+    """The home-screen suggestion splits high-value folder-deep-scans from
+    the email pile so they aren't buried; done/rejected excluded."""
     import menu_context
 
     requests = fake_vault / "raw" / "requests"
-    (requests / "request-a.json").write_text(json.dumps({"status": "pending"}))
-    (requests / "request-b.json").write_text(json.dumps({"status": "in_progress"}))
-    (requests / "request-c.json").write_text(json.dumps({"status": "done"}))
+    (requests / "request-a.json").write_text(
+        json.dumps({"type": "email-deep-scan", "status": "pending"}))
+    (requests / "request-b.json").write_text(
+        json.dumps({"type": "email-deep-scan", "status": "in_progress"}))
+    (requests / "request-c.json").write_text(
+        json.dumps({"type": "folder-deep-scan", "status": "pending"}))
+    (requests / "request-d.json").write_text(
+        json.dumps({"type": "folder-deep-scan", "status": "done"}))
+    (requests / "request-e.json").write_text(
+        json.dumps({"type": "email-deep-scan", "status": "rejected"}))
     (requests / "request-bad.json").write_text("not json")
-    assert menu_context.probe_curiosity_pending() == 2
+
+    assert menu_context.probe_folder_curiosity_pending() == 1  # pending folder only
+    assert menu_context.probe_curiosity_pending() == 2         # non-terminal email
+    assert menu_context._count_pending_requests() == 3         # all pending, any type
 
 
 def test_suggestions_counts_approved_lines(fake_vault):

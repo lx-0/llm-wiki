@@ -55,6 +55,24 @@ def _read(path: Path) -> dict | None:
         return None
 
 
+def _pending(type_filter: str | None = None) -> list[Path]:
+    """All pending requests (status not done/rejected), oldest-first,
+    optionally filtered to one `type`. Type-AGNOSTIC by default — the walk
+    and run-* paths must surface EVERY request type, not just email.
+    (email_backend.list_pending hard-filters to email-deep-scan, which
+    silently hid folder-deep-scan requests from the consumer — that filter
+    is wrong for the dispatcher.)"""
+    out: list[Path] = []
+    for p in _all_requests():
+        r = _read(p)
+        if r is None or r.get("status") in ("done", "rejected"):
+            continue
+        if type_filter and r.get("type") != type_filter:
+            continue
+        out.append(p)
+    return out
+
+
 def _list() -> NoReturn:
     rows = []
     for p in _all_requests():
@@ -112,8 +130,8 @@ def _run_one(slug_or_name: str, *, dry_run: bool) -> NoReturn:
     sys.exit(0 if ok else 2)
 
 
-def _run_oldest(*, dry_run: bool) -> NoReturn:
-    pending = email_backend.list_pending(REQUESTS_DIR)
+def _run_oldest(*, dry_run: bool, type_filter: str | None = None) -> NoReturn:
+    pending = _pending(type_filter)
     if not pending:
         log.info("No pending curiosity requests.")
         sys.exit(0)
@@ -123,8 +141,8 @@ def _run_oldest(*, dry_run: bool) -> NoReturn:
     sys.exit(0 if ok else 2)
 
 
-def _run_all(*, dry_run: bool) -> NoReturn:
-    pending = email_backend.list_pending(REQUESTS_DIR)
+def _run_all(*, dry_run: bool, type_filter: str | None = None) -> NoReturn:
+    pending = _pending(type_filter)
     if not pending:
         log.info("No pending curiosity requests.")
         sys.exit(0)
@@ -138,14 +156,14 @@ def _run_all(*, dry_run: bool) -> NoReturn:
     sys.exit(0 if fails == 0 else 2)
 
 
-def _run_batch(n: int, *, dry_run: bool) -> NoReturn:
+def _run_batch(n: int, *, dry_run: bool, type_filter: str | None = None) -> NoReturn:
     """Process the N oldest pending requests in one invocation.
 
     Used by the `curiosity_followup` flush-piggyback to drain the
     backlog at a steady rate (cooldown × N per day) without the
     thundering-herd risk of `--run-all` on accumulated backlogs.
     """
-    pending = email_backend.list_pending(REQUESTS_DIR)
+    pending = _pending(type_filter)
     if not pending:
         log.info("No pending curiosity requests.")
         sys.exit(0)
@@ -260,7 +278,7 @@ def _accept_all(paths: list[Path], *, dry_run: bool) -> tuple[int, int]:
     return accepted, fails
 
 
-def _walk(*, dry_run: bool) -> NoReturn:
+def _walk(*, dry_run: bool, type_filter: str | None = None) -> NoReturn:
     """Interactive walk over pending requests.
 
     Per item shows the full context (topic, source quote, rationale, folder,
@@ -273,7 +291,7 @@ def _walk(*, dry_run: bool) -> NoReturn:
     bulk confirmation (the content/cloud gate as a single y/N, not removed).
     `wiki curiosity --run-all` is the unattended, non-interactive equivalent.
     """
-    pending = email_backend.list_pending(REQUESTS_DIR)
+    pending = _pending(type_filter)
     if not pending:
         log.info("No pending curiosity requests.")
         sys.exit(0)
@@ -384,25 +402,32 @@ def main() -> int:
     group.add_argument("--run-batch", metavar="N", type=int, help="run the N oldest pending requests (drain at steady rate)")
     group.add_argument("--clear-done", action="store_true", help="delete request files with status: done")
     parser.add_argument("--dry-run", action="store_true", help="plan only, do not touch the mailbox or write output")
+    parser.add_argument(
+        "--type", dest="type_filter",
+        choices=["email-deep-scan", "folder-deep-scan"],
+        help="only walk/run requests of this type (e.g. just the "
+             "folder-deep-scans, skipping the email backlog)",
+    )
     args = parser.parse_args()
+    tf = args.type_filter
 
     if args.list:
         _list()
     if args.clear_done:
         _clear_done()
     if args.run_oldest:
-        _run_oldest(dry_run=args.dry_run)
+        _run_oldest(dry_run=args.dry_run, type_filter=tf)
     if args.run_all:
-        _run_all(dry_run=args.dry_run)
+        _run_all(dry_run=args.dry_run, type_filter=tf)
     if args.run_batch is not None:
         if args.run_batch < 1:
             log.error("--run-batch N requires N >= 1, got %d", args.run_batch)
             sys.exit(2)
-        _run_batch(args.run_batch, dry_run=args.dry_run)
+        _run_batch(args.run_batch, dry_run=args.dry_run, type_filter=tf)
     if args.run:
         _run_one(args.run, dry_run=args.dry_run)
     # No subcommand selected → walk
-    _walk(dry_run=args.dry_run)
+    _walk(dry_run=args.dry_run, type_filter=tf)
     return 0
 
 
