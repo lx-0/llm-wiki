@@ -1,7 +1,7 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-06-13T16:35:00+0200
+last_updated: 2026-06-13T16:52:00+0200
 current_milestone: M028
 active_slice: S01
 active_task: none
@@ -36,7 +36,15 @@ issue-#5 close. Grounded against HEAD: `reconcile_fact()` `correct_apply.py:190-
 is the sandbox pattern; destructive instruction `prompts/correct_apply.md:26`;
 `make_path_scope_hook` `sdk_helpers.py:404` is allow-list-only (needs exclude).
 
-**S01 progress: 2/6 tasks done.** ✅ **T02 SHIPPED** (commit `b114408`,
+**S01 progress: 3/6 tasks done.** ✅ **T03 SHIPPED** (commit `477756e`,
+`M028-S01-T03-SUMMARY.md`): `prompts/correct_apply.md` rewritten — negation
+SUPERSEDES (status: superseded + banner, body kept, "outdated != false"); agent
+no-shell, emits fenced JSON `## Proposed actions` (superseded/edited/renamed/
+deleted) as engine source-of-truth; `${deletion_allowed}`="false" in S01. Closes
+the T01 prompt/sandbox inconsistency. Suite **1325 green** (+3 render-smoke).
+Agent QUALITY unverified pending gated live SDK run. Next:
+`/ytstack:plan-task` for **S01-T04** (jsonrepair parser + engine rename
+executor consuming the proposal contract). ✅ **T02 SHIPPED** (commit `b114408`,
 `M028-S01-T02-SUMMARY.md`): `make_path_scope_hook` gained optional
 `denied_subpaths` (deny precedence over allowed roots); `apply()` passes
 `denied_subpaths=[FACTS_DIR]` → `knowledge/facts/` structurally write-protected.

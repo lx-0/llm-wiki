@@ -6,7 +6,7 @@ created: 2026-06-13T15:56:13+0200
 revised: 2026-06-13T16:10:00+0200
 status: planned
 task_count: 6
-completed_tasks: 2
+completed_tasks: 3
 ---
 
 # M028-S01 -- Slice Plan
@@ -38,7 +38,7 @@ delta. Trust model: **agent proposes, engine disposes.**
   rest of `knowledge/` is writable. Today the hook is allow-list-only — there is
   no way to express "knowledge/ except facts/". Unit-test the hook directly
   (allow knowledge/concepts, deny knowledge/facts, deny raw/).
-- [ ] T03 -- Rewrite the negation branch of `prompts/correct_apply.md` (L25-26 +
+- [x] T03 -- Rewrite the negation branch of `prompts/correct_apply.md` (L25-26 +
   the `## Applied summary` block L45-50): for `status: negation`/`supersession`,
   **annotate** — add `status: superseded` + `superseded_by: facts/${slug}` +
   `outdated_since: ${today}` to the article frontmatter and prepend a one-line
