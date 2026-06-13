@@ -18,6 +18,27 @@ every operator's `wiki update` → `uv sync` regenerate `uv.lock` and dirty thei
 config keys must also be wired into `scripts/migrations/migrate_config_keys.py`
 in the same commit.
 
+## [0.1.9] — 2026-06-13
+
+### Added
+
+- **`personal.output_language`** (default `"auto"`) — pins the **output prose
+  language** of compiled `knowledge/**` articles, surviving `wiki update`
+  (issue #4). `"auto"` keeps today's behavior — write in the source material's
+  language — and renders every compile substrate prompt byte-identically, so
+  existing vaults are a no-op on update. Set to a language (`"de"`, `"German"`,
+  `"fr"`, …) to force **all** compiled prose — article titles, body, summaries —
+  into that language regardless of source, while keeping code, technical
+  identifiers, proper names, and the canonical structural section headers
+  (`## State`, `## Timeline`, …) verbatim so downstream parsing / dedup don't
+  break. Injected via a `${output_language_instruction}` placeholder (new
+  `prompts/compile_output_language.md`) at the single central compile render
+  site, so it reaches all 8 substrate prompts (`compile_main`, `compile_default`,
+  `compile_daily`, `compile_health`, `compile_calendar`, `compile_pictures`,
+  `compile_screenshots`, `compile_memories`). Distinct from
+  `personal.voice_transcribe_language` (input transcription vs. output prose).
+  Curiosity + dream render on separate paths and are not yet covered.
+
 ## [0.1.8] — 2026-06-10
 
 ### Fixed
