@@ -4,9 +4,9 @@ slice: S01
 project: llm-wiki
 created: 2026-06-13T15:56:13+0200
 revised: 2026-06-13T16:10:00+0200
-status: planned
+status: done
 task_count: 6
-completed_tasks: 5
+completed_tasks: 6
 ---
 
 # M028-S01 -- Slice Plan
@@ -59,7 +59,7 @@ delta. Trust model: **agent proposes, engine disposes.**
   of `knowledge/` + `index.md` + the renames the engine performed — print
   created/modified/renamed counts + paths, and `log.warning` when the agent's
   `## Applied summary` diverges from the filesystem truth.
-- [ ] T06 -- Golden test reproducing issue #5 (RED first): a `negation` fact with
+- [x] T06 -- Golden test reproducing issue #5 (RED first): a `negation` fact with
   a broad term over a fixture vault deletes **0** articles (annotates instead);
   the path-scope hook denies an out-of-`knowledge/` write attempt; the printed
   delta equals the git delta; the divergence WARNING fires on a stubbed lying

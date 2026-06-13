@@ -1,9 +1,9 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-06-13T17:18:00+0200
+last_updated: 2026-06-13T17:30:00+0200
 current_milestone: M028
-active_slice: S01
+active_slice: none
 active_task: none
 last_completed_milestone: M026
 parked_milestone: M025
@@ -36,7 +36,18 @@ issue-#5 close. Grounded against HEAD: `reconcile_fact()` `correct_apply.py:190-
 is the sandbox pattern; destructive instruction `prompts/correct_apply.md:26`;
 `make_path_scope_hook` `sdk_helpers.py:404` is allow-list-only (needs exclude).
 
-**S01 progress: 5/6 tasks done.** ✅ **T05 SHIPPED** (commit `2e1c060`,
+**✅ S01 COMPLETE — 6/6 (2026-06-13).** `wiki correct apply` is now structurally
+non-destructive: sandboxed (no Bash, path-hook, facts/ write-protected), negation
+SUPERSEDES via annotation, agent emits a JSON proposal, engine executes renames
+(move + wikilink rewrite) and reports the real filesystem delta with a
+rename-aware deletion alarm. Commits `db60226`→`937cecb` (T01-T06). Suite **1336
+green**. The engine half is real-tested end to end (golden); the live-agent prompt
+QUALITY is the one gated gap (needs a paid SDK run). **Next: reassess-roadmap (S01
+boundary), then S02** (safe opt-in deletion: `.trash` executor + per-article
+backup + dirty-tree guard + `--allow-delete`/`disposition` gate).
+✅ **T06 SHIPPED** (commit `937cecb`, `M028-S01-T06-SUMMARY.md`): golden integration
+test + rename-aware `_divergence` (renames no longer false-fire the deletion alarm).
+✅ **T05 SHIPPED** (commit `2e1c060`,
 `M028-S01-T05-SUMMARY.md`): ground-truth reporting — git porcelain (knowledge/-
 scoped) or pre/post mtime snapshot; `_divergence` WARNs when real deletions >
 declared (issue-#5 alarm). Pure helpers unit-tested without git. Suite **1334
