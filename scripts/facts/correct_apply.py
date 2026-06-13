@@ -177,6 +177,10 @@ def _scan_candidates(terms: list, roots: list) -> list:
         for path in sorted(base.rglob("*.md")):
             if path.name == "index.md" and path.parent == base:
                 continue
+            # facts/ are authoritative source-of-truth, never an apply target —
+            # and a fact file matches its own negation term.
+            if path.parent.name == "facts" and path.parent.parent == base:
+                continue
             try:
                 text = path.read_text(encoding="utf-8").lower()
             except OSError:

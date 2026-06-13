@@ -469,6 +469,23 @@ def test_scan_candidates_classifies_primary_vs_mention(tmp_path) -> None:
     assert "index.md" not in by_path
 
 
+def test_scan_candidates_excludes_facts(tmp_path) -> None:
+    """The fact file itself matches its own term — must not list as a candidate."""
+    from facts import correct_apply
+
+    knowledge = tmp_path / "knowledge"
+    (knowledge / "facts").mkdir(parents=True)
+    (knowledge / "concepts").mkdir()
+    (knowledge / "facts" / "widget-not-real.md").write_text(
+        "---\ntype: fact\n---\nThe widget is not real.\n", encoding="utf-8")
+    (knowledge / "concepts" / "a.md").write_text("# A\n\nthe widget here\n", encoding="utf-8")
+
+    cands = correct_apply._scan_candidates(["widget"], [knowledge])
+    paths = [c["path"] for c in cands]
+    assert any("concepts/a.md" in p for p in paths)
+    assert not any("facts/" in p for p in paths)
+
+
 def test_dry_run_lists_candidates_without_agent(tmp_path, monkeypatch, caplog) -> None:
     import asyncio
     import logging as _logging
