@@ -93,3 +93,94 @@ def test_all_requests_returns_sorted_glob(tmp_path, monkeypatch):
     paths = cli._all_requests()
     names = [p.name for p in paths]
     assert names == ["request-a.json", "request-b.json"]
+
+
+# ── accept-all (bulk dispatch) — the operator's "accept all" function ──
+
+def test_accept_all_dispatches_every_path_and_counts(tmp_path, monkeypatch):
+    from curiosity import cli
+
+    paths = [
+        _write(tmp_path / "request-1.json", {"type": "email-deep-scan", "status": "pending"}),
+        _write(tmp_path / "request-2.json", {"type": "email-deep-scan", "status": "pending"}),
+        _write(tmp_path / "request-3.json", {"type": "folder-deep-scan", "status": "pending"}),
+    ]
+    seen = []
+
+    def fake_dispatch(p, *, dry_run):
+        seen.append(p)
+        return p.name != "request-2.json"  # one failure
+
+    monkeypatch.setattr(cli, "_dispatch", fake_dispatch)
+    accepted, fails = cli._accept_all(paths, dry_run=False)
+    assert seen == paths            # every request dispatched, in order
+    assert (accepted, fails) == (2, 1)
+
+
+def test_folder_consent_lines_lists_only_cloud_bound_files(tmp_path, monkeypatch):
+    """Accept-all must surface WHICH files go to the cloud (folder-deep-scan)
+    for one bulk informed consent — email requests are local, not listed."""
+    from core.config import CONFIG
+    from curiosity import cli
+
+    monkeypatch.setattr(CONFIG.models, "folder_scan_provider", "claude-sdk")
+    paths = [
+        _write(tmp_path / "request-1.json", {"type": "email-deep-scan", "status": "pending"}),
+        _write(tmp_path / "request-2.json", {
+            "type": "folder-deep-scan", "status": "pending",
+            "file_path": "Admin/Rechnungen/Hetzner-Mai.pdf"}),
+    ]
+    lines = cli._folder_consent_lines(paths)
+    assert lines == [("Admin/Rechnungen/Hetzner-Mai.pdf", "claude-sdk")]
+
+
+def test_walk_accept_all_key_dispatches_every_remaining(tmp_path, monkeypatch, capsys):
+    """Drive the interactive walk: on the first card press [A] then confirm
+    [y] → every remaining pending request is dispatched in one action. This
+    is the wiring verification, not just the helper (REGEL #1)."""
+    from curiosity import cli
+
+    p1 = _write(tmp_path / "request-1.json", {
+        "type": "folder-deep-scan", "status": "pending",
+        "topic": "t1", "root_id": "docs", "file_path": "a/x.pdf",
+        "rationale": "r"})
+    p2 = _write(tmp_path / "request-2.json", {
+        "type": "email-deep-scan", "status": "pending",
+        "topic": "t2", "folder": "INBOX", "account": "kasserver", "rationale": "r"})
+    monkeypatch.setattr(cli, "REQUESTS_DIR", tmp_path)
+    monkeypatch.setattr(cli.email_backend, "list_pending", lambda d: [p1, p2])
+
+    dispatched = []
+    monkeypatch.setattr(cli, "_dispatch",
+                        lambda p, *, dry_run: dispatched.append(p) or True)
+    keys = iter(["A", "y"])  # accept-all on card 1, then confirm
+    monkeypatch.setattr(cli, "read_key", lambda: next(keys))
+
+    with pytest.raises(SystemExit) as exc:
+        cli._walk(dry_run=False)
+    assert exc.value.code == 0
+    assert dispatched == [p1, p2]            # BOTH remaining dispatched
+    out = capsys.readouterr().out
+    assert "will be LOADED and sent" in out  # folder consent shown
+    assert "a/x.pdf" in out                  # the cloud-bound file listed
+
+
+def test_walk_accept_all_cancelled_on_no(tmp_path, monkeypatch):
+    """[A] then [n] cancels the bulk dispatch and returns to the per-item
+    prompt — nothing is sent."""
+    from curiosity import cli
+
+    p1 = _write(tmp_path / "request-1.json", {
+        "type": "folder-deep-scan", "status": "pending",
+        "topic": "t1", "file_path": "a/x.pdf", "rationale": "r"})
+    monkeypatch.setattr(cli, "REQUESTS_DIR", tmp_path)
+    monkeypatch.setattr(cli.email_backend, "list_pending", lambda d: [p1])
+    dispatched = []
+    monkeypatch.setattr(cli, "_dispatch",
+                        lambda p, *, dry_run: dispatched.append(p) or True)
+    keys = iter(["A", "n", "q"])  # accept-all, decline, then quit
+    monkeypatch.setattr(cli, "read_key", lambda: next(keys))
+
+    with pytest.raises(SystemExit):
+        cli._walk(dry_run=False)
+    assert dispatched == []  # nothing sent — consent declined

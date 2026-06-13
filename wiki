@@ -1005,6 +1005,10 @@ ${C_BOLD}USAGE${C_RESET}
 
 ${C_BOLD}WALK ACTIONS${C_RESET}
   [a]ccept   dispatch the request (pull email bodies, write deep-scan)
+  [A]ccept ALL  dispatch this + every remaining pending in one action
+              (folder-deep-scans first list the files sent to the cloud
+              provider + ask one bulk confirmation). Non-interactive
+              equivalent: \`wiki curiosity --run-all\`.
   [s]kip     leave as pending — comes back next walk
   [r]eject   persist status=rejected; producer skips this slug forever
   [q]uit     end the walk

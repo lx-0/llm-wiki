@@ -233,14 +233,45 @@ def _mark_rejected(path: Path, r: dict) -> None:
     path.write_text(json.dumps(r, indent=2), encoding="utf-8")
 
 
+def _folder_consent_lines(paths: list[Path]) -> list[tuple[str, str]]:
+    """For folder-deep-scan requests in `paths`, the (file_path, provider)
+    each would LOAD and send to the cloud. Accept-all surfaces this as one
+    consolidated informed-consent list — email requests are local mbox
+    reads (not cloud-bound) and are omitted. Honors the per-request content/
+    cloud gate (DECISIONS 2026-06-07) as a single bulk confirmation rather
+    than removing it."""
+    out: list[tuple[str, str]] = []
+    for p in paths:
+        r = _read(p)
+        if r and r.get("type") == "folder-deep-scan":
+            out.append((r.get("file_path", "?"), CONFIG.models.folder_scan_provider))
+    return out
+
+
+def _accept_all(paths: list[Path], *, dry_run: bool) -> tuple[int, int]:
+    """Dispatch every request in `paths` (the operator's accept-all). Returns
+    (accepted, failed). A failed dispatch does not stop the batch."""
+    accepted = fails = 0
+    for p in paths:
+        if _dispatch(p, dry_run=dry_run):
+            accepted += 1
+        else:
+            fails += 1
+    return accepted, fails
+
+
 def _walk(*, dry_run: bool) -> NoReturn:
     """Interactive walk over pending requests.
 
     Per item shows the full context (topic, source quote, rationale, folder,
-    source) and prompts [a]ccept / [s]kip / [r]eject / [q]uit. Skip leaves
-    the request pending (it shows up again next walk). Reject sets
-    status=rejected so the producer's persistent-rejection check drops
-    future re-emissions of the same slug.
+    source) and prompts [a]ccept / [s]kip / [r]eject / [A]ccept-ALL / [q]uit.
+    Skip leaves the request pending (it shows up again next walk). Reject
+    sets status=rejected so the producer's persistent-rejection check drops
+    future re-emissions of the same slug. Accept-ALL dispatches this item +
+    every remaining one in a single action — for folder-deep-scans it first
+    lists the files that will be sent to the cloud provider and asks one
+    bulk confirmation (the content/cloud gate as a single y/N, not removed).
+    `wiki curiosity --run-all` is the unattended, non-interactive equivalent.
     """
     pending = email_backend.list_pending(REQUESTS_DIR)
     if not pending:
@@ -259,7 +290,8 @@ def _walk(*, dry_run: bool) -> NoReturn:
 
         # Single-keypress prompt — same DRY mechanism the home menu uses
         # (core.console.read_key in cbreak mode). No Enter required.
-        print("  [a]ccept · [s]kip · [r]eject · [q]uit › ", end="", flush=True)
+        _PROMPT = "  [a]ccept · [s]kip · [r]eject · [A]ccept ALL · [q]uit › "
+        print(_PROMPT, end="", flush=True)
         while True:
             try:
                 key = read_key()
@@ -268,13 +300,42 @@ def _walk(*, dry_run: bool) -> NoReturn:
                 log.info("Walk aborted. %d accepted, %d skipped, %d rejected, %d remain.",
                          accepted, skipped, rejected, total - idx + 1)
                 sys.exit(0)
-            if key in ("a", "A"):
+            if key == "a":
                 print("a")
                 ok = _dispatch(path, dry_run=dry_run)
                 accepted += 1
                 if not ok:
                     fails += 1
                 break
+            if key == "A":  # accept ALL remaining (this item onward)
+                print("A")
+                remaining = pending[idx - 1:]
+                cloud = _folder_consent_lines(remaining)
+                if cloud:
+                    prov = cloud[0][1]
+                    print(f"\n  ⚠ {len(cloud)} file(s) will be LOADED and sent to "
+                          f"'{prov}':")
+                    for fp, _p in cloud[:15]:
+                        print(f"     {fp}")
+                    if len(cloud) > 15:
+                        print(f"     … +{len(cloud) - 15} more")
+                print(f"\n  Accept ALL {len(remaining)} remaining request(s)? "
+                      "[y/N] › ", end="", flush=True)
+                try:
+                    confirm = read_key()
+                except (OSError, KeyboardInterrupt):
+                    confirm = "n"
+                if confirm not in ("y", "Y"):
+                    print("n — cancelled")
+                    print("\r" + _PROMPT, end="", flush=True)
+                    continue  # back to per-item prompt for THIS request
+                print("y")
+                a, f = _accept_all(remaining, dry_run=dry_run)
+                accepted += a
+                fails += f
+                log.info("Accepted all: %d dispatched, %d failed (of %d remaining).",
+                         a, f, len(remaining))
+                sys.exit(0 if fails == 0 else 2)
             if key in ("s", "S", "enter"):
                 print("s")
                 skipped += 1
@@ -291,7 +352,7 @@ def _walk(*, dry_run: bool) -> NoReturn:
                          accepted, skipped, rejected, total - idx + 1)
                 sys.exit(0 if fails == 0 else 2)
             # Unknown key — beep / hint, keep prompting on same line.
-            print("\r  [a]ccept · [s]kip · [r]eject · [q]uit › ", end="", flush=True)
+            print("\r" + _PROMPT, end="", flush=True)
     log.info("Walk complete. %d accepted, %d skipped, %d rejected (of %d).",
              accepted, skipped, rejected, total)
     sys.exit(0 if fails == 0 else 2)
