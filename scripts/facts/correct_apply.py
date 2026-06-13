@@ -94,9 +94,11 @@ def _apply_agent_options(capture: StderrCapture) -> ClaudeAgentOptions:
     the safe `reconcile_fact()` pattern. Destructive ops (delete, rename) are
     engine-owned post-steps in later S01/S02 tasks, not agent actions.
 
-    Scope note: `make_path_scope_hook` is allow-list-only today, so
-    `knowledge/facts/` is still writable here — M028-S01-T02 adds the
-    `denied_subpaths` exclusion that closes it.
+    Scope note: writes are allowed across `knowledge/` (minus `facts/`),
+    `daily/`, `index.md`, and the operations log; `knowledge/facts/` is
+    write-protected via `denied_subpaths` (deny takes precedence over the
+    allowed `knowledge/` root) — the fact files are the source of truth the
+    agent must never edit.
     """
     return ClaudeAgentOptions(
         max_buffer_size=CONFIG.limits.sdk_max_buffer_size_mb * 1024 * 1024,
@@ -108,7 +110,8 @@ def _apply_agent_options(capture: StderrCapture) -> ClaudeAgentOptions:
                 HookMatcher(
                     matcher="Write|Edit",
                     hooks=[make_path_scope_hook(
-                        [KNOWLEDGE_DIR, DAILY_DIR, INDEX_FILE, LOG_FILE]
+                        [KNOWLEDGE_DIR, DAILY_DIR, INDEX_FILE, LOG_FILE],
+                        denied_subpaths=[FACTS_DIR],
                     )],
                 ),
             ],

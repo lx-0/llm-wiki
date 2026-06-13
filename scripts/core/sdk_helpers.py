@@ -401,7 +401,7 @@ def make_path_scope_gate(allowed_write_roots):
     return gate
 
 
-def make_path_scope_hook(allowed_write_roots):
+def make_path_scope_hook(allowed_write_roots, denied_subpaths=None):
     """Build a PreToolUse hook callback that path-scopes Write/Edit.
 
     Used as the working alternative to ``can_use_tool``: while
@@ -420,6 +420,12 @@ def make_path_scope_hook(allowed_write_roots):
         allowed_write_roots: iterable of ``pathlib.Path``. A Write/Edit is
             allowed iff its ``file_path`` resolves (after ``Path.resolve()``)
             inside one of these roots.
+        denied_subpaths: optional iterable of ``pathlib.Path``. A write is
+            denied if it resolves inside one of these, EVEN when it is also
+            inside an allowed root — deny takes precedence over allow. Carves
+            a write-protected island out of an allowed root (e.g.
+            ``knowledge/facts/`` inside ``knowledge/`` for `correct apply`,
+            M028). Defaults to none → existing callers are unchanged.
 
     Returns:
         An async callback compatible with the
@@ -427,6 +433,7 @@ def make_path_scope_hook(allowed_write_roots):
         wiring on ``ClaudeAgentOptions``.
     """
     resolved_roots = [Path(r).resolve() for r in allowed_write_roots]
+    resolved_denied = [Path(d).resolve() for d in (denied_subpaths or [])]
 
     async def hook(hook_input, _tool_use_id, _context):
         tool_input = hook_input.get("tool_input") or {}
@@ -449,6 +456,19 @@ def make_path_scope_hook(allowed_write_roots):
                     f"path could not be resolved: {exc}"
                 ),
             }}
+        # Deny precedence: a write-protected subpath blocks even allowed roots.
+        for denied in resolved_denied:
+            try:
+                resolved.relative_to(denied)
+                return {"hookSpecificOutput": {
+                    "hookEventName": "PreToolUse",
+                    "permissionDecision": "deny",
+                    "permissionDecisionReason": (
+                        f"{resolved} is under write-protected {denied}"
+                    ),
+                }}
+            except ValueError:
+                continue
         for root in resolved_roots:
             try:
                 resolved.relative_to(root)

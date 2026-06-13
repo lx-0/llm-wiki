@@ -130,6 +130,36 @@ def test_hook_multi_root_allows_log_file(tmp_path):
     assert _hook_decision(hook, tool="Write", file_path=sibling)["permissionDecision"] == "deny"
 
 
+def test_hook_denied_subpath_overrides_allowed_root(tmp_path):
+    """M028-S01-T02: `correct apply` writes across knowledge/ EXCEPT facts/.
+
+    `denied_subpaths` carves a write-protected island out of an allowed root.
+    Deny takes precedence over allow.
+    """
+    knowledge = tmp_path / "knowledge"
+    facts = knowledge / "facts"
+    facts.mkdir(parents=True)
+    hook = make_path_scope_hook([knowledge], denied_subpaths=[facts])
+    # knowledge/concepts/ — allowed.
+    assert _hook_decision(
+        hook, tool="Write", file_path=str(knowledge / "concepts" / "x.md")
+    )["permissionDecision"] == "allow"
+    # knowledge/facts/ — denied even though it is inside the allowed root.
+    d = _hook_decision(hook, tool="Write", file_path=str(facts / "x.md"))
+    assert d["permissionDecision"] == "deny"
+    assert "facts" in d["permissionDecisionReason"]
+
+
+def test_hook_denied_subpaths_defaults_to_none(tmp_path):
+    """No denied_subpaths → unchanged behaviour (backward compat)."""
+    knowledge = tmp_path / "knowledge"
+    (knowledge / "facts").mkdir(parents=True)
+    hook = make_path_scope_hook([knowledge])  # no denied_subpaths kwarg
+    assert _hook_decision(
+        hook, tool="Write", file_path=str(knowledge / "facts" / "x.md")
+    )["permissionDecision"] == "allow"
+
+
 def test_gate_allows_write_inside_scope(tmp_path):
     knowledge = tmp_path / "knowledge"
     knowledge.mkdir()
