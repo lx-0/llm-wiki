@@ -54,3 +54,15 @@ def test_success_has_no_error(tmp_path, monkeypatch):
                         lambda *a, **k: '{"overall": 4, "verdict": "keep"}')
     r = mod.review_article(_article(tmp_path), "m")
     assert "error" not in r and r["overall"] == 4 and r["article"] == "a.md"
+
+
+def test_sweep_deadline_capped_below_hard_kill():
+    """The soft sweep deadline always fires before the piggyback hard wall-clock
+    cap, so a slow-but-alive sweep writes its partial and exits clean instead of
+    being killed (false `timeout`). Uses the soft knob, but never more than
+    0.9× the hard cap."""
+    mod = _load_review_module()
+    # soft knob below the hard cap → use the knob as-is
+    assert mod._sweep_deadline_s(review_max=12600, piggyback_max=14400) == 12600
+    # hard cap lowered below the knob → deadline drops to 0.9× the hard cap
+    assert mod._sweep_deadline_s(review_max=12600, piggyback_max=10000) == 9000

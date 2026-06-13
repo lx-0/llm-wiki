@@ -192,9 +192,10 @@ def test_migrate_config_file_round_trip(tmp_path):
     # +1 scheduling.piggybacks_on_compile (compile drains due piggybacks), 2026-06-13
     # +1 personal.output_language (issue #4 compiled-prose language), 2026-06-13
     # +1 limits.curiosity_exclude_globs (curiosity substrate denylist), 2026-06-13
+    # +1 limits.review_max_sweep_runtime_s (review-wiki soft deadline), 2026-06-13
     # +1 limits.correct_apply_max_turns (M028 sandbox apply, issue #5), 2026-06-13
     # +1 limits.correct_broad_term_threshold (M028 broad-term warning, issue #5), 2026-06-13
-    assert len(changes) == 93, f"got {len(changes)} changes: {changes}"
+    assert len(changes) == 94, f"got {len(changes)} changes: {changes}"
 
     reparsed = yaml.safe_load(new_text)
     # piggyback side
@@ -280,6 +281,7 @@ def test_migrate_config_no_change_when_fully_current(tmp_path):
             "dream_per_call_timeout_s": 300,
             "curiosity_folder_max_candidates": 40,
             "curiosity_exclude_globs": ["raw/notes/email/deep-*"],
+            "review_max_sweep_runtime_s": 12600,
             "dream_tier1_recent_count": 20,
             "dream_tier1_digest_days": 7,
             "dream_tier2_sample_count": 50,
@@ -448,6 +450,7 @@ def test_migrate_additions_idempotent():
             "dream_per_call_timeout_s": 300,
             "curiosity_folder_max_candidates": 40,
             "curiosity_exclude_globs": ["raw/notes/email/deep-*"],
+            "review_max_sweep_runtime_s": 12600,
             "dream_tier1_recent_count": 20,
             "dream_tier1_digest_days": 7,
             "dream_tier2_sample_count": 50,

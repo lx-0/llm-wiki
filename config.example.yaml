@@ -247,6 +247,12 @@ limits:
   review_ollama_timeout_s: 300
   review_consecutive_failure_abort: 5
   review_checkpoint_every: 25
+  # Soft sweep deadline (seconds). On a big vault the weekly sweep (1 Ollama
+  # call × ~1700 articles) runs for hours against a slow-but-alive kcma; it used
+  # to march past the piggyback hard cap and get KILLED (false `timeout` + lost
+  # final report). At this deadline it writes its partial + exits clean instead.
+  # Always capped at 0.9× piggyback_max_runtime_s so it fires before the kill.
+  review_max_sweep_runtime_s: 12600  # 3.5h
   # Voice-punctuate Ollama timeout (collectors/voice.py). gemma4:e4b
   # cold-call into VRAM takes 30–40 s; warm run ~5–15 s. 120 s default
   # absorbs the cold-start; lower it if the operator's Ollama always-on.

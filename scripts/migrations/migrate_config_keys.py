@@ -75,6 +75,7 @@ Key changes covered (chronological):
   limits.review_checkpoint_every             (added 2026-05-30, default 25 — review-wiki writes the partial report every N articles so an aborted/killed sweep isn't lost)
   limits.dedup_fuzzy_threshold               (added 2026-05-31, default 0.85 — `wiki dedup` fuzzy-title match floor for duplicate-candidate proposal)
   limits.curiosity_exclude_globs             (added 2026-06-13, default ["raw/notes/email/deep-*"] — denylist: both curiosity passes skip circular email-deep-scan substrate before the Ollama call)
+  limits.review_max_sweep_runtime_s          (added 2026-06-13, default 12600 — review-wiki soft sweep deadline; clean partial + exit before the piggyback hard cap kills it)
   features.dream_web_research                (added 2026-05-31, default False — Exa-AI public-entity enrichment dream post-pass; issue #2)
   scheduling.web_research_cooldown_days      (added 2026-05-31, default 30 — `## Public Profile` refresh cooldown)
   scheduling.piggybacks_on_compile           (added 2026-06-13, default True — `wiki compile` drains due piggybacks at run-end, bypassing the evening hour-gate so update+compile-only operators keep maintenance current)
@@ -151,6 +152,10 @@ KEY_ADDITIONS: dict[str, dict[str, object]] = {
         # the circular email-deep-scan substrate. Match
         # Limits.curiosity_exclude_globs default in `scripts/core/config.py`.
         "curiosity_exclude_globs": ["raw/notes/email/deep-*"],
+        # review-wiki soft sweep deadline (2026-06-13). Self-terminate with a
+        # clean partial before the piggyback hard cap kills the multi-hour sweep
+        # (false `timeout`). Match Limits.review_max_sweep_runtime_s default.
+        "review_max_sweep_runtime_s": 12600,
         # M027 watched-folder candidate retrieval: over budget, inject the
         # top-N rarity-ranked candidate files (not the folder tree). Added
         # 2026-06-13 — the full dir-skeleton bloated the prompt and timed

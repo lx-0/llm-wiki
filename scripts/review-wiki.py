@@ -14,6 +14,7 @@ import argparse
 import json
 import logging
 import sys
+import time
 from pathlib import Path
 
 from core import ollama_client
@@ -188,6 +189,13 @@ def _write_reports(reviews: list[dict], model: str) -> tuple[Path, Path]:
     return md_path, json_path
 
 
+def _sweep_deadline_s(review_max: int, piggyback_max: int) -> float:
+    """Soft sweep deadline (seconds), always strictly under the piggyback hard
+    wall-clock cap so the sweep self-terminates with a clean partial report
+    before the runner kills it (which records a false `timeout`)."""
+    return min(review_max, 0.9 * piggyback_max)
+
+
 def main():
     parser = argparse.ArgumentParser(description="Review wiki articles with local LLM")
     parser.add_argument("--model", default=DEFAULT_MODEL, help=f"Ollama model (default: {DEFAULT_MODEL})")
@@ -216,12 +224,32 @@ def main():
 
     abort_n = CONFIG.limits.review_consecutive_failure_abort
     checkpoint_every = CONFIG.limits.review_checkpoint_every
+    deadline_s = _sweep_deadline_s(
+        CONFIG.limits.review_max_sweep_runtime_s,
+        CONFIG.limits.piggyback_max_runtime_s,
+    )
+    started = time.time()
 
     reviews: list[dict] = []
     consecutive_ollama_failures = 0
     aborted = False
 
     for i, article in enumerate(articles, 1):
+        # Soft deadline — self-terminate with a clean partial before the
+        # piggyback runner's hard wall-clock cap kills us (false `timeout` +
+        # lost final report). Checkpoints already persisted the work so far.
+        if time.time() - started > deadline_s:
+            _write_reports(reviews, args.model)
+            log.info(
+                "Sweep soft-deadline reached (%.0fs) — %d/%d reviewed, partial "
+                "report written, exiting cleanly.",
+                deadline_s, i - 1, len(articles),
+            )
+            print(
+                f"\nDeadline reached after {i - 1}/{len(articles)} reviews — "
+                f"partial report saved. (Next run continues the weekly cadence.)"
+            )
+            break
         rel = article.relative_to(KNOWLEDGE_DIR)
         print(f"[{i}/{len(articles)}] Reviewing {rel}...", end=" ", flush=True)
         review = review_article(article, args.model)

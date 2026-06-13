@@ -251,6 +251,15 @@ class Limits:
     # every N reviewed articles so an aborted/killed sweep keeps its work
     # (the report was previously written only at end-of-sweep).
     review_checkpoint_every: int = 25
+    # review-wiki.py soft sweep deadline (seconds). On a large vault the weekly
+    # sweep (one Ollama call per article × ~1700 articles) can run for hours
+    # against a slow-but-alive kcma; the consecutive-failure abort only fires on
+    # a DOWN server, so the run used to march past the piggyback hard wall-clock
+    # cap and get KILLED — recording a false `timeout` and losing the final
+    # report write. At this soft deadline the sweep instead writes its partial
+    # report and exits cleanly (status ok). Effective deadline is capped at
+    # 0.9× piggyback_max_runtime_s so it always fires before the hard kill.
+    review_max_sweep_runtime_s: int = 12600  # 3.5h
     # Voice punctuation Ollama-chat timeout (collectors/voice.py). gemma4:e4b
     # cold-call (model-load into VRAM) routinely hits 30–40 s; warm runs are
     # ~5–15 s. Hardcoded 30 s pre-2026-05-28 tripped on every first call after
