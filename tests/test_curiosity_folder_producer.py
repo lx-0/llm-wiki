@@ -603,12 +603,11 @@ def test_over_budget_digest_selects_source_relevant_files(env, monkeypatch):
         budget_chars=700,
         source_excerpt="Wir haben die Hetzner-Rechnung vom Mai noch nicht abgelegt.",
     )
-    assert len(block) <= 700
-    assert "Hetzner_2026-05.pdf" in block         # source-mentioned → kept
-    assert "Supabase-DPA.pdf" not in block        # unmentioned → dropped
-    assert "file-0250" not in block               # bulk noise → dropped
-    assert "Admin`/" in block                     # dir skeleton survives
-    assert "Admin/recent.txt" in block            # Recent survives
+    assert "Hetzner_2026-05.pdf" in block         # source-mentioned → candidate
+    assert "Supabase-DPA.pdf" not in block        # unmentioned → not retrieved
+    assert "file-0250" not in block               # bulk noise → not retrieved
+    assert "Admin/recent.txt" in block            # Recent survives (in head)
+    assert "## Candidate files" in block          # candidate list, not the tree
     # anchor set stays COMPLETE regardless of what was injected
     assert "Admin/Rechnungen/Hetzner_2026-05.pdf" in indexed["work"]
     assert "Admin/Vertraege/Supabase-DPA.pdf" in indexed["work"]

@@ -286,6 +286,14 @@ class Limits:
     # Lower = stricter (fewer, more-relevant files injected). 0 disables the
     # filter (every matching keyword selects — over-matches large vaults).
     curiosity_folder_keyword_max_matches: int = 30
+    # `curiosity_folder_max_candidates`: when the digests overflow the prompt
+    # budget, the producer does NOT inject the folder structure — it injects
+    # the top-N candidate files retrieved by rarity-weighted keyword match
+    # (rarer keyword = stronger signal). The model judges a short candidate
+    # list, not the 1000s-file tree. Keep small enough that a local 8B model
+    # processes it fast under schema-constrained decoding (lxw: a full
+    # dir-skeleton prompt timed out llama3.1:8b at 240s).
+    curiosity_folder_max_candidates: int = 40
     # `curiosity_quote_min_anchor_tokens`: the source_quote gate accepts the
     # quote if ANY contiguous N-token window from the (normalised) quote
     # appears in the (normalised) source excerpt. Strict whole-quote

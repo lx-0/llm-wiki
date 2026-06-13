@@ -154,43 +154,49 @@ def _file_line_path(ln: str) -> str:
     return m.group(1).lower() if m else ln.lower()
 
 
-def _discriminative_keywords(
-    keywords: set[str], file_paths: list[str], max_matches: int
-) -> set[str]:
-    """Keep only keywords rare enough in the corpus to be a selector.
+def _digest_head(digest_text: str) -> str:
+    """Everything before the `## Tree` section: frontmatter + Recent +
+    title. Always shown — orientation + the recency signal."""
+    head, sep, _ = digest_text.partition("\n## Tree")
+    return head if sep else digest_text
 
-    A keyword matching > `max_matches` file-paths is a structural term (a
-    top folder name like "admin"/"projekt") that selects half the vault —
-    it carries no topic signal. TF-IDF in spirit: a good file-selector is
-    rare in the corpus. `max_matches <= 0` disables the filter.
+
+def _rank_candidate_lines(
+    digests: dict[str, str], keywords: set[str], max_matches: int, top_k: int
+) -> tuple[dict[str, list[str]], int]:
+    """Retrieve the top-K candidate file-lines for the source, per root.
+
+    Deterministic Python retrieval over the COMPLETE on-disk index — the
+    model judges a short candidate list, it never browses the tree. Each
+    file-line scores `sum(1/df[kw])` over the source keywords it matches,
+    where `df` = corpus document-frequency of the keyword: rarer keyword =
+    stronger signal (TF-IDF in spirit, so a folder-name term like "admin"
+    contributes ~nothing while "hetzner" dominates). A pre-filter drops
+    purely-structural terms (df > `max_matches`) before scoring; the top-K
+    by score are returned, grouped by root. Returns ({root: lines}, n_kw_used).
     """
-    if max_matches <= 0:
-        return keywords
-    out: set[str] = set()
-    for kw in keywords:
-        n = sum(1 for p in file_paths if kw in p)
-        if 1 <= n <= max_matches:
-            out.add(kw)
-    return out
-
-
-def _select_relevant_digest(digest_text: str, keywords: set[str]) -> str:
-    """Keep frontmatter + Recent + dir skeleton, plus Tree FILE lines whose
-    path matches any (already-discriminative) source keyword. The body-blind
-    index stays the complete inventory on disk; the producer (the consumer)
-    selects what to inject — replaces the blind size-trim that hid every
-    non-recent filename and caused 100% organic abstention (lxw 2026-06)."""
-    head, sep, tree = digest_text.partition("\n## Tree")
-    if not sep:
-        return digest_text
-    kept: list[str] = []
-    for ln in tree.splitlines():
-        if not _is_tree_file_line(ln):
-            kept.append(ln)  # header / blank / dir skeleton — always
-            continue
-        if any(kw in _file_line_path(ln) for kw in keywords):
-            kept.append(ln)
-    return head + "\n## Tree" + "\n".join(kept) + "\n"
+    lines = [
+        (root, ln)
+        for root, text in digests.items()
+        for ln in text.splitlines()
+        if _is_tree_file_line(ln)
+    ]
+    df = {kw: sum(1 for _, ln in lines if kw in _file_line_path(ln)) for kw in keywords}
+    useful = {
+        kw for kw, n in df.items()
+        if n >= 1 and (max_matches <= 0 or n <= max_matches)
+    }
+    scored: list[tuple[float, str, str]] = []
+    for root, ln in lines:
+        path = _file_line_path(ln)
+        score = sum(1.0 / df[kw] for kw in useful if kw in path)
+        if score > 0:
+            scored.append((score, root, ln))
+    scored.sort(key=lambda t: (-t[0], t[2]))
+    by_root: dict[str, list[str]] = {}
+    for _, root, ln in scored[:top_k]:
+        by_root.setdefault(root, []).append(ln)
+    return by_root, len(useful)
 
 
 def _load_folder_digests(
@@ -199,12 +205,12 @@ def _load_folder_digests(
     """Read raw/index/*.md → (prompt block, {root_id: indexed rel_paths}).
 
     Full digests when they fit `budget_chars`; otherwise the producer
-    greps each digest for file-lines matching the source's topic keywords
-    and injects only those (+ frontmatter, Recent, dir skeleton). The
+    RETRIEVES the top-N candidate files (rarity-weighted keyword match over
+    the complete index) and injects only those + each root's
+    frontmatter/Recent — NOT the folder tree (the dir-skeleton alone
+    bloated the prompt and timed out the local model; lxw 2026-06-13). The
     `indexed` anchor set is ALWAYS built from the complete on-disk digest,
     independent of what's injected — so the file-exists gate stays sound.
-    Never a silent cap: selection stats are logged; if even the selected
-    set overflows, it is hard-capped with a WARNING.
     """
     digests: dict[str, str] = {}
     if RAW_INDEX_DIR.exists():
@@ -218,27 +224,27 @@ def _load_folder_digests(
         return block, paths
 
     keywords = _source_keywords(source_excerpt)
-    all_paths = [
-        _file_line_path(ln)
-        for text in digests.values()
-        for ln in text.splitlines()
-        if _is_tree_file_line(ln)
-    ]
-    discriminative = _discriminative_keywords(
-        keywords, all_paths, CONFIG.limits.curiosity_folder_keyword_max_matches
+    by_root, n_used = _rank_candidate_lines(
+        digests,
+        keywords,
+        CONFIG.limits.curiosity_folder_keyword_max_matches,
+        CONFIG.limits.curiosity_folder_max_candidates,
     )
-    selected = "\n\n".join(
-        _select_relevant_digest(text, discriminative) for text in digests.values()
-    )
+    parts = []
+    for root_id, text in digests.items():
+        cands = by_root.get(root_id, [])
+        body = "\n".join(cands) if cands else "_(no candidate files matched this source)_"
+        parts.append(f"{_digest_head(text)}\n## Candidate files\n\n{body}\n")
+    selected = "\n\n".join(parts)
+    n_cands = sum(len(v) for v in by_root.values())
     log.info(
-        "  Curiosity(folder): digests %d chars > budget %d — %d/%d keyword(s) "
-        "discriminative → selected %d chars",
-        len(block), budget_chars, len(discriminative), len(keywords), len(selected),
+        "  Curiosity(folder): digests %d chars > budget %d — retrieved %d "
+        "candidate file(s) via %d/%d keyword(s) → %d chars",
+        len(block), budget_chars, n_cands, n_used, len(keywords), len(selected),
     )
-    if len(selected) > budget_chars:
+    if len(selected) > budget_chars:  # backstop (huge candidate paths)
         log.warning(
-            "  Curiosity(folder): relevant selection %d chars still > budget "
-            "%d — hard-capped (some matching files omitted)",
+            "  Curiosity(folder): candidate block %d chars > budget %d — capped",
             len(selected), budget_chars,
         )
         selected = selected[:budget_chars]

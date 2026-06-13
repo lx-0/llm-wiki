@@ -137,6 +137,11 @@ KEY_ADDITIONS: dict[str, dict[str, object]] = {
         # file-lines get injected. Added 2026-06-13 after lxw showed the
         # producer over-matching generic keywords (admin/kosten/cloud).
         "curiosity_folder_keyword_max_matches": 30,
+        # M027 watched-folder candidate retrieval: over budget, inject the
+        # top-N rarity-ranked candidate files (not the folder tree). Added
+        # 2026-06-13 — the full dir-skeleton bloated the prompt and timed
+        # out the local 8B model at 240s.
+        "curiosity_folder_max_candidates": 40,
         # M014 dream-cycle per-message stall timeout. Added 2026-05-18
         # after paperclip-companies crashed at 339s on [1m] with empty
         # stderr — diagnostic instrumentation + structural alignment
