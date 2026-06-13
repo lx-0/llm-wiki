@@ -166,8 +166,9 @@ def test_migrate_config_file_round_trip(tmp_path):
     #    index`; max_tree_entries shipped+removed same day — write-time
     #    cap reversal 2026-06-10, never in this greenfield fixture)
     # +1 models.folder_scan_provider (M027-S04-T01 Q9 seam), 2026-06-10
-    # = 87 changes (no drops — operator has no orphan personal.* fields)
-    assert len(changes) == 87, f"got {len(changes)} changes: {changes}"
+    # +1 limits.curiosity_folder_keyword_max_matches (relevance grep), 2026-06-13
+    # = 88 changes (no drops — operator has no orphan personal.* fields)
+    assert len(changes) == 88, f"got {len(changes)} changes: {changes}"
 
     reparsed = yaml.safe_load(new_text)
     # piggyback side
@@ -250,6 +251,7 @@ def test_migrate_config_no_change_when_fully_current(tmp_path):
             "dream_entity_max_prompt_chars": 415_000,
             "dream_cycle_max_tokens_per_run": 2_000_000,
             "dream_per_call_timeout_s": 300,
+            "curiosity_folder_keyword_max_matches": 30,
             "dream_tier1_recent_count": 20,
             "dream_tier1_digest_days": 7,
             "dream_tier2_sample_count": 50,
@@ -412,6 +414,7 @@ def test_migrate_additions_idempotent():
             "dream_entity_max_prompt_chars": 415_000,
             "dream_cycle_max_tokens_per_run": 2_000_000,
             "dream_per_call_timeout_s": 300,
+            "curiosity_folder_keyword_max_matches": 30,
             "dream_tier1_recent_count": 20,
             "dream_tier1_digest_days": 7,
             "dream_tier2_sample_count": 50,

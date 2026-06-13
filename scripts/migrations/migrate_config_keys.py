@@ -131,6 +131,12 @@ KEY_ADDITIONS: dict[str, dict[str, object]] = {
         "folder_scan_provider": "claude-sdk",
     },
     "limits": {
+        # M027 watched-folder relevance grep: drop source keywords that
+        # match more than N file-paths (structural noise, not topic
+        # selectors). Only rare/discriminative keywords select which
+        # file-lines get injected. Added 2026-06-13 after lxw showed the
+        # producer over-matching generic keywords (admin/kosten/cloud).
+        "curiosity_folder_keyword_max_matches": 30,
         # M014 dream-cycle per-message stall timeout. Added 2026-05-18
         # after paperclip-companies crashed at 339s on [1m] with empty
         # stderr — diagnostic instrumentation + structural alignment

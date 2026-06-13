@@ -261,6 +261,12 @@ limits:
   # Below this threshold the gap is dropped (telemetry: folder_low_confidence).
   # Forces explicit abstention instead of "INBOX/COMPANY/00 COMPANY" hedging.
   curiosity_folder_confidence_min: 3
+  # Watched-folder relevance grep: a source keyword matching more than this
+  # many file-paths across the folder digests is structural noise (a top
+  # folder name), not a topic selector, and is dropped when choosing which
+  # file-lines to inject. Only rare/discriminative keywords select. Lower =
+  # stricter; 0 disables (every match selects — over-matches large vaults).
+  curiosity_folder_keyword_max_matches: 30
   # source_quote gate: accept the quote if ANY contiguous N-token window from
   # the normalised quote appears verbatim in the normalised source excerpt.
   # 5 = a 5-word verbatim block; lower = more permissive, higher = stricter.

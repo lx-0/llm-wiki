@@ -623,6 +623,39 @@ def test_under_budget_digest_is_full_injected(env):
     assert "vertrag-handy.pdf" in block  # a non-recent Tree file, full-inject
 
 
+def test_overcommon_keyword_is_not_a_selector(env, monkeypatch):
+    """A keyword that matches too many files (structural — a top folder
+    name like 'admin') carries no selection signal and is dropped; only
+    rare/topical keywords select. Without this the grep over-matches and
+    still drowns the model (lxw 2026-06-13: 'admin/kosten/cloud' matched
+    373 KB, hard-capped, still abstained)."""
+    root, _, _ = env
+    generic = "\n".join(
+        f"  - `Admin/file-{i:03d}.txt` · 1 KB" for i in range(60)
+    )
+    big = (
+        "---\ntype: folder-index\nroot_id: work\n"
+        'root_path: "/troves/work"\nfiles: 61\ndirs: 1\n'
+        "skipped_excluded: 0\nskipped_depth: 0\nerrors: 0\n---\n\n"
+        "## Recent changes\n\n- `Admin/recent.txt` · 2026-06-09 · 0 B\n\n"
+        "## Tree\n\n- `Admin`/\n" + generic
+        + "\n  - `Admin/Hetzner-Mai-Rechnung.pdf` · 1 KB\n"
+    )
+    (root / "raw" / "index" / "docs.md").unlink()
+    (root / "raw" / "index" / "work.md").write_text(big, encoding="utf-8")
+    monkeypatch.setattr(CONFIG.limits, "curiosity_folder_keyword_max_matches", 25)
+
+    block, _ = producer._load_folder_digests(
+        budget_chars=500,
+        source_excerpt="Wo liegt die Admin-Ablage der Hetzner-Rechnung vom Mai?",
+    )
+    # 'admin' matches 61 files (> 25) → not discriminative → its 60 generic
+    # files are NOT injected ...
+    assert "file-030.txt" not in block
+    # ... but 'hetzner' matches 1 → discriminative → injected.
+    assert "Hetzner-Mai-Rechnung.pdf" in block
+
+
 def test_source_keywords_drop_stopwords_short_and_numeric():
     kw = producer._source_keywords(
         "Wir haben die Hetzner-Rechnung 2026 vom Mai noch nicht abgelegt."

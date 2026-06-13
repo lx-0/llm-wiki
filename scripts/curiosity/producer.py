@@ -143,25 +143,52 @@ def _source_keywords(text: str) -> set[str]:
     return out
 
 
+def _is_tree_file_line(ln: str) -> bool:
+    """A Tree FILE line (not a dir-skeleton line, header, or blank)."""
+    return ln.lstrip().startswith("- `") and not ln.rstrip().endswith("`/")
+
+
+def _file_line_path(ln: str) -> str:
+    """Lowercased backticked path of a Tree file line (or the line itself)."""
+    m = _BACKTICKED_PATH.search(ln)
+    return m.group(1).lower() if m else ln.lower()
+
+
+def _discriminative_keywords(
+    keywords: set[str], file_paths: list[str], max_matches: int
+) -> set[str]:
+    """Keep only keywords rare enough in the corpus to be a selector.
+
+    A keyword matching > `max_matches` file-paths is a structural term (a
+    top folder name like "admin"/"projekt") that selects half the vault —
+    it carries no topic signal. TF-IDF in spirit: a good file-selector is
+    rare in the corpus. `max_matches <= 0` disables the filter.
+    """
+    if max_matches <= 0:
+        return keywords
+    out: set[str] = set()
+    for kw in keywords:
+        n = sum(1 for p in file_paths if kw in p)
+        if 1 <= n <= max_matches:
+            out.add(kw)
+    return out
+
+
 def _select_relevant_digest(digest_text: str, keywords: set[str]) -> str:
     """Keep frontmatter + Recent + dir skeleton, plus Tree FILE lines whose
-    path matches any source keyword. The body-blind index stays the
-    complete inventory on disk; the producer (the consumer) selects what to
-    inject — replaces the blind size-trim that hid every non-recent
-    filename and caused 100% organic abstention (lxw 2026-06-10/11)."""
+    path matches any (already-discriminative) source keyword. The body-blind
+    index stays the complete inventory on disk; the producer (the consumer)
+    selects what to inject — replaces the blind size-trim that hid every
+    non-recent filename and caused 100% organic abstention (lxw 2026-06)."""
     head, sep, tree = digest_text.partition("\n## Tree")
     if not sep:
         return digest_text
     kept: list[str] = []
     for ln in tree.splitlines():
-        stripped = ln.lstrip()
-        is_file_line = stripped.startswith("- `") and not ln.rstrip().endswith("`/")
-        if not is_file_line:
+        if not _is_tree_file_line(ln):
             kept.append(ln)  # header / blank / dir skeleton — always
             continue
-        m = _BACKTICKED_PATH.search(ln)
-        path_l = (m.group(1).lower() if m else ln.lower())
-        if any(kw in path_l for kw in keywords):
+        if any(kw in _file_line_path(ln) for kw in keywords):
             kept.append(ln)
     return head + "\n## Tree" + "\n".join(kept) + "\n"
 
@@ -191,13 +218,22 @@ def _load_folder_digests(
         return block, paths
 
     keywords = _source_keywords(source_excerpt)
+    all_paths = [
+        _file_line_path(ln)
+        for text in digests.values()
+        for ln in text.splitlines()
+        if _is_tree_file_line(ln)
+    ]
+    discriminative = _discriminative_keywords(
+        keywords, all_paths, CONFIG.limits.curiosity_folder_keyword_max_matches
+    )
     selected = "\n\n".join(
-        _select_relevant_digest(text, keywords) for text in digests.values()
+        _select_relevant_digest(text, discriminative) for text in digests.values()
     )
     log.info(
-        "  Curiosity(folder): digests %d chars > budget %d — selected %d "
-        "chars relevant to %d source keyword(s)",
-        len(block), budget_chars, len(selected), len(keywords),
+        "  Curiosity(folder): digests %d chars > budget %d — %d/%d keyword(s) "
+        "discriminative → selected %d chars",
+        len(block), budget_chars, len(discriminative), len(keywords), len(selected),
     )
     if len(selected) > budget_chars:
         log.warning(
