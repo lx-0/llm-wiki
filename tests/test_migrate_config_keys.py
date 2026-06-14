@@ -197,7 +197,8 @@ def test_migrate_config_file_round_trip(tmp_path):
     # +1 limits.correct_broad_term_threshold (M028 broad-term warning, issue #5), 2026-06-13
     # +4 intent-dispatch (features.extract_intents + limits.intent_source_globs
     #    + limits.intent_classify_timeout_s + limits.intent_min_confidence), 2026-06-13
-    assert len(changes) == 98, f"got {len(changes)} changes: {changes}"
+    # +1 models.intent_classify_model (intent-dispatch cheap tier), 2026-06-14
+    assert len(changes) == 99, f"got {len(changes)} changes: {changes}"
 
     reparsed = yaml.safe_load(new_text)
     # piggyback side
@@ -234,6 +235,7 @@ def test_migrate_config_no_change_when_fully_current(tmp_path):
         "models": {
             "dream_model": "claude-opus-4-8[1m]",
             "folder_scan_provider": "claude-sdk",
+            "intent_classify_model": "claude-haiku-4-5",
         },
         "scheduling": {
             "piggybacks_on_compile": True,
@@ -417,6 +419,7 @@ def test_migrate_additions_idempotent():
         "models": {
             "dream_model": "claude-opus-4-8[1m]",
             "folder_scan_provider": "claude-sdk",
+            "intent_classify_model": "claude-haiku-4-5",
         },
         "scheduling": {
             "piggybacks_on_compile": True,

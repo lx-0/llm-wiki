@@ -1451,6 +1451,8 @@ ${C_BOLD}USAGE${C_RESET}
                                                move legacy in-body voice
                                                source wikilinks into the
                                                daily voice.md sources: frontmatter
+  wiki backfill tasks-to-workspace [--dry-run] move legacy tasks/ intent queue
+                                               into workspace/inbox/
 
 ${C_BOLD}WHAT IT DOES${C_RESET}
   Each subcommand walks the relevant substrate and adds net-new keys to
@@ -1475,6 +1477,11 @@ cmd_backfill() {
       shift
       banner "wiki backfill voice-source-frontmatter"
       _run_script backfill_voice_source_frontmatter.py "$@"
+      ;;
+    tasks-to-workspace)
+      shift
+      banner "wiki backfill tasks-to-workspace"
+      _run_script backfill_tasks_to_workspace.py "$@"
       ;;
     *)
       err "unknown: wiki backfill $1 (try 'wiki backfill help')"

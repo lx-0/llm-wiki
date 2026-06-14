@@ -603,6 +603,13 @@ seed_vault_templates() {
     done
   fi
 
+  # 5c. workspace/ — the operator working layer (todo.md + inbox/ for detected
+  # intents). Seeded so the 4th layer always exists, even before the first
+  # intent lands (handlers create workspace/inbox/ lazily otherwise).
+  if [[ -f "$templates_dir/workspace/todo.md" ]]; then
+    _seed_file "$templates_dir/workspace/todo.md" "$target/workspace/todo.md" "$force" "workspace/todo.md" "$check"
+  fi
+
   # 6. .obsidian/*.json — top-level configs.
   if [[ -d "$templates_dir/.obsidian" ]]; then
     [[ "$check" == "1" ]] || mkdir -p "$target/.obsidian"

@@ -15,6 +15,8 @@ from .base import HandlerResult, Intent, IntentHandler, get_handler, register
 # Import order doesn't matter (keyed by KIND, not registration order). Each
 # import triggers @register at module load.
 from . import task_handler as _task_handler  # noqa: E402, F401
+from . import idea_handler as _idea_handler  # noqa: E402, F401
+from . import note_handler as _note_handler  # noqa: E402, F401
 
 log = logging.getLogger("compile")
 

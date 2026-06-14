@@ -86,6 +86,7 @@ Key changes covered (chronological):
   limits.intent_classify_timeout_s            (added 2026-06-13, default 120 — per-call timeout for intent classification SDK invocation)
   limits.intent_min_confidence                (added 2026-06-13, default "high" — confidence floor below which an intent is logged but not dispatched)
   models.{compile_model,compile_large_source_model,dream_model}  (value upgrade 2026-06-13: opus 4-7 → 4-8; only exact old-default values are bumped, pinned models preserved)
+  models.intent_classify_model               (added 2026-06-14, default "claude-haiku-4-5" — cheap triage tier for the intent-dispatch producer; "" → compile_model)
   personal.accounts.<id>.health.healthkit    (added 2026-05-19 M023 — Apple HealthKit XML export ingest;
                                               injected as a placeholder into any account already carrying
                                               `health.oura`, kind: healthkit-xml-export, empty inbox_dir
@@ -161,6 +162,10 @@ KEY_ADDITIONS: dict[str, dict[str, object]] = {
         # the only provider today; local LLM/agent later. Unknown values
         # raise loudly — no silent fallback. Added 2026-06-10.
         "folder_scan_provider": "claude-sdk",
+        # Intent-classification model (2026-06-14). Cheap triage tier for the
+        # intent-dispatch producer; "" falls back to compile_model. Match
+        # Models.intent_classify_model in scripts/core/config.py.
+        "intent_classify_model": "claude-haiku-4-5",
     },
     "limits": {
         # Curiosity denylist (2026-06-13). Both curiosity passes skip a source

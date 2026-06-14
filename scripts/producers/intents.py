@@ -2,15 +2,15 @@
 
 Reads one intake source (voice note first; extend via
 `CONFIG.limits.intent_source_globs`), asks Claude via the Agent SDK to classify
-it into an intent `{kind, summary, confidence}`, and — when the intent clears
-the configured confidence floor — dispatches it to the handler registered for
-its kind (`intents.dispatch`). The `task` handler writes an operator-facing
-record to `tasks/`; execution is a separate, operator-gated step (the
-`orchestrate-tasks` agent spec).
+it into an intent `{kind, summary, confidence}` (task | idea | note | none) and
+dispatches it to the handler registered for its kind (`intents.dispatch`). The
+task/idea/note handlers write an operator-facing record to `workspace/inbox/`;
+execution is a separate, operator-gated step (the `orchestrate-tasks` agent).
+The confidence floor gates `task` only; idea/note are captured liberally.
 
 Mirrors `facts.takes_producer` conventions:
-- Provider is Claude (compile_model), no Ollama fallback — classification needs
-  real reasoning. On SDK failure the source is skipped; compiled output is untouched.
+- Provider is Claude (`models.intent_classify_model`, default a cheap tier — it's
+  triage, not synthesis), no Ollama fallback. On SDK failure the source is skipped.
 - Tool surface is `Read` only — the producer emits JSON; the write goes through
   the dispatched handler.
 
@@ -110,7 +110,10 @@ class IntentsProducer:
         prompt = render(
             "intent_classify", source_path=rel_path, source_content=source_content,
         )
-        log.info("  Intent pass for %s (model=%s)", rel_path, CONFIG.models.compile_model)
+        # Intent classification is task/idea/note triage, not synthesis — a cheap
+        # model suffices. Falls back to compile_model if the knob is empty.
+        model = CONFIG.models.intent_classify_model or CONFIG.models.compile_model
+        log.info("  Intent pass for %s (model=%s)", rel_path, model)
 
         started = time.time()
         capture = StderrCapture()
@@ -121,7 +124,7 @@ class IntentsProducer:
                 options=ClaudeAgentOptions(
                     max_buffer_size=CONFIG.limits.sdk_max_buffer_size_mb * 1024 * 1024,
                     cwd=str(ROOT_DIR),
-                    model=CONFIG.models.compile_model,
+                    model=model,
                     allowed_tools=["Read"],
                     permission_mode="default",
                     max_turns=3,
@@ -139,7 +142,7 @@ class IntentsProducer:
         except Exception as exc:  # noqa: BLE001
             log_sdk_failure(
                 log, label="intent_classify", source=rel_path,
-                model=CONFIG.models.compile_model, input_chars=len(source_content),
+                model=model, input_chars=len(source_content),
                 started=started, capture=capture, exc=exc,
             )
             return ProducerResult(
@@ -185,15 +188,19 @@ class IntentsProducer:
 
         if kind == "none":
             return ProducerResult(
-                producer=self.SPEC.name, status="ok", reason="kind=none (not actionable)",
+                producer=self.SPEC.name, status="ok", reason="kind=none (noise)",
             )
 
-        floor = _CONFIDENCE_RANK.get(CONFIG.limits.intent_min_confidence, 2)
-        if _CONFIDENCE_RANK.get(confidence, 0) < floor:
-            return ProducerResult(
-                producer=self.SPEC.name, status="ok",
-                reason=f"below confidence floor (kind={kind}, conf={confidence})",
-            )
+        # Confidence floor applies to `task` ONLY — never auto-create a task on a
+        # weak signal. idea/note are low-stakes captures for the inbox, dispatched
+        # regardless of confidence (the operator triages them later).
+        if kind == "task":
+            floor = _CONFIDENCE_RANK.get(CONFIG.limits.intent_min_confidence, 2)
+            if _CONFIDENCE_RANK.get(confidence, 0) < floor:
+                return ProducerResult(
+                    producer=self.SPEC.name, status="ok",
+                    reason=f"task below confidence floor (conf={confidence})",
+                )
 
         intent = Intent(kind=kind, summary=summary, source=rel_path, confidence=confidence)
         try:

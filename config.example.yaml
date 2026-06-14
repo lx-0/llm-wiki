@@ -200,6 +200,10 @@ models:
   # answer-extract. "claude-sdk" is the only provider today; a local
   # LLM/agent provider is the long-term target. Unknown values raise.
   folder_scan_provider: claude-sdk
+  # Intent-classification model (intent-dispatch producer). Triage, not
+  # synthesis — a cheap tier is right + ~10× cheaper than compile Opus.
+  # Empty string falls back to compile_model.
+  intent_classify_model: claude-haiku-4-5
   # Ollama endpoint (used by all local LLM calls).
   ollama_url: http://localhost:11434
   # Vision model for screenshot OCR.

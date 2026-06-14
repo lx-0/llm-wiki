@@ -172,6 +172,10 @@ class Models:
     # `compile_force_long_context_types` does for compile's fan-out
     # substrates (daily-digest, etc). Set "" to fall back to compile_model.
     dream_model: str = "claude-opus-4-8[1m]"
+    # Intent-classification model (intent-dispatch producer). Triage — task vs
+    # idea vs note vs noise — not synthesis, so a cheap/fast tier is right and
+    # ~10× cheaper than the compile Opus. Empty string falls back to compile_model.
+    intent_classify_model: str = "claude-haiku-4-5"
     # Folder-scan answer provider (M027-S04, Q9 seam). The curiosity
     # folder backend reads an operator-approved file in-place and
     # distills an answer-extract. "claude-sdk" is the only provider
