@@ -1,3 +1,6 @@
+---
+model: qwen2.5vl:7b
+---
 Analyze this photograph. This is a camera / phone photo (not a screen capture). Your analysis will be stored alongside the image for search, and a knowledge compiler will use it to decide whether the photo is worth indexing.
 
 Respond with ONLY a JSON object (no markdown, no code fences):

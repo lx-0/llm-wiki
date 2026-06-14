@@ -122,3 +122,22 @@ def test_triage_resolve_prefix_and_ambiguous(tmp_path, monkeypatch):
     assert triage._resolve("voice-2026-06-12-y").stem == "voice-2026-06-12-y"
     assert triage._resolve("voice-2026") is None  # ambiguous → None
     assert triage._resolve("nope") is None
+
+
+# ── per-prompt frontmatter model (Prompty-style) ─────────────────────
+
+def test_prompt_model_frontmatter_overrides_fallback():
+    from core.prompts import prompt_model, render
+    # vision + intent prompts declare a model: in frontmatter
+    assert prompt_model("intent_classify", "FALLBACK") == "claude-haiku-4-5"
+    assert prompt_model("scan_pictures_vision", "gemma4:e4b") == "qwen2.5vl:7b"
+    # frontmatter is stripped from the rendered body (never reaches the LLM)
+    body = render("intent_classify", source_path="x", source_content="y")
+    assert not body.lstrip().startswith("---")
+    assert "model:" not in body.split("\n", 1)[0]
+
+
+def test_prompt_model_falls_back_when_no_frontmatter():
+    from core.prompts import prompt_model
+    # extract_takes has no frontmatter → first truthy fallback wins
+    assert prompt_model("extract_takes", "", "claude-opus-4-8") == "claude-opus-4-8"

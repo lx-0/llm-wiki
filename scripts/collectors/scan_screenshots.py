@@ -55,7 +55,7 @@ TZ = ZoneInfo(TIMEZONE)
 
 log = logging.getLogger("scan-screenshots")
 
-from core.prompts import render  # noqa: E402
+from core.prompts import render, prompt_model  # noqa: E402
 
 
 # ── State ───────────────────────────────────────────────────────────
@@ -119,7 +119,7 @@ def describe_screenshot(path: Path) -> dict | None:
         try:
             content, stats = ollama_client.chat_vision(
                 render("scan_screenshots_vision", project_examples_inline=project_examples_inline),
-                model=MODEL,
+                model=prompt_model("scan_screenshots_vision", MODEL),
                 image_b64=img_b64,
                 timeout=TIMEOUT,
             )

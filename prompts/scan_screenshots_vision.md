@@ -1,3 +1,6 @@
+---
+model: qwen2.5vl:7b
+---
 Analyze this screenshot. Your analysis will be stored as metadata alongside the image for search and retrieval. A knowledge compiler will use it to understand the user's work context and projects.
 
 Respond with ONLY a JSON object (no markdown, no code fences):

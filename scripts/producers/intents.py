@@ -34,7 +34,7 @@ from claude_agent_sdk import (
 
 from core.config import CONFIG
 from core.paths import ROOT_DIR, STATE_DIR
-from core.prompts import render
+from core.prompts import render, prompt_model
 from core.sdk_helpers import StderrCapture, log_sdk_failure
 
 from intents import Intent, dispatch
@@ -112,7 +112,7 @@ class IntentsProducer:
         )
         # Intent classification is task/idea/note triage, not synthesis — a cheap
         # model suffices. Falls back to compile_model if the knob is empty.
-        model = CONFIG.models.intent_classify_model or CONFIG.models.compile_model
+        model = prompt_model("intent_classify", CONFIG.models.intent_classify_model, CONFIG.models.compile_model)
         log.info("  Intent pass for %s (model=%s)", rel_path, model)
 
         started = time.time()

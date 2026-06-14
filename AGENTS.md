@@ -231,6 +231,8 @@ Drift detection is JSON-key-order-insensitive (`_files_equivalent` / canonical `
 2. Use `${var}` for placeholders (not Python's `{var}` — JSON/YAML examples in prompts have literal braces).
 3. Call `from prompts import render` and `prompt = render("name", var=value)`.
 
+**Per-prompt model (Prompty-style frontmatter).** A prompt MAY open with a YAML frontmatter block declaring its model — e.g. `scan_pictures_vision.md` / `scan_screenshots_vision.md` pin `model: qwen2.5vl:7b` (strong local OCR) and `intent_classify.md` pins `model: claude-haiku-4-5` (cheap triage). `render()` strips the frontmatter from the body (it never reaches the LLM); the caller resolves the model with `prompt_model("<name>", <fallback>, …)` — **frontmatter `model:` wins, else the first truthy fallback** (caller default → config knob → `compile_model`). This puts the model choice next to the prompt it belongs to instead of hardcoded at the call site; config knobs (`models.vision_model`, `models.intent_classify_model`) remain the fallback. (Agent-task specs `prompts/agents/*.md` carry their own `model:` via `AgentSpec`, a separate parser.)
+
 ### Adding an agent target (for hook install)
 
 1. Add a tuple to `WIKI_AGENTS` in `lib/agents.sh`: `name|detection-dir|config-file`.

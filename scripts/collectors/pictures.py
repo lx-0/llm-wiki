@@ -38,7 +38,7 @@ from collectors.base import Collector, CollectorSpec, RunResult, register
 from core import daily_capture, ollama_client
 from core.config import CONFIG, TIMEZONE
 from core.paths import RAW_DIR
-from core.prompts import render
+from core.prompts import render, prompt_model
 from core.utils import now_iso
 
 log = logging.getLogger(__name__)
@@ -48,7 +48,7 @@ THUMB_DIR = OUTPUT_DIR / "thumb"
 MOBILE_ARCHIVE_DIR = RAW_DIR / "inbox-mobile" / "pictures"
 ACCEPTED_SUFFIXES = (".jpeg", ".jpg", ".png", ".heic")
 
-MODEL = CONFIG.models.vision_model
+MODEL = prompt_model("scan_pictures_vision", CONFIG.models.vision_model)
 RESIZE_WIDTH = CONFIG.limits.screenshot_resize_width
 TIMEOUT = float(CONFIG.limits.screenshot_timeout_seconds)
 THUMB_WIDTH = 384  # px; matches scan_screenshots — Retina-source compromise
@@ -322,7 +322,7 @@ def _build_batch_report(results: list[dict], thumb_lookup: dict[str, str]) -> st
         "",
         f"# Pictures Batch — {now_iso()}",
         "",
-        f"Processed {len(results)} picture(s) with {CONFIG.models.vision_model} via {CONFIG.models.ollama_url}.",
+        f"Processed {len(results)} picture(s) with {MODEL} via {CONFIG.models.ollama_url}.",
         f"Vision pass: {len(keeps)} keep · {len(ephemerals)} ephemeral.",
         "",
         "| Time | Setting | Scene | Text visible | Tags | Relevance |",
