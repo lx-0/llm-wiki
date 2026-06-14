@@ -84,3 +84,41 @@ def test_strip_json_fences():
 def test_confidence_rank_ordering():
     from producers.intents import _CONFIDENCE_RANK
     assert _CONFIDENCE_RANK["low"] < _CONFIDENCE_RANK["medium"] < _CONFIDENCE_RANK["high"]
+
+
+# ── wiki triage CLI ──────────────────────────────────────────────────
+
+def _mk_inbox(tmp_path, monkeypatch):
+    import triage
+    d = tmp_path / "workspace" / "inbox"; d.mkdir(parents=True)
+    monkeypatch.setattr(triage, "WORKSPACE_INBOX_DIR", d)
+    def rec(stem, type_, status="pending", conf="high", summ="S"):
+        (d / f"{stem}.md").write_text(
+            f'---\ntype: {type_}\nstatus: {status}\nkind: {type_}\nconfidence: {conf}\n'
+            f'summary: "{summ}"\nsource: raw/voice/{stem}.md\n---\n# {summ}\n', encoding="utf-8")
+    return triage, rec, d
+
+
+def test_triage_list_pending_only(tmp_path, monkeypatch, capsys):
+    triage, rec, _ = _mk_inbox(tmp_path, monkeypatch)
+    rec("voice-a", "task"); rec("voice-b", "idea"); rec("voice-c", "note", status="dismissed")
+    assert triage._list(False) == 0
+    out = capsys.readouterr().out
+    assert "TASK" in out and "IDEA" in out and "voice-a" in out
+    assert "voice-c" not in out  # dismissed hidden unless --all
+    assert "2 pending · 3 total" in out
+
+
+def test_triage_done_and_dismiss(tmp_path, monkeypatch):
+    triage, rec, d = _mk_inbox(tmp_path, monkeypatch)
+    rec("voice-a", "task")
+    assert triage._set_status(triage._resolve("voice-a"), "done") == 0
+    assert "status: done" in (d / "voice-a.md").read_text()
+
+
+def test_triage_resolve_prefix_and_ambiguous(tmp_path, monkeypatch):
+    triage, rec, _ = _mk_inbox(tmp_path, monkeypatch)
+    rec("voice-2026-05-16-x", "task"); rec("voice-2026-06-12-y", "idea")
+    assert triage._resolve("voice-2026-06-12-y").stem == "voice-2026-06-12-y"
+    assert triage._resolve("voice-2026") is None  # ambiguous → None
+    assert triage._resolve("nope") is None

@@ -46,6 +46,23 @@ if (alerts.length === 0) {
 
 ---
 
+## 📥 Triage — captured intents
+
+> Detected from voice / photos and queued in `workspace/inbox/`. Keep one — **task** → run the `orchestrate-tasks` agent or do it; **idea / note** → promote into `knowledge/` — then set `status: done`; or `status: dismissed` for noise. CLI: `wiki triage` · `wiki triage done|dismiss <stem>`.
+
+```dataview
+TABLE WITHOUT ID
+  file.link AS "Record",
+  type AS "Type",
+  confidence AS "Conf",
+  summary AS "Summary"
+FROM "workspace/inbox"
+WHERE status = "pending"
+SORT type ASC, confidence DESC
+```
+
+---
+
 ## 🏠 Personal
 
 ### Active Areas

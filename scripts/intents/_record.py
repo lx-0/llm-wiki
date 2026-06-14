@@ -8,6 +8,7 @@ one place and the idempotence guard (skip if the stem already exists) uniform.
 
 from __future__ import annotations
 
+import json
 import logging
 from pathlib import Path
 
@@ -36,6 +37,7 @@ def write_inbox_record(intent: Intent, type_: str, triage_hint: str) -> HandlerR
         "status: pending\n"
         f"kind: {intent.kind}\n"
         f"confidence: {intent.confidence}\n"
+        f"summary: {json.dumps(summary)}\n"
         f"source: {intent.source}\n"
         f"detected_at: {now_iso()}\n"
         "---\n"

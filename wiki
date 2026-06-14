@@ -1393,6 +1393,28 @@ cmd_produce() {
   uv run --quiet --project "$WIKI_DIR" python "$WIKI_DIR/scripts/producers/cli.py" "$@"
 }
 
+cmd_triage() {
+  case "${1:-}" in
+    -h|--help|help)
+      cat <<EOF
+${C_BOLD}wiki triage${C_RESET} — review + clear the intent inbox (workspace/inbox/)
+
+${C_BOLD}USAGE${C_RESET}
+  wiki triage                 list pending records, grouped by type
+  wiki triage --all           list every record (incl. done/dismissed)
+  wiki triage done <stem>     mark a record status: done
+  wiki triage dismiss <stem>  mark a record status: dismissed
+
+Detected intents (task/idea/note) land in workspace/inbox/ with status: pending.
+Keep one (promote task→run, idea/note→knowledge) then \`done\`, or \`dismiss\` noise.
+\`<stem>\` matches the record filename; a unique prefix is enough.
+EOF
+      return 0
+      ;;
+  esac
+  uv run --quiet --project "$WIKI_DIR" python "$WIKI_DIR/scripts/triage.py" "$@"
+}
+
 help_bridge() {
   cat <<EOF
 ${C_BOLD}wiki bridge${C_RESET} — rsync-based mirror for sandbox-restricted intake folders
@@ -1789,6 +1811,7 @@ case "${1:-}" in
   collect)          shift; cmd_collect "$@" ;;
   index)            shift; cmd_index "$@" ;;
   produce)          shift; cmd_produce "$@" ;;
+  triage)           shift; cmd_triage "$@" ;;
   bridge)           shift; cmd_bridge "$@" ;;
   backfill)         shift; cmd_backfill "$@" ;;
   gmail-auth)       shift; cmd_gmail_auth "$@" ;;
