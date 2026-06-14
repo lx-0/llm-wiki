@@ -90,6 +90,7 @@ QUICK_ACTIONS: list[tuple[str, str, str, object]] = [
     ("q", "query",   "ask the wiki ($$)",            ("special", "query")),
     ("f", "flush",   "capture current session",      ["flush"]),
     ("l", "lint",    "cheap structural lint",        ["lint", "--structural-only"]),
+    ("t", "triage",  "review captured-intent inbox",  ["triage"]),
     ("s", "status",  "config + hooks + ollama",      ["status"]),
 ]
 
@@ -140,6 +141,9 @@ CATEGORIES: dict[str, tuple[str, list[tuple[str, str, str, object]]]] = {
         ("flush",         "flush session now",              "manual override",                        ["flush"]),
         ("agent-list",    "list agent tasks",               "prompts/agents/*.md",                    ["agent", "--list"]),
         ("agent-run",     "run an agent task",              "by id",                                  ("prompt", "Task id", ["agent", "{arg}"])),
+        ("triage",        "triage — list inbox",            "captured intents (task/idea/note)",      ["triage"]),
+        ("triage-done",   "triage — mark done",             "by record stem (unique prefix ok)",      ("prompt", "Record stem", ["triage", "done", "{arg}"])),
+        ("triage-dismiss","triage — dismiss",               "drop noise by record stem",              ("prompt", "Record stem", ["triage", "dismiss", "{arg}"])),
     ]),
     "g": ("setup", [
         ("status",        "status",                         "config + hooks + ollama",                ["status"]),
