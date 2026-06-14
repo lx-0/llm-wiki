@@ -21,8 +21,15 @@ genuine noise is dropped. Your job is to tell apart four kinds:
   "X lives at Y", "the meeting moved to Thursday", a definition, a snippet.
 - **none** — genuine noise ONLY: mic-checks, test recordings, empty
   pleasantries ("hallo hallo hallo", "test test", "hörst du mich"), accidental
-  captures with no content. When in doubt between `none` and `idea`, choose
-  `idea` — capturing a weak thought is cheap, dropping a real one is not.
+  captures with no content. **Crucially, also `none`: anything where the operator
+  is testing or fiddling with the recording / dictation setup ITSELF** — checking
+  whether the mic works, how it sounds, whether dictation is clear, tapping
+  settings ("doppeltippen", "dreifach tippen", "wie hörst du mich", "is this
+  clearer now", "jetzt hat es geklappt"). These are mic-checks → `none` **even
+  when phrased as a question** — a question is only an `idea` if it's about a real
+  topic, NOT about whether the recording/transcription is working. When in doubt
+  between `none` and `idea` on a REAL topic, choose `idea`; but setup-fiddling is
+  always `none`.
 
 ## Confidence rubric (REQUIRED)
 
