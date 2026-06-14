@@ -109,11 +109,14 @@ def test_triage_list_pending_only(tmp_path, monkeypatch, capsys):
     assert "2 pending · 3 total" in out
 
 
-def test_triage_done_and_dismiss(tmp_path, monkeypatch):
+def test_triage_accept_and_dismiss(tmp_path, monkeypatch):
     triage, rec, d = _mk_inbox(tmp_path, monkeypatch)
     rec("voice-a", "task")
-    assert triage._set_status(triage._resolve("voice-a"), "done") == 0
-    assert "status: done" in (d / "voice-a.md").read_text()
+    # triage keep → accepted (NOT done; done is the agent's execution outcome)
+    assert triage._set_status(triage._resolve("voice-a"), "accepted") == 0
+    assert "status: accepted" in (d / "voice-a.md").read_text()
+    assert triage._set_status(triage._resolve("voice-a"), "dismissed") == 0
+    assert "status: dismissed" in (d / "voice-a.md").read_text()
 
 
 def test_triage_resolve_prefix_and_ambiguous(tmp_path, monkeypatch):

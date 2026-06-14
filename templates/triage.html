@@ -13,7 +13,8 @@
   CONTRACT (keep in sync — see scripts/intents/_record.py + scripts/triage.py):
     Each workspace/inbox/<stem>.md opens with YAML frontmatter carrying:
       type:       task | idea | note     (the bucket; convertible here)
-      status:     pending | done | dismissed
+      status:     pending | accepted | dismissed   (triage decision)
+                  · done | blocked  (task execution outcome, set by the agent)
       kind:       task | idea | note      (classifier label; tracks type on convert)
       confidence: high | medium | low
       summary:    JSON-encoded one-liner
@@ -73,7 +74,7 @@
 <div class="bar" id="filters" style="display:none">
   <span class="statusline">Filter:</span>
   <button class="pill active" data-f="pending">pending</button>
-  <button class="pill" data-f="done">done</button>
+  <button class="pill" data-f="accepted">accepted</button>
   <button class="pill" data-f="dismissed">dismissed</button>
   <button class="pill" data-f="all">all</button>
   <span id="count" class="statusline"></span>
@@ -275,7 +276,7 @@ function recEl(r, t) {
     acts.appendChild(btn("→ note", "conv-b task", guard(() => applyFields(r, { type:"note", kind:"note" }))));
   else
     acts.appendChild(btn("→ todo", "conv-b", guard(() => applyFields(r, { type:"task", kind:"task" }))));
-  if (st !== "done")      acts.appendChild(btn("✓ done", "done-b", guard(() => applyFields(r, { status:"done" }))));
+  if (st !== "accepted")  acts.appendChild(btn("✓ accept", "done-b", guard(() => applyFields(r, { status:"accepted" }))));
   if (st !== "dismissed") acts.appendChild(btn("✗ dismiss", "drop-b", guard(() => applyFields(r, { status:"dismissed" }))));
   if (st !== "pending")   acts.appendChild(btn("↺ pending", "pill", guard(() => applyFields(r, { status:"pending" }))));
   top.appendChild(acts);

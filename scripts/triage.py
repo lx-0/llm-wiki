@@ -1,14 +1,19 @@
 """`wiki triage` — review + clear the intent-dispatch inbox (workspace/inbox/).
 
-Detected intents (task/idea/note) land in `workspace/inbox/` with
-`status: pending`. Triage = decide what each is:
-  - keep  → promote (task: run / do; idea/note: move into knowledge/) then mark done
-  - drop  → dismiss
+Detected intents (task/idea/note) land with `status: pending`. Triage decides
+keep vs drop:
+  - accept  → keep it. note/idea = filed; task = greenlit for the
+              orchestrate-tasks agent (which runs `status: accepted` tasks).
+  - dismiss → drop as noise.
 
-    wiki triage                 list pending records, grouped by type
-    wiki triage --all           list every record (incl. done/dismissed)
-    wiki triage done <stem>     mark a record status: done
-    wiki triage dismiss <stem>  mark a record status: dismissed
+Two separate axes: triage sets `pending → accepted | dismissed`; the
+orchestrate-tasks agent later sets a task `accepted → done | blocked` once it has
+actually executed it. So `done` always means "task executed", never "triaged".
+
+    wiki triage                  list pending records, grouped by type
+    wiki triage --all            list every record (incl. accepted/dismissed/done)
+    wiki triage accept <stem>    keep  → status: accepted
+    wiki triage dismiss <stem>   drop  → status: dismissed
 
 `<stem>` matches the record filename (a unique prefix is enough). Status is set
 by an in-place line-replace — formatting is preserved byte-for-byte.
@@ -81,7 +86,7 @@ def _list(show_all: bool) -> int:
         return 0
     shown = [(f, fm) for f, fm in recs if show_all or fm.get("status") == "pending"]
     if not shown:
-        print("No pending records. (use --all to see done/dismissed)")
+        print("No pending records. (use --all to see accepted/dismissed/done)")
         return 0
     shown.sort(key=lambda x: (_ORDER.get(x[1].get("type", ""), 9), x[0].name))
     cur = None
@@ -98,7 +103,7 @@ def _list(show_all: bool) -> int:
         print(f"      ({conf}{flag}) {summ}")
     pend = sum(1 for _, fm in recs if fm.get("status") == "pending")
     print(f"\n{pend} pending · {len(recs)} total.  "
-          "Act: wiki triage done|dismiss <stem>")
+          "Act: wiki triage accept|dismiss <stem>")
     return 0
 
 
@@ -106,21 +111,21 @@ def main() -> int:
     ap = argparse.ArgumentParser(prog="wiki triage", description=__doc__.split("\n", 1)[0])
     sub = ap.add_subparsers(dest="cmd")
     pl = sub.add_parser("list", help="list records (default)")
-    pl.add_argument("--all", action="store_true", help="include done/dismissed")
-    for verb in ("done", "dismiss"):
-        sp = sub.add_parser(verb, help=f"mark a record {verb}")
+    pl.add_argument("--all", action="store_true", help="include accepted/dismissed/done")
+    # Triage verbs only: keep (accept) / drop (dismiss). `done`/`blocked` are the
+    # orchestrate-tasks agent's execution outcomes, not triage decisions.
+    _VERB_STATUS = {"accept": "accepted", "dismiss": "dismissed"}
+    for verb in _VERB_STATUS:
+        sp = sub.add_parser(verb, help=f"{verb} a record → status: {_VERB_STATUS[verb]}")
         sp.add_argument("stem", help="record filename stem (unique prefix ok)")
     ap.add_argument("--all", action="store_true", help=argparse.SUPPRESS)
     args = ap.parse_args()
 
     if args.cmd in (None, "list"):
         return _list(getattr(args, "all", False))
-    if args.cmd == "done":
+    if args.cmd in _VERB_STATUS:
         p = _resolve(args.stem)
-        return _set_status(p, "done") if p else 1
-    if args.cmd == "dismiss":
-        p = _resolve(args.stem)
-        return _set_status(p, "dismissed") if p else 1
+        return _set_status(p, _VERB_STATUS[args.cmd]) if p else 1
     return 0
 
 
