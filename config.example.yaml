@@ -439,8 +439,13 @@ limits:
   # substrates get an intent-classification pass after compile; per-call
   # timeout; and the confidence floor below which an intent is logged but not
   # dispatched to a handler (keeps borderline ideas/questions out of tasks/).
+  # Attaches to the INGEST CHANNEL, not the file type: the mobile picture
+  # channel (raw/inbox-mobile/pictures/*.md — camera photos + phone
+  # screenshots) is in; desktop screenshots (raw/notes/screenshots/) are a
+  # different channel and stay out.
   intent_source_globs:
     - "raw/voice/*"
+    - "raw/inbox-mobile/pictures/*.md"
   intent_classify_timeout_s: 120
   intent_min_confidence: high
   # M014 dream-cycle resource gates (tokens, not dollars). Per-entity prompt-

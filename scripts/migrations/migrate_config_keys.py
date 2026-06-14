@@ -83,6 +83,7 @@ Key changes covered (chronological):
   personal.output_language                    (added 2026-06-13 issue #4, default "auto" — pin compiled-prose language; non-"auto" forces target language across compile prompts)
   features.extract_intents                    (added 2026-06-13, default False — intent-dispatch master switch; post-compile classifies intake notes → tasks/)
   limits.intent_source_globs                  (added 2026-06-13, default ["raw/voice/*"] — intake substrates the intent pass runs on)
+  limits.intent_source_globs                  ← list-extend with "raw/inbox-mobile/pictures/*.md" (2026-06-14 — intent now attaches to the mobile picture channel: camera photos + phone screenshots; desktop screenshots in raw/notes/screenshots/ stay out)
   limits.intent_classify_timeout_s            (added 2026-06-13, default 120 — per-call timeout for intent classification SDK invocation)
   limits.intent_min_confidence                (added 2026-06-13, default "high" — confidence floor below which an intent is logged but not dispatched)
   models.{compile_model,compile_large_source_model,dream_model}  (value upgrade 2026-06-13: opus 4-7 → 4-8; only exact old-default values are bumped, pinned models preserved)
@@ -331,7 +332,7 @@ KEY_ADDITIONS: dict[str, dict[str, object]] = {
         # confidence floor for the intent-classification post-pass (gated by
         # features.extract_intents). Match Limits defaults in
         # scripts/core/config.py.
-        "intent_source_globs": ["raw/voice/*"],
+        "intent_source_globs": ["raw/voice/*", "raw/inbox-mobile/pictures/*.md"],
         "intent_classify_timeout_s": 120,
         "intent_min_confidence": "high",
     },
@@ -570,6 +571,14 @@ LIST_ADDITIONS: dict[str, list[object]] = {
     # never re-list. raw/notes/folder/ answers stay compile sources
     # (NOT in this list).
     "limits.compile_skip_substrate_types": ["email-delta", "folder-index"],
+    # 2026-06-14: widen intent-dispatch to the mobile picture channel.
+    # The intent pass shipped voice-only (2026-06-13); operators who already
+    # have `intent_source_globs: [raw/voice/*]` pinned wouldn't otherwise pick
+    # up the new channel. Camera photos + phone screenshots both arrive via
+    # personal.picture_inbox → raw/inbox-mobile/pictures/*.md (the .md sidecar
+    # carries the vision text the classifier reads). Channel-based, not file-
+    # type-based: desktop screenshots (raw/notes/screenshots/) stay out.
+    "limits.intent_source_globs": ["raw/inbox-mobile/pictures/*.md"],
 }
 
 # Elements to REMOVE from existing list-valued config entries. The

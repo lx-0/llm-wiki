@@ -573,10 +573,17 @@ class Limits:
     extract_takes_max_per_source: int = 12
     # Intent-dispatch (gated by CONFIG.features.extract_intents). fnmatch globs
     # limiting which sources get an intent-classification pass after compile.
-    # Default = voice notes only; widen the list to add intake substrates
-    # (raw/captures/*, raw/notes/*, …) — no code change needed.
+    # Intake substrates the intent pass runs on. Voice notes + the mobile
+    # picture channel (camera photos AND phone screenshots the operator snapped
+    # to themselves — both arrive via personal.picture_inbox → archived under
+    # raw/inbox-mobile/pictures/ as .md sidecars carrying the vision text the
+    # classifier reads). Intent attaches to the INGEST CHANNEL, not the file
+    # type: desktop screenshots land in raw/notes/screenshots/ (a different
+    # channel) and stay out. Widen the list to add more channels — no code
+    # change needed.
     intent_source_globs: list[str] = field(default_factory=lambda: [
         "raw/voice/*",
+        "raw/inbox-mobile/pictures/*.md",
     ])
     # Per-call timeout for the intent-classification SDK invocation (seconds).
     intent_classify_timeout_s: int = 120
