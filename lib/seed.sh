@@ -580,6 +580,12 @@ seed_vault_templates() {
   # 3b. knowledge.base — native Obsidian Bases knowledge browser (built-in 1.10+).
   _seed_file "$templates_dir/knowledge.base" "$target/knowledge.base" "$force" "knowledge.base" "$check"
 
+  # 3c. triage.html — static, server-less triage UI for workspace/inbox/. Opened
+  # in a Chromium browser (File System Access API); reads + writes the same
+  # status:/type: frontmatter as `wiki triage` and the dashboard. Browser home
+  # surface, sibling to dashboard.md (the Obsidian home surface).
+  _seed_file "$templates_dir/triage.html" "$target/triage.html" "$force" "triage.html" "$check"
+
   # 4. Cache files (_dashboard-*.md) are NOT seeded — they're producer-only outputs
   #    of dashboard_stats.py / dashboard_lint.py. Seeding them (especially with --force)
   #    would clobber live data with the placeholder template. First wiki flush writes
@@ -693,7 +699,7 @@ seed_vault_templates() {
   # doing nothing (likely a typo or a non-seedable path).
   if [[ -n "$_SEED_ONLY_DST" && "$_SEED_ONLY_HIT" == "0" ]]; then
     warn "no seedable template matches '$only' — nothing done."
-    warn "seedable paths: README.md, AGENTS.md, dashboard.md, knowledge.base,"
+    warn "seedable paths: README.md, AGENTS.md, dashboard.md, knowledge.base, triage.html,"
     warn "  .claude/.env.example, .obsidian/*.json, .obsidian/plugins/<p>/data.json,"
     warn "  Templates/*.md, knowledge/MOCs/*.md, reports/studies/<id>/manifest.yaml"
   fi

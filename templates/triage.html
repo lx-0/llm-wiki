@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>llm-wiki · Triage</title>
+<!--
+  Static, server-less triage UI for the intent-dispatch inbox (workspace/inbox/).
+  Opens the vault folder via the File System Access API (Chromium: Chrome/Edge/
+  Brave) and reads + writes the SAME markdown the `wiki triage` CLI and Obsidian
+  dashboard act on — one source of truth, no JSON sidecar, no running process.
+
+  CONTRACT (keep in sync — see scripts/intents/_record.py + scripts/triage.py):
+    Each workspace/inbox/<stem>.md opens with YAML frontmatter carrying:
+      type:       task | idea | note     (the bucket; convertible here)
+      status:     pending | done | dismissed
+      kind:       task | idea | note      (classifier label; tracks type on convert)
+      confidence: high | medium | low
+      summary:    JSON-encoded one-liner
+      source:     vault-relative path to the origin note/photo
+    This file depends ONLY on those keys + the source-path conventions
+    (raw/inbox-mobile/pictures/<stem>.{md,jpeg,…} for photos, raw/voice/… etc.).
+    test_triage_record_contract.py guards the key set; a schema change there
+    fails the test as a reminder to update this file.
+-->
+<style>
+  :root { --bg:#1a1b1e; --card:#26282c; --fg:#e8e8ea; --muted:#9aa0a6; --line:#34373c;
+          --task:#ff6b6b; --idea:#ffd166; --note:#4dabf7; --done:#51cf66; --drop:#868e96; --accent:#3b5bdb; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+         background:var(--bg); color:var(--fg); padding:1.2rem; max-width:940px; margin:0 auto; }
+  h1 { font-size:1.25rem; margin:0 0 .2rem; }
+  .sub { color:var(--muted); font-size:.85rem; margin-bottom:1rem; }
+  button { font:inherit; cursor:pointer; border:0; border-radius:7px; padding:.4rem .7rem; }
+  .primary { background:var(--accent); color:#fff; padding:.55rem 1rem; font-weight:600; }
+  .bar { display:flex; gap:.5rem; flex-wrap:wrap; align-items:center; margin-bottom:1rem; }
+  .pill { background:var(--card); color:var(--fg); border:1px solid var(--line); }
+  .pill.active { background:#3a3d42; border-color:#5a5d62; }
+  .group-h { margin:1.4rem 0 .5rem; font-size:.8rem; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
+  .rec { background:var(--card); border-radius:9px; padding:.7rem .85rem; margin-bottom:.55rem; border-left:4px solid #444; }
+  .rec.task { border-left-color:var(--task); } .rec.idea { border-left-color:var(--idea); } .rec.note { border-left-color:var(--note); }
+  .rectop { display:flex; gap:.7rem; align-items:flex-start; }
+  .rec .meta { flex:1; min-width:0; }
+  .rec .sum { font-weight:500; cursor:pointer; }
+  .rec .small { color:var(--muted); font-size:.78rem; margin-top:.25rem; word-break:break-all; }
+  .tag { display:inline-block; font-size:.7rem; padding:.05rem .4rem; border-radius:4px; background:#3a3d42; color:var(--muted); margin-right:.35rem; }
+  .acts { display:flex; gap:.35rem; flex-shrink:0; flex-wrap:wrap; justify-content:flex-end; max-width:230px; }
+  .done-b { background:var(--done); color:#10260f; } .drop-b { background:var(--drop); color:#fff; }
+  .conv-b { background:#2b3a67; color:#cdd6f4; } .conv-b.task { background:#5a2b2b; color:#ffd6d6; }
+  .statusline { font-size:.72rem; color:var(--muted); }
+  .empty { color:var(--muted); padding:2rem 0; text-align:center; }
+  .err { background:#3a1d1d; color:#ffc9c9; padding:.7rem; border-radius:7px; margin:1rem 0; white-space:pre-wrap; }
+  .ok-flash { color:var(--done); }
+  code { background:#2f3338; padding:.05rem .3rem; border-radius:4px; }
+  .details { margin-top:.6rem; padding-top:.6rem; border-top:1px solid var(--line); display:none; }
+  .details.open { display:block; }
+  .details img { max-width:100%; max-height:60vh; border-radius:7px; display:block; margin:.3rem 0; }
+  .details pre { white-space:pre-wrap; word-break:break-word; background:#1f2125; padding:.6rem; border-radius:7px; font-size:.82rem; max-height:42vh; overflow:auto; margin:.3rem 0 0; }
+  .exp { font-size:.72rem; color:var(--muted); background:none; padding:.1rem .3rem; }
+</style>
+</head>
+<body>
+<h1>📥 llm-wiki Triage</h1>
+<div class="sub">Server-less. Writes <code>status:</code> / <code>type:</code> straight into the <code>.md</code> — same source of truth as <code>wiki triage</code> and the Obsidian dashboard.</div>
+
+<div id="support"></div>
+<div class="bar">
+  <button class="primary" id="pick">📂 Open vault</button>
+  <button class="pill" id="reconnect" style="display:none"></button>
+  <button class="pill" id="refresh" disabled>↻ Reload</button>
+  <span id="dir" class="statusline"></span>
+</div>
+<div class="bar" id="filters" style="display:none">
+  <span class="statusline">Filter:</span>
+  <button class="pill active" data-f="pending">pending</button>
+  <button class="pill" data-f="done">done</button>
+  <button class="pill" data-f="dismissed">dismissed</button>
+  <button class="pill" data-f="all">all</button>
+  <span id="count" class="statusline"></span>
+</div>
+<div id="out"></div>
+
+<script>
+"use strict";
+const ORDER = { task:0, idea:1, note:2 };
+const CONF  = { high:2, medium:1, low:0 };
+const IMG_EXT = [".jpeg",".jpg",".png",".heic",".webp",".gif"];
+let rootDir = null, inboxDir = null, filter = "pending";
+let RECS = [];                 // in-memory cache: {name, handle, fm, text}
+let objectUrls = [];           // revoked on every re-render to avoid leaks
+
+if (!window.showDirectoryPicker) {
+  document.getElementById("support").innerHTML =
+    '<div class="err">This browser lacks the File System Access API (Chromium only: Chrome/Edge/Brave). ' +
+    'Firefox/Safari can read but not write back.</div>';
+}
+
+/* ── IndexedDB: remember the directory handle so the picker is needed once ── */
+function idb() { return new Promise((res, rej) => {
+  const r = indexedDB.open("llmwiki-triage", 1);
+  r.onupgradeneeded = () => r.result.createObjectStore("kv");
+  r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+}); }
+async function idbSet(k, v) { const db = await idb(); return new Promise((res, rej) => {
+  const tx = db.transaction("kv", "readwrite"); tx.objectStore("kv").put(v, k);
+  tx.oncomplete = res; tx.onerror = () => rej(tx.error); }); }
+async function idbGet(k) { const db = await idb(); return new Promise((res, rej) => {
+  const tx = db.transaction("kv", "readonly"); const rq = tx.objectStore("kv").get(k);
+  rq.onsuccess = () => res(rq.result); rq.onerror = () => rej(rq.error); }); }
+
+/* ── frontmatter parse + field write (CONTRACT, see header comment) ── */
+function parseFrontmatter(text) {
+  const m = text.match(/^---\n([\s\S]*?)\n---/);
+  if (!m) return null;
+  const fm = {};
+  for (const line of m[1].split("\n")) {
+    const i = line.indexOf(":"); if (i < 0) continue;
+    const k = line.slice(0, i).trim(); let v = line.slice(i + 1).trim();
+    if (v.startsWith('"')) { try { v = JSON.parse(v); } catch {} }
+    fm[k] = v;
+  }
+  return fm;
+}
+function stripFrontmatter(text) { return text.replace(/^---\n[\s\S]*?\n---\n?/, "").trim(); }
+
+// Replace one frontmatter key's line, in place. /m + first-match = the
+// frontmatter line (it precedes any body mention). Returns new text.
+function setLine(text, key, value) {
+  const re = new RegExp("^" + key + ":.*$", "m");
+  return text.replace(re, key + ": " + value);
+}
+
+async function showErr(msg) { document.getElementById("out").innerHTML = '<div class="err">' + msg + '</div>'; }
+
+async function bind(root) {
+  rootDir = root;
+  inboxDir = await (await root.getDirectoryHandle("workspace")).getDirectoryHandle("inbox");
+  document.getElementById("dir").textContent = "📁 " + root.name + "/workspace/inbox";
+  document.getElementById("refresh").disabled = false;
+  document.getElementById("filters").style.display = "flex";
+  document.getElementById("reconnect").style.display = "none";
+  document.getElementById("pick").textContent = "📂 Other vault";
+  await reload();
+}
+
+async function pick() {
+  try {
+    const root = await window.showDirectoryPicker({ mode: "readwrite", id: "llmwiki-vault" });
+    await idbSet("vaultRoot", root);
+    await bind(root);
+  } catch (e) {
+    if (e.name === "AbortError") return;
+    showErr("Folder selection failed: " + e.name + " — " + e.message +
+            "\n(If 'SecurityError' from file://: serve once via  python3 -m http.server  and open via http://localhost.)");
+  }
+}
+
+/* On load: reconnect a remembered handle. Zero clicks if permission persists;
+   otherwise one Reconnect button (no folder navigation — browser requires a gesture). */
+async function tryAutoReconnect() {
+  if (!window.showDirectoryPicker) return;
+  let root; try { root = await idbGet("vaultRoot"); } catch { return; }
+  if (!root) return;
+  if (await root.queryPermission({ mode: "readwrite" }) === "granted") { await bind(root); return; }
+  const rc = document.getElementById("reconnect");
+  rc.style.display = "inline-block";
+  rc.textContent = "🔌 Reconnect " + root.name;
+  rc.onclick = async () => {
+    if (await root.requestPermission({ mode: "readwrite" }) === "granted") await bind(root);
+    else showErr("Permission not granted.");
+  };
+}
+
+/* ── disk I/O ── */
+async function reload() {
+  RECS = [];
+  try {
+    for await (const [name, handle] of inboxDir.entries()) {
+      if (!name.endsWith(".md") || handle.kind !== "file") continue;
+      const text = await (await handle.getFile()).text();
+      const fm = parseFrontmatter(text); if (!fm) continue;
+      RECS.push({ name, handle, fm, text });
+    }
+  } catch (e) { showErr("Read failed: " + e.name + " — " + e.message); return; }
+  render();
+}
+
+// Write changed frontmatter lines, then patch the in-memory record (no full
+// re-read of the whole folder — that's the optimization) and re-render.
+async function applyFields(rec, fields) {
+  let text = rec.text;
+  for (const [k, v] of Object.entries(fields)) text = setLine(text, k, v);
+  const w = await rec.handle.createWritable(); await w.write(text); await w.close();
+  rec.text = text;
+  Object.assign(rec.fm, fields);
+  render();
+}
+
+/* Resolve "raw/a/b/file.ext" under the vault root → FileHandle (or null). */
+async function resolveFile(relPath) {
+  try {
+    const parts = relPath.split("/"); let dir = rootDir;
+    for (let i = 0; i < parts.length - 1; i++) dir = await dir.getDirectoryHandle(parts[i]);
+    return await dir.getFileHandle(parts[parts.length - 1]);
+  } catch { return null; }
+}
+
+async function loadDetails(rec, box) {
+  box.innerHTML = "loading…";
+  const src = rec.fm.source || "";
+  try {
+    if (src.includes("/pictures/")) {
+      box.innerHTML = "";
+      const base = src.replace(/\.md$/, "");
+      for (const ext of IMG_EXT) {
+        const h = await resolveFile(base + ext);
+        if (h) {
+          const url = URL.createObjectURL(await h.getFile()); objectUrls.push(url);
+          const img = document.createElement("img"); img.src = url; box.appendChild(img); break;
+        }
+      }
+      const sh = await resolveFile(src);
+      if (sh) { const pre = document.createElement("pre"); pre.textContent = stripFrontmatter(await (await sh.getFile()).text()); box.appendChild(pre); }
+      if (!box.firstChild) box.textContent = "(source not found: " + src + ")";
+      return;
+    }
+    const h = await resolveFile(src);
+    if (!h) { box.textContent = "(source not found: " + src + ")"; return; }
+    box.innerHTML = ""; const pre = document.createElement("pre");
+    pre.textContent = stripFrontmatter(await (await h.getFile()).text()) || "(empty)"; box.appendChild(pre);
+  } catch (e) { box.textContent = "Source load error: " + e.name + " — " + e.message; }
+}
+
+/* ── render (from in-memory RECS) ── */
+function render() {
+  objectUrls.forEach(URL.revokeObjectURL); objectUrls = [];
+  const out = document.getElementById("out");
+  const shown = RECS.filter(r => filter === "all" ? true : (r.fm.status || "pending") === filter);
+  document.getElementById("count").textContent = shown.length + " / " + RECS.length + " records";
+  out.innerHTML = "";
+  if (!shown.length) { out.innerHTML = '<div class="empty">Nothing here. 🎉</div>'; return; }
+
+  const byType = {};
+  for (const r of shown) (byType[r.fm.type || "note"] ??= []).push(r);
+  for (const t of Object.keys(byType).sort((a, b) => (ORDER[a] ?? 9) - (ORDER[b] ?? 9))) {
+    const h = document.createElement("div"); h.className = "group-h"; h.textContent = t + " · " + byType[t].length;
+    out.appendChild(h);
+    byType[t].sort((a, b) => (CONF[b.fm.confidence] ?? 0) - (CONF[a.fm.confidence] ?? 0));
+    for (const r of byType[t]) out.appendChild(recEl(r, t));
+  }
+}
+
+function btn(label, cls, onclick) { const b = document.createElement("button"); b.className = cls; b.textContent = label; b.onclick = onclick; return b; }
+
+function recEl(r, t) {
+  const el = document.createElement("div"); el.className = "rec " + t;
+  const top = document.createElement("div"); top.className = "rectop";
+  const meta = document.createElement("div"); meta.className = "meta";
+  const isPic = (r.fm.source || "").includes("/pictures/");
+  meta.innerHTML =
+    '<div class="sum"></div>' +
+    '<div class="small"><span class="tag">' + (r.fm.confidence || "?") + '</span>' +
+    '<span class="tag">' + (r.fm.status || "pending") + '</span>' +
+    '<button class="exp">' + (isPic ? "🖼 view" : "▸ original") + '</button> ' +
+    (r.fm.source || r.name) + '</div>';
+  meta.querySelector(".sum").textContent = r.fm.summary || "(no summary)";
+  top.appendChild(meta);
+
+  const acts = document.createElement("div"); acts.className = "acts";
+  const st = r.fm.status || "pending";
+  const guard = (fn) => async () => { acts.innerHTML = '<span class="ok-flash">…</span>';
+    try { await fn(); } catch (e) { showErr("Write failed: " + e.name + " — " + e.message); } };
+  // convert: note/idea → task (and task → note to undo)
+  if (t === "task")
+    acts.appendChild(btn("→ note", "conv-b task", guard(() => applyFields(r, { type:"note", kind:"note" }))));
+  else
+    acts.appendChild(btn("→ todo", "conv-b", guard(() => applyFields(r, { type:"task", kind:"task" }))));
+  if (st !== "done")      acts.appendChild(btn("✓ done", "done-b", guard(() => applyFields(r, { status:"done" }))));
+  if (st !== "dismissed") acts.appendChild(btn("✗ dismiss", "drop-b", guard(() => applyFields(r, { status:"dismissed" }))));
+  if (st !== "pending")   acts.appendChild(btn("↺ pending", "pill", guard(() => applyFields(r, { status:"pending" }))));
+  top.appendChild(acts);
+  el.appendChild(top);
+
+  const det = document.createElement("div"); det.className = "details"; el.appendChild(det);
+  let loaded = false;
+  const toggle = () => { det.classList.toggle("open");
+    if (det.classList.contains("open") && !loaded) { loaded = true; loadDetails(r, det); } };
+  meta.querySelector(".exp").onclick = toggle;
+  meta.querySelector(".sum").onclick = toggle;
+  return el;
+}
+
+document.getElementById("pick").onclick = pick;
+document.getElementById("refresh").onclick = reload;
+for (const b of document.querySelectorAll("#filters [data-f]")) {
+  b.onclick = () => { filter = b.dataset.f;
+    for (const x of document.querySelectorAll("#filters [data-f]")) x.classList.toggle("active", x === b);
+    render(); };
+}
+tryAutoReconnect();
+</script>
+</body>
+</html>

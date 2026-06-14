@@ -48,7 +48,7 @@ if (alerts.length === 0) {
 
 ## 📥 Triage — captured intents
 
-> Detected from voice / photos and queued in `workspace/inbox/`. Keep one — **task** → run the `orchestrate-tasks` agent or do it; **idea / note** → promote into `knowledge/` — then set `status: done`; or `status: dismissed` for noise. CLI: `wiki triage` · `wiki triage done|dismiss <stem>`.
+> Detected from voice / photos and queued in `workspace/inbox/`. Keep one — **task** → run the `orchestrate-tasks` agent or do it; **idea / note** → promote into `knowledge/` — then set `status: done`; or `status: dismissed` for noise. CLI: `wiki triage` · `wiki triage done|dismiss <stem>`. Richer surface: open `triage.html` (vault root) in a Chromium browser — previews the photo/voice original and writes status / note↔task in place.
 
 ```dataview
 TABLE WITHOUT ID
