@@ -90,8 +90,12 @@ def test_confidence_rank_ordering():
 
 def _mk_inbox(tmp_path, monkeypatch):
     import triage
-    d = tmp_path / "workspace" / "inbox"; d.mkdir(parents=True)
+    ws = tmp_path / "workspace"
+    d = ws / "inbox"; d.mkdir(parents=True)
     monkeypatch.setattr(triage, "WORKSPACE_INBOX_DIR", d)
+    monkeypatch.setattr(triage, "WORKSPACE_TASKS_DIR", ws / "tasks")
+    monkeypatch.setattr(triage, "WORKSPACE_TODO", ws / "todo.md")
+    (ws / "todo.md").write_text("# Todo\n\n## Tasks\n\n<!-- accepted-tasks -->\n", encoding="utf-8")
     def rec(stem, type_, status="pending", conf="high", summ="S"):
         (d / f"{stem}.md").write_text(
             f'---\ntype: {type_}\nstatus: {status}\nkind: {type_}\nconfidence: {conf}\n'
@@ -109,14 +113,37 @@ def test_triage_list_pending_only(tmp_path, monkeypatch, capsys):
     assert "2 pending · 3 total" in out
 
 
-def test_triage_accept_and_dismiss(tmp_path, monkeypatch):
+def test_triage_accept_task_moves_and_lists(tmp_path, monkeypatch):
     triage, rec, d = _mk_inbox(tmp_path, monkeypatch)
-    rec("voice-a", "task")
-    # triage keep → accepted (NOT done; done is the agent's execution outcome)
-    assert triage._set_status(triage._resolve("voice-a"), "accepted") == 0
-    assert "status: accepted" in (d / "voice-a.md").read_text()
-    assert triage._set_status(triage._resolve("voice-a"), "dismissed") == 0
-    assert "status: dismissed" in (d / "voice-a.md").read_text()
+    rec("voice-a", "task", summ="Do the thing")
+    assert triage._accept(triage._resolve("voice-a")) == 0
+    assert not (d / "voice-a.md").exists()                       # moved out of inbox
+    moved = triage.WORKSPACE_TASKS_DIR / "001.md"
+    assert moved.exists() and "status: accepted" in moved.read_text()
+    assert "- [ ] Do the thing — [[tasks/001]]" in triage.WORKSPACE_TODO.read_text()
+
+
+def test_triage_accept_numbers_sequentially(tmp_path, monkeypatch):
+    triage, rec, _ = _mk_inbox(tmp_path, monkeypatch)
+    rec("t1", "task"); rec("t2", "task")
+    triage._accept(triage._resolve("t1")); triage._accept(triage._resolve("t2"))
+    assert {p.name for p in triage.WORKSPACE_TASKS_DIR.glob("*.md")} == {"001.md", "002.md"}
+
+
+def test_triage_accept_note_files_in_place(tmp_path, monkeypatch):
+    triage, rec, d = _mk_inbox(tmp_path, monkeypatch)
+    rec("voice-b", "note")
+    assert triage._accept(triage._resolve("voice-b")) == 0
+    assert (d / "voice-b.md").exists()                           # idea/note stay in inbox
+    assert "status: accepted" in (d / "voice-b.md").read_text()
+    assert not (triage.WORKSPACE_TASKS_DIR / "001.md").exists()  # not moved
+
+
+def test_triage_dismiss(tmp_path, monkeypatch):
+    triage, rec, d = _mk_inbox(tmp_path, monkeypatch)
+    rec("voice-c", "task")
+    assert triage._set_status(triage._resolve("voice-c"), "dismissed") == 0
+    assert "status: dismissed" in (d / "voice-c.md").read_text()
 
 
 def test_triage_resolve_prefix_and_ambiguous(tmp_path, monkeypatch):

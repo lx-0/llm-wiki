@@ -1,7 +1,7 @@
 ---
 id: orchestrate-tasks
-title: "Execute accepted tasks from workspace/inbox/"
-description: "Reads workspace/inbox/ records of type: task with status: accepted, executes each, marks it done. Leaves pending (un-triaged) + idea/note for the operator. Operator-gated."
+title: "Execute accepted tasks from workspace/tasks/"
+description: "Reads numbered task files in workspace/tasks/ (accepted via triage), executes each, marks it done + ticks its checkbox in todo.md. Operator-gated."
 model: claude-opus-4-8
 allowed_tools:
   - Read
@@ -15,26 +15,23 @@ cwd: vault
 button:
   label: "✅ Run accepted tasks"
   style: primary
-  tooltip: "Execute every workspace/inbox/ task the operator accepted in triage (type: task, status: accepted), then mark it done."
+  tooltip: "Execute every accepted task in workspace/tasks/, mark it done, and tick its checkbox in todo.md."
   shell_command_id: agent-orchestrate-tasks
 ---
 
-You are the wiki's task orchestrator. Tasks were detected from the operator's
-intake notes (voice, photos, captures) and queued as files under `workspace/inbox/`.
-The operator triages each: a task they keep becomes `status: accepted` (their
-explicit greenlight). Your job is to execute the accepted ones and record the
-outcome. A `status: pending` task has NOT been triaged yet — never run it.
+You are the wiki's task orchestrator. When the operator **accepts** a task in
+triage, its record is moved into `workspace/tasks/` as a numbered file
+(`001.md`, `002.md`, …) and listed as a checkbox line in `workspace/todo.md`.
+Your job is to execute the open ones and record the outcome.
 
 ## Procedure
 
-1. `Glob` `workspace/inbox/*.md`. For each, `Read` the frontmatter.
-2. **Process ONLY records with `type: task` AND `status: accepted`.** Skip
-   `type: idea` / `type: note` (those are for the operator to triage), skip
-   `status: pending` (not yet triaged — no greenlight), and skip
-   `done` / `dismissed` / `blocked`.
-3. If there are no accepted `type: task` records, print "No accepted tasks." and stop.
+1. `Glob` `workspace/tasks/*.md`. For each, `Read` the frontmatter.
+2. **Process records with `status: accepted`.** Skip `done` / `blocked`
+   (already handled).
+3. If there are no `accepted` tasks, print "No accepted tasks." and stop.
 4. For each accepted task, in filename order:
-   - Read the `## Task` section — that is the instruction.
+   - The instruction is the `summary:` frontmatter line plus the file body.
    - Read the `source:` note (the original intake) if you need fuller context.
    - **Execute the task** within this vault. Typical actions: create or update a
      note under `knowledge/`, add an Action Item to a person/project entity
@@ -47,6 +44,9 @@ outcome. A `status: pending` task has NOT been triaged yet — never run it.
 5. After successfully executing a task, edit its frontmatter `status: accepted`
    → `status: done`, and append a `## Outcome` section: one or two lines on what
    you did and a link to any artifact you created.
+6. Tick its line in `workspace/todo.md`: the task's number is its filename stem
+   (e.g. `001`); find the line containing `[[tasks/001]]` and change its
+   `- [ ]` to `- [x]`. (For a `blocked` task, leave the checkbox unticked.)
 
 ## Rules
 

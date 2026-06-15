@@ -2,21 +2,19 @@
 
 Detected intents (task/idea/note) land with `status: pending`. Triage decides
 keep vs drop:
-  - accept  → keep it. note/idea = filed; task = greenlit for the
-              orchestrate-tasks agent (which runs `status: accepted` tasks).
-  - dismiss → drop as noise.
-
-Two separate axes: triage sets `pending → accepted | dismissed`; the
-orchestrate-tasks agent later sets a task `accepted → done | blocked` once it has
-actually executed it. So `done` always means "task executed", never "triaged".
+  - accept a TASK → it MOVES out of inbox/ into `workspace/tasks/<NNN>.md`
+    (numbered) and a checkbox line `- [ ] <summary> — [[tasks/<NNN>]]` is added
+    to `workspace/todo.md` (the todo list). That is the action: an accepted task
+    is a real, listed, actionable item — not just a status flag.
+  - accept an idea/note → filed in place (`status: accepted`, stays in inbox/).
+  - dismiss → drop as noise (`status: dismissed`, stays in inbox/).
 
     wiki triage                  list pending records, grouped by type
     wiki triage --all            list every record (incl. accepted/dismissed/done)
-    wiki triage accept <stem>    keep  → status: accepted
+    wiki triage accept <stem>    task → moved to tasks/ + listed in todo.md
     wiki triage dismiss <stem>   drop  → status: dismissed
 
-`<stem>` matches the record filename (a unique prefix is enough). Status is set
-by an in-place line-replace — formatting is preserved byte-for-byte.
+`<stem>` matches the record filename (a unique prefix is enough).
 """
 
 from __future__ import annotations
@@ -28,10 +26,16 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from core.paths import WORKSPACE_INBOX_DIR  # noqa: E402
+from core.paths import (  # noqa: E402
+    WORKSPACE_INBOX_DIR,
+    WORKSPACE_TASKS_DIR,
+    WORKSPACE_TODO,
+)
 
 _FM_RE = re.compile(r"\A---\n(.*?)\n---", re.DOTALL)
 _ORDER = {"task": 0, "idea": 1, "note": 2}
+# Anchor line in todo.md after which accepted-task checkbox lines are inserted.
+_TODO_MARKER = "<!-- accepted-tasks"
 
 
 def _fields(text: str) -> dict[str, str]:
@@ -87,6 +91,46 @@ def _set_status(path: Path, status: str) -> int:
     return 0
 
 
+def _next_task_number() -> str:
+    """Next free sequence number across workspace/tasks/, zero-padded to 3."""
+    nums = [
+        int(m.group(1))
+        for f in WORKSPACE_TASKS_DIR.glob("*.md")
+        if (m := re.match(r"(\d+)", f.stem))
+    ]
+    return f"{(max(nums) + 1) if nums else 1:03d}"
+
+
+def _append_todo(num: str, summary: str) -> None:
+    """Add a checkbox line for the accepted task to todo.md (after the anchor)."""
+    line = f"- [ ] {summary} — [[tasks/{num}]]"
+    if WORKSPACE_TODO.exists():
+        lines = WORKSPACE_TODO.read_text(encoding="utf-8").splitlines()
+        idx = next((i for i, ln in enumerate(lines) if _TODO_MARKER in ln), None)
+        lines.insert(idx + 1 if idx is not None else len(lines), line)
+        WORKSPACE_TODO.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    else:
+        WORKSPACE_TODO.parent.mkdir(parents=True, exist_ok=True)
+        WORKSPACE_TODO.write_text(f"# Todo\n\n## Tasks\n\n{line}\n", encoding="utf-8")
+
+
+def _accept(path: Path) -> int:
+    """Accept a record. A TASK moves to workspace/tasks/<NNN>.md and gets a
+    checkbox line in todo.md; an idea/note is filed in place (status: accepted)."""
+    text = path.read_text(encoding="utf-8")
+    fm = _fields(text)
+    if fm.get("type") != "task":
+        return _set_status(path, "accepted")
+    num = _next_task_number()
+    text = re.subn(r"^status:.*$", "status: accepted", text, count=1, flags=re.M)[0]
+    WORKSPACE_TASKS_DIR.mkdir(parents=True, exist_ok=True)
+    (WORKSPACE_TASKS_DIR / f"{num}.md").write_text(text, encoding="utf-8")
+    path.unlink()
+    _append_todo(num, fm.get("summary") or path.stem)
+    print(f"{path.stem} → accepted: moved to tasks/{num}.md + listed in todo.md")
+    return 0
+
+
 def _list(show_all: bool) -> int:
     recs = _records()
     if not recs:
@@ -121,20 +165,24 @@ def main() -> int:
     sub = ap.add_subparsers(dest="cmd")
     pl = sub.add_parser("list", help="list records (default)")
     pl.add_argument("--all", action="store_true", help="include accepted/dismissed/done")
-    # Triage verbs only: keep (accept) / drop (dismiss). `done`/`blocked` are the
-    # orchestrate-tasks agent's execution outcomes, not triage decisions.
-    _VERB_STATUS = {"accept": "accepted", "dismiss": "dismissed"}
-    for verb in _VERB_STATUS:
-        sp = sub.add_parser(verb, help=f"{verb} a record → status: {_VERB_STATUS[verb]}")
+    # Triage verbs: accept (task → tasks/ + todo.md; idea/note → filed) / dismiss.
+    for verb, helptext in (
+        ("accept", "task → moved to tasks/ + listed in todo.md; idea/note filed"),
+        ("dismiss", "drop → status: dismissed"),
+    ):
+        sp = sub.add_parser(verb, help=helptext)
         sp.add_argument("stem", help="record filename stem (unique prefix ok)")
     ap.add_argument("--all", action="store_true", help=argparse.SUPPRESS)
     args = ap.parse_args()
 
     if args.cmd in (None, "list"):
         return _list(getattr(args, "all", False))
-    if args.cmd in _VERB_STATUS:
+    if args.cmd == "accept":
         p = _resolve(args.stem)
-        return _set_status(p, _VERB_STATUS[args.cmd]) if p else 1
+        return _accept(p) if p else 1
+    if args.cmd == "dismiss":
+        p = _resolve(args.stem)
+        return _set_status(p, "dismissed") if p else 1
     return 0
 
 

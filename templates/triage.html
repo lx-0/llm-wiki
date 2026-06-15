@@ -10,11 +10,16 @@
   Brave) and reads + writes the SAME markdown the `wiki triage` CLI and Obsidian
   dashboard act on — one source of truth, no JSON sidecar, no running process.
 
+  Accepting a TASK is a real action (mirrors `wiki triage accept`): the record
+  MOVES out of inbox/ into workspace/tasks/<NNN>.md (numbered) and a checkbox
+  line `- [ ] <summary> — [[tasks/<NNN>]]` is added to workspace/todo.md.
+  Accepting an idea/note just files it (status: accepted, stays in inbox);
+  dismiss sets status: dismissed.
+
   CONTRACT (keep in sync — see scripts/intents/_record.py + scripts/triage.py):
     Each workspace/inbox/<stem>.md opens with YAML frontmatter carrying:
       type:       task | idea | note     (the bucket; convertible here)
-      status:     pending | accepted | dismissed   (triage decision)
-                  · done | blocked  (task execution outcome, set by the agent)
+      status:     pending | accepted | dismissed
       kind:       task | idea | note      (classifier label; tracks type on convert)
       confidence: high | medium | low
       summary:    JSON-encoded one-liner
@@ -62,7 +67,7 @@
 </head>
 <body>
 <h1>📥 llm-wiki Triage</h1>
-<div class="sub">Server-less. Writes <code>status:</code> / <code>type:</code> straight into the <code>.md</code> — same source of truth as <code>wiki triage</code> and the Obsidian dashboard.</div>
+<div class="sub">Server-less. Accept a task → it moves to <code>tasks/</code> and lands on <code>todo.md</code>; idea/note get filed. Same source of truth as <code>wiki triage</code> and Obsidian.</div>
 
 <div id="support"></div>
 <div class="bar">
@@ -86,7 +91,7 @@
 const ORDER = { task:0, idea:1, note:2 };
 const CONF  = { high:2, medium:1, low:0 };
 const IMG_EXT = [".jpeg",".jpg",".png",".heic",".webp",".gif"];
-let rootDir = null, inboxDir = null, filter = "pending";
+let rootDir = null, workspaceDir = null, inboxDir = null, filter = "pending";
 let RECS = [];                 // in-memory cache: {name, handle, fm, text}
 let objectUrls = [];           // revoked on every re-render to avoid leaks
 
@@ -146,7 +151,8 @@ async function showErr(msg) { document.getElementById("out").innerHTML = '<div c
 
 async function bind(root) {
   rootDir = root;
-  inboxDir = await (await root.getDirectoryHandle("workspace")).getDirectoryHandle("inbox");
+  workspaceDir = await root.getDirectoryHandle("workspace");
+  inboxDir = await workspaceDir.getDirectoryHandle("inbox");
   document.getElementById("dir").textContent = "📁 " + root.name + "/workspace/inbox";
   document.getElementById("refresh").disabled = false;
   document.getElementById("filters").style.display = "flex";
@@ -206,6 +212,44 @@ async function applyFields(rec, fields) {
   rec.text = text;
   Object.assign(rec.fm, fields);
   render();
+}
+
+// Next free task number across workspace/tasks/, zero-padded to 3 (001, 002, …).
+async function nextTaskNumber() {
+  let max = 0;
+  try {
+    const tasks = await workspaceDir.getDirectoryHandle("tasks");
+    for await (const [name, h] of tasks.entries()) {
+      const m = name.match(/^(\d+)/);
+      if (h.kind === "file" && m) max = Math.max(max, parseInt(m[1], 10));
+    }
+  } catch { /* tasks/ not created yet */ }
+  return String(max + 1).padStart(3, "0");
+}
+
+// Insert a checkbox line into todo.md after the accepted-tasks anchor.
+async function appendTodo(num, summary) {
+  const line = `- [ ] ${summary} — [[tasks/${num}]]`;
+  let lines;
+  try { lines = (await (await (await workspaceDir.getFileHandle("todo.md")).getFile()).text()).split("\n"); }
+  catch { lines = ["# Todo", "", "## Tasks", ""]; }
+  const idx = lines.findIndex(l => l.includes("<!-- accepted-tasks"));
+  lines.splice(idx >= 0 ? idx + 1 : lines.length, 0, line);
+  const fh = await workspaceDir.getFileHandle("todo.md", { create: true });
+  const w = await fh.createWritable(); await w.write(lines.join("\n")); await w.close();
+}
+
+// Accept a TASK: move its record out of inbox/ into workspace/tasks/<NNN>.md
+// and add a checkbox line to todo.md. The record leaves the triage view.
+async function acceptTask(rec) {
+  const num = await nextTaskNumber();
+  const text = setLine(rec.text, "status", "accepted");
+  const tasks = await workspaceDir.getDirectoryHandle("tasks", { create: true });
+  const fh = await tasks.getFileHandle(`${num}.md`, { create: true });
+  const w = await fh.createWritable(); await w.write(text); await w.close();
+  await inboxDir.removeEntry(rec.name);
+  await appendTodo(num, rec.fm.summary || rec.name.replace(/\.md$/, ""));
+  await reload();   // record moved out of inbox → re-read
 }
 
 /* Resolve "raw/a/b/file.ext" under the vault root → FileHandle (or null). */
@@ -289,7 +333,8 @@ function recEl(r, t) {
     acts.appendChild(btn("→ note", "conv-b task", guard(() => applyFields(r, { type:"note", kind:"note" }))));
   else
     acts.appendChild(btn("→ todo", "conv-b", guard(() => applyFields(r, { type:"task", kind:"task" }))));
-  if (st !== "accepted")  acts.appendChild(btn("✓ accept", "done-b", guard(() => applyFields(r, { status:"accepted" }))));
+  if (st !== "accepted")  acts.appendChild(btn("✓ accept", "done-b", guard(() =>
+    t === "task" ? acceptTask(r) : applyFields(r, { status: "accepted" }))));
   if (st !== "dismissed") acts.appendChild(btn("✗ dismiss", "drop-b", guard(() => applyFields(r, { status:"dismissed" }))));
   if (st !== "pending")   acts.appendChild(btn("↺ pending", "pill", guard(() => applyFields(r, { status:"pending" }))));
   top.appendChild(acts);
