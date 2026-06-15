@@ -98,9 +98,10 @@ def _list(show_all: bool) -> int:
         st = fm.get("status", "?")
         flag = "" if st == "pending" else f" [{st}]"
         conf = fm.get("confidence", "?")
+        date = (fm.get("detected_at") or "")[:10] or "—"
         summ = fm.get("summary") or f.stem
         print(f"  • {f.stem}")
-        print(f"      ({conf}{flag}) {summ}")
+        print(f"      ({date} · {conf}{flag}) {summ}")
     pend = sum(1 for _, fm in recs if fm.get("status") == "pending")
     print(f"\n{pend} pending · {len(recs)} total.  "
           "Act: wiki triage accept|dismiss <stem>")

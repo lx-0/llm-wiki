@@ -258,9 +258,11 @@ function recEl(r, t) {
   const top = document.createElement("div"); top.className = "rectop";
   const meta = document.createElement("div"); meta.className = "meta";
   const isPic = (r.fm.source || "").includes("/pictures/");
+  const date = (r.fm.detected_at || "").slice(0, 10) || "—";
   meta.innerHTML =
     '<div class="sum"></div>' +
-    '<div class="small"><span class="tag">' + (r.fm.confidence || "?") + '</span>' +
+    '<div class="small"><span class="tag">📅 ' + date + '</span>' +
+    '<span class="tag">' + (r.fm.confidence || "?") + '</span>' +
     '<span class="tag">' + (r.fm.status || "pending") + '</span>' +
     '<button class="exp">' + (isPic ? "🖼 view" : "▸ original") + '</button> ' +
     (r.fm.source || r.name) + '</div>';
