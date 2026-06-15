@@ -46,6 +46,14 @@ def _fields(text: str) -> dict[str, str]:
     return out
 
 
+def _capture_date(source: str) -> str:
+    """Capture date (photo/voice recorded), parsed from the source filename —
+    photos `2026-06-04-213644`, voice `voice-2026-05-17-…`, screenshots
+    `Screenshot_20240904_…`. NOT detected_at (which is when it was classified)."""
+    m = re.search(r"(\d{4})-(\d{2})-(\d{2})", source) or re.search(r"(\d{4})(\d{2})(\d{2})", source)
+    return f"{m.group(1)}-{m.group(2)}-{m.group(3)}" if m else ""
+
+
 def _records() -> list[tuple[Path, dict]]:
     if not WORKSPACE_INBOX_DIR.is_dir():
         return []
@@ -98,7 +106,7 @@ def _list(show_all: bool) -> int:
         st = fm.get("status", "?")
         flag = "" if st == "pending" else f" [{st}]"
         conf = fm.get("confidence", "?")
-        date = (fm.get("detected_at") or "")[:10] or "—"
+        date = _capture_date(fm.get("source", "")) or (fm.get("detected_at") or "")[:10] or "—"
         summ = fm.get("summary") or f.stem
         print(f"  • {f.stem}")
         print(f"      ({date} · {conf}{flag}) {summ}")

@@ -124,6 +124,17 @@ function parseFrontmatter(text) {
 }
 function stripFrontmatter(text) { return text.replace(/^---\n[\s\S]*?\n---\n?/, "").trim(); }
 
+// Capture date = when the photo/voice was actually taken, NOT when the intent
+// was detected (detected_at is all "today"). It's encoded in the source
+// filename across substrates: photos `2026-06-04-213644`, voice
+// `voice-2026-05-17-0946-…`, screenshots `Screenshot_20240904_223550`. Parse
+// dashed YYYY-MM-DD first, then the 8-digit YYYYMMDD form.
+function captureDate(src) {
+  const s = src || "";
+  let m = s.match(/(\d{4})-(\d{2})-(\d{2})/) || s.match(/(\d{4})(\d{2})(\d{2})/);
+  return m ? `${m[1]}-${m[2]}-${m[3]}` : "";
+}
+
 // Replace one frontmatter key's line, in place. /m + first-match = the
 // frontmatter line (it precedes any body mention). Returns new text.
 function setLine(text, key, value) {
@@ -258,7 +269,7 @@ function recEl(r, t) {
   const top = document.createElement("div"); top.className = "rectop";
   const meta = document.createElement("div"); meta.className = "meta";
   const isPic = (r.fm.source || "").includes("/pictures/");
-  const date = (r.fm.detected_at || "").slice(0, 10) || "—";
+  const date = captureDate(r.fm.source) || (r.fm.detected_at || "").slice(0, 10) || "—";
   meta.innerHTML =
     '<div class="sum"></div>' +
     '<div class="small"><span class="tag">📅 ' + date + '</span>' +
