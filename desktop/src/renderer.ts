@@ -113,6 +113,18 @@ function fmtAgo(ms: number | null): string {
   return h < 24 ? `${h}h ago` : `${Math.round(h / 24)}d ago`;
 }
 
+type CompileState = 'idle' | 'running' | { ok: boolean; durationMs: number };
+let compileState: CompileState = 'idle';
+
+function compileLine(): string {
+  if (compileState === 'running') return 'compiling…';
+  if (compileState !== 'idle') {
+    const m = Math.max(1, Math.round(compileState.durationMs / 60000));
+    return compileState.ok ? `✓ compiled · ${m}m` : '✗ compile failed';
+  }
+  return '';
+}
+
 async function renderVault(): Promise<void> {
   const meta = document.getElementById('vault-meta');
   const box = document.getElementById('vault');
@@ -125,12 +137,33 @@ async function renderVault(): Promise<void> {
     }
     if (meta) meta.textContent = v.name;
     if (box) {
+      const running = compileState === 'running';
       box.innerHTML = `
-        <div class="vault-row"><span>${v.articleCount.toLocaleString()} articles</span><span class="muted">updated ${fmtAgo(v.lastActivityMs)}</span></div>
-        <div class="vault-path" title="${v.path}">${v.path.replace(/^\/Users\/[^/]+/, '~')}</div>`;
+        <div class="vault-row"><span class="big">${v.articleCount.toLocaleString()}</span><span class="muted">articles · updated ${fmtAgo(v.lastActivityMs)}</span></div>
+        <div class="vault-path" title="${v.path}">${v.path.replace(/^\/Users\/[^/]+/, '~')}</div>
+        <div class="vault-actions">
+          <span class="compile-state ${running ? 'running' : ''}">${compileLine()}</span>
+        </div>`;
+      const btn = document.createElement('button');
+      btn.className = 'compile';
+      btn.textContent = running ? 'Compiling…' : 'Compile';
+      btn.disabled = running;
+      btn.addEventListener('click', () => void compile());
+      box.querySelector('.vault-actions')?.appendChild(btn);
     }
   } catch (err) {
     console.error(err);
+  }
+}
+
+async function compile(): Promise<void> {
+  if (compileState === 'running') return;
+  const res = await window.vault.compile();
+  if (res.started || res.running) {
+    compileState = 'running';
+    void renderVault();
+  } else if (res.error) {
+    console.error('compile:', res.error);
   }
 }
 
@@ -149,10 +182,24 @@ window.addEventListener('DOMContentLoaded', () => {
   window.panel.onVisibility((v) => {
     panelVisible = v;
     if (v) {
-      // fresh on open
+      // fresh on open + restore compile state (in case it's running)
+      void window.vault.compileStatus().then((s) => {
+        if (s.running) compileState = 'running';
+        void renderVault();
+      });
       void renderStatus();
       void renderVault();
     }
+  });
+
+  // Compile finished (pushed from main): show result, refresh stats, reset later.
+  window.vault.onCompileDone((r) => {
+    compileState = { ok: r.ok, durationMs: r.durationMs };
+    void renderVault();
+    window.setTimeout(() => {
+      compileState = 'idle';
+      void renderVault();
+    }, 8000);
   });
 
   window.addEventListener('beforeunload', () => {

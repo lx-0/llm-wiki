@@ -3,7 +3,13 @@
 
 import { contextBridge, ipcRenderer } from 'electron';
 import { LISTENER_STATUS_CHANNEL, LISTENER_CONTROL_CHANNEL, type ListenerApi } from './listeners/ipc';
-import { VAULT_STATUS_CHANNEL, type VaultApi } from './vault/ipc';
+import {
+  VAULT_STATUS_CHANNEL,
+  VAULT_COMPILE_CHANNEL,
+  VAULT_COMPILE_STATUS_CHANNEL,
+  VAULT_COMPILE_DONE_CHANNEL,
+  type VaultApi,
+} from './vault/ipc';
 import { PANEL_VISIBILITY_CHANNEL, type PanelApi } from './panel/ipc';
 
 const listeners: ListenerApi = {
@@ -13,6 +19,9 @@ const listeners: ListenerApi = {
 
 const vault: VaultApi = {
   status: () => ipcRenderer.invoke(VAULT_STATUS_CHANNEL),
+  compile: () => ipcRenderer.invoke(VAULT_COMPILE_CHANNEL),
+  compileStatus: () => ipcRenderer.invoke(VAULT_COMPILE_STATUS_CHANNEL),
+  onCompileDone: (cb) => ipcRenderer.on(VAULT_COMPILE_DONE_CHANNEL, (_e, r) => cb(r)),
 };
 
 const panel: PanelApi = {

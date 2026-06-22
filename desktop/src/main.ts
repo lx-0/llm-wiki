@@ -6,7 +6,13 @@ import { getListenerStatus } from './listeners/status';
 import { startListener, stopListener, restartListener, type LifecycleAction, type LifecycleResult } from './listeners/lifecycle';
 import { LISTENER_STATUS_CHANNEL, LISTENER_CONTROL_CHANNEL } from './listeners/ipc';
 import { getVaultStatus } from './vault/status';
-import { VAULT_STATUS_CHANNEL } from './vault/ipc';
+import { startCompile, isCompiling } from './vault/compile';
+import {
+  VAULT_STATUS_CHANNEL,
+  VAULT_COMPILE_CHANNEL,
+  VAULT_COMPILE_STATUS_CHANNEL,
+  VAULT_COMPILE_DONE_CHANNEL,
+} from './vault/ipc';
 import { BRAIN_PNG_1X, BRAIN_PNG_2X } from './assets/brainIcon';
 import { PANEL_VISIBILITY_CHANNEL } from './panel/ipc';
 
@@ -51,6 +57,16 @@ ipcMain.handle(VAULT_STATUS_CHANNEL, () => {
   return v;
 });
 
+// IPC: compile (engine action — long-running). Starts the process and pushes the
+// result to the panel when it finishes.
+ipcMain.handle(VAULT_COMPILE_CHANNEL, () => {
+  return startCompile((result) => {
+    if (DEBUG) console.log(`${VAULT_COMPILE_DONE_CHANNEL} -> ${JSON.stringify(result)}`);
+    panel?.webContents.send(VAULT_COMPILE_DONE_CHANNEL, result);
+  });
+});
+ipcMain.handle(VAULT_COMPILE_STATUS_CHANNEL, () => ({ running: isCompiling() }));
+
 // --- Menubar (tray) app -----------------------------------------------------
 // This is a menubar utility, NOT a windowed app: a Tray icon shows live status
 // and clicking it toggles a small frameless panel (the renderer) anchored under
@@ -62,13 +78,17 @@ let panel: BrowserWindow | null = null;
 
 function createPanel(): BrowserWindow {
   const win = new BrowserWindow({
-    width: 380,
-    height: 200,
+    width: 360,
+    height: 280,
     show: false,
     frame: false,
     resizable: false,
     fullscreenable: false,
     skipTaskbar: true,
+    transparent: true,
+    vibrancy: 'popover', // macOS frosted-glass popover look
+    visualEffectState: 'active',
+    roundedCorners: true,
     webPreferences: { preload: path.join(__dirname, 'preload.js') },
   });
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
