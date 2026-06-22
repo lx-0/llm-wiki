@@ -3,9 +3,9 @@ milestone: M029
 project: llm-wiki
 size: M
 created: 2026-06-22T10:44:06+0200
-status: planned
+status: shipped-mvp-plus
 total_slices: 3
-completed_slices: 2
+completed_slices: 3
 ---
 
 # M029 Roadmap
@@ -28,7 +28,28 @@ Suggested framing (refine in slice-milestone):
 
 - [x] S01 -- Electron scaffold in `desktop/` + engine `--json` status contract + the spawn-now/daemon-ready bridge abstraction (toolchain-isolated from the Python repo).
 - [x] S02 -- Listener-lifecycle backend in-repo (launchctl start/stop + freshness probe, ported from the `sp`/watchdog logic, NOT depending on them) + the start/stop control wired through the bridge.
-- [ ] S03 -- Read-only health/status window (live poll: running state, mic/sys freshness, last-capture) + macOS packaging/signing/notarization + auto-update.
+- [x] S03 -- Menubar panel (live health: running state, mic/sys freshness, last-capture) + DMG packaging (`npm run dmg`/`make`). **Signing/notarization is env-gated but UNUSED** (needs operator Apple Developer ID); **auto-update NOT built** (no release host) — both deferred, see below.
+
+## Shipped beyond the MVP — 2026-06-22 (menubar GUI → CLI alternative)
+
+The wedge grew into a real wiki frontend (operator-confirmed north star: full
+GUI alternative to the `wiki` CLI for non-techies). Shipped this session:
+Ask (`query --brief`, markdown + copy), What's pending (`menu --json` actionable
+home), Update knowledge (`compile`, x/y), Health + Update app (`doctor --json` /
+`update`), Advanced (lint/links/dedup/review), Settings (LaunchAgent autostart),
+spinner+x/y on running actions, Open-in-Obsidian, brain app icon, FDA/TCC handling,
+auto-fit popover. DRY: `vault/wiki-exec.ts` shared spawn; generic engine-command
+runner. Full feature spec + gotchas: memory `project-desktop-app-m029`, KNOWLEDGE.md,
+DECISIONS 2026-06-22, `desktop/README.md`.
+
+## Deferred / next
+- **Signing + notarization** (operator Apple Developer ID) — removes the
+  right-click-to-Open Gatekeeper step; `forge.config.ts` already env-gated.
+- **Auto-update** (needs a release host) — currently rebuild + reinstall DMG manually.
+- **Intake actions** (ingest-youtube/html, collect) — the one meaningful command group
+  not yet surfaced; admin (config/hooks/skills/setup) deliberately excluded.
+- **Operator visual verification** of the GUI (rendering, FDA grant, login-cycle) — the
+  parts REGEL #1 says are unverified until run in the installed DMG.
 
 ## Run order
 

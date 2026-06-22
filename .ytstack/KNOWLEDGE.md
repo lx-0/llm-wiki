@@ -2622,3 +2622,39 @@ articles applying one fact and reported 6. The safe pattern (now used by both
   delete+create and would otherwise false-alarm.
 - A `--dry-run` is non-destructive and must NEVER be refused by a destructive-op
   guard — it is exactly the preview you run before deciding to clean the tree.
+
+## Desktop app (`desktop/`, Electron) — macOS gotchas (2026-06-22)
+
+- **TCC blocks iCloud-vault enumeration for a Finder-launched `.app`.** The vault lives
+  under `~/Library/Mobile Documents/iCloud~md~obsidian/…`; a packaged app can `stat` the
+  path but `readdir` of `knowledge/` is denied → silent **0 notes**. `~/.config` (the vault
+  registry) is NOT protected, so the vault name/path resolve fine — only enumeration fails.
+  Fix: detect the read failure and surface "grant Full Disk Access" + an Open-Settings
+  button (`x-apple.systempreferences:…?Privacy_AllFiles`), never show a silent 0. Dev
+  (`npm start`) works because it inherits the terminal's grant — so "works in dev, 0 in the
+  DMG" is the TCC signature, not a path bug.
+- **`app.setLoginItemSettings` does not register login items for an UNSIGNED app** on modern
+  macOS (SMAppService). Confirmed broken in the installed DMG (toggle did nothing). Use a
+  per-user **LaunchAgent** plist (`~/Library/LaunchAgents/<bundleid>.plist`, `RunAtLoad` →
+  `/usr/bin/open <app>`); presence of the file IS the enabled state (unit-testable). Only the
+  installed app (not dev) points at a real bundle.
+- **macOS tray right-click context menus are unreliable** for menubar/LSUIElement Electron
+  apps — `tray.on('right-click', popUpContextMenu)` silently does nothing. Put controls in
+  the panel (footer + `<details>` disclosures), not a tray menu.
+- **`[i/total]` is the shared engine progress format** — `compile.py`, `dedup.py`,
+  `review-wiki.py`, and `curiosity/cli.py` all print `[idx/total]`. One regex
+  (`\[(\d+)/(\d+)\]`) parses x/y progress for all of them; `dream`/`update` emit none
+  (spinner-only).
+- **Spawn the vault `wiki` with an augmented PATH.** A Finder/launchd-launched app has a
+  minimal PATH (no Homebrew/asdf) → `uv` not found → `wiki` fails. Prepend
+  `/opt/homebrew/bin:~/.local/bin:~/.asdf/shims:/usr/local/bin`. Use `execFileSync`/`spawn`
+  with arg arrays (never `execSync`).
+- **Frameless/vibrancy popover needs explicit content-fit.** A fixed window height scrolls
+  once content grows; size the window to `document.documentElement.scrollHeight` via a
+  `ResizeObserver` on `body` + a `toggle` listener on every `<details>` (clamp min/max).
+- **DMG must be rebuilt after every code change** (`npm run dmg`); `out/` is gitignored so
+  the DMG never lands in git. Verify currency with `find src -newer out/make/*.dmg` (0 = fresh).
+- **Engine `--json` is the GUI contract.** `wiki menu --json` (prioritized actionable
+  suggestions: count/label/cmd/priority) drives "What's pending"; `wiki doctor --json`
+  (summary + `engine-update-available` check) drives Health + the Update-app button. Don't
+  scrape human CLI text.

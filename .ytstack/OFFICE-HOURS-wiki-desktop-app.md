@@ -1,7 +1,7 @@
 ---
 name: llm-wiki Desktop App
 one-liner: A desktop app for llm-wiki's technical and non-technical users that makes the whole wiki usable without the CLI and shows its health at a glance.
-status: GO 2026-06-22 (CEO-review PROCEED + eng-review GO; Electron; wedge-first; init-project next)
+status: MVP-plus SHIPPED 2026-06-22 — menubar app grew into a CLI-alternative GUI (Ask/menu-json/compile/doctor/update/advanced/autostart/icon/DMG); see M029-ROADMAP + DECISIONS 2026-06-22. Deferred: signing/notarization (operator Apple ID), auto-update, intake actions, operator GUI verification.
 captured: 2026-06-13
 related: [[screenpipe-intake]], [[listener-lifecycle]], [[interactive-cli]], M003 Obsidian dashboard
 ---
