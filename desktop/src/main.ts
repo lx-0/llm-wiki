@@ -97,10 +97,12 @@ function brainIcon(): Electron.NativeImage {
   return img;
 }
 
-/** Small at-a-glance state glyph shown next to the brain icon. */
+/** At-a-glance recording indicator next to the brain icon — ONLY shown while
+ *  recording is on. Stopped ⇒ no glyph (just the brain). */
 function trayGlyph(): string {
   const s = getListenerStatus(LISTENERS[0]);
-  return !s.running ? ' ○' : s.zombieSuspected ? ' ◍' : ' ●';
+  if (!s.running) return '';
+  return s.zombieSuspected ? ' ◍' : ' ●';
 }
 
 app.on('ready', () => {
