@@ -5,4 +5,51 @@ body {
   margin: auto;
   max-width: 38rem;
   padding: 2rem;
+  color: #1c1c1e;
 }
+
+h1 { font-size: 1.4rem; margin: 0 0 0.25rem; }
+h2 { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; color: #8a8a8e; margin: 1.5rem 0 0.5rem; }
+
+ul { list-style: none; padding: 0; margin: 0; }
+
+.listener {
+  border: 1px solid #e5e5ea;
+  border-radius: 10px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.6rem;
+}
+
+.row { display: flex; align-items: center; gap: 0.5rem; }
+.row strong { font-size: 1.05rem; }
+.row button { margin-left: auto; }
+
+.dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.dot.running { background: #34c759; }
+.dot.stopped { background: #c7c7cc; }
+.dot.zombie  { background: #ff9500; }
+
+.state { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.03em; }
+.state.running { color: #248a3d; }
+.state.stopped { color: #8a8a8e; }
+.state.zombie  { color: #c93400; }
+
+.channels {
+  display: flex;
+  gap: 1.25rem;
+  margin-top: 0.5rem;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.9rem;
+  color: #3a3a3c;
+}
+.channels .muted { color: #8a8a8e; margin-left: auto; }
+
+button {
+  font-size: 0.9rem;
+  padding: 0.25rem 0.9rem;
+  border-radius: 7px;
+  border: 1px solid #c7c7cc;
+  background: #f2f2f7;
+  cursor: pointer;
+}
+button:disabled { opacity: 0.5; cursor: default; }
