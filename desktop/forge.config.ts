@@ -22,6 +22,7 @@ const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
     name: 'llm-wiki',
+    icon: 'assets/icon', // forge appends .icns on macOS (assets/icon.icns)
     // Stable app identity (not the generic com.github.Electron). Matters for TCC
     // grants the app may need later. Operator can rename to an org-preferred id.
     appBundleId: 'cloud.yesterday.llm-wiki',
