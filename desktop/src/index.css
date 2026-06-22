@@ -138,13 +138,38 @@ button:disabled { background: rgba(120,120,128,0.3); color: var(--muted); cursor
 #ask-input:focus { border-color: var(--blue); }
 .ask-bar button { margin-left: 0; }
 .ask-answer {
+  position: relative;
   margin-top: 8px; padding: 10px 12px; border-radius: 10px;
   background: var(--card); border: 0.5px solid var(--card-border);
-  font-size: 12.5px; line-height: 1.45; white-space: pre-wrap; word-break: break-word;
-  max-height: 260px; overflow-y: auto; -webkit-user-select: text; user-select: text;
+  font-size: 12.5px; line-height: 1.45; word-break: break-word;
+  max-height: 280px; overflow-y: auto; -webkit-user-select: text; user-select: text;
 }
 .ask-answer.thinking { color: var(--muted); font-style: italic; }
-.ask-answer.err { color: var(--amber); }
+.ask-answer.err { color: var(--amber); white-space: pre-wrap; }
+
+/* Rendered markdown answer */
+.ask-answer .md > :first-child { margin-top: 0; padding-right: 26px; }
+.ask-answer .md > :last-child { margin-bottom: 0; }
+.ask-answer .md p { margin: 0 0 8px; }
+.ask-answer .md ul, .ask-answer .md ol { margin: 0 0 8px; padding-left: 17px; }
+.ask-answer .md li { margin: 2px 0; }
+.ask-answer .md li::marker { color: var(--muted); }
+.ask-answer .md strong { font-weight: 700; }
+.ask-answer .md h1, .ask-answer .md h2, .ask-answer .md h3, .ask-answer .md h4 { font-size: 13px; font-weight: 700; margin: 11px 0 5px; }
+.ask-answer .md code { font-family: ui-monospace, 'SF Mono', monospace; font-size: 11px; background: rgba(120,120,128,0.2); padding: 1px 4px; border-radius: 4px; }
+.ask-answer .md a { color: var(--blue); text-decoration: none; }
+.ask-answer .md hr { border: none; border-top: 0.5px solid var(--hairline); margin: 9px 0; }
+.wl { color: var(--blue); font-weight: 500; }
+
+/* Minimalist copy button */
+.copy {
+  position: absolute; top: 7px; right: 7px; margin: 0;
+  width: 24px; height: 24px; padding: 0; border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(120,120,128,0.16); color: var(--muted);
+}
+.copy:hover { background: rgba(120,120,128,0.3); color: var(--text); }
+.copy.done { color: var(--green); background: rgba(52,199,89,0.15); }
 
 /* What's pending */
 .pending-list { margin-top: 6px; padding: 6px 10px; display: flex; flex-direction: column; }

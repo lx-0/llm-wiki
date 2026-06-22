@@ -42,6 +42,7 @@
     "vitest": "^4.1.9"
   },
   "dependencies": {
-    "electron-squirrel-startup": "^1.0.1"
+    "electron-squirrel-startup": "^1.0.1",
+    "marked": "^18.0.5"
   }
 }

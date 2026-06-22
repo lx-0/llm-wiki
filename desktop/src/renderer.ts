@@ -27,7 +27,20 @@
  */
 
 import './index.css';
+import { marked } from 'marked';
 import { ADVANCED_COMMANDS } from './vault/ipc';
+
+const ICON_COPY = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
+const ICON_CHECK = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>`;
+
+/** Render the answer markdown to HTML; wikilinks [[a/b/slug]] → a subtle chip (slug). */
+function renderMarkdown(md: string): string {
+  const withLinks = md.replace(/\[\[([^\]]+)\]\]/g, (_m, p: string) => {
+    const name = p.split('/').pop() || p;
+    return `<span class="wl">${name}</span>`;
+  });
+  return marked.parse(withLinks, { breaks: true, async: false }) as string;
+}
 
 // Live-polling health view + start/stop control. The renderer only calls the
 // contextBridge API — no Node, no engine.
@@ -304,8 +317,24 @@ async function ask(): Promise<void> {
   answer.textContent = 'Thinking…';
   try {
     const res = await window.vault.query(q);
-    answer.className = 'ask-answer' + (res.ok ? '' : ' err');
-    answer.textContent = res.answer || 'No answer.';
+    if (res.ok) {
+      answer.className = 'ask-answer';
+      answer.innerHTML = `<button class="copy" title="Copy to clipboard">${ICON_COPY}</button><div class="md">${renderMarkdown(res.answer)}</div>`;
+      const copyBtn = answer.querySelector('.copy') as HTMLButtonElement | null;
+      copyBtn?.addEventListener('click', () => {
+        void navigator.clipboard.writeText(res.answer).then(() => {
+          copyBtn.innerHTML = ICON_CHECK;
+          copyBtn.classList.add('done');
+          window.setTimeout(() => {
+            copyBtn.innerHTML = ICON_COPY;
+            copyBtn.classList.remove('done');
+          }, 1500);
+        });
+      });
+    } else {
+      answer.className = 'ask-answer err';
+      answer.textContent = res.answer || 'No answer.';
+    }
   } catch {
     answer.className = 'ask-answer err';
     answer.textContent = 'Something went wrong.';
