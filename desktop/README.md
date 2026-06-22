@@ -86,19 +86,38 @@ npm run make       # build .dmg + .zip
 npm run package    # build the .app only (no installer)
 ```
 
-### Signed + notarized build (for distribution without Gatekeeper warnings)
+### Signed + notarized build (runbook — for distribution without Gatekeeper warnings)
 
-Set your Apple Developer ID env vars, then build — `forge.config.ts` signs +
-notarizes automatically when these are present:
+This is what makes the app installable by non-technical users (no right-click→Open)
+and makes the Full-Disk-Access grant persist across updates. One-time setup needs an
+**Apple Developer account** ($99/yr). `forge.config.ts` is already wired — it signs +
+notarizes automatically when the env vars are present, and does nothing without them.
 
-```bash
-export APPLE_ID="you@example.com"
-export APPLE_PASSWORD="app-specific-password"   # from appleid.apple.com
-export APPLE_TEAM_ID="XXXXXXXXXX"
-npm run dmg
-```
+1. **Enroll** at developer.apple.com (Apple Developer Program).
+2. **Create a “Developer ID Application” certificate** (Xcode → Settings → Accounts →
+   Manage Certificates → +, or the Developer portal) — it lands in your login keychain.
+   Verify: `security find-identity -v -p codesigning` shows `Developer ID Application: …`.
+3. **App-specific password** for notarization: appleid.apple.com → Sign-In & Security →
+   App-Specific Passwords → generate one.
+4. **Find your Team ID**: developer.apple.com → Membership (10-char, e.g. `AB12CD34EF`).
+5. **Build signed + notarized:**
+   ```bash
+   export APPLE_ID="you@example.com"
+   export APPLE_PASSWORD="abcd-efgh-ijkl-mnop"   # the app-specific password
+   export APPLE_TEAM_ID="AB12CD34EF"
+   npm run dmg
+   ```
+   Notarization adds a few minutes (Apple processes it server-side). No entitlements
+   file is needed — `@electron/osx-sign` supplies the Electron defaults (incl. JIT).
+6. **Verify** the result: `spctl -a -vvv -t install out/make/llm-wiki-*.dmg` →
+   `accepted / Notarized Developer ID`.
 
-A “Developer ID Application” certificate must be in your login keychain.
+### Auto-update (after signing)
+
+Auto-update needs a **signed** app (Squirrel.Mac refuses to update unsigned apps) +
+a release host (e.g. GitHub Releases). Once signing is in place, wire
+`update-electron-app` against a releases feed — deferred until the release host is
+chosen. Until then, distribute the signed DMG and reinstall manually.
 
 ## Notes
 
