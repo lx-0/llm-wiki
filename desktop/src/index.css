@@ -8,6 +8,7 @@
   --card: rgba(255, 255, 255, 0.55);
   --card-border: rgba(0, 0, 0, 0.07);
   --hairline: rgba(0, 0, 0, 0.08);
+  --sticky-bg: rgba(246, 246, 248, 0.68);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -17,6 +18,7 @@
     --card: rgba(255, 255, 255, 0.08);
     --card-border: rgba(255, 255, 255, 0.1);
     --hairline: rgba(255, 255, 255, 0.12);
+    --sticky-bg: rgba(28, 28, 30, 0.62);
   }
 }
 
@@ -32,12 +34,23 @@ body {
   cursor: default;
 }
 
-body.panel { padding: 12px; }
+body.panel { padding: 0; }
 
 ul { list-style: none; padding: 0; margin: 0; }
 
+/* Sticky header + search bar (stay pinned while the body scrolls) */
+.sticky-top {
+  position: sticky; top: 0; z-index: 10;
+  padding: 12px 12px 9px;
+  background: var(--sticky-bg);
+  backdrop-filter: blur(22px) saturate(180%);
+  -webkit-backdrop-filter: blur(22px) saturate(180%);
+  border-bottom: 0.5px solid var(--hairline);
+}
+.body-scroll { padding: 10px 12px 12px; }
+
 /* Header */
-.app { display: flex; align-items: center; gap: 7px; padding: 2px 2px 10px; }
+.app { display: flex; align-items: center; gap: 7px; padding: 0; margin: 0 0 9px; }
 .logo { width: 17px; height: 17px; color: var(--text); flex: none; }
 .brand { font-weight: 700; font-size: 15px; letter-spacing: -0.01em; }
 .vault-meta { margin-left: auto; font-size: 11px; font-weight: 600; color: var(--muted); padding: 2px 8px; background: var(--card); border-radius: 6px; }
@@ -125,8 +138,7 @@ button:disabled { background: rgba(120,120,128,0.3); color: var(--muted); cursor
 .vault-hint { font-size: 11px; color: var(--muted); margin-top: 4px; line-height: 1.35; }
 .vault-hint b { color: var(--text); }
 
-/* Ask */
-.ask { margin-bottom: 11px; }
+/* Ask (the bar lives in the sticky header; the answer scrolls in the body) */
 .ask-bar { display: flex; gap: 7px; }
 #ask-input {
   flex: 1; min-width: 0; font: inherit; font-size: 13px;
@@ -139,7 +151,7 @@ button:disabled { background: rgba(120,120,128,0.3); color: var(--muted); cursor
 .ask-bar button { margin-left: 0; }
 .ask-answer {
   position: relative;
-  margin-top: 8px; padding: 10px 12px; border-radius: 10px;
+  margin: 0 0 11px; padding: 10px 12px; border-radius: 10px;
   background: var(--card); border: 0.5px solid var(--card-border);
   font-size: 12.5px; line-height: 1.45; word-break: break-word;
   max-height: 280px; overflow-y: auto; -webkit-user-select: text; user-select: text;

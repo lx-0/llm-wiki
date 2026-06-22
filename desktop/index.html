@@ -5,42 +5,44 @@
     <title>llm-wiki</title>
   </head>
   <body class="panel">
-    <header class="app">
-      <svg class="logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M11 4.4c-1.4-.8-3.4-.3-4 1.2-1.5.1-2.6 1.3-2.6 2.8 0 .3 0 .6.1.9-1 .5-1.6 1.5-1.6 2.6 0 .9.4 1.7 1.1 2.2-.2.4-.3.8-.3 1.3 0 1.5 1.2 2.7 2.8 2.8.5.9 1.5 1.5 2.6 1.5h1.8V4.9" />
-        <path d="M13 4.4c1.4-.8 3.4-.3 4 1.2 1.5.1 2.6 1.3 2.6 2.8 0 .3 0 .6-.1.9 1 .5 1.6 1.5 1.6 2.6 0 .9-.4 1.7-1.1 2.2.2.4.3.8.3 1.3 0 1.5-1.2 2.7-2.8 2.8-.5.9-1.5 1.5-2.6 1.5h-1.8V4.9" />
-        <circle cx="8.5" cy="10" r="1" fill="currentColor" stroke="none" />
-        <circle cx="15.5" cy="13.5" r="1" fill="currentColor" stroke="none" />
-      </svg>
-      <span class="brand">llm-wiki</span>
-      <span id="vault-meta" class="vault-meta"></span>
-    </header>
-    <div class="ask">
+    <div class="sticky-top">
+      <header class="app">
+        <svg class="logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M11 4.4c-1.4-.8-3.4-.3-4 1.2-1.5.1-2.6 1.3-2.6 2.8 0 .3 0 .6.1.9-1 .5-1.6 1.5-1.6 2.6 0 .9.4 1.7 1.1 2.2-.2.4-.3.8-.3 1.3 0 1.5 1.2 2.7 2.8 2.8.5.9 1.5 1.5 2.6 1.5h1.8V4.9" />
+          <path d="M13 4.4c1.4-.8 3.4-.3 4 1.2 1.5.1 2.6 1.3 2.6 2.8 0 .3 0 .6-.1.9 1 .5 1.6 1.5 1.6 2.6 0 .9-.4 1.7-1.1 2.2.2.4.3.8.3 1.3 0 1.5-1.2 2.7-2.8 2.8-.5.9-1.5 1.5-2.6 1.5h-1.8V4.9" />
+          <circle cx="8.5" cy="10" r="1" fill="currentColor" stroke="none" />
+          <circle cx="15.5" cy="13.5" r="1" fill="currentColor" stroke="none" />
+        </svg>
+        <span class="brand">llm-wiki</span>
+        <span id="vault-meta" class="vault-meta"></span>
+      </header>
       <div class="ask-bar">
         <input id="ask-input" type="text" placeholder="Ask your wiki anything…" autocomplete="off" spellcheck="false" />
         <button id="ask-btn" class="compile">Ask</button>
       </div>
-      <div id="ask-answer" class="ask-answer" hidden></div>
     </div>
-    <section id="vault" class="card vault"></section>
-    <div id="health" class="health"></div>
-    <div id="recent"></div>
-    <div id="pending"></div>
-    <h2 class="section-label">Listeners</h2>
-    <ul id="listeners"></ul>
-    <details id="advanced" class="disclosure">
-      <summary>Advanced</summary>
-      <div id="advanced-actions" class="advanced-actions"></div>
-    </details>
-    <details id="settings" class="disclosure">
-      <summary>Settings</summary>
-      <div class="disclosure-body">
-        <label class="login"><input type="checkbox" id="login-toggle" /> Start at login</label>
-      </div>
-    </details>
-    <footer class="footer">
-      <button id="quit" class="quit">Quit</button>
-    </footer>
+    <main class="body-scroll">
+      <div id="ask-answer" class="ask-answer" hidden></div>
+      <section id="vault" class="card vault"></section>
+      <div id="health" class="health"></div>
+      <div id="recent"></div>
+      <div id="pending"></div>
+      <h2 class="section-label">Listeners</h2>
+      <ul id="listeners"></ul>
+      <details id="advanced" class="disclosure">
+        <summary>Advanced</summary>
+        <div id="advanced-actions" class="advanced-actions"></div>
+      </details>
+      <details id="settings" class="disclosure">
+        <summary>Settings</summary>
+        <div class="disclosure-body">
+          <label class="login"><input type="checkbox" id="login-toggle" /> Start at login</label>
+        </div>
+      </details>
+      <footer class="footer">
+        <button id="quit" class="quit">Quit</button>
+      </footer>
+    </main>
     <script type="module" src="/src/renderer.ts"></script>
   </body>
 </html>
