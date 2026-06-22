@@ -30,17 +30,32 @@ import './index.css';
 
 // Live-polling health view + start/stop control. The renderer only calls the
 // contextBridge API — no Node, no engine.
-let busy = false;
 const POLL_MS = 3000;
-
-function fmtAge(c: { fresh: boolean; ageSeconds: number | null }): string {
-  if (c.ageSeconds == null) return 'no data';
-  const a = c.ageSeconds < 90 ? `${c.ageSeconds}s` : `${Math.round(c.ageSeconds / 60)}m`;
-  return `${a} ago${c.fresh ? ' ✓' : ''}`;
-}
+/** in-flight action per listener id, for instant toggle feedback */
+const pending = new Map<string, 'start' | 'stop'>();
 
 function fmtClock(ms: number | null): string {
-  return ms == null ? '—' : new Date(ms).toLocaleTimeString();
+  return ms == null ? '—' : new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+function fmtDur(sec: number | null): string {
+  if (sec == null) return '—';
+  return sec < 90 ? `${sec}s` : `${Math.round(sec / 60)}m`;
+}
+
+type Status = Awaited<ReturnType<typeof window.listeners.status>>[number];
+
+/** One clear, human line — semantic state, not a raw growing counter. */
+function summaryLine(s: Status): string {
+  const p = pending.get(s.id);
+  if (p) return p === 'start' ? 'starting…' : 'stopping…';
+  if (!s.running) return `stopped · last capture ${fmtClock(s.channels.mic.lastCaptureAtMs)}`;
+  const mic = s.channels.mic, sys = s.channels.system;
+  if (mic.fresh && sys.fresh) return 'capturing · mic + system audio';
+  const parts: string[] = [];
+  parts.push(mic.fresh ? 'mic ✓' : `mic silent ${fmtDur(mic.ageSeconds)}`);
+  parts.push(sys.fresh ? 'system ✓' : `system silent ${fmtDur(sys.ageSeconds)}`);
+  return parts.join(' · ');
 }
 
 async function renderStatus(): Promise<void> {
@@ -50,25 +65,22 @@ async function renderStatus(): Promise<void> {
     const statuses = await window.listeners.status();
     el.innerHTML = '';
     for (const s of statuses) {
-      const state = !s.running ? 'stopped' : s.zombieSuspected ? 'zombie' : 'running';
+      const p = pending.get(s.id);
+      const state = p ? 'busy' : !s.running ? 'stopped' : s.zombieSuspected ? 'zombie' : 'running';
       const card = document.createElement('li');
       card.className = 'listener';
       card.innerHTML = `
-        <div class="row">
+        <div class="head">
           <span class="dot ${state}"></span>
-          <strong>${s.id}</strong>
-          <span class="state ${state}">${state}</span>
+          <span class="name">${s.id}</span>
         </div>
-        <div class="channels">
-          <span>mic: ${fmtAge(s.channels.mic)}</span>
-          <span>sys: ${fmtAge(s.channels.system)}</span>
-          <span class="muted">last: ${fmtClock(s.channels.mic.lastCaptureAtMs)}</span>
-        </div>`;
+        <div class="summary ${state}">${summaryLine(s)}</div>`;
       const btn = document.createElement('button');
-      btn.textContent = s.running ? 'Stop' : 'Start';
-      btn.disabled = busy;
+      btn.className = s.running ? 'stop' : 'start';
+      btn.textContent = p ? '…' : s.running ? 'Stop' : 'Start';
+      btn.disabled = Boolean(p);
       btn.addEventListener('click', () => void control(s.id, s.running ? 'stop' : 'start'));
-      card.querySelector('.row')?.appendChild(btn);
+      card.querySelector('.head')?.appendChild(btn);
       el.appendChild(card);
     }
   } catch (err) {
@@ -78,14 +90,16 @@ async function renderStatus(): Promise<void> {
 }
 
 async function control(id: string, action: 'start' | 'stop'): Promise<void> {
-  if (busy) return;
-  busy = true;
-  void renderStatus(); // reflect disabled buttons
+  if (pending.has(id)) return;
+  pending.set(id, action); // instant feedback (starting…/stopping…)
+  void renderStatus();
   try {
     const res = await window.listeners.control(id, action);
     if (!res.ok) console.error(`${action} ${id} failed:`, res.error);
+    // give the daemon a moment to actually flip launchd state before we re-read
+    await new Promise((r) => setTimeout(r, 1500));
   } finally {
-    busy = false;
+    pending.delete(id);
     void renderStatus();
   }
 }
@@ -93,7 +107,7 @@ async function control(id: string, action: 'start' | 'stop'): Promise<void> {
 window.addEventListener('DOMContentLoaded', () => {
   void renderStatus();
   const timer = window.setInterval(() => {
-    if (!busy) void renderStatus();
+    if (pending.size === 0) void renderStatus();
   }, POLL_MS);
   window.addEventListener('beforeunload', () => window.clearInterval(timer));
 });
