@@ -3,9 +3,9 @@ milestone: M029
 slice: S01
 project: llm-wiki
 created: 2026-06-22T10:44:06+0200
-status: in_progress
+status: done
 task_count: 4
-completed_tasks: 2
+completed_tasks: 4
 ---
 
 # M029-S01 -- Slice Plan
@@ -29,12 +29,13 @@ MVP builds on a real, non-brittle foundation.
   freshness (per-device last-chunk, last-capture) into a typed status object. Pure
   freshness logic separated from I/O + unit-tested (vitest). **No Python `wiki
   --json` command** (deferred to the full-GUI expansion; YAGNI for the MVP).
-- [ ] T03 -- Wire `getListenerStatus()` to the renderer via IPC (main → preload
+- [x] T03 -- Wire `getListenerStatus()` to the renderer via IPC (main → preload
   `contextBridge` → renderer), typed end-to-end. The spawn-now/daemon-ready seam
   is retained only for *future* engine-pipeline calls, not listener status.
-- [ ] T04 -- Dev smoke test: app launches, calls the bridge, renders the parsed
-  status object (raw JSON dump is fine for this slice). Proves the engine↔app path
-  end-to-end before any real UI.
+- [x] T04 -- Dev smoke test: app launches, calls the bridge, renders the parsed
+  status object. **ABSORBED BY T03** — T03 renders the parsed status and its
+  dev-launch verification exercised this exact path end-to-end (no separate work
+  remained). Closed as absorbed, not dropped.
 
 ## Done when
 

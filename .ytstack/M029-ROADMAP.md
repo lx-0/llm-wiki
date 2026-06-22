@@ -5,7 +5,7 @@ size: M
 created: 2026-06-22T10:44:06+0200
 status: planned
 total_slices: 3
-completed_slices: 0
+completed_slices: 1
 ---
 
 # M029 Roadmap
@@ -26,7 +26,7 @@ Slice detail lives in per-slice `M029-S##-PLAN.md` files, created by `ytstack:sl
 
 Suggested framing (refine in slice-milestone):
 
-- [ ] S01 -- Electron scaffold in `desktop/` + engine `--json` status contract + the spawn-now/daemon-ready bridge abstraction (toolchain-isolated from the Python repo).
+- [x] S01 -- Electron scaffold in `desktop/` + engine `--json` status contract + the spawn-now/daemon-ready bridge abstraction (toolchain-isolated from the Python repo).
 - [ ] S02 -- Listener-lifecycle backend in-repo (launchctl start/stop + freshness probe, ported from the `sp`/watchdog logic, NOT depending on them) + the start/stop control wired through the bridge.
 - [ ] S03 -- Read-only health/status window (live poll: running state, mic/sys freshness, last-capture) + macOS packaging/signing/notarization + auto-update.
 
