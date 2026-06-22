@@ -3,9 +3,9 @@ milestone: M029
 slice: S02
 project: llm-wiki
 created: 2026-06-22T10:44:06+0200
-status: planned
+status: done
 task_count: 3
-completed_tasks: 1
+completed_tasks: 3
 ---
 
 # M029-S02 -- Slice Plan
@@ -22,10 +22,10 @@ operator-local prototypes.
   AND System-Audio-stale → restart), with the 30-min cooldown. **Self-contained**
   — must NOT shell out to `~/.screenpipe/sp` or `~/.screenpipe/watchdog.sh`
   (those stay disposable prototypes; this is the shipped equivalent).
-- [ ] T02 -- Wire a start/stop control through the bridge (renderer → main IPC →
+- [x] T02 -- Wire a start/stop control through the bridge (renderer → main IPC →
   lifecycle backend). Reflects real state (running/stopped) and disables itself
   while a transition is in flight.
-- [ ] T03 -- Verify start/stop actually takes effect: stopping halts DB growth,
+- [x] T03 -- Verify start/stop actually takes effect: stopping halts DB growth,
   starting resumes it (assert against `~/.screenpipe/db.sqlite` chunk counts
   before/after). Real behaviour, not just "the command returned 0".
 
