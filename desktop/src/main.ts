@@ -8,16 +8,21 @@ import { LISTENER_STATUS_CHANNEL, LISTENER_CONTROL_CHANNEL } from './listeners/i
 import { getVaultStatus } from './vault/status';
 import { VAULT_STATUS_CHANNEL } from './vault/ipc';
 import { BRAIN_PNG_1X, BRAIN_PNG_2X } from './assets/brainIcon';
+import { PANEL_VISIBILITY_CHANNEL } from './panel/ipc';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
   app.quit();
 }
 
+// Verbose IPC logging only when explicitly enabled (LLM_WIKI_DEBUG=1) — otherwise
+// a background app would spam the console on every poll.
+const DEBUG = process.env.LLM_WIKI_DEBUG === '1';
+
 // IPC: listener status (system data — launchd + sqlite, read directly; no engine call).
 ipcMain.handle(LISTENER_STATUS_CHANNEL, () => {
   const all = LISTENERS.map((l) => getListenerStatus(l));
-  console.log(`${LISTENER_STATUS_CHANNEL} -> ${JSON.stringify(all)}`);
+  if (DEBUG) console.log(`${LISTENER_STATUS_CHANNEL} -> ${JSON.stringify(all)}`);
   return all;
 });
 
@@ -33,14 +38,16 @@ ipcMain.handle(LISTENER_CONTROL_CHANNEL, (_e, id: string, action: LifecycleActio
   const fn = ACTIONS[action];
   if (!fn) return { action, ok: false, error: `unknown action: ${action}` };
   const res = fn(def);
-  console.log(`${LISTENER_CONTROL_CHANNEL} ${id}/${action} -> ${JSON.stringify(res)}`);
+  if (DEBUG) console.log(`${LISTENER_CONTROL_CHANNEL} ${id}/${action} -> ${JSON.stringify(res)}`);
+  // refresh the menubar glyph promptly after a toggle
+  tray?.setTitle(trayGlyph());
   return res;
 });
 
 // IPC: vault status (filesystem-derived facts about the active vault; no engine call).
 ipcMain.handle(VAULT_STATUS_CHANNEL, () => {
   const v = getVaultStatus();
-  console.log(`${VAULT_STATUS_CHANNEL} -> ${JSON.stringify(v)}`);
+  if (DEBUG) console.log(`${VAULT_STATUS_CHANNEL} -> ${JSON.stringify(v)}`);
   return v;
 });
 
@@ -71,6 +78,9 @@ function createPanel(): BrowserWindow {
   }
   // Behave like a menubar popover: dismiss when it loses focus.
   win.on('blur', () => win.hide());
+  // Tell the renderer when it's visible so it polls ONLY while shown.
+  win.on('show', () => win.webContents.send(PANEL_VISIBILITY_CHANNEL, true));
+  win.on('hide', () => win.webContents.send(PANEL_VISIBILITY_CHANNEL, false));
   return win;
 }
 
@@ -112,8 +122,10 @@ app.on('ready', () => {
   tray.setTitle(trayGlyph());
   tray.on('click', togglePanel);
   panel = createPanel();
-  // Refresh the menubar glyph on its own cadence (visible even when panel closed).
-  setInterval(() => tray?.setTitle(trayGlyph()), 5000);
+  // Lightweight background check for the menubar glyph (visible even when the
+  // panel is closed) — slow cadence; the panel does its own faster poll only
+  // while visible.
+  setInterval(() => tray?.setTitle(trayGlyph()), 15000);
 });
 
 // Menubar app: do NOT quit when the panel hides/closes — it lives in the tray.

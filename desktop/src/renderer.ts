@@ -30,7 +30,7 @@ import './index.css';
 
 // Live-polling health view + start/stop control. The renderer only calls the
 // contextBridge API — no Node, no engine.
-const POLL_MS = 3000;
+const POLL_MS = 5000;
 /** in-flight action per listener id, for instant toggle feedback */
 const pending = new Map<string, 'start' | 'stop'>();
 
@@ -135,12 +135,26 @@ async function renderVault(): Promise<void> {
 }
 
 window.addEventListener('DOMContentLoaded', () => {
-  void renderStatus();
-  void renderVault();
+  // Visibility is driven by MAIN (authoritative). Starts hidden ⇒ no polling
+  // until the panel is opened — a closed menubar panel does zero work.
+  let panelVisible = false;
+
   const t1 = window.setInterval(() => {
-    if (pending.size === 0) void renderStatus();
+    if (panelVisible && pending.size === 0) void renderStatus();
   }, POLL_MS);
-  const t2 = window.setInterval(() => void renderVault(), 60_000);
+  const t2 = window.setInterval(() => {
+    if (panelVisible) void renderVault();
+  }, 60_000);
+
+  window.panel.onVisibility((v) => {
+    panelVisible = v;
+    if (v) {
+      // fresh on open
+      void renderStatus();
+      void renderVault();
+    }
+  });
+
   window.addEventListener('beforeunload', () => {
     window.clearInterval(t1);
     window.clearInterval(t2);
