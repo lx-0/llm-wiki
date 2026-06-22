@@ -49,15 +49,29 @@ M -- see `M029-ROADMAP.md` for slice breakdown.
   spawn-now / daemon-ready abstraction; (2) macOS signing/notarization in-scope;
   (3) lifecycle logic in-repo, app owns system-control+health lane vs Obsidian's
   browse/edit lane.
+- 2026-06-22 (DRY re-scope of S01-T02, operator prompt "refactor sustainably"):
+  **Listener status is SYSTEM data (launchd + `~/.screenpipe/db.sqlite`), not
+  wiki-engine data** → the app reads it directly in TS; **no Python `wiki --json`
+  command for the MVP**, no engine config/migration, no cold-spawn. The engine
+  `--json` contract (eng-review seam 1) is deferred to the full-GUI expansion,
+  when the app consumes wiki-PIPELINE health (compile/dream/collector) — YAGNI now.
+  Listener-status logic is implemented **once** in `desktop/` as the single source
+  of truth for S02 (toggle state) + S03 (health window); `sp`/watchdog stay
+  disposable prototypes. Db-path/launchd-label live in a small in-`desktop/`
+  **listener registry** (one entry: screenpipe), prefiguring the
+  `listener-lifecycle` registry — not hardcoded.
+- 2026-06-22: Packaging toolchain = **electron-forge** (research-gated via
+  context7 in S01-T01: scaffold cmd + osxSign/osxNotarize confirmed).
+- 2026-06-22: Test runner = **vitest** (org standard per CLAUDE.md; integrates
+  with the scaffold's vite).
 
 ## Open questions
 
-- Bridge final call for the MVP: child-process spawn of `wiki ... --json` /
-  `launchctl` (simple, cold-start latency) vs a thin local daemon (warm, more
-  surface). Lean spawn for MVP; keep the seam swappable.
-- Packaging toolchain: `electron-builder` vs `electron-forge` (plan-task decision).
-- Lifecycle ownership: implement launchctl + freshness probe directly in `desktop/`
-  for the MVP, vs build the engine `listener-lifecycle` backend first and make the
-  app a thin client. Lean app-owns-for-MVP; consolidate later.
+- Bridge for the MVP: in-process TS status module (decided above); the
+  spawn-now/daemon-ready abstraction is retained only for *future* engine calls
+  (pipeline health), not needed for listener status.
+- Cross-tech CI: Node/Electron `desktop/` inside a Python/CLI repo — collection-
+  level isolation holds (pytest testpaths=tests, ruff .py-only); revisit if a
+  repo-wide pre-commit hook is added.
 - Cross-tech in one repo: Node/Electron `desktop/` inside a Python/CLI repo —
   decide CI / lint / build isolation so the two toolchains don't interfere.
