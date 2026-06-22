@@ -39,10 +39,21 @@ type Doctor = { issues: number; updateAvailable: boolean; updateMessage?: string
 let doctorState: Doctor | null = null;
 /** id of the running engine command (update/advanced), or null. Compile has its own state. */
 let advancedBusy: string | null = null;
+/** [i/total] progress of the running advanced/suggestion command (if it emits any). */
+let runProgress: { current: number; total: number } | null = null;
 const advancedResults = new Map<string, boolean>(); // id -> ok
 
 function engineBusy(): boolean {
   return compileState === 'running' || advancedBusy !== null;
+}
+
+/** A spinner, plus "x of y" when the running command reports progress. */
+function runningIndicator(): HTMLElement {
+  const el = document.createElement('span');
+  el.className = 'run-prog';
+  const xy = runProgress && runProgress.total > 0 ? `${runProgress.current} of ${runProgress.total}` : '';
+  el.innerHTML = `<span class="spin" aria-hidden="true"></span>${xy ? `<span class="run-x">${xy}</span>` : ''}`;
+  return el;
 }
 
 function fmtClock(ms: number | null): string {
@@ -225,8 +236,13 @@ function renderHealth(): void {
     row.innerHTML = `<span class="update-msg">App update available</span>`;
     const b = document.createElement('button');
     b.className = 'compile';
-    b.textContent = advancedBusy === 'update' ? 'Updating…' : 'Update app';
-    b.disabled = engineBusy();
+    if (advancedBusy === 'update') {
+      b.innerHTML = `<span class="spin light" aria-hidden="true"></span> Updating…`;
+      b.disabled = true;
+    } else {
+      b.textContent = 'Update app';
+      b.disabled = engineBusy();
+    }
     b.addEventListener('click', () => void runEngine('update'));
     row.appendChild(b);
     el.appendChild(row);
@@ -243,14 +259,18 @@ function renderAdvanced(): void {
     row.className = 'adv-row';
     const busy = advancedBusy === c.id;
     const ok = advancedResults.get(c.id);
-    const note = busy ? 'running…' : ok === undefined ? c.hint : ok ? 'done ✓' : 'failed';
+    const note = busy ? '' : ok === undefined ? c.hint : ok ? 'done ✓' : 'failed';
     row.innerHTML = `<span class="adv-label">${c.label}<span class="adv-hint">${note}</span></span>`;
-    const b = document.createElement('button');
-    b.className = 'ghost';
-    b.textContent = busy ? '…' : 'Run';
-    b.disabled = engineBusy();
-    b.addEventListener('click', () => void runEngine(c.id));
-    row.appendChild(b);
+    if (busy) {
+      row.appendChild(runningIndicator());
+    } else {
+      const b = document.createElement('button');
+      b.className = 'ghost';
+      b.textContent = 'Run';
+      b.disabled = engineBusy();
+      b.addEventListener('click', () => void runEngine(c.id));
+      row.appendChild(b);
+    }
     el.appendChild(row);
   }
 }
@@ -258,6 +278,7 @@ function renderAdvanced(): void {
 async function runEngine(id: string): Promise<void> {
   if (engineBusy()) return;
   advancedBusy = id;
+  runProgress = null;
   renderHealth();
   renderAdvanced();
   void renderVault(); // reflect disabled compile button
@@ -322,12 +343,16 @@ function renderPending(): void {
     row.className = 'pending-row';
     const busy = advancedBusy === s.cmd;
     row.innerHTML = `<span class="pending-label">${s.label}</span>`;
-    const b = document.createElement('button');
-    b.className = 'ghost';
-    b.textContent = busy ? '…' : 'Run';
-    b.disabled = engineBusy();
-    b.addEventListener('click', () => void runArgs(s.cmd));
-    row.appendChild(b);
+    if (busy) {
+      row.appendChild(runningIndicator());
+    } else {
+      const b = document.createElement('button');
+      b.className = 'ghost';
+      b.textContent = 'Run';
+      b.disabled = engineBusy();
+      b.addEventListener('click', () => void runArgs(s.cmd));
+      row.appendChild(b);
+    }
     list.appendChild(row);
   }
   el.appendChild(list);
@@ -336,6 +361,7 @@ function renderPending(): void {
 async function runArgs(cmd: string): Promise<void> {
   if (engineBusy()) return;
   advancedBusy = cmd;
+  runProgress = null;
   renderPending();
   renderHealth();
   renderAdvanced();
@@ -447,9 +473,19 @@ window.addEventListener('DOMContentLoaded', () => {
     }, 8000);
   });
 
+  // Per-step progress for the running advanced/suggestion command (if it emits [i/total]).
+  window.vault.onRunProgress(({ id, progress }) => {
+    if (advancedBusy !== id) return;
+    runProgress = progress;
+    renderPending();
+    renderAdvanced();
+    renderHealth();
+  });
+
   // Advanced / update / suggestion command finished (pushed from main).
   window.vault.onRunDone(({ id, result }) => {
     if (advancedBusy === id) advancedBusy = null;
+    runProgress = null;
     advancedResults.set(id, result.ok);
     renderAdvanced();
     renderPending();

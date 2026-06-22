@@ -17,6 +17,7 @@ import {
   VAULT_RUN_CHANNEL,
   VAULT_RUN_ARGS_CHANNEL,
   VAULT_RUN_STATUS_CHANNEL,
+  VAULT_RUN_PROGRESS_CHANNEL,
   VAULT_RUN_DONE_CHANNEL,
   type VaultApi,
 } from './vault/ipc';
@@ -42,6 +43,7 @@ const vault: VaultApi = {
   run: (id) => ipcRenderer.invoke(VAULT_RUN_CHANNEL, id),
   runArgs: (args) => ipcRenderer.invoke(VAULT_RUN_ARGS_CHANNEL, args),
   runStatus: () => ipcRenderer.invoke(VAULT_RUN_STATUS_CHANNEL),
+  onRunProgress: (cb) => ipcRenderer.on(VAULT_RUN_PROGRESS_CHANNEL, (_e, r) => cb(r)),
   onRunDone: (cb) => ipcRenderer.on(VAULT_RUN_DONE_CHANNEL, (_e, r) => cb(r)),
 };
 

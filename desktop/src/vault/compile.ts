@@ -116,16 +116,25 @@ export function startCompile(
   return spawnWiki('compile', ['compile'], onProgress, onDone);
 }
 
-/** Run any other engine command (update / lint / links / dedup / review). No x/y
- *  progress — the UI shows an indeterminate state until done. */
-export function startEngineCommand(id: EngineCommandId, onDone: (r: CompileResult) => void): CompileStart {
-  return spawnWiki(id, ENGINE_COMMANDS[id].args, () => {}, onDone);
+/** Run any other engine command (update / lint / links / dedup / review). Many
+ *  emit `[i/total]` (dedup, review, …) → x/y progress; the rest stay indeterminate. */
+export function startEngineCommand(
+  id: EngineCommandId,
+  onProgress: (p: CompileProgress) => void,
+  onDone: (r: CompileResult) => void,
+): CompileStart {
+  return spawnWiki(id, ENGINE_COMMANDS[id].args, onProgress, onDone);
 }
 
 /** Run an arbitrary `wiki <args>` command — used for the engine's own actionable
  *  menu suggestions (e.g. `lint --structural-only`, `dream --all-entities`). The
- *  cmd string from `wiki menu --json` is tokenised on spaces. */
-export function startEngineArgs(args: string[], onDone: (r: CompileResult) => void): CompileStart {
+ *  cmd string from `wiki menu --json` is tokenised on spaces. Curiosity scans,
+ *  dedup, and review emit `[i/total]` → x/y progress. */
+export function startEngineArgs(
+  args: string[],
+  onProgress: (p: CompileProgress) => void,
+  onDone: (r: CompileResult) => void,
+): CompileStart {
   if (args.length === 0) return { started: false, error: 'empty command' };
-  return spawnWiki(args.join(' '), args, () => {}, onDone);
+  return spawnWiki(args.join(' '), args, onProgress, onDone);
 }

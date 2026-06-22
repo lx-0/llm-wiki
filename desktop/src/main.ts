@@ -33,6 +33,7 @@ import {
   VAULT_RUN_CHANNEL,
   VAULT_RUN_ARGS_CHANNEL,
   VAULT_RUN_STATUS_CHANNEL,
+  VAULT_RUN_PROGRESS_CHANNEL,
   VAULT_RUN_DONE_CHANNEL,
 } from './vault/ipc';
 import { BRAIN_PNG_1X, BRAIN_PNG_2X } from './assets/brainIcon';
@@ -119,18 +120,26 @@ ipcMain.handle(VAULT_QUERY_CHANNEL, (_e, question: string) => runQuery(question)
 
 // IPC: run a generic engine command (update / lint / links / dedup / review).
 ipcMain.handle(VAULT_RUN_CHANNEL, (_e, id: EngineCommandId) => {
-  return startEngineCommand(id, (result) => {
-    if (DEBUG) console.log(`${VAULT_RUN_DONE_CHANNEL} ${id} -> ${JSON.stringify(result)}`);
-    panel?.webContents.send(VAULT_RUN_DONE_CHANNEL, { id, result });
-  });
+  return startEngineCommand(
+    id,
+    (progress) => panel?.webContents.send(VAULT_RUN_PROGRESS_CHANNEL, { id, progress }),
+    (result) => {
+      if (DEBUG) console.log(`${VAULT_RUN_DONE_CHANNEL} ${id} -> ${JSON.stringify(result)}`);
+      panel?.webContents.send(VAULT_RUN_DONE_CHANNEL, { id, result });
+    },
+  );
 });
 // IPC: run an arbitrary menu-suggestion command (cmd string → args).
 ipcMain.handle(VAULT_RUN_ARGS_CHANNEL, (_e, args: string[]) => {
   const id = args.join(' ');
-  return startEngineArgs(args, (result) => {
-    if (DEBUG) console.log(`${VAULT_RUN_DONE_CHANNEL} ${id} -> ${JSON.stringify(result)}`);
-    panel?.webContents.send(VAULT_RUN_DONE_CHANNEL, { id, result });
-  });
+  return startEngineArgs(
+    args,
+    (progress) => panel?.webContents.send(VAULT_RUN_PROGRESS_CHANNEL, { id, progress }),
+    (result) => {
+      if (DEBUG) console.log(`${VAULT_RUN_DONE_CHANNEL} ${id} -> ${JSON.stringify(result)}`);
+      panel?.webContents.send(VAULT_RUN_DONE_CHANNEL, { id, result });
+    },
+  );
 });
 ipcMain.handle(VAULT_RUN_STATUS_CHANNEL, () => ({ running: runningCommand() }));
 

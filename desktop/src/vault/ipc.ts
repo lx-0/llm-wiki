@@ -22,6 +22,7 @@ export const VAULT_QUERY_CHANNEL = 'vault:query';
 export const VAULT_RUN_CHANNEL = 'vault:run';
 export const VAULT_RUN_ARGS_CHANNEL = 'vault:run-args';
 export const VAULT_RUN_STATUS_CHANNEL = 'vault:run-status';
+export const VAULT_RUN_PROGRESS_CHANNEL = 'vault:run-progress';
 export const VAULT_RUN_DONE_CHANNEL = 'vault:run-done';
 export const VAULT_COMPILE_CHANNEL = 'vault:compile';
 export const VAULT_COMPILE_STATUS_CHANNEL = 'vault:compile-status';
@@ -48,6 +49,8 @@ export interface VaultApi {
   runArgs(args: string[]): Promise<CompileStart>;
   /** Which engine command is running right now (one at a time), or null. */
   runStatus(): Promise<{ running: 'compile' | EngineCommandId | null }>;
+  /** Fires on each `[i/total]` step of a run()/runArgs() command (if it emits any). */
+  onRunProgress(cb: (r: { id: string; progress: CompileProgress }) => void): void;
   /** Fires when a run() command finishes. */
   onRunDone(cb: (r: { id: EngineCommandId; result: CompileResult }) => void): void;
   /** Start `wiki compile` (long-running). Returns immediately. */

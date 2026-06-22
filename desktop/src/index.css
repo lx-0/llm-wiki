@@ -109,6 +109,17 @@ button.stop    { background: var(--red); }
 button.compile { background: var(--blue); }
 button:disabled { background: rgba(120,120,128,0.3); color: var(--muted); cursor: default; }
 
+/* Spinner + x/y for running actions */
+.spin {
+  display: inline-block; width: 12px; height: 12px;
+  border: 2px solid rgba(120,120,128,0.3); border-top-color: var(--blue);
+  border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle;
+}
+.spin.light { border-color: rgba(255,255,255,0.45); border-top-color: #fff; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.run-prog { margin-left: auto; display: inline-flex; align-items: center; gap: 7px; font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.run-x { color: var(--blue); font-weight: 600; }
+
 /* Vault access warning */
 .vault-warn { font-size: 13px; font-weight: 600; color: var(--amber); }
 .vault-hint { font-size: 11px; color: var(--muted); margin-top: 4px; line-height: 1.35; }
