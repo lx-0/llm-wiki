@@ -3,9 +3,9 @@ milestone: M029
 slice: S01
 project: llm-wiki
 created: 2026-06-22T10:44:06+0200
-status: planned
+status: in_progress
 task_count: 4
-completed_tasks: 0
+completed_tasks: 1
 ---
 
 # M029-S01 -- Slice Plan
@@ -16,7 +16,7 @@ MVP builds on a real, non-brittle foundation.
 
 ## Tasks
 
-- [ ] T01 -- Scaffold the Electron app in `desktop/`: own `package.json`, main +
+- [x] T01 -- Scaffold the Electron app in `desktop/`: own `package.json`, main +
   renderer entry, dev-run script. **Toolchain-isolated** from the Python/CLI repo
   — `desktop/.gitignore` for `node_modules`/build output, no interference with
   the repo's uv/pytest CI (decide electron-builder vs electron-forge here, record
