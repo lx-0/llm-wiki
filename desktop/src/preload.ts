@@ -10,6 +10,7 @@ import {
   VAULT_COMPILE_PROGRESS_CHANNEL,
   VAULT_COMPILE_DONE_CHANNEL,
   VAULT_OPEN_OBSIDIAN_CHANNEL,
+  VAULT_OPEN_FILE_CHANNEL,
   VAULT_OPEN_FDA_CHANNEL,
   VAULT_DOCTOR_CHANNEL,
   VAULT_MENU_CHANNEL,
@@ -32,6 +33,7 @@ const listeners: ListenerApi = {
 const vault: VaultApi = {
   status: () => ipcRenderer.invoke(VAULT_STATUS_CHANNEL),
   openInObsidian: () => ipcRenderer.invoke(VAULT_OPEN_OBSIDIAN_CHANNEL),
+  openFile: (file) => ipcRenderer.send(VAULT_OPEN_FILE_CHANNEL, file),
   openFullDiskAccess: () => ipcRenderer.send(VAULT_OPEN_FDA_CHANNEL),
   compile: () => ipcRenderer.invoke(VAULT_COMPILE_CHANNEL),
   compileStatus: () => ipcRenderer.invoke(VAULT_COMPILE_STATUS_CHANNEL),

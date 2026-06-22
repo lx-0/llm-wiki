@@ -183,6 +183,32 @@ function progressBar(): string {
   return `<div class="bar ${indeterminate ? 'indeterminate' : ''}"><div class="fill" style="width:${pct}%"></div></div>`;
 }
 
+function escapeHtml(s: string): string {
+  return s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c] as string);
+}
+
+/** Most recently modified knowledge entries; click opens the file in Obsidian. */
+function renderRecent(recent: { title: string; file: string; mtimeMs: number }[]): void {
+  const el = document.getElementById('recent');
+  if (!el) return;
+  if (!recent || recent.length === 0) {
+    el.innerHTML = '';
+    return;
+  }
+  el.innerHTML = `<h2 class="section-label">Recent entries</h2>`;
+  const list = document.createElement('div');
+  list.className = 'recent-list card';
+  for (const r of recent) {
+    const row = document.createElement('button');
+    row.className = 'recent-row';
+    row.title = 'Open in Obsidian';
+    row.innerHTML = `<span class="recent-title">${escapeHtml(r.title)}</span><span class="recent-ago">${fmtAgo(r.mtimeMs)}</span>`;
+    row.addEventListener('click', () => window.vault.openFile(r.file));
+    list.appendChild(row);
+  }
+  el.appendChild(list);
+}
+
 async function renderVault(): Promise<void> {
   const meta = document.getElementById('vault-meta');
   const box = document.getElementById('vault');
@@ -198,6 +224,7 @@ async function renderVault(): Promise<void> {
       meta.title = 'Open in Obsidian';
       meta.classList.add('link');
     }
+    renderRecent(v.recent ?? []);
     if (box) {
       if (!v.accessible) {
         // Can't read the vault — almost always macOS file access (the vault is

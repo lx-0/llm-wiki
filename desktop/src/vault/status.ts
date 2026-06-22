@@ -6,6 +6,14 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { resolveVault } from './registry';
 
+export interface RecentEntry {
+  /** display title (first H1, else slug) */
+  title: string;
+  /** path relative to the vault root, for an obsidian:// open link */
+  file: string;
+  mtimeMs: number;
+}
+
 export interface VaultStatus {
   name: string;
   path: string;
@@ -13,11 +21,15 @@ export interface VaultStatus {
   articleCount: number;
   /** newest article mtime under knowledge/, epoch ms (null if none) */
   lastActivityMs: number | null;
+  /** the most recently modified articles (newest first), for the "Recent" list */
+  recent: RecentEntry[];
   /** false if reading the vault was blocked (TCC / Full Disk Access) */
   accessible: boolean;
 }
 
-function walk(dir: string, acc: { count: number; newest: number }): void {
+const RECENT_COUNT = 5;
+
+function walk(dir: string, files: { full: string; mtimeMs: number }[]): void {
   let entries: fs.Dirent[];
   try {
     entries = fs.readdirSync(dir, { withFileTypes: true });
@@ -27,17 +39,26 @@ function walk(dir: string, acc: { count: number; newest: number }): void {
   for (const e of entries) {
     const full = path.join(dir, e.name);
     if (e.isDirectory()) {
-      walk(full, acc);
+      walk(full, files);
     } else if (e.name.endsWith('.md') && e.name !== 'index.md') {
-      acc.count++;
       try {
-        const m = fs.statSync(full).mtimeMs;
-        if (m > acc.newest) acc.newest = m;
+        files.push({ full, mtimeMs: fs.statSync(full).mtimeMs });
       } catch {
         /* skip unreadable */
       }
     }
   }
+}
+
+/** First H1 of a markdown file, else its slug (dashes → spaces). */
+function titleOf(full: string): string {
+  try {
+    const m = fs.readFileSync(full, 'utf8').match(/^#\s+(.+?)\s*$/m);
+    if (m) return m[1].trim();
+  } catch {
+    /* fall through to slug */
+  }
+  return (path.basename(full, '.md') || full).replace(/-/g, ' ');
 }
 
 export function getVaultStatus(): VaultStatus | null {
@@ -55,13 +76,21 @@ export function getVaultStatus(): VaultStatus | null {
     accessible = false;
   }
 
-  const acc = { count: 0, newest: 0 };
-  if (accessible) walk(knowledge, acc);
+  const files: { full: string; mtimeMs: number }[] = [];
+  if (accessible) walk(knowledge, files);
+  files.sort((a, b) => b.mtimeMs - a.mtimeMs);
+  const recent: RecentEntry[] = files.slice(0, RECENT_COUNT).map((f) => ({
+    title: titleOf(f.full),
+    file: path.relative(v.path, f.full),
+    mtimeMs: f.mtimeMs,
+  }));
+
   return {
     name: v.name,
     path: v.path,
-    articleCount: acc.count,
-    lastActivityMs: acc.newest || null,
+    articleCount: files.length,
+    lastActivityMs: files[0]?.mtimeMs ?? null,
+    recent,
     accessible,
   };
 }

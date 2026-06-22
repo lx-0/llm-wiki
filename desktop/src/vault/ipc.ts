@@ -29,12 +29,15 @@ export const VAULT_COMPILE_STATUS_CHANNEL = 'vault:compile-status';
 export const VAULT_COMPILE_PROGRESS_CHANNEL = 'vault:compile-progress';
 export const VAULT_COMPILE_DONE_CHANNEL = 'vault:compile-done';
 export const VAULT_OPEN_OBSIDIAN_CHANNEL = 'vault:open-obsidian';
+export const VAULT_OPEN_FILE_CHANNEL = 'vault:open-file';
 export const VAULT_OPEN_FDA_CHANNEL = 'vault:open-fda';
 
 export interface VaultApi {
   status(): Promise<VaultStatus | null>;
   /** Open the active vault in Obsidian. */
   openInObsidian(): Promise<{ ok: boolean }>;
+  /** Open one vault file (path relative to vault root) in Obsidian. */
+  openFile(file: string): void;
   /** Open System Settings → Privacy → Full Disk Access. */
   openFullDiskAccess(): void;
   /** Health + update-available, from `wiki doctor --json` (read-only, ~seconds). */

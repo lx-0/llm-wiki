@@ -26,6 +26,7 @@ import {
   VAULT_COMPILE_PROGRESS_CHANNEL,
   VAULT_COMPILE_DONE_CHANNEL,
   VAULT_OPEN_OBSIDIAN_CHANNEL,
+  VAULT_OPEN_FILE_CHANNEL,
   VAULT_OPEN_FDA_CHANNEL,
   VAULT_DOCTOR_CHANNEL,
   VAULT_MENU_CHANNEL,
@@ -106,6 +107,13 @@ ipcMain.handle(VAULT_OPEN_OBSIDIAN_CHANNEL, () => {
   if (!v) return { ok: false };
   void shell.openExternal(`obsidian://open?vault=${encodeURIComponent(v.name)}`);
   return { ok: true };
+});
+ipcMain.on(VAULT_OPEN_FILE_CHANNEL, (_e, file: string) => {
+  const v = resolveVault();
+  if (!v) return;
+  void shell.openExternal(
+    `obsidian://open?vault=${encodeURIComponent(v.name)}&file=${encodeURIComponent(file)}`,
+  );
 });
 ipcMain.on(VAULT_OPEN_FDA_CHANNEL, () => {
   void shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles');

@@ -173,6 +173,17 @@ button:disabled { background: rgba(120,120,128,0.3); color: var(--muted); cursor
 .copy.done { color: var(--green); background: rgba(52,199,89,0.15); }
 .clear:hover { background: rgba(255,69,58,0.85); color: #fff; }
 
+/* Recent entries */
+.recent-list { margin-top: 6px; padding: 4px 5px; display: flex; flex-direction: column; }
+.recent-row {
+  margin: 0; width: 100%; background: none; color: var(--text); font: inherit; font-weight: 400;
+  display: flex; align-items: baseline; gap: 8px; padding: 6px 7px; border-radius: 7px;
+  text-align: left; cursor: pointer;
+}
+.recent-row:hover { background: rgba(120,120,128,0.14); }
+.recent-title { flex: 1; font-size: 12.5px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.recent-ago { font-size: 11px; color: var(--muted); flex: none; font-variant-numeric: tabular-nums; }
+
 /* What's pending */
 .pending-list { margin-top: 6px; padding: 6px 10px; display: flex; flex-direction: column; }
 .pending-row { display: flex; align-items: center; gap: 8px; padding: 5px 0; }
