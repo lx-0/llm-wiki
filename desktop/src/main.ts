@@ -20,6 +20,7 @@ import {
 import { BRAIN_PNG_1X, BRAIN_PNG_2X } from './assets/brainIcon';
 import { PANEL_VISIBILITY_CHANNEL } from './panel/ipc';
 import { APP_LOGIN_GET_CHANNEL, APP_LOGIN_SET_CHANNEL, APP_QUIT_CHANNEL } from './app/ipc';
+import { isAutostartEnabled, setAutostart } from './app/autostart';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
@@ -75,12 +76,9 @@ ipcMain.handle(VAULT_COMPILE_CHANNEL, () => {
 });
 ipcMain.handle(VAULT_COMPILE_STATUS_CHANNEL, () => ({ running: isCompiling(), progress: currentProgress() }));
 
-// IPC: app-level — autostart (login item) + quit (surfaced in the panel footer).
-ipcMain.handle(APP_LOGIN_GET_CHANNEL, () => app.getLoginItemSettings().openAtLogin);
-ipcMain.handle(APP_LOGIN_SET_CHANNEL, (_e, open: boolean) => {
-  app.setLoginItemSettings({ openAtLogin: open });
-  return app.getLoginItemSettings().openAtLogin;
-});
+// IPC: app-level — autostart (LaunchAgent) + quit (surfaced in the panel footer).
+ipcMain.handle(APP_LOGIN_GET_CHANNEL, () => isAutostartEnabled());
+ipcMain.handle(APP_LOGIN_SET_CHANNEL, (_e, open: boolean) => setAutostart(open));
 ipcMain.on(APP_QUIT_CHANNEL, () => app.quit());
 
 // IPC: open the vault in Obsidian (the reading/browsing surface for non-techies).

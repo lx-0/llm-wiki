@@ -33,12 +33,16 @@ inherits the terminal's permissions.
 
 Both live in the **panel footer** (open the panel by clicking the menubar icon):
 
-> **☐ Start at login** — check it to launch the app at login (macOS login-item API).
+> **☐ Start at login** — check it to launch the app at login.
 > **Quit** — quit the app.
 
-(No separate LaunchAgent — unlike the screenpipe capture daemon, this is a normal
-GUI login item the app manages itself. A tray right-click menu was dropped because
-those are unreliable for menubar apps on macOS.)
+"Start at login" writes a per-user **LaunchAgent**
+(`~/Library/LaunchAgents/cloud.yesterday.llm-wiki.plist`, `RunAtLoad` → `open` the
+app) — this is reliable and works for the unsigned app, unlike Electron's
+`setLoginItemSettings` (which doesn't register for unsigned apps on modern macOS).
+Un-checking removes the plist. Only works in the **installed** app (the LaunchAgent
+points at the app bundle), not `npm start` dev. A tray right-click menu was dropped
+— unreliable for macOS menubar apps.
 
 ## Use
 
