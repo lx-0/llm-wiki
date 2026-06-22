@@ -204,7 +204,8 @@ button:disabled { background: rgba(120,120,128,0.3); color: var(--muted); cursor
 .ask-answer .md code { font-family: ui-monospace, 'SF Mono', monospace; font-size: 11px; background: rgba(120,120,128,0.2); padding: 1px 4px; border-radius: 4px; }
 .ask-answer .md a { color: var(--blue); text-decoration: none; }
 .ask-answer .md hr { border: none; border-top: 0.5px solid var(--hairline); margin: 9px 0; }
-.wl { color: var(--blue); font-weight: 500; }
+.wl { color: var(--blue); font-weight: 500; cursor: pointer; }
+.wl:hover { text-decoration: underline; }
 
 /* Minimalist answer tools (copy + clear) */
 .ask-tools { position: absolute; top: 7px; right: 7px; display: flex; gap: 4px; }

@@ -43,11 +43,13 @@ function clearAnswer(): void {
   answer.className = 'ask-answer';
 }
 
-/** Render the answer markdown to HTML; wikilinks [[a/b/slug]] → a subtle chip (slug). */
+/** Render the answer markdown to HTML; wikilinks [[a/b/slug]] / [[path|alias]] →
+ *  a clickable chip that opens the file in Obsidian (data-file carries the ref). */
 function renderMarkdown(md: string): string {
-  const withLinks = md.replace(/\[\[([^\]]+)\]\]/g, (_m, p: string) => {
-    const name = p.split('/').pop() || p;
-    return `<span class="wl">${name}</span>`;
+  const withLinks = md.replace(/\[\[([^\]]+)\]\]/g, (_m, inner: string) => {
+    const ref = inner.split('|')[0].split('#')[0].trim();
+    const name = (inner.includes('|') ? inner.split('|')[1] : ref.split('/').pop() || ref).trim();
+    return `<span class="wl" data-file="${escapeHtml(ref)}">${escapeHtml(name)}</span>`;
   });
   return marked.parse(withLinks, { breaks: true, async: false }) as string;
 }
@@ -482,6 +484,11 @@ window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('ask-input')?.addEventListener('keydown', (e) => {
     if ((e as KeyboardEvent).key === 'Enter') void ask();
   });
+  // Clickable wikilinks in the answer → open in Obsidian (delegated; survives re-render).
+  document.getElementById('ask-answer')?.addEventListener('click', (e) => {
+    const t = (e.target as HTMLElement).closest('.wl') as HTMLElement | null;
+    if (t?.dataset.file) window.vault.openFile(t.dataset.file);
+  });
 
   renderAdvanced();
 
@@ -513,6 +520,7 @@ window.addEventListener('DOMContentLoaded', () => {
       void renderVault();
       void loadDoctor(); // health + update-available (read-only, ~seconds)
       void loadMenu(); // what's pending (engine's actionable suggestions)
+      window.setTimeout(() => document.getElementById('ask-input')?.focus(), 30); // search-first
     }
   });
 

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Tray, nativeImage, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, Tray, nativeImage, shell, globalShortcut, Notification } from 'electron';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
 import { LISTENERS, getListener } from './listeners/registry';
@@ -56,6 +56,25 @@ if (started) {
 // a background app would spam the console on every poll.
 const DEBUG = process.env.LLM_WIKI_DEBUG === '1';
 
+// Menubar badge — count of the engine's pending "what's pending" items.
+let pendingCount = 0;
+function updateTrayTitle(): void {
+  if (!tray) return;
+  tray.setTitle(`${trayGlyph()}${pendingCount > 0 ? ` ${pendingCount}` : ''}`);
+}
+async function refreshBadge(): Promise<void> {
+  const m = await getMenu();
+  pendingCount = m ? m.suggestions.length : 0;
+  updateTrayTitle();
+}
+
+// Native notification when a background job finishes and the panel isn't open
+// (so a long compile/dream doesn't need babysitting).
+function notifyDone(body: string): void {
+  if (panel?.isVisible() || !Notification.isSupported()) return;
+  new Notification({ title: 'llm-wiki', body, silent: true }).show();
+}
+
 // IPC: listener status (system data — launchd + sqlite, read directly; no engine call).
 ipcMain.handle(LISTENER_STATUS_CHANNEL, () => {
   const all = LISTENERS.map((l) => getListenerStatus(l));
@@ -96,6 +115,8 @@ ipcMain.handle(VAULT_COMPILE_CHANNEL, () => {
     (result) => {
       if (DEBUG) console.log(`${VAULT_COMPILE_DONE_CHANNEL} -> ${JSON.stringify(result)}`);
       panel?.webContents.send(VAULT_COMPILE_DONE_CHANNEL, result);
+      notifyDone(result.ok ? 'Knowledge updated.' : 'Update failed.');
+      void refreshBadge();
     },
   );
 });
@@ -169,6 +190,8 @@ ipcMain.handle(VAULT_RUN_CHANNEL, (_e, id: EngineCommandId) => {
     (result) => {
       if (DEBUG) console.log(`${VAULT_RUN_DONE_CHANNEL} ${id} -> ${JSON.stringify(result)}`);
       panel?.webContents.send(VAULT_RUN_DONE_CHANNEL, { id, result });
+      notifyDone(result.ok ? `${id} finished.` : `${id} failed.`);
+      void refreshBadge();
     },
   );
 });
@@ -181,6 +204,8 @@ ipcMain.handle(VAULT_RUN_ARGS_CHANNEL, (_e, args: string[]) => {
     (result) => {
       if (DEBUG) console.log(`${VAULT_RUN_DONE_CHANNEL} ${id} -> ${JSON.stringify(result)}`);
       panel?.webContents.send(VAULT_RUN_DONE_CHANNEL, { id, result });
+      notifyDone(result.ok ? 'Finished.' : 'A task failed.');
+      void refreshBadge();
     },
   );
 });
@@ -273,13 +298,22 @@ app.on('ready', () => {
   tray.setTitle(trayGlyph());
   tray.on('click', togglePanel); // click → panel (autostart/quit live in the panel footer)
   panel = createPanel();
+
+  // Global hotkey: ⌥-Space toggles the panel from anywhere (focuses the Ask field).
+  globalShortcut.register('Alt+Space', togglePanel);
+
   // Lightweight background check for the menubar glyph (visible even when the
   // panel is closed) — slow cadence; the panel does its own faster poll only
   // while visible.
-  setInterval(() => tray?.setTitle(trayGlyph()), 15000);
+  setInterval(updateTrayTitle, 15000);
+  // Pending-work badge — heavier (spawns `wiki menu`), so a slow cadence.
+  setTimeout(() => void refreshBadge(), 8000);
+  setInterval(() => void refreshBadge(), 300000); // every 5 min
 });
 
 // Menubar app: do NOT quit when the panel hides/closes — it lives in the tray.
 app.on('window-all-closed', () => {
-  // intentionally empty on all platforms; quit via Cmd+Q / future tray menu.
+  // intentionally empty on all platforms; quit via Cmd+Q / the panel's Quit button.
 });
+
+app.on('will-quit', () => globalShortcut.unregisterAll());
