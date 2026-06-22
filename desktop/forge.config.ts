@@ -1,6 +1,7 @@
 import type { ForgeConfig } from '@electron-forge/shared-types';
 import { MakerSquirrel } from '@electron-forge/maker-squirrel';
 import { MakerZIP } from '@electron-forge/maker-zip';
+import { MakerDMG } from '@electron-forge/maker-dmg';
 import { MakerDeb } from '@electron-forge/maker-deb';
 import { MakerRpm } from '@electron-forge/maker-rpm';
 import { VitePlugin } from '@electron-forge/plugin-vite';
@@ -20,6 +21,10 @@ const SIGN = Boolean(process.env.APPLE_ID && process.env.APPLE_PASSWORD && proce
 const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
+    name: 'llm-wiki',
+    // Stable app identity (not the generic com.github.Electron). Matters for TCC
+    // grants the app may need later. Operator can rename to an org-preferred id.
+    appBundleId: 'cloud.yesterday.llm-wiki',
     ...(SIGN
       ? {
           osxSign: {},
@@ -35,6 +40,7 @@ const config: ForgeConfig = {
   makers: [
     new MakerSquirrel({}),
     new MakerZIP({}, ['darwin']),
+    new MakerDMG({ name: 'llm-wiki' }, ['darwin']),
     new MakerRpm({}),
     new MakerDeb({}),
   ],
