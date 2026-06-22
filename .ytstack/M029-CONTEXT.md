@@ -64,6 +64,12 @@ M -- see `M029-ROADMAP.md` for slice breakdown.
   context7 in S01-T01: scaffold cmd + osxSign/osxNotarize confirmed).
 - 2026-06-22: Test runner = **vitest** (org standard per CLAUDE.md; integrates
   with the scaffold's vite).
+- 2026-06-22 (correction): the app is a **menubar (tray) utility, NOT a windowed
+  app** — original requirement ("immer in der Menüleiste togglebar"). The MVP
+  first drifted to a windowed BrowserWindow; reworked: `app.dock.hide()` (no dock
+  icon), a `Tray` with a live status glyph, click toggles a frameless panel
+  anchored under the icon (dismiss-on-blur). Only the shell changed — status / IPC
+  / renderer logic was untouched (commit `32fb610`).
 
 ## Open questions
 
