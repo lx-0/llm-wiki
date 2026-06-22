@@ -473,25 +473,8 @@ window.addEventListener('DOMContentLoaded', () => {
     void window.vault.openInObsidian();
   });
 
-  // Footer: autostart toggle + quit.
-  const loginToggle = document.getElementById('login-toggle') as HTMLInputElement | null;
-  void window.app.getLoginItem().then((on) => {
-    if (loginToggle) loginToggle.checked = on;
-  });
-  loginToggle?.addEventListener('change', () => {
-    const want = loginToggle.checked;
-    void window.app
-      .setLoginItem(want)
-      .then((actual) => {
-        loginToggle.checked = actual; // reflect the real registered state
-        loginToggle.title =
-          actual === want
-            ? ''
-            : 'Login items register only for the installed app (drag to Applications) — not in dev mode';
-        if (actual !== want) console.warn('login item did not persist (dev mode or app not in /Applications?)');
-      })
-      .catch((e) => console.error('setLoginItem failed', e));
-  });
+  // Header gear → Settings window; footer Quit.
+  document.getElementById('settings-btn')?.addEventListener('click', () => window.app.openSettings());
   document.getElementById('quit')?.addEventListener('click', () => window.app.quit());
 
   // Ask: button + Enter key.

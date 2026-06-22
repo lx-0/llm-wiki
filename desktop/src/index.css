@@ -9,6 +9,7 @@
   --card-border: rgba(0, 0, 0, 0.07);
   --hairline: rgba(0, 0, 0, 0.08);
   --sticky-bg: rgba(246, 246, 248, 0.68);
+  --win-bg: #f3f3f5;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -19,6 +20,7 @@
     --card-border: rgba(255, 255, 255, 0.1);
     --hairline: rgba(255, 255, 255, 0.12);
     --sticky-bg: rgba(28, 28, 30, 0.62);
+    --win-bg: #232325;
   }
 }
 
@@ -57,6 +59,36 @@ ul { list-style: none; padding: 0; margin: 0; }
 .vault-meta.link { cursor: pointer; transition: background 0.12s, color 0.12s; }
 .vault-meta.link:hover { color: var(--blue); background: rgba(10, 132, 255, 0.12); }
 .vault-meta .ext { opacity: 0.6; font-size: 9px; }
+.gear {
+  margin: 0 0 0 6px; width: 24px; height: 24px; padding: 0; border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  background: none; color: var(--muted);
+}
+.gear:hover { background: rgba(120, 120, 128, 0.2); color: var(--text); }
+
+/* Settings window (settings.html — a normal opaque window, not the popover) */
+body.settings {
+  background: var(--win-bg); padding: 16px 18px; min-height: 100vh;
+}
+.settings-title { font-size: 16px; font-weight: 700; margin: 0 0 12px; }
+.settings-card {
+  background: var(--card); border: 0.5px solid var(--card-border);
+  border-radius: 12px; padding: 4px 14px;
+}
+.setting-row { display: flex; align-items: center; gap: 14px; padding: 11px 0; }
+.setting-label { display: flex; flex-direction: column; flex: 1; font-size: 13px; font-weight: 500; gap: 2px; }
+.setting-sub { font-size: 11px; font-weight: 400; color: var(--muted); }
+.switch {
+  appearance: none; -webkit-appearance: none; flex: none;
+  width: 38px; height: 22px; border-radius: 11px; background: rgba(120, 120, 128, 0.32);
+  position: relative; cursor: pointer; transition: background 0.2s;
+}
+.switch:checked { background: var(--green); }
+.switch::after {
+  content: ''; position: absolute; top: 2px; left: 2px; width: 18px; height: 18px;
+  border-radius: 50%; background: #fff; transition: transform 0.2s; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+.switch:checked::after { transform: translateX(16px); }
 
 /* Card */
 .card {

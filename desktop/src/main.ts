@@ -39,7 +39,12 @@ import {
 } from './vault/ipc';
 import { BRAIN_PNG_1X, BRAIN_PNG_2X } from './assets/brainIcon';
 import { PANEL_VISIBILITY_CHANNEL, PANEL_RESIZE_CHANNEL } from './panel/ipc';
-import { APP_LOGIN_GET_CHANNEL, APP_LOGIN_SET_CHANNEL, APP_QUIT_CHANNEL } from './app/ipc';
+import {
+  APP_LOGIN_GET_CHANNEL,
+  APP_LOGIN_SET_CHANNEL,
+  APP_QUIT_CHANNEL,
+  APP_OPEN_SETTINGS_CHANNEL,
+} from './app/ipc';
 import { isAutostartEnabled, setAutostart } from './app/autostart';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
@@ -100,6 +105,36 @@ ipcMain.handle(VAULT_COMPILE_STATUS_CHANNEL, () => ({ running: isCompiling(), pr
 ipcMain.handle(APP_LOGIN_GET_CHANNEL, () => isAutostartEnabled());
 ipcMain.handle(APP_LOGIN_SET_CHANNEL, (_e, open: boolean) => setAutostart(open));
 ipcMain.on(APP_QUIT_CHANNEL, () => app.quit());
+ipcMain.on(APP_OPEN_SETTINGS_CHANNEL, () => openSettings());
+
+// Settings lives in its own window (settings.html), opened from the header gear.
+let settingsWin: BrowserWindow | null = null;
+function openSettings(): void {
+  if (settingsWin && !settingsWin.isDestroyed()) {
+    settingsWin.show();
+    settingsWin.focus();
+    return;
+  }
+  settingsWin = new BrowserWindow({
+    width: 380,
+    height: 250,
+    resizable: false,
+    fullscreenable: false,
+    minimizable: false,
+    maximizable: false,
+    title: 'llm-wiki Settings',
+    webPreferences: { preload: path.join(__dirname, 'preload.js') },
+  });
+  settingsWin.setMenuBarVisibility(false);
+  if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
+    settingsWin.loadURL(`${MAIN_WINDOW_VITE_DEV_SERVER_URL}/settings.html`);
+  } else {
+    settingsWin.loadFile(path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/settings.html`));
+  }
+  settingsWin.on('closed', () => {
+    settingsWin = null;
+  });
+}
 
 // IPC: open the vault in Obsidian (the reading/browsing surface for non-techies).
 ipcMain.handle(VAULT_OPEN_OBSIDIAN_CHANNEL, () => {

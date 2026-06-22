@@ -23,7 +23,13 @@ import {
   type VaultApi,
 } from './vault/ipc';
 import { PANEL_VISIBILITY_CHANNEL, PANEL_RESIZE_CHANNEL, type PanelApi } from './panel/ipc';
-import { APP_LOGIN_GET_CHANNEL, APP_LOGIN_SET_CHANNEL, APP_QUIT_CHANNEL, type AppApi } from './app/ipc';
+import {
+  APP_LOGIN_GET_CHANNEL,
+  APP_LOGIN_SET_CHANNEL,
+  APP_QUIT_CHANNEL,
+  APP_OPEN_SETTINGS_CHANNEL,
+  type AppApi,
+} from './app/ipc';
 
 const listeners: ListenerApi = {
   status: () => ipcRenderer.invoke(LISTENER_STATUS_CHANNEL),
@@ -58,6 +64,7 @@ const appApi: AppApi = {
   getLoginItem: () => ipcRenderer.invoke(APP_LOGIN_GET_CHANNEL),
   setLoginItem: (open) => ipcRenderer.invoke(APP_LOGIN_SET_CHANNEL, open),
   quit: () => ipcRenderer.send(APP_QUIT_CHANNEL),
+  openSettings: () => ipcRenderer.send(APP_OPEN_SETTINGS_CHANNEL),
 };
 
 contextBridge.exposeInMainWorld('listeners', listeners);
