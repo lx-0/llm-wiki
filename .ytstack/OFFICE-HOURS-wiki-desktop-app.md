@@ -1,10 +1,36 @@
 ---
 name: llm-wiki Desktop App
 one-liner: A desktop app for llm-wiki's technical and non-technical users that makes the whole wiki usable without the CLI and shows its health at a glance.
-status: PARKED 2026-06-13 (office-hours done; blocked on open architecture questions before plan-ceo-review)
+status: PROCEED 2026-06-22 (CEO-review done; framework decided = Electron; wedge-first build; plan-eng-review next)
 captured: 2026-06-13
 related: [[screenpipe-intake]], [[listener-lifecycle]], [[interactive-cli]], M003 Obsidian dashboard
 ---
+
+## CEO review 2026-06-22 — PROCEED (mode: SCOPE REDUCTION)
+
+Un-parked because **starting/stopping screenpipe on the fly became urgent**.
+
+- **Premise:** still valid, *strengthened*. The listener-toggle wedge now has
+  its own operational pull, independent of the broader GUI vision.
+- **Framework:** **DECIDED by operator — Electron, no alternative.** The original
+  park-blocker (Electron vs Tauri vs lightweight menubar) is resolved by operator
+  call: Obsidian itself is Electron (stack-affinity, proven non-technical
+  desktop), and a lighter path was explicitly rejected. Tauri / xbar / rumps are
+  closed. Not re-litigated.
+- **Scope decision (SCOPE REDUCTION):** the first shippable Electron slice is the
+  **listener toggle + read-only health/status window** — NOT the full wiki GUI.
+  Capture / query / compile / control surface is the expansion after the MVP
+  shell proves out. The cathedral is real but is built nave-first.
+- **Honest consequence:** "Electron-only" means the urgent toggle now waits on
+  standing up the Electron MVP (slower than the lightweight path that was
+  rejected). Mitigation: keep the MVP *tiny* (toggle + status, no write paths) so
+  it ships in days; the interim `~/.screenpipe/sp` + watchdog keep the
+  operational need covered until it lands.
+- **Still open (for plan-eng-review, NOT a blocker to proceed):** how the Electron
+  shell drives the existing `wiki` CLI / Python core (IPC / spawn / local HTTP),
+  packaging + signing + auto-update, and whether it's its own repo (likely yes).
+- **Next:** `plan-eng-review` (concept mode) to lock the Electron↔engine data flow,
+  then `init-project` (own repo).
 
 # Office Hours — llm-wiki Desktop App
 
@@ -76,19 +102,22 @@ audiences immediately, with zero write paths:
 Ships in days. The full capture / query / control / compile surface is the
 expansion AFTER the read-only shell proves the desktop-app direction.
 
-## Architecture — NOT decided here (plan-eng-review owns this)
+## Architecture
 
-- **Framework:** operator proposes **Electron** (Obsidian itself is Electron →
-  stack-affinity, proven for non-technical desktop). **Tauri** (Rust + system
-  webview, lighter) must be compared, properly researched, not picked from the
-  gut. No desktop-app precedent in this Python/CLI/Obsidian project either way —
-  it is a genuine new surface (build toolchain, packaging, signing, auto-update,
-  maintenance for a small team).
-- **Reuse vs rebuild:** extend the existing Obsidian/M003 dashboard vs. a
-  standalone app. Hinges on the "what forces Sid to the CLI" answer above.
-- **Backend reuse:** whatever the shell, it should drive the existing `wiki`
-  CLI / Python core, not reimplement pipeline logic. The CLI stays the engine;
-  the app is a front-end.
+- **Framework: DECIDED — Electron** (operator call 2026-06-22, "no alternative").
+  Rationale: Obsidian itself is Electron (stack-affinity, proven non-technical
+  desktop). Tauri / lightweight-menubar paths considered and rejected. It is a
+  genuine new surface for this Python/CLI/Obsidian project (build toolchain,
+  packaging, signing, auto-update, maintenance) — accepted cost.
+- **Backend reuse (for plan-eng-review):** the Electron shell drives the existing
+  `wiki` CLI / Python core — it must NOT reimplement pipeline logic. Open: the
+  bridge mechanism (child-process spawn of `wiki` vs a thin local HTTP/IPC daemon
+  the Python core exposes). The CLI/engine stays the source of truth; the app is
+  a front-end + a listener-lifecycle controller.
+- **Reuse vs rebuild (for plan-eng-review):** the M003 Obsidian dashboard already
+  covers some non-technical surface — decide which actions move into the Electron
+  app vs stay in Obsidian, so the two don't drift. Not a blocker for the
+  toggle+status MVP.
 
 ## Relationship to other threads
 
@@ -103,12 +132,12 @@ expansion AFTER the read-only shell proves the desktop-app direction.
 
 ## Next step
 
-**PARKED 2026-06-13 by operator** — open architecture questions remain (see
-"Architecture" above: Electron vs Tauri, reuse Obsidian/M003 vs new app). Listed
-in `backlog/PRIORITY.md` (🌱 Medium). Resume below once those are settled.
+**UN-PARKED 2026-06-22; CEO-review PROCEED (above).** Framework decided
+(Electron). MVP scope reduced to listener-toggle + read-only health window.
 
-When unparked: `plan-ceo-review` (concept mode) to stress-test scope + ambition
-before any scaffolding — this initiative is big and scope-control is the main risk. Then
-optionally `plan-eng-review` (concept mode) for the Electron-vs-Tauri /
-reuse-vs-rebuild call, then `init-project` (likely its own project, not an
-llm-wiki milestone — the app is a separate codebase fronting the engine).
+1. `plan-eng-review` (concept mode) — lock the Electron↔engine bridge
+   (child-process `wiki` spawn vs local HTTP/IPC daemon), packaging/signing/
+   auto-update, and the Obsidian/M003 reuse boundary. This is the real remaining
+   technical work; it does NOT block the decision to proceed.
+2. `init-project` — own repo, separate codebase fronting the engine (not an
+   llm-wiki milestone).
