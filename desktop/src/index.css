@@ -57,8 +57,24 @@ ul { list-style: none; padding: 0; margin: 0; }
 .vault-path { font-size: 11px; color: var(--muted); margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .vault-actions { display: flex; align-items: center; margin-top: 10px; gap: 8px; }
 .compile-state { font-size: 11px; color: var(--muted); }
-.compile-state.running { color: var(--blue); }
+.compile-state.running { color: var(--blue); font-weight: 500; }
 .muted { color: var(--muted); }
+
+/* Compile progress bar */
+.bar {
+  height: 4px; border-radius: 3px; margin-top: 9px; overflow: hidden;
+  background: rgba(120, 120, 128, 0.22);
+}
+.bar .fill {
+  height: 100%; border-radius: 3px;
+  background: linear-gradient(90deg, var(--blue), #5e9eff);
+  transition: width 0.4s ease;
+}
+.bar.indeterminate .fill {
+  width: 35% !important;
+  animation: slide 1.2s ease-in-out infinite;
+}
+@keyframes slide { 0% { margin-left: -35%; } 100% { margin-left: 100%; } }
 
 .section-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin: 14px 2px 6px; }
 

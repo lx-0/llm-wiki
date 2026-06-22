@@ -6,11 +6,12 @@ import { getListenerStatus } from './listeners/status';
 import { startListener, stopListener, restartListener, type LifecycleAction, type LifecycleResult } from './listeners/lifecycle';
 import { LISTENER_STATUS_CHANNEL, LISTENER_CONTROL_CHANNEL } from './listeners/ipc';
 import { getVaultStatus } from './vault/status';
-import { startCompile, isCompiling } from './vault/compile';
+import { startCompile, isCompiling, currentProgress } from './vault/compile';
 import {
   VAULT_STATUS_CHANNEL,
   VAULT_COMPILE_CHANNEL,
   VAULT_COMPILE_STATUS_CHANNEL,
+  VAULT_COMPILE_PROGRESS_CHANNEL,
   VAULT_COMPILE_DONE_CHANNEL,
 } from './vault/ipc';
 import { BRAIN_PNG_1X, BRAIN_PNG_2X } from './assets/brainIcon';
@@ -60,12 +61,15 @@ ipcMain.handle(VAULT_STATUS_CHANNEL, () => {
 // IPC: compile (engine action — long-running). Starts the process and pushes the
 // result to the panel when it finishes.
 ipcMain.handle(VAULT_COMPILE_CHANNEL, () => {
-  return startCompile((result) => {
-    if (DEBUG) console.log(`${VAULT_COMPILE_DONE_CHANNEL} -> ${JSON.stringify(result)}`);
-    panel?.webContents.send(VAULT_COMPILE_DONE_CHANNEL, result);
-  });
+  return startCompile(
+    (progress) => panel?.webContents.send(VAULT_COMPILE_PROGRESS_CHANNEL, progress),
+    (result) => {
+      if (DEBUG) console.log(`${VAULT_COMPILE_DONE_CHANNEL} -> ${JSON.stringify(result)}`);
+      panel?.webContents.send(VAULT_COMPILE_DONE_CHANNEL, result);
+    },
+  );
 });
-ipcMain.handle(VAULT_COMPILE_STATUS_CHANNEL, () => ({ running: isCompiling() }));
+ipcMain.handle(VAULT_COMPILE_STATUS_CHANNEL, () => ({ running: isCompiling(), progress: currentProgress() }));
 
 // --- Menubar (tray) app -----------------------------------------------------
 // This is a menubar utility, NOT a windowed app: a Tray icon shows live status

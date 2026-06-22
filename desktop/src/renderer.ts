@@ -115,14 +115,27 @@ function fmtAgo(ms: number | null): string {
 
 type CompileState = 'idle' | 'running' | { ok: boolean; durationMs: number };
 let compileState: CompileState = 'idle';
+let compileProgress = { current: 0, total: 0 };
 
 function compileLine(): string {
-  if (compileState === 'running') return 'compiling…';
+  if (compileState === 'running') {
+    const { current, total } = compileProgress;
+    if (total > 0) return `Updating knowledge · ${current} of ${total}`;
+    return 'Updating knowledge…';
+  }
   if (compileState !== 'idle') {
     const m = Math.max(1, Math.round(compileState.durationMs / 60000));
-    return compileState.ok ? `✓ compiled · ${m}m` : '✗ compile failed';
+    return compileState.ok ? `Up to date · took ${m}m` : 'Update failed — try again';
   }
   return '';
+}
+
+function progressBar(): string {
+  if (compileState !== 'running') return '';
+  const { current, total } = compileProgress;
+  const pct = total > 0 ? Math.round((current / total) * 100) : 0;
+  const indeterminate = total === 0;
+  return `<div class="bar ${indeterminate ? 'indeterminate' : ''}"><div class="fill" style="width:${pct}%"></div></div>`;
 }
 
 async function renderVault(): Promise<void> {
@@ -139,14 +152,15 @@ async function renderVault(): Promise<void> {
     if (box) {
       const running = compileState === 'running';
       box.innerHTML = `
-        <div class="vault-row"><span class="big">${v.articleCount.toLocaleString()}</span><span class="muted">articles · updated ${fmtAgo(v.lastActivityMs)}</span></div>
+        <div class="vault-row"><span class="big">${v.articleCount.toLocaleString()}</span><span class="muted">notes · updated ${fmtAgo(v.lastActivityMs)}</span></div>
         <div class="vault-path" title="${v.path}">${v.path.replace(/^\/Users\/[^/]+/, '~')}</div>
+        ${progressBar()}
         <div class="vault-actions">
           <span class="compile-state ${running ? 'running' : ''}">${compileLine()}</span>
         </div>`;
       const btn = document.createElement('button');
       btn.className = 'compile';
-      btn.textContent = running ? 'Compiling…' : 'Compile';
+      btn.textContent = running ? 'Updating…' : 'Update';
       btn.disabled = running;
       btn.addEventListener('click', () => void compile());
       box.querySelector('.vault-actions')?.appendChild(btn);
@@ -184,12 +198,20 @@ window.addEventListener('DOMContentLoaded', () => {
     if (v) {
       // fresh on open + restore compile state (in case it's running)
       void window.vault.compileStatus().then((s) => {
-        if (s.running) compileState = 'running';
+        if (s.running) {
+          compileState = 'running';
+          compileProgress = s.progress;
+        }
         void renderVault();
       });
       void renderStatus();
       void renderVault();
     }
+  });
+
+  window.vault.onCompileProgress((p) => {
+    compileProgress = p;
+    if (compileState === 'running') void renderVault();
   });
 
   // Compile finished (pushed from main): show result, refresh stats, reset later.
