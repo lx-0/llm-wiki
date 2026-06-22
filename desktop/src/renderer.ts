@@ -223,9 +223,18 @@ window.addEventListener('DOMContentLoaded', () => {
     if (loginToggle) loginToggle.checked = on;
   });
   loginToggle?.addEventListener('change', () => {
-    void window.app.setLoginItem(loginToggle.checked).then((on) => {
-      loginToggle.checked = on;
-    });
+    const want = loginToggle.checked;
+    void window.app
+      .setLoginItem(want)
+      .then((actual) => {
+        loginToggle.checked = actual; // reflect the real registered state
+        loginToggle.title =
+          actual === want
+            ? ''
+            : 'Login items register only for the installed app (drag to Applications) — not in dev mode';
+        if (actual !== want) console.warn('login item did not persist (dev mode or app not in /Applications?)');
+      })
+      .catch((e) => console.error('setLoginItem failed', e));
   });
   document.getElementById('quit')?.addEventListener('click', () => window.app.quit());
 
