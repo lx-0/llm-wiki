@@ -5,7 +5,7 @@ project: llm-wiki
 created: 2026-06-22T10:44:06+0200
 status: planned
 task_count: 4
-completed_tasks: 0
+completed_tasks: 1
 ---
 
 # M029-S03 -- Slice Plan
@@ -15,7 +15,7 @@ both audiences can actually run.
 
 ## Tasks
 
-- [ ] T01 -- Read-only health window UI: listener running-state (green/red),
+- [x] T01 -- Read-only health window UI: listener running-state (green/red),
   per-device freshness (mic / System-Audio, "Xs ago"), last-capture timestamps,
   live poll (every few seconds) via the S01 bridge. No write paths beyond the
   S02 start/stop control. Catches exactly the "is it running before my meeting"
