@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Tray, nativeImage, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, Tray, nativeImage, shell, Menu } from 'electron';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
 import { LISTENERS, getListener } from './listeners/registry';
@@ -149,12 +149,29 @@ function trayGlyph(): string {
   return s.zombieSuspected ? ' ◍' : ' ●';
 }
 
+/** Right-click menu: launch-at-login toggle + quit. Rebuilt on open so the
+ *  checkbox reflects the live login-item state. */
+function trayMenu(): Menu {
+  const openAtLogin = app.getLoginItemSettings().openAtLogin;
+  return Menu.buildFromTemplate([
+    {
+      label: 'Start at login',
+      type: 'checkbox',
+      checked: openAtLogin,
+      click: () => app.setLoginItemSettings({ openAtLogin: !openAtLogin }),
+    },
+    { type: 'separator' },
+    { label: 'Quit llm-wiki', click: () => app.quit() },
+  ]);
+}
+
 app.on('ready', () => {
   app.dock?.hide(); // menubar-only — no dock icon
   tray = new Tray(brainIcon());
   tray.setToolTip('llm-wiki');
   tray.setTitle(trayGlyph());
-  tray.on('click', togglePanel);
+  tray.on('click', togglePanel); // left-click → panel
+  tray.on('right-click', () => tray?.popUpContextMenu(trayMenu())); // right-click → menu
   panel = createPanel();
   // Lightweight background check for the menubar glyph (visible even when the
   // panel is closed) — slow cadence; the panel does its own faster poll only
