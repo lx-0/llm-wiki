@@ -17,7 +17,7 @@ import {
   VAULT_RUN_DONE_CHANNEL,
   type VaultApi,
 } from './vault/ipc';
-import { PANEL_VISIBILITY_CHANNEL, type PanelApi } from './panel/ipc';
+import { PANEL_VISIBILITY_CHANNEL, PANEL_RESIZE_CHANNEL, type PanelApi } from './panel/ipc';
 import { APP_LOGIN_GET_CHANNEL, APP_LOGIN_SET_CHANNEL, APP_QUIT_CHANNEL, type AppApi } from './app/ipc';
 
 const listeners: ListenerApi = {
@@ -41,6 +41,7 @@ const vault: VaultApi = {
 
 const panel: PanelApi = {
   onVisibility: (cb) => ipcRenderer.on(PANEL_VISIBILITY_CHANNEL, (_e, v: boolean) => cb(v)),
+  resize: (height) => ipcRenderer.send(PANEL_RESIZE_CHANNEL, height),
 };
 
 const appApi: AppApi = {

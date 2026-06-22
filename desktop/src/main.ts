@@ -23,7 +23,7 @@ import {
   VAULT_RUN_DONE_CHANNEL,
 } from './vault/ipc';
 import { BRAIN_PNG_1X, BRAIN_PNG_2X } from './assets/brainIcon';
-import { PANEL_VISIBILITY_CHANNEL } from './panel/ipc';
+import { PANEL_VISIBILITY_CHANNEL, PANEL_RESIZE_CHANNEL } from './panel/ipc';
 import { APP_LOGIN_GET_CHANNEL, APP_LOGIN_SET_CHANNEL, APP_QUIT_CHANNEL } from './app/ipc';
 import { isAutostartEnabled, setAutostart } from './app/autostart';
 
@@ -118,9 +118,21 @@ ipcMain.handle(VAULT_RUN_STATUS_CHANNEL, () => ({ running: runningCommand() }));
 let tray: Tray | null = null;
 let panel: BrowserWindow | null = null;
 
+const PANEL_WIDTH = 360;
+const PANEL_MIN_H = 160;
+const PANEL_MAX_H = 640; // beyond this the panel scrolls
+
+// Renderer measures its content height and asks us to fit the window to it
+// (no scroll until PANEL_MAX_H).
+ipcMain.on(PANEL_RESIZE_CHANNEL, (_e, height: number) => {
+  if (!panel) return;
+  const h = Math.max(PANEL_MIN_H, Math.min(PANEL_MAX_H, Math.ceil(height)));
+  panel.setSize(PANEL_WIDTH, h, false);
+});
+
 function createPanel(): BrowserWindow {
   const win = new BrowserWindow({
-    width: 360,
+    width: PANEL_WIDTH,
     height: 280,
     show: false,
     frame: false,

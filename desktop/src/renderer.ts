@@ -318,6 +318,12 @@ window.addEventListener('DOMContentLoaded', () => {
 
   renderAdvanced();
 
+  // Auto-fit the window to content — no scrolling. Fires on any layout change
+  // (health/update appearing, advanced expanding, status changes).
+  const fit = () => window.panel.resize(document.documentElement.scrollHeight);
+  new ResizeObserver(fit).observe(document.body);
+  fit();
+
   window.panel.onVisibility((v) => {
     panelVisible = v;
     if (v) {
