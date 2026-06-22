@@ -32,6 +32,16 @@ import { ADVANCED_COMMANDS } from './vault/ipc';
 
 const ICON_COPY = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
 const ICON_CHECK = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>`;
+const ICON_X = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>`;
+
+/** Hide + empty the Ask answer (the × button). The popover re-fits via the observer. */
+function clearAnswer(): void {
+  const answer = document.getElementById('ask-answer');
+  if (!answer) return;
+  answer.hidden = true;
+  answer.innerHTML = '';
+  answer.className = 'ask-answer';
+}
 
 /** Render the answer markdown to HTML; wikilinks [[a/b/slug]] → a subtle chip (slug). */
 function renderMarkdown(md: string): string {
@@ -319,7 +329,11 @@ async function ask(): Promise<void> {
     const res = await window.vault.query(q);
     if (res.ok) {
       answer.className = 'ask-answer';
-      answer.innerHTML = `<button class="copy" title="Copy to clipboard">${ICON_COPY}</button><div class="md">${renderMarkdown(res.answer)}</div>`;
+      answer.innerHTML =
+        `<div class="ask-tools">` +
+        `<button class="icon-btn copy" title="Copy to clipboard">${ICON_COPY}</button>` +
+        `<button class="icon-btn clear" title="Clear">${ICON_X}</button>` +
+        `</div><div class="md">${renderMarkdown(res.answer)}</div>`;
       const copyBtn = answer.querySelector('.copy') as HTMLButtonElement | null;
       copyBtn?.addEventListener('click', () => {
         void navigator.clipboard.writeText(res.answer).then(() => {
@@ -331,9 +345,13 @@ async function ask(): Promise<void> {
           }, 1500);
         });
       });
+      answer.querySelector('.clear')?.addEventListener('click', clearAnswer);
     } else {
       answer.className = 'ask-answer err';
-      answer.textContent = res.answer || 'No answer.';
+      answer.innerHTML = `<div class="ask-tools"><button class="icon-btn clear" title="Clear">${ICON_X}</button></div><div class="md-plain"></div>`;
+      const plain = answer.querySelector('.md-plain');
+      if (plain) plain.textContent = res.answer || 'No answer.';
+      answer.querySelector('.clear')?.addEventListener('click', clearAnswer);
     }
   } catch {
     answer.className = 'ask-answer err';
