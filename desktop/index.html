@@ -27,12 +27,17 @@
     <div id="pending"></div>
     <h2 class="section-label">Listeners</h2>
     <ul id="listeners"></ul>
-    <details id="advanced" class="advanced">
+    <details id="advanced" class="disclosure">
       <summary>Advanced</summary>
       <div id="advanced-actions" class="advanced-actions"></div>
     </details>
+    <details id="settings" class="disclosure">
+      <summary>Settings</summary>
+      <div class="disclosure-body">
+        <label class="login"><input type="checkbox" id="login-toggle" /> Start at login</label>
+      </div>
+    </details>
     <footer class="footer">
-      <label class="login"><input type="checkbox" id="login-toggle" /> Start at login</label>
       <button id="quit" class="quit">Quit</button>
     </footer>
     <script type="module" src="/src/renderer.ts"></script>

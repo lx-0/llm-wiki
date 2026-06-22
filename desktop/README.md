@@ -31,10 +31,10 @@ inherits the terminal's permissions.
 
 ## Start at login (autostart) + Quit
 
-Both live in the **panel footer** (open the panel by clicking the menubar icon):
+Open the panel (click the menubar icon):
 
-> **☐ Start at login** — check it to launch the app at login.
-> **Quit** — quit the app.
+> **☐ Start at login** — under the collapsible **Settings** section; check it to launch the app at login.
+> **Quit** — in the footer.
 
 "Start at login" writes a per-user **LaunchAgent**
 (`~/Library/LaunchAgents/cloud.yesterday.llm-wiki.plist`, `RunAtLoad` → `open` the

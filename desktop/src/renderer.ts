@@ -461,6 +461,8 @@ window.addEventListener('DOMContentLoaded', () => {
   // (health/update appearing, advanced expanding, status changes).
   const fit = () => window.panel.resize(document.documentElement.scrollHeight);
   new ResizeObserver(fit).observe(document.body);
+  // Explicit fit on every disclosure expand/collapse (belt-and-suspenders vs the observer).
+  document.querySelectorAll('details').forEach((d) => d.addEventListener('toggle', fit));
   fit();
 
   window.panel.onVisibility((v) => {

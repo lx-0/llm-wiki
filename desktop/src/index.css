@@ -185,12 +185,13 @@ button:disabled { background: rgba(120,120,128,0.3); color: var(--muted); cursor
 .update-row { display: flex; align-items: center; margin-top: 8px; gap: 8px; }
 .update-msg { font-size: 12px; color: var(--blue); font-weight: 500; }
 
-/* Advanced disclosure */
-.advanced { margin-top: 12px; }
-.advanced > summary { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); cursor: pointer; list-style: none; }
-.advanced > summary::-webkit-details-marker { display: none; }
-.advanced > summary::before { content: '▸ '; }
-.advanced[open] > summary::before { content: '▾ '; }
+/* Collapsible disclosures (Advanced, Settings) */
+.disclosure { margin-top: 12px; }
+.disclosure > summary { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); cursor: pointer; list-style: none; }
+.disclosure > summary::-webkit-details-marker { display: none; }
+.disclosure > summary::before { content: '▸ '; }
+.disclosure[open] > summary::before { content: '▾ '; }
+.disclosure-body { margin-top: 8px; }
 .advanced-actions { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
 .adv-row { display: flex; align-items: center; gap: 8px; }
 .adv-label { font-size: 12.5px; display: flex; flex-direction: column; flex: 1; }
