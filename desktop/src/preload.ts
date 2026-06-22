@@ -11,6 +11,10 @@ import {
   VAULT_COMPILE_DONE_CHANNEL,
   VAULT_OPEN_OBSIDIAN_CHANNEL,
   VAULT_OPEN_FDA_CHANNEL,
+  VAULT_DOCTOR_CHANNEL,
+  VAULT_RUN_CHANNEL,
+  VAULT_RUN_STATUS_CHANNEL,
+  VAULT_RUN_DONE_CHANNEL,
   type VaultApi,
 } from './vault/ipc';
 import { PANEL_VISIBILITY_CHANNEL, type PanelApi } from './panel/ipc';
@@ -29,6 +33,10 @@ const vault: VaultApi = {
   compileStatus: () => ipcRenderer.invoke(VAULT_COMPILE_STATUS_CHANNEL),
   onCompileProgress: (cb) => ipcRenderer.on(VAULT_COMPILE_PROGRESS_CHANNEL, (_e, p) => cb(p)),
   onCompileDone: (cb) => ipcRenderer.on(VAULT_COMPILE_DONE_CHANNEL, (_e, r) => cb(r)),
+  doctor: () => ipcRenderer.invoke(VAULT_DOCTOR_CHANNEL),
+  run: (id) => ipcRenderer.invoke(VAULT_RUN_CHANNEL, id),
+  runStatus: () => ipcRenderer.invoke(VAULT_RUN_STATUS_CHANNEL),
+  onRunDone: (cb) => ipcRenderer.on(VAULT_RUN_DONE_CHANNEL, (_e, r) => cb(r)),
 };
 
 const panel: PanelApi = {

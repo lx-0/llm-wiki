@@ -20,12 +20,29 @@ export interface CompileProgress {
   total: number;
 }
 
+/** Engine commands the app can run (besides compile). Safe + $0 where possible:
+ *  `--suggest-only` dedup (no destructive merge), `--structural-only` lint ($0). */
+export type EngineCommandId = 'update' | 'lint' | 'links' | 'dedup' | 'review';
+export const ENGINE_COMMANDS: Record<EngineCommandId, { args: string[]; label: string }> = {
+  update: { args: ['update'], label: 'Update app' },
+  lint: { args: ['lint', '--structural-only'], label: 'Check for problems' },
+  links: { args: ['links'], label: 'Check links' },
+  dedup: { args: ['dedup', '--suggest-only'], label: 'Find duplicate pages' },
+  review: { args: ['review-wiki'], label: 'Review quality' },
+};
+
 let proc: ChildProcess | null = null;
+let runningCmd: 'compile' | EngineCommandId | null = null;
 let startedAt = 0;
 let lastProgress: CompileProgress = { current: 0, total: 0 };
 
 export function isCompiling(): boolean {
-  return proc !== null;
+  return runningCmd === 'compile';
+}
+
+/** Whatever engine command is running right now (one at a time), or null. */
+export function runningCommand(): 'compile' | EngineCommandId | null {
+  return runningCmd;
 }
 
 export function currentProgress(): CompileProgress {
@@ -50,7 +67,10 @@ export interface CompileStart {
   error?: string;
 }
 
-export function startCompile(
+/** Shared spawn for any `wiki <args>` engine command. One at a time. */
+function spawnWiki(
+  cmdId: 'compile' | EngineCommandId,
+  args: string[],
   onProgress: (p: CompileProgress) => void,
   onDone: (r: CompileResult) => void,
 ): CompileStart {
@@ -62,15 +82,16 @@ export function startCompile(
   startedAt = Date.now();
   lastProgress = { current: 0, total: 0 };
 
-  const child = spawn(wiki, ['compile'], {
+  const child = spawn(wiki, args, {
     cwd: v.path,
     env: { ...process.env, PATH: augmentedPath() },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   proc = child;
+  runningCmd = cmdId;
 
   // compile.py logs: "Files to compile: N", then per-file "[idx/total]",
-  // and "Nothing to compile" on a no-op. (ANSI codes around the text don't matter.)
+  // "Nothing to compile" on a no-op. (Only compile emits x/y; others stay indeterminate.)
   const scan = (buf: Buffer) => {
     for (const line of buf.toString().split('\n')) {
       let m: RegExpMatchArray | null;
@@ -92,10 +113,24 @@ export function startCompile(
   const finish = (code: number | null) => {
     if (proc !== child) return;
     proc = null;
+    runningCmd = null;
     onDone({ ok: code === 0, code, durationMs: Date.now() - startedAt });
   };
   child.on('exit', finish);
   child.on('error', () => finish(null));
 
   return { started: true };
+}
+
+export function startCompile(
+  onProgress: (p: CompileProgress) => void,
+  onDone: (r: CompileResult) => void,
+): CompileStart {
+  return spawnWiki('compile', ['compile'], onProgress, onDone);
+}
+
+/** Run any other engine command (update / lint / links / dedup / review). No x/y
+ *  progress — the UI shows an indeterminate state until done. */
+export function startEngineCommand(id: EngineCommandId, onDone: (r: CompileResult) => void): CompileStart {
+  return spawnWiki(id, ENGINE_COMMANDS[id].args, () => {}, onDone);
 }

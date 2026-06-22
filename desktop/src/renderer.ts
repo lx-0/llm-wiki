@@ -27,12 +27,23 @@
  */
 
 import './index.css';
+import { ADVANCED_COMMANDS } from './vault/ipc';
 
 // Live-polling health view + start/stop control. The renderer only calls the
 // contextBridge API — no Node, no engine.
 const POLL_MS = 5000;
 /** in-flight action per listener id, for instant toggle feedback */
 const pending = new Map<string, 'start' | 'stop'>();
+
+type Doctor = { issues: number; updateAvailable: boolean; updateMessage?: string };
+let doctorState: Doctor | null = null;
+/** id of the running engine command (update/advanced), or null. Compile has its own state. */
+let advancedBusy: string | null = null;
+const advancedResults = new Map<string, boolean>(); // id -> ok
+
+function engineBusy(): boolean {
+  return compileState === 'running' || advancedBusy !== null;
+}
 
 function fmtClock(ms: number | null): string {
   return ms == null ? '—' : new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -180,7 +191,7 @@ async function renderVault(): Promise<void> {
       btn.className = 'compile';
       btn.title = 'Turn newly captured material (notes, voice, screenshots, meetings) into wiki articles';
       btn.textContent = running ? 'Updating…' : 'Update knowledge';
-      btn.disabled = running;
+      btn.disabled = engineBusy();
       btn.addEventListener('click', () => void compile());
       box.querySelector('.vault-actions')?.appendChild(btn);
     }
@@ -189,8 +200,75 @@ async function renderVault(): Promise<void> {
   }
 }
 
+// --- Health + update -------------------------------------------------------
+async function loadDoctor(): Promise<void> {
+  doctorState = await window.vault.doctor();
+  renderHealth();
+}
+
+function renderHealth(): void {
+  const el = document.getElementById('health');
+  if (!el) return;
+  if (!doctorState) {
+    el.innerHTML = '';
+    return;
+  }
+  const d = doctorState;
+  const health =
+    d.issues === 0
+      ? `<span class="ok">● Everything healthy</span>`
+      : `<span class="warn">⚠ ${d.issues} ${d.issues === 1 ? 'issue' : 'issues'}</span>`;
+  el.innerHTML = `<div class="health-row">${health}</div>`;
+  if (d.updateAvailable) {
+    const row = document.createElement('div');
+    row.className = 'update-row';
+    row.innerHTML = `<span class="update-msg">App update available</span>`;
+    const b = document.createElement('button');
+    b.className = 'compile';
+    b.textContent = advancedBusy === 'update' ? 'Updating…' : 'Update app';
+    b.disabled = engineBusy();
+    b.addEventListener('click', () => void runEngine('update'));
+    row.appendChild(b);
+    el.appendChild(row);
+  }
+}
+
+// --- Advanced ---------------------------------------------------------------
+function renderAdvanced(): void {
+  const el = document.getElementById('advanced-actions');
+  if (!el) return;
+  el.innerHTML = '';
+  for (const c of ADVANCED_COMMANDS) {
+    const row = document.createElement('div');
+    row.className = 'adv-row';
+    const busy = advancedBusy === c.id;
+    const ok = advancedResults.get(c.id);
+    const note = busy ? 'running…' : ok === undefined ? c.hint : ok ? 'done ✓' : 'failed';
+    row.innerHTML = `<span class="adv-label">${c.label}<span class="adv-hint">${note}</span></span>`;
+    const b = document.createElement('button');
+    b.className = 'ghost';
+    b.textContent = busy ? '…' : 'Run';
+    b.disabled = engineBusy();
+    b.addEventListener('click', () => void runEngine(c.id));
+    row.appendChild(b);
+    el.appendChild(row);
+  }
+}
+
+async function runEngine(id: string): Promise<void> {
+  if (engineBusy()) return;
+  advancedBusy = id;
+  renderHealth();
+  renderAdvanced();
+  void renderVault(); // reflect disabled compile button
+  const res = await window.vault.run(id as never);
+  if (!res.started && !res.running) advancedBusy = null;
+  renderHealth();
+  renderAdvanced();
+}
+
 async function compile(): Promise<void> {
-  if (compileState === 'running') return;
+  if (engineBusy()) return;
   const res = await window.vault.compile();
   if (res.started || res.running) {
     compileState = 'running';
@@ -238,10 +316,12 @@ window.addEventListener('DOMContentLoaded', () => {
   });
   document.getElementById('quit')?.addEventListener('click', () => window.app.quit());
 
+  renderAdvanced();
+
   window.panel.onVisibility((v) => {
     panelVisible = v;
     if (v) {
-      // fresh on open + restore compile state (in case it's running)
+      // fresh on open + restore running state (compile or advanced)
       void window.vault.compileStatus().then((s) => {
         if (s.running) {
           compileState = 'running';
@@ -249,8 +329,14 @@ window.addEventListener('DOMContentLoaded', () => {
         }
         void renderVault();
       });
+      void window.vault.runStatus().then((s) => {
+        advancedBusy = s.running && s.running !== 'compile' ? s.running : null;
+        renderAdvanced();
+        renderHealth();
+      });
       void renderStatus();
       void renderVault();
+      void loadDoctor(); // health + update-available (read-only, ~seconds)
     }
   });
 
@@ -259,14 +345,25 @@ window.addEventListener('DOMContentLoaded', () => {
     if (compileState === 'running') void renderVault();
   });
 
-  // Compile finished (pushed from main): show result, refresh stats, reset later.
+  // Compile finished (pushed from main): show result, refresh stats + health, reset later.
   window.vault.onCompileDone((r) => {
     compileState = { ok: r.ok, durationMs: r.durationMs };
     void renderVault();
+    void loadDoctor();
     window.setTimeout(() => {
       compileState = 'idle';
       void renderVault();
     }, 8000);
+  });
+
+  // Advanced / update command finished (pushed from main).
+  window.vault.onRunDone(({ id, result }) => {
+    if (advancedBusy === id) advancedBusy = null;
+    advancedResults.set(id, result.ok);
+    renderAdvanced();
+    void renderVault(); // re-enable buttons
+    void loadDoctor(); // refresh health + update-available (esp. after `update`)
+    if (id === 'update' || id === 'dedup') void renderStatus();
   });
 
   window.addEventListener('beforeunload', () => {

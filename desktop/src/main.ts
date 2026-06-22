@@ -7,7 +7,8 @@ import { startListener, stopListener, restartListener, type LifecycleAction, typ
 import { LISTENER_STATUS_CHANNEL, LISTENER_CONTROL_CHANNEL } from './listeners/ipc';
 import { getVaultStatus } from './vault/status';
 import { resolveVault } from './vault/registry';
-import { startCompile, isCompiling, currentProgress } from './vault/compile';
+import { startCompile, isCompiling, currentProgress, startEngineCommand, runningCommand, type EngineCommandId } from './vault/compile';
+import { getDoctor } from './vault/doctor';
 import {
   VAULT_STATUS_CHANNEL,
   VAULT_COMPILE_CHANNEL,
@@ -16,6 +17,10 @@ import {
   VAULT_COMPILE_DONE_CHANNEL,
   VAULT_OPEN_OBSIDIAN_CHANNEL,
   VAULT_OPEN_FDA_CHANNEL,
+  VAULT_DOCTOR_CHANNEL,
+  VAULT_RUN_CHANNEL,
+  VAULT_RUN_STATUS_CHANNEL,
+  VAULT_RUN_DONE_CHANNEL,
 } from './vault/ipc';
 import { BRAIN_PNG_1X, BRAIN_PNG_2X } from './assets/brainIcon';
 import { PANEL_VISIBILITY_CHANNEL } from './panel/ipc';
@@ -91,6 +96,18 @@ ipcMain.handle(VAULT_OPEN_OBSIDIAN_CHANNEL, () => {
 ipcMain.on(VAULT_OPEN_FDA_CHANNEL, () => {
   void shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles');
 });
+
+// IPC: doctor (health + update-available) — one read-only call.
+ipcMain.handle(VAULT_DOCTOR_CHANNEL, () => getDoctor());
+
+// IPC: run a generic engine command (update / lint / links / dedup / review).
+ipcMain.handle(VAULT_RUN_CHANNEL, (_e, id: EngineCommandId) => {
+  return startEngineCommand(id, (result) => {
+    if (DEBUG) console.log(`${VAULT_RUN_DONE_CHANNEL} ${id} -> ${JSON.stringify(result)}`);
+    panel?.webContents.send(VAULT_RUN_DONE_CHANNEL, { id, result });
+  });
+});
+ipcMain.handle(VAULT_RUN_STATUS_CHANNEL, () => ({ running: runningCommand() }));
 
 // --- Menubar (tray) app -----------------------------------------------------
 // This is a menubar utility, NOT a windowed app: a Tray icon shows live status
