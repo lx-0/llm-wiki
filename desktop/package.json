@@ -11,7 +11,8 @@
     "make": "electron-forge make",
     "publish": "electron-forge publish",
     "lint": "eslint --ext .ts,.tsx .",
-    "test": "vitest run"
+    "test": "vitest run",
+    "dmg": "electron-forge make --targets @electron-forge/maker-dmg"
   },
   "keywords": [],
   "author": {
