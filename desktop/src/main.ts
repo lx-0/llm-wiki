@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain, Tray, nativeImage } from 'electron';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
 import { LISTENERS, getListener } from './listeners/registry';
@@ -34,50 +34,69 @@ ipcMain.handle(LISTENER_CONTROL_CHANNEL, (_e, id: string, action: LifecycleActio
   return res;
 });
 
-const createWindow = () => {
-  // Create the browser window.
-  const mainWindow = new BrowserWindow({
-    width: 800,
-    height: 600,
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
-    },
+// --- Menubar (tray) app -----------------------------------------------------
+// This is a menubar utility, NOT a windowed app: a Tray icon shows live status
+// and clicking it toggles a small frameless panel (the renderer) anchored under
+// the icon. No dock icon. The status/IPC/renderer logic is unchanged — only the
+// shell differs.
+
+let tray: Tray | null = null;
+let panel: BrowserWindow | null = null;
+
+function createPanel(): BrowserWindow {
+  const win = new BrowserWindow({
+    width: 380,
+    height: 200,
+    show: false,
+    frame: false,
+    resizable: false,
+    fullscreenable: false,
+    skipTaskbar: true,
+    webPreferences: { preload: path.join(__dirname, 'preload.js') },
   });
-
-  // and load the index.html of the app.
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
-    mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
+    win.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
   } else {
-    mainWindow.loadFile(
-      path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`),
-    );
+    win.loadFile(path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`));
   }
+  // Behave like a menubar popover: dismiss when it loses focus.
+  win.on('blur', () => win.hide());
+  return win;
+}
 
-  // Open the DevTools.
-  mainWindow.webContents.openDevTools();
-};
+function togglePanel(): void {
+  if (!panel || !tray) return;
+  if (panel.isVisible()) {
+    panel.hide();
+    return;
+  }
+  const tb = tray.getBounds();
+  const pb = panel.getBounds();
+  const x = Math.round(tb.x + tb.width / 2 - pb.width / 2);
+  const y = Math.round(tb.y + tb.height);
+  panel.setPosition(x, y, false);
+  panel.show();
+  panel.focus();
+}
 
-// This method will be called when Electron has finished
-// initialization and is ready to create browser windows.
-// Some APIs can only be used after this event occurs.
-app.on('ready', createWindow);
+/** Menubar title glyph from live status (visible without opening the panel). */
+function trayGlyph(): string {
+  const s = getListenerStatus(LISTENERS[0]);
+  return !s.running ? '○' : s.zombieSuspected ? '◍' : '●';
+}
 
-// Quit when all windows are closed, except on macOS. There, it's common
-// for applications and their menu bar to stay active until the user quits
-// explicitly with Cmd + Q.
+app.on('ready', () => {
+  app.dock?.hide(); // menubar-only — no dock icon
+  tray = new Tray(nativeImage.createEmpty());
+  tray.setToolTip('llm-wiki');
+  tray.setTitle(trayGlyph());
+  tray.on('click', togglePanel);
+  panel = createPanel();
+  // Refresh the menubar glyph on its own cadence (visible even when panel closed).
+  setInterval(() => tray?.setTitle(trayGlyph()), 5000);
+});
+
+// Menubar app: do NOT quit when the panel hides/closes — it lives in the tray.
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit();
-  }
+  // intentionally empty on all platforms; quit via Cmd+Q / future tray menu.
 });
-
-app.on('activate', () => {
-  // On OS X it's common to re-create a window in the app when the
-  // dock icon is clicked and there are no other windows open.
-  if (BrowserWindow.getAllWindows().length === 0) {
-    createWindow();
-  }
-});
-
-// In this file you can include the rest of your app's specific main process
-// code. You can also put them in separate files and import them here.
