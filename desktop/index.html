@@ -15,8 +15,16 @@
       <span class="brand">llm-wiki</span>
       <span id="vault-meta" class="vault-meta"></span>
     </header>
+    <div class="ask">
+      <div class="ask-bar">
+        <input id="ask-input" type="text" placeholder="Ask your wiki anything…" autocomplete="off" spellcheck="false" />
+        <button id="ask-btn" class="compile">Ask</button>
+      </div>
+      <div id="ask-answer" class="ask-answer" hidden></div>
+    </div>
     <section id="vault" class="card vault"></section>
     <div id="health" class="health"></div>
+    <div id="pending"></div>
     <h2 class="section-label">Listeners</h2>
     <ul id="listeners"></ul>
     <details id="advanced" class="advanced">

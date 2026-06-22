@@ -267,6 +267,84 @@ async function runEngine(id: string): Promise<void> {
   renderAdvanced();
 }
 
+// --- Ask (query) -----------------------------------------------------------
+let asking = false;
+async function ask(): Promise<void> {
+  const input = document.getElementById('ask-input') as HTMLInputElement | null;
+  const answer = document.getElementById('ask-answer');
+  const btn = document.getElementById('ask-btn') as HTMLButtonElement | null;
+  if (!input || !answer || asking) return;
+  const q = input.value.trim();
+  if (!q) return;
+  asking = true;
+  if (btn) { btn.disabled = true; btn.textContent = '…'; }
+  answer.hidden = false;
+  answer.className = 'ask-answer thinking';
+  answer.textContent = 'Thinking…';
+  try {
+    const res = await window.vault.query(q);
+    answer.className = 'ask-answer' + (res.ok ? '' : ' err');
+    answer.textContent = res.answer || 'No answer.';
+  } catch {
+    answer.className = 'ask-answer err';
+    answer.textContent = 'Something went wrong.';
+  } finally {
+    asking = false;
+    if (btn) { btn.disabled = false; btn.textContent = 'Ask'; }
+  }
+}
+
+// --- What's pending (the engine's own actionable menu) ---------------------
+type Menu = {
+  status: { articles?: number; last_compile_ago?: string };
+  suggestions: { count: number; label: string; cmd: string; priority: number; group: string }[];
+};
+let menuState: Menu | null = null;
+
+async function loadMenu(): Promise<void> {
+  menuState = (await window.vault.menu()) as Menu | null;
+  renderPending();
+}
+
+function renderPending(): void {
+  const el = document.getElementById('pending');
+  if (!el) return;
+  const items = (menuState?.suggestions ?? []).slice(0, 5);
+  if (items.length === 0) {
+    el.innerHTML = '';
+    return;
+  }
+  el.innerHTML = `<h2 class="section-label">What's pending</h2>`;
+  const list = document.createElement('div');
+  list.className = 'pending-list card';
+  for (const s of items) {
+    const row = document.createElement('div');
+    row.className = 'pending-row';
+    const busy = advancedBusy === s.cmd;
+    row.innerHTML = `<span class="pending-label">${s.label}</span>`;
+    const b = document.createElement('button');
+    b.className = 'ghost';
+    b.textContent = busy ? '…' : 'Run';
+    b.disabled = engineBusy();
+    b.addEventListener('click', () => void runArgs(s.cmd));
+    row.appendChild(b);
+    list.appendChild(row);
+  }
+  el.appendChild(list);
+}
+
+async function runArgs(cmd: string): Promise<void> {
+  if (engineBusy()) return;
+  advancedBusy = cmd;
+  renderPending();
+  renderHealth();
+  renderAdvanced();
+  void renderVault();
+  const res = await window.vault.runArgs(cmd.split(/\s+/));
+  if (!res.started && !res.running) advancedBusy = null;
+  renderPending();
+}
+
 async function compile(): Promise<void> {
   if (engineBusy()) return;
   const res = await window.vault.compile();
@@ -316,6 +394,12 @@ window.addEventListener('DOMContentLoaded', () => {
   });
   document.getElementById('quit')?.addEventListener('click', () => window.app.quit());
 
+  // Ask: button + Enter key.
+  document.getElementById('ask-btn')?.addEventListener('click', () => void ask());
+  document.getElementById('ask-input')?.addEventListener('keydown', (e) => {
+    if ((e as KeyboardEvent).key === 'Enter') void ask();
+  });
+
   renderAdvanced();
 
   // Auto-fit the window to content — no scrolling. Fires on any layout change
@@ -343,6 +427,7 @@ window.addEventListener('DOMContentLoaded', () => {
       void renderStatus();
       void renderVault();
       void loadDoctor(); // health + update-available (read-only, ~seconds)
+      void loadMenu(); // what's pending (engine's actionable suggestions)
     }
   });
 
@@ -362,13 +447,15 @@ window.addEventListener('DOMContentLoaded', () => {
     }, 8000);
   });
 
-  // Advanced / update command finished (pushed from main).
+  // Advanced / update / suggestion command finished (pushed from main).
   window.vault.onRunDone(({ id, result }) => {
     if (advancedBusy === id) advancedBusy = null;
     advancedResults.set(id, result.ok);
     renderAdvanced();
+    renderPending();
     void renderVault(); // re-enable buttons
     void loadDoctor(); // refresh health + update-available (esp. after `update`)
+    void loadMenu(); // the pending list shrinks as work gets done
     if (id === 'update' || id === 'dedup') void renderStatus();
   });
 

@@ -114,6 +114,33 @@ button:disabled { background: rgba(120,120,128,0.3); color: var(--muted); cursor
 .vault-hint { font-size: 11px; color: var(--muted); margin-top: 4px; line-height: 1.35; }
 .vault-hint b { color: var(--text); }
 
+/* Ask */
+.ask { margin-bottom: 11px; }
+.ask-bar { display: flex; gap: 7px; }
+#ask-input {
+  flex: 1; min-width: 0; font: inherit; font-size: 13px;
+  padding: 7px 11px; border-radius: 9px;
+  border: 0.5px solid var(--card-border); background: var(--card); color: var(--text);
+  -webkit-user-select: text; user-select: text; cursor: text; outline: none;
+}
+#ask-input::placeholder { color: var(--muted); }
+#ask-input:focus { border-color: var(--blue); }
+.ask-bar button { margin-left: 0; }
+.ask-answer {
+  margin-top: 8px; padding: 10px 12px; border-radius: 10px;
+  background: var(--card); border: 0.5px solid var(--card-border);
+  font-size: 12.5px; line-height: 1.45; white-space: pre-wrap; word-break: break-word;
+  max-height: 260px; overflow-y: auto; -webkit-user-select: text; user-select: text;
+}
+.ask-answer.thinking { color: var(--muted); font-style: italic; }
+.ask-answer.err { color: var(--amber); }
+
+/* What's pending */
+.pending-list { margin-top: 6px; padding: 6px 10px; display: flex; flex-direction: column; }
+.pending-row { display: flex; align-items: center; gap: 8px; padding: 5px 0; }
+.pending-row + .pending-row { border-top: 0.5px solid var(--hairline); }
+.pending-label { flex: 1; font-size: 12.5px; }
+
 /* Health */
 .health { margin-top: 9px; }
 .health-row { font-size: 12px; }

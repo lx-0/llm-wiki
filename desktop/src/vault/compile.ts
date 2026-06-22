@@ -5,9 +5,8 @@
 // engine's flock guards concurrency.
 
 import { spawn, type ChildProcess } from 'node:child_process';
-import os from 'node:os';
-import path from 'node:path';
 import { resolveVault } from './registry';
+import { augmentedPath, wikiBin } from './wiki-exec';
 
 export interface CompileResult {
   ok: boolean;
@@ -32,7 +31,7 @@ export const ENGINE_COMMANDS: Record<EngineCommandId, { args: string[]; label: s
 };
 
 let proc: ChildProcess | null = null;
-let runningCmd: 'compile' | EngineCommandId | null = null;
+let runningCmd: string | null = null;
 let startedAt = 0;
 let lastProgress: CompileProgress = { current: 0, total: 0 };
 
@@ -41,24 +40,12 @@ export function isCompiling(): boolean {
 }
 
 /** Whatever engine command is running right now (one at a time), or null. */
-export function runningCommand(): 'compile' | EngineCommandId | null {
+export function runningCommand(): string | null {
   return runningCmd;
 }
 
 export function currentProgress(): CompileProgress {
   return lastProgress;
-}
-
-/** uv/electron-spawn PATH fix — a launchd/Finder-launched app has a minimal PATH
- *  (no Homebrew/asdf), and the `wiki` wrapper needs `uv`. */
-function augmentedPath(): string {
-  const extra = [
-    '/opt/homebrew/bin',
-    path.join(os.homedir(), '.local', 'bin'),
-    path.join(os.homedir(), '.asdf', 'shims'),
-    '/usr/local/bin',
-  ];
-  return [...extra, process.env.PATH || ''].join(':');
 }
 
 export interface CompileStart {
@@ -69,7 +56,7 @@ export interface CompileStart {
 
 /** Shared spawn for any `wiki <args>` engine command. One at a time. */
 function spawnWiki(
-  cmdId: 'compile' | EngineCommandId,
+  cmdId: string,
   args: string[],
   onProgress: (p: CompileProgress) => void,
   onDone: (r: CompileResult) => void,
@@ -78,7 +65,7 @@ function spawnWiki(
   const v = resolveVault();
   if (!v) return { started: false, error: 'no vault found' };
 
-  const wiki = path.join(v.path, '.wiki', 'wiki');
+  const wiki = wikiBin(v.path);
   startedAt = Date.now();
   lastProgress = { current: 0, total: 0 };
 
@@ -133,4 +120,12 @@ export function startCompile(
  *  progress — the UI shows an indeterminate state until done. */
 export function startEngineCommand(id: EngineCommandId, onDone: (r: CompileResult) => void): CompileStart {
   return spawnWiki(id, ENGINE_COMMANDS[id].args, () => {}, onDone);
+}
+
+/** Run an arbitrary `wiki <args>` command — used for the engine's own actionable
+ *  menu suggestions (e.g. `lint --structural-only`, `dream --all-entities`). The
+ *  cmd string from `wiki menu --json` is tokenised on spaces. */
+export function startEngineArgs(args: string[], onDone: (r: CompileResult) => void): CompileStart {
+  if (args.length === 0) return { started: false, error: 'empty command' };
+  return spawnWiki(args.join(' '), args, () => {}, onDone);
 }

@@ -46,13 +46,20 @@ points at the app bundle), not `npm start` dev. A tray right-click menu was drop
 
 ## Use
 
-- **Left-click** the menubar icon → panel (status, controls).
+- **Left-click** the menubar icon → panel.
+- **Ask your wiki** → type a question, get a short answer (wraps `wiki query --brief`).
+- **What's pending** → the engine's own prioritized to-do list (`wiki menu --json`):
+  entities overdue for synthesis, edits since the last lint, scan requests to
+  review… each with a one-tap **Run**.
 - **`●` / `◍`** next to the icon = recording on / system-audio stalled. No glyph = stopped.
 - **Start / Stop** → toggles the screenpipe listener.
 - **Update knowledge** → turns newly captured material (notes, voice, screenshots,
-  meetings) into wiki articles — runs `wiki compile` under the hood, with live
-  `x of y` progress.
+  meetings) into wiki articles — runs `wiki compile`, with live `x of y` progress.
+- **Health** → `● Everything healthy` / `⚠ N issues` (from `wiki doctor`), plus an
+  **Update app** button when an engine update is available.
 - **vault pill (e.g. `lxw ↗`)** → opens the vault in Obsidian.
+- **Advanced** (collapsed) → Check for problems / Check links / Find duplicates /
+  Review quality — all read-only / $0.
 
 ## Dev
 

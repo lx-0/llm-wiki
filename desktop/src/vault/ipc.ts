@@ -3,6 +3,8 @@
 import type { VaultStatus } from './status';
 import type { CompileResult, CompileStart, CompileProgress, EngineCommandId } from './compile';
 import type { DoctorResult } from './doctor';
+import type { QueryResult } from './query';
+import type { MenuResult } from './menu';
 
 /** Advanced engine actions surfaced behind the "Advanced" disclosure. Renderer-safe
  *  (no node imports) — labels are end-user phrasing, all $0 / non-destructive. */
@@ -15,7 +17,10 @@ export const ADVANCED_COMMANDS: { id: Exclude<EngineCommandId, 'update'>; label:
 
 export const VAULT_STATUS_CHANNEL = 'vault:status';
 export const VAULT_DOCTOR_CHANNEL = 'vault:doctor';
+export const VAULT_MENU_CHANNEL = 'vault:menu';
+export const VAULT_QUERY_CHANNEL = 'vault:query';
 export const VAULT_RUN_CHANNEL = 'vault:run';
+export const VAULT_RUN_ARGS_CHANNEL = 'vault:run-args';
 export const VAULT_RUN_STATUS_CHANNEL = 'vault:run-status';
 export const VAULT_RUN_DONE_CHANNEL = 'vault:run-done';
 export const VAULT_COMPILE_CHANNEL = 'vault:compile';
@@ -33,8 +38,14 @@ export interface VaultApi {
   openFullDiskAccess(): void;
   /** Health + update-available, from `wiki doctor --json` (read-only, ~seconds). */
   doctor(): Promise<DoctorResult | null>;
+  /** Ask the knowledge base — `wiki query "Q" --brief`. LLM cost; returns the answer. */
+  query(question: string): Promise<QueryResult>;
+  /** The engine's prioritized actionable menu — `wiki menu --json`. */
+  menu(): Promise<MenuResult | null>;
   /** Run an engine command (update / lint / links / dedup / review). */
   run(id: EngineCommandId): Promise<CompileStart>;
+  /** Run an arbitrary engine command from a menu suggestion (cmd string → args). */
+  runArgs(args: string[]): Promise<CompileStart>;
   /** Which engine command is running right now (one at a time), or null. */
   runStatus(): Promise<{ running: 'compile' | EngineCommandId | null }>;
   /** Fires when a run() command finishes. */

@@ -4,9 +4,8 @@
 // + connectivity probes, ~seconds), not on the fast poll.
 
 import { spawn } from 'node:child_process';
-import os from 'node:os';
-import path from 'node:path';
 import { resolveVault } from './registry';
+import { augmentedPath, wikiBin } from './wiki-exec';
 
 export interface DoctorResult {
   /** critical + warning, EXCLUDING the engine-update-available check (that's surfaced as the update action) */
@@ -16,23 +15,12 @@ export interface DoctorResult {
   updateMessage?: string;
 }
 
-function augmentedPath(): string {
-  return [
-    '/opt/homebrew/bin',
-    path.join(os.homedir(), '.local', 'bin'),
-    path.join(os.homedir(), '.asdf', 'shims'),
-    '/usr/local/bin',
-    process.env.PATH || '',
-  ].join(':');
-}
-
 export function getDoctor(): Promise<DoctorResult | null> {
   return new Promise((resolve) => {
     const v = resolveVault();
     if (!v) return resolve(null);
-    const wiki = path.join(v.path, '.wiki', 'wiki');
     let out = '';
-    const child = spawn(wiki, ['doctor', '--json'], {
+    const child = spawn(wikiBin(v.path), ['doctor', '--json'], {
       cwd: v.path,
       env: { ...process.env, PATH: augmentedPath() },
       stdio: ['ignore', 'pipe', 'ignore'],
