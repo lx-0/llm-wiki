@@ -24,9 +24,17 @@ BUILT="$(find out -maxdepth 2 -name "${APP_NAME}.app" -type d | head -1)"
 [ -n "$BUILT" ] || { echo "✗ built ${APP_NAME}.app not found under out/"; exit 1; }
 
 echo "▸ Quitting running copy…"
+PROC_PAT="${APP_NAME}.app/Contents/MacOS/${APP_NAME}"   # matches the installed app, not dev Electron
 osascript -e "tell application \"${APP_NAME}\" to quit" 2>/dev/null || true
-pkill -f "${DEST}/Contents/MacOS/" 2>/dev/null || true
+for _ in 1 2 3 4 5 6; do pgrep -f "${PROC_PAT}" >/dev/null || break; sleep 0.5; done  # let it quit gracefully
+pkill -f "${PROC_PAT}" 2>/dev/null || true
 sleep 1
+pkill -9 -f "${PROC_PAT}" 2>/dev/null || true
+sleep 1
+if pgrep -f "${PROC_PAT}" >/dev/null; then
+  echo "✗ could not quit the running app (still alive: $(pgrep -f "${PROC_PAT}" | tr '\n' ' '))"; exit 1
+fi
+echo "  quit ✓"
 
 echo "▸ Installing → ${DEST}"
 mkdir -p "${DEST}"
