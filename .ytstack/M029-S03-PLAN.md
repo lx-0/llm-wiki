@@ -20,20 +20,23 @@ both audiences can actually run.
   live poll (every few seconds) via the S01 bridge. No write paths beyond the
   S02 start/stop control. Catches exactly the "is it running before my meeting"
   failure that motivated this.
-- [ ] T02 -- macOS packaging: build a `.app`, **code-sign** (Apple Developer ID)
-  + **notarize**. This also gives the app a stable TCC identity (the screenpipe-
-  bundle fix, generalised). Document the signing prerequisites for the operator.
-- [ ] T03 -- Auto-update wiring (`electron-updater` + a release channel, e.g.
-  GitHub Releases) so the app can ship fixes without manual reinstall.
-- [ ] T04 -- End-to-end verification on macOS: the signed, notarized `.app`
-  launches from `/Applications`, the toggle starts/stops screenpipe, the health
-  window shows live freshness, and (if the app holds the screenpipe TCC grants)
-  capture works without the separate watchdog. Report what's verified vs deferred.
+- [~] T02 -- macOS packaging. **CONFIG PREPARED, signing OPERATOR-GATED** (commit
+  `6cc9ab5`): `forge.config.ts` has env-gated `osxSign`/`osxNotarize` (prereqs
+  documented inline); unsigned `npm run package` verified → built + launched
+  `out/desktop-darwin-arm64/desktop.app`. The actual signed+notarized build needs
+  the operator's Apple Developer ID (`APPLE_ID`/`APPLE_PASSWORD`/`APPLE_TEAM_ID` +
+  a "Developer ID Application" cert). Not executable by the agent.
+- [ ] T03 -- Auto-update wiring. **DEFERRED — needs a release host decision**
+  (GitHub Releases vs other) + publisher config. Not scaffolded; pick the host first.
+- [~] T04 -- E2E. **UNSIGNED path verified** (package builds + .app launches; toggle
+  + live health verified in S02-T03 / S03-T01). The **signed/notarized** `.app`
+  from `/Applications` + TCC-grant inheritance is operator-gated (depends on T02).
 
 ## Done when
 
-All tasks `[x]`. A signed/notarized `.app` launches, toggles screenpipe, and shows
-live health. MVP exit criteria (M029-CONTEXT) met.
+Functional MVP (toggle + live health) — **DONE + verified** (S01, S02, S03-T01).
+Distribution (signed `.app` + auto-update) — operator-gated remainder (T02 signing,
+T03 host, T04 signed e2e). This is the milestone-handoff line.
 
 ## Notes
 
