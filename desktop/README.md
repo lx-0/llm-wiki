@@ -68,7 +68,15 @@ npm install
 npm start          # run in dev (vite + electron)
 npm test           # vitest unit tests
 LLM_WIKI_DEBUG=1 npm start   # verbose IPC logging
+npm run reinstall  # build the .app + (re)install into /Applications + launch
 ```
+
+`npm run reinstall` (`scripts/dev-install.sh`) is the fast local-test loop: it
+builds just the `.app`, rsyncs it over `/Applications/llm-wiki.app` (quitting the
+running copy first), and relaunches — no DMG mount/drag. Use this to test the
+**installed** app (TCC / login-item behave for real, unlike `npm start`). Caveat:
+an unsigned app's Full-Disk-Access grant is keyed on its code hash and may need
+re-granting after a rebuild.
 
 ## Build
 

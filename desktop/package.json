@@ -12,7 +12,8 @@
     "publish": "electron-forge publish",
     "lint": "eslint --ext .ts,.tsx .",
     "test": "vitest run",
-    "dmg": "electron-forge make --targets @electron-forge/maker-dmg"
+    "dmg": "electron-forge make --targets @electron-forge/maker-dmg",
+    "reinstall": "bash scripts/dev-install.sh"
   },
   "keywords": [],
   "author": {
