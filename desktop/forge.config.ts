@@ -7,9 +7,29 @@ import { VitePlugin } from '@electron-forge/plugin-vite';
 import { FusesPlugin } from '@electron-forge/plugin-fuses';
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
 
+// macOS signing/notarization is env-gated so `npm run package` works WITHOUT
+// credentials (unsigned dev build), and signs only when the operator's Apple
+// Developer ID env vars are present. Prereqs (operator-provided):
+//   APPLE_ID                — Apple Developer account email
+//   APPLE_PASSWORD          — app-specific password (appleid.apple.com)
+//   APPLE_TEAM_ID           — Developer team id
+// A "Developer ID Application" cert must be in the login keychain.
+// See https://www.electronforge.io/guides/code-signing/code-signing-macos
+const SIGN = Boolean(process.env.APPLE_ID && process.env.APPLE_PASSWORD && process.env.APPLE_TEAM_ID);
+
 const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
+    ...(SIGN
+      ? {
+          osxSign: {},
+          osxNotarize: {
+            appleId: process.env.APPLE_ID!,
+            appleIdPassword: process.env.APPLE_PASSWORD!,
+            teamId: process.env.APPLE_TEAM_ID!,
+          },
+        }
+      : {}),
   },
   rebuildConfig: {},
   makers: [
