@@ -7,7 +7,7 @@ active_slice: S04
 active_task: none
 last_completed_milestone: M026
 parked_milestone: M025
-parallel_milestones: [M021, M027]
+parallel_milestones: [M021, M027, M029]
 ---
 
 # State
