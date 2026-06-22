@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Tray, nativeImage } from 'electron';
+import { app, BrowserWindow, ipcMain, Tray, nativeImage, shell } from 'electron';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
 import { LISTENERS, getListener } from './listeners/registry';
@@ -6,6 +6,7 @@ import { getListenerStatus } from './listeners/status';
 import { startListener, stopListener, restartListener, type LifecycleAction, type LifecycleResult } from './listeners/lifecycle';
 import { LISTENER_STATUS_CHANNEL, LISTENER_CONTROL_CHANNEL } from './listeners/ipc';
 import { getVaultStatus } from './vault/status';
+import { resolveVault } from './vault/registry';
 import { startCompile, isCompiling, currentProgress } from './vault/compile';
 import {
   VAULT_STATUS_CHANNEL,
@@ -13,6 +14,7 @@ import {
   VAULT_COMPILE_STATUS_CHANNEL,
   VAULT_COMPILE_PROGRESS_CHANNEL,
   VAULT_COMPILE_DONE_CHANNEL,
+  VAULT_OPEN_OBSIDIAN_CHANNEL,
 } from './vault/ipc';
 import { BRAIN_PNG_1X, BRAIN_PNG_2X } from './assets/brainIcon';
 import { PANEL_VISIBILITY_CHANNEL } from './panel/ipc';
@@ -70,6 +72,14 @@ ipcMain.handle(VAULT_COMPILE_CHANNEL, () => {
   );
 });
 ipcMain.handle(VAULT_COMPILE_STATUS_CHANNEL, () => ({ running: isCompiling(), progress: currentProgress() }));
+
+// IPC: open the vault in Obsidian (the reading/browsing surface for non-techies).
+ipcMain.handle(VAULT_OPEN_OBSIDIAN_CHANNEL, () => {
+  const v = resolveVault();
+  if (!v) return { ok: false };
+  void shell.openExternal(`obsidian://open?vault=${encodeURIComponent(v.name)}`);
+  return { ok: true };
+});
 
 // --- Menubar (tray) app -----------------------------------------------------
 // This is a menubar utility, NOT a windowed app: a Tray icon shows live status

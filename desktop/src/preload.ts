@@ -9,6 +9,7 @@ import {
   VAULT_COMPILE_STATUS_CHANNEL,
   VAULT_COMPILE_PROGRESS_CHANNEL,
   VAULT_COMPILE_DONE_CHANNEL,
+  VAULT_OPEN_OBSIDIAN_CHANNEL,
   type VaultApi,
 } from './vault/ipc';
 import { PANEL_VISIBILITY_CHANNEL, type PanelApi } from './panel/ipc';
@@ -20,6 +21,7 @@ const listeners: ListenerApi = {
 
 const vault: VaultApi = {
   status: () => ipcRenderer.invoke(VAULT_STATUS_CHANNEL),
+  openInObsidian: () => ipcRenderer.invoke(VAULT_OPEN_OBSIDIAN_CHANNEL),
   compile: () => ipcRenderer.invoke(VAULT_COMPILE_CHANNEL),
   compileStatus: () => ipcRenderer.invoke(VAULT_COMPILE_STATUS_CHANNEL),
   onCompileProgress: (cb) => ipcRenderer.on(VAULT_COMPILE_PROGRESS_CHANNEL, (_e, p) => cb(p)),

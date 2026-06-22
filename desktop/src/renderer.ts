@@ -148,7 +148,11 @@ async function renderVault(): Promise<void> {
       if (box) box.textContent = '';
       return;
     }
-    if (meta) meta.textContent = v.name;
+    if (meta) {
+      meta.innerHTML = `${v.name} <span class="ext">↗</span>`;
+      meta.title = 'Open in Obsidian';
+      meta.classList.add('link');
+    }
     if (box) {
       const running = compileState === 'running';
       box.innerHTML = `
@@ -192,6 +196,11 @@ window.addEventListener('DOMContentLoaded', () => {
   const t2 = window.setInterval(() => {
     if (panelVisible) void renderVault();
   }, 60_000);
+
+  // Vault-name pill opens the vault in Obsidian (reading surface).
+  document.getElementById('vault-meta')?.addEventListener('click', () => {
+    void window.vault.openInObsidian();
+  });
 
   window.panel.onVisibility((v) => {
     panelVisible = v;

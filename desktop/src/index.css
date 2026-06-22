@@ -40,7 +40,10 @@ ul { list-style: none; padding: 0; margin: 0; }
 .app { display: flex; align-items: center; gap: 7px; padding: 2px 2px 10px; }
 .logo { width: 17px; height: 17px; color: var(--text); flex: none; }
 .brand { font-weight: 700; font-size: 15px; letter-spacing: -0.01em; }
-.vault-meta { margin-left: auto; font-size: 11px; font-weight: 600; color: var(--muted); padding: 2px 7px; background: var(--card); border-radius: 6px; }
+.vault-meta { margin-left: auto; font-size: 11px; font-weight: 600; color: var(--muted); padding: 2px 8px; background: var(--card); border-radius: 6px; }
+.vault-meta.link { cursor: pointer; transition: background 0.12s, color 0.12s; }
+.vault-meta.link:hover { color: var(--blue); background: rgba(10, 132, 255, 0.12); }
+.vault-meta .ext { opacity: 0.6; font-size: 9px; }
 
 /* Card */
 .card {
