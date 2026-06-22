@@ -28,6 +28,27 @@
 
 import './index.css';
 
-console.log(
-  '👋 This message is being logged by "renderer.ts", included via Vite',
-);
+// Minimal render of live listener status (UI polish is S03). The renderer only
+// calls the contextBridge API — no Node, no engine.
+async function renderStatus(): Promise<void> {
+  const el = document.getElementById('listeners');
+  if (!el) return;
+  try {
+    const statuses = await window.listeners.status();
+    el.innerHTML = statuses
+      .map((s) => {
+        const dot = !s.running ? '⏹ stopped' : s.zombieSuspected ? '⚠ zombie?' : '● running';
+        const ch = (label: string, c: { fresh: boolean; ageSeconds: number | null }) =>
+          `${label}: ${c.ageSeconds == null ? 'no data' : `${c.ageSeconds}s ago`}${c.fresh ? ' ✓' : ''}`;
+        return `<li><strong>${s.id}</strong> — ${dot} · ${ch('mic', s.channels.mic)} · ${ch('sys', s.channels.system)}</li>`;
+      })
+      .join('');
+  } catch (err) {
+    el.textContent = `status error: ${String(err)}`;
+    console.error(err);
+  }
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  void renderStatus();
+});

@@ -1,11 +1,21 @@
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, ipcMain } from 'electron';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
+import { LISTENERS } from './listeners/registry';
+import { getListenerStatus } from './listeners/status';
+import { LISTENER_STATUS_CHANNEL } from './listeners/ipc';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
   app.quit();
 }
+
+// IPC: listener status (system data — launchd + sqlite, read directly; no engine call).
+ipcMain.handle(LISTENER_STATUS_CHANNEL, () => {
+  const all = LISTENERS.map((l) => getListenerStatus(l));
+  console.log(`${LISTENER_STATUS_CHANNEL} -> ${JSON.stringify(all)}`);
+  return all;
+});
 
 const createWindow = () => {
   // Create the browser window.
