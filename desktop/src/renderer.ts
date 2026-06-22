@@ -154,6 +154,20 @@ async function renderVault(): Promise<void> {
       meta.classList.add('link');
     }
     if (box) {
+      if (!v.accessible) {
+        // Can't read the vault — almost always macOS file access (the vault is
+        // under iCloud Drive; a Finder-launched app needs Full Disk Access).
+        box.innerHTML = `
+          <div class="vault-warn">⚠ Can't read your vault</div>
+          <div class="vault-path">${v.path.replace(/^\/Users\/[^/]+/, '~')}</div>
+          <div class="vault-hint">Grant <b>Full Disk Access</b> to llm-wiki in System Settings → Privacy &amp; Security, then reopen.</div>`;
+        const fix = document.createElement('button');
+        fix.className = 'compile';
+        fix.textContent = 'Open Settings';
+        fix.addEventListener('click', () => void window.vault.openFullDiskAccess());
+        box.appendChild(fix);
+        return;
+      }
       const running = compileState === 'running';
       box.innerHTML = `
         <div class="vault-row"><span class="big">${v.articleCount.toLocaleString()}</span><span class="muted">notes · updated ${fmtAgo(v.lastActivityMs)}</span></div>
@@ -164,7 +178,8 @@ async function renderVault(): Promise<void> {
         </div>`;
       const btn = document.createElement('button');
       btn.className = 'compile';
-      btn.textContent = running ? 'Updating…' : 'Update';
+      btn.title = 'Turn newly captured material (notes, voice, screenshots, meetings) into wiki articles';
+      btn.textContent = running ? 'Updating…' : 'Update knowledge';
       btn.disabled = running;
       btn.addEventListener('click', () => void compile());
       box.querySelector('.vault-actions')?.appendChild(btn);
@@ -201,6 +216,18 @@ window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('vault-meta')?.addEventListener('click', () => {
     void window.vault.openInObsidian();
   });
+
+  // Footer: autostart toggle + quit.
+  const loginToggle = document.getElementById('login-toggle') as HTMLInputElement | null;
+  void window.app.getLoginItem().then((on) => {
+    if (loginToggle) loginToggle.checked = on;
+  });
+  loginToggle?.addEventListener('change', () => {
+    void window.app.setLoginItem(loginToggle.checked).then((on) => {
+      loginToggle.checked = on;
+    });
+  });
+  document.getElementById('quit')?.addEventListener('click', () => window.app.quit());
 
   window.panel.onVisibility((v) => {
     panelVisible = v;

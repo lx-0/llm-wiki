@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Tray, nativeImage, shell, Menu } from 'electron';
+import { app, BrowserWindow, ipcMain, Tray, nativeImage, shell } from 'electron';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
 import { LISTENERS, getListener } from './listeners/registry';
@@ -15,9 +15,11 @@ import {
   VAULT_COMPILE_PROGRESS_CHANNEL,
   VAULT_COMPILE_DONE_CHANNEL,
   VAULT_OPEN_OBSIDIAN_CHANNEL,
+  VAULT_OPEN_FDA_CHANNEL,
 } from './vault/ipc';
 import { BRAIN_PNG_1X, BRAIN_PNG_2X } from './assets/brainIcon';
 import { PANEL_VISIBILITY_CHANNEL } from './panel/ipc';
+import { APP_LOGIN_GET_CHANNEL, APP_LOGIN_SET_CHANNEL, APP_QUIT_CHANNEL } from './app/ipc';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
@@ -73,12 +75,23 @@ ipcMain.handle(VAULT_COMPILE_CHANNEL, () => {
 });
 ipcMain.handle(VAULT_COMPILE_STATUS_CHANNEL, () => ({ running: isCompiling(), progress: currentProgress() }));
 
+// IPC: app-level — autostart (login item) + quit (surfaced in the panel footer).
+ipcMain.handle(APP_LOGIN_GET_CHANNEL, () => app.getLoginItemSettings().openAtLogin);
+ipcMain.handle(APP_LOGIN_SET_CHANNEL, (_e, open: boolean) => {
+  app.setLoginItemSettings({ openAtLogin: open });
+  return app.getLoginItemSettings().openAtLogin;
+});
+ipcMain.on(APP_QUIT_CHANNEL, () => app.quit());
+
 // IPC: open the vault in Obsidian (the reading/browsing surface for non-techies).
 ipcMain.handle(VAULT_OPEN_OBSIDIAN_CHANNEL, () => {
   const v = resolveVault();
   if (!v) return { ok: false };
   void shell.openExternal(`obsidian://open?vault=${encodeURIComponent(v.name)}`);
   return { ok: true };
+});
+ipcMain.on(VAULT_OPEN_FDA_CHANNEL, () => {
+  void shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles');
 });
 
 // --- Menubar (tray) app -----------------------------------------------------
@@ -149,29 +162,12 @@ function trayGlyph(): string {
   return s.zombieSuspected ? ' ◍' : ' ●';
 }
 
-/** Right-click menu: launch-at-login toggle + quit. Rebuilt on open so the
- *  checkbox reflects the live login-item state. */
-function trayMenu(): Menu {
-  const openAtLogin = app.getLoginItemSettings().openAtLogin;
-  return Menu.buildFromTemplate([
-    {
-      label: 'Start at login',
-      type: 'checkbox',
-      checked: openAtLogin,
-      click: () => app.setLoginItemSettings({ openAtLogin: !openAtLogin }),
-    },
-    { type: 'separator' },
-    { label: 'Quit llm-wiki', click: () => app.quit() },
-  ]);
-}
-
 app.on('ready', () => {
   app.dock?.hide(); // menubar-only — no dock icon
   tray = new Tray(brainIcon());
   tray.setToolTip('llm-wiki');
   tray.setTitle(trayGlyph());
-  tray.on('click', togglePanel); // left-click → panel
-  tray.on('right-click', () => tray?.popUpContextMenu(trayMenu())); // right-click → menu
+  tray.on('click', togglePanel); // click → panel (autostart/quit live in the panel footer)
   panel = createPanel();
   // Lightweight background check for the menubar glyph (visible even when the
   // panel is closed) — slow cadence; the panel does its own faster poll only

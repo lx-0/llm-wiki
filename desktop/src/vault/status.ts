@@ -13,6 +13,8 @@ export interface VaultStatus {
   articleCount: number;
   /** newest article mtime under knowledge/, epoch ms (null if none) */
   lastActivityMs: number | null;
+  /** false if reading the vault was blocked (TCC / Full Disk Access) */
+  accessible: boolean;
 }
 
 function walk(dir: string, acc: { count: number; newest: number }): void {
@@ -41,12 +43,25 @@ function walk(dir: string, acc: { count: number; newest: number }): void {
 export function getVaultStatus(): VaultStatus | null {
   const v = resolveVault();
   if (!v) return null;
+
+  // Distinguish "blocked" from "empty": if we can't even enumerate knowledge/,
+  // the app lacks file access (TCC / Full Disk Access — the vault is often under
+  // iCloud Drive, which a Finder-launched .app can't read without the grant).
+  const knowledge = path.join(v.path, 'knowledge');
+  let accessible = true;
+  try {
+    fs.readdirSync(knowledge);
+  } catch {
+    accessible = false;
+  }
+
   const acc = { count: 0, newest: 0 };
-  walk(path.join(v.path, 'knowledge'), acc);
+  if (accessible) walk(knowledge, acc);
   return {
     name: v.name,
     path: v.path,
     articleCount: acc.count,
     lastActivityMs: acc.newest || null,
+    accessible,
   };
 }

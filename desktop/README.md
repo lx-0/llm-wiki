@@ -15,25 +15,39 @@ the vault in Obsidian.
    (only needed once). A signed/notarized build (below) skips this.
 4. The **brain icon** appears in the menubar. Click it for the panel.
 
-## Start at login (autostart)
+## Grant file access (first run, important)
 
-The app registers itself — no System Settings fiddling:
+If the vault shows **“Can't read your vault” / 0 notes**, the app lacks macOS file
+access. The vault usually lives under **iCloud Drive**, which a Finder-launched app
+can't read until you grant it:
 
-> **Right-click the menubar brain icon → check “Start at login”.**
+> **System Settings → Privacy & Security → Full Disk Access → add `llm-wiki`** (toggle on),
+> then reopen the app.
 
-This calls macOS's login-item API (`app.setLoginItemSettings`). Un-check it the
-same way. The same right-click menu also has **Quit llm-wiki**.
+(The panel's “Open Settings” button jumps you straight there.) This is the same
+kind of macOS permission the screenpipe capture needs — a fresh `.app` has no file
+access until granted. Running in dev (`npm start`) works without it because it
+inherits the terminal's permissions.
 
-(There is no separate LaunchAgent — unlike the screenpipe capture daemon, this is
-a normal GUI login item the app manages itself.)
+## Start at login (autostart) + Quit
+
+Both live in the **panel footer** (open the panel by clicking the menubar icon):
+
+> **☐ Start at login** — check it to launch the app at login (macOS login-item API).
+> **Quit** — quit the app.
+
+(No separate LaunchAgent — unlike the screenpipe capture daemon, this is a normal
+GUI login item the app manages itself. A tray right-click menu was dropped because
+those are unreliable for menubar apps on macOS.)
 
 ## Use
 
 - **Left-click** the menubar icon → panel (status, controls).
 - **`●` / `◍`** next to the icon = recording on / system-audio stalled. No glyph = stopped.
 - **Start / Stop** → toggles the screenpipe listener.
-- **Update** → runs `wiki compile` (refreshes knowledge from new material), with
-  live `x of y` progress.
+- **Update knowledge** → turns newly captured material (notes, voice, screenshots,
+  meetings) into wiki articles — runs `wiki compile` under the hood, with live
+  `x of y` progress.
 - **vault pill (e.g. `lxw ↗`)** → opens the vault in Obsidian.
 
 ## Dev
