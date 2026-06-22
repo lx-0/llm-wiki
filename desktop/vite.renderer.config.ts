@@ -10,6 +10,7 @@ export default defineConfig({
       input: {
         index: resolve(__dirname, 'index.html'),
         settings: resolve(__dirname, 'settings.html'),
+        onboarding: resolve(__dirname, 'onboarding.html'),
       },
     },
   },

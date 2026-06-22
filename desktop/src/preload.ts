@@ -28,6 +28,7 @@ import {
   APP_LOGIN_SET_CHANNEL,
   APP_QUIT_CHANNEL,
   APP_OPEN_SETTINGS_CHANNEL,
+  APP_ONBOARDING_DONE_CHANNEL,
   type AppApi,
 } from './app/ipc';
 
@@ -65,6 +66,7 @@ const appApi: AppApi = {
   setLoginItem: (open) => ipcRenderer.invoke(APP_LOGIN_SET_CHANNEL, open),
   quit: () => ipcRenderer.send(APP_QUIT_CHANNEL),
   openSettings: () => ipcRenderer.send(APP_OPEN_SETTINGS_CHANNEL),
+  onboardingDone: () => ipcRenderer.send(APP_ONBOARDING_DONE_CHANNEL),
 };
 
 contextBridge.exposeInMainWorld('listeners', listeners);

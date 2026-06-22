@@ -90,6 +90,35 @@ body.settings {
 }
 .switch:checked::after { transform: translateX(16px); }
 
+/* Onboarding window (onboarding.html) */
+body.onboarding { background: var(--win-bg); padding: 26px 26px 22px; min-height: 100vh; }
+.ob-hero { text-align: center; margin-bottom: 22px; }
+.ob-logo { width: 46px; height: 46px; color: var(--blue); }
+.ob-title { font-size: 21px; font-weight: 700; margin: 10px 0 4px; }
+.ob-sub { font-size: 13px; color: var(--muted); margin: 0; }
+.ob-steps { display: flex; flex-direction: column; gap: 10px; }
+.ob-step {
+  display: flex; gap: 12px; align-items: flex-start;
+  background: var(--card); border: 0.5px solid var(--card-border);
+  border-radius: 12px; padding: 13px 15px;
+}
+.ob-num {
+  flex: none; width: 22px; height: 22px; border-radius: 50%;
+  background: var(--blue); color: #fff; font-size: 12px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center; margin-top: 1px;
+}
+.ob-body { flex: 1; min-width: 0; }
+.ob-head { font-size: 13.5px; font-weight: 600; }
+.ob-detail { font-size: 12px; color: var(--muted); margin-top: 3px; line-height: 1.4; }
+.ob-detail b { color: var(--text); }
+.ob-actions { display: flex; gap: 8px; margin-top: 10px; }
+.ob-row { display: flex; align-items: center; gap: 12px; }
+.ob-row > span { flex: 1; }
+.btn-primary { margin: 0; background: var(--blue); color: #fff; padding: 6px 16px; }
+.btn-ghost { margin: 0; background: rgba(120,120,128,0.22); color: var(--text); font-weight: 500; padding: 6px 14px; }
+.btn-ghost:hover { background: rgba(120,120,128,0.34); }
+.ob-done { width: 100%; margin-top: 20px; padding: 9px; font-size: 13.5px; }
+
 /* Card */
 .card {
   background: var(--card);

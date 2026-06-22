@@ -6,6 +6,7 @@ export const APP_LOGIN_GET_CHANNEL = 'app:login-get';
 export const APP_LOGIN_SET_CHANNEL = 'app:login-set';
 export const APP_QUIT_CHANNEL = 'app:quit';
 export const APP_OPEN_SETTINGS_CHANNEL = 'app:open-settings';
+export const APP_ONBOARDING_DONE_CHANNEL = 'app:onboarding-done';
 
 export interface AppApi {
   /** current "open at login" state */
@@ -15,4 +16,6 @@ export interface AppApi {
   quit(): void;
   /** open the Settings window (singleton) */
   openSettings(): void;
+  /** mark first-run onboarding complete + close the onboarding window */
+  onboardingDone(): void;
 }

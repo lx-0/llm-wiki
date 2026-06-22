@@ -1,0 +1,60 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Welcome to llm-wiki</title>
+  </head>
+  <body class="onboarding">
+    <div class="ob-hero">
+      <svg class="ob-logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M11 4.4c-1.4-.8-3.4-.3-4 1.2-1.5.1-2.6 1.3-2.6 2.8 0 .3 0 .6.1.9-1 .5-1.6 1.5-1.6 2.6 0 .9.4 1.7 1.1 2.2-.2.4-.3.8-.3 1.3 0 1.5 1.2 2.7 2.8 2.8.5.9 1.5 1.5 2.6 1.5h1.8V4.9" />
+        <path d="M13 4.4c1.4-.8 3.4-.3 4 1.2 1.5.1 2.6 1.3 2.6 2.8 0 .3 0 .6-.1.9 1 .5 1.6 1.5 1.6 2.6 0 .9-.4 1.7-1.1 2.2.2.4.3.8.3 1.3 0 1.5-1.2 2.7-2.8 2.8-.5.9-1.5 1.5-2.6 1.5h-1.8V4.9" />
+        <circle cx="8.5" cy="10" r="1" fill="currentColor" stroke="none" />
+        <circle cx="15.5" cy="13.5" r="1" fill="currentColor" stroke="none" />
+      </svg>
+      <h1 class="ob-title">Welcome to llm-wiki</h1>
+      <p class="ob-sub">Your knowledge base, one click from the menu bar.</p>
+    </div>
+
+    <div class="ob-steps">
+      <div class="ob-step" id="step-vault">
+        <span class="ob-num">1</span>
+        <div class="ob-body">
+          <div class="ob-head">Your vault</div>
+          <div class="ob-detail" id="vault-detail">Looking…</div>
+        </div>
+      </div>
+
+      <div class="ob-step" id="step-access" hidden>
+        <span class="ob-num">2</span>
+        <div class="ob-body">
+          <div class="ob-head">Grant file access</div>
+          <div class="ob-detail">
+            Your vault is in iCloud Drive — macOS needs your OK. In
+            <b>Privacy &amp; Security → Full Disk Access</b>, turn on <b>llm-wiki</b>.
+          </div>
+          <div class="ob-actions">
+            <button id="open-fda" class="btn-primary">Open Settings</button>
+            <button id="recheck" class="btn-ghost">Re-check</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="ob-step" id="step-login">
+        <span class="ob-num" id="login-num">2</span>
+        <div class="ob-body">
+          <label class="ob-row">
+            <span>
+              <div class="ob-head">Start at login</div>
+              <div class="ob-detail">Keep llm-wiki running in the menu bar.</div>
+            </span>
+            <input type="checkbox" id="login-toggle" class="switch" />
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <button id="done" class="btn-primary ob-done">Get started</button>
+    <script type="module" src="/src/onboarding.ts"></script>
+  </body>
+</html>

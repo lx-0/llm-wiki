@@ -44,7 +44,9 @@ import {
   APP_LOGIN_SET_CHANNEL,
   APP_QUIT_CHANNEL,
   APP_OPEN_SETTINGS_CHANNEL,
+  APP_ONBOARDING_DONE_CHANNEL,
 } from './app/ipc';
+import fs from 'node:fs';
 import { isAutostartEnabled, setAutostart } from './app/autostart';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
@@ -156,6 +158,48 @@ function openSettings(): void {
     settingsWin = null;
   });
 }
+
+// First-run onboarding — a flag file in userData marks completion.
+function onboardedFlag(): string {
+  return path.join(app.getPath('userData'), 'onboarded');
+}
+function hasOnboarded(): boolean {
+  return fs.existsSync(onboardedFlag());
+}
+let onboardingWin: BrowserWindow | null = null;
+function openOnboarding(): void {
+  if (onboardingWin && !onboardingWin.isDestroyed()) {
+    onboardingWin.show();
+    onboardingWin.focus();
+    return;
+  }
+  onboardingWin = new BrowserWindow({
+    width: 460,
+    height: 580,
+    resizable: false,
+    fullscreenable: false,
+    maximizable: false,
+    title: 'Welcome to llm-wiki',
+    webPreferences: { preload: path.join(__dirname, 'preload.js') },
+  });
+  onboardingWin.setMenuBarVisibility(false);
+  if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
+    onboardingWin.loadURL(`${MAIN_WINDOW_VITE_DEV_SERVER_URL}/onboarding.html`);
+  } else {
+    onboardingWin.loadFile(path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/onboarding.html`));
+  }
+  onboardingWin.on('closed', () => {
+    onboardingWin = null;
+  });
+}
+ipcMain.on(APP_ONBOARDING_DONE_CHANNEL, () => {
+  try {
+    fs.writeFileSync(onboardedFlag(), new Date().toISOString());
+  } catch {
+    /* best-effort */
+  }
+  onboardingWin?.close();
+});
 
 // IPC: open the vault in Obsidian (the reading/browsing surface for non-techies).
 ipcMain.handle(VAULT_OPEN_OBSIDIAN_CHANNEL, () => {
@@ -298,6 +342,9 @@ app.on('ready', () => {
   tray.setTitle(trayGlyph());
   tray.on('click', togglePanel); // click → panel (autostart/quit live in the panel footer)
   panel = createPanel();
+
+  // First launch → guided onboarding (vault detect + FDA grant + start-at-login).
+  if (!hasOnboarded()) openOnboarding();
 
   // Global hotkey: ⌥-Space toggles the panel from anywhere (focuses the Ask field).
   globalShortcut.register('Alt+Space', togglePanel);
