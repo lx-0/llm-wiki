@@ -6,6 +6,29 @@ captured: 2026-06-13
 related: [[screenpipe-intake]], [[listener-lifecycle]], [[interactive-cli]], M003 Obsidian dashboard
 ---
 
+## North star confirmed 2026-06-22 — the app is a full CLI alternative
+
+Operator: *"perspektivisch ... die electron app soll alternativ zur CLI nutzbar
+sein."* The long-term target is that a non-technical keyuser (Sid) does
+**everything** they'd otherwise need the `wiki` CLI for, in the app — the app is
+the GUI equivalent of the CLI, not just a listener toggle. The M029 MVP (listener
+toggle + health window + Update/compile + Open-in-Obsidian) is the **foundation**;
+the expansion is *surfacing the meaningful CLI actions with good, non-technical
+UX*. This is multi-milestone, not one more feature. Curated action map (2026-06-22):
+
+- **Shipped (M029):** Update (`wiki compile`, with x/y progress), Open-in-Obsidian,
+  listener start/stop + health, vault stats.
+- **Next, end-user-meaningful:** **Ask** (`wiki query` — needs an input + scrollable
+  answer surface; reshapes the popover → a real UX decision, operator steer pending);
+  **Health** (`wiki doctor --json` → a quiet status indicator).
+- **Advanced / gated (NOT on the default non-technical surface):** flush, lint,
+  links, dream, dedup, review-wiki — maintenance + $-cost; belong behind an
+  "Advanced" affordance if surfaced at all.
+- **Admin (likely never in the app):** config, hooks, skills, seed, update, setup.
+
+Design principle (operator mandate): **good UX, minimal technical jargon** — "Update"
+not "compile", "notes" not "articles", progress + plain-language states.
+
 ## CEO review 2026-06-22 — PROCEED (mode: SCOPE REDUCTION)
 
 Un-parked because **starting/stopping screenpipe on the fly became urgent**.
