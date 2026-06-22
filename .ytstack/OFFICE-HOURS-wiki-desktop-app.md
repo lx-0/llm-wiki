@@ -1,7 +1,7 @@
 ---
 name: llm-wiki Desktop App
 one-liner: A desktop app for llm-wiki's technical and non-technical users that makes the whole wiki usable without the CLI and shows its health at a glance.
-status: PROCEED 2026-06-22 (CEO-review done; framework decided = Electron; wedge-first build; plan-eng-review next)
+status: GO 2026-06-22 (CEO-review PROCEED + eng-review GO; Electron; wedge-first; init-project next)
 captured: 2026-06-13
 related: [[screenpipe-intake]], [[listener-lifecycle]], [[interactive-cli]], M003 Obsidian dashboard
 ---
@@ -31,6 +31,44 @@ Un-parked because **starting/stopping screenpipe on the fly became urgent**.
   packaging + signing + auto-update, and whether it's its own repo (likely yes).
 - **Next:** `plan-eng-review` (concept mode) to lock the Electron↔engine data flow,
   then `init-project` (own repo).
+
+## Eng review 2026-06-22 — feasibility GO (MVP: toggle + read-only health)
+
+Stack is well-trodden (Electron/Node spawning local tools + reading SQLite); the
+MVP is genuinely small. Feasible. Three architectural risks to draw seams around
+*before* scaffolding — none is a blocker, all are "decide the seam early":
+
+1. **Structured-output contract (top risk).** A GUI that screen-scrapes the
+   human-formatted `wiki` CLI output is brittle (the project's recurring
+   write-read-symmetry trap). The engine must expose **`--json` on the commands
+   the app consumes** (start with `wiki status` / health). And the
+   Electron↔engine **bridge must be an abstraction**: for the MVP, child-process
+   spawn of small commands (`launchctl`, a `sqlite3`/`wiki status --json` read,
+   poll every few seconds) is enough — cold Python start is tolerable at low call
+   volume. But cold-spawning `wiki` for *everything* becomes the bottleneck as the
+   app grows toward query/compile/capture → design the bridge so it can swap to a
+   thin **local HTTP/IPC daemon** (warm Python process) later without rewriting
+   the UI. Spawn now, daemon-ready seam.
+2. **Signing/notarization overhead — which is also the TCC fix.** A real
+   recurring cost (Apple Developer ID $99/yr, notarization, `electron-updater` +
+   a release host). Upside: a properly signed `.app` holds **TCC grants stably**
+   — it *solves* the screenpipe-bundle TCC pain (signed app = stable identity,
+   exactly like Obsidian). Net positive on the listener side; accept the cost.
+   macOS-only first (operator + Sid are on Mac); defer Win/Linux. Exact toolchain
+   (electron-builder vs forge) is a plan-task decision.
+3. **Lifecycle-logic ownership + dual-GUI drift.** The toggle logic must ship
+   **in-repo** — the app must NOT shell out to `~/.screenpipe/sp` (machine-local,
+   unshipped). Decide ownership: either the engine `listener-lifecycle` subsystem
+   owns it (app = thin client) or the app owns the `launchctl` + freshness-probe
+   logic directly for the MVP (faster; consolidate with the engine subsystem
+   later). And keep lanes clean vs the **M003 Obsidian dashboard**: Obsidian owns
+   browse/read/edit; the Electron app owns **system control + health + onboarding**
+   (things Obsidian can't do). The MVP (toggle + health) is squarely in the app's
+   lane — zero overlap. Drift risk only appears if the app later duplicates
+   Obsidian's browse/query.
+
+**Verdict: GO to `init-project`** (own repo). Carry the three seam-decisions in as
+the first architecture notes.
 
 # Office Hours — llm-wiki Desktop App
 
