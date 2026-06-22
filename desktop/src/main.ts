@@ -5,6 +5,9 @@ import { LISTENERS, getListener } from './listeners/registry';
 import { getListenerStatus } from './listeners/status';
 import { startListener, stopListener, restartListener, type LifecycleAction, type LifecycleResult } from './listeners/lifecycle';
 import { LISTENER_STATUS_CHANNEL, LISTENER_CONTROL_CHANNEL } from './listeners/ipc';
+import { getVaultStatus } from './vault/status';
+import { VAULT_STATUS_CHANNEL } from './vault/ipc';
+import { BRAIN_PNG_1X, BRAIN_PNG_2X } from './assets/brainIcon';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
@@ -32,6 +35,13 @@ ipcMain.handle(LISTENER_CONTROL_CHANNEL, (_e, id: string, action: LifecycleActio
   const res = fn(def);
   console.log(`${LISTENER_CONTROL_CHANNEL} ${id}/${action} -> ${JSON.stringify(res)}`);
   return res;
+});
+
+// IPC: vault status (filesystem-derived facts about the active vault; no engine call).
+ipcMain.handle(VAULT_STATUS_CHANNEL, () => {
+  const v = getVaultStatus();
+  console.log(`${VAULT_STATUS_CHANNEL} -> ${JSON.stringify(v)}`);
+  return v;
 });
 
 // --- Menubar (tray) app -----------------------------------------------------
@@ -79,15 +89,23 @@ function togglePanel(): void {
   panel.focus();
 }
 
-/** Menubar title glyph from live status (visible without opening the panel). */
+/** Mechanized-brain template icon (1x + 2x retina). */
+function brainIcon(): Electron.NativeImage {
+  const img = nativeImage.createFromDataURL(`data:image/png;base64,${BRAIN_PNG_1X}`);
+  img.addRepresentation({ scaleFactor: 2, dataURL: `data:image/png;base64,${BRAIN_PNG_2X}` });
+  img.setTemplateImage(true); // macOS tints for light/dark
+  return img;
+}
+
+/** Small at-a-glance state glyph shown next to the brain icon. */
 function trayGlyph(): string {
   const s = getListenerStatus(LISTENERS[0]);
-  return !s.running ? '○' : s.zombieSuspected ? '◍' : '●';
+  return !s.running ? ' ○' : s.zombieSuspected ? ' ◍' : ' ●';
 }
 
 app.on('ready', () => {
   app.dock?.hide(); // menubar-only — no dock icon
-  tray = new Tray(nativeImage.createEmpty());
+  tray = new Tray(brainIcon());
   tray.setToolTip('llm-wiki');
   tray.setTitle(trayGlyph());
   tray.on('click', togglePanel);

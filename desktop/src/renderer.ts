@@ -104,10 +104,45 @@ async function control(id: string, action: 'start' | 'stop'): Promise<void> {
   }
 }
 
+function fmtAgo(ms: number | null): string {
+  if (ms == null) return '—';
+  const min = Math.round((Date.now() - ms) / 60000);
+  if (min < 1) return 'just now';
+  if (min < 60) return `${min}m ago`;
+  const h = Math.round(min / 60);
+  return h < 24 ? `${h}h ago` : `${Math.round(h / 24)}d ago`;
+}
+
+async function renderVault(): Promise<void> {
+  const meta = document.getElementById('vault-meta');
+  const box = document.getElementById('vault');
+  try {
+    const v = await window.vault.status();
+    if (!v) {
+      if (meta) meta.textContent = 'no vault';
+      if (box) box.textContent = '';
+      return;
+    }
+    if (meta) meta.textContent = v.name;
+    if (box) {
+      box.innerHTML = `
+        <div class="vault-row"><span>${v.articleCount.toLocaleString()} articles</span><span class="muted">updated ${fmtAgo(v.lastActivityMs)}</span></div>
+        <div class="vault-path" title="${v.path}">${v.path.replace(/^\/Users\/[^/]+/, '~')}</div>`;
+    }
+  } catch (err) {
+    console.error(err);
+  }
+}
+
 window.addEventListener('DOMContentLoaded', () => {
   void renderStatus();
-  const timer = window.setInterval(() => {
+  void renderVault();
+  const t1 = window.setInterval(() => {
     if (pending.size === 0) void renderStatus();
   }, POLL_MS);
-  window.addEventListener('beforeunload', () => window.clearInterval(timer));
+  const t2 = window.setInterval(() => void renderVault(), 60_000);
+  window.addEventListener('beforeunload', () => {
+    window.clearInterval(t1);
+    window.clearInterval(t2);
+  });
 });
