@@ -5,7 +5,7 @@ project: llm-wiki
 created: 2026-06-22T10:44:06+0200
 status: planned
 task_count: 3
-completed_tasks: 0
+completed_tasks: 1
 ---
 
 # M029-S02 -- Slice Plan
@@ -16,7 +16,7 @@ operator-local prototypes.
 
 ## Tasks
 
-- [ ] T01 -- Port the listener-lifecycle logic into shipped code under `desktop/`
+- [x] T01 -- Port the listener-lifecycle logic into shipped code under `desktop/`
   (or an engine `listener-lifecycle` backend, decide ownership per CONTEXT):
   `launchctl bootout/bootstrap/kickstart` + the zombie/freshness probe (mic-fresh
   AND System-Audio-stale → restart), with the 30-min cooldown. **Self-contained**
