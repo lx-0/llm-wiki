@@ -15,6 +15,8 @@ export interface ListenerDef {
   name: string;
   /** launchd label, for `launchctl list <label>` running-state */
   launchdLabel: string;
+  /** LaunchAgent plist, for `launchctl bootstrap` (start) */
+  plistPath: string;
   /** sqlite db the listener writes (read-only by the app) */
   dbPath: string;
   /** `audio_chunks.file_path LIKE` patterns per channel, for freshness */
@@ -26,6 +28,7 @@ export const LISTENERS: ListenerDef[] = [
     id: 'screenpipe',
     name: 'Screenpipe',
     launchdLabel: 'com.alex.screenpipe',
+    plistPath: path.join(os.homedir(), 'Library', 'LaunchAgents', 'com.alex.screenpipe.plist'),
     dbPath: path.join(os.homedir(), '.screenpipe', 'db.sqlite'),
     channels: { mic: '%Microphone%', system: '%System Audio%' },
   },
