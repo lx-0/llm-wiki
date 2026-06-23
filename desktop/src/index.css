@@ -26,6 +26,13 @@
 
 * { box-sizing: border-box; }
 
+/* No native scrollbars anywhere — scroll still works (trackpad/wheel). */
+::-webkit-scrollbar { width: 0; height: 0; background: transparent; }
+/* …except a thin, subtle one for the long Browse list. */
+.browse-list::-webkit-scrollbar { width: 6px; }
+.browse-list::-webkit-scrollbar-thumb { background: rgba(125, 211, 252, 0.2); border-radius: 3px; }
+.browse-list::-webkit-scrollbar-thumb:hover { background: rgba(125, 211, 252, 0.4); }
+
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif;
   margin: 0;
