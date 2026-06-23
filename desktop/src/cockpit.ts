@@ -1,10 +1,15 @@
-// Cockpit view — a full-window "neural net" sphere with a glass HUD. Adapted from
-// lx-0/agent-kiosk's sophia sphere theme (icosphere math + the layered look:
-// massive glow halo, breathing hot core, inner filled crystal, cubic depth-falloff
-// wireframe, blob deformation, scanlines, synapse pulses), re-implemented and
-// brand-coloured (violet glow + cyan wireframe). Reactive to engine activity.
+// Cockpit view — a living "neural net" of the actual knowledge base. The sphere's
+// nodes ARE entries (type-coloured, clickable → Obsidian); additive bloom, a
+// starfield, a breathing violet core, constellation labels of recent entries, and
+// answer shockwaves. Asking sends the question's letters orbiting playfully around
+// the net while the brain "thinks". Adapted from lx-0/agent-kiosk's sophia sphere,
+// re-implemented + brand-coloured + data-driven.
 import './index.css';
 import { marked } from 'marked';
+
+const ICO_COPY = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
+const ICO_CHECK = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>`;
+const ICO_X = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>`;
 
 // ─────────────────────────── icosphere (nodes + edges + faces) ───────────────
 function makeIcosphere(subdiv: number): { vertices: number[][]; edges: [number, number][]; faces: number[][] } {
@@ -58,6 +63,32 @@ const canvas = document.getElementById('cockpit-canvas') as HTMLCanvasElement;
 const ctx = canvas.getContext('2d')!;
 let W = 0, H = 0, cx = 0, cy = 0, radius = 0;
 
+const outer = makeIcosphere(2);
+const inner = makeIcosphere(1);
+const GLOW: [number, number, number] = [167, 139, 250]; // violet
+const NODE: [number, number, number] = [125, 211, 252]; // cyan
+const WARM: [number, number, number] = [255, 159, 64];
+const rgba = (c: [number, number, number], a: number) => `rgba(${c[0]},${c[1]},${c[2]},${a})`;
+
+// the sphere IS the knowledge graph — nodes mapped to real entries, coloured by type
+const TYPE_COLOR: Record<string, [number, number, number]> = {
+  person: [224, 82, 176], project: [26, 184, 200], concept: [148, 132, 240],
+  fact: [224, 86, 79], area: [52, 200, 110], map: [230, 180, 30], link: [240, 150, 70],
+};
+type NodeEntry = { type: string; file: string; title: string } | null;
+let nodeEntries: NodeEntry[] = [];
+const nodeColor = (i: number): [number, number, number] => {
+  const e = nodeEntries[i];
+  return e ? TYPE_COLOR[e.type] ?? NODE : NODE;
+};
+type P = { x: number; y: number; z: number };
+let lastProj: P[] = [];
+const ripples: { t: number }[] = [];
+let stars: { x: number; y: number; a: number; tw: number }[] = [];
+
+function genStars(): void {
+  stars = Array.from({ length: 90 }, () => ({ x: Math.random() * W, y: Math.random() * H, a: 0.05 + Math.random() * 0.22, tw: Math.random() * Math.PI * 2 }));
+}
 function resize(): void {
   const dpr = window.devicePixelRatio || 1;
   W = canvas.clientWidth || window.innerWidth;
@@ -68,21 +99,13 @@ function resize(): void {
   cx = W / 2;
   cy = H * 0.46;
   radius = Math.min(W * 0.62, H) * 0.32;
+  genStars();
 }
 window.addEventListener('resize', resize);
-
-const outer = makeIcosphere(2);
-const inner = makeIcosphere(1);
-const GLOW: [number, number, number] = [167, 139, 250]; // violet #a78bfa
-const NODE: [number, number, number] = [125, 211, 252]; // cyan/sky #7dd3fc
-const WARM: [number, number, number] = [255, 159, 64]; // amber bleed when issues
-const rgba = (c: [number, number, number], a: number) => `rgba(${c[0]},${c[1]},${c[2]},${a})`;
 
 function noise3D(x: number, y: number, z: number): number {
   return Math.sin(x * 2.1 + y * 1.3) * Math.cos(y * 1.7 + z * 2.3) * Math.sin(z * 1.9 + x * 1.1);
 }
-
-type P = { x: number; y: number; z: number };
 function project(v: number[], rotX: number, rotY: number, deform: number, t: number): P {
   const n = noise3D(v[0] * 2 + t * 0.5, v[1] * 2 + t * 0.3, v[2] * 2 + t * 0.4) * deform;
   const sc = 1 + n;
@@ -95,50 +118,39 @@ function project(v: number[], rotX: number, rotY: number, deform: number, t: num
   return { x: cx + x0 * radius * s, y: cy + y1 * radius * s, z: z1 };
 }
 
-// orbiting particles
 const orbits = [
-  { speed: 0.22, rx: 1.4, ry: 0.36, phase: 0 },
-  { speed: -0.16, rx: 1.22, ry: 0.26, phase: 1.7 },
-  { speed: 0.12, rx: 1.55, ry: 0.2, phase: 3.1 },
+  { speed: 0.22, rx: 1.42, ry: 0.36, phase: 0 },
+  { speed: -0.16, rx: 1.24, ry: 0.26, phase: 1.7 },
+  { speed: 0.12, rx: 1.58, ry: 0.2, phase: 3.1 },
 ];
 const particles = Array.from({ length: 16 }, (_, i) => ({ angle: (Math.PI * 2 / 16) * i, orbit: i % 3, size: 1.4 + (i % 5) * 0.5 }));
-
-// synapse pulses travelling along edges
 const pulses: { edge: number; t: number; speed: number }[] = [];
 let pulseAccum = 0;
 
-// reactive state
-let energy = 0.35; // 0..1, ramps when an engine job runs
-let targetEnergy = 0.35;
-let hasIssues = false;
-let thinking = false; // a question is being answered
-
-// "question threads into the net": glowing particles fly from the Ask card into
-// random sphere nodes when you submit a question.
-type Feed = { sx: number; sy: number; node: number; t: number; speed: number };
-const feeds: Feed[] = [];
-function igniteFromAsk(): void {
-  const rect = document.getElementById('ck-input')?.getBoundingClientRect();
-  const sx = rect ? rect.left + rect.width / 2 : cx;
-  const sy = rect ? rect.top : cy + radius;
-  for (let i = 0; i < 20; i++) {
-    feeds.push({
-      sx: sx + (Math.random() - 0.5) * (rect?.width ?? 200) * 0.7,
-      sy: sy + (Math.random() - 0.5) * 8,
-      node: Math.floor(Math.random() * outer.vertices.length),
-      t: -i * 0.025, // staggered launch
-      speed: 0.9 + Math.random() * 0.7,
-    });
-  }
-  thinking = true;
-  targetEnergy = 1;
-}
-// mouse parallax
+// reactive + interaction state
+let energy = 0.35, targetEnergy = 0.35, hasIssues = false, thinking = false;
 let mx = 0, my = 0, pRotX = 0, pRotY = 0;
 window.addEventListener('mousemove', (e) => {
   mx = (e.clientX / W - 0.5) * 2;
   my = (e.clientY / H - 0.5) * 2;
 });
+
+// question letters orbiting the net
+type Letter = { ch: string; a0: number; orbR: number; speed: number; tilt: number };
+let letters: Letter[] = [];
+let letterAlpha = 0;
+function igniteFromAsk(q: string): void {
+  const chars = q.replace(/\s+/g, ' ').trim().split('').slice(0, 48);
+  letters = chars.map((ch, i) => ({
+    ch,
+    a0: (i / Math.max(1, chars.length)) * Math.PI * 2 + Math.random() * 0.25,
+    orbR: 1.5 + Math.random() * 0.4,
+    speed: 0.45 + Math.random() * 0.3,
+    tilt: (Math.random() - 0.5) * 1.2,
+  }));
+  thinking = true;
+  targetEnergy = 1;
+}
 
 let last = 0;
 function draw(now: number): void {
@@ -154,34 +166,41 @@ function draw(now: number): void {
   const rotX = Math.sin(t * 0.12) * 0.26 + pRotX;
   const deform = 0.05 + energy * 0.05 + Math.sin(t * 0.7) * 0.02;
   const glowC = hasIssues ? WARM : GLOW;
+  const projOuter = outer.vertices.map((v) => project(v, rotX, rotY, deform, t));
+  const projInner = inner.vertices.map((v) => project([v[0] * 0.62, v[1] * 0.62, v[2] * 0.62], rotX, rotY, deform * 1.7, t * 1.3));
+  lastProj = projOuter;
 
-  // ─── massive glow halo (layered) ───
+  ctx.globalCompositeOperation = 'lighter'; // additive bloom for everything luminous
+
+  // starfield
+  for (const s of stars) {
+    const tw = 0.5 + 0.5 * Math.sin(t * 1.4 + s.tw);
+    ctx.fillStyle = rgba([200, 220, 255], s.a * tw);
+    ctx.fillRect(s.x, s.y, 1.3, 1.3);
+  }
+
+  // glow halo (layered)
   for (let i = 0; i < 3; i++) {
     const r = radius * (2.5 - i * 0.5);
-    const a = (0.16 + energy * 0.1) - i * 0.04;
+    const a = (0.14 + energy * 0.09) - i * 0.035;
     const g = ctx.createRadialGradient(cx + Math.sin(t * 0.7) * 8, cy + Math.cos(t * 0.5) * 6, 0, cx, cy, r);
     g.addColorStop(0, rgba(glowC, a));
-    g.addColorStop(0.3, rgba(glowC, a * 0.55));
-    g.addColorStop(0.6, rgba(glowC, a * 0.2));
+    g.addColorStop(0.3, rgba(glowC, a * 0.5));
+    g.addColorStop(0.6, rgba(glowC, a * 0.18));
     g.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, W, H);
   }
-
-  // ─── breathing hot core ───
+  // breathing hot core
   const blobR = radius * (0.5 + Math.sin(t * 1.1) * 0.07);
   const gb = ctx.createRadialGradient(cx + Math.sin(t * 0.6) * 14, cy + Math.cos(t * 0.8) * 11, 0, cx, cy, blobR);
-  gb.addColorStop(0, rgba(glowC, 0.32 + Math.sin(t * 1.5) * 0.06 + energy * 0.1));
-  gb.addColorStop(0.45, rgba(glowC, 0.18));
+  gb.addColorStop(0, rgba(glowC, 0.26 + Math.sin(t * 1.5) * 0.05 + energy * 0.1));
+  gb.addColorStop(0.45, rgba(glowC, 0.14));
   gb.addColorStop(1, 'rgba(0,0,0,0)');
   ctx.fillStyle = gb;
   ctx.fillRect(0, 0, W, H);
 
-  const rotXn = rotX, rotYn = rotY;
-  const projOuter = outer.vertices.map((v) => project(v, rotXn, rotYn, deform, t));
-  const projInner = inner.vertices.map((v) => project([v[0] * 0.62, v[1] * 0.62, v[2] * 0.62], rotXn, rotYn, deform * 1.7, t * 1.3));
-
-  // ─── inner crystal: filled semi-transparent faces (painter's algorithm) ───
+  // inner crystal (painter-sorted faces)
   inner.faces
     .map((f) => {
       const pts = f.map((i) => projInner[i]);
@@ -196,18 +215,18 @@ function draw(now: number): void {
       ctx.lineTo(pts[1].x, pts[1].y);
       ctx.lineTo(pts[2].x, pts[2].y);
       ctx.closePath();
-      ctx.fillStyle = rgba(glowC, 0.04 + front * 0.16);
+      ctx.fillStyle = rgba(glowC, 0.03 + front * 0.1);
       ctx.fill();
-      ctx.strokeStyle = rgba(glowC, 0.08 + front * 0.22);
+      ctx.strokeStyle = rgba(glowC, 0.05 + front * 0.16);
       ctx.lineWidth = 0.6;
       ctx.stroke();
     });
 
-  // ─── outer wireframe (aggressive cubic depth falloff) ───
+  // outer wireframe (cubic depth falloff)
   for (const [a, b] of outer.edges) {
     const z = (projOuter[a].z + projOuter[b].z) / 2;
     const d01 = (z + 1) / 2;
-    const br = Math.pow(d01, 2.6) * 0.7;
+    const br = Math.pow(d01, 2.6) * 0.55;
     if (br < 0.015) continue;
     ctx.beginPath();
     ctx.moveTo(projOuter[a].x, projOuter[a].y);
@@ -217,24 +236,36 @@ function draw(now: number): void {
     ctx.stroke();
   }
 
-  // ─── outer nodes (depth-shaded glowing dots) ───
-  for (const p of projOuter) {
+  // outer nodes (type-coloured, depth-shaded)
+  for (let i = 0; i < projOuter.length; i++) {
+    const p = projOuter[i];
     const d01 = (p.z + 1) / 2;
-    if (d01 < 0.18) continue;
-    const a = Math.pow(d01, 1.5) * 0.95;
-    const r = 0.8 + d01 * 2.4;
+    if (d01 < 0.16) continue;
+    const c = nodeColor(i);
+    const a = Math.pow(d01, 1.4) * 0.95;
+    const r = 0.9 + d01 * 2.8;
     ctx.beginPath();
     ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
-    ctx.fillStyle = rgba(NODE, a);
-    if (d01 > 0.45) {
-      ctx.shadowColor = rgba(NODE, 0.9);
-      ctx.shadowBlur = 5 + d01 * 9;
-    }
+    ctx.fillStyle = rgba(c, a);
+    ctx.shadowColor = rgba(c, 0.9);
+    ctx.shadowBlur = 6 + d01 * 12;
     ctx.fill();
-    ctx.shadowBlur = 0;
+  }
+  ctx.shadowBlur = 0;
+
+  // scanlines
+  for (let y = cy - radius; y < cy + radius; y += 6) {
+    const dy = (y - cy) / radius;
+    const hw = Math.sqrt(Math.max(0, 1 - dy * dy)) * radius;
+    ctx.beginPath();
+    ctx.moveTo(cx - hw, y);
+    ctx.lineTo(cx + hw, y);
+    ctx.strokeStyle = rgba(NODE, 0.025 + Math.sin(y * 0.5 + t * 3) * 0.012);
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
   }
 
-  // ─── synapse pulses (rate scales with energy) ───
+  // synapse pulses
   pulseAccum += dt;
   if (pulseAccum > 0.16 - energy * 0.11) {
     pulseAccum = 0;
@@ -257,22 +288,10 @@ function draw(now: number): void {
     ctx.shadowColor = rgba(NODE, 1);
     ctx.shadowBlur = 13;
     ctx.fill();
-    ctx.shadowBlur = 0;
   }
+  ctx.shadowBlur = 0;
 
-  // ─── scanlines (faint hologram texture across the orb) ───
-  for (let y = cy - radius; y < cy + radius; y += 6) {
-    const dy = (y - cy) / radius;
-    const hw = Math.sqrt(Math.max(0, 1 - dy * dy)) * radius;
-    ctx.beginPath();
-    ctx.moveTo(cx - hw, y);
-    ctx.lineTo(cx + hw, y);
-    ctx.strokeStyle = rgba(NODE, 0.03 + Math.sin(y * 0.5 + t * 3) * 0.015);
-    ctx.lineWidth = 0.5;
-    ctx.stroke();
-  }
-
-  // ─── orbit particles ───
+  // orbit particles
   for (const pt of particles) {
     const o = orbits[pt.orbit];
     pt.angle += dt * o.speed;
@@ -280,45 +299,111 @@ function draw(now: number): void {
     const oy = cy + Math.sin(pt.angle + o.phase) * radius * o.ry;
     ctx.beginPath();
     ctx.arc(ox, oy, pt.size, 0, Math.PI * 2);
-    ctx.fillStyle = rgba(NODE, 0.5);
+    ctx.fillStyle = rgba(NODE, 0.45);
     ctx.shadowColor = rgba(NODE, 0.8);
     ctx.shadowBlur = 8;
     ctx.fill();
-    ctx.shadowBlur = 0;
   }
+  ctx.shadowBlur = 0;
 
-  // ─── question feed: particles threading from the Ask card into the net ───
-  for (let i = feeds.length - 1; i >= 0; i--) {
-    const f = feeds[i];
-    f.t += dt * f.speed;
-    if (f.t < 0) continue;
-    if (f.t >= 1) {
-      pulses.push({ edge: Math.floor(Math.random() * outer.edges.length), t: 0, speed: 1.3 }); // arrival fires the net
-      feeds.splice(i, 1);
+  // answer shockwaves
+  for (let i = ripples.length - 1; i >= 0; i--) {
+    const rp = ripples[i];
+    rp.t += dt * 0.65;
+    if (rp.t >= 1) {
+      ripples.splice(i, 1);
       continue;
     }
-    const tgt = projOuter[f.node];
-    const e = f.t < 0.5 ? 2 * f.t * f.t : 1 - Math.pow(-2 * f.t + 2, 2) / 2; // easeInOut
-    const x = f.sx + (tgt.x - f.sx) * e;
-    const y = f.sy + (tgt.y - f.sy) * e;
-    const ep = Math.max(0, e - 0.06);
+    const rr = radius * 0.3 + rp.t * radius * 2.3;
     ctx.beginPath();
-    ctx.moveTo(f.sx + (tgt.x - f.sx) * ep, f.sy + (tgt.y - f.sy) * ep);
-    ctx.lineTo(x, y);
-    ctx.strokeStyle = rgba(NODE, 0.45 * (1 - f.t * 0.3));
-    ctx.lineWidth = 1.4;
+    ctx.arc(cx, cy, rr, 0, Math.PI * 2);
+    ctx.strokeStyle = rgba(NODE, 0.45 * (1 - rp.t));
+    ctx.lineWidth = 2.4 * (1 - rp.t) + 0.4;
     ctx.stroke();
-    ctx.beginPath();
-    ctx.arc(x, y, 2.2, 0, Math.PI * 2);
-    ctx.fillStyle = rgba(NODE, 0.95);
-    ctx.shadowColor = rgba(NODE, 1);
-    ctx.shadowBlur = 12;
-    ctx.fill();
-    ctx.shadowBlur = 0;
   }
+
+  // question letters orbiting the net
+  letterAlpha += ((thinking ? 1 : 0) - letterAlpha) * Math.min(1, dt * 3);
+  if (!thinking && letterAlpha < 0.03) letters = [];
+  if (letters.length) {
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    for (const L of letters) {
+      const ang = L.a0 + t * L.speed;
+      const ca = Math.cos(ang), sa = Math.sin(ang);
+      const X = ca * L.orbR, Y = sa * L.orbR * Math.sin(L.tilt), Z = sa * L.orbR * Math.cos(L.tilt);
+      const s = 340 / (340 + Z * radius * 0.55);
+      const depth = (Z / L.orbR + 1) / 2;
+      const a = letterAlpha * (0.2 + depth * 0.8);
+      const sz = 12 + depth * 9;
+      ctx.font = `700 ${sz}px -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif`;
+      ctx.fillStyle = rgba(NODE, a);
+      ctx.shadowColor = rgba(NODE, a);
+      ctx.shadowBlur = 10 * depth;
+      ctx.fillText(L.ch, cx + X * radius * s, cy + Y * radius * s);
+    }
+    ctx.shadowBlur = 0;
+    ctx.textAlign = 'start';
+    ctx.textBaseline = 'alphabetic';
+  }
+
+  ctx.globalCompositeOperation = 'source-over';
+
+  // constellation labels — recent entry titles on the front-most nodes
+  ctx.font = '600 11px -apple-system, BlinkMacSystemFont, sans-serif';
+  ctx.textBaseline = 'middle';
+  lastProj
+    .map((p, i) => ({ p, i }))
+    .filter((o) => nodeEntries[o.i] && (o.p.z + 1) / 2 > 0.84)
+    .sort((a, b) => b.p.z - a.p.z)
+    .slice(0, 5)
+    .forEach(({ p, i }) => {
+      const e = nodeEntries[i]!;
+      const d = (p.z + 1) / 2;
+      ctx.fillStyle = `rgba(226,232,240,${((d - 0.84) / 0.16) * 0.8})`;
+      ctx.fillText(e.title.length > 26 ? e.title.slice(0, 25) + '…' : e.title, p.x + 9, p.y);
+    });
+  ctx.textBaseline = 'alphabetic';
 
   requestAnimationFrame(draw);
 }
+
+// click / hover a node → open its entry
+function nodeAt(px: number, py: number): number {
+  let best = -1, bd = 17 * 17;
+  for (let i = 0; i < lastProj.length; i++) {
+    const p = lastProj[i];
+    if ((p.z + 1) / 2 < 0.4 || !nodeEntries[i]) continue;
+    const dx = p.x - px, dy = p.y - py, d = dx * dx + dy * dy;
+    if (d < bd) {
+      bd = d;
+      best = i;
+    }
+  }
+  return best;
+}
+canvas.addEventListener('click', (e) => {
+  const i = nodeAt(e.clientX, e.clientY);
+  if (i >= 0) window.vault.openFile(nodeEntries[i]!.file);
+});
+const tip = document.getElementById('ck-tip');
+canvas.addEventListener('mousemove', (e) => {
+  const i = nodeAt(e.clientX, e.clientY);
+  canvas.style.cursor = i >= 0 ? 'pointer' : 'default';
+  if (!tip) return;
+  if (i >= 0 && nodeEntries[i]) {
+    const en = nodeEntries[i]!;
+    tip.innerHTML = `<span class="type-badge t-${clsOf(en.type)}">${esc(en.type)}</span><span class="ck-tip-title">${esc(en.title)}</span>`;
+    tip.style.left = `${Math.min(e.clientX + 14, W - 290)}px`;
+    tip.style.top = `${e.clientY + 14}px`;
+    tip.hidden = false;
+  } else {
+    tip.hidden = true;
+  }
+});
+canvas.addEventListener('mouseleave', () => {
+  if (tip) tip.hidden = true;
+});
 
 // ─────────────────────────── HUD ─────────────────────────────────────────────
 const clsOf = (type: string) => type.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() || 'note';
@@ -332,8 +417,7 @@ function countUp(el: HTMLElement, to: number): void {
   cancelAnimationFrame(countRaf);
   const step = (n: number): void => {
     const k = Math.min(1, (n - start) / 800);
-    const val = Math.round(to * (1 - Math.pow(1 - k, 3)));
-    el.innerHTML = `<span class="ck-big">${val.toLocaleString()}</span> notes`;
+    el.innerHTML = `<span class="ck-big">${Math.round(to * (1 - Math.pow(1 - k, 3))).toLocaleString()}</span> notes`;
     if (k < 1) countRaf = requestAnimationFrame(step);
   };
   countRaf = requestAnimationFrame(step);
@@ -360,9 +444,18 @@ async function loadHud(): Promise<void> {
       recentEl.appendChild(row);
     }
   }
+  void loadGraph();
   void loadTypes();
   void loadDoctor();
   void loadPending();
+}
+
+async function loadGraph(): Promise<void> {
+  const entries = await window.vault.list();
+  nodeEntries = outer.vertices.map((_, i) => {
+    const e = entries[i];
+    return e ? { type: e.type, file: e.file, title: e.title } : null;
+  });
 }
 
 async function loadTypes(): Promise<void> {
@@ -371,8 +464,9 @@ async function loadTypes(): Promise<void> {
   const entries = await window.vault.list();
   const counts: Record<string, number> = {};
   for (const e of entries) counts[e.type] = (counts[e.type] || 0) + 1;
-  const top = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 5);
-  el.innerHTML = top
+  el.innerHTML = Object.entries(counts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
     .map(([type, n]) => `<span class="ck-type-chip"><span class="type-badge t-${clsOf(type)}">${esc(type)}</span>${n}</span>`)
     .join('');
 }
@@ -389,11 +483,10 @@ async function loadDoctor(): Promise<void> {
   }
 }
 
-// ── actions (Update + pending suggestions) — reactive sphere on run ──
 let busy = false;
 function setBusy(b: boolean): void {
   busy = b;
-  targetEnergy = b ? 1 : 0.35;
+  targetEnergy = b ? 1 : thinking ? 1 : 0.35;
   const u = document.getElementById('ck-update') as HTMLButtonElement | null;
   if (u) {
     u.disabled = b;
@@ -442,15 +535,13 @@ window.vault.onRunDone(() => {
   setBusy(false);
   void loadHud();
 });
-
-// poll engine busy-state so the sphere reacts even to jobs started elsewhere
 setInterval(() => {
   void window.vault.runStatus().then((s) => {
     if (!busy && !thinking) targetEnergy = s.running ? 1 : 0.35;
   });
 }, 1500);
 
-// ── ask ──
+// ── ask (with copy + close on the answer) ──
 let asking = false;
 async function ask(): Promise<void> {
   const input = document.getElementById('ck-input') as HTMLInputElement | null;
@@ -460,20 +551,40 @@ async function ask(): Promise<void> {
   const q = input.value.trim();
   if (!q) return;
   asking = true;
-  igniteFromAsk(); // question threads into the net + the sphere ramps up
+  igniteFromAsk(q); // letters orbit the net + the sphere ramps up
   if (btn) btn.disabled = true;
   answer.hidden = false;
   answer.className = 'ck-answer thinking';
   answer.textContent = 'Thinking…';
   try {
     const res = await window.vault.query(q);
-    answer.className = 'ck-answer' + (res.ok ? '' : ' err');
-    answer.innerHTML = res.ok
-      ? (marked.parse(
-          res.answer.replace(/\[\[([^\]]+)\]\]/g, (_m, p: string) => esc((p.split('|')[0].split('#')[0].split('/').pop() || p).trim())),
-          { breaks: true, async: false },
-        ) as string)
-      : esc(res.answer || 'No answer.');
+    if (res.ok) {
+      const html = marked.parse(
+        res.answer.replace(/\[\[([^\]]+)\]\]/g, (_m, p: string) => esc((p.split('|')[0].split('#')[0].split('/').pop() || p).trim())),
+        { breaks: true, async: false },
+      ) as string;
+      answer.className = 'ck-answer';
+      answer.innerHTML = `<div class="ck-tools"><button class="ck-icon copy" title="Copy">${ICO_COPY}</button><button class="ck-icon close" title="Close">${ICO_X}</button></div><div class="md">${html}</div>`;
+      const copyBtn = answer.querySelector('.copy') as HTMLButtonElement | null;
+      copyBtn?.addEventListener('click', () => {
+        void navigator.clipboard.writeText(res.answer).then(() => {
+          copyBtn.innerHTML = ICO_CHECK;
+          copyBtn.classList.add('done');
+          window.setTimeout(() => {
+            copyBtn.innerHTML = ICO_COPY;
+            copyBtn.classList.remove('done');
+          }, 1500);
+        });
+      });
+      answer.querySelector('.close')?.addEventListener('click', () => {
+        answer.hidden = true;
+        answer.innerHTML = '';
+      });
+      ripples.push({ t: 0 }); // the brain responds — shockwave through the net
+    } else {
+      answer.className = 'ck-answer err';
+      answer.textContent = res.answer || 'No answer.';
+    }
   } catch {
     answer.className = 'ck-answer err';
     answer.textContent = 'Something went wrong.';

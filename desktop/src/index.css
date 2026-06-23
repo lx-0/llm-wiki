@@ -224,7 +224,26 @@ body.cockpit {
 .ck-answer p { margin: 0 0 8px; }
 .ck-answer ul, .ck-answer ol { margin: 0 0 8px; padding-left: 18px; }
 .ck-answer strong { font-weight: 700; color: #fff; }
+.ck-answer { position: relative; }
 .ck-answer > :last-child { margin-bottom: 0; }
+.ck-answer .md > :first-child { padding-right: 58px; }
+.ck-tools { position: absolute; top: 8px; right: 8px; display: flex; gap: 4px; }
+.ck-icon {
+  margin: 0; width: 24px; height: 24px; padding: 0; border-radius: 6px; border: none; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.08); color: #93a4bd;
+}
+.ck-icon:hover { background: rgba(255,255,255,0.16); color: #e2e8f0; }
+.ck-icon.copy.done { color: #34c759; background: rgba(52,199,89,0.18); }
+.ck-icon.close:hover { background: rgba(255,69,58,0.75); color: #fff; }
+
+/* hover tooltip on a sphere node */
+.ck-tip {
+  position: fixed; z-index: 5; pointer-events: none; display: flex; align-items: center; gap: 7px;
+  padding: 5px 9px; border-radius: 9px; background: rgba(15,23,42,0.92);
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  border: 0.5px solid rgba(255,255,255,0.14); font-size: 12px; color: #e2e8f0; max-width: 280px;
+}
+.ck-tip-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Card */
 .card {
