@@ -270,6 +270,9 @@ button:disabled { background: rgba(120,120,128,0.3); color: var(--muted); cursor
   text-align: left; cursor: pointer;
 }
 .recent-row:hover { background: rgba(120,120,128,0.14); }
+.recent-row.new { background: rgba(10, 132, 255, 0.08); box-shadow: inset 2.5px 0 0 var(--blue); }
+.recent-row.new:hover { background: rgba(10, 132, 255, 0.14); }
+.recent-row.new .recent-title { font-weight: 600; }
 .recent-title { flex: 1; font-size: 12.5px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .recent-ago { font-size: 11px; color: var(--muted); flex: none; font-variant-numeric: tabular-nums; }
 

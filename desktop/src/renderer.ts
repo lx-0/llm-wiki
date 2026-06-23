@@ -195,6 +195,18 @@ function escapeHtml(s: string): string {
   return s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c] as string);
 }
 
+// "New since you last looked": entries with mtime > recentSeenMs are highlighted;
+// recentSeenMs advances when the panel closes (so they're no longer new next time).
+// Defaults to now on first run, so nothing is flagged until something actually changes.
+let recentSeenMs = ((): number => {
+  const stored = localStorage.getItem('recentSeenMs');
+  if (stored) return Number(stored);
+  const now = Date.now();
+  localStorage.setItem('recentSeenMs', String(now));
+  return now;
+})();
+let lastRecentNewest = 0;
+
 /** Most recently modified knowledge entries; click opens the file in Obsidian. */
 function renderRecent(recent: { title: string; file: string; type: string; mtimeMs: number }[]): void {
   const el = document.getElementById('recent');
@@ -206,9 +218,11 @@ function renderRecent(recent: { title: string; file: string; type: string; mtime
   el.innerHTML = `<h2 class="section-label">Recent entries</h2>`;
   const list = document.createElement('div');
   list.className = 'recent-list card';
+  let newest = 0;
   for (const r of recent) {
+    newest = Math.max(newest, r.mtimeMs);
     const row = document.createElement('button');
-    row.className = 'recent-row';
+    row.className = r.mtimeMs > recentSeenMs ? 'recent-row new' : 'recent-row';
     row.title = 'Open in Obsidian';
     const cls = r.type.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() || 'note';
     row.innerHTML =
@@ -218,6 +232,7 @@ function renderRecent(recent: { title: string; file: string; type: string; mtime
     row.addEventListener('click', () => window.vault.openFile(r.file));
     list.appendChild(row);
   }
+  lastRecentNewest = newest;
   el.appendChild(list);
 }
 
@@ -660,6 +675,10 @@ window.addEventListener('DOMContentLoaded', () => {
       void loadDoctor(); // health + update-available (read-only, ~seconds)
       void loadMenu(); // what's pending (engine's actionable suggestions)
       window.setTimeout(() => document.getElementById('ask-input')?.focus(), 30); // search-first
+    } else if (lastRecentNewest > recentSeenMs) {
+      // panel closed → the highlighted-new entries are now "seen"
+      recentSeenMs = lastRecentNewest;
+      localStorage.setItem('recentSeenMs', String(recentSeenMs));
     }
   });
 
