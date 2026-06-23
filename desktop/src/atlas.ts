@@ -238,6 +238,7 @@ function draw(now: number): void {
   for (const n of nodes) {
     const nr = nodeReveal(n);
     if (nr <= 0.01) continue;
+    if (n === expandedNode) continue; // rendered separately as the grown card
     const isHover = n === hover;
     const dim = active && !active.has(n) ? 0.32 : 1;
     const sc = (0.6 + 0.4 * nr) * (isHover ? 1.07 : 1);
@@ -315,7 +316,7 @@ function draw(now: number): void {
   }
   ctx.globalCompositeOperation = 'source-over';
 
-  drawExpanded(); // the clicked node-card grown into a full card with its preview
+  renderExpandedNode(); // the clicked node's own card, grown in place into a full card
   requestAnimationFrame(draw);
 }
 
@@ -340,10 +341,14 @@ window.addEventListener('mouseup', (e) => {
   if (!dragging) return;
   dragging = false;
   if (Math.hypot(e.clientX - downX, e.clientY - downY) < 5) {
-    const r = expandedRect();
-    if (r && e.clientX >= r.x && e.clientX <= r.x + r.w && e.clientY >= r.y && e.clientY <= r.y + r.h) {
-      if (expandedNode?.file) window.vault.openFile(expandedNode.file); // click the expanded card → open
-      return;
+    // clicks inside the grown card: footer strip → open, anything else (incl ×) → close
+    if (expandedNode && expandT > 0.4) {
+      const r = expRect;
+      if (e.clientX >= r.x && e.clientX <= r.x + r.w && e.clientY >= r.y && e.clientY <= r.y + r.h) {
+        if (e.clientY > r.y + r.h - 26 && expandedNode.file) window.vault.openFile(expandedNode.file);
+        else collapse();
+        return;
+      }
     }
     const n = nodeAt(e.clientX, e.clientY);
     if (n?.kind === 'entry') expandEntry(n);
@@ -410,6 +415,13 @@ function collapse(): void {
   expandedNode = null;
   expandedText = null;
 }
+let expRect = { x: 0, y: 0, w: 0, h: 0 };
+let expTargetH = H_ENTRY;
+function computeLayout(): void {
+  ctx.font = '400 12.5px -apple-system, BlinkMacSystemFont, sans-serif';
+  expandedLines = expandedText === null ? ['Loading…'] : wrapText(expandedText, EXP_W - 32, 11);
+  expTargetH = 60 + expandedLines.length * 17 + 28;
+}
 function expandEntry(n: GNode): void {
   if (!n.file) return;
   if (expandedNode === n) {
@@ -419,78 +431,94 @@ function expandEntry(n: GNode): void {
   expandedNode = n;
   expandedText = null;
   expandT = 0;
+  computeLayout();
   const file = n.file;
   void window.vault.preview(file).then((tx) => {
-    if (expandedNode?.file === file) expandedText = cleanMd(tx) || '(no content)';
+    if (expandedNode?.file === file) {
+      expandedText = cleanMd(tx) || '(no content)';
+      computeLayout();
+    }
   });
 }
-function expandedRect(): { x: number; y: number; w: number; h: number } | null {
-  if (!expandedNode) return null;
-  const h = 60 + expandedLines.length * 17 + 28;
-  const p = toScreen(expandedNode.x, expandedNode.y);
-  let x = p.x - (expandedNode.w * zoom) / 2;
-  let y = p.y - (expandedNode.h * zoom) / 2;
-  x = Math.max(16, Math.min(x, W - EXP_W - 16));
-  y = Math.max(54, Math.min(y, H - h - 16));
-  return { x, y, w: EXP_W, h };
-}
-function drawExpanded(): void {
+// The clicked node's OWN card grows in place (centered on the node), morphing into
+// the full detail card — not a separate overlay.
+function renderExpandedNode(): void {
   if (!expandedNode) return;
-  expandT += (1 - expandT) * 0.2;
+  expandT += (1 - expandT) * 0.18;
   const n = expandedNode;
-  ctx.font = '400 12.5px -apple-system, BlinkMacSystemFont, sans-serif';
-  expandedLines = expandedText === null ? ['Loading…'] : wrapText(expandedText, EXP_W - 32, 11);
-  const r = expandedRect()!;
-  ctx.save();
-  ctx.globalAlpha = Math.min(1, expandT * 1.3);
-  ctx.translate(r.x, r.y);
-  const sc = 0.9 + 0.1 * expandT;
-  ctx.scale(sc, sc);
-  // body
-  roundRect(0, 0, r.w, r.h, 12);
-  ctx.shadowColor = 'rgba(0,0,0,0.55)';
-  ctx.shadowBlur = 34;
-  ctx.fillStyle = 'rgba(13,21,40,0.98)';
+  const e = ease(expandT);
+  const p = toScreen(n.x, n.y);
+  const baseW = n.w * zoom, baseH = n.h * zoom;
+  const w = baseW + (EXP_W - baseW) * e;
+  const h = baseH + (expTargetH - baseH) * e;
+  const x = p.x - w / 2, y = p.y - h / 2; // centered on the node → grows in place
+  expRect = { x, y, w, h };
+  // card body
+  roundRect(x, y, w, h, 10);
+  ctx.shadowColor = rgba(n.color, 0.5);
+  ctx.shadowBlur = 14 + 22 * e;
+  const gb = ctx.createLinearGradient(0, y, 0, y + h);
+  gb.addColorStop(0, 'rgba(22,33,57,0.98)');
+  gb.addColorStop(1, 'rgba(11,18,34,0.98)');
+  ctx.fillStyle = gb;
   ctx.fill();
   ctx.shadowBlur = 0;
-  roundRect(0, 0, 3.5, r.h, 12);
+  roundRect(x, y, 3.5, h, 10);
   ctx.fillStyle = rgba(n.color, 1);
   ctx.fill();
-  roundRect(0, 0, r.w, r.h, 12);
-  ctx.strokeStyle = rgba(n.color, 0.55);
-  ctx.lineWidth = 1;
+  roundRect(x, y, w, h, 10);
+  ctx.strokeStyle = rgba(n.color, 0.7);
+  ctx.lineWidth = 1.2;
   ctx.stroke();
   ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
-  // type chip
-  ctx.font = '700 9px ui-monospace, monospace';
-  const chip = n.type.toUpperCase();
-  const chipW = ctx.measureText(chip).width + 14;
-  roundRect(16, 15, chipW, 16, 4);
-  ctx.fillStyle = rgba(n.color, 0.18);
-  ctx.fill();
-  ctx.fillStyle = rgba(n.color, 1);
-  ctx.fillText(chip, 23, 23.5);
-  // title
-  ctx.font = '700 14px -apple-system, BlinkMacSystemFont, sans-serif';
-  ctx.fillStyle = '#eef4fc';
-  ctx.fillText(ellipsize(n.label, r.w - 32), 16, 45);
-  // divider
-  ctx.strokeStyle = rgba(n.color, 0.22);
-  ctx.beginPath();
-  ctx.moveTo(16, 56);
-  ctx.lineTo(r.w - 16, 56);
-  ctx.stroke();
-  // body lines
-  ctx.font = '400 12.5px -apple-system, BlinkMacSystemFont, sans-serif';
-  ctx.fillStyle = 'rgba(214,226,244,0.82)';
-  expandedLines.forEach((ln, i) => ctx.fillText(ln, 16, 56 + 16 + i * 17));
-  // footer hint
-  ctx.font = '600 9.5px ui-monospace, monospace';
-  ctx.fillStyle = rgba(n.color, 0.7);
-  ctx.fillText('CLICK TO OPEN IN OBSIDIAN ↗', 16, r.h - 13);
-  ctx.restore();
-  ctx.globalAlpha = 1;
+  // compact label (title + sub) — fades out as the full content fades in
+  const ca = 1 - Math.min(1, e * 1.7);
+  if (ca > 0.02) {
+    ctx.globalAlpha = ca;
+    ctx.font = `${fontFor(n.kind)} -apple-system, BlinkMacSystemFont, sans-serif`;
+    ctx.fillStyle = '#eef4fc';
+    ctx.fillText(ellipsize(n.label, w - 30), x + 18, p.y - 6);
+    ctx.font = '500 9.5px -apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.fillStyle = rgba(n.color, 0.85);
+    ctx.fillText(n.sub, x + 18, p.y + 9);
+    ctx.globalAlpha = 1;
+  }
+  // full content — fades in once the card is mostly grown
+  const fa = Math.max(0, Math.min(1, (e - 0.55) / 0.45));
+  if (fa > 0.02) {
+    ctx.globalAlpha = fa;
+    ctx.font = '700 9px ui-monospace, monospace';
+    const chip = n.type.toUpperCase();
+    const chipW = ctx.measureText(chip).width + 14;
+    roundRect(x + 16, y + 14, chipW, 16, 4);
+    ctx.fillStyle = rgba(n.color, 0.2);
+    ctx.fill();
+    ctx.fillStyle = rgba(n.color, 1);
+    ctx.fillText(chip, x + 23, y + 22.5);
+    // close ×
+    ctx.font = '400 17px -apple-system, sans-serif';
+    ctx.fillStyle = 'rgba(226,232,240,0.6)';
+    ctx.textAlign = 'center';
+    ctx.fillText('×', x + w - 16, y + 21);
+    ctx.textAlign = 'left';
+    // title
+    ctx.font = '700 14px -apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.fillStyle = '#eef4fc';
+    ctx.fillText(ellipsize(n.label, w - 54), x + 16, y + 44);
+    ctx.strokeStyle = rgba(n.color, 0.22);
+    ctx.beginPath();
+    ctx.moveTo(x + 16, y + 56);
+    ctx.lineTo(x + w - 16, y + 56);
+    ctx.stroke();
+    ctx.font = '400 12.5px -apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.fillStyle = 'rgba(214,226,244,0.82)';
+    expandedLines.forEach((ln, i) => ctx.fillText(ln, x + 16, y + 56 + 16 + i * 17));
+    ctx.font = '600 9.5px ui-monospace, monospace';
+    ctx.fillStyle = rgba(n.color, 0.75);
+    ctx.fillText('OPEN IN OBSIDIAN ↗', x + 16, y + h - 13);
+    ctx.globalAlpha = 1;
+  }
   ctx.textBaseline = 'alphabetic';
 }
 window.addEventListener('keydown', (e) => {
