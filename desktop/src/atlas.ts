@@ -1,7 +1,8 @@
-// Atlas view — a hierarchical-graphical map of the knowledge base, inspired by
-// understand-anything's layered knowledge graph. Three levels radiating out:
-// vault → knowledge types → entries. Pan/zoom, glowing additive nodes coloured by
-// type, animated radial entrance, hover-to-highlight + tooltip, click → Obsidian.
+// Atlas view — a hierarchical knowledge graph of connected node-cards, in the
+// understand-anything style. Three layers (vault → knowledge types → entries) as
+// rounded cards with a type-coloured accent + title, joined by edge-to-edge bezier
+// connectors. Pan/zoom (zoom out = structure, zoom in = read), hover highlights the
+// subtree, click an entry → Obsidian, click a type → focus.
 import './index.css';
 
 const TYPE_COLOR: Record<string, [number, number, number]> = {
@@ -19,7 +20,7 @@ type Entry = { title: string; file: string; type: string; mtimeMs: number };
 type GNode = {
   id: string; kind: 'root' | 'type' | 'entry';
   label: string; type: string; file?: string;
-  x: number; y: number; r: number; color: [number, number, number];
+  x: number; y: number; w: number; h: number; color: [number, number, number];
   parent?: GNode;
 };
 
@@ -40,9 +41,17 @@ let nodes: GNode[] = [];
 const edges: [GNode, GNode][] = [];
 let vaultName = '';
 
-const ENTRIES_PER_TYPE = 14; // cap per layer (graph stays legible)
-const X_ROOT = -440, X_TYPE = 0, X_ENTRY = 300; // layered columns (left → right)
-const EGAP = 15; // entry vertical gap
+const ENTRIES_PER_TYPE = 10;
+const X_ROOT = -480, X_TYPE = -110, X_ENTRY = 250;
+const H_ROOT = 36, H_TYPE = 30, H_ENTRY = 26;
+const ROW = 12; // gap between stacked cards
+const fontFor = (k: GNode['kind']) => (k === 'root' ? '700 14px' : k === 'type' ? '700 13px' : '500 11.5px');
+
+function cardWidth(label: string, kind: GNode['kind']): number {
+  ctx.font = `${fontFor(kind)} -apple-system, BlinkMacSystemFont, sans-serif`;
+  const max = kind === 'entry' ? 210 : 168;
+  return Math.min(max, ctx.measureText(label).width + 26);
+}
 
 async function build(): Promise<void> {
   const v = await window.vault.status();
@@ -56,24 +65,21 @@ async function build(): Promise<void> {
   }
   const types = [...byType.entries()].sort((a, b) => b[1].length - a[1].length);
 
-  const root: GNode = { id: 'root', kind: 'root', label: vaultName || 'vault', type: 'root', x: X_ROOT, y: 0, r: 24, color: NODE };
+  const root: GNode = { id: 'root', kind: 'root', label: vaultName || 'vault', type: 'root', x: X_ROOT, y: 0, w: cardWidth(vaultName || 'vault', 'root'), h: H_ROOT, color: NODE };
   nodes = [root];
   edges.length = 0;
 
-  // allocate vertical space per type proportional to its (capped) entry count
-  const blockH = (count: number) => Math.max(110, Math.min(count, ENTRIES_PER_TYPE) * EGAP + 50);
+  const blockH = (count: number) => Math.min(count, ENTRIES_PER_TYPE) * (H_ENTRY + ROW);
   let total = 0;
-  for (const [, list] of types) total += blockH(list.length) + 36;
+  for (const [, list] of types) total += Math.max(H_TYPE + ROW, blockH(list.length)) + 30;
   let cursor = -total / 2;
 
   types.forEach(([type, list]) => {
-    const h = blockH(list.length);
+    const h = Math.max(H_TYPE + ROW, blockH(list.length));
     const cy = cursor + h / 2;
-    cursor += h + 36;
-    const tn: GNode = {
-      id: `t:${type}`, kind: 'type', label: `${type} · ${list.length}`, type,
-      x: X_TYPE, y: cy, r: 8 + Math.min(14, Math.sqrt(list.length) * 1.5), color: colorOf(type), parent: root,
-    };
+    cursor += h + 30;
+    const tlabel = `${type} · ${list.length}`;
+    const tn: GNode = { id: `t:${type}`, kind: 'type', label: tlabel, type, x: X_TYPE, y: cy, w: cardWidth(tlabel, 'type'), h: H_TYPE, color: colorOf(type), parent: root };
     nodes.push(tn);
     edges.push([root, tn]);
 
@@ -81,80 +87,102 @@ async function build(): Promise<void> {
     shown.forEach((e, ei) => {
       const en: GNode = {
         id: `e:${e.file}`, kind: 'entry', label: e.title, type: e.type, file: e.file,
-        x: X_ENTRY, y: cy + (ei - (shown.length - 1) / 2) * EGAP, r: 3.5, color: colorOf(e.type), parent: tn,
+        x: X_ENTRY, y: cy + (ei - (shown.length - 1) / 2) * (H_ENTRY + ROW), w: cardWidth(e.title, 'entry'), h: H_ENTRY, color: colorOf(e.type), parent: tn,
       };
       nodes.push(en);
       edges.push([tn, en]);
     });
   });
 
-  // fit the camera to the layered height
-  zoom = Math.max(0.3, Math.min(0.85, (H - 150) / Math.max(total, 1)));
+  zoom = Math.max(0.55, Math.min(0.85, (H - 140) / Math.max(total, 1))); // readable cards by default; pan to explore
   panX = -((X_ROOT + X_ENTRY) / 2) * zoom;
   panY = 0;
 }
 
 // camera
-let zoom = 0.62, panX = 0, panY = 0;
-let reveal = 0; // entrance animation 0..1
+let zoom = 0.6, panX = 0, panY = 0;
+let reveal = 0;
 let hover: GNode | null = null;
-const toScreen = (x: number, y: number, rv: number) => ({ x: W / 2 + (x * rv) * zoom + panX, y: H / 2 + (y * rv) * zoom + panY });
+const toScreen = (x: number, y: number, rv: number) => ({ x: W / 2 + x * rv * zoom + panX, y: H / 2 + y * rv * zoom + panY });
+
+function roundRect(x: number, y: number, w: number, h: number, r: number): void {
+  r = Math.min(r, h / 2, w / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
 
 function draw(now: number): void {
-  reveal += (1 - reveal) * 0.04;
-  const rv = reveal < 0.999 ? 1 - Math.pow(1 - reveal, 3) : 1; // ease-out expand from center
-  const t = now / 1000;
+  reveal += (1 - reveal) * 0.05;
+  const rv = reveal < 0.999 ? 1 - Math.pow(1 - reveal, 3) : 1;
   ctx.clearRect(0, 0, W, H);
-  ctx.globalCompositeOperation = 'lighter';
 
-  // edges
+  // edges — additive glow, edge-to-edge bezier
+  ctx.globalCompositeOperation = 'lighter';
   for (const [a, b] of edges) {
-    const pa = toScreen(a.x, a.y, rv), pb = toScreen(b.x, b.y, rv);
-    const hot = hover && (a === hover || b === hover || a === hover?.parent || b === hover?.parent);
-    ctx.strokeStyle = rgba(b.color, hot ? 0.6 : b.kind === 'entry' ? 0.12 : 0.26);
-    ctx.lineWidth = hot ? 1.5 : b.kind === 'entry' ? 0.7 : 1.1;
-    const mx = (pa.x + pb.x) / 2;
+    const sa = toScreen(a.x, a.y, rv), sb = toScreen(b.x, b.y, rv);
+    const ax = sa.x + (a.w * zoom) / 2, bx = sb.x - (b.w * zoom) / 2;
+    const hot = hover && (a === hover || b === hover || a === hover.parent || b === hover.parent);
+    ctx.strokeStyle = rgba(b.color, hot ? 0.7 : b.kind === 'entry' ? 0.16 : 0.32);
+    ctx.lineWidth = hot ? 1.7 : 1;
+    const mx = (ax + bx) / 2;
     ctx.beginPath();
-    ctx.moveTo(pa.x, pa.y);
-    ctx.bezierCurveTo(mx, pa.y, mx, pb.y, pb.x, pb.y); // horizontal-flow bezier (React-Flow style)
+    ctx.moveTo(ax, sa.y);
+    ctx.bezierCurveTo(mx, sa.y, mx, sb.y, bx, sb.y);
     ctx.stroke();
   }
+  ctx.globalCompositeOperation = 'source-over';
 
-  // nodes
-  ctx.textAlign = 'center';
+  // node cards
   ctx.textBaseline = 'middle';
   for (const n of nodes) {
     const p = toScreen(n.x, n.y, rv);
+    const w = n.w * zoom, h = n.h * zoom;
+    const x = p.x - w / 2, y = p.y - h / 2;
     const isHover = n === hover;
-    const pulse = n.kind === 'root' ? 1 + Math.sin(t * 1.5) * 0.06 : 1;
-    const r = n.r * (isHover ? 1.4 : 1) * pulse * (0.5 + zoom * 0.6);
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
-    ctx.fillStyle = rgba(n.color, n.kind === 'entry' ? 0.85 : 1);
-    ctx.shadowColor = rgba(n.color, 0.9);
-    ctx.shadowBlur = (n.kind === 'entry' ? 6 : 16) * (isHover ? 1.6 : 1);
+    const subtle = hover && !isHover && hover.parent !== n && n.parent !== hover && n !== hover.parent;
+    const alpha = subtle ? 0.45 : 1;
+    // card body
+    roundRect(x, y, w, h, 6 * zoom + 1);
+    ctx.fillStyle = `rgba(13,21,40,${0.92 * alpha})`;
+    if (isHover) {
+      ctx.shadowColor = rgba(n.color, 0.8);
+      ctx.shadowBlur = 18;
+    }
     ctx.fill();
-  }
-  ctx.shadowBlur = 0;
-
-  ctx.globalCompositeOperation = 'source-over';
-
-  // labels: root + type labels to the left of their node; entry labels to the right
-  for (const n of nodes) {
-    if (n.kind === 'entry' && zoom < 0.85 && n !== hover) continue;
-    const p = toScreen(n.x, n.y, rv);
-    const rr = n.r * (0.5 + zoom * 0.6);
-    const label = n.label.length > 30 ? n.label.slice(0, 29) + '…' : n.label;
-    if (n.kind === 'entry') {
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = rgba(n.color, (isHover ? 0.95 : 0.5) * alpha);
+    ctx.lineWidth = isHover ? 1.6 : 1;
+    ctx.stroke();
+    // type accent bar (left)
+    roundRect(x, y, Math.max(3, 3.5 * zoom), h, 6 * zoom + 1);
+    ctx.fillStyle = rgba(n.color, alpha);
+    ctx.fill();
+    // node dot
+    ctx.beginPath();
+    ctx.arc(x + 11 * zoom, p.y, 3 * zoom, 0, Math.PI * 2);
+    ctx.fillStyle = rgba(n.color, alpha);
+    ctx.shadowColor = rgba(n.color, 0.7);
+    ctx.shadowBlur = 6;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    // label (only when card is large enough to read)
+    if (h > 13) {
+      ctx.font = `${fontFor(n.kind)} -apple-system, BlinkMacSystemFont, sans-serif`;
+      ctx.fillStyle = `rgba(${n.kind === 'entry' ? '210,222,240' : '236,242,250'},${(n.kind === 'entry' ? 0.85 : 1) * alpha})`;
       ctx.textAlign = 'left';
-      ctx.font = `500 10.5px -apple-system, BlinkMacSystemFont, sans-serif`;
-      ctx.fillStyle = n === hover ? '#fff' : 'rgba(226,232,240,0.72)';
-      ctx.fillText(label, p.x + rr + 7, p.y);
-    } else {
-      ctx.textAlign = 'right';
-      ctx.font = `600 13px -apple-system, BlinkMacSystemFont, sans-serif`;
-      ctx.fillStyle = '#e2e8f0';
-      ctx.fillText(label, p.x - rr - 8, p.y);
+      const pad = 18 * zoom;
+      const maxw = w - pad - 8 * zoom;
+      let label = n.label;
+      if (ctx.measureText(label).width > maxw) {
+        while (label.length > 1 && ctx.measureText(label + '…').width > maxw) label = label.slice(0, -1);
+        label += '…';
+      }
+      ctx.fillText(label, x + pad, p.y + 0.5);
     }
   }
   ctx.textAlign = 'start';
@@ -164,20 +192,13 @@ function draw(now: number): void {
 
 // ── interaction ──
 function nodeAt(px: number, py: number): GNode | null {
-  const rv = 1;
-  let best: GNode | null = null, bd = 16 * 16;
-  for (const n of nodes) {
-    const p = toScreen(n.x, n.y, rv);
-    const rr = Math.max(8, n.r * (0.5 + zoom * 0.6));
-    const dx = p.x - px, dy = p.y - py, d = dx * dx + dy * dy;
-    if (d < Math.max(bd, rr * rr) && d < rr * rr + 60) {
-      if (d < bd) {
-        bd = d;
-        best = n;
-      }
-    }
+  for (let i = nodes.length - 1; i >= 0; i--) {
+    const n = nodes[i];
+    const p = toScreen(n.x, n.y, 1);
+    const w = n.w * zoom, h = n.h * zoom;
+    if (px >= p.x - w / 2 && px <= p.x + w / 2 && py >= p.y - h / 2 && py <= p.y + h / 2) return n;
   }
-  return best;
+  return null;
 }
 
 let dragging = false, lastX = 0, lastY = 0, downX = 0, downY = 0;
@@ -194,7 +215,6 @@ window.addEventListener('mouseup', (e) => {
     const n = nodeAt(e.clientX, e.clientY);
     if (n?.kind === 'entry' && n.file) window.vault.openFile(n.file);
     else if (n?.kind === 'type') {
-      // focus the cluster: center it
       panX = -(n.x * zoom);
       panY = -(n.y * zoom);
     }
@@ -226,9 +246,7 @@ canvas.addEventListener('mouseleave', () => {
 });
 canvas.addEventListener('wheel', (e) => {
   e.preventDefault();
-  const f = Math.exp(-e.deltaY * 0.0012);
-  const nz = Math.max(0.25, Math.min(3, zoom * f));
-  // zoom around cursor
+  const nz = Math.max(0.2, Math.min(2.4, zoom * Math.exp(-e.deltaY * 0.0012)));
   const wx = (e.clientX - W / 2 - panX) / zoom;
   const wy = (e.clientY - H / 2 - panY) / zoom;
   zoom = nz;
