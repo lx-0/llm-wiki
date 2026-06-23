@@ -17,6 +17,7 @@ export const ADVANCED_COMMANDS: { id: Exclude<EngineCommandId, 'update'>; label:
 
 export const VAULT_STATUS_CHANNEL = 'vault:status';
 export const VAULT_LIST_CHANNEL = 'vault:list';
+export const VAULT_PREVIEW_CHANNEL = 'vault:preview';
 export const VAULT_DOCTOR_CHANNEL = 'vault:doctor';
 export const VAULT_MENU_CHANNEL = 'vault:menu';
 export const VAULT_QUERY_CHANNEL = 'vault:query';
@@ -37,6 +38,8 @@ export interface VaultApi {
   status(): Promise<VaultStatus | null>;
   /** All knowledge entries (newest first) for the Browse window. */
   list(): Promise<EntryItem[]>;
+  /** Lazy content preview (body snippet) of one entry, by vault-relative path. */
+  preview(file: string): Promise<string>;
   /** Open the active vault in Obsidian. */
   openInObsidian(): Promise<{ ok: boolean }>;
   /** Open one vault file (path relative to vault root) in Obsidian. */

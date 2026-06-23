@@ -160,6 +160,25 @@ body.cockpit {
 .atlas-hint { bottom: 22px; left: 50%; transform: translateX(-50%); font-size: 11px; color: rgba(125,211,252,0.4); font-family: ui-monospace, monospace; letter-spacing: 0.04em; }
 .atlas-telemetry { top: 19px; left: 50%; transform: translateX(-50%); display: flex; gap: 9px; align-items: center;
   font-family: ui-monospace, 'SF Mono', monospace; font-size: 10px; letter-spacing: 0.12em; color: rgba(125,211,252,0.6); }
+
+/* Atlas detail card (lazy entry preview) */
+.atlas-detail {
+  right: 22px; top: 64px; width: 360px; max-height: calc(100vh - 110px); display: flex; flex-direction: column;
+  background: rgba(10,18,34,0.93); backdrop-filter: blur(22px); -webkit-backdrop-filter: blur(22px);
+  border: 0.5px solid rgba(125,211,252,0.25); border-radius: 12px; padding: 16px; box-shadow: 0 14px 44px rgba(0,0,0,0.55);
+}
+.ad-x { position: absolute; top: 10px; right: 12px; width: 24px; height: 24px; padding: 0; margin: 0; border: none;
+  background: rgba(255,255,255,0.08); color: #93a4bd; border-radius: 6px; font-size: 17px; line-height: 1; cursor: pointer; }
+.ad-x:hover { background: rgba(255,69,58,0.75); color: #fff; }
+.ad-head { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; padding-right: 28px; }
+.ad-title { font-size: 15px; font-weight: 700; color: #e2e8f0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ad-body { flex: 1; overflow-y: auto; font-size: 12.5px; line-height: 1.5; color: rgba(226,232,240,0.82); -webkit-user-select: text; user-select: text; }
+.ad-body p { margin: 0 0 8px; }
+.ad-body ul, .ad-body ol { margin: 0 0 8px; padding-left: 18px; }
+.ad-body strong { color: #fff; }
+.ad-body > :last-child { margin-bottom: 0; }
+.ad-loading { color: #93a4bd; font-style: italic; }
+.ad-open { width: 100%; margin-top: 14px; }
 .cockpit > :not(canvas):not(script) { position: absolute; z-index: 1; }
 
 .ck-top { top: 0; left: 0; right: 0; display: flex; align-items: center; justify-content: space-between; padding: 15px 20px; }

@@ -108,6 +108,23 @@ export function listEntries(): EntryItem[] {
   });
 }
 
+/** Lazy preview of one entry — body text after frontmatter + H1, capped. Path-guarded. */
+export function previewEntry(file: string): string {
+  const v = resolveVault();
+  if (!v) return '';
+  const full = path.resolve(v.path, file);
+  if (!full.startsWith(path.resolve(v.path) + path.sep)) return ''; // stay inside the vault
+  try {
+    let txt = fs.readFileSync(full, 'utf8');
+    txt = txt.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n/, ''); // frontmatter
+    txt = txt.replace(/^\s*#\s+.*\r?\n/, ''); // leading H1
+    txt = txt.trim();
+    return txt.length > 700 ? txt.slice(0, 700).trimEnd() + '…' : txt;
+  } catch {
+    return '';
+  }
+}
+
 export function getVaultStatus(): VaultStatus | null {
   const v = resolveVault();
   if (!v) return null;

@@ -5,7 +5,7 @@ import { LISTENERS, getListener } from './listeners/registry';
 import { getListenerStatus } from './listeners/status';
 import { startListener, stopListener, restartListener, type LifecycleAction, type LifecycleResult } from './listeners/lifecycle';
 import { LISTENER_STATUS_CHANNEL, LISTENER_CONTROL_CHANNEL } from './listeners/ipc';
-import { getVaultStatus, listEntries } from './vault/status';
+import { getVaultStatus, listEntries, previewEntry } from './vault/status';
 import { resolveVault } from './vault/registry';
 import {
   startCompile,
@@ -22,6 +22,7 @@ import { getMenu } from './vault/menu';
 import {
   VAULT_STATUS_CHANNEL,
   VAULT_LIST_CHANNEL,
+  VAULT_PREVIEW_CHANNEL,
   VAULT_COMPILE_CHANNEL,
   VAULT_COMPILE_STATUS_CHANNEL,
   VAULT_COMPILE_PROGRESS_CHANNEL,
@@ -313,6 +314,7 @@ ipcMain.on(VAULT_OPEN_FDA_CHANNEL, () => {
 
 // IPC: all knowledge entries (for the Browse window) — system data, fs read.
 ipcMain.handle(VAULT_LIST_CHANNEL, () => listEntries());
+ipcMain.handle(VAULT_PREVIEW_CHANNEL, (_e, file: string) => previewEntry(file));
 
 // IPC: doctor (health + update-available) — one read-only call.
 ipcMain.handle(VAULT_DOCTOR_CHANNEL, () => getDoctor());

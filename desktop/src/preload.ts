@@ -6,6 +6,7 @@ import { LISTENER_STATUS_CHANNEL, LISTENER_CONTROL_CHANNEL, type ListenerApi } f
 import {
   VAULT_STATUS_CHANNEL,
   VAULT_LIST_CHANNEL,
+  VAULT_PREVIEW_CHANNEL,
   VAULT_COMPILE_CHANNEL,
   VAULT_COMPILE_STATUS_CHANNEL,
   VAULT_COMPILE_PROGRESS_CHANNEL,
@@ -45,6 +46,7 @@ const listeners: ListenerApi = {
 const vault: VaultApi = {
   status: () => ipcRenderer.invoke(VAULT_STATUS_CHANNEL),
   list: () => ipcRenderer.invoke(VAULT_LIST_CHANNEL),
+  preview: (file) => ipcRenderer.invoke(VAULT_PREVIEW_CHANNEL, file),
   openInObsidian: () => ipcRenderer.invoke(VAULT_OPEN_OBSIDIAN_CHANNEL),
   openFile: (file) => ipcRenderer.send(VAULT_OPEN_FILE_CHANNEL, file),
   openFullDiskAccess: () => ipcRenderer.send(VAULT_OPEN_FDA_CHANNEL),

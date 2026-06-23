@@ -4,6 +4,7 @@
 // entrance, and hover that lights the whole path to the root. Pan/zoom, click an
 // entry → Obsidian, a type → focus.
 import './index.css';
+import { marked } from 'marked';
 
 const TYPE_COLOR: Record<string, [number, number, number]> = {
   person: [224, 82, 176], project: [26, 184, 200], concept: [148, 132, 240],
@@ -314,10 +315,12 @@ window.addEventListener('mouseup', (e) => {
   dragging = false;
   if (Math.hypot(e.clientX - downX, e.clientY - downY) < 5) {
     const n = nodeAt(e.clientX, e.clientY);
-    if (n?.kind === 'entry' && n.file) window.vault.openFile(n.file);
+    if (n?.kind === 'entry' && n.file) void showDetail(n);
     else if (n?.kind === 'type') {
       panX = -(n.x * zoom);
       panY = -(n.y * zoom);
+    } else if (!n) {
+      hideDetail();
     }
   }
 });
@@ -355,6 +358,43 @@ canvas.addEventListener('wheel', (e) => {
   panX = e.clientX - W / 2 - wx * zoom;
   panY = e.clientY - H / 2 - wy * zoom;
 }, { passive: false });
+
+// ── detail card: click an entry → expand a card with a lazily-loaded preview ──
+const clsOf = (type: string) => type.replace(/[^a-z]/gi, '').toLowerCase() || 'note';
+function renderMd(md: string): string {
+  const wl = md.replace(/\[\[([^\]]+)\]\]/g, (_m, p: string) => esc((p.split('|')[0].split('#')[0].split('/').pop() || p).trim()));
+  return marked.parse(wl, { breaks: true, async: false }) as string;
+}
+let detailFile: string | null = null;
+function hideDetail(): void {
+  detailFile = null;
+  const d = document.getElementById('atlas-detail');
+  if (d) d.hidden = true;
+}
+async function showDetail(n: GNode): Promise<void> {
+  if (!n.file) return;
+  const d = document.getElementById('atlas-detail');
+  const badge = document.getElementById('ad-badge');
+  const title = document.getElementById('ad-title');
+  const body = document.getElementById('ad-body');
+  if (!d || !badge || !title || !body) return;
+  detailFile = n.file;
+  badge.className = `type-badge t-${clsOf(n.type)}`;
+  badge.textContent = n.type;
+  title.textContent = n.label;
+  body.innerHTML = '<span class="ad-loading">Loading…</span>';
+  d.hidden = false;
+  const text = await window.vault.preview(n.file); // lazy — only fetched on click
+  if (detailFile !== n.file) return; // a newer click superseded this one
+  body.innerHTML = text ? renderMd(text) : '<span class="ad-loading">No preview available.</span>';
+}
+document.getElementById('ad-close')?.addEventListener('click', hideDetail);
+document.getElementById('ad-open')?.addEventListener('click', () => {
+  if (detailFile) window.vault.openFile(detailFile);
+});
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') hideDetail();
+});
 
 function renderLegend(): void {
   const el = document.getElementById('atlas-legend');
