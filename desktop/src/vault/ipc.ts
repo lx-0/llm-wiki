@@ -1,6 +1,6 @@
 // Vault IPC contract — shared by main + preload (per-domain, like listeners/ipc.ts).
 
-import type { VaultStatus } from './status';
+import type { VaultStatus, EntryItem } from './status';
 import type { CompileResult, CompileStart, CompileProgress, EngineCommandId } from './compile';
 import type { DoctorResult } from './doctor';
 import type { QueryResult } from './query';
@@ -16,6 +16,7 @@ export const ADVANCED_COMMANDS: { id: Exclude<EngineCommandId, 'update'>; label:
 ];
 
 export const VAULT_STATUS_CHANNEL = 'vault:status';
+export const VAULT_LIST_CHANNEL = 'vault:list';
 export const VAULT_DOCTOR_CHANNEL = 'vault:doctor';
 export const VAULT_MENU_CHANNEL = 'vault:menu';
 export const VAULT_QUERY_CHANNEL = 'vault:query';
@@ -34,6 +35,8 @@ export const VAULT_OPEN_FDA_CHANNEL = 'vault:open-fda';
 
 export interface VaultApi {
   status(): Promise<VaultStatus | null>;
+  /** All knowledge entries (newest first) for the Browse window. */
+  list(): Promise<EntryItem[]>;
   /** Open the active vault in Obsidian. */
   openInObsidian(): Promise<{ ok: boolean }>;
   /** Open one vault file (path relative to vault root) in Obsidian. */

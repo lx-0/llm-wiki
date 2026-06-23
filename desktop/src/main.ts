@@ -5,7 +5,7 @@ import { LISTENERS, getListener } from './listeners/registry';
 import { getListenerStatus } from './listeners/status';
 import { startListener, stopListener, restartListener, type LifecycleAction, type LifecycleResult } from './listeners/lifecycle';
 import { LISTENER_STATUS_CHANNEL, LISTENER_CONTROL_CHANNEL } from './listeners/ipc';
-import { getVaultStatus } from './vault/status';
+import { getVaultStatus, listEntries } from './vault/status';
 import { resolveVault } from './vault/registry';
 import {
   startCompile,
@@ -21,6 +21,7 @@ import { runQuery } from './vault/query';
 import { getMenu } from './vault/menu';
 import {
   VAULT_STATUS_CHANNEL,
+  VAULT_LIST_CHANNEL,
   VAULT_COMPILE_CHANNEL,
   VAULT_COMPILE_STATUS_CHANNEL,
   VAULT_COMPILE_PROGRESS_CHANNEL,
@@ -44,6 +45,7 @@ import {
   APP_LOGIN_SET_CHANNEL,
   APP_QUIT_CHANNEL,
   APP_OPEN_SETTINGS_CHANNEL,
+  APP_OPEN_BROWSE_CHANNEL,
   APP_ONBOARDING_DONE_CHANNEL,
 } from './app/ipc';
 import fs from 'node:fs';
@@ -129,6 +131,34 @@ ipcMain.handle(APP_LOGIN_GET_CHANNEL, () => isAutostartEnabled());
 ipcMain.handle(APP_LOGIN_SET_CHANNEL, (_e, open: boolean) => setAutostart(open));
 ipcMain.on(APP_QUIT_CHANNEL, () => app.quit());
 ipcMain.on(APP_OPEN_SETTINGS_CHANNEL, () => openSettings());
+ipcMain.on(APP_OPEN_BROWSE_CHANNEL, () => openBrowse());
+
+// Browse window (browse.html) — a searchable list of all knowledge entries.
+let browseWin: BrowserWindow | null = null;
+function openBrowse(): void {
+  if (browseWin && !browseWin.isDestroyed()) {
+    browseWin.show();
+    browseWin.focus();
+    return;
+  }
+  browseWin = new BrowserWindow({
+    width: 480,
+    height: 620,
+    minWidth: 360,
+    minHeight: 400,
+    title: 'Browse — llm-wiki',
+    webPreferences: { preload: path.join(__dirname, 'preload.js') },
+  });
+  browseWin.setMenuBarVisibility(false);
+  if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
+    browseWin.loadURL(`${MAIN_WINDOW_VITE_DEV_SERVER_URL}/browse.html`);
+  } else {
+    browseWin.loadFile(path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/browse.html`));
+  }
+  browseWin.on('closed', () => {
+    browseWin = null;
+  });
+}
 
 // Settings lives in its own window (settings.html), opened from the header gear.
 let settingsWin: BrowserWindow | null = null;
@@ -218,6 +248,9 @@ ipcMain.on(VAULT_OPEN_FILE_CHANNEL, (_e, file: string) => {
 ipcMain.on(VAULT_OPEN_FDA_CHANNEL, () => {
   void shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles');
 });
+
+// IPC: all knowledge entries (for the Browse window) — system data, fs read.
+ipcMain.handle(VAULT_LIST_CHANNEL, () => listEntries());
 
 // IPC: doctor (health + update-available) — one read-only call.
 ipcMain.handle(VAULT_DOCTOR_CHANNEL, () => getDoctor());

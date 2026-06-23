@@ -83,6 +83,31 @@ function titleOf(full: string): string {
   return (path.basename(full, '.md') || full).replace(/-/g, ' ');
 }
 
+export interface EntryItem {
+  title: string;
+  file: string;
+  type: string;
+  mtimeMs: number;
+}
+
+/** All knowledge entries (newest first) for the Browse window. Fast: readdir +
+ *  stat only, slug-derived titles (no per-file H1 read — would block on 1000s). */
+export function listEntries(): EntryItem[] {
+  const v = resolveVault();
+  if (!v) return [];
+  const files: { full: string; mtimeMs: number }[] = [];
+  walk(path.join(v.path, 'knowledge'), files);
+  files.sort((a, b) => b.mtimeMs - a.mtimeMs);
+  return files.map((f) => {
+    const rel = path.relative(v.path, f.full);
+    const title = path
+      .basename(f.full, '.md')
+      .replace(/-/g, ' ')
+      .replace(/\b\w/g, (c) => c.toUpperCase());
+    return { title, file: rel, type: typeOf(rel), mtimeMs: f.mtimeMs };
+  });
+}
+
 export function getVaultStatus(): VaultStatus | null {
   const v = resolveVault();
   if (!v) return null;

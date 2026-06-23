@@ -5,6 +5,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 import { LISTENER_STATUS_CHANNEL, LISTENER_CONTROL_CHANNEL, type ListenerApi } from './listeners/ipc';
 import {
   VAULT_STATUS_CHANNEL,
+  VAULT_LIST_CHANNEL,
   VAULT_COMPILE_CHANNEL,
   VAULT_COMPILE_STATUS_CHANNEL,
   VAULT_COMPILE_PROGRESS_CHANNEL,
@@ -28,6 +29,7 @@ import {
   APP_LOGIN_SET_CHANNEL,
   APP_QUIT_CHANNEL,
   APP_OPEN_SETTINGS_CHANNEL,
+  APP_OPEN_BROWSE_CHANNEL,
   APP_ONBOARDING_DONE_CHANNEL,
   type AppApi,
 } from './app/ipc';
@@ -39,6 +41,7 @@ const listeners: ListenerApi = {
 
 const vault: VaultApi = {
   status: () => ipcRenderer.invoke(VAULT_STATUS_CHANNEL),
+  list: () => ipcRenderer.invoke(VAULT_LIST_CHANNEL),
   openInObsidian: () => ipcRenderer.invoke(VAULT_OPEN_OBSIDIAN_CHANNEL),
   openFile: (file) => ipcRenderer.send(VAULT_OPEN_FILE_CHANNEL, file),
   openFullDiskAccess: () => ipcRenderer.send(VAULT_OPEN_FDA_CHANNEL),
@@ -66,6 +69,7 @@ const appApi: AppApi = {
   setLoginItem: (open) => ipcRenderer.invoke(APP_LOGIN_SET_CHANNEL, open),
   quit: () => ipcRenderer.send(APP_QUIT_CHANNEL),
   openSettings: () => ipcRenderer.send(APP_OPEN_SETTINGS_CHANNEL),
+  openBrowse: () => ipcRenderer.send(APP_OPEN_BROWSE_CHANNEL),
   onboardingDone: () => ipcRenderer.send(APP_ONBOARDING_DONE_CHANNEL),
 };
 
