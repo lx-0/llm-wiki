@@ -307,6 +307,10 @@ body.cockpit {
   font-family: ui-monospace, 'SF Mono', monospace; font-size: 10px; letter-spacing: 0.1em; color: rgba(125,211,252,0.65);
 }
 .ck-tel-sep { color: rgba(125,211,252,0.3); }
+/* colour key: the core glows this amber when the vault has issues */
+.ck-colorkey { bottom: 46px; left: 26px; display: flex; align-items: center; gap: 6px;
+  font-family: ui-monospace, 'SF Mono', monospace; font-size: 10px; letter-spacing: 0.1em; color: #ff9f40; }
+.ck-key-dot { width: 8px; height: 8px; border-radius: 50%; background: #ff9f40; box-shadow: 0 0 7px rgba(255, 159, 64, 0.7); }
 
 /* Card */
 .card {
