@@ -152,6 +152,22 @@ function igniteFromAsk(q: string): void {
   targetEnergy = 1;
 }
 
+// ── "enorm" extras ──
+let hoverNode = -1;
+const BLUE: [number, number, number] = [110, 165, 255];
+const PINK: [number, number, number] = [224, 82, 176];
+function auroraGlow(t: number): [number, number, number] {
+  const k = (Math.sin(t * 0.13) + 1) / 2;
+  return [GLOW[0] + (BLUE[0] - GLOW[0]) * k, GLOW[1] + (BLUE[1] - GLOW[1]) * k, GLOW[2] + (BLUE[2] - GLOW[2]) * k];
+}
+const arcs: { a: number; b: number; t: number; speed: number }[] = []; // thought-arcs between concepts
+let arcAccum = 0;
+const flares: { node: number; t: number }[] = []; // idle memories surfacing
+let flareAccum = 0;
+// drag-to-spin
+let userRotY = 0, velY = 0, userRotX = 0, velX = 0;
+let dragging = false, lastX = 0, lastY = 0, downX = 0, downY = 0;
+
 let last = 0;
 function draw(now: number): void {
   const dt = last ? Math.min(0.05, (now - last) / 1000) : 0;
@@ -162,10 +178,14 @@ function draw(now: number): void {
   pRotY += (mx * 0.3 - pRotY) * Math.min(1, dt * 3);
   ctx.clearRect(0, 0, W, H);
 
-  const rotY = t * (0.12 + energy * 0.18) + pRotY;
-  const rotX = Math.sin(t * 0.12) * 0.26 + pRotX;
+  userRotY += velY;
+  velY *= 0.94;
+  userRotX = Math.max(-1.2, Math.min(1.2, userRotX + velX));
+  velX *= 0.94;
+  const rotY = t * (0.12 + energy * 0.18) + pRotY + userRotY;
+  const rotX = Math.sin(t * 0.12) * 0.26 + pRotX + userRotX;
   const deform = 0.05 + energy * 0.05 + Math.sin(t * 0.7) * 0.02;
-  const glowC = hasIssues ? WARM : GLOW;
+  const glowC = hasIssues ? WARM : auroraGlow(t);
   const projOuter = outer.vertices.map((v) => project(v, rotX, rotY, deform, t));
   const projInner = inner.vertices.map((v) => project([v[0] * 0.62, v[1] * 0.62, v[2] * 0.62], rotX, rotY, deform * 1.7, t * 1.3));
   lastProj = projOuter;
@@ -177,6 +197,22 @@ function draw(now: number): void {
     const tw = 0.5 + 0.5 * Math.sin(t * 1.4 + s.tw);
     ctx.fillStyle = rgba([200, 220, 255], s.a * tw);
     ctx.fillRect(s.x, s.y, 1.3, 1.3);
+  }
+
+  // drifting nebula clouds — atmosphere + depth
+  const nebs: { x: number; y: number; r: number; c: [number, number, number]; a: number }[] = [
+    { x: cx - radius * 1.7, y: cy - radius * 0.9, r: radius * 2.3, c: GLOW, a: 0.05 },
+    { x: cx + radius * 1.8, y: cy + radius * 1.1, r: radius * 2.6, c: BLUE, a: 0.045 },
+    { x: cx + radius * 0.5, y: cy - radius * 1.7, r: radius * 1.9, c: PINK, a: 0.03 },
+  ];
+  for (const nb of nebs) {
+    const dx = Math.sin(t * 0.08 + nb.r) * 32;
+    const dy = Math.cos(t * 0.06 + nb.r) * 26;
+    const g = ctx.createRadialGradient(nb.x + dx, nb.y + dy, 0, nb.x + dx, nb.y + dy, nb.r);
+    g.addColorStop(0, rgba(nb.c, nb.a));
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
   }
 
   // glow halo (layered)
@@ -291,6 +327,113 @@ function draw(now: number): void {
   }
   ctx.shadowBlur = 0;
 
+  // thought-arcs: bright beams occasionally connecting two entry-nodes (ideas linking)
+  arcAccum += dt;
+  if (arcAccum > 1.4 - energy * 0.8 && arcs.length < 5) {
+    arcAccum = 0;
+    const ne: number[] = [];
+    for (let i = 0; i < nodeEntries.length; i++) if (nodeEntries[i]) ne.push(i);
+    if (ne.length > 2) {
+      const a = ne[Math.floor(Math.random() * ne.length)];
+      let b = ne[Math.floor(Math.random() * ne.length)];
+      if (b === a) b = ne[(ne.indexOf(a) + 3) % ne.length];
+      arcs.push({ a, b, t: 0, speed: 0.5 + Math.random() * 0.4 });
+    }
+  }
+  for (let i = arcs.length - 1; i >= 0; i--) {
+    const ar = arcs[i];
+    ar.t += dt * ar.speed;
+    if (ar.t >= 1) {
+      arcs.splice(i, 1);
+      continue;
+    }
+    const pa = projOuter[ar.a], pb = projOuter[ar.b];
+    const ox = (pa.x + pb.x) / 2 + ((pa.x + pb.x) / 2 - cx) * 0.45;
+    const oy = (pa.y + pb.y) / 2 + ((pa.y + pb.y) / 2 - cy) * 0.45;
+    const fade = Math.sin(ar.t * Math.PI);
+    ctx.beginPath();
+    ctx.moveTo(pa.x, pa.y);
+    ctx.quadraticCurveTo(ox, oy, pb.x, pb.y);
+    ctx.strokeStyle = rgba(NODE, 0.28 * fade);
+    ctx.lineWidth = 1.1;
+    ctx.shadowColor = rgba(NODE, fade);
+    ctx.shadowBlur = 6;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    const u = ar.t, iu = 1 - u;
+    const qx = iu * iu * pa.x + 2 * iu * u * ox + u * u * pb.x;
+    const qy = iu * iu * pa.y + 2 * iu * u * oy + u * u * pb.y;
+    ctx.beginPath();
+    ctx.arc(qx, qy, 2.6, 0, Math.PI * 2);
+    ctx.fillStyle = rgba(NODE, 0.9 * fade);
+    ctx.shadowColor = rgba(NODE, 1);
+    ctx.shadowBlur = 12;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+  }
+
+  // idle flares: a memory surfaces — a random front node pulses
+  flareAccum += dt;
+  if (flareAccum > 2.6 && flares.length < 2) {
+    flareAccum = 0;
+    const front: number[] = [];
+    for (let i = 0; i < projOuter.length; i++) if (nodeEntries[i] && (projOuter[i].z + 1) / 2 > 0.6) front.push(i);
+    if (front.length) flares.push({ node: front[Math.floor(Math.random() * front.length)], t: 0 });
+  }
+  for (let i = flares.length - 1; i >= 0; i--) {
+    const fl = flares[i];
+    fl.t += dt * 0.6;
+    if (fl.t >= 1) {
+      flares.splice(i, 1);
+      continue;
+    }
+    const p = projOuter[fl.node];
+    const fade = Math.sin(fl.t * Math.PI);
+    const c = nodeColor(fl.node);
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 4 + fl.t * 24, 0, Math.PI * 2);
+    ctx.strokeStyle = rgba(c, 0.55 * fade);
+    ctx.lineWidth = 1.5 * fade + 0.3;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+    ctx.fillStyle = rgba(c, fade);
+    ctx.shadowColor = rgba(c, 1);
+    ctx.shadowBlur = 14;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+  }
+
+  // hovered node: flare it + light its connections
+  if (hoverNode >= 0 && projOuter[hoverNode]) {
+    const hp = projOuter[hoverNode];
+    for (const [a, b] of outer.edges) {
+      if (a !== hoverNode && b !== hoverNode) continue;
+      ctx.beginPath();
+      ctx.moveTo(projOuter[a].x, projOuter[a].y);
+      ctx.lineTo(projOuter[b].x, projOuter[b].y);
+      ctx.strokeStyle = rgba(NODE, 0.6);
+      ctx.lineWidth = 1.3;
+      ctx.shadowColor = rgba(NODE, 0.9);
+      ctx.shadowBlur = 7;
+      ctx.stroke();
+    }
+    ctx.shadowBlur = 0;
+    const c = nodeColor(hoverNode);
+    ctx.beginPath();
+    ctx.arc(hp.x, hp.y, 5, 0, Math.PI * 2);
+    ctx.fillStyle = rgba(c, 1);
+    ctx.shadowColor = rgba(c, 1);
+    ctx.shadowBlur = 18;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.beginPath();
+    ctx.arc(hp.x, hp.y, 8 + Math.sin(t * 6) * 2, 0, Math.PI * 2);
+    ctx.strokeStyle = rgba(c, 0.6);
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+  }
+
   // orbit particles
   for (const pt of particles) {
     const o = orbits[pt.orbit];
@@ -382,27 +525,51 @@ function nodeAt(px: number, py: number): number {
   }
   return best;
 }
-canvas.addEventListener('click', (e) => {
-  const i = nodeAt(e.clientX, e.clientY);
-  if (i >= 0) window.vault.openFile(nodeEntries[i]!.file);
-});
 const tip = document.getElementById('ck-tip');
+if (tip) tip.hidden = false; // visibility managed via the .show class + opacity fade
+let tipHide = 0;
+function hideTipSoon(): void {
+  window.clearTimeout(tipHide);
+  tipHide = window.setTimeout(() => tip?.classList.remove('show'), 450);
+}
+canvas.addEventListener('mousedown', (e) => {
+  dragging = true;
+  downX = lastX = e.clientX;
+  downY = lastY = e.clientY;
+});
+window.addEventListener('mouseup', (e) => {
+  if (!dragging) return;
+  dragging = false;
+  if (Math.hypot(e.clientX - downX, e.clientY - downY) < 5) {
+    const i = nodeAt(e.clientX, e.clientY); // a click (not a drag) → open the entry
+    if (i >= 0) window.vault.openFile(nodeEntries[i]!.file);
+  }
+});
 canvas.addEventListener('mousemove', (e) => {
+  if (dragging) {
+    velY = (e.clientX - lastX) * 0.012; // drag spins the sphere (momentum decays in draw)
+    velX = -(e.clientY - lastY) * 0.008;
+    lastX = e.clientX;
+    lastY = e.clientY;
+  }
   const i = nodeAt(e.clientX, e.clientY);
-  canvas.style.cursor = i >= 0 ? 'pointer' : 'default';
+  hoverNode = i;
+  canvas.style.cursor = dragging ? 'grabbing' : i >= 0 ? 'pointer' : 'grab';
   if (!tip) return;
   if (i >= 0 && nodeEntries[i]) {
+    window.clearTimeout(tipHide);
     const en = nodeEntries[i]!;
     tip.innerHTML = `<span class="type-badge t-${clsOf(en.type)}">${esc(en.type)}</span><span class="ck-tip-title">${esc(en.title)}</span>`;
     tip.style.left = `${Math.min(e.clientX + 14, W - 290)}px`;
     tip.style.top = `${e.clientY + 14}px`;
-    tip.hidden = false;
-  } else {
-    tip.hidden = true;
+    tip.classList.add('show');
+  } else if (tip.classList.contains('show')) {
+    hideTipSoon(); // left the node → fade out after a grace delay
   }
 });
 canvas.addEventListener('mouseleave', () => {
-  if (tip) tip.hidden = true;
+  hoverNode = -1;
+  hideTipSoon();
 });
 
 // ─────────────────────────── HUD ─────────────────────────────────────────────
