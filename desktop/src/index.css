@@ -158,6 +158,8 @@ body.cockpit {
 .atlas-leg { display: flex; align-items: center; gap: 7px; font-size: 11px; color: rgba(226,232,240,0.7); text-transform: capitalize; font-family: ui-monospace, monospace; }
 .atlas-dot { width: 9px; height: 9px; border-radius: 50%; flex: none; box-shadow: 0 0 6px currentColor; }
 .atlas-hint { bottom: 22px; left: 50%; transform: translateX(-50%); font-size: 11px; color: rgba(125,211,252,0.4); font-family: ui-monospace, monospace; letter-spacing: 0.04em; }
+.atlas-telemetry { top: 19px; left: 50%; transform: translateX(-50%); display: flex; gap: 9px; align-items: center;
+  font-family: ui-monospace, 'SF Mono', monospace; font-size: 10px; letter-spacing: 0.12em; color: rgba(125,211,252,0.6); }
 .cockpit > :not(canvas):not(script) { position: absolute; z-index: 1; }
 
 .ck-top { top: 0; left: 0; right: 0; display: flex; align-items: center; justify-content: space-between; padding: 15px 20px; }
