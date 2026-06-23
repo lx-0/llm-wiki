@@ -196,7 +196,7 @@ function escapeHtml(s: string): string {
 }
 
 /** Most recently modified knowledge entries; click opens the file in Obsidian. */
-function renderRecent(recent: { title: string; file: string; mtimeMs: number }[]): void {
+function renderRecent(recent: { title: string; file: string; type: string; mtimeMs: number }[]): void {
   const el = document.getElementById('recent');
   if (!el) return;
   if (!recent || recent.length === 0) {
@@ -210,7 +210,11 @@ function renderRecent(recent: { title: string; file: string; mtimeMs: number }[]
     const row = document.createElement('button');
     row.className = 'recent-row';
     row.title = 'Open in Obsidian';
-    row.innerHTML = `<span class="recent-title">${escapeHtml(r.title)}</span><span class="recent-ago">${fmtAgo(r.mtimeMs)}</span>`;
+    const cls = r.type.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() || 'note';
+    row.innerHTML =
+      `<span class="type-badge t-${cls}">${escapeHtml(r.type)}</span>` +
+      `<span class="recent-title">${escapeHtml(r.title)}</span>` +
+      `<span class="recent-ago">${fmtAgo(r.mtimeMs)}</span>`;
     row.addEventListener('click', () => window.vault.openFile(r.file));
     list.appendChild(row);
   }

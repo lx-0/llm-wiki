@@ -266,12 +266,27 @@ button:disabled { background: rgba(120,120,128,0.3); color: var(--muted); cursor
 .recent-list { margin-top: 6px; padding: 4px 5px; display: flex; flex-direction: column; }
 .recent-row {
   margin: 0; width: 100%; background: none; color: var(--text); font: inherit; font-weight: 400;
-  display: flex; align-items: baseline; gap: 8px; padding: 6px 7px; border-radius: 7px;
+  display: flex; align-items: center; gap: 8px; padding: 6px 7px; border-radius: 7px;
   text-align: left; cursor: pointer;
 }
 .recent-row:hover { background: rgba(120,120,128,0.14); }
 .recent-title { flex: 1; font-size: 12.5px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .recent-ago { font-size: 11px; color: var(--muted); flex: none; font-variant-numeric: tabular-nums; }
+
+/* Entry-type badge */
+.type-badge {
+  flex: none; min-width: 52px; text-align: center;
+  font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em;
+  padding: 2px 6px; border-radius: 5px;
+}
+.t-person  { color: #e052b0; background: rgba(224, 82, 176, 0.15); }
+.t-project { color: #1aa8b8; background: rgba(26, 168, 184, 0.16); }
+.t-concept { color: #8b7be8; background: rgba(139, 123, 232, 0.16); }
+.t-fact    { color: #e0564f; background: rgba(224, 86, 79, 0.15); }
+.t-area    { color: #34a853; background: rgba(52, 168, 83, 0.15); }
+.t-map     { color: #cc9a00; background: rgba(217, 162, 0, 0.17); }
+.t-link    { color: #e0843c; background: rgba(224, 132, 60, 0.16); }
+.t-qa, .t-note { color: var(--muted); background: rgba(120, 120, 128, 0.16); }
 
 /* What's pending */
 .pending-list { margin-top: 6px; padding: 6px 10px; display: flex; flex-direction: column; }

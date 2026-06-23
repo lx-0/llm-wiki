@@ -11,7 +11,29 @@ export interface RecentEntry {
   title: string;
   /** path relative to the vault root, for an obsidian:// open link */
   file: string;
+  /** entry kind derived from the knowledge/ subfolder (person, project, concept, …) */
+  type: string;
   mtimeMs: number;
+}
+
+// knowledge/<folder>/… → a short singular label for the badge.
+const FOLDER_LABEL: Record<string, string> = {
+  people: 'person',
+  projects: 'project',
+  concepts: 'concept',
+  facts: 'fact',
+  areas: 'area',
+  MOCs: 'map',
+  connections: 'link',
+  qa: 'Q&A',
+};
+
+function typeOf(rel: string): string {
+  const parts = rel.split('/');
+  const ki = parts.indexOf('knowledge');
+  const folder = ki >= 0 ? parts[ki + 1] : parts[0];
+  if (!folder || folder.endsWith('.md')) return 'note'; // directly under knowledge/
+  return FOLDER_LABEL[folder] ?? folder;
 }
 
 export interface VaultStatus {
@@ -79,11 +101,10 @@ export function getVaultStatus(): VaultStatus | null {
   const files: { full: string; mtimeMs: number }[] = [];
   if (accessible) walk(knowledge, files);
   files.sort((a, b) => b.mtimeMs - a.mtimeMs);
-  const recent: RecentEntry[] = files.slice(0, RECENT_COUNT).map((f) => ({
-    title: titleOf(f.full),
-    file: path.relative(v.path, f.full),
-    mtimeMs: f.mtimeMs,
-  }));
+  const recent: RecentEntry[] = files.slice(0, RECENT_COUNT).map((f) => {
+    const rel = path.relative(v.path, f.full);
+    return { title: titleOf(f.full), file: rel, type: typeOf(rel), mtimeMs: f.mtimeMs };
+  });
 
   return {
     name: v.name,
