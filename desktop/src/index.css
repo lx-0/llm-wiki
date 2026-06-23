@@ -247,6 +247,25 @@ body.cockpit {
 .ck-tip.show { opacity: 1; }
 .ck-tip-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
+/* ── JARVIS / Minority-Report HUD restyle ── */
+.ck-panel { background: rgba(8,16,33,0.5); border: 0.5px solid rgba(125,211,252,0.22); border-radius: 3px; }
+.ck-panel::before, .ck-panel::after { content: ''; position: absolute; width: 9px; height: 9px; pointer-events: none; }
+.ck-panel::before { top: -1px; left: -1px; border-left: 1.5px solid rgba(125,211,252,0.6); border-top: 1.5px solid rgba(125,211,252,0.6); }
+.ck-panel::after { bottom: -1px; right: -1px; border-right: 1.5px solid rgba(125,211,252,0.6); border-bottom: 1.5px solid rgba(125,211,252,0.6); }
+.ck-panel-title { font-family: ui-monospace, 'SF Mono', monospace; font-size: 9.5px; letter-spacing: 0.14em; color: #7dd3fc; }
+.ck-panel-title::before { content: '// '; opacity: 0.6; }
+.ck-vault { font-family: ui-monospace, monospace; letter-spacing: 0.08em; border: 0.5px solid rgba(125,211,252,0.25); background: rgba(125,211,252,0.06); color: #7dd3fc; }
+.ck-btn { font-family: ui-monospace, monospace; letter-spacing: 0.06em; text-transform: uppercase; font-size: 11px; border-color: rgba(125,211,252,0.3); }
+.ck-btn.primary { background: rgba(10,132,255,0.85); }
+.ck-run { font-family: ui-monospace, monospace; text-transform: uppercase; letter-spacing: 0.05em; border-color: rgba(125,211,252,0.3); }
+#ck-input { font-family: ui-monospace, 'SF Mono', monospace; letter-spacing: 0.03em; border-color: rgba(125,211,252,0.3); }
+#ck-input::placeholder { color: rgba(125,211,252,0.4); }
+.ck-telemetry {
+  left: 26px; bottom: 26px; display: flex; gap: 9px; align-items: center;
+  font-family: ui-monospace, 'SF Mono', monospace; font-size: 10px; letter-spacing: 0.1em; color: rgba(125,211,252,0.65);
+}
+.ck-tel-sep { color: rgba(125,211,252,0.3); }
+
 /* Card */
 .card {
   background: var(--card);

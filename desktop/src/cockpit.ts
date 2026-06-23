@@ -167,6 +167,10 @@ let flareAccum = 0;
 // drag-to-spin
 let userRotY = 0, velY = 0, userRotX = 0, velX = 0;
 let dragging = false, lastX = 0, lastY = 0, downX = 0, downY = 0;
+// HUD panels tethered to the brain
+const tetherEls = ['.ck-pending', '.ck-recent', '.ck-ask']
+  .map((s) => document.querySelector(s))
+  .filter(Boolean) as HTMLElement[];
 
 let last = 0;
 function draw(now: number): void {
@@ -449,6 +453,105 @@ function draw(now: number): void {
   }
   ctx.shadowBlur = 0;
 
+  // ─── JARVIS reticle: concentric rings, tick gauge, rotating arcs, radar sweep ───
+  const RR = radius * 1.5;
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = rgba(NODE, 0.1);
+  ctx.beginPath();
+  ctx.arc(cx, cy, RR, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.save();
+  ctx.setLineDash([5, 11]);
+  ctx.lineDashOffset = -t * 26;
+  ctx.strokeStyle = rgba(NODE, 0.16);
+  ctx.beginPath();
+  ctx.arc(cx, cy, RR * 1.14, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.setLineDash([3, 14]);
+  ctx.lineDashOffset = t * 30;
+  ctx.strokeStyle = rgba(GLOW, 0.16);
+  ctx.beginPath();
+  ctx.arc(cx, cy, RR * 0.72, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+  // tick gauge
+  const TK = 80;
+  for (let i = 0; i < TK; i++) {
+    const a = (i / TK) * Math.PI * 2 + t * 0.06;
+    const major = i % 10 === 0;
+    const r1 = RR * 0.97, r2 = RR * (major ? 0.88 : 0.92);
+    ctx.strokeStyle = rgba(NODE, major ? 0.3 : 0.12);
+    ctx.lineWidth = major ? 1.4 : 0.7;
+    ctx.beginPath();
+    ctx.moveTo(cx + Math.cos(a) * r2, cy + Math.sin(a) * r2);
+    ctx.lineTo(cx + Math.cos(a) * r1, cy + Math.sin(a) * r1);
+    ctx.stroke();
+  }
+  // rotating broken-arc ring + end nodes
+  const AR = RR * 1.28;
+  for (let k = 0; k < 3; k++) {
+    const a0 = t * 0.25 + (k * Math.PI * 2) / 3;
+    ctx.strokeStyle = rgba(NODE, 0.22);
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.arc(cx, cy, AR, a0, a0 + 0.72);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(cx + Math.cos(a0) * AR, cy + Math.sin(a0) * AR, 2, 0, Math.PI * 2);
+    ctx.fillStyle = rgba(NODE, 0.6);
+    ctx.fill();
+  }
+  // radar sweep (fading trail)
+  const sweep = t * 0.5;
+  for (let s = 0; s < 16; s++) {
+    const a = sweep - s * 0.028;
+    ctx.strokeStyle = rgba(NODE, 0.1 * (1 - s / 16));
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + Math.cos(a) * RR * 0.95, cy + Math.sin(a) * RR * 0.95);
+    ctx.stroke();
+  }
+  // screen-corner brackets (HUD frame)
+  const bm = 26, bl = 22;
+  ctx.strokeStyle = rgba(NODE, 0.28);
+  ctx.lineWidth = 1.5;
+  for (const [bx, by, sx, sy] of [[bm, bm, 1, 1], [W - bm, bm, -1, 1], [bm, H - bm, 1, -1], [W - bm, H - bm, -1, -1]] as const) {
+    ctx.beginPath();
+    ctx.moveTo(bx, by + sy * bl);
+    ctx.lineTo(bx, by);
+    ctx.lineTo(bx + sx * bl, by);
+    ctx.stroke();
+  }
+
+  // ─── everything connected: tether each HUD panel to the brain (data flows in) ───
+  for (const el of tetherEls) {
+    const r = el.getBoundingClientRect();
+    if (r.width < 4) continue;
+    const ax = Math.max(r.left, Math.min(cx, r.right));
+    const ay = Math.max(r.top, Math.min(cy, r.bottom));
+    const ang = Math.atan2(ay - cy, ax - cx);
+    const sx = cx + Math.cos(ang) * RR, sy = cy + Math.sin(ang) * RR;
+    ctx.strokeStyle = rgba(NODE, 0.13);
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(sx, sy);
+    ctx.lineTo(ax, ay);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(ax, ay, 2.5, 0, Math.PI * 2);
+    ctx.fillStyle = rgba(NODE, 0.45);
+    ctx.shadowColor = rgba(NODE, 0.7);
+    ctx.shadowBlur = 6;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    const pt = (t * 0.45 + ang) % 1;
+    ctx.beginPath();
+    ctx.arc(sx + (ax - sx) * pt, sy + (ay - sy) * pt, 1.8, 0, Math.PI * 2);
+    ctx.fillStyle = rgba(NODE, 0.6 * (1 - pt));
+    ctx.fill();
+  }
+
   // answer shockwaves
   for (let i = ripples.length - 1; i >= 0; i--) {
     const rp = ripples[i];
@@ -662,9 +765,21 @@ function setBusy(b: boolean): void {
 }
 
 async function loadPending(): Promise<void> {
+  const m = await window.vault.menu();
+  const tel = document.getElementById('ck-telemetry');
+  if (tel) {
+    const st = (m?.status ?? {}) as { articles?: number; last_compile_ago?: string; ollama_reachable?: boolean };
+    tel.innerHTML = [
+      st.articles != null ? `NOTES ${st.articles}` : '',
+      st.last_compile_ago ? `COMPILED ${esc(st.last_compile_ago)} AGO` : '',
+      `OLLAMA ${st.ollama_reachable ? 'ONLINE' : 'OFFLINE'}`,
+    ]
+      .filter(Boolean)
+      .map((s) => `<span>${s}</span>`)
+      .join('<span class="ck-tel-sep">//</span>');
+  }
   const el = document.getElementById('ck-pending-list');
   if (!el) return;
-  const m = await window.vault.menu();
   const items = (m?.suggestions ?? []).slice(0, 5);
   el.innerHTML = '';
   if (items.length === 0) {
