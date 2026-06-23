@@ -4,7 +4,6 @@
 // entrance, and hover that lights the whole path to the root. Pan/zoom, click an
 // entry → Obsidian, a type → focus.
 import './index.css';
-import { marked } from 'marked';
 
 const TYPE_COLOR: Record<string, [number, number, number]> = {
   person: [224, 82, 176], project: [26, 184, 200], concept: [148, 132, 240],
@@ -29,7 +28,7 @@ function fmtAgo(ms: number): string {
 
 type Entry = { title: string; file: string; type: string; mtimeMs: number };
 type GNode = {
-  id: string; kind: 'root' | 'type' | 'entry'; label: string; type: string; file?: string;
+  id: string; kind: 'root' | 'type' | 'entry'; label: string; sub: string; type: string; file?: string;
   x: number; y: number; w: number; h: number; color: [number, number, number]; parent?: GNode; mtime?: number;
 };
 
@@ -52,13 +51,13 @@ let nodes: GNode[] = [];
 const edges: [GNode, GNode][] = [];
 let vaultName = '';
 
-const ENTRIES_PER_TYPE = 9;
-const X_ROOT = -480, X_TYPE = -110, X_ENTRY = 250;
-const H_ROOT = 38, H_TYPE = 32, H_ENTRY = 27, ROW = 13;
-const fontFor = (k: GNode['kind']) => (k === 'root' ? '700 14px' : k === 'type' ? '700 13px' : '500 11.5px');
+const ENTRIES_PER_TYPE = 7;
+const X_ROOT = -520, X_TYPE = -150, X_ENTRY = 250;
+const H_ROOT = 48, H_TYPE = 44, H_ENTRY = 44, ROW = 14;
+const fontFor = (k: GNode['kind']) => (k === 'root' ? '700 14.5px' : k === 'type' ? '700 13.5px' : '600 12px');
 function cardWidth(label: string, kind: GNode['kind']): number {
   ctx.font = `${fontFor(kind)} -apple-system, BlinkMacSystemFont, sans-serif`;
-  return Math.min(kind === 'entry' ? 214 : 170, ctx.measureText(label).width + 30);
+  return Math.max(kind === 'entry' ? 150 : 130, Math.min(kind === 'entry' ? 232 : 190, ctx.measureText(label).width + 50));
 }
 
 async function build(): Promise<void> {
@@ -73,7 +72,7 @@ async function build(): Promise<void> {
   }
   const types = [...byType.entries()].sort((a, b) => b[1].length - a[1].length);
 
-  const root: GNode = { id: 'root', kind: 'root', label: vaultName || 'vault', type: 'root', x: X_ROOT, y: 0, w: cardWidth(vaultName || 'vault', 'root'), h: H_ROOT, color: NODE };
+  const root: GNode = { id: 'root', kind: 'root', label: vaultName || 'vault', sub: `${(v?.articleCount ?? 0).toLocaleString()} notes`, type: 'root', x: X_ROOT, y: 0, w: cardWidth(vaultName || 'vault', 'root'), h: H_ROOT, color: NODE };
   nodes = [root];
   edges.length = 0;
 
@@ -85,13 +84,12 @@ async function build(): Promise<void> {
     const h = Math.max(H_TYPE + ROW, blockH(list.length));
     const cy = cursor + h / 2;
     cursor += h + 32;
-    const tlabel = `${type} · ${list.length}`;
-    const tn: GNode = { id: `t:${type}`, kind: 'type', label: tlabel, type, x: X_TYPE, y: cy, w: cardWidth(tlabel, 'type'), h: H_TYPE, color: colorOf(type), parent: root };
+    const tn: GNode = { id: `t:${type}`, kind: 'type', label: type, sub: `${list.length} ${list.length === 1 ? 'entry' : 'entries'}`, type, x: X_TYPE, y: cy, w: cardWidth(type, 'type'), h: H_TYPE, color: colorOf(type), parent: root };
     nodes.push(tn);
     edges.push([root, tn]);
     list.slice(0, ENTRIES_PER_TYPE).forEach((e, ei, arr) => {
       const en: GNode = {
-        id: `e:${e.file}`, kind: 'entry', label: e.title, type: e.type, file: e.file, mtime: e.mtimeMs,
+        id: `e:${e.file}`, kind: 'entry', label: e.title, sub: fmtAgo(e.mtimeMs), type: e.type, file: e.file, mtime: e.mtimeMs,
         x: X_ENTRY, y: cy + (ei - (arr.length - 1) / 2) * (H_ENTRY + ROW), w: cardWidth(e.title, 'entry'), h: H_ENTRY, color: colorOf(e.type), parent: tn,
       };
       nodes.push(en);
@@ -99,7 +97,7 @@ async function build(): Promise<void> {
     });
   });
 
-  zoom = Math.max(0.55, Math.min(0.85, (H - 140) / Math.max(total, 1)));
+  zoom = Math.max(0.62, Math.min(0.85, (H - 140) / Math.max(total, 1)));
   panX = -((X_ROOT + X_ENTRY) / 2) * zoom;
   panY = 0;
   const tel = document.getElementById('atlas-telemetry');
@@ -124,6 +122,30 @@ function roundRect(x: number, y: number, w: number, h: number, r: number): void 
   ctx.closePath();
 }
 const ease = (r: number) => 1 - Math.pow(1 - Math.max(0, Math.min(1, r)), 3);
+function ellipsize(s: string, maxw: number): string {
+  if (ctx.measureText(s).width <= maxw) return s;
+  let t = s;
+  while (t.length > 1 && ctx.measureText(t + '…').width > maxw) t = t.slice(0, -1);
+  return t + '…';
+}
+function wrapText(s: string, maxw: number, maxLines: number): string[] {
+  const words = s.replace(/\s+/g, ' ').trim().split(' ');
+  const lines: string[] = [];
+  let cur = '';
+  for (const w of words) {
+    const test = cur ? `${cur} ${w}` : w;
+    if (ctx.measureText(test).width > maxw && cur) {
+      lines.push(cur);
+      cur = w;
+      if (lines.length >= maxLines) {
+        lines[maxLines - 1] = ellipsize(lines[maxLines - 1] + '…', maxw);
+        return lines;
+      }
+    } else cur = test;
+  }
+  if (cur && lines.length < maxLines) lines.push(cur);
+  return lines;
+}
 function nodeReveal(n: GNode): number {
   const delay = n.kind === 'root' ? 0 : n.kind === 'type' ? 0.12 : 0.26;
   return ease((reveal - delay) / 0.4);
@@ -254,25 +276,27 @@ function draw(now: number): void {
     ctx.fill();
     // node dot
     ctx.beginPath();
-    ctx.arc(x + 12 * zoom, p.y, 3 * zoom * sc, 0, Math.PI * 2);
+    ctx.arc(x + 13 * zoom, p.y, 3 * zoom * sc, 0, Math.PI * 2);
     ctx.fillStyle = rgba(n.color, a);
     ctx.shadowColor = rgba(n.color, 0.8);
     ctx.shadowBlur = 6;
     ctx.fill();
     ctx.shadowBlur = 0;
-    // label
-    if (h > 12) {
+    // labels: title + sub (box scales with zoom, text stays readable)
+    const pad = 22 * zoom;
+    const maxw = w - pad - 9 * zoom;
+    ctx.textAlign = 'left';
+    if (h > 26) {
       ctx.font = `${fontFor(n.kind)} -apple-system, BlinkMacSystemFont, sans-serif`;
-      ctx.fillStyle = `rgba(${n.kind === 'entry' ? '214,226,244' : '238,244,252'},${(n.kind === 'entry' ? 0.9 : 1) * a})`;
-      ctx.textAlign = 'left';
-      const pad = 20 * zoom;
-      const maxw = w - pad - 9 * zoom;
-      let label = n.label;
-      if (ctx.measureText(label).width > maxw) {
-        while (label.length > 1 && ctx.measureText(label + '…').width > maxw) label = label.slice(0, -1);
-        label += '…';
-      }
-      ctx.fillText(label, x + pad, p.y + 0.5);
+      ctx.fillStyle = `rgba(238,244,252,${a})`;
+      ctx.fillText(ellipsize(n.label, maxw), x + pad, p.y - 6);
+      ctx.font = '500 9.5px -apple-system, BlinkMacSystemFont, sans-serif';
+      ctx.fillStyle = rgba(n.color, 0.85 * a);
+      ctx.fillText(ellipsize(n.sub, maxw), x + pad, p.y + 9);
+    } else if (h > 13) {
+      ctx.font = `${fontFor(n.kind)} -apple-system, BlinkMacSystemFont, sans-serif`;
+      ctx.fillStyle = `rgba(238,244,252,${a})`;
+      ctx.fillText(ellipsize(n.label, maxw), x + pad, p.y + 0.5);
     }
   }
   ctx.textAlign = 'start';
@@ -291,7 +315,7 @@ function draw(now: number): void {
   }
   ctx.globalCompositeOperation = 'source-over';
 
-  positionDetail(); // keep the expanded card glued to its node during pan/zoom
+  drawExpanded(); // the clicked node-card grown into a full card with its preview
   requestAnimationFrame(draw);
 }
 
@@ -316,14 +340,17 @@ window.addEventListener('mouseup', (e) => {
   if (!dragging) return;
   dragging = false;
   if (Math.hypot(e.clientX - downX, e.clientY - downY) < 5) {
+    const r = expandedRect();
+    if (r && e.clientX >= r.x && e.clientX <= r.x + r.w && e.clientY >= r.y && e.clientY <= r.y + r.h) {
+      if (expandedNode?.file) window.vault.openFile(expandedNode.file); // click the expanded card → open
+      return;
+    }
     const n = nodeAt(e.clientX, e.clientY);
-    if (n?.kind === 'entry' && n.file) void showDetail(n);
+    if (n?.kind === 'entry') expandEntry(n);
     else if (n?.kind === 'type') {
       panX = -(n.x * zoom);
       panY = -(n.y * zoom);
-    } else if (!n) {
-      hideDetail();
-    }
+    } else collapse();
   }
 });
 canvas.addEventListener('mousemove', (e) => {
@@ -361,58 +388,113 @@ canvas.addEventListener('wheel', (e) => {
   panY = e.clientY - H / 2 - wy * zoom;
 }, { passive: false });
 
-// ── detail card: click an entry → expand a card with a lazily-loaded preview ──
-const clsOf = (type: string) => type.replace(/[^a-z]/gi, '').toLowerCase() || 'note';
-function renderMd(md: string): string {
-  const wl = md.replace(/\[\[([^\]]+)\]\]/g, (_m, p: string) => esc((p.split('|')[0].split('#')[0].split('/').pop() || p).trim()));
-  return marked.parse(wl, { breaks: true, async: false }) as string;
+// ── expand a node-card IN PLACE on the canvas: click an entry → its card grows
+//    into a full card with a lazily-loaded content preview; click it → Obsidian ──
+let expandedText: string | null = null; // null = loading
+let expandT = 0;
+let expandedLines: string[] = [];
+const EXP_W = 332;
+function cleanMd(s: string): string {
+  return s
+    .replace(/```[\s\S]*?```/g, '')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/\[\[([^\]]+)\]\]/g, (_m, p: string) => p.split('|')[0].split('#')[0].split('/').pop() || p)
+    .replace(/^#{1,6}\s*/gm, '')
+    .replace(/^>\s?/gm, '')
+    .replace(/^[-*]\s/gm, '• ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 }
-let detailFile: string | null = null;
-function hideDetail(): void {
-  detailFile = null;
+function collapse(): void {
   expandedNode = null;
-  const d = document.getElementById('atlas-detail');
-  if (d) d.hidden = true;
+  expandedText = null;
 }
-/** Keep the expanded card glued to its node (it grows from the node's corner). */
-function positionDetail(): void {
-  const d = document.getElementById('atlas-detail') as HTMLElement | null;
-  if (!d || !expandedNode || d.hidden) return;
-  const p = toScreen(expandedNode.x, expandedNode.y);
-  const nodeLeft = p.x - (expandedNode.w * zoom) / 2;
-  const nodeTop = p.y - (expandedNode.h * zoom) / 2;
-  const cw = d.offsetWidth || 360, ch = d.offsetHeight || 300;
-  d.style.right = 'auto';
-  d.style.left = `${Math.max(14, Math.min(nodeLeft, W - cw - 14))}px`;
-  d.style.top = `${Math.max(54, Math.min(nodeTop, H - ch - 14))}px`;
-}
-async function showDetail(n: GNode): Promise<void> {
+function expandEntry(n: GNode): void {
   if (!n.file) return;
-  const d = document.getElementById('atlas-detail');
-  const badge = document.getElementById('ad-badge');
-  const title = document.getElementById('ad-title');
-  const body = document.getElementById('ad-body');
-  if (!d || !badge || !title || !body) return;
-  detailFile = n.file;
+  if (expandedNode === n) {
+    collapse();
+    return;
+  } // toggle
   expandedNode = n;
-  badge.className = `type-badge t-${clsOf(n.type)}`;
-  badge.textContent = n.type;
-  title.textContent = n.label;
-  body.innerHTML = '<span class="ad-loading">Loading…</span>';
-  (d as HTMLElement).style.setProperty('--accent', rgba(n.color, 0.5));
-  d.hidden = false;
-  positionDetail();
-  const text = await window.vault.preview(n.file); // lazy — only fetched on click
-  if (detailFile !== n.file) return; // a newer click superseded this one
-  body.innerHTML = text ? renderMd(text) : '<span class="ad-loading">No preview available.</span>';
-  positionDetail();
+  expandedText = null;
+  expandT = 0;
+  const file = n.file;
+  void window.vault.preview(file).then((tx) => {
+    if (expandedNode?.file === file) expandedText = cleanMd(tx) || '(no content)';
+  });
 }
-document.getElementById('ad-close')?.addEventListener('click', hideDetail);
-document.getElementById('ad-open')?.addEventListener('click', () => {
-  if (detailFile) window.vault.openFile(detailFile);
-});
+function expandedRect(): { x: number; y: number; w: number; h: number } | null {
+  if (!expandedNode) return null;
+  const h = 60 + expandedLines.length * 17 + 28;
+  const p = toScreen(expandedNode.x, expandedNode.y);
+  let x = p.x - (expandedNode.w * zoom) / 2;
+  let y = p.y - (expandedNode.h * zoom) / 2;
+  x = Math.max(16, Math.min(x, W - EXP_W - 16));
+  y = Math.max(54, Math.min(y, H - h - 16));
+  return { x, y, w: EXP_W, h };
+}
+function drawExpanded(): void {
+  if (!expandedNode) return;
+  expandT += (1 - expandT) * 0.2;
+  const n = expandedNode;
+  ctx.font = '400 12.5px -apple-system, BlinkMacSystemFont, sans-serif';
+  expandedLines = expandedText === null ? ['Loading…'] : wrapText(expandedText, EXP_W - 32, 11);
+  const r = expandedRect()!;
+  ctx.save();
+  ctx.globalAlpha = Math.min(1, expandT * 1.3);
+  ctx.translate(r.x, r.y);
+  const sc = 0.9 + 0.1 * expandT;
+  ctx.scale(sc, sc);
+  // body
+  roundRect(0, 0, r.w, r.h, 12);
+  ctx.shadowColor = 'rgba(0,0,0,0.55)';
+  ctx.shadowBlur = 34;
+  ctx.fillStyle = 'rgba(13,21,40,0.98)';
+  ctx.fill();
+  ctx.shadowBlur = 0;
+  roundRect(0, 0, 3.5, r.h, 12);
+  ctx.fillStyle = rgba(n.color, 1);
+  ctx.fill();
+  roundRect(0, 0, r.w, r.h, 12);
+  ctx.strokeStyle = rgba(n.color, 0.55);
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  // type chip
+  ctx.font = '700 9px ui-monospace, monospace';
+  const chip = n.type.toUpperCase();
+  const chipW = ctx.measureText(chip).width + 14;
+  roundRect(16, 15, chipW, 16, 4);
+  ctx.fillStyle = rgba(n.color, 0.18);
+  ctx.fill();
+  ctx.fillStyle = rgba(n.color, 1);
+  ctx.fillText(chip, 23, 23.5);
+  // title
+  ctx.font = '700 14px -apple-system, BlinkMacSystemFont, sans-serif';
+  ctx.fillStyle = '#eef4fc';
+  ctx.fillText(ellipsize(n.label, r.w - 32), 16, 45);
+  // divider
+  ctx.strokeStyle = rgba(n.color, 0.22);
+  ctx.beginPath();
+  ctx.moveTo(16, 56);
+  ctx.lineTo(r.w - 16, 56);
+  ctx.stroke();
+  // body lines
+  ctx.font = '400 12.5px -apple-system, BlinkMacSystemFont, sans-serif';
+  ctx.fillStyle = 'rgba(214,226,244,0.82)';
+  expandedLines.forEach((ln, i) => ctx.fillText(ln, 16, 56 + 16 + i * 17));
+  // footer hint
+  ctx.font = '600 9.5px ui-monospace, monospace';
+  ctx.fillStyle = rgba(n.color, 0.7);
+  ctx.fillText('CLICK TO OPEN IN OBSIDIAN ↗', 16, r.h - 13);
+  ctx.restore();
+  ctx.globalAlpha = 1;
+  ctx.textBaseline = 'alphabetic';
+}
 window.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') hideDetail();
+  if (e.key === 'Escape') collapse();
 });
 
 function renderLegend(): void {
