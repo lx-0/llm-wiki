@@ -189,6 +189,21 @@ body.cockpit {
 .ck-recent-row:hover { background: rgba(255,255,255,0.08); }
 .ck-recent-title { flex: 1; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
+.ck-pending { left: 22px; top: 72px; width: 256px; max-height: 52vh; overflow-y: auto; display: flex; flex-direction: column; }
+.ck-pending-row { display: flex; align-items: center; gap: 8px; padding: 7px 2px; }
+.ck-pending-row + .ck-pending-row { border-top: 0.5px solid rgba(255,255,255,0.08); }
+.ck-pending-label { flex: 1; font-size: 12px; color: #cdd8ea; line-height: 1.3; }
+.ck-run {
+  margin: 0; font: inherit; font-size: 11px; font-weight: 600; padding: 3px 11px; border-radius: 8px;
+  border: 0.5px solid rgba(255,255,255,0.16); background: rgba(255,255,255,0.08); color: #e2e8f0; cursor: pointer; flex: none;
+}
+.ck-run:hover:not(:disabled) { background: rgba(125,211,252,0.25); }
+.ck-run:disabled { opacity: 0.4; cursor: default; }
+.ck-empty { font-size: 12px; color: #93a4bd; padding: 6px 0; }
+.ck-update { width: 100%; margin-top: 11px; }
+.ck-types { margin-top: 13px; display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; pointer-events: none; }
+.ck-type-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: #cdd8ea; font-variant-numeric: tabular-nums; }
+
 .ck-ask { left: 50%; transform: translateX(-50%); bottom: 30px; width: min(600px, 84vw); display: flex; flex-wrap: wrap; gap: 9px; }
 #ck-input {
   flex: 1; min-width: 0; font: inherit; font-size: 14px; padding: 11px 16px; border-radius: 12px;
