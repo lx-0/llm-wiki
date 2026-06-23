@@ -90,7 +90,10 @@ function genStars(): void {
   stars = Array.from({ length: 90 }, () => ({ x: Math.random() * W, y: Math.random() * H, a: 0.05 + Math.random() * 0.22, tw: Math.random() * Math.PI * 2 }));
 }
 function resize(): void {
-  const dpr = window.devicePixelRatio || 1;
+  // Cap the device-pixel-ratio: on a retina display rendering at 2× means 4× the
+  // pixels for the (soft) glow fills. 1.5× is visually indistinguishable here but
+  // ~44% less fill work.
+  const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
   W = canvas.clientWidth || window.innerWidth;
   H = canvas.clientHeight || window.innerHeight;
   canvas.width = Math.round(W * dpr);
@@ -219,26 +222,25 @@ function draw(now: number): void {
     ctx.fillRect(0, 0, W, H);
   }
 
-  // glow halo (layered)
-  for (let i = 0; i < 3; i++) {
-    const r = radius * (2.5 - i * 0.5);
-    const a = (0.14 + energy * 0.09) - i * 0.035;
-    const g = ctx.createRadialGradient(cx + Math.sin(t * 0.7) * 8, cy + Math.cos(t * 0.5) * 6, 0, cx, cy, r);
-    g.addColorStop(0, rgba(glowC, a));
-    g.addColorStop(0.3, rgba(glowC, a * 0.5));
-    g.addColorStop(0.6, rgba(glowC, a * 0.18));
-    g.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, W, H);
-  }
-  // breathing hot core
+  // glow halo — one multi-stop radial (was 3 stacked full-screen fills)
+  const HR = radius * 2.5;
+  const ha = 0.17 + energy * 0.1;
+  const g = ctx.createRadialGradient(cx + Math.sin(t * 0.7) * 8, cy + Math.cos(t * 0.5) * 6, 0, cx, cy, HR);
+  g.addColorStop(0, rgba(glowC, ha));
+  g.addColorStop(0.16, rgba(glowC, ha * 0.62));
+  g.addColorStop(0.36, rgba(glowC, ha * 0.3));
+  g.addColorStop(0.62, rgba(glowC, ha * 0.1));
+  g.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
+  // breathing hot core — fill only its bounding box, not the whole screen
   const blobR = radius * (0.5 + Math.sin(t * 1.1) * 0.07);
   const gb = ctx.createRadialGradient(cx + Math.sin(t * 0.6) * 14, cy + Math.cos(t * 0.8) * 11, 0, cx, cy, blobR);
   gb.addColorStop(0, rgba(glowC, 0.26 + Math.sin(t * 1.5) * 0.05 + energy * 0.1));
   gb.addColorStop(0.45, rgba(glowC, 0.14));
   gb.addColorStop(1, 'rgba(0,0,0,0)');
   ctx.fillStyle = gb;
-  ctx.fillRect(0, 0, W, H);
+  ctx.fillRect(cx - blobR - 24, cy - blobR - 24, blobR * 2 + 48, blobR * 2 + 48);
 
   // inner crystal (painter-sorted faces)
   inner.faces
@@ -309,7 +311,7 @@ function draw(now: number): void {
   pulseAccum += dt;
   if (pulseAccum > 0.16 - energy * 0.11) {
     pulseAccum = 0;
-    if (pulses.length < 40) pulses.push({ edge: Math.floor(Math.random() * outer.edges.length), t: 0, speed: 0.8 + Math.random() * 1.0 });
+    if (pulses.length < 24) pulses.push({ edge: Math.floor(Math.random() * outer.edges.length), t: 0, speed: 0.8 + Math.random() * 1.0 });
   }
   for (let i = pulses.length - 1; i >= 0; i--) {
     const p = pulses[i];
@@ -474,19 +476,27 @@ function draw(now: number): void {
   ctx.arc(cx, cy, RR * 0.72, 0, Math.PI * 2);
   ctx.stroke();
   ctx.restore();
-  // tick gauge
+  // tick gauge — batched into 2 strokes (minor + major) instead of 80
   const TK = 80;
+  ctx.lineWidth = 0.7;
+  ctx.strokeStyle = rgba(NODE, 0.12);
+  ctx.beginPath();
   for (let i = 0; i < TK; i++) {
+    if (i % 10 === 0) continue;
     const a = (i / TK) * Math.PI * 2 + t * 0.06;
-    const major = i % 10 === 0;
-    const r1 = RR * 0.97, r2 = RR * (major ? 0.88 : 0.92);
-    ctx.strokeStyle = rgba(NODE, major ? 0.3 : 0.12);
-    ctx.lineWidth = major ? 1.4 : 0.7;
-    ctx.beginPath();
-    ctx.moveTo(cx + Math.cos(a) * r2, cy + Math.sin(a) * r2);
-    ctx.lineTo(cx + Math.cos(a) * r1, cy + Math.sin(a) * r1);
-    ctx.stroke();
+    ctx.moveTo(cx + Math.cos(a) * RR * 0.92, cy + Math.sin(a) * RR * 0.92);
+    ctx.lineTo(cx + Math.cos(a) * RR * 0.97, cy + Math.sin(a) * RR * 0.97);
   }
+  ctx.stroke();
+  ctx.lineWidth = 1.4;
+  ctx.strokeStyle = rgba(NODE, 0.3);
+  ctx.beginPath();
+  for (let i = 0; i < TK; i += 10) {
+    const a = (i / TK) * Math.PI * 2 + t * 0.06;
+    ctx.moveTo(cx + Math.cos(a) * RR * 0.88, cy + Math.sin(a) * RR * 0.88);
+    ctx.lineTo(cx + Math.cos(a) * RR * 0.97, cy + Math.sin(a) * RR * 0.97);
+  }
+  ctx.stroke();
   // rotating broken-arc ring + end nodes
   const AR = RR * 1.28;
   for (let k = 0; k < 3; k++) {
