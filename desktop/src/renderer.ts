@@ -527,6 +527,67 @@ async function runArgs(cmd: string): Promise<void> {
   renderPending();
 }
 
+// --- Sync sources (collectors) ---
+let collectorsLoaded = false;
+let collectorList: { name: string; configured: boolean }[] = [];
+const syncQueue: string[] = [];
+
+async function loadCollectors(): Promise<void> {
+  if (collectorsLoaded) return;
+  collectorsLoaded = true;
+  collectorList = await window.vault.collectors();
+  renderSources();
+}
+
+function renderSources(): void {
+  const el = document.getElementById('sources-list');
+  if (!el) return;
+  if (collectorList.length === 0) {
+    el.innerHTML = `<div class="adv-row"><span class="adv-label">No sources found<span class="adv-hint">configure collectors first</span></span></div>`;
+    return;
+  }
+  const configured = collectorList.filter((c) => c.configured);
+  el.innerHTML = '';
+  if (configured.length > 1) {
+    const row = document.createElement('div');
+    row.className = 'adv-row';
+    row.innerHTML = `<span class="adv-label">Sync all<span class="adv-hint">${configured.length} configured</span></span>`;
+    const b = document.createElement('button');
+    b.className = 'ghost';
+    b.textContent = syncQueue.length ? '…' : 'Sync all';
+    b.disabled = engineBusy();
+    b.addEventListener('click', () => syncAll());
+    row.appendChild(b);
+    el.appendChild(row);
+  }
+  for (const c of configured) {
+    const id = `collect ${c.name} --incremental`;
+    const row = document.createElement('div');
+    row.className = 'adv-row';
+    row.innerHTML = `<span class="adv-label">${escapeHtml(c.name)}</span>`;
+    if (advancedBusy === id) {
+      row.appendChild(runningIndicator());
+    } else {
+      const b = document.createElement('button');
+      b.className = 'ghost';
+      b.textContent = 'Sync';
+      b.disabled = engineBusy();
+      b.addEventListener('click', () => void runArgs(id));
+      row.appendChild(b);
+    }
+    el.appendChild(row);
+  }
+}
+
+function syncAll(): void {
+  if (engineBusy()) return;
+  const names = collectorList.filter((c) => c.configured).map((c) => c.name);
+  if (!names.length) return;
+  syncQueue.length = 0;
+  syncQueue.push(...names);
+  void runArgs(`collect ${syncQueue.shift()} --incremental`);
+}
+
 // --- Add to wiki (ingest a link) -------------------------------------------
 function syncAddBtn(): void {
   const b = document.getElementById('add-btn') as HTMLButtonElement | null;
@@ -655,6 +716,9 @@ window.addEventListener('DOMContentLoaded', () => {
   new ResizeObserver(fit).observe(document.body);
   // Explicit fit on every disclosure expand/collapse (belt-and-suspenders vs the observer).
   document.querySelectorAll('details').forEach((d) => d.addEventListener('toggle', fit));
+  document.getElementById('sources')?.addEventListener('toggle', (e) => {
+    if ((e.target as HTMLDetailsElement).open) void loadCollectors(); // lazy — spawns the CLI
+  });
   fit();
 
   window.panel.onVisibility((v) => {
@@ -708,6 +772,7 @@ window.addEventListener('DOMContentLoaded', () => {
     renderPending();
     renderAdvanced();
     renderHealth();
+    renderSources();
     if (addingId === id) renderAddStatus();
   });
 
@@ -722,6 +787,9 @@ window.addEventListener('DOMContentLoaded', () => {
     void loadDoctor(); // refresh health + update-available (esp. after `update`)
     void loadMenu(); // the pending list shrinks as work gets done
     if (id === 'update' || id === 'dedup') void renderStatus();
+    renderSources();
+    // sync-all: when one collector finishes, kick off the next queued one
+    if (syncQueue.length) void runArgs(`collect ${syncQueue.shift()} --incremental`);
     if (id === addingId) {
       addingId = null;
       addState = result.ok ? 'done' : 'failed';

@@ -21,13 +21,14 @@ export interface CompileProgress {
 
 /** Engine commands the app can run (besides compile). Safe + $0 where possible:
  *  `--suggest-only` dedup (no destructive merge), `--structural-only` lint ($0). */
-export type EngineCommandId = 'update' | 'lint' | 'links' | 'dedup' | 'review';
+export type EngineCommandId = 'update' | 'lint' | 'links' | 'dedup' | 'review' | 'dream';
 export const ENGINE_COMMANDS: Record<EngineCommandId, { args: string[]; label: string }> = {
   update: { args: ['update'], label: 'Update app' },
   lint: { args: ['lint', '--structural-only'], label: 'Check for problems' },
   links: { args: ['links'], label: 'Check links' },
   dedup: { args: ['dedup', '--suggest-only'], label: 'Find duplicate pages' },
   review: { args: ['review-wiki'], label: 'Review quality' },
+  dream: { args: ['dream'], label: 'Refresh entity pages' },
 };
 
 let proc: ChildProcess | null = null;

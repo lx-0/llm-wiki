@@ -5,6 +5,7 @@ import type { CompileResult, CompileStart, CompileProgress, EngineCommandId } fr
 import type { DoctorResult } from './doctor';
 import type { QueryResult } from './query';
 import type { MenuResult } from './menu';
+import type { Collector } from './collectors';
 
 /** Advanced engine actions surfaced behind the "Advanced" disclosure. Renderer-safe
  *  (no node imports) — labels are end-user phrasing, all $0 / non-destructive. */
@@ -13,11 +14,13 @@ export const ADVANCED_COMMANDS: { id: Exclude<EngineCommandId, 'update'>; label:
   { id: 'links', label: 'Check links', hint: 'Find broken links' },
   { id: 'dedup', label: 'Find duplicates', hint: 'Suggest merges (no changes)' },
   { id: 'review', label: 'Review quality', hint: 'Local quality pass' },
+  { id: 'dream', label: 'Refresh entity pages', hint: 'Re-synthesize people/projects ($)' },
 ];
 
 export const VAULT_STATUS_CHANNEL = 'vault:status';
 export const VAULT_LIST_CHANNEL = 'vault:list';
 export const VAULT_PREVIEW_CHANNEL = 'vault:preview';
+export const VAULT_COLLECTORS_CHANNEL = 'vault:collectors';
 export const VAULT_DOCTOR_CHANNEL = 'vault:doctor';
 export const VAULT_MENU_CHANNEL = 'vault:menu';
 export const VAULT_QUERY_CHANNEL = 'vault:query';
@@ -40,6 +43,8 @@ export interface VaultApi {
   list(): Promise<EntryItem[]>;
   /** Lazy content preview (body snippet) of one entry, by vault-relative path. */
   preview(file: string): Promise<string>;
+  /** Registered substrate collectors (intake sources) from `wiki collect --list`. */
+  collectors(): Promise<Collector[]>;
   /** Open the active vault in Obsidian. */
   openInObsidian(): Promise<{ ok: boolean }>;
   /** Open one vault file (path relative to vault root) in Obsidian. */

@@ -19,10 +19,12 @@ import {
 import { getDoctor } from './vault/doctor';
 import { runQuery } from './vault/query';
 import { getMenu } from './vault/menu';
+import { listCollectors } from './vault/collectors';
 import {
   VAULT_STATUS_CHANNEL,
   VAULT_LIST_CHANNEL,
   VAULT_PREVIEW_CHANNEL,
+  VAULT_COLLECTORS_CHANNEL,
   VAULT_COMPILE_CHANNEL,
   VAULT_COMPILE_STATUS_CHANNEL,
   VAULT_COMPILE_PROGRESS_CHANNEL,
@@ -315,6 +317,7 @@ ipcMain.on(VAULT_OPEN_FDA_CHANNEL, () => {
 // IPC: all knowledge entries (for the Browse window) — system data, fs read.
 ipcMain.handle(VAULT_LIST_CHANNEL, () => listEntries());
 ipcMain.handle(VAULT_PREVIEW_CHANNEL, (_e, file: string) => previewEntry(file));
+ipcMain.handle(VAULT_COLLECTORS_CHANNEL, () => listCollectors());
 
 // IPC: doctor (health + update-available) — one read-only call.
 ipcMain.handle(VAULT_DOCTOR_CHANNEL, () => getDoctor());
