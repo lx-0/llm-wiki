@@ -48,6 +48,7 @@ import {
   APP_OPEN_BROWSE_CHANNEL,
   APP_OPEN_COCKPIT_CHANNEL,
   APP_CLOSE_COCKPIT_CHANNEL,
+  APP_OPEN_ATLAS_CHANNEL,
   APP_ONBOARDING_DONE_CHANNEL,
 } from './app/ipc';
 import fs from 'node:fs';
@@ -189,6 +190,35 @@ function openCockpit(): void {
   }
   cockpitWin.on('closed', () => {
     cockpitWin = null;
+  });
+}
+
+// Atlas window (atlas.html) — hierarchical knowledge-graph view.
+ipcMain.on(APP_OPEN_ATLAS_CHANNEL, () => openAtlas());
+let atlasWin: BrowserWindow | null = null;
+function openAtlas(): void {
+  if (atlasWin && !atlasWin.isDestroyed()) {
+    atlasWin.show();
+    atlasWin.focus();
+    return;
+  }
+  atlasWin = new BrowserWindow({
+    width: 1100,
+    height: 720,
+    minWidth: 760,
+    minHeight: 520,
+    title: 'llm-wiki — Atlas',
+    backgroundColor: '#0b1220',
+    webPreferences: { preload: path.join(__dirname, 'preload.js') },
+  });
+  atlasWin.setMenuBarVisibility(false);
+  if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
+    atlasWin.loadURL(`${MAIN_WINDOW_VITE_DEV_SERVER_URL}/atlas.html`);
+  } else {
+    atlasWin.loadFile(path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/atlas.html`));
+  }
+  atlasWin.on('closed', () => {
+    atlasWin = null;
   });
 }
 

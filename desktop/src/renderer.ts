@@ -625,6 +625,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
   // Header: cockpit (expand) → Cockpit window; browse (magnifier) → Browse; gear → Settings.
   document.getElementById('cockpit-btn')?.addEventListener('click', () => window.app.openCockpit());
+  document.getElementById('atlas-btn')?.addEventListener('click', () => window.app.openAtlas());
   document.getElementById('browse-btn')?.addEventListener('click', () => window.app.openBrowse());
   document.getElementById('settings-btn')?.addEventListener('click', () => window.app.openSettings());
   document.getElementById('quit')?.addEventListener('click', () => window.app.quit());

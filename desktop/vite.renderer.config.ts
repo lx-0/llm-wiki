@@ -13,6 +13,7 @@ export default defineConfig({
         onboarding: resolve(__dirname, 'onboarding.html'),
         browse: resolve(__dirname, 'browse.html'),
         cockpit: resolve(__dirname, 'cockpit.html'),
+        atlas: resolve(__dirname, 'atlas.html'),
       },
     },
   },
