@@ -110,6 +110,7 @@ async function build(): Promise<void> {
 let zoom = 0.6, panX = 0, panY = 0;
 let reveal = 0;
 let hover: GNode | null = null;
+let expandedNode: GNode | null = null; // entry whose card is expanded in place
 const toScreen = (x: number, y: number) => ({ x: W / 2 + x * zoom + panX, y: H / 2 + y * zoom + panY });
 
 function roundRect(x: number, y: number, w: number, h: number, r: number): void {
@@ -127,22 +128,22 @@ function nodeReveal(n: GNode): number {
   const delay = n.kind === 'root' ? 0 : n.kind === 'type' ? 0.12 : 0.26;
   return ease((reveal - delay) / 0.4);
 }
-function activeSet(): Set<GNode> | null {
-  if (!hover) return null;
+function activeSet(focus: GNode | null): Set<GNode> | null {
+  if (!focus) return null;
   const s = new Set<GNode>();
-  let n: GNode | undefined = hover;
+  let n: GNode | undefined = focus;
   while (n) {
     s.add(n);
     n = n.parent;
   }
-  for (const m of nodes) if (m.parent === hover) s.add(m);
+  for (const m of nodes) if (m.parent === focus) s.add(m);
   return s;
 }
 
 function draw(now: number): void {
   reveal = Math.min(1.4, reveal + 0.012);
   const t = now / 1000;
-  const active = activeSet();
+  const active = activeSet(hover || expandedNode);
   ctx.clearRect(0, 0, W, H);
 
   // ── backdrop: blueprint grid (screen) + nebula + starfield ──
@@ -290,6 +291,7 @@ function draw(now: number): void {
   }
   ctx.globalCompositeOperation = 'source-over';
 
+  positionDetail(); // keep the expanded card glued to its node during pan/zoom
   requestAnimationFrame(draw);
 }
 
@@ -368,8 +370,21 @@ function renderMd(md: string): string {
 let detailFile: string | null = null;
 function hideDetail(): void {
   detailFile = null;
+  expandedNode = null;
   const d = document.getElementById('atlas-detail');
   if (d) d.hidden = true;
+}
+/** Keep the expanded card glued to its node (it grows from the node's corner). */
+function positionDetail(): void {
+  const d = document.getElementById('atlas-detail') as HTMLElement | null;
+  if (!d || !expandedNode || d.hidden) return;
+  const p = toScreen(expandedNode.x, expandedNode.y);
+  const nodeLeft = p.x - (expandedNode.w * zoom) / 2;
+  const nodeTop = p.y - (expandedNode.h * zoom) / 2;
+  const cw = d.offsetWidth || 360, ch = d.offsetHeight || 300;
+  d.style.right = 'auto';
+  d.style.left = `${Math.max(14, Math.min(nodeLeft, W - cw - 14))}px`;
+  d.style.top = `${Math.max(54, Math.min(nodeTop, H - ch - 14))}px`;
 }
 async function showDetail(n: GNode): Promise<void> {
   if (!n.file) return;
@@ -379,14 +394,18 @@ async function showDetail(n: GNode): Promise<void> {
   const body = document.getElementById('ad-body');
   if (!d || !badge || !title || !body) return;
   detailFile = n.file;
+  expandedNode = n;
   badge.className = `type-badge t-${clsOf(n.type)}`;
   badge.textContent = n.type;
   title.textContent = n.label;
   body.innerHTML = '<span class="ad-loading">Loading…</span>';
+  (d as HTMLElement).style.setProperty('--accent', rgba(n.color, 0.5));
   d.hidden = false;
+  positionDetail();
   const text = await window.vault.preview(n.file); // lazy — only fetched on click
   if (detailFile !== n.file) return; // a newer click superseded this one
   body.innerHTML = text ? renderMd(text) : '<span class="ad-loading">No preview available.</span>';
+  positionDetail();
 }
 document.getElementById('ad-close')?.addEventListener('click', hideDetail);
 document.getElementById('ad-open')?.addEventListener('click', () => {
