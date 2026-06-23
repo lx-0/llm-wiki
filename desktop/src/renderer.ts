@@ -623,7 +623,8 @@ window.addEventListener('DOMContentLoaded', () => {
     void window.vault.openInObsidian();
   });
 
-  // Header: browse (magnifier) → Browse window; gear → Settings; footer Quit.
+  // Header: cockpit (expand) → Cockpit window; browse (magnifier) → Browse; gear → Settings.
+  document.getElementById('cockpit-btn')?.addEventListener('click', () => window.app.openCockpit());
   document.getElementById('browse-btn')?.addEventListener('click', () => window.app.openBrowse());
   document.getElementById('settings-btn')?.addEventListener('click', () => window.app.openSettings());
   document.getElementById('quit')?.addEventListener('click', () => window.app.quit());

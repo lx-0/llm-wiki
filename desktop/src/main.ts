@@ -46,6 +46,8 @@ import {
   APP_QUIT_CHANNEL,
   APP_OPEN_SETTINGS_CHANNEL,
   APP_OPEN_BROWSE_CHANNEL,
+  APP_OPEN_COCKPIT_CHANNEL,
+  APP_CLOSE_COCKPIT_CHANNEL,
   APP_ONBOARDING_DONE_CHANNEL,
 } from './app/ipc';
 import fs from 'node:fs';
@@ -157,6 +159,36 @@ function openBrowse(): void {
   }
   browseWin.on('closed', () => {
     browseWin = null;
+  });
+}
+
+// Cockpit window (cockpit.html) — full-window neural-net view, toggle of compact.
+ipcMain.on(APP_OPEN_COCKPIT_CHANNEL, () => openCockpit());
+ipcMain.on(APP_CLOSE_COCKPIT_CHANNEL, () => cockpitWin?.close());
+let cockpitWin: BrowserWindow | null = null;
+function openCockpit(): void {
+  if (cockpitWin && !cockpitWin.isDestroyed()) {
+    cockpitWin.show();
+    cockpitWin.focus();
+    return;
+  }
+  cockpitWin = new BrowserWindow({
+    width: 1040,
+    height: 700,
+    minWidth: 720,
+    minHeight: 520,
+    title: 'llm-wiki — Cockpit',
+    backgroundColor: '#0b1220',
+    webPreferences: { preload: path.join(__dirname, 'preload.js') },
+  });
+  cockpitWin.setMenuBarVisibility(false);
+  if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
+    cockpitWin.loadURL(`${MAIN_WINDOW_VITE_DEV_SERVER_URL}/cockpit.html`);
+  } else {
+    cockpitWin.loadFile(path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/cockpit.html`));
+  }
+  cockpitWin.on('closed', () => {
+    cockpitWin = null;
   });
 }
 

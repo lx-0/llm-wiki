@@ -146,6 +146,71 @@ body.browse { background: var(--win-bg); display: flex; flex-direction: column; 
 .browse-ago { font-size: 11px; color: var(--muted); flex: none; font-variant-numeric: tabular-nums; }
 .browse-more { font-size: 11px; color: var(--muted); text-align: center; padding: 10px; }
 
+/* Cockpit view (cockpit.html) — always dark, neural-net canvas + glass HUD */
+body.cockpit {
+  margin: 0; height: 100vh; overflow: hidden; position: relative;
+  background: radial-gradient(ellipse at 50% 38%, #15233f 0%, #0b1220 68%);
+  color: #e2e8f0; -webkit-font-smoothing: antialiased; user-select: none; cursor: default;
+}
+#cockpit-canvas { position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: 0; display: block; }
+.cockpit > :not(canvas):not(script) { position: absolute; z-index: 1; }
+
+.ck-top { top: 0; left: 0; right: 0; display: flex; align-items: center; justify-content: space-between; padding: 15px 20px; }
+.ck-brand { display: flex; align-items: center; gap: 9px; color: #e2e8f0; }
+.ck-brand .ck-name { font-weight: 700; font-size: 16px; letter-spacing: -0.01em; }
+.ck-vault { font-size: 12px; color: #93a4bd; padding: 2px 9px; background: rgba(255,255,255,0.07); border-radius: 7px; }
+.ck-btn {
+  margin: 0; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer;
+  padding: 7px 14px; border-radius: 9px; border: 0.5px solid rgba(255,255,255,0.16);
+  background: rgba(255,255,255,0.07); color: #e2e8f0; transition: background 0.15s, filter 0.15s;
+}
+.ck-btn:hover { background: rgba(255,255,255,0.14); }
+.ck-btn.primary { background: #0a84ff; border-color: transparent; color: #fff; }
+.ck-btn.primary:hover:not(:disabled) { filter: brightness(1.1); }
+.ck-btn:disabled { opacity: 0.5; cursor: default; }
+
+.ck-center { left: 0; right: 0; top: 60%; text-align: center; pointer-events: none; }
+.ck-stat { font-size: 14px; color: #b9c6da; }
+.ck-stat .ck-big { font-size: 42px; font-weight: 800; letter-spacing: -0.02em; color: #fff; display: block; line-height: 1; margin-bottom: 5px; }
+.ck-health { margin-top: 13px; font-size: 12.5px; }
+.ck-health .ok { color: #34c759; }
+.ck-health .warn { color: #ffd60a; }
+
+.ck-panel {
+  background: rgba(255,255,255,0.05); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+  border: 0.5px solid rgba(255,255,255,0.1); border-radius: 14px; padding: 12px 14px;
+}
+.ck-recent { right: 22px; top: 72px; width: 252px; max-height: 48vh; overflow-y: auto; }
+.ck-panel-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #93a4bd; margin-bottom: 8px; }
+.ck-recent-row {
+  margin: 0; width: 100%; background: none; border: none; color: #e2e8f0; font: inherit; cursor: pointer;
+  display: flex; align-items: center; gap: 8px; padding: 6px 4px; border-radius: 7px; text-align: left;
+}
+.ck-recent-row:hover { background: rgba(255,255,255,0.08); }
+.ck-recent-title { flex: 1; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.ck-ask { left: 50%; transform: translateX(-50%); bottom: 30px; width: min(600px, 84vw); display: flex; flex-wrap: wrap; gap: 9px; }
+#ck-input {
+  flex: 1; min-width: 0; font: inherit; font-size: 14px; padding: 11px 16px; border-radius: 12px;
+  border: 0.5px solid rgba(255,255,255,0.16); background: rgba(255,255,255,0.08); color: #e2e8f0;
+  outline: none; -webkit-user-select: text; user-select: text; backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+}
+#ck-input:focus { border-color: #0a84ff; }
+#ck-input::placeholder { color: #93a4bd; }
+.ck-ask .ck-btn { padding: 11px 18px; }
+.ck-answer {
+  flex-basis: 100%; margin-top: 2px; padding: 14px 16px; border-radius: 12px;
+  background: rgba(255,255,255,0.06); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+  border: 0.5px solid rgba(255,255,255,0.1); font-size: 13px; line-height: 1.5; max-height: 38vh; overflow-y: auto;
+  color: #e2e8f0; -webkit-user-select: text; user-select: text;
+}
+.ck-answer.thinking { color: #93a4bd; font-style: italic; }
+.ck-answer.err { color: #ffd60a; }
+.ck-answer p { margin: 0 0 8px; }
+.ck-answer ul, .ck-answer ol { margin: 0 0 8px; padding-left: 18px; }
+.ck-answer strong { font-weight: 700; color: #fff; }
+.ck-answer > :last-child { margin-bottom: 0; }
+
 /* Card */
 .card {
   background: var(--card);

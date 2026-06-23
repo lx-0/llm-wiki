@@ -30,6 +30,8 @@ import {
   APP_QUIT_CHANNEL,
   APP_OPEN_SETTINGS_CHANNEL,
   APP_OPEN_BROWSE_CHANNEL,
+  APP_OPEN_COCKPIT_CHANNEL,
+  APP_CLOSE_COCKPIT_CHANNEL,
   APP_ONBOARDING_DONE_CHANNEL,
   type AppApi,
 } from './app/ipc';
@@ -70,6 +72,8 @@ const appApi: AppApi = {
   quit: () => ipcRenderer.send(APP_QUIT_CHANNEL),
   openSettings: () => ipcRenderer.send(APP_OPEN_SETTINGS_CHANNEL),
   openBrowse: () => ipcRenderer.send(APP_OPEN_BROWSE_CHANNEL),
+  openCockpit: () => ipcRenderer.send(APP_OPEN_COCKPIT_CHANNEL),
+  closeCockpit: () => ipcRenderer.send(APP_CLOSE_COCKPIT_CHANNEL),
   onboardingDone: () => ipcRenderer.send(APP_ONBOARDING_DONE_CHANNEL),
 };
 
