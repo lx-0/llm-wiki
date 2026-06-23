@@ -588,6 +588,15 @@ function syncAll(): void {
   void runArgs(`collect ${syncQueue.shift()} --incremental`);
 }
 
+// Pending-triage count on the header inbox button.
+async function renderTriageBadge(): Promise<void> {
+  const badge = document.getElementById('triage-badge');
+  if (!badge) return;
+  const n = (await window.vault.triage(false)).length;
+  badge.textContent = n ? String(n) : '';
+  badge.hidden = n === 0;
+}
+
 // --- Add to wiki (ingest a link) -------------------------------------------
 function syncAddBtn(): void {
   const b = document.getElementById('add-btn') as HTMLButtonElement | null;
@@ -688,6 +697,7 @@ window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('cockpit-btn')?.addEventListener('click', () => window.app.openCockpit());
   document.getElementById('atlas-btn')?.addEventListener('click', () => window.app.openAtlas());
   document.getElementById('browse-btn')?.addEventListener('click', () => window.app.openBrowse());
+  document.getElementById('triage-btn')?.addEventListener('click', () => window.app.openTriage());
   document.getElementById('settings-btn')?.addEventListener('click', () => window.app.openSettings());
   document.getElementById('quit')?.addEventListener('click', () => window.app.quit());
 
@@ -709,6 +719,7 @@ window.addEventListener('DOMContentLoaded', () => {
   });
 
   renderAdvanced();
+  void renderTriageBadge();
 
   // Auto-fit the window to content — no scrolling. Fires on any layout change
   // (health/update appearing, advanced expanding, status changes).
@@ -741,6 +752,7 @@ window.addEventListener('DOMContentLoaded', () => {
       void renderVault();
       void loadDoctor(); // health + update-available (read-only, ~seconds)
       void loadMenu(); // what's pending (engine's actionable suggestions)
+      void renderTriageBadge(); // inbox count on the triage button
       window.setTimeout(() => document.getElementById('ask-input')?.focus(), 30); // search-first
     } else if (lastRecentNewest > recentSeenMs) {
       // panel closed → the highlighted-new entries are now "seen"

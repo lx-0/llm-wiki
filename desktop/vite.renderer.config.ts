@@ -14,6 +14,7 @@ export default defineConfig({
         browse: resolve(__dirname, 'browse.html'),
         cockpit: resolve(__dirname, 'cockpit.html'),
         atlas: resolve(__dirname, 'atlas.html'),
+        triage: resolve(__dirname, 'triage.html'),
       },
     },
   },

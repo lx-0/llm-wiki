@@ -20,11 +20,14 @@ import { getDoctor } from './vault/doctor';
 import { runQuery } from './vault/query';
 import { getMenu } from './vault/menu';
 import { listCollectors } from './vault/collectors';
+import { listTriage, triageAction } from './vault/triage';
 import {
   VAULT_STATUS_CHANNEL,
   VAULT_LIST_CHANNEL,
   VAULT_PREVIEW_CHANNEL,
   VAULT_COLLECTORS_CHANNEL,
+  VAULT_TRIAGE_CHANNEL,
+  VAULT_TRIAGE_ACTION_CHANNEL,
   VAULT_COMPILE_CHANNEL,
   VAULT_COMPILE_STATUS_CHANNEL,
   VAULT_COMPILE_PROGRESS_CHANNEL,
@@ -52,6 +55,7 @@ import {
   APP_OPEN_COCKPIT_CHANNEL,
   APP_CLOSE_COCKPIT_CHANNEL,
   APP_OPEN_ATLAS_CHANNEL,
+  APP_OPEN_TRIAGE_CHANNEL,
   APP_ONBOARDING_DONE_CHANNEL,
 } from './app/ipc';
 import fs from 'node:fs';
@@ -225,6 +229,35 @@ function openAtlas(): void {
   });
 }
 
+// Triage — the intent-inbox review window (per-item accept/dismiss).
+let triageWin: BrowserWindow | null = null;
+function openTriage(): void {
+  if (triageWin && !triageWin.isDestroyed()) {
+    triageWin.show();
+    triageWin.focus();
+    return;
+  }
+  triageWin = new BrowserWindow({
+    width: 720,
+    height: 760,
+    minWidth: 480,
+    minHeight: 420,
+    title: 'llm-wiki — Triage',
+    backgroundColor: '#0b1220',
+    webPreferences: { preload: path.join(__dirname, 'preload.js') },
+  });
+  triageWin.setMenuBarVisibility(false);
+  if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
+    triageWin.loadURL(`${MAIN_WINDOW_VITE_DEV_SERVER_URL}/triage.html`);
+  } else {
+    triageWin.loadFile(path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/triage.html`));
+  }
+  triageWin.on('closed', () => {
+    triageWin = null;
+  });
+}
+ipcMain.on(APP_OPEN_TRIAGE_CHANNEL, () => openTriage());
+
 // Settings lives in its own window (settings.html), opened from the header gear.
 let settingsWin: BrowserWindow | null = null;
 function openSettings(): void {
@@ -318,6 +351,8 @@ ipcMain.on(VAULT_OPEN_FDA_CHANNEL, () => {
 ipcMain.handle(VAULT_LIST_CHANNEL, () => listEntries());
 ipcMain.handle(VAULT_PREVIEW_CHANNEL, (_e, file: string) => previewEntry(file));
 ipcMain.handle(VAULT_COLLECTORS_CHANNEL, () => listCollectors());
+ipcMain.handle(VAULT_TRIAGE_CHANNEL, (_e, showAll: boolean) => listTriage(showAll));
+ipcMain.handle(VAULT_TRIAGE_ACTION_CHANNEL, (_e, stem: string, action: 'accept' | 'dismiss') => triageAction(stem, action));
 
 // IPC: doctor (health + update-available) — one read-only call.
 ipcMain.handle(VAULT_DOCTOR_CHANNEL, () => getDoctor());

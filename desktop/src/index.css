@@ -26,6 +26,40 @@
 
 * { box-sizing: border-box; }
 
+/* Triage window — per-item intent-inbox review */
+.triage-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 20px 22px 12px; }
+.triage-title h1 { margin: 0; font-size: 19px; font-weight: 700; color: #e2e8f0; display: flex; align-items: center; gap: 9px; }
+.triage-count { font-size: 12px; font-weight: 700; color: #0b1220; background: #d4a574; border-radius: 10px; padding: 1px 8px; }
+.triage-count:empty { display: none; }
+.triage-sub { margin: 5px 0 0; font-size: 12px; color: #93a4bd; }
+.triage-allbox { font-size: 11px; color: #93a4bd; display: flex; align-items: center; gap: 5px; white-space: nowrap; cursor: pointer; }
+.triage-list { padding: 0 22px 24px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; }
+.triage-card { background: rgba(255,255,255,0.03); border: 0.5px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 13px 15px; }
+.triage-card.resolved { opacity: 0.5; }
+.triage-card-top { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
+.triage-status { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: #93a4bd; }
+.triage-date { margin-left: auto; font-size: 11px; color: #6b7a90; }
+.triage-summary { font-size: 13.5px; line-height: 1.45; color: #e2e8f0; }
+.triage-actions { display: flex; gap: 8px; margin-top: 12px; }
+.triage-accept, .triage-dismiss { border: none; border-radius: 7px; padding: 6px 14px; font-size: 12px; font-weight: 600; cursor: pointer; }
+.triage-accept { background: #2f6f4f; color: #d7f5e4; }
+.triage-accept:hover { background: #38845e; }
+.triage-dismiss { background: rgba(255,255,255,0.06); color: #93a4bd; }
+.triage-dismiss:hover { background: rgba(255,69,58,0.6); color: #fff; }
+.triage-working { font-size: 12px; color: #93a4bd; font-style: italic; }
+.triage-error { margin-top: 8px; font-size: 11.5px; color: #ff9f40; }
+.triage-empty { text-align: center; color: #93a4bd; padding: 64px 20px; }
+.triage-empty-ic { font-size: 34px; color: #34a853; margin-bottom: 8px; }
+.triage-empty p { margin: 0; font-size: 13px; }
+.t-task { background: rgba(26,184,200,0.16); color: #5fd3e0; }
+.t-idea { background: rgba(224,167,44,0.16); color: #e8b94c; }
+.t-note { background: rgba(148,132,240,0.16); color: #b3a7f0; }
+/* header button count badge (inbox/triage) */
+.gear { position: relative; }
+.hdr-badge { position: absolute; top: -3px; right: -3px; min-width: 14px; height: 14px; padding: 0 3px; border-radius: 7px;
+  background: #d4a574; color: #0b1220; font-size: 9px; font-weight: 700; line-height: 14px; text-align: center; }
+.hdr-badge[hidden] { display: none; }
+
 /* No native scrollbars anywhere — scroll still works (trackpad/wheel). */
 ::-webkit-scrollbar { width: 0; height: 0; background: transparent; }
 /* …except a thin, subtle one for the long Browse list. */

@@ -6,6 +6,7 @@ import type { DoctorResult } from './doctor';
 import type { QueryResult } from './query';
 import type { MenuResult } from './menu';
 import type { Collector } from './collectors';
+import type { TriageRecord } from './triage';
 
 /** Advanced engine actions surfaced behind the "Advanced" disclosure. Renderer-safe
  *  (no node imports) — labels are end-user phrasing, all $0 / non-destructive. */
@@ -21,6 +22,8 @@ export const VAULT_STATUS_CHANNEL = 'vault:status';
 export const VAULT_LIST_CHANNEL = 'vault:list';
 export const VAULT_PREVIEW_CHANNEL = 'vault:preview';
 export const VAULT_COLLECTORS_CHANNEL = 'vault:collectors';
+export const VAULT_TRIAGE_CHANNEL = 'vault:triage';
+export const VAULT_TRIAGE_ACTION_CHANNEL = 'vault:triage-action';
 export const VAULT_DOCTOR_CHANNEL = 'vault:doctor';
 export const VAULT_MENU_CHANNEL = 'vault:menu';
 export const VAULT_QUERY_CHANNEL = 'vault:query';
@@ -45,6 +48,10 @@ export interface VaultApi {
   preview(file: string): Promise<string>;
   /** Registered substrate collectors (intake sources) from `wiki collect --list`. */
   collectors(): Promise<Collector[]>;
+  /** Intent-inbox records for triage (read directly). Pending-only unless showAll. */
+  triage(showAll: boolean): Promise<TriageRecord[]>;
+  /** Accept or dismiss one inbox record (`wiki triage <action> <stem>`). */
+  triageAction(stem: string, action: 'accept' | 'dismiss'): Promise<{ ok: boolean; message: string }>;
   /** Open the active vault in Obsidian. */
   openInObsidian(): Promise<{ ok: boolean }>;
   /** Open one vault file (path relative to vault root) in Obsidian. */

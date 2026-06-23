@@ -8,6 +8,8 @@ import {
   VAULT_LIST_CHANNEL,
   VAULT_PREVIEW_CHANNEL,
   VAULT_COLLECTORS_CHANNEL,
+  VAULT_TRIAGE_CHANNEL,
+  VAULT_TRIAGE_ACTION_CHANNEL,
   VAULT_COMPILE_CHANNEL,
   VAULT_COMPILE_STATUS_CHANNEL,
   VAULT_COMPILE_PROGRESS_CHANNEL,
@@ -35,6 +37,7 @@ import {
   APP_OPEN_COCKPIT_CHANNEL,
   APP_CLOSE_COCKPIT_CHANNEL,
   APP_OPEN_ATLAS_CHANNEL,
+  APP_OPEN_TRIAGE_CHANNEL,
   APP_ONBOARDING_DONE_CHANNEL,
   type AppApi,
 } from './app/ipc';
@@ -49,6 +52,8 @@ const vault: VaultApi = {
   list: () => ipcRenderer.invoke(VAULT_LIST_CHANNEL),
   preview: (file) => ipcRenderer.invoke(VAULT_PREVIEW_CHANNEL, file),
   collectors: () => ipcRenderer.invoke(VAULT_COLLECTORS_CHANNEL),
+  triage: (showAll) => ipcRenderer.invoke(VAULT_TRIAGE_CHANNEL, showAll),
+  triageAction: (stem, action) => ipcRenderer.invoke(VAULT_TRIAGE_ACTION_CHANNEL, stem, action),
   openInObsidian: () => ipcRenderer.invoke(VAULT_OPEN_OBSIDIAN_CHANNEL),
   openFile: (file) => ipcRenderer.send(VAULT_OPEN_FILE_CHANNEL, file),
   openFullDiskAccess: () => ipcRenderer.send(VAULT_OPEN_FDA_CHANNEL),
@@ -80,6 +85,7 @@ const appApi: AppApi = {
   openCockpit: () => ipcRenderer.send(APP_OPEN_COCKPIT_CHANNEL),
   closeCockpit: () => ipcRenderer.send(APP_CLOSE_COCKPIT_CHANNEL),
   openAtlas: () => ipcRenderer.send(APP_OPEN_ATLAS_CHANNEL),
+  openTriage: () => ipcRenderer.send(APP_OPEN_TRIAGE_CHANNEL),
   onboardingDone: () => ipcRenderer.send(APP_ONBOARDING_DONE_CHANNEL),
 };
 
