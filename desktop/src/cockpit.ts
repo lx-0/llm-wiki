@@ -729,9 +729,35 @@ async function loadGraph(): Promise<void> {
 }
 
 async function loadTypes(): Promise<void> {
+  const entries = await window.vault.list();
+
+  // ── activity stats: entries touched today / this week + a 7-day sparkline ──
+  const midnight = new Date();
+  midnight.setHours(0, 0, 0, 0);
+  const startToday = midnight.getTime();
+  const now = Date.now();
+  const today = entries.filter((e) => e.mtimeMs >= startToday).length;
+  const week = entries.filter((e) => e.mtimeMs >= now - 7 * 86400e3).length;
+  const buckets = new Array(7).fill(0);
+  for (const e of entries) {
+    const d = new Date(e.mtimeMs);
+    d.setHours(0, 0, 0, 0);
+    const daysAgo = Math.round((startToday - d.getTime()) / 86400e3);
+    if (daysAgo >= 0 && daysAgo < 7) buckets[6 - daysAgo]++;
+  }
+  const max = Math.max(1, ...buckets);
+  const blocks = '▁▂▃▄▅▆▇█';
+  const spark = buckets.map((b) => (b === 0 ? '·' : blocks[Math.min(7, Math.round((b / max) * 7))])).join('');
+  const act = document.getElementById('ck-activity');
+  if (act) {
+    act.innerHTML =
+      `<span class="ck-act-num">+${today}</span> today` +
+      `<span class="ck-act-sep">·</span><span class="ck-act-num">+${week}</span> this week` +
+      `<span class="ck-act-spark" title="entries per day, last 7 days (today right)">${spark}</span>`;
+  }
+
   const el = document.getElementById('ck-types');
   if (!el) return;
-  const entries = await window.vault.list();
   const counts: Record<string, number> = {};
   for (const e of entries) counts[e.type] = (counts[e.type] || 0) + 1;
   el.innerHTML = Object.entries(counts)

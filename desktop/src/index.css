@@ -181,6 +181,12 @@ body.cockpit {
 .ck-health .ok { color: #34c759; }
 .ck-health .warn { color: #ffd60a; }
 
+.ck-activity { margin-top: 9px; display: flex; align-items: center; justify-content: center; gap: 7px;
+  font-family: ui-monospace, 'SF Mono', monospace; font-size: 12px; letter-spacing: 0.03em; color: rgba(226,232,240,0.62); }
+.ck-act-num { color: #7dd3fc; font-weight: 700; }
+.ck-act-sep { color: rgba(125,211,252,0.35); }
+.ck-act-spark { margin-left: 5px; color: #7dd3fc; letter-spacing: 1.5px; text-shadow: 0 0 7px rgba(125,211,252,0.5); }
+
 .ck-panel {
   background: rgba(255,255,255,0.05); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
   border: 0.5px solid rgba(255,255,255,0.1); border-radius: 14px; padding: 12px 14px;
