@@ -68,6 +68,10 @@ let advancedBusy: string | null = null;
 let runProgress: { current: number; total: number } | null = null;
 const advancedResults = new Map<string, boolean>(); // id -> ok
 
+/** "Add to wiki" link-ingest state (runs through the same engine runner). */
+let addingId: string | null = null;
+let addState: 'idle' | 'adding' | 'done' | 'failed' | 'invalid' = 'idle';
+
 function engineBusy(): boolean {
   return compileState === 'running' || advancedBusy !== null;
 }
@@ -212,6 +216,7 @@ function renderRecent(recent: { title: string; file: string; mtimeMs: number }[]
 }
 
 async function renderVault(): Promise<void> {
+  syncAddBtn(); // keep the "Add" button's enabled state in sync with engine busy
   const meta = document.getElementById('vault-meta');
   const box = document.getElementById('vault');
   try {
@@ -447,6 +452,74 @@ async function runArgs(cmd: string): Promise<void> {
   renderPending();
 }
 
+// --- Add to wiki (ingest a link) -------------------------------------------
+function syncAddBtn(): void {
+  const b = document.getElementById('add-btn') as HTMLButtonElement | null;
+  if (b) b.disabled = engineBusy();
+}
+
+function renderAddStatus(): void {
+  const el = document.getElementById('add-status');
+  if (!el) return;
+  if (addState === 'idle') {
+    el.hidden = true;
+    el.innerHTML = '';
+    return;
+  }
+  el.hidden = false;
+  if (addState === 'adding') {
+    const xy = runProgress && runProgress.total > 0 ? ` · ${runProgress.current} of ${runProgress.total}` : '';
+    el.className = 'add-status';
+    el.innerHTML = `<span class="spin" aria-hidden="true"></span><span>Adding…${xy}</span>`;
+  } else if (addState === 'done') {
+    el.className = 'add-status ok';
+    el.textContent = 'Added ✓ — it appears after the next Update.';
+  } else if (addState === 'failed') {
+    el.className = 'add-status err';
+    el.textContent = "Couldn't add that link.";
+  } else {
+    el.className = 'add-status err';
+    el.textContent = 'Paste a web page or YouTube link.';
+  }
+}
+
+async function addToWiki(): Promise<void> {
+  const input = document.getElementById('add-input') as HTMLInputElement | null;
+  if (!input) return;
+  const url = input.value.trim();
+  if (!url) return;
+  if (engineBusy()) {
+    addState = 'adding'; // something else is running; the runner will reject — nudge to wait
+    renderAddStatus();
+    return;
+  }
+  let args: string[] | null = null;
+  if (/(?:youtube\.com|youtu\.be)\//i.test(url)) args = ['ingest-youtube', '--url', url];
+  else if (/^https?:\/\//i.test(url)) args = ['ingest-html', url];
+  if (!args) {
+    addState = 'invalid';
+    renderAddStatus();
+    return;
+  }
+  addingId = args.join(' ');
+  advancedBusy = addingId;
+  runProgress = null;
+  addState = 'adding';
+  input.value = '';
+  renderAddStatus();
+  renderPending();
+  renderAdvanced();
+  renderHealth();
+  void renderVault();
+  const res = await window.vault.runArgs(args);
+  if (!res.started && !res.running) {
+    addingId = null;
+    advancedBusy = null;
+    addState = 'failed';
+    renderAddStatus();
+  }
+}
+
 async function compile(): Promise<void> {
   if (engineBusy()) return;
   const res = await window.vault.compile();
@@ -488,6 +561,12 @@ window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('ask-answer')?.addEventListener('click', (e) => {
     const t = (e.target as HTMLElement).closest('.wl') as HTMLElement | null;
     if (t?.dataset.file) window.vault.openFile(t.dataset.file);
+  });
+
+  // Add to wiki: button + Enter.
+  document.getElementById('add-btn')?.addEventListener('click', () => void addToWiki());
+  document.getElementById('add-input')?.addEventListener('keydown', (e) => {
+    if ((e as KeyboardEvent).key === 'Enter') void addToWiki();
   });
 
   renderAdvanced();
@@ -547,6 +626,7 @@ window.addEventListener('DOMContentLoaded', () => {
     renderPending();
     renderAdvanced();
     renderHealth();
+    if (addingId === id) renderAddStatus();
   });
 
   // Advanced / update / suggestion command finished (pushed from main).
@@ -560,6 +640,15 @@ window.addEventListener('DOMContentLoaded', () => {
     void loadDoctor(); // refresh health + update-available (esp. after `update`)
     void loadMenu(); // the pending list shrinks as work gets done
     if (id === 'update' || id === 'dedup') void renderStatus();
+    if (id === addingId) {
+      addingId = null;
+      addState = result.ok ? 'done' : 'failed';
+      renderAddStatus();
+      window.setTimeout(() => {
+        addState = 'idle';
+        renderAddStatus();
+      }, 6000);
+    }
   });
 
   window.addEventListener('beforeunload', () => {

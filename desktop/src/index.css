@@ -247,6 +247,21 @@ button:disabled { background: rgba(120,120,128,0.3); color: var(--muted); cursor
 .copy.done { color: var(--green); background: rgba(52,199,89,0.15); }
 .clear:hover { background: rgba(255,69,58,0.85); color: #fff; }
 
+/* Add to wiki */
+.add-card { margin-top: 6px; padding: 9px 10px; }
+.add-row { display: flex; gap: 7px; }
+#add-input {
+  flex: 1; min-width: 0; font: inherit; font-size: 12.5px; padding: 6px 10px; border-radius: 8px;
+  border: 0.5px solid var(--card-border); background: var(--card); color: var(--text);
+  -webkit-user-select: text; user-select: text; cursor: text; outline: none;
+}
+#add-input::placeholder { color: var(--muted); }
+#add-input:focus { border-color: var(--blue); }
+.add-row button { margin-left: 0; }
+.add-status { display: flex; align-items: center; gap: 7px; margin-top: 8px; font-size: 11.5px; color: var(--muted); }
+.add-status.ok { color: var(--green); }
+.add-status.err { color: var(--amber); }
+
 /* Recent entries */
 .recent-list { margin-top: 6px; padding: 4px 5px; display: flex; flex-direction: column; }
 .recent-row {
