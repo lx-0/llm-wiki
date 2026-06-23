@@ -60,8 +60,10 @@ const POLL_MS = 5000;
 /** in-flight action per listener id, for instant toggle feedback */
 const pending = new Map<string, 'start' | 'stop'>();
 
-type Doctor = { issues: number; updateAvailable: boolean; updateMessage?: string };
+type DoctorCheck = { id: string; severity: string; message: string; fix?: string; dispatchArgs?: string[] };
+type Doctor = { issues: number; updateAvailable: boolean; updateMessage?: string; checks?: DoctorCheck[] };
 let doctorState: Doctor | null = null;
+let healthExpanded = false;
 /** id of the running engine command (update/advanced), or null. Compile has its own state. */
 let advancedBusy: string | null = null;
 /** [i/total] progress of the running advanced/suggestion command (if it emits any). */
@@ -274,6 +276,19 @@ async function loadDoctor(): Promise<void> {
   renderHealth();
 }
 
+async function fixCheck(args: string[]): Promise<void> {
+  if (engineBusy() || args.length === 0) return;
+  advancedBusy = args.join(' ');
+  runProgress = null;
+  renderHealth();
+  renderAdvanced();
+  renderPending();
+  void renderVault();
+  const res = await window.vault.runArgs(args);
+  if (!res.started && !res.running) advancedBusy = null;
+  renderHealth();
+}
+
 function renderHealth(): void {
   const el = document.getElementById('health');
   if (!el) return;
@@ -282,11 +297,52 @@ function renderHealth(): void {
     return;
   }
   const d = doctorState;
-  const health =
-    d.issues === 0
-      ? `<span class="ok">● Everything healthy</span>`
-      : `<span class="warn">⚠ ${d.issues} ${d.issues === 1 ? 'issue' : 'issues'}</span>`;
-  el.innerHTML = `<div class="health-row">${health}</div>`;
+  el.innerHTML = '';
+
+  const row = document.createElement('div');
+  row.className = 'health-row';
+  if (d.issues === 0) {
+    row.innerHTML = `<span class="ok">● Everything healthy</span>`;
+  } else {
+    row.innerHTML = `<span class="warn">⚠ ${d.issues} ${d.issues === 1 ? 'issue' : 'issues'}</span><span class="chev">${healthExpanded ? '▾' : '▸'}</span>`;
+    row.classList.add('clickable');
+    row.addEventListener('click', () => {
+      healthExpanded = !healthExpanded;
+      renderHealth();
+    });
+  }
+  el.appendChild(row);
+
+  // Expanded: the individual checks, each with a Fix button when runnable.
+  if (d.issues > 0 && healthExpanded) {
+    const list = document.createElement('div');
+    list.className = 'health-list card';
+    for (const c of d.checks ?? []) {
+      const r = document.createElement('div');
+      r.className = 'health-item';
+      const runnable = c.dispatchArgs && c.dispatchArgs.length > 0 && !/auth/.test(c.dispatchArgs.join(' '));
+      const busy = advancedBusy === (c.dispatchArgs?.join(' ') ?? '');
+      r.innerHTML = `<span class="sev sev-${c.severity}"></span><span class="health-msg">${escapeHtml(c.message)}</span>`;
+      if (busy) {
+        r.appendChild(runningIndicator());
+      } else if (runnable) {
+        const b = document.createElement('button');
+        b.className = 'ghost';
+        b.textContent = 'Fix';
+        b.disabled = engineBusy();
+        b.addEventListener('click', () => void fixCheck(c.dispatchArgs as string[]));
+        r.appendChild(b);
+      } else if (c.fix) {
+        const hint = document.createElement('code');
+        hint.className = 'health-fix';
+        hint.textContent = c.fix;
+        r.appendChild(hint);
+      }
+      list.appendChild(r);
+    }
+    el.appendChild(list);
+  }
+
   if (d.updateAvailable) {
     const row = document.createElement('div');
     row.className = 'update-row';

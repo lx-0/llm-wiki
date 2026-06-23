@@ -286,6 +286,16 @@ button:disabled { background: rgba(120,120,128,0.3); color: var(--muted); cursor
 .health .warn { color: var(--amber); }
 .update-row { display: flex; align-items: center; margin-top: 8px; gap: 8px; }
 .update-msg { font-size: 12px; color: var(--blue); font-weight: 500; }
+.health-row.clickable { cursor: pointer; display: inline-flex; align-items: center; }
+.chev { margin-left: 6px; color: var(--muted); font-size: 10px; }
+.health-list { margin-top: 7px; padding: 2px 11px; display: flex; flex-direction: column; }
+.health-item { display: flex; align-items: center; gap: 8px; padding: 7px 0; }
+.health-item + .health-item { border-top: 0.5px solid var(--hairline); }
+.sev { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+.sev-critical { background: var(--red); }
+.sev-warning { background: var(--amber); }
+.health-msg { flex: 1; font-size: 12px; line-height: 1.35; }
+.health-fix { font-size: 10.5px; color: var(--muted); font-family: ui-monospace, 'SF Mono', monospace; flex: none; white-space: nowrap; }
 
 /* Collapsible disclosures (Advanced, Settings) */
 .disclosure { margin-top: 12px; }
