@@ -81,7 +81,8 @@ async function build(): Promise<void> {
     const h = Math.max(H_TYPE + ROW, blockH(list.length));
     const cy = cursor + h / 2;
     cursor += h + 32;
-    const tn: GNode = { id: `t:${type}`, kind: 'type', label: type, sub: `${list.length} ${list.length === 1 ? 'entry' : 'entries'}`, type, x: X_TYPE, y: cy, w: cardWidth(type, 'type'), h: H_TYPE, color: colorOf(type), parent: root, weight: list.length };
+    const wf = list.length / maxWeight; // 0..1 — heavier types become bigger cards (gravity)
+    const tn: GNode = { id: `t:${type}`, kind: 'type', label: type, sub: `${list.length} ${list.length === 1 ? 'entry' : 'entries'}`, type, x: X_TYPE, y: cy, w: cardWidth(type, 'type') * (1 + 0.32 * wf), h: H_TYPE * (1 + 0.42 * wf), color: colorOf(type), parent: root, weight: list.length };
     nodes.push(tn);
     edges.push([root, tn]);
     list.slice(0, ENTRIES_PER_TYPE).forEach((e, ei, arr) => {

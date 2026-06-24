@@ -292,7 +292,7 @@ async function renderVault(): Promise<void> {
           <span class="compile-state ${running ? 'running' : ''}">${compileLine()}</span>
         </div>`;
       const btn = document.createElement('button');
-      btn.className = 'upd-btn';
+      btn.className = 'ghost';
       btn.title = 'Turn newly captured material (notes, voice, screenshots, meetings) into wiki articles. ~1 min; uses AI.';
       btn.textContent = running ? 'Updating…' : 'Update knowledge';
       btn.disabled = engineBusy();
