@@ -1,6 +1,7 @@
 // Browse window — a searchable, type-filterable list of every knowledge entry.
 // Same preload, so window.vault.list() / openFile() are available.
 import './index.css';
+import { fmtAgo } from './lib/time';
 
 type Entry = { title: string; file: string; type: string; mtimeMs: number };
 
@@ -15,16 +16,6 @@ const filtersEl = document.getElementById('browse-filters');
 
 function escapeHtml(s: string): string {
   return s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c] as string);
-}
-
-function fmtAgo(ms: number): string {
-  const s = Math.max(0, (Date.now() - ms) / 1000);
-  if (s < 90) return 'just now';
-  const m = s / 60;
-  if (m < 90) return `${Math.round(m)}m`;
-  const h = m / 60;
-  if (h < 36) return `${Math.round(h)}h`;
-  return `${Math.round(h / 24)}d`;
 }
 
 function renderFilters(): void {
