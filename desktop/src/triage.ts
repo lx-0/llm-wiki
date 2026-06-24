@@ -1,7 +1,8 @@
-// Triage window — the per-item review surface for the intent inbox. Each captured
-// record is a card with a decision (Accept/Keep · Dismiss); the action runs the fast
-// non-interactive `wiki triage <action> <stem>` and the list refreshes. This is the
-// UX pattern for engine commands that need a human decision, not just a run.
+// Triage window — per-item intent-inbox review, reworked from synthetic-user feedback:
+// grouped by type with batch actions (clear the low-stakes bulk in one gesture),
+// type-coloured hierarchy (notes recede, tasks lead), confidence as a colour dot with
+// uncertain items sorted to the top, plain consistent Keep/Dismiss, and the jargon
+// rationale line dropped. Records read directly; actions run `wiki triage <verb> <stem>`.
 import './index.css';
 
 interface Rec {
@@ -15,18 +16,32 @@ interface Rec {
   confidence: string;
 }
 
-function srcInfo(src: string): { sub: string; file: string } {
-  const p = src.split('/');
-  return { sub: p.length >= 2 ? p[p.length - 2] : '', file: p[p.length - 1] || src };
-}
+const TYPES = [
+  { key: 'task', label: 'Tasks', color: '#5fd3e0', hint: 'Keep → becomes a to-do' },
+  { key: 'idea', label: 'Ideas', color: '#e8b94c', hint: 'Keep → filed for reference' },
+  { key: 'note', label: 'Notes', color: '#b3a7f0', hint: 'Keep → filed for reference' },
+];
+const CONF_COLOR: Record<string, string> = { high: '#34d399', medium: '#e8b94c', low: '#fb7185' };
+const CONF_RANK: Record<string, number> = { low: 0, medium: 1, high: 2 };
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 let showAll = false;
 let records: Rec[] = [];
 const busy = new Set<string>();
 const errors = new Map<string, string>();
+const batching = new Map<string, { done: number; total: number }>();
 
 function esc(s: string): string {
   return s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c] as string);
+}
+function srcSub(src: string): string {
+  const p = src.split('/');
+  return p.length >= 2 ? p[p.length - 2] : p[0] || '';
+}
+function fmtDate(d: string): string {
+  const [, m, day] = d.split('-');
+  const mon = MONTHS[Number(m) - 1];
+  return mon ? `${Number(day)} ${mon}` : d;
 }
 
 async function load(): Promise<void> {
@@ -46,57 +61,102 @@ function render(): void {
     return;
   }
   list.innerHTML = '';
-  for (const r of records) {
-    const card = document.createElement('div');
-    card.className = 'triage-card' + (r.status !== 'pending' ? ' resolved' : '');
-    const cls = ['task', 'idea', 'note'].includes(r.type) ? r.type : 'note';
-    const meta = [r.date, r.confidence && `${r.confidence} confidence`].filter(Boolean).join(' · ');
-    card.innerHTML = `
-      <div class="triage-card-top">
-        <span class="type-badge t-${cls}">${esc(r.type)}</span>
-        ${r.status !== 'pending' ? `<span class="triage-status">${esc(r.status)}</span>` : ''}
-        <span class="triage-date">${esc(meta)}</span>
-      </div>
-      <div class="triage-summary">${esc(r.summary)}</div>
-      ${r.detail ? `<div class="triage-detail">${esc(r.detail)}</div>` : ''}`;
-    if (r.source) {
-      const s = srcInfo(r.source);
-      const src = document.createElement('button');
-      src.className = 'triage-source';
-      src.title = `Open ${r.source} in Obsidian`;
-      src.innerHTML = `<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>from <b>${esc(s.sub || 'source')}</b> · ${esc(s.file)}`;
-      src.addEventListener('click', () => window.vault.openFile(r.source));
-      card.appendChild(src);
-    }
-    const err = errors.get(r.stem);
-    if (err) {
-      const e = document.createElement('div');
-      e.className = 'triage-error';
-      e.textContent = err;
-      card.appendChild(e);
-    }
-    if (r.status === 'pending') {
-      const actions = document.createElement('div');
-      actions.className = 'triage-actions';
-      if (busy.has(r.stem)) {
-        actions.innerHTML = `<span class="triage-working">Working…</span>`;
-      } else {
-        const acc = document.createElement('button');
-        acc.className = 'triage-accept';
-        acc.textContent = r.type === 'task' ? 'Accept → task' : 'Keep';
-        acc.title = r.type === 'task' ? 'Move to tasks/ and list in todo.md' : 'File in place (status: accepted)';
-        acc.addEventListener('click', () => void act(r.stem, 'accept'));
-        const dis = document.createElement('button');
-        dis.className = 'triage-dismiss';
-        dis.textContent = 'Dismiss';
-        dis.title = 'Drop as noise (status: dismissed)';
-        dis.addEventListener('click', () => void act(r.stem, 'dismiss'));
-        actions.append(acc, dis);
-      }
-      card.appendChild(actions);
-    }
-    list.appendChild(card);
+  const known = new Set(TYPES.map((t) => t.key));
+  const groups = [...TYPES, { key: 'other', label: 'Other', color: '#93a4bd', hint: '' }];
+  for (const t of groups) {
+    const items = records
+      .filter((r) => (t.key === 'other' ? !known.has(r.type) : r.type === t.key))
+      .sort((a, b) => (CONF_RANK[a.confidence] ?? 1) - (CONF_RANK[b.confidence] ?? 1) || b.stem.localeCompare(a.stem));
+    if (items.length) list.appendChild(renderGroup(t, items));
   }
+}
+
+function renderGroup(t: { key: string; label: string; color: string; hint: string }, items: Rec[]): HTMLElement {
+  const pendingItems = items.filter((r) => r.status === 'pending');
+  const sec = document.createElement('section');
+  sec.className = 'triage-group' + (t.key === 'note' ? ' muted' : '');
+
+  const head = document.createElement('div');
+  head.className = 'triage-group-head';
+  head.innerHTML = `<span class="triage-group-label" style="color:${t.color}"><span class="triage-group-dot" style="background:${t.color}"></span>${t.label}</span><span class="triage-group-count">${pendingItems.length}</span>`;
+  const batch = batching.get(t.key);
+  if (batch) {
+    const p = document.createElement('span');
+    p.className = 'triage-batch-prog';
+    p.textContent = `working ${batch.done}/${batch.total}…`;
+    head.appendChild(p);
+  } else if (pendingItems.length > 1) {
+    const wrap = document.createElement('div');
+    wrap.className = 'triage-batch';
+    const keep = document.createElement('button');
+    keep.className = 'triage-batch-keep';
+    keep.textContent = 'Keep all';
+    keep.addEventListener('click', () => void batchAct(t.key, 'accept'));
+    const dis = document.createElement('button');
+    dis.className = 'triage-batch-dismiss';
+    dis.textContent = 'Dismiss all';
+    dis.addEventListener('click', () => void batchAct(t.key, 'dismiss'));
+    wrap.append(keep, dis);
+    head.appendChild(wrap);
+  }
+  sec.appendChild(head);
+  if (t.hint) {
+    const h = document.createElement('p');
+    h.className = 'triage-group-hint';
+    h.textContent = t.hint;
+    sec.appendChild(h);
+  }
+  for (const r of items) sec.appendChild(renderRow(r, t.color));
+  return sec;
+}
+
+function renderRow(r: Rec, accent: string): HTMLElement {
+  const row = document.createElement('div');
+  row.className = 'triage-row' + (r.status !== 'pending' ? ' resolved' : '');
+  row.style.setProperty('--accent', accent);
+  const cdot = CONF_COLOR[r.confidence] || '#93a4bd';
+  const meta = [r.source && `from ${srcSub(r.source)}`, fmtDate(r.date), r.status !== 'pending' ? r.status : '']
+    .filter(Boolean)
+    .join(' · ');
+  row.innerHTML = `
+    <span class="triage-conf" style="background:${cdot}" title="${esc(r.confidence)} confidence"></span>
+    <div class="triage-main">
+      <div class="triage-summary">${esc(r.summary)}</div>
+      <div class="triage-meta${r.source ? ' clickable' : ''}">${esc(meta)}</div>
+    </div>`;
+  if (r.source) {
+    const m = row.querySelector('.triage-meta') as HTMLElement;
+    m.title = `Open ${r.source} in Obsidian`;
+    m.addEventListener('click', () => window.vault.openFile(r.source));
+  }
+  const err = errors.get(r.stem);
+  if (err) {
+    const e = document.createElement('div');
+    e.className = 'triage-error';
+    e.textContent = err;
+    row.querySelector('.triage-main')?.appendChild(e);
+  }
+  if (r.status === 'pending') {
+    const actions = document.createElement('div');
+    actions.className = 'triage-row-actions';
+    if (busy.has(r.stem) || batching.has(r.type)) {
+      actions.innerHTML = `<span class="triage-working">…</span>`;
+    } else {
+      const keep = document.createElement('button');
+      keep.className = 'triage-accept';
+      keep.textContent = 'Keep';
+      keep.title = r.type === 'task' ? 'Keep → becomes a to-do in todo.md' : 'Keep → filed for reference';
+      keep.addEventListener('click', () => void act(r.stem, 'accept'));
+      const dis = document.createElement('button');
+      dis.className = 'triage-dismiss';
+      dis.textContent = 'Dismiss';
+      dis.title = 'Drop as noise';
+      dis.addEventListener('click', () => void act(r.stem, 'dismiss'));
+      actions.append(keep, dis);
+    }
+    row.appendChild(actions);
+  }
+  return row;
 }
 
 async function act(stem: string, action: 'accept' | 'dismiss'): Promise<void> {
@@ -107,11 +167,36 @@ async function act(stem: string, action: 'accept' | 'dismiss'): Promise<void> {
   const res = await window.vault.triageAction(stem, action);
   busy.delete(stem);
   if (res.ok) {
-    await load(); // record changed status → drops out of the pending list
+    await load();
   } else {
     errors.set(stem, res.message || 'Action failed.');
     render();
   }
+}
+
+async function batchAct(type: string, action: 'accept' | 'dismiss'): Promise<void> {
+  if (batching.has(type)) return;
+  const stems = records.filter((r) => r.type === type && r.status === 'pending').map((r) => r.stem);
+  if (!stems.length) return;
+  const verb = action === 'accept' ? 'Keep' : 'Dismiss';
+  if (!window.confirm(`${verb} all ${stems.length} ${type}${stems.length === 1 ? '' : 's'}?`)) return;
+  batching.set(type, { done: 0, total: stems.length });
+  render();
+  let i = 0;
+  const worker = async (): Promise<void> => {
+    while (i < stems.length) {
+      const stem = stems[i++];
+      await window.vault.triageAction(stem, action);
+      const b = batching.get(type);
+      if (b) {
+        b.done++;
+        render();
+      }
+    }
+  };
+  await Promise.all([worker(), worker(), worker()]); // small pool — gentle on uv spawns
+  batching.delete(type);
+  await load();
 }
 
 document.getElementById('triage-all')?.addEventListener('change', (e) => {
