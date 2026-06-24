@@ -9,6 +9,16 @@ export interface PendingSuggestion {
   cmd: string;
 }
 
+/** A plain action verb for the button, so it's not a bare "Run what?". */
+export function pendingVerb(cmd: string): string {
+  const verb = cmd.trim().split(/\s+/)[0];
+  const map: Record<string, string> = {
+    compile: 'Add', 'process-inbox': 'Sort', dream: 'Refresh', 'dream-entity': 'Refresh',
+    dedup: 'Review', links: 'Fix', lint: 'Check', 'review-wiki': 'Review', curiosity: 'Explore', flush: 'Save',
+  };
+  return map[verb] ?? 'Run';
+}
+
 export function friendlyPending(s: PendingSuggestion): string {
   const n = s.count || 0;
   const plural = (one: string, many: string) => (n === 1 ? one : many);

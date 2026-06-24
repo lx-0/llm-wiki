@@ -452,6 +452,13 @@ body.cockpit {
 .vault-yield:empty { display: none; }
 .vault-yield b { color: #cfe0f5; font-weight: 700; }
 .vy-mark { color: #a78bfa; margin-right: 4px; }
+/* one-time nav hint (new users skip the unlabeled header icons) */
+.nav-hint { display: flex; align-items: center; gap: 10px; margin: 0 0 12px; padding: 9px 12px; border-radius: 10px;
+  background: rgba(167,139,250,0.10); border: 0.5px solid rgba(167,139,250,0.22); font-size: 11.5px; color: #c7cfdc; line-height: 1.4; }
+.nav-hint[hidden] { display: none; }
+.nav-hint b { color: #e6edf6; font-weight: 600; }
+.nav-hint-x { flex: none; font-size: 11px; font-weight: 600; color: #b3a7f0; background: rgba(167,139,250,0.16); border: none; border-radius: 7px; padding: 5px 11px; cursor: pointer; }
+.nav-hint-x:hover { background: rgba(167,139,250,0.28); }
 .compile-state { font-size: 11px; color: var(--muted); }
 .compile-state.running { color: var(--blue); font-weight: 500; }
 .muted { color: var(--muted); }

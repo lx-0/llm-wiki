@@ -15,16 +15,16 @@
         </svg>
         <span class="brand">llm-wiki</span>
         <span id="vault-meta" class="vault-meta"></span>
-        <button id="cockpit-btn" class="gear" title="Cockpit view" aria-label="Cockpit">
+        <button id="cockpit-btn" class="gear" title="Dashboard — your knowledge at a glance" aria-label="Dashboard">
           <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7 7"/><path d="M3 21l7-7"/></svg>
         </button>
-        <button id="atlas-btn" class="gear" title="Atlas view" aria-label="Atlas">
+        <button id="atlas-btn" class="gear" title="Map — how your notes connect" aria-label="Map">
           <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="6" r="2.2"/><circle cx="5" cy="18" r="2.2"/><circle cx="18" cy="12" r="2.2"/><path d="M7 7l9 4M7 17l9-4"/></svg>
         </button>
-        <button id="browse-btn" class="gear" title="Browse entries" aria-label="Browse">
+        <button id="browse-btn" class="gear" title="Browse all your notes" aria-label="Browse">
           <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
         </button>
-        <button id="triage-btn" class="gear" title="Triage inbox" aria-label="Triage">
+        <button id="triage-btn" class="gear" title="Sort new captures" aria-label="Sort captures">
           <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
           <span id="triage-badge" class="hdr-badge" hidden></span>
         </button>
@@ -38,6 +38,10 @@
       </div>
     </div>
     <main class="body-scroll">
+      <div id="nav-hint" class="nav-hint" hidden>
+        <span>↑ The icons above open your <b>Dashboard</b>, <b>Map</b>, all your <b>Notes</b>, and the <b>captures to sort</b>.</span>
+        <button id="nav-hint-x" class="nav-hint-x">Got it</button>
+      </div>
       <div id="ask-answer" class="ask-answer" hidden></div>
       <section id="vault" class="vault"></section>
       <div id="vault-yield" class="vault-yield"></div>

@@ -5,7 +5,7 @@
 // the net while the brain "thinks". Adapted from lx-0/agent-kiosk's sophia sphere,
 // re-implemented + brand-coloured + data-driven.
 import './index.css';
-import { friendlyPending } from './lib/pending';
+import { friendlyPending, pendingVerb } from './lib/pending';
 import { TYPE_COLOR, NODE, GLOW } from './lib/types';
 import { marked } from 'marked';
 
@@ -781,7 +781,7 @@ async function loadDoctor(): Promise<void> {
     el.innerHTML =
       d.issues === 0
         ? `<span class="ok">● all systems healthy</span>`
-        : `<span class="warn">⚠ ${d.issues} ${d.issues === 1 ? 'issue' : 'issues'}</span>`;
+        : `<span class="warn">${d.issues} to tidy up</span>`;
   }
 }
 
@@ -824,7 +824,7 @@ async function loadPending(): Promise<void> {
     row.innerHTML = `<span class="ck-pending-label" title="${esc(s.label)}">${esc(friendlyPending(s))}</span>`;
     const b = document.createElement('button');
     b.className = 'ck-run';
-    b.textContent = 'Run';
+    b.textContent = pendingVerb(s.cmd);
     b.title = 'Do this now — runs in the background, usually under a minute';
     b.disabled = busy;
     b.addEventListener('click', () => {

@@ -30,7 +30,7 @@ import './index.css';
 import { marked } from 'marked';
 import { ADVANCED_COMMANDS } from './vault/ipc';
 import { fmtAgo } from './lib/time';
-import { friendlyPending } from './lib/pending';
+import { friendlyPending, pendingVerb } from './lib/pending';
 import { TYPE_COLOR } from './lib/types';
 
 const ICON_COPY = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
@@ -338,7 +338,7 @@ function renderHealth(): void {
   if (d.issues === 0) {
     row.innerHTML = `<span class="ok">● Everything healthy</span>`;
   } else {
-    row.innerHTML = `<span class="warn">⚠ ${d.issues} ${d.issues === 1 ? 'issue' : 'issues'}</span><span class="chev">${healthExpanded ? '▾' : '▸'}</span>`;
+    row.innerHTML = `<span class="warn">${d.issues} ${d.issues === 1 ? 'thing' : 'things'} to tidy up</span><span class="chev">${healthExpanded ? '▾' : '▸'}</span>`;
     row.classList.add('clickable');
     row.addEventListener('click', () => {
       healthExpanded = !healthExpanded;
@@ -363,6 +363,7 @@ function renderHealth(): void {
         const b = document.createElement('button');
         b.className = 'ghost';
         b.textContent = 'Fix';
+        b.title = 'Safe — runs a quick cleanup in the background. Nothing is deleted.';
         b.disabled = engineBusy();
         b.addEventListener('click', () => void fixCheck(c.dispatchArgs as string[]));
         r.appendChild(b);
@@ -519,7 +520,7 @@ function renderPending(): void {
     } else {
       const b = document.createElement('button');
       b.className = 'ghost';
-      b.textContent = 'Run';
+      b.textContent = pendingVerb(s.cmd);
       b.title = 'Do this now — runs in the background, usually under a minute';
       b.disabled = engineBusy();
       b.addEventListener('click', () => void runArgs(s.cmd));
@@ -621,7 +622,7 @@ async function renderYield(): Promise<void> {
   const today = all.filter((e) => e.mtimeMs >= sod.getTime()).length;
   const week = all.filter((e) => e.mtimeMs >= Date.now() - 7 * 86400e3).length;
   el.innerHTML =
-    today || week ? `<span class="vy-mark">✦</span> learned <b>+${today}</b> today · <b>+${week}</b> this week` : '';
+    today || week ? `<span class="vy-mark">✦</span> <b>+${today}</b> notes added today · <b>+${week}</b> this week` : '';
 }
 
 // Pending-triage count on the header inbox button.
@@ -735,6 +736,14 @@ window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('browse-btn')?.addEventListener('click', () => window.app.openBrowse());
   document.getElementById('triage-btn')?.addEventListener('click', () => window.app.openTriage());
   document.getElementById('settings-btn')?.addEventListener('click', () => window.app.openSettings());
+
+  // one-time hint pointing at the unlabeled header icons (new users skip them)
+  const navHint = document.getElementById('nav-hint');
+  if (navHint && !localStorage.getItem('navHintSeen')) navHint.hidden = false;
+  document.getElementById('nav-hint-x')?.addEventListener('click', () => {
+    localStorage.setItem('navHintSeen', '1');
+    if (navHint) navHint.hidden = true;
+  });
   document.getElementById('quit')?.addEventListener('click', () => window.app.quit());
 
   // Ask: button + Enter key.
