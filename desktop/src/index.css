@@ -458,8 +458,10 @@ button {
 }
 button:hover:not(:disabled) { filter: brightness(1.08); }
 button:active:not(:disabled) { filter: brightness(0.94); }
-button.start   { background: var(--green); }
-button.stop    { background: var(--red); }
+/* listener controls are quiet ghosts — "active/stoppable", not an alarm; the one
+   saturated accent on the panel stays the hero ask box's blue (Jess). */
+button.start   { background: rgba(52, 199, 89, 0.14);  color: #5fd99a; border: 0.5px solid rgba(52, 199, 89, 0.30); }
+button.stop    { background: rgba(255, 69, 58, 0.13);  color: #ff9a90; border: 0.5px solid rgba(255, 69, 58, 0.30); }
 button.compile { background: var(--blue); }
 button:disabled { background: rgba(120,120,128,0.3); color: var(--muted); cursor: default; }
 
