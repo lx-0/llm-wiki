@@ -803,7 +803,7 @@ async function loadPending(): Promise<void> {
     const st = (m?.status ?? {}) as { articles?: number; last_compile_ago?: string; ollama_reachable?: boolean };
     tel.innerHTML = [
       st.articles != null ? `NOTES ${st.articles}` : '',
-      st.last_compile_ago ? `COMPILED ${esc(st.last_compile_ago)} AGO` : '',
+      st.last_compile_ago ? `UPDATED ${esc(st.last_compile_ago)}` : '',
       `OLLAMA ${st.ollama_reachable ? 'ONLINE' : 'OFFLINE'}`,
     ]
       .filter(Boolean)
