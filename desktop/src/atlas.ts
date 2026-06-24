@@ -24,8 +24,9 @@ function fmtAgo(ms: number): string {
 type Entry = { title: string; file: string; type: string; mtimeMs: number };
 type GNode = {
   id: string; kind: 'root' | 'type' | 'entry'; label: string; sub: string; type: string; file?: string;
-  x: number; y: number; w: number; h: number; color: [number, number, number]; parent?: GNode; mtime?: number;
+  x: number; y: number; w: number; h: number; color: [number, number, number]; parent?: GNode; mtime?: number; weight?: number;
 };
+let maxWeight = 1; // largest type's entry count — for centrality-scaled node dots
 
 const canvas = document.getElementById('atlas-canvas') as HTMLCanvasElement;
 const ctx = canvas.getContext('2d')!;
@@ -66,6 +67,7 @@ async function build(): Promise<void> {
     byType.set(e.type, a);
   }
   const types = [...byType.entries()].sort((a, b) => b[1].length - a[1].length);
+  maxWeight = Math.max(1, ...types.map(([, l]) => l.length));
 
   const root: GNode = { id: 'root', kind: 'root', label: vaultName || 'vault', sub: `${(v?.articleCount ?? 0).toLocaleString()} notes`, type: 'root', x: X_ROOT, y: 0, w: cardWidth(vaultName || 'vault', 'root'), h: H_ROOT, color: NODE };
   nodes = [root];
@@ -79,7 +81,7 @@ async function build(): Promise<void> {
     const h = Math.max(H_TYPE + ROW, blockH(list.length));
     const cy = cursor + h / 2;
     cursor += h + 32;
-    const tn: GNode = { id: `t:${type}`, kind: 'type', label: type, sub: `${list.length} ${list.length === 1 ? 'entry' : 'entries'}`, type, x: X_TYPE, y: cy, w: cardWidth(type, 'type'), h: H_TYPE, color: colorOf(type), parent: root };
+    const tn: GNode = { id: `t:${type}`, kind: 'type', label: type, sub: `${list.length} ${list.length === 1 ? 'entry' : 'entries'}`, type, x: X_TYPE, y: cy, w: cardWidth(type, 'type'), h: H_TYPE, color: colorOf(type), parent: root, weight: list.length };
     nodes.push(tn);
     edges.push([root, tn]);
     list.slice(0, ENTRIES_PER_TYPE).forEach((e, ei, arr) => {
@@ -270,12 +272,15 @@ function draw(now: number): void {
     roundRect(x, y, Math.max(3, 3.5 * zoom), h, rad);
     ctx.fillStyle = rgba(n.color, a);
     ctx.fill();
-    // node dot
+    // node dot — type cards' dots scale with their weight (entry count) so heavier
+    // clusters read as gravity wells; the eye is pulled to what's load-bearing
+    const wf = n.kind === 'type' ? (n.weight ?? 0) / maxWeight : 0;
+    const dotR = (3 + wf * 4.5) * zoom * sc;
     ctx.beginPath();
-    ctx.arc(x + 13 * zoom, p.y, 3 * zoom * sc, 0, Math.PI * 2);
+    ctx.arc(x + 13 * zoom, p.y, dotR, 0, Math.PI * 2);
     ctx.fillStyle = rgba(n.color, a);
-    ctx.shadowColor = rgba(n.color, 0.8);
-    ctx.shadowBlur = 6;
+    ctx.shadowColor = rgba(n.color, 0.85);
+    ctx.shadowBlur = 6 + wf * 10;
     ctx.fill();
     ctx.shadowBlur = 0;
     // labels: title + sub (box scales with zoom, text stays readable)

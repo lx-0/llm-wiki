@@ -444,6 +444,11 @@ body.cockpit {
 .upd-btn:disabled { opacity: 0.5; cursor: default; }
 .vault-path { font-size: 11px; color: var(--muted); margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .vault-actions { display: flex; align-items: center; margin-top: 8px; gap: 8px; }
+/* daily yield — what the tool learned (justifies the capture running) */
+.vault-yield { margin: 7px 2px 2px; font-size: 11.5px; color: var(--muted); }
+.vault-yield:empty { display: none; }
+.vault-yield b { color: #cfe0f5; font-weight: 700; }
+.vy-mark { color: #a78bfa; margin-right: 4px; }
 .compile-state { font-size: 11px; color: var(--muted); }
 .compile-state.running { color: var(--blue); font-weight: 500; }
 .muted { color: var(--muted); }

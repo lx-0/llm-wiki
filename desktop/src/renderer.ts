@@ -611,6 +611,19 @@ function syncAll(): void {
   void runArgs(`collect ${syncQueue.shift()} --incremental`);
 }
 
+// Daily yield — "what your tool learned" — the line that justifies the capture running.
+async function renderYield(): Promise<void> {
+  const el = document.getElementById('vault-yield');
+  if (!el) return;
+  const all = await window.vault.list();
+  const sod = new Date();
+  sod.setHours(0, 0, 0, 0);
+  const today = all.filter((e) => e.mtimeMs >= sod.getTime()).length;
+  const week = all.filter((e) => e.mtimeMs >= Date.now() - 7 * 86400e3).length;
+  el.innerHTML =
+    today || week ? `<span class="vy-mark">✦</span> learned <b>+${today}</b> today · <b>+${week}</b> this week` : '';
+}
+
 // Pending-triage count on the header inbox button.
 async function renderTriageBadge(): Promise<void> {
   const badge = document.getElementById('triage-badge');
@@ -743,6 +756,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
   renderAdvanced();
   void renderTriageBadge();
+  void renderYield();
 
   // Auto-fit the window to content — no scrolling. Fires on any layout change
   // (health/update appearing, advanced expanding, status changes).
@@ -776,6 +790,7 @@ window.addEventListener('DOMContentLoaded', () => {
       void loadDoctor(); // health + update-available (read-only, ~seconds)
       void loadMenu(); // what's pending (engine's actionable suggestions)
       void renderTriageBadge(); // inbox count on the triage button
+      void renderYield(); // "+N today" daily-yield line
       window.setTimeout(() => document.getElementById('ask-input')?.focus(), 30); // search-first
     } else if (lastRecentNewest > recentSeenMs) {
       // panel closed → the highlighted-new entries are now "seen"
