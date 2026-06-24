@@ -112,14 +112,13 @@ function renderGroup(t: { key: string; label: string; color: string; hint: strin
 
 function renderRow(r: Rec, accent: string): HTMLElement {
   const row = document.createElement('div');
-  row.className = 'triage-row' + (r.status !== 'pending' ? ' resolved' : '');
+  const lc = r.confidence === 'low';
+  row.className = 'triage-row' + (lc ? ' lc' : '') + (r.status !== 'pending' ? ' resolved' : '');
   row.style.setProperty('--accent', accent);
-  const cdot = CONF_COLOR[r.confidence] || '#93a4bd';
   const meta = [r.source && `from ${srcSub(r.source)}`, fmtDate(r.date), r.status !== 'pending' ? r.status : '']
     .filter(Boolean)
     .join(' · ');
   row.innerHTML = `
-    <span class="triage-conf" style="background:${cdot}" title="${esc(r.confidence)} confidence"></span>
     <div class="triage-main">
       <div class="triage-summary">${esc(r.summary)}</div>
       <div class="triage-meta${r.source ? ' clickable' : ''}">${esc(meta)}</div>
@@ -137,6 +136,15 @@ function renderRow(r: Rec, accent: string): HTMLElement {
     row.querySelector('.triage-main')?.appendChild(e);
   }
   if (r.status === 'pending') {
+    // "unsure" only on the low-confidence items (the ones that actually need a look),
+    // so the label IS its own legend; hover shows why. No colour-dot on every row.
+    if (lc) {
+      const u = document.createElement('span');
+      u.className = 'triage-unsure';
+      u.textContent = 'unsure';
+      u.title = r.detail ? `Low confidence — ${r.detail}` : 'Low confidence — worth a look before keeping';
+      row.appendChild(u);
+    }
     const actions = document.createElement('div');
     actions.className = 'triage-row-actions';
     if (busy.has(r.stem) || batching.has(r.type)) {
@@ -144,7 +152,7 @@ function renderRow(r: Rec, accent: string): HTMLElement {
     } else {
       const keep = document.createElement('button');
       keep.className = 'triage-accept';
-      keep.textContent = 'Keep';
+      keep.textContent = r.type === 'task' ? 'Keep → to-do' : 'Keep';
       keep.title = r.type === 'task' ? 'Keep → becomes a to-do in todo.md' : 'Keep → filed for reference';
       keep.addEventListener('click', () => void act(r.stem, 'accept'));
       const dis = document.createElement('button');

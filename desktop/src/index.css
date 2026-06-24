@@ -42,11 +42,12 @@
 .triage-group-dot { width: 8px; height: 8px; border-radius: 50%; }
 .triage-group-count { font-size: 11px; color: #6b7a90; font-weight: 600; }
 .triage-batch { margin-left: auto; display: flex; gap: 6px; }
-.triage-batch-keep, .triage-batch-dismiss { border: none; border-radius: 6px; padding: 3px 10px; font-size: 11px; font-weight: 600; cursor: pointer; }
-.triage-batch-keep { background: rgba(52,211,153,0.14); color: #6ee7b7; }
-.triage-batch-keep:hover { background: rgba(52,211,153,0.26); }
-.triage-batch-dismiss { background: rgba(255,255,255,0.05); color: #93a4bd; }
-.triage-batch-dismiss:hover { background: rgba(255,69,58,0.45); color: #fff; }
+/* quiet text-links, not loud buttons — bulk-dismiss must not out-shout the per-row verdict */
+.triage-batch-keep, .triage-batch-dismiss { border: none; background: none; padding: 3px 4px; font-size: 11px; font-weight: 600; cursor: pointer; }
+.triage-batch-keep { color: #6ee7b7; }
+.triage-batch-keep:hover { text-decoration: underline; }
+.triage-batch-dismiss { color: #7d8799; }
+.triage-batch-dismiss:hover { color: #fb7185; text-decoration: underline; }
 .triage-batch-prog { margin-left: auto; font-size: 11px; color: #7da8d8; font-style: italic; }
 .triage-group-hint { margin: 2px 0 9px; font-size: 10.5px; color: #5f6b7e; }
 /* compact rows */
@@ -54,9 +55,11 @@
   background: rgba(255,255,255,0.025); border: 0.5px solid rgba(255,255,255,0.06); border-left: 2.5px solid var(--accent, #888);
   border-radius: 9px; }
 .triage-row.resolved { opacity: 0.45; }
-.triage-conf { width: 7px; height: 7px; border-radius: 50%; flex: none; }
 .triage-main { flex: 1; min-width: 0; }
-.triage-summary { font-size: 13px; line-height: 1.35; color: #e2e8f0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.triage-summary { font-size: 13px; font-weight: 500; line-height: 1.35; color: #eef2f8; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+/* "unsure" marker — low-confidence only; the label is its own legend */
+.triage-unsure { flex: none; padding: 2px 8px; border-radius: 6px; background: rgba(251,113,133,0.16); color: #fb9aaa;
+  font-size: 10px; font-weight: 600; letter-spacing: 0.03em; cursor: default; }
 .triage-meta { font-size: 11px; color: #6b7a90; margin-top: 3px; }
 .triage-meta.clickable { cursor: pointer; }
 .triage-meta.clickable:hover { color: #a8cef0; text-decoration: underline; }
@@ -64,6 +67,9 @@
 .triage-accept, .triage-dismiss { border: none; border-radius: 7px; padding: 5px 13px; font-size: 12px; font-weight: 600; cursor: pointer; }
 .triage-accept { background: #2f6f4f; color: #d7f5e4; }
 .triage-accept:hover { background: #38845e; }
+/* confidence gives the button column a pulse: unsure keeps recede, confident keeps lead */
+.triage-row.lc .triage-accept { background: #27553d; color: #9fd1b6; }
+.triage-row.lc .triage-accept:hover { background: #316b4c; }
 .triage-dismiss { background: rgba(255,255,255,0.06); color: #93a4bd; }
 .triage-dismiss:hover { background: rgba(255,69,58,0.6); color: #fff; }
 .triage-working { font-size: 13px; color: #93a4bd; padding: 0 8px; }
