@@ -1885,3 +1885,44 @@ All 4 slices of the issue-#5 correct-apply hardening shipped; suite 1356 green. 
 - **No engine version bump.** The desktop app is not distributed via `wiki update`, so it does NOT touch the engine CHANGELOG/`pyproject` version; it has its own `desktop/package.json`.
 **Reason:** keeps the Python engine and the TS app toolchain-isolated; the status path needs no engine round-trip (fast, daemon-ready later); the engine's `menu --json` already computes the right to-do list so the GUI shouldn't re-derive it.
 **Linked artifacts:** `desktop/**`, `desktop/README.md`, memory `project-desktop-app-m029`, KNOWLEDGE.md (desktop gotchas), `.ytstack/M029-ROADMAP.md`, `OFFICE-HOURS-wiki-desktop-app.md`. SHIPPED MVP-plus; GUI rendering + signing/auto-update + intake actions deferred.
+
+### 2026-06-24 — Desktop app design + learnability arc (M029)
+
+The desktop app grew to 7 surfaces (panel, Cockpit, Atlas, Triage, Browse, Settings,
+Onboarding) with CLI parity (`collect`/`dream`/`triage`). Locked this session:
+
+- **One authored product, not a flat utility.** A single design language across every
+  window: shared atmosphere (violet core-glow → clean charcoal), one type-colour
+  palette in a single source (`desktop/src/lib/types.ts`, mirrored by the CSS `.t-*`),
+  one type-token (the filled badge pill, on canvas in atlas/cockpit too), one hero
+  accent (**blue = the Ask box alone**; secondary actions are grey-ghost, green = the
+  triage Keep, capture state = a red word-badge). The cockpit's `//` HUD labels are
+  **deliberately cockpit-only** (its identity) — not spread to the calm surfaces (5
+  `//` headers = costume). Validated by a synthetic "creative-director" persona over
+  ~6 rounds → "shippable, one authored product".
+- **The app speaks plain English; the engine/CLI keep operator terms.** User-facing
+  "vault" → "library" (engine + CLI stay "vault" — different audiences). Engine
+  `menu`/`doctor` jargon is humanised app-side (`friendlyPending`/`friendlyHealth`):
+  "entity pages overdue for dream" → "pages need refreshing"; "Run" → outcome verbs
+  (Add/Sort/Refresh); "⚠ 2 issues" → "2 things to tidy up". Onboarding states what the
+  app IS and where the data comes from; "Sync sources" carries the provenance line.
+- **Background capture is disclosed + consented, default-ON.** The screen/mic/audio
+  capture is operator-managed 24/7 — kept ON by default (operator intent) but now shown
+  as a consent step in onboarding (pausable there + from the menu bar) instead of a
+  buried surprise, and its live state is a readable **word** ("RECORDING"/"PAUSED"),
+  not a colour-only dot (a11y — a colourblind tester couldn't read the most
+  consequential status).
+- **The dense panel is NOT gutted.** A "show only Ask + answer, hide the rest behind a
+  button" idea was declined: the panel is the daily power-surface (at-a-glance status
+  is the point), and the new-user concern is met by onboarding + a one-time nav-hint +
+  the Ask box as hero. Decided, not deferred.
+- **Render-verification harness** (test this headlessly): render the real built
+  `.vite/renderer/main_window/*.html` under a stub preload with `STUB_MODE`
+  (default/noaccess/running/empty) + `/tmp/cap-state.js` (headless Electron
+  `capturePage()`, eval-injects UI states). Stub mock-data inconsistencies
+  (counts/timestamps) are NOT app bugs — re-verify against real code before "fixing".
+- **Synthetic-user method**: design review can be primed, but **learnability must be
+  tested BLIND + task-based** (don't tell the persona what each screen is) — else it
+  can't surface "I don't understand what this is". Blind first-run test rated the app
+  4/10, then 6/10 after the plain-words/library/capture-consent fixes. Full method in
+  memory `feedback-synthetic-user-review-method`.

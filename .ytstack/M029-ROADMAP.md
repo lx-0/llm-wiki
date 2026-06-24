@@ -55,6 +55,18 @@ DECISIONS 2026-06-22, `desktop/README.md`.
 
 Slices execute sequentially. After each slice, `ytstack:reassess-roadmap` checks if the plan still fits reality.
 
+## Post-MVP arc — design + learnability (2026-06-24)
+
+Beyond the MVP slices, the app grew to 7 surfaces (panel, Cockpit, Atlas, Triage,
+Browse, Settings, Onboarding) + CLI parity (`collect`/`dream`/`triage`), then went
+through a design-cohesion pass and a learnability pass (both via synthetic-user
+panels). Outcome: "one authored product, shippable" (design) + blind first-run
+learnability 4/10 → 6/10 (plain English, "library" not "vault", consented capture).
+Full record in `.ytstack/DECISIONS.md` (2026-06-24 entry) + memory
+`project-desktop-app-m029` / `feedback-synthetic-user-review-method`. **Open product
+call** (declined unilaterally): radically simplify the dense panel — kept as the daily
+power-surface. Headless verification: stub preload (`STUB_MODE`) + `/tmp/cap-state.js`.
+
 ## How to update this file
 
 - Flip slice checkbox `[ ]` → `[x]` when its tasks are all `summarize-task`-confirmed
