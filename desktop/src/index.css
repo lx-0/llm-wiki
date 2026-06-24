@@ -141,8 +141,12 @@ body.settings {
 .settings-title { font-size: 16px; font-weight: 700; margin: 0 0 12px; }
 .settings-card {
   background: var(--card); border: 0.5px solid var(--card-border);
-  border-radius: 12px; padding: 4px 14px;
+  border-radius: 12px; padding: 4px 14px; margin-bottom: 12px;
 }
+.settings-section { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 12px 0 8px; }
+.set-vault { font-size: 13px; color: #e2e8f0; line-height: 1.5; }
+.set-path { font-size: 11px; color: var(--muted); font-family: ui-monospace, 'SF Mono', monospace; margin-top: 2px; word-break: break-all; }
+.set-open { margin: 12px 0; }
 .setting-row { display: flex; align-items: center; gap: 14px; padding: 11px 0; }
 .setting-label { display: flex; flex-direction: column; flex: 1; font-size: 13px; font-weight: 500; gap: 2px; }
 .setting-sub { font-size: 11px; font-weight: 400; color: var(--muted); }

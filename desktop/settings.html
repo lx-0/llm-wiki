@@ -6,6 +6,13 @@
   </head>
   <body class="settings">
     <h1 class="settings-title">Settings</h1>
+
+    <div class="settings-card">
+      <div class="settings-section">Vault</div>
+      <div id="set-vault" class="set-vault">…</div>
+      <button id="set-open" class="ghost set-open">Open in Obsidian</button>
+    </div>
+
     <div class="settings-card">
       <label class="setting-row">
         <span class="setting-label">
@@ -14,7 +21,21 @@
         </span>
         <input type="checkbox" id="login-toggle" class="switch" />
       </label>
+      <div class="setting-row">
+        <span class="setting-label">
+          File access
+          <span class="setting-sub" id="fda-sub">Checking…</span>
+        </span>
+        <button id="fda-btn" class="ghost" hidden>Open Settings</button>
+      </div>
+      <div class="setting-row">
+        <span class="setting-label">
+          Screen &amp; audio capture
+          <span class="setting-sub" id="cap-sub">Checking…</span>
+        </span>
+      </div>
     </div>
+
     <script type="module" src="/src/settings.ts"></script>
   </body>
 </html>
