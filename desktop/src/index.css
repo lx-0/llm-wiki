@@ -186,6 +186,10 @@ body.onboarding { background: var(--win-bg); padding: 26px 26px 22px; min-height
   background: var(--card); border: 0.5px solid var(--card-border);
   border-radius: 12px; padding: 13px 15px;
 }
+/* respect the `hidden` attribute — element display:flex would otherwise override the
+   UA [hidden] rule, so the "Grant file access" step never hid when the vault was
+   readable (the real cause of the 1-2-2 numbering, not the static default). */
+.ob-step[hidden] { display: none; }
 .ob-num {
   flex: none; width: 22px; height: 22px; border-radius: 50%;
   background: var(--blue); color: #fff; font-size: 12px; font-weight: 700;
@@ -205,17 +209,17 @@ body.onboarding { background: var(--win-bg); padding: 26px 26px 22px; min-height
 
 /* Browse window (browse.html) */
 body.browse { background: var(--win-bg); display: flex; flex-direction: column; height: 100vh; padding: 0; }
-/* same shared atmosphere as the panel — one product across windows (browse, triage, settings) */
-body.browse::before, body.settings::before {
+/* same shared atmosphere as the panel — one product across every window */
+body.browse::before, body.settings::before, body.onboarding::before {
   content: ''; position: fixed; top: -210px; left: 50%; transform: translateX(-50%);
   width: 640px; height: 440px; pointer-events: none; z-index: 0;
   background: radial-gradient(ellipse at center, rgba(167, 139, 250, 0.13), rgba(125, 211, 252, 0.04) 46%, transparent 70%);
 }
-body.browse::after, body.settings::after {
+body.browse::after, body.settings::after, body.onboarding::after {
   content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 0;
   background: radial-gradient(ellipse at 50% 9%, transparent 46%, rgba(0, 0, 0, 0.28) 94%);
 }
-body.browse > *, body.settings > * { position: relative; z-index: 1; }
+body.browse > *, body.settings > *, body.onboarding > * { position: relative; z-index: 1; }
 .browse-head { display: flex; align-items: center; gap: 10px; padding: 14px 16px 10px; }
 #browse-input {
   flex: 1; font: inherit; font-size: 14px; padding: 8px 12px; border-radius: 9px;
@@ -557,6 +561,7 @@ button:disabled { background: rgba(120,120,128,0.3); color: var(--muted); cursor
 #add-input:focus { border-color: var(--blue); }
 .add-row button { margin-left: 0; }
 .add-status { display: flex; align-items: center; gap: 7px; margin-top: 8px; font-size: 11.5px; color: var(--muted); }
+.add-status[hidden] { display: none; } /* element display:flex would otherwise override [hidden] (same class of bug as .ob-step) */
 .add-status.ok { color: var(--green); }
 .add-status.err { color: var(--amber); }
 
