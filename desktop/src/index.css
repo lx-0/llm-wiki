@@ -42,11 +42,12 @@
 .triage-group-dot { width: 8px; height: 8px; border-radius: 50%; }
 .triage-group-count { font-size: 11px; color: #6b7a90; font-weight: 600; }
 .triage-batch { margin-left: auto; display: flex; gap: 6px; }
-/* quiet text-links, not loud buttons — bulk-dismiss must not out-shout the per-row verdict */
-.triage-batch-keep, .triage-batch-dismiss { border: none; background: none; padding: 3px 4px; font-size: 11px; font-weight: 600; cursor: pointer; }
-.triage-batch-keep { color: #6ee7b7; }
-.triage-batch-keep:hover { text-decoration: underline; }
-.triage-batch-dismiss { color: #7d8799; }
+/* asymmetric bulk actions: Keep-all is the safe, common default (soft pill);
+   Dismiss-all is the guarded one (bare quiet link) — it must not out-shout a verdict. */
+.triage-batch-keep, .triage-batch-dismiss { border: none; font-size: 11px; font-weight: 600; cursor: pointer; }
+.triage-batch-keep { background: rgba(52,211,153,0.14); color: #6ee7b7; padding: 3px 11px; border-radius: 6px; }
+.triage-batch-keep:hover { background: rgba(52,211,153,0.26); }
+.triage-batch-dismiss { background: none; color: #7d8799; padding: 3px 4px; }
 .triage-batch-dismiss:hover { color: #fb7185; text-decoration: underline; }
 .triage-batch-prog { margin-left: auto; font-size: 11px; color: #7da8d8; font-style: italic; }
 .triage-group-hint { margin: 2px 0 9px; font-size: 10.5px; color: #5f6b7e; }
