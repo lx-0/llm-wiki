@@ -267,8 +267,8 @@ function openSettings(): void {
     return;
   }
   settingsWin = new BrowserWindow({
-    width: 380,
-    height: 250,
+    width: 400,
+    height: 400,
     resizable: false,
     fullscreenable: false,
     minimizable: false,
@@ -303,7 +303,7 @@ function openOnboarding(): void {
   }
   onboardingWin = new BrowserWindow({
     width: 460,
-    height: 580,
+    height: 700,
     resizable: false,
     fullscreenable: false,
     maximizable: false,
