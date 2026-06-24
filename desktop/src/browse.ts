@@ -2,6 +2,7 @@
 // Same preload, so window.vault.list() / openFile() are available.
 import './index.css';
 import { fmtAgo } from './lib/time';
+import { TYPE_COLOR } from './lib/types';
 
 type Entry = { title: string; file: string; type: string; mtimeMs: number };
 
@@ -48,7 +49,10 @@ function render(): void {
     const row = document.createElement('button');
     row.className = 'browse-row';
     row.title = 'Open in Obsidian';
+    const c = TYPE_COLOR[cls] ?? [125, 211, 252];
+    row.style.setProperty('--c', `rgb(${c[0]},${c[1]},${c[2]})`); // type-colour edge + dot (panel DNA)
     row.innerHTML =
+      `<span class="browse-dot"></span>` +
       `<span class="type-badge t-${cls}">${escapeHtml(e.type)}</span>` +
       `<span class="browse-title">${escapeHtml(e.title)}</span>` +
       `<span class="browse-ago">${fmtAgo(e.mtimeMs)}</span>`;
