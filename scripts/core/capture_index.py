@@ -21,9 +21,13 @@ flushes can't corrupt the file.
 from __future__ import annotations
 
 import fcntl
+import re
 from contextlib import contextmanager
+from pathlib import Path
 
-from .paths import STATE_DIR
+import yaml
+
+from .paths import KNOWLEDGE_DIR, STATE_DIR
 from .utils import load_json_state, save_json_state
 
 CAPTURE_INDEX_FILE = STATE_DIR / "capture_index.json"
@@ -75,3 +79,64 @@ def record(capture_id: str, *, source_path: str, created: str) -> bool:
         }
         save_json_state(CAPTURE_INDEX_FILE, index)
         return True
+
+
+_FM_RE = re.compile(r"\A---\n(.*?)\n---", re.DOTALL)
+
+
+def _compiled_from(path: Path) -> list[str]:
+    """The `compiled_from` frontmatter of a compiled article, as a list of source
+    strings (str or list in the YAML — both normalised to a list)."""
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return []
+    m = _FM_RE.match(text)
+    if not m:
+        return []
+    try:
+        fm = yaml.safe_load(m.group(1))
+    except yaml.YAMLError:
+        return []
+    if not isinstance(fm, dict):
+        return []
+    cf = fm.get("compiled_from")
+    if isinstance(cf, str):
+        return [cf]
+    if isinstance(cf, list):
+        return [c for c in cf if isinstance(c, str)]
+    return []
+
+
+def resolve_articles(knowledge_dir: Path | None = None) -> dict[str, list[str]]:
+    """Map each captured `capture_id` → the knowledge article(s) it was compiled
+    into, by joining the index `source_path` against each article's `compiled_from`
+    frontmatter (the compile prompts stamp the source path the LLM compiled from).
+
+    Returns `{capture_id: [article_relpath, …]}` — an empty list means the capture
+    is recorded but not (yet) compiled into any article. Matching is by the capture
+    filename (`capture-<id>.md`), so a differing path prefix in `compiled_from` still
+    joins. Pure filesystem scan: no compile/agent dependency (the S02 forward link
+    must not forward-depend on S03). `{}` when the index is empty.
+    """
+    index = load()
+    if not index:
+        return {}
+    name_to_id = {
+        Path(entry["source_path"]).name: cid
+        for cid, entry in index.items()
+        if isinstance(entry, dict) and entry.get("source_path")
+    }
+    result: dict[str, list[str]] = {cid: [] for cid in index}
+    kdir = knowledge_dir or KNOWLEDGE_DIR
+    if not kdir.is_dir():
+        return result
+    root = kdir.parent
+    for art in sorted(kdir.rglob("*.md")):
+        for cf in _compiled_from(art):
+            cid = name_to_id.get(Path(cf.strip()).name)
+            if cid is not None:
+                rel = str(art.relative_to(root))
+                if rel not in result[cid]:
+                    result[cid].append(rel)
+    return result

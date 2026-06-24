@@ -79,3 +79,47 @@ def test_distinct_ids_coexist(index_env):
     ci.record("aaa", source_path="raw/captures/capture-aaa.md", created="t1")
     ci.record("bbb", source_path="raw/captures/capture-bbb.md", created="t2")
     assert set(ci.load()) == {"aaa", "bbb"}
+
+
+# --- M025-S02-T01: capture_id → article resolution -------------------------
+
+def _write_article(kdir, rel, compiled_from):
+    import yaml as _yaml
+
+    p = kdir / rel
+    p.parent.mkdir(parents=True, exist_ok=True)
+    fm = _yaml.safe_dump({"type": "person", "compiled_from": compiled_from}, sort_keys=False).strip()
+    p.write_text(f"---\n{fm}\n---\n# {p.stem}\nBody.\n", encoding="utf-8")
+    return p
+
+
+def test_resolve_articles_joins_compiled_from(index_env, tmp_path):
+    ci = index_env
+    ci.record("abc123", source_path="raw/captures/capture-abc123.md", created="t1")
+    ci.record("def456", source_path="raw/captures/capture-def456.md", created="t2")  # never compiled
+
+    kdir = tmp_path / "knowledge"
+    _write_article(kdir, "people/sid.md", ["raw/captures/capture-abc123.md", "raw/notes/email/x.md"])
+    _write_article(kdir, "concepts/x.md", "raw/notes/email/y.md")  # string form, no capture
+
+    res = ci.resolve_articles(knowledge_dir=kdir)
+    assert res["abc123"] == ["knowledge/people/sid.md"]
+    assert res["def456"] == []  # captured but not (yet) compiled
+
+
+def test_resolve_articles_basename_match_and_multiple(index_env, tmp_path):
+    ci = index_env
+    ci.record("xyz", source_path="raw/captures/capture-xyz.md", created="t1")
+    kdir = tmp_path / "knowledge"
+    _write_article(kdir, "projects/a.md", ["raw/captures/capture-xyz.md"])
+    _write_article(kdir, "projects/b.md", ["./raw/captures/capture-xyz.md"])  # differing prefix
+    _write_article(kdir, "facts/n.md", "raw/notes/x.md")  # no match
+    res = ci.resolve_articles(knowledge_dir=kdir)
+    assert sorted(res["xyz"]) == ["knowledge/projects/a.md", "knowledge/projects/b.md"]
+
+
+def test_resolve_articles_empty_index_and_missing_dir(index_env, tmp_path):
+    ci = index_env
+    assert ci.resolve_articles(knowledge_dir=tmp_path / "knowledge") == {}  # empty index → {}
+    ci.record("q", source_path="raw/captures/capture-q.md", created="t1")
+    assert ci.resolve_articles(knowledge_dir=tmp_path / "nope") == {"q": []}  # absent dir → no crash
