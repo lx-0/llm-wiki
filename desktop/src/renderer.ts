@@ -67,6 +67,18 @@ type DoctorCheck = { id: string; severity: string; message: string; fix?: string
 type Doctor = { issues: number; updateAvailable: boolean; updateMessage?: string; checks?: DoctorCheck[] };
 let doctorState: Doctor | null = null;
 let healthExpanded = false;
+
+/** Plain-English health messages — the engine's doctor speaks operator ("entity pages
+ *  overdue for dream", "broken wikilinks"); the original stays on hover. */
+function friendlyHealth(msg: string): string {
+  return msg
+    .replace(/\bentity pages\b/gi, 'pages')
+    .replace(/\bentity page\b/gi, 'page')
+    .replace(/\boverdue for dream\b/gi, 'need refreshing')
+    .replace(/\bwikilinks\b/gi, 'links')
+    .replace(/\bwikilink\b/gi, 'link')
+    .replace(/\bdream\b/gi, 'refresh');
+}
 /** id of the running engine command (update/advanced), or null. Compile has its own state. */
 let advancedBusy: string | null = null;
 /** [i/total] progress of the running advanced/suggestion command (if it emits any). */
@@ -112,7 +124,7 @@ function summaryLine(s: Status): string {
   if (p) return p === 'start' ? 'starting…' : 'stopping…';
   if (!s.running) return `stopped · last capture ${fmtClock(s.channels.mic.lastCaptureAtMs)}`;
   const mic = s.channels.mic, sys = s.channels.system;
-  if (mic.fresh && sys.fresh) return 'recording · mic + system audio';
+  if (mic.fresh && sys.fresh) return 'recording · screen, mic + system audio';
   const parts: string[] = [];
   parts.push(mic.fresh ? 'mic ✓' : `mic silent ${fmtDur(mic.ageSeconds)}`);
   parts.push(sys.fresh ? 'system ✓' : `system silent ${fmtDur(sys.ageSeconds)}`);
@@ -344,7 +356,7 @@ function renderHealth(): void {
       r.className = 'health-item';
       const runnable = c.dispatchArgs && c.dispatchArgs.length > 0 && !/auth/.test(c.dispatchArgs.join(' '));
       const busy = advancedBusy === (c.dispatchArgs?.join(' ') ?? '');
-      r.innerHTML = `<span class="sev sev-${c.severity}"></span><span class="health-msg">${escapeHtml(c.message)}</span>`;
+      r.innerHTML = `<span class="sev sev-${c.severity}"></span><span class="health-msg" title="${escapeHtml(c.message)}">${escapeHtml(friendlyHealth(c.message))}</span>`;
       if (busy) {
         r.appendChild(runningIndicator());
       } else if (runnable) {
