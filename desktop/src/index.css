@@ -220,6 +220,20 @@ body.browse::after, body.settings::after, body.onboarding::after {
   background: radial-gradient(ellipse at 50% 9%, transparent 46%, rgba(0, 0, 0, 0.28) 94%);
 }
 body.browse > *, body.settings > *, body.onboarding > * { position: relative; z-index: 1; }
+/* onboarding is first-touch — let the violet core glow brighter behind the welcome so
+   it belongs to the family from the very first screen (Jess: "the lone tourist") */
+body.onboarding::before {
+  width: 700px; height: 520px; top: -170px;
+  background: radial-gradient(ellipse at center, rgba(167, 139, 250, 0.20), rgba(125, 211, 252, 0.07) 44%, transparent 70%);
+}
+/* Browse type-breakdown footer + Sync-sources glyphs (cohesion / scannable rhythm) */
+.browse-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 9px 16px;
+  border-top: 0.5px solid var(--hairline); font-family: ui-monospace, 'SF Mono', monospace; font-size: 11px; letter-spacing: 0.02em; color: var(--muted); }
+.browse-foot:empty { display: none; }
+.bf-total { color: #aeb9c9; font-weight: 600; }
+.bf-type { display: inline-flex; align-items: center; gap: 5px; text-transform: capitalize; }
+.bf-dot { width: 6px; height: 6px; border-radius: 50%; flex: none; }
+.src-ico { flex: none; width: 18px; text-align: center; font-size: 13px; margin-right: 2px; }
 .browse-head { display: flex; align-items: center; gap: 10px; padding: 14px 16px 10px; }
 #browse-input {
   flex: 1; font: inherit; font-size: 14px; padding: 8px 12px; border-radius: 9px;

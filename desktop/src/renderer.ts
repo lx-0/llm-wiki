@@ -543,6 +543,13 @@ async function loadCollectors(): Promise<void> {
   renderSources();
 }
 
+/** Per-source glyphs so the substrate list scans at a glance instead of reading as a
+ *  wall of identical grey rows (these are the things the wiki eats). */
+const SOURCE_ICON: Record<string, string> = {
+  email: '✉️', calendar: '📅', voice: '🎙️', gmeet: '🎥', jamie: '💬', health: '❤️',
+  screenshots: '🖥️', pictures: '🖼️', browser: '🌐', tabs: '🗂️', youtube: '▶️', capture: '📥',
+};
+
 function renderSources(): void {
   const el = document.getElementById('sources-list');
   if (!el) return;
@@ -568,7 +575,7 @@ function renderSources(): void {
     const id = `collect ${c.name} --incremental`;
     const row = document.createElement('div');
     row.className = 'adv-row';
-    row.innerHTML = `<span class="adv-label">${escapeHtml(c.name)}</span>`;
+    row.innerHTML = `<span class="src-ico">${SOURCE_ICON[c.name] ?? '•'}</span><span class="adv-label">${escapeHtml(c.name)}</span>`;
     if (advancedBusy === id) {
       row.appendChild(runningIndicator());
     } else {

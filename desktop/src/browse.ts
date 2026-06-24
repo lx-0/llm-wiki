@@ -65,6 +65,30 @@ function render(): void {
     more.textContent = `Showing the first ${MAX_ROWS} of ${filtered.length} — refine your search.`;
     listEl.appendChild(more);
   }
+  renderFoot(filtered);
+}
+
+/** A type-breakdown footer — a resting structure that echoes the cockpit's legend so
+ *  Browse reads as designed, not a list dumped in a window. */
+function renderFoot(rows: Entry[]): void {
+  const foot = document.getElementById('browse-foot');
+  if (!foot) return;
+  const counts: Record<string, number> = {};
+  for (const e of rows) {
+    const cls = e.type.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() || 'note';
+    counts[cls] = (counts[cls] || 0) + 1;
+  }
+  const order = ['person', 'project', 'concept', 'fact', 'area', 'map', 'link'];
+  const types = [...order.filter((t) => counts[t]), ...Object.keys(counts).filter((t) => !order.includes(t))];
+  foot.innerHTML =
+    `<span class="bf-total">${rows.length} ${rows.length === 1 ? 'entry' : 'entries'}</span>` +
+    types
+      .map((t) => {
+        const c = TYPE_COLOR[t] ?? [125, 211, 252];
+        const col = `rgb(${c[0]},${c[1]},${c[2]})`;
+        return `<span class="bf-type"><span class="bf-dot" style="background:${col};box-shadow:0 0 6px ${col}"></span>${escapeHtml(t)} ${counts[t]}</span>`;
+      })
+      .join('');
 }
 
 input?.addEventListener('input', render);
