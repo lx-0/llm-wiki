@@ -142,6 +142,26 @@ def resolve_articles(knowledge_dir: Path | None = None) -> dict[str, list[str]]:
     return result
 
 
+_CORRECTION_RE = re.compile(r"^\s*(?:re|corrects)\s*[:#]\s*([0-9a-f]{6,12})\b", re.IGNORECASE)
+
+
+def detect_correction(content: str, *, known_ids) -> str | None:
+    """If a capture body opens with a `re:<id>` / `corrects:<id>` reference to a
+    KNOWN capture id, return the full id it corrects; else None (a fresh capture, or
+    a reference to an unknown id — which falls back to a fresh capture).
+
+    The referenced token may be the short-id shown in the digest (a prefix) or the
+    full id; it resolves only when it uniquely prefixes one known id. The hex shape +
+    known-id check keep an ordinary "Re: <subject>" email snippet from false-matching.
+    """
+    m = _CORRECTION_RE.match(content or "")
+    if not m:
+        return None
+    ref = m.group(1).lower()
+    matches = [kid for kid in known_ids if kid.startswith(ref)]
+    return matches[0] if len(matches) == 1 else None
+
+
 def _capture_gist(source_path: str, *, vault_root: Path) -> str:
     """The first non-empty body line of a raw capture, for a one-line digest row."""
     try:

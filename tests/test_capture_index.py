@@ -169,3 +169,42 @@ def test_build_captures_section_superseded_marker(index_env, tmp_path):
 
     section = ci.build_captures_section("2026-06-20", vault_root=tmp_path)
     assert "_superseded_" in section
+
+
+# --- M025-S02-T03: correction recognition ----------------------------------
+
+KNOWN = {"abc12345ef01", "deadbeef0099"}
+
+
+def test_detect_correction_full_id(index_env):
+    assert index_env.detect_correction("re: abc12345ef01 actually Friday", known_ids=KNOWN) == "abc12345ef01"
+
+
+def test_detect_correction_short_prefix_from_digest(index_env):
+    # the digest shows the 8-char short id; referencing it resolves to the full id
+    assert index_env.detect_correction("corrects:abc12345 — wrong reading", known_ids=KNOWN) == "abc12345ef01"
+
+
+def test_detect_correction_corrects_and_hash_forms(index_env):
+    assert index_env.detect_correction("corrects: deadbeef the X", known_ids=KNOWN) == "deadbeef0099"
+    assert index_env.detect_correction("re#abc12345 fix", known_ids=KNOWN) == "abc12345ef01"
+
+
+def test_detect_correction_unknown_id_falls_back_to_fresh(index_env):
+    assert index_env.detect_correction("re: 99999999 nope", known_ids=KNOWN) is None
+
+
+def test_detect_correction_fresh_capture_no_leading_token(index_env):
+    assert index_env.detect_correction("just a normal thought about pricing", known_ids=KNOWN) is None
+    assert index_env.detect_correction("", known_ids=KNOWN) is None
+
+
+def test_detect_correction_ignores_ordinary_email_re_subject(index_env):
+    # "Re: Lunch tomorrow" — the token after re: isn't hex, so no false match
+    assert index_env.detect_correction("Re: Lunch tomorrow?", known_ids=KNOWN) is None
+
+
+def test_detect_correction_ambiguous_prefix_is_fresh(index_env):
+    ambiguous = {"abcd1111", "abcd2222"}
+    assert index_env.detect_correction("re: abcd 1", known_ids=ambiguous) is None  # 'abcd' too short anyway
+    assert index_env.detect_correction("re: abcd11 x", known_ids={"abcd1111", "abcd1122"}) is None  # prefix matches 2

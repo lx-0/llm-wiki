@@ -3,9 +3,9 @@ milestone: M025
 slice: S02
 project: llm-wiki
 created: 2026-05-23T08:53:30+0200
-status: in-progress
+status: done
 task_count: 3
-completed_tasks: 2
+completed_tasks: 3
 ---
 
 # M025-S02 -- Slice Plan
@@ -31,11 +31,13 @@ Python-side via `compiled_from`).
   → built DETERMINISTICALLY (`build_captures_section()` + runner injection), prompt
   only suppresses agent double-coverage (2026-06-25, 15 tests). See
   `M025-S02-T02-SUMMARY.md`. Rendered-digest obedience operator-verified.
-- [ ] T03 -- Correction recognition (capture-side only): a capture body referencing
+- [x] T03 -- Correction recognition (capture-side only): a capture body referencing
   a known capture-id (`re:<id>` / `corrects:<id>` leading token) gets
   `kind: correction` + `corrects: <id>` frontmatter, distinct from a fresh capture.
   Add `docs/setup-captures.md` documenting the drop + correction syntax. Unit tests:
   correction vs fresh detection, unknown-id falls back to fresh capture.
+  → `detect_correction()` + collector tagging + `docs/setup-captures.md` (2026-06-25,
+  39 tests). See `M025-S02-T03-SUMMARY.md`.
 
 ## Done when
 

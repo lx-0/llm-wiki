@@ -167,6 +167,40 @@ def test_real_run_writes_id_named_note_with_frontmatter(capture_env):
     assert content in text
 
 
+# ── Correction recognition (M025-S02-T03) ────────────────────────────
+
+
+def test_correction_capture_tagged_when_referencing_known_id(capture_env):
+    coll, inbox, raw_captures = capture_env
+    from core import capture_index as ci
+
+    ci.record("abc12345ef01", source_path="raw/captures/capture-abc12345ef01.md", created="2026-06-20T09:00:00+02:00")
+    (inbox / "fix.txt").write_text("corrects:abc12345 the meeting is Friday not Monday\n")
+
+    result = coll.run()
+    assert len(result.files_written) == 1
+    text = result.files_written[0].read_text()
+    assert "kind: correction" in text
+    assert "corrects: abc12345ef01" in text  # short ref resolved to the full id
+
+
+def test_fresh_capture_has_no_correction_frontmatter(capture_env):
+    coll, inbox, raw_captures = capture_env
+    (inbox / "note.txt").write_text("just an idea about pricing tiers\n")
+    coll.run()
+    text = next(raw_captures.glob("capture-*.md")).read_text()
+    assert "kind: correction" not in text
+    assert "corrects:" not in text
+
+
+def test_correction_referencing_unknown_id_stays_fresh(capture_env):
+    coll, inbox, raw_captures = capture_env
+    (inbox / "x.txt").write_text("re: 99999999 this id was never captured\n")
+    coll.run()
+    text = next(raw_captures.glob("capture-*.md")).read_text()
+    assert "kind: correction" not in text
+
+
 def test_source_is_moved_into_vault_archive_zone(capture_env):
     coll, inbox, raw_captures = capture_env
     (inbox / "drop.md").write_text("ingest then archive me")

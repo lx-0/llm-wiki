@@ -72,7 +72,9 @@ def _inbox_path() -> Path | None:
     return Path(raw).expanduser()
 
 
-def _build_frontmatter(capture_id: str, captured_at: datetime, source: Path) -> str:
+def _build_frontmatter(
+    capture_id: str, captured_at: datetime, source: Path, *, corrects: str | None = None
+) -> str:
     lines = [
         "---",
         "type: capture",
@@ -80,6 +82,14 @@ def _build_frontmatter(capture_id: str, captured_at: datetime, source: Path) -> 
         f"capture_id: {capture_id}",
         f"captured_at: {captured_at.isoformat()}",
         f"source: {source.name}",
+    ]
+    if corrects:
+        # This capture opened with a `re:/corrects:<id>` reference to a known capture —
+        # mark it a correction targeting that interpretation (the supersede write-back
+        # is S03; here we only recognise + tag).
+        lines.append("kind: correction")
+        lines.append(f"corrects: {corrects}")
+    lines += [
         "tags: [capture]",
         "---",
         "",
@@ -175,6 +185,9 @@ class CaptureCollector:
 
         written: list[Path] = []
         errors: list[str] = []
+        # Snapshot known capture ids once — a correction references a PRIOR capture,
+        # already indexed before this run (corrections are async by design).
+        known_ids = set(capture_index.load().keys())
         for src in sources:
             try:
                 raw = src.read_text(encoding="utf-8").strip()
@@ -187,12 +200,13 @@ class CaptureCollector:
                 continue
 
             capture_id = _capture_id(raw)
+            corrects = capture_index.detect_correction(raw, known_ids=known_ids)
             captured_at = datetime.fromtimestamp(src.stat().st_mtime, tz=tz)
             # Filename is ID-derived: a re-drop of identical content lands on
             # the same path and overwrites, rather than spawning a duplicate.
             out_path = OUTPUT_DIR / f"capture-{capture_id}.md"
             out_path.write_text(
-                _build_frontmatter(capture_id, captured_at, src) + raw + "\n",
+                _build_frontmatter(capture_id, captured_at, src, corrects=corrects) + raw + "\n",
                 encoding="utf-8",
             )
             written.append(out_path)

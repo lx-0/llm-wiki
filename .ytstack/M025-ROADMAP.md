@@ -5,7 +5,7 @@ size: M
 created: 2026-05-23T08:42:54+0200
 status: in-progress
 total_slices: 3
-completed_slices: 1
+completed_slices: 2
 ---
 
 # M025 Roadmap
@@ -28,7 +28,7 @@ Slice detail lives in per-slice `M025-S##-PLAN.md` files, created by
 `ytstack:slice-milestone`. Suggested framing (refine in slice-milestone):
 
 - [x] S01 -- Capture spine: collector + stable capture-ID + capture index (3 tasks)
-- [ ] S02 -- Observable loop: capture→article resolution + digest section + correction recognition (3 tasks)
+- [x] S02 -- Observable loop: capture→article resolution + digest section + correction recognition (3 tasks)
 - [ ] S03 -- Correction write-back: supersede-marker + compile regenerate, E2E (4 tasks)
 
 ## Run order
