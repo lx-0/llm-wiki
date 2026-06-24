@@ -458,16 +458,18 @@ button:disabled { background: rgba(120,120,128,0.3); color: var(--muted); cursor
 .vault-hint b { color: var(--text); }
 
 /* Ask (the bar lives in the sticky header; the answer scrolls in the body) */
-.ask-bar { display: flex; gap: 7px; }
+.ask-bar { display: flex; gap: 8px; }
+/* The ask box is the app's primary action — let it dominate the panel. */
 #ask-input {
-  flex: 1; min-width: 0; font: inherit; font-size: 13px;
-  padding: 7px 11px; border-radius: 9px;
-  border: 0.5px solid var(--card-border); background: var(--card); color: var(--text);
+  flex: 1; min-width: 0; font: inherit; font-size: 14.5px;
+  padding: 11px 14px; border-radius: 11px;
+  border: 1px solid var(--card-border); background: var(--card); color: var(--text);
   -webkit-user-select: text; user-select: text; cursor: text; outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
 #ask-input::placeholder { color: var(--muted); }
-#ask-input:focus { border-color: var(--blue); }
-.ask-bar button { margin-left: 0; }
+#ask-input:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.18); }
+.ask-bar button { margin-left: 0; font-size: 14px; padding-left: 18px; padding-right: 18px; }
 .ask-answer {
   position: relative;
   margin: 0 0 11px; padding: 10px 12px; border-radius: 10px;
