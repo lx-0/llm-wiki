@@ -40,6 +40,11 @@
 .triage-status { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: #93a4bd; }
 .triage-date { margin-left: auto; font-size: 11px; color: #6b7a90; }
 .triage-summary { font-size: 13.5px; line-height: 1.45; color: #e2e8f0; }
+.triage-detail { font-size: 12px; line-height: 1.45; color: #93a4bd; margin-top: 6px; }
+.triage-source { display: inline-flex; align-items: center; gap: 5px; margin-top: 10px; padding: 3px 9px; border: none;
+  background: rgba(255,255,255,0.04); border-radius: 6px; font-size: 11px; color: #7da8d8; cursor: pointer; }
+.triage-source:hover { background: rgba(125,211,252,0.13); color: #a8cef0; }
+.triage-source b { color: #cfe0f5; font-weight: 600; }
 .triage-actions { display: flex; gap: 8px; margin-top: 12px; }
 .triage-accept, .triage-dismiss { border: none; border-radius: 7px; padding: 6px 14px; font-size: 12px; font-weight: 600; cursor: pointer; }
 .triage-accept { background: #2f6f4f; color: #d7f5e4; }

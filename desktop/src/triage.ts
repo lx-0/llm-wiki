@@ -10,8 +10,14 @@ interface Rec {
   status: string;
   summary: string;
   source: string;
+  detail: string;
   date: string;
   confidence: string;
+}
+
+function srcInfo(src: string): { sub: string; file: string } {
+  const p = src.split('/');
+  return { sub: p.length >= 2 ? p[p.length - 2] : '', file: p[p.length - 1] || src };
 }
 
 let showAll = false;
@@ -51,7 +57,17 @@ function render(): void {
         ${r.status !== 'pending' ? `<span class="triage-status">${esc(r.status)}</span>` : ''}
         <span class="triage-date">${esc(meta)}</span>
       </div>
-      <div class="triage-summary">${esc(r.summary)}</div>`;
+      <div class="triage-summary">${esc(r.summary)}</div>
+      ${r.detail ? `<div class="triage-detail">${esc(r.detail)}</div>` : ''}`;
+    if (r.source) {
+      const s = srcInfo(r.source);
+      const src = document.createElement('button');
+      src.className = 'triage-source';
+      src.title = `Open ${r.source} in Obsidian`;
+      src.innerHTML = `<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>from <b>${esc(s.sub || 'source')}</b> · ${esc(s.file)}`;
+      src.addEventListener('click', () => window.vault.openFile(r.source));
+      card.appendChild(src);
+    }
     const err = errors.get(r.stem);
     if (err) {
       const e = document.createElement('div');

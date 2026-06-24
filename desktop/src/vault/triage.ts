@@ -15,7 +15,8 @@ export interface TriageRecord {
   type: TriageType | string;
   status: string;
   summary: string;
-  source: string;
+  source: string; // vault-relative path of the substrate item it was detected from
+  detail: string; // human rationale from the record body
   date: string; // detected_at (YYYY-MM-DD)
   confidence: string;
 }
@@ -42,22 +43,35 @@ export function listTriage(showAll = false): TriageRecord[] {
   const records: TriageRecord[] = [];
   for (const f of files) {
     let fm = '';
+    let body = '';
     try {
       const txt = fs.readFileSync(path.join(dir, f), 'utf8');
       const m = txt.match(/^---\r?\n([\s\S]*?)\r?\n---/);
       if (!m) continue;
       fm = m[1];
+      body = txt.slice(m[0].length);
     } catch {
       continue;
     }
     const status = field(fm, 'status') || 'pending';
     if (!showAll && status !== 'pending') continue;
+    // rationale: first body paragraph, minus the provenance prefix + CLI instruction
+    const para = body.replace(/^\s*#[^\n]*\n/, '').trim().split(/\n\s*\n/)[0] || '';
+    const detail = para
+      .replace(/Detected from[^.]*\.\s*/i, '')
+      .replace(/\s*Set\s+`?status.*$/is, '')
+      .replace(/\[\[([^\]]+)\]\]/g, (_m, p: string) => p.split('|')[0])
+      .replace(/[_*`]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 240);
     records.push({
       stem: f.replace(/\.md$/, ''),
       type: field(fm, 'type') || 'note',
       status,
       summary: field(fm, 'summary') || f.replace(/\.md$/, ''),
       source: field(fm, 'source'),
+      detail,
       date: (field(fm, 'detected_at') || '').slice(0, 10),
       confidence: field(fm, 'confidence'),
     });
