@@ -51,6 +51,10 @@ const ENTRIES_PER_TYPE = 7;
 const X_ROOT = -520, X_TYPE = -150, X_ENTRY = 250;
 const H_ROOT = 48, H_TYPE = 44, H_ENTRY = 44, ROW = 14;
 const fontFor = (k: GNode['kind']) => (k === 'root' ? '700 14.5px' : k === 'type' ? '700 13.5px' : '600 12px');
+// title font scaled to the current zoom so it fits the (zoom-scaled) card instead of
+// being clipped to "Desktop A…" — fixed-px text in a shrinking box was the truncation
+const titleFont = (k: GNode['kind']) =>
+  `${k === 'root' ? 700 : 600} ${Math.max(9, (k === 'root' ? 14.5 : 12) * zoom).toFixed(1)}px -apple-system, BlinkMacSystemFont, sans-serif`;
 function cardWidth(label: string, kind: GNode['kind']): number {
   ctx.font = `${fontFor(kind)} -apple-system, BlinkMacSystemFont, sans-serif`;
   return Math.max(kind === 'entry' ? 150 : 130, Math.min(kind === 'entry' ? 232 : 190, ctx.measureText(label).width + 50));
@@ -303,14 +307,14 @@ function draw(now: number): void {
       ctx.fillStyle = `rgba(170,185,205,${0.9 * a})`;
       ctx.fillText(ellipsize(n.sub, maxw), x + pad, p.y + 11);
     } else if (h > 26) {
-      ctx.font = `${fontFor(n.kind)} -apple-system, BlinkMacSystemFont, sans-serif`;
+      ctx.font = titleFont(n.kind);
       ctx.fillStyle = `rgba(238,244,252,${a})`;
       ctx.fillText(ellipsize(n.label, maxw), x + pad, p.y - 6);
-      ctx.font = '500 9.5px -apple-system, BlinkMacSystemFont, sans-serif';
+      ctx.font = `500 ${Math.max(8, 9.5 * zoom).toFixed(1)}px -apple-system, BlinkMacSystemFont, sans-serif`;
       ctx.fillStyle = rgba(n.color, 0.85 * a);
       ctx.fillText(ellipsize(n.sub, maxw), x + pad, p.y + 9);
     } else if (h > 13) {
-      ctx.font = `${fontFor(n.kind)} -apple-system, BlinkMacSystemFont, sans-serif`;
+      ctx.font = titleFont(n.kind);
       ctx.fillStyle = `rgba(238,244,252,${a})`;
       ctx.fillText(ellipsize(n.label, maxw), x + pad, p.y + 0.5);
     }
