@@ -5,6 +5,7 @@
 // the net while the brain "thinks". Adapted from lx-0/agent-kiosk's sophia sphere,
 // re-implemented + brand-coloured + data-driven.
 import './index.css';
+import { friendlyPending } from './lib/pending';
 import { marked } from 'marked';
 
 const ICO_COPY = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
@@ -825,10 +826,11 @@ async function loadPending(): Promise<void> {
   for (const s of items) {
     const row = document.createElement('div');
     row.className = 'ck-pending-row';
-    row.innerHTML = `<span class="ck-pending-label">${esc(s.label)}</span>`;
+    row.innerHTML = `<span class="ck-pending-label" title="${esc(s.label)}">${esc(friendlyPending(s))}</span>`;
     const b = document.createElement('button');
     b.className = 'ck-run';
     b.textContent = 'Run';
+    b.title = 'Do this now — runs in the background, usually under a minute';
     b.disabled = busy;
     b.addEventListener('click', () => {
       if (busy) return;
