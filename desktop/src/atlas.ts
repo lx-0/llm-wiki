@@ -282,7 +282,21 @@ function draw(now: number): void {
     const pad = 22 * zoom;
     const maxw = w - pad - 9 * zoom;
     ctx.textAlign = 'left';
-    if (h > 26) {
+    if (n.kind === 'type' && h > 22) {
+      // type name as a filled-pill badge — the same token Browse/Panel/Recent use
+      const label = n.label.toUpperCase();
+      ctx.font = '700 9px -apple-system, BlinkMacSystemFont, sans-serif';
+      const pw = Math.min(ctx.measureText(label).width + 13, maxw);
+      const px = x + pad, py = p.y - 15;
+      roundRect(px, py, pw, 15, 4);
+      ctx.fillStyle = rgba(n.color, 0.2 * a);
+      ctx.fill();
+      ctx.fillStyle = rgba(n.color, a);
+      ctx.fillText(ellipsize(label, pw - 9), px + 6, py + 8);
+      ctx.font = '500 9.5px -apple-system, BlinkMacSystemFont, sans-serif';
+      ctx.fillStyle = `rgba(170,185,205,${0.9 * a})`;
+      ctx.fillText(ellipsize(n.sub, maxw), x + pad, p.y + 11);
+    } else if (h > 26) {
       ctx.font = `${fontFor(n.kind)} -apple-system, BlinkMacSystemFont, sans-serif`;
       ctx.fillStyle = `rgba(238,244,252,${a})`;
       ctx.fillText(ellipsize(n.label, maxw), x + pad, p.y - 6);
