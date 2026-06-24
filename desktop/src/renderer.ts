@@ -31,6 +31,7 @@ import { marked } from 'marked';
 import { ADVANCED_COMMANDS } from './vault/ipc';
 import { fmtAgo } from './lib/time';
 import { friendlyPending } from './lib/pending';
+import { TYPE_COLOR } from './lib/types';
 
 const ICON_COPY = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
 const ICON_CHECK = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>`;
@@ -224,7 +225,10 @@ function renderRecent(recent: { title: string; file: string; type: string; mtime
     row.className = r.mtimeMs > recentSeenMs ? 'recent-row new' : 'recent-row';
     row.title = 'Open in Obsidian';
     const cls = r.type.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() || 'note';
+    const c = TYPE_COLOR[cls] ?? [125, 211, 252];
+    row.style.setProperty('--c', `rgb(${c[0]},${c[1]},${c[2]})`); // type-colour edge + dot
     row.innerHTML =
+      `<span class="recent-dot"></span>` +
       `<span class="type-badge t-${cls}">${escapeHtml(r.type)}</span>` +
       `<span class="recent-title">${escapeHtml(r.title)}</span>` +
       `<span class="recent-ago">${fmtAgo(r.mtimeMs)}</span>`;
@@ -269,19 +273,19 @@ async function renderVault(): Promise<void> {
       }
       const running = compileState === 'running';
       box.innerHTML = `
-        <div class="vault-row"><span class="big">${v.articleCount.toLocaleString()}</span><span class="muted">notes · updated ${fmtAgo(v.lastActivityMs)}</span></div>
+        <div class="vault-cap"><span class="vault-stat"><span class="big">${v.articleCount.toLocaleString()}</span>notes · updated ${fmtAgo(v.lastActivityMs)}</span></div>
         <div class="vault-path" title="${v.path}">${v.path.replace(/^\/Users\/[^/]+/, '~')}</div>
         ${progressBar()}
         <div class="vault-actions">
           <span class="compile-state ${running ? 'running' : ''}">${compileLine()}</span>
         </div>`;
       const btn = document.createElement('button');
-      btn.className = 'compile';
+      btn.className = 'upd-btn';
       btn.title = 'Turn newly captured material (notes, voice, screenshots, meetings) into wiki articles. ~1 min; uses AI.';
       btn.textContent = running ? 'Updating…' : 'Update knowledge';
       btn.disabled = engineBusy();
       btn.addEventListener('click', () => void compile());
-      box.querySelector('.vault-actions')?.appendChild(btn);
+      box.querySelector('.vault-cap')?.appendChild(btn);
     }
   } catch (err) {
     console.error(err);

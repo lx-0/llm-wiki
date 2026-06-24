@@ -104,7 +104,19 @@ body {
   cursor: default;
 }
 
-body.panel { padding: 0; }
+body.panel { padding: 0; position: relative; }
+/* shared atmosphere — the cockpit's core glow, dimmed way down + faded to clean
+   charcoal, so the calm panel reads as the cockpit's intake bay (one product). */
+body.panel::before {
+  content: ''; position: fixed; top: -200px; left: 50%; transform: translateX(-50%);
+  width: 560px; height: 400px; pointer-events: none; z-index: 0;
+  background: radial-gradient(ellipse at center, rgba(167, 139, 250, 0.14), rgba(125, 211, 252, 0.045) 46%, transparent 70%);
+}
+body.panel::after {
+  content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+  background: radial-gradient(ellipse at 50% 12%, transparent 44%, rgba(0, 0, 0, 0.30) 94%);
+}
+body.panel .body-scroll { position: relative; z-index: 1; }
 
 ul { list-style: none; padding: 0; margin: 0; }
 
@@ -387,10 +399,20 @@ body.cockpit {
 }
 
 /* Vault */
-.vault-row { display: flex; align-items: baseline; gap: 6px; }
-.vault-row .big { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
-.vault-path { font-size: 11px; color: var(--muted); margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.vault-actions { display: flex; align-items: center; margin-top: 10px; gap: 8px; }
+/* the stat is a quiet caption now — the ask box is the hero, not this number */
+.vault { background: none; border: none; padding: 4px 2px 0; }
+.vault-cap { display: flex; align-items: center; gap: 8px; }
+.vault-stat { flex: 1; font-size: 12px; color: var(--muted); }
+.vault-stat .big { font-size: 15px; font-weight: 700; letter-spacing: -0.01em; color: var(--text); margin-right: 4px; }
+.upd-btn {
+  flex: none; font-size: 11.5px; font-weight: 600; color: #9fb8d6; cursor: pointer;
+  background: rgba(125, 211, 252, 0.10); border: 0.5px solid rgba(125, 211, 252, 0.20);
+  border-radius: 8px; padding: 6px 13px;
+}
+.upd-btn:hover { background: rgba(125, 211, 252, 0.18); }
+.upd-btn:disabled { opacity: 0.5; cursor: default; }
+.vault-path { font-size: 11px; color: var(--muted); margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vault-actions { display: flex; align-items: center; margin-top: 8px; gap: 8px; }
 .compile-state { font-size: 11px; color: var(--muted); }
 .compile-state.running { color: var(--blue); font-weight: 500; }
 .muted { color: var(--muted); }
@@ -461,14 +483,15 @@ button:disabled { background: rgba(120,120,128,0.3); color: var(--muted); cursor
 .ask-bar { display: flex; gap: 8px; }
 /* The ask box is the app's primary action — let it dominate the panel. */
 #ask-input {
-  flex: 1; min-width: 0; font: inherit; font-size: 14.5px;
-  padding: 11px 14px; border-radius: 11px;
-  border: 1px solid var(--card-border); background: var(--card); color: var(--text);
+  flex: 1; min-width: 0; font: inherit; font-size: 15px;
+  padding: 12px 15px; border-radius: 12px;
+  border: 1px solid rgba(125, 211, 252, 0.34); background: var(--card); color: var(--text);
+  box-shadow: 0 0 0 3px rgba(125, 211, 252, 0.06), 0 8px 30px rgba(125, 211, 252, 0.13), inset 0 1px 0 rgba(255, 255, 255, 0.05);
   -webkit-user-select: text; user-select: text; cursor: text; outline: none;
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 #ask-input::placeholder { color: var(--muted); }
-#ask-input:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.18); }
+#ask-input:focus { border-color: rgba(125, 211, 252, 0.6); box-shadow: 0 0 0 3px rgba(125, 211, 252, 0.12), 0 10px 40px rgba(125, 211, 252, 0.22); }
 .ask-bar button { margin-left: 0; font-size: 14px; padding-left: 18px; padding-right: 18px; }
 .ask-answer {
   position: relative;
@@ -526,13 +549,15 @@ button:disabled { background: rgba(120,120,128,0.3); color: var(--muted); cursor
 .recent-list { margin-top: 6px; padding: 4px 5px; display: flex; flex-direction: column; }
 .recent-row {
   margin: 0; width: 100%; background: none; color: var(--text); font: inherit; font-weight: 400;
-  display: flex; align-items: center; gap: 8px; padding: 6px 7px; border-radius: 7px;
-  text-align: left; cursor: pointer;
+  display: flex; align-items: center; gap: 8px; padding: 6px 7px 6px 9px; border-radius: 7px;
+  text-align: left; cursor: pointer; border-left: 2.5px solid var(--c, transparent);
 }
 .recent-row:hover { background: rgba(120,120,128,0.14); }
-.recent-row.new { background: rgba(10, 132, 255, 0.08); box-shadow: inset 2.5px 0 0 var(--blue); }
+.recent-row.new { background: rgba(10, 132, 255, 0.08); }
 .recent-row.new:hover { background: rgba(10, 132, 255, 0.14); }
 .recent-row.new .recent-title { font-weight: 600; }
+/* the jewel — a glowing type-coloured node-dot (the atlas/cockpit DNA) */
+.recent-dot { width: 7px; height: 7px; border-radius: 50%; flex: none; background: var(--c, #7dd3fc); box-shadow: 0 0 7px var(--c, #7dd3fc); }
 .recent-title { flex: 1; font-size: 12.5px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .recent-ago { font-size: 11px; color: var(--muted); flex: none; font-variant-numeric: tabular-nums; }
 
