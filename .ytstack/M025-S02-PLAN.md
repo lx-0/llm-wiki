@@ -5,7 +5,7 @@ project: llm-wiki
 created: 2026-05-23T08:53:30+0200
 status: in-progress
 task_count: 3
-completed_tasks: 1
+completed_tasks: 2
 ---
 
 # M025-S02 -- Slice Plan
@@ -24,10 +24,13 @@ Python-side via `compiled_from`).
   corpus (capture source → compiled article with `compiled_from`).
   → `core/capture_index.resolve_articles()` (2026-06-25, 9 tests). See
   `M025-S02-T01-SUMMARY.md`.
-- [ ] T02 -- Digest "Captures" section: extend `scripts/daily_digest_runner.py` +
+- [x] T02 -- Digest "Captures" section: extend `scripts/daily_digest_runner.py` +
   the `daily-digest` prompt (in `prompts/`) to render recent captures keyed by
   `capture_id` → interpretation (linked article) + the context the brain added.
   Integration test on a fixture (capture + resolved article → expected digest rows).
+  → built DETERMINISTICALLY (`build_captures_section()` + runner injection), prompt
+  only suppresses agent double-coverage (2026-06-25, 15 tests). See
+  `M025-S02-T02-SUMMARY.md`. Rendered-digest obedience operator-verified.
 - [ ] T03 -- Correction recognition (capture-side only): a capture body referencing
   a known capture-id (`re:<id>` / `corrects:<id>` leading token) gets
   `kind: correction` + `corrects: <id>` frontmatter, distinct from a fresh capture.

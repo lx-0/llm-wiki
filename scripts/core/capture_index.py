@@ -140,3 +140,54 @@ def resolve_articles(knowledge_dir: Path | None = None) -> dict[str, list[str]]:
                 if rel not in result[cid]:
                     result[cid].append(rel)
     return result
+
+
+def _capture_gist(source_path: str, *, vault_root: Path) -> str:
+    """The first non-empty body line of a raw capture, for a one-line digest row."""
+    try:
+        text = (vault_root / source_path).read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return ""
+    body = _FM_RE.sub("", text, count=1)
+    for line in body.splitlines():
+        s = line.strip()
+        if s and not s.startswith("#"):
+            return s if len(s) <= 80 else s[:77].rstrip() + "…"
+    return ""
+
+
+def build_captures_section(date_iso: str, *, vault_root: Path | None = None) -> str | None:
+    """The deterministic `## Captures` digest block for one day: each capture
+    created on `date_iso`, keyed by short-id, with the interpretation (the article
+    it was compiled into, via `resolve_articles()`) and a superseded marker.
+
+    Returns the markdown (trailing newline) or None if no captures that day. Built
+    Python-side — a table lookup, NOT an LLM call — so it's exact and testable; the
+    runner injects it into the agent-written digest.
+    """
+    from .paths import ROOT_DIR
+
+    root = vault_root or ROOT_DIR
+    index = load()
+    todays = {
+        cid: e
+        for cid, e in index.items()
+        if isinstance(e, dict) and str(e.get("created", ""))[:10] == date_iso
+    }
+    if not todays:
+        return None
+    resolved = resolve_articles(root / "knowledge")
+    lines = ["## Captures", ""]
+    for cid in sorted(todays, key=lambda c: str(todays[c].get("created", ""))):
+        entry = todays[cid]
+        short = cid[:8]
+        gist = _capture_gist(entry.get("source_path", ""), vault_root=root)
+        gist_part = f" · {gist}" if gist else ""
+        articles = resolved.get(cid, [])
+        if articles:
+            interp = ", ".join(f"[[{a}]]" for a in articles)
+            mark = " · _superseded_" if entry.get("status") == STATUS_SUPERSEDED else ""
+            lines.append(f"- `{short}`{gist_part} → {interp}{mark}")
+        else:
+            lines.append(f"- `{short}`{gist_part} → _not yet compiled_")
+    return "\n".join(lines) + "\n"

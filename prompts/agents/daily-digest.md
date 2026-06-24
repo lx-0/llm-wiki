@@ -31,6 +31,7 @@ You produce **one short daily digest** from the per-source captures under `daily
    - `meetings.md` — gmeet + jamie meeting one-liners.
    - `voice.md` — operator dictation intakes of the day.
    - `email.md` — per-account email summary: count + delta-link, top senders, and a sample of recent subjects.
+   - `captures.md` — quick-captures of the day. **Do NOT summarise or re-narrate these, and do NOT write your own `## Captures` section.** A deterministic Captures section (each capture → the article it was compiled into) is attached automatically after you finish — leaving it to you would only duplicate it. Skip this file.
 
 2. Read each file that exists. Skip silently if a source has no file.
 

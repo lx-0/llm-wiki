@@ -123,3 +123,49 @@ def test_resolve_articles_empty_index_and_missing_dir(index_env, tmp_path):
     assert ci.resolve_articles(knowledge_dir=tmp_path / "knowledge") == {}  # empty index → {}
     ci.record("q", source_path="raw/captures/capture-q.md", created="t1")
     assert ci.resolve_articles(knowledge_dir=tmp_path / "nope") == {"q": []}  # absent dir → no crash
+
+
+# --- M025-S02-T02: deterministic digest captures section -------------------
+
+def _write_capture_body(vault, cid, body):
+    p = vault / "raw" / "captures" / f"capture-{cid}.md"
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(f"---\ntype: capture\ncapture_id: {cid}\n---\n{body}\n", encoding="utf-8")
+
+
+def test_build_captures_section_resolves_and_filters_by_day(index_env, tmp_path):
+    ci = index_env
+    ci.record("aaa11111", source_path="raw/captures/capture-aaa11111.md", created="2026-06-20T09:00:00+02:00")
+    ci.record("bbb22222", source_path="raw/captures/capture-bbb22222.md", created="2026-06-20T10:00:00+02:00")
+    ci.record("ccc33333", source_path="raw/captures/capture-ccc33333.md", created="2026-06-19T10:00:00+02:00")
+    _write_capture_body(tmp_path, "aaa11111", "Buy milk and eggs")
+    _write_capture_body(tmp_path, "bbb22222", "Idea about pricing")
+    _write_article(tmp_path / "knowledge", "projects/groceries.md", ["raw/captures/capture-aaa11111.md"])
+
+    section = ci.build_captures_section("2026-06-20", vault_root=tmp_path)
+    assert section is not None
+    assert "## Captures" in section
+    assert "`aaa11111` · Buy milk and eggs → [[knowledge/projects/groceries.md]]" in section
+    assert "`bbb22222` · Idea about pricing → _not yet compiled_" in section
+    assert "ccc33333" not in section  # different day filtered out
+
+
+def test_build_captures_section_none_when_no_captures_that_day(index_env, tmp_path):
+    ci = index_env
+    ci.record("z", source_path="raw/captures/capture-z.md", created="2026-06-19T10:00:00+02:00")
+    assert ci.build_captures_section("2026-06-20", vault_root=tmp_path) is None
+
+
+def test_build_captures_section_superseded_marker(index_env, tmp_path):
+    ci = index_env
+    from core.utils import save_json_state
+
+    ci.record("sup55555", source_path="raw/captures/capture-sup55555.md", created="2026-06-20T09:00:00+02:00")
+    idx = ci.load()
+    idx["sup55555"]["status"] = ci.STATUS_SUPERSEDED
+    save_json_state(ci.CAPTURE_INDEX_FILE, idx)
+    _write_capture_body(tmp_path, "sup55555", "Old reading")
+    _write_article(tmp_path / "knowledge", "facts/x.md", ["raw/captures/capture-sup55555.md"])
+
+    section = ci.build_captures_section("2026-06-20", vault_root=tmp_path)
+    assert "_superseded_" in section
