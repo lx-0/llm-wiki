@@ -364,15 +364,18 @@ def test_write_last_dreamed_at_idempotent_same_day(vault: Path) -> None:
 
 def test_dreams_since_last_seen_reads_stamp(vault: Path) -> None:
     import dream
-    now = datetime.now(timezone.utc)
+    # Fixed `now` (not datetime.now()): the stamp is a date string truncated to
+    # midnight, so a wall-clock `now` drifted the gap out of [5,6) near midnight /
+    # across timezones (flaky — saw 6.005). Pinning `now` to noon keeps the gap a
+    # deterministic ~5.5 days regardless of when/where the suite runs.
+    now = datetime(2026, 6, 10, 12, 0, tzinfo=timezone.utc)
     five_days_ago = (now - timedelta(days=5)).strftime("%Y-%m-%d")
     p = _write_substrate(
         vault, "raw/notes/email/x.md", "Body.\n",
         frontmatter={"last_dreamed_at": five_days_ago},
     )
     days = dream._dreams_since_last_seen_days(p, now=now)
-    # strftime("%Y-%m-%d") truncates to midnight, so the gap can be anywhere in
-    # [5.0, 6.0) depending on time-of-day at test runtime.
+    # stamp = 2026-06-05 (midnight) vs now = 2026-06-10 12:00 → ~5.5 days.
     assert 5.0 <= days < 6.0
 
     unstamped = _write_substrate(vault, "raw/notes/email/y.md", "Body.\n")
