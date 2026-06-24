@@ -6,6 +6,7 @@
 // re-implemented + brand-coloured + data-driven.
 import './index.css';
 import { friendlyPending } from './lib/pending';
+import { TYPE_COLOR, NODE, GLOW } from './lib/types';
 import { marked } from 'marked';
 
 const ICO_COPY = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
@@ -66,16 +67,10 @@ let W = 0, H = 0, cx = 0, cy = 0, radius = 0;
 
 const outer = makeIcosphere(2);
 const inner = makeIcosphere(1);
-const GLOW: [number, number, number] = [167, 139, 250]; // violet
-const NODE: [number, number, number] = [125, 211, 252]; // cyan
-const WARM: [number, number, number] = [255, 159, 64];
+const WARM: [number, number, number] = [255, 159, 64]; // amber — the core's "issues" colour
 const rgba = (c: [number, number, number], a: number) => `rgba(${c[0]},${c[1]},${c[2]},${a})`;
 
 // the sphere IS the knowledge graph — nodes mapped to real entries, coloured by type
-const TYPE_COLOR: Record<string, [number, number, number]> = {
-  person: [224, 82, 176], project: [26, 184, 200], concept: [148, 132, 240],
-  fact: [224, 86, 79], area: [52, 200, 110], map: [230, 180, 30], link: [240, 150, 70],
-};
 type NodeEntry = { type: string; file: string; title: string } | null;
 let nodeEntries: NodeEntry[] = [];
 const nodeColor = (i: number): [number, number, number] => {

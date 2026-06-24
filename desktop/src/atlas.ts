@@ -4,13 +4,8 @@
 // entrance, and hover that lights the whole path to the root. Pan/zoom, click an
 // entry → Obsidian, a type → focus.
 import './index.css';
+import { TYPE_COLOR, NODE, GLOW } from './lib/types';
 
-const TYPE_COLOR: Record<string, [number, number, number]> = {
-  person: [224, 82, 176], project: [26, 184, 200], concept: [148, 132, 240],
-  fact: [224, 86, 79], area: [52, 200, 110], map: [230, 180, 30], link: [240, 150, 70],
-};
-const NODE: [number, number, number] = [125, 211, 252];
-const GLOW: [number, number, number] = [167, 139, 250];
 const rgba = (c: [number, number, number], a: number) => `rgba(${c[0]},${c[1]},${c[2]},${a})`;
 const colorOf = (t: string): [number, number, number] => TYPE_COLOR[t] ?? NODE;
 function esc(s: string): string {
