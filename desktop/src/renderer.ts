@@ -118,13 +118,22 @@ type Status = Awaited<ReturnType<typeof window.listeners.status>>[number];
 const LISTENER_LABELS: Record<string, string> = { screenpipe: 'Screen & audio capture' };
 const listenerLabel = (id: string): string => LISTENER_LABELS[id] ?? id;
 
-/** One clear, human line — semantic state, not a raw growing counter. */
+/** The capture state as a plain WORD, not a colour — the most consequential status
+ *  must be readable at a glance even if you can't tell the dot's colour (a11y). */
+function captureState(s: Status): string {
+  const p = pending.get(s.id);
+  if (p) return p === 'start' ? 'Starting…' : 'Stopping…';
+  if (!s.running) return 'Paused';
+  return s.zombieSuspected ? 'Check' : 'Recording';
+}
+
+/** The detail line — the state itself now lives in the captureState() chip. */
 function summaryLine(s: Status): string {
   const p = pending.get(s.id);
-  if (p) return p === 'start' ? 'starting…' : 'stopping…';
-  if (!s.running) return `stopped · last capture ${fmtClock(s.channels.mic.lastCaptureAtMs)}`;
+  if (p) return p === 'start' ? 'turning on…' : 'turning off…';
+  if (!s.running) return `last captured ${fmtClock(s.channels.mic.lastCaptureAtMs)}`;
   const mic = s.channels.mic, sys = s.channels.system;
-  if (mic.fresh && sys.fresh) return 'recording · screen, mic + system audio';
+  if (mic.fresh && sys.fresh) return 'screen, mic + system audio';
   const parts: string[] = [];
   parts.push(mic.fresh ? 'mic ✓' : `mic silent ${fmtDur(mic.ageSeconds)}`);
   parts.push(sys.fresh ? 'system ✓' : `system silent ${fmtDur(sys.ageSeconds)}`);
@@ -146,6 +155,7 @@ async function renderStatus(): Promise<void> {
         <div class="head">
           <span class="dot ${state}"></span>
           <span class="name" title="${s.id}">${listenerLabel(s.id)}</span>
+          <span class="cap-status state-${state}">${captureState(s)}</span>
         </div>
         <div class="summary ${state}">${summaryLine(s)}</div>`;
       const btn = document.createElement('button');
@@ -571,7 +581,7 @@ function renderSources(): void {
     return;
   }
   const configured = collectorList.filter((c) => c.configured);
-  el.innerHTML = '';
+  el.innerHTML = `<p class="adv-hint src-provenance">Your library fills up automatically from these — that's where your notes come from. Add or pause any of them here.</p>`;
   if (configured.length > 1) {
     const row = document.createElement('div');
     row.className = 'adv-row';

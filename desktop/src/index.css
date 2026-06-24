@@ -234,6 +234,7 @@ body.onboarding::before {
 .bf-type { display: inline-flex; align-items: center; gap: 5px; text-transform: capitalize; }
 .bf-dot { width: 6px; height: 6px; border-radius: 50%; flex: none; }
 .src-ico { flex: none; width: 18px; text-align: center; font-size: 13px; margin-right: 2px; }
+.src-provenance { margin: 0 0 9px; line-height: 1.45; }
 .browse-head { display: flex; align-items: center; gap: 10px; padding: 14px 16px 10px; }
 #browse-input {
   flex: 1; font: inherit; font-size: 14px; padding: 8px 12px; border-radius: 9px;
@@ -487,6 +488,11 @@ body.cockpit {
 .head { display: flex; align-items: center; gap: 8px; }
 .name { font-weight: 600; font-size: 14px; flex: 1; }
 .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+/* capture state as a readable WORD (not colour-only) — a11y for the most important status */
+.cap-status { flex: none; font-size: 10px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; padding: 2px 7px; border-radius: 5px; }
+.cap-status.state-running { color: #ff8a80; background: rgba(255, 69, 58, 0.16); }
+.cap-status.state-stopped, .cap-status.state-busy { color: #93a4bd; background: rgba(255, 255, 255, 0.06); }
+.cap-status.state-zombie { color: #ffd60a; background: rgba(255, 214, 10, 0.14); }
 .dot.running { background: var(--green); box-shadow: 0 0 7px rgba(52,199,89,0.7); }
 .dot.stopped { background: var(--muted); }
 .dot.zombie  { background: var(--amber); box-shadow: 0 0 7px rgba(255,159,10,0.7); }
