@@ -33,7 +33,7 @@ async function loadStatus(): Promise<void> {
   if (vaultEl) {
     vaultEl.innerHTML = v
       ? `<b>${esc(v.name)}</b> · ${v.articleCount.toLocaleString()} notes<div class="set-path" title="${esc(v.path)}">${esc(v.path.replace(/^\/Users\/[^/]+/, '~'))}</div>`
-      : 'No vault found yet — set one up with the wiki CLI first.';
+      : 'No library found yet — set one up with the wiki CLI first.';
   }
   if (openBtn) openBtn.hidden = !v;
 
@@ -42,7 +42,7 @@ async function loadStatus(): Promise<void> {
     fdaSub.textContent = !v
       ? '—'
       : ok
-        ? 'Granted — llm-wiki can read your vault'
+        ? 'Granted — llm-wiki can read your library'
         : "Not granted — llm-wiki can't read your iCloud vault yet";
   }
   if (fdaBtn) fdaBtn.hidden = !v || !!ok;

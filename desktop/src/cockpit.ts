@@ -705,7 +705,7 @@ async function loadHud(): Promise<void> {
   const statEl = document.getElementById('ck-stat');
   const recentEl = document.getElementById('ck-recent-list');
   if (!v) {
-    if (statEl) statEl.textContent = 'No vault found';
+    if (statEl) statEl.textContent = 'No library found';
     return;
   }
   if (vaultEl) vaultEl.textContent = v.name;

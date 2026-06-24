@@ -258,7 +258,7 @@ async function renderVault(): Promise<void> {
   try {
     const v = await window.vault.status();
     if (!v) {
-      if (meta) meta.textContent = 'no vault';
+      if (meta) meta.textContent = 'no library';
       if (box) box.textContent = '';
       return;
     }
@@ -273,7 +273,7 @@ async function renderVault(): Promise<void> {
         // Can't read the vault — almost always macOS file access (the vault is
         // under iCloud Drive; a Finder-launched app needs Full Disk Access).
         box.innerHTML = `
-          <div class="vault-warn">⚠ Can't read your vault</div>
+          <div class="vault-warn">⚠ Can't read your library</div>
           <div class="vault-path">${v.path.replace(/^\/Users\/[^/]+/, '~')}</div>
           <div class="vault-hint">Grant <b>Full Disk Access</b> to llm-wiki in System Settings → Privacy &amp; Security, then reopen.</div>`;
         const fix = document.createElement('button');

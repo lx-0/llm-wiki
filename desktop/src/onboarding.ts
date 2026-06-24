@@ -10,7 +10,7 @@ const loginNum = document.getElementById('login-num');
 async function loadVault(): Promise<void> {
   const v = await window.vault.status();
   if (!v) {
-    if (vaultDetail) vaultDetail.textContent = 'No vault found yet — set one up with the wiki CLI first.';
+    if (vaultDetail) vaultDetail.textContent = 'No library found yet — set one up with the wiki CLI first.';
     if (stepAccess) stepAccess.hidden = true;
     return;
   }
