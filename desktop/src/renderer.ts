@@ -99,13 +99,18 @@ function fmtDur(sec: number | null): string {
 
 type Status = Awaited<ReturnType<typeof window.listeners.status>>[number];
 
+/** Friendly names for background capture processes — "screenpipe" means nothing to a
+ *  non-technical user; say what it actually does. */
+const LISTENER_LABELS: Record<string, string> = { screenpipe: 'Screen & audio capture' };
+const listenerLabel = (id: string): string => LISTENER_LABELS[id] ?? id;
+
 /** One clear, human line — semantic state, not a raw growing counter. */
 function summaryLine(s: Status): string {
   const p = pending.get(s.id);
   if (p) return p === 'start' ? 'starting…' : 'stopping…';
   if (!s.running) return `stopped · last capture ${fmtClock(s.channels.mic.lastCaptureAtMs)}`;
   const mic = s.channels.mic, sys = s.channels.system;
-  if (mic.fresh && sys.fresh) return 'capturing · mic + system audio';
+  if (mic.fresh && sys.fresh) return 'recording · mic + system audio';
   const parts: string[] = [];
   parts.push(mic.fresh ? 'mic ✓' : `mic silent ${fmtDur(mic.ageSeconds)}`);
   parts.push(sys.fresh ? 'system ✓' : `system silent ${fmtDur(sys.ageSeconds)}`);
@@ -126,7 +131,7 @@ async function renderStatus(): Promise<void> {
       card.innerHTML = `
         <div class="head">
           <span class="dot ${state}"></span>
-          <span class="name">${s.id}</span>
+          <span class="name" title="${s.id}">${listenerLabel(s.id)}</span>
         </div>
         <div class="summary ${state}">${summaryLine(s)}</div>`;
       const btn = document.createElement('button');
@@ -271,7 +276,7 @@ async function renderVault(): Promise<void> {
         </div>`;
       const btn = document.createElement('button');
       btn.className = 'compile';
-      btn.title = 'Turn newly captured material (notes, voice, screenshots, meetings) into wiki articles';
+      btn.title = 'Turn newly captured material (notes, voice, screenshots, meetings) into wiki articles. ~1 min; uses AI.';
       btn.textContent = running ? 'Updating…' : 'Update knowledge';
       btn.disabled = engineBusy();
       btn.addEventListener('click', () => void compile());
@@ -498,6 +503,7 @@ function renderPending(): void {
       const b = document.createElement('button');
       b.className = 'ghost';
       b.textContent = 'Run';
+      b.title = 'Do this now — runs in the background, usually under a minute';
       b.disabled = engineBusy();
       b.addEventListener('click', () => void runArgs(s.cmd));
       row.appendChild(b);
