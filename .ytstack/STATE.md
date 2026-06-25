@@ -1,16 +1,33 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-06-13T19:30:00+0200
-current_milestone: M028
-active_slice: S04
+last_updated: 2026-06-25T02:00:00+0200
+current_milestone: M025
+active_slice: S03
 active_task: none
 last_completed_milestone: M026
-parked_milestone: M025
+parked_milestone: none
 parallel_milestones: [M021, M027, M029]
 ---
 
 # State
+
+**Status (2026-06-25): M025 — S02 complete, reassessed → proceed to S03.** Capture-
+correction loop: S01 (capture spine) + S02 shipped — T01 `resolve_articles()`
+forward-link, T02 deterministic digest `## Captures` section (runner-injected, not
+LLM), T03 correction recognition (`detect_correction` + collector `kind: correction`
+tagging + `docs/setup-captures.md`). Suite **1407 green**. Reassess-roadmap after S02:
+**A — proceed as planned**; S02 de-risked S03 (T01's `resolve_articles()` is exactly
+the article-resolution S03's regeneration needs). **Next: S03 — correction write-back**
+(supersede primitive + compile regenerate + E2E, 4 tasks), carrying the OPEN
+compile-regeneration eng-seam → slice via `slice-milestone` + `plan-eng-review` before
+implementing (potential L-split signal). Commits this session: M029 desktop
+design/learnability arc + window-size fixes (settings/onboarding were clipped),
+dream-sampling de-flake, M025-S02 (`ea6b0b9` / `75cdcc1` / `40c0fc7`). Push gated.
+**NOTE — STATE was stale:** it read `current_milestone: M028`, but **M028 AND M029 are
+both DONE** (verified: all slice summaries + shipped code); corrected `current` to M025.
+Re-verify against the per-milestone ROADMAPs, not this dashboard's history below.
+
 
 **Ad-hoc 2026-06-13e (output_language → curiosity + dream, 0.2.1):** Follow-up to
 issue #4 (the `personal.output_language` knob, shipped 0.1.9 — pins compiled-prose
