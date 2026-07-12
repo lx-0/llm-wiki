@@ -185,19 +185,141 @@ def _split_content(content) -> tuple[str, list[str]]:
     return "\n".join(t for t in text_parts if t), tool_parts
 
 
-def read_transcript(transcript_path: str) -> list[Turn]:
-    """Read a Claude Code JSONL transcript and return ordered Turns.
-
-    A Turn is dropped only if it produces no prose AND no tool summaries —
-    pure system/metadata entries. Empty assistant prose with tool calls is
-    kept (it carries the tool-sequence the compiler depends on).
-    """
+def _read_claude_entries(entries: list[dict]) -> list[Turn]:
+    """Normalize Claude Code JSONL entries into ordered turns."""
     turns: list[Turn] = []
+    for entry in entries:
+        msg = entry.get("message", {})
+        role = msg.get("role")
+        content = msg.get("content")
+
+        if role not in ("user", "assistant") or content is None:
+            continue
+
+        text, tools = _split_content(content)
+        text = text.strip()
+        if not text and not tools:
+            continue
+        turns.append(Turn(role=role, text=text, tools=tools))
+
+    return turns
+
+
+def _split_codex_content(content: object) -> str:
+    """Extract visible prose from Codex input_text/output_text blocks."""
+    if isinstance(content, str):
+        return content
+    if not isinstance(content, list):
+        return ""
+
+    text_parts: list[str] = []
+    for block in content:
+        if not isinstance(block, dict):
+            continue
+        if block.get("type") not in ("input_text", "output_text"):
+            continue
+        text = block.get("text", "")
+        if isinstance(text, str) and text:
+            text_parts.append(text)
+    return "\n".join(text_parts)
+
+
+def _codex_tool_input(payload: dict) -> dict:
+    """Return a bounded-summary-compatible dict for a Codex tool call."""
+    raw_input = payload.get("input", {})
+    if isinstance(raw_input, dict):
+        return raw_input
+    if isinstance(raw_input, str):
+        try:
+            parsed = json.loads(raw_input)
+        except json.JSONDecodeError:
+            return {"input": raw_input}
+        if isinstance(parsed, dict):
+            return parsed
+        return {"input": str(parsed)}
+    return {"input": str(raw_input)}
+
+
+def _read_codex_entries(entries: list[dict], turn_id: str | None) -> list[Turn]:
+    """Normalize one Codex rollout turn, excluding pre-context injections."""
+    target_turn = turn_id
+    if target_turn is None:
+        for entry in entries:
+            if entry.get("type") != "turn_context":
+                continue
+            candidate = entry.get("payload", {}).get("turn_id")
+            if isinstance(candidate, str) and candidate:
+                target_turn = candidate
+
+    if target_turn is None:
+        return []
+
+    turns: list[Turn] = []
+    active = False
+    for entry in entries:
+        entry_type = entry.get("type")
+        payload = entry.get("payload", {})
+        if not isinstance(payload, dict):
+            continue
+
+        if entry_type == "turn_context":
+            current_turn = payload.get("turn_id")
+            if active and current_turn != target_turn:
+                break
+            active = current_turn == target_turn
+            continue
+
+        if not active:
+            continue
+
+        if (
+            entry_type == "event_msg"
+            and payload.get("type") == "task_complete"
+            and payload.get("turn_id") == target_turn
+        ):
+            break
+
+        if entry_type != "response_item":
+            continue
+
+        payload_type = payload.get("type")
+        if payload_type == "message":
+            role = payload.get("role")
+            if role not in ("user", "assistant"):
+                continue
+            text = _split_codex_content(payload.get("content")).strip()
+            if text:
+                turns.append(Turn(role=role, text=text))
+        elif payload_type == "custom_tool_call":
+            name = str(payload.get("name", "?"))
+            turns.append(
+                Turn(role="assistant", tools=[_summarize_tool(name, _codex_tool_input(payload))])
+            )
+        elif payload_type == "custom_tool_call_output":
+            turns.append(
+                Turn(
+                    role="assistant",
+                    tools=[_summarize_tool_result({"content": payload.get("output", "")})],
+                )
+            )
+
+    return turns
+
+
+def read_transcript(transcript_path: str, *, turn_id: str | None = None) -> list[Turn]:
+    """Read Claude Code or Codex rollout JSONL and return ordered turns.
+
+    Claude transcripts keep their historical whole-session behavior. Codex
+    transcripts are turn-scoped because Codex fires ``Stop`` after every turn;
+    selecting from ``turn_context`` also excludes injected developer context
+    that may be serialized before the visible user message.
+    """
     path = Path(transcript_path)
     if not path.exists():
         log.warning(f"Transcript not found: {transcript_path}")
-        return turns
+        return []
 
+    entries: list[dict] = []
     with open(path, "r", encoding="utf-8") as f:
         for line in f:
             line = line.strip()
@@ -207,21 +329,15 @@ def read_transcript(transcript_path: str) -> list[Turn]:
                 entry = json.loads(line)
             except json.JSONDecodeError:
                 continue
+            if isinstance(entry, dict):
+                entries.append(entry)
 
-            msg = entry.get("message", {})
-            role = msg.get("role")
-            content = msg.get("content")
+    if any("message" in entry for entry in entries):
+        return _read_claude_entries(entries)
+    if any(entry.get("type") == "response_item" for entry in entries):
+        return _read_codex_entries(entries, turn_id)
 
-            if role not in ("user", "assistant") or content is None:
-                continue
-
-            text, tools = _split_content(content)
-            text = text.strip()
-            if not text and not tools:
-                continue
-            turns.append(Turn(role=role, text=text, tools=tools))
-
-    return turns
+    return []
 
 
 def _truncate_tail(s: str, budget: int) -> str:
