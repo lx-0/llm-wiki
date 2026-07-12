@@ -53,3 +53,11 @@ def test_missing_codex_turn_id_falls_back_to_session_id():
     )
 
     assert capture_id == "11111111-1111-1111-1111-111111111111"
+
+
+def test_background_flush_starts_a_new_session_on_posix():
+    module = _load_session_end_module()
+
+    kwargs = module.background_popen_kwargs("darwin")
+
+    assert kwargs == {"start_new_session": True}

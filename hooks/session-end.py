@@ -52,6 +52,14 @@ def capture_id_for_hook(hook_input: dict) -> str:
     return str(hook_input.get("session_id", "unknown"))
 
 
+def background_popen_kwargs(platform_name: str = sys.platform) -> dict:
+    """Return flags that keep the background flush alive after the hook exits."""
+    if platform_name == "win32":
+        create_no_window = 0x08000000
+        return {"creationflags": create_no_window}
+    return {"start_new_session": True}
+
+
 def main() -> None:
     # Recursion guard
     if os.environ.get("CLAUDE_INVOKED_BY"):
@@ -122,17 +130,12 @@ def main() -> None:
         capture_id,
     ]
 
-    kwargs: dict = {}
-    if sys.platform == "win32":
-        CREATE_NO_WINDOW = 0x08000000
-        kwargs["creationflags"] = CREATE_NO_WINDOW
-
     subprocess.Popen(
         cmd,
         stdout=subprocess.DEVNULL,
         stdin=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
-        **kwargs,
+        **background_popen_kwargs(),
     )
     log.info(f"Spawned flush.py for session {session_id} capture {capture_id}")
 
