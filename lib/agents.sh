@@ -69,7 +69,9 @@ hooks_installed() {
 
 # ── Hook payload generators ──────────────────────────────────────────
 # Each writes a JSON object to stdout with the wiki-managed hooks block.
-# Generators omit events the agent doesn't support (e.g. Codex has no PreCompact).
+# Generators omit events that would duplicate capture. Codex supports
+# PreCompact, but Stop already captures every completed turn with a stable
+# turn_id, so installing both would create a second path for the same turn.
 
 # All payload generators emit a `cd '<abs-vault>/.wiki' && uv run python
 # hooks/<name>.py` form. The cd anchors CWD inside the engine; uv then
