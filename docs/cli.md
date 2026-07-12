@@ -388,6 +388,12 @@ Run `./.wiki/wiki config keys` for the live enumeration of every settable leaf.
 | gemini | `.gemini/settings.json` | ✓ | ✓ | PreCompress |
 | cursor | `.cursor/hooks.json` | ✓ | ✓ | ✓ |
 
+Codex lifecycle semantics differ from Claude Code: `Stop` fires after each
+completed turn, not once at thread end. The session hook therefore reads only
+the matching rollout segment (`turn_context` through `task_complete`) and uses
+Codex's `turn_id` as the flush identity. Codex `PreCompact` is intentionally
+not installed because completed turns have already been captured by `Stop`.
+
 Install scope:
 
 - **user** (recommended, wizard default) — `~/<.agent>/...` — hooks fire for every agent session regardless of CWD. This is the right scope for llm-wiki's purpose: capture sessions from every project the operator works in, not only sessions launched with CWD = vault root. Generated commands use absolute paths so they resolve correctly from any working directory.

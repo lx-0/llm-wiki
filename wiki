@@ -200,7 +200,7 @@ ${C_BOLD}SCOPE${C_RESET}
 
 ${C_BOLD}EVENT MAPPING${C_RESET} (auto, per agent)
                   claude         codex     gemini       cursor
-  session-start   SessionStart   Start     SessionStart  —
+  session-start   SessionStart   SessionStart SessionStart  —
   session-end     SessionEnd     Stop      SessionEnd    stop
   pre-compact     PreCompact     —         PreCompress   —
 
