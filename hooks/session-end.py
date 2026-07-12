@@ -40,6 +40,18 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 
+def capture_id_for_hook(hook_input: dict) -> str:
+    """Return a unique flush identity for this hook invocation.
+
+    Claude Code's SessionEnd is session-scoped, while Codex Stop is
+    turn-scoped. Using Codex's turn_id prevents adjacent turns in one thread
+    from colliding with flush.py's session-level deduplication window.
+    """
+    if hook_input.get("hook_event_name") == "Stop" and hook_input.get("turn_id"):
+        return str(hook_input["turn_id"])
+    return str(hook_input.get("session_id", "unknown"))
+
+
 def main() -> None:
     # Recursion guard
     if os.environ.get("CLAUDE_INVOKED_BY"):
@@ -66,15 +78,17 @@ def main() -> None:
         return
 
     session_id = hook_input.get("session_id", "unknown")
+    turn_id = hook_input.get("turn_id")
+    capture_id = capture_id_for_hook(hook_input)
     transcript_path = hook_input.get("transcript_path", "")
 
     if not transcript_path:
         log.warning("No transcript_path in hook input, exiting.")
         return
 
-    log.info(f"Processing session {session_id}")
+    log.info(f"Processing session {session_id} capture {capture_id}")
 
-    turns = read_transcript(transcript_path)
+    turns = read_transcript(transcript_path, turn_id=turn_id)
     log.info(f"Found {len(turns)} turns in transcript")
 
     if len(turns) < MIN_TURNS_TO_FLUSH:
@@ -85,7 +99,7 @@ def main() -> None:
 
     context = build_context(turns)
 
-    staged = flush_pipeline.stage("session-end", session_id, context)
+    staged = flush_pipeline.stage("session-end", capture_id, context)
     context_file = staged.path
     log.info(f"Wrote context to {context_file}")
 
@@ -97,7 +111,16 @@ def main() -> None:
     # --project pins uv to .wiki/pyproject.toml regardless of the CWD the hook
     # was launched from. Without it, uv searches CWD upward for pyproject and
     # would fail since the vault root no longer carries one.
-    cmd = ["uv", "run", "--project", str(WIKI_DIR), "python", str(FLUSH_SCRIPT), str(context_file), session_id]
+    cmd = [
+        "uv",
+        "run",
+        "--project",
+        str(WIKI_DIR),
+        "python",
+        str(FLUSH_SCRIPT),
+        str(context_file),
+        capture_id,
+    ]
 
     kwargs: dict = {}
     if sys.platform == "win32":
@@ -111,7 +134,7 @@ def main() -> None:
         stderr=subprocess.DEVNULL,
         **kwargs,
     )
-    log.info(f"Spawned flush.py for session {session_id}")
+    log.info(f"Spawned flush.py for session {session_id} capture {capture_id}")
 
 
 if __name__ == "__main__":
