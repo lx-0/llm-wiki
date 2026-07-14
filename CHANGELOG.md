@@ -18,6 +18,54 @@ every operator's `wiki update` → `uv sync` regenerate `uv.lock` and dirty thei
 config keys must also be wired into `scripts/migrations/migrate_config_keys.py`
 in the same commit.
 
+## [0.2.2] — 2026-07-14
+
+### Added
+
+- **Codex sessions are now captured.** The session-capture hooks were installed
+  for every agent (`.claude`/`.codex`/`.gemini`/`.cursor`) and fired, but the
+  transcript reader parsed only the Claude Code JSONL schema — so every Codex
+  session yielded 0 turns and was silently skipped (121 rollouts, months of
+  usage, entirely dark; the health check stayed green because it verifies hooks
+  are *wired*, not that capture *works*). `read_transcript` is now format-aware
+  (`hooks/_transcript.py`): a Codex `{timestamp,type,payload}` rollout is parsed
+  (clean user prose from `event_msg/user_message`, assistant from
+  `response_item/message`, tools from `function_call`/`custom_tool_call`;
+  reasoning + developer noise skipped), and an unresolvable hook
+  `transcript_path` falls back to locating the rollout by session id under
+  `$CODEX_HOME`.
+- **`limits.dashboard_refresh_timeout_s`** (default 300) — the post-flush
+  dashboard refresh budget is now a config knob (was a hardcoded 120 s, too
+  tight for a growing vault under iCloud fs-stat variance).
+
+### Changed
+
+- **Session daily blocks are replace-in-place per session id.** Codex has no
+  SessionEnd event — its `Stop` hook fires per turn — so a single session
+  flushed many times; each fire now replaces the session's block in
+  `daily/<date>/sessions.md` (sentinel-wrapped) instead of appending a
+  duplicate. `scheduling.dedup_window_seconds` raised 60 → 900 to coalesce the
+  per-turn re-distills. Benign for Claude (one flush per session).
+- **Health: gmail on a filter-only account reports `info`, not `warning`.** An
+  account whose reader is IMAP but whose filter is `gmail-api` now surfaces
+  "email reading via IMAP is unaffected; only the suggestions label/move filter
+  is skipped" instead of the misleading "the gmail collector will skip it".
+
+### Fixed
+
+- **compile: a transient SDK `is_error` no longer aborts a whole batch.** The
+  `is_error` branch collapsed every non-`max_turns` result into an opaque
+  `agent_error` that the retry ladder skips (gates on `unknown`) yet the
+  consecutive-failure counter still counted — 3 transient CLI hiccups in a row
+  aborted the run. It now routes through `classify_failure` (fast empty-stderr →
+  `cli_crash`; slow no-signal → `unknown`, which the small-source skip path
+  survives).
+- **Ollama-unreachable log spam.** An offline home GPU flooded
+  `compile-errors.log` with ~299 near-identical "not reachable" WARNING lines
+  (one per compiled file per pass); a process-scoped warn-once helper now emits
+  one WARNING per run, the rest at DEBUG. The screenshot collector's
+  Ollama-unreachable message is likewise a WARNING now (was ERROR).
+
 ## [0.2.1] — 2026-06-13
 
 ### Changed

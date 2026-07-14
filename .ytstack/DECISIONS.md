@@ -1926,3 +1926,26 @@ Onboarding) with CLI parity (`collect`/`dream`/`triage`). Locked this session:
   can't surface "I don't understand what this is". Blind first-run test rated the app
   4/10, then 6/10 after the plain-words/library/capture-consent fixes. Full method in
   memory `feedback-synthetic-user-review-method`.
+
+## 2026-07-14: Format-aware transcript ingestion is the multi-agent capture seam
+
+**Context:** The session-capture hooks install for every agent
+(`.claude`/`.codex`/`.gemini`/`.cursor`) but each writes a different transcript
+schema. `read_transcript` parsed only Claude's JSONL, so Codex sessions captured
+0 turns for months while the health check (which verifies hooks are *wired*)
+stayed green.
+**Options considered:** (A) per-agent hook payloads that pre-normalise the
+transcript; (B) a format dispatcher inside `read_transcript`; (C) support only
+Claude.
+**Chose:** B — `read_transcript(path, session_id)` sniffs format
+(`_detect_format`) and dispatches to `_read_claude_transcript` |
+`_read_codex_transcript`; resolution falls back to a session-id→`$CODEX_HOME`
+rollout glob when the hook-supplied path is unresolvable.
+**Reason:** The hook layer is agent-owned and can't be relied on to normalise;
+the reader is the one place all agents converge, so a detector + per-format
+parser makes adding Gemini/Cursor a localized change. Corollaries: (1) Codex has
+no SessionEnd event — its `Stop` fires per turn — so daily session blocks are
+replace-in-place per session id and `dedup_window_seconds` coalesces re-distills
+(60→900); appending per Stop would spam N duplicate blocks per session. (2) A
+health check that a capability is *configured* is not evidence it *works* —
+verify end-to-end output (a real captured session in `daily/`), not the wiring.

@@ -1,6 +1,6 @@
 [project]
 name = "llm-wiki"
-version = "0.2.1"
+version = "0.2.2"
 description = "Personal knowledge wiki compiled from conversations and curated sources — based on Karpathy's LLM Wiki + Cole's claude-memory-compiler"
 readme = "README.md"
 license = { text = "MIT" }
