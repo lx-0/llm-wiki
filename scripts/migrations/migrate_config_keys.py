@@ -88,6 +88,9 @@ Key changes covered (chronological):
   limits.intent_min_confidence                (added 2026-06-13, default "high" — confidence floor below which an intent is logged but not dispatched)
   models.{compile_model,compile_large_source_model,dream_model}  (value upgrade 2026-06-13: opus 4-7 → 4-8; only exact old-default values are bumped, pinned models preserved)
   models.intent_classify_model               (added 2026-06-14, default "claude-haiku-4-5" — cheap triage tier for the intent-dispatch producer; "" → compile_model)
+  scheduling.dedup_window_seconds            (value upgrade 2026-07-14: 60 → 900; codex-session-capture
+                                              — knob broadened to per-session re-capture / Codex-per-turn-Stop
+                                              coalescing window; only the exact old default 60 is bumped)
   personal.accounts.<id>.health.healthkit    (added 2026-05-19 M023 — Apple HealthKit XML export ingest;
                                               injected as a placeholder into any account already carrying
                                               `health.oura`, kind: healthkit-xml-export, empty inbox_dir
@@ -146,6 +149,18 @@ MODEL_UPGRADES: dict[str, dict[str, str]] = {
     "compile_model": {"claude-opus-4-7": "claude-opus-4-8"},
     "compile_large_source_model": {"claude-opus-4-7[1m]": "claude-opus-4-8[1m]"},
     "dream_model": {"claude-opus-4-7[1m]": "claude-opus-4-8[1m]"},
+}
+
+# Engine-policy scalar value upgrades: an operator config still pinned to a
+# SUPERSEDED engine default is bumped to the current default. Only an EXACT
+# match of the old default is upgraded — a deliberately-tuned other value is
+# preserved. Keyed by "<parent>.<key>" → {old_value: new_value}.
+#   2026-07-14 (codex-session-capture): scheduling.dedup_window_seconds 60 → 900.
+#   The knob broadened from a rapid double-fire guard to the per-session
+#   re-capture / Codex-per-turn-Stop coalescing window; 60 s no longer bounds a
+#   multi-hour Codex session (fires are minutes-to-hours apart).
+VALUE_UPGRADES: dict[str, dict[object, object]] = {
+    "scheduling.dedup_window_seconds": {60: 900},
 }
 
 # Keys introduced in newer engine versions that should be injected into the
@@ -880,6 +895,29 @@ def migrate_model_upgrades(data: dict) -> list[str]:
     return changes
 
 
+def migrate_value_upgrades(data: dict) -> list[str]:
+    """Bump scalar config values still pinned to a superseded engine default.
+
+    Like migrate_model_upgrades but for arbitrary "<parent>.<key>" scalars.
+    Only an EXACT match of a retired default is rewritten; a deliberately-tuned
+    value is preserved untouched.
+    """
+    changes: list[str] = []
+    for path, mapping in VALUE_UPGRADES.items():
+        parent_name, _, key = path.partition(".")
+        if not key:
+            continue
+        block = data.get(parent_name)
+        if not isinstance(block, dict):
+            continue
+        cur = block.get(key)
+        # Guard bool (True == 1) so a boolean knob never matches an int default.
+        if not isinstance(cur, bool) and cur in mapping:
+            block[key] = mapping[cur]
+            changes.append(f"upgraded {path} {cur!r} → {mapping[cur]!r}")
+    return changes
+
+
 def migrate_config(config_path: Path) -> tuple[str | None, list[str]]:
     """Return (new_yaml_text_or_None, changes). None text → no change needed."""
     if not config_path.exists():
@@ -930,6 +968,10 @@ def migrate_config(config_path: Path) -> tuple[str | None, list[str]]:
     # Model-version upgrades — bump models.* values still on a retired default
     # (opus 4-7 → 4-8) so existing vaults don't stay frozen on the old default.
     changes.extend(migrate_model_upgrades(data))
+
+    # Scalar value upgrades — bump other retired-default scalars (e.g.
+    # scheduling.dedup_window_seconds 60 → 900) the same way.
+    changes.extend(migrate_value_upgrades(data))
 
     if not changes:
         return None, []

@@ -98,7 +98,14 @@ class DreamPriority:
 @dataclass
 class Scheduling:
     compile_after_hour: int = 18
-    dedup_window_seconds: int = 60
+    # Minimum seconds before the same session is re-captured (and its daily
+    # block replaced). Also the per-turn coalescing window for Codex, whose
+    # `Stop` hook fires per turn (no SessionEnd event) — a multi-hour session
+    # otherwise re-distills on every turn. 900 (15 min) bounds a heavy session
+    # to ~1 distill / 15 min while keeping the block near-current; the daily
+    # block is replace-in-place so no duplicates accrue either way. Was 60
+    # (rapid double-fire guard only) before the 2026-07-14 codex-capture arc.
+    dedup_window_seconds: int = 900
     # When true, a real (non-dry-run) `wiki compile` drains any due piggybacks
     # (dream-cycle, lint, curiosity, daily-digest, …) at the end of the run,
     # bypassing the `compile_after_hour` evening gate (per-task cooldowns still

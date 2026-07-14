@@ -113,13 +113,21 @@ actions:
 
 
 def append_to_daily(content: str, session_id: str) -> Path:
-    """Append extracted content to today's daily sessions log. Returns the file path.
+    """Write extracted session content into today's daily sessions log.
 
     Post-2026-05-15 (`daily/`-as-rollup arc, see
     `.ytstack/AD-HOC-daily-as-rollup-PLAN.md`): writes go to
-    `daily/<date>/sessions.md` — one of five per-source append-only files
-    that together compose the day's capture. The root `daily/<date>.md`
-    becomes the compile-stage digest, written by `compile.py` (not here).
+    `daily/<date>/sessions.md` — one of five per-source files that together
+    compose the day's capture. The root `daily/<date>.md` becomes the
+    compile-stage digest, written by `compile.py` (not here).
+
+    Replace-in-place per session (2026-07-14, codex-session-capture arc):
+    each session's block is wrapped in `<!-- wiki:session <id> begin/end -->`
+    sentinels and REPLACED if that session already has a block in today's
+    file, rather than appended. Codex has no SessionEnd event — its `Stop`
+    hook fires per turn, so one session flushes many times over its life;
+    without replace-in-place a single Codex session would spam N duplicate
+    blocks. Benign for Claude (one flush per session → one block).
 
     On first creation of the sessions file, also writes the per-day
     Summarize button block right after the H1 — clicking it from inside
@@ -136,15 +144,30 @@ def append_to_daily(content: str, session_id: str) -> Path:
     date_dir.mkdir(parents=True, exist_ok=True)
     daily_file = date_dir / "sessions.md"
 
-    header = f"\n\n---\n\n### Session `{session_id}` — {time_str}\n\n"
-    is_new = not daily_file.exists()
-    with open(daily_file, "a", encoding="utf-8") as f:
-        if is_new:
+    begin = f"<!-- wiki:session {session_id} begin -->"
+    end = f"<!-- wiki:session {session_id} end -->"
+    block = f"{begin}\n\n---\n\n### Session `{session_id}` — {time_str}\n\n{content}\n\n{end}\n"
+
+    if not daily_file.exists():
+        with open(daily_file, "w", encoding="utf-8") as f:
             f.write(f"# Daily Sessions — {date_str}\n\n")
             f.write(_DAILY_BUTTON_BLOCK)
-        f.write(header)
-        f.write(content)
-        f.write("\n")
+            f.write("\n")
+            f.write(block)
+        return daily_file
+
+    text = daily_file.read_text(encoding="utf-8")
+    if begin in text and end in text:
+        start = text.index(begin)
+        stop = text.index(end) + len(end)
+        # block ends with a trailing newline; drop it so the in-place splice
+        # doesn't accumulate a blank line on every replace.
+        text = text[:start] + block.rstrip("\n") + text[stop:]
+        daily_file.write_text(text, encoding="utf-8")
+    else:
+        sep = "" if text.endswith("\n") else "\n"
+        with open(daily_file, "a", encoding="utf-8") as f:
+            f.write(f"{sep}\n{block}")
     return daily_file
 
 

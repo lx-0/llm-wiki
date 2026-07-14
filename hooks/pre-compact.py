@@ -67,13 +67,15 @@ def main() -> None:
     session_id = hook_input.get("session_id", "unknown")
     transcript_path = hook_input.get("transcript_path", "")
 
-    if not transcript_path:
-        log.warning("No transcript_path in hook input, exiting.")
+    # See session-end.py: a missing path is recoverable via session_id → Codex
+    # rollout resolution; only bail when neither is usable.
+    if not transcript_path and session_id in ("", "unknown"):
+        log.warning("No transcript_path and no resolvable session_id, exiting.")
         return
 
     log.info(f"Processing pre-compact for session {session_id}")
 
-    turns = read_transcript(transcript_path)
+    turns = read_transcript(transcript_path, session_id)
     log.info(f"Found {len(turns)} turns in transcript")
 
     if len(turns) < MIN_TURNS_TO_FLUSH:

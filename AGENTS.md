@@ -112,7 +112,7 @@ llm-wiki/
 │   ├── review-wiki.py      ← per-article quality scoring (Ollama)
 │   └── retry-failed-flushes.py ← reprocess archived flush contexts
 ├── hooks/
-│   ├── _transcript.py      ← shared transcript walker + tool summarizer
+│   ├── _transcript.py      ← format-aware transcript reader (Claude JSONL + Codex rollout) + tool summarizer + session-id→rollout resolver
 │   ├── session-start.py    ← inject a pointer block + recent daily-log tail; agent pulls articles on demand
 │   ├── session-end.py      ← spawn flush.py with the conversation transcript
 │   └── pre-compact.py      ← safety-net flush before context compaction

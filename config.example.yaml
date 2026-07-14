@@ -6,8 +6,11 @@
 scheduling:
   # Hour-of-day at which auto-compile + piggyback tasks may spawn from flush.py.
   compile_after_hour: 18
-  # Dedup window (seconds) for repeated session-flushes of the same session id.
-  dedup_window_seconds: 60
+  # Minimum seconds before the same session is re-captured (its daily block is
+  # replace-in-place, so re-fires update rather than duplicate). Also coalesces
+  # Codex's per-turn `Stop` hook (no SessionEnd event) so a long session doesn't
+  # re-distill every turn. 900 = ~1 distill / 15 min for a heavy session.
+  dedup_window_seconds: 900
   # When true, a real `wiki compile` drains any due piggybacks (dream-cycle,
   # lint, curiosity, daily-digest, …) at the end of the run, bypassing the
   # compile_after_hour evening gate above (per-task cooldowns still rate-limit).

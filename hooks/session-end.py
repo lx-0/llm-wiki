@@ -68,13 +68,16 @@ def main() -> None:
     session_id = hook_input.get("session_id", "unknown")
     transcript_path = hook_input.get("transcript_path", "")
 
-    if not transcript_path:
-        log.warning("No transcript_path in hook input, exiting.")
+    # A missing transcript_path is still recoverable for Codex sessions —
+    # read_transcript resolves the rollout by session_id. Only bail when we
+    # have neither a path nor a usable id to resolve from.
+    if not transcript_path and session_id in ("", "unknown"):
+        log.warning("No transcript_path and no resolvable session_id, exiting.")
         return
 
     log.info(f"Processing session {session_id}")
 
-    turns = read_transcript(transcript_path)
+    turns = read_transcript(transcript_path, session_id)
     log.info(f"Found {len(turns)} turns in transcript")
 
     if len(turns) < MIN_TURNS_TO_FLUSH:
