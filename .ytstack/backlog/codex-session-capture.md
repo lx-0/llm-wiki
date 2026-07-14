@@ -1,6 +1,8 @@
 # Codex session capture — format-aware transcript ingestion
 
-Status: **in progress** (2026-07-14). Fix for a silent, latent capture failure.
+Status: **shipped** (2026-07-14, commit `fed2e05`) — engine-side; live on the
+operator vault after `wiki update` (pulls the code + applies the
+dedup_window_seconds 60→900 migration). Fix for a silent, latent capture failure.
 
 ## Problem (verified empirically on lxw)
 
