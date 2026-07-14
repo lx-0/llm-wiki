@@ -231,6 +231,13 @@ class Limits:
     flush_assistant_text_budget_chars: int = 50_000
     flush_user_text_budget_chars: int = 10_000
     flush_tool_summary_budget_chars: int = 10_000
+    # Best-effort dashboard (stats+lint) refresh budget after a flush. The
+    # refresh is lock-guarded and never blocks the flush; on timeout it is
+    # skipped and the next flush retries. Lifted from a hardcoded 120 s — too
+    # tight for a growing vault under iCloud fs-stat variance (29 timeouts
+    # observed). The real fix (share the corpus link-graph scan across
+    # dashboard_stats + dashboard_lint) is backlogged; this raises the ceiling.
+    dashboard_refresh_timeout_s: int = 300
     screenshot_resize_width: int = 512
     screenshot_timeout_seconds: int = 60
     # TCP connect timeout for every Ollama HTTP call (ollama_client.py). A

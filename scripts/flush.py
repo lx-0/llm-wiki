@@ -51,9 +51,10 @@ DASHBOARD_LOCK_FILE = STATE_DIR / "dashboard-refresh.lock"
 # 30s was too tight on iCloud-synced vaults under post-compile-hour
 # concurrent-flush bursts (incident 2026-05-03: 103 timeout records in
 # ~30 seconds). The dashboard scripts themselves take 5-15 s in steady
-# state; 120 s gives headroom against fs-stalls without blocking the
-# flush forever.
-DASHBOARD_REFRESH_TIMEOUT_S = 120
+# state but cross 120 s on a growing vault under iCloud fs-stat variance
+# (29 timeouts observed) — now a CONFIG knob (default 300 s). The refresh
+# is lock-guarded + best-effort; a timeout just skips it, never blocks flush.
+DASHBOARD_REFRESH_TIMEOUT_S = CONFIG.limits.dashboard_refresh_timeout_s
 TIMEZONE = CONFIG.scheduling.timezone
 COMPILE_AFTER_HOUR = CONFIG.scheduling.compile_after_hour
 DEDUP_WINDOW_SECONDS = CONFIG.scheduling.dedup_window_seconds

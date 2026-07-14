@@ -198,7 +198,8 @@ def test_migrate_config_file_round_trip(tmp_path):
     # +4 intent-dispatch (features.extract_intents + limits.intent_source_globs
     #    + limits.intent_classify_timeout_s + limits.intent_min_confidence), 2026-06-13
     # +1 models.intent_classify_model (intent-dispatch cheap tier), 2026-06-14
-    assert len(changes) == 99, f"got {len(changes)} changes: {changes}"
+    # +1 limits.dashboard_refresh_timeout_s (dashboard refresh budget knob), 2026-07-14
+    assert len(changes) == 100, f"got {len(changes)} changes: {changes}"
 
     reparsed = yaml.safe_load(new_text)
     # piggyback side
@@ -274,6 +275,7 @@ def test_migrate_config_no_change_when_fully_current(tmp_path):
             "flush_assistant_text_budget_chars": 50000,
             "flush_user_text_budget_chars": 10000,
             "flush_tool_summary_budget_chars": 10000,
+            "dashboard_refresh_timeout_s": 300,
             "compile_per_call_timeout_s": 600,
             "reports_default_lookback_days": 14,
             "connection_min_words": 50,
@@ -448,6 +450,7 @@ def test_migrate_additions_idempotent():
             "flush_assistant_text_budget_chars": 50000,
             "flush_user_text_budget_chars": 10000,
             "flush_tool_summary_budget_chars": 10000,
+            "dashboard_refresh_timeout_s": 300,
             "compile_per_call_timeout_s": 600,
             "reports_default_lookback_days": 14,
             "connection_min_words": 50,

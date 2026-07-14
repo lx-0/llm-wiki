@@ -607,13 +607,23 @@ def check_account_auths(*, quick: bool = False) -> list[CheckResult]:
             # sub-block needs the OAuth token bootstrapped once.
             reader = account_data.get("reader") or {}
             filt = account_data.get("filter") or {}
-            uses_gmail_api = (
-                reader.get("kind") == "gmail-api"
-                or filt.get("kind") == "gmail-api"
-            )
-            if uses_gmail_api:
+            if reader.get("kind") == "gmail-api":
+                # reader pulls messages via the Gmail REST API → the token is
+                # load-bearing; without it the collector genuinely skips.
                 results.append(_check_one_token(
                     account_id, "gmail", "gmail-token-", "gmail-auth",
+                ))
+            elif filt.get("kind") == "gmail-api":
+                # ONLY the write-side filter (suggestions label/move) uses the
+                # Gmail API; the reader is IMAP/App-Password, so email READING is
+                # unaffected. Report info (not warning) with accurate wording so
+                # this stops reading as a broken collector + a wrong re-auth
+                # prompt.
+                results.append(_check_one_token(
+                    account_id, "gmail", "gmail-token-", "gmail-auth",
+                    role_desc="email reading via IMAP is unaffected; only the "
+                              "suggestions label/move filter is skipped",
+                    missing_severity="info",
                 ))
         return results
     except Exception as exc:
@@ -622,10 +632,16 @@ def check_account_auths(*, quick: bool = False) -> list[CheckResult]:
 
 def _check_one_token(
     account_id: str, kind_label: str, token_prefix: str, auth_cmd: str,
+    *, role_desc: str | None = None, missing_severity: str = "warning",
 ) -> CheckResult:
     """Per-account-integration token-presence probe. Caller is the
     iterator in `check_account_auths`; not registered as a standalone
-    check (would require knowing which accounts exist at registration time)."""
+    check (would require knowing which accounts exist at registration time).
+
+    `role_desc` overrides the "what breaks without the token" clause (e.g. for
+    gmail, where a missing token skips only the write-side filter while an IMAP
+    reader keeps working); `missing_severity` lets such degraded-but-not-broken
+    cases report `info` instead of `warning`."""
     token_file = STATE_DIR / f"{token_prefix}{account_id}.json"
     check_id = f"account-auth-{account_id}-{kind_label}"
     if token_file.exists():
@@ -637,12 +653,13 @@ def _check_one_token(
             details={"account": account_id, "kind": kind_label,
                      "token_path": str(token_file)},
         )
+    role = role_desc or f"the {kind_label} collector will skip it"
     return CheckResult(
         id=check_id,
         category="connectivity",
-        severity="warning",
+        severity=missing_severity,
         message=f"{kind_label} OAuth not bootstrapped for account "
-                f"`{account_id}` — the {kind_label} collector will skip it",
+                f"`{account_id}` — {role}",
         fix=f"wiki {auth_cmd} {account_id}",
         dispatch_args=[auth_cmd, account_id],
         details={"account": account_id, "kind": kind_label,

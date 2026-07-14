@@ -236,6 +236,10 @@ limits:
   flush_assistant_text_budget_chars: 50000
   flush_user_text_budget_chars: 10000
   flush_tool_summary_budget_chars: 10000
+  # Best-effort dashboard refresh budget (s) after a flush; skipped on timeout,
+  # never blocks the flush. Raised from 120 for growing vaults under iCloud
+  # fs-stat variance.
+  dashboard_refresh_timeout_s: 300
   # Screenshot OCR.
   screenshot_resize_width: 512
   screenshot_timeout_seconds: 60

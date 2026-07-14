@@ -399,7 +399,7 @@ def scan(
 
     # Check Ollama connectivity
     if not ollama_client.is_reachable():
-        log.error("Ollama not reachable at %s", CONFIG.models.ollama_url)
+        log.warning("Ollama not reachable at %s", CONFIG.models.ollama_url)
         return {"processed": 0, "report_path": None,
                 "message": f"Ollama not reachable at {CONFIG.models.ollama_url}"}
 

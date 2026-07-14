@@ -56,6 +56,7 @@ from core.sdk_helpers import (
     PromptTooLargeError,
     StderrCapture,
     assert_prompt_within_budget,
+    classify_failure,
     extract_usage_tokens,
     log_sdk_failure,
     make_path_scope_gate,
@@ -233,7 +234,22 @@ async def _attempt(
             cost = final_result.total_cost_usd or 0.0
             tokens = total_input_tokens + total_output_tokens
             LEDGER.record(model=model_id, input_tokens=ledger_input, output_tokens=ledger_output)
-            kind = "max_turns" if final_result.subtype == "error_max_turns" else "agent_error"
+            if final_result.subtype == "error_max_turns":
+                kind = "max_turns"
+            else:
+                # Don't collapse every non-max_turns SDK is_error into an opaque
+                # `agent_error`: the retry ladder skips it (gates on
+                # kind=="unknown") yet the consecutive-failure counter still
+                # counts it, so 3 transient CLI hiccups in a row abort a whole
+                # batch. Route through the shared classifier — a fast
+                # empty-stderr fail → cli_crash (accurate abort message), a slow
+                # no-signal fail → unknown (which the small-source skip path
+                # survives without counting toward the abort).
+                kind = classify_failure(
+                    elapsed,
+                    final_result.result or "",
+                    "; ".join(final_result.errors or []),
+                ).kind
             detail = (
                 f"{final_result.subtype} after {final_result.num_turns} turns "
                 f"({elapsed:.1f}s, {tokens:,} tok)"

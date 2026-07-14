@@ -119,6 +119,28 @@ def is_reachable(timeout: float = 5.0) -> bool:
         return False
 
 
+_UNREACHABLE_WARNED = False
+
+
+def warn_unreachable_once(log, context: str = "") -> None:
+    """Log the 'Ollama unreachable → skipping' notice at WARNING the first time
+    this process hits it, DEBUG thereafter.
+
+    An offline home GPU otherwise floods the log with a near-identical line per
+    compiled file per pass (299 lines/48d observed). The actionable signal is
+    'the GPU box is down', which one line conveys; the per-file repetition is
+    noise. Process-scoped: a fresh compile/producer process re-warns once.
+    """
+    global _UNREACHABLE_WARNED
+    prefix = f"{context}: " if context else ""
+    msg = f"{prefix}Ollama not reachable at {_base_url()} — skipping"
+    if _UNREACHABLE_WARNED:
+        log.debug(msg)
+    else:
+        _UNREACHABLE_WARNED = True
+        log.warning("%s (further offline skips this run logged at DEBUG)", msg)
+
+
 # ── JSON extraction ───────────────────────────────────────────────────
 
 def strip_fences(text: str) -> str:

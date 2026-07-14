@@ -454,9 +454,11 @@ def test_account_auths_handles_multi_account_multi_integration(fake_vault, monke
 
 
 def test_account_auths_gmail_detected_via_filter_subblock(fake_vault, monkeypatch):
-    """Real-world lxw shape: reader is thunderbird-mbox (no OAuth),
-    filter is gmail-api (uses OAuth for label/move push). gmail-token
-    is required even though the reader doesn't touch the Gmail API."""
+    """Real-world lxw shape: reader is thunderbird-mbox / IMAP (no Gmail API),
+    filter is gmail-api (uses OAuth for label/move push). A missing gmail-token
+    degrades ONLY the write-side filter — email READING is unaffected — so this
+    reports `info` with accurate wording, not a `warning` claiming the collector
+    skips the account."""
     class _Personal:
         accounts = {
             "work": {
@@ -473,7 +475,9 @@ def test_account_auths_gmail_detected_via_filter_subblock(fake_vault, monkeypatc
     out = health.check_account_auths()
     assert len(out) == 1
     assert out[0].id == "account-auth-work-gmail"
-    assert out[0].severity == "warning"
+    assert out[0].severity == "info"
+    assert "reading" in out[0].message.lower()  # accurate: reading unaffected
+    assert "collector will skip" not in out[0].message
     assert out[0].dispatch_args == ["gmail-auth", "work"]
 
 

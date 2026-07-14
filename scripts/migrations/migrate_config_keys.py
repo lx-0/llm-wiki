@@ -88,6 +88,9 @@ Key changes covered (chronological):
   limits.intent_min_confidence                (added 2026-06-13, default "high" — confidence floor below which an intent is logged but not dispatched)
   models.{compile_model,compile_large_source_model,dream_model}  (value upgrade 2026-06-13: opus 4-7 → 4-8; only exact old-default values are bumped, pinned models preserved)
   models.intent_classify_model               (added 2026-06-14, default "claude-haiku-4-5" — cheap triage tier for the intent-dispatch producer; "" → compile_model)
+  limits.dashboard_refresh_timeout_s         (added 2026-07-14, default 300 — best-effort dashboard refresh
+                                              budget; lifted from a hardcoded 120 s that was too tight for a
+                                              growing vault under iCloud fs-stat variance)
   scheduling.dedup_window_seconds            (value upgrade 2026-07-14: 60 → 900; codex-session-capture
                                               — knob broadened to per-session re-capture / Codex-per-turn-Stop
                                               coalescing window; only the exact old default 60 is bumped)
@@ -269,6 +272,11 @@ KEY_ADDITIONS: dict[str, dict[str, object]] = {
         "flush_assistant_text_budget_chars": 50_000,
         "flush_user_text_budget_chars": 10_000,
         "flush_tool_summary_budget_chars": 10_000,
+        # Best-effort dashboard refresh budget (2026-07-14). Lifted from a
+        # hardcoded 120 s → 300 s CONFIG knob; too tight for a growing vault
+        # under iCloud fs-stat variance (29 timeouts). Match
+        # Limits.dashboard_refresh_timeout_s in scripts/core/config.py.
+        "dashboard_refresh_timeout_s": 300,
         # Per-compile-call timeout (seconds). Guards against bundled-CLI
         # HANG (vs crash — crashes already retry/abort). One stuck file
         # otherwise blocks every remaining file in the batch. On timeout:

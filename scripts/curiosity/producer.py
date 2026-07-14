@@ -298,10 +298,7 @@ async def maybe_generate_folder_requests(source: Path) -> None:
         return
 
     if not ollama_client.is_reachable():
-        log.warning(
-            "  Curiosity(folder): Ollama not reachable at %s — skipping",
-            CONFIG.models.ollama_url,
-        )
+        ollama_client.warn_unreachable_once(log, "  Curiosity(folder)")
         return
 
     prompt = render(
@@ -555,10 +552,7 @@ async def maybe_generate_curiosity_requests(source: Path) -> None:
     # file. The check costs ~5s and fast-skips instead. Placed after the cheap
     # size/glob/folder gates so it only runs when a real pass would happen.
     if not ollama_client.is_reachable():
-        log.warning(
-            "  Curiosity: Ollama not reachable at %s — skipping (server down?)",
-            CONFIG.models.ollama_url,
-        )
+        ollama_client.warn_unreachable_once(log, "  Curiosity")
         return
 
     log.info("  Curiosity pass for %s (model=%s, prompt=%d chars)",
