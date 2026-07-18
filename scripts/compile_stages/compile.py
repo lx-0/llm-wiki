@@ -500,22 +500,16 @@ async def compile_source(
 
     if failure is not None and CONFIG.limits.compile_skip_on_long_context_unknown:
         if failure.kind == "max_turns":
-            # Two knobs depending on routing: long-context substrates
-            # (compile_force_long_context_types) use compile_max_turns_long_context;
-            # everything else uses compile_max_turns. The "long" hint here is
-            # only correct when this file was actually long-context-routed.
-            turn_knob = (
-                "compile_max_turns_long_context"
-                if model == long_ctx_model
-                else "compile_max_turns"
-            )
+            # The turn budget is metadata.max_turns — pinned per substrate in
+            # compile_stages.route.SUBSTRATE_PROMPTS (or limits.compile_max_turns
+            # for unmapped substrates). Raise it there if this substrate
+            # legitimately needs more turns.
             log.warning(
                 "  skipping: max_turns hit (%s) — agent didn't finish within "
-                "the turn budget. Bumping `%s` for this substrate may help; "
-                "the file is left uncompiled. "
+                "the %d-turn budget; the file is left uncompiled. "
                 "Not counted toward consecutive-failure abort.",
                 failure.detail,
-                turn_knob,
+                metadata.max_turns,
             )
             return CompileResult(
                 status="skipped",

@@ -69,6 +69,7 @@ Key changes covered (chronological):
   personal.inbox_bridges                     (added 2026-05-28, default [] — rsync-based mirror for sandbox-restricted intake folders; see scripts/bridge/drive_sync.py)
   features.extract_picture_metadata          (added 2026-05-29, default True — EXIF + Android-screenshot-filename metadata extraction in pictures collector)
   limits.ollama_connect_timeout_s            (added 2026-05-30, default 10 — TCP connect cap for Ollama calls; prevents a down LAN GPU from burning the full read budget on connect)
+  limits.{compile_force_long_context_types, compile_max_turns_long_context, compile_large_source_chars}  → (removed 2026-07-18 — dead precedence-ladder knobs. Every SUBSTRATE_PROMPTS row + the default dispatch pin the model + max_turns, so the config-side long-context escalation tiers could never fire; deleted per the no-soft-deprecation policy. compile_large_source_model itself stays — it still backs the kind=unknown retry.)
   limits.piggyback_max_runtime_s             (added 2026-05-30, default 14400 — hard wall-clock cap the piggyback runner enforces on each spawned task; backstop against the review-wiki 19h half-open-socket hang)
   limits.review_ollama_timeout_s             (added 2026-05-30, default 300 — per-article Ollama read timeout for review-wiki.py, lifted from a module constant)
   limits.review_consecutive_failure_abort    (added 2026-05-30, default 5 — review-wiki aborts the sweep after N consecutive Ollama failures instead of grinding 1700×timeout when kcma is down)
@@ -206,12 +207,6 @@ KEY_ADDITIONS: dict[str, dict[str, object]] = {
         # stderr — diagnostic instrumentation + structural alignment
         # with compile_per_call_timeout_s. See KNOWLEDGE.md.
         "dream_per_call_timeout_s": 300,
-        # Empty by default since 2026-05-16 P2: daily-digest and
-        # calendar-rollup moved to dedicated lean prompts in
-        # SUBSTRATE_PROMPTS (compile.py). No remaining substrate
-        # legitimately needs [1m] up-front; the 50 KB size-threshold
-        # is the right escape hatch for large sources.
-        "compile_force_long_context_types": [],
         # Treat kind=unknown failures with no further retry path (small
         # source OR already on [1m]) as skips instead of hard failures.
         # Preserves the consecutive-failure budget so the batch survives
@@ -237,11 +232,6 @@ KEY_ADDITIONS: dict[str, dict[str, object]] = {
         "calendar_max_per_run": 500,
         "calendar_backfill_days": 90,
         "calendar_future_days": 7,
-        # Higher max_turns for force-long-context substrates (2026-05-16).
-        # Default 12 ran out partway through dense calendar-rollup days
-        # with 6+ attendees, hit `subtype=error_max_turns` and burned
-        # ~$3-4/attempt at [1m] pricing. 30 covers the realistic depth.
-        "compile_max_turns_long_context": 30,
         # Per-file cost guard (USD); abort batch on overrun. Defense
         # against substrate-prompt-mismatch loops that burn $5-10/file
         # silently. See KNOWLEDGE.md "calendar-rollup max_turns trap".
@@ -575,7 +565,7 @@ KEY_ADDITIONS: dict[str, dict[str, object]] = {
 
 # Elements to add to existing list-valued config entries. Used when an
 # engine update widens a list default (e.g. a new substrate type added to
-# `compile_force_long_context_types`). KEY_ADDITIONS only injects MISSING
+# `compile_skip_substrate_types`). KEY_ADDITIONS only injects MISSING
 # keys, so an operator who already pinned the list to the old default
 # wouldn't otherwise pick up the new element. Structure: dotted parent.key
 # path → list of elements to ensure are present. Idempotent: existing
@@ -607,17 +597,13 @@ LIST_ADDITIONS: dict[str, list[object]] = {
 # Elements to REMOVE from existing list-valued config entries. The
 # inverse of LIST_ADDITIONS — used when a list default narrows or an
 # entry's old position is no longer correct (e.g. a substrate type
-# moves out of compile_force_long_context_types because it got a
+# moves out of compile_skip_substrate_types because it got a
 # dedicated lean prompt). Structure: dotted parent.key path → list of
 # elements to ensure are NOT present. Idempotent.
 LIST_REMOVALS: dict[str, list[object]] = {
-    # 2026-05-16 — substrate-aware prompt dispatch landed
-    # (SUBSTRATE_PROMPTS in compile.py). Both daily-digest and
-    # calendar-rollup now have dedicated lean prompts that don't
-    # need [1m] up-front; the size-threshold escape hatch handles
-    # genuinely large sources. Clean these out of operator configs
-    # that picked them up during the brief P1 hotfix window.
-    "limits.compile_force_long_context_types": ["daily-digest", "calendar-rollup"],
+    # (2026-05-16 removed calendar-rollup + daily-digest from
+    # compile_force_long_context_types here; that whole key was dropped
+    # 2026-07-18 as a dead precedence-ladder knob — see KEY_DROPS.)
     # The P1 hotfix added calendar-rollup here to stop the burn;
     # P2 ships the actual fix (compile_calendar.md), so the skip is
     # no longer needed. Calendar files compile via the dedicated
@@ -656,6 +642,14 @@ KEY_DROPS: dict[str, set[str]] = {
         # coverage, no distortion). Transitional knob from the drop-based
         # selection that briefly shipped earlier today.
         "curiosity_folder_keyword_max_matches",
+        # Removed 2026-07-18 (C13 interface-honesty sweep) — dead
+        # precedence-ladder knobs. Every SUBSTRATE_PROMPTS row and the
+        # default dispatch pin model + max_turns, so the config-side
+        # long-context escalation tiers these three fed could never fire.
+        # compile_large_source_model is KEPT (backs the kind=unknown retry).
+        "compile_force_long_context_types",
+        "compile_max_turns_long_context",
+        "compile_large_source_chars",
     },
     "personal": {
         # Removed 2026-05-15 (M006) — calendar moved off Thunderbird-SQLite
@@ -956,7 +950,7 @@ def migrate_config(config_path: Path) -> tuple[str | None, list[str]]:
     changes.extend(migrate_account_additions(data))
 
     # List-element additions — widen existing list-valued knobs (e.g. when
-    # a new substrate type joins compile_force_long_context_types). Must
+    # a new substrate type joins compile_skip_substrate_types). Must
     # run after migrate_additions so a freshly-injected list also gets
     # any LIST_ADDITIONS for it (idempotent: already-present entries are
     # untouched).

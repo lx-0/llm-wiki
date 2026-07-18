@@ -268,7 +268,7 @@ def test_kind_unknown_on_long_context_skips(
     caplog.set_level(logging.WARNING, logger="compile")
     result = asyncio.run(compile_mod.compile_file(source, force=True))
 
-    assert result.status == "skipped" and result.skip_reason == "kind_unknown_on_long_context", result
+    assert result.status == "skipped" and result.skip_reason == "long_context_kind_unknown", result
     # Operator-visible WARNING explains the skip.
     assert any(
         "kind=unknown on long-context model" in r.getMessage()
@@ -316,8 +316,8 @@ _HEALTH_PROSE = (
 
 def test_health_rollup_stub_detector():
     """The deterministic detector: stub bodies True, operator prose False."""
-    import compile as compile_mod
-    f = compile_mod._health_rollup_body_is_stub
+    from compile_stages.route import _health_rollup_body_is_stub
+    f = _health_rollup_body_is_stub
     assert f(_HEALTH_STUB) is True
     # placeholder + extra blank lines + heading only → still stub
     assert f("---\ntype: health-rollup\n---\n\n# Health — x\n\n\n") is True

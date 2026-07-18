@@ -6,7 +6,7 @@ these stages in order:
   1. (selection stays in compile.py:select_files() — already factored)
   2. compile_source(content, metadata) → CompileResult         (S02)
   3. commit_article(result, target_path, metadata) → None      (S03)
-  4. run_post_passes(source, compile_result) → list             (S04)
+  4. run_post_passes(source) → list                             (S04)
 
 Each stage owns one concern: compile_source is the LLM-call boundary,
 commit_article is the knowledge/ write boundary, run_post_passes is the

@@ -1,9 +1,9 @@
 """Post-pass stage of the compile pipeline (M018-S04).
 
-``run_post_passes(source_path, compile_result, state) → list[ProducerResult]``
-owns the per-file post-pass loop that Phase 1 (commit ``e730d26``) wired
-inline into ``compile.py:main()``. It iterates ``ProducerRegistry.all_producers()``
-in registration order (suggestions → curiosity → takes) and calls the
+``run_post_passes(source_path) → list[ProducerResult]`` owns the per-file
+post-pass loop that Phase 1 (commit ``e730d26``) wired inline into
+``compile.py:main()``. It iterates ``ProducerRegistry.all_producers()`` in
+registration order (suggestions → curiosity → takes) and calls the
 already-shipping orchestrator ``evaluate_and_run(producer, source)`` for
 each — serial execution per CONTEXT Q1.
 
@@ -12,10 +12,10 @@ producers nor the caller's state-save. ``evaluate_and_run`` already
 wraps each ``Producer.run()`` and returns a ``ProducerResult(status="failed")``
 on raise; this caller propagates results without re-raising.
 
-State: ``run_post_passes`` does NOT mutate ``state`` — per-producer LLM
-usage is recorded centrally by the token ledger (``core/usage.py``), so the
-old dollar-shaped ``producer_cost_total`` accumulator was removed (DECISIONS
-2026-05-23). ``state`` is still accepted for API symmetry and future use.
+Producers consume the source path only — per-producer LLM usage is recorded
+centrally by the token ledger (``core/usage.py``), so no compile-result or
+state is threaded through (the old dollar-shaped ``producer_cost_total``
+accumulator was removed, DECISIONS 2026-05-23).
 
 What stays UPSTREAM in compile.py's per-file loop:
 
@@ -23,10 +23,6 @@ What stays UPSTREAM in compile.py's per-file loop:
   knowledge/ write succeeded — failed compiles get no post-pass)
 - ``state["total_cost"]`` accumulation (SDK-compile cost, separate concern)
 - ``save_state(state)``
-
-T01–T03 land this module parallel to the legacy inline block in
-``compile.py:main()``. T04 rewires the call site and deletes the legacy
-block.
 """
 
 from __future__ import annotations
@@ -38,26 +34,16 @@ from producers import all_producers
 from producers.base import ProducerResult
 from producers.orchestrate import evaluate_and_run
 
-from .types import CompileResult
-
 log = logging.getLogger("compile")
 
 
-async def run_post_passes(
-    source_path: Path,
-    compile_result: CompileResult,  # noqa: ARG001 — reserved for future producers that key off compile output
-    state: dict,  # noqa: ARG001 — reserved; usage now recorded centrally via core/usage.py
-) -> list[ProducerResult]:
+async def run_post_passes(source_path: Path) -> list[ProducerResult]:
     """Run every registered Producer against ``source_path`` serially.
 
     Returns one ``ProducerResult`` per registered Producer in registration
     order (today: suggestions → curiosity → takes). Skip/fail outcomes are
-    represented in the result, never raised. Does not mutate ``state`` (token
-    usage is recorded centrally via ``core/usage.py``).
-
-    ``compile_result`` is accepted for API symmetry with the other
-    compile_stages and for future producers that may want to key off the
-    compiled article shape; current producers consume the source path only.
+    represented in the result, never raised. Producers consume the source path
+    only; per-producer usage is recorded centrally via ``core/usage.py``.
     """
     results: list[ProducerResult] = []
     for producer in all_producers():

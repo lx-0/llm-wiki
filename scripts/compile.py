@@ -100,13 +100,7 @@ from compile_stages.post_passes import run_post_passes  # noqa: E402
 from compile_stages.types import CompileOutcome  # noqa: E402
 from compile_stages.route import (  # noqa: E402
     SUBSTRATE_PROMPTS,
-    _DEFAULT_DISPATCH,
-    _frontmatter_compile_role,
-    _frontmatter_field,
-    _frontmatter_type,
-    _health_rollup_body_is_stub,
     _parse_frontmatter,
-    _substrate_key,
 )
 
 
@@ -167,7 +161,7 @@ async def compile_file(
 ) -> CompileOutcome:
     """Compile a single source file into wiki articles.
 
-    Returns usage/cost info dict, or None on failure.
+    Returns one ``CompileOutcome`` per source (compiled / skipped / failed).
 
     ``force=True`` bypasses the substrate-type skip-list (used when the
     operator targets a single file via ``--file``; batch mode always
@@ -231,7 +225,7 @@ async def compile_file(
     return await _run_compile_route(source, source_content, rel_path, route)
 
 
-def _run_index_only(source: Path, rel_path: str, route) -> dict:
+def _run_index_only(source: Path, rel_path: str, route) -> CompileOutcome:
     """Execute the source-and-final IndexOnly route: append a knowledge/index.md
     entry by pathname (no SDK distill, no separate concept article), then mark the
     file ingested so re-runs no-op and check_orphan_sources doesn't flag it."""
@@ -263,7 +257,7 @@ def _run_index_only(source: Path, rel_path: str, route) -> dict:
     )
 
 
-def _run_health_stub(source: Path, rel_path: str) -> dict:
+def _run_health_stub(source: Path, rel_path: str) -> CompileOutcome:
     """Execute the HealthStub route: record the metric-only stub deterministically
     (mark ingested), no agent, no knowledge writes, $0. 2026-05-22 root-cause."""
     log.info(
@@ -279,17 +273,19 @@ def _run_health_stub(source: Path, rel_path: str) -> dict:
 
 async def _run_compile_route(
     source: Path, source_content: str, rel_path: str, route
-) -> dict | None:
+) -> CompileOutcome:
     """Execute the Compile route: dispatch-decision log, memory pre-pass (I/O —
     bootstraps a Timeline section + enriches metadata), then the chunk/single
-    compile_source call(s). Returns the legacy usage/skip/failure dict."""
+    compile_source call(s). Returns the resulting CompileOutcome."""
     metadata = route.metadata
     classification = route.classification
     source_type = metadata.substrate_type
 
     # Dispatch decision log (only for explicit SUBSTRATE_PROMPTS matches — skip
-    # the noise of "type=X → default" for the safe-by-default fallback).
-    if _substrate_key(source_content, rel_path) in SUBSTRATE_PROMPTS:
+    # the noise of "type=X → default" for the safe-by-default fallback). Use the
+    # key decide_route already resolved, not a re-derivation, so the log never
+    # diverges from the routing that actually happened.
+    if route.dispatch_key in SUBSTRATE_PROMPTS:
         short_model = ""
         if metadata.model_id:
             m = re.match(r"claude-(haiku|sonnet|opus)-(\d+-\d+)", metadata.model_id)
@@ -410,12 +406,9 @@ async def _run_compile_route(
     result = await compile_source(source_content, metadata)
 
     if result.status == "skipped":
-        # Map compile_source's skip_reason to the legacy skip tags; they differ
-        # only for the long-context kind=unknown case.
-        legacy_reason = {
-            "long_context_kind_unknown": "kind_unknown_on_long_context",
-        }.get(result.skip_reason or "", result.skip_reason or "unknown")
-        return CompileOutcome(status="skipped", skip_reason=legacy_reason)
+        return CompileOutcome(
+            status="skipped", skip_reason=result.skip_reason or "unknown",
+        )
 
     if result.status == "failed":
         return CompileOutcome(
@@ -496,12 +489,6 @@ def _spawn_maintenance() -> None:
         log.warning("  maintenance: piggyback spawn failed (continuing)", exc_info=True)
 
 
-# Skip reasons whose branch mutates state["ingested"] on DISK from inside
-# compile_file (source-and-final indexing; the deterministic health-rollup
-# stub path). After such a skip the main loop's in-memory `state` is stale, so
-# it MUST reload before its per-file/final save_state — otherwise that save
-# clobbers the on-disk mark and the file is re-selected every run. Any future
-# skip branch that writes state from inside compile_file must be added here.
 async def main() -> None:
     parser = argparse.ArgumentParser(description="Compile sources into wiki articles")
     parser.add_argument("--all", action="store_true", help="Recompile all files")
@@ -698,15 +685,7 @@ async def main() -> None:
         # `run_post_passes` iterates every registered Producer serially, absorbing
         # per-producer raises into ProducerResult(status="failed"). Per-producer LLM
         # usage is recorded centrally by the token ledger (core/usage.py).
-        from compile_stages.types import CompileResult
-        _compile_result = CompileResult(
-            status="ok",
-            cost_usd=outcome.cost_usd,
-            input_tokens=outcome.input_tokens,
-            output_tokens=outcome.output_tokens,
-            article=outcome.article,
-        )
-        await run_post_passes(source, _compile_result, state)
+        await run_post_passes(source)
 
         # Single state-save site: mark file ingested + persist immediately. Per-file
         # save (not just end-of-loop) so rate-limit aborts / kills / crashes don't lose

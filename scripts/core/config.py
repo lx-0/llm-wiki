@@ -162,12 +162,14 @@ class PiggybackTask:
 @dataclass
 class Models:
     compile_model: str = "claude-opus-4-8"
-    # Compile fallback for sources >= CONFIG.limits.compile_large_source_chars.
-    # The standard 200K-token Opus window dies silently (exit-1, empty stderr)
-    # on 100+ KB transcripts even with max_turns capped — Read-tool fan-out into
-    # knowledge/ articles plus the source itself blow past the window mid-stream.
-    # The 1M variant absorbs both. Set to "" to disable the auto-upgrade and
-    # stay on `compile_model` regardless of source size.
+    # Compile retry model on kind=unknown (compile_stages.compile). The standard
+    # 200K-token Opus window dies silently (exit-1, empty stderr) on 100+ KB
+    # transcripts even with max_turns capped — Read-tool fan-out into knowledge/
+    # articles plus the source itself blow past the window mid-stream. When a
+    # compile call returns kind=unknown on a source large enough
+    # (compile_retry_long_context_min_source_chars), it retries once with this
+    # 1M-context variant which absorbs both. Set to "" to disable the retry and
+    # surface the failure instead.
     compile_large_source_model: str = "claude-opus-4-8[1m]"
     # Dream-cycle entity re-synthesis (M014). dream-entity is a kanonical
     # fan-out workload: 1 entity-page Edit on top of N substrate Reads from
@@ -175,9 +177,8 @@ class Models:
     # knowledge/. Tool-turn ballooning blows the 200K Opus window mid-stream
     # the same way compile.py did pre-M010 (see KNOWLEDGE.md "tool-turn
     # ballooning is the new overflow vector"). Default to [1m] up-front so
-    # dream-entity calls have headroom for the inherent fan-out, just like
-    # `compile_force_long_context_types` does for compile's fan-out
-    # substrates (daily-digest, etc). Set "" to fall back to compile_model.
+    # dream-entity calls have headroom for the inherent fan-out. Set "" to
+    # fall back to compile_model.
     dream_model: str = "claude-opus-4-8[1m]"
     # Intent-classification model (intent-dispatch producer). Triage — task vs
     # idea vs note vs noise — not synthesis, so a cheap/fast tier is right and
@@ -418,17 +419,6 @@ class Limits:
     # (the closest many-entity shape); per-file cost guard
     # (compile_max_tokens_per_file) still bounds runaway burns.
     compile_max_turns: int = 20
-    # Higher cap for substrates listed in `compile_force_long_context_types`.
-    # Two-layer person/project pages with carry-forward semantics
-    # (Read-existing → Edit-State → Verify → maybe re-Edit) consume far more
-    # turns per attendee than the flat-atomic shape that informed the 12
-    # default. A dense calendar-rollup with 6 attendees + recurring concept
-    # updates needs ~15-20 turns; daily-digest with 6 topics needs similar.
-    # Hitting max_turns surfaces as `subtype=error_max_turns` on the
-    # ResultMessage and burns ~$3-4/attempt at [1m] pricing — the bigger
-    # cap is the cheaper end of the trade-off. See KNOWLEDGE.md
-    # "max_turns trap on dense fan-out substrates".
-    compile_max_turns_long_context: int = 30
     # Hard per-file TOKEN guard. When a single compile_file call's total token
     # use (input+output, summed from AssistantMessage.usage) exceeds this, the
     # file is marked failed with `kind=tokens_exceeded` and the batch ABORTS
@@ -470,10 +460,6 @@ class Limits:
     # curiosity-on-request. Set either to 0 to drop that part of the block.
     daily_email_top_senders: int = 5
     daily_email_sample_subjects: int = 12
-    # Threshold above which a source counts as "large" — surfaces one
-    # extra INFO line so the operator can see *which* file was big when
-    # the SDK call slows down. Pure logging signal, no behavior change.
-    compile_large_source_chars: int = 50_000
     # Per-compile-call timeout (seconds). Wraps the `async for message in
     # query(...)` iterator with `asyncio.wait_for`. When the bundled CLI
     # subprocess hangs (vs crashes — see KNOWLEDGE.md "hang vs crash"),
@@ -500,11 +486,13 @@ class Limits:
     # Retry once with `compile_large_source_model` (the 1M-context Opus
     # variant) when a compile call returns kind=unknown — the silent
     # exit-1 / empty-stderr signature of mid-stream context overflow from
-    # tool-turn fan-out into knowledge/ articles. The 50 KB source-size
-    # threshold catches deterministic overflows; this retry catches the
-    # stochastic ones on small sources where the same file succeeds 70%
-    # of the time and fails 30%. Off-switch for operators who would
-    # rather see the failure than pay the 1M-variant premium.
+    # tool-turn fan-out into knowledge/ articles. This is the ONLY model
+    # escalation the engine does: substrate routing pins Haiku per row
+    # (see compile_stages.route.SUBSTRATE_PROMPTS), and the retry catches
+    # the stochastic overflows on sources large enough to benefit (gated
+    # by compile_retry_long_context_min_source_chars) where the same file
+    # succeeds ~70% of the time and fails ~30%. Off-switch for operators
+    # who would rather see the failure than pay the 1M-variant premium.
     compile_retry_long_context_on_unknown: bool = True
     # Seconds to sleep after a kind=unknown failure before retrying with the
     # long-context model. The retry is back-to-back with the original failed
@@ -522,24 +510,6 @@ class Limits:
     # there. Sources under this threshold abort on first failure instead
     # of burning a rate-limit slot. Default 10 KB.
     compile_retry_long_context_min_source_chars: int = 10_240
-    # Force the long-context model up-front for substrates known to fan out
-    # heavily into existing knowledge during compile (matched by frontmatter
-    # `type:`). A daily-digest is <2 KB on the surface but references 6+
-    # topics — the compile agent Reads each related article to ground the
-    # synthesis, and the running context blows past 200K mid-stream → silent
-    # CLI exit-1 / kind=unknown after 1-5 minutes. The size-threshold above
-    # never catches it (source is small). Force the 1M variant for these
-    # types regardless of size. Empty tuple disables the override.
-    # Substrates that should auto-upgrade to the 1M-context model when
-    # using compile_main.md (the dialog-substrate prompt). DEFAULT IS
-    # EMPTY: both `daily-digest` and `calendar-rollup` used to be here
-    # because compile_main.md fan-out blew their 200K window, but they
-    # now have dedicated lean prompts in SUBSTRATE_PROMPTS that don't
-    # need [1m] — the size-threshold (50 KB) is the right escape hatch
-    # for any large source. Operators on older configs get cleared via
-    # migration LIST_REMOVALS. Add an entry here only if a substrate
-    # remains on compile_main AND legitimately overflows 200K.
-    compile_force_long_context_types: tuple[str, ...] = ()
     # When a kind=unknown failure has no further retry path available
     # (small source skipping retry, OR already on the long-context model),
     # treat it as a skip rather than a hard failure: log WARNING, return

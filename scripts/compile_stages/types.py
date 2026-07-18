@@ -70,9 +70,10 @@ class CompileMetadata:
     # `project_slug` populates the prompt's `${project_slug}` var,
     # `project_page_rel` populates `${project_page}` (vault-relative path
     # the agent can Read directly). Both None for non-memory substrates
-    # OR memory substrates whose project page couldn't be resolved (those
-    # short-circuit to `_skipped: memory_no_project_page` upstream and
-    # never reach compile_source).
+    # OR memory substrates whose project page couldn't be resolved — the
+    # latter still reach compile_source, which runs compile_memories.md in
+    # free-distill mode (concept stubs from the memory body) rather than
+    # short-circuiting.
     project_slug: str | None = None
     project_page_rel: str | None = None
 

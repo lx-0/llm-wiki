@@ -5,8 +5,8 @@ each case starts with an empty Registry and the real producers (the live
 suggestions/curiosity/takes) don't bleed in.
 
 The post-pass loop's contract is thin: iterate Registry, call
-``evaluate_and_run`` for each, collect results. It does NOT mutate state
-(per-producer usage is recorded centrally via the token ledger). Tests
+``evaluate_and_run`` for each, collect results. It takes only the source
+path — per-producer usage is recorded centrally via the token ledger. Tests
 assert ordering, failure-isolation, and gate-skip, mocking the orchestrator
 where it lets us test the loop's behavior without real producer bodies.
 """
@@ -91,7 +91,6 @@ def _stub_orchestrate_failed_on_raise(monkeypatch: pytest.MonkeyPatch):
 
 def test_run_post_passes_all_three_run(monkeypatch: pytest.MonkeyPatch):
     from compile_stages.post_passes import run_post_passes
-    from compile_stages.types import CompileResult
 
     _stub_orchestrate_failed_on_raise(monkeypatch)
 
@@ -99,11 +98,9 @@ def test_run_post_passes_all_three_run(monkeypatch: pytest.MonkeyPatch):
     p2 = _make_fake_producer("p2")
     p3 = _make_fake_producer("p3")
 
-    state: dict = {}
     source = Path("/tmp/raw/notes/x.md")
-    cr = CompileResult(status="ok", article="body")
 
-    results = asyncio.run(run_post_passes(source, cr, state))
+    results = asyncio.run(run_post_passes(source))
 
     assert len(results) == 3
     assert [r.producer for r in results] == ["p1", "p2", "p3"]
@@ -111,7 +108,6 @@ def test_run_post_passes_all_three_run(monkeypatch: pytest.MonkeyPatch):
     assert p1.calls == [source]
     assert p2.calls == [source]
     assert p3.calls == [source]
-    assert state == {}  # run_post_passes no longer mutates state (usage → ledger)
 
 
 # ── (2) Raising producer surfaces as failed; subsequent producers run ──
@@ -119,7 +115,6 @@ def test_run_post_passes_all_three_run(monkeypatch: pytest.MonkeyPatch):
 
 def test_run_post_passes_raise_does_not_block(monkeypatch: pytest.MonkeyPatch):
     from compile_stages.post_passes import run_post_passes
-    from compile_stages.types import CompileResult
 
     _stub_orchestrate_failed_on_raise(monkeypatch)
 
@@ -127,11 +122,9 @@ def test_run_post_passes_raise_does_not_block(monkeypatch: pytest.MonkeyPatch):
     p2 = _make_fake_producer("p2", raises=True)
     p3 = _make_fake_producer("p3")
 
-    state: dict = {}
     source = Path("/tmp/raw/notes/y.md")
-    cr = CompileResult(status="ok", article="body")
 
-    results = asyncio.run(run_post_passes(source, cr, state))
+    results = asyncio.run(run_post_passes(source))
 
     assert [r.status for r in results] == ["ok", "failed", "ok"]
     assert [r.producer for r in results] == ["p1", "p2", "p3"]
@@ -144,7 +137,6 @@ def test_run_post_passes_raise_does_not_block(monkeypatch: pytest.MonkeyPatch):
 
 def test_run_post_passes_gate_skip_does_not_call_run(monkeypatch: pytest.MonkeyPatch):
     from compile_stages.post_passes import run_post_passes
-    from compile_stages.types import CompileResult
 
     _stub_orchestrate_failed_on_raise(monkeypatch)
 
@@ -153,11 +145,9 @@ def test_run_post_passes_gate_skip_does_not_call_run(monkeypatch: pytest.MonkeyP
     p2 = _make_fake_producer("p2", enabled_key="features.nope")
     p3 = _make_fake_producer("p3")
 
-    state: dict = {}
     source = Path("/tmp/raw/notes/z.md")
-    cr = CompileResult(status="ok", article="body")
 
-    results = asyncio.run(run_post_passes(source, cr, state))
+    results = asyncio.run(run_post_passes(source))
 
     assert [r.status for r in results] == ["ok", "skipped", "ok"]
     assert p1.calls == [source]
@@ -170,16 +160,11 @@ def test_run_post_passes_gate_skip_does_not_call_run(monkeypatch: pytest.MonkeyP
 
 def test_run_post_passes_empty_registry(monkeypatch: pytest.MonkeyPatch):
     from compile_stages.post_passes import run_post_passes
-    from compile_stages.types import CompileResult
 
     _stub_orchestrate_failed_on_raise(monkeypatch)
 
-    state: dict = {"existing_key": "untouched"}
     source = Path("/tmp/raw/notes/empty.md")
-    cr = CompileResult(status="ok", article="body")
 
-    results = asyncio.run(run_post_passes(source, cr, state))
+    results = asyncio.run(run_post_passes(source))
 
     assert results == []
-    assert "producer_cost_total" not in state
-    assert state == {"existing_key": "untouched"}

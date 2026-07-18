@@ -127,11 +127,11 @@ def test_migrate_config_file_round_trip(tmp_path):
     new_text, changes = m.migrate_config(config_path)
     assert new_text is not None
     # 2 piggyback (rename + drop)
-    #  + 1 created-limits-block + 28 limits additions:
-    #    compile_force_long_context_types, compile_skip_on_long_context_unknown,
+    #  + 1 created-limits-block + 26 limits additions:
+    #    compile_skip_on_long_context_unknown,
     #    compile_aggregated_max_consecutive_failures (2026-05-17 circuit-breaker),
     #    compile_role_default_by_location (M007), 4 calendar_*,
-    #    compile_max_turns_long_context, compile_max_cost_per_file_usd,
+    #    compile_max_cost_per_file_usd,
     #    compile_skip_substrate_types — default ["email-delta"],
     #    daily_email_top_senders + daily_email_sample_subjects (2026-05-23 email rollup beta),
     #    3 flush_*_budget_chars (2026-05-16),
@@ -199,7 +199,7 @@ def test_migrate_config_file_round_trip(tmp_path):
     #    + limits.intent_classify_timeout_s + limits.intent_min_confidence), 2026-06-13
     # +1 models.intent_classify_model (intent-dispatch cheap tier), 2026-06-14
     # +1 limits.dashboard_refresh_timeout_s (dashboard refresh budget knob), 2026-07-14
-    assert len(changes) == 100, f"got {len(changes)} changes: {changes}"
+    assert len(changes) == 98, f"got {len(changes)} changes: {changes}"
 
     reparsed = yaml.safe_load(new_text)
     # piggyback side
@@ -209,10 +209,12 @@ def test_migrate_config_file_round_trip(tmp_path):
     assert reparsed["piggybacks"]["lint_structural"] == {"enabled": True, "cooldown_hours": 24}
     # new piggyback injected
     assert reparsed["piggybacks"]["calendar"] == {"enabled": True, "cooldown_hours": 6, "max_per_run": 500}
-    # additions side — force-long-context empty, skip-substrate-types
-    # has email-delta from KEY_ADDITIONS default (2026-05-16-evening)
-    # + folder-index (2026-06-10 M027-S02-T03)
-    assert reparsed["limits"]["compile_force_long_context_types"] == []
+    # additions side — skip-substrate-types has email-delta from
+    # KEY_ADDITIONS default (2026-05-16-evening) + folder-index
+    # (2026-06-10 M027-S02-T03). The dead compile_force_long_context_types
+    # knob is no longer injected (removed 2026-07-18 C13).
+    assert "compile_force_long_context_types" not in reparsed["limits"]
+    assert "compile_max_turns_long_context" not in reparsed["limits"]
     assert reparsed["limits"]["compile_skip_substrate_types"] == [
         "email-delta",
         "folder-index",
@@ -257,7 +259,6 @@ def test_migrate_config_no_change_when_fully_current(tmp_path):
             "analyst_pass2": {"enabled": False, "cooldown_hours": 168},
         },
         "limits": {
-            "compile_force_long_context_types": [],
             "compile_skip_on_long_context_unknown": True,
             "compile_aggregated_max_consecutive_failures": 3,
             "compile_role_default_by_location": True,
@@ -265,7 +266,6 @@ def test_migrate_config_no_change_when_fully_current(tmp_path):
             "calendar_max_per_run": 500,
             "calendar_backfill_days": 90,
             "calendar_future_days": 7,
-            "compile_max_turns_long_context": 30,
             "compile_max_tokens_per_file": 500_000,
             "compile_skip_substrate_types": ["email-delta", "folder-index"],
             "folder_index_max_depth": 0,
@@ -364,8 +364,9 @@ def test_migrate_config_no_piggybacks_block_still_runs_additions(tmp_path):
     new_text, changes = m.migrate_config(config_path)
     assert new_text is not None
     reparsed = yaml.safe_load(new_text)
-    assert reparsed["limits"]["compile_force_long_context_types"] == []
     assert reparsed["limits"]["compile_skip_on_long_context_unknown"] is True
+    # Dead compile_force_long_context_types knob is no longer injected (C13).
+    assert "compile_force_long_context_types" not in reparsed["limits"]
     # M014 also injects scheduling.dream_cooldown_days under the existing
     # scheduling block — operator's compile_after_hour stays untouched.
     assert reparsed["scheduling"]["compile_after_hour"] == 18
@@ -381,11 +382,9 @@ def test_migrate_additions_creates_missing_parent_block():
     data: dict = {}
     changes = m.migrate_additions(data)
     assert "limits" in data
-    # Default for force-long-context is empty since 2026-05-16 P2.
-    assert data["limits"]["compile_force_long_context_types"] == []
     assert data["limits"]["compile_skip_on_long_context_unknown"] is True
     assert any("created empty limits" in c for c in changes)
-    assert any("added limits.compile_force_long_context_types" in c for c in changes)
+    assert any("added limits.compile_skip_on_long_context_unknown" in c for c in changes)
 
 
 def test_migrate_additions_preserves_existing_values():
@@ -393,13 +392,13 @@ def test_migrate_additions_preserves_existing_values():
     m = _mod()
     data: dict = {
         "limits": {
-            "compile_force_long_context_types": ["daily-digest", "meeting-rollup"],  # operator override
+            "compile_skip_substrate_types": ["email-delta", "operator-custom"],  # operator override
             "compile_max_turns": 30,  # unrelated existing key
         },
     }
     m.migrate_additions(data)
-    # operator value untouched
-    assert data["limits"]["compile_force_long_context_types"] == ["daily-digest", "meeting-rollup"]
+    # operator value untouched (migrate_additions only injects MISSING keys)
+    assert data["limits"]["compile_skip_substrate_types"] == ["email-delta", "operator-custom"]
     # missing key still backfilled
     assert data["limits"]["compile_skip_on_long_context_unknown"] is True
     # unrelated key preserved
@@ -432,7 +431,6 @@ def test_migrate_additions_idempotent():
             "dream_insufficient_corpus_backoff_max_days": 30,
         },
         "limits": {
-            "compile_force_long_context_types": ["daily-digest", "calendar-rollup"],
             "compile_skip_on_long_context_unknown": True,
             "compile_aggregated_max_consecutive_failures": 3,
             "compile_role_default_by_location": True,
@@ -440,7 +438,6 @@ def test_migrate_additions_idempotent():
             "calendar_max_per_run": 500,
             "calendar_backfill_days": 90,
             "calendar_future_days": 7,
-            "compile_max_turns_long_context": 30,
             "compile_max_tokens_per_file": 500_000,
             "compile_skip_substrate_types": ["calendar-rollup"],
             "folder_index_max_depth": 0,
@@ -566,22 +563,20 @@ def test_migrate_list_additions_appends_to_existing_operator_list():
 
 
 def test_migrate_list_removals_prunes_legacy_substrate_entries():
-    """2026-05-16 P2 cleanup: operator configs from the P1 hotfix window
-    had calendar-rollup in skip-list and force-long-context-types; both
-    move out when dedicated lean prompts ship."""
+    """2026-05-18 cleanup: operator configs from the wind-down window had
+    calendar-rollup / memory-sync / memory-seed in the skip-list; they move
+    out when the dedicated lean prompts + memory-substrate reversal ship.
+    (compile_force_long_context_types itself was dropped entirely 2026-07-18
+    via KEY_DROPS, so it's no longer list-pruned here.)"""
     m = _mod()
     data: dict = {
         "limits": {
-            "compile_force_long_context_types": ["daily-digest", "calendar-rollup", "custom-type"],
             "compile_skip_substrate_types": ["calendar-rollup", "operator-custom"],
         },
     }
     changes = m.migrate_list_removals(data)
-    # Both legacy entries pruned; operator-custom entries preserved.
-    assert data["limits"]["compile_force_long_context_types"] == ["custom-type"]
+    # Legacy entry pruned; operator-custom entries preserved.
     assert data["limits"]["compile_skip_substrate_types"] == ["operator-custom"]
-    assert any("removed 'calendar-rollup' from limits.compile_force_long_context_types" in c for c in changes)
-    assert any("removed 'daily-digest' from limits.compile_force_long_context_types" in c for c in changes)
     assert any("removed 'calendar-rollup' from limits.compile_skip_substrate_types" in c for c in changes)
 
 
@@ -590,7 +585,6 @@ def test_migrate_list_removals_idempotent():
     m = _mod()
     data: dict = {
         "limits": {
-            "compile_force_long_context_types": [],
             "compile_skip_substrate_types": ["email-delta"],
             "daily_email_top_senders": 5,
             "daily_email_sample_subjects": 12,
@@ -637,6 +631,30 @@ def test_migrate_drops_removes_orphan_personal_calendar_fields():
     assert "primary_account" in data["personal"]  # unrelated
     assert len(changes) == 3
     assert all("dropped orphan personal." in c for c in changes)
+
+
+def test_migrate_drops_removes_dead_compile_ladder_knobs():
+    """C13 (2026-07-18): the three dead precedence-ladder knobs are pruned from
+    operator vaults on `wiki update`. compile_large_source_model is NOT touched
+    (it still backs the kind=unknown retry)."""
+    m = _mod()
+    data: dict = {
+        "limits": {
+            "compile_force_long_context_types": ["daily-digest"],
+            "compile_max_turns_long_context": 30,
+            "compile_large_source_chars": 50000,
+            "compile_max_turns": 20,  # KEPT — live default-dispatch knob
+        },
+        "models": {"compile_large_source_model": "claude-opus-4-8[1m]"},  # KEPT
+    }
+    changes = m.migrate_drops(data)
+    assert "compile_force_long_context_types" not in data["limits"]
+    assert "compile_max_turns_long_context" not in data["limits"]
+    assert "compile_large_source_chars" not in data["limits"]
+    assert data["limits"]["compile_max_turns"] == 20
+    assert data["models"]["compile_large_source_model"] == "claude-opus-4-8[1m]"
+    assert len(changes) == 3
+    assert all("dropped orphan limits." in c for c in changes)
 
 
 def test_migrate_drops_idempotent_when_clean():

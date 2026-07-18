@@ -21,63 +21,63 @@ import pytest
 
 class TestFrontmatterCompileRole:
     def test_extracts_explicit_role(self):
-        from compile import _frontmatter_compile_role
+        from compile_stages.route import _frontmatter_compile_role
         content = "---\ncompile_role: final-only\ntitle: x\n---\nbody"
         assert _frontmatter_compile_role(content) == "final-only"
 
     def test_extracts_source_and_final(self):
-        from compile import _frontmatter_compile_role
+        from compile_stages.route import _frontmatter_compile_role
         content = "---\ncompile_role: source-and-final\n---\n"
         assert _frontmatter_compile_role(content) == "source-and-final"
 
     def test_extracts_source_only(self):
-        from compile import _frontmatter_compile_role
+        from compile_stages.route import _frontmatter_compile_role
         content = "---\ncompile_role: source-only\n---\n"
         assert _frontmatter_compile_role(content) == "source-only"
 
     def test_returns_none_when_missing(self):
-        from compile import _frontmatter_compile_role
+        from compile_stages.route import _frontmatter_compile_role
         content = "---\ntype: concept\ntitle: x\n---\nbody"
         assert _frontmatter_compile_role(content) is None
 
     def test_returns_none_when_no_frontmatter(self):
-        from compile import _frontmatter_compile_role
+        from compile_stages.route import _frontmatter_compile_role
         assert _frontmatter_compile_role("no frontmatter here") is None
 
     def test_handles_quoted_value(self):
-        from compile import _frontmatter_compile_role
+        from compile_stages.route import _frontmatter_compile_role
         content = "---\ncompile_role: \"final-only\"\n---\n"
         assert _frontmatter_compile_role(content) == "final-only"
 
     def test_returns_none_for_unterminated_frontmatter(self):
-        from compile import _frontmatter_compile_role
+        from compile_stages.route import _frontmatter_compile_role
         content = "---\ncompile_role: final-only\nbody without closing fence"
         assert _frontmatter_compile_role(content) is None
 
 
 class TestFrontmatterField:
     def test_extracts_title(self):
-        from compile import _frontmatter_field
+        from compile_stages.route import _frontmatter_field
         content = "---\ntitle: My Strategy\n---\nbody"
         assert _frontmatter_field(content, "title") == "My Strategy"
 
     def test_returns_none_when_key_missing(self):
-        from compile import _frontmatter_field
+        from compile_stages.route import _frontmatter_field
         content = "---\ntype: concept\n---\n"
         assert _frontmatter_field(content, "title") is None
 
     def test_handles_quoted_value(self):
-        from compile import _frontmatter_field
+        from compile_stages.route import _frontmatter_field
         content = "---\ntitle: \"quoted value\"\n---\n"
         assert _frontmatter_field(content, "title") == "quoted value"
 
     def test_handles_value_with_punctuation(self):
-        from compile import _frontmatter_field
+        from compile_stages.route import _frontmatter_field
         content = "---\ntitle: with spaces, commas! and punc.\n---\n"
         assert _frontmatter_field(content, "title") == "with spaces, commas! and punc."
 
     def test_returns_none_when_no_frontmatter(self):
-        from compile import _frontmatter_field
+        from compile_stages.route import _frontmatter_field
         assert _frontmatter_field("body only", "title") is None
 
 

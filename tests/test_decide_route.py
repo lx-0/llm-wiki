@@ -166,18 +166,23 @@ def test_compile_carries_single_classification():
     assert r.classification.kind == "single"
 
 
-def test_size_escalation_when_dispatch_model_unset(monkeypatch):
-    """Precedence ladder: when a dispatch entry has model=None, a large source
-    escalates to the long-context model. (Currently dead for real data — every
-    SUBSTRATE_PROMPTS entry pins haiku — so exercised via a patched dispatch.)"""
-    from core.config import CONFIG
-
-    from compile_stages import route
+def test_compile_carries_dispatch_key():
+    """The Compile variant carries the resolved SUBSTRATE_PROMPTS lookup key so
+    callers log the actual routing decision instead of re-deriving it. It is the
+    frontmatter `type:` (or path-pattern fallback), or None when neither
+    resolves — the same value the dispatch table is keyed on."""
     from compile_stages.route import Compile
 
-    monkeypatch.setattr(route, "_DEFAULT_DISPATCH", ("compile_default", 12, None))
-    big = "---\ntype: unmapped-big\n---\n" + ("x " * (CONFIG.limits.compile_large_source_chars))
-    r = _route(big)
-    assert isinstance(r, Compile)
-    expected = CONFIG.models.compile_large_source_model or CONFIG.models.compile_model
-    assert r.metadata.model_id == expected
+    mapped = _route("---\ntype: calendar-rollup\n---\nmeetings")
+    assert isinstance(mapped, Compile)
+    assert mapped.dispatch_key == "calendar-rollup"
+
+    # A type present but unmapped still carries its key (not in SUBSTRATE_PROMPTS).
+    unmapped = _route("---\ntype: random-unmapped\n---\nbody")
+    assert isinstance(unmapped, Compile)
+    assert unmapped.dispatch_key == "random-unmapped"
+
+    # No frontmatter type and no path-pattern match → None (default dispatch).
+    keyless = _route("just a plain note body", path="raw/notes/plain.md")
+    assert isinstance(keyless, Compile)
+    assert keyless.dispatch_key is None

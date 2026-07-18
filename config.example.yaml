@@ -193,10 +193,11 @@ piggybacks:
 models:
   # Claude model used by compile.py + retry-failed-flushes.
   compile_model: claude-opus-4-8
-  # Compile fallback for sources >= limits.compile_large_source_chars.
-  # Standard 200K Opus window dies silently on 100+ KB transcripts. The 1M
-  # variant absorbs both the source and tool-turn reads. Set to empty string
-  # to disable the auto-upgrade.
+  # Compile retry model on kind=unknown. Standard 200K Opus window dies
+  # silently on 100+ KB transcripts; when a compile call fails kind=unknown on
+  # a large-enough source (limits.compile_retry_long_context_min_source_chars)
+  # the engine retries once with this 1M variant. Set to empty string to
+  # disable the retry and surface the failure instead.
   compile_large_source_model: claude-opus-4-8[1m]
   # Folder-scan answer provider (watched-folder curiosity). The backend
   # reads an operator-approved file in-place and distills an
@@ -354,14 +355,6 @@ limits:
   # sources looped on Read/Grep until hitting the 200K context window.
   # 20 lands in the daily-digest tier; per-file $ guard still bounds it.
   compile_max_turns: 20
-  # Higher cap for substrates listed in compile_force_long_context_types.
-  # Two-layer person/project pages with carry-forward (Read-existing →
-  # Edit-State → maybe re-Edit) consume far more turns than the flat
-  # atomic shape; a dense calendar-rollup with 6 attendees needs ~20
-  # turns. Hitting max_turns burns ~$3-4/attempt at [1m] pricing for
-  # nothing and surfaces as `subtype=error_max_turns` on the
-  # ResultMessage — the bigger cap is the cheaper end of the trade-off.
-  compile_max_turns_long_context: 30
   # Hard per-file TOKEN guard. When a single compile_file call's total token
   # use (input+output) exceeds this, the file is marked failed with
   # kind=tokens_exceeded and the BATCH ABORTS (not skips — operator must
@@ -392,8 +385,6 @@ limits:
   # curiosity-on-request.
   daily_email_top_senders: 5
   daily_email_sample_subjects: 12
-  # Surface an INFO line when source ≥ this many chars (logging signal only).
-  compile_large_source_chars: 50000
   # Per-compile-call timeout (seconds). Guards against the bundled CLI
   # subprocess HANGING (vs crashing — crashes already retry/abort). One
   # stuck file otherwise blocks every remaining file in the batch. On
@@ -403,17 +394,12 @@ limits:
   compile_per_call_timeout_s: 600
   # Retry once with `models.compile_large_source_model` on kind=unknown
   # (the silent exit-1 / empty-stderr signature of mid-stream context
-  # overflow from tool-turn fan-out into knowledge/). Catches the
-  # stochastic overflows on small sources that the size-threshold above
-  # misses. Set to false to skip the retry and surface the failure.
+  # overflow from tool-turn fan-out into knowledge/). This is the only
+  # model escalation the engine does — substrate routing pins Haiku per
+  # row. Gated by compile_retry_long_context_min_source_chars (the retry
+  # only helps sources large enough to benefit from the 1M window). Set
+  # to false to skip the retry and surface the failure.
   compile_retry_long_context_on_unknown: true
-  # Escape-hatch list: substrate types still routed through
-  # compile_main.md that legitimately need [1m] up-front. Empty by
-  # default since 2026-05-16 P2 — both daily-digest and calendar-rollup
-  # moved to dedicated lean prompts (SUBSTRATE_PROMPTS in compile.py),
-  # so this list has no entries now. Add a type here ONLY if (a) it
-  # still uses compile_main.md and (b) it reliably overflows 200K.
-  compile_force_long_context_types: []
   # When a kind=unknown failure cannot be retried (small source OR
   # already on the long-context model), treat it as a skip instead of a
   # hard failure — preserves the consecutive-failure budget so the batch

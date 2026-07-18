@@ -26,7 +26,7 @@ from .types import CompileMetadata
 
 # ── Substrate dispatch tables (moved from compile.py, M026-S02) ───────
 
-SUBSTRATE_PROMPTS: dict[str, tuple[str, int, str | None]] = {
+SUBSTRATE_PROMPTS: dict[str, tuple[str, int, str]] = {
     # Calendar + daily are mechanical Glob/Edit work — no reasoning depth
     # required. Routing to Haiku 4.5 (~6× cheaper than Opus) drops cost
     # from $2-3/file to $0.30-0.50 while keeping the same dispatch.
@@ -115,7 +115,7 @@ SUBSTRATE_PROMPTS: dict[str, tuple[str, int, str | None]] = {
 # `limits.compile_max_turns` actually changes the fall-through routing —
 # the previous hardcoded `12` made the config knob dead code (operator
 # couldn't tune the default via config; only by editing this module).
-_DEFAULT_DISPATCH: tuple[str, int, str | None] = (
+_DEFAULT_DISPATCH: tuple[str, int, str] = (
     "compile_default", CONFIG.limits.compile_max_turns, "claude-haiku-4-5-20251001",
 )
 
@@ -282,10 +282,17 @@ class HealthStub:
 
 @dataclass(frozen=True)
 class Compile:
-    """Needs an LLM call. Carries the upstream dispatch decision + classify result."""
+    """Needs an LLM call. Carries the upstream dispatch decision + classify result.
+
+    `dispatch_key` is the SUBSTRATE_PROMPTS lookup key `_substrate_key` resolved
+    (frontmatter `type:`, else path-pattern fallback; None for plain notes) —
+    carried so callers log the dispatch decision that was actually made instead
+    of re-deriving it and risking silent divergence.
+    """
 
     metadata: CompileMetadata
     classification: ClassifyResult
+    dispatch_key: str | None = None
 
 
 Route = Skip | IndexOnly | HealthStub | Compile
@@ -345,40 +352,17 @@ def decide_route(source: Path, content: str, *, force: bool = False) -> Route:
     if skip_type == "health-rollup" and _health_rollup_body_is_stub(content):
         return HealthStub()
 
-    # Compile route — substrate-aware prompt/model/max_turns dispatch.
+    # Compile route — substrate-aware prompt/model/max_turns dispatch. The
+    # matched SUBSTRATE_PROMPTS row (or _DEFAULT_DISPATCH) IS the whole
+    # decision: every row pins prompt + max_turns + model, per DECISIONS
+    # 2026-05-16 (substrate row wins, Haiku default — no config-side
+    # escalation ladder; the only model escalation left is compile_source's
+    # one-shot kind=unknown retry with CONFIG.models.compile_large_source_model).
     source_type = _frontmatter_type(content)
     dispatch_key = _substrate_key(content, rel_path)
-    substrate_prompt, substrate_max_turns, substrate_model = SUBSTRATE_PROMPTS.get(
+    substrate_prompt, max_turns_for_call, model = SUBSTRATE_PROMPTS.get(
         dispatch_key or "", _DEFAULT_DISPATCH,
     )
-
-    # Model precedence (high → low): substrate_model wins → force-long-context
-    # tier → size-based escalation → CONFIG.models.compile_model.
-    model = substrate_model or CONFIG.models.compile_model
-    force_long_ctx = (
-        source_type is not None
-        and source_type in CONFIG.limits.compile_force_long_context_types
-        and CONFIG.models.compile_large_source_model
-    )
-    if substrate_model:
-        # Substrate-specific model wins; don't escalate.
-        pass
-    elif force_long_ctx:
-        model = CONFIG.models.compile_large_source_model
-    elif (
-        len(content) >= CONFIG.limits.compile_large_source_chars
-        and CONFIG.models.compile_large_source_model
-    ):
-        model = CONFIG.models.compile_large_source_model
-
-    # Turn-budget precedence: per-substrate override → long-context tier →
-    # CONFIG default.
-    if substrate_max_turns is not None:
-        max_turns_for_call = substrate_max_turns
-    elif force_long_ctx:
-        max_turns_for_call = CONFIG.limits.compile_max_turns_long_context
-    else:
-        max_turns_for_call = CONFIG.limits.compile_max_turns
 
     classification = classify(content, source)
     metadata = CompileMetadata(
@@ -391,4 +375,6 @@ def decide_route(source: Path, content: str, *, force: bool = False) -> Route:
         project_slug=None,
         project_page_rel=None,
     )
-    return Compile(metadata=metadata, classification=classification)
+    return Compile(
+        metadata=metadata, classification=classification, dispatch_key=dispatch_key,
+    )
