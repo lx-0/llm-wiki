@@ -120,13 +120,18 @@ def file_hash(path: Path) -> str:
 
 # ── Slug / naming ─────────────────────────────────────────────────────
 
-def slugify(text: str) -> str:
-    """Convert text to a filename-safe slug."""
+def slugify(text: str, max_len: int | None = None) -> str:
+    """Convert text to a filename-safe slug.
+
+    `max_len` caps the result length (default None = no cap), so callers that
+    build filenames from long titles/URLs don't need a trailing `[:N]` slice.
+    """
     text = text.lower().strip()
     text = re.sub(r"[^\w\s-]", "", text)
     text = re.sub(r"[\s_]+", "-", text)
     text = re.sub(r"-+", "-", text)
-    return text.strip("-")
+    text = text.strip("-")
+    return text[:max_len] if max_len is not None else text
 
 
 # ── Wikilink helpers ──────────────────────────────────────────────────
