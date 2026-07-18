@@ -24,6 +24,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from core import markers
 from core.agent_spec import AgentSpec, parse_spec
 from core.paths import AGENT_SPECS_DIR
 
@@ -147,13 +148,17 @@ def update_dashboard(dashboard_path: Path) -> bool:
 
 
 def _replace_region(text: str, begin: str, end: str, body: str) -> str:
-    bi = text.find(begin)
-    ei = text.find(end)
-    if bi == -1 or ei == -1 or ei < bi:
+    """Rewrite the content BETWEEN a begin/end sentinel pair, keeping the markers
+    in place. Location (incl. the reversed/missing-marker contract) is delegated
+    to `markers.find_region`; a missing region warns and leaves the file
+    untouched (the dashboard markers are operator-seeded, not auto-inserted)."""
+    region = markers.find_region(text, begin, end)
+    if region is None:
         print(f"# warn: markers {begin!r}..{end!r} not found in dashboard; skipping", file=sys.stderr)
         return text
     body_block = body.strip("\n")
-    return text[: bi + len(begin)] + "\n" + body_block + "\n" + text[ei:]
+    replacement = f"{begin}\n{body_block}\n{end}"
+    return text[: region.start] + replacement + text[region.end :]
 
 
 def main() -> int:

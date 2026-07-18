@@ -35,7 +35,8 @@ from pathlib import Path
 from typing import Iterable
 from zoneinfo import ZoneInfo
 
-from .paths import DAILY_DIR, SESSIONS_DIR
+from . import daily_capture
+from .paths import SESSIONS_DIR
 from .config import TIMEZONE
 
 
@@ -95,23 +96,6 @@ def stage(kind: str, session_id: str, content: str) -> StagedFlush:
     return StagedFlush(path=path, session_id=session_id, kind=kind, created=ts)
 
 
-_DAILY_BUTTON_BLOCK = """\
-<!-- summarize-button:begin -->
-```meta-bind-button
-label: 📅 Summarize this day
-hidden: false
-class: ""
-tooltip: "Run summarize-day agent against this day's log."
-id: btn-summarize-here
-style: primary
-actions:
-  - type: command
-    command: "Shell commands: Wiki: agent summarize this day"
-```
-<!-- summarize-button:end -->
-"""
-
-
 def append_to_daily(content: str, session_id: str) -> Path:
     """Write extracted session content into today's daily sessions log.
 
@@ -134,41 +118,28 @@ def append_to_daily(content: str, session_id: str) -> Path:
     that file fires `agent-summarize-day-here`, which runs `wiki agent
     summarize-day --var date={{file_basename}}` so the summary targets
     THAT day, not today.
+
+    Thin caller over `daily_capture.replace_block`: the flock-protected
+    chokepoint owns the read-modify-write, so this write can no longer lose a
+    concurrently-appended session block (the invariant `daily_capture` already
+    enforced for the six collector sources). The timezone-aware date is computed
+    here and passed through — `date_str` never falls back to a naive
+    `date.today()`.
     """
     now = datetime.now(ZoneInfo(TIMEZONE))
     date_str = now.strftime("%Y-%m-%d")
     time_str = now.strftime("%H:%M:%S")
 
-    # Per-source subfolder: daily/<date>/sessions.md (one writer per file).
-    date_dir = DAILY_DIR / date_str
-    date_dir.mkdir(parents=True, exist_ok=True)
-    daily_file = date_dir / "sessions.md"
-
     begin = f"<!-- wiki:session {session_id} begin -->"
     end = f"<!-- wiki:session {session_id} end -->"
     block = f"{begin}\n\n---\n\n### Session `{session_id}` — {time_str}\n\n{content}\n\n{end}\n"
+    create_header = (
+        f"# Daily Sessions — {date_str}\n\n{daily_capture.SUMMARIZE_BUTTON_BLOCK}\n\n"
+    )
 
-    if not daily_file.exists():
-        with open(daily_file, "w", encoding="utf-8") as f:
-            f.write(f"# Daily Sessions — {date_str}\n\n")
-            f.write(_DAILY_BUTTON_BLOCK)
-            f.write("\n")
-            f.write(block)
-        return daily_file
-
-    text = daily_file.read_text(encoding="utf-8")
-    if begin in text and end in text:
-        start = text.index(begin)
-        stop = text.index(end) + len(end)
-        # block ends with a trailing newline; drop it so the in-place splice
-        # doesn't accumulate a blank line on every replace.
-        text = text[:start] + block.rstrip("\n") + text[stop:]
-        daily_file.write_text(text, encoding="utf-8")
-    else:
-        sep = "" if text.endswith("\n") else "\n"
-        with open(daily_file, "a", encoding="utf-8") as f:
-            f.write(f"{sep}\n{block}")
-    return daily_file
+    return daily_capture.replace_block(
+        date_str, "sessions", begin, end, block, create_header=create_header,
+    )
 
 
 def mark_complete(staged: StagedFlush) -> None:

@@ -33,6 +33,7 @@ sys.path.insert(0, str(SCRIPTS_DIR))
 
 import yaml
 
+from core import markers  # noqa: E402
 from core.paths import CONCEPTS_DIR, ROOT_DIR
 from core.config import CONFIG  # noqa: E402
 from core.utils import now_iso  # noqa: E402
@@ -184,8 +185,9 @@ def _upsert_block(page: Path, block: str) -> str:
     """Insert/replace the health-trends sentinel block in `page` (create if absent).
 
     Mirrors the backlinks-footer sentinel pattern. Placed before the
-    `<!-- backlinks:begin -->` footer if present, else appended.
-    """
+    `<!-- backlinks:begin -->` footer if present, else appended. Replace is
+    reversed-marker safe via `markers.ensure_region` (a bare find/index splice
+    would corrupt a file whose end marker precedes its begin marker)."""
     if not page.exists():
         page.parent.mkdir(parents=True, exist_ok=True)
         return (
@@ -195,14 +197,14 @@ def _upsert_block(page: Path, block: str) -> str:
             + block + "\n"
         )
     text = page.read_text(encoding="utf-8")
-    if BEGIN in text and END in text:
-        b = text.find(BEGIN)
-        e = text.find(END) + len(END)
-        return text[:b] + block + text[e:]
-    if "<!-- backlinks:begin -->" in text:
-        i = text.find("<!-- backlinks:begin -->")
-        return text[:i] + block + "\n\n" + text[i:]
-    return text.rstrip() + "\n\n" + block + "\n"
+
+    def _insert(current: str, blk: str) -> str:
+        if "<!-- backlinks:begin -->" in current:
+            i = current.find("<!-- backlinks:begin -->")
+            return current[:i] + blk + "\n\n" + current[i:]
+        return current.rstrip() + "\n\n" + blk + "\n"
+
+    return markers.ensure_region(text, BEGIN, END, block, insert=_insert)
 
 
 def run(dry_run: bool) -> int:

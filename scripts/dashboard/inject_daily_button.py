@@ -23,39 +23,25 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from core import markers
+from core.daily_capture import (
+    SUMMARIZE_BUTTON_BEGIN as BEGIN,
+    SUMMARIZE_BUTTON_BLOCK as BUTTON_BLOCK,
+    SUMMARIZE_BUTTON_END as END,
+)
 from core.paths import DAILY_DIR
 
+# The button block + its markers are the single source of truth in
+# core.daily_capture (flush_pipeline injects the same block on first creation of
+# daily/<date>/sessions.md). This backfiller imports it so the two write sites
+# can never drift.
 
-BEGIN = "<!-- summarize-button:begin -->"
-END = "<!-- summarize-button:end -->"
-
-BUTTON_BLOCK = f"""\
-{BEGIN}
-```meta-bind-button
-label: 📅 Summarize this day
-hidden: false
-class: ""
-tooltip: "Run summarize-day agent against this day's log."
-id: btn-summarize-here
-style: primary
-actions:
-  - type: command
-    command: "Shell commands: Wiki: agent summarize this day"
-```
-{END}"""
-
-
-_REGION_RE = re.compile(rf"\n*{re.escape(BEGIN)}.*?{re.escape(END)}\n*", re.DOTALL)
 _H1_RE = re.compile(r"^(# .*?\n)", re.MULTILINE)
-
-
-def _has_region(text: str) -> bool:
-    return BEGIN in text and END in text
 
 
 def insert_button(text: str) -> tuple[str, bool]:
     """Return (new_text, changed). Idempotent — no-op if region already present."""
-    if _has_region(text):
+    if markers.find_region(text, BEGIN, END) is not None:
         return text, False
     m = _H1_RE.search(text)
     if not m:
@@ -67,9 +53,10 @@ def insert_button(text: str) -> tuple[str, bool]:
 
 def remove_button(text: str) -> tuple[str, bool]:
     """Strip the button region. Returns (new_text, changed)."""
-    if not _has_region(text):
+    stripped = markers.strip_region(text, BEGIN, END)
+    if stripped == text:
         return text, False
-    return _REGION_RE.sub("\n", text), True
+    return stripped if stripped.endswith("\n") else stripped + "\n", True
 
 
 def main() -> int:

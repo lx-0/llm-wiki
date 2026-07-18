@@ -10,13 +10,11 @@ backlog/codex-session-capture.md.
 
 from __future__ import annotations
 
-from pathlib import Path
-
-from core import flush_pipeline
+from core import daily_capture, flush_pipeline
 
 
 def test_same_session_replaces_not_appends(tmp_path, monkeypatch):
-    monkeypatch.setattr(flush_pipeline, "DAILY_DIR", tmp_path)
+    monkeypatch.setattr(daily_capture, "DAILY_DIR", tmp_path)
     sid = "019f5ac6-643a-7371-bbe8-54114c79c0fd"
 
     flush_pipeline.append_to_daily("first capture", sid)
@@ -31,7 +29,7 @@ def test_same_session_replaces_not_appends(tmp_path, monkeypatch):
 
 
 def test_distinct_sessions_each_get_a_block(tmp_path, monkeypatch):
-    monkeypatch.setattr(flush_pipeline, "DAILY_DIR", tmp_path)
+    monkeypatch.setattr(daily_capture, "DAILY_DIR", tmp_path)
     a = "019f5ac6-643a-7371-bbe8-54114c79c0fd"
     b = "3eb6d245-c729-4fa8-bfce-8b7bd9bc6bfd"  # a Claude UUIDv4
 
@@ -45,7 +43,7 @@ def test_distinct_sessions_each_get_a_block(tmp_path, monkeypatch):
 
 
 def test_replace_preserves_other_sessions(tmp_path, monkeypatch):
-    monkeypatch.setattr(flush_pipeline, "DAILY_DIR", tmp_path)
+    monkeypatch.setattr(daily_capture, "DAILY_DIR", tmp_path)
     a = "019f5ac6-643a-7371-bbe8-54114c79c0fd"
     b = "3eb6d245-c729-4fa8-bfce-8b7bd9bc6bfd"
 

@@ -10,7 +10,6 @@ Tests the core invariants:
 from __future__ import annotations
 
 from datetime import date
-from pathlib import Path
 
 import pytest
 
@@ -154,6 +153,105 @@ def test_append_uses_lock(vault, monkeypatch):
     # Expect at least one LOCK_EX and one LOCK_UN
     assert fcntl.LOCK_EX in calls
     assert fcntl.LOCK_UN in calls
+
+
+# ── replace_block (sentinel-keyed insert-or-replace) ────────────────
+
+
+def _session_block(sid: str, body: str) -> tuple[str, str, str]:
+    begin = f"<!-- wiki:session {sid} begin -->"
+    end = f"<!-- wiki:session {sid} end -->"
+    return begin, end, f"{begin}\n\n### {sid}\n\n{body}\n\n{end}\n"
+
+
+def test_replace_block_creates_with_header(vault):
+    begin, end, block = _session_block("s1", "hello")
+    daily_capture.replace_block(
+        "2026-05-14", "sessions", begin, end, block, create_header="# Head\n\n"
+    )
+    f = vault / "daily" / "2026-05-14" / "sessions.md"
+    text = f.read_text()
+    assert text.startswith("# Head\n\n")
+    assert "hello" in text
+    assert text.count(begin) == 1
+
+
+def test_replace_block_replaces_same_key_in_place(vault):
+    begin, end, block1 = _session_block("s1", "v1")
+    _, _, block2 = _session_block("s1", "v2-grown")
+    daily_capture.replace_block("2026-05-14", "sessions", begin, end, block1)
+    daily_capture.replace_block("2026-05-14", "sessions", begin, end, block2)
+    text = (vault / "daily" / "2026-05-14" / "sessions.md").read_text()
+    assert "v2-grown" in text and "v1" not in text
+    assert text.count(begin) == 1
+
+
+def test_replace_block_appends_distinct_keys(vault):
+    b1, e1, blk1 = _session_block("s1", "one")
+    b2, e2, blk2 = _session_block("s2", "two")
+    daily_capture.replace_block("2026-05-14", "sessions", b1, e1, blk1)
+    daily_capture.replace_block("2026-05-14", "sessions", b2, e2, blk2)
+    text = (vault / "daily" / "2026-05-14" / "sessions.md").read_text()
+    assert "one" in text and "two" in text
+    assert text.count("<!-- wiki:session s1 begin -->") == 1
+    assert text.count("<!-- wiki:session s2 begin -->") == 1
+
+
+def test_replace_block_reversed_markers_do_not_corrupt(vault):
+    # A file whose end marker precedes its begin marker must NOT be spliced
+    # into garbage — the block is appended as a fresh region instead.
+    f = vault / "daily" / "2026-05-14" / "sessions.md"
+    f.parent.mkdir(parents=True, exist_ok=True)
+    begin, end, block = _session_block("s1", "fresh")
+    f.write_text(f"{end}\nstray-tail\n{begin}\nstray-head\n", encoding="utf-8")
+    daily_capture.replace_block("2026-05-14", "sessions", begin, end, block)
+    text = f.read_text()
+    assert "fresh" in text
+    assert "stray-tail" in text and "stray-head" in text  # nothing destroyed
+
+
+def test_replace_block_concurrent_writers_lose_no_blocks(vault):
+    """The invariant this candidate restores: many concurrent append+replace
+    writers of the SAME (date, source) file never lose each other's block.
+
+    Threads each open their own file descriptor, so the fcntl lock inside
+    replace_block genuinely serializes the read-modify-write across them; the
+    old unlocked read-splice-write in flush_pipeline would drop blocks here."""
+    import threading
+
+    n = 24
+    date_iso = "2026-05-14"
+    barrier = threading.Barrier(n)
+    errors: list[BaseException] = []
+
+    def worker(i: int) -> None:
+        sid = f"sess{i:02d}"
+        begin, end, block_v1 = _session_block(sid, f"v1-{i}")
+        _, _, block_v2 = _session_block(sid, f"v2-{i}")
+        try:
+            barrier.wait()
+            daily_capture.replace_block(date_iso, "sessions", begin, end, block_v1)
+            # a second fire of the SAME session (Codex Stop-per-turn) must
+            # replace in place, not append — exercises the replace path too.
+            daily_capture.replace_block(date_iso, "sessions", begin, end, block_v2)
+        except BaseException as exc:  # noqa: BLE001
+            errors.append(exc)
+
+    threads = [threading.Thread(target=worker, args=(i,)) for i in range(n)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    assert not errors, f"worker(s) raised: {errors}"
+    text = (vault / "daily" / date_iso / "sessions.md").read_text()
+    for i in range(n):
+        sid = f"sess{i:02d}"
+        assert text.count(f"<!-- wiki:session {sid} begin -->") == 1, (
+            f"session {sid} lost or duplicated under concurrency"
+        )
+        assert f"v2-{i}" in text, f"session {sid} final value missing"
+        assert f"v1-{i}" not in text, f"session {sid} stale value survived"
 
 
 # ── today helper ────────────────────────────────────────────────────

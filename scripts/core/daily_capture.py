@@ -15,16 +15,28 @@ inside `daily/<YYYY-MM-DD>/`; this helper enforces:
 - Path-traversal protection: source names are matched against a
   conservative regex so caller-poisoning is impossible.
 
-Two semantics:
+Four semantics, all under the same per-(date, source) flock:
 
 - `append(date, source, content)` — for streaming inputs that produce
-  multiple entries per day (voice intakes as they land, session-end
-  hook firing on each session close, gmeet/jamie meetings arriving
-  one at a time). Each call appends a newline-terminated block.
+  multiple entries per day (voice intakes as they land, gmeet/jamie
+  meetings arriving one at a time). Each call appends a newline-terminated
+  block.
+- `append_with_source(date, source, line, source_ref)` — `append` plus a
+  frontmatter `sources:` provenance entry.
 - `replace_section(date, source, content)` — for one-shot-per-run
   inputs that produce a single coherent block per collector pass
   (health-collector's daily Oura snapshot; email-collector's delta
   summary). Each call atomically replaces the file's content.
+- `replace_block(date, source, begin, end, block, ...)` — insert-or-replace
+  a single sentinel-bracketed block keyed by its markers, leaving every
+  other block in the same file untouched. This is how the sessions hook
+  writes `daily/<date>/sessions.md`: each session owns one
+  `<!-- wiki:session <id> begin/end -->` region, replaced in place when the
+  same session re-flushes (Codex fires a `Stop` hook per turn) instead of
+  spamming duplicate blocks. Routing it through this module closes the last
+  bypass of the one-writer-per-(date, source) invariant — sessions is the
+  highest-concurrency source, and its old unlocked read-splice-write path
+  (in flush_pipeline) could silently drop a concurrently-appended block.
 
 The root `daily/<date>.md` digest is **not** written by this module —
 that's compile.py's job (Phase 3). This helper only owns the
@@ -38,10 +50,34 @@ import re
 from datetime import date as _date
 from pathlib import Path
 
+from core import markers
 from core.paths import ROOT_DIR
 
 # Configured at import time so tests can monkey-patch.
 DAILY_DIR: Path = ROOT_DIR / "daily"
+
+# ── Summarize-this-day button (single source of truth) ────────────────
+# The per-day Meta-Bind button that fires the `summarize-day` agent against the
+# file it lives in. Written once at the top of `daily/<date>/sessions.md` on
+# first creation (via `replace_block` from flush_pipeline) and back-filled into
+# legacy `daily/*.md` by `scripts/dashboard/inject_daily_button.py`. Both write
+# sites import THIS constant so the block can never drift between them.
+SUMMARIZE_BUTTON_BEGIN = "<!-- summarize-button:begin -->"
+SUMMARIZE_BUTTON_END = "<!-- summarize-button:end -->"
+SUMMARIZE_BUTTON_BLOCK = f"""\
+{SUMMARIZE_BUTTON_BEGIN}
+```meta-bind-button
+label: 📅 Summarize this day
+hidden: false
+class: ""
+tooltip: "Run summarize-day agent against this day's log."
+id: btn-summarize-here
+style: primary
+actions:
+  - type: command
+    command: "Shell commands: Wiki: agent summarize this day"
+```
+{SUMMARIZE_BUTTON_END}"""
 
 # Allow-list. New collectors that want to write into daily/ MUST extend
 # this set explicitly — silent additions are a footgun.
@@ -213,6 +249,66 @@ def replace_section(date_iso: str, source: str, content: str) -> Path:
         fcntl.flock(fh.fileno(), fcntl.LOCK_EX)
         try:
             fh.write(content)
+            fh.flush()
+        finally:
+            fcntl.flock(fh.fileno(), fcntl.LOCK_UN)
+    return target
+
+
+def replace_block(
+    date_iso: str,
+    source: str,
+    begin: str,
+    end: str,
+    block: str,
+    *,
+    create_header: str = "",
+) -> Path:
+    """Insert-or-replace one sentinel-bracketed `block` in `daily/<date>/<source>.md`.
+
+    `block` must carry the `begin` … `end` markers itself and end with a newline.
+    The whole read-modify-write runs under the same flock as `append()`, so two
+    concurrent writers of the same (date, source) — the session hook firing on
+    close while a Codex `Stop`-hook re-flush lands, or two first-flushes of a new
+    day — can never lose each other's block. Semantics:
+
+    - **file empty / new** → write `create_header` + `block`.
+    - **block present** → replace the region in place (reversed-marker safe via
+      `markers.find_region`; the region's trailing newline is normalized so
+      repeated replaces of the same key don't accrete blank lines).
+    - **block absent** → append the block after a single blank-line separator.
+
+    `date_iso` is supplied by the caller (not derived from `today_iso()`) so a
+    timezone-aware date computed at the write site flows straight through — a
+    session that closes just after midnight lands in the correct day file.
+    """
+    target = _resolve_path(date_iso, source)
+    if not block.endswith("\n"):
+        block = block + "\n"
+
+    # a+ so the FD is positioned for both read (current content) and the
+    # truncating rewrite, all inside one lock hold.
+    with open(target, "a+", encoding="utf-8") as fh:
+        fcntl.flock(fh.fileno(), fcntl.LOCK_EX)
+        try:
+            fh.seek(0)
+            current = fh.read()
+            if not current:
+                new_text = create_header + block
+            else:
+                region = markers.find_region(current, begin, end)
+                if region is not None:
+                    new_text = (
+                        current[: region.start]
+                        + block.rstrip("\n")
+                        + current[region.end :]
+                    )
+                else:
+                    sep = "" if current.endswith("\n") else "\n"
+                    new_text = current + sep + "\n" + block
+            fh.seek(0)
+            fh.truncate()
+            fh.write(new_text)
             fh.flush()
         finally:
             fcntl.flock(fh.fileno(), fcntl.LOCK_UN)

@@ -19,6 +19,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from core import markers
 from core.links import (
     canonical_slug,
     outgoing_canonical_slugs,
@@ -85,17 +86,10 @@ def _render_footer(incoming_slugs: list[str], article: Path, knowledge_dir: Path
 def _strip_existing_footer(text: str) -> str:
     """Remove the managed region (and any surrounding blank lines) from `text`.
 
-    Idempotent: returns `text` unchanged if no sentinel is present."""
-    begin = text.find(BACKLINKS_BEGIN)
-    end = text.find(BACKLINKS_END)
-    if begin < 0 or end < begin:
-        return text
-    end_full = end + len(BACKLINKS_END)
-    head = text[:begin].rstrip()
-    tail = text[end_full:]
-    if head and not tail.startswith("\n"):
-        return head + tail
-    return head + tail.lstrip("\n")
+    Idempotent: returns `text` unchanged if no sentinel is present. Reversed or
+    partial sentinels are treated as absent (no corruption) — the shared
+    `markers.strip_region` contract."""
+    return markers.strip_region(text, BACKLINKS_BEGIN, BACKLINKS_END)
 
 
 def write_backlinks_footer(
