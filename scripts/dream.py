@@ -14,11 +14,12 @@ CLI surface:
 
     wiki dream-entity <slug>            # re-synthesize one entity
     wiki dream --all-entities           # sweep everyone, respecting cooldown
-    wiki dream-entity <slug> --dry-run  # print corpus + estimated cost, no SDK call
+    wiki dream-entity <slug> --dry-run  # print corpus size, no SDK call
 
 Piggyback wiring: see `core/piggybacks.py:_LEGACY_PIGGYBACK_COMMANDS["dream_cycle"]`.
-The piggyback shells out to `dream.py --piggyback`, which sweeps the N
-most-overdue entities under the per-run cost cap.
+The piggyback shells out to `dream.py piggyback`, which sweeps the N
+most-overdue entities under the per-run token cap
+(`CONFIG.limits.dream_cycle_max_tokens_per_run`).
 
 Resource gates (real, hard, no silent skips):
 
@@ -49,9 +50,11 @@ import random
 import re
 import sys
 import time
+from fnmatch import fnmatch as _fnmatch
 from dataclasses import dataclass, replace
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from pathlib import Path
+from typing import Literal
 
 import yaml
 
@@ -67,7 +70,6 @@ from core.config import CONFIG
 from core.usage import LEDGER
 from core.paths import (
     AREAS_DIR,
-    INDEX_FILE,
     KNOWLEDGE_DIR,
     LOG_FILE,
     PEOPLE_DIR,
@@ -83,9 +85,7 @@ from core.sdk_helpers import (
     UsageTokens,
     extract_usage_tokens,
     log_sdk_failure,
-    make_path_scope_gate,
     make_path_scope_hook,
-    prompt_stream,
 )
 from core.utils import now_iso, today_iso, append_history
 from core.console import (  # noqa: E402
@@ -744,7 +744,6 @@ def collect_corpus_tiered(
 
     # One filesystem walk; classify the hits.
     all_hits = _scan_mentioning_files(entity, vault_root=root, include_authored=True)
-    all_paths = [p for _ts, p in all_hits]
 
     # Partition: operator-authored knowledge vs regular substrate.
     authored: list[Path] = []
@@ -798,16 +797,6 @@ def collect_corpus_tiered(
         tier2_sampled=tier2_sampled,
         tier2_pool_size=len(older_pool),
     )
-
-
-def collect_corpus(entity: EntityRef, *, vault_root: Path | None = None) -> list[Path]:
-    """Back-compat shim — returns the deduped path list from the tiered build.
-
-    Kept so existing tests / callers (M014) that grab `collect_corpus()` and
-    inspect the result list continue to work. New code should call
-    `collect_corpus_tiered()` directly to get the tier breakdown.
-    """
-    return collect_corpus_tiered(entity, vault_root=vault_root).all_paths
 
 
 def render_corpus_block(
@@ -875,14 +864,50 @@ def render_corpus_block_tiered(
     return "\n".join(p for p in parts if p)
 
 
-# ── Cost estimation ─────────────────────────────────────────────────
+# ── Outcome type + exit-code contract ─────────────────────────────
+#
+# Mirrors the shipped M026 CompileOutcome pattern (DECISIONS.md 2026-05-23):
+# a typed per-entity outcome whose `kind` string is classified into a status
+# in ONE place, and whose CLI exit code is derived in ONE place — instead of
+# the old 6-value magic string mapped to exit codes divergently across the
+# entity / sweep / piggyback branches (per_call_timeout + piggyback
+# prompt_too_large both exited 0, invisible to piggyback_runner's rc→status
+# derivation — a real monitoring blindspot).
+
+DreamStatus = Literal["synthesized", "skipped", "failed"]
+
+# Benign no-ops (exit 0): nothing to synthesize, a designed digests-only skip,
+# or a dry run.
+_DREAM_SKIP_KINDS: frozenset[str] = frozenset(
+    {"no_substrate", "no_entity_substrate", "dry_run"}
+)
+# Real problems (nonzero exit): each MUST surface so an unattended piggyback
+# records `failed:<rc>` in piggyback-state.json rather than a false `ok`.
+_DREAM_FAILURE_KINDS: frozenset[str] = frozenset(
+    {"prompt_too_large", "per_call_timeout", "sdk_failure"}
+)
+
+# The single exit-code table. A kind absent here is a clean exit 0. per-call
+# timeout is 6 (was 0 everywhere — the blindspot); prompt_too_large 3 and
+# sdk_failure 4 keep their historical entity-branch codes.
+_DREAM_EXIT_CODES: dict[str, int] = {
+    "prompt_too_large": 3,
+    "sdk_failure": 4,
+    "per_call_timeout": 6,
+}
 
 
-# ── Main entity-pass ──────────────────────────────────────────────
+def classify_dream_kind(kind: str | None) -> DreamStatus:
+    """Map an outcome kind string to its typed status. ``None`` = synthesized."""
+    if kind is None:
+        return "synthesized"
+    if kind in _DREAM_FAILURE_KINDS:
+        return "failed"
+    return "skipped"
 
 
 @dataclass
-class DreamResult:
+class DreamOutcome:
     entity: EntityRef
     corpus_count: int
     corpus_chars: int
@@ -890,12 +915,119 @@ class DreamResult:
     input_tokens: int
     output_tokens: int
     sdk_result_text: str
-    skipped: str | None = None  # None = success
+    # None = synthesized; else a skip kind (_DREAM_SKIP_KINDS) or a failure
+    # kind (_DREAM_FAILURE_KINDS). Replaces the former `skipped` magic string.
+    kind: str | None = None
     elapsed_s: float = 0.0
     # True when the agent ran but returned the INSUFFICIENT_CORPUS sentinel —
     # a designed no-op that feeds the per-entity backoff (see
     # is_within_insufficient_backoff).
     insufficient_corpus: bool = False
+
+    @property
+    def status(self) -> DreamStatus:
+        return classify_dream_kind(self.kind)
+
+    @property
+    def failed(self) -> bool:
+        return self.status == "failed"
+
+    @property
+    def exit_code(self) -> int:
+        return _DREAM_EXIT_CODES.get(self.kind or "", 0)
+
+
+def dream_exit_code(outcomes: "DreamOutcome | list[DreamOutcome]") -> int:
+    """Highest-severity CLI exit code across one or more outcomes (0 = clean).
+
+    The single source of truth every dream CLI branch routes through, so a
+    failure kind can never again map to a nonzero exit on one path and 0 on
+    another."""
+    if isinstance(outcomes, DreamOutcome):
+        outcomes = [outcomes]
+    return max((o.exit_code for o in outcomes), default=0)
+
+
+# ── Pure pre/post-SDK decision functions ──────────────────────────
+#
+# Extracted from dream_entity's async monolith so the deterministic gate/trim
+# and outcome classification are table-testable WITHOUT an SDK mock or the
+# module-global monkeypatch block. They take the assembled corpus / stat
+# snapshots as parameters and read no globals.
+
+
+def pre_sdk_skip(
+    breakdown: CorpusBreakdown, *, require_entity_substrate: bool
+) -> str | None:
+    """Deterministic pre-SDK skip decision — inspects the assembled corpus
+    only. Returns a skip-kind string, or None to proceed to prompt-building.
+
+    - ``no_substrate``        — the mention-scan found nothing to synthesize.
+    - ``no_entity_substrate`` — the only corpus is non-mentioning daily digests
+      (a guaranteed INSUFFICIENT_CORPUS no-op that would still bill a full
+      prompt-cache write ~$0.80). Skip it for $0. Gated so the operator can
+      force a digests-only attempt via
+      ``features.dream_require_entity_substrate=false``.
+    """
+    if not breakdown.all_paths:
+        return "no_substrate"
+    entity_substrate = (
+        len(breakdown.tier1_authored)
+        + len(breakdown.tier1_recent)
+        + len(breakdown.tier2_sampled)
+    )
+    if require_entity_substrate and entity_substrate == 0:
+        return "no_entity_substrate"
+    return None
+
+
+@dataclass(frozen=True)
+class NoWriteVerdict:
+    """Pure post-SDK diagnosis of the entity page after the agent returns.
+
+    ``page_changed`` True = the agent wrote (normal success). When False, the
+    write either did not need to happen (``insufficient_corpus`` — a designed
+    no-op logged at INFO, feeding the per-entity backoff) or is suspicious (a
+    silent write-failure / 'would-change' prose logged at WARNING). ``level``
+    is the logging level for the no-op line; ``reason`` the human cause.
+    """
+
+    page_changed: bool
+    insufficient_corpus: bool
+    reason: str
+    level: int
+
+
+_INSUFFICIENT_NOOP_REASON = (
+    "agent declared INSUFFICIENT_CORPUS — designed no-op (no synthesizable "
+    "claims for this entity in the current corpus)"
+)
+_SUSPICIOUS_NOOP_REASON = (
+    "corpus had no new substrate to incorporate OR agent decided no changes "
+    "needed — UNEXPECTED (no INSUFFICIENT_CORPUS sentinel; possible silent "
+    "write-failure or 'would-change' prose)"
+)
+
+
+def classify_post_sdk_write(
+    *,
+    pre_mtime: float,
+    pre_size: int,
+    post_mtime: float,
+    post_size: int,
+    result_text: str,
+) -> NoWriteVerdict:
+    """Deterministic post-SDK write diagnosis — no globals, no I/O.
+
+    A changed page (mtime or size differs) is a normal write. A byte-identical
+    page is split into the EXPECTED INSUFFICIENT_CORPUS no-op (INFO) vs. the
+    SUSPICIOUS silent no-op (WARNING) the diagnostic exists to catch.
+    """
+    if pre_mtime != post_mtime or pre_size != post_size:
+        return NoWriteVerdict(True, False, "", logging.INFO)
+    if "INSUFFICIENT_CORPUS" in (result_text or ""):
+        return NoWriteVerdict(False, True, _INSUFFICIENT_NOOP_REASON, logging.INFO)
+    return NoWriteVerdict(False, False, _SUSPICIOUS_NOOP_REASON, logging.WARNING)
 
 
 def _read_facts_md() -> str:
@@ -927,19 +1059,16 @@ def _build_prompt(
     corpus_paths: list[Path],
     *,
     max_turns: int,
-    breakdown: CorpusBreakdown | None = None,
+    breakdown: CorpusBreakdown,
 ) -> tuple[str, int]:
-    """Render dream_entity.md with the entity + corpus. Returns (prompt, total_chars).
+    """Render dream_entity.md with the entity + tiered corpus. Returns
+    (prompt, total_chars).
 
-    If `breakdown` is provided, the corpus is rendered with per-tier section
-    headers so the LLM sees the Tier 1 / Tier 2 split (M016). Otherwise
-    falls back to the flat M014-style render (used by legacy tests / paths).
+    The corpus is always rendered with per-tier section headers so the LLM sees
+    the Tier 1 / Tier 2 split (M016) — the flat M014 render is gone.
     """
     current_page = entity.page.read_text(encoding="utf-8") if entity.page.exists() else "(file does not exist yet — create it from the two-layer template)"
-    if breakdown is not None:
-        corpus_block = render_corpus_block_tiered(breakdown)
-    else:
-        corpus_block = render_corpus_block(corpus_paths)
+    corpus_block = render_corpus_block_tiered(breakdown)
     corpus_chars = len(corpus_block)
     title = current_page_title(current_page) or entity.title
     prompt = render(
@@ -1030,11 +1159,11 @@ async def dream_entity(
     dry_run: bool = False,
     max_prompt_chars: int | None = None,
     max_turns: int | None = None,
-) -> DreamResult:
+) -> DreamOutcome:
     """Re-synthesize ONE entity page from the substrate corpus.
 
-    Size gate: pre-flight prompt-char check; on overrun returns a DreamResult
-    with `skipped="prompt_too_large"` and zero spend (the SDK is NEVER called
+    Size gate: pre-flight prompt-char check; on overrun returns a DreamOutcome
+    with `kind="prompt_too_large"` and zero spend (the SDK is NEVER called
     when the prompt exceeds the cap — context-overflow guard, not cost).
     """
     started = time.time()
@@ -1058,31 +1187,27 @@ async def dream_entity(
         breakdown.tier2_pool_size,
     )
 
-    if not corpus_paths:
+    # Deterministic pre-SDK gate (pure, table-tested — see pre_sdk_skip). The
+    # log line differs per kind but the DECISION lives in one pure function.
+    gate = pre_sdk_skip(
+        breakdown,
+        require_entity_substrate=CONFIG.features.dream_require_entity_substrate,
+    )
+    if gate == "no_substrate":
         log.warning(
             "  no substrate mentions %s — nothing to synthesize (skipping)",
             entity.slug,
         )
-        return DreamResult(
+        return DreamOutcome(
             entity=entity, corpus_count=0, corpus_chars=0,
             actual_cost_usd=0.0,
             input_tokens=0, output_tokens=0, sdk_result_text="",
-            skipped="no_substrate", elapsed_s=time.time() - started,
+            kind="no_substrate", elapsed_s=time.time() - started,
         )
-
-    # Pre-flight no-op skip: when the corpus carries ZERO entity-specific
-    # substrate (authored + recent + tier-2 all empty) the only files are
-    # date-pulled daily digests. Since the mention-scan found 0 hits, those
-    # digests provably do NOT mention the entity → the agent's quality gate
-    # will return INSUFFICIENT_CORPUS without writing, but the SDK call still
-    # bills a full prompt-cache write (~$0.80). Skip it for $0. (Guarded by a
-    # config flag so the operator can force a digests-only attempt.)
-    entity_substrate_count = (
-        len(breakdown.tier1_authored)
-        + len(breakdown.tier1_recent)
-        + len(breakdown.tier2_sampled)
-    )
-    if CONFIG.features.dream_require_entity_substrate and entity_substrate_count == 0:
+    if gate == "no_entity_substrate":
+        # The only corpus is non-mentioning daily digests → the agent's quality
+        # gate will return INSUFFICIENT_CORPUS without writing, but the SDK call
+        # still bills a full prompt-cache write (~$0.80). Skip it for $0.
         log.info(
             "  no entity-specific substrate for %s (only %d non-mentioning "
             "daily digest(s) in corpus) — guaranteed no-op, skipping SDK call "
@@ -1090,11 +1215,11 @@ async def dream_entity(
             "features.dream_require_entity_substrate=false to force.",
             entity.slug, len(breakdown.tier1_digests),
         )
-        return DreamResult(
+        return DreamOutcome(
             entity=entity, corpus_count=len(corpus_paths), corpus_chars=0,
             actual_cost_usd=0.0,
             input_tokens=0, output_tokens=0, sdk_result_text="",
-            skipped="no_entity_substrate", elapsed_s=time.time() - started,
+            kind="no_entity_substrate", elapsed_s=time.time() - started,
         )
 
     prompt, prompt_chars, breakdown, dropped = _build_prompt_within_budget(
@@ -1126,21 +1251,21 @@ async def dream_entity(
             "operator-authored substrate."
         )
         log.error("  ✗ %s", msg)
-        return DreamResult(
+        return DreamOutcome(
             entity=entity, corpus_count=len(corpus_paths),
             corpus_chars=sum(len(p.read_text(encoding="utf-8", errors="replace")) for p in corpus_paths),
             actual_cost_usd=0.0,
             input_tokens=0, output_tokens=0, sdk_result_text=msg,
-            skipped="prompt_too_large", elapsed_s=time.time() - started,
+            kind="prompt_too_large", elapsed_s=time.time() - started,
         )
 
     if dry_run:
         log.info("  --dry-run: would invoke SDK with %d-char prompt", prompt_chars)
-        return DreamResult(
+        return DreamOutcome(
             entity=entity, corpus_count=len(corpus_paths),
             corpus_chars=prompt_chars,
             actual_cost_usd=0.0, input_tokens=0, output_tokens=0,
-            sdk_result_text="(dry-run)", skipped="dry_run",
+            sdk_result_text="(dry-run)", kind="dry_run",
             elapsed_s=time.time() - started,
         )
 
@@ -1265,13 +1390,13 @@ async def dream_entity(
             pass
         capture.dump_to(log)
         elapsed = time.time() - started
-        return DreamResult(
+        return DreamOutcome(
             entity=entity, corpus_count=len(corpus_paths),
             corpus_chars=prompt_chars,
             actual_cost_usd=actual_cost, input_tokens=input_tokens,
             output_tokens=output_tokens,
             sdk_result_text=f"per-call timeout after {elapsed:.1f}s (msg_count={message_count})",
-            skipped="per_call_timeout", elapsed_s=elapsed,
+            kind="per_call_timeout", elapsed_s=elapsed,
         )
     except Exception as exc:  # noqa: BLE001 — classifier handles all paths
         log.error(
@@ -1288,11 +1413,11 @@ async def dream_entity(
             capture=capture,
             exc=exc,
         )
-        return DreamResult(
+        return DreamOutcome(
             entity=entity, corpus_count=len(corpus_paths),
             corpus_chars=prompt_chars,
             actual_cost_usd=0.0, input_tokens=input_tokens, output_tokens=output_tokens,
-            sdk_result_text=str(exc), skipped="sdk_failure",
+            sdk_result_text=str(exc), kind="sdk_failure",
             elapsed_s=time.time() - started,
         )
 
@@ -1322,38 +1447,27 @@ async def dream_entity(
     except OSError:
         _entity_post_mtime = _entity_pre_mtime
         _entity_post_size = _entity_pre_size
-    insufficient_corpus = False
-    if (
-        _entity_post_mtime == _entity_pre_mtime
-        and _entity_post_size == _entity_pre_size
-    ):
-        # Distinguish the EXPECTED no-op from the SUSPICIOUS one. The prompt's
-        # quality gate makes the agent print the `INSUFFICIENT_CORPUS` sentinel
-        # when the corpus has no synthesizable claims for the entity (common on
-        # generic-noun slugs whose mention-scan matches unrelated text — e.g.
-        # `kontakte` hitting the German word "Kontakte" in email metadata). That
-        # is a designed, correct no-op → INFO, so it stays out of the
-        # errors-only triage log. A byte-identical page WITHOUT that sentinel is
-        # the case this diagnostic was built for — a silent write-failure
-        # (callback-gate bug) or "would-change" prose — and stays at WARNING.
-        insufficient_corpus = "INSUFFICIENT_CORPUS" in (result_text or "")
-        level = logging.INFO if insufficient_corpus else logging.WARNING
-        reason = (
-            "agent declared INSUFFICIENT_CORPUS — designed no-op (no "
-            "synthesizable claims for this entity in the current corpus)"
-            if insufficient_corpus else
-            "corpus had no new substrate to incorporate OR agent decided no "
-            "changes needed — UNEXPECTED (no INSUFFICIENT_CORPUS sentinel; "
-            "possible silent write-failure or 'would-change' prose)"
-        )
+    # Distinguish the EXPECTED INSUFFICIENT_CORPUS no-op from the SUSPICIOUS
+    # silent one via the pure classifier (table-tested — classify_post_sdk_write).
+    # The sentinel fires on generic-noun slugs whose mention-scan matches
+    # unrelated text (e.g. `kontakte` hitting the German word in email metadata);
+    # a byte-identical page WITHOUT it is the silent write-failure this
+    # diagnostic was built for.
+    verdict = classify_post_sdk_write(
+        pre_mtime=_entity_pre_mtime, pre_size=_entity_pre_size,
+        post_mtime=_entity_post_mtime, post_size=_entity_post_size,
+        result_text=result_text,
+    )
+    insufficient_corpus = verdict.insufficient_corpus
+    if not verdict.page_changed:
         log.log(
-            level,
+            verdict.level,
             "  agent finished without modifying %s — %s. Page byte-identical "
             "to pre-run.",
-            str(entity.page.relative_to(ROOT_DIR)), reason,
+            str(entity.page.relative_to(ROOT_DIR)), verdict.reason,
         )
         log.log(
-            level,
+            verdict.level,
             "  agent final-message text (%d chars): %s",
             len(result_text or ""),
             (result_text or "(empty)")[:1500].replace("\n", " | "),
@@ -1442,12 +1556,21 @@ async def dream_entity(
         )
     except Exception:
         pass
-    return DreamResult(
+
+    # Web-research post-pass (issue #2) — fires on EVERY successful dream
+    # (single-entity, sweep, piggyback), restoring the shipped design after it
+    # regressed to the single-entity CLI branch only. Gated internally (feature
+    # flag + per-entity opt-in + cooldown) and fail-soft, so it is a no-op on
+    # the vast majority of entities. dry-run / gated / failed paths return
+    # earlier, so reaching here means a real synthesis attempt completed.
+    _maybe_web_research(entity)
+
+    return DreamOutcome(
         entity=entity, corpus_count=len(corpus_paths),
         corpus_chars=prompt_chars,
         actual_cost_usd=actual_cost, input_tokens=input_tokens,
         output_tokens=output_tokens, sdk_result_text=result_text,
-        skipped=None, elapsed_s=elapsed,
+        kind=None, elapsed_s=elapsed,
         insufficient_corpus=insufficient_corpus,
     )
 
@@ -1456,9 +1579,6 @@ async def dream_entity(
 
 
 # ── M017 dream-priority resolution ──────────────────────────────────
-
-
-from fnmatch import fnmatch as _fnmatch
 
 
 def compute_entity_priority(entity: EntityRef) -> tuple[float, str]:
@@ -1567,31 +1687,88 @@ def _select_for_sweep(
     return picked
 
 
-def list_candidates(*, cooldown_days: int | None = None) -> list[dict]:
-    """Return ranked candidate list for `wiki dream --list-candidates` UI."""
+@dataclass
+class SweepCandidate:
+    """One entity with EVERY sweep-selection verdict computed once.
+
+    The single source of truth both consumers read: ``dream_all_entities``
+    filters on ``cooldown_active`` + ``backoff_active`` (and applies selection
+    jitter to ``weight``), while ``list_candidates`` renders the full row —
+    so the operator debug view surfaces the insufficient-corpus backoff state,
+    not just cooldown. ``weight`` is the deterministic base (priority × age);
+    the sweep multiplies in per-run jitter itself.
+    """
+
+    entity: EntityRef
+    priority: float
+    source: str
+    age_days: float | None
+    cooldown_active: bool
+    backoff_active: bool
+    excluded: bool  # priority <= 0 → never auto-swept
+    weight: float
+
+
+def build_sweep_candidates(
+    *,
+    cooldown_days: int | None = None,
+    now: datetime | None = None,
+) -> list[SweepCandidate]:
+    """Every entity with every gate verdict resolved once. Neither filters nor
+    ranks — the two consumers do (see SweepCandidate). Fixes the historical
+    duplication where the sweep filtered insufficient-corpus backoff but
+    list_candidates was blind to it."""
     cd = cooldown_days if cooldown_days is not None else CONFIG.scheduling.dream_cooldown_days
-    rows: list[dict] = []
+    ref = now or datetime.now(timezone.utc)
+    rows: list[SweepCandidate] = []
     for ent in _list_all_entities():
         priority, source = compute_entity_priority(ent)
-        age_days = _last_synth_age_days(ent)
-        cooldown = age_days is not None and age_days < cd
-        weight = priority * (age_days if age_days is not None else 365.0)
-        rows.append({
-            "slug": ent.slug,
-            "kind": ent.kind,
-            "rel_path": str(ent.page.relative_to(ROOT_DIR)),
-            "priority": round(priority, 3),
-            "age_days": round(age_days, 1) if age_days is not None else None,
-            "weight": round(weight, 2),
-            "source": source,
-            "cooldown_active": cooldown,
-            "excluded": priority <= 0,
-        })
+        age = _last_synth_age_days(ent, now=ref)
+        cooldown_active = cd > 0 and age is not None and age < cd
+        backoff_active = is_within_insufficient_backoff(ent, now=ref)
+        age_for_weight = age if age is not None else 365.0
+        rows.append(
+            SweepCandidate(
+                entity=ent,
+                priority=priority,
+                source=source,
+                age_days=age,
+                cooldown_active=cooldown_active,
+                backoff_active=backoff_active,
+                excluded=priority <= 0,
+                weight=priority * age_for_weight,
+            )
+        )
+    return rows
+
+
+def list_candidates(*, cooldown_days: int | None = None) -> list[dict]:
+    """Return ranked candidate list for `wiki dream --list-candidates` UI.
+
+    Consumes the shared build_sweep_candidates so every gate the sweep applies
+    is surfaced here — including the insufficient-corpus backoff the debug view
+    was previously blind to (it only flagged cooldown).
+    """
+    rows = [
+        {
+            "slug": c.entity.slug,
+            "kind": c.entity.kind,
+            "rel_path": str(c.entity.page.relative_to(ROOT_DIR)),
+            "priority": round(c.priority, 3),
+            "age_days": round(c.age_days, 1) if c.age_days is not None else None,
+            "weight": round(c.weight, 2),
+            "source": c.source,
+            "cooldown_active": c.cooldown_active,
+            "backoff_active": c.backoff_active,
+            "excluded": c.excluded,
+        }
+        for c in build_sweep_candidates(cooldown_days=cooldown_days)
+    ]
     # Sort by priority (descending), then by weight (descending), then by slug.
     # Operator wants to see high-priority entities at top regardless of recent
     # synthesis — debug view of WHAT RULES FIRE, not WHAT GOT PICKED THIS RUN.
-    # (Selection-this-run weight = priority × age × jitter, with cooldown
-    # filter; that's `wiki dream piggyback --dry-run`, not list-candidates.)
+    # (Selection-this-run weight = priority × age × jitter, with cooldown +
+    # backoff filters; that's `wiki dream piggyback --dry-run`, not this view.)
     rows.sort(key=lambda r: (-r["priority"], -r["weight"], r["slug"]))
     return rows
 
@@ -1605,7 +1782,7 @@ async def dream_all_entities(
     dry_run: bool = False,
     selection_mode: str | None = None,
     seed: int | None = None,
-) -> list[DreamResult]:
+) -> list[DreamOutcome]:
     """Sweep all entities respecting caps + cooldown + M017 priority weighting.
 
     Selection mode (M017):
@@ -1616,30 +1793,27 @@ async def dream_all_entities(
     run_cap = per_run_max_tokens if per_run_max_tokens is not None else CONFIG.limits.dream_cycle_max_tokens_per_run
     mode = selection_mode or "probabilistic"
 
-    all_entities = _list_all_entities()
-    # Build (weight, entity, source) candidates: filter cooldown, compute weight via priority × age.
-    candidates: list[tuple[float, EntityRef, str]] = []
+    # One place computes every gate verdict (build_sweep_candidates); the sweep
+    # only FILTERS here. Skipped-because-backoff entities returned
+    # INSUFFICIENT_CORPUS recently — re-running now would re-burn a full SDK
+    # call on a guaranteed no-op (a successful synthesis clears it). Cooldown +
+    # backoff are both bypassed by an explicit `wiki dream <slug>`.
+    all_candidates = build_sweep_candidates(cooldown_days=cd)
+    total_entities = len(all_candidates)
     _sweep_rng = random.Random(seed) if seed is not None else random
+    candidates: list[tuple[float, EntityRef, str]] = []
     backed_off = 0
-    for ent in all_entities:
-        if is_within_cooldown(ent, cooldown_days=cd):
+    for cand in all_candidates:
+        if cand.cooldown_active:
             continue
-        # Skip entities still inside their insufficient-corpus backoff window —
-        # they returned INSUFFICIENT_CORPUS recently and re-running now would
-        # re-burn a full SDK call on a guaranteed no-op. A successful synthesis
-        # (once real substrate lands) clears the backoff. Bypassed by explicit
-        # `wiki dream <slug>`, same as cooldown.
-        if is_within_insufficient_backoff(ent):
+        if cand.backoff_active:
             backed_off += 1
             continue
-        priority, source = compute_entity_priority(ent)
-        age = _last_synth_age_days(ent)
-        # Never-synthesized = high age signal (365d default cap so it doesn't dominate)
-        age_for_weight = age if age is not None else 365.0
-        weight = priority * age_for_weight * _sweep_rng.uniform(0.85, 1.15)
-        candidates.append((weight, ent, source))
+        # Selection jitter on the deterministic base weight (priority × age).
+        weight = cand.weight * _sweep_rng.uniform(0.85, 1.15)
+        candidates.append((weight, cand.entity, cand.source))
 
-    # M017 selection
+    # M017 selection (zero-weight / excluded entities are dropped by _select_for_sweep)
     N = limit if limit is not None else len(candidates)
     ranked = _select_for_sweep(candidates, N, mode, seed=seed)
 
@@ -1648,10 +1822,10 @@ async def dream_all_entities(
     log.info(
         "─── dream sweep: %d entities total, %d candidates after cooldown+priority filter"
         "%s (mode=%s, run_cap=%s tok%s) ───",
-        len(all_entities), len(ranked), backoff_label, mode, f"{run_cap:,}", seed_label,
+        total_entities, len(ranked), backoff_label, mode, f"{run_cap:,}", seed_label,
     )
 
-    results: list[DreamResult] = []
+    results: list[DreamOutcome] = []
     cumulative = 0
     for idx, (_weight, ent, _source) in enumerate(ranked, 1):
         if limit is not None and idx > limit:
@@ -1681,12 +1855,11 @@ async def dream_all_entities(
     # "when did dream-cycle last run, for which entities, at what cost?"
     # Mirrors compile/flush event shape (see core.utils.append_history).
     try:
-        skipped_count = sum(1 for r in results if r.skipped)
-        no_write_count = 0  # detectable per-entity but not aggregated here
+        skipped_count = sum(1 for r in results if r.status != "synthesized")
         append_history(
             "dream_sweep",
             entities_processed=len(results),
-            entities_total=len(all_entities),
+            entities_total=total_entities,
             candidates_after_filter=len(ranked),
             mode=mode,
             seed=seed,
@@ -1705,9 +1878,15 @@ async def dream_all_entities(
 def _maybe_web_research(ent: EntityRef) -> None:
     """Fail-soft web-research post-pass after a successful dream. Gated
     internally (feature flag + per-entity opt-in + cooldown). Never raises —
-    a web hiccup must not break the dream flow."""
+    a web hiccup must not break the dream flow.
+
+    Wired into the ``dream_entity`` success seam so it fires on every path that
+    synthesizes an entity — single-entity, sweep, and piggyback alike — which
+    is the shipped design (backlog/shipped/dream-web-research.md: "hook after
+    dream_entity()"). It reads the module-level ``KNOWLEDGE_DIR`` (not a fresh
+    ``core.paths`` import) so tests that monkeypatch the vault root see it too.
+    """
     try:
-        from core.paths import KNOWLEDGE_DIR
         from web_research import run_web_research
 
         res = run_web_research(
@@ -1814,15 +1993,11 @@ async def _async_main() -> int:
             ent, dry_run=args.dry_run, max_prompt_chars=args.max_chars,
             max_turns=args.max_turns,
         )
-        if res.skipped == "prompt_too_large":
-            return 3
-        if res.skipped == "sdk_failure":
-            return 4
-        # Web-research post-pass (issue #2) — gated internally by the feature
-        # flag + per-entity opt-in + cooldown; fail-soft (never breaks dream).
-        if not args.dry_run and res.skipped is None:
-            _maybe_web_research(ent)
-        return 0
+        # Web-research post-pass (issue #2) now fires inside dream_entity's
+        # success seam — see _maybe_web_research — so it covers sweep +
+        # piggyback too, not just this single-entity branch. Exit code via the
+        # single dream_exit_code map (per_call_timeout is 6, not the old 0).
+        return dream_exit_code(res)
 
     if args.cmd == "web-research":
         ent = _resolve_entity(args.slug)
@@ -1841,11 +2016,11 @@ async def _async_main() -> int:
             selection_mode=args.selection_mode,
             seed=getattr(args, "seed", None),
         )
-        # Non-zero exit if any entity hit a real failure (cost-cap or SDK)
-        for r in results:
-            if r.skipped in ("prompt_too_large", "sdk_failure"):
-                return 5
-        return 0
+        # Nonzero exit if any entity hit a real failure — prompt-too-large,
+        # per-call timeout, or SDK failure. Same dream_exit_code map as the
+        # entity branch, so a hung-then-aborted unattended dream can no longer
+        # record a false `ok` in piggyback-state.json.
+        return dream_exit_code(results)
 
     if args.cmd == "piggyback":
         # M017: piggyback uses probabilistic mode by default (diversity over
@@ -1853,10 +2028,9 @@ async def _async_main() -> int:
         # high-weight). Operator can override per-invocation via `sweep
         # --selection-mode greedy`.
         results = await dream_all_entities(limit=args.limit, selection_mode="probabilistic")
-        for r in results:
-            if r.skipped == "sdk_failure":
-                return 5
-        return 0
+        # Same single exit-code map — a per_call_timeout or prompt_too_large in
+        # an unattended piggyback now surfaces as failed:<rc> (was `ok`).
+        return dream_exit_code(results)
 
     if args.cmd == "list-candidates":
         import json as _json
@@ -1869,7 +2043,14 @@ async def _async_main() -> int:
         print("-" * 110)
         for i, r in enumerate(rows[:args.limit], 1):
             age = f"{r['age_days']}d" if r['age_days'] is not None else "never"
-            flag = " (cooldown)" if r["cooldown_active"] else (" EXCLUDED" if r["excluded"] else "")
+            flags = []
+            if r["excluded"]:
+                flags.append("EXCLUDED")
+            if r["cooldown_active"]:
+                flags.append("cooldown")
+            if r["backoff_active"]:
+                flags.append("backoff")
+            flag = (" " + " ".join(flags)) if flags else ""
             print(f"{i:<5} {r['weight']:>8.2f}  {r['priority']:>6.2f}  {age:>7}  {r['slug']:<40} {r['source']}{flag}")
         if len(rows) > args.limit:
             print(f"... and {len(rows) - args.limit} more (raise --limit to see)")

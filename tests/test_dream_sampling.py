@@ -93,7 +93,6 @@ def vault(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Path]:
     monkeypatch.setattr(dream, "PEOPLE_DIR", tmp_path / "knowledge" / "people")
     monkeypatch.setattr(dream, "PROJECTS_DIR", tmp_path / "knowledge" / "projects")
     monkeypatch.setattr(dream, "AREAS_DIR", tmp_path / "knowledge" / "areas")
-    monkeypatch.setattr(dream, "INDEX_FILE", tmp_path / "knowledge" / "index.md")
     monkeypatch.setattr(dream, "LOG_FILE", tmp_path / "knowledge" / "log.md")
     monkeypatch.setattr(dream, "_SUBSTRATE_ROOTS", (tmp_path / "raw", tmp_path / "daily"))
     monkeypatch.setattr(
@@ -443,11 +442,9 @@ def test_corpus_stays_bounded_on_large_substrate_pool(vault: Path) -> None:
     # 70 files × 8 KB truncation + per-file header overhead ≈ ≤700 KB
     assert len(block) < 700_000, f"corpus block too big: {len(block)} bytes"
 
-    # Sanity: a flat collect (M014 path) would have rendered 500 × 8 KB =
-    # 4 MB. Verify the M014 shim still works for back-compat though.
-    legacy = dream.collect_corpus(ent, vault_root=vault)
-    # legacy returns the tiered all_paths — still bounded by construction
-    assert len(legacy) <= 70
+    # Sanity: a flat collect (M014 path) would have rendered 500 × 8 KB = 4 MB.
+    # The deduped path list from the tiered build stays bounded by construction.
+    assert len(bd.all_paths) <= 70
 
 
 # ── end-to-end: stamp write-back actually happens after a (faked) dream ─
@@ -490,7 +487,7 @@ def test_dream_entity_stamps_last_dreamed_at_after_sdk(
     ent = dream._resolve_entity("alex")
     assert ent is not None
     res = asyncio.run(dream.dream_entity(ent, max_prompt_chars=0))
-    assert res.skipped is None, f"unexpected skip: {res.skipped} ({res.sdk_result_text!r})"
+    assert res.kind is None, f"unexpected skip: {res.kind} ({res.sdk_result_text!r})"
 
     # Both substrate files were stamped — in the side-state, NOT in raw/.
     assert dream._get_last_dreamed_at(p1) is not None, "p1 not stamped"

@@ -4,8 +4,8 @@ Covered:
 
 1. Prompt-render contract — `prompts/dream_entity.md` substitutes all
    declared placeholders without raising PromptError.
-2. Cost-cap enforcement — when prompt cost-estimate exceeds the per-entity
-   cap, `dream_entity()` returns skipped="cost_cap_exceeded" and DOES NOT
+2. Size-cap enforcement — when the rendered prompt exceeds the per-entity
+   char cap, `dream_entity()` returns kind="prompt_too_large" and DOES NOT
    call the SDK (no silent burn).
 3. Cooldown — entities whose `last_synthesized_at:` is within the
    cooldown window are correctly skipped; older ones are eligible.
@@ -98,7 +98,6 @@ def vault(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Path]:
     monkeypatch.setattr(dream, "PEOPLE_DIR", tmp_path / "knowledge" / "people")
     monkeypatch.setattr(dream, "PROJECTS_DIR", tmp_path / "knowledge" / "projects")
     monkeypatch.setattr(dream, "AREAS_DIR", tmp_path / "knowledge" / "areas")
-    monkeypatch.setattr(dream, "INDEX_FILE", tmp_path / "knowledge" / "index.md")
     monkeypatch.setattr(dream, "LOG_FILE", tmp_path / "knowledge" / "log.md")
     monkeypatch.setattr(dream, "_SUBSTRATE_ROOTS", (tmp_path / "raw", tmp_path / "daily"))
     # Isolate the dream side-state files so tests never touch the real STATE_DIR.
@@ -123,7 +122,6 @@ def vault(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Path]:
 def test_prompt_render_substitutes_all_placeholders(vault: Path) -> None:
     """dream_entity.md must render without unresolved ${var} placeholders."""
     import dream
-    from core.prompts import render
 
     _write_entity_page(vault, "people", "demo")
     _write_substrate(vault, "raw/notes/n1.md", "Note mentioning demo with details.\n")
@@ -131,9 +129,9 @@ def test_prompt_render_substitutes_all_placeholders(vault: Path) -> None:
     ent = dream._resolve_entity("demo")
     assert ent is not None
 
-    paths = dream.collect_corpus(ent)
-    assert len(paths) == 1
-    prompt, _ = dream._build_prompt(ent, paths, max_turns=20)
+    breakdown = dream.collect_corpus_tiered(ent)
+    assert len(breakdown.all_paths) == 1
+    prompt, _ = dream._build_prompt(ent, breakdown.all_paths, max_turns=20, breakdown=breakdown)
     # No raw ${...} placeholders left.
     assert "${" not in prompt, f"unresolved placeholder in prompt: {prompt[:200]}"
     # Required strings show up.
@@ -200,7 +198,7 @@ def test_size_cap_rejects_sdk_call(vault: Path, monkeypatch: pytest.MonkeyPatch)
     # max_prompt_chars=1 → any real prompt exceeds it → gated pre-SDK.
     result = asyncio.run(dream.dream_entity(ent, max_prompt_chars=1))
 
-    assert result.skipped == "prompt_too_large", f"expected prompt_too_large, got {result.skipped!r}"
+    assert result.kind == "prompt_too_large", f"expected prompt_too_large, got {result.kind!r}"
     assert result.actual_cost_usd == 0.0
     assert sdk_called["n"] == 0, "SDK was invoked despite size-cap rejection — silent burn!"
     assert "PROMPT_TOO_LARGE" in result.sdk_result_text
@@ -259,11 +257,11 @@ def test_sweep_skips_cooldown_entities(vault: Path, monkeypatch: pytest.MonkeyPa
 
     async def _fake_dream_entity(entity, **kwargs):
         invocations.append(entity.slug)
-        return dream.DreamResult(
+        return dream.DreamOutcome(
             entity=entity, corpus_count=1, corpus_chars=100,
             actual_cost_usd=0.01,
             input_tokens=10, output_tokens=10, sdk_result_text="ok",
-            skipped=None, elapsed_s=0.0,
+            kind=None, elapsed_s=0.0,
         )
 
     monkeypatch.setattr(dream, "dream_entity", _fake_dream_entity)
@@ -284,11 +282,11 @@ def test_sweep_respects_per_run_token_cap(vault: Path, monkeypatch: pytest.Monke
     _write_substrate(vault, "raw/notes/all.md", "a, b, c all mentioned.\n")
 
     async def _fake_dream_entity(entity, **kwargs):
-        return dream.DreamResult(
+        return dream.DreamOutcome(
             entity=entity, corpus_count=1, corpus_chars=100,
             actual_cost_usd=0.0,
             input_tokens=10, output_tokens=10, sdk_result_text="ok",
-            skipped=None, elapsed_s=0.0,
+            kind=None, elapsed_s=0.0,
         )
 
     monkeypatch.setattr(dream, "dream_entity", _fake_dream_entity)
@@ -313,7 +311,7 @@ def test_collect_corpus_matches_whole_word(vault: Path) -> None:
 
     ent = dream._resolve_entity("al")
     assert ent is not None
-    paths = dream.collect_corpus(ent)
+    paths = dream.collect_corpus_tiered(ent).all_paths
     rels = {str(p.relative_to(vault)) for p in paths}
     assert "raw/notes/mention.md" in rels
     assert "daily/2026-05-10.md" in rels
@@ -331,7 +329,7 @@ def test_collect_corpus_picks_up_compiled_from_and_author(vault: Path) -> None:
     _write_substrate(vault, "raw/voice/2026-05-10.md", body)
     ent = dream._resolve_entity("alex")
     assert ent is not None
-    paths = dream.collect_corpus(ent)
+    paths = dream.collect_corpus_tiered(ent).all_paths
     rels = {str(p.relative_to(vault)) for p in paths}
     assert "raw/voice/2026-05-10.md" in rels
 
@@ -341,7 +339,7 @@ def test_prompt_carries_existing_state_and_timeline(vault: Path) -> None:
     rewriter can preserve operator-touched lines."""
     import dream
 
-    page = _write_entity_page(
+    _write_entity_page(
         vault, "people", "bob",
         body=(
             "# Bob\n\n## State\n\n- **Role:** OPERATOR-EDITED\n\n"
@@ -355,8 +353,8 @@ def test_prompt_carries_existing_state_and_timeline(vault: Path) -> None:
 
     ent = dream._resolve_entity("bob")
     assert ent is not None
-    paths = dream.collect_corpus(ent)
-    prompt, _ = dream._build_prompt(ent, paths, max_turns=20)
+    breakdown = dream.collect_corpus_tiered(ent)
+    prompt, _ = dream._build_prompt(ent, breakdown.all_paths, max_turns=20, breakdown=breakdown)
     assert "OPERATOR-EDITED" in prompt
     assert "OPERATOR-CHECKED-ITEM" in prompt
 
@@ -478,7 +476,7 @@ def test_skips_sdk_when_no_entity_specific_substrate(
     assert ent is not None
     result = asyncio.run(dream.dream_entity(ent))
 
-    assert result.skipped == "no_entity_substrate", f"got {result.skipped!r}"
+    assert result.kind == "no_entity_substrate", f"got {result.kind!r}"
     assert result.actual_cost_usd == 0.0
     assert calls["n"] == 0, "SDK invoked despite zero entity-specific substrate — wasted spend"
 
@@ -502,7 +500,7 @@ def test_does_not_skip_when_entity_substrate_present(
     assert ent is not None
     result = asyncio.run(dream.dream_entity(ent))
 
-    assert result.skipped is None, f"unexpected skip: {result.skipped!r}"
+    assert result.kind is None, f"unexpected skip: {result.kind!r}"
     assert calls["n"] == 1
 
 
@@ -659,6 +657,39 @@ def is_within_backoff(dream_mod, ent):
     return ent.slug in state and state[ent.slug]["count"] == 1
 
 
+# ── Web-research post-pass fires on the sweep path (issue #2 regression) ──
+
+
+def test_web_research_fires_on_sweep_not_just_single_entity(
+    vault: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The web-research post-pass must fire for entities synthesized by the
+    SWEEP (the unattended piggyback path), not only the single-entity CLI
+    branch. Regression guard: the invocation had drifted into the
+    `wiki dream-entity` branch, leaving the only unattended path
+    (dream_all_entities → dream_entity) dark despite the shipped design pinning
+    it to the dream_entity() success seam."""
+    import dream
+
+    _write_entity_page(vault, "people", "swept", last_synthesized_at="2026-01-01")
+    _write_substrate(vault, "raw/notes/n.md", "swept is mentioned in this note.\n")
+    # Drive the REAL dream_entity (not a monkeypatched stub) via a fake SDK call
+    # so the success seam is actually reached.
+    _make_fake_query(
+        monkeypatch,
+        usage={"input_tokens": 12, "cache_creation_input_tokens": 9000, "output_tokens": 50},
+        cost=0.2,
+        result_text="updated",
+    )
+
+    fired: list[str] = []
+    monkeypatch.setattr(dream, "_maybe_web_research", lambda ent: fired.append(ent.slug))
+
+    asyncio.run(dream.dream_all_entities(cooldown_days=7))
+
+    assert "swept" in fired, "web-research post-pass did not fire on the sweep path"
+
+
 def test_successful_synthesis_clears_backoff(
     vault: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -708,9 +739,9 @@ def test_sweep_skips_backed_off_entity(
 
     async def _fake_dream_entity(entity, **kwargs):
         invoked.append(entity.slug)
-        return dream.DreamResult(
+        return dream.DreamOutcome(
             entity=entity, corpus_count=0, corpus_chars=0, actual_cost_usd=0.0,
-            input_tokens=0, output_tokens=0, sdk_result_text="", skipped=None,
+            input_tokens=0, output_tokens=0, sdk_result_text="", kind=None,
             elapsed_s=0.0,
         )
 
@@ -718,3 +749,45 @@ def test_sweep_skips_backed_off_entity(
     asyncio.run(dream.dream_all_entities(cooldown_days=0))
 
     assert "dormant" not in invoked, "backed-off entity was selected by the sweep"
+
+
+# ── build_sweep_candidates: single source of truth for gate verdicts ──
+
+
+def test_build_sweep_candidates_flags_cooldown_and_backoff(
+    vault: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Every entity carries every gate verdict — the shared row the sweep
+    filters on and list_candidates renders. Backoff and cooldown are distinct
+    axes and both surface."""
+    import dream
+
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    _write_entity_page(vault, "people", "fresh", last_synthesized_at=today)  # cooldown
+    _write_entity_page(vault, "people", "dormant")                          # backoff
+    _write_entity_page(vault, "people", "ready")                            # clean
+    dream._record_insufficient_corpus("dormant")
+
+    rows = {c.entity.slug: c for c in dream.build_sweep_candidates(cooldown_days=7)}
+
+    assert rows["fresh"].cooldown_active is True
+    assert rows["fresh"].backoff_active is False
+    assert rows["dormant"].backoff_active is True
+    assert rows["dormant"].cooldown_active is False
+    assert rows["ready"].cooldown_active is False
+    assert rows["ready"].backoff_active is False
+
+
+def test_list_candidates_surfaces_backoff(
+    vault: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The debug view exposes insufficient-corpus backoff, not just cooldown —
+    the omission that made the sweep and list-candidates diverge."""
+    import dream
+
+    _write_entity_page(vault, "people", "dormant")
+    dream._record_insufficient_corpus("dormant")
+
+    rows = {r["slug"]: r for r in dream.list_candidates()}
+    assert rows["dormant"]["backoff_active"] is True
+    assert rows["dormant"]["cooldown_active"] is False
