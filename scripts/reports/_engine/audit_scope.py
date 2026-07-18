@@ -34,7 +34,6 @@ import argparse
 import dataclasses as dc
 import sys
 import time
-from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 # Project root on sys.path so `scripts.reports.*` imports resolve when
@@ -43,6 +42,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
 from scripts.core.paths import DAILY_DIR  # noqa: E402,F401
 from scripts.reports._engine.instrument import load_instrument  # noqa: E402
+from scripts.reports._engine.substrate_scope import (  # noqa: E402
+    CLINICAL_DEFAULT_SUBSTRATE_GLOBS,
+    resolve_substrate_files,
+)
 
 
 # Conservative tokens-per-char heuristic. Real Claude tokenisation is
@@ -51,25 +54,10 @@ from scripts.reports._engine.instrument import load_instrument  # noqa: E402
 # unsafe direction.
 CHARS_PER_TOKEN = 4
 
-# Default substrate subset for clinical-screen instruments. Scoped to
-# the substrates that legitimately surface clinical-screen signals
-# (sleep / mood / engagement / concentration). Wider per-instrument
-# scopes will be declared in items.yaml `scope:` blocks post-wedge.
-CLINICAL_DEFAULT_SUBSTRATE_GLOBS: tuple[str, ...] = (
-    "daily/*.md",
-    "raw/notes/voice/**/*.md",
-    "raw/notes/health/**/*.md",
-    "raw/transcripts/**/*.md",
-    "raw/notes/sessions/**/*.md",
-)
-
 # Budget the audit treats as "must fit". Opus 4.7 advertises 200K
 # input; we target 80% of that to leave headroom for prompt
 # scaffolding + system prompt + response.
 CONTEXT_BUDGET_TOKENS = 160_000
-
-# Default lookback if instrument.yaml doesn't specify.
-FALLBACK_LOOKBACK_DAYS = 14
 
 
 @dc.dataclass
@@ -98,27 +86,6 @@ class AuditResult:
         return "PASS"
 
 
-def _resolve_substrate_files(
-    vault_root: Path,
-    globs: tuple[str, ...],
-    lookback_days: int,
-) -> list[Path]:
-    """Return files matching any glob whose mtime falls in the window."""
-    cutoff = datetime.now(timezone.utc) - timedelta(days=lookback_days)
-    cutoff_epoch = cutoff.timestamp()
-    found: dict[Path, float] = {}
-    for pattern in globs:
-        for path in vault_root.glob(pattern):
-            if not path.is_file():
-                continue
-            mtime = path.stat().st_mtime
-            if mtime < cutoff_epoch:
-                continue
-            # Dedup if the file matches multiple globs.
-            found[path] = mtime
-    return sorted(found.keys())
-
-
 def _sum_chars(paths: list[Path]) -> int:
     total = 0
     for p in paths:
@@ -137,17 +104,11 @@ def audit_instrument(
 ) -> AuditResult:
     """Audit one instrument's scope against the budget."""
     instr = load_instrument(instrument_dir)
-    # For wedge instruments, default lookback is read from the
-    # `inference.default_lookback_days` field if present in
-    # instrument.yaml. Loader doesn't surface it yet (T03 didn't extend
-    # the loader for the inference section). Re-parse the raw yaml
-    # cheaply to pull it.
-    import yaml as yaml_mod
-    raw = yaml_mod.safe_load((instrument_dir / "instrument.yaml").read_text(encoding="utf-8"))
-    inference = raw.get("inference") or {}
-    lookback_days = int(inference.get("default_lookback_days", FALLBACK_LOOKBACK_DAYS))
+    # Default lookback comes straight off the loaded instrument's
+    # surfaced inference config — no raw re-parse.
+    lookback_days = instr.meta.inference.default_lookback_days
 
-    files = _resolve_substrate_files(
+    files = resolve_substrate_files(
         vault_root, CLINICAL_DEFAULT_SUBSTRATE_GLOBS, lookback_days
     )
     char_total = _sum_chars(files)
@@ -183,7 +144,7 @@ def audit_synthetic_personality_stub(vault_root: Path, budget: int) -> AuditResu
     )
     lookback_days = 180
 
-    files = _resolve_substrate_files(vault_root, globs, lookback_days)
+    files = resolve_substrate_files(vault_root, globs, lookback_days)
     char_total = _sum_chars(files)
     tokens = char_total // CHARS_PER_TOKEN
     return AuditResult(

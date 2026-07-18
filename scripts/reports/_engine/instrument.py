@@ -27,6 +27,43 @@ from scripts.reports._engine.lib.likert import LikertItem, LikertScale
 
 SUPPORTED_SCORING = ("standard-sum",)
 
+# Default lookback if instrument.yaml's `inference` section omits it.
+DEFAULT_LOOKBACK_DAYS = 14
+
+
+@dataclass(frozen=True)
+class InferenceConfig:
+    """The `inference:` section of instrument.yaml — the defaults the
+    runner + audit probe consume for scope resolution + scoring.
+
+    Surfaced by `load_instrument` so downstream never re-parses the raw
+    yaml to recover a single field (the pre-deepening runner + audit
+    probe each re-read `default_lookback_days` / `model` by hand). Unknown
+    keys are ignored; missing keys fall back to these defaults so a
+    pre-inference instrument.yaml still loads.
+    """
+
+    enabled: bool = True
+    min_confidence: float = 0.75
+    bandable_coverage_pct: float = 80.0
+    default_lookback_days: int = DEFAULT_LOOKBACK_DAYS
+    max_curiosity_per_run: int = 3
+    model: str | None = None  # per-instrument model override; None = engine default
+
+    @classmethod
+    def from_raw(cls, raw: dict | None) -> "InferenceConfig":
+        raw = raw or {}
+        return cls(
+            enabled=bool(raw.get("enabled", True)),
+            min_confidence=float(raw.get("min_confidence", 0.75)),
+            bandable_coverage_pct=float(raw.get("bandable_coverage_pct", 80.0)),
+            default_lookback_days=int(
+                raw.get("default_lookback_days", DEFAULT_LOOKBACK_DAYS)
+            ),
+            max_curiosity_per_run=int(raw.get("max_curiosity_per_run", 3)),
+            model=(str(raw["model"]) if raw.get("model") else None),
+        )
+
 
 @dataclass(frozen=True)
 class InstrumentMeta:
@@ -40,6 +77,7 @@ class InstrumentMeta:
     scoring: str
     licence: str
     licence_source: str
+    inference: InferenceConfig
 
 
 @dataclass(frozen=True)
@@ -54,6 +92,19 @@ class Instrument:
     @property
     def total_items(self) -> int:
         return len(self.items)
+
+    @property
+    def max_total(self) -> int:
+        """Highest achievable total: every item answered at the scale
+        ceiling. Reverse-coding is score-preserving, so this holds for
+        mixed reverse/forward items too."""
+        return self.meta.likert.hi * len(self.items)
+
+    @property
+    def concern_bands(self) -> tuple[str, ...]:
+        """Band labels this instrument flags as clinically elevated —
+        read straight from cutoffs.yaml's `concern: true` entries."""
+        return self.cutoffs.concern_bands
 
 
 def _require_keys(d: dict, required: set[str], where: str) -> None:
@@ -98,6 +149,9 @@ def load_instrument(instrument_dir: Path) -> Instrument:
             f"Supported: {SUPPORTED_SCORING}"
         )
     scale = LikertScale.parse(str(meta_raw["likert"]))
+    inference_raw = meta_raw.get("inference")
+    if inference_raw is not None and not isinstance(inference_raw, dict):
+        raise ValueError(f"{instrument_yaml}: `inference` must be a mapping")
     meta = InstrumentMeta(
         slug=str(meta_raw["slug"]),
         version=str(meta_raw["version"]),
@@ -107,6 +161,7 @@ def load_instrument(instrument_dir: Path) -> Instrument:
         scoring=str(meta_raw["scoring"]),
         licence=str(meta_raw["licence"]),
         licence_source=str(meta_raw["licence-source"]),
+        inference=InferenceConfig.from_raw(inference_raw),
     )
 
     items_raw = yaml.safe_load(items_yaml.read_text(encoding="utf-8"))

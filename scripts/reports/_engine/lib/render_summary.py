@@ -30,10 +30,12 @@ waere auch cool"). Per-instrument detail reports are infrastructure.
 
 from __future__ import annotations
 
+from functools import lru_cache
 from pathlib import Path
 
 import yaml
 
+from scripts.reports._engine.instrument import load_instrument
 from scripts.reports._engine.lib.charts import (
     render_radar,
     render_sparkline,
@@ -71,38 +73,62 @@ def _format_delta(curr: int, prev: int | None) -> str:
     return f"{sign}{delta}"
 
 
-def _instrument_max(snap: InstrumentSnapshot) -> int:
-    """Best-effort max total: total_items × highest answer.
+@lru_cache(maxsize=None)
+def _recover_instrument_meta(
+    slug: str, version: str
+) -> tuple[int, int, tuple[str, ...]] | None:
+    """Reload an instrument's `(max_total, likert_hi, concern_bands)` from
+    the engine's instrument definition.
 
-    The snapshot doesn't carry the likert hi explicitly, but we can
-    recover it from coverage's known fields plus the band-cutoffs.
-    For wedge instruments PHQ-9 (27), GAD-7 (21), ASRS-v1.1 (72),
-    WHO-5 (25), K6 (24) — but those numbers aren't in the snapshot.
-    We back-compute from total_items × an assumed scale ceiling read
-    from per-instrument heuristic: derived from the slug here.
-    """
-    # Hard-coded for wedge — post-wedge will move this into a loader-
-    # populated field on InstrumentSnapshot. For wedge cleanliness it's
-    # acceptable to keep the table here next to its only consumer.
-    SLUG_TO_MAX = {
-        "phq-9": 27,
-        "gad-7": 21,
-        "asrs-v1.1": 72,
-        "who-5": 25,
-        "k6": 24,
-        "pss-10": 40,  # 10 items × 0-4 scale; M019+ rebalance
-        "isi": 28,     # 7 items × 0-4 scale; M019+ sleep-screen expansion
-        "olbi": 80,    # 16 items × 1-5 scale; M019+ burnout-screen expansion (range 16-80)
-        "meq-19": 86,  # placeholder for future MEQ wiring
-    }
-    # Snapshot's `slug` is alias-or-filename — match the wedge canonical
-    # slug by suffix-stripping known alias patterns. Falls back to the
-    # naive product if unknown.
-    canonical = snap.slug
-    for known in SLUG_TO_MAX:
-        if canonical == known or canonical.startswith(known + "-"):
-            return SLUG_TO_MAX[known]
+    Backward-compat only: reports written before the runner surfaced these
+    into frontmatter carry `None`. We recover from the canonical loader
+    (never a hardcoded per-slug table) so historical runs still normalise +
+    flag correctly. Returns `None` if the instrument can't be loaded
+    (removed / renamed / aliased away from its slug)."""
+    if not version:
+        return None
+    engine_root = Path(__file__).resolve().parent.parent  # _engine/
+    idir = engine_root / "instruments" / slug / f"v{version}"
+    if not (idir / "instrument.yaml").is_file():
+        return None
+    try:
+        instr = load_instrument(idir)
+    except (ValueError, FileNotFoundError):
+        return None
+    return instr.max_total, instr.meta.likert.hi, instr.concern_bands
+
+
+def _instrument_max(snap: InstrumentSnapshot) -> int:
+    """Highest achievable total. Read straight off the loader-surfaced
+    frontmatter; recover from the instrument definition for old reports;
+    fall back to the naive item count only if the instrument is gone."""
+    if snap.max_total is not None:
+        return snap.max_total
+    recovered = _recover_instrument_meta(snap.slug, snap.version)
+    if recovered is not None:
+        return recovered[0]
     return max(snap.total_items, 1)
+
+
+def _instrument_likert_hi(snap: InstrumentSnapshot) -> int:
+    """Per-item scale ceiling. Frontmatter-first, then recovery, then 4."""
+    if snap.likert_hi is not None:
+        return snap.likert_hi
+    recovered = _recover_instrument_meta(snap.slug, snap.version)
+    if recovered is not None:
+        return recovered[1]
+    return 4
+
+
+def _instrument_concern_bands(snap: InstrumentSnapshot) -> tuple[str, ...]:
+    """Band labels this instrument flags as clinically elevated.
+    Frontmatter-first, then recovery from the instrument definition."""
+    if snap.concern_bands:
+        return snap.concern_bands
+    recovered = _recover_instrument_meta(snap.slug, snap.version)
+    if recovered is not None:
+        return recovered[2]
+    return ()
 
 
 def _build_radar_data(snapshot: RunSnapshot) -> dict[str, float]:
@@ -189,15 +215,6 @@ def _load_item_meta(slug: str, version: str) -> dict[str, dict]:
     return out
 
 
-def _per_item_likert_hi(snap: InstrumentSnapshot) -> int:
-    """Best-effort likert.hi recovery: max_total / total_items. Works
-    for instruments where every item has the same scale (current wedge
-    + post-wedge). Falls back to 4 (most common) if division fails."""
-    if snap.total_items <= 0:
-        return 4
-    return max(1, _instrument_max(snap) // snap.total_items)
-
-
 def _render_per_instrument_radars(
     timeline: Timeline,
     charts_dir: Path,
@@ -224,7 +241,7 @@ def _render_per_instrument_radars(
                          f"{slug}: per-item data unavailable (older run schema)")
             out[slug] = out_path
             continue
-        hi = _per_item_likert_hi(snap)
+        hi = _instrument_likert_hi(snap)
         current_data = {
             iid: max(0.0, min(1.0, val / hi))
             for iid, val in snap.per_item.items()
@@ -233,7 +250,7 @@ def _render_per_instrument_radars(
         if previous and slug in previous.instruments:
             prev_snap = previous.instruments[slug]
             if prev_snap.per_item:
-                prev_hi = _per_item_likert_hi(prev_snap)
+                prev_hi = _instrument_likert_hi(prev_snap)
                 previous_data = {
                     iid: max(0.0, min(1.0, val / prev_hi))
                     for iid, val in prev_snap.per_item.items()
@@ -485,22 +502,19 @@ def render_summary(
 
 
 def _crosscheck_flags(snapshot: RunSnapshot) -> list[str]:
-    """Wedge crosscheck — purely structural. S05 layer adds interpretive."""
+    """Wedge crosscheck — purely structural. S05 layer adds interpretive.
+
+    Concern bands come from each instrument's own declaration (its
+    cutoffs.yaml `concern: true` entries, surfaced into the report's
+    `concern_bands` frontmatter). No hardcoded per-slug table, so every
+    live instrument — including isi / olbi / pss-10 — can raise a flag."""
     flags: list[str] = []
-    # Find instruments that registered concerning band labels.
-    severe_bands = {
-        "phq-9": ("moderate", "moderately-severe", "severe"),
-        "gad-7": ("moderate", "severe"),
-        "who-5": ("poor", "low"),
-        "k6": ("high", "very-high"),
-    }
-    for slug, snap in snapshot.instruments.items():
-        for known, bands_of_concern in severe_bands.items():
-            if (slug == known or slug.startswith(known + "-")) and snap.band in bands_of_concern:
-                flags.append(
-                    f"⚠️ `{slug}` band = **{snap.band}** "
-                    f"(score {snap.total_score}, coverage {snap.coverage_pct}%)"
-                )
+    for snap in snapshot.instruments.values():
+        if snap.band and snap.band in _instrument_concern_bands(snap):
+            flags.append(
+                f"⚠️ `{snap.slug}` band = **{snap.band}** "
+                f"(score {snap.total_score}, coverage {snap.coverage_pct}%)"
+            )
 
     # Coverage outlier: if one instrument's coverage is dramatically lower
     # than the others, flag it — substrate gap for that domain.

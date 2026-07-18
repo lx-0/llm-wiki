@@ -27,7 +27,16 @@ import yaml
 
 @dataclass(frozen=True)
 class InstrumentSnapshot:
-    """One per-instrument score at one timestamp."""
+    """One per-instrument score at one timestamp.
+
+    `likert_hi`, `max_total`, and `concern_bands` are surfaced by the
+    runner's frontmatter (loader-populated) so the meta-report reads
+    scoring geometry + concern flags off the report instead of a
+    hardcoded per-slug table. They are `None`/empty for OLD reports
+    written before those keys existed — render_summary recovers those
+    from the engine's instrument definition, so historical runs still
+    normalise + flag correctly.
+    """
 
     slug: str                  # may be alias-derived from filename
     version: str
@@ -39,6 +48,9 @@ class InstrumentSnapshot:
     answered: int
     total_items: int
     per_item: dict[str, int] = field(default_factory=dict)
+    likert_hi: int | None = None
+    max_total: int | None = None
+    concern_bands: tuple[str, ...] = ()
 
 
 @dataclass
@@ -139,6 +151,24 @@ def _snapshot_from_report(report_path: Path) -> InstrumentSnapshot | None:
             per_item[str(k)] = int(v)
         except (TypeError, ValueError):
             continue
+    # Loader-surfaced geometry (may be absent on pre-deepening reports).
+    likert_raw = fm.get("likert")
+    likert_hi: int | None = None
+    if isinstance(likert_raw, dict) and likert_raw.get("hi") is not None:
+        try:
+            likert_hi = int(likert_raw["hi"])
+        except (TypeError, ValueError):
+            likert_hi = None
+    max_total: int | None = None
+    if fm.get("max_total") is not None:
+        try:
+            max_total = int(fm["max_total"])
+        except (TypeError, ValueError):
+            max_total = None
+    concern_raw = fm.get("concern_bands") or []
+    concern_bands = (
+        tuple(str(b) for b in concern_raw) if isinstance(concern_raw, list) else ()
+    )
     try:
         return InstrumentSnapshot(
             slug=instrument_key,
@@ -151,6 +181,9 @@ def _snapshot_from_report(report_path: Path) -> InstrumentSnapshot | None:
             answered=int(coverage.get("answered_at_high_confidence", 0)),
             total_items=int(coverage.get("total_items", 0)),
             per_item=per_item,
+            likert_hi=likert_hi,
+            max_total=max_total,
+            concern_bands=concern_bands,
         )
     except (TypeError, ValueError):
         return None

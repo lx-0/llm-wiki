@@ -3,6 +3,6 @@
 # Bands inclusive on both bounds; contiguous (no gaps).
 - {min: 0,  max: 4,  band: "minimal"}
 - {min: 5,  max: 9,  band: "mild"}
-- {min: 10, max: 14, band: "moderate"}
-- {min: 15, max: 19, band: "moderately-severe"}
-- {min: 20, max: 27, band: "severe"}
+- {min: 10, max: 14, band: "moderate", concern: true}
+- {min: 15, max: 19, band: "moderately-severe", concern: true}
+- {min: 20, max: 27, band: "severe", concern: true}

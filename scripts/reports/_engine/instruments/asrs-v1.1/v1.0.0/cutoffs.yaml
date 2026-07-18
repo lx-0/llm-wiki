@@ -8,5 +8,5 @@
 # threshold logic.
 - {min: 0,  max: 17, band: "minimal"}
 - {min: 18, max: 35, band: "mild"}
-- {min: 36, max: 53, band: "moderate"}
-- {min: 54, max: 72, band: "severe"}
+- {min: 36, max: 53, band: "moderate", concern: true}
+- {min: 54, max: 72, band: "severe", concern: true}

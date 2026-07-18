@@ -3,5 +3,5 @@
 # Bands inclusive on both bounds.
 - {min: 0,  max: 4,  band: "minimal"}
 - {min: 5,  max: 9,  band: "mild"}
-- {min: 10, max: 14, band: "moderate"}
-- {min: 15, max: 21, band: "severe"}
+- {min: 10, max: 14, band: "moderate", concern: true}
+- {min: 15, max: 21, band: "severe", concern: true}

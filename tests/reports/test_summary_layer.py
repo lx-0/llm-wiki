@@ -34,6 +34,9 @@ def _make_report(
     coverage_pct: float,
     answered: int,
     total_items: int,
+    concern_bands: list[str] | None = None,
+    max_total: int | None = None,
+    likert_hi: int | None = None,
 ) -> None:
     fm = {
         "instrument": slug,
@@ -49,6 +52,14 @@ def _make_report(
             "bandable_threshold": 80.0,
         },
     }
+    # Loader-surfaced geometry — omitted to simulate a pre-deepening report
+    # (render_summary then recovers from the engine instrument definition).
+    if likert_hi is not None:
+        fm["likert"] = {"lo": 0, "hi": likert_hi}
+    if max_total is not None:
+        fm["max_total"] = max_total
+    if concern_bands is not None:
+        fm["concern_bands"] = concern_bands
     path.parent.mkdir(parents=True, exist_ok=True)
     body = (
         "---\n"
@@ -75,6 +86,9 @@ def _seed_study_runs(study_dir: Path, runs: list[dict]) -> None:
                 coverage_pct=fields.get("coverage_pct", 100.0),
                 answered=fields.get("answered", fields.get("total_items", 9)),
                 total_items=fields.get("total_items", 9),
+                concern_bands=fields.get("concern_bands"),
+                max_total=fields.get("max_total"),
+                likert_hi=fields.get("likert_hi"),
             )
 
 
@@ -157,6 +171,44 @@ class TestTimelineLoader:
         timeline = load_timeline(tmp_path)
         series = timeline.series_for("phq-9")
         assert [s.total_score for s in series] == [4, 6, 8]
+
+
+class TestSnapshotGeometry:
+    def test_carries_loader_surfaced_fields(self, tmp_path: Path) -> None:
+        _seed_study_runs(
+            tmp_path,
+            [
+                {
+                    "timestamp": "2026-05-17T10-00-00",
+                    "instruments": {
+                        "phq-9": {"total": 12, "band": "moderate", "total_items": 9,
+                                  "likert_hi": 3, "max_total": 27,
+                                  "concern_bands": ["moderate", "severe"]},
+                    },
+                }
+            ],
+        )
+        snap = load_timeline(tmp_path).latest.instruments["phq-9"]  # type: ignore[union-attr]
+        assert snap.likert_hi == 3
+        assert snap.max_total == 27
+        assert snap.concern_bands == ("moderate", "severe")
+
+    def test_old_report_defaults_to_none_and_empty(self, tmp_path: Path) -> None:
+        _seed_study_runs(
+            tmp_path,
+            [
+                {
+                    "timestamp": "2026-05-17T10-00-00",
+                    "instruments": {
+                        "phq-9": {"total": 8, "band": "mild", "total_items": 9},
+                    },
+                }
+            ],
+        )
+        snap = load_timeline(tmp_path).latest.instruments["phq-9"]  # type: ignore[union-attr]
+        assert snap.likert_hi is None
+        assert snap.max_total is None
+        assert snap.concern_bands == ()
 
 
 class TestSnapshotFromDir:
@@ -359,6 +411,104 @@ class TestRenderSummary:
         assert "First run" in content
         # Delta column shows em-dash for run 1
         assert "| — |" in content
+
+    def test_flags_isi_olbi_pss10_from_frontmatter(self, tmp_path: Path) -> None:
+        """The three instruments the old hardcoded severe_bands table could
+        NEVER flag (isi / olbi / pss-10) now raise concern flags off their
+        own `concern_bands` frontmatter — no per-slug table."""
+        study_dir = tmp_path / "longitudinal-baseline"
+        _seed_study_runs(
+            study_dir,
+            [
+                {
+                    "timestamp": "2026-05-17T10-00-00",
+                    "instruments": {
+                        "isi": {"total": 25, "band": "severe", "coverage_pct": 100.0,
+                                "answered": 7, "total_items": 7, "likert_hi": 4,
+                                "max_total": 28,
+                                "concern_bands": ["moderate", "severe"]},
+                        "olbi": {"total": 70, "band": "very-high", "coverage_pct": 100.0,
+                                 "answered": 16, "total_items": 16, "likert_hi": 5,
+                                 "max_total": 80,
+                                 "concern_bands": ["high", "very-high"]},
+                        "pss-10": {"total": 30, "band": "high", "coverage_pct": 100.0,
+                                   "answered": 10, "total_items": 10, "likert_hi": 4,
+                                   "max_total": 40, "concern_bands": ["high"]},
+                    },
+                }
+            ],
+        )
+        timeline = load_timeline(study_dir)
+        out = render_summary(
+            study_id="longitudinal-baseline",
+            timeline=timeline,
+            summary_path=study_dir / "runs" / "2026-05-17T10-00-00" / "_summary.md",
+            charts_dir=study_dir / "runs" / "2026-05-17T10-00-00" / "charts",
+        )
+        content = out.read_text(encoding="utf-8")
+        assert "`isi` band = **severe**" in content
+        assert "`olbi` band = **very-high**" in content
+        assert "`pss-10` band = **high**" in content
+        assert "No automatic flags raised" not in content
+
+    def test_flags_recovered_when_frontmatter_lacks_concern_bands(
+        self, tmp_path: Path
+    ) -> None:
+        """OLD reports (pre-deepening) carry no `concern_bands` — the flag is
+        recovered from the engine instrument definition so historical runs
+        still surface elevated bands."""
+        study_dir = tmp_path / "longitudinal-baseline"
+        _seed_study_runs(
+            study_dir,
+            [
+                {
+                    "timestamp": "2026-05-17T10-00-00",
+                    # No concern_bands / max_total / likert_hi in frontmatter.
+                    "instruments": {
+                        "isi": {"total": 25, "band": "severe", "coverage_pct": 100.0,
+                                "answered": 7, "total_items": 7},
+                    },
+                }
+            ],
+        )
+        timeline = load_timeline(study_dir)
+        # Snapshot has no concern_bands (old shape) …
+        assert timeline.latest.instruments["isi"].concern_bands == ()  # type: ignore[union-attr]
+        out = render_summary(
+            study_id="longitudinal-baseline",
+            timeline=timeline,
+            summary_path=study_dir / "runs" / "2026-05-17T10-00-00" / "_summary.md",
+            charts_dir=study_dir / "runs" / "2026-05-17T10-00-00" / "charts",
+        )
+        # … yet the flag is still raised via engine-definition recovery.
+        assert "`isi` band = **severe**" in out.read_text(encoding="utf-8")
+
+    def test_non_concern_band_not_flagged(self, tmp_path: Path) -> None:
+        study_dir = tmp_path / "longitudinal-baseline"
+        _seed_study_runs(
+            study_dir,
+            [
+                {
+                    "timestamp": "2026-05-17T10-00-00",
+                    "instruments": {
+                        "isi": {"total": 3, "band": "no-clinical-insomnia",
+                                "coverage_pct": 100.0, "answered": 7, "total_items": 7,
+                                "likert_hi": 4, "max_total": 28,
+                                "concern_bands": ["moderate", "severe"]},
+                    },
+                }
+            ],
+        )
+        timeline = load_timeline(study_dir)
+        out = render_summary(
+            study_id="longitudinal-baseline",
+            timeline=timeline,
+            summary_path=study_dir / "runs" / "2026-05-17T10-00-00" / "_summary.md",
+            charts_dir=study_dir / "runs" / "2026-05-17T10-00-00" / "charts",
+        )
+        content = out.read_text(encoding="utf-8")
+        assert "band = **no-clinical-insomnia**" not in content
+        assert "No automatic flags raised" in content
 
     def test_summary_flags_low_coverage_outlier(self, tmp_path: Path) -> None:
         """When one instrument's coverage is far below the others, summary

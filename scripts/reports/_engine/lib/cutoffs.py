@@ -6,15 +6,20 @@ An instrument declares its cutoffs as an ordered list in
 ```yaml
 - {min: 0,  max: 4,  band: "minimal"}
 - {min: 5,  max: 9,  band: "mild"}
-- {min: 10, max: 14, band: "moderate"}
-- {min: 15, max: 19, band: "moderately-severe"}
-- {min: 20, max: 27, band: "severe"}
+- {min: 10, max: 14, band: "moderate", concern: true}
+- {min: 15, max: 19, band: "moderately-severe", concern: true}
+- {min: 20, max: 27, band: "severe", concern: true}
 ```
 
 Both bounds are INCLUSIVE. The bands must cover the instrument's valid
 score range without gaps or overlaps; `Cutoffs.validate()` enforces
 this at load time so a malformed cutoffs.yaml fails fast rather than
 silently silently returning the wrong band at a boundary.
+
+An optional `concern: true` flag marks a band as clinically elevated —
+the meta-report surfaces those as convergence/discrepancy flags. The
+flag lives here (not in a hardcoded per-slug table) so adding a new
+instrument stays a YAML-only operation.
 """
 
 from __future__ import annotations
@@ -29,6 +34,7 @@ class Band:
     min: int
     max: int
     band: str
+    concern: bool = False  # clinically-elevated → surfaced as a meta-report flag
 
     def contains(self, score: int) -> bool:
         return self.min <= score <= self.max
@@ -46,7 +52,12 @@ class Cutoffs:
         if not raw:
             raise ValueError("cutoffs.yaml must declare at least one band")
         bands = tuple(
-            Band(min=int(entry["min"]), max=int(entry["max"]), band=str(entry["band"]))
+            Band(
+                min=int(entry["min"]),
+                max=int(entry["max"]),
+                band=str(entry["band"]),
+                concern=bool(entry.get("concern", False)),
+            )
             for entry in raw
         )
         cutoffs = cls(bands=bands)
@@ -76,6 +87,12 @@ class Cutoffs:
     @property
     def range(self) -> tuple[int, int]:
         return (self.bands[0].min, self.bands[-1].max)
+
+    @property
+    def concern_bands(self) -> tuple[str, ...]:
+        """Labels of the bands flagged `concern: true`. The meta-report
+        raises a flag when an instrument's current band is in this set."""
+        return tuple(b.band for b in self.bands if b.concern)
 
     def band_for(self, score: int) -> str:
         """Look up the band for an integer score. Raises if out-of-range."""

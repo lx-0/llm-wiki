@@ -2,5 +2,5 @@
 # 7 items × 5-point scale (0-4) = total range 0-28.
 - {min: 0,  max: 7,  band: "no-clinical-insomnia"}
 - {min: 8,  max: 14, band: "subthreshold"}
-- {min: 15, max: 21, band: "moderate"}
-- {min: 22, max: 28, band: "severe"}
+- {min: 15, max: 21, band: "moderate", concern: true}
+- {min: 22, max: 28, band: "severe", concern: true}

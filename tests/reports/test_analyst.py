@@ -12,18 +12,17 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
 import yaml
 
-from scripts.analyze import (
-    _build_pass1_user_prompt,
-    _build_pass2_user_prompt,
-    _latest_run_dir,
-    _persist_pass1,
-    _persist_pass2,
-    _previous_run_dir,
+from scripts.reports._engine.lib.analyst import (
+    AnalystResult,
+    build_pass1_user_prompt,
+    build_pass2_user_prompt,
+    latest_run_dir,
+    persist_pass1,
+    persist_pass2,
+    previous_run_dir,
 )
-from scripts.reports._engine.lib.analyst import AnalystResult
 from scripts.reports._engine.study import Study, StudyManifest, StudyState
 
 
@@ -71,7 +70,7 @@ class TestRunDirHelpers:
                 {"timestamp": "2026-05-15T10-00-00"},
             ],
         )
-        latest = _latest_run_dir(study)
+        latest = latest_run_dir(study)
         assert latest is not None
         assert latest.name == "2026-05-17T10-00-00"
 
@@ -81,13 +80,13 @@ class TestRunDirHelpers:
         )
         # Plant a stale tmp dir
         (study.runs_dir / ".2026-05-18T10-00-00.tmp").mkdir()
-        latest = _latest_run_dir(study)
+        latest = latest_run_dir(study)
         assert latest is not None
         assert latest.name == "2026-05-17T10-00-00"
 
     def test_latest_returns_none_when_no_runs(self, tmp_path: Path) -> None:
         study = _build_study_dir(tmp_path, [])
-        assert _latest_run_dir(study) is None
+        assert latest_run_dir(study) is None
 
     def test_previous_run_dir(self, tmp_path: Path) -> None:
         study = _build_study_dir(
@@ -98,9 +97,9 @@ class TestRunDirHelpers:
                 {"timestamp": "2026-05-17T10-00-00"},
             ],
         )
-        latest = _latest_run_dir(study)
+        latest = latest_run_dir(study)
         assert latest is not None
-        prev = _previous_run_dir(study, latest)
+        prev = previous_run_dir(study, latest)
         assert prev is not None
         assert prev.name == "2026-05-15T10-00-00"
 
@@ -108,9 +107,9 @@ class TestRunDirHelpers:
         study = _build_study_dir(
             tmp_path, [{"timestamp": "2026-05-17T10-00-00"}]
         )
-        latest = _latest_run_dir(study)
+        latest = latest_run_dir(study)
         assert latest is not None
-        assert _previous_run_dir(study, latest) is None
+        assert previous_run_dir(study, latest) is None
 
 
 class TestPass1Prompt:
@@ -126,8 +125,8 @@ class TestPass1Prompt:
                 },
             }],
         )
-        run_dir = _latest_run_dir(study)
-        prompt = _build_pass1_user_prompt(study, run_dir)  # type: ignore[arg-type]
+        run_dir = latest_run_dir(study)
+        prompt = build_pass1_user_prompt(study, run_dir)  # type: ignore[arg-type]
         assert "test-baseline" in prompt
         assert "## Manifest" in prompt
         assert "study_id: test-baseline" in prompt
@@ -154,8 +153,8 @@ class TestPass1Prompt:
                 },
             ],
         )
-        run_dir = _latest_run_dir(study)
-        prompt = _build_pass1_user_prompt(study, run_dir)  # type: ignore[arg-type]
+        run_dir = latest_run_dir(study)
+        prompt = build_pass1_user_prompt(study, run_dir)  # type: ignore[arg-type]
         assert "Previous run's summary" in prompt
         assert "prev-data" in prompt
 
@@ -168,8 +167,8 @@ class TestPass1Prompt:
                 "instruments": {"phq-9": "# phq-9\n"},
             }],
         )
-        run_dir = _latest_run_dir(study)
-        prompt = _build_pass1_user_prompt(study, run_dir)  # type: ignore[arg-type]
+        run_dir = latest_run_dir(study)
+        prompt = build_pass1_user_prompt(study, run_dir)  # type: ignore[arg-type]
         assert "Previous run's summary" not in prompt
 
 
@@ -183,12 +182,12 @@ class TestPass2Prompt:
                 "instruments": {"phq-9": "# phq-9\n"},
             }],
         )
-        latest = _latest_run_dir(study)
+        latest = latest_run_dir(study)
         summary = latest / "_summary.md"  # type: ignore[union-attr]
         analysis = latest / "_analysis.md"  # type: ignore[union-attr]
         analysis.write_text("# pass-1 body\n", encoding="utf-8")
 
-        prompt = _build_pass2_user_prompt([(study, summary, analysis)])
+        prompt = build_pass2_user_prompt([(study, summary, analysis)])
         assert "1 study" in prompt
         assert "test-baseline" in prompt
         assert "Latest `_analysis.md`" in prompt
@@ -223,7 +222,7 @@ class TestPass2Prompt:
         )
 
         def latest_paths(study: Study) -> tuple[Path, Path]:
-            latest = _latest_run_dir(study)
+            latest = latest_run_dir(study)
             assert latest is not None
             (latest / "_analysis.md").write_text("# pass-1\n", encoding="utf-8")
             return latest / "_summary.md", latest / "_analysis.md"
@@ -232,7 +231,7 @@ class TestPass2Prompt:
         s2_summary, s2_analysis = latest_paths(s2)
         s2_reloaded = Study.load(s2.study_dir)
 
-        prompt = _build_pass2_user_prompt(
+        prompt = build_pass2_user_prompt(
             [(s1, s1_summary, s1_analysis), (s2_reloaded, s2_summary, s2_analysis)]
         )
         assert "2 study/studies" in prompt
@@ -247,7 +246,7 @@ class TestPersistence:
         study = _build_study_dir(
             tmp_path, [{"timestamp": "2026-05-17T10-00-00"}]
         )
-        run_dir = _latest_run_dir(study)
+        run_dir = latest_run_dir(study)
         result = AnalystResult(
             markdown_body="# Analysis — test-baseline @ 2026-05-17T10-00-00\n\n"
                           "Body line 1\nBody line 2\n",
@@ -258,7 +257,7 @@ class TestPersistence:
             cost_usd=0.08,
             pass_label="per-study",
         )
-        path = _persist_pass1(study, run_dir, result)  # type: ignore[arg-type]
+        path = persist_pass1(study, run_dir, result)  # type: ignore[arg-type]
         assert path.name == "_analysis.md"
         assert path.parent == run_dir
         content = path.read_text(encoding="utf-8")
@@ -276,14 +275,8 @@ class TestPersistence:
         assert "# Analysis — test-baseline" in content
         assert "Body line 1" in content
 
-    def test_pass2_persist_writes_to_analyses_dir(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        # Redirect analyses_root to tmp
-        monkeypatch.setattr(
-            "scripts.analyze._analyses_root",
-            lambda: tmp_path / "reports" / "analyses",
-        )
+    def test_pass2_persist_writes_to_analyses_dir(self, tmp_path: Path) -> None:
+        # Explicit vault_root — analyses land under <vault>/<reports_dir>/analyses.
         result = AnalystResult(
             markdown_body="# Cross-study analysis — 2026-05-17T11-00-00\n\n"
                           "N=1; body.\n",
@@ -294,8 +287,9 @@ class TestPersistence:
             cost_usd=0.04,
             pass_label="cross-study",
         )
-        path = _persist_pass2(result, study_count=1)
+        path = persist_pass2(result, study_count=1, vault_root=tmp_path)
         assert path.parent.name == "analyses"
+        assert tmp_path in path.parents
         content = path.read_text(encoding="utf-8")
         fm_end = content.index("\n---\n", 4)
         fm = yaml.safe_load(content[4:fm_end])

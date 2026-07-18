@@ -31,8 +31,8 @@ from pathlib import Path
 # Engine `scripts.*` imports.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from scripts.core.config import CONFIG  # noqa: E402
 from scripts.core.paths import ROOT_DIR  # noqa: E402
+from scripts.reports._engine.lib.analyst import studies_root  # noqa: E402
 from scripts.reports._engine.lib.render_summary import render_summary  # noqa: E402
 from scripts.reports._engine.lib.timeline import (  # noqa: E402
     load_timeline,
@@ -40,6 +40,7 @@ from scripts.reports._engine.lib.timeline import (  # noqa: E402
 )
 from scripts.reports._engine.runner import run_inference  # noqa: E402
 from scripts.reports._engine.study import (  # noqa: E402
+    InstrumentRef,
     RunDirectory,
     Study,
     StudyManifest,
@@ -54,7 +55,32 @@ log = logging.getLogger("study")
 
 
 def _studies_root() -> Path:
-    return ROOT_DIR / CONFIG.personal.reports_dir / "studies"
+    # Single source of the path shape lives in the analyst library; the
+    # study CLI always runs against the engine's ROOT_DIR.
+    return studies_root(ROOT_DIR)
+
+
+def _run_one_instrument(
+    ref: InstrumentRef, run_dir: RunDirectory, study: Study
+) -> Path:
+    """Run one instrument's inference and place its report at the ref's
+    canonical filename inside the run dir. Returns the final report path.
+
+    Shared by both retry phases of `cmd_run` (initial pass + end-of-run
+    deferred retry) so the run-and-place logic lives in exactly one spot.
+    Raises on inference failure — the caller decides defer-vs-terminal."""
+    report_path = run_inference(
+        ref.slug,
+        ref.version,
+        ROOT_DIR,
+        output_dir=run_dir.instruments_dir,
+        study_dir=study.study_dir,
+    )
+    target_path = run_dir.instruments_dir / ref.report_filename
+    if report_path.name != ref.report_filename:
+        report_path.rename(target_path)
+        report_path = target_path
+    return report_path
 
 
 def cmd_list(args: argparse.Namespace) -> int:
@@ -148,15 +174,8 @@ def cmd_run(args: argparse.Namespace) -> int:
                     f"source={ref.source}; running …",
                     flush=True,
                 )
-                target_path = run_dir.instruments_dir / ref.report_filename
                 try:
-                    report_path = run_inference(
-                        ref.slug,
-                        ref.version,
-                        ROOT_DIR,
-                        output_dir=run_dir.instruments_dir,
-                        study_dir=study.study_dir,
-                    )
+                    report_path = _run_one_instrument(ref, run_dir, study)
                 except Exception as exc:
                     # Skip-and-flag PHASE 1: collect for end-of-run
                     # retry. After 6+ minutes of running OTHER instruments,
@@ -170,14 +189,11 @@ def cmd_run(args: argparse.Namespace) -> int:
                         flush=True,
                     )
                     print(
-                        f"        queued for end-of-run retry attempt.",
+                        "        queued for end-of-run retry attempt.",
                         flush=True,
                     )
                     deferred_instruments.append(ref)
                     continue
-                if report_path.name != ref.report_filename:
-                    report_path.rename(target_path)
-                    report_path = target_path
                 per_inst_results.append((ref.alias or ref.slug, report_path))
                 print(f"      → {report_path.relative_to(run_dir.tmp_dir)}", flush=True)
 
@@ -203,15 +219,7 @@ def cmd_run(args: argparse.Namespace) -> int:
                         flush=True,
                     )
                     try:
-                        report_path = run_inference(
-                            ref.slug, ref.version, ROOT_DIR,
-                            output_dir=run_dir.instruments_dir,
-                            study_dir=study.study_dir,
-                        )
-                        target_path = run_dir.instruments_dir / ref.report_filename
-                        if report_path.name != ref.report_filename:
-                            report_path.rename(target_path)
-                            report_path = target_path
+                        report_path = _run_one_instrument(ref, run_dir, study)
                         per_inst_results.append((ref.alias or ref.slug, report_path))
                         print(
                             f"      ✓ recovered → {report_path.relative_to(run_dir.tmp_dir)}",
@@ -281,16 +289,15 @@ def cmd_run(args: argparse.Namespace) -> int:
         if not args.no_analyze:
             try:
                 from scripts.reports._engine.lib.analyst import (
-                    AnalystError, run_analyst,
-                )
-                from scripts.analyze import (
                     PERSONA_PER_STUDY,
-                    _build_pass1_user_prompt,
-                    _persist_pass1,
+                    AnalystError,
+                    build_pass1_user_prompt,
+                    persist_pass1,
+                    run_analyst,
                 )
 
                 final_run_dir = study.runs_dir / timestamp
-                user_prompt = _build_pass1_user_prompt(study, final_run_dir)
+                user_prompt = build_pass1_user_prompt(study, final_run_dir)
                 print(
                     f"\n→ Pass-1 analyst on this run "
                     f"(prompt_chars={len(user_prompt):,}) …",
@@ -302,7 +309,7 @@ def cmd_run(args: argparse.Namespace) -> int:
                     vault_cwd=ROOT_DIR,
                     pass_label="per-study",
                 )
-                analysis_path = _persist_pass1(study, final_run_dir, result)
+                analysis_path = persist_pass1(study, final_run_dir, result)
                 print(
                     f"  → {analysis_path.relative_to(study.runs_dir.parent.parent)}  "
                     f"cost=${result.cost_usd:.4f}  "

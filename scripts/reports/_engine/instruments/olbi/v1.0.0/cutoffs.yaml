@@ -4,5 +4,5 @@
 # more burnout uniformly.
 - {min: 16, max: 31, band: "low"}
 - {min: 32, max: 47, band: "moderate"}
-- {min: 48, max: 63, band: "high"}
-- {min: 64, max: 80, band: "very-high"}
+- {min: 48, max: 63, band: "high", concern: true}
+- {min: 64, max: 80, band: "very-high", concern: true}

@@ -48,8 +48,8 @@ from claude_agent_sdk import (  # noqa: E402
 
 from scripts.core.usage import LEDGER  # noqa: E402
 from scripts.core.sdk_helpers import (  # noqa: E402
+    FailureClass,
     StderrCapture,
-    classify_failure,
     log_sdk_failure,
     make_path_scope_gate,
     prompt_stream,
@@ -192,10 +192,46 @@ def default_batches(instrument: Instrument) -> list[InferenceBatch]:
     ]
 
 
+# Malformed-agent-output failures — the agent returned text but it
+# doesn't parse/validate into the expected schema. Retryable: a fresh
+# attempt often produces well-formed JSON (the bundled model is
+# stochastic). Modelled as a distinct FailureClass kind so retryability
+# stays a pure function of `failure.kind` — never a substring match on
+# the stringified error prose.
+SCHEMA_INVALID_KIND = "schema_invalid"
+
+# Failure kinds whose inference calls are worth retrying: silent
+# bundled-CLI crashes (`cli_crash` / `unknown`) and malformed-output
+# (`schema_invalid`) usually clear on a fresh attempt. Auth / model /
+# rate-limit / network / oom / max_turns / tokens_exceeded are NOT
+# retried — they recur identically or need operator intervention.
+RETRYABLE_FAILURE_KINDS: frozenset[str] = frozenset(
+    {"cli_crash", "unknown", SCHEMA_INVALID_KIND}
+)
+
+
+def is_inference_retryable(failure: FailureClass | None) -> bool:
+    """Pure predicate: is a failed inference batch worth retrying?
+
+    Depends only on the structured `failure.kind`. This replaces the old
+    substring-matching over the stringified error message — the exact
+    prose-coupling `CompileOutcome` was built to kill, where a wording
+    edit silently flipped retry behaviour."""
+    return failure is not None and failure.kind in RETRYABLE_FAILURE_KINDS
+
+
 class InferenceError(RuntimeError):
     """Raised when an inference call fails in a way the caller must
     surface (SDK crash, schema-invalid output, scope-lock violation).
+
+    Carries the structured `FailureClass` so callers decide retryability
+    via `is_inference_retryable(err.failure)` — a pure function of
+    `failure.kind` — instead of matching substrings in `str(err)`.
     """
+
+    def __init__(self, message: str, *, failure: FailureClass | None = None) -> None:
+        super().__init__(message)
+        self.failure = failure
 
 
 def _validate_json_schema(
@@ -204,12 +240,14 @@ def _validate_json_schema(
     """Reject malformed agent output before turning it into ItemInference."""
     if not isinstance(parsed, dict):
         raise InferenceError(
-            f"batch {batch_label!r}: agent output is not a JSON object"
+            f"batch {batch_label!r}: agent output is not a JSON object",
+            failure=FailureClass(SCHEMA_INVALID_KIND, "output is not a JSON object"),
         )
     items_section = parsed.get("items")
     if not isinstance(items_section, dict):
         raise InferenceError(
-            f"batch {batch_label!r}: missing/invalid 'items' object in output"
+            f"batch {batch_label!r}: missing/invalid 'items' object in output",
+            failure=FailureClass(SCHEMA_INVALID_KIND, "missing/invalid 'items' object"),
         )
     returned_ids = set(items_section.keys())
     expected_ids = set(expected_item_ids)
@@ -217,11 +255,13 @@ def _validate_json_schema(
     extra = returned_ids - expected_ids
     if missing:
         raise InferenceError(
-            f"batch {batch_label!r}: agent omitted items {sorted(missing)}"
+            f"batch {batch_label!r}: agent omitted items {sorted(missing)}",
+            failure=FailureClass(SCHEMA_INVALID_KIND, "agent omitted items"),
         )
     if extra:
         raise InferenceError(
-            f"batch {batch_label!r}: agent returned unknown items {sorted(extra)}"
+            f"batch {batch_label!r}: agent returned unknown items {sorted(extra)}",
+            failure=FailureClass(SCHEMA_INVALID_KIND, "agent returned unknown items"),
         )
 
 
@@ -242,7 +282,10 @@ def _extract_json_from_textblocks(text: str) -> dict:
     # Find first `{` and try to balance braces.
     start = text.find("{")
     if start < 0:
-        raise InferenceError("agent output contained no JSON object")
+        raise InferenceError(
+            "agent output contained no JSON object",
+            failure=FailureClass(SCHEMA_INVALID_KIND, "no JSON object in output"),
+        )
     depth = 0
     end = -1
     in_string = False
@@ -268,11 +311,17 @@ def _extract_json_from_textblocks(text: str) -> dict:
                 end = i + 1
                 break
     if end < 0:
-        raise InferenceError("agent output had unbalanced JSON braces")
+        raise InferenceError(
+            "agent output had unbalanced JSON braces",
+            failure=FailureClass(SCHEMA_INVALID_KIND, "unbalanced JSON braces"),
+        )
     try:
         return json.loads(text[start:end])
     except json.JSONDecodeError as exc:
-        raise InferenceError(f"agent output JSON failed to parse: {exc}") from exc
+        raise InferenceError(
+            f"agent output JSON failed to parse: {exc}",
+            failure=FailureClass(SCHEMA_INVALID_KIND, "JSON failed to parse"),
+        ) from exc
 
 
 async def infer_batch_async(
@@ -319,15 +368,7 @@ async def infer_batch_async(
             )
         except InferenceError as exc:
             last_exc = exc
-            msg = str(exc)
-            retryable = (
-                "unknown:" in msg or "cli_crash:" in msg
-                or "agent omitted items" in msg
-                or "agent returned unknown items" in msg
-                or "agent output JSON failed to parse" in msg
-                or "agent output had unbalanced JSON braces" in msg
-                or "agent output contained no JSON object" in msg
-            )
+            retryable = is_inference_retryable(exc.failure)
             if attempt < len(RETRY_BACKOFFS) and retryable:
                 backoff = RETRY_BACKOFFS[attempt]
                 log.warning(
@@ -406,7 +447,8 @@ async def _infer_batch_once_async(
             extra={"prompt_version": prompt_version},
         )
         raise InferenceError(
-            f"inference call failed for batch {batch.label!r}: {failure}"
+            f"inference call failed for batch {batch.label!r}: {failure}",
+            failure=failure,
         ) from exc
 
     elapsed_ms = int((time.perf_counter() - start) * 1000)

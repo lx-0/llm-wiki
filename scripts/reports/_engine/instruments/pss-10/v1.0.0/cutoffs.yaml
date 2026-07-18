@@ -3,4 +3,4 @@
 # → total range 0-40.
 - {min: 0,  max: 13, band: "low"}
 - {min: 14, max: 26, band: "moderate"}
-- {min: 27, max: 40, band: "high"}
+- {min: 27, max: 40, band: "high", concern: true}

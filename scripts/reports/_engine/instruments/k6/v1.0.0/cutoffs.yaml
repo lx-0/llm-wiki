@@ -5,5 +5,5 @@
 # threshold visible.
 - {min: 0,  max: 4,  band: "minimal"}
 - {min: 5,  max: 12, band: "moderate"}
-- {min: 13, max: 18, band: "high"}             # 13+ = published screen-positive
-- {min: 19, max: 24, band: "very-high"}
+- {min: 13, max: 18, band: "high", concern: true}       # 13+ = published screen-positive
+- {min: 19, max: 24, band: "very-high", concern: true}

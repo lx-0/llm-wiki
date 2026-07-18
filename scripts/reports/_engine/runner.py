@@ -42,36 +42,18 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 import yaml  # noqa: E402
 
 from scripts.core.prompts import render  # noqa: E402
-from scripts.reports._engine.audit_scope import (  # noqa: E402
-    CLINICAL_DEFAULT_SUBSTRATE_GLOBS,
-    FALLBACK_LOOKBACK_DAYS,
-    _resolve_substrate_files,
-)
-from scripts.reports._engine.instrument import load_instrument  # noqa: E402
+from scripts.reports._engine.instrument import Instrument, load_instrument  # noqa: E402
 from scripts.reports._engine.lib.inference import (  # noqa: E402
     InferenceRun,
     default_batches,
     infer_batch,
 )
+from scripts.reports._engine.substrate_scope import (  # noqa: E402
+    CLINICAL_DEFAULT_SUBSTRATE_GLOBS,
+    resolve_substrate_files,
+)
 from scripts.reports._engine.lib.verify_report import verify_report  # noqa: E402
 from scripts.reports._engine.score import score_instrument  # noqa: E402
-
-
-def _read_lookback_days(instrument_dir: Path) -> int:
-    """Pull `inference.default_lookback_days` from instrument.yaml."""
-    raw = yaml.safe_load(
-        (instrument_dir / "instrument.yaml").read_text(encoding="utf-8")
-    )
-    inference = raw.get("inference") or {}
-    return int(inference.get("default_lookback_days", FALLBACK_LOOKBACK_DAYS))
-
-
-def _read_inference_config(instrument_dir: Path) -> dict:
-    """Extract inference defaults from instrument.yaml for run frontmatter."""
-    raw = yaml.safe_load(
-        (instrument_dir / "instrument.yaml").read_text(encoding="utf-8")
-    )
-    return dict(raw.get("inference") or {})
 
 
 def _load_operator_answers(
@@ -168,24 +150,29 @@ def _persist_report(
     *,
     output_dir: Path,
     timestamp: str,
-    instrument_slug: str,
-    instrument_version: str,
+    instrument: Instrument,
     scored,
     run: InferenceRun,
-    rendered_prompt: str,
+    rendered_batches: list[tuple[str, str, str]],
     prompt_version: str,
-    instrument_dir: Path,
     lookback_days: int,
     substrate_paths: list[Path],
     vault_root: Path,
 ) -> Path:
-    """Write the run's report markdown with embedded methodology."""
-    output_dir.mkdir(parents=True, exist_ok=True)
-    report_path = output_dir / f"{instrument_slug}.md"
+    """Write the run's report markdown with embedded methodology.
 
-    meta = scored.meta
+    `rendered_batches` is `[(batch_label, prompt_version, rendered_prompt), ...]`
+    — the ACTUAL prompts sent to the SDK this run (operator-answered items
+    excluded, scoped per batch), so the embedded prompt block matches the
+    hashed `prompt_version` instead of a divergent second render.
+    """
+    meta = instrument.meta
+    instrument_dir = instrument.instrument_path
+    output_dir.mkdir(parents=True, exist_ok=True)
+    report_path = output_dir / f"{meta.slug}.md"
+
     score = scored.score
-    inference_cfg = _read_inference_config(instrument_dir)
+    inference_cfg = meta.inference
 
     # Frontmatter — embedded provenance fields per the Q6 durability
     # posture: a future AI reader must be able to interpret this
@@ -199,6 +186,12 @@ def _persist_report(
         "run_kind": "ad-hoc",
         "informant_report": True,
         "total_score": score.total,
+        # Loader-surfaced scoring geometry so downstream (timeline +
+        # meta-report) never re-derives it: likert scale, the highest
+        # achievable total, and which bands are clinically elevated.
+        "likert": {"lo": meta.likert.lo, "hi": meta.likert.hi},
+        "max_total": instrument.max_total,
+        "concern_bands": list(instrument.concern_bands),
         "band": scored.band,
         "bandable": scored.bandable,
         "coverage": {
@@ -242,13 +235,13 @@ def _persist_report(
     band_str = scored.band if scored.band else "*partial, not bandable*"
     lines.append("## Score\n")
     lines.append(
-        f"- **Total:** {score.total} / {meta.likert.hi * score.total_items}"
+        f"- **Total:** {score.total} / {instrument.max_total}"
     )
     lines.append(f"- **Band:** {band_str}")
     lines.append(
         f"- **Coverage:** {score.answered} / {score.total_items} items "
         f"({score.coverage_pct}%) at confidence ≥ "
-        f"{inference_cfg.get('min_confidence', 0.75)}"
+        f"{inference_cfg.min_confidence}"
     )
     lines.append(f"- **Bandable threshold:** {scored.bandable_threshold}%\n")
 
@@ -319,9 +312,18 @@ def _persist_report(
     lines.append(
         "<details><summary>Prompt rendered for this run</summary>\n"
     )
-    lines.append("```")
-    lines.append(rendered_prompt)
-    lines.append("```\n</details>\n")
+    if not rendered_batches:
+        lines.append(
+            "_(no SDK call this run — every item was operator-answered, "
+            "so no inference prompt was rendered.)_\n"
+        )
+    else:
+        for label, pv, prompt_text in rendered_batches:
+            lines.append(f"**Batch `{label}`** (prompt_version `{pv}`)\n")
+            lines.append("```")
+            lines.append(prompt_text)
+            lines.append("```\n")
+    lines.append("</details>\n")
 
     lines.append(
         "<details><summary>Scope-resolved substrate paths</summary>\n"
@@ -355,19 +357,18 @@ def run_inference(
 
     print(f"Loading instrument: {instrument_dir}", flush=True)
     instrument = load_instrument(instrument_dir)
-    lookback_days = _read_lookback_days(instrument_dir)
+    lookback_days = instrument.meta.inference.default_lookback_days
     print(f"  slug={instrument.meta.slug} v{instrument.meta.version}  "
           f"items={instrument.total_items}  lookback={lookback_days}d", flush=True)
 
     print("Resolving substrate scope...", flush=True)
-    paths = _resolve_substrate_files(
+    paths = resolve_substrate_files(
         vault_root, CLINICAL_DEFAULT_SUBSTRATE_GLOBS, lookback_days
     )
     print(f"  {len(paths)} files matched.", flush=True)
 
     # Build prompt vars
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    items_block = _render_items_block(instrument_dir)
 
     # Load operator-supplied answers (subset of items the operator
     # filled in via `wiki study answer …`). These items are excluded
@@ -387,8 +388,7 @@ def run_inference(
     # (claude-haiku-4-5) when not set. Used for instruments where
     # Haiku's confidence-conservativism caps coverage at 0% despite
     # substrate evidence (ISI sleep items 1-3 = Oura observable).
-    inference_cfg = _read_inference_config(instrument_dir)
-    instrument_model = inference_cfg.get("model")
+    instrument_model = instrument.meta.inference.model
 
     # Determine batches; drop operator-answered items per batch + skip
     # batches that become empty.
@@ -410,6 +410,11 @@ def run_inference(
         instrument_slug=instrument.meta.slug,
         instrument_version=instrument.meta.version,
     )
+
+    # Capture the ACTUAL prompt sent per batch (label, prompt_version,
+    # rendered text) so the report embeds exactly what was hashed into
+    # prompt_version — not a divergent second render with full items.
+    rendered_batches: list[tuple[str, str, str]] = []
 
     # For multi-batch instruments we'd subset items_block per batch.
     # Wedge instruments are single-batch — items_block covers the
@@ -443,6 +448,7 @@ def run_inference(
             substrate_block=substrate_block,
         )
         prompt_version = hashlib.sha256(rendered_prompt.encode("utf-8")).hexdigest()[:16]
+        rendered_batches.append((batch.label, prompt_version, rendered_prompt))
         print(f"  batch={batch.label}  prompt_chars={len(rendered_prompt):,}  "
               f"prompt_version={prompt_version}", flush=True)
 
@@ -471,36 +477,17 @@ def run_inference(
     print(f"\nScore: total={scored.score.total}  band={scored.band}  "
           f"coverage={scored.coverage_pct}%  bandable={scored.bandable}", flush=True)
 
-    # Persist
-    # Use first batch's prompt_version + first model_id as canonical
-    # for the report frontmatter. Per-batch values are preserved in
-    # the embedded prompt block.
+    # Persist. First batch's prompt_version is the canonical frontmatter
+    # identifier; every batch's ACTUAL prompt is embedded verbatim.
     first_pv = run.batches[0].prompt_version if run.batches else ""
-    rendered_prompt_for_doc = render(
-        "reports/infer_instrument",
-        instrument_slug=instrument.meta.slug,
-        instrument_version=instrument.meta.version,
-        instrument_title=instrument.meta.title,
-        instrument_domain=instrument.meta.domain,
-        likert_lo=instrument.meta.likert.lo,
-        likert_hi=instrument.meta.likert.hi,
-        lookback_days=lookback_days,
-        today=today,
-        batch_label=batches[0].label if batches else "all",
-        items_block=items_block,
-        substrate_block=_render_substrate_block(paths, vault_root),
-    )
-
     report_path = _persist_report(
         output_dir=output_dir,
         timestamp=timestamp,
-        instrument_slug=instrument.meta.slug,
-        instrument_version=instrument.meta.version,
+        instrument=instrument,
         scored=scored,
         run=run,
-        rendered_prompt=rendered_prompt_for_doc,
+        rendered_batches=rendered_batches,
         prompt_version=first_pv,
-        instrument_dir=instrument_dir,
         lookback_days=lookback_days,
         substrate_paths=paths,
         vault_root=vault_root,
