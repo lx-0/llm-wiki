@@ -108,6 +108,7 @@ CATEGORIES: dict[str, tuple[str, list[tuple[str, str, str, object]]]] = {
         ("html",          "ingest one URL or HTML file",    "html2text → raw/articles",               ("prompt", "URL or path",            ["ingest-html", "{arg}"])),
         ("youtube",       "ingest YouTube",                 "video or playlist",                      ("prompt", "Video or playlist URL", ["ingest-youtube", "--url", "{arg}"])),
         ("bridge",        "bridge — list mappings",         "sandbox-folder rsync mirror",            ["bridge", "list"]),
+        ("preprocess",    "preprocessors — list",           "in-vault intake normalizers",            ["preprocess", "--list"]),
     ]),
     "k": ("knowledge ops", [
         ("compile",       "compile changed sources ($$)",   "incremental run",                        ["compile"]),

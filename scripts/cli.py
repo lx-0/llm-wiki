@@ -536,6 +536,30 @@ EXAMPLES
   wiki produce takes raw/transcripts/2026-05-17-meeting.md  re-run takes for one source
   wiki produce curiosity raw/email/inbox-2026-05-17.md      manual curiosity pass"""
 
+H_PREPROCESS = """wiki preprocess — run a Preprocessor (in-vault intake normalizer)
+
+USAGE
+  wiki preprocess --list                    list registered Preprocessors
+  wiki preprocess <name> [source]           run one Preprocessor
+  wiki preprocess <name> --dry-run          preview without writing
+
+WHAT IS A PREPROCESSOR?
+  Preprocessors normalize material already INSIDE the vault (the inbox/
+  drop-zone, the Obsidian Web Clipper Clippings/ folder, a single HTML
+  file or URL) into the raw/** shape the compile loop reads. They run
+  BEFORE compile; Producers run after it. Unlike a Collector they never
+  read an outside substrate — singletons, no accounts.
+
+  Today: inbox, html, clippings. `source` (path or URL) is required for
+  preprocessors that take one (html); the folder-sweep singletons
+  (inbox, clippings) ignore it. `wiki process-inbox` and
+  `wiki ingest-html` remain as direct entry-points to the same logic.
+
+EXAMPLES
+  wiki preprocess --list                       show all registered preprocessors
+  wiki preprocess clippings --dry-run          preview the Clippings/ sweep
+  wiki preprocess html https://example.com/a   ingest one page into raw/articles"""
+
 H_TRIAGE = """wiki triage — review + clear the intent inbox (workspace/inbox/)
 
 USAGE
@@ -685,6 +709,8 @@ COMMANDS: tuple[CommandSpec, ...] = (
                 handler="collectors/folder_index.py", help_text=H_INDEX),
     CommandSpec("produce", "Collect & ingest", "run a Producer (post-compile extractor)",
                 handler="producers/cli.py", banner=False, menu=True, help_text=H_PRODUCE),
+    CommandSpec("preprocess", "Collect & ingest", "run a Preprocessor (--list to enumerate)",
+                handler="preprocessors/cli.py", banner=False, menu=True, help_text=H_PREPROCESS),
     CommandSpec("process-inbox", "Collect & ingest", "classify inbox/ files via Ollama",
                 handler="process-inbox.py", menu=True, help_text=H_PROCESS_INBOX),
     CommandSpec("ingest-html", "Collect & ingest", "convert an HTML file or URL into raw/",
