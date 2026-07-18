@@ -32,8 +32,15 @@ from zoneinfo import ZoneInfo
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from collectors.base import Collector, CollectorSpec, RunResult, register
-from core import daily_capture, ollama_client
+from collectors.base import (
+    CollectorSpec,
+    RunResult,
+    append_rollup,
+    archive_to_zone,
+    register,
+    scan_inbox,
+)
+from core import ollama_client
 from core.config import CONFIG, TIMEZONE
 from core.paths import RAW_DIR, ROOT_DIR
 from core.prompts import render
@@ -256,21 +263,10 @@ def _build_frontmatter(
 
 
 def _scan_inbox(inbox: Path) -> list[Path]:
-    """List inbox files eligible for ingest. Skips dot-files and anything
-    whose suffix isn't in ACCEPTED_SUFFIXES (text: .txt / .md; audio:
-    .m4a / .mp4 / .mp3 / .wav / .flac / .ogg / .aac)."""
-    if not inbox.exists():
-        return []
-    items: list[Path] = []
-    for p in inbox.iterdir():
-        if p.is_dir():
-            continue
-        if p.name.startswith("."):
-            continue
-        if p.suffix.lower() not in ACCEPTED_SUFFIXES:
-            continue
-        items.append(p)
-    return sorted(items, key=lambda p: p.stat().st_mtime)
+    """List inbox files eligible for ingest (text: .txt / .md; audio:
+    .m4a / .mp4 / .mp3 / .wav / .flac / .ogg / .aac). Thin wrapper over
+    the shared `base.scan_inbox` harness, binding this collector's suffixes."""
+    return scan_inbox(inbox, ACCEPTED_SUFFIXES)
 
 
 def _append_daily_rollup(captured_at: datetime, content: str, out_path: Path) -> None:
@@ -294,10 +290,10 @@ def _append_daily_rollup(captured_at: datetime, content: str, out_path: Path) ->
         source_ref = out_path.resolve().relative_to(ROOT_DIR.resolve()).as_posix()
     except (ValueError, OSError):
         source_ref = out_path.name
-    try:
-        daily_capture.append_with_source(date_iso, "voice", line, source_ref)
-    except Exception:  # noqa: BLE001
-        log.exception("daily-rollup append failed for voice note %s", out_path.name)
+    append_rollup(
+        date_iso, "voice", line,
+        source_ref=source_ref, log=log, context=f"voice note {out_path.name}",
+    )
 
 
 @register
@@ -367,7 +363,10 @@ class VoiceCollector:
                     continue
             if not raw:
                 errors.append(f"{src.name}: empty content, archived without ingest")
-                shutil.move(str(src), str(MOBILE_ARCHIVE_DIR / src.name))
+                try:
+                    archive_to_zone(src, MOBILE_ARCHIVE_DIR)
+                except OSError as exc:
+                    errors.append(f"{src.name}: archive failed ({exc})")
                 continue
 
             # Punctuation pre-process. Cleaned body + raw preserved in FM.
@@ -400,12 +399,7 @@ class VoiceCollector:
             _append_daily_rollup(captured_at, body, out_path)
 
             try:
-                # If archive already has a same-name file (re-run after manual
-                # restore), suffix the archive copy with mtime to avoid clobber.
-                dest = MOBILE_ARCHIVE_DIR / src.name
-                if dest.exists():
-                    dest = MOBILE_ARCHIVE_DIR / f"{src.stem}-{int(src.stat().st_mtime)}{src.suffix}"
-                shutil.move(str(src), str(dest))
+                archive_to_zone(src, MOBILE_ARCHIVE_DIR)
             except OSError as exc:
                 errors.append(f"{src.name}: archive failed ({exc})")
 

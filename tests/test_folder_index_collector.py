@@ -395,6 +395,75 @@ def test_cli_no_local_roots_is_friendly_noop(tmp_path, monkeypatch):
     assert folder_index.main([]) == 0
 
 
+# --- Registry adapter (FolderIndexCollector) ------------------------------
+
+
+def test_folder_index_collector_registered_and_visible_in_list():
+    from collectors import all_collectors, get_collector
+
+    names = [c.SPEC.name for c in all_collectors()]
+    assert "folder-index" in names  # was invisible to `wiki collect --list`
+    coll = get_collector("folder-index")
+    assert coll is not None
+    # Scheduling is deferred to M027 Q6/S06 — registered for visibility, not
+    # auto-piggyback.
+    assert coll.SPEC.piggyback_default is False
+    assert coll.SPEC.supports_account_loop is False
+
+
+def test_folder_index_collector_run_syncs_all_local_roots(tree, tmp_path, monkeypatch):
+    from collectors import get_collector
+
+    index_dir, _ = _sync_env(monkeypatch, tmp_path)
+    second = _second_tree(tmp_path)
+    _patch_watched(
+        monkeypatch,
+        [
+            _entry(tree),
+            {"id": "second-root", "kind": "local", "path": str(second)},
+            {"id": "nas-docs", "kind": "smb", "share": "//nas1/docs"},
+        ],
+    )
+    result = get_collector("folder-index").run()
+    assert (index_dir / "test-root.md").exists()
+    assert (index_dir / "second-root.md").exists()
+    assert not (index_dir / "nas-docs.md").exists()  # smb deferred to S06
+    # Two roots written on the first sync.
+    assert len(result.files_written) == 2
+    assert "2 local root(s)" in result.message
+
+
+def test_folder_index_collector_no_local_roots_is_noop(tmp_path, monkeypatch):
+    from collectors import get_collector
+
+    _sync_env(monkeypatch, tmp_path)
+    _patch_watched(monkeypatch, [{"id": "nas", "kind": "smb", "share": "//nas/x"}])
+    result = get_collector("folder-index").run()
+    assert result.files_written == ()
+    assert "no-op" in result.message
+
+
+def test_folder_index_collector_dry_run_writes_nothing(tree, tmp_path, monkeypatch):
+    from collectors import get_collector
+
+    index_dir, _ = _sync_env(monkeypatch, tmp_path)
+    _patch_watched(monkeypatch, [_entry(tree)])
+    result = get_collector("folder-index").run(dry_run=True)
+    assert result.files_written == ()
+    assert not index_dir.exists() or list(index_dir.glob("*.md")) == []
+    assert "dry-run" in result.message
+
+
+def test_folder_index_collector_is_configured_reflects_local_roots(tree, monkeypatch):
+    from collectors import get_collector
+
+    coll = get_collector("folder-index")
+    _patch_watched(monkeypatch, [])
+    assert coll.is_configured() is False
+    _patch_watched(monkeypatch, [_entry(tree)])
+    assert coll.is_configured() is True
+
+
 def test_write_index_one_digest_per_root(tree, tmp_path, monkeypatch):
     index_dir = tmp_path / "raw-index"
     monkeypatch.setattr(folder_index, "INDEX_DIR", index_dir)

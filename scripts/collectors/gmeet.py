@@ -53,6 +53,7 @@ shape is still read on the sibling-scan.
 
 from __future__ import annotations
 
+import functools
 import hashlib
 import logging
 import re
@@ -65,7 +66,16 @@ from typing import Any, Iterator
 import yaml
 
 from adapters.mailbox import MailboxReadError, resolve_reader
-from collectors.base import CollectorSpec, RunResult, register
+from collectors.base import (
+    CollectorSpec,
+    RunResult,
+    Watermark,
+    filter_accounts,
+    migrate_flat_state,
+    register,
+    resolve_accounts,
+    run_account_loop,
+)
 from core import google_oauth
 from core.config import CONFIG
 from core.google_oauth import OAuthApp
@@ -338,19 +348,12 @@ _DEFAULT_EMAIL_BACKFILL_DAYS = 30
 
 
 def _resolve_gmeet_accounts() -> list[_GmeetAccount]:
-    """Iterate `CONFIG.personal.accounts`, return the ones with a
-    `gmeet:` sub-block whose `kind == "gmeet-api"`. Mirrors the
-    `resolve_reader` / `resolve_filter` dispatch on `kind`. Unknown
-    kinds are silently skipped (graceful-agnostic)."""
-    out: list[_GmeetAccount] = []
-    accounts = CONFIG.personal.accounts or {}
+    """Return the accounts with a `gmeet:` sub-block whose `kind ==
+    "gmeet-api"`, via the shared `base.resolve_accounts` kind-dispatch.
+    Unknown kinds are silently skipped (graceful-agnostic)."""
     default_max = CONFIG.limits.gmeet_max_per_run
-    for aid, body in accounts.items():
-        if not isinstance(body, dict):
-            continue
-        block = body.get("gmeet")
-        if not isinstance(block, dict) or block.get("kind") != "gmeet-api":
-            continue
+
+    def _build(aid: str, block: dict) -> _GmeetAccount:
         per_acct_max = block.get("max_per_run")
         ed = block.get("email_discovery")
         if not isinstance(ed, dict):
@@ -359,7 +362,7 @@ def _resolve_gmeet_accounts() -> list[_GmeetAccount]:
         if not isinstance(senders, (list, tuple)) or not senders:
             senders = (_DEFAULT_NOTES_SENDER,)
         backfill = ed.get("backfill_days")
-        out.append(_GmeetAccount(
+        return _GmeetAccount(
             account_id=aid,
             drive_folder_id=block.get("drive_folder_id") or "",
             drive_folder_name=block.get("drive_folder_name") or "Meet Recordings",
@@ -371,8 +374,11 @@ def _resolve_gmeet_accounts() -> list[_GmeetAccount]:
             email_backfill_days=(
                 int(backfill) if backfill is not None else _DEFAULT_EMAIL_BACKFILL_DAYS
             ),
-        ))
-    return out
+        )
+
+    return resolve_accounts(
+        CONFIG.personal.accounts or {}, "gmeet-api", _build, block_key="gmeet"
+    )
 
 
 # ── HTTP client (inline — Drive API over the shared OAuth session) ────
@@ -692,15 +698,16 @@ class GmeetCollector:
             for a in self._accounts
         )
 
-    def run(self, *, dry_run: bool = False, incremental: bool = False) -> RunResult:
+    def run(
+        self, *, dry_run: bool = False, incremental: bool = False, account: str | None = None
+    ) -> RunResult:
         if not self._accounts:
             log.info("GmeetCollector: no accounts with kind=gmeet-api — skipping.")
             return RunResult(message="no-op (no gmeet accounts configured)")
 
-        all_files: list[Path] = []
-        total_skipped = 0
-        per_acct_messages: list[str] = []
-        any_state_touched = False
+        accounts = filter_accounts(self._accounts, account)
+        if not accounts:
+            return RunResult(message=f"no-op (no gmeet account {account!r} configured)")
 
         # Output dir + sibling-map are shared across accounts (Drive file ids
         # are globally unique, the flat output folder is fine). The sibling
@@ -713,42 +720,32 @@ class GmeetCollector:
         sibling_map, already_present = _scan_siblings(output_root)
 
         state = load_json_state(_STATE_FILE)
-        # Migrate the pre-multi-tenant flat shape ({last_seen_ts: ...}) into a
-        # default per-account bucket so a clean lift doesn't lose the watermark.
-        if "last_seen_ts" in state and not any(
-            isinstance(v, dict) and "last_seen_ts" in v for v in state.values()
-        ):
-            legacy = state.pop("last_seen_ts")
-            state.setdefault("default", {})["last_seen_ts"] = legacy
-            log.info("GmeetCollector: migrated legacy flat state → state['default']")
+        # Migrate the pre-multi-tenant flat shape into state["default"] so a
+        # clean lift doesn't lose the watermark (shared with jamie, verbatim).
+        migrate_flat_state(state, "last_seen_ts", log=log, name="GmeetCollector")
 
-        for acct in self._accounts:
-            try:
-                msg, files, skipped, state_touched = self._run_one_account(
-                    acct,
-                    state=state,
-                    already_present=already_present,
-                    sibling_map=sibling_map,
-                    dry_run=dry_run,
-                    incremental=incremental,
-                )
-            except Exception as e:  # noqa: BLE001
-                log.exception("GmeetCollector[%s]: unexpected", acct.account_id)
-                per_acct_messages.append(f"{acct.account_id}: ERROR {type(e).__name__}: {e}")
-                continue
-            all_files.extend(files)
-            total_skipped += skipped
-            per_acct_messages.append(f"{acct.account_id}: {msg}")
-            any_state_touched = any_state_touched or state_touched
+        scan = functools.partial(
+            self._run_one_account,
+            state=state,
+            already_present=already_present,
+            sibling_map=sibling_map,
+            dry_run=dry_run,
+            incremental=incremental,
+        )
+        outcome = run_account_loop(accounts, scan, log=log, name="GmeetCollector")
 
-        if not dry_run and any_state_touched:
+        if not dry_run and outcome.any_state_touched:
             save_json_state(_STATE_FILE, state)
 
+        all_files = [f for files, _skipped in outcome.payloads for f in files]
+        total_skipped = sum(skipped for _files, skipped in outcome.payloads)
         return RunResult(
             files_written=tuple(all_files),
             files_skipped=total_skipped,
-            state_keys_touched=tuple(a.account_id for a in self._accounts) if any_state_touched else (),
-            message=" · ".join(per_acct_messages) or "no-op",
+            state_keys_touched=(
+                tuple(a.account_id for a in accounts) if outcome.any_state_touched else ()
+            ),
+            message=" · ".join(outcome.messages) or "no-op",
         )
 
     def _run_one_account(
@@ -760,13 +757,14 @@ class GmeetCollector:
         sibling_map: dict[str, _Sibling],
         dry_run: bool,
         incremental: bool,
-    ) -> tuple[str, list[Path], int, bool]:
-        """Run one account's scan. Returns (one-line message, files, skipped, state_touched).
-        Mutates `state[acct.account_id]['last_seen_ts']` only on a successful scan
-        that wrote files — failures leave the watermark untouched."""
+    ) -> tuple[str, tuple[list[Path], int], bool]:
+        """Run one account's scan. Returns (message, (files, skipped), state_touched)
+        for the harness's payload-generic aggregation. Mutates
+        `state[acct.account_id]['last_seen_ts']` only on a successful scan that
+        advanced the watermark — failures leave it untouched (hold-on-failure)."""
         sess, err = google_oauth.session(_app(acct.account_id), acct.account_id)
         if err:
-            return f"auth: {err}", [], 0, False
+            return f"auth: {err}", ([], 0), False
 
         client = _DriveClient(session=sess, timeout_s=self._timeout_s)
 
@@ -825,7 +823,7 @@ class GmeetCollector:
 
         notes = " · ".join(n for n in (folder_note, email_note) if n)
         if not stubs:
-            return f"no-op{(' · ' + notes) if notes else ''}", [], 0, False
+            return f"no-op{(' · ' + notes) if notes else ''}", ([], 0), False
 
         # Group the listed Docs by `meeting_key`. Notes-Doc + Transcript-Doc
         # for the same meeting share a key and ingest as one file (combined or
@@ -850,7 +848,7 @@ class GmeetCollector:
 
         files_written: list[Path] = []
         skipped = 0
-        highest_created: str | None = per_acct_state.get("last_seen_ts")
+        watermark = Watermark.seed(per_acct_state.get("last_seen_ts"))
         input_source = "piggyback" if not dry_run and incremental else "cli"
 
         for key, doc_stubs in groups.items():
@@ -935,13 +933,8 @@ class GmeetCollector:
                     target.write_text(text, encoding="utf-8")
                     # Only own-folder docs advance the folder watermark; email-
                     # discovered docs are deduped by file-id, not by createdTime.
-                    created = stub.get("createdTime") or ""
-                    if (
-                        created
-                        and stub.get("id") in folder_ids
-                        and (highest_created is None or str(created) > str(highest_created))
-                    ):
-                        highest_created = str(created)
+                    if stub.get("id") in folder_ids:
+                        watermark.observe(stub.get("createdTime"))
                     short = _short_id(stub.get("id") or "")
                     if short:
                         already_present.add(short)
@@ -1003,27 +996,21 @@ class GmeetCollector:
                 short = _short_id(stub.get("id") or "")
                 if short:
                     already_present.add(short)
-
-            for stub, _exported in exports:
-                created = stub.get("createdTime") or ""
-                if (
-                    created
-                    and stub.get("id") in folder_ids
-                    and (highest_created is None or str(created) > str(highest_created))
-                ):
-                    highest_created = str(created)
+                # Only own-folder docs advance the folder watermark; email-
+                # discovered docs are deduped by file-id, not by createdTime.
+                if stub.get("id") in folder_ids:
+                    watermark.observe(stub.get("createdTime"))
 
         state_touched = False
-        if not dry_run and highest_created and highest_created != per_acct_state.get("last_seen_ts"):
-            per_acct_state["last_seen_ts"] = highest_created
+        if not dry_run and watermark.advanced:
+            per_acct_state["last_seen_ts"] = watermark.value
             state[acct.account_id] = per_acct_state
             state_touched = True
 
         summary = f"wrote {len(files_written)} · skipped {skipped}"
         return (
             f"{notes} · {summary}" if notes else f"listed {len(stubs)} · {summary}",
-            files_written,
-            skipped,
+            (files_written, skipped),
             state_touched,
         )
 

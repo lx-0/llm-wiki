@@ -92,10 +92,11 @@ State shape (``state/calendar-state.json``)::
 
 from __future__ import annotations
 
+import functools
 import logging
 import re
 from collections import defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -107,7 +108,14 @@ from adapters.calendar.google import (
     GoogleCalendarClient,
     SCOPE as _GOOGLE_CAL_SCOPE,
 )
-from collectors.base import CollectorSpec, RunResult, register
+from collectors.base import (
+    CollectorSpec,
+    RunResult,
+    filter_accounts,
+    register,
+    resolve_accounts,
+    run_account_loop,
+)
 from core import google_oauth
 from core.config import CONFIG
 from core.google_oauth import OAuthApp
@@ -203,33 +211,29 @@ class _CalendarAccount:
 
 
 def _resolve_calendar_accounts() -> list[_CalendarAccount]:
-    """Iterate ``CONFIG.personal.accounts``, return the ones with a
-    ``calendar:`` sub-block whose ``kind == "google-calendar"``. Mirrors
-    the gmeet / jamie dispatch pattern. Unknown kinds are silently
-    skipped (graceful agnostic)."""
-    out: list[_CalendarAccount] = []
-    accounts = CONFIG.personal.accounts or {}
+    """Return the accounts with a ``calendar:`` sub-block whose ``kind ==
+    "google-calendar"``, via the shared ``base.resolve_accounts``
+    kind-dispatch. Unknown kinds are silently skipped (graceful agnostic)."""
     default_backfill = CONFIG.limits.calendar_backfill_days
     default_future = CONFIG.limits.calendar_future_days
     default_max = CONFIG.limits.calendar_max_per_run
-    for aid, body in accounts.items():
-        if not isinstance(body, dict):
-            continue
-        block = body.get("calendar")
-        if not isinstance(block, dict) or block.get("kind") != "google-calendar":
-            continue
+
+    def _build(aid: str, block: dict) -> _CalendarAccount:
         include_raw = block.get("include") or []
         include = tuple(str(x) for x in include_raw if isinstance(x, str) and x)
         per_acct_max = block.get("max_per_run")
-        out.append(_CalendarAccount(
+        return _CalendarAccount(
             account_id=aid,
             include=include,
             backfill_days=int(block.get("backfill_days") or default_backfill),
             future_days=int(block.get("future_days") or default_future),
             since=block.get("since") or None,
             max_per_run=int(per_acct_max if per_acct_max is not None else default_max),
-        ))
-    return out
+        )
+
+    return resolve_accounts(
+        CONFIG.personal.accounts or {}, "google-calendar", _build, block_key="calendar"
+    )
 
 
 # ── OAuth ───────────────────────────────────────────────────────────
@@ -606,37 +610,37 @@ class CalendarCollector:
 
     # ── public entry point ───────────────────────────────────────────
 
-    def run(self, *, dry_run: bool = False, incremental: bool = False) -> RunResult:
+    def run(
+        self, *, dry_run: bool = False, incremental: bool = False, account: str | None = None
+    ) -> RunResult:
         if not self._accounts:
             log.info("CalendarCollector: no accounts with kind=google-calendar — skipping.")
             return RunResult(message="no-op (no calendar accounts configured)")
 
+        accounts = filter_accounts(self._accounts, account)
+        if not accounts:
+            return RunResult(message=f"no-op (no calendar account {account!r} configured)")
+
         state = load_json_state(_STATE_FILE)
         all_written: list[Path] = []
         total_skipped = 0
-        per_acct_messages: list[str] = []
-        any_state_touched = False
 
         # Gather per-account event blocks first so we can write per-date
         # files in one pass (a date can carry events from multiple accounts).
+        # The harness owns failure isolation + message aggregation; the payload
+        # here is (blocks, new_concepts) — payload-generic, not the files+skipped
+        # shape the other account collectors return.
         blocks_by_date: dict[str, list[_EventBlock]] = defaultdict(list)
         new_concepts: list[tuple[str, _EventBlock]] = []  # (slug, sample)
 
-        for acct in self._accounts:
-            try:
-                msg, blocks, concepts, state_touched = self._run_one_account(
-                    acct, state=state, incremental=incremental,
-                )
-            except Exception as e:  # noqa: BLE001 — collector boundary
-                log.exception("CalendarCollector[%s]: unexpected", acct.account_id)
-                per_acct_messages.append(f"{acct.account_id}: ERROR {type(e).__name__}: {e}")
-                continue
+        scan = functools.partial(self._run_one_account, state=state, incremental=incremental)
+        outcome = run_account_loop(accounts, scan, log=log, name="CalendarCollector")
+        for blocks, concepts in outcome.payloads:
             for b in blocks:
                 blocks_by_date[b.date_key()].append(b)
-            for slug, sample in concepts:
-                new_concepts.append((slug, sample))
-            any_state_touched = any_state_touched or state_touched
-            per_acct_messages.append(f"{acct.account_id}: {msg}")
+            new_concepts.extend(concepts)
+        any_state_touched = outcome.any_state_touched
+        per_acct_messages = outcome.messages
 
         # Cross-link pass — fuzzy match event title + date to transcripts.
         flat_blocks = [b for v in blocks_by_date.values() for b in v]
@@ -684,7 +688,9 @@ class CalendarCollector:
         return RunResult(
             files_written=tuple(all_written),
             files_skipped=total_skipped,
-            state_keys_touched=tuple(a.account_id for a in self._accounts) if any_state_touched else (),
+            state_keys_touched=(
+                tuple(a.account_id for a in accounts) if any_state_touched else ()
+            ),
             message=" · ".join(per_acct_messages) or "no-op",
         )
 
@@ -696,14 +702,15 @@ class CalendarCollector:
         *,
         state: dict,
         incremental: bool,
-    ) -> tuple[str, list[_EventBlock], list[tuple[str, _EventBlock]], bool]:
-        """Run one account's scan. Returns (message, blocks, new_concepts, state_touched).
+    ) -> tuple[str, tuple[list[_EventBlock], list[tuple[str, _EventBlock]]], bool]:
+        """Run one account's scan. Returns (message, (blocks, new_concepts),
+        state_touched) for the harness's payload-generic aggregation.
 
         ``new_concepts`` is the list of recurring-series slugs that need a
         canonical concept page written (first sighting only)."""
         sess, err = google_oauth.session(_app(acct.account_id), acct.account_id)
         if err:
-            return f"auth: {err}", [], [], False
+            return f"auth: {err}", ([], []), False
         client = GoogleCalendarClient(session=sess, timeout_s=self._timeout_s)
 
         # ── Calendar selection ──
@@ -711,10 +718,10 @@ class CalendarCollector:
             cal_items = client.list_calendars()
         except CalendarAPIError as e:
             log.error("CalendarCollector[%s]: list_calendars failed: %s", acct.account_id, e)
-            return f"list_calendars failed: {e}", [], [], False
+            return f"list_calendars failed: {e}", ([], []), False
         chosen = self._select_calendars(cal_items, acct)
         if not chosen:
-            return "no-op (no calendars selected)", [], [], False
+            return "no-op (no calendars selected)", ([], []), False
 
         # ── Time window ──
         now = datetime.now(timezone.utc)
@@ -876,7 +883,7 @@ class CalendarCollector:
             f"calendars={len(chosen)} · listed={total_listed} · blocks={len(blocks)}"
             f" · recurring={len(new_concepts)}"
         )
-        return msg, blocks, new_concepts, state_touched
+        return msg, (blocks, new_concepts), state_touched
 
     # ── helpers ──────────────────────────────────────────────────────
 

@@ -30,7 +30,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from adapters.mailbox import MailboxReader, MailboxReadError, resolve_reader
-from collectors.base import Collector, CollectorSpec, RunResult, register
+from collectors.base import CollectorSpec, RunResult, filter_accounts, register
 from core.paths import EMAIL_STATE_FILE, ROOT_DIR
 from core.utils import now_iso, today_iso
 from domain.mail import MessageMeta
@@ -67,12 +67,23 @@ class EmailCollector:
         """
         return any(reader is not None for _, _, reader in self._accounts)
 
-    def run(self, *, dry_run: bool = False, incremental: bool = False) -> RunResult:
+    def run(
+        self, *, dry_run: bool = False, incremental: bool = False, account: str | None = None
+    ) -> RunResult:
         output_root = ROOT_DIR / self.SPEC.output_subfolder
         active_accounts = [
             (aid, acc, reader) for aid, acc, reader in self._accounts if reader is not None
         ]
+        # --account restricts to one id (the shared harness filter; email keeps
+        # its own (id, body, reader) tuple shape + bespoke {"accounts": {...}}
+        # state + two-mode loop per DECISIONS 2026-05-14, so it uses the filter
+        # seam but not run_account_loop).
+        active_accounts = filter_accounts(active_accounts, account, id_of=lambda t: t[0])
         if not active_accounts:
+            if account is not None:
+                return RunResult(
+                    message=f"no-op (no email account {account!r} with resolvable reader)"
+                )
             log.info("EmailCollector: no accounts configured — skipping.")
             return RunResult(message="no-op (no accounts with resolvable reader)")
 

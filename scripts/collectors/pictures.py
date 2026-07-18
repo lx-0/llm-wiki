@@ -20,7 +20,6 @@ from __future__ import annotations
 import base64
 import json
 import logging
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -34,8 +33,15 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import httpx  # noqa: E402
 
 from collectors._picture_metadata import extract_metadata
-from collectors.base import Collector, CollectorSpec, RunResult, register
-from core import daily_capture, ollama_client
+from collectors.base import (
+    CollectorSpec,
+    RunResult,
+    append_rollup,
+    archive_to_zone,
+    register,
+    scan_inbox,
+)
+from core import ollama_client
 from core.config import CONFIG, TIMEZONE
 from core.paths import RAW_DIR
 from core.prompts import render, prompt_model
@@ -200,18 +206,10 @@ def describe_picture(path: Path) -> dict | None:
 
 
 def _scan_inbox(inbox: Path) -> list[Path]:
-    if not inbox.exists():
-        return []
-    items: list[Path] = []
-    for p in inbox.iterdir():
-        if p.is_dir():
-            continue
-        if p.name.startswith("."):
-            continue
-        if p.suffix.lower() not in ACCEPTED_SUFFIXES:
-            continue
-        items.append(p)
-    return sorted(items, key=lambda p: p.stat().st_mtime)
+    """List inbox files eligible for ingest (.jpeg / .jpg / .png / .heic).
+    Thin wrapper over the shared `base.scan_inbox` harness, binding this
+    collector's suffixes."""
+    return scan_inbox(inbox, ACCEPTED_SUFFIXES)
 
 
 def _render_picture_metadata_block(picture_metadata: dict) -> list[str]:
@@ -392,10 +390,7 @@ def _append_daily_rollup(captured_at: datetime, scene: str, archive_name: str) -
     if len(first_line) > 80:
         first_line = first_line[:77].rstrip() + "…"
     line = f"- **{time_label}** · {first_line} · `{archive_name}`"
-    try:
-        daily_capture.append(date_iso, "pictures", line)
-    except Exception:  # noqa: BLE001
-        log.exception("daily-rollup append failed for picture %s", archive_name)
+    append_rollup(date_iso, "pictures", line, log=log, context=f"picture {archive_name}")
 
 
 @register
@@ -433,6 +428,10 @@ class PicturesCollector:
             )
 
         tz = ZoneInfo(TIMEZONE)
+        # One scope label for every operator-facing message below. Under
+        # multi-inbox the per-inbox loop variable is NOT a valid stand-in
+        # (it leaks the last-scanned path); the whole-scope label is.
+        label = inboxes[0] if len(inboxes) == 1 else f"{len(inboxes)} configured inbox(es)"
         sources: list[Path] = []
         missing: list[Path] = []
         for inbox in inboxes:
@@ -448,7 +447,6 @@ class PicturesCollector:
             log.warning("picture_inbox: %d configured path(s) not found: %s",
                         len(missing), ", ".join(str(p) for p in missing))
         if not sources:
-            label = inboxes[0] if len(inboxes) == 1 else f"{len(inboxes)} configured inbox(es)"
             return RunResult(message=f"no new pictures in {label}")
 
         limit = _max_per_run()
@@ -457,7 +455,6 @@ class PicturesCollector:
             sources = sources[:limit]
 
         if dry_run:
-            label = inboxes[0] if len(inboxes) == 1 else f"{len(inboxes)} inbox(es)"
             return RunResult(
                 files_skipped=len(sources),
                 message=f"[dry-run] would ingest {len(sources)} picture(s) from {label}",
@@ -512,18 +509,12 @@ class PicturesCollector:
             if thumb is not None:
                 thumb_lookup[src.name] = thumb.name
 
-            archive_name = src.name
-            dest = MOBILE_ARCHIVE_DIR / archive_name
-            if dest.exists():
-                stem = src.stem
-                suffix = src.suffix
-                archive_name = f"{stem}-{int(src.stat().st_mtime)}{suffix}"
-                dest = MOBILE_ARCHIVE_DIR / archive_name
             try:
-                shutil.move(str(src), str(dest))
+                dest = archive_to_zone(src, MOBILE_ARCHIVE_DIR)
             except OSError as exc:
                 errors.append(f"{src.name}: archive failed ({exc})")
                 continue
+            archive_name = dest.name
 
             _write_archive_sidecar(dest, captured_at, meta, picture_metadata)
             _append_daily_rollup(captured_at, meta.get("scene_description", ""), archive_name)
@@ -537,7 +528,7 @@ class PicturesCollector:
         if not results:
             return RunResult(
                 files_skipped=len(sources),
-                message=f"no pictures processed successfully from {inbox}",
+                message=f"no pictures processed successfully from {label}",
                 errors=tuple(errors),
             )
 

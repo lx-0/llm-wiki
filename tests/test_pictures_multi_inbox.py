@@ -146,10 +146,43 @@ def test_run_skips_missing_path_warns_keeps_going(monkeypatch, pictures_mod, tmp
     assert any("missing" in r.message and "not found" in r.message for r in caplog.records)
 
 
+def test_run_all_vision_failed_message_is_multi_inbox_aware(monkeypatch, pictures_mod, tmp_path):
+    """Regression: the "no pictures processed" message must describe the whole
+    multi-inbox scope, not a stale single loop variable.
+
+    When 2+ inboxes are configured and every vision call fails, `results`
+    stays empty and the collector returns the no-success message. It used to
+    interpolate `inbox` — the leftover loop variable bound to the LAST inbox
+    scanned — naming one path while the run covered several. The sibling
+    no-source / dry-run messages already compute a multi-inbox label; this
+    path must too.
+    """
+    from core.config import CONFIG
+    a, b = tmp_path / "a", tmp_path / "b"
+    a.mkdir()
+    b.mkdir()
+    (a / "1.jpg").write_bytes(b"\xff\xd8\xff")
+    (b / "2.jpg").write_bytes(b"\xff\xd8\xff")
+
+    monkeypatch.setattr(CONFIG.personal, "picture_inbox", [str(a), str(b)])
+    # Every vision call fails -> results stays empty -> no-success return path.
+    monkeypatch.setattr(pictures_mod, "describe_picture", lambda src: None)
+    monkeypatch.setattr(pictures_mod, "_make_thumbnail", lambda src: None)
+    monkeypatch.setattr(pictures_mod.ollama_client, "is_reachable", lambda: True)
+
+    result = pictures_mod.PicturesCollector().run()
+
+    assert result.files_written == ()
+    # Describes the whole scope, not just the last-scanned inbox path.
+    assert "2 configured inbox(es)" in result.message
+    assert str(b) not in result.message
+
+
 def test_run_aggregates_sources_across_paths(monkeypatch, pictures_mod, tmp_path):
     from core.config import CONFIG
     a, b = tmp_path / "a", tmp_path / "b"
-    a.mkdir(); b.mkdir()
+    a.mkdir()
+    b.mkdir()
     (a / "1.jpg").write_bytes(b"\xff\xd8\xff")
     (b / "2.jpg").write_bytes(b"\xff\xd8\xff")
 

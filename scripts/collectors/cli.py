@@ -41,16 +41,27 @@ def _run_one(name: str, *, dry_run: bool, incremental: bool, account: str | None
     if not collector.is_configured():
         print(f"warning: collector {name!r} is not configured — running anyway")
 
-    # The base `run()` Protocol takes only dry_run + incremental. Account
-    # filtering lives in CONFIG today (operators pass `--account work` to
-    # restrict, but the Collector currently iterates *all* accounts that
-    # resolve to a Reader). We honor `--account` by setting an env var
-    # the Collector can opt into reading; today EmailCollector ignores
-    # it, that's a S02 follow-up. Logged for visibility.
+    # `--account` restricts the run to one account id. It only applies to
+    # account substrates (SPEC.supports_account_loop) — the field's real
+    # consumer. A singleton collector (browser, screenshots, …) that got an
+    # --account flag is an operator error, surfaced loudly rather than
+    # silently ignored.
     if account is not None:
-        print(f"note: --account={account} is parsed but not yet honored by EmailCollector (S02 task)")
-
-    result = collector.run(dry_run=dry_run, incremental=incremental)
+        if not collector.SPEC.supports_account_loop:
+            print(
+                f"error: collector {name!r} does not support --account "
+                "(not an account substrate)",
+                file=sys.stderr,
+            )
+            print(
+                "       --account applies only to account substrates "
+                "(email, calendar, gmeet, jamie, health)",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        result = collector.run(dry_run=dry_run, incremental=incremental, account=account)
+    else:
+        result = collector.run(dry_run=dry_run, incremental=incremental)
     print(result.message)
     print(f"  files written: {len(result.files_written)}")
     print(f"  files skipped: {result.files_skipped}")

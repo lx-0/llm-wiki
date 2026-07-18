@@ -22,6 +22,7 @@ from collectors.base import (  # noqa: F401  re-export the public API
 # when `cli.py` runs directly. Same fix pattern as email_collector.py.
 from collectors import calendar_collector  # noqa: F401,E402
 from collectors import email_collector  # noqa: F401,E402
+from collectors import folder_index  # noqa: F401,E402
 from collectors import gmeet  # noqa: F401,E402
 from collectors import health  # noqa: F401,E402
 from collectors import jamie  # noqa: F401,E402

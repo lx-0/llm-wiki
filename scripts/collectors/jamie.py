@@ -30,6 +30,7 @@ State:
 
 from __future__ import annotations
 
+import functools
 import json
 import logging
 import os
@@ -43,7 +44,16 @@ from urllib.parse import urlencode
 import httpx
 import yaml
 
-from collectors.base import CollectorSpec, RunResult, register
+from collectors.base import (
+    CollectorSpec,
+    RunResult,
+    Watermark,
+    filter_accounts,
+    migrate_flat_state,
+    register,
+    resolve_accounts,
+    run_account_loop,
+)
 from core.paths import ROOT_DIR, STATE_DIR
 from core.utils import load_json_state, now_iso, save_json_state
 from core.config import CONFIG
@@ -426,33 +436,28 @@ class _JamieAccount:
 
 
 def _resolve_jamie_accounts() -> list[_JamieAccount]:
-    """Iterate `CONFIG.personal.accounts`, return the ones with a
-    `jamie:` sub-block whose `kind == "jamie-api"`. Mirrors the
-    `resolve_reader` / `resolve_filter` / `_resolve_gmeet_accounts`
-    dispatch on `kind`. Accounts whose `api_key_env` resolves to an
-    empty/unset env var are still returned — `_run_one_account` reports
-    the missing key in its message instead of silently swallowing the
-    account (mirrors gmeet's per-account error surfacing)."""
-    out: list[_JamieAccount] = []
-    accounts = CONFIG.personal.accounts or {}
+    """Return the accounts with a `jamie:` sub-block whose `kind ==
+    "jamie-api"`, via the shared `base.resolve_accounts` kind-dispatch.
+    Accounts whose `api_key_env` resolves to an empty/unset env var are
+    still returned — `_run_one_account` reports the missing key in its
+    message instead of silently swallowing the account."""
     default_max = CONFIG.limits.jamie_max_per_run
-    for aid, body in accounts.items():
-        if not isinstance(body, dict):
-            continue
-        block = body.get("jamie")
-        if not isinstance(block, dict) or block.get("kind") != "jamie-api":
-            continue
+
+    def _build(aid: str, block: dict) -> _JamieAccount:
         env_name = (block.get("api_key_env") or "").strip()
         api_key = os.environ.get(env_name, "").strip() if env_name else ""
         per_acct_max = block.get("max_per_run")
-        out.append(_JamieAccount(
+        return _JamieAccount(
             account_id=aid,
             api_key=api_key,
             key_type=block.get("key_type") or "personal",
             since=block.get("since") or None,
             max_per_run=per_acct_max if per_acct_max is not None else default_max,
-        ))
-    return out
+        )
+
+    return resolve_accounts(
+        CONFIG.personal.accounts or {}, "jamie-api", _build, block_key="jamie"
+    )
 
 
 # ── Collector ────────────────────────────────────────────────────────
@@ -481,15 +486,16 @@ class JamieCollector:
             return False
         return any(a.api_key for a in self._accounts)
 
-    def run(self, *, dry_run: bool = False, incremental: bool = False) -> RunResult:
+    def run(
+        self, *, dry_run: bool = False, incremental: bool = False, account: str | None = None
+    ) -> RunResult:
         if not self._accounts:
             log.info("JamieCollector: no accounts with kind=jamie-api — skipping.")
             return RunResult(message="no-op (no jamie accounts configured)")
 
-        all_files: list[Path] = []
-        total_skipped = 0
-        per_acct_messages: list[str] = []
-        any_state_touched = False
+        accounts = filter_accounts(self._accounts, account)
+        if not accounts:
+            return RunResult(message=f"no-op (no jamie account {account!r} configured)")
 
         output_root = ROOT_DIR / self.SPEC.output_subfolder
         already_present: set[str] = set()
@@ -501,42 +507,31 @@ class JamieCollector:
             }
 
         state = load_json_state(_STATE_FILE)
-        # Migrate the pre-multi-tenant flat shape ({last_seen_ts: ...}) into a
-        # default per-account bucket so a clean lift doesn't lose the watermark.
-        if "last_seen_ts" in state and not any(
-            isinstance(v, dict) and "last_seen_ts" in v for v in state.values()
-        ):
-            legacy = state.pop("last_seen_ts")
-            state.setdefault("default", {})["last_seen_ts"] = legacy
-            log.info("JamieCollector: migrated legacy flat state → state['default']")
+        # Migrate the pre-multi-tenant flat shape into state["default"] so a
+        # clean lift doesn't lose the watermark (shared with gmeet, verbatim).
+        migrate_flat_state(state, "last_seen_ts", log=log, name="JamieCollector")
 
-        for acct in self._accounts:
-            try:
-                msg, files, skipped, state_touched = self._run_one_account(
-                    acct,
-                    state=state,
-                    already_present=already_present,
-                    dry_run=dry_run,
-                    incremental=incremental,
-                )
-            except Exception as e:  # noqa: BLE001
-                log.exception("JamieCollector[%s]: unexpected", acct.account_id)
-                per_acct_messages.append(f"{acct.account_id}: ERROR {type(e).__name__}: {e}")
-                continue
-            all_files.extend(files)
-            total_skipped += skipped
-            per_acct_messages.append(f"{acct.account_id}: {msg}")
-            already_present.update(_short_id(p.stem.rsplit("--", 1)[-1]) for p in files)
-            any_state_touched = any_state_touched or state_touched
+        scan = functools.partial(
+            self._run_one_account,
+            state=state,
+            already_present=already_present,
+            dry_run=dry_run,
+            incremental=incremental,
+        )
+        outcome = run_account_loop(accounts, scan, log=log, name="JamieCollector")
 
-        if not dry_run and any_state_touched:
+        if not dry_run and outcome.any_state_touched:
             save_json_state(_STATE_FILE, state)
 
+        all_files = [f for files, _skipped in outcome.payloads for f in files]
+        total_skipped = sum(skipped for _files, skipped in outcome.payloads)
         return RunResult(
             files_written=tuple(all_files),
             files_skipped=total_skipped,
-            state_keys_touched=tuple(a.account_id for a in self._accounts) if any_state_touched else (),
-            message=" · ".join(per_acct_messages) or "no-op",
+            state_keys_touched=(
+                tuple(a.account_id for a in accounts) if outcome.any_state_touched else ()
+            ),
+            message=" · ".join(outcome.messages) or "no-op",
         )
 
     def _run_one_account(
@@ -547,12 +542,13 @@ class JamieCollector:
         already_present: set[str],
         dry_run: bool,
         incremental: bool,
-    ) -> tuple[str, list[Path], int, bool]:
-        """Run one account's scan. Returns (one-line message, files, skipped, state_touched).
-        Mutates `state[acct.account_id]['last_seen_ts']` only on a successful scan
-        that wrote files — failures leave the watermark untouched."""
+    ) -> tuple[str, tuple[list[Path], int], bool]:
+        """Run one account's scan. Returns (message, (files, skipped), state_touched)
+        for the harness's payload-generic aggregation. Mutates
+        `state[acct.account_id]['last_seen_ts']` only on a successful scan that
+        advanced the watermark — failures leave it untouched (hold-on-failure)."""
         if not acct.api_key:
-            return "no-op (api key env var unset)", [], 0, False
+            return "no-op (api key env var unset)", ([], 0), False
 
         client = _JamieClient(
             api_key=acct.api_key, key_type=acct.key_type, timeout_s=self._timeout_s,
@@ -570,14 +566,14 @@ class JamieCollector:
             stubs = list(client.list_meetings(start_date=start_date, limit=acct.max_per_run))
         except JamieAPIError as e:
             log.error("JamieCollector[%s]: list failed: %s", acct.account_id, e)
-            return f"list failed: {e}", [], 0, False
+            return f"list failed: {e}", ([], 0), False
 
         if not stubs:
-            return f"no-op (0 meetings in window since={start_date or '—'})", [], 0, False
+            return f"no-op (0 meetings in window since={start_date or '—'})", ([], 0), False
 
         files_written: list[Path] = []
         skipped = 0
-        highest_started: str | None = per_acct_state.get("last_seen_ts")
+        watermark = Watermark.seed(per_acct_state.get("last_seen_ts"))
         input_source = "piggyback" if not dry_run and incremental else "cli"
         output_root = ROOT_DIR / self.SPEC.output_subfolder
 
@@ -620,6 +616,10 @@ class JamieCollector:
             target.write_text(md, encoding="utf-8")
             log.info("  [%s] wrote %s", acct.account_id, target.relative_to(ROOT_DIR))
             files_written.append(target)
+            # Keep dedup current so a later account in the same run doesn't
+            # re-write a meeting already written this run (ids are globally
+            # unique across accounts; this was a post-loop step in run()).
+            already_present.add(short)
 
             # Mirror a one-liner into daily/<date>/meetings.md.
             try:
@@ -631,18 +631,16 @@ class JamieCollector:
             except Exception:  # noqa: BLE001
                 log.exception("daily-rollup append failed for jamie meeting %s", mid)
 
-            if started_at and (highest_started is None or str(started_at) > str(highest_started)):
-                highest_started = str(started_at)
+            watermark.observe(started_at)
 
         state_touched = False
-        if not dry_run and highest_started and highest_started != per_acct_state.get("last_seen_ts"):
-            per_acct_state["last_seen_ts"] = highest_started
+        if not dry_run and watermark.advanced:
+            per_acct_state["last_seen_ts"] = watermark.value
             state[acct.account_id] = per_acct_state
             state_touched = True
 
         return (
             f"listed {len(stubs)} · wrote {len(files_written)} · skipped {skipped}",
-            files_written,
-            skipped,
+            (files_written, skipped),
             state_touched,
         )

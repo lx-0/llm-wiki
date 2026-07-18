@@ -25,6 +25,7 @@ Export.xml stored in state (unchanged hash → no-op for that account).
 
 from __future__ import annotations
 
+import functools
 import hashlib
 import logging
 import os
@@ -40,7 +41,15 @@ from adapters.health.healthkit_xml import (
     iter_aggregates as iter_healthkit_aggregates,
 )
 from adapters.health.oura import DailySummary, OuraAPIError, OuraClient
-from collectors.base import CollectorSpec, RunResult, register
+from collectors.base import (
+    CollectorSpec,
+    RunResult,
+    Watermark,
+    filter_accounts,
+    register,
+    resolve_accounts,
+    run_account_loop,
+)
 from core import daily_capture
 from core.config import CONFIG
 from core.paths import ROOT_DIR, STATE_DIR
@@ -218,63 +227,48 @@ class _HealthKitAccount:
 
 
 def _resolve_healthkit_accounts() -> list[_HealthKitAccount]:
-    """Iterate CONFIG.personal.accounts for entries with health.healthkit.kind == 'healthkit-xml-export'.
-
-    Accounts whose `inbox_dir` is empty or whose target file doesn't exist
-    are still returned — the per-account runner reports the missing file
-    in its message (mirrors Oura's missing-env-key surfacing).
+    """Return the accounts with a `health.healthkit` sub-block whose `kind ==
+    'healthkit-xml-export'`, via the shared `base.resolve_accounts` nested
+    kind-dispatch. Accounts whose `inbox_dir` is empty or whose target file
+    doesn't exist are still returned — the per-account runner reports the
+    missing file in its message (mirrors Oura's missing-env-key surfacing).
     """
-    out: list[_HealthKitAccount] = []
-    accounts = CONFIG.personal.accounts or {}
-    for aid, body in accounts.items():
-        if not isinstance(body, dict):
-            continue
-        health_block = body.get("health")
-        if not isinstance(health_block, dict):
-            continue
-        hk_block = health_block.get("healthkit")
-        if not isinstance(hk_block, dict) or hk_block.get("kind") != "healthkit-xml-export":
-            continue
+    def _build(aid: str, hk_block: dict) -> _HealthKitAccount:
         raw_dir = (hk_block.get("inbox_dir") or "").strip()
         inbox = Path(raw_dir).expanduser() if raw_dir else Path("")
         filename = (hk_block.get("filename") or "Export.xml").strip() or "Export.xml"
-        out.append(_HealthKitAccount(
-            account_id=aid,
-            inbox_dir=inbox,
-            filename=filename,
-        ))
-    return out
+        return _HealthKitAccount(account_id=aid, inbox_dir=inbox, filename=filename)
+
+    return resolve_accounts(
+        CONFIG.personal.accounts or {}, "healthkit-xml-export", _build,
+        block_key=("health", "healthkit"),
+    )
 
 
 def _resolve_health_accounts() -> list[_HealthAccount]:
-    """Iterate CONFIG.personal.accounts for entries with health.oura.kind == 'oura-pat'.
-
+    """Return the accounts with a `health.oura` sub-block whose `kind ==
+    'oura-pat'`, via the shared `base.resolve_accounts` nested kind-dispatch.
     Accounts whose api_key_env resolves to an empty/unset env var are still
     returned — `_run_one_account` reports the missing key in its message
-    (mirrors jamie/gmeet per-account error surfacing). Phase 1 ignores any
-    `health.healthkit` sub-block (deferred).
+    (mirrors jamie/gmeet per-account error surfacing).
     """
-    out: list[_HealthAccount] = []
-    accounts = CONFIG.personal.accounts or {}
     default_backfill = CONFIG.limits.oura_max_backfill_days
-    for aid, body in accounts.items():
-        if not isinstance(body, dict):
-            continue
-        health_block = body.get("health")
-        if not isinstance(health_block, dict):
-            continue
-        oura_block = health_block.get("oura")
-        if not isinstance(oura_block, dict) or oura_block.get("kind") != "oura-pat":
-            continue
+
+    def _build(aid: str, oura_block: dict) -> _HealthAccount:
         env_name = (oura_block.get("api_key_env") or "").strip()
         api_key = os.environ.get(env_name, "").strip() if env_name else ""
         per_acct_backfill = oura_block.get("backfill_days")
-        out.append(_HealthAccount(
+        return _HealthAccount(
             account_id=aid,
             oura_api_key=api_key,
-            backfill_days=int(per_acct_backfill) if per_acct_backfill is not None else default_backfill,
-        ))
-    return out
+            backfill_days=(
+                int(per_acct_backfill) if per_acct_backfill is not None else default_backfill
+            ),
+        )
+
+    return resolve_accounts(
+        CONFIG.personal.accounts or {}, "oura-pat", _build, block_key=("health", "oura")
+    )
 
 
 # ── Rendering ────────────────────────────────────────────────────────
@@ -349,61 +343,56 @@ class HealthCollector:
                 return True
         return False
 
-    def run(self, *, dry_run: bool = False, incremental: bool = False) -> RunResult:
+    def run(
+        self, *, dry_run: bool = False, incremental: bool = False, account: str | None = None
+    ) -> RunResult:
         if not self._accounts and not self._healthkit_accounts:
             log.info("HealthCollector: no accounts configured (Oura or HealthKit) — skipping.")
             return RunResult(message="no-op (no health accounts configured)")
 
-        all_files: list[Path] = []
-        total_skipped = 0
-        per_acct_messages: list[str] = []
-        any_state_touched = False
+        oura_accounts = filter_accounts(self._accounts, account)
+        hk_accounts = filter_accounts(self._healthkit_accounts, account)
+        if account is not None and not oura_accounts and not hk_accounts:
+            return RunResult(message=f"no-op (no health account {account!r} configured)")
 
         state = load_json_state(_STATE_FILE)
 
-        for acct in self._accounts:
-            try:
-                msg, files, skipped, state_touched = self._run_one_account(
-                    acct,
-                    state=state,
-                    dry_run=dry_run,
-                    incremental=incremental,
-                )
-            except Exception as e:  # noqa: BLE001
-                log.exception("HealthCollector[%s]: unexpected", acct.account_id)
-                per_acct_messages.append(f"{acct.account_id}: ERROR {type(e).__name__}: {e}")
-                continue
-            all_files.extend(files)
-            total_skipped += skipped
-            per_acct_messages.append(f"{acct.account_id} oura: {msg}")
-            any_state_touched = any_state_touched or state_touched
+        # Two account-kind loops through the same harness — Oura (with a
+        # watermark) and HealthKit (hash-state). Each keeps its per-source
+        # message sub-label via `describe`; both save into the one health-state
+        # file, so `save-if-touched` fires once for the combined outcome.
+        oura_outcome = run_account_loop(
+            oura_accounts,
+            functools.partial(
+                self._run_one_account, state=state, dry_run=dry_run, incremental=incremental
+            ),
+            log=log, name="HealthCollector",
+            describe=lambda a: f"{a.account_id} oura",
+        )
+        hk_outcome = run_account_loop(
+            hk_accounts,
+            functools.partial(self._run_one_healthkit_account, state=state, dry_run=dry_run),
+            log=log, name="HealthCollector",
+            describe=lambda a: f"{a.account_id} healthkit",
+        )
 
-        for hk in self._healthkit_accounts:
-            try:
-                msg, files, skipped, state_touched = self._run_one_healthkit_account(
-                    hk,
-                    state=state,
-                    dry_run=dry_run,
-                )
-            except Exception as e:  # noqa: BLE001
-                log.exception("HealthCollector[%s] healthkit: unexpected", hk.account_id)
-                per_acct_messages.append(f"{hk.account_id} healthkit: ERROR {type(e).__name__}: {e}")
-                continue
-            all_files.extend(files)
-            total_skipped += skipped
-            per_acct_messages.append(f"{hk.account_id} healthkit: {msg}")
-            any_state_touched = any_state_touched or state_touched
-
+        any_state_touched = oura_outcome.any_state_touched or hk_outcome.any_state_touched
         if not dry_run and any_state_touched:
             save_json_state(_STATE_FILE, state)
 
-        touched_ids = tuple({a.account_id for a in self._accounts} |
-                            {h.account_id for h in self._healthkit_accounts})
+        all_files = [
+            f for files, _skipped in (*oura_outcome.payloads, *hk_outcome.payloads) for f in files
+        ]
+        total_skipped = sum(
+            skipped for _files, skipped in (*oura_outcome.payloads, *hk_outcome.payloads)
+        )
+        touched_ids = tuple({a.account_id for a in oura_accounts} |
+                            {h.account_id for h in hk_accounts})
         return RunResult(
             files_written=tuple(all_files),
             files_skipped=total_skipped,
             state_keys_touched=touched_ids if any_state_touched else (),
-            message=" · ".join(per_acct_messages) or "no-op",
+            message=" · ".join(oura_outcome.messages + hk_outcome.messages) or "no-op",
         )
 
     def _run_one_account(
@@ -413,15 +402,16 @@ class HealthCollector:
         state: dict,
         dry_run: bool,
         incremental: bool,
-    ) -> tuple[str, list[Path], int, bool]:
-        """Run one account's scan. Returns (message, files, skipped, state_touched).
+    ) -> tuple[str, tuple[list[Path], int], bool]:
+        """Run one account's scan. Returns (message, (files, skipped),
+        state_touched) for the harness's payload-generic aggregation.
 
         Mutates `state[acct.account_id]['oura']['last_day']` only on success
         that actually advanced the watermark. Failures leave the watermark
-        untouched (matches jamie/gmeet failure-vs-empty discipline).
+        untouched (matches jamie/gmeet hold-on-failure discipline).
         """
         if not acct.oura_api_key:
-            return "no-op (oura api_key_env unset)", [], 0, False
+            return "no-op (oura api_key_env unset)", ([], 0), False
 
         per_acct = state.get(acct.account_id) or {}
         oura_state = per_acct.get("oura") or {}
@@ -439,7 +429,7 @@ class HealthCollector:
             start = (date.today() - timedelta(days=acct.backfill_days)).isoformat()
 
         if start > end_date:
-            return f"no-op (watermark {last_day} ≥ today {end_date})", [], 0, False
+            return f"no-op (watermark {last_day} ≥ today {end_date})", ([], 0), False
 
         log.info(
             "HealthCollector[%s]: fetching oura window %s → %s",
@@ -451,14 +441,14 @@ class HealthCollector:
             summaries = client.fetch_daily_summaries(start_date=start, end_date=end_date)
         except OuraAPIError as e:
             log.error("HealthCollector[%s]: oura fetch failed: %s", acct.account_id, e)
-            return f"oura fetch failed: {e}", [], 0, False
+            return f"oura fetch failed: {e}", ([], 0), False
 
         if not summaries:
-            return f"no-op (0 days with data in {start}..{end_date})", [], 0, False
+            return f"no-op (0 days with data in {start}..{end_date})", ([], 0), False
 
         files_written: list[Path] = []
         skipped = 0
-        highest_day: str | None = oura_state.get("last_day")
+        watermark = Watermark.seed(oura_state.get("last_day"))
         account_slug = _slug_account(acct.account_id)
 
         for summary in summaries:
@@ -469,8 +459,7 @@ class HealthCollector:
 
             if target.exists():
                 skipped += 1
-                if highest_day is None or summary.day > highest_day:
-                    highest_day = summary.day
+                watermark.observe(summary.day)
                 continue
 
             md = _render_markdown(summary, account_id=acct.account_id)
@@ -489,20 +478,18 @@ class HealthCollector:
             # line per (account, day), idempotent replace per account.
             self._update_daily_rollup(summary, acct.account_id)
 
-            if highest_day is None or summary.day > highest_day:
-                highest_day = summary.day
+            watermark.observe(summary.day)
 
         state_touched = False
-        if not dry_run and highest_day and highest_day != oura_state.get("last_day"):
-            oura_state["last_day"] = highest_day
+        if not dry_run and watermark.advanced:
+            oura_state["last_day"] = watermark.value
             per_acct["oura"] = oura_state
             state[acct.account_id] = per_acct
             state_touched = True
 
         return (
             f"fetched {len(summaries)} days · wrote {len(files_written)} · skipped {skipped}",
-            files_written,
-            skipped,
+            (files_written, skipped),
             state_touched,
         )
 
@@ -514,8 +501,9 @@ class HealthCollector:
         *,
         state: dict,
         dry_run: bool,
-    ) -> tuple[str, list[Path], int, bool]:
+    ) -> tuple[str, tuple[list[Path], int], bool]:
         """Stream Export.xml, merge per-day aggregates into the substrate files.
+        Returns (message, (files, skipped), state_touched) for the harness.
 
         Idempotent: SHA256 of Export.xml stored in state. Unchanged hash →
         no-op (skip the parse entirely). Changed/new → full re-pass; per-day
@@ -523,10 +511,10 @@ class HealthCollector:
         re-pass after a fresh export is bounded by per-day file rewrites.
         """
         if not acct.inbox_dir:
-            return "no-op (inbox_dir unset)", [], 0, False
+            return "no-op (inbox_dir unset)", ([], 0), False
         export_path = acct.inbox_dir / acct.filename
         if not export_path.exists():
-            return f"no-op (no {acct.filename} at {acct.inbox_dir})", [], 0, False
+            return f"no-op (no {acct.filename} at {acct.inbox_dir})", ([], 0), False
 
         per_acct = state.get(acct.account_id) or {}
         hk_state = per_acct.get("healthkit") or {}
@@ -538,7 +526,7 @@ class HealthCollector:
         )
         new_hash = _sha256_file(export_path)
         if prior_hash == new_hash:
-            return f"no-op (export unchanged, sha256={new_hash[:12]}…)", [], 0, False
+            return f"no-op (export unchanged, sha256={new_hash[:12]}…)", ([], 0), False
 
         log.info(
             "HealthCollector[%s] healthkit: streaming aggregates (hash %s%s)",
@@ -599,8 +587,7 @@ class HealthCollector:
         return (
             f"parsed {days_seen} days · wrote {len(files_written)} · "
             f"unchanged {skipped_unchanged}",
-            files_written,
-            skipped_unchanged,
+            (files_written, skipped_unchanged),
             state_touched,
         )
 

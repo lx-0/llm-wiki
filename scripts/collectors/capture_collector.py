@@ -33,7 +33,6 @@ from __future__ import annotations
 
 import hashlib
 import logging
-import shutil
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -41,8 +40,15 @@ from zoneinfo import ZoneInfo
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from collectors.base import CollectorSpec, RunResult, register
-from core import capture_index, daily_capture
+from collectors.base import (
+    CollectorSpec,
+    RunResult,
+    append_rollup,
+    archive_to_zone,
+    register,
+    scan_inbox,
+)
+from core import capture_index
 from core.config import CONFIG, TIMEZONE
 from core.paths import RAW_DIR
 
@@ -98,20 +104,10 @@ def _build_frontmatter(
 
 
 def _scan_inbox(inbox: Path) -> list[Path]:
-    """List inbox files eligible for ingest. Skips dot-files, sub-dirs, and
-    anything whose suffix isn't .txt / .md / .html."""
-    if not inbox.exists():
-        return []
-    items: list[Path] = []
-    for p in inbox.iterdir():
-        if p.is_dir():
-            continue
-        if p.name.startswith("."):
-            continue
-        if p.suffix.lower() not in ACCEPTED_SUFFIXES:
-            continue
-        items.append(p)
-    return sorted(items, key=lambda p: p.stat().st_mtime)
+    """List inbox files eligible for ingest (.txt / .md / .html). Thin
+    wrapper over the shared `base.scan_inbox` harness, binding this
+    collector's suffixes."""
+    return scan_inbox(inbox, ACCEPTED_SUFFIXES)
 
 
 def _append_daily_rollup(
@@ -129,10 +125,7 @@ def _append_daily_rollup(
     if len(first_line) > 80:
         first_line = first_line[:77].rstrip() + "…"
     line = f"- **{time_label}** · `{capture_id}` · {first_line} → [[{out_path.stem}]]"
-    try:
-        daily_capture.append(date_iso, "captures", line)
-    except Exception:  # noqa: BLE001
-        log.exception("daily-rollup append failed for capture %s", out_path.name)
+    append_rollup(date_iso, "captures", line, log=log, context=f"capture {out_path.name}")
 
 
 @register
@@ -236,12 +229,10 @@ class CaptureCollector:
 
     @staticmethod
     def _archive(src: Path, errors: list[str]) -> None:
-        """Move a processed source into the vault audit zone. On same-name
-        collision (re-run after manual restore), suffix with mtime."""
+        """Move a processed source into the vault audit zone via the shared
+        two-zone `base.archive_to_zone` harness (collision-safe). A move
+        failure is surfaced, never swallowed — the archive-move is the dedup."""
         try:
-            dest = MOBILE_ARCHIVE_DIR / src.name
-            if dest.exists():
-                dest = MOBILE_ARCHIVE_DIR / f"{src.stem}-{int(src.stat().st_mtime)}{src.suffix}"
-            shutil.move(str(src), str(dest))
+            archive_to_zone(src, MOBILE_ARCHIVE_DIR)
         except OSError as exc:
             errors.append(f"{src.name}: archive failed ({exc})")
