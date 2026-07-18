@@ -1,12 +1,12 @@
 // Engine bridge — runs `wiki compile` against the active vault. First action that
 // touches the wiki engine (not system data): long-running (Claude SDK, minutes) +
 // real cost, so it's spawned async, parses progress from the compiler's output, and
-// reports completion. Spawn the vault's own `wiki` wrapper (handles uv/venv); the
-// engine's flock guards concurrency.
+// reports completion. Spawn goes through the shared runWiki runner (vault resolution,
+// PATH, ANSI strip, timeout/kill); compile keeps only the single-flight slot + the
+// progress scan on top. The engine's flock guards concurrency at the engine level.
 
-import { spawn, type ChildProcess } from 'node:child_process';
 import { resolveVault } from './registry';
-import { augmentedPath, wikiBin } from './wiki-exec';
+import { runWiki } from './wiki-exec';
 
 export interface CompileResult {
   ok: boolean;
@@ -31,9 +31,12 @@ export const ENGINE_COMMANDS: Record<EngineCommandId, { args: string[]; label: s
   dream: { args: ['dream'], label: 'Refresh entity pages' },
 };
 
-let proc: ChildProcess | null = null;
+/** Wall-clock cap for any engine command (compile/dream/… can run minutes). Prevents
+ *  a wedged child from leaving the single-flight slot occupied forever; the engine's
+ *  own SDK/flock guards handle the finer-grained cases. */
+const ENGINE_TIMEOUT_MS = 60 * 60 * 1000;
+
 let runningCmd: string | null = null;
-let startedAt = 0;
 let lastProgress: CompileProgress = { current: 0, total: 0 };
 
 export function isCompiling(): boolean {
@@ -55,57 +58,53 @@ export interface CompileStart {
   error?: string;
 }
 
-/** Shared spawn for any `wiki <args>` engine command. One at a time. */
+/** Scan one output line for compile progress. compile.py logs "Files to compile: N",
+ *  then per-file "[idx/total]", "Nothing to compile" on a no-op. (Only compile emits
+ *  x/y; other commands stay indeterminate.) Behavior-preserving until the engine
+ *  emits structured progress lines. */
+export function scanProgress(line: string): CompileProgress | null {
+  let m: RegExpMatchArray | null;
+  if ((m = line.match(/\[(\d+)\/(\d+)\]/))) {
+    return { current: Number(m[1]), total: Number(m[2]) };
+  }
+  if ((m = line.match(/Files to compile:\s*(\d+)/))) {
+    return { current: 0, total: Number(m[1]) };
+  }
+  if (/Nothing to compile/.test(line)) {
+    return { current: 0, total: 0 };
+  }
+  return null;
+}
+
+/** Shared spawn for any `wiki <args>` engine command. One at a time (single-flight).
+ *  The spawn/PATH/timeout/kill live in runWiki; this owns the running slot + the
+ *  progress scan on top. */
 function spawnWiki(
   cmdId: string,
   args: string[],
   onProgress: (p: CompileProgress) => void,
   onDone: (r: CompileResult) => void,
 ): CompileStart {
-  if (proc) return { started: false, running: true };
+  if (runningCmd) return { started: false, running: true };
   const v = resolveVault();
   if (!v) return { started: false, error: 'no vault found' };
 
-  const wiki = wikiBin(v.path);
-  startedAt = Date.now();
   lastProgress = { current: 0, total: 0 };
-
-  const child = spawn(wiki, args, {
-    cwd: v.path,
-    env: { ...process.env, PATH: augmentedPath() },
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
-  proc = child;
   runningCmd = cmdId;
 
-  // compile.py logs: "Files to compile: N", then per-file "[idx/total]",
-  // "Nothing to compile" on a no-op. (Only compile emits x/y; others stay indeterminate.)
-  const scan = (buf: Buffer) => {
-    for (const line of buf.toString().split('\n')) {
-      let m: RegExpMatchArray | null;
-      if ((m = line.match(/\[(\d+)\/(\d+)\]/))) {
-        lastProgress = { current: Number(m[1]), total: Number(m[2]) };
-        onProgress(lastProgress);
-      } else if ((m = line.match(/Files to compile:\s*(\d+)/))) {
-        lastProgress = { current: 0, total: Number(m[1]) };
-        onProgress(lastProgress);
-      } else if (/Nothing to compile/.test(line)) {
-        lastProgress = { current: 0, total: 0 };
+  void runWiki(args, {
+    timeout: ENGINE_TIMEOUT_MS,
+    onLine: (line) => {
+      const p = scanProgress(line);
+      if (p) {
+        lastProgress = p;
         onProgress(lastProgress);
       }
-    }
-  };
-  child.stdout?.on('data', scan);
-  child.stderr?.on('data', scan);
-
-  const finish = (code: number | null) => {
-    if (proc !== child) return;
-    proc = null;
+    },
+  }).then((r) => {
     runningCmd = null;
-    onDone({ ok: code === 0, code, durationMs: Date.now() - startedAt });
-  };
-  child.on('exit', finish);
-  child.on('error', () => finish(null));
+    onDone({ ok: r.ok, code: r.code, durationMs: r.durationMs });
+  });
 
   return { started: true };
 }

@@ -1,43 +1,36 @@
 // Ask the knowledge base — the headline end-user action. Wraps `wiki query "Q"
-// --brief` (cheapest 5-10 line answer). Returns the answer text; LLM cost applies,
-// so it's request/response (not polled).
+// --brief` (cheapest 5-10 line answer) through the shared runWiki runner. Returns the
+// answer text; LLM cost applies, so it's request/response (not polled).
 
-import { spawn } from 'node:child_process';
-import { resolveVault } from './registry';
-import { augmentedPath, wikiBin, ANSI } from './wiki-exec';
+import { runWiki } from './wiki-exec';
 
 export interface QueryResult {
   ok: boolean;
   answer: string;
 }
 
-export function runQuery(question: string): Promise<QueryResult> {
-  return new Promise((resolve) => {
-    const q = question.trim();
-    if (!q) return resolve({ ok: false, answer: '' });
-    const v = resolveVault();
-    if (!v) return resolve({ ok: false, answer: 'No vault found.' });
+/** LLM round-trip for a brief answer — generous cap so a slow model doesn't get cut. */
+const QUERY_TIMEOUT_MS = 5 * 60_000;
 
-    let out = '';
-    let err = '';
-    const child = spawn(wikiBin(v.path), ['query', q, '--brief'], {
-      cwd: v.path,
-      env: { ...process.env, PATH: augmentedPath() },
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
-    child.stdout.on('data', (b: Buffer) => (out += b.toString()));
-    child.stderr.on('data', (b: Buffer) => (err += b.toString()));
-    child.on('error', () => resolve({ ok: false, answer: 'Could not run the query.' }));
-    child.on('exit', (code) => {
-      // Strip ANSI + the CLI's leading "wiki query" banner line.
-      const answer = out
-        .replace(ANSI, '')
-        .replace(/^\s*wiki query\s*\n/, '')
-        .trim();
-      resolve({
-        ok: code === 0 && answer.length > 0,
-        answer: answer || err.replace(ANSI, '').trim() || 'No answer.',
-      });
-    });
+/** Strip the CLI's leading "wiki query" banner line from an ANSI-stripped answer. */
+export function stripQueryBanner(stdout: string): string {
+  return stdout.replace(/^\s*wiki query\s*\n/, '').trim();
+}
+
+export async function runQuery(question: string): Promise<QueryResult> {
+  const q = question.trim();
+  if (!q) return { ok: false, answer: '' };
+
+  const r = await runWiki(['query', q, '--brief'], {
+    parse: stripQueryBanner,
+    timeout: QUERY_TIMEOUT_MS,
   });
+  if (r.error?.kind === 'no-vault') return { ok: false, answer: 'No vault found.' };
+  if (r.error?.kind === 'spawn-failed') return { ok: false, answer: 'Could not run the query.' };
+
+  const answer = r.data ?? '';
+  return {
+    ok: r.ok && answer.length > 0,
+    answer: answer || r.stderr.trim() || 'No answer.',
+  };
 }

@@ -5,9 +5,8 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { spawn } from 'node:child_process';
 import { resolveVault } from './registry';
-import { augmentedPath, wikiBin, ANSI } from './wiki-exec';
+import { runWiki } from './wiki-exec';
 
 export type TriageType = 'task' | 'idea' | 'note';
 export interface TriageRecord {
@@ -84,20 +83,16 @@ export function listTriage(showAll = false): TriageRecord[] {
   return records;
 }
 
+/** Fast, non-interactive; only the uv start costs anything. */
+const TRIAGE_ACTION_TIMEOUT_MS = 30_000;
+
 /** Run `wiki triage accept|dismiss <stem>` — fast, non-interactive. Async (uv startup). */
-export function triageAction(stem: string, action: 'accept' | 'dismiss'): Promise<{ ok: boolean; message: string }> {
-  return new Promise((resolve) => {
-    const v = resolveVault();
-    if (!v) return resolve({ ok: false, message: 'no vault' });
-    let out = '';
-    const child = spawn(wikiBin(v.path), ['triage', action, stem], {
-      cwd: v.path,
-      env: { ...process.env, PATH: augmentedPath() },
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
-    child.stdout.on('data', (b: Buffer) => (out += b.toString()));
-    child.stderr.on('data', (b: Buffer) => (out += b.toString()));
-    child.on('error', (e) => resolve({ ok: false, message: e.message }));
-    child.on('exit', (code) => resolve({ ok: code === 0, message: out.replace(ANSI, '').trim() }));
-  });
+export async function triageAction(
+  stem: string,
+  action: 'accept' | 'dismiss',
+): Promise<{ ok: boolean; message: string }> {
+  const r = await runWiki(['triage', action, stem], { timeout: TRIAGE_ACTION_TIMEOUT_MS });
+  if (r.error?.kind === 'no-vault') return { ok: false, message: 'no vault' };
+  if (r.error?.kind === 'spawn-failed') return { ok: false, message: r.error.message };
+  return { ok: r.ok, message: `${r.stdout}${r.stderr}`.trim() };
 }
