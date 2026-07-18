@@ -127,19 +127,29 @@ llm-wiki/
 
 ### Adding a tunable
 
-1. Extend the matching dataclass in `scripts/core/config.py`.
-2. Document the default in `config.example.yaml` with a comment.
-3. Document it in `docs/config.md` (the grouped reference).
+1. Extend the matching dataclass in `scripts/core/config_schema.py` with a
+   `#` comment above the field — that comment IS the documentation (the
+   docs table's Meaning column is generated from it).
+2. Document the default in `config.example.yaml` with a comment. A test
+   (`tests/test_config_docs.py`) fails if the example is missing the key or
+   carries a non-default value.
+3. Regenerate the reference tables: `uv run python
+   scripts/core/config_docs.py --write` (rewrites the generated region in
+   `docs/config.md`; a drift test fails if you skip this).
 4. Replace the hardcoded constant in the script with `CONFIG.<section>.<field>`.
 5. Don't add ad-hoc constants back to scripts — extend the config layer.
-6. **Add the key to `scripts/migrations/migrate_config_keys.py`** under
-   `KEY_ADDITIONS[<parent>]` with the same default. Operator vaults already
-   carry their own `config.yaml`; without this entry the new key is invisible
-   to the operator (dataclass defaults silently fire) and any rollout that
-   depends on the operator *seeing* the knob is broken. Same rule for
-   renames (extend `PIGGYBACK_RENAMES` etc.) and removals (`new_key=None`).
-   Direct edits to `<vault>/.wiki/config.yaml` are forbidden — the migration
-   is the only legal write path into an operator vault.
+6. **Add the key NAME to `scripts/migrations/migrate_config_keys.py`** —
+   either `INJECTED_KEYS[<parent>]` (injected into operator vaults; the value
+   is derived from the schema automatically) or `NEVER_INJECTED[<parent>]`
+   (explicit dataclass fall-through, e.g. secrets that belong in `.env`).
+   `tests/test_migrate_config_keys.py::test_every_schema_knob_has_a_migration_policy`
+   fails until one of the two carries the key. Operator vaults already carry
+   their own `config.yaml`; without injection the new key is invisible to the
+   operator (dataclass defaults silently fire) and any rollout that depends
+   on the operator *seeing* the knob is broken. Same rule for renames
+   (extend `PIGGYBACK_RENAMES` etc.) and removals (`new_key=None` /
+   `KEY_DROPS`). Direct edits to `<vault>/.wiki/config.yaml` are forbidden —
+   the migration is the only legal write path into an operator vault.
 
 ### Adding per-instance / personal data
 

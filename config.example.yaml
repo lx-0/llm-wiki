@@ -110,28 +110,37 @@ piggybacks:
   # (kind: jamie-api) whose `api_key_env` resolves to a non-empty environment
   # variable holding a jk_... key. If unset, this piggyback is silently
   # skipped (graceful agnostic).
+  # Per-run cap: limits.jamie_max_per_run (or the per-account jamie
+  # sub-block's max_per_run) — NOT a key on this block.
   jamie:
     enabled: true
     cooldown_hours: 6                    # tighter than scan_youtube — meetings are time-sensitive
-    max_per_run: 20
   # Pulls Google Meet / Gemini transcripts from Drive via collectors/gmeet.py.
   # Multi-tenant: requires at least one personal.accounts.<id>.gmeet sub-block
   # (kind: gmeet-api) AND `wiki gmeet-auth <id>` run for that account. Otherwise
   # silently skipped (graceful agnostic).
+  # Per-run cap: limits.gmeet_max_per_run (or the per-account gmeet
+  # sub-block's max_per_run) — NOT a key on this block.
   gmeet:
     enabled: true
     cooldown_hours: 6                    # tighter than scan_youtube — meetings are time-sensitive
-    max_per_run: 20
   # Pulls Google Calendar events via collectors/calendar.py. Multi-tenant:
   # requires at least one personal.accounts.<id>.calendar sub-block
   # (kind: google-calendar) AND `wiki calendar-auth <id>` run for that
   # account. Otherwise silently skipped (graceful agnostic). One markdown
   # file per date is written to raw/notes/calendar/<YYYY-MM-DD>.md;
   # recurring-event series collapse to knowledge/concepts/<slug>.md.
+  # Per-calendar event cap: limits.calendar_max_per_run (or the per-account
+  # calendar sub-block's max_per_run) — NOT a key on this block.
   calendar:
     enabled: true
     cooldown_hours: 6                    # mirrors gmeet/jamie — same temporal sensitivity
-    max_per_run: 500                     # per-calendar; multiple selected calendars multiply
+  # Oura / HealthKit health ingest (collectors/health.py, M023). Multi-tenant:
+  # requires at least one personal.accounts.<id>.health sub-block (oura and/or
+  # healthkit source). Otherwise silently skipped (graceful agnostic).
+  health:
+    enabled: true
+    cooldown_hours: 24
   # Inbox-watch for dictated voice notes (collectors/voice.py). Reads
   # *.txt / *.md from `personal.voice_inbox`, writes raw/voice/*.md,
   # archives the source under `<voice_inbox>/.processed/`. Silently
@@ -157,10 +166,19 @@ piggybacks:
     enabled: true
     cooldown_hours: 6                    # vision-LLM step — keep below screenshots' 24h but above voice
     max_per_run: 20
-  # Curiosity-loop consumer (scripts/curiosity/cli.py --run-oldest). Producer
-  # in compile.py writes raw/requests/*.json; this task picks the oldest pending
-  # one and runs the matching backend (email-deep-scan today).
+  # Curiosity-loop consumer (scripts/curiosity/cli.py --run-batch N). Producer
+  # in compile.py writes raw/requests/*.json; this task drains the N oldest
+  # pending ones per fire via the matching backend (email-deep-scan today).
+  # Drain rate: max_per_run × (24/cooldown_hours) = 5 × 4 = 20/day — keeps
+  # ahead of typical generation without thundering-herd on long backlogs.
   curiosity_followup:
+    enabled: true
+    cooldown_hours: 6
+    max_per_run: 5
+  # Distills yesterday's per-source captures (daily/<yesterday>/*.md) into a
+  # single ≤500-word digest at daily/<yesterday>.md. Runs once in the morning
+  # after the per-collector piggybacks have settled.
+  daily_digest_yesterday:
     enabled: true
     cooldown_hours: 24
   retry_failed_flushes:
@@ -199,6 +217,10 @@ models:
   # the engine retries once with this 1M variant. Set to empty string to
   # disable the retry and surface the failure instead.
   compile_large_source_model: claude-opus-4-8[1m]
+  # M014 dream-cycle entity re-synthesis. Fan-out workload (N substrate Reads
+  # per entity) that blows the standard 200K window mid-stream — default to the
+  # 1M variant up-front. Set to "" to fall back to compile_model.
+  dream_model: claude-opus-4-8[1m]
   # Folder-scan answer provider (watched-folder curiosity). The backend
   # reads an operator-approved file in-place and distills an
   # answer-extract. "claude-sdk" is the only provider today; a local
@@ -339,6 +361,10 @@ limits:
   calendar_max_per_run: 500              # per-calendar event cap; selected calendars multiply
   calendar_backfill_days: 90             # default past window (in days) on first run
   calendar_future_days: 7                # default future window re-fetched every run for mutations
+  # Oura health ingest (collectors/health.py — multi-tenant; per-account
+  # override is the health sub-block under personal.accounts.<id>.health).
+  oura_request_timeout_s: 30             # per-HTTP-call timeout against api.ouraring.com
+  oura_max_backfill_days: 90             # default first-run window; per-account override via backfill_days
   # Claude Agent SDK per-message buffer (stream-json line buffer). SDK default 1 MB
   # trips on tool-result messages carrying large knowledge/index.md or Write/Edit
   # calls on big articles. 50 MB is safe headroom.
@@ -400,6 +426,14 @@ limits:
   # only helps sources large enough to benefit from the 1M window). Set
   # to false to skip the retry and surface the failure.
   compile_retry_long_context_on_unknown: true
+  # Seconds to sleep after a kind=unknown failure before the long-context
+  # retry — back-to-back calls trip the per-minute API rate limit and the
+  # retry then fails with the same silent exit-1 signature. 0 disables.
+  compile_failure_backoff_s: 60
+  # Skip the long-context retry on sources smaller than this (chars): small
+  # sources fail kind=unknown for other reasons and the 1M window doesn't
+  # help — don't burn a rate-limit slot on them.
+  compile_retry_long_context_min_source_chars: 10240
   # When a kind=unknown failure cannot be retried (small source OR
   # already on the long-context model), treat it as a skip instead of a
   # hard failure — preserves the consecutive-failure budget so the batch
@@ -448,6 +482,10 @@ limits:
   # --all-entities` AND the dream_cycle piggyback.
   dream_entity_max_prompt_chars: 415000
   dream_cycle_max_tokens_per_run: 2000000
+  # Dream-cycle per-message stall timeout (seconds) — a single SDK message
+  # not arriving within this window converts the call to kind=timeout instead
+  # of hanging until the bundled CLI dies silently. 0 disables.
+  dream_per_call_timeout_s: 300
   # Concept-reconciliation routine (`wiki reconcile`). Structural gates, not
   # dollars: skip a fact violating more than max_files_per_fact concepts (too
   # broad — manual review), cap facts per run, and the turn budget for the
@@ -539,6 +577,10 @@ features:
   # (relative to knowledge/) created empty stubs when clicked from a nested
   # article. Idempotent — already-relative links produce zero writes.
   relativize_wikilinks: true
+  # Deterministic per-picture metadata (EXIF via Pillow + Android-screenshot
+  # filename pattern) added to each pictures-collector sidecar. Flip false if
+  # EXIF / location data should never enter the vault.
+  extract_picture_metadata: true
   # M019 operator-self-reports surface master switch. When true, `wiki study
   # run` and `wiki analyze` are wired and the flush.py piggyback orchestration
   # (per-study Pass-1 after each run; cross-study Pass-2 on its own schedule,
@@ -570,6 +612,9 @@ graph_view:
   # (applied to .obsidian/graph.json when the plugin builds.)
   mode: knowledge-only
   custom_search: ""
+  # Tag names treated as "domain anchors" for graph-view coloring + qa-schema
+  # lint. Empty list = engine default set (scripts/lint.py _DEFAULT_DOMAIN_TAGS).
+  domain_tags: []
 
 skills:
   # When true, `wiki skills install` / `wiki skills sync` also link
@@ -602,6 +647,10 @@ personal:
   # Path to a Simple Tab Groups (STG) backup directory (where the extension
   # writes its periodic *.json snapshots). Empty string disables STG imports.
   stg_backup_dir: ""
+  # Substring keywords marking calendar events as holidays / observances to
+  # skip during collectors/calendar.py ingest. Locale-specific, e.g.
+  # ["Christmas", "Easter"] or ["Weihnacht", "Ostern"]. Empty = no skipping.
+  calendar_skip_keywords: []
   # Directory the operator dumps dictation transcripts into. Any tool that
   # writes a .txt or .md works (OpenWhispr is the default recommendation;
   # FluidVoice, macOS dictation, Hammerspoon snippets also work). Audio

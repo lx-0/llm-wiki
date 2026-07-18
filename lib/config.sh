@@ -55,15 +55,20 @@ config_cmd_setup_wizard() {
   # Resolve default-index in plain shell BEFORE calling select_one. macOS
   # bash 3.2 mis-parses nested $( case … esac ) inside another $( … ) with
   # case-pattern ')' tokens (syntax error: unexpected newline near *)).
+  # The `*)` catch-all MUST map to the CURRENT engine default (claude-opus-4-8):
+  # with the retired 4-7 as option 1 it actively DOWNGRADED a default install —
+  # `config_get` returned 4-8, the catch-all picked index 1 = 4-7, and pressing
+  # Enter wrote the retired model that the next `wiki update` migration
+  # (MODEL_UPGRADES) bumped right back. Wizard and migration undoing each other.
   local model_default_idx
   case "$current_model" in
-    claude-opus-4-7)   model_default_idx=1 ;;
+    claude-opus-4-8)   model_default_idx=1 ;;
     claude-sonnet-4-6) model_default_idx=2 ;;
     claude-haiku-4-5)  model_default_idx=3 ;;
     *)                 model_default_idx=1 ;;
   esac
   local model
-  model="$(select_one "Pick" "claude-opus-4-7|claude-sonnet-4-6|claude-haiku-4-5" "$model_default_idx")"
+  model="$(select_one "Pick" "claude-opus-4-8|claude-sonnet-4-6|claude-haiku-4-5" "$model_default_idx")"
   if [[ "$model" != "$current_model" ]]; then
     config_set models.compile_model "$model"
   fi

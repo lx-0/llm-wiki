@@ -1,8 +1,15 @@
-"""Tests for the config-key migration (scripts/migrations/migrate_config_keys.py)."""
+"""Tests for the config-key migration (scripts/migrations/migrate_config_keys.py).
+
+The policy/drift tests at the bottom mechanically enforce the CLAUDE.md hard
+rule ("config-knob changes are not done until the vault is migrated"): adding
+a knob to `core.config_schema` without an explicit INJECTED_KEYS /
+NEVER_INJECTED entry fails the suite.
+"""
 
 from __future__ import annotations
 
-from pathlib import Path
+import copy
+from dataclasses import fields
 
 import yaml
 
@@ -126,80 +133,13 @@ def test_migrate_config_file_round_trip(tmp_path):
 
     new_text, changes = m.migrate_config(config_path)
     assert new_text is not None
-    # 2 piggyback (rename + drop)
-    #  + 1 created-limits-block + 26 limits additions:
-    #    compile_skip_on_long_context_unknown,
-    #    compile_aggregated_max_consecutive_failures (2026-05-17 circuit-breaker),
-    #    compile_role_default_by_location (M007), 4 calendar_*,
-    #    compile_max_cost_per_file_usd,
-    #    compile_skip_substrate_types — default ["email-delta"],
-    #    daily_email_top_senders + daily_email_sample_subjects (2026-05-23 email rollup beta),
-    #    3 flush_*_budget_chars (2026-05-16),
-    #    compile_per_call_timeout_s (M010), reports_default_lookback_days (M019),
-    #    connection_min_words (M012),
-    #    3 extract_takes_* (M011),
-    #    dream_entity_max_cost_usd + dream_cycle_max_cost_per_run_usd (M014),
-    #    dream_tier1_recent_count + dream_tier1_digest_days +
-    #    dream_tier2_sample_count (M016),
-    #    correct_apply_max_turns + correct_broad_term_threshold (M028, issue #5)
-    #  + 6 piggybacks additions (calendar, curiosity_followup, dream_cycle — M014,
-    #    pictures — 2026-05-17, study_run_due + analyst_pass2 — M019-S05)
-    #  + 1 created-features-block + 6 features additions
-    #    (extract_takes — M011, voice_punctuate — 2026-05-17,
-    #    suggestions_source_globs — Producer-seam arc,
-    #    compile_callback_gate — 2026-05-17 compile-scope fix,
-    #    materialize_backlinks — M020 backlinks-footer,
-    #    operator_reports — M019 operator-self-reports master switch)
-    #  + 1 created-personal-block + 5 personal additions
-    #    (implicit_operator_author — M009, picture_inbox — 2026-05-17,
-    #    reports_dir — M019, domains — M013, capture_inbox — M025)
-    #  + 1 scheduling addition (dream_cooldown_days — M014; the scheduling
-    #    block already exists in the test fixture, so no "created" event)
-    # (LIST_ADDITIONS has one entry but operator's freshly-injected
-    # skip-list already contains "email-delta" from KEY_ADDITIONS, so
-    # the list-extend is a no-op on greenfield.)
-    #  + 1 created-models-block + 1 models.dream_model (M014/M018 — fixture
-    #    sync was missing; pre-existing red until 2026-05-22)
-    #  + 1 limits.dream_per_call_timeout_s (M014 — same pre-existing gap)
-    #  + 3 limits.concept_reconcile_* + 1 scheduling.concept_reconcile_cooldown_days
-    #    + 1 features.concept_reconciliation (2026-05-22 concept-consistency-routine)
-    # +3 health_trends (2 limits + 1 features), 2026-05-23
-    # +1 personal.capture_inbox (M025 quick-capture loop), 2026-05-23
-    # +1 piggybacks.capture (M025 capture piggyback knob), 2026-05-23
-    # +5 personal.voice_transcribe_* (M026 audio ingest), 2026-05-28
-    # +1 limits.voice_punctuate_timeout_s (M026 hotfix), 2026-05-28
-    # +1 personal.inbox_bridges (inbox-bridge rsync mirror), 2026-05-28
-    # +1 features.relativize_wikilinks (relativize-wikilinks pass), 2026-05-29
-    # +1 features.extract_picture_metadata (EXIF + Android filename pattern), 2026-05-29
-    # +5 limits.{ollama_connect_timeout_s, piggyback_max_runtime_s,
-    #    review_ollama_timeout_s, review_consecutive_failure_abort,
-    #    review_checkpoint_every} (Ollama/piggyback/review reliability), 2026-05-30
-    # +1 limits.dedup_fuzzy_threshold (wiki dedup, issue #3), 2026-05-31
-    # +3 dream web-research (issue #2), 2026-05-31:
-    #    features.dream_web_research, scheduling.web_research_cooldown_days,
-    #    personal.exa_api_key
-    # +1 features.dream_require_entity_substrate (dream no-op skip), 2026-05-31
-    # +1 scheduling.dream_insufficient_corpus_backoff_max_days (backoff), 2026-06-02
-    # +1 personal.watched_folders (M027 watched-folder curiosity), 2026-06-07
-    # KEY_ADDITIONS injects the skip-list with BOTH defaults in one change;
-    # the LIST_ADDITIONS extend is a no-op on greenfield (folder-index
-    # already present), 2026-06-10 M027-S02-T03.
-    # +2 limits.folder_index_{max_depth,recent_n} (M027-S02-T04 `wiki
-    #    index`; max_tree_entries shipped+removed same day — write-time
-    #    cap reversal 2026-06-10, never in this greenfield fixture)
-    # +1 models.folder_scan_provider (M027-S04-T01 Q9 seam), 2026-06-10
-    # +1 limits.curiosity_folder_max_candidates (candidate retrieval), 2026-06-13
-    # +1 scheduling.piggybacks_on_compile (compile drains due piggybacks), 2026-06-13
-    # +1 personal.output_language (issue #4 compiled-prose language), 2026-06-13
-    # +1 limits.curiosity_exclude_globs (curiosity substrate denylist), 2026-06-13
-    # +1 limits.review_max_sweep_runtime_s (review-wiki soft deadline), 2026-06-13
-    # +1 limits.correct_apply_max_turns (M028 sandbox apply, issue #5), 2026-06-13
-    # +1 limits.correct_broad_term_threshold (M028 broad-term warning, issue #5), 2026-06-13
-    # +4 intent-dispatch (features.extract_intents + limits.intent_source_globs
-    #    + limits.intent_classify_timeout_s + limits.intent_min_confidence), 2026-06-13
-    # +1 models.intent_classify_model (intent-dispatch cheap tier), 2026-06-14
-    # +1 limits.dashboard_refresh_timeout_s (dashboard refresh budget knob), 2026-07-14
-    assert len(changes) == 98, f"got {len(changes)} changes: {changes}"
+    # No hand-counted change total here: KEY_ADDITIONS is derived from the
+    # schema, so the greenfield injection count changes with every new knob.
+    # What matters is behavior (below) + convergence: a second run on the
+    # migrated output must be a no-op.
+    config_path.write_text(new_text, encoding="utf-8")
+    second_text, second_changes = m.migrate_config(config_path)
+    assert second_text is None, f"migration did not converge: {second_changes}"
 
     reparsed = yaml.safe_load(new_text)
     # piggyback side
@@ -207,8 +147,9 @@ def test_migrate_config_file_round_trip(tmp_path):
     assert "scan_screenshots" not in reparsed["piggybacks"]
     assert "sync_memories" not in reparsed["piggybacks"]
     assert reparsed["piggybacks"]["lint_structural"] == {"enabled": True, "cooldown_hours": 24}
-    # new piggyback injected
-    assert reparsed["piggybacks"]["calendar"] == {"enabled": True, "cooldown_hours": 6, "max_per_run": 500}
+    # new piggyback injected — no max_per_run: dead on registry collectors
+    # (the live cap is limits.calendar_max_per_run / per-account sub-block)
+    assert reparsed["piggybacks"]["calendar"] == {"enabled": True, "cooldown_hours": 6}
     # additions side — skip-substrate-types has email-delta from
     # KEY_ADDITIONS default (2026-05-16-evening) + folder-index
     # (2026-06-10 M027-S02-T03). The dead compile_force_long_context_types
@@ -230,117 +171,19 @@ def test_migrate_config_file_round_trip(tmp_path):
 
 
 def test_migrate_config_no_change_when_fully_current(tmp_path):
-    """Piggybacks current AND additions already present → no change."""
+    """A config carrying every injected key at its engine default is a no-op.
+
+    The fixture is DERIVED from the migration's own KEY_ADDITIONS (whose
+    values come from core.config_schema) instead of a hand-enumerated copy of
+    every default — so it can never drift from the schema, and a KEY_ADDITION
+    whose injected value the migration itself would then rewrite (rename /
+    list-prune / value-upgrade conflict) fails as a non-convergence.
+    """
     m = _mod()
     config_path = tmp_path / ".wiki" / "config.yaml"
     config_path.parent.mkdir(parents=True)
-    config_path.write_text(yaml.safe_dump({
-        "models": {
-            "dream_model": "claude-opus-4-8[1m]",
-            "folder_scan_provider": "claude-sdk",
-            "intent_classify_model": "claude-haiku-4-5",
-        },
-        "scheduling": {
-            "piggybacks_on_compile": True,
-            "dream_cooldown_days": 7,
-            "dream_priority": {"default": 1.0, "paths": {}, "domain": {}, "tag_strategy": "max", "tags": {}, "status": {}},
-            "concept_reconcile_cooldown_days": 14,
-            "web_research_cooldown_days": 30,
-            "dream_insufficient_corpus_backoff_max_days": 30,
-        },
-        "piggybacks": {
-            "email": {"enabled": True, "cooldown_hours": 24},
-            "calendar": {"enabled": True, "cooldown_hours": 6, "max_per_run": 500},
-            "curiosity_followup": {"enabled": True, "cooldown_hours": 6, "max_per_run": 5},
-            "dream_cycle": {"enabled": True, "cooldown_hours": 24, "max_per_run": 3},
-            "pictures": {"enabled": True, "cooldown_hours": 6, "max_per_run": 20},
-            "capture": {"enabled": True, "cooldown_hours": 1},
-            "study_run_due": {"enabled": False, "cooldown_hours": 6},
-            "analyst_pass2": {"enabled": False, "cooldown_hours": 168},
-        },
-        "limits": {
-            "compile_skip_on_long_context_unknown": True,
-            "compile_aggregated_max_consecutive_failures": 3,
-            "compile_role_default_by_location": True,
-            "calendar_request_timeout_s": 30,
-            "calendar_max_per_run": 500,
-            "calendar_backfill_days": 90,
-            "calendar_future_days": 7,
-            "compile_max_tokens_per_file": 500_000,
-            "compile_skip_substrate_types": ["email-delta", "folder-index"],
-            "folder_index_max_depth": 0,
-            "folder_index_recent_n": 20,
-            "daily_email_top_senders": 5,
-            "daily_email_sample_subjects": 12,
-            "flush_assistant_text_budget_chars": 50000,
-            "flush_user_text_budget_chars": 10000,
-            "flush_tool_summary_budget_chars": 10000,
-            "dashboard_refresh_timeout_s": 300,
-            "compile_per_call_timeout_s": 600,
-            "reports_default_lookback_days": 14,
-            "connection_min_words": 50,
-            "extract_takes_source_globs": ["raw/transcripts/*", "raw/transcripts/**/*", "raw/voice/*", "daily/*"],
-            "extract_takes_timeout_s": 180,
-            "extract_takes_max_per_source": 12,
-            "dream_entity_max_prompt_chars": 415_000,
-            "dream_cycle_max_tokens_per_run": 2_000_000,
-            "dream_per_call_timeout_s": 300,
-            "curiosity_folder_max_candidates": 40,
-            "curiosity_exclude_globs": ["raw/notes/email/deep-*"],
-            "review_max_sweep_runtime_s": 12600,
-            "dream_tier1_recent_count": 20,
-            "dream_tier1_digest_days": 7,
-            "dream_tier2_sample_count": 50,
-            "concept_reconcile_max_files_per_fact": 25,
-            "concept_reconcile_max_facts_per_run": 10,
-            "concept_reconcile_max_turns": 15,
-            "correct_apply_max_turns": 50,
-            "correct_broad_term_threshold": 15,
-            "health_trends_recent_months": 6,
-            "health_trends_min_coverage_days": 10,
-            "voice_punctuate_timeout_s": 120,
-            "ollama_connect_timeout_s": 10,
-            "piggyback_max_runtime_s": 14400,
-            "review_ollama_timeout_s": 300,
-            "review_consecutive_failure_abort": 5,
-            "review_checkpoint_every": 25,
-            "dedup_fuzzy_threshold": 0.85,
-            "intent_source_globs": ["raw/voice/*", "raw/inbox-mobile/pictures/*.md"],
-            "intent_classify_timeout_s": 120,
-            "intent_min_confidence": "high",
-        },
-        "features": {
-            "extract_takes": False,
-            "extract_intents": False,
-            "dream_web_research": False,
-            "voice_punctuate": True,
-            "suggestions_source_globs": ["raw/email/*.md"],
-            "compile_callback_gate": True,
-            "materialize_backlinks": True,
-            "relativize_wikilinks": True,
-            "extract_picture_metadata": True,
-            "operator_reports": False,
-            "concept_reconciliation": False,
-            "health_trends": False,
-            "dream_require_entity_substrate": True,
-        },
-        "personal": {
-            "implicit_operator_author": None,
-            "picture_inbox": "",
-            "capture_inbox": "",
-            "reports_dir": "reports",
-            "domains": ["company", "personal", "ai", "meta"],
-            "voice_transcribe_model": "",
-            "voice_transcribe_language": "auto",
-            "voice_transcribe_threads": 4,
-            "voice_transcribe_binary": "",
-            "voice_transcribe_ffmpeg": "",
-            "inbox_bridges": [],
-            "watched_folders": [],
-            "exa_api_key": "",
-            "output_language": "auto",
-        },
-    }), encoding="utf-8")
+    fully_current = copy.deepcopy(m.KEY_ADDITIONS)
+    config_path.write_text(yaml.safe_dump(fully_current), encoding="utf-8")
 
     new_text, changes = m.migrate_config(config_path)
     assert new_text is None, f"unexpected migration: {changes}"
@@ -415,113 +258,10 @@ def test_migrate_additions_skips_non_dict_parent():
 
 
 def test_migrate_additions_idempotent():
+    """Derived fixture: a config that already carries every KEY_ADDITIONS
+    entry (at any value) receives no further additions."""
     m = _mod()
-    data: dict = {
-        "models": {
-            "dream_model": "claude-opus-4-8[1m]",
-            "folder_scan_provider": "claude-sdk",
-            "intent_classify_model": "claude-haiku-4-5",
-        },
-        "scheduling": {
-            "piggybacks_on_compile": True,
-            "dream_cooldown_days": 7,
-            "dream_priority": {"default": 1.0, "paths": {}, "domain": {}, "tag_strategy": "max", "tags": {}, "status": {}},
-            "concept_reconcile_cooldown_days": 14,
-            "web_research_cooldown_days": 30,
-            "dream_insufficient_corpus_backoff_max_days": 30,
-        },
-        "limits": {
-            "compile_skip_on_long_context_unknown": True,
-            "compile_aggregated_max_consecutive_failures": 3,
-            "compile_role_default_by_location": True,
-            "calendar_request_timeout_s": 30,
-            "calendar_max_per_run": 500,
-            "calendar_backfill_days": 90,
-            "calendar_future_days": 7,
-            "compile_max_tokens_per_file": 500_000,
-            "compile_skip_substrate_types": ["calendar-rollup"],
-            "folder_index_max_depth": 0,
-            "folder_index_recent_n": 20,
-            "daily_email_top_senders": 5,
-            "daily_email_sample_subjects": 12,
-            "flush_assistant_text_budget_chars": 50000,
-            "flush_user_text_budget_chars": 10000,
-            "flush_tool_summary_budget_chars": 10000,
-            "dashboard_refresh_timeout_s": 300,
-            "compile_per_call_timeout_s": 600,
-            "reports_default_lookback_days": 14,
-            "connection_min_words": 50,
-            "extract_takes_source_globs": ["raw/transcripts/*", "raw/transcripts/**/*", "raw/voice/*", "daily/*"],
-            "extract_takes_timeout_s": 180,
-            "extract_takes_max_per_source": 12,
-            "dream_entity_max_prompt_chars": 415_000,
-            "dream_cycle_max_tokens_per_run": 2_000_000,
-            "dream_per_call_timeout_s": 300,
-            "curiosity_folder_max_candidates": 40,
-            "curiosity_exclude_globs": ["raw/notes/email/deep-*"],
-            "review_max_sweep_runtime_s": 12600,
-            "dream_tier1_recent_count": 20,
-            "dream_tier1_digest_days": 7,
-            "dream_tier2_sample_count": 50,
-            "concept_reconcile_max_files_per_fact": 25,
-            "concept_reconcile_max_facts_per_run": 10,
-            "concept_reconcile_max_turns": 15,
-            "correct_apply_max_turns": 50,
-            "correct_broad_term_threshold": 15,
-            "health_trends_recent_months": 6,
-            "health_trends_min_coverage_days": 10,
-            "voice_punctuate_timeout_s": 120,
-            "ollama_connect_timeout_s": 10,
-            "piggyback_max_runtime_s": 14400,
-            "review_ollama_timeout_s": 300,
-            "review_consecutive_failure_abort": 5,
-            "review_checkpoint_every": 25,
-            "dedup_fuzzy_threshold": 0.85,
-            "intent_source_globs": ["raw/voice/*", "raw/inbox-mobile/pictures/*.md"],
-            "intent_classify_timeout_s": 120,
-            "intent_min_confidence": "high",
-        },
-        "piggybacks": {
-            "calendar": {"enabled": True, "cooldown_hours": 6, "max_per_run": 500},
-            "curiosity_followup": {"enabled": True, "cooldown_hours": 6, "max_per_run": 5},
-            "dream_cycle": {"enabled": True, "cooldown_hours": 24, "max_per_run": 3},
-            "pictures": {"enabled": True, "cooldown_hours": 6, "max_per_run": 20},
-            "capture": {"enabled": True, "cooldown_hours": 1},
-            "study_run_due": {"enabled": False, "cooldown_hours": 6},
-            "analyst_pass2": {"enabled": False, "cooldown_hours": 168},
-        },
-        "features": {
-            "extract_takes": False,
-            "extract_intents": False,
-            "dream_web_research": False,
-            "voice_punctuate": True,
-            "suggestions_source_globs": ["raw/email/*.md"],
-            "compile_callback_gate": True,
-            "materialize_backlinks": True,
-            "relativize_wikilinks": True,
-            "extract_picture_metadata": True,
-            "operator_reports": False,
-            "concept_reconciliation": False,
-            "health_trends": False,
-            "dream_require_entity_substrate": True,
-        },
-        "personal": {
-            "implicit_operator_author": None,
-            "picture_inbox": "",
-            "capture_inbox": "",
-            "reports_dir": "reports",
-            "domains": ["company", "personal", "ai", "meta"],
-            "voice_transcribe_model": "",
-            "voice_transcribe_language": "auto",
-            "voice_transcribe_threads": 4,
-            "voice_transcribe_binary": "",
-            "voice_transcribe_ffmpeg": "",
-            "inbox_bridges": [],
-            "watched_folders": [],
-            "exa_api_key": "",
-            "output_language": "auto",
-        },
-    }
+    data = copy.deepcopy(m.KEY_ADDITIONS)
     changes = m.migrate_additions(data)
     assert changes == [], f"expected idempotent, got changes: {changes}"
 
@@ -535,11 +275,7 @@ def test_migrate_additions_adds_calendar_block_when_absent():
     assert data["limits"]["calendar_max_per_run"] == 500
     assert data["limits"]["calendar_backfill_days"] == 90
     assert data["limits"]["calendar_future_days"] == 7
-    assert data["piggybacks"]["calendar"] == {
-        "enabled": True,
-        "cooldown_hours": 6,
-        "max_per_run": 500,
-    }
+    assert data["piggybacks"]["calendar"] == {"enabled": True, "cooldown_hours": 6}
 
 
 def test_migrate_list_additions_appends_to_existing_operator_list():
@@ -595,7 +331,8 @@ def test_migrate_list_removals_idempotent():
 
 
 def test_migrate_additions_preserves_existing_calendar_piggyback():
-    """Operator-tweaked calendar cooldown is not clobbered."""
+    """Operator-tweaked calendar cooldown is not clobbered by injection (the
+    dead max_per_run subkey is pruned separately, in migrate_piggybacks)."""
     m = _mod()
     data: dict = {
         "piggybacks": {
@@ -606,6 +343,35 @@ def test_migrate_additions_preserves_existing_calendar_piggyback():
     assert data["piggybacks"]["calendar"] == {
         "enabled": True, "cooldown_hours": 12, "max_per_run": 100,
     }
+
+
+def test_drops_dead_max_per_run_from_registry_meeting_piggybacks():
+    """C05: piggybacks.{jamie,gmeet,calendar}.max_per_run is a dead knob —
+    build_piggyback_tasks never passes it to a Registry collector; the live
+    caps are limits.*_max_per_run + per-account sub-blocks. Pruned
+    unconditionally, rest of the block preserved."""
+    m = _mod()
+    src = {
+        "jamie": {"enabled": True, "cooldown_hours": 6, "max_per_run": 20},
+        "gmeet": {"enabled": False, "cooldown_hours": 12, "max_per_run": 20},
+        "calendar": {"enabled": True, "cooldown_hours": 6, "max_per_run": 500},
+        "pictures": {"enabled": True, "cooldown_hours": 6, "max_per_run": 20},  # LIVE — kept
+    }
+    out, changes = m.migrate_piggybacks(src)
+    assert out["jamie"] == {"enabled": True, "cooldown_hours": 6}
+    assert out["gmeet"] == {"enabled": False, "cooldown_hours": 12}  # operator fields kept
+    assert out["calendar"] == {"enabled": True, "cooldown_hours": 6}
+    # pictures self-caps via CONFIG.piggybacks — its max_per_run is live
+    assert out["pictures"] == {"enabled": True, "cooldown_hours": 6, "max_per_run": 20}
+    assert sum("dropped piggybacks." in c and "max_per_run" in c for c in changes) == 3
+
+
+def test_subkey_drop_idempotent_when_absent():
+    m = _mod()
+    src = {"jamie": {"enabled": True, "cooldown_hours": 6}}
+    out, changes = m.migrate_piggybacks(src)
+    assert changes == []
+    assert out == src
 
 
 # ── migrate_drops: orphan-field pruning ─────────────────────────────
@@ -880,3 +646,106 @@ def test_model_upgrade_idempotent_on_current():
 def test_model_upgrade_noop_without_models_block():
     m = _mod()
     assert m.migrate_model_upgrades({}) == []
+
+# ── Schema ↔ migration drift policy (the mechanical hard-rule gate) ──
+#
+# CLAUDE.md hard rule: "Config-knob changes are not done until the vault is
+# migrated." These tests enforce it: every knob on the schema must carry an
+# explicit injection policy in the migration, so adding a dataclass field
+# without touching migrate_config_keys.py fails the suite.
+
+
+def _schema_leaf_fields() -> dict[str, set[str]]:
+    from core.config_schema import WikiConfig
+
+    cfg = WikiConfig()
+    return {
+        section: {f.name for f in fields(getattr(cfg, section))}
+        for section in (
+            "scheduling", "models", "limits", "features",
+            "graph_view", "skills", "personal",
+        )
+    }
+
+
+def test_every_schema_knob_has_a_migration_policy():
+    """Each schema field is in exactly one of INJECTED_KEYS / NEVER_INJECTED."""
+    m = _mod()
+    for section, schema_keys in _schema_leaf_fields().items():
+        injected = set(m.INJECTED_KEYS.get(section, ()))
+        never = set(m.NEVER_INJECTED.get(section, ()))
+        overlap = injected & never
+        assert not overlap, f"{section}: {sorted(overlap)} in BOTH policy tables"
+        missing = schema_keys - injected - never
+        assert not missing, (
+            f"{section}: knob(s) {sorted(missing)} have NO migration policy. "
+            "Add each to INJECTED_KEYS (inject into operator vaults with the "
+            "schema default) or NEVER_INJECTED (explicit dataclass fall-through) "
+            "in scripts/migrations/migrate_config_keys.py — CLAUDE.md hard rule: "
+            "config-knob changes are not done until the vault is migrated."
+        )
+        ghosts = (injected | never) - schema_keys
+        assert not ghosts, (
+            f"{section}: policy entries {sorted(ghosts)} have no backing schema "
+            "field — remove the stale entry (and add a KEY_DROPS entry if the "
+            "knob was deleted from the schema)."
+        )
+
+
+def test_injected_values_match_schema_defaults():
+    """KEY_ADDITIONS values are derived — guard against future hand-set literals."""
+    m = _mod()
+    for section, keys in m.INJECTED_KEYS.items():
+        for key in keys:
+            assert m.KEY_ADDITIONS[section][key] == m._schema_default(section, key), (
+                f"{section}.{key}: injected value diverges from the schema default"
+            )
+
+
+def test_piggyback_defaults_have_a_migration_policy():
+    """Every _default_piggybacks entry is either injected or explicitly not."""
+    from core.config_schema import _default_piggybacks
+
+    m = _mod()
+    default_names = set(_default_piggybacks())
+    injected = set(m.INJECTED_PIGGYBACKS)
+    never = set(m.NEVER_INJECTED_PIGGYBACKS)
+    assert not injected & never
+    missing = default_names - injected - never
+    assert not missing, (
+        f"piggybacks: {sorted(missing)} have no migration policy — add to "
+        "INJECTED_PIGGYBACKS or NEVER_INJECTED_PIGGYBACKS."
+    )
+    ghosts = (injected | never) - default_names
+    assert not ghosts, f"piggybacks: policy entries {sorted(ghosts)} not in _default_piggybacks()"
+    # A renamed-away old key must never reappear as a defaults-table name.
+    resurrected = set(m.PIGGYBACK_RENAMES) & default_names
+    assert not resurrected, (
+        f"piggybacks: renamed-away name(s) {sorted(resurrected)} back in defaults"
+    )
+    for name in injected:
+        assert m.KEY_ADDITIONS["piggybacks"][name] == m._piggyback_default(name)
+
+
+def test_key_drops_do_not_resurrect():
+    """A dropped orphan key must not exist on the schema (else the migration
+    would prune a live knob from operator vaults)."""
+    m = _mod()
+    schema = _schema_leaf_fields()
+    for section, orphans in m.KEY_DROPS.items():
+        live = set(orphans) & schema.get(section, set())
+        assert not live, f"{section}: KEY_DROPS would prune live schema knob(s) {sorted(live)}"
+
+
+def test_migration_converges_from_empty_config(tmp_path):
+    """Greenfield: empty config → one migration pass → second pass is a no-op."""
+    m = _mod()
+    config_path = tmp_path / ".wiki" / "config.yaml"
+    config_path.parent.mkdir(parents=True)
+    config_path.write_text("{}\n", encoding="utf-8")
+
+    first_text, first_changes = m.migrate_config(config_path)
+    assert first_changes, "expected greenfield injections"
+    config_path.write_text(first_text, encoding="utf-8")
+    second_text, second_changes = m.migrate_config(config_path)
+    assert second_text is None, f"migration did not converge: {second_changes}"

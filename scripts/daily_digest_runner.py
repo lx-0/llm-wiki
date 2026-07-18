@@ -2,8 +2,9 @@
 
 Triggered both manually (`wiki agent daily-digest --var date=YYYY-MM-DD`)
 and as the `daily_digest_yesterday` piggyback. This thin wrapper exists
-because the piggyback dispatcher in flush.py expects a script-path entry
-in `_LEGACY_PIGGYBACK_COMMANDS`; it resolves `--date yesterday` to an
+because the piggyback dispatcher (`core/piggybacks.py`) expects a
+script-path entry in `_BUILTIN_PIGGYBACK_TASKS`; it resolves `--date
+yesterday` to an
 ISO date and shells out to `wiki agent daily-digest --var date=<iso>`.
 
 If the target date has no per-source captures (no `daily/<date>/`

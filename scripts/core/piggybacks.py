@@ -36,16 +36,22 @@ PIGGYBACK_STATE_FILE = STATE_DIR / "piggyback-state.json"
 _module_log = logging.getLogger(__name__)
 
 
-# Piggyback tasks — merged from two sources of truth at build time:
+# Piggyback tasks — two DISCOVERY paths, one defaults source:
 #
 # 1. Registry-discovered Collectors with `SPEC.piggyback_default=True` —
 #    spawned as `collectors/cli.py <name>` (the canonical CLI for collectors).
-# 2. Legacy commands not yet ported to the Collector pattern — listed
-#    explicitly below until they get migrated.
+# 2. Built-in non-Collector tasks — maintenance / synthesis commands listed
+#    explicitly below. These are NOT "legacy not yet ported": lint, review,
+#    daily-digest, dream-cycle, study/analyst, reconcile, health-trends are
+#    deliberately not Collectors (they read the vault, not a substrate).
 #
-# Cooldown + enabled flag come from CONFIG.piggybacks.<name> for both.
+# enabled / cooldown_hours / max_per_run come from CONFIG.piggybacks.<name>
+# for both paths; the defaults behind that live in ONE place —
+# `core.config_schema._default_piggybacks` (parity with each collector's
+# SPEC.piggyback_cooldown_hours is enforced by
+# tests/test_piggyback_defaults.py).
 
-_LEGACY_PIGGYBACK_COMMANDS: dict[str, list[str]] = {
+_BUILTIN_PIGGYBACK_TASKS: dict[str, list[str]] = {
     "lint_structural": ["lint.py", "--structural-only"],
     "review_wiki": ["review-wiki.py"],
     "optimize_claude_md": ["optimize-claude-md.py"],
@@ -95,20 +101,26 @@ _LEGACY_PIGGYBACK_COMMANDS: dict[str, list[str]] = {
 
 def build_piggyback_tasks() -> list[dict]:
     """Resolve the enabled piggyback task list from the Collector registry +
-    legacy command table, honoring per-task `CONFIG.piggybacks.<name>` gates."""
+    built-in task table, honoring per-task `CONFIG.piggybacks.<name>` gates."""
     tasks: list[dict] = []
 
     # 1. Registry-discovered Collectors.
     try:
         from collectors import piggyback_collectors  # noqa: WPS433  late import to avoid cycles
     except ImportError:
-        piggyback_collectors = lambda: []  # type: ignore[assignment]
+        def piggyback_collectors():  # type: ignore[misc]
+            return []
 
     for collector in piggyback_collectors():
         name = collector.SPEC.name
         task_cfg = CONFIG.piggybacks.get(name)
         if task_cfg is not None and not task_cfg.enabled:
             continue
+        # CONFIG.piggybacks (defaults ⊕ operator overrides) is the cooldown
+        # source. The SPEC fallback is defense-in-depth only: every
+        # piggyback-default collector has a _default_piggybacks entry with
+        # the same cooldown (parity-tested), so task_cfg is never None for
+        # a collector shipped with the engine.
         cooldown = task_cfg.cooldown_hours if task_cfg else collector.SPEC.piggyback_cooldown_hours
         cmd = ["collectors/cli.py", name]
         if collector.SPEC.supports_incremental:
@@ -119,8 +131,8 @@ def build_piggyback_tasks() -> list[dict]:
             "cooldown_hours": cooldown,
         })
 
-    # 2. Legacy commands not yet on the Registry.
-    for name, cmd_template in _LEGACY_PIGGYBACK_COMMANDS.items():
+    # 2. Built-in non-Collector tasks.
+    for name, cmd_template in _BUILTIN_PIGGYBACK_TASKS.items():
         task_cfg = CONFIG.piggybacks.get(name)
         if task_cfg is None or not task_cfg.enabled:
             continue

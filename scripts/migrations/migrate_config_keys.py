@@ -99,6 +99,23 @@ Key changes covered (chronological):
                                               injected as a placeholder into any account already carrying
                                               `health.oura`, kind: healthkit-xml-export, empty inbox_dir
                                               = opt-out; operator fills in the iCloud / vault path)
+  piggybacks.{jamie,gmeet,calendar}.max_per_run  → (dropped 2026-07-18 C05 — dead knobs:
+                                              build_piggyback_tasks never passes max_per_run to a
+                                              Registry collector; the live caps are
+                                              limits.{jamie,gmeet,calendar}_max_per_run + the
+                                              per-account sub-blocks. Values 20/20/500 also
+                                              contradicted the live limits defaults 50/50/500.)
+  (structural, 2026-07-18 C05 piggyback-defaults collapse: `_default_piggybacks`
+   is now the ONE piggyback-defaults source — its zombie `email_incremental`
+   entry (readable by nothing; the runtime looks up `email`) became `email`,
+   and `health` gained an entry; runtime cooldowns are unchanged (both matched
+   the CollectorSpec fallback values, now parity-tested).)
+  (structural, 2026-07-18 C05 config-schema seam: injected VALUES are now derived
+   from `core.config_schema` — the hand-copied defaults and their "Match X default
+   in scripts/core/config.py" comments are gone. The curated injection policy
+   lives in INJECTED_KEYS / NEVER_INJECTED below;
+   tests/test_migrate_config_keys.py::test_every_schema_knob_has_a_migration_policy
+   fails when a schema knob is added without a policy entry.)
 
 Idempotent: a config already on the current schema produces no change.
 
@@ -111,12 +128,23 @@ from __future__ import annotations
 
 import argparse
 import logging
-import shutil
 import sys
-from datetime import datetime, timezone
+from dataclasses import asdict, is_dataclass
 from pathlib import Path
 
 import yaml
+
+# Standalone-script bootstrap (mirrors core/config.py): the migration is
+# invoked as `python scripts/migrations/migrate_config_keys.py` by `wiki
+# update`, so `scripts/` must be on sys.path for the core.* imports below.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+# IMPORTANT: import from core.config_schema, NEVER from core.config — that
+# module runs `load()` + dotenv against the global CONFIG_FILE at import time,
+# which need not be the vault we're migrating. The schema module is
+# side-effect-free by contract (see its docstring).
+from core.config_backup import backup_config_file  # noqa: E402
+from core.config_schema import WikiConfig, _default_piggybacks  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO,
@@ -124,6 +152,43 @@ logging.basicConfig(
     datefmt="%Y-%m-%dT%H:%M:%S",
 )
 log = logging.getLogger("migrate-config-keys")
+
+
+# ── Schema-derived defaults ─────────────────────────────────────────────
+# KEY_ADDITIONS below curates WHICH keys get injected (a policy choice —
+# see NEVER_INJECTED); the injected VALUES are read from the engine schema
+# so a default can never drift between dataclass and migration again. The
+# pre-C05 shape hand-copied every default with a "Match X default in
+# scripts/core/config.py" comment as the only sync protocol.
+
+_SCHEMA_DEFAULTS = WikiConfig()
+
+
+def _plain(value: object) -> object:
+    """Convert a schema default to plain YAML-dumpable types (tuple → list)."""
+    if is_dataclass(value) and not isinstance(value, type):
+        value = asdict(value)
+    if isinstance(value, tuple):
+        return [_plain(v) for v in value]
+    if isinstance(value, list):
+        return [_plain(v) for v in value]
+    if isinstance(value, dict):
+        return {k: _plain(v) for k, v in value.items()}
+    return value
+
+
+def _schema_default(section: str, key: str) -> object:
+    """Engine default for `<section>.<key>`, read from core.config_schema."""
+    return _plain(getattr(getattr(_SCHEMA_DEFAULTS, section), key))
+
+
+def _piggyback_default(name: str) -> dict[str, object]:
+    """Engine default block for `piggybacks.<name>` (max_per_run omitted when unset)."""
+    task = _default_piggybacks()[name]
+    block: dict[str, object] = {"enabled": task.enabled, "cooldown_hours": task.cooldown_hours}
+    if task.max_per_run is not None:
+        block["max_per_run"] = task.max_per_run
+    return block
 
 # old_key → new_key (rename, value preserved). new_key=None → drop the block.
 PIGGYBACK_RENAMES: dict[str, str | None] = {
@@ -143,6 +208,18 @@ PIGGYBACK_RENAMES: dict[str, str | None] = {
 #   by operator decision 2026-06-13 (vault-boundary violation + risk of silently
 #   dropping hand-built global rules). Code kept; default off.
 PIGGYBACK_FORCE_DISABLE: set[str] = {"optimize_claude_md"}
+
+# Dead per-piggyback subkeys pruned from operator blocks (2026-07-18 C05).
+# `build_piggyback_tasks` never passes max_per_run to a Registry collector, so
+# on jamie/gmeet/calendar the subkey was a knob that did nothing — while the
+# LIVE caps (limits.{jamie,gmeet,calendar}_max_per_run + the per-account
+# sub-blocks) sat elsewhere. Pruning is unconditional: the knob is dead at any
+# value, and leaving it suggests tunability that isn't there.
+PIGGYBACK_SUBKEY_DROPS: dict[str, tuple[str, ...]] = {
+    "jamie": ("max_per_run",),
+    "gmeet": ("max_per_run",),
+    "calendar": ("max_per_run",),
+}
 
 # Engine-policy model-version upgrades: an operator config still pinned to a
 # SUPERSEDED engine default is bumped to the current default. Only an EXACT
@@ -167,400 +244,254 @@ VALUE_UPGRADES: dict[str, dict[object, object]] = {
     "scheduling.dedup_window_seconds": {60: 900},
 }
 
+# ── Injection policy ────────────────────────────────────────────────────
+# WHICH keys the migration injects into operator vaults is a curated policy
+# choice, not a schema derivative: keys that predate the migration era are
+# already in every operator config (copied from config.example.yaml at
+# install), and some keys are deliberately left to dataclass fall-through
+# (e.g. personal secrets that belong in `.claude/.env`, or singleton paths
+# the operator sets once during setup). Every schema knob MUST appear in
+# exactly one of INJECTED_KEYS / NEVER_INJECTED — the drift test
+# (tests/test_migrate_config_keys.py::test_every_schema_knob_has_a_migration_policy)
+# enforces that, turning the CLAUDE.md hard rule ("config-knob changes are
+# not done until the vault is migrated") into a mechanical invariant.
+#
+# The injected VALUES are always read from core.config_schema (see
+# KEY_ADDITIONS below) — never hand-copied here.
+
+INJECTED_KEYS: dict[str, tuple[str, ...]] = {
+    "models": (
+        "dream_model",                # M014 dream-cycle model (2026-05-18)
+        "folder_scan_provider",       # M027-S04 Q9 seam (2026-06-10)
+        "intent_classify_model",      # intent-dispatch cheap tier (2026-06-14)
+    ),
+    "limits": (
+        "curiosity_exclude_globs",    # curiosity substrate denylist (2026-06-13)
+        "review_max_sweep_runtime_s",  # review-wiki soft sweep deadline (2026-06-13)
+        "curiosity_folder_max_candidates",  # M027 candidate retrieval (2026-06-13)
+        "dream_per_call_timeout_s",   # M014 per-message stall timeout (2026-05-18)
+        "compile_skip_on_long_context_unknown",   # kind=unknown → skip (2026-05-15)
+        "compile_aggregated_max_consecutive_failures",  # chunk circuit-breaker (2026-05-17)
+        "compile_role_default_by_location",       # M007-S01-T02 (2026-05-16)
+        # M006 Google Calendar collector (2026-05-15)
+        "calendar_request_timeout_s",
+        "calendar_max_per_run",
+        "calendar_backfill_days",
+        "calendar_future_days",
+        "compile_max_tokens_per_file",  # per-file token guard (2026-05-16, USD→tokens 2026-05-23)
+        "compile_skip_substrate_types",  # batch-mode substrate skip-list (2026-05-16)
+        # M027-S02-T04 watched-folder index knobs (2026-06-10)
+        "folder_index_max_depth",
+        "folder_index_recent_n",
+        # Email daily-rollup signal (beta, 2026-05-23)
+        "daily_email_top_senders",
+        "daily_email_sample_subjects",
+        # Per-class flush-context budgets (2026-05-16)
+        "flush_assistant_text_budget_chars",
+        "flush_user_text_budget_chars",
+        "flush_tool_summary_budget_chars",
+        "dashboard_refresh_timeout_s",  # dashboard refresh budget (2026-07-14)
+        "compile_per_call_timeout_s",   # per-compile-call hang guard (2026-05-16)
+        "reports_default_lookback_days",  # M019 instrument lookback (2026-05-17)
+        "connection_min_words",         # M012 connection quality gate (2026-05-16)
+        # M011 takes substrate (2026-05-16)
+        "extract_takes_source_globs",
+        "extract_takes_timeout_s",
+        "extract_takes_max_per_source",
+        # M014 dream-cycle resource gates (2026-05-16, USD→tokens 2026-05-23)
+        "dream_entity_max_prompt_chars",
+        "dream_cycle_max_tokens_per_run",
+        # M016 dream-cycle sampled-activation (2026-05-17)
+        "dream_tier1_recent_count",
+        "dream_tier1_digest_days",
+        "dream_tier2_sample_count",
+        # Concept-reconciliation routine (2026-05-22)
+        "concept_reconcile_max_files_per_fact",
+        "concept_reconcile_max_facts_per_run",
+        "concept_reconcile_max_turns",
+        # M028 hard-facts issue #5 (2026-06-13)
+        "correct_apply_max_turns",
+        "correct_broad_term_threshold",
+        # Health-trend synthesis (2026-05-23)
+        "health_trends_recent_months",
+        "health_trends_min_coverage_days",
+        "voice_punctuate_timeout_s",    # gemma cold-call absorb (2026-05-28)
+        # Ollama/piggyback/review reliability bundle (2026-05-30)
+        "ollama_connect_timeout_s",
+        "piggyback_max_runtime_s",
+        "review_ollama_timeout_s",
+        "review_consecutive_failure_abort",
+        "review_checkpoint_every",
+        "dedup_fuzzy_threshold",        # wiki dedup, issue #3 (2026-05-31)
+        # Intent-dispatch (2026-06-13)
+        "intent_source_globs",
+        "intent_classify_timeout_s",
+        "intent_min_confidence",
+    ),
+    "scheduling": (
+        "piggybacks_on_compile",        # compile drains due piggybacks (2026-06-13)
+        "dream_cooldown_days",          # M014 (2026-05-16)
+        "dream_priority",               # M017 (2026-05-17)
+        "concept_reconcile_cooldown_days",  # concept routine (2026-05-22)
+        "web_research_cooldown_days",   # dream web-research, issue #2 (2026-05-31)
+        "dream_insufficient_corpus_backoff_max_days",  # backoff (2026-06-02)
+    ),
+    "features": (
+        "extract_takes",                # M011 master switch (2026-05-16)
+        "dream_web_research",           # issue #2, external paid Exa call (2026-05-31)
+        "concept_reconciliation",       # autonomous concept edits, opt-in (2026-05-22)
+        "health_trends",                # deterministic + $0, default OFF (2026-05-23)
+        "voice_punctuate",              # Ollama punctuation pass (2026-05-17)
+        "suggestions_source_globs",     # Producer-seam arc (2026-05-17)
+        "compile_callback_gate",        # can_use_tool path-scope gate (2026-05-17)
+        "materialize_backlinks",        # M020 backlinks footer (2026-05-17)
+        "relativize_wikilinks",         # wikilink relativize pass (2026-05-29)
+        "extract_picture_metadata",     # EXIF + Android filename pattern (2026-05-29)
+        "operator_reports",             # M019 master switch (2026-05-17)
+        "dream_require_entity_substrate",  # dream no-op skip (2026-05-31)
+        "extract_intents",              # intent-dispatch master switch (2026-06-13)
+    ),
+    "personal": (
+        "implicit_operator_author",     # author-attribution fallback (2026-05-16)
+        "picture_inbox",                # pictures collector (2026-05-17)
+        "capture_inbox",                # M025 quick-capture loop (2026-05-23)
+        "reports_dir",                  # M019 reports surface (2026-05-17)
+        "domains",                      # M013 domain frontmatter axis (2026-05-16)
+        # M026 audio ingest via whisper.cpp (2026-05-28)
+        "voice_transcribe_model",
+        "voice_transcribe_language",
+        "voice_transcribe_threads",
+        "voice_transcribe_binary",
+        "voice_transcribe_ffmpeg",
+        "inbox_bridges",                # inbox-bridge rsync mirror (2026-05-28)
+        "watched_folders",              # M027 watched-folder curiosity (2026-06-07)
+        "exa_api_key",                  # Exa key; prefers .claude/.env (2026-05-31)
+        "output_language",              # issue #4 compiled-prose language (2026-06-13)
+    ),
+}
+
+# Piggyback default blocks injected so the knob is visible/tunable in the
+# operator's YAML. Values derive from _default_piggybacks().
+INJECTED_PIGGYBACKS: tuple[str, ...] = (
+    "calendar",             # M006 (2026-05-15)
+    "curiosity_followup",   # consumer piggyback, backlog-corrective (2026-05-16)
+    "dream_cycle",          # M014 (2026-05-16)
+    "pictures",             # pictures collector (2026-05-17)
+    "capture",              # M025 (2026-05-23)
+    "study_run_due",        # M019 schedule dispatcher, default OFF (2026-05-17)
+    "analyst_pass2",        # M019-S05 Pass-2 analyst, default OFF (2026-05-17)
+)
+
+# Schema knobs the migration deliberately does NOT inject. Two classes:
+#   - pre-migration-era keys every operator config already carries from the
+#     install-time config.example.yaml copy (re-injecting would be noise);
+#   - keys that stay dataclass-fall-through by design (secrets belong in
+#     `.claude/.env`; per-install paths are set once during setup; accounts
+#     are operator-authored structures).
+# Explicit so the drift test can prove every schema knob has a policy.
+NEVER_INJECTED: dict[str, tuple[str, ...]] = {
+    "models": (
+        "compile_model",
+        "compile_large_source_model",
+        "ollama_url",
+        "vision_model",
+        "curiosity_model",
+        "classify_model",
+    ),
+    "limits": (
+        "compile_max_files",
+        "compile_max_consecutive_failures",
+        "flush_max_retries",
+        "flush_retry_delay_seconds",
+        "screenshot_resize_width",
+        "screenshot_timeout_seconds",
+        "curiosity_max_gaps",
+        "curiosity_min_source_chars",
+        "curiosity_timeout_s",
+        "curiosity_max_prompt_chars",
+        "curiosity_source_globs",
+        "curiosity_folder_confidence_min",
+        "curiosity_quote_min_anchor_tokens",
+        "sparse_threshold_words",
+        "youtube_max_frames",
+        "youtube_max_duration_s",
+        "youtube_frame_resize_width",
+        "youtube_vision_timeout_s",
+        "youtube_aggregate_timeout_s",
+        "jamie_request_timeout_s",
+        "jamie_max_per_run",
+        "gmeet_request_timeout_s",
+        "gmeet_max_per_run",
+        "oura_request_timeout_s",
+        "oura_max_backfill_days",
+        "sdk_max_buffer_size_mb",
+        "query_max_prompt_chars",
+        "compile_max_prompt_chars",
+        "compile_max_turns",
+        "compile_retry_long_context_on_unknown",
+        "compile_failure_backoff_s",
+        "compile_retry_long_context_min_source_chars",
+    ),
+    "scheduling": (
+        "compile_after_hour",
+        "dedup_window_seconds",   # value bump handled via VALUE_UPGRADES
+        "timezone",
+    ),
+    "features": (
+        "curiosity_loop",
+        "vision_screenshots",
+        "procmail_execution",
+        "clippings_sweep",
+    ),
+    "graph_view": (
+        "mode",
+        "custom_search",
+        "domain_tags",
+    ),
+    "skills": (
+        "global_install",
+    ),
+    "personal": (
+        "primary_account",
+        "accounts",               # operator-authored structure
+        "email_folders",
+        "curiosity_folders",
+        "project_examples",
+        "calendar_skip_keywords",
+        "thunderbird_profile",
+        "firefox_profile",
+        "stg_backup_dir",
+        "voice_inbox",
+    ),
+}
+
+NEVER_INJECTED_PIGGYBACKS: tuple[str, ...] = (
+    "email",                  # pre-migration-era; in every config since install
+    "lint_structural",
+    "review_wiki",
+    "optimize_claude_md",     # force-disable handled via PIGGYBACK_FORCE_DISABLE
+    "screenshots",
+    "jamie",
+    "gmeet",
+    "health",                 # M023; runs by default without a block (graceful agnostic)
+    "voice",
+    "daily_digest_yesterday",
+    "retry_failed_flushes",
+)
+
 # Keys introduced in newer engine versions that should be injected into the
 # operator's config so they're visible/tunable. Structure: parent block name
 # → {key: default_value}. Missing parent blocks are created. Keys already
-# present (even with a different value) are left untouched.
+# present (even with a different value) are left untouched. Values are
+# DERIVED from core.config_schema — a default can never drift between the
+# dataclass and the migration again.
 KEY_ADDITIONS: dict[str, dict[str, object]] = {
-    "models": {
-        # M014 dream-cycle model. Default [1m] up-front — dream-entity is
-        # a fan-out workload that blows standard 200K Opus context mid-stream
-        # (see KNOWLEDGE.md "tool-turn ballooning"). Set to "" to fall back
-        # to models.compile_model. Added 2026-05-18.
-        "dream_model": "claude-opus-4-8[1m]",
-        # M027-S04 folder-scan answer provider (Q9 seam). claude-sdk is
-        # the only provider today; local LLM/agent later. Unknown values
-        # raise loudly — no silent fallback. Added 2026-06-10.
-        "folder_scan_provider": "claude-sdk",
-        # Intent-classification model (2026-06-14). Cheap triage tier for the
-        # intent-dispatch producer; "" falls back to compile_model. Match
-        # Models.intent_classify_model in scripts/core/config.py.
-        "intent_classify_model": "claude-haiku-4-5",
-    },
-    "limits": {
-        # Curiosity denylist (2026-06-13). Both curiosity passes skip a source
-        # matching any of these globs before the Ollama call. Default excludes
-        # the circular email-deep-scan substrate. Match
-        # Limits.curiosity_exclude_globs default in `scripts/core/config.py`.
-        "curiosity_exclude_globs": ["raw/notes/email/deep-*"],
-        # review-wiki soft sweep deadline (2026-06-13). Self-terminate with a
-        # clean partial before the piggyback hard cap kills the multi-hour sweep
-        # (false `timeout`). Match Limits.review_max_sweep_runtime_s default.
-        "review_max_sweep_runtime_s": 12600,
-        # M027 watched-folder candidate retrieval: over budget, inject the
-        # top-N rarity-ranked candidate files (not the folder tree). Added
-        # 2026-06-13 — the full dir-skeleton bloated the prompt and timed
-        # out the local 8B model at 240s.
-        "curiosity_folder_max_candidates": 40,
-        # M014 dream-cycle per-message stall timeout. Added 2026-05-18
-        # after paperclip-companies crashed at 339s on [1m] with empty
-        # stderr — diagnostic instrumentation + structural alignment
-        # with compile_per_call_timeout_s. See KNOWLEDGE.md.
-        "dream_per_call_timeout_s": 300,
-        # Treat kind=unknown failures with no further retry path (small
-        # source OR already on [1m]) as skips instead of hard failures.
-        # Preserves the consecutive-failure budget so the batch survives
-        # a structurally-unprocessable file.
-        "compile_skip_on_long_context_unknown": True,
-        # Circuit-breaker for aggregated-memory chunked compiles (2026-05-17).
-        # When N consecutive chunks fail (skipped OR failed), abort the
-        # rest of the chunk loop. Stops runaway $-burn on broken
-        # substrate-prompt × N-chunk fan-out (per-file cost guard fires
-        # per-chunk, not cumulatively). Set 0 to disable.
-        "compile_aggregated_max_consecutive_failures": 3,
-        # M007-S01-T02 (2026-05-16): When true (default), files without
-        # explicit `compile_role:` frontmatter get a role inferred from
-        # their top-level segment (raw/daily/inbox/knowledge → source-only).
-        # Set false to require explicit frontmatter on every file (useful
-        # if you have non-standard top-level folders).
-        "compile_role_default_by_location": True,
-        # Google Calendar collector (M006, 2026-05-15). Per-HTTP-call timeout
-        # against calendar.googleapis.com / per-calendar event cap / past +
-        # future windows in days. Match the dataclass defaults in
-        # `scripts/core/config.py:Limits.calendar_*`.
-        "calendar_request_timeout_s": 30,
-        "calendar_max_per_run": 500,
-        "calendar_backfill_days": 90,
-        "calendar_future_days": 7,
-        # Per-file cost guard (USD); abort batch on overrun. Defense
-        # against substrate-prompt-mismatch loops that burn $5-10/file
-        # silently. See KNOWLEDGE.md "calendar-rollup max_turns trap".
-        "compile_max_tokens_per_file": 500_000,
-        # Substrate-skip-list for batch mode (frontmatter `type:` values).
-        # Empty default since 2026-05-16 P2 landed (calendar-rollup
-        # moved out of the skip-list once compile_calendar.md prompt
-        # shipped). Last-resort escape hatch for substrate types with
-        # no good prompt yet. folder-index added 2026-06-10 (M027-S02
-        # body-blind watched-folder digests — metadata, nothing to distil).
-        "compile_skip_substrate_types": ["email-delta", "folder-index"],
-        # Watched-folder index knobs (M027-S02-T04, `wiki index`). Match
-        # Limits.folder_index_* defaults in scripts/core/config.py.
-        # max_depth 0 = unlimited (2026-06-10 reversal — complete
-        # inventory; raise per-install only for huge NAS roots).
-        "folder_index_max_depth": 0,
-        "folder_index_recent_n": 20,
-        # Email daily-rollup signal (beta, 2026-05-23). Top-N senders + sample
-        # of recent subjects in the per-account daily/<date>/email.md block, so
-        # the daily-digest agent extracts correspondents + themes. Match
-        # Limits.daily_email_* defaults in scripts/core/config.py.
-        "daily_email_top_senders": 5,
-        "daily_email_sample_subjects": 12,
-        # Per-class flush-context budgets (hooks/_transcript.py). Replaces
-        # the content-blind globals MAX_TURNS=30 + MAX_CONTEXT_CHARS=15_000
-        # that lost assistant analytical prose to tool-summary truncation.
-        # See KNOWLEDGE.md "Flush context — Karpathy/Cole pattern gen-2".
-        "flush_assistant_text_budget_chars": 50_000,
-        "flush_user_text_budget_chars": 10_000,
-        "flush_tool_summary_budget_chars": 10_000,
-        # Best-effort dashboard refresh budget (2026-07-14). Lifted from a
-        # hardcoded 120 s → 300 s CONFIG knob; too tight for a growing vault
-        # under iCloud fs-stat variance (29 timeouts). Match
-        # Limits.dashboard_refresh_timeout_s in scripts/core/config.py.
-        "dashboard_refresh_timeout_s": 300,
-        # Per-compile-call timeout (seconds). Guards against bundled-CLI
-        # HANG (vs crash — crashes already retry/abort). One stuck file
-        # otherwise blocks every remaining file in the batch. On timeout:
-        # log WARNING, _skipped (preserves consecutive-failure budget).
-        # Match Limits.compile_per_call_timeout_s default in
-        # `scripts/core/config.py`.
-        "compile_per_call_timeout_s": 600,
-        # M019 (2026-05-17): default lookback window for operator-self-report
-        # instruments (PHQ-9, GAD-7, ASRS-v1.1, WHO-5, MEQ-19 in the wedge).
-        # 14 days = standard clinical reference window for the PHQ/GAD family.
-        # Per-instrument override via `inference.default_lookback_days` field
-        # in instrument.yaml.
-        "reports_default_lookback_days": 14,
-        # M012 (2026-05-16): connection-article quality gate. Body word
-        # count below this floor fires `connection_shallow_body` in lint;
-        # 50 was chosen because anything shorter empirically just restates
-        # the linked concepts without asserting a real mechanism.
-        "connection_min_words": 50,
-        # M011 takes substrate (2026-05-16).
-        "extract_takes_source_globs": [
-            "raw/transcripts/*",
-            "raw/transcripts/**/*",
-            "raw/voice/*",
-            "daily/*",
-        ],
-        "extract_takes_timeout_s": 180,
-        "extract_takes_max_per_source": 12,
-        # M014 dream-cycle cost gates (2026-05-16). Pre-flight per-entity
-        # USD cap (estimate from prompt-char count; reject SDK call if over)
-        # + cumulative per-run cap for `wiki dream --all-entities` and the
-        # dream_cycle piggyback sweep. Match Limits.dream_*_usd defaults
-        # in `scripts/core/config.py`.
-        "dream_entity_max_prompt_chars": 415_000,
-        "dream_cycle_max_tokens_per_run": 2_000_000,
-        # M016 dream-cycle sampled-activation knobs (2026-05-17). Bound the
-        # per-dream corpus by construction (~600 KB) regardless of vault size.
-        # See `.ytstack/backlog/dream-sampled-activation.md` for the full
-        # 4-tier architecture + research grounding.
-        "dream_tier1_recent_count": 20,
-        "dream_tier1_digest_days": 7,
-        "dream_tier2_sample_count": 50,
-        # Concept-reconciliation routine (2026-05-22). Cost caps + turn budget
-        # for the autonomous `wiki reconcile` strict correct_apply.
-        # See `.ytstack/backlog/concept-consistency-routine.md`.
-        "concept_reconcile_max_files_per_fact": 25,
-        "concept_reconcile_max_facts_per_run": 10,
-        "concept_reconcile_max_turns": 15,
-        # `wiki correct apply` turn budget (M028, issue #5). Lifted from a
-        # hardcoded 50 when apply() was sandboxed.
-        "correct_apply_max_turns": 50,
-        # `wiki correct add` over-broad-term warning threshold (M028, issue #5).
-        "correct_broad_term_threshold": 15,
-        # Health-trend synthesis (2026-05-23). Recent-window + min-coverage for
-        # `wiki health-trends`. See `.ytstack/backlog/health-trend-synthesis.md`.
-        "health_trends_recent_months": 6,
-        "health_trends_min_coverage_days": 10,
-        # voice-punctuate Ollama timeout (2026-05-28). gemma4:e4b
-        # cold-call into VRAM regularly hits 30–40 s; pre-2026-05-28
-        # hardcoded 30 s tripped on every first call after a quiet
-        # period. 120 s mirrors the chat() default.
-        "voice_punctuate_timeout_s": 120,
-        # Reliability bundle (2026-05-30) — bounds the half-open-socket hang
-        # class that left review-wiki running 19h47m on a slept LAN GPU.
-        # See KNOWLEDGE.md "Ollama half-open socket". Match Limits defaults in
-        # scripts/core/config.py.
-        "ollama_connect_timeout_s": 10,
-        "piggyback_max_runtime_s": 14_400,
-        "review_ollama_timeout_s": 300,
-        "review_consecutive_failure_abort": 5,
-        "review_checkpoint_every": 25,
-        # `wiki dedup` (entity-dedup, issue #3, 2026-05-31). Fuzzy-title match
-        # floor for duplicate-candidate proposal. Match Limits.dedup_fuzzy_threshold
-        # default in scripts/core/config.py.
-        "dedup_fuzzy_threshold": 0.85,
-        # Intent-dispatch (2026-06-13). Source globs + per-call timeout +
-        # confidence floor for the intent-classification post-pass (gated by
-        # features.extract_intents). Match Limits defaults in
-        # scripts/core/config.py.
-        "intent_source_globs": ["raw/voice/*", "raw/inbox-mobile/pictures/*.md"],
-        "intent_classify_timeout_s": 120,
-        "intent_min_confidence": "high",
-    },
-    "scheduling": {
-        # 2026-06-13: `wiki compile` drains due piggybacks at run-end,
-        # bypassing the compile_after_hour evening gate (cooldowns still
-        # rate-limit) so operators who live in `wiki update && wiki compile`
-        # and rarely flush keep maintenance current. Match
-        # Scheduling.piggybacks_on_compile default in `scripts/core/config.py`.
-        "piggybacks_on_compile": True,
-        # M014 dream-cycle (2026-05-16). Per-entity cooldown — entities
-        # synthesized within this window are skipped by sweep + piggyback.
-        # Match Scheduling.dream_cooldown_days default in
-        # `scripts/core/config.py`.
-        "dream_cooldown_days": 7,
-        # M017 (2026-05-17): config-driven entity priority for dream-cycle
-        # selection. Empty defaults preserve M014 behavior (greedy by age).
-        # Operator populates paths/domain/tags/status to bias selection.
-        # See `.ytstack/backlog/dream-priority-config.md` for full spec.
-        "dream_priority": {
-            "default": 1.0,
-            "paths": {},
-            "domain": {},
-            "tag_strategy": "max",
-            "tags": {},
-            "status": {},
-        },
-        # Concept-reconciliation routine (2026-05-22). Per-fact cooldown —
-        # facts reconciled within this window are skipped. Match
-        # Scheduling.concept_reconcile_cooldown_days in config.py.
-        "concept_reconcile_cooldown_days": 14,
-        # Dream web-research (issue #2, 2026-05-31). Per-entity `## Public
-        # Profile` refresh cooldown. Match Scheduling.web_research_cooldown_days.
-        "web_research_cooldown_days": 30,
-        # Insufficient-corpus backoff cap (2026-06-02). Match
-        # Scheduling.dream_insufficient_corpus_backoff_max_days in config.py.
-        "dream_insufficient_corpus_backoff_max_days": 30,
-    },
-    "features": {
-        # M011 master switch — default OFF, flip True after dogfooding.
-        "extract_takes": False,
-        # Dream web-research (issue #2, 2026-05-31) — default OFF. Makes an
-        # EXTERNAL paid Exa API call; doubly gated by this flag + per-entity
-        # opt-in. Match Features.dream_web_research in config.py.
-        "dream_web_research": False,
-        # Concept-reconciliation routine (2026-05-22) — default OFF. Makes
-        # scoped autonomous writes to knowledge/concepts/; opt in after a
-        # `wiki reconcile --dry-run` review. See backlog doc.
-        "concept_reconciliation": False,
-        # Health-trend synthesis (2026-05-23) — deterministic + $0, default OFF.
-        # When True, `wiki health-trends` writes the trends block + the
-        # health_trends piggyback runs. See health-trend-synthesis.md.
-        "health_trends": False,
-        # 2026-05-17 voice-punctuation pre-process. Calls Ollama
-        # classify_model on every voice ingest to add punctuation +
-        # German-noun-case to dictation transcripts. Raw text preserved
-        # in `raw_transcript:` frontmatter. Default True; flip False if
-        # your dictation tool already punctuates or you want to skip
-        # the extra LLM call.
-        "voice_punctuate": True,
-        # 2026-05-17 Producer-seam arc. Source-glob allowlist for the
-        # suggestions post-pass. Default mirrors the legacy hardcoded
-        # `_is_email_source` filter; widening the list enables suggestions
-        # for additional substrates without code changes.
-        "suggestions_source_globs": ["raw/email/*.md"],
-        # 2026-05-17 Path-scope enforcement via `can_use_tool` callback.
-        # Replaces the decorative `Write(knowledge/**)` /
-        # `Edit(knowledge/**)` syntax in `--allowedTools` (bundled CLI
-        # parses it as bare Write/Edit, verified by
-        # `scripts/probe_compile_scope.py`). When True the compile + dream
-        # agents run in streaming mode with a Python-side gate; when False
-        # they use the legacy decorative allowlist (kept as a one-line
-        # rollback path while the streaming-mode rewrite proves itself
-        # under production load). Default True.
-        "compile_callback_gate": True,
-        # M020 backlinks footer — corpus-wide post-compile pass that writes a
-        # sentinel-managed `## Backlinks` block into every knowledge/<article>
-        # so AI agents reading raw markdown get incoming-link information
-        # without a corpus-wide ripgrep. Idempotent. Flip false to skip the
-        # sweep. Default True.
-        "materialize_backlinks": True,
-        # Relativize-wikilinks pass (2026-05-29) — corpus-wide post-compile
-        # rewrite of every wikilink to a path relative to its containing
-        # article, so Obsidian resolves cross-article links from nested
-        # folders instead of creating empty stubs. Idempotent. Default True.
-        "relativize_wikilinks": True,
-        # Per-picture deterministic metadata extraction (2026-05-29) — EXIF
-        # via Pillow + Android-screenshot filename pattern. Adds
-        # captured_at / device / location / shot / app_context frontmatter
-        # to each pictures-collector sidecar. Default True; graceful no-op
-        # when source carries no EXIF and isn't an Android screenshot.
-        "extract_picture_metadata": True,
-        # M019 operator-self-reports master switch (2026-05-17). When True,
-        # `wiki study run` + `wiki analyze` are wired and flush.py piggybacks
-        # for Pass-1 / Pass-2 fire. Default OFF — flip True after S05 lands
-        # and dogfooding completes. Air-gapped from the compile loop.
-        "operator_reports": False,
-        # Pre-flight no-op skip for dream-entity passes with ZERO
-        # entity-specific substrate (2026-05-31). When the corpus is only
-        # date-pulled daily digests that don't mention the entity, the
-        # synthesis is a guaranteed INSUFFICIENT_CORPUS no-op yet still bills a
-        # full prompt-cache write (~$0.80). True → skip the SDK call for $0.
-        # Match Features.dream_require_entity_substrate in config.py.
-        "dream_require_entity_substrate": True,
-        # Intent-dispatch master switch (2026-06-13). When True, a post-compile
-        # pass classifies intake notes (voice first) into intents and routes
-        # actionable ones to tasks/. Default OFF — +1 Claude SDK call per gated
-        # source + produces operator-review artifacts. Match
-        # Features.extract_intents in config.py.
-        "extract_intents": False,
-    },
-    "piggybacks": {
-        # M006 calendar collector — mirrors gmeet / jamie 6 h cadence.
-        # Per-account override lives in personal.accounts.<id>.calendar; the
-        # piggyback block here is the cooldown / batch-cap, not the auth
-        # state. An account without a kind=google-calendar sub-block silently
-        # skips the run.
-        "calendar": {"enabled": True, "cooldown_hours": 6, "max_per_run": 500},
-        # 2026-05-16: curiosity-consumer piggyback. Producer (compile.py)
-        # writes raw/requests/request-*.json after every compile;
-        # consumer (curiosity/cli.py --run-batch N) processes them via
-        # mailbox scan. Backlog-corrective default — drains 20/day
-        # (max_per_run × 4 fires) which beats the typical generation rate
-        # without thundering-herd on long backlogs.
-        # Was missed by the original P2 rollout of curiosity-consumer-gap;
-        # operator configs from before 2026-05-16 have NO curiosity_followup
-        # block at all, so requests accumulate in raw/requests/ forever.
-        "curiosity_followup": {"enabled": True, "cooldown_hours": 6, "max_per_run": 5},
-        # M014 dream-cycle piggyback (2026-05-16). Cooldown 24h means at
-        # most once-per-day fires; per-fire sweeps `max_per_run` entities
-        # (3 default) selected newest-overdue first. Per-entity cost cap
-        # AND per-run cumulative cost cap enforced inside dream.py.
-        "dream_cycle": {"enabled": True, "cooldown_hours": 24, "max_per_run": 3},
-        # 2026-05-17 pictures collector. Vision-LLM-driven, mirrors the
-        # screenshots cadence shape (max_per_run cap) but lighter cooldown
-        # because iCloud-Shortcut drops arrive throughout the day. Silently
-        # skipped when personal.picture_inbox is empty (graceful agnostic).
-        "pictures": {"enabled": True, "cooldown_hours": 6, "max_per_run": 20},
-        # M025 (2026-05-23) quick-capture collector. Folder-watch like voice,
-        # 1h cadence, no per-run cap. Registry auto-discovers the collector;
-        # this block is the operator-overridable enabled/cooldown knob. Silently
-        # skipped when personal.capture_inbox is empty.
-        "capture": {"enabled": True, "cooldown_hours": 1},
-        # M019 operator-self-reports schedule dispatcher. 6h cooldown
-        # checks 4×/day for due studies; the study's own schedule
-        # (weekly/monthly/quarterly) gates the actual run. Default OFF
-        # until S05 ships and operator flips features.operator_reports.
-        "study_run_due": {"enabled": False, "cooldown_hours": 6},
-        # M019-S05 Pass-2 analyst — cross-study synthesist. Pass-1 runs
-        # automatically inside `wiki study run`; Pass-2 runs weekly on
-        # its own cadence (or on-demand via `wiki analyze --cross-study-only`).
-        "analyst_pass2": {"enabled": False, "cooldown_hours": 168},
-    },
-    "personal": {
-        # 2026-05-16 author-attribution feature. Null default keeps the
-        # multi-tenant story intact — operators on single-tenant vaults set
-        # this to their own name (e.g. "alex") so compile.py routes
-        # unattributed beliefs/decisions to their `knowledge/people/<name>.md`
-        # page. Explicit `author:` frontmatter on a source file always
-        # overrides. See `.ytstack/backlog/author-attribution.md`.
-        "implicit_operator_author": None,
-        # 2026-05-17 pictures collector. Mirrors voice_inbox shape — operator
-        # sets to a folder iOS Shortcut (or similar) drops photos into; the
-        # collector folder-watches it, runs gemma4 vision on each file, and
-        # archives the source under <picture_inbox>/.processed/. Empty
-        # default keeps the multi-tenant story intact.
-        "picture_inbox": "",
-        # M025 (2026-05-23) quick-capture-correction loop. Operator one-taps
-        # cryptic notes into this folder; collectors/capture_collector.py
-        # folder-watches it, content-IDs each capture, and writes
-        # raw/captures/capture-<id>.md. Empty default keeps the multi-tenant
-        # story intact (collector silently skips).
-        "capture_inbox": "",
-        # M019 (2026-05-17) operator-self-reports surface location. Directory
-        # under vault root where reports/studies/ + reports/analyses/ live.
-        # Sibling of knowledge/, separate from .wiki/ (engine state).
-        "reports_dir": "reports",
-        # M013 (2026-05-16): optional `domain:` frontmatter axis on knowledge/
-        # articles. Cross-cutting life-domain tag (NOT a folder), extensible
-        # per vault. Lint warns on values outside this enum (grace period).
-        # `wiki query --domain X` filters to articles whose `domain:` matches.
-        # Default lifted from lx-vault audit (Company / Personal / AI top-
-        # level split). See `.ytstack/backlog/domain-frontmatter.md`.
-        "domains": ["company", "personal", "ai", "meta"],
-        # (2026-05-28) audio transcription via whisper.cpp. Empty model
-        # path keeps audio-ingest off; text dictation continues to work
-        # regardless. Operator pre-reqs: brew install whisper-cpp + download
-        # a ggml model file. See AGENTS.md voice-intake section.
-        "voice_transcribe_model": "",
-        "voice_transcribe_language": "auto",
-        "voice_transcribe_threads": 4,
-        "voice_transcribe_binary": "",
-        "voice_transcribe_ffmpeg": "",
-        # 2026-05-28 inbox-bridge. Empty default keeps the feature off — operator
-        # populates with {remote, local, mode?, enabled?, name?} dicts to mirror
-        # network-mounted / sandbox-restricted intake folders into local paths
-        # the substrate collectors then folder-watch. See `wiki bridge --help`.
-        "inbox_bridges": [],
-        # M027 (2026-06-07) watched-folder curiosity. Empty default keeps the
-        # feature off — operator populates with {id, kind: local|smb, path|share}
-        # dicts naming folders the curiosity loop may index + (on per-request
-        # approval) read. Validated by config._validate_watched_folders_schema.
-        "watched_folders": [],
-        # Dream web-research (issue #2, 2026-05-31). Exa AI key — empty default
-        # keeps the feature inert; falls back to env EXA_API_KEY. Prefer setting
-        # it in the vault's .claude/.env, not config.yaml. Match
-        # Personal.exa_api_key in config.py.
-        "exa_api_key": "",
-        # Issue #4 (2026-06-13) operator-overridable compiled-prose language.
-        # "auto" = today's behavior (write in the source material's language);
-        # byte-identical compile, so every existing vault is a no-op on update.
-        # Set to e.g. "de" / "German" to force all compiled prose into that
-        # language. Match Personal.output_language in config.py.
-        "output_language": "auto",
-    },
+    section: (
+        {name: _piggyback_default(name) for name in INJECTED_PIGGYBACKS}
+        if section == "piggybacks"
+        else {name: _schema_default(section, name) for name in INJECTED_KEYS[section]}
+    )
+    for section in ("models", "limits", "scheduling", "features", "piggybacks", "personal")
 }
 
 # Elements to add to existing list-valued config entries. Used when an
@@ -874,6 +805,20 @@ def migrate_piggybacks(piggybacks: dict) -> tuple[dict, list[str]]:
             block["enabled"] = False
             changes.append(f"disabled piggybacks.{key} (engine policy — was enabled)")
 
+    # Dead-subkey pruning: remove knobs that no consumer reads (see
+    # PIGGYBACK_SUBKEY_DROPS). The rest of the block is preserved.
+    for key, subkeys in PIGGYBACK_SUBKEY_DROPS.items():
+        block = out.get(key)
+        if not isinstance(block, dict):
+            continue
+        for subkey in subkeys:
+            if subkey in block:
+                block.pop(subkey)
+                changes.append(
+                    f"dropped piggybacks.{key}.{subkey} (dead knob — the live cap is "
+                    f"limits.{key}_max_per_run / the per-account sub-block)"
+                )
+
     return out, changes
 
 
@@ -984,38 +929,6 @@ def migrate_config(config_path: Path) -> tuple[str | None, list[str]]:
     return new_text, changes
 
 
-# Mirror of scripts/core/config.py's round-robin backup. The migration is
-# standalone (vault-parametrised via --vault) and must NOT import config.py —
-# that module runs `load()` at import time against the global CONFIG_FILE, which
-# need not be the vault we're migrating. So we replicate the location + naming +
-# keep-count here so migration backups land in the SAME place as engine writes.
-_CONFIG_BACKUP_KEEP_LAST = 10
-
-
-def _backup_config(config_path: Path) -> str | None:
-    """Snapshot config_path into <.wiki>/state/config-backups/ before overwrite.
-
-    Matches scripts/core/config.py: `config-<UTC-ts>.yaml`, keeps the last
-    _CONFIG_BACKUP_KEEP_LAST, prunes older. Returns the backup name or None.
-    """
-    bdir = config_path.parent / "state" / "config-backups"
-    bdir.mkdir(parents=True, exist_ok=True)
-    ts = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
-    out = bdir / f"config-{ts}.yaml"
-    if out.exists():
-        out = bdir / f"config-{ts}-{datetime.now(timezone.utc).microsecond:06d}.yaml"
-    shutil.copy2(config_path, out)
-
-    existing = sorted(bdir.glob("config-*.yaml"))
-    if len(existing) > _CONFIG_BACKUP_KEEP_LAST:
-        for stale in existing[: -_CONFIG_BACKUP_KEEP_LAST]:
-            try:
-                stale.unlink()
-            except OSError:
-                pass
-    return str(out.relative_to(config_path.parent))
-
-
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n", 1)[0])
     parser.add_argument("--vault", type=str, required=True,
@@ -1041,8 +954,13 @@ def main() -> int:
         log.info("Preview only. Re-run with --apply to write.")
         return 0
 
-    backup = _backup_config(config_path)
-    log.info("Backed up → %s", backup)
+    # Round-robin backup via the shared core.config_backup helper — the same
+    # location/naming/keep-count as engine writes (`wiki config set`).
+    backup = backup_config_file(config_path)
+    if backup is not None:
+        log.info("Backed up → %s", backup.relative_to(config_path.parent))
+    else:
+        log.warning("Backup failed (continuing) — check %s permissions", config_path.parent)
 
     config_path.write_text(new_text, encoding="utf-8")
     log.info("Wrote migrated config.yaml (%d change(s)).", len(changes))
