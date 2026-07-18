@@ -31,8 +31,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
-import yaml  # noqa: E402
-
+from scripts.core import frontmatter  # noqa: E402
 from scripts.reports._engine.instrument import load_instrument  # noqa: E402
 from scripts.reports._engine.lib.render_summary import render_summary  # noqa: E402
 from scripts.reports._engine.lib.timeline import load_timeline  # noqa: E402
@@ -41,27 +40,10 @@ from scripts.reports._engine.lib.timeline import load_timeline  # noqa: E402
 log = logging.getLogger("backfill")
 
 
-_FM_BOUNDARY = re.compile(r"^---\s*$", re.MULTILINE)
 # Parse a `| <id> | <answer> | ...` table row. Answer is integer or "—".
 _TABLE_ROW = re.compile(
     r"^\|\s*(?P<id>\S+)\s*\|\s*(?P<ans>[—\-\d]+)\s*\|", re.MULTILINE
 )
-
-
-def _split_frontmatter(text: str) -> tuple[dict | None, str, str]:
-    """Return (fm_dict, fm_yaml_str, body_after_fm)."""
-    if not text.startswith("---"):
-        return None, "", text
-    matches = list(_FM_BOUNDARY.finditer(text))
-    if len(matches) < 2:
-        return None, "", text
-    fm_yaml = text[matches[0].end() : matches[1].start()]
-    body = text[matches[1].end() :]
-    try:
-        fm = yaml.safe_load(fm_yaml)
-    except yaml.YAMLError:
-        return None, "", text
-    return (fm if isinstance(fm, dict) else None), fm_yaml, body
 
 
 def _parse_items_table(body: str) -> dict[str, int | None]:
@@ -130,8 +112,8 @@ def _normalise_answers(
 def backfill_report(report_path: Path) -> bool:
     """Backfill one per-instrument report. Returns True if rewritten."""
     text = report_path.read_text(encoding="utf-8")
-    fm, fm_yaml, body = _split_frontmatter(text)
-    if fm is None:
+    fm, body = frontmatter.parse(text)
+    if not fm:
         log.warning("  %s: no parseable frontmatter — skip", report_path.name)
         return False
     if "per_item" in fm and isinstance(fm["per_item"], dict) and fm["per_item"]:
@@ -162,13 +144,12 @@ def backfill_report(report_path: Path) -> bool:
     bak_path = report_path.with_suffix(report_path.suffix + ".bak-backfill")
     bak_path.write_text(text, encoding="utf-8")
 
-    # Inject per_item + per_item_backfilled into frontmatter
+    # Inject per_item + per_item_backfilled into frontmatter. Write-anew via
+    # core.frontmatter (these are engine-written reports, not operator YAML).
     fm["per_item"] = per_item
     fm["per_item_backfilled"] = True
 
-    new_fm_yaml = yaml.safe_dump(fm, sort_keys=False, allow_unicode=True).strip()
-    new_text = f"---\n{new_fm_yaml}\n---\n{body}"
-    report_path.write_text(new_text, encoding="utf-8")
+    frontmatter.write(report_path, fm, body)
     log.info(
         "  %s: backfilled %d item(s); %s",
         report_path.name,

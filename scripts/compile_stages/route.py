@@ -15,6 +15,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from core import frontmatter
 from core.compile_role import infer_compile_role
 from core.config import CONFIG
 from core.paths import ROOT_DIR
@@ -138,85 +139,33 @@ _SUBSTRATE_PATH_FALLBACKS: tuple[tuple[str, str], ...] = (
 )
 
 
-# ── Frontmatter helpers (moved from compile.py, M026-S02) ────────────
+# ── Frontmatter helpers — one-line callers into core.frontmatter (C03) ──
+#
+# The single grammar lives in `core.frontmatter`; router and classifier both
+# read `type:` through `frontmatter.field`, so divergence on the same bytes is
+# structurally impossible. The names below stay as thin compat callers:
+# compile.py imports `_parse_frontmatter`, tests import
+# `_frontmatter_compile_role` / `_frontmatter_field` / `_health_rollup_body_is_stub`.
 
 def _frontmatter_type(content: str) -> str | None:
-    """Extract `type:` from a leading YAML frontmatter block, or None.
-
-    Regex-only — sufficient for the single scalar field we need and avoids
-    pulling a yaml dependency into the compile hot path. Tolerates quoted
-    values and trailing whitespace; matches the first `type:` inside the
-    leading `---` … `---` fence, not anywhere else in the body.
-    """
-    if not content.startswith("---"):
-        return None
-    end = content.find("\n---", 3)
-    if end == -1:
-        return None
-    block = content[3:end]
-    import re
-    m = re.search(r"^type:\s*[\"']?([\w-]+)[\"']?\s*$", block, re.MULTILINE)
-    return m.group(1) if m else None
+    """`type:` scalar from the leading fence (regex-only compile hot path)."""
+    return frontmatter.field(content, "type")
 
 
 def _frontmatter_compile_role(content: str) -> str | None:
-    """Extract `compile_role:` from leading YAML frontmatter, or None.
-
-    Sibling to `_frontmatter_type`; same regex-only rationale. Returns the
-    raw string value — caller passes it to `core.compile_role.infer_compile_role`
-    for enum validation and default-by-location inference (M007-S02-T01).
-    """
-    if not content.startswith("---"):
-        return None
-    end = content.find("\n---", 3)
-    if end == -1:
-        return None
-    block = content[3:end]
-    import re
-    m = re.search(r"^compile_role:\s*[\"']?([\w-]+)[\"']?\s*$", block, re.MULTILINE)
-    return m.group(1) if m else None
+    """`compile_role:` scalar — caller passes it to `infer_compile_role`."""
+    return frontmatter.field(content, "compile_role")
 
 
 def _parse_frontmatter(content: str) -> dict:
-    """Parse leading YAML frontmatter into a dict. Tolerant; returns {} on
-    missing or malformed front-matter. Sibling to the regex-based
-    `_frontmatter_type`/`_frontmatter_field` helpers, used for the memory
-    pre-pass where we need the full `tags:` list + `project:` scalar
-    together (regex would need two passes + list parsing).
-    """
-    if not content.startswith("---\n"):
-        return {}
-    end = content.find("\n---\n", 4)
-    if end == -1:
-        return {}
-    block = content[4:end]
-    import yaml  # local import keeps module-load cost minimal
-    try:
-        fm = yaml.safe_load(block) or {}
-    except yaml.YAMLError:
-        return {}
-    return fm if isinstance(fm, dict) else {}
+    """Full frontmatter dict (tolerant, {} on missing/malformed). Used by the
+    memory pre-pass where `tags:` list + `project:` scalar are needed together."""
+    return frontmatter.parse(content)[0]
 
 
 def _frontmatter_field(content: str, key: str) -> str | None:
-    """Extract a scalar frontmatter field value by key, or None.
-
-    Generic sibling to `_frontmatter_type`. Tolerates quoted values (`"`, `'`)
-    and trailing whitespace; matches first occurrence of `<key>:` inside the
-    leading `---` fence. Designed for title-like scalars — does NOT parse
-    nested structures or lists (use yaml.safe_load for those).
-    """
-    if not content.startswith("---"):
-        return None
-    end = content.find("\n---", 3)
-    if end == -1:
-        return None
-    block = content[3:end]
-    import re
-    # Allow any non-newline chars in the value (spaces, punctuation, etc.)
-    pattern = rf"^{re.escape(key)}:\s*[\"']?(.*?)[\"']?\s*$"
-    m = re.search(pattern, block, re.MULTILINE)
-    return m.group(1).strip() if m else None
+    """Generic scalar accessor (quoted values tolerated, first match wins)."""
+    return frontmatter.field(content, key)
 
 
 def _substrate_key(source_content: str, rel_path: str) -> str | None:
@@ -241,11 +190,7 @@ def _health_rollup_body_is_stub(content: str) -> bool:
     than spawned through an SDK agent. An operator-prose body returns False and
     falls through to the agent for entity/Timeline extraction.
     """
-    if content.startswith("---"):
-        end = content.find("\n---", 3)
-        body = content[end + 4:] if end != -1 else content
-    else:
-        body = content
+    body = frontmatter.split_fence(content)[1]
     for line in body.splitlines():
         s = line.strip()
         if not s or s.startswith("# ") or s == "(Add observations below as needed.)":

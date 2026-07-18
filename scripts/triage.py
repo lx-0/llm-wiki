@@ -26,27 +26,31 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from core import frontmatter  # noqa: E402
 from core.paths import (  # noqa: E402
     WORKSPACE_INBOX_DIR,
     WORKSPACE_TASKS_DIR,
     WORKSPACE_TODO,
 )
 
-_FM_RE = re.compile(r"\A---\n(.*?)\n---", re.DOTALL)
 _ORDER = {"task": 0, "idea": 1, "note": 2}
 # Anchor line in todo.md after which accepted-task checkbox lines are inserted.
 _TODO_MARKER = "<!-- accepted-tasks"
 
 
 def _fields(text: str) -> dict[str, str]:
-    m = _FM_RE.match(text)
+    """Record frontmatter as a flat str dict, via the single core.frontmatter
+    grammar (C03). Real YAML parsing decodes quoted/escaped `summary:` values —
+    the old bare `.strip('\"')` reader surfaced json.dumps-escaped umlauts and
+    quotes as garbage (and copied them into todo.md on accept). Non-string
+    scalars (YAML timestamps etc.) are coerced to str for display."""
+    fm, _body = frontmatter.parse(text)
     out: dict[str, str] = {}
-    if not m:
-        return out
-    for line in m.group(1).splitlines():
-        if ":" in line:
-            k, _, v = line.partition(":")
-            out[k.strip()] = v.strip().strip('"')
+    for k, v in fm.items():
+        if isinstance(v, str):
+            out[str(k)] = v
+        else:
+            out[str(k)] = "" if v is None else str(v)
     return out
 
 

@@ -16,6 +16,7 @@ from pathlib import Path
 
 from claude_agent_sdk import ClaudeAgentOptions, ResultMessage, query
 
+from core import frontmatter
 from core.paths import DAILY_DIR, KNOWLEDGE_DIR, RAW_DIR, REPORTS_DIR, ROOT_DIR
 from core.utils import (
     build_inbound_count_map,
@@ -229,24 +230,16 @@ FOLDER_TO_TYPE = {
 
 
 def _read_frontmatter(path: Path) -> dict:
-    """Cheap YAML frontmatter parse — returns {} on no/invalid frontmatter."""
+    """Frontmatter dict via the single core.frontmatter grammar (C03) —
+    returns {} on unreadable file / no fence / malformed YAML. Values carry
+    YAML types (lists, bools); pre-C03 lint carried TWO parsers (a naive
+    line-splitter and a real-YAML one) with different tolerance, arbitrarily
+    distributed across checks."""
     try:
         text = path.read_text(encoding="utf-8")
     except OSError:
         return {}
-    if not text.startswith("---"):
-        return {}
-    end = text.find("\n---", 3)
-    if end == -1:
-        return {}
-    block = text[3:end].strip("\n")
-    out: dict = {}
-    for line in block.splitlines():
-        if ":" not in line or line.lstrip().startswith("#"):
-            continue
-        key, _, val = line.partition(":")
-        out[key.strip()] = val.strip().strip('"').strip("'")
-    return out
+    return frontmatter.parse(text)[0]
 
 
 def check_article_type() -> list[dict]:
@@ -318,7 +311,7 @@ def check_qa_schema() -> list[dict]:
         if article.name in ("index.md", "log.md"):
             continue
         rel = str(article.relative_to(KNOWLEDGE_DIR))
-        fm = _read_yaml_frontmatter(article)
+        fm = _read_frontmatter(article)
         # 1. type: qa required
         if fm.get("type") != "qa":
             actual = fm.get("type") or "(missing)"
@@ -373,7 +366,7 @@ def check_concept_domain_tag() -> list[dict]:
             if article.name in ("index.md", "log.md"):
                 continue
             rel = str(article.relative_to(KNOWLEDGE_DIR))
-            fm = _read_yaml_frontmatter(article)
+            fm = _read_frontmatter(article)
             raw_tags = fm.get("tags") or []
             tags = set(raw_tags) if isinstance(raw_tags, list) else set()
             if not (tags & domain_set):
@@ -434,14 +427,10 @@ def check_connection_depth() -> list[dict]:
         except OSError:
             continue
 
-        fm = _read_yaml_frontmatter(article)
+        fm = _read_frontmatter(article)
 
-        # Strip frontmatter for body-level checks
-        body = text
-        if text.startswith("---"):
-            end = text.find("\n---", 3)
-            if end != -1:
-                body = text[end + 4:]
+        # Strip frontmatter for body-level checks (single grammar, C03)
+        body = frontmatter.split_fence(text)[1]
 
         # Rule 1: ≥2 distinct knowledge-tree wikilinks. Endpoint cardinality is
         # a structural property, not an existence one (broken_link owns that),
@@ -512,18 +501,14 @@ def check_two_layer_pages() -> list[dict]:
             if article.name in ("index.md", "log.md"):
                 continue
             rel = str(article.relative_to(KNOWLEDGE_DIR))
-            fm = _read_yaml_frontmatter(article)
+            fm = _read_frontmatter(article)
             if fm.get("type") != expected_type:
                 # Type-mismatch is caught by check_article_type; don't double-report
                 continue
 
             text = article.read_text(encoding="utf-8")
-            # Strip frontmatter so we only inspect the body
-            body = text
-            if text.startswith("---"):
-                end = text.find("\n---", 3)
-                if end != -1:
-                    body = text[end + 4:]
+            # Strip frontmatter so we only inspect the body (single grammar, C03)
+            body = frontmatter.split_fence(text)[1]
 
             has_state = re.search(r"^## State\s*$", body, re.MULTILINE) is not None
             has_timeline = re.search(r"^## Timeline\s*$", body, re.MULTILINE) is not None
@@ -613,7 +598,7 @@ def check_action_item_syntax() -> list[dict]:
             if article.name in ("index.md", "log.md"):
                 continue
             rel = str(article.relative_to(KNOWLEDGE_DIR))
-            fm = _read_yaml_frontmatter(article)
+            fm = _read_frontmatter(article)
             if fm.get("type") != expected_type:
                 continue
             text = article.read_text(encoding="utf-8")
@@ -679,7 +664,7 @@ def check_area_status() -> list[dict]:
         if article.name in ("index.md", "log.md"):
             continue
         rel = str(article.relative_to(KNOWLEDGE_DIR))
-        fm = _read_yaml_frontmatter(article)
+        fm = _read_frontmatter(article)
         if fm.get("type") != "area":
             # type mismatch handled by check_article_type; don't double-report
             continue
@@ -715,26 +700,6 @@ def check_sparse_articles() -> list[dict]:
                 f"Sparse article: {word_count} words (minimum recommended: {SPARSE_THRESHOLD})",
             ))
     return issues
-
-
-def _read_yaml_frontmatter(path: Path) -> dict:
-    """Full YAML frontmatter parse (supports lists). Returns {} on no/invalid frontmatter."""
-    import yaml
-    try:
-        text = path.read_text(encoding="utf-8")
-    except OSError:
-        return {}
-    if not text.startswith("---"):
-        return {}
-    end = text.find("\n---", 3)
-    if end == -1:
-        return {}
-    block = text[3:end]
-    try:
-        data = yaml.safe_load(block)
-    except yaml.YAMLError:
-        return {}
-    return data if isinstance(data, dict) else {}
 
 
 def check_daily_consistency() -> list[dict]:
@@ -860,7 +825,7 @@ def check_facts_violations() -> list[dict]:
 
     facts_with_terms: list[tuple[str, str, list[str]]] = []  # (slug, status, terms)
     for fact in sorted((KNOWLEDGE_DIR / "facts").glob("*.md")):
-        fm = _read_yaml_frontmatter(fact)
+        fm = _read_frontmatter(fact)
         terms = fm.get("negation_terms") or []
         if not isinstance(terms, list):
             continue
@@ -881,7 +846,7 @@ def check_facts_violations() -> list[dict]:
             content_lower = article.read_text(encoding="utf-8").lower()
         except OSError:
             continue
-        art_fm = _read_yaml_frontmatter(article)
+        art_fm = _read_frontmatter(article)
         for slug, status, terms in facts_with_terms:
             if _superseded_by_fact(art_fm, slug):
                 continue  # already annotated as superseded by this fact
@@ -919,7 +884,7 @@ def check_takes_consistency() -> list[dict]:
 
     for md in sorted(takes_dir.glob("*.md")):
         rel = str(md.relative_to(KNOWLEDGE_DIR))
-        fm = _read_yaml_frontmatter(md)
+        fm = _read_frontmatter(md)
         if fm.get("type") != "takes":
             issues.append(issue(
                 "error", "takes_frontmatter_type", rel,
@@ -935,11 +900,7 @@ def check_takes_consistency() -> list[dict]:
             text = md.read_text(encoding="utf-8")
         except OSError:
             continue
-        body = text
-        if text.startswith("---"):
-            end = text.find("\n---", 3)
-            if end != -1:
-                body = text[end + 4 :]
+        body = frontmatter.split_fence(text)[1]
         for lineno, line in enumerate(body.splitlines(), start=1):
             if not line.startswith("- **"):
                 continue
@@ -975,7 +936,7 @@ def check_domain_value() -> list[dict]:
     if not valid:
         return issues
     for article in list_wiki_articles():
-        fm = _read_yaml_frontmatter(article)
+        fm = _read_frontmatter(article)
         value = fm.get("domain")
         if value is None:
             continue

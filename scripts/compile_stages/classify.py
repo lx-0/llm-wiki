@@ -19,6 +19,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
+from core import frontmatter
+
 
 ClassifyKind = Literal["aggregated-memory", "single"]
 
@@ -43,13 +45,12 @@ def classify(content: str, source: Path) -> ClassifyResult:
 
 
 def _split_at_h2(content: str) -> list[str]:
-    fm_match = re.match(r"^---\n.*?\n---\n", content, re.DOTALL)
-    if fm_match:
-        frontmatter = fm_match.group(0)
-        body = content[fm_match.end():]
-    else:
-        frontmatter = ""
-        body = content
+    # Fence detection via the single core.frontmatter grammar (C03).
+    # `split_fence` returns the body as an exact suffix of `content`, so the
+    # raw fence prefix (re-attached to every chunk) is the remaining head —
+    # the substrate file itself is never re-serialized.
+    block, body = frontmatter.split_fence(content)
+    fence_prefix = content[: len(content) - len(body)] if block is not None else ""
     parts = re.split(r"(?=^## )", body, flags=re.MULTILINE)
     pre_h2 = parts[0] if parts and not parts[0].startswith("## ") else ""
     sections = [p for p in parts if p.startswith("## ")]
@@ -58,27 +59,14 @@ def _split_at_h2(content: str) -> list[str]:
     chunks = []
     for i, section in enumerate(sections):
         if i == 0 and pre_h2.strip():
-            chunks.append(frontmatter + pre_h2 + section)
+            chunks.append(fence_prefix + pre_h2 + section)
         else:
-            chunks.append(frontmatter + section)
+            chunks.append(fence_prefix + section)
     return chunks
 
 
 def _frontmatter_type(content: str) -> str | None:
-    return _frontmatter_field(content, "type")
-
-
-def _frontmatter_field(content: str, key: str) -> str | None:
-    fm_match = re.match(r"^---\n(.*?)\n---", content, re.DOTALL)
-    if not fm_match:
-        return None
-    fm = fm_match.group(1)
-    for line in fm.splitlines():
-        m = re.match(rf"^{re.escape(key)}:\s*(.+?)\s*$", line)
-        if m:
-            value = m.group(1)
-            if (value.startswith("'") and value.endswith("'")) or \
-               (value.startswith('"') and value.endswith('"')):
-                value = value[1:-1]
-            return value
-    return None
+    """`type:` scalar via the single core.frontmatter grammar (C03) — the
+    identical accessor the router uses, so the same bytes can never get a
+    different answer here than in `decide_route`."""
+    return frontmatter.field(content, "type")

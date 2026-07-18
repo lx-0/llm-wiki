@@ -31,15 +31,12 @@ os.environ.setdefault("CLAUDE_INVOKED_BY", "take")
 import argparse
 import logging
 import re
-import shutil
 import sys
-from datetime import datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import yaml
-
+from core import frontmatter
 from core.paths import TAKES_DIR
 from core.utils import slugify, today_iso
 
@@ -67,44 +64,21 @@ def _take_path(slug: str) -> Path:
     return TAKES_DIR / f"{slug}.md"
 
 
+# Read/write via the single core.frontmatter grammar (C03). `serialize`
+# normalizes the fence/body separator, which also fixes the old writer's
+# grow-one-blank-line-per-append round-trip.
+
 def _backup(path: Path) -> Path | None:
-    if not path.exists():
-        return None
-    ts = datetime.now().strftime("%Y%m%d-%H%M%S")
-    bak = path.with_suffix(path.suffix + f".bak.{ts}")
-    shutil.copy2(path, bak)
-    return bak
+    return frontmatter.backup(path)
 
 
 def _read_frontmatter(path: Path) -> tuple[dict, str]:
     """Return (frontmatter_dict, body_text). Body excludes the YAML block."""
-    text = path.read_text(encoding="utf-8")
-    if not text.startswith("---\n"):
-        return {}, text
-    end = text.find("\n---\n", 4)
-    if end == -1:
-        return {}, text
-    block = text[4:end]
-    body = text[end + 5 :]
-    try:
-        fm = yaml.safe_load(block) or {}
-    except yaml.YAMLError:
-        fm = {}
-    if not isinstance(fm, dict):
-        fm = {}
-    return fm, body
+    return frontmatter.parse(path.read_text(encoding="utf-8"))
 
 
-def _write_file(path: Path, frontmatter: dict, body: str) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    serialized = yaml.safe_dump(
-        frontmatter, sort_keys=False, allow_unicode=True
-    ).rstrip()
-    # Body always ends with a single newline; lines are appended on separate
-    # invocations so we tolerate body shapes that may or may not have a
-    # trailing newline already.
-    body = body.rstrip() + "\n" if body.strip() else ""
-    path.write_text(f"---\n{serialized}\n---\n\n{body}", encoding="utf-8")
+def _write_file(path: Path, fm: dict, body: str) -> None:
+    frontmatter.write(path, fm, body)
 
 
 def _initial_body(holder_display: str) -> str:

@@ -22,7 +22,9 @@
       status:     pending | accepted | dismissed
       kind:       task | idea | note      (classifier label; tracks type on convert)
       confidence: high | medium | low
-      summary:    JSON-encoded one-liner
+      summary:    one-line YAML scalar (plain for ordinary text; YAML single-
+                  or double-quoted when the text needs it — legacy records
+                  were always JSON-double-quoted)
       source:     vault-relative path to the origin note/photo
     This file depends ONLY on those keys + the source-path conventions
     (raw/inbox-mobile/pictures/<stem>.{md,jpeg,…} for photos, raw/voice/… etc.).
@@ -122,7 +124,13 @@ function parseFrontmatter(text) {
   for (const line of m[1].split("\n")) {
     const i = line.indexOf(":"); if (i < 0) continue;
     const k = line.slice(0, i).trim(); let v = line.slice(i + 1).trim();
+    // YAML/JSON double-quoted scalar (JSON escapes are the shared subset;
+    // legacy records were always json.dumps-written).
     if (v.startsWith('"')) { try { v = JSON.parse(v); } catch {} }
+    // YAML single-quoted scalar ('' is the only escape).
+    else if (v.length >= 2 && v.startsWith("'") && v.endsWith("'")) {
+      v = v.slice(1, -1).replace(/''/g, "'");
+    }
     fm[k] = v;
   }
   return fm;

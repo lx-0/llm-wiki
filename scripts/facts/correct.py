@@ -31,16 +31,13 @@ os.environ.setdefault("CLAUDE_INVOKED_BY", "correct")
 import argparse
 import logging
 import os as _os
-import shutil
 import subprocess
 import sys
-from datetime import datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import yaml
-
+from core import frontmatter
 from core.paths import FACTS_DIR, KNOWLEDGE_DIR
 from core.config import CONFIG
 from core.utils import slugify, today_iso
@@ -61,37 +58,19 @@ def _fact_path(slug: str) -> Path:
     return FACTS_DIR / f"{slug}.md"
 
 
+# One-line delegates into the single core.frontmatter grammar (C03). Kept
+# under their historical names because dedup.py's merge flow imports them.
+
 def _backup(path: Path) -> Path | None:
-    if not path.exists():
-        return None
-    ts = datetime.now().strftime("%Y%m%d-%H%M%S")
-    bak = path.with_suffix(path.suffix + f".bak.{ts}")
-    shutil.copy2(path, bak)
-    return bak
+    return frontmatter.backup(path)
 
 
 def _read_frontmatter(path: Path) -> tuple[dict, str]:
-    text = path.read_text(encoding="utf-8")
-    if not text.startswith("---\n"):
-        return {}, text
-    end = text.find("\n---\n", 4)
-    if end == -1:
-        return {}, text
-    block = text[4:end]
-    body = text[end + 5 :]
-    try:
-        fm = yaml.safe_load(block) or {}
-    except yaml.YAMLError:
-        fm = {}
-    return fm, body
+    return frontmatter.parse(path.read_text(encoding="utf-8"))
 
 
-def _write_fact(path: Path, frontmatter: dict, body: str) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    serialized = yaml.safe_dump(
-        frontmatter, sort_keys=False, allow_unicode=True
-    ).rstrip()
-    path.write_text(f"---\n{serialized}\n---\n\n{body.strip()}\n", encoding="utf-8")
+def _write_fact(path: Path, fm: dict, body: str) -> None:
+    frontmatter.write(path, fm, body)
 
 
 def _list_facts() -> list[Path]:
@@ -182,7 +161,7 @@ def cmd_add(args: argparse.Namespace) -> int:
     if bak:
         log.info("Backed up existing %s -> %s", path.name, bak.name)
 
-    frontmatter = {
+    fm = {
         "title": title,
         "type": "fact",
         "status": status,
@@ -193,7 +172,7 @@ def cmd_add(args: argparse.Namespace) -> int:
         "applied": False,
         "negation_terms": list(args.term or []),
     }
-    _write_fact(path, frontmatter, body)
+    _write_fact(path, fm, body)
     if status == "negation":
         _warn_broad_terms(list(args.term or []), KNOWLEDGE_DIR)
     print(str(path))

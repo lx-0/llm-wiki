@@ -18,11 +18,10 @@ Per-instrument frontmatter fields the timeline reads:
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
-import yaml
+from scripts.core import frontmatter
 
 
 @dataclass(frozen=True)
@@ -102,26 +101,14 @@ class Timeline:
         return sorted(keys)
 
 
-_FM_BOUNDARY = re.compile(r"^---\s*$", re.MULTILINE)
-
-
 def _parse_frontmatter(markdown_text: str) -> dict | None:
     """Pull the YAML frontmatter block out of a markdown string.
 
-    Returns the parsed dict or None if there's no leading `---` block.
+    Single core.frontmatter grammar (C03); returns the parsed dict or None
+    when there's no leading fence / malformed YAML / empty block.
     """
-    if not markdown_text.startswith("---"):
-        return None
-    # Find the second `---` line
-    matches = list(_FM_BOUNDARY.finditer(markdown_text))
-    if len(matches) < 2:
-        return None
-    fm_start = matches[0].end()
-    fm_end = matches[1].start()
-    try:
-        return yaml.safe_load(markdown_text[fm_start:fm_end])
-    except yaml.YAMLError:
-        return None
+    fm = frontmatter.parse(markdown_text)[0]
+    return fm or None
 
 
 def _snapshot_from_report(report_path: Path) -> InstrumentSnapshot | None:

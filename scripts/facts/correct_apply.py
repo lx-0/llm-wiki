@@ -26,8 +26,6 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import yaml
-
 from claude_agent_sdk import (
     AssistantMessage,
     ClaudeAgentOptions,
@@ -36,6 +34,7 @@ from claude_agent_sdk import (
     query,
 )
 
+from core import frontmatter
 from core.paths import (
     CONCEPTS_DIR,
     DAILY_DIR,
@@ -66,32 +65,10 @@ logging.basicConfig(
 log = logging.getLogger("correct-apply")
 
 
-def _split_frontmatter(text: str) -> tuple[dict, str, str]:
-    """Return (frontmatter dict, raw frontmatter block, body)."""
-    if not text.startswith("---\n"):
-        return {}, "", text
-    end = text.find("\n---\n", 4)
-    if end == -1:
-        return {}, "", text
-    block = text[4:end]
-    body = text[end + 5 :]
-    try:
-        fm = yaml.safe_load(block) or {}
-    except yaml.YAMLError:
-        fm = {}
-    return (fm if isinstance(fm, dict) else {}), block, body
-
-
-def _write_frontmatter(path: Path, fm: dict, body: str) -> None:
-    serialized = yaml.safe_dump(fm, sort_keys=False, allow_unicode=True).rstrip()
-    path.write_text(f"---\n{serialized}\n---\n\n{body.lstrip()}", encoding="utf-8")
-
-
-def _backup(path: Path) -> Path:
-    ts = datetime.now().strftime("%Y%m%d-%H%M%S")
-    bak = path.with_suffix(path.suffix + f".bak.{ts}")
-    bak.write_bytes(path.read_bytes())
-    return bak
+# Frontmatter read/backup via the single core.frontmatter grammar (C03).
+# Writebacks stamp single keys with `frontmatter.update_fields` — surgical
+# line-replace, never a safe_dump round-trip of the operator's on-disk YAML
+# (DECISIONS 2026-05-15).
 
 
 _ACTION_KEYS = ("superseded", "edited", "renamed", "deleted")
@@ -462,7 +439,7 @@ async def apply(slug: str, dry_run: bool, allow_delete: bool = False, force: boo
         return 1
 
     fact_text = fact_path.read_text(encoding="utf-8")
-    fm, _block, _body = _split_frontmatter(fact_text)
+    fm, _body = frontmatter.parse(fact_text)
     if fm.get("type") != "fact":
         log.warning("File %s does not have type: fact — proceeding anyway.", fact_path)
 
@@ -566,13 +543,12 @@ async def apply(slug: str, dry_run: bool, allow_delete: bool = False, force: boo
     # Mark fact as applied. Re-read to avoid stomping if the agent edited it
     # (it shouldn't — the prompt forbids it — but be safe).
     current_text = fact_path.read_text(encoding="utf-8")
-    fm_now, _, body_now = _split_frontmatter(current_text)
+    fm_now, _body_now = frontmatter.parse(current_text)
     if fm_now:
-        _backup(fact_path)
-        fm_now["applied"] = now_iso()
-        fm_now["updated"] = today_iso()
-        _write_frontmatter(fact_path, fm_now, body_now)
-        log.info("Marked %s as applied=%s", rel_fact_path, fm_now["applied"])
+        frontmatter.backup(fact_path)
+        applied_at = now_iso()
+        frontmatter.update_fields(fact_path, applied=applied_at, updated=today_iso())
+        log.info("Marked %s as applied=%s", rel_fact_path, applied_at)
     else:
         log.warning("Could not parse fact frontmatter after run; not updating `applied:`.")
 
@@ -683,12 +659,12 @@ async def reconcile_fact(
 
     # Stamp the fact as reconciled (cooldown key). Re-read to avoid stomping.
     current_text = fact_path.read_text(encoding="utf-8")
-    fm_now, _, body_now = _split_frontmatter(current_text)
+    fm_now, _body_now = frontmatter.parse(current_text)
     if fm_now:
-        _backup(fact_path)
-        fm_now["last_reconciled"] = now_iso()
-        fm_now["updated"] = today_iso()
-        _write_frontmatter(fact_path, fm_now, body_now)
+        frontmatter.backup(fact_path)
+        frontmatter.update_fields(
+            fact_path, last_reconciled=now_iso(), updated=today_iso()
+        )
 
     return ReconcileResult(slug, "ok", cost_usd=cost, files=violating_files, detail="reconciled")
 
