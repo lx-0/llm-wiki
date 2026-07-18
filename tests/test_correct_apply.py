@@ -8,32 +8,39 @@ turn bound. The agent annotates; it can no longer shell out or delete.
 from __future__ import annotations
 
 
-def test_apply_options_sandboxed() -> None:
-    """`_apply_agent_options` returns a non-destructive, path-scoped config.
+def test_apply_call_spec_sandboxed() -> None:
+    """`_apply_call_spec` declares a non-destructive, path-scoped policy.
 
     Regression guard for issue #5: the wide-open `apply()` (Bash +
     acceptEdits + hardcoded 50 turns, no hook) deleted 17 articles. The
-    sandboxed options make destruction structurally impossible.
+    sandboxed spec makes destruction structurally impossible: the harness
+    (`run_sdk_query`) turns `write_scope` into the PreToolUse Write|Edit
+    path-scope hook with `permission_mode="default"` — pinned by
+    tests/test_sdk_run_harness.py.
     """
     from facts import correct_apply
     from core.config import CONFIG
-    from core.sdk_helpers import StderrCapture
 
-    opts = correct_apply._apply_agent_options(StderrCapture())
+    spec = correct_apply._apply_call_spec(source="fact:test", input_chars=10)
 
     # Bash is gone — the agent cannot `rm`/`git mv`.
-    assert "Bash" not in opts.allowed_tools
-    assert set(opts.allowed_tools) == {"Read", "Glob", "Grep", "Write", "Edit"}
+    assert "Bash" not in spec.allowed_tools
+    assert set(spec.allowed_tools) == {"Read", "Glob", "Grep", "Write", "Edit"}
 
-    # Not acceptEdits — writes go through the hook.
-    assert opts.permission_mode == "default"
+    # Not acceptEdits — the harness defaults the hook shape to "default".
+    assert spec.permission_mode is None
 
     # Turn bound is a config knob, not a magic number.
-    assert opts.max_turns == CONFIG.limits.correct_apply_max_turns
+    assert spec.max_turns == CONFIG.limits.correct_apply_max_turns
 
-    # A PreToolUse Write|Edit hook is wired (path-scope).
-    assert "PreToolUse" in (opts.hooks or {})
-    assert opts.hooks["PreToolUse"], "PreToolUse hook list must be non-empty"
+    # Write/Edit path-scope wired, facts/ carved out as write-protected
+    # (deny takes precedence over the allowed knowledge/ root).
+    assert spec.write_scope is not None
+    assert correct_apply.KNOWLEDGE_DIR in spec.write_scope.roots
+    assert spec.write_scope.denied_subpaths == (correct_apply.FACTS_DIR,)
+    # No legacy rollback shape — the hook applies regardless of the
+    # compile_callback_gate flag.
+    assert spec.write_scope.legacy_allowed_tools is None
 
 
 def _render_apply_prompt(deletion_allowed: str = "false") -> str:
@@ -222,7 +229,9 @@ def test_apply_golden_supersede_renames_deletes_nothing(tmp_path, monkeypatch, c
     monkeypatch.setattr(correct_apply, "FACTS_DIR", facts)
     monkeypatch.setattr(correct_apply, "KNOWLEDGE_DIR", knowledge)
     monkeypatch.setattr(correct_apply, "INDEX_FILE", index)
-    monkeypatch.setattr(correct_apply.LEDGER, "record", lambda **k: None)
+    import core.usage as usage_mod
+    # LEDGER.record now happens inside run_sdk_query (core.usage global).
+    monkeypatch.setattr(usage_mod.LEDGER, "record", lambda **k: None)
 
     agent_out = (
         "## Applied summary\nRenamed township → fleet.\n\n"
@@ -349,7 +358,9 @@ def test_apply_allow_delete_trashes_nominated(tmp_path, monkeypatch) -> None:
     monkeypatch.setattr(correct_apply, "FACTS_DIR", facts)
     monkeypatch.setattr(correct_apply, "KNOWLEDGE_DIR", knowledge)
     monkeypatch.setattr(correct_apply, "INDEX_FILE", knowledge / "index.md")
-    monkeypatch.setattr(correct_apply.LEDGER, "record", lambda **k: None)
+    import core.usage as usage_mod
+    # LEDGER.record now happens inside run_sdk_query (core.usage global).
+    monkeypatch.setattr(usage_mod.LEDGER, "record", lambda **k: None)
 
     agent_out = (
         "## Proposed actions\n```json\n"
@@ -579,7 +590,9 @@ def test_apply_deletion_e2e_clean_git(tmp_path, monkeypatch, caplog) -> None:
     monkeypatch.setattr(correct_apply, "FACTS_DIR", facts)
     monkeypatch.setattr(correct_apply, "KNOWLEDGE_DIR", knowledge)
     monkeypatch.setattr(correct_apply, "INDEX_FILE", knowledge / "index.md")
-    monkeypatch.setattr(correct_apply.LEDGER, "record", lambda **k: None)
+    import core.usage as usage_mod
+    # LEDGER.record now happens inside run_sdk_query (core.usage global).
+    monkeypatch.setattr(usage_mod.LEDGER, "record", lambda **k: None)
 
     agent_out = (
         "## Proposed actions\n```json\n"

@@ -13,6 +13,11 @@ S02-T02):
   permission_mode = 'default'
   can_use_tool = make_path_scope_gate([])  # deny-all-writes
   setting_sources = ['project']
+
+Since M021 S01 the composition is wired through ``run_sdk_query`` —
+``SdkCallSpec(deny_all_writes=True)`` assembles the deny-all gate plus
+the streaming prompt the callback contract requires; the tool sets stay
+caller-owned policy in ``ANALYST_ALLOWED_TOOLS`` / ``ANALYST_DISALLOWED_TOOLS``.
 """
 
 from __future__ import annotations
@@ -28,22 +33,10 @@ import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
-from claude_agent_sdk import (  # noqa: E402
-    AssistantMessage,
-    ClaudeAgentOptions,
-    ResultMessage,
-    UserMessage,
-    query,
-)
+from claude_agent_sdk import query  # noqa: E402
 
 from scripts.core.config import CONFIG  # noqa: E402
-from scripts.core.usage import LEDGER  # noqa: E402
-from scripts.core.sdk_helpers import (  # noqa: E402
-    StderrCapture,
-    log_sdk_failure,
-    make_path_scope_gate,
-    prompt_stream,
-)
+from scripts.core.sdk_helpers import SdkCallSpec, run_sdk_query  # noqa: E402
 from scripts.reports._engine.study import Study, utc_now_iso  # noqa: E402
 
 
@@ -161,66 +154,44 @@ async def _run_analyst_async(
     persona_version = _file_hash(system_prompt_path)
     prompt_version = _text_hash(user_prompt)
 
-    started_wall = time.time()
     start = time.perf_counter()
-    text_chunks: list[str] = []
-    cost = 0.0
-    in_tok = out_tok = 0
-    capture = StderrCapture()
 
-    options = ClaudeAgentOptions(
-        cwd=str(vault_cwd),
-        model=model,
-        system_prompt=persona_text,
-        allowed_tools=list(ANALYST_ALLOWED_TOOLS),
-        disallowed_tools=list(ANALYST_DISALLOWED_TOOLS),
-        permission_mode="default",
-        max_turns=max_turns,
-        setting_sources=["project"],
-        can_use_tool=make_path_scope_gate([]),
-        stderr=capture.callback,
-    )
-
-    try:
-        async for message in query(
-            prompt=prompt_stream(user_prompt), options=options
-        ):
-            if isinstance(message, AssistantMessage):
-                if message.usage:
-                    in_tok += message.usage.get("input_tokens", 0)
-                    out_tok += message.usage.get("output_tokens", 0)
-                for block in message.content:
-                    if type(block).__name__ == "TextBlock":
-                        text_chunks.append(getattr(block, "text", ""))
-            elif isinstance(message, UserMessage):
-                continue
-            elif isinstance(message, ResultMessage):
-                cost = float(getattr(message, "total_cost_usd", 0.0) or 0.0)
-    except Exception as exc:
-        failure = log_sdk_failure(
-            log,
+    # One harness call owns the mechanics (options assembly, stderr capture,
+    # cache-aware usage extraction, LEDGER recording — cache-inclusive, on
+    # every outcome — and failure diagnostics). The analyst scope-lock stays
+    # caller-owned policy: deny_all_writes wires the empty-roots can_use_tool
+    # gate + the streaming prompt the callback contract requires.
+    result = await run_sdk_query(
+        user_prompt,
+        SdkCallSpec(
             label=f"reports.analyst pass={pass_label}",
-            started=started_wall,
-            capture=capture,
-            exc=exc,
+            logger=log,
             model=model,
+            cwd=vault_cwd,
+            max_turns=max_turns,
+            system_prompt=persona_text,
+            allowed_tools=ANALYST_ALLOWED_TOOLS,
+            disallowed_tools=ANALYST_DISALLOWED_TOOLS,
+            setting_sources=("project",),
+            deny_all_writes=True,
             input_chars=len(user_prompt) + len(persona_text),
-            extra={"persona_version": persona_version,
-                   "prompt_version": prompt_version},
-        )
+            extra_log={"persona_version": persona_version,
+                       "prompt_version": prompt_version},
+        ),
+        query_fn=query,
+    )
+    if result.failure is not None:
         raise AnalystError(
-            f"analyst call failed (pass={pass_label}): {failure}"
-        ) from exc
+            f"analyst call failed (pass={pass_label}): {result.failure}"
+        ) from result.exc
 
     elapsed_ms = int((time.perf_counter() - start) * 1000)
-    body = "".join(text_chunks).strip()
+    body = result.assistant_text.strip()
     if not body:
         raise AnalystError(
             f"analyst returned empty markdown body (pass={pass_label}) — "
             f"check captured stderr"
         )
-
-    LEDGER.record(model=model, input_tokens=in_tok, output_tokens=out_tok)
 
     return AnalystResult(
         markdown_body=body,
@@ -228,7 +199,7 @@ async def _run_analyst_async(
         model_id=model,
         persona_version=persona_version,
         prompt_version=prompt_version,
-        cost_usd=cost,
+        cost_usd=result.cost_usd,
         pass_label=pass_label,
     )
 

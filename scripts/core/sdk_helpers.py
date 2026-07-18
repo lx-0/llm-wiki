@@ -1,4 +1,4 @@
-"""Diagnostic helpers for `claude_agent_sdk` calls.
+"""Claude-SDK call harness + diagnostic helpers for `claude_agent_sdk`.
 
 The SDK silently drops the bundled-CLI's stderr unless an
 `options.stderr` callback is wired, so failures surface as the
@@ -6,7 +6,33 @@ unhelpful `Command failed with exit code 1 - Check stderr output for
 details`. Without root-cause info the operator can only guess at
 rate-limits, auth failures, network blips, or hard CLI crashes.
 
-This module gives every SDK call site four primitives:
+The primary interface is the ``run_sdk_query(prompt, spec)`` harness
+(M021 slice 1): one deep seam that owns the *mechanics* every call site
+used to hand-roll — ``ClaudeAgentOptions`` assembly, path-scope gate
+wiring, the per-message stall-timeout loop, stderr capture, failure
+classification/logging, cache-aware usage extraction, and LEDGER
+recording. *Policy* stays caller-owned via ``SdkCallSpec``: which model,
+which tools, which write scope, which timeout — every site differs, and
+hiding those knobs was explicitly rejected in DECISIONS 2026-05-04.
+
+Use from a call site::
+
+    result = await run_sdk_query(
+        prompt,
+        SdkCallSpec(
+            label="compile_file", logger=log, model=model_id,
+            cwd=ROOT_DIR, max_turns=12, system_prompt=...,
+            allowed_tools=("Read", "Glob", "Grep", "Write", "Edit"),
+            write_scope=WriteScope(roots=(knowledge_dir,)),
+            stall_timeout_s=600, source=rel_path,
+        ),
+        query_fn=query,  # module-global so tests can monkeypatch it
+    )
+    if result.failure is not None:
+        ...  # caller decides retry / skip / abort from `failure.kind`
+
+Lower-level primitives (used by the harness, still available for
+non-``query()`` diagnostics):
 
   - ``StderrCapture`` — ring-buffer collector that doubles as the
     ``stderr=`` callback. Holds the last N lines for diagnostic dumps.
@@ -18,24 +44,6 @@ This module gives every SDK call site four primitives:
   - ``assert_prompt_within_budget`` — pre-flight guard that rejects a
     corpus-sized prompt *before* the SDK call, where context-window
     overflow would otherwise surface as an opaque ``kind=unknown``.
-
-Use from each SDK call site::
-
-    capture = StderrCapture()
-    started = time.time()
-    try:
-        async for msg in query(prompt=p, options=ClaudeAgentOptions(
-            ..., stderr=capture.callback,
-        )):
-            ...
-    except Exception as exc:
-        failure = log_sdk_failure(
-            log, label="compile_file",
-            source=rel_path, model=CONFIG.models.compile_model,
-            input_chars=len(src), started=started,
-            capture=capture, exc=exc,
-        )
-        # caller decides retry / continue / abort based on `failure.kind`
 """
 
 from __future__ import annotations
@@ -487,3 +495,435 @@ def make_path_scope_hook(allowed_write_roots, denied_subpaths=None):
             ),
         }}
     return hook
+
+
+# ── run_sdk_query — the one Claude-SDK call harness (M021 slice 1) ─────
+#
+# Every hand-rolled `async for message in query(...)` loop in the engine
+# re-implemented the same mechanics with drift: stderr capture, per-message
+# stall timeout, isinstance dispatch, usage summing (six sites summed the
+# documented-wrong uncached `usage["input_tokens"]` delta — see UsageTokens),
+# LEDGER recording, failure classification. The harness owns those mechanics
+# once. Policy stays caller-owned via SdkCallSpec (DECISIONS 2026-05-04:
+# every site has different tools/turns/permissions/system-prompt — do not
+# hide ClaudeAgentOptions knobs, parameterize them).
+#
+# Token accounting follows DECISIONS 2026-06-02 (dual basis):
+#   - `input_tokens`/`output_tokens` on the result are CACHE-INCLUSIVE
+#     (ResultMessage.usage preferred, per-turn cache-inclusive sum as
+#     fallback) — this is what the harness records to LEDGER.
+#   - `uncached_input_tokens`/`uncached_output_tokens` are the raw per-turn
+#     sums — the stable basis for runaway-budget guards (cache_read is
+#     re-counted per turn and would explode a tuned threshold).
+
+
+@dataclass(frozen=True)
+class WriteScope:
+    """Path-scope for agent Write/Edit, wired by the harness.
+
+    Production shape (2026-05-18): Write/Edit stay in ``allowed_tools`` so
+    the CLI exposes them, and a PreToolUse hook (``make_path_scope_hook``)
+    denies any write outside ``roots`` (with ``denied_subpaths`` carving
+    write-protected islands, deny-precedence).
+
+    ``legacy_allowed_tools`` is the pre-hook rollback shape
+    (``Write(<glob>)`` pseudo-scopes + ``acceptEdits``), used only when set
+    AND ``CONFIG.features.compile_callback_gate`` is off — keeps the
+    rollback one config flip away, exactly as the per-site branches did.
+    """
+
+    roots: tuple[Path, ...]
+    denied_subpaths: tuple[Path, ...] = ()
+    legacy_allowed_tools: tuple[str, ...] | None = None
+
+
+@dataclass(frozen=True)
+class SdkCallSpec:
+    """Per-site policy for one ``run_sdk_query`` call.
+
+    The harness unifies mechanics, not policy: tool sets, turn budgets,
+    permission modes, system prompts, timeouts and write scopes differ at
+    every site and stay here, caller-owned. ``None`` means "omit — let the
+    SDK/CLI default apply" (e.g. ``model=None`` runs the CLI's default
+    model; ``stall_timeout_s=None`` disables the per-message timeout).
+
+    The 3-layer substrate-injection scope enforcement (prompt + tools +
+    setting_sources) is preserved: the caller controls ``allowed_tools`` /
+    ``disallowed_tools`` / ``setting_sources`` explicitly, and write access
+    is gated via ``write_scope`` / ``deny_all_writes``.
+    """
+
+    label: str                                     # diagnostic label for logs
+    logger: logging.Logger                         # caller's logger (errors land in its *-errors.log)
+    model: str | None = None
+    cwd: Path | None = None
+    max_turns: int | None = None
+    system_prompt: str | dict | None = None
+    allowed_tools: tuple[str, ...] | None = None
+    disallowed_tools: tuple[str, ...] | None = None
+    permission_mode: str | None = None
+    setting_sources: tuple[str, ...] | None = None
+    write_scope: WriteScope | None = None          # hook-gated Write/Edit path scope
+    deny_all_writes: bool = False                  # read-only wedge (M019): can_use_tool deny-all
+    stall_timeout_s: float | None = None           # per-MESSAGE stall timeout, not wall-clock
+    source: str | None = None                      # provenance string for failure logs
+    input_chars: int | None = None                 # defaults to len(prompt)
+    extra_log: dict | None = None                  # extra key/values for log_sdk_failure
+    record_usage: bool = True                      # LEDGER.record on every outcome
+
+
+@dataclass(frozen=True)
+class SdkRunResult:
+    """Typed outcome of one ``run_sdk_query`` call.
+
+    ``failure is None`` means the stream completed without an SDK-level
+    error. ``input_tokens``/``output_tokens`` are the cache-inclusive
+    totals (the LEDGER basis); ``uncached_*`` are the raw per-turn sums
+    (the runaway-budget basis) — see DECISIONS 2026-06-02.
+    """
+
+    result_text: str = ""              # ResultMessage.result (final agent text)
+    assistant_text: str = ""           # concatenated AssistantMessage TextBlocks
+    input_tokens: int = 0              # cache-inclusive true input (LEDGER basis)
+    output_tokens: int = 0
+    uncached_input_tokens: int = 0     # raw per-turn sum (budget-guard basis)
+    uncached_output_tokens: int = 0
+    cost_usd: float = 0.0              # SDK-reported actual (ResultMessage.total_cost_usd)
+    message_count: int = 0
+    num_turns: int = 0
+    subtype: str | None = None         # ResultMessage.subtype when one arrived
+    failure: FailureClass | None = None
+    exc: BaseException | None = None   # original exception for `raise ... from`
+    elapsed_s: float = 0.0
+
+    @property
+    def ok(self) -> bool:
+        return self.failure is None
+
+
+def _structured_error_failure(final_result, elapsed_s: float, uncached_tokens: int) -> FailureClass:
+    """FailureClass for a structured ``ResultMessage(is_error=True)``.
+
+    ``error_max_turns`` maps to kind=max_turns; everything else routes
+    through the shared classifier so a fast empty-stderr fail lands as
+    cli_crash and a slow no-signal fail as unknown (which retry ladders
+    treat differently from an opaque agent_error).
+    """
+    errors = getattr(final_result, "errors", None) or []
+    if final_result.subtype == "error_max_turns":
+        kind = "max_turns"
+    else:
+        kind = classify_failure(
+            elapsed_s, final_result.result or "", "; ".join(errors),
+        ).kind
+    detail = (
+        f"{final_result.subtype} after {final_result.num_turns} turns "
+        f"({elapsed_s:.1f}s, {uncached_tokens:,} tok)"
+    )
+    if errors:
+        detail += f" — errors: {'; '.join(errors)}"
+    return FailureClass(kind, detail)
+
+
+async def run_sdk_query(prompt: str, spec: SdkCallSpec, *, query_fn=None) -> SdkRunResult:
+    """Run one Claude-SDK ``query()`` end-to-end. Never raises for SDK
+    failures — returns an ``SdkRunResult`` with ``failure`` set instead,
+    so callers keep full control of retry/skip/abort policy.
+
+    ``query_fn`` defaults to ``claude_agent_sdk.query``; call sites pass
+    their module-global ``query`` so tests keep monkeypatching the site's
+    own symbol (``monkeypatch.setattr(<mod>, "query", fake)``).
+
+    Mechanics owned here:
+      - options assembly (buffer size from CONFIG, stderr capture wired)
+      - write gating: ``spec.write_scope`` → PreToolUse path-scope hook
+        (production, 2026-05-18) or the legacy glob shape when the
+        ``compile_callback_gate`` flag is off; ``spec.deny_all_writes`` →
+        ``can_use_tool`` deny-all gate + streaming prompt (the callback
+        contract requires an AsyncIterable prompt)
+      - per-message stall-timeout loop (surfaces bundled-CLI hangs as
+        kind=timeout instead of blocking forever)
+      - cache-aware usage extraction on BOTH bases (see module comment)
+      - ``LEDGER.record`` on every outcome — success, structured error,
+        timeout, crash — with the cache-inclusive totals
+      - failure classification + ERROR-level diagnostics via
+        ``log_sdk_failure`` / ``StderrCapture``
+    """
+    # Late imports: sdk_helpers stays import-light for callers that only
+    # use the diagnostics primitives, and tests that monkeypatch
+    # `core.usage.LEDGER` / `classify_failure` see the swap at call time.
+    import asyncio
+
+    from claude_agent_sdk import (
+        AssistantMessage,
+        ClaudeAgentOptions,
+        HookMatcher,
+        ResultMessage,
+    )
+    from claude_agent_sdk import query as _sdk_query
+
+    from .config import CONFIG
+    from .usage import LEDGER, PROVIDER_CLAUDE
+
+    if query_fn is None:
+        query_fn = _sdk_query
+
+    log = spec.logger
+    capture = StderrCapture()
+    started = time.time()
+    input_chars = spec.input_chars if spec.input_chars is not None else len(prompt)
+    timeout = spec.stall_timeout_s if (spec.stall_timeout_s or 0) > 0 else None
+
+    # ── options assembly ──────────────────────────────────────────────
+    options_kwargs: dict = dict(
+        max_buffer_size=CONFIG.limits.sdk_max_buffer_size_mb * 1024 * 1024,
+        stderr=capture.callback,
+    )
+    if spec.cwd is not None:
+        options_kwargs["cwd"] = str(spec.cwd)
+    if spec.model is not None:
+        options_kwargs["model"] = spec.model
+    if spec.max_turns is not None:
+        options_kwargs["max_turns"] = spec.max_turns
+    if spec.system_prompt is not None:
+        options_kwargs["system_prompt"] = spec.system_prompt
+    if spec.setting_sources is not None:
+        options_kwargs["setting_sources"] = list(spec.setting_sources)
+    if spec.disallowed_tools is not None:
+        options_kwargs["disallowed_tools"] = list(spec.disallowed_tools)
+
+    query_prompt: object = prompt
+    if spec.deny_all_writes:
+        # Read-only wedge composition (M019): deny-all-writes can_use_tool
+        # gate as defense-in-depth under permission_mode="default". The
+        # callback contract requires a streaming prompt (prompt_stream).
+        options_kwargs["allowed_tools"] = list(spec.allowed_tools or ())
+        options_kwargs["permission_mode"] = spec.permission_mode or "default"
+        options_kwargs["can_use_tool"] = make_path_scope_gate([])
+        query_prompt = prompt_stream(prompt)
+    elif spec.write_scope is not None:
+        scope = spec.write_scope
+        if (
+            scope.legacy_allowed_tools is not None
+            and not CONFIG.features.compile_callback_gate
+        ):
+            # Rollback shape (pre-2026-05-18): Write(<glob>) pseudo-scopes
+            # + acceptEdits. One config flip away, per-site branch removed.
+            options_kwargs["allowed_tools"] = list(scope.legacy_allowed_tools)
+            options_kwargs["permission_mode"] = "acceptEdits"
+        else:
+            # Production write gate (2026-05-18): Write/Edit stay exposed
+            # in allowed_tools; the PreToolUse hook path-scopes them.
+            options_kwargs["allowed_tools"] = list(spec.allowed_tools or ())
+            options_kwargs["hooks"] = {
+                "PreToolUse": [
+                    HookMatcher(
+                        matcher="Write|Edit",
+                        hooks=[make_path_scope_hook(
+                            list(scope.roots),
+                            denied_subpaths=list(scope.denied_subpaths) or None,
+                        )],
+                    ),
+                ],
+            }
+            options_kwargs["permission_mode"] = spec.permission_mode or "default"
+    else:
+        if spec.allowed_tools is not None:
+            options_kwargs["allowed_tools"] = list(spec.allowed_tools)
+        if spec.permission_mode is not None:
+            options_kwargs["permission_mode"] = spec.permission_mode
+
+    options = ClaudeAgentOptions(**options_kwargs)
+
+    # ── accumulation state ────────────────────────────────────────────
+    uncached_in = uncached_out = 0        # raw per-turn sums (budget basis)
+    fallback_in = fallback_out = 0        # cache-inclusive per-turn fallback
+    text_parts: list[str] = []
+    final_result = None
+    result_text = ""
+    message_count = 0
+
+    def _record(input_tokens: int, output_tokens: int) -> None:
+        """LEDGER gets the cache-inclusive totals on EVERY outcome —
+        partial usage from a failed call is still real spend."""
+        if spec.record_usage:
+            LEDGER.record(
+                model=spec.model or "(default)",
+                provider=PROVIDER_CLAUDE,
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+            )
+
+    def _partial_result(failure: FailureClass, exc: BaseException | None) -> SdkRunResult:
+        return SdkRunResult(
+            result_text=result_text,
+            assistant_text="".join(text_parts),
+            input_tokens=fallback_in,
+            output_tokens=fallback_out,
+            uncached_input_tokens=uncached_in,
+            uncached_output_tokens=uncached_out,
+            cost_usd=0.0,
+            message_count=message_count,
+            num_turns=final_result.num_turns if final_result is not None else 0,
+            subtype=final_result.subtype if final_result is not None else None,
+            failure=failure,
+            exc=exc,
+            elapsed_s=time.time() - started,
+        )
+
+    # ── the one message loop ──────────────────────────────────────────
+    try:
+        agen = query_fn(prompt=query_prompt, options=options).__aiter__()
+        while True:
+            try:
+                if timeout is not None:
+                    message = await asyncio.wait_for(agen.__anext__(), timeout=timeout)
+                else:
+                    message = await agen.__anext__()
+            except StopAsyncIteration:
+                break
+            message_count += 1
+            if isinstance(message, AssistantMessage):
+                usage = getattr(message, "usage", None)
+                if usage:
+                    u = extract_usage_tokens(usage)
+                    uncached_in += u.input_tokens
+                    uncached_out += u.output_tokens
+                    fallback_in += u.total_input
+                    fallback_out += u.output_tokens
+                for block in getattr(message, "content", None) or ():
+                    if type(block).__name__ == "TextBlock":
+                        text_parts.append(getattr(block, "text", ""))
+            elif isinstance(message, ResultMessage):
+                final_result = message
+                result_text = message.result or ""
+    except asyncio.TimeoutError:
+        elapsed = time.time() - started
+        log.warning(
+            "  %s ⏱ per-call timeout after %.1fs (no message for %ss, "
+            "messages so far=%d) — bundled CLI hung. model=%s source=%s (%s chars).",
+            spec.label, elapsed, timeout, message_count,
+            spec.model or "(default)", spec.source or "—", f"{input_chars:,}",
+        )
+        try:
+            aclose = getattr(agen, "aclose", None)
+            if aclose is not None:
+                await aclose()
+        except Exception:  # noqa: BLE001 — best-effort cleanup
+            pass
+        log_sdk_failure(
+            log,
+            label=spec.label,
+            source=spec.source,
+            model=spec.model,
+            input_chars=input_chars,
+            started=started,
+            capture=capture,
+            exc=TimeoutError(
+                f"per-call timeout after {elapsed:.1f}s (stall_timeout_s={timeout})"
+            ),
+            extra=spec.extra_log,
+        )
+        _record(fallback_in, fallback_out)
+        return _partial_result(
+            FailureClass(
+                "timeout",
+                f"per-call stall after {elapsed:.1f}s (messages={message_count})",
+            ),
+            None,
+        )
+    except Exception as exc:  # noqa: BLE001 — classified below, caller decides
+        elapsed = time.time() - started
+        if final_result is not None and getattr(final_result, "is_error", False):
+            # Structured error: the CLI yielded a ResultMessage(is_error)
+            # then exited 1. Classify from the structured payload; the
+            # authoritative usage is still worth recording.
+            failure = _structured_error_failure(
+                final_result, elapsed, uncached_in + uncached_out,
+            )
+            u = extract_usage_tokens(final_result.usage)
+            ledger_in = u.total_input or fallback_in
+            ledger_out = u.output_tokens or fallback_out
+            _record(ledger_in, ledger_out)
+            log.error(
+                "  %s ✗ failed after %.1fs — kind=%s · %s",
+                spec.label, elapsed, failure.kind, failure.detail,
+            )
+            if spec.source is not None:
+                log.error("    source:    %s", spec.source)
+            if spec.model is not None:
+                log.error("    model:     %s", spec.model)
+            log.error(
+                "    input:     %s chars (%.1f KB)",
+                f"{input_chars:,}", input_chars / 1024,
+            )
+            log.error(
+                "    tokens:    %s in / %s out burned despite failure",
+                f"{uncached_in:,}", f"{uncached_out:,}",
+            )
+            capture.dump_to(log)
+            return SdkRunResult(
+                result_text=result_text,
+                assistant_text="".join(text_parts),
+                input_tokens=ledger_in,
+                output_tokens=ledger_out,
+                uncached_input_tokens=uncached_in,
+                uncached_output_tokens=uncached_out,
+                cost_usd=float(getattr(final_result, "total_cost_usd", 0.0) or 0.0),
+                message_count=message_count,
+                num_turns=final_result.num_turns,
+                subtype=final_result.subtype,
+                failure=failure,
+                exc=exc,
+                elapsed_s=elapsed,
+            )
+        failure = log_sdk_failure(
+            log,
+            label=spec.label,
+            source=spec.source,
+            model=spec.model,
+            input_chars=input_chars,
+            started=started,
+            capture=capture,
+            exc=exc,
+            extra=spec.extra_log,
+        )
+        _record(fallback_in, fallback_out)
+        return _partial_result(failure, exc)
+
+    # ── clean stream end ──────────────────────────────────────────────
+    elapsed = time.time() - started
+    u = extract_usage_tokens(final_result.usage if final_result is not None else None)
+    ledger_in = u.total_input or fallback_in
+    ledger_out = u.output_tokens or fallback_out
+    cost = float(final_result.total_cost_usd) if (
+        final_result is not None and final_result.total_cost_usd is not None
+    ) else 0.0
+    failure = None
+    if final_result is not None and getattr(final_result, "is_error", False):
+        # Structured error with a clean generator exit (no raise) — same
+        # classification as the raised variant above.
+        failure = _structured_error_failure(
+            final_result, elapsed, uncached_in + uncached_out,
+        )
+        log.error(
+            "  %s ✗ failed after %.1fs — kind=%s · %s",
+            spec.label, elapsed, failure.kind, failure.detail,
+        )
+        capture.dump_to(log)
+    _record(ledger_in, ledger_out)
+    return SdkRunResult(
+        result_text=result_text,
+        assistant_text="".join(text_parts),
+        input_tokens=ledger_in,
+        output_tokens=ledger_out,
+        uncached_input_tokens=uncached_in,
+        uncached_output_tokens=uncached_out,
+        cost_usd=cost,
+        message_count=message_count,
+        num_turns=final_result.num_turns if final_result is not None else 0,
+        subtype=final_result.subtype if final_result is not None else None,
+        failure=failure,
+        exc=None,
+        elapsed_s=elapsed,
+    )

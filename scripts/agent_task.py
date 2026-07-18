@@ -23,20 +23,13 @@ from datetime import datetime
 from pathlib import Path
 
 
-from claude_agent_sdk import (
-    AssistantMessage,
-    ClaudeAgentOptions,
-    ResultMessage,
-    query,
-)
-
-import time
+from claude_agent_sdk import query
 
 from core.agent_spec import AgentSpec, SpecError, list_specs, parse_spec
 from core.paths import AGENT_SPECS_DIR, LOGS_DIR, STATE_DIR
 from core.utils import now_iso, today_iso
-from core.config import CONFIG  # noqa: E402
-from core.sdk_helpers import StderrCapture, log_sdk_failure  # noqa: E402
+from core.config import CONFIG  # noqa: E402 — resolves the default model
+from core.sdk_helpers import SdkCallSpec, run_sdk_query  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO,
@@ -116,43 +109,36 @@ async def run(spec: AgentSpec, dry_run: bool, extra_vars: dict[str, str]) -> int
     log_file = LOGS_DIR / f"agent-{spec.id}-{datetime.now().strftime('%Y%m%d-%H%M%S')}.log"
 
     log.info("Running agent task %r (model=%s, cwd=%s)", spec.id, model, spec.cwd_path())
-    total_input_tokens = 0
-    total_output_tokens = 0
-    result_text = ""
 
-    started = time.time()
-    capture = StderrCapture()
-    try:
-        async for message in query(
-            prompt=rendered,
-            options=ClaudeAgentOptions(
-                max_buffer_size=CONFIG.limits.sdk_max_buffer_size_mb * 1024 * 1024,
-                cwd=str(spec.cwd_path()),
-                model=model,
-                allowed_tools=list(spec.allowed_tools),
-                permission_mode=spec.permission_mode,
-                max_turns=spec.max_turns,
-                system_prompt={"type": "preset", "preset": "claude_code"},
-                stderr=capture.callback,
-            ),
-        ):
-            if isinstance(message, AssistantMessage) and message.usage:
-                total_input_tokens += message.usage.get("input_tokens", 0)
-                total_output_tokens += message.usage.get("output_tokens", 0)
-            if isinstance(message, ResultMessage):
-                result_text = message.result or ""
-    except Exception as exc:
-        log_sdk_failure(
-            log,
+    # One harness call owns the mechanics (options assembly, stderr capture,
+    # per-message loop, cache-aware usage extraction, LEDGER recording,
+    # failure diagnostics). Recording to the LEDGER is new — the hand-rolled
+    # loop only summed tokens for the log file. Policy stays caller-owned:
+    # the agent spec's own tool set + permission mode pass through as a plain
+    # spec (agent tasks self-declare their sandbox — no engine path-scope
+    # hook), so `permission_mode=acceptEdits` specs behave as before.
+    result = await run_sdk_query(
+        rendered,
+        SdkCallSpec(
             label=f"agent_task:{spec.id}",
-            source=f"agent:{spec.id}",
+            logger=log,
             model=model,
+            cwd=spec.cwd_path(),
+            max_turns=spec.max_turns,
+            system_prompt={"type": "preset", "preset": "claude_code"},
+            allowed_tools=tuple(spec.allowed_tools),
+            permission_mode=spec.permission_mode,
+            source=f"agent:{spec.id}",
             input_chars=len(rendered),
-            started=started,
-            capture=capture,
-            exc=exc,
-        )
+        ),
+        query_fn=query,
+    )
+    if result.failure is not None:
         return 2
+
+    total_input_tokens = result.input_tokens
+    total_output_tokens = result.output_tokens
+    result_text = result.result_text
 
     log.info(
         "Agent %r done. Tokens — input: %d, output: %d",

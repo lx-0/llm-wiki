@@ -37,31 +37,19 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import time
 
-from claude_agent_sdk import (
-    AssistantMessage,
-    ClaudeAgentOptions,
-    ResultMessage,
-    query,
-    HookMatcher,
-)
+from claude_agent_sdk import query
 
 from core.config import CONFIG
-from core.usage import LEDGER
 from core.paths import AGENTS_FILE, KNOWLEDGE_DIR, LOG_FILE, ROOT_DIR
 from core.prompts import build_output_language_instruction, render
 from core.sdk_helpers import (
     FailureClass,
     PromptTooLargeError,
-    StderrCapture,
+    SdkCallSpec,
+    WriteScope,
     assert_prompt_within_budget,
-    classify_failure,
-    extract_usage_tokens,
-    log_sdk_failure,
-    make_path_scope_gate,
-    make_path_scope_hook,
-    prompt_stream,
+    run_sdk_query,
 )
 from core.utils import (
     now_iso,
@@ -116,203 +104,81 @@ async def _attempt(
     source_content: str,
     rel_path: str,
 ) -> tuple[dict, FailureClass | None]:
-    """One SDK ``query(...)`` round. Returns ``(success_dict, None)`` or
-    ``({}, FailureClass(...))``. Mirrors the inner ``_attempt`` in
-    ``compile.py:compile_file`` byte-for-byte; extracted here so
-    ``compile_source`` can retry it cleanly.
+    """One SDK round via ``run_sdk_query``. Returns ``(success_dict, None)``
+    or ``({}, FailureClass(...))``.
+
+    The harness owns the mechanics (options assembly, path-scope hook,
+    per-message stall timeout, usage extraction, LEDGER recording,
+    failure diagnostics). Compile-only POLICY stays here: the per-file
+    token budget guard on the deliberately-uncached per-turn basis
+    (DECISIONS 2026-06-02 — cache_read is re-counted per turn and would
+    explode the tuned threshold), applied to structured errors and
+    successes alike.
     """
-    total_input_tokens = 0
-    total_output_tokens = 0
-    result_text = ""
-    final_result: "ResultMessage | None" = None
-    started = time.time()
-    capture = StderrCapture()
-    per_call_timeout = CONFIG.limits.compile_per_call_timeout_s
-    common_options = dict(
-        max_buffer_size=CONFIG.limits.sdk_max_buffer_size_mb * 1024 * 1024,
-        cwd=str(ROOT_DIR),
-        model=model_id,
-        max_turns=max_turns,
-        system_prompt=render("compile_main_system"),
-        setting_sources=["project"],
-        stderr=capture.callback,
-    )
-    if CONFIG.features.compile_callback_gate:
-        # Path-scoped Write/Edit via PreToolUse hook (2026-05-18). The
-        # previous ``can_use_tool=make_path_scope_gate(...)`` approach
-        # combined with ``allowed_tools=[Read,Glob,Grep]`` (Write/Edit
-        # absent) silently blocked writes INSIDE knowledge/ too — the
-        # bundled CLI does not expose tools to the agent when absent from
-        # allowed_tools, regardless of callback Allow. ~16h of silent
-        # write-failure across compile + dream before discovery. The hook
-        # path keeps Write/Edit IN allowed_tools (exposed) but path-scopes
-        # them via PreToolUse hook — empirically INSIDE-allow + OUTSIDE-deny
-        # both work. See KNOWLEDGE.md for the probe transcript.
-        agent_options = ClaudeAgentOptions(
-            **common_options,
-            allowed_tools=["Read", "Glob", "Grep", "Write", "Edit"],
-            hooks={
-                "PreToolUse": [
-                    HookMatcher(
-                        matcher="Write|Edit",
-                        hooks=[make_path_scope_hook([ROOT_DIR / "knowledge", LOG_FILE])],
-                    ),
-                ],
-            },
-            permission_mode="default",
-        )
-        query_prompt = prompt_stream(prompt)
-    else:
-        agent_options = ClaudeAgentOptions(
-            **common_options,
-            allowed_tools=[
-                "Read", "Glob", "Grep",
-                "Write(knowledge/**)",
-                "Edit(knowledge/**)",
-            ],
-            permission_mode="acceptEdits",
-        )
-        query_prompt = prompt
-    try:
-        agen = query(prompt=query_prompt, options=agent_options).__aiter__()
-        while True:
-            try:
-                if per_call_timeout and per_call_timeout > 0:
-                    message = await asyncio.wait_for(
-                        agen.__anext__(), timeout=per_call_timeout
-                    )
-                else:
-                    message = await agen.__anext__()
-            except StopAsyncIteration:
-                break
-            if isinstance(message, AssistantMessage) and message.usage:
-                total_input_tokens += message.usage.get("input_tokens", 0)
-                total_output_tokens += message.usage.get("output_tokens", 0)
-            if isinstance(message, ResultMessage):
-                final_result = message
-                result_text = message.result or ""
-    except asyncio.TimeoutError:
-        elapsed = time.time() - started
-        log.warning(
-            "  compile_file ⏱ per-call timeout after %.1fs (no messages "
-            "for %ds) — bundled CLI hung; skipping file (consecutive-"
-            "failure budget preserved). model=%s source=%s (%d chars).",
-            elapsed, per_call_timeout, model_id, rel_path, len(source_content),
-        )
-        try:
-            aclose = getattr(agen, "aclose", None)
-            if aclose is not None:
-                await aclose()
-        except Exception:  # noqa: BLE001 — best-effort cleanup
-            pass
-        capture.dump_to(log)
-        log_sdk_failure(
-            log,
+    result = await run_sdk_query(
+        prompt,
+        SdkCallSpec(
             label="compile_file",
-            source=rel_path,
+            logger=log,
             model=model_id,
-            input_chars=len(source_content),
-            started=started,
-            capture=capture,
-            exc=TimeoutError(
-                f"per-call timeout after {elapsed:.1f}s "
-                f"(per_call_timeout={per_call_timeout}s)"
+            cwd=ROOT_DIR,
+            max_turns=max_turns,
+            system_prompt=render("compile_main_system"),
+            setting_sources=("project",),
+            # Path-scoped Write/Edit via PreToolUse hook (2026-05-18): the
+            # earlier can_use_tool + tools-absent shape silently blocked
+            # INSIDE-scope writes too (~16h of silent write-failure). The
+            # legacy glob shape stays one config flip away via
+            # features.compile_callback_gate. See KNOWLEDGE.md.
+            allowed_tools=("Read", "Glob", "Grep", "Write", "Edit"),
+            write_scope=WriteScope(
+                roots=(ROOT_DIR / "knowledge", LOG_FILE),
+                legacy_allowed_tools=(
+                    "Read", "Glob", "Grep",
+                    "Write(knowledge/**)", "Edit(knowledge/**)",
+                ),
             ),
-        )
-        return {}, FailureClass("timeout", f"per-call stall after {elapsed:.1f}s")
-    except Exception as exc:
-        elapsed = time.time() - started
-        if final_result is not None and final_result.is_error:
-            # Ledger gets the TRUE input (uncached + cache-creation + cache-read)
-            # for an accurate cost picture; the budget `tokens` check below stays
-            # on the uncached per-turn sum so its tuned threshold keeps its
-            # meaning (cache_read is re-counted per turn and would explode it —
-            # see UsageTokens / sdk_helpers).
-            _usage = extract_usage_tokens(final_result.usage)
-            ledger_input = _usage.total_input or total_input_tokens
-            ledger_output = _usage.output_tokens or total_output_tokens
-            cost = final_result.total_cost_usd or 0.0
-            tokens = total_input_tokens + total_output_tokens
-            LEDGER.record(model=model_id, input_tokens=ledger_input, output_tokens=ledger_output)
-            if final_result.subtype == "error_max_turns":
-                kind = "max_turns"
-            else:
-                # Don't collapse every non-max_turns SDK is_error into an opaque
-                # `agent_error`: the retry ladder skips it (gates on
-                # kind=="unknown") yet the consecutive-failure counter still
-                # counts it, so 3 transient CLI hiccups in a row abort a whole
-                # batch. Route through the shared classifier — a fast
-                # empty-stderr fail → cli_crash (accurate abort message), a slow
-                # no-signal fail → unknown (which the small-source skip path
-                # survives without counting toward the abort).
-                kind = classify_failure(
-                    elapsed,
-                    final_result.result or "",
-                    "; ".join(final_result.errors or []),
-                ).kind
-            detail = (
-                f"{final_result.subtype} after {final_result.num_turns} turns "
-                f"({elapsed:.1f}s, {tokens:,} tok)"
-            )
-            if final_result.errors:
-                detail += f" — errors: {'; '.join(final_result.errors)}"
-            budget = CONFIG.limits.compile_max_tokens_per_file
-            if budget > 0 and tokens > budget:
-                failure = FailureClass(
-                    "tokens_exceeded",
-                    f"{tokens:,} tok > budget {budget:,} on {rel_path} (underlying {kind}: {detail})",
-                )
-            else:
-                failure = FailureClass(kind, detail)
-            log.error(
-                "  compile_file ✗ %s · %s",
-                f"failed after {elapsed:.1f}s — kind={failure.kind}",
-                detail,
-            )
-            log.error("    source:    %s", rel_path)
-            log.error("    model:     %s", model_id)
-            log.error("    input:     %d chars (%.1f KB)",
-                      len(source_content), len(source_content) / 1024)
-            log.error("    tokens:    %s in / %s out burned despite failure",
-                      f"{total_input_tokens:,}", f"{total_output_tokens:,}")
-            if failure.kind == "tokens_exceeded":
-                log.error(
-                    "    TOKEN BUDGET EXCEEDED — batch will abort (raise "
-                    "`compile_max_tokens_per_file` from %s if you accept this, "
-                    "or add the substrate type to `compile_skip_substrate_types`).",
-                    f"{budget:,}",
-                )
-            capture.dump_to(log)
-            return {}, failure
-        failure = log_sdk_failure(
-            log,
-            label="compile_file",
+            stall_timeout_s=CONFIG.limits.compile_per_call_timeout_s,
             source=rel_path,
-            model=model_id,
             input_chars=len(source_content),
-            started=started,
-            capture=capture,
-            exc=exc,
-        )
+        ),
+        query_fn=query,
+    )
+
+    tokens = result.uncached_input_tokens + result.uncached_output_tokens
+    budget = CONFIG.limits.compile_max_tokens_per_file
+
+    if result.failure is not None:
+        failure = result.failure
+        if failure.kind == "timeout":
+            log.warning(
+                "  compile_file: skipping file after per-call timeout "
+                "(consecutive-failure budget preserved).",
+            )
+            return {}, failure
+        # Budget policy on structured errors (subtype present): a failed
+        # call that burned past the guard escalates to tokens_exceeded so
+        # the batch aborts instead of burning the same budget on the next
+        # file.
+        if result.subtype is not None and budget > 0 and tokens > budget:
+            failure = FailureClass(
+                "tokens_exceeded",
+                f"{tokens:,} tok > budget {budget:,} on {rel_path} "
+                f"(underlying {failure.kind}: {failure.detail})",
+            )
+            log.error(
+                "    TOKEN BUDGET EXCEEDED — batch will abort (raise "
+                "`compile_max_tokens_per_file` from %s if you accept this, "
+                "or add the substrate type to `compile_skip_substrate_types`).",
+                f"{budget:,}",
+            )
         return {}, failure
 
-    elapsed = time.time() - started
-    cost = float(final_result.total_cost_usd) if (
-        final_result is not None and final_result.total_cost_usd is not None
-    ) else 0.0
-    # TRUE input (cache-inclusive) for ledger + reporting; budget `tokens`
-    # stays on the uncached per-turn sum (see error-path comment above).
-    _usage = extract_usage_tokens(final_result.usage if final_result is not None else None)
-    true_input_tokens = _usage.total_input or total_input_tokens
-    true_output_tokens = _usage.output_tokens or total_output_tokens
-    tokens = total_input_tokens + total_output_tokens
-    LEDGER.record(model=model_id, input_tokens=true_input_tokens, output_tokens=true_output_tokens)
-    budget = CONFIG.limits.compile_max_tokens_per_file
     if budget > 0 and tokens > budget:
         log.error(
             "  compile_file ✗ tokens_exceeded · %s tok > budget %s "
             "(elapsed %.1fs, model=%s)",
-            f"{tokens:,}", f"{budget:,}", elapsed, model_id,
+            f"{tokens:,}", f"{budget:,}", result.elapsed_s, model_id,
         )
         log.error("    source:    %s", rel_path)
         log.error(
@@ -329,17 +195,17 @@ async def _attempt(
         )
     log.info(
         "  ✓ %.1fs · in:%s out:%s (%s tok)",
-        elapsed,
-        f"{true_input_tokens:,}",
-        f"{true_output_tokens:,}",
+        result.elapsed_s,
+        f"{result.input_tokens:,}",
+        f"{result.output_tokens:,}",
         f"{tokens:,}",
     )
     return (
         {
-            "input_tokens": true_input_tokens,
-            "output_tokens": true_output_tokens,
-            "cost_usd": cost,
-            "result": result_text,
+            "input_tokens": result.input_tokens,
+            "output_tokens": result.output_tokens,
+            "cost_usd": result.cost_usd,
+            "result": result.result_text,
         },
         None,
     )

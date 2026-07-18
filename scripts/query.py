@@ -14,12 +14,7 @@ import asyncio
 import logging
 import sys
 
-from claude_agent_sdk import (
-    AssistantMessage,
-    ClaudeAgentOptions,
-    ResultMessage,
-    query,
-)
+from claude_agent_sdk import query
 
 from core.paths import KNOWLEDGE_DIR, QA_DIR, ROOT_DIR
 from core.config import CONFIG
@@ -40,11 +35,10 @@ log = setup_console_logging("query")
 from core.prompts import render  # noqa: E402
 from core.sdk_helpers import (  # noqa: E402
     PromptTooLargeError,
-    StderrCapture,
+    SdkCallSpec,
     assert_prompt_within_budget,
-    log_sdk_failure,
+    run_sdk_query,
 )
-import time as _time  # noqa: E402
 
 # ── Query prompt ─────────────────────────────────────────────────────
 
@@ -223,54 +217,41 @@ async def main() -> None:
         log.error("%s", exc)
         sys.exit(1)
 
-    # Run the query agent
-    total_input_tokens = 0
-    total_output_tokens = 0
-    result_text = ""
-
-    started = _time.time()
-    capture = StderrCapture()
-    try:
-        async for message in query(
-            prompt=prompt,
-            options=ClaudeAgentOptions(
-                max_buffer_size=CONFIG.limits.sdk_max_buffer_size_mb * 1024 * 1024,
-                cwd=str(ROOT_DIR),
-                system_prompt={"type": "preset", "preset": "claude_code"},
-                allowed_tools=allowed_tools,
-                permission_mode="acceptEdits",
-                max_turns=15,
-                stderr=capture.callback,
-            ),
-        ):
-            if isinstance(message, AssistantMessage) and message.usage:
-                total_input_tokens += message.usage.get("input_tokens", 0)
-                total_output_tokens += message.usage.get("output_tokens", 0)
-            if isinstance(message, ResultMessage):
-                result_text = message.result
-    except Exception as exc:
-        log_sdk_failure(
-            log,
+    # Run the query agent. The harness owns mechanics (stderr capture,
+    # usage extraction, failure diagnostics) AND records this call's
+    # tokens to the usage LEDGER — query.py previously never recorded.
+    result = await run_sdk_query(
+        prompt,
+        SdkCallSpec(
             label="query",
-            model="(default)",
-            input_chars=len(prompt),
-            started=started,
-            capture=capture,
-            exc=exc,
-        )
+            logger=log,
+            cwd=ROOT_DIR,
+            max_turns=15,
+            system_prompt={"type": "preset", "preset": "claude_code"},
+            allowed_tools=tuple(allowed_tools),
+            permission_mode="acceptEdits",
+        ),
+        query_fn=query,
+    )
+    if result.failure is not None:
         sys.exit(1)
 
     # Print the answer
-    print("\n" + result_text)
+    print("\n" + result.result_text)
 
-    # Cost tracking
-    cost = (total_input_tokens * 5.0 + total_output_tokens * 25.0) / 1_000_000
-    log.info("Tokens — input: %d, output: %d, cost: $%.4f", total_input_tokens, total_output_tokens, cost)
+    # Usage is tracked in tokens per (provider, model) — DECISIONS
+    # 2026-05-23; the old hardcoded $5/$25-per-Mtok estimate is gone.
+    # Token counts are cache-inclusive (see UsageTokens).
+    log.info(
+        "Tokens — input: %d, output: %d", result.input_tokens, result.output_tokens,
+    )
 
-    # Update state
+    # Update state. total_cost accumulates the SDK-REPORTED actual cost
+    # (ResultMessage.total_cost_usd, an API passthrough — not a rate-card
+    # estimate); dashboards read this as total_cost_lifetime.
     state = load_state()
     state["query_count"] = state.get("query_count", 0) + 1
-    state["total_cost"] = round(state.get("total_cost", 0.0) + cost, 4)
+    state["total_cost"] = round(state.get("total_cost", 0.0) + result.cost_usd, 4)
     state["last_query"] = now_iso()
     save_state(state)
 

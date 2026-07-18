@@ -19,20 +19,13 @@ import json
 import logging
 import subprocess
 import sys
-import time as _time
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from claude_agent_sdk import (
-    AssistantMessage,
-    ClaudeAgentOptions,
-    HookMatcher,
-    ResultMessage,
-    query,
-)
+from claude_agent_sdk import query
 
 from core import frontmatter
 from core.paths import (
@@ -46,9 +39,8 @@ from core.paths import (
 )
 from core.utils import now_iso, today_iso
 from core.config import CONFIG  # noqa: E402
-from core.usage import LEDGER  # noqa: E402
 from core.prompts import render  # noqa: E402
-from core.sdk_helpers import StderrCapture, log_sdk_failure, make_path_scope_hook  # noqa: E402
+from core.sdk_helpers import SdkCallSpec, WriteScope, run_sdk_query  # noqa: E402
 from core.ollama_client import parse_json_lenient  # noqa: E402
 from core.links import (  # noqa: E402
     WIKILINK_RE,
@@ -394,41 +386,36 @@ def _report_filesystem_delta(delta: dict, divergences: list) -> None:
         log.warning(warning)
 
 
-def _apply_agent_options(capture: StderrCapture) -> ClaudeAgentOptions:
-    """Sandboxed SDK options for the `apply()` agent (M028, issue #5).
+def _apply_call_spec(*, source: str, input_chars: int) -> SdkCallSpec:
+    """Sandboxed ``SdkCallSpec`` for the `apply()` agent (M028, issue #5).
 
     Non-destructive by construction: no `Bash` (the agent cannot `rm`/`git mv`),
-    a PreToolUse path-scope hook constraining Write/Edit to the wiki's editable
-    surfaces, `permission_mode="default"`, and a config-knob turn bound. Mirrors
-    the safe `reconcile_fact()` pattern. Destructive ops (delete, rename) are
-    engine-owned post-steps in later S01/S02 tasks, not agent actions.
+    the harness wires a PreToolUse path-scope hook constraining Write/Edit to the
+    wiki's editable surfaces, `permission_mode="default"`, and a config-knob turn
+    bound. Mirrors the safe `reconcile_fact()` pattern. Destructive ops (delete,
+    rename) are engine-owned post-steps, not agent actions.
 
     Scope note: writes are allowed across `knowledge/` (minus `facts/`),
     `daily/`, `index.md`, and the operations log; `knowledge/facts/` is
-    write-protected via `denied_subpaths` (deny takes precedence over the
+    write-protected via ``denied_subpaths`` (deny takes precedence over the
     allowed `knowledge/` root) — the fact files are the source of truth the
-    agent must never edit.
+    agent must never edit. No ``legacy_allowed_tools`` → the harness always
+    uses the hook shape here, regardless of the compile rollback flag.
     """
-    return ClaudeAgentOptions(
-        max_buffer_size=CONFIG.limits.sdk_max_buffer_size_mb * 1024 * 1024,
-        cwd=str(ROOT_DIR),
+    return SdkCallSpec(
+        label="correct_apply",
+        logger=log,
         model=CONFIG.models.compile_model,
-        allowed_tools=["Read", "Glob", "Grep", "Write", "Edit"],
-        hooks={
-            "PreToolUse": [
-                HookMatcher(
-                    matcher="Write|Edit",
-                    hooks=[make_path_scope_hook(
-                        [KNOWLEDGE_DIR, DAILY_DIR, INDEX_FILE, LOG_FILE],
-                        denied_subpaths=[FACTS_DIR],
-                    )],
-                ),
-            ],
-        },
-        permission_mode="default",
+        cwd=ROOT_DIR,
         max_turns=CONFIG.limits.correct_apply_max_turns,
         system_prompt={"type": "preset", "preset": "claude_code"},
-        stderr=capture.callback,
+        allowed_tools=("Read", "Glob", "Grep", "Write", "Edit"),
+        write_scope=WriteScope(
+            roots=(KNOWLEDGE_DIR, DAILY_DIR, INDEX_FILE, LOG_FILE),
+            denied_subpaths=(FACTS_DIR,),
+        ),
+        source=source,
+        input_chars=input_chars,
     )
 
 
@@ -489,38 +476,22 @@ async def apply(slug: str, dry_run: bool, allow_delete: bool = False, force: boo
     is_git = (ROOT_DIR / ".git").exists()
     before_snapshot = None if is_git else _snapshot([KNOWLEDGE_DIR, INDEX_FILE])
 
-    total_input_tokens = 0
-    total_output_tokens = 0
-    result_text = ""
-
-    import time as _time
-    started = _time.time()
-    capture = StderrCapture()
-    try:
-        async for message in query(
-            prompt=prompt,
-            options=_apply_agent_options(capture),
-        ):
-            if isinstance(message, AssistantMessage) and message.usage:
-                total_input_tokens += message.usage.get("input_tokens", 0)
-                total_output_tokens += message.usage.get("output_tokens", 0)
-            if isinstance(message, ResultMessage):
-                result_text = message.result or ""
-    except Exception as exc:
-        log_sdk_failure(
-            log,
-            label="correct_apply",
-            source=f"fact:{slug}",
-            model=CONFIG.models.compile_model,
-            input_chars=len(prompt),
-            started=started,
-            capture=capture,
-            exc=exc,
-        )
+    # The harness owns the mechanics (options assembly, path-scope hook,
+    # stderr capture, cache-aware usage extraction, LEDGER recording, failure
+    # diagnostics); `_apply_call_spec` keeps the sandbox policy here.
+    result = await run_sdk_query(
+        prompt,
+        _apply_call_spec(source=f"fact:{slug}", input_chars=len(prompt)),
+        query_fn=query,
+    )
+    if result.failure is not None:
         return 2
 
+    total_input_tokens = result.input_tokens
+    total_output_tokens = result.output_tokens
+    result_text = result.result_text
+
     log.info("Agent done. Tokens — input: %d, output: %d", total_input_tokens, total_output_tokens)
-    LEDGER.record(model=CONFIG.models.compile_model, input_tokens=total_input_tokens, output_tokens=total_output_tokens)
     if result_text:
         print("\n" + result_text + "\n")
 
@@ -611,51 +582,30 @@ async def reconcile_fact(
             detail=f"would reconcile {len(violating_files)} file(s)",
         )
 
-    started = _time.time()
-    capture = StderrCapture()
-    cost = 0.0
-    in_tok = out_tok = 0
-    try:
-        async for message in query(
-            prompt=prompt,
-            options=ClaudeAgentOptions(
-                max_buffer_size=CONFIG.limits.sdk_max_buffer_size_mb * 1024 * 1024,
-                cwd=str(ROOT_DIR),
-                model=CONFIG.models.compile_model,
-                allowed_tools=["Read", "Glob", "Grep", "Write", "Edit"],
-                hooks={
-                    "PreToolUse": [
-                        HookMatcher(
-                            matcher="Write|Edit",
-                            hooks=[make_path_scope_hook([CONCEPTS_DIR, LOG_FILE])],
-                        ),
-                    ],
-                },
-                permission_mode="default",
-                max_turns=CONFIG.limits.concept_reconcile_max_turns,
-                system_prompt={"type": "preset", "preset": "claude_code"},
-                stderr=capture.callback,
-            ),
-        ):
-            if isinstance(message, AssistantMessage) and message.usage:
-                in_tok += message.usage.get("input_tokens", 0)
-                out_tok += message.usage.get("output_tokens", 0)
-            if isinstance(message, ResultMessage):
-                cost = message.total_cost_usd or 0.0
-    except Exception as exc:
-        log_sdk_failure(
-            log,
+    # Strict scope: writes locked to knowledge/concepts/ + the operations log
+    # via the harness PreToolUse hook. No `legacy_allowed_tools`, so the hook
+    # shape applies regardless of the compile rollback flag. The harness owns
+    # usage extraction + LEDGER recording (cache-inclusive, on every outcome).
+    result = await run_sdk_query(
+        prompt,
+        SdkCallSpec(
             label=f"reconcile_fact:{slug}",
-            source=f"fact:{slug}",
+            logger=log,
             model=CONFIG.models.compile_model,
+            cwd=ROOT_DIR,
+            max_turns=CONFIG.limits.concept_reconcile_max_turns,
+            system_prompt={"type": "preset", "preset": "claude_code"},
+            allowed_tools=("Read", "Glob", "Grep", "Write", "Edit"),
+            write_scope=WriteScope(roots=(CONCEPTS_DIR, LOG_FILE)),
+            source=f"fact:{slug}",
             input_chars=len(prompt),
-            started=started,
-            capture=capture,
-            exc=exc,
-        )
+        ),
+        query_fn=query,
+    )
+    if result.failure is not None:
         return ReconcileResult(slug, "failed", files=violating_files, detail="SDK call failed")
 
-    LEDGER.record(model=CONFIG.models.compile_model, input_tokens=in_tok, output_tokens=out_tok)
+    cost = result.cost_usd
 
     # Stamp the fact as reconciled (cooldown key). Re-read to avoid stomping.
     current_text = fact_path.read_text(encoding="utf-8")

@@ -58,16 +58,9 @@ from typing import Literal
 
 import yaml
 
-from claude_agent_sdk import (
-    AssistantMessage,
-    ClaudeAgentOptions,
-    ResultMessage,
-    query,
-    HookMatcher,
-)
+from claude_agent_sdk import query
 
 from core.config import CONFIG
-from core.usage import LEDGER
 from core.paths import (
     AREAS_DIR,
     KNOWLEDGE_DIR,
@@ -80,13 +73,7 @@ from core.paths import (
     DAILY_DIR,
 )
 from core.prompts import build_output_language_instruction, render
-from core.sdk_helpers import (
-    StderrCapture,
-    UsageTokens,
-    extract_usage_tokens,
-    log_sdk_failure,
-    make_path_scope_hook,
-)
+from core.sdk_helpers import SdkCallSpec, WriteScope, run_sdk_query
 from core.utils import now_iso, today_iso, append_history
 from core.console import (  # noqa: E402
     C_BOLD,
@@ -1289,144 +1276,71 @@ async def dream_entity(
         _entity_pre_size = 0
     log.info("  invoking %s (max_turns=%d, system=dream_entity_system)", model, turns)
 
-    # input_tokens here is the TRUE input (uncached + cache-creation +
-    # cache-read), not the raw `usage["input_tokens"]` delta. The bundled CLI
-    # caches the prompt by default, so the uncached delta is a misleading ~12
-    # for a 40 KB prompt; summing only that made healthy calls look like
-    # no-ops and false-fired the low-token warning below (see UsageTokens).
-    input_tokens = 0
-    output_tokens = 0
-    result_usage: UsageTokens | None = None
-    result_text = ""
-    actual_cost = 0.0
-    capture = StderrCapture()
-
-    # Path-scope: see compile.py for the full design comment. Same shape
-    # here — flag-branched to keep the rollback path one config flip away.
-    common_options = dict(
-        max_buffer_size=CONFIG.limits.sdk_max_buffer_size_mb * 1024 * 1024,
-        cwd=str(ROOT_DIR),
-        model=model,
-        max_turns=turns,
-        system_prompt=render("dream_entity_system"),
-        setting_sources=["project"],
-        stderr=capture.callback,
+    # One harness call owns the mechanics (options assembly, path-scope
+    # hook, per-message stall timeout, cache-aware usage extraction,
+    # LEDGER recording, failure diagnostics). input_tokens below is the
+    # TRUE cache-inclusive input — ResultMessage.usage preferred, per-turn
+    # cache-inclusive fallback (DECISIONS 2026-06-02); summing only the
+    # uncached delta made healthy calls look like no-ops and false-fired
+    # the low-token warning below.
+    sdk = await run_sdk_query(
+        prompt,
+        SdkCallSpec(
+            label=f"dream_entity:{entity.slug}",
+            logger=log,
+            model=model,
+            cwd=ROOT_DIR,
+            max_turns=turns,
+            system_prompt=render("dream_entity_system"),
+            setting_sources=("project",),
+            # Path-scope: see compile_stages/compile.py — same swap, same
+            # fix; the legacy glob shape stays one config flip away.
+            allowed_tools=("Read", "Glob", "Grep", "Write", "Edit"),
+            write_scope=WriteScope(
+                roots=(ROOT_DIR / "knowledge", LOG_FILE),
+                legacy_allowed_tools=(
+                    "Read", "Glob", "Grep",
+                    "Write(knowledge/**)", "Edit(knowledge/**)",
+                ),
+            ),
+            stall_timeout_s=CONFIG.limits.dream_per_call_timeout_s,
+            source=str(entity.page.relative_to(ROOT_DIR)),
+            input_chars=prompt_chars,
+        ),
+        query_fn=query,
     )
-    if CONFIG.features.compile_callback_gate:
-        # See compile_stages/compile.py for the rationale — same swap, same fix.
-        agent_options = ClaudeAgentOptions(
-            **common_options,
-            allowed_tools=["Read", "Glob", "Grep", "Write", "Edit"],
-            hooks={
-                "PreToolUse": [
-                    HookMatcher(
-                        matcher="Write|Edit",
-                        hooks=[make_path_scope_hook([ROOT_DIR / "knowledge", LOG_FILE])],
-                    ),
-                ],
-            },
-            permission_mode="default",
-        )
-        query_prompt = prompt
-    else:
-        agent_options = ClaudeAgentOptions(
-            **common_options,
-            allowed_tools=[
-                "Read", "Glob", "Grep",
-                "Write(knowledge/**)",
-                "Edit(knowledge/**)",
-            ],
-            permission_mode="acceptEdits",
-        )
-        query_prompt = prompt
+    input_tokens = sdk.input_tokens
+    output_tokens = sdk.output_tokens
+    result_text = sdk.result_text
+    actual_cost = sdk.cost_usd
 
-    # Per-message stall timeout (ports compile_stages/compile.py:155-200).
-    # The bare `async for message in query(...)` pattern in dream's pre-fix
-    # code would block indefinitely while the bundled CLI subprocess hung
-    # or crashed silently — exactly the failure mode that took 339s on
-    # paperclip-companies/[1m] with empty stderr. Per-message timeout
-    # surfaces stalls as kind=timeout with a clear elapsed-time log,
-    # AND gives us message-count visibility so we can see WHERE in the
-    # stream the call dies.
-    per_call_timeout = CONFIG.limits.dream_per_call_timeout_s
-    message_count = 0
-    try:
-        agen = query(prompt=query_prompt, options=agent_options).__aiter__()
-        while True:
-            try:
-                if per_call_timeout and per_call_timeout > 0:
-                    message = await asyncio.wait_for(
-                        agen.__anext__(), timeout=per_call_timeout
-                    )
-                else:
-                    message = await agen.__anext__()
-            except StopAsyncIteration:
-                break
-            message_count += 1
-            if isinstance(message, AssistantMessage) and message.usage:
-                # Per-turn fallback accumulation (used only if the ResultMessage
-                # carries no usage). total_input folds in the cache fields.
-                u = extract_usage_tokens(message.usage)
-                input_tokens += u.total_input
-                output_tokens += u.output_tokens
-            if isinstance(message, ResultMessage):
-                result_text = message.result or ""
-                actual_cost = float(getattr(message, "total_cost_usd", 0.0) or 0.0)
-                if message.usage:
-                    result_usage = extract_usage_tokens(message.usage)
-    except asyncio.TimeoutError:
+    if sdk.failure is not None:
         elapsed = time.time() - started
-        log.warning(
-            "  dream_entity ⏱ per-call timeout after %.1fs (no message "
-            "for %ds, last_message_count=%d) — bundled CLI hung. "
-            "model=%s slug=%s (%d chars).",
-            elapsed, per_call_timeout, message_count, model, entity.slug, prompt_chars,
+        if sdk.failure.kind == "timeout":
+            return DreamOutcome(
+                entity=entity, corpus_count=len(corpus_paths),
+                corpus_chars=prompt_chars,
+                actual_cost_usd=actual_cost, input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                sdk_result_text=(
+                    f"per-call timeout after {sdk.elapsed_s:.1f}s "
+                    f"(msg_count={sdk.message_count})"
+                ),
+                kind="per_call_timeout", elapsed_s=elapsed,
+            )
+        log.error(
+            "  dream_entity ✗ failed after %.1fs (last_message_count=%d): kind=%s",
+            sdk.elapsed_s, sdk.message_count, sdk.failure.kind,
         )
-        try:
-            aclose = getattr(agen, "aclose", None)
-            if aclose is not None:
-                await aclose()
-        except Exception:  # noqa: BLE001 — best-effort cleanup
-            pass
-        capture.dump_to(log)
-        elapsed = time.time() - started
         return DreamOutcome(
             entity=entity, corpus_count=len(corpus_paths),
             corpus_chars=prompt_chars,
             actual_cost_usd=actual_cost, input_tokens=input_tokens,
             output_tokens=output_tokens,
-            sdk_result_text=f"per-call timeout after {elapsed:.1f}s (msg_count={message_count})",
-            kind="per_call_timeout", elapsed_s=elapsed,
+            sdk_result_text=str(sdk.exc) if sdk.exc is not None else str(sdk.failure),
+            kind="sdk_failure",
+            elapsed_s=elapsed,
         )
-    except Exception as exc:  # noqa: BLE001 — classifier handles all paths
-        log.error(
-            "  dream_entity ✗ failed after %.1fs (last_message_count=%d): %s",
-            time.time() - started, message_count, type(exc).__name__,
-        )
-        log_sdk_failure(
-            log,
-            label=f"dream_entity:{entity.slug}",
-            source=str(entity.page.relative_to(ROOT_DIR)),
-            model=model,
-            input_chars=prompt_chars,
-            started=started,
-            capture=capture,
-            exc=exc,
-        )
-        return DreamOutcome(
-            entity=entity, corpus_count=len(corpus_paths),
-            corpus_chars=prompt_chars,
-            actual_cost_usd=0.0, input_tokens=input_tokens, output_tokens=output_tokens,
-            sdk_result_text=str(exc), kind="sdk_failure",
-            elapsed_s=time.time() - started,
-        )
-
-    # Prefer the ResultMessage's authoritative cumulative usage over the
-    # per-turn AssistantMessage sum (which double-counts cache_read across
-    # turns). Falls back to the running sum when the CLI omits result usage.
-    if result_usage is not None:
-        input_tokens = result_usage.total_input
-        output_tokens = result_usage.output_tokens
 
     elapsed = time.time() - started
     log.info(
@@ -1534,7 +1448,8 @@ async def dream_entity(
     if stamped:
         log.info("  stamped last_dreamed_at on %d substrate file(s)", stamped)
 
-    LEDGER.record(model=model, input_tokens=input_tokens, output_tokens=output_tokens)
+    # LEDGER recording happens inside run_sdk_query (cache-inclusive, on
+    # every outcome — including the timeout/failure paths above).
 
     # Per-entity history event so dashboard + grep can answer
     # "what happened on the last dream of entity X?".

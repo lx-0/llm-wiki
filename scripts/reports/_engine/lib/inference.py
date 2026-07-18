@@ -8,6 +8,11 @@ The wedge composition (verified empirically in M019-S01-T01):
   can_use_tool = make_path_scope_gate([])          # deny-all-writes
   setting_sources = ['project']
 
+Since M021 S01 the composition is wired through ``run_sdk_query`` —
+``SdkCallSpec(deny_all_writes=True)`` assembles the deny-all gate plus
+the streaming prompt the callback contract requires; the tool sets stay
+caller-owned policy in ``WEDGE_ALLOWED_TOOLS`` / ``WEDGE_DISALLOWED_TOOLS``.
+
 Agent receives an inference prompt (rendered from
 `prompts/reports/infer_instrument.md`) with one batch of items + the
 substrate-resolved excerpts inline. Returns one TextBlock containing
@@ -38,21 +43,12 @@ from pathlib import Path
 # module is imported via the engine's normal `scripts.reports.*` path.
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
-from claude_agent_sdk import (  # noqa: E402
-    AssistantMessage,
-    ClaudeAgentOptions,
-    ResultMessage,
-    UserMessage,
-    query,
-)
+from claude_agent_sdk import query  # noqa: E402
 
-from scripts.core.usage import LEDGER  # noqa: E402
 from scripts.core.sdk_helpers import (  # noqa: E402
     FailureClass,
-    StderrCapture,
-    log_sdk_failure,
-    make_path_scope_gate,
-    prompt_stream,
+    SdkCallSpec,
+    run_sdk_query,
 )
 from scripts.reports._engine.instrument import Instrument, LikertItem  # noqa: E402
 
@@ -398,76 +394,51 @@ async def _infer_batch_once_async(
     import logging
 
     log = logging.getLogger("reports.inference")
-    started_wall = time.time()
     start = time.perf_counter()
-    text_chunks: list[str] = []
-    cost = 0.0
-    in_tok = out_tok = 0
-    capture = StderrCapture()
 
-    options = ClaudeAgentOptions(
-        cwd=str(vault_cwd),
-        model=model,
-        allowed_tools=list(WEDGE_ALLOWED_TOOLS),
-        disallowed_tools=list(WEDGE_DISALLOWED_TOOLS),
-        permission_mode="default",
-        max_turns=max_turns,
-        setting_sources=["project"],
-        can_use_tool=make_path_scope_gate([]),
-        stderr=capture.callback,
-    )
-
-    try:
-        async for message in query(
-            prompt=prompt_stream(rendered_prompt), options=options
-        ):
-            if isinstance(message, AssistantMessage):
-                if message.usage:
-                    in_tok += message.usage.get("input_tokens", 0)
-                    out_tok += message.usage.get("output_tokens", 0)
-                for block in message.content:
-                    if type(block).__name__ == "TextBlock":
-                        text_chunks.append(getattr(block, "text", ""))
-            elif isinstance(message, UserMessage):
-                # Tool results — agent's Reads come back here. Don't
-                # need to capture them; the JSON output references
-                # them by path.
-                continue
-            elif isinstance(message, ResultMessage):
-                cost = float(getattr(message, "total_cost_usd", 0.0) or 0.0)
-    except Exception as exc:
-        failure = log_sdk_failure(
-            log,
+    # One harness call owns the mechanics (options assembly, stderr capture,
+    # cache-aware usage extraction, LEDGER recording — cache-inclusive, on
+    # every outcome — and failure diagnostics). The M019 wedge composition
+    # stays caller-owned policy: deny_all_writes wires the empty-roots
+    # can_use_tool gate + the streaming prompt the callback contract
+    # requires, with Write/Edit/NotebookEdit disallowed as defense-in-depth.
+    result = await run_sdk_query(
+        rendered_prompt,
+        SdkCallSpec(
             label=f"reports.inference batch={batch.label}",
-            started=started_wall,
-            capture=capture,
-            exc=exc,
+            logger=log,
             model=model,
+            cwd=vault_cwd,
+            max_turns=max_turns,
+            allowed_tools=WEDGE_ALLOWED_TOOLS,
+            disallowed_tools=WEDGE_DISALLOWED_TOOLS,
+            setting_sources=("project",),
+            deny_all_writes=True,
             input_chars=len(rendered_prompt),
-            extra={"prompt_version": prompt_version},
-        )
+            extra_log={"prompt_version": prompt_version},
+        ),
+        query_fn=query,
+    )
+    if result.failure is not None:
         raise InferenceError(
-            f"inference call failed for batch {batch.label!r}: {failure}",
-            failure=failure,
-        ) from exc
+            f"inference call failed for batch {batch.label!r}: {result.failure}",
+            failure=result.failure,
+        ) from result.exc
 
     elapsed_ms = int((time.perf_counter() - start) * 1000)
 
-    full_text = "".join(text_chunks)
-    parsed = _extract_json_from_textblocks(full_text)
+    parsed = _extract_json_from_textblocks(result.assistant_text)
     _validate_json_schema(parsed, batch.item_ids, batch.label)
     items: dict[str, ItemInference] = {}
     for item in batch.items:
         items[item.id] = ItemInference.from_json(item.id, parsed["items"][item.id])
-
-    LEDGER.record(model=model, input_tokens=in_tok, output_tokens=out_tok)
 
     return BatchResult(
         items=items,
         elapsed_ms=elapsed_ms,
         model_id=model,
         prompt_version=prompt_version,
-        cost_usd=cost,
+        cost_usd=result.cost_usd,
         batch_label=batch.label,
     )
 
