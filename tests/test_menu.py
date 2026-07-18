@@ -238,6 +238,87 @@ def test_screen_renders_group_subheaders_in_order_with_continuous_numbering():
         assert token in html, f"missing position number {token}"
 
 
+def test_every_quick_action_key_rendered_in_footer():
+    """Every declared QUICK_ACTIONS key must appear in the rendered home screen.
+    This is the load-bearing guard for the dead-'t' regression (triage was
+    declared in QUICK_ACTIONS but the hand-written footer omitted it)."""
+    import menu
+
+    html = menu._build_screen_html(menu.HomeState())
+    for key, _label, *_ in menu.QUICK_ACTIONS:
+        assert f"[<b>{key}</b>]" in html, f"quick action {key!r} declared but not rendered"
+
+
+def test_every_quick_action_key_is_bound():
+    """_QUICK_KEYS is the single set the home-screen key handler checks; it must
+    cover every declared quick action (the other half of the dead-'t' bug: the
+    hardcoded handler set omitted a declared key)."""
+    import menu
+
+    for key, *_ in menu.QUICK_ACTIONS:
+        assert key in menu._QUICK_KEYS, f"quick action {key!r} declared but not bound"
+
+
+def test_quick_action_keys_dont_collide_with_navigation():
+    """Quick-action keys must be disjoint from the category letters and the
+    reserved home-screen keys, or a keypress would be ambiguous."""
+    import menu
+
+    category_keys = set(menu.CATEGORIES)
+    reserved = {"h", "x", "/"}  # help / exit / filter
+    for key in menu._QUICK_KEYS:
+        assert key not in category_keys, f"quick key {key!r} collides with a category"
+        assert key not in reserved, f"quick key {key!r} collides with a reserved key"
+
+
+_SPECIAL_TO_COMMAND = {"query": "query", "correct_add": "correct"}
+
+
+def _menu_command_tokens() -> set[str]:
+    """The leading `wiki <command>` token of every menu dispatch entry."""
+    import menu
+
+    tokens: set[str] = set()
+
+    def add(dispatch) -> None:
+        if isinstance(dispatch, list):
+            tokens.add(dispatch[0])
+        elif isinstance(dispatch, tuple):
+            if dispatch[0] == "prompt":
+                tokens.add(dispatch[2][0])
+            elif dispatch[0] == "special":
+                tokens.add(_SPECIAL_TO_COMMAND[dispatch[1]])
+
+    for _key, _label, _desc, dispatch in menu.QUICK_ACTIONS:
+        add(dispatch)
+    for _letter, (_label, entries) in menu.CATEGORIES.items():
+        for _eid, _l, _d, dispatch in entries:
+            add(dispatch)
+    return tokens
+
+
+def test_menu_catalog_covers_every_table_menu_command():
+    """menu-catalog-complete: every command the cli.py table marks menu-visible
+    must be reachable from the menu catalog. Pins the fix for the 8 commands the
+    hand-curated menu missed (produce/bridge/backfill/reconcile/health-trends/
+    usage/study/analyze) and stops the catalog from silently drifting again."""
+    import cli
+
+    required = {c.name for c in cli.COMMANDS if c.menu}
+    missing = required - _menu_command_tokens()
+    assert not missing, f"menu-visible commands absent from menu catalog: {sorted(missing)}"
+
+
+def test_previously_missing_commands_now_in_menu():
+    """The eight commands the old menu couldn't reach are now browsable."""
+    tokens = _menu_command_tokens()
+    for name in (
+        "produce", "bridge", "backfill", "reconcile",
+        "health-trends", "usage", "study", "analyze",
+    ):
+        assert name in tokens, f"{name} still unreachable from the menu"
+
+
 # ── helpers ────────────────────────────────────────────────────────
 
 

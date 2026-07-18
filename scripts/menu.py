@@ -62,9 +62,9 @@ class _MenuFormatter(ConsoleFormatter):
 # already on root). Calling it here also guarantees the menu's stderr
 # emit path is wired through the SAME mechanism compile uses.
 _log = setup_console_logging("menu", formatter=_MenuFormatter())
-from core.health import CheckResult, build_health
-from core.paths import ROOT_DIR, WIKI_DIR
-from menu_context import build_status, build_suggestions
+from core.health import CheckResult, build_health  # noqa: E402 — after console setup
+from core.paths import ROOT_DIR, WIKI_DIR  # noqa: E402 — after console setup
+from menu_context import build_status, build_suggestions  # noqa: E402 — after console setup
 
 WIKI_BIN = WIKI_DIR / "wiki"
 
@@ -107,6 +107,7 @@ CATEGORIES: dict[str, tuple[str, list[tuple[str, str, str, object]]]] = {
         ("inbox",         "process inbox/ folder",          "classify + route via Ollama",            ["process-inbox"]),
         ("html",          "ingest one URL or HTML file",    "html2text → raw/articles",               ("prompt", "URL or path",            ["ingest-html", "{arg}"])),
         ("youtube",       "ingest YouTube",                 "video or playlist",                      ("prompt", "Video or playlist URL", ["ingest-youtube", "--url", "{arg}"])),
+        ("bridge",        "bridge — list mappings",         "sandbox-folder rsync mirror",            ["bridge", "list"]),
     ]),
     "k": ("knowledge ops", [
         ("compile",       "compile changed sources ($$)",   "incremental run",                        ["compile"]),
@@ -119,6 +120,7 @@ CATEGORIES: dict[str, tuple[str, list[tuple[str, str, str, object]]]] = {
         ("dream-all",     "dream — sweep all entities ($$$)", "rewrite every entity page",            ["dream", "--all-entities"]),
         ("dream-one",     "dream — one entity ($$)",        "by slug",                                ("prompt", "Entity slug", ["dream-entity", "{arg}"])),
         ("pin",           "pin article to a MOC",           "by name or path",                        ("prompt", "Article", ["pin", "{arg}"])),
+        ("health-trends", "health-trend synthesis",         "regen concepts/health.md ($0)",          ["health-trends", "--dry-run"]),
     ]),
     "d": ("facts/takes", [
         ("correct-list",  "list hard facts",                "knowledge/facts/*.md",                   ["correct", "list"]),
@@ -128,6 +130,7 @@ CATEGORIES: dict[str, tuple[str, list[tuple[str, str, str, object]]]] = {
         ("correct-apply", "propagate a hard fact ($$$)",    "agentic over vault",                     ("prompt", "Slug", ["correct", "apply", "{arg}"])),
         ("take-list",     "list takes",                     "knowledge/takes/*.md",                   ["take", "list"]),
         ("take-show",     "show takes for one holder",      "by slug",                                ("prompt", "Holder slug", ["take", "show", "{arg}"])),
+        ("dedup",         "dedup — suggest merges",         "STT-noise duplicate entity pages",       ["dedup", "--suggest-only"]),
     ]),
     "a": ("automation", [
         ("curio-walk",    "curiosity — walk pending",       "accept/skip/reject each (interactive)",  ["curiosity"]),
@@ -144,6 +147,10 @@ CATEGORIES: dict[str, tuple[str, list[tuple[str, str, str, object]]]] = {
         ("triage",        "triage — list inbox",            "captured intents (task/idea/note)",      ["triage"]),
         ("triage-done",   "triage — mark done",             "by record stem (unique prefix ok)",      ("prompt", "Record stem", ["triage", "done", "{arg}"])),
         ("triage-dismiss","triage — dismiss",               "drop noise by record stem",              ("prompt", "Record stem", ["triage", "dismiss", "{arg}"])),
+        ("produce",       "producers — list",               "post-compile derivative extractors",     ["produce", "--list"]),
+        ("reconcile",     "reconcile concepts",             "dry-run plan, no writes",                ["reconcile"]),
+        ("study",         "studies — list",                 "operator self-reports (M019)",           ["study", "list"]),
+        ("analyze",       "analyze self-reports ($$$)",     "two-pass analyst over studies",          ["analyze"]),
     ]),
     "g": ("setup", [
         ("status",        "status",                         "config + hooks + ollama",                ["status"]),
@@ -155,9 +162,19 @@ CATEGORIES: dict[str, tuple[str, list[tuple[str, str, str, object]]]] = {
         ("update",        "git pull + sync skills",         "ff-only",                                ["update"]),
         ("seed-audit",    "seed — audit drift",             "read-only",                              ["seed", "--check"]),
         ("seed-apply",    "seed — apply missing templates", "additive",                               ["seed"]),
+        ("backfill",      "backfill data-shape upgrades",   "one-shot key adds (shows help)",         ["backfill"]),
+        ("usage",         "token-usage ledger",             "tokens per provider/model",              ["usage"]),
         ("version",       "engine git revision",            "rev + origin",                           ["version"]),
     ]),
 }
+
+
+# Single source of truth for which single-key quick actions are live. Both the
+# home-screen render (the footer under "Quick actions") and the key handler in
+# `_run_home_picker` derive from this — so a QUICK_ACTIONS entry can never again
+# be declared-but-unbound-and-unrendered (the dead 't' triage shortcut before
+# C06). The every-key-bound-and-rendered contract is pinned by tests/test_menu.py.
+_QUICK_KEYS: frozenset[str] = frozenset(key for key, *_ in QUICK_ACTIONS)
 
 
 def _flatten_for_fuzzy() -> list[tuple[str, str, object]]:
@@ -476,10 +493,13 @@ def _build_screen_html(state: HomeState) -> str:
         lines.append("")
 
     lines.append("  <b>▸ Quick actions</b>")
-    lines.append(
-        "      [<b>c</b>] compile-10  [<b>C</b>] compile-all  [<b>q</b>] query  "
-        "[<b>f</b>] flush  [<b>l</b>] lint  [<b>s</b>] status"
+    # Derived from QUICK_ACTIONS so every declared shortcut is rendered — no
+    # hand-synced footer that can drift out of sync with the key handler.
+    quick = "  ".join(
+        f"[<b>{escape(key)}</b>] {escape(label)}"
+        for key, label, _desc, _disp in QUICK_ACTIONS
     )
+    lines.append(f"      {quick}")
     lines.append("")
 
     lines.append("  <b>▸ Browse</b>")
@@ -602,7 +622,7 @@ def _run_home_picker(state: HomeState) -> None:
         if key == "/":
             state.selected = ("filter",)
             continue
-        if key in ("c", "C", "q", "f", "l", "s"):
+        if key in _QUICK_KEYS:
             state.selected = ("quick", key)
             continue
         if key in ("o", "i", "k", "d", "a", "g"):
