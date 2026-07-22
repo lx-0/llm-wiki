@@ -361,6 +361,36 @@ def test_write_last_dreamed_at_idempotent_same_day(vault: Path) -> None:
     assert dream._write_last_dreamed_at(p, when=when) is False  # same day → no-op
 
 
+def test_stamp_last_dreamed_at_batches_one_write(vault: Path) -> None:
+    """The corpus-loop form: many files land in ONE locked store write
+    (StateStore arc — the per-file load+rewrite was the O(N²) hang shape),
+    re-stamping is a no-op, and the on-disk serialization stays byte-identical
+    to the pre-facade format (sort_keys + indent=2 + trailing newline)."""
+    import json
+
+    import dream
+
+    paths = [
+        _write_substrate(vault, f"raw/notes/email/batch-{i}.md", "Body.\n")
+        for i in range(3)
+    ]
+    when = datetime(2026, 5, 17, tzinfo=timezone.utc)
+
+    assert dream._stamp_last_dreamed_at(paths, when=when) == 3
+    activation = dream._load_dream_activation()
+    for i in range(3):
+        assert activation.get(f"raw/notes/email/batch-{i}.md") == "2026-05-17"
+
+    # All already stamped today → no-op, store not even rewritten.
+    mtime_before = dream._DREAM_ACTIVATION_FILE.stat().st_mtime_ns
+    assert dream._stamp_last_dreamed_at(paths, when=when) == 0
+    assert dream._DREAM_ACTIVATION_FILE.stat().st_mtime_ns == mtime_before
+
+    # Pre-facade byte format (what _save_dream_activation wrote).
+    on_disk = dream._DREAM_ACTIVATION_FILE.read_text(encoding="utf-8")
+    assert on_disk == json.dumps(json.loads(on_disk), sort_keys=True, indent=2) + "\n"
+
+
 def test_dreams_since_last_seen_reads_stamp(vault: Path) -> None:
     import dream
     # Fixed `now` (not datetime.now()): the stamp is a date string truncated to

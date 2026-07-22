@@ -13,42 +13,29 @@ Idempotent on re-ingest: a re-drop of identical content yields the same
 capture-ID, and `record()` leaves any existing entry untouched — so a
 "superseded" status set by S03 is NOT reset to "open" by a re-ingest.
 
-Concurrency: the read-modify-write runs under an fcntl flock (same pattern as
-`core.usage` / `core.daily_capture`), so parallel collector runs / SessionEnd
-flushes can't corrupt the file.
+Concurrency: the read-modify-write runs under the shared flock seam
+(`core.state_store.locked`), so parallel collector runs / SessionEnd flushes
+can't corrupt the file.
 """
 
 from __future__ import annotations
 
-import fcntl
 import re
-from contextlib import contextmanager
 from pathlib import Path
 
 import yaml
 
 from .paths import KNOWLEDGE_DIR, STATE_DIR
+from .state_store import locked
 from .utils import load_json_state, save_json_state
 
 CAPTURE_INDEX_FILE = STATE_DIR / "capture_index.json"
+# Historical lock name (predates the state_store default of `<file>.lock`) —
+# kept so a mixed-version engine/vault pair still contends on the same file.
 _LOCK_FILE = STATE_DIR / "capture_index.lock"
 
 STATUS_OPEN = "open"
 STATUS_SUPERSEDED = "superseded"
-
-
-@contextmanager
-def _locked():
-    _LOCK_FILE.parent.mkdir(parents=True, exist_ok=True)
-    fd = open(_LOCK_FILE, "w")
-    try:
-        fcntl.flock(fd.fileno(), fcntl.LOCK_EX)
-        yield
-    finally:
-        try:
-            fcntl.flock(fd.fileno(), fcntl.LOCK_UN)
-        finally:
-            fd.close()
 
 
 def load() -> dict[str, dict]:
@@ -68,7 +55,7 @@ def record(capture_id: str, *, source_path: str, created: str) -> bool:
     present the existing entry (including any S03-set `status`) is preserved and
     this returns False. Returns True when a new entry was added.
     """
-    with _locked():
+    with locked(_LOCK_FILE):
         index = load()
         if capture_id in index:
             return False

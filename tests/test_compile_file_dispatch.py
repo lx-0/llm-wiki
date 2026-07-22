@@ -30,11 +30,13 @@ def vault(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     saved: dict = {}
     monkeypatch.setattr(cmod, "load_state", lambda: {k: dict(v) if isinstance(v, dict) else v for k, v in saved.items()})
 
-    def _save(s: dict) -> None:
-        saved.clear()
-        saved.update(s)
+    # State writes go through the merge-under-lock seam now (StateStore arc);
+    # capture them so no test touches the real state.json.
+    def _fake_update_state(mutator):
+        mutator(saved)
+        return saved
 
-    monkeypatch.setattr(cmod, "save_state", _save)
+    monkeypatch.setattr(cmod, "update_state", _fake_update_state)
     monkeypatch.setattr(cmod, "file_hash", lambda p: "HASH")
 
     return tmp_path, raw, saved

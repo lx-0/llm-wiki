@@ -12,7 +12,6 @@ os.environ["CLAUDE_INVOKED_BY"] = "memory_flush"
 
 import asyncio
 import contextlib
-import fcntl
 import json
 import logging
 import subprocess
@@ -31,6 +30,7 @@ ROOT_DIR = WIKI_DIR.parent
 sys.path.insert(0, str(SCRIPTS_DIR))
 from core.config import CONFIG  # noqa: E402
 from core.sdk_helpers import StderrCapture, log_sdk_failure  # noqa: E402
+from core.state_store import is_ingested, try_locked  # noqa: E402
 
 from core import flush_pipeline  # noqa: E402
 from core.piggybacks import PIGGYBACK_STATE_FILE, run_due_piggybacks  # noqa: E402
@@ -183,8 +183,6 @@ async def extract_from_context(context: str) -> str | None:
 def maybe_trigger_compile(daily_file: Path) -> None:
     """Trigger compile.py as a detached background process if it's after COMPILE_AFTER_HOUR
     and the daily log has changed since last compile."""
-    import hashlib
-
     now = datetime.now(ZoneInfo(TIMEZONE))
     if now.hour < COMPILE_AFTER_HOUR:
         log.info(
@@ -192,26 +190,20 @@ def maybe_trigger_compile(daily_file: Path) -> None:
         )
         return
 
-    # Check if daily log has changed since last compile.
-    # Post-2026-05-15 rollup arc: daily files live at daily/<date>/<source>.md
-    # — `.name` alone collides (every day has a "sessions.md"), so the cache
-    # key uses the path relative to DAILY_DIR (e.g. "2026-05-14/sessions.md").
-    state_file = STATE_DIR / "state.json"
-    if state_file.exists():
-        try:
-            state = json.loads(state_file.read_text(encoding="utf-8"))
-            ingested = state.get("ingested", {})
-            try:
-                rel = str(daily_file.relative_to(DAILY_DIR))
-            except ValueError:
-                rel = daily_file.name  # not under daily/ — preserve old key
-            if rel in ingested:
-                current_hash = hashlib.sha256(daily_file.read_bytes()).hexdigest()[:16]
-                if ingested[rel].get("hash") == current_hash:
-                    log.info("Skipping compile — %s unchanged since last compile", rel)
-                    return
-        except (json.JSONDecodeError, OSError):
-            pass
+    # Skip when the file's content is already in the ingested ledger. The
+    # ledger schema (ROOT_DIR-relative key → plain content-hash string) lives
+    # in core.state_store — the previous hand-rolled reader here keyed by
+    # DAILY_DIR-relative path AND expected `{"hash": ...}` dict values
+    # (double schema drift vs compile.py's writes), so its skip branch could
+    # never fire and every evening flush unconditionally spawned compile.
+    try:
+        if is_ingested(daily_file):
+            log.info(
+                "Skipping compile — %s unchanged since last compile", daily_file.name
+            )
+            return
+    except (OSError, ValueError):
+        pass  # unreadable/corrupt state — fail open; compile re-checks the ledger
 
     log.info("Triggering compile for %s", daily_file.name)
     cmd = [sys.executable, str(COMPILE_SCRIPT), "--file", str(daily_file)]
@@ -241,7 +233,7 @@ def maybe_trigger_compile(daily_file: Path) -> None:
 @contextlib.contextmanager
 def _dashboard_refresh_lock():
     """Non-blocking lock so concurrent SessionEnd hooks don't all spawn
-    their own dashboard refresh.
+    their own dashboard refresh (`core.state_store.try_locked` + skip-log).
 
     Symptom on 2026-05-03: 103 `subprocess.TimeoutExpired` records in
     ~30s, all clustered around the post-compile-hour trigger when
@@ -250,24 +242,12 @@ def _dashboard_refresh_lock():
     fix is to serialize: first flush wins the lock, others skip — the
     next flush picks up the latest state anyway.
     """
-    DASHBOARD_LOCK_FILE.parent.mkdir(parents=True, exist_ok=True)
-    fd = open(DASHBOARD_LOCK_FILE, "w")
-    try:
-        try:
-            fcntl.flock(fd.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except BlockingIOError:
+    with try_locked(DASHBOARD_LOCK_FILE) as acquired:
+        if not acquired:
             log.info(
                 "dashboard refresh: another flush holds the lock — skipping (idempotent, next flush will retry)"
             )
-            yield False
-            return
-        yield True
-    finally:
-        try:
-            fcntl.flock(fd.fileno(), fcntl.LOCK_UN)
-        except OSError:
-            pass
-        fd.close()
+        yield acquired
 
 
 def _run_dashboard_script(script: Path, label: str) -> None:

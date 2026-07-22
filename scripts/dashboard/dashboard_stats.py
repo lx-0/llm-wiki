@@ -26,8 +26,6 @@ from datetime import datetime, timezone
 
 from core.paths import DAILY_DIR, KNOWLEDGE_DIR, ROOT_DIR, SESSIONS_DIR
 from core.utils import (
-    file_hash,
-    list_raw_files,
     list_wiki_articles,
     load_state,
     now_iso,
@@ -49,20 +47,12 @@ FAILED_DIR = SESSIONS_DIR / "failed-flushes"
 
 def list_pending_compiles() -> list[str]:
     """Return relative paths of raw/daily files whose hash differs from `state.ingested`.
-    Caller decides whether to count or display."""
-    state = load_state()
-    ingested = state.get("ingested", {})
-    pending: list[str] = []
-    for f in list_raw_files():
-        rel = str(f.relative_to(ROOT_DIR))
-        try:
-            current_hash = file_hash(f)
-        except (OSError, ValueError):
-            continue
-        if ingested.get(rel) != current_hash:
-            pending.append(rel)
-    pending.sort()
-    return pending
+    Caller decides whether to count or display. Sorted-for-display wrapper over
+    the ingested-ledger API (`core.state_store.pending_paths`) — the ledger
+    schema lives there, never re-derive it here."""
+    from core.state_store import pending_paths
+
+    return sorted(str(p.relative_to(ROOT_DIR)) for p in pending_paths())
 
 
 def count_pending_compiles() -> int:

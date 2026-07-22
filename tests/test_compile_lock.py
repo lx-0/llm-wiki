@@ -9,6 +9,10 @@ consecutive-failure abort caught the cascade but the work was already lost.
 The fix: compile.py acquires an exclusive non-blocking flock on
 STATE_DIR/compile.lock at the top of main(). Second invocation while the
 first holds the lock exits cleanly with a skip message — no work, no error.
+
+The helper itself now lives at `core.state_store.acquire_process_lock`
+(StateStore arc); these tests exercise it through compile's imported name so
+the seam compile actually uses stays proven.
 """
 
 from __future__ import annotations
@@ -37,7 +41,7 @@ def test_acquire_compile_lock_returns_handle_when_uncontested(tmp_path):
     import compile as compile_mod
 
     lock_path = tmp_path / "compile.lock"
-    handle = compile_mod._acquire_exclusive_lock(lock_path)
+    handle = compile_mod.acquire_process_lock(lock_path)
     try:
         assert handle is not None
     finally:
@@ -50,10 +54,10 @@ def test_acquire_compile_lock_returns_none_when_contended(tmp_path):
     import compile as compile_mod
 
     lock_path = tmp_path / "compile.lock"
-    first = compile_mod._acquire_exclusive_lock(lock_path)
+    first = compile_mod.acquire_process_lock(lock_path)
     try:
         assert first is not None
-        second = compile_mod._acquire_exclusive_lock(lock_path)
+        second = compile_mod.acquire_process_lock(lock_path)
         assert second is None, "expected None on contention, got handle"
     finally:
         if first is not None:
@@ -65,11 +69,11 @@ def test_acquire_compile_lock_recovers_after_release(tmp_path):
     import compile as compile_mod
 
     lock_path = tmp_path / "compile.lock"
-    first = compile_mod._acquire_exclusive_lock(lock_path)
+    first = compile_mod.acquire_process_lock(lock_path)
     assert first is not None
     first.close()
 
-    second = compile_mod._acquire_exclusive_lock(lock_path)
+    second = compile_mod.acquire_process_lock(lock_path)
     try:
         assert second is not None, "expected handle after release, got None"
     finally:

@@ -23,7 +23,6 @@ even if a collector forgets its own timeouts.
 from __future__ import annotations
 
 import argparse
-import fcntl
 import json
 import os
 import signal
@@ -38,6 +37,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from core.paths import STATE_DIR  # noqa: E402
+from core.state_store import locked  # noqa: E402
+from core.utils import save_json_state  # noqa: E402
 
 PIGGYBACK_STATE_FILE = STATE_DIR / "piggyback-state.json"
 
@@ -58,32 +59,27 @@ def record_status(
     state_file: Path = PIGGYBACK_STATE_FILE,
 ) -> None:
     """Merge ``fields`` into ``piggyback-state.json[name]`` under an exclusive
-    lock.
+    lock (`core.state_store.locked` on the sibling ``*.lock`` file).
 
     Read-modify-write so a concurrent writer (another piggyback runner, or
     flush.py recording the initial ``spawned`` state) never clobbers keys it
-    didn't touch. The lock lives on a sibling ``*.lock`` file so we never
-    truncate the data file while holding only a shared view of it.
+    didn't touch. A corrupt state file resets to empty rather than crashing
+    the runner; the save is atomic (tmp + os.replace).
     """
     state_file.parent.mkdir(parents=True, exist_ok=True)
-    lock_path = state_file.with_name(state_file.name + ".lock")
-    with open(lock_path, "w") as lf:
-        fcntl.flock(lf.fileno(), fcntl.LOCK_EX)
-        try:
-            data: dict = {}
-            if state_file.exists():
-                try:
-                    data = json.loads(state_file.read_text(encoding="utf-8"))
-                except (json.JSONDecodeError, OSError):
-                    data = {}
-            entry = data.get(name)
-            if not isinstance(entry, dict):
-                entry = {}
-            entry.update(fields)
-            data[name] = entry
-            state_file.write_text(json.dumps(data, indent=2), encoding="utf-8")
-        finally:
-            fcntl.flock(lf.fileno(), fcntl.LOCK_UN)
+    with locked(state_file.with_name(state_file.name + ".lock")):
+        data: dict = {}
+        if state_file.exists():
+            try:
+                data = json.loads(state_file.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, OSError):
+                data = {}
+        entry = data.get(name)
+        if not isinstance(entry, dict):
+            entry = {}
+        entry.update(fields)
+        data[name] = entry
+        save_json_state(state_file, data)
 
 
 def _terminate(proc: subprocess.Popen) -> None:

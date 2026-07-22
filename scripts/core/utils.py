@@ -8,6 +8,7 @@ YAML-driven) `config.py` module. Moved here in the 2026-05-14 config split
 
 import hashlib
 import json
+import os
 import re
 from datetime import datetime, timezone
 from pathlib import Path
@@ -46,23 +47,39 @@ def load_json_state(path: Path, default: dict | None = None) -> dict:
     return dict(default) if default else {}
 
 
-def save_json_state(path: Path, state: dict) -> None:
-    """Write a JSON state file (indent=2, default=str for datetime etc.)."""
+def save_json_state(
+    path: Path,
+    state: dict,
+    *,
+    sort_keys: bool = False,
+    trailing_newline: bool = False,
+) -> None:
+    """Write a JSON state file atomically (tmp + os.replace).
+
+    indent=2, default=str for datetime etc. A crash/kill mid-write can never
+    leave a torn file — for state.json a torn write means a full recompile
+    (~$1-2), which is why dream.py privately engineered the same pattern
+    before it was hoisted here (StateStore arc). ``sort_keys`` /
+    ``trailing_newline`` keep pre-existing serializations byte-stable."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(state, indent=2, default=str), encoding="utf-8")
+    text = json.dumps(state, indent=2, default=str, sort_keys=sort_keys)
+    if trailing_newline:
+        text += "\n"
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(text, encoding="utf-8")
+    os.replace(tmp, path)
 
 
 _DEFAULT_STATE = {"ingested": {}, "query_count": 0, "last_lint": None, "total_cost": 0.0}
 
 
 def load_state() -> dict:
-    """Load the compiler's primary state.json."""
+    """Load the compiler's primary state.json (fresh disk read).
+
+    Read-side only. Writers merge their own keys via
+    ``core.state_store.update_state`` — a whole-dict save here would clobber
+    concurrent counter writes (the pre-StateStore race)."""
     return load_json_state(STATE_FILE, _DEFAULT_STATE)
-
-
-def save_state(state: dict) -> None:
-    """Save the compiler's primary state.json."""
-    save_json_state(STATE_FILE, state)
 
 
 # ── Append-only event history (M003-S05) ──────────────────────────────

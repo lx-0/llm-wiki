@@ -37,8 +37,6 @@ Provider: Claude Agent SDK only — never Ollama. (See feedback memory
 
 from __future__ import annotations
 
-import json
-
 import os
 
 os.environ.setdefault("CLAUDE_INVOKED_BY", "dream")
@@ -74,6 +72,7 @@ from core.paths import (
 )
 from core.prompts import build_output_language_instruction, render
 from core.sdk_helpers import SdkCallSpec, WriteScope, run_sdk_query
+from core.state_store import StateStore, store_for
 from core.utils import now_iso, today_iso, append_history
 from core.console import (  # noqa: E402
     C_BOLD,
@@ -360,23 +359,24 @@ def _recency_decay(mtime: float, *, now: float | None = None) -> float:
 
 # Side-state file for dream-cycle activation tracking. Keyed by
 # vault-relative path -> ISO date. Kept OUT of substrate frontmatter so
-# raw/ stays byte-identical (raw-is-immutable rule).
+# raw/ stays byte-identical (raw-is-immutable rule). Storage goes through
+# the core.state_store facade (locked atomic writes + load-once cache) —
+# the sweep consults this store once per SCORED file, so an uncached
+# per-call disk parse was the recorded O(N²) hang shape.
 _DREAM_ACTIVATION_FILE = STATE_DIR / "dream-activation.json"
 
 
+def _activation_store() -> StateStore:
+    """The activation map's StateStore. Resolved per call (not at import) so
+    tests can monkeypatch `_DREAM_ACTIVATION_FILE`; format knobs keep the
+    pre-facade serialization (sort_keys + trailing newline) byte-stable."""
+    return store_for(_DREAM_ACTIVATION_FILE, sort_keys=True, trailing_newline=True)
+
+
 def _load_dream_activation() -> dict[str, str]:
-    try:
-        return json.loads(_DREAM_ACTIVATION_FILE.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return {}
-
-
-def _save_dream_activation(data: dict[str, str]) -> None:
-    """Atomic-replace write so a crash mid-write can't corrupt the file."""
-    _DREAM_ACTIVATION_FILE.parent.mkdir(parents=True, exist_ok=True)
-    tmp = _DREAM_ACTIVATION_FILE.with_suffix(".json.tmp")
-    tmp.write_text(json.dumps(data, sort_keys=True, indent=2) + "\n", encoding="utf-8")
-    tmp.replace(_DREAM_ACTIVATION_FILE)
+    """Cached snapshot of the activation map (read-only — writes go through
+    `_stamp_last_dreamed_at`)."""
+    return _activation_store().load()
 
 
 # ── Insufficient-corpus backoff ─────────────────────────────────────
@@ -395,20 +395,16 @@ def _save_dream_activation(data: dict[str, str]) -> None:
 _DREAM_INSUFFICIENT_FILE = STATE_DIR / "dream-insufficient-corpus.json"
 
 
+def _insufficient_store() -> StateStore:
+    """The backoff store's StateStore (same facade + format as the activation
+    map; resolved per call so tests can monkeypatch the file constant)."""
+    return store_for(_DREAM_INSUFFICIENT_FILE, sort_keys=True, trailing_newline=True)
+
+
 def _load_insufficient_state() -> dict[str, dict]:
-    try:
-        data = json.loads(_DREAM_INSUFFICIENT_FILE.read_text(encoding="utf-8"))
-        return data if isinstance(data, dict) else {}
-    except (OSError, json.JSONDecodeError):
-        return {}
-
-
-def _save_insufficient_state(data: dict[str, dict]) -> None:
-    """Atomic-replace write (mirrors _save_dream_activation)."""
-    _DREAM_INSUFFICIENT_FILE.parent.mkdir(parents=True, exist_ok=True)
-    tmp = _DREAM_INSUFFICIENT_FILE.with_suffix(".json.tmp")
-    tmp.write_text(json.dumps(data, sort_keys=True, indent=2) + "\n", encoding="utf-8")
-    tmp.replace(_DREAM_INSUFFICIENT_FILE)
+    """Cached snapshot of the backoff store (read-only — writes go through
+    `_record_insufficient_corpus` / `_clear_insufficient_corpus`)."""
+    return _insufficient_store().load()
 
 
 def _record_insufficient_corpus(slug: str, *, when: datetime | None = None) -> int:
@@ -416,13 +412,17 @@ def _record_insufficient_corpus(slug: str, *, when: datetime | None = None) -> i
     time, and return the new count. Tolerant — state-write failure logs and
     returns 0 so a backoff-bookkeeping hiccup never aborts a dream."""
     ref = when or datetime.now(timezone.utc)
-    try:
-        data = _load_insufficient_state()
+    result = {"count": 0}
+
+    def _bump(data: dict) -> None:
         entry = data.get(slug) if isinstance(data.get(slug), dict) else {}
         count = int(entry.get("count", 0)) + 1
         data[slug] = {"count": count, "last_at": ref.isoformat()}
-        _save_insufficient_state(data)
-        return count
+        result["count"] = count
+
+    try:
+        _insufficient_store().update(_bump)
+        return result["count"]
     except OSError as exc:
         log.warning("  could not record insufficient-corpus backoff for %s: %s", slug, exc)
         return 0
@@ -431,15 +431,20 @@ def _record_insufficient_corpus(slug: str, *, when: datetime | None = None) -> i
 def _clear_insufficient_corpus(slug: str) -> bool:
     """Drop any backoff entry for `slug` (called after a successful synthesis).
     Returns True if an entry was removed."""
-    try:
-        data = _load_insufficient_state()
+    removed = {"v": False}
+
+    def _drop(data: dict) -> None:
         if slug in data:
             del data[slug]
-            _save_insufficient_state(data)
-            return True
+            removed["v"] = True
+
+    try:
+        if slug not in _insufficient_store().load():
+            return False  # cached fast-path — skip a pointless locked rewrite
+        _insufficient_store().update(_drop)
     except OSError as exc:
         log.warning("  could not clear insufficient-corpus backoff for %s: %s", slug, exc)
-    return False
+    return removed["v"]
 
 
 def _insufficient_backoff_days(count: int, *, base_days: int, max_days: int) -> float:
@@ -544,32 +549,59 @@ def _compute_sampling_score(
     return importance * recency * dreams_since * noise
 
 
-def _write_last_dreamed_at(path: Path, when: datetime | None = None) -> bool:
-    """Record `last_dreamed_at` for a substrate file in the side-state
-    file (`state/dream-activation.json`). NEVER touches the substrate
-    file itself — raw/ is immutable (engine reads, never writes).
+def _stamp_last_dreamed_at(paths: list[Path], when: datetime | None = None) -> int:
+    """Record `last_dreamed_at` for many substrate files in ONE locked
+    read-modify-write on the side-state file (`state/dream-activation.json`).
+    NEVER touches the substrate files themselves — raw/ is immutable (engine
+    reads, never writes).
 
-    Returns True if the side-state was updated. Idempotent — same-day
-    stamp is a no-op (avoids churning the JSON on every dream of every
-    entity). Tolerant — write failure logs and returns False so a single
-    problematic file doesn't abort the rest of a dream.
+    Returns the number of files newly stamped. Idempotent — same-day stamps
+    are no-ops (already-stamped files are pre-filtered on the cached
+    snapshot, so an all-stamped corpus doesn't even rewrite the store).
+    Tolerant — a store-write failure logs and returns 0 so bookkeeping never
+    aborts a dream. The per-file load+rewrite this replaces was
+    O(stamped × store-size) — the recorded per-item-over-all-items hang shape.
     """
     stamp = (when or datetime.now(timezone.utc)).strftime("%Y-%m-%d")
+    rels: list[str] = []
+    for path in paths:
+        try:
+            rels.append(str(path.relative_to(ROOT_DIR)))
+        except ValueError:
+            rels.append(str(path))
+    store = _activation_store()
+    cached = store.load()
+    pending = [
+        rel for rel in rels
+        if not (isinstance(cached.get(rel), str) and cached[rel].startswith(stamp))
+    ]
+    if not pending:
+        return 0
+
+    stamped = {"n": 0}
+
+    def _apply(data: dict) -> None:
+        for rel in pending:
+            existing = data.get(rel)
+            if isinstance(existing, str) and existing.startswith(stamp):
+                continue  # another process stamped it since our cached read
+            data[rel] = stamp
+            stamped["n"] += 1
+
     try:
-        rel = str(path.relative_to(ROOT_DIR))
-    except ValueError:
-        rel = str(path)
-    try:
-        activation = _load_dream_activation()
-        existing = activation.get(rel)
-        if isinstance(existing, str) and existing.startswith(stamp):
-            return False  # already stamped today
-        activation[rel] = stamp
-        _save_dream_activation(activation)
-        return True
+        store.update(_apply)
     except OSError as exc:
-        log.warning("  could not stamp last_dreamed_at for %s: %s", rel, exc)
-        return False
+        log.warning(
+            "  could not stamp last_dreamed_at for %d file(s): %s", len(pending), exc
+        )
+        return 0
+    return stamped["n"]
+
+
+def _write_last_dreamed_at(path: Path, when: datetime | None = None) -> bool:
+    """Single-file form of `_stamp_last_dreamed_at`. Returns True if the
+    side-state was updated (False = already stamped today or write failure)."""
+    return _stamp_last_dreamed_at([path], when=when) == 1
 
 
 # ── Tiered corpus collection ────────────────────────────────────────
@@ -1418,10 +1450,11 @@ async def dream_entity(
         )
 
     # M016 — stamp last_dreamed_at on every substrate file that appeared in
-    # this dream's corpus. This is the activation-tracking mechanism that
-    # cycles files through Tier 2 sampling over time. Per-file write
-    # failures log and continue — the entity-page Write is the deliverable.
-    stamped = 0
+    # this dream's corpus, in ONE locked store write (the per-file rewrite
+    # was O(corpus × store-size)). This is the activation-tracking mechanism
+    # that cycles files through Tier 2 sampling over time. A write failure
+    # logs and continues — the entity-page Write is the deliverable.
+    to_stamp: list[Path] = []
     for path in corpus_paths:
         # Skip the entity page itself (its own last_synthesized_at is
         # written by the prompt's housekeeping rule). Skip daily/<date>.md
@@ -1443,8 +1476,8 @@ async def dream_entity(
             continue
         if re.fullmatch(r"daily/\d{4}-\d{2}-\d{2}/[^/]+\.md", rel):
             continue
-        if _write_last_dreamed_at(path):
-            stamped += 1
+        to_stamp.append(path)
+    stamped = _stamp_last_dreamed_at(to_stamp)
     if stamped:
         log.info("  stamped last_dreamed_at on %d substrate file(s)", stamped)
 

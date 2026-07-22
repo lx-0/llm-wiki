@@ -13,8 +13,6 @@ os.environ["CLAUDE_INVOKED_BY"] = "compile"
 
 import argparse
 import asyncio
-import fcntl
-import io
 import json
 import logging
 import re
@@ -23,13 +21,13 @@ import time
 from pathlib import Path
 
 from core.paths import INDEX_FILE, KNOWLEDGE_DIR, LOGS_DIR, LOG_FILE, ROOT_DIR, STATE_DIR, STATE_FILE
+from core.state_store import acquire_process_lock, pending_paths, update_state
 from core.utils import (
     file_hash,
     list_raw_files,
     list_wiki_articles,
     load_state,
     now_iso,
-    save_state,
     today_iso,
 )
 from core.sdk_helpers import FailureClass, is_fatal
@@ -108,9 +106,6 @@ from compile_stages.route import (  # noqa: E402
 
 def select_files(args: argparse.Namespace) -> list[Path]:
     """Determine which files to compile based on CLI args and state."""
-    state = load_state()
-    ingested = state.get("ingested", {})
-
     if args.file:
         target = Path(args.file)
         if not target.is_absolute():
@@ -120,20 +115,14 @@ def select_files(args: argparse.Namespace) -> list[Path]:
             sys.exit(1)
         return [target]
 
-    candidates = list_raw_files()
-
     if args.all:
-        return candidates
+        return list_raw_files()
 
-    # Filter to files that have changed since last compilation
-    changed = []
-    for f in candidates:
-        current_hash = file_hash(f)
-        rel = str(f.relative_to(ROOT_DIR))
-        if ingested.get(rel) != current_hash:
-            changed.append(f)
-
-    return changed
+    # Changed-since-last-compile = the ingested-ledger's pending view.
+    # The ledger schema (ROOT_DIR-relative key → plain content hash, legacy
+    # dict values tolerated) lives in core.state_store — never re-derive it
+    # here (the hand-rolled copy in flush.py drifted and went silently dead).
+    return pending_paths()
 
 
 # ── Compilation ──────────────────────────────────────────────────────
@@ -428,35 +417,35 @@ async def _run_compile_route(
 
 
 # ── Process-level mutex ──────────────────────────────────────────────
+# Only one compile.py at a time (2026-05-15 SessionEnd-storm incident) —
+# acquired via core.state_store.acquire_process_lock in main().
 
 _COMPILE_LOCK_FILE = STATE_DIR / "compile.lock"
 
 
-def _acquire_exclusive_lock(lock_path: Path) -> io.IOBase | None:
-    """Try to acquire an exclusive non-blocking flock on ``lock_path``.
+# ── State persistence ────────────────────────────────────────────────
 
-    Returns the open file handle on success — caller MUST keep the
-    reference alive for the duration of the critical section. The kernel
-    releases the flock automatically on process exit (or on explicit
-    ``handle.close()``), so no manual unlock is needed.
 
-    Returns ``None`` if another process already holds the lock.
+def _persist_outcome(
+    rel: str, digest: str, *, cost_delta: float = 0.0, stamp_compile: bool = False
+) -> dict:
+    """Merge one file's result into state.json under the state lock.
 
-    Background: 2026-05-15 incident — parallel SessionEnd hooks each
-    spawned ``compile.py --file daily/<X>.md`` for the same daily file,
-    producing 3-4 concurrent bundled-CLI subprocesses that competed for
-    the Claude subscription quota and crashed mid-stream with
-    ``kind=unknown``/empty stderr. A single global compile-lock prevents
-    the storm.
-    """
-    lock_path.parent.mkdir(parents=True, exist_ok=True)
-    fd = open(lock_path, "w")
-    try:
-        fcntl.flock(fd.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except BlockingIOError:
-        fd.close()
-        return None
-    return fd
+    compile used to hold its state dict in memory for the whole (multi-minute)
+    run and save the WHOLE dict per file — clobbering any query/lint counter
+    written meanwhile (last-writer-wins), and in the rare inverse direction a
+    concurrent counter-write could drop this run's freshly-ingested hash (a
+    recompile's worth of tokens). Merging under the lock keeps every writer's
+    keys alive; this run contributes only the ingested hash, its cost DELTA,
+    and (on success) the last_compile stamp."""
+    def _apply(state: dict) -> None:
+        state.setdefault("ingested", {})[rel] = digest
+        if cost_delta:
+            state["total_cost"] = round(state.get("total_cost", 0.0) + cost_delta, 4)
+        if stamp_compile:
+            state["last_compile"] = now_iso()
+
+    return update_state(_apply)
 
 
 # ── Main ─────────────────────────────────────────────────────────────
@@ -511,7 +500,7 @@ async def main() -> None:
     # from parallel SessionEnd hooks (or operator + hook) used to converge
     # on the same daily-file and crash the bundled CLI mid-stream under
     # subscription-quota contention. The lock is released on process exit.
-    _compile_lock = _acquire_exclusive_lock(_COMPILE_LOCK_FILE)
+    _compile_lock = acquire_process_lock(_COMPILE_LOCK_FILE)
     if _compile_lock is None:
         log.info(
             "Another compile process is already running (lock %s held) — exiting cleanly.",
@@ -560,8 +549,10 @@ async def main() -> None:
     for subdir in ["concepts", "connections", "qa", "people", "projects"]:
         (KNOWLEDGE_DIR / subdir).mkdir(parents=True, exist_ok=True)
 
-    state = load_state()
-    total_cost = state.get("total_cost", 0.0)
+    # Read-only baseline for cost display; every WRITE below is a key-wise
+    # merge-under-lock (core.state_store.update_state) so concurrent
+    # query/lint counter writes survive this multi-minute run.
+    total_cost = load_state().get("total_cost", 0.0)
     cost_at_start = total_cost  # for history-event cost_delta
     compiled_count = 0
     failed_count = 0
@@ -615,8 +606,7 @@ async def main() -> None:
             skipped_count += 1
             if outcome.ingest_hash:
                 rel = str(source.relative_to(ROOT_DIR))
-                state.setdefault("ingested", {})[rel] = file_hash(source)
-                save_state(state)
+                _persist_outcome(rel, file_hash(source))
             continue
 
         if outcome.status == "failed":
@@ -691,16 +681,19 @@ async def main() -> None:
         # save (not just end-of-loop) so rate-limit aborts / kills / crashes don't lose
         # work already done. Iron rule: "no gap between capture and persist".
         rel = str(source.relative_to(ROOT_DIR))
-        state.setdefault("ingested", {})[rel] = file_hash(source)
-        state["total_cost"] = round(total_cost, 4)
-        state["last_compile"] = now_iso()
-        save_state(state)
+        _persist_outcome(
+            rel, file_hash(source),
+            cost_delta=outcome.cost_usd, stamp_compile=True,
+        )
 
-    # Final save (idempotent — captures total_cost / last_compile if loop had
-    # zero successes and the per-file save above was never reached).
-    state["total_cost"] = round(total_cost, 4)
-    state["last_compile"] = now_iso()
-    save_state(state)
+    # Final stamp (idempotent — records last_compile if the loop had zero
+    # successes and the per-file merge above was never reached). Cost deltas
+    # were merged per-file; re-writing an absolute total here would clobber
+    # concurrent query-cost writes.
+    def _stamp_final(s: dict) -> None:
+        s["last_compile"] = now_iso()
+
+    state = update_state(_stamp_final)
 
     # Corpus-wide backlinks footer pass (M020). Runs after every compile so
     # newly-created articles or renamed targets propagate into incoming-link
@@ -767,7 +760,7 @@ async def main() -> None:
     )
     log.info(
         "  cost:    $%.4f this run · $%.4f lifetime",
-        run_cost, total_cost,
+        run_cost, state.get("total_cost", total_cost),
     )
     log.info("  time:    %dm %ds", elapsed_min, elapsed_sec)
 

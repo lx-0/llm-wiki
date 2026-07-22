@@ -344,7 +344,9 @@ def test_health_rollup_stub_takes_deterministic_path(
 
     captured = {}
     monkeypatch.setattr(compile_mod, "load_state", lambda: {})
-    monkeypatch.setattr(compile_mod, "save_state", lambda s: captured.update(s))
+    monkeypatch.setattr(
+        compile_mod, "update_state", lambda m: (m(captured), captured)[1]
+    )
 
     result = asyncio.run(compile_mod.compile_file(source, force=True))
 
@@ -382,7 +384,7 @@ def test_health_rollup_prose_falls_through_to_agent(
     from compile_stages import compile as _cs_mod
     monkeypatch.setattr(_cs_mod, "query", fake_query)
     monkeypatch.setattr(compile_mod, "load_state", lambda: {})
-    monkeypatch.setattr(compile_mod, "save_state", lambda s: None)
+    monkeypatch.setattr(compile_mod, "update_state", lambda m: {})
 
     asyncio.run(compile_mod.compile_file(source, force=True))
     assert called["n"] >= 1, "prose health rollup did not reach the SDK agent"
@@ -407,7 +409,9 @@ def test_deterministic_skip_routes_signal_ingest_hash(
 
     captured = {}
     monkeypatch.setattr(compile_mod, "load_state", lambda: {})
-    monkeypatch.setattr(compile_mod, "save_state", lambda s: captured.update(s))
+    monkeypatch.setattr(
+        compile_mod, "update_state", lambda m: (m(captured), captured)[1]
+    )
 
     outcome = asyncio.run(compile_mod.compile_file(source, force=True))
 

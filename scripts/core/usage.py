@@ -15,12 +15,11 @@ bucketed `date -> "<provider>:<model>" -> {...}`, under an fcntl lock.
 from __future__ import annotations
 
 import atexit
-import fcntl
-from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
 from .paths import STATE_DIR
+from .state_store import locked
 from .utils import load_json_state, save_json_state, today_iso
 
 PROVIDER_CLAUDE = "claude"
@@ -44,20 +43,6 @@ def provider_for_model(model: str) -> str:
 
 def _fmt_k(n: int) -> str:
     return f"{n / 1000:.1f}K" if n >= 1000 else str(int(n))
-
-
-@contextmanager
-def _locked(lock_path: Path):
-    lock_path.parent.mkdir(parents=True, exist_ok=True)
-    fd = open(lock_path, "w")
-    try:
-        fcntl.flock(fd.fileno(), fcntl.LOCK_EX)
-        yield
-    finally:
-        try:
-            fcntl.flock(fd.fileno(), fcntl.LOCK_UN)
-        finally:
-            fd.close()
 
 
 @dataclass
@@ -141,7 +126,7 @@ class UsageLedger:
         path = path or USAGE_FILE
         day = day or today_iso()
         path.parent.mkdir(parents=True, exist_ok=True)
-        with _locked(path.with_name(path.name + ".lock")):
+        with locked(path.with_name(path.name + ".lock")):
             data = load_json_state(path, {})
             bucket = data.setdefault(day, {})
             for (provider, model), u in self._by_key.items():

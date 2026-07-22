@@ -31,6 +31,7 @@ from claude_agent_sdk import ClaudeAgentOptions, ResultMessage, query
 from core import frontmatter
 from core.backlinks import BACKLINKS_BEGIN, BACKLINKS_END
 from core.paths import KNOWLEDGE_DIR, REPORTS_DIR, ROOT_DIR
+from core.state_store import update_state
 from core.utils import (
     extract_wikilinks,
     file_hash,
@@ -39,7 +40,6 @@ from core.utils import (
     load_state,
     now_iso,
     read_all_wiki_content,
-    save_state,
     today_iso,
 )
 from core.links import (  # noqa: E402
@@ -1243,10 +1243,12 @@ async def main() -> None:
     report_file.write_text(report, encoding="utf-8")
     log.info("Report saved to %s", report_file)
 
-    # Update state
-    state = load_state()
-    state["last_lint"] = now_iso()
-    save_state(state)
+    # Update state (merge-under-lock — a whole-dict save here raced compile's
+    # long-held state copy, last-writer-wins).
+    def _stamp_lint(state: dict) -> None:
+        state["last_lint"] = now_iso()
+
+    update_state(_stamp_lint)
 
     # Summary
     errors = sum(1 for i in all_issues if i.severity == "error")

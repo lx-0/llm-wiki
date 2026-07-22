@@ -18,12 +18,11 @@ from claude_agent_sdk import query
 
 from core.paths import KNOWLEDGE_DIR, QA_DIR, ROOT_DIR
 from core.config import CONFIG
+from core.state_store import update_state
 from core.utils import (
-    load_state,
     now_iso,
     read_hard_facts,
     read_wiki_index_compact,
-    save_state,
     slugify,
     today_iso,
 )
@@ -248,12 +247,15 @@ async def main() -> None:
 
     # Update state. total_cost accumulates the SDK-REPORTED actual cost
     # (ResultMessage.total_cost_usd, an API passthrough — not a rate-card
-    # estimate); dashboards read this as total_cost_lifetime.
-    state = load_state()
-    state["query_count"] = state.get("query_count", 0) + 1
-    state["total_cost"] = round(state.get("total_cost", 0.0) + result.cost_usd, 4)
-    state["last_query"] = now_iso()
-    save_state(state)
+    # estimate); dashboards read this as total_cost_lifetime. Merged
+    # under the state lock so a compile running in parallel can't clobber
+    # these counters with its own long-held copy (and vice versa).
+    def _bump_query_counters(state: dict) -> None:
+        state["query_count"] = state.get("query_count", 0) + 1
+        state["total_cost"] = round(state.get("total_cost", 0.0) + result.cost_usd, 4)
+        state["last_query"] = now_iso()
+
+    update_state(_bump_query_counters)
 
 
 if __name__ == "__main__":
