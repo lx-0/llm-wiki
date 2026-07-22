@@ -92,3 +92,93 @@ def test_legacy_json_escaped_summary_now_decodes():
         "---\n# x\n"
     )
     assert triage._fields(legacy)["summary"] == 'Müller sagt "hi"'
+
+
+# ── `wiki triage list --json` — the machine seam over the same records (C07) ──
+#
+# The desktop app consumes this payload instead of re-parsing frontmatter and
+# re-scrubbing the record body's template prose in TypeScript. The scrub now
+# lives engine-side (`triage._detail`), next door to the `_record.py` writer —
+# these tests are the tripwire that catches a rephrased hint template.
+
+
+def _write_record(rec_mod, *, kind: str, summary: str, source: str, type_: str, hint: str):
+    from intents.base import Intent
+
+    rec_mod.write_inbox_record(
+        Intent(kind=kind, summary=summary, source=source, confidence="high"),
+        type_=type_, triage_hint=hint,
+    )
+
+
+def test_json_list_serves_clean_detail(tmp_path, monkeypatch):
+    """The `detail` field is the triage hint alone — provenance prefix and the
+    `Set status: dismissed` CLI instruction are scrubbed engine-side."""
+    import intents._record as rec
+    import triage
+
+    monkeypatch.setattr(rec, "WORKSPACE_INBOX_DIR", tmp_path)
+    monkeypatch.setattr(triage, "WORKSPACE_INBOX_DIR", tmp_path)
+    _write_record(
+        rec, kind="action_item", summary="Reply to Bob",
+        source="raw/voice/2026-07-10-bob.md", type_="task",
+        hint="Accept to add it to your tasks.",
+    )
+
+    payload = triage._json_payload(show_all=False)
+    assert payload["pending"] == 1 and payload["total"] == 1
+    (record,) = payload["records"]
+    assert record["detail"] == "Accept to add it to your tasks."
+    assert "Detected from" not in record["detail"]
+    assert "status" not in record["detail"]
+    assert record["summary"] == "Reply to Bob"
+    assert record["date"] == "2026-07-10"  # capture date from the source filename
+
+
+def test_json_record_covers_the_frontmatter_contract(tmp_path, monkeypatch):
+    """Every CONTRACT_KEY the writer emits reaches the JSON consumer — the
+    payload is a serializer over `_fields`, not a hand-picked subset."""
+    import intents._record as rec
+    import triage
+
+    monkeypatch.setattr(rec, "WORKSPACE_INBOX_DIR", tmp_path)
+    monkeypatch.setattr(triage, "WORKSPACE_INBOX_DIR", tmp_path)
+    _write_record(
+        rec, kind="note", summary='Müller sagt "Grüß dich"',
+        source="raw/voice/v.md", type_="note", hint="Accept to keep it.",
+    )
+
+    (record,) = triage._json_payload(show_all=False)["records"]
+    missing = CONTRACT_KEYS - set(record)
+    assert not missing, f"JSON record lost contract keys: {missing}"
+    # Umlauts/quotes survive the whole write → parse → serialize path (C03).
+    assert record["summary"] == 'Müller sagt "Grüß dich"'
+
+
+def test_json_list_orders_by_type_and_filters_pending(tmp_path, monkeypatch):
+    """Same `_ORDER` contract as the human list (task < idea < note); dismissed
+    records only appear with show_all."""
+    import intents._record as rec
+    import triage
+
+    monkeypatch.setattr(rec, "WORKSPACE_INBOX_DIR", tmp_path)
+    monkeypatch.setattr(triage, "WORKSPACE_INBOX_DIR", tmp_path)
+    _write_record(rec, kind="note", summary="n", source="raw/voice/c-note.md",
+                  type_="note", hint="h.")
+    _write_record(rec, kind="action_item", summary="t", source="raw/voice/a-task.md",
+                  type_="task", hint="h.")
+    _write_record(rec, kind="idea", summary="i", source="raw/voice/b-idea.md",
+                  type_="idea", hint="h.")
+    dismissed = tmp_path / "c-note.md"
+    dismissed.write_text(
+        dismissed.read_text(encoding="utf-8").replace("status: pending", "status: dismissed"),
+        encoding="utf-8",
+    )
+
+    pending = triage._json_payload(show_all=False)
+    assert [r["type"] for r in pending["records"]] == ["task", "idea"]
+    assert pending["pending"] == 2 and pending["total"] == 3
+
+    everything = triage._json_payload(show_all=True)
+    assert [r["type"] for r in everything["records"]] == ["task", "idea", "note"]
+    assert [r["status"] for r in everything["records"]] == ["pending", "pending", "dismissed"]

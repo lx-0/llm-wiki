@@ -1,111 +1,68 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import * as fs from 'node:fs';
-import * as os from 'node:os';
-import * as path from 'node:path';
-import { listTriage } from './triage';
+import { describe, it, expect } from 'vitest';
+import { parseTriage } from './triage';
 
-// Build a throwaway vault + a registry that points at it (resolveVault reads
-// $XDG_CONFIG_HOME/llm-wiki/vaults), so listTriage's real fs read + the record-format
-// parse/scrub/sort run end-to-end. The record bodies mirror scripts/intents/_record.py
-// exactly — this test is the tripwire that catches the engine rephrasing that prose.
+// The record parse + prose scrub live engine-side now (`wiki triage list --json`,
+// pinned by tests/test_triage_record_contract.py). This side owns only the
+// payload → TriageRecord mapping and the display sort.
 
-let tmp: string;
-let prevXdg: string | undefined;
-
-// One record, frontmatter + body, in the exact shape _record.py writes.
-function record(opts: {
-  type: string;
-  status: string;
-  summary: string;
-  kind: string;
-  confidence: string;
-  source: string;
-  detectedAt: string;
-  stem: string;
-  hint: string;
-}): void {
-  const fm = [
-    '---',
-    `type: ${opts.type}`,
-    `status: ${opts.status}`,
-    `kind: ${opts.kind}`,
-    `confidence: ${opts.confidence}`,
-    `summary: ${JSON.stringify(opts.summary)}`,
-    `source: ${opts.source}`,
-    `detected_at: ${opts.detectedAt}`,
-    '---',
-  ].join('\n');
-  const body =
-    `# ${opts.summary}\n\n` +
-    `_Detected from [[${opts.stem}]] · ${opts.kind} · confidence ${opts.confidence}. ` +
-    `${opts.hint} Set \`status: dismissed\` to drop._\n\n` +
-    `## ${opts.type[0].toUpperCase()}${opts.type.slice(1)}\n\n` +
-    `${opts.summary}\n`;
-  const inbox = path.join(tmp, 'vault', 'workspace', 'inbox');
-  fs.writeFileSync(path.join(inbox, `${opts.stem}.md`), `${fm}\n${body}`, 'utf8');
-}
-
-beforeAll(() => {
-  tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'triage-test-'));
-  fs.mkdirSync(path.join(tmp, 'vault', 'workspace', 'inbox'), { recursive: true });
-  fs.mkdirSync(path.join(tmp, 'config', 'llm-wiki'), { recursive: true });
-  fs.writeFileSync(path.join(tmp, 'config', 'llm-wiki', 'vaults'), path.join(tmp, 'vault') + '\n');
-  prevXdg = process.env.XDG_CONFIG_HOME;
-  process.env.XDG_CONFIG_HOME = path.join(tmp, 'config');
-
-  record({
-    type: 'task', status: 'pending', kind: 'action_item', confidence: 'high',
-    summary: 'Reply to Bob about the invoice', source: 'raw/notes/email/2026-07-10-bob.md',
-    detectedAt: '2026-07-10T09:00:00', stem: '2026-07-10-bob',
-    hint: 'Accept to add it to your tasks.',
-  });
-  record({
-    type: 'idea', status: 'pending', kind: 'idea', confidence: 'medium',
-    summary: 'Spin up a weekend synth project', source: 'raw/notes/voice/2026-07-11-note.md',
-    detectedAt: '2026-07-11T20:00:00', stem: '2026-07-11-note',
-    hint: 'Accept to capture it.',
-  });
-  record({
-    type: 'note', status: 'dismissed', kind: 'note', confidence: 'low',
-    summary: 'Random passing thought', source: 'raw/notes/voice/2026-07-09-x.md',
-    detectedAt: '2026-07-09T08:00:00', stem: '2026-07-09-x',
-    hint: 'Accept to keep it.',
-  });
+const PAYLOAD = JSON.stringify({
+  records: [
+    {
+      stem: '2026-07-11-note', type: 'idea', status: 'pending', kind: 'idea',
+      summary: 'Spin up a weekend synth project', source: 'raw/notes/voice/2026-07-11-note.md',
+      confidence: 'medium', detected_at: '2026-07-11T20:00:00', date: '2026-07-11',
+      detail: 'Accept to capture it.',
+    },
+    {
+      stem: '2026-07-10-bob', type: 'task', status: 'pending', kind: 'action_item',
+      summary: 'Reply to Bob about the invoice', source: 'raw/notes/email/2026-07-10-bob.md',
+      confidence: 'high', detected_at: '2026-07-10T09:00:00', date: '2026-07-10',
+      detail: 'Accept to add it to your tasks.',
+    },
+    {
+      stem: '2026-07-09-x', type: 'note', status: 'dismissed', kind: 'note',
+      summary: 'Random passing thought', source: 'raw/notes/voice/2026-07-09-x.md',
+      confidence: 'low', detected_at: '2026-07-09T08:00:00', date: '2026-07-09',
+      detail: 'Accept to keep it.',
+    },
+  ],
+  pending: 2,
+  total: 3,
 });
 
-afterAll(() => {
-  if (prevXdg === undefined) delete process.env.XDG_CONFIG_HOME;
-  else process.env.XDG_CONFIG_HOME = prevXdg;
-  fs.rmSync(tmp, { recursive: true, force: true });
-});
-
-describe('listTriage', () => {
-  it('pending-only by default, task before idea', () => {
-    const recs = listTriage();
-    expect(recs.map((r) => r.stem)).toEqual(['2026-07-10-bob', '2026-07-11-note']);
+describe('parseTriage', () => {
+  it('display-sorts: pending first, task before idea, dismissed last', () => {
+    const recs = parseTriage(PAYLOAD);
+    expect(recs.map((r) => r.stem)).toEqual(['2026-07-10-bob', '2026-07-11-note', '2026-07-09-x']);
     expect(recs[0].type).toBe('task');
-    expect(recs[1].type).toBe('idea');
+    expect(recs[recs.length - 1].status).toBe('dismissed');
   });
 
-  it('scrubs the provenance prefix AND the "Set status: dismissed" CLI instruction from the detail', () => {
-    const bob = listTriage().find((r) => r.stem === '2026-07-10-bob');
-    expect(bob?.detail).toBe('Accept to add it to your tasks.');
-    expect(bob?.detail).not.toMatch(/Detected from/i);
-    expect(bob?.detail).not.toMatch(/status/i);
+  it('maps every TriageRecord field from the payload', () => {
+    const bob = parseTriage(PAYLOAD).find((r) => r.stem === '2026-07-10-bob');
+    expect(bob).toEqual({
+      stem: '2026-07-10-bob',
+      type: 'task',
+      status: 'pending',
+      summary: 'Reply to Bob about the invoice',
+      source: 'raw/notes/email/2026-07-10-bob.md',
+      detail: 'Accept to add it to your tasks.',
+      date: '2026-07-10',
+      confidence: 'high',
+    });
   });
 
-  it('parses frontmatter fields (summary unquoted, date truncated to YYYY-MM-DD)', () => {
-    const bob = listTriage().find((r) => r.stem === '2026-07-10-bob');
-    expect(bob?.summary).toBe('Reply to Bob about the invoice');
-    expect(bob?.source).toBe('raw/notes/email/2026-07-10-bob.md');
-    expect(bob?.date).toBe('2026-07-10');
-    expect(bob?.confidence).toBe('high');
+  it('returns [] for a payload without a records array', () => {
+    expect(parseTriage('{"records": null, "pending": 0, "total": 0}')).toEqual([]);
+    expect(parseTriage('{}')).toEqual([]);
   });
 
-  it('showAll includes dismissed records, pending still first', () => {
-    const all = listTriage(true);
-    expect(all.map((r) => r.stem)).toContain('2026-07-09-x');
-    expect(all[0].status).toBe('pending');
-    expect(all[all.length - 1].status).toBe('dismissed');
+  it('drops entries without a stem', () => {
+    const noisy = JSON.stringify({ records: [{ type: 'task' }], pending: 1, total: 1 });
+    expect(parseTriage(noisy)).toEqual([]);
+  });
+
+  it('throws on non-JSON output (runWiki turns that into data=null)', () => {
+    expect(() => parseTriage('workspace/inbox/ is empty — nothing to triage.')).toThrow();
   });
 });

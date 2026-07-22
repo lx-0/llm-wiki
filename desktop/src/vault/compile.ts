@@ -58,11 +58,27 @@ export interface CompileStart {
   error?: string;
 }
 
-/** Scan one output line for compile progress. compile.py logs "Files to compile: N",
- *  then per-file "[idx/total]", "Nothing to compile" on a no-op. (Only compile emits
- *  x/y; other commands stay indeterminate.) Behavior-preserving until the engine
- *  emits structured progress lines. */
+/** Marker prefix of the engine's structured progress lines
+ *  (`wiki compile --progress-json`). */
+const PROGRESS_PREFIX = 'PROGRESS ';
+
+/** Scan one output line for progress. Compile runs with `--progress-json`, so its
+ *  authoritative signal is the structured `PROGRESS {"current":i,"total":n}` line —
+ *  the engine's human log wording is free to change. The human patterns below stay
+ *  for the OTHER engine commands (dedup / review / curiosity emit `[i/total]` and
+ *  have no structured mode). */
 export function scanProgress(line: string): CompileProgress | null {
+  if (line.startsWith(PROGRESS_PREFIX)) {
+    try {
+      const d = JSON.parse(line.slice(PROGRESS_PREFIX.length)) as {
+        current?: unknown;
+        total?: unknown;
+      };
+      return { current: Number(d.current) || 0, total: Number(d.total) || 0 };
+    } catch {
+      return null;
+    }
+  }
   let m: RegExpMatchArray | null;
   if ((m = line.match(/\[(\d+)\/(\d+)\]/))) {
     return { current: Number(m[1]), total: Number(m[2]) };
@@ -113,7 +129,7 @@ export function startCompile(
   onProgress: (p: CompileProgress) => void,
   onDone: (r: CompileResult) => void,
 ): CompileStart {
-  return spawnWiki('compile', ['compile'], onProgress, onDone);
+  return spawnWiki('compile', ['compile', '--progress-json'], onProgress, onDone);
 }
 
 /** Run any other engine command (update / lint / links / dedup / review). Many

@@ -1,13 +1,14 @@
 """CLI entry-point for `wiki collect`. Bash dispatcher in `wiki` shells here.
 
 Two modes:
-- `--list`: enumerate registered Collectors with config status
+- `--list [--json]`: enumerate registered Collectors with config status
 - `<name> [--dry-run] [--incremental] [--account ID]`: run one Collector
 """
 
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 import sys
 from pathlib import Path
@@ -16,8 +17,26 @@ from typing import NoReturn
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 
-def _list() -> NoReturn:
+def _list(as_json: bool = False) -> NoReturn:
     from collectors import all_collectors
+
+    if as_json:
+        # Machine-readable seam (same posture as `wiki doctor --json` /
+        # `wiki menu --json`): GUI + agent consumers read this instead of
+        # scraping the human table's ✓/✗ glyph column.
+        payload = {
+            "collectors": [
+                {
+                    "name": c.SPEC.name,
+                    "configured": c.is_configured(),
+                    "output": c.SPEC.output_subfolder,
+                    "piggyback": "auto" if c.SPEC.piggyback_default else "manual-only",
+                }
+                for c in all_collectors()
+            ]
+        }
+        print(json.dumps(payload, indent=2))
+        sys.exit(0)
 
     print(f"{'NAME':<20} {'CONFIGURED':<18} {'OUTPUT':<28} PIGGYBACK")
     print("─" * 90)
@@ -103,14 +122,20 @@ def main() -> NoReturn:
 
     parser = argparse.ArgumentParser(prog="wiki collect")
     parser.add_argument("--list", action="store_true", help="enumerate registered collectors")
+    parser.add_argument(
+        "--json", action="store_true",
+        help="with --list: machine-readable output (desktop app / agents)",
+    )
     parser.add_argument("name", nargs="?", help="collector name (omit with --list)")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--incremental", action="store_true")
     parser.add_argument("--account", default=None)
     args = parser.parse_args()
 
+    if args.json and not args.list:
+        parser.error("--json requires --list")
     if args.list:
-        _list()
+        _list(as_json=args.json)
     if args.name is None:
         parser.error("missing collector name (or pass --list)")
     _run_one(args.name, dry_run=args.dry_run, incremental=args.incremental, account=args.account)

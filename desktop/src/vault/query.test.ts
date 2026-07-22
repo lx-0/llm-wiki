@@ -1,14 +1,26 @@
 import { describe, it, expect } from 'vitest';
-import { stripQueryBanner } from './query';
+import { parseQueryAnswer } from './query';
 
-describe('stripQueryBanner', () => {
-  it('strips the leading "wiki query" banner line', () => {
-    expect(stripQueryBanner('wiki query\nThe answer is 42.')).toBe('The answer is 42.');
+const PAYLOAD = JSON.stringify(
+  { question: 'What is X?', answer: 'The answer is 42.', input_tokens: 10, output_tokens: 5 },
+  null,
+  2,
+);
+
+describe('parseQueryAnswer', () => {
+  it('extracts the answer from the `wiki query --json` payload', () => {
+    expect(parseQueryAnswer(PAYLOAD)).toBe('The answer is 42.');
   });
-  it('tolerates surrounding whitespace on the banner line', () => {
-    expect(stripQueryBanner('  wiki query  \n\nbody text\n')).toBe('body text');
+
+  it('skips the dispatcher banner printed before the payload', () => {
+    expect(parseQueryAnswer(`wiki query\n\n${PAYLOAD}\n`)).toBe('The answer is 42.');
   });
-  it('leaves a bannerless answer untouched (just trimmed)', () => {
-    expect(stripQueryBanner('  just an answer  ')).toBe('just an answer');
+
+  it('returns "" when the payload has no string answer', () => {
+    expect(parseQueryAnswer('{"question": "q"}')).toBe('');
+  });
+
+  it('throws on output without JSON (runWiki turns that into data=null)', () => {
+    expect(() => parseQueryAnswer('wiki query\nsome prose answer')).toThrow();
   });
 });

@@ -11,6 +11,7 @@ keep vs drop:
 
     wiki triage                  list pending records, grouped by type
     wiki triage --all            list every record (incl. accepted/dismissed/done)
+    wiki triage list --json      machine-readable list (desktop app / agents)
     wiki triage accept <stem>    task → moved to tasks/ + listed in todo.md
     wiki triage dismiss <stem>   drop  → status: dismissed
 
@@ -20,6 +21,7 @@ keep vs drop:
 from __future__ import annotations
 
 import argparse
+import json
 import re
 import sys
 from pathlib import Path
@@ -62,19 +64,38 @@ def _capture_date(source: str) -> str:
     return f"{m.group(1)}-{m.group(2)}-{m.group(3)}" if m else ""
 
 
-def _records() -> list[tuple[Path, dict]]:
+def _detail(text: str) -> str:
+    """Human rationale for one record: the first body paragraph minus the
+    provenance prefix and the CLI-instruction suffix that `_record.py` writes
+    (`_Detected from [[stem]] · kind · confidence X. {hint} Set \\`status:
+    dismissed\\` to drop._`). Owning this scrub HERE keeps the record-format
+    coupling engine-internal — GUI/agent consumers get the clean hint via
+    `wiki triage list --json` instead of re-scrubbing the template prose
+    (rephrase the hint in `_record.py` and only this one reader must follow)."""
+    _fm, body = frontmatter.parse(text)
+    para = re.sub(r"^\s*#[^\n]*\n", "", body).strip()
+    para = re.split(r"\n\s*\n", para)[0] if para else ""
+    para = re.sub(r"Detected from[^.]*\.\s*", "", para, flags=re.I)
+    para = re.sub(r"\s*Set\s+`?status.*$", "", para, flags=re.I | re.S)
+    para = re.sub(r"\[\[([^\]]+)\]\]", lambda m: m.group(1).split("|")[0], para)
+    para = re.sub(r"[_*`]", "", para)
+    return re.sub(r"\s+", " ", para).strip()[:240]
+
+
+def _records() -> list[tuple[Path, dict, str]]:
     if not WORKSPACE_INBOX_DIR.is_dir():
         return []
     recs = []
     for f in sorted(WORKSPACE_INBOX_DIR.glob("*.md")):
-        recs.append((f, _fields(f.read_text(encoding="utf-8"))))
+        text = f.read_text(encoding="utf-8")
+        recs.append((f, _fields(text), text))
     return recs
 
 
 def _resolve(stem: str) -> Path | None:
-    cands = [f for f, _ in _records() if f.stem == stem]
+    cands = [f for f, _, _ in _records() if f.stem == stem]
     if not cands:
-        cands = [f for f, _ in _records() if f.stem.startswith(stem)]
+        cands = [f for f, _, _ in _records() if f.stem.startswith(stem)]
     if len(cands) == 1:
         return cands[0]
     if len(cands) > 1:
@@ -135,12 +156,44 @@ def _accept(path: Path) -> int:
     return 0
 
 
-def _list(show_all: bool) -> int:
+def _json_payload(show_all: bool) -> dict:
+    """`wiki triage list --json` — a serializer over the same `_fields`/`_ORDER`
+    contract the human list renders (plus the `_detail` body scrub). Machine
+    seam for the desktop app + agents; same posture as `wiki doctor --json`."""
+    recs = _records()
+    shown = [(f, fm, text) for f, fm, text in recs if show_all or fm.get("status") == "pending"]
+    shown.sort(key=lambda x: (_ORDER.get(x[1].get("type", ""), 9), x[0].name))
+    records = [
+        {
+            "stem": f.stem,
+            "type": fm.get("type", "note"),
+            "status": fm.get("status", "pending"),
+            "kind": fm.get("kind", ""),
+            "summary": fm.get("summary") or f.stem,
+            "source": fm.get("source", ""),
+            "confidence": fm.get("confidence", ""),
+            "detected_at": fm.get("detected_at", ""),
+            "date": _capture_date(fm.get("source", "")) or (fm.get("detected_at") or "")[:10],
+            "detail": _detail(text),
+        }
+        for f, fm, text in shown
+    ]
+    return {
+        "records": records,
+        "pending": sum(1 for _, fm, _ in recs if fm.get("status") == "pending"),
+        "total": len(recs),
+    }
+
+
+def _list(show_all: bool, as_json: bool = False) -> int:
+    if as_json:
+        print(json.dumps(_json_payload(show_all), indent=2))
+        return 0
     recs = _records()
     if not recs:
         print("workspace/inbox/ is empty — nothing to triage.")
         return 0
-    shown = [(f, fm) for f, fm in recs if show_all or fm.get("status") == "pending"]
+    shown = [(f, fm) for f, fm, _ in recs if show_all or fm.get("status") == "pending"]
     if not shown:
         print("No pending records. (use --all to see accepted/dismissed/done)")
         return 0
@@ -158,7 +211,7 @@ def _list(show_all: bool) -> int:
         summ = fm.get("summary") or f.stem
         print(f"  • {f.stem}")
         print(f"      ({date} · {conf}{flag}) {summ}")
-    pend = sum(1 for _, fm in recs if fm.get("status") == "pending")
+    pend = sum(1 for _, fm, _ in recs if fm.get("status") == "pending")
     print(f"\n{pend} pending · {len(recs)} total.  "
           "Act: wiki triage accept|dismiss <stem>")
     return 0
@@ -169,6 +222,10 @@ def main() -> int:
     sub = ap.add_subparsers(dest="cmd")
     pl = sub.add_parser("list", help="list records (default)")
     pl.add_argument("--all", action="store_true", help="include accepted/dismissed/done")
+    pl.add_argument(
+        "--json", action="store_true",
+        help="machine-readable list (desktop app / agents)",
+    )
     # Triage verbs: accept (task → tasks/ + todo.md; idea/note → filed) / dismiss.
     for verb, helptext in (
         ("accept", "task → moved to tasks/ + listed in todo.md; idea/note filed"),
@@ -180,7 +237,7 @@ def main() -> int:
     args = ap.parse_args()
 
     if args.cmd in (None, "list"):
-        return _list(getattr(args, "all", False))
+        return _list(getattr(args, "all", False), as_json=getattr(args, "json", False))
     if args.cmd == "accept":
         p = _resolve(args.stem)
         return _accept(p) if p else 1

@@ -46,9 +46,9 @@ export interface VaultApi {
   list(): Promise<EntryItem[]>;
   /** Lazy content preview (body snippet) of one entry, by vault-relative path. */
   preview(file: string): Promise<string>;
-  /** Registered substrate collectors (intake sources) from `wiki collect --list`. */
+  /** Registered substrate collectors (intake sources) from `wiki collect --list --json`. */
   collectors(): Promise<Collector[]>;
-  /** Intent-inbox records for triage (read directly). Pending-only unless showAll. */
+  /** Intent-inbox records from `wiki triage list --json`. Pending-only unless showAll. */
   triage(showAll: boolean): Promise<TriageRecord[]>;
   /** Accept or dismiss one inbox record (`wiki triage <action> <stem>`). */
   triageAction(stem: string, action: 'accept' | 'dismiss'): Promise<{ ok: boolean; message: string }>;
@@ -60,7 +60,7 @@ export interface VaultApi {
   openFullDiskAccess(): void;
   /** Health + update-available, from `wiki doctor --json` (read-only, ~seconds). */
   doctor(): Promise<DoctorResult | null>;
-  /** Ask the knowledge base — `wiki query "Q" --brief`. LLM cost; returns the answer. */
+  /** Ask the knowledge base — `wiki query "Q" --brief --json`. LLM cost; returns the answer. */
   query(question: string): Promise<QueryResult>;
   /** The engine's prioritized actionable menu — `wiki menu --json`. */
   menu(): Promise<MenuResult | null>;
@@ -78,7 +78,7 @@ export interface VaultApi {
   compile(): Promise<CompileStart>;
   /** Current compile state (running + last progress) — to restore UI on reopen. */
   compileStatus(): Promise<{ running: boolean; progress: CompileProgress }>;
-  /** Fires on each progress step ([idx/total] from the compiler). */
+  /** Fires on each progress step (structured PROGRESS lines from the compiler). */
   onCompileProgress(cb: (p: CompileProgress) => void): void;
   /** Fires when a compile finishes. */
   onCompileDone(cb: (r: CompileResult) => void): void;

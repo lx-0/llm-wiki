@@ -478,12 +478,36 @@ def _spawn_maintenance() -> None:
         log.warning("  maintenance: piggyback spawn failed (continuing)", exc_info=True)
 
 
+def _emit_progress(enabled: bool, current: int, total: int) -> None:
+    """Structured progress for GUI consumers (`wiki compile --progress-json`).
+
+    One line per event on stdout, flushed immediately (the desktop reads the
+    child's pipe line-by-line and Python block-buffers a piped stdout):
+
+        PROGRESS {"current": 1, "total": 12}
+
+    The human log lines on stderr stay the operator surface and are free to
+    change wording; this line is the machine seam (same posture as
+    `wiki doctor --json` / `wiki menu --json`). Default off — plain runs
+    emit no structured lines."""
+    if not enabled:
+        return
+    print(f"PROGRESS {json.dumps({'current': current, 'total': total})}", flush=True)
+
+
 async def main() -> None:
     parser = argparse.ArgumentParser(description="Compile sources into wiki articles")
     parser.add_argument("--all", action="store_true", help="Recompile all files")
     parser.add_argument("--file", type=str, help="Compile a specific file")
     parser.add_argument(
         "--dry-run", action="store_true", help="Show what would be compiled"
+    )
+    parser.add_argument(
+        "--progress-json", action="store_true",
+        help=(
+            "Emit machine-readable PROGRESS {\"current\": i, \"total\": n} lines "
+            "on stdout alongside the human log (desktop app / agents)"
+        ),
     )
     parser.add_argument(
         "--max-files", type=int, default=CONFIG.limits.compile_max_files,
@@ -525,6 +549,7 @@ async def main() -> None:
     files = select_files(args)
     if not files:
         log.info("Nothing to compile — all files up to date.")
+        _emit_progress(args.progress_json, 0, 0)
         # A no-op compile still keeps maintenance current — dream/lint/etc.
         # backlogs are independent of whether new sources landed this run.
         if not args.dry_run:
@@ -532,6 +557,7 @@ async def main() -> None:
         return
 
     log.info("Files to compile: %d", len(files))
+    _emit_progress(args.progress_json, 0, len(files))
     for f in files:
         log.info("  %s", f.relative_to(ROOT_DIR))
 
@@ -582,6 +608,7 @@ async def main() -> None:
         # compiles while idx runs through every candidate. Using `cap` here
         # produced a nonsensical `[1516/100]` when a big skip-backlog drained.
         prefix = f"[{idx}/{len(files)}] "
+        _emit_progress(args.progress_json, idx, len(files))
         try:
             outcome = await compile_file(source, prefix=prefix, force=force_compile)
         except Exception as exc:  # noqa: BLE001 — one file's crash must not kill the whole batch

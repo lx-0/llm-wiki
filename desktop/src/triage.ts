@@ -2,7 +2,8 @@
 // grouped by type with batch actions (clear the low-stakes bulk in one gesture),
 // type-coloured hierarchy (notes recede, tasks lead), confidence as a colour dot with
 // uncertain items sorted to the top, plain consistent Keep/Dismiss, and the jargon
-// rationale line dropped. Records read directly; actions run `wiki triage <verb> <stem>`.
+// rationale line dropped. Records come from `wiki triage list --json`; actions run
+// `wiki triage <verb> <stem>`.
 import './index.css';
 
 interface Rec {

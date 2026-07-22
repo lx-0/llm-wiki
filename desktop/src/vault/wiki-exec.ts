@@ -6,10 +6,9 @@
 // normalization. The six former spawn sites (compile / collectors / query /
 // triage / doctor / menu) collapse to args + a small parse/map on top.
 //
-// NOTE (behavior-preserving): the engine's output-parsing contracts are exactly as
-// today — a later engine-side candidate adds `--json` to the human-text surfaces
-// (collect --list, query, compile progress). This file does not scrape; each caller
-// still owns its own parse.
+// This file does not scrape; each caller owns its own parse over the engine's
+// machine-readable seams (doctor/menu/collect/triage/query `--json`, compile
+// `--progress-json`) — no module parses human log prose.
 
 import type { EventEmitter } from 'node:events';
 import { spawn } from 'node:child_process';

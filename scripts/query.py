@@ -3,6 +3,7 @@
 Usage:
     uv run python query.py "What do I know about X?"
     uv run python query.py "What do I know about X?" --brief
+    uv run python query.py "What do I know about X?" --brief --json
     uv run python query.py "What do I know about X?" --file-back
 """
 
@@ -11,6 +12,7 @@ os.environ["CLAUDE_INVOKED_BY"] = "query"
 
 import argparse
 import asyncio
+import json
 import logging
 import sys
 
@@ -57,6 +59,15 @@ async def main() -> None:
         help="Short bullet answer instead of a full essay (incompatible with --file-back)",
     )
     parser.add_argument(
+        "--json",
+        action="store_true",
+        help=(
+            "Machine-readable output: print a {question, answer, input_tokens, "
+            "output_tokens} JSON object instead of the raw answer (desktop app / "
+            "agents; incompatible with --file-back)"
+        ),
+    )
+    parser.add_argument(
         "--force",
         action="store_true",
         help="With --file-back: overwrite an existing qa/ note that matches the question slug",
@@ -87,10 +98,14 @@ async def main() -> None:
     question = args.question
     file_back = args.file_back
     brief = args.brief
+    as_json = args.json
     force = args.force
 
     if brief and file_back:
         log.error("--brief and --file-back are mutually exclusive — brief mode answers in-line only")
+        sys.exit(2)
+    if as_json and file_back:
+        log.error("--json and --file-back are mutually exclusive — JSON mode answers in-line only")
         sys.exit(2)
 
     include_final_only = args.include_final_only
@@ -235,8 +250,18 @@ async def main() -> None:
     if result.failure is not None:
         sys.exit(1)
 
-    # Print the answer
-    print("\n" + result.result_text)
+    # Print the answer. --json is the machine-readable seam (desktop app /
+    # agents; same posture as `wiki doctor --json`) — consumers parse this
+    # payload instead of scraping the banner + prose off stdout.
+    if as_json:
+        print(json.dumps({
+            "question": question,
+            "answer": result.result_text,
+            "input_tokens": result.input_tokens,
+            "output_tokens": result.output_tokens,
+        }, indent=2))
+    else:
+        print("\n" + result.result_text)
 
     # Usage is tracked in tokens per (provider, model) — DECISIONS
     # 2026-05-23; the old hardcoded $5/$25-per-Mtok estimate is gone.
