@@ -28,7 +28,6 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any
 
 import pytest
@@ -324,6 +323,40 @@ def test_render_date_file_single_managed_region():
     md = cal._render_date_file("2026-05-15", [block], existing_text=None)
     assert md.count(cal._EVENTS_BEGIN) == 1
     assert md.count(cal._EVENTS_END) == 1
+
+
+def test_render_date_file_round_trip_is_byte_stable(monkeypatch):
+    """Regeneration must be a fixpoint: feeding a rendered file back as
+    ``existing_text`` reproduces it byte-for-byte (operator vaults carry
+    existing sentinel regions — the rewrite must never drift them)."""
+    monkeypatch.setattr(cal, "now_iso", lambda: "2026-05-15T08:30:00Z")
+    block = _block()
+    existing = (
+        "---\nold: thing\n---\n"
+        "# Calendar — 2026-05-15\n\n"
+        "Operator note above the events.\n\n"
+        f"{cal._EVENTS_BEGIN}\n\n## OLD EVENT\n\n{cal._EVENTS_END}\n\n"
+        "Operator note below the events.\n"
+    )
+    once = cal._render_date_file("2026-05-15", [block], existing_text=existing)
+    twice = cal._render_date_file("2026-05-15", [block], existing_text=once)
+    assert twice == once
+
+
+def test_split_operator_prose_stray_end_before_region():
+    """A stray end marker BEFORE the genuine region must not blind the split
+    (core.markers contract): the managed region is still located, so old
+    event bodies never leak into the preserved operator prose."""
+    body = (
+        f"{cal._EVENTS_END}\n\n"
+        "Operator note.\n\n"
+        f"{cal._EVENTS_BEGIN}\n\n## OLD EVENT\n\n{cal._EVENTS_END}\n\n"
+        "Note below.\n"
+    )
+    pre, post = cal._split_operator_prose(f"# Calendar — 2026-05-15\n\n{body}")
+    assert "## OLD EVENT" not in pre
+    assert "## OLD EVENT" not in post
+    assert "Note below." in post
 
 
 # ── Transcript cross-link ──────────────────────────────────────────

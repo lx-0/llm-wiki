@@ -13,8 +13,6 @@ from datetime import date
 from pathlib import Path
 from types import SimpleNamespace
 
-import pytest
-
 from web_research import (
     SENTINEL_BEGIN,
     SENTINEL_END,
@@ -148,6 +146,43 @@ def test_upsert_idempotent_structure():
     assert twice.count(SENTINEL_BEGIN) == 1  # replaced, not stacked
     assert "last updated: 2026-06-01" in twice
     assert "last updated: 2026-05-01" not in twice
+
+
+def test_upsert_append_bytes_pinned_per_trailing_newline_shape():
+    """Byte-compat pin: whatever the page's trailing-newline shape, the append
+    seam is exactly one blank line + block + trailing newline. Operator vaults
+    carry all three shapes — none may drift."""
+    block = f"{SENTINEL_BEGIN}\nB\n{SENTINEL_END}"
+    assert upsert_block("# X\n\nbody", block) == f"# X\n\nbody\n\n{block}\n"
+    assert upsert_block("# X\n\nbody\n", block) == f"# X\n\nbody\n\n{block}\n"
+    assert upsert_block("# X\n\nbody\n\n", block) == f"# X\n\nbody\n\n{block}\n"
+
+
+def test_upsert_replace_round_trip_is_byte_stable():
+    """Re-upserting an identical block is a byte-for-byte fixpoint."""
+    block = build_block("X", FAKE_RESULTS, today=date(2026, 5, 1))
+    once = upsert_block("# X\n\nbody\n", block)
+    assert upsert_block(once, block) == once
+
+
+def test_upsert_replaces_despite_stray_end_marker():
+    """A stray end marker BEFORE the genuine block must not blind the upsert
+    (core.markers contract) — the block is replaced in place, never stacked."""
+    b1 = build_block("X", FAKE_RESULTS, today=date(2026, 5, 1))
+    text = f"# X\n\n{SENTINEL_END}\n\nbody\n\n{b1}\n"
+    b2 = build_block("X", FAKE_RESULTS, today=date(2026, 6, 1))
+    out = upsert_block(text, b2)
+    assert out.count(SENTINEL_BEGIN) == 1
+    assert "last updated: 2026-06-01" in out
+    assert "last updated: 2026-05-01" not in out
+
+
+def test_cooldown_stamp_found_despite_stray_end_marker():
+    """The cooldown stamp inside the genuine block is still honored when a
+    stray end marker precedes it (core.markers contract)."""
+    block = build_block("X", FAKE_RESULTS, today=date(2026, 5, 1))
+    text = f"# X\n\n{SENTINEL_END}\n\nbody\n\n{block}\n"
+    assert cooldown_active(text, cooldown_days=30, now=date(2026, 5, 10))
 
 
 # ── end-to-end + fail-soft ───────────────────────────────────────────

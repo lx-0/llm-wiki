@@ -116,7 +116,7 @@ from collectors.base import (
     resolve_accounts,
     run_account_loop,
 )
-from core import google_oauth
+from core import google_oauth, markers
 from core.config import CONFIG
 from core.google_oauth import OAuthApp
 from core.paths import ROOT_DIR, STATE_DIR
@@ -406,7 +406,8 @@ def _render_date_file(
 def _split_operator_prose(existing: str | None) -> tuple[str, str]:
     """Extract the operator-written sections before/after the managed
     events region. Returns ``("", "")`` when the file is new or doesn't
-    have the sentinels yet."""
+    have the sentinels yet. Region location (incl. the stray/reversed-marker
+    contract) is ``core.markers``."""
     if not existing:
         return "", ""
     # Strip frontmatter if present.
@@ -417,13 +418,10 @@ def _split_operator_prose(existing: str | None) -> tuple[str, str]:
             body = body[end + len("\n---\n"):]
     # Strip the first ``# Calendar — …`` heading (we always re-emit it).
     body = re.sub(r"^# Calendar —[^\n]*\n+", "", body, count=1)
-    begin_idx = body.find(_EVENTS_BEGIN)
-    end_idx = body.find(_EVENTS_END)
-    if begin_idx < 0 or end_idx < 0 or end_idx < begin_idx:
+    region = markers.find_region(body, _EVENTS_BEGIN, _EVENTS_END)
+    if region is None:
         return body.strip(), ""
-    pre = body[:begin_idx]
-    post = body[end_idx + len(_EVENTS_END):]
-    return pre.strip(), post.strip()
+    return body[: region.start].strip(), body[region.end :].strip()
 
 
 # ── Recurring concept page ──────────────────────────────────────────

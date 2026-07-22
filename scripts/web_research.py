@@ -42,6 +42,8 @@ from typing import Callable, Literal
 
 import yaml
 
+from core import markers
+
 log = logging.getLogger("web_research")
 
 SENTINEL_BEGIN = "<!-- web-research:begin -->"
@@ -105,12 +107,12 @@ def _entity_title(fm: dict, slug: str) -> str:
 
 def _block_last_updated(text: str) -> date | None:
     """The `last updated: YYYY-MM-DD` date inside an existing Public Profile
-    block, or None if there is no block / no parseable stamp."""
-    begin = text.find(SENTINEL_BEGIN)
-    end = text.find(SENTINEL_END)
-    if begin < 0 or end < begin:
+    block, or None if there is no block / no parseable stamp. Region location
+    (incl. the stray/reversed-marker contract) is `core.markers`."""
+    region = markers.find_region(text, SENTINEL_BEGIN, SENTINEL_END)
+    if region is None:
         return None
-    m = _LAST_UPDATED_RE.search(text[begin:end])
+    m = _LAST_UPDATED_RE.search(text[region.start : region.end])
     if not m:
         return None
     try:
@@ -157,14 +159,15 @@ def build_block(entity_name: str, results: list[dict], *, today: date, source: s
 
 def upsert_block(text: str, block: str) -> str:
     """Replace an existing sentinel block in place, else append it. Idempotent
-    on structure (re-running swaps the block, never stacks duplicates)."""
-    begin = text.find(SENTINEL_BEGIN)
-    end = text.find(SENTINEL_END)
-    if begin >= 0 and end > begin:
-        end += len(SENTINEL_END)
-        return text[:begin] + block + text[end:]
-    sep = "" if text.endswith("\n\n") else ("\n" if text.endswith("\n") else "\n\n")
-    return text + sep + block + "\n"
+    on structure (re-running swaps the block, never stacks duplicates). Region
+    location (incl. the stray/reversed-marker contract) is `core.markers`; the
+    append seam (exactly one blank line + trailing newline) stays ours."""
+
+    def _append(t: str, blk: str) -> str:
+        sep = "" if t.endswith("\n\n") else ("\n" if t.endswith("\n") else "\n\n")
+        return t + sep + blk + "\n"
+
+    return markers.ensure_region(text, SENTINEL_BEGIN, SENTINEL_END, block, insert=_append)
 
 
 # ── Exa backend (live-unverified: no key available at build time) ────
