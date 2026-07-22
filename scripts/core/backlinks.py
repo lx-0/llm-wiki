@@ -22,6 +22,7 @@ from pathlib import Path
 from core import markers
 from core.links import (
     canonical_slug,
+    iter_articles,
     outgoing_canonical_slugs,
     relative_link_for_slug,
 )
@@ -30,17 +31,6 @@ from core.links import (
 # and must survive across runs.
 BACKLINKS_BEGIN = "<!-- backlinks:begin -->"
 BACKLINKS_END = "<!-- backlinks:end -->"
-
-
-def _iter_articles(knowledge_dir: Path):
-    """Yield every `.md` in the knowledge dir except `index.md` and any
-    hidden file (those that start with `.`)."""
-    for path in knowledge_dir.rglob("*.md"):
-        if path.name == "index.md" and path.parent == knowledge_dir:
-            continue
-        if any(part.startswith(".") for part in path.relative_to(knowledge_dir).parts):
-            continue
-        yield path
 
 
 def build_backlinks_index(knowledge_dir: Path) -> dict[str, list[str]]:
@@ -53,7 +43,7 @@ def build_backlinks_index(knowledge_dir: Path) -> dict[str, list[str]]:
     collapse; incoming lists are alphabetically sorted."""
     vault = knowledge_dir.parent
     incoming: dict[str, set[str]] = {}
-    for path in _iter_articles(knowledge_dir):
+    for path in iter_articles(knowledge_dir):
         src = canonical_slug(path, knowledge_dir)
         if src is None:
             continue
@@ -135,7 +125,7 @@ def run_backlinks_pass(knowledge_dir: Path) -> dict[str, int]:
     index = build_backlinks_index(knowledge_dir)
     seen = 0
     written = 0
-    for path in _iter_articles(knowledge_dir):
+    for path in iter_articles(knowledge_dir):
         seen += 1
         slug = canonical_slug(path, knowledge_dir)
         if slug is None:

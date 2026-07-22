@@ -234,7 +234,6 @@ LIMIT 10
 > const queues = [
 >   { key: "orphans_count", title: "Orphans", section: "Orphans" },
 >   { key: "stale_count", title: "Stale", section: "Stale" },
->   { key: "missing_backlinks_count", title: "Missing backlinks", section: "Missing backlinks" },
 >   { key: "failed_flushes_count", title: "Failed flushes", section: "Failed flushes" },
 > ];
 > for (const q of queues) {

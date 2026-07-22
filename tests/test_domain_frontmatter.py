@@ -77,80 +77,68 @@ def _seed_article(tmp_path: Path, name: str, domain: str | None) -> Path:
 
 def test_check_domain_value_passes_on_valid(tmp_path, monkeypatch) -> None:
     import lint
-    from core import paths, utils
 
     fake_knowledge = tmp_path / "knowledge"
     fake_knowledge.mkdir(parents=True)
     _seed_article(tmp_path, "good.md", "company")
 
-    monkeypatch.setattr(paths, "KNOWLEDGE_DIR", fake_knowledge)
-    monkeypatch.setattr(lint, "KNOWLEDGE_DIR", fake_knowledge)
-    monkeypatch.setattr(utils, "WIKI_SUBDIRS", [fake_knowledge / "concepts"])
     # Force config to a deterministic enum for the check.
     monkeypatch.setattr(
         lint.CONFIG.personal, "domains", ["company", "personal", "ai", "meta"]
     )
 
-    issues = lint.check_domain_value()
+    ctx = lint.build_context(vault=tmp_path, knowledge_dir=fake_knowledge, state={})
+    issues = lint.check_domain_value(ctx)
     assert issues == [], f"valid value must produce no issues, got {issues}"
 
 
 def test_check_domain_value_warns_on_unknown(tmp_path, monkeypatch) -> None:
     import lint
-    from core import paths, utils
 
     fake_knowledge = tmp_path / "knowledge"
     fake_knowledge.mkdir(parents=True)
     _seed_article(tmp_path, "bad.md", "fintech")
 
-    monkeypatch.setattr(paths, "KNOWLEDGE_DIR", fake_knowledge)
-    monkeypatch.setattr(lint, "KNOWLEDGE_DIR", fake_knowledge)
-    monkeypatch.setattr(utils, "WIKI_SUBDIRS", [fake_knowledge / "concepts"])
     monkeypatch.setattr(
         lint.CONFIG.personal, "domains", ["company", "personal", "ai", "meta"]
     )
 
-    issues = lint.check_domain_value()
+    ctx = lint.build_context(vault=tmp_path, knowledge_dir=fake_knowledge, state={})
+    issues = lint.check_domain_value(ctx)
     assert len(issues) == 1, issues
-    assert issues[0]["check"] == "domain_invalid_value"
-    assert issues[0]["severity"] == "warning"
-    assert "fintech" in issues[0]["detail"]
+    assert issues[0].check == "domain_invalid_value"
+    assert issues[0].severity == "warning"
+    assert "fintech" in issues[0].detail
 
 
 def test_check_domain_value_ignores_untagged(tmp_path, monkeypatch) -> None:
     """Articles without `domain:` are silently in-scope — the feature is opt-in."""
     import lint
-    from core import paths, utils
 
     fake_knowledge = tmp_path / "knowledge"
     fake_knowledge.mkdir(parents=True)
     _seed_article(tmp_path, "untagged.md", None)
 
-    monkeypatch.setattr(paths, "KNOWLEDGE_DIR", fake_knowledge)
-    monkeypatch.setattr(lint, "KNOWLEDGE_DIR", fake_knowledge)
-    monkeypatch.setattr(utils, "WIKI_SUBDIRS", [fake_knowledge / "concepts"])
     monkeypatch.setattr(
         lint.CONFIG.personal, "domains", ["company", "personal", "ai", "meta"]
     )
 
-    assert lint.check_domain_value() == []
+    ctx = lint.build_context(vault=tmp_path, knowledge_dir=fake_knowledge, state={})
+    assert lint.check_domain_value(ctx) == []
 
 
 def test_check_domain_value_noop_when_enum_empty(tmp_path, monkeypatch) -> None:
     """Empty CONFIG.personal.domains disables the check entirely (operator opt-out)."""
     import lint
-    from core import paths, utils
 
     fake_knowledge = tmp_path / "knowledge"
     fake_knowledge.mkdir(parents=True)
     _seed_article(tmp_path, "anything.md", "totally-made-up")
 
-    monkeypatch.setattr(paths, "KNOWLEDGE_DIR", fake_knowledge)
-    monkeypatch.setattr(lint, "KNOWLEDGE_DIR", fake_knowledge)
-    monkeypatch.setattr(utils, "WIKI_SUBDIRS", [fake_knowledge / "concepts"])
     monkeypatch.setattr(lint.CONFIG.personal, "domains", [])
 
-    assert lint.check_domain_value() == []
+    ctx = lint.build_context(vault=tmp_path, knowledge_dir=fake_knowledge, state={})
+    assert lint.check_domain_value(ctx) == []
 
 
 # ── 4. query.py argparse accepts --domain ───────────────────────────────

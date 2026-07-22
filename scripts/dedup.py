@@ -47,7 +47,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import yaml
 
-from core.links import WIKILINK_RE, relative_target, resolve_link, strip_table_escape
+from core.links import relative_target, resolve_link, retarget_links
 
 logging.basicConfig(
     level=logging.INFO,
@@ -439,8 +439,10 @@ def rewrite_links(
 ) -> list[Path]:
     """Rewrite every wikilink across knowledge/ that resolves to ``target`` so
     it points at ``new_slug_path`` (e.g. ``people/josefine-bartsch``), rendered
-    relative to each source. Reuses `core.links.resolve_link` — the single
-    resolver — so behaviour never drifts from the relativize/backlinks passes.
+    relative to each source. Goes through `core.links.retarget_links` — THE
+    rewriter — so masking (frontmatter/fences are never rewritten) and the
+    `!`/`#anchor`/`|alias` mechanics never drift from rename/audit. Walker
+    policy: index.md is IN (its catalog rows link to the merged-away page).
 
     Returns the list of files changed (or that *would* change under dry-run)."""
     target = target.resolve()
@@ -457,17 +459,14 @@ def rewrite_links(
         except OSError:
             continue
 
-        def _sub(m: "object") -> str:
-            bang, tgt, heading, alias = m.groups()
-            clean, esc = strip_table_escape(tgt, alias)
-            resolved = resolve_link(clean, path, vault)
+        def _rewrite(clean: str, _path: Path = path) -> str | None:
+            resolved = resolve_link(clean, _path, vault)
             if resolved is None or resolved.resolve() != target:
-                return m.group(0)
-            new_target = relative_target(new_resolved, path, original_has_ext=False)
-            return f"{bang}[[{new_target}{heading or ''}{esc}{alias or ''}]]"
+                return None
+            return relative_target(new_resolved, _path, original_has_ext=False)
 
-        new_text = WIKILINK_RE.sub(_sub, original)
-        if new_text != original:
+        new_text, n = retarget_links(original, _rewrite)
+        if n and new_text != original:
             changed.append(path)
             if not dry_run:
                 path.write_text(new_text, encoding="utf-8")

@@ -15,7 +15,6 @@ def _base_data(**overrides) -> dict:
     data = {
         "orphans_count": 3,
         "stale_count": 7,
-        "missing_backlinks_count": 1,
         "failed_flushes_count": 2,
         "orphans": [
             {"link": "knowledge/concepts/foo", "detail": "never linked from index"},
@@ -25,9 +24,6 @@ def _base_data(**overrides) -> dict:
         "stale": [
             {"link": "knowledge/concepts/old", "detail": "last touched 2026-01-01 (120d ago)"},
         ] * 7,
-        "missing_backlinks": [
-            {"link": "knowledge/concepts/foo", "detail": "links [[bar]] but [[bar]] doesn't link back"},
-        ],
         "failed_flushes": [
             {"link": "scripts/sessions/failed-flushes/2026-04-29T1812.md", "detail": "TimeoutError"},
             {"link": "scripts/sessions/failed-flushes/2026-04-30T0901.md", "detail": "JSONDecodeError"},
@@ -44,7 +40,6 @@ def test_render_body_has_all_four_sections() -> None:
     body = dashboard_lint.render_body(_base_data())
     assert "## Orphans" in body
     assert "## Stale" in body
-    assert "## Missing backlinks" in body
     assert "## Failed flushes" in body
 
 
@@ -87,7 +82,6 @@ def test_write_dashboard_lint_frontmatter_shape(
     assert content.startswith("---\n")
     assert "orphans_count: 3" in content
     assert "stale_count: 7" in content
-    assert "missing_backlinks_count: 1" in content
     assert "failed_flushes_count: 2" in content
     assert "last_updated_ts: 2026-05-02T22:30:00+02:00" in content
     assert "## Orphans" in content
@@ -116,26 +110,25 @@ def test_e2e_one_issue_per_queue(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """End-to-end: one synthetic issue per queue → frontmatter counts all 1,
-    each section has exactly one wikilink line."""
+    each section has exactly one wikilink line. Queue lists come from a shared
+    LintResults (computed once per refresh, C04) — no per-collector re-runs."""
+    import lint
     from dashboard import dashboard_lint
+    from dashboard.lint_results import LintResults
 
     output = tmp_path / "_dashboard-lint.md"
     monkeypatch.setattr(dashboard_lint, "OUTPUT_FILE", output)
 
-    monkeypatch.setattr(
-        dashboard_lint,
-        "collect_orphans",
-        lambda: [{"link": "knowledge/concepts/orphan-x", "detail": "never linked"}],
-    )
-    monkeypatch.setattr(
-        dashboard_lint,
-        "collect_stale",
-        lambda: [{"link": "knowledge/projects/stale-y", "detail": "stale 90d"}],
-    )
-    monkeypatch.setattr(
-        dashboard_lint,
-        "collect_missing_backlinks",
-        lambda: [{"link": "knowledge/concepts/no-backlink-z", "detail": "links foo, foo doesn't link back"}],
+    results = LintResults(
+        generated_at="2026-05-02T22:30:00+02:00",
+        issues={
+            "orphan_pages": [lint.issue(
+                "warning", "orphan_page", "knowledge/concepts/orphan-x", "never linked",
+            )],
+            "stale_articles": [lint.issue(
+                "warning", "stale_article", "knowledge/projects/stale-y", "stale 90d",
+            )],
+        },
     )
     monkeypatch.setattr(
         dashboard_lint,
@@ -143,7 +136,7 @@ def test_e2e_one_issue_per_queue(
         lambda: [{"link": ".wiki/sessions/failed-flushes/2026-04-29T1812.md", "detail": "TimeoutError"}],
     )
 
-    data = dashboard_lint.compute_lint_data()
+    data = dashboard_lint.compute_lint_data(results)
     body = dashboard_lint.render_body(data)
     dashboard_lint.write_dashboard_lint(data, body)
 
@@ -151,11 +144,10 @@ def test_e2e_one_issue_per_queue(
 
     assert "orphans_count: 1" in content
     assert "stale_count: 1" in content
-    assert "missing_backlinks_count: 1" in content
     assert "failed_flushes_count: 1" in content
 
-    for header in ("## Orphans", "## Stale", "## Missing backlinks", "## Failed flushes"):
+    for header in ("## Orphans", "## Stale", "## Failed flushes"):
         assert header in content
 
     wikilink_lines = [ln for ln in content.splitlines() if ln.startswith("- [[")]
-    assert len(wikilink_lines) == 4, wikilink_lines
+    assert len(wikilink_lines) == 3, wikilink_lines

@@ -75,33 +75,17 @@ def count_failed_flushes() -> int:
     return sum(1 for p in FAILED_DIR.iterdir() if p.is_file() and p.suffix == ".md")
 
 
-def count_lint_warnings() -> int:
-    """Sum issues across the cheap (non-LLM) lint checks."""
-    from lint import (
-        check_article_type,
-        check_broken_links,
-        check_missing_backlinks,
-        check_orphan_pages,
-        check_orphan_sources,
-        check_stale_articles,
-    )
+def count_lint_warnings(lint_results=None) -> int:
+    """Sum issues across the cheap (non-LLM) structural lint checks.
 
-    total = 0
-    checks = (
-        check_broken_links,
-        check_orphan_pages,
-        check_orphan_sources,
-        check_stale_articles,
-        check_missing_backlinks,
-        check_article_type,
-    )
-    for fn in checks:
-        try:
-            issues = fn()
-            total += len(issues)
-        except Exception as exc:  # noqa: BLE001 — defensive: lint must not crash dashboard
-            log.warning("lint check %s failed: %s", fn.__name__, exc)
-    return total
+    ``lint_results`` is a `lint_results.LintResults` computed once per refresh
+    (C04) — passed by `main()` so stats + the follow-up dashboard_lint run share
+    ONE corpus read. None (direct call) computes fresh."""
+    from dashboard.lint_results import compute_lint_results
+
+    if lint_results is None:
+        lint_results = compute_lint_results()
+    return lint_results.total
 
 
 def total_cost_lifetime() -> float:
@@ -206,7 +190,7 @@ def _open_action_items_in_entities(knowledge_dir: Path = KNOWLEDGE_DIR) -> tuple
     return open_total, entities_with
 
 
-def compute_stats() -> dict:
+def compute_stats(lint_results=None) -> dict:
     pending = list_pending_compiles()
     open_commitments, entities_with_action_items = _open_action_items_in_entities()
     # Active surfaces exclude compile_role: final-only (archived hand-curated
@@ -220,7 +204,7 @@ def compute_stats() -> dict:
         "pending_compiles": len(pending),
         "pending_compile_paths": pending,
         "failed_flushes": count_failed_flushes(),
-        "lint_warnings": count_lint_warnings(),
+        "lint_warnings": count_lint_warnings(lint_results),
         "total_cost_lifetime": round(total_cost_lifetime(), 4),
         "total_tokens_lifetime": total_tokens_lifetime(),
         "articles_total": articles_active,
@@ -323,7 +307,13 @@ def main() -> int:
     parser.add_argument("--dry-run", action="store_true", help="print stats without writing")
     args = parser.parse_args()
 
-    stats = compute_stats()
+    # Compute the structural lint results ONCE (C04): the count feeds the stats
+    # callout here, the full lists are persisted for the dashboard_lint run that
+    # flush.py spawns right after this script — one corpus read per refresh.
+    from dashboard.lint_results import compute_lint_results, save_cache
+
+    lint_results = compute_lint_results()
+    stats = compute_stats(lint_results)
     callout = render_callout(stats)
 
     if args.dry_run:
@@ -332,6 +322,7 @@ def main() -> int:
         print(callout)
         return 0
 
+    save_cache(lint_results)
     out = write_dashboard_stats(stats, callout)
     log.info(
         "Wrote %s — pending=%d failed=%d lint=%d tokens=%s articles=%d",

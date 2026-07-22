@@ -15,21 +15,13 @@ from pathlib import Path
 import yaml
 
 from .paths import (
-    AREAS_DIR,
-    CONCEPTS_DIR,
-    CONNECTIONS_DIR,
     DAILY_DIR,
     FACTS_DIR,
     INDEX_FILE,
     KNOWLEDGE_DIR,
-    LOG_FILE,
-    PEOPLE_DIR,
-    PROJECTS_DIR,
-    QA_DIR,
     RAW_DIR,
     STATE_DIR,
     STATE_FILE,
-    TAKES_DIR,
 )
 
 
@@ -143,8 +135,6 @@ def extract_wikilinks(content: str) -> list[str]:
 
 # ── Wiki content helpers ──────────────────────────────────────────────
 
-WIKI_SUBDIRS = [CONCEPTS_DIR, CONNECTIONS_DIR, QA_DIR, PEOPLE_DIR, PROJECTS_DIR, AREAS_DIR, FACTS_DIR, TAKES_DIR]
-
 
 def read_wiki_index() -> str:
     """Read the knowledge base index file."""
@@ -209,13 +199,13 @@ def read_all_wiki_content() -> str:
     """Read index + all wiki articles into a single string for context."""
     parts = [f"## INDEX\n\n{read_wiki_index()}"]
 
-    for subdir in WIKI_SUBDIRS:
-        if not subdir.exists():
-            continue
-        for md_file in sorted(subdir.glob("*.md")):
-            rel = md_file.relative_to(KNOWLEDGE_DIR)
+    for md_file in list_wiki_articles():
+        rel = md_file.relative_to(KNOWLEDGE_DIR)
+        try:
             content = md_file.read_text(encoding="utf-8")
-            parts.append(f"## {rel}\n\n{content}")
+        except OSError:
+            continue
+        parts.append(f"## {rel}\n\n{content}")
 
     return "\n\n---\n\n".join(parts)
 
@@ -291,13 +281,22 @@ def _str_sort_key(s: str) -> int:
     return int(digits[:14]) if digits else 0
 
 
-def list_wiki_articles() -> list[Path]:
-    """List all wiki article files."""
-    articles = []
-    for subdir in WIKI_SUBDIRS:
-        if subdir.exists():
-            articles.extend(sorted(subdir.glob("*.md")))
-    return articles
+def list_wiki_articles(knowledge_dir: Path | None = None) -> list[Path]:
+    """List all wiki article files — THE canonical enumeration (C04).
+
+    Delegates to `core.links.iter_articles`: every `.md` under `knowledge/`
+    recursively (so `MOCs/` and future buckets are included) except the root
+    `index.md` and hidden files, sorted for determinism. Before C04 this was a
+    hardcoded flat 8-subdir glob that silently excluded `knowledge/MOCs/` from
+    every lint check and dashboard count. ``knowledge_dir`` defaults to the
+    vault's KNOWLEDGE_DIR; tests pass a temp corpus instead of monkeypatching.
+    """
+    from .links import iter_articles
+
+    kdir = knowledge_dir if knowledge_dir is not None else KNOWLEDGE_DIR
+    if not kdir.exists():
+        return []
+    return sorted(iter_articles(kdir))
 
 
 def is_compile_excluded_path(rel_path: str | Path) -> bool:
@@ -321,13 +320,19 @@ def is_compile_excluded_path(rel_path: str | Path) -> bool:
     return any(rel_s.startswith(pre) for pre in COMPILE_SUBSTRATE_EXCLUDED_PREFIXES)
 
 
-def list_raw_files() -> list[Path]:
+def list_raw_files(
+    daily_dir: Path | None = None, raw_dir: Path | None = None
+) -> list[Path]:
     """List all daily log files AND raw source files, newest first by mtime.
 
     Order policy: mtime DESC so the compile pipeline processes recent activity
     before old backlog. Rate-limit aborts (5h Opus window) hit the tail of
     the queue rather than starving newest content. The compile path is the
     only order-sensitive caller; lint and dashboard_stats are order-agnostic.
+
+    ``daily_dir`` / ``raw_dir`` default to the vault's DAILY_DIR / RAW_DIR;
+    lint's LintContext builder passes vault-derived paths so tests run over
+    temp corpora without monkeypatching module globals.
 
     Air-gap discipline: belt-and-braces filter via
     `is_compile_excluded_path()`. Today's walker only enters `daily/`
@@ -336,13 +341,15 @@ def list_raw_files() -> list[Path]:
     future walker expansion (e.g. a vault-root `*.md` sweep) silently
     letting `reports/` into compile.
     """
+    daily = daily_dir if daily_dir is not None else DAILY_DIR
+    raw = raw_dir if raw_dir is not None else RAW_DIR
     files: list[Path] = []
-    if DAILY_DIR.exists():
-        files.extend(DAILY_DIR.glob("*.md"))
-    if RAW_DIR.exists():
-        files.extend(RAW_DIR.rglob("*.md"))
+    if daily.exists():
+        files.extend(daily.glob("*.md"))
+    if raw.exists():
+        files.extend(raw.rglob("*.md"))
 
-    vault_root = DAILY_DIR.parent.resolve()
+    vault_root = daily.parent.resolve()
 
     def _allowed(p: Path) -> bool:
         try:
@@ -357,76 +364,15 @@ def list_raw_files() -> list[Path]:
 
 
 # ── Index helpers ─────────────────────────────────────────────────────
-
-def count_inbound_links(target: str, exclude_file: Path | None = None) -> int:
-    """Count how many wiki articles link to a given canonical target slug
-    (``concepts/foo``). Links are relative to their source file, so a literal
-    string match would miss `[[foo]]` / `[[../concepts/foo]]`; resolve each
-    link and compare canonical slugs instead.
-
-    NOTE: O(N) per call — calling this once per article (as the orphan check
-    once did) is O(N²) and hung the lint for ~99 min on 1700 articles
-    (incident 2026-05-30, KNOWLEDGE.md). Production now uses
-    ``build_inbound_count_map`` (one O(N) pass for ALL targets). This function
-    is retained as the parity oracle that ``tests/test_orphan_inbound_parity``
-    asserts the map against — keep the two semantically identical."""
-    from core.links import canonical_slug, link_target, resolve_link
-    from core.paths import ROOT_DIR
-
-    count = 0
-    for article in list_wiki_articles():
-        if article == exclude_file:
-            continue
-        content = article.read_text(encoding="utf-8")
-        for link in extract_wikilinks(content):
-            resolved = resolve_link(link_target(link), article, ROOT_DIR)
-            if resolved is not None and canonical_slug(resolved, KNOWLEDGE_DIR) == target:
-                count += 1
-                break
-    return count
-
-
-def build_inbound_count_map() -> dict[str, set[str]]:
-    """One O(N) pass over the corpus → ``{target_slug: {source_article_path}}``.
-
-    The single-pass replacement for calling ``count_inbound_links`` once per
-    article (which was O(N²) — N article-reads × N source-scans). For any
-    target slug, the inbound count is ``len(map.get(slug, set()) - {self})``,
-    where ``self`` is ``str(target_article)`` — exactly mirroring
-    ``count_inbound_links(slug, exclude_file=target_article)``:
-
-      * one entry per SOURCE article (a ``set``), matching the per-source
-        ``break`` (a source linking to a target N times still counts once);
-      * same resolver (``resolve_link``) on the same per-source content read
-        via ``extract_wikilinks`` over the FULL article text — so footer /
-        body links are treated identically to the per-target scan;
-      * only knowledge→knowledge edges survive (``canonical_slug`` returns
-        None for daily/raw citations).
-
-    Self-exclusion is the caller's job (subtract ``{str(article)}``), mirroring
-    ``exclude_file``. Verified byte-for-byte equal to the oracle in
-    ``tests/test_orphan_inbound_parity``."""
-    from core.links import canonical_slug, link_target, resolve_link
-    from core.paths import ROOT_DIR
-
-    inbound: dict[str, set[str]] = {}
-    for article in list_wiki_articles():
-        src_id = str(article)
-        try:
-            content = article.read_text(encoding="utf-8")
-        except OSError:
-            continue
-        targets_for_src: set[str] = set()
-        for link in extract_wikilinks(content):
-            resolved = resolve_link(link_target(link), article, ROOT_DIR)
-            if resolved is None:
-                continue
-            slug = canonical_slug(resolved, KNOWLEDGE_DIR)
-            if slug is not None:
-                targets_for_src.add(slug)
-        for slug in targets_for_src:
-            inbound.setdefault(slug, set()).add(src_id)
-    return inbound
+#
+# The footer-BLIND inbound-link helpers (`count_inbound_links` oracle +
+# `build_inbound_count_map`) were removed in C04: they counted the
+# engine-written `## Backlinks` footers as real edges, which neutralized
+# `check_orphan_pages` after M020 (backlog/orphan-check-footer-masking.md).
+# The footer-aware inbound map now lives in lint's LintContext builder,
+# derived from `core.links.outgoing_canonical_slugs` (the one O(N) pass —
+# DECISIONS 2026-05-30's single-pass rule holds; the parity oracle retired
+# with the semantics it enshrined).
 
 
 def get_article_word_count(path: Path) -> int:

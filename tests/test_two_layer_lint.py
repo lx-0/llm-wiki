@@ -6,9 +6,9 @@ Drives both lint functions against:
 - the broken fixtures (tests/fixtures/two_layer_broken/) — must surface
   the expected issue codes per-file
 
-Strategy: build a per-test temp `knowledge/` tree by symlinking the
+Strategy: build a per-test temp `knowledge/` tree by copying the
 fixture files into people/ or projects/ subdirs (driven by `type:`
-frontmatter), then monkeypatch `lint.KNOWLEDGE_DIR` and run the checks.
+frontmatter), then run the checks over a LintContext built from it.
 """
 from __future__ import annotations
 
@@ -53,11 +53,10 @@ def _build_knowledge(tmp_path: Path, sources: list[Path]) -> Path:
 
 
 @pytest.fixture
-def with_knowledge(tmp_path, monkeypatch):
-    def _setup(sources: list[Path]) -> Path:
+def with_knowledge(tmp_path):
+    def _setup(sources: list[Path]) -> lint.LintContext:
         knowledge = _build_knowledge(tmp_path, sources)
-        monkeypatch.setattr(lint, "KNOWLEDGE_DIR", knowledge)
-        return knowledge
+        return lint.build_context(vault=tmp_path, knowledge_dir=knowledge, state={})
     return _setup
 
 
@@ -65,62 +64,62 @@ def with_knowledge(tmp_path, monkeypatch):
 
 
 def test_valid_fixtures_have_no_two_layer_issues(with_knowledge):
-    with_knowledge(sorted(VALID_DIR.glob("*.md")))
-    issues = lint.check_two_layer_pages()
+    ctx = with_knowledge(sorted(VALID_DIR.glob("*.md")))
+    issues = lint.check_two_layer_pages(ctx)
     assert issues == [], f"Expected no issues, got: {issues}"
 
 
 def test_valid_fixtures_have_no_action_item_syntax_issues(with_knowledge):
-    with_knowledge(sorted(VALID_DIR.glob("*.md")))
-    issues = lint.check_action_item_syntax()
+    ctx = with_knowledge(sorted(VALID_DIR.glob("*.md")))
+    issues = lint.check_action_item_syntax(ctx)
     assert issues == [], f"Expected no issues, got: {issues}"
 
 
 # ── broken fixtures: expected issue codes per file ────────────────
 
 
-def _codes_for_file(issues: list[dict], rel: str) -> set[str]:
-    return {i["check"] for i in issues if i["file"] == rel}
+def _codes_for_file(issues: list[lint.Issue], rel: str) -> set[str]:
+    return {i.check for i in issues if i.file == rel}
 
 
 def test_missing_state_surfaces_correct_code(with_knowledge):
-    with_knowledge([BROKEN_DIR / "missing_state.md"])
-    issues = lint.check_two_layer_pages()
+    ctx = with_knowledge([BROKEN_DIR / "missing_state.md"])
+    issues = lint.check_two_layer_pages(ctx)
     codes = _codes_for_file(issues, "people/missing_state.md")
     assert "two_layer_missing_state" in codes
 
 
 def test_missing_separator_surfaces_correct_code(with_knowledge):
-    with_knowledge([BROKEN_DIR / "missing_separator.md"])
-    issues = lint.check_two_layer_pages()
+    ctx = with_knowledge([BROKEN_DIR / "missing_separator.md"])
+    issues = lint.check_two_layer_pages(ctx)
     codes = _codes_for_file(issues, "people/missing_separator.md")
     assert "two_layer_missing_body_separator" in codes
 
 
 def test_missing_timeline_surfaces_correct_code(with_knowledge):
-    with_knowledge([BROKEN_DIR / "missing_timeline.md"])
-    issues = lint.check_two_layer_pages()
+    ctx = with_knowledge([BROKEN_DIR / "missing_timeline.md"])
+    issues = lint.check_two_layer_pages(ctx)
     codes = _codes_for_file(issues, "projects/missing_timeline.md")
     assert "two_layer_missing_timeline" in codes
 
 
 def test_timeline_out_of_order_surfaces_correct_code(with_knowledge):
-    with_knowledge([BROKEN_DIR / "timeline_out_of_order.md"])
-    issues = lint.check_two_layer_pages()
+    ctx = with_knowledge([BROKEN_DIR / "timeline_out_of_order.md"])
+    issues = lint.check_two_layer_pages(ctx)
     codes = _codes_for_file(issues, "people/timeline_out_of_order.md")
     assert "timeline_not_reverse_chronological" in codes
 
 
 def test_action_item_no_checkbox_surfaces_correct_code(with_knowledge):
-    with_knowledge([BROKEN_DIR / "action_item_no_checkbox.md"])
-    issues = lint.check_two_layer_pages()
+    ctx = with_knowledge([BROKEN_DIR / "action_item_no_checkbox.md"])
+    issues = lint.check_two_layer_pages(ctx)
     codes = _codes_for_file(issues, "people/action_item_no_checkbox.md")
     assert "action_items_malformed" in codes
 
 
 def test_malformed_action_items_surfaces_all_three_codes(with_knowledge):
-    with_knowledge([BROKEN_DIR / "malformed_action_items.md"])
-    issues = lint.check_action_item_syntax()
+    ctx = with_knowledge([BROKEN_DIR / "malformed_action_items.md"])
+    issues = lint.check_action_item_syntax(ctx)
     codes = _codes_for_file(issues, "people/malformed_action_items.md")
     assert "action_item_invalid_due_date" in codes
     assert "action_item_malformed_priority" in codes

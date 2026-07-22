@@ -19,21 +19,27 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
 
 def test_fact_violations_by_slug_groups_filters_and_absolutizes(monkeypatch, tmp_path):
+    import lint
     import reconcile
 
     monkeypatch.setattr(reconcile, "ROOT_DIR", tmp_path)
     # Canned lint output: two concept hits for one fact, one for another,
     # plus a NON-concept hit (people/) that must be filtered out, plus a
-    # duplicate that must be deduped.
+    # duplicate that must be deduped. Grouping keys on the structured
+    # `fact_slug` payload — never on the prose detail (C04).
+    def iss(file, slug):
+        return lint.issue("warning", "fact_violation", file, "detail prose", fact_slug=slug)
+
     issues = [
-        {"file": "concepts/foo.md", "detail": "negation term from hard fact `facts/no-x`"},
-        {"file": "concepts/bar.md", "detail": "negation term from hard fact `facts/no-x`"},
-        {"file": "concepts/foo.md", "detail": "another term from hard fact `facts/no-x`"},  # dup file
-        {"file": "concepts/baz.md", "detail": "term from hard fact `facts/no-y`"},
-        {"file": "people/alex.md", "detail": "term from hard fact `facts/no-x`"},  # not a concept
-        {"file": "concepts/qux.md", "detail": "no slug here"},  # no fact slug → skipped
+        iss("concepts/foo.md", "no-x"),
+        iss("concepts/bar.md", "no-x"),
+        iss("concepts/foo.md", "no-x"),  # dup file
+        iss("concepts/baz.md", "no-y"),
+        iss("people/alex.md", "no-x"),  # not a concept
+        iss("concepts/qux.md", None),  # no fact slug → skipped
     ]
-    monkeypatch.setattr(reconcile.lint, "check_facts_violations", lambda: issues)
+    monkeypatch.setattr(reconcile.lint, "build_context", lambda **kw: None)
+    monkeypatch.setattr(reconcile.lint, "check_facts_violations", lambda ctx: issues)
 
     out = reconcile._fact_violations_by_slug()
 
@@ -47,24 +53,24 @@ def test_fact_violations_by_slug_groups_filters_and_absolutizes(monkeypatch, tmp
 
 def test_fact_violations_slug_handles_non_ascii(monkeypatch, tmp_path):
     """Fact slugs with non-ASCII (umlauts, incl. NFD-decomposed) must survive
-    extraction. Regression: `sidney-wach-ist-männlich` with NFD `ä` (a + U+0308)
-    truncated to `sidney-wach-ist-ma` under the old ASCII-only regex → no such fact."""
+    grouping. Regression: `sidney-wach-ist-männlich` with NFD `ä` (a + U+0308)
+    once truncated to `sidney-wach-ist-ma` under a prose-scraping ASCII regex →
+    "no such fact". The structured `fact_slug` payload passes through verbatim."""
     import unicodedata
 
+    import lint
     import reconcile
 
     monkeypatch.setattr(reconcile, "ROOT_DIR", tmp_path)
     nfd = unicodedata.normalize("NFD", "sidney-wach-ist-männlich")  # ä → a + U+0308
-    issues = [{
-        "file": "concepts/sidney.md",
-        "detail": (
-            f"Article contains negation term 'weiblich' from hard fact `facts/{nfd}` "
-            f"(status: negation). Reconcile manually or via `wiki correct apply {nfd}`."
-        ),
-    }]
-    monkeypatch.setattr(reconcile.lint, "check_facts_violations", lambda: issues)
+    issues = [lint.issue(
+        "warning", "fact_violation", "concepts/sidney.md",
+        "Article contains negation term 'weiblich'…", fact_slug=nfd,
+    )]
+    monkeypatch.setattr(reconcile.lint, "build_context", lambda **kw: None)
+    monkeypatch.setattr(reconcile.lint, "check_facts_violations", lambda ctx: issues)
     out = reconcile._fact_violations_by_slug()
-    assert list(out.keys()) == [nfd]  # full slug captured, not truncated at the umlaut
+    assert list(out.keys()) == [nfd]  # full slug survives, not truncated at the umlaut
 
 
 def test_within_cooldown(monkeypatch, tmp_path):

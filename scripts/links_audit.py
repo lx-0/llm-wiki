@@ -24,7 +24,6 @@ from __future__ import annotations
 
 import argparse
 import difflib
-import re
 import sys
 from collections import Counter
 from dataclasses import dataclass, field
@@ -33,7 +32,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # scripts/ on path
 
 from core.links import (  # noqa: E402
-    WIKILINK_RE,
     _strip_frontmatter_and_fences,
     canonical_slug,
     has_ext,
@@ -41,7 +39,7 @@ from core.links import (  # noqa: E402
     link_target,
     relative_link_for_slug,
     resolve_link,
-    strip_table_escape,
+    retarget_links,
 )
 from core.paths import KNOWLEDGE_DIR, ROOT_DIR  # noqa: E402
 from core.utils import extract_wikilinks  # noqa: E402
@@ -128,31 +126,26 @@ def build_audit(knowledge_dir: Path, vault: Path) -> Audit:
 
 def apply_fixes(knowledge_dir: Path, vault: Path, corrections: dict[str, str]) -> dict[str, int]:
     """Rewrite every approved broken target to its corrected slug, as a link
-    relative to each source article. Preserves `!`/`#anchor`/`|alias`/`\\|`."""
+    relative to each source article, via `core.links.retarget_links` (the one
+    rewriter — masking + `!`/`#anchor`/`|alias`/`\\|` preservation live there).
+
+    Matching is deliberately literal-by-string (the audit keyed its findings on
+    the broken target TEXT — the target resolves to nothing, so resolve-based
+    matching is impossible here). Walker policy: `iter_articles`, i.e. index.md
+    stays out — also deliberate."""
     files = links = 0
     for art in iter_articles(knowledge_dir):
         original = art.read_text(encoding="utf-8")
-        out_lines: list[str] = []
-        changed = 0
-        for _, line, live in _strip_frontmatter_and_fences(original.split("\n")):
-            if not live:
-                out_lines.append(line)
-                continue
 
-            def _sub(m: re.Match) -> str:
-                nonlocal changed
-                bang, target, heading, alias = m.groups()
-                t, esc = strip_table_escape(target, alias)
-                new_slug = corrections.get(t)
-                if new_slug is None:
-                    return m.group(0)
-                changed += 1
-                rel = relative_link_for_slug(new_slug, art, knowledge_dir)
-                return f"{bang}[[{rel}{heading or ''}{esc}{alias or ''}]]"
+        def _rewrite(target: str, _art: Path = art) -> str | None:
+            new_slug = corrections.get(target)
+            if new_slug is None:
+                return None
+            return relative_link_for_slug(new_slug, _art, knowledge_dir)
 
-            out_lines.append(WIKILINK_RE.sub(_sub, line))
+        new_text, changed = retarget_links(original, _rewrite)
         if changed:
-            art.write_text("\n".join(out_lines), encoding="utf-8")
+            art.write_text(new_text, encoding="utf-8")
             files += 1
             links += changed
     return {"files": files, "links": links}

@@ -1,12 +1,14 @@
 """Generate `_dashboard-lint.md` at vault root with current lint queues.
 
-Imports `check_orphan_pages`, `check_stale_articles`, `check_missing_backlinks`
-from `lint`; enumerates `SESSIONS_DIR/failed-flushes/*.md` for the fourth queue.
-Writes a Markdown fragment that `dashboard.md` transcludes section by section
-via `![[_dashboard-lint#Section]]` embeds.
+Queues: orphan pages, stale articles, failed flushes (`SESSIONS_DIR/
+failed-flushes/*.md`). Writes a Markdown fragment that `dashboard.md`
+transcludes section by section via `![[_dashboard-lint#Section]]` embeds.
 
-Runs after every flush (called from `flush.py` post-`refresh_dashboard_stats`).
-Also runnable standalone:
+Runs after every flush (called from `flush.py` right after
+`dashboard_stats.py`). The structural check results are computed ONCE per
+refresh (C04): the stats run persists them via `dashboard.lint_results`; this
+script consumes that cache while fresh and only recomputes when run
+standalone:
 
     uv run python scripts/dashboard/dashboard_lint.py            # write
     uv run python scripts/dashboard/dashboard_lint.py --dry-run  # print without writing
@@ -24,8 +26,10 @@ import argparse
 import json
 import logging
 
+from core.config import CONFIG
 from core.paths import ROOT_DIR, SESSIONS_DIR
 from core.utils import now_iso
+from dashboard.lint_results import LintResults, compute_lint_results, load_fresh_cache
 
 logging.basicConfig(
     level=logging.INFO,
@@ -42,7 +46,6 @@ DETAIL_TRUNCATE_AT = 120
 SECTIONS = (
     ("orphans", "Orphans"),
     ("stale", "Stale"),
-    ("missing_backlinks", "Missing backlinks"),
     ("failed_flushes", "Failed flushes"),
 )
 
@@ -61,33 +64,6 @@ def _issue_to_entry(issue) -> dict:
 
 
 # -- Counters --------------------------------------------------------
-
-def collect_orphans() -> list[dict]:
-    try:
-        from lint import check_orphan_pages
-        return [_issue_to_entry(i) for i in check_orphan_pages()]
-    except Exception as exc:
-        log.warning("check_orphan_pages failed: %s", exc)
-        return []
-
-
-def collect_stale() -> list[dict]:
-    try:
-        from lint import check_stale_articles
-        return [_issue_to_entry(i) for i in check_stale_articles()]
-    except Exception as exc:
-        log.warning("check_stale_articles failed: %s", exc)
-        return []
-
-
-def collect_missing_backlinks() -> list[dict]:
-    try:
-        from lint import check_missing_backlinks
-        return [_issue_to_entry(i) for i in check_missing_backlinks()]
-    except Exception as exc:
-        log.warning("check_missing_backlinks failed: %s", exc)
-        return []
-
 
 def collect_failed_flushes() -> list[dict]:
     if not FAILED_DIR.exists():
@@ -109,19 +85,20 @@ def collect_failed_flushes() -> list[dict]:
     return entries
 
 
-def compute_lint_data() -> dict:
-    orphans = collect_orphans()
-    stale = collect_stale()
-    missing = collect_missing_backlinks()
+def compute_lint_data(results: LintResults | None = None) -> dict:
+    """Assemble the queue lists from shared lint results (computed here only
+    when the caller has none — the flush path hands in the stats run's)."""
+    if results is None:
+        results = compute_lint_results()
+    orphans = [_issue_to_entry(i) for i in results.get("orphan_pages")]
+    stale = [_issue_to_entry(i) for i in results.get("stale_articles")]
     failed = collect_failed_flushes()
     return {
         "orphans_count": len(orphans),
         "stale_count": len(stale),
-        "missing_backlinks_count": len(missing),
         "failed_flushes_count": len(failed),
         "orphans": orphans,
         "stale": stale,
-        "missing_backlinks": missing,
         "failed_flushes": failed,
         "last_updated_ts": now_iso(),
     }
@@ -156,7 +133,6 @@ def write_dashboard_lint(data: dict, body: str) -> Path:
     fm_keys = (
         "orphans_count",
         "stale_count",
-        "missing_backlinks_count",
         "failed_flushes_count",
     )
     lines = ["---"]
@@ -177,12 +153,19 @@ def main() -> int:
     parser.add_argument("--dry-run", action="store_true", help="print without writing")
     args = parser.parse_args()
 
-    data = compute_lint_data()
+    # Within a flush refresh, dashboard_stats.py (spawned seconds before this
+    # script) already computed + cached the structural results — reuse them.
+    # Standalone runs find a stale/absent cache and recompute.
+    results = load_fresh_cache(max_age_s=CONFIG.limits.dashboard_refresh_timeout_s)
+    if results is not None:
+        log.info("Using shared lint results from %s (computed by dashboard_stats)",
+                 results.generated_at)
+    data = compute_lint_data(results)
     body = render_body(data)
 
     if args.dry_run:
         meta = {k: data[k] for k in (
-            "orphans_count", "stale_count", "missing_backlinks_count",
+            "orphans_count", "stale_count",
             "failed_flushes_count", "last_updated_ts",
         )}
         print(json.dumps(meta, indent=2))
@@ -192,11 +175,10 @@ def main() -> int:
 
     out = write_dashboard_lint(data, body)
     log.info(
-        "Wrote %s — orphans=%d stale=%d missing=%d failed=%d",
+        "Wrote %s — orphans=%d stale=%d failed=%d",
         out,
         data["orphans_count"],
         data["stale_count"],
-        data["missing_backlinks_count"],
         data["failed_flushes_count"],
     )
     return 0

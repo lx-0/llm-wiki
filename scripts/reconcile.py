@@ -31,7 +31,6 @@ os.environ["CLAUDE_INVOKED_BY"] = "reconcile"
 import argparse
 import asyncio
 import logging
-import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -56,31 +55,26 @@ logging.basicConfig(
 )
 log = logging.getLogger("reconcile")
 
-# lint emits the slug backtick-wrapped as `facts/<slug>` (lint.check_facts_violations).
-# Anchor on the backticks, not an ASCII char class: fact slugs can carry non-ASCII
-# (e.g. `sidney-wach-ist-männlich`), and an `ä` stored NFD-decomposed (a + U+0308)
-# silently truncates an `[A-Za-z0-9_-]+` capture mid-slug → "no such fact".
-_FACT_SLUG_RE = re.compile(r"`facts/([^`]+)`")
-
 
 def _fact_violations_by_slug() -> dict[str, list[str]]:
     """Group lint fact-violations by fact slug → list of ABSOLUTE concept paths.
 
     Strict scope: only `knowledge/concepts/` articles. `check_facts_violations`
-    yields file paths relative to KNOWLEDGE_DIR (e.g. `concepts/foo.md`) and a
-    detail string naming `facts/<slug>`.
+    yields Issues whose `file` is relative to KNOWLEDGE_DIR (`concepts/foo.md`)
+    and whose `fact_slug` payload names the fact — the structured field, not a
+    prose scrape (the old backtick-regex once truncated an NFD-decomposed `ä`
+    mid-slug → "no such fact"; slugs now pass through verbatim by construction).
     """
     out: dict[str, list[str]] = {}
-    for iss in lint.check_facts_violations():
-        rel = iss.get("file", "")
+    ctx = lint.build_context()
+    for iss in lint.check_facts_violations(ctx):
+        rel = iss.file
         if not rel.startswith("concepts/"):
             continue  # concepts-only scope (matches the write hook)
-        m = _FACT_SLUG_RE.search(iss.get("detail", ""))
-        if not m:
+        if not iss.fact_slug:
             continue
-        slug = m.group(1)
         abs_path = str((ROOT_DIR / "knowledge" / rel).resolve())
-        files = out.setdefault(slug, [])
+        files = out.setdefault(iss.fact_slug, [])
         if abs_path not in files:
             files.append(abs_path)
     return out

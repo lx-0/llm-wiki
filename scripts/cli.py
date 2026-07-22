@@ -155,7 +155,8 @@ USAGE
 
 NOTES
   Wraps scripts/lint.py. Structural checks: broken_links, orphan_pages,
-  orphan_sources, stale_articles, missing_backlinks, article_type, sparse_articles.
+  orphan_sources, stale_articles, article_type, sparse_articles, and more —
+  all run over one shared corpus context (LintContext).
   Report saved to .wiki/reports/lint-YYYY-MM-DD.md. Dashboard counts refresh."""
 
 H_LINKS = """wiki links — analyze (and optionally fix) broken wikilinks

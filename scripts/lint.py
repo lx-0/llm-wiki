@@ -3,6 +3,17 @@
 Usage:
     uv run python lint.py                    # full lint including LLM contradiction check
     uv run python lint.py --structural-only  # skip the LLM contradiction check
+
+Architecture (C04 — link-graph + corpus model seam): every structural check is
+a pure function ``check(ctx) -> list[Issue]`` over a `LintContext` built ONCE
+per run. The context is the single corpus read — canonical article enumeration
+(`core.utils.list_wiki_articles`, includes `knowledge/MOCs/`), parsed
+frontmatter (`core.frontmatter`), stripped bodies, footer-aware outgoing slugs
+(`core.links.outgoing_canonical_slugs` — the engine-written `## Backlinks`
+footers are NOT link edges), and the derived inbound map (the one-O(N)-pass
+rule from the 2026-05-30 incident lives in the builder). Issues carry a
+structured payload (`fact_slug`, `target_slug`) so consumers (reconcile,
+dashboards) never parse prose.
 """
 
 import os
@@ -10,30 +21,33 @@ os.environ["CLAUDE_INVOKED_BY"] = "lint"
 
 import argparse
 import asyncio
-import logging
 import sys
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Callable
 
 from claude_agent_sdk import ClaudeAgentOptions, ResultMessage, query
 
 from core import frontmatter
-from core.paths import DAILY_DIR, KNOWLEDGE_DIR, RAW_DIR, REPORTS_DIR, ROOT_DIR
+from core.backlinks import BACKLINKS_BEGIN, BACKLINKS_END
+from core.paths import KNOWLEDGE_DIR, REPORTS_DIR, ROOT_DIR
 from core.utils import (
-    build_inbound_count_map,
     extract_wikilinks,
     file_hash,
-    get_article_word_count,
     list_raw_files,
     list_wiki_articles,
     load_state,
     now_iso,
     read_all_wiki_content,
-    read_wiki_index,
     save_state,
     today_iso,
 )
-from core.links import canonical_slug, link_target, resolve_link  # noqa: E402
-from core.paths import ROOT_DIR  # noqa: E402  — vault root
+from core.links import (  # noqa: E402
+    canonical_slug,
+    link_target,
+    outgoing_canonical_slugs,
+    resolve_link,
+)
 
 # ── Logging ──────────────────────────────────────────────────────────
 from core.console import setup_console_logging  # noqa: E402
@@ -46,92 +60,218 @@ SPARSE_THRESHOLD = CONFIG.limits.sparse_threshold_words
 
 # ── Issue type ──────────────────────────────────────────────────────
 
-def issue(severity: str, check: str, file: str, detail: str, auto_fixable: bool = False) -> dict:
-    """Create a structured issue dict (matches Cole's pattern)."""
-    return {
-        "severity": severity,  # error, warning, suggestion
-        "check": check,
-        "file": file,
-        "detail": detail,
-        "auto_fixable": auto_fixable,
-    }
+@dataclass(frozen=True)
+class Issue:
+    """One lint finding. `fact_slug` / `target_slug` are the structured
+    payload consumers key on (reconcile groups by fact, dashboards link the
+    target) — the `detail` prose is display-only, never parsed."""
+
+    severity: str  # error, warning, suggestion
+    check: str
+    file: str
+    detail: str
+    auto_fixable: bool = False
+    fact_slug: str | None = None
+    target_slug: str | None = None
+
+
+def issue(
+    severity: str,
+    check: str,
+    file: str,
+    detail: str,
+    auto_fixable: bool = False,
+    *,
+    fact_slug: str | None = None,
+    target_slug: str | None = None,
+) -> Issue:
+    """Create a structured Issue (factory keeps the historic call shape)."""
+    return Issue(
+        severity=severity,
+        check=check,
+        file=file,
+        detail=detail,
+        auto_fixable=auto_fixable,
+        fact_slug=fact_slug,
+        target_slug=target_slug,
+    )
+
+
+# ── Corpus model ────────────────────────────────────────────────────
+
+@dataclass(frozen=True)
+class Article:
+    """One knowledge article, read + parsed exactly once per lint run."""
+
+    path: Path
+    rel: str                  # posix path relative to knowledge_dir, e.g. "concepts/foo.md"
+    text: str                 # full file content
+    fm: dict                  # tolerant frontmatter (core.frontmatter grammar)
+    body: str                 # frontmatter-stripped body
+    slug: str | None          # canonical knowledge slug, e.g. "concepts/foo"
+    outgoing: frozenset[str]  # footer-aware outgoing canonical slugs
+
+
+@dataclass(frozen=True)
+class LintContext:
+    """The corpus model every check runs over — built ONCE per run.
+
+    `inbound` maps target slug → source slugs and is derived from the
+    footer-aware `outgoing` sets, so the engine-materialized `## Backlinks`
+    footers (M020) never count as link edges. This builder IS the one-O(N)-pass
+    inbound computation (2026-05-30 decision); a per-article corpus rescan can
+    only be reintroduced here, nowhere else.
+    """
+
+    vault: Path
+    knowledge_dir: Path
+    articles: tuple[Article, ...]
+    index_content: str
+    inbound: dict[str, set[str]]
+    state: dict
+    raw_files: tuple[Path, ...]
+
+
+def build_context(
+    *,
+    vault: Path | None = None,
+    knowledge_dir: Path | None = None,
+    state: dict | None = None,
+    raw_files: list[Path] | None = None,
+) -> LintContext:
+    """Build the LintContext: the single corpus read of a lint run.
+
+    Defaults target the live vault; tests pass a temp ``vault`` /
+    ``knowledge_dir`` (+ ``state={}``) to lint an in-memory corpus without
+    monkeypatching module globals.
+    """
+    vault = vault if vault is not None else ROOT_DIR
+    kdir = knowledge_dir if knowledge_dir is not None else KNOWLEDGE_DIR
+
+    articles: list[Article] = []
+    for path in list_wiki_articles(kdir):
+        try:
+            text = path.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        fm, body = frontmatter.parse(text)
+        articles.append(Article(
+            path=path,
+            rel=path.relative_to(kdir).as_posix(),
+            text=text,
+            fm=fm,
+            body=body,
+            slug=canonical_slug(path, kdir),
+            outgoing=frozenset(outgoing_canonical_slugs(
+                text, path, vault, kdir, BACKLINKS_BEGIN, BACKLINKS_END
+            )),
+        ))
+
+    inbound: dict[str, set[str]] = {}
+    for art in articles:
+        if art.slug is None:
+            continue
+        for tgt in art.outgoing:
+            if tgt == art.slug:
+                continue  # self-links are not inbound edges
+            inbound.setdefault(tgt, set()).add(art.slug)
+
+    index_file = kdir / "index.md"
+    try:
+        index_content = index_file.read_text(encoding="utf-8") if index_file.exists() else ""
+    except OSError:
+        index_content = ""
+
+    if state is None:
+        state = load_state()
+    if raw_files is None:
+        raw_files = list_raw_files(daily_dir=vault / "daily", raw_dir=vault / "raw")
+
+    return LintContext(
+        vault=vault,
+        knowledge_dir=kdir,
+        articles=tuple(articles),
+        index_content=index_content,
+        inbound=inbound,
+        state=state,
+        raw_files=tuple(raw_files),
+    )
+
+
+def _in_folder(ctx: LintContext, folder: str) -> list[Article]:
+    """Articles under ``knowledge/<folder>/``, index.md/log.md filtered."""
+    prefix = f"{folder}/"
+    return [
+        a for a in ctx.articles
+        if a.rel.startswith(prefix) and a.path.name not in ("index.md", "log.md")
+    ]
 
 
 # ── Structural checks ───────────────────────────────────────────────
 
-def _wikilink_target_exists(link: str, source: Path) -> bool:
-    """Resolve an Obsidian-style wikilink target against the vault.
-
-    A link in a markdown file is relative to that file (the relativize-wikilinks
-    convention). `core.links.resolve_link` is the single resolver: it tries the
-    target relative to ``source``, the vault root, and ``<vault>/knowledge/``.
-    """
-    return resolve_link(link_target(link), source, ROOT_DIR) is not None
-
-
-def check_broken_links() -> list[dict]:
+def check_broken_links(ctx: LintContext) -> list[Issue]:
     """Find wikilinks that point to non-existent targets.
 
     All targets (knowledge/, daily/, raw/notes/, raw/articles/, …) get
     the ordinary broken-link check — no per-subtree exceptions.
+    `core.links.resolve_link` is the single resolver: it tries the target
+    relative to the source article, the vault root, and ``<vault>/knowledge/``.
     """
     issues = []
-    for article in list_wiki_articles():
-        content = article.read_text(encoding="utf-8")
-        rel = str(article.relative_to(KNOWLEDGE_DIR))
-        for link in extract_wikilinks(content):
-            if not _wikilink_target_exists(link, article):
+    for art in ctx.articles:
+        for link in extract_wikilinks(art.text):
+            target = link_target(link)
+            if resolve_link(target, art.path, ctx.vault) is None:
                 issues.append(issue(
-                    "error", "broken_link", rel,
+                    "error", "broken_link", art.rel,
                     f"Broken link: [[{link}]] — target does not exist",
+                    target_slug=target,
                 ))
     return issues
 
 
-def _is_fact(article: Path) -> bool:
-    """True if the article lives under knowledge/facts/."""
-    try:
-        rel = article.relative_to(KNOWLEDGE_DIR)
-    except ValueError:
-        return False
-    return rel.parts and rel.parts[0] == "facts"
+# Folders whose pages are orphan-by-design: facts are authoritative overrides,
+# MOC hubs are graph ROOTS (they link out to articles; nothing links back to a
+# hub, and hubs are reached via dashboard.md, outside knowledge/).
+_ORPHAN_EXEMPT_PREFIXES = ("facts/", "MOCs/")
 
 
-def check_orphan_pages() -> list[dict]:
-    """Find wiki articles that no other article links to."""
+def check_orphan_pages(ctx: LintContext) -> list[Issue]:
+    """Find wiki articles that no other article links to.
+
+    Footer-aware since C04: inbound edges come from `ctx.inbound`, which is
+    derived from `outgoing_canonical_slugs` — the sentinel `## Backlinks`
+    footer M020 writes into every linked-to article is excluded. (Footer-blind
+    counting gave every out-linking article a "free" inbound from its own
+    materialized footer, so only fully isolated islands were ever flagged —
+    backlog/orphan-check-footer-masking.md.) In-`index.md` membership still
+    counts as non-orphan, unchanged.
+    """
     issues = []
-    index_content = read_wiki_index()
-    # One O(N) pass for ALL targets, replacing the per-article
-    # count_inbound_links() that made this O(N²) and hung the lint ~99 min on
-    # 1700 articles (incident 2026-05-30, KNOWLEDGE.md). Behaviour-identical:
-    # inbound count = sources of `name` minus self (parity-tested against the
-    # count_inbound_links oracle).
-    inbound_map = build_inbound_count_map()
-
-    for article in list_wiki_articles():
-        if _is_fact(article):
-            continue  # facts are authoritative; orphan-by-design
-        rel = str(article.relative_to(KNOWLEDGE_DIR))
-        name = rel.replace(".md", "")
-        inbound = len(inbound_map.get(name, set()) - {str(article)})
-        in_index = f"[[{name}]]" in index_content
+    for art in ctx.articles:
+        if art.rel.startswith(_ORPHAN_EXEMPT_PREFIXES):
+            continue
+        if art.slug is None:
+            continue
+        name = art.rel[:-3] if art.rel.endswith(".md") else art.rel
+        inbound = len(ctx.inbound.get(art.slug, set()))
+        in_index = f"[[{name}]]" in ctx.index_content
 
         if inbound == 0 and not in_index:
             issues.append(issue(
-                "warning", "orphan_page", rel,
+                "warning", "orphan_page", art.rel,
                 f"Orphan page: no other articles link to [[{name}]]",
             ))
     return issues
 
 
-def check_orphan_sources() -> list[dict]:
+def check_orphan_sources(ctx: LintContext) -> list[Issue]:
     """Find daily/raw source files that were never compiled into any article."""
     issues = []
-    state = load_state()
-    ingested = state.get("ingested", {})
+    ingested = ctx.state.get("ingested", {})
 
-    for source in list_raw_files():
-        rel = str(source.relative_to(ROOT_DIR))
+    for source in ctx.raw_files:
+        rel = str(source.relative_to(ctx.vault))
         if rel not in ingested:
             issues.append(issue(
                 "warning", "orphan_source", rel,
@@ -140,17 +280,16 @@ def check_orphan_sources() -> list[dict]:
     return issues
 
 
-def check_stale_articles() -> list[dict]:
+def check_stale_articles(ctx: LintContext) -> list[Issue]:
     """Find articles whose source files have changed since last compilation."""
     issues = []
-    state = load_state()
-    ingested = state.get("ingested", {})
+    ingested = ctx.state.get("ingested", {})
 
-    for source in list_raw_files():
-        rel = str(source.relative_to(ROOT_DIR))
+    for source in ctx.raw_files:
+        rel = str(source.relative_to(ctx.vault))
         if rel not in ingested:
             continue
-        # state.ingested[rel] is a hash string (compile.py:492 writes file_hash(source) directly).
+        # state.ingested[rel] is a hash string (compile.py writes file_hash(source) directly).
         # Older state files used a {hash, compiled_at, ...} dict shape — handle both defensively.
         stored = ingested[rel]
         if isinstance(stored, dict):
@@ -166,54 +305,11 @@ def check_stale_articles() -> list[dict]:
     return issues
 
 
-def _outgoing_knowledge_slugs(article: Path) -> set[str]:
-    """Canonical knowledge-slugs an article links to, links resolved relative
-    to the article. Substrate (daily/raw) and dangling links are dropped."""
-    try:
-        content = article.read_text(encoding="utf-8")
-    except OSError:
-        return set()
-    slugs: set[str] = set()
-    for link in extract_wikilinks(content):
-        resolved = resolve_link(link_target(link), article, ROOT_DIR)
-        if resolved is None:
-            continue
-        slug = canonical_slug(resolved, KNOWLEDGE_DIR)
-        if slug:
-            slugs.add(slug)
-    return slugs
-
-
-def check_missing_backlinks() -> list[dict]:
-    """Find articles that link to X but X doesn't link back."""
-    issues = []
-    cache: dict[Path, set[str]] = {}
-    for article in list_wiki_articles():
-        if _is_fact(article):
-            continue  # facts override; reciprocity not expected
-        rel = str(article.relative_to(KNOWLEDGE_DIR))
-        src_slug = canonical_slug(article, KNOWLEDGE_DIR)
-        if src_slug is None:
-            continue
-
-        for link in extract_wikilinks(article.read_text(encoding="utf-8")):
-            resolved = resolve_link(link_target(link), article, ROOT_DIR)
-            if resolved is None:
-                continue
-            tgt_slug = canonical_slug(resolved, KNOWLEDGE_DIR)
-            if tgt_slug is None or tgt_slug == src_slug:
-                continue  # substrate citation or self-link
-            back = cache.get(resolved)
-            if back is None:
-                back = _outgoing_knowledge_slugs(resolved)
-                cache[resolved] = back
-            if src_slug not in back:
-                issues.append(issue(
-                    "suggestion", "missing_backlink", rel,
-                    f"[[{src_slug}]] links to [[{tgt_slug}]] but not vice versa",
-                    auto_fixable=True,
-                ))
-    return issues
+# check_missing_backlinks was removed in C04: M020 materializes the reciprocal
+# edge into every linked-to article's `## Backlinks` footer on each compile, so
+# reciprocity is an engine invariant now — footer-blind the check was vacuous
+# (the footer satisfied it), footer-stripped it would flag every deliberate
+# one-directional body link. See the C04 decision entry in .ytstack/DECISIONS.md.
 
 
 FOLDER_TO_TYPE = {
@@ -232,9 +328,9 @@ FOLDER_TO_TYPE = {
 def _read_frontmatter(path: Path) -> dict:
     """Frontmatter dict via the single core.frontmatter grammar (C03) —
     returns {} on unreadable file / no fence / malformed YAML. Values carry
-    YAML types (lists, bools); pre-C03 lint carried TWO parsers (a naive
-    line-splitter and a real-YAML one) with different tolerance, arbitrarily
-    distributed across checks."""
+    YAML types (lists, bools). Used for files OUTSIDE the knowledge corpus
+    (raw/, daily/, inbox/ walks); knowledge articles carry their parsed
+    frontmatter on `Article.fm`."""
     try:
         text = path.read_text(encoding="utf-8")
     except OSError:
@@ -242,32 +338,30 @@ def _read_frontmatter(path: Path) -> dict:
     return frontmatter.parse(text)[0]
 
 
-def check_article_type() -> list[dict]:
+def check_article_type(ctx: LintContext) -> list[Issue]:
     """Verify every knowledge article carries `type:` and that it matches its folder."""
     issues = []
-    for article in list_wiki_articles():
-        rel = str(article.relative_to(KNOWLEDGE_DIR))
-        if article.name in ("index.md", "log.md"):
+    for art in ctx.articles:
+        if art.path.name in ("index.md", "log.md"):
             continue
         # First path segment under knowledge/ is the substrate folder.
-        parts = rel.split("/")
+        parts = art.rel.split("/")
         if len(parts) < 2:
             continue  # top-level file other than index/log — not a typed article
         folder = parts[0]
         expected = FOLDER_TO_TYPE.get(folder)
         if expected is None:
             continue  # unknown folder — let other checks handle it
-        fm = _read_frontmatter(article)
-        actual = fm.get("type")
+        actual = art.fm.get("type")
         if not actual:
             issues.append(issue(
-                "warning", "missing_type", rel,
+                "warning", "missing_type", art.rel,
                 f"Missing `type:` frontmatter — expected `type: {expected}` (matches folder `{folder}/`)",
                 auto_fixable=True,
             ))
         elif actual != expected:
             issues.append(issue(
-                "warning", "type_mismatch", rel,
+                "warning", "type_mismatch", art.rel,
                 f"`type: {actual}` does not match folder `{folder}/` (expected `type: {expected}`)",
                 auto_fixable=True,
             ))
@@ -293,7 +387,7 @@ def _domain_tags() -> tuple[str, ...]:
     return _DEFAULT_DOMAIN_TAGS
 
 
-def check_qa_schema() -> list[dict]:
+def check_qa_schema(ctx: LintContext) -> list[Issue]:
     """Verify each knowledge/qa/ note has type:qa, an index row, and ≥1 domain tag.
 
     qa/ notes are written by `wiki query --file-back` via the Claude SDK. The
@@ -302,46 +396,38 @@ def check_qa_schema() -> list[dict]:
     one. This check catches that drift.
     """
     issues = []
-    qa_dir = KNOWLEDGE_DIR / "qa"
-    if not qa_dir.exists():
-        return issues
-    index_content = read_wiki_index()
     domain_set = set(_domain_tags())
-    for article in sorted(qa_dir.glob("*.md")):
-        if article.name in ("index.md", "log.md"):
-            continue
-        rel = str(article.relative_to(KNOWLEDGE_DIR))
-        fm = _read_frontmatter(article)
+    for art in _in_folder(ctx, "qa"):
         # 1. type: qa required
-        if fm.get("type") != "qa":
-            actual = fm.get("type") or "(missing)"
+        if art.fm.get("type") != "qa":
+            actual = art.fm.get("type") or "(missing)"
             issues.append(issue(
-                "error", "qa_missing_type", rel,
+                "error", "qa_missing_type", art.rel,
                 f"qa/ note has `type: {actual}` — must be `type: qa` per schema",
                 auto_fixable=True,
             ))
         # 2. must appear in index.md
-        stem = article.stem
-        if f"[[qa/{stem}]]" not in index_content:
+        stem = art.path.stem
+        if f"[[qa/{stem}]]" not in ctx.index_content:
             issues.append(issue(
-                "warning", "qa_not_in_index", rel,
+                "warning", "qa_not_in_index", art.rel,
                 f"qa/{stem} is not referenced in knowledge/index.md — "
                 f"`wiki query --file-back` should have added a row",
             ))
         # 3. should have ≥1 domain tag (else falls into grey bucket in graph view)
-        raw_tags = fm.get("tags") or []
+        raw_tags = art.fm.get("tags") or []
         tags = set(raw_tags) if isinstance(raw_tags, list) else set()
         # Strip the redundant `qa` tag — that information lives in type:
         if not (tags & domain_set):
             issues.append(issue(
-                "warning", "qa_no_domain_tag", rel,
+                "warning", "qa_no_domain_tag", art.rel,
                 f"qa/ note has no domain tag from {sorted(domain_set)} — "
                 f"will render grey in graph view. Add e.g. `tags: [llm-wiki]`.",
             ))
     return issues
 
 
-def check_concept_domain_tag() -> list[dict]:
+def check_concept_domain_tag(ctx: LintContext) -> list[Issue]:
     """Warn on knowledge/concepts/ and knowledge/connections/ notes whose tags
     miss any domain anchor.
 
@@ -359,19 +445,12 @@ def check_concept_domain_tag() -> list[dict]:
     issues = []
     domain_set = set(_domain_tags())
     for folder in ("concepts", "connections"):
-        folder_dir = KNOWLEDGE_DIR / folder
-        if not folder_dir.exists():
-            continue
-        for article in sorted(folder_dir.glob("*.md")):
-            if article.name in ("index.md", "log.md"):
-                continue
-            rel = str(article.relative_to(KNOWLEDGE_DIR))
-            fm = _read_frontmatter(article)
-            raw_tags = fm.get("tags") or []
+        for art in _in_folder(ctx, folder):
+            raw_tags = art.fm.get("tags") or []
             tags = set(raw_tags) if isinstance(raw_tags, list) else set()
             if not (tags & domain_set):
                 issues.append(issue(
-                    "warning", "concept_no_domain_tag", rel,
+                    "warning", "concept_no_domain_tag", art.rel,
                     f"{folder[:-1]} has no tag from {sorted(domain_set)} — "
                     f"will render grey in graph view. Current tags: {sorted(tags)[:6]}",
                 ))
@@ -388,7 +467,7 @@ def check_concept_domain_tag() -> list[dict]:
 CONNECTION_KIND_FIELDS = ("tension", "mechanism", "dependency")
 
 
-def check_connection_depth() -> list[dict]:
+def check_connection_depth(ctx: LintContext) -> list[Issue]:
     """Quality gate for `knowledge/connections/` articles (M012).
 
     A connection article MUST:
@@ -411,41 +490,24 @@ def check_connection_depth() -> list[dict]:
     `type: connection` yet (folder-only) are still checked — rule 1 + 3 hold
     regardless of frontmatter, rule 2 fires the missing-kind warning.
     """
-    issues: list[dict] = []
-    connections_dir = KNOWLEDGE_DIR / "connections"
-    if not connections_dir.exists():
-        return issues
-
+    issues: list[Issue] = []
     min_words = CONFIG.limits.connection_min_words
 
-    for article in sorted(connections_dir.glob("*.md")):
-        if article.name in ("index.md", "log.md"):
-            continue
-        rel = str(article.relative_to(KNOWLEDGE_DIR))
-        try:
-            text = article.read_text(encoding="utf-8")
-        except OSError:
-            continue
-
-        fm = _read_frontmatter(article)
-
-        # Strip frontmatter for body-level checks (single grammar, C03)
-        body = frontmatter.split_fence(text)[1]
-
+    for art in _in_folder(ctx, "connections"):
         # Rule 1: ≥2 distinct knowledge-tree wikilinks. Endpoint cardinality is
         # a structural property, not an existence one (broken_link owns that),
         # so count lexically without resolving to disk. Substrate citations
         # (daily/raw) are excluded regardless of relative depth — strip any
         # leading `./` / `../` before testing the prefix (`../../daily/…`).
         knowledge_links: set[str] = set()
-        for link in extract_wikilinks(body):
+        for link in extract_wikilinks(art.body):
             target = link_target(link)
             if target.lstrip("./").startswith(("daily/", "raw/")):
                 continue
             knowledge_links.add(target)
         if len(knowledge_links) < 2:
             issues.append(issue(
-                "warning", "connection_under_linked", rel,
+                "warning", "connection_under_linked", art.rel,
                 f"connection article cites only {len(knowledge_links)} distinct "
                 f"knowledge wikilink(s) — a connection MUST name ≥2 endpoints "
                 f"(found: {sorted(knowledge_links)})",
@@ -454,11 +516,11 @@ def check_connection_depth() -> list[dict]:
         # Rule 2: one of tension/mechanism/dependency must be present + non-empty.
         present_kinds = [
             k for k in CONNECTION_KIND_FIELDS
-            if k in fm and fm[k] not in (None, "", [])
+            if k in art.fm and art.fm[k] not in (None, "", [])
         ]
         if not present_kinds:
             issues.append(issue(
-                "warning", "connection_missing_kind", rel,
+                "warning", "connection_missing_kind", art.rel,
                 f"connection article missing a kind discriminator — exactly one of "
                 f"{list(CONNECTION_KIND_FIELDS)} must be present in frontmatter "
                 f"to declare whether this is a mechanism / contrast / hard-dependency",
@@ -466,10 +528,10 @@ def check_connection_depth() -> list[dict]:
             ))
 
         # Rule 3: body word-count ≥ floor.
-        body_word_count = len(body.split())
+        body_word_count = len(art.body.split())
         if body_word_count < min_words:
             issues.append(issue(
-                "warning", "connection_shallow_body", rel,
+                "warning", "connection_shallow_body", art.rel,
                 f"connection article body is {body_word_count} words "
                 f"(minimum {min_words}) — too short to assert a real mechanism / "
                 f"contrast / dependency beyond restating the linked concepts",
@@ -478,7 +540,7 @@ def check_connection_depth() -> list[dict]:
     return issues
 
 
-def check_two_layer_pages() -> list[dict]:
+def check_two_layer_pages(ctx: LintContext) -> list[Issue]:
     """Enforce the two-layer State+Timeline shape for `type: person|project` articles.
 
     Each entity page MUST have: a `## State` heading, a body-level `---` separator
@@ -491,24 +553,15 @@ def check_two_layer_pages() -> list[dict]:
     Reference fixtures: tests/fixtures/two_layer/.
     """
     import re
-    issues: list[dict] = []
+    issues: list[Issue] = []
     entity_folders = (("people", "person"), ("projects", "project"))
     for folder, expected_type in entity_folders:
-        folder_path = KNOWLEDGE_DIR / folder
-        if not folder_path.exists():
-            continue
-        for article in sorted(folder_path.glob("*.md")):
-            if article.name in ("index.md", "log.md"):
-                continue
-            rel = str(article.relative_to(KNOWLEDGE_DIR))
-            fm = _read_frontmatter(article)
-            if fm.get("type") != expected_type:
+        for art in _in_folder(ctx, folder):
+            if art.fm.get("type") != expected_type:
                 # Type-mismatch is caught by check_article_type; don't double-report
                 continue
 
-            text = article.read_text(encoding="utf-8")
-            # Strip frontmatter so we only inspect the body (single grammar, C03)
-            body = frontmatter.split_fence(text)[1]
+            body = art.body
 
             has_state = re.search(r"^## State\s*$", body, re.MULTILINE) is not None
             has_timeline = re.search(r"^## Timeline\s*$", body, re.MULTILINE) is not None
@@ -521,19 +574,19 @@ def check_two_layer_pages() -> list[dict]:
 
             if not has_state:
                 issues.append(issue(
-                    "error", "two_layer_missing_state", rel,
+                    "error", "two_layer_missing_state", art.rel,
                     f"`type: {expected_type}` article missing `## State` section "
                     f"(spec: prompts/compile_main.md Instruction 3)",
                 ))
             if not has_body_separator:
                 issues.append(issue(
-                    "error", "two_layer_missing_body_separator", rel,
+                    "error", "two_layer_missing_body_separator", art.rel,
                     f"`type: {expected_type}` article missing the `---` separator "
                     f"between State and Timeline blocks",
                 ))
             if not has_timeline:
                 issues.append(issue(
-                    "error", "two_layer_missing_timeline", rel,
+                    "error", "two_layer_missing_timeline", art.rel,
                     f"`type: {expected_type}` article missing `## Timeline` section",
                 ))
 
@@ -545,7 +598,7 @@ def check_two_layer_pages() -> list[dict]:
                 for i in range(len(dates) - 1):
                     if dates[i] < dates[i + 1]:
                         issues.append(issue(
-                            "warning", "timeline_not_reverse_chronological", rel,
+                            "warning", "timeline_not_reverse_chronological", art.rel,
                             f"Timeline entries out of order: {dates[i]} before {dates[i + 1]} "
                             f"(newest first expected)",
                         ))
@@ -564,7 +617,7 @@ def check_two_layer_pages() -> list[dict]:
                         continue
                     if not (line.startswith("- [ ]") or line.startswith("- [x]") or line.startswith("- [X]")):
                         issues.append(issue(
-                            "warning", "action_items_malformed", rel,
+                            "warning", "action_items_malformed", art.rel,
                             f"Action Items line does not start with `- [ ]` or `- [x]`: "
                             f"{line[:80]!r}",
                         ))
@@ -572,7 +625,7 @@ def check_two_layer_pages() -> list[dict]:
     return issues
 
 
-def check_action_item_syntax() -> list[dict]:
+def check_action_item_syntax(ctx: LintContext) -> list[Issue]:
     """Validate Obsidian-Tasks-plugin syntax inside `## Action Items` sections
     of entity pages (knowledge/people/ + knowledge/projects/).
 
@@ -582,7 +635,7 @@ def check_action_item_syntax() -> list[dict]:
     structural breaks). One issue per file per rule.
     """
     import re
-    issues: list[dict] = []
+    issues: list[Issue] = []
     entity_folders = (("people", "person"), ("projects", "project"))
     DATE_RE = re.compile(r"📅 (\d{4}-\d{2}-\d{2})(?:\s|$)")
     DATE_PREFIX_RE = re.compile(r"📅 ")
@@ -591,17 +644,10 @@ def check_action_item_syntax() -> list[dict]:
     RECURRENCE_RE = re.compile(r"🔁 \S")
     RECURRENCE_PREFIX_RE = re.compile(r"🔁(?:\s|$)")
     for folder, expected_type in entity_folders:
-        folder_path = KNOWLEDGE_DIR / folder
-        if not folder_path.exists():
-            continue
-        for article in sorted(folder_path.glob("*.md")):
-            if article.name in ("index.md", "log.md"):
+        for art in _in_folder(ctx, folder):
+            if art.fm.get("type") != expected_type:
                 continue
-            rel = str(article.relative_to(KNOWLEDGE_DIR))
-            fm = _read_frontmatter(article)
-            if fm.get("type") != expected_type:
-                continue
-            text = article.read_text(encoding="utf-8")
+            text = art.text
             # Locate ## Action Items section
             ai_match = re.search(r"^## Action Items\s*$", text, re.MULTILINE)
             if not ai_match:
@@ -626,19 +672,19 @@ def check_action_item_syntax() -> list[dict]:
 
             if invalid_date:
                 issues.append(issue(
-                    "warning", "action_item_invalid_due_date", rel,
+                    "warning", "action_item_invalid_due_date", art.rel,
                     "Action Items section contains `📅` without a valid `YYYY-MM-DD` date — "
                     "Obsidian-Tasks-plugin syntax expects `📅 2026-05-20`",
                 ))
             if malformed_priority:
                 issues.append(issue(
-                    "warning", "action_item_malformed_priority", rel,
+                    "warning", "action_item_malformed_priority", art.rel,
                     "Action Items section contains `⏫` not bounded by whitespace — "
                     "must be standalone token, not concatenated to adjacent glyphs",
                 ))
             if empty_recurrence:
                 issues.append(issue(
-                    "warning", "action_item_empty_recurrence", rel,
+                    "warning", "action_item_empty_recurrence", art.rel,
                     "Action Items section contains `🔁` without recurrence content — "
                     "Obsidian-Tasks-plugin syntax expects `🔁 every week` (or similar)",
                 ))
@@ -648,7 +694,7 @@ def check_action_item_syntax() -> list[dict]:
 _VALID_AREA_STATUS = ("active", "dormant", "retired")
 
 
-def check_area_status() -> list[dict]:
+def check_area_status(ctx: LintContext) -> list[Issue]:
     """Validate `status:` frontmatter on `knowledge/areas/` pages.
 
     Areas (`type: area`) are ongoing responsibilities; they carry a
@@ -656,22 +702,15 @@ def check_area_status() -> list[dict]:
     (distinct from project status — areas don't `plan` or `done`).
     Missing status is an error; an unknown enum value is also an error.
     """
-    issues: list[dict] = []
-    areas_dir = KNOWLEDGE_DIR / "areas"
-    if not areas_dir.exists():
-        return issues
-    for article in sorted(areas_dir.glob("*.md")):
-        if article.name in ("index.md", "log.md"):
-            continue
-        rel = str(article.relative_to(KNOWLEDGE_DIR))
-        fm = _read_frontmatter(article)
-        if fm.get("type") != "area":
+    issues: list[Issue] = []
+    for art in _in_folder(ctx, "areas"):
+        if art.fm.get("type") != "area":
             # type mismatch handled by check_article_type; don't double-report
             continue
-        status = fm.get("status")
+        status = art.fm.get("status")
         if not status:
             issues.append(issue(
-                "error", "area_missing_status", rel,
+                "error", "area_missing_status", art.rel,
                 f"`type: area` article missing `status:` frontmatter "
                 f"(must be one of {list(_VALID_AREA_STATUS)})",
                 auto_fixable=True,
@@ -679,30 +718,29 @@ def check_area_status() -> list[dict]:
             continue
         if status not in _VALID_AREA_STATUS:
             issues.append(issue(
-                "error", "area_invalid_status", rel,
+                "error", "area_invalid_status", art.rel,
                 f"`status: {status!r}` is not a valid area status. "
                 f"Allowed: {list(_VALID_AREA_STATUS)}.",
             ))
     return issues
 
 
-def check_sparse_articles() -> list[dict]:
-    """Find articles with fewer than SPARSE_THRESHOLD words."""
+def check_sparse_articles(ctx: LintContext) -> list[Issue]:
+    """Find articles with fewer than SPARSE_THRESHOLD words (frontmatter excluded)."""
     issues = []
-    for article in list_wiki_articles():
-        if _is_fact(article):
+    for art in ctx.articles:
+        if art.rel.startswith("facts/"):
             continue  # facts may legitimately be terse
-        word_count = get_article_word_count(article)
+        word_count = len(art.body.split())
         if word_count < SPARSE_THRESHOLD:
-            rel = str(article.relative_to(KNOWLEDGE_DIR))
             issues.append(issue(
-                "suggestion", "sparse_article", rel,
+                "suggestion", "sparse_article", art.rel,
                 f"Sparse article: {word_count} words (minimum recommended: {SPARSE_THRESHOLD})",
             ))
     return issues
 
 
-def check_daily_consistency() -> list[dict]:
+def check_daily_consistency(ctx: LintContext) -> list[Issue]:
     """Verify the daily/-rollup invariants (post-2026-05-15 architecture).
 
     Two structural rules — both warnings, neither blocks:
@@ -723,8 +761,8 @@ def check_daily_consistency() -> list[dict]:
     """
     import re
     from datetime import date as _date
-    issues: list[dict] = []
-    daily_root = ROOT_DIR / "daily"
+    issues: list[Issue] = []
+    daily_root = ctx.vault / "daily"
     if not daily_root.is_dir():
         return issues
 
@@ -811,50 +849,46 @@ def _superseded_by_fact(art_fm: dict, slug: str) -> bool:
     return ref.rsplit("/", 1)[-1].removesuffix(".md") == slug
 
 
-def check_facts_violations() -> list[dict]:
+def check_facts_violations(ctx: LintContext) -> list[Issue]:
     """For each hard fact with negation_terms, grep all non-facts knowledge files for hits.
 
-    Each hit is a `warning` issue: an article asserts something a hard fact negates.
-    Disambiguation/clarification facts contribute no structural lint hits — those drift
-    cases need the LLM contradiction check (or the agentic correct-apply processor).
-    An article already annotated `status: superseded` by the fact is not re-flagged.
+    Each hit is a `warning` issue carrying the fact's slug in the structured
+    `fact_slug` payload (consumers — `wiki reconcile` — group on that field,
+    never on the prose detail): an article asserts something a hard fact
+    negates. Disambiguation/clarification facts contribute no structural lint
+    hits — those drift cases need the LLM contradiction check (or the agentic
+    correct-apply processor). An article already annotated `status: superseded`
+    by the fact is not re-flagged.
     """
-    issues: list[dict] = []
-    if not (KNOWLEDGE_DIR / "facts").exists():
-        return issues
+    issues: list[Issue] = []
 
     facts_with_terms: list[tuple[str, str, list[str]]] = []  # (slug, status, terms)
-    for fact in sorted((KNOWLEDGE_DIR / "facts").glob("*.md")):
-        fm = _read_frontmatter(fact)
-        terms = fm.get("negation_terms") or []
+    for fact in _in_folder(ctx, "facts"):
+        terms = fact.fm.get("negation_terms") or []
         if not isinstance(terms, list):
             continue
         terms = [t for t in terms if isinstance(t, str) and t.strip()]
         if not terms:
             continue
-        status = str(fm.get("status", "negation"))
-        facts_with_terms.append((fact.stem, status, terms))
+        status = str(fact.fm.get("status", "negation"))
+        facts_with_terms.append((fact.path.stem, status, terms))
 
     if not facts_with_terms:
         return issues
 
-    for article in list_wiki_articles():
-        if _is_fact(article):
+    for art in ctx.articles:
+        if art.rel.startswith("facts/"):
             continue
-        rel = str(article.relative_to(KNOWLEDGE_DIR))
-        try:
-            content_lower = article.read_text(encoding="utf-8").lower()
-        except OSError:
-            continue
-        art_fm = _read_frontmatter(article)
+        content_lower = art.text.lower()
         for slug, status, terms in facts_with_terms:
-            if _superseded_by_fact(art_fm, slug):
+            if _superseded_by_fact(art.fm, slug):
                 continue  # already annotated as superseded by this fact
             for term in terms:
                 if term.lower() in content_lower:
                     issues.append(issue(
-                        "warning", "fact_violation", rel,
+                        "warning", "fact_violation", art.rel,
                         f"Article contains negation term {term!r} from hard fact `facts/{slug}` (status: {status}). Reconcile manually or via `wiki correct apply {slug}`.",
+                        fact_slug=slug,
                     ))
     return issues
 
@@ -868,7 +902,7 @@ _TAKE_LINE_RE = _re_takes.compile(
 )
 
 
-def check_takes_consistency() -> list[dict]:
+def check_takes_consistency(ctx: LintContext) -> list[Issue]:
     """Validate `knowledge/takes/*.md` shape (M011, v1 — shape-only).
 
     Per-file checks:
@@ -877,36 +911,25 @@ def check_takes_consistency() -> list[dict]:
       - Every body line that starts with `- **` matches the canonical
         take regex; malformed lines surface as warnings.
     """
-    issues: list[dict] = []
-    takes_dir = KNOWLEDGE_DIR / "takes"
-    if not takes_dir.exists():
-        return issues
-
-    for md in sorted(takes_dir.glob("*.md")):
-        rel = str(md.relative_to(KNOWLEDGE_DIR))
-        fm = _read_frontmatter(md)
-        if fm.get("type") != "takes":
+    issues: list[Issue] = []
+    for art in _in_folder(ctx, "takes"):
+        if art.fm.get("type") != "takes":
             issues.append(issue(
-                "error", "takes_frontmatter_type", rel,
+                "error", "takes_frontmatter_type", art.rel,
                 "Takes file must carry `type: takes` in frontmatter.",
             ))
-        holder = fm.get("holder")
+        holder = art.fm.get("holder")
         if not holder or not str(holder).strip():
             issues.append(issue(
-                "error", "takes_frontmatter_holder_missing", rel,
+                "error", "takes_frontmatter_holder_missing", art.rel,
                 "Takes file must carry a non-empty `holder:` field in frontmatter.",
             ))
-        try:
-            text = md.read_text(encoding="utf-8")
-        except OSError:
-            continue
-        body = frontmatter.split_fence(text)[1]
-        for lineno, line in enumerate(body.splitlines(), start=1):
+        for lineno, line in enumerate(art.body.splitlines(), start=1):
             if not line.startswith("- **"):
                 continue
             if not _TAKE_LINE_RE.match(line):
                 issues.append(issue(
-                    "warning", "takes_line_malformed", rel,
+                    "warning", "takes_line_malformed", art.rel,
                     f"Line {lineno} does not match canonical take shape: {line[:120]}",
                 ))
     return issues
@@ -917,7 +940,7 @@ def check_takes_consistency() -> list[dict]:
 from core.compile_role import VALID_ROLES as _COMPILE_ROLE_VALID  # noqa: E402
 
 
-def check_domain_value() -> list[dict]:
+def check_domain_value(ctx: LintContext) -> list[Issue]:
     """Warn on `domain:` frontmatter values outside CONFIG.personal.domains.
 
     Optional axis (M013). When `domain:` is set on a knowledge/ article, it
@@ -930,21 +953,19 @@ def check_domain_value() -> list[dict]:
 
     Spec: `.ytstack/backlog/domain-frontmatter.md`.
     """
-    issues: list[dict] = []
+    issues: list[Issue] = []
     domains_cfg = getattr(CONFIG.personal, "domains", None) or []
     valid = {d for d in domains_cfg if isinstance(d, str)}
     if not valid:
         return issues
-    for article in list_wiki_articles():
-        fm = _read_frontmatter(article)
-        value = fm.get("domain")
+    for art in ctx.articles:
+        value = art.fm.get("domain")
         if value is None:
             continue
         if not isinstance(value, str) or value not in valid:
-            rel = str(article.relative_to(KNOWLEDGE_DIR))
             allowed = ", ".join(sorted(valid))
             issues.append(issue(
-                "warning", "domain_invalid_value", rel,
+                "warning", "domain_invalid_value", art.rel,
                 f"`domain: {value!r}` is not in CONFIG.personal.domains "
                 f"({allowed}). Fix the value, or add it to config.yaml "
                 f"under `personal.domains:`.",
@@ -952,7 +973,24 @@ def check_domain_value() -> list[dict]:
     return issues
 
 
-def check_compile_role() -> list[dict]:
+def _iter_vault_frontmatters(ctx: LintContext):
+    """Yield ``(vault_rel, fm)`` for every `.md` under raw/, daily/, inbox/
+    (walked + parsed here) and knowledge/ (reused from the corpus model —
+    no second knowledge read)."""
+    for root in (ctx.vault / "raw", ctx.vault / "daily", ctx.vault / "inbox"):
+        if not root.exists():
+            continue
+        for md in root.rglob("*.md"):
+            yield str(md.relative_to(ctx.vault)), _read_frontmatter(md)
+    for art in ctx.articles:
+        try:
+            rel = art.path.relative_to(ctx.vault).as_posix()
+        except ValueError:
+            rel = f"knowledge/{art.rel}"
+        yield rel, art.fm
+
+
+def check_compile_role(ctx: LintContext) -> list[Issue]:
     """Reject frontmatter `compile_role:` values not in VALID_ROLES.
 
     Walks every `.md` under raw/, daily/, knowledge/, inbox/. Files that omit
@@ -963,29 +1001,22 @@ def check_compile_role() -> list[dict]:
     top-level boundaries without explicit override) is deferred — needs
     git-history walk, tracked as follow-up.
     """
-    issues: list[dict] = []
-    inbox_dir = ROOT_DIR / "inbox"
-    roots = [RAW_DIR, DAILY_DIR, KNOWLEDGE_DIR, inbox_dir]
-    for root in roots:
-        if not root.exists():
+    issues: list[Issue] = []
+    for rel, fm in _iter_vault_frontmatters(ctx):
+        role = fm.get("compile_role")
+        if role is None:
             continue
-        for md in root.rglob("*.md"):
-            fm = _read_frontmatter(md)
-            role = fm.get("compile_role")
-            if role is None:
-                continue
-            if role not in _COMPILE_ROLE_VALID:
-                rel = str(md.relative_to(ROOT_DIR))
-                valid_list = ", ".join(sorted(_COMPILE_ROLE_VALID))
-                issues.append(issue(
-                    "error", "compile_role_invalid", rel,
-                    f"`compile_role: {role!r}` is not a valid value. "
-                    f"Allowed: {valid_list}.",
-                ))
+        if role not in _COMPILE_ROLE_VALID:
+            valid_list = ", ".join(sorted(_COMPILE_ROLE_VALID))
+            issues.append(issue(
+                "error", "compile_role_invalid", rel,
+                f"`compile_role: {role!r}` is not a valid value. "
+                f"Allowed: {valid_list}.",
+            ))
     return issues
 
 
-def check_author_required_on_source_and_final() -> list[dict]:
+def check_author_required_on_source_and_final(ctx: LintContext) -> list[Issue]:
     """`compile_role: source-and-final` pages MUST carry `author:` frontmatter.
 
     Provenance protection: when operator-personal content sits in
@@ -999,27 +1030,20 @@ def check_author_required_on_source_and_final() -> list[dict]:
     persoenlichen texte irgendwann einfach rausgefiltert werden oder
     unbedeutend werden". Lint is the enforcement surface.)
     """
-    issues: list[dict] = []
-    inbox_dir = ROOT_DIR / "inbox"
-    roots = [RAW_DIR, DAILY_DIR, KNOWLEDGE_DIR, inbox_dir]
-    for root in roots:
-        if not root.exists():
+    issues: list[Issue] = []
+    for rel, fm in _iter_vault_frontmatters(ctx):
+        if fm.get("compile_role") != "source-and-final":
             continue
-        for md in root.rglob("*.md"):
-            fm = _read_frontmatter(md)
-            if fm.get("compile_role") != "source-and-final":
-                continue
-            if not fm.get("author"):
-                rel = str(md.relative_to(ROOT_DIR))
-                issues.append(issue(
-                    "error", "source_and_final_missing_author", rel,
-                    "`compile_role: source-and-final` requires an `author:` "
-                    "frontmatter field. Without it, operator-authored content "
-                    "is indistinguishable from compile-output and can drown "
-                    "in the noise. Add `author: <name>` (or set "
-                    "`personal.implicit_operator_author` and operator-author "
-                    "files inherit it).",
-                ))
+        if not fm.get("author"):
+            issues.append(issue(
+                "error", "source_and_final_missing_author", rel,
+                "`compile_role: source-and-final` requires an `author:` "
+                "frontmatter field. Without it, operator-authored content "
+                "is indistinguishable from compile-output and can drown "
+                "in the noise. Add `author: <name>` (or set "
+                "`personal.implicit_operator_author` and operator-author "
+                "files inherit it).",
+            ))
     return issues
 
 
@@ -1030,7 +1054,7 @@ from core.sdk_helpers import StderrCapture, log_sdk_failure  # noqa: E402
 import time as _time  # noqa: E402
 
 
-async def check_contradictions() -> list[dict]:
+async def check_contradictions() -> list[Issue]:
     """Use an LLM to find contradictions between articles."""
     wiki_content = read_all_wiki_content()
     if not wiki_content.strip():
@@ -1092,12 +1116,12 @@ async def check_contradictions() -> list[dict]:
 
 # ── Report generation ────────────────────────────────────────────────
 
-def generate_report(all_issues: list[dict]) -> str:
+def generate_report(all_issues: list[Issue]) -> str:
     """Generate a markdown lint report."""
-    errors = [i for i in all_issues if i["severity"] == "error"]
-    warnings = [i for i in all_issues if i["severity"] == "warning"]
-    suggestions = [i for i in all_issues if i["severity"] == "suggestion"]
-    auto_fixable = [i for i in all_issues if i.get("auto_fixable")]
+    errors = [i for i in all_issues if i.severity == "error"]
+    warnings = [i for i in all_issues if i.severity == "warning"]
+    suggestions = [i for i in all_issues if i.severity == "suggestion"]
+    auto_fixable = [i for i in all_issues if i.auto_fixable]
 
     lines = [
         f"# Lint Report — {today_iso()}",
@@ -1119,8 +1143,8 @@ def generate_report(all_issues: list[dict]) -> str:
             lines.append(f"## {severity}")
             lines.append("")
             for i in items:
-                fixable = " *(auto-fixable)*" if i.get("auto_fixable") else ""
-                lines.append(f"- **[{marker}]** `{i['file']}` — {i['detail']}{fixable}")
+                fixable = " *(auto-fixable)*" if i.auto_fixable else ""
+                lines.append(f"- **[{marker}]** `{i.file}` — {i.detail}{fixable}")
             lines.append("")
 
     if not all_issues:
@@ -1128,6 +1152,31 @@ def generate_report(all_issues: list[dict]) -> str:
         lines.append("")
 
     return "\n".join(lines)
+
+
+# ── Check registry ───────────────────────────────────────────────────
+
+# name → check(ctx). Registration order is run/report order.
+CHECKS: list[tuple[str, Callable[[LintContext], list[Issue]]]] = [
+    ("Broken links", check_broken_links),
+    ("Orphan pages", check_orphan_pages),
+    ("Orphan sources", check_orphan_sources),
+    ("Stale articles", check_stale_articles),
+    ("Article type", check_article_type),
+    ("QA schema", check_qa_schema),
+    ("Concept domain tag", check_concept_domain_tag),
+    ("Connection depth", check_connection_depth),
+    ("Two-layer pages", check_two_layer_pages),
+    ("Action item syntax", check_action_item_syntax),
+    ("Area status", check_area_status),
+    ("Daily consistency", check_daily_consistency),
+    ("Sparse articles", check_sparse_articles),
+    ("Facts violations", check_facts_violations),
+    ("Compile role enum", check_compile_role),
+    ("Source-and-final author required", check_author_required_on_source_and_final),
+    ("Domain value enum", check_domain_value),
+    ("Takes consistency", check_takes_consistency),
+]
 
 
 # ── Main ─────────────────────────────────────────────────────────────
@@ -1160,34 +1209,15 @@ async def main() -> None:
 
     log.info("Starting lint (structural_only=%s)", args.structural_only)
 
-    all_issues: list[dict] = []
+    ctx = build_context()
+    log.info("Corpus context built: %d article(s)", len(ctx.articles))
 
-    checks = [
-        ("Broken links", check_broken_links),
-        ("Orphan pages", check_orphan_pages),
-        ("Orphan sources", check_orphan_sources),
-        ("Stale articles", check_stale_articles),
-        ("Missing backlinks", check_missing_backlinks),
-        ("Article type", check_article_type),
-        ("QA schema", check_qa_schema),
-        ("Concept domain tag", check_concept_domain_tag),
-        ("Connection depth", check_connection_depth),
-        ("Two-layer pages", check_two_layer_pages),
-        ("Action item syntax", check_action_item_syntax),
-        ("Area status", check_area_status),
-        ("Daily consistency", check_daily_consistency),
-        ("Sparse articles", check_sparse_articles),
-        ("Facts violations", check_facts_violations),
-        ("Compile role enum", check_compile_role),
-        ("Source-and-final author required", check_author_required_on_source_and_final),
-        ("Domain value enum", check_domain_value),
-        ("Takes consistency", check_takes_consistency),
-    ]
+    all_issues: list[Issue] = []
 
-    for name, check_fn in checks:
+    for name, check_fn in CHECKS:
         log.info("Checking: %s...", name)
         try:
-            issues = check_fn()
+            issues = check_fn(ctx)
         except Exception as exc:  # noqa: BLE001 — one bad check must not abort the run
             log.exception("Check %r crashed: %s", name, exc)
             all_issues.append(issue(
@@ -1219,9 +1249,9 @@ async def main() -> None:
     save_state(state)
 
     # Summary
-    errors = sum(1 for i in all_issues if i["severity"] == "error")
-    warnings = sum(1 for i in all_issues if i["severity"] == "warning")
-    suggestions = sum(1 for i in all_issues if i["severity"] == "suggestion")
+    errors = sum(1 for i in all_issues if i.severity == "error")
+    warnings = sum(1 for i in all_issues if i.severity == "warning")
+    suggestions = sum(1 for i in all_issues if i.severity == "suggestion")
     print(f"\nResults: {errors} errors, {warnings} warnings, {suggestions} suggestions")
 
     if errors > 0:

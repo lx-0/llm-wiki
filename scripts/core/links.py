@@ -7,15 +7,17 @@ writes `[[concepts/foo]]` points at the non-existent `<vault>/concepts/foo.md`
 and Obsidian offers to create an empty stub. The fix: every link is rewritten
 to `os.path.relpath(target, source.parent)`.
 
-This module owns four operations, used across the engine so they never drift:
+This module owns five operations, used across the engine so they never drift:
 
 - ``resolve_link``      — locate the real file a link target points at.
 - ``canonical_slug``    — the knowledge-relative id of an article (``concepts/foo``).
 - ``relative_target``   — render a resolved file as a path relative to a source.
 - ``relativize_text``   — rewrite every link in an article to relative form.
+- ``retarget_links``    — THE wikilink rewriter every retargeting flow goes through.
 
 Consumers: the corpus relativize pass (`compile` post-pass + migration CLI),
-the backlinks footer pass (`core.backlinks`), and lint's link checks.
+the backlinks footer pass (`core.backlinks`), lint's link checks, and the three
+retargeting flows (`rename_article`, `links_audit --fix`, `dedup` merge).
 """
 
 from __future__ import annotations
@@ -23,6 +25,7 @@ from __future__ import annotations
 import os
 import re
 from pathlib import Path
+from typing import Callable
 
 # `[[target]]`, `![[target]]`, with optional `#heading` and `|alias`.
 # Groups: 1=bang 2=target 3=heading(incl #) 4=alias(incl |)
@@ -210,10 +213,51 @@ def outgoing_canonical_slugs(
     return slugs
 
 
+def retarget_links(text: str, rewrite: Callable[[str], str | None]) -> tuple[str, int]:
+    """THE wikilink rewriter (C04). Every retargeting flow — `rename_article`,
+    `links_audit --fix`, the `dedup` merge — goes through this one function so
+    the fragile mechanics live in exactly one place: frontmatter + code fences
+    are masked (links there are never rewritten), and the embed-bang, `#anchor`,
+    table-escaped ``\\|`` and ``|alias`` decorations are preserved verbatim.
+
+    ``rewrite`` receives each CLEAN target (anchor/alias/escape stripped) and
+    returns the replacement target string, or None to keep the link unchanged.
+    Matching policy (resolve-to-file vs literal string) and walker policy
+    (index.md in or out) stay caller-side — those are deliberate behavioural
+    differences between the three flows, not drift.
+
+    Returns ``(new_text, links_changed)``.
+    """
+    changed = 0
+    out: list[str] = []
+    for _, line, live in _strip_frontmatter_and_fences(text.split("\n")):
+        if not live:
+            out.append(line)
+            continue
+
+        def _sub(m: re.Match) -> str:
+            nonlocal changed
+            bang, target, heading, alias = m.groups()
+            clean, esc = strip_table_escape(target, alias)
+            new_target = rewrite(clean)
+            if new_target is None or new_target == clean:
+                return m.group(0)
+            changed += 1
+            return f"{bang}[[{new_target}{heading or ''}{esc}{alias or ''}]]"
+
+        out.append(WIKILINK_RE.sub(_sub, line))
+    return "\n".join(out), changed
+
+
 def iter_articles(knowledge_dir: Path):
-    """Every `.md` under ``knowledge_dir`` except `index.md` (the catalog —
-    its links already resolve source-relative from `knowledge/`) and hidden
-    files. Mirrors `core.backlinks`'s walk."""
+    """THE canonical article enumeration (C04): every `.md` under
+    ``knowledge_dir`` — recursive, so `MOCs/` and any future bucket are
+    included — except the root `index.md` (the catalog; its links already
+    resolve source-relative from `knowledge/`) and hidden files.
+
+    `core.backlinks`, `core.utils.list_wiki_articles` (lint / dashboards /
+    compile stats), `links_audit`, and the relativize pass all walk through
+    this one generator; corpus membership is answered exactly once."""
     for path in knowledge_dir.rglob("*.md"):
         if path.name == "index.md" and path.parent == knowledge_dir:
             continue
@@ -269,27 +313,16 @@ def rename_article(old: Path, new: Path, knowledge_dir: Path, vault: Path) -> di
             text = src.read_text(encoding="utf-8")
         except OSError:
             continue
-        changed = False
-        out: list[str] = []
-        for _, line, live in _strip_frontmatter_and_fences(text.split("\n")):
-            if not live:
-                out.append(line)
-                continue
 
-            def _sub(m: re.Match, _src: Path = src) -> str:
-                nonlocal changed
-                bang, target, heading, alias = m.groups()
-                t, esc = strip_table_escape(target, alias)
-                resolved = resolve_link(t, _src, vault)
-                if resolved is not None and resolved.resolve() == old_resolved:
-                    changed = True
-                    new_target = relative_target(new_resolved, _src, has_ext(t))
-                    return f"{bang}[[{new_target}{heading or ''}{esc}{alias or ''}]]"
-                return m.group(0)
+        def _rewrite(target: str, _src: Path = src) -> str | None:
+            resolved = resolve_link(target, _src, vault)
+            if resolved is not None and resolved.resolve() == old_resolved:
+                return relative_target(new_resolved, _src, has_ext(target))
+            return None
 
-            out.append(WIKILINK_RE.sub(_sub, line))
+        new_text, changed = retarget_links(text, _rewrite)
         if changed:
-            pending.append((src, "\n".join(out)))
+            pending.append((src, new_text))
 
     new.parent.mkdir(parents=True, exist_ok=True)
     old.rename(new)

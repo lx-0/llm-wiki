@@ -10,12 +10,10 @@ Covers:
     a domain tag
 
 Strategy mirrors `tests/test_two_layer_lint.py`: build a fake
-`knowledge/` tree under tmp_path, monkeypatch `lint.KNOWLEDGE_DIR`,
+`knowledge/` tree under tmp_path, build a LintContext over it,
 invoke the check, assert issue codes.
 """
 from __future__ import annotations
-
-from pathlib import Path
 
 import pytest
 
@@ -124,37 +122,36 @@ depth and the wikilink endpoints are both present already.
 
 
 @pytest.fixture
-def with_knowledge(tmp_path, monkeypatch):
-    """Materialise a fake knowledge/ tree and point lint at it."""
-    def _setup(files: dict[str, str]) -> Path:
+def with_knowledge(tmp_path):
+    """Materialise a fake knowledge/ tree and build a LintContext over it."""
+    def _setup(files: dict[str, str]) -> lint.LintContext:
         knowledge = tmp_path / "knowledge"
         for rel, content in files.items():
             target = knowledge / rel
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(content, encoding="utf-8")
-        monkeypatch.setattr(lint, "KNOWLEDGE_DIR", knowledge)
-        return knowledge
+        return lint.build_context(vault=tmp_path, knowledge_dir=knowledge, state={})
     return _setup
 
 
-def _codes_for_file(issues: list[dict], rel: str) -> set[str]:
-    return {i["check"] for i in issues if i["file"] == rel}
+def _codes_for_file(issues: list[lint.Issue], rel: str) -> set[str]:
+    return {i.check for i in issues if i.file == rel}
 
 
 # ── check_connection_depth ─────────────────────────────────────────
 
 
 def test_good_connection_passes_depth_check(with_knowledge):
-    with_knowledge({"connections/good.md": GOOD_CONNECTION})
-    issues = lint.check_connection_depth()
+    ctx = with_knowledge({"connections/good.md": GOOD_CONNECTION})
+    issues = lint.check_connection_depth(ctx)
     assert _codes_for_file(issues, "connections/good.md") == set(), (
         f"Expected no issues for good connection, got: {issues}"
     )
 
 
 def test_shallow_cooccurrence_fails_depth_check(with_knowledge):
-    with_knowledge({"connections/shallow.md": SHALLOW_COOCCURRENCE})
-    issues = lint.check_connection_depth()
+    ctx = with_knowledge({"connections/shallow.md": SHALLOW_COOCCURRENCE})
+    issues = lint.check_connection_depth(ctx)
     codes = _codes_for_file(issues, "connections/shallow.md")
     # Co-occurrence article cites only one knowledge wikilink AND has no
     # mechanism/tension/dependency frontmatter AND has very short body.
@@ -164,8 +161,8 @@ def test_shallow_cooccurrence_fails_depth_check(with_knowledge):
 
 
 def test_missing_kind_frontmatter_fails(with_knowledge):
-    with_knowledge({"connections/no_kind.md": MISSING_KIND})
-    issues = lint.check_connection_depth()
+    ctx = with_knowledge({"connections/no_kind.md": MISSING_KIND})
+    issues = lint.check_connection_depth(ctx)
     codes = _codes_for_file(issues, "connections/no_kind.md")
     assert "connection_missing_kind" in codes
     # Body has two distinct wikilinks and >50 words — only the kind field is missing.
@@ -174,8 +171,8 @@ def test_missing_kind_frontmatter_fails(with_knowledge):
 
 
 def test_short_body_fails_word_count_gate(with_knowledge):
-    with_knowledge({"connections/short.md": SHORT_BODY})
-    issues = lint.check_connection_depth()
+    ctx = with_knowledge({"connections/short.md": SHORT_BODY})
+    issues = lint.check_connection_depth(ctx)
     codes = _codes_for_file(issues, "connections/short.md")
     assert "connection_shallow_body" in codes
 
@@ -188,8 +185,8 @@ def test_tension_field_accepted_as_kind(with_knowledge):
         'mechanism: "A2A\'s task-state model provides the inter-agent dispatch primitive that the work-orchestration gap had identified as missing."',
         'tension: "A2A spec assumes a single dispatcher, but Fleet\'s work-orchestration model requires multiple."',
     )
-    with_knowledge({"connections/tension.md": article})
-    issues = lint.check_connection_depth()
+    ctx = with_knowledge({"connections/tension.md": article})
+    issues = lint.check_connection_depth(ctx)
     assert "connection_missing_kind" not in _codes_for_file(
         issues, "connections/tension.md"
     )
@@ -200,8 +197,8 @@ def test_dependency_field_accepted_as_kind(with_knowledge):
         'mechanism: "A2A\'s task-state model provides the inter-agent dispatch primitive that the work-orchestration gap had identified as missing."',
         'dependency: "Work orchestration cannot ship until A2A is in place."',
     )
-    with_knowledge({"connections/dep.md": article})
-    issues = lint.check_connection_depth()
+    ctx = with_knowledge({"connections/dep.md": article})
+    issues = lint.check_connection_depth(ctx)
     assert "connection_missing_kind" not in _codes_for_file(
         issues, "connections/dep.md"
     )
@@ -226,8 +223,8 @@ tags: [fleet]
 relationship worth tracking in detail across multiple coming weeks, but
 for now the substrate citations are all we have to anchor it.
 """
-    with_knowledge({"connections/sub.md": article})
-    issues = lint.check_connection_depth()
+    ctx = with_knowledge({"connections/sub.md": article})
+    issues = lint.check_connection_depth(ctx)
     codes = _codes_for_file(issues, "connections/sub.md")
     assert "connection_under_linked" in codes
 
@@ -235,12 +232,12 @@ for now the substrate citations are all we have to anchor it.
 def test_index_and_log_files_are_skipped(with_knowledge):
     """`connections/index.md` and `connections/log.md` are meta-files, not
     connection articles — they must not trigger the depth check."""
-    with_knowledge({
+    ctx = with_knowledge({
         "connections/index.md": "# Index\n",
         "connections/log.md": "# Log\n",
     })
-    issues = lint.check_connection_depth()
-    rels = {i["file"] for i in issues}
+    issues = lint.check_connection_depth(ctx)
+    rels = {i.file for i in issues}
     assert "connections/index.md" not in rels
     assert "connections/log.md" not in rels
 
@@ -251,8 +248,8 @@ def test_index_and_log_files_are_skipped(with_knowledge):
 def test_concept_without_domain_tag_still_flagged(with_knowledge):
     """Regression: extending the check to walk connections/ must NOT break
     the original concept walk."""
-    with_knowledge({"concepts/orphan.md": CONCEPT_NO_DOMAIN_TAG})
-    issues = lint.check_concept_domain_tag()
+    ctx = with_knowledge({"concepts/orphan.md": CONCEPT_NO_DOMAIN_TAG})
+    issues = lint.check_concept_domain_tag(ctx)
     codes = _codes_for_file(issues, "concepts/orphan.md")
     assert "concept_no_domain_tag" in codes
 
@@ -260,8 +257,8 @@ def test_concept_without_domain_tag_still_flagged(with_knowledge):
 def test_connection_without_domain_tag_now_flagged(with_knowledge):
     """Extension: connection without a domain tag should fire the same
     issue code (`concept_no_domain_tag` — kept for backwards-compat)."""
-    with_knowledge({"connections/no_tag.md": CONNECTION_NO_DOMAIN_TAG})
-    issues = lint.check_concept_domain_tag()
+    ctx = with_knowledge({"connections/no_tag.md": CONNECTION_NO_DOMAIN_TAG})
+    issues = lint.check_concept_domain_tag(ctx)
     codes = _codes_for_file(issues, "connections/no_tag.md")
     assert "concept_no_domain_tag" in codes
 
@@ -269,7 +266,7 @@ def test_connection_without_domain_tag_now_flagged(with_knowledge):
 def test_good_connection_has_no_domain_tag_issue(with_knowledge):
     """The GOOD_CONNECTION fixture carries `tags: [fleet]` — must not fire
     the domain-tag check."""
-    with_knowledge({"connections/good.md": GOOD_CONNECTION})
-    issues = lint.check_concept_domain_tag()
+    ctx = with_knowledge({"connections/good.md": GOOD_CONNECTION})
+    issues = lint.check_concept_domain_tag(ctx)
     codes = _codes_for_file(issues, "connections/good.md")
     assert "concept_no_domain_tag" not in codes

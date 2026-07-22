@@ -1,7 +1,7 @@
 """Tests for the takes substrate (M011 — third-party belief attribution).
 
 Covers:
-- TAKES_DIR / WIKI_SUBDIRS / FOLDER_TO_TYPE wiring
+- TAKES_DIR / canonical-enumeration / FOLDER_TO_TYPE wiring
 - slug normalisation
 - first-touch file creation has the expected frontmatter shape
 - idempotent add (refuse exact duplicate)
@@ -28,10 +28,15 @@ def test_takes_dir_declared_and_under_knowledge() -> None:
     assert paths.TAKES_DIR == paths.KNOWLEDGE_DIR / "takes"
 
 
-def test_wiki_subdirs_includes_takes() -> None:
+def test_canonical_enumeration_includes_takes(tmp_path: Path) -> None:
     from core import utils
-    from core.paths import TAKES_DIR
-    assert TAKES_DIR in utils.WIKI_SUBDIRS, "WIKI_SUBDIRS must include TAKES_DIR"
+    # Canonical enumeration (C04): list_wiki_articles walks knowledge/
+    # recursively, so takes/ files are corpus members.
+    knowledge = tmp_path / "knowledge"
+    (knowledge / "takes").mkdir(parents=True)
+    md = knowledge / "takes" / "jane.md"
+    md.write_text("---\ntype: takes\nholder: jane\n---\n", encoding="utf-8")
+    assert md in utils.list_wiki_articles(knowledge)
 
 
 def test_lint_folder_to_type_maps_takes() -> None:
@@ -244,21 +249,20 @@ def test_add_belief_gets_trailing_period(monkeypatch: pytest.MonkeyPatch, tmp_pa
 # ── lint.check_takes_consistency ─────────────────────────────────────
 
 
-def _patch_lint(monkeypatch: pytest.MonkeyPatch, knowledge_dir: Path) -> None:
-    """Point lint.py at a fake knowledge/ root."""
+def _ctx(knowledge_dir: Path):
+    """LintContext over a fake knowledge/ root."""
     import lint
-    from core import paths
 
-    monkeypatch.setattr(paths, "KNOWLEDGE_DIR", knowledge_dir)
-    monkeypatch.setattr(lint, "KNOWLEDGE_DIR", knowledge_dir)
+    return lint.build_context(
+        vault=knowledge_dir.parent, knowledge_dir=knowledge_dir, state={}
+    )
 
 
 def test_lint_takes_clean_when_dir_absent(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     import lint
     knowledge = tmp_path / "knowledge"
     knowledge.mkdir(parents=True)
-    _patch_lint(monkeypatch, knowledge)
-    assert lint.check_takes_consistency() == []
+    assert lint.check_takes_consistency(_ctx(knowledge)) == []
 
 
 def test_lint_takes_passes_canonical_file(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -279,8 +283,7 @@ def test_lint_takes_passes_canonical_file(monkeypatch: pytest.MonkeyPatch, tmp_p
         "- **2026-04-16** [medium] · `daily/2026-04-16.md` — Another belief.\n",
         encoding="utf-8",
     )
-    _patch_lint(monkeypatch, knowledge)
-    assert lint.check_takes_consistency() == []
+    assert lint.check_takes_consistency(_ctx(knowledge)) == []
 
 
 def test_lint_takes_flags_missing_type(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -295,9 +298,8 @@ def test_lint_takes_flags_missing_type(monkeypatch: pytest.MonkeyPatch, tmp_path
         "- **2026-04-15** [high] · `daily/x.md` — Body content.\n",
         encoding="utf-8",
     )
-    _patch_lint(monkeypatch, knowledge)
-    issues = lint.check_takes_consistency()
-    checks = {i["check"] for i in issues}
+    issues = lint.check_takes_consistency(_ctx(knowledge))
+    checks = {i.check for i in issues}
     assert "takes_frontmatter_type" in checks
 
 
@@ -313,9 +315,8 @@ def test_lint_takes_flags_missing_holder(monkeypatch: pytest.MonkeyPatch, tmp_pa
         "- **2026-04-15** [high] · `daily/x.md` — Body content.\n",
         encoding="utf-8",
     )
-    _patch_lint(monkeypatch, knowledge)
-    issues = lint.check_takes_consistency()
-    checks = {i["check"] for i in issues}
+    issues = lint.check_takes_consistency(_ctx(knowledge))
+    checks = {i.check for i in issues}
     assert "takes_frontmatter_holder_missing" in checks
 
 
@@ -334,11 +335,10 @@ def test_lint_takes_flags_malformed_line(monkeypatch: pytest.MonkeyPatch, tmp_pa
         "- **bad-date** [low] · `daily/x.md` — Bad date.\n",
         encoding="utf-8",
     )
-    _patch_lint(monkeypatch, knowledge)
-    issues = lint.check_takes_consistency()
-    malformed = [i for i in issues if i["check"] == "takes_line_malformed"]
+    issues = lint.check_takes_consistency(_ctx(knowledge))
+    malformed = [i for i in issues if i.check == "takes_line_malformed"]
     assert len(malformed) == 2
-    assert all(i["severity"] == "warning" for i in malformed)
+    assert all(i.severity == "warning" for i in malformed)
 
 
 def test_lint_takes_ignores_non_take_bullets(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -357,5 +357,4 @@ def test_lint_takes_ignores_non_take_bullets(monkeypatch: pytest.MonkeyPatch, tm
         "- **2026-04-15** [high] · `daily/x.md` — Real take.\n",
         encoding="utf-8",
     )
-    _patch_lint(monkeypatch, knowledge)
-    assert lint.check_takes_consistency() == []
+    assert lint.check_takes_consistency(_ctx(knowledge)) == []
