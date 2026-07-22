@@ -18,6 +18,166 @@ every operator's `wiki update` → `uv sync` regenerate `uv.lock` and dirty thei
 config keys must also be wired into `scripts/migrations/migrate_config_keys.py`
 in the same commit.
 
+## [0.3.0] — 2026-07-22
+
+The architecture-deepening arc: 14 refactor candidates in 4 waves (C01–C14),
+consolidating the engine's copy-pasted plumbing into named seams. Mostly
+internal — but the sweep surfaced and fixed a series of live operator-facing
+bugs, listed under **Fixed**.
+
+### Added
+
+- **`wiki preprocess` + the Preprocessor seam.** The three in-vault intake
+  normalizers (`inbox`, `html`, `clippings`) now share one Protocol + Registry
+  (`scripts/preprocessors/`), like collectors and producers. `wiki preprocess
+  --list` enumerates them; `wiki preprocess <name> [source]` runs one
+  (`--dry-run` supported). The legacy entry points (`wiki process-inbox`,
+  `wiki ingest-html`, compile's clippings sweep) are unchanged shims.
+- **`wiki auth <service> <account-id>`** (gmail | gmeet | calendar) — one OAuth
+  bootstrap front-door; the existing `wiki gmail-auth` / `wiki gmeet-auth` /
+  `wiki calendar-auth <id>` remain as aliases. The account id is passed as an
+  argument, no longer interpolated into a `python -c` source string.
+- **`folder-index` is a first-class collector** — visible in `wiki collect
+  --list`, runnable as `wiki collect folder-index` (syncs every `kind=local`
+  watched-folders root). `wiki index` keeps the rich flags (single root-id,
+  `--force`).
+- **Machine-readable seams for every desktop-consumed surface:** `wiki collect
+  --list --json`, `wiki triage list --json`, `wiki query --json`, and
+  `wiki compile --progress-json` (structured `PROGRESS {"current","total"}`
+  stdout lines, default off). The desktop app consumes these instead of
+  scraping human log prose, so operator-facing wording is free to change again.
+
+### Changed
+
+- **`wiki help` now lists every command.** Nine commands that were dispatchable
+  but invisible to `wiki help` and non-TTY callers (produce, triage, bridge,
+  backfill, reconcile, health-trends, usage, study, analyze) are shown;
+  `wiki compile --help` again documents `--max-files`. The catalog is
+  table-driven (`scripts/cli.py`), so help, menu and dispatch can no longer
+  drift apart.
+- **`wiki collect --account <id>` is honored** — it restricts a collector run
+  to a single account substrate (email, calendar, gmeet, jamie, health).
+  Handing `--account` to a non-account collector now exits with a clear error
+  instead of being silently ignored.
+- **Silent failures now surface.** Every intentional exception-suppression in
+  the engine goes through the new labeled `swallow()` seam (`core/errors.py`)
+  or explicit log-and-continue — ~43 previously-silent sites (health probes,
+  browser/tabs scans, mailbox decodes, OAuth refresh, piggyback spawn, usage
+  exit-flush, dream history appends) now leave WARNING/DEBUG log lines instead
+  of vanishing. No pipeline behavior changed; only visibility.
+- **State writes are crash-safe and race-free.** All engine JSON state saves
+  are atomic (tmp + rename), and `state.json` updates merge under a lock — a
+  compile running for minutes can no longer wipe out query/lint counters
+  written meanwhile, and a mid-write crash can no longer tear the ingested
+  ledger (a torn ledger meant a full recompile).
+- **Token accounting is correct-by-construction at every migrated Claude-SDK
+  call site.** One shared harness (`run_sdk_query`) records cache-inclusive
+  totals to the usage ledger (`wiki usage`) on every outcome — study runs,
+  analyst passes, `wiki query` and agent tasks previously under-reported input
+  by orders of magnitude under prompt caching, or recorded nothing at all.
+  `wiki query` no longer prints a made-up dollar estimate; its lifetime-cost
+  stat now accumulates the SDK-reported actual. Bundled-CLI hangs surface as
+  `kind=timeout` with partial-spend accounting at every migrated site.
+- **Dream failures are visible to monitoring.** Per-call timeouts and
+  prompt-too-large now exit nonzero on every path (entity / sweep / piggyback),
+  so an unattended dream that hangs-then-aborts records `failed:<rc>` in
+  piggyback-state.json instead of a false `ok`. `wiki dream list-candidates`
+  shows the insufficient-corpus `backoff` flag next to `cooldown`. (Sweep
+  exit codes changed from the conflated 5 to per-kind 3/4/6.)
+- **Config layer single-sourced.** Every knob's name/type/default lives in
+  `scripts/core/config_schema.py`; migration values, `config.example.yaml`
+  and the `docs/config.md` tables are derived from it and drift-tested
+  (documented coverage grew ~55 → 186 keys). Config loading is type-safe (a
+  value that doesn't fit the schema type → WARNING naming the key + engine
+  default kept; a YAML parse error → loud "running on factory defaults"
+  ERROR). Piggyback defaults have ONE source: the zombie `email_incremental`
+  key is gone (`piggybacks.email` is the real key), `piggybacks.health` is
+  visible, and the dead `max_per_run` subkeys on jamie/gmeet/calendar are
+  pruned from operator vaults. Runtime cadence unchanged.
+- **Lint sees `knowledge/MOCs/` and no longer counts engine-written
+  `## Backlinks` footers as link edges** — the Orphans dashboard queue reports
+  real orphans again (expect a one-time jump after updating; review the new
+  batch once). Dashboard refresh is faster and safer: the structural lint
+  checks run once per refresh over a single corpus read (shared between the
+  stats callout and the lint queues), and the post-command refresh runs once
+  through the fcntl-locked path (previously eight copy-pasted unlocked bash
+  call sites; manual `wiki flush` refreshed twice).
+- **Reports carry their scoring geometry.** Per-instrument report frontmatter
+  now records the instrument's Likert scale, max total and concern-band
+  declaration, so the meta-report reads geometry off the report instead of a
+  hardcoded per-slug table (older reports stay readable — missing geometry is
+  recovered from the engine definition). Adding a new instrument is a
+  YAML-only operation again.
+- **The desktop app talks to the engine through one seam.** Every `wiki`
+  invocation goes through a single `runWiki()` runner with a per-call timeout
+  (a hung health check can no longer wedge the app) and consistent error
+  handling, and the GUI parses the new JSON surfaces instead of prose.
+
+### Fixed
+
+- **Inbox HTML drops ingest again.** Every `.html`/`.htm` file dropped into
+  `inbox/` failed silently and was stranded there forever — the delegation
+  pointed at `ROOT_DIR/scripts/ingest-html.py`, a path that exists in no
+  deployed vault layout (and the test mocked the subprocess to success). It
+  now ingests in-process; a failed ingest leaves the original in `inbox/`
+  (retryable, no data loss).
+- **Dream web-research fires on sweep + piggyback**, not only single-entity
+  `wiki dream <slug>` — the doubly-gated Public-Profile enrichment was
+  previously dead on every unattended run, the paths it was engineered for.
+- **Concern flags fire for every live clinical instrument.** The insomnia
+  (ISI), burnout (OLBI) and stress (PSS-10) screens on the default
+  longitudinal-baseline study were structurally flag-blind and could never
+  surface an elevated band; concern bands are now declared per-band in each
+  instrument's cutoffs.yaml.
+- **`wiki analyze --vault <path>` resolves the analyst agent's citations
+  against the given vault** (it previously discovered studies under `--vault`
+  but ran the agent against the engine root).
+- **Triage records round-trip umlauts and quotes.** Summaries like
+  `Müller sagt "hi"` no longer garble to json-escaped text in `wiki triage`,
+  triage.html, the desktop Triage list, or on accept into `workspace/todo.md`;
+  legacy escaped records on disk decode cleanly without migration. Fact stamps
+  (`applied:`, `last_reconciled:`) now surgically line-replace their single
+  key, so operator formatting in `knowledge/facts/` survives apply/reconcile.
+- **`daily/<date>/sessions.md` writes go through the flock-protected
+  chokepoint** — the session hook was the last writer bypassing the
+  one-writer-per-(date,source) lock; a concurrent burst of SessionEnd /
+  Codex per-turn flushes can no longer silently drop a session block. All
+  sentinel-region splices (`<!-- x:begin/end -->`) now share one
+  `core.markers` primitive — a stray or reversed end marker can no longer
+  corrupt calendar day-rollups, blind the web-research cooldown stamp, or
+  write garbled text back (the reversed-marker corruption class is fixed once
+  for all sites).
+- **Evening flush skips an unchanged daily file again** — the skip check had
+  been silently broken by schema drift, so every flush unconditionally
+  spawned compile.
+- **Setup wizard no longer downgrades the compile model.** Pressing Enter on a
+  default install wrote the retired claude-opus-4-7, which the next
+  `wiki update` bumped back. `config.example.yaml` gained 9 missing keys and
+  now matches every engine default exactly (test-enforced; fresh installs
+  previously got `curiosity_followup` at a 24h cooldown instead of the
+  engine's 6h/max-5 drain rate).
+- **Interactive menu: the `t` (triage) quick-action shortcut works** (it was
+  declared but did nothing), and nine previously-unreachable commands
+  (produce, bridge, backfill, reconcile, health-trends, usage, study, analyze,
+  dedup) are now browsable.
+- **Pictures multi-inbox message** — under a multi-inbox
+  `personal.picture_inbox`, the "no pictures processed" message named only the
+  last-scanned inbox path; it now describes the whole configured scope.
+
+### Removed
+
+- **Three dead compile knobs** (`compile_force_long_context_types`,
+  `compile_max_turns_long_context`, `compile_large_source_chars`). They fed a
+  model/turn escalation ladder that could never fire — substrate routing pins
+  the model and turn budget per row (Haiku by default), so only the first
+  ladder tier was ever reachable. `wiki update` prunes them from operator
+  vaults. The only remaining model escalation is the one-shot kind=unknown
+  retry with `compile_large_source_model` (unchanged).
+- **The `missing_backlinks` lint check + its dashboard queue.** Since M020 the
+  backlinks pass materializes the reciprocal edge as a footer on every
+  compile, so the check was vacuous — reciprocity is an engine invariant, not
+  a lint finding.
+
 ## [0.2.2] — 2026-07-14
 
 ### Added

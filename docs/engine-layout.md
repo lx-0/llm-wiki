@@ -16,7 +16,7 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 
 ```text
 .wiki/
-├── wiki                       ← entry point — sources lib/*.sh, dispatches subcommands
+├── wiki                       ← entry point (bash) — bootstrap + fail-closed vault guard + TTY detection + genuinely-bash commands; every Python-backed subcommand delegates to scripts/cli.py
 ├── install.sh                 ← one-liner installer (also re-runnable from a checkout)
 ├── config.example.yaml        ← tracked  ── │ copy at install time
 ├── config.yaml                ← gitignored ─┘
@@ -33,15 +33,23 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 │   │   ├── config.py              ← CONFIG singleton (YAML-driven) + get/set/keys CLI + TIMEZONE + .env bootstrap
 │   │   ├── prompts.py             ← prompt template loader (${var} substitution)
 │   │   ├── ollama_client.py       ← single Ollama transport (chat / chat_schema / chat_vision)
-│   │   ├── sdk_helpers.py         ← StderrCapture + log_sdk_failure + assert_prompt_within_budget (Claude Agent SDK)
+│   │   ├── config_schema.py       ← side-effect-free config schema (every knob: name/type/default/doc-comment); consumed by config.py, the key-migration, and config_docs.py (generates docs/config.md tables)
+│   │   ├── sdk_helpers.py         ← run_sdk_query(prompt, SdkCallSpec) — the ONE Claude-SDK call harness (options assembly, path-scope gates, stall-timeout loop, usage → LEDGER, failure classification) + StderrCapture + assert_prompt_within_budget
+│   │   ├── frontmatter.py         ← the single frontmatter grammar (parse/parse_strict/field/write/update_fields) — never hand-roll a `---` parser
+│   │   ├── markers.py             ← sentinel-region primitive (find_region + replace/ensure/strip_region) for `<!-- x:begin/end -->` managed blocks
+│   │   ├── state_store.py         ← flock primitives + atomic JSON saves + state.json merge-under-lock + ingested-ledger API
+│   │   ├── errors.py              ← swallow(label) — labeled intentional exception suppression (AGENTS.md § Exception handling)
+│   │   ├── daily_capture.py       ← fcntl-flocked append/replace_section/replace_block into daily/<date>/<source>.md
 │   │   ├── utils.py               ← shared helpers (article listing, JSON state, history) + now_iso/today_iso
 │   │   ├── backlinks.py           ← corpus-wide backlinks-footer materialization (post-compile global pass; sentinel-managed `## Backlinks` per article)
 │   │   ├── agent_spec.py          ← agent-task spec parser (prompts/agents/*.md → AgentSpec)
 │   │   ├── google_oauth.py        ← Gmail OAuth2 bootstrap (local-loopback consent flow)
 │   │   └── flush_pipeline.py      ← staged-flush state machine (stage / commit / archive / pending)
+│   ├── cli.py                 ← table-driven `wiki` dispatcher — the CommandSpec table is the single source of truth for the command catalog (help/menu derive from it; owns the once-per-command locked dashboard refresh + `wiki auth`)
 │   ├── collectors/            ← substrate→raw/ writers (Registry + scan-* CLIs + dispatcher)
-│   │   ├── base.py                ← Collector Protocol, SPEC, Registry
-│   │   ├── cli.py                 ← `wiki collect` dispatcher (Registry lookup + run-one)
+│   │   ├── base.py                ← Collector Protocol, SPEC, Registry + account-loop harness (resolve_accounts/filter_accounts/Watermark/run_account_loop) + inbox-intake harness (scan_inbox/archive_to_zone/append_rollup)
+│   │   ├── cli.py                 ← `wiki collect` dispatcher (Registry lookup + run-one; honors --account via SPEC.supports_account_loop)
+│   │   ├── folder_index.py        ← body-blind folder index (`wiki index`; registered as the `folder-index` collector)
 │   │   ├── email_collector.py     ← email Collector (multi-backend via adapters/mailbox/)
 │   │   ├── jamie.py               ← Jamie AI meeting-notetaker
 │   │   ├── gmeet.py               ← Google Meet / Gemini transcripts (Drive API)
@@ -56,6 +64,12 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 │   │   ├── calendar/google.py     ← Google Calendar v3 REST wrapper (list_calendars / list_events / get_event)
 │   │   └── mailbox/{gmail,thunderbird,allinkl,imap,base}.py
 │   ├── domain/                ← pure domain types (mail message, filter rule)
+│   ├── preprocessors/         ← in-vault intake normalizers (pre-compile; Protocol + Registry, singletons)
+│   │   ├── base.py                ← Preprocessor Protocol, PreprocessorSpec, PreprocessResult, Registry
+│   │   ├── cli.py                 ← `wiki preprocess` dispatcher (--list / <name> [source] [--dry-run])
+│   │   ├── inbox.py               ← <vault>/inbox/ classifier (shim: scripts/process-inbox.py)
+│   │   ├── html_ingest.py         ← HTML file/URL → raw/articles (named to avoid the stdlib `html` shadow; shim: scripts/ingest-html.py)
+│   │   └── clippings.py           ← <vault>/Clippings/ sweep (shim: scripts/clippings_sweep.py)
 │   ├── facts/                 ← hard-fact subsystem (knowledge/facts/<slug>.md consumers) + takes producer
 │   │   ├── correct.py             ← CRUD CLI: add/list/remove/edit/path
 │   │   ├── correct_apply.py       ← agent-driven propagation across vault
@@ -82,10 +96,12 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 │   ├── dashboard/             ← Obsidian dashboard helpers (post-flush + seed-time)
 │   │   ├── dashboard_stats.py     ← _dashboard-stats.md generator
 │   │   ├── dashboard_lint.py      ← _dashboard-lint.md generator
+│   │   ├── lint_results.py        ← once-per-refresh structural-lint compute, cached in STATE_DIR (shared by the stats + lint renderers)
 │   │   ├── agent_buttons.py       ← agent-button discovery + dashboard.md rewriter
 │   │   └── inject_daily_button.py ← idempotent Summarize-button injection into daily/<date>/sessions.md
 │   ├── reports/_engine/       ← operator-self-reports surface (air-gapped from compile)
 │   │   ├── runner.py              ← `run_inference()` — substrate-scope resolve + batched SDK calls + persist `runs/<ts>/instruments/<slug>.md`
+│   │   ├── substrate_scope.py     ← the privacy-boundary seam: which operator substrate an inference run may read (CLINICAL_DEFAULT_SUBSTRATE_GLOBS + resolve_substrate_files; probe imports production, never the reverse)
 │   │   ├── instrument.py          ← yaml loader for `instruments/<slug>/v<x>/{instrument,items,cutoffs}.yaml`
 │   │   ├── score.py               ← deterministic Likert + reverse-coding + band lookup
 │   │   ├── backfill_per_item.py   ← one-shot: re-parse pre-2026-05-17T16-14 reports' body `## Items` table → frontmatter `per_item:`
@@ -106,12 +122,12 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 │   ├── backfill_daily_rollup.py     ← one-shot: raw/{health,voice,transcripts/{jamie,gmeet}} → daily/<date>/{health,voice,meetings}.md
 │   ├── cleanup_legacy_daily_roots.py ← one-shot: byte-match-verified delete of legacy daily/<date>.md
 │   ├── daily_digest_runner.py       ← piggyback wrapper for `wiki agent daily-digest`
-│   ├── lint.py                ← 8 structural checks + 1 LLM contradiction check
+│   ├── lint.py                ← structural checks over a once-built LintContext corpus (footer-aware link graph) + 1 LLM contradiction check
 │   ├── query.py               ← Claude Agent SDK natural-language query (read-only / file-back)
 │   ├── agent_task.py          ← generic Claude Agent SDK runner for prompts/agents/*.md
-│   ├── clippings_sweep.py     ← <vault>/Clippings/ → raw/articles/ (pre-compile lift)
-│   ├── ingest-html.py         ← HTML file or URL → text + visual (Playwright + Vision LLM)
-│   ├── process-inbox.py       ← <vault>/inbox/ → classify + move to raw/ subfolder
+│   ├── clippings_sweep.py     ← thin shim → preprocessors/clippings.py (<vault>/Clippings/ → raw/articles/, pre-compile lift)
+│   ├── ingest-html.py         ← thin shim → preprocessors/html_ingest.py (HTML file or URL → text + visual)
+│   ├── process-inbox.py       ← thin shim → preprocessors/inbox.py (<vault>/inbox/ → classify + move to raw/ subfolder)
 │   ├── review-wiki.py         ← per-article quality scoring via local LLM
 │   ├── optimize-claude-md.py  ← cross-project pattern → ~/.claude/CLAUDE.md edits
 │   ├── retry-failed-flushes.py ← reprocess archived flush contexts
@@ -134,6 +150,7 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 │   ├── use-llm-wiki/SKILL.md   ← global-eligible: also links into ~/.claude/skills/
 │   ├── vault-health-check/SKILL.md
 │   └── vault-triage/SKILL.md
+├── desktop/                   ← Electron menubar GUI (npm) — every engine call goes through src/vault/wiki-exec.ts:runWiki() and the engine's --json seams (collect/triage/query/compile-progress + doctor/menu)
 └── (gitignored runtime)
     ├── .venv/                 ← uv-managed Python environment
     ├── state/                 ← *.json hash trackers, dedup, cooldowns

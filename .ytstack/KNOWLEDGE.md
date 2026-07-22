@@ -2207,10 +2207,9 @@ Confirms earlier STATE.md note on `--scale 2` dropping content >12k pixels per s
 
 Shipped 2026-05-17 in `b6cadaa` to fix the compile-memories cross-link-fanout that aborted operator's compile run on 4 consecutive max_turns failures (~$0.93 burned).
 
-`scripts/compile_stages/classify.py:classify(content, source) → (kind, chunks)` runs on every substrate BEFORE `compile_source()`. Three shapes today:
+`scripts/compile_stages/classify.py:classify(content, source) → (kind, chunks)` runs on every substrate BEFORE `compile_source()`. Two shapes today (a third, `instructions` — filename `__AGENTS.md|__CLAUDE.md|__README.md` → `compile_instructions` — was removed 2026-05-18; its dead code `_looks_like_instructions` + constants deleted 2026-07-18, C13):
 
 - `aggregated-memory` — substrate has `type: memory-seed|memory-sync` AND H2-section count ≥ 4. Compile.py loops one call per H2-chunk (frontmatter re-attached in memory, raw byte-identical). Each chunk inherits the existing `compile_memories.md` prompt + 25-turn budget. 25-turn budget binds per memory not per aggregate.
-- `instructions` — filename ends `__AGENTS.md|__CLAUDE.md|__README.md` OR origin frontmatter path ends in those OR first 500 chars contain `# AGENTS.md` H1 hint. Compile.py overrides `substrate_prompt = "compile_instructions"` for a single-pass project-doc handler (max 2 Edits, no cross-link fanout).
 - `single` — every other substrate; unchanged path.
 
 **Generalisation:** any future producer/consumer mismatch (substrate shape doesn't match its prompt's iteration model) gets a new `ClassifyKind` enum value + a branch in `compile_file`. Single seam, single place to update. Don't bump prompt budgets — fix the shape.
@@ -2668,3 +2667,76 @@ articles applying one fact and reported 6. The safe pattern (now used by both
   suggestions: count/label/cmd/priority) drives "What's pending"; `wiki doctor --json`
   (summary + `engine-update-available` check) drives Health + the Update-app button. Don't
   scrape human CLI text.
+
+## Architecture-deepening arc 0.3.0 (2026-07-18 → 2026-07-22) — gotchas
+
+Per-candidate learnings from the 14-candidate seam arc (C01–C14). Decisions live in DECISIONS.md same dates.
+
+### Preprocessors + inbox (C12)
+
+- **Preprocessor stdlib-shadow:** a module named `scripts/preprocessors/html.py` shadows the stdlib `html` package when `cli.py` runs directly (Python puts `scripts/preprocessors/` on sys.path[0]) — `html2text` does `import html.entities` and crashes with `'html' is not a package`. Same class as `scripts/collectors/<stdlib_name>.py`. Fix: name the file `html_ingest.py`; keep the SPEC name clean ("html"). Package-qualified imports from pytest don't trip it — only running cli.py directly does, so a CLI smoke-run is the test that catches it.
+- **Mocks-mask-wiring, inbox edition:** the `.html`/`.htm` inbox delegation shelled out to `ROOT_DIR/scripts/ingest-html.py` via `uv run python` — ROOT_DIR is the vault root but the engine lives at WIKI_DIR/scripts, so the path existed in no layout. Every HTML drop failed the subprocess and stayed in inbox/ forever. The bug survived because tests monkeypatched subprocess.run to returncode-0 — the mock masked exactly the broken wiring. Lesson: at least one test per cross-script/cross-process delegation must exercise the real wiring un-mocked; converting the delegation to an in-process function call makes that trivial.
+
+### Collector harness (C09)
+
+- **Registry adapter on a module that ALSO runs as a script:** guard the `@register` class + its `from collectors.base import ...` behind `if __package__ not in (None, ""):`. When the module runs as __main__ (e.g. `wiki index` → `python folder_index.py`), importing collectors.base triggers collectors/__init__.py which imports every collector — pulling httpx/yt-dlp/pillow into a path that should stay light. With the guard, the adapter activates only when collectors/__init__ imports the module as a submodule. Verified by subprocess probe.
+- **Shared collector helpers that read CONFIG must take the data as a param,** not import CONFIG themselves. Collector tests monkeypatch the COLLECTOR MODULE's `CONFIG` (e.g. `gmeet.CONFIG`); a helper in base.py doing its own `from core.config import CONFIG` reads the real (empty) config and the patch is bypassed. base.resolve_accounts takes the accounts mapping as its first arg for exactly this reason.
+
+### Reports (C10)
+
+- **Backward-compat for evolving report frontmatter:** when adding loader-surfaced keys (likert/max_total/concern_bands) to per-instrument report frontmatter, OLD reports lack them. Recover the missing geometry by reloading the instrument definition through the canonical loader (lru_cache on slug+version), not a hardcoded table — new reports read frontmatter directly, old reports stay correct, a removed instrument falls back to the naive item count only as a last resort.
+- **Retry loops must key on FailureClass.kind, not substrings** of the stringified error: the previous substring set silently excluded two malformed-output variants from retry purely because their wording wasn't in the list — a wording edit could flip retry behaviour. Attaching a `schema_invalid` FailureClass to every malformed-output raise site makes retryability testable and edit-proof.
+- **The embedded "Prompt rendered for this run" block must embed the ACTUAL per-batch prompts** captured during the run (label + prompt_version + text), not a fresh second render with the full item list — the second render diverged from the hashed prompt_version whenever operator answers excluded items or the run was multi-batch.
+
+### Markers + daily concurrency (C08, markers-adoption)
+
+- **Marker-region splice hardening:** a begin/end sentinel splice done as first-occurrence `text.index(begin)`/`text.index(end)` with NO ordering guard writes CORRUPTED text back when the end marker precedes the begin marker (stop < start → text[:start] + block + text[stop:] duplicates/garbles). The fix is one shared locator (`core.markers.find_region`) that searches for `end` strictly AFTER `begin`, so a reversed or stray lone-end resolves to "no region" (append/insert) instead of a corrupting splice. Migrate every `<!-- x:begin/end -->` consumer onto it rather than re-deriving the guard per site. Adoption pattern: core.markers owns WHERE the region is plus the missing/reversed/duplicated contract; the caller owns the block bytes and the insert/append seam. Byte-compat proof: round-trip fixpoint test on a real-shaped fixture + append-bytes pinned for all three trailing-newline shapes.
+- **An advertised invariant is only as good as the actual write path per source:** `daily_capture` called itself "the single chokepoint for ALL writes" and listed `sessions` in KNOWN_SOURCES — while flush_pipeline wrote sessions.md directly, unlocked, for months. The flock only protects a (date, source) if EVERY writer goes through the chokepoint. Grep the actual write path per source; don't trust the allow-list membership.
+
+### Dream (C11)
+
+- **Divergent per-branch CLI exit codes are a monitoring blindspot,** not just cosmetic drift. piggyback_runner derives status (ok / failed:<rc>) from the spawned child's exit code, so any failure kind that maps to exit 0 on the unattended path silently records `ok`. Derive exit codes in ONE place from a typed outcome, and make every failure kind nonzero — the entity branch's convention (3/4) is the one to unify onto, not the sweep's conflated 5.
+- **When ruff flags an "unused" import, check whether a test monkeypatches it before deleting** — dream.INDEX_FILE was F401 in the module yet monkeypatched by two fixtures. It was dead on BOTH sides, so removing import AND setattr lines together was correct; deleting only the import would have raised AttributeError at fixture setup (monkeypatch.setattr raises on a missing attribute).
+
+### CLI dispatcher + JSON seams (C06, C07 part B)
+
+- **Python block-buffers stdout when it is NOT a TTY** (pipes, hooks, desktop capture). Two consequences: (1) a `print()`ed banner lands AFTER a spawned child's output unless you `sys.stdout.flush()` before spawning (bash `printf` was unbuffered — caught moving the banner into cli.py); (2) structured progress lines read line-by-line from a child's pipe MUST be printed with `flush=True` (compile.py `_emit_progress`) or the GUI sees them only at process exit.
+- **The bash dispatcher prints its banner before a subcommand's stdout,** so a JSON payload from e.g. `wiki query --json` is NOT the first bytes on stdout — consumers must parse from the first `{` (the banner never contains one).
+- **Post-command dashboard refresh must go through flush.py's fcntl-locked `refresh_dashboard_stats`/`refresh_dashboard_lint`** (import flush, do not reimplement). The lock exists to serialize concurrent refreshes after the 2026-05-03 SessionEnd storm (103 TimeoutExpired in ~30s). Before C06, eight copy-pasted bash refresh sites bypassed it and manual `wiki flush` refreshed twice.
+- **The dispatcher runs each Python-backed handler as a child process** (`subprocess.run([sys.executable, <script>, *args])`), not via runpy/import — a heavy handler's asyncio loop, `CLAUDE_INVOKED_BY` env mutation, and SDK import state stay contained in the child.
+
+### Frontmatter grammar (C03)
+
+- **Same-bytes/two-grammars is a Write-Read-Symmetrie failure class that hides inside ONE function call:** decide_route consulted route's `[\w-]+`-value regex for the skip-list gate and classify's any-value line parser three lines later — no test could catch it because each grammar was locally consistent. The fix that sticks is a shared accessor both sides import, plus an identity table-test over the edge inputs (fence-at-EOF, `--- ` trailing space, CRLF, quoted, valueless).
+- **yaml.safe_dump round-trip writers grow artifacts:** take.py's append re-captured the body with one leading newline and re-wrote it behind a fresh blank separator — one extra blank line per append, latent for months because nothing parses blank lines. Serializers that normalize (strip leading newlines, exactly one separator) are round-trip-stable; writers built from f-string + find() offsets are not.
+- **Adopting a dead session's uncommitted worktree:** the highest-risk defect is the invisible MISSING line, not the visible wrong line — the drafted route.py used `frontmatter.field(...)` without ever importing the module; it imported cleanly (references live inside function bodies) and only failed at call time. Run the module's tests FIRST; treat "module imports fine" as zero evidence.
+
+### SDK harness (C01)
+
+- **A structured `is_error` ResultMessage can arrive with a CLEAN generator exit (no raise):** treating stream-end as success silently returns partial output — agent_task wrote its output file and exited 0 after error_max_turns. run_sdk_query classifies both the raised and the clean-exit variants; never gate success on "no exception" alone.
+- **Tests that want to silence/inspect LEDGER writes must patch the record method on the shared `core.usage.LEDGER` OBJECT** (`monkeypatch.setattr(usage_mod.LEDGER, "record", ...)`), not a module-level LEDGER binding in the call-site module — those bindings are gone, and the harness resolves LEDGER at call time via its own package-relative import (`core.*` vs `scripts.core.*` are distinct module instances under pytest).
+- **SdkCallSpec.deny_all_writes reproduces the M019 wedge exactly** (empty-roots can_use_tool gate + streaming-prompt envelope + permission_mode=default); `write_scope` reproduces the production PreToolUse hook shape with optional denied_subpaths and optional legacy_allowed_tools rollback gated by features.compile_callback_gate — sites without legacy tools always get the hook shape regardless of the flag.
+
+### Config layer (C05)
+
+- **Hand-synced doc tables rot exactly where no consumer enforces them:** config.example.yaml stayed current (install copies it) while docs/config.md accumulated 7+ stale defaults including a safety-relevant one (optimize_claude_md shown enabled). Fix the CLASS, not the instances: generate the tables from the schema and add a regenerate-and-diff test; keep only genuine prose hand-authored.
+- **Interactive-wizard catch-all defaults are a downgrade trap:** a `case`+select_one picker whose `*)` arm maps to a hardcoded option list silently rewrites the CURRENT default to a retired value the moment the engine default moves past the list (config.sh compile-model 4-8→4-7, with the migration bumping it back — a write-loop between wizard and migration). Any wizard option list mirroring an engine default needs its catch-all pinned to that default.
+- **"Two tables with invisible precedence" audit method:** before collapsing duplicate default tables, derive the REAL runtime winner per name from the consumer code (here: `CONFIG.piggybacks.get(name)` wins when the name exists; SPEC only via fall-through) — email/health silently used the other table than the 7 siblings because of a zombie key name and a missing entry. Preserve values name-by-name and pin the collapsed state with a parity test that also catches future zombies.
+
+### StateStore (C02)
+
+- **Schema-drift dead branch (flush.maybe_trigger_compile):** flush keyed the ingested ledger by DAILY_DIR-relative path while compile writes ROOT_DIR-relative keys, AND called `.get("hash")` on values that are plain 16-hex strings — double drift, so the "Skipping compile — unchanged" branch could NEVER fire and every evening flush unconditionally spawned compile; a hypothetical key match would have raised an uncaught AttributeError. Root cause: one implicit schema, three hand-rolled consumers, zero tests. The schema now lives only in core.state_store's ledger API; when N modules parse the same state file by hand, the drift is not hypothetical.
+- **state.json race anatomy (fixed by merge-under-lock):** compile loaded state once at run start, held the dict in memory for the whole multi-minute run, and saved the WHOLE dict per file — any query_count/total_cost/last_lint written concurrently by query/lint was clobbered last-writer-wins; the rare inverse direction could drop a freshly-ingested hash = a recompile's worth of tokens. Deterministic interleaving pinned in tests/test_state_store.py.
+
+### Desktop toolchain (C07)
+
+- **desktop tsconfig pins typescript ~4.5.4 while node_modules ships a modern @types/node** whose .d.ts syntax 4.5 can't parse — `npx tsc --noEmit` floods with TS1005/TS1109 errors inside @types/node and is NOT a usable typecheck gate. The real gates are `npm run test` (vitest via esbuild, no type-check) and `npm run lint` (eslint without a type-aware parser). Write test fakes structurally correct on their own; a small `as unknown as X` cast on a hand-built ChildLike fake is the pragmatic path since neither gate verifies it.
+- **desktop/ uses package-lock.json (npm), not pnpm** — install with `npm ci` before `npm run test`/`npm run lint`.
+
+### Exception seam (C14)
+
+- **Silent-site census method:** AST walk over except-handlers catching Exception/BaseException, classifying body shape (lone `pass` = silent-pass; `return` without any log/print call in the handler subtree = unlogged-return). Two census gotchas: (1) logging hidden inside a called helper (`_mark_error`, `_probe_failed`) makes a site a false positive — check the helper before converting; (2) a shared funnel helper is the highest-leverage fix — one `log.warning` in health.py's `_probe_failed` converted 13 sites in one edit.
+
+### Cross-cutting: the repo ruff baseline was never clean
+
+`uv run ruff check .` from the repo root reported ~160–220 pre-existing findings (F401/F541/E702/E402 across scripts/, tests/, docs build scripts) at every wave of this arc — identical sets on main; ruff is deliberately absent from .pre-commit-config.yaml (only gitleaks + hygiene hooks run) and never lints .ts. Do NOT treat a non-zero repo-wide `ruff check .` as a regression for a scoped change — diff the touched files against main first. A dedicated lint-sweep candidate (plus a `[tool.ruff.lint]` policy in pyproject.toml) would make `ruff check .` a meaningful gate; tracked in `.ytstack/backlog/deepening-arc-followups.md`.

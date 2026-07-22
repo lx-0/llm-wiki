@@ -29,7 +29,8 @@ The **vault's own `AGENTS.md`** (separate file, not this one) is the article sch
 
 ```text
 llm-wiki/
-├── wiki                    ← entry-point CLI (bash, sources lib/*.sh)
+├── wiki                    ← entry-point CLI (bash: bootstrap + fail-closed vault guard + TTY detection
+│                             + genuinely-bash commands; every Python-backed subcommand delegates to scripts/cli.py)
 ├── lib/
 │   ├── common.sh           ← paths, colors, log helpers, deps, backup
 │   ├── ui.sh               ← interactive prompts (confirm/ask/select_*)
@@ -42,15 +43,22 @@ llm-wiki/
 │   │   ├── config.py           ← CONFIG singleton (YAML-driven) + get/set/keys CLI + TIMEZONE + .env bootstrap
 │   │   ├── prompts.py          ← prompt template loader (${var} substitution)
 │   │   ├── ollama_client.py    ← single Ollama transport (chat / chat_schema / chat_vision)
-│   │   ├── sdk_helpers.py      ← StderrCapture + log_sdk_failure + assert_prompt_within_budget (Claude Agent SDK)
+│   │   ├── config_schema.py    ← side-effect-free config schema (every knob: name/type/default/doc-comment) — single source for config.py, the key-migration, and config_docs.py
+│   │   ├── sdk_helpers.py      ← run_sdk_query(prompt, SdkCallSpec) — the ONE Claude-SDK call harness (options, path-scope gates, stall-timeout, dual-basis usage → LEDGER, failure classification) + StderrCapture + assert_prompt_within_budget
+│   │   ├── frontmatter.py      ← the single frontmatter grammar (parse/parse_strict/field/write/update_fields) — never hand-roll a `---` parser
+│   │   ├── markers.py          ← sentinel-region primitive (find_region + replace/ensure/strip_region) for `<!-- x:begin/end -->` managed blocks
+│   │   ├── state_store.py      ← flock primitives + atomic JSON saves + state.json merge-under-lock + ingested-ledger API
+│   │   ├── errors.py           ← swallow(label) — labeled intentional exception suppression (see § Exception handling)
 │   │   ├── utils.py            ← shared helpers (article listing, JSON state, history) + now_iso/today_iso
 │   │   ├── agent_spec.py       ← agent-task spec parser (prompts/agents/*.md → AgentSpec)
 │   │   ├── google_oauth.py     ← shared Google OAuth2 helper (local-loopback consent + token cache; used by gmail + gmeet)
 │   │   ├── flush_pipeline.py   ← staged-flush state machine (stage/commit/archive/pending)
 │   │   └── daily_capture.py    ← fcntl-flocked append/replace into daily/<date>/<source>.md (sources: sessions/health/meetings/voice/email)
+│   ├── cli.py              ← table-driven `wiki` dispatcher — the CommandSpec table is the single source of truth for the command catalog (help/menu/dispatch derive from it; owns the once-per-command locked dashboard refresh + the `wiki auth` OAuth registry)
 │   ├── collectors/         ← substrate→raw/ writers (Registry + scan-* CLIs + dispatcher)
-│   │   ├── base.py             ← Collector Protocol, SPEC, Registry
-│   │   ├── cli.py              ← `wiki collect` dispatcher (Registry lookup + run-one)
+│   │   ├── base.py             ← Collector Protocol, SPEC, Registry + the shared account-loop harness (resolve_accounts/filter_accounts/Watermark/run_account_loop/migrate_flat_state) + inbox-intake harness (scan_inbox/archive_to_zone/append_rollup)
+│   │   ├── cli.py              ← `wiki collect` dispatcher (Registry lookup + run-one; honors --account via SPEC.supports_account_loop)
+│   │   ├── folder_index.py     ← body-blind folder index (`wiki index`; registered as the `folder-index` collector)
 │   │   ├── email_collector.py  ← email collector (renamed from email.py to avoid stdlib shadow)
 │   │   ├── jamie.py            ← Jamie AI meeting-notetaker
 │   │   ├── gmeet.py            ← Google Meet / Gemini transcripts (Drive API; OAuth via core/google_oauth.py)
@@ -62,6 +70,12 @@ llm-wiki/
 │   │   ├── scan_browser.py     ← BrowserCollector (Registry; migrated 2026-05-14)
 │   │   ├── scan_screenshots.py ← ScreenshotsCollector (Registry, piggyback; migrated 2026-05-14)
 │   │   └── scan_youtube.py     ← YoutubeCollector (Registry; migrated 2026-05-14 — Phase 2 complete)
+│   ├── preprocessors/      ← in-vault intake normalizers (pre-compile; Protocol + Registry, singletons — see CONTEXT.md "Preprocessor")
+│   │   ├── base.py             ← Preprocessor Protocol, PreprocessorSpec, PreprocessResult, Registry
+│   │   ├── cli.py              ← `wiki preprocess` dispatcher (--list / <name> [source] [--dry-run])
+│   │   ├── inbox.py            ← <vault>/inbox/ classifier (shim: scripts/process-inbox.py)
+│   │   ├── html_ingest.py      ← HTML file/URL → raw/articles (named to avoid the stdlib `html` shadow; shim: scripts/ingest-html.py)
+│   │   └── clippings.py        ← <vault>/Clippings/ sweep (shim: scripts/clippings_sweep.py)
 │   ├── facts/              ← hard-fact subsystem (knowledge/facts/<slug>.md consumers) + takes producer
 │   │   ├── correct.py          ← CRUD CLI: add/list/remove/edit/path
 │   │   ├── correct_apply.py    ← agent-driven propagation across vault
@@ -107,7 +121,7 @@ llm-wiki/
 │   ├── flush.py            ← session-end → daily/ append + piggyback spawner
 │   ├── lint.py             ← 8 structural checks + 1 LLM contradiction check
 │   ├── query.py            ← Claude Agent SDK query (read-only or file-back)
-│   ├── process-inbox.py    ← classify dropped files into raw/ subfolders
+│   ├── process-inbox.py    ← thin shim → preprocessors/inbox.py (classify dropped files into raw/ subfolders)
 │   ├── optimize-claude-md.py ← suggests CLAUDE.md edits from compiled patterns
 │   ├── review-wiki.py      ← per-article quality scoring (Ollama)
 │   └── retry-failed-flushes.py ← reprocess archived flush contexts
@@ -117,6 +131,7 @@ llm-wiki/
 │   ├── session-end.py      ← spawn flush.py with the conversation transcript
 │   └── pre-compact.py      ← safety-net flush before context compaction
 ├── prompts/                ← LLM prompts as .md files (${var} placeholders)
+├── desktop/                ← Electron menubar GUI (npm, not pnpm) — every engine call goes through src/vault/wiki-exec.ts:runWiki() and the engine's --json seams; never scrapes human CLI text
 ├── config.example.yaml     ← copy → config.yaml on install (gitignored)
 ├── pyproject.toml + uv.lock
 ├── install.sh              ← one-liner installer

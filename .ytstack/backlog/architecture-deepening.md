@@ -1,8 +1,25 @@
 # Architecture Deepening — M003+ Candidates
 
-Surfaced via `/improve-codebase-architecture` walk (2026-05-02), after M002 closed. **Refreshed 2026-05-17** after the codebase ~2×'d in size (compile.py 511→1340, dream.py 0→1091, lint.py 326→1214, new subpackages facts/, suggestions/, curiosity/, dashboard/, sessions/, and new collectors pictures/voice/gmeet/jamie/health/calendar).
+Surfaced via `/improve-codebase-architecture` walk (2026-05-02), after M002 closed. **Refreshed 2026-05-17** after the codebase ~2×'d in size (compile.py 511→1340, dream.py 0→1091, lint.py 326→1214, new subpackages facts/, suggestions/, curiosity/, dashboard/, sessions/, and new collectors pictures/voice/gmeet/jamie/health/calendar). **Reconciled 2026-07-22** after the 0.3.0 architecture-deepening arc.
 
 Vocabulary: domain terms from `CONTEXT.md`, architecture terms from improve-codebase-architecture's LANGUAGE.md (module / interface / depth / seam / adapter / leverage / locality / deletion-test).
+
+## Refresh summary (2026-07-22)
+
+Reconciled after the **0.3.0 architecture-deepening arc** — 14 candidates (C01–C14) in 4 waves, commits `4678f0c`…`eba4644` (2026-07-18 → 2026-07-22), documented in CHANGELOG 0.3.0 + DECISIONS.md same dates.
+
+- **Shipped this arc, from this list:**
+  - **#3 Model seam — slice 1 shipped** (C01 = M021 S01): `run_sdk_query` harness in `core/sdk_helpers.py`, 7 call-site files migrated. Remaining hand-rolled loops (suggestions, takes, folder_providers, intents, flush, lint, optimize-claude-md) + the Ollama side (S02) stay open.
+  - **#5 compile.py orchestration — resolved.** The decide_route/CompileOutcome design shipped earlier (M026); C13 (this arc) deleted the unreachable model/turn precedence-ladder tiers + 3 dead knobs, leaving the single dispatch table.
+  - **#6 Preprocessor seam ✓** (C12) — `scripts/preprocessors/` + `wiki preprocess`; the live HTML-inbox delegation bug fixed in the same candidate.
+  - **#8 StateStore ✓** (C02) — `core/state_store.py`: flock primitives, atomic saves, state.json merge-under-lock, ingested-ledger API.
+  - **#12 Exception-handling ✓** (C14) — `core.errors.swallow(label)` + AGENTS.md decision tree; ~43 silent sites converted.
+  - **#16 dream.py phase extraction ✓** (C11) — landed as typed `DreamOutcome` + pure `pre_sdk_skip` / `classify_post_sdk_write` / `build_sweep_candidates` (a different cut than sketched, same testability payoff).
+  - **#17 rename ✓** (C05) — `_BUILTIN_PIGGYBACK_TASKS` (now in `core/piggybacks.py`).
+  - **Skipped-list "CLI dispatch" — shipped** (C06): table-driven `CommandSpec` dispatcher in `scripts/cli.py`; the defer-condition ("3+ subcommands need shared dispatch") was long crossed.
+- **Shipped this arc, not on this list** (net-new candidates from the 2026-07 fan-out): single frontmatter grammar (C03), collector account-loop + inbox-intake harness (C09), reports interface sweep (C10), config-schema single source (C05), lint LintContext + footer-aware link graph (C04), desktop runWiki seam + engine `--json` contract (C07 A+B), `core.markers` + daily flock chokepoint (C08 + markers-adoption).
+- **Still open:** #4 (linter seam — defer condition unchanged), #7 (hook harness), #9 (logging), #10 (async Ollama — now = M021 S02), #11 (markdown helper), #13 (datetime/tz), #15 (dashboard consolidation — C04 shared the lint compute between the two renderers via a STATE_DIR cache; the 4-script dashboard-write seam itself remains).
+- **Followups from the arc:** `.ytstack/backlog/deepening-arc-followups.md` (one file, grouped by candidate).
 
 ## Refresh summary (2026-05-17)
 
@@ -50,9 +67,11 @@ The old circular import (`config.py` ↔ `wiki_config.py` for `TIMEZONE`) is eli
 
 ---
 
-## #3 — Model seam (HIGH — planned as M021 2026-05-17)
+## #3 — Model seam (IN PROGRESS — S01 shipped 2026-07-18, C01)
 
-**Status:** Planned via `ytstack:plan-milestone` 2026-05-17 as **M021** (L-sized, 5 slices). CONTEXT + ROADMAP at `.ytstack/M021-{CONTEXT,ROADMAP}.md`. 5 open questions parked in M021-CONTEXT.md (module location, schema shape, FailureClass unification, cost shape, migration order); Q1+Q4 close before S01, Q3 before S02, Q2+Q5 before S03. **Not started.** Sequenced after Producer-seam Phase 1 ✓ + M018 ✓.
+**Status (2026-07-22):** **M021 S01 shipped** as C01 of the 0.3.0 arc — `run_sdk_query(prompt, SdkCallSpec)` in `core/sdk_helpers.py` owns all Claude-SDK mechanics (options assembly, path-scope gates, stall-timeout loop, dual-basis usage extraction, LEDGER recording on every outcome, failure classification); 7 call-site files migrated (compile_stages/compile, dream, query, agent_task, correct_apply ×2, reports inference+analyst). DECISIONS 2026-07-18 reopens the 2026-05-04 no-wrapper choice. Open: remaining hand-rolled loops (suggestions, takes_producer, folder_providers, intents, flush, lint, optimize-claude-md) and the Ollama side (S02, `ollama_client` sync-in-async + to_thread bridge).
+
+**Status (2026-05-17, historical):** Planned via `ytstack:plan-milestone` 2026-05-17 as **M021** (L-sized, 5 slices). CONTEXT + ROADMAP at `.ytstack/M021-{CONTEXT,ROADMAP}.md`. 5 open questions parked in M021-CONTEXT.md (module location, schema shape, FailureClass unification, cost shape, migration order); Q1+Q4 close before S01, Q3 before S02, Q2+Q5 before S03. Sequenced after Producer-seam Phase 1 ✓ + M018 ✓.
 
 ---
 
@@ -82,9 +101,11 @@ Lint.py now has its own shallow-interface problem (two linters in a trench coat,
 
 ---
 
-## #5 — `compile.py` orchestration vs. I/O separation (PARTIALLY RESOLVED — residual re-designed 2026-05-23)
+## #5 — `compile.py` orchestration vs. I/O separation (✅ RESOLVED — M026 + C13 2026-07-18)
 
-**Status (2026-05-23):** Original framing OBSOLETE. M018 already extracted the LLM stage (`compile_source`) + Producer post-passes (`run_post_passes`); `commit_article` was correctly cancelled (agent-side writes, not Python I/O — `commit-article-manifest.md`). The residual is just `compile_file` (404 LOC) being a monolithic dispatcher (route-decision + deterministic-execution + dispatch-precedence interleaved). Re-graded HIGH→**MEDIUM** ("make routing a testable decision"). Re-designed via `improve-codebase-architecture` grilling into a coarse pure `decide_route` + typed `CompileOutcome` (single state-save, kills `_STATE_MUTATING_SKIPS` + the magic-key dict). Full design + 4-slice breakdown: **`.ytstack/backlog/compile-dispatch-seam.md`**. Pick up there at next `ytstack:plan-milestone`.
+**Status (2026-07-22):** The `decide_route` + `CompileOutcome` design from `compile-dispatch-seam.md` shipped as M026. C13 (0.3.0 arc) finished the interface-honesty residue: deleted the unreachable model/turn precedence-ladder tiers + the 3 dead knobs feeding them (`compile_force_long_context_types`, `compile_max_turns_long_context`, `compile_large_source_chars`), collapsed routing to the single SUBSTRATE_PROMPTS/_DEFAULT_DISPATCH table lookup, and put `dispatch_key` on the Compile route variant so logging never re-derives the decision. DECISIONS 2026-07-18.
+
+**Status (2026-05-23, historical):** Original framing OBSOLETE. M018 already extracted the LLM stage (`compile_source`) + Producer post-passes (`run_post_passes`); `commit_article` was correctly cancelled (agent-side writes, not Python I/O — `commit-article-manifest.md`). The residual is just `compile_file` (404 LOC) being a monolithic dispatcher (route-decision + deterministic-execution + dispatch-precedence interleaved). Re-graded HIGH→**MEDIUM** ("make routing a testable decision"). Re-designed via `improve-codebase-architecture` grilling into a coarse pure `decide_route` + typed `CompileOutcome` (single state-save, kills `_STATE_MUTATING_SKIPS` + the magic-key dict). Full design + 4-slice breakdown: **`.ytstack/backlog/compile-dispatch-seam.md`**. Pick up there at next `ytstack:plan-milestone`.
 
 **Status (2026-05-17, historical):** Grilled into a design doc at `.ytstack/backlog/producer-seam.md` as **Milestone-B** of the two-milestone arc (Producer seam first, then this).
 
@@ -110,7 +131,11 @@ Lint.py now has its own shallow-interface problem (two linters in a trench coat,
 
 ---
 
-## #6 — Preprocessor seam (HIGH)
+## #6 — Preprocessor seam (✅ DONE 2026-07-18 — C12)
+
+**Resolved 2026-07-18** (C12, 0.3.0 arc). Shipped essentially as sketched below: `scripts/preprocessors/{base,cli,inbox,html_ingest,clippings}.py` with Protocol + PreprocessorSpec + PreprocessResult + Registry; the three legacy scripts became thin runnable shims (compile.py's `import clippings_sweep` unchanged); `wiki preprocess --list | <name> [source]` wired into the dispatcher table. Bonus: fixed the live `.html`-inbox delegation bug the seam-work exposed (every HTML drop had been stranded — see CHANGELOG 0.3.0 Fixed). The html module is `html_ingest.py` (stdlib-shadow gotcha, KNOWLEDGE.md). CONTEXT.md got the Preprocessor entry the naming-concern below asked for.
+
+(Original entry:)
 
 **Files:** `scripts/process-inbox.py` (252), `scripts/ingest-html.py` (283), `scripts/clippings_sweep.py` (102).
 
@@ -150,7 +175,11 @@ Each hook script becomes a 10-line wrapper.
 
 ---
 
-## #8 — `StateStore` module + concurrency safety (MEDIUM, with race-risk angle)
+## #8 — `StateStore` module + concurrency safety (✅ DONE 2026-07-22 — C02)
+
+**Resolved 2026-07-22** (C02, 0.3.0 arc). `core/state_store.py`: flock primitives (locked/try_locked/acquire_process_lock), atomic `save_json_state` (tmp + os.replace), `state.json` merge-under-lock (`update_state` — each writer merges only its own keys into a fresh disk read), ingested-ledger API (schema in exactly one place), StateStore facade for hot side-state files. The predicted race was real (compile's whole-dict save clobbered concurrent query/lint counters) and a schema-drift dead branch was found on top (flush's compile-skip never fired) — both fixed, concurrency pinned by deterministic + 8-thread hammer tests. DECISIONS 2026-07-22.
+
+(Original entry:)
 
 **Files:** `scripts/utils.py:load_json_state` / `save_json_state` (8 lines), consumed by `scripts/compile.py`, `scripts/query.py`, and indirectly `scripts/retry-failed-flushes.py` via `flush_pipeline`. State files in `state/`: `state.json`, `email-state.json`, `screenshot-state.json`, dedup windows, cooldowns.
 
@@ -223,7 +252,11 @@ Then suggestion + curiosity passes use `asyncio.gather()` for fan-out instead of
 
 ---
 
-## #12 — Exception-handling pattern consistency (MEDIUM)
+## #12 — Exception-handling pattern consistency (✅ DONE 2026-07-22 — C14)
+
+**Resolved 2026-07-22** (C14, 0.3.0 arc). `core/errors.py:swallow(label, *, level, logger)` — ContextDecorator, suppresses Exception (never KeyboardInterrupt/SystemExit), one labeled log line per suppression. Census found 149 catch-all sites in 8 patterns, ~43 fully silent; the mechanical pass converted exactly the silent set (silent-pass + unlogged bare-return). The `Result[T]` half of the sketch was NOT needed — the collector/producer boundaries already had typed results. AGENTS.md carries the 5-step decision tree. DECISIONS 2026-07-22; census method in KNOWLEDGE.md.
+
+(Original entry:)
 
 **Files:** ~51 `except Exception:` / `except BaseException:` blocks across `scripts/compile.py`, `scripts/ollama_client.py`, `scripts/scan-calendar.py`, `scripts/scan-browser.py`, `scripts/scan-screenshots.py`, `scripts/lint.py`, `scripts/review-wiki.py`, `scripts/optimize-claude-md.py`, and others.
 
@@ -291,7 +324,9 @@ Three different gate-shapes today: suggestions has zero CONFIG gate + hardcoded 
 
 ---
 
-## #15 — Dashboard suite consolidation (MEDIUM — NEW 2026-05-17)
+## #15 — Dashboard suite consolidation (MEDIUM — partially touched 2026-07-22)
+
+**Update (2026-07-22):** C04 (0.3.0 arc) shipped the shared once-per-refresh lint compute — `dashboard_stats` persists structural lint results to a `STATE_DIR/dashboard-lint-results.json` cache under the existing flush lock, `dashboard_lint` consumes it while fresh (`scripts/dashboard/lint_results.py`). The 4-script dashboard-**write** seam sketched below remains open.
 
 **Files:** `scripts/dashboard/dashboard_stats.py` (327), `scripts/dashboard/dashboard_lint.py` (206), `scripts/dashboard/inject_daily_button.py` (112), `scripts/dashboard/agent_buttons.py` (185).
 
@@ -305,7 +340,11 @@ Three different gate-shapes today: suggestions has zero CONFIG gate + hardcoded 
 
 ---
 
-## #16 — `dream.py` phase extraction (MEDIUM — NEW 2026-05-17)
+## #16 — `dream.py` phase extraction (✅ DONE 2026-07-18 — C11)
+
+**Resolved 2026-07-18** (C11, 0.3.0 arc), with a different cut than sketched but the same testability payoff: typed `DreamOutcome` (mirrors CompileOutcome) + single `dream_exit_code()` map, pure `pre_sdk_skip()` gate + `classify_post_sdk_write()` post-SDK classifier + `build_sweep_candidates()` (all gate verdicts incl. backoff, consumed by sweep AND `list-candidates`) — all deterministic, table-tested without SDK mocks. Same candidate restored the web-research post-pass firing on sweep/piggyback and removed the phantom cost-cap surface + M014 shims. DECISIONS 2026-07-18.
+
+(Original entry:)
 
 **Files:** `scripts/dream.py` (1091).
 
@@ -319,7 +358,11 @@ Three different gate-shapes today: suggestions has zero CONFIG gate + hardcoded 
 
 ---
 
-## #17 — Rename `_LEGACY_PIGGYBACK_COMMANDS` (LOW — NEW 2026-05-17 — 5-min polish)
+## #17 — Rename `_LEGACY_PIGGYBACK_COMMANDS` (✅ DONE 2026-07-18 — C05)
+
+**Resolved 2026-07-18** (absorbed by C05, 0.3.0 arc): renamed to `_BUILTIN_PIGGYBACK_TASKS`, exactly as proposed — the dict now lives in `core/piggybacks.py` (moved there by the earlier compile-drain split). References in dream.py, daily_digest_runner.py, docs/PROCESS.md updated; one docstring straggler in `scan_screenshots.py` tracked in `deepening-arc-followups.md`.
+
+(Original entry:)
 
 **Files:** `scripts/flush.py:78-97`.
 
@@ -337,7 +380,7 @@ Three different gate-shapes today: suggestions has zero CONFIG gate + hardcoded 
 - **`prompts.py` (49 lines).** Looks trivial but earns its keep as *a place* — 10 importers means single point of customization. Locality, not depth.
 - **`execute-suggestions.py` approval flow.** One client, no seam yet. Deepen when a second approval workflow appears.
 - **`utils.py` cohesion split.** Real but LOW-priority polish — three logical groups (state I/O, wiki content, text utils) that don't yet justify a split. Fold into the config-split PR's import-header cleanup or defer.
-- **CLI dispatch (`wiki` bash → Python argparse).** Today only `wiki collect` delegates to a Python dispatcher (`cli_collect.py`). One delegating subcommand isn't a seam. Revisit when 3+ subcommands need shared dispatch (post Backlog #1 + #6).
+- **CLI dispatch (`wiki` bash → Python argparse).** Today only `wiki collect` delegates to a Python dispatcher (`cli_collect.py`). One delegating subcommand isn't a seam. Revisit when 3+ subcommands need shared dispatch (post Backlog #1 + #6). **→ Shipped 2026-07-18 (C06, 0.3.0 arc):** the defer-condition was long crossed (43 commands, 5 Python dispatchers); table-driven `CommandSpec` dispatcher in `scripts/cli.py` is now the command-catalog source of truth. DECISIONS 2026-07-18.
 - **Environment-variable schema.** Only 2-3 env-var lookups exist (`CLAUDE_INVOKED_BY` recursion guard, `IMAP_*_USER/PASS` for mail). Pattern hasn't emerged yet. Defer until a third use case lands.
 - **Test coverage as a standalone backlog item.** ~700 test lines for ~6300 code lines is a *symptom* of the deepening opportunities above (untestable interfaces), not a separate item. Coverage rises naturally as #1, #5, #6, etc. land — each refactor's RED-GREEN-REFACTOR cycle adds tests for the new shape. Backfilling tests against tangled legacy interfaces is busywork that locks the bad shape in place.
 
