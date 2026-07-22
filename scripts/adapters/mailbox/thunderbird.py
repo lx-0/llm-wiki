@@ -207,7 +207,8 @@ def _find_mbox_files(
 def _decode_header(raw: str) -> str:
     try:
         return str(email.header.make_header(email.header.decode_header(raw)))
-    except Exception:
+    except Exception as e:  # noqa: BLE001 — per-header fallback, raw form is usable
+        log.debug("header decode failed [%.60s]: %s", raw, e)
         return raw
 
 
@@ -220,7 +221,8 @@ def _parse_date(raw: str) -> datetime | None:
     """
     try:
         dt = email.utils.parsedate_to_datetime(raw)
-    except Exception:
+    except Exception as e:  # noqa: BLE001 — per-message fallback, treated as undated
+        log.debug("Date header parse failed [%.60s]: %s", raw, e)
         return None
     if dt is None:
         return None
@@ -339,7 +341,8 @@ def _decode_part(part: mailbox.mboxMessage) -> str:
         if payload is None:
             return ""
         return payload.decode(part.get_content_charset() or "utf-8", errors="replace")
-    except Exception:
+    except Exception as e:  # noqa: BLE001 — per-part fallback to empty body
+        log.debug("mbox part decode failed: %s", e)
         return ""
 
 

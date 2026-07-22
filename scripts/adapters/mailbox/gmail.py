@@ -197,7 +197,8 @@ def _parse_internal_date(internal_ms: str | None) -> datetime:
         return datetime.fromtimestamp(0)
     try:
         return datetime.fromtimestamp(int(internal_ms) / 1000)
-    except Exception:  # noqa: BLE001
+    except Exception as e:  # noqa: BLE001 — per-message fallback to epoch
+        log.debug("internalDate parse failed [%.30s]: %s", internal_ms, e)
         return datetime.fromtimestamp(0)
 
 
@@ -211,7 +212,8 @@ def _extract_text_body(payload: dict) -> str:
         if data:
             try:
                 return base64.urlsafe_b64decode(data).decode("utf-8", errors="replace")
-            except Exception:  # noqa: BLE001
+            except Exception as e:  # noqa: BLE001 — per-message fallback to empty body
+                log.debug("body base64 decode failed: %s", e)
                 return ""
     for part in payload.get("parts") or ():
         out = _extract_text_body(part)

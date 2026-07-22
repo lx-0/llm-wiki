@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import os
 import signal
 import subprocess
@@ -39,6 +40,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from core.paths import STATE_DIR  # noqa: E402
 from core.state_store import locked  # noqa: E402
 from core.utils import save_json_state  # noqa: E402
+
+log = logging.getLogger(__name__)
 
 PIGGYBACK_STATE_FILE = STATE_DIR / "piggyback-state.json"
 
@@ -135,6 +138,7 @@ def run_piggyback(
             start_new_session=(sys.platform != "win32"),
         )
     except Exception as exc:  # noqa: BLE001 — record any spawn failure
+        log.warning("piggyback %s: spawn failed: %s: %s", name, type(exc).__name__, exc)
         record_status(
             name,
             {

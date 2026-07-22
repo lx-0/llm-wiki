@@ -30,6 +30,7 @@ from datetime import datetime, timezone
 from typing import Iterator
 
 from adapters.mailbox.base import MailboxReadError
+from core.errors import swallow
 from domain.mail import Message, MessageMeta
 
 log = logging.getLogger(__name__)
@@ -237,10 +238,8 @@ def _chunks(seq, n: int):
 
 
 def _quiet_logout(client) -> None:
-    try:
+    with swallow("imap logout", level="debug", logger=log):  # best-effort cleanup
         client.logout()
-    except Exception:  # noqa: BLE001, S110  best-effort cleanup
-        pass
 
 
 def _message_date(data: dict) -> datetime | None:
@@ -267,7 +266,8 @@ def _decode_mime(raw: bytes | str | None) -> str:
         raw = raw.decode("utf-8", "replace")
     try:
         return str(email.header.make_header(email.header.decode_header(raw)))
-    except Exception:  # noqa: BLE001
+    except Exception as e:  # noqa: BLE001 — per-header fallback, raw form is usable
+        log.debug("MIME header decode failed [%.60s]: %s", raw, e)
         return raw
 
 
@@ -337,14 +337,16 @@ def _extract_body(msg) -> str:
                     return (part.get_payload(decode=True) or b"").decode(
                         part.get_content_charset() or "utf-8", errors="replace"
                     )
-                except Exception:  # noqa: BLE001
+                except Exception as e:  # noqa: BLE001 — per-message fallback to empty body
+                    log.debug("multipart body decode failed: %s", e)
                     return ""
         return ""
     try:
         return (msg.get_payload(decode=True) or b"").decode(
             msg.get_content_charset() or "utf-8", errors="replace"
         )
-    except Exception:  # noqa: BLE001
+    except Exception as e:  # noqa: BLE001 — per-message fallback to empty body
+        log.debug("body decode failed: %s", e)
         return ""
 
 

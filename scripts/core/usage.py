@@ -18,6 +18,7 @@ import atexit
 from dataclasses import dataclass
 from pathlib import Path
 
+from .errors import swallow
 from .paths import STATE_DIR
 from .state_store import locked
 from .utils import load_json_state, save_json_state, today_iso
@@ -144,15 +145,14 @@ class UsageLedger:
 LEDGER = UsageLedger()
 
 
+@swallow("usage-ledger exit flush")
 def _flush_on_exit() -> None:
     """Best-effort persist of the process-global ledger at exit (no-op if empty).
 
     Centralizes the run-boundary flush so no entrypoint needs its own persist
-    call. Won't fire on SIGKILL/os._exit — acceptable: this is observability."""
-    try:
-        LEDGER.persist()
-    except Exception:  # noqa: BLE001 — never let accounting break a run
-        pass
+    call. Won't fire on SIGKILL/os._exit — acceptable: this is observability.
+    Accounting must never break a run — a persist failure is swallowed, logged."""
+    LEDGER.persist()
 
 
 atexit.register(_flush_on_exit)

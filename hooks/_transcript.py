@@ -78,7 +78,9 @@ class Budgets:
                 user_text=CONFIG.limits.flush_user_text_budget_chars,
                 tool_summary=CONFIG.limits.flush_tool_summary_budget_chars,
             )
-        except Exception:  # noqa: BLE001  config-load failure must never break flush
+        except Exception as e:  # noqa: BLE001  config-load failure must never break flush
+            log.warning("flush budgets: config load failed, using defaults: %s: %s",
+                        type(e).__name__, e)
             return cls()
 
 

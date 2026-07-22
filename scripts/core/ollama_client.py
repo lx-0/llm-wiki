@@ -18,6 +18,7 @@ Base URL comes from `CONFIG.models.ollama_url`. Do NOT hardcode the IP.
 from __future__ import annotations
 
 import json
+import logging
 import re
 import socket
 from typing import Any
@@ -26,6 +27,8 @@ import httpx
 
 from .config import CONFIG
 from .usage import LEDGER
+
+_module_log = logging.getLogger(__name__)
 
 
 _FENCE_LEADING = re.compile(r"^```[a-zA-Z]*\s*", flags=re.MULTILINE)
@@ -115,7 +118,9 @@ def is_reachable(timeout: float = 5.0) -> bool:
         with _client(timeout) as c:
             r = c.get(f"{_base_url()}/api/tags")
         return r.status_code == 200
-    except Exception:
+    except Exception as e:  # noqa: BLE001 — callers warn via warn_unreachable_once;
+        # the exception detail (DNS vs refused vs timeout) is diagnostic only
+        _module_log.debug("ollama reachability probe failed: %s: %s", type(e).__name__, e)
         return False
 
 

@@ -337,7 +337,8 @@ def probe_ollama_reachable() -> bool | None:
         from core.config import CONFIG
 
         url = (CONFIG.models.ollama_url or "").strip()
-    except Exception:
+    except Exception as e:  # noqa: BLE001 — probe skipped, but a broken config must log
+        log.warning("ollama probe: config load failed: %s: %s", type(e).__name__, e)
         return None
     if not url:
         return None

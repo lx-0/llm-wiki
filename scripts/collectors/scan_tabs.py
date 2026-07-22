@@ -26,6 +26,7 @@ from urllib.parse import urlparse
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from collectors.base import Collector, CollectorSpec, RunResult, register
+from core.errors import swallow
 from core.paths import RAW_DIR, ROOT_DIR
 from core.utils import today_iso
 from core.config import CONFIG
@@ -67,16 +68,15 @@ def scan_backup(backup_path: Path) -> dict:
             url = tab.get("url", "")
             tab_title = tab.get("title", "")
 
-            # Extract domain
-            try:
+            # Extract domain — one bad URL among hundreds is a per-item
+            # fallback, not a scan failure.
+            with swallow("tab domain parse", level="debug", logger=log):
                 domain = urlparse(url).netloc
                 if domain:
                     # Simplify domain
                     domain = domain.replace("www.", "")
                     domains[domain] += 1
                     all_domains[domain] += 1
-            except Exception:
-                pass
 
             tab_list.append({
                 "title": tab_title,

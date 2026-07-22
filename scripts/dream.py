@@ -59,6 +59,7 @@ import yaml
 from claude_agent_sdk import query
 
 from core.config import CONFIG
+from core.errors import swallow
 from core.paths import (
     AREAS_DIR,
     KNOWLEDGE_DIR,
@@ -1486,7 +1487,7 @@ async def dream_entity(
 
     # Per-entity history event so dashboard + grep can answer
     # "what happened on the last dream of entity X?".
-    try:
+    with swallow("dream-entity history append", logger=log):
         append_history(
             "dream_entity",
             slug=entity.slug,
@@ -1502,8 +1503,6 @@ async def dream_entity(
                 and _entity_post_size == _entity_pre_size
             ),
         )
-    except Exception:
-        pass
 
     # Web-research post-pass (issue #2) — fires on EVERY successful dream
     # (single-entity, sweep, piggyback), restoring the shipped design after it
@@ -1802,7 +1801,8 @@ async def dream_all_entities(
     # Append-only history event so dashboard + grep can answer
     # "when did dream-cycle last run, for which entities, at what cost?"
     # Mirrors compile/flush event shape (see core.utils.append_history).
-    try:
+    # Observability is best-effort, never blocks the dream.
+    with swallow("dream-sweep history append", logger=log):
         skipped_count = sum(1 for r in results if r.status != "synthesized")
         append_history(
             "dream_sweep",
@@ -1815,8 +1815,6 @@ async def dream_all_entities(
             skipped=skipped_count,
             picked_slugs=[r.entity.slug for r in results],
         )
-    except Exception:
-        pass  # observability is best-effort, never block the dream
     return results
 
 

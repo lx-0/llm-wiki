@@ -18,6 +18,7 @@ sub-50ms latency. Used by hooks where 250ms is too slow.
 
 from __future__ import annotations
 
+import logging
 import os
 import re
 import socket
@@ -41,6 +42,8 @@ from core.paths import (
     WIKI_DIR,
 )
 
+
+log = logging.getLogger(__name__)
 
 SEVERITY_ORDER = {"critical": 0, "warning": 1, "info": 2, "ok": 3}
 
@@ -883,6 +886,9 @@ def to_json(results: list[CheckResult]) -> list[dict]:
 
 
 def _probe_failed(id_: str, category: str, exc: Exception) -> CheckResult:
+    # Single funnel for every check's except-clause — the probe failure
+    # surfaces in the banner AND leaves a log line (silent-swallow seam).
+    log.warning("health probe failed [%s]: %s: %s", id_, type(exc).__name__, exc)
     return CheckResult(
         id=id_,
         category=category,

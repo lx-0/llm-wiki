@@ -6,7 +6,7 @@ Conventions for AI coding agents and human contributors working on this repo.
 
 - [What this repo is](#what-this-repo-is) — engine vs vault, three vault layers
 - [Repo layout](#repo-layout) — top-level tree
-- [Conventions](#conventions) — [tunable](#adding-a-tunable) · [personal data](#adding-per-instance--personal-data) · [prompt](#adding-a-prompt) · [agent target](#adding-an-agent-target-for-hook-install) · [path handling](#path-handling) · [Python env](#python-environment) · [YAML & JSON](#yaml--json) · [side effects](#side-effects)
+- [Conventions](#conventions) — [tunable](#adding-a-tunable) · [personal data](#adding-per-instance--personal-data) · [prompt](#adding-a-prompt) · [agent target](#adding-an-agent-target-for-hook-install) · [path handling](#path-handling) · [Python env](#python-environment) · [YAML & JSON](#yaml--json) · [side effects](#side-effects) · [exception handling](#exception-handling-decision-tree)
 - [Style](#style) — bash, python, logging, commits
 - [When in doubt](#when-in-doubt) — pointers to concept + architecture
 
@@ -279,6 +279,34 @@ The Python venv lives at `<vault>/.wiki/.venv/` (inside the engine, NOT at the v
 
 - Hooks run in **<10s** budget — no API calls, only file I/O. Heavy work goes to spawned background processes (`flush.py`, piggybacks).
 - `compile.py` and `query.py` use the Claude Agent SDK with `model=CONFIG.models.compile_model`. Other scripts use Ollama (configurable via `models.ollama_url`).
+
+### Exception handling (decision tree)
+
+The engine runs unattended — its dominant failure mode is the **silent skip**. A failure that
+produces no log line is invisible by design, so bare `except Exception: pass` and unlogged
+fallback-returns are banned. For every new `except Exception`, walk this tree top-down:
+
+1. **Adapter seam** (mailbox / calendar / gmeet reader or filter)? → raise a **typed error**
+   (`MailboxReadError`, `GmeetAPIError`, `CalendarAPIError`) with `from e`. The collector
+   boundary catches, logs, and isolates it (`core watermark-on-failure` stays intact).
+2. **Claude SDK call**? → route through `core.sdk_helpers` (`run_sdk_query`,
+   `classify_failure` + `log_sdk_failure`). Never hand-roll SDK exception handling.
+3. **Collector / Producer boundary** (one account, one source)? → `log.exception(...)` +
+   return the typed result (`AccountLoopOutcome` error entry, `ProducerResult(status="failed")`,
+   `RunResult(success=False)`, `CheckResult(severity="warning")`). One bad item never kills
+   the loop, and never disappears either.
+4. **Intentional suppression** (best-effort cleanup, observability write, per-item parse
+   fallback)? → `with swallow("label")` from `core.errors` — context manager or decorator.
+   The label makes the intent greppable and every suppression logs. Level rules:
+   - default `level="warning"` — a degraded capability the operator should see (WARNING+
+     also lands in the errors-only log archives, per repo convention);
+   - `level="debug"` — best-effort cleanup (`agen.aclose()`, IMAP logout) and hot-loop
+     per-item fallbacks (one bad date/header among thousands) where WARNING would flood.
+5. Never catch `BaseException`; `swallow` re-raises `KeyboardInterrupt`/`SystemExit` unlogged.
+
+If none of 1-4 fits, the exception should propagate — an uncaught traceback in an errors-only
+log beats a swallowed one. When a fallback value must be returned inline (e.g. decode → `""`),
+explicit `log.debug/log.warning` + `return` is the equivalent of `swallow` and equally legal.
 
 ### Evaluating a new intake channel (substrate priority, locked 2026-05-22)
 

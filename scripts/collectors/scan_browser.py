@@ -32,6 +32,7 @@ from urllib.parse import urlparse
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from collectors.base import Collector, CollectorSpec, RunResult, register
+from core.errors import swallow
 from core.paths import RAW_DIR, ROOT_DIR
 from core.utils import today_iso
 from core.config import CONFIG
@@ -68,7 +69,8 @@ def clean_domain(url: str) -> str | None:
         if domain in SKIP_DOMAINS or not domain:
             return None
         return domain
-    except Exception:
+    except Exception as e:  # noqa: BLE001 — per-URL fallback, row is dropped
+        log.debug("URL parse failed [%.80s]: %s", url, e)
         return None
 
 
@@ -137,10 +139,8 @@ def scan_firefox_places(places_path: Path) -> dict | None:
             continue
         dt = None
         if date_added:
-            try:
+            with swallow("firefox bookmark date parse", level="debug", logger=log):
                 dt = datetime.fromtimestamp(date_added / 1_000_000).strftime("%Y-%m-%d")
-            except Exception:
-                pass
         bookmarks.append({
             "title": title or "(no title)",
             "url": url,
@@ -166,10 +166,8 @@ def scan_firefox_places(places_path: Path) -> dict | None:
         if visit_count >= 3:
             dt = None
             if last_visit:
-                try:
+                with swallow("firefox history date parse", level="debug", logger=log):
                     dt = datetime.fromtimestamp(last_visit / 1_000_000).strftime("%Y-%m-%d")
-                except Exception:
-                    pass
             history_entries.append({
                 "title": title or "(no title)",
                 "url": url,
@@ -183,13 +181,11 @@ def scan_firefox_places(places_path: Path) -> dict | None:
     mn, mx = cur.fetchone()
     date_range = None
     if mn and mx:
-        try:
+        with swallow("firefox history date-range parse", level="debug", logger=log):
             date_range = {
                 "from": datetime.fromtimestamp(mn / 1_000_000).strftime("%Y-%m-%d"),
                 "to": datetime.fromtimestamp(mx / 1_000_000).strftime("%Y-%m-%d"),
             }
-        except Exception:
-            pass
 
     cur.execute("SELECT COUNT(*) FROM moz_historyvisits")
     total_visits = cur.fetchone()[0]
@@ -208,7 +204,9 @@ def scan_firefox_places(places_path: Path) -> dict | None:
     if form_history.exists():
         tmp_fh = Path("/tmp/ff-formhistory-scan.sqlite")
         shutil.copy2(form_history, tmp_fh)
-        try:
+        # A broken formhistory DB loses only the search-history section,
+        # not the whole scan — but it must say so in the log.
+        with swallow("firefox search-history scan", logger=log):
             fh_db = sqlite3.connect(str(tmp_fh))
             fh_cur = fh_db.cursor()
             fh_cur.execute("""
@@ -219,14 +217,10 @@ def scan_firefox_places(places_path: Path) -> dict | None:
             for value, times, last_used in fh_cur.fetchall():
                 dt = None
                 if last_used:
-                    try:
+                    with swallow("firefox search date parse", level="debug", logger=log):
                         dt = datetime.fromtimestamp(last_used / 1_000_000).strftime("%Y-%m-%d")
-                    except Exception:
-                        pass
                 searches.append({"query": value, "times": times, "last_used": dt})
             fh_db.close()
-        except Exception:
-            pass
         tmp_fh.unlink(missing_ok=True)
 
     # Google searches from URL history
@@ -234,7 +228,7 @@ def scan_firefox_places(places_path: Path) -> dict | None:
     import urllib.parse
     for entry in history_entries:
         if "google." in entry.get("domain", "") and "/search" in entry.get("url", ""):
-            try:
+            with swallow("google-search query parse", level="debug", logger=log):
                 parsed_qs = urllib.parse.parse_qs(urllib.parse.urlparse(entry["url"]).query)
                 q = parsed_qs.get("q", [""])[0]
                 if q:
@@ -243,8 +237,6 @@ def scan_firefox_places(places_path: Path) -> dict | None:
                         "visits": entry["visits"],
                         "last_visit": entry["last_visit"],
                     })
-            except Exception:
-                pass
 
     return {
         "bookmarks": bookmarks,
@@ -275,12 +267,10 @@ def walk_chrome_bookmarks(node: dict, path: str = "") -> list[dict]:
             date_added = node.get("date_added")
             dt = None
             if date_added:
-                try:
+                with swallow("chrome bookmark date parse", level="debug", logger=log):
                     # Chrome uses Windows epoch (microseconds since 1601-01-01)
                     ts = (int(date_added) - 11644473600000000) / 1_000_000
                     dt = datetime.fromtimestamp(ts).strftime("%Y-%m-%d")
-                except Exception:
-                    pass
             items.append({
                 "title": name,
                 "url": url,
@@ -334,11 +324,9 @@ def scan_chrome_history(history_path: Path) -> dict | None:
             if visit_count >= 3:
                 dt = None
                 if last_visit:
-                    try:
+                    with swallow("chrome history date parse", level="debug", logger=log):
                         ts = (last_visit - 11644473600000000) / 1_000_000
                         dt = datetime.fromtimestamp(ts).strftime("%Y-%m-%d")
-                    except Exception:
-                        pass
                 entries.append({
                     "title": title or "(no title)",
                     "url": url,
@@ -351,7 +339,8 @@ def scan_chrome_history(history_path: Path) -> dict | None:
         total_visits = cur.fetchone()[0]
 
         db.close()
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 — error surfaces in the report AND the log
+        log.warning("chrome history scan failed: %s: %s", type(e).__name__, e)
         return {"error": str(e)}
     finally:
         tmp.unlink(missing_ok=True)

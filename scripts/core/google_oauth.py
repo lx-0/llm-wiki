@@ -123,7 +123,9 @@ def credentials(app: OAuthApp, account_id: str):
             try:
                 creds.refresh(Request())
                 _persist(creds, token_file, app.scopes)
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:  # noqa: BLE001 — hint returned to caller, logged here too
+                log.warning("%s[%s]: token refresh failed: %s: %s",
+                            app.service_label, account_id, type(e).__name__, e)
                 return None, f"Token refresh failed: {e}"
         else:
             return None, bootstrap_hint(app, account_id)
@@ -195,6 +197,8 @@ def bootstrap(app: OAuthApp, account_id: str) -> tuple[bool, str]:
         )
         creds = flow.run_local_server(port=0)
         _persist(creds, token_path(app, account_id), app.scopes)
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:  # noqa: BLE001 — hint returned to caller, logged here too
+        log.warning("%s[%s]: OAuth flow failed: %s: %s",
+                    app.service_label, account_id, type(e).__name__, e)
         return False, f"OAuth flow failed: {type(e).__name__}: {e}"
     return True, f"Token cached at {token_path(app, account_id)}"

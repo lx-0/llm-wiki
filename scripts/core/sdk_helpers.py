@@ -54,6 +54,8 @@ import time
 from collections import deque
 from dataclasses import dataclass, field
 
+from .errors import swallow
+
 # Patterns matched against captured stderr + exception text. Order is
 # priority — most-specific first.
 _RE_RATE_LIMIT = re.compile(
@@ -805,12 +807,12 @@ async def run_sdk_query(prompt: str, spec: SdkCallSpec, *, query_fn=None) -> Sdk
             spec.label, elapsed, timeout, message_count,
             spec.model or "(default)", spec.source or "—", f"{input_chars:,}",
         )
-        try:
+        # Best-effort cleanup — a second failure while closing a hung
+        # stream is expected, log it at debug only.
+        with swallow("sdk stream aclose after timeout", level="debug", logger=log):
             aclose = getattr(agen, "aclose", None)
             if aclose is not None:
                 await aclose()
-        except Exception:  # noqa: BLE001 — best-effort cleanup
-            pass
         log_sdk_failure(
             log,
             label=spec.label,
