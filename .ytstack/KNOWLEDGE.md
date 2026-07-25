@@ -2740,3 +2740,34 @@ Per-candidate learnings from the 14-candidate seam arc (C01–C14). Decisions li
 ### Cross-cutting: the repo ruff baseline was never clean
 
 `uv run ruff check .` from the repo root reported ~160–220 pre-existing findings (F401/F541/E702/E402 across scripts/, tests/, docs build scripts) at every wave of this arc — identical sets on main; ruff is deliberately absent from .pre-commit-config.yaml (only gitleaks + hygiene hooks run) and never lints .ts. Do NOT treat a non-zero repo-wide `ruff check .` as a regression for a scoped change — diff the touched files against main first. A dedicated lint-sweep candidate (plus a `[tool.ruff.lint]` policy in pyproject.toml) would make `ruff check .` a meaningful gate; tracked in `.ytstack/backlog/deepening-arc-followups.md`.
+
+## The test suite wrote real vault files next to the checkout (2026-07-25)
+
+### Symptom
+
+`projects/lx-0/` — the collection directory the engine checkout sits in — had grown a `daily/` tree with 70 files across 23 date folders, a `knowledge/takes/` folder, and `_dashboard-{lint,stats}.md`. It looked like a stray vault. Newest write was three days old, so it was still live.
+
+### Root cause
+
+`core/paths.py` derives everything from `__file__` under the install layout `<vault>/.wiki/`:
+
+```
+CORE_DIR = <engine>/scripts/core   →   WIKI_DIR = <engine>   →   ROOT_DIR = WIKI_DIR.parent
+```
+
+In a real install `ROOT_DIR` is the vault. In a **development checkout** the same line resolves to the directory *next to the repo* — so `DAILY_DIR`, `RAW_DIR`, `KNOWLEDGE_DIR` and the `_dashboard-*.md` targets all point at the operator's filesystem. The collector tests monkeypatched `paths.RAW_DIR` but never `core.daily_capture.DAILY_DIR`, so the daily-rollup append ran for real: 22 tests across `test_capture_collector.py`, `test_voice_collector.py`, `test_voice_collector_audio.py`, `test_pictures_collector.py`, `test_pictures_multi_inbox.py`. Same leak one level down in worktrees — tests in `.claude/worktrees/wf_*/` fed `.claude/worktrees/daily/`.
+
+Nothing caught it for two months because the target is outside every repo: no `git status`, no gitignore rule, no failing assertion. `knowledge/takes/` (2026-05-16) and `_dashboard-*.md` (2026-05-17, a manual `flush` run from the repo) were older instances of the same class that had stopped reproducing but left their files behind.
+
+### Lesson
+
+A test that reaches a path constant derived from `ROOT_DIR` writes to the operator's disk, silently. Patching the *one* constant a test happens to touch fixes the instance, not the class — the next collector repeats it. The class-level fix is a write guard, because the failure mode is specifically "nobody is watching that directory".
+
+### Fix
+
+`tests/_vault_isolation.py` + autouse fixture in `tests/conftest.py`, two layers:
+
+1. `isolated_vault_paths` repoints `core.daily_capture.DAILY_DIR` at a per-test sink under pytest's tmp base. Tests that patch it themselves still win (their `monkeypatch` runs later).
+2. `install_write_guard` (from `pytest_configure`) wraps `builtins.open` / `io.open` / `Path.open` / `Path.mkdir` / `os.{makedirs,mkdir,rename,replace,remove,unlink,rmdir}` and raises `VaultWriteEscape` on the first write landing under `ROOT_DIR` but outside `WIKI_DIR`. Prefix comparison on `os.path.abspath`, no syscall — it runs on every write in the suite (1773 tests, ~15 s, no measurable change).
+
+`tests/test_vault_isolation.py` pins the guard itself: without it the patching lives only in `pytest_configure` and could stop applying with nothing noticing. Verified by reproducing the leak (files dated the same day appeared mid-run), then confirming a clean run touches nothing outside the checkout.
