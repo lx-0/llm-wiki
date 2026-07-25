@@ -275,6 +275,11 @@ A link in a markdown file is relative to that file. Obsidian resolves a slash-be
 
 Scripts use `Path(__file__).resolve().parent` for `SCRIPTS_DIR`, `.parent.parent` for `WIKI_DIR`, `.parent.parent.parent` for the vault root. After `install.sh` clones the repo into `<vault>/.wiki/`, this resolves correctly. Don't hardcode absolute paths.
 
+**In a development checkout that last step is wrong by construction:** `ROOT_DIR` resolves to the directory *next to* the repo, so `DAILY_DIR`, `RAW_DIR`, `KNOWLEDGE_DIR` and the `_dashboard-*.md` targets point at the operator's filesystem. Consequences for anything you write:
+
+- **Tests must never reach a `ROOT_DIR`-derived constant.** Monkeypatch it at the module that owns it — `core.daily_capture.DAILY_DIR`, not `core.paths.DAILY_DIR`, if that's where the write site reads it. `tests/conftest.py` repoints the known ones and a write guard (`tests/_vault_isolation.py`) raises `VaultWriteEscape` on anything that escapes the checkout, so a forgotten one is a red test rather than a silent leak.
+- **Running engine scripts from the repo writes outside it.** `wiki flush`, dashboard regeneration and friends will happily create `<repo>/../_dashboard-*.md`. Exercise write paths against a real vault or a scratch one (`WIKI_VAULT`-style redirection), never from the checkout.
+
 ### Python environment
 
 The Python venv lives at `<vault>/.wiki/.venv/` (inside the engine, NOT at the vault root). `install.sh` runs `uv sync --project <DEST>` so this happens automatically. Two ways to invoke scripts:

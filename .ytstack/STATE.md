@@ -1,7 +1,7 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-07-14T15:30:00+0200
+last_updated: 2026-07-25T12:05:00+0200
 current_milestone: M025
 active_slice: S03
 active_task: none
@@ -28,6 +28,24 @@ dream-sampling de-flake, M025-S02 (`ea6b0b9` / `75cdcc1` / `40c0fc7`). Push gate
 both DONE** (verified: all slice summaries + shipped code); corrected `current` to M025.
 Re-verify against the per-milestone ROADMAPs, not this dashboard's history below.
 
+
+**Ad-hoc 2026-07-25 (test-suite vault-write isolation):** Operator asked where the
+`daily/` folder next to the checkout came from. It was the test suite: `core/paths.py`
+infers the vault as `WIKI_DIR.parent`, which in a dev checkout is the directory NEXT TO
+the repo, and 22 collector tests patched `paths.RAW_DIR` but never
+`core.daily_capture.DAILY_DIR` — so daily rollups had been written for real for two
+months (70 files / 23 date folders, plus `knowledge/takes/` and `_dashboard-*.md` from
+earlier instances, plus the same leak into `.claude/worktrees/daily/`). Fixed at the
+process level, not per test: `tests/conftest.py` repoints `DAILY_DIR` at a tmp sink AND
+installs a write guard (`tests/_vault_isolation.py`) that raises `VaultWriteEscape` on
+anything landing under `ROOT_DIR` outside `WIKI_DIR`; guard pinned by its own 4 tests.
+Suite **1773 green**, 14.3 s (unchanged). 85 leaked files moved to the session
+scratchpad, not deleted. **No CHANGELOG entry / no version bump — test infrastructure,
+no engine behaviour change; still 0.3.0.** Commit `6548069`, **committed, NOT pushed**
+(verified: `main...origin/main [ahead 1]`, `origin/main` at `64bcc6e`). Residue
+backlogged: `backlog/dev-checkout-root-dir-inference.md` (only `DAILY_DIR` is
+proactively repointed; non-test runs from the repo still write outside it). Does NOT
+touch milestone state — M025/S03 remains next.
 
 **Ad-hoc 2026-06-13e (output_language → curiosity + dream, 0.2.1):** Follow-up to
 issue #4 (the `personal.output_language` knob, shipped 0.1.9 — pins compiled-prose
