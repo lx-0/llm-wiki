@@ -1,16 +1,20 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-07-25T12:05:00+0200
-current_milestone: M025
-active_slice: S03
+last_updated: 2026-08-25T06:49:07Z
+current_milestone: M030
+active_slice: none
 active_task: none
 last_completed_milestone: M026
 parked_milestone: none
-parallel_milestones: [M021, M027, M029]
+parallel_milestones: [M021, M025, M027, M029]
 ---
 
 # State
+
+**Status:** M030 planned (M) — `wiki publish`: one-way idempotent mirror of ALL of `knowledge/` into meinkontext per `docs/PRODUCER-CONTRACT.md` (context-mcp v0.0.56; llm-wiki is the named first consumer). Pitch + verified contract details: `.ytstack/OFFICE-HOURS-remote-mcp-access.md` (committed 99cc7f6). Gate decided by operator 2026-08-25: full knowledge/, no subset filter; raw/, daily/, workspace/ never leave. Ready to slice.
+
+Next action: Run `ytstack:slice-milestone` to break M030 into concrete slices and tasks (suggested framing in M030-ROADMAP.md: mapping core → producer transport → cadence + docs + live proof). NOTE: M025-S03 (correction write-back) remains open in parallel — moved to parallel_milestones, its next-action block below still applies when resuming it.
 
 **Status (2026-06-25): M025 — S02 complete, reassessed → proceed to S03.** Capture-
 correction loop: S01 (capture spine) + S02 shipped — T01 `resolve_articles()`
