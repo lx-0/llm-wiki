@@ -1,12 +1,11 @@
 """Stale-session env sanitizing before SDK spawns (M031-S01).
 
-Root cause, live-proven 2026-08-25 (T3/T5 discriminating experiment on lxw):
-SessionEnd-hook children inherit CLAUDE_CODE_SSE_PORT / MESSAGING_SOCKET of
-the DYING parent session; the bundled CLI contacts the dead endpoint and exits
-1 with empty stderr — the entire flush-extract outage since 2026-08-14 (the
-day the host Claude Code update introduced these env vars). Input-independent:
-39-byte contexts failed identically. Fix = strip the session-wiring class in
-the ONE SDK harness before any spawn.
+Hygiene, not the outage fix: hook-spawned engine processes inherit the DYING
+parent session's wiring vars (CLAUDE_CODE_SSE_PORT / MESSAGING_SOCKET / …) —
+dead endpoints with no legitimate consumer. This was initially suspected as
+the 2026-08 flush-outage cause and REFUTED by a clean same-input A/B; the
+real cause was host-MCP schema injection (fixed via strict-mcp-config in the
+harness + flush). The strip stays as defensive hygiene with these tests.
 """
 from __future__ import annotations
 

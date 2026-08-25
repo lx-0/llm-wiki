@@ -57,13 +57,13 @@ from dataclasses import dataclass, field
 from .errors import swallow
 
 # ── Stale-session env hygiene ─────────────────────────────────────────
-# Root cause of the 2026-08-14→08-25 flush-extract outage (live-proven via
-# discriminating experiment: dead-socket env reproduces cli_crash/empty-stderr
-# exactly; live-socket env succeeds on the same context): SessionEnd-hook
-# children inherit the DYING parent session's wiring vars
-# (CLAUDE_CODE_SSE_PORT, CLAUDE_CODE_MESSAGING_SOCKET, …); the bundled CLI
-# contacts the dead endpoint on startup and exits 1 without stderr. The vars
-# have no legitimate consumer in a detached engine process — strip the class.
+# Hook-spawned engine processes inherit the DYING parent session's wiring
+# vars (CLAUDE_CODE_SSE_PORT, CLAUDE_CODE_MESSAGING_SOCKET, …) — dead
+# endpoints with no legitimate consumer in a detached process; strip the
+# class defensively. NOTE (M031-S01 debugging record): this was FIRST
+# suspected as the 2026-08 flush outage cause and then REFUTED by a clean
+# same-input A/B — the real cause was host-MCP schema injection (see the
+# strict-mcp-config block in run_sdk_query). Kept as hygiene, not as fix.
 # KEPT deliberately: CLAUDE_INVOKED_BY (engine-owned marker) and all
 # ANTHROPIC_* auth vars.
 _STALE_SESSION_ENV_EXACT = frozenset({"CLAUDECODE", "CLAUDE_PID", "CLAUDE_EFFORT"})
@@ -767,6 +767,16 @@ async def run_sdk_query(prompt: str, spec: SdkCallSpec, *, query_fn=None) -> Sdk
             options_kwargs["allowed_tools"] = list(spec.allowed_tools)
         if spec.permission_mode is not None:
             options_kwargs["permission_mode"] = spec.permission_mode
+
+    # Engine SDK calls NEVER want the HOST's MCP servers (substrate-is-subject
+    # discipline — and the M031-S01 root cause: a host MCP server shipping a
+    # top-level oneOf/allOf/anyOf schema turned every request into an API 400
+    # → silent CLI exit 1). strict-mcp-config makes the CLI use ONLY the MCP
+    # config passed explicitly (none, unless a spec sets one).
+    options_kwargs.setdefault("mcp_servers", {})
+    extra = dict(options_kwargs.get("extra_args") or {})
+    extra.setdefault("strict-mcp-config", None)
+    options_kwargs["extra_args"] = extra
 
     options = ClaudeAgentOptions(**options_kwargs)
 

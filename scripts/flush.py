@@ -11,11 +11,11 @@ import os
 os.environ["CLAUDE_INVOKED_BY"] = "memory_flush"
 
 # Strip the DYING parent session's wiring vars (CLAUDE_CODE_SSE_PORT,
-# MESSAGING_SOCKET, …) BEFORE the SDK import: hook-spawned flushes inherit
-# them, the bundled CLI contacts the dead endpoint and exits 1 with empty
-# stderr — the entire 2026-08-14→25 flush outage (M031-S01 root cause; flush
-# bypasses the run_sdk_query harness, so the harness-side strip alone does
-# not cover this path). sdk_helpers is import-light (no SDK pull).
+# MESSAGING_SOCKET, …) BEFORE the SDK import — hook-spawned flushes inherit
+# dead endpoints. Hygiene, NOT the 2026-08 outage cause (that was host-MCP
+# schema injection; see extract_from_context's strict-mcp-config). flush
+# bypasses the run_sdk_query harness, hence the module-level call here.
+# sdk_helpers is import-light (no SDK pull).
 import sys
 from pathlib import Path
 
@@ -161,6 +161,14 @@ async def extract_from_context(context: str) -> str | None:
                     tools=[],
                     max_turns=3,
                     setting_sources=[],
+                    # ROOT CAUSE of the 2026-08-14→25 outage (M031-S01, proven
+                    # T12/T13): without strict-mcp-config the CLI injects the
+                    # HOST's MCP-server tools into the request; one host server
+                    # ships a schema with top-level oneOf/allOf/anyOf → API 400
+                    # → exit 1 with empty stderr, flaky with MCP connectivity.
+                    # Flush wants ZERO tools — never load host MCP config.
+                    mcp_servers={},
+                    extra_args={"strict-mcp-config": None},
                     stderr=capture.callback,
                 ),
             ):
