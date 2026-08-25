@@ -119,11 +119,15 @@ def test_map_slugs_empty_slug_raises_naming_path(tmp_path: Path) -> None:
         map_slugs(tmp_path)
 
 
-def test_map_slugs_overlong_name_raises(tmp_path: Path) -> None:
+def test_map_slugs_overlong_name_truncates_deterministically(tmp_path: Path) -> None:
     # write_article's name param is capped at MAX_NAME_LENGTH=120 server-side.
+    # ALLES-mode (S04): raw/memories/ carries >120-char filenames — truncate
+    # to a 120-cap fixpoint slug instead of aborting the whole plan.
     _article(tmp_path, f"concepts/{'a' * 121}.md")
-    with pytest.raises(ValueError, match="120"):
-        map_slugs(tmp_path)
+    mapping = map_slugs(tmp_path)
+    (slug,) = mapping.keys()
+    assert slug == "a" * 120
+    assert server_slug(slug) == slug
 
 
 def test_map_slugs_unresolvable_collision_raises_with_both_paths(tmp_path: Path) -> None:

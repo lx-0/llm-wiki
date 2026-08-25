@@ -49,6 +49,14 @@ def server_slug(name: str) -> str:
     return _HYPHEN_TRIM.sub("", _NON_ALNUM_RUN.sub("-", folded.lower()))
 
 
+def _capped_slug(name: str) -> str:
+    """Slug candidate under the server's 120-char NAME cap: slugify, then
+    truncate deterministically (S04 — raw/memories/ carries >120-char
+    filenames; aborting the whole plan over one pathological name would
+    defeat ALLES-mode). The result stays a slugify fixpoint."""
+    return server_slug(name)[:MAX_NAME_LENGTH].rstrip("-")
+
+
 def _walk_root(vault: Path, root: str) -> Iterator[Path]:
     """Markdown files of one publish root. ``knowledge`` keeps THE canonical
     walker (``iter_articles`` — root index.md + hidden excluded); every other
@@ -107,13 +115,7 @@ def map_slugs(
     for root in roots:
         walked.extend(_walk_root(vault, root))
     for path in sorted(walked):
-        rel = path.relative_to(vault).as_posix()
-        if len(path.stem) > MAX_NAME_LENGTH:
-            raise ValueError(
-                f"{rel}: article name exceeds {MAX_NAME_LENGTH} chars "
-                "(server-side write_article name cap) — rename the article"
-            )
-        entries.append((rel, path))
+        entries.append((path.relative_to(vault).as_posix(), path))
 
     prev_by_path = {rel: slug for slug, rel in (previous or {}).items()}
     assigned: dict[str, str] = {}
@@ -127,7 +129,7 @@ def map_slugs(
 
     base_groups: dict[str, list[tuple[str, Path]]] = {}
     for rel, path in fresh:
-        base = server_slug(path.stem)
+        base = _capped_slug(path.stem)
         if not base:
             raise ValueError(f"{rel}: name slugifies to empty — rename the article")
         base_groups.setdefault(base, []).append((rel, path))
@@ -135,7 +137,7 @@ def map_slugs(
     for base, group in sorted(base_groups.items()):
         contested = len(group) > 1 or base in assigned
         for rel, path in group:
-            slug = server_slug(f"{path.parent.name}-{path.stem}") if contested else base
+            slug = _capped_slug(f"{path.parent.name}-{path.stem}") if contested else base
             if slug in assigned:
                 raise PublishCollisionError(
                     f"slug '{slug}' collides: {assigned[slug]} vs {rel} — "
