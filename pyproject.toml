@@ -9,6 +9,9 @@ authors = [
 ]
 requires-python = ">=3.12"
 dependencies = [
+    # httpx: engine-wide HTTP client (ollama, oura, jamie, publish). Declared
+    # 2026-08-25 (M030-S02-T01) — was a latent transitive-dep violation.
+    "httpx",
     "claude-agent-sdk>=0.1.29",
     "html2text>=2025.4.15",
     "imapclient>=3.0.0",

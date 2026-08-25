@@ -39,6 +39,7 @@ from core.config_schema import (  # noqa: E402
     Limits,
     Models,
     Personal,
+    Publish,
     Scheduling,
     Skills,
     _default_piggybacks,
@@ -59,6 +60,7 @@ _SECTIONS: tuple[tuple[str, type], ...] = (
     ("graph_view", GraphView),
     ("skills", Skills),
     ("personal", Personal),
+    ("publish", Publish),
 )
 
 # Piggyback names that legitimately appear in config.example.yaml without a

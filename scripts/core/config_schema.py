@@ -1095,6 +1095,26 @@ def _default_piggybacks() -> dict[str, PiggybackTask]:
 
 
 @dataclass
+class Publish:
+    """`wiki publish` — one-way mirror of knowledge/ into meinkontext (M030).
+
+    Binding contract: docs/PRODUCER-CONTRACT.md in the context-mcp repo.
+    The auth token is NOT a config knob — it lives as MEINKONTEXT_TOKEN in
+    `<vault>/.claude/.env` (secrets never enter config.yaml)."""
+
+    # Master switch. Off = the feature does not exist: no network, no state.
+    enabled: bool = False
+    # Streamable-HTTP MCP endpoint of the operator's context-mcp instance,
+    # e.g. https://dev.meinkontext.de/mcp. Empty = unconfigured (publish errors
+    # with an actionable message).
+    endpoint: str = ""
+    # Identity of the managed wiki on the server (create_wiki slug — stable,
+    # do not rename after the first publish) and its display name.
+    wiki_slug: str = "llm-wiki"
+    wiki_name: str = "LLM Wiki"
+
+
+@dataclass
 class WikiConfig:
     scheduling: Scheduling = field(default_factory=Scheduling)
     piggybacks: dict[str, PiggybackTask] = field(default_factory=_default_piggybacks)
@@ -1104,3 +1124,4 @@ class WikiConfig:
     graph_view: GraphView = field(default_factory=GraphView)
     skills: Skills = field(default_factory=Skills)
     personal: Personal = field(default_factory=Personal)
+    publish: Publish = field(default_factory=Publish)

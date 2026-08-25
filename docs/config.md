@@ -261,6 +261,15 @@ sub-blocks instead.
 | `personal.domains` | `["company", "personal", "ai", "meta"]` | M013 (2026-05-16): optional `domain:` frontmatter axis on `knowledge/` articles. |
 | `personal.output_language` | `"auto"` | Issue #4 (2026-06-13): pin the OUTPUT prose language of compiled `knowledge/**` articles. |
 
+## publish
+
+| Key | Default | Meaning |
+|---|---|---|
+| `publish.enabled` | `false` | Master switch. Off = the feature does not exist: no network, no state. |
+| `publish.endpoint` | `""` | Streamable-HTTP MCP endpoint of the operator's context-mcp instance, e.g. https://dev.meinkontext.de/mcp. |
+| `publish.wiki_slug` | `"llm-wiki"` | Identity of the managed wiki on the server (create_wiki slug — stable, do not rename after the first publish) and its display name. |
+| `publish.wiki_name` | `"LLM Wiki"` | — |
+
 <!-- END GENERATED TABLES -->
 
 ## Non-default piggyback keys

@@ -879,3 +879,17 @@ personal:
   curiosity_folders: []
   # Concrete project/product names used as examples in scan_screenshots_vision.md.
   project_examples: []
+
+publish:
+  # `wiki publish` — one-way mirror of knowledge/ into meinkontext (M030).
+  # Contract: docs/PRODUCER-CONTRACT.md in the context-mcp repo. The auth
+  # token is NOT a config knob — export MEINKONTEXT_TOKEN in .claude/.env.
+  # Master switch. Off = the feature does not exist: no network, no state.
+  enabled: false
+  # Streamable-HTTP MCP endpoint of the operator's context-mcp instance,
+  # e.g. https://dev.meinkontext.de/mcp. Empty = unconfigured.
+  endpoint: ""
+  # Identity of the managed wiki on the server (create_wiki slug — stable,
+  # do not rename after the first publish) and its display name.
+  wiki_slug: "llm-wiki"
+  wiki_name: "LLM Wiki"

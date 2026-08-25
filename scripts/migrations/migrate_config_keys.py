@@ -368,6 +368,14 @@ INJECTED_KEYS: dict[str, tuple[str, ...]] = {
         "exa_api_key",                  # Exa key; prefers .claude/.env (2026-05-31)
         "output_language",              # issue #4 compiled-prose language (2026-06-13)
     ),
+    # M030 `wiki publish` (2026-08-25) — whole block is new; migrate_additions
+    # creates the parent on first run. Token stays .env-only (no schema key).
+    "publish": (
+        "enabled",
+        "endpoint",
+        "wiki_slug",
+        "wiki_name",
+    ),
 }
 
 # Piggyback default blocks injected so the knob is visible/tunable in the
@@ -491,7 +499,7 @@ KEY_ADDITIONS: dict[str, dict[str, object]] = {
         if section == "piggybacks"
         else {name: _schema_default(section, name) for name in INJECTED_KEYS[section]}
     )
-    for section in ("models", "limits", "scheduling", "features", "piggybacks", "personal")
+    for section in ("models", "limits", "scheduling", "features", "piggybacks", "personal", "publish")
 }
 
 # Elements to add to existing list-valued config entries. Used when an
