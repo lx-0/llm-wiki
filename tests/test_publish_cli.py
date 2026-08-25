@@ -67,6 +67,30 @@ def test_render_human_shows_totals(tmp_path: Path) -> None:
     assert "foo" in out and "knowledge/people/bar.md" in out
 
 
+def test_piggyback_flag_skips_quietly_when_disabled(capsys) -> None:
+    # Piggyback fires unconditionally from the table; the publish.enabled
+    # gate makes it a designed no-op (exit 0), not an error — dev/default
+    # config has publish.enabled=false, so this runs against the real gate.
+    from publish.cli import main
+
+    assert main(["--piggyback"]) == 0
+    assert "skipping" in capsys.readouterr().err
+
+
+def test_disabled_live_publish_errors_before_walking_the_vault() -> None:
+    from publish.cli import main
+
+    assert main([]) == 1  # actionable error, and NO corpus walk happened
+
+
+def test_publish_piggyback_task_registered() -> None:
+    from core.piggybacks import build_piggyback_tasks
+
+    task = next(t for t in build_piggyback_tasks() if t["name"] == "publish")
+    assert task["cmd"] == ["publish/cli.py", "--piggyback"]
+    assert task["cooldown_hours"] == 6
+
+
 def test_command_catalog_has_publish_row() -> None:
     import cli
 

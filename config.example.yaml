@@ -208,6 +208,13 @@ piggybacks:
     enabled: false
     cooldown_hours: 168
 
+  # M030 wiki publish — keeps the meinkontext mirror fresh after compile.
+  # The real gate is publish.enabled (default false): on disabled vaults the
+  # cadence fire is a quiet no-op. Idempotent — nothing changed = no writes.
+  publish:
+    enabled: true
+    cooldown_hours: 6
+
 models:
   # Claude model used by compile.py + retry-failed-flushes.
   compile_model: claude-opus-4-8

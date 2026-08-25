@@ -102,6 +102,8 @@ def main(argv: list[str] | None = None) -> int:
                         help="machine-readable output")
     parser.add_argument("--auth", action="store_true",
                         help="connect the producer: one-time browser OAuth consent")
+    parser.add_argument("--piggyback", action="store_true",
+                        help="cadence mode: quiet no-op when publish is disabled")
     args = parser.parse_args(argv)
 
     if args.auth:
@@ -120,6 +122,21 @@ def main(argv: list[str] | None = None) -> int:
     # Imported lazily so tests can drive the plan builder with explicit paths.
     from core.config import CONFIG
     from core.paths import ROOT_DIR
+
+    # Enabled-gate BEFORE any corpus walk: the piggyback fires on cadence and
+    # must be a designed no-op (exit 0) on disabled vaults; a human gets the
+    # actionable error. Dry-run stays available either way.
+    if not args.dry_run and not CONFIG.publish.enabled:
+        if args.piggyback:
+            print("publish piggyback: publish.enabled=false — skipping",
+                  file=sys.stderr)
+            return 0
+        print(
+            "publish is disabled — enable with `wiki config set publish.enabled true` "
+            "(and set publish.endpoint)",
+            file=sys.stderr,
+        )
+        return 1
 
     roots = tuple(CONFIG.publish.roots)
     store = manifest_store()
@@ -153,13 +170,6 @@ def main(argv: list[str] | None = None) -> int:
     from publish.oauth import current_access_token
 
     cfg = CONFIG.publish
-    if not cfg.enabled:
-        print(
-            "publish is disabled — enable with `wiki config set publish.enabled true` "
-            "(and set publish.endpoint)",
-            file=sys.stderr,
-        )
-        return 1
 
     # Token order: explicit env override wins (must be a USER token — org
     # api-keys are read-only for the write tools); default = the OAuth store

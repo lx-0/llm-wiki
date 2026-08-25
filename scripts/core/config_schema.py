@@ -1091,6 +1091,12 @@ def _default_piggybacks() -> dict[str, PiggybackTask]:
         # consumes the latest one; longer cadence is fine since per-study
         # Pass-1 already fires per-run. Default OFF.
         "analyst_pass2": PiggybackTask(cooldown_hours=168, enabled=False),
+        # M030 wiki publish — meinkontext mirror freshness. Enabled here so
+        # the cadence exists by default; the REAL gate is publish.enabled
+        # (default false): on disabled vaults the --piggyback fire is a
+        # designed quiet no-op. Idempotent (content-hash delta), so a fire
+        # with nothing changed costs one corpus scan, zero network writes.
+        "publish": PiggybackTask(cooldown_hours=6, enabled=True),
     }
 
 

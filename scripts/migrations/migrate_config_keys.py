@@ -389,6 +389,7 @@ INJECTED_PIGGYBACKS: tuple[str, ...] = (
     "capture",              # M025 (2026-05-23)
     "study_run_due",        # M019 schedule dispatcher, default OFF (2026-05-17)
     "analyst_pass2",        # M019-S05 Pass-2 analyst, default OFF (2026-05-17)
+    "publish",              # M030-S03 meinkontext-mirror cadence (2026-08-25)
 )
 
 # Schema knobs the migration deliberately does NOT inject. Two classes:

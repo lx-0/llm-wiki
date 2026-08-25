@@ -217,6 +217,7 @@ sub-blocks instead.
 | `piggybacks.dream_cycle` | `true` | 24 | 3 |
 | `piggybacks.study_run_due` | `false` | 6 | — |
 | `piggybacks.analyst_pass2` | `false` | 168 | — |
+| `piggybacks.publish` | `true` | 6 | — |
 
 ## graph_view
 

@@ -96,6 +96,11 @@ _BUILTIN_PIGGYBACK_TASKS: dict[str, list[str]] = {
     # needs a `piggybacks.health_trends` block (default absent → skipped) AND
     # `features.health_trends` (off → health_trends.py falls back to dry-run).
     "health_trends": ["health_trends.py"],
+    # M030 wiki publish — keeps the meinkontext mirror fresh after compile.
+    # Double-gated: piggybacks.publish (cadence) AND publish.enabled
+    # (--piggyback exits 0 quietly on disabled vaults). Idempotent by
+    # content hash — a no-op fire plans zero writes.
+    "publish": ["publish/cli.py", "--piggyback"],
 }
 
 
