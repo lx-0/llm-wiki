@@ -1296,3 +1296,31 @@ A dollar figure may appear ONLY for a provider explicitly registered as pay-per-
 - **Best-effort** — a missed/double record degrades the report, never correctness (observability, not control flow).
 - **Non-numeric frontmatter** (sensitivity, sources, date) → ignored; only real numbers aggregate.
 - **Anti-bloat** → ONE sentinel block replaced in place each run — the opposite of the per-file compiled_from bloat that motivated the per-day deterministic skip.
+
+## 17. Publish (meinkontext remote mirror)
+
+`wiki publish` (`scripts/publish/`) maintains a managed wiki on the operator's context-mcp server as a one-way, idempotent mirror of the vault's markdown — the remote delivery half of M030 (lane D: llm-wiki produces, meinkontext serves over MCP). Contract: `docs/PRODUCER-CONTRACT.md` in the context-mcp repo (executable twin: its REFERENCE PRODUCER RUN test).
+
+```mermaid
+flowchart TD
+    ROOTS["publish.roots markdown<br/>(knowledge + raw + daily + reports + workspace)"] --> MAP["corpus.map_slugs<br/>fixpoint slugs (server slugify port),<br/>stability vs manifest, escalating disambiguation"]
+    IDX["knowledge/index.md rows"] --> DESC["describe — description per article<br/>(summary → first paragraph → stem, UTF-16 cap 1024)"]
+    MAP --> REN["render.normalize_links<br/>links → global slugs, else plain text"]
+    REN --> DELTA["delta — sha256 per payload vs<br/>state/publish.json manifest"]
+    DESC --> DELTA
+    DELTA -->|create/update/retract| EXEC["executor — sequential write_article /<br/>delete_object; fail-soft on server rejects"]
+    EXEC -->|"per-article, only after server success"| MANIFEST["state/publish.json<br/>(StateStore, layout v2 vault-rel)"]
+    OAUTH["oauth — DCR + PKCE + offline_access<br/>state/meinkontext-oauth.json"] --> CLIENT["client — stateless JSON-RPC over httpx,<br/>5xx retry, forced token refresh on -32001"]
+    EXEC --> CLIENT
+```
+
+**Wedge shape**: everything is delta-driven — the server versions every write, so idempotency is the producer's job (content-hash manifest). Local delete ⇒ `delete_object` (archive upstream, auditable); re-created file ⇒ `write_article` restores with continuing version history (live-proven, seq continues). The generated start page (MOC links + per-corpus counts) is tracked under the manifest's separate `start_page` key so the delta engine never plans its retraction. Cadence: `piggybacks.publish` fires `wiki publish --piggyback` after compile (quiet no-op while `publish.enabled: false`).
+
+### Edge Cases
+- **Server re-slugifies `name`** → every local slug is a fixpoint of the ported `slugifySkillName`; disambiguation ladder parent → full path → path+hash; >120-char stems truncate deterministically.
+- **Secret-shaped content** (key blocks, sk-prefixes in session transcripts) → server secret gate rejects; per-article fail-soft skip + WARNING, listed in the report.
+- **Non-markdown files** → no contract channel; counted loudly in the dry-run, never silently dropped.
+- **Upstream deploys mid-run** (every context-mcp merge deploys) → bounded 5xx retry with backoff.
+- **Access-JWT expiry mid-run** → token provider forces one refresh per request on `-32001` and retries.
+- **Transport abort** → progress is already persisted per article; the rerun resumes.
+- **v1 manifests** (knowledge-relative paths) → one-shot layout migration on load; live rollout proved zero phantom retractions.
