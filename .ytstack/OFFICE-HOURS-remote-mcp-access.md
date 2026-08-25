@@ -102,7 +102,7 @@ Sequencing note (REGEL #2): the llm-wiki side (gate + publish producer) is decid
 
 ## Open Questions
 
-1. **Gate width for D** (the remaining blocker before building `wiki publish`): full `knowledge/` export, or scope/sensitivity-gated subset (`sensitivity:` finally gets its policy consumer; `scope:` as compile-time axis per the federation notes)? What is the default — allowlist or blocklist?
+1. ~~Gate width for D~~ RESOLVED by operator 2026-08-25 ("ALLES"): **full `knowledge/` export, no sensitivity/scope subset.** The only boundary is `knowledge/` itself — raw/, daily/, workspace/ never leave (locked decisions: raw stays in the personal vault; also contract-infeasible: markdown-only articles, secret gate, 100 MB quota). The `sensitivity:` axis stays marking-only for this feature.
 2. **Is deep-corpus remote access (A) actually needed** once curated knowledge is deliverable everywhere via D — or is A deferred until a concrete session proves the gap?
 3. If A ever ships: may remote callers trigger `wiki query` (LLM spend + state writes), and is Mac-awake availability acceptable?
 4. ~~Retrieval ownership~~ RESOLVED 2026-08-24: meinkontext serves FTS `search` over article bodies + `get_object`; articles stay out of the digest.
@@ -123,8 +123,8 @@ Lane A (if built):
 ## Next Steps
 
 1. ~~meinkontext side~~ DONE 2026-08-24: Knowledge-KB shipped there as M019 (wikis first-class, v0.0.55) + M020 (producer contract, v0.0.56); `PRODUCER-CONTRACT.md` names llm-wiki's `wiki publish` as first consumer.
-2. Operator decides the **gate width** (Open Q1) — the only remaining decision before planning.
-3. Then `ytstack:plan-milestone` here for the publish feature: sensitivity/scope gate + `wiki publish` producer (contract-driven; copy the REFERENCE PRODUCER RUN as the integration-test template), knobs + migration same commit, PROCESS.md + config docs + both infographics in the same arc (llm-wiki-change process).
+2. ~~Gate width~~ DECIDED 2026-08-25: full `knowledge/`, no subset filter (see Open Questions #1).
+3. `ytstack:plan-milestone` here for the publish feature: `wiki publish` producer, contract-driven (REFERENCE PRODUCER RUN as integration-test template), knobs + migration same commit, PROCESS.md + config docs + both infographics in the same arc (llm-wiki-change process).
 
 ## What I noticed about how you think
 
