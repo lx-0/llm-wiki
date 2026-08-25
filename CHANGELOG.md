@@ -18,6 +18,56 @@ every operator's `wiki update` → `uv sync` regenerate `uv.lock` and dirty thei
 config keys must also be wired into `scripts/migrations/migrate_config_keys.py`
 in the same commit.
 
+## [0.4.0] — 2026-08-25
+
+The remote-access arc (M030): `wiki publish` mirrors the vault into a managed
+wiki on the operator's meinkontext (context-mcp) server — substrate and
+distillate as ONE wiki, readable by every agent anywhere over MCP. The vault
+stays the only source of truth; ~6.5k articles live after the first rollout.
+
+### Added
+
+- **`wiki publish`** — one-way, content-hash-idempotent mirror per the
+  context-mcp producer contract. `--dry-run` (+`--json`) prints the full plan
+  incl. per-corpus totals and the count of non-markdown files that have no
+  contract channel; `--auth` runs the one-time browser OAuth consent (DCR
+  public client, PKCE S256, `offline_access` → headless refresh-token flow,
+  incl. forced mid-run refresh when the access JWT expires); `--piggyback` is
+  the cadence mode (quiet no-op while `publish.enabled: false`).
+- **`publish.*` config block** (`enabled`, `endpoint`, `wiki_slug`,
+  `wiki_name`, `roots`) + `piggybacks.publish` (cooldown 6 h) so the mirror
+  stays fresh after the operator's normal compile loop.
+- **Multi-root corpora** (`publish.roots`): knowledge/ plus — per the ALLES
+  decision — raw/, daily/, reports/, workspace/. Slugs are fixpoints of the
+  server-side slugification (escalating disambiguation: parent → full path →
+  path+hash; deterministic 120-char cap); wikilinks normalize to global
+  slugs (unresolvable ones degrade to plain text); descriptions come from
+  the article's index.md summary row. Deleting a file archives the article
+  upstream; re-creating it restores it with continuing version history
+  (live-proven).
+- **docs/setup-publish.md** operator runbook + PROCESS.md §17.
+
+### Changed
+
+- `MEINKONTEXT_TOKEN` in `.claude/.env` is now an explicit override only
+  (must be a USER token — org api-keys are read-only for the write tools);
+  the OAuth token store at `.wiki/state/meinkontext-oauth.json` is the
+  default auth path.
+
+### Fixed
+
+- **`core/config.py load()` silently ignored whole new config sections** —
+  the hand-maintained merge list lacked new blocks, so operator YAML read
+  back as engine defaults (`publish.enabled: true` came back `false`). Now
+  merged + guarded by a derive-from-schema loader regression test; the
+  parallel silent gap in `config_docs.py _SECTIONS` is closed too.
+- Description length now capped in UTF-16 code units (the server measures JS
+  `String.length`; emoji count double — two live rejects).
+- Bounded 5xx/connection retry with backoff (the server redeploys on every
+  merge; a mid-run 503 no longer aborts the batch) and per-article resume
+  from the manifest after hard aborts.
+- `httpx` was engine-wide undeclared in `pyproject.toml` — now explicit.
+
 ## [0.3.0] — 2026-07-22
 
 The architecture-deepening arc: 14 refactor candidates in 4 waves (C01–C14),

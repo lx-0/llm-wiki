@@ -2781,3 +2781,15 @@ Adding a config *section* (not just a knob) is not done with the dataclass. Four
 ### Fix
 
 `load()` merge line added; `tests/test_config_loader_sections.py` derives the section list from the `WikiConfig` dataclass and asserts one overridden scalar per section survives `load()` — a future new section now fails the suite instead of running on factory defaults. (`config_docs._SECTIONS` has no equivalent guard yet; its failure is cosmetic.)
+
+## Long-running producer batches against a GitOps service: two abort classes are STRUCTURAL (2026-08-25, M030)
+
+### Lesson
+
+A multi-thousand-write sequential batch against a service that (a) redeploys on every merge and (b) issues sub-hour access JWTs WILL be cut mid-run — these are not flukes. First widened publish died at 54 s to a 503 connection-reset (upstream rollout mid-run), the resumed run at 51 min to `-32001` (JWT expiry). Neither is retryable-by-rerun alone unless per-item progress persists.
+
+### Fix (three legs, all needed)
+
+1. Per-item state writes only AFTER server success → any abort resumes exactly where it stopped (manifest as journal).
+2. Bounded 5xx/connection retry with backoff in the client (2 s/8 s) — deterministic errors (4xx, JSON-RPC validation) are NEVER retried; a repeated write is at worst a redundant deduplicated version per the producer contract.
+3. Token PROVIDER instead of token value: on `-32001`/401 force ONE refresh and retry the request. Resolving auth once at process start is a latent bug in any run longer than the token lifetime.
