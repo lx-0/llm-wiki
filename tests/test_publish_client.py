@@ -77,6 +77,48 @@ def test_call_tool_returns_result_and_tool_text_parses() -> None:
     assert json.loads(tool_text(result)) == {"ok": True}
 
 
+def test_transient_5xx_is_retried_with_backoff() -> None:
+    # Live incident 2026-08-25: envoy answered 503 "connection termination"
+    # mid-run during an upstream deploy (every meinkontext merge deploys).
+    # A bounded retry rides out pod rollouts; a repeated write is at worst a
+    # redundant deduplicated version per the contract.
+    attempts = {"n": 0}
+    naps: list[float] = []
+
+    def responder(method, payload):
+        if method == "tools/call":
+            attempts["n"] += 1
+            if attempts["n"] < 3:
+                return httpx.Response(503, text="upstream connect error")
+        return None
+
+    seen: list[dict] = []
+    client = ContextMcpClient(
+        "https://example.test/mcp", "tok-123",
+        transport=_server(seen, responder), retry_sleep=naps.append,
+    )
+    result = client.call_tool("list_wikis", {})
+    assert result["isError"] is False
+    assert attempts["n"] == 3
+    assert naps == [2.0, 8.0]
+
+
+def test_persistent_5xx_raises_after_three_attempts() -> None:
+    def responder(method, payload):
+        if method == "tools/call":
+            return httpx.Response(503, text="upstream connect error")
+        return None
+
+    naps: list[float] = []
+    client = ContextMcpClient(
+        "https://example.test/mcp", "tok-123",
+        transport=_server([], responder), retry_sleep=naps.append,
+    )
+    with pytest.raises(PublishClientError, match="503"):
+        client.call_tool("list_wikis", {})
+    assert naps == [2.0, 8.0]
+
+
 def test_http_401_raises_publish_client_error() -> None:
     def responder(method, payload):
         return httpx.Response(401, json={

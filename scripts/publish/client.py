@@ -12,10 +12,17 @@ axis — a read timeout alone does not fire on half-open sockets.
 from __future__ import annotations
 
 import itertools
+import time
+from typing import Callable
 
 import httpx
 
 PROTOCOL_VERSION = "2025-06-18"
+
+# Bounded retry for connection-level failures and 5xx: rides out upstream pod
+# rollouts (every meinkontext merge deploys — live 503 incident 2026-08-25).
+# A repeated write is at worst a redundant deduplicated version (contract).
+_RETRY_BACKOFF_S: tuple[float, ...] = (2.0, 8.0)
 
 
 class PublishClientError(RuntimeError):
@@ -47,7 +54,9 @@ class ContextMcpClient:
         *,
         timeout: httpx.Timeout | None = None,
         transport: httpx.BaseTransport | None = None,
+        retry_sleep: Callable[[float], None] = time.sleep,
     ) -> None:
+        self._retry_sleep = retry_sleep
         if not endpoint:
             raise PublishClientError(
                 "publish.endpoint is not configured (wiki config set publish.endpoint …)"
@@ -84,24 +93,42 @@ class ContextMcpClient:
             "method": method,
             "params": params,
         }
-        response = self._post(payload)
-        body: dict = {}
-        try:
-            body = response.json()
-        except ValueError:
-            pass
-        error = body.get("error")
-        if error:
-            raise PublishClientError(
-                f"{method}: server error {error.get('code')}: {error.get('message')}"
-            )
-        if response.status_code != 200:
-            raise PublishClientError(
-                f"{method}: HTTP {response.status_code}: {response.text[:200]}"
-            )
-        if "result" not in body:
-            raise PublishClientError(f"{method}: malformed response (no result)")
-        return body["result"]
+        attempts = len(_RETRY_BACKOFF_S) + 1
+        last: PublishClientError | None = None
+        for attempt in range(attempts):
+            try:
+                response = self._post(payload)
+            except PublishClientError as exc:  # connection-level
+                last = exc
+            else:
+                body: dict = {}
+                try:
+                    body = response.json()
+                except ValueError:
+                    pass
+                error = body.get("error")
+                if error:
+                    # JSON-RPC errors (auth, unknown tool, validation) are
+                    # deterministic — never retried.
+                    raise PublishClientError(
+                        f"{method}: server error {error.get('code')}: "
+                        f"{error.get('message')}"
+                    )
+                if response.status_code == 200:
+                    if "result" not in body:
+                        raise PublishClientError(
+                            f"{method}: malformed response (no result)"
+                        )
+                    return body["result"]
+                last = PublishClientError(
+                    f"{method}: HTTP {response.status_code}: {response.text[:200]}"
+                )
+                if response.status_code < 500:
+                    raise last  # 4xx is deterministic — no retry
+            if attempt < attempts - 1:
+                self._retry_sleep(_RETRY_BACKOFF_S[attempt])
+        assert last is not None
+        raise last
 
     def _notify(self, method: str) -> None:
         self._post({"jsonrpc": "2.0", "method": method})
