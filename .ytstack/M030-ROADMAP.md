@@ -5,7 +5,7 @@ size: M
 created: 2026-08-25T06:49:07Z
 status: planned
 total_slices: 3
-completed_slices: 0
+completed_slices: 1
 ---
 
 # M030 Roadmap
@@ -22,7 +22,7 @@ completed_slices: 0
 
 Slice detail lives in per-slice `M030-S##-PLAN.md` files, created by `ytstack:slice-milestone`.
 
-- [ ] S01 -- Mapping core: offline transform of knowledge/ into contract-shaped payloads (slugs, wikilink normalization, descriptions, content-hash delta, `publish --dry-run`)
+- [x] S01 -- Mapping core: offline transform of knowledge/ into contract-shaped payloads (slugs, wikilink normalization, descriptions, content-hash delta, `publish --dry-run`)
 - [ ] S02 -- Producer transport: `wiki publish` against meinkontext (JSON-RPC client, wiki bootstrap + start page, write/retract/restore executor, knobs+migration, first full live publish)
 - [ ] S03 -- Cadence + proof: compile piggyback, live retraction/restore E2E, reach-anywhere proof with Mac asleep, docs + infographics, closeout
 

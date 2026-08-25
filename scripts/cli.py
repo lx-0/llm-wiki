@@ -205,6 +205,20 @@ NOTES
   features.health_trends (off -> dry-run). Spec:
   .ytstack/backlog/health-trend-synthesis.md."""
 
+H_PUBLISH = """wiki publish — mirror knowledge/ into meinkontext (producer contract)
+
+USAGE
+  wiki publish --dry-run             print the publish plan (create/update/retract)
+  wiki publish --dry-run --json      machine-readable plan (GUI/agent seam)
+
+NOTES
+  One-way mirror of ALL of knowledge/ into the operator's meinkontext wiki
+  (context-mcp; binding contract: docs/PRODUCER-CONTRACT.md in that repo).
+  Idempotent by content hash — unchanged articles are never re-sent. raw/,
+  daily/ and workspace/ never leave the vault. Live execution ships with
+  M030-S02; until then the command is dry-run only.
+"""
+
 H_USAGE = """wiki usage — token-usage ledger (tokens per provider/model)
 
 USAGE
@@ -754,6 +768,8 @@ COMMANDS: tuple[CommandSpec, ...] = (
                 handler="links_audit.py", help_text=H_LINKS),
     CommandSpec("pin", "Knowledge ops", "pin an article into a Map-of-Content",
                 handler="pin.py", banner=False, menu=True, help_text=H_PIN),
+    CommandSpec("publish", "Knowledge ops", "mirror knowledge/ into meinkontext (--dry-run)",
+                handler="publish/cli.py", help_text=H_PUBLISH),
     CommandSpec("review-wiki", "Knowledge ops", "per-article quality scores (local LLM, free)",
                 handler="review-wiki.py", menu=True, help_text=H_REVIEW_WIKI),
     CommandSpec("health-trends", "Knowledge ops", "deterministic health-trend synthesis ($0)",

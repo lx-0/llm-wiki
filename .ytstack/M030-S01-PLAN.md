@@ -3,9 +3,9 @@ milestone: M030
 slice: S01
 project: llm-wiki
 created: 2026-08-25T07:01:45Z
-status: planned
+status: done
 task_count: 5
-completed_tasks: 4
+completed_tasks: 5
 ---
 
 # M030-S01 -- Slice Plan
@@ -18,7 +18,7 @@ completed_tasks: 4
 - [x] T02 -- Wikilink normalization reusing the `core.links` resolver: relative-to-file links → `[[target-slug]]`; unresolvable targets and targets outside `knowledge/` degrade to plain text (brackets stripped); fixture tests incl. footer/embed edge cases.
 - [x] T03 -- Description sourcing: per-article summary from the article's `knowledge/index.md` row via the FULL index-row parse (`read_wiki_index` + pipe-sentinel split, utils.py:205-208, shape `['', title, summary, sources, date, '']` — NOT `read_wiki_index_compact`, which strips exactly the summary column), fallback = first body paragraph; enforce non-empty ≤1024 chars; tests for both paths.
 - [x] T04 -- Content-hash delta engine: sha256 over the transformed payload (content + description + start_page flag), diff vs the state manifest → created/changed/deleted sets; idempotency test proves a second run yields an empty plan.
-- [ ] T05 -- `wiki publish --dry-run`: CommandSpec entry in the `scripts/cli.py` table printing the publish plan (per-article action + totals, `--json` seam for GUI/agents); golden test on a fixture vault.
+- [x] T05 -- `wiki publish --dry-run`: CommandSpec entry in the `scripts/cli.py` table printing the publish plan (per-article action + totals, `--json` seam for GUI/agents); golden test on a fixture vault.
 
 ## Done when
 

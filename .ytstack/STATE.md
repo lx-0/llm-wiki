@@ -12,9 +12,9 @@ parallel_milestones: [M021, M025, M027, M029]
 
 # State
 
-**Status:** M030 planned (M) — `wiki publish`: one-way idempotent mirror of ALL of `knowledge/` into meinkontext per `docs/PRODUCER-CONTRACT.md` (context-mcp v0.0.56; llm-wiki is the named first consumer). Pitch + verified contract details: `.ytstack/OFFICE-HOURS-remote-mcp-access.md` (committed 99cc7f6). Gate decided by operator 2026-08-25: full knowledge/, no subset filter; raw/, daily/, workspace/ never leave. Ready to slice.
+**Status:** M030 / S01 COMPLETE (5/5 tasks, suite 1819 green) — mapping core shipped: fixpoint slug mapper (`publish/corpus.py`), wikilink normalization (`publish/render.py`), description sourcing (`publish/describe.py`), content-hash delta (`publish/delta.py`), `wiki publish --dry-run` + `--json` in the CommandSpec catalog. All offline/fixture-tested; nothing has touched the live vault or server yet.
 
-Next action: Run `ytstack:slice-milestone` to break M030 into concrete slices and tasks (suggested framing in M030-ROADMAP.md: mapping core → producer transport → cadence + docs + live proof). NOTE: M025-S03 (correction write-back) remains open in parallel — moved to parallel_milestones, its next-action block below still applies when resuming it.
+Next action: reassess at the slice boundary, then S02 (producer transport). S02-T01..T04 are code-only; **S02-T05 (first full live publish of lxw) is operator-driven** — needs the `MEINKONTEXT_TOKEN` minted per context-mcp's live-import runbook and an explicit operator go (DECISIONS 2026-08-25: dry-run review replaces the approval walk). NOTE: M025-S03 (correction write-back) remains open in parallel — moved to parallel_milestones, its next-action block below still applies when resuming it.
 
 **Status (2026-06-25): M025 — S02 complete, reassessed → proceed to S03.** Capture-
 correction loop: S01 (capture spine) + S02 shipped — T01 `resolve_articles()`
