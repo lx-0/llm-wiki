@@ -55,6 +55,28 @@ def render_human(plan: PublishPlan) -> str:
     return "\n".join(lines)
 
 
+def render_report(report) -> str:
+    lines = [
+        f"published: {len(report.created)} created, {len(report.updated)} updated, "
+        f"{len(report.retracted)} retracted, {report.unchanged} unchanged"
+        + (", start page written" if report.start_page_written else "")
+    ]
+    for slug, reason in report.skipped:
+        lines.append(f"  SKIPPED  {slug}: {reason}")
+    return "\n".join(lines)
+
+
+def report_json(report) -> dict:
+    return {
+        "created": report.created,
+        "updated": report.updated,
+        "retracted": report.retracted,
+        "skipped": [{"slug": s, "reason": r} for s, r in report.skipped],
+        "start_page_written": report.start_page_written,
+        "unchanged": report.unchanged,
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="wiki publish",
@@ -63,26 +85,46 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--dry-run", action="store_true",
                         help="print the publish plan without writing anywhere")
     parser.add_argument("--json", action="store_true", dest="as_json",
-                        help="machine-readable plan output")
+                        help="machine-readable output")
     args = parser.parse_args(argv)
 
     # Imported lazily so tests can drive the plan builder with explicit paths.
     from core.paths import KNOWLEDGE_DIR, ROOT_DIR
 
     store = manifest_store()
-    plan, _ = build_publish_plan(KNOWLEDGE_DIR, ROOT_DIR, store)
+    plan, slug_map = build_publish_plan(KNOWLEDGE_DIR, ROOT_DIR, store)
 
-    if args.as_json:
-        print(json.dumps(to_json_payload(plan), ensure_ascii=False))
-    else:
-        print(render_human(plan))
+    if args.dry_run:
+        if args.as_json:
+            print(json.dumps(to_json_payload(plan), ensure_ascii=False))
+        else:
+            print(render_human(plan))
+        return 0
 
-    if not args.dry_run:
+    from core.config import CONFIG
+
+    from publish.bootstrap import ensure_wiki, start_page_payload
+    from publish.client import ContextMcpClient, resolve_token
+    from publish.executor import execute_publish
+
+    cfg = CONFIG.publish
+    if not cfg.enabled:
         print(
-            "live publish is not implemented yet (M030-S02) — run with --dry-run",
+            "publish is disabled — enable with `wiki config set publish.enabled true` "
+            "(and set publish.endpoint)",
             file=sys.stderr,
         )
         return 1
+
+    with ContextMcpClient(cfg.endpoint, resolve_token()) as client:
+        ensure_wiki(client, cfg.wiki_slug, cfg.wiki_name)
+        start = start_page_payload(slug_map, cfg.wiki_name)
+        report = execute_publish(client, store, plan, start, cfg.wiki_slug)
+
+    if args.as_json:
+        print(json.dumps(report_json(report), ensure_ascii=False))
+    else:
+        print(render_report(report))
     return 0
 
 

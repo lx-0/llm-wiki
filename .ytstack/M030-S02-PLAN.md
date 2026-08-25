@@ -5,7 +5,7 @@ project: llm-wiki
 created: 2026-08-25T07:01:45Z
 status: planned
 task_count: 5
-completed_tasks: 2
+completed_tasks: 3
 ---
 
 # M030-S02 -- Slice Plan
@@ -16,7 +16,7 @@ completed_tasks: 2
 
 - [x] T01 -- Minimal stateless MCP JSON-RPC client over httpx (`initialize` + `tools/call` against `POST /mcp`; the server runs Streamable HTTP with `enableJsonResponse: true`, so plain JSON round-trips suffice — no new SDK dependency): bearer token from `MEINKONTEXT_TOKEN` in `<vault>/.claude/.env` (their client convention), explicit `httpx.Timeout` + keepalive per house pattern; **declare `httpx` in `pyproject.toml` in the SAME commit** (engine-wide latent violation of the deps-explicit rule — it is imported everywhere but never declared). Config knobs `publish.enabled` (default false), `publish.endpoint`, `publish.wiki_slug`, `publish.wiki_name` in `config_schema.py` + `config.example.yaml` + migration entries in the SAME commit. The token is NO schema key at all — .env-only (llm-wiki's own `.env` convention, like EXA/IMAP), so no migration class applies.
 - [x] T02 -- Wiki bootstrap: idempotent `create_wiki {name, slug, managed_by: "llm-wiki"}` (existence check via `list_wikis`), plus generated start page (compact overview linking the MOCs + article count) published with `start_page: true`.
-- [ ] T03 -- Publish executor: sequential `write_article` for created/changed, `delete_object` for locally-deleted slugs, re-publish restores archived slugs; per-article fail-soft (server secret-gate reject → skip + WARNING in the errors-log, run continues); state manifest updated per article only on server success.
+- [x] T03 -- Publish executor: sequential `write_article` for created/changed, `delete_object` for locally-deleted slugs, re-publish restores archived slugs; per-article fail-soft (server secret-gate reject → skip + WARNING in the errors-log, run continues); state manifest updated per article only on server success.
 - [ ] T04 -- Lifecycle integration test mirroring the REFERENCE PRODUCER RUN semantics (`wiki-tools.test.ts:266` in context-mcp) against a fake in-process JSON-RPC server: publish → update (version bump) → retract → re-publish-restores; the fake server REPLICATES the server-side `slugifySkillName` re-slugification (asserting the S01 fixpoint property end-to-end); at least one test drives the real client + executor unmocked at the seam (mocks-mask-wiring rule).
 - [ ] T05 -- First full live publish of the lxw vault against `dev.meinkontext.de`: mint the operator token per the live-import runbook (`docs/setup/MCP-CONNECT.md`, context-mcp), run `wiki publish`, verify article counts via `list_wikis`/dashboard, rerun proves zero writes. Record evidence in the task summary.
 
