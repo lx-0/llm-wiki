@@ -29,6 +29,12 @@ class PublishClientError(RuntimeError):
     """Transport-level failure: HTTP status, JSON-RPC error, malformed body."""
 
 
+class PublishAuthError(PublishClientError):
+    """Unauthorized (-32001 / HTTP 401) — with a token provider, one forced
+    refresh + retry rides out mid-run access-token expiry (live incident
+    2026-08-25: the JWT expired 51 min into the widened publish)."""
+
+
 class ToolCallError(RuntimeError):
     """The tool executed and answered ``isError: true`` (e.g. secret-gate
     reject, cross-wiki slug conflict). Message = the tool's text content."""
@@ -50,8 +56,9 @@ class ContextMcpClient:
     def __init__(
         self,
         endpoint: str,
-        token: str,
+        token: str | None = None,
         *,
+        token_provider: Callable[..., str] | None = None,
         timeout: httpx.Timeout | None = None,
         transport: httpx.BaseTransport | None = None,
         retry_sleep: Callable[[float], None] = time.sleep,
@@ -61,15 +68,21 @@ class ContextMcpClient:
             raise PublishClientError(
                 "publish.endpoint is not configured (wiki config set publish.endpoint …)"
             )
+        if token_provider is None:
+            if token is None:
+                raise PublishClientError("either token or token_provider is required")
+            static = token
+
+            def token_provider(force: bool = False) -> str:  # noqa: ARG001
+                return static
+
+        self._token_provider = token_provider
+        self._token: str | None = None
         self._endpoint = endpoint
         self._ids = itertools.count(1)
         self._protocol: str | None = None
-        headers = {
-            "Authorization": f"Bearer {token}",
-            "Accept": "application/json, text/event-stream",
-        }
         self._http = httpx.Client(
-            headers=headers,
+            headers={"Accept": "application/json, text/event-stream"},
             timeout=timeout
             or httpx.Timeout(connect=10.0, read=60.0, write=60.0, pool=10.0),
             transport=transport,
@@ -78,7 +91,9 @@ class ContextMcpClient:
     # ── wire ────────────────────────────────────────────────────────────
 
     def _post(self, payload: dict) -> httpx.Response:
-        headers = {}
+        if self._token is None:
+            self._token = self._token_provider(force=False)
+        headers = {"Authorization": f"Bearer {self._token}"}
         if self._protocol:
             headers["MCP-Protocol-Version"] = self._protocol
         try:
@@ -87,6 +102,14 @@ class ContextMcpClient:
             raise PublishClientError(f"{self._endpoint}: {exc}") from exc
 
     def _rpc(self, method: str, params: dict) -> dict:
+        try:
+            return self._rpc_once(method, params)
+        except PublishAuthError:
+            # One forced token refresh per request, then a single retry.
+            self._token = self._token_provider(force=True)
+            return self._rpc_once(method, params)
+
+    def _rpc_once(self, method: str, params: dict) -> dict:
         payload = {
             "jsonrpc": "2.0",
             "id": next(self._ids),
@@ -108,23 +131,28 @@ class ContextMcpClient:
                     pass
                 error = body.get("error")
                 if error:
-                    # JSON-RPC errors (auth, unknown tool, validation) are
-                    # deterministic — never retried.
-                    raise PublishClientError(
+                    message = (
                         f"{method}: server error {error.get('code')}: "
                         f"{error.get('message')}"
                     )
+                    if error.get("code") == -32001 or response.status_code == 401:
+                        raise PublishAuthError(message)
+                    # Other JSON-RPC errors (unknown tool, validation) are
+                    # deterministic — never retried.
+                    raise PublishClientError(message)
                 if response.status_code == 200:
                     if "result" not in body:
                         raise PublishClientError(
                             f"{method}: malformed response (no result)"
                         )
                     return body["result"]
+                if response.status_code == 401:
+                    raise PublishAuthError(f"{method}: HTTP 401 Unauthorized")
                 last = PublishClientError(
                     f"{method}: HTTP {response.status_code}: {response.text[:200]}"
                 )
                 if response.status_code < 500:
-                    raise last  # 4xx is deterministic — no retry
+                    raise last  # other 4xx is deterministic — no retry
             if attempt < attempts - 1:
                 self._retry_sleep(_RETRY_BACKOFF_S[attempt])
         assert last is not None

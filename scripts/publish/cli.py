@@ -163,12 +163,21 @@ def main(argv: list[str] | None = None) -> int:
 
     # Token order: explicit env override wins (must be a USER token — org
     # api-keys are read-only for the write tools); default = the OAuth store
-    # minted by `wiki publish --auth`, refreshed headlessly.
+    # minted by `wiki publish --auth`, refreshed headlessly — including
+    # mid-run via the client's forced-refresh path (JWTs expire in <1 h,
+    # a full publish runs longer).
     import os
 
-    token = os.environ.get("MEINKONTEXT_TOKEN", "").strip() or current_access_token()
+    env_token = os.environ.get("MEINKONTEXT_TOKEN", "").strip()
+    if env_token:
+        client = ContextMcpClient(cfg.endpoint, env_token)
+    else:
+        def _provider(force: bool = False) -> str:
+            return current_access_token(force_refresh=force)
 
-    with ContextMcpClient(cfg.endpoint, token) as client:
+        client = ContextMcpClient(cfg.endpoint, token_provider=_provider)
+
+    with client:
         ensure_wiki(client, cfg.wiki_slug, cfg.wiki_name)
         start = start_page_payload(slug_map, cfg.wiki_name)
         report = execute_publish(client, store, plan, start, cfg.wiki_slug)

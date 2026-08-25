@@ -226,15 +226,24 @@ def mint_interactive(
 
 
 def current_access_token(
-    store_path: Path | None = None, *, http: httpx.Client | None = None
+    store_path: Path | None = None,
+    *,
+    http: httpx.Client | None = None,
+    force_refresh: bool = False,
 ) -> str:
     """A valid access token from the cache — refreshed (with rotation) when
-    stale. Raises with an actionable ``--auth`` hint when disconnected."""
+    stale, or unconditionally with ``force_refresh`` (the client forces one
+    after a mid-run -32001: server-side expiry beats our local clock).
+    Raises with an actionable ``--auth`` hint when disconnected."""
     store = token_store(store_path)
     data = store.reload()
     if not data.get("refresh_token"):
         raise PublishClientError(f"no producer token — {_AUTH_HINT}")
-    if data.get("access_token") and data.get("expires_at", 0) > time.time() + _SKEW_S:
+    if (
+        not force_refresh
+        and data.get("access_token")
+        and data.get("expires_at", 0) > time.time() + _SKEW_S
+    ):
         return data["access_token"]
 
     http = http or httpx.Client(timeout=httpx.Timeout(10.0))

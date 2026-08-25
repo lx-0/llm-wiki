@@ -119,6 +119,71 @@ def test_persistent_5xx_raises_after_three_attempts() -> None:
     assert naps == [2.0, 8.0]
 
 
+def test_expired_token_mid_run_forces_refresh_and_retries() -> None:
+    # Live incident 2026-08-25 #2: the access JWT expired 51 min into the
+    # widened publish (-32001 mid-run). With a token provider, an auth error
+    # forces ONE refresh and retries the request.
+    provider_calls: list[bool] = []
+
+    def provider(force: bool = False) -> str:
+        provider_calls.append(force)
+        return "new" if force else "old"
+
+    def responder(method, payload):
+        return None  # auth handled via recorder inspection below
+
+    seen: list[dict] = []
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        payload = json.loads(request.content.decode()) if request.content else {}
+        seen.append({"headers": dict(request.headers), "payload": payload})
+        method = payload.get("method")
+        auth = request.headers.get("authorization")
+        if method == "initialize":
+            return httpx.Response(200, json={
+                "jsonrpc": "2.0", "id": payload["id"],
+                "result": {"protocolVersion": "2025-06-18", "capabilities": {}},
+            })
+        if method == "notifications/initialized":
+            return httpx.Response(202)
+        if auth != "Bearer new":
+            return httpx.Response(401, json={
+                "jsonrpc": "2.0",
+                "error": {"code": -32001, "message": "Unauthorized"}, "id": None,
+            })
+        return httpx.Response(200, json={
+            "jsonrpc": "2.0", "id": payload["id"],
+            "result": {"content": [{"type": "text", "text": "{}"}], "isError": False},
+        })
+
+    client = ContextMcpClient(
+        "https://example.test/mcp", token_provider=provider,
+        transport=httpx.MockTransport(handle), retry_sleep=lambda s: None,
+    )
+    result = client.call_tool("list_wikis", {})
+    assert result["isError"] is False
+    assert True in provider_calls  # forced refresh happened
+    assert seen[-1]["headers"]["authorization"] == "Bearer new"
+
+
+def test_persistent_auth_error_raises_after_one_forced_refresh() -> None:
+    def provider(force: bool = False) -> str:
+        return "still-bad"
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(401, json={
+            "jsonrpc": "2.0",
+            "error": {"code": -32001, "message": "Unauthorized"}, "id": None,
+        })
+
+    client = ContextMcpClient(
+        "https://example.test/mcp", token_provider=provider,
+        transport=httpx.MockTransport(handle), retry_sleep=lambda s: None,
+    )
+    with pytest.raises(PublishClientError, match="Unauthorized"):
+        client.call_tool("list_wikis", {})
+
+
 def test_http_401_raises_publish_client_error() -> None:
     def responder(method, payload):
         return httpx.Response(401, json={
