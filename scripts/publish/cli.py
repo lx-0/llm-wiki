@@ -86,7 +86,22 @@ def main(argv: list[str] | None = None) -> int:
                         help="print the publish plan without writing anywhere")
     parser.add_argument("--json", action="store_true", dest="as_json",
                         help="machine-readable output")
+    parser.add_argument("--auth", action="store_true",
+                        help="connect the producer: one-time browser OAuth consent")
     args = parser.parse_args(argv)
+
+    if args.auth:
+        from core.config import CONFIG
+
+        from publish.oauth import DEFAULT_TOKEN_PATH, mint_interactive
+
+        if not CONFIG.publish.endpoint:
+            print("set publish.endpoint first (wiki config set publish.endpoint …)",
+                  file=sys.stderr)
+            return 1
+        mint_interactive(CONFIG.publish.endpoint)
+        print(f"producer connected — tokens stored at {DEFAULT_TOKEN_PATH}")
+        return 0
 
     # Imported lazily so tests can drive the plan builder with explicit paths.
     from core.paths import KNOWLEDGE_DIR, ROOT_DIR
@@ -104,8 +119,9 @@ def main(argv: list[str] | None = None) -> int:
     from core.config import CONFIG
 
     from publish.bootstrap import ensure_wiki, start_page_payload
-    from publish.client import ContextMcpClient, resolve_token
+    from publish.client import ContextMcpClient
     from publish.executor import execute_publish
+    from publish.oauth import current_access_token
 
     cfg = CONFIG.publish
     if not cfg.enabled:
@@ -116,7 +132,14 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 1
 
-    with ContextMcpClient(cfg.endpoint, resolve_token()) as client:
+    # Token order: explicit env override wins (must be a USER token — org
+    # api-keys are read-only for the write tools); default = the OAuth store
+    # minted by `wiki publish --auth`, refreshed headlessly.
+    import os
+
+    token = os.environ.get("MEINKONTEXT_TOKEN", "").strip() or current_access_token()
+
+    with ContextMcpClient(cfg.endpoint, token) as client:
         ensure_wiki(client, cfg.wiki_slug, cfg.wiki_name)
         start = start_page_payload(slug_map, cfg.wiki_name)
         report = execute_publish(client, store, plan, start, cfg.wiki_slug)

@@ -12,16 +12,10 @@ axis — a read timeout alone does not fire on half-open sockets.
 from __future__ import annotations
 
 import itertools
-import os
 
 import httpx
 
 PROTOCOL_VERSION = "2025-06-18"
-_RUNBOOK_HINT = (
-    "mint a user-scoped OAuth token per context-mcp's live-import runbook "
-    "(docs/setup/MCP-CONNECT.md) and export it as MEINKONTEXT_TOKEN in "
-    "<vault>/.claude/.env"
-)
 
 
 class PublishClientError(RuntimeError):
@@ -31,13 +25,6 @@ class PublishClientError(RuntimeError):
 class ToolCallError(RuntimeError):
     """The tool executed and answered ``isError: true`` (e.g. secret-gate
     reject, cross-wiki slug conflict). Message = the tool's text content."""
-
-
-def resolve_token() -> str:
-    token = os.environ.get("MEINKONTEXT_TOKEN", "").strip()
-    if not token:
-        raise PublishClientError(f"MEINKONTEXT_TOKEN is not set — {_RUNBOOK_HINT}")
-    return token
 
 
 def tool_text(result: dict) -> str:
