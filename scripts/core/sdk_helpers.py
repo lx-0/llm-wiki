@@ -56,6 +56,33 @@ from dataclasses import dataclass, field
 
 from .errors import swallow
 
+# ── Stale-session env hygiene ─────────────────────────────────────────
+# Root cause of the 2026-08-14→08-25 flush-extract outage (live-proven via
+# discriminating experiment: dead-socket env reproduces cli_crash/empty-stderr
+# exactly; live-socket env succeeds on the same context): SessionEnd-hook
+# children inherit the DYING parent session's wiring vars
+# (CLAUDE_CODE_SSE_PORT, CLAUDE_CODE_MESSAGING_SOCKET, …); the bundled CLI
+# contacts the dead endpoint on startup and exits 1 without stderr. The vars
+# have no legitimate consumer in a detached engine process — strip the class.
+# KEPT deliberately: CLAUDE_INVOKED_BY (engine-owned marker) and all
+# ANTHROPIC_* auth vars.
+_STALE_SESSION_ENV_EXACT = frozenset({"CLAUDECODE", "CLAUDE_PID", "CLAUDE_EFFORT"})
+_STALE_SESSION_ENV_PREFIX = "CLAUDE_CODE_"
+
+
+def sanitize_stale_session_env(environ: dict) -> list[str]:
+    """Remove inherited Claude-Code session-wiring vars from ``environ``
+    (mutates in place). Returns the removed keys, sorted callers-side for
+    logging. Idempotent; a clean env is a no-op."""
+    removed = [
+        key
+        for key in list(environ)
+        if key in _STALE_SESSION_ENV_EXACT or key.startswith(_STALE_SESSION_ENV_PREFIX)
+    ]
+    for key in removed:
+        del environ[key]
+    return removed
+
 # Patterns matched against captured stderr + exception text. Order is
 # priority — most-specific first.
 _RE_RATE_LIMIT = re.compile(
@@ -655,6 +682,12 @@ async def run_sdk_query(prompt: str, spec: SdkCallSpec, *, query_fn=None) -> Sdk
     # use the diagnostics primitives, and tests that monkeypatch
     # `core.usage.LEDGER` / `classify_failure` see the swap at call time.
     import asyncio
+    import os
+
+    removed_env = sanitize_stale_session_env(os.environ)  # type: ignore[arg-type]
+    if removed_env:
+        spec.logger.debug("stripped stale session env before SDK spawn: %s",
+                          ", ".join(sorted(removed_env)))
 
     from claude_agent_sdk import (
         AssistantMessage,
