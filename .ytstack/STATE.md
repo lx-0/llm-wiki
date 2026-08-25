@@ -2,8 +2,8 @@
 project: llm-wiki
 slug: llm-wiki
 last_updated: 2026-08-25T06:49:07Z
-current_milestone: none
-active_slice: none
+current_milestone: M031
+active_slice: S01
 active_task: none
 last_completed_milestone: M030
 parked_milestone: none
@@ -22,7 +22,9 @@ parallel_milestones: [M021, M025, M027, M029]
 
 **M030 COMPLETE 2026-08-25 (4/4 slices).** Remote access shipped end-to-end: the whole vault markdown (6571 articles + start page, ONE wiki) lives on dev.meinkontext.de, kept fresh by the compile piggyback; retract/restore live-proven on the tool surface; docs/CHANGELOG 0.4.0/infographics in the same arc. T03 reach-anywhere closed passed-with-caveats (operator had no second device; server-side grounded-read proven via MCP — other-device client + claude.ai connector remain as cheap verification debt, `backlog/publish-asset-channel.md` §3). Milestone-boundary reassess: no further slices needed; deferred threads live in `backlog/publish-asset-channel.md` (asset-channel upstream ask §1, 4 secret-gate files §2, reach-caveat §3).
 
-Next action: operator picks the next milestone (`ytstack:plan-milestone`); parallel arcs M025-S03 (correction write-back) etc. remain open per their blocks below. After T05: S03 (piggyback cadence, live retract/restore E2E, reach-anywhere proof, docs + infographics, closeout). NOTE: M025-S03 (correction write-back) remains open in parallel — moved to parallel_milestones, its next-action block below still applies when resuming it.
+**M031 RELIABILITY WAVE planned (L, 4 slices) — operator go "A+C" 2026-08-25** after the full-state audit (`reviews/2026-08-25-lxw-vault-audit.md`). C quick-wins already executed: health_trends + concept_reconciliation enabled (+ piggyback blocks), `links --fix --yes` (19 corrections / 26 links / 20 files), Fleet/Township `correct apply` sweep launched. Operator-side (lane B, NOT in milestone): kcma-d8 back online, mobile-bridge/LaunchAgents check; Triage-65 + Suggestions-10 decisions.
+
+Next action: M031-S01 (flush outage) — systematic-debugging first: classify the cli_crash class with captured evidence before any fix. Parallel arcs M025-S03 etc. remain open per their blocks below. After T05: S03 (piggyback cadence, live retract/restore E2E, reach-anywhere proof, docs + infographics, closeout). NOTE: M025-S03 (correction write-back) remains open in parallel — moved to parallel_milestones, its next-action block below still applies when resuming it.
 
 **Status (2026-06-25): M025 — S02 complete, reassessed → proceed to S03.** Capture-
 correction loop: S01 (capture spine) + S02 shipped — T01 `resolve_articles()`
