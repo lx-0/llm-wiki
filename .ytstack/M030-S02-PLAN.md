@@ -3,9 +3,9 @@ milestone: M030
 slice: S02
 project: llm-wiki
 created: 2026-08-25T07:01:45Z
-status: planned
+status: done
 task_count: 6
-completed_tasks: 5
+completed_tasks: 6
 ---
 
 # M030-S02 -- Slice Plan
@@ -18,7 +18,7 @@ completed_tasks: 5
 - [x] T02 -- Wiki bootstrap: idempotent `create_wiki {name, slug, managed_by: "llm-wiki"}` (existence check via `list_wikis`), plus generated start page (compact overview linking the MOCs + article count) published with `start_page: true`.
 - [x] T03 -- Publish executor: sequential `write_article` for created/changed, `delete_object` for locally-deleted slugs, re-publish restores archived slugs; per-article fail-soft (server secret-gate reject → skip + WARNING in the errors-log, run continues); state manifest updated per article only on server success.
 - [x] T04 -- Lifecycle integration test mirroring the REFERENCE PRODUCER RUN semantics (`wiki-tools.test.ts:266` in context-mcp) against a fake in-process JSON-RPC server: publish → update (version bump) → retract → re-publish-restores; the fake server REPLICATES the server-side `slugifySkillName` re-slugification (asserting the S01 fixpoint property end-to-end); at least one test drives the real client + executor unmocked at the seam (mocks-mask-wiring rule).
-- [ ] T05 -- First full live publish of the lxw vault against `dev.meinkontext.de`: mint the operator token per the live-import runbook (`docs/setup/MCP-CONNECT.md`, context-mcp), run `wiki publish`, verify article counts via `list_wikis`/dashboard, rerun proves zero writes. Record evidence in the task summary.
+- [x] T05 -- First full live publish of the lxw vault against `dev.meinkontext.de`: mint the operator token per the live-import runbook (`docs/setup/MCP-CONNECT.md`, context-mcp), run `wiki publish`, verify article counts via `list_wikis`/dashboard, rerun proves zero writes. Record evidence in the task summary.
 
 - [x] T06 -- OAuth user-token flow (ADDED 2026-08-25, operator catch: MCP-CONNECT.md documents no producer token mint — the Keychain `MEINKONTEXT_TOKEN` from that doc is an ORG api-key and read-only; write tools are user-principal only; the user JWT is short-lived). `wiki publish --auth`: RFC-9728/8414 discovery → DCR (`grant_types: [authorization_code, refresh_token]`, public client, PKCE S256) → one browser consent with scope `offline_access` (+ `resource=<endpoint>`) → access+refresh tokens persisted at `STATE_DIR/meinkontext-oauth.json` (google_oauth token-cache convention); headless auto-refresh with rotation before every publish run. Refresh-issuance condition verified in the vendored oauth-provider (client allows refresh grant AND scope offline_access). Env `MEINKONTEXT_TOKEN` demoted to explicit override/escape hatch. EXECUTES BEFORE T05 (T05 depends on it).
 
