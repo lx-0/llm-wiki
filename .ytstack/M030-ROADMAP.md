@@ -22,9 +22,9 @@ completed_slices: 0
 
 Slice detail lives in per-slice `M030-S##-PLAN.md` files, created by `ytstack:slice-milestone`.
 
-- [ ] S01 -- (to be planned)
-- [ ] S02 -- (to be planned)
-- [ ] S03 -- (to be planned)
+- [ ] S01 -- Mapping core: offline transform of knowledge/ into contract-shaped payloads (slugs, wikilink normalization, descriptions, content-hash delta, `publish --dry-run`)
+- [ ] S02 -- Producer transport: `wiki publish` against meinkontext (JSON-RPC client, wiki bootstrap + start page, write/retract/restore executor, knobs+migration, first full live publish)
+- [ ] S03 -- Cadence + proof: compile piggyback, live retraction/restore E2E, reach-anywhere proof with Mac asleep, docs + infographics, closeout
 
 Suggested framing for slicing (not binding): S01 mapping core (slug + wikilink normalization + description sourcing + content-hash state, offline against fixtures) → S02 producer transport (MCP client, create_wiki/write_article/retract/restore against live dev, token bootstrap, knobs + migration) → S03 cadence + docs + live end-to-end proof (piggyback/manual, PROCESS.md, config docs, infographics, closeout).
 

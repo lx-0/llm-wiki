@@ -31,10 +31,16 @@ M -- see `M030-ROADMAP.md` for slice breakdown.
 
 ## Open questions
 
-- Slug mapping: `knowledge/<type>/<name>.md` → flat global kebab-case slug. Prefix (`lw-`?) vs bare slugs; deterministic collision policy (slugs are unique across the WHOLE meinkontext catalog, not just our wiki).
-- Wikilink normalization: links are stored relative-to-file (core.links resolver) — normalization to `[[target-slug]]` must reuse that resolver; behavior for links whose target is outside knowledge/ (raw/, daily/) → drop, plain-text, or leave dangling?
-- Per-article `description` (required, ≤1024): source from the article's `knowledge/index.md` summary row (preferred, zero new LLM cost) — fallback when an article has no index row?
-- Publish cadence: compile piggyback (piggybacks.py pattern, cooldown-gated) vs explicit `wiki publish` only for v1?
-- Token bootstrap UX: where the OAuth token lives (`<vault>/.claude/.env` key name) and how the operator mints it (runbook pointer vs guided flow).
-- `start_page: true` target: generated landing page vs an existing MOC (index.md is too large to be the entry page).
-- Secret-gate rejects (server-side scan): skip-and-report per article vs abort run.
+(none — all seven slicing questions resolved 2026-08-25 as engine-side defaults, see decisions above; operator may veto any of them before the affected task runs)
+
+## Defaults decided at slicing (2026-08-25, operator veto possible)
+
+- Slugs: bare kebab-case, no `lw-` prefix (readability; the server already rejects cross-wiki slug collisions with the owning wiki named — surfaced as errors, deterministic local collision check on top).
+- Wikilinks: normalize via the existing `core.links` resolver; unresolvable targets and targets outside `knowledge/` degrade to plain text (compile policy already bans body links to raw/ + daily/, so this is the rare-edge posture, not the common case).
+- Descriptions: `knowledge/index.md` summary row (full-index row parse — the compact loader strips the summary column), fallback first body paragraph, hard-capped 1024.
+- `knowledge/index.md` itself is EXCLUDED from the publish set (inventory table would flood server FTS without persona value; the generated start page replaces it as entry point).
+- Slugs must be FIXPOINTS of the server-side `slugifySkillName` re-slugification (NFKD fold, lowercase, `[^a-z0-9]+`→`-`, hyphen-trim, 120-char cap), else retraction ids diverge — unit-tested.
+- Cadence: explicit `wiki publish` (S02) + compile piggyback via a proper `piggybacks.publish` table entry (S03; no separate bool knob).
+- Token: `MEINKONTEXT_TOKEN` in `<vault>/.claude/.env` — llm-wiki's OWN .env convention (like EXA/IMAP; context-mcp's own convention is Keychain/env-var, never a file). NO schema key, .env-only. Caveat: the vault iCloud-syncs, so the token reaches Apple's cloud — runbook must name this and offer Keychain indirection (S03-T04).
+- Start page: small generated overview article (MOC links + counts) with `start_page: true` — index.md is too large to serve as entry page.
+- Secret-gate rejects: fail-soft — skip article, WARNING in errors-log, run continues (matches compile's per-item posture).

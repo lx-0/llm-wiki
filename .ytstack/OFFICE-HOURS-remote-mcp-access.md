@@ -112,7 +112,7 @@ Sequencing note (REGEL #2): the llm-wiki side (gate + publish producer) is decid
 
 Lane D (export channel):
 - After a compile + publish cycle, an agent on ANY machine (incl. a claude.ai custom connector) answers a personal-context question from meinkontext-served articles/facts — Mac may be asleep.
-- Nothing outside the gate ever leaves the vault: no raw/, daily/, workspace/ content and no `sensitivity:`-excluded article reaches meinkontext, verified by gate tests; first export requires an explicit human approval walk.
+- Nothing outside `knowledge/` ever leaves the vault (raw/, daily/, workspace/ excluded by construction), verified by tests. ~~First export requires a human approval walk~~ SUPERSEDED 2026-08-25 (DECISIONS.md): gate = ALLES leaves no per-article decision to approve; the operator control is `wiki publish --dry-run` review + operator-driven first live publish.
 - Publish is one-way and idempotent (content-hash delta); deleting/retracting an article locally retracts it upstream on next publish.
 
 Lane A (if built):
