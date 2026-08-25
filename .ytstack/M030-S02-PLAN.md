@@ -26,4 +26,5 @@ All tasks marked `[x]` and verified via `ytstack:summarize-task`.
 
 ## Notes
 
+- 2026-08-25 (operator catch, post-T04): `MEINKONTEXT_TOKEN` was missing from the seeded `templates/.claude/.env.example` — added with runbook pointer + iCloud caution (`3e97c32`). Template-resync rule: env-var additions belong in the same commit as the code that reads them; T01 missed it.
 - WATCH-ITEM (architect review 2026-08-25): upstream tests retract via `svc.archive()` directly, not via the `delete_object` TOOL, and `delete_object`'s description text is stale ("currently NO restore") vs contract §Lifecycle 5 (run wins). T05 + S03-T02 are the first real proof of the tool-surface retract/restore path — on any deviation, report upstream via operator tasking (REGEL #2), do not work around silently.
