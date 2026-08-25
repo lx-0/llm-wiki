@@ -2771,3 +2771,13 @@ A test that reaches a path constant derived from `ROOT_DIR` writes to the operat
 2. `install_write_guard` (from `pytest_configure`) wraps `builtins.open` / `io.open` / `Path.open` / `Path.mkdir` / `os.{makedirs,mkdir,rename,replace,remove,unlink,rmdir}` and raises `VaultWriteEscape` on the first write landing under `ROOT_DIR` but outside `WIKI_DIR`. Prefix comparison on `os.path.abspath`, no syscall — it runs on every write in the suite (1773 tests, ~15 s, no measurable change).
 
 `tests/test_vault_isolation.py` pins the guard itself: without it the patching lives only in `pytest_configure` and could stop applying with nothing noticing. Verified by reproducing the leak (files dated the same day appeared mid-run), then confirming a clean run touches nothing outside the checkout.
+
+## A new top-level config section touches FOUR hand-maintained registries — two fail silent (2026-08-25, M030-S02)
+
+### Lesson
+
+Adding a config *section* (not just a knob) is not done with the dataclass. Four places list sections by hand: (1) `config_schema.WikiConfig` (the field), (2) `core/config.py load()`'s merge list, (3) `migrate_config_keys.py`'s `KEY_ADDITIONS` section tuple, (4) `config_docs.py _SECTIONS`. The migration one fails LOUD (policy drift test). The other two fail SILENT: `config_docs` reports "docs already current" while omitting the section, and — worse — `load()` simply never merges the operator's YAML, so `wiki config set publish.enabled true` wrote correct YAML that read back as `False`. Caught only by live read-back verification on lxw (the schema/example/migration drift tests all passed).
+
+### Fix
+
+`load()` merge line added; `tests/test_config_loader_sections.py` derives the section list from the `WikiConfig` dataclass and asserts one overridden scalar per section survives `load()` — a future new section now fails the suite instead of running on factory defaults. (`config_docs._SECTIONS` has no equivalent guard yet; its failure is cosmetic.)

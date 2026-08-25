@@ -320,6 +320,7 @@ def load() -> WikiConfig:
     cfg.graph_view = _merge_dataclass(cfg.graph_view, raw.get("graph_view") or {})
     cfg.skills = _merge_dataclass(cfg.skills, raw.get("skills") or {})
     cfg.personal = _merge_dataclass(cfg.personal, raw.get("personal") or {})
+    cfg.publish = _merge_dataclass(cfg.publish, raw.get("publish") or {})
     return cfg
 
 
