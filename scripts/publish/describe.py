@@ -40,10 +40,19 @@ def _collapse(text: str) -> str:
     return " ".join(text.split())
 
 
+def _utf16_units(text: str) -> int:
+    """The server validates ``description.length`` in JS — UTF-16 code units,
+    where astral characters (emoji) count double. Measure the same way (live
+    incident 2026-08-25: Python len passed, server rejected)."""
+    return len(text.encode("utf-16-le")) // 2
+
+
 def _cap(text: str) -> str:
-    if len(text) <= MAX_DESCRIPTION_LENGTH:
+    if _utf16_units(text) <= MAX_DESCRIPTION_LENGTH:
         return text
-    return text[: MAX_DESCRIPTION_LENGTH - 1].rstrip() + "…"
+    units = text.encode("utf-16-le")[: (MAX_DESCRIPTION_LENGTH - 1) * 2]
+    # errors="ignore" drops a half surrogate pair cut at the boundary
+    return units.decode("utf-16-le", errors="ignore").rstrip() + "…"
 
 
 def description_index(

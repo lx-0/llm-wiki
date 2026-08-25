@@ -73,3 +73,17 @@ def test_describe_caps_at_1024(tmp_path: Path) -> None:
     got = describe("concepts/foo.md", long_body, {})
     assert len(got) <= 1024
     assert got.endswith("…")
+
+
+def _utf16_units(text: str) -> int:
+    return len(text.encode("utf-16-le")) // 2
+
+
+def test_describe_caps_by_utf16_units_not_codepoints(tmp_path: Path) -> None:
+    # The server validates description.length in JS — UTF-16 code units, where
+    # astral chars (emoji) count DOUBLE. Live incident 2026-08-25: beulco/
+    # sprenger passed the Python len-cap yet were rejected upstream.
+    emoji_summary = "🚀" * 600  # 600 codepoints, 1200 UTF-16 units
+    got = describe("concepts/foo.md", "", {"concepts/foo.md": emoji_summary})
+    assert _utf16_units(got) <= 1024
+    assert got.endswith("…")
