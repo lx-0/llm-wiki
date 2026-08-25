@@ -10,6 +10,20 @@ import os
 
 os.environ["CLAUDE_INVOKED_BY"] = "memory_flush"
 
+# Strip the DYING parent session's wiring vars (CLAUDE_CODE_SSE_PORT,
+# MESSAGING_SOCKET, …) BEFORE the SDK import: hook-spawned flushes inherit
+# them, the bundled CLI contacts the dead endpoint and exits 1 with empty
+# stderr — the entire 2026-08-14→25 flush outage (M031-S01 root cause; flush
+# bypasses the run_sdk_query harness, so the harness-side strip alone does
+# not cover this path). sdk_helpers is import-light (no SDK pull).
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from core.sdk_helpers import sanitize_stale_session_env
+
+sanitize_stale_session_env(os.environ)
+
 import asyncio
 import contextlib
 import json
