@@ -893,3 +893,9 @@ publish:
   # do not rename after the first publish) and its display name.
   wiki_slug: "llm-wiki"
   wiki_name: "LLM Wiki"
+  # Vault roots whose markdown publishes (vault-relative folder names).
+  # Default = the curated wiki only; the ALLES widening adds raw, daily,
+  # reports, workspace. Non-markdown files never publish (markdown-only
+  # contract).
+  roots:
+  - knowledge

@@ -269,6 +269,7 @@ sub-blocks instead.
 | `publish.endpoint` | `""` | Streamable-HTTP MCP endpoint of the operator's context-mcp instance, e.g. https://dev.meinkontext.de/mcp. |
 | `publish.wiki_slug` | `"llm-wiki"` | Identity of the managed wiki on the server (create_wiki slug — stable, do not rename after the first publish) and its display name. |
 | `publish.wiki_name` | `"LLM Wiki"` | — |
+| `publish.roots` | `["knowledge"]` | Vault roots whose markdown publishes (vault-relative folder names). |
 
 <!-- END GENERATED TABLES -->
 

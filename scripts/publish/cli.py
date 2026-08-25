@@ -16,7 +16,14 @@ from pathlib import Path
 # same bootstrap as bridge/cli.py.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from publish.corpus import load_manifest, manifest_store, map_slugs  # noqa: E402
+from publish.corpus import (  # noqa: E402
+    DEFAULT_ROOTS,
+    count_non_markdown,
+    load_manifest,
+    manifest_store,
+    map_slugs,
+    migrate_manifest_layout,
+)
 from publish.delta import PublishPlan, build_payloads, plan_delta  # noqa: E402
 from publish.describe import description_index  # noqa: E402
 
@@ -24,16 +31,18 @@ from core.state_store import StateStore  # noqa: E402
 
 
 def build_publish_plan(
-    knowledge_dir: Path, vault: Path, store: StateStore
+    vault: Path, store: StateStore, roots: tuple[str, ...] = DEFAULT_ROOTS
 ) -> tuple[PublishPlan, dict[str, str]]:
-    """Manifest → stable slug map → payloads → delta plan."""
+    """Manifest (layout-migrated) → stable slug map → payloads → delta plan."""
+    migrate_manifest_layout(store)
     manifest = load_manifest(store)
     previous = {slug: entry.get("path", "") for slug, entry in manifest.items()}
-    slug_map = map_slugs(knowledge_dir, previous=previous)
+    slug_map = map_slugs(vault, roots, previous=previous)
+    knowledge_dir = vault / "knowledge"
     index_file = knowledge_dir / "index.md"
     index_text = index_file.read_text(encoding="utf-8") if index_file.exists() else ""
     index = description_index(index_text, knowledge_dir, vault)
-    payloads = build_payloads(knowledge_dir, vault, slug_map, index)
+    payloads = build_payloads(vault, slug_map, index)
     return plan_delta(payloads, manifest), slug_map
 
 
@@ -109,19 +118,34 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     # Imported lazily so tests can drive the plan builder with explicit paths.
-    from core.paths import KNOWLEDGE_DIR, ROOT_DIR
+    from core.config import CONFIG
+    from core.paths import ROOT_DIR
 
+    roots = tuple(CONFIG.publish.roots)
     store = manifest_store()
-    plan, slug_map = build_publish_plan(KNOWLEDGE_DIR, ROOT_DIR, store)
+    plan, slug_map = build_publish_plan(ROOT_DIR, store, roots)
+    non_md = count_non_markdown(ROOT_DIR, roots)
+
+    by_root: dict[str, int] = {}
+    for rel in slug_map.values():
+        root = rel.split("/", 1)[0]
+        by_root[root] = by_root.get(root, 0) + 1
+    breakdown = " · ".join(f"{r} {n}" for r, n in sorted(by_root.items()))
 
     if args.dry_run:
         if args.as_json:
-            print(json.dumps(to_json_payload(plan), ensure_ascii=False))
+            payload = to_json_payload(plan)
+            payload["non_markdown_skipped"] = non_md
+            print(json.dumps(payload, ensure_ascii=False))
         else:
             print(render_human(plan))
+            print(f"corpora: {breakdown}")
+            if non_md:
+                print(
+                    f"note: {non_md} non-markdown files in the publish roots have "
+                    "no contract channel (markdown-only) and are not published"
+                )
         return 0
-
-    from core.config import CONFIG
 
     from publish.bootstrap import ensure_wiki, start_page_payload
     from publish.client import ContextMcpClient

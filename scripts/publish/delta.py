@@ -55,20 +55,19 @@ def _payload_hash(name: str, description: str, content: str) -> str:
 
 
 def build_payloads(
-    knowledge_dir: Path,
     vault: Path,
     slug_map: dict[str, str],
     index: dict[str, str],
 ) -> list[ArticlePayload]:
     """Read + transform every mapped article into its wire shape, sorted by
-    slug. ``slug_map`` is T01's ``{slug: rel}``; ``index`` is T03's
-    ``{rel: summary}``."""
+    slug. ``slug_map`` is ``{slug: vault-relative rel}``; ``index`` is
+    ``{rel: summary}`` (same key space)."""
     slug_by_relpath = {rel: slug for slug, rel in slug_map.items()}
     payloads: list[ArticlePayload] = []
     for slug, rel in sorted(slug_map.items()):
-        path = knowledge_dir / rel
+        path = vault / rel
         body = path.read_text(encoding="utf-8")
-        content, _ = normalize_links(body, path, vault, slug_by_relpath, knowledge_dir)
+        content, _ = normalize_links(body, path, vault, slug_by_relpath)
         description = describe(rel, body, index)
         stem = Path(rel).stem
         name = stem if server_slug(stem) == slug else slug

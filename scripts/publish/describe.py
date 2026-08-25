@@ -59,11 +59,12 @@ def description_index(
     index_text: str, knowledge_dir: Path, vault: Path
 ) -> dict[str, str]:
     """Parse the full index (`| Article | Summary | Compiled From | Updated |`)
-    into ``{knowledge-relative path: summary text}``. Rows whose Article link
-    does not resolve are skipped (the audit surface for those is `wiki links`,
-    not publish)."""
+    into ``{VAULT-relative path: summary text}`` (keys like
+    ``knowledge/concepts/foo.md`` since the M030-S04 vault-rel layout). Rows
+    whose Article link does not resolve are skipped (the audit surface for
+    those is `wiki links`, not publish)."""
     source = knowledge_dir / "index.md"
-    knowledge_root = knowledge_dir.resolve()
+    vault_root = vault.resolve()
     out: dict[str, str] = {}
     for line in index_text.splitlines():
         if not line.startswith("| ") or line.startswith("| Article |"):
@@ -81,7 +82,7 @@ def description_index(
         if resolved is None:
             continue
         try:
-            rel = resolved.relative_to(knowledge_root).as_posix()
+            rel = resolved.relative_to(vault_root).as_posix()
         except ValueError:
             continue
         out[rel] = _collapse(_links_to_text(cols[2]))

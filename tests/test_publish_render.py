@@ -1,4 +1,4 @@
-"""Tests for publish wikilink normalization (M030-S01-T02).
+"""Tests for publish wikilink normalization (M030-S01-T02, vault-rel since S04).
 
 A served article's links must resolve BY SLUG on the meinkontext side
 (PRODUCER-CONTRACT.md: links are `[[target-slug]]`, resolved by convention).
@@ -26,14 +26,16 @@ def _vault(tmp_path: Path) -> tuple[Path, Path]:
     return vault, k
 
 
-def _slug_index(k: Path) -> dict[str, str]:
-    return {rel: slug for slug, rel in map_slugs(k).items()}
+def _slug_index(vault: Path) -> dict[str, str]:
+    # knowledge-only roots here: raw/ stays outside the publish set, so links
+    # into it must degrade (the multiroot behavior has its own test file).
+    return {rel: slug for slug, rel in map_slugs(vault).items()}
 
 
 def test_cross_folder_link_becomes_slug(tmp_path: Path) -> None:
     vault, k = _vault(tmp_path)
     src = k / "people" / "bar.md"
-    text, n = normalize_links("see [[../concepts/foo]]\n", src, vault, _slug_index(k), k)
+    text, n = normalize_links("see [[../concepts/foo]]\n", src, vault, _slug_index(vault))
     assert text == "see [[foo]]\n"
     assert n == 1
 
@@ -43,7 +45,7 @@ def test_alias_heading_and_bang_preserved_on_slug_rewrite(tmp_path: Path) -> Non
     src = k / "people" / "bar.md"
     text, _ = normalize_links(
         "a [[../concepts/foo#History|the Foo]] b ![[../concepts/foo]]\n",
-        src, vault, _slug_index(k), k,
+        src, vault, _slug_index(vault),
     )
     assert text == "a [[foo#History|the Foo]] b ![[foo]]\n"
 
@@ -51,7 +53,9 @@ def test_alias_heading_and_bang_preserved_on_slug_rewrite(tmp_path: Path) -> Non
 def test_disambiguated_slug_is_used(tmp_path: Path) -> None:
     vault, k = _vault(tmp_path)
     src = k / "people" / "bar.md"
-    text, _ = normalize_links("[[../concepts/alex]] und [[alex]]\n", src, vault, _slug_index(k), k)
+    text, _ = normalize_links(
+        "[[../concepts/alex]] und [[alex]]\n", src, vault, _slug_index(vault)
+    )
     # people/bar.md's neighbor link [[alex]] resolves source-relative to people/alex.md
     assert text == "[[concepts-alex]] und [[people-alex]]\n"
 
@@ -59,7 +63,7 @@ def test_disambiguated_slug_is_used(tmp_path: Path) -> None:
 def test_unresolvable_link_degrades_to_plain_text(tmp_path: Path) -> None:
     vault, k = _vault(tmp_path)
     src = k / "concepts" / "foo.md"
-    text, n = normalize_links("see [[does-not-exist]] here\n", src, vault, _slug_index(k), k)
+    text, n = normalize_links("see [[does-not-exist]] here\n", src, vault, _slug_index(vault))
     assert text == "see does-not-exist here\n"
     assert n == 1
 
@@ -67,29 +71,39 @@ def test_unresolvable_link_degrades_to_plain_text(tmp_path: Path) -> None:
 def test_alias_wins_as_plain_text(tmp_path: Path) -> None:
     vault, k = _vault(tmp_path)
     src = k / "concepts" / "foo.md"
-    text, _ = normalize_links("[[does-not-exist#h|Nice Name]]\n", src, vault, _slug_index(k), k)
+    text, _ = normalize_links("[[does-not-exist#h|Nice Name]]\n", src, vault, _slug_index(vault))
     assert text == "Nice Name\n"
 
 
-def test_outside_knowledge_target_degrades(tmp_path: Path) -> None:
+def test_outside_publish_set_target_degrades(tmp_path: Path) -> None:
     vault, k = _vault(tmp_path)
     src = k / "concepts" / "foo.md"
-    text, _ = normalize_links("[[../../raw/notes/scratch]]\n", src, vault, _slug_index(k), k)
+    text, _ = normalize_links("[[../../raw/notes/scratch]]\n", src, vault, _slug_index(vault))
     assert text == "../../raw/notes/scratch\n"
 
 
 def test_index_md_link_degrades(tmp_path: Path) -> None:
     vault, k = _vault(tmp_path)
     src = k / "concepts" / "foo.md"
-    text, _ = normalize_links("[[../index|Katalog]]\n", src, vault, _slug_index(k), k)
+    text, _ = normalize_links("[[../index|Katalog]]\n", src, vault, _slug_index(vault))
     assert text == "Katalog\n"
 
 
 def test_media_embed_degrades_to_filename(tmp_path: Path) -> None:
     vault, k = _vault(tmp_path)
     src = k / "concepts" / "foo.md"
-    text, _ = normalize_links("![[diagram.png]]\n", src, vault, _slug_index(k), k)
+    text, _ = normalize_links("![[diagram.png]]\n", src, vault, _slug_index(vault))
     assert text == "diagram.png\n"
+
+
+def test_raw_link_becomes_slug_when_raw_is_published(tmp_path: Path) -> None:
+    # ONE-wiki decision (2026-08-25): with raw/ in the roots, substrate links
+    # resolve to slugs instead of degrading.
+    vault, k = _vault(tmp_path)
+    idx = {rel: slug for slug, rel in map_slugs(vault, ("knowledge", "raw")).items()}
+    src = k / "concepts" / "foo.md"
+    text, _ = normalize_links("[[../../raw/notes/scratch]]\n", src, vault, idx)
+    assert text == "[[scratch]]\n"
 
 
 def test_frontmatter_and_fences_untouched(tmp_path: Path) -> None:
@@ -100,7 +114,7 @@ def test_frontmatter_and_fences_untouched(tmp_path: Path) -> None:
         "```\n[[../concepts/foo]]\n```\n"
         "[[../concepts/foo]]\n"
     )
-    text, n = normalize_links(original, src, vault, _slug_index(k), k)
+    text, n = normalize_links(original, src, vault, _slug_index(vault))
     assert "compiled_from: [[x]]" in text
     assert "```\n[[../concepts/foo]]\n```" in text
     assert text.endswith("[[foo]]\n")
@@ -111,7 +125,7 @@ def test_no_links_round_trips_byte_identical(tmp_path: Path) -> None:
     vault, k = _vault(tmp_path)
     src = k / "concepts" / "foo.md"
     original = "plain text\n\nwith | table | pipes |\n"
-    text, n = normalize_links(original, src, vault, _slug_index(k), k)
+    text, n = normalize_links(original, src, vault, _slug_index(vault))
     assert text == original
     assert n == 0
 
@@ -120,6 +134,6 @@ def test_table_escaped_alias_pipe_preserved(tmp_path: Path) -> None:
     vault, k = _vault(tmp_path)
     src = k / "people" / "bar.md"
     text, _ = normalize_links(
-        "| [[../concepts/foo\\|Foo]] |\n", src, vault, _slug_index(k), k
+        "| [[../concepts/foo\\|Foo]] |\n", src, vault, _slug_index(vault)
     )
     assert text == "| [[foo\\|Foo]] |\n"

@@ -30,11 +30,10 @@ def normalize_links(
     source: Path,
     vault: Path,
     slug_by_relpath: dict[str, str],
-    knowledge_dir: Path,
 ) -> tuple[str, int]:
     """Rewrite ``text`` (an article at ``source``) for serving.
 
-    - a link resolving to a published article (knowledge-relative path in
+    - a link resolving to a published article (VAULT-relative path in
       ``slug_by_relpath``) gets its target replaced by the slug; embed-bang,
       ``#heading``, ``|alias`` and the table-escaped ``\\|`` all survive
     - every other link collapses to plain text: the alias if present, else the
@@ -43,7 +42,7 @@ def normalize_links(
     Returns ``(new_text, changed_link_count)``; link-free text round-trips
     byte-identical.
     """
-    knowledge_root = knowledge_dir.resolve()
+    vault_root = vault.resolve()
     changed = 0
     out: list[str] = []
     for _, line, live in _strip_frontmatter_and_fences(text.split("\n")):
@@ -60,7 +59,7 @@ def normalize_links(
             resolved = resolve_link(clean, source, vault)
             if resolved is not None:
                 try:
-                    rel = resolved.relative_to(knowledge_root).as_posix()
+                    rel = resolved.relative_to(vault_root).as_posix()
                 except ValueError:
                     rel = None
                 if rel is not None:

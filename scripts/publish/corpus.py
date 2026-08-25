@@ -12,10 +12,16 @@ from __future__ import annotations
 import re
 import unicodedata
 from pathlib import Path
+from typing import Iterator, Sequence
 
 from core.links import iter_articles
 from core.paths import STATE_DIR
 from core.state_store import StateStore
+
+# Default corpus: the curated wiki only. The ALLES widening (M030-S04,
+# operator 2026-08-25: "Substrat und Destillat gehören zusammen") adds
+# raw/daily/reports/workspace per-vault via `publish.roots`.
+DEFAULT_ROOTS: tuple[str, ...] = ("knowledge",)
 
 # write_article's name cap server-side (skill-validation.ts:29). The slug
 # function itself does NOT truncate — overlong names are rejected upstream,
@@ -43,13 +49,49 @@ def server_slug(name: str) -> str:
     return _HYPHEN_TRIM.sub("", _NON_ALNUM_RUN.sub("-", folded.lower()))
 
 
-def map_slugs(
-    knowledge_dir: Path, previous: dict[str, str] | None = None
-) -> dict[str, str]:
-    """Assign a flat global slug to every article under ``knowledge_dir``.
+def _walk_root(vault: Path, root: str) -> Iterator[Path]:
+    """Markdown files of one publish root. ``knowledge`` keeps THE canonical
+    walker (``iter_articles`` — root index.md + hidden excluded); every other
+    root walks ``**/*.md`` with the same hidden-exclusion. A missing root is
+    silently empty (not every vault has workspace/)."""
+    base = vault / root
+    if not base.is_dir():
+        return
+    if root == "knowledge":
+        yield from iter_articles(base)
+        return
+    for path in base.rglob("*.md"):
+        if any(part.startswith(".") for part in path.relative_to(base).parts):
+            continue
+        yield path
 
-    Returns ``{slug: knowledge-relative posix path}``. Walk = ``iter_articles``
-    (root ``index.md`` and hidden files excluded there). Deterministic and
+
+def count_non_markdown(vault: Path, roots: Sequence[str]) -> int:
+    """Files in the publish roots the contract cannot carry (markdown-only).
+    Reported by the CLI so the cap is never silent."""
+    count = 0
+    for root in roots:
+        base = vault / root
+        if not base.is_dir():
+            continue
+        for path in base.rglob("*"):
+            if not path.is_file() or path.suffix == ".md":
+                continue
+            if any(part.startswith(".") for part in path.relative_to(base).parts):
+                continue
+            count += 1
+    return count
+
+
+def map_slugs(
+    vault: Path,
+    roots: Sequence[str] = DEFAULT_ROOTS,
+    previous: dict[str, str] | None = None,
+) -> dict[str, str]:
+    """Assign a flat global slug to every markdown article under ``roots``.
+
+    Returns ``{slug: VAULT-relative posix path}`` (e.g.
+    ``knowledge/concepts/foo.md``, ``raw/notes/x.md``). Deterministic and
     input-order-independent: entries and base-slug groups are processed in
     sorted order.
 
@@ -61,8 +103,11 @@ def map_slugs(
     - an empty slug or a collision surviving disambiguation is a hard error
     """
     entries: list[tuple[str, Path]] = []
-    for path in sorted(iter_articles(knowledge_dir)):
-        rel = path.relative_to(knowledge_dir).as_posix()
+    walked: list[Path] = []
+    for root in roots:
+        walked.extend(_walk_root(vault, root))
+    for path in sorted(walked):
+        rel = path.relative_to(vault).as_posix()
         if len(path.stem) > MAX_NAME_LENGTH:
             raise ValueError(
                 f"{rel}: article name exceeds {MAX_NAME_LENGTH} chars "
@@ -106,6 +151,26 @@ def manifest_store(path: Path | None = None) -> StateStore:
     instance per call so reloads observe the disk truth; the schema is
     additive — T04 adds hashes, S02 adds wiki metadata."""
     return StateStore(path or DEFAULT_MANIFEST_PATH)
+
+
+def migrate_manifest_layout(store: StateStore) -> None:
+    """One-shot v1→v2 manifest migration (M030-S04): v1 stored
+    KNOWLEDGE-relative paths (`concepts/foo.md`), v2 stores VAULT-relative
+    (`knowledge/concepts/foo.md`). Without this, the first widened run would
+    see every live article as deleted and plan 2000+ phantom retractions.
+    Idempotent via the ``layout`` marker; locked RMW like every manifest write."""
+    if store.load().get("layout") == "vault-rel":
+        return
+
+    def _mut(data: dict) -> None:
+        articles = data.get("articles", {})
+        for entry in articles.values():
+            path = entry.get("path", "")
+            if path and not path.startswith("knowledge/"):
+                entry["path"] = f"knowledge/{path}"
+        data["layout"] = "vault-rel"
+
+    store.update(_mut)
 
 
 def load_manifest(store: StateStore) -> dict:

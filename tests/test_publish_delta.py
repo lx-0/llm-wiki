@@ -41,9 +41,9 @@ def _vault(tmp_path: Path) -> tuple[Path, Path]:
 def _payloads(vault: Path, k: Path):
     from publish.describe import description_index
 
-    slug_map = map_slugs(k)
+    slug_map = map_slugs(vault)
     index = description_index((k / "index.md").read_text(encoding="utf-8"), k, vault)
-    return build_payloads(k, vault, slug_map, index)
+    return build_payloads(vault, slug_map, index)
 
 
 def test_payload_content_is_link_normalized_and_described(tmp_path: Path) -> None:
@@ -119,7 +119,7 @@ def test_deleted_article_plans_retraction_and_record_removes(tmp_path: Path) -> 
     (k / "concepts" / "foo.md").unlink()
     manifest = store.reload().get("articles", {})
     plan = plan_delta(_payloads(vault, k), manifest)
-    assert plan.retract == [("foo", "concepts/foo.md")]
+    assert plan.retract == [("foo", "knowledge/concepts/foo.md")]
 
     record_retracted(store, "foo")
     assert "foo" not in store.reload().get("articles", {})

@@ -142,7 +142,7 @@ def _run_publish(server: FakeContextMcp, store, k: Path, vault: Path):
     client = ContextMcpClient("https://fake.test/mcp", "tok",
                               transport=server.transport())
     ensure_wiki(client, "llm-wiki", "LLM Wiki")
-    plan, slug_map = build_publish_plan(k, vault, store)
+    plan, slug_map = build_publish_plan(vault, store)
     start = start_page_payload(slug_map, "LLM Wiki")
     return execute_publish(client, store, plan, start, "llm-wiki")
 

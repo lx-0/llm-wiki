@@ -44,12 +44,19 @@ def start_page_payload(slug_map: dict[str, str], wiki_name: str) -> ArticlePaylo
             f"an article already claims the reserved start-page slug '{START_SLUG}' "
             f"({slug_map[START_SLUG]}) — rename it"
         )
-    mocs = sorted(slug for slug, rel in slug_map.items() if rel.startswith("MOCs/"))
+    mocs = sorted(
+        slug for slug, rel in slug_map.items() if rel.startswith("knowledge/MOCs/")
+    )
+    by_root: dict[str, int] = {}
+    for rel in slug_map.values():
+        by_root[rel.split("/", 1)[0]] = by_root.get(rel.split("/", 1)[0], 0) + 1
+    corpora = " · ".join(f"{root} {n}" for root, n in sorted(by_root.items()))
     lines = [
         f"# {wiki_name}",
         "",
-        f"Compiled mirror of the operator's knowledge base — {len(slug_map)} articles, "
-        "published one-way from the local llm-wiki vault. Change it there, read it here.",
+        f"One-way mirror of the operator's llm-wiki vault — {len(slug_map)} articles "
+        f"({corpora}). knowledge/ is the compiled distillate; the other corpora are "
+        "its substrate. Change it in the vault, read it here.",
         "",
     ]
     if mocs:

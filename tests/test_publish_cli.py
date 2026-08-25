@@ -30,26 +30,29 @@ def _vault(tmp_path: Path) -> tuple[Path, Path]:
 def test_dry_run_plan_golden(tmp_path: Path) -> None:
     vault, k = _vault(tmp_path)
     store = manifest_store(tmp_path / "publish.json")
-    plan, slug_map = build_publish_plan(k, vault, store)
+    plan, slug_map = build_publish_plan(vault, store)
     assert to_json_payload(plan) == {
         "create": [
-            {"slug": "bar", "path": "people/bar.md"},
-            {"slug": "foo", "path": "concepts/foo.md"},
+            {"slug": "bar", "path": "knowledge/people/bar.md"},
+            {"slug": "foo", "path": "knowledge/concepts/foo.md"},
         ],
         "update": [],
         "retract": [],
         "unchanged": 0,
     }
-    assert slug_map == {"bar": "people/bar.md", "foo": "concepts/foo.md"}
+    assert slug_map == {
+        "bar": "knowledge/people/bar.md",
+        "foo": "knowledge/concepts/foo.md",
+    }
 
 
 def test_dry_run_is_idempotent_after_publish(tmp_path: Path) -> None:
     vault, k = _vault(tmp_path)
     store = manifest_store(tmp_path / "publish.json")
-    plan, _ = build_publish_plan(k, vault, store)
+    plan, _ = build_publish_plan(vault, store)
     for payload in plan.create:
         record_published(store, payload)
-    second, _ = build_publish_plan(k, vault, store)
+    second, _ = build_publish_plan(vault, store)
     assert to_json_payload(second) == {
         "create": [], "update": [], "retract": [], "unchanged": 2,
     }
@@ -58,10 +61,10 @@ def test_dry_run_is_idempotent_after_publish(tmp_path: Path) -> None:
 def test_render_human_shows_totals(tmp_path: Path) -> None:
     vault, k = _vault(tmp_path)
     store = manifest_store(tmp_path / "publish.json")
-    plan, _ = build_publish_plan(k, vault, store)
+    plan, _ = build_publish_plan(vault, store)
     out = render_human(plan)
     assert "2 create" in out and "0 unchanged" in out
-    assert "foo" in out and "people/bar.md" in out
+    assert "foo" in out and "knowledge/people/bar.md" in out
 
 
 def test_command_catalog_has_publish_row() -> None:

@@ -1,4 +1,4 @@
-"""Tests for publish description sourcing (M030-S01-T03).
+"""Tests for publish description sourcing (M030-S01-T03, vault-rel since S04).
 
 write_article requires a non-empty description ≤1024 chars — it drives
 listings and search on the meinkontext side. Source of truth is the article's
@@ -31,24 +31,24 @@ def _knowledge(tmp_path: Path) -> tuple[Path, Path]:
     return vault, k
 
 
-def test_description_index_maps_rel_to_summary(tmp_path: Path) -> None:
+def test_description_index_maps_vault_rel_to_summary(tmp_path: Path) -> None:
     vault, k = _knowledge(tmp_path)
     idx = description_index(INDEX, k, vault)
-    assert idx["concepts/foo.md"] == "What foo is about."
-    assert "people/alex.md" in idx
+    assert idx["knowledge/concepts/foo.md"] == "What foo is about."
+    assert "knowledge/people/alex.md" in idx
 
 
 def test_index_summary_wikilinks_collapse_to_text(tmp_path: Path) -> None:
     vault, k = _knowledge(tmp_path)
     idx = description_index(INDEX, k, vault)
-    assert idx["people/alex.md"] == "Wer Foo baut."
+    assert idx["knowledge/people/alex.md"] == "Wer Foo baut."
 
 
 def test_describe_prefers_index_summary(tmp_path: Path) -> None:
     vault, k = _knowledge(tmp_path)
     idx = description_index(INDEX, k, vault)
     body = "---\ndomain: x\n---\n\n# Title\n\nFirst paragraph here.\n"
-    assert describe("concepts/foo.md", body, idx) == "What foo is about."
+    assert describe("knowledge/concepts/foo.md", body, idx) == "What foo is about."
 
 
 def test_describe_falls_back_to_first_paragraph(tmp_path: Path) -> None:
@@ -58,19 +58,18 @@ def test_describe_falls_back_to_first_paragraph(tmp_path: Path) -> None:
         "---\ndomain: x\n---\n\n# Heading\n\n"
         "Erster Absatz mit [[concepts/foo|Foo]] drin.\nZweite Zeile.\n\nNext para.\n"
     )
-    got = describe("concepts/empty.md", body, idx)
+    got = describe("knowledge/concepts/empty.md", body, idx)
     assert got == "Erster Absatz mit Foo drin. Zweite Zeile."
 
 
 def test_describe_final_fallback_is_stem(tmp_path: Path) -> None:
-    vault, k = _knowledge(tmp_path)
-    got = describe("concepts/some-article.md", "---\nx: y\n---\n", {})
+    got = describe("knowledge/concepts/some-article.md", "---\nx: y\n---\n", {})
     assert got == "some-article"
 
 
 def test_describe_caps_at_1024(tmp_path: Path) -> None:
     long_body = "x" * 3000 + "\n"
-    got = describe("concepts/foo.md", long_body, {})
+    got = describe("knowledge/concepts/foo.md", long_body, {})
     assert len(got) <= 1024
     assert got.endswith("…")
 
@@ -84,6 +83,7 @@ def test_describe_caps_by_utf16_units_not_codepoints(tmp_path: Path) -> None:
     # astral chars (emoji) count DOUBLE. Live incident 2026-08-25: beulco/
     # sprenger passed the Python len-cap yet were rejected upstream.
     emoji_summary = "🚀" * 600  # 600 codepoints, 1200 UTF-16 units
-    got = describe("concepts/foo.md", "", {"concepts/foo.md": emoji_summary})
+    rel = "knowledge/concepts/foo.md"
+    got = describe(rel, "", {rel: emoji_summary})
     assert _utf16_units(got) <= 1024
     assert got.endswith("…")

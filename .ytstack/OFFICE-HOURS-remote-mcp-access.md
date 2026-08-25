@@ -102,7 +102,7 @@ Sequencing note (REGEL #2): the llm-wiki side (gate + publish producer) is decid
 
 ## Open Questions
 
-1. ~~Gate width for D~~ RESOLVED by operator 2026-08-25 ("ALLES"): **full `knowledge/` export, no sensitivity/scope subset.** The only boundary is `knowledge/` itself — raw/, daily/, workspace/ never leave (locked decisions: raw stays in the personal vault; also contract-infeasible: markdown-only articles, secret gate, 100 MB quota). The `sensitivity:` axis stays marking-only for this feature.
+1. ~~Gate width for D~~ RESOLVED by operator 2026-08-25, in two steps: first read as "full `knowledge/`"; operator corrected same day — **"ALLES" means the WHOLE VAULT, into ONE wiki** ("Substrat und Destillat gehören zusammen"): every markdown file under knowledge/, raw/, daily/, reports/, workspace/ publishes into the single managed wiki (M030-S04; `publish.roots` knob). This consciously supersedes the raw-never-leaves posture for the operator's own private org (see DECISIONS 2026-08-25); it stays binding for any federation channel. Hard boundary that remains: markdown-only (contract) — binary/JSON assets have no channel (open upstream ask); the server secret gate is the per-article backstop. `sensitivity:` stays marking-only.
 2. **Is deep-corpus remote access (A) actually needed** once curated knowledge is deliverable everywhere via D — or is A deferred until a concrete session proves the gap?
 3. If A ever ships: may remote callers trigger `wiki query` (LLM spend + state writes), and is Mac-awake availability acceptable?
 4. ~~Retrieval ownership~~ RESOLVED 2026-08-24: meinkontext serves FTS `search` over article bodies + `get_object`; articles stay out of the digest.

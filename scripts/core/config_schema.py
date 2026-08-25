@@ -1112,6 +1112,12 @@ class Publish:
     # do not rename after the first publish) and its display name.
     wiki_slug: str = "llm-wiki"
     wiki_name: str = "LLM Wiki"
+    # Vault roots whose markdown publishes (vault-relative folder names).
+    # Default = the curated wiki only. The ALLES widening (M030-S04, operator
+    # 2026-08-25: "Substrat und Destillat gehören zusammen") adds raw, daily,
+    # reports, workspace per-vault. Non-markdown files never publish
+    # (contract: one markdown file per article).
+    roots: list[str] = field(default_factory=lambda: ["knowledge"])
 
 
 @dataclass

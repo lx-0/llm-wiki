@@ -375,6 +375,7 @@ INJECTED_KEYS: dict[str, tuple[str, ...]] = {
         "endpoint",
         "wiki_slug",
         "wiki_name",
+        "roots",                # M030-S04 ALLES widening (2026-08-25)
     ),
 }
 

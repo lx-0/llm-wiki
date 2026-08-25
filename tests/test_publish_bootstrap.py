@@ -49,27 +49,29 @@ def test_ensure_wiki_creates_with_managed_by() -> None:
     assert args == {"name": "LLM Wiki", "slug": "llm-wiki", "managed_by": "llm-wiki"}
 
 
-def test_start_page_lists_mocs_and_count() -> None:
+def test_start_page_lists_mocs_and_corpora() -> None:
     slug_map = {
-        "foo": "concepts/foo.md",
-        "llm-wiki-moc": "MOCs/llm-wiki-moc.md",
-        "fleet": "MOCs/fleet.md",
+        "foo": "knowledge/concepts/foo.md",
+        "llm-wiki-moc": "knowledge/MOCs/llm-wiki-moc.md",
+        "fleet": "knowledge/MOCs/fleet.md",
+        "scratch": "raw/notes/scratch.md",
     }
     payload = start_page_payload(slug_map, "LLM Wiki")
     assert payload.slug == START_SLUG
-    assert "3 articles" in payload.content
+    assert "4 articles" in payload.content
+    assert "knowledge 3" in payload.content and "raw 1" in payload.content
     assert "[[llm-wiki-moc]]" in payload.content and "[[fleet]]" in payload.content
     assert payload.description
 
 
 def test_start_page_slug_collision_raises() -> None:
     with pytest.raises(ValueError, match="start"):
-        start_page_payload({"start": "concepts/start.md"}, "LLM Wiki")
+        start_page_payload({"start": "knowledge/concepts/start.md"}, "LLM Wiki")
 
 
 def test_start_page_hash_tracked_outside_articles(tmp_path: Path) -> None:
     store = manifest_store(tmp_path / "publish.json")
-    payload = start_page_payload({"foo": "concepts/foo.md"}, "LLM Wiki")
+    payload = start_page_payload({"foo": "knowledge/concepts/foo.md"}, "LLM Wiki")
     assert needs_start_page(store, payload) is True
     record_start_page(store, payload)
     assert needs_start_page(store, payload) is False
@@ -77,5 +79,8 @@ def test_start_page_hash_tracked_outside_articles(tmp_path: Path) -> None:
     plan = plan_delta([], store.reload().get("articles", {}))
     assert plan.retract == []
 
-    changed = start_page_payload({"foo": "concepts/foo.md", "bar": "people/bar.md"}, "LLM Wiki")
+    changed = start_page_payload(
+        {"foo": "knowledge/concepts/foo.md", "bar": "knowledge/people/bar.md"},
+        "LLM Wiki",
+    )
     assert needs_start_page(store, changed) is True
