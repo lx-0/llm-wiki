@@ -130,15 +130,17 @@ def test_map_slugs_overlong_name_truncates_deterministically(tmp_path: Path) -> 
     assert server_slug(slug) == slug
 
 
-def test_map_slugs_unresolvable_collision_raises_with_both_paths(tmp_path: Path) -> None:
-    # Same stem AND same parent dir name in different subtrees: parent-based
-    # disambiguation yields the identical slug for both — must hard-fail.
+def test_same_parent_stem_escalates_to_full_path_slug(tmp_path: Path) -> None:
+    # Same stem AND same parent dir name in different subtrees (real corpus:
+    # reports/studies/*/runs/<ts>/instruments/gad-7.md): parent-based
+    # disambiguation collides, so later entries escalate to the full-path slug.
     _article(tmp_path, "people/x/alex.md")
     _article(tmp_path, "friends/x/alex.md")
-    with pytest.raises(PublishCollisionError) as exc:
-        map_slugs(tmp_path)
-    msg = str(exc.value)
-    assert "people/x/alex.md" in msg and "friends/x/alex.md" in msg
+    mapping = map_slugs(tmp_path)
+    assert mapping == {
+        "x-alex": "knowledge/friends/x/alex.md",  # first in sort order
+        "knowledge-people-x-alex": "knowledge/people/x/alex.md",
+    }
 
 
 def test_map_slugs_stability_keeps_prior_slug_on_new_collision(tmp_path: Path) -> None:

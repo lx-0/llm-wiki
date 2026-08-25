@@ -9,6 +9,7 @@ silently misses (architect review 2026-08-25, issue 2).
 """
 from __future__ import annotations
 
+import hashlib
 import re
 import unicodedata
 from pathlib import Path
@@ -137,15 +138,36 @@ def map_slugs(
     for base, group in sorted(base_groups.items()):
         contested = len(group) > 1 or base in assigned
         for rel, path in group:
-            slug = _capped_slug(f"{path.parent.name}-{path.stem}") if contested else base
-            if slug in assigned:
+            for slug in _disambiguation_ladder(base, rel, path, contested):
+                if slug not in assigned:
+                    assigned[slug] = rel
+                    break
+            else:
                 raise PublishCollisionError(
-                    f"slug '{slug}' collides: {assigned[slug]} vs {rel} — "
-                    "rename one of the articles"
+                    f"no free slug for {rel} (base '{base}') — "
+                    f"last candidate taken by {assigned.get(base, '?')}"
                 )
-            assigned[slug] = rel
 
     return dict(sorted(assigned.items()))
+
+
+def _disambiguation_ladder(
+    base: str, rel: str, path: Path, contested: bool
+) -> Iterator[str]:
+    """Slug candidates, cheapest first. Uncontested → the base. Contested →
+    parent-stem, then the full vault-relative path (unique by construction;
+    real-corpus case: reports/studies/*/runs/<ts>/instruments/gad-7.md shares
+    stem AND parent name across runs), then path+hash as the truncation-proof
+    last resort (two >120-char paths can collide after capping)."""
+    if not contested:
+        yield base
+        return
+    yield _capped_slug(f"{path.parent.name}-{path.stem}")
+    rel_stem = rel[:-3] if rel.endswith(".md") else rel
+    full = _capped_slug(rel_stem.replace("/", "-"))
+    yield full
+    digest = hashlib.sha256(rel.encode("utf-8")).hexdigest()[:8]
+    yield f"{full[: MAX_NAME_LENGTH - 9].rstrip('-')}-{digest}"
 
 
 def manifest_store(path: Path | None = None) -> StateStore:
