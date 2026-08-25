@@ -2793,3 +2793,13 @@ A multi-thousand-write sequential batch against a service that (a) redeploys on 
 1. Per-item state writes only AFTER server success → any abort resumes exactly where it stopped (manifest as journal).
 2. Bounded 5xx/connection retry with backoff in the client (2 s/8 s) — deterministic errors (4xx, JSON-RPC validation) are NEVER retried; a repeated write is at worst a redundant deduplicated version per the producer contract.
 3. Token PROVIDER instead of token value: on `-32001`/401 force ONE refresh and retry the request. Resolving auth once at process start is a latent bug in any run longer than the token lifetime.
+
+## Full-state audit 2026-08-25: outages cluster by TRIGGER SOURCE, and nothing screams (2026-08-25)
+
+### Lesson
+
+Two months between audits let three whole clusters die silently while every dashboard-adjacent signal looked alive: (1) flush-extract ~99% failure since 08-14 (retry queue 234 deep, diverging — drain was coupled to compile cadence, which ran 2 days in 30), (2) the entire Ollama feature set since 06-22 (curiosity/review/vision — host offline), (3) ALL device-side intake + queue consumers since mid-June (screenshots/pictures/voice/mobile-bridge/triage/suggestions — one Mac-side cause, not six defects). The invariant: server-/API-side collectors keep running forever; anything that depends on a local trigger (LaunchAgent, compile piggyback, a host being awake) fails as a CLUSTER and only an explicit full-state audit notices, because per-feature errors land in per-feature logs nobody tails. Full report: `.ytstack/reviews/2026-08-25-lxw-vault-audit.md`.
+
+### Fix direction
+
+Audit belongs on cadence, not on operator hunch (last one ~3 months prior). Cheap standing options: doctor gaining a "substrate freshness" check (newest artifact age per configured collector vs its cooldown — the audit derived this mechanically) and a piggyback-state check (status failed:* or last_run > 3× cooldown). Both are deterministic, $0, and would have flagged all three clusters within days instead of months.
