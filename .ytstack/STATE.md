@@ -2,10 +2,10 @@
 project: llm-wiki
 slug: llm-wiki
 last_updated: 2026-08-25T06:49:07Z
-current_milestone: M030
-active_slice: S01
+current_milestone: none
+active_slice: none
 active_task: none
-last_completed_milestone: M026
+last_completed_milestone: M030
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
 ---
@@ -20,7 +20,9 @@ parallel_milestones: [M021, M025, M027, M029]
 
 **S03 5/6 DONE (2026-08-25):** piggyback cadence live (`piggybacks.publish` 6h, quiet no-op gate — `wiki publish --piggyback`); retract/restore E2E live-proven ON THE TOOL SURFACE (probe article: delete→archived, rewrite→restored at seq 2 — architect watch-item closed); docs (README bullet, docs/setup-publish.md, PROCESS §17) + both infographics (publish pill + meinkontext-mirror box; two pre-existing canvas defects fixed: missing health pill, overview card overflow; all three render gates clean); CHANGELOG 0.4.0 + version bump + uv.lock. Suite 1858 green.
 
-Next action: **S03-T03 — the ONLY open item in M030: operator reach-anywhere proof.** From another machine (or a claude.ai custom connector), connect to https://dev.meinkontext.de/mcp, ask a personal-context question that a wiki article answers, with the Mac allowed to sleep. On success: flip S03+M030 in the roadmap, run `ytstack:reassess-roadmap`, milestone done. Also open for the operator (non-blocking): sanitize the 4 secret-gate-skipped files or leave local-only; optional upstream ask for a binary/asset channel (3860 non-md files). After T05: S03 (piggyback cadence, live retract/restore E2E, reach-anywhere proof, docs + infographics, closeout). NOTE: M025-S03 (correction write-back) remains open in parallel — moved to parallel_milestones, its next-action block below still applies when resuming it.
+**M030 COMPLETE 2026-08-25 (4/4 slices).** Remote access shipped end-to-end: the whole vault markdown (6571 articles + start page, ONE wiki) lives on dev.meinkontext.de, kept fresh by the compile piggyback; retract/restore live-proven on the tool surface; docs/CHANGELOG 0.4.0/infographics in the same arc. T03 reach-anywhere closed passed-with-caveats (operator had no second device; server-side grounded-read proven via MCP — other-device client + claude.ai connector remain as cheap verification debt, `backlog/publish-asset-channel.md` §3). Milestone-boundary reassess: no further slices needed; deferred threads live in `backlog/publish-asset-channel.md` (asset-channel upstream ask §1, 4 secret-gate files §2, reach-caveat §3).
+
+Next action: operator picks the next milestone (`ytstack:plan-milestone`); parallel arcs M025-S03 (correction write-back) etc. remain open per their blocks below. After T05: S03 (piggyback cadence, live retract/restore E2E, reach-anywhere proof, docs + infographics, closeout). NOTE: M025-S03 (correction write-back) remains open in parallel — moved to parallel_milestones, its next-action block below still applies when resuming it.
 
 **Status (2026-06-25): M025 — S02 complete, reassessed → proceed to S03.** Capture-
 correction loop: S01 (capture spine) + S02 shipped — T01 `resolve_articles()`

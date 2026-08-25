@@ -3,9 +3,9 @@ milestone: M030
 project: llm-wiki
 size: M
 created: 2026-08-25T06:49:07Z
-status: planned
-total_slices: 3
-completed_slices: 3
+status: done
+total_slices: 4
+completed_slices: 4
 ---
 
 # M030 Roadmap
@@ -25,7 +25,7 @@ Slice detail lives in per-slice `M030-S##-PLAN.md` files, created by `ytstack:sl
 - [x] S01 -- Mapping core: offline transform of knowledge/ into contract-shaped payloads (slugs, wikilink normalization, descriptions, content-hash delta, `publish --dry-run`)
 - [x] S02 -- Producer transport: `wiki publish` against meinkontext (JSON-RPC client, wiki bootstrap + start page, write/retract/restore executor, knobs+migration, OAuth producer flow, first full live publish: 2022+start live, idempotency live-proven)
 - [x] S04 -- ALLES vault-wide into ONE wiki: raw/ + daily/ + reports/ + workspace/ md into `llm-wiki` (operator: "Substrat und Destillat gehören zusammen"), vault-relative manifest keys + migration (zero retraction), `publish.roots` knob, live rest-publish (~4551 md)
-- [ ] S03 -- Cadence + proof: compile piggyback, live retraction/restore E2E, reach-anywhere proof with Mac asleep, docs + infographics, closeout
+- [x] S03 -- Cadence + proof: compile piggyback, live retraction/restore E2E, reach-anywhere proof (closed passed-with-caveats: other-device/claude.ai untested — backlog/publish-asset-channel.md §3), docs + infographics, closeout
 
 Suggested framing for slicing (not binding): S01 mapping core (slug + wikilink normalization + description sourcing + content-hash state, offline against fixtures) → S02 producer transport (MCP client, create_wiki/write_article/retract/restore against live dev, token bootstrap, knobs + migration) → S03 cadence + docs + live end-to-end proof (piggyback/manual, PROCESS.md, config docs, infographics, closeout).
 
