@@ -11,11 +11,16 @@ import json
 import sys
 from pathlib import Path
 
-from publish.corpus import load_manifest, manifest_store, map_slugs
-from publish.delta import PublishPlan, build_payloads, plan_delta
-from publish.describe import description_index
+# Dispatched as a child process (`python scripts/publish/cli.py`): sys.path[0]
+# is THIS directory, so `publish`/`core` need scripts/ on the path first —
+# same bootstrap as bridge/cli.py.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from core.state_store import StateStore
+from publish.corpus import load_manifest, manifest_store, map_slugs  # noqa: E402
+from publish.delta import PublishPlan, build_payloads, plan_delta  # noqa: E402
+from publish.describe import description_index  # noqa: E402
+
+from core.state_store import StateStore  # noqa: E402
 
 
 def build_publish_plan(
