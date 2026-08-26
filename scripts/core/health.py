@@ -838,16 +838,30 @@ def _parse_ts(raw: object) -> datetime | None:
     return dt.astimezone() if dt.tzinfo is None else dt
 
 
+def _piggyback_tasks() -> list[dict]:
+    """The scheduler's own task list — `{name, cooldown_hours, cmd}` per task.
+
+    THE source of truth for both the state-file key and the cadence: built-in
+    tasks persist under `name.replace('_','-')` (config `review_wiki` → state
+    `review-wiki`), and the list already excludes disabled tasks and
+    collectors that aren't registered. Iterating CONFIG.piggybacks instead
+    reported 12 healthy tasks as "never ran" on the live vault (2026-08-26).
+    """
+    from core.piggybacks import build_piggyback_tasks
+
+    return build_piggyback_tasks()
+
+
 def check_piggyback_health(
     *, state_file: Path | None = None, now: datetime | None = None
 ) -> list[CheckResult]:
     """Piggyback outcome + substrate-freshness audit over piggyback-state.json.
 
-    Per ENABLED task in CONFIG.piggybacks, first matching condition wins:
+    Per task the SCHEDULER would fire, first matching condition wins:
       - last completed run failed/timeout/error → warning (with last_error)
       - status running/spawned past the runner's wall-clock cap (+1h slack)
         → warning (orphaned runner — the runner records `timeout` at the cap)
-      - last fire older than limits.doctor_piggyback_stale_factor × cooldown
+      - last fire older than max(factor × cooldown, stale_min_hours)
         → warning (substrate dark)
     Never-ran tasks aggregate into one info line; all healthy → one ok line.
     """
@@ -868,13 +882,19 @@ def check_piggyback_health(
 
     cap_s = int(getattr(CONFIG.limits, "piggyback_max_runtime_s", 14_400))
     stale_factor = int(getattr(CONFIG.limits, "doctor_piggyback_stale_factor", 4))
+    stale_floor_s = int(getattr(CONFIG.limits, "doctor_piggyback_stale_min_hours", 24)) * 3600
+
+    try:
+        tasks = _piggyback_tasks()
+    except Exception as exc:
+        return [_probe_failed("piggyback-health", "pipeline", exc)]
 
     results: list[CheckResult] = []
     never_ran: list[str] = []
     healthy = 0
-    for name, task in sorted(CONFIG.piggybacks.items()):
-        if not getattr(task, "enabled", True):
-            continue
+    for task in sorted(tasks, key=lambda t: str(t.get("name", ""))):
+        name = str(task.get("name", ""))
+        cooldown_hours = int(task.get("cooldown_hours") or 0)
         entry = state.get(name)
         if not isinstance(entry, dict):
             never_ran.append(name)
@@ -901,13 +921,16 @@ def check_piggyback_health(
                 fix="check the pid in piggyback-state.json; kill leftovers",
             ))
             continue
-        stale_after_s = stale_factor * task.cooldown_hours * 3600
+        # Piggybacks only fire when the operator compiles/flushes, so a short
+        # cadence alone can't define staleness — any normal quiet stretch
+        # would flag every 1h task (live false positive: voice at 12h).
+        stale_after_s = max(stale_factor * cooldown_hours * 3600, stale_floor_s)
         if last_run is not None and (now - last_run).total_seconds() > stale_after_s:
             age_days = (now - last_run).total_seconds() / 86_400
             results.append(CheckResult(
                 id=f"piggyback-{name}", category="pipeline", severity="warning",
                 message=(f"piggyback {name}: no fire for {age_days:.1f}d "
-                         f"(cadence {task.cooldown_hours}h) — substrate dark"),
+                         f"(cadence {cooldown_hours}h) — substrate dark"),
                 fix="run `wiki compile` (piggybacks_on_compile) or check flush.py runs",
             ))
             continue

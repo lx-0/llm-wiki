@@ -287,6 +287,9 @@ limits:
   # wiki doctor: piggyback counts as stale (substrate dark) after
   # factor × its cooldown_hours without a fire.
   doctor_piggyback_stale_factor: 4
+  # Floor under that threshold — piggybacks fire only when you compile, so a
+  # short cadence alone would flag every quiet stretch.
+  doctor_piggyback_stale_min_hours: 24
   # review-wiki.py: per-article Ollama read timeout, consecutive-failure abort
   # (stop grinding 1700×timeout when kcma is down), and incremental-report
   # checkpoint cadence (don't lose a multi-hour partial sweep).

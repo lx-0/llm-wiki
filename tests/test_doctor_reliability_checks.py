@@ -26,15 +26,66 @@ def _iso(dt: datetime) -> str:
 
 @pytest.fixture
 def piggy_config(monkeypatch):
-    """One enabled 6h-cooldown task; stale factor 4 → stale after 24h."""
+    """One enabled 6h-cooldown task; stale factor 4 → stale after 24h.
+
+    Patches the SCHEDULER's task list (the same source `flush.py` fires from),
+    not CONFIG.piggybacks — the state file is keyed by scheduler task name,
+    which is NOT the config key for built-in tasks (`review_wiki` persists as
+    `review-wiki`).
+    """
     from core.config import CONFIG
 
-    monkeypatch.setattr(CONFIG, "piggybacks", {
-        "gmeet": PiggybackTask(enabled=True, cooldown_hours=6),
-        "off_task": PiggybackTask(enabled=False, cooldown_hours=1),
-    })
+    monkeypatch.setattr(health, "_piggyback_tasks", lambda: [
+        {"name": "gmeet", "cooldown_hours": 6},
+    ])
     monkeypatch.setattr(CONFIG.limits, "doctor_piggyback_stale_factor", 4)
+    monkeypatch.setattr(CONFIG.limits, "doctor_piggyback_stale_min_hours", 24)
     return CONFIG
+
+
+def test_state_key_matches_scheduler_not_config_key(tmp_path, monkeypatch):
+    """Regression (live-found 2026-08-26): the check iterated CONFIG.piggybacks
+    and looked those names up in piggyback-state.json, but built-in tasks
+    persist under `name.replace('_','-')` — so 12 healthy tasks on the live
+    vault were reported 'never ran'. The scheduler's own task list is the
+    single source of truth for both the key and the cooldown."""
+    from core.config import CONFIG
+
+    monkeypatch.setattr(health, "_piggyback_tasks", lambda: [
+        {"name": "review-wiki", "cooldown_hours": 168},
+    ])
+    monkeypatch.setattr(CONFIG.limits, "doctor_piggyback_stale_factor", 4)
+    monkeypatch.setattr(CONFIG.limits, "doctor_piggyback_stale_min_hours", 24)
+    sf = _state_file(tmp_path, {"review-wiki": {
+        "status": "ok", "last_run": _iso(NOW - timedelta(hours=2)),
+    }})
+    results = health.check_piggyback_health(state_file=sf, now=NOW)
+    assert [r.severity for r in results] == ["ok"]
+
+
+def test_short_cadence_not_stale_within_min_hours(tmp_path, monkeypatch):
+    """Live false positive: `voice` (1h cadence) warned 'substrate dark' after
+    12h. Piggybacks only fire when the operator compiles, so factor×cooldown
+    alone flags every short-cadence task during any normal quiet stretch. The
+    threshold floors at doctor_piggyback_stale_min_hours."""
+    from core.config import CONFIG
+
+    monkeypatch.setattr(health, "_piggyback_tasks", lambda: [
+        {"name": "voice", "cooldown_hours": 1},
+    ])
+    monkeypatch.setattr(CONFIG.limits, "doctor_piggyback_stale_factor", 4)
+    monkeypatch.setattr(CONFIG.limits, "doctor_piggyback_stale_min_hours", 24)
+    sf = _state_file(tmp_path, {"voice": {
+        "status": "ok", "last_run": _iso(NOW - timedelta(hours=12)),
+    }})
+    assert [r.severity for r in health.check_piggyback_health(state_file=sf, now=NOW)] == ["ok"]
+
+    # Past the floor it does warn — the check still has teeth.
+    sf2 = _state_file(tmp_path, {"voice": {
+        "status": "ok", "last_run": _iso(NOW - timedelta(hours=30)),
+    }})
+    assert any(r.severity == "warning"
+               for r in health.check_piggyback_health(state_file=sf2, now=NOW))
 
 
 def _state_file(tmp_path: Path, data: dict) -> Path:
@@ -88,11 +139,14 @@ def test_piggyback_healthy_is_single_ok(tmp_path, piggy_config):
     assert [r.severity for r in results] == ["ok"]
 
 
-def test_piggyback_disabled_task_ignored(tmp_path, piggy_config):
-    """A disabled task with a rotten status must not warn."""
+def test_disabled_task_ignored(tmp_path, piggy_config):
+    """A disabled task with a rotten status must not warn — the scheduler's
+    task list already excludes disabled tasks, so a stale state entry for one
+    is simply not looked at."""
     sf = _state_file(tmp_path, {
         "gmeet": {"status": "ok", "last_run": _iso(NOW - timedelta(hours=2))},
-        "off_task": {"status": "failed:7", "last_run": _iso(NOW - timedelta(days=30))},
+        "optimize-claude-md": {"status": "failed:7",
+                               "last_run": _iso(NOW - timedelta(days=30))},
     })
     results = health.check_piggyback_health(state_file=sf, now=NOW)
     assert [r.severity for r in results] == ["ok"]

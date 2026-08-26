@@ -260,6 +260,11 @@ class Limits:
     # (collector dark — audit 2026-08-25 found substrates silently off for
     # weeks with nothing surfacing it).
     doctor_piggyback_stale_factor: int = 4
+    # Floor under that threshold. Piggybacks fire only when the operator
+    # compiles/flushes, so factor × a short cadence flags every quiet stretch
+    # (live: `voice`, 1h cadence, warned after 12h). Below this many hours
+    # nothing counts as dark, whatever its cadence.
+    doctor_piggyback_stale_min_hours: int = 24
     # review-wiki.py per-article Ollama read timeout (was a hardcoded 300 in
     # the script). Generous because the quality-review prompt is large and
     # gemma cold-calls are slow; the connect cap + keepalive above prevent a

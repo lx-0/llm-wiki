@@ -336,6 +336,7 @@ INJECTED_KEYS: dict[str, tuple[str, ...]] = {
         "gmeet_export_dead_letter_attempts",
         "gmeet_export_dead_letter_reprobe_days",
         "doctor_piggyback_stale_factor",
+        "doctor_piggyback_stale_min_hours",
     ),
     "scheduling": (
         "piggybacks_on_compile",        # compile drains due piggybacks (2026-06-13)
