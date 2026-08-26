@@ -1,7 +1,7 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-08-25T06:49:07Z
+last_updated: 2026-08-26T10:00:00Z
 current_milestone: M031
 active_slice: S01
 active_task: none
@@ -11,6 +11,8 @@ parallel_milestones: [M021, M025, M027, M029]
 ---
 
 # State
+
+**M031 S03 COMPLETE 2026-08-26** (small-fix package — detail in `M031-ROADMAP.md` S03 line): wikilink shell-guard, lint tag-crash, piggyback stale-last_error, dollar-counter retirement, gmeet export dead-letter, compile_model-knob truthing (E3; lxw config migrated opus→haiku live). E4/E10 refuted. 6 commits (d9f167b…8e6f2dc), suite **1881 green**, engine live on lxw. **S02 DONE** (see roadmap). **S01 nearly closed:** root cause (host-MCP schema injection → `--strict-mcp-config` + `mcp_servers={}`) fixed + proven; queue drained 234 → 22; residual 22 re-probed clean (one flushed live in 6.1 s — transient, not a new class), final drain pass running. Remaining: S01 closeout note + **S04** (doctor substrate-freshness + piggyback-health + index-drift gate, docs/CHANGELOG/infographics, milestone reassess).
 
 **Status:** M030 / S01 COMPLETE + S02 4/5 (suite 1836 green). Shipped: mapping core (S01: fixpoint slugs, link normalization, descriptions, hash delta, `wiki publish --dry-run/--json`), producer transport (S02-T01..T04: stateless MCP JSON-RPC client over httpx — wire shape live-verified against dev.meinkontext.de, 401-probe; `publish.*` knobs + migration + httpx declared; wiki bootstrap + generated start page tracked outside the article manifest; sequential fail-soft executor with resume-safe manifest writes; lifecycle integration test mirroring the REFERENCE PRODUCER RUN incl. restore-on-write at seq 3 and zero-write rerun). Slice-boundary reassess after S01: no deviations, roadmap unchanged. Found+fixed en route: `config_docs.py` `_SECTIONS` silently skipped new config blocks.
 
