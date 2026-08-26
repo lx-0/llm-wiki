@@ -70,3 +70,8 @@ __pycache__/
 # TMP
 ~*.md
 ~*/
+
+# Zoom-crop review artifacts. The excalidraw renderer writes `--crop` output to
+# docs/<name>-crop.png, so every diagram review (CLAUDE.md gate 3) clobbers
+# them. They are throwaway, referenced by nothing, and regenerated on demand.
+docs/*-crop.png

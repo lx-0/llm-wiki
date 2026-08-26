@@ -18,6 +18,65 @@ every operator's `wiki update` → `uv sync` regenerate `uv.lock` and dirty thei
 config keys must also be wired into `scripts/migrations/migrate_config_keys.py`
 in the same commit.
 
+## [0.5.0] — 2026-08-26
+
+The reliability wave (M031), driven by a full-state audit of the operator's
+live vault. Three silent-failure classes are closed: session flushes that
+died without a trace, `knowledge/index.md` drifting away from the corpus, and
+piggyback/collector trouble nothing ever surfaced. The theme is that a failure
+you cannot see is worse than one that shouts — every fix here either removes
+the silence or makes `wiki doctor` say it out loud.
+
+### Added
+
+- **`wiki reindex`** — deterministic reconciliation of `knowledge/index.md`
+  against the corpus (dedupe last-wins, drop dangling rows, append missing
+  ones with first-paragraph summaries), preserving surrounding prose
+  byte-for-byte. `--dry-run` reports without writing. It also runs
+  automatically as a post-compile pass, replacing the LLM bookkeeping step
+  that caused the drift in the first place.
+- **`wiki doctor` reliability checks** — `piggyback-health` walks every task
+  the scheduler would fire and reports a failed/timeout outcome (with its
+  error), a run stuck past the runner's wall-clock cap, or a substrate that
+  has gone dark; `index-drift` dry-runs the reconciler and offers `wiki
+  reindex` as a one-key fix.
+- **gmeet export dead-letter** — un-exportable Drive doc-ids (access revoked,
+  document deleted) are parked in a per-account negative cache after
+  `limits.gmeet_export_dead_letter_attempts` failures instead of being
+  re-attempted on every run, with a re-probe after
+  `limits.gmeet_export_dead_letter_reprobe_days` so restored access heals
+  itself.
+
+### Fixed
+
+- **Session flushes died silently for eleven days.** The bundled CLI exited 1
+  with empty stderr because the host's MCP-server tools were injected into
+  every request and one of them ships a schema the API rejects. Every engine
+  SDK call now passes `--strict-mcp-config` with no MCP servers. The 234
+  contexts that had piled up in the retry archive were drained.
+- **Archive files with non-conforming names were stranded forever** — they
+  were neither retried nor reported. One real context had been invisible
+  since July.
+- **`models.compile_model` steered nothing.** Every compile route had pinned
+  Haiku since M026 while the knob still advertised Opus; the default route
+  reads the knob again and the default now matches what actually runs
+  (operator configs are migrated).
+- **Bash `[[ … ]]` test syntax parsed as a wikilink**, producing phantom
+  broken-link errors, index junk rows, and stripped brackets in published
+  articles.
+- **A piggyback's stale `last_error` survived its next completed run**, so a
+  day-old timeout was reported for a run that had just failed for an entirely
+  different reason.
+- **`wiki lint` crashed** on frontmatter tags that YAML parsed as integers
+  (e.g. a bare year).
+
+### Removed
+
+- **The legacy dollar counter.** `state.json`'s `total_cost` is no longer
+  accumulated — token accounting in `usage.json`/LEDGER has been the metering
+  surface since 2026-05-23. Existing keys are left untouched; nothing reads
+  them.
+
 ## [0.4.0] — 2026-08-25
 
 The remote-access arc (M030): `wiki publish` mirrors the vault into a managed
