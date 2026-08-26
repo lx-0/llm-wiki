@@ -575,11 +575,10 @@ async def main() -> None:
     for subdir in ["concepts", "connections", "qa", "people", "projects"]:
         (KNOWLEDGE_DIR / subdir).mkdir(parents=True, exist_ok=True)
 
-    # Read-only baseline for cost display; every WRITE below is a key-wise
-    # merge-under-lock (core.state_store.update_state) so concurrent
-    # query/lint counter writes survive this multi-minute run.
-    total_cost = load_state().get("total_cost", 0.0)
-    cost_at_start = total_cost  # for history-event cost_delta
+    # Every WRITE below is a key-wise merge-under-lock
+    # (core.state_store.update_state) so concurrent query/lint counter writes
+    # survive this multi-minute run.
+    run_cost = 0.0  # SDK-reported, this run only — see the summary note below
     compiled_count = 0
     failed_count = 0
     skipped_count = 0
@@ -694,7 +693,7 @@ async def main() -> None:
         # Success (status == "compiled") — reset failure streak
         consecutive_failures = 0
         compiled_count += 1
-        total_cost += outcome.cost_usd
+        run_cost += outcome.cost_usd
         run_input_tokens += outcome.input_tokens
         run_output_tokens += outcome.output_tokens
 
@@ -774,8 +773,7 @@ async def main() -> None:
             articles_total=len(list_wiki_articles()),
             compiled_this_run=compiled_count,
             failed_this_run=failed_count,
-            cost_delta=round(total_cost - cost_at_start, 4),
-            cost_total=state["total_cost"],
+            cost_delta=round(run_cost, 4),
             tokens_this_run=run_input_tokens + run_output_tokens,
         )
 
@@ -787,13 +785,14 @@ async def main() -> None:
     # skip-list hits.
     pending = len(files) - compiled_count - failed_count - skipped_count
     elapsed_min, elapsed_sec = divmod(int(time.time() - run_started), 60)
-    # Use the SDK-reported per-file cost deltas (already summed into
-    # total_cost in the per-file loop) rather than re-deriving from
-    # token counts. The token formula assumed Opus pricing on raw input
-    # tokens, but Haiku/Sonnet-routed substrates use different rates and
-    # SDK reports cache-discounted token counts — both biases compounded
-    # to a 50-80× under-report on Haiku-heavy runs.
-    run_cost = round(total_cost - cost_at_start, 4)
+    # Cost is per-RUN only. The SDK-reported per-file deltas (summed into
+    # run_cost above) beat re-deriving from token counts: the token formula
+    # assumed Opus pricing on raw input tokens, but Haiku/Sonnet-routed
+    # substrates use different rates and the SDK reports cache-discounted
+    # counts — both biases compounded to a 50-80× under-report on
+    # Haiku-heavy runs. There is no lifetime dollar total any more; token
+    # accounting in usage.json/LEDGER is the metering surface
+    # (DECISIONS 2026-05-23).
     log.info("─── compilation %s ───", outcome)
     log.info(
         "  files:   %d done · %d failed · %d skipped · %d pending of %d candidates",
@@ -803,10 +802,7 @@ async def main() -> None:
         "  tokens:  in:%s · out:%s · this run",
         f"{run_input_tokens:,}", f"{run_output_tokens:,}",
     )
-    log.info(
-        "  cost:    $%.4f this run · $%.4f lifetime",
-        run_cost, state.get("total_cost", total_cost),
-    )
+    log.info("  cost:    $%.4f this run", round(run_cost, 4))
     log.info("  time:    %dm %ds", elapsed_min, elapsed_sec)
 
     # Drain due maintenance (dream/lint/curiosity/digests) now that the corpus

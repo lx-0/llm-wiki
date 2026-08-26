@@ -21,7 +21,6 @@ What stays UPSTREAM in compile.py's per-file loop:
 
 - the decision to call this stage at all (only after the SDK compile +
   knowledge/ write succeeded — failed compiles get no post-pass)
-- ``state["total_cost"]`` accumulation (SDK-compile cost, separate concern)
 - the per-file state merge (``compile._persist_outcome`` →
   ``core.state_store.update_state``)
 """

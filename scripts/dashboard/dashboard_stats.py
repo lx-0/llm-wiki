@@ -78,11 +78,6 @@ def count_lint_warnings(lint_results=None) -> int:
     return lint_results.total
 
 
-def total_cost_lifetime() -> float:
-    state = load_state()
-    return float(state.get("total_cost", 0.0))
-
-
 def total_tokens_lifetime() -> int:
     """Sum input+output tokens across the whole usage ledger (state/usage.json).
 
@@ -195,7 +190,6 @@ def compute_stats(lint_results=None) -> dict:
         "pending_compile_paths": pending,
         "failed_flushes": count_failed_flushes(),
         "lint_warnings": count_lint_warnings(lint_results),
-        "total_cost_lifetime": round(total_cost_lifetime(), 4),
         "total_tokens_lifetime": total_tokens_lifetime(),
         "articles_total": articles_active,
         "articles_final_only": articles_final_only,
@@ -269,7 +263,6 @@ def write_dashboard_stats(stats: dict, callout: str) -> Path:
         "pending_compiles",
         "failed_flushes",
         "lint_warnings",
-        "total_cost_lifetime",
         "total_tokens_lifetime",
         "articles_total",
         "daily_logs_total",

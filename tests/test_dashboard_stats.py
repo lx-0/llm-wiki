@@ -19,7 +19,6 @@ def _base_stats(**overrides) -> dict:
         "pending_compiles": 5,
         "failed_flushes": 0,
         "lint_warnings": 12,
-        "total_cost_lifetime": 3.4567,
         "total_tokens_lifetime": 1234567,
         "articles_total": 263,
         "daily_logs_total": 47,
@@ -82,7 +81,10 @@ def test_write_dashboard_stats_frontmatter_shape(
     assert "pending_compiles: 5" in content
     assert "failed_flushes: 0" in content
     assert "lint_warnings: 12" in content
-    assert "total_cost_lifetime: 3.4567" in content
+    # No dollar field: token accounting is the metering surface
+    # (DECISIONS 2026-05-23); the old lifetime figure was frozen for compile
+    # and still creeping from queries, i.e. wrong in both directions.
+    assert "total_cost_lifetime" not in content
     assert "total_tokens_lifetime: 1234567" in content
     assert "articles_total: 263" in content
     assert "daily_logs_total: 47" in content

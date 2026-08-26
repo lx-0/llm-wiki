@@ -145,7 +145,11 @@ def state_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 def test_update_state_seeds_default_shape(state_file: Path) -> None:
     state = state_store.update_state(lambda s: None)
     assert state["ingested"] == {} and state["query_count"] == 0
-    assert json.loads(state_file.read_text(encoding="utf-8"))["total_cost"] == 0.0
+    on_disk = json.loads(state_file.read_text(encoding="utf-8"))
+    assert on_disk["last_lint"] is None
+    # No dollar key: accounting is token-only (DECISIONS 2026-05-23), and a
+    # seeded `total_cost` invited writers back onto a retired surface.
+    assert "total_cost" not in on_disk
 
 
 def test_update_state_corrupt_raises_not_resets(state_file: Path) -> None:
@@ -164,7 +168,7 @@ def test_compile_merge_preserves_concurrent_query_counter(state_file: Path) -> N
     query_count meanwhile; compile then persists a file result. Old code
     saved compile's whole stale dict → query_count reset (last-writer-wins).
     Merge-under-lock keeps both writers' keys."""
-    save_json_state(state_file, {"ingested": {}, "query_count": 0, "total_cost": 1.0})
+    save_json_state(state_file, {"ingested": {}, "query_count": 0, "lint_runs": 1})
 
     # compile run start: holds its (stale) view for the whole run.
     _compile_view = json.loads(state_file.read_text(encoding="utf-8"))
@@ -172,14 +176,14 @@ def test_compile_merge_preserves_concurrent_query_counter(state_file: Path) -> N
     # concurrent query lands its counters (query.py's mutator shape).
     def _query_bump(s: dict) -> None:
         s["query_count"] = s.get("query_count", 0) + 1
-        s["total_cost"] = round(s.get("total_cost", 0.0) + 0.5, 4)
+        s["lint_runs"] = s.get("lint_runs", 0) + 1
 
     state_store.update_state(_query_bump)
 
     # compile persists one compiled file via its merge (compile.py's shape).
     def _compile_merge(s: dict) -> None:
         s.setdefault("ingested", {})["raw/notes/a.md"] = "abc123"
-        s["total_cost"] = round(s.get("total_cost", 0.0) + 0.25, 4)
+        s["lint_runs"] = s.get("lint_runs", 0) + 1
         s["last_compile"] = "2026-07-18T20:00:00"
 
     state_store.update_state(_compile_merge)
@@ -187,7 +191,7 @@ def test_compile_merge_preserves_concurrent_query_counter(state_file: Path) -> N
     final = json.loads(state_file.read_text(encoding="utf-8"))
     assert final["query_count"] == 1, "query's counter was clobbered"
     assert final["ingested"] == {"raw/notes/a.md": "abc123"}, "compile's hash was lost"
-    assert final["total_cost"] == 1.75, "cost deltas must accumulate from both writers"
+    assert final["lint_runs"] == 3, "increments must accumulate from both writers"
 
 
 def test_update_state_thread_hammer_loses_no_increment(state_file: Path) -> None:
@@ -217,16 +221,17 @@ def test_compile_persist_outcome_merges_under_lock(
     update_state — a query counter written mid-run survives compile's save."""
     import compile as compile_mod
 
-    save_json_state(state_file, {"ingested": {}, "query_count": 7, "total_cost": 0.0})
+    save_json_state(state_file, {"ingested": {}, "query_count": 7, "total_cost": 305.89})
 
     state = compile_mod._persist_outcome("raw/notes/x.md", "beef1234", stamp_compile=True)
 
     on_disk = json.loads(state_file.read_text(encoding="utf-8"))
     assert on_disk["query_count"] == 7
     assert on_disk["ingested"]["raw/notes/x.md"] == "beef1234"
-    # Dollar accounting retired (DECISIONS 2026-05-23 token-only): the stale
-    # key survives untouched, compile never accumulates into it.
-    assert on_disk["total_cost"] == 0.0
+    # Dollar accounting retired (DECISIONS 2026-05-23 token-only). A vault's
+    # historical total survives byte-for-byte — nothing reads it and nothing
+    # adds to it; it is not rewritten to zero either.
+    assert on_disk["total_cost"] == 305.89
     assert "last_compile" in on_disk
     assert state == on_disk
 

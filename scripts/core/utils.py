@@ -70,7 +70,7 @@ def save_json_state(
     os.replace(tmp, path)
 
 
-_DEFAULT_STATE = {"ingested": {}, "query_count": 0, "last_lint": None, "total_cost": 0.0}
+_DEFAULT_STATE = {"ingested": {}, "query_count": 0, "last_lint": None}
 
 
 def load_state() -> dict:

@@ -123,7 +123,7 @@ def collect_state(vault: Path) -> dict:
     for p in candidates:
         if p.exists():
             return json.loads(p.read_text())
-    return {"ingested": {}, "total_cost": 0}
+    return {"ingested": {}}
 
 
 def collect_run_progress(vault: Path) -> tuple[int, int]:
@@ -190,7 +190,6 @@ def render(vault: Path) -> str:
 
     total_raw = sum(raw.values())
     ingested = len(state.get("ingested", {}))
-    cost = state.get("total_cost", 0)
     backlog = max(0, total_raw - ingested)
     pct_ingested = 100 * ingested / total_raw if total_raw else 0
 
@@ -242,7 +241,7 @@ def render(vault: Path) -> str:
     color = GRN if pct_ingested > 70 else YEL if pct_ingested > 30 else RED
     out.append(box_top("COMPILE BACKLOG", W))
     out.append(line(f"ingested  {bar(pct_ingested, fill=maybe(color))} {pct_ingested:>5.1f}%   {ingested}/{total_raw}", W))
-    out.append(line(f"{maybe(DIM)}backlog: {backlog} files open · cost ${cost:.2f} cumulative{maybe(RST)}", W))
+    out.append(line(f"{maybe(DIM)}backlog: {backlog} files open{maybe(RST)}", W))
     out.append(box_bot(W))
     out.append("")
 

@@ -15,7 +15,6 @@ from pathlib import Path
 import pytest
 
 import core.health as health
-from core.config_schema import PiggybackTask
 
 NOW = datetime(2026, 8, 26, 12, 0, 0).astimezone()
 

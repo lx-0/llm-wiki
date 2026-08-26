@@ -2,7 +2,6 @@
 pending_compiles: 0
 failed_flushes: 0
 lint_warnings: 0
-total_cost_lifetime: 0
 articles_total: 0
 daily_logs_total: 0
 open_commitments: 0

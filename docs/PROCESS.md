@@ -860,7 +860,6 @@ Der Inhalt der Frontmatter:
 | `pending_compiles` | `list_raw_files()` ∖ `state.ingested` (Hash-Vergleich) |
 | `failed_flushes` | Anzahl `*.md` in `.wiki/sessions/failed-flushes/` |
 | `lint_warnings` | Summe aus den 5 strukturellen Lint-Checks (kein LLM) |
-| `total_cost_lifetime` | `state.json:total_cost` |
 | `articles_total` | `len(list_wiki_articles())` |
 | `daily_logs_total` | Anzahl `daily/*.md` |
 | `last_compile_ts` | mtime des neuesten Artikels in `knowledge/` |
