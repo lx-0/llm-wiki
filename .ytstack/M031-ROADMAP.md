@@ -17,7 +17,7 @@ completed_slices: 0
 ## Slices
 
 - [ ] S01 -- Flush outage: systematic root-cause of the cli_crash class (evidence-first), fix + 70 KB regression, retry-drain decoupled with catch-up, live queue 234 → 0, sessions.md flowing
-- [ ] S02 -- Index drift: writer upsert fix (test-pinned), `wiki index rebuild` one-shot reconciliation (dedupe + deterministic backfill of 561 + junk removal), lint drift gate, live rebuild verified
+- [x] S02 -- Index drift DONE 2026-08-26: root cause was the LLM prompt step itself (told to upsert a table it must not read) — replaced by the deterministic `core/index_sync.py` post-compile pass + `wiki reindex` CLI; prompt step removed. Live: 362 deduped / 33 dropped / 574 appended, control dry-run 2024 rows · 0 changes · idempotent (== corpus). Drift gate folded into S04's doctor checks (one home). Expected one-time follow-on: ~574 publish updates (better descriptions) on the next piggyback fire.
 - [ ] S03 -- Link grammar + S-fix package: bash-bracket guard in core/links.py (Obsidian-verified), lint-check crash, stale last_error, 9 migration keys, dollar-counter retirement, gmeet dead-letter, scan_youtube cleanup, compile_model-knob decision
 - [ ] S04 -- Never-again + closeout: doctor substrate-freshness + piggyback-health checks, docs/CHANGELOG/infographics, milestone reassess
 
