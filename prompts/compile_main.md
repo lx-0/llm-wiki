@@ -226,8 +226,7 @@ ${source_content}
    ---
    ```
 
-5. **Update `knowledge/index.md`** — add or update the table row for each article you created or modified. Format:
-   `| [[path/without/.md]] | one-line summary | source file(s) | ${today} |`
+5. **Do NOT edit `knowledge/index.md`.** The engine reconciles the catalog table deterministically after every compile (dedupe, drop dangling rows, append missing articles) — a hand-added row would only be churned. Your summaries still reach the index: write them as the article's first body paragraph.
 
 6. **Append to `.wiki/logs/operations.md`** — add a dated entry summarizing what was compiled:
    `- ${now}: Compiled `${source_path}` → [list of articles created/updated]`

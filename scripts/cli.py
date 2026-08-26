@@ -770,6 +770,8 @@ COMMANDS: tuple[CommandSpec, ...] = (
                 handler="pin.py", banner=False, menu=True, help_text=H_PIN),
     CommandSpec("publish", "Knowledge ops", "mirror knowledge/ into meinkontext (--dry-run)",
                 handler="publish/cli.py", help_text=H_PUBLISH),
+    CommandSpec("reindex", "Knowledge ops", "reconcile index.md against the corpus (--dry-run)",
+                handler="reindex.py"),
     CommandSpec("review-wiki", "Knowledge ops", "per-article quality scores (local LLM, free)",
                 handler="review-wiki.py", menu=True, help_text=H_REVIEW_WIKI),
     CommandSpec("health-trends", "Knowledge ops", "deterministic health-trend synthesis ($0)",

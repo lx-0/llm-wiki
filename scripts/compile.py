@@ -748,6 +748,26 @@ async def main() -> None:
             rl_stats["links_rewritten"],
         )
 
+    # Deterministic index reconciliation (M031-S02). The catalog table is
+    # engine bookkeeping — the former LLM prompt step ("add or update the
+    # row") could never upsert against a table it was told not to read, and
+    # drifted to 362 duplicate / 561 missing rows on the live vault. Runs
+    # after the link passes; idempotent — unchanged corpus writes nothing.
+    from datetime import datetime as _dt
+
+    from core.config import TIMEZONE
+    from core.index_sync import sync_index
+    ix_stats = sync_index(
+        KNOWLEDGE_DIR, ROOT_DIR,
+        today=_dt.now(TIMEZONE).strftime("%Y-%m-%d"),
+    )
+    if ix_stats["changed"]:
+        log.info(
+            "  index sync: %d kept · %d deduped · %d dropped · %d appended",
+            ix_stats["kept"], ix_stats["deduped"],
+            ix_stats["dropped_dangling"], ix_stats["appended"],
+        )
+
     # Append-only history event so Dashboard P2 charts can render time series.
     if compiled_count > 0:
         from core.utils import append_history
