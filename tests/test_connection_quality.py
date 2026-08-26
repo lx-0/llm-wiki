@@ -121,6 +121,19 @@ depth and the wikilink endpoints are both present already.
 """
 
 
+@pytest.fixture(autouse=True)
+def configured_domain_tags(monkeypatch):
+    """The domain-tag checks read `graph_view.domain_tags` — THE list, with no
+    engine fallback since 2026-08-26 (lint.py used to hardcode one operator's
+    project names because the knob was unreachable). These tests exercise the
+    check's logic, so they state the domains explicitly instead of inheriting
+    whatever a vault happens to configure."""
+    from core.config import CONFIG
+
+    monkeypatch.setattr(CONFIG.graph_view, "domain_tags",
+                        ["fleet", "openclaw", "llm-wiki"], raising=False)
+
+
 @pytest.fixture
 def with_knowledge(tmp_path):
     """Materialise a fake knowledge/ tree and build a LintContext over it."""

@@ -744,19 +744,17 @@ _FROZEN_NEVER_INJECTED: dict[str, set[str]] = {
         "clippings_sweep", "curiosity_loop", "procmail_execution",
         "vision_screenshots",
     },
-    "graph_view": {"custom_search", "domain_tags", "mode"},
+    "graph_view": {"custom_search", "mode"},
     "limits": {
-        "compile_failure_backoff_s", "compile_max_consecutive_failures",
+        "compile_max_consecutive_failures",
         "compile_max_files", "compile_max_prompt_chars", "compile_max_turns",
-        "compile_retry_long_context_min_source_chars",
         "compile_retry_long_context_on_unknown",
         "curiosity_folder_confidence_min", "curiosity_max_gaps",
         "curiosity_max_prompt_chars", "curiosity_min_source_chars",
         "curiosity_quote_min_anchor_tokens", "curiosity_source_globs",
         "curiosity_timeout_s", "flush_max_retries", "flush_retry_delay_seconds",
         "gmeet_max_per_run", "gmeet_request_timeout_s", "jamie_max_per_run",
-        "jamie_request_timeout_s", "oura_max_backfill_days",
-        "oura_request_timeout_s", "query_max_prompt_chars",
+        "jamie_request_timeout_s", "query_max_prompt_chars",
         "screenshot_resize_width", "screenshot_timeout_seconds",
         "sdk_max_buffer_size_mb", "sparse_threshold_words",
         "youtube_aggregate_timeout_s", "youtube_frame_resize_width",
@@ -768,7 +766,7 @@ _FROZEN_NEVER_INJECTED: dict[str, set[str]] = {
         "curiosity_model", "ollama_url", "vision_model",
     },
     "personal": {
-        "accounts", "calendar_skip_keywords", "curiosity_folders",
+        "accounts", "curiosity_folders",
         "email_folders", "firefox_profile", "primary_account",
         "project_examples", "stg_backup_dir", "thunderbird_profile",
         "voice_inbox",
@@ -804,6 +802,86 @@ def test_never_injected_is_a_closed_historical_set():
         "deleted from the schema, drop it from _FROZEN_NEVER_INJECTED too; if "
         "it moved to INJECTED_KEYS, that is a policy change worth stating."
     )
+
+
+def test_every_never_injected_key_reaches_a_vault_or_is_exempt_by_nature():
+    """The classes NEVER_INJECTED now claims are about the VALUE's nature —
+    secret, per-install path, operator-authored structure, engine-internal
+    tuning. None of them can apply to a knob a collector reads as a plain
+    tunable. This pins the four that were misfiled on exactly that confusion
+    (2026-08-26) so they cannot drift back."""
+    m = _mod()
+    moved = {
+        "limits": ("oura_request_timeout_s", "oura_max_backfill_days",
+                   "compile_failure_backoff_s",
+                   "compile_retry_long_context_min_source_chars"),
+        "graph_view": ("domain_tags",),
+        "personal": ("calendar_skip_keywords",),
+    }
+    for section, keys in moved.items():
+        for key in keys:
+            assert key in m.INJECTED_KEYS.get(section, ()), (
+                f"{section}.{key} must be injected — it is a plain tunable with "
+                "a live reader, not a secret/path/structure"
+            )
+            assert key not in m.NEVER_INJECTED.get(section, ())
+    assert "daily_digest_yesterday" in m.INJECTED_PIGGYBACKS
+    assert "daily_digest_yesterday" not in m.NEVER_INJECTED_PIGGYBACKS
+
+
+# ── graph_view.domain_tags legacy seed ───────────────────────────────
+
+
+def test_domain_tags_seeded_when_key_absent():
+    """lint.py hardcoded one operator's project names because the knob was
+    unreachable. Removing the hardcode must not change what their vault does,
+    so a config that predates the knob is seeded with that exact list."""
+    m = _mod()
+    data = {"graph_view": {"mode": "default"}}
+    changes = m.migrate_domain_tags_seed(data)
+    assert data["graph_view"]["domain_tags"] == m._LEGACY_LINT_DOMAIN_TAGS
+    assert len(changes) == 1
+    assert data["graph_view"]["mode"] == "default"
+
+
+def test_domain_tags_seed_respects_an_explicit_empty_list():
+    """A fresh install carries `domain_tags: []` from config.example.yaml —
+    that is a choice, not an absence, and must survive."""
+    m = _mod()
+    data = {"graph_view": {"domain_tags": []}}
+    assert m.migrate_domain_tags_seed(data) == []
+    assert data["graph_view"]["domain_tags"] == []
+
+
+def test_domain_tags_seed_never_overwrites_operator_tags():
+    m = _mod()
+    data = {"graph_view": {"domain_tags": ["acme", "widgets"]}}
+    assert m.migrate_domain_tags_seed(data) == []
+    assert data["graph_view"]["domain_tags"] == ["acme", "widgets"]
+
+
+def test_domain_tags_seed_creates_a_missing_block():
+    m = _mod()
+    data: dict = {}
+    m.migrate_domain_tags_seed(data)
+    assert data["graph_view"]["domain_tags"] == m._LEGACY_LINT_DOMAIN_TAGS
+
+
+def test_domain_tags_seed_is_idempotent():
+    m = _mod()
+    data: dict = {}
+    m.migrate_domain_tags_seed(data)
+    assert m.migrate_domain_tags_seed(data) == []
+
+
+def test_seed_runs_before_injection_so_it_is_not_pre_empted():
+    """migrate_additions would inject the schema default (an empty list) and
+    lock the vault out of the seed, so ordering is load-bearing."""
+    m = _mod()
+    data = {"graph_view": {"mode": "default"}}
+    m.migrate_domain_tags_seed(data)
+    m.migrate_additions(data)
+    assert data["graph_view"]["domain_tags"] == m._LEGACY_LINT_DOMAIN_TAGS
 
 
 def test_piggyback_defaults_have_a_migration_policy():

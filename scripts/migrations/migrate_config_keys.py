@@ -275,6 +275,12 @@ INJECTED_KEYS: dict[str, tuple[str, ...]] = {
         "intent_classify_model",      # intent-dispatch cheap tier (2026-06-14)
         "compile_default_route_model",  # compile fall-through route (2026-08-26)
     ),
+    "graph_view": (
+        # Was NEVER_INJECTED, so no vault could set it — and lint.py grew a
+        # hardcoded copy of ONE operator's project names as the fallback
+        # (2026-08-26).
+        "domain_tags",
+    ),
     "limits": (
         "curiosity_exclude_globs",    # curiosity substrate denylist (2026-06-13)
         "review_max_sweep_runtime_s",  # review-wiki soft sweep deadline (2026-06-13)
@@ -342,6 +348,15 @@ INJECTED_KEYS: dict[str, tuple[str, ...]] = {
         "gmeet_export_dead_letter_reprobe_days",
         "doctor_piggyback_stale_factor",
         "doctor_piggyback_stale_min_hours",
+        # Misfiled in NEVER_INJECTED until 2026-08-26 — born 2026-05-15, one
+        # day after the migration shipped, so no install-time copy carried
+        # them and no backfill ever ran. The compile pair is the sharpest
+        # case: the retry's on/off switch was visible while the threshold
+        # that gates it and the failure-backoff were not.
+        "oura_request_timeout_s",
+        "oura_max_backfill_days",
+        "compile_failure_backoff_s",
+        "compile_retry_long_context_min_source_chars",
     ),
     "scheduling": (
         "piggybacks_on_compile",        # compile drains due piggybacks (2026-06-13)
@@ -372,6 +387,11 @@ INJECTED_KEYS: dict[str, tuple[str, ...]] = {
         "capture_inbox",                # M025 quick-capture loop (2026-05-23)
         "reports_dir",                  # M019 reports surface (2026-05-17)
         "domains",                      # M013 domain frontmatter axis (2026-05-16)
+        # Misfiled in NEVER_INJECTED until 2026-08-26: it is a real tuning
+        # knob the calendar collector reads, not an operator-authored
+        # structure, and it only entered config.example.yaml long after this
+        # vault was installed.
+        "calendar_skip_keywords",
         # M026 audio ingest via whisper.cpp (2026-05-28)
         "voice_transcribe_model",
         "voice_transcribe_language",
@@ -405,15 +425,33 @@ INJECTED_PIGGYBACKS: tuple[str, ...] = (
     "study_run_due",        # M019 schedule dispatcher, default OFF (2026-05-17)
     "analyst_pass2",        # M019-S05 Pass-2 analyst, default OFF (2026-05-17)
     "publish",              # M030-S03 meinkontext-mirror cadence (2026-08-25)
+    # Enabled-by-default daily job that no vault could see or retune — it sat
+    # in NEVER_INJECTED with no stated justification at all (2026-08-26).
+    "daily_digest_yesterday",
 )
 
-# Schema knobs the migration deliberately does NOT inject. Two classes:
-#   - pre-migration-era keys every operator config already carries from the
-#     install-time config.example.yaml copy (re-injecting would be noise);
-#   - keys that stay dataclass-fall-through by design (secrets belong in
-#     `.claude/.env`; per-install paths are set once during setup; accounts
-#     are operator-authored structures).
-# Explicit so the drift test can prove every schema knob has a policy.
+# Schema knobs the migration deliberately does NOT inject.
+#
+# This list used to justify itself with "pre-migration-era keys every operator
+# config already carries from the install-time config.example.yaml copy". That
+# premise was never checkable and was measurably FALSE: install.sh copies
+# config.example.yaml into the vault exactly once, so a knob that entered
+# config.example.yaml AFTER a vault was installed never reaches it, and
+# NEVER_INJECTED guarantees no backfill. Eight such knobs were found running on
+# hidden dataclass defaults on the live vault (2026-08-26) — including two
+# halves of the compile retry ladder whose on/off switch WAS visible. Seven
+# were moved to INJECTED_KEYS; the classes below are what remains, and each is
+# something you can verify by reading the value's nature, not by assuming
+# history:
+#   - secrets and credentials — those belong in `.claude/.env`;
+#   - per-install paths set once during setup;
+#   - operator-authored structures (accounts, folder lists) where an injected
+#     empty default would be noise, not a starting point;
+#   - engine-internal tuning an operator has no basis to change (buffer sizes,
+#     prompt-char ceilings) — visible in config.example.yaml as documentation.
+# Explicit so the drift test can prove every schema knob has a policy, and
+# frozen by tests/test_migrate_config_keys.py so a NEW knob can never be
+# appended here by prefix-adjacency.
 NEVER_INJECTED: dict[str, tuple[str, ...]] = {
     "models": (
         "compile_model",
@@ -447,15 +485,11 @@ NEVER_INJECTED: dict[str, tuple[str, ...]] = {
         "jamie_max_per_run",
         "gmeet_request_timeout_s",
         "gmeet_max_per_run",
-        "oura_request_timeout_s",
-        "oura_max_backfill_days",
         "sdk_max_buffer_size_mb",
         "query_max_prompt_chars",
         "compile_max_prompt_chars",
         "compile_max_turns",
         "compile_retry_long_context_on_unknown",
-        "compile_failure_backoff_s",
-        "compile_retry_long_context_min_source_chars",
     ),
     "scheduling": (
         "compile_after_hour",
@@ -471,7 +505,6 @@ NEVER_INJECTED: dict[str, tuple[str, ...]] = {
     "graph_view": (
         "mode",
         "custom_search",
-        "domain_tags",
     ),
     "skills": (
         "global_install",
@@ -482,7 +515,6 @@ NEVER_INJECTED: dict[str, tuple[str, ...]] = {
         "email_folders",
         "curiosity_folders",
         "project_examples",
-        "calendar_skip_keywords",
         "thunderbird_profile",
         "firefox_profile",
         "stg_backup_dir",
@@ -498,9 +530,12 @@ NEVER_INJECTED_PIGGYBACKS: tuple[str, ...] = (
     "screenshots",
     "jamie",
     "gmeet",
-    "health",                 # M023; runs by default without a block (graceful agnostic)
+    # Third class, distinct from the two above: designed to run block-less and
+    # skip gracefully per account when no health sub-block exists
+    # (config_schema `_default_piggybacks`). Injecting a block would state a
+    # cadence for a job that may have nothing to collect.
+    "health",
     "voice",
-    "daily_digest_yesterday",
     "retry_failed_flushes",
 )
 
@@ -516,7 +551,8 @@ KEY_ADDITIONS: dict[str, dict[str, object]] = {
         if section == "piggybacks"
         else {name: _schema_default(section, name) for name in INJECTED_KEYS[section]}
     )
-    for section in ("models", "limits", "scheduling", "features", "piggybacks", "personal", "publish")
+    for section in ("models", "limits", "scheduling", "features", "piggybacks",
+                    "personal", "graph_view", "publish")
 }
 
 # Elements to add to existing list-valued config entries. Used when an
@@ -890,6 +926,38 @@ def migrate_value_upgrades(data: dict) -> list[str]:
     return changes
 
 
+# The domain list `scripts/lint.py` carried as a module constant until
+# 2026-08-26. It was ONE operator's project names living in engine code — the
+# knob that was supposed to hold them (graph_view.domain_tags) sat in
+# NEVER_INJECTED, so no vault could ever set it and the fallback became the
+# de-facto behaviour. Writing it into the config of a vault that predates the
+# knob preserves that behaviour exactly; fresh installs carry
+# `domain_tags: []` from config.example.yaml and are left alone.
+_LEGACY_LINT_DOMAIN_TAGS: list[str] = [
+    "fleet", "openclaw", "claude-code", "yesterday", "llm-wiki",
+    "paperclip", "ytstack", "township", "pixeltales", "lxw",
+]
+
+
+def migrate_domain_tags_seed(data: dict) -> list[str]:
+    """Seed `graph_view.domain_tags` on vaults that never had the key.
+
+    Only when ABSENT — an operator who set it (including to an empty list)
+    keeps their choice.
+    """
+    gv = data.get("graph_view")
+    if not isinstance(gv, dict):
+        gv = {}
+        data["graph_view"] = gv
+    if "domain_tags" in gv:
+        return []
+    gv["domain_tags"] = list(_LEGACY_LINT_DOMAIN_TAGS)
+    return [
+        "seeded graph_view.domain_tags with the list lint.py used to hardcode "
+        f"({len(_LEGACY_LINT_DOMAIN_TAGS)} tags) — edit it to match your own domains"
+    ]
+
+
 def migrate_config(config_path: Path) -> tuple[str | None, list[str]]:
     """Return (new_yaml_text_or_None, changes). None text → no change needed."""
     if not config_path.exists():
@@ -908,6 +976,11 @@ def migrate_config(config_path: Path) -> tuple[str | None, list[str]]:
         if pb_changes:
             data["piggybacks"] = new_piggybacks
             changes.extend(pb_changes)
+
+    # Legacy domain-tag seed. MUST run before migrate_additions, which would
+    # otherwise inject the schema default (an empty list) and lock the vault
+    # out of the seed.
+    changes.extend(migrate_domain_tags_seed(data))
 
     # Key additions — backfill new knobs under their parent block so they're
     # visible to the operator. Runs unconditionally; entries already present

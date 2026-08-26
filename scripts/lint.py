@@ -378,21 +378,16 @@ def check_article_type(ctx: LintContext) -> list[Issue]:
 
 # Domain tags considered "meaningful" for graph-view coloring. A qa/ note
 # without any of these gets a warning so it doesn't fall into the grey
-# fallback bucket. List is sourced from CONFIG.graph_view.domain_tags when
-# present; fallback covers the lxw vault's main domains. Add via config.yaml:
-#   graph_view:
-#     domain_tags: [fleet, openclaw, claude-code, ...]
-_DEFAULT_DOMAIN_TAGS = (
-    "fleet", "openclaw", "claude-code", "yesterday", "llm-wiki",
-    "paperclip", "ytstack", "township", "pixeltales", "lxw",
-)
-
-
+# fallback bucket. THE list is `CONFIG.graph_view.domain_tags` — there is no
+# engine fallback: this module used to hardcode one operator's project names
+# because the knob sat in NEVER_INJECTED and no vault could set it
+# (2026-08-26). Empty list = the operator has not named their domains, so the
+# rule stays quiet rather than warning against a list nobody chose.
 def _domain_tags() -> tuple[str, ...]:
     cfg = getattr(CONFIG.graph_view, "domain_tags", None)
-    if cfg and isinstance(cfg, list):
+    if isinstance(cfg, list):
         return tuple(t for t in cfg if isinstance(t, str))
-    return _DEFAULT_DOMAIN_TAGS
+    return ()
 
 
 def check_qa_schema(ctx: LintContext) -> list[Issue]:
@@ -422,11 +417,14 @@ def check_qa_schema(ctx: LintContext) -> list[Issue]:
                 f"qa/{stem} is not referenced in knowledge/index.md — "
                 f"`wiki query --file-back` should have added a row",
             ))
-        # 3. should have ≥1 domain tag (else falls into grey bucket in graph view)
+        # 3. should have ≥1 domain tag (else falls into grey bucket in graph
+        # view). Skipped entirely when the operator has named no domains —
+        # warning "no domain tag from []" on every note would be noise, and
+        # the engine has no business guessing what their domains are.
         raw_tags = art.fm.get("tags") or []
-        tags = set(raw_tags) if isinstance(raw_tags, list) else set()
+        tags = {str(t) for t in raw_tags} if isinstance(raw_tags, list) else set()
         # Strip the redundant `qa` tag — that information lives in type:
-        if not (tags & domain_set):
+        if domain_set and not (tags & domain_set):
             issues.append(issue(
                 "warning", "qa_no_domain_tag", art.rel,
                 f"qa/ note has no domain tag from {sorted(domain_set)} — "
@@ -458,7 +456,8 @@ def check_concept_domain_tag(ctx: LintContext) -> list[Issue]:
             # str-coerce: YAML parses bare numeric tags as ints, and a mixed
             # str/int set makes sorted() raise (live check-crash 2026-08-24).
             tags = {str(t) for t in raw_tags} if isinstance(raw_tags, list) else set()
-            if not (tags & domain_set):
+            # Quiet when the operator has named no domains — see _domain_tags.
+            if domain_set and not (tags & domain_set):
                 issues.append(issue(
                     "warning", "concept_no_domain_tag", art.rel,
                     f"{folder[:-1]} has no tag from {sorted(domain_set)} — "
