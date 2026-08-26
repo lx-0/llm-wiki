@@ -284,6 +284,9 @@ limits:
   # Backstop against a hung child (the review-wiki hang ran 19h47m unbounded).
   # 4h is generous for a full review-wiki sweep.
   piggyback_max_runtime_s: 14400
+  # wiki doctor: piggyback counts as stale (substrate dark) after
+  # factor × its cooldown_hours without a fire.
+  doctor_piggyback_stale_factor: 4
   # review-wiki.py: per-article Ollama read timeout, consecutive-failure abort
   # (stop grinding 1700×timeout when kcma is down), and incremental-report
   # checkpoint cadence (don't lose a multi-hour partial sweep).

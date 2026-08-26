@@ -18,6 +18,7 @@ sub-50ms latency. Used by hooks where 250ms is too slow.
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import re
@@ -818,6 +819,157 @@ def check_voice_audio_setup() -> CheckResult:
         return _probe_failed("voice-audio-setup", "config", exc)
 
 
+# ── Reliability checks (M031-S04) ───────────────────────────────────
+# The 2026-08-25 audit found three silent-failure classes doctor never
+# surfaced: a piggyback stuck on a failed/timeout outcome, substrates dark
+# for weeks (no fire, nothing flagging it), and knowledge/index.md drifting
+# from the corpus. Each is a warning here, not critical — the vault still
+# functions, but the operator is losing intake/navigation silently.
+
+
+def _parse_ts(raw: object) -> datetime | None:
+    """Local-ISO timestamps from piggyback_runner/flush; naive → local tz."""
+    if not isinstance(raw, str) or not raw:
+        return None
+    try:
+        dt = datetime.fromisoformat(raw)
+    except ValueError:
+        return None
+    return dt.astimezone() if dt.tzinfo is None else dt
+
+
+def check_piggyback_health(
+    *, state_file: Path | None = None, now: datetime | None = None
+) -> list[CheckResult]:
+    """Piggyback outcome + substrate-freshness audit over piggyback-state.json.
+
+    Per ENABLED task in CONFIG.piggybacks, first matching condition wins:
+      - last completed run failed/timeout/error → warning (with last_error)
+      - status running/spawned past the runner's wall-clock cap (+1h slack)
+        → warning (orphaned runner — the runner records `timeout` at the cap)
+      - last fire older than limits.doctor_piggyback_stale_factor × cooldown
+        → warning (substrate dark)
+    Never-ran tasks aggregate into one info line; all healthy → one ok line.
+    """
+    from core.config import CONFIG
+
+    now = now or datetime.now().astimezone()
+    sf = state_file or (STATE_DIR / "piggyback-state.json")
+    state: dict = {}
+    if sf.exists():
+        try:
+            state = json.loads(sf.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            return [CheckResult(
+                id="piggyback-health", category="pipeline", severity="warning",
+                message=f"piggyback state unreadable: {sf.name}",
+                fix="inspect the file; the runner rewrites it on the next fire",
+            )]
+
+    cap_s = int(getattr(CONFIG.limits, "piggyback_max_runtime_s", 14_400))
+    stale_factor = int(getattr(CONFIG.limits, "doctor_piggyback_stale_factor", 4))
+
+    results: list[CheckResult] = []
+    never_ran: list[str] = []
+    healthy = 0
+    for name, task in sorted(CONFIG.piggybacks.items()):
+        if not getattr(task, "enabled", True):
+            continue
+        entry = state.get(name)
+        if not isinstance(entry, dict):
+            never_ran.append(name)
+            continue
+        status = str(entry.get("status") or "")
+        last_error = entry.get("last_error")
+        started = _parse_ts(entry.get("started"))
+        last_run = _parse_ts(entry.get("last_run")) or _parse_ts(entry.get("ended"))
+
+        if status == "timeout" or status.startswith(("failed:", "error:")):
+            detail = f" — {last_error}" if last_error else ""
+            results.append(CheckResult(
+                id=f"piggyback-{name}", category="pipeline", severity="warning",
+                message=f"piggyback {name}: last run {status}{detail}",
+                fix="next compile retries after cooldown; logs in .wiki/logs/",
+            ))
+            continue
+        if status in ("running", "spawned") and started is not None \
+                and (now - started).total_seconds() > cap_s + 3600:
+            results.append(CheckResult(
+                id=f"piggyback-{name}", category="pipeline", severity="warning",
+                message=(f"piggyback {name}: {status} since {started:%Y-%m-%d %H:%M} "
+                         "— past the runner's wall-clock cap (orphaned?)"),
+                fix="check the pid in piggyback-state.json; kill leftovers",
+            ))
+            continue
+        stale_after_s = stale_factor * task.cooldown_hours * 3600
+        if last_run is not None and (now - last_run).total_seconds() > stale_after_s:
+            age_days = (now - last_run).total_seconds() / 86_400
+            results.append(CheckResult(
+                id=f"piggyback-{name}", category="pipeline", severity="warning",
+                message=(f"piggyback {name}: no fire for {age_days:.1f}d "
+                         f"(cadence {task.cooldown_hours}h) — substrate dark"),
+                fix="run `wiki compile` (piggybacks_on_compile) or check flush.py runs",
+            ))
+            continue
+        healthy += 1
+
+    if never_ran:
+        results.append(CheckResult(
+            id="piggyback-never-ran", category="pipeline", severity="info",
+            message=f"piggyback(s) never ran yet: {', '.join(never_ran)}",
+        ))
+    if not results or healthy:
+        results.append(CheckResult(
+            id="piggyback-health", category="pipeline", severity="ok",
+            message=f"{healthy} piggyback(s) healthy (last fires within cadence)",
+        ))
+    return results
+
+
+def check_index_drift(
+    *, quick: bool = False, knowledge_dir: Path | None = None, vault: Path | None = None
+) -> CheckResult:
+    """Dry-run `core.index_sync` against the corpus; drift → warn + `wiki reindex`.
+
+    Walks every knowledge/ article (first-paragraph reads), so it is skipped
+    in --quick mode.
+    """
+    if quick:
+        return CheckResult(
+            id="index-drift", category="pipeline", severity="info",
+            message="index drift check skipped (--quick)",
+        )
+    knowledge = knowledge_dir or KNOWLEDGE_DIR
+    if not knowledge.exists():
+        return CheckResult(
+            id="index-drift", category="pipeline", severity="info",
+            message="no knowledge/ yet — index drift not applicable",
+        )
+    try:
+        from core.index_sync import sync_index
+
+        stats = sync_index(
+            knowledge, vault or ROOT_DIR,
+            today=datetime.now().astimezone().date().isoformat(),
+            apply=False,
+        )
+    except Exception as exc:
+        return _probe_failed("index-drift", "pipeline", exc)
+    if stats.get("changed"):
+        return CheckResult(
+            id="index-drift", category="pipeline", severity="warning",
+            message=(f"knowledge/index.md drift: {stats.get('deduped', 0)} duplicate / "
+                     f"{stats.get('dropped_dangling', 0)} dangling / "
+                     f"{stats.get('appended', 0)} missing row(s)"),
+            fix="wiki reindex",
+            dispatch_args=["reindex"],
+        )
+    return CheckResult(
+        id="index-drift", category="pipeline", severity="ok",
+        message=f"knowledge/index.md in sync ({stats.get('kept', 0)} rows)",
+    )
+
+
 # ── Orchestration ───────────────────────────────────────────────────
 
 
@@ -838,6 +990,8 @@ _ALL_CHECKS: list[Callable[..., CheckResult | list[CheckResult]]] = [
     check_no_knowledge_articles,
     check_compile_state,
     check_voice_audio_setup,
+    check_piggyback_health,
+    check_index_drift,
 ]
 
 

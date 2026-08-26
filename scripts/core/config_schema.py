@@ -255,6 +255,11 @@ class Limits:
     # status="timeout". 4h is generous for a full review-wiki sweep; lower it
     # once per-task overrides exist.
     piggyback_max_runtime_s: int = 14_400
+    # `wiki doctor` substrate-freshness threshold: an enabled piggyback whose
+    # last fire is older than factor × its cooldown_hours is flagged stale
+    # (collector dark — audit 2026-08-25 found substrates silently off for
+    # weeks with nothing surfacing it).
+    doctor_piggyback_stale_factor: int = 4
     # review-wiki.py per-article Ollama read timeout (was a hardcoded 300 in
     # the script). Generous because the quality-review prompt is large and
     # gemma cold-calls are slow; the connect cap + keepalive above prevent a

@@ -439,6 +439,7 @@ NEVER_INJECTED: dict[str, tuple[str, ...]] = {
         "gmeet_max_per_run",
         "gmeet_export_dead_letter_attempts",
         "gmeet_export_dead_letter_reprobe_days",
+        "doctor_piggyback_stale_factor",
         "oura_request_timeout_s",
         "oura_max_backfill_days",
         "sdk_max_buffer_size_mb",

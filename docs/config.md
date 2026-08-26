@@ -114,6 +114,7 @@ The `.env` file: only the **variable NAME** lives in `config.yaml` (e.g. `api_ke
 | `limits.screenshot_timeout_seconds` | `60` | Per-screenshot Ollama timeout (seconds). |
 | `limits.ollama_connect_timeout_s` | `10` | TCP connect timeout for every Ollama HTTP call (ollama_client.py). |
 | `limits.piggyback_max_runtime_s` | `14400` | Hard wall-clock cap the piggyback runner (core/piggyback_runner.py) enforces on every spawned piggyback. |
+| `limits.doctor_piggyback_stale_factor` | `4` | `wiki doctor` substrate-freshness threshold: an enabled piggyback whose last fire is older than factor × its cooldown_hours is flagged stale (collector dark — audit 2026-08-25 found substrates silently off for weeks with nothing surfacing … |
 | `limits.review_ollama_timeout_s` | `300` | review-wiki.py per-article Ollama read timeout (was a hardcoded 300 in the script). |
 | `limits.review_consecutive_failure_abort` | `5` | review-wiki.py fail-fast: abort the full-vault sweep after this many CONSECUTIVE per-article Ollama failures. |
 | `limits.review_checkpoint_every` | `25` | review-wiki.py incremental checkpoint: flush the partial JSON report every N reviewed articles so an aborted/killed sweep keeps its work (the report was previously written only at end-of-sweep). |
