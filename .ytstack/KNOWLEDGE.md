@@ -2802,4 +2802,34 @@ Two months between audits let three whole clusters die silently while every dash
 
 ### Fix direction
 
-Audit belongs on cadence, not on operator hunch (last one ~3 months prior). Cheap standing options: doctor gaining a "substrate freshness" check (newest artifact age per configured collector vs its cooldown — the audit derived this mechanically) and a piggyback-state check (status failed:* or last_run > 3× cooldown). Both are deterministic, $0, and would have flagged all three clusters within days instead of months.
+Audit belongs on cadence, not on operator hunch (last one ~3 months prior). Cheap standing options: doctor gaining a "substrate freshness" check (newest artifact age per configured collector vs its cooldown — the audit derived this mechanically) and a piggyback-state check (status failed:* or last_run > 3× cooldown). Both are deterministic, $0, and would have flagged all three clusters within days instead of months. (Both shipped in M031-S04.)
+
+## A config knob that never reaches the operator's config is dead weight, and "they already have it" is not a testable claim (2026-08-26, M031)
+
+### Lesson
+
+`migrate_config_keys.py` splits every schema knob into INJECTED_KEYS (written into operator vaults) and NEVER_INJECTED. The latter justified itself with "pre-migration-era keys every operator config ALREADY carries from the install-time `config.example.yaml` copy". `install.sh` performs that copy exactly **once**, at install — so a knob added to `config.example.yaml` afterwards never reaches an existing vault, and NEVER_INJECTED guarantees no backfill will ever add it. Measured against the live vault: 8 of 70 entries absent, every one born after the migration script shipped. The sharpest pair was `compile_retry_long_context_on_unknown` (visible) next to `compile_retry_long_context_min_source_chars` (invisible) — the operator could see a switch and not the threshold that gates it.
+
+Second-order damage: because `graph_view.domain_tags` was unreachable, `lint.py` grew a hardcoded list of ONE operator's project names as its fallback. An unreachable knob doesn't stay unused — its value migrates into engine code as seed data.
+
+### Why it survived every test
+
+The drift test asserted each knob is in **exactly one** table, never the **right** one. Moving three keys between tables changed no test outcome — proven by doing it. And the freeze guard added the same day snapshotted the tables *as they were*, certifying eight misfilings as correct in perpetuity. A guard written from the status quo ratifies the status quo.
+
+### Fix
+
+Policy classes must be checkable by reading the VALUE's nature (secret → `.claude/.env`, per-install path, operator-authored structure, engine-internal tuning), never by asserting history. NEVER_INJECTED is frozen so a new knob can't be appended by prefix-adjacency — the mistake that started this: three M031 knobs were pasted next to `gmeet_request_timeout_s`, which lives in the never-inject table, and `wiki update` answered "already on the current key schema". When removing a hardcoded fallback, migrate its value into configs that predate the knob (`migrate_domain_tags_seed`) so behaviour is preserved rather than silently changed.
+
+## Re-audit your own arc before closing it — three of the M031 fixes were wrong or partial (2026-08-26)
+
+### Lesson
+
+An adversarial multi-agent pass over the arc's own commits (4 dimensions × independent refutation) found 24 confirmed defects, 3 of them in code shipped hours earlier and already propagated to the operator's vault:
+
+1. **`models.compile_model` "dead knob"** — concluded from reading ONE consumer (`compile_stages/route.py`). Five others read it, including `wiki correct apply`, a 50-turn agent that WRITES into `knowledge/`. The "cleanup" silently downgraded it Opus→Haiku, and `MODEL_UPGRADES` rewrote any operator re-pin on every `wiki update`. **A knob is dead only after grepping every reader — a single call site proves nothing.**
+2. **The bash-`[[ … ]]` wikilink guard** was verified with a corpus diff over `WIKILINK_RE` matches and declared total. `lint`, `links_audit` and the compile router don't use that regex — they use `core.utils.extract_wikilinks`, which carried a **second copy of the grammar**. The guarded engine was live and the next lint run still emitted the same errors. **Verify against the consumer's own path, not the path you changed.**
+3. **"nothing reads it"** about the retired `total_cost` key — four readers did, one of them rendering it into the operator's dashboard frontmatter, while `query.py` kept writing it. A half-retired key is worse than a live one: the number stays on screen and is now wrong in both directions.
+
+### Fix
+
+The pattern in all three: a claim verified through the artifact I had just edited rather than through the surfaces that consume it. Before claiming a removal or a fix is complete, enumerate consumers with a repo-wide grep and re-measure on the LIVE surface (here: run the actual check function over the vault corpus, `274` broken links with `0` bash-shaped — down from 295).
