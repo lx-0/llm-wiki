@@ -178,7 +178,16 @@ def run_piggyback(
     status = "ok" if rc == 0 else f"failed:{rc}"
     record_status(
         name,
-        {"status": status, "ended": _now_iso(), "duration_s": duration},
+        {
+            "status": status,
+            "ended": _now_iso(),
+            "duration_s": duration,
+            # Always overwrite: a stale last_error from an earlier timeout
+            # otherwise survives the merge and misdiagnoses this run (live
+            # incident: review-wiki showed "killed after 14400s" for an
+            # 8.5 s rc=1 run — audit 2026-08-25).
+            "last_error": None if rc == 0 else f"exit {rc}",
+        },
         state_file=state_file,
     )
     return rc

@@ -30,6 +30,24 @@ def test_records_nonzero_exit(tmp_path):
     assert json.loads(sf.read_text())["t"]["status"] == "failed:3"
 
 
+def test_stale_last_error_is_overwritten_on_next_run(tmp_path):
+    """Live incident (audit 2026-08-25): review-wiki showed a day-old
+    "killed after 14400s" last_error for an 8.5 s rc=1 run — the rc-path
+    merged without touching last_error. Every completed run must overwrite
+    it: fresh text on failure, None on success."""
+    from core import piggyback_runner as pr
+    sf = tmp_path / "piggyback-state.json"
+    sf.write_text(json.dumps({"t": {"last_error": "killed after 14400s wall-clock cap"}}))
+
+    pr.run_piggyback("t", 60, [sys.executable, "-c", "import sys; sys.exit(1)"], state_file=sf)
+    entry = json.loads(sf.read_text())["t"]
+    assert entry["last_error"] == "exit 1"
+
+    pr.run_piggyback("t", 60, [sys.executable, "-c", "pass"], state_file=sf)
+    entry = json.loads(sf.read_text())["t"]
+    assert entry["status"] == "ok" and entry["last_error"] is None
+
+
 def test_records_timeout_and_kills_promptly(tmp_path):
     from core import piggyback_runner as pr
     sf = tmp_path / "piggyback-state.json"
