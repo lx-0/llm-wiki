@@ -48,6 +48,14 @@ log = logging.getLogger(__name__)
 
 SEVERITY_ORDER = {"critical": 0, "warning": 1, "info": 2, "ok": 3}
 
+# Ceiling on the doctor's Ollama TCP probe. The operator's
+# `limits.ollama_connect_timeout_s` is sized for real calls (10 s is generous
+# on a LAN); the health screen only needs enough headroom to clear jitter, and
+# must not stall for ten seconds when the box is genuinely off. Not a config
+# knob: it bounds doctor's own latency, not the engine's network behaviour,
+# and the operator already controls the value it caps.
+_OLLAMA_PROBE_CAP_S = 3.0
+
 
 @dataclass
 class CheckResult:
@@ -175,8 +183,15 @@ def check_hooks_installed() -> CheckResult:
 def check_ollama_reachable(*, quick: bool = False) -> CheckResult:
     """Warning if `models.ollama_url` is set but the host isn't reachable.
 
-    Skipped in --quick mode (TCP connect with 150ms timeout still costs
-    real wall-clock for an unreachable host).
+    Skipped in --quick mode — a TCP connect to a dead host costs real
+    wall-clock no matter how small the budget.
+
+    The budget derives from `limits.ollama_connect_timeout_s` (capped for the
+    health screen, see `_OLLAMA_PROBE_CAP_S`). It used to be a hardcoded
+    0.15 s, which is below ordinary LAN jitter: against a healthy host
+    answering in 6-41 ms, 2 of 12 connects still exceeded it and were reported
+    `unreachable` (measured 2026-08-26). A check that cries wolf on a working
+    host is worse than no check — the operator learns to ignore it.
     """
     if quick:
         return CheckResult(
@@ -199,9 +214,14 @@ def check_ollama_reachable(*, quick: bool = False) -> CheckResult:
         parsed = urlparse(url)
         host = parsed.hostname or "localhost"
         port = parsed.port or (443 if parsed.scheme == "https" else 80)
+        budget = min(
+            float(getattr(getattr(CONFIG, "limits", None),
+                          "ollama_connect_timeout_s", 10)),
+            _OLLAMA_PROBE_CAP_S,
+        )
         started = time.monotonic()
         try:
-            with socket.create_connection((host, port), timeout=0.15):
+            with socket.create_connection((host, port), timeout=budget):
                 ms = int((time.monotonic() - started) * 1000)
             return CheckResult(
                 id="ollama-reachable",

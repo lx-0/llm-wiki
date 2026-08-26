@@ -210,6 +210,75 @@ def test_ollama_warning_when_unreachable(fake_vault, monkeypatch):
     assert "unreachable" in result.message
 
 
+def test_ollama_connect_budget_is_not_a_hair_trigger(fake_vault, monkeypatch):
+    """Live 2026-08-26: the check used a hardcoded 150 ms TCP budget while
+    `limits.ollama_connect_timeout_s` (10 s) existed for exactly this. Against
+    a healthy LAN host answering in 6-41 ms, 2 of 12 connects still blew past
+    150 ms and were reported `unreachable` — a ~17% false-alarm rate on the
+    one check that is supposed to tell the operator their GPU box is down. The
+    budget derives from config, floors well above LAN jitter, and stays capped
+    so a genuinely dead host can't stall the health screen."""
+    class _Models:
+        ollama_url = "http://192.168.2.42:11434"
+
+    class _Limits:
+        ollama_connect_timeout_s = 10
+
+    class _CONFIG:
+        models = _Models()
+        limits = _Limits()
+
+    monkeypatch.setitem(__import__("sys").modules, "core.config",
+                        type("M", (), {"CONFIG": _CONFIG})())
+
+    seen = {}
+
+    class _Sock:
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+
+    def _capture(address, timeout=None, **kw):
+        seen["timeout"] = timeout
+        return _Sock()
+
+    monkeypatch.setattr(socket, "create_connection", _capture)
+    result = health.check_ollama_reachable()
+
+    assert result.severity == "ok"
+    assert seen["timeout"] >= 1.0, (
+        f"connect budget {seen['timeout']}s is below LAN jitter — false 'unreachable'"
+    )
+    assert seen["timeout"] <= _Limits.ollama_connect_timeout_s
+    assert seen["timeout"] <= 5.0, "health screen must not stall on a dead host"
+
+
+def test_ollama_connect_budget_respects_a_lower_config(fake_vault, monkeypatch):
+    """An operator who tightens the knob is honoured, not overridden."""
+    class _Models:
+        ollama_url = "http://192.168.2.42:11434"
+
+    class _Limits:
+        ollama_connect_timeout_s = 2
+
+    class _CONFIG:
+        models = _Models()
+        limits = _Limits()
+
+    monkeypatch.setitem(__import__("sys").modules, "core.config",
+                        type("M", (), {"CONFIG": _CONFIG})())
+
+    seen = {}
+
+    class _Sock:
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+
+    monkeypatch.setattr(socket, "create_connection",
+                        lambda address, timeout=None, **kw: (seen.update(timeout=timeout), _Sock())[1])
+    health.check_ollama_reachable()
+    assert seen["timeout"] == 2
+
+
 # ── check_compile_errors_recent ────────────────────────────────────
 
 
