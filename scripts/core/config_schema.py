@@ -371,6 +371,8 @@ class Limits:
     # (kind: gmeet-api, drive_folder_id, drive_folder_name, since, max_per_run).
     gmeet_request_timeout_s: int = 30     # per-HTTP-call timeout against the Drive API
     gmeet_max_per_run: int = 50           # default cap; per-account override is the gmeet sub-block's max_per_run
+    gmeet_export_dead_letter_attempts: int = 3   # export failures per doc-id before it parks in the dead-letter
+    gmeet_export_dead_letter_reprobe_days: int = 7  # days a parked doc-id waits before one re-probe (re-granted access heals)
     # Google Calendar ingest (collectors/calendar.py — see also
     # CONFIG.piggybacks.calendar). Multi-tenant: per-account calendar block
     # under personal.accounts.<id>.calendar (kind: google-calendar,

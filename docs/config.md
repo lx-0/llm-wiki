@@ -140,6 +140,8 @@ The `.env` file: only the **variable NAME** lives in `config.yaml` (e.g. `api_ke
 | `limits.jamie_max_per_run` | `50` | default cap per account (overridable via the per-account jamie sub-block) |
 | `limits.gmeet_request_timeout_s` | `30` | Google Meet ingest (collectors/gmeet.py — see also CONFIG.piggybacks.gmeet). |
 | `limits.gmeet_max_per_run` | `50` | default cap; per-account override is the gmeet sub-block's max_per_run |
+| `limits.gmeet_export_dead_letter_attempts` | `3` | export failures per doc-id before it parks in the dead-letter |
+| `limits.gmeet_export_dead_letter_reprobe_days` | `7` | days a parked doc-id waits before one re-probe (re-granted access heals) |
 | `limits.calendar_request_timeout_s` | `30` | Google Calendar ingest (collectors/calendar.py — see also CONFIG.piggybacks.calendar). |
 | `limits.calendar_max_per_run` | `500` | default per-calendar cap; per-account override is the calendar sub-block's max_per_run |
 | `limits.calendar_backfill_days` | `90` | default past window per run (events with updated >= now-N for delta sync) |

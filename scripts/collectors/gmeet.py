@@ -514,6 +514,40 @@ class _DriveClient:
             return self._get(url, params={"mimeType": _EXPORT_FALLBACK_MIME}, expect_json=False)
 
 
+# ── Export dead-letter ───────────────────────────────────────────────
+# Un-exportable doc-ids (colleague revoked access / doc deleted) were
+# re-attempted every run because the 30-day email window re-surfaces the same
+# ids (backlog gmeet-export-dead-letter.md; audit 2026-08-25: one id 404ing
+# across runs). Negative cache per account in gmeet-state.json under
+# `export_failed`; bounded re-probe so a re-granted doc eventually imports.
+
+
+def _record_export_failure(dead: dict, file_id: str, error: str, *, now: str) -> None:
+    entry = dead.setdefault(file_id, {"first_seen": now, "attempts": 0})
+    entry["attempts"] = entry.get("attempts", 0) + 1
+    entry["last_error"] = str(error)[:200]
+    entry["last_attempt"] = now
+
+
+def _dead_letter_skip(
+    entry: dict | None, *, now: str, max_attempts: int, reprobe_days: int
+) -> bool:
+    """True while the id is over its attempt budget AND inside the re-probe
+    window; after the window one retry is allowed so a re-granted doc
+    eventually imports. Unparseable timestamps skip (fail-closed: no
+    re-attempt storm on corrupt state)."""
+    if not entry or entry.get("attempts", 0) < max_attempts:
+        return False
+    last = entry.get("last_attempt", "")
+    if not last:
+        return True
+    try:
+        cutoff = datetime.fromisoformat(last) + timedelta(days=reprobe_days)
+        return datetime.fromisoformat(now) < cutoff
+    except ValueError:
+        return True
+
+
 # ── Rendering ────────────────────────────────────────────────────────
 
 _HEADING_BY_KIND = {
@@ -849,6 +883,9 @@ class GmeetCollector:
         files_written: list[Path] = []
         skipped = 0
         watermark = Watermark.seed(per_acct_state.get("last_seen_ts"))
+        dead: dict = per_acct_state.get("export_failed") or {}
+        dead_touched = False
+        skipped_dead = 0
         input_source = "piggyback" if not dry_run and incremental else "cli"
 
         for key, doc_stubs in groups.items():
@@ -888,12 +925,24 @@ class GmeetCollector:
             exports: list[tuple[dict, str]] = []
             for stub in new_stubs:
                 file_id = stub.get("id") or ""
+                if _dead_letter_skip(
+                    dead.get(file_id),
+                    now=now_iso(),
+                    max_attempts=CONFIG.limits.gmeet_export_dead_letter_attempts,
+                    reprobe_days=CONFIG.limits.gmeet_export_dead_letter_reprobe_days,
+                ):
+                    skipped_dead += 1
+                    continue
                 try:
                     exported = client.export_doc(file_id)
                 except GmeetAPIError as e:
                     log.warning("GmeetCollector[%s]: export %s — %s",
                                 acct.account_id, file_id, e)
+                    _record_export_failure(dead, file_id, str(e), now=now_iso())
+                    dead_touched = True
                     continue
+                if dead.pop(file_id, None) is not None:
+                    dead_touched = True
                 exports.append((stub, exported))
 
             if not exports:
@@ -1002,12 +1051,27 @@ class GmeetCollector:
                     watermark.observe(stub.get("createdTime"))
 
         state_touched = False
-        if not dry_run and watermark.advanced:
-            per_acct_state["last_seen_ts"] = watermark.value
+        if not dry_run and (watermark.advanced or dead_touched):
+            if watermark.advanced:
+                per_acct_state["last_seen_ts"] = watermark.value
+            if dead:
+                per_acct_state["export_failed"] = dead
+            else:
+                per_acct_state.pop("export_failed", None)
             state[acct.account_id] = per_acct_state
             state_touched = True
 
+        if skipped_dead:
+            log.info(
+                "GmeetCollector[%s]: %d un-exportable doc(s) parked in dead-letter "
+                "(re-probe after %dd)",
+                acct.account_id, skipped_dead,
+                CONFIG.limits.gmeet_export_dead_letter_reprobe_days,
+            )
+
         summary = f"wrote {len(files_written)} · skipped {skipped}"
+        if skipped_dead:
+            summary += f" · {skipped_dead} dead-letter"
         return (
             f"{notes} · {summary}" if notes else f"listed {len(stubs)} · {summary}",
             (files_written, skipped),
