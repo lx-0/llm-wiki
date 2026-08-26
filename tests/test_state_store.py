@@ -219,14 +219,14 @@ def test_compile_persist_outcome_merges_under_lock(
 
     save_json_state(state_file, {"ingested": {}, "query_count": 7, "total_cost": 0.0})
 
-    state = compile_mod._persist_outcome(
-        "raw/notes/x.md", "beef1234", cost_delta=0.5, stamp_compile=True
-    )
+    state = compile_mod._persist_outcome("raw/notes/x.md", "beef1234", stamp_compile=True)
 
     on_disk = json.loads(state_file.read_text(encoding="utf-8"))
     assert on_disk["query_count"] == 7
     assert on_disk["ingested"]["raw/notes/x.md"] == "beef1234"
-    assert on_disk["total_cost"] == 0.5
+    # Dollar accounting retired (DECISIONS 2026-05-23 token-only): the stale
+    # key survives untouched, compile never accumulates into it.
+    assert on_disk["total_cost"] == 0.0
     assert "last_compile" in on_disk
     assert state == on_disk
 

@@ -426,9 +426,7 @@ _COMPILE_LOCK_FILE = STATE_DIR / "compile.lock"
 # ── State persistence ────────────────────────────────────────────────
 
 
-def _persist_outcome(
-    rel: str, digest: str, *, cost_delta: float = 0.0, stamp_compile: bool = False
-) -> dict:
+def _persist_outcome(rel: str, digest: str, *, stamp_compile: bool = False) -> dict:
     """Merge one file's result into state.json under the state lock.
 
     compile used to hold its state dict in memory for the whole (multi-minute)
@@ -436,12 +434,14 @@ def _persist_outcome(
     written meanwhile (last-writer-wins), and in the rare inverse direction a
     concurrent counter-write could drop this run's freshly-ingested hash (a
     recompile's worth of tokens). Merging under the lock keeps every writer's
-    keys alive; this run contributes only the ingested hash, its cost DELTA,
-    and (on success) the last_compile stamp."""
+    keys alive; this run contributes only the ingested hash and (on success)
+    the last_compile stamp."""
     def _apply(state: dict) -> None:
         state.setdefault("ingested", {})[rel] = digest
-        if cost_delta:
-            state["total_cost"] = round(state.get("total_cost", 0.0) + cost_delta, 4)
+        # total_cost accumulation retired (audit 2026-08-25): the dollar
+        # counter contradicted DECISIONS 2026-05-23 (token-only accounting —
+        # usage.json/LEDGER is the metering surface). The stale key stays in
+        # existing state files untouched; nothing reads it.
         if stamp_compile:
             state["last_compile"] = now_iso()
 
@@ -708,10 +708,7 @@ async def main() -> None:
         # save (not just end-of-loop) so rate-limit aborts / kills / crashes don't lose
         # work already done. Iron rule: "no gap between capture and persist".
         rel = str(source.relative_to(ROOT_DIR))
-        _persist_outcome(
-            rel, file_hash(source),
-            cost_delta=outcome.cost_usd, stamp_compile=True,
-        )
+        _persist_outcome(rel, file_hash(source), stamp_compile=True)
 
     # Final stamp (idempotent — records last_compile if the loop had zero
     # successes and the per-file merge above was never reached). Cost deltas
