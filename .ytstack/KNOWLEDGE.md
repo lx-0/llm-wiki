@@ -2820,6 +2820,20 @@ The drift test asserted each knob is in **exactly one** table, never the **right
 
 Policy classes must be checkable by reading the VALUE's nature (secret → `.claude/.env`, per-install path, operator-authored structure, engine-internal tuning), never by asserting history. NEVER_INJECTED is frozen so a new knob can't be appended by prefix-adjacency — the mistake that started this: three M031 knobs were pasted next to `gmeet_request_timeout_s`, which lives in the never-inject table, and `wiki update` answered "already on the current key schema". When removing a hardcoded fallback, migrate its value into configs that predate the knob (`migrate_domain_tags_seed`) so behaviour is preserved rather than silently changed.
 
+## "Ollama is down" is a hypothesis, not a diagnosis — three layers can produce it (2026-08-26)
+
+### Lesson
+
+After the operator restarted `kcma-d8`, `curiosity-followup` and `review-wiki` still showed `failed:*`. Neither had anything to do with the host. Verifying a restored dependency means walking the whole path, and each layer failed differently:
+
+1. **The host** — reachable, all three configured models present, and the engine's own `ollama_client.chat` answered on every one. Green.
+2. **The consumer's own logic** — `curiosity-followup` was red because `_pending()` excluded only `done`/`rejected`, so the folder backend's terminal quarantine states (`not-answered`/`error`/`stale`) were re-selected on every fire. Sorted oldest-first they were picked FIRST, each returned `unchanged_since_failure` instantly, and the batch exited 2 — permanently red, 709 real requests never drained. The backend's own comment already specified the contract ("Batches never re-dispatch them"); the CLI never implemented it. **Same shape as the gmeet export dead-letter fixed the same day** — a terminal outcome re-tried forever because the selector didn't know it was terminal.
+3. **The environment** — `review-wiki` then died in 0.1 s: the vault venv had *partially materialized* packages (`httpx` without `_transports/`, `claude_agent_sdk` without `mcp.client`, `prompt_toolkit` without a submodule). Version metadata intact, most modules importable, import raises. `uv sync --reinstall` repaired it. Cause unproven — iCloud eviction of `.venv` contents (the vault lives under `~/Library/Mobile Documents/`) or an interrupted `uv` run; a probe 17 minutes earlier had imported `httpx` fine, so it broke mid-session. Backlog: `venv-integrity-check.md`.
+
+### Fix direction
+
+Verify a restored dependency at the layer the FEATURE uses, not at the layer that broke: a `curl /api/tags` proves a port, an engine-path call proves the client, and only running the actual consumer proves the feature. Measure a **model swap** rather than a warm call — a single-GPU Ollama host holds one model, so the honest cold number is 60-75 s warm-cache / ~160 s post-reboot, not the ~36 s previously recorded (this under-measurement is what left `youtube_vision_timeout_s` at 90 s, of which a 63 s swap ate two thirds).
+
 ## Re-audit your own arc before closing it — three of the M031 fixes were wrong or partial (2026-08-26)
 
 ### Lesson
