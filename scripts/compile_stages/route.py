@@ -111,13 +111,14 @@ SUBSTRATE_PROMPTS: dict[str, tuple[str, int, str]] = {
 }
 
 # Default for any substrate-type NOT in SUBSTRATE_PROMPTS. Lean prompt
-# + Haiku + operator-tunable budget. The max_turns is read from CONFIG
-# at module-import time so a vault-side bump to
-# `limits.compile_max_turns` actually changes the fall-through routing —
-# the previous hardcoded `12` made the config knob dead code (operator
-# couldn't tune the default via config; only by editing this module).
+# + operator-tunable budget + operator-tunable model. Both knobs are read
+# from CONFIG at module-import time so a vault-side change actually
+# reroutes the fall-through — a hardcoded value here makes the config
+# knob dead code (bit both `limits.compile_max_turns` pre-M026 and
+# `models.compile_model`, audit 2026-08-25 E3). Per-substrate rows above
+# keep their empirical per-row pins.
 _DEFAULT_DISPATCH: tuple[str, int, str] = (
-    "compile_default", CONFIG.limits.compile_max_turns, "claude-haiku-4-5-20251001",
+    "compile_default", CONFIG.limits.compile_max_turns, CONFIG.models.compile_model,
 )
 
 

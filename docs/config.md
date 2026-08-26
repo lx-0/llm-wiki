@@ -66,7 +66,7 @@ The `.env` file: only the **variable NAME** lives in `config.yaml` (e.g. `api_ke
 
 | Key | Default | Meaning |
 |---|---|---|
-| `models.compile_model` | `"claude-opus-4-8"` | Claude model used by compile.py + retry-failed-flushes.py. |
+| `models.compile_model` | `"claude-haiku-4-5-20251001"` | Default Claude model for SDK surfaces without a per-substrate pin: the compile default route (compile_stages/route.py — per-substrate rows keep their own empirical pins), suggestions, facts/correct/takes, agent tasks, and the dream/intent … |
 | `models.compile_large_source_model` | `"claude-opus-4-8[1m]"` | Compile retry model on kind=unknown (compile_stages.compile). |
 | `models.dream_model` | `"claude-opus-4-8[1m]"` | Dream-cycle entity re-synthesis (M014). dream-entity is a kanonical fan-out workload: 1 entity-page Edit on top of N substrate Reads from its corpus (T1=10-30 files typical) + Grep/Glob exploration of knowledge/. |
 | `models.intent_classify_model` | `"claude-haiku-4-5"` | Intent-classification model (intent-dispatch producer). |

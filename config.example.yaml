@@ -216,8 +216,10 @@ piggybacks:
     cooldown_hours: 6
 
 models:
-  # Claude model used by compile.py + retry-failed-flushes.
-  compile_model: claude-opus-4-8
+  # Default model for SDK surfaces without a per-substrate pin: the compile
+  # default route (per-substrate routes pin their own), suggestions, facts,
+  # agent tasks, dream/intent fallbacks.
+  compile_model: claude-haiku-4-5-20251001
   # Compile retry model on kind=unknown. Standard 200K Opus window dies
   # silently on 100+ KB transcripts; when a compile call fails kind=unknown on
   # a large-enough source (limits.compile_retry_long_context_min_source_chars)
@@ -234,7 +236,7 @@ models:
   # LLM/agent provider is the long-term target. Unknown values raise.
   folder_scan_provider: claude-sdk
   # Intent-classification model (intent-dispatch producer). Triage, not
-  # synthesis — a cheap tier is right + ~10× cheaper than compile Opus.
+  # synthesis — a cheap/fast tier is right.
   # Empty string falls back to compile_model.
   intent_classify_model: claude-haiku-4-5
   # Ollama endpoint (used by all local LLM calls).

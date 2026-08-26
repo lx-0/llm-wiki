@@ -619,10 +619,21 @@ def test_model_upgrade_bumps_retired_default():
         "dream_model": "claude-opus-4-7[1m]",
     }}
     changes = m.migrate_model_upgrades(data)
-    assert data["models"]["compile_model"] == "claude-opus-4-8"
+    assert data["models"]["compile_model"] == "claude-haiku-4-5-20251001"
     assert data["models"]["compile_large_source_model"] == "claude-opus-4-8[1m]"
     assert data["models"]["dream_model"] == "claude-opus-4-8[1m]"
     assert len(changes) == 3
+
+
+def test_model_upgrade_compile_model_opus_to_haiku():
+    """2026-08-26 flip (audit E3): route.py has pinned Haiku per-substrate since
+    M026 — an operator vault still on the old opus default follows the engine
+    default so the knob tells the truth again."""
+    m = _mod()
+    data = {"models": {"compile_model": "claude-opus-4-8"}}
+    changes = m.migrate_model_upgrades(data)
+    assert data["models"]["compile_model"] == "claude-haiku-4-5-20251001"
+    assert len(changes) == 1
 
 
 def test_model_upgrade_preserves_pinned_other_model():
@@ -637,7 +648,7 @@ def test_model_upgrade_preserves_pinned_other_model():
 def test_model_upgrade_idempotent_on_current():
     m = _mod()
     data = {"models": {
-        "compile_model": "claude-opus-4-8",
+        "compile_model": "claude-haiku-4-5-20251001",
         "dream_model": "claude-opus-4-8[1m]",
     }}
     assert m.migrate_model_upgrades(data) == []

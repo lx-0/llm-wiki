@@ -226,8 +226,13 @@ PIGGYBACK_SUBKEY_DROPS: dict[str, tuple[str, ...]] = {
 # match of the old default is upgraded — a deliberately-pinned other model is
 # preserved untouched. Keyed by models.<key> → {old_value: new_value}.
 #   2026-06-13: opus 4-7 → 4-8 across compile / large-source / dream.
+#   2026-08-26: compile_model opus → Haiku (audit E3 — routes had pinned Haiku
+#   since M026; the default route now follows this knob again).
 MODEL_UPGRADES: dict[str, dict[str, str]] = {
-    "compile_model": {"claude-opus-4-7": "claude-opus-4-8"},
+    "compile_model": {
+        "claude-opus-4-7": "claude-haiku-4-5-20251001",
+        "claude-opus-4-8": "claude-haiku-4-5-20251001",
+    },
     "compile_large_source_model": {"claude-opus-4-7[1m]": "claude-opus-4-8[1m]"},
     "dream_model": {"claude-opus-4-7[1m]": "claude-opus-4-8[1m]"},
 }

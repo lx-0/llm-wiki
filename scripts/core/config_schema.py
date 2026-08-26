@@ -142,8 +142,13 @@ class PiggybackTask:
 
 @dataclass
 class Models:
-    # Claude model used by compile.py + retry-failed-flushes.py.
-    compile_model: str = "claude-opus-4-8"
+    # Default Claude model for SDK surfaces without a per-substrate pin: the
+    # compile default route (compile_stages/route.py — per-substrate rows keep
+    # their own empirical pins), suggestions, facts/correct/takes, agent
+    # tasks, and the dream/intent fallbacks. Flipped opus→haiku 2026-08-26
+    # (audit E3): every compile route had pinned Haiku since M026, so the old
+    # opus default steered nothing and lied to the operator.
+    compile_model: str = "claude-haiku-4-5-20251001"
     # Compile retry model on kind=unknown (compile_stages.compile). The standard
     # 200K-token Opus window dies silently (exit-1, empty stderr) on 100+ KB
     # transcripts even with max_turns capped — Read-tool fan-out into knowledge/
@@ -163,8 +168,8 @@ class Models:
     # fall back to compile_model.
     dream_model: str = "claude-opus-4-8[1m]"
     # Intent-classification model (intent-dispatch producer). Triage — task vs
-    # idea vs note vs noise — not synthesis, so a cheap/fast tier is right and
-    # ~10× cheaper than the compile Opus. Empty string falls back to compile_model.
+    # idea vs note vs noise — not synthesis, so a cheap/fast tier is right.
+    # Empty string falls back to compile_model.
     intent_classify_model: str = "claude-haiku-4-5"
     # Folder-scan answer provider (M027-S04, Q9 seam). The curiosity
     # folder backend reads an operator-approved file in-place and

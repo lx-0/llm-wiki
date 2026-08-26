@@ -186,3 +186,13 @@ def test_compile_carries_dispatch_key():
     keyless = _route("just a plain note body", path="raw/notes/plain.md")
     assert isinstance(keyless, Compile)
     assert keyless.dispatch_key is None
+
+
+def test_default_dispatch_model_follows_config_knob():
+    """Audit 2026-08-25 E3: models.compile_model was a dead knob — every route
+    hardcoded Haiku while the knob claimed to steer compile. The default route
+    now reads the knob (per-substrate rows keep their empirical pins)."""
+    from compile_stages.route import _DEFAULT_DISPATCH
+    from core.config import CONFIG
+
+    assert _DEFAULT_DISPATCH[2] == CONFIG.models.compile_model
