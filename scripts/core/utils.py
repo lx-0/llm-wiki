@@ -146,8 +146,22 @@ def slugify(text: str, max_len: int | None = None) -> str:
 # ── Wikilink helpers ──────────────────────────────────────────────────
 
 def extract_wikilinks(content: str) -> list[str]:
-    """Extract all [[wikilinks]] from markdown content."""
-    return re.findall(r"\[\[([^\]]+)\]\]", content)
+    """Extract the raw inner string of every [[wikilink]] in ``content``.
+
+    Delegates to `core.links.WIKILINK_RE` — THE wikilink grammar — so lint,
+    links_audit and the compile route inherit every grammar rule instead of
+    matching against a second, looser copy. They diverged once: the
+    bash-`[[ … ]]` guard landed on WIKILINK_RE while this function kept its
+    own `\\[\\[([^\\]]+)\\]\\]`, so shell tests were still linted as broken
+    links after the "fix" (2026-08-26). `core.links` imports nothing from this
+    module, so the dependency is one-way.
+    """
+    from .links import WIKILINK_RE
+
+    return [
+        m.group(2) + (m.group(3) or "") + (m.group(4) or "")
+        for m in WIKILINK_RE.finditer(content)
+    ]
 
 
 # ── Wiki content helpers ──────────────────────────────────────────────

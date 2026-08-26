@@ -43,6 +43,7 @@ from core.utils import (
     today_iso,
 )
 from core.links import (  # noqa: E402
+    _strip_frontmatter_and_fences,
     canonical_slug,
     link_target,
     outgoing_canonical_slugs,
@@ -219,14 +220,21 @@ def check_broken_links(ctx: LintContext) -> list[Issue]:
     """
     issues = []
     for art in ctx.articles:
-        for link in extract_wikilinks(art.text):
-            target = link_target(link)
-            if resolve_link(target, art.path, ctx.vault) is None:
-                issues.append(issue(
-                    "error", "broken_link", art.rel,
-                    f"Broken link: [[{link}]] — target does not exist",
-                    target_slug=target,
-                ))
+        # Skip frontmatter + fenced code, exactly like links_audit and the
+        # rewrite passes: a `[[…]]` inside a ```bash block is sample code, not
+        # a reference, and reporting it as a broken link is a false positive
+        # the operator cannot fix (2026-08-26).
+        for _, line, live in _strip_frontmatter_and_fences(art.text.split("\n")):
+            if not live:
+                continue
+            for link in extract_wikilinks(line):
+                target = link_target(link)
+                if resolve_link(target, art.path, ctx.vault) is None:
+                    issues.append(issue(
+                        "error", "broken_link", art.rel,
+                        f"Broken link: [[{link}]] — target does not exist",
+                        target_slug=target,
+                    ))
     return issues
 
 
