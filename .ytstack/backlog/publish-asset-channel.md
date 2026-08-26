@@ -10,10 +10,12 @@ CLOSED by operator — no further messages; state below is final):
 - Version retention for managed wikis: upstream takes it as a DESIGN part of
   the same milestone (breaks one of their invariants — their operator decides;
   our "history lives canonically in the vault" argument is the core input).
-- Quota interim: upstream recommends the operator set the org override to
-  500 MiB NOW (org_settings.storage_quota_bytes, operator handgriff on the
-  meinkontext side) — removes the 2–6-month version-accumulation cliff.
-  OPEN OPERATOR ACTION, one word to the meinkontext side.
+- Quota: NO action needed (operator call 2026-08-26, correct). The
+  "2–6-month cliff" was an analysis error: the 24→38.6 MiB jump was the
+  ONE-TIME widening rest-run (1,210 creates + 603 updates), not cadence
+  churn. Real steady-state ≈ 0.1–0.3 MiB/day → the 100-MiB default lasts
+  years. Override + version retention only become relevant WITH the asset
+  channel (405 MiB binaries) — same milestone, no interim step.
 - delete_object/update_object stale texts: fixed upstream (v0.0.63).
 - Schema-400 hunt: closed — offender was a dynamic remote tool catalog,
   no longer reproducible; engine permanently immune via strict-mcp-config.
