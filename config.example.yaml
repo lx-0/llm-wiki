@@ -364,7 +364,7 @@ limits:
   youtube_max_frames: 30                 # Tier-3 visual: cap frames per video
   youtube_max_duration_s: 10800          # Tier-3: skip videos longer than this (default 3h)
   youtube_frame_resize_width: 512        # ffmpeg downscale before vision model
-  youtube_vision_timeout_s: 90           # per-frame ollama call timeout
+  youtube_vision_timeout_s: 240          # per-frame call — must cover a model SWAP (~60s), not just inference
   youtube_aggregate_timeout_s: 300       # final synthesis call timeout
   # Jamie ingest (collectors/jamie.py).
   jamie_request_timeout_s: 30            # per-HTTP-call timeout against api.meetjamie.ai

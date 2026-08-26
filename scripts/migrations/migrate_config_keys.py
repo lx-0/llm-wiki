@@ -249,8 +249,14 @@ MODEL_UPGRADES: dict[str, dict[str, str]] = {
 #   The knob broadened from a rapid double-fire guard to the per-session
 #   re-capture / Codex-per-turn-Stop coalescing window; 60 s no longer bounds a
 #   multi-hour Codex session (fires are minutes-to-hours apart).
+#   2026-08-26: limits.youtube_vision_timeout_s 90 → 240. The budget has to
+#   cover a MODEL SWAP, not just inference — a single-GPU Ollama host evicts
+#   the resident model, and swapping in the ~10 GB vision model measured 63 s
+#   on kcma-d8 with a warm page cache (168 s cold after a reboot). 90 s left
+#   ~27 s for the frame itself.
 VALUE_UPGRADES: dict[str, dict[object, object]] = {
     "scheduling.dedup_window_seconds": {60: 900},
+    "limits.youtube_vision_timeout_s": {90: 240},
 }
 
 # ── Injection policy ────────────────────────────────────────────────────

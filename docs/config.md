@@ -137,7 +137,7 @@ The `.env` file: only the **variable NAME** lives in `config.yaml` (e.g. `api_ke
 | `limits.youtube_max_frames` | `30` | YouTube ingest (scan-youtube.py — see also CONFIG.piggybacks.scan_youtube) Tier-3 visual: cap frames per video |
 | `limits.youtube_max_duration_s` | `10800` | Tier-3: skip videos longer than this (3h default) |
 | `limits.youtube_frame_resize_width` | `512` | ffmpeg downscale before vision model |
-| `limits.youtube_vision_timeout_s` | `90` | per-frame ollama call timeout |
+| `limits.youtube_vision_timeout_s` | `240` | Per-frame Ollama call timeout. Must cover a MODEL SWAP, not just inference: a single-GPU Ollama host evicts the resident model, and a swap to the ~10 GB vision model measured 63 s on kcma-d8 with a warm page cache (2026-08-26) — the old 90 … |
 | `limits.youtube_aggregate_timeout_s` | `300` | final synthesis call timeout |
 | `limits.jamie_request_timeout_s` | `30` | Jamie ingest (collectors/jamie.py — see also CONFIG.piggybacks.jamie). |
 | `limits.jamie_max_per_run` | `50` | default cap per account (overridable via the per-account jamie sub-block) |

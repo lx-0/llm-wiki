@@ -383,7 +383,13 @@ class Limits:
     youtube_max_frames: int = 30          # Tier-3 visual: cap frames per video
     youtube_max_duration_s: int = 10800   # Tier-3: skip videos longer than this (3h default)
     youtube_frame_resize_width: int = 512  # ffmpeg downscale before vision model
-    youtube_vision_timeout_s: int = 90    # per-frame ollama call timeout
+    # Per-frame Ollama call timeout. Must cover a MODEL SWAP, not just
+    # inference: a single-GPU Ollama host evicts the resident model, and a
+    # swap to the ~10 GB vision model measured 63 s on kcma-d8 with a warm
+    # page cache (2026-08-26) — the old 90 s left ~27 s for the actual frame,
+    # so the first frame of a scan could time out whenever the vision model
+    # was not already loaded.
+    youtube_vision_timeout_s: int = 240
     youtube_aggregate_timeout_s: int = 300  # final synthesis call timeout
     # Jamie ingest (collectors/jamie.py — see also CONFIG.piggybacks.jamie).
     # Multi-tenant: per-account jamie block under personal.accounts.<id>.jamie
