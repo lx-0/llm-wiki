@@ -332,6 +332,10 @@ INJECTED_KEYS: dict[str, tuple[str, ...]] = {
         "intent_source_globs",
         "intent_classify_timeout_s",
         "intent_min_confidence",
+        # M031 reliability wave (2026-08-26)
+        "gmeet_export_dead_letter_attempts",
+        "gmeet_export_dead_letter_reprobe_days",
+        "doctor_piggyback_stale_factor",
     ),
     "scheduling": (
         "piggybacks_on_compile",        # compile drains due piggybacks (2026-06-13)
@@ -437,9 +441,6 @@ NEVER_INJECTED: dict[str, tuple[str, ...]] = {
         "jamie_max_per_run",
         "gmeet_request_timeout_s",
         "gmeet_max_per_run",
-        "gmeet_export_dead_letter_attempts",
-        "gmeet_export_dead_letter_reprobe_days",
-        "doctor_piggyback_stale_factor",
         "oura_request_timeout_s",
         "oura_max_backfill_days",
         "sdk_max_buffer_size_mb",

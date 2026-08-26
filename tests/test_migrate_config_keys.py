@@ -713,6 +713,88 @@ def test_injected_values_match_schema_defaults():
             )
 
 
+# NEVER_INJECTED is a CLOSED historical set. Both of its justifying classes are
+# backward-looking: (1) pre-migration-era keys operator configs ALREADY carry
+# from the install-time config.example.yaml copy, (2) secrets / per-install
+# paths / operator-authored account structures. A brand-new knob can be
+# neither — it belongs in INJECTED_KEYS so the migration writes it into
+# operator vaults (CLAUDE.md hard rule). Incident 2026-08-26: three new limits
+# knobs were appended here next to same-prefixed neighbours
+# (gmeet_request_timeout_s) and silently never reached the operator's config;
+# `wiki update` reported "already on the current key schema" and every existing
+# test stayed green, because the drift test only checks that a knob is in
+# EXACTLY ONE table — never that it is in the RIGHT one.
+#
+# To add an entry here: extend this snapshot in the same commit AND write the
+# justifying class into the NEVER_INJECTED docstring. If you cannot name the
+# class, the key belongs in INJECTED_KEYS.
+_FROZEN_NEVER_INJECTED: dict[str, set[str]] = {
+    "features": {
+        "clippings_sweep", "curiosity_loop", "procmail_execution",
+        "vision_screenshots",
+    },
+    "graph_view": {"custom_search", "domain_tags", "mode"},
+    "limits": {
+        "compile_failure_backoff_s", "compile_max_consecutive_failures",
+        "compile_max_files", "compile_max_prompt_chars", "compile_max_turns",
+        "compile_retry_long_context_min_source_chars",
+        "compile_retry_long_context_on_unknown",
+        "curiosity_folder_confidence_min", "curiosity_max_gaps",
+        "curiosity_max_prompt_chars", "curiosity_min_source_chars",
+        "curiosity_quote_min_anchor_tokens", "curiosity_source_globs",
+        "curiosity_timeout_s", "flush_max_retries", "flush_retry_delay_seconds",
+        "gmeet_max_per_run", "gmeet_request_timeout_s", "jamie_max_per_run",
+        "jamie_request_timeout_s", "oura_max_backfill_days",
+        "oura_request_timeout_s", "query_max_prompt_chars",
+        "screenshot_resize_width", "screenshot_timeout_seconds",
+        "sdk_max_buffer_size_mb", "sparse_threshold_words",
+        "youtube_aggregate_timeout_s", "youtube_frame_resize_width",
+        "youtube_max_duration_s", "youtube_max_frames",
+        "youtube_vision_timeout_s",
+    },
+    "models": {
+        "classify_model", "compile_large_source_model", "compile_model",
+        "curiosity_model", "ollama_url", "vision_model",
+    },
+    "personal": {
+        "accounts", "calendar_skip_keywords", "curiosity_folders",
+        "email_folders", "firefox_profile", "primary_account",
+        "project_examples", "stg_backup_dir", "thunderbird_profile",
+        "voice_inbox",
+    },
+    "scheduling": {"compile_after_hour", "dedup_window_seconds", "timezone"},
+    "skills": {"global_install"},
+}
+
+
+def test_never_injected_is_a_closed_historical_set():
+    m = _mod()
+    actual = {section: set(keys) for section, keys in m.NEVER_INJECTED.items()}
+    added = {
+        s: sorted(actual.get(s, set()) - _FROZEN_NEVER_INJECTED.get(s, set()))
+        for s in actual
+    }
+    added = {s: keys for s, keys in added.items() if keys}
+    assert not added, (
+        f"new NEVER_INJECTED entries: {added}. A brand-new knob cannot satisfy "
+        "either justifying class — put it in INJECTED_KEYS so operator vaults "
+        "actually receive it (CLAUDE.md hard rule). If it genuinely is a "
+        "secret / per-install path / operator-authored structure, extend "
+        "_FROZEN_NEVER_INJECTED here AND document the class in the "
+        "NEVER_INJECTED docstring, in the same commit."
+    )
+    removed = {
+        s: sorted(_FROZEN_NEVER_INJECTED[s] - actual.get(s, set()))
+        for s in _FROZEN_NEVER_INJECTED
+    }
+    removed = {s: keys for s, keys in removed.items() if keys}
+    assert not removed, (
+        f"NEVER_INJECTED entries disappeared: {removed}. If the knob was "
+        "deleted from the schema, drop it from _FROZEN_NEVER_INJECTED too; if "
+        "it moved to INJECTED_KEYS, that is a policy change worth stating."
+    )
+
+
 def test_piggyback_defaults_have_a_migration_policy():
     """Every _default_piggybacks entry is either injected or explicitly not."""
     from core.config_schema import _default_piggybacks
