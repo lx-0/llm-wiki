@@ -18,6 +18,51 @@ every operator's `wiki update` → `uv sync` regenerate `uv.lock` and dirty thei
 config keys must also be wired into `scripts/migrations/migrate_config_keys.py`
 in the same commit.
 
+## [0.5.1] — 2026-08-26
+
+An adversarial re-audit of 0.5.0 — the reliability wave checking its own work.
+Four of its changes were wrong or incomplete, and the audit that drove them had
+one premise that did not survive contact with the operator's actual config.
+
+### Fixed
+
+- **`models.compile_model` was never a dead knob.** 0.5.0 read only the compile
+  router, saw Haiku pinned on every row, and re-tiered the knob to Haiku. Five
+  other surfaces read it with no pin of their own — including `wiki correct
+  apply`, the agent that writes corrections into `knowledge/` — so the change
+  silently downgraded them, and the migration rewrote any operator re-pin back
+  on every `wiki update`. `compile_model` returns to Opus; the compile
+  fall-through keeps its own knob. Affected configs are migrated back.
+- **The bash-`[[ … ]]` guard reached only half its consumers.** It landed on
+  the shared wikilink regex, but `lint`, the links audit, and the compile
+  router go through a second, looser extractor that kept matching shell tests.
+  There is one grammar now, and the broken-link check skips fenced code like
+  every other link pass — 21 phantom errors gone from the live vault.
+- **Seven config knobs reached no operator vault.** They sat in the migration's
+  never-inject list on the premise that every config already carried them from
+  its install-time copy; that copy happens once, so anything added later never
+  arrives. Among them the threshold gating compile's long-context retry, whose
+  on/off switch *was* visible. The never-inject classes are now stated in terms
+  a reader can check, and are frozen against silent growth.
+- **`wiki doctor`'s new piggyback check read the wrong state keys**, reporting
+  twelve healthy tasks as never-run, and called a substrate dark after a few
+  quiet hours. It walks the scheduler's own task list now, with a floor under
+  the staleness threshold.
+- **Retry-archive files with unrecognised names were stranded** — never retried
+  and never reported. One real context had been invisible since July.
+
+### Changed
+
+- **`lint` no longer ships a hardcoded domain list.** `graph_view.domain_tags`
+  is the source; vaults that predate the knob are seeded with the old built-in
+  list so nothing changes for them, and the domain-tag checks stay quiet when
+  no domains are configured rather than warning against an empty set.
+- **The dollar counter is fully retired.** 0.5.0 stopped compile writing it
+  while `wiki query` kept accumulating and the dashboard kept rendering it, so
+  the "lifetime" figure drifted upward from queries alone. The field, its
+  template line, the health line and the docs row are gone; per-run cost still
+  prints. A vault's historical value is left untouched.
+
 ## [0.5.0] — 2026-08-26
 
 The reliability wave (M031), driven by a full-state audit of the operator's
@@ -57,10 +102,11 @@ the silence or makes `wiki doctor` say it out loud.
 - **Archive files with non-conforming names were stranded forever** — they
   were neither retried nor reported. One real context had been invisible
   since July.
-- **`models.compile_model` steered nothing.** Every compile route had pinned
-  Haiku since M026 while the knob still advertised Opus; the default route
-  reads the knob again and the default now matches what actually runs
-  (operator configs are migrated).
+- **The compile fall-through route was a hardcoded model literal**, so no
+  operator could retune it. It reads `models.compile_default_route_model` now.
+  (An earlier attempt re-pointed it at `models.compile_model` and re-tiered
+  that knob to Haiku on the theory that it was dead — see 0.5.1, which undoes
+  it.)
 - **Bash `[[ … ]]` test syntax parsed as a wikilink**, producing phantom
   broken-link errors, index junk rows, and stripped brackets in published
   articles.
@@ -74,8 +120,8 @@ the silence or makes `wiki doctor` say it out loud.
 
 - **The legacy dollar counter.** `state.json`'s `total_cost` is no longer
   accumulated — token accounting in `usage.json`/LEDGER has been the metering
-  surface since 2026-05-23. Existing keys are left untouched; nothing reads
-  them.
+  surface since 2026-05-23. (Completed in 0.5.1; this release only stopped the
+  compile writer.)
 
 ## [0.4.0] — 2026-08-25
 
