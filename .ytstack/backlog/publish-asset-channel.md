@@ -1,6 +1,24 @@
 # Backlog: publish — non-markdown assets + secret-gate leftovers
 
-Parked 2026-08-25 at M030 close. Two independent threads.
+Parked 2026-08-25 at M030 close. THREAD STATUS 2026-08-26 (upstream exchange
+CLOSED by operator — no further messages; state below is final):
+
+- Asset channel: upstream ACCEPTED as milestone candidate (contract extension:
+  binary files on knowledge packages + resource delivery, with REFERENCE-RUN
+  twin). Our sizing delivered: 3,866 files / 405 MiB (+25.7 MiB _attachments),
+  largest single file 9.4 MiB; proposal 1 GiB org quota + 16 MiB per-file cap.
+- Version retention for managed wikis: upstream takes it as a DESIGN part of
+  the same milestone (breaks one of their invariants — their operator decides;
+  our "history lives canonically in the vault" argument is the core input).
+- Quota interim: upstream recommends the operator set the org override to
+  500 MiB NOW (org_settings.storage_quota_bytes, operator handgriff on the
+  meinkontext side) — removes the 2–6-month version-accumulation cliff.
+  OPEN OPERATOR ACTION, one word to the meinkontext side.
+- delete_object/update_object stale texts: fixed upstream (v0.0.63).
+- Schema-400 hunt: closed — offender was a dynamic remote tool catalog,
+  no longer reproducible; engine permanently immune via strict-mcp-config.
+
+Original threads:
 
 ## 1. Binary/JSON asset channel (upstream ask)
 
