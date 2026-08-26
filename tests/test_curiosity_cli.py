@@ -199,3 +199,56 @@ def test_pending_filters_by_type_and_excludes_done(tmp_path, monkeypatch):
     assert names(cli._pending()) == ["request-1.json", "request-2.json"]
     assert names(cli._pending("folder-deep-scan")) == ["request-1.json"]
     assert names(cli._pending("email-deep-scan")) == ["request-2.json"]
+
+
+# ── quarantined requests must not be re-dispatched by automated batches ──
+#
+# Live find 2026-08-26: `_pending` excluded only done/rejected, so the folder
+# backend's terminal quarantine states came back on EVERY batch. Sorted
+# oldest-first they were picked first, each returned `unchanged_since_failure`
+# instantly, and the batch exited 2 — `curiosity-followup` sat permanently
+# `failed:2` while making zero progress on 709 genuinely pending requests.
+# The backend already documents the contract ("Batches never re-dispatch
+# them; an explicit re-dispatch retries ONLY when the staleness gate says the
+# source changed") — `_pending` just never implemented it.
+
+_QUARANTINED = ("not-answered", "error", "stale")
+
+
+@pytest.mark.parametrize("status", _QUARANTINED)
+def test_batches_skip_quarantined_requests(tmp_path, monkeypatch, status):
+    from curiosity import cli
+
+    monkeypatch.setattr(cli, "REQUESTS_DIR", tmp_path)
+    _write(tmp_path / "request-1.json", {"type": "folder-deep-scan", "status": status})
+    _write(tmp_path / "request-2.json", {"type": "folder-deep-scan", "status": "pending"})
+
+    assert [p.name for p in cli._pending(for_batch=True)] == ["request-2.json"]
+
+
+def test_operator_surfaces_still_show_quarantined(tmp_path, monkeypatch):
+    """The walk and --list must keep showing them — quarantine is a state the
+    operator needs to see and can act on, not a deletion."""
+    from curiosity import cli
+
+    monkeypatch.setattr(cli, "REQUESTS_DIR", tmp_path)
+    _write(tmp_path / "request-1.json", {"type": "folder-deep-scan", "status": "not-answered"})
+    _write(tmp_path / "request-2.json", {"type": "folder-deep-scan", "status": "pending"})
+
+    assert sorted(p.name for p in cli._pending()) == ["request-1.json", "request-2.json"]
+
+
+def test_batch_of_only_quarantined_requests_is_a_no_op_not_a_failure(tmp_path, monkeypatch):
+    """Nothing left to drain is success — the piggyback must not go red."""
+    from curiosity import cli
+
+    monkeypatch.setattr(cli, "REQUESTS_DIR", tmp_path)
+    _write(tmp_path / "request-1.json", {"type": "folder-deep-scan", "status": "not-answered"})
+
+    dispatched = []
+    monkeypatch.setattr(cli, "_dispatch", lambda p, **kw: dispatched.append(p) or True)
+
+    with pytest.raises(SystemExit) as exc:
+        cli._run_batch(5, dry_run=False)
+    assert exc.value.code == 0
+    assert dispatched == []

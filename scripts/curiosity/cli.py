@@ -55,17 +55,37 @@ def _read(path: Path) -> dict | None:
         return None
 
 
-def _pending(type_filter: str | None = None) -> list[Path]:
-    """All pending requests (status not done/rejected), oldest-first,
-    optionally filtered to one `type`. Type-AGNOSTIC by default — the walk
-    and run-* paths must surface EVERY request type, not just email.
-    (email_backend.list_pending hard-filters to email-deep-scan, which
-    silently hid folder-deep-scan requests from the consumer — that filter
-    is wrong for the dispatcher.)"""
+# Terminal states the folder backend quarantines into (backends/folder.py
+# `_FAIL_STATES`). They are outcomes, not retryable work: the file did not
+# answer the topic, vanished, or the provider failed on a source that has not
+# changed since. The backend re-admits them only when the staleness gate says
+# the source changed, and only on an EXPLICIT re-dispatch.
+_QUARANTINED_STATES = ("not-answered", "error", "stale")
+
+
+def _pending(type_filter: str | None = None, *, for_batch: bool = False) -> list[Path]:
+    """Pending requests, oldest-first, optionally filtered to one `type`.
+
+    Type-AGNOSTIC by default — the walk and run-* paths must surface EVERY
+    request type, not just email. (email_backend.list_pending hard-filters to
+    email-deep-scan, which silently hid folder-deep-scan requests from the
+    consumer — that filter is wrong for the dispatcher.)
+
+    ``for_batch=True`` additionally drops quarantined requests. Automated
+    drains (the `curiosity_followup` piggyback, `--run-all`) must not
+    re-dispatch them: sorted oldest-first they are picked FIRST every fire,
+    return `unchanged_since_failure` instantly, and starve the real backlog
+    while marking the piggyback failed. Live 2026-08-26: 11 quarantined
+    requests kept the piggyback permanently red with 709 genuinely pending
+    behind them. Operator-facing surfaces (`--walk`, `--list`) still show
+    them — quarantine is a state to see and act on, not a deletion.
+    """
     out: list[Path] = []
     for p in _all_requests():
         r = _read(p)
         if r is None or r.get("status") in ("done", "rejected"):
+            continue
+        if for_batch and r.get("status") in _QUARANTINED_STATES:
             continue
         if type_filter and r.get("type") != type_filter:
             continue
@@ -131,7 +151,9 @@ def _run_one(slug_or_name: str, *, dry_run: bool) -> NoReturn:
 
 
 def _run_oldest(*, dry_run: bool, type_filter: str | None = None) -> NoReturn:
-    pending = _pending(type_filter)
+    # Non-interactive drain like the batch: skip quarantined so "oldest" is
+    # the oldest ACTIONABLE request, not a terminal one that re-fails at once.
+    pending = _pending(type_filter, for_batch=True)
     if not pending:
         log.info("No pending curiosity requests.")
         sys.exit(0)
@@ -142,7 +164,7 @@ def _run_oldest(*, dry_run: bool, type_filter: str | None = None) -> NoReturn:
 
 
 def _run_all(*, dry_run: bool, type_filter: str | None = None) -> NoReturn:
-    pending = _pending(type_filter)
+    pending = _pending(type_filter, for_batch=True)
     if not pending:
         log.info("No pending curiosity requests.")
         sys.exit(0)
@@ -163,7 +185,7 @@ def _run_batch(n: int, *, dry_run: bool, type_filter: str | None = None) -> NoRe
     backlog at a steady rate (cooldown × N per day) without the
     thundering-herd risk of `--run-all` on accumulated backlogs.
     """
-    pending = _pending(type_filter)
+    pending = _pending(type_filter, for_batch=True)
     if not pending:
         log.info("No pending curiosity requests.")
         sys.exit(0)
