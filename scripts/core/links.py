@@ -28,8 +28,15 @@ from pathlib import Path
 from typing import Callable
 
 # `[[target]]`, `![[target]]`, with optional `#heading` and `|alias`.
+# Guard (audit 2026-08-25): a target that starts/ends with space/tab or starts
+# with `!` is NOT a link — that's bash double-bracket test syntax in a live
+# line (`[[ -f "$f" ]]`, `[[! -o monitor]]`), which leaked into lint errors,
+# publish-render degradation, and index junk rows. No generated article name
+# has those shapes.
 # Groups: 1=bang 2=target 3=heading(incl #) 4=alias(incl |)
-WIKILINK_RE = re.compile(r"(!?)\[\[([^\]#|]+)(#[^\]|]*)?(\|[^\]]*)?\]\]")
+WIKILINK_RE = re.compile(
+    r"(!?)\[\[(?![ \t!])([^\]#|]+)(?<![ \t])(#[^\]|]*)?(\|[^\]]*)?\]\]"
+)
 
 _MEDIA_EXT = {
     ".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".bmp", ".ico",

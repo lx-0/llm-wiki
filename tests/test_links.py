@@ -235,3 +235,48 @@ def test_rename_article_leaves_unrelated_links(vault: Path) -> None:
 
     rename_article(old, new, knowledge, vault)
     assert ref.read_text(encoding="utf-8") == "Link to [[bar]] only.\n"
+
+
+# ── bash `[[ … ]]` is not a wikilink (audit 2026-08-25) ──────────────
+# Shell double-bracket tests in live lines (outside code fences) matched
+# WIKILINK_RE and leaked into lint errors, publish render degradation, and
+# index junk rows. Grammar guard: a target that starts/ends with whitespace
+# or starts with `!` is not a link — every consumer inherits via the regex.
+
+_SHELL_TEST_LINES = [
+    '[[ -f "$logfile" ]]',
+    '[[ "$status" == "complete" ]]',
+    "[[ $size -gt 104857600 ]]",
+    "[[! -o monitor]]",
+    'if [[ -n "$var" ]]; then echo yes; fi',
+]
+
+
+@pytest.mark.parametrize("line", _SHELL_TEST_LINES)
+def test_shell_double_bracket_is_not_a_wikilink(line: str) -> None:
+    from core.links import WIKILINK_RE
+
+    assert WIKILINK_RE.search(line) is None, line
+
+
+def test_real_wikilinks_still_match() -> None:
+    from core.links import WIKILINK_RE
+
+    for line, target in [
+        ("see [[concepts/foo]]", "concepts/foo"),
+        ("see [[foo|Foo Bar]]", "foo"),
+        ("embed ![[diagram.png]]", "diagram.png"),
+        ("see [[foo#Heading]]", "foo"),
+        ("multi word [[foo bar baz]]", "foo bar baz"),
+    ]:
+        m = WIKILINK_RE.search(line)
+        assert m is not None and m.group(2) == target, line
+
+
+def test_relativize_leaves_shell_test_lines_untouched(vault: Path) -> None:
+    text = 'Rotate when big:\n\n[[ $size -gt 104857600 ]] && truncate -s 0 "$f"\n'
+    source = vault / "knowledge" / "concepts" / "foo.md"
+    out, changed, unresolved = relativize_text(text, source, vault)
+    assert out == text
+    assert changed == 0
+    assert unresolved == []
