@@ -263,6 +263,18 @@ def test_connection_without_domain_tag_now_flagged(with_knowledge):
     assert "concept_no_domain_tag" in codes
 
 
+def test_mixed_type_tags_do_not_crash_the_check(with_knowledge):
+    """Live incident (lint-2026-08-24: check crashed \"'<' not supported
+    between instances of 'str' and 'int'\"): YAML parses bare numeric tags as
+    ints; `sorted(mixed-set)` raises and killed the whole check. Tags must be
+    coerced to str."""
+    body = "---\ntags: [2026, personal]\n---\n\n# Mixed\n\nBody.\n"
+    ctx = with_knowledge({"concepts/mixed.md": body})
+    issues = lint.check_concept_domain_tag(ctx)  # must not raise
+    codes = _codes_for_file(issues, "concepts/mixed.md")
+    assert "concept_no_domain_tag" in codes  # 2026/personal are no domains
+
+
 def test_good_connection_has_no_domain_tag_issue(with_knowledge):
     """The GOOD_CONNECTION fixture carries `tags: [fleet]` — must not fire
     the domain-tag check."""

@@ -447,7 +447,9 @@ def check_concept_domain_tag(ctx: LintContext) -> list[Issue]:
     for folder in ("concepts", "connections"):
         for art in _in_folder(ctx, folder):
             raw_tags = art.fm.get("tags") or []
-            tags = set(raw_tags) if isinstance(raw_tags, list) else set()
+            # str-coerce: YAML parses bare numeric tags as ints, and a mixed
+            # str/int set makes sorted() raise (live check-crash 2026-08-24).
+            tags = {str(t) for t in raw_tags} if isinstance(raw_tags, list) else set()
             if not (tags & domain_set):
                 issues.append(issue(
                     "warning", "concept_no_domain_tag", art.rel,
