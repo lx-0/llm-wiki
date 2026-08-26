@@ -156,18 +156,46 @@ def archive_failure(staged: StagedFlush) -> Path:
     return archive_path
 
 
+def _rescue(path: Path) -> StagedFlush:
+    """Synthesize a StagedFlush for an archive file whose name doesn't parse.
+
+    `parse_name` stays strict — hooks and `flush.py` rely on it to RECOGNIZE
+    staged files among other content. But FAILED_DIR means "this still needs a
+    retry", so dropping a file there for a name mismatch strands it silently:
+    `sessions/failed-flushes/flush-context.md` (a real, hand-PII-cleaned
+    context) sat unretried and unreported from 2026-07-25 until a manual
+    listing found it 2026-08-26.
+
+    The session id is derived from the stem so it is STABLE across drains —
+    it wraps the daily-log sentinel block, and an unstable id would append a
+    duplicate block on every retry instead of replacing in place.
+    """
+    kind = "session-end"
+    for prefix, k in _PREFIX_TO_KIND.items():
+        if path.name.startswith(prefix):
+            kind = k
+            break
+    stem = re.sub(r"[^0-9a-zA-Z_-]+", "-", path.stem).strip("-") or "unnamed"
+    try:
+        created = int(path.stat().st_mtime)
+    except OSError:
+        created = 0
+    return StagedFlush(path=path, session_id=f"rescued-{stem}", kind=kind, created=created)
+
+
 def pending(limit: int | None = None) -> Iterable[StagedFlush]:
-    """Iterate archived flushes that need a retry. Sorted oldest-first."""
+    """Iterate archived flushes that need a retry. Sorted oldest-first.
+
+    Every regular file in the archive is yielded — conforming names via
+    `parse_name`, the rest via `_rescue` — so nothing in the retry queue can
+    become invisible to the drain.
+    """
     if not FAILED_DIR.exists():
         return []
     out: list[StagedFlush] = []
-    for path in sorted(FAILED_DIR.iterdir()):
+    for path in FAILED_DIR.iterdir():
         if not path.is_file():
             continue
-        staged = parse_name(path)
-        if staged is None:
-            continue
-        out.append(staged)
-        if limit is not None and len(out) >= limit:
-            break
-    return out
+        out.append(parse_name(path) or _rescue(path))
+    out.sort(key=lambda s: (s.created, s.path.name))
+    return out[:limit] if limit is not None else out
