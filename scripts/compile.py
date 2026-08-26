@@ -754,12 +754,13 @@ async def main() -> None:
     # drifted to 362 duplicate / 561 missing rows on the live vault. Runs
     # after the link passes; idempotent — unchanged corpus writes nothing.
     from datetime import datetime as _dt
+    from zoneinfo import ZoneInfo as _zi
 
     from core.config import TIMEZONE
     from core.index_sync import sync_index
     ix_stats = sync_index(
         KNOWLEDGE_DIR, ROOT_DIR,
-        today=_dt.now(TIMEZONE).strftime("%Y-%m-%d"),
+        today=_dt.now(_zi(TIMEZONE)).strftime("%Y-%m-%d"),
     )
     if ix_stats["changed"]:
         log.info(

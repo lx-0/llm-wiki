@@ -219,6 +219,19 @@ NOTES
   M030-S02; until then the command is dry-run only.
 """
 
+H_REINDEX = """wiki reindex — reconcile knowledge/index.md against the corpus
+
+USAGE
+  wiki reindex                       apply (dedupe, drop dangling, append missing)
+  wiki reindex --dry-run             report what would change without writing
+
+NOTES
+  Deterministic engine bookkeeping (M031): duplicate rows → last occurrence
+  wins; rows for deleted articles are dropped; articles without a row are
+  appended with a first-paragraph summary. The same pass runs automatically
+  after every compile — this command is the manual/catch-up trigger.
+"""
+
 H_USAGE = """wiki usage — token-usage ledger (tokens per provider/model)
 
 USAGE
@@ -771,7 +784,7 @@ COMMANDS: tuple[CommandSpec, ...] = (
     CommandSpec("publish", "Knowledge ops", "mirror knowledge/ into meinkontext (--dry-run)",
                 handler="publish/cli.py", help_text=H_PUBLISH),
     CommandSpec("reindex", "Knowledge ops", "reconcile index.md against the corpus (--dry-run)",
-                handler="reindex.py"),
+                handler="reindex.py", help_text=H_REINDEX),
     CommandSpec("review-wiki", "Knowledge ops", "per-article quality scores (local LLM, free)",
                 handler="review-wiki.py", menu=True, help_text=H_REVIEW_WIKI),
     CommandSpec("health-trends", "Knowledge ops", "deterministic health-trend synthesis ($0)",
