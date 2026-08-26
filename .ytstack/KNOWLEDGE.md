@@ -2833,3 +2833,23 @@ An adversarial multi-agent pass over the arc's own commits (4 dimensions × inde
 ### Fix
 
 The pattern in all three: a claim verified through the artifact I had just edited rather than through the surfaces that consume it. Before claiming a removal or a fix is complete, enumerate consumers with a repo-wide grep and re-measure on the LIVE surface (here: run the actual check function over the vault corpus, `274` broken links with `0` bash-shaped — down from 295).
+
+## `.git` is not always a directory — `[[ -d "$X/.git" ]]` is the wrong checkout test (2026-08-26)
+
+### Lesson
+
+`cmd_update` and `cmd_version` in `wiki` both gated on `[[ -d "$WIKI_DIR/.git" ]]`. That test is false for three perfectly normal layouts, because git writes `.git` as a **file** containing `gitdir: <path>` for each of them: a linked worktree, a submodule, and a repo whose git-dir has been relocated. The engine reported `Not a git checkout. Cannot report version.` and `wiki update` refused outright — on a vault that was a completely healthy checkout.
+
+The relocation is not hypothetical: the operator's vault lives in iCloud (`iCloud~md~obsidian/Documents/lxw`), and its `.git` was **772 MB of packfiles** — 27 % of the entire iCloud allowance — for a working tree of ~500 MB. Git repos do not belong in a file-sync container at all; beyond the size, iCloud had produced conflict copies of the **git index itself** (`index 7` … `index 12`) and 16 stray `.DS_Store` files inside `.git`, one of them in `refs/`, which made `git fsck` report `badRefName`. The fix is a git-dir redirect: `mv <vault>/.git ~/.gitdirs/<name>`, write `gitdir: …` into `<vault>/.git`, then set `core.worktree` on the relocated repo. History and all git behaviour stay intact; iCloud syncs a 33-byte text file.
+
+### Fix
+
+Ask git, never stat the path:
+
+```bash
+if ! git -C "$WIKI_DIR" rev-parse --git-dir >/dev/null 2>&1; then
+```
+
+Same rule for any future checkout guard, in bash or Python — `(root / ".git").is_dir()` has the identical bug.
+
+Vault layout as of 2026-08-26: all three repos (`lxw`, `lxw/.wiki`, `lx`) are git-dir-redirected into `~/.gitdirs/`, and `<vault>/.wiki/.venv` is a **symlink** to `~/.venvs/lxw-wiki`, which keeps 400 MB of site-packages out of iCloud and shrank `.wiki` from 589 MB to 40 MB. Verified after the change: `uv sync --project <vault>/.wiki` follows the symlink and audits the target instead of replacing it — both with `UV_PROJECT_ENVIRONMENT` set and without it (the `wiki update` path). Order matters: build the environment at its real location first, then put the symlink in place, because a `uv sync` that finds no `.venv` at all will create a real directory there.

@@ -471,7 +471,11 @@ EOF
       *)                        err "unknown flag: $1"; exit 1 ;;
     esac
   done
-  if [[ ! -d "$WIKI_DIR/.git" ]]; then
+  # Ask git, don't stat `.git`: it is a FILE (`gitdir: <path>`), not a directory,
+  # whenever the repo is a linked worktree, a submodule, or has had its git-dir
+  # relocated — e.g. to keep the 770 MB of packfiles out of an iCloud-synced
+  # vault. A `-d` test reports "not a checkout" for all three.
+  if ! git -C "$WIKI_DIR" rev-parse --git-dir >/dev/null 2>&1; then
     die "Not a git checkout — wiki/ wasn't installed via install.sh. Manual update required."
   fi
 
@@ -587,7 +591,9 @@ EOF
 }
 
 cmd_version() {
-  if [[ -d "$WIKI_DIR/.git" ]]; then
+  # See cmd_update: `.git` is a file, not a directory, for worktrees, submodules
+  # and relocated git-dirs — ask git instead of stat-ing the path.
+  if git -C "$WIKI_DIR" rev-parse --git-dir >/dev/null 2>&1; then
     local rev; rev="$(git -C "$WIKI_DIR" rev-parse --short HEAD)"
     local tag; tag="$(git -C "$WIKI_DIR" describe --tags --always 2>/dev/null || echo "")"
     local origin; origin="$(git -C "$WIKI_DIR" config --get remote.origin.url 2>/dev/null || echo "")"
