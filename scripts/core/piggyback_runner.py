@@ -129,6 +129,29 @@ def run_piggyback(
     started = time.time()
     record_status(name, {"status": "running", "started": _now_iso()}, state_file=state_file)
 
+    # A killed RUNNER must not leave `status: running` behind. Without this,
+    # the entry lies about a task that is not running (dead pid), buries the
+    # previous real outcome, and doctor's orphan check only notices after the
+    # wall-clock cap + 1 h. Observed twice on 2026-08-26 when a foreground
+    # timeout killed the runner mid-child. Restores the previous handler so a
+    # nested/embedded caller keeps its own signal semantics.
+    _prev_handlers: dict[int, object] = {}
+
+    def _on_signal(signum, _frame):
+        _terminate(proc)
+        record_status(
+            name,
+            {
+                "status": "interrupted",
+                "ended": _now_iso(),
+                "duration_s": round(time.time() - started, 1),
+                "last_error": f"runner received {signal.Signals(signum).name}",
+            },
+            state_file=state_file,
+        )
+        signal.signal(signum, _prev_handlers.get(signum, signal.SIG_DFL))
+        os.kill(os.getpid(), signum)
+
     try:
         proc = subprocess.Popen(  # noqa: S603 — cmd is engine-constructed, not user input
             cmd,
@@ -152,6 +175,17 @@ def run_piggyback(
         return 1
 
     record_status(name, {"pid": proc.pid}, state_file=state_file)
+
+    # Armed only now: before the spawn there is no child to reap, and the
+    # spawn-failure path above already records its own outcome.
+    for _sig in (signal.SIGTERM, signal.SIGINT):
+        try:
+            _prev_handlers[_sig] = signal.getsignal(_sig)
+            signal.signal(_sig, _on_signal)
+        except (ValueError, OSError):
+            # Not the main thread, or the platform refuses — the wall-clock
+            # cap and doctor's orphan check remain as backstops.
+            pass
 
     wait_timeout = timeout_s if timeout_s and timeout_s > 0 else None
     try:

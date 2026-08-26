@@ -48,6 +48,50 @@ def test_stale_last_error_is_overwritten_on_next_run(tmp_path):
     assert entry["status"] == "ok" and entry["last_error"] is None
 
 
+def test_killed_runner_records_interrupted_not_running(tmp_path):
+    """A runner that is itself killed must not leave `status=running` behind.
+
+    Observed twice on 2026-08-26: a foreground timeout killed the runner
+    mid-child, and piggyback-state.json kept `status: running` with a dead pid
+    forever. Doctor's orphan check only notices after the wall-clock cap + 1 h,
+    so until then the entry silently lies about a task that is not running —
+    and the previous real outcome is buried. On SIGTERM/SIGINT the runner
+    records `interrupted`, reaps its child, and exits.
+    """
+    import signal
+    import subprocess as sp
+
+    from core import piggyback_runner as pr
+
+    sf = tmp_path / "piggyback-state.json"
+    scripts_dir = Path(pr.__file__).resolve().parent.parent
+    driver = (
+        "import sys; sys.path.insert(0, %r)\n"
+        "from pathlib import Path\n"
+        "from core import piggyback_runner as pr\n"
+        "pr.run_piggyback('t', 600, [%r, '-c', 'import time; time.sleep(60)'],"
+        " state_file=Path(%r))\n" % (str(scripts_dir), sys.executable, str(sf))
+    )
+    proc = sp.Popen([sys.executable, "-c", driver],
+                    stdout=sp.DEVNULL, stderr=sp.DEVNULL)
+    # Wait for the runner to record `running` before signalling it.
+    for _ in range(100):
+        if sf.exists() and json.loads(sf.read_text()).get("t", {}).get("status") == "running":
+            break
+        time.sleep(0.05)
+    else:
+        proc.kill()
+        raise AssertionError("runner never recorded `running`")
+
+    proc.send_signal(signal.SIGTERM)
+    proc.wait(timeout=15)
+
+    entry = json.loads(sf.read_text())["t"]
+    assert entry["status"] == "interrupted", entry
+    assert entry["last_error"]
+    assert "ended" in entry and "duration_s" in entry
+
+
 def test_records_timeout_and_kills_promptly(tmp_path):
     from core import piggyback_runner as pr
     sf = tmp_path / "piggyback-state.json"
