@@ -619,21 +619,32 @@ def test_model_upgrade_bumps_retired_default():
         "dream_model": "claude-opus-4-7[1m]",
     }}
     changes = m.migrate_model_upgrades(data)
-    assert data["models"]["compile_model"] == "claude-haiku-4-5-20251001"
+    assert data["models"]["compile_model"] == "claude-opus-4-8"
     assert data["models"]["compile_large_source_model"] == "claude-opus-4-8[1m]"
     assert data["models"]["dream_model"] == "claude-opus-4-8[1m]"
     assert len(changes) == 3
 
 
-def test_model_upgrade_compile_model_opus_to_haiku():
-    """2026-08-26 flip (audit E3): route.py has pinned Haiku per-substrate since
-    M026 — an operator vault still on the old opus default follows the engine
-    default so the knob tells the truth again."""
+def test_model_upgrade_undoes_the_e3_haiku_misflip():
+    """Audit E3 concluded compile_model was dead from route.py alone and flipped
+    it to Haiku, silently re-tiering five agentic readers — `wiki correct apply`
+    (which WRITES into knowledge/), takes, suggestions, folder answers, agent
+    tasks. Vaults that took the flip are mapped back to the reasoning tier."""
     m = _mod()
-    data = {"models": {"compile_model": "claude-opus-4-8"}}
+    data = {"models": {"compile_model": "claude-haiku-4-5-20251001"}}
     changes = m.migrate_model_upgrades(data)
-    assert data["models"]["compile_model"] == "claude-haiku-4-5-20251001"
+    assert data["models"]["compile_model"] == "claude-opus-4-8"
     assert len(changes) == 1
+
+
+def test_compile_model_is_not_the_compile_route_model():
+    """The two must stay distinct knobs: a cheap fall-through route tier must
+    never be reachable by re-tiering the agentic default (the E3 confusion)."""
+    from core.config_schema import Models
+
+    models = Models()
+    assert models.compile_model == "claude-opus-4-8"
+    assert models.compile_default_route_model == "claude-haiku-4-5-20251001"
 
 
 def test_model_upgrade_preserves_pinned_other_model():
@@ -648,7 +659,7 @@ def test_model_upgrade_preserves_pinned_other_model():
 def test_model_upgrade_idempotent_on_current():
     m = _mod()
     data = {"models": {
-        "compile_model": "claude-haiku-4-5-20251001",
+        "compile_model": "claude-opus-4-8",
         "dream_model": "claude-opus-4-8[1m]",
     }}
     assert m.migrate_model_upgrades(data) == []

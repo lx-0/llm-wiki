@@ -226,12 +226,16 @@ PIGGYBACK_SUBKEY_DROPS: dict[str, tuple[str, ...]] = {
 # match of the old default is upgraded — a deliberately-pinned other model is
 # preserved untouched. Keyed by models.<key> → {old_value: new_value}.
 #   2026-06-13: opus 4-7 → 4-8 across compile / large-source / dream.
-#   2026-08-26: compile_model opus → Haiku (audit E3 — routes had pinned Haiku
-#   since M026; the default route now follows this knob again).
+#   2026-08-26: compile_model opus → Haiku, then REVERTED the same day. Audit
+#   E3 read only compile_stages/route.py, saw Haiku pinned on every row, and
+#   concluded the knob was dead — but five agentic surfaces read it, including
+#   `wiki correct apply`, which writes into knowledge/. The flip re-tiered them
+#   silently, so the haiku value is mapped back to Opus here; the compile
+#   fall-through moved to its own knob (models.compile_default_route_model).
 MODEL_UPGRADES: dict[str, dict[str, str]] = {
     "compile_model": {
-        "claude-opus-4-7": "claude-haiku-4-5-20251001",
-        "claude-opus-4-8": "claude-haiku-4-5-20251001",
+        "claude-opus-4-7": "claude-opus-4-8",
+        "claude-haiku-4-5-20251001": "claude-opus-4-8",
     },
     "compile_large_source_model": {"claude-opus-4-7[1m]": "claude-opus-4-8[1m]"},
     "dream_model": {"claude-opus-4-7[1m]": "claude-opus-4-8[1m]"},
@@ -269,6 +273,7 @@ INJECTED_KEYS: dict[str, tuple[str, ...]] = {
         "dream_model",                # M014 dream-cycle model (2026-05-18)
         "folder_scan_provider",       # M027-S04 Q9 seam (2026-06-10)
         "intent_classify_model",      # intent-dispatch cheap tier (2026-06-14)
+        "compile_default_route_model",  # compile fall-through route (2026-08-26)
     ),
     "limits": (
         "curiosity_exclude_globs",    # curiosity substrate denylist (2026-06-13)

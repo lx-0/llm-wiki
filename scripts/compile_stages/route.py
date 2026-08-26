@@ -118,7 +118,8 @@ SUBSTRATE_PROMPTS: dict[str, tuple[str, int, str]] = {
 # `models.compile_model`, audit 2026-08-25 E3). Per-substrate rows above
 # keep their empirical per-row pins.
 _DEFAULT_DISPATCH: tuple[str, int, str] = (
-    "compile_default", CONFIG.limits.compile_max_turns, CONFIG.models.compile_model,
+    "compile_default", CONFIG.limits.compile_max_turns,
+    CONFIG.models.compile_default_route_model,
 )
 
 

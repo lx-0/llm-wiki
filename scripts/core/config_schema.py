@@ -142,13 +142,22 @@ class PiggybackTask:
 
 @dataclass
 class Models:
-    # Default Claude model for SDK surfaces without a per-substrate pin: the
-    # compile default route (compile_stages/route.py — per-substrate rows keep
-    # their own empirical pins), suggestions, facts/correct/takes, agent
-    # tasks, and the dream/intent fallbacks. Flipped opus→haiku 2026-08-26
-    # (audit E3): every compile route had pinned Haiku since M026, so the old
-    # opus default steered nothing and lied to the operator.
-    compile_model: str = "claude-haiku-4-5-20251001"
+    # Default Claude model for the AGENTIC surfaces that have no pin of their
+    # own: `wiki correct apply` (writes into knowledge/), the takes producer,
+    # the suggestions producer, folder-answer extraction, agent tasks, and the
+    # dream/intent fallbacks. Reasoning tier, not a triage tier.
+    #
+    # Do NOT re-flip this to a cheap tier on the theory that it is unused:
+    # audit E3 (2026-08-26) read only compile_stages/route.py, saw Haiku pinned
+    # on every row, concluded "dead knob", and flipped it — silently re-tiering
+    # the fact-correction agent. The compile default route has its own knob
+    # below; that is the one E3 actually wanted.
+    compile_model: str = "claude-opus-4-8"
+    # Model for the compile fall-through route (compile_stages/route.py
+    # `_DEFAULT_DISPATCH`) — substrates with no SUBSTRATE_PROMPTS row of their
+    # own. Read from CONFIG at import time so a vault-side change actually
+    # reroutes; the per-substrate rows keep their empirical per-row pins.
+    compile_default_route_model: str = "claude-haiku-4-5-20251001"
     # Compile retry model on kind=unknown (compile_stages.compile). The standard
     # 200K-token Opus window dies silently (exit-1, empty stderr) on 100+ KB
     # transcripts even with max_turns capped — Read-tool fan-out into knowledge/

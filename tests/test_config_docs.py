@@ -41,9 +41,8 @@ def test_generated_tables_reflect_safety_truth():
     tables = config_docs.generate_tables()
     # optimize_claude_md was shown enabled:true though force-disabled 2026-06-13.
     assert "| `piggybacks.optimize_claude_md` | `false` |" in tables
-    # compile_model was shown as the retired claude-opus-4-7 (and stayed on
-    # opus while every route pinned Haiku — flipped 2026-08-26, audit E3).
-    assert '| `models.compile_model` | `"claude-haiku-4-5-20251001"` |' in tables
+    # compile_model was shown as the retired claude-opus-4-7.
+    assert '| `models.compile_model` | `"claude-opus-4-8"` |' in tables
     # curiosity_model was shown as gemma4:e4b — documented in the schema itself
     # as the schema-ignoring '6-week stillstand' pick.
     assert '| `models.curiosity_model` | `"llama3.1:8b"` |' in tables

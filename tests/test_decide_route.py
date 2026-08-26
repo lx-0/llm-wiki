@@ -189,10 +189,12 @@ def test_compile_carries_dispatch_key():
 
 
 def test_default_dispatch_model_follows_config_knob():
-    """Audit 2026-08-25 E3: models.compile_model was a dead knob — every route
-    hardcoded Haiku while the knob claimed to steer compile. The default route
-    now reads the knob (per-substrate rows keep their empirical pins)."""
+    """The compile fall-through route was a hardcoded Haiku literal, so no
+    operator could retune it. It reads its OWN knob — not compile_model, which
+    steers the agentic surfaces (`wiki correct apply` et al) and must not be
+    re-tiered by a compile-routing decision."""
     from compile_stages.route import _DEFAULT_DISPATCH
     from core.config import CONFIG
 
-    assert _DEFAULT_DISPATCH[2] == CONFIG.models.compile_model
+    assert _DEFAULT_DISPATCH[2] == CONFIG.models.compile_default_route_model
+    assert _DEFAULT_DISPATCH[2] != CONFIG.models.compile_model

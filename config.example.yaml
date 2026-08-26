@@ -216,10 +216,13 @@ piggybacks:
     cooldown_hours: 6
 
 models:
-  # Default model for SDK surfaces without a per-substrate pin: the compile
-  # default route (per-substrate routes pin their own), suggestions, facts,
-  # agent tasks, dream/intent fallbacks.
-  compile_model: claude-haiku-4-5-20251001
+  # Default model for the AGENTIC surfaces with no pin of their own: `wiki
+  # correct apply` (writes into knowledge/), takes, suggestions, folder
+  # answers, agent tasks, dream/intent fallbacks. Reasoning tier — the compile
+  # fall-through has its own knob below.
+  compile_model: claude-opus-4-8
+  # Compile fall-through route (substrates with no dedicated prompt row).
+  compile_default_route_model: claude-haiku-4-5-20251001
   # Compile retry model on kind=unknown. Standard 200K Opus window dies
   # silently on 100+ KB transcripts; when a compile call fails kind=unknown on
   # a large-enough source (limits.compile_retry_long_context_min_source_chars)
