@@ -1,92 +1,137 @@
-# Backlog Priority — post-M020 snapshot
+# Backlog Priority — reconciled against the code, 2026-08-27
 
-Last reset: 2026-05-17 after M020 (backlinks footer) closeout, refreshed same day after the M019 doc-sync + drift-sweep + diagrams-badge-cleanup arc + 3 new study-arc backlog entries (+ 1 parallel-session entry, not mine). Inventory: 52 open · 30 shipped (`shipped/`) · 2 rejected (`rejected/`). (2026-05-22: distribution-strip shipped via sparse-checkout; study-piggyback-audit done — wiring OK.)
+Inventory: **83 reconciled** → 11 moved to `shipped/`, **72 still in the working set**
+(31 open · 37 partially done · 1 shipped-but-held · 2 superseded · 1 stale premise).
 
-**Heuristic, not formal commitment.** Re-evaluate after every milestone close. When a file ships, `git mv` it into `shipped/`; when explicitly rejected, into `rejected/`. Keep the working directory short — agents glance at this list to find the next move.
+The previous snapshot was cut on 2026-05-17, before M021–M031 shipped, and 28 of the
+83 filed items were not mentioned in it at all — a third of the backlog invisible to
+anyone glancing here for the next move. Every entry below was re-derived by reading
+the CODE (scripts/, tests/, CHANGELOG, git log) rather than trusting what the item
+says about itself, and every SHIPPED/superseded verdict was independently refuted
+before it was accepted, because a wrong one deletes real work from the radar.
 
-## 🔥 Hot — small, contained, ready to ship
+Effort: S = hours · M = a day or two · L = a milestone. `·partial` means some phases
+shipped and the sentence names only what remains.
 
-Pick one when "next?" comes up and the operator wants a concrete tick.
+## 🔥 Hot — high value, ships in hours or days
 
-- **`study-run-due-piggyback-audit.md`** — verify the M019 daily-schedule piggyback actually fires on lxw (enabled in vault, default-off in engine). 30-min audit; ripens 2026-05-19 to 2026-05-23 so week-1 review has clean data. **Audited 2026-05-22: wiring works (fires/spawns/cooldown OK, run_count=8); the doc's "daily" premise was wrong — manifest is `schedule: weekly`, so the runs-gap is expected. No fix needed; close it.**
-- **`correct-apply-overreach-and-partial-runs.md`** — `wiki correct apply` over-reaches on `clarification`/`disambiguation` facts: inserts top-of-page "Superseded" banners on pages that only *reference* the renamed entity (hit live on lxw 2026-05-31 — active `ytstack.md` + `paperclip-companies.md` read as deprecated). Defect A = half-day prompt fix in `prompts/correct_apply.md` (subject-vs-reference rule). Defect B (medium) = a run crashed mid-propagation (empty-stderr exit, no `## Applied summary`), leaving a partial, non-resumable correction → make `apply` idempotent + emit partial-application manifest.
-- **`ytstack-hook-exit-code.md`** — `pre-tool-use-edit` hook exits 2 when intent was warn-only. Half-day fix or plan-task skill change.
-- **`voice-punctuate-followups.md`** — end-to-end test + optional pre-2026-05-17 backfill + quality observation window.
-- **`pictures-followups.md`** — HEIC ingest path untested, archive-policy decision deferred (iCloud footprint).
-- **`stg-glob-pattern.md`** — Firefox STG backup dir versions; glob support so engine doesn't pin a single version.
-- **`voice-openwhispr.md`** — OpenWhispr v1.7.0 stores transcripts in SQLite, not files. Reader-kind for voice collector.
-- **`flush-orphan-recovery.md`** — recovery for orphan flushes (check current state).
-- **`preflight-guard-rollout.md`** — extend pre-flight prompt-size guard to remaining LLM call sites.
-- **`system-level-scheduler.md`** — piggybacks fire from Claude-Code SessionEnd today; a day without Claude Code = no pipeline activity. LaunchAgent / systemd-timer-driven scheduler so vault stays current even when operator doesn't open Claude Code. Surfaced via inbox-bridge wedge 2026-05-29. M-shaped (touches flush.py + new CLI verbs + per-platform install scripts).
+- **`home-screen-ux.md`** (M ·partial) — Close the probe-coverage gap so features with pending work cannot be silently absent from the home screen — folder-index staleness, per-collector inboxes (voice/pictures/captures), dedup candidates, non-gmail OAuth bootstrap — preferably by adding freshness checks to the existing doctor `_ALL_CHECKS` registry, which already renders into the actionable list via `dispatch_args`, rather than building a third registry.
+- **`preflight-guard-rollout.md`** (M ·partial) — Wire the guard into suggestions/producer.py and optimize-claude-md.py as written, then extend to the ~10 call sites that did not exist when the doc was written — flush.py and suggestions/producer.py are the two that actually embed unbounded operator content (a full staged transcript; a full email source file plus the compact index).
+- **`compiler-suggestions.md`** (S ·partial) — Glob FIXED 2026-08-27 (`raw/email/*.md` → `raw/notes/email/*.md`, commit 0ef4449, operator config migrated); what remains is to confirm the producer actually emits on the next compile and to decide the 10 suggestion actions that have sat `status: pending` since 2026-05-14.
+- **`curiosity-request-dedup.md`** (S) — Build the per-(account, folder) supersede pass plus the producer-side skip-if-pending guard — the redundancy is live and each of the ~664 duplicate requests will cost a Claude SDK compile pass when it drains.
+- **`flush-extract-outage.md`** (S ·partial) — The outage is genuinely over — root cause was host-MCP schema injection (the doc's size-class and stale-env leads were both refuted) and Path A writes sessions again — but no test asserts the fix (`grep -rn strict-mcp-config tests/` hits only a comment at tests/test_sdk_env_sanitize.py:7), so add that regression assertion over run_sdk_query AND flush.py's bypass path before a refactor silently reopens a 99%-failure outage; the retry_failed_flushes drain is also still bound to compile cadence at config.example.yaml:184-187.
+- **`flush-orphan-recovery.md`** (S) — Extend `pending()` (or retry-failed-flushes.py) to sweep the `sessions/` root for staged files older than a staleness threshold and re-feed them, plus a `wiki doctor` check so the queue stops being invisible — note the doc's double-append risk is already moot because `append_to_daily` REPLACES a per-session sentinel block (flush_pipeline.py:133-142) instead of appending.
+- **`olbi-coverage-optimization.md`** (S) — Fix the three dead substrate globs in scripts/reports/_engine/substrate_scope.py:32-38 so voice and session rollups are actually read, re-measure coverage, then close the three-month-overdue m019-week-1-review by picking path 1 against the deterministic 8 null items.
+- **`orphan-check-footer-masking.md`** (S ·partial) — Answer the item's own open question — decide whether in-index.md membership should still count now that the index is machine-generated for every article, then re-baseline; until then the orphan check cannot fire and reports a permanent, meaningless zero.
 
-## 🌱 Medium — design clarified, blocked or waiting on signal
+## 🏔 Big rocks — high value, milestone-sized
 
-Real value, real cost; needs canary data, parallel-session coordination, or operator green-light.
+- **`architecture-scaling-2028.md`** (L) — Build Lever 2 — compile-side MOC linklist upkeep plus an MOC-first retrieval contract — and split the meta-entry into moc-auto-maintenance.md + lifecycle-tiering.md, now that the 1500-row and 2000-article triggers have both fired.
+- **`consumption-curiosity-axis.md`** (L ·partial) — No consumption channel has been built (no Spotify, Readwise, or YouTube watch-history collector exists), but the doc's own blocking prerequisite — a synthesis consumer that turns consumption substrate into a persona portrait — is now live in the dream-cycle, so the first-mover channel (reading-highlights per the doc's own sequencing) is unblocked.
+- **`dms-collector.md`** (L) — Untouched — build the Phase 1 Telegram wedge (Telethon session + scripts/adapters/dms/telegram.py + per-conversation allowlist), which is the one backlog item that covers a genuinely dark persona region the operator actually produces daily, and whose named consumer (M005 entity-pages with State+Timeline) is now live rather than hypothetical.
+- **`nas-ingest.md`** (L ·partial) — The doc's own 3-stage `scan-nas.py` -> raw/notes/nas/ design is superseded by the body-blind raw/index/ + folder-deep-scan architecture, and what actually remains is M027-S06: the smbprotocol reader, the out-of-sandbox (TCC-safe) body reader, the periodic scheduler, and one e2e on a real NAS share.
+- **`recursive-session-summary.md`** (L) — Build the async rolling-summary path (background spawn around the 10 s hook timeout, plus a long-synthetic-transcript fixture) — the "only build this if truncation actually shows up in staging" condition is empirically met on the operator's own vault, so assistant prose is being silently dropped before it reaches daily/ and knowledge/.
+- **`screenpipe-intake.md`** (L ·partial) — The screenpipe DB→knowledge/ collector is still unbuilt, and capture itself has been dead since 2026-08-21 (last frame 2026-08-21T14:39:52 in a 4.9 GB db.sqlite; `launchctl list` shows only com.alex.screenpipe-watchdog loaded, not com.alex.screenpipe) — so 10 GB of the broadest persona substrate is accumulating unread and has silently stopped growing.
+- **`system-level-scheduler.md`** (L ·partial) — The clock is still missing — add `wiki flush --piggybacks-only`, a sweep LaunchAgent template plus `wiki scheduler {install,uninstall,status}`, and settle the SessionEnd double-fire question, so a Claude-Code-free week no longer freezes every collector.
 
-- **`health-trend-synthesis.md`** — MVP SHIPPED 2026-05-23 (`wiki health-trends`, deterministic $0 aggregation → `## Trends` block in `concepts/health.md`). Deferred future layers: LLM narrative, cross-substrate correlation, MOC hub, charts.
-- **`concept-consistency-routine.md`** — SHIPPED all 5 phases (`wiki reconcile`, autonomous fact-violation reconciliation; folded into the architecture.excalidraw Hard-Facts band). Default-off; awaiting operator opt-in + first live `--apply` run.
-- **`compile-agent-no-filesystem-write.md`** — return structured payload via `ResultMessage`, write deterministically in `compile.py`. Was the M018-S03 vision before that slice got cancelled; full requirements in `commit-article-manifest.md`.
-- **`commit-article-manifest.md`** — re-arch plan for `commit_article` after M018-S03 cancel (knowledge-writes are agent-side via SDK tool-use, not pure I/O extractable).
-- **`search-tools.md`** — M020-deferred axis-aware `wiki search --type --domain --author` + temporal `wiki recent`. Re-evaluate when vault crosses ~3k articles or dream-cycle/curiosity surface a real query bottleneck.
-- **`recursive-session-summary.md`** — flush-context Phase 2 (hierarchical summarisation). Deferred 4-6 wks after gen-2 budgets prove out.
-- **`personality-substrate-predigestion.md`** — gating IPIP-NEO-120 / HEXACO-60 / PID-5 behind pre-digestion. M019 follow-up; not blocking the wedge. **The natural next M019-arc milestone** once the week-1 review confirms the wedge is operationally useful.
-- **`olbi-coverage-optimization.md`** — OLBI is the highest-cost ($0.28) + lowest-coverage (37.5%) instrument on the manifest. Three mitigation paths laid out (operator-input / Exhaustion-only fork / Sonnet override). Decision belongs in the 2026-05-24 week-1 review.
-- **`pass2-dashboard-widget.md`** — dashboard pane surfacing the latest Pass-2 cross-study finding. DECISIONS.md flagged as M019 closeout deferred. Ripens after first Pass-2 cycle (~within a week of 2026-05-24).
-- **`lx-vault-merge.md`** — Phase 2 (longform import + cross-vault link reconciliation). Phase 0+1 ✓; Phase 2 unblocked by M007/M008/M009 ships.
-- **`interactive-cli.md`** — Python interactive-menu shipped (`scripts/menu.py`); this is the broader CLI UX vision.
-- **`m005-infographics-extension.md`** — deferred parts only after the 2026-05-15 wrapup doc-gap pass.
-- **`subtype-axis.md`** — split `concepts/` into ~6 color groups for the graph view. Quality-of-life, not load-bearing. Re-evaluate after dream-cycle output shape stabilises.
-- **`obsidian-app-json-smart-merge.md`** — concrete: smart-merge `.obsidian/app.json` so `wiki seed --force` doesn't overwrite operator preferences.
-- **`compiler-suggestions.md`** — suggestion sweep originating from compile-time observations (status TBD on re-read).
-- **`postcompact-only-injection.md`** — optional optimization on the 2026-05-05 pointer-block refactor.
-- **`prompt-aware-index-injection.md`** — optional/configurable feature, evaluate after SessionStart matures.
-- **`wiki-correct-deferred.md`** — `wiki correct` CLI followups.
-- **`curiosity-dashboard.md`** — dashboard pane for curiosity-loop output.
-- **`curiosity-topic-as-search-query.md`** — use curiosity-topic as IMAP/Gmail search-query, not blind folder dump.
-- **`dashboard-action-items.md`** — likely subsumed by M005's Personal Tasks pane (verify before reopening).
-- **`dashboard-upcoming-events.md`** — was blocked on calendar-collector; M006 shipped, so now unblocked.
-- **`../OFFICE-HOURS-wiki-desktop-app.md`** — ▶️ ACTIVE (NEW INITIATIVE; un-parked 2026-06-22). Desktop GUI fronting llm-wiki: accessibility for non-technical keyusers (Sid won't touch the CLI → ~50% of keyusers don't engage) + always-on health/status overview. Premise validated (accessibility = product-survival gate; multi-user is a wiki *quality* driver → `company-brain-federation`). **CEO-review PROCEED (SCOPE REDUCTION):** framework **decided = Electron** (operator, no alternative); MVP = **listener toggle + read-only health window** (driven by urgent need to start/stop screenpipe on the fly), full GUI is the expansion. **Next: `plan-eng-review` (concept)** to lock the Electron↔engine bridge + packaging, then `init-project` (own repo). Folds in `listener-lifecycle` (toggle); screenpipe **collector** stays separate + unvalidated. Interim op-need covered by `~/.screenpipe/sp` + watchdog.
+## 🌱 Medium
 
-## 🌾 Collector ideas — large pool, pick when capacity allows
+- **`architecture-deepening.md`** (L ·partial) — Seven candidates remain genuinely open (#4 linter seam, #7 hook harness, #9 logging, #10 async Ollama = M021-S02, #11 markdown helper, #13 datetime/tz, #15 dashboard consolidation); the doc needs no reconciliation, only execution.
+- **`curiosity-dashboard.md`** (L ·partial) — A bulk-triage surface for the 706 pending requests is still missing — filterable list with cost/rationale per request and approve/reject in place (the natural home is now the desktop app, not the Obsidian Meta-Bind callouts the doc sketches), plus the unbuilt pre-resolve candidate step.
+- **`listener-lifecycle.md`** (L ·partial) — Generalize the desktop prototype into the engine: plist generation/load for a listener (the shared LaunchAgent core also owed to system-level-scheduler.md), per-install config instead of registry.ts's hardcoded `com.alex.screenpipe`, and CLI/menu parity — noting the value is capped until a screenpipe collector exists, since today the subsystem would keep alive a daemon whose output never reaches the vault.
+- **`lx-vault-merge.md`** (L ·partial) — Phase 2 is now fully unblocked and untouched — 103 hand-written strategy/personal docs still sit sealed in imported/lx/ (indexed by nothing, not even the M030 whole-vault publish), and the shipped compile-role/raw-notes-longform path makes it far cheaper than the doc's 65-entity hand-walk plan.
+- **`browser-history-collector.md`** (M ·partial) — Give the existing scan_browser.py a delta/daily-rollup mode plus query-param redaction and a typed_count gate so it can be turned into a piggyback without flooding compile with an 80 KB near-duplicate snapshot each day.
+- **`correct-apply-overreach-and-partial-runs.md`** (M ·partial) — Three of four asks remain: the prompt still lets the agent stamp page-level `> **Superseded**` banners on reference-only active pages, apply is still non-idempotent on re-run, and a mid-run crash still exits with zero record of which files were already touched.
+- **`curiosity-topic-as-search-query.md`** (M) — Untouched — add the optional `query` arg to the MailboxReader protocol and its three adapters, and have the producer emit `query_terms` alongside `topic`; note it partly conflicts with the dedup item (topic-filtering would make per-folder requests non-identical, so decide dedup-vs-query ordering first).
+- **`dashboard-action-items.md`** (M ·partial) — The daily/ session action-item stream (4,875 plain bullets, 100 files) still has no surface — needs either the recency-windowed dataviewjs scrape the doc proposes or a decision to close it as absorbed by the meeting-commitment layer.
+- **`dashboard-upcoming-events.md`** (M) — The M006 blocker is genuinely dead — future-dated per-event rollups exist in the vault (2026-08-28.md, 2026-08-31.md, collector ran 2026-08-25) — but zero of this item's own deliverable is built: the dashboard needs a dataviewjs heading-parser (or per-event `Key::` inline fields emitted by _render_event_block) plus a calendar_future_days 7→14 bump with its migration, not a paste-in Dataview block.
+- **`deepening-arc-followups.md`** (M ·partial) — Most items still stand and two of them hand the operator crashing commands from the engine's own help (`wiki dream-entity --cost-cap`, `wiki analyze --all-studies`), so what remains is stripping those phantom-flag help blocks, one sync-process-docs pass over PROCESS.md/cli.md, and a [tool.ruff.lint] select/ignore policy — the rest (scan_screenshots.py:552 docstring, study.py:361-366 hand-rolled flock, folder_index.py:449 piggyback_default, M021-ROADMAP.md:5 status:planned) is cosmetic; core/utils.py's LOG_FILE F401 is already fixed and templates/dashboard.md is already clean of missing_backlinks_count.
+- **`health-trend-synthesis.md`** (M ·partial) — The four named deferrals are still unbuilt — the thin LLM narrative pass over the aggregates ("what changed and when"), cross-substrate correlation with calendar/voice/mood, a `knowledge/MOCs/health.md` hub, and sparkline charts; the narrative layer is the one that turns 2602 ingested health days into a persona axis the wiki can actually speak about.
+- **`music-listening-collector.md`** (M) — Confirm the operator scrobbles to Last.fm, then build Phase 1 (user.getrecenttracks → raw/notes/music/<year>/<date>.md rollups) and edit the file's superseded P3/correlation-ribbon paragraph.
+- **`obsidian-plugin.md`** (M ·partial) — Rewrite the item around the three residual gaps instead of filing it to rejected/: no failed-flush queue in any GUI, no approve/reject surface for suggestions or curiosity outside a TTY, and the desktop's folder-scan Review button crashing headlessly on termios.error.
+- **`operator-financial-operational-fact-layer.md`** (M ·partial) — Write the PII policy (which derived figures may become facts) and add the operator-finance / wach-wegener-ug fact node — the collector, the digests and the sensitivity marking are already in place and pointed at exactly the right two directories, and publish.enabled: true in the lxw config means anything ingested now also leaves the machine.
+- **`prompt-aware-index-injection.md`** (M) — Build the deterministic ripgrep UserPromptSubmit hook — the retrieval problem it targets tripled in size, but its own hard precondition #2 is further from met than when written (1831 concepts vs 43 people / 65 projects / 9 facts in the live vault), so a naive index grep can still only ever return concepts.
+- **`relativize-wikilinks-followups.md`** (M ·partial) — Triage the 178 dangling knowledge refs (create-or-drop) and fix the handful of malformed `../`/`knowledge/`-prefixed link forms; the longform relativize-walk extension can be dropped as unneeded.
+- **`sunoflow-collector.md`** (M) — Write Phase 1 end to end — `SunoflowConfig` under `personal.accounts.<id>.sunoflow` with its migration entry, a registered Collector walking `GET /api/songs` on a watermark into `raw/notes/sunoflow/`, registry line and template resync; Phase 2 (play history) still waits on lx-0/SunoFlow#70, unverifiable from here.
+- **`wiki-correct-deferred.md`** (M ·partial) — The paraphrase-blind fact lint is the one item with teeth left — a fact whose negation term is reworded slips through silently — while severity tiers, `add --apply`, the audit trail, and the dashboard editor stay parked and the rename/propagation items are effectively covered.
+- **`collectors.md`** (S ·partial) — Spin the three orphan rows (Downloads watcher, LinkedIn ingest, Articles/RSS) out into their own backlog files -- or keep them in place -- before trimming the answered sections and the 5 shipped rows.
+- **`compile-agent-no-filesystem-write.md`** (S ·partial) — Write the substrate-injection regression fixture the file specifies (compile a daily/ file describing fake engine changes, assert nothing outside knowledge/ is touched) and fix the stale AGENTS.md:350 line pointer before retiring the mitigation half.
+- **`index-md-drift.md`** (S ·partial) — Strip the surviving 'append a row to knowledge/index.md' instruction from the seven non-main prompts so they match compile_main.md:229's do-not-edit rule.
+- **`m019-week-1-review.md`** (S) — The review never ran and its checklist premise is dead (manifest was `schedule: weekly` from day one, not 7 daily runs), but the one real decision is now answerable and the data says revert: across 11 post-override runs ISI on Sonnet still swings 0.0%-57.1% coverage (0.0% on 2026-07-23), i.e. Sonnet ~= Haiku, which per the DECISIONS decision tree means drop the costlier override.
+- **`obsidian-app-json-smart-merge.md`** (S ·partial) — Correct docs/setup-obsidian.md:151-170 to document the shipped overlay + `--extract-custom`, and close the residual gap where `wiki seed --force` silently discards Obsidian-UI-written app.json drift that was never extracted into an overlay.
+- **`pass2-dashboard-widget.md`** (S) — Build the half-day `_dashboard-reports.md` cache-file pane (headline + datestamp + open link) — Pass-2 has been firing weekly and unread for three months, so the engine currently pays for a synthesis with no consumption surface.
+- **`publish-asset-channel.md`** (S) — Only one slice is actionable in this repo today — mask the key-shaped spans in the four secret-gate-skipped articles so the next piggyback publishes them; the asset channel is accepted upstream as a context-mcp milestone and cannot start engine-side (REGEL #2), and the reach-anywhere caveat needs a second device, not code.
+- **`screenshots-intake.md`** (S) — E (app-enum schema), F (project-hallucination guard) and G (per-run vision log) are all untouched — F is the one that matters, since an unvalidated `project:` still feeds the compile folder-routing heuristic on a piggyback that fires daily (piggyback-state.json `screenshots` last_run 2026-08-25, ok); H is moot because the PNG-copy-into-vault design it targeted was replaced by thumbnails (scan_screenshots.py:187-188, originals never copied).
+- **`stg-glob-pattern.md`** (S) — The ~20-LOC glob resolver is unwritten and the knob it would auto-heal is currently three Firefox majors and three months stale, though the payoff is capped today because neither `tabs` nor `browser` appears in the lxw piggybacks block and raw/notes/browser/ has produced nothing since browser-overview-2026-04-12.md.
 
-Each one is a substrate collector; same shape as the 11 already shipped. None is hot; ship when the substrate's input grows enough to be worth wiring.
+## 🧊 Low — real, not urgent
 
-> **Consumption/curiosity axis (2026-05-22 reframe):** `music-listening`, `youtube-intake` (watch-history), `browser-history`, `reading-highlights` cover one persona-axis — the non-work self that work-substrate misses. Per `.ytstack/DECISIONS.md` 2026-05-22, value them by *blindspot-coverage*, not signal-density; `music-listening-collector.md`'s "weight-low correlation-ribbon" framing is superseded. Pick by axis-coverage (steep diminishing returns stacking channels) and gate on a synthesis consumer existing. Cluster doc + sequencing: `consumption-curiosity-axis.md`. (Suno = production axis, not this one.)
+- **`agent-apply-channel.md`** (L) — Run the office-hours question the doc itself demands ("what structured mutation does an agent actually need to make weekly?"), then build at most the one op that survives — structured claim into `knowledge/takes/` — plus the claim-identity-across-recompile rule.
+- **`commit-article-manifest.md`** (L) — Nothing is built; the manifest-emitter / agent-write-disarm re-architecture stays deferred with no forcing blocker yet -- keep the file in the open queue.
+- **`company-brain-federation.md`** (L) — All three condensed open items remain unbuilt — `scope:` as a compile-time frontmatter axis, a fail-closed promote channel, and cross-vault entity identity (`wiki dedup` is still single-vault) — and the office-hours that would commit it has never been held.
+- **`github-activity-collector.md`** (L) — Build the whole thing — a `personal.accounts.<id>.github` multi-tenant collector over GraphQL `contributionsCollection` writing PR-level markdown to `raw/notes/github/` with a per-account event/commit watermark; but note the doc's premise "none of it reaches the wiki" has weakened, because session-flush capture (now including Codex, commit fed2e05) already lands the work narrative in `daily/<date>/sessions.md`, so this covers the operator's best-covered axis rather than a dark one.
+- **`personality-substrate-predigestion.md`** (L) — Still genuinely gated and the gate got tighter (3.6× the budget, not 92% of it), so the pre-digestion layer remains the prerequisite — but it is an L-sized build sitting on top of a wedge whose substrate scope is currently broken, so it should not be picked up before that is fixed.
+- **`reading-highlights-collector.md`** (L) — Build the Readwise (or Kindle-SQLite) collector — but the doc's own "decide before starting" gate resolves against it: after months of substrate there is no trace in the operator's corpus that they use any of these apps, so this is a collector for a substrate they do not demonstrably produce.
+- **`subtype-axis.md`** (L) — Build the whole proposal from scratch — compile-prompt rule, `check_article_subtype()` lint, deterministic tag-heuristic backfill script + CLI verb, `schema.concept_subtypes` config key with its same-commit migration, and 6 graph.json colour groups.
+- **`youtube-intake.md`** (L ·partial) — T3-cloud, the curiosity upgrade/search loop, and the dashboard buttons are all still unbuilt — and the substrate is cold: 3 videos ever, all mtime 2026-05-03, with the piggyback's inbox `raw/inbox/youtube.md` (scan_youtube.py:49) resolving to a directory that does not exist on lxw, so the enabled 24h piggyback is a permanent no-op.
+- **`dev-checkout-root-dir-inference.md`** (M) — The test-process fence still stands and neither unfixed half moved — no WIKI_VAULT override, no refuse-to-run-from-a-checkout guard, no whole-vault tmp fixture — so a `wiki flush` or dashboard regen run from the repo still writes `_dashboard-*.md` next to the checkout; pick one of the three sketched options or record "leave it" as the decision.
+- **`gbrain-comparison.md`** (M ·partial) — Two never-broken-out sub-items remain — per-folder `RESOLVER.md` files in each `knowledge/<type>/` plus a lint check, and an IR-style eval bench (`evals/queries.jsonl` + replay) to make compile-quality claims measurable instead of anecdotal; the doc itself should be demoted to a reference artifact since its three headline candidates are all in production.
+- **`readme-polish.md`** (M) — Record a `wiki setup → status → compile` hero cast, add adopter logos and a community link — all three remain gated on facts that have not changed (no adopters, no willingness to staff support), and this is README polish with no bearing on intake coverage or silent failure.
+- **`search-tools.md`** (M ·partial) — The CLI `wiki search --type/--domain/--author` and `wiki recent` still do not exist; the M029 desktop Browse window already covers the type-filter and recency slice for a human, so what remains is the agent-facing CLI form plus the domain/author axes — and the document's own revisit trigger has not fired.
+- **`vault-dashboard.md`** (M ·partial) — Either give state/history.jsonl a reader (the S05 time-series charts it was built for) and add the daily-activity heatmap the installed plugin is waiting on, or drop both and stop paying for a write-only log and a dead plugin.
+- **`voice-openwhispr.md`** (M) — Neither path is closed: the SQLite reader-kind is unbuilt, and the doc's Path-A premise (OpenWhispr's own export toggle) is still unverified — docs/setup-voice.md:198 tells the operator to use a setting they reported not finding in v1.7.0.
+- **`codex-distill-verbose.md`** (S) — Untouched: either add the tool-activity summarisation (drop apply_patch hunk bodies, keep the file list) or close it deliberately as won't-fix — but not on the strength of an artifact the coalescing logic overwrites.
+- **`correct-apply-edited-underreport.md`** (S) — Either strengthen prompts/correct_apply.md to demand every Write/Edit target under `edited`, or stop echoing the agent's advisory `edited`/`superseded` lists and print only the git/snapshot-derived delta.
+- **`dream-insufficient-corpus-backoff.md`** (S ·partial) — Option 1 is in the code exactly as the doc claims and the cost leak is capped at ~$1/30d, so what remains is the deliberately deferred v2 (store the mention-count at backoff time and clear the entry when it grows, cutting re-try latency when real substrate lands mid-window) plus the unbuilt option 2 mention-scan precision — neither is worth building until the staleness is actually observed.
+- **`gmail-personal-consumer-account-gap.md`** (S) — No engineering path remains to build — this is a decision record awaiting a constraint relaxation, with one concrete defect worth fixing: `_check_one_token` (health.py:687-688) still attaches `fix="wiki gmail-auth gmail-personal"` and dispatchable `dispatch_args` to the info result, so `wiki doctor` hands the operator a button that can only return Google 403 `org_internal`.
+- **`gmeet-email-discovery-infographic.md`** (S) — Extend the gmeet box description in both `.excalidraw` files to note the two discovery sources (own-Drive folder scan + email-announced colleague meetings), re-render, and run the three mandatory gates from CLAUDE.md (bbox-overlap scan, glyph-width scan, zoom-crop review at ≥1600px).
+- **`m005-infographics-extension.md`** (S ·partial) — Only deferred item #2 remains: annotate vault-tour.excalidraw's knowledge/projects/ entry with the two-layer entity shape, then re-render vault-tour.png (which README.md:94 uses as a public hero image).
+- **`memories-decision-doubt.md`** (S ·partial) — Core reversal is done and heavily exercised; the single named follow-up remains — re-promote `raw/memories/` to a first-class substrate node in docs/architecture.excalidraw (and re-render), which the project's own infographics-track-engine rule requires.
+- **`pictures-followups.md`** (S ·partial) — Fix the config.example.yaml archive-path drift and add the pictures node to both infographics; the HEIC path stays wait-and-see and the archive-size question is moot for now since the collector has been idle since 2026-06-14.
+- **`postcompact-only-injection.md`** (S) — Add a `source` check to hooks/session-start.py so injection fires only on compaction/resume — but the doc's own gate ("≥2 weeks of observation data") has been open ~3 months with zero data collected, and `wiki publish`/meinkontext MCP (M030) has since weakened the discoverability risk this was trading against.
+- **`seed-semantic-diff.md`** (S ·partial) — Add a per-file ignore-list for Obsidian runtime UI keys (close, collapse-*, scale, plus the shellcommands icon field) so --check stops reporting drift that no operator action can clear.
+- **`token-usage-accounting.md`** (S ·partial) — Replace templates/_dashboard-stats.md line 17 with the 🔢 token line and add the missing `total_tokens_lifetime: 0` frontmatter key so a freshly seeded (or `wiki seed --force`d) vault matches what dashboard_stats.py writes, then file the doc into backlog/shipped/.
+- **`voice-punctuate-followups.md`** (S ·partial) — Only the optional `wiki backfill voice-punctuation` pass over the 38 pre-2026-05-17 notes remains, and those are short test transcripts in a substrate that has been idle since 2026-06-12.
 
-- **`screenshots-intake.md`** — Tier 3+4 still open (Tier 0-2 shipped).
-- **`youtube-intake.md`** — T3-cloud + curiosity-loop + dashboard open (T0-T3-local shipped).
-- **`imap-reader-and-gmail-strategy.md`** — generic IMAP shipped; internal-OAuth-app strategy doc.
-- **`browser-history-collector.md`** — Firefox/Chrome history → raw/notes/browser/.
-- **`github-activity-collector.md`** — issues/PRs/comments → raw/notes/github/.
-- **`reading-highlights-collector.md`** — Readwise/Kindle/Pocket → raw/notes/highlights/.
-- **`music-listening-collector.md`** — Spotify/Apple Music → raw/notes/music/.
-- **`llm-transcripts-collector.md`** — Claude/ChatGPT export → raw/transcripts/llm/.
-- **`dms-collector.md`** — Slack/iMessage/WhatsApp → raw/notes/dms/.
-- **`nas-ingest.md`** — local NAS file-tree as substrate.
-- **`sunoflow-collector.md`** — Suno music-generation history (2026-05-15 self-cartography arc).
+## ✅ Shipped — moved into `shipped/` on 2026-08-27
 
-## 📚 Research / cluster / forward-looking
+Kept here as the record of what this reconcile retired. One did NOT move:
+**`imap-reader-and-gmail-strategy.md`** stays in the working set because filing it
+would bury the org-side Internal-OAuth-app note it still carries — relocate that
+into a setup doc first, then move it.
 
-Living docs, not actionable wedges. Read when adjacent work surfaces them.
 
-- **`architecture-deepening.md`** — 13 candidates + 6 M003 framings (do NOT re-run `improve-codebase-architecture`).
-- **`architecture-scaling-2028.md`** — 4-lever sequence for 5k+ articles (subtype-axis → MOC-first → lifecycle-tier → recursive-dream-cycle).
-- **`gbrain-comparison.md`** — gbrain pattern lift (entity-pages + takes + dream-cycle all shipped from this cluster; remaining ideas live here).
-- **`karpathy-comparison.md`** — Karpathy-pattern comparison cluster.
-- **`company-brain-federation.md`** — pre-office-hours findings (Alex+Sid, 2026-06-13): llm-wiki as a *company* wiki via federation (personal vaults ⊕ fail-closed channel ⊕ company reconciliation brain) + critique of Suh's single-timeline thesis. **Feeds the planned company-brain office-hours.** Condensed open work: scope-as-compile-axis · fail-closed promote channel (reuse M027) · cross-vault entity identity + multi-author reconciliation (Takes/Connections seed).
-- **`collectors.md`** — parent collector-pattern doc.
-- **`vault-dashboard.md`** — original vault-UX design doc; M003 dashboard shipped most of it.
-- **`obsidian-plugin.md`** — engine-as-plugin idea (ready, not actionable now).
-- **`seed-semantic-diff.md`** — semantic-diff for `wiki seed` operator-preference preservation.
-- **`readme-polish.md`** — deferred README polish items pending engine stability.
-- **`cleanup-followups.md`** — accumulated cleanup notes.
+- **`codex-session-capture.md`** — Shipped 2026-07-14 (fed2e05): a format-sniffing transcript reader parses Codex rollouts, resolves them by session-id glob when the hook path is wrong, and coalesces to one sentinel-wrapped block per session per day — only the `git mv` into .ytstack/backlog/shipped/ remains.
+- **`compile-dispatch-seam.md`** — Shipped in full as M026 (4 slices) with both S04 follow-ups since closed -- move the file to backlog/shipped/.
+- **`concept-consistency-routine.md`** — Fully shipped and now operator-enabled with a live --apply run on record -- move the file to backlog/shipped/ (its Decision C cost-knob text is stale but no work remains).
+- **`dashboard-graph-scan-dedupe.md`** — The corpus link-graph scan is computed once per flush by dashboard_stats and consumed from STATE_DIR/dashboard-lint-results.json by dashboard_lint; lint refresh dropped from ~10s to 0.3s and the 120s timeout class is gone — only `git mv` of the doc into .ytstack/backlog/shipped/ remains.
+- **`folder-curiosity-candidate-index.md`** — Numbered-candidate-index gap schema shipped: the folder-curiosity producer hands the local model a ranked numbered candidate list and takes back an integer, resolving it to (root_id, file_path) in Python, with out-of-range picks dropped as candidate_invalid — verified live on lxw with 49 organic requests, no placeholder paths, all confidences at or above the operator threshold.
+- **`imap-reader-and-gmail-strategy.md`** — Generic IMAP reader shipped and running live on lxw; git mv the file to shipped/ and relocate the org-side Internal-OAuth-app note into a setup doc first.
+- **`interactive-cli.md`** — Home screen, context probe, category browse and single-source command catalog all shipped and were surpassed; move the file to shipped/ alongside python-interactive-menu.md.
+- **`study-run-due-piggyback-audit.md`** — Audit ran clean end-to-end — piggyback fires, honours the weekly schedule, locks per study, and max_per_run is a non-issue; file can move to backlog/shipped/.
+- **`venv-integrity-check.md`** — Nothing to build — move the doc to .ytstack/backlog/shipped/venv-integrity-check.md; note only that the check is non-quick by design, so it fires on an operator-initiated `wiki doctor`, not on the silent piggyback path that motivated it.
+- **`voice-intake.md`** — Nothing to build — move the doc to .ytstack/backlog/shipped/voice-intake.md; live follow-ups stay owned by voice-openwhispr.md, voice-punctuate-followups.md and voice-source-ref-and-intent-producer.md.
+- **`voice-source-ref-and-intent-producer.md`** — Shipped whole: voice source-refs moved to daily-rollup `sources:` frontmatter (with the ALL-backfill applied to every historical file), and the intents producer + IntentHandler registry + workspace/ layer + wiki triage CLI + triage.html + dashboard panel + orchestrate-tasks spec run in production on lxw; only the explicitly-deferred fact/research/question/event handlers remain as extension points.
+- **`ytstack-hook-exit-code.md`** — Shipped and live: the hook is advisory exit 0 with a `.ytstack/**` + meta-file whitelist, published as ytstack 0.1.6 and present in this machine's installed plugin cache; only hygiene remains -- git mv the file into .ytstack/backlog/shipped/ and delete its stale entry at .ytstack/backlog/PRIORITY.md:13, which still advertises the bug in the Hot list.
 
-## ✅ Done — in `shipped/`
+## ⚰️ Superseded / stale premise — re-read before acting
 
-29 files moved 2026-05-17. M005-M020 + ad-hoc arcs: areas-bucket, author-attribution, calendar-collector, compile-{60kb, 1m-fallback, per-call-timeout, role-axis, scope-allowlist}, connection-quality, curiosity-consumer-gap, domain-frontmatter, dream-{cycle, priority-config, sampled-activation}, entity-pages-state-timeline, gmeet-collector, health-collector, jamie-intake + multi-tenant-lift, m019-diagrams-update, m020-infographic-update, operator-self-reports, producer-seam, python-interactive-menu, takes-substrate, use-llm-wiki-skill, vault-health-doctor, watermark-on-failure-fix, agents-template-scanner-resync.
+- **`cleanup-followups.md`** (SUPERSEDED) — Close the file: the only survivor is ten inert dead patterns in the operator's own vault .gitignore, which no engine check covers and which cost nothing where they sit.
+- **`karpathy-comparison.md`** (SUPERSEDED) — Archive the pre-M001 draft to shipped/ (or rejected/) since docs/PRINCIPLES.md publishes its substance with better attribution — salvage only the naive-PKM migration guide if it is wanted for README onboarding.
+- **`llm-transcripts-collector.md`** (STALE_PREMISE) — Rewrite the item around what is actually dark — claude.ai/ChatGPT ZIP exports and Cursor's state.vscdb — delete the Phase-1 Claude Code walker, but keep the privacy denylist/redaction item, which is now an unmitigated gap in the shipped hook path.
 
-**2026-05-31:** `entity-dedup` (#3) + `dream-web-research` (#2) shipped + live-verified on lxw (issues CLOSED) → `shipped/`. Same session: a seed-robustness / config-overlay arc (engine v0.1.1→0.1.6) — targeted seed, JSON-order-aware drift, `.env` additive merge, shell-commands array-merge fix, **config overlays** (`template ⊕ untracked operator overlay`; DECISIONS 2026-05-31), uv.lock-sync rule. Full arc: `.ytstack/AD-HOC-issues-2-3-and-seed-overlay-SUMMARY.md`.
+## How to keep this honest
 
-## ❌ Rejected — in `rejected/`
+Re-reconcile at every milestone close, and re-derive from the code — a backlog item
+describes the world on the day it was written. When something ships, `git mv` it into
+`shipped/`; when it is rejected, into `rejected/`. An item not listed here is invisible
+to anyone glancing for the next move, so every file left in the working set must appear
+in one of the live sections above — check with:
 
-`lateral-linking.md` (Tag-Jaccard "Related" rejected after audit re-verify) · `meetily-intake.md` (rejected during Jamie eval).
+```sh
+comm -23 <(ls .ytstack/backlog/*.md | xargs -n1 basename | grep -v PRIORITY | sort) \
+         <(grep -oE '`[a-z0-9.-]+\.md`' .ytstack/backlog/PRIORITY.md | tr -d '`' | sort -u)
+```
+
+Empty output means the index covers the directory. It printed 28 filenames before this
+reconcile.
