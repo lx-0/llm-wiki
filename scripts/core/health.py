@@ -1019,7 +1019,7 @@ def check_piggyback_health(
     results: list[CheckResult] = []
     never_ran: list[str] = []
     stale: list[tuple[str, datetime, int]] = []
-    fresh_runs: list[datetime] = []
+    all_runs: list[datetime] = []   # every task's last_run, for the idle test
     healthy = 0
     for task in sorted(tasks, key=lambda t: str(t.get("name", ""))):
         name = str(task.get("name", ""))
@@ -1032,6 +1032,8 @@ def check_piggyback_health(
         last_error = entry.get("last_error")
         started = _parse_ts(entry.get("started"))
         last_run = _parse_ts(entry.get("last_run")) or _parse_ts(entry.get("ended"))
+        if last_run is not None:
+            all_runs.append(last_run)
 
         if status == "timeout" or status.startswith(("failed:", "error:")):
             detail = f" — {last_error}" if last_error else ""
@@ -1057,8 +1059,6 @@ def check_piggyback_health(
         if last_run is not None and (now - last_run).total_seconds() > stale_after_s:
             stale.append((name, last_run, cooldown_hours))
             continue
-        if last_run is not None:
-            fresh_runs.append(last_run)
         healthy += 1
 
     # One idle pipeline is ONE finding. Because every piggyback fires from the
@@ -1068,13 +1068,14 @@ def check_piggyback_health(
     # dark while OTHERS fired recently is the opposite: genuinely broken, and
     # still reported on its own.
     if stale:
-        newest_fire = max((lr for _, lr, _ in stale), default=None)
-        for other in fresh_runs:
-            if newest_fire is None or other > newest_fire:
-                newest_fire = other
+        # "Has the pipeline fired at all lately?" — the newest last_run across
+        # EVERY task, stale or not. Not "are some tasks non-stale": a weekly
+        # task sits comfortably inside a 28-day threshold without having run,
+        # so counting those as evidence of a live pipeline suppressed the
+        # collapse entirely on the live vault (2026-08-27).
+        newest_fire = max(all_runs, default=None)
         pipeline_idle = (
-            not fresh_runs
-            and newest_fire is not None
+            newest_fire is not None
             and (now - newest_fire).total_seconds() > stale_floor_s
         )
         if pipeline_idle and len(stale) >= 3:
