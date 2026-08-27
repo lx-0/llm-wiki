@@ -839,6 +839,113 @@ def check_voice_audio_setup() -> CheckResult:
         return _probe_failed("voice-audio-setup", "config", exc)
 
 
+# ── Dependency integrity ────────────────────────────────────────────
+# A venv can rot into a state that looks installed and isn't: correct
+# `.dist-info`, correct version, most modules present — and one subpackage
+# missing, so the top-level import raises. Live 2026-08-26 on the operator's
+# vault: `httpx` without `_transports/`, `claude_agent_sdk` without
+# `mcp.client`, `prompt_toolkit` without a submodule. That is every HTTP
+# surface plus compile / flush / dream / publish down at once, and the only
+# symptom was a piggyback exiting non-zero with no stderr.
+#
+# Suspected cause: the vault lives under `~/Library/Mobile Documents/`, so
+# iCloud can evict `.venv` file contents. Unproven, and it does not matter
+# here — the check is about noticing, not about the cause.
+
+# Distributions whose import name differs from their package name. Only the
+# EXCEPTIONS are data; the list itself is derived from pyproject.toml so it
+# can never drift from what is actually declared.
+_IMPORT_NAME_OVERRIDES: dict[str, str] = {
+    "pyyaml": "yaml",
+    "python-dotenv": "dotenv",
+    "pillow": "PIL",
+    "claude-agent-sdk": "claude_agent_sdk",
+    "youtube-transcript-api": "youtube_transcript_api",
+    "yt-dlp": "yt_dlp",
+    "google-auth": "google.auth",
+    "google-auth-oauthlib": "google_auth_oauthlib",
+    "html2text": "html2text",
+    "imapclient": "imapclient",
+}
+
+
+def _declared_import_names() -> list[str]:
+    """Import names for every distribution in `pyproject.toml`'s
+    `[project].dependencies`, in declaration order."""
+    import tomllib
+
+    data = tomllib.loads((WIKI_DIR / "pyproject.toml").read_text(encoding="utf-8"))
+    out: list[str] = []
+    for spec in data.get("project", {}).get("dependencies", []):
+        # "package>=1.2" / "package[extra]==1" → "package"
+        dist = re.split(r"[<>=!~\[; ]", str(spec).strip(), maxsplit=1)[0].strip().lower()
+        if dist:
+            out.append(_IMPORT_NAME_OVERRIDES.get(dist, dist.replace("-", "_")))
+    return out
+
+
+def _failed_imports(names: list[str]) -> list[tuple[str, str]]:
+    """Import each name in a SUBPROCESS, return [(name, error)] for failures.
+
+    Out-of-process because a half-installed C extension can abort the
+    interpreter — taking doctor down with it — and because importing the
+    engine's heavy deps into the doctor process would slow every run.
+    """
+    if not names:
+        return []
+    probe = (
+        "import importlib, json, sys\n"
+        "out = []\n"
+        "for n in sys.argv[1:]:\n"
+        "    try:\n"
+        "        importlib.import_module(n)\n"
+        "    except BaseException as exc:\n"
+        "        out.append([n, f'{type(exc).__name__}: {exc}'])\n"
+        "print(json.dumps(out))\n"
+    )
+    try:
+        proc = subprocess.run(  # noqa: S603 — argv is engine-derived
+            [sys.executable, "-c", probe, *names],
+            capture_output=True, text=True, timeout=120,
+        )
+    except (subprocess.TimeoutExpired, OSError) as exc:
+        return [("(probe)", f"{type(exc).__name__}: {exc}")]
+    try:
+        return [(n, e) for n, e in json.loads(proc.stdout or "[]")]
+    except (json.JSONDecodeError, TypeError, ValueError):
+        # The probe itself died — that IS a broken environment.
+        detail = (proc.stderr or "no output").strip().splitlines()[-1:]
+        return [("(probe)", detail[0] if detail else "probe produced no output")]
+
+
+def check_dependencies_importable(*, quick: bool = False) -> CheckResult:
+    """Critical if any declared dependency fails to import."""
+    if quick:
+        return CheckResult(
+            id="dependencies-importable", category="config", severity="info",
+            message="dependency import check skipped (--quick)",
+        )
+    try:
+        names = _declared_import_names()
+    except Exception as exc:  # noqa: BLE001
+        return _probe_failed("dependencies-importable", "config", exc)
+
+    failures = _failed_imports(names)
+    if not failures:
+        return CheckResult(
+            id="dependencies-importable", category="config", severity="ok",
+            message=f"all {len(names)} declared dependencies import cleanly",
+        )
+    shown = ", ".join(n for n, _ in failures[:3])
+    more = f" (+{len(failures) - 3} more)" if len(failures) > 3 else ""
+    return CheckResult(
+        id="dependencies-importable", category="config", severity="critical",
+        message=f"{len(failures)} declared dependenc(ies) fail to import: {shown}{more}",
+        fix=f"cd '{WIKI_DIR}' && uv sync --reinstall",
+        details={"failed": [{"module": n, "error": e} for n, e in failures]},
+    )
+
+
 # ── Reliability checks (M031-S04) ───────────────────────────────────
 # The 2026-08-25 audit found three silent-failure classes doctor never
 # surfaced: a piggyback stuck on a failed/timeout outcome, substrates dark
@@ -1035,6 +1142,7 @@ _ALL_CHECKS: list[Callable[..., CheckResult | list[CheckResult]]] = [
     check_voice_audio_setup,
     check_piggyback_health,
     check_index_drift,
+    check_dependencies_importable,
 ]
 
 
