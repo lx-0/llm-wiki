@@ -12,6 +12,26 @@ parallel_milestones: [M021, M025, M027, M029]
 
 # State
 
+**POST-M031 SWEEP 2026-08-27 — backlog reconciled, four more silent failures closed.** The
+backlog index was a post-M020 snapshot (2026-05-17) claiming 52 items against 83 files, with
+28 files unmentioned — a third of it invisible. All 83 re-derived against the CODE by a
+verified fan-out (every shipped/superseded verdict independently refuted first): 31 open ·
+37 partial · 12 shipped · 2 superseded · 1 dead premise. 11 filed into `shipped/` (working
+set 83 → 72); `PRIORITY.md` now carries an executable coverage check instead of a drifting
+count. Shipped alongside: `wiki doctor` dependency-integrity check (the partially-materialized
+venv class that killed compile/flush/publish at once), idle-pipeline collapse (banner 10 → 3
+warnings; its first gate was unreachable on real data and was re-fixed), the suggestions
+source-glob fix (`raw/email/*.md` → `raw/notes/email/*.md` — a fully built subsystem had been
+idle since 2026-05-17 with no error anywhere), and the missing regression guard on the
+M031-S01 flush-outage fix. Suite 1945 green, all pushed.
+
+**Operator-facing findings from the sweep (not engine work):** kcma-d8 is DOWN again
+(0/8 TCP connects, verified 2026-08-27) · screenpipe capture has been dead since
+2026-08-21 — `launchctl` shows only the watchdog loaded, not `com.alex.screenpipe`, so a
+4.9 GB db has stopped growing · 706 curiosity requests pending, ~664 of them duplicates
+across 13 folder-keys, each costing a compile pass when it drains · the youtube piggyback
+is a permanent no-op (its inbox path does not exist on lxw).
+
 **M031 RELIABILITY WAVE COMPLETE 2026-08-26 — all 4 slices, released 0.5.0 → 0.5.1, pushed (`3a558d3`).** S01 flush outage (root cause: host-MCP schema injection; queue 234 → 0, incl. one context stranded since July by a silent `pending()` drop). S02 deterministic index sync + `wiki reindex`. S03 small-fix package. S04 doctor `piggyback-health` + `index-drift`, docs/CHANGELOG/infographics.
 
 **Then the arc audited itself and found its own work wanting** — 4-dimension adversarial workflow, 24 confirmed findings, 3 in code shipped hours earlier and already propagated: `models.compile_model` was declared dead from ONE consumer and its Haiku flip silently downgraded `wiki correct apply` (reverted; compile fall-through moved to its own knob); the bash-bracket wikilink guard reached only half its consumers (`extract_wikilinks` carried a second grammar — now delegated, 21 phantom lint errors gone, live-measured 295 → 274 with 0 bash-shaped); the dollar counter was half-retired with four live readers (finished). Plus 7 config knobs that reached no operator vault because the never-inject policy rested on an uncheckable premise, and `lint.py` had grown a hardcoded copy of the operator's project names as fallback for a knob no vault could set. All fixed, migrated live, suite 1917 green. Lessons in `KNOWLEDGE.md` (2 new entries) + `CLAUDE.md` (consumer-grep rule, push rule).
