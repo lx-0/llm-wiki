@@ -1018,6 +1018,8 @@ def check_piggyback_health(
 
     results: list[CheckResult] = []
     never_ran: list[str] = []
+    stale: list[tuple[str, datetime, int]] = []
+    fresh_runs: list[datetime] = []
     healthy = 0
     for task in sorted(tasks, key=lambda t: str(t.get("name", ""))):
         name = str(task.get("name", ""))
@@ -1053,15 +1055,47 @@ def check_piggyback_health(
         # would flag every 1h task (live false positive: voice at 12h).
         stale_after_s = max(stale_factor * cooldown_hours * 3600, stale_floor_s)
         if last_run is not None and (now - last_run).total_seconds() > stale_after_s:
-            age_days = (now - last_run).total_seconds() / 86_400
-            results.append(CheckResult(
-                id=f"piggyback-{name}", category="pipeline", severity="warning",
-                message=(f"piggyback {name}: no fire for {age_days:.1f}d "
-                         f"(cadence {cooldown_hours}h) — substrate dark"),
-                fix="run `wiki compile` (piggybacks_on_compile) or check flush.py runs",
-            ))
+            stale.append((name, last_run, cooldown_hours))
             continue
+        if last_run is not None:
+            fresh_runs.append(last_run)
         healthy += 1
+
+    # One idle pipeline is ONE finding. Because every piggyback fires from the
+    # same trigger, an operator who simply hasn't compiled for two days used to
+    # get a warning per task — eight of them, all restating one fact, which
+    # trains the reader to skim the banner (live 2026-08-27). A task that is
+    # dark while OTHERS fired recently is the opposite: genuinely broken, and
+    # still reported on its own.
+    if stale:
+        newest_fire = max((lr for _, lr, _ in stale), default=None)
+        for other in fresh_runs:
+            if newest_fire is None or other > newest_fire:
+                newest_fire = other
+        pipeline_idle = (
+            not fresh_runs
+            and newest_fire is not None
+            and (now - newest_fire).total_seconds() > stale_floor_s
+        )
+        if pipeline_idle and len(stale) >= 3:
+            age_days = (now - newest_fire).total_seconds() / 86_400
+            results.append(CheckResult(
+                id="piggyback-pipeline-idle", category="pipeline", severity="warning",
+                message=(f"pipeline idle for {age_days:.1f}d — {len(stale)} piggyback(s) "
+                         f"past their cadence ({', '.join(n for n, _, _ in stale[:4])}"
+                         f"{'…' if len(stale) > 4 else ''})"),
+                fix="run `wiki compile` — piggybacks drain from it (piggybacks_on_compile)",
+                details={"stale": [n for n, _, _ in stale]},
+            ))
+        else:
+            for name, last_run, cooldown_hours in stale:
+                age_days = (now - last_run).total_seconds() / 86_400
+                results.append(CheckResult(
+                    id=f"piggyback-{name}", category="pipeline", severity="warning",
+                    message=(f"piggyback {name}: no fire for {age_days:.1f}d "
+                             f"(cadence {cooldown_hours}h) — substrate dark"),
+                    fix="run `wiki compile` (piggybacks_on_compile) or check flush.py runs",
+                ))
 
     if never_ran:
         results.append(CheckResult(

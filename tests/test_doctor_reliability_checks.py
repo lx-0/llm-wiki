@@ -151,6 +151,54 @@ def test_disabled_task_ignored(tmp_path, piggy_config):
     assert [r.severity for r in results] == ["ok"]
 
 
+def test_idle_pipeline_collapses_into_one_warning(tmp_path, monkeypatch):
+    """Live 2026-08-27: the operator had not compiled for 1.7 days, and doctor
+    printed EIGHT 'substrate dark' warnings — one per task, all describing the
+    same single fact. A banner where most lines repeat one root cause trains
+    the reader to skim past it. Piggybacks fire from compile/flush, so when
+    they are all stale together the finding is 'the pipeline is idle', once."""
+    from core.config import CONFIG
+
+    monkeypatch.setattr(health, "_piggyback_tasks", lambda: [
+        {"name": n, "cooldown_hours": 6} for n in ("calendar", "gmeet", "jamie", "voice")
+    ])
+    monkeypatch.setattr(CONFIG.limits, "doctor_piggyback_stale_factor", 4)
+    monkeypatch.setattr(CONFIG.limits, "doctor_piggyback_stale_min_hours", 24)
+
+    last = _iso(NOW - timedelta(days=1, hours=17))
+    sf = _state_file(tmp_path, {
+        n: {"status": "ok", "last_run": last} for n in ("calendar", "gmeet", "jamie", "voice")
+    })
+    results = health.check_piggyback_health(state_file=sf, now=NOW)
+    warns = [r for r in results if r.severity == "warning"]
+    assert len(warns) == 1, [r.message for r in warns]
+    assert "pipeline" in warns[0].message.lower()
+    assert "4" in warns[0].message  # names how many tasks it covers
+
+
+def test_one_task_dark_while_the_pipeline_runs_still_warns_individually(tmp_path, monkeypatch):
+    """The signal that must NOT be collapsed: everything else fired recently,
+    so this task is genuinely broken rather than merely un-triggered."""
+    from core.config import CONFIG
+
+    monkeypatch.setattr(health, "_piggyback_tasks", lambda: [
+        {"name": n, "cooldown_hours": 6} for n in ("calendar", "gmeet", "jamie")
+    ])
+    monkeypatch.setattr(CONFIG.limits, "doctor_piggyback_stale_factor", 4)
+    monkeypatch.setattr(CONFIG.limits, "doctor_piggyback_stale_min_hours", 24)
+
+    sf = _state_file(tmp_path, {
+        "calendar": {"status": "ok", "last_run": _iso(NOW - timedelta(hours=2))},
+        "jamie": {"status": "ok", "last_run": _iso(NOW - timedelta(hours=3))},
+        "gmeet": {"status": "ok", "last_run": _iso(NOW - timedelta(days=21))},
+    })
+    results = health.check_piggyback_health(state_file=sf, now=NOW)
+    warns = [r for r in results if r.severity == "warning"]
+    assert len(warns) == 1
+    assert "gmeet" in warns[0].message
+    assert "pipeline" not in warns[0].message.lower()
+
+
 def test_piggyback_never_ran_is_info(tmp_path, piggy_config):
     sf = _state_file(tmp_path, {})
     results = health.check_piggyback_health(state_file=sf, now=NOW)
