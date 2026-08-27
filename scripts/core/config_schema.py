@@ -725,8 +725,13 @@ class Features:
     # legacy hardcoded `_is_email_source` filter; widen the list to enable
     # suggestions for other substrates (e.g. raw/transcripts/*). Evaluated by
     # producers.orchestrate at compile time (Producer-seam arc, S03).
+    # Matched with fnmatch against the source path RELATIVE TO THE VAULT ROOT.
+    # It read `raw/email/*.md` from 2026-05-17 to 2026-08-27 — a directory the
+    # engine never writes; the email collector lands in `raw/notes/email/`. The
+    # gate therefore matched nothing and the whole suggestions subsystem sat
+    # idle for months without an error anywhere (found by backlog reconcile).
     suggestions_source_globs: list[str] = field(default_factory=lambda: [
-        "raw/email/*.md",
+        "raw/notes/email/*.md",
     ])
     # Pre-process voice transcripts through the local classify_model (Ollama)
     # to add punctuation, sentence-case, and German-noun capitalization. The

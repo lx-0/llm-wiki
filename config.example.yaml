@@ -572,8 +572,12 @@ features:
   # fnmatch patterns matched against source paths relative to ROOT_DIR.
   # Default mirrors the legacy hardcoded `_is_email_source` filter; widen to
   # enable suggestions for other substrates.
+  # Matched against the source path RELATIVE TO THE VAULT ROOT — a glob that
+  # names the wrong directory matches nothing and the producer silently never
+  # runs (this said `raw/email/*.md` until 2026-08-27; email lands under
+  # `raw/notes/email/`).
   suggestions_source_globs:
-    - "raw/email/*.md"
+    - "raw/notes/email/*.md"
   # Path-scope enforcement for compile + dream agent Write/Edit calls via a
   # `can_use_tool` callback (Python-side gate). The previous defense —
   # `"Write(knowledge/**)"` / `"Edit(knowledge/**)"` in `--allowedTools` —

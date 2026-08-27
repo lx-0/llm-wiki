@@ -90,7 +90,7 @@ The `.env` file: only the **variable NAME** lives in `config.yaml` (e.g. `api_ke
 | `features.extract_takes` | `false` | M011 takes substrate. Default OFF — flip True after dogfooding. |
 | `features.extract_intents` | `false` | Intent extraction (intent-dispatch). Post-compile pass that classifies an intake note (voice first) into an intent {kind, summary, confidence} and routes it to a per-kind handler (the `task` handler writes an operator- facing record to … |
 | `features.dream_web_research` | `false` | Dream web-research (issue #2). When True, `wiki dream <slug>` runs a post-pass that researches PUBLIC entities (founders, execs, speakers) via Exa AI and writes a sentinel-managed `## Public Profile` block. |
-| `features.suggestions_source_globs` | `["raw/email/*.md"]` | Source-glob allowlist for the suggestions post-pass. |
+| `features.suggestions_source_globs` | `["raw/notes/email/*.md"]` | Source-glob allowlist for the suggestions post-pass. |
 | `features.voice_punctuate` | `true` | Pre-process voice transcripts through the local classify_model (Ollama) to add punctuation, sentence-case, and German-noun capitalization. |
 | `features.compile_callback_gate` | `true` | Path-scope enforcement for compile + dream agent Write/Edit calls via a `can_use_tool` callback (Python-side gate). |
 | `features.extract_picture_metadata` | `true` | Deterministic per-picture metadata extraction (EXIF + Android screenshot filename pattern). |

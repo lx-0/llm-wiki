@@ -259,6 +259,18 @@ VALUE_UPGRADES: dict[str, dict[object, object]] = {
     "limits.youtube_vision_timeout_s": {90: 240},
 }
 
+# List-valued equivalents of VALUE_UPGRADES: an operator list still holding a
+# superseded engine default is rewritten wholesale. Only an EXACT match of the
+# old list is replaced, so a widened/tuned list survives untouched.
+#   2026-08-27: features.suggestions_source_globs pointed at `raw/email/*.md`,
+#   a directory the engine never writes (email lands in `raw/notes/email/`),
+#   so the suggestions producer never fired.
+LIST_VALUE_UPGRADES: dict[str, tuple[list, list]] = {
+    "features.suggestions_source_globs": (
+        ["raw/email/*.md"], ["raw/notes/email/*.md"],
+    ),
+}
+
 # ── Injection policy ────────────────────────────────────────────────────
 # WHICH keys the migration injects into operator vaults is a curated policy
 # choice, not a schema derivative: keys that predate the migration era are
@@ -929,6 +941,17 @@ def migrate_value_upgrades(data: dict) -> list[str]:
         if not isinstance(cur, bool) and cur in mapping:
             block[key] = mapping[cur]
             changes.append(f"upgraded {path} {cur!r} → {mapping[cur]!r}")
+
+    for path, (old, new) in LIST_VALUE_UPGRADES.items():
+        parent_name, _, key = path.partition(".")
+        if not key:
+            continue
+        block = data.get(parent_name)
+        if not isinstance(block, dict):
+            continue
+        if block.get(key) == old:
+            block[key] = list(new)
+            changes.append(f"upgraded {path} {old!r} → {new!r}")
     return changes
 
 
