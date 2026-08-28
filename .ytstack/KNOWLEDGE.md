@@ -2820,6 +2820,42 @@ The drift test asserted each knob is in **exactly one** table, never the **right
 
 Policy classes must be checkable by reading the VALUE's nature (secret → `.claude/.env`, per-install path, operator-authored structure, engine-internal tuning), never by asserting history. NEVER_INJECTED is frozen so a new knob can't be appended by prefix-adjacency — the mistake that started this: three M031 knobs were pasted next to `gmeet_request_timeout_s`, which lives in the never-inject table, and `wiki update` answered "already on the current key schema". When removing a hardcoded fallback, migrate its value into configs that predate the knob (`migrate_domain_tags_seed`) so behaviour is preserved rather than silently changed.
 
+## An index that does not cover its corpus is worse than no index (2026-08-27)
+
+### Lesson
+
+Two of them turned up in the same session, with the same shape and the same silence:
+
+- **`MEMORY.md`** had grown to 42 KB against a 24 KB read limit. Everything past the limit is dropped at load, so the tail entries were invisible while the file looked complete — nothing errors, the index just quietly stops covering its own directory.
+- **`.ytstack/backlog/PRIORITY.md`** was a snapshot from before eleven milestones shipped: 52 claimed items against 83 files, 28 filenames never mentioned. An agent glancing there for "what's next" saw a third of the backlog as non-existent.
+
+Both failed the same way an over-tight health check does: the artifact is present, it renders, and it is wrong in a direction nobody is looking. The corpus grows continuously; the index is written once and then trusted forever.
+
+### Fix
+
+Give every index an **executable coverage check** and put it IN the index, so the next reader can run it:
+
+```sh
+comm -23 <(ls .ytstack/backlog/*.md | xargs -n1 basename | grep -v PRIORITY | sort) \
+         <(grep -oE '`[a-z0-9.-]+\.md`' .ytstack/backlog/PRIORITY.md | tr -d '`' | sort -u)
+```
+
+Empty output = the index covers the directory. A count in prose ("52 open") does not survive contact with a growing directory; a diff does. For the memory index the equivalent constraint is the byte limit — when it is exceeded, split (`MEMORY-archive.md`) rather than truncate, because delisting and deleting are the same thing to a reader.
+
+## A guard written from the status quo ratifies the status quo (2026-08-26/27)
+
+### Lesson
+
+Three times in two days, a guard added to prevent a class was itself shaped by the broken state it was written next to:
+
+1. The config drift test asserted every knob is in **exactly one** policy table — never the RIGHT one. Moving three keys between tables changed no test outcome, which is precisely how three new knobs landed in `NEVER_INJECTED` and never reached the operator's config.
+2. The freeze test added to fix that snapshotted `NEVER_INJECTED` **as it was**, certifying eight pre-existing misfilings as correct in perpetuity.
+3. The idle-pipeline collapse shipped with a gate ("are any tasks non-stale") that was unreachable on real data, because a weekly task sits inside its own generous threshold without ever running. It passed its tests and did nothing.
+
+### Fix
+
+A guard is not done when it passes on the fixed code — **it is done when it has been observed to FAIL on the bug it exists to catch**. Reintroduce the defect in memory (monkeypatch the table, mutate the source string, feed the real-world state file) and watch the assertion fire; the cost is one throwaway probe. And when the guard is a snapshot of current state, ask separately whether that state is correct — freezing is not validating.
+
 ## "Ollama is down" is a hypothesis, not a diagnosis — three layers can produce it (2026-08-26)
 
 ### Lesson

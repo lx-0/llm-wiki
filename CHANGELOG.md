@@ -18,6 +18,68 @@ every operator's `wiki update` → `uv sync` regenerate `uv.lock` and dirty thei
 config keys must also be wired into `scripts/migrations/migrate_config_keys.py`
 in the same commit.
 
+## [0.5.2] — 2026-08-28
+
+Health signals that tell the truth, and the backlog index rebuilt from the
+code. Every fix here was found by running the engine against the operator's
+live vault rather than by reading it — including four in checks and features
+this project shipped days earlier.
+
+### Added
+
+- **`wiki doctor` dependency check** — imports every dependency declared in
+  `pyproject.toml` (in a subprocess, so a half-installed C extension cannot
+  take the audit down with it) and reports a failure as **critical** with the
+  `uv sync --reinstall` fix. Catches the venv that looks installed and is not:
+  correct version metadata, most modules present, one subpackage missing, and
+  the top-level import raises — which takes down every HTTP surface plus
+  compile, flush, dream and publish simultaneously. Seen live on 2026-08-26.
+
+### Fixed
+
+- **The suggestions producer had never run.** Its source glob pointed at
+  `raw/email/*.md`, a directory the engine does not write — email lands in
+  `raw/notes/email/`. A fully built subsystem (producer, prompt, CLI, IMAP
+  backend, tests) idled from 2026-05-17 with no error anywhere. Operator
+  configs pinned to the broken value are migrated.
+- **`wiki doctor` reported a healthy Ollama host as unreachable.** The probe
+  used a hardcoded 150 ms TCP budget while `limits.ollama_connect_timeout_s`
+  existed for the purpose; against a host answering in 6-41 ms, 2 of 12
+  connects still exceeded it. The budget now derives from that knob, capped so
+  a genuinely dead host cannot stall the audit.
+- **One idle pipeline is one finding.** Piggybacks all fire from the same
+  trigger, so an operator who had not compiled for two days got eight
+  identical "substrate dark" warnings. They collapse into a single
+  `pipeline idle` line; a task dark while others fired recently still reports
+  on its own, because that one is genuinely broken.
+- **A killed piggyback runner left `status: running` forever**, with a dead
+  pid, burying the previous real outcome. It now records `interrupted` on
+  SIGTERM/SIGINT, reaps the child's process group, and re-raises.
+- **Curiosity batches re-dispatched their own quarantine.** Requests parked as
+  `not-answered`/`error`/`stale` were re-selected on every fire, failed
+  instantly, and pinned the piggyback red while 709 real requests never
+  drained. Automated drains skip them; `--walk`, `--list` and an explicit
+  `--run <slug>` still reach them.
+- **`limits.youtube_vision_timeout_s` could not cover a model swap.** On a
+  single-GPU Ollama host, swapping in the vision model measured 63 s of the
+  90 s budget. Raised to 240 s, with a migration for pinned configs.
+- **`wiki update` refused to run from a linked worktree, submodule, or
+  relocated git-dir**, because it tested `.git` as a directory when git also
+  stores it as a pointer file.
+
+### Changed
+
+- **The backlog index is reconciled against the code.** It was a snapshot from
+  before eleven milestones shipped, listing 52 items against 83 files with 28
+  never mentioned. All 83 re-derived from `scripts/`, `tests/`, the changelog
+  and git history, with every "already shipped" verdict independently
+  challenged first; 11 filed away, and the file now carries an executable
+  coverage check instead of a count that drifts.
+- **The dollar-counter retirement is finished** (started in 0.5.1): the query
+  writer, the dashboard field and its template line, the health line and the
+  docs row are gone. Per-run cost still prints; a vault's historical
+  `total_cost` value is left untouched.
+
 ## [0.5.1] — 2026-08-26
 
 An adversarial re-audit of 0.5.0 — the reliability wave checking its own work.

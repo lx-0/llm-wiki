@@ -182,6 +182,19 @@ Agents pick a suggestion from `wiki menu --json` then dispatch via the
 regular bash subcommand (e.g. `wiki compile`). They never ask the menu
 to dispatch — bash stays single source of truth.
 
+### What the reliability checks look for
+
+Four checks exist specifically to surface failures that otherwise produce no
+error anywhere. All are skipped by `--quick` (they cost a subprocess or a
+corpus walk), so they run on an operator-initiated `wiki doctor`:
+
+| Check | Fires when | Why it exists |
+|---|---|---|
+| `dependencies-importable` | any dependency declared in `pyproject.toml` fails to import (**critical**) | A venv can hold a package with correct version metadata and a missing subpackage — the import raises and takes down every HTTP surface plus compile, flush, dream and publish at once. The only symptom otherwise is a piggyback exiting non-zero with empty stderr. Fix: `uv sync --reinstall`. |
+| `piggyback-health` | a task's last run failed or timed out, a run is stuck past the wall-clock cap, or a substrate has gone dark | Piggybacks are fire-and-forget with output to `DEVNULL`; without this their outcome is invisible. A whole fleet stale together collapses into one `pipeline idle` finding — see DECISIONS 2026-08-27. |
+| `index-drift` | `knowledge/index.md` disagrees with the corpus | Dry-runs the reconciler; offers `wiki reindex` as a dispatchable fix. |
+| `ollama-reachable` | the configured Ollama host refuses a TCP connect | Budget derives from `limits.ollama_connect_timeout_s`, capped for the audit. A probe tighter than LAN jitter reports false outages, which is worse than no probe. |
+
 ## Subcommand cheat sheet
 
 Grouped by purpose. Run `wiki <cmd> --help` for the full per-command help block.
@@ -238,6 +251,7 @@ Grouped by purpose. Run `wiki <cmd> --help` for the full per-command help block.
 | `wiki agent daily-digest --var date=YYYY-MM-DD` | run the `daily-digest` agent: read all `daily/<date>/*.md` per-source captures and write a ≤500-word distillation into `daily/<date>.md`. Also runs once-daily as the `daily_digest_yesterday` piggyback. |
 | `wiki lint` | full health check — structural + LLM contradiction sweep ($ cost). Report → `.wiki/reports/lint-YYYY-MM-DD.md`. |
 | `wiki lint --structural-only` | cheap, no-LLM lint — 8 checks (`broken_links`, `orphan_pages`, `orphan_sources`, `stale_articles`, `missing_backlinks`, `article_type`, `sparse_articles`, `facts_violations`). Used by piggyback. |
+| `wiki reindex [--dry-run]` | reconcile `knowledge/index.md` against the corpus — dedupe last-wins, drop dangling rows, append missing ones with first-paragraph summaries. Deterministic, $0, preserves surrounding prose byte-for-byte. Also runs automatically as a post-compile pass; the compile agent is forbidden to edit the index. |
 | `wiki links` | broken-wikilink report — categorizes into media embeds (asset missing), doc placeholders (examples, left alone), and dangling article refs (with fuzzy correction suggestions). Read-only ($0). |
 | `wiki links --fix` | interactively rewrite high-confidence dangling refs (per-item approval): exact basename in a different bucket (≡) or close string match (~). `--yes` auto-applies the ≡ tier only. Missing-article refs are never auto-fixed. |
 | `wiki query "QUESTION"` | ask the knowledge base — picks relevant articles via `knowledge/index.md`, answers via configured query model (LLM cost). |

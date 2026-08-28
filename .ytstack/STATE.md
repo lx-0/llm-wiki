@@ -1,16 +1,40 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-08-26T10:00:00Z
-current_milestone: M031
-active_slice: S01
+last_updated: 2026-08-28T09:00:00Z
+current_milestone: none
+active_slice: none
 active_task: none
-last_completed_milestone: M030
+last_completed_milestone: M031
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
 ---
 
 # State
+
+## ▶ NEXT — no milestone is open; released 0.5.2
+
+M031 closed 2026-08-26, the post-milestone sweep ran 2026-08-27, and the backlog
+is reconciled against the code (`backlog/PRIORITY.md`, 72 in the working set).
+`plan-milestone` has a factual basis for the first time in a while — the three
+candidates the reconcile surfaced, in the order it argues for:
+
+1. **Curiosity dedup + drain** (S, high). 706 requests pending, ~664 duplicates
+   across 13 folder-keys; each costs a Claude compile pass when it drains. The
+   cheapest real money saved in the whole list.
+2. **Flush orphan recovery** (S, high). 29 staged files sit in the `sessions/`
+   root, 8 of whose session-ids appear in NO `daily/` file — captured sessions
+   that never reached the vault, invisible to `pending()` and to doctor.
+3. **MOC auto-maintenance** (L, high, `architecture-scaling-2028.md`). Both
+   triggers the doc set for itself have now fired (1500 index rows, 2000
+   articles); MOC linklists are still 100% manual and the flat 1831-file
+   `concepts/` is the real retrieval bottleneck. This is the next *milestone*;
+   1 and 2 are hours.
+
+Operator-side, unchanged and not engine work: **kcma-d8 is down** (verified
+2026-08-27), **screenpipe has not recorded since 2026-08-21** (`launchctl` shows
+only the watchdog, not `com.alex.screenpipe`), and the youtube piggyback is a
+permanent no-op (its inbox path does not exist on lxw).
 
 **POST-M031 SWEEP 2026-08-27 — backlog reconciled, four more silent failures closed.** The
 backlog index was a post-M020 snapshot (2026-05-17) claiming 52 items against 83 files, with

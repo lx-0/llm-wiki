@@ -17,7 +17,7 @@ Zwei fundamental getrennte Ingest-Pfade konvergieren bei `compile.py`:
 - **Path A** — Automatische Session-Capture (Hooks → daily/ → compile)
 - **Path B** — Kuratierte Quellen (Scanners/Manual/Inbox → raw/ → compile)
 
-## Übersicht — die 15 Prozesse
+## Übersicht — die 18 Prozesse
 
 | # | Process | Was passiert | Trigger |
 |---|---|---|---|
@@ -37,6 +37,8 @@ Zwei fundamental getrennte Ingest-Pfade konvergieren bei `compile.py`:
 | [14](#14-concept-reconciliation) | Concept Reconciliation | Signal-driven autonomous loop: consumes lint fact-violations, auto-reconciles `knowledge/concepts/` against the hard facts they contradict via strict scoped `correct_apply`. Contradictions/quality propose-only. | `wiki reconcile` / `concept_reconcile` piggyback (double-gated OFF) |
 | [15](#15-health-trend-synthesis) | Health-Trend Synthesis | Deterministic ($0, no LLM): aggregates numeric metrics across `raw/notes/health/**` into a sentinel-managed `## Trends` block in `concepts/health.md` (coverage-aware monthly stats + trend arrows). The synthesis consumer per-day stubs lack. | `wiki health-trends` / `health_trends` piggyback (default OFF) |
 | [16](#16-usage-accounting-tokens-per-providermodel) | Usage Accounting | Tokens per `(provider, model)` ledger — every LLM call (Ollama + Claude SDK) records to `state/usage.json`; gates are token/structural, never dollars (Claude subscription + local Ollama). | `core/usage.py` · `wiki usage` |
+| [17](#17-publish-meinkontext-remote-mirror) | Publish | One-way idempotent mirror of the vault's markdown into a managed wiki on the operator's context-mcp server — content-hash delta, fixpoint slugs, retract/restore. | `wiki publish` · `publish` piggyback (6h) |
+| [18](#18-reliability-audits-what-runs-and-on-what-cadence) | Reliability Audits | The layered defence against silent failure: `doctor` checks (venv, piggyback health, index drift, connectivity), structural lint, the periodic full-state vault audit, and the backlog reconcile that keeps the next-move index honest. | operator-initiated · piggyback · at milestone close |
 
 ---
 
@@ -1323,3 +1325,37 @@ flowchart TD
 - **Access-JWT expiry mid-run** → token provider forces one refresh per request on `-32001` and retries.
 - **Transport abort** → progress is already persisted per article; the rerun resumes.
 - **v1 manifests** (knowledge-relative paths) → one-shot layout migration on load; live rollout proved zero phantom retractions.
+
+## 18. Reliability audits (what runs, and on what cadence)
+
+Three of this engine's worst incidents were invisible for weeks — a 99%-failure
+flush outage, an entire feature set dead because its host was off, a producer
+that never fired because its glob named a directory nothing writes. None threw
+an error a human would see. The countermeasures are deliberately split by who
+pays for them:
+
+| Surface | Cadence | Cost | Catches |
+|---|---|---|---|
+| `wiki doctor` (non-quick) | operator-initiated | seconds | broken venv, piggyback outcomes + substrate freshness, index drift, connectivity, config/setup |
+| `wiki doctor --quick` | hooks / home screen | ~50 ms | the subset that needs no subprocess or network |
+| `wiki lint --structural-only` | piggyback | $0 | article-level defects (links, orphans, staleness, schema) |
+| Full-state vault audit | at milestone close, or when a cluster smells | ~an hour | everything the above cannot see: cross-feature clusters, usage reality, cost drift. Report → `.ytstack/reviews/YYYY-MM-DD-*.md` |
+| Backlog reconcile | at milestone close | ~20 min fan-out | backlog items whose premise expired — see below |
+
+**Backlog reconcile.** A backlog item describes the world on the day it was
+written; after a few milestones a third of them are lying. The reconcile shards
+`.ytstack/backlog/*.md` across parallel readers, and each one determines status
+from the CODE (`scripts/`, `tests/`, CHANGELOG, `git log`) rather than from what
+the document claims about itself. Every `SHIPPED`/`SUPERSEDED` verdict is then
+independently challenged before it is accepted — that error direction deletes
+real work from the radar permanently, while an over-cautious `OPEN` costs
+nothing. Shipped items are `git mv`-ed into `backlog/shipped/` in the same pass,
+and `PRIORITY.md` carries an executable coverage check so the index can never
+again silently stop covering its directory (it had 28 unlisted files when this
+was first run, 2026-08-27).
+
+**The audits audit each other.** Two of the checks shipped for this purpose were
+themselves wrong on first contact with live data — the Ollama probe reported a
+healthy host as down, and the piggyback check fanned one idle pipeline into eight
+warnings. Run a new check against the real vault before trusting it, and treat
+its first surprising output as a bug in the check until proven otherwise.
