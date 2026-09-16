@@ -9,11 +9,14 @@ with EMPTY stderr — so the only visible symptom was a retry queue growing to
 ANSI escapes) were investigated and refuted before the real cause was found.
 
 The fix is two flags, and it had NO test: `--strict-mcp-config` plus an empty
-`mcp_servers`, on BOTH paths — `core.sdk_helpers.run_sdk_query` (the harness
-every producer uses) and `scripts/flush.py`, which constructs
-`ClaudeAgentOptions` directly and therefore bypasses the harness entirely.
-A refactor that drops either one silently reopens the outage, which is why
-these assert on the options actually handed to the SDK.
+`mcp_servers`, applied by `core.sdk_helpers.run_sdk_query` — the harness
+every producer uses. `scripts/flush.py` used to construct `ClaudeAgentOptions`
+directly and carry both flags itself; since 2026-09-17 it goes through the
+harness (so structured API errors reach its log — the 2026-09-09→17 outage),
+and the bypass-path tests below became "flush must NOT bypass the harness".
+A refactor that reintroduces a direct `query()` loop in flush silently
+reopens both outages, which is why these assert on the options actually
+handed to the SDK and on the shape of flush's call site.
 """
 
 from __future__ import annotations
@@ -80,7 +83,8 @@ def test_harness_never_loads_host_mcp_servers(captured_options):
     {"allowed_tools": ("Read",), "permission_mode": "default"},
     {"deny_all_writes": True},
     {"model": "claude-haiku-4-5-20251001", "max_turns": 3},
-], ids=["plain", "tools+mode", "deny-writes", "model+turns"])
+    {"tools": (), "setting_sources": ()},
+], ids=["plain", "tools+mode", "deny-writes", "model+turns", "no-tools"])
 def test_harness_isolation_holds_for_every_spec_shape(captured_options, spec_kwargs):
     """The isolation is applied after the branchy per-spec options assembly.
     A refactor that moves a branch below it, or rebuilds options_kwargs, must
@@ -91,43 +95,63 @@ def test_harness_isolation_holds_for_every_spec_shape(captured_options, spec_kwa
     assert "strict-mcp-config" in (seen.get("extra_args") or {})
 
 
-# ── the bypass path ─────────────────────────────────────────────────
+# ── flush's call site ───────────────────────────────────────────────
 
 
-def _flush_extract_options_kwargs() -> dict[str, ast.expr]:
-    """Static read of the ClaudeAgentOptions(...) call inside
-    flush.extract_from_context. Static because importing flush.py pulls the
-    whole engine, and because the point is to catch a REFACTOR that removes
-    the kwargs — which a static read catches even if the call never runs."""
+def _extract_from_context_node() -> ast.AsyncFunctionDef:
+    """Static read of flush.extract_from_context. Static because the point is
+    to catch a REFACTOR of the call site — which a static read catches even
+    if the call never runs."""
     tree = ast.parse((SCRIPTS / "flush.py").read_text(encoding="utf-8"))
     for node in ast.walk(tree):
         if isinstance(node, ast.AsyncFunctionDef) and node.name == "extract_from_context":
-            for call in ast.walk(node):
-                if isinstance(call, ast.Call) and getattr(call.func, "id", "") == "ClaudeAgentOptions":
-                    return {kw.arg: kw.value for kw in call.keywords if kw.arg}
-    raise AssertionError("ClaudeAgentOptions(...) not found in extract_from_context")
+            return node
+    raise AssertionError("extract_from_context not found in flush.py")
 
 
-def test_flush_bypass_path_also_isolates_mcp():
-    kwargs = _flush_extract_options_kwargs()
+def _calls_named(node: ast.AST, name: str) -> list[ast.Call]:
+    return [
+        call for call in ast.walk(node)
+        if isinstance(call, ast.Call) and getattr(call.func, "id", "") == name
+    ]
 
-    servers = kwargs.get("mcp_servers")
-    assert servers is not None, "flush.py bypasses the harness — it must set mcp_servers itself"
-    assert isinstance(servers, ast.Dict) and not servers.keys, "mcp_servers must be empty"
 
-    extra = kwargs.get("extra_args")
-    assert extra is not None and isinstance(extra, ast.Dict)
-    flags = [k.value for k in extra.keys if isinstance(k, ast.Constant)]
-    assert "strict-mcp-config" in flags, (
-        "flush.py must pass --strict-mcp-config; it does not go through run_sdk_query"
+def test_flush_goes_through_the_harness():
+    """flush must not hand-roll `query()` / `ClaudeAgentOptions` again: the
+    harness owns host-MCP isolation AND structured-error classification. A
+    direct loop reopens the 2026-08 (MCP schema) and 2026-09 (silent API
+    refusal) outages at once."""
+    node = _extract_from_context_node()
+    assert not _calls_named(node, "ClaudeAgentOptions"), (
+        "extract_from_context builds ClaudeAgentOptions directly — route it "
+        "through run_sdk_query (SdkCallSpec) instead"
     )
+    assert not _calls_named(node, "query"), "extract_from_context must not call query() directly"
+    assert _calls_named(node, "run_sdk_query"), "extract_from_context must call run_sdk_query"
 
 
 def test_flush_still_requests_zero_tools():
-    """Adjacent invariant from the same call site: `tools=[]` emits an empty
-    base toolset. `allowed_tools=[]` is falsy and the SDK transport skips it,
-    leaving the DEFAULT toolset active — which once turned this summarisation
-    call into an agentic Grep/Read loop over the substrate."""
-    kwargs = _flush_extract_options_kwargs()
+    """Adjacent invariant from the same call site: `tools=()` on the spec
+    emits an empty BASE toolset (`--tools ""`). `allowed_tools=()` is falsy
+    and the SDK transport skips it, leaving the DEFAULT toolset active — which
+    once turned this summarisation call into an agentic Grep/Read loop over
+    the substrate."""
+    specs = _calls_named(_extract_from_context_node(), "SdkCallSpec")
+    assert specs, "extract_from_context must build an SdkCallSpec"
+    kwargs = {kw.arg: kw.value for kw in specs[0].keywords if kw.arg}
     tools = kwargs.get("tools")
-    assert tools is not None and isinstance(tools, ast.List) and not tools.elts
+    assert tools is not None and isinstance(tools, ast.Tuple) and not tools.elts, (
+        "flush's spec must pass tools=() — an empty base toolset, not allowed_tools"
+    )
+
+
+def test_harness_emits_empty_base_toolset_for_tools_spec(captured_options):
+    """The harness side of the same contract: `tools=()` must reach
+    ClaudeAgentOptions as `tools=[]` (truthy-check-proof list), and an unset
+    spec must leave the kwarg out so the CLI default applies."""
+    sh, seen, sentinel = captured_options
+    _run(sh, sentinel, tools=())
+    assert seen.get("tools") == []
+    seen.clear()
+    _run(sh, sentinel)
+    assert "tools" not in seen

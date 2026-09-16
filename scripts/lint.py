@@ -1091,7 +1091,17 @@ async def check_contradictions() -> list[Issue]:
             ),
         ):
             if isinstance(message, ResultMessage):
-                if message.subtype == "success" and message.result:
+                if getattr(message, "is_error", False):
+                    # SDK 0.2.x reports a refused call (bad model, API 400,
+                    # client version floor) as subtype="success" + is_error
+                    # with the API's text in `result`. Without this guard
+                    # that text would be parsed as contradiction findings.
+                    log.error(
+                        "  lint_contradiction ✗ structured error (%s): %s",
+                        message.subtype,
+                        " ".join((message.result or "").split())[:240],
+                    )
+                elif message.subtype == "success" and message.result:
                     result_parts.append(message.result)
     except Exception as exc:
         failure = log_sdk_failure(

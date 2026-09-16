@@ -310,6 +310,110 @@ def test_compile_errors_ignores_old_entries(fake_vault):
     assert result.severity == "ok"
 
 
+# ── check_flush_pipeline ───────────────────────────────────────────
+#
+# 2026-09-09→17: eight days of dead flushes, invisible on every operator
+# surface. These pin the stall signal (failures newer than the last
+# success + repeated spawns) and that the message names the remedy.
+
+
+def _ts(delta_s: float, hook_style: bool = False) -> str:
+    dt = datetime.now() - timedelta(seconds=delta_s)
+    if hook_style:
+        return dt.strftime("%Y-%m-%d %H:%M:%S,000")
+    return dt.strftime("%Y-%m-%dT%H:%M:%S")
+
+
+def _write_flush_logs(vault: Path, flush_lines: list[str], error_lines: list[str],
+                      archived: int = 0) -> None:
+    logs = vault / ".wiki" / "logs"
+    (logs / "flush.log").write_text("\n".join(flush_lines) + "\n")
+    (logs / "flush-errors.log").write_text("\n".join(error_lines) + "\n")
+    failed = vault / ".wiki" / "sessions" / "failed-flushes"
+    failed.mkdir(parents=True, exist_ok=True)
+    for i in range(archived):
+        (failed / f"session-flush-{i}-1.md").write_text("ctx")
+
+
+def test_flush_pipeline_ok_without_log(fake_vault):
+    result = health.check_flush_pipeline()
+    assert result.severity == "ok"
+    assert result.details["archived"] == 0
+
+
+def test_flush_pipeline_critical_when_failures_follow_last_success(fake_vault):
+    _write_flush_logs(
+        fake_vault,
+        flush_lines=[
+            f"{_ts(3 * 86400)}  INFO  Appended to /v/daily/x/sessions.md",
+            f"{_ts(7200, True)} [hook] Spawned flush.py for session a",
+            f"{_ts(3600, True)} [hook] Spawned flush.py for session b",
+            f"{_ts(600, True)} [hook] Spawned flush.py for session a",
+        ],
+        error_lines=[
+            f"{_ts(3500)}  ERROR    flush_extract attempt 1/3 ✗ failed after 2.0s — "
+            "kind=cli_outdated · API refuses the bundled Claude CLI version — bump "
+            "claude-agent-sdk in the engine, then `wiki update`",
+        ],
+        archived=5,
+    )
+    result = health.check_flush_pipeline()
+    assert result.severity == "critical"
+    assert "kind=cli_outdated" in result.message
+    assert "5 archived" in result.message
+    assert result.dispatch_args == ["update"], "cli_outdated is one command away"
+    assert result.details["spawns_since_success"] == 3
+
+
+def test_flush_pipeline_not_stalled_below_spawn_threshold(fake_vault):
+    """One or two spawns after a failure line are in flight, not a stall."""
+    _write_flush_logs(
+        fake_vault,
+        flush_lines=[
+            f"{_ts(86400)}  INFO  Appended to /v/daily/x/sessions.md",
+            f"{_ts(120, True)} [hook] Spawned flush.py for session a",
+        ],
+        error_lines=[f"{_ts(60)}  ERROR    flush_extract attempt 1/3 ✗ failed after 9s — kind=network · x"],
+        archived=1,
+    )
+    result = health.check_flush_pipeline()
+    assert result.severity == "warning"
+    assert "1 archived" in result.message
+
+
+def test_flush_pipeline_ok_when_success_is_newest(fake_vault):
+    """A success after the last failure clears the stall regardless of how
+    many spawns preceded it."""
+    _write_flush_logs(
+        fake_vault,
+        flush_lines=[
+            f"{_ts(7200, True)} [hook] Spawned flush.py for session a",
+            f"{_ts(7100, True)} [hook] Spawned flush.py for session b",
+            f"{_ts(7000, True)} [hook] Spawned flush.py for session c",
+            f"{_ts(300)}  INFO  Appended to /v/daily/x/sessions.md",
+        ],
+        error_lines=[f"{_ts(7050)}  ERROR    flush_extract attempt 3/3 ✗ failed after 2.0s — kind=cli_crash · y"],
+        archived=0,
+    )
+    result = health.check_flush_pipeline()
+    assert result.severity == "ok"
+    assert "landed" in result.message
+
+
+def test_flush_pipeline_reads_only_the_tail(fake_vault, monkeypatch):
+    """Multi-MB iCloud-synced logs: the check must seek, not read whole."""
+    monkeypatch.setattr(health, "_FLUSH_LOG_TAIL_BYTES", 200)
+    old_noise = [f"{_ts(90000)}  INFO  noise line {i}" for i in range(200)]
+    _write_flush_logs(
+        fake_vault,
+        flush_lines=old_noise + [f"{_ts(60)}  INFO  Appended to /v/daily/x/sessions.md"],
+        error_lines=[],
+    )
+    result = health.check_flush_pipeline()
+    assert result.severity == "ok"
+    assert result.details["last_success"] is not None
+
+
 # ── check_no_knowledge_articles + check_compile_state ──────────────
 
 

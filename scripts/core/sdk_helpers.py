@@ -83,8 +83,22 @@ def sanitize_stale_session_env(environ: dict) -> list[str]:
         del environ[key]
     return removed
 
-# Patterns matched against captured stderr + exception text. Order is
-# priority — most-specific first.
+# Patterns matched against captured stderr + exception text + the CLI's own
+# result text. Order is priority — most-specific first.
+#
+# cli_outdated: the API refuses a client version below a server-side floor
+# ("Claude Code 2.1.97 does not support this model; version 2.1.251 or newer
+# is required", error_code claude_code_version_too_old). Observed 2026-09-09
+# on the lxw vault: the bundled CLI inside claude-agent-sdk 0.1.58 was
+# refused for 8 days and every flush landed as `cli_crash` because the CLI
+# reports API errors on STDOUT (as a ResultMessage) and the 0.1.x SDK tore
+# the process down before that message reached us. Fatal: the fix is a
+# newer claude-agent-sdk (`wiki update` after the engine bumps the pin).
+_RE_CLI_OUTDATED = re.compile(
+    r"(claude_code_version_too_old|version\s+\S+\s+or\s+newer\s+is\s+required|"
+    r"does\s+not\s+support\s+this\s+model)",
+    re.IGNORECASE,
+)
 _RE_RATE_LIMIT = re.compile(
     r"\b(429|rate.?limit(ed)?|overload(ed)?|usage.?limit(ed)?|quota.?exceeded)\b",
     re.IGNORECASE,
@@ -96,7 +110,11 @@ _RE_AUTH = re.compile(
 )
 _RE_MODEL = re.compile(
     r"(invalid.?model|model.?not.?found|unknown.?model|model.?does.?not.?exist|"
-    r"no.?such.?model)",
+    # `[claude-code:unrecognized_model] {"model": …}` on stderr and "There's
+    # an issue with the selected model (<name>)" as the result text — the
+    # shapes CLI 2.1.273 actually emits for a bad model name (probed
+    # 2026-09-17); neither matched the older patterns.
+    r"no.?such.?model|unrecognized.?model|issue.?with.?the.?selected.?model)",
     re.IGNORECASE,
 )
 _RE_NETWORK = re.compile(
@@ -154,7 +172,7 @@ class StderrCapture:
 class FailureClass:
     """Classification of one failed SDK call."""
 
-    kind: str   # rate_limit | auth | model | network | oom | cli_crash | max_turns | tokens_exceeded | unknown
+    kind: str   # cli_outdated | rate_limit | auth | model | network | oom | cli_crash | max_turns | tokens_exceeded | unknown
     detail: str
 
     def __str__(self) -> str:  # pragma: no cover — formatting only
@@ -264,6 +282,12 @@ def classify_failure(
       3. fallback "unknown" — operator should read captured lines
     """
     haystack = f"{captured_text}\n{exc_text}"
+    if _RE_CLI_OUTDATED.search(haystack):
+        return FailureClass(
+            "cli_outdated",
+            "API refuses the bundled Claude CLI version — bump claude-agent-sdk "
+            "in the engine, then `wiki update`",
+        )
     if _RE_RATE_LIMIT.search(haystack):
         return FailureClass("rate_limit", "matched 429/overload/quota pattern")
     if _RE_AUTH.search(haystack):
@@ -276,9 +300,15 @@ def classify_failure(
         return FailureClass("oom", "stderr suggested out-of-memory")
     if elapsed_s < 5.0:
         if not captured_text.strip():
+            # Say what we know, not what we guess: the CLI wrote nothing to
+            # stderr and no ResultMessage reached us. API-level refusals
+            # (version floor, bad model, 400s) arrive as a ResultMessage on
+            # stdout; when the SDK drops it, this is all that's left.
             return FailureClass(
                 "cli_crash",
-                f"failed in {elapsed_s:.1f}s with empty stderr — bundled CLI exited silently",
+                f"failed in {elapsed_s:.1f}s — no result message, nothing on "
+                "stderr (the CLI reports API errors on stdout; `wiki doctor` "
+                "→ flush-pipeline shows the last classified cause)",
             )
         return FailureClass(
             "cli_crash",
@@ -342,10 +372,12 @@ def is_fatal(failure: FailureClass) -> bool:
     batch would likely burn the same money on the next file (same prompt /
     same substrate / same loop pattern). Operator must intervene
     (increase the budget knob, or skip the offending substrate type).
-    Rate-limit + network + cli_crash + max_turns + unknown are potentially
-    transient and don't fail-fast.
+    cli_outdated (API-side client version floor) fails identically until
+    the engine ships a newer claude-agent-sdk — retrying burns 30 s sleeps
+    for nothing. Rate-limit + network + cli_crash + max_turns + unknown are
+    potentially transient and don't fail-fast.
     """
-    return failure.kind in {"auth", "model", "tokens_exceeded"}
+    return failure.kind in {"auth", "model", "tokens_exceeded", "cli_outdated"}
 
 
 # ── Path-scope permission gate ──────────────────────────────────────────
@@ -590,6 +622,13 @@ class SdkCallSpec:
     system_prompt: str | dict | None = None
     allowed_tools: tuple[str, ...] | None = None
     disallowed_tools: tuple[str, ...] | None = None
+    # BASE toolset (`--tools`). `tools=()` emits `--tools ""` → the agent
+    # has NO tools at all. Distinct from `allowed_tools`, which is only an
+    # allow-filter on top of the base set — and `allowed_tools=()` is falsy,
+    # so the SDK transport skips the flag and the DEFAULT toolset stays
+    # active (KNOWLEDGE "to disable tools use tools=[]"). Text-in/text-out
+    # sites (flush, lint contradictions) want this one.
+    tools: tuple[str, ...] | None = None
     permission_mode: str | None = None
     setting_sources: tuple[str, ...] | None = None
     write_scope: WriteScope | None = None          # hook-gated Write/Edit path scope
@@ -630,20 +669,36 @@ class SdkRunResult:
         return self.failure is None
 
 
-def _structured_error_failure(final_result, elapsed_s: float, uncached_tokens: int) -> FailureClass:
+_RESULT_EXCERPT_CHARS = 240
+
+
+def _structured_error_failure(
+    final_result,
+    elapsed_s: float,
+    uncached_tokens: int,
+    stderr_text: str = "",
+) -> FailureClass:
     """FailureClass for a structured ``ResultMessage(is_error=True)``.
 
     ``error_max_turns`` maps to kind=max_turns; everything else routes
-    through the shared classifier so a fast empty-stderr fail lands as
-    cli_crash and a slow no-signal fail as unknown (which retry ladders
-    treat differently from an opaque agent_error).
+    through the shared classifier over the result text, the SDK's
+    ``errors`` list AND the captured stderr, so a fast empty-stderr fail
+    lands as cli_crash and a slow no-signal fail as unknown (which retry
+    ladders treat differently from an opaque agent_error).
+
+    The result text IS the API's error message ("API Error: 400 {…}",
+    "There's an issue with the selected model …") — the CLI reports it as
+    a ResultMessage, not on stderr. It goes into the detail verbatim
+    (excerpted) so the *-errors.log line names the cause instead of
+    "success after 1 turns". Lesson of the 2026-09-09→17 outage.
     """
     errors = getattr(final_result, "errors", None) or []
+    result_text = final_result.result or ""
     if final_result.subtype == "error_max_turns":
         kind = "max_turns"
     else:
         kind = classify_failure(
-            elapsed_s, final_result.result or "", "; ".join(errors),
+            elapsed_s, f"{result_text}\n{stderr_text}", "; ".join(errors),
         ).kind
     detail = (
         f"{final_result.subtype} after {final_result.num_turns} turns "
@@ -651,6 +706,11 @@ def _structured_error_failure(final_result, elapsed_s: float, uncached_tokens: i
     )
     if errors:
         detail += f" — errors: {'; '.join(errors)}"
+    excerpt = " ".join(result_text.split())
+    if excerpt:
+        if len(excerpt) > _RESULT_EXCERPT_CHARS:
+            excerpt = excerpt[:_RESULT_EXCERPT_CHARS] + "…"
+        detail += f" — result: {excerpt}"
     return FailureClass(kind, detail)
 
 
@@ -726,6 +786,8 @@ async def run_sdk_query(prompt: str, spec: SdkCallSpec, *, query_fn=None) -> Sdk
         options_kwargs["setting_sources"] = list(spec.setting_sources)
     if spec.disallowed_tools is not None:
         options_kwargs["disallowed_tools"] = list(spec.disallowed_tools)
+    if spec.tools is not None:
+        options_kwargs["tools"] = list(spec.tools)
 
     query_prompt: object = prompt
     if spec.deny_all_writes:
@@ -884,7 +946,7 @@ async def run_sdk_query(prompt: str, spec: SdkCallSpec, *, query_fn=None) -> Sdk
             # then exited 1. Classify from the structured payload; the
             # authoritative usage is still worth recording.
             failure = _structured_error_failure(
-                final_result, elapsed, uncached_in + uncached_out,
+                final_result, elapsed, uncached_in + uncached_out, capture.text,
             )
             u = extract_usage_tokens(final_result.usage)
             ledger_in = u.total_input or fallback_in
@@ -949,7 +1011,7 @@ async def run_sdk_query(prompt: str, spec: SdkCallSpec, *, query_fn=None) -> Sdk
         # Structured error with a clean generator exit (no raise) — same
         # classification as the raised variant above.
         failure = _structured_error_failure(
-            final_result, elapsed, uncached_in + uncached_out,
+            final_result, elapsed, uncached_in + uncached_out, capture.text,
         )
         log.error(
             "  %s ✗ failed after %.1fs — kind=%s · %s",

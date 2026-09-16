@@ -18,6 +18,57 @@ every operator's `wiki update` → `uv sync` regenerate `uv.lock` and dirty thei
 config keys must also be wired into `scripts/migrations/migrate_config_keys.py`
 in the same commit.
 
+## [0.5.3] — 2026-09-17
+
+Session capture was dead for eight days and nothing said so. From 2026-09-09
+the API refused the bundled Claude CLI (2.1.97, from claude-agent-sdk 0.1.58)
+with `claude_code_version_too_old` — every flush, Claude Code and Codex alike,
+was logged as `cli_crash · bundled CLI exited silently`, 446 contexts piled up
+in `failed-flushes/`, and `daily/` stopped growing. The operator noticed by
+asking whether the Codex hook was even installed. Found by running the
+bundled CLI by hand: the cause had been on stdout the whole time.
+
+### Fixed
+
+- **claude-agent-sdk 0.1.58 → 0.2.153** (bundled CLI 2.1.273). The
+  dependency floor in `pyproject.toml` is now `>=0.2.148`, the first SDK that
+  bundles a CLI the API accepts (≥ 2.1.251), with a comment explaining why the
+  floor is load-bearing. Operators get it via `wiki update` (runs `uv sync`).
+- **`flush.py` no longer hand-rolls the SDK call** — it goes through the
+  `run_sdk_query` harness like every other producer, so a structured API
+  refusal (`ResultMessage(is_error=True)` with the API's text in `result`) is
+  classified and logged with its cause instead of being dropped. The old
+  `subtype == "success"` check would also have appended the API error text to
+  `daily/` as the session summary under SDK 0.2.x (which reports refusals as
+  `subtype="success", is_error=True`); `lint`'s contradiction pass got the
+  same guard.
+- **Fatal failure kinds stop the flush retry ladder on the first attempt.**
+  auth / model / cli_outdated fail identically until the operator acts; three
+  attempts × 30 s sleeps per session only delayed the archive.
+
+### Added
+
+- **`wiki doctor` → `flush-pipeline`**: critical when flushes keep being
+  spawned but none has landed since the newest classified failure, warning
+  while an archive of failed contexts waits for retry. Reads log *tails* only
+  (the logs are multi-MB on iCloud). The message carries the last failure's
+  kind and detail; for `cli_outdated` it is dispatchable as `wiki update`.
+- **Failure kind `cli_outdated`** (fatal) — matches the API's version-floor
+  refusal. **`model`** now also matches the phrasings CLI 2.1.273 actually
+  emits (`[claude-code:unrecognized_model]`, "issue with the selected model").
+- **Structured-error details carry the API's own sentence** (excerpted to 240
+  chars) and the captured stderr feeds the classifier too. The fast-fail
+  `cli_crash` text no longer asserts "exited silently" — it says what is
+  known (no result message, nothing on stderr) and points at the doctor.
+- `SdkCallSpec.tools` — the BASE toolset (`--tools`), for text-in/text-out
+  sites that need `tools=()`; `allowed_tools=()` is falsy and never reaches
+  the CLI.
+
+### Changed
+
+- Flush extraction usage is now recorded in the token ledger (harness
+  default) — it was the one SDK call site that never accounted for itself.
+
 ## [0.5.2] — 2026-08-28
 
 Health signals that tell the truth, and the backlog index rebuilt from the

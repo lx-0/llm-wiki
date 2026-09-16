@@ -378,3 +378,105 @@ def test_stream_without_result_message_is_ok_with_fallback_usage(
     assert result.assistant_text == "partial"
     assert result.input_tokens == 4
     assert result.num_turns == 0
+
+
+# ── 5. structured API refusals carry their cause (2026-09-09→17 outage) ──
+#
+# The CLI reports API errors as a ResultMessage on STDOUT — `subtype="success"`,
+# `is_error=True`, the API's text in `result`. For eight days the flush log
+# said `cli_crash · bundled CLI exited silently` while the cause, "Claude Code
+# 2.1.97 does not support this model; version 2.1.251 or newer is required",
+# sat in exactly that field. These pin: the kind, the excerpt in the detail,
+# and fatality (no retry ladder for a version floor).
+
+_VERSION_FLOOR_RESULT = (
+    'API Error: 400 {"type":"error","error":{"type":"invalid_request_error",'
+    '"message":"Claude Code 2.1.97 does not support this model; version 2.1.251 '
+    "or newer is required. Run 'claude update', or update the Claude desktop app, "
+    'then try again.","details":{"error_code":"claude_code_version_too_old"}},'
+    '"request_id":"req_011Cf7yyk64feqMLwRE2vzYN"}'
+)
+
+
+def test_structured_error_api_version_floor_is_cli_outdated_and_fatal(ledger: UsageLedger):
+    """Real payload from the lxw vault (2026-09-17 probe): result text on a
+    subtype=success/is_error ResultMessage, then the 0.1.x-style exit-1 raise."""
+    from core.sdk_helpers import is_fatal
+
+    async def refused_query(*, prompt, options):  # noqa: ARG001
+        yield _result(result=_VERSION_FLOOR_RESULT, cost=0.0, is_error=True,
+                      subtype="success", usage={"input_tokens": 0, "output_tokens": 0})
+        raise RuntimeError("Command failed with exit code 1")
+
+    result = asyncio.run(run_sdk_query("p", _spec(), query_fn=refused_query))
+
+    assert result.failure is not None
+    assert result.failure.kind == "cli_outdated"
+    assert "2.1.251 or newer is required" in result.failure.detail, (
+        "the API's own sentence must be in the log line, not just a kind"
+    )
+    assert is_fatal(result.failure), "a version floor never clears on retry"
+
+
+def test_structured_error_without_raise_is_cli_outdated(ledger: UsageLedger):
+    """SDK 0.2.x shape: the refused ResultMessage arrives and the generator
+    ends cleanly. Must not be mistaken for ok — and must not be reported as
+    'success after 1 turns' with the cause dropped."""
+    async def refused_query(*, prompt, options):  # noqa: ARG001
+        yield _result(result=_VERSION_FLOOR_RESULT, cost=0.0, is_error=True,
+                      subtype="success")
+
+    result = asyncio.run(run_sdk_query("p", _spec(), query_fn=refused_query))
+    assert not result.ok
+    assert result.failure.kind == "cli_outdated"
+    assert "version 2.1.251 or newer is required" in result.failure.detail
+    assert "success after 1 turns" in result.failure.detail, "structured shape still visible"
+
+
+def test_structured_error_bad_model_classified_from_result_text(ledger: UsageLedger):
+    """CLI 2.1.273 phrases a bad model as "There's an issue with the selected
+    model (<name>)" — none of the older invalid-model patterns matched it."""
+    async def bad_model_query(*, prompt, options):  # noqa: ARG001
+        yield _result(
+            result="There's an issue with the selected model (claude-nope-9). "
+                   "It may not exist or you may not have access to it.",
+            cost=0.0, is_error=True, subtype="success",
+        )
+
+    result = asyncio.run(run_sdk_query("p", _spec(), query_fn=bad_model_query))
+    assert result.failure.kind == "model"
+    assert "claude-nope-9" in result.failure.detail
+
+
+def test_structured_error_bad_model_classified_from_stderr(ledger: UsageLedger):
+    """The same refusal seen only on stderr (`[claude-code:unrecognized_model]`)
+    with an empty result text: captured stderr must feed the classifier too."""
+    async def bad_model_query(*, prompt, options):  # noqa: ARG001
+        options.stderr('[claude-code:unrecognized_model] {"model":"claude-nope-9","query_source":"sdk"}')
+        yield _result(result="", cost=0.0, is_error=True, subtype="success")
+
+    result = asyncio.run(run_sdk_query("p", _spec(), query_fn=bad_model_query))
+    assert result.failure.kind == "model"
+
+
+def test_structured_error_excerpt_is_bounded(ledger: UsageLedger):
+    async def long_query(*, prompt, options):  # noqa: ARG001
+        yield _result(result="API Error: 500 " + "x" * 5000, cost=0.0,
+                      is_error=True, subtype="success")
+
+    result = asyncio.run(run_sdk_query("p", _spec(), query_fn=long_query))
+    assert len(result.failure.detail) < 400
+    assert result.failure.detail.endswith("…")
+
+
+# ── 6. base toolset ───────────────────────────────────────────────────
+
+
+def test_tools_spec_reaches_options_as_base_toolset(ledger: UsageLedger):
+    captured: dict = {}
+    asyncio.run(run_sdk_query("p", _spec(tools=()), query_fn=_capture_options(captured)))
+    assert captured["options"].tools == []
+
+    captured.clear()
+    asyncio.run(run_sdk_query("p", _spec(), query_fn=_capture_options(captured)))
+    assert captured["options"].tools is None

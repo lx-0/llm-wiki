@@ -1,6 +1,6 @@
 [project]
 name = "llm-wiki"
-version = "0.5.2"
+version = "0.5.3"
 description = "Personal knowledge wiki compiled from conversations and curated sources — based on Karpathy's LLM Wiki + Cole's claude-memory-compiler"
 readme = "README.md"
 license = { text = "MIT" }
@@ -12,7 +12,13 @@ dependencies = [
     # httpx: engine-wide HTTP client (ollama, oura, jamie, publish). Declared
     # 2026-08-25 (M030-S02-T01) — was a latent transitive-dep violation.
     "httpx",
-    "claude-agent-sdk>=0.1.29",
+    # The floor is load-bearing, not cosmetic: the API refuses Claude CLI
+    # builds below a server-side minimum (2026-09-09: "version 2.1.251 or
+    # newer is required", error_code claude_code_version_too_old) and every
+    # SDK call then dies as `cli_outdated`. 0.2.148 is the first SDK that
+    # bundles CLI 2.1.251. When that floor moves again, bump this AND the
+    # lock (`uv lock --upgrade-package claude-agent-sdk`) in one commit.
+    "claude-agent-sdk>=0.2.148",
     "html2text>=2025.4.15",
     "imapclient>=3.0.0",
     # Required by collectors/_picture_metadata.py for EXIF parsing on

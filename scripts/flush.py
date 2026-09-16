@@ -13,9 +13,10 @@ os.environ["CLAUDE_INVOKED_BY"] = "memory_flush"
 # Strip the DYING parent session's wiring vars (CLAUDE_CODE_SSE_PORT,
 # MESSAGING_SOCKET, …) BEFORE the SDK import — hook-spawned flushes inherit
 # dead endpoints. Hygiene, NOT the 2026-08 outage cause (that was host-MCP
-# schema injection; see extract_from_context's strict-mcp-config). flush
-# bypasses the run_sdk_query harness, hence the module-level call here.
-# sdk_helpers is import-light (no SDK pull).
+# schema injection; the run_sdk_query harness isolates it). The harness
+# sanitizes again per call; this module-level pass also covers the
+# compile.py / piggyback children this process spawns, which inherit its
+# env. sdk_helpers is import-light (no SDK pull).
 import sys
 from pathlib import Path
 
@@ -35,15 +36,13 @@ from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from claude_agent_sdk import ClaudeAgentOptions, ResultMessage, query
-
 # ── Paths & constants ────────────────────────────────────────────────
 SCRIPTS_DIR = Path(__file__).resolve().parent
 WIKI_DIR = SCRIPTS_DIR.parent
 ROOT_DIR = WIKI_DIR.parent
 sys.path.insert(0, str(SCRIPTS_DIR))
 from core.config import CONFIG  # noqa: E402
-from core.sdk_helpers import StderrCapture, log_sdk_failure  # noqa: E402
+from core.sdk_helpers import SdkCallSpec, is_fatal, run_sdk_query  # noqa: E402
 from core.state_store import is_ingested, try_locked  # noqa: E402
 
 from core import flush_pipeline  # noqa: E402
@@ -138,66 +137,70 @@ RETRY_DELAY = CONFIG.limits.flush_retry_delay_seconds
 
 
 async def extract_from_context(context: str) -> str | None:
-    """Use Claude to extract structured knowledge from a conversation context."""
+    """Use Claude to extract structured knowledge from a conversation context.
+
+    Runs through the one SDK harness (`run_sdk_query`), not a hand-rolled
+    `query()` loop. The harness classifies a structured error — a
+    ``ResultMessage(is_error=True)`` whose ``result`` text IS the API's
+    message — and logs it with its cause. The old loop only saw exceptions:
+    from 2026-09-09 to 09-17 every flush (Claude Code and Codex alike) died
+    as `cli_crash · exited silently` when the real answer, "Claude Code
+    2.1.97 does not support this model; version 2.1.251 or newer is
+    required", had been on stdout the whole time. It also guards the
+    success path: with SDK 0.2.x a refused call comes back as
+    ``subtype="success", is_error=True`` — the old ``subtype == "success"``
+    check would have appended the API error text to daily/ as the session
+    summary.
+
+    Fatal kinds (auth / model / cli_outdated) stop the retry ladder on the
+    first attempt: they fail identically until the operator intervenes, and
+    three attempts × 30 s sleeps per session only delayed the archive.
+    """
     prompt = render("flush_extract", context=context)
 
     last_failure = None
     for attempt in range(1, MAX_RETRIES + 1):
-        result_parts: list[str] = []
-        capture = StderrCapture()
-        started = time.time()
-        try:
-            async for message in query(
-                prompt=prompt,
-                options=ClaudeAgentOptions(
-                    max_buffer_size=CONFIG.limits.sdk_max_buffer_size_mb * 1024 * 1024,
-                    system_prompt=render("flush_extract_system"),
-                    # `tools=[]` emits `--tools ""` (empty base toolset) so the agent
-                    # has NO tools. `allowed_tools=[]` is falsy and gets skipped by the
-                    # SDK transport, leaving the default toolset active — which turned
-                    # this summarization call into an agentic Grep/Read loop over the
-                    # substrate (treating the conversation as a task), causing the
-                    # kind=unknown failures + ~$0.4/call cost.
-                    tools=[],
-                    max_turns=3,
-                    setting_sources=[],
-                    # ROOT CAUSE of the 2026-08-14→25 outage (M031-S01, proven
-                    # T12/T13): without strict-mcp-config the CLI injects the
-                    # HOST's MCP-server tools into the request; one host server
-                    # ships a schema with top-level oneOf/allOf/anyOf → API 400
-                    # → exit 1 with empty stderr, flaky with MCP connectivity.
-                    # Flush wants ZERO tools — never load host MCP config.
-                    mcp_servers={},
-                    extra_args={"strict-mcp-config": None},
-                    stderr=capture.callback,
-                ),
-            ):
-                if isinstance(message, ResultMessage):
-                    if message.subtype == "success" and message.result:
-                        result_parts.append(message.result)
-            return "\n".join(result_parts) if result_parts else None
-        except Exception as exc:
-            last_failure = log_sdk_failure(
-                log,
-                label=f"flush_extract attempt {attempt}/{MAX_RETRIES}",
-                model="(default)",
-                input_chars=len(context),
-                started=started,
-                capture=capture,
-                exc=exc,
+        spec = SdkCallSpec(
+            label=f"flush_extract attempt {attempt}/{MAX_RETRIES}",
+            logger=log,
+            system_prompt=render("flush_extract_system"),
+            # `tools=()` → `--tools ""` (empty BASE toolset): the agent has NO
+            # tools. `allowed_tools=()` is falsy and the SDK transport skips
+            # it, leaving the default toolset active — which once turned this
+            # summarization call into an agentic Grep/Read loop over the
+            # substrate (kind=unknown failures + ~$0.4/call).
+            tools=(),
+            max_turns=3,
+            setting_sources=(),
+            input_chars=len(context),
+            # Host-MCP isolation (mcp_servers={} + --strict-mcp-config) is the
+            # harness default — the 2026-08-14→25 outage root cause (M031-S01).
+        )
+        outcome = await run_sdk_query(prompt, spec)
+        if outcome.ok:
+            return outcome.result_text or None
+
+        last_failure = outcome.failure
+        if is_fatal(last_failure):
+            log.error(
+                "Claude extraction failed with a fatal kind=%s — not retrying "
+                "(fails identically until fixed): %s",
+                last_failure.kind, last_failure.detail,
             )
-            if attempt < MAX_RETRIES:
-                log.warning(
-                    "Retrying in %ds (last kind=%s)...",
-                    RETRY_DELAY, last_failure.kind,
-                )
-                await asyncio.sleep(RETRY_DELAY)
-            else:
-                log.error(
-                    "Claude extraction failed after %d attempts (last kind=%s)",
-                    MAX_RETRIES, last_failure.kind,
-                )
-                return None
+            return None
+        if attempt < MAX_RETRIES:
+            log.warning(
+                "Retrying in %ds (last kind=%s)...",
+                RETRY_DELAY, last_failure.kind,
+            )
+            await asyncio.sleep(RETRY_DELAY)
+        else:
+            log.error(
+                "Claude extraction failed after %d attempts (last kind=%s)",
+                MAX_RETRIES, last_failure.kind,
+            )
+            return None
+    return None
 
 
 # ── Compile trigger ──────────────────────────────────────────────────

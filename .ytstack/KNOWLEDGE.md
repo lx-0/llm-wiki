@@ -2903,3 +2903,30 @@ if ! git -C "$WIKI_DIR" rev-parse --git-dir >/dev/null 2>&1; then
 Same rule for any future checkout guard, in bash or Python — `(root / ".git").is_dir()` has the identical bug.
 
 Vault layout as of 2026-08-26: all three repos (`lxw`, `lxw/.wiki`, `lx`) are git-dir-redirected into `~/.gitdirs/`, and `<vault>/.wiki/.venv` is a **symlink** to `~/.venvs/lxw-wiki`, which keeps 400 MB of site-packages out of iCloud and shrank `.wiki` from 589 MB to 40 MB. Verified after the change: `uv sync --project <vault>/.wiki` follows the symlink and audits the target instead of replacing it — both with `UV_PROJECT_ENVIRONMENT` set and without it (the `wiki update` path). Order matters: build the environment at its real location first, then put the symlink in place, because a `uv sync` that finds no `.venv` at all will create a real directory there.
+
+## The API refuses old Claude CLI builds, and the SDK reported it as "exited silently" for eight days (2026-09-17)
+
+### Symptom
+
+From 2026-09-09 16:46 every session flush on the lxw vault — Claude Code and Codex alike — failed in ~2 s: `flush_extract attempt N/3 ✗ failed after 2.2s — kind=cli_crash · failed in 2.2s with empty stderr — bundled CLI exited silently`, `exception: Command failed with exit code 1`, `[CLI-STDERR] (empty)`. 446 contexts in `failed-flushes/`, last `Appended to daily/…` on 09-09, `compile.log` frozen on 09-08 (compile only fires from a *successful* evening flush, so the retry piggyback never ran either). No engine commit since 08-28; no operator surface said anything. The operator asked "ist codex überhaupt aktiv als hook?" — it was; the Stop hook had fired 77/49/56 times for the three long-lived threads, every one staged and spawned.
+
+### Root cause (reproduced by running the bundled binary by hand)
+
+```
+$ <vault>/.wiki/.venv/…/claude_agent_sdk/_bundled/claude -p "Reply OK" --output-format json
+{"type":"result","subtype":"success","is_error":true,"result":"API Error: 400 {…\"message\":\"Claude Code 2.1.97 does not support this model; version 2.1.251 or newer is required. …\",\"details\":{\"error_code\":\"claude_code_version_too_old\"}}", …}
+```
+
+claude-agent-sdk 0.1.58 bundles CLI 2.1.97 (April build). The API introduced a server-side client-version floor; the CLI reports the refusal **as a ResultMessage on stdout**, and the 0.1.x SDK tore the process down on exit 1 before that message reached the consumer — `final_result` stayed `None`, `classify_failure` saw 2 s + empty stderr and *invented* "exited silently". The exception text the SDK raises is a constant (`stderr="Check stderr output for details"`), so nothing downstream could know better.
+
+### Lessons
+
+1. **A dependency's bundled binary is a moving API client.** The pin `claude-agent-sdk>=0.1.29` was cosmetic; the floor is now `>=0.2.148` (first SDK with CLI ≥ 2.1.251) with the reason in `pyproject.toml`. When the API raises the floor again, the symptom will be `kind=cli_outdated` in one line — not eight days of `cli_crash`.
+2. **"Empty stderr" is not evidence of silence.** The CLI puts API errors on stdout. Any classifier that says *why* something failed from the *absence* of a signal is guessing; the `cli_crash` text now says what is known and points at `wiki doctor`.
+3. **Hand-rolled SDK loops rot.** flush bypassed `run_sdk_query` "for isolation" and therefore missed every improvement the harness got (structured-error classification, ledger). It also had a latent data bug: under SDK 0.2.x a refusal is `subtype="success", is_error=True`, and `if message.subtype == "success" and message.result` would have appended `API Error: 400 …` to `daily/` as the session summary. flush and lint now guard `is_error`; flush runs through the harness. Guard test: `tests/test_sdk_mcp_isolation.py::test_flush_goes_through_the_harness`.
+4. **A pipeline whose only retry trigger is its own success has no recovery path.** compile → piggyback → retry-failed-flushes all hang off a successful evening flush. The new `flush-pipeline` doctor check is the watchdog; the chain itself is unchanged (backlog candidate: retry drain independent of flush success, and newest-per-session dedup — 361 of the 446 archives were re-captures of the same three Codex threads).
+5. **Probe with the real binary before theorising about the SDK.** Three prior "exit-1-empty-stderr" root causes exist in this file (tools=[] agentic loop, host-MCP schema, prompt overflow); the memory rule "never assume parity of cause" held — this was a fourth. The 60-second direct CLI run settled it; the SDK-level repro took 35 s to say `unknown`.
+
+### Fix (this arc)
+
+`uv lock --upgrade-package claude-agent-sdk` → 0.2.153 (CLI 2.1.273); `cli_outdated` failure kind (fatal); `_structured_error_failure` classifies over result text + stderr and carries the API's sentence; `SdkCallSpec.tools`; flush via harness with fatal-kind short-circuit; `check_flush_pipeline` in `wiki doctor`. Verified live on lxw: `wiki update`, then a retry of one archived context landed in `daily/`.

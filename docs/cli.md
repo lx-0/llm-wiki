@@ -88,9 +88,19 @@ jumps directly. When everything passes the section renders
 
 **(2b) Heads-up** — critical/warning health checks WITHOUT a clean auto-fix
 (`ollama-unreachable`, `claude-authed`, `compile-errors-recent`,
-`template-drift`). Read-only — operator runs the suggested fix manually.
-(`engine-update-available` lives in the actionable list, not here, because
-its fix is the single command `wiki update`.)
+`flush-pipeline`, `template-drift`). Read-only — operator runs the suggested
+fix manually. (`engine-update-available` lives in the actionable list, not
+here, because its fix is the single command `wiki update`; `flush-pipeline`
+moves there too when its last classified failure is `cli_outdated`, whose
+fix is the same command.)
+
+`flush-pipeline` is the session-capture watchdog: it reads the tails of
+`flush.log` / `flush-errors.log` and the `sessions/failed-flushes/` archive,
+and goes **critical** when flushes keep being spawned but none has landed
+since the newest classified failure — the message names that failure
+(`kind=cli_outdated · API refuses the bundled Claude CLI version …`) so the
+remedy is one line away. Before it existed, eight days of dead flushes
+(2026-09-09→17) were invisible on every operator surface.
 
 **(3) Quick actions** — `c` compile / `q` query / `f` flush / `l` lint
 (structural-only) / `s` status. Letter or number both work; compile is

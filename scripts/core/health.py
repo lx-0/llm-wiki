@@ -1158,6 +1158,159 @@ def check_index_drift(
 # ── Orchestration ───────────────────────────────────────────────────
 
 
+# ── flush pipeline ──────────────────────────────────────────────────
+#
+# 2026-09-09→17: every session flush (Claude Code AND Codex) died for eight
+# days and nothing on the operator's surface said so. The hooks fired,
+# flush.log filled with `cli_crash`, 446 contexts piled up in
+# failed-flushes/, daily/ simply stopped growing — and the operator found
+# out by asking whether Codex was "even hooked up". This check reads the
+# TAILS of flush.log + flush-errors.log (they are multi-MB, iCloud-synced;
+# never the whole file on the doctor path), counts the archive, and names
+# the last classified failure so the remedy is in the message.
+
+_FLUSH_LOG_TAIL_BYTES = 512 * 1024
+# Spawns needed after the last success before "stalled" fires — one or two
+# unfinished flushes right after a success are just in flight.
+_FLUSH_STALL_MIN_SPAWNS = 3
+_RE_LOG_LINE_TS = re.compile(r"^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2}:\d{2})")
+_RE_FLUSH_FAILURE_KIND = re.compile(r"flush_extract.*?kind=([a-z_]+)(?:\s+·\s+(.*))?$")
+_FLUSH_FIX_BY_KIND: dict[str, tuple[str, list[str] | None]] = {
+    "cli_outdated": (
+        "run `wiki update` — the bundled Claude CLI is below the API's version "
+        "floor; the engine must ship a newer claude-agent-sdk (see CHANGELOG)",
+        ["update"],
+    ),
+    "auth": ("claude /login (or set ANTHROPIC_API_KEY)", None),
+    "model": ("check `models.*` in .wiki/config.yaml against the API's model list", None),
+    "rate_limit": ("wait — retries drain via the retry_failed_flushes piggyback", None),
+}
+
+
+def _tail_text(path: Path, max_bytes: int) -> str:
+    """Last ``max_bytes`` of a log as text, first partial line dropped."""
+    size = path.stat().st_size
+    with path.open("rb") as f:
+        if size > max_bytes:
+            f.seek(size - max_bytes)
+        data = f.read()
+    text = data.decode("utf-8", errors="replace")
+    if size > max_bytes:
+        text = text.split("\n", 1)[-1]
+    return text
+
+
+def _log_line_ts(line: str) -> float | None:
+    """Naive-local timestamp of a flush.log / flush-errors.log line. Both
+    ``2026-09-16 21:02:27,890 [hook] …`` and ``2026-09-16T21:02:28  INFO``
+    shapes occur in the same file."""
+    m = _RE_LOG_LINE_TS.match(line)
+    if not m:
+        return None
+    try:
+        return datetime.fromisoformat(f"{m.group(1)}T{m.group(2)}").timestamp()
+    except ValueError:
+        return None
+
+
+def _last_flush_failure(err_log: Path) -> tuple[float | None, str | None, str | None]:
+    """(timestamp, kind, detail) of the newest classified flush_extract
+    failure line, or (None, None, None)."""
+    if not err_log.exists() or err_log.stat().st_size == 0:
+        return None, None, None
+    for line in reversed(_tail_text(err_log, _FLUSH_LOG_TAIL_BYTES).splitlines()):
+        m = _RE_FLUSH_FAILURE_KIND.search(line)
+        if not m:
+            continue
+        ts = _log_line_ts(line)
+        if ts is None:
+            continue
+        return ts, m.group(1), (m.group(2) or "").strip() or None
+    return None, None, None
+
+
+def check_flush_pipeline() -> CheckResult:
+    """Critical when flushes keep being spawned but none lands and the
+    newest classified failure is younger than the last success; warning
+    while an archive of failed contexts is waiting for retry; ok otherwise.
+    """
+    flush_log = LOGS_DIR / "flush.log"
+    err_log = LOGS_DIR / "flush-errors.log"
+    failed_dir = WIKI_DIR / "sessions" / "failed-flushes"
+    archived = (
+        sum(1 for p in failed_dir.iterdir() if p.is_file())
+        if failed_dir.exists() else 0
+    )
+    if not flush_log.exists() or flush_log.stat().st_size == 0:
+        return CheckResult(
+            id="flush-pipeline", category="pipeline", severity="ok",
+            message="no session flushed yet (flush.log absent)",
+            details={"archived": archived},
+        )
+
+    last_ok: float | None = None
+    spawns: list[float] = []
+    for line in _tail_text(flush_log, _FLUSH_LOG_TAIL_BYTES).splitlines():
+        if "Appended to " in line:
+            ts = _log_line_ts(line)
+            if ts is not None:
+                last_ok = ts
+        elif "Spawned flush.py" in line:
+            ts = _log_line_ts(line)
+            if ts is not None:
+                spawns.append(ts)
+    spawns_since_ok = sum(1 for ts in spawns if ts > (last_ok or 0.0))
+    fail_ts, fail_kind, fail_detail = _last_flush_failure(err_log)
+    details = {
+        "archived": archived,
+        "last_success": (
+            datetime.fromtimestamp(last_ok).isoformat(timespec="seconds")
+            if last_ok else None
+        ),
+        "spawns_since_success": spawns_since_ok,
+        "last_failure_kind": fail_kind,
+    }
+    since = _humanize_delta(time.time() - last_ok) if last_ok else "never"
+
+    stalled = (
+        fail_ts is not None
+        and fail_ts > (last_ok or 0.0)
+        and spawns_since_ok >= _FLUSH_STALL_MIN_SPAWNS
+    )
+    if stalled:
+        cause = f"kind={fail_kind}"
+        if fail_detail:
+            cause += f" · {fail_detail}"
+        fix, dispatch = _FLUSH_FIX_BY_KIND.get(
+            fail_kind or "", ("tail -50 .wiki/logs/flush-errors.log", None),
+        )
+        return CheckResult(
+            id="flush-pipeline", category="pipeline", severity="critical",
+            message=(
+                f"flush pipeline stalled — last successful flush {since}, "
+                f"{spawns_since_ok} spawned since, {archived} archived; "
+                f"last failure: {cause}"
+            ),
+            fix=fix, dispatch_args=dispatch, details=details,
+        )
+    if archived:
+        return CheckResult(
+            id="flush-pipeline", category="pipeline", severity="warning",
+            message=(
+                f"{archived} archived flush context(s) awaiting retry "
+                f"(last successful flush {since})"
+            ),
+            fix="drains via the retry_failed_flushes piggyback after the next "
+                "successful flush or `wiki compile`",
+            details=details,
+        )
+    return CheckResult(
+        id="flush-pipeline", category="pipeline", severity="ok",
+        message=f"last flush landed {since}",
+        details=details,
+    )
+
+
 # Checks return either a single CheckResult or a list[CheckResult]
 # (for multi-result probes like per-account auth — one CheckResult per
 # account-integration pair, count knowable only at probe time).
@@ -1170,6 +1323,7 @@ _ALL_CHECKS: list[Callable[..., CheckResult | list[CheckResult]]] = [
     check_claude_authed,
     check_account_auths,
     check_compile_errors_recent,
+    check_flush_pipeline,
     check_template_drift,
     check_engine_update_available,
     check_no_knowledge_articles,
