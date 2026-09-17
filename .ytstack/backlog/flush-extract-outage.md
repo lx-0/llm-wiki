@@ -28,3 +28,30 @@ days in 30) → never converges.
 - Retry drain: decouple from compile cadence (own piggyback cooldown or drain-N
   proportional to queue depth); 234-deep queue needs a catch-up mode.
 - Regression: flush E2E over a 70 KB fixture.
+
+## 2026-09-17 addendum — a fourth cause, and the drain is the open item
+
+The exit-1-empty-stderr signature recurred 2026-09-09→17 with a **fourth** root
+cause: the API's client-version floor (`claude_code_version_too_old`, bundled CLI
+2.1.97 < 2.1.251). Fixed in 0.5.3 (SDK 0.2.153, `cli_outdated` kind, flush via
+`run_sdk_query`, `flush-pipeline` doctor check) — KNOWLEDGE 2026-09-17 has the
+full trace. The regression assertion this item asked for exists:
+`tests/test_sdk_mcp_isolation.py` (harness isolation + "flush must not bypass").
+
+What is still open is the **drain**, and it is now the expensive part:
+
+- 445 archived contexts after the fix; **361 are re-captures of the same three
+  long-lived Codex threads** (Stop fires per turn, every fire archived its own
+  copy). `retry-failed-flushes.py` retries oldest-first, 5 per run, and each
+  success `append_to_daily` REPLACES the same per-session block — so ~360 SDK
+  calls would produce three blocks.
+- The retry only fires from a *successful evening flush* (piggyback) or a
+  compile. During the outage neither happened, so the queue never drained and
+  compile did not run for eight days either.
+
+Fix shape: (1) collapse the archive to the newest context per `session_id`
+before draining (older copies are strictly superseded by replace-in-place
+semantics — the same thing the live path does every turn); (2) drain on its
+own cadence, proportional to queue depth, not gated on flush success;
+(3) keep `flush-pipeline` as the watchdog. (1) is an hour; it turns a
+months-long drain of 445 into ~60 calls.

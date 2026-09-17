@@ -50,6 +50,14 @@ that produced them is still live.
    `.processing` / `.done` marker, or move dedup-record + delete into a single
    guarded step. Heavier; (1) is probably enough.
 
+## 2026-09-17 note
+
+The "queue is invisible" half is closed: `wiki doctor` → `flush-pipeline`
+(0.5.3) reports the archive count, the last landed flush, and the newest
+classified failure, and goes critical on a stall. The orphan sweep of the
+`sessions/` root itself is still open; when it is built, feed it through the
+same newest-per-session collapse proposed in `flush-extract-outage.md`.
+
 ## Decision needed
 
 - Adopt (1) with the `_is_duplicate` guard, or go for (2)?
