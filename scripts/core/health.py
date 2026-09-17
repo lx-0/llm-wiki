@@ -1354,10 +1354,13 @@ def check_flush_pipeline() -> CheckResult:
 #   2. dataless (evicted) scripts/prompts/templates → every import and
 #      render blocks on a download; `claude_agent_sdk` took six minutes to
 #      import, `wiki doctor` four.
-# The layout that avoids both: venv at ~/.venvs/<name>, `.wiki/.venv` a
-# symlink to it (KNOWLEDGE 2026-08-26). iCloud does not sync symlinks
-# faithfully — the lxw symlink came back as `.venv 2` next to a fresh real
-# `.venv` that a later `uv sync` had created in place.
+# The layout that avoids both: venv at ~/.venvs/<name>, addressed
+# explicitly. The 2026-08-26 symlink form did not survive on lxw: iCloud's
+# reconciliation kept the directory the cloud state already had under
+# `.venv` (re-materialised, old content) and shelved the symlink as
+# `.venv 2`, its conflict-copy name — nobody touched it by hand. A symlink
+# inside an iCloud folder is a layout the sync engine can veto
+# (KNOWLEDGE 2026-09-17).
 
 _CLOUD_PATH_MARKERS = ("/Library/Mobile Documents/", "/Library/CloudStorage/")
 # BSD `SF_DATALESS` (0x40000000): file contents are not on disk (evicted by a

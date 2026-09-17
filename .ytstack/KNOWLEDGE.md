@@ -2939,7 +2939,15 @@ claude-agent-sdk 0.1.58 bundles CLI 2.1.97 (April build). The API introduced a s
 
 ### Root cause (three `~/Library/Logs/DiagnosticReports/claude-*.ips`)
 
-`termination: CODESIGNING · Taskgated Invalid Signature`, `procPath: …/Mobile Documents/iCloud~md~obsidian/*/claude`, launched 31 s before the kill. The 2026-08-26 layout (`.wiki/.venv` → symlink to `~/.venvs/lxw-wiki`) had not survived: iCloud does not sync symlinks faithfully, the symlink came back as `.venv 2`, and a later `uv sync` (which "creates a real directory when it finds no .venv") built a real `.venv` inside the vault. 2 024 files under `.wiki` were dataless at the time — `uv.lock`, `AGENTS.md`, `.git`, and the 200 MB CLI. When iCloud materialises or evicts a mapped executable, its pages stop matching the code signature and the kernel kills the process.
+`termination: CODESIGNING · Taskgated Invalid Signature`, `procPath: …/Mobile Documents/iCloud~md~obsidian/*/claude`, launched 31 s before the kill. The 2026-08-26 layout (`.wiki/.venv` → symlink to `~/.venvs/lxw-wiki`) had not survived, and nobody touched it by hand — the timestamps say what happened (measured 2026-09-17):
+
+| entry | born | content |
+| --- | --- | --- |
+| `.wiki/.venv` (real dir) | 2026-08-26 15:09 | the OLD in-iCloud venv: 3 000+ files dated April–May 2026, 835 iCloud conflict copies (`* 2.py`) inside, 353 files touched 08-26, 38 touched 09-17 |
+| `.wiki/.venv 2` (symlink → `~/.venvs/lxw-wiki`) | 2026-08-26 15:11 | the migration's symlink, shelved under iCloud's conflict-copy name |
+| `~/.venvs/lxw-wiki` | 2026-08-26 15:09 | never written again — still claude-agent-sdk 0.1.58 |
+
+So the migration built the target and placed the symlink, and iCloud Drive's reconciliation then kept the *directory* that the cloud state already had under `.venv` (re-materialised with its old content) and renamed the newcomer symlink to `.venv 2` — exactly the way it names conflict copies. Every `wiki update` since (08-27, 09-08, 09-17) ran `uv sync` into the iCloud directory. The 08-26 verification ("uv sync follows the symlink") was true at that minute; the sync engine undid the layout afterwards. Lesson: **a symlink is not a layout you can keep inside an iCloud folder** — the durable form is an environment *outside* the vault that the engine addresses explicitly (`UV_PROJECT_ENVIRONMENT`, set by the `wiki` dispatcher and the hook commands), not a link the sync engine can veto. 2 024 files under `.wiki` were dataless at the time — `uv.lock`, `AGENTS.md`, `.git`, and the 200 MB CLI. When iCloud materialises or evicts a mapped executable, its pages stop matching the code signature and the kernel kills the process.
 
 ### Lessons
 
