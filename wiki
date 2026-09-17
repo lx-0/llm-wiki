@@ -561,6 +561,21 @@ EOF
   if ! uv sync --project "$WIKI_DIR" --quiet; then
     warn "uv sync reported errors — runtime imports may fail. Run 'uv sync --project $WIKI_DIR' manually."
   fi
+  # Cloud-synced vault → the environment lives outside it (lib/common.sh
+  # exported UV_PROJECT_ENVIRONMENT, so the sync above already went there).
+  # Say so, and point at what is now dead weight inside the vault: a real
+  # .wiki/.venv that iCloud keeps hauling around (400 MB on lxw). Never
+  # deleted here — the operator removes it once, deliberately.
+  if [[ -n "${WIKI_VENV_DIR:-}" ]]; then
+    info "Engine environment: $WIKI_VENV_DIR (outside cloud-synced storage)"
+    if [[ -e "$WIKI_DIR/.venv" && ! -L "$WIKI_DIR/.venv" ]]; then
+      warn "stale in-vault environment at $WIKI_DIR/.venv is no longer used — remove it: rm -rf '$WIKI_DIR/.venv'"
+    fi
+    if ! grep -qs 'UV_PROJECT_ENVIRONMENT=' "$HOME/.claude/settings.json" "$HOME/.codex/hooks.json" \
+         "$ROOT_DIR/.claude/settings.json" "$ROOT_DIR/.codex/hooks.json" 2>/dev/null; then
+      warn "installed agent hooks still run the engine from the in-vault environment — re-run: wiki hooks install"
+    fi
+  fi
 
   # Run config-schema migration unconditionally — idempotent, prints
   # "no change" when the vault is already on the current schema, prints

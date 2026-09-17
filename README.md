@@ -255,7 +255,7 @@ curl -fsSL https://raw.githubusercontent.com/lx-0/llm-wiki/main/install.sh | bas
 curl -fsSL https://raw.githubusercontent.com/lx-0/llm-wiki/main/install.sh | bash -s -- ~/path/to/vault
 ```
 
-The installer clones into `<target>/.wiki/`, seeds `config.yaml` from `config.example.yaml`, runs `uv sync` so the venv lives at `<target>/.wiki/.venv/`, and seeds the vault root from `.wiki/templates/` — but **only when each target file is absent**, never overwriting existing work.
+The installer clones into `<target>/.wiki/`, seeds `config.yaml` from `config.example.yaml`, runs `uv sync` so the venv lives at `<target>/.wiki/.venv/` (or at `~/.venvs/<vault>-wiki` when the vault sits in iCloud Drive / CloudStorage — cloud sync evicts files and kills running binaries; the engine addresses that environment via `UV_PROJECT_ENVIRONMENT`), and seeds the vault root from `.wiki/templates/` — but **only when each target file is absent**, never overwriting existing work.
 
 | Created path | Source | Purpose |
 |---|---|---|
@@ -291,7 +291,7 @@ cd ~/path/to/vault
 ./.wiki/wiki seed --force          # overwrite existing templates with engine versions
 ```
 
-`wiki update` pulls into `.wiki/` (preserves `config.yaml` + `.venv/`), then runs `wiki skills sync` so newly-shipped engine skills land in `<vault>/.claude/skills/` automatically. Foreign entries (your own skills, other tools' symlinks) are never touched. When `skills.global_install` is on, the sync also refreshes the global `~/.claude/skills/` symlink — the opt-in survives updates with no re-flagging.
+`wiki update` pulls into `.wiki/` (preserves `config.yaml`, re-syncs the environment where it lives), then runs `wiki skills sync` so newly-shipped engine skills land in `<vault>/.claude/skills/` automatically. Foreign entries (your own skills, other tools' symlinks) are never touched. When `skills.global_install` is on, the sync also refreshes the global `~/.claude/skills/` symlink — the opt-in survives updates with no re-flagging.
 
 If the `.wiki/` checkout has uncommitted changes to **tracked** engine files (direct edits inside `<vault>/.wiki/` — which a `--ff-only` pull would otherwise refuse), `wiki update` lists them and offers to `git stash` them so the pull can proceed. After pulling it re-applies the stash automatically, but only if it merges cleanly onto the new engine; if it would conflict, the stash is left unpopped (recover with `git -C <.wiki> stash pop`). Run it from a terminal — non-interactively (e.g. dashboard button) it refuses rather than touching your changes. (`config.yaml`, `state/`, `logs/` are gitignored and never trigger this.)
 

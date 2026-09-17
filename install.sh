@@ -171,9 +171,21 @@ chmod +x "$DEST/wiki"
 # ── venv ─────────────────────────────────────────────────────────────
 # Create the Python venv inside .wiki/ so it stays alongside the engine
 # (not at the vault root). Subsequent uv invocations use --project .wiki.
-printf "%ssyncing python deps into %s/.venv …%s\n" "$D" "$DEST" "$N"
+# Exception, decided by the engine's own rule (lib/common.sh, the single
+# source): a vault inside iCloud Drive / CloudStorage gets its environment
+# at ~/.venvs/<vault>-wiki instead — cloud eviction SIGKILLs a running
+# binary there. Ask the rule rather than restating it.
+VENV_OVERRIDE="$(WIKI_DIR="$DEST" ROOT_DIR="$TARGET" bash -c \
+  'source "$WIKI_DIR/lib/common.sh" >/dev/null 2>&1; printf "%s" "${UV_PROJECT_ENVIRONMENT:-}"')"
+if [[ -n "$VENV_OVERRIDE" ]]; then
+  export UV_PROJECT_ENVIRONMENT="$VENV_OVERRIDE"
+  VENV_PATH="$VENV_OVERRIDE"
+else
+  VENV_PATH="$DEST/.venv"
+fi
+printf "%ssyncing python deps into %s …%s\n" "$D" "$VENV_PATH" "$N"
 if uv sync --project "$DEST" --quiet 2>/dev/null; then
-  ok "venv ready at $DEST/.venv"
+  ok "venv ready at $VENV_PATH"
 else
   warn "uv sync failed — run 'uv sync --project $DEST' manually before first use"
 fi
@@ -190,5 +202,5 @@ ${B}Next steps:${N}
 
 ${D}docs:    $DEST/README.md${N}
 ${D}config:  $DEST/config.yaml${N}
-${D}venv:    $DEST/.venv      (run scripts via 'uv run --project $DEST python …')${N}
+${D}venv:    $VENV_PATH      (run engine commands via './.wiki/wiki …' — it knows where the environment is)${N}
 EOF

@@ -4,7 +4,7 @@ The engine lives under `<vault>/.wiki/` — hidden from Obsidian's file tree (Ob
 
 For a higher-level view (vault layout, install, CLI usage), see the [README](../README.md). For development conventions (style, side-effect rules, how to add a tunable / prompt / agent target), see [AGENTS.md](../AGENTS.md).
 
-> **Hard rule — `.venv/` location.** The Python virtualenv lives at `<vault>/.wiki/.venv/`, never at the vault root. `install.sh` runs `uv sync --project <DEST>` precisely to enforce this. A vault-root `.venv/` would leak engine internals into the data layer and break `wiki update` round-trips. If you find one there, delete it and re-run `uv sync --project <vault>/.wiki`.
+> **Hard rule — `.venv/` location.** The Python virtualenv lives at `<vault>/.wiki/.venv/`, never at the vault root — **unless the vault is inside a cloud-synced folder** (iCloud Drive `~/Library/Mobile Documents/…`, `~/Library/CloudStorage/…`), in which case it lives at `~/.venvs/<vault>-wiki` and every uv invocation is told so via `UV_PROJECT_ENVIRONMENT`. The rule has one home, `lib/common.sh` (`wiki_venv_dir`): the `wiki` dispatcher exports the variable, `lib/agents.sh` writes it literally into the agent hook commands, `install.sh` asks the rule, and Python only reads the result (`sys.prefix`). Why: cloud sync evicts file contents, and macOS SIGKILLs a running binary whose pages stop matching their code signature mid-swap — the 200 MB bundled Claude CLI died three times in one night on the operator vault (2026-09-17). A symlink at `.wiki/.venv` is not a fix; iCloud shelved it as `.venv 2` and kept its directory. A vault-root `.venv/` would leak engine internals into the data layer and break `wiki update` round-trips. Never start the engine with a bare `uv run --project .wiki` on such a vault — go through `wiki …`, which knows where the environment is; `wiki doctor` → `engine-cloud-eviction` reports the actual state.
 
 ## Contents
 
@@ -152,7 +152,7 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 │   └── vault-triage/SKILL.md
 ├── desktop/                   ← Electron menubar GUI (npm) — every engine call goes through src/vault/wiki-exec.ts:runWiki() and the engine's --json seams (collect/triage/query/compile-progress + doctor/menu)
 └── (gitignored runtime)
-    ├── .venv/                 ← uv-managed Python environment
+    ├── .venv/                 ← uv-managed Python environment (cloud-synced vaults: ~/.venvs/<vault>-wiki instead, see hard rule above)
     ├── state/                 ← *.json hash trackers, dedup, cooldowns
     ├── logs/                  ← flush.log + flush-errors.log (WARNING+), compile.log (full stderr-mirror) + compile-errors.log (WARNING+)
     ├── sessions/              ← session-flush staging + failed-flushes/

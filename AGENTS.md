@@ -282,7 +282,7 @@ Scripts use `Path(__file__).resolve().parent` for `SCRIPTS_DIR`, `.parent.parent
 
 ### Python environment
 
-The Python venv lives at `<vault>/.wiki/.venv/` (inside the engine, NOT at the vault root). `install.sh` runs `uv sync --project <DEST>` so this happens automatically. Two ways to invoke scripts:
+The Python venv lives at `<vault>/.wiki/.venv/` (inside the engine, NOT at the vault root). `install.sh` runs `uv sync --project <DEST>` so this happens automatically. **Exception — cloud-synced vaults** (iCloud Drive, `~/Library/CloudStorage`): the environment lives at `~/.venvs/<vault>-wiki`, addressed via `UV_PROJECT_ENVIRONMENT`, which the `wiki` dispatcher exports and the installed hook commands carry literally (rule: `lib/common.sh`, rationale: `docs/engine-layout.md` hard rule). On such a vault, run engine commands through `wiki …`; a bare `uv run --project .wiki` would rebuild an environment inside the cloud folder. Two ways to invoke scripts:
 
 - **Interactive** — `cd <vault>/.wiki && uv run python scripts/<X>.py <args>`. Matches all script docstring examples.
 - **From any CWD** — `uv run --project <vault>/.wiki python <vault>/.wiki/scripts/<X>.py <args>`. Used by hooks (the `--project` flag is hardcoded in the agent settings.json so the hook works regardless of which directory the user's session was launched from).

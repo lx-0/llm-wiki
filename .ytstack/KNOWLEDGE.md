@@ -2955,6 +2955,6 @@ So the migration built the target and placed the symlink, and iCloud Drive's rec
 2. **`exit code: -9` is the kernel talking, not the CLI.** It is now `kind=cli_killed` with the crash-report path in the detail. Transient per attempt, so the retry ladder is the right response — but the fix is the layout, not more retries.
 3. **Slowness is a symptom too.** Minute-long imports and a four-minute doctor were the same eviction, hours before the first SIGKILL.
 
-### Fix
+### Fix (0.5.4, same day)
 
-Layout: `UV_PROJECT_ENVIRONMENT=~/.venvs/lxw-wiki uv sync --project <vault>/.wiki`, then replace the real `.wiki/.venv` with a symlink (build first, link second). Not applied in this arc — it is a mutation of the operator's live install and was handed back as a decision with the doctor check pointing at it.
+No symlink. The engine decides where its environment is: `lib/common.sh:wiki_venv_dir` — vault under `~/Library/Mobile Documents/` or `~/Library/CloudStorage/` → `~/.venvs/<vault>-wiki`, exported as `UV_PROJECT_ENVIRONMENT` by the `wiki` dispatcher, written literally into every agent hook command by `lib/agents.sh` (the agent spawns hooks with *its* env), asked by `install.sh`; Python reads only `sys.prefix`. `wiki doctor` guards both ends (`engine-cloud-eviction` on the running prefix, `hooks-installed` on the hook commands). The operator asked why not the platform app-data directory (`~/Library/Application Support`) — fair for an app, but this is a regenerable Python environment and `~/.venvs/<name>` was already there, so it stayed. Manual `uv run --project .wiki` on such a vault is now the one remaining way to recreate an in-vault `.venv`; the doctor reports it as stale within the day.

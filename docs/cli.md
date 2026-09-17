@@ -95,12 +95,16 @@ moves there too when its last classified failure is `cli_outdated`, whose
 fix is the same command.)
 
 `engine-cloud-eviction` guards the engine's own files against cloud-synced
-storage: **critical** when `.wiki/.venv` resolves inside iCloud Drive or
-`~/Library/CloudStorage/` (evictions SIGKILL the bundled Claude CLI mid-run
-— `Taskgated Invalid Signature` in the macOS crash report, `kind=cli_killed`
-in the engine log), **warning** when scripts/prompts/templates are currently
-evicted (every import blocks on a download). The venv belongs at
-`~/.venvs/<name>` with `.wiki/.venv` a symlink to it.
+storage: **critical** when the running environment (`sys.prefix`) resolves
+inside iCloud Drive or `~/Library/CloudStorage/` (evictions SIGKILL the
+bundled Claude CLI mid-run — `Taskgated Invalid Signature` in the macOS crash
+report, `kind=cli_killed` in the engine log; dispatchable as `wiki update`),
+**warning** when a stale `.wiki/.venv` still sits in the cloud path although
+the engine runs from `~/.venvs/<vault>-wiki`, or when scripts/prompts/
+templates are currently evicted (every import blocks on a download).
+`hooks-installed` additionally warns when the environment override is active
+but the installed hook commands do not carry it — `wiki hooks install`
+rewrites them.
 
 `flush-pipeline` is the session-capture watchdog: it reads the tails of
 `flush.log` / `flush-errors.log` and the `sessions/failed-flushes/` archive,
@@ -227,7 +231,7 @@ Grouped by purpose. Run `wiki <cmd> --help` for the full per-command help block.
 | `wiki doctor [--quick] [--json]` | vault-health audit: config + connectivity + pipeline checks. `--quick` skips network + subprocess probes (~50ms). `--json` for agents. Exit code 1 if any critical issue. |
 | `wiki setup [--help]` | first-time wizard (6 questions) + hook install |
 | `wiki status` | config summary, hook install table, Ollama probe |
-| `wiki update [--no-skills]` | `git pull --ff-only` the engine checkout + sync skill symlinks; never touches `config.yaml` or `.venv/` content. `--no-skills` skips the skill sync step. |
+| `wiki update [--no-skills]` | `git pull --ff-only` the engine checkout, `uv sync` the environment where it lives (`.wiki/.venv`, or `~/.venvs/<vault>-wiki` for cloud-synced vaults — then it also reports a stale in-vault `.venv` and hooks that lack the environment path), run config migrations + sync skill symlinks; never touches `config.yaml`. `--no-skills` skips the skill sync step. |
 | `wiki seed` | additive: drop in missing vault templates (`AGENTS.md`, `dashboard.md`, `.obsidian/*.json`, plugin `data.json`); merge `community-plugins.json` without dropping yours. |
 | `wiki seed --force` | overwrite existing vault templates with engine versions (discards your edits to dashboard/AGENTS/`.obsidian`). |
 | `wiki version` | print engine git revision + tag + origin URL. |

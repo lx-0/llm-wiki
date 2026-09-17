@@ -453,30 +453,87 @@ def test_flush_pipeline_reads_only_the_tail(fake_vault, monkeypatch):
 # ── check_engine_cloud_eviction ────────────────────────────────────
 
 
-def test_cloud_eviction_ok_when_venv_local(fake_vault):
-    (fake_vault / ".wiki" / ".venv").mkdir()
+def test_cloud_eviction_ok_when_running_env_is_local(fake_vault, monkeypatch):
+    local_env = fake_vault / "_home" / ".venvs" / "v-wiki"
+    local_env.mkdir(parents=True)
+    monkeypatch.setattr(health.sys, "prefix", str(local_env))
     (fake_vault / ".wiki" / "scripts").mkdir()
     (fake_vault / ".wiki" / "scripts" / "a.py").write_text("x")
     result = health.check_engine_cloud_eviction()
     assert result.severity == "ok"
     assert result.details["scanned"] == 1
+    assert result.details["stale_in_vault_venv"] is None
 
 
-def test_cloud_eviction_critical_when_venv_resolves_into_icloud(fake_vault):
-    """A symlink that resolves into `~/Library/Mobile Documents/` is the
-    lxw 2026-09-17 shape (and a real dir there is the same thing)."""
-    cloud_venv = fake_vault / "Library" / "Mobile Documents" / "iCloud~x" / "v" / ".venv"
-    cloud_venv.mkdir(parents=True)
-    (fake_vault / ".wiki" / ".venv").symlink_to(cloud_venv)
+def test_cloud_eviction_critical_when_running_env_is_in_icloud(fake_vault, monkeypatch):
+    """The interpreter's own prefix is the ground truth — a hook or a bare
+    `uv run --project .wiki` that landed in the in-vault environment inside
+    `~/Library/Mobile Documents/` is the lxw 2026-09-17 shape."""
+    cloud_env = fake_vault / "Library" / "Mobile Documents" / "iCloud~x" / "v" / ".wiki" / ".venv"
+    cloud_env.mkdir(parents=True)
+    monkeypatch.setattr(health.sys, "prefix", str(cloud_env))
     result = health.check_engine_cloud_eviction()
     assert result.severity == "critical"
     assert "SIGKILL" in result.message
     assert result.details["venv_in_cloud"] is True
-    assert "symlink" in (result.fix or "")
+    assert result.dispatch_args == ["update"]
+
+
+def test_cloud_eviction_warns_about_stale_in_vault_env(fake_vault, monkeypatch):
+    """Engine runs from ~/.venvs (good) but a real .wiki/.venv still sits in
+    the cloud path — dead weight and a trap; the fix names the rm."""
+    cloud_vault = fake_vault / "Library" / "Mobile Documents" / "iCloud~x" / "v"
+    stale = cloud_vault / ".wiki" / ".venv"
+    stale.mkdir(parents=True)
+    monkeypatch.setattr(health, "WIKI_DIR", cloud_vault / ".wiki")
+    local_env = fake_vault / "_home" / ".venvs" / "v-wiki"
+    local_env.mkdir(parents=True)
+    monkeypatch.setattr(health.sys, "prefix", str(local_env))
+    result = health.check_engine_cloud_eviction()
+    assert result.severity == "warning"
+    assert result.details["stale_in_vault_venv"] == str(stale)
+    assert result.fix == f"rm -rf '{stale}'"
+
+
+def test_hooks_warn_when_env_override_missing_from_hook_command(fake_vault, monkeypatch):
+    """UV_PROJECT_ENVIRONMENT is active for this vault but the installed
+    Claude hook predates it → flush would run from the in-vault env."""
+    fake_home = fake_vault / "_fake_home"
+    (fake_home / ".claude").mkdir(parents=True)
+    monkeypatch.setattr(Path, "home", classmethod(lambda cls: fake_home))
+    monkeypatch.setenv("UV_PROJECT_ENVIRONMENT", str(fake_home / ".venvs" / "v-wiki"))
+    (fake_home / ".claude" / "settings.json").write_text(
+        '{"hooks": {"SessionEnd": [{"hooks": [{"command": '
+        "\"cd '/v/.wiki' && uv run python hooks/session-end.py\"}]}]}}"
+    )
+    result = health.check_hooks_installed()
+    assert result.severity == "warning"
+    assert result.details["stale_env"] == ["claude"]
+    assert "wiki hooks install" in result.fix
+
+    # Rewritten hook (what `wiki hooks install` emits now) → ok again.
+    (fake_home / ".claude" / "settings.json").write_text(
+        '{"hooks": {"SessionEnd": [{"hooks": [{"command": '
+        "\"cd '/v/.wiki' && UV_PROJECT_ENVIRONMENT='/h/.venvs/v-wiki' uv run python hooks/session-end.py\"}]}]}}"
+    )
+    assert health.check_hooks_installed().severity == "ok"
+
+
+def test_hooks_ok_without_env_override_even_if_hooks_lack_it(fake_vault, monkeypatch):
+    fake_home = fake_vault / "_fake_home"
+    (fake_home / ".claude").mkdir(parents=True)
+    monkeypatch.setattr(Path, "home", classmethod(lambda cls: fake_home))
+    monkeypatch.delenv("UV_PROJECT_ENVIRONMENT", raising=False)
+    (fake_home / ".claude" / "settings.json").write_text(
+        '{"x": "cd \'/v/.wiki\' && uv run python hooks/session-end.py"}'
+    )
+    assert health.check_hooks_installed().severity == "ok"
 
 
 def test_cloud_eviction_warning_when_engine_files_are_dataless(fake_vault, monkeypatch):
-    (fake_vault / ".wiki" / ".venv").mkdir()
+    local_env = fake_vault / "_home" / ".venvs" / "v-wiki"
+    local_env.mkdir(parents=True)
+    monkeypatch.setattr(health.sys, "prefix", str(local_env))
     prompts = fake_vault / ".wiki" / "prompts"
     prompts.mkdir()
     (prompts / "flush_extract.md").write_text("x")

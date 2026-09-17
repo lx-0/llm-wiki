@@ -25,6 +25,39 @@ HOOK_SESSION_START_ABS="$WIKI_DIR/hooks/session-start.py"
 HOOK_SESSION_END_ABS="$WIKI_DIR/hooks/session-end.py"
 HOOK_PRE_COMPACT_ABS="$WIKI_DIR/hooks/pre-compact.py"
 
+# ── Engine environment location (the ONE rule; Python reads the result) ──
+# A vault inside a cloud-synced folder (iCloud Drive, ~/Library/CloudStorage)
+# must not run its Python environment from there: the sync engine evicts file
+# contents to save space and re-materialises them on access, and the kernel
+# SIGKILLs a mapped executable whose pages stop matching their code signature
+# mid-swap (`Taskgated Invalid Signature`, lxw 2026-09-17 — three kills of
+# the 200 MB bundled Claude CLI in one night, six-minute imports the same
+# evening). A symlink at .wiki/.venv is NOT a fix: iCloud kept the directory
+# it already had and shelved the symlink as `.venv 2`. So for such vaults the
+# environment lives at ~/.venvs/<vault>-wiki and every uv invocation gets
+# told so via UV_PROJECT_ENVIRONMENT — exported here for the dispatcher, and
+# written literally into the agent hook commands by lib/agents.sh, because
+# hook processes come from the agent, not from `wiki`. An operator-set
+# UV_PROJECT_ENVIRONMENT always wins. Elsewhere uv's default (.wiki/.venv)
+# stays and this exports nothing.
+wiki_path_is_cloud_synced() {
+  case "$1" in
+    */Library/Mobile\ Documents/*|*/Library/CloudStorage/*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+wiki_venv_dir() {
+  if [[ -n "${UV_PROJECT_ENVIRONMENT:-}" ]]; then
+    printf "%s" "$UV_PROJECT_ENVIRONMENT"
+  elif wiki_path_is_cloud_synced "$WIKI_DIR"; then
+    printf "%s/.venvs/%s-wiki" "$HOME" "$(basename "$ROOT_DIR")"
+  fi
+}
+WIKI_VENV_DIR="$(wiki_venv_dir)"
+if [[ -n "$WIKI_VENV_DIR" ]]; then
+  export UV_PROJECT_ENVIRONMENT="$WIKI_VENV_DIR"
+fi
+
 # ── Colors / output ──────────────────────────────────────────────────
 if [[ -t 1 ]]; then
   C_RESET=$'\e[0m'; C_DIM=$'\e[2m'; C_BOLD=$'\e[1m'

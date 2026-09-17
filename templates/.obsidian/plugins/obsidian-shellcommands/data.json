@@ -102,7 +102,7 @@
     },
     "wiki-refresh-stats": {
       "platform_specific_commands": {
-        "default": "uv run --project .wiki python .wiki/scripts/dashboard_stats.py"
+        "default": "./.wiki/wiki refresh-dashboards"
       },
       "shells": {},
       "alias": "Wiki: refresh dashboard stats",

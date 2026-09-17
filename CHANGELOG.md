@@ -18,6 +18,40 @@ every operator's `wiki update` → `uv sync` regenerate `uv.lock` and dirty thei
 config keys must also be wired into `scripts/migrations/migrate_config_keys.py`
 in the same commit.
 
+## [0.5.4] — 2026-09-17
+
+The engine environment moves out of cloud-synced vaults. Verifying 0.5.3 on
+the operator vault showed why: `.wiki/.venv` had drifted back into iCloud
+Drive (iCloud had shelved the 08-26 symlink as `.venv 2` and kept its own
+directory), 2 024 engine files were evicted, and the bundled Claude CLI was
+SIGKILLed three times with `Taskgated Invalid Signature`.
+
+### Changed
+
+- **Cloud-synced vaults run their Python environment from
+  `~/.venvs/<vault>-wiki`.** One rule in `lib/common.sh` (`wiki_venv_dir`):
+  a vault under `~/Library/Mobile Documents/` or `~/Library/CloudStorage/`
+  gets `UV_PROJECT_ENVIRONMENT` exported by the `wiki` dispatcher, written
+  literally into the agent hook commands by `wiki hooks install`, and asked
+  by `install.sh`. An operator-set `UV_PROJECT_ENVIRONMENT` always wins;
+  other vaults keep uv's default `.wiki/.venv`. No symlink involved — a
+  symlink is a layout the sync engine can veto.
+- `wiki update` says where the environment lives and warns about a stale
+  in-vault `.venv` (never deletes it) and about installed hooks that still
+  lack the environment path.
+- The Obsidian "refresh dashboard stats" shell command now runs
+  `./.wiki/wiki refresh-dashboards` — it pointed at a script that no longer
+  exists.
+
+### Added
+
+- `wiki doctor` → `hooks-installed` warns when the environment override is
+  active but an installed hook command does not carry it (the hook would run
+  flush/compile from the in-vault environment).
+- `engine-cloud-eviction` now judges the *running* environment
+  (`sys.prefix`), warns about a stale in-vault `.venv` with the `rm` to run,
+  and dispatches `wiki update` for the critical case.
+
 ## [0.5.3] — 2026-09-17
 
 Session capture was dead for eight days and nothing said so. From 2026-09-09

@@ -79,12 +79,26 @@ hooks_installed() {
 # resolve correctly because the cd is absolute.
 # Single quotes around the path survive into the JSON command string and
 # protect paths that contain spaces (e.g. Mobile Documents/iCloud~md~obsidian).
+#
+# When the engine environment lives outside the vault (WIKI_VENV_DIR from
+# lib/common.sh — cloud-synced vaults), the command carries
+# `UV_PROJECT_ENVIRONMENT='<dir>'` literally: the hook process is spawned by
+# the agent with the agent's env, not by `wiki`, so nothing else could set
+# it, and everything the hook spawns (flush → compile → piggybacks) inherits
+# it. `wiki doctor` (hooks-installed) warns when installed hooks lack it.
+hook_cmd() {
+  local script="$1" env_prefix=""
+  if [[ -n "${WIKI_VENV_DIR:-}" ]]; then
+    env_prefix="UV_PROJECT_ENVIRONMENT='$WIKI_VENV_DIR' "
+  fi
+  printf "cd '%s' && %suv run python %s" "$WIKI_DIR" "$env_prefix" "$script"
+}
 
 claude_hooks_payload() {
   jq -n \
-    --arg start "cd '$WIKI_DIR' && uv run python hooks/session-start.py" \
-    --arg end "cd '$WIKI_DIR' && uv run python hooks/session-end.py" \
-    --arg compact "cd '$WIKI_DIR' && uv run python hooks/pre-compact.py" \
+    --arg start "$(hook_cmd hooks/session-start.py)" \
+    --arg end "$(hook_cmd hooks/session-end.py)" \
+    --arg compact "$(hook_cmd hooks/pre-compact.py)" \
     '{
       hooks: {
         SessionStart: [{matcher:"", hooks:[{type:"command", command:$start, timeout:15}]}],
@@ -96,8 +110,8 @@ claude_hooks_payload() {
 
 codex_hooks_payload() {
   jq -n \
-    --arg start "cd '$WIKI_DIR' && uv run python hooks/session-start.py" \
-    --arg end "cd '$WIKI_DIR' && uv run python hooks/session-end.py" \
+    --arg start "$(hook_cmd hooks/session-start.py)" \
+    --arg end "$(hook_cmd hooks/session-end.py)" \
     '{
       hooks: {
         SessionStart: [{matcher:"", hooks:[{type:"command", command:$start, timeout:15}]}],
@@ -109,9 +123,9 @@ codex_hooks_payload() {
 gemini_hooks_payload() {
   # Gemini timeouts are in milliseconds.
   jq -n \
-    --arg start "cd '$WIKI_DIR' && uv run python hooks/session-start.py" \
-    --arg end "cd '$WIKI_DIR' && uv run python hooks/session-end.py" \
-    --arg compact "cd '$WIKI_DIR' && uv run python hooks/pre-compact.py" \
+    --arg start "$(hook_cmd hooks/session-start.py)" \
+    --arg end "$(hook_cmd hooks/session-end.py)" \
+    --arg compact "$(hook_cmd hooks/pre-compact.py)" \
     '{
       hooks: {
         SessionStart: [{matcher:"", hooks:[{type:"command", command:$start, timeout:15000}]}],
@@ -127,9 +141,9 @@ cursor_hooks_payload() {
   # version=1, hooks dict with arrays per event, no `matcher` wrapper —
   # commands attach directly to the event array).
   jq -n \
-    --arg start "cd '$WIKI_DIR' && uv run python hooks/session-start.py" \
-    --arg end "cd '$WIKI_DIR' && uv run python hooks/session-end.py" \
-    --arg compact "cd '$WIKI_DIR' && uv run python hooks/pre-compact.py" \
+    --arg start "$(hook_cmd hooks/session-start.py)" \
+    --arg end "$(hook_cmd hooks/session-end.py)" \
+    --arg compact "$(hook_cmd hooks/pre-compact.py)" \
     '{
       version: 1,
       hooks: {

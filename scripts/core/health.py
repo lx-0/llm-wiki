@@ -141,6 +141,7 @@ def check_hooks_installed() -> CheckResult:
         ]
         installed_user: list[str] = []
         installed_project: list[str] = []
+        stale_env_agents: list[str] = []
         for agent_dir, filename in agent_files:
             for scope, root, target in (
                 ("user", Path.home(), installed_user),
@@ -155,12 +156,36 @@ def check_hooks_installed() -> CheckResult:
                     continue
                 if wiki_hook_re.search(text):
                     target.append(agent_dir.lstrip("."))
+                    if "UV_PROJECT_ENVIRONMENT=" not in text:
+                        stale_env_agents.append(agent_dir.lstrip("."))
         if installed_user or installed_project:
             parts = []
             if installed_user:
                 parts.append(f"user: {', '.join(installed_user)}")
             if installed_project:
                 parts.append(f"project: {', '.join(installed_project)}")
+            # Environment parity: when the engine runs from an out-of-vault
+            # environment (UV_PROJECT_ENVIRONMENT, exported by the `wiki`
+            # dispatcher for cloud-synced vaults), the installed hook
+            # commands must carry it literally — the agent spawns them with
+            # ITS env, not ours. Hooks without it run flush/compile from the
+            # in-vault environment iCloud keeps evicting (lxw 2026-09-17).
+            stale_env = sorted(set(stale_env_agents))
+            if os.environ.get("UV_PROJECT_ENVIRONMENT") and stale_env:
+                return CheckResult(
+                    id="hooks-installed",
+                    category="config",
+                    severity="warning",
+                    message=(
+                        f"hooks installed ({'; '.join(parts)}) but "
+                        f"{', '.join(stale_env)} still run the engine from the "
+                        "in-vault environment (no UV_PROJECT_ENVIRONMENT in the "
+                        "hook command)"
+                    ),
+                    fix="wiki hooks install (rewrites the hook commands with the environment path)",
+                    details={"user": installed_user, "project": installed_project,
+                             "stale_env": stale_env},
+                )
             return CheckResult(
                 id="hooks-installed",
                 category="config",
@@ -1396,20 +1421,44 @@ def _count_dataless(root: Path) -> tuple[int, int]:
     return dataless, scanned
 
 
+def _effective_env_dir() -> Path:
+    """The environment THIS interpreter runs from — `sys.prefix` is the
+    ground truth, whatever the dispatcher, a hook or a manual `uv run`
+    resolved. Not `.wiki/.venv`: with UV_PROJECT_ENVIRONMENT set that path
+    is at best a stale leftover."""
+    try:
+        return Path(sys.prefix).resolve()
+    except OSError:
+        return Path(sys.prefix)
+
+
 def check_engine_cloud_eviction() -> CheckResult:
-    """Critical when the engine venv resolves inside a cloud-synced path;
-    warning when engine source files are currently evicted; ok otherwise.
+    """Critical when the engine runs from an environment inside a
+    cloud-synced path; warning when a stale in-vault environment is still
+    lying in such a path or engine source files are currently evicted;
+    ok otherwise.
     """
-    venv = WIKI_DIR / ".venv"
-    details: dict = {"venv": None, "venv_in_cloud": False, "dataless": 0, "scanned": 0}
-    venv_real: Path | None = None
-    if venv.exists():
+    venv_real = _effective_env_dir()
+    details: dict = {
+        "venv": str(venv_real),
+        "venv_in_cloud": _in_cloud_path(venv_real),
+        "stale_in_vault_venv": None,
+        "dataless": 0,
+        "scanned": 0,
+    }
+    # A real .wiki/.venv that is NOT the running environment: dead weight
+    # the sync engine keeps hauling (400 MB on lxw) and a trap for any
+    # manual `uv run --project .wiki` without the environment variable.
+    in_vault = WIKI_DIR / ".venv"
+    stale_in_vault: Path | None = None
+    if in_vault.exists() and not in_vault.is_symlink():
         try:
-            venv_real = venv.resolve()
+            same = in_vault.resolve() == venv_real
         except OSError:
-            venv_real = venv
-        details["venv"] = str(venv_real)
-        details["venv_in_cloud"] = _in_cloud_path(venv_real)
+            same = False
+        if not same and _in_cloud_path(in_vault):
+            stale_in_vault = in_vault
+            details["stale_in_vault_venv"] = str(in_vault)
 
     dataless = scanned = 0
     for sub in _EVICTION_SCAN_DIRS:
@@ -1421,21 +1470,33 @@ def check_engine_cloud_eviction() -> CheckResult:
     details["dataless"] = dataless
     details["scanned"] = scanned
 
-    if venv_real is not None and details["venv_in_cloud"]:
+    if details["venv_in_cloud"]:
         return CheckResult(
             id="engine-cloud-eviction", category="config", severity="critical",
             message=(
-                f"engine venv lives inside a cloud-synced path ({venv_real}) — "
-                "evictions SIGKILL the bundled Claude CLI mid-run (Code Signature "
-                "Invalid) and stall imports for minutes"
+                f"engine runs from an environment inside a cloud-synced path "
+                f"({venv_real}) — evictions SIGKILL the bundled Claude CLI mid-run "
+                "(Code Signature Invalid) and stall imports for minutes"
                 + (f"; {dataless} engine file(s) evicted right now" if dataless else "")
             ),
             fix=(
-                "build the venv outside the cloud path and link it: "
-                "`UV_PROJECT_ENVIRONMENT=~/.venvs/<name> uv sync --project <vault>/.wiki`, "
-                "then replace <vault>/.wiki/.venv with a symlink to it (build first, "
-                "link second — a uv sync that finds no .venv creates a real one)"
+                "run `wiki update` (engine ≥0.5.4 builds the environment at "
+                "~/.venvs/<vault>-wiki for cloud-synced vaults), then `wiki hooks install` "
+                "so the agent hooks use it too; always start the engine via `wiki …`, "
+                "never a bare `uv run --project .wiki`"
             ),
+            dispatch_args=["update"],
+            details=details,
+        )
+    if stale_in_vault is not None:
+        return CheckResult(
+            id="engine-cloud-eviction", category="config", severity="warning",
+            message=(
+                f"stale in-vault environment at {stale_in_vault} is no longer used "
+                f"(engine runs from {venv_real}) but the sync engine keeps hauling it"
+                + (f"; {dataless} engine file(s) evicted right now" if dataless else "")
+            ),
+            fix=f"rm -rf '{stale_in_vault}'",
             details=details,
         )
     if dataless:
@@ -1450,10 +1511,7 @@ def check_engine_cloud_eviction() -> CheckResult:
         )
     return CheckResult(
         id="engine-cloud-eviction", category="config", severity="ok",
-        message=(
-            "engine venv outside cloud-synced storage"
-            if venv_real is not None else "no venv to check"
-        ),
+        message=f"engine environment outside cloud-synced storage ({venv_real})",
         details=details,
     )
 

@@ -10,7 +10,7 @@ format: markdown + mermaid + yaml-frontmatter
 
 Lebende Dokumentation aller Datenflüsse im Agentic Brain. Jeder Process wird beschrieben durch: Mermaid-Diagramm (Übersicht), Prosa (Erklärungen, Kontext, Warum), Tabellen (Konfiguration, Routing), Edge Cases.
 
-> **Konvention für die `uv run …`-Beispiele in diesem Doc:** alle als CWD = `<vault>/.wiki/` gemeint. Der Python-Venv lebt unter `<vault>/.wiki/.venv/` (vom `install.sh` per `uv sync --project <DEST>` erzeugt). Aus jeder anderen Working-Directory entweder `cd <vault>/.wiki` voranstellen oder `--project <vault>/.wiki` als Flag setzen.
+> **Konvention für die `uv run …`-Beispiele in diesem Doc:** alle als CWD = `<vault>/.wiki/` gemeint. Der Python-Venv lebt unter `<vault>/.wiki/.venv/` (vom `install.sh` per `uv sync --project <DEST>` erzeugt); liegt der Vault in iCloud Drive oder `~/Library/CloudStorage`, stattdessen unter `~/.venvs/<vault>-wiki`, adressiert über `UV_PROJECT_ENVIRONMENT` (Regel in `lib/common.sh`, Begründung in `docs/engine-layout.md`). Aus jeder anderen Working-Directory entweder `cd <vault>/.wiki` voranstellen oder `--project <vault>/.wiki` als Flag setzen — bei einem Cloud-Vault aber immer über `wiki …` gehen, das die Variable exportiert.
 
 Zwei fundamental getrennte Ingest-Pfade konvergieren bei `compile.py`:
 
