@@ -88,11 +88,19 @@ jumps directly. When everything passes the section renders
 
 **(2b) Heads-up** — critical/warning health checks WITHOUT a clean auto-fix
 (`ollama-unreachable`, `claude-authed`, `compile-errors-recent`,
-`flush-pipeline`, `template-drift`). Read-only — operator runs the suggested
+`flush-pipeline`, `engine-cloud-eviction`, `template-drift`). Read-only — operator runs the suggested
 fix manually. (`engine-update-available` lives in the actionable list, not
 here, because its fix is the single command `wiki update`; `flush-pipeline`
 moves there too when its last classified failure is `cli_outdated`, whose
 fix is the same command.)
+
+`engine-cloud-eviction` guards the engine's own files against cloud-synced
+storage: **critical** when `.wiki/.venv` resolves inside iCloud Drive or
+`~/Library/CloudStorage/` (evictions SIGKILL the bundled Claude CLI mid-run
+— `Taskgated Invalid Signature` in the macOS crash report, `kind=cli_killed`
+in the engine log), **warning** when scripts/prompts/templates are currently
+evicted (every import blocks on a download). The venv belongs at
+`~/.venvs/<name>` with `.wiki/.venv` a symlink to it.
 
 `flush-pipeline` is the session-capture watchdog: it reads the tails of
 `flush.log` / `flush-errors.log` and the `sessions/failed-flushes/` archive,

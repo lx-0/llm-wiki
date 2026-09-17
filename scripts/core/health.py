@@ -848,9 +848,14 @@ def check_voice_audio_setup() -> CheckResult:
 # surface plus compile / flush / dream / publish down at once, and the only
 # symptom was a piggyback exiting non-zero with no stderr.
 #
-# Suspected cause: the vault lives under `~/Library/Mobile Documents/`, so
-# iCloud can evict `.venv` file contents. Unproven, and it does not matter
-# here — the check is about noticing, not about the cause.
+# Cause, proven 2026-09-17: the vault lives under `~/Library/Mobile
+# Documents/`, `.wiki/.venv` had drifted from a symlink into a real directory
+# inside it, and iCloud evicts file contents there — 2 024 dataless engine
+# files at the time, the 200 MB bundled Claude CLI among them. Three crash
+# reports the same night: `CODESIGNING · Taskgated Invalid Signature`, i.e.
+# the kernel SIGKILLed the CLI when pages of the mapped binary no longer
+# matched its signature mid-materialisation. `check_engine_cloud_eviction`
+# below reports that state; this check stays about noticing the import rot.
 
 # Distributions whose import name differs from their package name. Only the
 # EXCEPTIONS are data; the list itself is derived from pyproject.toml so it
@@ -1229,10 +1234,34 @@ def _last_flush_failure(err_log: Path) -> tuple[float | None, str | None, str | 
     return None, None, None
 
 
+def _newest_sessions_capture_mtime() -> float | None:
+    """mtime of the newest ``daily/<date>/sessions.md`` — the artifact a
+    landed flush writes (replace-in-place per session). Ground truth for
+    "when did a flush last land", independent of how far back the log tail
+    reaches: on the lxw vault 512 KB of flush.log covered two days of a
+    stall and the last `Appended to` line was eight days back."""
+    daily = ROOT_DIR / "daily"
+    if not daily.is_dir():
+        return None
+    newest: float | None = None
+    for p in daily.glob("*/sessions.md"):
+        try:
+            m = p.stat().st_mtime
+        except OSError:
+            continue
+        if newest is None or m > newest:
+            newest = m
+    return newest
+
+
 def check_flush_pipeline() -> CheckResult:
     """Critical when flushes keep being spawned but none lands and the
     newest classified failure is younger than the last success; warning
     while an archive of failed contexts is waiting for retry; ok otherwise.
+
+    "Last success" is the newer of the log's last `Appended to` line and the
+    newest `daily/*/sessions.md` mtime, so a log tail that no longer reaches
+    the last good flush does not read as "never".
     """
     flush_log = LOGS_DIR / "flush.log"
     err_log = LOGS_DIR / "flush-errors.log"
@@ -1259,6 +1288,9 @@ def check_flush_pipeline() -> CheckResult:
             ts = _log_line_ts(line)
             if ts is not None:
                 spawns.append(ts)
+    landed = _newest_sessions_capture_mtime()
+    if landed is not None and (last_ok is None or landed > last_ok):
+        last_ok = landed
     spawns_since_ok = sum(1 for ts in spawns if ts > (last_ok or 0.0))
     fail_ts, fail_kind, fail_detail = _last_flush_failure(err_log)
     details = {
@@ -1270,7 +1302,7 @@ def check_flush_pipeline() -> CheckResult:
         "spawns_since_success": spawns_since_ok,
         "last_failure_kind": fail_kind,
     }
-    since = _humanize_delta(time.time() - last_ok) if last_ok else "never"
+    since = _humanize_delta(time.time() - last_ok) if last_ok else "none found"
 
     stalled = (
         fail_ts is not None
@@ -1311,6 +1343,118 @@ def check_flush_pipeline() -> CheckResult:
     )
 
 
+# ── engine files in a cloud-synced path ─────────────────────────────
+#
+# The vault may live in iCloud Drive (lxw does); the ENGINE must not run
+# from evicted files. Two failure shapes, both seen live 2026-09-17:
+#   1. `.wiki/.venv` resolving inside the cloud path → the bundled Claude
+#      CLI (200 MB) gets evicted/re-materialised while mapped and the kernel
+#      SIGKILLs it (`Taskgated Invalid Signature`); the SDK reports
+#      `exit code: -9` and the engine logs kind=cli_killed.
+#   2. dataless (evicted) scripts/prompts/templates → every import and
+#      render blocks on a download; `claude_agent_sdk` took six minutes to
+#      import, `wiki doctor` four.
+# The layout that avoids both: venv at ~/.venvs/<name>, `.wiki/.venv` a
+# symlink to it (KNOWLEDGE 2026-08-26). iCloud does not sync symlinks
+# faithfully — the lxw symlink came back as `.venv 2` next to a fresh real
+# `.venv` that a later `uv sync` had created in place.
+
+_CLOUD_PATH_MARKERS = ("/Library/Mobile Documents/", "/Library/CloudStorage/")
+# BSD `SF_DATALESS` (0x40000000): file contents are not on disk (evicted by a
+# cloud provider). `stat.SF_DATALESS` only exists from Python 3.13.
+_SF_DATALESS = 0x40000000
+# Engine directories that are read on every run and must be resident.
+_EVICTION_SCAN_DIRS = ("scripts", "prompts", "templates", "hooks", "lib")
+
+
+def _is_dataless(st: os.stat_result) -> bool:
+    return bool(getattr(st, "st_flags", 0) & _SF_DATALESS)
+
+
+def _in_cloud_path(p: Path) -> bool:
+    s = str(p)
+    return any(marker in s for marker in _CLOUD_PATH_MARKERS)
+
+
+def _count_dataless(root: Path) -> tuple[int, int]:
+    """(dataless files, files scanned) under ``root`` — stat only, never a
+    read, so the scan itself materialises nothing."""
+    dataless = scanned = 0
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = [d for d in dirnames if d not in ("__pycache__", ".git")]
+        for name in filenames:
+            try:
+                st = os.stat(os.path.join(dirpath, name))
+            except OSError:
+                continue
+            scanned += 1
+            if _is_dataless(st):
+                dataless += 1
+    return dataless, scanned
+
+
+def check_engine_cloud_eviction() -> CheckResult:
+    """Critical when the engine venv resolves inside a cloud-synced path;
+    warning when engine source files are currently evicted; ok otherwise.
+    """
+    venv = WIKI_DIR / ".venv"
+    details: dict = {"venv": None, "venv_in_cloud": False, "dataless": 0, "scanned": 0}
+    venv_real: Path | None = None
+    if venv.exists():
+        try:
+            venv_real = venv.resolve()
+        except OSError:
+            venv_real = venv
+        details["venv"] = str(venv_real)
+        details["venv_in_cloud"] = _in_cloud_path(venv_real)
+
+    dataless = scanned = 0
+    for sub in _EVICTION_SCAN_DIRS:
+        d = WIKI_DIR / sub
+        if d.is_dir():
+            n, s = _count_dataless(d)
+            dataless += n
+            scanned += s
+    details["dataless"] = dataless
+    details["scanned"] = scanned
+
+    if venv_real is not None and details["venv_in_cloud"]:
+        return CheckResult(
+            id="engine-cloud-eviction", category="config", severity="critical",
+            message=(
+                f"engine venv lives inside a cloud-synced path ({venv_real}) — "
+                "evictions SIGKILL the bundled Claude CLI mid-run (Code Signature "
+                "Invalid) and stall imports for minutes"
+                + (f"; {dataless} engine file(s) evicted right now" if dataless else "")
+            ),
+            fix=(
+                "build the venv outside the cloud path and link it: "
+                "`UV_PROJECT_ENVIRONMENT=~/.venvs/<name> uv sync --project <vault>/.wiki`, "
+                "then replace <vault>/.wiki/.venv with a symlink to it (build first, "
+                "link second — a uv sync that finds no .venv creates a real one)"
+            ),
+            details=details,
+        )
+    if dataless:
+        return CheckResult(
+            id="engine-cloud-eviction", category="config", severity="warning",
+            message=(
+                f"{dataless} of {scanned} engine file(s) are evicted from local "
+                "storage — imports and prompt renders block on cloud downloads"
+            ),
+            fix=f"brctl download '{WIKI_DIR}' (or open the folder in Finder to re-download)",
+            details=details,
+        )
+    return CheckResult(
+        id="engine-cloud-eviction", category="config", severity="ok",
+        message=(
+            "engine venv outside cloud-synced storage"
+            if venv_real is not None else "no venv to check"
+        ),
+        details=details,
+    )
+
+
 # Checks return either a single CheckResult or a list[CheckResult]
 # (for multi-result probes like per-account auth — one CheckResult per
 # account-integration pair, count knowable only at probe time).
@@ -1332,6 +1476,7 @@ _ALL_CHECKS: list[Callable[..., CheckResult | list[CheckResult]]] = [
     check_piggyback_health,
     check_index_drift,
     check_dependencies_importable,
+    check_engine_cloud_eviction,
 ]
 
 

@@ -56,6 +56,15 @@ bundled CLI by hand: the cause had been on stdout the whole time.
 - **Failure kind `cli_outdated`** (fatal) — matches the API's version-floor
   refusal. **`model`** now also matches the phrasings CLI 2.1.273 actually
   emits (`[claude-code:unrecognized_model]`, "issue with the selected model").
+  **`cli_killed`** (transient) — the SDK's `exit code: -9`: the OS SIGKILLed
+  the CLI; the detail points at `~/Library/Logs/DiagnosticReports/claude-*.ips`.
+- **`wiki doctor` → `engine-cloud-eviction`**: critical when `.wiki/.venv`
+  resolves inside iCloud Drive / `~/Library/CloudStorage/`, warning when
+  engine source files are currently evicted. Found while verifying this
+  release on the operator vault: the venv had drifted from a symlink into a
+  real directory inside iCloud, 2 024 engine files were dataless, the
+  bundled CLI was SIGKILLed three times with `Taskgated Invalid Signature`,
+  and `claude_agent_sdk` took six minutes to import.
 - **Structured-error details carry the API's own sentence** (excerpted to 240
   chars) and the captured stderr feeds the classifier too. The fast-fail
   `cli_crash` text no longer asserts "exited silently" — it says what is

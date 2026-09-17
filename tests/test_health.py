@@ -400,6 +400,42 @@ def test_flush_pipeline_ok_when_success_is_newest(fake_vault):
     assert "landed" in result.message
 
 
+def test_flush_pipeline_last_success_from_daily_when_log_tail_is_too_short(fake_vault):
+    """The log tail may not reach the last `Appended to` line any more (lxw:
+    512 KB covered two days of stall, the last success was 8 days back). The
+    newest daily/*/sessions.md mtime is the landed artifact and must be used
+    — both to date the last success and to clear a stall when it is newer
+    than the last failure."""
+    _write_flush_logs(
+        fake_vault,
+        flush_lines=[
+            f"{_ts(7200, True)} [hook] Spawned flush.py for session a",
+            f"{_ts(7100, True)} [hook] Spawned flush.py for session b",
+            f"{_ts(7000, True)} [hook] Spawned flush.py for session c",
+        ],
+        error_lines=[f"{_ts(7050)}  ERROR    flush_extract attempt 3/3 ✗ failed after 2.0s — kind=cli_crash · y"],
+        archived=3,
+    )
+    sessions = fake_vault / "daily" / "2026-09-17" / "sessions.md"
+    sessions.parent.mkdir(parents=True)
+    sessions.write_text("<!-- wiki:session c begin -->\n")
+    landed = time.time() - 600
+    os.utime(sessions, (landed, landed))
+
+    result = health.check_flush_pipeline()
+    assert result.severity == "warning", "a capture landed after the failure — not stalled"
+    assert result.details["last_success"] is not None
+    assert "none found" not in result.message
+
+    # Same logs, but the landed artifact predates the failure → stalled, and
+    # the message dates the last success instead of saying "none found".
+    stale = time.time() - 3 * 86400
+    os.utime(sessions, (stale, stale))
+    result = health.check_flush_pipeline()
+    assert result.severity == "critical"
+    assert "last successful flush 3d ago" in result.message
+
+
 def test_flush_pipeline_reads_only_the_tail(fake_vault, monkeypatch):
     """Multi-MB iCloud-synced logs: the check must seek, not read whole."""
     monkeypatch.setattr(health, "_FLUSH_LOG_TAIL_BYTES", 200)
@@ -412,6 +448,63 @@ def test_flush_pipeline_reads_only_the_tail(fake_vault, monkeypatch):
     result = health.check_flush_pipeline()
     assert result.severity == "ok"
     assert result.details["last_success"] is not None
+
+
+# ── check_engine_cloud_eviction ────────────────────────────────────
+
+
+def test_cloud_eviction_ok_when_venv_local(fake_vault):
+    (fake_vault / ".wiki" / ".venv").mkdir()
+    (fake_vault / ".wiki" / "scripts").mkdir()
+    (fake_vault / ".wiki" / "scripts" / "a.py").write_text("x")
+    result = health.check_engine_cloud_eviction()
+    assert result.severity == "ok"
+    assert result.details["scanned"] == 1
+
+
+def test_cloud_eviction_critical_when_venv_resolves_into_icloud(fake_vault):
+    """A symlink that resolves into `~/Library/Mobile Documents/` is the
+    lxw 2026-09-17 shape (and a real dir there is the same thing)."""
+    cloud_venv = fake_vault / "Library" / "Mobile Documents" / "iCloud~x" / "v" / ".venv"
+    cloud_venv.mkdir(parents=True)
+    (fake_vault / ".wiki" / ".venv").symlink_to(cloud_venv)
+    result = health.check_engine_cloud_eviction()
+    assert result.severity == "critical"
+    assert "SIGKILL" in result.message
+    assert result.details["venv_in_cloud"] is True
+    assert "symlink" in (result.fix or "")
+
+
+def test_cloud_eviction_warning_when_engine_files_are_dataless(fake_vault, monkeypatch):
+    (fake_vault / ".wiki" / ".venv").mkdir()
+    prompts = fake_vault / ".wiki" / "prompts"
+    prompts.mkdir()
+    (prompts / "flush_extract.md").write_text("x")
+    (prompts / "other.md").write_text("y")
+    evicted = {str(prompts / "flush_extract.md")}
+    real_stat = os.stat
+
+    def fake_is_dataless(st):  # noqa: ARG001
+        return getattr(st, "_evicted", False)
+
+    def fake_stat(path, *a, **kw):
+        st = real_stat(path, *a, **kw)
+
+        class _St:
+            def __init__(self, inner, ev):
+                self._inner, self._evicted = inner, ev
+
+            def __getattr__(self, n):
+                return getattr(self._inner, n)
+
+        return _St(st, str(path) in evicted)
+
+    monkeypatch.setattr(health, "_is_dataless", fake_is_dataless)
+    monkeypatch.setattr(health.os, "stat", fake_stat)
+    result = health.check_engine_cloud_eviction()
+    assert result.severity == "warning"
+    assert result.details == {**result.details, "dataless": 1, "scanned": 2}
+    assert "brctl download" in (result.fix or "")
 
 
 # ── check_no_knowledge_articles + check_compile_state ──────────────

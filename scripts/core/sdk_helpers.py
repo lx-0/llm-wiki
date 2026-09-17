@@ -99,6 +99,15 @@ _RE_CLI_OUTDATED = re.compile(
     r"does\s+not\s+support\s+this\s+model)",
     re.IGNORECASE,
 )
+# cli_killed: the bundled CLI died from SIGKILL (SDK reports "exit code: -9").
+# Nothing inside the process writes that; the kernel did it. On macOS the
+# reason is in ~/Library/Logs/DiagnosticReports/claude-*.ips — seen
+# 2026-09-17 as `CODESIGNING · Taskgated Invalid Signature` because the
+# vault's .venv had drifted back INTO iCloud Drive and the 200 MB binary was
+# being evicted/re-materialised while mapped. Transient per call (the next
+# attempt ran), so not fatal — but the detail must name the report, not
+# "exited silently".
+_RE_SIGKILL = re.compile(r"(exit code:\s*-9\b|\bSIGKILL\b|signal\s+9\b)", re.IGNORECASE)
 _RE_RATE_LIMIT = re.compile(
     r"\b(429|rate.?limit(ed)?|overload(ed)?|usage.?limit(ed)?|quota.?exceeded)\b",
     re.IGNORECASE,
@@ -172,7 +181,7 @@ class StderrCapture:
 class FailureClass:
     """Classification of one failed SDK call."""
 
-    kind: str   # cli_outdated | rate_limit | auth | model | network | oom | cli_crash | max_turns | tokens_exceeded | unknown
+    kind: str   # cli_outdated | cli_killed | rate_limit | auth | model | network | oom | cli_crash | max_turns | tokens_exceeded | unknown
     detail: str
 
     def __str__(self) -> str:  # pragma: no cover — formatting only
@@ -287,6 +296,14 @@ def classify_failure(
             "cli_outdated",
             "API refuses the bundled Claude CLI version — bump claude-agent-sdk "
             "in the engine, then `wiki update`",
+        )
+    if _RE_SIGKILL.search(haystack):
+        return FailureClass(
+            "cli_killed",
+            "bundled CLI was SIGKILLed by the OS — on macOS read the newest "
+            "~/Library/Logs/DiagnosticReports/claude-*.ips (`Code Signature "
+            "Invalid` = the binary sits in an iCloud/CloudStorage path and was "
+            "evicted while running; `wiki doctor` → engine-cloud-eviction)",
         )
     if _RE_RATE_LIMIT.search(haystack):
         return FailureClass("rate_limit", "matched 429/overload/quota pattern")

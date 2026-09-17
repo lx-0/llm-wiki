@@ -2929,4 +2929,24 @@ claude-agent-sdk 0.1.58 bundles CLI 2.1.97 (April build). The API introduced a s
 
 ### Fix (this arc)
 
-`uv lock --upgrade-package claude-agent-sdk` → 0.2.153 (CLI 2.1.273); `cli_outdated` failure kind (fatal); `_structured_error_failure` classifies over result text + stderr and carries the API's sentence; `SdkCallSpec.tools`; flush via harness with fatal-kind short-circuit; `check_flush_pipeline` in `wiki doctor`. Verified live on lxw: `wiki update`, then a retry of one archived context landed in `daily/`.
+`uv lock --upgrade-package claude-agent-sdk` → 0.2.153 (CLI 2.1.273); `cli_outdated` failure kind (fatal); `_structured_error_failure` classifies over result text + stderr and carries the API's sentence; `SdkCallSpec.tools`; flush via harness with fatal-kind short-circuit; `check_flush_pipeline` in `wiki doctor`. Verified live on lxw: `wiki update`, then `retry-failed-flushes.py --limit 1` landed a 09-09 context in `daily/2026-09-17/sessions.md` (446 → 445 archived) — on its **second** attempt; the first died of the finding below.
+
+## The vault venv drifted back into iCloud, and the kernel SIGKILLs an evicted binary mid-run (2026-09-17)
+
+### Symptom
+
+`CLIConnectionError: Cannot write to terminated process (exit code: -9)` after ~30 s, empty stderr, `kind=unknown`. Three times the same night, always as a child of a Python SDK call, never when running the bundled binary by hand. `claude_agent_sdk` took six minutes to import inside the vault; `wiki doctor` took four; `grep` on `flush.log` timed out.
+
+### Root cause (three `~/Library/Logs/DiagnosticReports/claude-*.ips`)
+
+`termination: CODESIGNING · Taskgated Invalid Signature`, `procPath: …/Mobile Documents/iCloud~md~obsidian/*/claude`, launched 31 s before the kill. The 2026-08-26 layout (`.wiki/.venv` → symlink to `~/.venvs/lxw-wiki`) had not survived: iCloud does not sync symlinks faithfully, the symlink came back as `.venv 2`, and a later `uv sync` (which "creates a real directory when it finds no .venv") built a real `.venv` inside the vault. 2 024 files under `.wiki` were dataless at the time — `uv.lock`, `AGENTS.md`, `.git`, and the 200 MB CLI. When iCloud materialises or evicts a mapped executable, its pages stop matching the code signature and the kernel kills the process.
+
+### Lessons
+
+1. **A symlink inside an iCloud path is not a durable layout decision.** Verify `readlink <vault>/.wiki/.venv` before trusting the 08-26 entry; `wiki doctor` → `engine-cloud-eviction` now reports the state on every run.
+2. **`exit code: -9` is the kernel talking, not the CLI.** It is now `kind=cli_killed` with the crash-report path in the detail. Transient per attempt, so the retry ladder is the right response — but the fix is the layout, not more retries.
+3. **Slowness is a symptom too.** Minute-long imports and a four-minute doctor were the same eviction, hours before the first SIGKILL.
+
+### Fix
+
+Layout: `UV_PROJECT_ENVIRONMENT=~/.venvs/lxw-wiki uv sync --project <vault>/.wiki`, then replace the real `.wiki/.venv` with a symlink (build first, link second). Not applied in this arc — it is a mutation of the operator's live install and was handed back as a decision with the doctor check pointing at it.

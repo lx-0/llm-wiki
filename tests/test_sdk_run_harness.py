@@ -469,6 +469,25 @@ def test_structured_error_excerpt_is_bounded(ledger: UsageLedger):
     assert result.failure.detail.endswith("…")
 
 
+def test_sigkill_is_cli_killed_and_names_the_crash_report(ledger: UsageLedger):
+    """The SDK's exact text when the OS kills the CLI mid-run (lxw 2026-09-17,
+    three times: CODESIGNING · Taskgated Invalid Signature, venv inside
+    iCloud). Not fatal — the next attempt ran — but the detail must point at
+    DiagnosticReports instead of claiming the CLI 'exited silently'."""
+    from claude_agent_sdk import CLIConnectionError
+
+    from core.sdk_helpers import is_fatal
+
+    async def killed_query(*, prompt, options):  # noqa: ARG001
+        raise CLIConnectionError("Cannot write to terminated process (exit code: -9)")
+        yield  # pragma: no cover
+
+    result = asyncio.run(run_sdk_query("p", _spec(), query_fn=killed_query))
+    assert result.failure.kind == "cli_killed"
+    assert "DiagnosticReports" in result.failure.detail
+    assert not is_fatal(result.failure)
+
+
 # ── 6. base toolset ───────────────────────────────────────────────────
 
 
