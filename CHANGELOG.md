@@ -43,6 +43,15 @@ SIGKILLed three times with `Taskgated Invalid Signature`.
   `./.wiki/wiki refresh-dashboards` — it pointed at a script that no longer
   exists.
 
+### Fixed
+
+- **`wiki hooks install` no longer drops the operator's other hooks.** The
+  installer deep-merged with jq `*`, which *replaces* arrays — a re-install
+  into a SessionStart that also held a ytstack or herdr hook would have kept
+  only the wiki entry. Per event it now keeps every non-wiki entry and
+  replaces only the wiki-managed one(s), for all four agent config shapes.
+  Found on the operator's own configs while preparing the hook rewrite.
+
 ### Added
 
 - `wiki doctor` → `hooks-installed` warns when the environment override is

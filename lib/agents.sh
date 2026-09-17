@@ -165,7 +165,19 @@ agent_payload() {
 }
 
 # ── Merge / install / uninstall ──────────────────────────────────────
-# Merge a JSON payload into an existing JSON file using jq deep-merge.
+# Merge a JSON payload into an existing JSON file.
+#
+# Top-level keys deep-merge (jq `*`). The `hooks` block does NOT: jq's `*`
+# REPLACES arrays, so a plain deep-merge of `{hooks:{SessionStart:[wiki]}}`
+# into a config whose SessionStart already holds the operator's other hooks
+# would silently drop those (lxw 2026-09-17: one foreign entry per agent
+# in SessionStart — ytstack / herdr — gone on the next `wiki hooks install`).
+# Per event we therefore keep every entry that is not wiki-managed and
+# replace only ours (identified by the same command grammar as
+# `hooks_installed`); both entry shapes are handled — Claude/Codex/Gemini
+# `{matcher, hooks:[{command}]}` and Cursor's bare `{type, command}`.
+_WIKI_HOOK_CMD_RE='\.wiki['"'"'"/ ].*hooks/(session-(start|end)|pre-compact)'
+
 merge_into_config() {
   local cfg="$1" payload="$2"
   mkdir -p "$(dirname "$cfg")"
@@ -174,7 +186,19 @@ merge_into_config() {
       err "Existing $cfg is not valid JSON — refusing to merge."
       return 1
     fi
-    jq --argjson p "$payload" '. * $p' "$cfg" > "$cfg.tmp" && mv "$cfg.tmp" "$cfg"
+    jq --argjson p "$payload" --arg re "$_WIKI_HOOK_CMD_RE" '
+      def wiki_managed:
+        ([.command? // empty] + [((.hooks // [])[]? | .command? // empty)])
+        | any(test($re));
+      . as $cfg
+      | ($cfg * ($p | del(.hooks)))
+      | if ($p.hooks // null) then
+          .hooks = (
+            reduce ($p.hooks | to_entries[]) as $e ($cfg.hooks // {};
+              .[$e.key] = (((.[$e.key] // []) | map(select(wiki_managed | not))) + $e.value))
+          )
+        else . end
+    ' "$cfg" > "$cfg.tmp" && mv "$cfg.tmp" "$cfg"
   else
     echo "$payload" | jq . > "$cfg"
   fi
