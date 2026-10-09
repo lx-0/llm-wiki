@@ -301,6 +301,9 @@ INJECTED_KEYS: dict[str, tuple[str, ...]] = {
     ),
     "limits": (
         "curiosity_exclude_globs",    # curiosity substrate denylist (2026-06-13)
+        "wispr_request_timeout_s",    # direct HTTP meeting collector (2026-10-09)
+        "wispr_max_per_run",
+        "wispr_max_pages",
         "review_max_sweep_runtime_s",  # review-wiki soft sweep deadline (2026-06-13)
         "curiosity_folder_max_candidates",  # M027 candidate retrieval (2026-06-13)
         "dream_per_call_timeout_s",   # M014 per-message stall timeout (2026-05-18)
@@ -435,6 +438,7 @@ INJECTED_KEYS: dict[str, tuple[str, ...]] = {
 # Piggyback default blocks injected so the knob is visible/tunable in the
 # operator's YAML. Values derive from _default_piggybacks().
 INJECTED_PIGGYBACKS: tuple[str, ...] = (
+    "wispr",
     "calendar",             # M006 (2026-05-15)
     "curiosity_followup",   # consumer piggyback, backlog-corrective (2026-05-16)
     "dream_cycle",          # M014 (2026-05-16)

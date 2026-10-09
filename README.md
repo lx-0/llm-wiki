@@ -324,6 +324,7 @@ Hooks always use Option B (the `--project` flag is hardcoded into the agent conf
 | [docs/engine-layout.md](docs/engine-layout.md) | File-by-file tree of `.wiki/` — the engine internals |
 | [docs/naming.md](docs/naming.md) | Naming conventions for raw sources and knowledge articles |
 | [docs/architecture.png](docs/architecture.png) | Full Excalidraw render of the cognitive architecture |
+| [docs/meeting-collectors-architecture.md](docs/meeting-collectors-architecture.md) | Jamie and Wispr direct HTTP collectors: authentication, source capture, daily provenance and compilation |
 | [AGENTS.md](AGENTS.md) | Conventions for AI agents working on **this codebase** (separate from the vault's own AGENTS.md) |
 | [.ytstack/PROJECT.md](.ytstack/PROJECT.md) | Project framing, success criteria, current status |
 | [.ytstack/DECISIONS.md](.ytstack/DECISIONS.md) | Locked architectural choices |

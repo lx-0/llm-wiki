@@ -1,0 +1,11 @@
+# Project permissions requested by Alex, 2026-10-09.
+approval_policy = "on-request"
+approvals_reviewer = "auto_review"
+default_permissions = "wiki-development"
+
+[permissions.wiki-development]
+description = "Wiki development and direct collector API verification."
+extends = ":workspace"
+
+[permissions.wiki-development.network]
+enabled = true

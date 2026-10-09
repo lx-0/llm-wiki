@@ -396,6 +396,12 @@ class Limits:
     # (kind: jamie-api, api_key_env, key_type, since, max_per_run).
     jamie_request_timeout_s: int = 30     # per-HTTP-call timeout against api.meetjamie.ai
     jamie_max_per_run: int = 50           # default cap per account (overridable via the per-account jamie sub-block)
+    # Timeout in seconds for each direct Wispr Flow meeting API request.
+    wispr_request_timeout_s: int = 30
+    # Maximum new or changed Wispr meetings written per account per run.
+    wispr_max_per_run: int = 50
+    # Maximum Wispr sync pages per account; incomplete scans retain their watermark.
+    wispr_max_pages: int = 100
     # Google Meet ingest (collectors/gmeet.py — see also CONFIG.piggybacks.gmeet).
     # Multi-tenant: per-account gmeet block under personal.accounts.<id>.gmeet
     # (kind: gmeet-api, drive_folder_id, drive_folder_name, since, max_per_run).
@@ -1017,6 +1023,8 @@ class Personal:
     # entirely and unattributed content stays generic. An explicit `author:`
     # frontmatter always wins over the implicit default.
     implicit_operator_author: str | None = None
+    # Wispr also uses personal.accounts.<id>.wispr (kind: wispr-api), with
+    # access_token_env or session_file + user_id; no account defaults shipped.
     # Jamie AI + Google Meet + Google Calendar integrations are multi-tenant via
     # per-account `jamie:` / `gmeet:` / `calendar:` sub-blocks under
     # `personal.accounts.<id>` (kinds: `jamie-api`, `gmeet-api`,
@@ -1092,6 +1100,7 @@ def _default_piggybacks() -> dict[str, PiggybackTask]:
         # sub-blocks — NOT here (build_piggyback_tasks never passes
         # max_per_run to a Registry collector).
         "jamie": PiggybackTask(cooldown_hours=6),
+        "wispr": PiggybackTask(cooldown_hours=6),
         "gmeet": PiggybackTask(cooldown_hours=6),
         "calendar": PiggybackTask(cooldown_hours=6),
         # Oura / HealthKit ingest (M023). Account-bound like jamie/gmeet;

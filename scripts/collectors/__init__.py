@@ -26,6 +26,7 @@ from collectors import folder_index  # noqa: F401,E402
 from collectors import gmeet  # noqa: F401,E402
 from collectors import health  # noqa: F401,E402
 from collectors import jamie  # noqa: F401,E402
+from collectors import wispr  # noqa: F401,E402
 from collectors import scan_browser  # noqa: F401,E402
 from collectors import scan_screenshots  # noqa: F401,E402
 from collectors import scan_tabs  # noqa: F401,E402

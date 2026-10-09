@@ -141,6 +141,9 @@ The `.env` file: only the **variable NAME** lives in `config.yaml` (e.g. `api_ke
 | `limits.youtube_aggregate_timeout_s` | `300` | final synthesis call timeout |
 | `limits.jamie_request_timeout_s` | `30` | Jamie ingest (collectors/jamie.py — see also CONFIG.piggybacks.jamie). |
 | `limits.jamie_max_per_run` | `50` | default cap per account (overridable via the per-account jamie sub-block) |
+| `limits.wispr_request_timeout_s` | `30` | Timeout in seconds for each direct Wispr Flow meeting API request. |
+| `limits.wispr_max_per_run` | `50` | Maximum new or changed Wispr meetings written per account per run. |
+| `limits.wispr_max_pages` | `100` | Maximum Wispr sync pages per account; incomplete scans retain their watermark. |
 | `limits.gmeet_request_timeout_s` | `30` | Google Meet ingest (collectors/gmeet.py — see also CONFIG.piggybacks.gmeet). |
 | `limits.gmeet_max_per_run` | `50` | default cap; per-account override is the gmeet sub-block's max_per_run |
 | `limits.gmeet_export_dead_letter_attempts` | `3` | export failures per doc-id before it parks in the dead-letter |
@@ -211,6 +214,7 @@ sub-blocks instead.
 | `piggybacks.screenshots` | `true` | 24 | 50 |
 | `piggybacks.curiosity_followup` | `true` | 6 | 5 |
 | `piggybacks.jamie` | `true` | 6 | — |
+| `piggybacks.wispr` | `true` | 6 | — |
 | `piggybacks.gmeet` | `true` | 6 | — |
 | `piggybacks.calendar` | `true` | 6 | — |
 | `piggybacks.health` | `true` | 24 | — |

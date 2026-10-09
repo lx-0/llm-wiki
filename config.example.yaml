@@ -115,6 +115,11 @@ piggybacks:
   jamie:
     enabled: true
     cooldown_hours: 6                    # tighter than scan_youtube — meetings are time-sensitive
+  # Direct Wispr meeting API. Inert until a personal.accounts.<id>.wispr
+  # account is configured; see docs/setup-wispr.md.
+  wispr:
+    enabled: true
+    cooldown_hours: 6
   # Pulls Google Meet / Gemini transcripts from Drive via collectors/gmeet.py.
   # Multi-tenant: requires at least one personal.accounts.<id>.gmeet sub-block
   # (kind: gmeet-api) AND `wiki gmeet-auth <id>` run for that account. Otherwise
@@ -369,6 +374,10 @@ limits:
   # Jamie ingest (collectors/jamie.py).
   jamie_request_timeout_s: 30            # per-HTTP-call timeout against api.meetjamie.ai
   jamie_max_per_run: 50                  # default cap per account (per-account override is the jamie sub-block's max_per_run)
+  # Direct Wispr API request timeout (seconds), write cap, and page cap.
+  wispr_request_timeout_s: 30
+  wispr_max_per_run: 50
+  wispr_max_pages: 100
   # Google Meet ingest (collectors/gmeet.py — multi-tenant; per-account override
   # is the gmeet sub-block's max_per_run under personal.accounts.<id>.gmeet).
   gmeet_request_timeout_s: 30            # per-HTTP-call timeout against the Drive API
@@ -890,6 +899,9 @@ personal:
   #       imap_pass_env: IMAP_PERSONAL_GMAIL_PASS         # Google App Password: 16 lowercase chars, no spaces, needs 2FA
   #       # imap_user_env: ...                           # optional; omit → uses account.email
   #       # folders: [INBOX]                             # optional allowlist; omit → all folders
+  # Wispr: see docs/setup-wispr.md for a wispr: {kind: wispr-api, ...}
+  # account block. Uses access_token_env, or session_file plus user_id.
+  # No personal account identifiers or tokens are shipped by default.
   accounts: {}
   # Folder list for the curiosity loop. Each entry: { path, desc }.
   # `path` strings also become the schema enum in compile.py — single
