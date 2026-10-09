@@ -26,6 +26,7 @@ from core.sdk_helpers import sanitize_stale_session_env
 sanitize_stale_session_env(os.environ)
 
 import asyncio
+import argparse
 import contextlib
 import json
 import logging
@@ -344,13 +345,29 @@ def maybe_run_piggyback_tasks() -> None:
 
 # ── Main ─────────────────────────────────────────────────────────────
 
-async def main() -> None:
-    if len(sys.argv) < 3:
-        print("Usage: uv run python flush.py <context_file.md> <session_id>")
-        sys.exit(1)
+def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        prog="wiki flush",
+        description="Extract a daily entry with the Claude Agent SDK (LLM cost applies).",
+        epilog=("Use only a disposable UTF-8 Markdown copy of conversation context. "
+                "The file is deleted after success, duplicate-skip or empty input; "
+                "failed extraction moves it to .wiki/sessions/failed-flushes/. "
+                "Evening flushes may also trigger compilation and piggyback tasks."),
+    )
+    parser.add_argument("context_file", type=Path, metavar="context_file.md",
+                        help="disposable conversation context: requests, decisions and outcomes")
+    parser.add_argument("session_id", help="capture identity used for deduplication")
+    args = sys.argv[1:] if argv is None else argv
+    if not args:
+        parser.print_help(sys.stderr)
+        parser.exit(2)
+    return parser.parse_args(args)
 
-    context_file = Path(sys.argv[1])
-    session_id = sys.argv[2]
+
+async def main() -> None:
+    args = _parse_args()
+    context_file = args.context_file
+    session_id = args.session_id
 
     log.info("flush start — session=%s context=%s", session_id, context_file)
 

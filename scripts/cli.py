@@ -136,16 +136,27 @@ NOTES
   Wraps scripts/compile.py. Runs Claude Agent SDK against your configured compile_model.
   LLM cost applies. Dashboard counts refresh automatically afterwards."""
 
-H_FLUSH = """wiki flush — capture the current Claude Code session context to daily/
+H_FLUSH = """wiki flush — extract a daily entry from a disposable context file
 
 USAGE
-  wiki flush                         manually trigger a flush (normally automatic via hooks)
+  wiki flush <context_file.md> <session_id>
+
+INPUT
+  Write a temporary UTF-8 Markdown file containing the conversation context:
+  relevant user requests, decisions, outcomes and unresolved work. Hooks normally
+  prepare it automatically; manual callers must supply it. Use a unique session_id
+  for a new capture; repeated IDs are subject to the session dedup window.
+
+CONSUMED FILE
+  The input is deleted after success, on duplicate-skip and when empty.
+  Failed extraction moves it into .wiki/sessions/failed-flushes/ for retry.
+  Pass only a disposable copy, never an original project or vault file.
 
 NOTES
-  Wraps scripts/flush.py. Reads recent session transcript, extracts a
-  daily-log entry, appends to daily/YYYY-MM-DD.md. After 18:00 (or
-  whatever scheduling.compile_after_hour is set to), triggers compile +
-  piggyback tasks. Dashboard counts refresh automatically afterwards."""
+  Extraction uses the Claude Agent SDK: LLM cost applies. The result is written
+  to daily/YYYY-MM-DD/sessions.md. After scheduling.compile_after_hour, a flush
+  can also trigger compilation (additional LLM cost) and due piggyback tasks.
+  Dashboard counts refresh automatically afterwards."""
 
 H_LINT = """wiki lint — health-check the knowledge base
 
@@ -805,8 +816,9 @@ COMMANDS: tuple[CommandSpec, ...] = (
     CommandSpec("dedup", "Facts & takes", "find + merge STT-noise duplicate entity pages",
                 handler="dedup.py", refresh_after=True, menu=True, help_text=H_DEDUP),
     # Review & maintenance
-    CommandSpec("flush", "Review & maintenance", "capture current session context to daily/",
-                handler="flush.py", menu=True, help_text=H_FLUSH),
+    CommandSpec("flush", "Review & maintenance", "extract a disposable context file to daily/",
+                handler="flush.py", menu=True, help_text=H_FLUSH,
+                show_help_on_empty=True, empty_help_exit=2),
     CommandSpec("curiosity", "Review & maintenance", "review + run curiosity deep-scan requests",
                 handler="curiosity/cli.py", menu=True, help_text=H_CURIOSITY),
     CommandSpec("suggestions", "Review & maintenance", "review + execute optimization suggestions",

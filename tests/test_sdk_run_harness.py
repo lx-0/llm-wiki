@@ -186,6 +186,27 @@ def test_generic_exception_classified_and_recorded(ledger: UsageLedger):
     assert ledger.totals()[("claude", "claude-test-model")].calls == 1
 
 
+@pytest.mark.parametrize("raises_after_result", [False, True])
+def test_issue6_empty_zero_token_result_is_a_failure(ledger: UsageLedger, raises_after_result):
+    """Issue #6: subtype=success, one turn, no stderr and zero tokens.
+
+    Pin both CLI stream endings: neither may be recorded as a successful
+    compilation or collapsed back into the old opaque agent_error bucket.
+    """
+    async def refused_query(*, prompt, options):
+        yield _result(result="", cost=0.0, is_error=True, subtype="success",
+                      num_turns=1, usage={"input_tokens": 0, "output_tokens": 0})
+        if raises_after_result:
+            raise RuntimeError("Command failed with exit code 1")
+
+    result = asyncio.run(run_sdk_query("p", _spec(), query_fn=refused_query))
+    assert not result.ok
+    assert result.failure.kind == "cli_crash"
+    assert result.input_tokens == result.output_tokens == 0
+    assert result.cost_usd == 0.0
+    assert result.num_turns == 1
+
+
 def test_structured_error_max_turns(ledger: UsageLedger):
     """ResultMessage(is_error, subtype=error_max_turns) then raise — the
     bundled CLI's exit-1 shape. Kind comes from the structured payload,

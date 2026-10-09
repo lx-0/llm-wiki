@@ -102,6 +102,8 @@ def main() -> None:
     if sys.platform == "win32":
         CREATE_NO_WINDOW = 0x08000000
         kwargs["creationflags"] = CREATE_NO_WINDOW
+    else:
+        kwargs["start_new_session"] = True
 
     subprocess.Popen(
         cmd,

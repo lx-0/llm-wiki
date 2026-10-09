@@ -106,6 +106,10 @@ def main() -> None:
     if sys.platform == "win32":
         CREATE_NO_WINDOW = 0x08000000
         kwargs["creationflags"] = CREATE_NO_WINDOW
+    else:
+        # Stop hooks can be torn down with their process group after return.
+        # The staged flush must survive to finish its extraction independently.
+        kwargs["start_new_session"] = True
 
     subprocess.Popen(
         cmd,

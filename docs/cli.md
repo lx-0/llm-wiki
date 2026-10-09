@@ -269,7 +269,7 @@ Grouped by purpose. Run `wiki <cmd> --help` for the full per-command help block.
 | `wiki compile` | run `compile.py` against sources whose hash changed since last run (LLM cost via `models.compile_model`). Refreshes dashboard counts. |
 | `wiki compile --all` | force-recompile every source under `raw/` + `daily/`. |
 | `wiki compile --file PATH` | compile a single file (path relative to vault root). |
-| `wiki flush` | manual flush — capture current Claude Code session transcript into `daily/YYYY-MM-DD/sessions.md` (post-2026-05-15 rollup arc; normally automatic via SessionEnd hook). After `compile_after_hour` triggers compile + piggybacks. |
+| `wiki flush <context_file.md> <session_id>` | Extract caller-supplied UTF-8 Markdown conversation context into `daily/YYYY-MM-DD/sessions.md` (Claude SDK; LLM cost applies). **Input is consumed:** deleted on success, duplicate-skip or empty input; moved to `.wiki/sessions/failed-flushes/` on extraction failure. Pass a disposable copy containing requests, decisions and outcomes, never an original file. Use a unique ID for a new capture. After `compile_after_hour`, may trigger compilation (additional cost) + piggybacks. Bare invocation prints help. |
 | `wiki agent daily-digest --var date=YYYY-MM-DD` | run the `daily-digest` agent: read all `daily/<date>/*.md` per-source captures and write a ≤500-word distillation into `daily/<date>.md`. Also runs once-daily as the `daily_digest_yesterday` piggyback. |
 | `wiki lint` | full health check — structural + LLM contradiction sweep ($ cost). Report → `.wiki/reports/lint-YYYY-MM-DD.md`. |
 | `wiki lint --structural-only` | cheap, no-LLM lint — 8 checks (`broken_links`, `orphan_pages`, `orphan_sources`, `stale_articles`, `missing_backlinks`, `article_type`, `sparse_articles`, `facts_violations`). Used by piggyback. |
@@ -423,6 +423,13 @@ Run `./.wiki/wiki config keys` for the live enumeration of every settable leaf.
 | codex | `.codex/hooks.json` | ✓ | Stop | — |
 | gemini | `.gemini/settings.json` | ✓ | ✓ | PreCompress |
 | cursor | `.cursor/hooks.json` | ✓ | ✓ | ✓ |
+
+Codex's `Stop` hook captures the session through the format-aware rollout reader.
+The session ID remains the capture identity: dedup coalesces repeated stops, and
+the next extraction replaces that session's daily block. The reader resolves
+missing rollout paths by session ID and uses clean user-message events to avoid
+capturing injected instructions. POSIX background flushes start in their own
+process session so they can finish after the foreground hook exits.
 
 Install scope:
 

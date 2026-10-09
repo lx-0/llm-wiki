@@ -69,7 +69,8 @@ hooks_installed() {
 
 # ── Hook payload generators ──────────────────────────────────────────
 # Each writes a JSON object to stdout with the wiki-managed hooks block.
-# Generators omit events the agent doesn't support (e.g. Codex has no PreCompact).
+# Generators emit the engine's configured capture events. Codex uses Stop;
+# its session captures are coalesced by dedup and daily block replacement.
 
 # All payload generators emit a `cd '<abs-vault>/.wiki' && uv run python
 # hooks/<name>.py` form. The cd anchors CWD inside the engine; uv then

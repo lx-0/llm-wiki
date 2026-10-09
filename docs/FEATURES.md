@@ -29,7 +29,8 @@ Living overview of every engine feature: what's documented, where it's implement
 
 | Feature | Status | Code | Trigger | Docs | Known gaps |
 |---|---|---|---|---|---|
-| Session capture (start/end) | 🟢 | `hooks/session-start.py`, `hooks/session-end.py`, `hooks/_transcript.py`, `scripts/flush.py`, `scripts/core/flush_pipeline.py` | Claude Code / Codex / Gemini / Cursor session lifecycle | README "What you get", PROCESS §2, concept "Sensory buffer" | — |
+| Session capture (start/end) | 🟢 | `hooks/session-start.py`, `hooks/session-end.py`, `hooks/_transcript.py`, `scripts/flush.py`, `scripts/core/flush_pipeline.py` | Claude Code / Codex / Gemini / Cursor session lifecycle | README "What you get", PROCESS §2, concept "Sensory buffer" | POSIX hook flushes run in a separate process session. Codex capture remains session-scoped with dedup + replacement of daily blocks. |
+| Manual context flush | 🟢 | `scripts/cli.py`, `scripts/flush.py` | `wiki flush <context_file.md> <session_id>` | cli.md; `use-llm-wiki` skill | Consumes a disposable input file; Claude SDK extraction and optional subsequent compilation incur LLM cost. |
 | Pre-compact safety flush | 🟢 | `hooks/pre-compact.py` | Context-window compaction in Claude Code | PROCESS §2 | — |
 | Daily log append (`daily/YYYY-MM-DD/sessions.md`) | 🟢 | `scripts/core/flush_pipeline.py:append_to_daily` | flush.py extraction success | PROCESS §2, concept "Episodic memory" | Post-2026-05-15 rollup arc: writes to per-source subfolder, not flat root. |
 | Per-source daily-rollup writer | 🟢 | `scripts/core/daily_capture.py` (fcntl-flocked, `KNOWN_SOURCES`-validated `append` / `replace_section`) | health/voice/jamie/gmeet/email collectors mirror their primary output as one-liners | PROCESS §2, AGENTS.md Layer 2 | New 2026-05-15. 16 unit tests in `tests/test_daily_capture.py`. |

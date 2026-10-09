@@ -1,6 +1,7 @@
 ---
 name: use-llm-wiki
-version: 1.0.0
+metadata:
+  version: "1.0.0"
 description: |
   Discover and use a locally-available LLM-wiki through its `wiki` CLI — from
   any project, not just inside the vault. Read the knowledge base to ground
@@ -192,8 +193,17 @@ right one for the question; don't conflate them.
 
 Mutating. Confirm with the operator before each, and report what landed.
 
-- **`wiki flush`** — capture the current Claude Code context into `daily/`.
-  Use when this session produced something worth keeping in the wiki.
+- **`wiki flush <context_file.md> <session_id>`** — extract a daily session
+  entry using the Claude Agent SDK (**LLM cost applies**). Manual callers author
+  a disposable UTF-8 Markdown file with relevant conversation context: requests,
+  decisions, outcomes and unresolved work. The command does not locate the
+  current conversation automatically. Use a unique session ID for a new capture.
+  **The file is consumed:** deleted after success, duplicate-skip or empty input;
+  moved into `.wiki/sessions/failed-flushes/` if extraction fails. Always pass a
+  disposable copy, never an original project or vault file. Output lands in
+  `daily/YYYY-MM-DD/sessions.md`; evening runs may trigger compilation with
+  additional LLM cost, plus due piggybacks. Explain this cost when seeking
+  authorization, unless the current task already authorizes the capture.
 - **`wiki correct add "TITLE" "TRUTH" [--status S] [--term T ...]`** — record a
   hard fact that overrides any raw source at compile + query time. Use when the
   agent learns the operator's sources contradict reality.
