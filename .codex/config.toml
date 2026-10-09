@@ -1,11 +1,14 @@
 # Project permissions requested by Alex, 2026-10-09.
-approval_policy = "on-request"
-approvals_reviewer = "auto_review"
+# No interactive approval prompts; filesystem access stays scoped below.
+approval_policy = "never"
 default_permissions = "wiki-development"
 
 [permissions.wiki-development]
-description = "Wiki development and direct collector API verification."
+description = "Wiki development, Git operations and configured local vault deployment."
 extends = ":workspace"
+
+[permissions.wiki-development.filesystem.":workspace_roots"]
+".git" = "write"
 
 [permissions.wiki-development.network]
 enabled = true
