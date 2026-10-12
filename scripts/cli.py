@@ -216,18 +216,28 @@ NOTES
   features.health_trends (off -> dry-run). Spec:
   .ytstack/backlog/health-trend-synthesis.md."""
 
-H_PUBLISH = """wiki publish — mirror knowledge/ into meinkontext (producer contract)
+H_PUBLISH = """wiki publish — mirror the vault's markdown into meinkontext (producer contract)
 
 USAGE
+  wiki publish --auth                one-time connect: browser login + consent
+                                     (tokens → .wiki/state/meinkontext-oauth.json)
   wiki publish --dry-run             print the publish plan (create/update/retract)
   wiki publish --dry-run --json      machine-readable plan (GUI/agent seam)
+  wiki publish                       execute the plan (idempotent by content hash)
+  wiki publish --piggyback           cadence mode; quiet no-op while publish.enabled is false
+
+SETUP
+  1. wiki config set publish.enabled true
+  2. wiki config set publish.endpoint https://<your-context-mcp>/mcp
+  3. wiki publish --auth    (needs a meinkontext USER login — org api-keys are read-only)
+  Full runbook: docs/setup-publish.md
 
 NOTES
-  One-way mirror of ALL of knowledge/ into the operator's meinkontext wiki
+  One-way mirror of every markdown file under `publish.roots` (engine
+  default: knowledge/; add raw/, daily/, reports/, workspace/ to publish the
+  substrate too) into ONE managed wiki on the operator's meinkontext server
   (context-mcp; binding contract: docs/PRODUCER-CONTRACT.md in that repo).
-  Idempotent by content hash — unchanged articles are never re-sent. raw/,
-  daily/ and workspace/ never leave the vault. Live execution ships with
-  M030-S02; until then the command is dry-run only.
+  Unchanged articles are never re-sent; local deletes archive upstream.
 """
 
 H_REINDEX = """wiki reindex — reconcile knowledge/index.md against the corpus
@@ -792,7 +802,7 @@ COMMANDS: tuple[CommandSpec, ...] = (
                 handler="links_audit.py", help_text=H_LINKS),
     CommandSpec("pin", "Knowledge ops", "pin an article into a Map-of-Content",
                 handler="pin.py", banner=False, menu=True, help_text=H_PIN),
-    CommandSpec("publish", "Knowledge ops", "mirror knowledge/ into meinkontext (--dry-run)",
+    CommandSpec("publish", "Knowledge ops", "mirror the vault into meinkontext (--auth once, --dry-run, run)",
                 handler="publish/cli.py", help_text=H_PUBLISH),
     CommandSpec("reindex", "Knowledge ops", "reconcile index.md against the corpus (--dry-run)",
                 handler="reindex.py", help_text=H_REINDEX),

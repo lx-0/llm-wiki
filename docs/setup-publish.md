@@ -41,6 +41,12 @@ Hard boundaries:
 
 ## One-time connect
 
+Prerequisites: a running context-mcp (meinkontext) instance reachable over
+HTTPS and a **user account** on it — the browser consent in step 3 signs in
+as that user, and only user principals may write. An org api-key from the
+MCP-CONNECT setup is not enough (read-only). Nothing else is needed on the
+server side; `wiki publish` creates the managed wiki on first run.
+
 1. `wiki config set publish.enabled true`
 2. `wiki config set publish.endpoint https://<your-context-mcp>/mcp`
 3. `wiki publish --auth` — one browser login + consent. The producer
