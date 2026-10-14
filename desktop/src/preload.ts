@@ -3,13 +3,10 @@
 
 import { contextBridge, ipcRenderer } from 'electron';
 import {
-  APP_CLOSE_COCKPIT_CHANNEL,
   APP_LOGIN_GET_CHANNEL,
   APP_LOGIN_SET_CHANNEL,
   APP_ONBOARDING_DONE_CHANNEL,
-  APP_OPEN_ATLAS_CHANNEL,
   APP_OPEN_BROWSE_CHANNEL,
-  APP_OPEN_COCKPIT_CHANNEL,
   APP_OPEN_OVERVIEW_CHANNEL,
   APP_OPEN_SETTINGS_CHANNEL,
   APP_OPEN_TRIAGE_CHANNEL,
@@ -90,9 +87,6 @@ const appApi: AppApi = {
   openSettings: () => ipcRenderer.send(APP_OPEN_SETTINGS_CHANNEL),
   openBrowse: () => ipcRenderer.send(APP_OPEN_BROWSE_CHANNEL),
   openOverview: () => ipcRenderer.send(APP_OPEN_OVERVIEW_CHANNEL),
-  openCockpit: () => ipcRenderer.send(APP_OPEN_COCKPIT_CHANNEL),
-  closeCockpit: () => ipcRenderer.send(APP_CLOSE_COCKPIT_CHANNEL),
-  openAtlas: () => ipcRenderer.send(APP_OPEN_ATLAS_CHANNEL),
   openTriage: () => ipcRenderer.send(APP_OPEN_TRIAGE_CHANNEL),
   onboardingDone: () => ipcRenderer.send(APP_ONBOARDING_DONE_CHANNEL),
 };

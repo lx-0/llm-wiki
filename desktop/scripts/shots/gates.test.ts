@@ -24,6 +24,6 @@ describe('layoutFailures', () => {
   it('fails strict pages on any finding and only reports the rest', () => {
     const layout = { overlaps: ['a <> b'], offscreen: [], clipped: ['c'] };
     expect(layoutFailures(STRICT, 'index', layout)).toEqual(['a <> b', 'c']);
-    expect(layoutFailures(STRICT, 'cockpit', layout)).toEqual([]);
+    expect(layoutFailures(STRICT, 'legacy', layout)).toEqual([]);
   });
 });

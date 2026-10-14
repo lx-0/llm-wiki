@@ -248,12 +248,16 @@ input {
   box-shadow: 0 2px 6px oklch(0% 0 0 / 0.12);
 }
 
+/* reduced motion must beat every component's own transition — the one place !important belongs */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
+    /* biome-ignore lint/complexity/noImportantStyles: the operator's OS setting outranks component motion */
     transition-duration: 0.01ms !important;
+    /* biome-ignore lint/complexity/noImportantStyles: the operator's OS setting outranks component motion */
     animation-duration: 0.01ms !important;
+    /* biome-ignore lint/complexity/noImportantStyles: the operator's OS setting outranks component motion */
     animation-iteration-count: 1 !important;
   }
 }

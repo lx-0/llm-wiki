@@ -14,8 +14,8 @@ const path = require('node:path');
 const { AUDIT_SCRIPT } = require('./audit.cjs');
 const { layoutFailures, restHeightFailure } = require('./gates.cjs');
 
-/** Windows built on the token system: clipped text fails the run there, not just overlap.
- *  Cockpit and Atlas are audited and reported only — they go in S05. */
+/** Every page is built on the token system, so every page is strict: clipped text fails the
+ *  run there, not just overlap. (A page outside the set would be audited and reported only.) */
 const STRICT_PAGES = new Set(['index', 'overview', 'settings', 'onboarding', 'browse', 'triage', 'smoke']);
 
 app.commandLine.appendSwitch('force-device-scale-factor', '2');
@@ -78,8 +78,6 @@ const SURFACES = [
     states: ['default', 'empty', 'no-access', 'table', 'run-done'],
     settle: 1000,
   },
-  { page: 'cockpit', w: 1040, h: 700, schemes: ['dark'], states: ['default'], settle: 3500 },
-  { page: 'atlas', w: 1100, h: 720, schemes: ['dark'], states: ['default'], settle: 3500 },
   { page: 'smoke', w: 600, h: 1040, schemes: ['light', 'dark'], states: ['default'], settle: 800 },
 ];
 

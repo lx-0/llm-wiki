@@ -1,7 +1,7 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-15T05:50:00+02:00
+last_updated: 2026-10-15T06:25:00+02:00
 current_milestone: M032
 active_slice: S05
 active_task: none
@@ -35,9 +35,10 @@ S05 3/6: T01 `listeners.timeline` shipped (hourly mic/system chunk counts from t
 sqlite); T02 Overview window shipped (nav → `openOverview`, hero + stat tiles, 30-day columns,
 `ui/tip`, `lib/activity.ts`); T03 Overview complete (type bars, capture heat strip on a
 validated ordinal `--heat-*` ramp, health rows with verbs, next up, Charts | Table twin; 60
-captures clean). Next task: T04 delete Cockpit + Atlas (+ `index.css`, `lib/types.ts`, IPC;
-Triage window → Inbox, theme-aware background) via `plan-task`; then T05 blind learnability
-panel + DMG; T06 closeout. vitest 112 + pytest 2024 green.
+captures clean); T04 Cockpit + Atlas deleted with `index.css`, `lib/types.ts` and their IPC —
+seven renderer pages, 58 captures all strict, theme-aware window chrome, biome 0 / 0 for the
+first time. S05 4/6. Next task: T05 blind synthetic learnability panel + one fix round +
+`npm run dmg` via `plan-task`; then T06 closeout. vitest 112 + pytest 2024 green.
 
 **S01 COMPLETE (5/5)** -- harness `npm run shots` (30 captures; real panel
 height 1,027 px vs 640 clamp), TypeScript 5.9 strict + svelte-check gate in `npm test`, Biome

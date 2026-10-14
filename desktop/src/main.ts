@@ -14,13 +14,10 @@ import {
 import started from 'electron-squirrel-startup';
 import { isAutostartEnabled, setAutostart } from './app/autostart';
 import {
-  APP_CLOSE_COCKPIT_CHANNEL,
   APP_LOGIN_GET_CHANNEL,
   APP_LOGIN_SET_CHANNEL,
   APP_ONBOARDING_DONE_CHANNEL,
-  APP_OPEN_ATLAS_CHANNEL,
   APP_OPEN_BROWSE_CHANNEL,
-  APP_OPEN_COCKPIT_CHANNEL,
   APP_OPEN_OVERVIEW_CHANNEL,
   APP_OPEN_SETTINGS_CHANNEL,
   APP_OPEN_TRIAGE_CHANNEL,
@@ -175,6 +172,10 @@ ipcMain.on(APP_QUIT_CHANNEL, () => app.quit());
 ipcMain.on(APP_OPEN_SETTINGS_CHANNEL, () => openSettings());
 ipcMain.on(APP_OPEN_BROWSE_CHANNEL, () => openBrowse());
 
+/** A window's first paint matches the scheme its page will render — the surface tokens of
+ *  styles/tokens.css — so no window flashes a dark hex into a light scheme. */
+const windowBackground = (): string => (nativeTheme.shouldUseDarkColors ? '#1c1c1e' : '#f6f6f8');
+
 // Browse window (browse.html) — a searchable list of all knowledge entries.
 let browseWin: BrowserWindow | null = null;
 function openBrowse(): void {
@@ -189,6 +190,7 @@ function openBrowse(): void {
     minWidth: 360,
     minHeight: 400,
     title: 'Browse — llm-wiki',
+    backgroundColor: windowBackground(),
     webPreferences: { preload: path.join(__dirname, 'preload.cjs') },
   });
   browseWin.setMenuBarVisibility(false);
@@ -217,7 +219,7 @@ function openOverview(): void {
     minWidth: 720,
     minHeight: 560,
     title: 'Overview — llm-wiki',
-    backgroundColor: nativeTheme.shouldUseDarkColors ? '#1c1c1e' : '#f6f6f8',
+    backgroundColor: windowBackground(),
     webPreferences: { preload: path.join(__dirname, 'preload.cjs') },
   });
   overviewWin.setMenuBarVisibility(false);
@@ -231,66 +233,7 @@ function openOverview(): void {
   });
 }
 
-// Cockpit window (cockpit.html) — full-window neural-net view, toggle of compact.
-ipcMain.on(APP_OPEN_COCKPIT_CHANNEL, () => openCockpit());
-ipcMain.on(APP_CLOSE_COCKPIT_CHANNEL, () => cockpitWin?.close());
-let cockpitWin: BrowserWindow | null = null;
-function openCockpit(): void {
-  if (cockpitWin && !cockpitWin.isDestroyed()) {
-    cockpitWin.show();
-    cockpitWin.focus();
-    return;
-  }
-  cockpitWin = new BrowserWindow({
-    width: 1040,
-    height: 700,
-    minWidth: 720,
-    minHeight: 520,
-    title: 'llm-wiki — Cockpit',
-    backgroundColor: '#0b1220',
-    webPreferences: { preload: path.join(__dirname, 'preload.cjs') },
-  });
-  cockpitWin.setMenuBarVisibility(false);
-  if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
-    cockpitWin.loadURL(`${MAIN_WINDOW_VITE_DEV_SERVER_URL}/cockpit.html`);
-  } else {
-    cockpitWin.loadFile(path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/cockpit.html`));
-  }
-  cockpitWin.on('closed', () => {
-    cockpitWin = null;
-  });
-}
-
-// Atlas window (atlas.html) — hierarchical knowledge-graph view.
-ipcMain.on(APP_OPEN_ATLAS_CHANNEL, () => openAtlas());
-let atlasWin: BrowserWindow | null = null;
-function openAtlas(): void {
-  if (atlasWin && !atlasWin.isDestroyed()) {
-    atlasWin.show();
-    atlasWin.focus();
-    return;
-  }
-  atlasWin = new BrowserWindow({
-    width: 1100,
-    height: 720,
-    minWidth: 760,
-    minHeight: 520,
-    title: 'llm-wiki — Atlas',
-    backgroundColor: '#0b1220',
-    webPreferences: { preload: path.join(__dirname, 'preload.cjs') },
-  });
-  atlasWin.setMenuBarVisibility(false);
-  if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
-    atlasWin.loadURL(`${MAIN_WINDOW_VITE_DEV_SERVER_URL}/atlas.html`);
-  } else {
-    atlasWin.loadFile(path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/atlas.html`));
-  }
-  atlasWin.on('closed', () => {
-    atlasWin = null;
-  });
-}
-
-// Triage — the intent-inbox review window (per-item accept/dismiss).
+// Inbox — the intent-inbox review window (per-item accept/dismiss), page triage.html.
 let triageWin: BrowserWindow | null = null;
 function openTriage(): void {
   if (triageWin && !triageWin.isDestroyed()) {
@@ -303,8 +246,8 @@ function openTriage(): void {
     height: 760,
     minWidth: 480,
     minHeight: 420,
-    title: 'llm-wiki — Triage',
-    backgroundColor: '#0b1220',
+    title: 'Inbox — llm-wiki',
+    backgroundColor: windowBackground(),
     webPreferences: { preload: path.join(__dirname, 'preload.cjs') },
   });
   triageWin.setMenuBarVisibility(false);
@@ -334,7 +277,8 @@ function openSettings(): void {
     fullscreenable: false,
     minimizable: false,
     maximizable: false,
-    title: 'llm-wiki Settings',
+    title: 'Settings — llm-wiki',
+    backgroundColor: windowBackground(),
     webPreferences: { preload: path.join(__dirname, 'preload.cjs') },
   });
   settingsWin.setMenuBarVisibility(false);
@@ -369,6 +313,7 @@ function openOnboarding(): void {
     fullscreenable: false,
     maximizable: false,
     title: 'Welcome to llm-wiki',
+    backgroundColor: windowBackground(),
     webPreferences: { preload: path.join(__dirname, 'preload.cjs') },
   });
   onboardingWin.setMenuBarVisibility(false);
