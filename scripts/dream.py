@@ -1185,32 +1185,30 @@ def current_page_title(page_text: str) -> str | None:
     return str(val) if val else None
 
 
-async def dream_entity(
+def _skip_outcome(
     entity: EntityRef,
+    kind: str,
     *,
-    dry_run: bool = False,
-    max_prompt_chars: int | None = None,
-    max_turns: int | None = None,
+    started: float,
+    corpus_count: int = 0,
+    corpus_chars: int = 0,
+    text: str = "",
 ) -> DreamOutcome:
-    """Re-synthesize ONE entity page from the substrate corpus.
-
-    Size gate: pre-flight prompt-char check; on overrun returns a DreamOutcome
-    with `kind="prompt_too_large"` and zero spend (the SDK is NEVER called
-    when the prompt exceeds the cap — context-overflow guard, not cost).
-    """
-    started = time.time()
-    max_chars = (
-        max_prompt_chars
-        if max_prompt_chars is not None
-        else CONFIG.limits.dream_entity_max_prompt_chars
+    """A zero-spend outcome — the SDK was never called (gate, size cap, dry-run)."""
+    return DreamOutcome(
+        entity=entity,
+        corpus_count=corpus_count,
+        corpus_chars=corpus_chars,
+        actual_cost_usd=0.0,
+        input_tokens=0,
+        output_tokens=0,
+        sdk_result_text=text,
+        kind=kind,
+        elapsed_s=time.time() - started,
     )
-    turns = max_turns if max_turns is not None else 20
 
-    # M016: tiered corpus. Bounded by construction at ~600 KB total
-    # regardless of vault size (the M014 flat-collect path hit context
-    # overflow on 475-file alex.md → 2.3 MB).
-    breakdown = collect_corpus_tiered(entity)
-    corpus_paths = breakdown.all_paths
+
+def _log_corpus_breakdown(entity: EntityRef, breakdown: CorpusBreakdown) -> None:
     log.info(
         "  entity=%s kind=%s — corpus: T1=%d (auth=%d/recent=%d/digests=%d) "
         "T2=%d sampled of %d-file older pool",
@@ -1224,56 +1222,14 @@ async def dream_entity(
         breakdown.tier2_pool_size,
     )
 
-    # Deterministic pre-SDK gate (pure, table-tested — see pre_sdk_skip). The
-    # log line differs per kind but the DECISION lives in one pure function.
-    gate = pre_sdk_skip(
-        breakdown,
-        require_entity_substrate=CONFIG.features.dream_require_entity_substrate,
-    )
-    if gate == "no_substrate":
-        log.warning(
-            "  no substrate mentions %s — nothing to synthesize (skipping)",
-            entity.slug,
-        )
-        return DreamOutcome(
-            entity=entity,
-            corpus_count=0,
-            corpus_chars=0,
-            actual_cost_usd=0.0,
-            input_tokens=0,
-            output_tokens=0,
-            sdk_result_text="",
-            kind="no_substrate",
-            elapsed_s=time.time() - started,
-        )
-    if gate == "no_entity_substrate":
-        # The only corpus is non-mentioning daily digests → the agent's quality
-        # gate will return INSUFFICIENT_CORPUS without writing, but the SDK call
-        # still bills a full prompt-cache write (~$0.80). Skip it for $0.
-        log.info(
-            "  no entity-specific substrate for %s (only %d non-mentioning "
-            "daily digest(s) in corpus) — guaranteed no-op, skipping SDK call "
-            "($0 instead of a prompt-cache write). Set "
-            "features.dream_require_entity_substrate=false to force.",
-            entity.slug,
-            len(breakdown.tier1_digests),
-        )
-        return DreamOutcome(
-            entity=entity,
-            corpus_count=len(corpus_paths),
-            corpus_chars=0,
-            actual_cost_usd=0.0,
-            input_tokens=0,
-            output_tokens=0,
-            sdk_result_text="",
-            kind="no_entity_substrate",
-            elapsed_s=time.time() - started,
-        )
 
+def _build_entity_prompt(
+    entity: EntityRef, breakdown: CorpusBreakdown, *, turns: int, max_chars: int
+) -> tuple[str, int, CorpusBreakdown]:
+    """The prompt within the char budget, with the trim + size log lines."""
     prompt, prompt_chars, breakdown, dropped = _build_prompt_within_budget(
         entity, breakdown, max_turns=turns, max_chars=max_chars
     )
-    corpus_paths = breakdown.all_paths  # reflect any budget trim downstream
     if dropped:
         # By-design graceful degrade (M016 sampled-activation already rotates
         # Tier-2 across runs), not an anomaly — INFO so it stays out of the
@@ -1285,7 +1241,7 @@ async def dream_entity(
             "Authored + digests preserved.",
             dropped,
             f"{max_chars:,}",
-            len(corpus_paths),
+            len(breakdown.all_paths),
             prompt_chars,
         )
     log.info(
@@ -1294,72 +1250,27 @@ async def dream_entity(
         prompt_chars / 1024,
         f"{max_chars:,}" if max_chars > 0 else "unlimited",
     )
+    return prompt, prompt_chars, breakdown
 
-    if max_chars > 0 and prompt_chars > max_chars:
-        msg = (
-            f"PROMPT_TOO_LARGE: entity={entity.slug} prompt={prompt_chars} chars "
-            f"> max={max_chars} (corpus={len(corpus_paths)} files, "
-            "non-droppable: authored + daily digests alone exceed the cap). "
-            "Raise CONFIG.limits.dream_entity_max_prompt_chars or prune "
-            "operator-authored substrate."
-        )
-        log.error("  ✗ %s", msg)
-        return DreamOutcome(
-            entity=entity,
-            corpus_count=len(corpus_paths),
-            corpus_chars=sum(
-                len(p.read_text(encoding="utf-8", errors="replace")) for p in corpus_paths
-            ),
-            actual_cost_usd=0.0,
-            input_tokens=0,
-            output_tokens=0,
-            sdk_result_text=msg,
-            kind="prompt_too_large",
-            elapsed_s=time.time() - started,
-        )
 
-    if dry_run:
-        log.info("  --dry-run: would invoke SDK with %d-char prompt", prompt_chars)
-        return DreamOutcome(
-            entity=entity,
-            corpus_count=len(corpus_paths),
-            corpus_chars=prompt_chars,
-            actual_cost_usd=0.0,
-            input_tokens=0,
-            output_tokens=0,
-            sdk_result_text="(dry-run)",
-            kind="dry_run",
-            elapsed_s=time.time() - started,
-        )
+async def _invoke_entity_sdk(
+    entity: EntityRef, prompt: str, prompt_chars: int, *, model: str, turns: int
+):
+    """One harness call owns the mechanics (options assembly, path-scope
+    hook, per-message stall timeout, cache-aware usage extraction, LEDGER
+    recording, failure diagnostics). The returned input_tokens is the TRUE
+    cache-inclusive input — ResultMessage.usage preferred, per-turn
+    cache-inclusive fallback (DECISIONS 2026-06-02); summing only the uncached
+    delta made healthy calls look like no-ops and false-fired the low-token
+    warning.
 
-    # Real SDK call. Single attempt — dream is a periodic pass; if it fails,
-    # the next pass picks the entity up again.
-    # Model pick: prefer the 1M-context variant because dream-entity is
-    # inherently a fan-out workload (Reads N corpus files + Grep/Glob into
-    # knowledge/ → tool-turn ballooning blows the standard 200K window
-    # mid-stream, surfacing as the silent kind=unknown exit-1 documented
-    # in KNOWLEDGE.md "tool-turn ballooning". Fall back to compile_model
-    # if dream_model is explicitly disabled by setting it to "".
-    model = CONFIG.models.dream_model or CONFIG.models.compile_model
-    # Snapshot entity page mtime + size so we can detect a "no vault write"
-    # outcome (agent ran but decided no changes needed, OR was silently
-    # blocked from writing). Compared post-SDK below.
-    try:
-        _entity_pre_mtime = entity.page.stat().st_mtime
-        _entity_pre_size = entity.page.stat().st_size
-    except OSError:
-        _entity_pre_mtime = 0.0
-        _entity_pre_size = 0
-    log.info("  invoking %s (max_turns=%d, system=dream_entity_system)", model, turns)
-
-    # One harness call owns the mechanics (options assembly, path-scope
-    # hook, per-message stall timeout, cache-aware usage extraction,
-    # LEDGER recording, failure diagnostics). input_tokens below is the
-    # TRUE cache-inclusive input — ResultMessage.usage preferred, per-turn
-    # cache-inclusive fallback (DECISIONS 2026-06-02); summing only the
-    # uncached delta made healthy calls look like no-ops and false-fired
-    # the low-token warning below.
-    sdk = await run_sdk_query(
+    Model pick (the caller's `model`): prefer the 1M-context variant because
+    dream-entity is inherently a fan-out workload (Reads N corpus files +
+    Grep/Glob into knowledge/ → tool-turn ballooning blows the standard 200K
+    window mid-stream, surfacing as the silent kind=unknown exit-1 documented
+    in KNOWLEDGE.md "tool-turn ballooning"). Fall back to compile_model if
+    dream_model is explicitly disabled by setting it to ""."""
+    return await run_sdk_query(
         prompt,
         SdkCallSpec(
             label=f"dream_entity:{entity.slug}",
@@ -1388,78 +1299,72 @@ async def dream_entity(
         ),
         query_fn=query,
     )
-    input_tokens = sdk.input_tokens
-    output_tokens = sdk.output_tokens
-    result_text = sdk.result_text
-    actual_cost = sdk.cost_usd
 
-    if sdk.failure is not None:
-        elapsed = time.time() - started
-        if sdk.failure.kind == "timeout":
-            return DreamOutcome(
-                entity=entity,
-                corpus_count=len(corpus_paths),
-                corpus_chars=prompt_chars,
-                actual_cost_usd=actual_cost,
-                input_tokens=input_tokens,
-                output_tokens=output_tokens,
-                sdk_result_text=(
-                    f"per-call timeout after {sdk.elapsed_s:.1f}s (msg_count={sdk.message_count})"
-                ),
-                kind="per_call_timeout",
-                elapsed_s=elapsed,
-            )
-        log.error(
-            "  dream_entity ✗ failed after %.1fs (last_message_count=%d): kind=%s",
-            sdk.elapsed_s,
-            sdk.message_count,
-            sdk.failure.kind,
-        )
+
+def _failure_outcome(
+    entity: EntityRef, sdk, *, corpus_count: int, prompt_chars: int, started: float
+) -> DreamOutcome:
+    """The outcome of a failed SDK call: a per-call timeout or an SDK failure."""
+    elapsed = time.time() - started
+    if sdk.failure.kind == "timeout":
         return DreamOutcome(
             entity=entity,
-            corpus_count=len(corpus_paths),
+            corpus_count=corpus_count,
             corpus_chars=prompt_chars,
-            actual_cost_usd=actual_cost,
-            input_tokens=input_tokens,
-            output_tokens=output_tokens,
-            sdk_result_text=str(sdk.exc) if sdk.exc is not None else str(sdk.failure),
-            kind="sdk_failure",
+            actual_cost_usd=sdk.cost_usd,
+            input_tokens=sdk.input_tokens,
+            output_tokens=sdk.output_tokens,
+            sdk_result_text=(
+                f"per-call timeout after {sdk.elapsed_s:.1f}s (msg_count={sdk.message_count})"
+            ),
+            kind="per_call_timeout",
             elapsed_s=elapsed,
         )
-
-    elapsed = time.time() - started
-    log.info(
-        "  ✓ done in %.1fs · in:%s out:%s ($%.4f)",
-        elapsed,
-        f"{input_tokens:,}",
-        f"{output_tokens:,}",
-        actual_cost,
+    log.error(
+        "  dream_entity ✗ failed after %.1fs (last_message_count=%d): kind=%s",
+        sdk.elapsed_s,
+        sdk.message_count,
+        sdk.failure.kind,
     )
-    # Diagnostic: did the agent actually write to the entity page?
-    # Compares mtime+size against the pre-SDK snapshot. False positives
-    # are harmless (operator manually touched the page mid-run); false
-    # negatives matter (silent agent no-op was the surface the operator
-    # asked about — "dream nichts in vault schreibt").
+    return DreamOutcome(
+        entity=entity,
+        corpus_count=corpus_count,
+        corpus_chars=prompt_chars,
+        actual_cost_usd=sdk.cost_usd,
+        input_tokens=sdk.input_tokens,
+        output_tokens=sdk.output_tokens,
+        sdk_result_text=str(sdk.exc) if sdk.exc is not None else str(sdk.failure),
+        kind="sdk_failure",
+        elapsed_s=elapsed,
+    )
+
+
+def _page_snapshot(page: Path, *, fallback: tuple[float, int] = (0.0, 0)) -> tuple[float, int]:
+    """(mtime, size) of the entity page — the "did the agent write?" witness."""
     try:
-        _entity_post_mtime = entity.page.stat().st_mtime
-        _entity_post_size = entity.page.stat().st_size
+        return page.stat().st_mtime, page.stat().st_size
     except OSError:
-        _entity_post_mtime = _entity_pre_mtime
-        _entity_post_size = _entity_pre_size
-    # Distinguish the EXPECTED INSUFFICIENT_CORPUS no-op from the SUSPICIOUS
-    # silent one via the pure classifier (table-tested — classify_post_sdk_write).
-    # The sentinel fires on generic-noun slugs whose mention-scan matches
-    # unrelated text (e.g. `kontakte` hitting the German word in email metadata);
-    # a byte-identical page WITHOUT it is the silent write-failure this
-    # diagnostic was built for.
+        return fallback
+
+
+def _post_sdk_write_check(
+    entity: EntityRef, pre: tuple[float, int], post: tuple[float, int], result_text: str
+) -> bool:
+    """Diagnostic: did the agent actually write to the entity page? Compares
+    mtime+size against the pre-SDK snapshot. False positives are harmless
+    (operator manually touched the page mid-run); false negatives matter
+    (silent agent no-op was the surface the operator asked about — "dream
+    nichts in vault schreibt"). Distinguishes the EXPECTED INSUFFICIENT_CORPUS
+    no-op from the SUSPICIOUS silent one via the pure classifier (table-tested —
+    classify_post_sdk_write) and keeps the insufficient-corpus backoff
+    bookkeeping. Returns whether the agent reported an insufficient corpus."""
     verdict = classify_post_sdk_write(
-        pre_mtime=_entity_pre_mtime,
-        pre_size=_entity_pre_size,
-        post_mtime=_entity_post_mtime,
-        post_size=_entity_post_size,
+        pre_mtime=pre[0],
+        pre_size=pre[1],
+        post_mtime=post[0],
+        post_size=post[1],
         result_text=result_text,
     )
-    insufficient_corpus = verdict.insufficient_corpus
     if not verdict.page_changed:
         log.log(
             verdict.level,
@@ -1473,7 +1378,7 @@ async def dream_entity(
             len(result_text or ""),
             (result_text or "(empty)")[:1500].replace("\n", " | "),
         )
-        if insufficient_corpus:
+        if verdict.insufficient_corpus:
             # Back this entity off so the next sweep doesn't re-burn ~$1 on the
             # same guaranteed no-op (exponential window; cleared on the first
             # successful synthesis). Bookkeeping only — never aborts the run.
@@ -1489,13 +1394,19 @@ async def dream_entity(
         # Real synthesis happened — clear any prior backoff so the entity
         # returns to the normal cadence immediately.
         _clear_insufficient_corpus(entity.slug)
-    # Suspiciously-low token-count signal. A 60 KB prompt should report tens
-    # of thousands of TRUE input tokens. `input_tokens` here already folds in
-    # cache_creation + cache_read (see UsageTokens) — the pre-fix gate compared
-    # only the uncached `usage["input_tokens"]` delta (~12 under prompt caching)
-    # and false-fired on every healthy call. A genuine early-exit / buffer
-    # truncation shows near-zero TRUE input AND ~$0 billed cost; require both so
-    # the diagnostic keeps its teeth without crying wolf.
+    return verdict.insufficient_corpus
+
+
+def _warn_if_substrate_unprocessed(
+    prompt_chars: int, input_tokens: int, actual_cost: float
+) -> None:
+    """Suspiciously-low token-count signal. A 60 KB prompt should report tens
+    of thousands of TRUE input tokens. `input_tokens` already folds in
+    cache_creation + cache_read (see UsageTokens) — the pre-fix gate compared
+    only the uncached `usage["input_tokens"]` delta (~12 under prompt caching)
+    and false-fired on every healthy call. A genuine early-exit / buffer
+    truncation shows near-zero TRUE input AND ~$0 billed cost; require both so
+    the diagnostic keeps its teeth without crying wolf."""
     if prompt_chars >= 5000 and input_tokens < 1000 and actual_cost < 0.01:
         log.warning(
             "  SDK reported only %d true input tokens (incl. cache) and $%.4f "
@@ -1507,11 +1418,13 @@ async def dream_entity(
             prompt_chars,
         )
 
-    # M016 — stamp last_dreamed_at on every substrate file that appeared in
-    # this dream's corpus, in ONE locked store write (the per-file rewrite
-    # was O(corpus × store-size)). This is the activation-tracking mechanism
-    # that cycles files through Tier 2 sampling over time. A write failure
-    # logs and continues — the entity-page Write is the deliverable.
+
+def _stamp_corpus(entity: EntityRef, corpus_paths: list[Path]) -> None:
+    """M016 — stamp last_dreamed_at on every substrate file that appeared in
+    this dream's corpus, in ONE locked store write (the per-file rewrite was
+    O(corpus × store-size)). This is the activation-tracking mechanism that
+    cycles files through Tier 2 sampling over time. A write failure logs and
+    continues — the entity-page Write is the deliverable."""
     to_stamp: list[Path] = []
     for path in corpus_paths:
         # Skip the entity page itself (its own last_synthesized_at is
@@ -1539,26 +1452,161 @@ async def dream_entity(
     if stamped:
         log.info("  stamped last_dreamed_at on %d substrate file(s)", stamped)
 
-    # LEDGER recording happens inside run_sdk_query (cache-inclusive, on
-    # every outcome — including the timeout/failure paths above).
 
-    # Per-entity history event so dashboard + grep can answer
-    # "what happened on the last dream of entity X?".
+def _append_dream_history(
+    entity: EntityRef,
+    *,
+    corpus_count: int,
+    prompt_chars: int,
+    actual_cost: float,
+    input_tokens: int,
+    output_tokens: int,
+    elapsed: float,
+    no_vault_write: bool,
+) -> None:
+    """Per-entity history event so dashboard + grep can answer "what happened
+    on the last dream of entity X?"."""
     with swallow("dream-entity history append", logger=log):
         append_history(
             "dream_entity",
             slug=entity.slug,
             kind=entity.kind,
-            corpus_count=len(corpus_paths),
+            corpus_count=corpus_count,
             corpus_chars=prompt_chars,
             cost_usd=round(actual_cost, 4),
             input_tokens=input_tokens,
             output_tokens=output_tokens,
             elapsed_s=round(elapsed, 1),
-            no_vault_write=(
-                _entity_post_mtime == _entity_pre_mtime and _entity_post_size == _entity_pre_size
-            ),
+            no_vault_write=no_vault_write,
         )
+
+
+async def dream_entity(
+    entity: EntityRef,
+    *,
+    dry_run: bool = False,
+    max_prompt_chars: int | None = None,
+    max_turns: int | None = None,
+) -> DreamOutcome:
+    """Re-synthesize ONE entity page from the substrate corpus.
+
+    Size gate: pre-flight prompt-char check; on overrun returns a DreamOutcome
+    with `kind="prompt_too_large"` and zero spend (the SDK is NEVER called
+    when the prompt exceeds the cap — context-overflow guard, not cost).
+    """
+    started = time.time()
+    max_chars = (
+        max_prompt_chars
+        if max_prompt_chars is not None
+        else CONFIG.limits.dream_entity_max_prompt_chars
+    )
+    turns = max_turns if max_turns is not None else 20
+
+    # M016: tiered corpus. Bounded by construction at ~600 KB total
+    # regardless of vault size (the M014 flat-collect path hit context
+    # overflow on 475-file alex.md → 2.3 MB).
+    breakdown = collect_corpus_tiered(entity)
+    _log_corpus_breakdown(entity, breakdown)
+
+    # Deterministic pre-SDK gate (pure, table-tested — see pre_sdk_skip). The
+    # log line differs per kind but the DECISION lives in one pure function.
+    gate = pre_sdk_skip(
+        breakdown,
+        require_entity_substrate=CONFIG.features.dream_require_entity_substrate,
+    )
+    if gate == "no_substrate":
+        log.warning(
+            "  no substrate mentions %s — nothing to synthesize (skipping)",
+            entity.slug,
+        )
+        return _skip_outcome(entity, "no_substrate", started=started)
+    if gate == "no_entity_substrate":
+        # The only corpus is non-mentioning daily digests → the agent's quality
+        # gate will return INSUFFICIENT_CORPUS without writing, but the SDK call
+        # still bills a full prompt-cache write (~$0.80). Skip it for $0.
+        log.info(
+            "  no entity-specific substrate for %s (only %d non-mentioning "
+            "daily digest(s) in corpus) — guaranteed no-op, skipping SDK call "
+            "($0 instead of a prompt-cache write). Set "
+            "features.dream_require_entity_substrate=false to force.",
+            entity.slug,
+            len(breakdown.tier1_digests),
+        )
+        return _skip_outcome(
+            entity, "no_entity_substrate", started=started, corpus_count=len(breakdown.all_paths)
+        )
+
+    prompt, prompt_chars, breakdown = _build_entity_prompt(
+        entity, breakdown, turns=turns, max_chars=max_chars
+    )
+    corpus_paths = breakdown.all_paths  # reflect any budget trim downstream
+
+    if max_chars > 0 and prompt_chars > max_chars:
+        msg = (
+            f"PROMPT_TOO_LARGE: entity={entity.slug} prompt={prompt_chars} chars "
+            f"> max={max_chars} (corpus={len(corpus_paths)} files, "
+            "non-droppable: authored + daily digests alone exceed the cap). "
+            "Raise CONFIG.limits.dream_entity_max_prompt_chars or prune "
+            "operator-authored substrate."
+        )
+        log.error("  ✗ %s", msg)
+        return _skip_outcome(
+            entity,
+            "prompt_too_large",
+            started=started,
+            corpus_count=len(corpus_paths),
+            corpus_chars=sum(
+                len(p.read_text(encoding="utf-8", errors="replace")) for p in corpus_paths
+            ),
+            text=msg,
+        )
+
+    if dry_run:
+        log.info("  --dry-run: would invoke SDK with %d-char prompt", prompt_chars)
+        return _skip_outcome(
+            entity,
+            "dry_run",
+            started=started,
+            corpus_count=len(corpus_paths),
+            corpus_chars=prompt_chars,
+            text="(dry-run)",
+        )
+
+    # Real SDK call, single attempt — dream is a periodic pass; if it fails, the
+    # next pass picks the entity up again. Model pick: see _invoke_entity_sdk.
+    model = CONFIG.models.dream_model or CONFIG.models.compile_model
+    pre = _page_snapshot(entity.page)  # compared post-SDK: did the agent write?
+    log.info("  invoking %s (max_turns=%d, system=dream_entity_system)", model, turns)
+    sdk = await _invoke_entity_sdk(entity, prompt, prompt_chars, model=model, turns=turns)
+    if sdk.failure is not None:
+        return _failure_outcome(
+            entity, sdk, corpus_count=len(corpus_paths), prompt_chars=prompt_chars, started=started
+        )
+
+    elapsed = time.time() - started
+    log.info(
+        "  ✓ done in %.1fs · in:%s out:%s ($%.4f)",
+        elapsed,
+        f"{sdk.input_tokens:,}",
+        f"{sdk.output_tokens:,}",
+        sdk.cost_usd,
+    )
+    post = _page_snapshot(entity.page, fallback=pre)
+    insufficient_corpus = _post_sdk_write_check(entity, pre, post, sdk.result_text)
+    _warn_if_substrate_unprocessed(prompt_chars, sdk.input_tokens, sdk.cost_usd)
+    _stamp_corpus(entity, corpus_paths)
+    # LEDGER recording happens inside run_sdk_query (cache-inclusive, on
+    # every outcome — including the timeout/failure paths above).
+    _append_dream_history(
+        entity,
+        corpus_count=len(corpus_paths),
+        prompt_chars=prompt_chars,
+        actual_cost=sdk.cost_usd,
+        input_tokens=sdk.input_tokens,
+        output_tokens=sdk.output_tokens,
+        elapsed=elapsed,
+        no_vault_write=(post == pre),
+    )
 
     # Web-research post-pass (issue #2) — fires on EVERY successful dream
     # (single-entity, sweep, piggyback), restoring the shipped design after it
@@ -1572,10 +1620,10 @@ async def dream_entity(
         entity=entity,
         corpus_count=len(corpus_paths),
         corpus_chars=prompt_chars,
-        actual_cost_usd=actual_cost,
-        input_tokens=input_tokens,
-        output_tokens=output_tokens,
-        sdk_result_text=result_text,
+        actual_cost_usd=sdk.cost_usd,
+        input_tokens=sdk.input_tokens,
+        output_tokens=sdk.output_tokens,
+        sdk_result_text=sdk.result_text,
         kind=None,
         elapsed_s=elapsed,
         insufficient_corpus=insufficient_corpus,
@@ -1955,7 +2003,9 @@ def _run_web_research_standalone(ent: EntityRef, *, dry_run: bool) -> int:
     return 0
 
 
-async def _async_main() -> int:
+def _build_parser() -> argparse.ArgumentParser:
+    """The `wiki dream` argv surface: entity / web-research / sweep / piggyback /
+    list-candidates (the oracle pins `--help`; the routing lives in `_async_main`)."""
     parser = argparse.ArgumentParser(description="Dream-cycle entity re-synthesis (M014)")
     sub = parser.add_subparsers(dest="cmd")
 
@@ -2011,39 +2061,70 @@ async def _async_main() -> int:
     p_lc.add_argument("--limit", type=int, default=30, help="Top N rows (default 30)")
     p_lc.add_argument("--json", action="store_true", help="Emit machine-readable JSON")
 
+    return parser
+
+
+async def _cmd_entity(args: argparse.Namespace) -> int:
+    """`wiki dream entity <slug>`: resolve, honour the cooldown gate, dream once."""
+    ent = _resolve_entity(args.slug)
+    if ent is None:
+        log.error(
+            "No entity page found for slug %r under knowledge/{people,projects,areas}/. "
+            "Check the slug or create the page first via per-file compile.",
+            args.slug,
+        )
+        return 2
+    if not args.ignore_cooldown and is_within_cooldown(ent):
+        age = _last_synth_age_days(ent)
+        cooldown = CONFIG.scheduling.dream_cooldown_days
+        log.info(
+            "Skipping %s: last_synthesized_at is %.1f days old < cooldown %dd. "
+            "Re-run with --ignore-cooldown to force.",
+            ent.slug,
+            age or 0.0,
+            cooldown,
+        )
+        return 0
+    res = await dream_entity(
+        ent,
+        dry_run=args.dry_run,
+        max_prompt_chars=args.max_chars,
+        max_turns=args.max_turns,
+    )
+    # Web-research post-pass (issue #2) now fires inside dream_entity's
+    # success seam — see _maybe_web_research — so it covers sweep +
+    # piggyback too, not just this single-entity branch. Exit code via the
+    # single dream_exit_code map (per_call_timeout is 6, not the old 0).
+    return dream_exit_code(res)
+
+
+def _print_candidates(rows: list[dict], limit: int) -> None:
+    """The `list-candidates` table (the `--json` branch prints the rows raw)."""
+    print(f"{'Rank':<5} {'Weight':>8}  {'Prio':>6}  {'Age':>7}  {'Slug':<40} Source")
+    print("-" * 110)
+    for i, r in enumerate(rows[:limit], 1):
+        age = f"{r['age_days']}d" if r["age_days"] is not None else "never"
+        flags = []
+        if r["excluded"]:
+            flags.append("EXCLUDED")
+        if r["cooldown_active"]:
+            flags.append("cooldown")
+        if r["backoff_active"]:
+            flags.append("backoff")
+        flag = (" " + " ".join(flags)) if flags else ""
+        print(
+            f"{i:<5} {r['weight']:>8.2f}  {r['priority']:>6.2f}  {age:>7}  {r['slug']:<40} {r['source']}{flag}"
+        )
+    if len(rows) > limit:
+        print(f"... and {len(rows) - limit} more (raise --limit to see)")
+
+
+async def _async_main() -> int:
+    parser = _build_parser()
     args = parser.parse_args()
 
     if args.cmd == "entity":
-        ent = _resolve_entity(args.slug)
-        if ent is None:
-            log.error(
-                "No entity page found for slug %r under knowledge/{people,projects,areas}/. "
-                "Check the slug or create the page first via per-file compile.",
-                args.slug,
-            )
-            return 2
-        if not args.ignore_cooldown and is_within_cooldown(ent):
-            age = _last_synth_age_days(ent)
-            cooldown = CONFIG.scheduling.dream_cooldown_days
-            log.info(
-                "Skipping %s: last_synthesized_at is %.1f days old < cooldown %dd. "
-                "Re-run with --ignore-cooldown to force.",
-                ent.slug,
-                age or 0.0,
-                cooldown,
-            )
-            return 0
-        res = await dream_entity(
-            ent,
-            dry_run=args.dry_run,
-            max_prompt_chars=args.max_chars,
-            max_turns=args.max_turns,
-        )
-        # Web-research post-pass (issue #2) now fires inside dream_entity's
-        # success seam — see _maybe_web_research — so it covers sweep +
-        # piggyback too, not just this single-entity branch. Exit code via the
-        # single dream_exit_code map (per_call_timeout is 6, not the old 0).
-        return dream_exit_code(res)
+        return await _cmd_entity(args)
 
     if args.cmd == "web-research":
         ent = _resolve_entity(args.slug)
@@ -2085,24 +2166,7 @@ async def _async_main() -> int:
         if args.json:
             print(_json.dumps(rows, indent=2))
             return 0
-        # Pretty table
-        print(f"{'Rank':<5} {'Weight':>8}  {'Prio':>6}  {'Age':>7}  {'Slug':<40} Source")
-        print("-" * 110)
-        for i, r in enumerate(rows[: args.limit], 1):
-            age = f"{r['age_days']}d" if r["age_days"] is not None else "never"
-            flags = []
-            if r["excluded"]:
-                flags.append("EXCLUDED")
-            if r["cooldown_active"]:
-                flags.append("cooldown")
-            if r["backoff_active"]:
-                flags.append("backoff")
-            flag = (" " + " ".join(flags)) if flags else ""
-            print(
-                f"{i:<5} {r['weight']:>8.2f}  {r['priority']:>6.2f}  {age:>7}  {r['slug']:<40} {r['source']}{flag}"
-            )
-        if len(rows) > args.limit:
-            print(f"... and {len(rows) - args.limit} more (raise --limit to see)")
+        _print_candidates(rows, args.limit)
         return 0
 
     parser.print_help()

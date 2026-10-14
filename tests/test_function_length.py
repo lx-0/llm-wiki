@@ -27,8 +27,7 @@ EXCLUDED = {
 # `<path>::<qualname>` → the length measured when the entry was listed. Shrinks only: every
 # S04 task that splits a function removes its entry here.
 ALLOWLIST: dict[str, int] = {
-    # measured 2026-10-15 (M033-S04-T01): 20 of 1,402 functions
-    "scripts/dream.py::dream_entity": 395,
+    # measured 2026-10-15 (M033-S04-T01): 20 of 1,402 functions; T02 removed dream's two
     "scripts/compile.py::main": 345,
     "scripts/collectors/gmeet.py::GmeetCollector._run_one_account": 340,
     "scripts/core/sdk_helpers.py::run_sdk_query": 339,
@@ -47,7 +46,6 @@ ALLOWLIST: dict[str, int] = {
     "scripts/facts/takes_producer.py::maybe_extract_takes": 164,
     "scripts/compile.py::_run_compile_route": 164,
     "scripts/producers/intents.py::IntentsProducer.run": 159,
-    "scripts/dream.py::_async_main": 152,
 }
 
 
