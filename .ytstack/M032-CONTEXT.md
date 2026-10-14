@@ -66,10 +66,12 @@ grow past 7 tasks each, S05 becomes M032b.
   `menu` and `doctor` (+ the TUI consuming the same `title`); no config knob is added, so
   no migration is required. Everything else engine-side waits for M033.
 
+- 2026-10-14: Operator go ("arbeite den plan komplett ab") on the recommendations:
+  **Svelte 5** for the renderer (scaffold lands in S01, not S03); **Cockpit + Atlas are
+  deleted** in favour of the Overview window; **Biome** replaces ESLint for the desktop.
+  Execution runs on `main` with per-task pushes (no active parallel session; ytstack keys
+  on `$PWD`).
+
 ## Open questions
 
-1. **Renderer framework** — Svelte 5 (recommended) vs `lit-html` + store. Decide before
-   S03; S01–S02 are framework-independent.
-2. **Cockpit + Atlas** — delete both for the Overview window (recommended) vs keep Atlas
-   as a backlog pitch for a real link graph.
-3. **Desktop lint/format** — Biome (recommended, stack default) vs ESLint 9 flat config.
+(none — the three framework/surface/tooling questions were decided 2026-10-14, see above.)

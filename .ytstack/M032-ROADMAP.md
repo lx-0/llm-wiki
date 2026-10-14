@@ -25,12 +25,11 @@ Slice detail lives in per-slice `M032-S##-PLAN.md` files, created by `ytstack:sl
 
 Suggested framing (refine in slice-milestone; audit in `backlog/deslop-arc.md`):
 
-- [ ] S01 -- **Harness + toolchain.** Port `/tmp/llmwiki-shots/render.py` into
-      `desktop/scripts/` with checked-in fixtures (states: default / running / failed /
-      no-access / empty, light + dark); TypeScript 4.5 → 5.x with `strict`, typecheck in
-      `npm test`; ESLint → Biome; strip the Forge boilerplate (renderer comment,
-      package.json name/description); dedupe `escapeHtml`/`fmtAgo`/icons/logo into `lib/`.
-      Framework-independent. (~4 tasks)
+- [ ] S01 -- **Harness + toolchain.** Electron capture harness in `desktop/scripts/`
+      with checked-in fixtures (states: default / running / failed / no-access / empty,
+      light + dark); TypeScript 4.5 → 5.x with `strict`, typecheck in `npm test`; ESLint →
+      Biome; Svelte 5 scaffold; strip the Forge boilerplate (renderer comment, package.json
+      name/description). (4 tasks — `M032-S01-PLAN.md`)
 - [ ] S02 -- **Engine contract + one action model.** `wiki menu --json` and
       `wiki doctor --json` gain `schema`, `title`, `verb`, `group`, `argv` (engine-side,
       consumer-grep: `menu_context`, `menu.py`, `health.py`, desktop, tests); the TUI reuses
