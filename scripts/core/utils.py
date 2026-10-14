@@ -135,7 +135,13 @@ def file_hash(path: Path) -> str:
 _ASCII_SLUG_RE = re.compile(r"[^a-z0-9]+")
 
 
-def slugify(text: str, max_len: int | None = None, *, ascii_only: bool = False) -> str:
+def slugify(
+    text: str,
+    max_len: int | None = None,
+    *,
+    ascii_only: bool = False,
+    empty: str | None = None,
+) -> str:
     """Convert text to a filename-safe slug — the engine's one slug function.
 
     Default grammar: Unicode word characters survive (`josé-garcía-lópez`),
@@ -150,18 +156,23 @@ def slugify(text: str, max_len: int | None = None, *, ascii_only: bool = False) 
     never ends in `-`, and an empty result is `"untitled"`. Transcript and video
     filenames in operator vaults carry this shape; `tests/test_slugify.py` pins
     both grammars.
+
+    `empty` overrides what an empty result becomes (`""` in the default grammar,
+    `"untitled"` in the ASCII one) — e.g. the health collector's account slug
+    falls back to `"account"`.
     """
     if ascii_only:
         s = _ASCII_SLUG_RE.sub("-", text.lower()).strip("-")
         if max_len is not None:
             s = s[:max_len].rstrip("-")
-        return s or "untitled"
+        return s or ("untitled" if empty is None else empty)
     text = text.lower().strip()
     text = re.sub(r"[^\w\s-]", "", text)
     text = re.sub(r"[\s_]+", "-", text)
     text = re.sub(r"-+", "-", text)
     text = text.strip("-")
-    return text[:max_len] if max_len is not None else text
+    text = text[:max_len] if max_len is not None else text
+    return text or ("" if empty is None else empty)
 
 
 # ── Wikilink helpers ──────────────────────────────────────────────────

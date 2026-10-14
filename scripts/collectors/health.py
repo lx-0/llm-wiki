@@ -55,7 +55,7 @@ from collectors.base import (
 from core import daily_capture
 from core.config import CONFIG
 from core.paths import ROOT_DIR, STATE_DIR
-from core.utils import load_json_state, save_json_state
+from core.utils import load_json_state, save_json_state, slugify
 
 log = logging.getLogger(__name__)
 
@@ -63,13 +63,7 @@ _STATE_FILE = STATE_DIR / "health-state.json"
 _OUTPUT_SUBFOLDER = "raw/notes/health"
 _DEFAULT_BACKFILL_DAYS = 90
 
-_ACCOUNT_SLUG_RE = re.compile(r"[^a-z0-9]+")
 _FRONTMATTER_RE = re.compile(r"^---\n(.*?)\n---\n?(.*)$", re.DOTALL)
-
-
-def _slug_account(account_id: str) -> str:
-    s = _ACCOUNT_SLUG_RE.sub("-", account_id.lower()).strip("-")
-    return s or "account"
 
 
 def _sha256_file(path: Path, chunk: int = 1 << 20) -> str:
@@ -483,7 +477,7 @@ class HealthCollector:
         files_written: list[Path] = []
         skipped = 0
         watermark = Watermark.seed(oura_state.get("last_day"))
-        account_slug = _slug_account(acct.account_id)
+        account_slug = slugify(acct.account_id, ascii_only=True, empty="account")
 
         for summary in summaries:
             year = summary.day.split("-", 1)[0] if "-" in summary.day else "unknown"
@@ -577,7 +571,7 @@ class HealthCollector:
 
         files_written: list[Path] = []
         skipped_unchanged = 0
-        account_slug = _slug_account(acct.account_id)
+        account_slug = slugify(acct.account_id, ascii_only=True, empty="account")
         days_seen = 0
         days_with_data = 0
 

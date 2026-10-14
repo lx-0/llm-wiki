@@ -12,6 +12,9 @@ summary).
 
 from __future__ import annotations
 
+import re
+from pathlib import Path
+
 import pytest
 
 from core.utils import slugify
@@ -61,3 +64,40 @@ def test_collector_filename_grammar(text: str, max_len: int, expected: str) -> N
 )
 def test_default_grammar_unchanged(text: str, max_len: int | None, expected: str) -> None:
     assert slugify(text, max_len=max_len) == expected
+
+
+def test_empty_fallback_is_a_keyword() -> None:
+    """The health collector's account slug falls back to "account", not "untitled"."""
+    assert slugify("", ascii_only=True, empty="account") == "account"
+    assert slugify("???", ascii_only=True, empty="account") == "account"
+    assert slugify("Oura Main", ascii_only=True, empty="account") == "oura-main"
+    assert slugify("", empty="note") == "note"
+
+
+def test_curiosity_request_slug_shape() -> None:
+    """`raw/requests/request-<slug>-<date>.json` — formerly an inline `re.sub` cut at 40."""
+    topic = "Why did the Q3 pipeline review stall? (follow-up with Sid)"
+    assert slugify(topic, max_len=40, ascii_only=True) == "why-did-the-q3-pipeline-review-stall-fol"
+
+
+# ── no second slug grammar outside core/utils ─────────────────────────────────
+
+_ASCII_GRAMMAR = re.compile(r"\[\^a-z0-9\]\+")
+# publish/corpus.server_slug is an exact port of context-mcp's slugifySkillName (NFKD fold +
+# diacritics stripped + the same run rule) — the SERVER's grammar, pinned as a fixpoint in
+# tests/test_publish_corpus.py; it is not a copy of ours and must not drift towards it.
+_ALLOWED = {"scripts/core/utils.py", "scripts/publish/corpus.py"}
+
+
+def test_no_second_slug_grammar_outside_the_seam() -> None:
+    repo = Path(__file__).resolve().parent.parent
+    offenders = [
+        f"{p.relative_to(repo)}:{n}"
+        for p in sorted((repo / "scripts").rglob("*.py"))
+        if str(p.relative_to(repo)) not in _ALLOWED
+        for n, line in enumerate(p.read_text(encoding="utf-8").splitlines(), 1)
+        if _ASCII_GRAMMAR.search(line)
+    ]
+    assert offenders == [], "slug grammar copies outside core/utils.slugify:\n" + "\n".join(
+        offenders
+    )

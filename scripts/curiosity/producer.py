@@ -32,7 +32,7 @@ from core import ollama_client
 from core.config import CONFIG
 from core.paths import ROOT_DIR
 from core.prompts import build_output_language_instruction, render
-from core.utils import now_iso, today_iso
+from core.utils import now_iso, slugify, today_iso
 
 log = logging.getLogger("compile")
 
@@ -489,7 +489,7 @@ async def maybe_generate_folder_requests(source: Path) -> None:
                 dropped["empty_rationale"] = dropped.get("empty_rationale", 0) + 1
                 continue
 
-            slug = re.sub(r"[^a-z0-9]+", "-", topic.lower())[:40].strip("-")
+            slug = slugify(topic, max_len=40, ascii_only=True)
             request_path = RAW_REQUESTS_DIR / f"request-{slug}-{today_iso()}.json"
             if request_path.exists():
                 dropped["duplicate"] = dropped.get("duplicate", 0) + 1
@@ -796,7 +796,7 @@ async def maybe_generate_curiosity_requests(source: Path) -> None:
                 dropped["quote_unsourced"] = dropped.get("quote_unsourced", 0) + 1
                 continue
 
-            slug = re.sub(r"[^a-z0-9]+", "-", topic.lower())[:40].strip("-")
+            slug = slugify(topic, max_len=40, ascii_only=True)
             request_path = RAW_REQUESTS_DIR / f"request-{slug}-{today_iso()}.json"
 
             if request_path.exists():
