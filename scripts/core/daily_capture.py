@@ -51,7 +51,7 @@ from datetime import date as _date
 from datetime import datetime
 from pathlib import Path
 
-from core import markers
+from core import frontmatter, markers
 from core.paths import ROOT_DIR
 from core.utils import ellipsize
 
@@ -163,20 +163,17 @@ def append(date_iso: str, source: str, content: str) -> Path:
     return target
 
 
-_FRONTMATTER_RE = re.compile(r"\A---\n(.*?\n)---\n?(.*)\Z", re.DOTALL)
-
-
 def _read_sources_and_body(text: str) -> tuple[list[str], str]:
     """Split a daily-source file into (existing `sources:` list, body).
 
-    Only the `sources:` block is understood; any other frontmatter keys are
+    The fence split is the seam's (`core.frontmatter.split_fence`); only the
+    `sources:` block is understood here, any other frontmatter keys are
     preserved verbatim by being re-emitted around the merged list. Files with
     no frontmatter return ([], full-text-as-body).
     """
-    m = _FRONTMATTER_RE.match(text)
-    if not m:
+    fm_raw, body = frontmatter.split_fence(text)
+    if fm_raw is None:
         return [], text
-    fm_raw, body = m.group(1), m.group(2)
     sources: list[str] = []
     in_sources = False
     other_lines: list[str] = []

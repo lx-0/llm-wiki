@@ -24,6 +24,7 @@ import re
 import sys
 from pathlib import Path
 
+from core import frontmatter
 from core.console import setup_console_logging
 from core.paths import KNOWLEDGE_DIR
 from core.utils import list_wiki_articles
@@ -40,7 +41,8 @@ FOLDER_TO_TYPE = {
     "facts": "fact",
 }
 
-_FRONTMATTER_RE = re.compile(r"^---\n(.*?)\n---\n", re.DOTALL)
+# The in-block `type:` line for the write-side replace / insert below; the READ of the
+# value goes through the seam (`frontmatter.field`), the fence through `split_fence`.
 _TYPE_LINE_RE = re.compile(r"^type:\s*(.+)$", re.MULTILINE)
 
 
@@ -54,14 +56,11 @@ def expected_type_for(article: Path) -> str | None:
 
 def needs_migration(content: str, expected: str) -> tuple[bool, str]:
     """Return (yes/no, reason). reason is the action label for logging."""
-    fm_match = _FRONTMATTER_RE.match(content)
-    if not fm_match:
+    if frontmatter.split_fence(content)[0] is None:
         return True, "add-frontmatter"
-    fm = fm_match.group(1)
-    type_match = _TYPE_LINE_RE.search(fm)
-    if not type_match:
+    actual = frontmatter.field(content, "type")
+    if actual is None:
         return True, "add-type"
-    actual = type_match.group(1).strip().strip('"').strip("'")
     if actual != expected:
         return True, f"correct-type ({actual} → {expected})"
     return False, ""
@@ -69,12 +68,10 @@ def needs_migration(content: str, expected: str) -> tuple[bool, str]:
 
 def apply_migration(content: str, expected: str) -> str:
     """Insert or correct the `type:` field. Preserves all other frontmatter."""
-    fm_match = _FRONTMATTER_RE.match(content)
-    if not fm_match:
+    fm, body = frontmatter.split_fence(content)
+    if fm is None:
         # No frontmatter at all — wrap the whole file in a minimal block.
         return f"---\ntype: {expected}\n---\n{content}"
-    fm = fm_match.group(1)
-    body = content[fm_match.end() :]
     if _TYPE_LINE_RE.search(fm):
         new_fm = _TYPE_LINE_RE.sub(f"type: {expected}", fm, count=1)
     else:

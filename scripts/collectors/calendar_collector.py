@@ -118,7 +118,7 @@ from collectors.base import (
     resolve_accounts,
     run_account_loop,
 )
-from core import google_oauth, markers
+from core import frontmatter, google_oauth, markers
 from core.config import CONFIG
 from core.google_oauth import OAuthApp
 from core.paths import ROOT_DIR, STATE_DIR
@@ -403,12 +403,8 @@ def _split_operator_prose(existing: str | None) -> tuple[str, str]:
     contract) is ``core.markers``."""
     if not existing:
         return "", ""
-    # Strip frontmatter if present.
-    body = existing
-    if body.startswith("---\n"):
-        end = body.find("\n---\n", 4)
-        if end >= 0:
-            body = body[end + len("\n---\n") :]
+    # Strip frontmatter if present (the seam's fence grammar; no fence → whole text).
+    _block, body = frontmatter.split_fence(existing)
     # Strip the first ``# Calendar — …`` heading (we always re-emit it).
     body = re.sub(r"^# Calendar —[^\n]*\n+", "", body, count=1)
     region = markers.find_region(body, _EVENTS_BEGIN, _EVENTS_END)
@@ -503,16 +499,8 @@ def _scan_transcripts() -> list[_TranscriptRef]:
                 text = p.read_text(encoding="utf-8")
             except OSError:
                 continue
-            if not text.startswith("---\n"):
-                continue
-            end = text.find("\n---\n", 4)
-            if end < 0:
-                continue
-            try:
-                front = yaml.safe_load(text[4:end])
-            except yaml.YAMLError:
-                continue
-            if not isinstance(front, dict):
+            front, _body = frontmatter.parse(text)
+            if not front:  # no fence, malformed, or not a mapping — the seam says {}
                 continue
             title = front.get("title")
             started = front.get("started_at") or front.get("date")

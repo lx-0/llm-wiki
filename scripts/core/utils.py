@@ -436,13 +436,8 @@ def list_raw_files(daily_dir: Path | None = None, raw_dir: Path | None = None) -
 
 def get_article_word_count(path: Path) -> int:
     """Count words in an article, excluding YAML frontmatter."""
-    content = path.read_text(encoding="utf-8")
-    # Strip frontmatter
-    if content.startswith("---"):
-        end = content.find("---", 3)
-        if end != -1:
-            content = content[end + 3 :]
-    return len(content.split())
+    _block, body = frontmatter.split_fence(path.read_text(encoding="utf-8"))
+    return len(body.split())
 
 
 def build_index_entry(rel_path: str, summary: str, sources: str, updated: str) -> str:

@@ -16,7 +16,6 @@ Usage (`wiki suggestions` — the dispatcher spawns this module as `-m suggestio
 from __future__ import annotations
 
 import argparse
-import re
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -25,6 +24,7 @@ from zoneinfo import ZoneInfo
 import yaml
 
 from adapters.mailbox import resolve_filter
+from core import frontmatter
 from core.config import CONFIG, TIMEZONE
 from core.paths import RAW_SUGGESTIONS_DIR, ROOT_DIR
 from domain.mail import FilterAction, FilterCondition, FilterRule
@@ -34,10 +34,9 @@ from suggestions.backends import imap as imap_actions
 
 
 def load_suggestion(path: Path) -> dict:
-    text = path.read_text(encoding="utf-8")
-    text = re.sub(r"^---\s*\n", "", text, count=1)
-    text = re.sub(r"\n---\s*$", "", text, count=1)
-    return yaml.safe_load(text) or {}
+    """A suggestion file is a fenced YAML document with no body (`save_suggestion` writes
+    it) — read through the seam's strict parse: a malformed file raises, as it did."""
+    return frontmatter.parse_strict(path.read_text(encoding="utf-8"))[0]
 
 
 def save_suggestion(path: Path, data: dict) -> None:

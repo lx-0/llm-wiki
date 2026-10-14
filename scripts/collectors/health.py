@@ -29,7 +29,6 @@ import functools
 import hashlib
 import logging
 import os
-import re
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -53,6 +52,7 @@ from collectors.base import (
     resolve_accounts,
     run_account_loop,
 )
+from core import frontmatter
 from core.config import CONFIG
 from core.paths import ROOT_DIR, STATE_DIR
 from core.utils import load_json_state, save_json_state, slugify
@@ -62,8 +62,6 @@ log = logging.getLogger(__name__)
 _STATE_FILE = STATE_DIR / "health-state.json"
 _OUTPUT_SUBFOLDER = "raw/notes/health"
 _DEFAULT_BACKFILL_DAYS = 90
-
-_FRONTMATTER_RE = re.compile(r"^---\n(.*?)\n---\n?(.*)$", re.DOTALL)
 
 
 def _sha256_file(path: Path, chunk: int = 1 << 20) -> str:
@@ -101,14 +99,11 @@ def _merge_healthkit_into_path(
 
     if target.exists():
         text = target.read_text(encoding="utf-8")
-        m = _FRONTMATTER_RE.match(text)
-        if m:
-            fm_text, body = m.group(1), m.group(2)
+        block, body = frontmatter.split_fence(text)
+        if block is not None:
             try:
-                existing: dict = yaml.safe_load(fm_text) or {}
-                if not isinstance(existing, dict):
-                    existing = {}
-            except yaml.YAMLError:
+                existing, body = frontmatter.parse_strict(text)
+            except frontmatter.FrontmatterError:
                 log.warning(
                     "healthkit: frontmatter in %s is not valid YAML — rebuilding from scratch",
                     target,

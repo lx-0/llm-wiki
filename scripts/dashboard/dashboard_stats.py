@@ -19,9 +19,9 @@ os.environ["CLAUDE_INVOKED_BY"] = "dashboard_stats"
 import argparse
 import json
 import logging
-import re
 from datetime import UTC, datetime
 
+from core import frontmatter
 from core.console import setup_console_logging
 from core.paths import DAILY_DIR, KNOWLEDGE_DIR, ROOT_DIR, SESSIONS_DIR
 from core.utils import (
@@ -106,26 +106,14 @@ def _is_final_only(article: Path) -> bool:
 
     Files marked final-only are hand-curated archives — visible via grep + graph
     + Obsidian search, but excluded from dashboard active surfaces (and from
-    MOC auto-includes + ``wiki query`` default scope). Regex-only to keep this
-    hot in the stats loop. (M007-S03-T01.)
+    MOC auto-includes + ``wiki query`` default scope). The seam's regex-only
+    `field` accessor keeps this hot in the stats loop. (M007-S03-T01.)
     """
     try:
         text = article.read_text(encoding="utf-8")
     except OSError:
         return False
-    if not text.startswith("---"):
-        return False
-    end = text.find("\n---", 3)
-    if end == -1:
-        return False
-    block = text[3:end]
-    return bool(
-        re.search(
-            r"^compile_role:\s*[\"']?final-only[\"']?\s*$",
-            block,
-            re.MULTILINE,
-        )
-    )
+    return frontmatter.field(text, "compile_role") == "final-only"
 
 
 def _open_action_items_in_entities(knowledge_dir: Path = KNOWLEDGE_DIR) -> tuple[int, int]:

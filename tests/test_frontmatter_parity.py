@@ -199,3 +199,45 @@ def test_no_private_frontmatter_grammar_outside_the_seam() -> None:
     assert offenders == [], (
         "private frontmatter grammar outside core/frontmatter.py:\n" + "\n".join(offenders)
     )
+
+
+# ── no fence grammar ANYWHERE outside the seam (M033-S03-T07) ────────────────
+
+# A hand-rolled fence READ at line level: a fence regex, a `startswith` / `find` probe on
+# the text, or one of the private regex names the unnamed sites carried. Writers that emit
+# a `---` line are not matched (no `"---\n"` in the list).
+_FENCE_READ_SMELLS = (
+    "\\A---",
+    '"^---',
+    'startswith("---',
+    "startswith('---",
+    'find("\\n---',
+    'index("\\n---',
+    "_FM_RE",
+    "_FRONTMATTER_RE",
+)
+# Lines that look like a fence read and are not — the reason stands beside each.
+_ALLOWED_FENCE_LINES = {
+    "scripts/lint.py": (
+        "`^---\\s*$` over the BODY finds thematic breaks before `## Timeline`, not a fence"
+    ),
+}
+
+
+def test_no_fence_grammar_anywhere_outside_the_seam() -> None:
+    """Exit criterion 5 at line level: T02's guard looked only inside `*frontmatter*`-named
+    functions and missed eight grammars under other names (T03's smell grep found them —
+    health's merge read, two calendar probes, capture_index, daily_capture, the word count,
+    the final-only probe, the type migration, the suggestion loader). Every line of every
+    module under scripts/ is scanned; the one `---` scan that is not a fence is allow-listed
+    with its reason."""
+    offenders: list[str] = []
+    for path in sorted((REPO / "scripts").rglob("*.py")):
+        rel = str(path.relative_to(REPO))
+        if path == _SEAM or rel in _ALLOWED_FENCE_LINES:
+            continue
+        for n, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            smells = [s for s in _FENCE_READ_SMELLS if s in line]
+            if smells:
+                offenders.append(f"{rel}:{n} {smells}")
+    assert offenders == [], "fence grammar outside core/frontmatter.py:\n" + "\n".join(offenders)

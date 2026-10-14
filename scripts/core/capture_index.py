@@ -23,8 +23,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-import yaml
-
+from . import frontmatter
 from .paths import KNOWLEDGE_DIR, STATE_DIR
 from .state_store import locked
 from .utils import ellipsize, load_json_state, save_json_state
@@ -68,9 +67,6 @@ def record(capture_id: str, *, source_path: str, created: str) -> bool:
         return True
 
 
-_FM_RE = re.compile(r"\A---\n(.*?)\n---", re.DOTALL)
-
-
 def _compiled_from(path: Path) -> list[str]:
     """The `compiled_from` frontmatter of a compiled article, as a list of source
     strings (str or list in the YAML — both normalised to a list)."""
@@ -78,15 +74,7 @@ def _compiled_from(path: Path) -> list[str]:
         text = path.read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError):
         return []
-    m = _FM_RE.match(text)
-    if not m:
-        return []
-    try:
-        fm = yaml.safe_load(m.group(1))
-    except yaml.YAMLError:
-        return []
-    if not isinstance(fm, dict):
-        return []
+    fm, _body = frontmatter.parse(text)
     cf = fm.get("compiled_from")
     if isinstance(cf, str):
         return [cf]
@@ -155,7 +143,7 @@ def _capture_gist(source_path: str, *, vault_root: Path) -> str:
         text = (vault_root / source_path).read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError):
         return ""
-    body = _FM_RE.sub("", text, count=1)
+    _block, body = frontmatter.split_fence(text)
     for line in body.splitlines():
         s = line.strip()
         if s and not s.startswith("#"):
