@@ -1,7 +1,7 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-14T20:40:00+02:00
+last_updated: 2026-10-14T21:20:00+02:00
 current_milestone: M032
 active_slice: S03
 active_task: none
@@ -19,7 +19,8 @@ schema 2 with title/verb/argv/tools, desktop `lib/actions.ts` merge model, parse
 `ADVANCED_COMMANDS` + `friendly*` rewrite layers deleted; vitest 63 + pytest 2024 green).
 Reassess after S02: **A — proceed as planned**. S03 1/4: T01 tokens (`styles/tokens.css`),
 primitives (`ui/Button|Switch|TypeBadge`, `ui/icons.ts`), glow/blur layers out, primitives sheet
-in the harness. Next task: T02 (Settings + Onboarding as Svelte windows) via `plan-task`.
+in the harness; T02 Settings + Onboarding as Svelte windows (label + value rows, one sentence
+each, 36 captures). Next task: T03 (Browse + Triage as Svelte windows) via `plan-task`.
 
 **S01 COMPLETE (5/5)** -- harness `npm run shots` (30 captures; real panel
 height 1,027 px vs 640 clamp), TypeScript 5.9 strict + svelte-check gate in `npm test`, Biome
