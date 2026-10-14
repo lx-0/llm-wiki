@@ -356,7 +356,12 @@ Long-term direction: remove agent-side filesystem writes entirely — agent retu
 ## Style
 
 - Bash: `set -euo pipefail`, `[[ ... ]]` over `[ ... ]`, lowercase function names.
-- Python: type hints, dataclasses for config, `Path` not str. ruff-friendly.
+- Python: type hints, dataclasses for config, `Path` not str. Formatted and linted by ruff
+  (`uv run ruff format --check scripts hooks tests`, `uv run ruff check scripts hooks tests`);
+  `scripts/core/config_schema.py` is excluded from the formatter on purpose — its field
+  comments are the source of `docs/config.md` (see `pyproject.toml`). The mechanical
+  format commit is listed in `.git-blame-ignore-revs`; run once per clone:
+  `git config blame.ignoreRevsFile .git-blame-ignore-revs`.
 - No emoji in code. Logs use ASCII status markers (✓ ! ✗) only via the helpers in `lib/common.sh`.
 - Commit messages: imperative mood, short subject (≤70 chars), body explains why.
 

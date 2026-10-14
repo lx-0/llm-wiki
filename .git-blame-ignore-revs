@@ -1,0 +1,6 @@
+# Commits `git blame` should look through. Activate once per clone:
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+# (GitHub's blame view reads this file automatically.)
+
+# M033-S01-T02: ruff format — mechanical, no logic change (290 files), 2026-10-14
+ec061106ce52f0000c89fb767ea722b891e24490
