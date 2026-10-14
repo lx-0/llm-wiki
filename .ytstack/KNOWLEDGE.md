@@ -2741,7 +2741,7 @@ Per-candidate learnings from the 14-candidate seam arc (C01–C14). Decisions li
 
 ### Desktop toolchain (C07)
 
-- **desktop tsconfig pins typescript ~4.5.4 while node_modules ships a modern @types/node** whose .d.ts syntax 4.5 can't parse — `npx tsc --noEmit` floods with TS1005/TS1109 errors inside @types/node and is NOT a usable typecheck gate. The real gates are `npm run test` (vitest via esbuild, no type-check) and `npm run lint` (eslint without a type-aware parser). Write test fakes structurally correct on their own; a small `as unknown as X` cast on a hand-built ChildLike fake is the pragmatic path since neither gate verifies it.
+- **Typecheck gate (since M032-S01-T02, 2026-10-14):** TypeScript 5.9 `strict` over `src/` + the root configs; `npm test` = `npm run typecheck && vitest run`. Until then the desktop pinned TypeScript 4.5.4, whose parser choked on modern `.d.ts` syntax in `node_modules` (866 TS1005/TS1109 errors), so `tsc` was not a usable gate and test fakes relied on `as unknown as X` casts — those casts are now checked; prefer structurally correct fakes. When a change seems to pass "for free", prove the gate with a throwaway `const probe: number = "x"` file first.
 - **desktop/ uses package-lock.json (npm), not pnpm** — install with `npm ci` before `npm run test`/`npm run lint`.
 
 ### Exception seam (C14)
