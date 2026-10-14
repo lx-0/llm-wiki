@@ -33,6 +33,7 @@ from typing import Any
 import pytest
 
 from collectors import calendar_collector as cal
+from core.utils import slugify
 
 # ── Registry / Spec ─────────────────────────────────────────────────
 
@@ -370,7 +371,7 @@ def test_attach_transcript_links_matches_by_date_and_title():
     ref = cal._TranscriptRef(
         relpath="raw/transcripts/jamie/2026-05-14--alex-x-sid--abc.md",
         title="Alex × Sid",
-        title_slug=cal._slugify("Alex × Sid"),
+        title_slug=slugify("Alex × Sid", max_len=60, ascii_only=True),
         date_key="2026-05-14",
         kind="jamie",
     )
@@ -407,7 +408,7 @@ def test_attach_transcript_links_substring_match():
     ref = cal._TranscriptRef(
         relpath="raw/transcripts/jamie/2026-05-14--alex-x-sid--abc.md",
         title=transcript_title,
-        title_slug=cal._slugify(transcript_title),
+        title_slug=slugify(transcript_title, max_len=60, ascii_only=True),
         date_key="2026-05-14",
         kind="jamie",
     )

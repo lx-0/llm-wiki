@@ -57,7 +57,7 @@ from collectors.base import (
 )
 from core.config import CONFIG
 from core.paths import ROOT_DIR, STATE_DIR
-from core.utils import load_json_state, now_iso, save_json_state
+from core.utils import load_json_state, now_iso, save_json_state, slugify
 
 log = logging.getLogger(__name__)
 
@@ -92,13 +92,7 @@ _API_VERSION = "v1"
 # ── Output shape ─────────────────────────────────────────────────────
 
 _OUTPUT_SUBFOLDER = "raw/transcripts/jamie"
-_SLUG_RE = re.compile(r"[^a-z0-9]+")
 _DEFAULT_SHORT_ID_LEN = 8
-
-
-def _slugify(text: str, max_len: int = 60) -> str:
-    s = _SLUG_RE.sub("-", text.lower()).strip("-")
-    return s[:max_len].rstrip("-") or "untitled"
 
 
 def _short_id(meeting_id: str) -> str:
@@ -624,7 +618,7 @@ class JamieCollector:
             title = full.get("title") or mid
             started_at = full.get("startTime") or stub.get("startTime") or ""
             date_prefix = str(started_at)[:10] if started_at else now_iso()[:10]
-            fname = f"{date_prefix}--{_slugify(title)}--{short}.md"
+            fname = f"{date_prefix}--{slugify(title, max_len=60, ascii_only=True)}--{short}.md"
             target = output_root / fname
 
             if dry_run:

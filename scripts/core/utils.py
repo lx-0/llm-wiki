@@ -132,12 +132,30 @@ def file_hash(path: Path) -> str:
 # ── Slug / naming ─────────────────────────────────────────────────────
 
 
-def slugify(text: str, max_len: int | None = None) -> str:
-    """Convert text to a filename-safe slug.
+_ASCII_SLUG_RE = re.compile(r"[^a-z0-9]+")
 
-    `max_len` caps the result length (default None = no cap), so callers that
-    build filenames from long titles/URLs don't need a trailing `[:N]` slice.
+
+def slugify(text: str, max_len: int | None = None, *, ascii_only: bool = False) -> str:
+    """Convert text to a filename-safe slug — the engine's one slug function.
+
+    Default grammar: Unicode word characters survive (`josé-garcía-lópez`),
+    punctuation is dropped (`don't` → `dont`), whitespace / underscore runs become
+    `-`, and `max_len` is a plain slice (default None = no cap). It names
+    `knowledge/facts/<slug>.md`, `knowledge/takes/<slug>.md`, voice notes and
+    html ingests — existing files depend on it.
+
+    `ascii_only=True` is the collectors' filename grammar (jamie / gmeet /
+    calendar / youtube; formerly four private copies): every run of non-`[a-z0-9]`
+    becomes `-` (`möglich` → `m-glich`, `don't` → `don-t`), outer dashes go, a cut
+    never ends in `-`, and an empty result is `"untitled"`. Transcript and video
+    filenames in operator vaults carry this shape; `tests/test_slugify.py` pins
+    both grammars.
     """
+    if ascii_only:
+        s = _ASCII_SLUG_RE.sub("-", text.lower()).strip("-")
+        if max_len is not None:
+            s = s[:max_len].rstrip("-")
+        return s or "untitled"
     text = text.lower().strip()
     text = re.sub(r"[^\w\s-]", "", text)
     text = re.sub(r"[\s_]+", "-", text)

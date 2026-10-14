@@ -81,7 +81,7 @@ from core import frontmatter, google_oauth
 from core.config import CONFIG
 from core.google_oauth import OAuthApp
 from core.paths import ROOT_DIR, STATE_DIR
-from core.utils import load_json_state, now_iso, save_json_state
+from core.utils import load_json_state, now_iso, save_json_state, slugify
 
 log = logging.getLogger(__name__)
 
@@ -107,7 +107,6 @@ _SCOPES = ("https://www.googleapis.com/auth/drive.meet.readonly",)
 
 _OUTPUT_SUBFOLDER = "raw/transcripts/gmeet"
 _STATE_FILE = STATE_DIR / "gmeet-state.json"
-_SLUG_RE = re.compile(r"[^a-z0-9]+")
 _SHORT_ID_LEN = 12
 _MEETING_KEY_LEN = 12
 # Normaliser for the meeting-key hash: lowercase, collapse whitespace, drop
@@ -137,11 +136,6 @@ _TITLE_SUFFIX_RE = re.compile(
     r"notizen von gemini|gemini-notizen)\s*$",
     re.IGNORECASE,
 )
-
-
-def _slugify(text: str, max_len: int = 60) -> str:
-    s = _SLUG_RE.sub("-", text.lower()).strip("-")
-    return s[:max_len].rstrip("-") or "untitled"
 
 
 def _short_id(file_id: str) -> str:
@@ -1040,7 +1034,10 @@ class GmeetCollector:
             # Filename: meeting-key suffix (was: short-Doc-id). Stable across
             # Doc-of-different-kind appends — the file never gets renamed when
             # a paired Doc arrives later.
-            fname = f"{date_prefix}--{_slugify(_meeting_title(first_name))}--{key}.md"
+            fname = (
+                f"{date_prefix}--"
+                f"{slugify(_meeting_title(first_name), max_len=60, ascii_only=True)}--{key}.md"
+            )
             target = (ROOT_DIR / self.SPEC.output_subfolder) / fname
 
             if dry_run:

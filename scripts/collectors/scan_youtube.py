@@ -40,7 +40,7 @@ import yaml
 from collectors.base import CollectorSpec, RunResult, register
 from core.config import CONFIG
 from core.paths import RAW_DIR
-from core.utils import now_iso
+from core.utils import now_iso, slugify
 
 # yt-dlp + youtube-transcript-api are imported lazily so --help works
 # without the deps installed.
@@ -577,13 +577,6 @@ def _build_aggregate_prompt(metadata: dict, transcript: dict | None, frames: lis
 
 # ── Slugging + write ─────────────────────────────────────────────────
 
-_SLUG_RE = re.compile(r"[^a-z0-9]+")
-
-
-def slugify(text: str, max_len: int = 60) -> str:
-    s = _SLUG_RE.sub("-", text.lower()).strip("-")
-    return s[:max_len].rstrip("-") or "untitled"
-
 
 @dataclass
 class Sidecar:
@@ -715,8 +708,8 @@ def write_sidecar(side: Sidecar, *, out_dir: Path) -> Path:
     to re-derive the structured shape.
     """
     out_dir.mkdir(parents=True, exist_ok=True)
-    channel_slug = slugify(side.metadata.get("channel") or "unknown")
-    title_slug = slugify(side.metadata.get("title") or side.video_id, max_len=50)
+    channel_slug = slugify(side.metadata.get("channel") or "unknown", max_len=60, ascii_only=True)
+    title_slug = slugify(side.metadata.get("title") or side.video_id, max_len=50, ascii_only=True)
     base = f"{channel_slug}--{title_slug}--{side.video_id}"
     md_path = out_dir / f"{base}.md"
     md_path.write_text(render_markdown(side), encoding="utf-8")

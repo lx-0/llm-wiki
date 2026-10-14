@@ -122,7 +122,7 @@ from core import google_oauth, markers
 from core.config import CONFIG
 from core.google_oauth import OAuthApp
 from core.paths import ROOT_DIR, STATE_DIR
-from core.utils import load_json_state, now_iso, save_json_state
+from core.utils import load_json_state, now_iso, save_json_state, slugify
 
 log = logging.getLogger(__name__)
 
@@ -131,7 +131,6 @@ log = logging.getLogger(__name__)
 
 _OUTPUT_SUBFOLDER = "raw/notes/calendar"
 _STATE_FILE = STATE_DIR / "calendar-state.json"
-_SLUG_RE = re.compile(r"[^a-z0-9]+")
 
 
 # Region inside the per-date file that the collector owns. Operator-typed
@@ -146,12 +145,8 @@ _EVENTS_END = "<!-- calendar:events:end -->"
 _FOCUS_HOUR_CAP = 12.0  # an all-day event doesn't get counted as 24h focus
 
 
-# ── Slug + time helpers ──────────────────────────────────────────────
-
-
-def _slugify(text: str, max_len: int = 60) -> str:
-    s = _SLUG_RE.sub("-", text.lower()).strip("-")
-    return s[:max_len].rstrip("-") or "untitled"
+# ── Time helpers ─────────────────────────────────────────────────────
+# (slugs come from `core.utils.slugify(..., ascii_only=True)` — the filename grammar)
 
 
 def _parse_event_time(raw: dict | None) -> tuple[datetime | None, bool]:
@@ -530,7 +525,7 @@ def _scan_transcripts() -> list[_TranscriptRef]:
                 _TranscriptRef(
                     relpath=str(p.relative_to(ROOT_DIR)),
                     title=title,
-                    title_slug=_slugify(title),
+                    title_slug=slugify(title, max_len=60, ascii_only=True),
                     date_key=date_key,
                     kind=kind,
                 )
@@ -555,7 +550,7 @@ def _attach_transcript_links(blocks: list[_EventBlock], refs: list[_TranscriptRe
         candidates = by_date.get(date_key) or []
         if not candidates:
             continue
-        evt_slug = _slugify(b.summary)
+        evt_slug = slugify(b.summary, max_len=60, ascii_only=True)
         if not evt_slug:
             continue
         # Match: same date + the longer of (event-slug, transcript-slug)
@@ -833,7 +828,7 @@ class CalendarCollector:
                 if isinstance(recurring_event_id, str) and recurring_event_id:
                     slug = recurring_map.get(recurring_event_id)
                     if slug is None:
-                        slug = _slugify(summary or recurring_event_id)
+                        slug = slugify(summary or recurring_event_id, max_len=60, ascii_only=True)
                         recurring_map[recurring_event_id] = slug
                     recurring_slug = slug
                     recurring_title = summary or slug.replace("-", " ").title()
