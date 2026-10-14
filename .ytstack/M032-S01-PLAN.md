@@ -3,9 +3,9 @@ milestone: M032
 slice: S01
 project: llm-wiki
 created: 2026-10-14T13:40:00+02:00
-status: planned
+status: done
 task_count: 5
-completed_tasks: 4
+completed_tasks: 5
 ---
 
 # M032-S01 -- Slice Plan
@@ -18,7 +18,7 @@ completed_tasks: 4
 - [x] T02 -- TypeScript 4.5 → 5.x with `strict: true`, `moduleResolution: bundler`; fix every resulting error in `src/`; `npm run typecheck` (`tsc --noEmit`) added and green; `npm test` runs typecheck + vitest.
 - [x] T03 -- Biome replaces ESLint: `biome.json` (lint + format), ESLint config/deps removed, one mechanical format commit, `npm run lint` = `biome check`; lint green.
 - [x] T04 -- Electron Forge 7.11 → 8.0 + Vite 5 → 8 (Forge 8's Vite plugin targets Vite 8; main/preload emitted as `.cjs`, `@electron/fuses` 2.x, DMG output path moved; vitest then shares the app's Vite); `npm run package` + `npm run shots` green.
-- [ ] T05 -- Svelte 5 scaffold + boilerplate out: `svelte` + `@sveltejs/vite-plugin-svelte` 7 wired into the renderer config, `svelte-check` in `npm run typecheck`, a smoke component rendered through the harness; the Forge template comment in `renderer.ts` and the placeholder `package.json` metadata (name / productName / description / keywords) replaced.
+- [x] T05 -- Svelte 5 scaffold + boilerplate out: `svelte` + `@sveltejs/vite-plugin-svelte` 7 wired into the renderer config, `svelte-check` in `npm run typecheck`, a smoke component rendered through the harness; the Forge template comment in `renderer.ts` and the placeholder `package.json` metadata (name / productName / description / keywords) replaced.
 
 ## Done when
 

@@ -2749,6 +2749,14 @@ Per-candidate learnings from the 14-candidate seam arc (C01–C14). Decisions li
   alias of `build.rolldownOptions`; DMG output moved to `out/make/dmg/<arch>/`;
   `electron-forge publish` is `release`. vitest 4 shares the app's Vite 8 (peer `^6||^7||^8`).
   Harness scripts stay `.cjs` on purpose so the preload can `require()` under `sandbox: false`.
+- **Svelte 5 renderer (since M032-S01-T05, 2026-10-14):** `vite-plugin-svelte` sits in the
+  renderer Vite config (Forge and `npm run shots` both run it); `npm run typecheck` = `tsc
+  --noEmit && svelte-check --tsconfig ./tsconfig.json`. `tsc` resolves `*.svelte` imports as soon
+  as the file imports anything from `svelte` (ambient module declarations ship with the package —
+  no `types: ["svelte"]`). Under the `rtk` hook, svelte-check output is rewritten to
+  `<ts> ERROR "<file>" line:col "<msg>"` lines and the summary line disappears — trust the exit
+  code. Component scripts that touch the preload use the `window.vault|listeners|panel|app`
+  globals from `src/global.d.ts` unchanged.
 - **Biome is the desktop linter/formatter (since M032-S01-T03, 2026-10-14):** `npm run lint` =
   `biome check`; warnings do not fail the run, errors do. From a Claude Code session the `rtk`
   shell hook intercepts any command line containing `biome` or `lint` and prints "ESLint output

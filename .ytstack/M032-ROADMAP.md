@@ -5,7 +5,7 @@ size: L
 created: 2026-10-14T13:10:00+02:00
 status: planned
 total_slices: 5
-completed_slices: 0
+completed_slices: 1
 ---
 
 # M032 Roadmap
@@ -25,7 +25,7 @@ Slice detail lives in per-slice `M032-S##-PLAN.md` files, created by `ytstack:sl
 
 Suggested framing (refine in slice-milestone; audit in `backlog/deslop-arc.md`):
 
-- [ ] S01 -- **Harness + toolchain.** Electron capture harness in `desktop/scripts/`
+- [x] S01 -- **Harness + toolchain.** Electron capture harness in `desktop/scripts/`
       with checked-in fixtures (states: default / running / failed / no-access / empty,
       light + dark); TypeScript 4.5 → 5.x with `strict`, typecheck in `npm test`; ESLint →
       Biome; Svelte 5 scaffold; strip the Forge boilerplate (renderer comment, package.json
