@@ -1,8 +1,8 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-08-28T09:00:00Z
-current_milestone: none
+last_updated: 2026-10-14T13:10:00+02:00
+current_milestone: M032
 active_slice: none
 active_task: none
 last_completed_milestone: M031
@@ -12,7 +12,34 @@ parallel_milestones: [M021, M025, M027, M029]
 
 # State
 
-## ▶ NEXT — no milestone is open; released 0.5.2
+## ▶ NEXT — M032 planned (L): desktop de-slop
+
+**Status:** M032 planned (L, 5 slices). Ready to slice — pending the operator's review of
+the plan.
+
+Operator request 2026-10-14: the app reads as vibe-coded (explanatory text everywhere, too
+little visual feedback) and the codebase should be modernised and clean-coded. Audited
+2026-10-14 with a headless render of all 7 desktop surfaces (17 screenshots under
+`/tmp/llmwiki-shots/`, harness `render.py` there — scratch until M032-S01 commits it),
+ruff/AST censuses over the engine, and green baselines (pytest 2011, vitest 53). Full
+audit + three-milestone arc: `backlog/deslop-arc.md` (M032 desktop → M033 engine
+modernisation → M034 dispatcher/surface diet). Milestone files: `M032-CONTEXT.md`,
+`M032-ROADMAP.md`.
+
+Headline findings: panel requests 1,377 px for 11 stacked sections (clamped to 640 →
+always scrolls); the same engine action renders up to 3× with 3 verbs (doctor + menu +
+advanced lists, no shared model); vocabulary patched by regex/maps at render time; Cockpit
+and Atlas are decoration without information (icosphere, stars, HUD labels, pasted
+Tailwind palette); light mode broken on Triage + Settings (hardcoded dark hex); TS 4.5.5
+with no working typecheck; engine never formatted (145/190 files), 183 unused `noqa`, 17
+private frontmatter parsers next to `core/frontmatter.py`, 15 functions ≥ 150 lines,
+2,742 lines of bash in front of the Python dispatcher, CI runs gitleaks only.
+
+Next action: operator reviews `deslop-arc.md` + `M032-CONTEXT.md` and answers open
+question 1 (renderer framework: Svelte 5 recommended) — then run `ytstack:slice-milestone`
+for M032. The three 2026-08-28 candidates below stay queued behind the arc.
+
+## 2026-08-28 — no milestone was open; released 0.5.2
 
 M031 closed 2026-08-26, the post-milestone sweep ran 2026-08-27, and the backlog
 is reconciled against the code (`backlog/PRIORITY.md`, 72 in the working set).

@@ -26,6 +26,8 @@ shipped and the sentence names only what remains.
 
 ## 🏔 Big rocks — high value, milestone-sized
 
+- **`deslop-arc.md`** (L + L + M · **M032 planned 2026-10-14**) — Operator-requested de-slop arc: desktop app (walls of text → status shapes + one action list, Cockpit/Atlas → Overview charts, tokens + light-mode fix, renderer rebuilt with TS 5/Biome + committed screenshot harness) → engine modernisation (format + lint policy + CI, `scripts/` as a package, dedupe onto the existing seams, split the 15 ≥150-line functions, pyright) → dispatcher/surface diet (bash → thin bootstrap, README ≤ 300 lines). Audit numbers and the three-milestone table live in the file; M032-CONTEXT/ROADMAP are cut from it.
+
 - **`architecture-scaling-2028.md`** (L) — Build Lever 2 — compile-side MOC linklist upkeep plus an MOC-first retrieval contract — and split the meta-entry into moc-auto-maintenance.md + lifecycle-tiering.md, now that the 1500-row and 2000-article triggers have both fired.
 - **`consumption-curiosity-axis.md`** (L ·partial) — No consumption channel has been built (no Spotify, Readwise, or YouTube watch-history collector exists), but the doc's own blocking prerequisite — a synthesis consumer that turns consumption substrate into a persona portrait — is now live in the dream-cycle, so the first-mover channel (reading-highlights per the doc's own sequencing) is unblocked.
 - **`dms-collector.md`** (L) — Untouched — build the Phase 1 Telegram wedge (Telethon session + scripts/adapters/dms/telegram.py + per-conversation allowlist), which is the one backlog item that covers a genuinely dark persona region the operator actually produces daily, and whose named consumer (M005 entity-pages with State+Timeline) is now live rather than hypothetical.
