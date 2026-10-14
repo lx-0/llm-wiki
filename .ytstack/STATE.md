@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-15T01:15:00+02:00
+last_updated: 2026-10-15T01:26:00+02:00
 current_milestone: M033
 active_slice: S03
-active_task: T06
+active_task: none
 last_completed_milestone: M032
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -133,7 +133,15 @@ already exist (M022 harness), the three `_scan_inbox` are one-line bindings; wha
 ellipsis — five homes by smell — and the swallowed append, hand-typed again in jamie / gmeet /
 health ×2 / email). Fold: `core.utils.ellipsize` + `daily_capture.rollup_line`, every
 collector rollup through `base.append_rollup`; byte-exact pins from a parity capture, two
-guards, RED first.
+guards, RED first. **S03 6/7** — T06 (`cc7bfec`): `core.utils.ellipsize` +
+`daily_capture.rollup_line`; the three collectors' shapes built on it (parity on fixtures
+byte-identical), the three `_scan_inbox` bindings inlined, six hand-typed appends (jamie,
+gmeet, health ×2, email, wispr — the sixth missed by the plan's grep) through
+`base.append_rollup`; two guards (measured on HEAD: 5 + 6 offenders). Found en route: the
+email fake-reader tests had a CONFIG stub without `limits`, so their rollup had been raising
+inside the swallowed try — fixed, the rollup lands now. Suite 2116. CI for `cc7bfec`
+pending. **Next: T07 (the eight unnamed fence grammars + the widened guard) via
+`plan-task`; then `reassess-roadmap` closes S03.**
 
 ## M032 COMPLETE (L, 2026-10-14): desktop de-slop
 
