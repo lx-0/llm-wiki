@@ -15,7 +15,12 @@ import {
   APP_QUIT_CHANNEL,
   type AppApi,
 } from './app/ipc';
-import { LISTENER_CONTROL_CHANNEL, LISTENER_STATUS_CHANNEL, type ListenerApi } from './listeners/ipc';
+import {
+  LISTENER_CONTROL_CHANNEL,
+  LISTENER_STATUS_CHANNEL,
+  LISTENER_TIMELINE_CHANNEL,
+  type ListenerApi,
+} from './listeners/ipc';
 import { PANEL_RESIZE_CHANNEL, PANEL_VISIBILITY_CHANNEL, type PanelApi } from './panel/ipc';
 import {
   VAULT_COLLECTORS_CHANNEL,
@@ -45,6 +50,7 @@ import {
 const listeners: ListenerApi = {
   status: () => ipcRenderer.invoke(LISTENER_STATUS_CHANNEL),
   control: (id, action) => ipcRenderer.invoke(LISTENER_CONTROL_CHANNEL, id, action),
+  timeline: (id, hours) => ipcRenderer.invoke(LISTENER_TIMELINE_CHANNEL, id, hours),
 };
 
 const vault: VaultApi = {

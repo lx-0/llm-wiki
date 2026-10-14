@@ -1,9 +1,49 @@
 import { describe, expect, it } from 'vitest';
 import { LISTENERS } from './registry';
-import { channelStatus, deriveStatus, FRESH_SEC, getListenerStatus, ZOMBIE_SYS_STALE_SEC } from './status';
+import {
+  bucketByHour,
+  channelStatus,
+  deriveStatus,
+  FRESH_SEC,
+  getListenerStatus,
+  ZOMBIE_SYS_STALE_SEC,
+} from './status';
 
 const NOW = 1_750_000_000_000; // fixed clock for deterministic tests
 const sAgo = (s: number) => NOW - s * 1000;
+const HOUR = 3_600_000;
+/** start of the local hour that contains `ms` — the bins are aligned to the operator's clock */
+const hourStart = (ms: number): number => {
+  const d = new Date(ms);
+  d.setMinutes(0, 0, 0);
+  return d.getTime();
+};
+
+describe('bucketByHour (pure)', () => {
+  const h0 = hourStart(NOW);
+
+  it('empty input → one zero bin per hour, the newest bin being the current hour', () => {
+    const t = bucketByHour([], NOW, 24);
+    expect(t.bucketMs).toBe(HOUR);
+    expect(t.startMs).toBe(h0 - 23 * HOUR);
+    expect(t.counts).toHaveLength(24);
+    expect(t.counts.every((n) => n === 0)).toBe(true);
+    expect(bucketByHour([], NOW, 3).counts).toHaveLength(3);
+  });
+
+  it('counts samples into aligned bins; the boundary belongs to the later bin', () => {
+    const t = bucketByHour([h0 + 5 * 60_000, h0 + 6 * 60_000, h0 - 1, h0 - 23 * HOUR], NOW, 24);
+    expect(t.counts[23]).toBe(2);
+    expect(t.counts[22]).toBe(1);
+    expect(t.counts[0]).toBe(1);
+  });
+
+  it('drops samples outside the window — older than the first bin or past the current hour', () => {
+    const t = bucketByHour([h0 - 23 * HOUR - 1, h0 + HOUR, NOW], NOW, 24);
+    expect(t.counts.reduce((a, b) => a + b, 0)).toBe(1);
+    expect(t.counts[23]).toBe(1);
+  });
+});
 
 describe('channelStatus (pure)', () => {
   it('null last → not fresh, null age', () => {

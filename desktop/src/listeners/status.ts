@@ -102,3 +102,74 @@ export function getListenerStatus(def: ListenerDef, nowMs: number = Date.now()):
     nowMs,
   });
 }
+
+// ---- capture timeline: hourly chunk counts (the Overview's heat strip) ---------
+
+export interface CaptureTimeline {
+  /** epoch ms of the first bin's start — a local hour boundary */
+  startMs: number;
+  bucketMs: number;
+  /** chunks per bin, oldest first; the last bin is the current hour */
+  mic: number[];
+  system: number[];
+}
+
+const HOUR_MS = 3_600_000;
+
+/** Start of the local hour containing `ms` — bins follow the operator's clock, not UTC. Bins
+ *  are a fixed hour apart, so across a DST switch inside the window the labels drift by one
+ *  hour for that day; a 24 h strip wears that twice a year. */
+function hourStart(ms: number): number {
+  const d = new Date(ms);
+  d.setMinutes(0, 0, 0);
+  return d.getTime();
+}
+
+/** Count samples into `hours` hourly bins ending with the current hour. Anything outside the
+ *  window — older than the first bin or past the current hour — is dropped. */
+export function bucketByHour(
+  timesMs: readonly number[],
+  nowMs: number,
+  hours: number,
+): { startMs: number; bucketMs: number; counts: number[] } {
+  const bins = Math.max(1, Math.floor(hours));
+  const startMs = hourStart(nowMs) - (bins - 1) * HOUR_MS;
+  const counts = new Array<number>(bins).fill(0);
+  for (const t of timesMs) {
+    const index = Math.floor((t - startMs) / HOUR_MS);
+    if (index >= 0 && index < bins) counts[index] += 1;
+  }
+  return { startMs, bucketMs: HOUR_MS, counts };
+}
+
+/** Epoch ms of every `audio_chunks` row matching `likePattern` since `sinceMs` — the same
+ *  julianday trick as lastChunkMs, so the stored text format never matters. */
+export function chunkTimesMs(dbPath: string, likePattern: string, sinceMs: number): number[] {
+  const since = new Date(sinceMs).toISOString();
+  const sql =
+    `select cast((julianday(timestamp) - 2440587.5) * 86400000 as integer) ` +
+    `from audio_chunks where file_path like '${likePattern.replace(/'/g, "''")}' ` +
+    `and julianday(timestamp) >= julianday('${since}');`;
+  try {
+    const out = execFileSync('sqlite3', ['-readonly', dbPath, sql], { encoding: 'utf8' });
+    return out
+      .split('\n')
+      .map(Number)
+      .filter((ms) => Number.isFinite(ms) && ms > 0);
+  } catch {
+    return []; // db missing / unreadable ⇒ an empty timeline, never a crash
+  }
+}
+
+/** Hourly mic / system chunk counts over the last `hours`, newest bin last. */
+export function getCaptureTimeline(
+  def: ListenerDef,
+  hours = 24,
+  nowMs: number = Date.now(),
+): CaptureTimeline {
+  const bins = Math.max(1, Math.floor(hours));
+  const startMs = hourStart(nowMs) - (bins - 1) * HOUR_MS;
+  const mic = bucketByHour(chunkTimesMs(def.dbPath, def.channels.mic, startMs), nowMs, bins);
+  const system = bucketByHour(chunkTimesMs(def.dbPath, def.channels.system, startMs), nowMs, bins);
+  return { startMs: mic.startMs, bucketMs: mic.bucketMs, mic: mic.counts, system: system.counts };
+}

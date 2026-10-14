@@ -55,6 +55,7 @@ contextBridge.exposeInMainWorld('vault', {
 contextBridge.exposeInMainWorld('listeners', {
   status: () => later(fx.listeners),
   control: () => later({ ok: true }),
+  timeline: (id) => later(id === 'screenpipe' ? fx.listenerTimeline : null),
 });
 
 contextBridge.exposeInMainWorld('panel', {

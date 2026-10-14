@@ -91,6 +91,23 @@ function entries(now) {
     }));
 }
 
+/** 24 hourly bins ending at the current hour: a workday of ~120 chunks per channel and hour
+ *  (the live 30 s cadence), a lunch gap, nothing overnight. */
+function timeline(now) {
+  const end = new Date(now);
+  end.setMinutes(0, 0, 0);
+  const startMs = end.getTime() - 23 * HOUR;
+  const mic = [];
+  const system = [];
+  for (let i = 0; i < 24; i += 1) {
+    const h = new Date(startMs + i * HOUR).getHours();
+    const on = (h >= 8 && h <= 12) || (h >= 14 && h <= 18);
+    mic.push(on ? 112 + ((i * 7) % 9) : 0);
+    system.push(on ? (h >= 14 ? 96 + ((i * 5) % 11) : 118 - ((i * 3) % 7)) : 0);
+  }
+  return { startMs, bucketMs: HOUR, mic, system };
+}
+
 const ANSWER =
   '**Sid** owns the Fleet onboarding track. The last two syncs ([[knowledge/people/sid-rahman|Sid Rahman]], ' +
   '[[knowledge/projects/fleet|Fleet]]) agreed on a Thursday deadline for the deck; the open blocker is the ' +
@@ -322,6 +339,7 @@ function base(now) {
         checkedAtMs: now,
       },
     ],
+    listenerTimeline: timeline(now),
     app: { loginItem: true },
   };
 }
@@ -355,6 +373,8 @@ const STATES = {
     fx.listeners[0].running = false;
     fx.listeners[0].channels.mic = { lastCaptureAtMs: null, ageSeconds: null, fresh: false };
     fx.listeners[0].channels.system = { lastCaptureAtMs: null, ageSeconds: null, fresh: false };
+    fx.listenerTimeline.mic.fill(0);
+    fx.listenerTimeline.system.fill(0);
     return fx;
   },
 };

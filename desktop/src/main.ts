@@ -25,7 +25,11 @@ import {
   APP_QUIT_CHANNEL,
 } from './app/ipc';
 import { BRAIN_PNG_1X, BRAIN_PNG_2X } from './assets/brainIcon';
-import { LISTENER_CONTROL_CHANNEL, LISTENER_STATUS_CHANNEL } from './listeners/ipc';
+import {
+  LISTENER_CONTROL_CHANNEL,
+  LISTENER_STATUS_CHANNEL,
+  LISTENER_TIMELINE_CHANNEL,
+} from './listeners/ipc';
 import {
   type LifecycleAction,
   type LifecycleResult,
@@ -34,7 +38,7 @@ import {
   stopListener,
 } from './listeners/lifecycle';
 import { getListener, LISTENERS } from './listeners/registry';
-import { getListenerStatus } from './listeners/status';
+import { type CaptureTimeline, getCaptureTimeline, getListenerStatus } from './listeners/status';
 import { PANEL_RESIZE_CHANNEL, PANEL_VISIBILITY_CHANNEL } from './panel/ipc';
 import { listCollectors } from './vault/collectors';
 import {
@@ -109,6 +113,17 @@ ipcMain.handle(LISTENER_STATUS_CHANNEL, () => {
   const all = LISTENERS.map((l) => getListenerStatus(l));
   if (DEBUG) console.log(`${LISTENER_STATUS_CHANNEL} -> ${JSON.stringify(all)}`);
   return all;
+});
+
+// IPC: hourly capture timeline (the Overview's heat strip) — same sqlite, read-only.
+const TIMELINE_MAX_HOURS = 24 * 31;
+ipcMain.handle(LISTENER_TIMELINE_CHANNEL, (_e, id: string, hours?: number): CaptureTimeline | null => {
+  const def = getListener(id);
+  if (!def) return null;
+  const span = Number.isFinite(hours)
+    ? Math.min(Math.max(Math.floor(hours as number), 1), TIMELINE_MAX_HOURS)
+    : 24;
+  return getCaptureTimeline(def, span);
 });
 
 // IPC: listener control (start/stop/restart). Renderer input is validated here.
