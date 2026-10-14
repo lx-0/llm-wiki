@@ -4,7 +4,7 @@ slice: S02
 project: llm-wiki
 created: 2026-10-14T18:50:00+02:00
 status: planned
-task_count: 5
+task_count: 6
 completed_tasks: 4
 ---
 
@@ -19,6 +19,7 @@ completed_tasks: 4
 - [x] T03 -- `cli.py` spawns handlers as `[sys.executable, "-m", <module>, *args]` from the chosen root (process isolation kept, `UV_PROJECT_ENVIRONMENT` / `--project` behaviour unchanged); the bash `_run_script` / `_dispatch_python` paths in `wiki` keep working byte-for-byte on the oracle (they move to Python in M034).
 - [x] T04 -- The `sys.path.insert` sites go: modules import from the package root; the one remaining bootstrap lives where the decision put it (dispatcher / `conftest.py`); E402 per-file ignores from S01-T04 removed; `pythonpath` in `[tool.pytest.ini_options]` matches the layout; KNOWLEDGE C01 marked closed with the proof (one `id()` for `core.config` under pytest).
 - [ ] T05 -- Operator path proven: `wiki update` + `uv sync` on a scratch copy of a vault's `.wiki/` (hook commands, piggyback spawn lines, `install.sh`) still resolve every entry point; `docs/engine-layout.md` + `AGENTS.md` tree updated; `wiki doctor` unchanged on the oracle.
+- [ ] T06 -- Documented invocations follow the layout: every by-path call of a sub-package module in `docs/PROCESS.md`, `docs/FEATURES.md`, `docs/config.md`, the 13 module docstrings (`collectors/scan_*`, `dashboard/*`, `facts/*`, `curiosity/cli`, `suggestions/cli`, `core/config`, `core/config_docs`) and the two `config_docs` hint strings spells the `wiki <cmd>` form where one exists, else `PYTHONPATH=.wiki/scripts uv run --project .wiki python -m <pkg>.<module>` (entry modules where `-m` would double-import, as T02 did for the preprocessors); the collectors' "direct CLI still works" claims go; repo-wide grep before and after (`uv run python scripts/<pkg>/<x>.py` → 0 hits).
 
 ## Done when
 
@@ -29,3 +30,4 @@ All tasks marked `[x]` and verified via `ytstack:summarize-task`.
 - Renaming the package to `llm_wiki` is explicitly out (it would change every operator hook command — that is M034's bash port). T01 chooses between the two layouts that keep the directory name.
 - 2026-10-14 (T01): **layout A** — `scripts/` is the source root (DECISIONS 2026-10-14). Inventory on `466f569`: 82 files with a `sys.path.insert` (shapes: `parent.parent` 31, `parent` 19, `parent.parent / "scripts"` 12, `SCRIPTS_DIR` 7, `parents[3]` 6, misc 7); 28 files / 75 lines import `scripts.*` (`study.py`, `analyze.py`, `reports/_engine/**` ×10, `tests/reports/**` ×15, `tests/test_compile_role.py`); hooks: `pre-compact.py` + `session-end.py` two inserts each, `_transcript.py` one lazy; tests: `conftest.py` + 9 files. `cli.py` dispatches via `command.handler` (a script path) → `_run_child`; piggybacks spawn `core/piggyback_runner.py … -- <cmd>` with `collectors/cli.py <name>`-style cmds built in `core/piggybacks.py` (T03 maps both onto `-m`). No `scripts/__init__.py`, ever — T04's guard test asserts it is absent.
 - 2026-10-14 (T04): two commits — A (`50bc825`): the 28-file import rewrite onto `core.*` / `reports.*`, `tests/test_layout.py`, `wiki config` runs `core.config` as a module; B: every per-module bootstrap deleted, `hooks/_bootstrap.py` is the one left, pytest `pythonpath = ["scripts", "hooks"]`, E402 ignores re-derived. The bootstrap lives in `hooks/`, not in the dispatcher / `conftest.py` the task line named: pytest's `pythonpath` already covers conftest, `cli.py` stopped needing one when T03's `-m` spawn landed, and only the hooks run as plain scripts from the harness. C01 is closed by a textual guard (second spelling incl. quoted monkeypatch targets, `sys.path.insert`, `scripts/__init__.py`, `core.config.__file__` under `SCRIPTS_DIR`), not an `id()` probe — `scripts.core` stays importable as a namespace package whenever `.wiki/` is on the path, so identity can only be kept out of the code textually.
+- 2026-10-14 (T05 planning): T06 added. With the per-module bootstraps gone, a sub-package module no longer runs by file path (`uv run python scripts/collectors/scan_tabs.py` → `ModuleNotFoundError: collectors`); the engine's own spawns were converted in T02–T04, but ~60 documented invocations (docs/PROCESS.md, FEATURES.md, config.md, 13 docstrings) still spell that form. The lxw checkout is at `5b6b947` (2026-10-12) — T05's update-path proof starts there.

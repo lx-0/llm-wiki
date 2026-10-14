@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-14T20:15:00+02:00
+last_updated: 2026-10-14T20:40:00+02:00
 current_milestone: M033
 active_slice: S02
-active_task: none
+active_task: T05
 last_completed_milestone: M032
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -55,9 +55,13 @@ more. Suite 2044. **S02 4/5** — T04 (two commits, A `50bc825` + B): one import
 per-module bootstrap deleted (83 lines / 80 files), `hooks/_bootstrap.py` the one left,
 pytest `pythonpath = ["scripts", "hooks"]`, `tests/test_layout.py` guard, E402 ignores
 re-derived (flush / lint / test_sdk_helpers / hooks), `wiki config` → `-m core.config`.
-Suite 2048, ruff + format clean, five dispatcher smokes + hook import chain ok. CI on
-`origin/main`: pending the push of A + B. Next: T05 — operator path on a scratch vault copy
-+ `docs/engine-layout.md` / `AGENTS.md` trees (`plan-task`).
+Suite 2048, ruff + format clean, five dispatcher smokes + hook import chain ok. CI green on
+`origin/main` at `c1abc72` (runs 38613560228 + 38613559870; that push also carries the
+date-slip stamp corrections). **S02 T05 planned** (`M033-S02-T05-PLAN.md`): operator-path proof
+on scratch copies — update path from the lxw checkout's `5b6b947` (2026-10-12, pre-M032)
+plus a fresh `install.sh` — and the two trees. **T06 added** (6 tasks now): the ~60 documented
+by-path invocations of sub-package modules (`docs/PROCESS.md`, `FEATURES.md`, `config.md`, 13
+docstrings) that the bootstrap removal turned into `ModuleNotFoundError`s. Next: execute T05.
 
 ## M032 COMPLETE (L, 2026-10-14): desktop de-slop
 
