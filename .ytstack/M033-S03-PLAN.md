@@ -5,7 +5,7 @@ project: llm-wiki
 created: 2026-10-14T18:50:00+02:00
 status: planned
 task_count: 6
-completed_tasks: 1
+completed_tasks: 2
 ---
 
 # M033-S03 -- Slice Plan
@@ -15,7 +15,7 @@ completed_tasks: 1
 ## Tasks
 
 - [x] T01 -- Frontmatter, top-level scripts (9 of 17): `pin.py`, `web_research.py`, `backfill_picture_metadata.py`, `backfill_daily_rollup.py`, `dedup.py`, `health_trends.py`, `reconcile.py`, `lint.py`, `dream.py` delegate to `core/frontmatter.parse` / `field` / `split_fence`; a parity test per site runs the old function's fixtures through the seam first (differences are decisions, recorded).
-- [ ] T02 -- Frontmatter, packages (8 of 17): `menu_context._read_frontmatter_field`, `compile_stages/route.py`, `collectors/gmeet.py`, `core/agent_spec.py`, `core/prompts.py`, `facts/correct.py`, `facts/take.py`, `reports/_engine/lib/timeline.py` — same method; afterwards `grep -rn "def _\?\(read\|parse\|split\)_frontmatter" scripts` prints only `core/frontmatter.py`.
+- [x] T02 -- Frontmatter, packages (8 of 17): `menu_context._read_frontmatter_field`, `compile_stages/route.py`, `collectors/gmeet.py`, `core/agent_spec.py`, `core/prompts.py`, `facts/correct.py`, `facts/take.py`, `reports/_engine/lib/timeline.py` — same method; afterwards `grep -rn "def _\?\(read\|parse\|split\)_frontmatter" scripts` prints only `core/frontmatter.py`.
 - [ ] T03 -- Slugify 5 → 1: `core/utils.slugify` gains whatever `scan_youtube.slugify` and the byte-identical `_slugify(text, max_len=60)` in `jamie` / `calendar_collector` / `gmeet` need (max-length semantics compared on their fixtures — filenames in operator vaults must not change: parity test over the real `raw/` filename patterns), callers switched.
 - [ ] T04 -- Logging → one setup: `preprocessors/cli`, `producers/cli`, `collectors/cli`, `bridge/cli` `_setup_logging` replaced by `core/console.setup_console_logging` (idempotent — KNOWLEDGE "lazy-import CLI module = doubled stderr"); then the inventory S02 left behind — 36 files call `logging.basicConfig` (`grep -rln 'logging.basicConfig' scripts`): the CLIs and the entry scripts go through the seam, a one-shot migration / backfill may keep a `__main__`-local call only where the seam cannot serve it (recorded per file); and the six modules whose console setup sits before their imports (`noqa: E402` in `compile`, `menu`, `query`, `review_wiki`, `optimize_claude_md`, `collectors/scan_screenshots`) end with their imports at the top, because the seam imports cleanly. stderr parity checked on the oracle. Split at plan-task if the sweep does not fit one context window.
 - [ ] T05 -- State through the store: `email_collector`, `scan_screenshots`, `folder_index` `_load_state` / `_save_state` replaced by `core/state_store.store_for` (lock + atomic write), watermark semantics proven by the collectors' existing tests plus one race test per site mirroring `tests/test_state_store.py`.

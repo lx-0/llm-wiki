@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-14T22:00:00+02:00
+last_updated: 2026-10-14T22:27:00+02:00
 current_milestone: M033
 active_slice: S03
-active_task: T02
+active_task: none
 last_completed_milestone: M032
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -87,11 +87,14 @@ console-before-import modules), may split at plan-task; `backlog/lazy-collector-
 onto `core/frontmatter` across ten top-level scripts (repo-wide `def …frontmatter…(` 31 →
 26; parity 119/143 identical, the 24 deltas = the seam's tolerance + two recorded decisions;
 two call-site contracts kept via `parse_strict`); `tests/test_frontmatter_parity.py` (six
-cases RED before the fold). Suite 2071. CI green on `f03d13b`. **T02 planned**
-(`M033-S03-T02-PLAN.md`): seven package-side grammar copies → the seam (menu_context, gmeet,
-agent_spec, prompts, verify_report, utils, links), single-call-site forwarders inlined, a
-guard that no `*frontmatter*` function outside the seam carries `safe_load` or a fence
-literal. Next: execute T02.
+cases RED before the fold). Suite 2071. CI green on `f03d13b`. **S03 2/6** — T02
+(`f4e8a3c`): the seven package-side read grammars folded onto the seam (menu_context, gmeet,
+agent_spec, prompts, verify_report, utils, links + inbox's fence probe), three forwarders
+inlined, the guard `test_no_private_frontmatter_grammar_outside_the_seam` (RED on 10 → 1 →
+green); grammar readers outside the seam 7 → 0, `def …frontmatter…(` 26 → 23; the three
+hand-built writers stay by decision (S03 notes). Parity 72/91 before the fold, deltas = the
+seam's tolerance + one old regex bug (`----` closed the fences). Suite 2072. Next: T03 —
+slugify 5 → 1 (`plan-task`); CI for `f4e8a3c` pending.
 
 ## M032 COMPLETE (L, 2026-10-14): desktop de-slop
 
