@@ -11,16 +11,24 @@ Design constraints:
       menu falls back to browse-only rendering.
     * Per-probe try/except so a single broken signal never kills the rest.
 
-Output schema (stdout, one line):
+Output schema (stdout, one line) — `schema` is `core.actions.SCHEMA`:
     {
+      "schema": 2,
       "status": {
         "articles": 384,
         "last_compile_ago": "4h",
         "ollama_reachable": true
       },
       "suggestions": [
-        {"key": "1", "count": 3, "label": "3 files in inbox/",
-         "cmd": "process-inbox", "priority": 1},
+        {"key": "1", "id": "process-inbox", "count": 3,
+         "label": "3 files in inbox/",            # operator terms (TUI)
+         "title": "3 new captures to sort",       # plain English (GUI, agents)
+         "verb": "Sort", "group": "do", "argv": ["process-inbox"], "priority": 1},
+        ...
+      ],
+      "tools": [                                  # always available, no count
+        {"id": "lint", "title": "Check for problems", "verb": "Check",
+         "group": "tools", "argv": ["lint", "--structural-only"]},
         ...
       ]
     }
@@ -43,6 +51,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from core import actions
 from core.paths import (
     DAILY_DIR,
     INBOX_DIR,
@@ -248,47 +257,43 @@ def build_suggestions() -> list[dict]:
     Each entry has: key, count, label, cmd, priority, group. Only entries with
     count > 0 are returned. Keys are auto-numbered "1".."N" after sort.
     """
-    # `group` is the intent-class the home screen renders under (lever 2):
-    #   do     — only the operator drives it (process inbox, compile, flush,
-    #            execute approved suggestions)
-    #   auto   — self-draining via piggybacks now (dream/lint/email-curiosity);
-    #            shown as status, not an imperative
-    #   review — opt-in review queue (document-scan requests need consent)
+    # Each probe is keyed on a `core.actions` catalogue id, which owns the intent group
+    # (do / auto / review — lever 2 of the home screen), the argv and the plain-English
+    # title + verb that GUI consumers render verbatim. `label` stays operator-speak for
+    # the TUI (DECISIONS 2026-06-24).
     raw = [
-        ("inbox",       probe_inbox,                1, "do",
-         lambda n: f"{n} file{'s' if n != 1 else ''} in inbox/",          "process-inbox"),
-        ("compile",     probe_compile_changed,      2, "do",
-         lambda n: f"{n} source{'s' if n != 1 else ''} changed since compile", "compile"),
-        ("folder-scan", probe_folder_curiosity_pending, 3, "review",
-         lambda n: f"{n} document-scan request{'s' if n != 1 else ''} to review",
-         "curiosity --type folder-deep-scan"),
-        ("curiosity",   probe_curiosity_pending,    8, "auto",
-         lambda n: f"{n} email-scan request{'s' if n != 1 else ''} pending",
-         "curiosity --type email-deep-scan"),
-        ("suggestions", probe_suggestions_approved, 4, "do",
-         lambda n: f"{n} approved suggestion{'s' if n != 1 else ''} to execute", "suggestions"),
-        ("dream",       probe_dream_overdue,        5, "auto",
-         lambda n: f"{n} entit{'ies' if n != 1 else 'y'} overdue for dream",    "dream --all-entities"),
-        ("flush",       probe_flush_missing,        6, "do",
-         lambda _: "today's session has not been flushed",                       "flush"),
-        ("lint",        probe_lint_stale,           7, "auto",
-         lambda _: "knowledge edits since last lint sweep",                      "lint --structural-only"),
+        ("process-inbox", probe_inbox, 1,
+         lambda n: f"{n} file{'s' if n != 1 else ''} in inbox/"),
+        ("compile", probe_compile_changed, 2,
+         lambda n: f"{n} source{'s' if n != 1 else ''} changed since compile"),
+        ("curiosity-folder", probe_folder_curiosity_pending, 3,
+         lambda n: f"{n} document-scan request{'s' if n != 1 else ''} to review"),
+        ("curiosity-email", probe_curiosity_pending, 8,
+         lambda n: f"{n} email-scan request{'s' if n != 1 else ''} pending"),
+        ("suggestions", probe_suggestions_approved, 4,
+         lambda n: f"{n} approved suggestion{'s' if n != 1 else ''} to execute"),
+        ("dream-sweep", probe_dream_overdue, 5,
+         lambda n: f"{n} entit{'ies' if n != 1 else 'y'} overdue for dream"),
+        ("flush", probe_flush_missing, 6,
+         lambda _: "today's session has not been flushed"),
+        ("lint", probe_lint_stale, 7,
+         lambda _: "knowledge edits since last lint sweep"),
     ]
     results = []
-    for name, probe, priority, group, label_fn, cmd in raw:
+    for action_id, probe, priority, label_fn in raw:
         try:
             n = probe()
         except Exception as e:
-            log.warning("probe %s failed: %s", name, e)
+            log.warning("probe %s failed: %s", action_id, e)
             continue
         if n <= 0:
             continue
+        spec = actions.get(action_id)
         results.append({
+            **spec.to_json(n),
             "count": n,
             "label": label_fn(n),
-            "cmd": cmd,
             "priority": priority,
-            "group": group,
         })
     results.sort(key=lambda r: r["priority"])
     for i, r in enumerate(results, start=1):
@@ -405,7 +410,15 @@ def main() -> int:
         "menu_context produced %d suggestions + %d status fields in %dms",
         len(suggestions), len(status), elapsed_ms,
     )
-    json.dump({"status": status, "suggestions": suggestions}, sys.stdout)
+    json.dump(
+        {
+            "schema": actions.SCHEMA,
+            "status": status,
+            "suggestions": suggestions,
+            "tools": actions.tools(),
+        },
+        sys.stdout,
+    )
     sys.stdout.write("\n")
     return 0
 

@@ -142,7 +142,7 @@ def test_home_state_actions_combines_health_and_suggestions():
         CheckResult("b", "config", "warning", "no auto-fix",
                     fix="run something manually", dispatch_args=None),
     ]
-    state.suggestions = [{"key": "1", "label": "3 files in inbox/", "cmd": "process-inbox"}]
+    state.suggestions = [{"key": "1", "label": "3 files in inbox/", "argv": ["process-inbox"]}]
     actions = state.actions()
     assert len(actions) == 2  # one actionable health + one suggestion (the dispatchless health stays out)
     assert actions[0]["kind"] == "health"
@@ -195,11 +195,11 @@ def test_actions_ordered_do_then_auto_then_review():
                     fix="wiki gmail-auth", dispatch_args=["gmail-auth", "gmail-personal"]),
     ]
     state.suggestions = [
-        {"key": "1", "label": "101 overdue for dream", "cmd": "dream --all-entities",
+        {"key": "1", "label": "101 overdue for dream", "argv": ["dream", "--all-entities"],
          "priority": 5, "group": "auto"},
         {"key": "2", "label": "1 document-scan to review",
-         "cmd": "curiosity --type folder-deep-scan", "priority": 3, "group": "review"},
-        {"key": "3", "label": "149 changed since compile", "cmd": "compile",
+         "argv": ["curiosity", "--type", "folder-deep-scan"], "priority": 3, "group": "review"},
+        {"key": "3", "label": "149 changed since compile", "argv": ["compile"],
          "priority": 2, "group": "do"},
     ]
     actions = state.actions()
@@ -221,12 +221,12 @@ def test_screen_renders_group_subheaders_in_order_with_continuous_numbering():
                     fix="wiki gmail-auth", dispatch_args=["gmail-auth", "gmail-personal"]),
     ]
     state.suggestions = [
-        {"key": "1", "label": "149 changed since compile", "cmd": "compile",
+        {"key": "1", "label": "149 changed since compile", "argv": ["compile"],
          "priority": 2, "group": "do"},
-        {"key": "2", "label": "101 overdue for dream", "cmd": "dream --all-entities",
+        {"key": "2", "label": "101 overdue for dream", "argv": ["dream", "--all-entities"],
          "priority": 5, "group": "auto"},
         {"key": "3", "label": "1 document-scan to review",
-         "cmd": "curiosity --type folder-deep-scan", "priority": 3, "group": "review"},
+         "argv": ["curiosity", "--type", "folder-deep-scan"], "priority": 3, "group": "review"},
     ]
     html = menu._build_screen_html(state)
     i_do = html.find("Needs you")

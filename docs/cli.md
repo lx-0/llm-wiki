@@ -165,17 +165,29 @@ read vault state programmatically without parsing pretty output:
 ./.wiki/wiki doctor --quick --json   # skip TCP + subprocess probes (~50ms)
 ```
 
-`wiki menu --json` payload:
+`wiki menu --json` payload (`schema` = `core.actions.SCHEMA`; consumers refuse unknown schemas):
 
 ```json
 {
+  "schema": 2,
   "status": {"articles": 384, "last_compile_ago": "4h", "ollama_reachable": true},
   "suggestions": [
-    {"key": "1", "count": 3, "label": "3 files in inbox/",
-     "cmd": "process-inbox", "priority": 1}
+    {"key": "1", "id": "process-inbox", "count": 3,
+     "label": "3 files in inbox/",
+     "title": "3 new captures to sort", "verb": "Sort",
+     "group": "do", "argv": ["process-inbox"], "priority": 1}
+  ],
+  "tools": [
+    {"id": "lint", "title": "Check for problems", "verb": "Check",
+     "group": "tools", "argv": ["lint", "--structural-only"]}
   ]
 }
 ```
+
+`label` is operator-speak for the TUI; `title` + `verb` are the plain-English rendering GUI
+consumers show verbatim (both come from the one catalogue in `scripts/core/actions.py`);
+`group` is the home-screen intent class (`do` / `auto` / `review`); `tools` lists the
+maintenance actions that are available without a pending count.
 
 `wiki doctor --json` payload:
 
@@ -200,7 +212,7 @@ Stable field names per check: `id`, `category`, `severity`, `message`,
 issue into the navigable Actionable list and Enter dispatches
 `wiki <dispatch_args>`.
 
-Agents pick a suggestion from `wiki menu --json` then dispatch via the
+Agents pick a suggestion from `wiki menu --json` then dispatch its `argv` via the
 regular bash subcommand (e.g. `wiki compile`). They never ask the menu
 to dispatch — bash stays single source of truth.
 

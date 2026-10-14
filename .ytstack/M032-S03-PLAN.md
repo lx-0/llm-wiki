@@ -15,7 +15,7 @@ completed_tasks: 0
 ## Tasks
 
 - [ ] T01 -- Tokens + palette: `src/styles/tokens.css` (colour / space / radius / type scale, light + dark), `src/lib/palette.ts` as the single type-colour source applied as CSS custom properties at startup, shared `lib/` helpers (`time.ts`, `icons.ts`), the glow/blur/HUD/sparkle/emoji layers removed from the stylesheet.
-- [ ] T02 -- Settings + Onboarding as Svelte windows (pilot): same behaviour, label + value instead of sub-sentences, one sentence per onboarding step; harness states light/dark.
+- [ ] T02 -- Settings + Onboarding as Svelte windows (pilot): same behaviour, label + value instead of sub-sentences, one sentence per onboarding step; harness states light/dark; the S01 smoke page (`smoke.html`, `src/windows/smoke/`) deleted.
 - [ ] T03 -- Browse + Triage as Svelte windows: layouts kept, hardcoded dark hex gone (light-mode defect closed by construction), group hints and the triage sub-line cut to labels.
 - [ ] T04 -- Old `settings.ts` / `onboarding.ts` / `browse.ts` / `triage.ts` + their CSS blocks deleted; screenshot gate (overlap, overflow, zoom-crop) over the four windows × light/dark; harness fixtures extended where a state was missing.
 

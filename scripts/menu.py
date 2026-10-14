@@ -388,14 +388,14 @@ class HomeState:
                 "_sort": (0, _SEV_RANK.get(r.severity, 9)),
             })
         for s in self.suggestions:
-            cmd_str = s.get("cmd", "")
+            argv = list(s.get("argv", []))
             items.append({
                 "kind": "suggestion",
                 "severity": "probe",
                 "group": s.get("group", "do"),
                 "label": s.get("label", ""),
-                "dispatch_args": cmd_str.split(),
-                "cmd_display": cmd_str,
+                "dispatch_args": argv,
+                "cmd_display": " ".join(argv),
                 "_sort": (1, s.get("priority", 99)),
             })
         # Group by intent-class (do → auto → review), preserving in-group order.

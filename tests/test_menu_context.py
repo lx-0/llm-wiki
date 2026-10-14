@@ -136,9 +136,28 @@ def test_suggestions_carry_intent_group(fake_vault):
     (fake_vault / "raw" / "requests" / "request-r.json").write_text(
         json.dumps({"type": "folder-deep-scan", "status": "pending"}))
 
-    by_cmd = {r["cmd"]: r for r in menu_context.build_suggestions()}
-    assert by_cmd["process-inbox"]["group"] == "do"
-    assert by_cmd["curiosity --type folder-deep-scan"]["group"] == "review"
+    by_id = {r["id"]: r for r in menu_context.build_suggestions()}
+    assert by_id["process-inbox"]["group"] == "do"
+    assert by_id["curiosity-folder"]["group"] == "review"
+
+
+def test_suggestions_carry_catalogue_vocabulary(fake_vault):
+    """Schema 2: every suggestion renders the engine's own plain-English title, verb
+    and argv from core.actions — consumers (desktop, agents) show them verbatim; the
+    operator-term `label` stays for the TUI."""
+    import menu_context
+
+    for name in ("a.md", "b.md", "c.md"):
+        (fake_vault / "inbox" / name).write_text("x")
+
+    by_id = {r["id"]: r for r in menu_context.build_suggestions()}
+    inbox = by_id["process-inbox"]
+    assert inbox["count"] == 3
+    assert inbox["title"] == "3 new captures to sort"
+    assert inbox["verb"] == "Sort"
+    assert inbox["argv"] == ["process-inbox"]
+    assert inbox["label"] == "3 files in inbox/"
+    assert "cmd" not in inbox
 
 
 def test_suggestions_counts_approved_lines(fake_vault):
@@ -222,11 +241,13 @@ def test_build_suggestions_returns_only_nonzero_counts_sorted(fake_vault):
 
     results = menu_context.build_suggestions()
     # Only inbox should remain non-zero.
-    keys = [r["cmd"] for r in results]
-    assert "process-inbox" in keys
+    ids = [r["id"] for r in results]
+    assert "process-inbox" in ids
     # All entries have the right schema.
     for r in results:
-        assert set(r.keys()) == {"count", "label", "cmd", "priority", "key", "group"}
+        assert set(r.keys()) == {
+            "id", "count", "label", "title", "verb", "group", "argv", "priority", "key",
+        }
         assert r["count"] > 0
     # Sorted by ascending priority + auto-numbered keys.
     priorities = [r["priority"] for r in results]
@@ -235,7 +256,7 @@ def test_build_suggestions_returns_only_nonzero_counts_sorted(fake_vault):
 
 
 def test_cli_emits_valid_json_object():
-    """End-to-end: subprocess call returns a parseable {status, suggestions}."""
+    """End-to-end: subprocess call returns a parseable schema-2 payload."""
     proc = subprocess.run(
         [sys.executable, str(MENU_CONTEXT_PY)],
         capture_output=True,
@@ -245,9 +266,11 @@ def test_cli_emits_valid_json_object():
     assert proc.returncode == 0
     data = json.loads(proc.stdout)
     assert isinstance(data, dict)
-    assert set(data.keys()) == {"status", "suggestions"}
+    assert set(data.keys()) == {"schema", "status", "suggestions", "tools"}
+    assert data["schema"] == 2
     assert isinstance(data["status"], dict)
     assert isinstance(data["suggestions"], list)
+    assert {t["id"] for t in data["tools"]} >= {"lint", "links-fix", "dedup"}
 
 
 # ── Status one-liner probes ─────────────────────────────────────────

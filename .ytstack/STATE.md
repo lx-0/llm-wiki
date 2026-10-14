@@ -1,9 +1,9 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-14T16:55:00+02:00
+last_updated: 2026-10-14T17:50:00+02:00
 current_milestone: M032
-active_slice: none
+active_slice: S02
 active_task: none
 last_completed_milestone: M031
 parked_milestone: none
@@ -12,13 +12,19 @@ parallel_milestones: [M021, M025, M027, M029]
 
 # State
 
-## ▶ NEXT — M032 planned (L): desktop de-slop
+## ▶ NEXT — M032 in flight (L): desktop de-slop
 
-**Status:** M032 / S01 COMPLETE (5/5) -- harness `npm run shots` (30 captures; real panel
+**Status:** M032 / S02 -- 1/4 tasks done (T01 engine action catalogue `core/actions.py`,
+`menu --json` schema 2 with title/verb/group/argv + tools; suite 2023 green). Next task: T02
+(doctor JSON: `CheckResult.title`, verb, schema) via `plan-task`.
+
+**S01 COMPLETE (5/5)** -- harness `npm run shots` (30 captures; real panel
 height 1,027 px vs 640 clamp), TypeScript 5.9 strict + svelte-check gate in `npm test`, Biome
 (0 errors), Forge 8 + Vite 8 + fuses 2 (package/test/shots green, zero warnings), Svelte 5
-scaffold proven through the harness, template boilerplate gone. Next: `ytstack:reassess-roadmap`
-at the slice boundary, then S02 (engine JSON contract + one action model) via `plan-task`. Operator go 2026-10-14 ("arbeite den plan komplett ab"); S01–S05
+scaffold proven through the harness, template boilerplate gone. Reassess-roadmap 2026-10-14
+after S01: **A — proceed as planned** (toolchain landed one major newer than planned — Forge 8 /
+Vite 8 — which only simplifies S03–S05; the smoke page is added to S03-T02's deletion list).
+Next slice: S02 (engine JSON contract + one action model) via `plan-task`. Operator go 2026-10-14 ("arbeite den plan komplett ab"); S01–S05
 sliced (19 tasks), decisions locked (Svelte 5, Biome, Overview replaces Cockpit + Atlas).
 Executing sequentially on `main`, push per verified task.
 

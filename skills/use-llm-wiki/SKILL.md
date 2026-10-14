@@ -181,11 +181,14 @@ right one for the question; don't conflate them.
 
   ```sh
   wiki menu --json
-  # → {"status": {"articles", "last_compile_ago", "ollama_reachable"},
-  #    "suggestions": [{"key", "count", "label", "cmd", "priority"}, …]}
+  # → {"schema": 2,
+  #    "status": {"articles", "last_compile_ago", "ollama_reachable"},
+  #    "suggestions": [{"key", "id", "count", "label", "title", "verb",
+  #                     "group", "argv", "priority"}, …],
+  #    "tools": [{"id", "title", "verb", "group", "argv"}, …]}
   ```
 
-  Pick a suggestion by reading `cmd`, then invoke `wiki <cmd>`
+  Pick a suggestion by reading `argv`, then invoke `wiki <argv…>`
   directly. Don't ask the menu to dispatch — bash is single source of
   truth for what each subcommand does.
 
