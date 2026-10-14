@@ -28,13 +28,9 @@ from datetime import datetime
 from pathlib import Path
 
 from core.config import CONFIG
+from core.console import setup_console_logging
 from core.paths import RAW_DIR
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s  %(levelname)s  %(message)s",
-    datefmt="%Y-%m-%dT%H:%M:%S",
-)
 log = logging.getLogger("migrate-inbox-archive")
 
 
@@ -109,6 +105,7 @@ def _migrate_one(source_name: str, inbox_attr: str, dry_run: bool) -> dict:
 
 
 def main(argv: list[str] | None = None) -> int:
+    setup_console_logging("migrate-inbox-archive")
     parser = argparse.ArgumentParser(
         description="Migrate <inbox>/.processed/ into vault audit zone"
     )

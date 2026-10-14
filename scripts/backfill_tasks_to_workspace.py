@@ -20,6 +20,7 @@ import logging
 import shutil
 import sys
 
+from core.console import setup_console_logging
 from core.paths import ROOT_DIR, WORKSPACE_INBOX_DIR
 
 log = logging.getLogger("backfill-tasks-to-workspace")
@@ -75,5 +76,5 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO, format="%(message)s")
+    setup_console_logging("backfill-tasks-to-workspace")
     sys.exit(main())

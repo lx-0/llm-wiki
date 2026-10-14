@@ -234,12 +234,16 @@ def setup_console_logging(
     formatter: ConsoleFormatter | None = None,
     log_file: Path | None = None,
     error_file: Path | None = None,
+    level: int = logging.INFO,
     silence_libraries: bool = True,
 ) -> logging.Logger:
-    """One-stop logging setup for a CLI script.
+    """One-stop logging setup for a CLI script — the engine's one logging setup.
 
     Replaces the boilerplate ``logging.basicConfig(...)`` + per-script
     handler glue with a single call that gives every CLI the same look.
+    Called from the entry point (``main()`` / the ``__main__`` block), never
+    at module level: an importable module must not configure its importer's
+    root logger (KNOWLEDGE "no basicConfig in importable modules").
 
     Args:
         logger_name: returned via ``logging.getLogger(...)`` for the
@@ -250,6 +254,8 @@ def setup_console_logging(
         log_file: optional ``Path`` for an INFO+ archive (verbose ISO
             timestamps, no colors).
         error_file: optional ``Path`` for a WARNING+ archive.
+        level: the root level (default INFO; the home-screen probe runs at
+            WARNING so its INFO never reaches the operator's terminal).
         silence_libraries: silence ``httpx``/``httpcore`` and the SDK's
             pre-exception ``"Fatal error in message reader"`` line so the
             caller's own classifier output is the first error visible.
@@ -258,7 +264,7 @@ def setup_console_logging(
         The named logger.
     """
     root = logging.getLogger()
-    root.setLevel(logging.INFO)
+    root.setLevel(level)
 
     # Idempotent stderr-handler setup. When a CLI module lazy-imports
     # another CLI module at run-time (incident 2026-05-18: dream.py

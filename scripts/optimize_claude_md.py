@@ -16,13 +16,17 @@ import argparse
 import asyncio
 import logging
 import shutil
+import time as _time
 from datetime import datetime
 from pathlib import Path
 
 from claude_agent_sdk import ClaudeAgentOptions, ResultMessage, query
 
 from core.config import CONFIG
+from core.console import setup_console_logging
 from core.paths import LOG_FILE, ROOT_DIR
+from core.prompts import render
+from core.sdk_helpers import StderrCapture, log_sdk_failure
 from core.utils import now_iso, read_wiki_index_compact
 
 # ── Config ──────────────────────────────────────────────────────────
@@ -30,17 +34,7 @@ from core.utils import now_iso, read_wiki_index_compact
 CLAUDE_MD = Path.home() / ".claude" / "CLAUDE.md"
 BACKUP_DIR = ROOT_DIR / "raw" / "notes" / "claude-md-backups"
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s  %(levelname)s  %(message)s",
-    datefmt="%Y-%m-%dT%H:%M:%S",
-)
 log = logging.getLogger("optimize-claude-md")
-
-import time as _time  # noqa: E402
-
-from core.prompts import render  # noqa: E402
-from core.sdk_helpers import StderrCapture, log_sdk_failure  # noqa: E402
 
 # ── Main ────────────────────────────────────────────────────────────
 
@@ -170,4 +164,5 @@ async def main() -> None:
 
 
 if __name__ == "__main__":
+    setup_console_logging("optimize-claude-md")
     asyncio.run(main())

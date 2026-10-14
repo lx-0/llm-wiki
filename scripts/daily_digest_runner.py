@@ -23,17 +23,13 @@ from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from core.config import TIMEZONE
+from core.console import setup_console_logging
 from core.paths import DAILY_DIR, WIKI_DIR
 
 # A `## Captures` section up to the next `## ` heading or end-of-file.
 _CAPTURES_SECTION_RE = re.compile(r"\n*^## Captures$.*?(?=^## |\Z)", re.DOTALL | re.MULTILINE)
 
 log = logging.getLogger("daily_digest_runner")
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s | %(levelname)-7s | %(name)s | %(message)s",
-    datefmt="%H:%M:%S",
-)
 
 
 def _resolve_date(arg: str) -> str:
@@ -86,6 +82,7 @@ def _attach_captures_section(date_iso: str) -> None:
 
 
 def main() -> int:
+    setup_console_logging("daily_digest_runner")
     ap = argparse.ArgumentParser(description="Run the daily-digest agent for a given date.")
     ap.add_argument(
         "--date",

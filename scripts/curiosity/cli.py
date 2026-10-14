@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import NoReturn
 
 from core.config import CONFIG
-from core.console import read_key
+from core.console import read_key, setup_console_logging
 from core.paths import ROOT_DIR
 from core.utils import now_iso
 from curiosity.backends import email as email_backend
@@ -32,11 +32,6 @@ from curiosity.backends import folder as folder_backend
 
 REQUESTS_DIR = ROOT_DIR / "raw" / "requests"
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s  %(levelname)s  %(message)s",
-    datefmt="%Y-%m-%dT%H:%M:%S",
-)
 log = logging.getLogger("curiosity")
 
 
@@ -439,6 +434,7 @@ def _clear_done() -> NoReturn:
 
 
 def main() -> int:
+    setup_console_logging("curiosity")
     parser = argparse.ArgumentParser(
         description="Curiosity request consumer — list / run / clear pending requests."
     )

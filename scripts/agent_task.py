@@ -27,15 +27,11 @@ from claude_agent_sdk import query
 
 from core.agent_spec import AgentSpec, SpecError, parse_spec
 from core.config import CONFIG
+from core.console import setup_console_logging
 from core.paths import AGENT_SPECS_DIR, LOGS_DIR, STATE_DIR
 from core.sdk_helpers import SdkCallSpec, run_sdk_query
 from core.utils import now_iso, today_iso
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s  %(levelname)s  %(message)s",
-    datefmt="%Y-%m-%dT%H:%M:%S",
-)
 log = logging.getLogger("agent-task")
 
 
@@ -224,6 +220,7 @@ async def main_async() -> int:
 
 
 def main() -> int:
+    setup_console_logging("agent-task")
     return asyncio.run(main_async())
 
 

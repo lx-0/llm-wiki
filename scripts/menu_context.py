@@ -50,6 +50,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from core import actions, frontmatter
+from core.console import setup_console_logging
 from core.paths import (
     AREAS_DIR,
     DAILY_DIR,
@@ -65,8 +66,6 @@ from core.paths import (
 )
 
 log = logging.getLogger("menu_context")
-logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s: %(message)s")
-
 WALL_CLOCK_BUDGET_S = 0.5
 
 # ── Probes ───────────────────────────────────────────────────────────
@@ -395,6 +394,10 @@ def _timeout_handler(signum, frame):
 
 
 def main() -> int:
+    # WARNING: the probes' INFO never reaches the operator's terminal; errors and
+    # warnings do. Set up here, not at import — menu.py and the oracle import this
+    # module and own their root logger.
+    setup_console_logging("menu_context", level=logging.WARNING)
     start = time.monotonic()
     status: dict = {}
     suggestions: list[dict] = []

@@ -29,11 +29,8 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s  %(levelname)s  %(message)s",
-    datefmt="%Y-%m-%dT%H:%M:%S",
-)
+from core.console import setup_console_logging
+
 log = logging.getLogger("migrate-log-md-path")
 
 
@@ -106,6 +103,7 @@ def migrate(vault: Path, dry_run: bool) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    setup_console_logging("migrate-log-md-path")
     parser = argparse.ArgumentParser(
         description="Migrate knowledge/log.md → .wiki/logs/operations.md"
     )

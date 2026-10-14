@@ -27,13 +27,9 @@ os.environ["CLAUDE_INVOKED_BY"] = "flush_retry"
 
 from core import flush_pipeline
 from core.config import CONFIG
-from flush import extract_from_context
+from core.console import setup_console_logging
+from flush import ERRORS_LOG_FILE, LOG_FILE, extract_from_context
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s  %(levelname)s  %(message)s",
-    datefmt="%Y-%m-%dT%H:%M:%S",
-)
 log = logging.getLogger("retry-failed-flushes")
 
 
@@ -80,6 +76,10 @@ async def main_async(dry_run: bool, limit: int) -> None:
 
 
 def main() -> None:
+    # Runs as a piggyback with stdio on DEVNULL (core.piggybacks): the archive in
+    # flush.log / flush-errors.log is its only trace — the same files this process
+    # wrote to while it still inherited flush's import-time setup.
+    setup_console_logging("retry-failed-flushes", log_file=LOG_FILE, error_file=ERRORS_LOG_FILE)
     parser = argparse.ArgumentParser(description="Retry failed flushes")
     parser.add_argument("--dry-run", action="store_true")
     _retry_pb = CONFIG.piggybacks.get("retry_failed_flushes")

@@ -11,10 +11,12 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import logging
 import sys
 from pathlib import Path
 from typing import NoReturn
+
+from core.console import setup_console_logging
+from core.paths import LOGS_DIR
 
 
 def _list() -> NoReturn:
@@ -66,30 +68,10 @@ def _run_one(name: str, source: Path) -> NoReturn:
     sys.exit(0 if result.status != "failed" else 1)
 
 
-def _setup_logging() -> None:
-    """Console (stderr, terse) + a persistent timestamped file.
-
-    Mirrors collectors/cli.py — operator-invoked Producer runs leave a
-    trace in `logs/producers.log` so a piggyback/replay failure is
-    diagnosable even when stdout/stderr were routed to DEVNULL.
-    """
-    from core.paths import LOGS_DIR
-
-    LOGS_DIR.mkdir(parents=True, exist_ok=True)
-    root = logging.getLogger()
-    root.setLevel(logging.INFO)
-
-    console = logging.StreamHandler(sys.stderr)
-    console.setFormatter(logging.Formatter("%(levelname)s %(message)s"))
-    root.addHandler(console)
-
-    file_handler = logging.FileHandler(LOGS_DIR / "producers.log", encoding="utf-8")
-    file_handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
-    root.addHandler(file_handler)
-
-
 def main() -> NoReturn:
-    _setup_logging()
+    # Console + `logs/producers.log`: an operator-invoked replay leaves a trace even
+    # when stdout/stderr were routed to DEVNULL.
+    setup_console_logging("producers", log_file=LOGS_DIR / "producers.log")
 
     parser = argparse.ArgumentParser(prog="wiki produce")
     parser.add_argument("--list", action="store_true", help="enumerate registered producers")

@@ -25,6 +25,7 @@ import argparse
 import asyncio
 import contextlib
 import json
+import logging
 import subprocess
 import sys
 import time
@@ -39,6 +40,7 @@ ROOT_DIR = WIKI_DIR.parent
 
 from core import flush_pipeline
 from core.config import CONFIG
+from core.console import setup_console_logging
 from core.entry import child_env, python_m
 from core.piggybacks import run_due_piggybacks
 from core.sdk_helpers import SdkCallSpec, is_fatal, run_sdk_query
@@ -78,19 +80,7 @@ SESSIONS_DIR = flush_pipeline.SESSIONS_DIR
 FAILED_FLUSHES_DIR = flush_pipeline.FAILED_DIR
 append_to_daily = flush_pipeline.append_to_daily
 
-# ── Logging ──────────────────────────────────────────────────────────
-# Shared console setup: TTY-detected colors on stderr, INFO+ archive to
-# LOG_FILE, WARNING+ archive to ERRORS_LOG_FILE. Hook invocations are
-# non-TTY → plain stderr (silently captured by the hook); manual
-# `wiki flush` from a TTY gets the colorized output (matches compile /
-# dream / lint / etc. — same UX language across the CLI).
-from core.console import setup_console_logging
-
-log = setup_console_logging(
-    "flush",
-    log_file=LOG_FILE,
-    error_file=ERRORS_LOG_FILE,
-)
+log = logging.getLogger("flush")
 
 
 # ── Dedup helpers ────────────────────────────────────────────────────
@@ -378,6 +368,11 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 
 async def main() -> None:
+    # Shared console setup: TTY-detected colors on stderr, INFO+ archive to
+    # LOG_FILE, WARNING+ archive to ERRORS_LOG_FILE. Hook invocations are
+    # non-TTY → plain stderr (silently captured by the hook); manual
+    # `wiki flush` from a TTY gets the colorized output.
+    setup_console_logging("flush", log_file=LOG_FILE, error_file=ERRORS_LOG_FILE)
     args = _parse_args()
     context_file = args.context_file
     session_id = args.session_id

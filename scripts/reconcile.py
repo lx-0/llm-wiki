@@ -38,16 +38,12 @@ from pathlib import Path
 import lint
 from core import frontmatter
 from core.config import CONFIG
+from core.console import setup_console_logging
 from core.paths import FACTS_DIR, LOG_FILE, ROOT_DIR
 from core.usage import LEDGER
 from core.utils import now_iso
 from facts.correct_apply import ReconcileResult, reconcile_fact
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s  %(levelname)s  %(message)s",
-    datefmt="%Y-%m-%dT%H:%M:%S",
-)
 log = logging.getLogger("reconcile")
 
 
@@ -184,6 +180,7 @@ async def run(*, apply: bool, limit: int | None) -> int:
 
 
 def main() -> int:
+    setup_console_logging("reconcile")
     parser = argparse.ArgumentParser(description="Autonomous concept-reconciliation routine.")
     parser.add_argument(
         "--apply",

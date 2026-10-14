@@ -19,6 +19,7 @@ loop iterations reuse the already-imported module.
 from __future__ import annotations
 
 import contextlib
+import logging
 import os
 import re
 import subprocess
@@ -38,6 +39,9 @@ from core.console import (
     read_key,
     setup_console_logging,
 )
+from core.health import CheckResult, build_health
+from core.paths import ROOT_DIR, WIKI_DIR
+from menu_context import build_status, build_suggestions
 
 
 class _MenuFormatter(ConsoleFormatter):
@@ -53,16 +57,7 @@ class _MenuFormatter(ConsoleFormatter):
         return record.getMessage()
 
 
-# Set up the logging stream-handler before any module-level imports below
-# could pull in something that grabs root.handlers. setup_console_logging
-# is idempotent — if another CLI already set up a stderr StreamHandler,
-# this no-ops and reuses it (so the menu inherits whatever formatter is
-# already on root). Calling it here also guarantees the menu's stderr
-# emit path is wired through the SAME mechanism compile uses.
-_log = setup_console_logging("menu", formatter=_MenuFormatter())
-from core.health import CheckResult, build_health  # noqa: E402 — after console setup
-from core.paths import ROOT_DIR, WIKI_DIR  # noqa: E402 — after console setup
-from menu_context import build_status, build_suggestions  # noqa: E402 — after console setup
+_log = logging.getLogger("menu")
 
 WIKI_BIN = WIKI_DIR / "wiki"
 
@@ -856,6 +851,9 @@ def _fuzzy_filter(query: str) -> None:
 
 
 def main() -> int:
+    # The screen render is one log record per frame (`_log.info` in the loop): the
+    # menu formatter goes on root here, at the entry point, never at import.
+    setup_console_logging("menu", formatter=_MenuFormatter())
     if not sys.stdin.isatty() or not sys.stdout.isatty():
         # Non-TTY callers — defer to `wiki help`. Same posture as the
         # bash entry-point's TTY check.

@@ -8,16 +8,11 @@ package has one execution and no warning. `wiki collect youtube` is the Registry
 run; this entry keeps the direct CLI's `--url / --inbox / --tier` flags.
 """
 
-import logging
-
 from collectors.scan_youtube import main
+from core.console import setup_console_logging
 
 if __name__ == "__main__":
-    # Logging stays local to the entry point (see scan_youtube's own __main__ block:
-    # a module-level basicConfig would hijack the root logger of every importer).
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s  %(levelname)s  %(message)s",
-        datefmt="%Y-%m-%dT%H:%M:%S",
-    )
+    # Logging is set up here, at the entry point — the collector module configures
+    # nothing at import (it is imported by the package and by the Registry run).
+    setup_console_logging("scan-youtube")
     raise SystemExit(main())

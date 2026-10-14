@@ -8,25 +8,11 @@ Subcommands:
 from __future__ import annotations
 
 import argparse
-import logging
 import sys
 from typing import NoReturn
 
-
-def _setup_logging() -> None:
-    from core.paths import LOGS_DIR
-
-    LOGS_DIR.mkdir(parents=True, exist_ok=True)
-    root = logging.getLogger()
-    root.setLevel(logging.INFO)
-
-    console = logging.StreamHandler(sys.stderr)
-    console.setFormatter(logging.Formatter("%(levelname)s %(message)s"))
-    root.addHandler(console)
-
-    file_handler = logging.FileHandler(LOGS_DIR / "bridge.log", encoding="utf-8")
-    file_handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
-    root.addHandler(file_handler)
+from core.console import setup_console_logging
+from core.paths import LOGS_DIR
 
 
 def _list_mappings() -> NoReturn:
@@ -81,7 +67,7 @@ def _run_sync(dry_run: bool) -> NoReturn:
 
 
 def main() -> NoReturn:
-    _setup_logging()
+    setup_console_logging("bridge", log_file=LOGS_DIR / "bridge.log")
 
     parser = argparse.ArgumentParser(
         prog="wiki bridge",

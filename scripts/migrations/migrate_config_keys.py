@@ -140,12 +140,8 @@ import yaml
 # side-effect-free by contract (see its docstring).
 from core.config_backup import backup_config_file
 from core.config_schema import WikiConfig, _default_piggybacks
+from core.console import setup_console_logging
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s  %(levelname)s  %(message)s",
-    datefmt="%Y-%m-%dT%H:%M:%S",
-)
 log = logging.getLogger("migrate-config-keys")
 
 
@@ -1071,6 +1067,7 @@ def migrate_config(config_path: Path) -> tuple[str | None, list[str]]:
 
 
 def main() -> int:
+    setup_console_logging("migrate-config-keys")
     parser = argparse.ArgumentParser(description=__doc__.split("\n", 1)[0])
     parser.add_argument(
         "--vault",

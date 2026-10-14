@@ -12,16 +12,11 @@ script has one execution and is run by path from the vault root:
     uv run --project .wiki python .wiki/scripts/scan_screenshots.py --backfill 7
 """
 
-import logging
-
 from collectors.scan_screenshots import main
+from core.console import setup_console_logging
 
 if __name__ == "__main__":
-    # Logging stays local to the entry point (see the module's own __main__ block: a
-    # module-level basicConfig would hijack the root logger of every importer).
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s  %(levelname)s  %(message)s",
-        datefmt="%Y-%m-%dT%H:%M:%S",
-    )
+    # Logging is set up here, at the entry point — the collector module configures
+    # nothing at import (it is imported by the package and by the Registry run).
+    setup_console_logging("scan-screenshots")
     main()

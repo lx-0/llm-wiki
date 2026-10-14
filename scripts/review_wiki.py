@@ -18,22 +18,17 @@ import time
 from pathlib import Path
 
 from core import ollama_client
+from core.config import CONFIG
+from core.console import setup_console_logging
 from core.paths import KNOWLEDGE_DIR, REPORTS_DIR
+from core.prompts import render
 from core.utils import (
     get_article_word_count,
     list_wiki_articles,
     today_iso,
 )
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s  %(levelname)s  %(message)s",
-    datefmt="%Y-%m-%dT%H:%M:%S",
-)
 log = logging.getLogger("review")
-
-from core.config import CONFIG  # noqa: E402
-from core.prompts import render  # noqa: E402
 
 DEFAULT_MODEL = CONFIG.models.classify_model
 
@@ -205,6 +200,7 @@ def _sweep_deadline_s(review_max: int, piggyback_max: int) -> float:
 
 
 def main():
+    setup_console_logging("review")
     parser = argparse.ArgumentParser(description="Review wiki articles with local LLM")
     parser.add_argument(
         "--model", default=DEFAULT_MODEL, help=f"Ollama model (default: {DEFAULT_MODEL})"

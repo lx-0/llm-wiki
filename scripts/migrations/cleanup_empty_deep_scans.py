@@ -31,11 +31,8 @@ import re
 import sys
 from pathlib import Path
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s  %(levelname)s  %(message)s",
-    datefmt="%Y-%m-%dT%H:%M:%S",
-)
+from core.console import setup_console_logging
+
 log = logging.getLogger("cleanup-empty-deep-scans")
 
 # Frontmatter signature for curiosity-loop output. Matches the strict
@@ -99,6 +96,7 @@ def reset_to_pending(path: Path) -> None:
 
 
 def main() -> int:
+    setup_console_logging("cleanup-empty-deep-scans")
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--vault", required=True, help="Vault root path")
     parser.add_argument("--apply", action="store_true", help="write changes (default: preview)")

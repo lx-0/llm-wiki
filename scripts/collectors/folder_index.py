@@ -464,8 +464,3 @@ class FolderIndexCollector:
             ),
             errors=tuple(errors),
         )
-
-
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO, format="%(message)s")
-    raise SystemExit(main())

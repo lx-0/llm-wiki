@@ -24,6 +24,7 @@ import logging
 import re
 from pathlib import Path
 
+from core.console import setup_console_logging
 from core.paths import RAW_ARTICLES_DIR, ROOT_DIR, STATE_DIR
 from preprocessors.base import PreprocessorSpec, PreprocessResult, register
 
@@ -117,7 +118,7 @@ class ClippingsPreprocessor:
 
 
 def main() -> None:
-    logging.basicConfig(level=logging.INFO, format="%(message)s")
+    setup_console_logging("clippings")
     n = sweep()
     if n == 0:
         print("clippings-sweep: nothing to move")

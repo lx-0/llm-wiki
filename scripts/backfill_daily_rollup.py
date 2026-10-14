@@ -27,6 +27,7 @@ import sys
 from pathlib import Path
 
 from core import frontmatter
+from core.console import setup_console_logging
 
 log = logging.getLogger("backfill_daily_rollup")
 
@@ -187,9 +188,7 @@ def main() -> int:
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
 
-    logging.basicConfig(
-        level=logging.INFO, format="%(asctime)s | %(levelname)-7s | %(message)s", datefmt="%H:%M:%S"
-    )
+    setup_console_logging("backfill_daily_rollup")
 
     if not args.vault.is_dir():
         print(f"error: --vault {args.vault} is not a directory", file=sys.stderr)

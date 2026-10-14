@@ -31,6 +31,7 @@ from datetime import date as _date
 from pathlib import Path
 
 from core import frontmatter
+from core.console import setup_console_logging
 
 log = logging.getLogger("cleanup_legacy_daily_roots")
 
@@ -49,9 +50,7 @@ def main() -> int:
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
 
-    logging.basicConfig(
-        level=logging.INFO, format="%(asctime)s | %(levelname)-7s | %(message)s", datefmt="%H:%M:%S"
-    )
+    setup_console_logging("cleanup_legacy_daily_roots")
 
     if not args.vault.is_dir():
         print(f"error: --vault {args.vault} is not a directory", file=sys.stderr)

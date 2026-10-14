@@ -30,6 +30,7 @@ import sys
 from pathlib import Path
 
 from core import frontmatter
+from core.console import setup_console_logging
 from reports._engine.instrument import load_instrument
 from reports._engine.lib.render_summary import render_summary
 from reports._engine.lib.timeline import load_timeline
@@ -209,11 +210,7 @@ def backfill_study(study_dir: Path, rerender_summary: bool = False) -> tuple[int
 
 
 def main() -> int:
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s  %(levelname)-7s %(message)s",
-        datefmt="%Y-%m-%dT%H:%M:%S",
-    )
+    setup_console_logging("backfill")
     parser = argparse.ArgumentParser(description=__doc__.split("\n", 1)[0])
     parser.add_argument(
         "--study-dir",

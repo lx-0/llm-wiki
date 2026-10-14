@@ -36,6 +36,7 @@ import yaml
 
 from collectors._picture_metadata import extract_metadata
 from core import frontmatter
+from core.console import setup_console_logging
 from core.paths import RAW_DIR
 
 log = logging.getLogger("backfill-picture-metadata")
@@ -120,10 +121,7 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(levelname)s %(message)s",
-    )
+    setup_console_logging("backfill-picture-metadata")
 
     if not PICTURES_ARCHIVE.exists():
         log.error("pictures archive not found: %s", PICTURES_ARCHIVE)

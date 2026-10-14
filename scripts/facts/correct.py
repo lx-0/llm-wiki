@@ -39,14 +39,10 @@ from pathlib import Path
 
 from core import frontmatter
 from core.config import CONFIG
+from core.console import setup_console_logging
 from core.paths import FACTS_DIR, KNOWLEDGE_DIR
 from core.utils import slugify, today_iso
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s  %(levelname)s  %(message)s",
-    datefmt="%Y-%m-%dT%H:%M:%S",
-)
 log = logging.getLogger("correct")
 
 VALID_STATUS = {"negation", "disambiguation", "clarification", "supersession"}
@@ -232,6 +228,7 @@ def cmd_path(args: argparse.Namespace) -> int:
 
 
 def main() -> int:
+    setup_console_logging("correct")
     parser = argparse.ArgumentParser(description=__doc__.split("\n", 1)[0])
     sub = parser.add_subparsers(dest="cmd", required=True)
 

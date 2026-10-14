@@ -9,9 +9,11 @@ from __future__ import annotations
 
 import argparse
 import json
-import logging
 import sys
 from typing import NoReturn
+
+from core.console import setup_console_logging
+from core.paths import LOGS_DIR
 
 
 def _list(as_json: bool = False) -> NoReturn:
@@ -91,30 +93,10 @@ def _run_one(name: str, *, dry_run: bool, incremental: bool, account: str | None
     sys.exit(0)
 
 
-def _setup_logging() -> None:
-    """Console (stderr, terse) + a persistent timestamped file.
-
-    Piggyback collector runs are spawned by `flush.py` with stdout/stderr
-    routed to DEVNULL — without the FileHandler a failed run would leave no
-    trace at all. `logs/collectors.log` is that trace.
-    """
-    from core.paths import LOGS_DIR
-
-    LOGS_DIR.mkdir(parents=True, exist_ok=True)
-    root = logging.getLogger()
-    root.setLevel(logging.INFO)
-
-    console = logging.StreamHandler(sys.stderr)
-    console.setFormatter(logging.Formatter("%(levelname)s %(message)s"))
-    root.addHandler(console)
-
-    file_handler = logging.FileHandler(LOGS_DIR / "collectors.log", encoding="utf-8")
-    file_handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
-    root.addHandler(file_handler)
-
-
 def main() -> NoReturn:
-    _setup_logging()
+    # Console + `logs/collectors.log`: piggyback collector runs are spawned by
+    # `flush.py` with stdout/stderr routed to DEVNULL — the file is their only trace.
+    setup_console_logging("collectors", log_file=LOGS_DIR / "collectors.log")
 
     parser = argparse.ArgumentParser(prog="wiki collect")
     parser.add_argument("--list", action="store_true", help="enumerate registered collectors")

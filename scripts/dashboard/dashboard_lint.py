@@ -25,15 +25,11 @@ import json
 import logging
 
 from core.config import CONFIG
+from core.console import setup_console_logging
 from core.paths import ROOT_DIR, SESSIONS_DIR
 from core.utils import now_iso
 from dashboard.lint_results import LintResults, compute_lint_results, load_fresh_cache
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s  %(levelname)s  %(message)s",
-    datefmt="%Y-%m-%dT%H:%M:%S",
-)
 log = logging.getLogger("dashboard-lint")
 
 OUTPUT_FILE = ROOT_DIR / "_dashboard-lint.md"
@@ -156,6 +152,7 @@ def write_dashboard_lint(data: dict, body: str) -> Path:
 
 
 def main() -> int:
+    setup_console_logging("dashboard-lint")
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dry-run", action="store_true", help="print without writing")
     args = parser.parse_args()

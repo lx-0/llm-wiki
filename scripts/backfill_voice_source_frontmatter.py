@@ -28,6 +28,7 @@ import re
 import sys
 
 from core import daily_capture
+from core.console import setup_console_logging
 from core.paths import ROOT_DIR
 
 log = logging.getLogger("backfill-voice-source-frontmatter")
@@ -96,5 +97,5 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO, format="%(message)s")
+    setup_console_logging("backfill-voice-source-frontmatter")
     sys.exit(main())

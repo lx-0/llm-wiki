@@ -8,6 +8,10 @@ rather than re-importing under a fake stderr.
 from __future__ import annotations
 
 import logging
+import os
+import re
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -15,6 +19,8 @@ import pytest
 from core import console
 
 ROOT = Path(__file__).resolve().parent.parent
+# `setup_console_logging(` / `log = setup_console_logging(` at column 0 — a call at import.
+_MODULE_LEVEL_SETUP = re.compile(r"^(?:\w+\s*=\s*)?setup_console_logging\(")
 
 
 def _make_record(msg: str, level: int = logging.INFO) -> logging.LogRecord:
@@ -243,3 +249,73 @@ class TestSetupHelper:
         finally:
             root.handlers = existing_handlers
             logging.shutdown()
+
+
+class TestOneSetupEverywhere:
+    """M033-S03-T04: the seam is the engine's one logging setup."""
+
+    def test_level_keyword_sets_the_root_level(self, monkeypatch):
+        """The home-screen probe (menu_context) runs at WARNING so its INFO never reaches
+        the operator's terminal — the seam carries the level instead of a private
+        basicConfig."""
+        root = logging.getLogger()
+        existing_handlers, existing_level = list(root.handlers), root.level
+        monkeypatch.setattr(root, "handlers", [])
+        try:
+            console.setup_console_logging("quiet-cli", level=logging.WARNING)
+            assert root.level == logging.WARNING
+        finally:
+            root.handlers = existing_handlers
+            root.setLevel(existing_level)
+
+    def test_no_module_under_scripts_calls_basicconfig(self):
+        """Every CLI goes through setup_console_logging; a `logging.basicConfig` anywhere
+        under scripts/ is a second setup — and at module level the root-logger footgun
+        KNOWLEDGE records ("no basicConfig in importable modules")."""
+        offenders = [
+            f"{p.relative_to(ROOT)}:{n}"
+            for p in sorted((ROOT / "scripts").rglob("*.py"))
+            if p.name != "console.py"
+            for n, line in enumerate(p.read_text(encoding="utf-8").splitlines(), 1)
+            if "logging.basicConfig(" in line
+        ]
+        assert offenders == [], "logging.basicConfig outside core/console.py:\n" + "\n".join(
+            offenders
+        )
+
+    def test_no_module_level_setup_console_logging(self):
+        """The seam is called from an entry point, never at import: a module-level
+        `setup_console_logging(...)` (bare or `log = …`) configures the root logger of
+        whoever imports the module — lint ← reconcile, flush ← retry_failed_flushes,
+        preprocessors.inbox ← its package, compile / dream / query ← the tests. A call
+        at column 0 is the smell; an indented call sits inside an entry function."""
+        offenders = [
+            f"{p.relative_to(ROOT)}:{n}"
+            for p in sorted((ROOT / "scripts").rglob("*.py"))
+            for n, line in enumerate(p.read_text(encoding="utf-8").splitlines(), 1)
+            if _MODULE_LEVEL_SETUP.match(line)
+        ]
+        assert offenders == [], "module-level setup_console_logging:\n" + "\n".join(offenders)
+
+    @pytest.mark.parametrize(
+        "module",
+        ["menu_context", "facts.correct_apply", "compile", "lint", "flush", "preprocessors.inbox"],
+    )
+    def test_importing_an_engine_module_configures_no_root_handler(self, module: str):
+        """These modules are imported by other modules (menu_context by menu.py and the
+        oracle, facts.correct_apply by reconcile, compile by the maintenance tests, lint by
+        reconcile, flush by retry_failed_flushes, preprocessors.inbox by its package): a
+        setup at import configured the importer's root logger. Checked in a fresh
+        interpreter — under pytest the root already has handlers and a basicConfig would
+        silently no-op, hiding exactly this."""
+        code = f"import logging, {module}; print(len(logging.getLogger().handlers))"
+        proc = subprocess.run(
+            [sys.executable, "-c", code],
+            capture_output=True,
+            text=True,
+            env={**os.environ, "PYTHONPATH": str(ROOT / "scripts")},
+            check=False,
+            timeout=60,
+        )
+        assert proc.returncode == 0, proc.stderr
+        assert proc.stdout.strip() == "0", f"importing {module} configured the root logger"

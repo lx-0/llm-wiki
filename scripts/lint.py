@@ -22,6 +22,7 @@ os.environ["CLAUDE_INVOKED_BY"] = "lint"
 
 import argparse
 import asyncio
+import logging
 import sys
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -31,8 +32,7 @@ from claude_agent_sdk import ClaudeAgentOptions, ResultMessage, query
 
 from core import frontmatter
 from core.backlinks import BACKLINKS_BEGIN, BACKLINKS_END
-
-# ── Logging ──────────────────────────────────────────────────────────
+from core.config import CONFIG
 from core.console import setup_console_logging
 from core.links import (
     _strip_frontmatter_and_fences,
@@ -54,9 +54,7 @@ from core.utils import (
     today_iso,
 )
 
-log = setup_console_logging("lint")
-
-from core.config import CONFIG
+log = logging.getLogger("lint")
 
 SPARSE_THRESHOLD = CONFIG.limits.sparse_threshold_words
 
@@ -1383,6 +1381,7 @@ def _lint_exit_code(errors: int, structural_only: bool) -> int:
 
 
 async def main() -> None:
+    setup_console_logging("lint")
     parser = argparse.ArgumentParser(description="Lint the knowledge base")
     parser.add_argument(
         "--structural-only",

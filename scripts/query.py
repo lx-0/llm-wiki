@@ -14,15 +14,21 @@ os.environ["CLAUDE_INVOKED_BY"] = "query"
 import argparse
 import asyncio
 import json
+import logging
 import sys
 
 from claude_agent_sdk import query
 
 from core.config import CONFIG
-
-# ── Logging ──────────────────────────────────────────────────────────
 from core.console import setup_console_logging
 from core.paths import QA_DIR, ROOT_DIR
+from core.prompts import render
+from core.sdk_helpers import (
+    PromptTooLargeError,
+    SdkCallSpec,
+    assert_prompt_within_budget,
+    run_sdk_query,
+)
 from core.state_store import update_state
 from core.utils import (
     now_iso,
@@ -32,15 +38,7 @@ from core.utils import (
     today_iso,
 )
 
-log = setup_console_logging("query")
-
-from core.prompts import render  # noqa: E402
-from core.sdk_helpers import (  # noqa: E402
-    PromptTooLargeError,
-    SdkCallSpec,
-    assert_prompt_within_budget,
-    run_sdk_query,
-)
+log = logging.getLogger("query")
 
 # ── Query prompt ─────────────────────────────────────────────────────
 
@@ -48,6 +46,7 @@ from core.sdk_helpers import (  # noqa: E402
 
 
 async def main() -> None:
+    setup_console_logging("query")
     parser = argparse.ArgumentParser(description="Query the knowledge base")
     parser.add_argument("question", type=str, help="Your question")
     parser.add_argument(

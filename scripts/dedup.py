@@ -46,13 +46,9 @@ from pathlib import Path
 import yaml
 
 from core import frontmatter
+from core.console import setup_console_logging
 from core.links import relative_target, resolve_link, retarget_links
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s  %(levelname)s  %(message)s",
-    datefmt="%Y-%m-%dT%H:%M:%S",
-)
 log = logging.getLogger("dedup")
 
 # Entity buckets dedup operates on. People + projects + areas are the
@@ -664,6 +660,7 @@ def _resolve_entity_arg(arg: str, knowledge_dir: Path) -> EntityPage | None:
 
 
 def main(argv: list[str] | None = None) -> int:
+    setup_console_logging("dedup")
     parser = argparse.ArgumentParser(description=__doc__.split("\n", 1)[0])
     parser.add_argument(
         "--suggest-only",

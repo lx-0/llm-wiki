@@ -34,6 +34,7 @@ from collectors.base import CollectorSpec, RunResult, register
 from core import ollama_client
 from core.config import CONFIG, TIMEZONE
 from core.paths import RAW_DIR, STATE_DIR
+from core.prompts import prompt_model, render
 from core.utils import load_json_state, now_iso, save_json_state
 
 # ── Config ──────────────────────────────────────────────────────────
@@ -54,8 +55,6 @@ TIMEOUT = float(CONFIG.limits.screenshot_timeout_seconds)
 TZ = ZoneInfo(TIMEZONE)
 
 log = logging.getLogger("scan-screenshots")
-
-from core.prompts import prompt_model, render  # noqa: E402
 
 # ── State ───────────────────────────────────────────────────────────
 
@@ -658,17 +657,3 @@ def main() -> None:
             dry_run=args.dry_run,
             limit=args.limit,
         )
-
-
-if __name__ == "__main__":
-    # Module-level basicConfig was polluting the root logger whenever
-    # `collectors/__init__.py` import-chained into this module — flush.py's
-    # subsequent basicConfig became a no-op, silently shunting all its
-    # logging to stderr (and to DEVNULL when spawned as a piggyback). Keep
-    # logging setup local to the standalone-script entry point.
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s  %(levelname)s  %(message)s",
-        datefmt="%Y-%m-%dT%H:%M:%S",
-    )
-    main()

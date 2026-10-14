@@ -15,15 +15,23 @@ os.environ["CLAUDE_INVOKED_BY"] = "compile"
 import argparse
 import asyncio
 import json
+import logging
 import re
 import sys
 import time
 from pathlib import Path
 
+from compile_stages.post_passes import run_post_passes
+from compile_stages.route import SUBSTRATE_PROMPTS
+from compile_stages.types import CompileOutcome
+from core import frontmatter
+from core.config import CONFIG
+
 # ── Logging ──────────────────────────────────────────────────────────
 # Generic console formatting + file handlers come from `core.console`.
 # compile-specific colorization (per-file header, dispatch, curiosity)
-# lives in `_CompileFormatter` below as a thin subclass.
+# lives in `_CompileFormatter` below as a thin subclass; the setup call
+# sits in `main()` — importing this module configures nothing.
 from core.console import (
     C_BOLD,
     C_CYAN,
@@ -40,6 +48,7 @@ from core.paths import (
     ROOT_DIR,
     STATE_DIR,
 )
+from core.piggybacks import run_due_piggybacks
 from core.sdk_helpers import FailureClass, is_fatal
 from core.state_store import acquire_process_lock, pending_paths, update_state
 from core.utils import (
@@ -81,20 +90,7 @@ class _CompileFormatter(ConsoleFormatter):
         return None
 
 
-LOGS_DIR.mkdir(parents=True, exist_ok=True)
-log = setup_console_logging(
-    "compile",
-    formatter=_CompileFormatter(),
-    log_file=LOGS_DIR / "compile.log",
-    error_file=LOGS_DIR / "compile-errors.log",
-)
-
-from compile_stages.post_passes import run_post_passes  # noqa: E402
-from compile_stages.route import SUBSTRATE_PROMPTS  # noqa: E402
-from compile_stages.types import CompileOutcome  # noqa: E402
-from core import frontmatter  # noqa: E402
-from core.config import CONFIG  # noqa: E402
-from core.piggybacks import run_due_piggybacks  # noqa: E402
+log = logging.getLogger("compile")
 
 # ── File selection ───────────────────────────────────────────────────
 
@@ -506,6 +502,12 @@ def _emit_progress(enabled: bool, current: int, total: int) -> None:
 
 
 async def main() -> None:
+    setup_console_logging(
+        "compile",
+        formatter=_CompileFormatter(),
+        log_file=LOGS_DIR / "compile.log",
+        error_file=LOGS_DIR / "compile-errors.log",
+    )
     parser = argparse.ArgumentParser(description="Compile sources into wiki articles")
     parser.add_argument("--all", action="store_true", help="Recompile all files")
     parser.add_argument("--file", type=str, help="Compile a specific file")

@@ -14,6 +14,7 @@ double-import warning, since the package imports this module to register it).
 from __future__ import annotations
 
 import argparse
+import logging
 import shutil
 import subprocess
 from datetime import datetime
@@ -37,7 +38,7 @@ from core.utils import today_iso
 from preprocessors.base import PreprocessorSpec, PreprocessResult, register
 from preprocessors.html_ingest import ingest as ingest_html_source
 
-log = setup_console_logging("inbox")
+log = logging.getLogger("inbox")
 
 DEFAULT_MODEL = CONFIG.models.classify_model
 
@@ -299,6 +300,7 @@ class InboxPreprocessor:
 
 
 def main() -> None:
+    setup_console_logging("inbox")
     parser = argparse.ArgumentParser(description="Process inbox/ files")
     parser.add_argument(
         "--model", default=DEFAULT_MODEL, help=f"Ollama model (default: {DEFAULT_MODEL})"

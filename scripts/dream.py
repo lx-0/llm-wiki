@@ -129,7 +129,7 @@ class _DreamFormatter(ConsoleFormatter):
         return None
 
 
-log = setup_console_logging("dream", formatter=_DreamFormatter())
+log = logging.getLogger("dream")
 
 
 # ── Constants ─────────────────────────────────────────────────────────
@@ -2110,6 +2110,7 @@ async def _async_main() -> int:
 
 
 def main() -> int:
+    setup_console_logging("dream", formatter=_DreamFormatter())
     return asyncio.run(_async_main())
 
 

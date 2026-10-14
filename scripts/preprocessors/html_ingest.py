@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import logging
 import subprocess
 import sys
 import tempfile
@@ -42,7 +43,7 @@ from core.paths import RAW_ARTICLES_DIR, ROOT_DIR, WIKI_DIR
 from core.utils import slugify, today_iso
 from preprocessors.base import PreprocessorSpec, PreprocessResult, register
 
-log = setup_console_logging("ingest-html")
+log = logging.getLogger("ingest-html")
 
 DEFAULT_MODEL = CONFIG.models.vision_model
 
@@ -299,6 +300,7 @@ class HtmlPreprocessor:
 
 
 def main() -> None:
+    setup_console_logging("ingest-html")
     parser = argparse.ArgumentParser(description="Ingest HTML files or URLs")
     parser.add_argument("source", help="Path to HTML file or URL")
     parser.add_argument(

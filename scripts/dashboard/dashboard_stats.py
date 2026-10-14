@@ -22,17 +22,13 @@ import logging
 import re
 from datetime import UTC, datetime
 
+from core.console import setup_console_logging
 from core.paths import DAILY_DIR, KNOWLEDGE_DIR, ROOT_DIR, SESSIONS_DIR
 from core.utils import (
     list_wiki_articles,
     now_iso,
 )
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s  %(levelname)s  %(message)s",
-    datefmt="%Y-%m-%dT%H:%M:%S",
-)
 log = logging.getLogger("dashboard-stats")
 
 OUTPUT_FILE = ROOT_DIR / "_dashboard-stats.md"
@@ -282,6 +278,7 @@ def write_dashboard_stats(stats: dict, callout: str) -> Path:
 
 
 def main() -> int:
+    setup_console_logging("dashboard-stats")
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dry-run", action="store_true", help="print stats without writing")
     args = parser.parse_args()

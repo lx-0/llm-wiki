@@ -30,14 +30,10 @@ from statistics import mean
 
 from core import frontmatter, markers
 from core.config import CONFIG
+from core.console import setup_console_logging
 from core.paths import CONCEPTS_DIR, ROOT_DIR
 from core.utils import now_iso
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s  %(levelname)s  %(message)s",
-    datefmt="%Y-%m-%dT%H:%M:%S",
-)
 log = logging.getLogger("health-trends")
 
 BEGIN = "<!-- health-trends:begin -->"
@@ -205,6 +201,7 @@ def run(dry_run: bool) -> int:
 
 
 def main() -> int:
+    setup_console_logging("health-trends")
     parser = argparse.ArgumentParser(description="Deterministic health-trend synthesis.")
     parser.add_argument("--dry-run", action="store_true", help="print the block, write nothing")
     args = parser.parse_args()

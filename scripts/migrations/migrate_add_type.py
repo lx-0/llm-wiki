@@ -24,14 +24,10 @@ import re
 import sys
 from pathlib import Path
 
+from core.console import setup_console_logging
 from core.paths import KNOWLEDGE_DIR
 from core.utils import list_wiki_articles
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s  %(levelname)s  %(message)s",
-    datefmt="%Y-%m-%dT%H:%M:%S",
-)
 log = logging.getLogger("migrate-add-type")
 
 FOLDER_TO_TYPE = {
@@ -93,6 +89,7 @@ def apply_migration(content: str, expected: str) -> str:
 
 
 def main() -> int:
+    setup_console_logging("migrate-add-type")
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()

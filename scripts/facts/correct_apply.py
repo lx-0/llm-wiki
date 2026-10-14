@@ -28,6 +28,7 @@ from claude_agent_sdk import query
 
 from core import frontmatter
 from core.config import CONFIG
+from core.console import setup_console_logging
 from core.links import (
     WIKILINK_RE,
     rename_article,
@@ -48,11 +49,6 @@ from core.prompts import render
 from core.sdk_helpers import SdkCallSpec, WriteScope, run_sdk_query
 from core.utils import now_iso, today_iso
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s  %(levelname)s  %(message)s",
-    datefmt="%Y-%m-%dT%H:%M:%S",
-)
 log = logging.getLogger("correct-apply")
 
 
@@ -639,6 +635,7 @@ async def reconcile_fact(
 
 
 def main() -> int:
+    setup_console_logging("correct-apply")
     parser = argparse.ArgumentParser(description="Propagate a hard fact across the vault.")
     parser.add_argument("slug", help="fact slug (filename without .md)")
     parser.add_argument(
