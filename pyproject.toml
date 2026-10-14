@@ -45,12 +45,18 @@ Issues = "https://github.com/lx-0/llm-wiki/issues"
 dev = [
     "pytest>=8.0",
 ]
+lint = [
+    "ruff==0.16.10",
+]
 
 [tool.ruff]
 line-length = 100
 # scripts/ is the source root (tests run with pythonpath = ["scripts"]): lets the import
 # sorter file `core`, `collectors`, … as first-party instead of third-party.
 src = ["scripts", "tests"]
+# pre-commit and editors pass paths explicitly; without this, `exclude` lists below would
+# only apply to discovered files and the hand-formatted file would get reformatted anyway.
+force-exclude = true
 
 [tool.ruff.format]
 # core/config_schema.py is read as TEXT by core/config_docs.py: the field comments become

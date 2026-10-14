@@ -1,0 +1,71 @@
+name: ci
+
+# The engine and desktop gates, on every push and PR to main. Same commands as the
+# local gates (AGENTS.md "Style"): ruff check + format --check + pytest for the engine,
+# tsc + svelte-check + vitest + biome for the desktop app. The screenshot harness
+# (`npm run shots`) needs an Electron display and stays a local gate.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  engine:
+    name: engine (ruff + pytest)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+          enable-cache: true
+
+      - name: Sync (locked, with the lint group)
+        run: uv sync --frozen --group lint
+
+      - name: ruff check
+        run: uv run --frozen --group lint ruff check scripts hooks tests
+
+      - name: ruff format --check
+        run: uv run --frozen --group lint ruff format --check scripts hooks tests
+
+      - name: pytest
+        run: uv run --frozen pytest -q -p no:cacheprovider
+
+  desktop:
+    name: desktop (typecheck + vitest + biome)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+
+      - name: npm ci
+        run: npm ci
+
+      - name: npm test (tsc + svelte-check + vitest)
+        run: npm test
+
+      - name: biome
+        run: npm run lint

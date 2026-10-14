@@ -23,7 +23,26 @@ repos:
         # agent hook payloads
       - id: detect-private-key
       - id: end-of-file-fixer
+        # Vault templates keep their trailing blank lines on purpose (Obsidian inserts
+        # them verbatim); the Excalidraw app writes its JSON without a final newline and
+        # would fight the hook on every save.
+        exclude: ^(templates/|docs/.*\.excalidraw$)
       - id: trailing-whitespace
         exclude: '\.md$'  # Markdown allows trailing whitespace for line breaks
       - id: mixed-line-ending
         args: [--fix=lf]
+
+  # Formatter + linter — the same ruff the engine pins in pyproject.toml's `lint`
+  # dependency group (CI runs that one). Keep `rev` and `ruff==x.y.z` on one number.
+  # Scope = the CI scope (scripts/, hooks/, tests/); config_schema.py is excluded from
+  # the formatter here as well, because pre-commit passes paths explicitly and ruff's
+  # `format.exclude` only applies to discovered files.
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.10
+    hooks:
+      - id: ruff-check
+        files: ^(scripts|hooks|tests)/
+        args: [--fix]
+      - id: ruff-format
+        files: ^(scripts|hooks|tests)/
+        exclude: ^scripts/core/config_schema\.py$

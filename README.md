@@ -332,18 +332,18 @@ Hooks always use Option B (the `--project` flag is hardcoded into the agent conf
 
 > **Documentation language.** Most docs are English. **`docs/PROCESS.md` is in German** — pull requests that touch a flow keep the existing prose language; bilingual is fine, and Mermaid labels / table headers in English keep diagrams accessible.
 
-## Security
+## Security and code gates
 
-Secrets-leak prevention runs on two layers:
+Secrets-leak prevention and the code gates run on two layers:
 
-- **CI** ([.github/workflows/secrets-scan.yml](.github/workflows/secrets-scan.yml)) — gitleaks scans every push + PR + nightly cron. Blocks merge on leaks.
-- **Pre-commit** ([.pre-commit-config.yaml](.pre-commit-config.yaml)) — local hooks block leaks before they reach git:
+- **CI** — [secrets-scan.yml](.github/workflows/secrets-scan.yml): gitleaks scans every push + PR + nightly cron, blocks merge on leaks. [ci.yml](.github/workflows/ci.yml): on every push + PR to `main`, the engine job runs `ruff check`, `ruff format --check` and the pytest suite (Linux), the desktop job runs `npm test` (tsc + svelte-check + vitest) and Biome.
+- **Pre-commit** ([.pre-commit-config.yaml](.pre-commit-config.yaml)) — local hooks block leaks and lint drift before they reach git (gitleaks, file hygiene, `ruff-check --fix`, `ruff-format`):
 
   ```bash
   pip install pre-commit && pre-commit install
   ```
 
-Gitleaks rules + allowlist live in [.gitleaks.toml](.gitleaks.toml). Manual scan: `gitleaks detect --no-banner -v`.
+The ruff rule set — and the reason for every ignore — lives in [pyproject.toml](pyproject.toml); run the gates by hand with `uv sync --group lint` once, then `uv run --group lint ruff check scripts hooks tests`. Gitleaks rules + allowlist live in [.gitleaks.toml](.gitleaks.toml). Manual scan: `gitleaks detect --no-banner -v`.
 
 If you find a leak in history, rotate the secret immediately, then file an issue (don't post the leaked value).
 
