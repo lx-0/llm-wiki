@@ -14,12 +14,12 @@ from core.sdk_helpers import PromptTooLargeError, assert_prompt_within_budget
 
 
 def test_under_budget_does_not_raise() -> None:
-    assert_prompt_within_budget(100, 500, label="query") is None
+    assert assert_prompt_within_budget(100, 500, label="query") is None
 
 
 def test_at_budget_does_not_raise() -> None:
     # Boundary: exactly at the limit is allowed.
-    assert_prompt_within_budget(500, 500, label="query") is None
+    assert assert_prompt_within_budget(500, 500, label="query") is None
 
 
 def test_over_budget_raises() -> None:

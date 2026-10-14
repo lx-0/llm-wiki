@@ -322,10 +322,7 @@ def check_stale_articles(ctx: LintContext) -> list[Issue]:
         # state.ingested[rel] is a hash string (compile.py writes file_hash(source) directly).
         # Older state files used a {hash, compiled_at, ...} dict shape — handle both defensively.
         stored = ingested[rel]
-        if isinstance(stored, dict):
-            stored_hash = stored.get("hash", "")
-        else:
-            stored_hash = str(stored)
+        stored_hash = stored.get("hash", "") if isinstance(stored, dict) else str(stored)
         current_hash = file_hash(source)
         if stored_hash != current_hash:
             issues.append(
@@ -1284,8 +1281,8 @@ async def check_contradictions() -> list[Issue]:
         return []
 
     issues = []
-    for line in result.strip().split("\n"):
-        line = line.strip()
+    for raw_line in result.strip().split("\n"):
+        line = raw_line.strip()
         if line.startswith("CONTRADICTION:") or line.startswith("INCONSISTENCY:"):
             issues.append(
                 issue(

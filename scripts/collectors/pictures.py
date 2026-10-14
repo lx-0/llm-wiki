@@ -109,6 +109,7 @@ def _make_thumbnail(src: Path) -> Path | None:
             ["sips", "--resampleWidth", str(THUMB_WIDTH), str(src), "--out", str(dst)],
             capture_output=True,
             text=True,
+            check=False,
         )
         if proc.returncode != 0:
             log.warning("  thumbnail failed (%d): %s", proc.returncode, proc.stderr.strip()[:200])
@@ -127,6 +128,7 @@ def _resize_image(path: Path) -> Path:
     subprocess.run(
         ["sips", "--resampleWidth", str(RESIZE_WIDTH), str(path), "--out", str(tmp)],
         capture_output=True,
+        check=False,
     )
     return tmp
 

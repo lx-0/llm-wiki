@@ -145,7 +145,7 @@ def test_real_run_writes_frontmatter_and_archives_sources(voice_env):
 
 
 def test_dotfiles_and_wrong_suffix_are_ignored(voice_env):
-    coll, inbox, raw_voice = voice_env
+    coll, inbox, _raw_voice = voice_env
     (inbox / "real.txt").write_text("ingest me")
     (inbox / ".hidden").write_text("dot-file, skip")
     (inbox / "photo.jpg").write_text("wrong suffix, skip")
@@ -163,7 +163,7 @@ def test_dotfiles_and_wrong_suffix_are_ignored(voice_env):
 
 
 def test_rerun_is_idempotent(voice_env):
-    coll, inbox, raw_voice = voice_env
+    coll, inbox, _raw_voice = voice_env
     (inbox / "once.txt").write_text("only ingest me once")
 
     first = coll.run()
@@ -178,7 +178,7 @@ def test_rerun_is_idempotent(voice_env):
 
 
 def test_empty_source_file_is_archived_without_ingest(voice_env):
-    coll, inbox, raw_voice = voice_env
+    coll, inbox, _raw_voice = voice_env
     (inbox / "empty.txt").write_text("")
     (inbox / "ok.txt").write_text("real content")
 

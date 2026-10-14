@@ -224,7 +224,7 @@ def update_fields(path: Path, **fields: object) -> None:
         line = _scalar_line(key, value)
         pat = re.compile(rf"^{re.escape(key)}:[^\n]*$", re.MULTILINE)
         if pat.search(block):
-            block = pat.sub(lambda _m: line, block, count=1)
+            block = pat.sub(lambda _m, _line=line: _line, block, count=1)
         else:
             if block and not block.endswith("\n"):
                 block += "\n"

@@ -345,7 +345,7 @@ def acquire_study_lock(study_id: str) -> io.IOBase | None:
     """
     lock_path = _study_lock_path(study_id)
     lock_path.parent.mkdir(parents=True, exist_ok=True)
-    fd = open(lock_path, "w")
+    fd = open(lock_path, "w")  # noqa: SIM115  the handle IS the lock; the caller keeps it alive
     try:
         fcntl.flock(fd.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
     except BlockingIOError:

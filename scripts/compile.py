@@ -736,7 +736,7 @@ async def main() -> None:
     def _stamp_final(s: dict) -> None:
         s["last_compile"] = now_iso()
 
-    state = update_state(_stamp_final)
+    update_state(_stamp_final)
 
     # Corpus-wide backlinks footer pass (M020). Runs after every compile so
     # newly-created articles or renamed targets propagate into incoming-link
@@ -774,7 +774,7 @@ async def main() -> None:
     # drifted to 362 duplicate / 561 missing rows on the live vault. Runs
     # after the link passes; idempotent — unchanged corpus writes nothing.
     from datetime import datetime as _dt
-    from zoneinfo import ZoneInfo as _zi
+    from zoneinfo import ZoneInfo
 
     from core.config import TIMEZONE
     from core.index_sync import sync_index
@@ -782,7 +782,7 @@ async def main() -> None:
     ix_stats = sync_index(
         KNOWLEDGE_DIR,
         ROOT_DIR,
-        today=_dt.now(_zi(TIMEZONE)).strftime("%Y-%m-%d"),
+        today=_dt.now(ZoneInfo(TIMEZONE)).strftime("%Y-%m-%d"),
     )
     if ix_stats["changed"]:
         log.info(

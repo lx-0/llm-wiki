@@ -2758,6 +2758,14 @@ Per-candidate learnings from the 14-candidate seam arc (C01–C14). Decisions li
   `compile.load_state` "to isolate state" and isolated nothing. Removing the unused import
   turned them into `AttributeError`s. Fix the tests (drop the patch, or patch the consumer
   module), never re-add a dead import with `noqa` to keep a lying test green.
+- **An "unsafe" autofix assumes a type the rule has in mind — review each hunk against the
+  real one (M033-S01-T04):** SIM118 turned `for key in mbox.keys()` into `for key in mbox`
+  in the Thunderbird reader; `mailbox.Mailbox.__iter__` yields *messages*, so `mbox[key]`
+  failed on every message and the reader silently returned nothing (three adapter tests
+  caught it). `.keys()`/`.items()`/`.get` rewrites (SIM118, PLC0206, SIM401) and
+  `next(iter(x))` are only equivalent for real dicts / iterables of the same thing — run
+  `--unsafe-fixes` scoped by `--select`, read the diff per hunk, and pin a deliberate
+  exception with `# noqa: <code>  reason` so the next pass cannot redo it.
 - **`ruff format` + a text-reading generator = lost content (M033-S01-T02):**
   `core/config_docs.py` builds `docs/config.md` from the field comments in
   `core/config_schema.py`; the formatter wraps long field lines and moves the trailing

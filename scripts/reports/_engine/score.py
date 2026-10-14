@@ -72,10 +72,7 @@ def score_instrument(
     instr: Instrument = load_instrument(instrument_dir)
     result = score_answers(list(instr.items), answers)
     band: str | None
-    if result.coverage_pct >= threshold:
-        band = instr.cutoffs.band_for(result.total)
-    else:
-        band = None
+    band = instr.cutoffs.band_for(result.total) if result.coverage_pct >= threshold else None
     return ScoredInstrument(
         meta=instr.meta,
         score=result,

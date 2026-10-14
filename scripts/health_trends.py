@@ -88,8 +88,8 @@ def collect_metrics(
                 continue
             if isinstance(v, (int, float)):
                 series[k].append((date, float(v)))
-    for k in series:
-        series[k].sort(key=lambda dv: dv[0])
+    for points in series.values():
+        points.sort(key=lambda dv: dv[0])
     span = (min(dates), max(dates)) if dates else ("", "")
     return series, len(dates), span
 

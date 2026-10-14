@@ -429,7 +429,7 @@ def ffmpeg_extract_frame(video: Path, timestamp_s: float, dest: Path) -> bool:
         f"scale={width}:-1",
         str(dest),
     ]
-    r = subprocess.run(cmd, capture_output=True)
+    r = subprocess.run(cmd, capture_output=True, check=False)
     return r.returncode == 0 and dest.exists()
 
 

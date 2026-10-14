@@ -12,6 +12,7 @@ axis — a read timeout alone does not fire on half-open sockets.
 
 from __future__ import annotations
 
+import contextlib
 import itertools
 import time
 from collections.abc import Callable
@@ -125,10 +126,8 @@ class ContextMcpClient:
                 last = exc
             else:
                 body: dict = {}
-                try:
+                with contextlib.suppress(ValueError):
                     body = response.json()
-                except ValueError:
-                    pass
                 error = body.get("error")
                 if error:
                     message = f"{method}: server error {error.get('code')}: {error.get('message')}"

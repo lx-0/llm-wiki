@@ -213,7 +213,7 @@ def test_lexical_and_timestamp(monkeypatch):
         }
     )
     assert wispr._text(notes) == "A decision"
-    fm, _, date, _ = wispr._render(meeting(created_at="2026-10-08T23:30:00Z"), "test")
+    _fm, _, date, _ = wispr._render(meeting(created_at="2026-10-08T23:30:00Z"), "test")
     assert date == "2026-10-09"
     assert wispr._date("2026-10-08T15:37:03.608000") == wispr._date("1791473823608")
     with pytest.raises(ValueError):
@@ -221,7 +221,7 @@ def test_lexical_and_timestamp(monkeypatch):
 
 
 def test_empty_live_response(env, monkeypatch):
-    _, state, _ = env
+    _, _state, _ = env
     mock_client(
         monkeypatch,
         [

@@ -58,7 +58,7 @@ def _resolve(name_or_path: str, known: list[Path]) -> Path | None:
     if path.exists():
         return path
     for f in known:
-        if f.name == name_or_path or f.stem == name_or_path:
+        if name_or_path in (f.name, f.stem):
             return f
     for f in known:
         if name_or_path in f.name:

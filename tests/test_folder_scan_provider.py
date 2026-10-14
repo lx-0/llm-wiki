@@ -94,7 +94,7 @@ def test_missing_file_propagates_file_not_found(tmp_path, monkeypatch):
 
     async def fake_query(*, prompt, options):  # pragma: no cover
         raise AssertionError("SDK must not be called for a missing file")
-        yield  # noqa: unreachable — makes this an async generator
+        yield  # unreachable on purpose — the bare yield makes this an async generator
 
     monkeypatch.setattr(fp, "query", fake_query)
     monkeypatch.setattr(fp, "render", lambda name, **kw: "PROMPT")

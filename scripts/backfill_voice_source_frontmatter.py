@@ -44,7 +44,8 @@ def _migrate_text(text: str) -> tuple[str, int]:
     sources, body = daily_capture._read_sources_and_body(text)
     lifted = 0
     out_lines: list[str] = []
-    for line in body.splitlines():
+    for raw_line in body.splitlines():
+        line = raw_line
         m = _WIKILINK_RE.search(line)
         if m:
             ref = f"raw/voice/{m.group(1)}.md"

@@ -35,8 +35,8 @@ def test_rescued_entry_has_a_stable_session_id(tmp_path, monkeypatch):
     """The id wraps the daily-log sentinel block, so a re-run must reuse it
     rather than appending a second block."""
     _archive(tmp_path, monkeypatch, "flush-context.md")
-    first = list(fp.pending())[0]
-    second = list(fp.pending())[0]
+    first = next(iter(fp.pending()))
+    second = next(iter(fp.pending()))
     assert first.session_id == second.session_id
     assert first.session_id
 
@@ -55,7 +55,7 @@ def test_rescued_entry_created_from_mtime(tmp_path, monkeypatch):
     import os
 
     os.utime(failed / "flush-context.md", (stamp, stamp))
-    assert list(fp.pending())[0].created == stamp
+    assert next(iter(fp.pending())).created == stamp
 
 
 def test_pending_still_sorts_oldest_first(tmp_path, monkeypatch):

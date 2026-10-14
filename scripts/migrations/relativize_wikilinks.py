@@ -56,7 +56,7 @@ def main() -> int:
         if args.apply and new_text != original:
             path.write_text(new_text, encoding="utf-8")
         elif not args.apply:
-            for o, nw in zip(original.split("\n"), new_text.split("\n")):
+            for o, nw in zip(original.split("\n"), new_text.split("\n"), strict=False):
                 if o != nw:
                     print(f"  - {o}")
                     print(f"  + {nw}")

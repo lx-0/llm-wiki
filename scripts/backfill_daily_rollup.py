@@ -200,7 +200,7 @@ def main() -> int:
         description="Backfill daily/-rollup from existing substrate files."
     )
     ap.add_argument("--vault", required=True, type=Path)
-    ap.add_argument("--source", choices=["all"] + list(_SOURCES), default="all")
+    ap.add_argument("--source", choices=["all", *list(_SOURCES)], default="all")
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
 

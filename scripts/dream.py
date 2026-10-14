@@ -1672,7 +1672,7 @@ def compute_entity_priority(entity: EntityRef) -> tuple[float, str]:
 
 def _select_for_sweep(
     candidates: list[tuple[float, EntityRef, str]],
-    N: int,
+    N: int,  # noqa: N803  N = the sample size, the docstring's notation
     mode: str,
     *,
     seed: int | None = None,
@@ -1694,7 +1694,7 @@ def _select_for_sweep(
     # probabilistic (default): weighted-random-sample without replacement
     weights = [w for w, _, _ in eligible]
     picked: list[tuple[float, EntityRef, str]] = []
-    pool = list(zip(weights, eligible))
+    pool = list(zip(weights, eligible, strict=False))
     for _ in range(min(N, len(eligible))):
         if not pool:
             break

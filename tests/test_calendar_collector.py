@@ -461,8 +461,7 @@ class _FakeClient:
         page_size=250,
         limit=None,
     ):
-        for ev in self._events_by_cal.get(calendar_id, []):
-            yield ev
+        yield from self._events_by_cal.get(calendar_id, [])
 
 
 @pytest.fixture

@@ -74,6 +74,7 @@ seed_vault_templates "{target}" "{wiki_dir}" 1
         capture_output=True,
         text=True,
         timeout=10,
+        check=False,
     )
     # Seed itself must succeed (not a test of failure, of preservation).
     assert result.returncode == 0, f"seed failed: {result.stderr}"

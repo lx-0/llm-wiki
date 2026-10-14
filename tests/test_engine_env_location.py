@@ -87,7 +87,7 @@ def test_hook_commands_carry_the_environment_for_cloud_vaults(agent):
         h["command"]
         for group in payload["hooks"].values()
         for entry in group
-        for h in (entry["hooks"] if "hooks" in entry else [entry])
+        for h in (entry.get("hooks", [entry]))
     ]
     assert commands, f"{agent}: no hook commands emitted"
     for cmd in commands:

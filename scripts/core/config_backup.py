@@ -12,6 +12,7 @@ global CONFIG_FILE at import) — can share it instead of carrying its own copy.
 
 from __future__ import annotations
 
+import contextlib
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -47,10 +48,8 @@ def backup_config_file(config_path: Path, *, keep_last: int = BACKUP_KEEP_LAST) 
         existing = sorted(bdir.glob("config-*.yaml"))
         if len(existing) > keep_last:
             for stale in existing[:-keep_last]:
-                try:
+                with contextlib.suppress(OSError):
                     stale.unlink()
-                except OSError:
-                    pass
         return out
     except OSError:
         return None

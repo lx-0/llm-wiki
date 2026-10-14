@@ -33,7 +33,6 @@ def vault(tmp_path: Path) -> Path:
 
 
 def test_suggest_bucket_tier_wrong_folder(vault: Path) -> None:
-    kn = vault / "knowledge"
     slugs = ["connections/cascading-debug", "projects/ytstack"]
     by_base = {"cascading-debug": ["connections/cascading-debug"], "ytstack": ["projects/ytstack"]}
     slug, tier = la._suggest("concepts/cascading-debug", slugs, by_base)

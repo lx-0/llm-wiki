@@ -27,6 +27,7 @@ gracefully with empty EXIF; capture time falls back to mtime.
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import re
 from datetime import datetime
@@ -173,10 +174,8 @@ def _parse_exif(src: Path) -> dict:
     shot: dict = {}
     fnumber = tag("FNumber")
     if fnumber is not None:
-        try:
+        with contextlib.suppress(TypeError, ValueError):
             shot["aperture"] = round(float(fnumber), 1)
-        except (TypeError, ValueError):
-            pass
     exposure = tag("ExposureTime")
     if exposure is not None:
         try:
@@ -202,10 +201,8 @@ def _parse_exif(src: Path) -> dict:
             pass
     focal = tag("FocalLength")
     if focal is not None:
-        try:
+        with contextlib.suppress(TypeError, ValueError):
             shot["focal_length_mm"] = round(float(focal), 1)
-        except (TypeError, ValueError):
-            pass
     if shot:
         out["shot"] = shot
 

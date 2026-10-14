@@ -281,7 +281,7 @@ def _validate_watched_folders_schema(personal_raw: dict) -> None:
             )
     if not offenders:
         return
-    raise ConfigError("\n".join(["personal.watched_folders has invalid entries:", ""] + offenders))
+    raise ConfigError("\n".join(["personal.watched_folders has invalid entries:", "", *offenders]))
 
 
 def load() -> WikiConfig:
@@ -457,7 +457,7 @@ def _set_in_yaml(key: str, value: object) -> None:
             if not isinstance(raw, dict):
                 raw = {}
         except yaml.YAMLError as e:
-            raise SystemExit(f"Existing {CONFIG_FILE} is not valid YAML: {e}")
+            raise SystemExit(f"Existing {CONFIG_FILE} is not valid YAML: {e}") from e
     else:
         raw = {}
 

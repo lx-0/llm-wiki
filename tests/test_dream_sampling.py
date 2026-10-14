@@ -236,7 +236,7 @@ def test_tier1_excludes_entity_page_from_corpus_paths(vault: Path) -> None:
 # ── Tier 2 mechanics (weighted sampling) ───────────────────────────
 
 
-def test_tier2_samples_K_files_from_older_pool(vault: Path) -> None:
+def test_tier2_samples_k_files_from_older_pool(vault: Path) -> None:
     """K-element sample drawn from the pool of substrate older than Tier 1."""
     import dream
 

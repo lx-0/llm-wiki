@@ -284,6 +284,7 @@ def test_cli_emits_valid_json_object():
         capture_output=True,
         text=True,
         timeout=5,
+        check=False,
     )
     assert proc.returncode == 0
     data = json.loads(proc.stdout)

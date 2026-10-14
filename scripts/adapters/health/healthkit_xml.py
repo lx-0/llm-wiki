@@ -206,7 +206,7 @@ def iter_aggregates(
     """
     by_day: dict[str, HealthKitDailyAggregate] = {}
 
-    for ev, el in ET.iterparse(str(xml_path), events=("end",)):
+    for _ev, el in ET.iterparse(str(xml_path), events=("end",)):
         if el.tag == "Record":
             _ingest_record(el, by_day, drop_sources)
             el.clear()
@@ -355,5 +355,5 @@ def _normalised_for_field(field_name: str, value: float, unit: str | None) -> fl
 def _maybe_int(field_name: str, value: float) -> int | float:
     """Fields that semantically count whole units render cleaner as ints."""
     if field_name in ("steps_total", "flights_climbed", "resting_hr"):
-        return int(round(value))
+        return round(value)
     return value

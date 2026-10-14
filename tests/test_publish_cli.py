@@ -29,7 +29,7 @@ def _vault(tmp_path: Path) -> tuple[Path, Path]:
 
 
 def test_dry_run_plan_golden(tmp_path: Path) -> None:
-    vault, k = _vault(tmp_path)
+    vault, _k = _vault(tmp_path)
     store = manifest_store(tmp_path / "publish.json")
     plan, slug_map = build_publish_plan(vault, store)
     assert to_json_payload(plan) == {
@@ -48,7 +48,7 @@ def test_dry_run_plan_golden(tmp_path: Path) -> None:
 
 
 def test_dry_run_is_idempotent_after_publish(tmp_path: Path) -> None:
-    vault, k = _vault(tmp_path)
+    vault, _k = _vault(tmp_path)
     store = manifest_store(tmp_path / "publish.json")
     plan, _ = build_publish_plan(vault, store)
     for payload in plan.create:
@@ -63,7 +63,7 @@ def test_dry_run_is_idempotent_after_publish(tmp_path: Path) -> None:
 
 
 def test_render_human_shows_totals(tmp_path: Path) -> None:
-    vault, k = _vault(tmp_path)
+    vault, _k = _vault(tmp_path)
     store = manifest_store(tmp_path / "publish.json")
     plan, _ = build_publish_plan(vault, store)
     out = render_human(plan)

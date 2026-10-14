@@ -66,7 +66,6 @@ def process_request(
     account_id = request.get("account") or CONFIG.personal.primary_account
     folder = request.get("folder", "").strip()
     topic = request.get("topic", "").strip()
-    rationale = request.get("rationale", "").strip()
     slug_match = request_path.stem.removeprefix("request-")  # request-{slug}-{date}
 
     if not account_id or not folder or not topic:

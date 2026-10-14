@@ -326,4 +326,5 @@ def main() -> None:
     subprocess.run(
         [sys.executable, str(compile_script)],
         cwd=str(WIKI_DIR),
+        check=False,
     )

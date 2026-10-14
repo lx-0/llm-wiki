@@ -133,7 +133,7 @@ def _summarize_tool(name: str, inp: dict) -> str:
     if name == "TodoWrite":
         todos = inp.get("todos", [])
         return f"[TodoWrite] {len(todos)} item(s)"
-    if name == "Task" or name == "Agent":
+    if name in {"Task", "Agent"}:
         desc = _truncate(inp.get("description", ""), 80)
         return f"[Agent] {desc}"
     if name == "Skill":
@@ -256,8 +256,8 @@ def _detect_format(path: Path) -> str:
     try:
         with open(path, encoding="utf-8") as f:
             checked = 0
-            for line in f:
-                line = line.strip()
+            for raw_line in f:
+                line = raw_line.strip()
                 if not line:
                     continue
                 try:
@@ -291,8 +291,8 @@ def _read_claude_transcript(transcript_path: str | Path) -> list[Turn]:
         return turns
 
     with open(path, encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
+        for raw_line in f:
+            line = raw_line.strip()
             if not line:
                 continue
             try:
@@ -401,8 +401,8 @@ def _read_codex_transcript(transcript_path: str | Path) -> list[Turn]:
             turns.append(Turn(role="assistant", text="", tools=[summary]))
 
     with open(path, encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
+        for raw_line in f:
+            line = raw_line.strip()
             if not line:
                 continue
             try:

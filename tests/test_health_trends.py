@@ -123,7 +123,7 @@ def test_render_block_stale_metric_shows_no_recent(tmp_path, monkeypatch):
     block = ht.render_block(h)
 
     def cells(metric):
-        row = next(l for l in block.splitlines() if f"`{metric}`" in l)
+        row = next(line for line in block.splitlines() if f"`{metric}`" in line)
         return [c.strip() for c in row.strip("|").split("|")]
 
     sleep = cells("sleep_score")  # metric, days, range, all-time, last6mo, trend

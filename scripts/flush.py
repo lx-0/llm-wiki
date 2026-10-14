@@ -284,8 +284,7 @@ def _run_dashboard_script(script: Path, label: str) -> None:
     try:
         result = subprocess.run(
             [sys.executable, str(script)],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            capture_output=True,
             stdin=subprocess.DEVNULL,
             check=False,
             timeout=DASHBOARD_REFRESH_TIMEOUT_S,

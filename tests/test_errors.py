@@ -32,24 +32,32 @@ def test_no_exception_no_log(caplog):
 
 
 def test_debug_level_logs_at_debug(caplog):
-    with caplog.at_level(logging.DEBUG, logger="core.errors"):
-        with swallow("cleanup-site", level="debug"):
-            raise OSError("socket gone")
+    with (
+        caplog.at_level(logging.DEBUG, logger="core.errors"),
+        swallow("cleanup-site", level="debug"),
+    ):
+        raise OSError("socket gone")
     assert len(caplog.records) == 1
     assert caplog.records[0].levelno == logging.DEBUG
 
 
 def test_keyboard_interrupt_propagates_unlogged(caplog):
-    with caplog.at_level(logging.DEBUG, logger="core.errors"), pytest.raises(KeyboardInterrupt):
-        with swallow("interrupt-site"):
-            raise KeyboardInterrupt
+    with (
+        caplog.at_level(logging.DEBUG, logger="core.errors"),
+        pytest.raises(KeyboardInterrupt),
+        swallow("interrupt-site"),
+    ):
+        raise KeyboardInterrupt
     assert caplog.records == []
 
 
 def test_system_exit_propagates_unlogged(caplog):
-    with caplog.at_level(logging.DEBUG, logger="core.errors"), pytest.raises(SystemExit):
-        with swallow("exit-site"):
-            raise SystemExit(3)
+    with (
+        caplog.at_level(logging.DEBUG, logger="core.errors"),
+        pytest.raises(SystemExit),
+        swallow("exit-site"),
+    ):
+        raise SystemExit(3)
     assert caplog.records == []
 
 
@@ -79,9 +87,11 @@ def test_invalid_level_raises_at_construction():
 
 def test_logger_override_routes_to_given_logger(caplog):
     custom = logging.getLogger("test.swallow.custom")
-    with caplog.at_level(logging.WARNING, logger="test.swallow.custom"):
-        with swallow("routed-site", logger=custom):
-            raise KeyError("missing")
+    with (
+        caplog.at_level(logging.WARNING, logger="test.swallow.custom"),
+        swallow("routed-site", logger=custom),
+    ):
+        raise KeyError("missing")
     assert len(caplog.records) == 1
     assert caplog.records[0].name == "test.swallow.custom"
 

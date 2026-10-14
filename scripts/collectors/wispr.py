@@ -128,14 +128,13 @@ class WisprClient:
                     f"Wispr HTTP {response.status_code}: open Flow and sign in; "
                     "check cloud-sync access or renew the configured token"
                 )
-            if response.status_code == 429 or response.status_code >= 500:
-                if not attempt:
-                    try:
-                        delay = min(float(response.headers.get("Retry-After", "1")), 30)
-                    except ValueError:
-                        delay = 1
-                    time.sleep(max(0, delay))
-                    continue
+            if (response.status_code == 429 or response.status_code >= 500) and not attempt:
+                try:
+                    delay = min(float(response.headers.get("Retry-After", "1")), 30)
+                except ValueError:
+                    delay = 1
+                time.sleep(max(0, delay))
+                continue
             if response.status_code != 200:
                 raise WisprAPIError(f"Wispr sync HTTP {response.status_code}")
             try:

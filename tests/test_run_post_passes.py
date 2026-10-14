@@ -117,8 +117,8 @@ def test_run_post_passes_raise_does_not_block(monkeypatch: pytest.MonkeyPatch):
 
     _stub_orchestrate_failed_on_raise(monkeypatch)
 
-    p1 = _make_fake_producer("p1")
-    p2 = _make_fake_producer("p2", raises=True)
+    _make_fake_producer("p1")
+    _make_fake_producer("p2", raises=True)
     p3 = _make_fake_producer("p3")
 
     source = Path("/tmp/raw/notes/y.md")

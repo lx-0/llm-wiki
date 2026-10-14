@@ -148,7 +148,7 @@ def test_answer_artifact_is_compile_candidate_and_routes_like_email(tmp_path, mo
                 as_of_mtime=file_abs.stat().st_mtime,
             )
 
-    monkeypatch.setattr(fb, "get_provider", lambda: _Stub())
+    monkeypatch.setattr(fb, "get_provider", _Stub)
     request_path = tmp_path / "request-steuer-2026-06-10.json"
     request_path.write_text(
         json.dumps(
@@ -183,13 +183,13 @@ def test_answer_artifact_is_compile_candidate_and_routes_like_email(tmp_path, mo
     # never saw the folder-answer rules in compile_main; two zero-write
     # runs on a real invoice answer). Answers carry type: folder-answer
     # and route explicitly to compile_main.
-    from pathlib import Path as P
+    from pathlib import Path
 
     from compile_stages.route import Compile, decide_route
 
     answer_text = answer_path.read_text(encoding="utf-8")
     assert "type: folder-answer" in answer_text
-    answer_route = decide_route(P("raw/notes/folder") / answer_path.name, answer_text)
+    answer_route = decide_route(Path("raw/notes/folder") / answer_path.name, answer_text)
     assert isinstance(answer_route, Compile)
     assert answer_route.metadata.substrate_prompt == "compile_main"
 

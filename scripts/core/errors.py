@@ -39,7 +39,7 @@ _LEVELS = {
 }
 
 
-class swallow(ContextDecorator):
+class swallow(ContextDecorator):  # noqa: N801  lowercase on purpose, like contextlib.suppress
     """Suppress ``Exception`` inside the block, logging it with a label.
 
     Context manager and decorator (via :class:`ContextDecorator`):

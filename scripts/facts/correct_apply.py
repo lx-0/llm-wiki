@@ -141,8 +141,8 @@ def _scan_candidates(terms: list, roots: list) -> list:
     if not lowered:
         return []
     out = []
-    for base in roots:
-        base = Path(base)
+    for root in roots:
+        base = Path(root)
         if not base.exists():
             continue
         vault = base.parent
@@ -197,6 +197,7 @@ def _tree_safe_for_deletion(vault: Path) -> tuple[bool, str]:
             capture_output=True,
             text=True,
             timeout=30,
+            check=False,
         )
     except (OSError, subprocess.SubprocessError):
         return False, "git status failed — cannot verify a clean tree"
@@ -325,6 +326,7 @@ def _git_delta(vault: Path) -> dict | None:
             capture_output=True,
             text=True,
             timeout=30,
+            check=False,
         )
     except (OSError, subprocess.SubprocessError):
         return None
@@ -336,8 +338,8 @@ def _git_delta(vault: Path) -> dict | None:
 def _snapshot(roots) -> dict:
     """`{path: (mtime_ns, size)}` for every file under the given roots."""
     snap: dict[str, tuple[int, int]] = {}
-    for root in roots:
-        root = Path(root)
+    for raw_root in roots:
+        root = Path(raw_root)
         if not root.exists():
             continue
         paths = [root] if root.is_file() else [p for p in root.rglob("*") if p.is_file()]

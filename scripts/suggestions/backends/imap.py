@@ -179,7 +179,7 @@ def condition_to_imap_search(condition: str) -> list:
         # IMAP OR is binary; fold left.
         out = criteria[0]
         for c in criteria[1:]:
-            out = ["OR"] + out + c
+            out = ["OR", *out, *c]
         return out
     # AND-combined (default)
     out: list = []

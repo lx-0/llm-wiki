@@ -258,7 +258,7 @@ def ledger_vault(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
 
 
 def test_is_ingested_matches_current_hash(ledger_vault) -> None:
-    vault, fresh, stale = ledger_vault
+    _vault, fresh, stale = ledger_vault
     save_json_state(
         state_store.STATE_FILE,
         {"ingested": {"raw/notes/stale.md": file_hash(stale)}},
@@ -291,7 +291,7 @@ def test_is_ingested_outside_vault_is_false(ledger_vault, tmp_path: Path) -> Non
 
 
 def test_pending_paths_lists_changed_and_new_in_scan_order(ledger_vault) -> None:
-    vault, fresh, stale = ledger_vault
+    _vault, fresh, stale = ledger_vault
     save_json_state(
         state_store.STATE_FILE,
         {"ingested": {"raw/notes/stale.md": file_hash(stale)}},
@@ -310,7 +310,7 @@ def test_compile_select_files_uses_ledger(ledger_vault, monkeypatch) -> None:
 
     import compile as compile_mod
 
-    vault, fresh, stale = ledger_vault
+    _vault, fresh, stale = ledger_vault
     save_json_state(
         state_store.STATE_FILE,
         {"ingested": {"raw/notes/stale.md": file_hash(stale)}},

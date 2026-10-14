@@ -62,7 +62,7 @@ def count_md_flat(path: Path) -> int:
 
 def bar(pct: float, width: int = 26, fill: str = "", empty_color: str = "") -> str:
     pct = max(0.0, min(100.0, pct))
-    n = int(round(width * pct / 100))
+    n = round(width * pct / 100)
     return f"{fill}{'█' * n}{empty_color or maybe(GRY)}{'░' * (width - n)}{maybe(RST)}"
 
 
@@ -225,7 +225,7 @@ def render(vault: Path) -> str:
             if n == 0:
                 continue
             barw = 24
-            filled = int(round(barw * n / max_n))
+            filled = round(barw * n / max_n)
             color = maybe(CYN if label == "concepts" else MAG if label == "connections" else BLU)
             out.append(
                 line(
@@ -242,7 +242,7 @@ def render(vault: Path) -> str:
         max_r = max(raw.values()) or 1
         for label, n in raw.items():
             barw = 24
-            filled = int(round(barw * n / max_r))
+            filled = round(barw * n / max_r)
             pct = 100 * n / total_raw
             pct_str = f"{pct:>4.1f}%" if pct >= 0.1 else " <0.1%"
             out.append(
@@ -289,7 +289,7 @@ def render(vault: Path) -> str:
         if inline_per_concept >= target_min / 2
         else RED
     )
-    filled = int(round(barw * density_pct / 100))
+    filled = round(barw * density_pct / 100)
     out.append(
         line(
             f"links/concept  {maybe(color)}{'█' * filled}{maybe(GRY)}{'░' * (barw - filled)}{maybe(RST)}  {inline_per_concept:>4.1f}  {maybe(DIM)}target {target_min}-{target_max}{maybe(RST)}",

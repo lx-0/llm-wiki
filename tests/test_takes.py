@@ -130,7 +130,7 @@ def test_first_touch_frontmatter_shape(monkeypatch: pytest.MonkeyPatch, tmp_path
     assert "created" in fm and "last_updated" in fm
     assert "# Takes — Jane Doe" in body
     # Body contains exactly one take line matching the canonical shape.
-    lines = [l for l in body.splitlines() if l.startswith("- **")]
+    lines = [line for line in body.splitlines() if line.startswith("- **")]
     assert len(lines) == 1
     assert "[high]" in lines[0]
     assert "raw/transcripts/jamie/2026-04-15--abc.md" in lines[0]
@@ -151,8 +151,8 @@ def test_idempotent_add_refuses_exact_duplicate(
     rc2 = take.cmd_add(args)
     assert rc2 == 0
 
-    fm, body = _read_takes_file(takes_dir / "jane-doe.md")
-    take_lines = [l for l in body.splitlines() if l.startswith("- **")]
+    _fm, body = _read_takes_file(takes_dir / "jane-doe.md")
+    take_lines = [line for line in body.splitlines() if line.startswith("- **")]
     assert len(take_lines) == 1, f"expected idempotent add, got {take_lines}"
 
 
@@ -164,8 +164,8 @@ def test_add_appends_distinct_lines(monkeypatch: pytest.MonkeyPatch, tmp_path: P
     rc1 = take.cmd_add(_add_args(date="2026-04-15", belief="First take."))
     rc2 = take.cmd_add(_add_args(date="2026-04-16", belief="Second take."))
     assert rc1 == 0 and rc2 == 0
-    fm, body = _read_takes_file(takes_dir / "jane-doe.md")
-    take_lines = [l for l in body.splitlines() if l.startswith("- **")]
+    _fm, body = _read_takes_file(takes_dir / "jane-doe.md")
+    take_lines = [line for line in body.splitlines() if line.startswith("- **")]
     assert len(take_lines) == 2
 
 
@@ -206,8 +206,8 @@ def test_list_show_remove(
     # remove --line 1 (drops the first take line)
     rc = take.cmd_remove(argparse.Namespace(slug="jane-doe", line=1, all=False))
     assert rc == 0
-    fm, body = _read_takes_file(takes_dir / "jane-doe.md")
-    remaining = [l for l in body.splitlines() if l.startswith("- **")]
+    _fm, body = _read_takes_file(takes_dir / "jane-doe.md")
+    remaining = [line for line in body.splitlines() if line.startswith("- **")]
     assert len(remaining) == 1
     assert "Belief two." in remaining[0]
 
@@ -252,8 +252,8 @@ def test_add_belief_gets_trailing_period(monkeypatch: pytest.MonkeyPatch, tmp_pa
 
     rc = take.cmd_add(_add_args(belief="No terminal punctuation here"))
     assert rc == 0
-    fm, body = _read_takes_file(takes_dir / "jane-doe.md")
-    line = next(l for l in body.splitlines() if l.startswith("- **"))
+    _fm, body = _read_takes_file(takes_dir / "jane-doe.md")
+    line = next(ln for ln in body.splitlines() if ln.startswith("- **"))
     assert line.rstrip().endswith(".")
 
 

@@ -177,7 +177,7 @@ def test_real_run_writes_id_named_note_with_frontmatter(capture_env):
 
 
 def test_correction_capture_tagged_when_referencing_known_id(capture_env):
-    coll, inbox, raw_captures = capture_env
+    coll, inbox, _raw_captures = capture_env
     from core import capture_index as ci
 
     ci.record(
@@ -212,7 +212,7 @@ def test_correction_referencing_unknown_id_stays_fresh(capture_env):
 
 
 def test_source_is_moved_into_vault_archive_zone(capture_env):
-    coll, inbox, raw_captures = capture_env
+    coll, inbox, _raw_captures = capture_env
     (inbox / "drop.md").write_text("ingest then archive me")
 
     coll.run()
@@ -228,7 +228,7 @@ def test_source_is_moved_into_vault_archive_zone(capture_env):
 
 
 def test_dotfiles_and_wrong_suffix_are_ignored(capture_env):
-    coll, inbox, raw_captures = capture_env
+    coll, inbox, _raw_captures = capture_env
     (inbox / "real.txt").write_text("ingest me")
     (inbox / ".hidden").write_text("dot-file, skip")
     (inbox / "photo.jpg").write_text("wrong suffix, skip")
@@ -262,7 +262,7 @@ def test_redropping_same_content_overwrites_not_duplicates(capture_env):
 
 
 def test_rerun_with_empty_inbox_is_idempotent(capture_env):
-    coll, inbox, raw_captures = capture_env
+    coll, inbox, _raw_captures = capture_env
     (inbox / "once.txt").write_text("only here once")
 
     first = coll.run()
@@ -277,7 +277,7 @@ def test_rerun_with_empty_inbox_is_idempotent(capture_env):
 
 
 def test_empty_source_file_is_archived_without_ingest(capture_env):
-    coll, inbox, raw_captures = capture_env
+    coll, inbox, _raw_captures = capture_env
     (inbox / "empty.txt").write_text("")
     (inbox / "ok.txt").write_text("real content")
 
@@ -297,7 +297,7 @@ def test_empty_source_file_is_archived_without_ingest(capture_env):
 def test_real_run_records_capture_in_index(capture_env):
     from core import capture_index
 
-    coll, inbox, raw_captures = capture_env
+    coll, inbox, _raw_captures = capture_env
     (inbox / "note.txt").write_text("remember the thing")
 
     result = coll.run()
@@ -317,7 +317,7 @@ def test_redrop_does_not_reset_superseded_index_entry(capture_env):
     from core import capture_index
     from core.utils import save_json_state
 
-    coll, inbox, raw_captures = capture_env
+    coll, inbox, _raw_captures = capture_env
     content = "a cryptic note the brain will misread"
 
     (inbox / "first.txt").write_text(content)
@@ -340,7 +340,7 @@ def test_redrop_does_not_reset_superseded_index_entry(capture_env):
 
 
 def test_daily_rollup_line_lands(capture_env, monkeypatch, tmp_path):
-    coll, inbox, raw_captures = capture_env
+    coll, inbox, _raw_captures = capture_env
     from core import daily_capture
 
     daily_dir = tmp_path / "daily"

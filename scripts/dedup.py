@@ -675,7 +675,7 @@ def _resolve_entity_arg(arg: str, knowledge_dir: Path) -> EntityPage | None:
         kind = p.parent.name
         return load_entity(p.resolve(), kind if kind in ENTITY_KINDS else "people")
     for e in load_entities(knowledge_dir):
-        if e.slug == arg or f"{e.kind}/{e.slug}" == arg:
+        if arg in (e.slug, f"{e.kind}/{e.slug}"):
             return e
     return None
 

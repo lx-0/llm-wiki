@@ -107,6 +107,7 @@ def test_query_json_and_file_back_are_mutually_exclusive():
         text=True,
         timeout=30,
         cwd=REPO_ROOT / "scripts",
+        check=False,
     )
     assert proc.returncode == 2
     assert "mutually exclusive" in proc.stderr

@@ -41,7 +41,7 @@ def pictures_env(tmp_path, monkeypatch):
 
 
 def test_picture_archive_lands_in_vault_not_inbox_processed(pictures_env, monkeypatch):
-    pictures_mod, inbox, vault_raw = pictures_env
+    pictures_mod, inbox, _vault_raw = pictures_env
 
     # Drop a fake PNG (vision call is mocked, so bytes content doesn't matter).
     (inbox / "IMG_1234.png").write_bytes(b"\x89PNG\r\n\x1a\n_FAKE_")

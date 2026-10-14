@@ -69,11 +69,11 @@ def test_killed_runner_records_interrupted_not_running(tmp_path):
     sf = tmp_path / "piggyback-state.json"
     scripts_dir = Path(pr.__file__).resolve().parent.parent
     driver = (
-        "import sys; sys.path.insert(0, %r)\n"
+        f"import sys; sys.path.insert(0, {str(scripts_dir)!r})\n"
         "from pathlib import Path\n"
         "from core import piggyback_runner as pr\n"
-        "pr.run_piggyback('t', 600, [%r, '-c', 'import time; time.sleep(60)'],"
-        " state_file=Path(%r))\n" % (str(scripts_dir), sys.executable, str(sf))
+        f"pr.run_piggyback('t', 600, [{sys.executable!r}, '-c', 'import time; time.sleep(60)'],"
+        f" state_file=Path({str(sf)!r}))\n"
     )
     proc = sp.Popen([sys.executable, "-c", driver], stdout=sp.DEVNULL, stderr=sp.DEVNULL)
     # Wait for the runner to record `running` before signalling it.

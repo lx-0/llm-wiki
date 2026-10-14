@@ -21,7 +21,7 @@ def test_fixture_exists_with_jamie_naming_convention() -> None:
     name = FIXTURE_PATH.name
     parts = name.removesuffix(".md").split("--")
     assert len(parts) == 3, f"jamie filename must have 3 `--`-separated parts: {name}"
-    date_part, slug, short_id = parts
+    date_part, _slug, _short_id = parts
     assert len(date_part) == 10 and date_part.count("-") == 2, "date part must be YYYY-MM-DD"
 
 

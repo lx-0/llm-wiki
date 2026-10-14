@@ -109,8 +109,8 @@ def read_history(limit: int | None = None) -> list[dict]:
     if not history_file.exists():
         return []
     events: list[dict] = []
-    for line in history_file.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
+    for raw_line in history_file.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
         if not line:
             continue
         try:

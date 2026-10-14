@@ -22,6 +22,7 @@ def _run(args: list[str]) -> subprocess.CompletedProcess:
         capture_output=True,
         text=True,
         timeout=15,
+        check=False,
     )
 
 

@@ -33,7 +33,7 @@ def test_needs_migration_correct() -> None:
     from migrations import migrate_add_type as m
 
     fm = '---\ntitle: "X"\ntype: concept\n---\nbody\n'
-    change, reason = m.needs_migration(fm, "concept")
+    change, _reason = m.needs_migration(fm, "concept")
     assert change is False
 
 

@@ -562,14 +562,14 @@ def test_build_prompt_within_budget_trims_to_fit(vault: Path) -> None:
     breakdown = dream.collect_corpus_tiered(ent)
 
     # Full prompt size with everything in.
-    full_prompt, full_chars = dream._build_prompt(
+    _full_prompt, full_chars = dream._build_prompt(
         ent, breakdown.all_paths, max_turns=20, breakdown=breakdown
     )
     assert full_chars > 0
 
     # Force a budget just under the full size → must drop at least one file.
     budget = full_chars - 500
-    prompt, prompt_chars, trimmed, dropped = dream._build_prompt_within_budget(
+    _prompt, prompt_chars, trimmed, dropped = dream._build_prompt_within_budget(
         ent, breakdown, max_turns=20, max_chars=budget
     )
     assert dropped >= 1, "expected at least one file dropped to fit the budget"
@@ -587,7 +587,7 @@ def test_build_prompt_within_budget_noop_when_under_cap(vault: Path) -> None:
     ent = dream._resolve_entity("small")
     assert ent is not None
     breakdown = dream.collect_corpus_tiered(ent)
-    prompt, prompt_chars, trimmed, dropped = dream._build_prompt_within_budget(
+    _prompt, _prompt_chars, trimmed, dropped = dream._build_prompt_within_budget(
         ent, breakdown, max_turns=20, max_chars=10_000_000
     )
     assert dropped == 0

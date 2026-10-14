@@ -1,7 +1,7 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-14T20:50:00+02:00
+last_updated: 2026-10-14T21:50:00+02:00
 current_milestone: M033
 active_slice: S01
 active_task: none
@@ -28,8 +28,12 @@ reverted by hand) + `.git-blame-ignore-revs` + AGENTS.md line. **S01 3/5** — T
 policy (`[tool.ruff.lint]` select + ignores with reasons, per-file E402/F401, `src`),
 safe autofixes over 230 files, `# isort: off` blocks guarding the three registries' run
 order (verified == HEAD), four dead `compile.load_state` test patches removed. Residue
-244 findings / 41 codes for T04. Suite 2030 green, format clean. Next: T04 — hand-fix
-the residue until `ruff check` exits 0 (`plan-task`).
+244 findings / 41 codes for T04. **S01 4/5** — T04 residue cleared: `ruff check` →
+`All checks passed!` (pass A: 110 scoped unsafe fixes reviewed per hunk, one semantic
+trap caught by the suite and reverted — `mailbox.Mailbox` iterates messages, not keys;
+pass B: 23 explicit `check=False`, renames, two never-asserting tests fixed, nine coded
+`noqa` with reasons, N806 ignored / RUF012 under tests). Suite 2030 green. Next: T05 —
+ruff in pre-commit + `ci.yml` running both suites (`plan-task`).
 
 ## M032 COMPLETE (L, 2026-10-14): desktop de-slop
 

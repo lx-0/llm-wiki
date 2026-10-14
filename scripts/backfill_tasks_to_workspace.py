@@ -22,6 +22,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+import contextlib
+
 from core.paths import ROOT_DIR, WORKSPACE_INBOX_DIR
 
 log = logging.getLogger("backfill-tasks-to-workspace")
@@ -70,10 +72,8 @@ def main() -> int:
         return 0
     # remove tasks/ if now empty
     if not any(old.iterdir()):
-        try:
+        with contextlib.suppress(OSError):
             old.rmdir()
-        except OSError:
-            pass
     log.info("moved %d record(s) to workspace/inbox/ (%d skipped).", moved, skipped)
     return 0
 

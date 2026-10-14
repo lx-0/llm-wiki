@@ -873,9 +873,8 @@ class CalendarCollector:
                     new_etag_map[block.event_id] = block.etag
 
                 upd = ev.get("updated")
-                if isinstance(upd, str):
-                    if newest_updated is None or upd > newest_updated:
-                        newest_updated = upd
+                if isinstance(upd, str) and (newest_updated is None or upd > newest_updated):
+                    newest_updated = upd
 
             # State update: keep etag union of old + new (events not
             # mentioned this run might still be in the cache; they'll be

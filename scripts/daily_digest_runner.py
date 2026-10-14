@@ -53,7 +53,7 @@ def _resolve_date(arg: str) -> str:
     except ValueError as exc:
         raise SystemExit(
             f"daily-digest: invalid --date {arg!r} — expected ISO YYYY-MM-DD, 'today', or 'yesterday' ({exc})"
-        )
+        ) from exc
 
 
 def _inject_captures_section(text: str, section: str) -> str:
@@ -126,7 +126,7 @@ def main() -> int:
 
     cmd = [str(wiki_bin), "agent", "daily-digest", "--var", f"date={target_date}"]
     log.info("daily-digest: %s", " ".join(cmd))
-    result = subprocess.run(cmd, cwd=WIKI_DIR.parent)
+    result = subprocess.run(cmd, cwd=WIKI_DIR.parent, check=False)
     if result.returncode == 0:
         # The agent produced the digest; attach the deterministic Captures section.
         _attach_captures_section(target_date)

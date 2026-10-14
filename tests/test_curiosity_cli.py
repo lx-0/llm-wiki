@@ -195,7 +195,7 @@ def test_walk_accept_all_cancelled_on_no(tmp_path, monkeypatch):
     prompt — nothing is sent."""
     from curiosity import cli
 
-    p1 = _write(
+    _write(
         tmp_path / "request-1.json",
         {
             "type": "folder-deep-scan",
@@ -227,7 +227,9 @@ def test_pending_filters_by_type_and_excludes_done(tmp_path, monkeypatch):
     _write(tmp_path / "request-3.json", {"type": "folder-deep-scan", "status": "done"})
     _write(tmp_path / "request-4.json", {"type": "email-deep-scan", "status": "rejected"})
 
-    names = lambda paths: sorted(p.name for p in paths)
+    def names(paths):
+        return sorted(p.name for p in paths)
+
     assert names(cli._pending()) == ["request-1.json", "request-2.json"]
     assert names(cli._pending("folder-deep-scan")) == ["request-1.json"]
     assert names(cli._pending("email-deep-scan")) == ["request-2.json"]

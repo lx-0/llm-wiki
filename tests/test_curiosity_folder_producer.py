@@ -292,7 +292,7 @@ def _fake_provider(monkeypatch, folder_backend, answer_md, error=None):
                 error=error,
             )
 
-    monkeypatch.setattr(folder_backend, "get_provider", lambda: _Fake())
+    monkeypatch.setattr(folder_backend, "get_provider", _Fake)
 
 
 def test_persist_answer_only_and_flip_request(tmp_path, monkeypatch):
@@ -420,7 +420,7 @@ def test_provider_error_marks_request_error(tmp_path, monkeypatch):
 def test_error_request_retries_only_after_file_change(tmp_path, monkeypatch):
     """The staleness gate: unchanged file -> skip without constructing a
     provider; touched file -> retry proceeds and can succeed."""
-    fb, root, request_path = _persist_env(tmp_path, monkeypatch)
+    fb, _root, request_path = _persist_env(tmp_path, monkeypatch)
     trove_file = tmp_path / "trove" / "11 Steuern" / "Steuerbescheid-2024.pdf"
     os.utime(trove_file, (1234.5, 1234.5))  # current mtime == failure anchor
     _fake_provider(monkeypatch, fb, "", error="empty_result")
@@ -442,7 +442,7 @@ def test_error_request_retries_only_after_file_change(tmp_path, monkeypatch):
 
 
 def test_missing_file_marks_stale_and_retries_on_reappearance(tmp_path, monkeypatch):
-    fb, root, request_path = _persist_env(tmp_path, monkeypatch)
+    fb, _root, request_path = _persist_env(tmp_path, monkeypatch)
     trove_file = tmp_path / "trove" / "11 Steuern" / "Steuerbescheid-2024.pdf"
     trove_file.unlink()
     res = fb.process_request(request_path, dry_run=False)
@@ -464,7 +464,7 @@ def test_missing_file_marks_stale_and_retries_on_reappearance(tmp_path, monkeypa
 
 
 def test_done_request_is_never_redispatched(tmp_path, monkeypatch):
-    fb, root, request_path = _persist_env(tmp_path, monkeypatch)
+    fb, _root, request_path = _persist_env(tmp_path, monkeypatch)
     req = json.loads(request_path.read_text(encoding="utf-8"))
     req["status"] = "done"
     request_path.write_text(json.dumps(req, indent=2), encoding="utf-8")
@@ -638,7 +638,7 @@ def test_candidate_ranking_coverage_then_recency(env):
     (root / "raw" / "index" / "docs.md").unlink()
     (root / "raw" / "index" / "work.md").write_text(big, encoding="utf-8")
 
-    block, candidates = producer._folder_candidates(
+    _block, candidates = producer._folder_candidates(
         source_excerpt="Wo liegt die Hetzner-Rechnung? Hab die Zahlen nicht im Kopf.",
         top_k=40,
     )

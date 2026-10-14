@@ -38,7 +38,7 @@ from __future__ import annotations
 import fcntl
 import io
 from collections.abc import Callable
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from pathlib import Path
 
 from .paths import ROOT_DIR, STATE_FILE
@@ -66,7 +66,7 @@ def locked(lock_path: Path):
     critical section. Parent dirs are created; the lock is released and the
     handle closed on exit (also on exception)."""
     lock_path.parent.mkdir(parents=True, exist_ok=True)
-    fd = open(lock_path, "w")
+    fd = open(lock_path, "w")  # noqa: SIM115  the handle IS the lock; closed in `finally`
     try:
         fcntl.flock(fd.fileno(), fcntl.LOCK_EX)
         yield
@@ -84,7 +84,7 @@ def try_locked(lock_path: Path):
     best-effort work like the dashboard refresh) where waiting is worse than
     skipping — the next run picks up the latest state anyway."""
     lock_path.parent.mkdir(parents=True, exist_ok=True)
-    fd = open(lock_path, "w")
+    fd = open(lock_path, "w")  # noqa: SIM115  the handle IS the lock; closed in `finally`
     acquired = False
     try:
         try:
@@ -95,10 +95,8 @@ def try_locked(lock_path: Path):
         yield acquired
     finally:
         if acquired:
-            try:
+            with suppress(OSError):
                 fcntl.flock(fd.fileno(), fcntl.LOCK_UN)
-            except OSError:
-                pass
         fd.close()
 
 
@@ -118,7 +116,7 @@ def acquire_process_lock(lock_path: Path) -> io.IOBase | None:
     stderr. A single global compile-lock prevents the storm.
     """
     lock_path.parent.mkdir(parents=True, exist_ok=True)
-    fd = open(lock_path, "w")
+    fd = open(lock_path, "w")  # noqa: SIM115  the handle IS the lock; the caller keeps it alive
     try:
         fcntl.flock(fd.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
     except BlockingIOError:

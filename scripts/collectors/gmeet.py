@@ -902,8 +902,8 @@ class GmeetCollector:
             name = stub.get("name") or file_id
             groups.setdefault(_meeting_key(name), []).append(stub)
         _KIND_ORDER = {"notes": 0, "transcript": 1, "unknown": 2}
-        for key in groups:
-            groups[key].sort(key=lambda d: _KIND_ORDER.get(_classify_doc(d.get("name") or ""), 99))
+        for docs in groups.values():
+            docs.sort(key=lambda d: _KIND_ORDER.get(_classify_doc(d.get("name") or ""), 99))
 
         files_written: list[Path] = []
         skipped = 0

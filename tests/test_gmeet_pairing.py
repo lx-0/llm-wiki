@@ -116,7 +116,7 @@ def test_scan_siblings_parses_new_list_frontmatter(tmp_path: Path) -> None:
         "---\n\n## Summary\n\nx\n\n## Transcript\n\ny\n",
         encoding="utf-8",
     )
-    smap, sids = gmeet._scan_siblings(tmp_path)
+    smap, _sids = gmeet._scan_siblings(tmp_path)
     sib = smap[gmeet._meeting_key(name + " – Notizen von Gemini")]
     assert sib.doc_kinds == {"notes", "transcript"}
     assert sib.drive_doc_ids == {"doc_notes_xyz", "doc_tx_xyz"}
@@ -137,7 +137,7 @@ def test_scan_siblings_tolerates_malformed_frontmatter(tmp_path: Path) -> None:
 
     smap, _sids = gmeet._scan_siblings(tmp_path)
     assert len(smap) == 1
-    assert list(smap.values())[0].path == good
+    assert next(iter(smap.values())).path == good
 
 
 # ── _render_markdown ────────────────────────────────────────────────
@@ -210,7 +210,7 @@ def test_merge_into_sibling_upgrades_legacy_singular_to_list_shape(tmp_path: Pat
     name = "Pair – 2026/05/15 – Notizen von Gemini"
     _write_legacy_file(tmp_path, drive_doc_id="doc_notes_id", doc_kind="notes", drive_doc_name=name)
     smap, _ = gmeet._scan_siblings(tmp_path)
-    sib = list(smap.values())[0]
+    sib = next(iter(smap.values()))
     new_doc = {
         "id": "doc_tx_id",
         "name": "Pair – 2026/05/15 – Transcript",
@@ -246,7 +246,7 @@ def test_merge_into_sibling_preserves_body_of_existing_sections(tmp_path: Path) 
         body=legacy_body,
     )
     smap, _ = gmeet._scan_siblings(tmp_path)
-    sib = list(smap.values())[0]
+    sib = next(iter(smap.values()))
     new_doc = {"id": "tx_id", "name": "Pair – Transcript", "createdTime": "2026-05-15T10:05:00Z"}
     merged = gmeet._merge_into_sibling(
         sib, new_doc, "transcript body", account_id="acct", input_source="cli"

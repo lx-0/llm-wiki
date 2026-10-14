@@ -208,7 +208,7 @@ async def maybe_extract_takes(source: Path) -> None:
             dropped += 1
             continue
         try:
-            path, status = _append_take(
+            _path, status = _append_take(
                 holder=holder,
                 belief=belief,
                 confidence=confidence,

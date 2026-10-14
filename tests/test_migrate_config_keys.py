@@ -35,7 +35,7 @@ def test_renames_scan_screenshots_preserving_value():
 def test_renames_follow_requests():
     m = _mod()
     src = {"follow_requests": {"enabled": True, "cooldown_hours": 24}}
-    out, changes = m.migrate_piggybacks(src)
+    out, _changes = m.migrate_piggybacks(src)
     assert "follow_requests" not in out
     assert out["curiosity_followup"] == {"enabled": True, "cooldown_hours": 24}
 
@@ -43,7 +43,7 @@ def test_renames_follow_requests():
 def test_renames_email_incremental():
     m = _mod()
     src = {"email_incremental": {"enabled": False, "cooldown_hours": 48}}
-    out, changes = m.migrate_piggybacks(src)
+    out, _changes = m.migrate_piggybacks(src)
     assert "email_incremental" not in out
     assert out["email"] == {"enabled": False, "cooldown_hours": 48}
 
@@ -88,7 +88,7 @@ def test_preserves_unrelated_keys():
         "lint_structural": {"enabled": True, "cooldown_hours": 24},
         "review_wiki": {"enabled": True, "cooldown_hours": 168},
     }
-    out, changes = m.migrate_piggybacks(src)
+    out, _changes = m.migrate_piggybacks(src)
     assert out["lint_structural"] == {"enabled": True, "cooldown_hours": 24}
     assert out["review_wiki"] == {"enabled": True, "cooldown_hours": 168}
     assert "screenshots" in out
@@ -137,7 +137,7 @@ def test_migrate_config_file_round_trip(tmp_path):
         encoding="utf-8",
     )
 
-    new_text, changes = m.migrate_config(config_path)
+    new_text, _changes = m.migrate_config(config_path)
     assert new_text is not None
     # No hand-counted change total here: KEY_ADDITIONS is derived from the
     # schema, so the greenfield injection count changes with every new knob.
@@ -212,7 +212,7 @@ def test_migrate_config_no_piggybacks_block_still_runs_additions(tmp_path):
         yaml.safe_dump({"scheduling": {"compile_after_hour": 18}}), encoding="utf-8"
     )
 
-    new_text, changes = m.migrate_config(config_path)
+    new_text, _changes = m.migrate_config(config_path)
     assert new_text is not None
     reparsed = yaml.safe_load(new_text)
     assert reparsed["limits"]["compile_skip_on_long_context_unknown"] is True
@@ -482,7 +482,7 @@ def test_migrate_config_round_trip_with_drops(tmp_path):
         encoding="utf-8",
     )
 
-    new_text, changes = m.migrate_config(config_path)
+    new_text, _changes = m.migrate_config(config_path)
     assert new_text is not None
     reparsed = yaml.safe_load(new_text)
 

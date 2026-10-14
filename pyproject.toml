@@ -74,6 +74,9 @@ ignore = [
     "E501",
     # en-dashes, arrows and ellipses in strings, docstrings and comments are typography, not typos
     "RUF001", "RUF002", "RUF003",
+    # function-local constants (regex tables, sentinels, the Windows CREATE_NO_WINDOW flag,
+    # test shorthands like `P = Producer`) are named like constants on purpose
+    "N806",
     # complexity family: M033-S04 gates function LENGTH with a committed AST test
     # (tests/test_function_length.py); complexity thresholds are revisited at the S04 close
     "C901", "PLR0911", "PLR0912", "PLR0913", "PLR0915", "PLR0917",
@@ -82,6 +85,8 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 # re-exports are the package API
 "**/__init__.py" = ["F401"]
+# test fakes declare class-level dicts / lists as fixture data; no instance shares them
+"tests/**" = ["RUF012"]
 # code before imports (sys.path bootstraps, in-file setup) — M033-S02 removes the bootstrap,
 # S01-T04 takes what is left; until then the six files that trip E402 are listed, not the rule
 "scripts/flush.py" = ["E402"]

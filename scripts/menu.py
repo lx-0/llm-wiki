@@ -18,6 +18,7 @@ loop iterations reuse the already-imported module.
 
 from __future__ import annotations
 
+import contextlib
 import os
 import re
 import subprocess
@@ -373,7 +374,7 @@ def dispatch_subprocess(args: list[str]) -> int:
     if not WIKI_BIN.exists():
         print(f"wiki binary not found at {WIKI_BIN}", file=sys.stderr)
         return 1
-    return subprocess.run([str(WIKI_BIN), *args]).returncode
+    return subprocess.run([str(WIKI_BIN), *args], check=False).returncode
 
 
 def render_dispatch(dispatch: object, arg_prompt: Callable[[str], str | None]) -> None:
@@ -861,7 +862,7 @@ def main() -> int:
     if not sys.stdin.isatty() or not sys.stdout.isatty():
         # Non-TTY callers — defer to `wiki help`. Same posture as the
         # bash entry-point's TTY check.
-        subprocess.run([str(WIKI_BIN), "help"])
+        subprocess.run([str(WIKI_BIN), "help"], check=False)
         return 0
 
     state = HomeState()
@@ -903,7 +904,7 @@ def main() -> int:
                 _pause()
             elif tag == "help":
                 print()
-                subprocess.run([str(WIKI_BIN), "help"])
+                subprocess.run([str(WIKI_BIN), "help"], check=False)
                 _pause()
             elif tag == "filter":
                 pt = _import_pt()
@@ -918,10 +919,8 @@ def main() -> int:
 
 
 def _pause() -> None:
-    try:
+    with contextlib.suppress(EOFError, KeyboardInterrupt):
         input("\nPress Enter to continue ")
-    except (EOFError, KeyboardInterrupt):
-        pass
 
 
 if __name__ == "__main__":

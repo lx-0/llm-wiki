@@ -308,7 +308,7 @@ def _delete_vault(tmp_path, monkeypatch):
 
 
 def test_execute_deletes_moves_to_trash_when_allowed(tmp_path, monkeypatch) -> None:
-    mod, vault, knowledge, doomed, index = _delete_vault(tmp_path, monkeypatch)
+    mod, vault, _knowledge, doomed, index = _delete_vault(tmp_path, monkeypatch)
     actions = {
         "superseded": [],
         "edited": [],
@@ -329,7 +329,7 @@ def test_execute_deletes_moves_to_trash_when_allowed(tmp_path, monkeypatch) -> N
 
 
 def test_execute_deletes_noop_when_gate_off(tmp_path, monkeypatch) -> None:
-    mod, vault, knowledge, doomed, index = _delete_vault(tmp_path, monkeypatch)
+    mod, vault, _knowledge, doomed, _index = _delete_vault(tmp_path, monkeypatch)
     actions = {
         "superseded": [],
         "edited": [],
@@ -345,7 +345,7 @@ def test_execute_deletes_noop_when_gate_off(tmp_path, monkeypatch) -> None:
 
 
 def test_execute_deletes_skips_outside_knowledge(tmp_path, monkeypatch) -> None:
-    mod, vault, knowledge, doomed, index = _delete_vault(tmp_path, monkeypatch)
+    mod, vault, _knowledge, _doomed, _index = _delete_vault(tmp_path, monkeypatch)
     actions = {"superseded": [], "edited": [], "renamed": [], "deleted": ["raw/notes/x.md"]}
 
     executed = mod._execute_deletes(actions, vault, allowed=True)
@@ -505,7 +505,7 @@ def test_apply_refuses_deletion_on_unsafe_tree(tmp_path, monkeypatch) -> None:
     assert rc == 3  # refused
     assert called["spawned"] is False  # no paid agent run
     # …but --force bypasses the guard (will spawn; we only assert it gets past the gate)
-    rc2 = asyncio.run(correct_apply.apply("f", dry_run=False, allow_delete=True, force=True))
+    asyncio.run(correct_apply.apply("f", dry_run=False, allow_delete=True, force=True))
     assert called["spawned"] is True
 
 

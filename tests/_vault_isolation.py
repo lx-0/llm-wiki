@@ -47,7 +47,7 @@ _WIKI_PREFIX = f"{WIKI_DIR}{os.sep}"
 _WRITE_MODE_CHARS = frozenset("wxa+")
 
 
-class VaultWriteEscape(RuntimeError):
+class VaultWriteEscape(RuntimeError):  # noqa: N818  an escape, not an error — the name is the sentence the failure prints
     """A test wrote outside the checkout, into the inferred vault root."""
 
 

@@ -108,7 +108,7 @@ def patched_backend(monkeypatch, tmp_path, sample_messages):
     monkeypatch.setattr(backend, "ROOT_DIR", tmp_path)
 
     class _CONFIG:
-        class personal:
+        class personal:  # noqa: N801  mirrors the CONFIG.personal attribute it fakes
             primary_account = "testacct"
             accounts = {"testacct": fake_account}
 
@@ -213,7 +213,7 @@ def test_process_request_idempotent_when_already_done(patched_backend, request_p
 def test_process_request_missing_account_in_config(patched_backend, request_path, monkeypatch):
     # Strip the account from CONFIG.personal.accounts
     class _EmptyCONFIG:
-        class personal:
+        class personal:  # noqa: N801  mirrors the CONFIG.personal attribute it fakes
             primary_account = "testacct"
             accounts = {}
 

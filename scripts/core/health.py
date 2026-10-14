@@ -146,7 +146,7 @@ def check_hooks_installed() -> CheckResult:
         installed_project: list[str] = []
         stale_env_agents: list[str] = []
         for agent_dir, filename in agent_files:
-            for scope, root, target in (
+            for _scope, root, target in (
                 ("user", Path.home(), installed_user),
                 ("project", ROOT_DIR, installed_project),
             ):
@@ -428,6 +428,7 @@ def check_template_drift(*, quick: bool = False) -> CheckResult:
             stderr=subprocess.DEVNULL,
             timeout=5,
             text=True,
+            check=False,
         )
         drifted = [
             line.split(maxsplit=1)[1].split(" ", 1)[0]
@@ -480,10 +481,10 @@ def check_engine_update_available(*, quick: bool = False) -> CheckResult:
             )
         ups = subprocess.run(
             ["git", "-C", str(WIKI_DIR), "rev-parse", "--abbrev-ref", "@{u}"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            capture_output=True,
             timeout=2,
             text=True,
+            check=False,
         )
         if ups.returncode != 0:
             return CheckResult(
@@ -499,6 +500,7 @@ def check_engine_update_available(*, quick: bool = False) -> CheckResult:
             stderr=subprocess.PIPE,
             timeout=8,
             text=True,
+            check=False,
         )
         if fetch.returncode != 0:
             return CheckResult(
@@ -513,6 +515,7 @@ def check_engine_update_available(*, quick: bool = False) -> CheckResult:
             stderr=subprocess.DEVNULL,
             timeout=2,
             text=True,
+            check=False,
         )
         n = int((count.stdout or "0").strip() or "0")
         if n == 0:
@@ -528,6 +531,7 @@ def check_engine_update_available(*, quick: bool = False) -> CheckResult:
             stderr=subprocess.DEVNULL,
             timeout=2,
             text=True,
+            check=False,
         )
         head = (latest.stdout or "").strip()[:80]
         msg = f"{n} engine commit{'s' if n != 1 else ''} behind {upstream}"
@@ -1000,6 +1004,7 @@ def _failed_imports(names: list[str]) -> list[tuple[str, str]]:
             capture_output=True,
             text=True,
             timeout=120,
+            check=False,
         )
     except (subprocess.TimeoutExpired, OSError) as exc:
         return [("(probe)", f"{type(exc).__name__}: {exc}")]
@@ -1692,10 +1697,7 @@ def build_health(*, quick: bool = False) -> list[CheckResult]:
             # Pass quick=True only to checks that accept it (introspect signature).
             from inspect import signature
 
-            if "quick" in signature(fn).parameters:
-                produced = fn(quick=quick)
-            else:
-                produced = fn()
+            produced = fn(quick=quick) if "quick" in signature(fn).parameters else fn()
             if isinstance(produced, list):
                 results.extend(produced)
             else:

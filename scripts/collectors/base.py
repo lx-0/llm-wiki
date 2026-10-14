@@ -18,7 +18,7 @@ import shutil
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, ClassVar, Generic, Protocol, TypeVar, runtime_checkable
+from typing import Any, ClassVar, Protocol, TypeVar, runtime_checkable
 
 _log = logging.getLogger(__name__)
 
@@ -182,7 +182,7 @@ def _account_id_attr(acct: Any) -> str:
     return acct.account_id
 
 
-def resolve_accounts(
+def resolve_accounts[A](
     accounts: dict[str, Any],
     kind: str,
     build: Callable[[str, dict[str, Any]], A],
@@ -222,7 +222,7 @@ def resolve_accounts(
     return out
 
 
-def filter_accounts(
+def filter_accounts[A](
     accounts: Sequence[A],
     account_id: str | None,
     *,
@@ -301,7 +301,7 @@ class Watermark:
 
 
 @dataclass
-class AccountLoopOutcome(Generic[P]):
+class AccountLoopOutcome[P]:
     """Aggregate of one account-loop run — payload-generic.
 
     ``payloads`` are the per-account scan results (files+skipped for
@@ -318,7 +318,7 @@ class AccountLoopOutcome(Generic[P]):
     error_ids: list[str]
 
 
-def run_account_loop(
+def run_account_loop[A, P](
     accounts: Sequence[A],
     scan_one: Callable[[A], tuple[str, P, bool]],
     *,

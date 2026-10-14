@@ -137,7 +137,7 @@ def warn_unreachable_once(log, context: str = "") -> None:
     'the GPU box is down', which one line conveys; the per-file repetition is
     noise. Process-scoped: a fresh compile/producer process re-warns once.
     """
-    global _UNREACHABLE_WARNED
+    global _UNREACHABLE_WARNED  # noqa: PLW0603  process-scoped warn-once flag, by design
     prefix = f"{context}: " if context else ""
     msg = f"{prefix}Ollama not reachable at {_base_url()} — skipping"
     if _UNREACHABLE_WARNED:

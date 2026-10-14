@@ -247,7 +247,7 @@ def _iter_metadata(
         log.warning("ThunderbirdMboxReader: cannot open %s: %s", path, e)
         return
 
-    for key in mbox.keys():
+    for key in mbox.keys():  # noqa: SIM118  mailbox.Mailbox iterates MESSAGES; .keys() iterates keys
         try:
             msg = mbox[key]
         except Exception:
@@ -295,7 +295,7 @@ def _iter_deep(
         log.warning("ThunderbirdMboxReader: cannot open %s: %s", path, e)
         return
 
-    for key in mbox.keys():
+    for key in mbox.keys():  # noqa: SIM118  mailbox.Mailbox iterates MESSAGES; .keys() iterates keys
         try:
             msg = mbox[key]
         except Exception:

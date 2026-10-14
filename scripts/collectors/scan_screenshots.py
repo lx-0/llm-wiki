@@ -105,6 +105,7 @@ def resize_image(path: Path) -> Path:
     subprocess.run(
         ["sips", "--resampleWidth", str(RESIZE_WIDTH), str(path), "--out", str(tmp)],
         capture_output=True,
+        check=False,
     )
     return tmp
 
@@ -208,6 +209,7 @@ def make_thumbnail(src: Path) -> Path | None:
             ["sips", "--resampleWidth", str(THUMB_WIDTH), str(src), "--out", str(dst)],
             capture_output=True,
             text=True,
+            check=False,
         )
         if proc.returncode != 0:
             log.warning("  thumbnail failed (%d): %s", proc.returncode, proc.stderr.strip()[:200])
@@ -541,7 +543,7 @@ def retrofit_batch_reports(dry_run: bool = False) -> None:
     for report in reports:
         text = report.read_text(encoding="utf-8")
 
-        def repl(m: re.Match) -> str:
+        def repl(m: re.Match, text: str = text) -> str:
             head = m.group(0)
             fname = m.group(2)
             embed = f"![[thumb/{fname}]]"

@@ -308,7 +308,7 @@ def test_merge_by_day_yields_summary_for_each_day_in_any_source() -> None:
     assert may_12.sleep_hours is None
 
 
-def test_merge_by_day_skips_days_with_only_None_metrics() -> None:
+def test_merge_by_day_skips_days_with_only_none_metrics() -> None:
     sleep = {"2026-05-14": {"sleep_score": None}}
     sessions = {"2026-05-14": {"sleep_hours": None, "hrv_overnight": None, "resting_hr": None}}
     readiness = {"2026-05-14": {"readiness_score": None}}

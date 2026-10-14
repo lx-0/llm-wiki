@@ -464,7 +464,7 @@ def test_flush_pipeline_reads_only_the_tail(fake_vault, monkeypatch):
     old_noise = [f"{_ts(90000)}  INFO  noise line {i}" for i in range(200)]
     _write_flush_logs(
         fake_vault,
-        flush_lines=old_noise + [f"{_ts(60)}  INFO  Appended to /v/daily/x/sessions.md"],
+        flush_lines=[*old_noise, f"{_ts(60)}  INFO  Appended to /v/daily/x/sessions.md"],
         error_lines=[],
     )
     result = health.check_flush_pipeline()

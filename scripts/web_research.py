@@ -94,9 +94,7 @@ def is_opted_in(fm: dict) -> bool:
     tags = fm.get("tags")
     if isinstance(tags, str):
         tags = [tags]
-    if isinstance(tags, list) and PUBLIC_PERSON_TAG in tags:
-        return True
-    return False
+    return bool(isinstance(tags, list) and PUBLIC_PERSON_TAG in tags)
 
 
 def _entity_title(fm: dict, slug: str) -> str:

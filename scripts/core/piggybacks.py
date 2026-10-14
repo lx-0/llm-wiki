@@ -261,7 +261,7 @@ def run_due_piggybacks(
             log.warning("Piggyback %s: script not found: %s", name, script)
             continue
 
-        cmd = [sys.executable, str(script)] + task["cmd"][1:]
+        cmd = [sys.executable, str(script), *task["cmd"][1:]]
         wrapped = [sys.executable, str(runner), name, str(timeout_s), "--", *cmd]
         log.info("Piggyback %s: spawning %s (cap %ds)", name, " ".join(task["cmd"]), timeout_s)
 

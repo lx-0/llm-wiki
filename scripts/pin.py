@@ -104,7 +104,7 @@ def _lookup_summary(wikilink_basename: str) -> str:
 
 
 def _existing_sections(moc_text: str) -> list[str]:
-    return [l[3:].strip() for l in moc_text.splitlines() if l.startswith("## ")]
+    return [line[3:].strip() for line in moc_text.splitlines() if line.startswith("## ")]
 
 
 def _pick_section(sections: list[str]) -> str:
@@ -164,8 +164,8 @@ def _insert_pin(moc_path: Path, section: str, line: str) -> tuple[bool, str]:
     else:
         # Find first dataview block to insert before; else append to EOF.
         dv_start = len(lines)
-        for j, l in enumerate(lines):
-            stripped = l.strip()
+        for j, entry in enumerate(lines):
+            stripped = entry.strip()
             if stripped.startswith("```dataview") or stripped.startswith("```dataviewjs"):
                 dv_start = j
                 break

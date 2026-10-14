@@ -74,7 +74,7 @@ class Cutoffs:
         sorted_bands = sorted(self.bands, key=lambda b: b.min)
         if list(sorted_bands) != list(self.bands):
             raise ValueError("Cutoffs must be declared in ascending order by `min`")
-        for prev, nxt in zip(self.bands, self.bands[1:]):
+        for prev, nxt in zip(self.bands, self.bands[1:], strict=False):
             expected_next_min = prev.max + 1
             if nxt.min != expected_next_min:
                 raise ValueError(

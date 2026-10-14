@@ -244,9 +244,8 @@ class TestRunDirectory:
         # Pre-create the final dir to provoke collision.
         runs.mkdir()
         (runs / "2026-05-17T17-00-00").mkdir()
-        with pytest.raises(FileExistsError):
-            with RunDirectory(runs, "2026-05-17T17-00-00") as rd:
-                rd.write("_summary.md", "x")
+        with pytest.raises(FileExistsError), RunDirectory(runs, "2026-05-17T17-00-00") as rd:
+            rd.write("_summary.md", "x")
 
     def test_stale_tmp_cleaned_on_enter(self, tmp_path: Path) -> None:
         runs = tmp_path / "runs"

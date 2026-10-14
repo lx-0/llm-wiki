@@ -43,7 +43,7 @@ def captured_options(monkeypatch):
 
     seen: dict = {}
 
-    class _Sentinel(Exception):
+    class _Sentinel(Exception):  # noqa: N818  control-flow sentinel, not an error
         pass
 
     class _FakeOptions:

@@ -37,6 +37,8 @@ from pathlib import Path
 # with arbitrary CWD), mirroring the engine's other entrypoints.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+import contextlib
+
 from core.paths import STATE_DIR
 from core.state_store import locked
 from core.utils import save_json_state
@@ -107,10 +109,8 @@ def _terminate(proc: subprocess.Popen) -> None:
     except OSError:
         pass  # EPERM / ESRCH — fall through to the direct-child kill below
     if proc.poll() is None:
-        try:
+        with contextlib.suppress(OSError):
             proc.kill()
-        except OSError:
-            pass
 
 
 def run_piggyback(
@@ -192,10 +192,8 @@ def run_piggyback(
         rc = proc.wait(timeout=wait_timeout)
     except subprocess.TimeoutExpired:
         _terminate(proc)
-        try:
+        with contextlib.suppress(subprocess.TimeoutExpired):
             proc.wait(timeout=10)
-        except subprocess.TimeoutExpired:
-            pass
         record_status(
             name,
             {

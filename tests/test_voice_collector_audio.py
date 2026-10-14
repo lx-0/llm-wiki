@@ -86,7 +86,7 @@ def _make_mock_run(transcript: str):
 
 
 def test_scan_inbox_includes_audio_files(voice_env):
-    voice_mod, coll, inbox, raw_voice = voice_env
+    voice_mod, _coll, inbox, _raw_voice = voice_env
     (inbox / "memo.m4a").write_bytes(b"fake-m4a")
     (inbox / "voice.wav").write_bytes(b"fake-wav")
     (inbox / "rec.mp3").write_bytes(b"fake-mp3")
@@ -121,7 +121,7 @@ def test_m4a_routes_through_ffmpeg_and_whisper(voice_env, monkeypatch):
 
 
 def test_mp3_skips_ffmpeg_native_whisper_format(voice_env, monkeypatch):
-    voice_mod, coll, inbox, raw_voice = voice_env
+    voice_mod, coll, inbox, _raw_voice = voice_env
     (inbox / "rec.mp3").write_bytes(b"fake-mp3")
 
     calls: list[list[str]] = []
@@ -167,7 +167,7 @@ def test_audio_transcript_runs_through_punctuate_when_enabled(voice_env, monkeyp
 
 
 def test_audio_with_empty_model_path_leaves_file_in_inbox(voice_env, monkeypatch):
-    voice_mod, coll, inbox, raw_voice = voice_env
+    _voice_mod, coll, inbox, raw_voice = voice_env
     (inbox / "memo.m4a").write_bytes(b"fake-m4a")
     from core.config import CONFIG
 
@@ -183,7 +183,7 @@ def test_audio_with_empty_model_path_leaves_file_in_inbox(voice_env, monkeypatch
 
 
 def test_audio_with_missing_model_file_leaves_file_in_inbox(voice_env, monkeypatch):
-    voice_mod, coll, inbox, raw_voice = voice_env
+    _voice_mod, coll, inbox, _raw_voice = voice_env
     (inbox / "memo.m4a").write_bytes(b"fake-m4a")
     from core.config import CONFIG
 
@@ -196,7 +196,7 @@ def test_audio_with_missing_model_file_leaves_file_in_inbox(voice_env, monkeypat
 
 
 def test_audio_with_missing_whisper_binary_leaves_file_in_inbox(voice_env, monkeypatch):
-    voice_mod, coll, inbox, raw_voice = voice_env
+    voice_mod, coll, inbox, _raw_voice = voice_env
     (inbox / "memo.m4a").write_bytes(b"fake-m4a")
     from core.config import CONFIG
 
@@ -211,7 +211,7 @@ def test_audio_with_missing_whisper_binary_leaves_file_in_inbox(voice_env, monke
 
 
 def test_audio_with_whisper_subprocess_error_leaves_file_in_inbox(voice_env, monkeypatch):
-    voice_mod, coll, inbox, raw_voice = voice_env
+    voice_mod, coll, inbox, _raw_voice = voice_env
     (inbox / "memo.m4a").write_bytes(b"fake-m4a")
 
     def fake_run(argv, **kwargs):
@@ -232,7 +232,7 @@ def test_audio_with_whisper_subprocess_error_leaves_file_in_inbox(voice_env, mon
 
 
 def test_audio_with_ffmpeg_error_leaves_m4a_in_inbox(voice_env, monkeypatch):
-    voice_mod, coll, inbox, raw_voice = voice_env
+    voice_mod, coll, inbox, _raw_voice = voice_env
     (inbox / "memo.m4a").write_bytes(b"fake-m4a")
 
     def fake_run(argv, **kwargs):
@@ -253,7 +253,7 @@ def test_audio_with_ffmpeg_error_leaves_m4a_in_inbox(voice_env, monkeypatch):
 
 
 def test_audio_with_empty_whisper_stdout_leaves_file_in_inbox(voice_env, monkeypatch):
-    voice_mod, coll, inbox, raw_voice = voice_env
+    voice_mod, coll, inbox, _raw_voice = voice_env
     (inbox / "memo.m4a").write_bytes(b"fake-m4a")
     monkeypatch.setattr(voice_mod.subprocess, "run", _make_mock_run(""))
 

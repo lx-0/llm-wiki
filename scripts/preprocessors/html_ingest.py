@@ -263,6 +263,7 @@ def ingest(source: str, mode: str, model: str, compile: bool) -> Path | None:
         subprocess.run(
             [sys.executable, str(compile_script)],
             cwd=str(WIKI_DIR),
+            check=False,
         )
 
     return output_path

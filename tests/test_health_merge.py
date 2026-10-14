@@ -115,8 +115,8 @@ def test_frontmatter_key_order_is_stable(tmp_path):
     agg = _agg(weight_kg=75.5, steps_total=8000, body_fat_pct=18.0, workouts=[{"type": "Walking"}])
     _merge_healthkit_into_path(target, agg, account_id="default")
     text = target.read_text(encoding="utf-8")
-    lines = [l for l in text.split("\n") if ":" in l and not l.startswith(" ")]
-    keys = [l.split(":", 1)[0] for l in lines]
+    lines = [line for line in text.split("\n") if ":" in line and not line.startswith(" ")]
+    keys = [line.split(":", 1)[0] for line in lines]
     # title precedes type; sources precedes any metric; HealthKit keys grouped
     assert keys.index("title") < keys.index("type")
     assert keys.index("sources") < keys.index("weight_kg")
