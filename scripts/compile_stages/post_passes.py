@@ -72,5 +72,8 @@ def _log_summary(results: list[ProducerResult]) -> None:
     breakdown = " ".join(parts)
     log.info(
         "  post-pass: %d ok · %d skipped · %d failed — %s",
-        ok, skipped, failed, breakdown,
+        ok,
+        skipped,
+        failed,
+        breakdown,
     )

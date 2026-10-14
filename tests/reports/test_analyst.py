@@ -75,9 +75,7 @@ class TestRunDirHelpers:
         assert latest.name == "2026-05-17T10-00-00"
 
     def test_latest_skips_tmp_dirs(self, tmp_path: Path) -> None:
-        study = _build_study_dir(
-            tmp_path, [{"timestamp": "2026-05-17T10-00-00"}]
-        )
+        study = _build_study_dir(tmp_path, [{"timestamp": "2026-05-17T10-00-00"}])
         # Plant a stale tmp dir
         (study.runs_dir / ".2026-05-18T10-00-00.tmp").mkdir()
         latest = latest_run_dir(study)
@@ -104,9 +102,7 @@ class TestRunDirHelpers:
         assert prev.name == "2026-05-15T10-00-00"
 
     def test_previous_none_on_single_run(self, tmp_path: Path) -> None:
-        study = _build_study_dir(
-            tmp_path, [{"timestamp": "2026-05-17T10-00-00"}]
-        )
+        study = _build_study_dir(tmp_path, [{"timestamp": "2026-05-17T10-00-00"}])
         latest = latest_run_dir(study)
         assert latest is not None
         assert previous_run_dir(study, latest) is None
@@ -116,14 +112,16 @@ class TestPass1Prompt:
     def test_inlines_manifest_summary_and_instruments(self, tmp_path: Path) -> None:
         study = _build_study_dir(
             tmp_path,
-            [{
-                "timestamp": "2026-05-17T10-00-00",
-                "summary": "# summary content\nfoo bar baz\n",
-                "instruments": {
-                    "phq-9": "# phq-9 report\nQ3 sleep evidence ...\n",
-                    "gad-7": "# gad-7 report\nQ1 nervous ...\n",
-                },
-            }],
+            [
+                {
+                    "timestamp": "2026-05-17T10-00-00",
+                    "summary": "# summary content\nfoo bar baz\n",
+                    "instruments": {
+                        "phq-9": "# phq-9 report\nQ3 sleep evidence ...\n",
+                        "gad-7": "# gad-7 report\nQ1 nervous ...\n",
+                    },
+                }
+            ],
         )
         run_dir = latest_run_dir(study)
         prompt = build_pass1_user_prompt(study, run_dir)  # type: ignore[arg-type]
@@ -161,11 +159,13 @@ class TestPass1Prompt:
     def test_no_previous_section_on_single_run(self, tmp_path: Path) -> None:
         study = _build_study_dir(
             tmp_path,
-            [{
-                "timestamp": "2026-05-17T10-00-00",
-                "summary": "# summary\n",
-                "instruments": {"phq-9": "# phq-9\n"},
-            }],
+            [
+                {
+                    "timestamp": "2026-05-17T10-00-00",
+                    "summary": "# summary\n",
+                    "instruments": {"phq-9": "# phq-9\n"},
+                }
+            ],
         )
         run_dir = latest_run_dir(study)
         prompt = build_pass1_user_prompt(study, run_dir)  # type: ignore[arg-type]
@@ -176,11 +176,13 @@ class TestPass2Prompt:
     def test_n1_acknowledges_single_study(self, tmp_path: Path) -> None:
         study = _build_study_dir(
             tmp_path,
-            [{
-                "timestamp": "2026-05-17T10-00-00",
-                "summary": "# sum\n",
-                "instruments": {"phq-9": "# phq-9\n"},
-            }],
+            [
+                {
+                    "timestamp": "2026-05-17T10-00-00",
+                    "summary": "# sum\n",
+                    "instruments": {"phq-9": "# phq-9\n"},
+                }
+            ],
         )
         latest = latest_run_dir(study)
         summary = latest / "_summary.md"  # type: ignore[union-attr]
@@ -198,24 +200,26 @@ class TestPass2Prompt:
         # Build two synthetic studies
         s1 = _build_study_dir(
             tmp_path / "s1-dir",
-            [{
-                "timestamp": "2026-05-17T10-00-00",
-                "summary": "# clinical sum\n",
-                "instruments": {"phq-9": "# phq-9\n"},
-            }],
+            [
+                {
+                    "timestamp": "2026-05-17T10-00-00",
+                    "summary": "# clinical sum\n",
+                    "instruments": {"phq-9": "# phq-9\n"},
+                }
+            ],
         )
         s2 = _build_study_dir(
             tmp_path / "s2-dir",
-            [{
-                "timestamp": "2026-05-17T10-00-00",
-                "summary": "# personality sum\n",
-                "instruments": {"ipip-neo": "# ipip-neo\n"},
-            }],
+            [
+                {
+                    "timestamp": "2026-05-17T10-00-00",
+                    "summary": "# personality sum\n",
+                    "instruments": {"ipip-neo": "# ipip-neo\n"},
+                }
+            ],
         )
         # rename manifests for distinctness
-        m2 = yaml.safe_load(
-            (s2.study_dir / "manifest.yaml").read_text(encoding="utf-8")
-        )
+        m2 = yaml.safe_load((s2.study_dir / "manifest.yaml").read_text(encoding="utf-8"))
         m2["study_id"] = "personality-deep-dive"
         (s2.study_dir / "manifest.yaml").write_text(
             yaml.safe_dump(m2, sort_keys=False), encoding="utf-8"
@@ -243,13 +247,11 @@ class TestPass2Prompt:
 
 class TestPersistence:
     def test_pass1_persist_writes_frontmatter_and_body(self, tmp_path: Path) -> None:
-        study = _build_study_dir(
-            tmp_path, [{"timestamp": "2026-05-17T10-00-00"}]
-        )
+        study = _build_study_dir(tmp_path, [{"timestamp": "2026-05-17T10-00-00"}])
         run_dir = latest_run_dir(study)
         result = AnalystResult(
             markdown_body="# Analysis — test-baseline @ 2026-05-17T10-00-00\n\n"
-                          "Body line 1\nBody line 2\n",
+            "Body line 1\nBody line 2\n",
             elapsed_ms=42_000,
             model_id="claude-haiku-4-5",
             persona_version="abc123",
@@ -278,8 +280,7 @@ class TestPersistence:
     def test_pass2_persist_writes_to_analyses_dir(self, tmp_path: Path) -> None:
         # Explicit vault_root — analyses land under <vault>/<reports_dir>/analyses.
         result = AnalystResult(
-            markdown_body="# Cross-study analysis — 2026-05-17T11-00-00\n\n"
-                          "N=1; body.\n",
+            markdown_body="# Cross-study analysis — 2026-05-17T11-00-00\n\nN=1; body.\n",
             elapsed_ms=15_000,
             model_id="claude-haiku-4-5",
             persona_version="xx",

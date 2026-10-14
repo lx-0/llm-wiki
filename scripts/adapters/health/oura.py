@@ -211,9 +211,7 @@ def _merge_by_day(
 
     Returns results sorted by day ascending.
     """
-    all_days: set[str] = (
-        set(daily_sleep) | set(sleep_sessions) | set(readiness) | set(activity)
-    )
+    all_days: set[str] = set(daily_sleep) | set(sleep_sessions) | set(readiness) | set(activity)
     out: list[DailySummary] = []
     for day in sorted(all_days):
         ds = daily_sleep.get(day, {})
@@ -291,28 +289,23 @@ class OuraClient:
                 continue
             if 500 <= r.status_code < 600:
                 if attempt == 2:
-                    raise OuraAPIError(
-                        f"persistent {r.status_code} on {endpoint}: {r.text[:200]}"
-                    )
+                    raise OuraAPIError(f"persistent {r.status_code} on {endpoint}: {r.text[:200]}")
                 log.warning("oura %s: %d — retrying once in 5s", endpoint, r.status_code)
                 time.sleep(5)
                 continue
             if r.status_code != 200:
-                raise OuraAPIError(
-                    f"unexpected {r.status_code} on {endpoint}: {r.text[:200]}"
-                )
+                raise OuraAPIError(f"unexpected {r.status_code} on {endpoint}: {r.text[:200]}")
 
             try:
                 envelope = r.json()
             except ValueError as e:
                 raise OuraAPIError(f"non-JSON body on {endpoint}: {e}") from e
             if not isinstance(envelope, dict):
-                raise OuraAPIError(
-                    f"{endpoint} returned {type(envelope).__name__}, expected dict"
-                )
+                raise OuraAPIError(f"{endpoint} returned {type(envelope).__name__}, expected dict")
             if not self._logged_discovery:
-                log.debug("oura discovery: GET %s top-level keys=%s",
-                          endpoint, sorted(envelope.keys()))
+                log.debug(
+                    "oura discovery: GET %s top-level keys=%s", endpoint, sorted(envelope.keys())
+                )
                 self._logged_discovery = True
             return envelope
 

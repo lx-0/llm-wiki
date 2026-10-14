@@ -26,6 +26,7 @@ Usage:
 """
 
 import os
+
 os.environ.setdefault("CLAUDE_INVOKED_BY", "take")
 
 import argparse
@@ -67,6 +68,7 @@ def _take_path(slug: str) -> Path:
 # Read/write via the single core.frontmatter grammar (C03). `serialize`
 # normalizes the fence/body separator, which also fixes the old writer's
 # grow-one-blank-line-per-append round-trip.
+
 
 def _backup(path: Path) -> Path | None:
     return frontmatter.backup(path)
@@ -126,9 +128,7 @@ def _append_take(
 
     confidence = confidence.lower().strip()
     if confidence not in VALID_CONFIDENCE:
-        raise ValueError(
-            f"confidence must be one of {list(VALID_CONFIDENCE)}, got {confidence!r}"
-        )
+        raise ValueError(f"confidence must be one of {list(VALID_CONFIDENCE)}, got {confidence!r}")
 
     date = date or today_iso()
     line = _format_take_line(date, confidence, source.strip(), belief)
@@ -262,9 +262,7 @@ def cmd_remove(args: argparse.Namespace) -> int:
         log.info("removed entire takes file %s (backup at %s)", path, bak)
         return 0
     if args.line is None:
-        log.error(
-            "remove requires --line N (1-based) or --all. Use `show` to list lines."
-        )
+        log.error("remove requires --line N (1-based) or --all. Use `show` to list lines.")
         return 2
     takes = _parse_take_lines(body)
     if args.line < 1 or args.line > len(takes):

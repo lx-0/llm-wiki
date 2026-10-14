@@ -51,7 +51,9 @@ def _resolve_date(arg: str) -> str:
     try:
         return date.fromisoformat(arg).isoformat()
     except ValueError as exc:
-        raise SystemExit(f"daily-digest: invalid --date {arg!r} — expected ISO YYYY-MM-DD, 'today', or 'yesterday' ({exc})")
+        raise SystemExit(
+            f"daily-digest: invalid --date {arg!r} — expected ISO YYYY-MM-DD, 'today', or 'yesterday' ({exc})"
+        )
 
 
 def _inject_captures_section(text: str, section: str) -> str:
@@ -88,15 +90,21 @@ def _attach_captures_section(date_iso: str) -> None:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="Run the daily-digest agent for a given date.")
-    ap.add_argument("--date", default="yesterday",
-                    help="ISO date YYYY-MM-DD, or 'today' / 'yesterday'. Default: yesterday.")
+    ap.add_argument(
+        "--date",
+        default="yesterday",
+        help="ISO date YYYY-MM-DD, or 'today' / 'yesterday'. Default: yesterday.",
+    )
     args = ap.parse_args()
 
     target_date = _resolve_date(args.date)
     date_dir = DAILY_DIR / target_date
 
     if not date_dir.is_dir():
-        log.info("daily-digest: no captures at %s — skipping (no-op)", date_dir.relative_to(DAILY_DIR.parent))
+        log.info(
+            "daily-digest: no captures at %s — skipping (no-op)",
+            date_dir.relative_to(DAILY_DIR.parent),
+        )
         return 0
 
     captures = sorted(p.name for p in date_dir.glob("*.md"))
@@ -104,8 +112,12 @@ def main() -> int:
         log.info("daily-digest: %s/ exists but is empty — skipping", target_date)
         return 0
 
-    log.info("daily-digest: distilling %d capture(s) for %s (%s)",
-             len(captures), target_date, ", ".join(captures))
+    log.info(
+        "daily-digest: distilling %d capture(s) for %s (%s)",
+        len(captures),
+        target_date,
+        ", ".join(captures),
+    )
 
     wiki_bin = WIKI_DIR / "wiki"
     if not wiki_bin.is_file():

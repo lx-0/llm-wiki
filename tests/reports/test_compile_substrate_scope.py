@@ -54,9 +54,7 @@ def test_excluded_prefixes_have_trailing_slash() -> None:
     ],
 )
 def test_excluded_paths_blocked(rel_path: str) -> None:
-    assert is_compile_excluded_path(rel_path), (
-        f"{rel_path!r} should be blocked by the air-gap"
-    )
+    assert is_compile_excluded_path(rel_path), f"{rel_path!r} should be blocked by the air-gap"
 
 
 @pytest.mark.parametrize(
@@ -73,9 +71,7 @@ def test_excluded_paths_blocked(rel_path: str) -> None:
     ],
 )
 def test_allowed_paths_pass(rel_path: str) -> None:
-    assert not is_compile_excluded_path(rel_path), (
-        f"{rel_path!r} should pass the air-gap filter"
-    )
+    assert not is_compile_excluded_path(rel_path), f"{rel_path!r} should pass the air-gap filter"
 
 
 def test_handles_pathlib_input() -> None:
@@ -122,6 +118,7 @@ def test_list_raw_files_excludes_reports_at_vault_root(
     monkeypatch.setattr("scripts.core.utils.RAW_DIR", vault / "raw")
 
     from scripts.core.utils import list_raw_files
+
     listed = list_raw_files()
 
     resolved_listed = [p.resolve() for p in listed]
@@ -148,9 +145,5 @@ def test_compile_prompt_lists_reports_as_excluded() -> None:
     to `knowledge/`).
     """
     repo_root = Path(__file__).resolve().parents[2]
-    prompt = (repo_root / "prompts" / "compile_main_system.md").read_text(
-        encoding="utf-8"
-    )
-    assert "reports/**" in prompt, (
-        "compile_main_system.md must list reports/** in its SCOPE block"
-    )
+    prompt = (repo_root / "prompts" / "compile_main_system.md").read_text(encoding="utf-8")
+    assert "reports/**" in prompt, "compile_main_system.md must list reports/** in its SCOPE block"

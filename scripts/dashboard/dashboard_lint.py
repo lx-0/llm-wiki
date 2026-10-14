@@ -52,6 +52,7 @@ SECTIONS = (
 
 # -- Issue -> {link, detail} normalisation --------------------------
 
+
 def _issue_to_entry(issue) -> dict:
     """Normalise a lint Issue (dataclass / dict / tuple) to {link, detail}."""
     if isinstance(issue, dict):
@@ -65,6 +66,7 @@ def _issue_to_entry(issue) -> dict:
 
 # -- Counters --------------------------------------------------------
 
+
 def collect_failed_flushes() -> list[dict]:
     if not FAILED_DIR.exists():
         return []
@@ -75,7 +77,11 @@ def collect_failed_flushes() -> list[dict]:
         # First non-empty line as detail (cheap heuristic).
         try:
             first_line = next(
-                (line.strip() for line in p.read_text(encoding="utf-8").splitlines() if line.strip()),
+                (
+                    line.strip()
+                    for line in p.read_text(encoding="utf-8").splitlines()
+                    if line.strip()
+                ),
                 "",
             )
         except OSError:
@@ -106,6 +112,7 @@ def compute_lint_data(results: LintResults | None = None) -> dict:
 
 # -- Render ----------------------------------------------------------
 
+
 def _truncate(detail: str) -> str:
     if len(detail) <= DETAIL_TRUNCATE_AT:
         return detail
@@ -129,6 +136,7 @@ def render_body(data: dict) -> str:
 
 # -- Write -----------------------------------------------------------
 
+
 def write_dashboard_lint(data: dict, body: str) -> Path:
     fm_keys = (
         "orphans_count",
@@ -148,6 +156,7 @@ def write_dashboard_lint(data: dict, body: str) -> Path:
 
 # -- Main ------------------------------------------------------------
 
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dry-run", action="store_true", help="print without writing")
@@ -158,16 +167,22 @@ def main() -> int:
     # Standalone runs find a stale/absent cache and recompute.
     results = load_fresh_cache(max_age_s=CONFIG.limits.dashboard_refresh_timeout_s)
     if results is not None:
-        log.info("Using shared lint results from %s (computed by dashboard_stats)",
-                 results.generated_at)
+        log.info(
+            "Using shared lint results from %s (computed by dashboard_stats)", results.generated_at
+        )
     data = compute_lint_data(results)
     body = render_body(data)
 
     if args.dry_run:
-        meta = {k: data[k] for k in (
-            "orphans_count", "stale_count",
-            "failed_flushes_count", "last_updated_ts",
-        )}
+        meta = {
+            k: data[k]
+            for k in (
+                "orphans_count",
+                "stale_count",
+                "failed_flushes_count",
+                "last_updated_ts",
+            )
+        }
         print(json.dumps(meta, indent=2))
         print()
         print(body)

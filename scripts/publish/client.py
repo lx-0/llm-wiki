@@ -9,6 +9,7 @@ HTTP 401 with a JSON-RPC error body and OAuth resource metadata in
 Timeouts follow the house httpx pattern: explicit ``httpx.Timeout`` on every
 axis — a read timeout alone does not fire on half-open sockets.
 """
+
 from __future__ import annotations
 
 import itertools
@@ -83,8 +84,7 @@ class ContextMcpClient:
         self._protocol: str | None = None
         self._http = httpx.Client(
             headers={"Accept": "application/json, text/event-stream"},
-            timeout=timeout
-            or httpx.Timeout(connect=10.0, read=60.0, write=60.0, pool=10.0),
+            timeout=timeout or httpx.Timeout(connect=10.0, read=60.0, write=60.0, pool=10.0),
             transport=transport,
         )
 
@@ -131,10 +131,7 @@ class ContextMcpClient:
                     pass
                 error = body.get("error")
                 if error:
-                    message = (
-                        f"{method}: server error {error.get('code')}: "
-                        f"{error.get('message')}"
-                    )
+                    message = f"{method}: server error {error.get('code')}: {error.get('message')}"
                     if error.get("code") == -32001 or response.status_code == 401:
                         raise PublishAuthError(message)
                     # Other JSON-RPC errors (unknown tool, validation) are
@@ -142,9 +139,7 @@ class ContextMcpClient:
                     raise PublishClientError(message)
                 if response.status_code == 200:
                     if "result" not in body:
-                        raise PublishClientError(
-                            f"{method}: malformed response (no result)"
-                        )
+                        raise PublishClientError(f"{method}: malformed response (no result)")
                     return body["result"]
                 if response.status_code == 401:
                     raise PublishAuthError(f"{method}: HTTP 401 Unauthorized")

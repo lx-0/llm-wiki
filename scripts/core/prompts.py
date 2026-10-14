@@ -15,6 +15,7 @@ Conventions:
 
 Add a new prompt: drop a new .md in `prompts/`, call `render("name", ...)`.
 """
+
 from __future__ import annotations
 
 import re

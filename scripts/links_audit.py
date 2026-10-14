@@ -77,7 +77,9 @@ def _is_placeholder(target: str) -> bool:
     return base in {"foo", "bar", "baz", "slug", "xyz", "abc", "wikilink", "wikilinks"}
 
 
-def _suggest(target: str, slugs: list[str], by_base: dict[str, list[str]]) -> tuple[str | None, str | None]:
+def _suggest(
+    target: str, slugs: list[str], by_base: dict[str, list[str]]
+) -> tuple[str | None, str | None]:
     """Propose a correction for a dangling target. Returns (slug, tier)."""
     base = target.split("/")[-1].lower()
     # Tier 1 — exact basename in a different bucket (near-certain: wrong folder,
@@ -156,19 +158,25 @@ def apply_fixes(knowledge_dir: Path, vault: Path, corrections: dict[str, str]) -
 
 def _print_report(audit: Audit) -> None:
     n_dangling = sum(d.count for d in audit.dangling)
-    print(f"Broken links: {len(audit.embeds)} media · {len(audit.literals)} placeholders · "
-          f"{len(audit.dangling)} dangling refs ({n_dangling} occurrences)\n")
+    print(
+        f"Broken links: {len(audit.embeds)} media · {len(audit.literals)} placeholders · "
+        f"{len(audit.dangling)} dangling refs ({n_dangling} occurrences)\n"
+    )
 
     if audit.fixable:
         print(f"── Fixable dangling refs ({len(audit.fixable)}) — `wiki links --fix` to apply ──")
         for d in sorted(audit.fixable, key=lambda x: (x.tier != "bucket", -x.count)):
             mark = "≡" if d.tier == "bucket" else "~"
-            print(f"  {d.count:3d}x  [[{d.target}]]  {mark}→  [[{d.suggestion}]]   (e.g. {d.example})")
+            print(
+                f"  {d.count:3d}x  [[{d.target}]]  {mark}→  [[{d.suggestion}]]   (e.g. {d.example})"
+            )
         print()
 
     missing = [d for d in audit.dangling if not d.suggestion]
     if missing:
-        print(f"── Missing articles ({len(missing)}) — create via compile/dream, or drop the link ──")
+        print(
+            f"── Missing articles ({len(missing)}) — create via compile/dream, or drop the link ──"
+        )
         for d in sorted(missing, key=lambda x: -x.count):
             print(f"  {d.count:3d}x  [[{d.target}]]   (e.g. {d.example})")
         print()
@@ -201,27 +209,39 @@ def _run_fixer(knowledge_dir: Path, vault: Path, audit: Audit, assume_yes: bool)
             print("No bucket-tier corrections to auto-apply. Run interactively for fuzzy matches.")
             return
         stats = apply_fixes(knowledge_dir, vault, approved)
-        print(f"Applied {len(approved)} bucket-tier correction(s): {stats['links']} link(s) "
-              f"rewritten across {stats['files']} file(s).")
+        print(
+            f"Applied {len(approved)} bucket-tier correction(s): {stats['links']} link(s) "
+            f"rewritten across {stats['files']} file(s)."
+        )
         if skipped:
-            print(f"Skipped {len(skipped)} fuzzy match(es) — run `wiki links --fix` interactively to review.")
+            print(
+                f"Skipped {len(skipped)} fuzzy match(es) — run `wiki links --fix` interactively to review."
+            )
         return
 
     if not sys.stdin.isatty():
-        print("--fix needs a TTY for per-item approval (or pass --yes for bucket-tier only). Aborting.",
-              file=sys.stderr)
+        print(
+            "--fix needs a TTY for per-item approval (or pass --yes for bucket-tier only). Aborting.",
+            file=sys.stderr,
+        )
         sys.exit(2)
 
     approved: dict[str, str] = {}
     apply_all = False
-    print(f"{len(fixable)} fixable links. [y]es / [n]o / [a]ll / [q]uit\n"
-          "  ≡ = exact basename, different bucket (near-certain)   ~ = close string match\n")
+    print(
+        f"{len(fixable)} fixable links. [y]es / [n]o / [a]ll / [q]uit\n"
+        "  ≡ = exact basename, different bucket (near-certain)   ~ = close string match\n"
+    )
     for d in fixable:
         mark = "≡" if d.tier == "bucket" else "~"
         if apply_all:
             approved[d.target] = d.suggestion
             continue
-        ans = input(f"  {d.count:3d}x  [[{d.target}]]  {mark}→  [[{d.suggestion}]]  ? [y/n/a/q] ").strip().lower()
+        ans = (
+            input(f"  {d.count:3d}x  [[{d.target}]]  {mark}→  [[{d.suggestion}]]  ? [y/n/a/q] ")
+            .strip()
+            .lower()
+        )
         if ans == "q":
             break
         if ans == "a":
@@ -234,14 +254,22 @@ def _run_fixer(knowledge_dir: Path, vault: Path, audit: Audit, assume_yes: bool)
         print("\nNothing approved.")
         return
     stats = apply_fixes(knowledge_dir, vault, approved)
-    print(f"\nApplied {len(approved)} correction(s): {stats['links']} link(s) rewritten "
-          f"across {stats['files']} file(s).")
+    print(
+        f"\nApplied {len(approved)} correction(s): {stats['links']} link(s) rewritten "
+        f"across {stats['files']} file(s)."
+    )
 
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="Analyze (and optionally fix) broken wikilinks.")
-    ap.add_argument("--fix", action="store_true", help="Interactively rewrite high-confidence dangling refs")
-    ap.add_argument("--yes", action="store_true", help="With --fix: apply all high-confidence corrections (no prompt)")
+    ap.add_argument(
+        "--fix", action="store_true", help="Interactively rewrite high-confidence dangling refs"
+    )
+    ap.add_argument(
+        "--yes",
+        action="store_true",
+        help="With --fix: apply all high-confidence corrections (no prompt)",
+    )
     args = ap.parse_args()
 
     if not KNOWLEDGE_DIR.is_dir():

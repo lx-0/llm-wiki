@@ -16,6 +16,7 @@ corpus deterministically — same family as the relativize and backlinks passes:
   (frontmatter stripped, links collapsed to text, pipes escaped), source =
   first frontmatter ``sources`` entry (else an em dash), date = today
 """
+
 from __future__ import annotations
 
 import re
@@ -99,9 +100,7 @@ def sync_index(knowledge_dir: Path, vault: Path, *, today: str, apply: bool = Tr
     lines = original.split("\n")
     knowledge_root = knowledge_dir
 
-    corpus = {
-        p.relative_to(knowledge_dir).as_posix(): p for p in iter_articles(knowledge_dir)
-    }
+    corpus = {p.relative_to(knowledge_dir).as_posix(): p for p in iter_articles(knowledge_dir)}
 
     # First sweep: find each target's LAST row occurrence.
     last_occurrence: dict[str, int] = {}

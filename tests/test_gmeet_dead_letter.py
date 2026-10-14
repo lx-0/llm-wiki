@@ -4,6 +4,7 @@ Un-exportable Drive doc-ids (access revoked / deleted) were re-attempted on
 every run — 8 warning blocks in 30 days for the same ids, one id failing
 across runs with no skip. Negative cache per account with bounded re-probe.
 """
+
 from __future__ import annotations
 
 from collectors.gmeet import _dead_letter_skip, _record_export_failure
@@ -36,10 +37,18 @@ def test_reprobe_after_cadence_allows_retry() -> None:
         _record_export_failure(dead, "doc1", "404", now="2026-08-01T10:00:00+02:00")
     # within the 7-day window → skip; after it → re-probe (a re-granted doc
     # must eventually import again)
-    assert _dead_letter_skip(dead["doc1"], now="2026-08-05T10:00:00+02:00",
-                             max_attempts=3, reprobe_days=7) is True
-    assert _dead_letter_skip(dead["doc1"], now="2026-08-26T10:00:00+02:00",
-                             max_attempts=3, reprobe_days=7) is False
+    assert (
+        _dead_letter_skip(
+            dead["doc1"], now="2026-08-05T10:00:00+02:00", max_attempts=3, reprobe_days=7
+        )
+        is True
+    )
+    assert (
+        _dead_letter_skip(
+            dead["doc1"], now="2026-08-26T10:00:00+02:00", max_attempts=3, reprobe_days=7
+        )
+        is False
+    )
 
 
 def test_none_entry_never_skips() -> None:

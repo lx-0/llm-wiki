@@ -142,7 +142,11 @@ async def run(*, apply: bool, limit: int | None) -> int:
     n_files = sum(len(v) for v in by_slug.values())
     log.info(
         "%d fact(s) violated across %d concept file(s). mode=%s gates: <=%d files/fact, <=%d facts/run",
-        total_facts, n_files, "DRY-RUN" if dry_run else "APPLY", max_files, max_facts,
+        total_facts,
+        n_files,
+        "DRY-RUN" if dry_run else "APPLY",
+        max_files,
+        max_facts,
     )
 
     results: list[ReconcileResult] = []
@@ -152,8 +156,12 @@ async def run(*, apply: bool, limit: int | None) -> int:
             log.info("  reached %d facts this run — stopping sweep.", max_facts)
             break
         if len(files) > max_files:
-            log.info("  %s: %d files > max_files_per_fact (%d) — skipping (too broad, manual review)",
-                     slug, len(files), max_files)
+            log.info(
+                "  %s: %d files > max_files_per_fact (%d) — skipping (too broad, manual review)",
+                slug,
+                len(files),
+                max_files,
+            )
             continue
         if _within_cooldown(slug, cooldown_days=cooldown_days):
             log.info("  %s: within cooldown (%dd) — skipping", slug, cooldown_days)
@@ -169,26 +177,36 @@ async def run(*, apply: bool, limit: int | None) -> int:
     failed = [r for r in results if r.status == "failed"]
     log.info(
         "reconcile done: %d ok · %d skipped/dry · %d failed",
-        len(ok), len(skipped), len(failed),
+        len(ok),
+        len(skipped),
+        len(failed),
     )
     log.info("  %s", LEDGER.summary_line())
 
     if apply and ok:
-        _append_log_summary([
-            f"- Facts auto-reconciled: {len(ok)} ({', '.join(r.slug for r in ok)})",
-            f"- Concept files touched: {sum(len(r.files) for r in ok)}",
-            f"- {LEDGER.summary_line()}",
-            "- Propose-only (contradictions / quality): see `wiki lint` / the lint dashboard — not auto-applied.",
-        ])
+        _append_log_summary(
+            [
+                f"- Facts auto-reconciled: {len(ok)} ({', '.join(r.slug for r in ok)})",
+                f"- Concept files touched: {sum(len(r.files) for r in ok)}",
+                f"- {LEDGER.summary_line()}",
+                "- Propose-only (contradictions / quality): see `wiki lint` / the lint dashboard — not auto-applied.",
+            ]
+        )
     return 0
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Autonomous concept-reconciliation routine.")
-    parser.add_argument("--apply", action="store_true",
-                        help="actually edit (requires features.concept_reconciliation); default is dry-run")
-    parser.add_argument("--dry-run", action="store_true",
-                        help="explicit dry-run (the default; --apply overrides nothing if both given — dry-run wins)")
+    parser.add_argument(
+        "--apply",
+        action="store_true",
+        help="actually edit (requires features.concept_reconciliation); default is dry-run",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="explicit dry-run (the default; --apply overrides nothing if both given — dry-run wins)",
+    )
     parser.add_argument("--limit", type=int, default=None, help="max facts to process this run")
     args = parser.parse_args()
 

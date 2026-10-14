@@ -146,6 +146,7 @@ _FOCUS_HOUR_CAP = 12.0  # an all-day event doesn't get counted as 24h focus
 
 # ── Slug + time helpers ──────────────────────────────────────────────
 
+
 def _slugify(text: str, max_len: int = 60) -> str:
     s = _SLUG_RE.sub("-", text.lower()).strip("-")
     return s[:max_len].rstrip("-") or "untitled"
@@ -198,6 +199,7 @@ def _event_duration_hours(start: datetime, end: datetime | None, *, all_day: boo
 
 # ── Account resolution ──────────────────────────────────────────────
 
+
 @dataclass(frozen=True)
 class _CalendarAccount:
     """Resolved calendar config for one ``personal.accounts.<id>`` entry."""
@@ -239,7 +241,6 @@ def _resolve_calendar_accounts() -> list[_CalendarAccount]:
 # ── OAuth ───────────────────────────────────────────────────────────
 
 
-
 def _app(account_id: str) -> OAuthApp:
     return OAuthApp(
         client_file=google_oauth.resolve_client_file(
@@ -261,6 +262,7 @@ def calendar_auth_bootstrap(account_id: str) -> tuple[bool, str]:
 
 # ── Event filtering ─────────────────────────────────────────────────
 
+
 def _is_holiday(title: str) -> bool:
     """Match against ``CONFIG.personal.calendar_skip_keywords`` (locale-specific)."""
     if not title:
@@ -278,8 +280,7 @@ def _is_operator_declined(event: dict, operator_email: str | None) -> bool:
         if not isinstance(att, dict):
             continue
         is_self = att.get("self") is True or (
-            isinstance(att.get("email"), str)
-            and att["email"].lower() == operator_email.lower()
+            isinstance(att.get("email"), str) and att["email"].lower() == operator_email.lower()
         )
         if is_self and att.get("responseStatus") == "declined":
             return True
@@ -287,6 +288,7 @@ def _is_operator_declined(event: dict, operator_email: str | None) -> bool:
 
 
 # ── Rendering ───────────────────────────────────────────────────────
+
 
 @dataclass
 class _EventBlock:
@@ -328,9 +330,7 @@ def _render_event_block(b: _EventBlock) -> str:
     if b.location:
         meta.append(f"- **Location:** {b.location}")
     if b.recurring_slug and b.recurring_title:
-        meta.append(
-            f"- **Recurring:** [[concepts/{b.recurring_slug}|{b.recurring_title}]]"
-        )
+        meta.append(f"- **Recurring:** [[concepts/{b.recurring_slug}|{b.recurring_title}]]")
     if b.transcript_link:
         meta.append(f"- **Transcript:** {b.transcript_link}")
     meta.append(f"- **Event ID:** {b.event_id}")
@@ -384,11 +384,7 @@ def _render_date_file(
     fm = yaml.safe_dump(front, sort_keys=False, allow_unicode=True).strip()
 
     events_md = "\n".join(_render_event_block(b) for b in blocks_sorted).rstrip()
-    managed_region = (
-        f"{_EVENTS_BEGIN}\n\n"
-        f"{events_md}\n\n"
-        f"{_EVENTS_END}"
-    )
+    managed_region = f"{_EVENTS_BEGIN}\n\n{events_md}\n\n{_EVENTS_END}"
 
     pre_prose, post_prose = _split_operator_prose(existing_text)
     body_parts = [f"# Calendar — {date_key}", ""]
@@ -415,7 +411,7 @@ def _split_operator_prose(existing: str | None) -> tuple[str, str]:
     if body.startswith("---\n"):
         end = body.find("\n---\n", 4)
         if end >= 0:
-            body = body[end + len("\n---\n"):]
+            body = body[end + len("\n---\n") :]
     # Strip the first ``# Calendar — …`` heading (we always re-emit it).
     body = re.sub(r"^# Calendar —[^\n]*\n+", "", body, count=1)
     region = markers.find_region(body, _EVENTS_BEGIN, _EVENTS_END)
@@ -425,6 +421,7 @@ def _split_operator_prose(existing: str | None) -> tuple[str, str]:
 
 
 # ── Recurring concept page ──────────────────────────────────────────
+
 
 def _recurring_concept_path(slug: str) -> Path:
     return ROOT_DIR / "knowledge" / "concepts" / f"{slug}.md"
@@ -451,7 +448,9 @@ def _render_recurring_concept(
         "ingested_at": now_iso(),
     }
     fm = yaml.safe_dump(front, sort_keys=False, allow_unicode=True).strip()
-    cadence = "Recurring calendar series." if not sample_block.all_day else "Recurring all-day event."
+    cadence = (
+        "Recurring calendar series." if not sample_block.all_day else "Recurring all-day event."
+    )
     body_parts = [
         f"# {title}",
         "",
@@ -481,11 +480,11 @@ _TRANSCRIPT_ROOTS = ("raw/transcripts/gmeet", "raw/transcripts/jamie")
 
 @dataclass(frozen=True)
 class _TranscriptRef:
-    relpath: str       # path relative to ROOT_DIR
+    relpath: str  # path relative to ROOT_DIR
     title: str
     title_slug: str
-    date_key: str      # "YYYY-MM-DD"
-    kind: str          # "gmeet" | "jamie"
+    date_key: str  # "YYYY-MM-DD"
+    kind: str  # "gmeet" | "jamie"
 
     def to_link(self) -> str:
         stem = Path(self.relpath).stem
@@ -525,13 +524,15 @@ def _scan_transcripts() -> list[_TranscriptRef]:
             date_key = started[:10]
             if not re.match(r"^\d{4}-\d{2}-\d{2}$", date_key):
                 continue
-            refs.append(_TranscriptRef(
-                relpath=str(p.relative_to(ROOT_DIR)),
-                title=title,
-                title_slug=_slugify(title),
-                date_key=date_key,
-                kind=kind,
-            ))
+            refs.append(
+                _TranscriptRef(
+                    relpath=str(p.relative_to(ROOT_DIR)),
+                    title=title,
+                    title_slug=_slugify(title),
+                    date_key=date_key,
+                    kind=kind,
+                )
+            )
     return refs
 
 
@@ -569,8 +570,10 @@ def _attach_transcript_links(blocks: list[_EventBlock], refs: list[_TranscriptRe
             if evt_slug in ts or ts in evt_slug:
                 best = r
                 continue
-            if len(evt_slug) >= 6 and len(ts) >= 6 and (
-                ts.startswith(evt_slug[:6]) or evt_slug.startswith(ts[:6])
+            if (
+                len(evt_slug) >= 6
+                and len(ts) >= 6
+                and (ts.startswith(evt_slug[:6]) or evt_slug.startswith(ts[:6]))
             ):
                 best = r
         if best is not None:
@@ -580,6 +583,7 @@ def _attach_transcript_links(blocks: list[_EventBlock], refs: list[_TranscriptRe
 
 
 # ── Collector ───────────────────────────────────────────────────────
+
 
 @register
 class CalendarCollector:
@@ -672,12 +676,15 @@ class CalendarCollector:
             existing = target.read_text(encoding="utf-8") if target.exists() else None
             md = _render_date_file(date_key, blocks, existing_text=existing)
             if dry_run:
-                log.info("  DRY: would write %s (%d events, %d bytes)",
-                         target.relative_to(ROOT_DIR), len(blocks), len(md))
+                log.info(
+                    "  DRY: would write %s (%d events, %d bytes)",
+                    target.relative_to(ROOT_DIR),
+                    len(blocks),
+                    len(md),
+                )
                 continue
             target.write_text(md, encoding="utf-8")
-            log.info("  wrote %s (%d events)",
-                     target.relative_to(ROOT_DIR), len(blocks))
+            log.info("  wrote %s (%d events)", target.relative_to(ROOT_DIR), len(blocks))
             all_written.append(target)
 
         if not dry_run and any_state_touched:
@@ -686,9 +693,7 @@ class CalendarCollector:
         return RunResult(
             files_written=tuple(all_written),
             files_skipped=total_skipped,
-            state_keys_touched=(
-                tuple(a.account_id for a in accounts) if any_state_touched else ()
-            ),
+            state_keys_touched=(tuple(a.account_id for a in accounts) if any_state_touched else ()),
             message=" · ".join(per_acct_messages) or "no-op",
         )
 
@@ -760,16 +765,22 @@ class CalendarCollector:
                 time_min = acct.since
 
             try:
-                events = list(client.list_events(
-                    cal_id,
-                    time_min=time_min,
-                    time_max=time_max,
-                    updated_min=updated_min,
-                    limit=acct.max_per_run,
-                ))
+                events = list(
+                    client.list_events(
+                        cal_id,
+                        time_min=time_min,
+                        time_max=time_max,
+                        updated_min=updated_min,
+                        limit=acct.max_per_run,
+                    )
+                )
             except CalendarAPIError as e:
-                log.error("CalendarCollector[%s/%s]: list_events failed: %s",
-                          acct.account_id, cal_summary, e)
+                log.error(
+                    "CalendarCollector[%s/%s]: list_events failed: %s",
+                    acct.account_id,
+                    cal_summary,
+                    e,
+                )
                 continue
 
             total_listed += len(events)
@@ -839,7 +850,9 @@ class CalendarCollector:
                     calendar_summary=cal_summary,
                     account_id=acct.account_id,
                     is_meeting=is_meeting,
-                    recurring_event_id=recurring_event_id if isinstance(recurring_event_id, str) else None,
+                    recurring_event_id=recurring_event_id
+                    if isinstance(recurring_event_id, str)
+                    else None,
                     recurring_slug=recurring_slug,
                     recurring_title=recurring_title,
                 )

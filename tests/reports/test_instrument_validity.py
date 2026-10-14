@@ -25,8 +25,7 @@ from scripts.reports._engine.score import score_instrument
 
 
 INSTRUMENTS_ROOT = (
-    Path(__file__).resolve().parents[2]
-    / "scripts" / "reports" / "_engine" / "instruments"
+    Path(__file__).resolve().parents[2] / "scripts" / "reports" / "_engine" / "instruments"
 )
 
 
@@ -43,9 +42,7 @@ WEDGE_INSTRUMENTS = [
 
 
 @pytest.mark.parametrize("slug,version,n_items,max_total", WEDGE_INSTRUMENTS)
-def test_wedge_instrument_loads(
-    slug: str, version: str, n_items: int, max_total: int
-) -> None:
+def test_wedge_instrument_loads(slug: str, version: str, n_items: int, max_total: int) -> None:
     """Each wedge instrument loads + has the expected item count + total range.
 
     Achievable range = (n_items * likert.lo, n_items * likert.hi).
@@ -72,6 +69,7 @@ def _direction_answer_set(slug: str, version: str, direction: str) -> dict:
     opposite literal value so post-reverse they contribute min/max.
     """
     import yaml as yaml_mod
+
     items_path = INSTRUMENTS_ROOT / slug / f"v{version}" / "items.yaml"
     instr_path = INSTRUMENTS_ROOT / slug / f"v{version}" / "instrument.yaml"
     raw_instr = yaml_mod.safe_load(instr_path.read_text(encoding="utf-8"))
@@ -192,9 +190,7 @@ class TestASRSSubscales:
 
     def test_asrs_subscale_sums_correct(self) -> None:
         answers = {str(i): 2 for i in range(1, 19)}
-        result = score_instrument(
-            INSTRUMENTS_ROOT / "asrs-v1.1" / "v1.0.0", answers
-        )
+        result = score_instrument(INSTRUMENTS_ROOT / "asrs-v1.1" / "v1.0.0", answers)
         # 6 items × 2 = 12 for Part A; 12 × 2 = 24 for Part B
         assert result.score.per_subscale == {"Part-A": 12, "Part-B": 24}
         assert result.score.total == 36
@@ -213,12 +209,12 @@ class TestSubstrateInferableCuration:
         self, slug: str, version: str, n_items: int, max_total: int
     ) -> None:
         import yaml as yaml_mod
+
         items_path = INSTRUMENTS_ROOT / slug / f"v{version}" / "items.yaml"
         raw = yaml_mod.safe_load(items_path.read_text(encoding="utf-8"))
         for item in raw:
             assert "substrate_inferable" in item, (
-                f"{slug} v{version} item {item.get('id')!r}: "
-                f"missing substrate_inferable curation"
+                f"{slug} v{version} item {item.get('id')!r}: missing substrate_inferable curation"
             )
             assert isinstance(item["substrate_inferable"], bool), (
                 f"{slug} v{version} item {item.get('id')!r}: "
@@ -233,15 +229,16 @@ class TestSubstrateInferableCuration:
         pins them so any silent drift surfaces.
         """
         import yaml as yaml_mod
+
         expected_inferable = {
-            "phq-9": 4,        # of 9 items = 44%
-            "gad-7": 4,        # of 7 items = 57%
-            "asrs-v1.1": 6,    # of 18 items = 33%
-            "who-5": 4,        # of 5 items = 80% — highest single-screen
-            "k6": 2,           # of 6 items = 33% — lowest (dropped from wedge)
-            "pss-10": 5,       # of 10 items = 50%
-            "isi": 4,          # of 7 items = 57% — Oura items 1-3, item 7 sessions
-            "olbi": 8,         # of 16 items = 50% — 4 each per subscale
+            "phq-9": 4,  # of 9 items = 44%
+            "gad-7": 4,  # of 7 items = 57%
+            "asrs-v1.1": 6,  # of 18 items = 33%
+            "who-5": 4,  # of 5 items = 80% — highest single-screen
+            "k6": 2,  # of 6 items = 33% — lowest (dropped from wedge)
+            "pss-10": 5,  # of 10 items = 50%
+            "isi": 4,  # of 7 items = 57% — Oura items 1-3, item 7 sessions
+            "olbi": 8,  # of 16 items = 50% — 4 each per subscale
         }
         for slug, expected in expected_inferable.items():
             items_path = INSTRUMENTS_ROOT / slug / "v1.0.0" / "items.yaml"

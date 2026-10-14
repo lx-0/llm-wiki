@@ -68,8 +68,7 @@ def _run_one(name: str, *, dry_run: bool, incremental: bool, account: str | None
     if account is not None:
         if not collector.SPEC.supports_account_loop:
             print(
-                f"error: collector {name!r} does not support --account "
-                "(not an account substrate)",
+                f"error: collector {name!r} does not support --account (not an account substrate)",
                 file=sys.stderr,
             )
             print(
@@ -123,7 +122,8 @@ def main() -> NoReturn:
     parser = argparse.ArgumentParser(prog="wiki collect")
     parser.add_argument("--list", action="store_true", help="enumerate registered collectors")
     parser.add_argument(
-        "--json", action="store_true",
+        "--json",
+        action="store_true",
         help="with --list: machine-readable output (desktop app / agents)",
     )
     parser.add_argument("name", nargs="?", help="collector name (omit with --list)")

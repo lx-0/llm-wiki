@@ -83,10 +83,7 @@ def save_cache(results: LintResults) -> None:
     try:
         payload = {
             "generated_at": results.generated_at,
-            "issues": {
-                name: [asdict(i) for i in items]
-                for name, items in results.issues.items()
-            },
+            "issues": {name: [asdict(i) for i in items] for name, items in results.issues.items()},
         }
         CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
         CACHE_FILE.write_text(json.dumps(payload, indent=2), encoding="utf-8")

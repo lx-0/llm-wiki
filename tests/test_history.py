@@ -11,9 +11,7 @@ from pathlib import Path
 import pytest
 
 
-def test_append_history_creates_file(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_append_history_creates_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     from core import utils
 
     monkeypatch.setattr(utils, "STATE_DIR", tmp_path)
@@ -55,10 +53,10 @@ def test_read_history_skips_malformed_lines(
     history_file = tmp_path / "history.jsonl"
     history_file.write_text(
         '{"ts":"2026-05-01T00:00:00Z","type":"compile","articles_total":1}\n'
-        'this is not json\n'
+        "this is not json\n"
         '{"ts":"2026-05-02T00:00:00Z","type":"flush","session_id":"xyz"}\n'
-        '\n'  # blank line
-        '{truncated\n',
+        "\n"  # blank line
+        "{truncated\n",
         encoding="utf-8",
     )
     events = utils.read_history()

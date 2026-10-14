@@ -58,10 +58,11 @@ _STAGED_NAME_RE = re.compile(
 @dataclass
 class StagedFlush:
     """A flush context file staged on disk, awaiting extraction or retry."""
+
     path: Path
     session_id: str
-    kind: str        # "session-end" | "pre-compact"
-    created: int     # unix timestamp parsed from filename
+    kind: str  # "session-end" | "pre-compact"
+    created: int  # unix timestamp parsed from filename
 
 
 def parse_name(path: Path) -> StagedFlush | None:
@@ -133,12 +134,15 @@ def append_to_daily(content: str, session_id: str) -> Path:
     begin = f"<!-- wiki:session {session_id} begin -->"
     end = f"<!-- wiki:session {session_id} end -->"
     block = f"{begin}\n\n---\n\n### Session `{session_id}` — {time_str}\n\n{content}\n\n{end}\n"
-    create_header = (
-        f"# Daily Sessions — {date_str}\n\n{daily_capture.SUMMARIZE_BUTTON_BLOCK}\n\n"
-    )
+    create_header = f"# Daily Sessions — {date_str}\n\n{daily_capture.SUMMARIZE_BUTTON_BLOCK}\n\n"
 
     return daily_capture.replace_block(
-        date_str, "sessions", begin, end, block, create_header=create_header,
+        date_str,
+        "sessions",
+        begin,
+        end,
+        block,
+        create_header=create_header,
     )
 
 

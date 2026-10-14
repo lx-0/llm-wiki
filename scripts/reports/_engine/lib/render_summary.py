@@ -74,9 +74,7 @@ def _format_delta(curr: int, prev: int | None) -> str:
 
 
 @lru_cache(maxsize=None)
-def _recover_instrument_meta(
-    slug: str, version: str
-) -> tuple[int, int, tuple[str, ...]] | None:
+def _recover_instrument_meta(slug: str, version: str) -> tuple[int, int, tuple[str, ...]] | None:
     """Reload an instrument's `(max_total, likert_hi, concern_bands)` from
     the engine's instrument definition.
 
@@ -134,8 +132,7 @@ def _instrument_concern_bands(snap: InstrumentSnapshot) -> tuple[str, ...]:
 def _build_radar_data(snapshot: RunSnapshot) -> dict[str, float]:
     """Normalise each instrument's score to 0..1 for radar plot."""
     return {
-        s.slug: _normalise(s.total_score, _instrument_max(s))
-        for s in snapshot.instruments.values()
+        s.slug: _normalise(s.total_score, _instrument_max(s)) for s in snapshot.instruments.values()
     }
 
 
@@ -146,9 +143,7 @@ def _build_coverage_series(timeline: Timeline) -> list[float]:
         if not run.instruments:
             series.append(0.0)
             continue
-        avg = sum(s.coverage_pct for s in run.instruments.values()) / len(
-            run.instruments
-        )
+        avg = sum(s.coverage_pct for s in run.instruments.values()) / len(run.instruments)
         series.append(avg)
     return series
 
@@ -171,8 +166,7 @@ def _render_per_instrument_timelines(
         if not snapshots:
             continue
         series: list[tuple[str, float, float]] = [
-            (s.timestamp, float(s.total_score), s.coverage_pct)
-            for s in snapshots
+            (s.timestamp, float(s.total_score), s.coverage_pct) for s in snapshots
         ]
         max_total = _instrument_max(snapshots[-1])
         out_path = charts_dir / f"timeline-{key}.svg"
@@ -237,15 +231,14 @@ def _render_per_instrument_radars(
             # No per_item data — predates the runner extension.
             # Render placeholder so the link works.
             from scripts.reports._engine.lib.charts import _placeholder
-            _placeholder(out_path, 360, 360,
-                         f"{slug}: per-item data unavailable (older run schema)")
+
+            _placeholder(
+                out_path, 360, 360, f"{slug}: per-item data unavailable (older run schema)"
+            )
             out[slug] = out_path
             continue
         hi = _instrument_likert_hi(snap)
-        current_data = {
-            iid: max(0.0, min(1.0, val / hi))
-            for iid, val in snap.per_item.items()
-        }
+        current_data = {iid: max(0.0, min(1.0, val / hi)) for iid, val in snap.per_item.items()}
         previous_data = None
         if previous and slug in previous.instruments:
             prev_snap = previous.instruments[slug]
@@ -314,10 +307,7 @@ def render_summary(
 
     # 4. Frontmatter
     bandable_count = sum(1 for s in latest.instruments.values() if s.bandable)
-    avg_cov = (
-        sum(s.coverage_pct for s in latest.instruments.values())
-        / len(latest.instruments)
-    )
+    avg_cov = sum(s.coverage_pct for s in latest.instruments.values()) / len(latest.instruments)
     fm = {
         "kind": "meta-report",
         "study_id": study_id,
@@ -340,16 +330,12 @@ def render_summary(
 
     # Cross-instrument table
     lines.append("## Cross-instrument current state\n")
-    lines.append(
-        "| Instrument | Score | Band | Coverage | Δ vs. previous |"
-    )
+    lines.append("| Instrument | Score | Band | Coverage | Δ vs. previous |")
     lines.append("|---|---|---|---|---|")
     prev_snapshots = previous.instruments if previous else {}
     for key in sorted(latest.instruments.keys()):
         snap = latest.instruments[key]
-        prev_score = (
-            prev_snapshots[key].total_score if key in prev_snapshots else None
-        )
+        prev_score = prev_snapshots[key].total_score if key in prev_snapshots else None
         delta = _format_delta(snap.total_score, prev_score)
         band = snap.band or "*partial*"
         max_total = _instrument_max(snap)
@@ -405,24 +391,26 @@ def render_summary(
         # but this is a vault-internal surface so that's irrelevant.
         if key in per_inst_radars:
             rel = per_inst_radars[key].relative_to(summary_path.parent)
-            lines.append(f"**Item-level breakdown** — each axis is one item, "
-                         f"vertex distance from center = item's normalised value "
-                         f"(0..1). Dashed overlay = previous run when available. "
-                         f"Legend on the right of the radar.\n")
-            latest_snap = (
-                latest.instruments.get(key) if latest else None
+            lines.append(
+                f"**Item-level breakdown** — each axis is one item, "
+                f"vertex distance from center = item's normalised value "
+                f"(0..1). Dashed overlay = previous run when available. "
+                f"Legend on the right of the radar.\n"
             )
+            latest_snap = latest.instruments.get(key) if latest else None
             item_meta = (
                 _load_item_meta(latest_snap.slug, latest_snap.version)
                 if (latest_snap and latest_snap.version)
                 else {}
             )
             if item_meta:
+
                 def _sort_key(iid):
                     try:
                         return (0, int(iid))
                     except (ValueError, TypeError):
                         return (1, str(iid))
+
                 # Build the legend table as HTML (markdown table inside
                 # flex container can be brittle in some renderers).
                 rows_html: list[str] = []
@@ -435,7 +423,7 @@ def render_summary(
                 )
                 for iid in sorted(item_meta.keys(), key=_sort_key):
                     m = item_meta[iid]
-                    text_short = (m["text"].replace("<", "&lt;").replace(">", "&gt;"))
+                    text_short = m["text"].replace("<", "&lt;").replace(">", "&gt;")
                     if len(text_short) > 110:
                         text_short = text_short[:107] + "…"
                     rev = "↩︎" if m["reverse_coded"] else ""
@@ -443,25 +431,25 @@ def render_summary(
                     inf_color = "#1B7340" if m["substrate_inferable"] else "#9ca3af"
                     sub = (m["subscale"] or "").replace("<", "&lt;")
                     rows_html.append(
-                        f'<tr>'
+                        f"<tr>"
                         f'<td style="white-space:nowrap;padding-right:0.6em;font-family:ui-monospace,monospace;">{iid}</td>'
                         f'<td style="padding-right:0.6em;">{text_short}</td>'
                         f'<td style="text-align:center;padding-right:0.4em;">{rev}</td>'
                         f'<td style="text-align:center;color:{inf_color};padding-right:0.6em;">{inf}</td>'
                         f'<td style="white-space:nowrap;color:#6b7280;">{sub}</td>'
-                        f'</tr>'
+                        f"</tr>"
                     )
                 table_html = (
                     '<table style="border-collapse:collapse;font-size:0.85em;line-height:1.4;">'
                     + "".join(rows_html)
-                    + '</table>'
+                    + "</table>"
                 )
                 lines.append(
                     '<div style="display:flex;gap:1.2em;align-items:flex-start;flex-wrap:wrap;margin:0.6em 0;">'
                     f'<div style="flex:0 0 360px;"><img src="{rel}" alt="{key} per-item radar" '
                     'style="width:100%;height:auto;"></div>'
                     f'<div style="flex:1 1 280px;min-width:280px;">{table_html}</div>'
-                    '</div>\n'
+                    "</div>\n"
                 )
             else:
                 # No item-meta — fall back to plain radar image.

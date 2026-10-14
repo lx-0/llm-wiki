@@ -57,9 +57,7 @@ class InferenceConfig:
             enabled=bool(raw.get("enabled", True)),
             min_confidence=float(raw.get("min_confidence", 0.75)),
             bandable_coverage_pct=float(raw.get("bandable_coverage_pct", 80.0)),
-            default_lookback_days=int(
-                raw.get("default_lookback_days", DEFAULT_LOOKBACK_DAYS)
-            ),
+            default_lookback_days=int(raw.get("default_lookback_days", DEFAULT_LOOKBACK_DAYS)),
             max_curiosity_per_run=int(raw.get("max_curiosity_per_run", 3)),
             model=(str(raw["model"]) if raw.get("model") else None),
         )

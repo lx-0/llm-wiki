@@ -126,8 +126,8 @@ def test_parse_proposed_actions_shape_guards_nonlist() -> None:
     from facts import correct_apply
 
     a = correct_apply._parse_proposed_actions('{"deleted": "oops", "renamed": [{"bad": 1}]}')
-    assert a["deleted"] == []          # scalar → []
-    assert a["renamed"] == []          # malformed {from,to} dropped
+    assert a["deleted"] == []  # scalar → []
+    assert a["renamed"] == []  # malformed {from,to} dropped
 
 
 # ── ground-truth reporting (M028-S01-T05) ──
@@ -191,11 +191,20 @@ def test_divergence_does_not_flag_engine_rename_as_deletion() -> None:
     the engine knows it renamed, so it must NOT raise a deletion alarm."""
     from facts import correct_apply
 
-    actions = {"superseded": [], "edited": [], "renamed":
-               [{"from": "knowledge/projects/township.md", "to": "knowledge/projects/fleet.md"}],
-               "deleted": []}
-    delta = {"created": ["knowledge/projects/fleet.md"], "modified": [],
-             "deleted": ["knowledge/projects/township.md"], "renamed": []}
+    actions = {
+        "superseded": [],
+        "edited": [],
+        "renamed": [
+            {"from": "knowledge/projects/township.md", "to": "knowledge/projects/fleet.md"}
+        ],
+        "deleted": [],
+    }
+    delta = {
+        "created": ["knowledge/projects/fleet.md"],
+        "modified": [],
+        "deleted": ["knowledge/projects/township.md"],
+        "renamed": [],
+    }
     executed = [{"from": "knowledge/projects/township.md", "to": "knowledge/projects/fleet.md"}]
     assert correct_apply._divergence(actions, delta, executed_renames=executed) == []
 
@@ -230,6 +239,7 @@ def test_apply_golden_supersede_renames_deletes_nothing(tmp_path, monkeypatch, c
     monkeypatch.setattr(correct_apply, "KNOWLEDGE_DIR", knowledge)
     monkeypatch.setattr(correct_apply, "INDEX_FILE", index)
     import core.usage as usage_mod
+
     # LEDGER.record now happens inside run_sdk_query (core.usage global).
     monkeypatch.setattr(usage_mod.LEDGER, "record", lambda **k: None)
 
@@ -243,14 +253,21 @@ def test_apply_golden_supersede_renames_deletes_nothing(tmp_path, monkeypatch, c
 
     async def fake_query(*, prompt, options):  # noqa: ARG001
         yield ResultMessage(
-            subtype="success", duration_ms=1, duration_api_ms=1, is_error=False,
-            num_turns=1, session_id="t", total_cost_usd=0.0,
-            usage={"input_tokens": 1, "output_tokens": 1}, result=agent_out,
+            subtype="success",
+            duration_ms=1,
+            duration_api_ms=1,
+            is_error=False,
+            num_turns=1,
+            session_id="t",
+            total_cost_usd=0.0,
+            usage={"input_tokens": 1, "output_tokens": 1},
+            result=agent_out,
         )
 
     monkeypatch.setattr(correct_apply, "query", fake_query)
 
     import logging as _logging
+
     caplog.set_level(_logging.WARNING, logger="correct-apply")
     rc = asyncio.run(correct_apply.apply("ssot", dry_run=False))
     assert rc == 0
@@ -290,13 +307,17 @@ def _delete_vault(tmp_path, monkeypatch):
 
 def test_execute_deletes_moves_to_trash_when_allowed(tmp_path, monkeypatch) -> None:
     mod, vault, knowledge, doomed, index = _delete_vault(tmp_path, monkeypatch)
-    actions = {"superseded": [], "edited": [], "renamed": [],
-               "deleted": ["knowledge/concepts/false-claim.md"]}
+    actions = {
+        "superseded": [],
+        "edited": [],
+        "renamed": [],
+        "deleted": ["knowledge/concepts/false-claim.md"],
+    }
 
     executed = mod._execute_deletes(actions, vault, allowed=True)
 
     assert executed == ["knowledge/concepts/false-claim.md"]
-    assert not doomed.exists()                      # gone from original location
+    assert not doomed.exists()  # gone from original location
     trashed = list((vault / ".trash").rglob("false-claim.md"))
     assert trashed, "file must be recoverable under .trash/"
     # index row dropped, sibling kept
@@ -307,13 +328,17 @@ def test_execute_deletes_moves_to_trash_when_allowed(tmp_path, monkeypatch) -> N
 
 def test_execute_deletes_noop_when_gate_off(tmp_path, monkeypatch) -> None:
     mod, vault, knowledge, doomed, index = _delete_vault(tmp_path, monkeypatch)
-    actions = {"superseded": [], "edited": [], "renamed": [],
-               "deleted": ["knowledge/concepts/false-claim.md"]}
+    actions = {
+        "superseded": [],
+        "edited": [],
+        "renamed": [],
+        "deleted": ["knowledge/concepts/false-claim.md"],
+    }
 
     executed = mod._execute_deletes(actions, vault, allowed=False)
 
     assert executed == []
-    assert doomed.exists()                          # gate off → nothing deleted
+    assert doomed.exists()  # gate off → nothing deleted
     assert not (vault / ".trash").exists()
 
 
@@ -322,7 +347,7 @@ def test_execute_deletes_skips_outside_knowledge(tmp_path, monkeypatch) -> None:
     actions = {"superseded": [], "edited": [], "renamed": [], "deleted": ["raw/notes/x.md"]}
 
     executed = mod._execute_deletes(actions, vault, allowed=True)
-    assert executed == []                           # never delete outside knowledge/
+    assert executed == []  # never delete outside knowledge/
 
 
 # ── deletion gate (M028-S02-T02) ──
@@ -331,9 +356,9 @@ def test_execute_deletes_skips_outside_knowledge(tmp_path, monkeypatch) -> None:
 def test_deletion_allowed_resolution() -> None:
     from facts import correct_apply
 
-    assert correct_apply._deletion_allowed({}, True) is True            # CLI flag
+    assert correct_apply._deletion_allowed({}, True) is True  # CLI flag
     assert correct_apply._deletion_allowed({"disposition": "delete"}, False) is True  # fact field
-    assert correct_apply._deletion_allowed({}, False) is False          # neither
+    assert correct_apply._deletion_allowed({}, False) is False  # neither
     assert correct_apply._deletion_allowed({"disposition": "supersede"}, False) is False
 
 
@@ -352,13 +377,17 @@ def test_apply_allow_delete_trashes_nominated(tmp_path, monkeypatch) -> None:
     bogus.write_text("# Bogus event that never happened\n", encoding="utf-8")
     (knowledge / "index.md").write_text("- [[concepts/bogus]] — x\n", encoding="utf-8")
     fact = facts / "neverhappened.md"
-    fact.write_text("---\ntype: fact\nstatus: negation\napplied: false\n---\n\nThat never happened.\n", encoding="utf-8")
+    fact.write_text(
+        "---\ntype: fact\nstatus: negation\napplied: false\n---\n\nThat never happened.\n",
+        encoding="utf-8",
+    )
 
     monkeypatch.setattr(correct_apply, "ROOT_DIR", vault)
     monkeypatch.setattr(correct_apply, "FACTS_DIR", facts)
     monkeypatch.setattr(correct_apply, "KNOWLEDGE_DIR", knowledge)
     monkeypatch.setattr(correct_apply, "INDEX_FILE", knowledge / "index.md")
     import core.usage as usage_mod
+
     # LEDGER.record now happens inside run_sdk_query (core.usage global).
     monkeypatch.setattr(usage_mod.LEDGER, "record", lambda **k: None)
 
@@ -372,16 +401,24 @@ def test_apply_allow_delete_trashes_nominated(tmp_path, monkeypatch) -> None:
         # the gate must reach the prompt
         assert "Deletion permitted: true" in prompt
         yield ResultMessage(
-            subtype="success", duration_ms=1, duration_api_ms=1, is_error=False,
-            num_turns=1, session_id="t", total_cost_usd=0.0,
-            usage={"input_tokens": 1, "output_tokens": 1}, result=agent_out,
+            subtype="success",
+            duration_ms=1,
+            duration_api_ms=1,
+            is_error=False,
+            num_turns=1,
+            session_id="t",
+            total_cost_usd=0.0,
+            usage={"input_tokens": 1, "output_tokens": 1},
+            result=agent_out,
         )
 
     monkeypatch.setattr(correct_apply, "query", fake_query)
 
     # force=True bypasses the clean-git-tree guard (tested separately) — this test
     # exercises the gate + executor on a non-git tmp vault.
-    rc = asyncio.run(correct_apply.apply("neverhappened", dry_run=False, allow_delete=True, force=True))
+    rc = asyncio.run(
+        correct_apply.apply("neverhappened", dry_run=False, allow_delete=True, force=True)
+    )
     assert rc == 0
     assert not bogus.exists()
     assert list((vault / ".trash").rglob("bogus.md")), "must be recoverable in .trash"
@@ -392,16 +429,30 @@ def test_apply_allow_delete_trashes_nominated(tmp_path, monkeypatch) -> None:
 
 def _git_init(path) -> None:
     import subprocess
+
     subprocess.run(["git", "init", "-q", str(path)], check=True)
     subprocess.run(["git", "-C", str(path), "add", "-A"], check=True)
     subprocess.run(
-        ["git", "-C", str(path), "-c", "user.email=t@t", "-c", "user.name=t",
-         "commit", "-q", "-m", "init"], check=True,
+        [
+            "git",
+            "-C",
+            str(path),
+            "-c",
+            "user.email=t@t",
+            "-c",
+            "user.name=t",
+            "commit",
+            "-q",
+            "-m",
+            "init",
+        ],
+        check=True,
     )
 
 
 def test_tree_safe_non_git(tmp_path, monkeypatch) -> None:
     from facts import correct_apply
+
     monkeypatch.setattr(correct_apply, "KNOWLEDGE_DIR", tmp_path / "knowledge")
     safe, reason = correct_apply._tree_safe_for_deletion(tmp_path)
     assert safe is False and "git" in reason.lower()
@@ -409,6 +460,7 @@ def test_tree_safe_non_git(tmp_path, monkeypatch) -> None:
 
 def test_tree_safe_clean_then_dirty(tmp_path, monkeypatch) -> None:
     from facts import correct_apply
+
     knowledge = tmp_path / "knowledge"
     (knowledge / "concepts").mkdir(parents=True)
     (knowledge / "concepts" / "a.md").write_text("# A\n", encoding="utf-8")
@@ -432,7 +484,7 @@ def test_apply_refuses_deletion_on_unsafe_tree(tmp_path, monkeypatch) -> None:
     facts = tmp_path / "knowledge" / "facts"
     facts.mkdir(parents=True)
     (facts / "f.md").write_text("---\ntype: fact\nstatus: negation\n---\n\nx\n", encoding="utf-8")
-    monkeypatch.setattr(correct_apply, "ROOT_DIR", tmp_path)        # not a git repo
+    monkeypatch.setattr(correct_apply, "ROOT_DIR", tmp_path)  # not a git repo
     monkeypatch.setattr(correct_apply, "FACTS_DIR", facts)
     monkeypatch.setattr(correct_apply, "KNOWLEDGE_DIR", tmp_path / "knowledge")
 
@@ -445,8 +497,8 @@ def test_apply_refuses_deletion_on_unsafe_tree(tmp_path, monkeypatch) -> None:
     monkeypatch.setattr(correct_apply, "query", fake_query)
 
     rc = asyncio.run(correct_apply.apply("f", dry_run=False, allow_delete=True))
-    assert rc == 3                          # refused
-    assert called["spawned"] is False       # no paid agent run
+    assert rc == 3  # refused
+    assert called["spawned"] is False  # no paid agent run
     # …but --force bypasses the guard (will spawn; we only assert it gets past the gate)
     rc2 = asyncio.run(correct_apply.apply("f", dry_run=False, allow_delete=True, force=True))
     assert called["spawned"] is True
@@ -462,10 +514,12 @@ def test_scan_candidates_classifies_primary_vs_mention(tmp_path) -> None:
     (knowledge / "concepts").mkdir(parents=True)
     # title hit → primary (supersede/delete-eligible)
     (knowledge / "concepts" / "senkrechtstarter-award.md").write_text(
-        "# Senkrechtstarter Award\n\nwe won it\n", encoding="utf-8")
+        "# Senkrechtstarter Award\n\nwe won it\n", encoding="utf-8"
+    )
     # body-only mention → edit
     (knowledge / "concepts" / "timeline.md").write_text(
-        "# 2026 timeline\n\nIn April the senkrechtstarter award was mentioned.\n", encoding="utf-8")
+        "# 2026 timeline\n\nIn April the senkrechtstarter award was mentioned.\n", encoding="utf-8"
+    )
     # no hit
     (knowledge / "concepts" / "unrelated.md").write_text("# Other\n\nnothing\n", encoding="utf-8")
     (knowledge / "index.md").write_text("- [[concepts/senkrechtstarter-award]]\n", encoding="utf-8")
@@ -488,7 +542,8 @@ def test_scan_candidates_excludes_facts(tmp_path) -> None:
     (knowledge / "facts").mkdir(parents=True)
     (knowledge / "concepts").mkdir()
     (knowledge / "facts" / "widget-not-real.md").write_text(
-        "---\ntype: fact\n---\nThe widget is not real.\n", encoding="utf-8")
+        "---\ntype: fact\n---\nThe widget is not real.\n", encoding="utf-8"
+    )
     (knowledge / "concepts" / "a.md").write_text("# A\n\nthe widget here\n", encoding="utf-8")
 
     cands = correct_apply._scan_candidates(["widget"], [knowledge])
@@ -508,7 +563,10 @@ def test_dry_run_lists_candidates_without_agent(tmp_path, monkeypatch, caplog) -
     (knowledge / "concepts").mkdir()
     (knowledge / "concepts" / "foo.md").write_text("# Foo\n\nthe widget term\n", encoding="utf-8")
     fact = facts / "w.md"
-    fact.write_text("---\ntype: fact\nstatus: negation\nnegation_terms:\n  - widget\n---\n\nno widget\n", encoding="utf-8")
+    fact.write_text(
+        "---\ntype: fact\nstatus: negation\nnegation_terms:\n  - widget\n---\n\nno widget\n",
+        encoding="utf-8",
+    )
 
     monkeypatch.setattr(correct_apply, "ROOT_DIR", tmp_path)
     monkeypatch.setattr(correct_apply, "FACTS_DIR", facts)
@@ -526,7 +584,7 @@ def test_dry_run_lists_candidates_without_agent(tmp_path, monkeypatch, caplog) -
     rc = asyncio.run(correct_apply.apply("w", dry_run=True))
     assert rc == 0
     assert spawned["v"] is False
-    assert "foo.md" in caplog.text          # blast radius surfaced
+    assert "foo.md" in caplog.text  # blast radius surfaced
 
 
 def test_dry_run_never_refused_even_with_allow_delete(tmp_path, monkeypatch, caplog) -> None:
@@ -542,27 +600,40 @@ def test_dry_run_never_refused_even_with_allow_delete(tmp_path, monkeypatch, cap
     (knowledge / "concepts").mkdir()
     (knowledge / "concepts" / "foo.md").write_text("# Foo widget\n", encoding="utf-8")
     fact = facts / "w.md"
-    fact.write_text("---\ntype: fact\nstatus: negation\nnegation_terms:\n  - widget\n---\n\nx\n", encoding="utf-8")
+    fact.write_text(
+        "---\ntype: fact\nstatus: negation\nnegation_terms:\n  - widget\n---\n\nx\n",
+        encoding="utf-8",
+    )
 
-    monkeypatch.setattr(correct_apply, "ROOT_DIR", tmp_path)   # not a git repo → unsafe for a REAL delete run
+    monkeypatch.setattr(
+        correct_apply, "ROOT_DIR", tmp_path
+    )  # not a git repo → unsafe for a REAL delete run
     monkeypatch.setattr(correct_apply, "FACTS_DIR", facts)
     monkeypatch.setattr(correct_apply, "KNOWLEDGE_DIR", knowledge)
     monkeypatch.setattr(correct_apply, "DAILY_DIR", tmp_path / "daily")
     caplog.set_level(_logging.INFO, logger="correct-apply")
 
     rc = asyncio.run(correct_apply.apply("w", dry_run=True, allow_delete=True))
-    assert rc == 0                               # previewed, not refused
+    assert rc == 0  # previewed, not refused
     assert "Refusing deletion-enabled run" not in caplog.text
-    assert "foo.md" in caplog.text               # blast radius shown
+    assert "foo.md" in caplog.text  # blast radius shown
 
 
 def test_divergence_silent_for_declared_deletion() -> None:
     from facts import correct_apply
 
-    actions = {"superseded": [], "edited": [], "renamed": [],
-               "deleted": ["knowledge/concepts/bogus.md"]}
-    delta = {"created": [], "modified": [], "renamed": [],
-             "deleted": ["knowledge/concepts/bogus.md"]}
+    actions = {
+        "superseded": [],
+        "edited": [],
+        "renamed": [],
+        "deleted": ["knowledge/concepts/bogus.md"],
+    }
+    delta = {
+        "created": [],
+        "modified": [],
+        "renamed": [],
+        "deleted": ["knowledge/concepts/bogus.md"],
+    }
     assert correct_apply._divergence(actions, delta, executed_renames=[]) == []
 
 
@@ -584,13 +655,17 @@ def test_apply_deletion_e2e_clean_git(tmp_path, monkeypatch, caplog) -> None:
     (knowledge / "index.md").write_text("- [[concepts/bogus]] — x\n", encoding="utf-8")
     _git_init(vault)  # commit the articles → clean tree
     fact = facts / "nh.md"
-    fact.write_text("---\ntype: fact\nstatus: negation\napplied: false\n---\n\nNever happened.\n", encoding="utf-8")
+    fact.write_text(
+        "---\ntype: fact\nstatus: negation\napplied: false\n---\n\nNever happened.\n",
+        encoding="utf-8",
+    )
 
     monkeypatch.setattr(correct_apply, "ROOT_DIR", vault)
     monkeypatch.setattr(correct_apply, "FACTS_DIR", facts)
     monkeypatch.setattr(correct_apply, "KNOWLEDGE_DIR", knowledge)
     monkeypatch.setattr(correct_apply, "INDEX_FILE", knowledge / "index.md")
     import core.usage as usage_mod
+
     # LEDGER.record now happens inside run_sdk_query (core.usage global).
     monkeypatch.setattr(usage_mod.LEDGER, "record", lambda **k: None)
 
@@ -602,18 +677,24 @@ def test_apply_deletion_e2e_clean_git(tmp_path, monkeypatch, caplog) -> None:
 
     async def fake_query(*, prompt, options):  # noqa: ARG001
         yield ResultMessage(
-            subtype="success", duration_ms=1, duration_api_ms=1, is_error=False,
-            num_turns=1, session_id="t", total_cost_usd=0.0,
-            usage={"input_tokens": 1, "output_tokens": 1}, result=agent_out,
+            subtype="success",
+            duration_ms=1,
+            duration_api_ms=1,
+            is_error=False,
+            num_turns=1,
+            session_id="t",
+            total_cost_usd=0.0,
+            usage={"input_tokens": 1, "output_tokens": 1},
+            result=agent_out,
         )
 
     monkeypatch.setattr(correct_apply, "query", fake_query)
     caplog.set_level(_logging.WARNING, logger="correct-apply")
 
     rc = asyncio.run(correct_apply.apply("nh", dry_run=False, allow_delete=True))  # no --force
-    assert rc == 0                                        # clean tree → guard passes
+    assert rc == 0  # clean tree → guard passes
     assert not bogus.exists()
-    assert list((vault / ".trash").rglob("bogus.md"))     # recoverable
+    assert list((vault / ".trash").rglob("bogus.md"))  # recoverable
     assert "vanished with no accounting" not in caplog.text  # declared+executed → no alarm
 
 
@@ -626,7 +707,9 @@ def test_deletion_never_allowed_for_supersession() -> None:
     # supersession = was true, now outdated → annotate only, never delete,
     # even with the CLI flag or disposition: delete.
     assert correct_apply._deletion_allowed({"status": "supersession"}, True) is False
-    assert correct_apply._deletion_allowed(
-        {"status": "supersession", "disposition": "delete"}, False) is False
+    assert (
+        correct_apply._deletion_allowed({"status": "supersession", "disposition": "delete"}, False)
+        is False
+    )
     # negation stays delete-eligible behind the gate
     assert correct_apply._deletion_allowed({"status": "negation"}, True) is True

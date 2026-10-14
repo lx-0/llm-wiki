@@ -19,12 +19,8 @@ import yaml
 from core.paths import ROOT_DIR, WIKI_DIR
 
 
-VALID_TOOLS = frozenset(
-    {"Read", "Edit", "Write", "Glob", "Grep", "Bash", "WebFetch", "WebSearch"}
-)
-VALID_PERMISSION_MODES = frozenset(
-    {"default", "acceptEdits", "plan", "bypassPermissions"}
-)
+VALID_TOOLS = frozenset({"Read", "Edit", "Write", "Glob", "Grep", "Bash", "WebFetch", "WebSearch"})
+VALID_PERMISSION_MODES = frozenset({"default", "acceptEdits", "plan", "bypassPermissions"})
 VALID_BUTTON_STYLES = frozenset({"primary", "default", "destructive", "plain"})
 VALID_CWD = frozenset({"vault", "wiki"})
 
@@ -82,9 +78,7 @@ class AgentSpec:
                 f"agent {self.id!r}: permission_mode {self.permission_mode!r} not in {sorted(VALID_PERMISSION_MODES)}"
             )
         if self.cwd not in VALID_CWD:
-            raise SpecError(
-                f"agent {self.id!r}: cwd {self.cwd!r} not in {sorted(VALID_CWD)}"
-            )
+            raise SpecError(f"agent {self.id!r}: cwd {self.cwd!r} not in {sorted(VALID_CWD)}")
         if self.max_turns < 1 or self.max_turns > 100:
             raise SpecError(f"agent {self.id!r}: max_turns must be 1..100, got {self.max_turns}")
         if self.button is not None:

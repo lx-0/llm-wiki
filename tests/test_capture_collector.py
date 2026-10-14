@@ -58,6 +58,7 @@ def capture_env(tmp_path, monkeypatch):
     monkeypatch.setattr(ci_mod, "_LOCK_FILE", state_dir / "capture_index.lock")
 
     from collectors import capture_collector as cap_mod
+
     importlib.reload(cap_mod)
 
     return cap_mod.CaptureCollector(), inbox, vault_raw / "captures"
@@ -68,6 +69,7 @@ def capture_env(tmp_path, monkeypatch):
 
 def test_capture_id_is_deterministic_for_same_content():
     from collectors import capture_collector as cap_mod
+
     importlib.reload(cap_mod)
 
     a = cap_mod._capture_id("crack the nuts at the bakery")
@@ -79,6 +81,7 @@ def test_capture_id_is_deterministic_for_same_content():
 
 def test_capture_id_ignores_surrounding_whitespace():
     from collectors import capture_collector as cap_mod
+
     importlib.reload(cap_mod)
 
     bare = cap_mod._capture_id("eine kryptische notiz")
@@ -88,6 +91,7 @@ def test_capture_id_ignores_surrounding_whitespace():
 
 def test_capture_id_differs_for_different_content():
     from collectors import capture_collector as cap_mod
+
     importlib.reload(cap_mod)
 
     assert cap_mod._capture_id("note one") != cap_mod._capture_id("note two")
@@ -99,6 +103,7 @@ def test_capture_id_differs_for_different_content():
 def test_unconfigured_inbox_is_graceful(monkeypatch):
     from core.config import CONFIG
     from collectors import capture_collector as cap_mod
+
     importlib.reload(cap_mod)
 
     monkeypatch.setattr(CONFIG.personal, "capture_inbox", "")
@@ -112,6 +117,7 @@ def test_unconfigured_inbox_is_graceful(monkeypatch):
 def test_missing_inbox_path_is_graceful(monkeypatch, tmp_path):
     from core.config import CONFIG
     from collectors import capture_collector as cap_mod
+
     importlib.reload(cap_mod)
 
     monkeypatch.setattr(CONFIG.personal, "capture_inbox", str(tmp_path / "nope"))
@@ -152,6 +158,7 @@ def test_real_run_writes_id_named_note_with_frontmatter(capture_env):
     assert result.errors == ()
 
     from collectors import capture_collector as cap_mod
+
     expected_id = cap_mod._capture_id(content)
     out_path = raw_captures / f"capture-{expected_id}.md"
     assert out_path.exists(), f"expected ID-derived filename capture-{expected_id}.md"
@@ -174,7 +181,11 @@ def test_correction_capture_tagged_when_referencing_known_id(capture_env):
     coll, inbox, raw_captures = capture_env
     from core import capture_index as ci
 
-    ci.record("abc12345ef01", source_path="raw/captures/capture-abc12345ef01.md", created="2026-06-20T09:00:00+02:00")
+    ci.record(
+        "abc12345ef01",
+        source_path="raw/captures/capture-abc12345ef01.md",
+        created="2026-06-20T09:00:00+02:00",
+    )
     (inbox / "fix.txt").write_text("corrects:abc12345 the meeting is Friday not Monday\n")
 
     result = coll.run()
@@ -208,6 +219,7 @@ def test_source_is_moved_into_vault_archive_zone(capture_env):
     coll.run()
 
     from collectors import capture_collector as cap_mod
+
     archive = cap_mod.MOBILE_ARCHIVE_DIR
     assert archive.is_dir()
     assert sorted(p.name for p in archive.iterdir()) == ["drop.md"]
@@ -275,6 +287,7 @@ def test_empty_source_file_is_archived_without_ingest(capture_env):
     assert len(result.files_written) == 1  # only the non-empty one
     assert any("empty.txt" in e for e in result.errors)
     from collectors import capture_collector as cap_mod
+
     assert (cap_mod.MOBILE_ARCHIVE_DIR / "empty.txt").exists()
     assert not (inbox / ".processed").exists()
 
@@ -293,7 +306,7 @@ def test_real_run_records_capture_in_index(capture_env):
     assert result.errors == ()
     idx = capture_index.load()
     assert len(idx) == 1
-    (cid, entry), = idx.items()
+    ((cid, entry),) = idx.items()
     assert entry["source_path"] == f"raw/captures/capture-{cid}.md"
     assert entry["status"] == capture_index.STATUS_OPEN
     assert entry["created"]  # iso timestamp recorded
@@ -310,7 +323,7 @@ def test_redrop_does_not_reset_superseded_index_entry(capture_env):
 
     (inbox / "first.txt").write_text(content)
     coll.run()
-    (cid, _), = capture_index.load().items()
+    ((cid, _),) = capture_index.load().items()
 
     # Simulate S03 flipping the interpretation to superseded.
     idx = capture_index.load()
@@ -330,6 +343,7 @@ def test_redrop_does_not_reset_superseded_index_entry(capture_env):
 def test_daily_rollup_line_lands(capture_env, monkeypatch, tmp_path):
     coll, inbox, raw_captures = capture_env
     from core import daily_capture
+
     daily_dir = tmp_path / "daily"
     monkeypatch.setattr(daily_capture, "DAILY_DIR", daily_dir)
 
@@ -348,10 +362,12 @@ def test_daily_rollup_line_lands(capture_env, monkeypatch, tmp_path):
 
 def test_config_personal_has_capture_inbox_field():
     from core.config import Personal
+
     assert hasattr(Personal(), "capture_inbox")
     assert Personal().capture_inbox == ""
 
 
 def test_migration_injects_capture_inbox():
     from migrations.migrate_config_keys import KEY_ADDITIONS
+
     assert KEY_ADDITIONS["personal"]["capture_inbox"] == ""

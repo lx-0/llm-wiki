@@ -28,13 +28,17 @@ def _article(tmp_path):
 
 def test_transport_failure_is_ollama_kind(tmp_path, monkeypatch):
     import httpx
+
     mod = _load_review_module()
     monkeypatch.setattr(mod, "KNOWLEDGE_DIR", tmp_path)
     monkeypatch.setattr(mod, "render", lambda *a, **k: "PROMPT")
-    monkeypatch.setattr(mod.ollama_client, "chat",
-                        lambda *a, **k: (_ for _ in ()).throw(httpx.ConnectError("refused")))
+    monkeypatch.setattr(
+        mod.ollama_client,
+        "chat",
+        lambda *a, **k: (_ for _ in ()).throw(httpx.ConnectError("refused")),
+    )
     r = mod.review_article(_article(tmp_path), "m")
-    assert r["error_kind"] == "ollama"   # counts toward fail-fast abort
+    assert r["error_kind"] == "ollama"  # counts toward fail-fast abort
 
 
 def test_unparseable_output_is_parse_kind(tmp_path, monkeypatch):
@@ -43,15 +47,16 @@ def test_unparseable_output_is_parse_kind(tmp_path, monkeypatch):
     monkeypatch.setattr(mod, "render", lambda *a, **k: "PROMPT")
     monkeypatch.setattr(mod.ollama_client, "chat", lambda *a, **k: "not json at all")
     r = mod.review_article(_article(tmp_path), "m")
-    assert r["error_kind"] == "parse"   # kcma is UP — must NOT trip fail-fast
+    assert r["error_kind"] == "parse"  # kcma is UP — must NOT trip fail-fast
 
 
 def test_success_has_no_error(tmp_path, monkeypatch):
     mod = _load_review_module()
     monkeypatch.setattr(mod, "KNOWLEDGE_DIR", tmp_path)
     monkeypatch.setattr(mod, "render", lambda *a, **k: "PROMPT")
-    monkeypatch.setattr(mod.ollama_client, "chat",
-                        lambda *a, **k: '{"overall": 4, "verdict": "keep"}')
+    monkeypatch.setattr(
+        mod.ollama_client, "chat", lambda *a, **k: '{"overall": 4, "verdict": "keep"}'
+    )
     r = mod.review_article(_article(tmp_path), "m")
     assert "error" not in r and r["overall"] == 4 and r["article"] == "a.md"
 

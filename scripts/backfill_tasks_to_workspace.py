@@ -62,7 +62,11 @@ def main() -> int:
             moved += 1
 
     if args.dry_run:
-        log.info("[dry-run] %d would move, %d already present. Re-run without --dry-run.", len(records), skipped)
+        log.info(
+            "[dry-run] %d would move, %d already present. Re-run without --dry-run.",
+            len(records),
+            skipped,
+        )
         return 0
     # remove tasks/ if now empty
     if not any(old.iterdir()):

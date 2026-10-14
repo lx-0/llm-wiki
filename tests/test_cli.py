@@ -65,8 +65,15 @@ def test_previously_invisible_commands_now_visible():
     """The nine commands the old bash help omitted must render now."""
     text = cli.render_help()
     for name in (
-        "produce", "triage", "bridge", "backfill",
-        "reconcile", "health-trends", "usage", "study", "analyze",
+        "produce",
+        "triage",
+        "bridge",
+        "backfill",
+        "reconcile",
+        "health-trends",
+        "usage",
+        "study",
+        "analyze",
     ):
         assert name in text, f"{name} still invisible in help"
 
@@ -106,16 +113,16 @@ def test_run_command_dispatches_child_with_args(spy, capsys):
 
 
 def test_refresh_after_runs_only_when_flagged(spy):
-    cli.run_command(cli.BY_NAME["compile"], [])   # refresh_after=True
+    cli.run_command(cli.BY_NAME["compile"], [])  # refresh_after=True
     assert spy["refreshed"] is True
 
     spy["refreshed"] = False
-    cli.run_command(cli.BY_NAME["flush"], [])      # refresh_after=False (flush self-refreshes)
+    cli.run_command(cli.BY_NAME["flush"], [])  # refresh_after=False (flush self-refreshes)
     assert spy["refreshed"] is False
 
 
 def test_no_banner_command_stays_quiet(spy, capsys):
-    cli.run_command(cli.BY_NAME["triage"], ["--all"])   # banner=False
+    cli.run_command(cli.BY_NAME["triage"], ["--all"])  # banner=False
     assert capsys.readouterr().out == ""
     assert spy["child"] == ("triage.py", ["--all"])
 
@@ -164,7 +171,7 @@ def test_query_bare_shows_help_exit_zero(spy):
 
 def test_correct_bare_shows_help_exit_one(spy):
     code = cli.run_command(cli.BY_NAME["correct"], [])
-    assert code == 1        # bare correct signals "provide a subcommand"
+    assert code == 1  # bare correct signals "provide a subcommand"
     assert spy["child"] is None
 
 

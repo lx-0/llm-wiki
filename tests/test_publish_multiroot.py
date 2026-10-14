@@ -4,6 +4,7 @@ Operator decisions 2026-08-25: ALLES vault-wide, ONE wiki. Rel keys become
 VAULT-relative; the v1 manifest (knowledge-relative, already live with 2022
 articles) must migrate in place with ZERO phantom retractions.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -80,10 +81,14 @@ def test_manifest_layout_migration_zero_retraction(tmp_path: Path) -> None:
     vault = _vault(tmp_path)
     store = manifest_store(tmp_path / "publish.json")
     # simulate the LIVE v1 manifest: knowledge-relative paths, no layout marker
-    store.update(lambda d: d.update(articles={
-        "foo": {"path": "concepts/foo.md", "hash": "stale"},
-        "hub": {"path": "MOCs/hub.md", "hash": "stale"},
-    }))
+    store.update(
+        lambda d: d.update(
+            articles={
+                "foo": {"path": "concepts/foo.md", "hash": "stale"},
+                "hub": {"path": "MOCs/hub.md", "hash": "stale"},
+            }
+        )
+    )
 
     migrate_manifest_layout(store)
     articles = store.reload()["articles"]
@@ -95,9 +100,7 @@ def test_manifest_layout_migration_zero_retraction(tmp_path: Path) -> None:
     assert store.reload()["articles"]["foo"]["path"] == "knowledge/concepts/foo.md"
 
     # slug stability + no phantom retraction against the widened corpus
-    mapping = map_slugs(vault, ROOTS, previous={
-        slug: e["path"] for slug, e in articles.items()
-    })
+    mapping = map_slugs(vault, ROOTS, previous={slug: e["path"] for slug, e in articles.items()})
     assert mapping["foo"] == "knowledge/concepts/foo.md"
     plan = plan_delta([], {})  # shape check only
     assert plan.retract == []

@@ -4,6 +4,7 @@ write_article requires a non-empty description ≤1024 chars — it drives
 listings and search on the meinkontext side. Source of truth is the article's
 index.md summary row; body paragraph and stem are fallbacks.
 """
+
 from __future__ import annotations
 
 from pathlib import Path

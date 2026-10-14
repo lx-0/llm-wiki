@@ -1,4 +1,5 @@
 """Direct Wispr HTTP contract, retry/dedup and no-write guarantees."""
+
 import json
 from types import SimpleNamespace
 
@@ -14,29 +15,38 @@ MID2 = "22222222-2222-4222-8222-222222222222"
 def meeting(mid=MID, **changes):
     # Field names/types captured from the live /api/v1/meetings/sync response.
     return {
-        "id": mid, "title": "Design review", "created_at": "2026-10-08T15:37:03.608000",
-        "modified_at": "2026-10-08T15:54:09.043677", "ended_at": "2026-10-08T15:54:08.525000",
-        "is_deleted": False, "finalized": True, "is_recording": False,
-        "notes": "", "summary": "Decision: ship the collector.",
+        "id": mid,
+        "title": "Design review",
+        "created_at": "2026-10-08T15:37:03.608000",
+        "modified_at": "2026-10-08T15:54:09.043677",
+        "ended_at": "2026-10-08T15:54:08.525000",
+        "is_deleted": False,
+        "finalized": True,
+        "is_recording": False,
+        "notes": "",
+        "summary": "Decision: ship the collector.",
         "refined_transcript": "[00:01] Alex: Let's ship it.",
-        "contacts": [], "transcript_deleted_at": None, **changes,
+        "contacts": [],
+        "transcript_deleted_at": None,
+        **changes,
     }
 
 
 def page(rows, cursor=None, sync="1791475000000"):
-    return {"pull": rows, "acked": [], "rejected": [],
-            "sync_time": sync, "next_cursor": cursor}
+    return {"pull": rows, "acked": [], "rejected": [], "sync_time": sync, "next_cursor": cursor}
 
 
 @pytest.fixture
 def env(tmp_path, monkeypatch):
     root = tmp_path / "vault"
     state = tmp_path / "state.json"
-    limits = SimpleNamespace(wispr_max_per_run=50, wispr_max_pages=100,
-                             wispr_request_timeout_s=30)
+    limits = SimpleNamespace(wispr_max_per_run=50, wispr_max_pages=100, wispr_request_timeout_s=30)
     account = {"wispr": {"kind": "wispr-api", "access_token_env": "WISPR_TEST_TOKEN"}}
-    monkeypatch.setattr(wispr, "CONFIG", SimpleNamespace(
-        personal=SimpleNamespace(accounts={"test": account}), limits=limits))
+    monkeypatch.setattr(
+        wispr,
+        "CONFIG",
+        SimpleNamespace(personal=SimpleNamespace(accounts={"test": account}), limits=limits),
+    )
     monkeypatch.setenv("WISPR_TEST_TOKEN", "test-secret")
     monkeypatch.setattr(wispr, "ROOT_DIR", root)
     monkeypatch.setattr(wispr, "_STATE_FILE", state)
@@ -46,6 +56,7 @@ def env(tmp_path, monkeypatch):
 
 def mock_client(monkeypatch, pages):
     calls = []
+
     def handle(request):
         body = json.loads(request.content)
         assert request.url == "https://api.wisprflow.ai/api/v1/meetings/sync"
@@ -55,11 +66,16 @@ def mock_client(monkeypatch, pages):
         assert "recording_states" not in body
         assert body["supports_refined_stamp_fetch"] is False
         calls.append(body)
-        result = pages[min(len(calls)-1, len(pages)-1)]
-        return httpx.Response(result if isinstance(result, int) else 200,
-                              json={} if isinstance(result, int) else result)
+        result = pages[min(len(calls) - 1, len(pages) - 1)]
+        return httpx.Response(
+            result if isinstance(result, int) else 200,
+            json={} if isinstance(result, int) else result,
+        )
+
     original = wispr.WisprClient
-    monkeypatch.setattr(wispr, "WisprClient", lambda a: original(a, transport=httpx.MockTransport(handle)))
+    monkeypatch.setattr(
+        wispr, "WisprClient", lambda a: original(a, transport=httpx.MockTransport(handle))
+    )
     return calls
 
 
@@ -101,10 +117,17 @@ def test_dry_run_has_no_writes(env, monkeypatch):
 
 def test_empty_and_recording_are_retried(env, monkeypatch):
     root, state, _ = env
-    mock_client(monkeypatch, [page([
-        meeting(summary=None, refined_transcript=None),
-        meeting(MID2, is_recording=True),
-    ])])
+    mock_client(
+        monkeypatch,
+        [
+            page(
+                [
+                    meeting(summary=None, refined_transcript=None),
+                    meeting(MID2, is_recording=True),
+                ]
+            )
+        ],
+    )
     result = wispr.WisprCollector().run(incremental=True)
     assert "2 pending" in result.message and not result.files_written
     assert json.loads(state.read_text())["test"]["sync_time"] == "0"
@@ -179,8 +202,16 @@ def test_deleted_remote_source_does_not_delete_archive(env, monkeypatch):
 
 def test_lexical_and_timestamp(monkeypatch):
     monkeypatch.setattr(wispr, "TIMEZONE", "Europe/Berlin")
-    notes = json.dumps({"root": {"type": "root", "children": [
-        {"type": "paragraph", "children": [{"type": "text", "text": "A decision"}]}]}})
+    notes = json.dumps(
+        {
+            "root": {
+                "type": "root",
+                "children": [
+                    {"type": "paragraph", "children": [{"type": "text", "text": "A decision"}]}
+                ],
+            }
+        }
+    )
     assert wispr._text(notes) == "A decision"
     fm, _, date, _ = wispr._render(meeting(created_at="2026-10-08T23:30:00Z"), "test")
     assert date == "2026-10-09"
@@ -191,10 +222,23 @@ def test_lexical_and_timestamp(monkeypatch):
 
 def test_empty_live_response(env, monkeypatch):
     _, state, _ = env
-    mock_client(monkeypatch, [page([meeting(
-        notes="", summary=None, refined_transcript=None,
-        transcript_ready=False, summary_ready=False,
-    )], sync="0")])
+    mock_client(
+        monkeypatch,
+        [
+            page(
+                [
+                    meeting(
+                        notes="",
+                        summary=None,
+                        refined_transcript=None,
+                        transcript_ready=False,
+                        summary_ready=False,
+                    )
+                ],
+                sync="0",
+            )
+        ],
+    )
     result = wispr.WisprCollector().run()
     assert not result.errors and not result.files_written
     assert "1 pending" in result.message

@@ -281,11 +281,11 @@ class TestRouterClassifierIdentity:
 
     EDGE_INPUTS = (
         "---\ntype: memory-sync\n---\nbody",
-        "--- \ntype: memory-sync\n---\nbody",     # trailing space on open fence
+        "--- \ntype: memory-sync\n---\nbody",  # trailing space on open fence
         "---\r\ntype: memory-sync\r\n---\r\nbody",  # CRLF
-        "---\ntype: memory-sync\n---",              # fence at EOF
-        '---\ntype: "memory-sync"\n---\nbody',      # quoted
-        "---\ntype:\n---\nbody",                    # valueless
+        "---\ntype: memory-sync\n---",  # fence at EOF
+        '---\ntype: "memory-sync"\n---\nbody',  # quoted
+        "---\ntype:\n---\nbody",  # valueless
         "---\ntype: memory-sync\nno closing fence",
     )
 
@@ -299,9 +299,7 @@ class TestRouterClassifierIdentity:
         from core.config import CONFIG
         from compile_stages.route import Skip, decide_route
 
-        monkeypatch.setattr(
-            CONFIG.limits, "compile_skip_substrate_types", ("calendar-rollup",)
-        )
+        monkeypatch.setattr(CONFIG.limits, "compile_skip_substrate_types", ("calendar-rollup",))
         for content in (
             "---\r\ntype: calendar-rollup\r\n---\r\nstuff",
             "--- \ntype: calendar-rollup\n--- \nstuff",

@@ -117,6 +117,7 @@ def tz_messages() -> list[MessageMeta]:
     normalises every Date header to UTC-aware. The incremental path
     compares against a tz-aware `since`, so its fixtures must be aware too.
     """
+
     def _msg(mid: str, folder: str, sender: str, dt: datetime) -> MessageMeta:
         return MessageMeta(
             id=mid,
@@ -131,7 +132,9 @@ def tz_messages() -> list[MessageMeta]:
 
     return [
         _msg("1", "INBOX", "alice@example.com", datetime(2026, 5, 1, 10, 0, tzinfo=timezone.utc)),
-        _msg("2", "INBOX/Work", "bob@example.com", datetime(2026, 5, 10, 9, 0, tzinfo=timezone.utc)),
+        _msg(
+            "2", "INBOX/Work", "bob@example.com", datetime(2026, 5, 10, 9, 0, tzinfo=timezone.utc)
+        ),
         _msg("3", "INBOX", "alice@example.com", datetime(2026, 5, 12, 15, 0, tzinfo=timezone.utc)),
     ]
 
@@ -411,11 +414,17 @@ def test_incremental_clears_last_error_on_recovery(
     """A successful scan clears a stale last_error — the state file always
     reflects current health, not a frozen old failure."""
     _isolate_email_state.write_text(
-        json.dumps({"accounts": {"testacct": {
-            "last_run_ts": "2026-05-05T00:00:00+00:00",
-            "last_error": "login failed earlier",
-            "last_error_at": "2026-05-13T00:00:00+00:00",
-        }}}),
+        json.dumps(
+            {
+                "accounts": {
+                    "testacct": {
+                        "last_run_ts": "2026-05-05T00:00:00+00:00",
+                        "last_error": "login failed earlier",
+                        "last_error_at": "2026-05-13T00:00:00+00:00",
+                    }
+                }
+            }
+        ),
         encoding="utf-8",
     )
     email_mod = _email_mod_with_account(
@@ -438,10 +447,14 @@ def test_load_state_migrates_legacy_shape(
     from collectors import email_collector as email_mod
 
     _isolate_email_state.write_text(
-        json.dumps({
-            "mboxes": {"ImapMail/server/INBOX": {"size": 1, "count": 1, "last_scan": "2026-04-01"}},
-            "last_incremental": "2026-05-01",
-        }),
+        json.dumps(
+            {
+                "mboxes": {
+                    "ImapMail/server/INBOX": {"size": 1, "count": 1, "last_scan": "2026-04-01"}
+                },
+                "last_incremental": "2026-05-01",
+            }
+        ),
         encoding="utf-8",
     )
 

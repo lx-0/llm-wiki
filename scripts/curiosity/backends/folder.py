@@ -91,8 +91,9 @@ def process_request(request_path: Path, *, dry_run: bool) -> RunResult:
     candidate = _resolve(root_id, file_path)
     if candidate is None:
         log.warning(
-            "  Folder backend: root_id %r not in personal.watched_folders "
-            "(request %s)", root_id, request_path.name,
+            "  Folder backend: root_id %r not in personal.watched_folders (request %s)",
+            root_id,
+            request_path.name,
         )
         return RunResult(success=False, error=f"unknown root_id {root_id!r}")
     exists = candidate.exists()
@@ -100,11 +101,12 @@ def process_request(request_path: Path, *, dry_run: bool) -> RunResult:
     if dry_run:
         log.info("  [dry-run] folder-deep-scan %s", request_path.name)
         log.info("    topic : %s", topic)
-        log.info("    file  : %s (%s)", candidate,
-                 "exists" if exists else "MISSING — stale index?")
+        log.info("    file  : %s (%s)", candidate, "exists" if exists else "MISSING — stale index?")
         log.info(
             "    S04 would ask: file %r will be loaded and sent to the "
-            "configured backend to answer %r — approve?", file_path, topic,
+            "configured backend to answer %r — approve?",
+            file_path,
+            topic,
         )
         return RunResult(success=True)
 
@@ -128,12 +130,15 @@ def process_request(request_path: Path, *, dry_run: bool) -> RunResult:
         # Stale index — file gone between indexing and read. Quarantine
         # so batches stop re-dispatching; reappearance re-eligibles it.
         log.warning(
-            "  Folder backend: %s MISSING (stale index?) — request %s "
-            "marked stale", candidate, request_path.name,
+            "  Folder backend: %s MISSING (stale index?) — request %s marked stale",
+            candidate,
+            request_path.name,
         )
         return _mark_failed(
-            request, request_path,
-            status="stale", error=f"file missing: {candidate}",
+            request,
+            request_path,
+            status="stale",
+            error=f"file missing: {candidate}",
         )
 
     provider = get_provider()
@@ -149,28 +154,37 @@ def process_request(request_path: Path, *, dry_run: bool) -> RunResult:
     except FileNotFoundError as exc:
         log.warning("  Folder backend: file vanished mid-read: %s", exc)
         return _mark_failed(
-            request, request_path,
-            status="stale", error=f"file missing: {exc}",
+            request,
+            request_path,
+            status="stale",
+            error=f"file missing: {exc}",
         )
 
     if answer.error:
         log.warning(
             "  Folder backend: provider failed for %s — %s",
-            request_path.name, answer.error,
+            request_path.name,
+            answer.error,
         )
         return _mark_failed(
-            request, request_path,
-            status="error", error=answer.error,
+            request,
+            request_path,
+            status="error",
+            error=answer.error,
             failed_as_of_mtime=answer.as_of_mtime,
         )
     if NOT_ANSWERED_SENTINEL in answer.answer_md:
         log.info(
             "  Folder backend: %s does not answer %r — nothing persisted, "
-            "request marked not-answered", file_path, topic,
+            "request marked not-answered",
+            file_path,
+            topic,
         )
         return _mark_failed(
-            request, request_path,
-            status="not-answered", error="not_answered_in_file",
+            request,
+            request_path,
+            status="not-answered",
+            error="not_answered_in_file",
             failed_as_of_mtime=answer.as_of_mtime,
         )
 
@@ -182,8 +196,7 @@ def process_request(request_path: Path, *, dry_run: bool) -> RunResult:
         _render_answer(request, answer, sensitivity=entry.get("sensitivity")),
         encoding="utf-8",
     )
-    log.info("  Wrote %s (answer-only, %d chars)",
-             output_path, len(answer.answer_md))
+    log.info("  Wrote %s (answer-only, %d chars)", output_path, len(answer.answer_md))
 
     request["status"] = "done"
     request["processed_at"] = now_iso()
@@ -214,14 +227,11 @@ def _mark_failed(
     if failed_as_of_mtime is not None:
         request["failed_as_of_mtime"] = failed_as_of_mtime
     request_path.write_text(json.dumps(request, indent=2), encoding="utf-8")
-    log.warning("  Folder backend: request %s -> %s (%s)",
-                request_path.name, status, error)
+    log.warning("  Folder backend: request %s -> %s (%s)", request_path.name, status, error)
     return RunResult(success=False, error=error)
 
 
-def _render_answer(
-    request: dict, answer: ScanAnswer, *, sensitivity: str | None = None
-) -> str:
+def _render_answer(request: dict, answer: ScanAnswer, *, sensitivity: str | None = None) -> str:
     """Answer artifact — email-deep-scan shape + S04 provenance.
 
     A normal compile source: frontmatter provenance (incl. the as-of
@@ -238,15 +248,11 @@ def _render_answer(
     lines.append("kind: folder-deep-scan")
     lines.append(f"topic: {json.dumps(topic, ensure_ascii=False)}")
     lines.append(f"root_id: {request.get('root_id', '')}")
-    lines.append(
-        f"file_path: {json.dumps(answer.file_path, ensure_ascii=False)}"
-    )
+    lines.append(f"file_path: {json.dumps(answer.file_path, ensure_ascii=False)}")
     lines.append(f"as_of_mtime: {answer.as_of_mtime}")
     # Human-readable twin of the float above: the compile agent (and the
     # operator) read a date; the staleness machinery keeps the float.
-    as_of_date = datetime.fromtimestamp(
-        answer.as_of_mtime, tz=timezone.utc
-    ).strftime("%Y-%m-%d")
+    as_of_date = datetime.fromtimestamp(answer.as_of_mtime, tz=timezone.utc).strftime("%Y-%m-%d")
     lines.append(f"as_of: {as_of_date}")
     lines.append(f"provider: {CONFIG.models.folder_scan_provider}")
     if sensitivity:
@@ -254,8 +260,8 @@ def _render_answer(
         # answer; compile_main propagates it onto derived articles.
         lines.append(f"sensitivity: {sensitivity}")
     lines.append('origin: "curiosity/folder-deep-scan"')
-    lines.append(f"request_source: \"{request.get('source', '')}\"")
-    lines.append(f"request_created: \"{request.get('created', '')}\"")
+    lines.append(f'request_source: "{request.get("source", "")}"')
+    lines.append(f'request_created: "{request.get("created", "")}"')
     lines.append(f'processed_at: "{now_iso()}"')
     lines.append("---")
     lines.append("")

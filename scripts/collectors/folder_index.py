@@ -123,9 +123,7 @@ def walk_root(entry: dict, *, max_depth: int, recent_n: int) -> FolderIndex:
         for child in children:
             try:
                 # follow_symlinks=False: a symlink (even to a dir) is a non-dir.
-                (dirs if child.is_dir(follow_symlinks=False) else nondirs).append(
-                    child
-                )
+                (dirs if child.is_dir(follow_symlinks=False) else nondirs).append(child)
             except OSError:
                 counts["errors"] += 1
         dirs.sort(key=lambda c: c.name)
@@ -292,9 +290,7 @@ def index_signature(index: FolderIndex) -> str:
     """
     h = hashlib.sha256()
     for e in sorted(index.tree, key=lambda e: e.rel_path):
-        h.update(
-            f"{e.rel_path}\x00{int(e.is_dir)}\x00{e.size}\x00{e.mtime}\n".encode()
-        )
+        h.update(f"{e.rel_path}\x00{int(e.is_dir)}\x00{e.size}\x00{e.mtime}\n".encode())
     return h.hexdigest()
 
 
@@ -308,9 +304,7 @@ def _load_state() -> dict:
 
 def _save_state(state: dict) -> None:
     STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
-    STATE_FILE.write_text(
-        json.dumps(state, indent=2, ensure_ascii=False), encoding="utf-8"
-    )
+    STATE_FILE.write_text(json.dumps(state, indent=2, ensure_ascii=False), encoding="utf-8")
 
 
 def sync_root(
@@ -332,14 +326,8 @@ def sync_root(
     digest_path = INDEX_DIR / f"{index.root_id}.md"
     state = _load_state()
     previous = state.get(index.root_id) or {}
-    if (
-        not force
-        and previous.get("signature") == signature
-        and digest_path.exists()
-    ):
-        return SyncResult(
-            written=False, path=digest_path, reason="unchanged", signature=signature
-        )
+    if not force and previous.get("signature") == signature and digest_path.exists():
+        return SyncResult(written=False, path=digest_path, reason="unchanged", signature=signature)
     path = write_index(index)
     state[index.root_id] = {
         "signature": signature,
@@ -359,12 +347,8 @@ def main(argv: list[str] | None = None) -> int:
         prog="wiki index",
         description="Body-blind folder-index digests for personal.watched_folders.",
     )
-    parser.add_argument(
-        "root_id", nargs="?", help="sync only this watched_folders entry"
-    )
-    parser.add_argument(
-        "--force", action="store_true", help="re-write even when unchanged"
-    )
+    parser.add_argument("root_id", nargs="?", help="sync only this watched_folders entry")
+    parser.add_argument("--force", action="store_true", help="re-write even when unchanged")
     args = parser.parse_args(argv)
 
     from core.config import CONFIG
@@ -375,9 +359,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.root_id:
         if any(e.get("id") == args.root_id for e in smb):
-            log.error(
-                "root %r is kind=smb — NAS indexing lands in S06.", args.root_id
-            )
+            log.error("root %r is kind=smb — NAS indexing lands in S06.", args.root_id)
             return 1
         local = [e for e in local if e.get("id") == args.root_id]
         if not local:
@@ -454,17 +436,12 @@ if __package__ not in (None, ""):
         def is_configured(self) -> bool:
             from core.config import CONFIG
 
-            return any(
-                e.get("kind") == "local" for e in (CONFIG.personal.watched_folders or [])
-            )
+            return any(e.get("kind") == "local" for e in (CONFIG.personal.watched_folders or []))
 
         def run(self, *, dry_run: bool = False, incremental: bool = False) -> RunResult:
             from core.config import CONFIG
 
-            local = [
-                e for e in (CONFIG.personal.watched_folders or [])
-                if e.get("kind") == "local"
-            ]
+            local = [e for e in (CONFIG.personal.watched_folders or []) if e.get("kind") == "local"]
             if not local:
                 return RunResult(message="no-op (no kind=local watched_folders configured)")
             if dry_run:

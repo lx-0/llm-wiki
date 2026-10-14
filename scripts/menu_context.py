@@ -262,22 +262,39 @@ def build_suggestions() -> list[dict]:
     # title + verb that GUI consumers render verbatim. `label` stays operator-speak for
     # the TUI (DECISIONS 2026-06-24).
     raw = [
-        ("process-inbox", probe_inbox, 1,
-         lambda n: f"{n} file{'s' if n != 1 else ''} in inbox/"),
-        ("compile", probe_compile_changed, 2,
-         lambda n: f"{n} source{'s' if n != 1 else ''} changed since compile"),
-        ("curiosity-folder", probe_folder_curiosity_pending, 3,
-         lambda n: f"{n} document-scan request{'s' if n != 1 else ''} to review"),
-        ("curiosity-email", probe_curiosity_pending, 8,
-         lambda n: f"{n} email-scan request{'s' if n != 1 else ''} pending"),
-        ("suggestions", probe_suggestions_approved, 4,
-         lambda n: f"{n} approved suggestion{'s' if n != 1 else ''} to execute"),
-        ("dream-sweep", probe_dream_overdue, 5,
-         lambda n: f"{n} entit{'ies' if n != 1 else 'y'} overdue for dream"),
-        ("flush", probe_flush_missing, 6,
-         lambda _: "today's session has not been flushed"),
-        ("lint", probe_lint_stale, 7,
-         lambda _: "knowledge edits since last lint sweep"),
+        ("process-inbox", probe_inbox, 1, lambda n: f"{n} file{'s' if n != 1 else ''} in inbox/"),
+        (
+            "compile",
+            probe_compile_changed,
+            2,
+            lambda n: f"{n} source{'s' if n != 1 else ''} changed since compile",
+        ),
+        (
+            "curiosity-folder",
+            probe_folder_curiosity_pending,
+            3,
+            lambda n: f"{n} document-scan request{'s' if n != 1 else ''} to review",
+        ),
+        (
+            "curiosity-email",
+            probe_curiosity_pending,
+            8,
+            lambda n: f"{n} email-scan request{'s' if n != 1 else ''} pending",
+        ),
+        (
+            "suggestions",
+            probe_suggestions_approved,
+            4,
+            lambda n: f"{n} approved suggestion{'s' if n != 1 else ''} to execute",
+        ),
+        (
+            "dream-sweep",
+            probe_dream_overdue,
+            5,
+            lambda n: f"{n} entit{'ies' if n != 1 else 'y'} overdue for dream",
+        ),
+        ("flush", probe_flush_missing, 6, lambda _: "today's session has not been flushed"),
+        ("lint", probe_lint_stale, 7, lambda _: "knowledge edits since last lint sweep"),
     ]
     results = []
     for action_id, probe, priority, label_fn in raw:
@@ -289,12 +306,14 @@ def build_suggestions() -> list[dict]:
         if n <= 0:
             continue
         spec = actions.get(action_id)
-        results.append({
-            **spec.to_json(n),
-            "count": n,
-            "label": label_fn(n),
-            "priority": priority,
-        })
+        results.append(
+            {
+                **spec.to_json(n),
+                "count": n,
+                "label": label_fn(n),
+                "priority": priority,
+            }
+        )
     results.sort(key=lambda r: r["priority"])
     for i, r in enumerate(results, start=1):
         r["key"] = str(i)
@@ -308,11 +327,7 @@ def probe_articles() -> int:
     """Total knowledge/ articles (any .md, excluding index.md / log.md)."""
     if not KNOWLEDGE_DIR.exists():
         return 0
-    return sum(
-        1
-        for p in KNOWLEDGE_DIR.rglob("*.md")
-        if p.name not in ("index.md", "log.md")
-    )
+    return sum(1 for p in KNOWLEDGE_DIR.rglob("*.md") if p.name not in ("index.md", "log.md"))
 
 
 def probe_last_compile_ago() -> str | None:
@@ -408,7 +423,9 @@ def main() -> int:
     elapsed_ms = int((time.monotonic() - start) * 1000)
     log.debug(
         "menu_context produced %d suggestions + %d status fields in %dms",
-        len(suggestions), len(status), elapsed_ms,
+        len(suggestions),
+        len(status),
+        elapsed_ms,
     )
     json.dump(
         {

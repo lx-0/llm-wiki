@@ -61,8 +61,8 @@ _OLLAMA_PROBE_CAP_S = 3.0
 @dataclass
 class CheckResult:
     id: str
-    category: str           # "config" / "connectivity" / "pipeline"
-    severity: str           # "critical" / "warning" / "info" / "ok"
+    category: str  # "config" / "connectivity" / "pipeline"
+    severity: str  # "critical" / "warning" / "info" / "ok"
     message: str
     fix: str | None = None  # human-readable suggestion (shell or prose)
     # When set, the home-screen banner promotes this check into the
@@ -135,9 +135,7 @@ def check_hooks_installed() -> CheckResult:
     # .wiki/hooks/session-start.py` form AND the cd-anchored
     # `cd '<abs>/.wiki' && uv run python hooks/session-start.py` form
     # used by earlier engine versions + user-scope installs.
-    wiki_hook_re = re.compile(
-        r"\.wiki['\"/ ].*hooks/(session-(start|end)|pre-compact|_transcript)"
-    )
+    wiki_hook_re = re.compile(r"\.wiki['\"/ ].*hooks/(session-(start|end)|pre-compact|_transcript)")
     try:
         agent_files = [
             (".claude", "settings.json"),
@@ -189,8 +187,11 @@ def check_hooks_installed() -> CheckResult:
                         "hook command)"
                     ),
                     fix="wiki hooks install (rewrites the hook commands with the environment path)",
-                    details={"user": installed_user, "project": installed_project,
-                             "stale_env": stale_env},
+                    details={
+                        "user": installed_user,
+                        "project": installed_project,
+                        "stale_env": stale_env,
+                    },
                 )
             return CheckResult(
                 id="hooks-installed",
@@ -250,8 +251,7 @@ def check_ollama_reachable(*, quick: bool = False) -> CheckResult:
         host = parsed.hostname or "localhost"
         port = parsed.port or (443 if parsed.scheme == "https" else 80)
         budget = min(
-            float(getattr(getattr(CONFIG, "limits", None),
-                          "ollama_connect_timeout_s", 10)),
+            float(getattr(getattr(CONFIG, "limits", None), "ollama_connect_timeout_s", 10)),
             _OLLAMA_PROBE_CAP_S,
         )
         started = time.monotonic()
@@ -270,8 +270,10 @@ def check_ollama_reachable(*, quick: bool = False) -> CheckResult:
                 id="ollama-reachable",
                 category="connectivity",
                 severity="warning",
-                message=(f"ollama unreachable at {url} "
-                         f"(to turn local AI off: `wiki config set models.ollama_url ''`)"),
+                message=(
+                    f"ollama unreachable at {url} "
+                    f"(to turn local AI off: `wiki config set models.ollama_url ''`)"
+                ),
                 # The GUI shows title + fix; the fix is the one plain action, the config
                 # alternative stays in the message for the TUI — a shell command in a GUI
                 # hint read as "this app will turn into a terminal" (blind panel, 2026-10-15).
@@ -479,7 +481,10 @@ def check_engine_update_available(*, quick: bool = False) -> CheckResult:
             )
         ups = subprocess.run(
             ["git", "-C", str(WIKI_DIR), "rev-parse", "--abbrev-ref", "@{u}"],
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=2, text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=2,
+            text=True,
         )
         if ups.returncode != 0:
             return CheckResult(
@@ -491,7 +496,10 @@ def check_engine_update_available(*, quick: bool = False) -> CheckResult:
         upstream = ups.stdout.strip()
         fetch = subprocess.run(
             ["git", "-C", str(WIKI_DIR), "fetch", "--quiet", "--no-tags"],
-            stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, timeout=8, text=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+            timeout=8,
+            text=True,
         )
         if fetch.returncode != 0:
             return CheckResult(
@@ -502,7 +510,10 @@ def check_engine_update_available(*, quick: bool = False) -> CheckResult:
             )
         count = subprocess.run(
             ["git", "-C", str(WIKI_DIR), "rev-list", "--count", f"HEAD..{upstream}"],
-            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=2, text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            timeout=2,
+            text=True,
         )
         n = int((count.stdout or "0").strip() or "0")
         if n == 0:
@@ -514,7 +525,10 @@ def check_engine_update_available(*, quick: bool = False) -> CheckResult:
             )
         latest = subprocess.run(
             ["git", "-C", str(WIKI_DIR), "log", "-1", "--format=%h %s", upstream],
-            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=2, text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            timeout=2,
+            text=True,
         )
         head = (latest.stdout or "").strip()[:80]
         msg = f"{n} engine commit{'s' if n != 1 else ''} behind {upstream}"
@@ -546,11 +560,7 @@ def check_no_knowledge_articles() -> CheckResult:
                 severity="info",
                 message="knowledge/ directory missing",
             )
-        n = sum(
-            1
-            for p in KNOWLEDGE_DIR.rglob("*.md")
-            if p.name not in ("index.md", "log.md")
-        )
+        n = sum(1 for p in KNOWLEDGE_DIR.rglob("*.md") if p.name not in ("index.md", "log.md"))
         if n == 0:
             return CheckResult(
                 id="no-knowledge-articles",
@@ -620,7 +630,6 @@ def check_compile_state() -> CheckResult:
         return _probe_failed("compile-state", "pipeline", exc)
 
 
-
 def check_account_auths(*, quick: bool = False) -> list[CheckResult]:
     """One CheckResult per (account, OAuth-integration) pair declared
     under `personal.accounts.<id>.<block>`.
@@ -652,7 +661,7 @@ def check_account_auths(*, quick: bool = False) -> list[CheckResult]:
         # block_key, expected_kind, token_prefix, auth_cmd
         oauth_integrations = [
             ("calendar", "google-calendar", "calendar-token-", "calendar-auth"),
-            ("gmeet",    "gmeet-api",       "gmeet-token-",    "gmeet-auth"),
+            ("gmeet", "gmeet-api", "gmeet-token-", "gmeet-auth"),
         ]
         results: list[CheckResult] = []
         for account_id, account_data in accounts.items():
@@ -662,9 +671,14 @@ def check_account_auths(*, quick: bool = False) -> list[CheckResult]:
                 block = account_data.get(block_key)
                 if not isinstance(block, dict) or block.get("kind") != expected_kind:
                     continue
-                results.append(_check_one_token(
-                    account_id, block_key, token_prefix, auth_cmd,
-                ))
+                results.append(
+                    _check_one_token(
+                        account_id,
+                        block_key,
+                        token_prefix,
+                        auth_cmd,
+                    )
+                )
             # gmail is special: the `gmail-token-<id>.json` cache is
             # consumed by EITHER the reader (mailbox adapter; reads
             # messages via Gmail REST API) OR the filter (suggestions
@@ -676,29 +690,44 @@ def check_account_auths(*, quick: bool = False) -> list[CheckResult]:
             if reader.get("kind") == "gmail-api":
                 # reader pulls messages via the Gmail REST API → the token is
                 # load-bearing; without it the collector genuinely skips.
-                results.append(_check_one_token(
-                    account_id, "gmail", "gmail-token-", "gmail-auth",
-                ))
+                results.append(
+                    _check_one_token(
+                        account_id,
+                        "gmail",
+                        "gmail-token-",
+                        "gmail-auth",
+                    )
+                )
             elif filt.get("kind") == "gmail-api":
                 # ONLY the write-side filter (suggestions label/move) uses the
                 # Gmail API; the reader is IMAP/App-Password, so email READING is
                 # unaffected. Report info (not warning) with accurate wording so
                 # this stops reading as a broken collector + a wrong re-auth
                 # prompt.
-                results.append(_check_one_token(
-                    account_id, "gmail", "gmail-token-", "gmail-auth",
-                    role_desc="email reading via IMAP is unaffected; only the "
-                              "suggestions label/move filter is skipped",
-                    missing_severity="info",
-                ))
+                results.append(
+                    _check_one_token(
+                        account_id,
+                        "gmail",
+                        "gmail-token-",
+                        "gmail-auth",
+                        role_desc="email reading via IMAP is unaffected; only the "
+                        "suggestions label/move filter is skipped",
+                        missing_severity="info",
+                    )
+                )
         return results
     except Exception as exc:
         return [_probe_failed("account-auths", "connectivity", exc)]
 
 
 def _check_one_token(
-    account_id: str, kind_label: str, token_prefix: str, auth_cmd: str,
-    *, role_desc: str | None = None, missing_severity: str = "warning",
+    account_id: str,
+    kind_label: str,
+    token_prefix: str,
+    auth_cmd: str,
+    *,
+    role_desc: str | None = None,
+    missing_severity: str = "warning",
 ) -> CheckResult:
     """Per-account-integration token-presence probe. Caller is the
     iterator in `check_account_auths`; not registered as a standalone
@@ -716,23 +745,19 @@ def _check_one_token(
             category="connectivity",
             severity="ok",
             message=f"{kind_label} OAuth ready for account `{account_id}`",
-            details={"account": account_id, "kind": kind_label,
-                     "token_path": str(token_file)},
+            details={"account": account_id, "kind": kind_label, "token_path": str(token_file)},
         )
     role = role_desc or f"the {kind_label} collector will skip it"
     return CheckResult(
         id=check_id,
         category="connectivity",
         severity=missing_severity,
-        message=f"{kind_label} OAuth not bootstrapped for account "
-                f"`{account_id}` — {role}",
+        message=f"{kind_label} OAuth not bootstrapped for account `{account_id}` — {role}",
         title=f"Sign in to {kind_label} ({account_id})",
         fix=f"wiki {auth_cmd} {account_id}",
         dispatch_args=[auth_cmd, account_id],
-        details={"account": account_id, "kind": kind_label,
-                 "expected_token": str(token_file)},
+        details={"account": account_id, "kind": kind_label, "expected_token": str(token_file)},
     )
-
 
 
 def check_wiki_on_path() -> CheckResult:
@@ -816,31 +841,40 @@ def check_voice_audio_setup() -> CheckResult:
         inbox_raw = (CONFIG.personal.voice_inbox or "").strip()
         if not inbox_raw:
             return CheckResult(
-                id="voice-audio-setup", category="config", severity="ok",
+                id="voice-audio-setup",
+                category="config",
+                severity="ok",
                 message="voice_inbox not configured — audio ingest n/a",
             )
         inbox = Path(inbox_raw).expanduser()
         if not inbox.exists():
             return CheckResult(
-                id="voice-audio-setup", category="config", severity="ok",
+                id="voice-audio-setup",
+                category="config",
+                severity="ok",
                 message=f"voice_inbox not found ({inbox}) — audio ingest n/a",
             )
         # Only the audio half — leave dictation-text alone.
         audio_exts = {".m4a", ".mp4", ".mp3", ".wav", ".flac", ".ogg", ".aac"}
         audio_files = [
-            p for p in inbox.iterdir()
+            p
+            for p in inbox.iterdir()
             if p.is_file() and not p.name.startswith(".") and p.suffix.lower() in audio_exts
         ]
         if not audio_files:
             return CheckResult(
-                id="voice-audio-setup", category="config", severity="ok",
+                id="voice-audio-setup",
+                category="config",
+                severity="ok",
                 message="no audio files queued in voice_inbox",
             )
 
         model_raw = (CONFIG.personal.voice_transcribe_model or "").strip()
         if not model_raw:
             return CheckResult(
-                id="voice-audio-setup", category="config", severity="warning",
+                id="voice-audio-setup",
+                category="config",
+                severity="warning",
                 message=(
                     f"{len(audio_files)} audio file(s) queued but "
                     f"personal.voice_transcribe_model is empty"
@@ -850,7 +884,9 @@ def check_voice_audio_setup() -> CheckResult:
         model_path = Path(model_raw).expanduser()
         if not model_path.is_file():
             return CheckResult(
-                id="voice-audio-setup", category="config", severity="warning",
+                id="voice-audio-setup",
+                category="config",
+                severity="warning",
                 message=f"voice_transcribe_model {model_path} does not exist",
                 fix="download a ggml model from https://huggingface.co/ggerganov/whisper.cpp/tree/main",
             )
@@ -859,7 +895,9 @@ def check_voice_audio_setup() -> CheckResult:
         whisper = whisper_cfg or shutil.which("whisper-cli")
         if not whisper or (whisper_cfg and not Path(whisper_cfg).expanduser().is_file()):
             return CheckResult(
-                id="voice-audio-setup", category="config", severity="warning",
+                id="voice-audio-setup",
+                category="config",
+                severity="warning",
                 message="whisper-cli not on $PATH",
                 fix="brew install whisper-cpp",
             )
@@ -871,13 +909,17 @@ def check_voice_audio_setup() -> CheckResult:
             ffmpeg = ffmpeg_cfg or shutil.which("ffmpeg")
             if not ffmpeg or (ffmpeg_cfg and not Path(ffmpeg_cfg).expanduser().is_file()):
                 return CheckResult(
-                    id="voice-audio-setup", category="config", severity="warning",
+                    id="voice-audio-setup",
+                    category="config",
+                    severity="warning",
                     message="ffmpeg not on $PATH (required for m4a/mp4/aac pre-conversion)",
                     fix="brew install ffmpeg",
                 )
 
         return CheckResult(
-            id="voice-audio-setup", category="config", severity="ok",
+            id="voice-audio-setup",
+            category="config",
+            severity="ok",
             message=f"{len(audio_files)} audio file(s) queued, transcription pipeline ready",
         )
     except Exception as exc:
@@ -956,7 +998,9 @@ def _failed_imports(names: list[str]) -> list[tuple[str, str]]:
     try:
         proc = subprocess.run(  # noqa: S603 — argv is engine-derived
             [sys.executable, "-c", probe, *names],
-            capture_output=True, text=True, timeout=120,
+            capture_output=True,
+            text=True,
+            timeout=120,
         )
     except (subprocess.TimeoutExpired, OSError) as exc:
         return [("(probe)", f"{type(exc).__name__}: {exc}")]
@@ -972,7 +1016,9 @@ def check_dependencies_importable(*, quick: bool = False) -> CheckResult:
     """Critical if any declared dependency fails to import."""
     if quick:
         return CheckResult(
-            id="dependencies-importable", category="config", severity="info",
+            id="dependencies-importable",
+            category="config",
+            severity="info",
             message="dependency import check skipped (--quick)",
         )
     try:
@@ -983,13 +1029,17 @@ def check_dependencies_importable(*, quick: bool = False) -> CheckResult:
     failures = _failed_imports(names)
     if not failures:
         return CheckResult(
-            id="dependencies-importable", category="config", severity="ok",
+            id="dependencies-importable",
+            category="config",
+            severity="ok",
             message=f"all {len(names)} declared dependencies import cleanly",
         )
     shown = ", ".join(n for n, _ in failures[:3])
     more = f" (+{len(failures) - 3} more)" if len(failures) > 3 else ""
     return CheckResult(
-        id="dependencies-importable", category="config", severity="critical",
+        id="dependencies-importable",
+        category="config",
+        severity="critical",
         message=f"{len(failures)} declared dependenc(ies) fail to import: {shown}{more}",
         fix=f"cd '{WIKI_DIR}' && uv sync --reinstall",
         details={"failed": [{"module": n, "error": e} for n, e in failures]},
@@ -1051,11 +1101,15 @@ def check_piggyback_health(
         try:
             state = json.loads(sf.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError):
-            return [CheckResult(
-                id="piggyback-health", category="pipeline", severity="warning",
-                message=f"piggyback state unreadable: {sf.name}",
-                fix="inspect the file; the runner rewrites it on the next fire",
-            )]
+            return [
+                CheckResult(
+                    id="piggyback-health",
+                    category="pipeline",
+                    severity="warning",
+                    message=f"piggyback state unreadable: {sf.name}",
+                    fix="inspect the file; the runner rewrites it on the next fire",
+                )
+            ]
 
     cap_s = int(getattr(CONFIG.limits, "piggyback_max_runtime_s", 14_400))
     stale_factor = int(getattr(CONFIG.limits, "doctor_piggyback_stale_factor", 4))
@@ -1069,7 +1123,7 @@ def check_piggyback_health(
     results: list[CheckResult] = []
     never_ran: list[str] = []
     stale: list[tuple[str, datetime, int]] = []
-    all_runs: list[datetime] = []   # every task's last_run, for the idle test
+    all_runs: list[datetime] = []  # every task's last_run, for the idle test
     healthy = 0
     for task in sorted(tasks, key=lambda t: str(t.get("name", ""))):
         name = str(task.get("name", ""))
@@ -1087,20 +1141,33 @@ def check_piggyback_health(
 
         if status == "timeout" or status.startswith(("failed:", "error:")):
             detail = f" — {last_error}" if last_error else ""
-            results.append(CheckResult(
-                id=f"piggyback-{name}", category="pipeline", severity="warning",
-                message=f"piggyback {name}: last run {status}{detail}",
-                fix="next compile retries after cooldown; logs in .wiki/logs/",
-            ))
+            results.append(
+                CheckResult(
+                    id=f"piggyback-{name}",
+                    category="pipeline",
+                    severity="warning",
+                    message=f"piggyback {name}: last run {status}{detail}",
+                    fix="next compile retries after cooldown; logs in .wiki/logs/",
+                )
+            )
             continue
-        if status in ("running", "spawned") and started is not None \
-                and (now - started).total_seconds() > cap_s + 3600:
-            results.append(CheckResult(
-                id=f"piggyback-{name}", category="pipeline", severity="warning",
-                message=(f"piggyback {name}: {status} since {started:%Y-%m-%d %H:%M} "
-                         "— past the runner's wall-clock cap (orphaned?)"),
-                fix="check the pid in piggyback-state.json; kill leftovers",
-            ))
+        if (
+            status in ("running", "spawned")
+            and started is not None
+            and (now - started).total_seconds() > cap_s + 3600
+        ):
+            results.append(
+                CheckResult(
+                    id=f"piggyback-{name}",
+                    category="pipeline",
+                    severity="warning",
+                    message=(
+                        f"piggyback {name}: {status} since {started:%Y-%m-%d %H:%M} "
+                        "— past the runner's wall-clock cap (orphaned?)"
+                    ),
+                    fix="check the pid in piggyback-state.json; kill leftovers",
+                )
+            )
             continue
         # Piggybacks only fire when the operator compiles/flushes, so a short
         # cadence alone can't define staleness — any normal quiet stretch
@@ -1125,39 +1192,58 @@ def check_piggyback_health(
         # collapse entirely on the live vault (2026-08-27).
         newest_fire = max(all_runs, default=None)
         pipeline_idle = (
-            newest_fire is not None
-            and (now - newest_fire).total_seconds() > stale_floor_s
+            newest_fire is not None and (now - newest_fire).total_seconds() > stale_floor_s
         )
         if pipeline_idle and len(stale) >= 3:
             age_days = (now - newest_fire).total_seconds() / 86_400
-            results.append(CheckResult(
-                id="piggyback-pipeline-idle", category="pipeline", severity="warning",
-                message=(f"pipeline idle for {age_days:.1f}d — {len(stale)} piggyback(s) "
-                         f"past their cadence ({', '.join(n for n, _, _ in stale[:4])}"
-                         f"{'…' if len(stale) > 4 else ''})"),
-                fix="run `wiki compile` — piggybacks drain from it (piggybacks_on_compile)",
-                details={"stale": [n for n, _, _ in stale]},
-            ))
+            results.append(
+                CheckResult(
+                    id="piggyback-pipeline-idle",
+                    category="pipeline",
+                    severity="warning",
+                    message=(
+                        f"pipeline idle for {age_days:.1f}d — {len(stale)} piggyback(s) "
+                        f"past their cadence ({', '.join(n for n, _, _ in stale[:4])}"
+                        f"{'…' if len(stale) > 4 else ''})"
+                    ),
+                    fix="run `wiki compile` — piggybacks drain from it (piggybacks_on_compile)",
+                    details={"stale": [n for n, _, _ in stale]},
+                )
+            )
         else:
             for name, last_run, cooldown_hours in stale:
                 age_days = (now - last_run).total_seconds() / 86_400
-                results.append(CheckResult(
-                    id=f"piggyback-{name}", category="pipeline", severity="warning",
-                    message=(f"piggyback {name}: no fire for {age_days:.1f}d "
-                             f"(cadence {cooldown_hours}h) — substrate dark"),
-                    fix="run `wiki compile` (piggybacks_on_compile) or check flush.py runs",
-                ))
+                results.append(
+                    CheckResult(
+                        id=f"piggyback-{name}",
+                        category="pipeline",
+                        severity="warning",
+                        message=(
+                            f"piggyback {name}: no fire for {age_days:.1f}d "
+                            f"(cadence {cooldown_hours}h) — substrate dark"
+                        ),
+                        fix="run `wiki compile` (piggybacks_on_compile) or check flush.py runs",
+                    )
+                )
 
     if never_ran:
-        results.append(CheckResult(
-            id="piggyback-never-ran", category="pipeline", severity="info",
-            message=f"piggyback(s) never ran yet: {', '.join(never_ran)}",
-        ))
+        results.append(
+            CheckResult(
+                id="piggyback-never-ran",
+                category="pipeline",
+                severity="info",
+                message=f"piggyback(s) never ran yet: {', '.join(never_ran)}",
+            )
+        )
     if not results or healthy:
-        results.append(CheckResult(
-            id="piggyback-health", category="pipeline", severity="ok",
-            message=f"{healthy} piggyback(s) healthy (last fires within cadence)",
-        ))
+        results.append(
+            CheckResult(
+                id="piggyback-health",
+                category="pipeline",
+                severity="ok",
+                message=f"{healthy} piggyback(s) healthy (last fires within cadence)",
+            )
+        )
     return results
 
 
@@ -1171,20 +1257,25 @@ def check_index_drift(
     """
     if quick:
         return CheckResult(
-            id="index-drift", category="pipeline", severity="info",
+            id="index-drift",
+            category="pipeline",
+            severity="info",
             message="index drift check skipped (--quick)",
         )
     knowledge = knowledge_dir or KNOWLEDGE_DIR
     if not knowledge.exists():
         return CheckResult(
-            id="index-drift", category="pipeline", severity="info",
+            id="index-drift",
+            category="pipeline",
+            severity="info",
             message="no knowledge/ yet — index drift not applicable",
         )
     try:
         from core.index_sync import sync_index
 
         stats = sync_index(
-            knowledge, vault or ROOT_DIR,
+            knowledge,
+            vault or ROOT_DIR,
             today=datetime.now().astimezone().date().isoformat(),
             apply=False,
         )
@@ -1192,16 +1283,22 @@ def check_index_drift(
         return _probe_failed("index-drift", "pipeline", exc)
     if stats.get("changed"):
         return CheckResult(
-            id="index-drift", category="pipeline", severity="warning",
-            message=(f"knowledge/index.md drift: {stats.get('deduped', 0)} duplicate / "
-                     f"{stats.get('dropped_dangling', 0)} dangling / "
-                     f"{stats.get('appended', 0)} missing row(s)"),
+            id="index-drift",
+            category="pipeline",
+            severity="warning",
+            message=(
+                f"knowledge/index.md drift: {stats.get('deduped', 0)} duplicate / "
+                f"{stats.get('dropped_dangling', 0)} dangling / "
+                f"{stats.get('appended', 0)} missing row(s)"
+            ),
             title="Your note list is out of date",
             fix="wiki reindex",
             dispatch_args=["reindex"],
         )
     return CheckResult(
-        id="index-drift", category="pipeline", severity="ok",
+        id="index-drift",
+        category="pipeline",
+        severity="ok",
         message=f"knowledge/index.md in sync ({stats.get('kept', 0)} rows)",
     )
 
@@ -1312,13 +1409,12 @@ def check_flush_pipeline() -> CheckResult:
     flush_log = LOGS_DIR / "flush.log"
     err_log = LOGS_DIR / "flush-errors.log"
     failed_dir = WIKI_DIR / "sessions" / "failed-flushes"
-    archived = (
-        sum(1 for p in failed_dir.iterdir() if p.is_file())
-        if failed_dir.exists() else 0
-    )
+    archived = sum(1 for p in failed_dir.iterdir() if p.is_file()) if failed_dir.exists() else 0
     if not flush_log.exists() or flush_log.stat().st_size == 0:
         return CheckResult(
-            id="flush-pipeline", category="pipeline", severity="ok",
+            id="flush-pipeline",
+            category="pipeline",
+            severity="ok",
             message="no session flushed yet (flush.log absent)",
             details={"archived": archived},
         )
@@ -1342,8 +1438,7 @@ def check_flush_pipeline() -> CheckResult:
     details = {
         "archived": archived,
         "last_success": (
-            datetime.fromtimestamp(last_ok).isoformat(timespec="seconds")
-            if last_ok else None
+            datetime.fromtimestamp(last_ok).isoformat(timespec="seconds") if last_ok else None
         ),
         "spawns_since_success": spawns_since_ok,
         "last_failure_kind": fail_kind,
@@ -1360,32 +1455,41 @@ def check_flush_pipeline() -> CheckResult:
         if fail_detail:
             cause += f" · {fail_detail}"
         fix, dispatch = _FLUSH_FIX_BY_KIND.get(
-            fail_kind or "", ("tail -50 .wiki/logs/flush-errors.log", None),
+            fail_kind or "",
+            ("tail -50 .wiki/logs/flush-errors.log", None),
         )
         return CheckResult(
-            id="flush-pipeline", category="pipeline", severity="critical",
+            id="flush-pipeline",
+            category="pipeline",
+            severity="critical",
             message=(
                 f"flush pipeline stalled — last successful flush {since}, "
                 f"{spawns_since_ok} spawned since, {archived} archived; "
                 f"last failure: {cause}"
             ),
             title="Saving your AI chats has stalled",
-            fix=fix, dispatch_args=dispatch, details=details,
+            fix=fix,
+            dispatch_args=dispatch,
+            details=details,
         )
     if archived:
         return CheckResult(
-            id="flush-pipeline", category="pipeline", severity="warning",
+            id="flush-pipeline",
+            category="pipeline",
+            severity="warning",
             message=(
                 f"{archived} archived flush context(s) awaiting retry "
                 f"(last successful flush {since})"
             ),
             title=f"{archived} AI chat{'s' if archived != 1 else ''} waiting to be saved",
             fix="drains via the retry_failed_flushes piggyback after the next "
-                "successful flush or `wiki compile`",
+            "successful flush or `wiki compile`",
             details=details,
         )
     return CheckResult(
-        id="flush-pipeline", category="pipeline", severity="ok",
+        id="flush-pipeline",
+        category="pipeline",
+        severity="ok",
         message=f"last flush landed {since}",
         details=details,
     )
@@ -1495,7 +1599,9 @@ def check_engine_cloud_eviction() -> CheckResult:
 
     if details["venv_in_cloud"]:
         return CheckResult(
-            id="engine-cloud-eviction", category="config", severity="critical",
+            id="engine-cloud-eviction",
+            category="config",
+            severity="critical",
             message=(
                 f"engine runs from an environment inside a cloud-synced path "
                 f"({venv_real}) — evictions SIGKILL the bundled Claude CLI mid-run "
@@ -1514,7 +1620,9 @@ def check_engine_cloud_eviction() -> CheckResult:
         )
     if stale_in_vault is not None:
         return CheckResult(
-            id="engine-cloud-eviction", category="config", severity="warning",
+            id="engine-cloud-eviction",
+            category="config",
+            severity="warning",
             message=(
                 f"stale in-vault environment at {stale_in_vault} is no longer used "
                 f"(engine runs from {venv_real}) but the sync engine keeps hauling it"
@@ -1526,7 +1634,9 @@ def check_engine_cloud_eviction() -> CheckResult:
         )
     if dataless:
         return CheckResult(
-            id="engine-cloud-eviction", category="config", severity="warning",
+            id="engine-cloud-eviction",
+            category="config",
+            severity="warning",
             message=(
                 f"{dataless} of {scanned} engine file(s) are evicted from local "
                 "storage — imports and prompt renders block on cloud downloads"
@@ -1536,7 +1646,9 @@ def check_engine_cloud_eviction() -> CheckResult:
             details=details,
         )
     return CheckResult(
-        id="engine-cloud-eviction", category="config", severity="ok",
+        id="engine-cloud-eviction",
+        category="config",
+        severity="ok",
         message=f"engine environment outside cloud-synced storage ({venv_real})",
         details=details,
     )

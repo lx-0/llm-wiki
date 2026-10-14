@@ -35,6 +35,7 @@ def pictures_env(tmp_path, monkeypatch):
     monkeypatch.setattr(paths_mod, "RAW_DIR", vault_raw)
 
     from collectors import pictures as pictures_mod
+
     importlib.reload(pictures_mod)
 
     return pictures_mod, inbox, vault_raw

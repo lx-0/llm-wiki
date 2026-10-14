@@ -4,6 +4,7 @@ S01 ships the PLAN side: `--dry-run` prints exactly what a live publish would
 do (create/update/retract/unchanged, per the content-hash delta), with a
 `--json` seam for GUI/agent consumers. Live execution lands in S02.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -96,14 +97,20 @@ def main(argv: list[str] | None = None) -> int:
         prog="wiki publish",
         description="Mirror knowledge/ into meinkontext (producer contract).",
     )
-    parser.add_argument("--dry-run", action="store_true",
-                        help="print the publish plan without writing anywhere")
-    parser.add_argument("--json", action="store_true", dest="as_json",
-                        help="machine-readable output")
-    parser.add_argument("--auth", action="store_true",
-                        help="connect the producer: one-time browser OAuth consent")
-    parser.add_argument("--piggyback", action="store_true",
-                        help="cadence mode: quiet no-op when publish is disabled")
+    parser.add_argument(
+        "--dry-run", action="store_true", help="print the publish plan without writing anywhere"
+    )
+    parser.add_argument(
+        "--json", action="store_true", dest="as_json", help="machine-readable output"
+    )
+    parser.add_argument(
+        "--auth", action="store_true", help="connect the producer: one-time browser OAuth consent"
+    )
+    parser.add_argument(
+        "--piggyback",
+        action="store_true",
+        help="cadence mode: quiet no-op when publish is disabled",
+    )
     args = parser.parse_args(argv)
 
     if args.auth:
@@ -112,8 +119,9 @@ def main(argv: list[str] | None = None) -> int:
         from publish.oauth import DEFAULT_TOKEN_PATH, mint_interactive
 
         if not CONFIG.publish.endpoint:
-            print("set publish.endpoint first (wiki config set publish.endpoint …)",
-                  file=sys.stderr)
+            print(
+                "set publish.endpoint first (wiki config set publish.endpoint …)", file=sys.stderr
+            )
             return 1
         mint_interactive(CONFIG.publish.endpoint)
         print(f"producer connected — tokens stored at {DEFAULT_TOKEN_PATH}")
@@ -128,8 +136,7 @@ def main(argv: list[str] | None = None) -> int:
     # actionable error. Dry-run stays available either way.
     if not args.dry_run and not CONFIG.publish.enabled:
         if args.piggyback:
-            print("publish piggyback: publish.enabled=false — skipping",
-                  file=sys.stderr)
+            print("publish piggyback: publish.enabled=false — skipping", file=sys.stderr)
             return 0
         print(
             "publish is disabled — enable with `wiki config set publish.enabled true` "
@@ -182,6 +189,7 @@ def main(argv: list[str] | None = None) -> int:
     if env_token:
         client = ContextMcpClient(cfg.endpoint, env_token)
     else:
+
         def _provider(force: bool = False) -> str:
             return current_access_token(force_refresh=force)
 

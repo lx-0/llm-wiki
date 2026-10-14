@@ -10,6 +10,7 @@ Strategy: build a per-test temp `knowledge/` tree by copying the
 fixture files into people/ or projects/ subdirs (driven by `type:`
 frontmatter), then run the checks over a LintContext built from it.
 """
+
 from __future__ import annotations
 
 import re
@@ -57,6 +58,7 @@ def with_knowledge(tmp_path):
     def _setup(sources: list[Path]) -> lint.LintContext:
         knowledge = _build_knowledge(tmp_path, sources)
         return lint.build_context(vault=tmp_path, knowledge_dir=knowledge, state={})
+
     return _setup
 
 

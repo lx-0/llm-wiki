@@ -108,9 +108,7 @@ def audit_instrument(
     # surfaced inference config — no raw re-parse.
     lookback_days = instr.meta.inference.default_lookback_days
 
-    files = resolve_substrate_files(
-        vault_root, CLINICAL_DEFAULT_SUBSTRATE_GLOBS, lookback_days
-    )
+    files = resolve_substrate_files(vault_root, CLINICAL_DEFAULT_SUBSTRATE_GLOBS, lookback_days)
     char_total = _sum_chars(files)
     tokens = char_total // CHARS_PER_TOKEN
 

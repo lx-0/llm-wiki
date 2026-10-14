@@ -61,11 +61,7 @@ def _make_report(
     if concern_bands is not None:
         fm["concern_bands"] = concern_bands
     path.parent.mkdir(parents=True, exist_ok=True)
-    body = (
-        "---\n"
-        + yaml.safe_dump(fm, sort_keys=False).strip()
-        + "\n---\n\n# Report body\n"
-    )
+    body = "---\n" + yaml.safe_dump(fm, sort_keys=False).strip() + "\n---\n\n# Report body\n"
     path.write_text(body, encoding="utf-8")
 
 
@@ -161,9 +157,7 @@ class TestTimelineLoader:
             [
                 {
                     "timestamp": f"2026-05-{day:02d}T10-00-00",
-                    "instruments": {
-                        "phq-9": {"total": d, "band": "mild", "total_items": 9}
-                    },
+                    "instruments": {"phq-9": {"total": d, "band": "mild", "total_items": 9}},
                 }
                 for day, d in [(10, 4), (15, 6), (17, 8)]
             ],
@@ -181,9 +175,14 @@ class TestSnapshotGeometry:
                 {
                     "timestamp": "2026-05-17T10-00-00",
                     "instruments": {
-                        "phq-9": {"total": 12, "band": "moderate", "total_items": 9,
-                                  "likert_hi": 3, "max_total": 27,
-                                  "concern_bands": ["moderate", "severe"]},
+                        "phq-9": {
+                            "total": 12,
+                            "band": "moderate",
+                            "total_items": 9,
+                            "likert_hi": 3,
+                            "max_total": 27,
+                            "concern_bands": ["moderate", "severe"],
+                        },
                     },
                 }
             ],
@@ -278,7 +277,7 @@ class TestChartsSvg:
         out = render_radar(current, tmp_path / "radar.svg", previous=previous)
         content = self._assert_valid_svg(out)
         assert "stroke-dasharray" in content  # previous polygon is dashed
-        assert "previous run" in content      # legend mentions previous
+        assert "previous run" in content  # legend mentions previous
 
     def test_timeline_renders_multi_point(self, tmp_path: Path) -> None:
         series = [
@@ -313,23 +312,53 @@ class TestRenderSummary:
                 {
                     "timestamp": "2026-05-10T10-00-00",
                     "instruments": {
-                        "phq-9": {"total": 4, "band": "minimal", "coverage_pct": 44.4,
-                                  "answered": 4, "total_items": 9},
-                        "gad-7": {"total": 3, "band": "minimal", "coverage_pct": 57.1,
-                                  "answered": 4, "total_items": 7},
-                        "who-5": {"total": 18, "band": "moderate", "coverage_pct": 100.0,
-                                  "answered": 5, "total_items": 5},
+                        "phq-9": {
+                            "total": 4,
+                            "band": "minimal",
+                            "coverage_pct": 44.4,
+                            "answered": 4,
+                            "total_items": 9,
+                        },
+                        "gad-7": {
+                            "total": 3,
+                            "band": "minimal",
+                            "coverage_pct": 57.1,
+                            "answered": 4,
+                            "total_items": 7,
+                        },
+                        "who-5": {
+                            "total": 18,
+                            "band": "moderate",
+                            "coverage_pct": 100.0,
+                            "answered": 5,
+                            "total_items": 5,
+                        },
                     },
                 },
                 {
                     "timestamp": "2026-05-17T10-00-00",
                     "instruments": {
-                        "phq-9": {"total": 6, "band": "mild", "coverage_pct": 44.4,
-                                  "answered": 4, "total_items": 9},
-                        "gad-7": {"total": 4, "band": "minimal", "coverage_pct": 57.1,
-                                  "answered": 4, "total_items": 7},
-                        "who-5": {"total": 15, "band": "moderate", "coverage_pct": 100.0,
-                                  "answered": 5, "total_items": 5},
+                        "phq-9": {
+                            "total": 6,
+                            "band": "mild",
+                            "coverage_pct": 44.4,
+                            "answered": 4,
+                            "total_items": 9,
+                        },
+                        "gad-7": {
+                            "total": 4,
+                            "band": "minimal",
+                            "coverage_pct": 57.1,
+                            "answered": 4,
+                            "total_items": 7,
+                        },
+                        "who-5": {
+                            "total": 15,
+                            "band": "moderate",
+                            "coverage_pct": 100.0,
+                            "answered": 5,
+                            "total_items": 5,
+                        },
                     },
                 },
             ],
@@ -394,8 +423,13 @@ class TestRenderSummary:
                 {
                     "timestamp": "2026-05-17T10-00-00",
                     "instruments": {
-                        "phq-9": {"total": 6, "band": "mild", "coverage_pct": 44.4,
-                                  "answered": 4, "total_items": 9},
+                        "phq-9": {
+                            "total": 6,
+                            "band": "mild",
+                            "coverage_pct": 44.4,
+                            "answered": 4,
+                            "total_items": 9,
+                        },
                     },
                 }
             ],
@@ -423,17 +457,36 @@ class TestRenderSummary:
                 {
                     "timestamp": "2026-05-17T10-00-00",
                     "instruments": {
-                        "isi": {"total": 25, "band": "severe", "coverage_pct": 100.0,
-                                "answered": 7, "total_items": 7, "likert_hi": 4,
-                                "max_total": 28,
-                                "concern_bands": ["moderate", "severe"]},
-                        "olbi": {"total": 70, "band": "very-high", "coverage_pct": 100.0,
-                                 "answered": 16, "total_items": 16, "likert_hi": 5,
-                                 "max_total": 80,
-                                 "concern_bands": ["high", "very-high"]},
-                        "pss-10": {"total": 30, "band": "high", "coverage_pct": 100.0,
-                                   "answered": 10, "total_items": 10, "likert_hi": 4,
-                                   "max_total": 40, "concern_bands": ["high"]},
+                        "isi": {
+                            "total": 25,
+                            "band": "severe",
+                            "coverage_pct": 100.0,
+                            "answered": 7,
+                            "total_items": 7,
+                            "likert_hi": 4,
+                            "max_total": 28,
+                            "concern_bands": ["moderate", "severe"],
+                        },
+                        "olbi": {
+                            "total": 70,
+                            "band": "very-high",
+                            "coverage_pct": 100.0,
+                            "answered": 16,
+                            "total_items": 16,
+                            "likert_hi": 5,
+                            "max_total": 80,
+                            "concern_bands": ["high", "very-high"],
+                        },
+                        "pss-10": {
+                            "total": 30,
+                            "band": "high",
+                            "coverage_pct": 100.0,
+                            "answered": 10,
+                            "total_items": 10,
+                            "likert_hi": 4,
+                            "max_total": 40,
+                            "concern_bands": ["high"],
+                        },
                     },
                 }
             ],
@@ -451,9 +504,7 @@ class TestRenderSummary:
         assert "`pss-10` band = **high**" in content
         assert "No automatic flags raised" not in content
 
-    def test_flags_recovered_when_frontmatter_lacks_concern_bands(
-        self, tmp_path: Path
-    ) -> None:
+    def test_flags_recovered_when_frontmatter_lacks_concern_bands(self, tmp_path: Path) -> None:
         """OLD reports (pre-deepening) carry no `concern_bands` — the flag is
         recovered from the engine instrument definition so historical runs
         still surface elevated bands."""
@@ -465,8 +516,13 @@ class TestRenderSummary:
                     "timestamp": "2026-05-17T10-00-00",
                     # No concern_bands / max_total / likert_hi in frontmatter.
                     "instruments": {
-                        "isi": {"total": 25, "band": "severe", "coverage_pct": 100.0,
-                                "answered": 7, "total_items": 7},
+                        "isi": {
+                            "total": 25,
+                            "band": "severe",
+                            "coverage_pct": 100.0,
+                            "answered": 7,
+                            "total_items": 7,
+                        },
                     },
                 }
             ],
@@ -491,10 +547,16 @@ class TestRenderSummary:
                 {
                     "timestamp": "2026-05-17T10-00-00",
                     "instruments": {
-                        "isi": {"total": 3, "band": "no-clinical-insomnia",
-                                "coverage_pct": 100.0, "answered": 7, "total_items": 7,
-                                "likert_hi": 4, "max_total": 28,
-                                "concern_bands": ["moderate", "severe"]},
+                        "isi": {
+                            "total": 3,
+                            "band": "no-clinical-insomnia",
+                            "coverage_pct": 100.0,
+                            "answered": 7,
+                            "total_items": 7,
+                            "likert_hi": 4,
+                            "max_total": 28,
+                            "concern_bands": ["moderate", "severe"],
+                        },
                     },
                 }
             ],
@@ -520,10 +582,20 @@ class TestRenderSummary:
                 {
                     "timestamp": "2026-05-17T10-00-00",
                     "instruments": {
-                        "phq-9": {"total": 4, "band": "minimal", "coverage_pct": 100.0,
-                                  "answered": 9, "total_items": 9},
-                        "k6": {"total": 2, "band": "minimal", "coverage_pct": 30.0,
-                               "answered": 2, "total_items": 6},
+                        "phq-9": {
+                            "total": 4,
+                            "band": "minimal",
+                            "coverage_pct": 100.0,
+                            "answered": 9,
+                            "total_items": 9,
+                        },
+                        "k6": {
+                            "total": 2,
+                            "band": "minimal",
+                            "coverage_pct": 30.0,
+                            "answered": 2,
+                            "total_items": 6,
+                        },
                     },
                 }
             ],

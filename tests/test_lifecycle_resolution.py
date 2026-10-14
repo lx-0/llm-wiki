@@ -4,6 +4,7 @@ Validates the BEFORE / AFTER fixture pair shape and that the rendered
 compile prompt for the AFTER substrate carries the resolution-detection
 rules from T02. LLM-emission validation is operator-canary work.
 """
+
 from __future__ import annotations
 
 from pathlib import Path

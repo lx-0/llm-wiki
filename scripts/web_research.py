@@ -182,13 +182,15 @@ def search_exa(query: str, api_key: str, num_results: int = 5) -> list[dict]:
     correct per the skill but UNVERIFIED against the live API (no Exa key was
     available when it was written) — see the backlog. All unit tests inject a
     fake backend; this function is only exercised against the real endpoint."""
-    payload = json.dumps({
-        "query": query,
-        "num_results": num_results,
-        "type": "auto",
-        "use_autoprompt": True,
-        "contents": {"text": {"max_characters": 1000}},
-    }).encode("utf-8")
+    payload = json.dumps(
+        {
+            "query": query,
+            "num_results": num_results,
+            "type": "auto",
+            "use_autoprompt": True,
+            "contents": {"text": {"max_characters": 1000}},
+        }
+    ).encode("utf-8")
     req = urllib.request.Request(
         EXA_ENDPOINT,
         data=payload,
@@ -199,11 +201,13 @@ def search_exa(query: str, api_key: str, num_results: int = 5) -> list[dict]:
         data = json.loads(resp.read().decode("utf-8"))
     out: list[dict] = []
     for r in data.get("results", []):
-        out.append({
-            "title": r.get("title") or "",
-            "url": r.get("url") or "",
-            "text": r.get("text") or "",
-        })
+        out.append(
+            {
+                "title": r.get("title") or "",
+                "url": r.get("url") or "",
+                "text": r.get("text") or "",
+            }
+        )
     return out
 
 

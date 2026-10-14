@@ -58,9 +58,7 @@ def test_unknown_provider_name_is_loud_config_error(monkeypatch):
         fp.get_provider()
 
 
-def test_claude_provider_happy_path_scopes_read_to_the_file(
-    trove_file, monkeypatch
-):
+def test_claude_provider_happy_path_scopes_read_to_the_file(trove_file, monkeypatch):
     from curiosity.backends import folder_providers as fp
 
     captured = {}

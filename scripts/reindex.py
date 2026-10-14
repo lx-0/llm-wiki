@@ -5,6 +5,7 @@ dedupe duplicate rows (last wins), drop dangling rows, append missing
 articles with first-paragraph summaries. `--dry-run` prints the stats
 without writing.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -25,12 +26,14 @@ def main(argv: list[str] | None = None) -> int:
         prog="wiki reindex",
         description="Reconcile knowledge/index.md against the corpus (deterministic).",
     )
-    parser.add_argument("--dry-run", action="store_true",
-                        help="report what would change without writing")
+    parser.add_argument(
+        "--dry-run", action="store_true", help="report what would change without writing"
+    )
     args = parser.parse_args(argv)
 
     stats = sync_index(
-        KNOWLEDGE_DIR, ROOT_DIR,
+        KNOWLEDGE_DIR,
+        ROOT_DIR,
         today=datetime.now(ZoneInfo(TIMEZONE)).strftime("%Y-%m-%d"),
         apply=not args.dry_run,
     )

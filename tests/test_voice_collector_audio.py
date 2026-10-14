@@ -55,6 +55,7 @@ def voice_env(tmp_path, monkeypatch):
     monkeypatch.setattr(CONFIG.features, "voice_punctuate", False)
 
     from collectors import voice as voice_mod
+
     importlib.reload(voice_mod)
 
     return voice_mod, voice_mod.VoiceCollector(), inbox, vault_raw / "voice"
@@ -66,6 +67,7 @@ def _make_mock_run(transcript: str):
 
     The dispatcher inspects argv[0] to tell the two binaries apart.
     """
+
     def fake_run(argv, **kwargs):
         binary = Path(argv[0]).name
         if binary.startswith("whisper"):
@@ -76,6 +78,7 @@ def _make_mock_run(transcript: str):
         out_path.parent.mkdir(parents=True, exist_ok=True)
         out_path.write_bytes(b"fake-wav")
         return subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
+
     return fake_run
 
 
@@ -143,6 +146,7 @@ def test_audio_transcript_runs_through_punctuate_when_enabled(voice_env, monkeyp
     voice_mod, coll, inbox, raw_voice = voice_env
     (inbox / "memo.m4a").write_bytes(b"fake-m4a")
     from core.config import CONFIG
+
     monkeypatch.setattr(CONFIG.features, "voice_punctuate", True)
     monkeypatch.setattr(voice_mod, "_punctuate", lambda raw: "Dies ist ein Test.")
     monkeypatch.setattr(voice_mod.subprocess, "run", _make_mock_run("dies ist ein test"))
@@ -166,6 +170,7 @@ def test_audio_with_empty_model_path_leaves_file_in_inbox(voice_env, monkeypatch
     voice_mod, coll, inbox, raw_voice = voice_env
     (inbox / "memo.m4a").write_bytes(b"fake-m4a")
     from core.config import CONFIG
+
     monkeypatch.setattr(CONFIG.personal, "voice_transcribe_model", "")
 
     result = coll.run()
@@ -181,6 +186,7 @@ def test_audio_with_missing_model_file_leaves_file_in_inbox(voice_env, monkeypat
     voice_mod, coll, inbox, raw_voice = voice_env
     (inbox / "memo.m4a").write_bytes(b"fake-m4a")
     from core.config import CONFIG
+
     monkeypatch.setattr(CONFIG.personal, "voice_transcribe_model", "/nonexistent/model.bin")
 
     result = coll.run()
@@ -193,6 +199,7 @@ def test_audio_with_missing_whisper_binary_leaves_file_in_inbox(voice_env, monke
     voice_mod, coll, inbox, raw_voice = voice_env
     (inbox / "memo.m4a").write_bytes(b"fake-m4a")
     from core.config import CONFIG
+
     monkeypatch.setattr(CONFIG.personal, "voice_transcribe_binary", "/nonexistent/whisper-cli")
     # Force `shutil.which` lookup to also miss so the fallback can't rescue.
     monkeypatch.setattr(voice_mod.shutil, "which", lambda name: None)
@@ -215,6 +222,7 @@ def test_audio_with_whisper_subprocess_error_leaves_file_in_inbox(voice_env, mon
         out_path.parent.mkdir(parents=True, exist_ok=True)
         out_path.write_bytes(b"fake-wav")
         return subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
+
     monkeypatch.setattr(voice_mod.subprocess, "run", fake_run)
 
     result = coll.run()
@@ -230,9 +238,12 @@ def test_audio_with_ffmpeg_error_leaves_m4a_in_inbox(voice_env, monkeypatch):
     def fake_run(argv, **kwargs):
         binary = Path(argv[0]).name
         if not binary.startswith("whisper"):
-            raise subprocess.CalledProcessError(returncode=1, cmd=argv, stderr=b"format unsupported")
+            raise subprocess.CalledProcessError(
+                returncode=1, cmd=argv, stderr=b"format unsupported"
+            )
         # Whisper should never be reached because ffmpeg failed first.
         raise AssertionError("whisper-cli should not be called when ffmpeg fails")
+
     monkeypatch.setattr(voice_mod.subprocess, "run", fake_run)
 
     result = coll.run()

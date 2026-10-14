@@ -150,8 +150,7 @@ async def run_probe(
                     elif tool_name == "Read":
                         outcome.read_tool_uses.append(entry)
                     print(
-                        f"  → tool_use {tool_name}: "
-                        f"{json.dumps(tool_input)[:120]}",
+                        f"  → tool_use {tool_name}: {json.dumps(tool_input)[:120]}",
                         flush=True,
                     )
         elif isinstance(message, UserMessage):
@@ -163,9 +162,7 @@ async def run_probe(
                             "content": str(getattr(block, "content", ""))[:240],
                         }
                         outcome.tool_results.append(tool_results)
-                        err_flag = (
-                            "ERR" if getattr(block, "is_error", False) else "ok "
-                        )
+                        err_flag = "ERR" if getattr(block, "is_error", False) else "ok "
                         print(
                             f"  ← tool_result [{err_flag}]: "
                             f"{str(getattr(block, 'content', ''))[:140]}",
@@ -179,8 +176,7 @@ async def run_probe(
     outcome.text_summary = " ".join(text_chunks).strip()
     if target_path is not None:
         print(
-            f"  on disk after: {outcome.actual_on_disk} "
-            f"(expected {outcome.expected_on_disk})",
+            f"  on disk after: {outcome.actual_on_disk} (expected {outcome.expected_on_disk})",
             flush=True,
         )
     return outcome
@@ -189,11 +185,7 @@ async def run_probe(
 def _check_control_read(o: ProbeOutcome) -> bool:
     # Positive control: at least one Read tool use, and text response
     # mentions the substrate content. No write attempts at all.
-    return (
-        len(o.read_tool_uses) >= 1
-        and len(o.write_tool_uses) == 0
-        and len(o.edit_tool_uses) == 0
-    )
+    return len(o.read_tool_uses) >= 1 and len(o.write_tool_uses) == 0 and len(o.edit_tool_uses) == 0
 
 
 def _check_write_denied(o: ProbeOutcome) -> bool:
@@ -296,10 +288,7 @@ async def main_async() -> int:
                 f"tool_results={len(o.tool_results)}"
             )
             if o.target_path is not None:
-                print(
-                    f"          on_disk={o.actual_on_disk} "
-                    f"expected={o.expected_on_disk}"
-                )
+                print(f"          on_disk={o.actual_on_disk} expected={o.expected_on_disk}")
             if o.tool_results:
                 for r in o.tool_results:
                     err = "ERR" if r.get("is_error") else "ok "

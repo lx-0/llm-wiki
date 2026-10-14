@@ -74,7 +74,10 @@ def main() -> None:
     if os.environ.get("CLAUDE_INVOKED_BY"):
         # Emit an empty hookSpecificOutput so the SDK doesn't think the hook
         # crashed; just contribute no extra context to engine-launched sessions.
-        json.dump({"hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": ""}}, sys.stdout)
+        json.dump(
+            {"hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": ""}},
+            sys.stdout,
+        )
         return
     context = build_context()
     output = {

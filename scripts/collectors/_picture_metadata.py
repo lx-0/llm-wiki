@@ -54,9 +54,7 @@ def _parse_android_filename(src: Path) -> dict:
         return {}
     date_str, time_str, app_ctx, _ext = match.groups()
     try:
-        captured_at = datetime.strptime(
-            f"{date_str}{time_str}", "%Y%m%d%H%M%S"
-        )
+        captured_at = datetime.strptime(f"{date_str}{time_str}", "%Y%m%d%H%M%S")
     except ValueError:
         return {}
     return {
@@ -125,9 +123,7 @@ def _parse_exif(src: Path) -> dict:
         raw = tag(date_key)
         if isinstance(raw, str) and raw.strip():
             try:
-                out["captured_at"] = datetime.strptime(
-                    raw.strip(), "%Y:%m:%d %H:%M:%S"
-                )
+                out["captured_at"] = datetime.strptime(raw.strip(), "%Y:%m:%d %H:%M:%S")
                 break
             except ValueError:
                 continue

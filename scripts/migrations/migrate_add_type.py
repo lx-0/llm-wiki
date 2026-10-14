@@ -80,7 +80,7 @@ def apply_migration(content: str, expected: str) -> str:
         # No frontmatter at all — wrap the whole file in a minimal block.
         return f"---\ntype: {expected}\n---\n{content}"
     fm = fm_match.group(1)
-    body = content[fm_match.end():]
+    body = content[fm_match.end() :]
     if _TYPE_LINE_RE.search(fm):
         new_fm = _TYPE_LINE_RE.sub(f"type: {expected}", fm, count=1)
     else:

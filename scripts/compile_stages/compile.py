@@ -91,7 +91,7 @@ def _build_owner_block() -> str:
         "When distilling first-person beliefs, commitments, or decisions from "
         f"a source that has no explicit `author:` frontmatter, attribute them "
         f"to **{owner}**. You MAY Read `{page_rel}` to resolve self-references "
-        "(\"I\", \"we\", \"my company\") and to find existing entries you "
+        '("I", "we", "my company") and to find existing entries you '
         "should connect new facts to.\n"
     )
 
@@ -134,8 +134,11 @@ async def _attempt(
             write_scope=WriteScope(
                 roots=(ROOT_DIR / "knowledge", LOG_FILE),
                 legacy_allowed_tools=(
-                    "Read", "Glob", "Grep",
-                    "Write(knowledge/**)", "Edit(knowledge/**)",
+                    "Read",
+                    "Glob",
+                    "Grep",
+                    "Write(knowledge/**)",
+                    "Edit(knowledge/**)",
                 ),
             ),
             stall_timeout_s=CONFIG.limits.compile_per_call_timeout_s,
@@ -176,9 +179,11 @@ async def _attempt(
 
     if budget > 0 and tokens > budget:
         log.error(
-            "  compile_file ✗ tokens_exceeded · %s tok > budget %s "
-            "(elapsed %.1fs, model=%s)",
-            f"{tokens:,}", f"{budget:,}", result.elapsed_s, model_id,
+            "  compile_file ✗ tokens_exceeded · %s tok > budget %s (elapsed %.1fs, model=%s)",
+            f"{tokens:,}",
+            f"{budget:,}",
+            result.elapsed_s,
+            model_id,
         )
         log.error("    source:    %s", rel_path)
         log.error(
@@ -211,9 +216,7 @@ async def _attempt(
     )
 
 
-async def compile_source(
-    content: str, metadata: CompileMetadata
-) -> CompileResult:
+async def compile_source(content: str, metadata: CompileMetadata) -> CompileResult:
     """Run the LLM compile for one source. No file I/O, no state writes.
 
     Inputs:
@@ -236,8 +239,11 @@ async def compile_source(
     - compile_skip_on_long_context_unknown (treats unrecoverable
       kind=unknown / max_turns as skip-and-flag instead of hard failure)
     """
-    rel_path = str(metadata.source_path.relative_to(ROOT_DIR)) \
-        if metadata.source_path.is_absolute() else str(metadata.source_path)
+    rel_path = (
+        str(metadata.source_path.relative_to(ROOT_DIR))
+        if metadata.source_path.is_absolute()
+        else str(metadata.source_path)
+    )
 
     # Context blobs the substrate prompt expects. Read inside the stage
     # (option A per the T02 task — keeps CompileMetadata lean; the alternative
@@ -300,7 +306,8 @@ async def compile_source(
             "  size warning: %d chars (%.1f KB) — entering known-fragile "
             "size class; SDK call may take 5-15 min or fail kind=unknown "
             "(per-call timeout: %ds)",
-            len(content), len(content) / 1024,
+            len(content),
+            len(content) / 1024,
             CONFIG.limits.compile_per_call_timeout_s,
         )
 
@@ -345,15 +352,12 @@ async def compile_source(
         if success:
             total_cost += success.get("cost_usd", 0.0)
         model = long_ctx_model
-    elif (
-        failure is not None
-        and failure.kind == "unknown"
-        and len(content) < min_for_retry
-    ):
+    elif failure is not None and failure.kind == "unknown" and len(content) < min_for_retry:
         log.info(
             "  skipping long-context retry (source %d chars < %d) — "
             "small-source kind=unknown is typically tool-fanout, not context overflow",
-            len(content), min_for_retry,
+            len(content),
+            min_for_retry,
         )
 
     # Skip-and-flag for structural failures with no further retry path.
@@ -400,7 +404,8 @@ async def compile_source(
                     "  skipping: small-source kind=unknown with no retry path "
                     "(source %d chars < %d, long-context retry doesn't help here). "
                     "Not counted toward consecutive-failure abort.",
-                    len(content), min_for_retry,
+                    len(content),
+                    min_for_retry,
                 )
                 return CompileResult(
                     status="skipped",

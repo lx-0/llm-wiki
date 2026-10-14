@@ -118,7 +118,9 @@ def update_dashboard(dashboard_path: Path) -> bool:
     if the file changed.
     """
     if not dashboard_path.exists():
-        print(f"# warn: {dashboard_path} does not exist; skipping dashboard rewrite", file=sys.stderr)
+        print(
+            f"# warn: {dashboard_path} does not exist; skipping dashboard rewrite", file=sys.stderr
+        )
         return False
 
     text = dashboard_path.read_text(encoding="utf-8")
@@ -154,7 +156,9 @@ def _replace_region(text: str, begin: str, end: str, body: str) -> str:
     untouched (the dashboard markers are operator-seeded, not auto-inserted)."""
     region = markers.find_region(text, begin, end)
     if region is None:
-        print(f"# warn: markers {begin!r}..{end!r} not found in dashboard; skipping", file=sys.stderr)
+        print(
+            f"# warn: markers {begin!r}..{end!r} not found in dashboard; skipping", file=sys.stderr
+        )
         return text
     body_block = body.strip("\n")
     replacement = f"{begin}\n{body_block}\n{end}"
@@ -163,7 +167,10 @@ def _replace_region(text: str, begin: str, end: str, body: str) -> str:
 
 def main() -> int:
     if len(sys.argv) < 2 or sys.argv[1] not in {
-        "shell-commands", "meta-bind-defs", "inline-refs", "update-dashboard",
+        "shell-commands",
+        "meta-bind-defs",
+        "inline-refs",
+        "update-dashboard",
     }:
         print(
             "usage: scripts/dashboard/agent_buttons.py {shell-commands | meta-bind-defs | inline-refs | update-dashboard <path>}",
@@ -179,7 +186,10 @@ def main() -> int:
         sys.stdout.write(inline_refs())
     elif mode == "update-dashboard":
         if len(sys.argv) != 3:
-            print("usage: scripts/dashboard/agent_buttons.py update-dashboard <dashboard.md>", file=sys.stderr)
+            print(
+                "usage: scripts/dashboard/agent_buttons.py update-dashboard <dashboard.md>",
+                file=sys.stderr,
+            )
             return 2
         changed = update_dashboard(Path(sys.argv[2]))
         print("changed" if changed else "unchanged")

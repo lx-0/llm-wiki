@@ -3,6 +3,7 @@
 Pure additive data types — no engine wiring. Mirrors test_compile_stages_types
 (import inside each test, frozen-ness check).
 """
+
 from __future__ import annotations
 
 from dataclasses import FrozenInstanceError
@@ -12,6 +13,7 @@ import pytest
 
 
 # ── CompileOutcome ───────────────────────────────────────────────────
+
 
 def test_compile_outcome_defaults():
     from compile_stages.types import CompileOutcome
@@ -53,6 +55,7 @@ def test_compile_outcome_is_frozen():
 
 
 # ── Route union ──────────────────────────────────────────────────────
+
 
 def test_route_skip():
     from compile_stages.route import Skip

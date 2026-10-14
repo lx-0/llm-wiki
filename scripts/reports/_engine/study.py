@@ -67,22 +67,18 @@ class InstrumentRef:
 
     slug: str
     version: str
-    source: str = "inferred"      # inferred | form | both
-    alias: str | None = None      # disambiguates two refs to the same slug
+    source: str = "inferred"  # inferred | form | both
+    alias: str | None = None  # disambiguates two refs to the same slug
 
     @classmethod
     def from_dict(cls, raw: dict) -> "InstrumentRef":
         if not isinstance(raw, dict):
             raise ValueError(f"InstrumentRef must be a mapping, got {type(raw).__name__}")
         if "slug" not in raw or "version" not in raw:
-            raise ValueError(
-                f"InstrumentRef missing slug/version: {raw!r}"
-            )
+            raise ValueError(f"InstrumentRef missing slug/version: {raw!r}")
         source = str(raw.get("source", "inferred"))
         if source not in ("inferred", "form", "both"):
-            raise ValueError(
-                f"InstrumentRef source must be inferred|form|both, got {source!r}"
-            )
+            raise ValueError(f"InstrumentRef source must be inferred|form|both, got {source!r}")
         return cls(
             slug=str(raw["slug"]),
             version=str(raw["version"]),
@@ -102,8 +98,8 @@ class StudyManifest:
 
     study_id: str
     title: str
-    created: str       # ISO timestamp; informational
-    schedule: str      # one of SUPPORTED_SCHEDULES
+    created: str  # ISO timestamp; informational
+    schedule: str  # one of SUPPORTED_SCHEDULES
     instruments: tuple[InstrumentRef, ...]
     notes: str = ""
 
@@ -119,8 +115,7 @@ class StudyManifest:
         schedule = str(raw["schedule"])
         if schedule not in SUPPORTED_SCHEDULES:
             raise ValueError(
-                f"manifest schedule must be one of {SUPPORTED_SCHEDULES}, "
-                f"got {schedule!r}"
+                f"manifest schedule must be one of {SUPPORTED_SCHEDULES}, got {schedule!r}"
             )
         instruments_raw = raw["instruments"]
         if not isinstance(instruments_raw, list) or not instruments_raw:
@@ -145,9 +140,7 @@ class StudyManifest:
     def from_path(cls, manifest_path: Path) -> "StudyManifest":
         if not manifest_path.is_file():
             raise FileNotFoundError(f"manifest not found: {manifest_path}")
-        return cls.from_dict(
-            yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
-        )
+        return cls.from_dict(yaml.safe_load(manifest_path.read_text(encoding="utf-8")))
 
     def to_dict(self) -> dict:
         """Round-trip-friendly dict for `yaml.safe_dump`."""
@@ -174,7 +167,7 @@ class StudyState:
     """Mutable engine-managed state per study. Lives at
     `<study_dir>/state.yaml`."""
 
-    last_run_at: str | None = None    # ISO UTC; None = never run
+    last_run_at: str | None = None  # ISO UTC; None = never run
     run_count: int = 0
 
     @classmethod
@@ -262,8 +255,7 @@ def _validate_slug(slug: str, *, where: str = "slug") -> None:
     bad = set(slug) - _SLUG_OK_CHARS
     if bad:
         raise ValueError(
-            f"{where}={slug!r} contains invalid chars: {sorted(bad)} "
-            f"(allowed: a-z, 0-9, hyphen)"
+            f"{where}={slug!r} contains invalid chars: {sorted(bad)} (allowed: a-z, 0-9, hyphen)"
         )
 
 
@@ -308,9 +300,7 @@ class RunDirectory:
             return
         # Success: atomic rename.
         if self.final_dir.exists():
-            raise FileExistsError(
-                f"target run dir already exists: {self.final_dir}"
-            )
+            raise FileExistsError(f"target run dir already exists: {self.final_dir}")
         self.tmp_dir.rename(self.final_dir)
 
     @property
@@ -391,9 +381,7 @@ def list_studies(studies_root: Path) -> list[Study]:
     return out
 
 
-def fork_study(
-    source_study: Study, new_study_id: str, studies_root: Path
-) -> Path:
+def fork_study(source_study: Study, new_study_id: str, studies_root: Path) -> Path:
     """Clone `source_study`'s manifest into a new study dir.
 
     Creates `studies_root/<new_study_id>/manifest.yaml` with the
@@ -413,8 +401,8 @@ def fork_study(
         schedule=source_study.manifest.schedule,
         instruments=source_study.manifest.instruments,
         notes=f"Forked from `{source_study.manifest.study_id}` on "
-              f"{datetime.now(timezone.utc).date().isoformat()}. "
-              f"Edit instruments / schedule / title as needed.",
+        f"{datetime.now(timezone.utc).date().isoformat()}. "
+        f"Edit instruments / schedule / title as needed.",
     )
     (new_dir / "manifest.yaml").write_text(
         yaml.safe_dump(

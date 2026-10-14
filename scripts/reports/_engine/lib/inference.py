@@ -124,9 +124,7 @@ class ItemInference:
             item_id=item_id,
             answer=int(answer_val) if answer_val is not None else None,
             confidence=float(raw.get("confidence", 0.0)),
-            evidence=[
-                EvidenceRecord.from_json(ev) for ev in (raw.get("evidence") or [])
-            ],
+            evidence=[EvidenceRecord.from_json(ev) for ev in (raw.get("evidence") or [])],
             reasoning=str(raw.get("reasoning", "")).strip(),
         )
 
@@ -144,9 +142,9 @@ class BatchResult:
     items: dict[str, ItemInference]
     elapsed_ms: int
     model_id: str
-    prompt_version: str            # SHA256 of the rendered prompt
+    prompt_version: str  # SHA256 of the rendered prompt
     cost_usd: float
-    batch_label: str = "all"       # human-readable batch identifier
+    batch_label: str = "all"  # human-readable batch identifier
 
 
 @dataclass
@@ -201,9 +199,7 @@ SCHEMA_INVALID_KIND = "schema_invalid"
 # (`schema_invalid`) usually clear on a fresh attempt. Auth / model /
 # rate-limit / network / oom / max_turns / tokens_exceeded are NOT
 # retried — they recur identically or need operator intervention.
-RETRYABLE_FAILURE_KINDS: frozenset[str] = frozenset(
-    {"cli_crash", "unknown", SCHEMA_INVALID_KIND}
-)
+RETRYABLE_FAILURE_KINDS: frozenset[str] = frozenset({"cli_crash", "unknown", SCHEMA_INVALID_KIND})
 
 
 def is_inference_retryable(failure: FailureClass | None) -> bool:
@@ -230,9 +226,7 @@ class InferenceError(RuntimeError):
         self.failure = failure
 
 
-def _validate_json_schema(
-    parsed: dict, expected_item_ids: list[str], batch_label: str
-) -> None:
+def _validate_json_schema(parsed: dict, expected_item_ids: list[str], batch_label: str) -> None:
     """Reject malformed agent output before turning it into ItemInference."""
     if not isinstance(parsed, dict):
         raise InferenceError(
@@ -339,6 +333,7 @@ async def infer_batch_async(
     intervention.
     """
     import logging
+
     log = logging.getLogger("reports.inference")
     last_exc: Exception | None = None
     # 3 attempts total: original + 2 retries with backoff 2s, then 5s.
@@ -370,9 +365,12 @@ async def infer_batch_async(
                 log.warning(
                     "  inference batch=%s failed (attempt %d/3) with retryable "
                     "error; retrying after %.1fs …",
-                    batch.label, attempt + 1, backoff,
+                    batch.label,
+                    attempt + 1,
+                    backoff,
                 )
                 import asyncio
+
                 await asyncio.sleep(backoff)
                 continue
             raise

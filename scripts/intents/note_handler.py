@@ -16,6 +16,7 @@ class NoteHandler:
 
     def handle(self, intent: Intent) -> HandlerResult:
         return write_inbox_record(
-            intent, "note",
+            intent,
+            "note",
             "A reference note — promote it to knowledge/ or keep for reference.",
         )

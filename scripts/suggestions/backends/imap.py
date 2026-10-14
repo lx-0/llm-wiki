@@ -59,6 +59,7 @@ def _imap_client(account_id: str):
     if "gmail" in host or kind == "gmail-api":
         # OAuth2 — token cache lives where GmailFilter put it (.claude/gmail-token-<id>.pickle)
         from adapters.mailbox.gmail import _credentials  # type: ignore[import-not-found]
+
         creds, err = _credentials(account_id)
         if err:
             return None, err

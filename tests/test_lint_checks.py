@@ -133,9 +133,7 @@ def test_stale_handles_legacy_dict_state_shape(tmp_path):
     fresh = {"ingested": {"raw/notes/legacy.md": {"hash": file_hash(src)}}}
     assert lint.check_stale_articles(_ctx(tmp_path, state=fresh)) == []
     stale = {"ingested": {"raw/notes/legacy.md": {"hash": "different"}}}
-    assert _codes(lint.check_stale_articles(_ctx(tmp_path, state=stale))) == {
-        "stale_article"
-    }
+    assert _codes(lint.check_stale_articles(_ctx(tmp_path, state=stale))) == {"stale_article"}
 
 
 def test_uningested_source_is_not_stale(tmp_path):
@@ -196,9 +194,7 @@ def test_daily_root_without_digest_type_flagged(tmp_path):
     (tmp_path / "knowledge").mkdir()
     _write(tmp_path / "daily" / "2026-01-05" / "sessions.md", "capture")
     _write(tmp_path / "daily" / "2026-01-05.md", "no frontmatter at all")
-    assert _codes(lint.check_daily_consistency(_ctx(tmp_path))) == {
-        "daily_root_not_digest"
-    }
+    assert _codes(lint.check_daily_consistency(_ctx(tmp_path))) == {"daily_root_not_digest"}
 
 
 def test_daily_unknown_source_and_legacy_flat_flagged(tmp_path):
@@ -265,7 +261,9 @@ def test_compile_role_invalid_value_flagged_everywhere(tmp_path):
     k = tmp_path / "knowledge"
     _write(tmp_path / "raw" / "notes" / "bad.md", "---\ncompile_role: bogus\n---\n")
     _write(tmp_path / "inbox" / "drop.md", "---\ncompile_role: final\n---\n")
-    _write(k / "concepts" / "ok.md", "---\ncompile_role: source-and-final\nauthor: alex\n---\nBody.")
+    _write(
+        k / "concepts" / "ok.md", "---\ncompile_role: source-and-final\nauthor: alex\n---\nBody."
+    )
     issues = lint.check_compile_role(_ctx(tmp_path))
     assert {i.file for i in issues} == {"raw/notes/bad.md", "inbox/drop.md"}
     assert _codes(issues) == {"compile_role_invalid"}

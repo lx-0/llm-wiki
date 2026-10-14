@@ -11,6 +11,7 @@ Usage:
 """
 
 import os
+
 os.environ["CLAUDE_INVOKED_BY"] = "correct_apply"
 
 import argparse
@@ -119,7 +120,9 @@ def _execute_renames(actions: dict, vault: Path) -> list:
             counts = rename_article(old, new, KNOWLEDGE_DIR, vault)
             log.info(
                 "Renamed %s → %s (%d ref(s) rewritten)",
-                entry["from"], entry["to"], counts["articles_rewritten"],
+                entry["from"],
+                entry["to"],
+                counts["articles_rewritten"],
             )
             executed.append(entry)
         except Exception as exc:  # noqa: BLE001 — a bad rename must not abort the run
@@ -162,11 +165,13 @@ def _scan_candidates(terms: list, roots: list) -> list:
             title_line = next((ln for ln in text.split("\n") if ln.startswith("# ")), "")
             head = title_line + " " + path.stem.lower()
             primary = any(t in head for t in hits)
-            out.append({
-                "path": path.relative_to(vault).as_posix(),
-                "action": "supersede (delete-eligible)" if primary else "edit",
-                "primary": primary,
-            })
+            out.append(
+                {
+                    "path": path.relative_to(vault).as_posix(),
+                    "action": "supersede (delete-eligible)" if primary else "edit",
+                    "primary": primary,
+                }
+            )
     return out
 
 
@@ -179,9 +184,19 @@ def _tree_safe_for_deletion(vault: Path) -> tuple[bool, str]:
         return False, "vault is not a git repository — deletions would be unrecoverable"
     try:
         proc = subprocess.run(
-            ["git", "-C", str(vault), "status", "--porcelain",
-             "--", "knowledge", ":(exclude)knowledge/facts"],
-            capture_output=True, text=True, timeout=30,
+            [
+                "git",
+                "-C",
+                str(vault),
+                "status",
+                "--porcelain",
+                "--",
+                "knowledge",
+                ":(exclude)knowledge/facts",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
         )
     except (OSError, subprocess.SubprocessError):
         return False, "git status failed — cannot verify a clean tree"
@@ -283,6 +298,7 @@ def _execute_deletes(actions: dict, vault: Path, *, allowed: bool) -> list:
 # summary, which under-reported 17 deletions as 6. git porcelain when the vault
 # is a repo, else a pre/post mtime snapshot.
 
+
 def _parse_porcelain(out: str) -> dict:
     """Classify `git status --porcelain` lines into created/modified/deleted/renamed."""
     delta = {"created": [], "modified": [], "deleted": [], "renamed": []}
@@ -306,7 +322,9 @@ def _git_delta(vault: Path) -> dict | None:
     try:
         proc = subprocess.run(
             ["git", "-C", str(vault), "status", "--porcelain", "--", "knowledge"],
-            capture_output=True, text=True, timeout=30,
+            capture_output=True,
+            text=True,
+            timeout=30,
         )
     except (OSError, subprocess.SubprocessError):
         return None
@@ -356,6 +374,7 @@ def _divergence(actions: dict, delta: dict, executed_renames: list) -> list:
     every rename would false-alarm. Basename-normalized because porcelain paths
     (repo-relative) and snapshot paths (absolute) differ by mode.
     """
+
     def _base(p: str) -> str:
         return Path(p).name
 
@@ -376,8 +395,10 @@ def _divergence(actions: dict, delta: dict, executed_renames: list) -> list:
 def _report_filesystem_delta(delta: dict, divergences: list) -> None:
     log.info(
         "Filesystem delta — created: %d, modified: %d, renamed: %d, deleted: %d",
-        len(delta["created"]), len(delta["modified"]),
-        len(delta["renamed"]), len(delta["deleted"]),
+        len(delta["created"]),
+        len(delta["modified"]),
+        len(delta["renamed"]),
+        len(delta["deleted"]),
     )
     for category in ("created", "modified", "renamed", "deleted"):
         for path in delta[category]:
@@ -437,9 +458,7 @@ async def apply(slug: str, dry_run: bool, allow_delete: bool = False, force: boo
     if deletion_allowed and not force and not dry_run:
         safe, reason = _tree_safe_for_deletion(ROOT_DIR)
         if not safe:
-            log.error(
-                "Refusing deletion-enabled run: %s. Re-run with --force to override.", reason
-            )
+            log.error("Refusing deletion-enabled run: %s. Re-run with --force to override.", reason)
             return 3
 
     rel_fact_path = fact_path.relative_to(ROOT_DIR)
@@ -538,7 +557,7 @@ async def apply(slug: str, dry_run: bool, allow_delete: bool = False, force: boo
 @dataclass
 class ReconcileResult:
     slug: str
-    status: str            # ok | skipped | failed | dry_run
+    status: str  # ok | skipped | failed | dry_run
     cost_usd: float = 0.0
     files: list[str] = field(default_factory=list)
     detail: str = ""
@@ -578,7 +597,9 @@ async def reconcile_fact(
 
     if dry_run:
         return ReconcileResult(
-            slug, "dry_run", files=violating_files,
+            slug,
+            "dry_run",
+            files=violating_files,
             detail=f"would reconcile {len(violating_files)} file(s)",
         )
 
@@ -612,9 +633,7 @@ async def reconcile_fact(
     fm_now, _body_now = frontmatter.parse(current_text)
     if fm_now:
         frontmatter.backup(fact_path)
-        frontmatter.update_fields(
-            fact_path, last_reconciled=now_iso(), updated=today_iso()
-        )
+        frontmatter.update_fields(fact_path, last_reconciled=now_iso(), updated=today_iso())
 
     return ReconcileResult(slug, "ok", cost_usd=cost, files=violating_files, detail="reconciled")
 

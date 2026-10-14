@@ -13,6 +13,7 @@ import pytest
 def _patch_inbox(monkeypatch, tmp_path):
     """All handlers write via intents._record.WORKSPACE_INBOX_DIR."""
     import intents._record as rec
+
     monkeypatch.setattr(rec, "WORKSPACE_INBOX_DIR", tmp_path / "workspace" / "inbox")
 
 
@@ -21,8 +22,14 @@ def test_task_handler_writes_record(tmp_path, monkeypatch):
     from intents import dispatch
     from intents.base import Intent
 
-    res = dispatch(Intent(kind="task", summary="Bau einen Collector für Spotify.",
-                          source="raw/voice/voice-2026-06-12-2212-x.md", confidence="high"))
+    res = dispatch(
+        Intent(
+            kind="task",
+            summary="Bau einen Collector für Spotify.",
+            source="raw/voice/voice-2026-06-12-2212-x.md",
+            confidence="high",
+        )
+    )
     assert res.status == "ok" and res.output and res.output.exists()
     text = res.output.read_text(encoding="utf-8")
     assert "type: task" in text and "status: pending" in text
@@ -36,11 +43,22 @@ def test_idea_and_note_handlers(tmp_path, monkeypatch):
     from intents import dispatch
     from intents.base import Intent
 
-    idea = dispatch(Intent(kind="idea", summary="Feediverse agents?", source="raw/voice/a.md", confidence="medium"))
+    idea = dispatch(
+        Intent(
+            kind="idea", summary="Feediverse agents?", source="raw/voice/a.md", confidence="medium"
+        )
+    )
     assert idea.status == "ok"
     assert "type: idea" in idea.output.read_text(encoding="utf-8")
 
-    note = dispatch(Intent(kind="note", summary="Gateway lives at llm.yester.cloud", source="raw/voice/b.md", confidence="high"))
+    note = dispatch(
+        Intent(
+            kind="note",
+            summary="Gateway lives at llm.yester.cloud",
+            source="raw/voice/b.md",
+            confidence="high",
+        )
+    )
     assert note.status == "ok"
     assert "type: note" in note.output.read_text(encoding="utf-8")
 
@@ -59,12 +77,14 @@ def test_handler_idempotent(tmp_path, monkeypatch):
 def test_none_is_noop():
     from intents import dispatch
     from intents.base import Intent
+
     res = dispatch(Intent(kind="none", summary="", source="x.md", confidence="high"))
     assert res.status == "skipped" and res.reason == "no handler"
 
 
 def test_all_three_handlers_registered():
     from intents.base import get_handler
+
     assert get_handler("task") is not None
     assert get_handler("idea") is not None
     assert get_handler("note") is not None
@@ -72,40 +92,52 @@ def test_all_three_handlers_registered():
 
 def test_producer_registered():
     import producers
+
     assert "intents" in [p.SPEC.name for p in producers.all_producers()]
 
 
 def test_strip_json_fences():
     from producers.intents import _strip_json_fences
+
     assert json.loads(_strip_json_fences('```json\n{"kind": "idea"}\n```')) == {"kind": "idea"}
     assert _strip_json_fences('{"kind": "task"}') == '{"kind": "task"}'
 
 
 def test_confidence_rank_ordering():
     from producers.intents import _CONFIDENCE_RANK
+
     assert _CONFIDENCE_RANK["low"] < _CONFIDENCE_RANK["medium"] < _CONFIDENCE_RANK["high"]
 
 
 # ── wiki triage CLI ──────────────────────────────────────────────────
 
+
 def _mk_inbox(tmp_path, monkeypatch):
     import triage
+
     ws = tmp_path / "workspace"
-    d = ws / "inbox"; d.mkdir(parents=True)
+    d = ws / "inbox"
+    d.mkdir(parents=True)
     monkeypatch.setattr(triage, "WORKSPACE_INBOX_DIR", d)
     monkeypatch.setattr(triage, "WORKSPACE_TASKS_DIR", ws / "tasks")
     monkeypatch.setattr(triage, "WORKSPACE_TODO", ws / "todo.md")
     (ws / "todo.md").write_text("# Todo\n\n## Tasks\n\n<!-- accepted-tasks -->\n", encoding="utf-8")
+
     def rec(stem, type_, status="pending", conf="high", summ="S"):
         (d / f"{stem}.md").write_text(
-            f'---\ntype: {type_}\nstatus: {status}\nkind: {type_}\nconfidence: {conf}\n'
-            f'summary: "{summ}"\nsource: raw/voice/{stem}.md\n---\n# {summ}\n', encoding="utf-8")
+            f"---\ntype: {type_}\nstatus: {status}\nkind: {type_}\nconfidence: {conf}\n"
+            f'summary: "{summ}"\nsource: raw/voice/{stem}.md\n---\n# {summ}\n',
+            encoding="utf-8",
+        )
+
     return triage, rec, d
 
 
 def test_triage_list_pending_only(tmp_path, monkeypatch, capsys):
     triage, rec, _ = _mk_inbox(tmp_path, monkeypatch)
-    rec("voice-a", "task"); rec("voice-b", "idea"); rec("voice-c", "note", status="dismissed")
+    rec("voice-a", "task")
+    rec("voice-b", "idea")
+    rec("voice-c", "note", status="dismissed")
     assert triage._list(False) == 0
     out = capsys.readouterr().out
     assert "TASK" in out and "IDEA" in out and "voice-a" in out
@@ -117,7 +149,7 @@ def test_triage_accept_task_moves_and_lists(tmp_path, monkeypatch):
     triage, rec, d = _mk_inbox(tmp_path, monkeypatch)
     rec("voice-a", "task", summ="Do the thing")
     assert triage._accept(triage._resolve("voice-a")) == 0
-    assert not (d / "voice-a.md").exists()                       # moved out of inbox
+    assert not (d / "voice-a.md").exists()  # moved out of inbox
     moved = triage.WORKSPACE_TASKS_DIR / "001.md"
     assert moved.exists() and "status: accepted" in moved.read_text()
     assert "- [ ] Do the thing — [[tasks/001]]" in triage.WORKSPACE_TODO.read_text()
@@ -125,8 +157,10 @@ def test_triage_accept_task_moves_and_lists(tmp_path, monkeypatch):
 
 def test_triage_accept_numbers_sequentially(tmp_path, monkeypatch):
     triage, rec, _ = _mk_inbox(tmp_path, monkeypatch)
-    rec("t1", "task"); rec("t2", "task")
-    triage._accept(triage._resolve("t1")); triage._accept(triage._resolve("t2"))
+    rec("t1", "task")
+    rec("t2", "task")
+    triage._accept(triage._resolve("t1"))
+    triage._accept(triage._resolve("t2"))
     assert {p.name for p in triage.WORKSPACE_TASKS_DIR.glob("*.md")} == {"001.md", "002.md"}
 
 
@@ -134,7 +168,7 @@ def test_triage_accept_note_files_in_place(tmp_path, monkeypatch):
     triage, rec, d = _mk_inbox(tmp_path, monkeypatch)
     rec("voice-b", "note")
     assert triage._accept(triage._resolve("voice-b")) == 0
-    assert (d / "voice-b.md").exists()                           # idea/note stay in inbox
+    assert (d / "voice-b.md").exists()  # idea/note stay in inbox
     assert "status: accepted" in (d / "voice-b.md").read_text()
     assert not (triage.WORKSPACE_TASKS_DIR / "001.md").exists()  # not moved
 
@@ -148,7 +182,8 @@ def test_triage_dismiss(tmp_path, monkeypatch):
 
 def test_triage_resolve_prefix_and_ambiguous(tmp_path, monkeypatch):
     triage, rec, _ = _mk_inbox(tmp_path, monkeypatch)
-    rec("voice-2026-05-16-x", "task"); rec("voice-2026-06-12-y", "idea")
+    rec("voice-2026-05-16-x", "task")
+    rec("voice-2026-06-12-y", "idea")
     assert triage._resolve("voice-2026-06-12-y").stem == "voice-2026-06-12-y"
     assert triage._resolve("voice-2026") is None  # ambiguous → None
     assert triage._resolve("nope") is None
@@ -156,8 +191,10 @@ def test_triage_resolve_prefix_and_ambiguous(tmp_path, monkeypatch):
 
 # ── per-prompt frontmatter model (Prompty-style) ─────────────────────
 
+
 def test_prompt_model_frontmatter_overrides_fallback():
     from core.prompts import prompt_model, render
+
     # vision + intent prompts declare a model: in frontmatter
     assert prompt_model("intent_classify", "FALLBACK") == "claude-haiku-4-5"
     assert prompt_model("scan_pictures_vision", "gemma4:e4b") == "qwen2.5vl:7b"
@@ -169,5 +206,6 @@ def test_prompt_model_frontmatter_overrides_fallback():
 
 def test_prompt_model_falls_back_when_no_frontmatter():
     from core.prompts import prompt_model
+
     # extract_takes has no frontmatter → first truthy fallback wins
     assert prompt_model("extract_takes", "", "claude-opus-4-8") == "claude-opus-4-8"

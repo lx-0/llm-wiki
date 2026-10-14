@@ -79,6 +79,7 @@ def _run(coro):
 # its own coverage. (The can_use_tool gate above silently blocked inside-scope
 # writes in production, which is why the hook superseded it — 2026-05-18.)
 
+
 def _hook_decision(hook, *, tool, file_path):
     out = _run(hook({"tool_name": tool, "tool_input": {"file_path": file_path}}, "tid", None))
     return out["hookSpecificOutput"]
@@ -124,7 +125,9 @@ def test_hook_multi_root_allows_log_file(tmp_path):
     log_file = tmp_path / ".wiki" / "logs" / "operations.md"
     hook = make_path_scope_hook([knowledge, log_file])
     # The operations log (a second permitted root) is writable…
-    assert _hook_decision(hook, tool="Write", file_path=str(log_file))["permissionDecision"] == "allow"
+    assert (
+        _hook_decision(hook, tool="Write", file_path=str(log_file))["permissionDecision"] == "allow"
+    )
     # …but a sibling engine file is not.
     sibling = str(tmp_path / ".wiki" / "config.yaml")
     assert _hook_decision(hook, tool="Write", file_path=sibling)["permissionDecision"] == "deny"
@@ -141,9 +144,12 @@ def test_hook_denied_subpath_overrides_allowed_root(tmp_path):
     facts.mkdir(parents=True)
     hook = make_path_scope_hook([knowledge], denied_subpaths=[facts])
     # knowledge/concepts/ — allowed.
-    assert _hook_decision(
-        hook, tool="Write", file_path=str(knowledge / "concepts" / "x.md")
-    )["permissionDecision"] == "allow"
+    assert (
+        _hook_decision(hook, tool="Write", file_path=str(knowledge / "concepts" / "x.md"))[
+            "permissionDecision"
+        ]
+        == "allow"
+    )
     # knowledge/facts/ — denied even though it is inside the allowed root.
     d = _hook_decision(hook, tool="Write", file_path=str(facts / "x.md"))
     assert d["permissionDecision"] == "deny"
@@ -155,9 +161,12 @@ def test_hook_denied_subpaths_defaults_to_none(tmp_path):
     knowledge = tmp_path / "knowledge"
     (knowledge / "facts").mkdir(parents=True)
     hook = make_path_scope_hook([knowledge])  # no denied_subpaths kwarg
-    assert _hook_decision(
-        hook, tool="Write", file_path=str(knowledge / "facts" / "x.md")
-    )["permissionDecision"] == "allow"
+    assert (
+        _hook_decision(hook, tool="Write", file_path=str(knowledge / "facts" / "x.md"))[
+            "permissionDecision"
+        ]
+        == "allow"
+    )
 
 
 def test_gate_allows_write_inside_scope(tmp_path):
@@ -245,6 +254,7 @@ def test_prompt_stream_yields_one_user_message():
         async for msg in prompt_stream("hello world"):
             out.append(msg)
         return out
+
     msgs = _run(collect())
     assert msgs == [{"type": "user", "message": {"role": "user", "content": "hello world"}}]
 

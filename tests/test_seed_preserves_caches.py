@@ -50,8 +50,12 @@ def test_seed_force_does_not_clobber_live_dashboard_stats(tmp_path: Path) -> Non
     # Seed templates dir with the actual placeholder + the two other templates
     # `_seed_file` will iterate.
     shutil.copy(TEMPLATE_FILE, wiki_dir / "templates" / "_dashboard-stats.md")
-    (wiki_dir / "templates" / "AGENTS.example.md").write_text("AGENTS placeholder", encoding="utf-8")
-    (wiki_dir / "templates" / "dashboard.md").write_text("# Dashboard placeholder", encoding="utf-8")
+    (wiki_dir / "templates" / "AGENTS.example.md").write_text(
+        "AGENTS placeholder", encoding="utf-8"
+    )
+    (wiki_dir / "templates" / "dashboard.md").write_text(
+        "# Dashboard placeholder", encoding="utf-8"
+    )
 
     # Live cache with real counts.
     cache = target / "_dashboard-stats.md"

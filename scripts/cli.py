@@ -107,15 +107,15 @@ class CommandSpec:
     group: str
     summary: str
     kind: str = "py"
-    handler: str | None = None            # script path relative to scripts/
+    handler: str | None = None  # script path relative to scripts/
     banner: bool = True
     banner_subtitle: str | None = None
-    refresh_after: bool = False           # refresh dashboards once, locked, after
-    needs_vault: bool = True              # informational; the bash guard enforces it
-    show_help_on_empty: bool = False      # bare `wiki <name>` prints help
-    empty_help_exit: int = 0              # exit code for the bare-help case
-    menu: bool = False                    # expected to be reachable from menu.py
-    help_text: str | None = None          # rich per-command help (was a bash heredoc)
+    refresh_after: bool = False  # refresh dashboards once, locked, after
+    needs_vault: bool = True  # informational; the bash guard enforces it
+    show_help_on_empty: bool = False  # bare `wiki <name>` prints help
+    empty_help_exit: int = 0  # exit code for the bare-help case
+    menu: bool = False  # expected to be reachable from menu.py
+    help_text: str | None = None  # rich per-command help (was a bash heredoc)
     subroutes: tuple[SubRoute, ...] = ()
 
 
@@ -728,121 +728,372 @@ EXAMPLES
 
 COMMANDS: tuple[CommandSpec, ...] = (
     # Home & status
-    CommandSpec("menu", "Home & status", "interactive home screen (--json for agents)",
-                kind="bash", needs_vault=False),
-    CommandSpec("status", "Home & status", "config + hooks + Ollama summary",
-                kind="bash", menu=True),
-    CommandSpec("doctor", "Home & status", "vault-health audit (--quick / --json)",
-                kind="bash"),
-    CommandSpec("version", "Home & status", "print installed git revision",
-                kind="bash", needs_vault=False, menu=True),
+    CommandSpec(
+        "menu",
+        "Home & status",
+        "interactive home screen (--json for agents)",
+        kind="bash",
+        needs_vault=False,
+    ),
+    CommandSpec(
+        "status", "Home & status", "config + hooks + Ollama summary", kind="bash", menu=True
+    ),
+    CommandSpec("doctor", "Home & status", "vault-health audit (--quick / --json)", kind="bash"),
+    CommandSpec(
+        "version",
+        "Home & status",
+        "print installed git revision",
+        kind="bash",
+        needs_vault=False,
+        menu=True,
+    ),
     # Setup
-    CommandSpec("setup", "Setup", "first-time setup (config wizard + hooks)",
-                kind="bash", menu=True),
-    CommandSpec("config", "Setup", "interactive config editor (get/set/keys/…)",
-                kind="bash", menu=True),
-    CommandSpec("hooks", "Setup", "install/uninstall session hooks per agent",
-                kind="bash", menu=True),
-    CommandSpec("skills", "Setup", "wire engine skills into .claude/skills/",
-                kind="bash", menu=True),
-    CommandSpec("install-shortcut", "Setup", "symlink ~/.local/bin/wiki -> this vault",
-                kind="bash", needs_vault=False),
-    CommandSpec("update", "Setup", "git pull --ff-only + sync deps/skills",
-                kind="bash", menu=True),
-    CommandSpec("seed", "Setup", "re-apply engine templates to the vault",
-                kind="bash", menu=True),
+    CommandSpec(
+        "setup", "Setup", "first-time setup (config wizard + hooks)", kind="bash", menu=True
+    ),
+    CommandSpec(
+        "config", "Setup", "interactive config editor (get/set/keys/…)", kind="bash", menu=True
+    ),
+    CommandSpec(
+        "hooks", "Setup", "install/uninstall session hooks per agent", kind="bash", menu=True
+    ),
+    CommandSpec(
+        "skills", "Setup", "wire engine skills into .claude/skills/", kind="bash", menu=True
+    ),
+    CommandSpec(
+        "install-shortcut",
+        "Setup",
+        "symlink ~/.local/bin/wiki -> this vault",
+        kind="bash",
+        needs_vault=False,
+    ),
+    CommandSpec("update", "Setup", "git pull --ff-only + sync deps/skills", kind="bash", menu=True),
+    CommandSpec("seed", "Setup", "re-apply engine templates to the vault", kind="bash", menu=True),
     # Collect & ingest
-    CommandSpec("collect", "Collect & ingest", "run a Collector (--list to enumerate)",
-                handler="collectors/cli.py", banner=False, menu=True, help_text=H_COLLECT),
-    CommandSpec("index", "Collect & ingest", "body-blind folder-index digests",
-                handler="collectors/folder_index.py", help_text=H_INDEX),
-    CommandSpec("produce", "Collect & ingest", "run a Producer (post-compile extractor)",
-                handler="producers/cli.py", banner=False, menu=True, help_text=H_PRODUCE),
-    CommandSpec("preprocess", "Collect & ingest", "run a Preprocessor (--list to enumerate)",
-                handler="preprocessors/cli.py", banner=False, menu=True, help_text=H_PREPROCESS),
-    CommandSpec("process-inbox", "Collect & ingest", "classify inbox/ files via Ollama",
-                handler="process-inbox.py", menu=True, help_text=H_PROCESS_INBOX),
-    CommandSpec("ingest-html", "Collect & ingest", "convert an HTML file or URL into raw/",
-                handler="ingest-html.py", menu=True, help_text=H_INGEST_HTML),
-    CommandSpec("ingest-youtube", "Collect & ingest", "pull YouTube videos into raw/notes/",
-                handler="collectors/scan_youtube.py", menu=True, help_text=H_INGEST_YOUTUBE),
-    CommandSpec("bridge", "Collect & ingest", "rsync mirror for sandbox-restricted folders",
-                handler="bridge/cli.py", banner=False, menu=True, help_text=H_BRIDGE),
-    CommandSpec("backfill", "Collect & ingest", "one-shot data-shape upgrades",
-                handler=None, banner=False, show_help_on_empty=True, menu=True,
-                help_text=H_BACKFILL,
-                subroutes=(
-                    SubRoute("picture-metadata", "backfill_picture_metadata.py",
-                             "wiki backfill picture-metadata"),
-                    SubRoute("voice-source-frontmatter", "backfill_voice_source_frontmatter.py",
-                             "wiki backfill voice-source-frontmatter"),
-                    SubRoute("tasks-to-workspace", "backfill_tasks_to_workspace.py",
-                             "wiki backfill tasks-to-workspace"),
-                )),
-    CommandSpec("auth", "Collect & ingest", "OAuth bootstrap (gmail/gmeet/calendar)",
-                kind="auth", help_text=H_AUTH),
-    CommandSpec("gmail-auth", "Collect & ingest", "alias: wiki auth gmail <account-id>",
-                kind="bash", menu=True),
-    CommandSpec("gmeet-auth", "Collect & ingest", "alias: wiki auth gmeet <account-id>",
-                kind="bash", menu=True),
-    CommandSpec("calendar-auth", "Collect & ingest", "alias: wiki auth calendar <account-id>",
-                kind="bash", menu=True),
+    CommandSpec(
+        "collect",
+        "Collect & ingest",
+        "run a Collector (--list to enumerate)",
+        handler="collectors/cli.py",
+        banner=False,
+        menu=True,
+        help_text=H_COLLECT,
+    ),
+    CommandSpec(
+        "index",
+        "Collect & ingest",
+        "body-blind folder-index digests",
+        handler="collectors/folder_index.py",
+        help_text=H_INDEX,
+    ),
+    CommandSpec(
+        "produce",
+        "Collect & ingest",
+        "run a Producer (post-compile extractor)",
+        handler="producers/cli.py",
+        banner=False,
+        menu=True,
+        help_text=H_PRODUCE,
+    ),
+    CommandSpec(
+        "preprocess",
+        "Collect & ingest",
+        "run a Preprocessor (--list to enumerate)",
+        handler="preprocessors/cli.py",
+        banner=False,
+        menu=True,
+        help_text=H_PREPROCESS,
+    ),
+    CommandSpec(
+        "process-inbox",
+        "Collect & ingest",
+        "classify inbox/ files via Ollama",
+        handler="process-inbox.py",
+        menu=True,
+        help_text=H_PROCESS_INBOX,
+    ),
+    CommandSpec(
+        "ingest-html",
+        "Collect & ingest",
+        "convert an HTML file or URL into raw/",
+        handler="ingest-html.py",
+        menu=True,
+        help_text=H_INGEST_HTML,
+    ),
+    CommandSpec(
+        "ingest-youtube",
+        "Collect & ingest",
+        "pull YouTube videos into raw/notes/",
+        handler="collectors/scan_youtube.py",
+        menu=True,
+        help_text=H_INGEST_YOUTUBE,
+    ),
+    CommandSpec(
+        "bridge",
+        "Collect & ingest",
+        "rsync mirror for sandbox-restricted folders",
+        handler="bridge/cli.py",
+        banner=False,
+        menu=True,
+        help_text=H_BRIDGE,
+    ),
+    CommandSpec(
+        "backfill",
+        "Collect & ingest",
+        "one-shot data-shape upgrades",
+        handler=None,
+        banner=False,
+        show_help_on_empty=True,
+        menu=True,
+        help_text=H_BACKFILL,
+        subroutes=(
+            SubRoute(
+                "picture-metadata", "backfill_picture_metadata.py", "wiki backfill picture-metadata"
+            ),
+            SubRoute(
+                "voice-source-frontmatter",
+                "backfill_voice_source_frontmatter.py",
+                "wiki backfill voice-source-frontmatter",
+            ),
+            SubRoute(
+                "tasks-to-workspace",
+                "backfill_tasks_to_workspace.py",
+                "wiki backfill tasks-to-workspace",
+            ),
+        ),
+    ),
+    CommandSpec(
+        "auth",
+        "Collect & ingest",
+        "OAuth bootstrap (gmail/gmeet/calendar)",
+        kind="auth",
+        help_text=H_AUTH,
+    ),
+    CommandSpec(
+        "gmail-auth",
+        "Collect & ingest",
+        "alias: wiki auth gmail <account-id>",
+        kind="bash",
+        menu=True,
+    ),
+    CommandSpec(
+        "gmeet-auth",
+        "Collect & ingest",
+        "alias: wiki auth gmeet <account-id>",
+        kind="bash",
+        menu=True,
+    ),
+    CommandSpec(
+        "calendar-auth",
+        "Collect & ingest",
+        "alias: wiki auth calendar <account-id>",
+        kind="bash",
+        menu=True,
+    ),
     # Knowledge ops
-    CommandSpec("compile", "Knowledge ops", "compile changed (or all) sources into knowledge/",
-                handler="compile.py", refresh_after=True, menu=True, help_text=H_COMPILE),
-    CommandSpec("dream", "Knowledge ops", "sweep all entity pages (oldest-overdue first)",
-                kind="bash", menu=True),
-    CommandSpec("dream-entity", "Knowledge ops", "re-synthesize ONE entity page by slug",
-                kind="bash", menu=True),
-    CommandSpec("query", "Knowledge ops", "ask the knowledge base in natural language",
-                handler="query.py", show_help_on_empty=True, menu=True, help_text=H_QUERY),
-    CommandSpec("lint", "Knowledge ops", "structural + LLM contradiction health check",
-                handler="lint.py", refresh_after=True, menu=True, help_text=H_LINT),
-    CommandSpec("links", "Knowledge ops", "broken-wikilink report (--fix to rewrite)",
-                handler="links_audit.py", help_text=H_LINKS),
-    CommandSpec("pin", "Knowledge ops", "pin an article into a Map-of-Content",
-                handler="pin.py", banner=False, menu=True, help_text=H_PIN),
-    CommandSpec("publish", "Knowledge ops", "mirror the vault into meinkontext (--auth once, --dry-run, run)",
-                handler="publish/cli.py", help_text=H_PUBLISH),
-    CommandSpec("reindex", "Knowledge ops", "reconcile index.md against the corpus (--dry-run)",
-                handler="reindex.py", help_text=H_REINDEX),
-    CommandSpec("review-wiki", "Knowledge ops", "per-article quality scores (local LLM, free)",
-                handler="review-wiki.py", menu=True, help_text=H_REVIEW_WIKI),
-    CommandSpec("health-trends", "Knowledge ops", "deterministic health-trend synthesis ($0)",
-                handler="health_trends.py", menu=True, help_text=H_HEALTH_TRENDS),
-    CommandSpec("agent", "Knowledge ops", "run an agentic task (prompts/agents/<id>.md)",
-                handler="agent_task.py", menu=True, help_text=H_AGENT),
+    CommandSpec(
+        "compile",
+        "Knowledge ops",
+        "compile changed (or all) sources into knowledge/",
+        handler="compile.py",
+        refresh_after=True,
+        menu=True,
+        help_text=H_COMPILE,
+    ),
+    CommandSpec(
+        "dream",
+        "Knowledge ops",
+        "sweep all entity pages (oldest-overdue first)",
+        kind="bash",
+        menu=True,
+    ),
+    CommandSpec(
+        "dream-entity",
+        "Knowledge ops",
+        "re-synthesize ONE entity page by slug",
+        kind="bash",
+        menu=True,
+    ),
+    CommandSpec(
+        "query",
+        "Knowledge ops",
+        "ask the knowledge base in natural language",
+        handler="query.py",
+        show_help_on_empty=True,
+        menu=True,
+        help_text=H_QUERY,
+    ),
+    CommandSpec(
+        "lint",
+        "Knowledge ops",
+        "structural + LLM contradiction health check",
+        handler="lint.py",
+        refresh_after=True,
+        menu=True,
+        help_text=H_LINT,
+    ),
+    CommandSpec(
+        "links",
+        "Knowledge ops",
+        "broken-wikilink report (--fix to rewrite)",
+        handler="links_audit.py",
+        help_text=H_LINKS,
+    ),
+    CommandSpec(
+        "pin",
+        "Knowledge ops",
+        "pin an article into a Map-of-Content",
+        handler="pin.py",
+        banner=False,
+        menu=True,
+        help_text=H_PIN,
+    ),
+    CommandSpec(
+        "publish",
+        "Knowledge ops",
+        "mirror the vault into meinkontext (--auth once, --dry-run, run)",
+        handler="publish/cli.py",
+        help_text=H_PUBLISH,
+    ),
+    CommandSpec(
+        "reindex",
+        "Knowledge ops",
+        "reconcile index.md against the corpus (--dry-run)",
+        handler="reindex.py",
+        help_text=H_REINDEX,
+    ),
+    CommandSpec(
+        "review-wiki",
+        "Knowledge ops",
+        "per-article quality scores (local LLM, free)",
+        handler="review-wiki.py",
+        menu=True,
+        help_text=H_REVIEW_WIKI,
+    ),
+    CommandSpec(
+        "health-trends",
+        "Knowledge ops",
+        "deterministic health-trend synthesis ($0)",
+        handler="health_trends.py",
+        menu=True,
+        help_text=H_HEALTH_TRENDS,
+    ),
+    CommandSpec(
+        "agent",
+        "Knowledge ops",
+        "run an agentic task (prompts/agents/<id>.md)",
+        handler="agent_task.py",
+        menu=True,
+        help_text=H_AGENT,
+    ),
     # Facts & takes
-    CommandSpec("correct", "Facts & takes", "record hard facts that override compiled content",
-                handler="facts/correct.py", refresh_after=True, show_help_on_empty=True,
-                empty_help_exit=1, menu=True, help_text=H_CORRECT,
-                subroutes=(
-                    SubRoute("apply", "facts/correct_apply.py", "wiki correct apply",
-                             "Agentic propagation — Claude Agent SDK over vault root."),
-                )),
-    CommandSpec("take", "Facts & takes", "record third-party belief attribution (M011)",
-                handler="facts/take.py", refresh_after=True, show_help_on_empty=True,
-                empty_help_exit=1, menu=True, help_text=H_TAKE),
-    CommandSpec("dedup", "Facts & takes", "find + merge STT-noise duplicate entity pages",
-                handler="dedup.py", refresh_after=True, menu=True, help_text=H_DEDUP),
+    CommandSpec(
+        "correct",
+        "Facts & takes",
+        "record hard facts that override compiled content",
+        handler="facts/correct.py",
+        refresh_after=True,
+        show_help_on_empty=True,
+        empty_help_exit=1,
+        menu=True,
+        help_text=H_CORRECT,
+        subroutes=(
+            SubRoute(
+                "apply",
+                "facts/correct_apply.py",
+                "wiki correct apply",
+                "Agentic propagation — Claude Agent SDK over vault root.",
+            ),
+        ),
+    ),
+    CommandSpec(
+        "take",
+        "Facts & takes",
+        "record third-party belief attribution (M011)",
+        handler="facts/take.py",
+        refresh_after=True,
+        show_help_on_empty=True,
+        empty_help_exit=1,
+        menu=True,
+        help_text=H_TAKE,
+    ),
+    CommandSpec(
+        "dedup",
+        "Facts & takes",
+        "find + merge STT-noise duplicate entity pages",
+        handler="dedup.py",
+        refresh_after=True,
+        menu=True,
+        help_text=H_DEDUP,
+    ),
     # Review & maintenance
-    CommandSpec("flush", "Review & maintenance", "extract a disposable context file to daily/",
-                handler="flush.py", menu=True, help_text=H_FLUSH,
-                show_help_on_empty=True, empty_help_exit=2),
-    CommandSpec("curiosity", "Review & maintenance", "review + run curiosity deep-scan requests",
-                handler="curiosity/cli.py", menu=True, help_text=H_CURIOSITY),
-    CommandSpec("suggestions", "Review & maintenance", "review + execute optimization suggestions",
-                handler="suggestions/cli.py", menu=True, help_text=H_SUGGESTIONS),
-    CommandSpec("reconcile", "Review & maintenance", "autonomous concept-consistency routine",
-                handler="reconcile.py", menu=True, help_text=H_RECONCILE),
-    CommandSpec("triage", "Review & maintenance", "review + clear the intent inbox",
-                handler="triage.py", banner=False, menu=True, help_text=H_TRIAGE),
-    CommandSpec("study", "Review & maintenance", "operator-self-reports surface (M019)",
-                handler="study.py", menu=True, help_text=H_STUDY),
-    CommandSpec("analyze", "Review & maintenance", "operator-self-reports analyst layer",
-                handler="analyze.py", menu=True, help_text=H_ANALYZE),
-    CommandSpec("usage", "Review & maintenance", "token-usage ledger (per provider/model)",
-                handler="usage_report.py", menu=True, help_text=H_USAGE),
+    CommandSpec(
+        "flush",
+        "Review & maintenance",
+        "extract a disposable context file to daily/",
+        handler="flush.py",
+        menu=True,
+        help_text=H_FLUSH,
+        show_help_on_empty=True,
+        empty_help_exit=2,
+    ),
+    CommandSpec(
+        "curiosity",
+        "Review & maintenance",
+        "review + run curiosity deep-scan requests",
+        handler="curiosity/cli.py",
+        menu=True,
+        help_text=H_CURIOSITY,
+    ),
+    CommandSpec(
+        "suggestions",
+        "Review & maintenance",
+        "review + execute optimization suggestions",
+        handler="suggestions/cli.py",
+        menu=True,
+        help_text=H_SUGGESTIONS,
+    ),
+    CommandSpec(
+        "reconcile",
+        "Review & maintenance",
+        "autonomous concept-consistency routine",
+        handler="reconcile.py",
+        menu=True,
+        help_text=H_RECONCILE,
+    ),
+    CommandSpec(
+        "triage",
+        "Review & maintenance",
+        "review + clear the intent inbox",
+        handler="triage.py",
+        banner=False,
+        menu=True,
+        help_text=H_TRIAGE,
+    ),
+    CommandSpec(
+        "study",
+        "Review & maintenance",
+        "operator-self-reports surface (M019)",
+        handler="study.py",
+        menu=True,
+        help_text=H_STUDY,
+    ),
+    CommandSpec(
+        "analyze",
+        "Review & maintenance",
+        "operator-self-reports analyst layer",
+        handler="analyze.py",
+        menu=True,
+        help_text=H_ANALYZE,
+    ),
+    CommandSpec(
+        "usage",
+        "Review & maintenance",
+        "token-usage ledger (per provider/model)",
+        handler="usage_report.py",
+        menu=True,
+        help_text=H_USAGE,
+    ),
     # Help
     CommandSpec("help", "Help", "this message", kind="bash", needs_vault=False),
 )
@@ -879,8 +1130,7 @@ def run_auth(rest: list[str]) -> int:
         return 0
     service = rest[0]
     if service not in AUTH_SERVICES:
-        _err(f"unknown auth service: {service} "
-             f"(expected: {', '.join(AUTH_SERVICES)})")
+        _err(f"unknown auth service: {service} (expected: {', '.join(AUTH_SERVICES)})")
         return 1
     # `wiki auth gmail` (no id) / `wiki gmail-auth` alias with no id -> service help.
     if len(rest) < 2 or rest[1] in ("-h", "--help", "help"):
@@ -923,9 +1173,12 @@ def _style_help(text: str) -> str:
     out: list[str] = []
     for i, line in enumerate(text.splitlines()):
         stripped = line.strip()
-        is_header = stripped and stripped == stripped.upper() and any(
-            ch.isalpha() for ch in stripped
-        ) and all(ch.isupper() or not ch.isalpha() for ch in stripped)
+        is_header = (
+            stripped
+            and stripped == stripped.upper()
+            and any(ch.isalpha() for ch in stripped)
+            and all(ch.isupper() or not ch.isalpha() for ch in stripped)
+        )
         if i == 0 or is_header:
             out.append(f"{_BOLD}{line}{_RESET}")
         else:
@@ -1004,8 +1257,7 @@ def run_command(command: CommandSpec, rest: list[str]) -> int:
         if not rest:
             _print_help_text(command)
             return 0
-        _err(f"unknown: wiki {command.name} {rest[0]} "
-             f"(try 'wiki {command.name} help')")
+        _err(f"unknown: wiki {command.name} {rest[0]} (try 'wiki {command.name} help')")
         return 1
 
     if banner_on:

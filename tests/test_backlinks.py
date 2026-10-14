@@ -242,7 +242,9 @@ def test_writer_removes_block_when_incoming_empty(tmp_path: Path) -> None:
 def test_writer_preserves_operator_content_above_footer(tmp_path: Path) -> None:
     """Anything above the sentinel survives a footer rewrite."""
     art = tmp_path / "concepts" / "target.md"
-    original = "---\ntitle: Target\n---\n# Target\n\nOperator paragraph.\n\n## A heading\n\nMore body.\n"
+    original = (
+        "---\ntitle: Target\n---\n# Target\n\nOperator paragraph.\n\n## A heading\n\nMore body.\n"
+    )
     _write(art, original)
     write_backlinks_footer(art, ["concepts/alpha"], tmp_path)
     txt = art.read_text(encoding="utf-8")

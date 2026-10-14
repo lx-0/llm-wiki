@@ -24,8 +24,19 @@ SCHEMA = 2
 #: `test_actions` checks every catalogue argv against the union of both.
 BASH_OWNED_COMMANDS = frozenset(
     {
-        "setup", "config", "hooks", "skills", "install-shortcut", "update", "seed", "menu",
-        "doctor", "status", "version", "dream", "dream-entity",
+        "setup",
+        "config",
+        "hooks",
+        "skills",
+        "install-shortcut",
+        "update",
+        "seed",
+        "menu",
+        "doctor",
+        "status",
+        "version",
+        "dream",
+        "dream-entity",
     }
 )
 
@@ -95,29 +106,70 @@ def _spec(
 _SPECS: tuple[ActionSpec, ...] = (
     # "library" is the operator-facing noun everywhere (welcome, settings, panel) — never
     # "wiki" or "vault"; "files" not "captures", which collides with screen/audio capture.
-    _spec("process-inbox", "Sort", "do", ["process-inbox"],
-          "{n} new file to sort into your library", "{n} new files to sort into your library"),
-    _spec("compile", "Add", "do", ["compile"],
-          "{n} new item to add to your library", "{n} new items to add to your library"),
-    _spec("curiosity-folder", "Review", "review", ["curiosity", "--type", "folder-deep-scan"],
-          "{n} folder-scan request to review", "{n} folder-scan requests to review"),
-    _spec("curiosity-email", "Explore", "auto", ["curiosity", "--type", "email-deep-scan"],
-          "{n} email scan pending", "{n} email scans pending"),
-    _spec("suggestions", "Run", "do", ["suggestions"],
-          "{n} approved suggestion to run", "{n} approved suggestions to run"),
-    _spec("dream-sweep", "Refresh", "auto", ["dream", "--all-entities"],
-          "{n} page needs refreshing", "{n} pages need refreshing", tool=True),
-    _spec("flush", "Save", "do", ["flush"],
-          "Save today's AI chat to your library"),
-    _spec("lint", "Check", "auto", ["lint", "--structural-only"],
-          "Notes changed since the last health check", tool=True),
+    _spec(
+        "process-inbox",
+        "Sort",
+        "do",
+        ["process-inbox"],
+        "{n} new file to sort into your library",
+        "{n} new files to sort into your library",
+    ),
+    _spec(
+        "compile",
+        "Add",
+        "do",
+        ["compile"],
+        "{n} new item to add to your library",
+        "{n} new items to add to your library",
+    ),
+    _spec(
+        "curiosity-folder",
+        "Review",
+        "review",
+        ["curiosity", "--type", "folder-deep-scan"],
+        "{n} folder-scan request to review",
+        "{n} folder-scan requests to review",
+    ),
+    _spec(
+        "curiosity-email",
+        "Explore",
+        "auto",
+        ["curiosity", "--type", "email-deep-scan"],
+        "{n} email scan pending",
+        "{n} email scans pending",
+    ),
+    _spec(
+        "suggestions",
+        "Run",
+        "do",
+        ["suggestions"],
+        "{n} approved suggestion to run",
+        "{n} approved suggestions to run",
+    ),
+    _spec(
+        "dream-sweep",
+        "Refresh",
+        "auto",
+        ["dream", "--all-entities"],
+        "{n} page needs refreshing",
+        "{n} pages need refreshing",
+        tool=True,
+    ),
+    _spec("flush", "Save", "do", ["flush"], "Save today's AI chat to your library"),
+    _spec(
+        "lint",
+        "Check",
+        "auto",
+        ["lint", "--structural-only"],
+        "Notes changed since the last health check",
+        tool=True,
+    ),
     # Tools stay non-destructive and $0: `links` reports, `dedup --suggest-only` never merges.
-    _spec("links", "Check", "tools", ["links"],
-          "Check links", tool=True),
-    _spec("dedup", "Review", "tools", ["dedup", "--suggest-only"],
-          "Find duplicate pages", tool=True),
-    _spec("review-wiki", "Review", "tools", ["review-wiki"],
-          "Review page quality", tool=True),
+    _spec("links", "Check", "tools", ["links"], "Check links", tool=True),
+    _spec(
+        "dedup", "Review", "tools", ["dedup", "--suggest-only"], "Find duplicate pages", tool=True
+    ),
+    _spec("review-wiki", "Review", "tools", ["review-wiki"], "Review page quality", tool=True),
 )
 
 #: Plain-English titles for the tool listing of probe-backed rows (their ``title_one`` is the

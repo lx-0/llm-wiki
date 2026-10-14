@@ -1,4 +1,5 @@
 """Manual flush must explain consumption and reject invalid calls before extraction."""
+
 import asyncio
 
 import pytest

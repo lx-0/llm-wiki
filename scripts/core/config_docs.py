@@ -326,7 +326,9 @@ def check_example(example_path: Path) -> list[str]:
             )
     for name in pb:
         if name not in defaults and name not in EXAMPLE_EXTRA_PIGGYBACKS:
-            problems.append(f"unknown piggyback `piggybacks.{name}` (no default, not a known extra)")
+            problems.append(
+                f"unknown piggyback `piggybacks.{name}` (no default, not a known extra)"
+            )
     return problems
 
 

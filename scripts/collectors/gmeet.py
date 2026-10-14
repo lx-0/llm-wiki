@@ -118,10 +118,10 @@ _MEETING_KEY_LEN = 12
 # SINGLE+DOUBLE QUOTATION MARK (‘’ “”), DOUBLE+SINGLE LOW-9 (‚„), HIGH-REVERSED-9
 # (‛ ‟), LEFT/RIGHT-POINTING ANGLE (‹›).
 _TITLE_NORMALISE_QUOTES_RE = re.compile(
-    "[\"'«»"        # " ' « »
+    "[\"'«»"  # " ' « »
     "‘’‚‛"  # ‘ ’ ‚ ‛
     "“”„‟"  # “ ” „ ‟
-    "‹›]"             # ‹ ›
+    "‹›]"  # ‹ ›
 )
 _TITLE_NORMALISE_WS_RE = re.compile(r"\s+")
 
@@ -209,6 +209,7 @@ class _Sibling:
     legacy singular (`doc_kind:`, `drive_doc_id:`, `drive_doc_name:`) shape so
     a vault populated by the pre-pairing version is still indexed correctly.
     """
+
     path: Path
     front: dict
     body: str
@@ -233,7 +234,7 @@ def _split_frontmatter(text: str) -> tuple[dict, str] | None:
         return None
     if not isinstance(data, dict):
         return None
-    return data, text[end + len("\n---\n"):]
+    return data, text[end + len("\n---\n") :]
 
 
 def _scan_siblings(output_root: Path) -> tuple[dict[str, _Sibling], set[str]]:
@@ -296,11 +297,10 @@ def _scan_siblings(output_root: Path) -> tuple[dict[str, _Sibling], set[str]]:
             key = _meeting_key(name)
             # First file wins on collision (alphabetical sort makes it
             # deterministic — earliest dated meeting keeps the slot).
-            key_map.setdefault(key, _Sibling(path=p, front=front, body=body,
-                                              doc_kinds=kinds, drive_doc_ids=ids))
+            key_map.setdefault(
+                key, _Sibling(path=p, front=front, body=body, doc_kinds=kinds, drive_doc_ids=ids)
+            )
     return key_map, short_ids
-
-
 
 
 def _app(account_id: str) -> OAuthApp:
@@ -327,9 +327,11 @@ def gmeet_auth_bootstrap(account_id: str) -> tuple[bool, str]:
 
 # ── Per-account resolution ───────────────────────────────────────────
 
+
 @dataclass(frozen=True)
 class _GmeetAccount:
     """Resolved gmeet config for one `personal.accounts.<id>` entry."""
+
     account_id: str
     drive_folder_id: str
     drive_folder_name: str
@@ -376,12 +378,11 @@ def _resolve_gmeet_accounts() -> list[_GmeetAccount]:
             ),
         )
 
-    return resolve_accounts(
-        CONFIG.personal.accounts or {}, "gmeet-api", _build, block_key="gmeet"
-    )
+    return resolve_accounts(CONFIG.personal.accounts or {}, "gmeet-api", _build, block_key="gmeet")
 
 
 # ── HTTP client (inline — Drive API over the shared OAuth session) ────
+
 
 class GmeetAPIError(RuntimeError):
     """Raised on non-recoverable Drive API failures (401, persistent 5xx, schema)."""
@@ -395,7 +396,7 @@ class _DriveClient:
     network error / 429 / 5xx, raise on 401 / persistent failure.
     """
 
-    session: Any                 # google.auth.transport.requests.AuthorizedSession
+    session: Any  # google.auth.transport.requests.AuthorizedSession
     timeout_s: float
 
     def _get(self, url: str, *, params: dict | None = None, expect_json: bool = True) -> Any:
@@ -404,15 +405,16 @@ class _DriveClient:
                 r = self.session.get(url, params=params, timeout=self.timeout_s)
             except Exception as e:  # noqa: BLE001  network layer — requests/urllib3
                 if attempt == 2:
-                    raise GmeetAPIError(f"network failure on GET {url}: {type(e).__name__}: {e}") from e
+                    raise GmeetAPIError(
+                        f"network failure on GET {url}: {type(e).__name__}: {e}"
+                    ) from e
                 log.warning("gmeet GET %s: %s — retrying once in 5s", url, type(e).__name__)
                 time.sleep(5)
                 continue
 
             if r.status_code == 401:
                 raise GmeetAPIError(
-                    "401 from Drive — token invalid or scope not granted. "
-                    "Re-run `wiki gmeet-auth`."
+                    "401 from Drive — token invalid or scope not granted. Re-run `wiki gmeet-auth`."
                 )
             if r.status_code == 403:
                 # 403 is non-recoverable here (scope/permission/export-size) —
@@ -465,7 +467,11 @@ class _DriveClient:
         return files[0].get("id")
 
     def list_docs(
-        self, folder_id: str, *, since: str | None = None, limit: int | None = None,
+        self,
+        folder_id: str,
+        *,
+        since: str | None = None,
+        limit: int | None = None,
     ) -> Iterator[dict]:
         """Yield Google-Doc file stubs in `folder_id`, oldest first.
 
@@ -595,13 +601,15 @@ def _render_markdown(docs: list[tuple[dict, str]], *, account_id: str, input_sou
         kind = _classify_doc(name)
         if kind not in kinds_in_order:
             kinds_in_order.append(kind)
-        drive_docs_entries.append({
-            "id": file_id,
-            "name": name,
-            "kind": kind,
-            "url": doc.get("webViewLink"),
-            "created": doc.get("createdTime"),
-        })
+        drive_docs_entries.append(
+            {
+                "id": file_id,
+                "name": name,
+                "kind": kind,
+                "url": doc.get("webViewLink"),
+                "created": doc.get("createdTime"),
+            }
+        )
 
     front: dict[str, Any] = {
         "type": "transcript",
@@ -624,8 +632,10 @@ def _render_markdown(docs: list[tuple[dict, str]], *, account_id: str, input_sou
         header_bits.append(str(created)[:10])
     header_bits.append("+".join(kinds_in_order))
 
-    sections = [_section_body(_classify_doc(doc.get("name") or doc.get("id") or ""),
-                              exported) for doc, exported in docs]
+    sections = [
+        _section_body(_classify_doc(doc.get("name") or doc.get("id") or ""), exported)
+        for doc, exported in docs
+    ]
 
     parts: list[str] = [
         f"---\n{fm}\n---",
@@ -640,8 +650,9 @@ def _render_markdown(docs: list[tuple[dict, str]], *, account_id: str, input_sou
     return "\n".join(parts) + "\n"
 
 
-def _merge_into_sibling(sibling: _Sibling, doc: dict, exported: str,
-                        *, account_id: str, input_source: str) -> str:
+def _merge_into_sibling(
+    sibling: _Sibling, doc: dict, exported: str, *, account_id: str, input_source: str
+) -> str:
     """Append a new Doc's section into an existing meeting file. Returns the
     new full text (caller writes it back). Updates `doc_kinds` + `drive_docs`
     in the frontmatter and migrates legacy singular fields to the list shape
@@ -672,24 +683,30 @@ def _merge_into_sibling(sibling: _Sibling, doc: dict, exported: str,
     if isinstance(legacy_id, str) and legacy_id:
         # Re-classify legacy entry from its name so the doc_kinds list above
         # stays consistent with drive_docs.
-        legacy_kind = _classify_doc(legacy_name or "") if isinstance(legacy_name, str) else "unknown"
-        drive_docs.append({
-            "id": legacy_id,
-            "name": legacy_name if isinstance(legacy_name, str) else legacy_id,
-            "kind": legacy_kind,
-            "url": legacy_url if isinstance(legacy_url, str) else None,
-            "created": front.get("started_at"),
-        })
+        legacy_kind = (
+            _classify_doc(legacy_name or "") if isinstance(legacy_name, str) else "unknown"
+        )
+        drive_docs.append(
+            {
+                "id": legacy_id,
+                "name": legacy_name if isinstance(legacy_name, str) else legacy_id,
+                "kind": legacy_kind,
+                "url": legacy_url if isinstance(legacy_url, str) else None,
+                "created": front.get("started_at"),
+            }
+        )
     for d in front.get("drive_docs") or []:
         if isinstance(d, dict) and d.get("id") and d["id"] not in {x["id"] for x in drive_docs}:
             drive_docs.append(d)
-    drive_docs.append({
-        "id": file_id,
-        "name": name,
-        "kind": new_kind,
-        "url": doc.get("webViewLink"),
-        "created": doc.get("createdTime"),
-    })
+    drive_docs.append(
+        {
+            "id": file_id,
+            "name": name,
+            "kind": new_kind,
+            "url": doc.get("webViewLink"),
+            "created": doc.get("createdTime"),
+        }
+    )
     # Drop None values per drive_docs entry to keep frontmatter terse.
     front["drive_docs"] = [{k: v for k, v in d.items() if v is not None} for d in drive_docs]
 
@@ -704,6 +721,7 @@ def _merge_into_sibling(sibling: _Sibling, doc: dict, exported: str,
 
 
 # ── Collector ────────────────────────────────────────────────────────
+
 
 @register
 class GmeetCollector:
@@ -821,16 +839,23 @@ class GmeetCollector:
                     "GmeetCollector[%s]: drive_folder_id is empty — auto-resolved by "
                     "name to %s. Pin it in config (personal.accounts.%s.gmeet.drive_folder_id) "
                     "for collision-safe runs.",
-                    acct.account_id, folder_id, acct.account_id,
+                    acct.account_id,
+                    folder_id,
+                    acct.account_id,
                 )
         if folder_id:
             since = per_acct_state.get("last_seen_ts") if incremental else acct.since
             log.info(
                 "GmeetCollector[%s]: listing Docs (folder=%s, since=%s, limit=%d)",
-                acct.account_id, folder_id, since or "—", acct.max_per_run,
+                acct.account_id,
+                folder_id,
+                since or "—",
+                acct.max_per_run,
             )
             try:
-                folder_stubs = list(client.list_docs(folder_id, since=since, limit=acct.max_per_run))
+                folder_stubs = list(
+                    client.list_docs(folder_id, since=since, limit=acct.max_per_run)
+                )
             except GmeetAPIError as e:
                 log.error("GmeetCollector[%s]: folder list failed: %s", acct.account_id, e)
                 folder_note = f"folder-list failed: {e}"
@@ -877,8 +902,7 @@ class GmeetCollector:
             groups.setdefault(_meeting_key(name), []).append(stub)
         _KIND_ORDER = {"notes": 0, "transcript": 1, "unknown": 2}
         for key in groups:
-            groups[key].sort(key=lambda d: _KIND_ORDER.get(
-                _classify_doc(d.get("name") or ""), 99))
+            groups[key].sort(key=lambda d: _KIND_ORDER.get(_classify_doc(d.get("name") or ""), 99))
 
         files_written: list[Path] = []
         skipped = 0
@@ -911,7 +935,10 @@ class GmeetCollector:
                         # the file manually if they want the regen.
                         log.info(
                             "GmeetCollector[%s]: %s — same kind (%s) already present in %s, skipping",
-                            acct.account_id, file_id, new_kind, sibling.path.name,
+                            acct.account_id,
+                            file_id,
+                            new_kind,
+                            sibling.path.name,
                         )
                         skipped += 1
                         continue
@@ -936,8 +963,7 @@ class GmeetCollector:
                 try:
                     exported = client.export_doc(file_id)
                 except GmeetAPIError as e:
-                    log.warning("GmeetCollector[%s]: export %s — %s",
-                                acct.account_id, file_id, e)
+                    log.warning("GmeetCollector[%s]: export %s — %s", acct.account_id, file_id, e)
                     _record_export_failure(dead, file_id, str(e), now=now_iso())
                     dead_touched = True
                     continue
@@ -955,13 +981,20 @@ class GmeetCollector:
                 target = sibling.path
                 for stub, exported in exports:
                     text = _merge_into_sibling(
-                        current, stub, exported,
-                        account_id=acct.account_id, input_source=input_source,
+                        current,
+                        stub,
+                        exported,
+                        account_id=acct.account_id,
+                        input_source=input_source,
                     )
                     if dry_run:
-                        log.info("  DRY[%s]: would merge %s into %s (%d bytes)",
-                                 acct.account_id, stub.get("id") or "?",
-                                 target.relative_to(ROOT_DIR), len(text))
+                        log.info(
+                            "  DRY[%s]: would merge %s into %s (%d bytes)",
+                            acct.account_id,
+                            stub.get("id") or "?",
+                            target.relative_to(ROOT_DIR),
+                            len(text),
+                        )
                         continue
                     # Re-parse the merged text so the next iteration of the
                     # group (rare: three Docs in one meeting) sees the latest
@@ -970,14 +1003,21 @@ class GmeetCollector:
                     if parsed is None:
                         log.error(
                             "GmeetCollector[%s]: post-merge frontmatter unparseable for %s — aborting group",
-                            acct.account_id, target.relative_to(ROOT_DIR),
+                            acct.account_id,
+                            target.relative_to(ROOT_DIR),
                         )
                         break
                     new_front, new_body = parsed
                     current = _Sibling(
-                        path=target, front=new_front, body=new_body,
+                        path=target,
+                        front=new_front,
+                        body=new_body,
                         doc_kinds=set(new_front.get("doc_kinds") or []),
-                        drive_doc_ids={d.get("id") for d in (new_front.get("drive_docs") or []) if isinstance(d, dict) and d.get("id")},
+                        drive_doc_ids={
+                            d.get("id")
+                            for d in (new_front.get("drive_docs") or [])
+                            if isinstance(d, dict) and d.get("id")
+                        },
                     )
                     target.write_text(text, encoding="utf-8")
                     # Only own-folder docs advance the folder watermark; email-
@@ -988,8 +1028,12 @@ class GmeetCollector:
                     if short:
                         already_present.add(short)
                 if not dry_run:
-                    log.info("  [%s] merged %d Doc(s) into %s",
-                             acct.account_id, len(exports), target.relative_to(ROOT_DIR))
+                    log.info(
+                        "  [%s] merged %d Doc(s) into %s",
+                        acct.account_id,
+                        len(exports),
+                        target.relative_to(ROOT_DIR),
+                    )
                     # Keep sibling_map in sync for cross-account reuse later
                     # in the same run.
                     sibling_map[key] = current
@@ -997,8 +1041,7 @@ class GmeetCollector:
                 continue
 
             # No sibling — write a fresh combined file for this meeting.
-            md = _render_markdown(exports, account_id=acct.account_id,
-                                  input_source=input_source)
+            md = _render_markdown(exports, account_id=acct.account_id, input_source=input_source)
             first_doc, _ = exports[0]
             first_name = first_doc.get("name") or first_doc.get("id") or "unknown"
             first_created = first_doc.get("createdTime") or ""
@@ -1010,19 +1053,29 @@ class GmeetCollector:
             target = (ROOT_DIR / self.SPEC.output_subfolder) / fname
 
             if dry_run:
-                log.info("  DRY[%s]: would write %s (%d Doc(s), %d bytes)",
-                         acct.account_id, target.relative_to(ROOT_DIR), len(exports), len(md))
+                log.info(
+                    "  DRY[%s]: would write %s (%d Doc(s), %d bytes)",
+                    acct.account_id,
+                    target.relative_to(ROOT_DIR),
+                    len(exports),
+                    len(md),
+                )
                 continue
 
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(md, encoding="utf-8")
-            log.info("  [%s] wrote %s (%d Doc(s))",
-                     acct.account_id, target.relative_to(ROOT_DIR), len(exports))
+            log.info(
+                "  [%s] wrote %s (%d Doc(s))",
+                acct.account_id,
+                target.relative_to(ROOT_DIR),
+                len(exports),
+            )
             files_written.append(target)
 
             # Mirror a one-liner into daily/<date>/meetings.md.
             try:
                 from core import daily_capture as _daily_capture
+
                 if re.match(r"^\d{4}-\d{2}-\d{2}$", date_prefix):
                     rollup_line = f"- **gmeet** · {_meeting_title(first_name)} → [[{target.stem}]]"
                     _daily_capture.append(date_prefix, "meetings", rollup_line)
@@ -1036,9 +1089,15 @@ class GmeetCollector:
             if parsed is not None:
                 new_front, new_body = parsed
                 sibling_map[key] = _Sibling(
-                    path=target, front=new_front, body=new_body,
+                    path=target,
+                    front=new_front,
+                    body=new_body,
                     doc_kinds=set(new_front.get("doc_kinds") or []),
-                    drive_doc_ids={d.get("id") for d in (new_front.get("drive_docs") or []) if isinstance(d, dict) and d.get("id")},
+                    drive_doc_ids={
+                        d.get("id")
+                        for d in (new_front.get("drive_docs") or [])
+                        if isinstance(d, dict) and d.get("id")
+                    },
                 )
             already_present.add(key)
             for stub, _exported in exports:
@@ -1065,7 +1124,8 @@ class GmeetCollector:
             log.info(
                 "GmeetCollector[%s]: %d un-exportable doc(s) parked in dead-letter "
                 "(re-probe after %dd)",
-                acct.account_id, skipped_dead,
+                acct.account_id,
+                skipped_dead,
                 CONFIG.limits.gmeet_export_dead_letter_reprobe_days,
             )
 

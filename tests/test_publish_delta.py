@@ -5,6 +5,7 @@ job (PRODUCER-CONTRACT.md): diff by content hash locally, publish only
 created/changed, retract deleted. A rerun over unchanged input must plan
 zero writes.
 """
+
 from __future__ import annotations
 
 from pathlib import Path

@@ -22,6 +22,7 @@ from domain.mail import FilterRule, Message, MessageMeta
 
 # ── Failure signal ───────────────────────────────────────────────────
 
+
 class MailboxReadError(RuntimeError):
     """A reader could not complete a scan of a *configured* account.
 
@@ -37,6 +38,7 @@ class MailboxReadError(RuntimeError):
 
 
 # ── Read side ────────────────────────────────────────────────────────
+
 
 @runtime_checkable
 class MailboxReader(Protocol):
@@ -88,13 +90,14 @@ class MailboxReader(Protocol):
 
 # ── Write side ───────────────────────────────────────────────────────
 
+
 @dataclass(frozen=True)
 class ApplyResult:
     """What `MailboxFilter.apply()` returns — feedback for `suggestions/cli.py`."""
 
     success: bool
     rule_id: str | None = None  # backend's id for the persisted rule, when known
-    message: str = ""           # human-readable; appears in operator-facing logs
+    message: str = ""  # human-readable; appears in operator-facing logs
     dry_run: bool = False
 
 

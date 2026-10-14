@@ -15,6 +15,7 @@ live 2026-05-15 against the operator's account):
 
 Network is isolated via direct payload injection; no real PAT required.
 """
+
 from __future__ import annotations
 
 import pytest
@@ -75,7 +76,7 @@ SLEEP_SESSIONS_PAYLOAD = {
             "period": 0,
             "bedtime_start": "2026-05-13T23:30:00+00:00",
             "bedtime_end": "2026-05-14T06:48:00+00:00",
-            "total_sleep_duration": 25920,    # 7.2 h
+            "total_sleep_duration": 25920,  # 7.2 h
             "average_hrv": 52,
             "average_heart_rate": 58.2,
             "lowest_heart_rate": 54,
@@ -86,7 +87,7 @@ SLEEP_SESSIONS_PAYLOAD = {
             "day": "2026-05-13",
             "type": "late_nap",
             "period": 1,
-            "total_sleep_duration": 1200,     # 20-min nap — shorter
+            "total_sleep_duration": 1200,  # 20-min nap — shorter
             "average_hrv": 45,
             "average_heart_rate": 65.0,
             "lowest_heart_rate": 62,
@@ -96,7 +97,7 @@ SLEEP_SESSIONS_PAYLOAD = {
             "day": "2026-05-13",
             "type": "long_sleep",
             "period": 0,
-            "total_sleep_duration": 23400,    # 6.5 h — the longer, correct one
+            "total_sleep_duration": 23400,  # 6.5 h — the longer, correct one
             "average_hrv": 48,
             "average_heart_rate": 60.0,
             "lowest_heart_rate": 56,
@@ -213,8 +214,8 @@ def test_parse_sleep_sessions_skips_rows_without_day_or_duration() -> None:
     payload = {
         "data": [
             {"day": "2026-05-14", "total_sleep_duration": 25920},
-            {"total_sleep_duration": 5000},        # no day — drop
-            {"day": "2026-05-13"},                  # no duration — drop
+            {"total_sleep_duration": 5000},  # no day — drop
+            {"day": "2026-05-13"},  # no duration — drop
         ]
     }
     out = _parse_sleep_sessions(payload)
@@ -229,12 +230,14 @@ def test_parse_sleep_sessions_returns_empty_on_no_data() -> None:
 def test_parse_sleep_sessions_falls_back_to_average_hr_when_lowest_missing() -> None:
     """Older API responses may emit `average_heart_rate` only. Use that as a fallback."""
     payload = {
-        "data": [{
-            "day": "2026-05-14",
-            "total_sleep_duration": 25920,
-            "average_heart_rate": 58.2,
-            # lowest_heart_rate absent
-        }]
+        "data": [
+            {
+                "day": "2026-05-14",
+                "total_sleep_duration": 25920,
+                "average_heart_rate": 58.2,
+                # lowest_heart_rate absent
+            }
+        ]
     }
     out = _parse_sleep_sessions(payload)
     assert out["2026-05-14"]["resting_hr"] == 58  # int-cast of average
@@ -282,12 +285,12 @@ def test_merge_by_day_combines_four_endpoints_into_one_summary_per_day() -> None
 
     assert set(by_day.keys()) == {"2026-05-14", "2026-05-13"}
     may_14 = by_day["2026-05-14"]
-    assert may_14.sleep_score == 84              # /daily_sleep
+    assert may_14.sleep_score == 84  # /daily_sleep
     assert may_14.sleep_hours == pytest.approx(7.2, rel=1e-3)  # /sleep
-    assert may_14.hrv_overnight == 52            # /sleep
-    assert may_14.resting_hr == 54               # /sleep
-    assert may_14.readiness_score == 79          # /daily_readiness
-    assert may_14.steps == 8412                  # /daily_activity
+    assert may_14.hrv_overnight == 52  # /sleep
+    assert may_14.resting_hr == 54  # /sleep
+    assert may_14.readiness_score == 79  # /daily_readiness
+    assert may_14.steps == 8412  # /daily_activity
 
 
 def test_merge_by_day_yields_summary_for_each_day_in_any_source() -> None:

@@ -37,9 +37,9 @@ class InstrumentSnapshot:
     normalise + flag correctly.
     """
 
-    slug: str                  # may be alias-derived from filename
+    slug: str  # may be alias-derived from filename
     version: str
-    timestamp: str             # ISO-style with hyphens for filesystem safety
+    timestamp: str  # ISO-style with hyphens for filesystem safety
     total_score: int
     band: str | None
     bandable: bool
@@ -87,11 +87,7 @@ class Timeline:
     def series_for(self, instrument_key: str) -> list[InstrumentSnapshot]:
         """Time-ordered series of snapshots for one instrument key
         (alias-or-slug)."""
-        return [
-            r.instruments[instrument_key]
-            for r in self.runs
-            if instrument_key in r.instruments
-        ]
+        return [r.instruments[instrument_key] for r in self.runs if instrument_key in r.instruments]
 
     def all_instrument_keys(self) -> list[str]:
         """Union of instrument keys across all runs, sorted."""
@@ -153,9 +149,7 @@ def _snapshot_from_report(report_path: Path) -> InstrumentSnapshot | None:
         except (TypeError, ValueError):
             max_total = None
     concern_raw = fm.get("concern_bands") or []
-    concern_bands = (
-        tuple(str(b) for b in concern_raw) if isinstance(concern_raw, list) else ()
-    )
+    concern_bands = tuple(str(b) for b in concern_raw) if isinstance(concern_raw, list) else ()
     try:
         return InstrumentSnapshot(
             slug=instrument_key,

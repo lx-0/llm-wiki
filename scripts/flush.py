@@ -50,8 +50,8 @@ from core import flush_pipeline  # noqa: E402
 from core.piggybacks import PIGGYBACK_STATE_FILE, run_due_piggybacks  # noqa: E402
 
 DAILY_DIR = ROOT_DIR / "daily"
-STATE_DIR = WIKI_DIR / "state"     # *.json runtime artifacts (hash trackers, cooldowns)
-LOGS_DIR = WIKI_DIR / "logs"       # *.log files
+STATE_DIR = WIKI_DIR / "state"  # *.json runtime artifacts (hash trackers, cooldowns)
+LOGS_DIR = WIKI_DIR / "logs"  # *.log files
 STATE_DIR.mkdir(parents=True, exist_ok=True)
 LOGS_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -89,6 +89,7 @@ append_to_daily = flush_pipeline.append_to_daily
 # `wiki flush` from a TTY gets the colorized output (matches compile /
 # dream / lint / etc. — same UX language across the CLI).
 from core.console import setup_console_logging
+
 log = setup_console_logging(
     "flush",
     log_file=LOG_FILE,
@@ -97,6 +98,7 @@ log = setup_console_logging(
 
 
 # ── Dedup helpers ────────────────────────────────────────────────────
+
 
 def _load_last_flush() -> dict:
     if LAST_FLUSH_FILE.exists():
@@ -186,19 +188,22 @@ async def extract_from_context(context: str) -> str | None:
             log.error(
                 "Claude extraction failed with a fatal kind=%s — not retrying "
                 "(fails identically until fixed): %s",
-                last_failure.kind, last_failure.detail,
+                last_failure.kind,
+                last_failure.detail,
             )
             return None
         if attempt < MAX_RETRIES:
             log.warning(
                 "Retrying in %ds (last kind=%s)...",
-                RETRY_DELAY, last_failure.kind,
+                RETRY_DELAY,
+                last_failure.kind,
             )
             await asyncio.sleep(RETRY_DELAY)
         else:
             log.error(
                 "Claude extraction failed after %d attempts (last kind=%s)",
-                MAX_RETRIES, last_failure.kind,
+                MAX_RETRIES,
+                last_failure.kind,
             )
             return None
     return None
@@ -206,14 +211,13 @@ async def extract_from_context(context: str) -> str | None:
 
 # ── Compile trigger ──────────────────────────────────────────────────
 
+
 def maybe_trigger_compile(daily_file: Path) -> None:
     """Trigger compile.py as a detached background process if it's after COMPILE_AFTER_HOUR
     and the daily log has changed since last compile."""
     now = datetime.now(ZoneInfo(TIMEZONE))
     if now.hour < COMPILE_AFTER_HOUR:
-        log.info(
-            "Skipping compile — current hour %d < %d", now.hour, COMPILE_AFTER_HOUR
-        )
+        log.info("Skipping compile — current hour %d < %d", now.hour, COMPILE_AFTER_HOUR)
         return
 
     # Skip when the file's content is already in the ingested ledger. The
@@ -224,9 +228,7 @@ def maybe_trigger_compile(daily_file: Path) -> None:
     # never fire and every evening flush unconditionally spawned compile.
     try:
         if is_ingested(daily_file):
-            log.info(
-                "Skipping compile — %s unchanged since last compile", daily_file.name
-            )
+            log.info("Skipping compile — %s unchanged since last compile", daily_file.name)
             return
     except (OSError, ValueError):
         pass  # unreadable/corrupt state — fail open; compile re-checks the ledger
@@ -255,6 +257,7 @@ def maybe_trigger_compile(daily_file: Path) -> None:
 
 
 # ── Dashboard refresh ───────────────────────────────────────────────
+
 
 @contextlib.contextmanager
 def _dashboard_refresh_lock():
@@ -293,7 +296,10 @@ def _run_dashboard_script(script: Path, label: str) -> None:
         elapsed = time.time() - started
         log.error(
             "dashboard %s refresh TIMEOUT after %.1fs (limit=%ds) — %s",
-            label, elapsed, DASHBOARD_REFRESH_TIMEOUT_S, script.name,
+            label,
+            elapsed,
+            DASHBOARD_REFRESH_TIMEOUT_S,
+            script.name,
         )
         if exc.stderr:
             log.error("    stderr: %s", exc.stderr.decode("utf-8", errors="replace")[:500])
@@ -305,7 +311,9 @@ def _run_dashboard_script(script: Path, label: str) -> None:
     if result.returncode != 0:
         log.warning(
             "dashboard %s refresh failed (exit=%d, %.1fs): %s",
-            label, result.returncode, elapsed,
+            label,
+            result.returncode,
+            elapsed,
             result.stderr.decode("utf-8", errors="replace")[:500],
         )
     else:
@@ -332,6 +340,7 @@ def refresh_dashboard_lint() -> None:
 
 # ── Piggyback tasks ─────────────────────────────────────────────────
 
+
 def maybe_run_piggyback_tasks() -> None:
     """Spawn due piggyback tasks (evening-only, cooldown-gated).
 
@@ -345,17 +354,24 @@ def maybe_run_piggyback_tasks() -> None:
 
 # ── Main ─────────────────────────────────────────────────────────────
 
+
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog="wiki flush",
         description="Extract a daily entry with the Claude Agent SDK (LLM cost applies).",
-        epilog=("Use only a disposable UTF-8 Markdown copy of conversation context. "
-                "The file is deleted after success, duplicate-skip or empty input; "
-                "failed extraction moves it to .wiki/sessions/failed-flushes/. "
-                "Evening flushes may also trigger compilation and piggyback tasks."),
+        epilog=(
+            "Use only a disposable UTF-8 Markdown copy of conversation context. "
+            "The file is deleted after success, duplicate-skip or empty input; "
+            "failed extraction moves it to .wiki/sessions/failed-flushes/. "
+            "Evening flushes may also trigger compilation and piggyback tasks."
+        ),
     )
-    parser.add_argument("context_file", type=Path, metavar="context_file.md",
-                        help="disposable conversation context: requests, decisions and outcomes")
+    parser.add_argument(
+        "context_file",
+        type=Path,
+        metavar="context_file.md",
+        help="disposable conversation context: requests, decisions and outcomes",
+    )
     parser.add_argument("session_id", help="capture identity used for deduplication")
     args = sys.argv[1:] if argv is None else argv
     if not args:
@@ -397,7 +413,10 @@ async def main() -> None:
     # caller-constructed) is wrapped as a synthetic StagedFlush so the
     # pipeline helpers still work uniformly.
     staged = flush_pipeline.parse_name(context_file) or flush_pipeline.StagedFlush(
-        path=context_file, session_id=session_id, kind="session-end", created=int(time.time()),
+        path=context_file,
+        session_id=session_id,
+        kind="session-end",
+        created=int(time.time()),
     )
 
     if not extracted:
@@ -419,6 +438,7 @@ async def main() -> None:
 
     # Append-only history event for Dashboard P2 charts.
     from core.utils import append_history
+
     append_history(
         "flush",
         session_id=session_id,

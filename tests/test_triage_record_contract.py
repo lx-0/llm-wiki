@@ -8,6 +8,7 @@ pins the contract: the frontmatter keys the writer emits AND the keys the HTML
 depends on. Rename a key in `_record.py` and forget the HTML → this test fails,
 naming exactly what drifted. (Write-Read-Symmetry rule.)
 """
+
 from __future__ import annotations
 
 import re
@@ -21,12 +22,14 @@ _TRIAGE_HTML = Path(__file__).resolve().parent.parent / "templates" / "triage.ht
 
 def _record_frontmatter_keys(tmp_path, monkeypatch) -> set[str]:
     import intents._record as rec
+
     monkeypatch.setattr(rec, "WORKSPACE_INBOX_DIR", tmp_path)
     from intents.base import Intent
 
     rec.write_inbox_record(
         Intent(kind="note", summary="x", source="raw/voice/v.md", confidence="high"),
-        type_="note", triage_hint="hint.",
+        type_="note",
+        triage_hint="hint.",
     )
     text = (tmp_path / "v.md").read_text(encoding="utf-8")
     m = re.match(r"\A---\n(.*?)\n---", text, re.DOTALL)
@@ -67,7 +70,8 @@ def test_summary_umlaut_and_quote_round_trip(tmp_path, monkeypatch):
     summary = 'Müller sagt "Grüß dich" und geht.'
     rec.write_inbox_record(
         Intent(kind="task", summary=summary, source="raw/voice/v.md", confidence="high"),
-        type_="task", triage_hint="hint.",
+        type_="task",
+        triage_hint="hint.",
     )
     text = (tmp_path / "v.md").read_text(encoding="utf-8")
     fields = triage._fields(text)
@@ -107,7 +111,8 @@ def _write_record(rec_mod, *, kind: str, summary: str, source: str, type_: str, 
 
     rec_mod.write_inbox_record(
         Intent(kind=kind, summary=summary, source=source, confidence="high"),
-        type_=type_, triage_hint=hint,
+        type_=type_,
+        triage_hint=hint,
     )
 
 
@@ -120,8 +125,11 @@ def test_json_list_serves_clean_detail(tmp_path, monkeypatch):
     monkeypatch.setattr(rec, "WORKSPACE_INBOX_DIR", tmp_path)
     monkeypatch.setattr(triage, "WORKSPACE_INBOX_DIR", tmp_path)
     _write_record(
-        rec, kind="action_item", summary="Reply to Bob",
-        source="raw/voice/2026-07-10-bob.md", type_="task",
+        rec,
+        kind="action_item",
+        summary="Reply to Bob",
+        source="raw/voice/2026-07-10-bob.md",
+        type_="task",
         hint="Accept to add it to your tasks.",
     )
 
@@ -144,8 +152,12 @@ def test_json_record_covers_the_frontmatter_contract(tmp_path, monkeypatch):
     monkeypatch.setattr(rec, "WORKSPACE_INBOX_DIR", tmp_path)
     monkeypatch.setattr(triage, "WORKSPACE_INBOX_DIR", tmp_path)
     _write_record(
-        rec, kind="note", summary='Müller sagt "Grüß dich"',
-        source="raw/voice/v.md", type_="note", hint="Accept to keep it.",
+        rec,
+        kind="note",
+        summary='Müller sagt "Grüß dich"',
+        source="raw/voice/v.md",
+        type_="note",
+        hint="Accept to keep it.",
     )
 
     (record,) = triage._json_payload(show_all=False)["records"]
@@ -163,12 +175,15 @@ def test_json_list_orders_by_type_and_filters_pending(tmp_path, monkeypatch):
 
     monkeypatch.setattr(rec, "WORKSPACE_INBOX_DIR", tmp_path)
     monkeypatch.setattr(triage, "WORKSPACE_INBOX_DIR", tmp_path)
-    _write_record(rec, kind="note", summary="n", source="raw/voice/c-note.md",
-                  type_="note", hint="h.")
-    _write_record(rec, kind="action_item", summary="t", source="raw/voice/a-task.md",
-                  type_="task", hint="h.")
-    _write_record(rec, kind="idea", summary="i", source="raw/voice/b-idea.md",
-                  type_="idea", hint="h.")
+    _write_record(
+        rec, kind="note", summary="n", source="raw/voice/c-note.md", type_="note", hint="h."
+    )
+    _write_record(
+        rec, kind="action_item", summary="t", source="raw/voice/a-task.md", type_="task", hint="h."
+    )
+    _write_record(
+        rec, kind="idea", summary="i", source="raw/voice/b-idea.md", type_="idea", hint="h."
+    )
     dismissed = tmp_path / "c-note.md"
     dismissed.write_text(
         dismissed.read_text(encoding="utf-8").replace("status: pending", "status: dismissed"),

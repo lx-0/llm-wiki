@@ -82,7 +82,7 @@ _ROUTE_WORKSPACE = "workspace"
 # tRPC parameter names (Jamie's vocabulary, not generic REST).
 _PARAM_LIMIT = "limit"
 _PARAM_CURSOR = "cursor"
-_PARAM_START_DATE = "startDate"     # ISO 8601 — filter by startTime >= startDate
+_PARAM_START_DATE = "startDate"  # ISO 8601 — filter by startTime >= startDate
 
 _STATE_FILE = STATE_DIR / "jamie-state.json"
 _API_VERSION = "v1"
@@ -113,6 +113,7 @@ def _short_id(meeting_id: str) -> str:
 
 # ── HTTP client (inline — no adapter family yet) ─────────────────────
 
+
 class JamieAPIError(RuntimeError):
     """Raised on non-recoverable Jamie API failures (401, persistent 5xx, schema)."""
 
@@ -120,7 +121,7 @@ class JamieAPIError(RuntimeError):
 @dataclass
 class _JamieClient:
     api_key: str
-    key_type: str               # "personal" | "workspace"
+    key_type: str  # "personal" | "workspace"
     timeout_s: float
     _logged_discovery: bool = False
 
@@ -154,7 +155,9 @@ class _JamieClient:
                 r = httpx.get(url, headers=self.headers, timeout=self.timeout_s)
             except httpx.HTTPError as e:
                 if attempt == 2:
-                    raise JamieAPIError(f"network failure on {operation}: {type(e).__name__}: {e}") from e
+                    raise JamieAPIError(
+                        f"network failure on {operation}: {type(e).__name__}: {e}"
+                    ) from e
                 log.warning("jamie %s: %s — retrying once in 5s", operation, type(e).__name__)
                 time.sleep(5)
                 continue
@@ -172,7 +175,9 @@ class _JamieClient:
                 continue
             if 500 <= r.status_code < 600:
                 if attempt == 2:
-                    raise JamieAPIError(f"persistent {r.status_code} on {operation}: {r.text[:200]}")
+                    raise JamieAPIError(
+                        f"persistent {r.status_code} on {operation}: {r.text[:200]}"
+                    )
                 log.warning("jamie %s: %d — retrying once in 5s", operation, r.status_code)
                 time.sleep(5)
                 continue
@@ -183,7 +188,8 @@ class _JamieClient:
             # tRPC envelope unwrap: result.data.json holds the actual payload.
             payload = (
                 envelope.get("result", {}).get("data", {}).get("json")
-                if isinstance(envelope, dict) else None
+                if isinstance(envelope, dict)
+                else None
             )
             if payload is None:
                 # Some endpoints might return the bare payload — fall through.
@@ -197,7 +203,10 @@ class _JamieClient:
         raise JamieAPIError(f"unreachable: exhausted retries on {operation}")
 
     def list_meetings(
-        self, *, start_date: str | None = None, limit: int | None = None,
+        self,
+        *,
+        start_date: str | None = None,
+        limit: int | None = None,
     ) -> Iterator[dict]:
         """Yield meeting stubs (id, title, startTime, endTime, ...).
 
@@ -219,7 +228,9 @@ class _JamieClient:
             payload = self._get("meetings.list", page_params)
 
             if not isinstance(payload, dict):
-                raise JamieAPIError(f"meetings.list returned {type(payload).__name__}, expected dict")
+                raise JamieAPIError(
+                    f"meetings.list returned {type(payload).__name__}, expected dict"
+                )
             meetings = payload.get("meetings") or []
             for item in meetings:
                 yield item
@@ -308,6 +319,7 @@ def _duration_minutes(started_at: str | None, ended_at: str | None) -> int | Non
         return None
     try:
         from datetime import datetime
+
         s = datetime.fromisoformat(str(started_at).replace("Z", "+00:00"))
         e = datetime.fromisoformat(str(ended_at).replace("Z", "+00:00"))
         return max(0, int((e - s).total_seconds()) // 60)
@@ -366,7 +378,8 @@ def _render_markdown(meeting: dict, *, account_id: str, key_type: str, input_sou
         "duration_min": duration_min,
         "participants": [
             {"name": p.get("name"), "email": p.get("email")}
-            for p in participants if isinstance(p, dict)
+            for p in participants
+            if isinstance(p, dict)
         ],
         "calendar_event": calendar_event_id,
         "tags": list(dict.fromkeys(["jamie", "meeting", *tag_names])),
@@ -425,12 +438,14 @@ def _render_markdown(meeting: dict, *, account_id: str, key_type: str, input_sou
 
 # ── Per-account resolution ───────────────────────────────────────────
 
+
 @dataclass(frozen=True)
 class _JamieAccount:
     """Resolved jamie config for one `personal.accounts.<id>` entry."""
+
     account_id: str
-    api_key: str                # resolved from os.environ at resolution time
-    key_type: str               # "personal" | "workspace"
+    api_key: str  # resolved from os.environ at resolution time
+    key_type: str  # "personal" | "workspace"
     since: str | None
     max_per_run: int
 
@@ -455,12 +470,11 @@ def _resolve_jamie_accounts() -> list[_JamieAccount]:
             max_per_run=per_acct_max if per_acct_max is not None else default_max,
         )
 
-    return resolve_accounts(
-        CONFIG.personal.accounts or {}, "jamie-api", _build, block_key="jamie"
-    )
+    return resolve_accounts(CONFIG.personal.accounts or {}, "jamie-api", _build, block_key="jamie")
 
 
 # ── Collector ────────────────────────────────────────────────────────
+
 
 @register
 class JamieCollector:
@@ -501,9 +515,7 @@ class JamieCollector:
         already_present: set[str] = set()
         if output_root.exists():
             already_present = {
-                p.stem.rsplit("--", 1)[-1]
-                for p in output_root.glob("*.md")
-                if "--" in p.stem
+                p.stem.rsplit("--", 1)[-1] for p in output_root.glob("*.md") if "--" in p.stem
             }
 
         state = load_json_state(_STATE_FILE)
@@ -551,7 +563,9 @@ class JamieCollector:
             return "no-op (api key env var unset)", ([], 0), False
 
         client = _JamieClient(
-            api_key=acct.api_key, key_type=acct.key_type, timeout_s=self._timeout_s,
+            api_key=acct.api_key,
+            key_type=acct.key_type,
+            timeout_s=self._timeout_s,
         )
 
         per_acct_state = state.get(acct.account_id) or {}
@@ -559,7 +573,10 @@ class JamieCollector:
 
         log.info(
             "JamieCollector[%s]: listing meetings (key_type=%s, startDate=%s, limit=%d)",
-            acct.account_id, acct.key_type, start_date or "—", acct.max_per_run,
+            acct.account_id,
+            acct.key_type,
+            start_date or "—",
+            acct.max_per_run,
         )
 
         try:
@@ -598,8 +615,10 @@ class JamieCollector:
                 continue
 
             md = _render_markdown(
-                full, account_id=acct.account_id,
-                key_type=acct.key_type, input_source=input_source,
+                full,
+                account_id=acct.account_id,
+                key_type=acct.key_type,
+                input_source=input_source,
             )
             title = full.get("title") or mid
             started_at = full.get("startTime") or stub.get("startTime") or ""
@@ -608,8 +627,12 @@ class JamieCollector:
             target = output_root / fname
 
             if dry_run:
-                log.info("  DRY[%s]: would write %s (%d bytes)",
-                         acct.account_id, target.relative_to(ROOT_DIR), len(md))
+                log.info(
+                    "  DRY[%s]: would write %s (%d bytes)",
+                    acct.account_id,
+                    target.relative_to(ROOT_DIR),
+                    len(md),
+                )
                 continue
 
             output_root.mkdir(parents=True, exist_ok=True)
@@ -624,6 +647,7 @@ class JamieCollector:
             # Mirror a one-liner into daily/<date>/meetings.md.
             try:
                 from core import daily_capture
+
                 meet_date = str(started_at)[:10] if started_at else now_iso()[:10]
                 if re.match(r"^\d{4}-\d{2}-\d{2}$", meet_date):
                     rollup_line = f"- **jamie** · {title} → [[{target.stem}]]"

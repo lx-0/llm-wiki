@@ -44,7 +44,8 @@ def vault(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(cs_mod, "read_hard_facts", lambda: "")
     monkeypatch.setattr(cs_mod, "render", lambda *a, **kw: "STUB-PROMPT")
     monkeypatch.setattr(
-        cs_mod, "assert_prompt_within_budget",
+        cs_mod,
+        "assert_prompt_within_budget",
         lambda *a, **kw: None,
     )
 
@@ -53,6 +54,7 @@ def vault(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
 
 def _metadata(source: Path, model_id: str = "claude-opus-4-7", max_turns: int = 12):
     from compile_stages.types import CompileMetadata
+
     return CompileMetadata(
         source_path=source,
         compile_role="source-only",
@@ -65,6 +67,7 @@ def _metadata(source: Path, model_id: str = "claude-opus-4-7", max_turns: int = 
 
 def _result_message(result: str = "article body", cost: float = 0.0123):
     from claude_agent_sdk import ResultMessage
+
     return ResultMessage(
         subtype="success",
         duration_ms=1,
@@ -115,20 +118,23 @@ def test_compile_source_kind_unknown_on_long_context(
     from compile_stages.compile import compile_source
 
     _, raw = vault
-    big = "z" * (
-        cs_mod.CONFIG.limits.compile_retry_long_context_min_source_chars + 1_024
-    )
+    big = "z" * (cs_mod.CONFIG.limits.compile_retry_long_context_min_source_chars + 1_024)
     src = raw / "big-unknown.md"
     src.write_text(big, encoding="utf-8")
 
     monkeypatch.setattr(
-        cs_mod.CONFIG.limits, "compile_skip_on_long_context_unknown", True,
+        cs_mod.CONFIG.limits,
+        "compile_skip_on_long_context_unknown",
+        True,
     )
     monkeypatch.setattr(
-        cs_mod.CONFIG.limits, "compile_per_call_timeout_s", 0,
+        cs_mod.CONFIG.limits,
+        "compile_per_call_timeout_s",
+        0,
     )
     monkeypatch.setattr(
-        cs_mod.CONFIG.models, "compile_large_source_model",
+        cs_mod.CONFIG.models,
+        "compile_large_source_model",
         "claude-opus-4-7[1m]",
     )
 
@@ -138,9 +144,11 @@ def test_compile_source_kind_unknown_on_long_context(
     from core.sdk_helpers import FailureClass
 
     monkeypatch.setattr(
-        sdk_helpers, "classify_failure",
+        sdk_helpers,
+        "classify_failure",
         lambda elapsed_s, captured_text, exc_text="": FailureClass(
-            "unknown", f"simulated kind=unknown after {elapsed_s:.1f}s",
+            "unknown",
+            f"simulated kind=unknown after {elapsed_s:.1f}s",
         ),
     )
 
@@ -165,9 +173,7 @@ def test_compile_source_kind_unknown_on_long_context(
 # ── (3) max_turns failure → skipped ───────────────────────────────────
 
 
-def test_compile_source_max_turns_returns_skipped(
-    vault, monkeypatch: pytest.MonkeyPatch
-):
+def test_compile_source_max_turns_returns_skipped(vault, monkeypatch: pytest.MonkeyPatch):
     """ResultMessage(is_error=True, subtype=error_max_turns) lands as
     skip_reason=max_turns_exhausted (mirrors legacy compile_file)."""
     from compile_stages import compile as cs_mod
@@ -179,10 +185,14 @@ def test_compile_source_max_turns_returns_skipped(
     src.write_text("tiny", encoding="utf-8")
 
     monkeypatch.setattr(
-        cs_mod.CONFIG.limits, "compile_skip_on_long_context_unknown", True,
+        cs_mod.CONFIG.limits,
+        "compile_skip_on_long_context_unknown",
+        True,
     )
     monkeypatch.setattr(
-        cs_mod.CONFIG.limits, "compile_per_call_timeout_s", 0,
+        cs_mod.CONFIG.limits,
+        "compile_per_call_timeout_s",
+        0,
     )
 
     async def max_turns_query(*, prompt, options):  # noqa: ARG001
@@ -213,9 +223,7 @@ def test_compile_source_max_turns_returns_skipped(
 # ── (4) pre-flight 60kb fail → skipped BEFORE SDK call ────────────────
 
 
-def test_compile_source_prompt_too_large_before_sdk(
-    vault, monkeypatch: pytest.MonkeyPatch
-):
+def test_compile_source_prompt_too_large_before_sdk(vault, monkeypatch: pytest.MonkeyPatch):
     """assert_prompt_within_budget raising PromptTooLargeError returns
     skipped without ever calling query()."""
     from compile_stages import compile as cs_mod
@@ -227,9 +235,7 @@ def test_compile_source_prompt_too_large_before_sdk(
     src.write_text("x" * 100, encoding="utf-8")
 
     def fail_budget(*a, **kw):
-        raise PromptTooLargeError(
-            "compile_file huge.md exceeds budget: 1000000 chars > 800000 max"
-        )
+        raise PromptTooLargeError("compile_file huge.md exceeds budget: 1000000 chars > 800000 max")
 
     monkeypatch.setattr(cs_mod, "assert_prompt_within_budget", fail_budget)
 
@@ -251,9 +257,7 @@ def test_compile_source_prompt_too_large_before_sdk(
 # ── (5) bonus — generic exception → failed ────────────────────────────
 
 
-def test_compile_source_generic_exception_returns_failed(
-    vault, monkeypatch: pytest.MonkeyPatch
-):
+def test_compile_source_generic_exception_returns_failed(vault, monkeypatch: pytest.MonkeyPatch):
     """Non-structured exception (no final ResultMessage) classifies via
     log_sdk_failure and returns CompileResult(failed) with a kind set."""
     from compile_stages import compile as cs_mod
@@ -264,12 +268,15 @@ def test_compile_source_generic_exception_returns_failed(
     src.write_text("tiny", encoding="utf-8")
 
     monkeypatch.setattr(
-        cs_mod.CONFIG.limits, "compile_per_call_timeout_s", 0,
+        cs_mod.CONFIG.limits,
+        "compile_per_call_timeout_s",
+        0,
     )
     # Source is too small for the long-context retry to fire — keeps the
     # test deterministic with one _attempt round.
     monkeypatch.setattr(
-        cs_mod.CONFIG.limits, "compile_retry_long_context_min_source_chars",
+        cs_mod.CONFIG.limits,
+        "compile_retry_long_context_min_source_chars",
         10_000_000,
     )
 

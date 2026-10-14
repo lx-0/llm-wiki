@@ -13,6 +13,7 @@ Strategy mirrors `tests/test_two_layer_lint.py`: build a fake
 `knowledge/` tree under tmp_path, build a LintContext over it,
 invoke the check, assert issue codes.
 """
+
 from __future__ import annotations
 
 import pytest
@@ -130,13 +131,15 @@ def configured_domain_tags(monkeypatch):
     whatever a vault happens to configure."""
     from core.config import CONFIG
 
-    monkeypatch.setattr(CONFIG.graph_view, "domain_tags",
-                        ["fleet", "openclaw", "llm-wiki"], raising=False)
+    monkeypatch.setattr(
+        CONFIG.graph_view, "domain_tags", ["fleet", "openclaw", "llm-wiki"], raising=False
+    )
 
 
 @pytest.fixture
 def with_knowledge(tmp_path):
     """Materialise a fake knowledge/ tree and build a LintContext over it."""
+
     def _setup(files: dict[str, str]) -> lint.LintContext:
         knowledge = tmp_path / "knowledge"
         for rel, content in files.items():
@@ -144,6 +147,7 @@ def with_knowledge(tmp_path):
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(content, encoding="utf-8")
         return lint.build_context(vault=tmp_path, knowledge_dir=knowledge, state={})
+
     return _setup
 
 
@@ -200,9 +204,7 @@ def test_tension_field_accepted_as_kind(with_knowledge):
     )
     ctx = with_knowledge({"connections/tension.md": article})
     issues = lint.check_connection_depth(ctx)
-    assert "connection_missing_kind" not in _codes_for_file(
-        issues, "connections/tension.md"
-    )
+    assert "connection_missing_kind" not in _codes_for_file(issues, "connections/tension.md")
 
 
 def test_dependency_field_accepted_as_kind(with_knowledge):
@@ -212,9 +214,7 @@ def test_dependency_field_accepted_as_kind(with_knowledge):
     )
     ctx = with_knowledge({"connections/dep.md": article})
     issues = lint.check_connection_depth(ctx)
-    assert "connection_missing_kind" not in _codes_for_file(
-        issues, "connections/dep.md"
-    )
+    assert "connection_missing_kind" not in _codes_for_file(issues, "connections/dep.md")
 
 
 def test_substrate_wikilinks_do_not_count_as_endpoints(with_knowledge):
@@ -245,10 +245,12 @@ for now the substrate citations are all we have to anchor it.
 def test_index_and_log_files_are_skipped(with_knowledge):
     """`connections/index.md` and `connections/log.md` are meta-files, not
     connection articles — they must not trigger the depth check."""
-    ctx = with_knowledge({
-        "connections/index.md": "# Index\n",
-        "connections/log.md": "# Log\n",
-    })
+    ctx = with_knowledge(
+        {
+            "connections/index.md": "# Index\n",
+            "connections/log.md": "# Log\n",
+        }
+    )
     issues = lint.check_connection_depth(ctx)
     rels = {i.file for i in issues}
     assert "connections/index.md" not in rels

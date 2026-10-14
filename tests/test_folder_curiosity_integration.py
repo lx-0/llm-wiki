@@ -41,16 +41,12 @@ def vault(tmp_path, monkeypatch):
     """Fixture tree + REAL walked/written digest + source note."""
     trove = tmp_path / "trove"
     (trove / "11 Steuern").mkdir(parents=True)
-    (trove / "11 Steuern" / "Steuerbescheid-2024.pdf").write_text(
-        "x", encoding="utf-8"
-    )
+    (trove / "11 Steuern" / "Steuerbescheid-2024.pdf").write_text("x", encoding="utf-8")
     (trove / "ümlaut notizen.md").write_text("u", encoding="utf-8")
     (trove / "decoy.txt").write_text("d", encoding="utf-8")
 
     monkeypatch.setattr(folder_index, "INDEX_DIR", tmp_path / "raw" / "index")
-    monkeypatch.setattr(
-        folder_index, "STATE_FILE", tmp_path / "state" / "folder-index.json"
-    )
+    monkeypatch.setattr(folder_index, "STATE_FILE", tmp_path / "state" / "folder-index.json")
     monkeypatch.setattr(producer, "ROOT_DIR", tmp_path)
     monkeypatch.setattr(producer, "RAW_REQUESTS_DIR", tmp_path / "raw" / "requests")
     monkeypatch.setattr(producer, "RAW_INDEX_DIR", tmp_path / "raw" / "index")
@@ -124,9 +120,7 @@ def test_confidence_gate_over_real_chain(vault, monkeypatch):
     assert _requests(root) == []
 
 
-def test_answer_artifact_is_compile_candidate_and_routes_like_email(
-    tmp_path, monkeypatch
-):
+def test_answer_artifact_is_compile_candidate_and_routes_like_email(tmp_path, monkeypatch):
     """S05-T01 pins: a persisted folder answer (a) appears in compile's
     candidate list (`list_raw_files` walks raw/) and (b) routes through
     the SAME dispatch lane as the proven email deep-scans — parity-
@@ -158,14 +152,20 @@ def test_answer_artifact_is_compile_candidate_and_routes_like_email(
     monkeypatch.setattr(fb, "get_provider", lambda: _Stub())
     request_path = tmp_path / "request-steuer-2026-06-10.json"
     request_path.write_text(
-        json.dumps({
-            "type": "folder-deep-scan", "status": "pending",
-            "root_id": "docs",
-            "file_path": "11 Steuern/Steuerbescheid-2024.pdf",
-            "file_confidence": 5, "topic": "Steuerbescheid 2024",
-            "rationale": "r", "source": "raw/notes/note.md",
-            "created": "2026-06-10T20:00:00+00:00",
-        }, indent=2),
+        json.dumps(
+            {
+                "type": "folder-deep-scan",
+                "status": "pending",
+                "root_id": "docs",
+                "file_path": "11 Steuern/Steuerbescheid-2024.pdf",
+                "file_confidence": 5,
+                "topic": "Steuerbescheid 2024",
+                "rationale": "r",
+                "source": "raw/notes/note.md",
+                "created": "2026-06-10T20:00:00+00:00",
+            },
+            indent=2,
+        ),
         encoding="utf-8",
     )
     assert fb.process_request(request_path, dry_run=False).success is True
@@ -190,9 +190,7 @@ def test_answer_artifact_is_compile_candidate_and_routes_like_email(
 
     answer_text = answer_path.read_text(encoding="utf-8")
     assert "type: folder-answer" in answer_text
-    answer_route = decide_route(
-        P("raw/notes/folder") / answer_path.name, answer_text
-    )
+    answer_route = decide_route(P("raw/notes/folder") / answer_path.name, answer_text)
     assert isinstance(answer_route, Compile)
     assert answer_route.metadata.substrate_prompt == "compile_main"
 

@@ -85,11 +85,13 @@ def test_special_handlers_resolved():
 def test_render_status_line_with_full_status():
     import menu
 
-    s = menu.render_status_line({
-        "articles": 384,
-        "last_compile_ago": "4h",
-        "ollama_reachable": True,
-    })
+    s = menu.render_status_line(
+        {
+            "articles": 384,
+            "last_compile_ago": "4h",
+            "ollama_reachable": True,
+        }
+    )
     assert "384 articles" in s
     assert "last compile 4h ago" in s
     assert "ollama ✓" in s
@@ -137,14 +139,21 @@ def test_home_state_actions_combines_health_and_suggestions():
     assert state.n_actions() == 0
 
     state.health = [
-        CheckResult("a", "config", "critical", "fix me",
-                    fix="wiki setup", dispatch_args=["setup"]),
-        CheckResult("b", "config", "warning", "no auto-fix",
-                    fix="run something manually", dispatch_args=None),
+        CheckResult("a", "config", "critical", "fix me", fix="wiki setup", dispatch_args=["setup"]),
+        CheckResult(
+            "b",
+            "config",
+            "warning",
+            "no auto-fix",
+            fix="run something manually",
+            dispatch_args=None,
+        ),
     ]
     state.suggestions = [{"key": "1", "label": "3 files in inbox/", "argv": ["process-inbox"]}]
     actions = state.actions()
-    assert len(actions) == 2  # one actionable health + one suggestion (the dispatchless health stays out)
+    assert (
+        len(actions) == 2
+    )  # one actionable health + one suggestion (the dispatchless health stays out)
     assert actions[0]["kind"] == "health"
     assert actions[0]["dispatch_args"] == ["setup"]
     assert actions[1]["kind"] == "suggestion"
@@ -159,12 +168,11 @@ def test_home_state_info_health_excludes_actionable():
 
     state = menu.HomeState()
     state.health = [
-        CheckResult("a", "config", "warning", "actionable",
-                    fix="wiki x", dispatch_args=["x"]),
-        CheckResult("b", "config", "warning", "manual only",
-                    fix="manual step", dispatch_args=None),
-        CheckResult("c", "config", "info", "informational",
-                    fix=None, dispatch_args=None),  # never in either
+        CheckResult("a", "config", "warning", "actionable", fix="wiki x", dispatch_args=["x"]),
+        CheckResult("b", "config", "warning", "manual only", fix="manual step", dispatch_args=None),
+        CheckResult(
+            "c", "config", "info", "informational", fix=None, dispatch_args=None
+        ),  # never in either
     ]
     assert len(state.actionable_health()) == 1
     assert len(state.info_health()) == 1
@@ -191,16 +199,37 @@ def test_actions_ordered_do_then_auto_then_review():
 
     state = menu.HomeState()
     state.health = [
-        CheckResult("oauth", "config", "warning", "gmail oauth not bootstrapped",
-                    fix="wiki gmail-auth", dispatch_args=["gmail-auth", "gmail-personal"]),
+        CheckResult(
+            "oauth",
+            "config",
+            "warning",
+            "gmail oauth not bootstrapped",
+            fix="wiki gmail-auth",
+            dispatch_args=["gmail-auth", "gmail-personal"],
+        ),
     ]
     state.suggestions = [
-        {"key": "1", "label": "101 overdue for dream", "argv": ["dream", "--all-entities"],
-         "priority": 5, "group": "auto"},
-        {"key": "2", "label": "1 document-scan to review",
-         "argv": ["curiosity", "--type", "folder-deep-scan"], "priority": 3, "group": "review"},
-        {"key": "3", "label": "149 changed since compile", "argv": ["compile"],
-         "priority": 2, "group": "do"},
+        {
+            "key": "1",
+            "label": "101 overdue for dream",
+            "argv": ["dream", "--all-entities"],
+            "priority": 5,
+            "group": "auto",
+        },
+        {
+            "key": "2",
+            "label": "1 document-scan to review",
+            "argv": ["curiosity", "--type", "folder-deep-scan"],
+            "priority": 3,
+            "group": "review",
+        },
+        {
+            "key": "3",
+            "label": "149 changed since compile",
+            "argv": ["compile"],
+            "priority": 2,
+            "group": "do",
+        },
     ]
     actions = state.actions()
     assert [a["group"] for a in actions] == ["do", "do", "auto", "review"]
@@ -217,16 +246,37 @@ def test_screen_renders_group_subheaders_in_order_with_continuous_numbering():
 
     state = menu.HomeState()
     state.health = [
-        CheckResult("oauth", "config", "warning", "gmail oauth not bootstrapped",
-                    fix="wiki gmail-auth", dispatch_args=["gmail-auth", "gmail-personal"]),
+        CheckResult(
+            "oauth",
+            "config",
+            "warning",
+            "gmail oauth not bootstrapped",
+            fix="wiki gmail-auth",
+            dispatch_args=["gmail-auth", "gmail-personal"],
+        ),
     ]
     state.suggestions = [
-        {"key": "1", "label": "149 changed since compile", "argv": ["compile"],
-         "priority": 2, "group": "do"},
-        {"key": "2", "label": "101 overdue for dream", "argv": ["dream", "--all-entities"],
-         "priority": 5, "group": "auto"},
-        {"key": "3", "label": "1 document-scan to review",
-         "argv": ["curiosity", "--type", "folder-deep-scan"], "priority": 3, "group": "review"},
+        {
+            "key": "1",
+            "label": "149 changed since compile",
+            "argv": ["compile"],
+            "priority": 2,
+            "group": "do",
+        },
+        {
+            "key": "2",
+            "label": "101 overdue for dream",
+            "argv": ["dream", "--all-entities"],
+            "priority": 5,
+            "group": "auto",
+        },
+        {
+            "key": "3",
+            "label": "1 document-scan to review",
+            "argv": ["curiosity", "--type", "folder-deep-scan"],
+            "priority": 3,
+            "group": "review",
+        },
     ]
     html = menu._build_screen_html(state)
     i_do = html.find("Needs you")
@@ -313,8 +363,14 @@ def test_previously_missing_commands_now_in_menu():
     """The eight commands the old menu couldn't reach are now browsable."""
     tokens = _menu_command_tokens()
     for name in (
-        "produce", "bridge", "backfill", "reconcile",
-        "health-trends", "usage", "study", "analyze",
+        "produce",
+        "bridge",
+        "backfill",
+        "reconcile",
+        "health-trends",
+        "usage",
+        "study",
+        "analyze",
     ):
         assert name in tokens, f"{name} still unreachable from the menu"
 

@@ -37,7 +37,8 @@ def _write_spec(dirpath: Path, slug: str, frontmatter: str, body: str = "Body") 
 
 def test_parse_spec_minimal_valid(tmp_path: Path) -> None:
     path = _write_spec(
-        tmp_path, "demo",
+        tmp_path,
+        "demo",
         textwrap.dedent("""\
             id: demo
             title: "Demo task"
@@ -57,7 +58,8 @@ def test_parse_spec_minimal_valid(tmp_path: Path) -> None:
 
 def test_parse_spec_full(tmp_path: Path) -> None:
     path = _write_spec(
-        tmp_path, "full",
+        tmp_path,
+        "full",
         textwrap.dedent("""\
             id: full
             title: "Full spec"
@@ -90,7 +92,8 @@ def test_parse_spec_full(tmp_path: Path) -> None:
 def test_button_default_shell_command_id(tmp_path: Path) -> None:
     """When the button doesn't declare shell_command_id, it defaults to agent-<id>."""
     path = _write_spec(
-        tmp_path, "auto",
+        tmp_path,
+        "auto",
         textwrap.dedent("""\
             id: auto
             title: "Auto"
@@ -116,7 +119,8 @@ def test_parse_spec_no_frontmatter(tmp_path: Path) -> None:
 
 def test_parse_spec_missing_required_id(tmp_path: Path) -> None:
     path = _write_spec(
-        tmp_path, "noid",
+        tmp_path,
+        "noid",
         textwrap.dedent("""\
             title: "Has title but no id"
             allowed_tools: [Read]
@@ -128,7 +132,8 @@ def test_parse_spec_missing_required_id(tmp_path: Path) -> None:
 
 def test_parse_spec_missing_allowed_tools(tmp_path: Path) -> None:
     path = _write_spec(
-        tmp_path, "notools",
+        tmp_path,
+        "notools",
         textwrap.dedent("""\
             id: notools
             title: "No tools"
@@ -140,7 +145,8 @@ def test_parse_spec_missing_allowed_tools(tmp_path: Path) -> None:
 
 def test_parse_spec_unknown_tool(tmp_path: Path) -> None:
     path = _write_spec(
-        tmp_path, "wrongtool",
+        tmp_path,
+        "wrongtool",
         textwrap.dedent("""\
             id: wrongtool
             title: "Wrong tool"
@@ -153,7 +159,8 @@ def test_parse_spec_unknown_tool(tmp_path: Path) -> None:
 
 def test_parse_spec_invalid_permission_mode(tmp_path: Path) -> None:
     path = _write_spec(
-        tmp_path, "perm",
+        tmp_path,
+        "perm",
         textwrap.dedent("""\
             id: perm
             title: "Bad permission"
@@ -167,7 +174,8 @@ def test_parse_spec_invalid_permission_mode(tmp_path: Path) -> None:
 
 def test_parse_spec_invalid_button_style(tmp_path: Path) -> None:
     path = _write_spec(
-        tmp_path, "btnstyle",
+        tmp_path,
+        "btnstyle",
         textwrap.dedent("""\
             id: btnstyle
             title: "Bad style"
@@ -183,7 +191,8 @@ def test_parse_spec_invalid_button_style(tmp_path: Path) -> None:
 
 def test_parse_spec_max_turns_out_of_range(tmp_path: Path) -> None:
     path = _write_spec(
-        tmp_path, "turns",
+        tmp_path,
+        "turns",
         textwrap.dedent("""\
             id: turns
             title: "Turns"
@@ -212,7 +221,8 @@ def test_list_specs_empty_dir(tmp_path: Path) -> None:
 def test_list_specs_skips_non_md_files(tmp_path: Path) -> None:
     """Discovery globs `*.md` only — backup/sidecar files are ignored."""
     _write_spec(
-        tmp_path, "real",
+        tmp_path,
+        "real",
         "id: real\ntitle: R\nallowed_tools: [Read]",
     )
     (tmp_path / "real.md.bak").write_text("backup file")
@@ -224,7 +234,8 @@ def test_list_specs_skips_non_md_files(tmp_path: Path) -> None:
 def test_list_specs_sorted(tmp_path: Path) -> None:
     for slug in ["zebra", "alpha", "mango"]:
         _write_spec(
-            tmp_path, slug,
+            tmp_path,
+            slug,
             f"id: {slug}\ntitle: {slug}\nallowed_tools: [Read]",
         )
     specs = list_specs(tmp_path)
@@ -236,15 +247,20 @@ def test_list_specs_sorted(tmp_path: Path) -> None:
 
 def test_render_body_no_vars() -> None:
     spec = AgentSpec(
-        id="x", title="x", body="static body", allowed_tools=["Read"],
+        id="x",
+        title="x",
+        body="static body",
+        allowed_tools=["Read"],
     )
     assert spec.render_body() == "static body"
 
 
 def test_render_body_substitutes() -> None:
     spec = AgentSpec(
-        id="x", title="x",
-        body="hello ${who} on ${day}", allowed_tools=["Read"],
+        id="x",
+        title="x",
+        body="hello ${who} on ${day}",
+        allowed_tools=["Read"],
     )
     assert spec.render_body(who="alex", day="2026-05-02") == "hello alex on 2026-05-02"
 
@@ -262,7 +278,8 @@ def test_record_last_run_writes_state_not_prompt(tmp_path: Path, monkeypatch) ->
     import agent_task
 
     path = _write_spec(
-        tmp_path, "demo",
+        tmp_path,
+        "demo",
         textwrap.dedent("""\
             id: demo
             title: "Demo"

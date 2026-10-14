@@ -79,8 +79,9 @@ class Budgets:
                 tool_summary=CONFIG.limits.flush_tool_summary_budget_chars,
             )
         except Exception as e:  # noqa: BLE001  config-load failure must never break flush
-            log.warning("flush budgets: config load failed, using defaults: %s: %s",
-                        type(e).__name__, e)
+            log.warning(
+                "flush budgets: config load failed, using defaults: %s: %s", type(e).__name__, e
+            )
             return cls()
 
 
@@ -88,8 +89,8 @@ class Budgets:
 class Turn:
     """One transcript turn split into per-class streams."""
 
-    role: str            # "user" | "assistant"
-    text: str = ""       # prose (everything that isn't tool_use / tool_result)
+    role: str  # "user" | "assistant"
+    text: str = ""  # prose (everything that isn't tool_use / tool_result)
     tools: list[str] = field(default_factory=list)  # one-line tool summaries
 
 
@@ -204,9 +205,7 @@ def read_transcript(transcript_path: str, session_id: str | None = None) -> list
     """
     resolved = resolve_transcript(transcript_path, session_id)
     if resolved is None:
-        log.warning(
-            "Transcript not found (path=%r session=%r)", transcript_path, session_id
-        )
+        log.warning("Transcript not found (path=%r session=%r)", transcript_path, session_id)
         return []
     if _detect_format(resolved) == "codex":
         return _read_codex_transcript(resolved)
@@ -218,10 +217,17 @@ def read_transcript(transcript_path: str, session_id: str | None = None) -> list
 # Top-level `type` values that mark a Codex rollout line (`{timestamp, type,
 # payload}`). Distinct from the Claude schema, whose lines carry a `message`
 # object with a `role`.
-_CODEX_TOP_TYPES = frozenset({
-    "session_meta", "response_item", "event_msg", "turn_context",
-    "world_state", "compacted", "inter_agent_communication_metadata",
-})
+_CODEX_TOP_TYPES = frozenset(
+    {
+        "session_meta",
+        "response_item",
+        "event_msg",
+        "turn_context",
+        "world_state",
+        "compacted",
+        "inter_agent_communication_metadata",
+    }
+)
 
 
 def resolve_transcript(transcript_path: str | None, session_id: str | None) -> Path | None:
@@ -322,12 +328,21 @@ def _read_claude_transcript(transcript_path: str | Path) -> list[Turn]:
 #   skipped         ← developer/system messages, reasoning (encrypted), and
 #                     every other type (streaming duplicates + metadata)
 
-_CODEX_TOOL_CALL_TYPES = frozenset({
-    "function_call", "custom_tool_call", "web_search_call", "tool_search_call",
-})
-_CODEX_TOOL_OUTPUT_TYPES = frozenset({
-    "function_call_output", "custom_tool_call_output", "tool_search_output",
-})
+_CODEX_TOOL_CALL_TYPES = frozenset(
+    {
+        "function_call",
+        "custom_tool_call",
+        "web_search_call",
+        "tool_search_call",
+    }
+)
+_CODEX_TOOL_OUTPUT_TYPES = frozenset(
+    {
+        "function_call_output",
+        "custom_tool_call_output",
+        "tool_search_output",
+    }
+)
 
 
 def _codex_message_text(payload: dict) -> str:
@@ -467,7 +482,9 @@ def build_context(turns: list[Turn] | list[dict], *, budgets: Budgets | None = N
         if isinstance(t, Turn):
             normalised.append(t)
         elif isinstance(t, dict):
-            normalised.append(Turn(role=t.get("role", "user"), text=str(t.get("text", "")), tools=[]))
+            normalised.append(
+                Turn(role=t.get("role", "user"), text=str(t.get("text", "")), tools=[])
+            )
     turns = normalised
 
     # Pass 1: walk newest → oldest, pull each turn's contribution into the

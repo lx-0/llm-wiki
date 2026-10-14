@@ -35,7 +35,10 @@ def test_real_links_still_extracted_with_anchor_and_alias() -> None:
         "plus [[baz#Section]] and an embed ![[diagram.png]]\n"
     )
     assert extract_wikilinks(text) == [
-        "concepts/foo", "bar|Bar Label", "baz#Section", "diagram.png",
+        "concepts/foo",
+        "bar|Bar Label",
+        "baz#Section",
+        "diagram.png",
     ]
 
 

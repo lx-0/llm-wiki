@@ -5,6 +5,7 @@ runs Streamable HTTP with enableJsonResponse — plain JSON round-trips; an
 unauthenticated call answers HTTP 401 with a JSON-RPC error body
 (code -32001). Tests drive the real client through httpx.MockTransport.
 """
+
 from __future__ import annotations
 
 import json
@@ -32,20 +33,32 @@ def _server(recorder: list[dict], responder=None):
             if custom is not None:
                 return custom
         if method == "initialize":
-            return httpx.Response(200, json={
-                "jsonrpc": "2.0", "id": payload["id"],
-                "result": {"protocolVersion": "2025-06-18",
-                           "serverInfo": {"name": "context-mcp", "version": "0.0.56"},
-                           "capabilities": {}},
-            })
+            return httpx.Response(
+                200,
+                json={
+                    "jsonrpc": "2.0",
+                    "id": payload["id"],
+                    "result": {
+                        "protocolVersion": "2025-06-18",
+                        "serverInfo": {"name": "context-mcp", "version": "0.0.56"},
+                        "capabilities": {},
+                    },
+                },
+            )
         if method == "notifications/initialized":
             return httpx.Response(202)
         if method == "tools/call":
-            return httpx.Response(200, json={
-                "jsonrpc": "2.0", "id": payload["id"],
-                "result": {"content": [{"type": "text", "text": '{"ok": true}'}],
-                           "isError": False},
-            })
+            return httpx.Response(
+                200,
+                json={
+                    "jsonrpc": "2.0",
+                    "id": payload["id"],
+                    "result": {
+                        "content": [{"type": "text", "text": '{"ok": true}'}],
+                        "isError": False,
+                    },
+                },
+            )
         return httpx.Response(200, json={"jsonrpc": "2.0", "id": payload.get("id"), "result": {}})
 
     return httpx.MockTransport(handle)
@@ -53,7 +66,8 @@ def _server(recorder: list[dict], responder=None):
 
 def _client(recorder: list[dict], responder=None) -> ContextMcpClient:
     return ContextMcpClient(
-        "https://example.test/mcp", "tok-123",
+        "https://example.test/mcp",
+        "tok-123",
         transport=_server(recorder, responder),
     )
 
@@ -94,8 +108,10 @@ def test_transient_5xx_is_retried_with_backoff() -> None:
 
     seen: list[dict] = []
     client = ContextMcpClient(
-        "https://example.test/mcp", "tok-123",
-        transport=_server(seen, responder), retry_sleep=naps.append,
+        "https://example.test/mcp",
+        "tok-123",
+        transport=_server(seen, responder),
+        retry_sleep=naps.append,
     )
     result = client.call_tool("list_wikis", {})
     assert result["isError"] is False
@@ -111,8 +127,10 @@ def test_persistent_5xx_raises_after_three_attempts() -> None:
 
     naps: list[float] = []
     client = ContextMcpClient(
-        "https://example.test/mcp", "tok-123",
-        transport=_server([], responder), retry_sleep=naps.append,
+        "https://example.test/mcp",
+        "tok-123",
+        transport=_server([], responder),
+        retry_sleep=naps.append,
     )
     with pytest.raises(PublishClientError, match="503"):
         client.call_tool("list_wikis", {})
@@ -140,25 +158,39 @@ def test_expired_token_mid_run_forces_refresh_and_retries() -> None:
         method = payload.get("method")
         auth = request.headers.get("authorization")
         if method == "initialize":
-            return httpx.Response(200, json={
-                "jsonrpc": "2.0", "id": payload["id"],
-                "result": {"protocolVersion": "2025-06-18", "capabilities": {}},
-            })
+            return httpx.Response(
+                200,
+                json={
+                    "jsonrpc": "2.0",
+                    "id": payload["id"],
+                    "result": {"protocolVersion": "2025-06-18", "capabilities": {}},
+                },
+            )
         if method == "notifications/initialized":
             return httpx.Response(202)
         if auth != "Bearer new":
-            return httpx.Response(401, json={
+            return httpx.Response(
+                401,
+                json={
+                    "jsonrpc": "2.0",
+                    "error": {"code": -32001, "message": "Unauthorized"},
+                    "id": None,
+                },
+            )
+        return httpx.Response(
+            200,
+            json={
                 "jsonrpc": "2.0",
-                "error": {"code": -32001, "message": "Unauthorized"}, "id": None,
-            })
-        return httpx.Response(200, json={
-            "jsonrpc": "2.0", "id": payload["id"],
-            "result": {"content": [{"type": "text", "text": "{}"}], "isError": False},
-        })
+                "id": payload["id"],
+                "result": {"content": [{"type": "text", "text": "{}"}], "isError": False},
+            },
+        )
 
     client = ContextMcpClient(
-        "https://example.test/mcp", token_provider=provider,
-        transport=httpx.MockTransport(handle), retry_sleep=lambda s: None,
+        "https://example.test/mcp",
+        token_provider=provider,
+        transport=httpx.MockTransport(handle),
+        retry_sleep=lambda s: None,
     )
     result = client.call_tool("list_wikis", {})
     assert result["isError"] is False
@@ -171,14 +203,20 @@ def test_persistent_auth_error_raises_after_one_forced_refresh() -> None:
         return "still-bad"
 
     def handle(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(401, json={
-            "jsonrpc": "2.0",
-            "error": {"code": -32001, "message": "Unauthorized"}, "id": None,
-        })
+        return httpx.Response(
+            401,
+            json={
+                "jsonrpc": "2.0",
+                "error": {"code": -32001, "message": "Unauthorized"},
+                "id": None,
+            },
+        )
 
     client = ContextMcpClient(
-        "https://example.test/mcp", token_provider=provider,
-        transport=httpx.MockTransport(handle), retry_sleep=lambda s: None,
+        "https://example.test/mcp",
+        token_provider=provider,
+        transport=httpx.MockTransport(handle),
+        retry_sleep=lambda s: None,
     )
     with pytest.raises(PublishClientError, match="Unauthorized"):
         client.call_tool("list_wikis", {})
@@ -186,10 +224,14 @@ def test_persistent_auth_error_raises_after_one_forced_refresh() -> None:
 
 def test_http_401_raises_publish_client_error() -> None:
     def responder(method, payload):
-        return httpx.Response(401, json={
-            "jsonrpc": "2.0",
-            "error": {"code": -32001, "message": "Unauthorized"}, "id": None,
-        })
+        return httpx.Response(
+            401,
+            json={
+                "jsonrpc": "2.0",
+                "error": {"code": -32001, "message": "Unauthorized"},
+                "id": None,
+            },
+        )
 
     with pytest.raises(PublishClientError, match="Unauthorized"):
         _client([], responder).call_tool("list_wikis", {})
@@ -198,10 +240,14 @@ def test_http_401_raises_publish_client_error() -> None:
 def test_jsonrpc_error_raises_publish_client_error() -> None:
     def responder(method, payload):
         if method == "tools/call":
-            return httpx.Response(200, json={
-                "jsonrpc": "2.0", "id": payload["id"],
-                "error": {"code": -32602, "message": "unknown tool"},
-            })
+            return httpx.Response(
+                200,
+                json={
+                    "jsonrpc": "2.0",
+                    "id": payload["id"],
+                    "error": {"code": -32602, "message": "unknown tool"},
+                },
+            )
         return None
 
     with pytest.raises(PublishClientError, match="unknown tool"):
@@ -211,12 +257,17 @@ def test_jsonrpc_error_raises_publish_client_error() -> None:
 def test_tool_is_error_raises_tool_call_error_with_text() -> None:
     def responder(method, payload):
         if method == "tools/call":
-            return httpx.Response(200, json={
-                "jsonrpc": "2.0", "id": payload["id"],
-                "result": {"content": [{"type": "text",
-                                        "text": "secret-shaped value detected"}],
-                           "isError": True},
-            })
+            return httpx.Response(
+                200,
+                json={
+                    "jsonrpc": "2.0",
+                    "id": payload["id"],
+                    "result": {
+                        "content": [{"type": "text", "text": "secret-shaped value detected"}],
+                        "isError": True,
+                    },
+                },
+            )
         return None
 
     with pytest.raises(ToolCallError, match="secret-shaped"):

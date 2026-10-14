@@ -65,9 +65,7 @@ class ImapReader:
     def _credentials(self) -> tuple[str, str]:
         """(user, password). Raises MailboxReadError if host/creds are unset."""
         if not self._host:
-            raise MailboxReadError(
-                f"ImapReader[{self._account_id}]: no imap_host configured"
-            )
+            raise MailboxReadError(f"ImapReader[{self._account_id}]: no imap_host configured")
         user = (os.environ.get(self._user_env, "") if self._user_env else "") or self._default_user
         password = os.environ.get(self._pass_env, "") if self._pass_env else ""
         if not user or not password:
@@ -164,8 +162,9 @@ class ImapReader:
                     client.select_folder(raw_name, readonly=True)
                     uids = client.search(criteria)
                 except Exception as e:  # noqa: BLE001
-                    log.warning("ImapReader[%s]: scan of %r failed: %s",
-                                self._account_id, norm_name, e)
+                    log.warning(
+                        "ImapReader[%s]: scan of %r failed: %s", self._account_id, norm_name, e
+                    )
                     continue
                 for batch in _chunks(uids, _FETCH_BATCH):
                     fetched = client.fetch(batch, ["ENVELOPE", "RFC822.SIZE", "INTERNALDATE"])
@@ -198,8 +197,9 @@ class ImapReader:
                     client.select_folder(raw_name, readonly=True)
                     uids = client.search(criteria)
                 except Exception as e:  # noqa: BLE001
-                    log.warning("ImapReader[%s]: deep scan of %r failed: %s",
-                                self._account_id, norm_name, e)
+                    log.warning(
+                        "ImapReader[%s]: deep scan of %r failed: %s", self._account_id, norm_name, e
+                    )
                     continue
                 for batch in _chunks(uids, _FETCH_BATCH):
                     fetched = client.fetch(
@@ -234,7 +234,7 @@ def _normalise_folder(name: str, delim: bytes | str | None) -> str:
 
 def _chunks(seq, n: int):
     for i in range(0, len(seq), n):
-        yield seq[i:i + n]
+        yield seq[i : i + n]
 
 
 def _quiet_logout(client) -> None:

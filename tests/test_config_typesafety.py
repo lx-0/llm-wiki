@@ -29,9 +29,7 @@ from core.config_schema import Limits, Personal, PiggybackTask
 
 def test_merge_keeps_default_on_type_mismatch(caplog: pytest.LogCaptureFixture):
     with caplog.at_level(logging.WARNING, logger="core.config"):
-        merged = config._merge_dataclass(
-            Limits(), {"compile_max_turns": "twenty"}, path="limits"
-        )
+        merged = config._merge_dataclass(Limits(), {"compile_max_turns": "twenty"}, path="limits")
     assert merged.compile_max_turns == Limits().compile_max_turns
     assert any("limits.compile_max_turns" in r.message for r in caplog.records)
 
@@ -62,9 +60,7 @@ def test_merge_accepts_int_for_float_field():
 
 def test_merge_accepts_list_for_tuple_field():
     """YAML has no tuple form — a list override satisfies a tuple-typed field."""
-    merged = config._merge_dataclass(
-        Limits(), {"compile_skip_substrate_types": ["email-delta"]}
-    )
+    merged = config._merge_dataclass(Limits(), {"compile_skip_substrate_types": ["email-delta"]})
     assert list(merged.compile_skip_substrate_types) == ["email-delta"]
 
 
@@ -91,9 +87,7 @@ def test_merge_piggyback_type_mismatch_keeps_default(caplog: pytest.LogCaptureFi
             {"lint_structural": {"cooldown_hours": "daily"}},
         )
     assert merged["lint_structural"].cooldown_hours == 24
-    assert any(
-        "piggybacks.lint_structural.cooldown_hours" in r.message for r in caplog.records
-    )
+    assert any("piggybacks.lint_structural.cooldown_hours" in r.message for r in caplog.records)
 
 
 # ── _coerce structured-target refusal ───────────────────────────────────

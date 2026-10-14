@@ -8,12 +8,14 @@ from __future__ import annotations
 
 def test_folder_to_type_includes_moc() -> None:
     import lint
+
     assert lint.FOLDER_TO_TYPE.get("MOCs") == "moc"
 
 
 def test_folder_to_type_covers_all_substrate_folders() -> None:
     """Sanity: each well-known folder maps to a distinct type identifier."""
     import lint
+
     expected = {"concepts", "connections", "qa", "people", "projects", "MOCs", "facts"}
     assert expected.issubset(set(lint.FOLDER_TO_TYPE.keys()))
     types = list(lint.FOLDER_TO_TYPE.values())

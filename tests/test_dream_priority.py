@@ -40,11 +40,14 @@ def vault(tmp_path, monkeypatch):
     monkeypatch.setattr("dream.PEOPLE_DIR", vault_root / "knowledge" / "people")
     monkeypatch.setattr("dream.PROJECTS_DIR", vault_root / "knowledge" / "projects")
     monkeypatch.setattr("dream.AREAS_DIR", vault_root / "knowledge" / "areas")
-    monkeypatch.setattr("dream._ENTITY_KINDS", {
-        "people": (vault_root / "knowledge" / "people", "person"),
-        "projects": (vault_root / "knowledge" / "projects", "project"),
-        "areas": (vault_root / "knowledge" / "areas", "area"),
-    })
+    monkeypatch.setattr(
+        "dream._ENTITY_KINDS",
+        {
+            "people": (vault_root / "knowledge" / "people", "person"),
+            "projects": (vault_root / "knowledge" / "projects", "project"),
+            "areas": (vault_root / "knowledge" / "areas", "area"),
+        },
+    )
     return vault_root
 
 
@@ -54,12 +57,21 @@ def vault(tmp_path, monkeypatch):
 def test_frontmatter_priority_wins_over_config(vault, monkeypatch):
     """dream_priority in frontmatter beats all config rules."""
     import dream
+
     _make_entity(vault, "alex", "people", {"dream_priority": 8.5, "domain": "personal"})
 
-    cfg = type("DP", (), {
-        "default": 1.0, "paths": {"knowledge/people/alex.md": 99.0},
-        "domain": {"personal": 100.0}, "tags": {}, "tag_strategy": "max", "status": {},
-    })()
+    cfg = type(
+        "DP",
+        (),
+        {
+            "default": 1.0,
+            "paths": {"knowledge/people/alex.md": 99.0},
+            "domain": {"personal": 100.0},
+            "tags": {},
+            "tag_strategy": "max",
+            "status": {},
+        },
+    )()
     with patch.object(dream.CONFIG.scheduling, "dream_priority", cfg):
         ent = dream._resolve_entity("alex")
         weight, source = dream.compute_entity_priority(ent)
@@ -70,8 +82,20 @@ def test_frontmatter_priority_wins_over_config(vault, monkeypatch):
 def test_frontmatter_zero_excludes(vault, monkeypatch):
     """dream_priority: 0 means excluded, beats config that would weight it."""
     import dream
+
     _make_entity(vault, "alex", "people", {"dream_priority": 0})
-    cfg = type("DP", (), {"default": 5.0, "paths": {}, "domain": {}, "tags": {}, "tag_strategy": "max", "status": {}})()
+    cfg = type(
+        "DP",
+        (),
+        {
+            "default": 5.0,
+            "paths": {},
+            "domain": {},
+            "tags": {},
+            "tag_strategy": "max",
+            "status": {},
+        },
+    )()
     with patch.object(dream.CONFIG.scheduling, "dream_priority", cfg):
         ent = dream._resolve_entity("alex")
         weight, _ = dream.compute_entity_priority(ent)
@@ -83,11 +107,20 @@ def test_frontmatter_zero_excludes(vault, monkeypatch):
 
 def test_explicit_path_match(vault, monkeypatch):
     import dream
+
     _make_entity(vault, "alex", "people", {})
-    cfg = type("DP", (), {
-        "default": 1.0, "paths": {"knowledge/people/alex.md": 5.0},
-        "domain": {}, "tags": {}, "tag_strategy": "max", "status": {},
-    })()
+    cfg = type(
+        "DP",
+        (),
+        {
+            "default": 1.0,
+            "paths": {"knowledge/people/alex.md": 5.0},
+            "domain": {},
+            "tags": {},
+            "tag_strategy": "max",
+            "status": {},
+        },
+    )()
     with patch.object(dream.CONFIG.scheduling, "dream_priority", cfg):
         ent = dream._resolve_entity("alex")
         weight, source = dream.compute_entity_priority(ent)
@@ -97,11 +130,20 @@ def test_explicit_path_match(vault, monkeypatch):
 
 def test_glob_path_match(vault, monkeypatch):
     import dream
+
     _make_entity(vault, "personal-old-archived", "areas", {})
-    cfg = type("DP", (), {
-        "default": 1.0, "paths": {"knowledge/areas/personal-*-archived.md": 0},
-        "domain": {}, "tags": {}, "tag_strategy": "max", "status": {},
-    })()
+    cfg = type(
+        "DP",
+        (),
+        {
+            "default": 1.0,
+            "paths": {"knowledge/areas/personal-*-archived.md": 0},
+            "domain": {},
+            "tags": {},
+            "tag_strategy": "max",
+            "status": {},
+        },
+    )()
     with patch.object(dream.CONFIG.scheduling, "dream_priority", cfg):
         ent = dream._resolve_entity("personal-old-archived")
         weight, _ = dream.compute_entity_priority(ent)
@@ -111,15 +153,24 @@ def test_glob_path_match(vault, monkeypatch):
 def test_paths_first_match_wins(vault, monkeypatch):
     """Earlier path-pattern wins over later more-specific one (operator-controlled order)."""
     import dream
+
     _make_entity(vault, "alex", "people", {})
     # Dict iteration order = insertion order (Python 3.7+)
     paths = {}
     paths["knowledge/people/*.md"] = 2.0
     paths["knowledge/people/alex.md"] = 5.0  # would win if not first-match
-    cfg = type("DP", (), {
-        "default": 1.0, "paths": paths,
-        "domain": {}, "tags": {}, "tag_strategy": "max", "status": {},
-    })()
+    cfg = type(
+        "DP",
+        (),
+        {
+            "default": 1.0,
+            "paths": paths,
+            "domain": {},
+            "tags": {},
+            "tag_strategy": "max",
+            "status": {},
+        },
+    )()
     with patch.object(dream.CONFIG.scheduling, "dream_priority", cfg):
         ent = dream._resolve_entity("alex")
         weight, _ = dream.compute_entity_priority(ent)
@@ -131,11 +182,20 @@ def test_paths_first_match_wins(vault, monkeypatch):
 
 def test_domain_multiplier(vault, monkeypatch):
     import dream
+
     _make_entity(vault, "alex", "people", {"domain": "personal"})
-    cfg = type("DP", (), {
-        "default": 1.0, "paths": {},
-        "domain": {"personal": 1.5}, "tags": {}, "tag_strategy": "max", "status": {},
-    })()
+    cfg = type(
+        "DP",
+        (),
+        {
+            "default": 1.0,
+            "paths": {},
+            "domain": {"personal": 1.5},
+            "tags": {},
+            "tag_strategy": "max",
+            "status": {},
+        },
+    )()
     with patch.object(dream.CONFIG.scheduling, "dream_priority", cfg):
         ent = dream._resolve_entity("alex")
         weight, _ = dream.compute_entity_priority(ent)
@@ -144,12 +204,20 @@ def test_domain_multiplier(vault, monkeypatch):
 
 def test_tag_strategy_max(vault, monkeypatch):
     import dream
+
     _make_entity(vault, "alex", "people", {"tags": ["work-active", "operator-anchor"]})
-    cfg = type("DP", (), {
-        "default": 1.0, "paths": {},
-        "domain": {}, "tags": {"work-active": 2.5, "operator-anchor": 5.0},
-        "tag_strategy": "max", "status": {},
-    })()
+    cfg = type(
+        "DP",
+        (),
+        {
+            "default": 1.0,
+            "paths": {},
+            "domain": {},
+            "tags": {"work-active": 2.5, "operator-anchor": 5.0},
+            "tag_strategy": "max",
+            "status": {},
+        },
+    )()
     with patch.object(dream.CONFIG.scheduling, "dream_priority", cfg):
         ent = dream._resolve_entity("alex")
         weight, _ = dream.compute_entity_priority(ent)
@@ -158,12 +226,20 @@ def test_tag_strategy_max(vault, monkeypatch):
 
 def test_tag_strategy_sum(vault, monkeypatch):
     import dream
+
     _make_entity(vault, "alex", "people", {"tags": ["work-active", "operator-anchor"]})
-    cfg = type("DP", (), {
-        "default": 1.0, "paths": {},
-        "domain": {}, "tags": {"work-active": 2.5, "operator-anchor": 5.0},
-        "tag_strategy": "sum", "status": {},
-    })()
+    cfg = type(
+        "DP",
+        (),
+        {
+            "default": 1.0,
+            "paths": {},
+            "domain": {},
+            "tags": {"work-active": 2.5, "operator-anchor": 5.0},
+            "tag_strategy": "sum",
+            "status": {},
+        },
+    )()
     with patch.object(dream.CONFIG.scheduling, "dream_priority", cfg):
         ent = dream._resolve_entity("alex")
         weight, _ = dream.compute_entity_priority(ent)
@@ -172,12 +248,20 @@ def test_tag_strategy_sum(vault, monkeypatch):
 
 def test_status_multiplier(vault, monkeypatch):
     import dream
+
     _make_entity(vault, "personal-chng-me", "areas", {"status": "retired"})
-    cfg = type("DP", (), {
-        "default": 1.0, "paths": {},
-        "domain": {}, "tags": {}, "tag_strategy": "max",
-        "status": {"active": 1.0, "retired": 0.05},
-    })()
+    cfg = type(
+        "DP",
+        (),
+        {
+            "default": 1.0,
+            "paths": {},
+            "domain": {},
+            "tags": {},
+            "tag_strategy": "max",
+            "status": {"active": 1.0, "retired": 0.05},
+        },
+    )()
     with patch.object(dream.CONFIG.scheduling, "dream_priority", cfg):
         ent = dream._resolve_entity("personal-chng-me")
         weight, _ = dream.compute_entity_priority(ent)
@@ -187,16 +271,29 @@ def test_status_multiplier(vault, monkeypatch):
 def test_composite_formula(vault, monkeypatch):
     """All multipliers compose: default × domain × tag × status."""
     import dream
-    _make_entity(vault, "alex", "people", {
-        "domain": "personal", "tags": ["operator-anchor"], "status": "active",
-    })
-    cfg = type("DP", (), {
-        "default": 2.0, "paths": {},
-        "domain": {"personal": 1.5},
-        "tags": {"operator-anchor": 3.0},
-        "tag_strategy": "max",
-        "status": {"active": 1.0},
-    })()
+
+    _make_entity(
+        vault,
+        "alex",
+        "people",
+        {
+            "domain": "personal",
+            "tags": ["operator-anchor"],
+            "status": "active",
+        },
+    )
+    cfg = type(
+        "DP",
+        (),
+        {
+            "default": 2.0,
+            "paths": {},
+            "domain": {"personal": 1.5},
+            "tags": {"operator-anchor": 3.0},
+            "tag_strategy": "max",
+            "status": {"active": 1.0},
+        },
+    )()
     with patch.object(dream.CONFIG.scheduling, "dream_priority", cfg):
         ent = dream._resolve_entity("alex")
         weight, _ = dream.compute_entity_priority(ent)
@@ -205,10 +302,20 @@ def test_composite_formula(vault, monkeypatch):
 
 def test_default_when_no_rules_match(vault, monkeypatch):
     import dream
+
     _make_entity(vault, "obscure", "people", {})
-    cfg = type("DP", (), {
-        "default": 1.0, "paths": {}, "domain": {}, "tags": {}, "tag_strategy": "max", "status": {},
-    })()
+    cfg = type(
+        "DP",
+        (),
+        {
+            "default": 1.0,
+            "paths": {},
+            "domain": {},
+            "tags": {},
+            "tag_strategy": "max",
+            "status": {},
+        },
+    )()
     with patch.object(dream.CONFIG.scheduling, "dream_priority", cfg):
         ent = dream._resolve_entity("obscure")
         weight, source = dream.compute_entity_priority(ent)
@@ -222,6 +329,7 @@ def test_default_when_no_rules_match(vault, monkeypatch):
 def test_select_greedy_top_n():
     import dream
     from dream import EntityRef
+
     candidates = [
         (1.0, EntityRef(slug="a", kind="people", page=Path("a"), type_value="person"), "src"),
         (5.0, EntityRef(slug="b", kind="people", page=Path("b"), type_value="person"), "src"),
@@ -236,8 +344,13 @@ def test_select_greedy_top_n():
 def test_select_zero_weight_excluded():
     import dream
     from dream import EntityRef
+
     candidates = [
-        (0.0, EntityRef(slug="zero", kind="people", page=Path("z"), type_value="person"), "excluded"),
+        (
+            0.0,
+            EntityRef(slug="zero", kind="people", page=Path("z"), type_value="person"),
+            "excluded",
+        ),
         (1.0, EntityRef(slug="one", kind="people", page=Path("o"), type_value="person"), "src"),
     ]
     picked = dream._select_for_sweep(candidates, N=5, mode="greedy")
@@ -249,8 +362,13 @@ def test_select_probabilistic_returns_n_items():
     """Probabilistic mode returns exactly min(N, eligible_count) without replacement."""
     import dream
     from dream import EntityRef
+
     candidates = [
-        (float(i + 1), EntityRef(slug=f"e{i}", kind="people", page=Path(str(i)), type_value="person"), "src")
+        (
+            float(i + 1),
+            EntityRef(slug=f"e{i}", kind="people", page=Path(str(i)), type_value="person"),
+            "src",
+        )
         for i in range(5)
     ]
     picked = dream._select_for_sweep(candidates, N=3, mode="probabilistic")
@@ -264,6 +382,7 @@ def test_select_probabilistic_biased_toward_high_weight():
     """Over many rolls, high-weight entity selected more often than low-weight."""
     import dream
     from dream import EntityRef
+
     candidates = [
         (10.0, EntityRef(slug="high", kind="people", page=Path("h"), type_value="person"), "src"),
         (1.0, EntityRef(slug="low", kind="people", page=Path("l"), type_value="person"), "src"),
@@ -282,12 +401,21 @@ def test_select_probabilistic_biased_toward_high_weight():
 
 def test_list_candidates_shape(vault, monkeypatch):
     import dream
+
     _make_entity(vault, "alex", "people", {"domain": "personal"})
     _make_entity(vault, "yesterday-os", "projects", {"domain": "ai"})
-    cfg = type("DP", (), {
-        "default": 1.0, "paths": {"knowledge/people/alex.md": 5.0},
-        "domain": {"ai": 1.5}, "tags": {}, "tag_strategy": "max", "status": {},
-    })()
+    cfg = type(
+        "DP",
+        (),
+        {
+            "default": 1.0,
+            "paths": {"knowledge/people/alex.md": 5.0},
+            "domain": {"ai": 1.5},
+            "tags": {},
+            "tag_strategy": "max",
+            "status": {},
+        },
+    )()
     with patch.object(dream.CONFIG.scheduling, "dream_priority", cfg):
         rows = dream.list_candidates()
     assert len(rows) == 2

@@ -83,12 +83,15 @@ def test_distinct_ids_coexist(index_env):
 
 # --- M025-S02-T01: capture_id → article resolution -------------------------
 
+
 def _write_article(kdir, rel, compiled_from):
     import yaml as _yaml
 
     p = kdir / rel
     p.parent.mkdir(parents=True, exist_ok=True)
-    fm = _yaml.safe_dump({"type": "person", "compiled_from": compiled_from}, sort_keys=False).strip()
+    fm = _yaml.safe_dump(
+        {"type": "person", "compiled_from": compiled_from}, sort_keys=False
+    ).strip()
     p.write_text(f"---\n{fm}\n---\n# {p.stem}\nBody.\n", encoding="utf-8")
     return p
 
@@ -96,10 +99,14 @@ def _write_article(kdir, rel, compiled_from):
 def test_resolve_articles_joins_compiled_from(index_env, tmp_path):
     ci = index_env
     ci.record("abc123", source_path="raw/captures/capture-abc123.md", created="t1")
-    ci.record("def456", source_path="raw/captures/capture-def456.md", created="t2")  # never compiled
+    ci.record(
+        "def456", source_path="raw/captures/capture-def456.md", created="t2"
+    )  # never compiled
 
     kdir = tmp_path / "knowledge"
-    _write_article(kdir, "people/sid.md", ["raw/captures/capture-abc123.md", "raw/notes/email/x.md"])
+    _write_article(
+        kdir, "people/sid.md", ["raw/captures/capture-abc123.md", "raw/notes/email/x.md"]
+    )
     _write_article(kdir, "concepts/x.md", "raw/notes/email/y.md")  # string form, no capture
 
     res = ci.resolve_articles(knowledge_dir=kdir)
@@ -122,10 +129,13 @@ def test_resolve_articles_empty_index_and_missing_dir(index_env, tmp_path):
     ci = index_env
     assert ci.resolve_articles(knowledge_dir=tmp_path / "knowledge") == {}  # empty index → {}
     ci.record("q", source_path="raw/captures/capture-q.md", created="t1")
-    assert ci.resolve_articles(knowledge_dir=tmp_path / "nope") == {"q": []}  # absent dir → no crash
+    assert ci.resolve_articles(knowledge_dir=tmp_path / "nope") == {
+        "q": []
+    }  # absent dir → no crash
 
 
 # --- M025-S02-T02: deterministic digest captures section -------------------
+
 
 def _write_capture_body(vault, cid, body):
     p = vault / "raw" / "captures" / f"capture-{cid}.md"
@@ -135,12 +145,26 @@ def _write_capture_body(vault, cid, body):
 
 def test_build_captures_section_resolves_and_filters_by_day(index_env, tmp_path):
     ci = index_env
-    ci.record("aaa11111", source_path="raw/captures/capture-aaa11111.md", created="2026-06-20T09:00:00+02:00")
-    ci.record("bbb22222", source_path="raw/captures/capture-bbb22222.md", created="2026-06-20T10:00:00+02:00")
-    ci.record("ccc33333", source_path="raw/captures/capture-ccc33333.md", created="2026-06-19T10:00:00+02:00")
+    ci.record(
+        "aaa11111",
+        source_path="raw/captures/capture-aaa11111.md",
+        created="2026-06-20T09:00:00+02:00",
+    )
+    ci.record(
+        "bbb22222",
+        source_path="raw/captures/capture-bbb22222.md",
+        created="2026-06-20T10:00:00+02:00",
+    )
+    ci.record(
+        "ccc33333",
+        source_path="raw/captures/capture-ccc33333.md",
+        created="2026-06-19T10:00:00+02:00",
+    )
     _write_capture_body(tmp_path, "aaa11111", "Buy milk and eggs")
     _write_capture_body(tmp_path, "bbb22222", "Idea about pricing")
-    _write_article(tmp_path / "knowledge", "projects/groceries.md", ["raw/captures/capture-aaa11111.md"])
+    _write_article(
+        tmp_path / "knowledge", "projects/groceries.md", ["raw/captures/capture-aaa11111.md"]
+    )
 
     section = ci.build_captures_section("2026-06-20", vault_root=tmp_path)
     assert section is not None
@@ -160,7 +184,11 @@ def test_build_captures_section_superseded_marker(index_env, tmp_path):
     ci = index_env
     from core.utils import save_json_state
 
-    ci.record("sup55555", source_path="raw/captures/capture-sup55555.md", created="2026-06-20T09:00:00+02:00")
+    ci.record(
+        "sup55555",
+        source_path="raw/captures/capture-sup55555.md",
+        created="2026-06-20T09:00:00+02:00",
+    )
     idx = ci.load()
     idx["sup55555"]["status"] = ci.STATUS_SUPERSEDED
     save_json_state(ci.CAPTURE_INDEX_FILE, idx)
@@ -177,16 +205,24 @@ KNOWN = {"abc12345ef01", "deadbeef0099"}
 
 
 def test_detect_correction_full_id(index_env):
-    assert index_env.detect_correction("re: abc12345ef01 actually Friday", known_ids=KNOWN) == "abc12345ef01"
+    assert (
+        index_env.detect_correction("re: abc12345ef01 actually Friday", known_ids=KNOWN)
+        == "abc12345ef01"
+    )
 
 
 def test_detect_correction_short_prefix_from_digest(index_env):
     # the digest shows the 8-char short id; referencing it resolves to the full id
-    assert index_env.detect_correction("corrects:abc12345 — wrong reading", known_ids=KNOWN) == "abc12345ef01"
+    assert (
+        index_env.detect_correction("corrects:abc12345 — wrong reading", known_ids=KNOWN)
+        == "abc12345ef01"
+    )
 
 
 def test_detect_correction_corrects_and_hash_forms(index_env):
-    assert index_env.detect_correction("corrects: deadbeef the X", known_ids=KNOWN) == "deadbeef0099"
+    assert (
+        index_env.detect_correction("corrects: deadbeef the X", known_ids=KNOWN) == "deadbeef0099"
+    )
     assert index_env.detect_correction("re#abc12345 fix", known_ids=KNOWN) == "abc12345ef01"
 
 
@@ -195,7 +231,9 @@ def test_detect_correction_unknown_id_falls_back_to_fresh(index_env):
 
 
 def test_detect_correction_fresh_capture_no_leading_token(index_env):
-    assert index_env.detect_correction("just a normal thought about pricing", known_ids=KNOWN) is None
+    assert (
+        index_env.detect_correction("just a normal thought about pricing", known_ids=KNOWN) is None
+    )
     assert index_env.detect_correction("", known_ids=KNOWN) is None
 
 
@@ -206,5 +244,9 @@ def test_detect_correction_ignores_ordinary_email_re_subject(index_env):
 
 def test_detect_correction_ambiguous_prefix_is_fresh(index_env):
     ambiguous = {"abcd1111", "abcd2222"}
-    assert index_env.detect_correction("re: abcd 1", known_ids=ambiguous) is None  # 'abcd' too short anyway
-    assert index_env.detect_correction("re: abcd11 x", known_ids={"abcd1111", "abcd1122"}) is None  # prefix matches 2
+    assert (
+        index_env.detect_correction("re: abcd 1", known_ids=ambiguous) is None
+    )  # 'abcd' too short anyway
+    assert (
+        index_env.detect_correction("re: abcd11 x", known_ids={"abcd1111", "abcd1122"}) is None
+    )  # prefix matches 2

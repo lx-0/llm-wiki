@@ -90,7 +90,8 @@ def test_max_per_run_only_where_consumed():
     defaults = _default_piggybacks()
     registry_names = set(_registry_piggyback_specs())
     with_cap = {
-        name for name in registry_names
+        name
+        for name in registry_names
         if name in defaults and defaults[name].max_per_run is not None
     }
     assert with_cap == {"screenshots", "pictures"}, (

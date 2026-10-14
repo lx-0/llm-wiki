@@ -4,6 +4,7 @@ Written against the LEGACY compile_file (must pass before the decide_route
 wiring), then re-run after the refactor to prove behavior is identical. The
 SDK call is faked; ROOT_DIR + state are redirected to a tmp vault.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -28,7 +29,11 @@ def vault(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(rmod, "ROOT_DIR", tmp_path)
 
     saved: dict = {}
-    monkeypatch.setattr(cmod, "load_state", lambda: {k: dict(v) if isinstance(v, dict) else v for k, v in saved.items()})
+    monkeypatch.setattr(
+        cmod,
+        "load_state",
+        lambda: {k: dict(v) if isinstance(v, dict) else v for k, v in saved.items()},
+    )
 
     # State writes go through the merge-under-lock seam now (StateStore arc);
     # capture them so no test touches the real state.json.
@@ -72,9 +77,8 @@ def test_substrate_excluded_skip_records_hash(vault, monkeypatch):
     ingested-hash on skip — otherwise the collector's write-once delta files
     re-list as compile candidates on every run forever (lxw, 2026-06-02)."""
     from core.config import CONFIG
-    monkeypatch.setattr(
-        CONFIG.limits, "compile_skip_substrate_types", ("email-delta",)
-    )
+
+    monkeypatch.setattr(CONFIG.limits, "compile_skip_substrate_types", ("email-delta",))
     _, raw, _ = vault
     src = raw / "delta-2026-06-02.md"
     src.write_text("---\ntype: email-delta\n---\n- new mail summary", encoding="utf-8")
@@ -88,8 +92,7 @@ def test_health_rollup_stub_records_deterministically(vault):
     _, raw, saved = vault
     src = raw / "health.md"
     src.write_text(
-        "---\ntype: health-rollup\n---\n# Health — 2026-05-20\n"
-        "(Add observations below as needed.)",
+        "---\ntype: health-rollup\n---\n# Health — 2026-05-20\n(Add observations below as needed.)",
         encoding="utf-8",
     )
     o = _run(src)

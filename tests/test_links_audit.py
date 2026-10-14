@@ -98,7 +98,10 @@ def test_apply_fixes_rewrites_relative_preserving_alias(vault: Path) -> None:
     stats = la.apply_fixes(kn, vault, {"concepts/cascading-debug": "connections/cascading-debug"})
     assert stats == {"files": 1, "links": 1}
     # from concepts/src.md → connections/cascading-debug = ../connections/cascading-debug, alias kept
-    assert src.read_text(encoding="utf-8") == "See [[../connections/cascading-debug|the debug pattern]] here."
+    assert (
+        src.read_text(encoding="utf-8")
+        == "See [[../connections/cascading-debug|the debug pattern]] here."
+    )
 
 
 def test_apply_fixes_only_touches_approved(vault: Path) -> None:
@@ -114,7 +117,9 @@ def test_apply_fixes_only_touches_approved(vault: Path) -> None:
 def test_apply_fixes_skips_code_fence(vault: Path) -> None:
     kn = vault / "knowledge"
     src = kn / "concepts" / "src.md"
-    src.write_text("```\n[[concepts/cascading-debug]]\n```\n[[concepts/cascading-debug]]", encoding="utf-8")
+    src.write_text(
+        "```\n[[concepts/cascading-debug]]\n```\n[[concepts/cascading-debug]]", encoding="utf-8"
+    )
     stats = la.apply_fixes(kn, vault, {"concepts/cascading-debug": "connections/cascading-debug"})
     assert stats["links"] == 1  # only the non-fenced one
     txt = src.read_text(encoding="utf-8")

@@ -118,8 +118,9 @@ class EmailCollector:
             try:
                 messages = list(reader.scan_metadata())
             except MailboxReadError as e:
-                log.error("EmailCollector: %s — scan FAILED, watermark untouched: %s",
-                          account_id, e)
+                log.error(
+                    "EmailCollector: %s — scan FAILED, watermark untouched: %s", account_id, e
+                )
                 errors.append(f"{account_id}: {e}")
                 if not dry_run:
                     _record_failure(accounts_state, account_id, str(e), run_start)
@@ -197,25 +198,32 @@ class EmailCollector:
                 if prev.get("last_run_ts"):
                     log.warning(
                         "EmailCollector: %s — unparseable watermark %r, re-baselining",
-                        account_id, prev.get("last_run_ts"),
+                        account_id,
+                        prev.get("last_run_ts"),
                     )
                 else:
-                    log.info("EmailCollector: %s — baseline recorded, no delta on first run",
-                             account_id)
+                    log.info(
+                        "EmailCollector: %s — baseline recorded, no delta on first run", account_id
+                    )
                 baselined.append(account_id)
                 if not dry_run:
                     _record_success(accounts_state, account_id, run_start)
                 continue
 
-            log.info("EmailCollector: %s — incremental scan since %s",
-                     account_id, since.isoformat())
+            log.info(
+                "EmailCollector: %s — incremental scan since %s", account_id, since.isoformat()
+            )
             try:
                 messages = list(reader.scan_metadata(since=since))
             except MailboxReadError as e:
                 # Scan failed — hold the watermark so the next run retries
                 # this exact window, and surface the error instead of hiding it.
-                log.error("EmailCollector: %s — scan FAILED, watermark held at %s: %s",
-                          account_id, prev.get("last_run_ts"), e)
+                log.error(
+                    "EmailCollector: %s — scan FAILED, watermark held at %s: %s",
+                    account_id,
+                    prev.get("last_run_ts"),
+                    e,
+                )
                 errors.append(f"{account_id}: {e}")
                 if not dry_run:
                     _record_failure(accounts_state, account_id, str(e), run_start)
@@ -225,20 +233,27 @@ class EmailCollector:
                 report_path = output_root / f"{account_id}-delta-{_now_slug()}.md"
                 report_text = _render_delta_report(account_id, messages, since=since)
                 if dry_run:
-                    log.info("  DRY RUN: would write %d-msg delta to %s",
-                             len(messages), report_path)
+                    log.info(
+                        "  DRY RUN: would write %d-msg delta to %s", len(messages), report_path
+                    )
                 else:
                     output_root.mkdir(parents=True, exist_ok=True)
                     report_path.write_text(report_text, encoding="utf-8")
-                    log.info("  wrote %d-msg delta → %s",
-                             len(messages), report_path.relative_to(ROOT_DIR))
+                    log.info(
+                        "  wrote %d-msg delta → %s",
+                        len(messages),
+                        report_path.relative_to(ROOT_DIR),
+                    )
                     files_written.append(report_path)
                     # Mirror a one-liner into daily/<today>/email.md per account.
                     try:
                         from core import daily_capture
                         from datetime import date as _date
+
                         rollup_block = _email_rollup_block(
-                            account_id, messages, report_path.stem,
+                            account_id,
+                            messages,
+                            report_path.stem,
                             top_senders=CONFIG.limits.daily_email_top_senders,
                             sample_subjects=CONFIG.limits.daily_email_sample_subjects,
                         )
@@ -274,6 +289,7 @@ class EmailCollector:
 # ── Report rendering ─────────────────────────────────────────────────
 # Stable shape — preserves what scripts/scan-email.py used to emit.
 # When S03 lands Gmail, shape stays identical (only the source backend changes).
+
 
 def _render_report(account_id: str, messages: list[MessageMeta]) -> str:
     if not messages:
@@ -313,9 +329,7 @@ def _render_report(account_id: str, messages: list[MessageMeta]) -> str:
     return "\n".join(lines)
 
 
-def _render_delta_report(
-    account_id: str, messages: list[MessageMeta], *, since: datetime
-) -> str:
+def _render_delta_report(account_id: str, messages: list[MessageMeta], *, since: datetime) -> str:
     """Delta sibling of `_render_report` — only messages newer than the watermark.
 
     One file per account. Unlike the full-sweep overview (which aggregates,
@@ -400,6 +414,7 @@ def _email_rollup_block(
 #                                "last_error": "<msg>",          # only if last scan failed
 #                                "last_error_at": "<iso8601>"}}}
 
+
 def _record_success(accounts_state: dict, account_id: str, run_start: str) -> None:
     """Advance the watermark and drop any prior error — the scan completed.
 
@@ -473,11 +488,13 @@ def _load_state() -> dict:
         legacy_date = data.get("last_incremental")
         if legacy_date:
             watermark = f"{legacy_date}T00:00:00+00:00"
-            for account_id in (CONFIG.personal.accounts or {}):
+            for account_id in CONFIG.personal.accounts or {}:
                 accounts[account_id] = {"last_run_ts": watermark}
             log.info(
                 "EmailCollector: migrated legacy email-state.json — seeded "
-                "%d account(s) with watermark %s", len(accounts), watermark,
+                "%d account(s) with watermark %s",
+                len(accounts),
+                watermark,
             )
         return {"accounts": accounts}
     return {"accounts": {}}

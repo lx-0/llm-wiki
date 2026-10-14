@@ -26,9 +26,7 @@ from scripts.core.compile_role import (
 
 class TestValidRoles:
     def test_three_canonical_values(self):
-        assert VALID_ROLES == frozenset(
-            {"source-only", "source-and-final", "final-only"}
-        )
+        assert VALID_ROLES == frozenset({"source-only", "source-and-final", "final-only"})
 
     def test_membership(self):
         assert "source-only" in VALID_ROLES
@@ -50,17 +48,9 @@ class TestExplicitOverride:
     )
     def test_explicit_role_returned_regardless_of_location(self, role):
         # File in raw/ but frontmatter says final-only → final-only wins
-        assert (
-            infer_compile_role(Path("raw/notes/x.md"), {"compile_role": role})
-            == role
-        )
+        assert infer_compile_role(Path("raw/notes/x.md"), {"compile_role": role}) == role
         # File in knowledge/ but frontmatter says source-and-final → wins
-        assert (
-            infer_compile_role(
-                Path("knowledge/concepts/x.md"), {"compile_role": role}
-            )
-            == role
-        )
+        assert infer_compile_role(Path("knowledge/concepts/x.md"), {"compile_role": role}) == role
 
     def test_invalid_explicit_raises_value_error(self):
         with pytest.raises(ValueError, match="invalid compile_role"):
@@ -93,16 +83,12 @@ class TestDefaultByLocation:
         # knowledge/ would normally resolve to source-only anyway, but with the
         # knob off we want explicit "no inference, just source-only"
         assert (
-            infer_compile_role(
-                Path("knowledge/concepts/x.md"), {}, default_by_location=False
-            )
+            infer_compile_role(Path("knowledge/concepts/x.md"), {}, default_by_location=False)
             == "source-only"
         )
         # Even from raw/, with knob off
         assert (
-            infer_compile_role(
-                Path("raw/notes/x.md"), {}, default_by_location=False
-            )
+            infer_compile_role(Path("raw/notes/x.md"), {}, default_by_location=False)
             == "source-only"
         )
 
@@ -122,18 +108,14 @@ class TestVaultRoot:
     def test_absolute_path_with_vault_root(self, tmp_path):
         vault = tmp_path
         target = vault / "knowledge" / "concepts" / "x.md"
-        assert (
-            infer_compile_role(target, {}, vault_root=vault) == "source-only"
-        )
+        assert infer_compile_role(target, {}, vault_root=vault) == "source-only"
 
     def test_absolute_path_outside_vault_root_falls_back(self, tmp_path):
         vault = tmp_path
         outside = Path("/tmp/totally-other/x.md")
         # path.relative_to(vault) raises; helper catches and uses parts as-is
         # /tmp/totally-other/x.md has no known segment → fallback source-only
-        assert (
-            infer_compile_role(outside, {}, vault_root=vault) == "source-only"
-        )
+        assert infer_compile_role(outside, {}, vault_root=vault) == "source-only"
 
     def test_vault_root_none_uses_path_parts_directly(self):
         # Absolute-looking path with known segment somewhere in it

@@ -33,7 +33,12 @@ def oracle(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, str]:
     scratch = tmp_path / "scratch"
     scratch.mkdir()
     home = patch_engine_paths(monkeypatch, vault, scratch)
-    return {str(vault): "<VAULT>", str(home): "<HOME>", str(scratch): "<SCRATCH>", str(REPO_ROOT): "<WIKI>"}
+    return {
+        str(vault): "<VAULT>",
+        str(home): "<HOME>",
+        str(scratch): "<SCRATCH>",
+        str(REPO_ROOT): "<WIKI>",
+    }
 
 
 def test_menu_json_matches_golden(oracle, capsys, request) -> None:

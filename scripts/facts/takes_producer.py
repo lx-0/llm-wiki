@@ -226,5 +226,8 @@ async def maybe_extract_takes(source: Path) -> None:
 
     log.info(
         "  Takes: %d appended, %d duplicate, %d dropped (raw=%d)",
-        appended, duplicates, dropped, len(takes),
+        appended,
+        duplicates,
+        dropped,
+        len(takes),
     )

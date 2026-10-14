@@ -31,8 +31,7 @@ def _isolate_registry():
     producers_base._PRODUCERS.update(saved)
 
 
-def _make_fake_producer(name: str, raises: bool = False,
-                       enabled_key: str | None = None):
+def _make_fake_producer(name: str, raises: bool = False, enabled_key: str | None = None):
     """Build a Producer class that records each run() call site-effectfully.
 
     The class carries a ``calls`` class attribute that test bodies can

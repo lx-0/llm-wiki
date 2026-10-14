@@ -73,9 +73,7 @@ class Cutoffs:
                 raise ValueError(f"Band {b.band!r}: max {b.max} < min {b.min}")
         sorted_bands = sorted(self.bands, key=lambda b: b.min)
         if list(sorted_bands) != list(self.bands):
-            raise ValueError(
-                "Cutoffs must be declared in ascending order by `min`"
-            )
+            raise ValueError("Cutoffs must be declared in ascending order by `min`")
         for prev, nxt in zip(self.bands, self.bands[1:]):
             expected_next_min = prev.max + 1
             if nxt.min != expected_next_min:
@@ -98,13 +96,9 @@ class Cutoffs:
         """Look up the band for an integer score. Raises if out-of-range."""
         lo, hi = self.range
         if not (lo <= score <= hi):
-            raise ValueError(
-                f"Score {score} is outside the declared cutoff range {lo}..{hi}"
-            )
+            raise ValueError(f"Score {score} is outside the declared cutoff range {lo}..{hi}")
         for b in self.bands:
             if b.contains(score):
                 return b.band
         # Unreachable if validate() passed: bands cover [lo..hi] contiguously.
-        raise AssertionError(
-            f"Score {score} fell through cutoffs ladder despite valid range"
-        )
+        raise AssertionError(f"Score {score} fell through cutoffs ladder despite valid range")

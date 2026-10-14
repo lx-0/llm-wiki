@@ -50,9 +50,9 @@ _CYAN = "\033[36m" if _TTY else ""
 
 _SEVERITY_STYLE = {
     "critical": (f"{_RED}✗{_RESET}", _RED),
-    "warning":  (f"{_YELLOW}⚠{_RESET}", _YELLOW),
-    "info":     (f"{_DIM}ℹ{_RESET}",    _DIM),
-    "ok":       (f"{_GREEN}✓{_RESET}",  ""),
+    "warning": (f"{_YELLOW}⚠{_RESET}", _YELLOW),
+    "info": (f"{_DIM}ℹ{_RESET}", _DIM),
+    "ok": (f"{_GREEN}✓{_RESET}", ""),
 }
 
 
@@ -82,8 +82,12 @@ def render_pretty(results: list[CheckResult], summary: dict) -> str:
             categories.append((cat, items))
 
     for cat, items in categories:
-        title = {"config": "Config + setup", "connectivity": "Connectivity",
-                 "pipeline": "Pipeline", "unknown": "Other"}.get(cat, cat.title())
+        title = {
+            "config": "Config + setup",
+            "connectivity": "Connectivity",
+            "pipeline": "Pipeline",
+            "unknown": "Other",
+        }.get(cat, cat.title())
         lines.append(f"  {_BOLD}{title}{_RESET}")
         for r in items:
             glyph, color = _SEVERITY_STYLE.get(r.severity, ("?", ""))
@@ -144,11 +148,13 @@ def main() -> int:
         description="Full vault-health audit. Default: pretty report.",
     )
     parser.add_argument(
-        "--json", action="store_true",
+        "--json",
+        action="store_true",
         help="Machine-readable output (for agents).",
     )
     parser.add_argument(
-        "--quick", action="store_true",
+        "--quick",
+        action="store_true",
         help="Skip network + subprocess probes (sub-50ms; for hooks).",
     )
     args = parser.parse_args()

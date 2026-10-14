@@ -11,11 +11,19 @@ def _seed_firefox_places(db_path: Path) -> None:
     """Minimal Firefox places.sqlite — one bookmark, one visited page."""
     db = sqlite3.connect(str(db_path))
     cur = db.cursor()
-    cur.execute("CREATE TABLE moz_places (id INTEGER PRIMARY KEY, url TEXT, title TEXT, visit_count INTEGER, last_visit_date INTEGER)")
-    cur.execute("CREATE TABLE moz_bookmarks (id INTEGER PRIMARY KEY, fk INTEGER, type INTEGER, title TEXT, parent INTEGER, dateAdded INTEGER)")
+    cur.execute(
+        "CREATE TABLE moz_places (id INTEGER PRIMARY KEY, url TEXT, title TEXT, visit_count INTEGER, last_visit_date INTEGER)"
+    )
+    cur.execute(
+        "CREATE TABLE moz_bookmarks (id INTEGER PRIMARY KEY, fk INTEGER, type INTEGER, title TEXT, parent INTEGER, dateAdded INTEGER)"
+    )
     cur.execute("CREATE TABLE moz_historyvisits (id INTEGER PRIMARY KEY, visit_date INTEGER)")
-    cur.execute("INSERT INTO moz_places VALUES (1, 'https://example.com/page', 'Example', 5, 1700000000000000)")
-    cur.execute("INSERT INTO moz_bookmarks VALUES (10, 1, 1, 'Example bookmark', 2, 1700000000000000)")
+    cur.execute(
+        "INSERT INTO moz_places VALUES (1, 'https://example.com/page', 'Example', 5, 1700000000000000)"
+    )
+    cur.execute(
+        "INSERT INTO moz_bookmarks VALUES (10, 1, 1, 'Example bookmark', 2, 1700000000000000)"
+    )
     cur.execute("INSERT INTO moz_bookmarks VALUES (2, NULL, 2, 'Toolbar', NULL, NULL)")
     cur.execute("INSERT INTO moz_historyvisits VALUES (1, 1700000000000000)")
     db.commit()
@@ -26,9 +34,13 @@ def _seed_chrome_history(db_path: Path) -> None:
     """Minimal Chrome history SQLite — urls + visits tables."""
     db = sqlite3.connect(str(db_path))
     cur = db.cursor()
-    cur.execute("CREATE TABLE urls (url TEXT, title TEXT, visit_count INTEGER, last_visit_time INTEGER)")
+    cur.execute(
+        "CREATE TABLE urls (url TEXT, title TEXT, visit_count INTEGER, last_visit_time INTEGER)"
+    )
     cur.execute("CREATE TABLE visits (id INTEGER PRIMARY KEY)")
-    cur.execute("INSERT INTO urls VALUES ('https://chrome-site.com', 'Chrome Page', 8, 13350000000000000)")
+    cur.execute(
+        "INSERT INTO urls VALUES ('https://chrome-site.com', 'Chrome Page', 8, 13350000000000000)"
+    )
     cur.execute("INSERT INTO visits VALUES (1)")
     db.commit()
     db.close()
@@ -93,11 +105,26 @@ def test_browser_run_dry_run_does_not_write(monkeypatch, tmp_path):
     from collectors import scan_browser
 
     chrome_bm = tmp_path / "Bookmarks"
-    chrome_bm.write_text(json.dumps({
-        "roots": {"bookmark_bar": {"name": "Bar", "children": [
-            {"type": "url", "name": "Site", "url": "https://site.com", "date_added": "13350000000000000"}
-        ]}}
-    }), encoding="utf-8")
+    chrome_bm.write_text(
+        json.dumps(
+            {
+                "roots": {
+                    "bookmark_bar": {
+                        "name": "Bar",
+                        "children": [
+                            {
+                                "type": "url",
+                                "name": "Site",
+                                "url": "https://site.com",
+                                "date_added": "13350000000000000",
+                            }
+                        ],
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
 
     monkeypatch.setattr(scan_browser, "_FF_PROFILE_RAW", "")
     monkeypatch.setattr(scan_browser, "_STG_RAW", "")
@@ -126,11 +153,26 @@ def test_browser_run_writes_report_multi_source(monkeypatch, tmp_path):
     _seed_chrome_history(chrome_hist)
     # Chrome bookmarks
     chrome_bm = tmp_path / "Bookmarks"
-    chrome_bm.write_text(json.dumps({
-        "roots": {"bookmark_bar": {"name": "Bar", "children": [
-            {"type": "url", "name": "ChromeSite", "url": "https://chrome-bm.com", "date_added": "13350000000000000"}
-        ]}}
-    }), encoding="utf-8")
+    chrome_bm.write_text(
+        json.dumps(
+            {
+                "roots": {
+                    "bookmark_bar": {
+                        "name": "Bar",
+                        "children": [
+                            {
+                                "type": "url",
+                                "name": "ChromeSite",
+                                "url": "https://chrome-bm.com",
+                                "date_added": "13350000000000000",
+                            }
+                        ],
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
 
     monkeypatch.setattr(scan_browser, "_FF_PROFILE_RAW", str(tmp_path))
     monkeypatch.setattr(scan_browser, "_STG_RAW", "")

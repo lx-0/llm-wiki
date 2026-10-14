@@ -13,6 +13,7 @@ Three layers:
 - manifest: StateStore-backed slug↔path persistence at an explicit path
   (tests never touch the real STATE_DIR).
 """
+
 from __future__ import annotations
 
 from pathlib import Path

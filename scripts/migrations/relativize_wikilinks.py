@@ -33,9 +33,13 @@ from core.links import (  # noqa: E402
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--vault", required=True, type=Path, help="Vault root (folder containing .obsidian/)")
+    ap.add_argument(
+        "--vault", required=True, type=Path, help="Vault root (folder containing .obsidian/)"
+    )
     ap.add_argument("--apply", action="store_true", help="Write changes (default: dry-run)")
-    ap.add_argument("--only", type=str, default=None, help="Limit to one file, path relative to vault")
+    ap.add_argument(
+        "--only", type=str, default=None, help="Limit to one file, path relative to vault"
+    )
     args = ap.parse_args()
 
     vault: Path = args.vault.expanduser().resolve()
@@ -63,9 +67,11 @@ def main() -> int:
     # Whole-corpus.
     if args.apply:
         stats = run_relativize_pass(knowledge, vault)
-        print(f"[APPLIED] articles_seen={stats['articles_seen']} "
-              f"articles_written={stats['articles_written']} "
-              f"links_rewritten={stats['links_rewritten']}")
+        print(
+            f"[APPLIED] articles_seen={stats['articles_seen']} "
+            f"articles_written={stats['articles_written']} "
+            f"links_rewritten={stats['links_rewritten']}"
+        )
         return 0
 
     # Dry-run summary without writing.
@@ -79,8 +85,10 @@ def main() -> int:
         if n and new_text != original:
             files_changed += 1
             links += n
-    print(f"[DRY-RUN] files_changed={files_changed} links_rewritten={links} "
-          f"distinct_unresolved={len(unresolved_total)}")
+    print(
+        f"[DRY-RUN] files_changed={files_changed} links_rewritten={links} "
+        f"distinct_unresolved={len(unresolved_total)}"
+    )
     if unresolved_total:
         print("top unresolved (left untouched):")
         for tgt, cnt in sorted(unresolved_total.items(), key=lambda kv: -kv[1])[:25]:

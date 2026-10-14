@@ -34,8 +34,10 @@ def write_inbox_record(intent: Intent, type_: str, triage_hint: str) -> HandlerR
     target = WORKSPACE_INBOX_DIR / f"{stem}.md"
     if target.exists():
         return HandlerResult(
-            kind=intent.kind, status="skipped",
-            reason=f"inbox record already exists: {target.name}", output=target,
+            kind=intent.kind,
+            status="skipped",
+            reason=f"inbox record already exists: {target.name}",
+            output=target,
         )
     summary = " ".join(intent.summary.split()) or "(no summary)"
     fm = {

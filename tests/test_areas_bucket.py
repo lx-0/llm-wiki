@@ -19,6 +19,7 @@ import pytest
 
 def test_areas_dir_declared_and_under_knowledge() -> None:
     from core import paths
+
     assert hasattr(paths, "AREAS_DIR"), "core.paths.AREAS_DIR must exist"
     assert paths.AREAS_DIR == paths.KNOWLEDGE_DIR / "areas"
 
@@ -43,12 +44,14 @@ def test_list_wiki_articles_picks_up_areas(tmp_path) -> None:
 
 def test_lint_folder_to_type_maps_areas_to_area() -> None:
     import lint
+
     assert lint.FOLDER_TO_TYPE.get("areas") == "area"
 
 
 def test_pin_type_to_moc_routes_area() -> None:
     """pin.py routes `type: area` articles to the `areas` MOC."""
     import pin
+
     assert pin.TYPE_TO_MOC.get("area") == "areas"
 
 

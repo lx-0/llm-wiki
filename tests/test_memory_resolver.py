@@ -20,18 +20,15 @@ from compile_stages.memory import (  # noqa: E402
 
 # ── _strip_path_prefix ─────────────────────────────────────────────────────
 
+
 class TestStripPathPrefix:
     def test_strips_after_projects_marker(self):
-        assert _strip_path_prefix(
-            "home-alex-Code-WebDev-projects-lx-0-llm-wiki"
-        ) == "lx-0-llm-wiki"
+        assert _strip_path_prefix("home-alex-Code-WebDev-projects-lx-0-llm-wiki") == "lx-0-llm-wiki"
 
     def test_strips_after_last_projects_marker(self):
         # If a path happens to contain '-projects-' twice, the LAST one wins
         # (the actual `projects/` directory marker).
-        assert _strip_path_prefix(
-            "user-projects-misc-projects-real-project"
-        ) == "real-project"
+        assert _strip_path_prefix("user-projects-misc-projects-real-project") == "real-project"
 
     def test_no_marker_strips_leading_dashes(self):
         assert _strip_path_prefix("-paperclip-playground") == "paperclip-playground"
@@ -45,17 +42,18 @@ class TestStripPathPrefix:
 
 # ── _extract_tag_slugs ─────────────────────────────────────────────────────
 
+
 class TestExtractTagSlugs:
     def test_filters_utility_tags(self):
-        assert _extract_tag_slugs(
-            ["yesterday-ai-openclaw", "claude-memory", "seed"]
-        ) == ["yesterday-ai-openclaw"]
+        assert _extract_tag_slugs(["yesterday-ai-openclaw", "claude-memory", "seed"]) == [
+            "yesterday-ai-openclaw"
+        ]
 
     def test_filters_all_utility_variants(self):
         # All four utility tags should be filtered.
-        assert _extract_tag_slugs(
-            ["myproj", "claude-memory", "memory", "sync", "seed"]
-        ) == ["myproj"]
+        assert _extract_tag_slugs(["myproj", "claude-memory", "memory", "sync", "seed"]) == [
+            "myproj"
+        ]
 
     def test_non_list_returns_empty(self):
         assert _extract_tag_slugs(None) == []
@@ -66,12 +64,11 @@ class TestExtractTagSlugs:
         assert _extract_tag_slugs([]) == []
 
     def test_non_string_items_filtered(self):
-        assert _extract_tag_slugs(["valid-slug", 42, None, "another"]) == [
-            "valid-slug", "another"
-        ]
+        assert _extract_tag_slugs(["valid-slug", 42, None, "another"]) == ["valid-slug", "another"]
 
 
 # ── resolve_project_slug ──────────────────────────────────────────────────
+
 
 def _scaffold_vault(tmp_path: Path, project_stems: list[str]) -> Path:
     """Build a tmp vault with `knowledge/projects/<stem>.md` files."""
@@ -97,7 +94,9 @@ class TestResolveProjectSlug:
         """memory-sync resolves via frontmatter project: after path-prefix strip."""
         vault = _scaffold_vault(tmp_path, ["lx-0-llm-wiki", "fleet"])
         result = resolve_project_slug(
-            source=Path("raw/memories/home-alex-Code-WebDev-projects-lx-0-llm-wiki__feedback_foo.md"),
+            source=Path(
+                "raw/memories/home-alex-Code-WebDev-projects-lx-0-llm-wiki__feedback_foo.md"
+            ),
             frontmatter={
                 "type": "memory-sync",
                 "project": "home-alex-Code-WebDev-projects-lx-0-llm-wiki",
@@ -121,9 +120,14 @@ class TestResolveProjectSlug:
 
     def test_ambiguous_substring_returns_none(self, tmp_path):
         """Slug matching multiple project pages → None, not a guess."""
-        vault = _scaffold_vault(tmp_path, [
-            "paperclip", "paperclip-playground", "paperclip-companies",
-        ])
+        vault = _scaffold_vault(
+            tmp_path,
+            [
+                "paperclip",
+                "paperclip-playground",
+                "paperclip-companies",
+            ],
+        )
         result = resolve_project_slug(
             source=Path("raw/memories/x.md"),
             frontmatter={"tags": ["paperclip"]},
@@ -134,9 +138,13 @@ class TestResolveProjectSlug:
 
     def test_ambiguous_substring_no_exact_returns_none(self, tmp_path):
         """Substring with multiple matches and no exact → None."""
-        vault = _scaffold_vault(tmp_path, [
-            "openclaw-hub-infrastructure", "openclaw-ops-repo",
-        ])
+        vault = _scaffold_vault(
+            tmp_path,
+            [
+                "openclaw-hub-infrastructure",
+                "openclaw-ops-repo",
+            ],
+        )
         # 'openclaw' matches both as substring → ambiguous.
         result = resolve_project_slug(
             source=Path("raw/memories/x.md"),
@@ -180,6 +188,7 @@ class TestResolveProjectSlug:
 
 
 # ── ensure_timeline_section ────────────────────────────────────────────────
+
 
 class TestEnsureTimelineSection:
     def test_appends_when_absent(self, tmp_path):

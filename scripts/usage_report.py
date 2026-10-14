@@ -25,14 +25,18 @@ def _row(key: str, i: int, o: int, c: int) -> str:
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description="Token-usage ledger report (tokens per provider/model).")
+    ap = argparse.ArgumentParser(
+        description="Token-usage ledger report (tokens per provider/model)."
+    )
     ap.add_argument("--days", type=int, default=7, help="show the last N days (default 7; 0 = all)")
     ap.add_argument("--json", action="store_true", help="print raw JSON")
     args = ap.parse_args()
 
     if not USAGE_FILE.exists():
-        print("No usage recorded yet (state/usage.json absent). "
-              "Run a compile / dream / reconcile / collect first.")
+        print(
+            "No usage recorded yet (state/usage.json absent). "
+            "Run a compile / dream / reconcile / collect first."
+        )
         return 0
 
     data = json.loads(USAGE_FILE.read_text(encoding="utf-8"))
@@ -52,7 +56,9 @@ def main() -> int:
             i, o, c = u.get("input_tokens", 0), u.get("output_tokens", 0), u.get("calls", 0)
             print(_row(key, i, o, c))
             a = agg.setdefault(key, [0, 0, 0])
-            a[0] += i; a[1] += o; a[2] += c
+            a[0] += i
+            a[1] += o
+            a[2] += c
 
     print(f"\nTotals ({len(days)} day(s) shown):")
     for key in sorted(agg):

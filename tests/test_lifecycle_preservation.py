@@ -5,6 +5,7 @@ The AFTER substrate touches the page (an email from Bob) but does NOT
 mention the contract. Validates that the rendered compile prompt carries
 the preservation rule (T01) so a future canary run will preserve the [x].
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -37,8 +38,9 @@ def test_after_substrate_does_not_mention_contract() -> None:
     # Substrate touches Bob — preservation context is real
     assert "Bob Smith" in body
     # But no contract / signing language
-    assert "contract" not in body.lower().split("expected lifecycle")[0], \
+    assert "contract" not in body.lower().split("expected lifecycle")[0], (
         "AFTER substrate body must not mention 'contract' before the truth-set block"
+    )
     # A genuine new commitment IS present (operator's EOW response)
     assert "EOW" in body or "follow up" in body.lower()
 

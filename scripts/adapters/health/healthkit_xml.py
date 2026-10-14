@@ -128,10 +128,17 @@ class HealthKitDailyAggregate:
         """
         out: dict = {}
         for k in (
-            "weight_kg", "body_fat_pct", "lean_body_mass_kg", "bmi",
-            "resting_hr", "height_cm",
-            "steps_total", "distance_km", "active_energy_kcal",
-            "basal_energy_kcal", "flights_climbed",
+            "weight_kg",
+            "body_fat_pct",
+            "lean_body_mass_kg",
+            "bmi",
+            "resting_hr",
+            "height_cm",
+            "steps_total",
+            "distance_km",
+            "active_energy_kcal",
+            "basal_energy_kcal",
+            "flights_climbed",
         ):
             v = getattr(self, k)
             if v is not None:
@@ -206,9 +213,15 @@ def iter_aggregates(
         elif el.tag == "Workout":
             _ingest_workout(el, by_day, drop_sources)
             el.clear()
-        elif el.tag in ("MetadataEntry", "HeartRateVariabilityMetadataList",
-                        "WorkoutEvent", "WorkoutRoute", "WorkoutStatistics",
-                        "Correlation", "ActivitySummary"):
+        elif el.tag in (
+            "MetadataEntry",
+            "HeartRateVariabilityMetadataList",
+            "WorkoutEvent",
+            "WorkoutRoute",
+            "WorkoutStatistics",
+            "Correlation",
+            "ActivitySummary",
+        ):
             # Drop the noise children early so they don't accumulate.
             el.clear()
 
@@ -282,7 +295,7 @@ def _ingest_workout(
         return
     raw_type = el.get("workoutActivityType") or ""
     if raw_type.startswith(_WORKOUT_PREFIX):
-        type_name = raw_type[len(_WORKOUT_PREFIX):]
+        type_name = raw_type[len(_WORKOUT_PREFIX) :]
     else:
         type_name = raw_type or "Unknown"
     duration_min = _to_float(el.get("duration"))
@@ -294,11 +307,15 @@ def _ingest_workout(
 
     distance_raw = _to_float(el.get("totalDistance"))
     distance_unit = el.get("totalDistanceUnit")
-    distance_km = _normalise(distance_raw, distance_unit, _UNIT_TO_KM) if distance_raw is not None else None
+    distance_km = (
+        _normalise(distance_raw, distance_unit, _UNIT_TO_KM) if distance_raw is not None else None
+    )
 
     energy_raw = _to_float(el.get("totalEnergyBurned"))
     energy_unit = el.get("totalEnergyBurnedUnit")
-    energy_kcal = _normalise(energy_raw, energy_unit, _UNIT_TO_KCAL) if energy_raw is not None else None
+    energy_kcal = (
+        _normalise(energy_raw, energy_unit, _UNIT_TO_KCAL) if energy_raw is not None else None
+    )
 
     workout_row: dict = {"type": type_name, "start": el.get("startDate", "")}
     if duration_min is not None:

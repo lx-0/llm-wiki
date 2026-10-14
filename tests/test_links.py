@@ -26,6 +26,7 @@ from core.links import (
 @pytest.fixture
 def vault(tmp_path: Path) -> Path:
     """A vault with knowledge/{concepts,people}, daily/, raw/notes/."""
+
     def w(rel: str) -> None:
         p = tmp_path / rel
         p.parent.mkdir(parents=True, exist_ok=True)
@@ -50,7 +51,9 @@ def test_resolve_same_folder_bare(vault: Path) -> None:
 
 def test_resolve_cross_folder_relative(vault: Path) -> None:
     src = vault / "knowledge" / "concepts" / "foo.md"
-    assert resolve_link("../people/alex", src, vault) == (vault / "knowledge/people/alex.md").resolve()
+    assert (
+        resolve_link("../people/alex", src, vault) == (vault / "knowledge/people/alex.md").resolve()
+    )
 
 
 def test_resolve_legacy_knowledge_relative_form(vault: Path) -> None:
@@ -61,8 +64,13 @@ def test_resolve_legacy_knowledge_relative_form(vault: Path) -> None:
 
 def test_resolve_substrate_sibling_vault_absolute(vault: Path) -> None:
     src = vault / "knowledge" / "concepts" / "foo.md"
-    assert resolve_link("daily/2026-05-15.md", src, vault) == (vault / "daily/2026-05-15.md").resolve()
-    assert resolve_link("../../daily/2026-05-15.md", src, vault) == (vault / "daily/2026-05-15.md").resolve()
+    assert (
+        resolve_link("daily/2026-05-15.md", src, vault) == (vault / "daily/2026-05-15.md").resolve()
+    )
+    assert (
+        resolve_link("../../daily/2026-05-15.md", src, vault)
+        == (vault / "daily/2026-05-15.md").resolve()
+    )
 
 
 def test_resolve_unresolvable_returns_none(vault: Path) -> None:
@@ -72,7 +80,10 @@ def test_resolve_unresolvable_returns_none(vault: Path) -> None:
 
 def test_resolve_media_extension_kept(vault: Path) -> None:
     src = vault / "knowledge" / "concepts" / "foo.md"
-    assert resolve_link("diagram.png", src, vault) == (vault / "knowledge/concepts/diagram.png").resolve()
+    assert (
+        resolve_link("diagram.png", src, vault)
+        == (vault / "knowledge/concepts/diagram.png").resolve()
+    )
 
 
 # ── canonical_slug ────────────────────────────────────────────────────────
@@ -111,8 +122,7 @@ def test_link_target(raw: str, expected: str) -> None:
 def test_relativize_three_shapes(vault: Path) -> None:
     src = vault / "knowledge" / "concepts" / "foo.md"
     text = (
-        "Same: [[concepts/bar]]. Cross: [[people/alex|Alex]]. "
-        "Substrate: [[daily/2026-05-15.md]]."
+        "Same: [[concepts/bar]]. Cross: [[people/alex|Alex]]. Substrate: [[daily/2026-05-15.md]]."
     )
     new, n, unresolved = relativize_text(text, src, vault)
     assert "[[bar]]" in new

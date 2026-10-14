@@ -7,6 +7,7 @@ Tests the core invariants:
 - fcntl lock prevents concurrent corruption
 - inputs are date-stamped (any source can claim "today")
 """
+
 from __future__ import annotations
 
 from datetime import date
@@ -140,6 +141,7 @@ def test_append_uses_lock(vault, monkeypatch):
     # Smoke check: the helper imports fcntl and calls flock around the file write.
     # We assert by intercepting fcntl.flock and confirming it's called.
     import fcntl
+
     calls = []
     original = fcntl.flock
 

@@ -81,9 +81,7 @@ def main() -> None:
     log.info(f"Found {len(turns)} turns in transcript")
 
     if len(turns) < MIN_TURNS_TO_FLUSH:
-        log.info(
-            f"Only {len(turns)} turns (min {MIN_TURNS_TO_FLUSH}), skipping flush."
-        )
+        log.info(f"Only {len(turns)} turns (min {MIN_TURNS_TO_FLUSH}), skipping flush.")
         return
 
     context = build_context(turns)
@@ -100,7 +98,16 @@ def main() -> None:
     # --project pins uv to .wiki/pyproject.toml regardless of the CWD the hook
     # was launched from. Without it, uv searches CWD upward for pyproject and
     # would fail since the vault root no longer carries one.
-    cmd = ["uv", "run", "--project", str(WIKI_DIR), "python", str(FLUSH_SCRIPT), str(context_file), session_id]
+    cmd = [
+        "uv",
+        "run",
+        "--project",
+        str(WIKI_DIR),
+        "python",
+        str(FLUSH_SCRIPT),
+        str(context_file),
+        session_id,
+    ]
 
     kwargs: dict = {}
     if sys.platform == "win32":

@@ -60,6 +60,7 @@ from core.prompts import render, prompt_model  # noqa: E402
 
 # ── State ───────────────────────────────────────────────────────────
 
+
 def _load_state() -> dict:
     return load_json_state(STATE_FILE)
 
@@ -69,6 +70,7 @@ def _save_state(state: dict) -> None:
 
 
 # ── Screenshot Discovery ────────────────────────────────────────────
+
 
 def find_new_screenshots(since: datetime | None = None) -> list[Path]:
     """Find PNG screenshots newer than `since`."""
@@ -96,6 +98,7 @@ def parse_screenshot_timestamp(path: Path) -> datetime | None:
 
 
 # ── Vision ──────────────────────────────────────────────────────────
+
 
 def resize_image(path: Path) -> Path:
     """Resize to RESIZE_WIDTH using macOS sips. Returns temp file path."""
@@ -155,10 +158,15 @@ def describe_screenshot(path: Path) -> dict | None:
         parsed["relevance"] = rel if rel in ("keep", "ephemeral") else "keep"
 
         project = parsed.get("project") or ""
-        log.info("  %dKB -> %d tokens in %.1fs [%s] %s%s",
-                 size_kb, eval_count, dt, parsed["relevance"],
-                 parsed.get("app", "?"),
-                 f" ({project})" if project else "")
+        log.info(
+            "  %dKB -> %d tokens in %.1fs [%s] %s%s",
+            size_kb,
+            eval_count,
+            dt,
+            parsed["relevance"],
+            parsed.get("app", "?"),
+            f" ({project})" if project else "",
+        )
 
         return {
             **parsed,
@@ -179,6 +187,7 @@ def describe_screenshot(path: Path) -> dict | None:
 
 # ── Sidecar & Report Generation ────────────────────────────────────
 
+
 def make_thumbnail(src: Path) -> Path | None:
     """Generate a deterministic vault-side thumbnail of the original PNG.
 
@@ -198,7 +207,8 @@ def make_thumbnail(src: Path) -> Path | None:
     try:
         proc = subprocess.run(
             ["sips", "--resampleWidth", str(THUMB_WIDTH), str(src), "--out", str(dst)],
-            capture_output=True, text=True,
+            capture_output=True,
+            text=True,
         )
         if proc.returncode != 0:
             log.warning("  thumbnail failed (%d): %s", proc.returncode, proc.stderr.strip()[:200])
@@ -245,7 +255,7 @@ def write_home_sidecar(
         f"vision_tokens: {int(meta.get('tokens', 0) or 0)}",
     ]
     if batch_report_slug:
-        fm.append(f"batch_report: \"[[{batch_report_slug}]]\"")
+        fm.append(f'batch_report: "[[{batch_report_slug}]]"')
     fm.append("---")
 
     body = [
@@ -257,16 +267,18 @@ def write_home_sidecar(
         f"**Key Text**: {meta.get('key_text', '') or '_(none)_'}",
     ]
     if raw_response:
-        body.extend([
-            "",
-            "<details><summary>Raw vision response</summary>",
-            "",
-            "```json",
-            raw_response,
-            "```",
-            "",
-            "</details>",
-        ])
+        body.extend(
+            [
+                "",
+                "<details><summary>Raw vision response</summary>",
+                "",
+                "```json",
+                raw_response,
+                "```",
+                "",
+                "</details>",
+            ]
+        )
     sidecar.write_text("\n".join(fm + body) + "\n", encoding="utf-8")
     return sidecar
 
@@ -295,11 +307,13 @@ def generate_batch_report(results: list[dict]) -> str:
     ]
     if ephemerals:
         lines.append(f"Skipped {ephemerals} ephemeral screenshot(s) from wiki report.")
-    lines.extend([
-        "",
-        "| Time | App | Project | Summary | Tags |",
-        "|------|-----|---------|---------|------|",
-    ])
+    lines.extend(
+        [
+            "",
+            "| Time | App | Project | Summary | Tags |",
+            "|------|-----|---------|---------|------|",
+        ]
+    )
     for r in keeps:
         ts_str = r["timestamp"].strftime("%H:%M")
         m = r["meta"]
@@ -325,18 +339,22 @@ def generate_batch_report(results: list[dict]) -> str:
             lines.append(f"- **Summary**: {m.get('summary', '')}")
             lines.append(f"- **Key Text**: {m.get('key_text', '')}")
             lines.append(f"- **Tags**: {', '.join(m.get('tags', []))}")
-            lines.append(f"- **Vision**: {m.get('model', '?')} · {m.get('tokens', 0)} tokens · {m.get('duration_s', '?')}s")
+            lines.append(
+                f"- **Vision**: {m.get('model', '?')} · {m.get('tokens', 0)} tokens · {m.get('duration_s', '?')}s"
+            )
             if raw_response:
-                lines.extend([
-                    "",
-                    "<details><summary>Raw vision response</summary>",
-                    "",
-                    "```json",
-                    raw_response,
-                    "```",
-                    "",
-                    "</details>",
-                ])
+                lines.extend(
+                    [
+                        "",
+                        "<details><summary>Raw vision response</summary>",
+                        "",
+                        "```json",
+                        raw_response,
+                        "```",
+                        "",
+                        "</details>",
+                    ]
+                )
             lines.append("")
 
     lines.append(f"---\n*Auto-generated by scan-screenshots.py at {now_iso()}*")
@@ -344,6 +362,7 @@ def generate_batch_report(results: list[dict]) -> str:
 
 
 # ── Main ────────────────────────────────────────────────────────────
+
 
 def scan(
     scan_all: bool = False,
@@ -394,14 +413,20 @@ def scan(
             ts_str = ts.strftime("%Y-%m-%d %H:%M") if ts else "?"
             print(f"  [{ts_str}] {s.name} ({s.stat().st_size // 1024}KB)")
         print(f"\n{len(screenshots)} screenshots would be processed.")
-        return {"processed": 0, "report_path": None,
-                "message": f"[dry-run] {len(screenshots)} screenshot(s) would be processed"}
+        return {
+            "processed": 0,
+            "report_path": None,
+            "message": f"[dry-run] {len(screenshots)} screenshot(s) would be processed",
+        }
 
     # Check Ollama connectivity
     if not ollama_client.is_reachable():
         log.warning("Ollama not reachable at %s", CONFIG.models.ollama_url)
-        return {"processed": 0, "report_path": None,
-                "message": f"Ollama not reachable at {CONFIG.models.ollama_url}"}
+        return {
+            "processed": 0,
+            "report_path": None,
+            "message": f"Ollama not reachable at {CONFIG.models.ollama_url}",
+        }
 
     # Pre-compute the batch slug so vault sidecars can backlink to it.
     REPORT_DIR.mkdir(parents=True, exist_ok=True)
@@ -411,9 +436,7 @@ def scan(
     # Process screenshots
     results = []
     for i, path in enumerate(screenshots, 1):
-        ts = parse_screenshot_timestamp(path) or datetime.fromtimestamp(
-            path.stat().st_mtime, tz=TZ
-        )
+        ts = parse_screenshot_timestamp(path) or datetime.fromtimestamp(path.stat().st_mtime, tz=TZ)
         log.info("[%d/%d] %s", i, len(screenshots), path.name)
 
         meta = describe_screenshot(path)
@@ -426,21 +449,25 @@ def scan(
         sidecar = write_home_sidecar(path, ts, meta, batch_report_slug=batch_report_slug)
         # Vault thumbnail (512px PNG) so the batch report can preview inline.
         thumb = make_thumbnail(path)
-        log.info("  Sidecar: %s  Thumb: %s",
-                 sidecar.name, thumb.name if thumb else "skipped")
+        log.info("  Sidecar: %s  Thumb: %s", sidecar.name, thumb.name if thumb else "skipped")
 
-        results.append({
-            "file": path,
-            "timestamp": ts,
-            "meta": meta,
-        })
+        results.append(
+            {
+                "file": path,
+                "timestamp": ts,
+                "meta": meta,
+            }
+        )
 
     if not results:
         log.warning("No screenshots processed successfully")
         state["last_scan"] = now_iso()
         _save_state(state)
-        return {"processed": 0, "report_path": None,
-                "message": "no screenshots processed successfully"}
+        return {
+            "processed": 0,
+            "report_path": None,
+            "message": "no screenshots processed successfully",
+        }
 
     # Write batch report for wiki compilation
     report_path = REPORT_DIR / f"{batch_report_slug}.md"
@@ -495,8 +522,7 @@ def backfill_thumbnails(dry_run: bool = False) -> None:
                 log.info("  ... %d thumbnails", made)
         else:
             errors += 1
-    log.info("Backfill thumbnails: %d made, %d already-present, %d errors",
-             made, skipped, errors)
+    log.info("Backfill thumbnails: %d made, %d already-present, %d errors", made, skipped, errors)
 
 
 def retrofit_batch_reports(dry_run: bool = False) -> None:
@@ -510,10 +536,12 @@ def retrofit_batch_reports(dry_run: bool = False) -> None:
     reports = sorted(REPORT_DIR.glob("screenshots-*.md"))
     log.info("Retrofit: scanning %d batch reports", len(reports))
     import re
+
     pattern = re.compile(r"^### (.+?) — `(Screenshot [^`]+\.png)`\s*$", re.MULTILINE)
     patched = skipped = 0
     for report in reports:
         text = report.read_text(encoding="utf-8")
+
         def repl(m: re.Match) -> str:
             head = m.group(0)
             fname = m.group(2)
@@ -521,6 +549,7 @@ def retrofit_batch_reports(dry_run: bool = False) -> None:
             if embed in text:  # already retrofit at some other location
                 return head
             return f"{head}\n\n{embed}"
+
         new_text = pattern.sub(repl, text)
         # Skip if no real change OR if embed lines already present at all positions
         embed_count_before = text.count("![[thumb/")
@@ -528,8 +557,9 @@ def retrofit_batch_reports(dry_run: bool = False) -> None:
         if embed_count_after > embed_count_before:
             if not dry_run:
                 report.write_text(new_text, encoding="utf-8")
-            log.info("  patched %s (+%d embeds)", report.name,
-                     embed_count_after - embed_count_before)
+            log.info(
+                "  patched %s (+%d embeds)", report.name, embed_count_after - embed_count_before
+            )
             patched += 1
         else:
             skipped += 1
@@ -592,21 +622,41 @@ class ScreenshotsCollector:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Scan screenshots with local LLM vision")
-    parser.add_argument("--all", action="store_true", help="Scan all screenshots without sidecar (ignore time window)")
+    parser.add_argument(
+        "--all",
+        action="store_true",
+        help="Scan all screenshots without sidecar (ignore time window)",
+    )
     parser.add_argument("--backfill", type=int, metavar="DAYS", help="Scan last N days")
     parser.add_argument("--dry-run", action="store_true", help="Show what would be processed")
-    parser.add_argument("--limit", type=int, default=MAX_PER_RUN, help=f"Max screenshots per run (default {MAX_PER_RUN})")
-    parser.add_argument("--backfill-thumbnails", action="store_true",
-                        help="Generate vault thumbnails for every PNG without one (no LLM)")
-    parser.add_argument("--retrofit-batch-reports", action="store_true",
-                        help="Add ![[thumb/...]] embeds to existing batch reports")
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=MAX_PER_RUN,
+        help=f"Max screenshots per run (default {MAX_PER_RUN})",
+    )
+    parser.add_argument(
+        "--backfill-thumbnails",
+        action="store_true",
+        help="Generate vault thumbnails for every PNG without one (no LLM)",
+    )
+    parser.add_argument(
+        "--retrofit-batch-reports",
+        action="store_true",
+        help="Add ![[thumb/...]] embeds to existing batch reports",
+    )
     args = parser.parse_args()
-    if getattr(args, 'backfill_thumbnails'):
+    if getattr(args, "backfill_thumbnails"):
         backfill_thumbnails(dry_run=args.dry_run)
-    elif getattr(args, 'retrofit_batch_reports'):
+    elif getattr(args, "retrofit_batch_reports"):
         retrofit_batch_reports(dry_run=args.dry_run)
     else:
-        scan(scan_all=getattr(args, 'all'), backfill_days=args.backfill, dry_run=args.dry_run, limit=args.limit)
+        scan(
+            scan_all=getattr(args, "all"),
+            backfill_days=args.backfill,
+            dry_run=args.dry_run,
+            limit=args.limit,
+        )
 
 
 if __name__ == "__main__":

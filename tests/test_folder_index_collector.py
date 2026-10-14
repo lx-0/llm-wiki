@@ -101,9 +101,7 @@ def test_depth_zero_means_unlimited(tree):
 
 def test_include_exclude_globs_exclude_wins(tree):
     # Excluded dir: absent from tree, not descended, counted.
-    idx = walk_root(
-        _entry(tree, exclude=["excluded-dir"]), max_depth=10, recent_n=5
-    )
+    idx = walk_root(_entry(tree, exclude=["excluded-dir"]), max_depth=10, recent_n=5)
     rels = _rels(idx.tree)
     assert "excluded-dir" not in rels
     assert os.path.join("excluded-dir", "secret.txt") not in rels
@@ -171,9 +169,7 @@ def test_filenames_land_unmasked(tree):
     rels = _nfc_rels(idx.tree)
     assert "ümlaut file ä.txt" in rels  # umlauts + spaces verbatim, no masking
     assert ".dotfile" in rels  # dotfiles not hidden either
-    by_rel = {
-        unicodedata.normalize("NFC", e.rel_path): e for e in idx.tree
-    }
+    by_rel = {unicodedata.normalize("NFC", e.rel_path): e for e in idx.tree}
     assert by_rel["ümlaut file ä.txt"].ext == ".txt"
     assert by_rel["ümlaut file ä.txt"].is_dir is False
     assert by_rel["a-dir"].is_dir is True
@@ -232,9 +228,7 @@ def test_render_index_always_full_tree(tree):
     # timestamps are triage signal, size alone is not enough)
     os.utime(tree / "afile.txt", (86400, 86400))  # 1970-01-02
     out2 = render_index(walk_root(_entry(tree), max_depth=10, recent_n=3))
-    afile_line = next(
-        ln for ln in out2.splitlines() if "`afile.txt`" in ln and "- " in ln
-    )
+    afile_line = next(ln for ln in out2.splitlines() if "`afile.txt`" in ln and "- " in ln)
     assert "modified 1970-01-02" in afile_line
     assert "created" in afile_line
 
@@ -283,9 +277,7 @@ def test_sync_root_writes_first_then_skips_unchanged(tree, tmp_path, monkeypatch
     assert second.reason == "unchanged"
 
 
-def test_sync_root_rewrites_on_force_and_on_deleted_digest(
-    tree, tmp_path, monkeypatch
-):
+def test_sync_root_rewrites_on_force_and_on_deleted_digest(tree, tmp_path, monkeypatch):
     _sync_env(monkeypatch, tmp_path)
     first = sync_root(_entry(tree), max_depth=10, recent_n=3)
     # operator deleted the digest — unchanged signature must NOT mask that
@@ -293,9 +285,7 @@ def test_sync_root_rewrites_on_force_and_on_deleted_digest(
     rewrite = sync_root(_entry(tree), max_depth=10, recent_n=3)
     assert rewrite.written is True
     assert rewrite.path.exists()
-    forced = sync_root(
-        _entry(tree), max_depth=10, recent_n=3, force=True
-    )
+    forced = sync_root(_entry(tree), max_depth=10, recent_n=3, force=True)
     assert forced.written is True
 
 
@@ -368,15 +358,10 @@ def test_cli_force_rewrites_unchanged_tree(tree, tmp_path, monkeypatch):
     before = json.loads(state_file.read_text(encoding="utf-8"))
     assert folder_index.main(["--force"]) == 0
     after = json.loads(state_file.read_text(encoding="utf-8"))
-    assert (
-        after["test-root"]["last_indexed_at"]
-        != before["test-root"]["last_indexed_at"]
-    )
+    assert after["test-root"]["last_indexed_at"] != before["test-root"]["last_indexed_at"]
 
 
-def test_cli_failing_root_fails_soft_but_exits_nonzero(
-    tree, tmp_path, monkeypatch
-):
+def test_cli_failing_root_fails_soft_but_exits_nonzero(tree, tmp_path, monkeypatch):
     index_dir, _ = _sync_env(monkeypatch, tmp_path)
     _patch_watched(
         monkeypatch,

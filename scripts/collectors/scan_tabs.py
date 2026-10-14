@@ -78,17 +78,21 @@ def scan_backup(backup_path: Path) -> dict:
                     domains[domain] += 1
                     all_domains[domain] += 1
 
-            tab_list.append({
-                "title": tab_title,
-                "url": url,
-            })
+            tab_list.append(
+                {
+                    "title": tab_title,
+                    "url": url,
+                }
+            )
 
-        groups_data.append({
-            "title": title,
-            "tab_count": len(tabs),
-            "tabs": tab_list,
-            "top_domains": dict(domains.most_common(5)),
-        })
+        groups_data.append(
+            {
+                "title": title,
+                "tab_count": len(tabs),
+                "tabs": tab_list,
+                "top_domains": dict(domains.most_common(5)),
+            }
+        )
 
     # Sort by tab count
     groups_data.sort(key=lambda x: x["tab_count"], reverse=True)
@@ -140,9 +144,7 @@ def generate_report(data: dict) -> str:
 
         # Top domains for this group
         if group["top_domains"]:
-            domains_str = ", ".join(
-                f"{d} ({c})" for d, c in list(group["top_domains"].items())[:3]
-            )
+            domains_str = ", ".join(f"{d} ({c})" for d, c in list(group["top_domains"].items())[:3])
             lines.append(f"Domains: {domains_str}")
             lines.append("")
 

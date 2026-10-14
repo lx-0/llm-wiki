@@ -48,6 +48,8 @@ def _curiosity_excluded(rel_path: str) -> bool:
     """
     excl = CONFIG.limits.curiosity_exclude_globs
     return bool(excl) and any(fnmatch.fnmatch(rel_path, g) for g in excl)
+
+
 RAW_REQUESTS_DIR = ROOT_DIR / "raw" / "requests"
 RAW_INDEX_DIR = ROOT_DIR / "raw" / "index"  # body-blind folder digests (M027-S02)
 
@@ -102,7 +104,7 @@ def _quote_anchored_in_source(quote_norm: str, source_norm: str, min_tokens: int
         # Reading a 1-4 word phrase loosely is risky (stop-word coincidence).
         return quote_norm in source_norm
     for start in range(len(tokens) - min_tokens + 1):
-        window = " ".join(tokens[start:start + min_tokens])
+        window = " ".join(tokens[start : start + min_tokens])
         if window in source_norm:
             return True
     return False
@@ -127,17 +129,88 @@ def _indexed_paths(digest_text: str) -> set[str]:
 
 # Frequent German + English function words that carry no topic signal —
 # excluded from the relevance grep so they don't match half the vault.
-_STOPWORDS = frozenset({
-    "aber", "auch", "dass", "dann", "denn", "doch", "eine", "einen", "einem",
-    "einer", "haben", "hatte", "hier", "ist", "kann", "mehr", "nicht", "noch",
-    "oder", "schon", "sehr", "sind", "über", "und", "von", "vom", "war",
-    "waren", "weil", "werden", "wie", "wird", "wurde", "diese", "dieser",
-    "dieses", "alle", "also", "beim", "durch", "gibt", "habe", "wenn",
-    "with", "that", "this", "from", "have", "has", "the", "and", "for",
-    "are", "was", "were", "will", "would", "there", "their", "they", "been",
-    "what", "when", "which", "into", "than", "then", "them", "some", "such",
-    "about", "after", "also", "just", "only", "more", "most", "other",
-})
+_STOPWORDS = frozenset(
+    {
+        "aber",
+        "auch",
+        "dass",
+        "dann",
+        "denn",
+        "doch",
+        "eine",
+        "einen",
+        "einem",
+        "einer",
+        "haben",
+        "hatte",
+        "hier",
+        "ist",
+        "kann",
+        "mehr",
+        "nicht",
+        "noch",
+        "oder",
+        "schon",
+        "sehr",
+        "sind",
+        "über",
+        "und",
+        "von",
+        "vom",
+        "war",
+        "waren",
+        "weil",
+        "werden",
+        "wie",
+        "wird",
+        "wurde",
+        "diese",
+        "dieser",
+        "dieses",
+        "alle",
+        "also",
+        "beim",
+        "durch",
+        "gibt",
+        "habe",
+        "wenn",
+        "with",
+        "that",
+        "this",
+        "from",
+        "have",
+        "has",
+        "the",
+        "and",
+        "for",
+        "are",
+        "was",
+        "were",
+        "will",
+        "would",
+        "there",
+        "their",
+        "they",
+        "been",
+        "what",
+        "when",
+        "which",
+        "into",
+        "than",
+        "then",
+        "them",
+        "some",
+        "such",
+        "about",
+        "after",
+        "also",
+        "just",
+        "only",
+        "more",
+        "most",
+        "other",
+    }
+)
 
 _WORD_RE = re.compile(r"[a-z0-9äöüß]+")
 
@@ -214,17 +287,20 @@ def _rank_candidates(
                 continue
             coverage = sum(1 for kw in keywords if kw in _file_line_path(ln))
             if coverage:
-                scored.append((
-                    coverage, _modified_date(ln), root,
-                    _file_line_realpath(ln), _file_line_meta(ln),
-                ))
+                scored.append(
+                    (
+                        coverage,
+                        _modified_date(ln),
+                        root,
+                        _file_line_realpath(ln),
+                        _file_line_meta(ln),
+                    )
+                )
     scored.sort(key=lambda t: (t[0], t[1]), reverse=True)
     return [(root, path, meta) for _c, _m, root, path, meta in scored[:top_k]]
 
 
-def _folder_candidates(
-    source_excerpt: str, top_k: int
-) -> tuple[str, dict[int, tuple[str, str]]]:
+def _folder_candidates(source_excerpt: str, top_k: int) -> tuple[str, dict[int, tuple[str, str]]]:
     """Read raw/index/*.md → a NUMBERED candidate-file block + the
     {number: (root_id, file_path)} map the producer resolves the model's
     pick through.
@@ -250,10 +326,7 @@ def _folder_candidates(
         candidates[i] = (root_id, path)
         tail = f" · {meta}" if meta else ""
         lines.append(f"[{i}] (root `{root_id}`) `{path}`{tail}")
-    block = (
-        "## Candidate files (ranked by relevance to this source)\n\n"
-        + "\n".join(lines) + "\n"
-    )
+    block = "## Candidate files (ranked by relevance to this source)\n\n" + "\n".join(lines) + "\n"
     return block, candidates
 
 
@@ -314,11 +387,16 @@ async def maybe_generate_folder_requests(source: Path) -> None:
     if len(prompt) > CONFIG.limits.curiosity_max_prompt_chars:
         log.warning(
             "  Curiosity(folder): prompt %d chars exceeds budget %d — sending anyway",
-            len(prompt), CONFIG.limits.curiosity_max_prompt_chars,
+            len(prompt),
+            CONFIG.limits.curiosity_max_prompt_chars,
         )
 
-    log.info("  Curiosity(folder) pass for %s (model=%s, prompt=%d chars)",
-             rel_path, CURIOSITY_MODEL, len(prompt))
+    log.info(
+        "  Curiosity(folder) pass for %s (model=%s, prompt=%d chars)",
+        rel_path,
+        CURIOSITY_MODEL,
+        len(prompt),
+    )
 
     schema = {
         "type": "object",
@@ -349,7 +427,10 @@ async def maybe_generate_folder_requests(source: Path) -> None:
                         "rationale": {"type": "string"},
                     },
                     "required": [
-                        "topic", "candidate", "file_confidence", "rationale",
+                        "topic",
+                        "candidate",
+                        "file_confidence",
+                        "rationale",
                     ],
                 },
             },
@@ -369,8 +450,10 @@ async def maybe_generate_folder_requests(source: Path) -> None:
         except json.JSONDecodeError:
             log.warning("  Curiosity(folder): invalid JSON: %s", content[:200])
             return
-        gaps = parsed if isinstance(parsed, list) else (
-            parsed.get("gaps", []) if isinstance(parsed, dict) else []
+        gaps = (
+            parsed
+            if isinstance(parsed, list)
+            else (parsed.get("gaps", []) if isinstance(parsed, dict) else [])
         )
         gaps = [g for g in gaps if isinstance(g, dict)]
         if not gaps:
@@ -382,7 +465,7 @@ async def maybe_generate_folder_requests(source: Path) -> None:
         kept = 0
         dropped: dict[str, int] = {}
         confidence_min = CONFIG.limits.curiosity_folder_confidence_min
-        for gap in gaps[:CONFIG.limits.curiosity_max_gaps]:
+        for gap in gaps[: CONFIG.limits.curiosity_max_gaps]:
             topic = (gap.get("topic") or "").strip()
             rationale = (gap.get("rationale") or "").strip()
 
@@ -430,29 +513,37 @@ async def maybe_generate_folder_requests(source: Path) -> None:
             }
             request_path.write_text(json.dumps(request, indent=2), encoding="utf-8")
             kept += 1
-            log.info("  Curiosity(folder) request: %s → %s/%s",
-                     topic, root_id, file_path)
+            log.info("  Curiosity(folder) request: %s → %s/%s", topic, root_id, file_path)
 
         if dropped or kept != raw_count:
             drop_str = ", ".join(f"{k}={v}" for k, v in dropped.items()) or "none"
             log.info(
                 "  Curiosity(folder): %d gap(s) gen, %d kept (dropped: %s)",
-                raw_count, kept, drop_str,
+                raw_count,
+                kept,
+                drop_str,
             )
 
     except httpx.TimeoutException:
-        log.warning("  Curiosity(folder): Ollama timeout (model=%s, %ds)",
-                    CURIOSITY_MODEL, CONFIG.limits.curiosity_timeout_s)
+        log.warning(
+            "  Curiosity(folder): Ollama timeout (model=%s, %ds)",
+            CURIOSITY_MODEL,
+            CONFIG.limits.curiosity_timeout_s,
+        )
     except httpx.HTTPStatusError as e:
         if e.response.status_code == 404:
             log.warning(
                 "  Curiosity(folder): Ollama model %r not available — pull it "
                 "(`ollama pull %s`) or change CONFIG.models.curiosity_model",
-                CURIOSITY_MODEL, CURIOSITY_MODEL,
+                CURIOSITY_MODEL,
+                CURIOSITY_MODEL,
             )
         else:
-            log.warning("  Curiosity(folder): Ollama HTTP %s — %s",
-                        e.response.status_code, e.response.text[:200])
+            log.warning(
+                "  Curiosity(folder): Ollama HTTP %s — %s",
+                e.response.status_code,
+                e.response.text[:200],
+            )
     except httpx.HTTPError as e:
         log.warning("  Curiosity(folder): Ollama connection error: %s", e)
     except (json.JSONDecodeError, KeyError) as e:
@@ -493,8 +584,9 @@ async def maybe_generate_curiosity_requests(source: Path) -> None:
     allowed = CONFIG.personal.curiosity_folders or []
     if allowed:
         allowed_set = set(allowed)
-        folders_used = [f for f in CONFIG.personal.email_folders
-                        if f.get("path") and f["path"] in allowed_set]
+        folders_used = [
+            f for f in CONFIG.personal.email_folders if f.get("path") and f["path"] in allowed_set
+        ]
         if not folders_used:
             log.warning(
                 "  Curiosity: personal.curiosity_folders=%r matched zero "
@@ -515,7 +607,7 @@ async def maybe_generate_curiosity_requests(source: Path) -> None:
     # used to map `folder_index → folder_path` after parsing. Uses
     # `folders_used` (post-allowlist), NOT raw CONFIG.personal.email_folders.
     folder_listing = "\n".join(
-        f"{i+1}. {f['path']} — {f.get('desc', '')}".rstrip(" —")
+        f"{i + 1}. {f['path']} — {f.get('desc', '')}".rstrip(" —")
         for i, f in enumerate(folders_used)
     )
 
@@ -542,7 +634,8 @@ async def maybe_generate_curiosity_requests(source: Path) -> None:
     if len(prompt) > CONFIG.limits.curiosity_max_prompt_chars:
         log.warning(
             "  Curiosity: prompt %d chars exceeds budget %d — sending anyway",
-            len(prompt), CONFIG.limits.curiosity_max_prompt_chars,
+            len(prompt),
+            CONFIG.limits.curiosity_max_prompt_chars,
         )
 
     # Ollama reachability pre-check (mirrors scan_youtube / scan_screenshots /
@@ -555,8 +648,12 @@ async def maybe_generate_curiosity_requests(source: Path) -> None:
         ollama_client.warn_unreachable_once(log, "  Curiosity")
         return
 
-    log.info("  Curiosity pass for %s (model=%s, prompt=%d chars)",
-             rel_path, CURIOSITY_MODEL, len(prompt))
+    log.info(
+        "  Curiosity pass for %s (model=%s, prompt=%d chars)",
+        rel_path,
+        CURIOSITY_MODEL,
+        len(prompt),
+    )
 
     account_names = list(CONFIG.personal.accounts.keys()) or [CONFIG.personal.primary_account]
     schema = {
@@ -590,8 +687,12 @@ async def maybe_generate_curiosity_requests(source: Path) -> None:
                         "rationale": {"type": "string"},
                     },
                     "required": [
-                        "topic", "source_quote", "folder_index",
-                        "folder_confidence", "account", "rationale",
+                        "topic",
+                        "source_quote",
+                        "folder_index",
+                        "folder_confidence",
+                        "account",
+                        "rationale",
                     ],
                 },
             },
@@ -631,8 +732,9 @@ async def maybe_generate_curiosity_requests(source: Path) -> None:
 
         non_dict = [g for g in gaps if not isinstance(g, dict)]
         if non_dict:
-            log.warning("  Curiosity: dropping %d non-dict gap(s); sample=%r",
-                        len(non_dict), non_dict[0])
+            log.warning(
+                "  Curiosity: dropping %d non-dict gap(s); sample=%r", len(non_dict), non_dict[0]
+            )
         gaps = [g for g in gaps if isinstance(g, dict)]
         if not gaps:
             return
@@ -643,7 +745,7 @@ async def maybe_generate_curiosity_requests(source: Path) -> None:
         kept = 0
         dropped: dict[str, int] = {}
         confidence_min = CONFIG.limits.curiosity_folder_confidence_min
-        for gap in gaps[:CONFIG.limits.curiosity_max_gaps]:
+        for gap in gaps[: CONFIG.limits.curiosity_max_gaps]:
             topic = gap.get("topic", "").strip()
             rationale = gap.get("rationale", "").strip()
             source_quote = (gap.get("source_quote") or "").strip()
@@ -729,12 +831,17 @@ async def maybe_generate_curiosity_requests(source: Path) -> None:
             drop_str = ", ".join(f"{k}={v}" for k, v in dropped.items()) or "none"
             log.info(
                 "  Curiosity: %d gap(s) gen, %d kept (dropped: %s)",
-                raw_count, kept, drop_str,
+                raw_count,
+                kept,
+                drop_str,
             )
 
     except httpx.TimeoutException:
-        log.warning("  Curiosity: Ollama timeout (model=%s, %ds)",
-                    CURIOSITY_MODEL, CONFIG.limits.curiosity_timeout_s)
+        log.warning(
+            "  Curiosity: Ollama timeout (model=%s, %ds)",
+            CURIOSITY_MODEL,
+            CONFIG.limits.curiosity_timeout_s,
+        )
     except httpx.HTTPStatusError as e:
         # Distinguish "model not pulled" (404) from generic Ollama errors so
         # the operator gets a clear "ollama pull <model>" hint when needed.
@@ -742,11 +849,13 @@ async def maybe_generate_curiosity_requests(source: Path) -> None:
             log.warning(
                 "  Curiosity: Ollama model %r not available — pull it on the host "
                 "(`ollama pull %s`) or change CONFIG.models.curiosity_model",
-                CURIOSITY_MODEL, CURIOSITY_MODEL,
+                CURIOSITY_MODEL,
+                CURIOSITY_MODEL,
             )
         else:
-            log.warning("  Curiosity: Ollama HTTP %s — %s",
-                        e.response.status_code, e.response.text[:200])
+            log.warning(
+                "  Curiosity: Ollama HTTP %s — %s", e.response.status_code, e.response.text[:200]
+            )
     except httpx.HTTPError as e:
         log.warning("  Curiosity: Ollama connection error: %s", e)
     except (json.JSONDecodeError, KeyError) as e:

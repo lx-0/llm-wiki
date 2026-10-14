@@ -78,13 +78,17 @@ def test_harness_never_loads_host_mcp_servers(captured_options):
     )
 
 
-@pytest.mark.parametrize("spec_kwargs", [
-    {},
-    {"allowed_tools": ("Read",), "permission_mode": "default"},
-    {"deny_all_writes": True},
-    {"model": "claude-haiku-4-5-20251001", "max_turns": 3},
-    {"tools": (), "setting_sources": ()},
-], ids=["plain", "tools+mode", "deny-writes", "model+turns", "no-tools"])
+@pytest.mark.parametrize(
+    "spec_kwargs",
+    [
+        {},
+        {"allowed_tools": ("Read",), "permission_mode": "default"},
+        {"deny_all_writes": True},
+        {"model": "claude-haiku-4-5-20251001", "max_turns": 3},
+        {"tools": (), "setting_sources": ()},
+    ],
+    ids=["plain", "tools+mode", "deny-writes", "model+turns", "no-tools"],
+)
 def test_harness_isolation_holds_for_every_spec_shape(captured_options, spec_kwargs):
     """The isolation is applied after the branchy per-spec options assembly.
     A refactor that moves a branch below it, or rebuilds options_kwargs, must
@@ -111,7 +115,8 @@ def _extract_from_context_node() -> ast.AsyncFunctionDef:
 
 def _calls_named(node: ast.AST, name: str) -> list[ast.Call]:
     return [
-        call for call in ast.walk(node)
+        call
+        for call in ast.walk(node)
         if isinstance(call, ast.Call) and getattr(call.func, "id", "") == name
     ]
 

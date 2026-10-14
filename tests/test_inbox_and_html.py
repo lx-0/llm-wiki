@@ -71,9 +71,9 @@ def test_add_frontmatter_uses_defaults_when_classification_missing_fields(tmp_pa
     p.write_text("body\n", encoding="utf-8")
     process_inbox_mod.add_frontmatter(p, {})  # empty classification
     content = p.read_text(encoding="utf-8")
-    assert "type: note" in content       # default category
-    assert "language: de" in content     # default language
-    assert "tags: []" in content         # empty tag list
+    assert "type: note" in content  # default category
+    assert "language: de" in content  # default language
+    assert "tags: []" in content  # empty tag list
 
 
 # ── html.extract_content (html2text round-trip) ────────────────────
@@ -196,7 +196,11 @@ def test_process_inbox_md_writes_artifact_and_archives_original(tmp_path, monkey
     original = "# Hello\nThis is a test note body.\n"
     (dirs["inbox"] / "test.md").write_text(original)
 
-    monkeypatch.setattr(process_inbox_mod, "classify_file", lambda fp, m: {"category": "note", "suggested_name": "test"})
+    monkeypatch.setattr(
+        process_inbox_mod,
+        "classify_file",
+        lambda fp, m: {"category": "note", "suggested_name": "test"},
+    )
     process_inbox_mod.process_inbox(model="stub", dry_run=False)
 
     artifact = dirs["raw_notes"] / "test.md"
@@ -221,22 +225,28 @@ def test_process_inbox_html_ingests_in_process_and_archives_original(tmp_path, m
     # Skip the visual path (Playwright + Vision-LLM) — content extraction and
     # file writing run for real, exercising the full in-process wiring.
     monkeypatch.setattr(ingest_html_mod, "screenshot_html", lambda *a, **k: False)
+
     # Guard: the html path must NOT spawn a subprocess (the old broken behavior).
     def _boom(*a, **k):
         raise AssertionError("HTML path spawned a subprocess — should be in-process")
+
     monkeypatch.setattr(ingest_html_mod.subprocess, "run", _boom)
     monkeypatch.setattr(process_inbox_mod.subprocess, "run", _boom)
 
     process_inbox_mod.process_inbox(model="stub", dry_run=False)
 
     archive = dirs["raw_inbox_wiki"] / "page.html"
-    assert archive.exists(), "HTML original missing from raw/inbox-wiki/ (regression: stranded again?)"
+    assert archive.exists(), (
+        "HTML original missing from raw/inbox-wiki/ (regression: stranded again?)"
+    )
     assert archive.read_text() == html_body, "HTML original was mutated"
     assert list(dirs["inbox"].iterdir()) == [], "inbox not drained"
     # The in-process ingest wrote a derived article + saved the original HTML.
     md_artifacts = list(dirs["raw_articles"].glob("*.md"))
     assert md_artifacts, "no markdown artifact written to raw/articles/ by in-process ingest"
-    assert any(p.suffix == ".html" for p in dirs["raw_articles"].iterdir()), "original HTML not saved alongside article"
+    assert any(p.suffix == ".html" for p in dirs["raw_articles"].iterdir()), (
+        "original HTML not saved alongside article"
+    )
 
 
 def test_process_inbox_html_missing_output_leaves_inbox_untouched(tmp_path, monkeypatch):
@@ -249,7 +259,9 @@ def test_process_inbox_html_missing_output_leaves_inbox_untouched(tmp_path, monk
     monkeypatch.setattr(process_inbox_mod, "ingest_html_source", lambda *a, **k: None)
     process_inbox_mod.process_inbox(model="stub", dry_run=False)
 
-    assert (dirs["inbox"] / "page.html").exists(), "failed HTML ingest should leave the original in inbox/"
+    assert (dirs["inbox"] / "page.html").exists(), (
+        "failed HTML ingest should leave the original in inbox/"
+    )
     assert not dirs["raw_inbox_wiki"].exists() or list(dirs["raw_inbox_wiki"].iterdir()) == []
 
 
@@ -259,13 +271,17 @@ def test_process_inbox_mp3_archives_only_no_artifact(tmp_path, monkeypatch):
     (dirs["inbox"] / "memo.mp3").write_bytes(audio_bytes)
 
     classify_calls = []
-    monkeypatch.setattr(process_inbox_mod, "classify_file", lambda fp, m: classify_calls.append(fp) or None)
+    monkeypatch.setattr(
+        process_inbox_mod, "classify_file", lambda fp, m: classify_calls.append(fp) or None
+    )
     process_inbox_mod.process_inbox(model="stub", dry_run=False)
 
     archive = dirs["raw_inbox_wiki"] / "memo.mp3"
     assert archive.exists(), "mp3 original missing from raw/inbox-wiki/"
     assert archive.read_bytes() == audio_bytes, "mp3 original was mutated"
-    assert not dirs["raw_notes"].exists() or list(dirs["raw_notes"].iterdir()) == [], "binary should produce no artifact"
+    assert not dirs["raw_notes"].exists() or list(dirs["raw_notes"].iterdir()) == [], (
+        "binary should produce no artifact"
+    )
     assert classify_calls == [], "binary path should skip LLM classify"
     assert list(dirs["inbox"].iterdir()) == [], "inbox not drained"
 
@@ -276,7 +292,9 @@ def test_process_inbox_pdf_archives_only_no_artifact(tmp_path, monkeypatch):
     (dirs["inbox"] / "paper.pdf").write_bytes(pdf_bytes)
 
     classify_calls = []
-    monkeypatch.setattr(process_inbox_mod, "classify_file", lambda fp, m: classify_calls.append(fp) or None)
+    monkeypatch.setattr(
+        process_inbox_mod, "classify_file", lambda fp, m: classify_calls.append(fp) or None
+    )
     process_inbox_mod.process_inbox(model="stub", dry_run=False)
 
     archive = dirs["raw_inbox_wiki"] / "paper.pdf"

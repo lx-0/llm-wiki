@@ -66,8 +66,9 @@ def _migrate_text(text: str) -> tuple[str, int]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n", 1)[0])
-    parser.add_argument("--dry-run", action="store_true",
-                        help="Show what would change without writing.")
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Show what would change without writing."
+    )
     args = parser.parse_args()
 
     daily_dir = ROOT_DIR / "daily"

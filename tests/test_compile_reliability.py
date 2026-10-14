@@ -48,7 +48,9 @@ def vault(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     # branch); everything else is patched on cs_mod.
     monkeypatch.setattr(compile_mod, "ROOT_DIR", tmp_path)
     monkeypatch.setattr(cs_mod, "ROOT_DIR", tmp_path)
-    monkeypatch.setattr(route_mod, "ROOT_DIR", tmp_path)  # decide_route reads route.ROOT_DIR (M026-S02)
+    monkeypatch.setattr(
+        route_mod, "ROOT_DIR", tmp_path
+    )  # decide_route reads route.ROOT_DIR (M026-S02)
     monkeypatch.setattr(cs_mod, "AGENTS_FILE", tmp_path / "AGENTS.md")
     monkeypatch.setattr(cs_mod, "KNOWLEDGE_DIR", tmp_path / "knowledge")
 
@@ -57,7 +59,8 @@ def vault(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(cs_mod, "read_hard_facts", lambda: "")
     monkeypatch.setattr(cs_mod, "render", lambda *a, **kw: "STUB-PROMPT")
     monkeypatch.setattr(
-        cs_mod, "assert_prompt_within_budget",
+        cs_mod,
+        "assert_prompt_within_budget",
         lambda *a, **kw: None,
     )
 
@@ -87,21 +90,25 @@ def test_size_warning_fires_at_60kb_threshold(
     async def fake_query(*, prompt, options):  # noqa: ARG001
         yield ResultMessage(
             subtype="success",
-            duration_ms=1, duration_api_ms=1,
-            is_error=False, num_turns=1, session_id="t",
-            total_cost_usd=0.0, usage={"input_tokens": 1, "output_tokens": 1},
+            duration_ms=1,
+            duration_api_ms=1,
+            is_error=False,
+            num_turns=1,
+            session_id="t",
+            total_cost_usd=0.0,
+            usage={"input_tokens": 1, "output_tokens": 1},
             result="ok",
         )
 
     from compile_stages import compile as _cs_mod
+
     monkeypatch.setattr(_cs_mod, "query", fake_query)
 
     caplog.set_level(logging.INFO, logger="compile")
     asyncio.run(compile_mod.compile_file(source, force=True))
 
     matched = [
-        r for r in caplog.records
-        if "size warning" in r.getMessage() and "60500" in r.getMessage()
+        r for r in caplog.records if "size warning" in r.getMessage() and "60500" in r.getMessage()
     ]
     assert matched, (
         "Expected an INFO 'size warning' line citing the source size; got: "
@@ -124,13 +131,18 @@ def test_size_warning_silent_below_60kb(
     async def fake_query(*, prompt, options):  # noqa: ARG001
         yield ResultMessage(
             subtype="success",
-            duration_ms=1, duration_api_ms=1,
-            is_error=False, num_turns=1, session_id="t",
-            total_cost_usd=0.0, usage={"input_tokens": 1, "output_tokens": 1},
+            duration_ms=1,
+            duration_api_ms=1,
+            is_error=False,
+            num_turns=1,
+            session_id="t",
+            total_cost_usd=0.0,
+            usage={"input_tokens": 1, "output_tokens": 1},
             result="ok",
         )
 
     from compile_stages import compile as _cs_mod
+
     monkeypatch.setattr(_cs_mod, "query", fake_query)
     caplog.set_level(logging.INFO, logger="compile")
     asyncio.run(compile_mod.compile_file(source, force=True))
@@ -152,7 +164,9 @@ def test_per_call_timeout_returns_skipped(
 
     # Override the timeout knob to a tight value so the test runs in <1 s.
     monkeypatch.setattr(
-        compile_mod.CONFIG.limits, "compile_per_call_timeout_s", 1,
+        compile_mod.CONFIG.limits,
+        "compile_per_call_timeout_s",
+        1,
     )
 
     async def hanging_query(*, prompt, options):  # noqa: ARG001
@@ -161,6 +175,7 @@ def test_per_call_timeout_returns_skipped(
         yield  # pragma: no cover
 
     from compile_stages import compile as _cs_mod
+
     monkeypatch.setattr(_cs_mod, "query", hanging_query)
 
     caplog.set_level(logging.WARNING, logger="compile")
@@ -169,14 +184,11 @@ def test_per_call_timeout_returns_skipped(
     assert result.status == "skipped" and result.skip_reason == "compile_per_call_timeout", result
     # WARNING line surfaces the hang for the operator.
     assert any(
-        "per-call timeout" in r.getMessage() and r.levelname == "WARNING"
-        for r in caplog.records
+        "per-call timeout" in r.getMessage() and r.levelname == "WARNING" for r in caplog.records
     ), [r.getMessage() for r in caplog.records]
 
 
-def test_per_call_timeout_disabled_with_zero(
-    vault, monkeypatch: pytest.MonkeyPatch
-):
+def test_per_call_timeout_disabled_with_zero(vault, monkeypatch: pytest.MonkeyPatch):
     """Setting compile_per_call_timeout_s=0 disables the wait_for wrap."""
     import compile as compile_mod
     from claude_agent_sdk import ResultMessage
@@ -185,7 +197,9 @@ def test_per_call_timeout_disabled_with_zero(
     source = _write_source(raw, "fast.md", "tiny")
 
     monkeypatch.setattr(
-        compile_mod.CONFIG.limits, "compile_per_call_timeout_s", 0,
+        compile_mod.CONFIG.limits,
+        "compile_per_call_timeout_s",
+        0,
     )
 
     async def fast_query(*, prompt, options):  # noqa: ARG001
@@ -193,13 +207,18 @@ def test_per_call_timeout_disabled_with_zero(
         # timeout — though with timeout=0 the path bypasses wait_for).
         yield ResultMessage(
             subtype="success",
-            duration_ms=1, duration_api_ms=1,
-            is_error=False, num_turns=1, session_id="t",
-            total_cost_usd=0.0, usage={"input_tokens": 1, "output_tokens": 1},
+            duration_ms=1,
+            duration_api_ms=1,
+            is_error=False,
+            num_turns=1,
+            session_id="t",
+            total_cost_usd=0.0,
+            usage={"input_tokens": 1, "output_tokens": 1},
             result="ok",
         )
 
     from compile_stages import compile as _cs_mod
+
     monkeypatch.setattr(_cs_mod, "query", fast_query)
     result = asyncio.run(compile_mod.compile_file(source, force=True))
     # Success path: compiled, NOT skipped.
@@ -224,22 +243,31 @@ def test_kind_unknown_on_long_context_skips(
 
     # Ensure both knobs are on so the retry-then-skip path runs.
     monkeypatch.setattr(
-        compile_mod.CONFIG.limits, "compile_retry_long_context_on_unknown", True,
+        compile_mod.CONFIG.limits,
+        "compile_retry_long_context_on_unknown",
+        True,
     )
     monkeypatch.setattr(
-        compile_mod.CONFIG.limits, "compile_skip_on_long_context_unknown", True,
+        compile_mod.CONFIG.limits,
+        "compile_skip_on_long_context_unknown",
+        True,
     )
     monkeypatch.setattr(
-        compile_mod.CONFIG.limits, "compile_failure_backoff_s", 0,
+        compile_mod.CONFIG.limits,
+        "compile_failure_backoff_s",
+        0,
     )
     # Disable per-call timeout so the simulated SDK error is what fails,
     # not the test scaffold's tight timeout.
     monkeypatch.setattr(
-        compile_mod.CONFIG.limits, "compile_per_call_timeout_s", 0,
+        compile_mod.CONFIG.limits,
+        "compile_per_call_timeout_s",
+        0,
     )
     # Force a long-context model id so the retry path can fire.
     monkeypatch.setattr(
-        compile_mod.CONFIG.models, "compile_large_source_model",
+        compile_mod.CONFIG.models,
+        "compile_large_source_model",
         "claude-opus-4-7[1m]",
     )
 
@@ -264,16 +292,16 @@ def test_kind_unknown_on_long_context_skips(
         yield  # pragma: no cover
 
     from compile_stages import compile as _cs_mod
+
     monkeypatch.setattr(_cs_mod, "query", crashing_query)
     caplog.set_level(logging.WARNING, logger="compile")
     result = asyncio.run(compile_mod.compile_file(source, force=True))
 
     assert result.status == "skipped" and result.skip_reason == "long_context_kind_unknown", result
     # Operator-visible WARNING explains the skip.
-    assert any(
-        "kind=unknown on long-context model" in r.getMessage()
-        for r in caplog.records
-    ), [r.getMessage() for r in caplog.records]
+    assert any("kind=unknown on long-context model" in r.getMessage() for r in caplog.records), [
+        r.getMessage() for r in caplog.records
+    ]
 
 
 # ── config knob present + migration entry present ────────────────────
@@ -282,6 +310,7 @@ def test_kind_unknown_on_long_context_skips(
 def test_compile_per_call_timeout_config_knob_present():
     """The knob lives in the Limits dataclass with the documented default."""
     from core.config import Limits
+
     lim = Limits()
     assert hasattr(lim, "compile_per_call_timeout_s")
     assert lim.compile_per_call_timeout_s == 600
@@ -291,6 +320,7 @@ def test_compile_per_call_timeout_in_migration_additions():
     """Same-commit migration: the knob is wired into KEY_ADDITIONS so existing
     operator vaults pick it up via `wiki update` (CLAUDE.md hard rule)."""
     from migrations.migrate_config_keys import KEY_ADDITIONS
+
     assert "compile_per_call_timeout_s" in KEY_ADDITIONS["limits"]
     assert KEY_ADDITIONS["limits"]["compile_per_call_timeout_s"] == 600
 
@@ -317,6 +347,7 @@ _HEALTH_PROSE = (
 def test_health_rollup_stub_detector():
     """The deterministic detector: stub bodies True, operator prose False."""
     from compile_stages.route import _health_rollup_body_is_stub
+
     f = _health_rollup_body_is_stub
     assert f(_HEALTH_STUB) is True
     # placeholder + extra blank lines + heading only → still stub
@@ -326,9 +357,7 @@ def test_health_rollup_stub_detector():
     assert f("---\ntype: health-rollup\n---\n\n# Health — x\n\nWent for a run.\n") is False
 
 
-def test_health_rollup_stub_takes_deterministic_path(
-    vault, monkeypatch: pytest.MonkeyPatch
-):
+def test_health_rollup_stub_takes_deterministic_path(vault, monkeypatch: pytest.MonkeyPatch):
     """A stub-body health rollup is recorded WITHOUT spawning the SDK agent,
     and its hash is written to state so re-runs are no-ops."""
     import compile as compile_mod
@@ -340,13 +369,12 @@ def test_health_rollup_stub_takes_deterministic_path(
         raise AssertionError("SDK query() was called for a health-rollup stub")
 
     from compile_stages import compile as _cs_mod
+
     monkeypatch.setattr(_cs_mod, "query", boom_query)
 
     captured = {}
     monkeypatch.setattr(compile_mod, "load_state", lambda: {})
-    monkeypatch.setattr(
-        compile_mod, "update_state", lambda m: (m(captured), captured)[1]
-    )
+    monkeypatch.setattr(compile_mod, "update_state", lambda m: (m(captured), captured)[1])
 
     result = asyncio.run(compile_mod.compile_file(source, force=True))
 
@@ -359,9 +387,7 @@ def test_health_rollup_stub_takes_deterministic_path(
     assert not list((vault[0] / "knowledge").rglob("*.md"))
 
 
-def test_health_rollup_prose_falls_through_to_agent(
-    vault, monkeypatch: pytest.MonkeyPatch
-):
+def test_health_rollup_prose_falls_through_to_agent(vault, monkeypatch: pytest.MonkeyPatch):
     """Operator-prose health days still reach the SDK agent (entity extraction
     needs reasoning) — the deterministic short-circuit must NOT swallow them."""
     import compile as compile_mod
@@ -375,13 +401,19 @@ def test_health_rollup_prose_falls_through_to_agent(
     async def fake_query(*, prompt, options):  # noqa: ARG001
         called["n"] += 1
         yield ResultMessage(
-            subtype="success", duration_ms=1, duration_api_ms=1,
-            is_error=False, num_turns=1, session_id="t",
-            total_cost_usd=0.0, usage={"input_tokens": 1, "output_tokens": 1},
+            subtype="success",
+            duration_ms=1,
+            duration_api_ms=1,
+            is_error=False,
+            num_turns=1,
+            session_id="t",
+            total_cost_usd=0.0,
+            usage={"input_tokens": 1, "output_tokens": 1},
             result="ok",
         )
 
     from compile_stages import compile as _cs_mod
+
     monkeypatch.setattr(_cs_mod, "query", fake_query)
     monkeypatch.setattr(compile_mod, "load_state", lambda: {})
     monkeypatch.setattr(compile_mod, "update_state", lambda m: {})
@@ -390,9 +422,7 @@ def test_health_rollup_prose_falls_through_to_agent(
     assert called["n"] >= 1, "prose health rollup did not reach the SDK agent"
 
 
-def test_deterministic_skip_routes_signal_ingest_hash(
-    vault, monkeypatch: pytest.MonkeyPatch
-):
+def test_deterministic_skip_routes_signal_ingest_hash(vault, monkeypatch: pytest.MonkeyPatch):
     """New contract (M026-S04): deterministic skip routes do NOT self-persist
     state — they return CompileOutcome(ingest_hash=True) and main() owns the single
     save. Replaces the old _STATE_MUTATING_SKIPS reload-dance guard."""
@@ -405,13 +435,12 @@ def test_deterministic_skip_routes_signal_ingest_hash(
         raise AssertionError("SDK query() was called for a health-rollup stub")
 
     from compile_stages import compile as _cs_mod
+
     monkeypatch.setattr(_cs_mod, "query", boom_query)
 
     captured = {}
     monkeypatch.setattr(compile_mod, "load_state", lambda: {})
-    monkeypatch.setattr(
-        compile_mod, "update_state", lambda m: (m(captured), captured)[1]
-    )
+    monkeypatch.setattr(compile_mod, "update_state", lambda m: (m(captured), captured)[1])
 
     outcome = asyncio.run(compile_mod.compile_file(source, force=True))
 

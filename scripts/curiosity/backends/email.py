@@ -39,7 +39,9 @@ class RunResult:
     error: str | None = None
 
 
-def process_request(request_path: Path, *, body_limit: int = DEFAULT_BODY_LIMIT, dry_run: bool = False) -> RunResult:
+def process_request(
+    request_path: Path, *, body_limit: int = DEFAULT_BODY_LIMIT, dry_run: bool = False
+) -> RunResult:
     """Process one email-deep-scan request file.
 
     On success: writes the deep-scan markdown, updates request frontmatter to
@@ -72,11 +74,15 @@ def process_request(request_path: Path, *, body_limit: int = DEFAULT_BODY_LIMIT,
 
     account_cfg = (CONFIG.personal.accounts or {}).get(account_id)
     if account_cfg is None:
-        return _mark_error(request, request_path, f"account {account_id!r} not in CONFIG.personal.accounts")
+        return _mark_error(
+            request, request_path, f"account {account_id!r} not in CONFIG.personal.accounts"
+        )
 
     reader = resolve_reader(account_cfg)
     if reader is None:
-        return _mark_error(request, request_path, f"no reader adapter resolved for account {account_id!r}")
+        return _mark_error(
+            request, request_path, f"no reader adapter resolved for account {account_id!r}"
+        )
 
     log.info("  Deep-scan %s/%s topic=%r (cap=%d)", account_id, folder, topic, body_limit)
 
@@ -127,16 +133,18 @@ def _render(request: dict, messages: list, account_id: str) -> str:
     lines.append(f"topic: {json.dumps(topic, ensure_ascii=False)}")
     lines.append(f"folder: {json.dumps(folder, ensure_ascii=False)}")
     lines.append(f"account: {account_id}")
-    lines.append(f"origin: \"curiosity/email-deep-scan\"")
-    lines.append(f"request_source: \"{source}\"")
-    lines.append(f"request_created: \"{created}\"")
-    lines.append(f"processed_at: \"{now_iso()}\"")
+    lines.append(f'origin: "curiosity/email-deep-scan"')
+    lines.append(f'request_source: "{source}"')
+    lines.append(f'request_created: "{created}"')
+    lines.append(f'processed_at: "{now_iso()}"')
     lines.append(f"messages: {len(messages)}")
     lines.append("---")
     lines.append("")
     lines.append(f"# Deep scan — {topic}")
     lines.append("")
-    lines.append(f"**Folder:** `{folder}` · **Account:** `{account_id}` · **Pulled:** {len(messages)} message(s)")
+    lines.append(
+        f"**Folder:** `{folder}` · **Account:** `{account_id}` · **Pulled:** {len(messages)} message(s)"
+    )
     lines.append("")
     lines.append(f"**Why this scan:** {rationale}")
     lines.append("")
@@ -152,7 +160,11 @@ def _render(request: dict, messages: list, account_id: str) -> str:
 
     for msg in messages_sorted:
         meta = msg.meta
-        when = meta.date.strftime("%Y-%m-%d %H:%M") if isinstance(meta.date, datetime) else str(meta.date)
+        when = (
+            meta.date.strftime("%Y-%m-%d %H:%M")
+            if isinstance(meta.date, datetime)
+            else str(meta.date)
+        )
         to_field = ", ".join(meta.to_addrs) if meta.to_addrs else "—"
 
         lines.append(f"## {meta.subject or '(no subject)'}")

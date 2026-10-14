@@ -34,13 +34,25 @@ from typing import Callable
 # publish-render degradation, and index junk rows. No generated article name
 # has those shapes.
 # Groups: 1=bang 2=target 3=heading(incl #) 4=alias(incl |)
-WIKILINK_RE = re.compile(
-    r"(!?)\[\[(?![ \t!])([^\]#|]+)(?<![ \t])(#[^\]|]*)?(\|[^\]]*)?\]\]"
-)
+WIKILINK_RE = re.compile(r"(!?)\[\[(?![ \t!])([^\]#|]+)(?<![ \t])(#[^\]|]*)?(\|[^\]]*)?\]\]")
 
 _MEDIA_EXT = {
-    ".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".bmp", ".ico",
-    ".pdf", ".mp3", ".mp4", ".m4a", ".wav", ".mov", ".webm", ".excalidraw",
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".gif",
+    ".webp",
+    ".svg",
+    ".bmp",
+    ".ico",
+    ".pdf",
+    ".mp3",
+    ".mp4",
+    ".m4a",
+    ".wav",
+    ".mov",
+    ".webm",
+    ".excalidraw",
 }
 
 
@@ -190,8 +202,12 @@ def relativize_text(text: str, source: Path, vault: Path) -> tuple[str, int, lis
 
 
 def outgoing_canonical_slugs(
-    text: str, source: Path, vault: Path, knowledge_dir: Path,
-    footer_begin: str, footer_end: str,
+    text: str,
+    source: Path,
+    vault: Path,
+    knowledge_dir: Path,
+    footer_begin: str,
+    footer_end: str,
 ) -> set[str]:
     """Canonical knowledge-slugs this article links to (for the backlinks index).
 
@@ -201,7 +217,7 @@ def outgoing_canonical_slugs(
     begin = text.find(footer_begin)
     end = text.find(footer_end)
     if begin >= 0 and end > begin:
-        text = text[:begin] + text[end + len(footer_end):]
+        text = text[:begin] + text[end + len(footer_end) :]
 
     slugs: set[str] = set()
     for _, line, live in _strip_frontmatter_and_fences(text.split("\n")):

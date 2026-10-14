@@ -103,12 +103,14 @@ class TestBand:
 
 class TestConcernBands:
     def test_concern_flag_parsed_from_list(self) -> None:
-        c = Cutoffs.from_list([
-            {"min": 0, "max": 4, "band": "minimal"},
-            {"min": 5, "max": 9, "band": "mild"},
-            {"min": 10, "max": 14, "band": "moderate", "concern": True},
-            {"min": 15, "max": 21, "band": "severe", "concern": True},
-        ])
+        c = Cutoffs.from_list(
+            [
+                {"min": 0, "max": 4, "band": "minimal"},
+                {"min": 5, "max": 9, "band": "mild"},
+                {"min": 10, "max": 14, "band": "moderate", "concern": True},
+                {"min": 15, "max": 21, "band": "severe", "concern": True},
+            ]
+        )
         assert c.concern_bands == ("moderate", "severe")
 
     def test_no_concern_flags_yields_empty_tuple(self) -> None:
@@ -116,10 +118,12 @@ class TestConcernBands:
         assert c.concern_bands == ()
 
     def test_concern_absent_key_is_false(self) -> None:
-        c = Cutoffs.from_list([
-            {"min": 0, "max": 5, "band": "low"},
-            {"min": 6, "max": 10, "band": "high", "concern": True},
-        ])
+        c = Cutoffs.from_list(
+            [
+                {"min": 0, "max": 5, "band": "low"},
+                {"min": 6, "max": 10, "band": "high", "concern": True},
+            ]
+        )
         assert c.bands[0].concern is False
         assert c.bands[1].concern is True
         assert c.concern_bands == ("high",)

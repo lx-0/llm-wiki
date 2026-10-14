@@ -7,6 +7,7 @@ migration AND the generated docs — and the loader silently ignored it, so
 derives the section list from the WikiConfig dataclass itself, so a future
 new section fails loudly instead of silently running on defaults.
 """
+
 from __future__ import annotations
 
 from dataclasses import fields, is_dataclass
@@ -40,9 +41,7 @@ def test_every_section_override_survives_load(tmp_path: Path, monkeypatch) -> No
             expected[(section_field.name, scalar.name)] = new
             break
         else:
-            raise AssertionError(
-                f"section {section_field.name}: no scalar field to probe"
-            )
+            raise AssertionError(f"section {section_field.name}: no scalar field to probe")
 
     cfg_file = tmp_path / "config.yaml"
     cfg_file.write_text(yaml.safe_dump(overrides), encoding="utf-8")

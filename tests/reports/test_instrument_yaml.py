@@ -14,8 +14,7 @@ from scripts.reports._engine.instrument import (
 
 
 _INSTRUMENTS_ROOT = (
-    Path(__file__).resolve().parents[2]
-    / "scripts" / "reports" / "_engine" / "instruments"
+    Path(__file__).resolve().parents[2] / "scripts" / "reports" / "_engine" / "instruments"
 )
 
 
@@ -85,9 +84,12 @@ class TestLoadInstrument:
 
     def test_missing_required_meta_key_rejected(self, tmp_path: Path) -> None:
         # Drop the `domain` field
-        bad = "\n".join(
-            line for line in GOOD_INSTRUMENT_YAML.splitlines() if not line.startswith("domain:")
-        ) + "\n"
+        bad = (
+            "\n".join(
+                line for line in GOOD_INSTRUMENT_YAML.splitlines() if not line.startswith("domain:")
+            )
+            + "\n"
+        )
         d = _write_instrument(tmp_path, bad, GOOD_ITEMS_YAML, GOOD_CUTOFFS_YAML)
         with pytest.raises(ValueError, match="missing required keys"):
             load_instrument(d)
@@ -126,9 +128,7 @@ class TestInferenceConfigSurfaced:
 
     def test_defaults_when_no_inference_section(self, tmp_path: Path) -> None:
         # GOOD_INSTRUMENT_YAML has no `inference:` block.
-        d = _write_instrument(
-            tmp_path, GOOD_INSTRUMENT_YAML, GOOD_ITEMS_YAML, GOOD_CUTOFFS_YAML
-        )
+        d = _write_instrument(tmp_path, GOOD_INSTRUMENT_YAML, GOOD_ITEMS_YAML, GOOD_CUTOFFS_YAML)
         cfg = load_instrument(d).meta.inference
         assert cfg == InferenceConfig()
         assert cfg.default_lookback_days == DEFAULT_LOOKBACK_DAYS
@@ -160,14 +160,16 @@ class TestInferenceConfigSurfaced:
 
 class TestMaxTotalAndConcern:
     def test_max_total_is_scale_hi_times_items(self) -> None:
-        assert _live("phq-9").max_total == 27   # 9 items × 0-3
-        assert _live("gad-7").max_total == 21   # 7 items × 0-3
-        assert _live("who-5").max_total == 25   # 5 items × 0-5
-        assert _live("olbi").max_total == 80    # 16 items × 1-5
+        assert _live("phq-9").max_total == 27  # 9 items × 0-3
+        assert _live("gad-7").max_total == 21  # 7 items × 0-3
+        assert _live("who-5").max_total == 25  # 5 items × 0-5
+        assert _live("olbi").max_total == 80  # 16 items × 1-5
 
     def test_phq9_concern_bands(self) -> None:
         assert _live("phq-9").concern_bands == (
-            "moderate", "moderately-severe", "severe",
+            "moderate",
+            "moderately-severe",
+            "severe",
         )
 
     def test_previously_unflaggable_live_instruments_now_declare_concern(self) -> None:

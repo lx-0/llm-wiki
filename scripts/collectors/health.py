@@ -127,14 +127,18 @@ def _merge_healthkit_into_path(
         body = ""
 
     changed = False
-    base = dict(existing) if existing else {
-        "title": f"Health — {agg.day}",
-        "type": "health-rollup",
-        "date": agg.day,
-        "account": account_id,
-        "sources": [],
-        "sensitivity": "high",
-    }
+    base = (
+        dict(existing)
+        if existing
+        else {
+            "title": f"Health — {agg.day}",
+            "type": "health-rollup",
+            "date": agg.day,
+            "account": account_id,
+            "sources": [],
+            "sensitivity": "high",
+        }
+    )
     # Ensure mandatory keys exist even when merging into an Oura file
     base.setdefault("title", f"Health — {agg.day}")
     base.setdefault("type", "health-rollup")
@@ -167,15 +171,30 @@ def _merge_healthkit_into_path(
     for k in ("title", "type", "date", "account", "sources"):
         if k in base:
             ordered[k] = base[k]
-    oura_keys = ("sleep_hours", "sleep_score", "readiness_score",
-                 "hrv_overnight", "steps", "resting_hr")
+    oura_keys = (
+        "sleep_hours",
+        "sleep_score",
+        "readiness_score",
+        "hrv_overnight",
+        "steps",
+        "resting_hr",
+    )
     for k in oura_keys:
         if k in base and k not in ordered:
             ordered[k] = base[k]
-    hk_keys = ("weight_kg", "body_fat_pct", "lean_body_mass_kg", "bmi",
-               "height_cm", "steps_total", "distance_km",
-               "active_energy_kcal", "basal_energy_kcal",
-               "flights_climbed", "workouts")
+    hk_keys = (
+        "weight_kg",
+        "body_fat_pct",
+        "lean_body_mass_kg",
+        "bmi",
+        "height_cm",
+        "steps_total",
+        "distance_km",
+        "active_energy_kcal",
+        "basal_energy_kcal",
+        "flights_climbed",
+        "workouts",
+    )
     for k in hk_keys:
         if k in base and k not in ordered:
             ordered[k] = base[k]
@@ -209,8 +228,9 @@ def _merge_healthkit_into_path(
 @dataclass(frozen=True)
 class _HealthAccount:
     """Resolved health-config for one `personal.accounts.<id>` entry (Phase 1: oura-pat)."""
+
     account_id: str
-    oura_api_key: str         # resolved from os.environ at resolution time
+    oura_api_key: str  # resolved from os.environ at resolution time
     backfill_days: int
 
 
@@ -221,6 +241,7 @@ class _HealthKitAccount:
     Phase 2 (M023). `inbox_dir` resolved with `~` expansion; an empty value
     means the account opted out (collector silently skips it).
     """
+
     account_id: str
     inbox_dir: Path
     filename: str  # default "Export.xml"
@@ -233,6 +254,7 @@ def _resolve_healthkit_accounts() -> list[_HealthKitAccount]:
     doesn't exist are still returned — the per-account runner reports the
     missing file in its message (mirrors Oura's missing-env-key surfacing).
     """
+
     def _build(aid: str, hk_block: dict) -> _HealthKitAccount:
         raw_dir = (hk_block.get("inbox_dir") or "").strip()
         inbox = Path(raw_dir).expanduser() if raw_dir else Path("")
@@ -240,7 +262,9 @@ def _resolve_healthkit_accounts() -> list[_HealthKitAccount]:
         return _HealthKitAccount(account_id=aid, inbox_dir=inbox, filename=filename)
 
     return resolve_accounts(
-        CONFIG.personal.accounts or {}, "healthkit-xml-export", _build,
+        CONFIG.personal.accounts or {},
+        "healthkit-xml-export",
+        _build,
         block_key=("health", "healthkit"),
     )
 
@@ -366,13 +390,15 @@ class HealthCollector:
             functools.partial(
                 self._run_one_account, state=state, dry_run=dry_run, incremental=incremental
             ),
-            log=log, name="HealthCollector",
+            log=log,
+            name="HealthCollector",
             describe=lambda a: f"{a.account_id} oura",
         )
         hk_outcome = run_account_loop(
             hk_accounts,
             functools.partial(self._run_one_healthkit_account, state=state, dry_run=dry_run),
-            log=log, name="HealthCollector",
+            log=log,
+            name="HealthCollector",
             describe=lambda a: f"{a.account_id} healthkit",
         )
 
@@ -386,8 +412,9 @@ class HealthCollector:
         total_skipped = sum(
             skipped for _files, skipped in (*oura_outcome.payloads, *hk_outcome.payloads)
         )
-        touched_ids = tuple({a.account_id for a in oura_accounts} |
-                            {h.account_id for h in hk_accounts})
+        touched_ids = tuple(
+            {a.account_id for a in oura_accounts} | {h.account_id for h in hk_accounts}
+        )
         return RunResult(
             files_written=tuple(all_files),
             files_skipped=total_skipped,
@@ -422,8 +449,11 @@ class HealthCollector:
             try:
                 start = (datetime.fromisoformat(last_day).date() + timedelta(days=1)).isoformat()
             except ValueError:
-                log.warning("HealthCollector[%s]: invalid last_day %r — falling back to backfill",
-                            acct.account_id, last_day)
+                log.warning(
+                    "HealthCollector[%s]: invalid last_day %r — falling back to backfill",
+                    acct.account_id,
+                    last_day,
+                )
                 start = (date.today() - timedelta(days=acct.backfill_days)).isoformat()
         else:
             start = (date.today() - timedelta(days=acct.backfill_days)).isoformat()
@@ -433,7 +463,9 @@ class HealthCollector:
 
         log.info(
             "HealthCollector[%s]: fetching oura window %s → %s",
-            acct.account_id, start, end_date,
+            acct.account_id,
+            start,
+            end_date,
         )
 
         client = OuraClient(api_key=acct.oura_api_key, timeout_s=self._timeout_s)
@@ -465,8 +497,12 @@ class HealthCollector:
             md = _render_markdown(summary, account_id=acct.account_id)
 
             if dry_run:
-                log.info("  DRY[%s]: would write %s (%d bytes)",
-                         acct.account_id, target.relative_to(ROOT_DIR), len(md))
+                log.info(
+                    "  DRY[%s]: would write %s (%d bytes)",
+                    acct.account_id,
+                    target.relative_to(ROOT_DIR),
+                    len(md),
+                )
                 continue
 
             output_dir.mkdir(parents=True, exist_ok=True)
@@ -522,7 +558,9 @@ class HealthCollector:
 
         log.info(
             "HealthCollector[%s] healthkit: hashing %s (%d bytes)",
-            acct.account_id, export_path, export_path.stat().st_size,
+            acct.account_id,
+            export_path,
+            export_path.stat().st_size,
         )
         new_hash = _sha256_file(export_path)
         if prior_hash == new_hash:
@@ -552,13 +590,14 @@ class HealthCollector:
             target = output_dir / fname
 
             if dry_run:
-                log.info("  DRY[%s] healthkit: would touch %s",
-                         acct.account_id, target.relative_to(ROOT_DIR))
+                log.info(
+                    "  DRY[%s] healthkit: would touch %s",
+                    acct.account_id,
+                    target.relative_to(ROOT_DIR),
+                )
                 continue
 
-            changed = _merge_healthkit_into_path(
-                target, agg, account_id=acct.account_id
-            )
+            changed = _merge_healthkit_into_path(target, agg, account_id=acct.account_id)
             if changed:
                 files_written.append(target)
                 # Only enrich the per-day rollup when Oura already wrote one
@@ -567,9 +606,7 @@ class HealthCollector:
                 # `daily/<YYYY-MM-DD>/` folders for dates the operator has
                 # no other activity for. The Oura collector owns the
                 # rollup's existence; HealthKit only adds keys on overlap.
-                daily_health_file = (
-                    ROOT_DIR / "daily" / agg.day / "health.md"
-                )
+                daily_health_file = ROOT_DIR / "daily" / agg.day / "health.md"
                 if daily_health_file.exists():
                     self._update_daily_rollup_healthkit(agg, acct.account_id)
             else:
@@ -585,8 +622,7 @@ class HealthCollector:
             state_touched = True
 
         return (
-            f"parsed {days_seen} days · wrote {len(files_written)} · "
-            f"unchanged {skipped_unchanged}",
+            f"parsed {days_seen} days · wrote {len(files_written)} · unchanged {skipped_unchanged}",
             (files_written, skipped_unchanged),
             state_touched,
         )

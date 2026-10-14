@@ -255,9 +255,7 @@ def _best_name_similarity(a: EntityPage, b: EntityPage) -> float:
     )
 
 
-def find_candidates(
-    entities: list[EntityPage], *, threshold: float
-) -> list[CandidatePair]:
+def find_candidates(entities: list[EntityPage], *, threshold: float) -> list[CandidatePair]:
     """Ranked duplicate-candidate pairs. Three signals, deduped by pair:
 
     1. phonetic-key collision (within same kind)    → strong base 0.9
@@ -320,7 +318,10 @@ def find_candidates(
                 log.warning(
                     "fuzzy scan skipped for %s/'%s*' bucket (%d entities > %d cap); "
                     "phonetic + shared-source signals still apply",
-                    kind, letter, len(bucket), MAX_FUZZY_BUCKET,
+                    kind,
+                    letter,
+                    len(bucket),
+                    MAX_FUZZY_BUCKET,
                 )
                 continue
             for a, b in combinations(bucket, 2):
@@ -566,18 +567,12 @@ def merge_pages(
         merged_fm["title"] = canonical_name.strip()
 
     if not dry_run:
-        serialized = yaml.safe_dump(
-            merged_fm, sort_keys=False, allow_unicode=True
-        ).rstrip()
-        keep.path.write_text(
-            f"---\n{serialized}\n---\n\n{merged_body.lstrip()}", encoding="utf-8"
-        )
+        serialized = yaml.safe_dump(merged_fm, sort_keys=False, allow_unicode=True).rstrip()
+        keep.path.write_text(f"---\n{serialized}\n---\n\n{merged_body.lstrip()}", encoding="utf-8")
 
     # Wikilink rewrite B → A (canonical knowledge-relative slug path).
     new_slug_path = f"{keep.kind}/{keep.slug}"
-    links = rewrite_links(
-        knowledge_dir, vault, drop.path, new_slug_path, dry_run=dry_run
-    )
+    links = rewrite_links(knowledge_dir, vault, drop.path, new_slug_path, dry_run=dry_run)
 
     # Back up + delete B.
     backup: Path | None = None
@@ -588,9 +583,7 @@ def merge_pages(
         drop.path.unlink()
 
     # Canonical-name hard fact.
-    fact = record_canonical_fact(
-        drop.title, canonical_name, source_slug=keep.slug, dry_run=dry_run
-    )
+    fact = record_canonical_fact(drop.title, canonical_name, source_slug=keep.slug, dry_run=dry_run)
 
     return MergeResult(
         keep=keep.path,
@@ -612,8 +605,8 @@ def _print_candidates(cands: list[CandidatePair]) -> None:
     print(f"Found {len(cands)} candidate pair(s):\n")
     for i, c in enumerate(cands, 1):
         print(f"[{i}] {c.confidence:.2f}  {c.a.kind}/")
-        print(f"      A: {c.a.slug:32s} \"{c.a.title}\"")
-        print(f"      B: {c.b.slug:32s} \"{c.b.title}\"")
+        print(f'      A: {c.a.slug:32s} "{c.a.title}"')
+        print(f'      B: {c.b.slug:32s} "{c.b.title}"')
         print(f"      → {', '.join(c.reasons)}\n")
 
 
@@ -631,14 +624,14 @@ def _interactive_loop(
     total = len(cands)
     for i, c in enumerate(cands, 1):
         print(f"\n[{i}/{total}] potential duplicate ({c.confidence:.2f} · {', '.join(c.reasons)}):")
-        print(f"  A: {c.a.kind}/{c.a.slug}  \"{c.a.title}\"")
-        print(f"  B: {c.b.kind}/{c.b.slug}  \"{c.b.title}\"")
+        print(f'  A: {c.a.kind}/{c.a.slug}  "{c.a.title}"')
+        print(f'  B: {c.b.kind}/{c.b.slug}  "{c.b.title}"')
         ans = _ask("  → same entity? [y/N/skip/quit] ").lower()
         if ans in ("q", "quit"):
             break
         if ans not in ("y", "yes"):
             continue
-        which = _ask(f"  → correct name? [A=\"{c.a.title}\" / B=\"{c.b.title}\" / type] ").strip()
+        which = _ask(f'  → correct name? [A="{c.a.title}" / B="{c.b.title}" / type] ').strip()
         if which.lower() in ("a", ""):
             keep, drop, canonical = c.a, c.b, c.a.title
         elif which.lower() == "b":
@@ -646,14 +639,18 @@ def _interactive_loop(
         else:
             keep, drop, canonical = c.a, c.b, which
         confirm = _ask(
-            f"  → merge {drop.slug} INTO {keep.slug} as \"{canonical}\"? "
+            f'  → merge {drop.slug} INTO {keep.slug} as "{canonical}"? '
             f"{'(dry-run) ' if dry_run else ''}[y/N] "
         ).lower()
         if confirm not in ("y", "yes"):
             continue
         res = merge_pages(
-            keep, drop, canonical_name=canonical,
-            knowledge_dir=knowledge_dir, vault=vault, dry_run=dry_run,
+            keep,
+            drop,
+            canonical_name=canonical,
+            knowledge_dir=knowledge_dir,
+            vault=vault,
+            dry_run=dry_run,
         )
         _report_merge(res, keep, drop)
         merged += 1
@@ -685,22 +682,36 @@ def _resolve_entity_arg(arg: str, knowledge_dir: Path) -> EntityPage | None:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n", 1)[0])
-    parser.add_argument("--suggest-only", action="store_true",
-                        help="print the candidate list and exit (no interactive loop)")
-    parser.add_argument("--dry-run", action="store_true",
-                        help="walk + merge without writing anything to disk")
-    parser.add_argument("--threshold", type=float, default=None,
-                        help="fuzzy match floor 0..1 (default: limits.dedup_fuzzy_threshold)")
+    parser.add_argument(
+        "--suggest-only",
+        action="store_true",
+        help="print the candidate list and exit (no interactive loop)",
+    )
+    parser.add_argument(
+        "--dry-run", action="store_true", help="walk + merge without writing anything to disk"
+    )
+    parser.add_argument(
+        "--threshold",
+        type=float,
+        default=None,
+        help="fuzzy match floor 0..1 (default: limits.dedup_fuzzy_threshold)",
+    )
     sub = parser.add_subparsers(dest="cmd")
     p_merge = sub.add_parser("merge", help="standalone merge of a known pair")
     p_merge.add_argument("drop", help="entity to merge away (slug | kind/slug | path)")
     p_merge.add_argument("--into", required=True, help="entity to keep (slug | kind/slug | path)")
-    p_merge.add_argument("--name", default=None, help="canonical name (default: the kept page's title)")
+    p_merge.add_argument(
+        "--name", default=None, help="canonical name (default: the kept page's title)"
+    )
     # Accept --dry-run AFTER `merge` too (operators type it last). A separate
     # dest avoids the argparse quirk where the subparser default clobbers the
     # top-level value; the two are OR-ed below.
-    p_merge.add_argument("--dry-run", action="store_true", dest="merge_dry_run",
-                         help="show the merge without writing")
+    p_merge.add_argument(
+        "--dry-run",
+        action="store_true",
+        dest="merge_dry_run",
+        help="show the merge without writing",
+    )
     args = parser.parse_args(argv)
     # Honour --dry-run in either position (top-level or after `merge`).
     args.dry_run = args.dry_run or getattr(args, "merge_dry_run", False)
@@ -715,6 +726,7 @@ def main(argv: list[str] | None = None) -> int:
     if threshold is None:
         try:
             from core.config import CONFIG
+
             threshold = CONFIG.limits.dedup_fuzzy_threshold
         except Exception:  # noqa: BLE001 — config optional for detection
             threshold = 0.85
@@ -723,21 +735,24 @@ def main(argv: list[str] | None = None) -> int:
         keep = _resolve_entity_arg(args.into, KNOWLEDGE_DIR)
         drop = _resolve_entity_arg(args.drop, KNOWLEDGE_DIR)
         if keep is None or drop is None:
-            log.error("could not resolve %s",
-                      args.into if keep is None else args.drop)
+            log.error("could not resolve %s", args.into if keep is None else args.drop)
             return 1
         if keep.slug == drop.slug:
             log.error("refusing to merge a page into itself")
             return 1
         canonical = args.name or keep.title
-        print(f"merge {drop.kind}/{drop.slug} INTO {keep.kind}/{keep.slug} as \"{canonical}\"")
+        print(f'merge {drop.kind}/{drop.slug} INTO {keep.kind}/{keep.slug} as "{canonical}"')
         confirm = _ask(f"  → confirm? {'(dry-run) ' if args.dry_run else ''}[y/N] ").lower()
         if confirm not in ("y", "yes"):
             print("aborted.")
             return 0
         res = merge_pages(
-            keep, drop, canonical_name=canonical,
-            knowledge_dir=KNOWLEDGE_DIR, vault=ROOT_DIR, dry_run=args.dry_run,
+            keep,
+            drop,
+            canonical_name=canonical,
+            knowledge_dir=KNOWLEDGE_DIR,
+            vault=ROOT_DIR,
+            dry_run=args.dry_run,
         )
         _report_merge(res, keep, drop)
         return 0

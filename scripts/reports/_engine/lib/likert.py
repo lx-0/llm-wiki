@@ -37,29 +37,21 @@ class LikertScale:
     @classmethod
     def parse(cls, spec: str) -> "LikertScale":
         if not isinstance(spec, str) or "-" not in spec:
-            raise ValueError(
-                f"Likert scale spec must be 'lo-hi' (got {spec!r})"
-            )
+            raise ValueError(f"Likert scale spec must be 'lo-hi' (got {spec!r})")
         try:
             lo_s, hi_s = spec.split("-", 1)
             lo, hi = int(lo_s), int(hi_s)
         except ValueError as exc:
             raise ValueError(f"Likert scale spec invalid: {spec!r}") from exc
         if hi <= lo:
-            raise ValueError(
-                f"Likert scale must have hi > lo (got lo={lo} hi={hi})"
-            )
+            raise ValueError(f"Likert scale must have hi > lo (got lo={lo} hi={hi})")
         return cls(lo=lo, hi=hi)
 
     def validate(self, value: int) -> None:
         if not isinstance(value, int) or isinstance(value, bool):
-            raise ValueError(
-                f"Likert answer must be int, got {type(value).__name__}: {value!r}"
-            )
+            raise ValueError(f"Likert answer must be int, got {type(value).__name__}: {value!r}")
         if not (self.lo <= value <= self.hi):
-            raise ValueError(
-                f"Likert answer {value} outside scale {self.lo}..{self.hi}"
-            )
+            raise ValueError(f"Likert answer {value} outside scale {self.lo}..{self.hi}")
 
     def reverse(self, value: int) -> int:
         """Symmetric flip: maps `lo` to `hi`, `hi` to `lo`, midpoints to midpoints."""
@@ -111,9 +103,7 @@ def score_answers(
     known_ids = {it.id for it in items}
     unknown_ids = set(answers) - known_ids
     if unknown_ids:
-        raise ValueError(
-            f"answers contain unknown item ids: {sorted(unknown_ids)}"
-        )
+        raise ValueError(f"answers contain unknown item ids: {sorted(unknown_ids)}")
 
     total = 0
     per_subscale: dict[str, int] = {}

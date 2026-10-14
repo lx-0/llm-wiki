@@ -28,6 +28,7 @@ FIXTURE = Path(__file__).resolve().parent / "fixtures" / "codex_rollout_sample.j
 
 # ── Format detection ─────────────────────────────────────────────────
 
+
 def test_detect_codex_format():
     assert _transcript._detect_format(FIXTURE) == "codex"
 
@@ -35,14 +36,19 @@ def test_detect_codex_format():
 def test_detect_claude_format(tmp_path: Path):
     p = tmp_path / "claude.jsonl"
     p.write_text(
-        json.dumps({"message": {"role": "user", "content": "hi"}}) + "\n"
-        + json.dumps({"message": {"role": "assistant", "content": [{"type": "text", "text": "yo"}]}}) + "\n",
+        json.dumps({"message": {"role": "user", "content": "hi"}})
+        + "\n"
+        + json.dumps(
+            {"message": {"role": "assistant", "content": [{"type": "text", "text": "yo"}]}}
+        )
+        + "\n",
         encoding="utf-8",
     )
     assert _transcript._detect_format(p) == "claude"
 
 
 # ── Codex parser ─────────────────────────────────────────────────────
+
 
 def test_codex_parser_returns_turns():
     turns = _transcript._read_codex_transcript(FIXTURE)
@@ -67,8 +73,8 @@ def test_codex_assistant_prose_from_output_text():
 def test_codex_tool_calls_captured():
     turns = _transcript._read_codex_transcript(FIXTURE)
     tools = "\n".join(tool for t in turns for tool in t.tools)
-    assert "search" in tools          # function_call (mcp semble)
-    assert "apply_patch" in tools     # custom_tool_call
+    assert "search" in tools  # function_call (mcp semble)
+    assert "apply_patch" in tools  # custom_tool_call
 
 
 def test_codex_skips_reasoning_and_developer_noise():
@@ -82,6 +88,7 @@ def test_codex_skips_reasoning_and_developer_noise():
 
 # ── Dispatcher: the real integration that was broken ─────────────────
 
+
 def test_read_transcript_dispatches_codex_rollout():
     turns = read_transcript(str(FIXTURE))
     assert len(turns) > 0, "read_transcript must now handle Codex rollouts"
@@ -92,11 +99,20 @@ def test_read_transcript_dispatches_codex_rollout():
 def test_read_transcript_claude_regression(tmp_path: Path):
     p = tmp_path / "claude.jsonl"
     p.write_text(
-        json.dumps({"message": {"role": "user", "content": "hello"}}) + "\n"
-        + json.dumps({"message": {"role": "assistant", "content": [
-            {"type": "text", "text": "world"},
-            {"type": "tool_use", "name": "Bash", "input": {"command": "ls"}},
-        ]}}) + "\n",
+        json.dumps({"message": {"role": "user", "content": "hello"}})
+        + "\n"
+        + json.dumps(
+            {
+                "message": {
+                    "role": "assistant",
+                    "content": [
+                        {"type": "text", "text": "world"},
+                        {"type": "tool_use", "name": "Bash", "input": {"command": "ls"}},
+                    ],
+                }
+            }
+        )
+        + "\n",
         encoding="utf-8",
     )
     turns = read_transcript(str(p))
@@ -106,6 +122,7 @@ def test_read_transcript_claude_regression(tmp_path: Path):
 
 
 # ── Resolution fallback (fixes the 287 "Transcript not found") ────────
+
 
 def test_resolve_transcript_prefers_existing_path():
     got = _transcript.resolve_transcript(str(FIXTURE), session_id=None)

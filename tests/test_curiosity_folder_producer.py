@@ -109,9 +109,11 @@ def _run(monkeypatch, src, gaps):
 
 
 def _requests(root):
-    return sorted((root / "raw" / "requests").glob("request-*.json")) if (
-        root / "raw" / "requests"
-    ).exists() else []
+    return (
+        sorted((root / "raw" / "requests").glob("request-*.json"))
+        if (root / "raw" / "requests").exists()
+        else []
+    )
 
 
 def test_indexed_file_gap_writes_folder_deep_scan_request(env, monkeypatch):
@@ -211,8 +213,7 @@ def test_dispatch_routes_folder_deep_scan_to_folder_backend(tmp_path, monkeypatc
     assert cli._dispatch(p, dry_run=True) is True
     assert called == {"path": p, "dry_run": True}
     # a genuinely unknown type still hits the unsupported error path
-    bogus = _request_file(tmp_path, name="request-bogus-2026-06-10.json",
-                          type="weird-scan")
+    bogus = _request_file(tmp_path, name="request-bogus-2026-06-10.json", type="weird-scan")
     assert cli._dispatch(bogus, dry_run=True) is False
 
 
@@ -250,8 +251,7 @@ def test_skeleton_dry_run_resolves_path_and_reports_exists(tmp_path, monkeypatch
     res = folder_backend.process_request(p, dry_run=True)
     assert res.success is True
     # unknown root_id is a shape error even in dry-run
-    bad = _request_file(tmp_path, name="request-bad-root-2026-06-10.json",
-                        root_id="nope")
+    bad = _request_file(tmp_path, name="request-bad-root-2026-06-10.json", root_id="nope")
     assert folder_backend.process_request(bad, dry_run=True).success is False
 
 
@@ -275,9 +275,7 @@ def _persist_env(tmp_path, monkeypatch):
         [{"id": "docs", "kind": "local", "path": str(tmp_path / "trove")}],
     )
     monkeypatch.setattr(folder_backend, "ROOT_DIR", tmp_path)
-    monkeypatch.setattr(
-        folder_backend, "ANSWER_DIR", tmp_path / "raw" / "notes" / "folder"
-    )
+    monkeypatch.setattr(folder_backend, "ANSWER_DIR", tmp_path / "raw" / "notes" / "folder")
     p = _request_file(tmp_path)
     return folder_backend, tmp_path, p
 
@@ -299,14 +297,16 @@ def _fake_provider(monkeypatch, folder_backend, answer_md, error=None):
 
 def test_persist_answer_only_and_flip_request(tmp_path, monkeypatch):
     fb, root, request_path = _persist_env(tmp_path, monkeypatch)
-    _fake_provider(
-        monkeypatch, fb, "## Answer\n\nFinal amount: 1234 EUR (page 2)."
-    )
+    _fake_provider(monkeypatch, fb, "## Answer\n\nFinal amount: 1234 EUR (page 2).")
     res = fb.process_request(request_path, dry_run=False)
     assert res.success is True
 
-    answer = root / "raw" / "notes" / "folder" / (
-        "answer-" + request_path.stem.removeprefix("request-") + ".md"
+    answer = (
+        root
+        / "raw"
+        / "notes"
+        / "folder"
+        / ("answer-" + request_path.stem.removeprefix("request-") + ".md")
     )
     assert answer.exists()
     text = answer.read_text(encoding="utf-8")
@@ -322,20 +322,21 @@ def test_persist_answer_only_and_flip_request(tmp_path, monkeypatch):
     assert req["output"].endswith(answer.name)
 
 
-def test_sensitivity_stamped_into_answer_when_root_carries_it(
-    tmp_path, monkeypatch
-):
+def test_sensitivity_stamped_into_answer_when_root_carries_it(tmp_path, monkeypatch):
     """Q3 full build: the root's sensitivity value travels into the answer
     frontmatter; compile propagates it from there (prompt rule)."""
     fb, root, request_path = _persist_env(tmp_path, monkeypatch)
     monkeypatch.setattr(
         CONFIG.personal,
         "watched_folders",
-        [{
-            "id": "docs", "kind": "local",
-            "path": str(tmp_path / "trove"),
-            "sensitivity": "private",
-        }],
+        [
+            {
+                "id": "docs",
+                "kind": "local",
+                "path": str(tmp_path / "trove"),
+                "sensitivity": "private",
+            }
+        ],
     )
     _fake_provider(monkeypatch, fb, "## Answer\n\ndistilled")
     assert fb.process_request(request_path, dry_run=False).success is True
@@ -353,10 +354,7 @@ def test_no_sensitivity_line_when_root_has_none(tmp_path, monkeypatch):
 
 def test_compile_main_prompt_carries_sensitivity_propagation_rule():
     """The substrate-agnostic carry rule lives in the main compile prompt."""
-    prompt = (
-        __import__("pathlib").Path("prompts/compile_main.md")
-        .read_text(encoding="utf-8")
-    )
+    prompt = __import__("pathlib").Path("prompts/compile_main.md").read_text(encoding="utf-8")
     assert "sensitivity" in prompt
 
 
@@ -365,10 +363,7 @@ def test_compile_main_prompt_records_folder_answer_facts():
     dismiss an operator-approved invoice extract (run 2026-06-10 23:15 —
     done, 0 writes). folder-deep-scan answers are explicitly requested
     facts: the prompt must instruct recording them despite the bar."""
-    prompt = (
-        __import__("pathlib").Path("prompts/compile_main.md")
-        .read_text(encoding="utf-8")
-    )
+    prompt = __import__("pathlib").Path("prompts/compile_main.md").read_text(encoding="utf-8")
     assert "folder-deep-scan" in prompt
     assert "raw/notes/folder/" in prompt
 
@@ -381,7 +376,8 @@ def test_p2_no_raw_body_anywhere_under_the_vault(tmp_path, monkeypatch):
     # which is outside the vault in production but inside tmp here) and
     # assert the raw body marker persisted nowhere.
     offenders = [
-        f for f in root.rglob("*")
+        f
+        for f in root.rglob("*")
         if f.is_file()
         and "trove" not in f.parts
         and RAW_BODY_MARKER in f.read_text(encoding="utf-8", errors="ignore")
@@ -394,7 +390,8 @@ def test_sentinel_marks_request_not_answered(tmp_path, monkeypatch):
     staleness anchor) so batches stop re-dispatching; nothing persisted."""
     fb, root, request_path = _persist_env(tmp_path, monkeypatch)
     _fake_provider(
-        monkeypatch, fb,
+        monkeypatch,
+        fb,
         "NOT ANSWERED IN THIS FILE\nIt is a phone contract, not a tax doc.",
     )
     res = fb.process_request(request_path, dry_run=False)
@@ -444,9 +441,7 @@ def test_error_request_retries_only_after_file_change(tmp_path, monkeypatch):
     assert json.loads(request_path.read_text(encoding="utf-8"))["status"] == "done"
 
 
-def test_missing_file_marks_stale_and_retries_on_reappearance(
-    tmp_path, monkeypatch
-):
+def test_missing_file_marks_stale_and_retries_on_reappearance(tmp_path, monkeypatch):
     fb, root, request_path = _persist_env(tmp_path, monkeypatch)
     trove_file = tmp_path / "trove" / "11 Steuern" / "Steuerbescheid-2024.pdf"
     trove_file.unlink()
@@ -500,9 +495,7 @@ def _card_env(tmp_path, monkeypatch, create_file=True):
     )
 
 
-def test_walk_card_folder_request_shows_informed_consent(
-    tmp_path, monkeypatch, capsys
-):
+def test_walk_card_folder_request_shows_informed_consent(tmp_path, monkeypatch, capsys):
     import curiosity.cli as cli
 
     _card_env(tmp_path, monkeypatch)
@@ -524,9 +517,7 @@ def test_walk_card_folder_request_shows_informed_consent(
     assert "Account" not in out
 
 
-def test_walk_card_folder_request_marks_missing_file(
-    tmp_path, monkeypatch, capsys
-):
+def test_walk_card_folder_request_marks_missing_file(tmp_path, monkeypatch, capsys):
     import curiosity.cli as cli
 
     _card_env(tmp_path, monkeypatch, create_file=False)
@@ -609,11 +600,11 @@ def test_over_budget_digest_selects_source_relevant_files(env, monkeypatch):
         source_excerpt="Wir haben die Hetzner-Rechnung vom Mai noch nicht abgelegt.",
         top_k=40,
     )
-    assert "Hetzner_2026-05.pdf" in block         # source-mentioned → candidate
-    assert "Supabase-DPA.pdf" not in block        # unmentioned → not retrieved
-    assert "file-0250" not in block               # bulk noise → not retrieved
-    assert "## Candidate files" in block          # numbered candidate list
-    assert "[1] (root `work`)" in block           # numbered + root-tagged
+    assert "Hetzner_2026-05.pdf" in block  # source-mentioned → candidate
+    assert "Supabase-DPA.pdf" not in block  # unmentioned → not retrieved
+    assert "file-0250" not in block  # bulk noise → not retrieved
+    assert "## Candidate files" in block  # numbered candidate list
+    assert "[1] (root `work`)" in block  # numbered + root-tagged
     # the candidate map resolves the number back to (root, path)
     assert ("work", "Admin/Rechnungen/Hetzner_2026-05.pdf") in candidates.values()
 
@@ -665,9 +656,9 @@ def test_source_keywords_drop_stopwords_short_and_numeric():
     )
     assert "hetzner" in kw
     assert "rechnung" in kw
-    assert "2026" not in kw   # pure numeric dropped
-    assert "die" not in kw    # stopword
-    assert "mai" not in kw    # too short (<4)
+    assert "2026" not in kw  # pure numeric dropped
+    assert "die" not in kw  # stopword
+    assert "mai" not in kw  # too short (<4)
 
 
 def test_curiosity_excluded_skips_email_deep_scans():

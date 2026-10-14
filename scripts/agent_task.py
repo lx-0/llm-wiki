@@ -12,6 +12,7 @@ Usage:
 """
 
 import os
+
 os.environ["CLAUDE_INVOKED_BY"] = "agent_task"
 
 import argparse
@@ -77,9 +78,7 @@ def _record_last_run(agent_id: str) -> None:
     runs = _load_agent_runs()
     runs[agent_id] = now_iso()
     AGENT_RUNS_FILE.parent.mkdir(parents=True, exist_ok=True)
-    AGENT_RUNS_FILE.write_text(
-        json.dumps(runs, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-    )
+    AGENT_RUNS_FILE.write_text(json.dumps(runs, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
 async def run(spec: AgentSpec, dry_run: bool, extra_vars: dict[str, str]) -> int:
@@ -99,7 +98,9 @@ async def run(spec: AgentSpec, dry_run: bool, extra_vars: dict[str, str]) -> int
         if spec.button:
             log.info(
                 "  button:          %s (style=%s, shell_id=%s)",
-                spec.button.label, spec.button.style, spec.button.shell_command_id,
+                spec.button.label,
+                spec.button.style,
+                spec.button.shell_command_id,
             )
         log.info("  vars:            %s", vars_resolved)
         log.info("  body (first 200): %s", rendered[:200].replace("\n", " "))
@@ -142,7 +143,9 @@ async def run(spec: AgentSpec, dry_run: bool, extra_vars: dict[str, str]) -> int
 
     log.info(
         "Agent %r done. Tokens — input: %d, output: %d",
-        spec.id, total_input_tokens, total_output_tokens,
+        spec.id,
+        total_input_tokens,
+        total_output_tokens,
     )
     log_file.write_text(
         f"# agent: {spec.id}\n# title: {spec.title}\n# completed: {now_iso()}\n# tokens: input={total_input_tokens} output={total_output_tokens}\n\n{result_text}\n",
@@ -186,9 +189,13 @@ async def main_async() -> int:
     parser = argparse.ArgumentParser(description="Run an agentic task.")
     parser.add_argument("id", nargs="?", help="task id (matches prompts/agents/<id>.md)")
     parser.add_argument("--list", action="store_true", help="list available tasks")
-    parser.add_argument("--dry-run", action="store_true", help="resolve + print spec without spawning")
     parser.add_argument(
-        "--var", action="append", default=[],
+        "--dry-run", action="store_true", help="resolve + print spec without spawning"
+    )
+    parser.add_argument(
+        "--var",
+        action="append",
+        default=[],
         help="prompt-body substitution (repeatable). Format: key=value",
     )
     args = parser.parse_args()

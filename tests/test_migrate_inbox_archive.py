@@ -36,6 +36,7 @@ def fake_vault(tmp_path, monkeypatch):
     monkeypatch.setattr(paths_mod, "RAW_DIR", vault_raw)
 
     from migrations import migrate_inbox_archive as mig
+
     importlib.reload(mig)
 
     return mig, voice_inbox, picture_inbox, vault_raw
@@ -88,8 +89,12 @@ def test_filename_collision_gets_mtime_suffix(fake_vault):
     # Original destination preserved
     assert (dest / "note.txt").read_text() == "vault-resident version, keep me"
     # Migrated file gets mtime-suffix
-    collisions = [p for p in dest.iterdir() if p.name.startswith("note-") and p.name.endswith(".txt")]
-    assert len(collisions) == 1, f"expected 1 mtime-suffixed file, got {[p.name for p in dest.iterdir()]}"
+    collisions = [
+        p for p in dest.iterdir() if p.name.startswith("note-") and p.name.endswith(".txt")
+    ]
+    assert len(collisions) == 1, (
+        f"expected 1 mtime-suffixed file, got {[p.name for p in dest.iterdir()]}"
+    )
     assert collisions[0].read_text() == "legacy version"
 
 
@@ -123,6 +128,7 @@ def test_unconfigured_inboxes_are_skipped_gracefully(tmp_path, monkeypatch):
     monkeypatch.setattr(paths_mod, "RAW_DIR", tmp_path / "vault" / "raw")
 
     from migrations import migrate_inbox_archive as mig
+
     importlib.reload(mig)
 
     rc = mig.main([])

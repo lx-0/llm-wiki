@@ -4,6 +4,7 @@
 in `knowledge/people/` + `knowledge/projects/`, returning (open_total,
 entities_with_at_least_one_open).
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -15,7 +16,7 @@ def _make_entity(folder: Path, name: str, action_items_block: str) -> Path:
     folder.mkdir(parents=True, exist_ok=True)
     body = (
         "---\n"
-        f"title: \"{name}\"\n"
+        f'title: "{name}"\n'
         f"type: {'person' if folder.name == 'people' else 'project'}\n"
         "---\n\n"
         f"# {name}\n\n"
@@ -37,7 +38,8 @@ def test_empty_knowledge_returns_zero(tmp_path: Path) -> None:
 def test_single_person_three_open_items(tmp_path: Path) -> None:
     knowledge = tmp_path / "knowledge"
     _make_entity(
-        knowledge / "people", "Jane Doe",
+        knowledge / "people",
+        "Jane Doe",
         "- [ ] Send the Q3 deck 📅 2026-04-22\n"
         "- [ ] Follow up on Bob intro\n"
         "- [ ] Schedule onboarding 📅 2026-05-01",
@@ -49,10 +51,9 @@ def test_single_person_three_open_items(tmp_path: Path) -> None:
 def test_mix_open_and_checked_counts_only_open(tmp_path: Path) -> None:
     knowledge = tmp_path / "knowledge"
     _make_entity(
-        knowledge / "people", "Bob Smith",
-        "- [x] Sign the contract\n"
-        "- [X] Pay invoice\n"
-        "- [ ] Schedule onboarding call 📅 2026-04-15",
+        knowledge / "people",
+        "Bob Smith",
+        "- [x] Sign the contract\n- [X] Pay invoice\n- [ ] Schedule onboarding call 📅 2026-04-15",
     )
     open_total, entities_with = _open_action_items_in_entities(knowledge)
     assert (open_total, entities_with) == (1, 1)

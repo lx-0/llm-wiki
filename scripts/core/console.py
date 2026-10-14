@@ -65,6 +65,7 @@ def is_tty() -> bool:
 # POSIX terminal does. Shared here next to the C_* constants so input +
 # output share one console-substrate module.
 
+
 def read_key(fd: int | None = None) -> str:
     """Read one keypress from `fd` (default stdin) in cbreak mode.
 
@@ -102,7 +103,10 @@ def read_key(fd: int | None = None) -> str:
             seq = os.read(fd, 2)
             if seq.startswith(b"[") and len(seq) >= 2:
                 return {
-                    b"A": "up", b"B": "down", b"C": "right", b"D": "left",
+                    b"A": "up",
+                    b"B": "down",
+                    b"C": "right",
+                    b"D": "left",
                 }.get(seq[1:2], "esc")
             return "esc"
         return ch.decode("utf-8", errors="replace")
@@ -163,6 +167,7 @@ class ConsoleFormatter(logging.Formatter):
             else:
                 return m.group(0)
             return f"{color}${m.group(1)}{C_RESET}"
+
         return self._COST_RE.sub(_sub, msg)
 
     def _format_message_extras(self, msg: str) -> str | None:
@@ -197,9 +202,7 @@ class ConsoleFormatter(logging.Formatter):
         level_text = "" if record.levelname == "INFO" else record.levelname
         level = level_text.ljust(7)
         if level_color and _TTY and level_text:
-            level = f"{level_color}{level_text}{C_RESET}".ljust(
-                7 + len(level_color) + len(C_RESET)
-            )
+            level = f"{level_color}{level_text}{C_RESET}".ljust(7 + len(level_color) + len(C_RESET))
 
         return f"{C_DIM}{ts}{C_RESET}  {level}  {msg}"
 
@@ -216,9 +219,7 @@ class SdkNoiseFilter(logging.Filter):
     the archive still has the lines for debugging.
     """
 
-    _DROP_SUBSTRINGS = (
-        "Using bundled Claude Code CLI:",
-    )
+    _DROP_SUBSTRINGS = ("Using bundled Claude Code CLI:",)
 
     def filter(self, record: logging.LogRecord) -> bool:
         msg = record.getMessage()

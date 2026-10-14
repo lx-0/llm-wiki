@@ -54,6 +54,7 @@ def voice_env(tmp_path, monkeypatch):
     monkeypatch.setattr(CONFIG.features, "voice_punctuate", False)
 
     from collectors import voice as voice_mod
+
     importlib.reload(voice_mod)
 
     return voice_mod.VoiceCollector(), inbox, vault_raw / "voice"
@@ -65,6 +66,7 @@ def voice_env(tmp_path, monkeypatch):
 def test_unconfigured_inbox_is_graceful(monkeypatch):
     from core.config import CONFIG
     from collectors import voice as voice_mod
+
     importlib.reload(voice_mod)
 
     monkeypatch.setattr(CONFIG.personal, "voice_inbox", "")
@@ -78,6 +80,7 @@ def test_unconfigured_inbox_is_graceful(monkeypatch):
 def test_missing_inbox_path_is_graceful(monkeypatch, tmp_path):
     from core.config import CONFIG
     from collectors import voice as voice_mod
+
     importlib.reload(voice_mod)
 
     monkeypatch.setattr(CONFIG.personal, "voice_inbox", str(tmp_path / "does-not-exist"))
@@ -132,6 +135,7 @@ def test_real_run_writes_frontmatter_and_archives_sources(voice_env):
     # Sources moved into vault audit zone (M022: raw/inbox-mobile/voice/),
     # NOT into <inbox>/.processed/ (the pre-M022 location).
     from collectors import voice as voice_mod
+
     archive = voice_mod.MOBILE_ARCHIVE_DIR
     assert archive.is_dir()
     assert sorted(p.name for p in archive.iterdir()) == ["note-a.txt", "note-b.md"]
@@ -186,6 +190,7 @@ def test_empty_source_file_is_archived_without_ingest(voice_env):
     # Empty file still archived so re-runs don't keep retrying — but now
     # in the vault audit zone, not <inbox>/.processed/.
     from collectors import voice as voice_mod
+
     assert (voice_mod.MOBILE_ARCHIVE_DIR / "empty.txt").exists()
     assert not (inbox / ".processed").exists()
 
@@ -197,6 +202,7 @@ def test_same_minute_slug_collision_gets_seconds_suffix(voice_env, monkeypatch):
     (inbox / "second.txt").write_text("die gleiche slug erste sechs woerter")
     # Force same mtime so the slug-base is identical
     import os
+
     fixed_ts = 1747341792  # 2026-05-15T17:23:12 UTC, arbitrary stable value
     os.utime(inbox / "first.txt", (fixed_ts, fixed_ts))
     os.utime(inbox / "second.txt", (fixed_ts, fixed_ts))

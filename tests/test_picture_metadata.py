@@ -14,6 +14,7 @@ from pathlib import Path
 
 def _import():
     from collectors import _picture_metadata as m
+
     return m
 
 

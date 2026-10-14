@@ -68,9 +68,7 @@ def score_instrument(
         ValueError: from score_answers (invalid value, unknown item id).
     """
     threshold = (
-        bandable_threshold
-        if bandable_threshold is not None
-        else DEFAULT_BANDABLE_COVERAGE_PCT
+        bandable_threshold if bandable_threshold is not None else DEFAULT_BANDABLE_COVERAGE_PCT
     )
     instr: Instrument = load_instrument(instrument_dir)
     result = score_answers(list(instr.items), answers)

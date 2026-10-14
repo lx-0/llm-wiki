@@ -41,8 +41,17 @@ def fake_vault(tmp_path, monkeypatch):
     areas = knowledge / "areas"
     reports = tmp_path / ".wiki" / "reports"
     state = tmp_path / ".wiki" / "state"
-    for d in (inbox, raw_requests, raw_suggestions, daily_sessions,
-              people, projects, areas, reports, state):
+    for d in (
+        inbox,
+        raw_requests,
+        raw_suggestions,
+        daily_sessions,
+        people,
+        projects,
+        areas,
+        reports,
+        state,
+    ):
         d.mkdir(parents=True, exist_ok=True)
 
     monkeypatch.setattr(menu_context, "INBOX_DIR", inbox)
@@ -92,6 +101,7 @@ def test_compile_changed_with_state_counts_only_newer(fake_vault):
     old = fake_vault / "raw" / "old.md"
     old.write_text("x")
     import os
+
     # Backdate the source so it's older than last_compile.
     ten_minutes_ago = datetime.now().timestamp() - 600
     os.utime(old, (ten_minutes_ago, ten_minutes_ago))
@@ -110,20 +120,25 @@ def test_curiosity_probes_split_folder_from_email(fake_vault):
 
     requests = fake_vault / "raw" / "requests"
     (requests / "request-a.json").write_text(
-        json.dumps({"type": "email-deep-scan", "status": "pending"}))
+        json.dumps({"type": "email-deep-scan", "status": "pending"})
+    )
     (requests / "request-b.json").write_text(
-        json.dumps({"type": "email-deep-scan", "status": "in_progress"}))
+        json.dumps({"type": "email-deep-scan", "status": "in_progress"})
+    )
     (requests / "request-c.json").write_text(
-        json.dumps({"type": "folder-deep-scan", "status": "pending"}))
+        json.dumps({"type": "folder-deep-scan", "status": "pending"})
+    )
     (requests / "request-d.json").write_text(
-        json.dumps({"type": "folder-deep-scan", "status": "done"}))
+        json.dumps({"type": "folder-deep-scan", "status": "done"})
+    )
     (requests / "request-e.json").write_text(
-        json.dumps({"type": "email-deep-scan", "status": "rejected"}))
+        json.dumps({"type": "email-deep-scan", "status": "rejected"})
+    )
     (requests / "request-bad.json").write_text("not json")
 
     assert menu_context.probe_folder_curiosity_pending() == 1  # pending folder only
-    assert menu_context.probe_curiosity_pending() == 2         # non-terminal email
-    assert menu_context._count_pending_requests() == 3         # all pending, any type
+    assert menu_context.probe_curiosity_pending() == 2  # non-terminal email
+    assert menu_context._count_pending_requests() == 3  # all pending, any type
 
 
 def test_suggestions_carry_intent_group(fake_vault):
@@ -134,7 +149,8 @@ def test_suggestions_carry_intent_group(fake_vault):
 
     (fake_vault / "inbox" / "a.md").write_text("x")
     (fake_vault / "raw" / "requests" / "request-r.json").write_text(
-        json.dumps({"type": "folder-deep-scan", "status": "pending"}))
+        json.dumps({"type": "folder-deep-scan", "status": "pending"})
+    )
 
     by_id = {r["id"]: r for r in menu_context.build_suggestions()}
     assert by_id["process-inbox"]["group"] == "do"
@@ -216,9 +232,7 @@ def test_lint_stale_with_no_reports_returns_1(fake_vault, monkeypatch):
 
     # KNOWLEDGE_DIR isn't monkeypatched on the module top-level — the probe
     # imports it lazily. Point it at our fake vault for this test.
-    monkeypatch.setattr(
-        "core.paths.KNOWLEDGE_DIR", fake_vault / "knowledge", raising=False
-    )
+    monkeypatch.setattr("core.paths.KNOWLEDGE_DIR", fake_vault / "knowledge", raising=False)
     assert menu_context.probe_lint_stale() == 1
 
 
@@ -246,7 +260,15 @@ def test_build_suggestions_returns_only_nonzero_counts_sorted(fake_vault):
     # All entries have the right schema.
     for r in results:
         assert set(r.keys()) == {
-            "id", "count", "label", "title", "verb", "group", "argv", "priority", "key",
+            "id",
+            "count",
+            "label",
+            "title",
+            "verb",
+            "group",
+            "argv",
+            "priority",
+            "key",
         }
         assert r["count"] > 0
     # Sorted by ascending priority + auto-numbered keys.

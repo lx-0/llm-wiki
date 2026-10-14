@@ -54,11 +54,16 @@ def test_summarize_day_runs_against_fixture(
 
     async def fake_query(*, prompt: str, options):  # type: ignore[no-untyped-def]
         from claude_agent_sdk import ResultMessage
+
         msg = ResultMessage(
             subtype="success",
-            duration_ms=10, duration_api_ms=10,
-            is_error=False, num_turns=1, session_id="sess-test",
-            total_cost_usd=0.0, usage={"input_tokens": 100, "output_tokens": 50},
+            duration_ms=10,
+            duration_api_ms=10,
+            is_error=False,
+            num_turns=1,
+            session_id="sess-test",
+            total_cost_usd=0.0,
+            usage={"input_tokens": 100, "output_tokens": 50},
             result="Pretended to write a Summary block. Done.",
         )
         yield msg

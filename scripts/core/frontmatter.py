@@ -80,7 +80,7 @@ def split_fence(text: str) -> tuple[str | None, str]:
     m = _OPEN_RE.match(text)
     if not m:
         return None, text
-    rest = text[m.end():]
+    rest = text[m.end() :]
     close = _CLOSE_RE.search(rest)
     if close is None:
         return None, text
@@ -89,7 +89,7 @@ def split_fence(text: str) -> tuple[str | None, str]:
         block = block[:-2]
     elif block.endswith("\n"):
         block = block[:-1]
-    body = rest[close.end():]
+    body = rest[close.end() :]
     if body.startswith("\n"):
         body = body[1:]
     return block, body
@@ -127,9 +127,7 @@ def parse_strict(text: str) -> tuple[dict, str]:
     except yaml.YAMLError as exc:
         raise FrontmatterError(f"malformed frontmatter YAML: {exc}") from exc
     if not isinstance(data, dict):
-        raise FrontmatterError(
-            f"frontmatter is not a mapping (got {type(data).__name__})"
-        )
+        raise FrontmatterError(f"frontmatter is not a mapping (got {type(data).__name__})")
     return data, body
 
 
@@ -173,9 +171,7 @@ def serialize(fm: dict, body: str) -> str:
     with a single trailing newline. Write-anew only (DECISIONS 2026-05-15)."""
     import yaml
 
-    block = yaml.safe_dump(
-        fm, sort_keys=False, allow_unicode=True, width=_DUMP_WIDTH
-    ).rstrip()
+    block = yaml.safe_dump(fm, sort_keys=False, allow_unicode=True, width=_DUMP_WIDTH).rstrip()
     body_out = body.strip("\n")
     if body_out:
         return f"---\n{block}\n---\n\n{body_out}\n"
@@ -219,7 +215,7 @@ def update_fields(path: Path, **fields: object) -> None:
     m = _OPEN_RE.match(text)
     if not m:
         raise FrontmatterError(f"no frontmatter fence in {path}")
-    rest = text[m.end():]
+    rest = text[m.end() :]
     close = _CLOSE_RE.search(rest)
     if close is None:
         raise FrontmatterError(f"unterminated frontmatter fence in {path}")
@@ -233,7 +229,7 @@ def update_fields(path: Path, **fields: object) -> None:
             if block and not block.endswith("\n"):
                 block += "\n"
             block += line + "\n"
-    path.write_text(text[: m.end()] + block + rest[close.start():], encoding="utf-8")
+    path.write_text(text[: m.end()] + block + rest[close.start() :], encoding="utf-8")
 
 
 def backup(path: Path) -> Path | None:

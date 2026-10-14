@@ -56,8 +56,13 @@ CHROME_HISTORY = CHROME_PROFILE / "History"
 REPORT_DIR = RAW_DIR / "notes" / "browser"
 
 SKIP_DOMAINS = {
-    "localhost", "127.0.0.1", "about:blank", "", "newtab",
-    "accounts.google.com", "mail.google.com",
+    "localhost",
+    "127.0.0.1",
+    "about:blank",
+    "",
+    "newtab",
+    "accounts.google.com",
+    "mail.google.com",
 }
 
 
@@ -75,6 +80,7 @@ def clean_domain(url: str) -> str | None:
 
 
 # ── Firefox Tab Groups ────────────────────────────────────────────────
+
 
 def scan_stg(backup_dir: Path) -> dict | None:
     """Scan Simple Tab Groups backup."""
@@ -98,10 +104,12 @@ def scan_stg(backup_dir: Path) -> dict | None:
         for tab in tabs:
             if not isinstance(tab, dict):
                 continue
-            tab_list.append({
-                "title": tab.get("title", ""),
-                "url": tab.get("url", ""),
-            })
+            tab_list.append(
+                {
+                    "title": tab.get("title", ""),
+                    "url": tab.get("url", ""),
+                }
+            )
         if tabs:
             groups.append({"title": title, "tab_count": len(tabs), "tabs": tab_list})
 
@@ -110,6 +118,7 @@ def scan_stg(backup_dir: Path) -> dict | None:
 
 
 # ── Firefox Bookmarks + History ───────────────────────────────────────
+
 
 def scan_firefox_places(places_path: Path) -> dict | None:
     """Scan Firefox places.sqlite for bookmarks and history."""
@@ -141,13 +150,15 @@ def scan_firefox_places(places_path: Path) -> dict | None:
         if date_added:
             with swallow("firefox bookmark date parse", level="debug", logger=log):
                 dt = datetime.fromtimestamp(date_added / 1_000_000).strftime("%Y-%m-%d")
-        bookmarks.append({
-            "title": title or "(no title)",
-            "url": url,
-            "domain": domain,
-            "date": dt,
-            "folder": folder or "",
-        })
+        bookmarks.append(
+            {
+                "title": title or "(no title)",
+                "url": url,
+                "domain": domain,
+                "date": dt,
+                "folder": folder or "",
+            }
+        )
 
     # History - top visited
     history_domains = Counter()
@@ -168,13 +179,15 @@ def scan_firefox_places(places_path: Path) -> dict | None:
             if last_visit:
                 with swallow("firefox history date parse", level="debug", logger=log):
                     dt = datetime.fromtimestamp(last_visit / 1_000_000).strftime("%Y-%m-%d")
-            history_entries.append({
-                "title": title or "(no title)",
-                "url": url,
-                "visits": visit_count,
-                "last_visit": dt,
-                "domain": domain,
-            })
+            history_entries.append(
+                {
+                    "title": title or "(no title)",
+                    "url": url,
+                    "visits": visit_count,
+                    "last_visit": dt,
+                    "domain": domain,
+                }
+            )
 
     # History date range
     cur.execute("SELECT MIN(visit_date), MAX(visit_date) FROM moz_historyvisits")
@@ -226,17 +239,20 @@ def scan_firefox_places(places_path: Path) -> dict | None:
     # Google searches from URL history
     google_searches = []
     import urllib.parse
+
     for entry in history_entries:
         if "google." in entry.get("domain", "") and "/search" in entry.get("url", ""):
             with swallow("google-search query parse", level="debug", logger=log):
                 parsed_qs = urllib.parse.parse_qs(urllib.parse.urlparse(entry["url"]).query)
                 q = parsed_qs.get("q", [""])[0]
                 if q:
-                    google_searches.append({
-                        "query": q,
-                        "visits": entry["visits"],
-                        "last_visit": entry["last_visit"],
-                    })
+                    google_searches.append(
+                        {
+                            "query": q,
+                            "visits": entry["visits"],
+                            "last_visit": entry["last_visit"],
+                        }
+                    )
 
     return {
         "bookmarks": bookmarks,
@@ -253,6 +269,7 @@ def scan_firefox_places(places_path: Path) -> dict | None:
 
 
 # ── Chrome Bookmarks + History ────────────────────────────────────────
+
 
 def walk_chrome_bookmarks(node: dict, path: str = "") -> list[dict]:
     """Recursively extract Chrome bookmarks."""
@@ -271,13 +288,15 @@ def walk_chrome_bookmarks(node: dict, path: str = "") -> list[dict]:
                     # Chrome uses Windows epoch (microseconds since 1601-01-01)
                     ts = (int(date_added) - 11644473600000000) / 1_000_000
                     dt = datetime.fromtimestamp(ts).strftime("%Y-%m-%d")
-            items.append({
-                "title": name,
-                "url": url,
-                "domain": domain,
-                "date": dt,
-                "folder": path,
-            })
+            items.append(
+                {
+                    "title": name,
+                    "url": url,
+                    "domain": domain,
+                    "date": dt,
+                    "folder": path,
+                }
+            )
 
     for child in node.get("children", []):
         items.extend(walk_chrome_bookmarks(child, current))
@@ -327,13 +346,15 @@ def scan_chrome_history(history_path: Path) -> dict | None:
                     with swallow("chrome history date parse", level="debug", logger=log):
                         ts = (last_visit - 11644473600000000) / 1_000_000
                         dt = datetime.fromtimestamp(ts).strftime("%Y-%m-%d")
-                entries.append({
-                    "title": title or "(no title)",
-                    "url": url,
-                    "visits": visit_count,
-                    "last_visit": dt,
-                    "domain": domain,
-                })
+                entries.append(
+                    {
+                        "title": title or "(no title)",
+                        "url": url,
+                        "visits": visit_count,
+                        "last_visit": dt,
+                        "domain": domain,
+                    }
+                )
 
         cur.execute("SELECT COUNT(*) FROM visits")
         total_visits = cur.fetchone()[0]
@@ -354,8 +375,10 @@ def scan_chrome_history(history_path: Path) -> dict | None:
 
 # ── Report Generation ─────────────────────────────────────────────────
 
-def generate_report(ff_stg: dict | None, ff_places: dict | None,
-                    chrome_bm: list | None, chrome_hist: dict | None) -> str:
+
+def generate_report(
+    ff_stg: dict | None, ff_places: dict | None, chrome_bm: list | None, chrome_hist: dict | None
+) -> str:
     """Generate comprehensive browser overview report."""
     lines = [
         "---",
@@ -374,7 +397,9 @@ def generate_report(ff_stg: dict | None, ff_places: dict | None,
 
     # ── STG ──
     if ff_stg:
-        lines.append(f"## Firefox Tab Groups ({ff_stg['total_tabs']} tabs in {ff_stg['total_groups']} groups)")
+        lines.append(
+            f"## Firefox Tab Groups ({ff_stg['total_tabs']} tabs in {ff_stg['total_groups']} groups)"
+        )
         lines.append("")
         for g in ff_stg["groups"]:
             if g["tab_count"] == 0:
@@ -402,12 +427,16 @@ def generate_report(ff_stg: dict | None, ff_places: dict | None,
         lines.append("### Neueste 30 Bookmarks")
         lines.append("")
         for bm in ff_places["bookmarks"][:30]:
-            lines.append(f"- [{bm['title'][:60]}]({bm['url'][:100]}) ({bm['date']}, {bm['folder']})")
+            lines.append(
+                f"- [{bm['title'][:60]}]({bm['url'][:100]}) ({bm['date']}, {bm['folder']})"
+            )
         lines.append("")
 
         # ── Firefox History ──
         dr = ff_places.get("history_date_range", {})
-        lines.append(f"## Firefox History ({ff_places['history_total_visits']} visits, {dr.get('from','?')}—{dr.get('to','?')})")
+        lines.append(
+            f"## Firefox History ({ff_places['history_total_visits']} visits, {dr.get('from', '?')}—{dr.get('to', '?')})"
+        )
         lines.append("")
         lines.append("### Top Domains")
         lines.append("")
@@ -417,7 +446,9 @@ def generate_report(ff_stg: dict | None, ff_places: dict | None,
         lines.append("### Meistbesuchte Seiten")
         lines.append("")
         for entry in ff_places["history_top"][:30]:
-            lines.append(f"- {entry['title'][:60]} ({entry['visits']}x, zuletzt {entry['last_visit']})")
+            lines.append(
+                f"- {entry['title'][:60]} ({entry['visits']}x, zuletzt {entry['last_visit']})"
+            )
             lines.append(f"  {entry['url'][:100]}")
         lines.append("")
 
@@ -432,13 +463,13 @@ def generate_report(ff_stg: dict | None, ff_places: dict | None,
                 lines.append("### Suchleiste")
                 lines.append("")
                 for s in searches[:30]:
-                    lines.append(f"- \"{s['query']}\" ({s['times']}x, zuletzt {s['last_used']})")
+                    lines.append(f'- "{s["query"]}" ({s["times"]}x, zuletzt {s["last_used"]})')
                 lines.append("")
             if google:
                 lines.append("### Google Suchen (aus URL History)")
                 lines.append("")
                 for s in google[:30]:
-                    lines.append(f"- \"{s['query']}\" ({s['visits']}x, zuletzt {s['last_visit']})")
+                    lines.append(f'- "{s["query"]}" ({s["visits"]}x, zuletzt {s["last_visit"]})')
                 lines.append("")
 
     # ── Chrome Bookmarks ──
@@ -520,7 +551,9 @@ class BrowserCollector:
 
     def run(self, *, dry_run: bool = False, incremental: bool = False) -> RunResult:
         if not self.is_configured():
-            return RunResult(message="No browser sources configured (Firefox profile / STG dir / Chrome)")
+            return RunResult(
+                message="No browser sources configured (Firefox profile / STG dir / Chrome)"
+            )
 
         sources = _scan_all_sources()
         present = [k for k, v in sources.items() if v]
@@ -570,7 +603,9 @@ def main():
         print("Scanning Firefox Bookmarks + History...")
         ff_places = scan_firefox_places(FF_PLACES)
         if ff_places:
-            print(f"  {ff_places['bookmark_count']} bookmarks, {ff_places['history_total_visits']} visits")
+            print(
+                f"  {ff_places['bookmark_count']} bookmarks, {ff_places['history_total_visits']} visits"
+            )
         else:
             print("  places.sqlite not found")
 

@@ -32,15 +32,21 @@ def _user(text: str = "", tools: list[str] | None = None) -> Turn:
 
 # ── Asymmetric truncation: prose budget independent of tool budget ────────
 
+
 def test_long_assistant_prose_survives_a_tool_spam_burst():
     """The bug fixed: 50K analysis lost when tool dumps fill MAX_CONTEXT_CHARS."""
     long_analysis = "A" * 30_000
     tool_spam = [f"[Read] /some/long/path/file-{i}.py" for i in range(2000)]
     turns = [_assistant(text=long_analysis, tools=tool_spam)]
 
-    out = build_context(turns, budgets=Budgets(
-        assistant_text=50_000, user_text=10_000, tool_summary=10_000,
-    ))
+    out = build_context(
+        turns,
+        budgets=Budgets(
+            assistant_text=50_000,
+            user_text=10_000,
+            tool_summary=10_000,
+        ),
+    )
 
     assert long_analysis in out, "assistant prose was clipped despite fitting its own budget"
     # The 30K of prose must not be pushed out by the 50K+ of tool spam.
@@ -50,29 +56,35 @@ def test_tool_spam_capped_independent_of_prose():
     long_tools = ["[Bash] ls -la" for _ in range(2000)]  # ~28K total
     turns = [_assistant(text="short note", tools=long_tools)]
 
-    out = build_context(turns, budgets=Budgets(
-        assistant_text=50_000, user_text=10_000, tool_summary=5_000,
-    ))
+    out = build_context(
+        turns,
+        budgets=Budgets(
+            assistant_text=50_000,
+            user_text=10_000,
+            tool_summary=5_000,
+        ),
+    )
 
     tool_section_size = sum(len(line) for line in out.splitlines() if line.startswith("[Bash]"))
-    assert tool_section_size <= 5_100, (
-        f"tool budget exceeded: {tool_section_size} > 5000"
-    )
+    assert tool_section_size <= 5_100, f"tool budget exceeded: {tool_section_size} > 5000"
     assert "short note" in out
 
 
 # ── Prefer-tail: newest content wins under budget pressure ───────────────
 
+
 def test_prefer_tail_drops_oldest_assistant_turns():
     """When assistant prose exceeds budget, the recent turns survive."""
-    turns = [
-        _assistant(text=f"turn-{i}: " + "X" * 100)
-        for i in range(20)
-    ]
+    turns = [_assistant(text=f"turn-{i}: " + "X" * 100) for i in range(20)]
     # 20 turns × ~110 chars = ~2200 chars; budget 500 keeps only the tail
-    out = build_context(turns, budgets=Budgets(
-        assistant_text=500, user_text=10_000, tool_summary=10_000,
-    ))
+    out = build_context(
+        turns,
+        budgets=Budgets(
+            assistant_text=500,
+            user_text=10_000,
+            tool_summary=10_000,
+        ),
+    )
 
     assert "turn-19" in out, "newest assistant turn must survive"
     assert "turn-0" not in out, "oldest assistant turn must be dropped first"
@@ -83,9 +95,14 @@ def test_prefer_tail_within_a_single_oversized_turn():
     huge = "OLD" * 5_000 + "NEW_PART_OF_PROSE"
     turns = [_assistant(text=huge)]
 
-    out = build_context(turns, budgets=Budgets(
-        assistant_text=200, user_text=10_000, tool_summary=10_000,
-    ))
+    out = build_context(
+        turns,
+        budgets=Budgets(
+            assistant_text=200,
+            user_text=10_000,
+            tool_summary=10_000,
+        ),
+    )
 
     assert "NEW_PART_OF_PROSE" in out
     assert "[... truncated" in out
@@ -93,18 +110,22 @@ def test_prefer_tail_within_a_single_oversized_turn():
 
 # ── Turn dropping vs partial inclusion ───────────────────────────────────
 
+
 def test_turn_kept_when_only_tool_stream_fits():
     """If assistant budget is full but tool budget isn't, the turn still emits."""
     filler = _assistant(text="X" * 1000)  # fills assistant budget
     target = _assistant(text="dropped prose", tools=["[Bash] target-cmd"])
 
-    out = build_context([filler, target], budgets=Budgets(
-        assistant_text=1_000, user_text=10_000, tool_summary=10_000,
-    ))
-
-    assert "[Bash] target-cmd" in out, (
-        "tool summary must survive even when text class is full"
+    out = build_context(
+        [filler, target],
+        budgets=Budgets(
+            assistant_text=1_000,
+            user_text=10_000,
+            tool_summary=10_000,
+        ),
     )
+
+    assert "[Bash] target-cmd" in out, "tool summary must survive even when text class is full"
     # The turn header (## Assistant) for the target turn must appear.
     assert out.count("## Assistant") >= 2
 
@@ -118,15 +139,21 @@ def test_completely_empty_turns_are_dropped():
 
 # ── Independence of user vs assistant budget ─────────────────────────────
 
+
 def test_user_and_assistant_budgets_are_independent():
     """A long assistant turn doesn't starve user prose, and vice versa."""
     turns = [
         _user(text="U" * 8_000),
         _assistant(text="A" * 40_000),
     ]
-    out = build_context(turns, budgets=Budgets(
-        assistant_text=50_000, user_text=10_000, tool_summary=10_000,
-    ))
+    out = build_context(
+        turns,
+        budgets=Budgets(
+            assistant_text=50_000,
+            user_text=10_000,
+            tool_summary=10_000,
+        ),
+    )
 
     assert "U" * 8_000 in out
     assert "A" * 40_000 in out
@@ -134,10 +161,9 @@ def test_user_and_assistant_budgets_are_independent():
 
 # ── Chronological output order preserved ─────────────────────────────────
 
+
 def test_output_is_chronological_after_tail_pruning():
-    turns = [
-        _user(text=f"q{i}") for i in range(5)
-    ]
+    turns = [_user(text=f"q{i}") for i in range(5)]
     out = build_context(turns)
     # All 5 should fit easily; check order.
     positions = [out.find(f"q{i}") for i in range(5)]
@@ -146,6 +172,7 @@ def test_output_is_chronological_after_tail_pruning():
 
 
 # ── from_config fallback path ────────────────────────────────────────────
+
 
 def test_budgets_from_config_falls_back_cleanly_without_engine():
     """Standalone use (no CONFIG importable) must return Defaults, not crash."""

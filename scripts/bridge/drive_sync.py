@@ -50,6 +50,7 @@ class BridgeResult:
     mappings AND missing-remote (TCC, Drive offline, operator typo).
     `failed` covers rsync non-zero exit. `ok` includes dry-run.
     """
+
     name: str
     status: str  # "ok" | "skipped" | "failed"
     reason: str = ""
@@ -61,6 +62,7 @@ class BridgeResult:
 @dataclass
 class BridgeRunSummary:
     """Top-level result of `run()` — one entry per mapping."""
+
     results: list[BridgeResult] = field(default_factory=list)
 
     @property
@@ -174,8 +176,9 @@ def sync_one(
     cmd.append(f"{remote}/")
     cmd.append(f"{local}/")
 
-    log.info("bridge %s: %s -> %s (%s%s)", name, remote, local, mode,
-             ", dry-run" if dry_run else "")
+    log.info(
+        "bridge %s: %s -> %s (%s%s)", name, remote, local, mode, ", dry-run" if dry_run else ""
+    )
 
     try:
         proc = _run(cmd, capture_output=True, text=True, check=False)

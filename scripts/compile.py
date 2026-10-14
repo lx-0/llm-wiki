@@ -9,6 +9,7 @@ Usage:
 """
 
 import os
+
 os.environ["CLAUDE_INVOKED_BY"] = "compile"
 
 import argparse
@@ -20,7 +21,15 @@ import sys
 import time
 from pathlib import Path
 
-from core.paths import INDEX_FILE, KNOWLEDGE_DIR, LOGS_DIR, LOG_FILE, ROOT_DIR, STATE_DIR, STATE_FILE
+from core.paths import (
+    INDEX_FILE,
+    KNOWLEDGE_DIR,
+    LOGS_DIR,
+    LOG_FILE,
+    ROOT_DIR,
+    STATE_DIR,
+    STATE_FILE,
+)
 from core.state_store import acquire_process_lock, pending_paths, update_state
 from core.utils import (
     file_hash,
@@ -67,12 +76,9 @@ class _CompileFormatter(ConsoleFormatter):
     _CURIOSITY_RE = re.compile(r"^\s+Curiosity[: ]")
 
     def _format_message_extras(self, msg: str) -> str | None:
-        if (mh := self._HEADER_RE.match(msg.strip())):
+        if mh := self._HEADER_RE.match(msg.strip()):
             pos, badge, path = mh.group(1), mh.group(2), mh.group(3)
-            return (
-                f"{C_BOLD}{C_CYAN}▶ [{pos}] "
-                f"{C_YELLOW}[{badge}]{C_CYAN} {path}{C_RESET}"
-            )
+            return f"{C_BOLD}{C_CYAN}▶ [{pos}] {C_YELLOW}[{badge}]{C_CYAN} {path}{C_RESET}"
         if self._DISPATCH_RE.match(msg):
             return f"{C_DIM}{msg}{C_RESET}"
         if self._CURIOSITY_RE.match(msg):
@@ -103,6 +109,7 @@ from compile_stages.route import (  # noqa: E402
 
 
 # ── File selection ───────────────────────────────────────────────────
+
 
 def select_files(args: argparse.Namespace) -> list[Path]:
     """Determine which files to compile based on CLI args and state."""
@@ -191,7 +198,7 @@ async def compile_file(
             log.info(
                 "  skipping: type=%s is in compile_skip_substrate_types "
                 "(use `wiki compile --file <path>` to force)",
-                route.reason[len("substrate_type_excluded_"):],
+                route.reason[len("substrate_type_excluded_") :],
             )
         # Record the ingested-hash on deterministic skips (empty / final-only /
         # substrate-excluded), mirroring the IndexOnly + HealthStub routes. The
@@ -202,7 +209,9 @@ async def compile_file(
         # email-delta + final-only sources (34 + 3 on lxw, 2026-06-02). If the
         # body later changes, the hash mismatch correctly re-evaluates it.
         return CompileOutcome(
-            status="skipped", skip_reason=route.reason, ingest_hash=True,
+            status="skipped",
+            skip_reason=route.reason,
+            ingest_hash=True,
         )
 
     if isinstance(route, IndexOnly):
@@ -219,12 +228,16 @@ def _run_index_only(source: Path, rel_path: str, route) -> CompileOutcome:
     entry by pathname (no SDK distill, no separate concept article), then mark the
     file ingested so re-runs no-op and check_orphan_sources doesn't flag it."""
     from core.utils import build_index_entry
+
     log.info(
         "  source-and-final: indexing only (no distill) — %d wikilinks discovered",
         len(route.wikilinks),
     )
     new_entry = build_index_entry(
-        rel_path, route.title, "(source-and-final)", today_iso(),
+        rel_path,
+        route.title,
+        "(source-and-final)",
+        today_iso(),
     )
     if INDEX_FILE.exists():
         existing = INDEX_FILE.read_text(encoding="utf-8")
@@ -249,10 +262,7 @@ def _run_index_only(source: Path, rel_path: str, route) -> CompileOutcome:
 def _run_health_stub(source: Path, rel_path: str) -> CompileOutcome:
     """Execute the HealthStub route: record the metric-only stub deterministically
     (mark ingested), no agent, no knowledge writes, $0. 2026-05-22 root-cause."""
-    log.info(
-        "  health-rollup stub-body — deterministic record "
-        "(no agent, no knowledge writes, $0)"
-    )
+    log.info("  health-rollup stub-body — deterministic record (no agent, no knowledge writes, $0)")
     return CompileOutcome(
         status="skipped",
         skip_reason="health_rollup_stub_deterministic",
@@ -278,9 +288,7 @@ async def _run_compile_route(
         short_model = ""
         if metadata.model_id:
             m = re.match(r"claude-(haiku|sonnet|opus)-(\d+-\d+)", metadata.model_id)
-            short_model = (
-                f" @ {m.group(1)}-{m.group(2)}" if m else f" @ {metadata.model_id}"
-            )
+            short_model = f" @ {m.group(1)}-{m.group(2)}" if m else f" @ {metadata.model_id}"
         log.info("  type=%s → %s%s", source_type, metadata.substrate_prompt, short_model)
 
     # Memory-substrate pre-pass: resolve target project page + bootstrap the
@@ -293,6 +301,7 @@ async def _run_compile_route(
             ensure_timeline_section,
             resolve_project_slug,
         )
+
         fm = _parse_frontmatter(source_content)
         project_slug = resolve_project_slug(source, fm, ROOT_DIR)
         if project_slug is None:
@@ -309,7 +318,8 @@ async def _run_compile_route(
             project_page_rel = str(project_page.relative_to(ROOT_DIR))
             log.info(
                 "  memory pre-pass: project=%s page=%s (Timeline bootstrapped if absent)",
-                project_slug, project_page_rel,
+                project_slug,
+                project_page_rel,
             )
             metadata = dataclasses.replace(
                 metadata,
@@ -344,7 +354,9 @@ async def _run_compile_route(
                     "`prompts/compile_memories.md` or add `%s` to "
                     "`compile_skip_substrate_types`. Already-ok chunks "
                     "preserved.",
-                    consecutive_failures, i - 1, len(classification.chunks),
+                    consecutive_failures,
+                    i - 1,
+                    len(classification.chunks),
                     source_type,
                 )
                 aborted_at = i - 1
@@ -366,9 +378,15 @@ async def _run_compile_route(
         log.info(
             "  aggregated-memory result: %d ok / %d skipped / %d failed "
             "(total in:%d out:%d $%.4f)%s",
-            ok_count, skip_count, fail_count, total_in, total_out, total_cost,
+            ok_count,
+            skip_count,
+            fail_count,
+            total_in,
+            total_out,
+            total_cost,
             f" — ABORTED at chunk {aborted_at}/{len(classification.chunks)}"
-            if aborted_at is not None else "",
+            if aborted_at is not None
+            else "",
         )
         if not any_ok:
             return CompileOutcome(
@@ -396,7 +414,8 @@ async def _run_compile_route(
 
     if result.status == "skipped":
         return CompileOutcome(
-            status="skipped", skip_reason=result.skip_reason or "unknown",
+            status="skipped",
+            skip_reason=result.skip_reason or "unknown",
         )
 
     if result.status == "failed":
@@ -436,6 +455,7 @@ def _persist_outcome(rel: str, digest: str, *, stamp_compile: bool = False) -> d
     recompile's worth of tokens). Merging under the lock keeps every writer's
     keys alive; this run contributes only the ingested hash and (on success)
     the last_compile stamp."""
+
     def _apply(state: dict) -> None:
         state.setdefault("ingested", {})[rel] = digest
         # total_cost accumulation retired (audit 2026-08-25): the dollar
@@ -449,6 +469,7 @@ def _persist_outcome(rel: str, digest: str, *, stamp_compile: bool = False) -> d
 
 
 # ── Main ─────────────────────────────────────────────────────────────
+
 
 def _spawn_maintenance() -> None:
     """Drain due piggybacks at the end of a real compile.
@@ -470,7 +491,8 @@ def _spawn_maintenance() -> None:
         if spawned:
             log.info(
                 "  maintenance: spawned %d due piggyback(s): %s",
-                len(spawned), ", ".join(spawned),
+                len(spawned),
+                ", ".join(spawned),
             )
         else:
             log.info("  maintenance: 0 due — queues current")
@@ -499,22 +521,24 @@ async def main() -> None:
     parser = argparse.ArgumentParser(description="Compile sources into wiki articles")
     parser.add_argument("--all", action="store_true", help="Recompile all files")
     parser.add_argument("--file", type=str, help="Compile a specific file")
+    parser.add_argument("--dry-run", action="store_true", help="Show what would be compiled")
     parser.add_argument(
-        "--dry-run", action="store_true", help="Show what would be compiled"
-    )
-    parser.add_argument(
-        "--progress-json", action="store_true",
+        "--progress-json",
+        action="store_true",
         help=(
-            "Emit machine-readable PROGRESS {\"current\": i, \"total\": n} lines "
+            'Emit machine-readable PROGRESS {"current": i, "total": n} lines '
             "on stdout alongside the human log (desktop app / agents)"
         ),
     )
     parser.add_argument(
-        "--max-files", type=int, default=CONFIG.limits.compile_max_files,
+        "--max-files",
+        type=int,
+        default=CONFIG.limits.compile_max_files,
         help="Stop after N files (to stay under the 5h rate-limit window). 0 = unlimited.",
     )
     parser.add_argument(
-        "--max-consecutive-failures", type=int,
+        "--max-consecutive-failures",
+        type=int,
         default=CONFIG.limits.compile_max_consecutive_failures,
         help="Abort run when this many files fail back-to-back (rate-limit signal).",
     )
@@ -540,9 +564,12 @@ async def main() -> None:
     if CONFIG.features.clippings_sweep:
         try:
             import clippings_sweep
+
             n_swept = clippings_sweep.sweep()
             if n_swept > 0:
-                log.info("Pre-compile: swept %d file(s) from Clippings/ into raw/articles/", n_swept)
+                log.info(
+                    "Pre-compile: swept %d file(s) from Clippings/ into raw/articles/", n_swept
+                )
         except Exception as e:  # noqa: BLE001 — never let sweep failures abort compile
             log.warning("Pre-compile clippings sweep failed (continuing): %s", e)
 
@@ -619,7 +646,8 @@ async def main() -> None:
             # caught — it's a real task/process cancellation that must propagate.)
             log.exception("  ✗ unhandled exception compiling %s", source.relative_to(ROOT_DIR))
             outcome = CompileOutcome(
-                status="failed", failure_kind="exception",
+                status="failed",
+                failure_kind="exception",
                 failure_detail=str(exc) or repr(exc),
             )
 
@@ -649,7 +677,8 @@ async def main() -> None:
                 log.error(
                     "Fatal failure (kind=%s): %s. Aborting before wasting "
                     "more attempts on the same misconfiguration.",
-                    failure.kind, failure.detail,
+                    failure.kind,
+                    failure.detail,
                 )
                 aborted = True
                 abort_reason = f"fatal/{failure.kind}"
@@ -668,7 +697,7 @@ async def main() -> None:
                     log.error(
                         "%d consecutive bundled-CLI fast-crashes (kind=cli_crash). "
                         "This is NOT a rate-limit. See [CLI-STDERR] above. "
-                        "Sanity-check: `claude --version` and `claude -p \"hi\"`.",
+                        'Sanity-check: `claude --version` and `claude -p "hi"`.',
                         consecutive_failures,
                     )
                     abort_reason = "cli_crash"
@@ -683,7 +712,8 @@ async def main() -> None:
                     log.error(
                         "%d consecutive failures (kinds=%s). See *-errors.log "
                         "for captured stderr. Aborting.",
-                        consecutive_failures, ",".join(kinds) or "unknown",
+                        consecutive_failures,
+                        ",".join(kinds) or "unknown",
                     )
                     abort_reason = "mixed"
                 aborted = True
@@ -725,10 +755,12 @@ async def main() -> None:
     # it off if the per-compile read-sweep ever becomes a load concern.
     if CONFIG.features.materialize_backlinks:
         from core.backlinks import run_backlinks_pass
+
         bl_stats = run_backlinks_pass(KNOWLEDGE_DIR)
         log.info(
             "  backlinks pass: %d articles seen · %d rewritten",
-            bl_stats["articles_seen"], bl_stats["articles_written"],
+            bl_stats["articles_seen"],
+            bl_stats["articles_written"],
         )
 
     # Relativize wikilinks corpus-wide so cross-article links resolve in
@@ -737,10 +769,12 @@ async def main() -> None:
     # normalized too. Idempotent — already-relative links produce zero writes.
     if CONFIG.features.relativize_wikilinks:
         from core.links import run_relativize_pass
+
         rl_stats = run_relativize_pass(KNOWLEDGE_DIR, ROOT_DIR)
         log.info(
             "  relativize pass: %d articles seen · %d rewritten · %d links",
-            rl_stats["articles_seen"], rl_stats["articles_written"],
+            rl_stats["articles_seen"],
+            rl_stats["articles_written"],
             rl_stats["links_rewritten"],
         )
 
@@ -754,20 +788,25 @@ async def main() -> None:
 
     from core.config import TIMEZONE
     from core.index_sync import sync_index
+
     ix_stats = sync_index(
-        KNOWLEDGE_DIR, ROOT_DIR,
+        KNOWLEDGE_DIR,
+        ROOT_DIR,
         today=_dt.now(_zi(TIMEZONE)).strftime("%Y-%m-%d"),
     )
     if ix_stats["changed"]:
         log.info(
             "  index sync: %d kept · %d deduped · %d dropped · %d appended",
-            ix_stats["kept"], ix_stats["deduped"],
-            ix_stats["dropped_dangling"], ix_stats["appended"],
+            ix_stats["kept"],
+            ix_stats["deduped"],
+            ix_stats["dropped_dangling"],
+            ix_stats["appended"],
         )
 
     # Append-only history event so Dashboard P2 charts can render time series.
     if compiled_count > 0:
         from core.utils import append_history
+
         append_history(
             "compile",
             articles_total=len(list_wiki_articles()),
@@ -796,11 +835,16 @@ async def main() -> None:
     log.info("─── compilation %s ───", outcome)
     log.info(
         "  files:   %d done · %d failed · %d skipped · %d pending of %d candidates",
-        compiled_count, failed_count, skipped_count, pending, len(files),
+        compiled_count,
+        failed_count,
+        skipped_count,
+        pending,
+        len(files),
     )
     log.info(
         "  tokens:  in:%s · out:%s · this run",
-        f"{run_input_tokens:,}", f"{run_output_tokens:,}",
+        f"{run_input_tokens:,}",
+        f"{run_output_tokens:,}",
     )
     log.info("  cost:    $%.4f this run", round(run_cost, 4))
     log.info("  time:    %dm %ds", elapsed_min, elapsed_sec)

@@ -73,6 +73,7 @@ def test_collector_filename_avoids_stdlib_shadow():
     # Stdlib `calendar` must still be reachable.
     import calendar as stdlib_calendar
     from calendar import timegm  # noqa: F401 — what http.cookiejar does
+
     assert callable(stdlib_calendar.timegm)
 
 
@@ -451,8 +452,16 @@ class _FakeClient:
     def list_calendars(self) -> list[dict]:
         return list(self._cal_items)
 
-    def list_events(self, calendar_id: str, *, time_min=None, time_max=None,
-                    updated_min=None, page_size=250, limit=None):
+    def list_events(
+        self,
+        calendar_id: str,
+        *,
+        time_min=None,
+        time_max=None,
+        updated_min=None,
+        page_size=250,
+        limit=None,
+    ):
         for ev in self._events_by_cal.get(calendar_id, []):
             yield ev
 
@@ -506,28 +515,30 @@ def test_run_writes_per_date_rollup(monkeypatch, _isolated_vault):
     _configure_one_account(monkeypatch)
     fake = _FakeClient(
         cal_items=[{"id": "primary", "summary": "Personal", "primary": True, "selected": True}],
-        events_by_cal={"primary": [
-            {
-                "id": "evt1",
-                "etag": '"e1"',
-                "summary": "Sprint review",
-                "start": {"dateTime": "2026-05-15T09:00:00+00:00"},
-                "end": {"dateTime": "2026-05-15T10:00:00+00:00"},
-                "attendees": [
-                    {"email": "alex@example.com", "self": True, "responseStatus": "accepted"},
-                    {"email": "bob@example.com", "responseStatus": "accepted"},
-                ],
-                "updated": "2026-05-15T08:00:00Z",
-            },
-            {
-                "id": "evt2",
-                "etag": '"e2"',
-                "summary": "Focus block",
-                "start": {"dateTime": "2026-05-15T10:30:00+00:00"},
-                "end": {"dateTime": "2026-05-15T12:00:00+00:00"},
-                "updated": "2026-05-15T08:00:00Z",
-            },
-        ]},
+        events_by_cal={
+            "primary": [
+                {
+                    "id": "evt1",
+                    "etag": '"e1"',
+                    "summary": "Sprint review",
+                    "start": {"dateTime": "2026-05-15T09:00:00+00:00"},
+                    "end": {"dateTime": "2026-05-15T10:00:00+00:00"},
+                    "attendees": [
+                        {"email": "alex@example.com", "self": True, "responseStatus": "accepted"},
+                        {"email": "bob@example.com", "responseStatus": "accepted"},
+                    ],
+                    "updated": "2026-05-15T08:00:00Z",
+                },
+                {
+                    "id": "evt2",
+                    "etag": '"e2"',
+                    "summary": "Focus block",
+                    "start": {"dateTime": "2026-05-15T10:30:00+00:00"},
+                    "end": {"dateTime": "2026-05-15T12:00:00+00:00"},
+                    "updated": "2026-05-15T08:00:00Z",
+                },
+            ]
+        },
     )
     _stub_session(monkeypatch, fake)
 
@@ -548,36 +559,38 @@ def test_run_skips_cancelled_and_declined(monkeypatch, _isolated_vault):
     _configure_one_account(monkeypatch)
     fake = _FakeClient(
         cal_items=[{"id": "primary", "summary": "Personal", "primary": True, "selected": True}],
-        events_by_cal={"primary": [
-            {
-                "id": "ok",
-                "etag": '"1"',
-                "summary": "Will land",
-                "start": {"dateTime": "2026-05-15T09:00:00+00:00"},
-                "end": {"dateTime": "2026-05-15T09:30:00+00:00"},
-                "updated": "2026-05-15T08:00:00Z",
-            },
-            {
-                "id": "cancelled",
-                "etag": '"c"',
-                "status": "cancelled",
-                "summary": "Will not land",
-                "start": {"dateTime": "2026-05-15T10:00:00+00:00"},
-                "end": {"dateTime": "2026-05-15T10:30:00+00:00"},
-                "updated": "2026-05-15T08:00:00Z",
-            },
-            {
-                "id": "declined",
-                "etag": '"d"',
-                "summary": "Declined event",
-                "start": {"dateTime": "2026-05-15T11:00:00+00:00"},
-                "end": {"dateTime": "2026-05-15T11:30:00+00:00"},
-                "attendees": [
-                    {"email": "alex@example.com", "self": True, "responseStatus": "declined"},
-                ],
-                "updated": "2026-05-15T08:00:00Z",
-            },
-        ]},
+        events_by_cal={
+            "primary": [
+                {
+                    "id": "ok",
+                    "etag": '"1"',
+                    "summary": "Will land",
+                    "start": {"dateTime": "2026-05-15T09:00:00+00:00"},
+                    "end": {"dateTime": "2026-05-15T09:30:00+00:00"},
+                    "updated": "2026-05-15T08:00:00Z",
+                },
+                {
+                    "id": "cancelled",
+                    "etag": '"c"',
+                    "status": "cancelled",
+                    "summary": "Will not land",
+                    "start": {"dateTime": "2026-05-15T10:00:00+00:00"},
+                    "end": {"dateTime": "2026-05-15T10:30:00+00:00"},
+                    "updated": "2026-05-15T08:00:00Z",
+                },
+                {
+                    "id": "declined",
+                    "etag": '"d"',
+                    "summary": "Declined event",
+                    "start": {"dateTime": "2026-05-15T11:00:00+00:00"},
+                    "end": {"dateTime": "2026-05-15T11:30:00+00:00"},
+                    "attendees": [
+                        {"email": "alex@example.com", "self": True, "responseStatus": "declined"},
+                    ],
+                    "updated": "2026-05-15T08:00:00Z",
+                },
+            ]
+        },
     )
     _stub_session(monkeypatch, fake)
     cal.CalendarCollector().run()
@@ -594,26 +607,28 @@ def test_run_collapses_recurring_to_concept_page(monkeypatch, _isolated_vault):
     _configure_one_account(monkeypatch)
     fake = _FakeClient(
         cal_items=[{"id": "primary", "summary": "Personal", "primary": True, "selected": True}],
-        events_by_cal={"primary": [
-            {
-                "id": "evt-day1",
-                "etag": '"e1"',
-                "summary": "Weekly Standup",
-                "recurringEventId": "rec-series-1",
-                "start": {"dateTime": "2026-05-15T09:00:00+00:00"},
-                "end": {"dateTime": "2026-05-15T09:30:00+00:00"},
-                "updated": "2026-05-15T08:00:00Z",
-            },
-            {
-                "id": "evt-day2",
-                "etag": '"e2"',
-                "summary": "Weekly Standup",
-                "recurringEventId": "rec-series-1",
-                "start": {"dateTime": "2026-05-16T09:00:00+00:00"},
-                "end": {"dateTime": "2026-05-16T09:30:00+00:00"},
-                "updated": "2026-05-15T08:00:00Z",
-            },
-        ]},
+        events_by_cal={
+            "primary": [
+                {
+                    "id": "evt-day1",
+                    "etag": '"e1"',
+                    "summary": "Weekly Standup",
+                    "recurringEventId": "rec-series-1",
+                    "start": {"dateTime": "2026-05-15T09:00:00+00:00"},
+                    "end": {"dateTime": "2026-05-15T09:30:00+00:00"},
+                    "updated": "2026-05-15T08:00:00Z",
+                },
+                {
+                    "id": "evt-day2",
+                    "etag": '"e2"',
+                    "summary": "Weekly Standup",
+                    "recurringEventId": "rec-series-1",
+                    "start": {"dateTime": "2026-05-16T09:00:00+00:00"},
+                    "end": {"dateTime": "2026-05-16T09:30:00+00:00"},
+                    "updated": "2026-05-15T08:00:00Z",
+                },
+            ]
+        },
     )
     _stub_session(monkeypatch, fake)
     cal.CalendarCollector().run()
@@ -647,16 +662,18 @@ def test_run_attaches_transcript_link(monkeypatch, _isolated_vault):
 
     fake = _FakeClient(
         cal_items=[{"id": "primary", "summary": "Personal", "primary": True, "selected": True}],
-        events_by_cal={"primary": [
-            {
-                "id": "evt-x",
-                "etag": '"x"',
-                "summary": "Sprint review",
-                "start": {"dateTime": "2026-05-15T09:00:00+00:00"},
-                "end": {"dateTime": "2026-05-15T10:00:00+00:00"},
-                "updated": "2026-05-15T08:00:00Z",
-            },
-        ]},
+        events_by_cal={
+            "primary": [
+                {
+                    "id": "evt-x",
+                    "etag": '"x"',
+                    "summary": "Sprint review",
+                    "start": {"dateTime": "2026-05-15T09:00:00+00:00"},
+                    "end": {"dateTime": "2026-05-15T10:00:00+00:00"},
+                    "updated": "2026-05-15T08:00:00Z",
+                },
+            ]
+        },
     )
     _stub_session(monkeypatch, fake)
     cal.CalendarCollector().run()
@@ -669,16 +686,18 @@ def test_run_persists_state_per_account_and_calendar(monkeypatch, _isolated_vaul
     _configure_one_account(monkeypatch)
     fake = _FakeClient(
         cal_items=[{"id": "primary", "summary": "Personal", "primary": True, "selected": True}],
-        events_by_cal={"primary": [
-            {
-                "id": "evt1",
-                "etag": '"e1"',
-                "summary": "X",
-                "start": {"dateTime": "2026-05-15T09:00:00+00:00"},
-                "end": {"dateTime": "2026-05-15T09:30:00+00:00"},
-                "updated": "2026-05-15T08:00:00Z",
-            },
-        ]},
+        events_by_cal={
+            "primary": [
+                {
+                    "id": "evt1",
+                    "etag": '"e1"',
+                    "summary": "X",
+                    "start": {"dateTime": "2026-05-15T09:00:00+00:00"},
+                    "end": {"dateTime": "2026-05-15T09:30:00+00:00"},
+                    "updated": "2026-05-15T08:00:00Z",
+                },
+            ]
+        },
     )
     _stub_session(monkeypatch, fake)
     cal.CalendarCollector().run(incremental=True)
@@ -697,16 +716,18 @@ def test_run_dry_run_writes_nothing(monkeypatch, _isolated_vault):
     _configure_one_account(monkeypatch)
     fake = _FakeClient(
         cal_items=[{"id": "primary", "summary": "Personal", "primary": True, "selected": True}],
-        events_by_cal={"primary": [
-            {
-                "id": "evt1",
-                "etag": '"e1"',
-                "summary": "X",
-                "start": {"dateTime": "2026-05-15T09:00:00+00:00"},
-                "end": {"dateTime": "2026-05-15T09:30:00+00:00"},
-                "updated": "2026-05-15T08:00:00Z",
-            },
-        ]},
+        events_by_cal={
+            "primary": [
+                {
+                    "id": "evt1",
+                    "etag": '"e1"',
+                    "summary": "X",
+                    "start": {"dateTime": "2026-05-15T09:00:00+00:00"},
+                    "end": {"dateTime": "2026-05-15T09:30:00+00:00"},
+                    "updated": "2026-05-15T08:00:00Z",
+                },
+            ]
+        },
     )
     _stub_session(monkeypatch, fake)
     cal.CalendarCollector().run(dry_run=True)

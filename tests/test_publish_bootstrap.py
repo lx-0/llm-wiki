@@ -1,4 +1,5 @@
 """Tests for wiki bootstrap + start page (M030-S02-T02)."""
+
 from __future__ import annotations
 
 import json
@@ -25,13 +26,17 @@ class FakeClient:
     def call_tool(self, name: str, arguments: dict) -> dict:
         self.calls.append((name, arguments))
         if name == "list_wikis":
-            return {"content": [{"type": "text",
-                                 "text": json.dumps({"wikis": self.wikis}, indent=2)}],
-                    "isError": False}
+            return {
+                "content": [{"type": "text", "text": json.dumps({"wikis": self.wikis}, indent=2)}],
+                "isError": False,
+            }
         if name == "create_wiki":
-            return {"content": [{"type": "text",
-                                 "text": json.dumps({"wiki": {"slug": arguments.get("slug")}})}],
-                    "isError": False}
+            return {
+                "content": [
+                    {"type": "text", "text": json.dumps({"wiki": {"slug": arguments.get("slug")}})}
+                ],
+                "isError": False,
+            }
         raise AssertionError(f"unexpected tool {name}")
 
 

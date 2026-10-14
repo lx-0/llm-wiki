@@ -27,7 +27,9 @@ def test_spawn_maintenance_fires_when_knob_enabled(monkeypatch):
 def test_spawn_maintenance_skipped_when_knob_disabled(monkeypatch):
     calls = []
     monkeypatch.setattr(compile_mod, "run_due_piggybacks", lambda **kw: calls.append(kw) or [])
-    monkeypatch.setattr(compile_mod.CONFIG.scheduling, "piggybacks_on_compile", False, raising=False)
+    monkeypatch.setattr(
+        compile_mod.CONFIG.scheduling, "piggybacks_on_compile", False, raising=False
+    )
 
     compile_mod._spawn_maintenance()
 
@@ -36,6 +38,7 @@ def test_spawn_maintenance_skipped_when_knob_disabled(monkeypatch):
 
 def test_spawn_maintenance_never_raises(monkeypatch):
     """A piggyback-spawn failure must never abort the compile that triggered it."""
+
     def boom(**kw):
         raise RuntimeError("spawn exploded")
 

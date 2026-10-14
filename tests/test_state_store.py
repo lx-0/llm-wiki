@@ -255,9 +255,7 @@ def ledger_vault(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(state_store, "ROOT_DIR", tmp_path, raising=True)
     # list_raw_files reads utils' module globals; stub the import in
     # state_store so the ledger walks OUR vault, newest-first order preserved.
-    monkeypatch.setattr(
-        state_store, "list_raw_files", lambda: [fresh, stale], raising=True
-    )
+    monkeypatch.setattr(state_store, "list_raw_files", lambda: [fresh, stale], raising=True)
     return tmp_path, fresh, stale
 
 

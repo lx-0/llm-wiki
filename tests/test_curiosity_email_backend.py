@@ -35,7 +35,9 @@ class _FakeReader:
         for m in self._messages:
             yield m.meta
 
-    def scan_deep(self, folder: str, limit: int = 0, since: datetime | None = None) -> Iterator[Message]:
+    def scan_deep(
+        self, folder: str, limit: int = 0, since: datetime | None = None
+    ) -> Iterator[Message]:
         emitted = 0
         for m in self._messages:
             if m.meta.folder != folder:
@@ -77,17 +79,20 @@ def request_path(tmp_path: Path) -> Path:
     """A pending email-deep-scan request file at a clean temp path."""
     p = tmp_path / "request-customer-y-2026-05-13.json"
     p.write_text(
-        json.dumps({
-            "type": "email-deep-scan",
-            "status": "pending",
-            "folder": "INBOX/Work",
-            "account": "testacct",
-            "model": "gemma4:e4b",
-            "topic": "Customer Y meeting prep",
-            "rationale": "Compile mentioned Customer Y but no article exists yet.",
-            "source": "daily/2026-05-13.md",
-            "created": "2026-05-13T11:00:00+00:00",
-        }, indent=2),
+        json.dumps(
+            {
+                "type": "email-deep-scan",
+                "status": "pending",
+                "folder": "INBOX/Work",
+                "account": "testacct",
+                "model": "gemma4:e4b",
+                "topic": "Customer Y meeting prep",
+                "rationale": "Compile mentioned Customer Y but no article exists yet.",
+                "source": "daily/2026-05-13.md",
+                "created": "2026-05-13T11:00:00+00:00",
+            },
+            indent=2,
+        ),
         encoding="utf-8",
     )
     return p
@@ -129,7 +134,9 @@ def test_render_includes_frontmatter_and_message_bodies(patched_backend, sample_
         "source": "daily/2026-05-13.md",
         "created": "2026-05-13T11:00:00+00:00",
     }
-    out = patched_backend._render(request, [m for m in sample_messages if m.meta.folder == "INBOX/Work"], "testacct")
+    out = patched_backend._render(
+        request, [m for m in sample_messages if m.meta.folder == "INBOX/Work"], "testacct"
+    )
 
     assert out.startswith("---\n")
     assert "type: note" in out
@@ -160,8 +167,12 @@ def test_render_truncates_long_body(patched_backend):
     long_body = "X" * 20000
     msg = _msg("INBOX/Work", "Long", long_body)
     request = {
-        "type": "email-deep-scan", "folder": "INBOX/Work", "topic": "T",
-        "rationale": "R", "source": "s", "created": "c",
+        "type": "email-deep-scan",
+        "folder": "INBOX/Work",
+        "topic": "T",
+        "rationale": "R",
+        "source": "s",
+        "created": "c",
     }
     out = patched_backend._render(request, [msg], "testacct")
     assert "[truncated]" in out
@@ -206,6 +217,7 @@ def test_process_request_missing_account_in_config(patched_backend, request_path
         class personal:
             primary_account = "testacct"
             accounts = {}
+
     monkeypatch.setattr(patched_backend, "CONFIG", _EmptyCONFIG)
 
     result = patched_backend.process_request(request_path)
@@ -237,6 +249,7 @@ def test_process_request_wrong_type(patched_backend, tmp_path):
 
 def test_process_request_missing_file(tmp_path):
     from curiosity.backends import email as backend
+
     result = backend.process_request(tmp_path / "does-not-exist.json")
     assert not result.success
     assert "not found" in result.error
@@ -268,18 +281,42 @@ def test_list_pending_excludes_done(tmp_path):
 
     requests_dir = tmp_path / "requests"
     requests_dir.mkdir()
-    (requests_dir / "request-a.json").write_text(json.dumps({
-        "type": "email-deep-scan", "status": "pending",
-    }), encoding="utf-8")
-    (requests_dir / "request-b.json").write_text(json.dumps({
-        "type": "email-deep-scan", "status": "done",
-    }), encoding="utf-8")
-    (requests_dir / "request-c.json").write_text(json.dumps({
-        "type": "email-deep-scan", "status": "error",
-    }), encoding="utf-8")
-    (requests_dir / "request-d.json").write_text(json.dumps({
-        "type": "youtube-deep-watch", "status": "pending",
-    }), encoding="utf-8")
+    (requests_dir / "request-a.json").write_text(
+        json.dumps(
+            {
+                "type": "email-deep-scan",
+                "status": "pending",
+            }
+        ),
+        encoding="utf-8",
+    )
+    (requests_dir / "request-b.json").write_text(
+        json.dumps(
+            {
+                "type": "email-deep-scan",
+                "status": "done",
+            }
+        ),
+        encoding="utf-8",
+    )
+    (requests_dir / "request-c.json").write_text(
+        json.dumps(
+            {
+                "type": "email-deep-scan",
+                "status": "error",
+            }
+        ),
+        encoding="utf-8",
+    )
+    (requests_dir / "request-d.json").write_text(
+        json.dumps(
+            {
+                "type": "youtube-deep-watch",
+                "status": "pending",
+            }
+        ),
+        encoding="utf-8",
+    )
 
     pending = backend.list_pending(requests_dir)
     # a + c remain (pending + error); b excluded (done); d excluded (wrong type)
@@ -289,6 +326,7 @@ def test_list_pending_excludes_done(tmp_path):
 
 def test_list_pending_empty_dir(tmp_path):
     from curiosity.backends import email as backend
+
     assert backend.list_pending(tmp_path / "missing") == []
     (tmp_path / "empty").mkdir()
     assert backend.list_pending(tmp_path / "empty") == []

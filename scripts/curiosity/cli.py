@@ -100,13 +100,15 @@ def _list() -> NoReturn:
         if r is None:
             rows.append((p.name, "?", "?", "?", "(unreadable)"))
             continue
-        rows.append((
-            p.name,
-            r.get("type", "?"),
-            r.get("status", "?"),
-            r.get("account", "?"),
-            r.get("topic", "")[:50],
-        ))
+        rows.append(
+            (
+                p.name,
+                r.get("type", "?"),
+                r.get("status", "?"),
+                r.get("account", "?"),
+                r.get("topic", "")[:50],
+            )
+        )
     if not rows:
         print("No curiosity requests in raw/requests/.")
         sys.exit(0)
@@ -143,8 +145,12 @@ def _run_one(slug_or_name: str, *, dry_run: bool) -> NoReturn:
         log.error("No request matched %r. Use --list to see all.", slug_or_name)
         sys.exit(1)
     if len(matches) > 1:
-        log.error("Ambiguous: %d matches for %r (%s). Be more specific.",
-                  len(matches), slug_or_name, ", ".join(p.name for p in matches))
+        log.error(
+            "Ambiguous: %d matches for %r (%s). Be more specific.",
+            len(matches),
+            slug_or_name,
+            ", ".join(p.name for p in matches),
+        )
         sys.exit(1)
     ok = _dispatch(matches[0], dry_run=dry_run)
     sys.exit(0 if ok else 2)
@@ -198,7 +204,9 @@ def _run_batch(n: int, *, dry_run: bool, type_filter: str | None = None) -> NoRe
             fails += 1
     log.info(
         "Batch done. %d failed, %d processed, %d still pending.",
-        fails, len(batch) - fails, len(pending) - len(batch),
+        fails,
+        len(batch) - fails,
+        len(pending) - len(batch),
     )
     sys.exit(0 if fails == 0 else 2)
 
@@ -219,7 +227,9 @@ def _print_request_card(idx: int, total: int, path: Path, r: dict) -> None:
     if r.get("type") == "folder-deep-scan":
         _print_folder_card_body(r)
         return
-    print(f"  Folder      : {r.get('folder', '?')}   (confidence {r.get('folder_confidence', '?')}/5)")
+    print(
+        f"  Folder      : {r.get('folder', '?')}   (confidence {r.get('folder_confidence', '?')}/5)"
+    )
     print(f"  Account     : {r.get('account', '?')}")
     print(f"  Source      : {r.get('source', '?')}")
     print(f"  Created     : {r.get('created', '?')}")
@@ -243,8 +253,7 @@ def _print_folder_card_body(r: dict) -> None:
     """folder-deep-scan card body — the informed-consent gate."""
     root_id = r.get("root_id", "?")
     file_path = r.get("file_path", "?")
-    print(f"  File        : {root_id}/{file_path}   "
-          f"(confidence {r.get('file_confidence', '?')}/5)")
+    print(f"  File        : {root_id}/{file_path}   (confidence {r.get('file_confidence', '?')}/5)")
     candidate = folder_backend._resolve(root_id, file_path)
     if candidate is not None:
         marker = "exists" if candidate.exists() else "MISSING — stale index?"
@@ -255,9 +264,8 @@ def _print_folder_card_body(r: dict) -> None:
     print(f"  Created     : {r.get('created', '?')}")
     print()
     provider = CONFIG.models.folder_scan_provider
-    print(f"  ⚠ Accept will LOAD this file and send its content to "
-          f"'{provider}'")
-    print(f"    to answer: \"{r.get('topic', '?')}\"")
+    print(f"  ⚠ Accept will LOAD this file and send its content to '{provider}'")
+    print(f'    to answer: "{r.get("topic", "?")}"')
     rationale = (r.get("rationale") or "").strip()
     if rationale:
         print()
@@ -337,8 +345,13 @@ def _walk(*, dry_run: bool, type_filter: str | None = None) -> NoReturn:
                 key = read_key()
             except (OSError, KeyboardInterrupt):
                 print()
-                log.info("Walk aborted. %d accepted, %d skipped, %d rejected, %d remain.",
-                         accepted, skipped, rejected, total - idx + 1)
+                log.info(
+                    "Walk aborted. %d accepted, %d skipped, %d rejected, %d remain.",
+                    accepted,
+                    skipped,
+                    rejected,
+                    total - idx + 1,
+                )
                 sys.exit(0)
             if key == "a":
                 print("a")
@@ -349,18 +362,20 @@ def _walk(*, dry_run: bool, type_filter: str | None = None) -> NoReturn:
                 break
             if key == "A":  # accept ALL remaining (this item onward)
                 print("A")
-                remaining = pending[idx - 1:]
+                remaining = pending[idx - 1 :]
                 cloud = _folder_consent_lines(remaining)
                 if cloud:
                     prov = cloud[0][1]
-                    print(f"\n  ⚠ {len(cloud)} file(s) will be LOADED and sent to "
-                          f"'{prov}':")
+                    print(f"\n  ⚠ {len(cloud)} file(s) will be LOADED and sent to '{prov}':")
                     for fp, _p in cloud[:15]:
                         print(f"     {fp}")
                     if len(cloud) > 15:
                         print(f"     … +{len(cloud) - 15} more")
-                print(f"\n  Accept ALL {len(remaining)} remaining request(s)? "
-                      "[y/N] › ", end="", flush=True)
+                print(
+                    f"\n  Accept ALL {len(remaining)} remaining request(s)? [y/N] › ",
+                    end="",
+                    flush=True,
+                )
                 try:
                     confirm = read_key()
                 except (OSError, KeyboardInterrupt):
@@ -373,8 +388,12 @@ def _walk(*, dry_run: bool, type_filter: str | None = None) -> NoReturn:
                 a, f = _accept_all(remaining, dry_run=dry_run)
                 accepted += a
                 fails += f
-                log.info("Accepted all: %d dispatched, %d failed (of %d remaining).",
-                         a, f, len(remaining))
+                log.info(
+                    "Accepted all: %d dispatched, %d failed (of %d remaining).",
+                    a,
+                    f,
+                    len(remaining),
+                )
                 sys.exit(0 if fails == 0 else 2)
             if key in ("s", "S", "enter"):
                 print("s")
@@ -388,13 +407,23 @@ def _walk(*, dry_run: bool, type_filter: str | None = None) -> NoReturn:
                 break
             if key in ("q", "Q", "c-c", "c-d", "esc"):
                 print("q")
-                log.info("Walk ended. %d accepted, %d skipped, %d rejected, %d remain.",
-                         accepted, skipped, rejected, total - idx + 1)
+                log.info(
+                    "Walk ended. %d accepted, %d skipped, %d rejected, %d remain.",
+                    accepted,
+                    skipped,
+                    rejected,
+                    total - idx + 1,
+                )
                 sys.exit(0 if fails == 0 else 2)
             # Unknown key — beep / hint, keep prompting on same line.
             print("\r" + _PROMPT, end="", flush=True)
-    log.info("Walk complete. %d accepted, %d skipped, %d rejected (of %d).",
-             accepted, skipped, rejected, total)
+    log.info(
+        "Walk complete. %d accepted, %d skipped, %d rejected (of %d).",
+        accepted,
+        skipped,
+        rejected,
+        total,
+    )
     sys.exit(0 if fails == 0 else 2)
 
 
@@ -416,19 +445,35 @@ def main() -> int:
         description="Curiosity request consumer — list / run / clear pending requests."
     )
     group = parser.add_mutually_exclusive_group(required=False)
-    group.add_argument("--walk", action="store_true", help="interactive walk: accept/skip/reject each pending (default)")
+    group.add_argument(
+        "--walk",
+        action="store_true",
+        help="interactive walk: accept/skip/reject each pending (default)",
+    )
     group.add_argument("--list", action="store_true", help="list all requests + statuses")
-    group.add_argument("--run-oldest", action="store_true", help="run the oldest pending request (non-interactive)")
+    group.add_argument(
+        "--run-oldest", action="store_true", help="run the oldest pending request (non-interactive)"
+    )
     group.add_argument("--run", metavar="SLUG", help="run one request by slug substring")
     group.add_argument("--run-all", action="store_true", help="run every pending request")
-    group.add_argument("--run-batch", metavar="N", type=int, help="run the N oldest pending requests (drain at steady rate)")
-    group.add_argument("--clear-done", action="store_true", help="delete request files with status: done")
-    parser.add_argument("--dry-run", action="store_true", help="plan only, do not touch the mailbox or write output")
+    group.add_argument(
+        "--run-batch",
+        metavar="N",
+        type=int,
+        help="run the N oldest pending requests (drain at steady rate)",
+    )
+    group.add_argument(
+        "--clear-done", action="store_true", help="delete request files with status: done"
+    )
     parser.add_argument(
-        "--type", dest="type_filter",
+        "--dry-run", action="store_true", help="plan only, do not touch the mailbox or write output"
+    )
+    parser.add_argument(
+        "--type",
+        dest="type_filter",
         choices=["email-deep-scan", "folder-deep-scan"],
         help="only walk/run requests of this type (e.g. just the "
-             "folder-deep-scans, skipping the email backlog)",
+        "folder-deep-scans, skipping the email backlog)",
     )
     args = parser.parse_args()
     tf = args.type_filter

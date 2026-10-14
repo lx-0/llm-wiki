@@ -125,8 +125,7 @@ def register(cls: type[Producer]) -> type[Producer]:
     """
     if not hasattr(cls, "SPEC"):
         raise TypeError(
-            f"@register: {cls.__name__} must define a SPEC class attribute "
-            "(ProducerSpec instance)."
+            f"@register: {cls.__name__} must define a SPEC class attribute (ProducerSpec instance)."
         )
     spec = cls.SPEC  # type: ignore[attr-defined]
     if spec.name in _PRODUCERS:

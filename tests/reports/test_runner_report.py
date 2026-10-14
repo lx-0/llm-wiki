@@ -20,8 +20,7 @@ from scripts.reports._engine.score import score_instrument
 
 
 _INSTRUMENTS_ROOT = (
-    Path(__file__).resolve().parents[2]
-    / "scripts" / "reports" / "_engine" / "instruments"
+    Path(__file__).resolve().parents[2] / "scripts" / "reports" / "_engine" / "instruments"
 )
 
 

@@ -156,7 +156,11 @@ def count_orphans(vault: Path) -> int:
     folder = vault / "knowledge" / "concepts"
     if not folder.is_dir():
         return 0
-    return sum(1 for f in folder.iterdir() if f.suffix == ".md" and "[[" not in f.read_text(errors="ignore"))
+    return sum(
+        1
+        for f in folder.iterdir()
+        if f.suffix == ".md" and "[[" not in f.read_text(errors="ignore")
+    )
 
 
 def daily_activity(vault: Path, days: int = 14) -> list[int]:
@@ -165,7 +169,10 @@ def daily_activity(vault: Path, days: int = 14) -> list[int]:
         return []
     files = {f.stem for f in folder.iterdir() if f.suffix == ".md"}
     today = dt.date.today()
-    return [1 if (today - dt.timedelta(days=i)).isoformat() in files else 0 for i in range(days - 1, -1, -1)]
+    return [
+        1 if (today - dt.timedelta(days=i)).isoformat() in files else 0
+        for i in range(days - 1, -1, -1)
+    ]
 
 
 def latest_in(folder: Path, suffix: str = ".md") -> str | None:
@@ -220,7 +227,12 @@ def render(vault: Path) -> str:
             barw = 24
             filled = int(round(barw * n / max_n))
             color = maybe(CYN if label == "concepts" else MAG if label == "connections" else BLU)
-            out.append(line(f"{label:12s} {color}{'█' * filled}{maybe(GRY)}{'░' * (barw - filled)}{maybe(RST)}  {n:>4}", W))
+            out.append(
+                line(
+                    f"{label:12s} {color}{'█' * filled}{maybe(GRY)}{'░' * (barw - filled)}{maybe(RST)}  {n:>4}",
+                    W,
+                )
+            )
     out.append(box_bot(W))
     out.append("")
 
@@ -233,14 +245,24 @@ def render(vault: Path) -> str:
             filled = int(round(barw * n / max_r))
             pct = 100 * n / total_raw
             pct_str = f"{pct:>4.1f}%" if pct >= 0.1 else " <0.1%"
-            out.append(line(f"{label:12s} {maybe(CYN)}{'█' * filled}{maybe(GRY)}{'░' * (barw - filled)}{maybe(RST)}  {n:>4}  {pct_str}", W))
+            out.append(
+                line(
+                    f"{label:12s} {maybe(CYN)}{'█' * filled}{maybe(GRY)}{'░' * (barw - filled)}{maybe(RST)}  {n:>4}  {pct_str}",
+                    W,
+                )
+            )
     out.append(box_bot(W))
     out.append("")
 
     # COMPILE BACKLOG
     color = GRN if pct_ingested > 70 else YEL if pct_ingested > 30 else RED
     out.append(box_top("COMPILE BACKLOG", W))
-    out.append(line(f"ingested  {bar(pct_ingested, fill=maybe(color))} {pct_ingested:>5.1f}%   {ingested}/{total_raw}", W))
+    out.append(
+        line(
+            f"ingested  {bar(pct_ingested, fill=maybe(color))} {pct_ingested:>5.1f}%   {ingested}/{total_raw}",
+            W,
+        )
+    )
     out.append(line(f"{maybe(DIM)}backlog: {backlog} files open{maybe(RST)}", W))
     out.append(box_bot(W))
     out.append("")
@@ -250,7 +272,9 @@ def render(vault: Path) -> str:
         cap = 100  # default; could be parsed from log
         run_pct = 100 * done / cap
         out.append(box_top("ACTIVE COMPILE RUN", W, suffix=f"cap={cap} "))
-        out.append(line(f"progress  {bar(run_pct, fill=maybe(CYN))} {run_pct:>5.1f}%   {done}/{cap}", W))
+        out.append(
+            line(f"progress  {bar(run_pct, fill=maybe(CYN))} {run_pct:>5.1f}%   {done}/{cap}", W)
+        )
         out.append(box_bot(W))
         out.append("")
 
@@ -258,21 +282,46 @@ def render(vault: Path) -> str:
     out.append(box_top("GRAPH DENSITY", W))
     barw = 18
     density_pct = min(100, 100 * inline_per_concept / target_max)
-    color = GRN if inline_per_concept >= target_min else YEL if inline_per_concept >= target_min / 2 else RED
+    color = (
+        GRN
+        if inline_per_concept >= target_min
+        else YEL
+        if inline_per_concept >= target_min / 2
+        else RED
+    )
     filled = int(round(barw * density_pct / 100))
-    out.append(line(f"links/concept  {maybe(color)}{'█' * filled}{maybe(GRY)}{'░' * (barw - filled)}{maybe(RST)}  {inline_per_concept:>4.1f}  {maybe(DIM)}target {target_min}-{target_max}{maybe(RST)}", W))
+    out.append(
+        line(
+            f"links/concept  {maybe(color)}{'█' * filled}{maybe(GRY)}{'░' * (barw - filled)}{maybe(RST)}  {inline_per_concept:>4.1f}  {maybe(DIM)}target {target_min}-{target_max}{maybe(RST)}",
+            W,
+        )
+    )
     orphan_color = GRN if orphan_n == 0 else RED
     icon = "✓" if orphan_n == 0 else "✕"
-    out.append(line(f"orphans        {maybe(orphan_color)}{icon} {orphan_n} concepts without [[wikilinks]]{maybe(RST)}", W))
+    out.append(
+        line(
+            f"orphans        {maybe(orphan_color)}{icon} {orphan_n} concepts without [[wikilinks]]{maybe(RST)}",
+            W,
+        )
+    )
     cc_ratio = concept_n / max(knowledge["connections"], 1)
-    out.append(line(f"c:cn ratio     {cc_ratio:>4.1f} : 1  {maybe(DIM)}({concept_n}c / {knowledge['connections']}cn){maybe(RST)}", W))
+    out.append(
+        line(
+            f"c:cn ratio     {cc_ratio:>4.1f} : 1  {maybe(DIM)}({concept_n}c / {knowledge['connections']}cn){maybe(RST)}",
+            W,
+        )
+    )
     out.append(box_bot(W))
     out.append("")
 
     # PIPELINE CADENCE
     out.append(box_top("PIPELINE CADENCE", W))
     gate_open = hour >= gate
-    gate_str = f"{maybe(GRN)}✓ open  (hour={hour}≥{gate}){maybe(RST)}" if gate_open else f"{maybe(YEL)}● gated (hour={hour}<{gate}){maybe(RST)}"
+    gate_str = (
+        f"{maybe(GRN)}✓ open  (hour={hour}≥{gate}){maybe(RST)}"
+        if gate_open
+        else f"{maybe(YEL)}● gated (hour={hour}<{gate}){maybe(RST)}"
+    )
     out.append(line(f"compile gate     {gate_str}", W))
 
     latest_d = latest_in(vault / "daily")
@@ -290,7 +339,12 @@ def render(vault: Path) -> str:
 
     if activity:
         spark = sparkline(activity)
-        out.append(line(f"daily activity   {maybe(CYN)}{spark}{maybe(RST)}  {maybe(DIM)}(last {len(activity)}d){maybe(RST)}", W))
+        out.append(
+            line(
+                f"daily activity   {maybe(CYN)}{spark}{maybe(RST)}  {maybe(DIM)}(last {len(activity)}d){maybe(RST)}",
+                W,
+            )
+        )
     out.append(box_bot(W))
 
     return "\n".join(out)
@@ -304,7 +358,10 @@ def main() -> int:
 
     vault = args.vault.resolve()
     if not (vault / "knowledge").is_dir() and not (vault / ".wiki").is_dir():
-        print(f"error: {vault} doesn't look like a wiki vault (no knowledge/ or .wiki/)", file=sys.stderr)
+        print(
+            f"error: {vault} doesn't look like a wiki vault (no knowledge/ or .wiki/)",
+            file=sys.stderr,
+        )
         return 1
 
     print(render(vault))

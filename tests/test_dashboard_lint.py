@@ -23,10 +23,17 @@ def _base_data(**overrides) -> dict:
         ],
         "stale": [
             {"link": "knowledge/concepts/old", "detail": "last touched 2026-01-01 (120d ago)"},
-        ] * 7,
+        ]
+        * 7,
         "failed_flushes": [
-            {"link": "scripts/sessions/failed-flushes/2026-04-29T1812.md", "detail": "TimeoutError"},
-            {"link": "scripts/sessions/failed-flushes/2026-04-30T0901.md", "detail": "JSONDecodeError"},
+            {
+                "link": "scripts/sessions/failed-flushes/2026-04-29T1812.md",
+                "detail": "TimeoutError",
+            },
+            {
+                "link": "scripts/sessions/failed-flushes/2026-04-30T0901.md",
+                "detail": "JSONDecodeError",
+            },
         ],
         "last_updated_ts": "2026-05-02T22:30:00+02:00",
     }
@@ -106,9 +113,7 @@ def test_write_dashboard_lint_truncates_long_detail(
     assert "…" in content or "..." in content
 
 
-def test_e2e_one_issue_per_queue(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_e2e_one_issue_per_queue(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """End-to-end: one synthetic issue per queue → frontmatter counts all 1,
     each section has exactly one wikilink line. Queue lists come from a shared
     LintResults (computed once per refresh, C04) — no per-collector re-runs."""
@@ -122,18 +127,30 @@ def test_e2e_one_issue_per_queue(
     results = LintResults(
         generated_at="2026-05-02T22:30:00+02:00",
         issues={
-            "orphan_pages": [lint.issue(
-                "warning", "orphan_page", "knowledge/concepts/orphan-x", "never linked",
-            )],
-            "stale_articles": [lint.issue(
-                "warning", "stale_article", "knowledge/projects/stale-y", "stale 90d",
-            )],
+            "orphan_pages": [
+                lint.issue(
+                    "warning",
+                    "orphan_page",
+                    "knowledge/concepts/orphan-x",
+                    "never linked",
+                )
+            ],
+            "stale_articles": [
+                lint.issue(
+                    "warning",
+                    "stale_article",
+                    "knowledge/projects/stale-y",
+                    "stale 90d",
+                )
+            ],
         },
     )
     monkeypatch.setattr(
         dashboard_lint,
         "collect_failed_flushes",
-        lambda: [{"link": ".wiki/sessions/failed-flushes/2026-04-29T1812.md", "detail": "TimeoutError"}],
+        lambda: [
+            {"link": ".wiki/sessions/failed-flushes/2026-04-29T1812.md", "detail": "TimeoutError"}
+        ],
     )
 
     data = dashboard_lint.compute_lint_data(results)

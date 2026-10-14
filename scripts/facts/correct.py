@@ -26,6 +26,7 @@ Usage:
 """
 
 import os
+
 os.environ.setdefault("CLAUDE_INVOKED_BY", "correct")
 
 import argparse
@@ -60,6 +61,7 @@ def _fact_path(slug: str) -> Path:
 
 # One-line delegates into the single core.frontmatter grammar (C03). Kept
 # under their historical names because dedup.py's merge flow imports them.
+
 
 def _backup(path: Path) -> Path | None:
     return frontmatter.backup(path)
@@ -108,7 +110,9 @@ def _warn_broad_terms(terms: list, knowledge_dir: Path) -> None:
             log.warning(
                 "negation_term %r matches %d articles (> %d) — narrow it? "
                 "Broad terms turn into lint noise or a large apply blast radius.",
-                term, n, threshold,
+                term,
+                n,
+                threshold,
             )
 
 

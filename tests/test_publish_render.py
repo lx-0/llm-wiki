@@ -5,6 +5,7 @@ A served article's links must resolve BY SLUG on the meinkontext side
 Links the remote reader cannot follow — unresolvable targets, media embeds,
 anything outside the publish set — degrade to plain text instead of dangling.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -45,7 +46,9 @@ def test_alias_heading_and_bang_preserved_on_slug_rewrite(tmp_path: Path) -> Non
     src = k / "people" / "bar.md"
     text, _ = normalize_links(
         "a [[../concepts/foo#History|the Foo]] b ![[../concepts/foo]]\n",
-        src, vault, _slug_index(vault),
+        src,
+        vault,
+        _slug_index(vault),
     )
     assert text == "a [[foo#History|the Foo]] b ![[foo]]\n"
 
@@ -53,9 +56,7 @@ def test_alias_heading_and_bang_preserved_on_slug_rewrite(tmp_path: Path) -> Non
 def test_disambiguated_slug_is_used(tmp_path: Path) -> None:
     vault, k = _vault(tmp_path)
     src = k / "people" / "bar.md"
-    text, _ = normalize_links(
-        "[[../concepts/alex]] und [[alex]]\n", src, vault, _slug_index(vault)
-    )
+    text, _ = normalize_links("[[../concepts/alex]] und [[alex]]\n", src, vault, _slug_index(vault))
     # people/bar.md's neighbor link [[alex]] resolves source-relative to people/alex.md
     assert text == "[[concepts-alex]] und [[people-alex]]\n"
 
@@ -110,9 +111,7 @@ def test_frontmatter_and_fences_untouched(tmp_path: Path) -> None:
     vault, k = _vault(tmp_path)
     src = k / "people" / "bar.md"
     original = (
-        "---\ncompiled_from: [[x]]\n---\n"
-        "```\n[[../concepts/foo]]\n```\n"
-        "[[../concepts/foo]]\n"
+        "---\ncompiled_from: [[x]]\n---\n```\n[[../concepts/foo]]\n```\n[[../concepts/foo]]\n"
     )
     text, n = normalize_links(original, src, vault, _slug_index(vault))
     assert "compiled_from: [[x]]" in text
@@ -133,7 +132,5 @@ def test_no_links_round_trips_byte_identical(tmp_path: Path) -> None:
 def test_table_escaped_alias_pipe_preserved(tmp_path: Path) -> None:
     vault, k = _vault(tmp_path)
     src = k / "people" / "bar.md"
-    text, _ = normalize_links(
-        "| [[../concepts/foo\\|Foo]] |\n", src, vault, _slug_index(vault)
-    )
+    text, _ = normalize_links("| [[../concepts/foo\\|Foo]] |\n", src, vault, _slug_index(vault))
     assert text == "| [[foo\\|Foo]] |\n"

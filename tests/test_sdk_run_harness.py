@@ -36,6 +36,7 @@ log = logging.getLogger("test-harness")
 
 def _assistant(usage: dict | None, text: str = "thinking"):
     from claude_agent_sdk import AssistantMessage, TextBlock
+
     return AssistantMessage(content=[TextBlock(text=text)], model="m", usage=usage)
 
 
@@ -49,6 +50,7 @@ def _result(
     num_turns: int = 1,
 ):
     from claude_agent_sdk import ResultMessage
+
     return ResultMessage(
         subtype=subtype,
         duration_ms=1,
@@ -73,6 +75,7 @@ def ledger(monkeypatch: pytest.MonkeyPatch) -> UsageLedger:
     """Fresh ledger swapped in for the process-global one. The harness
     imports LEDGER at call time, so the swap is visible."""
     import core.usage as usage_mod
+
     fresh = UsageLedger()
     monkeypatch.setattr(usage_mod, "LEDGER", fresh)
     return fresh
@@ -131,9 +134,9 @@ def test_per_turn_fallback_is_cache_inclusive_but_budget_basis_is_uncached(
     result = asyncio.run(run_sdk_query("p", _spec(), query_fn=fake_query))
 
     assert result.ok
-    assert result.input_tokens == 2 * (10 + 1_000 + 500)   # cache-inclusive fallback
+    assert result.input_tokens == 2 * (10 + 1_000 + 500)  # cache-inclusive fallback
     assert result.output_tokens == 10
-    assert result.uncached_input_tokens == 20              # raw per-turn (budget basis)
+    assert result.uncached_input_tokens == 20  # raw per-turn (budget basis)
     assert result.uncached_output_tokens == 10
     assert ledger.totals()[("claude", "claude-test-model")].input_tokens == 3_020
 
@@ -141,7 +144,7 @@ def test_per_turn_fallback_is_cache_inclusive_but_budget_basis_is_uncached(
 def test_assistant_text_and_result_text_both_captured(ledger: UsageLedger):
     async def fake_query(*, prompt, options):  # noqa: ARG001
         yield _assistant(None, text='{"items": ')
-        yield _assistant(None, text='{}}')
+        yield _assistant(None, text="{}}")
         yield _result(result="final", usage={"input_tokens": 1, "output_tokens": 1})
 
     result = asyncio.run(run_sdk_query("p", _spec(), query_fn=fake_query))
@@ -155,13 +158,12 @@ def test_assistant_text_and_result_text_both_captured(ledger: UsageLedger):
 
 def test_timeout_records_partial_usage_and_classifies(ledger: UsageLedger):
     async def hanging_query(*, prompt, options):  # noqa: ARG001
-        yield _assistant({"input_tokens": 7, "cache_creation_input_tokens": 100,
-                          "output_tokens": 3})
+        yield _assistant(
+            {"input_tokens": 7, "cache_creation_input_tokens": 100, "output_tokens": 3}
+        )
         await asyncio.sleep(60)
 
-    result = asyncio.run(
-        run_sdk_query("p", _spec(stall_timeout_s=0.05), query_fn=hanging_query)
-    )
+    result = asyncio.run(run_sdk_query("p", _spec(stall_timeout_s=0.05), query_fn=hanging_query))
 
     assert result.failure is not None
     assert result.failure.kind == "timeout"
@@ -193,9 +195,16 @@ def test_issue6_empty_zero_token_result_is_a_failure(ledger: UsageLedger, raises
     Pin both CLI stream endings: neither may be recorded as a successful
     compilation or collapsed back into the old opaque agent_error bucket.
     """
+
     async def refused_query(*, prompt, options):
-        yield _result(result="", cost=0.0, is_error=True, subtype="success",
-                      num_turns=1, usage={"input_tokens": 0, "output_tokens": 0})
+        yield _result(
+            result="",
+            cost=0.0,
+            is_error=True,
+            subtype="success",
+            num_turns=1,
+            usage={"input_tokens": 0, "output_tokens": 0},
+        )
         if raises_after_result:
             raise RuntimeError("Command failed with exit code 1")
 
@@ -211,12 +220,15 @@ def test_structured_error_max_turns(ledger: UsageLedger):
     """ResultMessage(is_error, subtype=error_max_turns) then raise — the
     bundled CLI's exit-1 shape. Kind comes from the structured payload,
     LEDGER gets the authoritative cache-inclusive usage."""
+
     async def max_turns_query(*, prompt, options):  # noqa: ARG001
         yield _result(
-            result="", cost=0.05, is_error=True, subtype="error_max_turns",
+            result="",
+            cost=0.05,
+            is_error=True,
+            subtype="error_max_turns",
             num_turns=12,
-            usage={"input_tokens": 3, "cache_creation_input_tokens": 900,
-                   "output_tokens": 4},
+            usage={"input_tokens": 3, "cache_creation_input_tokens": 900, "output_tokens": 4},
         )
         raise RuntimeError("Command failed with exit code 1")
 
@@ -233,10 +245,15 @@ def test_structured_error_max_turns(ledger: UsageLedger):
 
 def test_structured_error_without_raise_still_classified(ledger: UsageLedger):
     """A clean generator exit with is_error=True must not masquerade as ok."""
+
     async def error_query(*, prompt, options):  # noqa: ARG001
         yield _result(
-            result="", cost=0.0, is_error=True, subtype="error_max_turns",
-            num_turns=8, usage={"input_tokens": 1, "output_tokens": 1},
+            result="",
+            cost=0.0,
+            is_error=True,
+            subtype="error_max_turns",
+            num_turns=8,
+            usage={"input_tokens": 1, "output_tokens": 1},
         )
 
     result = asyncio.run(run_sdk_query("p", _spec(), query_fn=error_query))
@@ -248,6 +265,7 @@ def test_default_model_records_under_claude_provider(ledger: UsageLedger):
     """model=None (CLI default) must not fall into the ollama provider
     bucket via provider_for_model('') — the harness is Claude-side by
     definition and records provider explicitly."""
+
     async def fake_query(*, prompt, options):  # noqa: ARG001
         yield _result(usage={"input_tokens": 10, "output_tokens": 5})
 
@@ -271,6 +289,7 @@ def _capture_options(captured: dict):
         captured["prompt"] = prompt
         captured["options"] = options
         yield _result(usage={"input_tokens": 1, "output_tokens": 1})
+
     return fake_query
 
 
@@ -296,6 +315,7 @@ def test_write_scope_legacy_shape_when_gate_flag_off(
     ledger: UsageLedger, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
     from core.config import CONFIG
+
     monkeypatch.setattr(CONFIG.features, "compile_callback_gate", False)
 
     captured: dict = {}
@@ -303,7 +323,8 @@ def test_write_scope_legacy_shape_when_gate_flag_off(
     spec = _spec(
         allowed_tools=("Read", "Glob", "Grep", "Write", "Edit"),
         write_scope=WriteScope(
-            roots=(tmp_path / "knowledge",), legacy_allowed_tools=legacy,
+            roots=(tmp_path / "knowledge",),
+            legacy_allowed_tools=legacy,
         ),
     )
     asyncio.run(run_sdk_query("p", spec, query_fn=_capture_options(captured)))
@@ -320,6 +341,7 @@ def test_write_scope_hook_shape_ignores_flag_without_legacy_tools(
     """Sites without a legacy fallback (correct_apply/reconcile) keep the
     hook shape even when the compile rollback flag is off."""
     from core.config import CONFIG
+
     monkeypatch.setattr(CONFIG.features, "compile_callback_gate", False)
 
     captured: dict = {}
@@ -351,14 +373,14 @@ def test_deny_all_writes_wires_gate_and_streaming_prompt(ledger: UsageLedger):
     # The can_use_tool contract requires a streaming prompt.
     async def _collect(stream):
         return [m async for m in stream]
+
     msgs = asyncio.run(_collect(captured["prompt"]))
-    assert msgs == [
-        {"type": "user", "message": {"role": "user", "content": "hello"}}
-    ]
+    assert msgs == [{"type": "user", "message": {"role": "user", "content": "hello"}}]
 
     # And the gate itself denies writes anywhere.
     async def _deny_check():
         return await options.can_use_tool("Write", {"file_path": "/tmp/x.md"}, None)
+
     assert asyncio.run(_deny_check()).behavior == "deny"
 
 
@@ -390,6 +412,7 @@ def test_stream_without_result_message_is_ok_with_fallback_usage(
 ):
     """Stream ends cleanly with only AssistantMessages: not a failure
     (parity with the legacy loops), usage from the per-turn fallback."""
+
     async def fake_query(*, prompt, options):  # noqa: ARG001
         yield _assistant({"input_tokens": 4, "output_tokens": 2}, text="partial")
 
@@ -425,8 +448,13 @@ def test_structured_error_api_version_floor_is_cli_outdated_and_fatal(ledger: Us
     from core.sdk_helpers import is_fatal
 
     async def refused_query(*, prompt, options):  # noqa: ARG001
-        yield _result(result=_VERSION_FLOOR_RESULT, cost=0.0, is_error=True,
-                      subtype="success", usage={"input_tokens": 0, "output_tokens": 0})
+        yield _result(
+            result=_VERSION_FLOOR_RESULT,
+            cost=0.0,
+            is_error=True,
+            subtype="success",
+            usage={"input_tokens": 0, "output_tokens": 0},
+        )
         raise RuntimeError("Command failed with exit code 1")
 
     result = asyncio.run(run_sdk_query("p", _spec(), query_fn=refused_query))
@@ -443,9 +471,9 @@ def test_structured_error_without_raise_is_cli_outdated(ledger: UsageLedger):
     """SDK 0.2.x shape: the refused ResultMessage arrives and the generator
     ends cleanly. Must not be mistaken for ok — and must not be reported as
     'success after 1 turns' with the cause dropped."""
+
     async def refused_query(*, prompt, options):  # noqa: ARG001
-        yield _result(result=_VERSION_FLOOR_RESULT, cost=0.0, is_error=True,
-                      subtype="success")
+        yield _result(result=_VERSION_FLOOR_RESULT, cost=0.0, is_error=True, subtype="success")
 
     result = asyncio.run(run_sdk_query("p", _spec(), query_fn=refused_query))
     assert not result.ok
@@ -457,11 +485,14 @@ def test_structured_error_without_raise_is_cli_outdated(ledger: UsageLedger):
 def test_structured_error_bad_model_classified_from_result_text(ledger: UsageLedger):
     """CLI 2.1.273 phrases a bad model as "There's an issue with the selected
     model (<name>)" — none of the older invalid-model patterns matched it."""
+
     async def bad_model_query(*, prompt, options):  # noqa: ARG001
         yield _result(
             result="There's an issue with the selected model (claude-nope-9). "
-                   "It may not exist or you may not have access to it.",
-            cost=0.0, is_error=True, subtype="success",
+            "It may not exist or you may not have access to it.",
+            cost=0.0,
+            is_error=True,
+            subtype="success",
         )
 
     result = asyncio.run(run_sdk_query("p", _spec(), query_fn=bad_model_query))
@@ -472,8 +503,11 @@ def test_structured_error_bad_model_classified_from_result_text(ledger: UsageLed
 def test_structured_error_bad_model_classified_from_stderr(ledger: UsageLedger):
     """The same refusal seen only on stderr (`[claude-code:unrecognized_model]`)
     with an empty result text: captured stderr must feed the classifier too."""
+
     async def bad_model_query(*, prompt, options):  # noqa: ARG001
-        options.stderr('[claude-code:unrecognized_model] {"model":"claude-nope-9","query_source":"sdk"}')
+        options.stderr(
+            '[claude-code:unrecognized_model] {"model":"claude-nope-9","query_source":"sdk"}'
+        )
         yield _result(result="", cost=0.0, is_error=True, subtype="success")
 
     result = asyncio.run(run_sdk_query("p", _spec(), query_fn=bad_model_query))
@@ -482,8 +516,9 @@ def test_structured_error_bad_model_classified_from_stderr(ledger: UsageLedger):
 
 def test_structured_error_excerpt_is_bounded(ledger: UsageLedger):
     async def long_query(*, prompt, options):  # noqa: ARG001
-        yield _result(result="API Error: 500 " + "x" * 5000, cost=0.0,
-                      is_error=True, subtype="success")
+        yield _result(
+            result="API Error: 500 " + "x" * 5000, cost=0.0, is_error=True, subtype="success"
+        )
 
     result = asyncio.run(run_sdk_query("p", _spec(), query_fn=long_query))
     assert len(result.failure.detail) < 400

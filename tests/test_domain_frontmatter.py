@@ -27,6 +27,7 @@ import pytest
 def test_config_personal_domains_default() -> None:
     """Dataclass default ships the enum lifted from the lx-vault audit."""
     from core.config import CONFIG
+
     assert CONFIG.personal.domains == ["company", "personal", "ai", "meta"]
 
 
@@ -35,15 +36,20 @@ def test_config_personal_domains_default() -> None:
 
 def test_migrate_key_additions_has_domains() -> None:
     from migrations import migrate_config_keys as m
+
     assert "personal" in m.KEY_ADDITIONS
     assert m.KEY_ADDITIONS["personal"]["domains"] == [
-        "company", "personal", "ai", "meta",
+        "company",
+        "personal",
+        "ai",
+        "meta",
     ]
 
 
 def test_migrate_additions_injects_domains_into_personal_block() -> None:
     """A config missing personal.domains gets it injected with the default."""
     from migrations import migrate_config_keys as m
+
     data: dict = {"personal": {"primary_account": "alex"}}
     changes = m.migrate_additions(data)
     assert data["personal"]["domains"] == ["company", "personal", "ai", "meta"]
@@ -53,6 +59,7 @@ def test_migrate_additions_injects_domains_into_personal_block() -> None:
 def test_migrate_additions_idempotent_when_present() -> None:
     """A config that already pins personal.domains keeps the operator value."""
     from migrations import migrate_config_keys as m
+
     data: dict = {"personal": {"domains": ["work", "home"]}}
     changes = m.migrate_additions(data)
     assert data["personal"]["domains"] == ["work", "home"]
@@ -83,9 +90,7 @@ def test_check_domain_value_passes_on_valid(tmp_path, monkeypatch) -> None:
     _seed_article(tmp_path, "good.md", "company")
 
     # Force config to a deterministic enum for the check.
-    monkeypatch.setattr(
-        lint.CONFIG.personal, "domains", ["company", "personal", "ai", "meta"]
-    )
+    monkeypatch.setattr(lint.CONFIG.personal, "domains", ["company", "personal", "ai", "meta"])
 
     ctx = lint.build_context(vault=tmp_path, knowledge_dir=fake_knowledge, state={})
     issues = lint.check_domain_value(ctx)
@@ -99,9 +104,7 @@ def test_check_domain_value_warns_on_unknown(tmp_path, monkeypatch) -> None:
     fake_knowledge.mkdir(parents=True)
     _seed_article(tmp_path, "bad.md", "fintech")
 
-    monkeypatch.setattr(
-        lint.CONFIG.personal, "domains", ["company", "personal", "ai", "meta"]
-    )
+    monkeypatch.setattr(lint.CONFIG.personal, "domains", ["company", "personal", "ai", "meta"])
 
     ctx = lint.build_context(vault=tmp_path, knowledge_dir=fake_knowledge, state={})
     issues = lint.check_domain_value(ctx)
@@ -119,9 +122,7 @@ def test_check_domain_value_ignores_untagged(tmp_path, monkeypatch) -> None:
     fake_knowledge.mkdir(parents=True)
     _seed_article(tmp_path, "untagged.md", None)
 
-    monkeypatch.setattr(
-        lint.CONFIG.personal, "domains", ["company", "personal", "ai", "meta"]
-    )
+    monkeypatch.setattr(lint.CONFIG.personal, "domains", ["company", "personal", "ai", "meta"])
 
     ctx = lint.build_context(vault=tmp_path, knowledge_dir=fake_knowledge, state={})
     assert lint.check_domain_value(ctx) == []
@@ -170,8 +171,8 @@ def test_query_argparse_accepts_domain_flag() -> None:
 def test_query_module_declares_domain_argument() -> None:
     """The actual query.py source declares the --domain flag (regression
     guard against accidental removal in future edits)."""
-    query_src = (
-        Path(__file__).resolve().parent.parent / "scripts" / "query.py"
-    ).read_text(encoding="utf-8")
+    query_src = (Path(__file__).resolve().parent.parent / "scripts" / "query.py").read_text(
+        encoding="utf-8"
+    )
     assert "--domain" in query_src
     assert "CONFIG.personal.domains" in query_src

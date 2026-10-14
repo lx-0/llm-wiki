@@ -153,7 +153,14 @@ def process_inbox(model: str, dry_run: bool = False) -> list[dict]:
             log.info("  HTML detected → ingesting in-process (mode=both)")
             if dry_run:
                 print(f"  {file_path.name} → raw/articles/ (extract) + raw/inbox-wiki/ (original)")
-                results.append({"source": file_path.name, "category": "html-ingest", "target": "raw/articles/", "classification": {}})
+                results.append(
+                    {
+                        "source": file_path.name,
+                        "category": "html-ingest",
+                        "target": "raw/articles/",
+                        "classification": {},
+                    }
+                )
                 continue
 
             try:
@@ -165,8 +172,19 @@ def process_inbox(model: str, dry_run: bool = False) -> list[dict]:
                 log.error("  HTML ingest produced no output for %s", file_path.name)
                 continue
             archived = _archive_to_inbox_wiki(file_path)
-            log.info("  Done (html ingested → %s; original → %s)", out.relative_to(ROOT_DIR), archived.relative_to(ROOT_DIR))
-            results.append({"source": file_path.name, "category": "html-ingest", "target": str(out.relative_to(ROOT_DIR)), "classification": {}})
+            log.info(
+                "  Done (html ingested → %s; original → %s)",
+                out.relative_to(ROOT_DIR),
+                archived.relative_to(ROOT_DIR),
+            )
+            results.append(
+                {
+                    "source": file_path.name,
+                    "category": "html-ingest",
+                    "target": str(out.relative_to(ROOT_DIR)),
+                    "classification": {},
+                }
+            )
             continue
 
         # ── Binary intake (audio/pdf/etc.) → archive-only, no artifact ──
@@ -174,21 +192,42 @@ def process_inbox(model: str, dry_run: bool = False) -> list[dict]:
             log.info("  Binary intake (%s) → archive-only", ext)
             if dry_run:
                 print(f"  {file_path.name} → raw/inbox-wiki/ (binary-only, no artifact)")
-                results.append({"source": file_path.name, "category": "binary", "target": "raw/inbox-wiki/", "classification": {}})
+                results.append(
+                    {
+                        "source": file_path.name,
+                        "category": "binary",
+                        "target": "raw/inbox-wiki/",
+                        "classification": {},
+                    }
+                )
                 continue
             archived = _archive_to_inbox_wiki(file_path)
             log.info("  Archived → %s", archived.relative_to(ROOT_DIR))
-            results.append({"source": file_path.name, "category": "binary", "target": str(archived.relative_to(ROOT_DIR)), "classification": {}})
+            results.append(
+                {
+                    "source": file_path.name,
+                    "category": "binary",
+                    "target": str(archived.relative_to(ROOT_DIR)),
+                    "classification": {},
+                }
+            )
             continue
 
         # ── md/txt → LLM classify, write artifact, archive original ──
         log.info("  Classifying with %s...", model)
         classification = classify_file(file_path, model)
         if not classification:
-            classification = {"category": "note", "suggested_name": file_path.stem.lower().replace(" ", "-")}
+            classification = {
+                "category": "note",
+                "suggested_name": file_path.stem.lower().replace(" ", "-"),
+            }
             log.info("  LLM failed, defaulting to 'note'")
         else:
-            log.info("  → %s (%s)", classification.get("category"), classification.get("summary", "")[:60])
+            log.info(
+                "  → %s (%s)",
+                classification.get("category"),
+                classification.get("summary", "")[:60],
+            )
 
         category = classification.get("category", "note")
         target_dir = CATEGORY_DIRS.get(category, RAW_NOTES_DIR)
@@ -204,7 +243,9 @@ def process_inbox(model: str, dry_run: bool = False) -> list[dict]:
         }
 
         if dry_run:
-            print(f"  {file_path.name} → {target_path.relative_to(ROOT_DIR)} + raw/inbox-wiki/{file_path.name}")
+            print(
+                f"  {file_path.name} → {target_path.relative_to(ROOT_DIR)} + raw/inbox-wiki/{file_path.name}"
+            )
             results.append(result)
             continue
 
@@ -219,7 +260,11 @@ def process_inbox(model: str, dry_run: bool = False) -> list[dict]:
         # Archive original (unmodified) to inbox-wiki
         archived = _archive_to_inbox_wiki(file_path)
 
-        log.info("  Artifact → %s; original → %s", target_path.relative_to(ROOT_DIR), archived.relative_to(ROOT_DIR))
+        log.info(
+            "  Artifact → %s; original → %s",
+            target_path.relative_to(ROOT_DIR),
+            archived.relative_to(ROOT_DIR),
+        )
         result["target"] = str(target_path.relative_to(ROOT_DIR))
         results.append(result)
 
@@ -227,6 +272,7 @@ def process_inbox(model: str, dry_run: bool = False) -> list[dict]:
 
 
 # ── Preprocessor adapter ──────────────────────────────────────────────
+
 
 @register
 class InboxPreprocessor:
@@ -249,10 +295,15 @@ class InboxPreprocessor:
 
 # ── Runnable entry point (via `scripts/process-inbox.py` shim) ────────
 
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Process inbox/ files")
-    parser.add_argument("--model", default=DEFAULT_MODEL, help=f"Ollama model (default: {DEFAULT_MODEL})")
-    parser.add_argument("--no-compile", action="store_true", help="Don't trigger compilation after processing")
+    parser.add_argument(
+        "--model", default=DEFAULT_MODEL, help=f"Ollama model (default: {DEFAULT_MODEL})"
+    )
+    parser.add_argument(
+        "--no-compile", action="store_true", help="Don't trigger compilation after processing"
+    )
     parser.add_argument("--dry-run", action="store_true", help="Show what would happen")
     args = parser.parse_args()
 

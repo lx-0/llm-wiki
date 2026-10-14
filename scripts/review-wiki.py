@@ -20,7 +20,13 @@ from pathlib import Path
 from core import ollama_client
 
 from core.paths import KNOWLEDGE_DIR, REPORTS_DIR, ROOT_DIR
-from core.utils import get_article_word_count, list_wiki_articles, now_iso, read_wiki_index, today_iso
+from core.utils import (
+    get_article_word_count,
+    list_wiki_articles,
+    now_iso,
+    read_wiki_index,
+    today_iso,
+)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -34,6 +40,7 @@ from core.prompts import render  # noqa: E402
 
 DEFAULT_MODEL = CONFIG.models.classify_model
 
+
 def review_article(article_path: Path, model: str) -> dict | None:
     """Send an article to the local LLM for review."""
     content = article_path.read_text(encoding="utf-8")
@@ -43,9 +50,7 @@ def review_article(article_path: Path, model: str) -> dict | None:
     prompt = render("review_wiki", article_content=content)
 
     try:
-        raw = ollama_client.chat(
-            prompt, model=model, timeout=CONFIG.limits.review_ollama_timeout_s
-        )
+        raw = ollama_client.chat(prompt, model=model, timeout=CONFIG.limits.review_ollama_timeout_s)
         review = ollama_client.parse_json_lenient(raw)
         review["article"] = rel
         review["word_count"] = word_count
@@ -56,15 +61,19 @@ def review_article(article_path: Path, model: str) -> dict | None:
         # connectivity failure, so `error_kind=parse` does not count toward the
         # consecutive-failure abort (which is meant to catch a down server).
         log.warning("Failed to parse JSON for %s: %s", rel, raw[:200])
-        return {"article": rel, "word_count": word_count,
-                "error": "JSON parse failed", "error_kind": "parse", "raw": raw[:300]}
+        return {
+            "article": rel,
+            "word_count": word_count,
+            "error": "JSON parse failed",
+            "error_kind": "parse",
+            "raw": raw[:300],
+        }
     except Exception as e:
         # Connection refused / read timeout / HTTP error — a transport-level
         # failure. `error_kind=ollama` so the caller can fail-fast when kcma is
         # down instead of grinding 1700×timeout.
         log.error("Failed to review %s: %s", rel, e)
-        return {"article": rel, "word_count": word_count,
-                "error": str(e), "error_kind": "ollama"}
+        return {"article": rel, "word_count": word_count, "error": str(e), "error_kind": "ollama"}
 
 
 def generate_report(reviews: list[dict], model: str) -> str:
@@ -161,8 +170,12 @@ def generate_report(reviews: list[dict], model: str) -> str:
     lines.append("")
     lines.append("## All Articles")
     lines.append("")
-    lines.append("| Article | Words | Overall | Accuracy | Depth | Conn. | Action. | Fresh. | Verdict |")
-    lines.append("|---------|-------|---------|----------|-------|-------|---------|--------|---------|")
+    lines.append(
+        "| Article | Words | Overall | Accuracy | Depth | Conn. | Action. | Fresh. | Verdict |"
+    )
+    lines.append(
+        "|---------|-------|---------|----------|-------|-------|---------|--------|---------|"
+    )
     for r in sorted(valid, key=lambda x: x.get("overall", 0), reverse=True):
         lines.append(
             f"| `{r['article']}` | {r.get('word_count', '?')} | "
@@ -183,9 +196,7 @@ def _write_reports(reviews: list[dict], model: str) -> tuple[Path, Path]:
     md_path = REPORTS_DIR / f"wiki-review-{today_iso()}.md"
     md_path.write_text(generate_report(reviews, model), encoding="utf-8")
     json_path = REPORTS_DIR / f"wiki-review-{today_iso()}.json"
-    json_path.write_text(
-        json.dumps(reviews, indent=2, ensure_ascii=False), encoding="utf-8"
-    )
+    json_path.write_text(json.dumps(reviews, indent=2, ensure_ascii=False), encoding="utf-8")
     return md_path, json_path
 
 
@@ -198,14 +209,16 @@ def _sweep_deadline_s(review_max: int, piggyback_max: int) -> float:
 
 def main():
     parser = argparse.ArgumentParser(description="Review wiki articles with local LLM")
-    parser.add_argument("--model", default=DEFAULT_MODEL, help=f"Ollama model (default: {DEFAULT_MODEL})")
+    parser.add_argument(
+        "--model", default=DEFAULT_MODEL, help=f"Ollama model (default: {DEFAULT_MODEL})"
+    )
     parser.add_argument("--limit", type=int, help="Max articles to review")
     parser.add_argument("--dry-run", action="store_true", help="Just list articles")
     args = parser.parse_args()
 
     articles = list_wiki_articles()
     if args.limit:
-        articles = articles[:args.limit]
+        articles = articles[: args.limit]
 
     print(f"Articles to review: {len(articles)}")
     print(f"Model: {args.model}")
@@ -219,7 +232,9 @@ def main():
     # Check Ollama connectivity
     if not ollama_client.is_reachable():
         print(f"ERROR: Cannot reach Ollama at {CONFIG.models.ollama_url}")
-        print("Is the Ollama server reachable? Check `ollama serve` locally or your remote endpoint.")
+        print(
+            "Is the Ollama server reachable? Check `ollama serve` locally or your remote endpoint."
+        )
         sys.exit(1)
 
     abort_n = CONFIG.limits.review_consecutive_failure_abort
@@ -243,7 +258,9 @@ def main():
             log.info(
                 "Sweep soft-deadline reached (%.0fs) — %d/%d reviewed, partial "
                 "report written, exiting cleanly.",
-                deadline_s, i - 1, len(articles),
+                deadline_s,
+                i - 1,
+                len(articles),
             )
             print(
                 f"\nDeadline reached after {i - 1}/{len(articles)} reviews — "
@@ -265,7 +282,9 @@ def main():
                     log.error(
                         "Aborting sweep after %d consecutive Ollama failures "
                         "(kcma down?). %d/%d articles reviewed.",
-                        consecutive_ollama_failures, i, len(articles),
+                        consecutive_ollama_failures,
+                        i,
+                        len(articles),
                     )
                     print(
                         f"\nABORTED: {consecutive_ollama_failures} consecutive "

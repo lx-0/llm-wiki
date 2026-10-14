@@ -4,6 +4,7 @@ Verifies the substrate-path triggers the compile prompt's commitment-
 extraction rule and that the rendered prompt carries the substrate
 content end-to-end. No LLM call; emission validation is T05's job.
 """
+
 from __future__ import annotations
 
 from pathlib import Path

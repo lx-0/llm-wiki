@@ -44,6 +44,7 @@ def test_gmail_auth_bootstrap_missing_client_secret(
     # google-oauth-client.json / gmail-oauth-client.json exist for the
     # resolver to find. Bootstrap should error cleanly.
     from core import google_oauth as _go
+
     monkeypatch.setattr(_go, "ROOT_DIR", tmp_path)
     ok, msg = gmail_mod.gmail_auth_bootstrap("test")
     assert not ok

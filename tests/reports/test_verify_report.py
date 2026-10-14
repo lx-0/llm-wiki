@@ -103,8 +103,7 @@ def test_good_report_passes(tmp_path: Path) -> None:
 def test_missing_frontmatter_key_flagged(tmp_path: Path) -> None:
     # Drop the `prompt_version` line
     bad = "\n".join(
-        line for line in GOOD_REPORT_TEMPLATE.splitlines()
-        if not line.startswith("prompt_version:")
+        line for line in GOOD_REPORT_TEMPLATE.splitlines() if not line.startswith("prompt_version:")
     )
     out = _write(tmp_path, bad)
     result = verify_report(out)
@@ -115,7 +114,8 @@ def test_missing_frontmatter_key_flagged(tmp_path: Path) -> None:
 def test_missing_section_flagged(tmp_path: Path) -> None:
     # Drop the "## Embedded methodology" line
     bad = "\n".join(
-        line for line in GOOD_REPORT_TEMPLATE.splitlines()
+        line
+        for line in GOOD_REPORT_TEMPLATE.splitlines()
         if line.strip() != "## Embedded methodology"
     )
     out = _write(tmp_path, bad)
@@ -159,11 +159,20 @@ def test_missing_file(tmp_path: Path) -> None:
 def test_required_lists_locked() -> None:
     """Pin the required lists so a silent edit surfaces here."""
     assert set(REQUIRED_FRONTMATTER_KEYS) == {
-        "instrument", "version", "run_timestamp", "total_score",
-        "model_id", "prompt_version", "scope", "coverage",
+        "instrument",
+        "version",
+        "run_timestamp",
+        "total_score",
+        "model_id",
+        "prompt_version",
+        "scope",
+        "coverage",
     }
     assert set(REQUIRED_SECTIONS) == {
-        "Score", "Items", "Per-item detail", "Embedded methodology",
+        "Score",
+        "Items",
+        "Per-item detail",
+        "Embedded methodology",
     }
     assert set(REQUIRED_METHODOLOGY_SUMMARIES) == {
         "Items (verbatim from items.yaml)",

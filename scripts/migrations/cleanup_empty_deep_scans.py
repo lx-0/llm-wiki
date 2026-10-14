@@ -42,7 +42,7 @@ log = logging.getLogger("cleanup-empty-deep-scans")
 # pair (origin tag + zero-message marker) to avoid deleting other
 # deep-scan formats that happen to have 0 messages legitimately.
 _ORIGIN_RE = re.compile(r'^origin:\s*"?curiosity/email-deep-scan"?\s*$', re.MULTILINE)
-_MESSAGES_RE = re.compile(r'^messages:\s*0\s*$', re.MULTILINE)
+_MESSAGES_RE = re.compile(r"^messages:\s*0\s*$", re.MULTILINE)
 
 
 def find_empty_outputs(deep_scan_dir: Path) -> list[Path]:

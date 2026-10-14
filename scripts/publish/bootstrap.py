@@ -7,6 +7,7 @@ The managed wiki is created ONCE (`create_wiki` with the cooperative
 hash is tracked under the manifest's separate ``start_page`` key — never in
 ``articles``, where the delta engine would plan its retraction.
 """
+
 from __future__ import annotations
 
 import json
@@ -31,9 +32,7 @@ def ensure_wiki(client, slug: str, name: str) -> bool:
     existing = {w.get("slug") for w in listing.get("wikis", [])}
     if slug in existing:
         return False
-    client.call_tool(
-        "create_wiki", {"name": name, "slug": slug, "managed_by": PRODUCER_ID}
-    )
+    client.call_tool("create_wiki", {"name": name, "slug": slug, "managed_by": PRODUCER_ID})
     return True
 
 
@@ -44,9 +43,7 @@ def start_page_payload(slug_map: dict[str, str], wiki_name: str) -> ArticlePaylo
             f"an article already claims the reserved start-page slug '{START_SLUG}' "
             f"({slug_map[START_SLUG]}) — rename it"
         )
-    mocs = sorted(
-        slug for slug, rel in slug_map.items() if rel.startswith("knowledge/MOCs/")
-    )
+    mocs = sorted(slug for slug, rel in slug_map.items() if rel.startswith("knowledge/MOCs/"))
     by_root: dict[str, int] = {}
     for rel in slug_map.values():
         by_root[rel.split("/", 1)[0]] = by_root.get(rel.split("/", 1)[0], 0) + 1

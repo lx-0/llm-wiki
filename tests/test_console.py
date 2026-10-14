@@ -21,8 +21,13 @@ from core import console  # noqa: E402
 
 def _make_record(msg: str, level: int = logging.INFO) -> logging.LogRecord:
     return logging.LogRecord(
-        name="test", level=level, pathname=__file__, lineno=1,
-        msg=msg, args=(), exc_info=None,
+        name="test",
+        level=level,
+        pathname=__file__,
+        lineno=1,
+        msg=msg,
+        args=(),
+        exc_info=None,
     )
 
 
@@ -54,9 +59,7 @@ class TestNonTtyPlainOutput:
         assert "hello world" in out
 
     def test_warning_has_label_without_color_codes(self, plain_mode):
-        out = console.ConsoleFormatter().format(
-            _make_record("careful now", level=logging.WARNING)
-        )
+        out = console.ConsoleFormatter().format(_make_record("careful now", level=logging.WARNING))
         assert "\033[" not in out
         assert "WARNING" in out
 
@@ -73,16 +76,12 @@ class TestTtyColorization:
         assert "INFO" not in out
 
     def test_warning_label_colored(self, tty_mode):
-        out = console.ConsoleFormatter().format(
-            _make_record("watch out", level=logging.WARNING)
-        )
+        out = console.ConsoleFormatter().format(_make_record("watch out", level=logging.WARNING))
         assert "\033[33m" in out  # yellow
         assert "WARNING" in out
 
     def test_error_label_colored(self, tty_mode):
-        out = console.ConsoleFormatter().format(
-            _make_record("broken", level=logging.ERROR)
-        )
+        out = console.ConsoleFormatter().format(_make_record("broken", level=logging.ERROR))
         assert "\033[31m" in out  # red
         assert "ERROR" in out
 
@@ -95,9 +94,7 @@ class TestTtyColorization:
         assert "\033[31m✗\033[0m" in out
 
     def test_section_banner_bolded(self, tty_mode):
-        out = console.ConsoleFormatter().format(
-            _make_record("─── compiling 10 of 50 ───")
-        )
+        out = console.ConsoleFormatter().format(_make_record("─── compiling 10 of 50 ───"))
         assert "\033[1m" in out  # bold
 
     def test_elapsed_dimmed(self, tty_mode):
@@ -105,27 +102,26 @@ class TestTtyColorization:
         assert "\033[2m12.5s\033[0m" in out
 
     def test_tokens_dimmed(self, tty_mode):
-        out = console.ConsoleFormatter().format(
-            _make_record("usage: in:1,200 out:300 fini")
-        )
+        out = console.ConsoleFormatter().format(_make_record("usage: in:1,200 out:300 fini"))
         assert "\033[2min:1,200 out:300\033[0m" in out
 
 
 class TestCostTiering:
-    @pytest.mark.parametrize("amount,expected_color", [
-        ("0.01", "\033[2m"),    # < $0.05 — dim
-        ("0.04", "\033[2m"),    # < $0.05 — dim
-        ("0.10", None),         # mid — plain (no color wrap)
-        ("0.49", None),         # just under $0.50 — plain
-        ("0.50", "\033[33m"),   # ≥ $0.50 — yellow
-        ("1.49", "\033[33m"),   # just under $1.50 — yellow
-        ("1.50", "\033[1m\033[33m"),  # ≥ $1.50 — bold + yellow
-        ("12.34", "\033[1m\033[33m"), # high cost — bold + yellow
-    ])
+    @pytest.mark.parametrize(
+        "amount,expected_color",
+        [
+            ("0.01", "\033[2m"),  # < $0.05 — dim
+            ("0.04", "\033[2m"),  # < $0.05 — dim
+            ("0.10", None),  # mid — plain (no color wrap)
+            ("0.49", None),  # just under $0.50 — plain
+            ("0.50", "\033[33m"),  # ≥ $0.50 — yellow
+            ("1.49", "\033[33m"),  # just under $1.50 — yellow
+            ("1.50", "\033[1m\033[33m"),  # ≥ $1.50 — bold + yellow
+            ("12.34", "\033[1m\033[33m"),  # high cost — bold + yellow
+        ],
+    )
     def test_tier_colors(self, tty_mode, amount, expected_color):
-        out = console.ConsoleFormatter().format(
-            _make_record(f"cost: (${amount}) reported")
-        )
+        out = console.ConsoleFormatter().format(_make_record(f"cost: (${amount}) reported"))
         if expected_color is None:
             # Mid-tier ($0.10–$0.49): no color wrap.
             assert f"${amount}" in out
@@ -140,9 +136,7 @@ class TestCostTiering:
 class TestSdkNoiseFilter:
     def test_drops_bundled_cli_line(self):
         f = console.SdkNoiseFilter()
-        rec = _make_record(
-            "Using bundled Claude Code CLI: /some/long/path/cli.js"
-        )
+        rec = _make_record("Using bundled Claude Code CLI: /some/long/path/cli.js")
         assert f.filter(rec) is False
 
     def test_keeps_other_lines(self):
@@ -181,9 +175,7 @@ class TestSetupHelper:
         monkeypatch.setattr(root, "handlers", [])
         try:
             console.setup_console_logging("my-cli")
-            assert any(
-                isinstance(h, logging.StreamHandler) for h in root.handlers
-            )
+            assert any(isinstance(h, logging.StreamHandler) for h in root.handlers)
         finally:
             root.handlers = existing_handlers
 
@@ -194,9 +186,7 @@ class TestSetupHelper:
         try:
             log_path = tmp_path / "subdir" / "test.log"
             console.setup_console_logging("my-cli", log_file=log_path)
-            file_handlers = [
-                h for h in root.handlers if isinstance(h, logging.FileHandler)
-            ]
+            file_handlers = [h for h in root.handlers if isinstance(h, logging.FileHandler)]
             assert len(file_handlers) == 1
             assert Path(file_handlers[0].baseFilename) == log_path
             assert log_path.parent.exists()  # mkdir(parents=True) ran
@@ -215,21 +205,19 @@ class TestSetupHelper:
         try:
             console.setup_console_logging("first-cli")
             stderr_handlers_after_first = [
-                h for h in root.handlers
-                if isinstance(h, logging.StreamHandler)
-                and not isinstance(h, logging.FileHandler)
+                h
+                for h in root.handlers
+                if isinstance(h, logging.StreamHandler) and not isinstance(h, logging.FileHandler)
             ]
             assert len(stderr_handlers_after_first) == 1
             first_formatter = stderr_handlers_after_first[0].formatter
 
             # Second call (simulates the lazy cross-import that caused the bug)
-            console.setup_console_logging(
-                "second-cli", formatter=console.ConsoleFormatter()
-            )
+            console.setup_console_logging("second-cli", formatter=console.ConsoleFormatter())
             stderr_handlers_after_second = [
-                h for h in root.handlers
-                if isinstance(h, logging.StreamHandler)
-                and not isinstance(h, logging.FileHandler)
+                h
+                for h in root.handlers
+                if isinstance(h, logging.StreamHandler) and not isinstance(h, logging.FileHandler)
             ]
             # No new stderr handler — would have been the bug.
             assert len(stderr_handlers_after_second) == 1
@@ -249,9 +237,9 @@ class TestSetupHelper:
             console.setup_console_logging("first-cli", log_file=log_path)
             console.setup_console_logging("second-cli", log_file=log_path)
             file_handlers = [
-                h for h in root.handlers
-                if isinstance(h, logging.FileHandler)
-                and h.baseFilename == str(log_path.resolve())
+                h
+                for h in root.handlers
+                if isinstance(h, logging.FileHandler) and h.baseFilename == str(log_path.resolve())
             ]
             assert len(file_handlers) == 1
         finally:

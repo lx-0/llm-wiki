@@ -52,6 +52,7 @@ SLUG_MAX_LEN = 80
 
 # ── Content extraction ────────────────────────────────────────────────
 
+
 def extract_content(html: str) -> str:
     """Convert HTML to clean Markdown."""
     h = html2text.HTML2Text()
@@ -65,6 +66,7 @@ def extract_content(html: str) -> str:
 
 
 # ── Visual analysis ───────────────────────────────────────────────────
+
 
 def screenshot_html(source: str, output_path: Path) -> bool:
     """Take a screenshot of an HTML file or URL using Playwright."""
@@ -108,7 +110,10 @@ Be thorough and specific. This analysis will be stored as knowledge."""
 
     try:
         content, _ = ollama_client.chat_vision(
-            prompt, model=model, image_b64=image_data, timeout=300,
+            prompt,
+            model=model,
+            image_b64=image_data,
+            timeout=300,
         )
         return content
     except Exception as e:
@@ -118,9 +123,11 @@ Be thorough and specific. This analysis will be stored as knowledge."""
 
 # ── Title extraction ──────────────────────────────────────────────────
 
+
 def extract_title(html: str) -> str:
     """Extract <title> from HTML."""
     import re
+
     match = re.search(r"<title[^>]*>(.*?)</title>", html, re.IGNORECASE | re.DOTALL)
     if match:
         return match.group(1).strip()
@@ -128,6 +135,7 @@ def extract_title(html: str) -> str:
 
 
 # ── Main ingest logic ────────────────────────────────────────────────
+
 
 def ingest(source: str, mode: str, model: str, compile: bool) -> Path | None:
     """Ingest an HTML file or URL."""
@@ -144,7 +152,9 @@ def ingest(source: str, mode: str, model: str, compile: bool) -> Path | None:
         except Exception as e:
             log.error("Failed to fetch URL: %s", e)
             return None
-        slug = slugify(urlparse(source).path.split("/")[-1] or urlparse(source).netloc, max_len=SLUG_MAX_LEN)
+        slug = slugify(
+            urlparse(source).path.split("/")[-1] or urlparse(source).netloc, max_len=SLUG_MAX_LEN
+        )
         origin = source
     else:
         source_path = Path(source).resolve()
@@ -203,6 +213,7 @@ def ingest(source: str, mode: str, model: str, compile: bool) -> Path | None:
             # Save screenshot alongside the article
             screenshot_dest = RAW_ARTICLES_DIR / f"{slug}.png"
             import shutil
+
             shutil.move(str(screenshot_path), str(screenshot_dest))
             parts.append("## Screenshot")
             parts.append("")
@@ -228,7 +239,9 @@ def ingest(source: str, mode: str, model: str, compile: bool) -> Path | None:
     parts.append("## Original Source")
     parts.append("")
     parts.append(f"The full original HTML is available at `{html_rel}`.")
-    parts.append("Read it with the Read tool for additional context if the extracted content above is insufficient.")
+    parts.append(
+        "Read it with the Read tool for additional context if the extracted content above is insufficient."
+    )
     parts.append("")
 
     # Update origin in frontmatter to point to the saved HTML
@@ -258,6 +271,7 @@ def ingest(source: str, mode: str, model: str, compile: bool) -> Path | None:
 
 # ── Preprocessor adapter ──────────────────────────────────────────────
 
+
 @register
 class HtmlPreprocessor:
     """Convert one HTML file/URL into `raw/articles/`. Requires a `source`."""
@@ -285,6 +299,7 @@ class HtmlPreprocessor:
 
 # ── Runnable entry point (via `scripts/ingest-html.py` shim) ──────────
 
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Ingest HTML files or URLs")
     parser.add_argument("source", help="Path to HTML file or URL")
@@ -294,7 +309,11 @@ def main() -> None:
         default="content",
         help="Extraction mode (default: content)",
     )
-    parser.add_argument("--model", default=DEFAULT_MODEL, help=f"Ollama model for visual analysis (default: {DEFAULT_MODEL})")
+    parser.add_argument(
+        "--model",
+        default=DEFAULT_MODEL,
+        help=f"Ollama model for visual analysis (default: {DEFAULT_MODEL})",
+    )
     parser.add_argument("--no-compile", action="store_true", help="Don't trigger compilation")
     args = parser.parse_args()
 

@@ -44,6 +44,7 @@ import time as _time  # noqa: E402
 
 # ── Main ────────────────────────────────────────────────────────────
 
+
 async def optimize(dry_run: bool = False) -> None:
     if not CLAUDE_MD.exists():
         log.error("CLAUDE.md not found: %s", CLAUDE_MD)
@@ -57,7 +58,9 @@ async def optimize(dry_run: bool = False) -> None:
     log.info("Wiki: %d chars compact index", len(index_md))
 
     if dry_run:
-        log.info("[dry-run] Would optimize CLAUDE.md based on %d chars of wiki index", len(index_md))
+        log.info(
+            "[dry-run] Would optimize CLAUDE.md based on %d chars of wiki index", len(index_md)
+        )
         return
 
     # Backup
@@ -133,10 +136,16 @@ async def optimize(dry_run: bool = False) -> None:
     # Log the diff
     if LOG_FILE.exists():
         import difflib
-        diff = list(difflib.unified_diff(
-            current.splitlines(), updated.splitlines(),
-            fromfile="CLAUDE.md (before)", tofile="CLAUDE.md (after)", lineterm=""
-        ))
+
+        diff = list(
+            difflib.unified_diff(
+                current.splitlines(),
+                updated.splitlines(),
+                fromfile="CLAUDE.md (before)",
+                tofile="CLAUDE.md (after)",
+                lineterm="",
+            )
+        )
         if diff:
             diff_text = "\n".join(diff[:50])  # limit diff size
             with open(LOG_FILE, "a", encoding="utf-8") as f:
@@ -153,7 +162,9 @@ async def optimize(dry_run: bool = False) -> None:
 
 async def main() -> None:
     parser = argparse.ArgumentParser(description="Optimize ~/.claude/CLAUDE.md from wiki knowledge")
-    parser.add_argument("--dry-run", action="store_true", help="Show what would happen without writing")
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Show what would happen without writing"
+    )
     args = parser.parse_args()
     await optimize(dry_run=args.dry_run)
 

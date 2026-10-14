@@ -61,12 +61,17 @@ def migrate(vault: Path, *, dry_run: bool) -> tuple[int, int, int]:
                 continue
             # Content differs — somebody already started using the new structure.
             # Don't clobber; flag for operator review.
-            print(f"  CONFLICT: {target_file} exists with different content — skipping {entry.name}", file=sys.stderr)
+            print(
+                f"  CONFLICT: {target_file} exists with different content — skipping {entry.name}",
+                file=sys.stderr,
+            )
             skipped_other += 1
             continue
 
         if dry_run:
-            print(f"  DRY: would copy {entry.name} → {date_stem}/sessions.md ({entry.stat().st_size} bytes)")
+            print(
+                f"  DRY: would copy {entry.name} → {date_stem}/sessions.md ({entry.stat().st_size} bytes)"
+            )
         else:
             target_dir.mkdir(parents=True, exist_ok=True)
             target_file.write_text(entry.read_text(encoding="utf-8"), encoding="utf-8")
@@ -78,10 +83,10 @@ def migrate(vault: Path, *, dry_run: bool) -> tuple[int, int, int]:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("--vault", required=True, type=Path,
-                    help="Vault root (the folder that contains daily/)")
-    ap.add_argument("--dry-run", action="store_true",
-                    help="Show what would happen; write nothing")
+    ap.add_argument(
+        "--vault", required=True, type=Path, help="Vault root (the folder that contains daily/)"
+    )
+    ap.add_argument("--dry-run", action="store_true", help="Show what would happen; write nothing")
     args = ap.parse_args()
 
     if not args.vault.is_dir():

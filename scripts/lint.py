@@ -17,6 +17,7 @@ dashboards) never parse prose.
 """
 
 import os
+
 os.environ["CLAUDE_INVOKED_BY"] = "lint"
 
 import argparse
@@ -52,6 +53,7 @@ from core.links import (  # noqa: E402
 
 # ── Logging ──────────────────────────────────────────────────────────
 from core.console import setup_console_logging  # noqa: E402
+
 log = setup_console_logging("lint")
 
 from core.config import CONFIG  # noqa: E402
@@ -60,6 +62,7 @@ SPARSE_THRESHOLD = CONFIG.limits.sparse_threshold_words
 
 
 # ── Issue type ──────────────────────────────────────────────────────
+
 
 @dataclass(frozen=True)
 class Issue:
@@ -100,16 +103,17 @@ def issue(
 
 # ── Corpus model ────────────────────────────────────────────────────
 
+
 @dataclass(frozen=True)
 class Article:
     """One knowledge article, read + parsed exactly once per lint run."""
 
     path: Path
-    rel: str                  # posix path relative to knowledge_dir, e.g. "concepts/foo.md"
-    text: str                 # full file content
-    fm: dict                  # tolerant frontmatter (core.frontmatter grammar)
-    body: str                 # frontmatter-stripped body
-    slug: str | None          # canonical knowledge slug, e.g. "concepts/foo"
+    rel: str  # posix path relative to knowledge_dir, e.g. "concepts/foo.md"
+    text: str  # full file content
+    fm: dict  # tolerant frontmatter (core.frontmatter grammar)
+    body: str  # frontmatter-stripped body
+    slug: str | None  # canonical knowledge slug, e.g. "concepts/foo"
     outgoing: frozenset[str]  # footer-aware outgoing canonical slugs
 
 
@@ -156,17 +160,21 @@ def build_context(
         except OSError:
             continue
         fm, body = frontmatter.parse(text)
-        articles.append(Article(
-            path=path,
-            rel=path.relative_to(kdir).as_posix(),
-            text=text,
-            fm=fm,
-            body=body,
-            slug=canonical_slug(path, kdir),
-            outgoing=frozenset(outgoing_canonical_slugs(
-                text, path, vault, kdir, BACKLINKS_BEGIN, BACKLINKS_END
-            )),
-        ))
+        articles.append(
+            Article(
+                path=path,
+                rel=path.relative_to(kdir).as_posix(),
+                text=text,
+                fm=fm,
+                body=body,
+                slug=canonical_slug(path, kdir),
+                outgoing=frozenset(
+                    outgoing_canonical_slugs(
+                        text, path, vault, kdir, BACKLINKS_BEGIN, BACKLINKS_END
+                    )
+                ),
+            )
+        )
 
     inbound: dict[str, set[str]] = {}
     for art in articles:
@@ -203,12 +211,14 @@ def _in_folder(ctx: LintContext, folder: str) -> list[Article]:
     """Articles under ``knowledge/<folder>/``, index.md/log.md filtered."""
     prefix = f"{folder}/"
     return [
-        a for a in ctx.articles
+        a
+        for a in ctx.articles
         if a.rel.startswith(prefix) and a.path.name not in ("index.md", "log.md")
     ]
 
 
 # ── Structural checks ───────────────────────────────────────────────
+
 
 def check_broken_links(ctx: LintContext) -> list[Issue]:
     """Find wikilinks that point to non-existent targets.
@@ -230,11 +240,15 @@ def check_broken_links(ctx: LintContext) -> list[Issue]:
             for link in extract_wikilinks(line):
                 target = link_target(link)
                 if resolve_link(target, art.path, ctx.vault) is None:
-                    issues.append(issue(
-                        "error", "broken_link", art.rel,
-                        f"Broken link: [[{link}]] — target does not exist",
-                        target_slug=target,
-                    ))
+                    issues.append(
+                        issue(
+                            "error",
+                            "broken_link",
+                            art.rel,
+                            f"Broken link: [[{link}]] — target does not exist",
+                            target_slug=target,
+                        )
+                    )
     return issues
 
 
@@ -266,10 +280,14 @@ def check_orphan_pages(ctx: LintContext) -> list[Issue]:
         in_index = f"[[{name}]]" in ctx.index_content
 
         if inbound == 0 and not in_index:
-            issues.append(issue(
-                "warning", "orphan_page", art.rel,
-                f"Orphan page: no other articles link to [[{name}]]",
-            ))
+            issues.append(
+                issue(
+                    "warning",
+                    "orphan_page",
+                    art.rel,
+                    f"Orphan page: no other articles link to [[{name}]]",
+                )
+            )
     return issues
 
 
@@ -281,10 +299,14 @@ def check_orphan_sources(ctx: LintContext) -> list[Issue]:
     for source in ctx.raw_files:
         rel = str(source.relative_to(ctx.vault))
         if rel not in ingested:
-            issues.append(issue(
-                "warning", "orphan_source", rel,
-                f"Uncompiled source: {rel} has not been ingested",
-            ))
+            issues.append(
+                issue(
+                    "warning",
+                    "orphan_source",
+                    rel,
+                    f"Uncompiled source: {rel} has not been ingested",
+                )
+            )
     return issues
 
 
@@ -306,10 +328,14 @@ def check_stale_articles(ctx: LintContext) -> list[Issue]:
             stored_hash = str(stored)
         current_hash = file_hash(source)
         if stored_hash != current_hash:
-            issues.append(issue(
-                "warning", "stale_article", rel,
-                f"Stale: {rel} has changed since last compilation",
-            ))
+            issues.append(
+                issue(
+                    "warning",
+                    "stale_article",
+                    rel,
+                    f"Stale: {rel} has changed since last compilation",
+                )
+            )
     return issues
 
 
@@ -362,17 +388,25 @@ def check_article_type(ctx: LintContext) -> list[Issue]:
             continue  # unknown folder — let other checks handle it
         actual = art.fm.get("type")
         if not actual:
-            issues.append(issue(
-                "warning", "missing_type", art.rel,
-                f"Missing `type:` frontmatter — expected `type: {expected}` (matches folder `{folder}/`)",
-                auto_fixable=True,
-            ))
+            issues.append(
+                issue(
+                    "warning",
+                    "missing_type",
+                    art.rel,
+                    f"Missing `type:` frontmatter — expected `type: {expected}` (matches folder `{folder}/`)",
+                    auto_fixable=True,
+                )
+            )
         elif actual != expected:
-            issues.append(issue(
-                "warning", "type_mismatch", art.rel,
-                f"`type: {actual}` does not match folder `{folder}/` (expected `type: {expected}`)",
-                auto_fixable=True,
-            ))
+            issues.append(
+                issue(
+                    "warning",
+                    "type_mismatch",
+                    art.rel,
+                    f"`type: {actual}` does not match folder `{folder}/` (expected `type: {expected}`)",
+                    auto_fixable=True,
+                )
+            )
     return issues
 
 
@@ -404,19 +438,27 @@ def check_qa_schema(ctx: LintContext) -> list[Issue]:
         # 1. type: qa required
         if art.fm.get("type") != "qa":
             actual = art.fm.get("type") or "(missing)"
-            issues.append(issue(
-                "error", "qa_missing_type", art.rel,
-                f"qa/ note has `type: {actual}` — must be `type: qa` per schema",
-                auto_fixable=True,
-            ))
+            issues.append(
+                issue(
+                    "error",
+                    "qa_missing_type",
+                    art.rel,
+                    f"qa/ note has `type: {actual}` — must be `type: qa` per schema",
+                    auto_fixable=True,
+                )
+            )
         # 2. must appear in index.md
         stem = art.path.stem
         if f"[[qa/{stem}]]" not in ctx.index_content:
-            issues.append(issue(
-                "warning", "qa_not_in_index", art.rel,
-                f"qa/{stem} is not referenced in knowledge/index.md — "
-                f"`wiki query --file-back` should have added a row",
-            ))
+            issues.append(
+                issue(
+                    "warning",
+                    "qa_not_in_index",
+                    art.rel,
+                    f"qa/{stem} is not referenced in knowledge/index.md — "
+                    f"`wiki query --file-back` should have added a row",
+                )
+            )
         # 3. should have ≥1 domain tag (else falls into grey bucket in graph
         # view). Skipped entirely when the operator has named no domains —
         # warning "no domain tag from []" on every note would be noise, and
@@ -425,11 +467,15 @@ def check_qa_schema(ctx: LintContext) -> list[Issue]:
         tags = {str(t) for t in raw_tags} if isinstance(raw_tags, list) else set()
         # Strip the redundant `qa` tag — that information lives in type:
         if domain_set and not (tags & domain_set):
-            issues.append(issue(
-                "warning", "qa_no_domain_tag", art.rel,
-                f"qa/ note has no domain tag from {sorted(domain_set)} — "
-                f"will render grey in graph view. Add e.g. `tags: [llm-wiki]`.",
-            ))
+            issues.append(
+                issue(
+                    "warning",
+                    "qa_no_domain_tag",
+                    art.rel,
+                    f"qa/ note has no domain tag from {sorted(domain_set)} — "
+                    f"will render grey in graph view. Add e.g. `tags: [llm-wiki]`.",
+                )
+            )
     return issues
 
 
@@ -458,11 +504,15 @@ def check_concept_domain_tag(ctx: LintContext) -> list[Issue]:
             tags = {str(t) for t in raw_tags} if isinstance(raw_tags, list) else set()
             # Quiet when the operator has named no domains — see _domain_tags.
             if domain_set and not (tags & domain_set):
-                issues.append(issue(
-                    "warning", "concept_no_domain_tag", art.rel,
-                    f"{folder[:-1]} has no tag from {sorted(domain_set)} — "
-                    f"will render grey in graph view. Current tags: {sorted(tags)[:6]}",
-                ))
+                issues.append(
+                    issue(
+                        "warning",
+                        "concept_no_domain_tag",
+                        art.rel,
+                        f"{folder[:-1]} has no tag from {sorted(domain_set)} — "
+                        f"will render grey in graph view. Current tags: {sorted(tags)[:6]}",
+                    )
+                )
     return issues
 
 
@@ -515,36 +565,47 @@ def check_connection_depth(ctx: LintContext) -> list[Issue]:
                 continue
             knowledge_links.add(target)
         if len(knowledge_links) < 2:
-            issues.append(issue(
-                "warning", "connection_under_linked", art.rel,
-                f"connection article cites only {len(knowledge_links)} distinct "
-                f"knowledge wikilink(s) — a connection MUST name ≥2 endpoints "
-                f"(found: {sorted(knowledge_links)})",
-            ))
+            issues.append(
+                issue(
+                    "warning",
+                    "connection_under_linked",
+                    art.rel,
+                    f"connection article cites only {len(knowledge_links)} distinct "
+                    f"knowledge wikilink(s) — a connection MUST name ≥2 endpoints "
+                    f"(found: {sorted(knowledge_links)})",
+                )
+            )
 
         # Rule 2: one of tension/mechanism/dependency must be present + non-empty.
         present_kinds = [
-            k for k in CONNECTION_KIND_FIELDS
-            if k in art.fm and art.fm[k] not in (None, "", [])
+            k for k in CONNECTION_KIND_FIELDS if k in art.fm and art.fm[k] not in (None, "", [])
         ]
         if not present_kinds:
-            issues.append(issue(
-                "warning", "connection_missing_kind", art.rel,
-                f"connection article missing a kind discriminator — exactly one of "
-                f"{list(CONNECTION_KIND_FIELDS)} must be present in frontmatter "
-                f"to declare whether this is a mechanism / contrast / hard-dependency",
-                auto_fixable=True,
-            ))
+            issues.append(
+                issue(
+                    "warning",
+                    "connection_missing_kind",
+                    art.rel,
+                    f"connection article missing a kind discriminator — exactly one of "
+                    f"{list(CONNECTION_KIND_FIELDS)} must be present in frontmatter "
+                    f"to declare whether this is a mechanism / contrast / hard-dependency",
+                    auto_fixable=True,
+                )
+            )
 
         # Rule 3: body word-count ≥ floor.
         body_word_count = len(art.body.split())
         if body_word_count < min_words:
-            issues.append(issue(
-                "warning", "connection_shallow_body", art.rel,
-                f"connection article body is {body_word_count} words "
-                f"(minimum {min_words}) — too short to assert a real mechanism / "
-                f"contrast / dependency beyond restating the linked concepts",
-            ))
+            issues.append(
+                issue(
+                    "warning",
+                    "connection_shallow_body",
+                    art.rel,
+                    f"connection article body is {body_word_count} words "
+                    f"(minimum {min_words}) — too short to assert a real mechanism / "
+                    f"contrast / dependency beyond restating the linked concepts",
+                )
+            )
 
     return issues
 
@@ -562,6 +623,7 @@ def check_two_layer_pages(ctx: LintContext) -> list[Issue]:
     Reference fixtures: tests/fixtures/two_layer/.
     """
     import re
+
     issues: list[Issue] = []
     entity_folders = (("people", "person"), ("projects", "project"))
     for folder, expected_type in entity_folders:
@@ -577,59 +639,84 @@ def check_two_layer_pages(ctx: LintContext) -> list[Issue]:
             separator_lines = [m.start() for m in re.finditer(r"^---\s*$", body, re.MULTILINE)]
             timeline_match = re.search(r"^## Timeline\s*$", body, re.MULTILINE)
             has_body_separator = bool(
-                separator_lines and timeline_match
+                separator_lines
+                and timeline_match
                 and any(pos < timeline_match.start() for pos in separator_lines)
             )
 
             if not has_state:
-                issues.append(issue(
-                    "error", "two_layer_missing_state", art.rel,
-                    f"`type: {expected_type}` article missing `## State` section "
-                    f"(spec: prompts/compile_main.md Instruction 3)",
-                ))
+                issues.append(
+                    issue(
+                        "error",
+                        "two_layer_missing_state",
+                        art.rel,
+                        f"`type: {expected_type}` article missing `## State` section "
+                        f"(spec: prompts/compile_main.md Instruction 3)",
+                    )
+                )
             if not has_body_separator:
-                issues.append(issue(
-                    "error", "two_layer_missing_body_separator", art.rel,
-                    f"`type: {expected_type}` article missing the `---` separator "
-                    f"between State and Timeline blocks",
-                ))
+                issues.append(
+                    issue(
+                        "error",
+                        "two_layer_missing_body_separator",
+                        art.rel,
+                        f"`type: {expected_type}` article missing the `---` separator "
+                        f"between State and Timeline blocks",
+                    )
+                )
             if not has_timeline:
-                issues.append(issue(
-                    "error", "two_layer_missing_timeline", art.rel,
-                    f"`type: {expected_type}` article missing `## Timeline` section",
-                ))
+                issues.append(
+                    issue(
+                        "error",
+                        "two_layer_missing_timeline",
+                        art.rel,
+                        f"`type: {expected_type}` article missing `## Timeline` section",
+                    )
+                )
 
             # Reverse-chronological check on Timeline entries
             if has_timeline:
-                tail = body[timeline_match.end():]
+                tail = body[timeline_match.end() :]
                 # Match `- **YYYY-MM-DD**` line starts
                 dates = re.findall(r"^- \*\*(\d{4}-\d{2}-\d{2})\*\*", tail, re.MULTILINE)
                 for i in range(len(dates) - 1):
                     if dates[i] < dates[i + 1]:
-                        issues.append(issue(
-                            "warning", "timeline_not_reverse_chronological", art.rel,
-                            f"Timeline entries out of order: {dates[i]} before {dates[i + 1]} "
-                            f"(newest first expected)",
-                        ))
+                        issues.append(
+                            issue(
+                                "warning",
+                                "timeline_not_reverse_chronological",
+                                art.rel,
+                                f"Timeline entries out of order: {dates[i]} before {dates[i + 1]} "
+                                f"(newest first expected)",
+                            )
+                        )
                         break  # one warning per file
 
             # Action Items prefix sanity (deep syntax = T02)
             ai_match = re.search(r"^## Action Items\s*$", body, re.MULTILINE)
             if ai_match:
                 # Scan lines until next `## ` heading or `---`
-                after = body[ai_match.end():]
+                after = body[ai_match.end() :]
                 section_end = re.search(r"^(## |---\s*$)", after, re.MULTILINE)
-                section = after[:section_end.start()] if section_end else after
+                section = after[: section_end.start()] if section_end else after
                 for raw_line in section.splitlines():
                     line = raw_line.strip()
                     if not line:
                         continue
-                    if not (line.startswith("- [ ]") or line.startswith("- [x]") or line.startswith("- [X]")):
-                        issues.append(issue(
-                            "warning", "action_items_malformed", art.rel,
-                            f"Action Items line does not start with `- [ ]` or `- [x]`: "
-                            f"{line[:80]!r}",
-                        ))
+                    if not (
+                        line.startswith("- [ ]")
+                        or line.startswith("- [x]")
+                        or line.startswith("- [X]")
+                    ):
+                        issues.append(
+                            issue(
+                                "warning",
+                                "action_items_malformed",
+                                art.rel,
+                                f"Action Items line does not start with `- [ ]` or `- [x]`: "
+                                f"{line[:80]!r}",
+                            )
+                        )
                         break  # one warning per file
     return issues
 
@@ -644,6 +731,7 @@ def check_action_item_syntax(ctx: LintContext) -> list[Issue]:
     structural breaks). One issue per file per rule.
     """
     import re
+
     issues: list[Issue] = []
     entity_folders = (("people", "person"), ("projects", "project"))
     DATE_RE = re.compile(r"📅 (\d{4}-\d{2}-\d{2})(?:\s|$)")
@@ -661,9 +749,9 @@ def check_action_item_syntax(ctx: LintContext) -> list[Issue]:
             ai_match = re.search(r"^## Action Items\s*$", text, re.MULTILINE)
             if not ai_match:
                 continue
-            after = text[ai_match.end():]
+            after = text[ai_match.end() :]
             section_end = re.search(r"^(## |---\s*$)", after, re.MULTILINE)
-            section = after[:section_end.start()] if section_end else after
+            section = after[: section_end.start()] if section_end else after
 
             invalid_date = False
             malformed_priority = False
@@ -680,23 +768,35 @@ def check_action_item_syntax(ctx: LintContext) -> list[Issue]:
                     empty_recurrence = True
 
             if invalid_date:
-                issues.append(issue(
-                    "warning", "action_item_invalid_due_date", art.rel,
-                    "Action Items section contains `📅` without a valid `YYYY-MM-DD` date — "
-                    "Obsidian-Tasks-plugin syntax expects `📅 2026-05-20`",
-                ))
+                issues.append(
+                    issue(
+                        "warning",
+                        "action_item_invalid_due_date",
+                        art.rel,
+                        "Action Items section contains `📅` without a valid `YYYY-MM-DD` date — "
+                        "Obsidian-Tasks-plugin syntax expects `📅 2026-05-20`",
+                    )
+                )
             if malformed_priority:
-                issues.append(issue(
-                    "warning", "action_item_malformed_priority", art.rel,
-                    "Action Items section contains `⏫` not bounded by whitespace — "
-                    "must be standalone token, not concatenated to adjacent glyphs",
-                ))
+                issues.append(
+                    issue(
+                        "warning",
+                        "action_item_malformed_priority",
+                        art.rel,
+                        "Action Items section contains `⏫` not bounded by whitespace — "
+                        "must be standalone token, not concatenated to adjacent glyphs",
+                    )
+                )
             if empty_recurrence:
-                issues.append(issue(
-                    "warning", "action_item_empty_recurrence", art.rel,
-                    "Action Items section contains `🔁` without recurrence content — "
-                    "Obsidian-Tasks-plugin syntax expects `🔁 every week` (or similar)",
-                ))
+                issues.append(
+                    issue(
+                        "warning",
+                        "action_item_empty_recurrence",
+                        art.rel,
+                        "Action Items section contains `🔁` without recurrence content — "
+                        "Obsidian-Tasks-plugin syntax expects `🔁 every week` (or similar)",
+                    )
+                )
     return issues
 
 
@@ -718,19 +818,27 @@ def check_area_status(ctx: LintContext) -> list[Issue]:
             continue
         status = art.fm.get("status")
         if not status:
-            issues.append(issue(
-                "error", "area_missing_status", art.rel,
-                f"`type: area` article missing `status:` frontmatter "
-                f"(must be one of {list(_VALID_AREA_STATUS)})",
-                auto_fixable=True,
-            ))
+            issues.append(
+                issue(
+                    "error",
+                    "area_missing_status",
+                    art.rel,
+                    f"`type: area` article missing `status:` frontmatter "
+                    f"(must be one of {list(_VALID_AREA_STATUS)})",
+                    auto_fixable=True,
+                )
+            )
             continue
         if status not in _VALID_AREA_STATUS:
-            issues.append(issue(
-                "error", "area_invalid_status", art.rel,
-                f"`status: {status!r}` is not a valid area status. "
-                f"Allowed: {list(_VALID_AREA_STATUS)}.",
-            ))
+            issues.append(
+                issue(
+                    "error",
+                    "area_invalid_status",
+                    art.rel,
+                    f"`status: {status!r}` is not a valid area status. "
+                    f"Allowed: {list(_VALID_AREA_STATUS)}.",
+                )
+            )
     return issues
 
 
@@ -742,10 +850,14 @@ def check_sparse_articles(ctx: LintContext) -> list[Issue]:
             continue  # facts may legitimately be terse
         word_count = len(art.body.split())
         if word_count < SPARSE_THRESHOLD:
-            issues.append(issue(
-                "suggestion", "sparse_article", art.rel,
-                f"Sparse article: {word_count} words (minimum recommended: {SPARSE_THRESHOLD})",
-            ))
+            issues.append(
+                issue(
+                    "suggestion",
+                    "sparse_article",
+                    art.rel,
+                    f"Sparse article: {word_count} words (minimum recommended: {SPARSE_THRESHOLD})",
+                )
+            )
     return issues
 
 
@@ -770,6 +882,7 @@ def check_daily_consistency(ctx: LintContext) -> list[Issue]:
     """
     import re
     from datetime import date as _date
+
     issues: list[Issue] = []
     daily_root = ctx.vault / "daily"
     if not daily_root.is_dir():
@@ -800,46 +913,62 @@ def check_daily_consistency(ctx: LintContext) -> list[Issue]:
         if d == today_iso:
             continue  # digest may not have run yet for today
         if d not in root_md_dates:
-            issues.append(issue(
-                "warning", "daily_missing_digest", f"daily/{d}.md",
-                f"daily/{d}/ has {len(captures)} per-source capture(s) "
-                f"({', '.join(captures)}) but no root digest. Run "
-                f"`wiki agent daily-digest --var date={d}` to produce it.",
-            ))
+            issues.append(
+                issue(
+                    "warning",
+                    "daily_missing_digest",
+                    f"daily/{d}.md",
+                    f"daily/{d}/ has {len(captures)} per-source capture(s) "
+                    f"({', '.join(captures)}) but no root digest. Run "
+                    f"`wiki agent daily-digest --var date={d}` to produce it.",
+                )
+            )
         else:
             # Root exists. Verify it's a real digest, not a legacy flat-daily
             # left behind by the migration script (which copies, doesn't move).
             root_fm = _read_frontmatter(daily_root / f"{d}.md")
             if root_fm.get("type") != "daily-digest":
-                issues.append(issue(
-                    "warning", "daily_root_not_digest", f"daily/{d}.md",
-                    f"daily/{d}.md exists alongside daily/{d}/ but has "
-                    f"type={root_fm.get('type')!r} (not 'daily-digest'). "
-                    "Likely a legacy flat-daily preserved by the migration. "
-                    f"Run `wiki agent daily-digest --var date={d}` to "
-                    "regenerate it as a proper digest, OR delete it if the "
-                    "subfolder content is sufficient.",
-                ))
+                issues.append(
+                    issue(
+                        "warning",
+                        "daily_root_not_digest",
+                        f"daily/{d}.md",
+                        f"daily/{d}.md exists alongside daily/{d}/ but has "
+                        f"type={root_fm.get('type')!r} (not 'daily-digest'). "
+                        "Likely a legacy flat-daily preserved by the migration. "
+                        f"Run `wiki agent daily-digest --var date={d}` to "
+                        "regenerate it as a proper digest, OR delete it if the "
+                        "subfolder content is sufficient.",
+                    )
+                )
         # Unknown sources nudge
         for cap in captures:
             stem = cap[:-3] if cap.endswith(".md") else cap
             if KNOWN_SOURCES and stem not in KNOWN_SOURCES:
-                issues.append(issue(
-                    "warning", "daily_unknown_source", f"daily/{d}/{cap}",
-                    f"Source name {stem!r} is not in daily_capture.KNOWN_SOURCES "
-                    f"({sorted(KNOWN_SOURCES)}). Rename or relocate.",
-                ))
+                issues.append(
+                    issue(
+                        "warning",
+                        "daily_unknown_source",
+                        f"daily/{d}/{cap}",
+                        f"Source name {stem!r} is not in daily_capture.KNOWN_SOURCES "
+                        f"({sorted(KNOWN_SOURCES)}). Rename or relocate.",
+                    )
+                )
 
     for d in root_md_dates - set(subfolder_dates):
         if d == today_iso:
             continue
-        issues.append(issue(
-            "warning", "daily_legacy_flat", f"daily/{d}.md",
-            f"daily/{d}.md exists without a daily/{d}/ subfolder — this is "
-            "the pre-2026-05-15 flat-daily shape. Run "
-            "`uv run python scripts/migrate_daily_to_rollup.py --vault <path>` "
-            "to migrate.",
-        ))
+        issues.append(
+            issue(
+                "warning",
+                "daily_legacy_flat",
+                f"daily/{d}.md",
+                f"daily/{d}.md exists without a daily/{d}/ subfolder — this is "
+                "the pre-2026-05-15 flat-daily shape. Run "
+                "`uv run python scripts/migrate_daily_to_rollup.py --vault <path>` "
+                "to migrate.",
+            )
+        )
 
     return issues
 
@@ -894,11 +1023,15 @@ def check_facts_violations(ctx: LintContext) -> list[Issue]:
                 continue  # already annotated as superseded by this fact
             for term in terms:
                 if term.lower() in content_lower:
-                    issues.append(issue(
-                        "warning", "fact_violation", art.rel,
-                        f"Article contains negation term {term!r} from hard fact `facts/{slug}` (status: {status}). Reconcile manually or via `wiki correct apply {slug}`.",
-                        fact_slug=slug,
-                    ))
+                    issues.append(
+                        issue(
+                            "warning",
+                            "fact_violation",
+                            art.rel,
+                            f"Article contains negation term {term!r} from hard fact `facts/{slug}` (status: {status}). Reconcile manually or via `wiki correct apply {slug}`.",
+                            fact_slug=slug,
+                        )
+                    )
     return issues
 
 
@@ -923,24 +1056,36 @@ def check_takes_consistency(ctx: LintContext) -> list[Issue]:
     issues: list[Issue] = []
     for art in _in_folder(ctx, "takes"):
         if art.fm.get("type") != "takes":
-            issues.append(issue(
-                "error", "takes_frontmatter_type", art.rel,
-                "Takes file must carry `type: takes` in frontmatter.",
-            ))
+            issues.append(
+                issue(
+                    "error",
+                    "takes_frontmatter_type",
+                    art.rel,
+                    "Takes file must carry `type: takes` in frontmatter.",
+                )
+            )
         holder = art.fm.get("holder")
         if not holder or not str(holder).strip():
-            issues.append(issue(
-                "error", "takes_frontmatter_holder_missing", art.rel,
-                "Takes file must carry a non-empty `holder:` field in frontmatter.",
-            ))
+            issues.append(
+                issue(
+                    "error",
+                    "takes_frontmatter_holder_missing",
+                    art.rel,
+                    "Takes file must carry a non-empty `holder:` field in frontmatter.",
+                )
+            )
         for lineno, line in enumerate(art.body.splitlines(), start=1):
             if not line.startswith("- **"):
                 continue
             if not _TAKE_LINE_RE.match(line):
-                issues.append(issue(
-                    "warning", "takes_line_malformed", art.rel,
-                    f"Line {lineno} does not match canonical take shape: {line[:120]}",
-                ))
+                issues.append(
+                    issue(
+                        "warning",
+                        "takes_line_malformed",
+                        art.rel,
+                        f"Line {lineno} does not match canonical take shape: {line[:120]}",
+                    )
+                )
     return issues
 
 
@@ -973,12 +1118,16 @@ def check_domain_value(ctx: LintContext) -> list[Issue]:
             continue
         if not isinstance(value, str) or value not in valid:
             allowed = ", ".join(sorted(valid))
-            issues.append(issue(
-                "warning", "domain_invalid_value", art.rel,
-                f"`domain: {value!r}` is not in CONFIG.personal.domains "
-                f"({allowed}). Fix the value, or add it to config.yaml "
-                f"under `personal.domains:`.",
-            ))
+            issues.append(
+                issue(
+                    "warning",
+                    "domain_invalid_value",
+                    art.rel,
+                    f"`domain: {value!r}` is not in CONFIG.personal.domains "
+                    f"({allowed}). Fix the value, or add it to config.yaml "
+                    f"under `personal.domains:`.",
+                )
+            )
     return issues
 
 
@@ -1017,11 +1166,14 @@ def check_compile_role(ctx: LintContext) -> list[Issue]:
             continue
         if role not in _COMPILE_ROLE_VALID:
             valid_list = ", ".join(sorted(_COMPILE_ROLE_VALID))
-            issues.append(issue(
-                "error", "compile_role_invalid", rel,
-                f"`compile_role: {role!r}` is not a valid value. "
-                f"Allowed: {valid_list}.",
-            ))
+            issues.append(
+                issue(
+                    "error",
+                    "compile_role_invalid",
+                    rel,
+                    f"`compile_role: {role!r}` is not a valid value. Allowed: {valid_list}.",
+                )
+            )
     return issues
 
 
@@ -1044,15 +1196,19 @@ def check_author_required_on_source_and_final(ctx: LintContext) -> list[Issue]:
         if fm.get("compile_role") != "source-and-final":
             continue
         if not fm.get("author"):
-            issues.append(issue(
-                "error", "source_and_final_missing_author", rel,
-                "`compile_role: source-and-final` requires an `author:` "
-                "frontmatter field. Without it, operator-authored content "
-                "is indistinguishable from compile-output and can drown "
-                "in the noise. Add `author: <name>` (or set "
-                "`personal.implicit_operator_author` and operator-author "
-                "files inherit it).",
-            ))
+            issues.append(
+                issue(
+                    "error",
+                    "source_and_final_missing_author",
+                    rel,
+                    "`compile_role: source-and-final` requires an `author:` "
+                    "frontmatter field. Without it, operator-authored content "
+                    "is indistinguishable from compile-output and can drown "
+                    "in the noise. Add `author: <name>` (or set "
+                    "`personal.implicit_operator_author` and operator-author "
+                    "files inherit it).",
+                )
+            )
     return issues
 
 
@@ -1113,10 +1269,14 @@ async def check_contradictions() -> list[Issue]:
             capture=capture,
             exc=exc,
         )
-        return [issue(
-            "error", "contradiction", "(system)",
-            f"LLM contradiction check failed (kind={failure.kind}, see logs)",
-        )]
+        return [
+            issue(
+                "error",
+                "contradiction",
+                "(system)",
+                f"LLM contradiction check failed (kind={failure.kind}, see logs)",
+            )
+        ]
 
     result = "\n".join(result_parts)
     if "NO_ISSUES" in result:
@@ -1126,14 +1286,20 @@ async def check_contradictions() -> list[Issue]:
     for line in result.strip().split("\n"):
         line = line.strip()
         if line.startswith("CONTRADICTION:") or line.startswith("INCONSISTENCY:"):
-            issues.append(issue(
-                "warning", "contradiction", "(cross-article)", line,
-            ))
+            issues.append(
+                issue(
+                    "warning",
+                    "contradiction",
+                    "(cross-article)",
+                    line,
+                )
+            )
 
     return issues
 
 
 # ── Report generation ────────────────────────────────────────────────
+
 
 def generate_report(all_issues: list[Issue]) -> str:
     """Generate a markdown lint report."""
@@ -1200,6 +1366,7 @@ CHECKS: list[tuple[str, Callable[[LintContext], list[Issue]]]] = [
 
 # ── Main ─────────────────────────────────────────────────────────────
 
+
 def _lint_exit_code(errors: int, structural_only: bool) -> int:
     """Exit code for the lint run.
 
@@ -1239,10 +1406,14 @@ async def main() -> None:
             issues = check_fn(ctx)
         except Exception as exc:  # noqa: BLE001 — one bad check must not abort the run
             log.exception("Check %r crashed: %s", name, exc)
-            all_issues.append(issue(
-                "error", "check_crashed", "(system)",
-                f"Lint check {name!r} crashed: {exc}. See logs for traceback.",
-            ))
+            all_issues.append(
+                issue(
+                    "error",
+                    "check_crashed",
+                    "(system)",
+                    f"Lint check {name!r} crashed: {exc}. See logs for traceback.",
+                )
+            )
             continue
         all_issues.extend(issues)
         log.info("  Found %d issue(s)", len(issues))

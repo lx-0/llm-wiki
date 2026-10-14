@@ -7,6 +7,7 @@ the 2026-08 flush-outage cause and REFUTED by a clean same-input A/B; the
 real cause was host-MCP schema injection (fixed via strict-mcp-config in the
 harness + flush). The strip stays as defensive hygiene with these tests.
 """
+
 from __future__ import annotations
 
 from core.sdk_helpers import sanitize_stale_session_env
@@ -35,8 +36,12 @@ def test_strips_session_wiring_class() -> None:
     assert not any(k.startswith("CLAUDE_CODE_") for k in env)
     assert "CLAUDE_PID" not in env and "CLAUDE_EFFORT" not in env
     assert sorted(removed) == [
-        "CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT", "CLAUDE_CODE_MESSAGING_SOCKET",
-        "CLAUDE_CODE_SESSION_ID", "CLAUDE_CODE_SSE_PORT", "CLAUDE_EFFORT",
+        "CLAUDECODE",
+        "CLAUDE_CODE_ENTRYPOINT",
+        "CLAUDE_CODE_MESSAGING_SOCKET",
+        "CLAUDE_CODE_SESSION_ID",
+        "CLAUDE_CODE_SSE_PORT",
+        "CLAUDE_EFFORT",
         "CLAUDE_PID",
     ]
 

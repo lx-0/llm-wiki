@@ -128,7 +128,7 @@ def _render_items_block(
         rev = " [REVERSE-CODED]" if item.get("reverse_coded") else ""
         lines.append(
             f"- **{item['id']}** (substrate_inferable: {flag_str}){sub_suffix}{rev}\n"
-            f"    \"{item['text']}\""
+            f'    "{item["text"]}"'
         )
     return "\n".join(lines)
 
@@ -140,9 +140,7 @@ def _render_substrate_block(paths: list[Path], vault_root: Path) -> str:
     """
     if not paths:
         return "  (no substrate files matched the lookback window — answers will be `null` across the board)"
-    rels = sorted(
-        str(p.relative_to(vault_root)) for p in paths if p.is_relative_to(vault_root)
-    )
+    rels = sorted(str(p.relative_to(vault_root)) for p in paths if p.is_relative_to(vault_root))
     return "\n".join(f"- `{r}`" for r in rels)
 
 
@@ -234,9 +232,7 @@ def _persist_report(
     # Score block
     band_str = scored.band if scored.band else "*partial, not bandable*"
     lines.append("## Score\n")
-    lines.append(
-        f"- **Total:** {score.total} / {instrument.max_total}"
-    )
+    lines.append(f"- **Total:** {score.total} / {instrument.max_total}")
     lines.append(f"- **Band:** {band_str}")
     lines.append(
         f"- **Coverage:** {score.answered} / {score.total_items} items "
@@ -282,36 +278,22 @@ def _persist_report(
 
     # Embedded methodology — durable record
     lines.append("## Embedded methodology\n")
-    lines.append(
-        "<details><summary>Items (verbatim from items.yaml)</summary>\n"
-    )
+    lines.append("<details><summary>Items (verbatim from items.yaml)</summary>\n")
     lines.append("```yaml")
-    lines.append(
-        (instrument_dir / "items.yaml").read_text(encoding="utf-8").strip()
-    )
+    lines.append((instrument_dir / "items.yaml").read_text(encoding="utf-8").strip())
     lines.append("```\n</details>\n")
 
-    lines.append(
-        "<details><summary>Cutoffs (verbatim from cutoffs.yaml)</summary>\n"
-    )
+    lines.append("<details><summary>Cutoffs (verbatim from cutoffs.yaml)</summary>\n")
     lines.append("```yaml")
-    lines.append(
-        (instrument_dir / "cutoffs.yaml").read_text(encoding="utf-8").strip()
-    )
+    lines.append((instrument_dir / "cutoffs.yaml").read_text(encoding="utf-8").strip())
     lines.append("```\n</details>\n")
 
-    lines.append(
-        "<details><summary>Instrument meta (verbatim from instrument.yaml)</summary>\n"
-    )
+    lines.append("<details><summary>Instrument meta (verbatim from instrument.yaml)</summary>\n")
     lines.append("```yaml")
-    lines.append(
-        (instrument_dir / "instrument.yaml").read_text(encoding="utf-8").strip()
-    )
+    lines.append((instrument_dir / "instrument.yaml").read_text(encoding="utf-8").strip())
     lines.append("```\n</details>\n")
 
-    lines.append(
-        "<details><summary>Prompt rendered for this run</summary>\n"
-    )
+    lines.append("<details><summary>Prompt rendered for this run</summary>\n")
     if not rendered_batches:
         lines.append(
             "_(no SDK call this run — every item was operator-answered, "
@@ -325,9 +307,7 @@ def _persist_report(
             lines.append("```\n")
     lines.append("</details>\n")
 
-    lines.append(
-        "<details><summary>Scope-resolved substrate paths</summary>\n"
-    )
+    lines.append("<details><summary>Scope-resolved substrate paths</summary>\n")
     for p in sorted(substrate_paths):
         try:
             rel = p.relative_to(vault_root)
@@ -358,13 +338,14 @@ def run_inference(
     print(f"Loading instrument: {instrument_dir}", flush=True)
     instrument = load_instrument(instrument_dir)
     lookback_days = instrument.meta.inference.default_lookback_days
-    print(f"  slug={instrument.meta.slug} v{instrument.meta.version}  "
-          f"items={instrument.total_items}  lookback={lookback_days}d", flush=True)
+    print(
+        f"  slug={instrument.meta.slug} v{instrument.meta.version}  "
+        f"items={instrument.total_items}  lookback={lookback_days}d",
+        flush=True,
+    )
 
     print("Resolving substrate scope...", flush=True)
-    paths = resolve_substrate_files(
-        vault_root, CLINICAL_DEFAULT_SUBSTRATE_GLOBS, lookback_days
-    )
+    paths = resolve_substrate_files(vault_root, CLINICAL_DEFAULT_SUBSTRATE_GLOBS, lookback_days)
     print(f"  {len(paths)} files matched.", flush=True)
 
     # Build prompt vars
@@ -449,8 +430,11 @@ def run_inference(
         )
         prompt_version = hashlib.sha256(rendered_prompt.encode("utf-8")).hexdigest()[:16]
         rendered_batches.append((batch.label, prompt_version, rendered_prompt))
-        print(f"  batch={batch.label}  prompt_chars={len(rendered_prompt):,}  "
-              f"prompt_version={prompt_version}", flush=True)
+        print(
+            f"  batch={batch.label}  prompt_chars={len(rendered_prompt):,}  "
+            f"prompt_version={prompt_version}",
+            flush=True,
+        )
 
         t0 = time.perf_counter()
         infer_kwargs = {
@@ -465,17 +449,23 @@ def run_inference(
             **infer_kwargs,
         )
         dt = time.perf_counter() - t0
-        print(f"    → answered={sum(1 for inf in result.items.values() if inf.answer is not None)}"
-              f"/{len(result.items)}  "
-              f"cost=${result.cost_usd:.4f}  elapsed={dt:.1f}s", flush=True)
+        print(
+            f"    → answered={sum(1 for inf in result.items.values() if inf.answer is not None)}"
+            f"/{len(result.items)}  "
+            f"cost=${result.cost_usd:.4f}  elapsed={dt:.1f}s",
+            flush=True,
+        )
         run.batches.append(result)
 
     # Score deterministically — merge operator-supplied answers
     # over inferred. Operator wins where both exist.
     answers = {**run.answers, **operator_answers}
     scored = score_instrument(instrument_dir, answers)
-    print(f"\nScore: total={scored.score.total}  band={scored.band}  "
-          f"coverage={scored.coverage_pct}%  bandable={scored.bandable}", flush=True)
+    print(
+        f"\nScore: total={scored.score.total}  band={scored.band}  "
+        f"coverage={scored.coverage_pct}%  bandable={scored.bandable}",
+        flush=True,
+    )
 
     # Persist. First batch's prompt_version is the canonical frontmatter
     # identifier; every batch's ACTUAL prompt is embedded verbatim.
@@ -528,6 +518,7 @@ def main() -> int:
     except Exception as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         import traceback
+
         traceback.print_exc()
         return 1
     return 0

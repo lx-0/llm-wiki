@@ -46,7 +46,9 @@ def load_suggestion(path: Path) -> dict:
 
 def save_suggestion(path: Path, data: dict) -> None:
     path.write_text(
-        "---\n" + yaml.dump(data, default_flow_style=False, allow_unicode=True, sort_keys=False) + "---\n",
+        "---\n"
+        + yaml.dump(data, default_flow_style=False, allow_unicode=True, sort_keys=False)
+        + "---\n",
         encoding="utf-8",
     )
 
@@ -75,7 +77,9 @@ def describe_action(i: int, action: dict) -> None:
     action_type = action.get("type", "?")
     status = action.get("status", "pending")
     account = action.get("account", CONFIG.personal.primary_account)
-    status_icon = {"pending": "⏳", "approved": "✅", "rejected": "❌", "executed": "✔️"}.get(status, "?")
+    status_icon = {"pending": "⏳", "approved": "✅", "rejected": "❌", "executed": "✔️"}.get(
+        status, "?"
+    )
 
     print(f"  Action {i} [{status_icon} {status}]: {action_type} (account: {account})")
 
@@ -93,7 +97,9 @@ def describe_action(i: int, action: dict) -> None:
 
     elif action_type == "imap-move":
         print(f"    Search: {action.get('search', [])}")
-        print(f"    From: {action.get('source_folder', 'INBOX')} → To: {action.get('target_folder', '?')}")
+        print(
+            f"    From: {action.get('source_folder', 'INBOX')} → To: {action.get('target_folder', '?')}"
+        )
 
     elif action_type == "imap-tag":
         print(f"    Search: {action.get('search', [])}")
@@ -134,7 +140,9 @@ def execute_action(action: dict, dry_run: bool = True) -> bool:
             return False
 
         # Translate the YAML rule to domain.mail.FilterRule.
-        rule = _yaml_to_filter_rule(rule_name, condition_str, folder, rule_yaml.get("action", "Move to folder"))
+        rule = _yaml_to_filter_rule(
+            rule_name, condition_str, folder, rule_yaml.get("action", "Move to folder")
+        )
 
         result = filter_adapter.apply(rule, dry_run=dry_run)
         print(f"    {result.message}")
@@ -175,7 +183,9 @@ def execute_action(action: dict, dry_run: bool = True) -> bool:
         return False
 
 
-def _yaml_to_filter_rule(name: str, condition_str: str, folder: str, action_label: str) -> FilterRule:
+def _yaml_to_filter_rule(
+    name: str, condition_str: str, folder: str, action_label: str
+) -> FilterRule:
     """Translate the YAML-suggestion rule shape to domain.mail.FilterRule.
 
     YAML condition is the legacy TB-style string ('OR (from,is,a@b) (subject,contains,foo)').
@@ -230,16 +240,33 @@ def main() -> None:
         description="Execute optimization suggestions — per-action approval",
         epilog="Each action within a suggestion is approved/rejected individually.",
     )
-    parser.add_argument("--list", action="store_true", help="List all suggestions with per-action status")
-    parser.add_argument("--review", type=str, metavar="FILE", help="Interactively review each action in a suggestion")
-    parser.add_argument("--approve", type=str, metavar="FILE", help="Approve an action (requires action number)")
-    parser.add_argument("--reject", type=str, metavar="FILE", help="Reject an action (requires action number)")
-    parser.add_argument("action_num", nargs="?", type=int, help="Action number for --approve/--reject (1-based)")
-    parser.add_argument("--dry-run", action="store_true", help="Preview approved actions without executing")
+    parser.add_argument(
+        "--list", action="store_true", help="List all suggestions with per-action status"
+    )
+    parser.add_argument(
+        "--review",
+        type=str,
+        metavar="FILE",
+        help="Interactively review each action in a suggestion",
+    )
+    parser.add_argument(
+        "--approve", type=str, metavar="FILE", help="Approve an action (requires action number)"
+    )
+    parser.add_argument(
+        "--reject", type=str, metavar="FILE", help="Reject an action (requires action number)"
+    )
+    parser.add_argument(
+        "action_num", nargs="?", type=int, help="Action number for --approve/--reject (1-based)"
+    )
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Preview approved actions without executing"
+    )
     args = parser.parse_args()
 
     RAW_SUGGESTIONS_DIR.mkdir(parents=True, exist_ok=True)
-    suggestion_files = sorted(RAW_SUGGESTIONS_DIR.glob("*.yaml")) + sorted(RAW_SUGGESTIONS_DIR.glob("*.yml"))
+    suggestion_files = sorted(RAW_SUGGESTIONS_DIR.glob("*.yaml")) + sorted(
+        RAW_SUGGESTIONS_DIR.glob("*.yml")
+    )
 
     if not suggestion_files:
         print("No suggestions in raw/suggestions/")
@@ -324,16 +351,22 @@ def main() -> None:
             describe_action(i, action)
 
             while True:
-                choice = input(f"  Action {i}: [a]pprove / [r]eject / [s]kip / [q]uit? ").strip().lower()
+                choice = (
+                    input(f"  Action {i}: [a]pprove / [r]eject / [s]kip / [q]uit? ").strip().lower()
+                )
                 if choice in ("a", "approve"):
                     action["status"] = "approved"
-                    action["reviewed"] = datetime.now(ZoneInfo(TIMEZONE)).isoformat(timespec="seconds")
+                    action["reviewed"] = datetime.now(ZoneInfo(TIMEZONE)).isoformat(
+                        timespec="seconds"
+                    )
                     save_suggestion(path, data)
                     print(f"    → Approved\n")
                     break
                 elif choice in ("r", "reject"):
                     action["status"] = "rejected"
-                    action["reviewed"] = datetime.now(ZoneInfo(TIMEZONE)).isoformat(timespec="seconds")
+                    action["reviewed"] = datetime.now(ZoneInfo(TIMEZONE)).isoformat(
+                        timespec="seconds"
+                    )
                     save_suggestion(path, data)
                     print(f"    → Rejected\n")
                     break

@@ -25,6 +25,7 @@ _log = logging.getLogger(__name__)
 
 # ── Spec ─────────────────────────────────────────────────────────────
 
+
 @dataclass(frozen=True)
 class CollectorSpec:
     """Static declaration on each Collector subclass.
@@ -57,6 +58,7 @@ class CollectorSpec:
 
 # ── Result type ──────────────────────────────────────────────────────
 
+
 @dataclass(frozen=True)
 class RunResult:
     """What `Collector.run()` returns — metrics for logging + state updates."""
@@ -69,6 +71,7 @@ class RunResult:
 
 
 # ── Collector Protocol ───────────────────────────────────────────────
+
 
 @runtime_checkable
 class Collector(Protocol):
@@ -153,11 +156,7 @@ def piggyback_collectors() -> list[Collector]:
     Filters by `SPEC.piggyback_default and is_configured()`. Collectors
     whose CONFIG isn't populated are silently skipped (graceful agnostic).
     """
-    return [
-        c
-        for c in all_collectors()
-        if c.SPEC.piggyback_default and c.is_configured()
-    ]
+    return [c for c in all_collectors() if c.SPEC.piggyback_default and c.is_configured()]
 
 
 def get_collector(name: str) -> Collector | None:

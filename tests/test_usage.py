@@ -11,6 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
 def test_provider_for_model():
     from core import usage
+
     assert usage.provider_for_model("claude-opus-4-7") == "claude"
     assert usage.provider_for_model("claude-opus-4-7[1m]") == "claude"
     assert usage.provider_for_model("anthropic/claude-x") == "claude"
@@ -21,6 +22,7 @@ def test_provider_for_model():
 
 def test_record_groups_by_provider_model_and_counts_calls():
     from core import usage
+
     L = usage.UsageLedger()
     L.record(model="claude-opus-4-7", input_tokens=100, output_tokens=20)
     L.record(model="claude-opus-4-7", input_tokens=50, output_tokens=10)
@@ -35,6 +37,7 @@ def test_record_groups_by_provider_model_and_counts_calls():
 
 def test_record_ollama_and_openai_usage_shapes():
     from core import usage
+
     L = usage.UsageLedger()
     L.record_ollama("gemma4:e4b", {"prompt_eval_count": 12, "eval_count": 7})
     L.record_openai_usage("llama3.1:8b", {"prompt_tokens": 3, "completion_tokens": 4})
@@ -49,6 +52,7 @@ def test_record_ollama_and_openai_usage_shapes():
 
 def test_persist_merges_under_date_bucket(tmp_path):
     from core import usage
+
     p = tmp_path / "usage.json"
     L = usage.UsageLedger()
     L.record(model="claude-opus-4-7", input_tokens=100, output_tokens=20)
@@ -67,15 +71,21 @@ def test_persist_merges_under_date_bucket(tmp_path):
 
 def test_persist_separate_days_dont_merge(tmp_path):
     from core import usage
+
     p = tmp_path / "usage.json"
-    a = usage.UsageLedger(); a.record(model="claude-opus-4-7", input_tokens=1); a.persist(p, day="2026-05-22")
-    b = usage.UsageLedger(); b.record(model="claude-opus-4-7", input_tokens=2); b.persist(p, day="2026-05-23")
+    a = usage.UsageLedger()
+    a.record(model="claude-opus-4-7", input_tokens=1)
+    a.persist(p, day="2026-05-22")
+    b = usage.UsageLedger()
+    b.record(model="claude-opus-4-7", input_tokens=2)
+    b.persist(p, day="2026-05-23")
     data = json.loads(p.read_text(encoding="utf-8"))
     assert set(data.keys()) == {"2026-05-22", "2026-05-23"}
 
 
 def test_persist_empty_is_noop(tmp_path):
     from core import usage
+
     p = tmp_path / "usage.json"
     usage.UsageLedger().persist(p, day="2026-05-23")
     assert not p.exists()
@@ -83,6 +93,7 @@ def test_persist_empty_is_noop(tmp_path):
 
 def test_summary_line():
     from core import usage
+
     L = usage.UsageLedger()
     assert L.summary_line() == "usage: (none)"
     L.record(model="claude-opus-4-7", input_tokens=1500, output_tokens=300)
@@ -93,6 +104,7 @@ def test_summary_line():
 def test_usage_report_renders(tmp_path, monkeypatch, capsys):
     from core import usage
     import usage_report
+
     p = tmp_path / "usage.json"
     L = usage.UsageLedger()
     L.record(model="claude-opus-4-7", input_tokens=12000, output_tokens=3400)
@@ -108,6 +120,7 @@ def test_usage_report_renders(tmp_path, monkeypatch, capsys):
 
 def test_usage_report_absent_is_graceful(tmp_path, monkeypatch, capsys):
     import usage_report
+
     monkeypatch.setattr(usage_report, "USAGE_FILE", tmp_path / "nope.json")
     monkeypatch.setattr("sys.argv", ["usage_report"])
     assert usage_report.main() == 0

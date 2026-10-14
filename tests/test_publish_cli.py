@@ -1,4 +1,5 @@
 """Tests for `wiki publish --dry-run` (M030-S01-T05)."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -54,7 +55,10 @@ def test_dry_run_is_idempotent_after_publish(tmp_path: Path) -> None:
         record_published(store, payload)
     second, _ = build_publish_plan(vault, store)
     assert to_json_payload(second) == {
-        "create": [], "update": [], "retract": [], "unchanged": 2,
+        "create": [],
+        "update": [],
+        "retract": [],
+        "unchanged": 2,
     }
 
 

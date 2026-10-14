@@ -56,6 +56,7 @@ def _read_frontmatter(path: Path) -> dict:
         return {}
     try:
         import yaml
+
         data = yaml.safe_load(m.group(1))
         return data if isinstance(data, dict) else {}
     except Exception as e:  # noqa: BLE001 — file skipped, but a bad frontmatter must log
@@ -164,7 +165,9 @@ def _meetings_lines(vault: Path) -> list[tuple[str, str]]:
 # ── Idempotent appender ──────────────────────────────────────────────
 
 
-def _append_if_absent(daily_root: Path, date_iso: str, source: str, line: str, *, dry_run: bool) -> bool:
+def _append_if_absent(
+    daily_root: Path, date_iso: str, source: str, line: str, *, dry_run: bool
+) -> bool:
     """Append the line to daily/<date>/<source>.md if it's not already there.
     Returns True if a write would happen (or did happen)."""
     subfolder = daily_root / date_iso
@@ -193,15 +196,17 @@ _SOURCES = {
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description="Backfill daily/-rollup from existing substrate files.")
+    ap = argparse.ArgumentParser(
+        description="Backfill daily/-rollup from existing substrate files."
+    )
     ap.add_argument("--vault", required=True, type=Path)
     ap.add_argument("--source", choices=["all"] + list(_SOURCES), default="all")
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
 
-    logging.basicConfig(level=logging.INFO,
-                        format="%(asctime)s | %(levelname)-7s | %(message)s",
-                        datefmt="%H:%M:%S")
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s | %(levelname)-7s | %(message)s", datefmt="%H:%M:%S"
+    )
 
     if not args.vault.is_dir():
         print(f"error: --vault {args.vault} is not a directory", file=sys.stderr)
@@ -229,13 +234,17 @@ def main() -> int:
         total_appended += appended
         total_skipped += skipped
         verb = "would append" if args.dry_run else "appended"
-        log.info("  %s: %s %d line(s), skipped %d (already present)",
-                 src, verb, appended, skipped)
+        log.info("  %s: %s %d line(s), skipped %d (already present)", src, verb, appended, skipped)
 
     log.info("")
-    log.info("backfill-daily-rollup totals: %s %d line(s), skipped %d (vault=%s, dry_run=%s)",
-             "would append" if args.dry_run else "appended", total_appended, total_skipped,
-             args.vault, args.dry_run)
+    log.info(
+        "backfill-daily-rollup totals: %s %d line(s), skipped %d (vault=%s, dry_run=%s)",
+        "would append" if args.dry_run else "appended",
+        total_appended,
+        total_skipped,
+        args.vault,
+        args.dry_run,
+    )
     return 0
 
 

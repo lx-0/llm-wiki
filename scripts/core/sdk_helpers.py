@@ -83,6 +83,7 @@ def sanitize_stale_session_env(environ: dict) -> list[str]:
         del environ[key]
     return removed
 
+
 # Patterns matched against captured stderr + exception text + the CLI's own
 # result text. Order is priority — most-specific first.
 #
@@ -181,7 +182,7 @@ class StderrCapture:
 class FailureClass:
     """Classification of one failed SDK call."""
 
-    kind: str   # cli_outdated | cli_killed | rate_limit | auth | model | network | oom | cli_crash | max_turns | tokens_exceeded | unknown
+    kind: str  # cli_outdated | cli_killed | rate_limit | auth | model | network | oom | cli_crash | max_turns | tokens_exceeded | unknown
     detail: str
 
     def __str__(self) -> str:  # pragma: no cover — formatting only
@@ -214,9 +215,7 @@ def assert_prompt_within_budget(
         return
     detail = ""
     if breakdown:
-        detail = " — " + ", ".join(
-            f"{name} {n:,} chars" for name, n in breakdown.items()
-        )
+        detail = " — " + ", ".join(f"{name} {n:,} chars" for name, n in breakdown.items())
     raise PromptTooLargeError(
         f"{label}: assembled prompt is {prompt_chars:,} chars, over the "
         f"{limit_chars:,}-char budget{detail}. The input has outgrown an "
@@ -362,7 +361,10 @@ def log_sdk_failure(
 
     log.error(
         "  %s ✗ failed after %.1fs — kind=%s · %s",
-        label, elapsed, cls.kind, cls.detail,
+        label,
+        elapsed,
+        cls.kind,
+        cls.detail,
     )
     if source is not None:
         log.error("    source:    %s", source)
@@ -371,7 +373,8 @@ def log_sdk_failure(
     if input_chars is not None:
         log.error(
             "    input:     %s chars (%.1f KB)",
-            f"{input_chars:,}", input_chars / 1024,
+            f"{input_chars:,}",
+            input_chars / 1024,
         )
     if extra:
         for k, v in extra.items():
@@ -525,53 +528,62 @@ def make_path_scope_hook(allowed_write_roots, denied_subpaths=None):
         tool_input = hook_input.get("tool_input") or {}
         raw_path = tool_input.get("file_path", "")
         if not raw_path:
-            return {"hookSpecificOutput": {
-                "hookEventName": "PreToolUse",
-                "permissionDecision": "deny",
-                "permissionDecisionReason": (
-                    f"{hook_input.get('tool_name', '?')} missing file_path"
-                ),
-            }}
+            return {
+                "hookSpecificOutput": {
+                    "hookEventName": "PreToolUse",
+                    "permissionDecision": "deny",
+                    "permissionDecisionReason": (
+                        f"{hook_input.get('tool_name', '?')} missing file_path"
+                    ),
+                }
+            }
         try:
             resolved = Path(raw_path).resolve()
         except (OSError, ValueError) as exc:
-            return {"hookSpecificOutput": {
-                "hookEventName": "PreToolUse",
-                "permissionDecision": "deny",
-                "permissionDecisionReason": (
-                    f"path could not be resolved: {exc}"
-                ),
-            }}
+            return {
+                "hookSpecificOutput": {
+                    "hookEventName": "PreToolUse",
+                    "permissionDecision": "deny",
+                    "permissionDecisionReason": (f"path could not be resolved: {exc}"),
+                }
+            }
         # Deny precedence: a write-protected subpath blocks even allowed roots.
         for denied in resolved_denied:
             try:
                 resolved.relative_to(denied)
-                return {"hookSpecificOutput": {
-                    "hookEventName": "PreToolUse",
-                    "permissionDecision": "deny",
-                    "permissionDecisionReason": (
-                        f"{resolved} is under write-protected {denied}"
-                    ),
-                }}
+                return {
+                    "hookSpecificOutput": {
+                        "hookEventName": "PreToolUse",
+                        "permissionDecision": "deny",
+                        "permissionDecisionReason": (
+                            f"{resolved} is under write-protected {denied}"
+                        ),
+                    }
+                }
             except ValueError:
                 continue
         for root in resolved_roots:
             try:
                 resolved.relative_to(root)
-                return {"hookSpecificOutput": {
-                    "hookEventName": "PreToolUse",
-                    "permissionDecision": "allow",
-                }}
+                return {
+                    "hookSpecificOutput": {
+                        "hookEventName": "PreToolUse",
+                        "permissionDecision": "allow",
+                    }
+                }
             except ValueError:
                 continue
-        return {"hookSpecificOutput": {
-            "hookEventName": "PreToolUse",
-            "permissionDecision": "deny",
-            "permissionDecisionReason": (
-                f"{resolved} not under any permitted root "
-                f"({', '.join(str(r) for r in resolved_roots)})"
-            ),
-        }}
+        return {
+            "hookSpecificOutput": {
+                "hookEventName": "PreToolUse",
+                "permissionDecision": "deny",
+                "permissionDecisionReason": (
+                    f"{resolved} not under any permitted root "
+                    f"({', '.join(str(r) for r in resolved_roots)})"
+                ),
+            }
+        }
+
     return hook
 
 
@@ -631,8 +643,8 @@ class SdkCallSpec:
     is gated via ``write_scope`` / ``deny_all_writes``.
     """
 
-    label: str                                     # diagnostic label for logs
-    logger: logging.Logger                         # caller's logger (errors land in its *-errors.log)
+    label: str  # diagnostic label for logs
+    logger: logging.Logger  # caller's logger (errors land in its *-errors.log)
     model: str | None = None
     cwd: Path | None = None
     max_turns: int | None = None
@@ -648,13 +660,13 @@ class SdkCallSpec:
     tools: tuple[str, ...] | None = None
     permission_mode: str | None = None
     setting_sources: tuple[str, ...] | None = None
-    write_scope: WriteScope | None = None          # hook-gated Write/Edit path scope
-    deny_all_writes: bool = False                  # read-only wedge (M019): can_use_tool deny-all
-    stall_timeout_s: float | None = None           # per-MESSAGE stall timeout, not wall-clock
-    source: str | None = None                      # provenance string for failure logs
-    input_chars: int | None = None                 # defaults to len(prompt)
-    extra_log: dict | None = None                  # extra key/values for log_sdk_failure
-    record_usage: bool = True                      # LEDGER.record on every outcome
+    write_scope: WriteScope | None = None  # hook-gated Write/Edit path scope
+    deny_all_writes: bool = False  # read-only wedge (M019): can_use_tool deny-all
+    stall_timeout_s: float | None = None  # per-MESSAGE stall timeout, not wall-clock
+    source: str | None = None  # provenance string for failure logs
+    input_chars: int | None = None  # defaults to len(prompt)
+    extra_log: dict | None = None  # extra key/values for log_sdk_failure
+    record_usage: bool = True  # LEDGER.record on every outcome
 
 
 @dataclass(frozen=True)
@@ -667,18 +679,18 @@ class SdkRunResult:
     (the runaway-budget basis) — see DECISIONS 2026-06-02.
     """
 
-    result_text: str = ""              # ResultMessage.result (final agent text)
-    assistant_text: str = ""           # concatenated AssistantMessage TextBlocks
-    input_tokens: int = 0              # cache-inclusive true input (LEDGER basis)
+    result_text: str = ""  # ResultMessage.result (final agent text)
+    assistant_text: str = ""  # concatenated AssistantMessage TextBlocks
+    input_tokens: int = 0  # cache-inclusive true input (LEDGER basis)
     output_tokens: int = 0
-    uncached_input_tokens: int = 0     # raw per-turn sum (budget-guard basis)
+    uncached_input_tokens: int = 0  # raw per-turn sum (budget-guard basis)
     uncached_output_tokens: int = 0
-    cost_usd: float = 0.0              # SDK-reported actual (ResultMessage.total_cost_usd)
+    cost_usd: float = 0.0  # SDK-reported actual (ResultMessage.total_cost_usd)
     message_count: int = 0
     num_turns: int = 0
-    subtype: str | None = None         # ResultMessage.subtype when one arrived
+    subtype: str | None = None  # ResultMessage.subtype when one arrived
     failure: FailureClass | None = None
-    exc: BaseException | None = None   # original exception for `raise ... from`
+    exc: BaseException | None = None  # original exception for `raise ... from`
     elapsed_s: float = 0.0
 
     @property
@@ -715,7 +727,9 @@ def _structured_error_failure(
         kind = "max_turns"
     else:
         kind = classify_failure(
-            elapsed_s, f"{result_text}\n{stderr_text}", "; ".join(errors),
+            elapsed_s,
+            f"{result_text}\n{stderr_text}",
+            "; ".join(errors),
         ).kind
     detail = (
         f"{final_result.subtype} after {final_result.num_turns} turns "
@@ -763,8 +777,9 @@ async def run_sdk_query(prompt: str, spec: SdkCallSpec, *, query_fn=None) -> Sdk
 
     removed_env = sanitize_stale_session_env(os.environ)  # type: ignore[arg-type]
     if removed_env:
-        spec.logger.debug("stripped stale session env before SDK spawn: %s",
-                          ", ".join(sorted(removed_env)))
+        spec.logger.debug(
+            "stripped stale session env before SDK spawn: %s", ", ".join(sorted(removed_env))
+        )
 
     from claude_agent_sdk import (
         AssistantMessage,
@@ -817,10 +832,7 @@ async def run_sdk_query(prompt: str, spec: SdkCallSpec, *, query_fn=None) -> Sdk
         query_prompt = prompt_stream(prompt)
     elif spec.write_scope is not None:
         scope = spec.write_scope
-        if (
-            scope.legacy_allowed_tools is not None
-            and not CONFIG.features.compile_callback_gate
-        ):
+        if scope.legacy_allowed_tools is not None and not CONFIG.features.compile_callback_gate:
             # Rollback shape (pre-2026-05-18): Write(<glob>) pseudo-scopes
             # + acceptEdits. One config flip away, per-site branch removed.
             options_kwargs["allowed_tools"] = list(scope.legacy_allowed_tools)
@@ -833,10 +845,12 @@ async def run_sdk_query(prompt: str, spec: SdkCallSpec, *, query_fn=None) -> Sdk
                 "PreToolUse": [
                     HookMatcher(
                         matcher="Write|Edit",
-                        hooks=[make_path_scope_hook(
-                            list(scope.roots),
-                            denied_subpaths=list(scope.denied_subpaths) or None,
-                        )],
+                        hooks=[
+                            make_path_scope_hook(
+                                list(scope.roots),
+                                denied_subpaths=list(scope.denied_subpaths) or None,
+                            )
+                        ],
                     ),
                 ],
             }
@@ -860,8 +874,8 @@ async def run_sdk_query(prompt: str, spec: SdkCallSpec, *, query_fn=None) -> Sdk
     options = ClaudeAgentOptions(**options_kwargs)
 
     # ── accumulation state ────────────────────────────────────────────
-    uncached_in = uncached_out = 0        # raw per-turn sums (budget basis)
-    fallback_in = fallback_out = 0        # cache-inclusive per-turn fallback
+    uncached_in = uncached_out = 0  # raw per-turn sums (budget basis)
+    fallback_in = fallback_out = 0  # cache-inclusive per-turn fallback
     text_parts: list[str] = []
     final_result = None
     result_text = ""
@@ -926,8 +940,13 @@ async def run_sdk_query(prompt: str, spec: SdkCallSpec, *, query_fn=None) -> Sdk
         log.warning(
             "  %s ⏱ per-call timeout after %.1fs (no message for %ss, "
             "messages so far=%d) — bundled CLI hung. model=%s source=%s (%s chars).",
-            spec.label, elapsed, timeout, message_count,
-            spec.model or "(default)", spec.source or "—", f"{input_chars:,}",
+            spec.label,
+            elapsed,
+            timeout,
+            message_count,
+            spec.model or "(default)",
+            spec.source or "—",
+            f"{input_chars:,}",
         )
         # Best-effort cleanup — a second failure while closing a hung
         # stream is expected, log it at debug only.
@@ -943,9 +962,7 @@ async def run_sdk_query(prompt: str, spec: SdkCallSpec, *, query_fn=None) -> Sdk
             input_chars=input_chars,
             started=started,
             capture=capture,
-            exc=TimeoutError(
-                f"per-call timeout after {elapsed:.1f}s (stall_timeout_s={timeout})"
-            ),
+            exc=TimeoutError(f"per-call timeout after {elapsed:.1f}s (stall_timeout_s={timeout})"),
             extra=spec.extra_log,
         )
         _record(fallback_in, fallback_out)
@@ -963,7 +980,10 @@ async def run_sdk_query(prompt: str, spec: SdkCallSpec, *, query_fn=None) -> Sdk
             # then exited 1. Classify from the structured payload; the
             # authoritative usage is still worth recording.
             failure = _structured_error_failure(
-                final_result, elapsed, uncached_in + uncached_out, capture.text,
+                final_result,
+                elapsed,
+                uncached_in + uncached_out,
+                capture.text,
             )
             u = extract_usage_tokens(final_result.usage)
             ledger_in = u.total_input or fallback_in
@@ -971,7 +991,10 @@ async def run_sdk_query(prompt: str, spec: SdkCallSpec, *, query_fn=None) -> Sdk
             _record(ledger_in, ledger_out)
             log.error(
                 "  %s ✗ failed after %.1fs — kind=%s · %s",
-                spec.label, elapsed, failure.kind, failure.detail,
+                spec.label,
+                elapsed,
+                failure.kind,
+                failure.detail,
             )
             if spec.source is not None:
                 log.error("    source:    %s", spec.source)
@@ -979,11 +1002,13 @@ async def run_sdk_query(prompt: str, spec: SdkCallSpec, *, query_fn=None) -> Sdk
                 log.error("    model:     %s", spec.model)
             log.error(
                 "    input:     %s chars (%.1f KB)",
-                f"{input_chars:,}", input_chars / 1024,
+                f"{input_chars:,}",
+                input_chars / 1024,
             )
             log.error(
                 "    tokens:    %s in / %s out burned despite failure",
-                f"{uncached_in:,}", f"{uncached_out:,}",
+                f"{uncached_in:,}",
+                f"{uncached_out:,}",
             )
             capture.dump_to(log)
             return SdkRunResult(
@@ -1020,19 +1045,27 @@ async def run_sdk_query(prompt: str, spec: SdkCallSpec, *, query_fn=None) -> Sdk
     u = extract_usage_tokens(final_result.usage if final_result is not None else None)
     ledger_in = u.total_input or fallback_in
     ledger_out = u.output_tokens or fallback_out
-    cost = float(final_result.total_cost_usd) if (
-        final_result is not None and final_result.total_cost_usd is not None
-    ) else 0.0
+    cost = (
+        float(final_result.total_cost_usd)
+        if (final_result is not None and final_result.total_cost_usd is not None)
+        else 0.0
+    )
     failure = None
     if final_result is not None and getattr(final_result, "is_error", False):
         # Structured error with a clean generator exit (no raise) — same
         # classification as the raised variant above.
         failure = _structured_error_failure(
-            final_result, elapsed, uncached_in + uncached_out, capture.text,
+            final_result,
+            elapsed,
+            uncached_in + uncached_out,
+            capture.text,
         )
         log.error(
             "  %s ✗ failed after %.1fs — kind=%s · %s",
-            spec.label, elapsed, failure.kind, failure.detail,
+            spec.label,
+            elapsed,
+            failure.kind,
+            failure.detail,
         )
         capture.dump_to(log)
     _record(ledger_in, ledger_out)

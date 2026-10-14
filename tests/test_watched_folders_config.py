@@ -66,9 +66,7 @@ def test_validate_requires_id():
     from core.config import ConfigError, _validate_watched_folders_schema
 
     with pytest.raises(ConfigError):
-        _validate_watched_folders_schema(
-            {"watched_folders": [{"kind": "local", "path": "/p"}]}
-        )
+        _validate_watched_folders_schema({"watched_folders": [{"kind": "local", "path": "/p"}]})
 
 
 # ── load() wiring: the validator actually fires through config.load() ──
@@ -81,11 +79,7 @@ def test_load_rejects_bad_watched_folders(tmp_path: Path, monkeypatch: pytest.Mo
 
     bad = tmp_path / "config.yaml"
     bad.write_text(
-        "personal:\n"
-        "  watched_folders:\n"
-        "    - id: x\n"
-        "      kind: bogus\n"
-        "      path: /p\n",
+        "personal:\n  watched_folders:\n    - id: x\n      kind: bogus\n      path: /p\n",
         encoding="utf-8",
     )
     monkeypatch.setattr(config, "CONFIG_FILE", bad)
@@ -111,6 +105,7 @@ def test_load_accepts_valid_watched_folders(tmp_path: Path, monkeypatch: pytest.
     assert cfg.personal.watched_folders == [
         {"id": "docs", "kind": "local", "path": "~/Sync/Private"}
     ]
+
 
 def test_validate_accepts_optional_sensitivity_string():
     """M027-S05-T02 (Q3 full build): optional per-root sensitivity tag."""

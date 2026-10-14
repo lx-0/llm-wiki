@@ -46,10 +46,17 @@ def test_tabs_run_dry_run_does_not_write(monkeypatch, tmp_path):
     backup_dir = tmp_path / "stg"
     backup_dir.mkdir()
     backup_path = backup_dir / "stg-2026-05-13.json"
-    backup_path.write_text(json.dumps({
-        "version": 5,
-        "groups": [{"title": "Work", "tabs": [{"url": "https://example.com", "title": "Ex"}]}],
-    }), encoding="utf-8")
+    backup_path.write_text(
+        json.dumps(
+            {
+                "version": 5,
+                "groups": [
+                    {"title": "Work", "tabs": [{"url": "https://example.com", "title": "Ex"}]}
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
 
     monkeypatch.setattr(scan_tabs, "_STG_RAW", str(backup_dir))
     monkeypatch.setattr(scan_tabs, "DEFAULT_BACKUP_DIR", backup_dir)
@@ -69,14 +76,24 @@ def test_tabs_run_writes_report(monkeypatch, tmp_path):
     backup_dir = tmp_path / "stg"
     backup_dir.mkdir()
     backup_path = backup_dir / "stg-2026-05-13.json"
-    backup_path.write_text(json.dumps({
-        "version": 5,
-        "groups": [
-            {"title": "Work", "tabs": [{"url": "https://a.com", "title": "A"},
-                                       {"url": "https://b.com", "title": "B"}]},
-            {"title": "Reading", "tabs": [{"url": "https://c.com", "title": "C"}]},
-        ],
-    }), encoding="utf-8")
+    backup_path.write_text(
+        json.dumps(
+            {
+                "version": 5,
+                "groups": [
+                    {
+                        "title": "Work",
+                        "tabs": [
+                            {"url": "https://a.com", "title": "A"},
+                            {"url": "https://b.com", "title": "B"},
+                        ],
+                    },
+                    {"title": "Reading", "tabs": [{"url": "https://c.com", "title": "C"}]},
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
 
     monkeypatch.setattr(scan_tabs, "_STG_RAW", str(backup_dir))
     monkeypatch.setattr(scan_tabs, "DEFAULT_BACKUP_DIR", backup_dir)
@@ -123,8 +140,12 @@ def test_register_rejects_genuine_name_collision():
 
     class FakeTabs:
         SPEC = CollectorSpec(name="tabs", output_subfolder="raw/x", piggyback_default=False)
-        def is_configured(self): return False
-        def run(self, *, dry_run=False, incremental=False): return RunResult()
+
+        def is_configured(self):
+            return False
+
+        def run(self, *, dry_run=False, incremental=False):
+            return RunResult()
 
     with pytest.raises(ValueError, match="already registered"):
         register(FakeTabs)

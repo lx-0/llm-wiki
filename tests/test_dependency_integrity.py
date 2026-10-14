@@ -25,9 +25,9 @@ def test_declared_dependencies_all_resolve_to_an_import_name():
     assert names, "no dependencies parsed from pyproject.toml"
     # Spot-check the mappings that are NOT identity, i.e. the ones a future
     # dependency bump can silently break.
-    assert "yaml" in names          # pyyaml
-    assert "dotenv" in names        # python-dotenv
-    assert "PIL" in names           # pillow
+    assert "yaml" in names  # pyyaml
+    assert "dotenv" in names  # python-dotenv
+    assert "PIL" in names  # pillow
     assert "claude_agent_sdk" in names
     assert "yt_dlp" in names
     # And that no raw distribution name leaked through unmapped.
@@ -45,7 +45,8 @@ def test_broken_package_is_critical_and_names_it(monkeypatch):
     """A partially materialized package is not a warning — the engine cannot
     run at all, so it must outrank everything else in the banner."""
     monkeypatch.setattr(
-        health, "_failed_imports",
+        health,
+        "_failed_imports",
         lambda names: [("httpx", "ModuleNotFoundError: No module named 'httpx._transports'")],
     )
     r = health.check_dependencies_importable()
@@ -56,7 +57,8 @@ def test_broken_package_is_critical_and_names_it(monkeypatch):
 
 def test_several_failures_are_summarised_not_dumped(monkeypatch):
     monkeypatch.setattr(
-        health, "_failed_imports",
+        health,
+        "_failed_imports",
         lambda names: [(f"pkg{i}", "ModuleNotFoundError: boom") for i in range(9)],
     )
     r = health.check_dependencies_importable()
@@ -78,6 +80,7 @@ def test_quick_mode_skips(monkeypatch):
 def test_probe_survives_an_unreadable_pyproject(monkeypatch):
     """Doctor must never crash — a missing/garbled manifest degrades to a
     reported probe failure, not a traceback."""
+
     def _boom():
         raise OSError("pyproject gone")
 

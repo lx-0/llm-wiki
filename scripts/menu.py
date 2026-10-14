@@ -87,86 +87,249 @@ WIKI_BIN = WIKI_DIR / "wiki"
 QUICK_ACTIONS: list[tuple[str, str, str, object]] = [
     ("c", "compile", "compile up to 10 changed sources ($$)", ["compile", "--max-files", "10"]),
     ("C", "compile-all", "force-recompile every source ($$$)", ["compile", "--all"]),
-    ("q", "query",   "ask the wiki ($$)",            ("special", "query")),
-    ("f", "flush",   "capture current session",      ["flush"]),
-    ("l", "lint",    "cheap structural lint",        ["lint", "--structural-only"]),
-    ("t", "triage",  "review captured-intent inbox",  ["triage"]),
-    ("s", "status",  "config + hooks + ollama",      ["status"]),
+    ("q", "query", "ask the wiki ($$)", ("special", "query")),
+    ("f", "flush", "capture current session", ["flush"]),
+    ("l", "lint", "cheap structural lint", ["lint", "--structural-only"]),
+    ("t", "triage", "review captured-intent inbox", ["triage"]),
+    ("s", "status", "config + hooks + ollama", ["status"]),
 ]
 
 
 CATEGORIES: dict[str, tuple[str, list[tuple[str, str, str, object]]]] = {
-    "o": ("collectors + OAuth", [
-        ("list",          "list collectors",                "see what's registered",                  ["collect", "--list"]),
-        ("run",           "run a collector",                "by name (see 'list' first)",             ("prompt", "Collector name", ["collect", "{arg}"])),
-        ("gmail",         "gmail OAuth bootstrap",          "one-time per account",                   ("prompt", "Account id",     ["gmail-auth", "{arg}"])),
-        ("gmeet",         "gmeet OAuth bootstrap",          "Google Meet transcripts",                ("prompt", "Account id",     ["gmeet-auth", "{arg}"])),
-        ("calendar",      "calendar OAuth bootstrap",       "Google Calendar events",                 ("prompt", "Account id",     ["calendar-auth", "{arg}"])),
-    ]),
-    "i": ("ingest", [
-        ("inbox",         "process inbox/ folder",          "classify + route via Ollama",            ["process-inbox"]),
-        ("html",          "ingest one URL or HTML file",    "html2text → raw/articles",               ("prompt", "URL or path",            ["ingest-html", "{arg}"])),
-        ("youtube",       "ingest YouTube",                 "video or playlist",                      ("prompt", "Video or playlist URL", ["ingest-youtube", "--url", "{arg}"])),
-        ("bridge",        "bridge — list mappings",         "sandbox-folder rsync mirror",            ["bridge", "list"]),
-        ("preprocess",    "preprocessors — list",           "in-vault intake normalizers",            ["preprocess", "--list"]),
-    ]),
-    "k": ("knowledge ops", [
-        ("compile",       "compile changed sources ($$)",   "incremental run",                        ["compile"]),
-        ("compile-10",    "compile up to 10 sources ($$)",  "small batch — cap via --max-files 10",   ["compile", "--max-files", "10"]),
-        ("compile-file",  "compile one file ($$)",          "vault-relative path",                    ("prompt", "Path", ["compile", "--file", "{arg}"])),
-        ("lint-struct",   "lint (structural only)",         "no LLM, cheap",                          ["lint", "--structural-only"]),
-        ("lint-full",     "lint (full, costs $)",           "incl. contradiction check",              ["lint"]),
-        ("query",         "query the wiki ($$)",            "natural-language",                       ("special", "query")),
-        ("review",        "review-wiki (local LLM, free)",  "per-article quality",                    ["review-wiki"]),
-        ("dream-all",     "dream — sweep all entities ($$$)", "rewrite every entity page",            ["dream", "--all-entities"]),
-        ("dream-one",     "dream — one entity ($$)",        "by slug",                                ("prompt", "Entity slug", ["dream-entity", "{arg}"])),
-        ("pin",           "pin article to a MOC",           "by name or path",                        ("prompt", "Article", ["pin", "{arg}"])),
-        ("health-trends", "health-trend synthesis",         "regen concepts/health.md ($0)",          ["health-trends", "--dry-run"]),
-    ]),
-    "d": ("facts/takes", [
-        ("correct-list",  "list hard facts",                "knowledge/facts/*.md",                   ["correct", "list"]),
-        ("correct-add",   "add a hard fact",                "title + truth",                          ("special", "correct_add")),
-        ("correct-edit",  "edit a hard fact",               "open in $EDITOR",                        ("prompt", "Slug", ["correct", "edit", "{arg}"])),
-        ("correct-remove","remove a hard fact",             "creates .bak",                           ("prompt", "Slug", ["correct", "remove", "{arg}"])),
-        ("correct-apply", "propagate a hard fact ($$$)",    "agentic over vault",                     ("prompt", "Slug", ["correct", "apply", "{arg}"])),
-        ("take-list",     "list takes",                     "knowledge/takes/*.md",                   ["take", "list"]),
-        ("take-show",     "show takes for one holder",      "by slug",                                ("prompt", "Holder slug", ["take", "show", "{arg}"])),
-        ("dedup",         "dedup — suggest merges",         "STT-noise duplicate entity pages",       ["dedup", "--suggest-only"]),
-    ]),
-    "a": ("automation", [
-        ("curio-walk",    "curiosity — walk pending",       "accept/skip/reject each (interactive)",  ["curiosity"]),
-        ("curio-list",    "curiosity — list requests",      "raw/requests/*.json",                    ["curiosity", "--list"]),
-        ("curio-oldest",  "curiosity — run oldest",         "non-interactive, local LLM (free)",      ["curiosity", "--run-oldest"]),
-        ("curio-all",     "curiosity — run all",            "all pending",                            ["curiosity", "--run-all"]),
-        ("curio-clear",   "curiosity — clear done",         "delete done files",                      ["curiosity", "--clear-done"]),
-        ("sugg-list",     "suggestions — list",             "raw/suggestions/*.yaml",                 ["suggestions", "--list"]),
-        ("sugg-review",   "suggestions — review one",       "interactive",                            ("prompt", "Suggestion id", ["suggestions", "--review", "{arg}"])),
-        ("sugg-exec",     "suggestions — execute approved", "imap moves / tags",                      ["suggestions"]),
-        ("flush",         "flush session now",              "manual override",                        ["flush"]),
-        ("agent-list",    "list agent tasks",               "prompts/agents/*.md",                    ["agent", "--list"]),
-        ("agent-run",     "run an agent task",              "by id",                                  ("prompt", "Task id", ["agent", "{arg}"])),
-        ("triage",        "triage — list inbox",            "captured intents (task/idea/note)",      ["triage"]),
-        ("triage-done",   "triage — mark done",             "by record stem (unique prefix ok)",      ("prompt", "Record stem", ["triage", "done", "{arg}"])),
-        ("triage-dismiss","triage — dismiss",               "drop noise by record stem",              ("prompt", "Record stem", ["triage", "dismiss", "{arg}"])),
-        ("produce",       "producers — list",               "post-compile derivative extractors",     ["produce", "--list"]),
-        ("reconcile",     "reconcile concepts",             "dry-run plan, no writes",                ["reconcile"]),
-        ("study",         "studies — list",                 "operator self-reports (M019)",           ["study", "list"]),
-        ("analyze",       "analyze self-reports ($$$)",     "two-pass analyst over studies",          ["analyze"]),
-    ]),
-    "g": ("setup", [
-        ("status",        "status",                         "config + hooks + ollama",                ["status"]),
-        ("wizard",        "run setup wizard",               "6 questions + hooks",                    ["setup"]),
-        ("config",        "edit config interactively",      "lib/config.sh",                          ["config"]),
-        ("hooks-status",  "hooks install table",            "per agent + scope",                      ["hooks", "status"]),
-        ("hooks-install", "install hooks",                  "interactive picker",                     ["hooks", "install"]),
-        ("skills-status", "skills install table",           "per skill + global",                     ["skills", "status"]),
-        ("update",        "git pull + sync skills",         "ff-only",                                ["update"]),
-        ("seed-audit",    "seed — audit drift",             "read-only",                              ["seed", "--check"]),
-        ("seed-apply",    "seed — apply missing templates", "additive",                               ["seed"]),
-        ("backfill",      "backfill data-shape upgrades",   "one-shot key adds (shows help)",         ["backfill"]),
-        ("usage",         "token-usage ledger",             "tokens per provider/model",              ["usage"]),
-        ("version",       "engine git revision",            "rev + origin",                           ["version"]),
-    ]),
+    "o": (
+        "collectors + OAuth",
+        [
+            ("list", "list collectors", "see what's registered", ["collect", "--list"]),
+            (
+                "run",
+                "run a collector",
+                "by name (see 'list' first)",
+                ("prompt", "Collector name", ["collect", "{arg}"]),
+            ),
+            (
+                "gmail",
+                "gmail OAuth bootstrap",
+                "one-time per account",
+                ("prompt", "Account id", ["gmail-auth", "{arg}"]),
+            ),
+            (
+                "gmeet",
+                "gmeet OAuth bootstrap",
+                "Google Meet transcripts",
+                ("prompt", "Account id", ["gmeet-auth", "{arg}"]),
+            ),
+            (
+                "calendar",
+                "calendar OAuth bootstrap",
+                "Google Calendar events",
+                ("prompt", "Account id", ["calendar-auth", "{arg}"]),
+            ),
+        ],
+    ),
+    "i": (
+        "ingest",
+        [
+            ("inbox", "process inbox/ folder", "classify + route via Ollama", ["process-inbox"]),
+            (
+                "html",
+                "ingest one URL or HTML file",
+                "html2text → raw/articles",
+                ("prompt", "URL or path", ["ingest-html", "{arg}"]),
+            ),
+            (
+                "youtube",
+                "ingest YouTube",
+                "video or playlist",
+                ("prompt", "Video or playlist URL", ["ingest-youtube", "--url", "{arg}"]),
+            ),
+            ("bridge", "bridge — list mappings", "sandbox-folder rsync mirror", ["bridge", "list"]),
+            (
+                "preprocess",
+                "preprocessors — list",
+                "in-vault intake normalizers",
+                ["preprocess", "--list"],
+            ),
+        ],
+    ),
+    "k": (
+        "knowledge ops",
+        [
+            ("compile", "compile changed sources ($$)", "incremental run", ["compile"]),
+            (
+                "compile-10",
+                "compile up to 10 sources ($$)",
+                "small batch — cap via --max-files 10",
+                ["compile", "--max-files", "10"],
+            ),
+            (
+                "compile-file",
+                "compile one file ($$)",
+                "vault-relative path",
+                ("prompt", "Path", ["compile", "--file", "{arg}"]),
+            ),
+            (
+                "lint-struct",
+                "lint (structural only)",
+                "no LLM, cheap",
+                ["lint", "--structural-only"],
+            ),
+            ("lint-full", "lint (full, costs $)", "incl. contradiction check", ["lint"]),
+            ("query", "query the wiki ($$)", "natural-language", ("special", "query")),
+            ("review", "review-wiki (local LLM, free)", "per-article quality", ["review-wiki"]),
+            (
+                "dream-all",
+                "dream — sweep all entities ($$$)",
+                "rewrite every entity page",
+                ["dream", "--all-entities"],
+            ),
+            (
+                "dream-one",
+                "dream — one entity ($$)",
+                "by slug",
+                ("prompt", "Entity slug", ["dream-entity", "{arg}"]),
+            ),
+            (
+                "pin",
+                "pin article to a MOC",
+                "by name or path",
+                ("prompt", "Article", ["pin", "{arg}"]),
+            ),
+            (
+                "health-trends",
+                "health-trend synthesis",
+                "regen concepts/health.md ($0)",
+                ["health-trends", "--dry-run"],
+            ),
+        ],
+    ),
+    "d": (
+        "facts/takes",
+        [
+            ("correct-list", "list hard facts", "knowledge/facts/*.md", ["correct", "list"]),
+            ("correct-add", "add a hard fact", "title + truth", ("special", "correct_add")),
+            (
+                "correct-edit",
+                "edit a hard fact",
+                "open in $EDITOR",
+                ("prompt", "Slug", ["correct", "edit", "{arg}"]),
+            ),
+            (
+                "correct-remove",
+                "remove a hard fact",
+                "creates .bak",
+                ("prompt", "Slug", ["correct", "remove", "{arg}"]),
+            ),
+            (
+                "correct-apply",
+                "propagate a hard fact ($$$)",
+                "agentic over vault",
+                ("prompt", "Slug", ["correct", "apply", "{arg}"]),
+            ),
+            ("take-list", "list takes", "knowledge/takes/*.md", ["take", "list"]),
+            (
+                "take-show",
+                "show takes for one holder",
+                "by slug",
+                ("prompt", "Holder slug", ["take", "show", "{arg}"]),
+            ),
+            (
+                "dedup",
+                "dedup — suggest merges",
+                "STT-noise duplicate entity pages",
+                ["dedup", "--suggest-only"],
+            ),
+        ],
+    ),
+    "a": (
+        "automation",
+        [
+            (
+                "curio-walk",
+                "curiosity — walk pending",
+                "accept/skip/reject each (interactive)",
+                ["curiosity"],
+            ),
+            (
+                "curio-list",
+                "curiosity — list requests",
+                "raw/requests/*.json",
+                ["curiosity", "--list"],
+            ),
+            (
+                "curio-oldest",
+                "curiosity — run oldest",
+                "non-interactive, local LLM (free)",
+                ["curiosity", "--run-oldest"],
+            ),
+            ("curio-all", "curiosity — run all", "all pending", ["curiosity", "--run-all"]),
+            (
+                "curio-clear",
+                "curiosity — clear done",
+                "delete done files",
+                ["curiosity", "--clear-done"],
+            ),
+            (
+                "sugg-list",
+                "suggestions — list",
+                "raw/suggestions/*.yaml",
+                ["suggestions", "--list"],
+            ),
+            (
+                "sugg-review",
+                "suggestions — review one",
+                "interactive",
+                ("prompt", "Suggestion id", ["suggestions", "--review", "{arg}"]),
+            ),
+            ("sugg-exec", "suggestions — execute approved", "imap moves / tags", ["suggestions"]),
+            ("flush", "flush session now", "manual override", ["flush"]),
+            ("agent-list", "list agent tasks", "prompts/agents/*.md", ["agent", "--list"]),
+            ("agent-run", "run an agent task", "by id", ("prompt", "Task id", ["agent", "{arg}"])),
+            ("triage", "triage — list inbox", "captured intents (task/idea/note)", ["triage"]),
+            (
+                "triage-done",
+                "triage — mark done",
+                "by record stem (unique prefix ok)",
+                ("prompt", "Record stem", ["triage", "done", "{arg}"]),
+            ),
+            (
+                "triage-dismiss",
+                "triage — dismiss",
+                "drop noise by record stem",
+                ("prompt", "Record stem", ["triage", "dismiss", "{arg}"]),
+            ),
+            (
+                "produce",
+                "producers — list",
+                "post-compile derivative extractors",
+                ["produce", "--list"],
+            ),
+            ("reconcile", "reconcile concepts", "dry-run plan, no writes", ["reconcile"]),
+            ("study", "studies — list", "operator self-reports (M019)", ["study", "list"]),
+            ("analyze", "analyze self-reports ($$$)", "two-pass analyst over studies", ["analyze"]),
+        ],
+    ),
+    "g": (
+        "setup",
+        [
+            ("status", "status", "config + hooks + ollama", ["status"]),
+            ("wizard", "run setup wizard", "6 questions + hooks", ["setup"]),
+            ("config", "edit config interactively", "lib/config.sh", ["config"]),
+            ("hooks-status", "hooks install table", "per agent + scope", ["hooks", "status"]),
+            ("hooks-install", "install hooks", "interactive picker", ["hooks", "install"]),
+            ("skills-status", "skills install table", "per skill + global", ["skills", "status"]),
+            ("update", "git pull + sync skills", "ff-only", ["update"]),
+            ("seed-audit", "seed — audit drift", "read-only", ["seed", "--check"]),
+            ("seed-apply", "seed — apply missing templates", "additive", ["seed"]),
+            (
+                "backfill",
+                "backfill data-shape upgrades",
+                "one-shot key adds (shows help)",
+                ["backfill"],
+            ),
+            ("usage", "token-usage ledger", "tokens per provider/model", ["usage"]),
+            ("version", "engine git revision", "rev + origin", ["version"]),
+        ],
+    ),
 }
 
 
@@ -261,7 +424,7 @@ def _handle_correct_add(arg_prompt: Callable[[str], str | None]) -> None:
 
 
 _SPECIAL_HANDLERS: dict[str, Callable[[Callable[[str], str | None]], None]] = {
-    "query":       _handle_query,
+    "query": _handle_query,
     "correct_add": _handle_correct_add,
 }
 
@@ -281,6 +444,7 @@ def _import_pt():
 
     class _PT:
         pass
+
     pt = _PT()
     pt.Application = Application
     pt.HTML = HTML
@@ -306,9 +470,7 @@ def _pick_query_mode() -> str:
     """Tiny picker for query mode. Returns 'default' / 'brief' / 'file-back'."""
     pt = _import_pt()
     try:
-        pick = pt.prompt(
-            "Mode [d=default / b=brief / f=file-back] (default d): "
-        ).strip().lower()
+        pick = pt.prompt("Mode [d=default / b=brief / f=file-back] (default d): ").strip().lower()
     except (EOFError, KeyboardInterrupt):
         return "default"
     return {"b": "brief", "f": "file-back"}.get(pick, "default")
@@ -344,18 +506,14 @@ class HomeState:
     def actionable_health(self) -> list[CheckResult]:
         """Health entries severity critical|warning with a dispatch_args.
         These are the ones the cursor can run via Enter."""
-        return [
-            r for r in self.health
-            if r.severity in ("critical", "warning") and r.dispatch_args
-        ]
+        return [r for r in self.health if r.severity in ("critical", "warning") and r.dispatch_args]
 
     def info_health(self) -> list[CheckResult]:
         """Health entries severity critical|warning WITHOUT dispatch_args.
         Rendered as a read-only Heads-up section below the actionable list
         — operator runs the fix manually (e.g. `tail …`, `claude /login`)."""
         return [
-            r for r in self.health
-            if r.severity in ("critical", "warning") and not r.dispatch_args
+            r for r in self.health if r.severity in ("critical", "warning") and not r.dispatch_args
         ]
 
     def actions(self) -> list[dict]:
@@ -375,29 +533,33 @@ class HomeState:
         _SEV_RANK = {"critical": 0, "warning": 1}
         items: list[dict] = []
         for r in self.actionable_health():
-            items.append({
-                "kind": "health",
-                "severity": r.severity,
-                # Actionable health always needs the operator → `do` group.
-                "group": "do",
-                "label": r.message,
-                "dispatch_args": list(r.dispatch_args),
-                "cmd_display": " ".join(r.dispatch_args),
-                # Sort within a group: health (0) before suggestions (1), then
-                # by severity / priority.
-                "_sort": (0, _SEV_RANK.get(r.severity, 9)),
-            })
+            items.append(
+                {
+                    "kind": "health",
+                    "severity": r.severity,
+                    # Actionable health always needs the operator → `do` group.
+                    "group": "do",
+                    "label": r.message,
+                    "dispatch_args": list(r.dispatch_args),
+                    "cmd_display": " ".join(r.dispatch_args),
+                    # Sort within a group: health (0) before suggestions (1), then
+                    # by severity / priority.
+                    "_sort": (0, _SEV_RANK.get(r.severity, 9)),
+                }
+            )
         for s in self.suggestions:
             argv = list(s.get("argv", []))
-            items.append({
-                "kind": "suggestion",
-                "severity": "probe",
-                "group": s.get("group", "do"),
-                "label": s.get("label", ""),
-                "dispatch_args": argv,
-                "cmd_display": " ".join(argv),
-                "_sort": (1, s.get("priority", 99)),
-            })
+            items.append(
+                {
+                    "kind": "suggestion",
+                    "severity": "probe",
+                    "group": s.get("group", "do"),
+                    "label": s.get("label", ""),
+                    "dispatch_args": argv,
+                    "cmd_display": " ".join(argv),
+                    "_sort": (1, s.get("priority", 99)),
+                }
+            )
         # Group by intent-class (do → auto → review), preserving in-group order.
         items.sort(key=lambda it: (_GROUP_RANK.get(it["group"], 0), it["_sort"]))
         return items
@@ -463,9 +625,7 @@ def _build_screen_html(state: HomeState) -> str:
             )
         lines.append("")
     else:
-        lines.append(
-            "  <ansibrightblack>✨ Nothing pending — vault is current.</ansibrightblack>"
-        )
+        lines.append("  <ansibrightblack>✨ Nothing pending — vault is current.</ansibrightblack>")
         lines.append("")
 
     # ── Heads-up: warnings without auto-fix ─────────────────────────
@@ -475,8 +635,7 @@ def _build_screen_html(state: HomeState) -> str:
     info_issues = state.info_health()
     if info_issues:
         lines.append(
-            "  <b>▸ Heads-up</b>  "
-            "<ansibrightblack>(read-only — fix manually)</ansibrightblack>"
+            "  <b>▸ Heads-up</b>  <ansibrightblack>(read-only — fix manually)</ansibrightblack>"
         )
         for r in info_issues:
             if r.severity == "critical":
@@ -485,33 +644,24 @@ def _build_screen_html(state: HomeState) -> str:
                 glyph = "<ansiyellow>⚠</ansiyellow>"
             lines.append(f"      {glyph} {escape(r.message)}")
             if r.fix:
-                lines.append(
-                    f"        <ansibrightblack>→ {escape(r.fix)}</ansibrightblack>"
-                )
-        lines.append(
-            "      <ansibrightblack>(`wiki doctor` for the full audit)</ansibrightblack>"
-        )
+                lines.append(f"        <ansibrightblack>→ {escape(r.fix)}</ansibrightblack>")
+        lines.append("      <ansibrightblack>(`wiki doctor` for the full audit)</ansibrightblack>")
         lines.append("")
 
     lines.append("  <b>▸ Quick actions</b>")
     # Derived from QUICK_ACTIONS so every declared shortcut is rendered — no
     # hand-synced footer that can drift out of sync with the key handler.
     quick = "  ".join(
-        f"[<b>{escape(key)}</b>] {escape(label)}"
-        for key, label, _desc, _disp in QUICK_ACTIONS
+        f"[<b>{escape(key)}</b>] {escape(label)}" for key, label, _desc, _disp in QUICK_ACTIONS
     )
     lines.append(f"      {quick}")
     lines.append("")
 
     lines.append("  <b>▸ Browse</b>")
     lines.append(
-        "      [<b>o</b>] collectors+OAuth   [<b>i</b>] ingest    "
-        "[<b>k</b>] knowledge ops"
+        "      [<b>o</b>] collectors+OAuth   [<b>i</b>] ingest    [<b>k</b>] knowledge ops"
     )
-    lines.append(
-        "      [<b>d</b>] facts/takes        [<b>a</b>] automation "
-        "[<b>g</b>] setup"
-    )
+    lines.append("      [<b>d</b>] facts/takes        [<b>a</b>] automation [<b>g</b>] setup")
     lines.append("")
     lines.append(
         "      [<b>h</b>] full help     [<b>x</b>] exit     "
@@ -556,12 +706,18 @@ def _git_revision() -> str:
 # render in the operator's terminal, the menu's render too — they are now
 # literally the same bytes on the same stream.
 _ANSI_TAGS = {
-    "<b>": C_BOLD, "</b>": C_RESET,
-    "<ansicyan>": C_CYAN, "</ansicyan>": C_RESET,
-    "<ansired>": C_RED, "</ansired>": C_RESET,
-    "<ansigreen>": C_GREEN, "</ansigreen>": C_RESET,
-    "<ansiyellow>": C_YELLOW, "</ansiyellow>": C_RESET,
-    "<ansibrightblack>": C_DIM, "</ansibrightblack>": C_RESET,
+    "<b>": C_BOLD,
+    "</b>": C_RESET,
+    "<ansicyan>": C_CYAN,
+    "</ansicyan>": C_RESET,
+    "<ansired>": C_RED,
+    "</ansired>": C_RESET,
+    "<ansigreen>": C_GREEN,
+    "</ansigreen>": C_RESET,
+    "<ansiyellow>": C_YELLOW,
+    "</ansiyellow>": C_RESET,
+    "<ansibrightblack>": C_DIM,
+    "</ansibrightblack>": C_RESET,
 }
 _TAG_RE = re.compile("|".join(re.escape(k) for k in _ANSI_TAGS))
 
@@ -670,9 +826,7 @@ def _fuzzy_filter(query: str) -> None:
         print("  (empty query)")
         return
     matches = [
-        (id_, label, dispatch)
-        for id_, label, dispatch in _flatten_for_fuzzy()
-        if q in id_.lower()
+        (id_, label, dispatch) for id_, label, dispatch in _flatten_for_fuzzy() if q in id_.lower()
     ]
     if not matches:
         print(f"  no command matches '/{query}'")

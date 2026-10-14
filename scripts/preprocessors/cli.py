@@ -79,7 +79,9 @@ def main() -> NoReturn:
     parser = argparse.ArgumentParser(prog="wiki preprocess")
     parser.add_argument("--list", action="store_true", help="enumerate registered preprocessors")
     parser.add_argument("name", nargs="?", help="preprocessor name (omit with --list)")
-    parser.add_argument("source", nargs="?", help="source path/URL (only for takes_source preprocessors)")
+    parser.add_argument(
+        "source", nargs="?", help="source path/URL (only for takes_source preprocessors)"
+    )
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
 

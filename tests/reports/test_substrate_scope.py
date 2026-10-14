@@ -36,9 +36,7 @@ class TestResolveSubstrateFiles:
 
     def test_dedupes_across_overlapping_globs(self, tmp_path: Path) -> None:
         _touch(tmp_path / "daily" / "a.md", age_days=1)
-        out = resolve_substrate_files(
-            tmp_path, ("daily/*.md", "daily/a.md"), lookback_days=14
-        )
+        out = resolve_substrate_files(tmp_path, ("daily/*.md", "daily/a.md"), lookback_days=14)
         assert out == [tmp_path / "daily" / "a.md"]
 
     def test_returns_sorted(self, tmp_path: Path) -> None:

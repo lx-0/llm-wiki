@@ -4,6 +4,7 @@ Write tools are user-principal only; the user JWT is short-lived. The
 producer therefore holds a refresh token (scope `offline_access`, PKCE
 public client) and refreshes headlessly — one browser consent at setup.
 """
+
 from __future__ import annotations
 
 import json
@@ -33,17 +34,23 @@ def _as_transport(recorder: list[dict], *, expires_in: int = 300):
         body = request.content.decode() if request.content else ""
         recorder.append({"url": url, "body": body})
         if url.endswith("/.well-known/oauth-protected-resource/mcp"):
-            return httpx.Response(200, json={
-                "resource": ENDPOINT,
-                "authorization_servers": [f"{ORIGIN}/api/auth"],
-            })
+            return httpx.Response(
+                200,
+                json={
+                    "resource": ENDPOINT,
+                    "authorization_servers": [f"{ORIGIN}/api/auth"],
+                },
+            )
         if "/.well-known/oauth-authorization-server" in url:
-            return httpx.Response(200, json={
-                "issuer": f"{ORIGIN}/api/auth",
-                "authorization_endpoint": f"{ORIGIN}/api/auth/oauth2/authorize",
-                "token_endpoint": f"{ORIGIN}/api/auth/oauth2/token",
-                "registration_endpoint": f"{ORIGIN}/api/auth/oauth2/register",
-            })
+            return httpx.Response(
+                200,
+                json={
+                    "issuer": f"{ORIGIN}/api/auth",
+                    "authorization_endpoint": f"{ORIGIN}/api/auth/oauth2/authorize",
+                    "token_endpoint": f"{ORIGIN}/api/auth/oauth2/token",
+                    "registration_endpoint": f"{ORIGIN}/api/auth/oauth2/register",
+                },
+            )
         if url.endswith("/oauth2/register"):
             payload = json.loads(body)
             assert "refresh_token" in payload["grant_types"]
@@ -54,16 +61,26 @@ def _as_transport(recorder: list[dict], *, expires_in: int = 300):
             if form["grant_type"] == "authorization_code":
                 assert form["code"] == "code-abc"
                 assert form["code_verifier"]
-                return httpx.Response(200, json={
-                    "access_token": "acc-1", "expires_in": expires_in,
-                    "refresh_token": "ref-1", "token_type": "Bearer",
-                })
+                return httpx.Response(
+                    200,
+                    json={
+                        "access_token": "acc-1",
+                        "expires_in": expires_in,
+                        "refresh_token": "ref-1",
+                        "token_type": "Bearer",
+                    },
+                )
             assert form["grant_type"] == "refresh_token"
             if form["refresh_token"] == "ref-1":
-                return httpx.Response(200, json={
-                    "access_token": "acc-2", "expires_in": expires_in,
-                    "refresh_token": "ref-2", "token_type": "Bearer",
-                })
+                return httpx.Response(
+                    200,
+                    json={
+                        "access_token": "acc-2",
+                        "expires_in": expires_in,
+                        "refresh_token": "ref-2",
+                        "token_type": "Bearer",
+                    },
+                )
             return httpx.Response(400, json={"error": "invalid_grant"})
         raise AssertionError(f"unexpected url {url}")
 
@@ -128,8 +145,9 @@ def test_refresh_failure_points_at_auth(tmp_path: Path) -> None:
 
 def test_missing_store_points_at_auth(tmp_path: Path) -> None:
     with pytest.raises(PublishClientError, match="--auth"):
-        current_access_token(tmp_path / "absent.json", http=httpx.Client(
-            transport=_as_transport([])))
+        current_access_token(
+            tmp_path / "absent.json", http=httpx.Client(transport=_as_transport([]))
+        )
 
 
 def test_wait_for_code_loopback_listener() -> None:

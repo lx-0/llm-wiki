@@ -12,6 +12,7 @@ wikilink grammar, same policy as every retargeting flow; duplicating the
 fence/frontmatter walker here would be exactly the drift links.py exists to
 prevent.
 """
+
 from __future__ import annotations
 
 import re

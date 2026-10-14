@@ -9,6 +9,7 @@ refresh grant AND scope offline_access) was verified in the vendored
 better-auth oauth-provider. Token cache follows the google_oauth convention:
 ``STATE_DIR/meinkontext-oauth.json`` via the locked StateStore.
 """
+
 from __future__ import annotations
 
 import base64
@@ -52,9 +53,7 @@ def discover(http: httpx.Client, endpoint: str) -> dict:
     """RFC 9728 protected-resource metadata → RFC 8414 AS metadata."""
     parsed = urllib.parse.urlparse(endpoint)
     origin = f"{parsed.scheme}://{parsed.netloc}"
-    resource_meta = _get_json(
-        http, f"{origin}/.well-known/oauth-protected-resource{parsed.path}"
-    )
+    resource_meta = _get_json(http, f"{origin}/.well-known/oauth-protected-resource{parsed.path}")
     servers = resource_meta.get("authorization_servers") or []
     if not servers:
         raise PublishClientError(f"{endpoint}: no authorization_servers in metadata")
@@ -90,8 +89,7 @@ def _register_client(http: httpx.Client, meta: dict, redirect_uri: str) -> str:
         raise PublishClientError(f"client registration failed: {exc}") from exc
     if response.status_code not in (200, 201):
         raise PublishClientError(
-            f"client registration failed: HTTP {response.status_code}: "
-            f"{response.text[:200]}"
+            f"client registration failed: HTTP {response.status_code}: {response.text[:200]}"
         )
     return response.json()["client_id"]
 
@@ -187,20 +185,24 @@ def mint_interactive(
 
     verifier = secrets.token_urlsafe(48)
     challenge = (
-        base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest())
-        .rstrip(b"=")
-        .decode()
+        base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b"=").decode()
     )
-    auth_url = meta["authorization_endpoint"] + "?" + urllib.parse.urlencode({
-        "response_type": "code",
-        "client_id": client_id,
-        "redirect_uri": redirect_uri,
-        "scope": "offline_access",
-        "code_challenge": challenge,
-        "code_challenge_method": "S256",
-        "resource": endpoint,
-        "state": secrets.token_urlsafe(16),
-    })
+    auth_url = (
+        meta["authorization_endpoint"]
+        + "?"
+        + urllib.parse.urlencode(
+            {
+                "response_type": "code",
+                "client_id": client_id,
+                "redirect_uri": redirect_uri,
+                "scope": "offline_access",
+                "code_challenge": challenge,
+                "code_challenge_method": "S256",
+                "resource": endpoint,
+                "state": secrets.token_urlsafe(16),
+            }
+        )
+    )
 
     if consent is not None:
         code = consent(auth_url)
@@ -210,19 +212,27 @@ def mint_interactive(
         assert wait is not None
         code = wait()
 
-    tokens = _exchange(http, meta["token_endpoint"], {
-        "grant_type": "authorization_code",
-        "code": code,
-        "redirect_uri": redirect_uri,
-        "client_id": client_id,
-        "code_verifier": verifier,
-        "resource": endpoint,
-    })
-    _persist(token_store(store_path), tokens, {
-        "client_id": client_id,
-        "token_endpoint": meta["token_endpoint"],
-        "resource": endpoint,
-    })
+    tokens = _exchange(
+        http,
+        meta["token_endpoint"],
+        {
+            "grant_type": "authorization_code",
+            "code": code,
+            "redirect_uri": redirect_uri,
+            "client_id": client_id,
+            "code_verifier": verifier,
+            "resource": endpoint,
+        },
+    )
+    _persist(
+        token_store(store_path),
+        tokens,
+        {
+            "client_id": client_id,
+            "token_endpoint": meta["token_endpoint"],
+            "resource": endpoint,
+        },
+    )
 
 
 def current_access_token(
@@ -248,12 +258,16 @@ def current_access_token(
 
     http = http or httpx.Client(timeout=httpx.Timeout(10.0))
     try:
-        tokens = _exchange(http, data["token_endpoint"], {
-            "grant_type": "refresh_token",
-            "refresh_token": data["refresh_token"],
-            "client_id": data["client_id"],
-            "resource": data.get("resource", ""),
-        })
+        tokens = _exchange(
+            http,
+            data["token_endpoint"],
+            {
+                "grant_type": "refresh_token",
+                "refresh_token": data["refresh_token"],
+                "client_id": data["client_id"],
+                "resource": data.get("resource", ""),
+            },
+        )
     except PublishClientError as exc:
         raise PublishClientError(f"token refresh failed ({exc}) — {_AUTH_HINT}") from exc
     _persist(store, tokens, {})

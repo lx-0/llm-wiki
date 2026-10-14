@@ -23,6 +23,7 @@ def test_fact_violations_by_slug_groups_filters_and_absolutizes(monkeypatch, tmp
     import reconcile
 
     monkeypatch.setattr(reconcile, "ROOT_DIR", tmp_path)
+
     # Canned lint output: two concept hits for one fact, one for another,
     # plus a NON-concept hit (people/) that must be filtered out, plus a
     # duplicate that must be deduped. Grouping keys on the structured
@@ -63,10 +64,15 @@ def test_fact_violations_slug_handles_non_ascii(monkeypatch, tmp_path):
 
     monkeypatch.setattr(reconcile, "ROOT_DIR", tmp_path)
     nfd = unicodedata.normalize("NFD", "sidney-wach-ist-männlich")  # ä → a + U+0308
-    issues = [lint.issue(
-        "warning", "fact_violation", "concepts/sidney.md",
-        "Article contains negation term 'weiblich'…", fact_slug=nfd,
-    )]
+    issues = [
+        lint.issue(
+            "warning",
+            "fact_violation",
+            "concepts/sidney.md",
+            "Article contains negation term 'weiblich'…",
+            fact_slug=nfd,
+        )
+    ]
     monkeypatch.setattr(reconcile.lint, "build_context", lambda **kw: None)
     monkeypatch.setattr(reconcile.lint, "check_facts_violations", lambda ctx: issues)
     out = reconcile._fact_violations_by_slug()
@@ -99,17 +105,22 @@ def test_reconcile_fact_dry_run_makes_no_sdk_call(monkeypatch, tmp_path):
     facts.mkdir()
     monkeypatch.setattr(correct_apply, "FACTS_DIR", facts)
     monkeypatch.setattr(correct_apply, "ROOT_DIR", tmp_path)
-    (facts / "no-x.md").write_text("---\ntype: fact\nstatus: negation\nnegation_terms: [x]\n---\n\nX is false.\n")
+    (facts / "no-x.md").write_text(
+        "---\ntype: fact\nstatus: negation\nnegation_terms: [x]\n---\n\nX is false.\n"
+    )
 
     def boom(*a, **kw):
         raise AssertionError("query() must not be called in dry-run")
 
     monkeypatch.setattr(correct_apply, "query", boom)
 
-    res = asyncio.run(correct_apply.reconcile_fact(
-        "no-x", [str(tmp_path / "knowledge/concepts/foo.md")],
-        dry_run=True,
-    ))
+    res = asyncio.run(
+        correct_apply.reconcile_fact(
+            "no-x",
+            [str(tmp_path / "knowledge/concepts/foo.md")],
+            dry_run=True,
+        )
+    )
     assert res.status == "dry_run"
     assert res.cost_usd == 0.0
 
@@ -120,9 +131,11 @@ def test_run_skips_facts_exceeding_max_files(monkeypatch):
     reconcile_fact is never called for it."""
     import reconcile
 
-    monkeypatch.setattr(reconcile, "_fact_violations_by_slug",
-                        lambda: {"broad": [f"/c/{i}.md" for i in range(50)],
-                                 "narrow": ["/c/a.md"]})
+    monkeypatch.setattr(
+        reconcile,
+        "_fact_violations_by_slug",
+        lambda: {"broad": [f"/c/{i}.md" for i in range(50)], "narrow": ["/c/a.md"]},
+    )
     monkeypatch.setattr(reconcile.CONFIG.limits, "concept_reconcile_max_files_per_fact", 25)
     monkeypatch.setattr(reconcile.CONFIG.limits, "concept_reconcile_max_facts_per_run", 10)
     monkeypatch.setattr(reconcile, "_within_cooldown", lambda *a, **k: False)
@@ -131,6 +144,7 @@ def test_run_skips_facts_exceeding_max_files(monkeypatch):
 
     async def fake_reconcile_fact(slug, files, *, dry_run):
         from facts.correct_apply import ReconcileResult
+
         called.append(slug)
         return ReconcileResult(slug, "dry_run", files=files)
 
@@ -142,8 +156,9 @@ def test_run_skips_facts_exceeding_max_files(monkeypatch):
 def test_run_respects_max_facts_per_run(monkeypatch):
     import reconcile
 
-    monkeypatch.setattr(reconcile, "_fact_violations_by_slug",
-                        lambda: {f"f{i}": ["/c/a.md"] for i in range(5)})
+    monkeypatch.setattr(
+        reconcile, "_fact_violations_by_slug", lambda: {f"f{i}": ["/c/a.md"] for i in range(5)}
+    )
     monkeypatch.setattr(reconcile.CONFIG.limits, "concept_reconcile_max_files_per_fact", 25)
     monkeypatch.setattr(reconcile.CONFIG.limits, "concept_reconcile_max_facts_per_run", 2)
     monkeypatch.setattr(reconcile, "_within_cooldown", lambda *a, **k: False)
@@ -152,6 +167,7 @@ def test_run_respects_max_facts_per_run(monkeypatch):
 
     async def fake_reconcile_fact(slug, files, *, dry_run):
         from facts.correct_apply import ReconcileResult
+
         called.append(slug)
         return ReconcileResult(slug, "dry_run", files=files)
 
@@ -166,7 +182,11 @@ def test_reconcile_fact_missing_fact_fails(monkeypatch, tmp_path):
     facts = tmp_path / "facts"
     facts.mkdir()
     monkeypatch.setattr(correct_apply, "FACTS_DIR", facts)
-    res = asyncio.run(correct_apply.reconcile_fact(
-        "ghost", ["/x/concepts/foo.md"], dry_run=True,
-    ))
+    res = asyncio.run(
+        correct_apply.reconcile_fact(
+            "ghost",
+            ["/x/concepts/foo.md"],
+            dry_run=True,
+        )
+    )
     assert res.status == "failed"

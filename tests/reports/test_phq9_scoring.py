@@ -19,7 +19,12 @@ from scripts.reports._engine.score import (
 
 PHQ9_DIR = (
     Path(__file__).resolve().parents[2]
-    / "scripts" / "reports" / "_engine" / "instruments" / "phq-9" / "v1.0.0"
+    / "scripts"
+    / "reports"
+    / "_engine"
+    / "instruments"
+    / "phq-9"
+    / "v1.0.0"
 )
 
 
@@ -40,10 +45,10 @@ class TestPHQ9Scoring:
     @pytest.mark.parametrize(
         "uniform_answer,expected_total,expected_band",
         [
-            (0, 0, "minimal"),       # 9*0 = 0
-            (1, 9, "mild"),          # 9*1 = 9 (top of mild)
+            (0, 0, "minimal"),  # 9*0 = 0
+            (1, 9, "mild"),  # 9*1 = 9 (top of mild)
             (2, 18, "moderately-severe"),  # 9*2 = 18
-            (3, 27, "severe"),       # 9*3 = 27 (top of severe)
+            (3, 27, "severe"),  # 9*3 = 27 (top of severe)
         ],
     )
     def test_uniform_answers_band(
@@ -113,6 +118,7 @@ class TestPHQ9Scoring:
         curated. Loader ignores the field today but it's locked for
         S02's inference scope-resolver."""
         import yaml as yaml_mod
+
         items_path = PHQ9_DIR / "items.yaml"
         raw = yaml_mod.safe_load(items_path.read_text(encoding="utf-8"))
         for item in raw:
@@ -131,6 +137,7 @@ class TestPHQ9Scoring:
         Pin this in test so a future yaml edit can't silently flip it.
         """
         import yaml as yaml_mod
+
         raw = yaml_mod.safe_load((PHQ9_DIR / "items.yaml").read_text(encoding="utf-8"))
         q9 = next(item for item in raw if str(item["id"]) == "9")
         assert q9["substrate_inferable"] is False, (

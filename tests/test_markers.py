@@ -17,6 +17,7 @@ E = "<!-- x:end -->"
 
 # ── find_region ─────────────────────────────────────────────────────
 
+
 def test_find_region_locates_full_span_markers_included():
     text = f"head\n{B}\ninner\n{E}\ntail"
     region = markers.find_region(text, B, E)
@@ -55,6 +56,7 @@ def test_find_region_stray_end_before_valid_pair_still_found():
 
 
 # ── replace_region ──────────────────────────────────────────────────
+
 
 def test_replace_region_replaces_in_place():
     text = f"top\n\n{B}\nold\n{E}\n\nbottom"
@@ -101,11 +103,10 @@ def test_replace_region_is_idempotent_for_identical_block():
 
 # ── ensure_region ───────────────────────────────────────────────────
 
+
 def test_ensure_region_replaces_when_present():
     text = f"x\n{B}\nold\n{E}\ny"
-    out = markers.ensure_region(
-        text, B, E, f"{B}\nnew\n{E}", insert=lambda t, blk: t + "\n" + blk
-    )
+    out = markers.ensure_region(text, B, E, f"{B}\nnew\n{E}", insert=lambda t, blk: t + "\n" + blk)
     assert "new" in out and "old" not in out
     assert out.count(B) == 1
 
@@ -131,6 +132,7 @@ def test_ensure_region_reversed_markers_route_to_insert():
 
 
 # ── strip_region ────────────────────────────────────────────────────
+
 
 def test_strip_region_removes_span_and_collapses_seam():
     text = f"before\n\n{B}\nbody\n{E}\n\nafter\n"

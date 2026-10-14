@@ -19,19 +19,23 @@ import yaml
 # ── producer._is_email_source ───────────────────────────────────────
 
 
-@pytest.mark.parametrize("path,expected", [
-    ("raw/notes/email/work-2026-05-13.md", True),
-    ("raw/notes/email/account-2026-05-13.md", True),  # generic email path
-    ("raw/notes/thunderbird/overview.md", True),       # legacy thunderbird substrate path
-    ("raw/notes/EMAIL/Capitals.md", True),             # case-insensitive
-    ("raw/articles/news.md", False),
-    ("daily/2026-05-13.md", False),
-    ("raw/notes/screenshots/screenshots-x.md", False),
-    ("raw/transcripts/jamie/x.md", False),
-    ("", False),
-])
+@pytest.mark.parametrize(
+    "path,expected",
+    [
+        ("raw/notes/email/work-2026-05-13.md", True),
+        ("raw/notes/email/account-2026-05-13.md", True),  # generic email path
+        ("raw/notes/thunderbird/overview.md", True),  # legacy thunderbird substrate path
+        ("raw/notes/EMAIL/Capitals.md", True),  # case-insensitive
+        ("raw/articles/news.md", False),
+        ("daily/2026-05-13.md", False),
+        ("raw/notes/screenshots/screenshots-x.md", False),
+        ("raw/transcripts/jamie/x.md", False),
+        ("", False),
+    ],
+)
 def test_is_email_source(path: str, expected: bool) -> None:
     from suggestions.producer import _is_email_source
+
     assert _is_email_source(path) == expected
 
 
@@ -156,7 +160,7 @@ def test_resolve_matches_filename(tmp_path, monkeypatch):
 
     assert cli._resolve("b-test.md", files) == tmp_path / "b-test.md"
     assert cli._resolve("b-test", files) == tmp_path / "b-test.md"  # stem match
-    assert cli._resolve("test", files) == tmp_path / "b-test.md"    # substring match
+    assert cli._resolve("test", files) == tmp_path / "b-test.md"  # substring match
 
 
 def test_resolve_returns_none_for_no_match(tmp_path, monkeypatch, capsys):

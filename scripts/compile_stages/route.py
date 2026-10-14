@@ -39,7 +39,7 @@ SUBSTRATE_PROMPTS: dict[str, tuple[str, int, str]] = {
     # Empirical: 12-turn budget hit at $1.14 (Opus) with 2 entities
     # edited. 20 + Haiku covers digests with up to ~6 mentioned entities
     # well under budget.
-    "daily-digest":    ("compile_daily", 20, "claude-haiku-4-5-20251001"),
+    "daily-digest": ("compile_daily", 20, "claude-haiku-4-5-20251001"),
     # Health-rollup is metric-only frontmatter with a stub body ~99% of
     # days. Falling through to compile_main.md spawned the heavy
     # two-layer carry-forward audit on a file with no dialog → cost
@@ -52,14 +52,14 @@ SUBSTRATE_PROMPTS: dict[str, tuple[str, int, str]] = {
     # safety rule) + final emit = 5 minimum, plus slack for Glob /
     # re-Read / prose-branch Timeline appends. Empirical: budget=6
     # consistently hit max_turns on 2026-05-16 batch.
-    "health-rollup":   ("compile_health", 10, "claude-haiku-4-5-20251001"),
+    "health-rollup": ("compile_health", 10, "claude-haiku-4-5-20251001"),
     # Folder-deep-scan answer extracts (M027-S05). The operator
     # explicitly requested + approved these facts, so they must hit
     # compile_main's rule 12 (record-the-fact exemption from the
     # "not trivial facts" bar) — the compile_default fallback dismissed
     # a real invoice answer to zero writes twice on 2026-06-10. Small,
     # focused sources: Haiku at 20 turns covers grep + augment + log.
-    "folder-answer":   ("compile_main", 20, "claude-haiku-4-5-20251001"),
+    "folder-answer": ("compile_main", 20, "claude-haiku-4-5-20251001"),
     # Screenshot batches: 50-screenshot reports with per-frame summaries
     # + table-of-contents. compile_main.md hit max_turns at $5+/file
     # on 2026-05-15 (49 screenshots → many concept-page Edits). Lean
@@ -72,7 +72,7 @@ SUBSTRATE_PROMPTS: dict[str, tuple[str, int, str]] = {
     # much tighter anti-noise filter — most camera photos become zero
     # knowledge entries. 20 turns + Haiku covers the rare actionable
     # batch (whiteboard captures, receipts, document scans).
-    "picture-batch":    ("compile_pictures", 20, "claude-haiku-4-5-20251001"),
+    "picture-batch": ("compile_pictures", 20, "claude-haiku-4-5-20251001"),
     # Memory-sync / memory-seed: engine pre-resolves project_slug +
     # bootstraps `## Timeline` section before SDK (compile_stages.memory),
     # so the prompt is purely mechanical: Read → Edit-append, 2 turns.
@@ -84,8 +84,8 @@ SUBSTRATE_PROMPTS: dict[str, tuple[str, int, str]] = {
     # The new prompt also handles "no project page → distill to concepts/"
     # which needs more agent moves (Glob existing concepts, Edit-append or
     # Write-new, plus optional connection-article creation).
-    "memory-sync":     ("compile_memories", 20, "claude-haiku-4-5-20251001"),
-    "memory-seed":     ("compile_memories", 20, "claude-haiku-4-5-20251001"),
+    "memory-sync": ("compile_memories", 20, "claude-haiku-4-5-20251001"),
+    "memory-seed": ("compile_memories", 20, "claude-haiku-4-5-20251001"),
     # Longform notes — entity-dense narrative content (strategy docs,
     # design memos, multi-section essays) routinely 15-25 KB with 15-25
     # concept references. compile_default (the lean fallback prompt) +
@@ -94,7 +94,7 @@ SUBSTRATE_PROMPTS: dict[str, tuple[str, int, str]] = {
     # on max_turns 2026-05-17. Routed here to compile_main (rich prompt)
     # with 25-turn budget — matches the memory-sync legacy budget and
     # the daily-digest tier for many-entity Haiku substrates.
-    "longform":        ("compile_main", 60, "claude-haiku-4-5-20251001"),
+    "longform": ("compile_main", 60, "claude-haiku-4-5-20251001"),
     # Transcripts (jamie/gmeet meetings, youtube videos) carry attributed
     # dialog + named participants. compile_main owns the two-layer
     # person-stub creation + State/Timeline carry-forward + Action-Item
@@ -107,7 +107,7 @@ SUBSTRATE_PROMPTS: dict[str, tuple[str, int, str]] = {
     # compile_main self-gates person-stub creation on attributed dialog,
     # so single-speaker youtube transcripts extract concepts without
     # spawning spurious people pages.
-    "transcript":      ("compile_main", 60, "claude-haiku-4-5-20251001"),
+    "transcript": ("compile_main", 60, "claude-haiku-4-5-20251001"),
 }
 
 # Default for any substrate-type NOT in SUBSTRATE_PROMPTS. Lean prompt
@@ -118,7 +118,8 @@ SUBSTRATE_PROMPTS: dict[str, tuple[str, int, str]] = {
 # `models.compile_model`, audit 2026-08-25 E3). Per-substrate rows above
 # keep their empirical per-row pins.
 _DEFAULT_DISPATCH: tuple[str, int, str] = (
-    "compile_default", CONFIG.limits.compile_max_turns,
+    "compile_default",
+    CONFIG.limits.compile_max_turns,
     CONFIG.models.compile_default_route_model,
 )
 
@@ -132,12 +133,12 @@ _DEFAULT_DISPATCH: tuple[str, int, str] = (
 # overlap; iterate from most-specific to least-specific.
 _SUBSTRATE_PATH_FALLBACKS: tuple[tuple[str, str], ...] = (
     ("raw/notes/screenshots/screenshots-", "screenshot-batch"),
-    ("raw/notes/pictures/pictures-",       "picture-batch"),
+    ("raw/notes/pictures/pictures-", "picture-batch"),
     # Legacy meeting transcripts dropped under raw/transcripts/ without a
     # `type:` frontmatter still need the rich dialog prompt (issue #1).
     # Current collectors (jamie/gmeet) always emit `type: transcript`, so
     # this only matters for hand-placed / pre-frontmatter files.
-    ("raw/transcripts/",                   "transcript"),
+    ("raw/transcripts/", "transcript"),
 )
 
 
@@ -148,6 +149,7 @@ _SUBSTRATE_PATH_FALLBACKS: tuple[tuple[str, str], ...] = (
 # structurally impossible. The names below stay as thin compat callers:
 # compile.py imports `_parse_frontmatter`, tests import
 # `_frontmatter_compile_role` / `_frontmatter_field` / `_health_rollup_body_is_stub`.
+
 
 def _frontmatter_type(content: str) -> str | None:
     """`type:` scalar from the leading fence (regex-only compile hot path)."""
@@ -203,6 +205,7 @@ def _health_rollup_body_is_stub(content: str) -> bool:
 
 # ── Route union ──────────────────────────────────────────────────────
 
+
 @dataclass(frozen=True)
 class Skip:
     """No work: empty body / final-only / substrate-skip-list."""
@@ -247,6 +250,7 @@ Route = Skip | IndexOnly | HealthStub | Compile
 
 # ── The decision ─────────────────────────────────────────────────────
 
+
 def decide_route(source: Path, content: str, *, force: bool = False) -> Route:
     """Pure routing decision for one source — no I/O, no logging, no state.
 
@@ -259,9 +263,7 @@ def decide_route(source: Path, content: str, *, force: bool = False) -> Route:
     `force=True` bypasses the substrate-type skip-list (operator targeted a
     single file via `--file`); batch mode passes `force=False`.
     """
-    rel_path = (
-        str(source.relative_to(ROOT_DIR)) if source.is_absolute() else str(source)
-    )
+    rel_path = str(source.relative_to(ROOT_DIR)) if source.is_absolute() else str(source)
 
     if not content.strip():
         return Skip("empty")
@@ -308,7 +310,8 @@ def decide_route(source: Path, content: str, *, force: bool = False) -> Route:
     source_type = _frontmatter_type(content)
     dispatch_key = _substrate_key(content, rel_path)
     substrate_prompt, max_turns_for_call, model = SUBSTRATE_PROMPTS.get(
-        dispatch_key or "", _DEFAULT_DISPATCH,
+        dispatch_key or "",
+        _DEFAULT_DISPATCH,
     )
 
     classification = classify(content, source)
@@ -323,5 +326,7 @@ def decide_route(source: Path, content: str, *, force: bool = False) -> Route:
         project_page_rel=None,
     )
     return Compile(
-        metadata=metadata, classification=classification, dispatch_key=dispatch_key,
+        metadata=metadata,
+        classification=classification,
+        dispatch_key=dispatch_key,
     )

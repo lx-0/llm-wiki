@@ -56,10 +56,12 @@ def test_add_writes_sources_and_trust(monkeypatch: pytest.MonkeyPatch, tmp_path:
     _patch_facts_dir(monkeypatch, facts_dir)
     from facts import correct
 
-    rc = correct.cmd_add(_add_args(
-        source=["https://handelsblatt.de/x", "raw/clippings/mail.md"],
-        trust="confirmed",
-    ))
+    rc = correct.cmd_add(
+        _add_args(
+            source=["https://handelsblatt.de/x", "raw/clippings/mail.md"],
+            trust="confirmed",
+        )
+    )
     assert rc == 0
 
     fm = _read_fact(facts_dir, "senkrechtstarter-award")
@@ -90,19 +92,23 @@ def test_add_rejects_blank_source(monkeypatch: pytest.MonkeyPatch, tmp_path: Pat
     assert rc == 2
 
 
-def test_add_user_source_with_default_trust(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_add_user_source_with_default_trust(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     facts_dir = tmp_path / "knowledge" / "facts"
     _patch_facts_dir(monkeypatch, facts_dir)
     from facts import correct
 
-    rc = correct.cmd_add(_add_args(
-        title="Office hours",
-        body="Office opens at 10am Monday.",
-        status="clarification",
-        source=["user:2026-05-03"],
-        trust=correct.DEFAULT_TRUST,
-        term=[],
-    ))
+    rc = correct.cmd_add(
+        _add_args(
+            title="Office hours",
+            body="Office opens at 10am Monday.",
+            status="clarification",
+            source=["user:2026-05-03"],
+            trust=correct.DEFAULT_TRUST,
+            term=[],
+        )
+    )
     assert rc == 0
 
     fm = _read_fact(facts_dir, "office-hours")
@@ -161,11 +167,13 @@ def test_read_hard_facts_renders_sources(monkeypatch: pytest.MonkeyPatch, tmp_pa
     from facts import correct
     from core import utils
 
-    correct.cmd_add(_add_args(
-        source=["https://x.test/a", "user:2026-05-03"],
-        trust="confirmed",
-        term=[],
-    ))
+    correct.cmd_add(
+        _add_args(
+            source=["https://x.test/a", "user:2026-05-03"],
+            trust="confirmed",
+            term=[],
+        )
+    )
     out = utils.read_hard_facts()
     assert "Sources: https://x.test/a, user:2026-05-03" in out
     assert "[trust: confirmed]" in out
@@ -228,4 +236,5 @@ def test_warn_broad_terms_fires_above_threshold(tmp_path, monkeypatch, caplog) -
 
 def test_supersession_is_valid_status() -> None:
     from facts import correct
+
     assert "supersession" in correct.VALID_STATUS

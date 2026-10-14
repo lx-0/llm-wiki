@@ -73,10 +73,7 @@ def _resolve_article(arg: str) -> Path:
         return candidate.resolve()
     # try basename match under knowledge/, excluding MOCs themselves
     basename = p.name if p.suffix == ".md" else f"{p.name}.md"
-    matches = [
-        m for m in KNOWLEDGE_DIR.rglob(basename)
-        if "MOCs" not in m.parts and m.is_file()
-    ]
+    matches = [m for m in KNOWLEDGE_DIR.rglob(basename) if "MOCs" not in m.parts and m.is_file()]
     if not matches:
         sys.exit(f"article not found: {arg}")
     if len(matches) > 1:
@@ -145,7 +142,11 @@ def _insert_pin(moc_path: Path, section: str, line: str) -> tuple[bool, str]:
         end = len(lines)
         for j in range(idx + 1, len(lines)):
             stripped = lines[j].strip()
-            if lines[j].startswith("## ") or stripped.startswith("```dataview") or stripped.startswith("```dataviewjs"):
+            if (
+                lines[j].startswith("## ")
+                or stripped.startswith("```dataview")
+                or stripped.startswith("```dataviewjs")
+            ):
                 end = j
                 break
         # Append after the last existing `- ` item in this section,
@@ -184,7 +185,9 @@ def _insert_pin(moc_path: Path, section: str, line: str) -> tuple[bool, str]:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Pin an article to a MOC")
     parser.add_argument("article", help="basename, vault-relative path, or absolute path")
-    parser.add_argument("--moc", help="override target MOC name (default: from `type:` frontmatter)")
+    parser.add_argument(
+        "--moc", help="override target MOC name (default: from `type:` frontmatter)"
+    )
     parser.add_argument("--section", help="MOC section (interactive prompt if omitted)")
     parser.add_argument("--summary", help="annotation text (default: from knowledge/index.md row)")
     args = parser.parse_args()
@@ -209,8 +212,7 @@ def main() -> None:
         atype = fm.get("type")
         if not atype:
             sys.exit(
-                f"no `type:` frontmatter in {article.relative_to(ROOT_DIR)} — "
-                "pass --moc explicitly"
+                f"no `type:` frontmatter in {article.relative_to(ROOT_DIR)} — pass --moc explicitly"
             )
         moc_name = TYPE_TO_MOC.get(atype)
         if not moc_name:

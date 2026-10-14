@@ -48,7 +48,9 @@ def test_youtube_run_maps_drain_result(monkeypatch, tmp_path):
     from collectors import scan_youtube
 
     inbox = tmp_path / "youtube.md"
-    inbox.write_text("https://youtu.be/aaaaaaaaaaa\nhttps://youtu.be/bbbbbbbbbbb\n", encoding="utf-8")
+    inbox.write_text(
+        "https://youtu.be/aaaaaaaaaaa\nhttps://youtu.be/bbbbbbbbbbb\n", encoding="utf-8"
+    )
     monkeypatch.setattr(scan_youtube, "INBOX_FILE", inbox)
 
     written_a = tmp_path / "video-a.md"
@@ -57,7 +59,9 @@ def test_youtube_run_maps_drain_result(monkeypatch, tmp_path):
     def fake_ingest_items(items, **kw):
         # one written, one skipped
         return {
-            "written": 1, "skipped": 1, "failed": 0,
+            "written": 1,
+            "skipped": 1,
+            "failed": 0,
             "results": [
                 {"video_id": "aaaaaaaaaaa", "status": "written", "path": str(written_a)},
                 {"video_id": "bbbbbbbbbbb", "status": "skipped"},
@@ -100,8 +104,7 @@ def test_drain_inbox_processes_items(monkeypatch, tmp_path):
 
     inbox = tmp_path / "youtube.md"
     inbox.write_text(
-        "https://youtu.be/aaaaaaaaaaa\n"
-        "https://www.youtube.com/watch?v=bbbbbbbbbbb\n",
+        "https://youtu.be/aaaaaaaaaaa\nhttps://www.youtube.com/watch?v=bbbbbbbbbbb\n",
         encoding="utf-8",
     )
 
@@ -110,9 +113,15 @@ def test_drain_inbox_processes_items(monkeypatch, tmp_path):
     def fake_ingest_items(items, **kw):
         seen["count"] = len(items)
         seen["input_source"] = kw.get("input_source")
-        return {"written": 2, "skipped": 0, "failed": 0,
-                "results": [{"status": "written", "path": "/tmp/a.md"},
-                            {"status": "written", "path": "/tmp/b.md"}]}
+        return {
+            "written": 2,
+            "skipped": 0,
+            "failed": 0,
+            "results": [
+                {"status": "written", "path": "/tmp/a.md"},
+                {"status": "written", "path": "/tmp/b.md"},
+            ],
+        }
 
     monkeypatch.setattr(scan_youtube, "_ingest_items", fake_ingest_items)
 
@@ -149,7 +158,10 @@ def test_extract_video_id():
     from collectors import scan_youtube
 
     assert scan_youtube.extract_video_id("https://youtu.be/dQw4w9WgXcQ") == "dQw4w9WgXcQ"
-    assert scan_youtube.extract_video_id("https://www.youtube.com/watch?v=dQw4w9WgXcQ") == "dQw4w9WgXcQ"
+    assert (
+        scan_youtube.extract_video_id("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
+        == "dQw4w9WgXcQ"
+    )
     assert scan_youtube.extract_video_id("https://example.com/x") is None
 
 

@@ -6,6 +6,7 @@ while the same prompt FORBIDS reading index.md in full — the agent can never
 upsert, so it appends or forgets. The fix moves the bookkeeping to a
 deterministic post-compile pass; the prompt step is removed.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -63,15 +64,20 @@ def test_dedupes_keeps_last_drops_dangling_backfills_missing(tmp_path: Path) -> 
     # pipe escaped, joined lines, today's date, frontmatter-less source dash
     assert "| [[concepts/bar]] | Bar \\| with pipe. Second line. | — | 2026-08-26 |" in text
     assert stats == {
-        "rows_before": 4, "kept": 2, "deduped": 1,
-        "dropped_dangling": 1, "appended": 1, "changed": True,
+        "rows_before": 4,
+        "kept": 2,
+        "deduped": 1,
+        "dropped_dangling": 1,
+        "appended": 1,
+        "changed": True,
     }
 
 
 def test_backfill_uses_frontmatter_source(tmp_path: Path) -> None:
     vault, k = _vault(tmp_path)
-    _write_index(k, "| [[concepts/bar]] | b | — | 2026-08-01 |\n"
-                    "| [[people/alex]] | a | — | 2026-08-01 |\n")
+    _write_index(
+        k, "| [[concepts/bar]] | b | — | 2026-08-01 |\n| [[people/alex]] | a | — | 2026-08-01 |\n"
+    )
     sync_index(k, vault, today="2026-08-26")
     text = (k / "index.md").read_text(encoding="utf-8")
     assert "| [[concepts/foo]] | Foo erklärt alles. | raw/a.md | 2026-08-26 |" in text

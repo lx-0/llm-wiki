@@ -15,6 +15,7 @@ class IdeaHandler:
 
     def handle(self, intent: Intent) -> HandlerResult:
         return write_inbox_record(
-            intent, "idea",
+            intent,
+            "idea",
             "An idea to incubate — promote it to a project/concept when ready.",
         )

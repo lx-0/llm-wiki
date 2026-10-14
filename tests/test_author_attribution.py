@@ -86,16 +86,16 @@ def test_key_additions_idempotent_when_already_present(tmp_path: Path) -> None:
     if new_text is not None:
         data = yaml.safe_load(new_text)
         assert data["personal"]["implicit_operator_author"] == "alex"
-    assert not any(
-        "implicit_operator_author" in c and "added" in c for c in changes
-    ), f"migration tried to re-inject an already-set key: {changes}"
+    assert not any("implicit_operator_author" in c and "added" in c for c in changes), (
+        f"migration tried to re-inject an already-set key: {changes}"
+    )
 
 
 def test_config_example_yaml_documents_the_key() -> None:
     """`config.example.yaml` carries the key under `personal:` for fresh installs."""
-    example = (
-        Path(__file__).resolve().parent.parent / "config.example.yaml"
-    ).read_text(encoding="utf-8")
+    example = (Path(__file__).resolve().parent.parent / "config.example.yaml").read_text(
+        encoding="utf-8"
+    )
     data = yaml.safe_load(example)
     assert "personal" in data, "config.example.yaml missing personal: block"
     assert "implicit_operator_author" in data["personal"], (

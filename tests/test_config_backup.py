@@ -28,9 +28,7 @@ def test_backup_created_on_set(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) 
     assert "compile_after_hour: 17" in snapshot  # prior value preserved
 
 
-def test_backup_round_robin_keeps_last_n(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_backup_round_robin_keeps_last_n(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """After more than _CONFIG_BACKUP_KEEP_LAST writes, oldest are pruned."""
     import time
 
@@ -51,9 +49,7 @@ def test_backup_round_robin_keeps_last_n(
     assert len(backups) == 3, f"expected 3 backups, got {len(backups)}"
 
 
-def test_backup_first_write_no_op(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_backup_first_write_no_op(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """No file to back up = no-op (no error, no empty file)."""
     cfg_file = tmp_path / "config.yaml"  # doesn't exist yet
 

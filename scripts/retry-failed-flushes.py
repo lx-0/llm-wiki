@@ -24,6 +24,7 @@ from pathlib import Path
 
 # Must be set BEFORE importing claude_agent_sdk
 import os
+
 os.environ["CLAUDE_INVOKED_BY"] = "flush_retry"
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))

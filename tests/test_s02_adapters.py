@@ -156,7 +156,9 @@ def test_thunderbird_msgfilter_apply_writes_and_lists(tmp_path: Path) -> None:
 # ── ConfigError on legacy schema ─────────────────────────────────────
 
 
-def test_config_error_on_legacy_account_schema(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_config_error_on_legacy_account_schema(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     legacy_yaml = tmp_path / "legacy.yaml"
     legacy_yaml.write_text(
         "personal:\n"
@@ -329,6 +331,7 @@ def test_scan_deep_finds_messages_via_alias(tmp_path: Path) -> None:
     """End-to-end: scan_deep with canonical name actually retrieves
     messages from the aliased on-disk location."""
     import mailbox
+
     (tmp_path / "INBOX-1.sbd").mkdir()
     mbox_path = tmp_path / "INBOX-1.sbd" / "Vertraege"
     box = mailbox.mbox(str(mbox_path))

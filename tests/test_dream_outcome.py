@@ -27,8 +27,14 @@ from dream import (
 def _outcome(kind: str | None) -> DreamOutcome:
     ent = EntityRef(slug="x", kind="people", page=Path("x.md"), type_value="person")
     return DreamOutcome(
-        entity=ent, corpus_count=0, corpus_chars=0, actual_cost_usd=0.0,
-        input_tokens=0, output_tokens=0, sdk_result_text="", kind=kind,
+        entity=ent,
+        corpus_count=0,
+        corpus_chars=0,
+        actual_cost_usd=0.0,
+        input_tokens=0,
+        output_tokens=0,
+        sdk_result_text="",
+        kind=kind,
     )
 
 
@@ -79,9 +85,7 @@ def test_dream_exit_code_batch_takes_highest() -> None:
     # batch returns 0.
     assert dream_exit_code([_outcome(None), _outcome("dry_run")]) == 0
     assert dream_exit_code([_outcome(None), _outcome("per_call_timeout")]) == 6
-    assert dream_exit_code(
-        [_outcome("prompt_too_large"), _outcome("per_call_timeout")]
-    ) == 6
+    assert dream_exit_code([_outcome("prompt_too_large"), _outcome("per_call_timeout")]) == 6
     assert dream_exit_code([]) == 0
 
 
@@ -132,7 +136,10 @@ def test_pre_sdk_skip_proceeds_with_entity_substrate() -> None:
 
 def test_classify_post_sdk_changed_page_is_success() -> None:
     v = classify_post_sdk_write(
-        pre_mtime=1.0, pre_size=100, post_mtime=2.0, post_size=120,
+        pre_mtime=1.0,
+        pre_size=100,
+        post_mtime=2.0,
+        post_size=120,
         result_text="whatever",
     )
     assert v.page_changed is True
@@ -142,7 +149,10 @@ def test_classify_post_sdk_changed_page_is_success() -> None:
 
 def test_classify_post_sdk_insufficient_corpus_is_info_noop() -> None:
     v = classify_post_sdk_write(
-        pre_mtime=5.0, pre_size=100, post_mtime=5.0, post_size=100,
+        pre_mtime=5.0,
+        pre_size=100,
+        post_mtime=5.0,
+        post_size=100,
         result_text="INSUFFICIENT_CORPUS: 0 claims from 8 sources",
     )
     assert v.page_changed is False
@@ -152,7 +162,10 @@ def test_classify_post_sdk_insufficient_corpus_is_info_noop() -> None:
 
 def test_classify_post_sdk_silent_noop_is_warning() -> None:
     v = classify_post_sdk_write(
-        pre_mtime=5.0, pre_size=100, post_mtime=5.0, post_size=100,
+        pre_mtime=5.0,
+        pre_size=100,
+        post_mtime=5.0,
+        post_size=100,
         result_text="I would update the State section but ...",
     )
     assert v.page_changed is False

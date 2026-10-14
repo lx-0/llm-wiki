@@ -113,6 +113,7 @@ def build_piggyback_tasks() -> list[dict]:
     try:
         from collectors import piggyback_collectors  # noqa: WPS433  late import to avoid cycles
     except ImportError:
+
         def piggyback_collectors():  # type: ignore[misc]
             return []
 
@@ -130,11 +131,13 @@ def build_piggyback_tasks() -> list[dict]:
         cmd = ["collectors/cli.py", name]
         if collector.SPEC.supports_incremental:
             cmd.append("--incremental")
-        tasks.append({
-            "name": name,
-            "cmd": cmd,
-            "cooldown_hours": cooldown,
-        })
+        tasks.append(
+            {
+                "name": name,
+                "cmd": cmd,
+                "cooldown_hours": cooldown,
+            }
+        )
 
     # 2. Built-in non-Collector tasks.
     for name, cmd_template in _BUILTIN_PIGGYBACK_TASKS.items():
@@ -154,11 +157,13 @@ def build_piggyback_tasks() -> list[dict]:
                 cmd.append(str(task_cfg.max_per_run))
             else:
                 cmd.append(arg)
-        tasks.append({
-            "name": name.replace("_", "-"),
-            "cmd": cmd,
-            "cooldown_hours": task_cfg.cooldown_hours,
-        })
+        tasks.append(
+            {
+                "name": name.replace("_", "-"),
+                "cmd": cmd,
+                "cooldown_hours": task_cfg.cooldown_hours,
+            }
+        )
 
     return tasks
 
@@ -166,6 +171,7 @@ def build_piggyback_tasks() -> list[dict]:
 def load_piggyback_state() -> dict:
     """Read the persisted `{name: {last_run, status}}` cooldown ledger."""
     import json
+
     if PIGGYBACK_STATE_FILE.exists():
         try:
             return json.loads(PIGGYBACK_STATE_FILE.read_text(encoding="utf-8"))
@@ -230,8 +236,11 @@ def run_due_piggybacks(
     state = load_piggyback_state()
     tasks = build_piggyback_tasks()
     pending = due_tasks(
-        state=state, now=now, tasks=tasks,
-        after_hour=after_hour, ignore_hour_gate=ignore_hour_gate,
+        state=state,
+        now=now,
+        tasks=tasks,
+        after_hour=after_hour,
+        ignore_hour_gate=ignore_hour_gate,
     )
 
     # Wrap each command in piggyback_runner so the child runs under a hard

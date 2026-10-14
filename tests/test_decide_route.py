@@ -4,6 +4,7 @@ Table-tests the route selection + the substrate→model/max_turns precedence lad
 with no SDK / state / filesystem mocking. Paths are relative (not under ROOT_DIR)
 so infer_compile_role's location lookup falls back to path.parts.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -18,6 +19,7 @@ def _route(content: str, path: str = "raw/notes/x.md", force: bool = False):
 
 
 # ── terminal skip/index/stub routes ──────────────────────────────────
+
 
 def test_empty_body_skips():
     from compile_stages.route import Skip
@@ -39,8 +41,7 @@ def test_source_and_final_is_index_only():
     from compile_stages.route import IndexOnly
 
     content = (
-        "---\ncompile_role: source-and-final\ntitle: My Strategy\n---\n"
-        "see [[foo]] and [[bar]]"
+        "---\ncompile_role: source-and-final\ntitle: My Strategy\n---\nsee [[foo]] and [[bar]]"
     )
     r = _route(content)
     assert isinstance(r, IndexOnly)
@@ -78,17 +79,14 @@ def test_folder_index_default_skips_but_folder_answers_compile():
     assert r.reason == "substrate_type_excluded_folder-index"
 
     answer = "---\ntype: note\nkind: folder-deep-scan\n---\nDistilled answer body."
-    assert isinstance(
-        _route(answer, path="raw/notes/folder/answer-tax-2025.md"), Compile
-    )
+    assert isinstance(_route(answer, path="raw/notes/folder/answer-tax-2025.md"), Compile)
 
 
 def test_health_rollup_stub_is_healthstub_but_prose_compiles():
     from compile_stages.route import Compile, HealthStub
 
     stub = (
-        "---\ntype: health-rollup\n---\n# Health — 2026-05-20\n"
-        "(Add observations below as needed.)"
+        "---\ntype: health-rollup\n---\n# Health — 2026-05-20\n(Add observations below as needed.)"
     )
     assert isinstance(_route(stub), HealthStub)
     prose = "---\ntype: health-rollup\n---\n# Health — 2026-05-20\nFelt great after a long run."
@@ -96,6 +94,7 @@ def test_health_rollup_stub_is_healthstub_but_prose_compiles():
 
 
 # ── Compile route + dispatch precedence ──────────────────────────────
+
 
 def test_plain_note_uses_default_dispatch():
     from core.config import CONFIG

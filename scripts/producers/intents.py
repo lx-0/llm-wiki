@@ -90,7 +90,8 @@ class IntentsProducer:
 
         if rel_path in _load_seen():
             return ProducerResult(
-                producer=self.SPEC.name, status="skipped",
+                producer=self.SPEC.name,
+                status="skipped",
                 reason=f"already classified: {rel_path}",
             )
 
@@ -98,21 +99,28 @@ class IntentsProducer:
             source_content = source.read_text(encoding="utf-8")
         except OSError as exc:
             return ProducerResult(
-                producer=self.SPEC.name, status="failed",
+                producer=self.SPEC.name,
+                status="failed",
                 reason=f"read failed: {exc}",
             )
         if not source_content.strip():
             _mark_seen(rel_path)
             return ProducerResult(
-                producer=self.SPEC.name, status="skipped", reason="empty source",
+                producer=self.SPEC.name,
+                status="skipped",
+                reason="empty source",
             )
 
         prompt = render(
-            "intent_classify", source_path=rel_path, source_content=source_content,
+            "intent_classify",
+            source_path=rel_path,
+            source_content=source_content,
         )
         # Intent classification is task/idea/note triage, not synthesis — a cheap
         # model suffices. Falls back to compile_model if the knob is empty.
-        model = prompt_model("intent_classify", CONFIG.models.intent_classify_model, CONFIG.models.compile_model)
+        model = prompt_model(
+            "intent_classify", CONFIG.models.intent_classify_model, CONFIG.models.compile_model
+        )
         log.info("  Intent pass for %s (model=%s)", rel_path, model)
 
         started = time.time()
@@ -141,18 +149,26 @@ class IntentsProducer:
                             result_text = block.text
         except Exception as exc:  # noqa: BLE001
             log_sdk_failure(
-                log, label="intent_classify", source=rel_path,
-                model=model, input_chars=len(source_content),
-                started=started, capture=capture, exc=exc,
+                log,
+                label="intent_classify",
+                source=rel_path,
+                model=model,
+                input_chars=len(source_content),
+                started=started,
+                capture=capture,
+                exc=exc,
             )
             return ProducerResult(
-                producer=self.SPEC.name, status="failed",
+                producer=self.SPEC.name,
+                status="failed",
                 reason=f"{type(exc).__name__}: {exc}",
             )
 
         if not result_text.strip():
             return ProducerResult(
-                producer=self.SPEC.name, status="failed", reason="empty model response",
+                producer=self.SPEC.name,
+                status="failed",
+                reason="empty model response",
             )
 
         cleaned = _strip_json_fences(result_text)
@@ -162,19 +178,22 @@ class IntentsProducer:
             idx = cleaned.find("{")
             if idx < 0:
                 return ProducerResult(
-                    producer=self.SPEC.name, status="failed",
+                    producer=self.SPEC.name,
+                    status="failed",
                     reason=f"non-JSON response: {cleaned[:120]!r}",
                 )
             try:
                 parsed = json.loads(cleaned[idx:])
             except json.JSONDecodeError:
                 return ProducerResult(
-                    producer=self.SPEC.name, status="failed",
+                    producer=self.SPEC.name,
+                    status="failed",
                     reason=f"invalid JSON: {cleaned[:120]!r}",
                 )
         if not isinstance(parsed, dict):
             return ProducerResult(
-                producer=self.SPEC.name, status="failed",
+                producer=self.SPEC.name,
+                status="failed",
                 reason=f"unexpected response type {type(parsed).__name__}",
             )
 
@@ -188,7 +207,9 @@ class IntentsProducer:
 
         if kind == "none":
             return ProducerResult(
-                producer=self.SPEC.name, status="ok", reason="kind=none (noise)",
+                producer=self.SPEC.name,
+                status="ok",
+                reason="kind=none (noise)",
             )
 
         # Confidence floor applies to `task` ONLY — never auto-create a task on a
@@ -198,7 +219,8 @@ class IntentsProducer:
             floor = _CONFIDENCE_RANK.get(CONFIG.limits.intent_min_confidence, 2)
             if _CONFIDENCE_RANK.get(confidence, 0) < floor:
                 return ProducerResult(
-                    producer=self.SPEC.name, status="ok",
+                    producer=self.SPEC.name,
+                    status="ok",
                     reason=f"task below confidence floor (conf={confidence})",
                 )
 
@@ -208,12 +230,14 @@ class IntentsProducer:
         except Exception as exc:  # noqa: BLE001
             log.exception("IntentsProducer dispatch failed for %s", rel_path)
             return ProducerResult(
-                producer=self.SPEC.name, status="failed",
+                producer=self.SPEC.name,
+                status="failed",
                 reason=f"dispatch {type(exc).__name__}: {exc}",
             )
 
         return ProducerResult(
-            producer=self.SPEC.name, status="ok",
+            producer=self.SPEC.name,
+            status="ok",
             reason=f"kind={kind} → {res.status}",
             outputs=(res.output,) if res.output else (),
         )

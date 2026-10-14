@@ -259,10 +259,7 @@ class GmailFilter:
             if dry_run:
                 return ApplyResult(
                     success=True,
-                    message=(
-                        f"gmail-api: would POST filter "
-                        f"({from_criteria} → {label_name})"
-                    ),
+                    message=(f"gmail-api: would POST filter ({from_criteria} → {label_name})"),
                     dry_run=True,
                 )
 

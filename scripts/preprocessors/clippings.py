@@ -96,6 +96,7 @@ def sweep() -> int:
 
 # ── Preprocessor adapter ──────────────────────────────────────────────
 
+
 @register
 class ClippingsPreprocessor:
     """Lift `Clippings/*.md` into `raw/articles/`. Folder-sweep singleton."""
@@ -111,7 +112,9 @@ class ClippingsPreprocessor:
                 message=f"would sweep {len(candidates)} clipping(s) → {self.SPEC.output_subfolder}/",
             )
         moved = sweep()
-        return PreprocessResult(message=f"swept {moved} clipping(s) into {self.SPEC.output_subfolder}/")
+        return PreprocessResult(
+            message=f"swept {moved} clipping(s) into {self.SPEC.output_subfolder}/"
+        )
 
 
 def main() -> None:

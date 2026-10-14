@@ -112,7 +112,7 @@ def _extract_frontmatter(text: str) -> dict | None:
     matches = list(pattern.finditer(text))
     if len(matches) < 2:
         return None
-    block = text[matches[0].end():matches[1].start()]
+    block = text[matches[0].end() : matches[1].start()]
     try:
         parsed = yaml.safe_load(block)
     except yaml.YAMLError:

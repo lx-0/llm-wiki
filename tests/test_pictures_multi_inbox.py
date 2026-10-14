@@ -33,6 +33,7 @@ def pictures_mod(tmp_path, monkeypatch):
     monkeypatch.setattr(paths_mod, "RAW_DIR", vault_raw)
 
     from collectors import pictures as mod
+
     importlib.reload(mod)
     return mod
 
@@ -42,12 +43,14 @@ def pictures_mod(tmp_path, monkeypatch):
 
 def test_inbox_paths_empty_string(monkeypatch, pictures_mod):
     from core.config import CONFIG
+
     monkeypatch.setattr(CONFIG.personal, "picture_inbox", "")
     assert pictures_mod._inbox_paths() == []
 
 
 def test_inbox_paths_single_string(monkeypatch, pictures_mod, tmp_path):
     from core.config import CONFIG
+
     p = tmp_path / "a"
     monkeypatch.setattr(CONFIG.personal, "picture_inbox", str(p))
     paths = pictures_mod._inbox_paths()
@@ -57,6 +60,7 @@ def test_inbox_paths_single_string(monkeypatch, pictures_mod, tmp_path):
 
 def test_inbox_paths_list_form(monkeypatch, pictures_mod, tmp_path):
     from core.config import CONFIG
+
     p1, p2 = tmp_path / "a", tmp_path / "b"
     monkeypatch.setattr(CONFIG.personal, "picture_inbox", [str(p1), str(p2)])
     paths = pictures_mod._inbox_paths()
@@ -66,6 +70,7 @@ def test_inbox_paths_list_form(monkeypatch, pictures_mod, tmp_path):
 def test_inbox_paths_list_skips_blanks(monkeypatch, pictures_mod, tmp_path):
     """Operator can leave dead entries in the list without breaking the scan."""
     from core.config import CONFIG
+
     p = tmp_path / "real"
     monkeypatch.setattr(CONFIG.personal, "picture_inbox", ["", str(p), "   ", None])
     paths = pictures_mod._inbox_paths()
@@ -74,12 +79,14 @@ def test_inbox_paths_list_skips_blanks(monkeypatch, pictures_mod, tmp_path):
 
 def test_inbox_paths_empty_list(monkeypatch, pictures_mod):
     from core.config import CONFIG
+
     monkeypatch.setattr(CONFIG.personal, "picture_inbox", [])
     assert pictures_mod._inbox_paths() == []
 
 
 def test_inbox_paths_expands_tilde(monkeypatch, pictures_mod):
     from core.config import CONFIG
+
     monkeypatch.setattr(CONFIG.personal, "picture_inbox", ["~/foo", "~/bar"])
     paths = pictures_mod._inbox_paths()
     assert all("~" not in str(p) for p in paths)
@@ -91,6 +98,7 @@ def test_inbox_paths_expands_tilde(monkeypatch, pictures_mod):
 
 def test_is_configured_false_when_all_paths_empty(monkeypatch, pictures_mod):
     from core.config import CONFIG
+
     monkeypatch.setattr(CONFIG.personal, "picture_inbox", "")
     coll = pictures_mod.PicturesCollector()
     assert coll.is_configured() is False
@@ -98,6 +106,7 @@ def test_is_configured_false_when_all_paths_empty(monkeypatch, pictures_mod):
 
 def test_is_configured_false_when_no_path_exists(monkeypatch, pictures_mod, tmp_path):
     from core.config import CONFIG
+
     monkeypatch.setattr(
         CONFIG.personal,
         "picture_inbox",
@@ -109,6 +118,7 @@ def test_is_configured_false_when_no_path_exists(monkeypatch, pictures_mod, tmp_
 
 def test_is_configured_true_when_any_path_exists(monkeypatch, pictures_mod, tmp_path):
     from core.config import CONFIG
+
     real = tmp_path / "real"
     real.mkdir()
     monkeypatch.setattr(
@@ -125,6 +135,7 @@ def test_is_configured_true_when_any_path_exists(monkeypatch, pictures_mod, tmp_
 
 def test_run_no_inbox_configured(monkeypatch, pictures_mod):
     from core.config import CONFIG
+
     monkeypatch.setattr(CONFIG.personal, "picture_inbox", "")
     result = pictures_mod.PicturesCollector().run()
     assert "not configured" in result.message
@@ -132,6 +143,7 @@ def test_run_no_inbox_configured(monkeypatch, pictures_mod):
 
 def test_run_skips_missing_path_warns_keeps_going(monkeypatch, pictures_mod, tmp_path, caplog):
     from core.config import CONFIG
+
     real = tmp_path / "real"
     real.mkdir()
     missing = tmp_path / "missing"
@@ -158,6 +170,7 @@ def test_run_all_vision_failed_message_is_multi_inbox_aware(monkeypatch, picture
     path must too.
     """
     from core.config import CONFIG
+
     a, b = tmp_path / "a", tmp_path / "b"
     a.mkdir()
     b.mkdir()
@@ -180,6 +193,7 @@ def test_run_all_vision_failed_message_is_multi_inbox_aware(monkeypatch, picture
 
 def test_run_aggregates_sources_across_paths(monkeypatch, pictures_mod, tmp_path):
     from core.config import CONFIG
+
     a, b = tmp_path / "a", tmp_path / "b"
     a.mkdir()
     b.mkdir()
@@ -187,11 +201,20 @@ def test_run_aggregates_sources_across_paths(monkeypatch, pictures_mod, tmp_path
     (b / "2.jpg").write_bytes(b"\xff\xd8\xff")
 
     monkeypatch.setattr(CONFIG.personal, "picture_inbox", [str(a), str(b)])
-    monkeypatch.setattr(pictures_mod, "describe_picture", lambda src: {
-        "scene_description": "x", "objects": [], "action": "",
-        "text_visible": "", "relevance": "ephemeral", "tags": [],
-        "people_present": False, "raw_response": "",
-    })
+    monkeypatch.setattr(
+        pictures_mod,
+        "describe_picture",
+        lambda src: {
+            "scene_description": "x",
+            "objects": [],
+            "action": "",
+            "text_visible": "",
+            "relevance": "ephemeral",
+            "tags": [],
+            "people_present": False,
+            "raw_response": "",
+        },
+    )
     monkeypatch.setattr(pictures_mod, "_make_thumbnail", lambda src: None)
     monkeypatch.setattr(pictures_mod.ollama_client, "is_reachable", lambda: True)
 

@@ -47,8 +47,9 @@ def test_setup_run_critical_when_default_config_and_no_state(fake_vault, monkeyp
     class _CONFIG:
         models = _Models()
 
-    monkeypatch.setitem(__import__("sys").modules, "core.config",
-                        type("M", (), {"CONFIG": _CONFIG})())
+    monkeypatch.setitem(
+        __import__("sys").modules, "core.config", type("M", (), {"CONFIG": _CONFIG})()
+    )
     result = health.check_setup_run()
     assert result.severity == "critical"
     assert result.fix == "wiki setup"
@@ -64,8 +65,9 @@ def test_setup_run_ok_when_state_exists(fake_vault, monkeypatch):
     class _CONFIG:
         models = _Models()
 
-    monkeypatch.setitem(__import__("sys").modules, "core.config",
-                        type("M", (), {"CONFIG": _CONFIG})())
+    monkeypatch.setitem(
+        __import__("sys").modules, "core.config", type("M", (), {"CONFIG": _CONFIG})()
+    )
     result = health.check_setup_run()
     assert result.severity == "ok"
 
@@ -132,9 +134,7 @@ def test_hooks_detects_multiple_agents_across_scopes(fake_vault, monkeypatch):
     )
     # cursor in project scope (direct-path style)
     (fake_vault / ".cursor").mkdir()
-    (fake_vault / ".cursor" / "hooks.json").write_text(
-        '{"x": ".wiki/hooks/session-end.py"}'
-    )
+    (fake_vault / ".cursor" / "hooks.json").write_text('{"x": ".wiki/hooks/session-end.py"}')
     result = health.check_hooks_installed()
     assert result.severity == "ok"
     assert result.details["user"] == ["claude"]
@@ -185,8 +185,9 @@ def test_ollama_info_when_not_configured(fake_vault, monkeypatch):
     class _CONFIG:
         models = _Models()
 
-    monkeypatch.setitem(__import__("sys").modules, "core.config",
-                        type("M", (), {"CONFIG": _CONFIG})())
+    monkeypatch.setitem(
+        __import__("sys").modules, "core.config", type("M", (), {"CONFIG": _CONFIG})()
+    )
     result = health.check_ollama_reachable()
     assert result.severity == "info"
 
@@ -198,8 +199,9 @@ def test_ollama_warning_when_unreachable(fake_vault, monkeypatch):
     class _CONFIG:
         models = _Models()
 
-    monkeypatch.setitem(__import__("sys").modules, "core.config",
-                        type("M", (), {"CONFIG": _CONFIG})())
+    monkeypatch.setitem(
+        __import__("sys").modules, "core.config", type("M", (), {"CONFIG": _CONFIG})()
+    )
 
     def _refuse(*_a, **_kw):
         raise OSError("test: unreachable")
@@ -218,6 +220,7 @@ def test_ollama_connect_budget_is_not_a_hair_trigger(fake_vault, monkeypatch):
     one check that is supposed to tell the operator their GPU box is down. The
     budget derives from config, floors well above LAN jitter, and stays capped
     so a genuinely dead host can't stall the health screen."""
+
     class _Models:
         ollama_url = "http://192.168.2.42:11434"
 
@@ -228,14 +231,18 @@ def test_ollama_connect_budget_is_not_a_hair_trigger(fake_vault, monkeypatch):
         models = _Models()
         limits = _Limits()
 
-    monkeypatch.setitem(__import__("sys").modules, "core.config",
-                        type("M", (), {"CONFIG": _CONFIG})())
+    monkeypatch.setitem(
+        __import__("sys").modules, "core.config", type("M", (), {"CONFIG": _CONFIG})()
+    )
 
     seen = {}
 
     class _Sock:
-        def __enter__(self): return self
-        def __exit__(self, *a): return False
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
 
     def _capture(address, timeout=None, **kw):
         seen["timeout"] = timeout
@@ -254,6 +261,7 @@ def test_ollama_connect_budget_is_not_a_hair_trigger(fake_vault, monkeypatch):
 
 def test_ollama_connect_budget_respects_a_lower_config(fake_vault, monkeypatch):
     """An operator who tightens the knob is honoured, not overridden."""
+
     class _Models:
         ollama_url = "http://192.168.2.42:11434"
 
@@ -264,17 +272,24 @@ def test_ollama_connect_budget_respects_a_lower_config(fake_vault, monkeypatch):
         models = _Models()
         limits = _Limits()
 
-    monkeypatch.setitem(__import__("sys").modules, "core.config",
-                        type("M", (), {"CONFIG": _CONFIG})())
+    monkeypatch.setitem(
+        __import__("sys").modules, "core.config", type("M", (), {"CONFIG": _CONFIG})()
+    )
 
     seen = {}
 
     class _Sock:
-        def __enter__(self): return self
-        def __exit__(self, *a): return False
+        def __enter__(self):
+            return self
 
-    monkeypatch.setattr(socket, "create_connection",
-                        lambda address, timeout=None, **kw: (seen.update(timeout=timeout), _Sock())[1])
+        def __exit__(self, *a):
+            return False
+
+    monkeypatch.setattr(
+        socket,
+        "create_connection",
+        lambda address, timeout=None, **kw: (seen.update(timeout=timeout), _Sock())[1],
+    )
     health.check_ollama_reachable()
     assert seen["timeout"] == 2
 
@@ -324,8 +339,9 @@ def _ts(delta_s: float, hook_style: bool = False) -> str:
     return dt.strftime("%Y-%m-%dT%H:%M:%S")
 
 
-def _write_flush_logs(vault: Path, flush_lines: list[str], error_lines: list[str],
-                      archived: int = 0) -> None:
+def _write_flush_logs(
+    vault: Path, flush_lines: list[str], error_lines: list[str], archived: int = 0
+) -> None:
     logs = vault / ".wiki" / "logs"
     (logs / "flush.log").write_text("\n".join(flush_lines) + "\n")
     (logs / "flush-errors.log").write_text("\n".join(error_lines) + "\n")
@@ -373,7 +389,9 @@ def test_flush_pipeline_not_stalled_below_spawn_threshold(fake_vault):
             f"{_ts(86400)}  INFO  Appended to /v/daily/x/sessions.md",
             f"{_ts(120, True)} [hook] Spawned flush.py for session a",
         ],
-        error_lines=[f"{_ts(60)}  ERROR    flush_extract attempt 1/3 ✗ failed after 9s — kind=network · x"],
+        error_lines=[
+            f"{_ts(60)}  ERROR    flush_extract attempt 1/3 ✗ failed after 9s — kind=network · x"
+        ],
         archived=1,
     )
     result = health.check_flush_pipeline()
@@ -392,7 +410,9 @@ def test_flush_pipeline_ok_when_success_is_newest(fake_vault):
             f"{_ts(7000, True)} [hook] Spawned flush.py for session c",
             f"{_ts(300)}  INFO  Appended to /v/daily/x/sessions.md",
         ],
-        error_lines=[f"{_ts(7050)}  ERROR    flush_extract attempt 3/3 ✗ failed after 2.0s — kind=cli_crash · y"],
+        error_lines=[
+            f"{_ts(7050)}  ERROR    flush_extract attempt 3/3 ✗ failed after 2.0s — kind=cli_crash · y"
+        ],
         archived=0,
     )
     result = health.check_flush_pipeline()
@@ -413,7 +433,9 @@ def test_flush_pipeline_last_success_from_daily_when_log_tail_is_too_short(fake_
             f"{_ts(7100, True)} [hook] Spawned flush.py for session b",
             f"{_ts(7000, True)} [hook] Spawned flush.py for session c",
         ],
-        error_lines=[f"{_ts(7050)}  ERROR    flush_extract attempt 3/3 ✗ failed after 2.0s — kind=cli_crash · y"],
+        error_lines=[
+            f"{_ts(7050)}  ERROR    flush_extract attempt 3/3 ✗ failed after 2.0s — kind=cli_crash · y"
+        ],
         archived=3,
     )
     sessions = fake_vault / "daily" / "2026-09-17" / "sessions.md"
@@ -627,19 +649,33 @@ def test_health_summary_counts_each_severity(fake_vault):
 def test_to_json_serializable(fake_vault):
     sample = [health.CheckResult("a", "config", "ok", "x", fix="y", details={"k": 1})]
     out = health.to_json(sample)
-    assert out == [{
-        "id": "a", "category": "config", "severity": "ok",
-        "message": "x", "fix": "y", "dispatch_args": None, "details": {"k": 1},
-        "title": "x", "verb": None,
-    }]
+    assert out == [
+        {
+            "id": "a",
+            "category": "config",
+            "severity": "ok",
+            "message": "x",
+            "fix": "y",
+            "dispatch_args": None,
+            "details": {"k": 1},
+            "title": "x",
+            "verb": None,
+        }
+    ]
     json.dumps(out)  # round-trips through json
 
 
 def test_to_json_includes_dispatch_args():
-    sample = [health.CheckResult(
-        "a", "config", "warning", "x",
-        fix="wiki setup", dispatch_args=["setup"],
-    )]
+    sample = [
+        health.CheckResult(
+            "a",
+            "config",
+            "warning",
+            "x",
+            fix="wiki setup",
+            dispatch_args=["setup"],
+        )
+    ]
     out = health.to_json(sample)
     assert out[0]["dispatch_args"] == ["setup"]
 
@@ -649,13 +685,17 @@ def test_to_json_renders_plain_title_and_catalogue_verb():
     plain-English `title` keeps its operator `message` for the TUI; the verb comes from
     core.actions by dispatch_args, and is None when nothing is dispatchable."""
     with_title = health.CheckResult(
-        "gmail-auth", "config", "warning",
+        "gmail-auth",
+        "config",
+        "warning",
         "Gmail OAuth not bootstrapped for account gmail-personal",
-        fix="wiki gmail-auth gmail-personal", dispatch_args=["gmail-auth", "gmail-personal"],
+        fix="wiki gmail-auth gmail-personal",
+        dispatch_args=["gmail-auth", "gmail-personal"],
         title="Sign in to Gmail (gmail-personal)",
     )
-    manual = health.CheckResult("claude-authed", "connectivity", "critical", "claude /login",
-                                fix="claude /login")
+    manual = health.CheckResult(
+        "claude-authed", "connectivity", "critical", "claude /login", fix="claude /login"
+    )
     out = health.to_json([with_title, manual])
     assert out[0]["title"] == "Sign in to Gmail (gmail-personal)"
     assert out[0]["message"].startswith("Gmail OAuth")
@@ -667,6 +707,7 @@ def test_to_json_renders_plain_title_and_catalogue_verb():
 def test_check_setup_run_carries_dispatch_args(fake_vault, monkeypatch):
     """The promoted-to-actionable checks set both `fix` (human-readable)
     and `dispatch_args` (concrete invocation)."""
+
     class _Models:
         ollama_url = ""
         compile_model = "claude-opus-4-7"
@@ -674,8 +715,9 @@ def test_check_setup_run_carries_dispatch_args(fake_vault, monkeypatch):
     class _CONFIG:
         models = _Models()
 
-    monkeypatch.setitem(__import__("sys").modules, "core.config",
-                        type("M", (), {"CONFIG": _CONFIG})())
+    monkeypatch.setitem(
+        __import__("sys").modules, "core.config", type("M", (), {"CONFIG": _CONFIG})()
+    )
     result = health.check_setup_run()
     assert result.severity == "critical"
     assert result.dispatch_args == ["setup"]
@@ -694,6 +736,7 @@ def test_check_hooks_dispatch_args_when_missing(fake_vault, monkeypatch):
 def test_unactionable_checks_have_no_dispatch_args(fake_vault, monkeypatch):
     """Multi-step / external / shell-only fixes have fix= set but dispatch_args=None
     so the banner doesn't try to auto-run them."""
+
     # ollama-unreachable
     class _Models:
         ollama_url = "http://nonexistent-host-12345:11434"
@@ -701,8 +744,9 @@ def test_unactionable_checks_have_no_dispatch_args(fake_vault, monkeypatch):
     class _CONFIG:
         models = _Models()
 
-    monkeypatch.setitem(__import__("sys").modules, "core.config",
-                        type("M", (), {"CONFIG": _CONFIG})())
+    monkeypatch.setitem(
+        __import__("sys").modules, "core.config", type("M", (), {"CONFIG": _CONFIG})()
+    )
 
     def _refuse(*_a, **_kw):
         raise OSError("test: unreachable")
@@ -723,10 +767,15 @@ def test_probe_failed_returns_warning_with_exception_text(fake_vault):
 
 
 def test_account_auths_empty_when_no_accounts(fake_vault, monkeypatch):
-    class _Personal: accounts = {}
-    class _CONFIG: personal = _Personal()
-    monkeypatch.setitem(__import__("sys").modules, "core.config",
-                        type("M", (), {"CONFIG": _CONFIG})())
+    class _Personal:
+        accounts = {}
+
+    class _CONFIG:
+        personal = _Personal()
+
+    monkeypatch.setitem(
+        __import__("sys").modules, "core.config", type("M", (), {"CONFIG": _CONFIG})()
+    )
     out = health.check_account_auths()
     assert out == []
 
@@ -734,9 +783,13 @@ def test_account_auths_empty_when_no_accounts(fake_vault, monkeypatch):
 def test_account_auths_emits_ok_when_token_exists(fake_vault, monkeypatch):
     class _Personal:
         accounts = {"work": {"calendar": {"kind": "google-calendar"}}}
-    class _CONFIG: personal = _Personal()
-    monkeypatch.setitem(__import__("sys").modules, "core.config",
-                        type("M", (), {"CONFIG": _CONFIG})())
+
+    class _CONFIG:
+        personal = _Personal()
+
+    monkeypatch.setitem(
+        __import__("sys").modules, "core.config", type("M", (), {"CONFIG": _CONFIG})()
+    )
     state = fake_vault / ".wiki" / "state"
     monkeypatch.setattr(health, "STATE_DIR", state)
     (state / "calendar-token-work.json").write_text('{"token": "x"}')
@@ -751,9 +804,13 @@ def test_account_auths_emits_ok_when_token_exists(fake_vault, monkeypatch):
 def test_account_auths_emits_warning_with_dispatch_args_when_missing(fake_vault, monkeypatch):
     class _Personal:
         accounts = {"work": {"gmeet": {"kind": "gmeet-api"}}}
-    class _CONFIG: personal = _Personal()
-    monkeypatch.setitem(__import__("sys").modules, "core.config",
-                        type("M", (), {"CONFIG": _CONFIG})())
+
+    class _CONFIG:
+        personal = _Personal()
+
+    monkeypatch.setitem(
+        __import__("sys").modules, "core.config", type("M", (), {"CONFIG": _CONFIG})()
+    )
     state = fake_vault / ".wiki" / "state"
     monkeypatch.setattr(health, "STATE_DIR", state)
     # no token file present
@@ -776,9 +833,13 @@ def test_account_auths_handles_multi_account_multi_integration(fake_vault, monke
                 "calendar": {"kind": "google-calendar"},
             },
         }
-    class _CONFIG: personal = _Personal()
-    monkeypatch.setitem(__import__("sys").modules, "core.config",
-                        type("M", (), {"CONFIG": _CONFIG})())
+
+    class _CONFIG:
+        personal = _Personal()
+
+    monkeypatch.setitem(
+        __import__("sys").modules, "core.config", type("M", (), {"CONFIG": _CONFIG})()
+    )
     state = fake_vault / ".wiki" / "state"
     monkeypatch.setattr(health, "STATE_DIR", state)
     # work calendar has token; the other two don't
@@ -803,6 +864,7 @@ def test_account_auths_gmail_detected_via_filter_subblock(fake_vault, monkeypatc
     degrades ONLY the write-side filter — email READING is unaffected — so this
     reports `info` with accurate wording, not a `warning` claiming the collector
     skips the account."""
+
     class _Personal:
         accounts = {
             "work": {
@@ -810,9 +872,13 @@ def test_account_auths_gmail_detected_via_filter_subblock(fake_vault, monkeypatc
                 "filter": {"kind": "gmail-api"},
             },
         }
-    class _CONFIG: personal = _Personal()
-    monkeypatch.setitem(__import__("sys").modules, "core.config",
-                        type("M", (), {"CONFIG": _CONFIG})())
+
+    class _CONFIG:
+        personal = _Personal()
+
+    monkeypatch.setitem(
+        __import__("sys").modules, "core.config", type("M", (), {"CONFIG": _CONFIG})()
+    )
     state = fake_vault / ".wiki" / "state"
     monkeypatch.setattr(health, "STATE_DIR", state)
 
@@ -828,11 +894,16 @@ def test_account_auths_gmail_detected_via_filter_subblock(fake_vault, monkeypatc
 def test_account_auths_gmail_detected_via_reader_subblock(fake_vault, monkeypatch):
     """Alternative shape: reader.kind=gmail-api (mailbox itself is
     Gmail API), no separate filter. Same gmail-token needed."""
+
     class _Personal:
         accounts = {"work": {"reader": {"kind": "gmail-api"}}}
-    class _CONFIG: personal = _Personal()
-    monkeypatch.setitem(__import__("sys").modules, "core.config",
-                        type("M", (), {"CONFIG": _CONFIG})())
+
+    class _CONFIG:
+        personal = _Personal()
+
+    monkeypatch.setitem(
+        __import__("sys").modules, "core.config", type("M", (), {"CONFIG": _CONFIG})()
+    )
     state = fake_vault / ".wiki" / "state"
     monkeypatch.setattr(health, "STATE_DIR", state)
 
@@ -845,6 +916,7 @@ def test_account_auths_ignores_non_oauth_integrations(fake_vault, monkeypatch):
     """jamie-api uses an api key (env var), not OAuth — no token cache
     to probe. thunderbird-mbox + imap don't need OAuth either. The
     check must skip them silently rather than emit confusing warnings."""
+
     class _Personal:
         accounts = {
             "kasserver": {
@@ -853,9 +925,13 @@ def test_account_auths_ignores_non_oauth_integrations(fake_vault, monkeypatch):
             },
             "default": {"jamie": {"kind": "jamie-api"}},
         }
-    class _CONFIG: personal = _Personal()
-    monkeypatch.setitem(__import__("sys").modules, "core.config",
-                        type("M", (), {"CONFIG": _CONFIG})())
+
+    class _CONFIG:
+        personal = _Personal()
+
+    monkeypatch.setitem(
+        __import__("sys").modules, "core.config", type("M", (), {"CONFIG": _CONFIG})()
+    )
     state = fake_vault / ".wiki" / "state"
     monkeypatch.setattr(health, "STATE_DIR", state)
 
@@ -870,9 +946,13 @@ def test_build_health_flattens_multi_result_checks(fake_vault, monkeypatch):
 
     class _Personal:
         accounts = {"a": {"calendar": {"kind": "google-calendar"}}}
-    class _CONFIG: personal = _Personal()
-    monkeypatch.setitem(__import__("sys").modules, "core.config",
-                        type("M", (), {"CONFIG": _CONFIG})())
+
+    class _CONFIG:
+        personal = _Personal()
+
+    monkeypatch.setitem(
+        __import__("sys").modules, "core.config", type("M", (), {"CONFIG": _CONFIG})()
+    )
     state = fake_vault / ".wiki" / "state"
     monkeypatch.setattr(health, "STATE_DIR", state)
 
@@ -889,6 +969,7 @@ def test_build_health_flattens_multi_result_checks(fake_vault, monkeypatch):
 
 def test_wiki_on_path_warning_when_missing(fake_vault, monkeypatch):
     import shutil
+
     (fake_vault / ".wiki").mkdir(exist_ok=True)
     (fake_vault / ".wiki" / "wiki").write_text("#!/bin/sh")
     monkeypatch.setattr(shutil, "which", lambda _name: None)
@@ -900,6 +981,7 @@ def test_wiki_on_path_warning_when_missing(fake_vault, monkeypatch):
 
 def test_wiki_on_path_ok_when_resolves_to_this_vault(tmp_path, monkeypatch):
     import shutil
+
     wiki_dir = tmp_path / ".wiki"
     wiki_dir.mkdir()
     own = wiki_dir / "wiki"
@@ -913,6 +995,7 @@ def test_wiki_on_path_ok_when_resolves_to_this_vault(tmp_path, monkeypatch):
 
 def test_wiki_on_path_warning_when_resolves_elsewhere(tmp_path, monkeypatch):
     import shutil
+
     own = tmp_path / "vault-a" / ".wiki" / "wiki"
     own.parent.mkdir(parents=True)
     own.write_text("#!/bin/sh")

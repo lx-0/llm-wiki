@@ -7,6 +7,7 @@ only writes created/changed articles and retracts deleted ones. Manifest
 writes happen per article, only after server success (S02 executor calls
 ``record_published`` / ``record_retracted``).
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -84,9 +85,7 @@ def build_payloads(
     return payloads
 
 
-def plan_delta(
-    payloads: list[ArticlePayload], manifest_articles: dict
-) -> PublishPlan:
+def plan_delta(payloads: list[ArticlePayload], manifest_articles: dict) -> PublishPlan:
     """Diff wire payloads against the manifest's ``articles`` section."""
     plan = PublishPlan()
     seen: set[str] = set()

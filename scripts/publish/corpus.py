@@ -7,6 +7,7 @@ persist locally must be a fixpoint of that function — otherwise the manifest
 id and the server article id diverge and retraction (`delete_object` by id)
 silently misses (architect review 2026-08-25, issue 2).
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -151,9 +152,7 @@ def map_slugs(
     return dict(sorted(assigned.items()))
 
 
-def _disambiguation_ladder(
-    base: str, rel: str, path: Path, contested: bool
-) -> Iterator[str]:
+def _disambiguation_ladder(base: str, rel: str, path: Path, contested: bool) -> Iterator[str]:
     """Slug candidates, cheapest first. Uncontested → the base. Contested →
     parent-stem, then the full vault-relative path (unique by construction;
     real-corpus case: reports/studies/*/runs/<ts>/instruments/gad-7.md shares
@@ -209,8 +208,7 @@ def save_manifest(mapping: dict[str, str], store: StateStore) -> None:
     def _mut(data: dict) -> None:
         old = data.get("articles", {})
         data["articles"] = {
-            slug: {**old.get(slug, {}), "path": rel}
-            for slug, rel in sorted(mapping.items())
+            slug: {**old.get(slug, {}), "path": rel} for slug, rel in sorted(mapping.items())
         }
 
     store.update(_mut)

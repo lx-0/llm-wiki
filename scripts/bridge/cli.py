@@ -78,8 +78,7 @@ def _run_sync(dry_run: bool) -> NoReturn:
             print(f"  {marker} {r.name}: {r.status}")
 
     print(
-        f"\n{summary.ok_count} ok · {summary.skipped_count} skipped · "
-        f"{summary.failed_count} failed"
+        f"\n{summary.ok_count} ok · {summary.skipped_count} skipped · {summary.failed_count} failed"
     )
     sys.exit(summary.exit_code)
 

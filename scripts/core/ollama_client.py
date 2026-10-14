@@ -48,9 +48,9 @@ _FENCE_TRAILING = re.compile(r"\s*```\s*$", flags=re.MULTILINE)
 #
 # Built defensively: macOS exposes TCP_KEEPALIVE (idle), Linux TCP_KEEPIDLE.
 # Interval/count are present on both but guarded via getattr just in case.
-_KEEPALIVE_IDLE_S = 60       # idle seconds before the first probe
-_KEEPALIVE_INTERVAL_S = 15   # seconds between probes
-_KEEPALIVE_COUNT = 4         # peer declared dead after this many unacked probes
+_KEEPALIVE_IDLE_S = 60  # idle seconds before the first probe
+_KEEPALIVE_INTERVAL_S = 15  # seconds between probes
+_KEEPALIVE_COUNT = 4  # peer declared dead after this many unacked probes
 _WRITE_TIMEOUT_S = 30.0
 _POOL_TIMEOUT_S = 10.0
 
@@ -112,6 +112,7 @@ def _base_url() -> str:
 
 # ── Liveness ──────────────────────────────────────────────────────────
 
+
 def is_reachable(timeout: float = 5.0) -> bool:
     """Quick GET /api/tags. Used before kicking off long batches."""
     try:
@@ -148,6 +149,7 @@ def warn_unreachable_once(log, context: str = "") -> None:
 
 # ── JSON extraction ───────────────────────────────────────────────────
 
+
 def strip_fences(text: str) -> str:
     """Remove leading/trailing markdown code fences if present."""
     text = text.strip()
@@ -175,6 +177,7 @@ def parse_json_lenient(text: str) -> Any:
 
 
 # ── Chat variants ─────────────────────────────────────────────────────
+
 
 def chat(
     prompt: str,
@@ -250,11 +253,13 @@ def chat_vision(
             f"{_base_url()}/api/chat",
             json={
                 "model": model,
-                "messages": [{
-                    "role": "user",
-                    "content": prompt,
-                    "images": [image_b64],
-                }],
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": prompt,
+                        "images": [image_b64],
+                    }
+                ],
                 "stream": False,
             },
         )

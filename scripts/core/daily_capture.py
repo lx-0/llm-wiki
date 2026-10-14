@@ -81,15 +81,17 @@ actions:
 
 # Allow-list. New collectors that want to write into daily/ MUST extend
 # this set explicitly — silent additions are a footgun.
-KNOWN_SOURCES: frozenset[str] = frozenset({
-    "sessions",  # Claude Code session-end hook (was the old daily/<date>.md content)
-    "health",    # collectors/health.py (Oura daily rollup; replace-per-run)
-    "meetings",  # collectors/{gmeet,jamie}.py (append per meeting)
-    "voice",     # collectors/voice.py (append per intake)
-    "email",     # collectors/email_collector.py (replace per delta-run)
-    "pictures",  # collectors/pictures.py (append per intake)
-    "captures",  # collectors/capture_collector.py (append per intake, M025)
-})
+KNOWN_SOURCES: frozenset[str] = frozenset(
+    {
+        "sessions",  # Claude Code session-end hook (was the old daily/<date>.md content)
+        "health",  # collectors/health.py (Oura daily rollup; replace-per-run)
+        "meetings",  # collectors/{gmeet,jamie}.py (append per meeting)
+        "voice",  # collectors/voice.py (append per intake)
+        "email",  # collectors/email_collector.py (replace per delta-run)
+        "pictures",  # collectors/pictures.py (append per intake)
+        "captures",  # collectors/capture_collector.py (append per intake, M025)
+    }
+)
 
 _ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _SAFE_SOURCE_RE = re.compile(r"^[a-z][a-z0-9_-]*$")
@@ -106,9 +108,7 @@ def today_iso() -> str:
 
 def _validate_date(date_iso: str) -> None:
     if not isinstance(date_iso, str) or not _ISO_DATE_RE.match(date_iso):
-        raise ValueError(
-            f"daily_capture: expected ISO date YYYY-MM-DD, got {date_iso!r}"
-        )
+        raise ValueError(f"daily_capture: expected ISO date YYYY-MM-DD, got {date_iso!r}")
 
 
 def _validate_source(source: str) -> None:
@@ -194,9 +194,7 @@ def _read_sources_and_body(text: str) -> tuple[list[str], str]:
     return sources, body
 
 
-def append_with_source(
-    date_iso: str, source: str, line: str, source_ref: str
-) -> Path:
+def append_with_source(date_iso: str, source: str, line: str, source_ref: str) -> Path:
     """Append a body `line` AND record `source_ref` in the file's frontmatter.
 
     For substrates that want provenance to the canonical `raw/` file without
@@ -298,11 +296,7 @@ def replace_block(
             else:
                 region = markers.find_region(current, begin, end)
                 if region is not None:
-                    new_text = (
-                        current[: region.start]
-                        + block.rstrip("\n")
-                        + current[region.end :]
-                    )
+                    new_text = current[: region.start] + block.rstrip("\n") + current[region.end :]
                 else:
                     sep = "" if current.endswith("\n") else "\n"
                     new_text = current + sep + "\n" + block

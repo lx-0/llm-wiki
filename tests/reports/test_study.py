@@ -60,9 +60,7 @@ class TestInstrumentRef:
             InstrumentRef.from_dict({"slug": "x", "version": "1.0.0", "source": "magic"})
 
     def test_report_filename_uses_alias_if_set(self) -> None:
-        ref = InstrumentRef.from_dict(
-            {"slug": "phq-9", "version": "1.0.0", "alias": "phq-9-self"}
-        )
+        ref = InstrumentRef.from_dict({"slug": "phq-9", "version": "1.0.0", "alias": "phq-9-self"})
         assert ref.report_filename == "phq-9-self.md"
 
     def test_report_filename_falls_back_to_slug(self) -> None:
@@ -112,10 +110,8 @@ class TestStudyManifest:
         ok = dict(
             VALID_MANIFEST,
             instruments=[
-                {"slug": "phq-9", "version": "1.0.0", "source": "inferred",
-                 "alias": "phq-9-inf"},
-                {"slug": "phq-9", "version": "1.0.0", "source": "form",
-                 "alias": "phq-9-self"},
+                {"slug": "phq-9", "version": "1.0.0", "source": "inferred", "alias": "phq-9-inf"},
+                {"slug": "phq-9", "version": "1.0.0", "source": "form", "alias": "phq-9-self"},
             ],
         )
         m = StudyManifest.from_dict(ok)

@@ -85,10 +85,21 @@ def _migrate_one(source_name: str, inbox_attr: str, dry_run: bool) -> dict:
         stats["moved"] += 1
 
     if dry_run:
-        log.info("%s: dry-run — would move %d files (%d collisions)", source_name, stats["moved"], stats["collisions"])
+        log.info(
+            "%s: dry-run — would move %d files (%d collisions)",
+            source_name,
+            stats["moved"],
+            stats["collisions"],
+        )
         return stats
 
-    log.info("%s: moved %d files → %s (%d collisions resolved)", source_name, stats["moved"], dest, stats["collisions"])
+    log.info(
+        "%s: moved %d files → %s (%d collisions resolved)",
+        source_name,
+        stats["moved"],
+        dest,
+        stats["collisions"],
+    )
     try:
         legacy.rmdir()
         stats["rmdir"] = True
@@ -100,8 +111,12 @@ def _migrate_one(source_name: str, inbox_attr: str, dry_run: bool) -> dict:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Migrate <inbox>/.processed/ into vault audit zone")
-    parser.add_argument("--dry-run", action="store_true", help="Show what would move without writing")
+    parser = argparse.ArgumentParser(
+        description="Migrate <inbox>/.processed/ into vault audit zone"
+    )
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Show what would move without writing"
+    )
     args = parser.parse_args(argv)
 
     if args.dry_run:
@@ -112,7 +127,9 @@ def main(argv: list[str] | None = None) -> int:
         stats = _migrate_one(source_name, inbox_attr, dry_run=args.dry_run)
         total_moved += stats["moved"]
 
-    log.info("Migration complete: %d files %s", total_moved, "would move" if args.dry_run else "moved")
+    log.info(
+        "Migration complete: %d files %s", total_moved, "would move" if args.dry_run else "moved"
+    )
     return 0
 
 

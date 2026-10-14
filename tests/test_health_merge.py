@@ -69,8 +69,8 @@ def test_merge_into_oura_file_preserves_oura_keys(tmp_path):
     agg = _agg(
         weight_kg=75.5,
         steps_total=8000,  # HealthKit steps DIFFER from Oura steps; both keys
-                           # live side-by-side (Oura wins for `steps`, HealthKit
-                           # adds `steps_total`).
+        # live side-by-side (Oura wins for `steps`, HealthKit
+        # adds `steps_total`).
         body_fat_pct=18.2,
         workouts=[{"type": "Running", "duration_min": 30.0}],
     )
@@ -82,11 +82,11 @@ def test_merge_into_oura_file_preserves_oura_keys(tmp_path):
     assert fm["sleep_hours"] == 7.5
     assert fm["sleep_score"] == 80
     assert fm["hrv_overnight"] == 45
-    assert fm["steps"] == 6000           # Oura wins on overlap
+    assert fm["steps"] == 6000  # Oura wins on overlap
     assert fm["resting_hr"] == 55
     # HealthKit keys added
     assert fm["weight_kg"] == 75.5
-    assert fm["steps_total"] == 8000     # HealthKit-only key
+    assert fm["steps_total"] == 8000  # HealthKit-only key
     assert fm["body_fat_pct"] == 18.2
     assert fm["workouts"] == [{"type": "Running", "duration_min": 30.0}]
     # Sources unioned
@@ -113,8 +113,7 @@ def test_empty_aggregate_skipped(tmp_path):
 
 def test_frontmatter_key_order_is_stable(tmp_path):
     target = tmp_path / "2024-01-15--default.md"
-    agg = _agg(weight_kg=75.5, steps_total=8000, body_fat_pct=18.0,
-               workouts=[{"type": "Walking"}])
+    agg = _agg(weight_kg=75.5, steps_total=8000, body_fat_pct=18.0, workouts=[{"type": "Walking"}])
     _merge_healthkit_into_path(target, agg, account_id="default")
     text = target.read_text(encoding="utf-8")
     lines = [l for l in text.split("\n") if ":" in l and not l.startswith(" ")]

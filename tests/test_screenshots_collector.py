@@ -73,8 +73,11 @@ def test_screenshots_run_maps_scan_result_with_report(monkeypatch, tmp_path):
     def fake_scan(*, scan_all=False, dry_run=False, limit=0, **kw):
         captured["scan_all"] = scan_all
         captured["dry_run"] = dry_run
-        return {"processed": 3, "report_path": report,
-                "message": "3 screenshot(s) processed (2 keep, 1 ephemeral) → screenshots-...md"}
+        return {
+            "processed": 3,
+            "report_path": report,
+            "message": "3 screenshot(s) processed (2 keep, 1 ephemeral) → screenshots-...md",
+        }
 
     monkeypatch.setattr(scan_screenshots, "scan", fake_scan)
 
@@ -95,8 +98,13 @@ def test_screenshots_run_maps_empty_scan_result(monkeypatch, tmp_path):
     sshots.mkdir()
     monkeypatch.setattr(scan_screenshots, "SCREENSHOTS_DIR", sshots)
     monkeypatch.setattr(
-        scan_screenshots, "scan",
-        lambda **kw: {"processed": 0, "report_path": None, "message": "Ollama not reachable at ..."},
+        scan_screenshots,
+        "scan",
+        lambda **kw: {
+            "processed": 0,
+            "report_path": None,
+            "message": "Ollama not reachable at ...",
+        },
     )
 
     result = scan_screenshots.ScreenshotsCollector().run()

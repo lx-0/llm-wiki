@@ -58,10 +58,13 @@ def test_collect_list_json_payload(monkeypatch, capsys):
     data = json.loads(capsys.readouterr().out)
     assert data == {
         "collectors": [
-            {"name": "email", "configured": True, "output": "raw/email",
-             "piggyback": "auto"},
-            {"name": "browser", "configured": False, "output": "raw/browser",
-             "piggyback": "manual-only"},
+            {"name": "email", "configured": True, "output": "raw/email", "piggyback": "auto"},
+            {
+                "name": "browser",
+                "configured": False,
+                "output": "raw/browser",
+                "piggyback": "manual-only",
+            },
         ]
     }
 
@@ -85,7 +88,7 @@ def test_compile_emit_progress_line_shape(capsys):
     compile_mod._emit_progress(True, 3, 12)
     line = capsys.readouterr().out.strip()
     assert line.startswith("PROGRESS ")
-    assert json.loads(line[len("PROGRESS "):]) == {"current": 3, "total": 12}
+    assert json.loads(line[len("PROGRESS ") :]) == {"current": 3, "total": 12}
 
 
 def test_compile_emit_progress_off_by_default(capsys):
@@ -99,9 +102,10 @@ def test_query_json_and_file_back_are_mutually_exclusive():
     """--json answers in-line only; combined with --file-back it exits 2
     before any SDK call (fast — the guard runs right after argparse)."""
     proc = subprocess.run(
-        [sys.executable, str(REPO_ROOT / "scripts" / "query.py"),
-         "q", "--json", "--file-back"],
-        capture_output=True, text=True, timeout=30,
+        [sys.executable, str(REPO_ROOT / "scripts" / "query.py"), "q", "--json", "--file-back"],
+        capture_output=True,
+        text=True,
+        timeout=30,
         cwd=REPO_ROOT / "scripts",
     )
     assert proc.returncode == 2

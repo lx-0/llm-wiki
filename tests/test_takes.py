@@ -24,12 +24,14 @@ import yaml
 
 def test_takes_dir_declared_and_under_knowledge() -> None:
     from core import paths
+
     assert hasattr(paths, "TAKES_DIR"), "core.paths.TAKES_DIR must exist"
     assert paths.TAKES_DIR == paths.KNOWLEDGE_DIR / "takes"
 
 
 def test_canonical_enumeration_includes_takes(tmp_path: Path) -> None:
     from core import utils
+
     # Canonical enumeration (C04): list_wiki_articles walks knowledge/
     # recursively, so takes/ files are corpus members.
     knowledge = tmp_path / "knowledge"
@@ -41,6 +43,7 @@ def test_canonical_enumeration_includes_takes(tmp_path: Path) -> None:
 
 def test_lint_folder_to_type_maps_takes() -> None:
     import lint
+
     assert lint.FOLDER_TO_TYPE.get("takes") == "takes"
 
 
@@ -96,17 +99,20 @@ def test_slug_normalisation(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> 
     assert rc == 0
     assert (takes_dir / "jane-doe.md").exists()
 
-    rc = take.cmd_add(_add_args(
-        holder="José García-López",
-        belief="A different belief.",
-        source="daily/2026-05-15.md",
-    ))
+    rc = take.cmd_add(
+        _add_args(
+            holder="José García-López",
+            belief="A different belief.",
+            source="daily/2026-05-15.md",
+        )
+    )
     assert rc == 0
     # slugify drops accents to plain ASCII via the existing core.utils.slugify
     # (lowercase + non-word chars → hyphens). The exact mapping depends on
     # slugify's handling of unicode — assert the produced filename is what
     # slugify returned for this input.
     from core.utils import slugify
+
     expected = slugify("José García-López")
     assert (takes_dir / f"{expected}.md").exists()
 
@@ -131,7 +137,9 @@ def test_first_touch_frontmatter_shape(monkeypatch: pytest.MonkeyPatch, tmp_path
     assert "raw/transcripts/jamie/2026-04-15--abc.md" in lines[0]
 
 
-def test_idempotent_add_refuses_exact_duplicate(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_idempotent_add_refuses_exact_duplicate(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     takes_dir = tmp_path / "knowledge" / "takes"
     _patch_takes_dir(monkeypatch, takes_dir)
     from facts import take
@@ -162,20 +170,24 @@ def test_add_appends_distinct_lines(monkeypatch: pytest.MonkeyPatch, tmp_path: P
     assert len(take_lines) == 2
 
 
-def test_list_show_remove(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+def test_list_show_remove(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     takes_dir = tmp_path / "knowledge" / "takes"
     _patch_takes_dir(monkeypatch, takes_dir)
     from facts import take
 
     take.cmd_add(_add_args(date="2026-04-15", belief="Belief one."))
     take.cmd_add(_add_args(date="2026-04-16", belief="Belief two."))
-    take.cmd_add(_add_args(
-        holder="Bob Smith",
-        belief="Bob has a position.",
-        date="2026-04-17",
-        source="daily/2026-04-17.md",
-        confidence="medium",
-    ))
+    take.cmd_add(
+        _add_args(
+            holder="Bob Smith",
+            belief="Bob has a position.",
+            date="2026-04-17",
+            source="daily/2026-04-17.md",
+            confidence="medium",
+        )
+    )
 
     # list
     capsys.readouterr()  # clear
@@ -253,13 +265,12 @@ def _ctx(knowledge_dir: Path):
     """LintContext over a fake knowledge/ root."""
     import lint
 
-    return lint.build_context(
-        vault=knowledge_dir.parent, knowledge_dir=knowledge_dir, state={}
-    )
+    return lint.build_context(vault=knowledge_dir.parent, knowledge_dir=knowledge_dir, state={})
 
 
 def test_lint_takes_clean_when_dir_absent(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     import lint
+
     knowledge = tmp_path / "knowledge"
     knowledge.mkdir(parents=True)
     assert lint.check_takes_consistency(_ctx(knowledge)) == []
@@ -267,12 +278,13 @@ def test_lint_takes_clean_when_dir_absent(monkeypatch: pytest.MonkeyPatch, tmp_p
 
 def test_lint_takes_passes_canonical_file(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     import lint
+
     knowledge = tmp_path / "knowledge"
     takes = knowledge / "takes"
     takes.mkdir(parents=True)
     (takes / "jane-doe.md").write_text(
         "---\n"
-        "title: \"Takes — Jane Doe\"\n"
+        'title: "Takes — Jane Doe"\n'
         "type: takes\n"
         "holder: jane-doe\n"
         "created: 2026-05-13\n"
@@ -288,14 +300,12 @@ def test_lint_takes_passes_canonical_file(monkeypatch: pytest.MonkeyPatch, tmp_p
 
 def test_lint_takes_flags_missing_type(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     import lint
+
     knowledge = tmp_path / "knowledge"
     takes = knowledge / "takes"
     takes.mkdir(parents=True)
     (takes / "broken.md").write_text(
-        "---\n"
-        "holder: broken\n"
-        "---\n\n"
-        "- **2026-04-15** [high] · `daily/x.md` — Body content.\n",
+        "---\nholder: broken\n---\n\n- **2026-04-15** [high] · `daily/x.md` — Body content.\n",
         encoding="utf-8",
     )
     issues = lint.check_takes_consistency(_ctx(knowledge))
@@ -305,14 +315,12 @@ def test_lint_takes_flags_missing_type(monkeypatch: pytest.MonkeyPatch, tmp_path
 
 def test_lint_takes_flags_missing_holder(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     import lint
+
     knowledge = tmp_path / "knowledge"
     takes = knowledge / "takes"
     takes.mkdir(parents=True)
     (takes / "no-holder.md").write_text(
-        "---\n"
-        "type: takes\n"
-        "---\n\n"
-        "- **2026-04-15** [high] · `daily/x.md` — Body content.\n",
+        "---\ntype: takes\n---\n\n- **2026-04-15** [high] · `daily/x.md` — Body content.\n",
         encoding="utf-8",
     )
     issues = lint.check_takes_consistency(_ctx(knowledge))
@@ -322,6 +330,7 @@ def test_lint_takes_flags_missing_holder(monkeypatch: pytest.MonkeyPatch, tmp_pa
 
 def test_lint_takes_flags_malformed_line(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     import lint
+
     knowledge = tmp_path / "knowledge"
     takes = knowledge / "takes"
     takes.mkdir(parents=True)
@@ -341,9 +350,12 @@ def test_lint_takes_flags_malformed_line(monkeypatch: pytest.MonkeyPatch, tmp_pa
     assert all(i.severity == "warning" for i in malformed)
 
 
-def test_lint_takes_ignores_non_take_bullets(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_lint_takes_ignores_non_take_bullets(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     """Bullets that don't start with `- **` (e.g. plain list intro) are skipped."""
     import lint
+
     knowledge = tmp_path / "knowledge"
     takes = knowledge / "takes"
     takes.mkdir(parents=True)

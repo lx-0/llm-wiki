@@ -24,7 +24,11 @@ from web_research import (
 )
 
 FAKE_RESULTS = [
-    {"title": "Brightwave Labs", "url": "https://brightwave.example", "text": "Agency founded by them."},
+    {
+        "title": "Brightwave Labs",
+        "url": "https://brightwave.example",
+        "text": "Agency founded by them.",
+    },
     {"title": "LinkedIn", "url": "https://linkedin.com/in/x", "text": "CEO & founder."},
 ]
 
@@ -65,7 +69,9 @@ def test_opt_in_detection():
 
 def test_skip_feature_disabled(tmp_path: Path):
     p, kd = _page(tmp_path, ["type: person", "web_research: true"])
-    res = run_web_research(p, config=_config(enabled=False), knowledge_dir=kd, backend=_fake_backend)
+    res = run_web_research(
+        p, config=_config(enabled=False), knowledge_dir=kd, backend=_fake_backend
+    )
     assert res.status == "skipped" and res.reason == "feature_disabled"
 
 
@@ -85,8 +91,11 @@ def test_skip_cooldown(tmp_path: Path):
     block = build_block("X", FAKE_RESULTS, today=date(2026, 5, 20))
     p, kd = _page(tmp_path, ["type: person", "web_research: true"], body="# X\n\n" + block + "\n")
     res = run_web_research(
-        p, config=_config(cooldown=30), knowledge_dir=kd,
-        now=date(2026, 5, 31), backend=_fake_backend,
+        p,
+        config=_config(cooldown=30),
+        knowledge_dir=kd,
+        now=date(2026, 5, 31),
+        backend=_fake_backend,
     )
     assert res.status == "skipped" and res.reason == "cooldown"
 
@@ -95,8 +104,11 @@ def test_cooldown_expired_runs(tmp_path: Path):
     block = build_block("X", FAKE_RESULTS, today=date(2026, 3, 1))
     p, kd = _page(tmp_path, ["type: person", "web_research: true"], body="# X\n\n" + block + "\n")
     res = run_web_research(
-        p, config=_config(cooldown=30), knowledge_dir=kd,
-        now=date(2026, 5, 31), backend=_fake_backend,
+        p,
+        config=_config(cooldown=30),
+        knowledge_dir=kd,
+        now=date(2026, 5, 31),
+        backend=_fake_backend,
     )
     assert res.status == "ok" and res.wrote
 
@@ -105,8 +117,11 @@ def test_force_bypasses_gates(tmp_path: Path):
     """Standalone `web-research <slug>`: no opt-in, feature off → still runs."""
     p, kd = _page(tmp_path, ["type: person"])
     res = run_web_research(
-        p, config=_config(enabled=False), knowledge_dir=kd,
-        force=True, backend=_fake_backend,
+        p,
+        config=_config(enabled=False),
+        knowledge_dir=kd,
+        force=True,
+        backend=_fake_backend,
     )
     assert res.status == "ok" and res.wrote
 
@@ -120,7 +135,9 @@ def test_refuses_target_outside_knowledge(tmp_path: Path):
     raw = tmp_path / "raw" / "notes" / "x.md"
     raw.parent.mkdir(parents=True)
     raw.write_text("---\ntype: person\nweb_research: true\n---\n\n# X\n", encoding="utf-8")
-    res = run_web_research(raw, config=_config(), knowledge_dir=kd, force=True, backend=_fake_backend)
+    res = run_web_research(
+        raw, config=_config(), knowledge_dir=kd, force=True, backend=_fake_backend
+    )
     assert res.status == "skipped" and res.reason == "outside_knowledge"
     # And nothing was written into raw/.
     assert SENTINEL_BEGIN not in raw.read_text()
@@ -201,7 +218,9 @@ def test_end_to_end_writes_block_not_raw(tmp_path: Path):
 def test_dry_run_writes_nothing(tmp_path: Path):
     p, kd = _page(tmp_path, ["type: person", "web_research: true"])
     before = p.read_text()
-    res = run_web_research(p, config=_config(), knowledge_dir=kd, dry_run=True, backend=_fake_backend)
+    res = run_web_research(
+        p, config=_config(), knowledge_dir=kd, dry_run=True, backend=_fake_backend
+    )
     assert res.status == "ok" and not res.wrote and res.block
     assert p.read_text() == before
 
@@ -209,6 +228,7 @@ def test_dry_run_writes_nothing(tmp_path: Path):
 def test_backend_error_is_failsoft(tmp_path: Path):
     def boom(*_):
         raise ValueError("exa 500")
+
     p, kd = _page(tmp_path, ["type: person", "web_research: true"])
     res = run_web_research(p, config=_config(), knowledge_dir=kd, backend=boom)
     assert res.status == "failed" and "exa 500" in res.reason
@@ -225,23 +245,29 @@ def test_dream_standalone_wiring(tmp_path: Path, monkeypatch, capsys):
     p.write_text("---\ntype: person\nname: Jordan Hale\n---\n\n# Jordan Hale\n", encoding="utf-8")
 
     import core.paths as paths
+
     monkeypatch.setattr(paths, "PEOPLE_DIR", kd / "people", raising=False)
     monkeypatch.setattr(paths, "PROJECTS_DIR", kd / "projects", raising=False)
     monkeypatch.setattr(paths, "AREAS_DIR", kd / "areas", raising=False)
     monkeypatch.setattr(paths, "KNOWLEDGE_DIR", kd, raising=False)
     monkeypatch.setenv("EXA_API_KEY", "test-key")
     import web_research
+
     monkeypatch.setattr(web_research, "search_exa", _fake_backend)
 
     import dream
+
     monkeypatch.setattr(dream, "PEOPLE_DIR", kd / "people", raising=False)
     monkeypatch.setattr(dream, "PROJECTS_DIR", kd / "projects", raising=False)
     monkeypatch.setattr(dream, "AREAS_DIR", kd / "areas", raising=False)
     monkeypatch.setattr(
-        dream, "_ENTITY_KINDS",
-        {"people": (kd / "people", "person"),
-         "projects": (kd / "projects", "project"),
-         "areas": (kd / "areas", "area")},
+        dream,
+        "_ENTITY_KINDS",
+        {
+            "people": (kd / "people", "person"),
+            "projects": (kd / "projects", "project"),
+            "areas": (kd / "areas", "area"),
+        },
         raising=False,
     )
 

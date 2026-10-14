@@ -23,10 +23,13 @@ def _write(path: Path, payload: dict) -> Path:
 def test_dispatch_routes_email_deep_scan_to_email_backend(tmp_path, monkeypatch):
     from curiosity import cli
 
-    request_path = _write(tmp_path / "request-x.json", {
-        "type": "email-deep-scan",
-        "status": "pending",
-    })
+    request_path = _write(
+        tmp_path / "request-x.json",
+        {
+            "type": "email-deep-scan",
+            "status": "pending",
+        },
+    )
 
     calls = []
 
@@ -47,10 +50,13 @@ def test_dispatch_routes_email_deep_scan_to_email_backend(tmp_path, monkeypatch)
 def test_dispatch_rejects_unsupported_type(tmp_path, monkeypatch):
     from curiosity import cli
 
-    request_path = _write(tmp_path / "request-yt.json", {
-        "type": "youtube-deep-watch",
-        "status": "pending",
-    })
+    request_path = _write(
+        tmp_path / "request-yt.json",
+        {
+            "type": "youtube-deep-watch",
+            "status": "pending",
+        },
+    )
 
     # Email backend should not be called.
     monkeypatch.setattr(
@@ -97,6 +103,7 @@ def test_all_requests_returns_sorted_glob(tmp_path, monkeypatch):
 
 # ── accept-all (bulk dispatch) — the operator's "accept all" function ──
 
+
 def test_accept_all_dispatches_every_path_and_counts(tmp_path, monkeypatch):
     from curiosity import cli
 
@@ -113,7 +120,7 @@ def test_accept_all_dispatches_every_path_and_counts(tmp_path, monkeypatch):
 
     monkeypatch.setattr(cli, "_dispatch", fake_dispatch)
     accepted, fails = cli._accept_all(paths, dry_run=False)
-    assert seen == paths            # every request dispatched, in order
+    assert seen == paths  # every request dispatched, in order
     assert (accepted, fails) == (2, 1)
 
 
@@ -126,9 +133,14 @@ def test_folder_consent_lines_lists_only_cloud_bound_files(tmp_path, monkeypatch
     monkeypatch.setattr(CONFIG.models, "folder_scan_provider", "claude-sdk")
     paths = [
         _write(tmp_path / "request-1.json", {"type": "email-deep-scan", "status": "pending"}),
-        _write(tmp_path / "request-2.json", {
-            "type": "folder-deep-scan", "status": "pending",
-            "file_path": "Admin/Rechnungen/Hetzner-Mai.pdf"}),
+        _write(
+            tmp_path / "request-2.json",
+            {
+                "type": "folder-deep-scan",
+                "status": "pending",
+                "file_path": "Admin/Rechnungen/Hetzner-Mai.pdf",
+            },
+        ),
     ]
     lines = cli._folder_consent_lines(paths)
     assert lines == [("Admin/Rechnungen/Hetzner-Mai.pdf", "claude-sdk")]
@@ -140,28 +152,42 @@ def test_walk_accept_all_key_dispatches_every_remaining(tmp_path, monkeypatch, c
     is the wiring verification, not just the helper (REGEL #1)."""
     from curiosity import cli
 
-    p1 = _write(tmp_path / "request-1.json", {
-        "type": "folder-deep-scan", "status": "pending",
-        "topic": "t1", "root_id": "docs", "file_path": "a/x.pdf",
-        "rationale": "r"})
-    p2 = _write(tmp_path / "request-2.json", {
-        "type": "email-deep-scan", "status": "pending",
-        "topic": "t2", "folder": "INBOX", "account": "kasserver", "rationale": "r"})
+    p1 = _write(
+        tmp_path / "request-1.json",
+        {
+            "type": "folder-deep-scan",
+            "status": "pending",
+            "topic": "t1",
+            "root_id": "docs",
+            "file_path": "a/x.pdf",
+            "rationale": "r",
+        },
+    )
+    p2 = _write(
+        tmp_path / "request-2.json",
+        {
+            "type": "email-deep-scan",
+            "status": "pending",
+            "topic": "t2",
+            "folder": "INBOX",
+            "account": "kasserver",
+            "rationale": "r",
+        },
+    )
     monkeypatch.setattr(cli, "REQUESTS_DIR", tmp_path)
 
     dispatched = []
-    monkeypatch.setattr(cli, "_dispatch",
-                        lambda p, *, dry_run: dispatched.append(p) or True)
+    monkeypatch.setattr(cli, "_dispatch", lambda p, *, dry_run: dispatched.append(p) or True)
     keys = iter(["A", "y"])  # accept-all on card 1, then confirm
     monkeypatch.setattr(cli, "read_key", lambda: next(keys))
 
     with pytest.raises(SystemExit) as exc:
         cli._walk(dry_run=False)
     assert exc.value.code == 0
-    assert dispatched == [p1, p2]            # BOTH remaining dispatched
+    assert dispatched == [p1, p2]  # BOTH remaining dispatched
     out = capsys.readouterr().out
     assert "will be LOADED and sent" in out  # folder consent shown
-    assert "a/x.pdf" in out                  # the cloud-bound file listed
+    assert "a/x.pdf" in out  # the cloud-bound file listed
 
 
 def test_walk_accept_all_cancelled_on_no(tmp_path, monkeypatch):
@@ -169,13 +195,19 @@ def test_walk_accept_all_cancelled_on_no(tmp_path, monkeypatch):
     prompt — nothing is sent."""
     from curiosity import cli
 
-    p1 = _write(tmp_path / "request-1.json", {
-        "type": "folder-deep-scan", "status": "pending",
-        "topic": "t1", "file_path": "a/x.pdf", "rationale": "r"})
+    p1 = _write(
+        tmp_path / "request-1.json",
+        {
+            "type": "folder-deep-scan",
+            "status": "pending",
+            "topic": "t1",
+            "file_path": "a/x.pdf",
+            "rationale": "r",
+        },
+    )
     monkeypatch.setattr(cli, "REQUESTS_DIR", tmp_path)
     dispatched = []
-    monkeypatch.setattr(cli, "_dispatch",
-                        lambda p, *, dry_run: dispatched.append(p) or True)
+    monkeypatch.setattr(cli, "_dispatch", lambda p, *, dry_run: dispatched.append(p) or True)
     keys = iter(["A", "n", "q"])  # accept-all, decline, then quit
     monkeypatch.setattr(cli, "read_key", lambda: next(keys))
 

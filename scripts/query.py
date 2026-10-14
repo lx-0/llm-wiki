@@ -8,6 +8,7 @@ Usage:
 """
 
 import os
+
 os.environ["CLAUDE_INVOKED_BY"] = "query"
 
 import argparse
@@ -31,6 +32,7 @@ from core.utils import (
 
 # ── Logging ──────────────────────────────────────────────────────────
 from core.console import setup_console_logging  # noqa: E402
+
 log = setup_console_logging("query")
 
 from core.prompts import render  # noqa: E402
@@ -44,6 +46,7 @@ from core.sdk_helpers import (  # noqa: E402
 # ── Query prompt ─────────────────────────────────────────────────────
 
 # ── Main ─────────────────────────────────────────────────────────────
+
 
 async def main() -> None:
     parser = argparse.ArgumentParser(description="Query the knowledge base")
@@ -102,7 +105,9 @@ async def main() -> None:
     force = args.force
 
     if brief and file_back:
-        log.error("--brief and --file-back are mutually exclusive — brief mode answers in-line only")
+        log.error(
+            "--brief and --file-back are mutually exclusive — brief mode answers in-line only"
+        )
         sys.exit(2)
     if as_json and file_back:
         log.error("--json and --file-back are mutually exclusive — JSON mode answers in-line only")
@@ -121,12 +126,17 @@ async def main() -> None:
             "--domain %r is not in CONFIG.personal.domains (%s). "
             "Add it to config.yaml under `personal.domains:` or pick one of "
             "the configured values.",
-            domain, ", ".join(valid_domains),
+            domain,
+            ", ".join(valid_domains),
         )
         sys.exit(2)
     log.info(
         "Query: %s (brief=%s, file_back=%s, include_final_only=%s, domain=%s)",
-        question, brief, file_back, include_final_only, domain,
+        question,
+        brief,
+        file_back,
+        include_final_only,
+        domain,
     )
 
     # Embed only the compact article index (path + date); the agent pulls
@@ -188,7 +198,9 @@ async def main() -> None:
             log.error(
                 "qa/ already has %d note(s) matching slug `%s*.md` (%s). "
                 "Re-run with --force to overwrite, or rephrase the question for a distinct slug.",
-                len(existing), candidate_slug, ", ".join(p.name for p in existing[:3]),
+                len(existing),
+                candidate_slug,
+                ", ".join(p.name for p in existing[:3]),
             )
             sys.exit(3)
         prompt = render(
@@ -254,12 +266,17 @@ async def main() -> None:
     # agents; same posture as `wiki doctor --json`) — consumers parse this
     # payload instead of scraping the banner + prose off stdout.
     if as_json:
-        print(json.dumps({
-            "question": question,
-            "answer": result.result_text,
-            "input_tokens": result.input_tokens,
-            "output_tokens": result.output_tokens,
-        }, indent=2))
+        print(
+            json.dumps(
+                {
+                    "question": question,
+                    "answer": result.result_text,
+                    "input_tokens": result.input_tokens,
+                    "output_tokens": result.output_tokens,
+                },
+                indent=2,
+            )
+        )
     else:
         print("\n" + result.result_text)
 
@@ -267,7 +284,9 @@ async def main() -> None:
     # 2026-05-23; the old hardcoded $5/$25-per-Mtok estimate is gone.
     # Token counts are cache-inclusive (see UsageTokens).
     log.info(
-        "Tokens — input: %d, output: %d", result.input_tokens, result.output_tokens,
+        "Tokens — input: %d, output: %d",
+        result.input_tokens,
+        result.output_tokens,
     )
 
     # Merged under the state lock so a compile running in parallel can't

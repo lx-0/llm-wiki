@@ -130,8 +130,7 @@ def cmd_pass2(args: argparse.Namespace, vault_root: Path) -> int:
         studies_with.append((study, summary, analysis))
 
     if not studies_with:
-        print("(no studies with completed Pass-1 outputs — run "
-              "`wiki analyze --all-studies` first)")
+        print("(no studies with completed Pass-1 outputs — run `wiki analyze --all-studies` first)")
         return 0
 
     print(
@@ -180,22 +179,25 @@ def cmd_default(args: argparse.Namespace, vault_root: Path) -> int:
 
 def main() -> int:
     from core.console import setup_console_logging
+
     setup_console_logging("analyze")
     parser = argparse.ArgumentParser(description="Operator-self-reports analyst layer")
-    parser.add_argument("--vault", default=None, type=Path,
-                        help="Override vault root (defaults to engine ROOT_DIR).")
-    parser.add_argument("--study", default=None,
-                        help="Pass-1: restrict to one study slug.")
-    parser.add_argument("--cross-study-only", action="store_true",
-                        help="Skip Pass-1, run Pass-2 only.")
-    parser.add_argument("--no-pass2", action="store_true",
-                        help="Run Pass-1, skip Pass-2.")
-    parser.add_argument("--rerun", action="store_true",
-                        help="Overwrite existing _analysis.md files.")
-    args = parser.parse_args()
-    vault_root = (
-        args.vault.expanduser().resolve() if args.vault is not None else ROOT_DIR
+    parser.add_argument(
+        "--vault",
+        default=None,
+        type=Path,
+        help="Override vault root (defaults to engine ROOT_DIR).",
     )
+    parser.add_argument("--study", default=None, help="Pass-1: restrict to one study slug.")
+    parser.add_argument(
+        "--cross-study-only", action="store_true", help="Skip Pass-1, run Pass-2 only."
+    )
+    parser.add_argument("--no-pass2", action="store_true", help="Run Pass-1, skip Pass-2.")
+    parser.add_argument(
+        "--rerun", action="store_true", help="Overwrite existing _analysis.md files."
+    )
+    args = parser.parse_args()
+    vault_root = args.vault.expanduser().resolve() if args.vault is not None else ROOT_DIR
     return cmd_default(args, vault_root)
 
 

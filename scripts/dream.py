@@ -116,12 +116,9 @@ class _DreamFormatter(ConsoleFormatter):
     _LIMIT_RE = re.compile(r"^(Reached --limit=\d+|Per-run token cap reached)")
 
     def _format_message_extras(self, msg: str) -> str | None:
-        if (mh := self._HEADER_RE.match(msg.strip())):
+        if mh := self._HEADER_RE.match(msg.strip()):
             pos, action, slug = mh.group(1), mh.group(2), mh.group(3)
-            return (
-                f"{C_BOLD}{C_CYAN}▶ [{pos}] {action} "
-                f"{C_YELLOW}{slug}{C_RESET}"
-            )
+            return f"{C_BOLD}{C_CYAN}▶ [{pos}] {action} {C_YELLOW}{slug}{C_RESET}"
         for rx in self._DIM_INFO_RES:
             if rx.match(msg):
                 # Dim the whole line but keep cost-amount tier colors inside —
@@ -208,9 +205,7 @@ def _list_all_entities() -> list[EntityRef]:
             continue
         for page in sorted(dir_.glob("*.md")):
             slug = page.stem
-            out.append(
-                EntityRef(slug=slug, kind=kind, page=page, type_value=type_value)
-            )
+            out.append(EntityRef(slug=slug, kind=kind, page=page, type_value=type_value))
     return out
 
 
@@ -226,9 +221,7 @@ def _parse_iso_date(value: object) -> datetime | None:
         return datetime(value.year, value.month, value.day, tzinfo=timezone.utc)
     if isinstance(value, str):
         try:
-            return datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone(
-                timezone.utc
-            )
+            return datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone(timezone.utc)
         except ValueError:
             return None
     return None
@@ -294,13 +287,13 @@ _OPERATOR_AUTHORED_ROOTS: tuple[str, ...] = ("concepts", "areas", "people", "pro
 # spec doc — these are heuristics, not learned weights (A-Mem MoE gating
 # is future work). Calibrated by operator-eye on lxw substrate.
 _IMPORTANCE_RULES: tuple[tuple[str, float], ...] = (
-    ("raw/memories/",                3.0),
-    ("raw/transcripts/jamie/",       2.0),
-    ("raw/transcripts/gmeet/",       2.0),
-    ("raw/notes/longform/",          1.5),
-    ("raw/notes/email/",             1.0),
-    ("raw/notes/calendar/",          1.0),
-    ("raw/notes/screenshots/",       0.8),
+    ("raw/memories/", 3.0),
+    ("raw/transcripts/jamie/", 2.0),
+    ("raw/transcripts/gmeet/", 2.0),
+    ("raw/notes/longform/", 1.5),
+    ("raw/notes/email/", 1.0),
+    ("raw/notes/calendar/", 1.0),
+    ("raw/notes/screenshots/", 0.8),
 )
 
 # Sentinel for "this file has never been dreamed" — large enough that any
@@ -467,7 +460,11 @@ def is_within_insufficient_backoff(
 
     `max_days <= 0` disables the mechanism entirely (every entity passes)."""
     base = base_days if base_days is not None else CONFIG.scheduling.dream_cooldown_days
-    cap = max_days if max_days is not None else CONFIG.scheduling.dream_insufficient_corpus_backoff_max_days
+    cap = (
+        max_days
+        if max_days is not None
+        else CONFIG.scheduling.dream_insufficient_corpus_backoff_max_days
+    )
     if cap <= 0:
         return False
     entry = _load_insufficient_state().get(entity.slug)
@@ -573,7 +570,8 @@ def _stamp_last_dreamed_at(paths: list[Path], when: datetime | None = None) -> i
     store = _activation_store()
     cached = store.load()
     pending = [
-        rel for rel in rels
+        rel
+        for rel in rels
         if not (isinstance(cached.get(rel), str) and cached[rel].startswith(stamp))
     ]
     if not pending:
@@ -592,9 +590,7 @@ def _stamp_last_dreamed_at(paths: list[Path], when: datetime | None = None) -> i
     try:
         store.update(_apply)
     except OSError as exc:
-        log.warning(
-            "  could not stamp last_dreamed_at for %d file(s): %s", len(pending), exc
-        )
+        log.warning("  could not stamp last_dreamed_at for %d file(s): %s", len(pending), exc)
         return 0
     return stamped["n"]
 
@@ -609,7 +605,10 @@ def _write_last_dreamed_at(path: Path, when: datetime | None = None) -> bool:
 
 
 def _scan_mentioning_files(
-    entity: EntityRef, *, vault_root: Path, include_authored: bool = True,
+    entity: EntityRef,
+    *,
+    vault_root: Path,
+    include_authored: bool = True,
 ) -> list[tuple[float, Path]]:
     """Walk all substrate roots once, return (mtime, path) for matches.
 
@@ -718,7 +717,12 @@ class CorpusBreakdown:
         """
         seen: set[Path] = set()
         out: list[Path] = []
-        for group in (self.tier1_authored, self.tier1_recent, self.tier1_digests, self.tier2_sampled):
+        for group in (
+            self.tier1_authored,
+            self.tier1_recent,
+            self.tier1_digests,
+            self.tier2_sampled,
+        ):
             for p in group:
                 rp = p.resolve()
                 if rp in seen:
@@ -757,9 +761,21 @@ def collect_corpus_tiered(
     score noise term uses the module-default Random instance.
     """
     root = vault_root or ROOT_DIR
-    recent_n = tier1_recent_count if tier1_recent_count is not None else CONFIG.limits.dream_tier1_recent_count
-    digest_days = tier1_digest_days if tier1_digest_days is not None else CONFIG.limits.dream_tier1_digest_days
-    sample_k = tier2_sample_count if tier2_sample_count is not None else CONFIG.limits.dream_tier2_sample_count
+    recent_n = (
+        tier1_recent_count
+        if tier1_recent_count is not None
+        else CONFIG.limits.dream_tier1_recent_count
+    )
+    digest_days = (
+        tier1_digest_days
+        if tier1_digest_days is not None
+        else CONFIG.limits.dream_tier1_digest_days
+    )
+    sample_k = (
+        tier2_sample_count
+        if tier2_sample_count is not None
+        else CONFIG.limits.dream_tier2_sample_count
+    )
     rng = random.Random(rng_seed) if rng_seed is not None else random.Random()
 
     # One filesystem walk; classify the hits.
@@ -820,7 +836,10 @@ def collect_corpus_tiered(
 
 
 def render_corpus_block(
-    paths: list[Path], *, vault_root: Path | None = None, max_chars_per_file: int = _PER_FILE_TRUNCATION_CHARS
+    paths: list[Path],
+    *,
+    vault_root: Path | None = None,
+    max_chars_per_file: int = _PER_FILE_TRUNCATION_CHARS,
 ) -> str:
     """Render the corpus as a single markdown block for prompt embedding.
 
@@ -837,7 +856,10 @@ def render_corpus_block(
             continue
         rel = str(path.relative_to(root))
         if len(text) > max_chars_per_file:
-            text = text[:max_chars_per_file] + f"\n\n[... truncated at {max_chars_per_file} chars ...]\n"
+            text = (
+                text[:max_chars_per_file]
+                + f"\n\n[... truncated at {max_chars_per_file} chars ...]\n"
+            )
         chunks.append(f"### `{rel}`\n\n```markdown\n{text}\n```\n")
     return "\n".join(chunks)
 
@@ -860,12 +882,15 @@ def render_corpus_block_tiered(
     def _render_group(group_paths: list[Path], label: str) -> str:
         if not group_paths:
             return ""
-        body = render_corpus_block(group_paths, vault_root=root, max_chars_per_file=max_chars_per_file)
+        body = render_corpus_block(
+            group_paths, vault_root=root, max_chars_per_file=max_chars_per_file
+        )
         return f"\n## {label} ({len(group_paths)} files)\n\n{body}"
 
     # Dedup for display: a file in both authored and recent shows once under
     # authored (the more-specific role).
     seen: set[Path] = set()
+
     def _dedup(paths: list[Path]) -> list[Path]:
         out: list[Path] = []
         for p in paths:
@@ -877,10 +902,18 @@ def render_corpus_block_tiered(
         return out
 
     parts: list[str] = []
-    parts.append(_render_group(_dedup(breakdown.tier1_authored), "Tier 1 — operator-authored content"))
+    parts.append(
+        _render_group(_dedup(breakdown.tier1_authored), "Tier 1 — operator-authored content")
+    )
     parts.append(_render_group(_dedup(breakdown.tier1_digests), "Tier 1 — recent daily digests"))
-    parts.append(_render_group(_dedup(breakdown.tier1_recent), "Tier 1 — most-recent substrate mentioning entity"))
-    parts.append(_render_group(_dedup(breakdown.tier2_sampled), "Tier 2 — weighted-sampled older substrate"))
+    parts.append(
+        _render_group(
+            _dedup(breakdown.tier1_recent), "Tier 1 — most-recent substrate mentioning entity"
+        )
+    )
+    parts.append(
+        _render_group(_dedup(breakdown.tier2_sampled), "Tier 2 — weighted-sampled older substrate")
+    )
     return "\n".join(p for p in parts if p)
 
 
@@ -898,9 +931,7 @@ DreamStatus = Literal["synthesized", "skipped", "failed"]
 
 # Benign no-ops (exit 0): nothing to synthesize, a designed digests-only skip,
 # or a dry run.
-_DREAM_SKIP_KINDS: frozenset[str] = frozenset(
-    {"no_substrate", "no_entity_substrate", "dry_run"}
-)
+_DREAM_SKIP_KINDS: frozenset[str] = frozenset({"no_substrate", "no_entity_substrate", "dry_run"})
 # Real problems (nonzero exit): each MUST surface so an unattended piggyback
 # records `failed:<rc>` in piggyback-state.json rather than a false `ok`.
 _DREAM_FAILURE_KINDS: frozenset[str] = frozenset(
@@ -976,9 +1007,7 @@ def dream_exit_code(outcomes: "DreamOutcome | list[DreamOutcome]") -> int:
 # snapshots as parameters and read no globals.
 
 
-def pre_sdk_skip(
-    breakdown: CorpusBreakdown, *, require_entity_substrate: bool
-) -> str | None:
+def pre_sdk_skip(breakdown: CorpusBreakdown, *, require_entity_substrate: bool) -> str | None:
     """Deterministic pre-SDK skip decision — inspects the assembled corpus
     only. Returns a skip-kind string, or None to proceed to prompt-building.
 
@@ -992,9 +1021,7 @@ def pre_sdk_skip(
     if not breakdown.all_paths:
         return "no_substrate"
     entity_substrate = (
-        len(breakdown.tier1_authored)
-        + len(breakdown.tier1_recent)
-        + len(breakdown.tier2_sampled)
+        len(breakdown.tier1_authored) + len(breakdown.tier1_recent) + len(breakdown.tier2_sampled)
     )
     if require_entity_substrate and entity_substrate == 0:
         return "no_entity_substrate"
@@ -1087,7 +1114,11 @@ def _build_prompt(
     The corpus is always rendered with per-tier section headers so the LLM sees
     the Tier 1 / Tier 2 split (M016) — the flat M014 render is gone.
     """
-    current_page = entity.page.read_text(encoding="utf-8") if entity.page.exists() else "(file does not exist yet — create it from the two-layer template)"
+    current_page = (
+        entity.page.read_text(encoding="utf-8")
+        if entity.page.exists()
+        else "(file does not exist yet — create it from the two-layer template)"
+    )
     corpus_block = render_corpus_block_tiered(breakdown)
     corpus_chars = len(corpus_block)
     title = current_page_title(current_page) or entity.title
@@ -1187,7 +1218,11 @@ async def dream_entity(
     when the prompt exceeds the cap — context-overflow guard, not cost).
     """
     started = time.time()
-    max_chars = max_prompt_chars if max_prompt_chars is not None else CONFIG.limits.dream_entity_max_prompt_chars
+    max_chars = (
+        max_prompt_chars
+        if max_prompt_chars is not None
+        else CONFIG.limits.dream_entity_max_prompt_chars
+    )
     turns = max_turns if max_turns is not None else 20
 
     # M016: tiered corpus. Bounded by construction at ~600 KB total
@@ -1198,7 +1233,8 @@ async def dream_entity(
     log.info(
         "  entity=%s kind=%s — corpus: T1=%d (auth=%d/recent=%d/digests=%d) "
         "T2=%d sampled of %d-file older pool",
-        entity.slug, entity.kind,
+        entity.slug,
+        entity.kind,
         breakdown.tier1_count,
         len(breakdown.tier1_authored),
         len(breakdown.tier1_recent),
@@ -1219,10 +1255,15 @@ async def dream_entity(
             entity.slug,
         )
         return DreamOutcome(
-            entity=entity, corpus_count=0, corpus_chars=0,
+            entity=entity,
+            corpus_count=0,
+            corpus_chars=0,
             actual_cost_usd=0.0,
-            input_tokens=0, output_tokens=0, sdk_result_text="",
-            kind="no_substrate", elapsed_s=time.time() - started,
+            input_tokens=0,
+            output_tokens=0,
+            sdk_result_text="",
+            kind="no_substrate",
+            elapsed_s=time.time() - started,
         )
     if gate == "no_entity_substrate":
         # The only corpus is non-mentioning daily digests → the agent's quality
@@ -1233,13 +1274,19 @@ async def dream_entity(
             "daily digest(s) in corpus) — guaranteed no-op, skipping SDK call "
             "($0 instead of a prompt-cache write). Set "
             "features.dream_require_entity_substrate=false to force.",
-            entity.slug, len(breakdown.tier1_digests),
+            entity.slug,
+            len(breakdown.tier1_digests),
         )
         return DreamOutcome(
-            entity=entity, corpus_count=len(corpus_paths), corpus_chars=0,
+            entity=entity,
+            corpus_count=len(corpus_paths),
+            corpus_chars=0,
             actual_cost_usd=0.0,
-            input_tokens=0, output_tokens=0, sdk_result_text="",
-            kind="no_entity_substrate", elapsed_s=time.time() - started,
+            input_tokens=0,
+            output_tokens=0,
+            sdk_result_text="",
+            kind="no_entity_substrate",
+            elapsed_s=time.time() - started,
         )
 
     prompt, prompt_chars, breakdown, dropped = _build_prompt_within_budget(
@@ -1255,11 +1302,16 @@ async def dream_entity(
             "  corpus over budget — dropped %d lowest-value Tier-2/recent "
             "file(s) to fit the %s-char cap (now %d files, %d chars). "
             "Authored + digests preserved.",
-            dropped, f"{max_chars:,}", len(corpus_paths), prompt_chars,
+            dropped,
+            f"{max_chars:,}",
+            len(corpus_paths),
+            prompt_chars,
         )
     log.info(
         "  prompt: %d chars (%.1f KB) — max %s chars",
-        prompt_chars, prompt_chars / 1024, f"{max_chars:,}" if max_chars > 0 else "unlimited",
+        prompt_chars,
+        prompt_chars / 1024,
+        f"{max_chars:,}" if max_chars > 0 else "unlimited",
     )
 
     if max_chars > 0 and prompt_chars > max_chars:
@@ -1272,20 +1324,30 @@ async def dream_entity(
         )
         log.error("  ✗ %s", msg)
         return DreamOutcome(
-            entity=entity, corpus_count=len(corpus_paths),
-            corpus_chars=sum(len(p.read_text(encoding="utf-8", errors="replace")) for p in corpus_paths),
+            entity=entity,
+            corpus_count=len(corpus_paths),
+            corpus_chars=sum(
+                len(p.read_text(encoding="utf-8", errors="replace")) for p in corpus_paths
+            ),
             actual_cost_usd=0.0,
-            input_tokens=0, output_tokens=0, sdk_result_text=msg,
-            kind="prompt_too_large", elapsed_s=time.time() - started,
+            input_tokens=0,
+            output_tokens=0,
+            sdk_result_text=msg,
+            kind="prompt_too_large",
+            elapsed_s=time.time() - started,
         )
 
     if dry_run:
         log.info("  --dry-run: would invoke SDK with %d-char prompt", prompt_chars)
         return DreamOutcome(
-            entity=entity, corpus_count=len(corpus_paths),
+            entity=entity,
+            corpus_count=len(corpus_paths),
             corpus_chars=prompt_chars,
-            actual_cost_usd=0.0, input_tokens=0, output_tokens=0,
-            sdk_result_text="(dry-run)", kind="dry_run",
+            actual_cost_usd=0.0,
+            input_tokens=0,
+            output_tokens=0,
+            sdk_result_text="(dry-run)",
+            kind="dry_run",
             elapsed_s=time.time() - started,
         )
 
@@ -1332,8 +1394,11 @@ async def dream_entity(
             write_scope=WriteScope(
                 roots=(ROOT_DIR / "knowledge", LOG_FILE),
                 legacy_allowed_tools=(
-                    "Read", "Glob", "Grep",
-                    "Write(knowledge/**)", "Edit(knowledge/**)",
+                    "Read",
+                    "Glob",
+                    "Grep",
+                    "Write(knowledge/**)",
+                    "Edit(knowledge/**)",
                 ),
             ),
             stall_timeout_s=CONFIG.limits.dream_per_call_timeout_s,
@@ -1351,24 +1416,30 @@ async def dream_entity(
         elapsed = time.time() - started
         if sdk.failure.kind == "timeout":
             return DreamOutcome(
-                entity=entity, corpus_count=len(corpus_paths),
+                entity=entity,
+                corpus_count=len(corpus_paths),
                 corpus_chars=prompt_chars,
-                actual_cost_usd=actual_cost, input_tokens=input_tokens,
+                actual_cost_usd=actual_cost,
+                input_tokens=input_tokens,
                 output_tokens=output_tokens,
                 sdk_result_text=(
-                    f"per-call timeout after {sdk.elapsed_s:.1f}s "
-                    f"(msg_count={sdk.message_count})"
+                    f"per-call timeout after {sdk.elapsed_s:.1f}s (msg_count={sdk.message_count})"
                 ),
-                kind="per_call_timeout", elapsed_s=elapsed,
+                kind="per_call_timeout",
+                elapsed_s=elapsed,
             )
         log.error(
             "  dream_entity ✗ failed after %.1fs (last_message_count=%d): kind=%s",
-            sdk.elapsed_s, sdk.message_count, sdk.failure.kind,
+            sdk.elapsed_s,
+            sdk.message_count,
+            sdk.failure.kind,
         )
         return DreamOutcome(
-            entity=entity, corpus_count=len(corpus_paths),
+            entity=entity,
+            corpus_count=len(corpus_paths),
             corpus_chars=prompt_chars,
-            actual_cost_usd=actual_cost, input_tokens=input_tokens,
+            actual_cost_usd=actual_cost,
+            input_tokens=input_tokens,
             output_tokens=output_tokens,
             sdk_result_text=str(sdk.exc) if sdk.exc is not None else str(sdk.failure),
             kind="sdk_failure",
@@ -1401,17 +1472,19 @@ async def dream_entity(
     # a byte-identical page WITHOUT it is the silent write-failure this
     # diagnostic was built for.
     verdict = classify_post_sdk_write(
-        pre_mtime=_entity_pre_mtime, pre_size=_entity_pre_size,
-        post_mtime=_entity_post_mtime, post_size=_entity_post_size,
+        pre_mtime=_entity_pre_mtime,
+        pre_size=_entity_pre_size,
+        post_mtime=_entity_post_mtime,
+        post_size=_entity_post_size,
         result_text=result_text,
     )
     insufficient_corpus = verdict.insufficient_corpus
     if not verdict.page_changed:
         log.log(
             verdict.level,
-            "  agent finished without modifying %s — %s. Page byte-identical "
-            "to pre-run.",
-            str(entity.page.relative_to(ROOT_DIR)), verdict.reason,
+            "  agent finished without modifying %s — %s. Page byte-identical to pre-run.",
+            str(entity.page.relative_to(ROOT_DIR)),
+            verdict.reason,
         )
         log.log(
             verdict.level,
@@ -1428,7 +1501,8 @@ async def dream_entity(
                 log.info(
                     "  insufficient-corpus backoff for %s → consecutive no-op #%d "
                     "(will be deprioritized in the sweep until new substrate lands).",
-                    entity.slug, count,
+                    entity.slug,
+                    count,
                 )
     else:
         # Real synthesis happened — clear any prior backoff so the entity
@@ -1447,7 +1521,9 @@ async def dream_entity(
             "cost for a %d-char prompt — substrate-processing did not happen "
             "(CLI early-exit, buffer truncation, or tool-use short-circuit). "
             "Check the SDK result text for clues.",
-            input_tokens, actual_cost, prompt_chars,
+            input_tokens,
+            actual_cost,
+            prompt_chars,
         )
 
     # M016 — stamp last_dreamed_at on every substrate file that appeared in
@@ -1499,8 +1575,7 @@ async def dream_entity(
             output_tokens=output_tokens,
             elapsed_s=round(elapsed, 1),
             no_vault_write=(
-                _entity_post_mtime == _entity_pre_mtime
-                and _entity_post_size == _entity_pre_size
+                _entity_post_mtime == _entity_pre_mtime and _entity_post_size == _entity_pre_size
             ),
         )
 
@@ -1513,11 +1588,15 @@ async def dream_entity(
     _maybe_web_research(entity)
 
     return DreamOutcome(
-        entity=entity, corpus_count=len(corpus_paths),
+        entity=entity,
+        corpus_count=len(corpus_paths),
         corpus_chars=prompt_chars,
-        actual_cost_usd=actual_cost, input_tokens=input_tokens,
-        output_tokens=output_tokens, sdk_result_text=result_text,
-        kind=None, elapsed_s=elapsed,
+        actual_cost_usd=actual_cost,
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+        sdk_result_text=result_text,
+        kind=None,
+        elapsed_s=elapsed,
         insufficient_corpus=insufficient_corpus,
     )
 
@@ -1737,7 +1816,11 @@ async def dream_all_entities(
       - "greedy": top-N by weight — deterministic, predictable
     """
     cd = cooldown_days if cooldown_days is not None else CONFIG.scheduling.dream_cooldown_days
-    run_cap = per_run_max_tokens if per_run_max_tokens is not None else CONFIG.limits.dream_cycle_max_tokens_per_run
+    run_cap = (
+        per_run_max_tokens
+        if per_run_max_tokens is not None
+        else CONFIG.limits.dream_cycle_max_tokens_per_run
+    )
     mode = selection_mode or "probabilistic"
 
     # One place computes every gate verdict (build_sweep_candidates); the sweep
@@ -1769,7 +1852,12 @@ async def dream_all_entities(
     log.info(
         "─── dream sweep: %d entities total, %d candidates after cooldown+priority filter"
         "%s (mode=%s, run_cap=%s tok%s) ───",
-        total_entities, len(ranked), backoff_label, mode, f"{run_cap:,}", seed_label,
+        total_entities,
+        len(ranked),
+        backoff_label,
+        mode,
+        f"{run_cap:,}",
+        seed_label,
     )
 
     results: list[DreamOutcome] = []
@@ -1781,22 +1869,31 @@ async def dream_all_entities(
         if run_cap > 0 and cumulative >= run_cap:
             log.info(
                 "Per-run token cap reached (%s >= %s tok) — stopping after %d entities",
-                f"{cumulative:,}", f"{run_cap:,}", idx - 1,
+                f"{cumulative:,}",
+                f"{run_cap:,}",
+                idx - 1,
             )
             break
         log.info(
             "▶ [%d/%d] dream-entity %s — weight=%.2f · source: %s",
-            idx, len(ranked), ent.slug, _weight, _source or "(default)",
+            idx,
+            len(ranked),
+            ent.slug,
+            _weight,
+            _source or "(default)",
         )
         res = await dream_entity(
-            ent, dry_run=dry_run, max_prompt_chars=per_entity_max_chars,
+            ent,
+            dry_run=dry_run,
+            max_prompt_chars=per_entity_max_chars,
         )
         results.append(res)
         cumulative += res.input_tokens + res.output_tokens
 
     log.info(
         "─── dream sweep finished: %d entities processed, cumulative %s tok ───",
-        len(results), f"{cumulative:,}",
+        len(results),
+        f"{cumulative:,}",
     )
     # Append-only history event so dashboard + grep can answer
     # "when did dream-cycle last run, for which entities, at what cost?"
@@ -1836,7 +1933,10 @@ def _maybe_web_research(ent: EntityRef) -> None:
         from web_research import run_web_research
 
         res = run_web_research(
-            ent.page, config=CONFIG, knowledge_dir=KNOWLEDGE_DIR, force=False,
+            ent.page,
+            config=CONFIG,
+            knowledge_dir=KNOWLEDGE_DIR,
+            force=False,
         )
         if res.status == "ok" and res.wrote:
             log.info("  web-research: wrote Public Profile block for %s", ent.slug)
@@ -1855,8 +1955,11 @@ def _run_web_research_standalone(ent: EntityRef, *, dry_run: bool) -> int:
     from web_research import run_web_research
 
     res = run_web_research(
-        ent.page, config=CONFIG, knowledge_dir=KNOWLEDGE_DIR,
-        force=True, dry_run=dry_run,
+        ent.page,
+        config=CONFIG,
+        knowledge_dir=KNOWLEDGE_DIR,
+        force=True,
+        dry_run=dry_run,
     )
     if res.status == "ok":
         if dry_run and res.block:
@@ -1877,16 +1980,24 @@ async def _async_main() -> int:
 
     p_one = sub.add_parser("entity", help="Re-synthesize one entity by slug")
     p_one.add_argument("slug", help="Entity slug (e.g. alex, emmett, yesterday-os)")
-    p_one.add_argument("--dry-run", action="store_true", help="Print prompt + estimate, no SDK call")
-    p_one.add_argument("--max-chars", type=int, default=None, help="Override per-entity prompt-char cap")
+    p_one.add_argument(
+        "--dry-run", action="store_true", help="Print prompt + estimate, no SDK call"
+    )
+    p_one.add_argument(
+        "--max-chars", type=int, default=None, help="Override per-entity prompt-char cap"
+    )
     p_one.add_argument("--max-turns", type=int, default=20, help="SDK max_turns budget")
-    p_one.add_argument("--ignore-cooldown", action="store_true", help="Skip the last_synthesized_at gate")
+    p_one.add_argument(
+        "--ignore-cooldown", action="store_true", help="Skip the last_synthesized_at gate"
+    )
 
-    p_wr = sub.add_parser("web-research",
-        help="Public-entity web enrichment for ONE entity (issue #2)")
+    p_wr = sub.add_parser(
+        "web-research", help="Public-entity web enrichment for ONE entity (issue #2)"
+    )
     p_wr.add_argument("slug", help="Entity slug (a public person)")
-    p_wr.add_argument("--dry-run", action="store_true",
-        help="Print the Public Profile block, write nothing")
+    p_wr.add_argument(
+        "--dry-run", action="store_true", help="Print the Public Profile block, write nothing"
+    )
 
     p_all = sub.add_parser("sweep", help="Sweep all entities (--all-entities)")
     p_all.add_argument("--dry-run", action="store_true")
@@ -1895,7 +2006,9 @@ async def _async_main() -> int:
     p_all.add_argument("--per-run-max-tokens", type=int, default=None)
     p_all.add_argument("--limit", type=int, default=None, help="Hard cap on entity count this run")
     p_all.add_argument(
-        "--seed", type=int, default=None,
+        "--seed",
+        type=int,
+        default=None,
         help="Pin RNG seed for reproducible probabilistic selection (debug aid).",
     )
     p_all.add_argument(
@@ -1903,14 +2016,16 @@ async def _async_main() -> int:
         choices=["probabilistic", "greedy"],
         default=None,
         help="M017: probabilistic (weighted-random) | greedy (top-N by weight). "
-             "Default reads from piggybacks.dream_cycle.selection_mode config.",
+        "Default reads from piggybacks.dream_cycle.selection_mode config.",
     )
 
     p_pb = sub.add_parser("piggyback", help="Piggyback wrapper — runs sweep with config defaults")
     p_pb.add_argument("--limit", type=int, default=None)
 
-    p_lc = sub.add_parser("list-candidates",
-        help="M017: show ranked candidate list with priority + age + source breakdown")
+    p_lc = sub.add_parser(
+        "list-candidates",
+        help="M017: show ranked candidate list with priority + age + source breakdown",
+    )
     p_lc.add_argument("--cooldown-days", type=int, default=None)
     p_lc.add_argument("--limit", type=int, default=30, help="Top N rows (default 30)")
     p_lc.add_argument("--json", action="store_true", help="Emit machine-readable JSON")
@@ -1932,11 +2047,15 @@ async def _async_main() -> int:
             log.info(
                 "Skipping %s: last_synthesized_at is %.1f days old < cooldown %dd. "
                 "Re-run with --ignore-cooldown to force.",
-                ent.slug, age or 0.0, cooldown,
+                ent.slug,
+                age or 0.0,
+                cooldown,
             )
             return 0
         res = await dream_entity(
-            ent, dry_run=args.dry_run, max_prompt_chars=args.max_chars,
+            ent,
+            dry_run=args.dry_run,
+            max_prompt_chars=args.max_chars,
             max_turns=args.max_turns,
         )
         # Web-research post-pass (issue #2) now fires inside dream_entity's
@@ -1980,6 +2099,7 @@ async def _async_main() -> int:
 
     if args.cmd == "list-candidates":
         import json as _json
+
         rows = list_candidates(cooldown_days=args.cooldown_days)
         if args.json:
             print(_json.dumps(rows, indent=2))
@@ -1987,8 +2107,8 @@ async def _async_main() -> int:
         # Pretty table
         print(f"{'Rank':<5} {'Weight':>8}  {'Prio':>6}  {'Age':>7}  {'Slug':<40} Source")
         print("-" * 110)
-        for i, r in enumerate(rows[:args.limit], 1):
-            age = f"{r['age_days']}d" if r['age_days'] is not None else "never"
+        for i, r in enumerate(rows[: args.limit], 1):
+            age = f"{r['age_days']}d" if r["age_days"] is not None else "never"
             flags = []
             if r["excluded"]:
                 flags.append("EXCLUDED")
@@ -1997,7 +2117,9 @@ async def _async_main() -> int:
             if r["backoff_active"]:
                 flags.append("backoff")
             flag = (" " + " ".join(flags)) if flags else ""
-            print(f"{i:<5} {r['weight']:>8.2f}  {r['priority']:>6.2f}  {age:>7}  {r['slug']:<40} {r['source']}{flag}")
+            print(
+                f"{i:<5} {r['weight']:>8.2f}  {r['priority']:>6.2f}  {age:>7}  {r['slug']:<40} {r['source']}{flag}"
+            )
         if len(rows) > args.limit:
             print(f"... and {len(rows) - args.limit} more (raise --limit to see)")
         return 0

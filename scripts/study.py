@@ -60,9 +60,7 @@ def _studies_root() -> Path:
     return studies_root(ROOT_DIR)
 
 
-def _run_one_instrument(
-    ref: InstrumentRef, run_dir: RunDirectory, study: Study
-) -> Path:
+def _run_one_instrument(ref: InstrumentRef, run_dir: RunDirectory, study: Study) -> Path:
     """Run one instrument's inference and place its report at the ref's
     canonical filename inside the run dir. Returns the final report path.
 
@@ -96,8 +94,10 @@ def cmd_list(args: argparse.Namespace) -> int:
         m = s.manifest
         last = s.state.last_run_at or "—"
         due = "DUE" if s.is_due() else "—"
-        print(f"  {m.study_id:<32}  schedule={m.schedule:<10}  "
-              f"runs={s.state.run_count:>3}  last={last:<26}  {due}")
+        print(
+            f"  {m.study_id:<32}  schedule={m.schedule:<10}  "
+            f"runs={s.state.run_count:>3}  last={last:<26}  {due}"
+        )
         print(f"    title:       {m.title}")
         print(f"    instruments: {', '.join(r.alias or r.slug for r in m.instruments)}")
         print()
@@ -137,9 +137,7 @@ def cmd_run(args: argparse.Namespace) -> int:
         # Optional: restrict to one instrument alias.
         instruments = list(study.manifest.instruments)
         if args.instrument:
-            instruments = [
-                r for r in instruments if (r.alias or r.slug) == args.instrument
-            ]
+            instruments = [r for r in instruments if (r.alias or r.slug) == args.instrument]
             if not instruments:
                 print(
                     f"ERROR: --instrument {args.instrument!r} not present in study "
@@ -170,8 +168,7 @@ def cmd_run(args: argparse.Namespace) -> int:
                     )
                     continue
                 print(
-                    f"  - {ref.alias or ref.slug} v{ref.version}: "
-                    f"source={ref.source}; running …",
+                    f"  - {ref.alias or ref.slug} v{ref.version}: source={ref.source}; running …",
                     flush=True,
                 )
                 try:
@@ -210,12 +207,12 @@ def cmd_run(args: argparse.Namespace) -> int:
                     flush=True,
                 )
                 import time as _time_mod
+
                 _time_mod.sleep(60.0)
                 still_failed: list = []
                 for ref in deferred_instruments:
                     print(
-                        f"  - {ref.alias or ref.slug} v{ref.version}: "
-                        f"deferred retry …",
+                        f"  - {ref.alias or ref.slug} v{ref.version}: deferred retry …",
                         flush=True,
                     )
                     try:
@@ -227,8 +224,7 @@ def cmd_run(args: argparse.Namespace) -> int:
                         )
                     except Exception as exc:
                         print(
-                            f"      ✗ still failing: {type(exc).__name__}: "
-                            f"{exc}",
+                            f"      ✗ still failing: {type(exc).__name__}: {exc}",
                             flush=True,
                         )
                         still_failed.append(ref)
@@ -255,8 +251,9 @@ def cmd_run(args: argparse.Namespace) -> int:
                     summary_path=run_dir.tmp_dir / "_summary.md",
                     charts_dir=run_dir.charts_dir,
                 )
-                print(f"      → meta-report: {summary_path.relative_to(run_dir.tmp_dir)}",
-                      flush=True)
+                print(
+                    f"      → meta-report: {summary_path.relative_to(run_dir.tmp_dir)}", flush=True
+                )
             except Exception as exc:
                 # Failure here MUST not poison the run — per-instrument
                 # reports are the source of truth. Log + continue, the
@@ -299,8 +296,7 @@ def cmd_run(args: argparse.Namespace) -> int:
                 final_run_dir = study.runs_dir / timestamp
                 user_prompt = build_pass1_user_prompt(study, final_run_dir)
                 print(
-                    f"\n→ Pass-1 analyst on this run "
-                    f"(prompt_chars={len(user_prompt):,}) …",
+                    f"\n→ Pass-1 analyst on this run (prompt_chars={len(user_prompt):,}) …",
                     flush=True,
                 )
                 result = run_analyst(
@@ -363,21 +359,24 @@ def cmd_new(args: argparse.Namespace) -> int:
         print(f"ERROR: study {args.study_id!r} already exists at {new_dir}", file=sys.stderr)
         return 2
     try:
-        manifest = StudyManifest.from_dict({
-            "study_id": args.study_id,
-            "title": f"{args.study_id} (rename me)",
-            "created": datetime.now(timezone.utc).isoformat(),
-            "schedule": "manual",
-            "instruments": [
-                {"slug": "phq-9", "version": "1.0.0", "source": "inferred"},
-            ],
-            "notes": "Stub manifest — edit `instruments` and `schedule`, then `wiki study run`.",
-        })
+        manifest = StudyManifest.from_dict(
+            {
+                "study_id": args.study_id,
+                "title": f"{args.study_id} (rename me)",
+                "created": datetime.now(timezone.utc).isoformat(),
+                "schedule": "manual",
+                "instruments": [
+                    {"slug": "phq-9", "version": "1.0.0", "source": "inferred"},
+                ],
+                "notes": "Stub manifest — edit `instruments` and `schedule`, then `wiki study run`.",
+            }
+        )
     except ValueError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 2
     new_dir.mkdir(parents=True)
     import yaml
+
     (new_dir / "manifest.yaml").write_text(
         yaml.safe_dump(
             manifest.to_dict(),
@@ -418,7 +417,9 @@ def cmd_piggyback(args: argparse.Namespace) -> int:
     for s in due:
         # Re-use cmd_run by faking the args namespace.
         run_args = argparse.Namespace(
-            study_id=s.manifest.study_id, instrument=None, no_analyze=False,
+            study_id=s.manifest.study_id,
+            instrument=None,
+            no_analyze=False,
         )
         rc = cmd_run(run_args)
         if rc != 0:
@@ -452,6 +453,7 @@ def cmd_answer(args: argparse.Namespace) -> int:
 
     answers_path = study_dir / "operator_answers.yaml"
     import yaml as yaml_mod
+
     if answers_path.is_file():
         data = yaml_mod.safe_load(answers_path.read_text(encoding="utf-8")) or {}
         if not isinstance(data, dict):
@@ -497,6 +499,7 @@ def cmd_diff(args: argparse.Namespace) -> int:
 
 def main() -> int:
     from core.console import setup_console_logging
+
     setup_console_logging("study")
 
     parser = argparse.ArgumentParser(description="Study lifecycle commands")
@@ -536,8 +539,12 @@ def main() -> int:
     p_ans.add_argument("study_id")
     p_ans.add_argument("instrument", help="instrument slug, e.g. phq-9")
     p_ans.add_argument("item", help="item id from items.yaml, e.g. 9")
-    p_ans.add_argument("value", type=int, help="integer answer within the instrument's Likert scale")
-    p_ans.add_argument("--note", default=None, help="optional free-form note (timestamp logged automatically)")
+    p_ans.add_argument(
+        "value", type=int, help="integer answer within the instrument's Likert scale"
+    )
+    p_ans.add_argument(
+        "--note", default=None, help="optional free-form note (timestamp logged automatically)"
+    )
     p_ans.set_defaults(func=cmd_answer)
 
     p_pb = sub.add_parser(

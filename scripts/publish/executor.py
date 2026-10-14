@@ -7,6 +7,7 @@ article already accepted is persisted in the manifest, so the rerun resumes
 where it stopped. The manifest is written only AFTER server success — never
 optimistically.
 """
+
 from __future__ import annotations
 
 import logging

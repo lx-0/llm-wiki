@@ -44,9 +44,12 @@ async def maybe_generate_suggestions(source: Path, dry_run: bool = False) -> Non
     source_content = source.read_text(encoding="utf-8")
     index_md = read_wiki_index_compact()
 
-    accounts_inline = ", ".join(
-        f"{name} = {info.get('email', '')}" for name, info in CONFIG.personal.accounts.items()
-    ) or "(none configured)"
+    accounts_inline = (
+        ", ".join(
+            f"{name} = {info.get('email', '')}" for name, info in CONFIG.personal.accounts.items()
+        )
+        or "(none configured)"
+    )
 
     prompt = render(
         "compile_suggestion",

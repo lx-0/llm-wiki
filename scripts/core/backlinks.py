@@ -65,8 +65,7 @@ def _render_footer(incoming_slugs: list[str], article: Path, knowledge_dir: Path
     canonical slug as a link relative to ``article``."""
     lines = [BACKLINKS_BEGIN, "", "## Backlinks", ""]
     lines.extend(
-        f"- [[{relative_link_for_slug(slug, article, knowledge_dir)}]]"
-        for slug in incoming_slugs
+        f"- [[{relative_link_for_slug(slug, article, knowledge_dir)}]]" for slug in incoming_slugs
     )
     lines.append("")
     lines.append(BACKLINKS_END)

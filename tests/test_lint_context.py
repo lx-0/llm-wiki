@@ -22,9 +22,7 @@ def _write(p: Path, text: str) -> None:
 
 
 def _ctx(tmp_path: Path) -> lint.LintContext:
-    return lint.build_context(
-        vault=tmp_path, knowledge_dir=tmp_path / "knowledge", state={}
-    )
+    return lint.build_context(vault=tmp_path, knowledge_dir=tmp_path / "knowledge", state={})
 
 
 # ── footer-aware orphan check (the live bug this candidate fixes) ────

@@ -27,14 +27,22 @@ from scripts.reports._engine.lib.likert import LikertItem, LikertScale
 
 def _assistant(usage: dict | None, text: str):
     from claude_agent_sdk import AssistantMessage, TextBlock
+
     return AssistantMessage(content=[TextBlock(text=text)], model="m", usage=usage)
 
 
 def _result(usage: dict | None, cost: float = 0.3, result: str = ""):
     from claude_agent_sdk import ResultMessage
+
     return ResultMessage(
-        subtype="success", duration_ms=1, duration_api_ms=1, is_error=False,
-        num_turns=1, session_id="t", total_cost_usd=cost, usage=usage,
+        subtype="success",
+        duration_ms=1,
+        duration_api_ms=1,
+        is_error=False,
+        num_turns=1,
+        session_id="t",
+        total_cost_usd=cost,
+        usage=usage,
         result=result,
     )
 
@@ -91,8 +99,10 @@ class TestInferenceAccounting:
 
         result = asyncio.run(
             inf._infer_batch_once_async(
-                "rendered prompt", self._batch(),
-                vault_cwd=Path("/tmp"), prompt_version="pv",
+                "rendered prompt",
+                self._batch(),
+                vault_cwd=Path("/tmp"),
+                prompt_version="pv",
             )
         )
 
@@ -119,8 +129,10 @@ class TestInferenceAccounting:
         with pytest.raises(inf.InferenceError) as ei:
             asyncio.run(
                 inf._infer_batch_once_async(
-                    "rendered prompt", self._batch(),
-                    vault_cwd=Path("/tmp"), prompt_version="pv",
+                    "rendered prompt",
+                    self._batch(),
+                    vault_cwd=Path("/tmp"),
+                    prompt_version="pv",
                 )
             )
         assert ei.value.failure is not None
@@ -140,8 +152,10 @@ class TestInferenceAccounting:
         with pytest.raises(inf.InferenceError) as ei:
             asyncio.run(
                 inf._infer_batch_once_async(
-                    "rendered prompt", self._batch(),
-                    vault_cwd=Path("/tmp"), prompt_version="pv",
+                    "rendered prompt",
+                    self._batch(),
+                    vault_cwd=Path("/tmp"),
+                    prompt_version="pv",
                 )
             )
         # Fast fail + empty stderr → cli_crash, which the retry ladder retries.
@@ -169,8 +183,10 @@ class TestInferenceAccounting:
         monkeypatch.setattr(inf, "query", fake_query)
         asyncio.run(
             inf._infer_batch_once_async(
-                "rendered prompt", self._batch(),
-                vault_cwd=Path("/tmp"), prompt_version="pv",
+                "rendered prompt",
+                self._batch(),
+                vault_cwd=Path("/tmp"),
+                prompt_version="pv",
             )
         )
 
@@ -180,9 +196,11 @@ class TestInferenceAccounting:
         assert options.permission_mode == "default"
         assert options.setting_sources == ["project"]
         assert options.can_use_tool is not None
+
         # Deny-all gate: no write root is permitted.
         async def _deny():
             return await options.can_use_tool("Write", {"file_path": "/tmp/x"}, None)
+
         assert asyncio.run(_deny()).behavior == "deny"
         # Streaming prompt envelope (can_use_tool contract).
         assert not isinstance(captured["prompt"], str)

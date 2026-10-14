@@ -80,14 +80,17 @@ class UsageLedger:
         """The one method call sites use. `provider` is inferred when omitted."""
         provider = provider or provider_for_model(model)
         self._by_key.setdefault((provider, model), Usage()).add(
-            input_tokens=input_tokens, output_tokens=output_tokens, calls=calls,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            calls=calls,
         )
 
     def record_ollama(self, model: str, stats: dict) -> None:
         """Record from a native /api/chat response (`prompt_eval_count`/`eval_count`)."""
         s = stats or {}
         self.record(
-            model=model, provider=PROVIDER_OLLAMA,
+            model=model,
+            provider=PROVIDER_OLLAMA,
             input_tokens=s.get("prompt_eval_count", 0) or 0,
             output_tokens=s.get("eval_count", 0) or 0,
         )
@@ -96,7 +99,8 @@ class UsageLedger:
         """Record from an OpenAI-compat `usage` block (`prompt_tokens`/`completion_tokens`)."""
         u = usage or {}
         self.record(
-            model=model, provider=PROVIDER_OLLAMA,
+            model=model,
+            provider=PROVIDER_OLLAMA,
             input_tokens=u.get("prompt_tokens", 0) or 0,
             output_tokens=u.get("completion_tokens", 0) or 0,
         )

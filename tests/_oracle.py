@@ -47,7 +47,11 @@ _DIGITS = re.compile(r"\d+")
 
 
 def _article(title: str, type_: str, body: str, **extra: str) -> str:
-    lines = [f"title: {title}", f"type: {type_}", "summary: fixture article for the behaviour oracle"]
+    lines = [
+        f"title: {title}",
+        f"type: {type_}",
+        "summary: fixture article for the behaviour oracle",
+    ]
     lines.extend(f"{key}: {value}" for key, value in extra.items())
     return "---\n" + "\n".join(lines) + "\n---\n\n# " + title + "\n\n" + body + "\n"
 
@@ -97,7 +101,11 @@ def build_fixture_vault(root: Path) -> Path:
     )
     (raw / "requests").mkdir()
     for n, (type_, status) in enumerate(
-        (("folder-deep-scan", "pending"), ("email-deep-scan", "pending"), ("email-deep-scan", "done")),
+        (
+            ("folder-deep-scan", "pending"),
+            ("email-deep-scan", "pending"),
+            ("email-deep-scan", "done"),
+        ),
         start=1,
     ):
         (raw / "requests" / f"request-{n:04d}.json").write_text(
@@ -106,7 +114,9 @@ def build_fixture_vault(root: Path) -> Path:
     (raw / "suggestions").mkdir()
 
     (vault / "inbox").mkdir()
-    (vault / "inbox" / "dropped.html").write_text("<html><body>dropped</body></html>", encoding="utf-8")
+    (vault / "inbox" / "dropped.html").write_text(
+        "<html><body>dropped</body></html>", encoding="utf-8"
+    )
     (vault / "inbox" / "dropped.md").write_text("# dropped\n", encoding="utf-8")
 
     (vault / "daily" / "2026-01-02").mkdir(parents=True)
@@ -217,7 +227,9 @@ def menu_payload(capsys: pytest.CaptureFixture[str]) -> dict:
     return json.loads(capsys.readouterr().out)
 
 
-def doctor_quick_payload(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> dict:
+def doctor_quick_payload(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> dict:
     import doctor
 
     monkeypatch.setattr(sys, "argv", ["doctor", "--quick", "--json"])

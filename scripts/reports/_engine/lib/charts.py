@@ -29,11 +29,11 @@ from pathlib import Path
 # Visual tokens — kept in one place so the operator's later style
 # adjustments don't need to chase variables across the file.
 _PALETTE = {
-    "ink": "#1f2937",         # default stroke + text
-    "muted": "#9ca3af",       # gridlines + secondary labels
-    "current": "#2563eb",     # current-run polygon stroke
+    "ink": "#1f2937",  # default stroke + text
+    "muted": "#9ca3af",  # gridlines + secondary labels
+    "current": "#2563eb",  # current-run polygon stroke
     "current_fill": "rgba(37, 99, 235, 0.18)",
-    "previous": "#9333ea",    # previous-run overlay stroke (dashed)
+    "previous": "#9333ea",  # previous-run overlay stroke (dashed)
     "previous_fill": "rgba(147, 51, 234, 0.10)",
     "axis": "#d1d5db",
     "warn": "#dc2626",
@@ -58,10 +58,9 @@ def _placeholder(out_path: Path, width: int, height: int, message: str) -> Path:
     body = (
         _svg_header(width, height)
         + f'<rect width="100%" height="100%" fill="#f9fafb" stroke="{_PALETTE["muted"]}"/>'
-        + f'<text x="{width//2}" y="{height//2}" text-anchor="middle" '
-          f'dominant-baseline="middle" fill="{_PALETTE["muted"]}" font-size="14">'
-          f"{message}</text>"
-        + "</svg>"
+        + f'<text x="{width // 2}" y="{height // 2}" text-anchor="middle" '
+        f'dominant-baseline="middle" fill="{_PALETTE["muted"]}" font-size="14">'
+        f"{message}</text>" + "</svg>"
     )
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(body, encoding="utf-8")
@@ -110,10 +109,9 @@ def render_sparkline(
         _svg_header(width, height)
         + f'<rect width="100%" height="100%" fill="white"/>'
         + f'<polyline points="{polyline}" fill="none" '
-          f'stroke="{_PALETTE["current"]}" stroke-width="1.5"/>'
+        f'stroke="{_PALETTE["current"]}" stroke-width="1.5"/>'
         + f'<circle cx="{last.x:.1f}" cy="{last.y:.1f}" r="2.5" '
-          f'fill="{_PALETTE["current"]}"/>'
-        + "</svg>"
+        f'fill="{_PALETTE["current"]}"/>' + "</svg>"
     )
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(body, encoding="utf-8")
@@ -144,7 +142,7 @@ def render_radar(
         return _placeholder(out_path, width, height, "no instruments to plot")
 
     cx, cy = width / 2, height / 2 - 10  # slight upward shift to make room for legend
-    radius = min(width, height) / 2 - 60   # margin for axis labels
+    radius = min(width, height) / 2 - 60  # margin for axis labels
 
     def _polar(i: int, v_norm: float) -> Point:
         # Angle 0 at top, going clockwise.
@@ -200,8 +198,7 @@ def render_radar(
     # Dots at each current-polygon vertex (clarify discrete data points)
     for p in curr_pts:
         elements.append(
-            f'<circle cx="{p.x:.1f}" cy="{p.y:.1f}" r="3" '
-            f'fill="{_PALETTE["current"]}"/>'
+            f'<circle cx="{p.x:.1f}" cy="{p.y:.1f}" r="3" fill="{_PALETTE["current"]}"/>'
         )
 
     # Axis labels — slightly outside the radius, anchor depends on x position
@@ -279,8 +276,7 @@ def render_timeline(
         return Point(x, y)
 
     score_norm = [
-        max(0.0, min(1.0, s / score_max if score_max > 0 else 0.0))
-        for (_, s, _) in series
+        max(0.0, min(1.0, s / score_max if score_max > 0 else 0.0)) for (_, s, _) in series
     ]
     cov_norm = [max(0.0, min(1.0, c / 100.0)) for (_, _, c) in series]
     score_pts = [_coord(i, v) for i, v in enumerate(score_norm)]
@@ -319,8 +315,7 @@ def render_timeline(
     # Dots at each score point
     for p in score_pts:
         elements.append(
-            f'<circle cx="{p.x:.1f}" cy="{p.y:.1f}" r="2.5" '
-            f'fill="{_PALETTE["current"]}"/>'
+            f'<circle cx="{p.x:.1f}" cy="{p.y:.1f}" r="2.5" fill="{_PALETTE["current"]}"/>'
         )
 
     # X-axis labels (compact dates — every other tick if many points)

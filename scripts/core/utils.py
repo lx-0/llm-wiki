@@ -28,6 +28,7 @@ from .paths import (
 
 # ── Datetime helpers ──────────────────────────────────────────────────
 
+
 def now_iso() -> str:
     """Current time in ISO 8601 format (local tz, second precision)."""
     return datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
@@ -39,6 +40,7 @@ def today_iso() -> str:
 
 
 # ── State management ──────────────────────────────────────────────────
+
 
 def load_json_state(path: Path, default: dict | None = None) -> dict:
     """Load a JSON state file, returning `default` (or {}) when missing."""
@@ -84,6 +86,7 @@ def load_state() -> dict:
 
 # ── Append-only event history (M003-S05) ──────────────────────────────
 
+
 def append_history(event_type: str, **fields) -> None:
     """Append one JSON line to STATE_DIR/history.jsonl.
 
@@ -122,12 +125,14 @@ def read_history(limit: int | None = None) -> list[dict]:
 
 # ── File hashing ──────────────────────────────────────────────────────
 
+
 def file_hash(path: Path) -> str:
     """SHA-256 hash of a file (first 16 hex chars)."""
     return hashlib.sha256(path.read_bytes()).hexdigest()[:16]
 
 
 # ── Slug / naming ─────────────────────────────────────────────────────
+
 
 def slugify(text: str, max_len: int | None = None) -> str:
     """Convert text to a filename-safe slug.
@@ -145,6 +150,7 @@ def slugify(text: str, max_len: int | None = None) -> str:
 
 # ── Wikilink helpers ──────────────────────────────────────────────────
 
+
 def extract_wikilinks(content: str) -> list[str]:
     """Extract the raw inner string of every [[wikilink]] in ``content``.
 
@@ -159,8 +165,7 @@ def extract_wikilinks(content: str) -> list[str]:
     from .links import WIKILINK_RE
 
     return [
-        m.group(2) + (m.group(3) or "") + (m.group(4) or "")
-        for m in WIKILINK_RE.finditer(content)
+        m.group(2) + (m.group(3) or "") + (m.group(4) or "") for m in WIKILINK_RE.finditer(content)
     ]
 
 
@@ -195,11 +200,7 @@ def read_wiki_index_compact() -> str:
     pipe-alias syntax (`[[X\\|alias]]`) is preserved.
     """
     if not INDEX_FILE.exists():
-        return (
-            "# Knowledge Base Index\n\n"
-            "| Article | Updated |\n"
-            "|---|---|"
-        )
+        return "# Knowledge Base Index\n\n| Article | Updated |\n|---|---|"
     txt = INDEX_FILE.read_text(encoding="utf-8")
     out: list[str] = []
     in_table_head = False
@@ -298,11 +299,7 @@ def read_hard_facts() -> str:
     parts = []
     for trust, _updated, rel, sources, raw_text in entries:
         sources_line = ", ".join(sources)
-        parts.append(
-            f"### {rel}  [trust: {trust}]\n\n"
-            f"> Sources: {sources_line}\n\n"
-            f"{raw_text}"
-        )
+        parts.append(f"### {rel}  [trust: {trust}]\n\n> Sources: {sources_line}\n\n{raw_text}")
     return "\n\n".join(parts)
 
 
@@ -351,9 +348,7 @@ def is_compile_excluded_path(rel_path: str | Path) -> bool:
     return any(rel_s.startswith(pre) for pre in COMPILE_SUBSTRATE_EXCLUDED_PREFIXES)
 
 
-def list_raw_files(
-    daily_dir: Path | None = None, raw_dir: Path | None = None
-) -> list[Path]:
+def list_raw_files(daily_dir: Path | None = None, raw_dir: Path | None = None) -> list[Path]:
     """List all daily log files AND raw source files, newest first by mtime.
 
     Order policy: mtime DESC so the compile pipeline processes recent activity
@@ -413,7 +408,7 @@ def get_article_word_count(path: Path) -> int:
     if content.startswith("---"):
         end = content.find("---", 3)
         if end != -1:
-            content = content[end + 3:]
+            content = content[end + 3 :]
     return len(content.split())
 
 

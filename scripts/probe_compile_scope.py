@@ -56,7 +56,9 @@ from claude_agent_sdk import (
 
 # Mirror the production `allowed_tools` 1:1 — that's the whole point.
 PRODUCTION_ALLOWED_TOOLS = [
-    "Read", "Glob", "Grep",
+    "Read",
+    "Glob",
+    "Grep",
     "Write(knowledge/**)",
     "Edit(knowledge/**)",
 ]
@@ -102,19 +104,24 @@ class ProbeOutcome:
     target_path: Path
     expected_on_disk: bool
     actual_on_disk: bool
-    write_tool_uses: list[dict]          # input dicts of every Write attempt
-    tool_results: list[dict]             # {'is_error', 'content', 'name'}
-    text_summary: str                    # joined TextBlock content
+    write_tool_uses: list[dict]  # input dicts of every Write attempt
+    tool_results: list[dict]  # {'is_error', 'content', 'name'}
+    text_summary: str  # joined TextBlock content
 
     @property
     def matches_expectation(self) -> bool:
         return self.expected_on_disk == self.actual_on_disk
 
 
-async def run_probe(label: str, prompt: str, cwd: Path, target_path: Path,
-                    expected_on_disk: bool,
-                    allowed_tools: list[str] | None = None,
-                    can_use_tool=None) -> ProbeOutcome:
+async def run_probe(
+    label: str,
+    prompt: str,
+    cwd: Path,
+    target_path: Path,
+    expected_on_disk: bool,
+    allowed_tools: list[str] | None = None,
+    can_use_tool=None,
+) -> ProbeOutcome:
     """Run one SDK call against a given allowed_tools / can_use_tool combo."""
     print(f"\n=== {label} ===", flush=True)
     print(f"  prompt: {prompt[:80]}{'...' if len(prompt) > 80 else ''}", flush=True)
@@ -139,7 +146,7 @@ async def run_probe(label: str, prompt: str, cwd: Path, target_path: Path,
         max_turns=3,
         setting_sources=["project"],
         system_prompt="You are a probe agent. Follow the user's instruction precisely. "
-                      "If a tool call is denied, report that fact in your text response.",
+        "If a tool call is denied, report that fact in your text response.",
     )
     if can_use_tool is not None:
         options_kwargs["can_use_tool"] = can_use_tool
@@ -167,13 +174,18 @@ async def run_probe(label: str, prompt: str, cwd: Path, target_path: Path,
             if isinstance(message.content, list):
                 for block in message.content:
                     if type(block).__name__ == "ToolResultBlock":
-                        tool_results.append({
-                            "is_error": getattr(block, "is_error", None),
-                            "content": str(getattr(block, "content", ""))[:200],
-                        })
+                        tool_results.append(
+                            {
+                                "is_error": getattr(block, "is_error", None),
+                                "content": str(getattr(block, "content", ""))[:200],
+                            }
+                        )
                         err_flag = "ERR" if getattr(block, "is_error", False) else "ok "
-                        print(f"  ← tool_result [{err_flag}]: "
-                              f"{str(getattr(block, 'content', ''))[:120]}", flush=True)
+                        print(
+                            f"  ← tool_result [{err_flag}]: "
+                            f"{str(getattr(block, 'content', ''))[:120]}",
+                            flush=True,
+                        )
         elif isinstance(message, ResultMessage):
             cost = getattr(message, "total_cost_usd", None) or 0
             print(f"  result: stop_reason=? cost=${cost:.4f}", flush=True)
@@ -261,24 +273,31 @@ async def main_async() -> int:
         for o in outcomes:
             status = "PASS" if o.matches_expectation else "FAIL"
             print(f"  [{status}] {o.label}")
-            print(f"          expected_on_disk={o.expected_on_disk}  "
-                  f"actual_on_disk={o.actual_on_disk}")
-            print(f"          write_tool_uses={len(o.write_tool_uses)}  "
-                  f"tool_results={len(o.tool_results)}")
+            print(
+                f"          expected_on_disk={o.expected_on_disk}  "
+                f"actual_on_disk={o.actual_on_disk}"
+            )
+            print(
+                f"          write_tool_uses={len(o.write_tool_uses)}  "
+                f"tool_results={len(o.tool_results)}"
+            )
             if o.tool_results:
                 for r in o.tool_results:
-                    print(f"            result is_error={r['is_error']!r}: "
-                          f"{r['content'][:80]}")
+                    print(f"            result is_error={r['is_error']!r}: {r['content'][:80]}")
             if o.text_summary:
                 print(f"          said: {o.text_summary[:120]}")
 
         all_pass = all(o.matches_expectation for o in outcomes)
         print()
-        print(f"  production allowlist (Write(knowledge/**)):  "
-              f"inside={'✓' if inside.matches_expectation else '✗'}  "
-              f"outside={'✓' if outside.matches_expectation else '✗'}")
-        print(f"  can_use_tool callback:                       "
-              f"outside={'✓' if outside_via_callback.matches_expectation else '✗'}")
+        print(
+            f"  production allowlist (Write(knowledge/**)):  "
+            f"inside={'✓' if inside.matches_expectation else '✗'}  "
+            f"outside={'✓' if outside.matches_expectation else '✗'}"
+        )
+        print(
+            f"  can_use_tool callback:                       "
+            f"outside={'✓' if outside_via_callback.matches_expectation else '✗'}"
+        )
         print()
         if all_pass:
             print("✓ All three probes match expectation.")

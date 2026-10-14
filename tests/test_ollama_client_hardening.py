@@ -14,6 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
 def test_keepalive_socket_options_enable_keepalive():
     from core import ollama_client
+
     opts = ollama_client._keepalive_socket_options()
     # SO_KEEPALIVE must be on — without it a half-open ESTABLISHED socket
     # never gets probed and recv() blocks indefinitely.
@@ -27,6 +28,7 @@ def test_keepalive_socket_options_enable_keepalive():
 
 def test_timeout_splits_connect_from_read(monkeypatch):
     from core import ollama_client
+
     monkeypatch.setattr(ollama_client.CONFIG.limits, "ollama_connect_timeout_s", 7)
     t = ollama_client._timeout(33.0)
     # A single httpx float would make connect == read; we want a short connect
@@ -43,6 +45,7 @@ def test_unreachable_host_fails_fast_not_hangs(monkeypatch):
     against a half-open socket). TEST-NET-1 (192.0.2.0/24) is reserved and
     unroutable, so the connect is dropped → connect-timeout fires."""
     from core import ollama_client
+
     monkeypatch.setattr(ollama_client.CONFIG.models, "ollama_url", "http://192.0.2.1:11434")
     monkeypatch.setattr(ollama_client.CONFIG.limits, "ollama_connect_timeout_s", 2)
     start = time.time()

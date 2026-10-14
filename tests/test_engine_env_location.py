@@ -32,17 +32,17 @@ pytestmark = pytest.mark.skipif(
 def _bash(script: str, env: dict | None = None) -> str:
     result = subprocess.run(
         ["bash", "-c", script],
-        capture_output=True, text=True, check=True,
-        env={"HOME": "/h", "PATH": "/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin",
-             **(env or {})},
+        capture_output=True,
+        text=True,
+        check=True,
+        env={"HOME": "/h", "PATH": "/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin", **(env or {})},
     )
     return result.stdout
 
 
 def _source(vault: str, extra_env: dict | None = None, tail: str = "") -> str:
     return _bash(
-        f"WIKI_DIR='{vault}/.wiki' ROOT_DIR='{vault}'; "
-        f"source '{ENGINE}/lib/common.sh'; {tail}",
+        f"WIKI_DIR='{vault}/.wiki' ROOT_DIR='{vault}'; source '{ENGINE}/lib/common.sh'; {tail}",
         env=extra_env,
     )
 
@@ -106,9 +106,24 @@ def test_hooks_installed_regex_matches_env_form(tmp_path: Path):
     """`hooks_installed` (and health.check_hooks_installed, same grammar)
     must recognise the new command shape as a wiki-managed hook."""
     cfg = tmp_path / "hooks.json"
-    cfg.write_text(json.dumps({"hooks": {"Stop": [{"hooks": [{"command":
-        f"cd '{ICLOUD_VAULT}/.wiki' && UV_PROJECT_ENVIRONMENT='/h/.venvs/lxw-wiki' "
-        "uv run python hooks/session-end.py"}]}]}}))
+    cfg.write_text(
+        json.dumps(
+            {
+                "hooks": {
+                    "Stop": [
+                        {
+                            "hooks": [
+                                {
+                                    "command": f"cd '{ICLOUD_VAULT}/.wiki' && UV_PROJECT_ENVIRONMENT='/h/.venvs/lxw-wiki' "
+                                    "uv run python hooks/session-end.py"
+                                }
+                            ]
+                        }
+                    ]
+                }
+            }
+        )
+    )
     out = _bash(
         f"WIKI_DIR='{ICLOUD_VAULT}/.wiki' ROOT_DIR='{ICLOUD_VAULT}'; "
         f"source '{ENGINE}/lib/common.sh'; source '{ENGINE}/lib/agents.sh'; "

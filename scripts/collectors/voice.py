@@ -85,7 +85,8 @@ def _punctuate(raw_transcript: str) -> str | None:
         if len(cleaned) > 3 * max(len(raw_transcript), 40):
             log.warning(
                 "voice punctuation returned %d chars from %d-char source — likely hallucination, falling back to raw",
-                len(cleaned), len(raw_transcript),
+                len(cleaned),
+                len(raw_transcript),
             )
             return None
         return cleaned
@@ -112,7 +113,9 @@ def _resolve_binary(configured: str, fallback_name: str) -> str | None:
         p = Path(configured).expanduser()
         if p.is_file():
             return str(p)
-        log.warning("configured %s path %s does not exist — falling back to $PATH", fallback_name, p)
+        log.warning(
+            "configured %s path %s does not exist — falling back to $PATH", fallback_name, p
+        )
     found = shutil.which(fallback_name)
     return found  # None if not on PATH
 
@@ -146,7 +149,8 @@ def _transcribe_audio(src: Path) -> str | None:
     if not model_path.is_file():
         log.warning(
             "voice_transcribe_model %s does not exist — leaving audio file %s in inbox",
-            model_path, src.name,
+            model_path,
+            src.name,
         )
         return None
 
@@ -170,58 +174,98 @@ def _transcribe_audio(src: Path) -> str | None:
             if not ffmpeg:
                 log.warning(
                     "ffmpeg not on $PATH (needed for %s; native whisper formats are mp3/wav/flac/ogg) — leaving %s in inbox",
-                    suffix, src.name,
+                    suffix,
+                    src.name,
                 )
                 return None
             audio_path = Path(tmp) / "audio.wav"
             try:
                 subprocess.run(
                     [
-                        ffmpeg, "-hide_banner", "-loglevel", "error", "-y",
-                        "-i", str(src),
-                        "-ar", "16000", "-ac", "1", "-c:a", "pcm_s16le",
+                        ffmpeg,
+                        "-hide_banner",
+                        "-loglevel",
+                        "error",
+                        "-y",
+                        "-i",
+                        str(src),
+                        "-ar",
+                        "16000",
+                        "-ac",
+                        "1",
+                        "-c:a",
+                        "pcm_s16le",
                         str(audio_path),
                     ],
-                    check=True, capture_output=True, timeout=FFMPEG_TIMEOUT_S,
+                    check=True,
+                    capture_output=True,
+                    timeout=FFMPEG_TIMEOUT_S,
                 )
             except subprocess.TimeoutExpired:
-                log.warning("ffmpeg timed out after %ds converting %s — leaving in inbox",
-                            int(FFMPEG_TIMEOUT_S), src.name)
+                log.warning(
+                    "ffmpeg timed out after %ds converting %s — leaving in inbox",
+                    int(FFMPEG_TIMEOUT_S),
+                    src.name,
+                )
                 return None
             except subprocess.CalledProcessError as exc:
                 stderr = (exc.stderr or b"").decode("utf-8", errors="replace").strip()
-                log.warning("ffmpeg failed (%s) on %s: %s — leaving in inbox",
-                            exc.returncode, src.name, stderr[:200])
+                log.warning(
+                    "ffmpeg failed (%s) on %s: %s — leaving in inbox",
+                    exc.returncode,
+                    src.name,
+                    stderr[:200],
+                )
                 return None
 
         try:
             result = subprocess.run(
                 [
                     whisper,
-                    "-m", str(model_path),
-                    "-l", language,
-                    "-t", str(threads),
-                    "-nt", "-np",
-                    "-f", str(audio_path),
+                    "-m",
+                    str(model_path),
+                    "-l",
+                    language,
+                    "-t",
+                    str(threads),
+                    "-nt",
+                    "-np",
+                    "-f",
+                    str(audio_path),
                 ],
-                check=True, capture_output=True, text=True, timeout=TRANSCRIBE_TIMEOUT_S,
+                check=True,
+                capture_output=True,
+                text=True,
+                timeout=TRANSCRIBE_TIMEOUT_S,
             )
         except subprocess.TimeoutExpired:
-            log.warning("whisper-cli timed out after %ds on %s — leaving in inbox",
-                        int(TRANSCRIBE_TIMEOUT_S), src.name)
+            log.warning(
+                "whisper-cli timed out after %ds on %s — leaving in inbox",
+                int(TRANSCRIBE_TIMEOUT_S),
+                src.name,
+            )
             return None
         except subprocess.CalledProcessError as exc:
             stderr = (exc.stderr or "").strip()
-            log.warning("whisper-cli failed (%s) on %s: %s — leaving in inbox",
-                        exc.returncode, src.name, stderr[-200:])
+            log.warning(
+                "whisper-cli failed (%s) on %s: %s — leaving in inbox",
+                exc.returncode,
+                src.name,
+                stderr[-200:],
+            )
             return None
 
     text = (result.stdout or "").strip()
     if not text:
         log.warning("whisper-cli returned empty transcript for %s — leaving in inbox", src.name)
         return None
-    log.info("transcribed %s (%d chars, lang=%s, model=%s)",
-             src.name, len(text), language, model_path.name)
+    log.info(
+        "transcribed %s (%d chars, lang=%s, model=%s)",
+        src.name,
+        len(text),
+        language,
+        model_path.name,
+    )
     return text
 
 
@@ -291,8 +335,12 @@ def _append_daily_rollup(captured_at: datetime, content: str, out_path: Path) ->
     except (ValueError, OSError):
         source_ref = out_path.name
     append_rollup(
-        date_iso, "voice", line,
-        source_ref=source_ref, log=log, context=f"voice note {out_path.name}",
+        date_iso,
+        "voice",
+        line,
+        source_ref=source_ref,
+        log=log,
+        context=f"voice note {out_path.name}",
     )
 
 
@@ -382,9 +430,7 @@ class VoiceCollector:
             out_path = OUTPUT_DIR / out_name
             # Same-minute slug collision: append seconds.
             if out_path.exists():
-                out_path = OUTPUT_DIR / out_name.replace(
-                    ".md", f"-{captured_at.strftime('%S')}.md"
-                )
+                out_path = OUTPUT_DIR / out_name.replace(".md", f"-{captured_at.strftime('%S')}.md")
 
             frontmatter = _build_frontmatter(
                 captured_at,

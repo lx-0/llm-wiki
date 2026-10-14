@@ -52,7 +52,10 @@ def migrate(vault: Path, dry_run: bool) -> int:
 
     sources = [knowledge / name for name in SOURCE_CANDIDATES if (knowledge / name).exists()]
     if not sources:
-        log.info("Nothing to migrate — no knowledge/log.md (or quarantine variant) found at %s", knowledge)
+        log.info(
+            "Nothing to migrate — no knowledge/log.md (or quarantine variant) found at %s",
+            knowledge,
+        )
         return 0
 
     if not dry_run:
@@ -77,14 +80,23 @@ def migrate(vault: Path, dry_run: bool) -> int:
                 merged = f"{head}\n\n{rest.lstrip()}\n{stripped_src}"
             else:
                 merged = f"# Operations Log\n\n{dest_text.lstrip()}\n{stripped_src}"
-            audit = src.with_suffix(src.suffix + f".migrated-{datetime.now().strftime('%Y%m%dT%H%M%S')}")
+            audit = src.with_suffix(
+                src.suffix + f".migrated-{datetime.now().strftime('%Y%m%dT%H%M%S')}"
+            )
             if dry_run:
-                log.info("would merge %s (%d bytes) into existing %s, leaving audit copy %s",
-                         src, src_size, dest, audit.name)
+                log.info(
+                    "would merge %s (%d bytes) into existing %s, leaving audit copy %s",
+                    src,
+                    src_size,
+                    dest,
+                    audit.name,
+                )
             else:
                 dest.write_text(merged, encoding="utf-8")
                 src.rename(audit)
-                log.info("merged %s (%d bytes) into %s; audit copy at %s", src, src_size, dest, audit)
+                log.info(
+                    "merged %s (%d bytes) into %s; audit copy at %s", src, src_size, dest, audit
+                )
         else:
             if dry_run:
                 log.info("would move %s (%d bytes) → %s", src, src_size, dest)
@@ -96,10 +108,18 @@ def migrate(vault: Path, dry_run: bool) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Migrate knowledge/log.md → .wiki/logs/operations.md")
-    parser.add_argument("--vault", type=Path, default=None,
-                        help="Vault root (default: derive from this file's location)")
-    parser.add_argument("--dry-run", action="store_true", help="Show what would happen without writing")
+    parser = argparse.ArgumentParser(
+        description="Migrate knowledge/log.md → .wiki/logs/operations.md"
+    )
+    parser.add_argument(
+        "--vault",
+        type=Path,
+        default=None,
+        help="Vault root (default: derive from this file's location)",
+    )
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Show what would happen without writing"
+    )
     args = parser.parse_args(argv)
 
     if args.vault is not None:

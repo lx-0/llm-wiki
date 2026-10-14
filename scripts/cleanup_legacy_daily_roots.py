@@ -51,9 +51,9 @@ def main() -> int:
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
 
-    logging.basicConfig(level=logging.INFO,
-                        format="%(asctime)s | %(levelname)-7s | %(message)s",
-                        datefmt="%H:%M:%S")
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s | %(levelname)-7s | %(message)s", datefmt="%H:%M:%S"
+    )
 
     if not args.vault.is_dir():
         print(f"error: --vault {args.vault} is not a directory", file=sys.stderr)
@@ -109,13 +109,17 @@ def main() -> int:
         if root_bytes != sub_bytes:
             skipped_diverged += 1
             diverged_paths.append(entry.name)
-            log.warning("  %s: content diverges from daily/%s/sessions.md — refusing to delete",
-                        entry.name, date_iso)
+            log.warning(
+                "  %s: content diverges from daily/%s/sessions.md — refusing to delete",
+                entry.name,
+                date_iso,
+            )
             continue
 
         if args.dry_run:
-            log.info("  DRY: would delete %s (%d bytes, matches subfolder)",
-                     entry.name, len(root_bytes))
+            log.info(
+                "  DRY: would delete %s (%d bytes, matches subfolder)", entry.name, len(root_bytes)
+            )
         else:
             entry.unlink()
             log.info("  deleted %s", entry.name)
@@ -127,13 +131,18 @@ def main() -> int:
     log.info("  skipped (today):           %d", skipped_today)
     log.info("  skipped (real digest):     %d", skipped_digest)
     log.info("  skipped (no subfolder):    %d", skipped_no_subfolder)
-    log.info("  skipped (diverged):        %d  %s",
-             skipped_diverged, f"— {diverged_paths}" if diverged_paths else "")
+    log.info(
+        "  skipped (diverged):        %d  %s",
+        skipped_diverged,
+        f"— {diverged_paths}" if diverged_paths else "",
+    )
     if skipped_diverged:
         log.warning("Diverged files need operator review. Either:")
         log.warning("  (a) accept the subfolder version as canonical → manually remove root,")
         log.warning("  (b) merge the diverged root edits into daily/<date>/sessions.md by hand,")
-        log.warning("  (c) leave both in place — the divergence will surface as a daily_root_not_digest lint warning.")
+        log.warning(
+            "  (c) leave both in place — the divergence will surface as a daily_root_not_digest lint warning."
+        )
     return 0
 
 

@@ -36,7 +36,11 @@ import pytest
 
 
 def _write_entity_page(
-    vault: Path, kind: str, slug: str, *, last_synthesized_at: str | None = None,
+    vault: Path,
+    kind: str,
+    slug: str,
+    *,
+    last_synthesized_at: str | None = None,
     body: str | None = None,
 ) -> Path:
     """Drop a minimal entity page with the two-layer State+Timeline shape."""
@@ -77,9 +81,14 @@ def vault(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Path]:
     monkey-patched to point here so the test never touches the real lxw vault.
     """
     for sub in (
-        "knowledge/people", "knowledge/projects", "knowledge/areas",
-        "knowledge/concepts", "knowledge/facts",
-        "raw/transcripts", "raw/notes", "daily",
+        "knowledge/people",
+        "knowledge/projects",
+        "knowledge/areas",
+        "knowledge/concepts",
+        "knowledge/facts",
+        "raw/transcripts",
+        "raw/notes",
+        "daily",
     ):
         (tmp_path / sub).mkdir(parents=True, exist_ok=True)
     (tmp_path / "knowledge" / "index.md").write_text(
@@ -101,16 +110,21 @@ def vault(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Path]:
     monkeypatch.setattr(dream, "LOG_FILE", tmp_path / "knowledge" / "log.md")
     monkeypatch.setattr(dream, "_SUBSTRATE_ROOTS", (tmp_path / "raw", tmp_path / "daily"))
     # Isolate the dream side-state files so tests never touch the real STATE_DIR.
-    monkeypatch.setattr(dream, "_DREAM_ACTIVATION_FILE", tmp_path / "state" / "dream-activation.json")
-    monkeypatch.setattr(dream, "_DREAM_INSUFFICIENT_FILE", tmp_path / "state" / "dream-insufficient-corpus.json")
+    monkeypatch.setattr(
+        dream, "_DREAM_ACTIVATION_FILE", tmp_path / "state" / "dream-activation.json"
+    )
+    monkeypatch.setattr(
+        dream, "_DREAM_INSUFFICIENT_FILE", tmp_path / "state" / "dream-insufficient-corpus.json"
+    )
     # _ENTITY_KINDS holds Path values captured at module-import time — rebuild
     # so the test's monkeypatched dirs are visible to _resolve_entity / _list_all_entities.
     monkeypatch.setattr(
-        dream, "_ENTITY_KINDS",
+        dream,
+        "_ENTITY_KINDS",
         {
-            "people":   (tmp_path / "knowledge" / "people",   "person"),
+            "people": (tmp_path / "knowledge" / "people", "person"),
             "projects": (tmp_path / "knowledge" / "projects", "project"),
-            "areas":    (tmp_path / "knowledge" / "areas",    "area"),
+            "areas": (tmp_path / "knowledge" / "areas", "area"),
         },
     )
     yield tmp_path
@@ -225,14 +239,16 @@ def test_cooldown_skips_recent_synthesis(vault: Path) -> None:
 
     assert dream.is_within_cooldown(fresh, cooldown_days=7) is True
     assert dream.is_within_cooldown(stale, cooldown_days=7) is False
-    assert dream.is_within_cooldown(never, cooldown_days=7) is False, \
+    assert dream.is_within_cooldown(never, cooldown_days=7) is False, (
         "never-synthesized entity must be eligible (not within cooldown)"
+    )
 
 
 def test_cooldown_zero_disables_gate(vault: Path) -> None:
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     _write_entity_page(vault, "people", "fresh", last_synthesized_at=today)
     import dream
+
     ent = dream._resolve_entity("fresh")
     assert ent is not None
     assert dream.is_within_cooldown(ent, cooldown_days=0) is False
@@ -258,10 +274,15 @@ def test_sweep_skips_cooldown_entities(vault: Path, monkeypatch: pytest.MonkeyPa
     async def _fake_dream_entity(entity, **kwargs):
         invocations.append(entity.slug)
         return dream.DreamOutcome(
-            entity=entity, corpus_count=1, corpus_chars=100,
+            entity=entity,
+            corpus_count=1,
+            corpus_chars=100,
             actual_cost_usd=0.01,
-            input_tokens=10, output_tokens=10, sdk_result_text="ok",
-            kind=None, elapsed_s=0.0,
+            input_tokens=10,
+            output_tokens=10,
+            sdk_result_text="ok",
+            kind=None,
+            elapsed_s=0.0,
         )
 
     monkeypatch.setattr(dream, "dream_entity", _fake_dream_entity)
@@ -283,10 +304,15 @@ def test_sweep_respects_per_run_token_cap(vault: Path, monkeypatch: pytest.Monke
 
     async def _fake_dream_entity(entity, **kwargs):
         return dream.DreamOutcome(
-            entity=entity, corpus_count=1, corpus_chars=100,
+            entity=entity,
+            corpus_count=1,
+            corpus_chars=100,
             actual_cost_usd=0.0,
-            input_tokens=10, output_tokens=10, sdk_result_text="ok",
-            kind=None, elapsed_s=0.0,
+            input_tokens=10,
+            output_tokens=10,
+            sdk_result_text="ok",
+            kind=None,
+            elapsed_s=0.0,
         )
 
     monkeypatch.setattr(dream, "dream_entity", _fake_dream_entity)
@@ -323,9 +349,7 @@ def test_collect_corpus_picks_up_compiled_from_and_author(vault: Path) -> None:
     import dream
 
     _write_entity_page(vault, "people", "alex")
-    body = (
-        "---\nauthor: alex\ntitle: Voice note\n---\n\nDictated thought.\n"
-    )
+    body = "---\nauthor: alex\ntitle: Voice note\n---\n\nDictated thought.\n"
     _write_substrate(vault, "raw/voice/2026-05-10.md", body)
     ent = dream._resolve_entity("alex")
     assert ent is not None
@@ -340,7 +364,9 @@ def test_prompt_carries_existing_state_and_timeline(vault: Path) -> None:
     import dream
 
     _write_entity_page(
-        vault, "people", "bob",
+        vault,
+        "people",
+        "bob",
         body=(
             "# Bob\n\n## State\n\n- **Role:** OPERATOR-EDITED\n\n"
             "## Action Items\n\n- [x] OPERATOR-CHECKED-ITEM\n\n"
@@ -357,9 +383,6 @@ def test_prompt_carries_existing_state_and_timeline(vault: Path) -> None:
     prompt, _ = dream._build_prompt(ent, breakdown.all_paths, max_turns=20, breakdown=breakdown)
     assert "OPERATOR-EDITED" in prompt
     assert "OPERATOR-CHECKED-ITEM" in prompt
-
-
-
 
 
 # ── 7. Agent-task spec parses & defaults make sense ─────────────────
@@ -393,8 +416,14 @@ def _make_fake_query(monkeypatch, *, usage, cost, result_text="done"):
         calls["n"] += 1
         yield AssistantMessage(content=[TextBlock(text=result_text)], model="m", usage=usage)
         yield ResultMessage(
-            subtype="success", duration_ms=1, duration_api_ms=1, is_error=False,
-            num_turns=1, session_id="s", total_cost_usd=cost, usage=usage,
+            subtype="success",
+            duration_ms=1,
+            duration_api_ms=1,
+            is_error=False,
+            num_turns=1,
+            session_id="s",
+            total_cost_usd=cost,
+            usage=usage,
             result=result_text,
         )
 
@@ -427,8 +456,12 @@ def test_low_token_warning_does_not_fire_on_cached_call(
     with caplog.at_level(logging.WARNING):
         result = asyncio.run(dream.dream_entity(ent))
 
-    assert "SDK reported only" not in caplog.text, "false-positive low-token warning fired on a cached call"
-    assert result.input_tokens == 40012, f"expected cache-inclusive total, got {result.input_tokens}"
+    assert "SDK reported only" not in caplog.text, (
+        "false-positive low-token warning fired on a cached call"
+    )
+    assert result.input_tokens == 40012, (
+        f"expected cache-inclusive total, got {result.input_tokens}"
+    )
 
 
 def test_low_token_warning_still_fires_on_genuine_early_exit(
@@ -442,8 +475,12 @@ def test_low_token_warning_still_fires_on_genuine_early_exit(
     _write_entity_page(vault, "people", "early")
     _write_substrate(vault, "raw/notes/n.md", "early appears here in substrate.\n")
 
-    usage = {"input_tokens": 12, "cache_creation_input_tokens": 0,
-             "cache_read_input_tokens": 0, "output_tokens": 3}
+    usage = {
+        "input_tokens": 12,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "output_tokens": 3,
+    }
     _make_fake_query(monkeypatch, usage=usage, cost=0.0)
 
     ent = dream._resolve_entity("early")
@@ -513,7 +550,8 @@ def test_build_prompt_within_budget_trims_to_fit(vault: Path) -> None:
     # Several mentioning substrate files, each non-trivial.
     for i in range(6):
         _write_substrate(
-            vault, f"raw/notes/n{i}.md",
+            vault,
+            f"raw/notes/n{i}.md",
             f"trim is discussed here, entry {i}. " + ("filler content. " * 80),
         )
 
@@ -582,9 +620,7 @@ def test_insufficient_corpus_noop_logs_at_info_not_warning(
     assert not warned, "INSUFFICIENT_CORPUS no-op must not hit WARNING/errors-log"
 
 
-def test_unexplained_noop_still_warns(
-    vault: Path, monkeypatch: pytest.MonkeyPatch, caplog
-) -> None:
+def test_unexplained_noop_still_warns(vault: Path, monkeypatch: pytest.MonkeyPatch, caplog) -> None:
     """A byte-identical page with NO sentinel (possible silent write-failure)
     must keep its WARNING — that's the diagnostic this check exists for."""
     import logging
@@ -605,7 +641,8 @@ def test_unexplained_noop_still_warns(
         asyncio.run(dream.dream_entity(ent))
 
     warned = [
-        r for r in caplog.records
+        r
+        for r in caplog.records
         if r.levelno >= logging.WARNING and "finished without modifying" in r.getMessage()
     ]
     assert warned, "unexplained no-op should still warn (silent write-failure surface)"
@@ -616,12 +653,13 @@ def test_unexplained_noop_still_warns(
 
 def test_backoff_window_is_exponential_capped():
     import dream
+
     f = dream._insufficient_backoff_days
     assert f(0, base_days=7, max_days=30) == 0.0
     assert f(1, base_days=7, max_days=30) == 7.0
     assert f(2, base_days=7, max_days=30) == 14.0
     assert f(3, base_days=7, max_days=30) == 28.0
-    assert f(4, base_days=7, max_days=30) == 30.0   # 56 capped to 30
+    assert f(4, base_days=7, max_days=30) == 30.0  # 56 capped to 30
     assert f(9, base_days=7, max_days=30) == 30.0
 
 
@@ -690,9 +728,7 @@ def test_web_research_fires_on_sweep_not_just_single_entity(
     assert "swept" in fired, "web-research post-pass did not fire on the sweep path"
 
 
-def test_successful_synthesis_clears_backoff(
-    vault: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_successful_synthesis_clears_backoff(vault: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Once a real synthesis lands, the backoff entry is cleared so the entity
     returns to normal cadence."""
     import dream
@@ -710,12 +746,23 @@ def test_successful_synthesis_clears_backoff(
 
     async def _writing_query(*args, **kwargs):
         page.write_text(page.read_text(encoding="utf-8") + "\n- new line\n", encoding="utf-8")
-        yield AssistantMessage(content=[TextBlock(text="updated")], model="m",
-                               usage={"input_tokens": 12, "cache_creation_input_tokens": 9000, "output_tokens": 60})
-        yield ResultMessage(subtype="success", duration_ms=1, duration_api_ms=1,
-                            is_error=False, num_turns=1, session_id="s",
-                            total_cost_usd=0.3, usage={"input_tokens": 12, "cache_creation_input_tokens": 9000, "output_tokens": 60},
-                            result="updated")
+        yield AssistantMessage(
+            content=[TextBlock(text="updated")],
+            model="m",
+            usage={"input_tokens": 12, "cache_creation_input_tokens": 9000, "output_tokens": 60},
+        )
+        yield ResultMessage(
+            subtype="success",
+            duration_ms=1,
+            duration_api_ms=1,
+            is_error=False,
+            num_turns=1,
+            session_id="s",
+            total_cost_usd=0.3,
+            usage={"input_tokens": 12, "cache_creation_input_tokens": 9000, "output_tokens": 60},
+            result="updated",
+        )
+
     monkeypatch.setattr(_d, "query", _writing_query)
 
     ent = dream._resolve_entity("recovers")
@@ -725,9 +772,7 @@ def test_successful_synthesis_clears_backoff(
     assert "recovers" not in dream._load_insufficient_state(), "backoff not cleared after synthesis"
 
 
-def test_sweep_skips_backed_off_entity(
-    vault: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_sweep_skips_backed_off_entity(vault: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """dream_all_entities must not select an entity inside its backoff window."""
     import dream
 
@@ -740,8 +785,14 @@ def test_sweep_skips_backed_off_entity(
     async def _fake_dream_entity(entity, **kwargs):
         invoked.append(entity.slug)
         return dream.DreamOutcome(
-            entity=entity, corpus_count=0, corpus_chars=0, actual_cost_usd=0.0,
-            input_tokens=0, output_tokens=0, sdk_result_text="", kind=None,
+            entity=entity,
+            corpus_count=0,
+            corpus_chars=0,
+            actual_cost_usd=0.0,
+            input_tokens=0,
+            output_tokens=0,
+            sdk_result_text="",
+            kind=None,
             elapsed_s=0.0,
         )
 
@@ -764,8 +815,8 @@ def test_build_sweep_candidates_flags_cooldown_and_backoff(
 
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     _write_entity_page(vault, "people", "fresh", last_synthesized_at=today)  # cooldown
-    _write_entity_page(vault, "people", "dormant")                          # backoff
-    _write_entity_page(vault, "people", "ready")                            # clean
+    _write_entity_page(vault, "people", "dormant")  # backoff
+    _write_entity_page(vault, "people", "ready")  # clean
     dream._record_insufficient_corpus("dormant")
 
     rows = {c.entity.slug: c for c in dream.build_sweep_candidates(cooldown_days=7)}
@@ -778,9 +829,7 @@ def test_build_sweep_candidates_flags_cooldown_and_backoff(
     assert rows["ready"].backoff_active is False
 
 
-def test_list_candidates_surfaces_backoff(
-    vault: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_list_candidates_surfaces_backoff(vault: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """The debug view exposes insufficient-corpus backoff, not just cooldown —
     the omission that made the sweep and list-candidates diverge."""
     import dream

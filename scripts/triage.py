@@ -99,7 +99,10 @@ def _resolve(stem: str) -> Path | None:
     if len(cands) == 1:
         return cands[0]
     if len(cands) > 1:
-        print(f"ambiguous '{stem}' — matches {len(cands)}: {[c.stem for c in cands][:5]}", file=sys.stderr)
+        print(
+            f"ambiguous '{stem}' — matches {len(cands)}: {[c.stem for c in cands][:5]}",
+            file=sys.stderr,
+        )
     else:
         print(f"no inbox record matching '{stem}'", file=sys.stderr)
     return None
@@ -212,8 +215,7 @@ def _list(show_all: bool, as_json: bool = False) -> int:
         print(f"  • {f.stem}")
         print(f"      ({date} · {conf}{flag}) {summ}")
     pend = sum(1 for _, fm, _ in recs if fm.get("status") == "pending")
-    print(f"\n{pend} pending · {len(recs)} total.  "
-          "Act: wiki triage accept|dismiss <stem>")
+    print(f"\n{pend} pending · {len(recs)} total.  Act: wiki triage accept|dismiss <stem>")
     return 0
 
 
@@ -223,7 +225,8 @@ def main() -> int:
     pl = sub.add_parser("list", help="list records (default)")
     pl.add_argument("--all", action="store_true", help="include accepted/dismissed/done")
     pl.add_argument(
-        "--json", action="store_true",
+        "--json",
+        action="store_true",
         help="machine-readable list (desktop app / agents)",
     )
     # Triage verbs: accept (task → tasks/ + todo.md; idea/note → filed) / dismiss.

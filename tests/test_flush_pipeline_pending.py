@@ -26,8 +26,7 @@ def _archive(tmp_path: Path, monkeypatch, *names: str) -> Path:
 
 
 def test_pending_rescues_unparseable_names(tmp_path, monkeypatch):
-    _archive(tmp_path, monkeypatch,
-             "session-flush-abc-1780000000.md", "flush-context.md")
+    _archive(tmp_path, monkeypatch, "session-flush-abc-1780000000.md", "flush-context.md")
     got = {s.path.name for s in fp.pending()}
     assert got == {"session-flush-abc-1780000000.md", "flush-context.md"}
 
@@ -54,17 +53,22 @@ def test_rescued_entry_created_from_mtime(tmp_path, monkeypatch):
     failed = _archive(tmp_path, monkeypatch, "flush-context.md")
     stamp = int(time.time()) - 86_400
     import os
+
     os.utime(failed / "flush-context.md", (stamp, stamp))
     assert list(fp.pending())[0].created == stamp
 
 
 def test_pending_still_sorts_oldest_first(tmp_path, monkeypatch):
-    failed = _archive(tmp_path, monkeypatch,
-                      "session-flush-a-1780000000.md",
-                      "session-flush-b-1770000000.md",
-                      "stray.md")
+    failed = _archive(
+        tmp_path,
+        monkeypatch,
+        "session-flush-a-1780000000.md",
+        "session-flush-b-1770000000.md",
+        "stray.md",
+    )
     now = int(time.time())
     import os
+
     os.utime(failed / "stray.md", (now, now))
     order = [s.created for s in fp.pending()]
     assert order == sorted(order)

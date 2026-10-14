@@ -84,7 +84,9 @@ def test_resolve_accounts_nested_block_key():
         accounts, "oura-pat", lambda aid, block: aid, block_key=("health", "oura")
     )
     hk = base.resolve_accounts(
-        accounts, "healthkit-xml-export", lambda aid, block: aid,
+        accounts,
+        "healthkit-xml-export",
+        lambda aid, block: aid,
         block_key=("health", "healthkit"),
     )
     assert oura == ["me"]
@@ -200,7 +202,10 @@ def test_run_account_loop_describe_controls_message_label():
         return ("done", None, False)
 
     outcome = base.run_account_loop(
-        accts, scan, log=log, name="Health",
+        accts,
+        scan,
+        log=log,
+        name="Health",
         describe=lambda a: f"{a.account_id} oura",
     )
     assert outcome.messages == ["me oura: done"]

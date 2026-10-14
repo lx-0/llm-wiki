@@ -6,6 +6,7 @@ ContextMcpClient + bootstrap + executor against a stateful in-process fake
 speaking the observed wire shape — including the server-side re-slugification
 (slugifySkillName), so the S01 fixpoint property is asserted end-to-end.
 """
+
 from __future__ import annotations
 
 import json
@@ -37,11 +38,14 @@ class FakeContextMcp:
         payload = json.loads(request.content.decode()) if request.content else {}
         method = payload.get("method")
         if method == "initialize":
-            return self._rpc(payload, {
-                "protocolVersion": "2025-06-18",
-                "serverInfo": {"name": "context-mcp", "version": "0.0.56"},
-                "capabilities": {},
-            })
+            return self._rpc(
+                payload,
+                {
+                    "protocolVersion": "2025-06-18",
+                    "serverInfo": {"name": "context-mcp", "version": "0.0.56"},
+                    "capabilities": {},
+                },
+            )
         if method == "notifications/initialized":
             return httpx.Response(202)
         if method == "tools/call":
@@ -52,15 +56,21 @@ class FakeContextMcp:
 
     @staticmethod
     def _rpc(payload: dict, result: dict) -> httpx.Response:
-        return httpx.Response(200, json={
-            "jsonrpc": "2.0", "id": payload.get("id"), "result": result,
-        })
+        return httpx.Response(
+            200,
+            json={
+                "jsonrpc": "2.0",
+                "id": payload.get("id"),
+                "result": result,
+            },
+        )
 
     @staticmethod
     def _json_result(value: dict) -> dict:
-        return {"content": [{"type": "text",
-                             "text": json.dumps(value, indent=2)}],
-                "isError": False}
+        return {
+            "content": [{"type": "text", "text": json.dumps(value, indent=2)}],
+            "isError": False,
+        }
 
     @staticmethod
     def _error(text: str) -> dict:
@@ -75,8 +85,11 @@ class FakeContextMcp:
             slug = server_slug(args.get("slug") or args["name"])
             if slug in self.wikis:
                 return self._error(f'a wiki with slug "{slug}" already exists')
-            self.wikis[slug] = {"slug": slug, "name": args["name"],
-                                "managed_by": args.get("managed_by")}
+            self.wikis[slug] = {
+                "slug": slug,
+                "name": args["name"],
+                "managed_by": args.get("managed_by"),
+            }
             return self._json_result({"wiki": self.wikis[slug]})
         if name == "write_article":
             return self._write_article(args)
@@ -104,17 +117,20 @@ class FakeContextMcp:
             entry = {"wiki": args["wiki"], "seq": 0, "archived": False}
             self.articles[slug] = entry
         if entry["wiki"] != args["wiki"]:
-            return self._error(
-                f'article "{slug}" belongs to wiki "{entry["wiki"]}"')
+            return self._error(f'article "{slug}" belongs to wiki "{entry["wiki"]}"')
         if entry["archived"]:
             entry["archived"] = False  # restore-on-write (contract §5)
         entry["seq"] += 1
         entry["content"] = args["content"]
-        return self._json_result({
-            "article_id": slug, "wiki": args["wiki"],
-            "version_seq": entry["seq"], "created": created,
-            **({"start_page": True} if args.get("start_page") else {}),
-        })
+        return self._json_result(
+            {
+                "article_id": slug,
+                "wiki": args["wiki"],
+                "version_seq": entry["seq"],
+                "created": created,
+                **({"start_page": True} if args.get("start_page") else {}),
+            }
+        )
 
 
 def _vault(tmp_path: Path) -> tuple[Path, Path]:
@@ -139,8 +155,7 @@ def _vault(tmp_path: Path) -> tuple[Path, Path]:
 
 
 def _run_publish(server: FakeContextMcp, store, k: Path, vault: Path):
-    client = ContextMcpClient("https://fake.test/mcp", "tok",
-                              transport=server.transport())
+    client = ContextMcpClient("https://fake.test/mcp", "tok", transport=server.transport())
     ensure_wiki(client, "llm-wiki", "LLM Wiki")
     plan, slug_map = build_publish_plan(vault, store)
     start = start_page_payload(slug_map, "LLM Wiki")

@@ -8,6 +8,7 @@ would see it, the surgical path is calling `core.prompts.render` directly.
 LLM-emission quality (does the model actually obey the rule?) is S03's
 real-substrate canary deliverable, not this plumbing test.
 """
+
 from __future__ import annotations
 
 from core.prompts import render

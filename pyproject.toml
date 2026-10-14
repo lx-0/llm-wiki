@@ -49,6 +49,13 @@ dev = [
 [tool.ruff]
 line-length = 100
 
+[tool.ruff.format]
+# core/config_schema.py is read as TEXT by core/config_docs.py: the field comments become
+# docs/config.md. ruff's wrapping moves trailing comments off the field line and the
+# generator drops them (eight descriptions went to "—" on 2026-10-14). The file is 72 %
+# comment by design (deslop-arc audit: "leave it") — formatted by hand, linted like the rest.
+exclude = ["scripts/core/config_schema.py"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["scripts"]

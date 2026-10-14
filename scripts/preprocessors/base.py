@@ -28,6 +28,7 @@ from typing import ClassVar, Protocol, runtime_checkable
 
 # ── Spec ─────────────────────────────────────────────────────────────
 
+
 @dataclass(frozen=True)
 class PreprocessorSpec:
     """Static declaration on each Preprocessor class.
@@ -53,6 +54,7 @@ class PreprocessorSpec:
 
 # ── Result type ──────────────────────────────────────────────────────
 
+
 @dataclass(frozen=True)
 class PreprocessResult:
     """What `Preprocessor.run()` returns — metrics for logging + CLI output."""
@@ -64,6 +66,7 @@ class PreprocessResult:
 
 
 # ── Preprocessor Protocol ────────────────────────────────────────────
+
 
 @runtime_checkable
 class Preprocessor(Protocol):

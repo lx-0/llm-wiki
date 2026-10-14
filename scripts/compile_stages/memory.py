@@ -51,7 +51,7 @@ def _strip_path_prefix(s: str) -> str:
     marker = "-projects-"
     idx = s.rfind(marker)
     if idx >= 0:
-        return s[idx + len(marker):]
+        return s[idx + len(marker) :]
     return s.lstrip("-")
 
 

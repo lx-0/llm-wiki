@@ -41,7 +41,10 @@ def _write_entity_page(vault: Path, kind: str, slug: str, *, body: str | None = 
         "---",
     ]
     page = dir_ / f"{slug}.md"
-    page.write_text("\n".join(fm) + "\n\n" + (body or f"# {slug}\n\n## State\n\n## Timeline\n"), encoding="utf-8")
+    page.write_text(
+        "\n".join(fm) + "\n\n" + (body or f"# {slug}\n\n## State\n\n## Timeline\n"),
+        encoding="utf-8",
+    )
     return page
 
 
@@ -63,6 +66,7 @@ def _write_substrate(
     path.write_text(text, encoding="utf-8")
     if mtime is not None:
         import os
+
         os.utime(path, (mtime, mtime))
     return path
 
@@ -71,11 +75,17 @@ def _write_substrate(
 def vault(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Path]:
     """Temp vault with the standard tree, monkey-patched into dream module."""
     for sub in (
-        "knowledge/people", "knowledge/projects", "knowledge/areas",
+        "knowledge/people",
+        "knowledge/projects",
+        "knowledge/areas",
         "knowledge/concepts",
-        "raw/transcripts/jamie", "raw/transcripts/gmeet",
-        "raw/notes/email", "raw/notes/calendar", "raw/notes/screenshots",
-        "raw/notes/longform", "raw/memories",
+        "raw/transcripts/jamie",
+        "raw/transcripts/gmeet",
+        "raw/notes/email",
+        "raw/notes/calendar",
+        "raw/notes/screenshots",
+        "raw/notes/longform",
+        "raw/memories",
         "daily",
     ):
         (tmp_path / sub).mkdir(parents=True, exist_ok=True)
@@ -86,6 +96,7 @@ def vault(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Path]:
     (tmp_path / "knowledge" / "log.md").write_text("# Log\n", encoding="utf-8")
 
     import dream
+
     monkeypatch.setattr(dream, "ROOT_DIR", tmp_path)
     monkeypatch.setattr(dream, "RAW_DIR", tmp_path / "raw")
     monkeypatch.setattr(dream, "DAILY_DIR", tmp_path / "daily")
@@ -96,11 +107,12 @@ def vault(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Path]:
     monkeypatch.setattr(dream, "LOG_FILE", tmp_path / "knowledge" / "log.md")
     monkeypatch.setattr(dream, "_SUBSTRATE_ROOTS", (tmp_path / "raw", tmp_path / "daily"))
     monkeypatch.setattr(
-        dream, "_ENTITY_KINDS",
+        dream,
+        "_ENTITY_KINDS",
         {
-            "people":   (tmp_path / "knowledge" / "people",   "person"),
+            "people": (tmp_path / "knowledge" / "people", "person"),
             "projects": (tmp_path / "knowledge" / "projects", "project"),
-            "areas":    (tmp_path / "knowledge" / "areas",    "area"),
+            "areas": (tmp_path / "knowledge" / "areas", "area"),
         },
     )
     # last_dreamed_at lives in a side-state JSON (commit 3f35ab3 — raw/ is
@@ -109,7 +121,8 @@ def vault(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Path]:
     # across runs → first run of the day stamps it, later runs see "already
     # stamped today" and return False (stateful cross-run pollution).
     monkeypatch.setattr(
-        dream, "_DREAM_ACTIVATION_FILE",
+        dream,
+        "_DREAM_ACTIVATION_FILE",
         tmp_path / ".wiki" / "state" / "dream-activation.json",
     )
     yield tmp_path
@@ -127,7 +140,8 @@ def test_tier1_includes_most_recent_n_substrate(vault: Path) -> None:
     # 30 substrate files at descending mtime — newest first
     for i in range(30):
         _write_substrate(
-            vault, f"raw/notes/longform/n{i:02d}.md",
+            vault,
+            f"raw/notes/longform/n{i:02d}.md",
             f"# Note {i}\n\nalex did something interesting.\n",
             mtime=now - i * 86400,
         )
@@ -135,7 +149,10 @@ def test_tier1_includes_most_recent_n_substrate(vault: Path) -> None:
     ent = dream._resolve_entity("alex")
     assert ent is not None
     bd = dream.collect_corpus_tiered(
-        ent, tier1_recent_count=10, tier1_digest_days=0, tier2_sample_count=0,
+        ent,
+        tier1_recent_count=10,
+        tier1_digest_days=0,
+        tier2_sample_count=0,
         rng_seed=42,
     )
 
@@ -155,14 +172,18 @@ def test_tier1_includes_daily_digests(vault: Path) -> None:
     for i in range(10):
         d = today - timedelta(days=i)
         _write_substrate(
-            vault, f"daily/{d.isoformat()}.md",
+            vault,
+            f"daily/{d.isoformat()}.md",
             f"# {d.isoformat()}\n\nGeneric digest content (no slug mention).\n",
         )
 
     ent = dream._resolve_entity("alex")
     assert ent is not None
     bd = dream.collect_corpus_tiered(
-        ent, tier1_recent_count=0, tier1_digest_days=5, tier2_sample_count=0,
+        ent,
+        tier1_recent_count=0,
+        tier1_digest_days=5,
+        tier2_sample_count=0,
         rng_seed=42,
     )
     assert len(bd.tier1_digests) == 5
@@ -178,13 +199,15 @@ def test_tier1_includes_operator_authored_content(vault: Path) -> None:
     _write_entity_page(vault, "people", "alex")
     # Operator-authored concept (no mention of slug in body, just frontmatter)
     _write_substrate(
-        vault, "knowledge/concepts/personal-music-taste.md",
+        vault,
+        "knowledge/concepts/personal-music-taste.md",
         "# Music\n\nThoughts on bands.\n",
         frontmatter={"title": "Music Taste", "author": "alex", "compile_role": "source-and-final"},
     )
     # Non-authored concept that mentions slug — should NOT appear as authored
     _write_substrate(
-        vault, "knowledge/concepts/some-topic.md",
+        vault,
+        "knowledge/concepts/some-topic.md",
         "Topic page authored by the compile agent. alex mentioned here.\n",
         frontmatter={"title": "Some Topic"},
     )
@@ -223,14 +246,16 @@ def test_tier2_samples_K_files_from_older_pool(vault: Path) -> None:
     # 50 files older than Tier 1
     for i in range(50):
         _write_substrate(
-            vault, f"raw/notes/email/old{i:02d}.md",
+            vault,
+            f"raw/notes/email/old{i:02d}.md",
             f"alex was mentioned here, message {i}\n",
             mtime=now - (100 + i) * 86400,
         )
     # 5 recent files for Tier 1
     for i in range(5):
         _write_substrate(
-            vault, f"raw/notes/email/new{i:02d}.md",
+            vault,
+            f"raw/notes/email/new{i:02d}.md",
             f"alex recent {i}\n",
             mtime=now - i * 86400,
         )
@@ -238,7 +263,10 @@ def test_tier2_samples_K_files_from_older_pool(vault: Path) -> None:
     ent = dream._resolve_entity("alex")
     assert ent is not None
     bd = dream.collect_corpus_tiered(
-        ent, tier1_recent_count=5, tier1_digest_days=0, tier2_sample_count=20,
+        ent,
+        tier1_recent_count=5,
+        tier1_digest_days=0,
+        tier2_sample_count=20,
         rng_seed=42,
     )
     assert len(bd.tier1_recent) == 5
@@ -273,6 +301,7 @@ def test_compute_sampling_score_components(vault: Path) -> None:
 
 def test_recency_decay_monotone(vault: Path) -> None:
     import dream
+
     now = time.time()
     fresh = dream._recency_decay(now, now=now)
     old = dream._recency_decay(now - 365 * 86400, now=now)
@@ -286,6 +315,7 @@ def test_recency_decay_monotone(vault: Path) -> None:
 
 def test_importance_lookup(vault: Path) -> None:
     import dream
+
     assert dream._importance_for("raw/memories/m.md") == 3.0
     assert dream._importance_for("raw/transcripts/jamie/foo.md") == 2.0
     assert dream._importance_for("raw/transcripts/gmeet/bar.md") == 2.0
@@ -299,12 +329,16 @@ def test_importance_lookup(vault: Path) -> None:
 def test_never_dreamed_file_dominates_score(vault: Path) -> None:
     """A file with no last_dreamed_at: gets the sentinel; beats stamped files."""
     import dream
+
     now = time.time()
     fresh = _write_substrate(vault, "raw/notes/email/fresh.md", "alex\n", mtime=now)
     # Stamped file: dreamed today
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     stamped = _write_substrate(
-        vault, "raw/notes/email/stamped.md", "alex\n", mtime=now,
+        vault,
+        "raw/notes/email/stamped.md",
+        "alex\n",
+        mtime=now,
         frontmatter={"last_dreamed_at": today},
     )
 
@@ -322,6 +356,7 @@ def test_write_last_dreamed_at_records_side_state(vault: Path) -> None:
     """The stamp lands in the side-state JSON, NOT in the substrate file —
     raw/ is immutable (commit 3f35ab3, moved out of frontmatter)."""
     import dream
+
     p = _write_substrate(vault, "raw/notes/email/no-fm.md", "Body only — no frontmatter.\n")
     before = p.read_text()
     when = datetime(2026, 5, 17, tzinfo=timezone.utc)
@@ -339,14 +374,17 @@ def test_write_last_dreamed_at_records_side_state(vault: Path) -> None:
 def test_write_last_dreamed_at_leaves_substrate_untouched(vault: Path) -> None:
     """A file with its own frontmatter is never polluted with last_dreamed_at."""
     import dream
+
     p = _write_substrate(
-        vault, "raw/notes/email/with-fm.md", "Body here.\n",
+        vault,
+        "raw/notes/email/with-fm.md",
+        "Body here.\n",
         frontmatter={"title": "x", "author": "alex"},
     )
     when = datetime(2026, 5, 17, tzinfo=timezone.utc)
     dream._write_last_dreamed_at(p, when=when)
     fm, body = dream._parse_frontmatter(p.read_text())
-    assert fm == {"title": "x", "author": "alex"}   # unchanged, no last_dreamed_at
+    assert fm == {"title": "x", "author": "alex"}  # unchanged, no last_dreamed_at
     assert "Body here." in body
     # The stamp lives in the side-state, keyed by the vault-relative path.
     assert dream._load_dream_activation().get("raw/notes/email/with-fm.md") == "2026-05-17"
@@ -355,9 +393,10 @@ def test_write_last_dreamed_at_leaves_substrate_untouched(vault: Path) -> None:
 def test_write_last_dreamed_at_idempotent_same_day(vault: Path) -> None:
     """Re-stamping with the same date is a no-op (don't churn the side-state)."""
     import dream
+
     p = _write_substrate(vault, "raw/notes/email/x.md", "Body.\n")
     when = datetime(2026, 5, 17, 12, 0, tzinfo=timezone.utc)
-    assert dream._write_last_dreamed_at(p, when=when) is True   # first stamp writes
+    assert dream._write_last_dreamed_at(p, when=when) is True  # first stamp writes
     assert dream._write_last_dreamed_at(p, when=when) is False  # same day → no-op
 
 
@@ -370,10 +409,7 @@ def test_stamp_last_dreamed_at_batches_one_write(vault: Path) -> None:
 
     import dream
 
-    paths = [
-        _write_substrate(vault, f"raw/notes/email/batch-{i}.md", "Body.\n")
-        for i in range(3)
-    ]
+    paths = [_write_substrate(vault, f"raw/notes/email/batch-{i}.md", "Body.\n") for i in range(3)]
     when = datetime(2026, 5, 17, tzinfo=timezone.utc)
 
     assert dream._stamp_last_dreamed_at(paths, when=when) == 3
@@ -393,6 +429,7 @@ def test_stamp_last_dreamed_at_batches_one_write(vault: Path) -> None:
 
 def test_dreams_since_last_seen_reads_stamp(vault: Path) -> None:
     import dream
+
     # Fixed `now` (not datetime.now()): the stamp is a date string truncated to
     # midnight, so a wall-clock `now` drifted the gap out of [5,6) near midnight /
     # across timezones (flaky — saw 6.005). Pinning `now` to noon keeps the gap a
@@ -400,7 +437,9 @@ def test_dreams_since_last_seen_reads_stamp(vault: Path) -> None:
     now = datetime(2026, 6, 10, 12, 0, tzinfo=timezone.utc)
     five_days_ago = (now - timedelta(days=5)).strftime("%Y-%m-%d")
     p = _write_substrate(
-        vault, "raw/notes/email/x.md", "Body.\n",
+        vault,
+        "raw/notes/email/x.md",
+        "Body.\n",
         frontmatter={"last_dreamed_at": five_days_ago},
     )
     days = dream._dreams_since_last_seen_days(p, now=now)
@@ -418,14 +457,21 @@ def test_dreams_since_last_seen_reads_stamp(vault: Path) -> None:
 def test_prompt_carries_conflict_aware_reshape_mandate() -> None:
     """Prompt must contain the explicit RE-EVALUATE / supersede mandate."""
     from core.prompts import render
+
     body = render(
         "dream_entity",
-        entity_slug="x", entity_title="X", entity_type="person",
+        entity_slug="x",
+        entity_title="X",
+        entity_type="person",
         entity_page="knowledge/people/x.md",
         current_page="(none)",
-        corpus_block="(empty)", corpus_count=0, corpus_chars=0,
-        owner_block="", facts_md="",
-        max_turns=20, today="2026-05-17",
+        corpus_block="(empty)",
+        corpus_count=0,
+        corpus_chars=0,
+        owner_block="",
+        facts_md="",
+        max_turns=20,
+        today="2026-05-17",
         now="2026-05-17T00:00:00Z",
         entity_link="knowledge/people/x",
         output_language_instruction="",
@@ -455,7 +501,9 @@ def test_corpus_stays_bounded_on_large_substrate_pool(vault: Path) -> None:
     for i in range(500):
         sub = "raw/notes/email" if i % 2 == 0 else "raw/notes/longform"
         _write_substrate(
-            vault, f"{sub}/n{i:04d}.md", big_body,
+            vault,
+            f"{sub}/n{i:04d}.md",
+            big_body,
             mtime=now - i * 3600,
         )
 
@@ -481,7 +529,8 @@ def test_corpus_stays_bounded_on_large_substrate_pool(vault: Path) -> None:
 
 
 def test_dream_entity_stamps_last_dreamed_at_after_sdk(
-    vault: Path, monkeypatch: pytest.MonkeyPatch,
+    vault: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """A successful dream must stamp every corpus file — in the side-state,
     not by mutating the raw/ files."""
@@ -528,7 +577,8 @@ def test_dream_entity_stamps_last_dreamed_at_after_sdk(
 
 
 def test_dream_entity_skips_stamp_on_daily_digest(
-    vault: Path, monkeypatch: pytest.MonkeyPatch,
+    vault: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """daily/<date>.md is NOT stamped (mtime would churn on every dream)."""
     import asyncio
@@ -545,9 +595,14 @@ def test_dream_entity_skips_stamp_on_daily_digest(
     async def _fake_query(*args, **kwargs):
         yield _UsageMsg()
         yield ResultMessage(
-            subtype="success", duration_ms=10, duration_api_ms=10,
-            is_error=False, num_turns=1, session_id="x",
-            total_cost_usd=0.01, result="ok",
+            subtype="success",
+            duration_ms=10,
+            duration_api_ms=10,
+            is_error=False,
+            num_turns=1,
+            session_id="x",
+            total_cost_usd=0.01,
+            result="ok",
         )
 
     monkeypatch.setattr(dream, "query", _fake_query)

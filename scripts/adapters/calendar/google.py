@@ -65,8 +65,7 @@ class GoogleCalendarClient:
                     raise CalendarAPIError(
                         f"network failure on GET {url}: {type(e).__name__}: {e}"
                     ) from e
-                log.warning("calendar GET %s: %s — retrying once in 5s",
-                            url, type(e).__name__)
+                log.warning("calendar GET %s: %s — retrying once in 5s", url, type(e).__name__)
                 time.sleep(5)
                 continue
 
@@ -76,21 +75,14 @@ class GoogleCalendarClient:
                     "Re-run `wiki calendar-auth`."
                 )
             if r.status_code == 403:
-                raise CalendarAPIError(
-                    f"403 on GET {url}: {r.text[:200]}"
-                )
+                raise CalendarAPIError(f"403 on GET {url}: {r.text[:200]}")
             if r.status_code == 404:
-                raise CalendarAPIError(
-                    f"404 on GET {url}: calendar id not found or not accessible"
-                )
+                raise CalendarAPIError(f"404 on GET {url}: calendar id not found or not accessible")
             if r.status_code == 429:
                 wait = int(r.headers.get("Retry-After", "10"))
                 if attempt == 2:
-                    raise CalendarAPIError(
-                        f"429 on GET {url} after retry (waited {wait}s)"
-                    )
-                log.warning("calendar GET %s: 429 — sleeping %ds before retry",
-                            url, wait)
+                    raise CalendarAPIError(f"429 on GET {url} after retry (waited {wait}s)")
+                log.warning("calendar GET %s: 429 — sleeping %ds before retry", url, wait)
                 time.sleep(wait)
                 continue
             if 500 <= r.status_code < 600:
@@ -98,14 +90,11 @@ class GoogleCalendarClient:
                     raise CalendarAPIError(
                         f"persistent {r.status_code} on GET {url}: {r.text[:200]}"
                     )
-                log.warning("calendar GET %s: %d — retrying once in 5s",
-                            url, r.status_code)
+                log.warning("calendar GET %s: %d — retrying once in 5s", url, r.status_code)
                 time.sleep(5)
                 continue
             if r.status_code != 200:
-                raise CalendarAPIError(
-                    f"unexpected {r.status_code} on GET {url}: {r.text[:200]}"
-                )
+                raise CalendarAPIError(f"unexpected {r.status_code} on GET {url}: {r.text[:200]}")
 
             try:
                 payload = r.json()
@@ -114,9 +103,7 @@ class GoogleCalendarClient:
                     f"non-JSON response from {url}: {type(e).__name__}: {e}"
                 ) from e
             if not isinstance(payload, dict):
-                raise CalendarAPIError(
-                    f"{url} returned {type(payload).__name__}, expected dict"
-                )
+                raise CalendarAPIError(f"{url} returned {type(payload).__name__}, expected dict")
             return payload
 
         raise CalendarAPIError(f"unreachable: exhausted retries on GET {url}")
@@ -190,6 +177,7 @@ class GoogleCalendarClient:
         # urlencoded for the path segment. The session normally does this,
         # but Google Calendar's path-parameter encoding is conservative.
         from urllib.parse import quote
+
         cal_segment = quote(calendar_id, safe="")
         url = f"{_API_BASE}/calendars/{cal_segment}/events"
 
@@ -212,6 +200,7 @@ class GoogleCalendarClient:
         """Fetch a single event (used by the etag re-fetch path when a
         listed instance reports a changed etag)."""
         from urllib.parse import quote
+
         cal_segment = quote(calendar_id, safe="")
         evt_segment = quote(event_id, safe="")
         return self._get(f"{_API_BASE}/calendars/{cal_segment}/events/{evt_segment}")

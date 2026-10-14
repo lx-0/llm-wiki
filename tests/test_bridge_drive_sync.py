@@ -12,6 +12,7 @@ from types import SimpleNamespace
 
 def _import():
     from bridge import drive_sync
+
     return drive_sync
 
 
@@ -19,6 +20,7 @@ def _ok(stdout: str = "", stderr: str = "", rc: int = 0):
     def fake_run(cmd, **kwargs):
         fake_run.calls.append(cmd)
         return SimpleNamespace(returncode=rc, stdout=stdout, stderr=stderr)
+
     fake_run.calls = []
     return fake_run
 

@@ -37,7 +37,9 @@ def _envelope(subject: str, mailbox: str, host: str, date: datetime | None) -> E
     )
 
 
-def _fetch_row(subject: str, sender: str, date: datetime | None, *, internaldate: bool = True) -> dict:
+def _fetch_row(
+    subject: str, sender: str, date: datetime | None, *, internaldate: bool = True
+) -> dict:
     mailbox, _, host = sender.partition("@")
     row: dict = {
         b"ENVELOPE": _envelope(subject, mailbox, host, date),
@@ -133,10 +135,14 @@ def test_imap_reader_satisfies_protocol() -> None:
 def test_scan_metadata_builds_message_meta() -> None:
     FakeIMAPClient.FOLDERS = {
         "INBOX": {
-            1: _fetch_row("hello", "alice@example.com", datetime(2026, 5, 10, 9, 0, tzinfo=timezone.utc)),
+            1: _fetch_row(
+                "hello", "alice@example.com", datetime(2026, 5, 10, 9, 0, tzinfo=timezone.utc)
+            ),
         },
         "INBOX/Work": {
-            2: _fetch_row("invoice", "bob@vendor.com", datetime(2026, 5, 11, 8, 0, tzinfo=timezone.utc)),
+            2: _fetch_row(
+                "invoice", "bob@vendor.com", datetime(2026, 5, 11, 8, 0, tzinfo=timezone.utc)
+            ),
         },
     }
     metas = list(_reader().scan_metadata())
@@ -166,7 +172,9 @@ def test_scan_metadata_since_drops_old_and_undated() -> None:
 def test_scan_metadata_folder_allowlist() -> None:
     FakeIMAPClient.FOLDERS = {
         "INBOX": {1: _fetch_row("keep", "a@x.com", datetime(2026, 5, 10, tzinfo=timezone.utc))},
-        "[Gmail]/All Mail": {2: _fetch_row("skip", "b@x.com", datetime(2026, 5, 10, tzinfo=timezone.utc))},
+        "[Gmail]/All Mail": {
+            2: _fetch_row("skip", "b@x.com", datetime(2026, 5, 10, tzinfo=timezone.utc))
+        },
     }
     metas = list(_reader(folders=["INBOX"]).scan_metadata())
     assert {m.subject for m in metas} == {"keep"}
@@ -178,7 +186,9 @@ def test_scan_metadata_skips_noselect_folders() -> None:
     """
     FakeIMAPClient.FOLDERS = {
         "[Gmail]": {},  # noselect namespace container
-        "[Gmail]/All Mail": {1: _fetch_row("real", "a@x.com", datetime(2026, 5, 10, tzinfo=timezone.utc))},
+        "[Gmail]/All Mail": {
+            1: _fetch_row("real", "a@x.com", datetime(2026, 5, 10, tzinfo=timezone.utc))
+        },
     }
     FakeIMAPClient.NOSELECT = {"[Gmail]"}
 
@@ -194,7 +204,9 @@ def test_scan_metadata_raises_without_credentials(monkeypatch: pytest.MonkeyPatc
     the collector must be able to tell "couldn't read" from "0 new mail".
     """
     monkeypatch.delenv("TEST_IMAP_PASS", raising=False)
-    FakeIMAPClient.FOLDERS = {"INBOX": {1: _fetch_row("x", "a@x.com", datetime(2026, 5, 10, tzinfo=timezone.utc))}}
+    FakeIMAPClient.FOLDERS = {
+        "INBOX": {1: _fetch_row("x", "a@x.com", datetime(2026, 5, 10, tzinfo=timezone.utc))}
+    }
     with pytest.raises(MailboxReadError):
         list(_reader().scan_metadata())
 
@@ -202,7 +214,9 @@ def test_scan_metadata_raises_without_credentials(monkeypatch: pytest.MonkeyPatc
 def test_scan_metadata_raises_on_login_failure() -> None:
     """Bad app password → IMAP login fails → surfaced as MailboxReadError."""
     FakeIMAPClient.RAISE_ON_LOGIN = True
-    FakeIMAPClient.FOLDERS = {"INBOX": {1: _fetch_row("x", "a@x.com", datetime(2026, 5, 10, tzinfo=timezone.utc))}}
+    FakeIMAPClient.FOLDERS = {
+        "INBOX": {1: _fetch_row("x", "a@x.com", datetime(2026, 5, 10, tzinfo=timezone.utc))}
+    }
     with pytest.raises(MailboxReadError):
         list(_reader().scan_metadata())
 

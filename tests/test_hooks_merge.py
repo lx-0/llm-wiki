@@ -28,28 +28,55 @@ pytestmark = pytest.mark.skipif(
 
 def _merge(cfg: Path, agent: str) -> dict:
     subprocess.run(
-        ["bash", "-c",
-         f"WIKI_DIR='{VAULT}/.wiki' ROOT_DIR='{VAULT}'; "
-         f"source '{ENGINE}/lib/common.sh'; source '{ENGINE}/lib/agents.sh'; "
-         f"merge_into_config '{cfg}' \"$(agent_payload {agent})\""],
-        check=True, capture_output=True, text=True,
+        [
+            "bash",
+            "-c",
+            f"WIKI_DIR='{VAULT}/.wiki' ROOT_DIR='{VAULT}'; "
+            f"source '{ENGINE}/lib/common.sh'; source '{ENGINE}/lib/agents.sh'; "
+            f"merge_into_config '{cfg}' \"$(agent_payload {agent})\"",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
         env={"HOME": "/h", "PATH": "/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin"},
     )
     return json.loads(cfg.read_text())
 
 
 def _old_wiki(script: str) -> dict:
-    return {"matcher": "", "hooks": [{"type": "command", "timeout": 10,
-            "command": f"cd '{VAULT}/.wiki' && uv run python hooks/{script}"}]}
+    return {
+        "matcher": "",
+        "hooks": [
+            {
+                "type": "command",
+                "timeout": 10,
+                "command": f"cd '{VAULT}/.wiki' && uv run python hooks/{script}",
+            }
+        ],
+    }
 
 
 def test_codex_merge_keeps_foreign_session_start_hook(tmp_path: Path):
     cfg = tmp_path / "hooks.json"
-    herdr = {"hooks": [{"type": "command", "command": "bash '/h/.codex/herdr-agent-state.sh' session", "timeout": 10}]}
-    cfg.write_text(json.dumps({"hooks": {
-        "SessionStart": [_old_wiki("session-start.py"), herdr],
-        "Stop": [_old_wiki("session-end.py")],
-    }}))
+    herdr = {
+        "hooks": [
+            {
+                "type": "command",
+                "command": "bash '/h/.codex/herdr-agent-state.sh' session",
+                "timeout": 10,
+            }
+        ]
+    }
+    cfg.write_text(
+        json.dumps(
+            {
+                "hooks": {
+                    "SessionStart": [_old_wiki("session-start.py"), herdr],
+                    "Stop": [_old_wiki("session-end.py")],
+                }
+            }
+        )
+    )
     out = _merge(cfg, "codex")
     start = out["hooks"]["SessionStart"]
     assert herdr in start, "the operator's own hook must survive the install"
@@ -61,13 +88,17 @@ def test_codex_merge_keeps_foreign_session_start_hook(tmp_path: Path):
 
 def test_claude_merge_preserves_other_top_level_keys_and_events(tmp_path: Path):
     cfg = tmp_path / "settings.json"
-    cfg.write_text(json.dumps({
-        "permissions": {"allow": ["Bash(git status)"]},
-        "hooks": {
-            "SessionStart": [{"hooks": [{"type": "command", "command": "ytstack-inject"}]}],
-            "UserPromptSubmit": [{"hooks": [{"type": "command", "command": "other"}]}],
-        },
-    }))
+    cfg.write_text(
+        json.dumps(
+            {
+                "permissions": {"allow": ["Bash(git status)"]},
+                "hooks": {
+                    "SessionStart": [{"hooks": [{"type": "command", "command": "ytstack-inject"}]}],
+                    "UserPromptSubmit": [{"hooks": [{"type": "command", "command": "other"}]}],
+                },
+            }
+        )
+    )
     out = _merge(cfg, "claude")
     assert out["permissions"] == {"allow": ["Bash(git status)"]}
     assert out["hooks"]["UserPromptSubmit"][0]["hooks"][0]["command"] == "other"
@@ -79,12 +110,23 @@ def test_claude_merge_preserves_other_top_level_keys_and_events(tmp_path: Path):
 
 def test_cursor_bare_entries_are_recognised(tmp_path: Path):
     cfg = tmp_path / "hooks.json"
-    cfg.write_text(json.dumps({"version": 1, "hooks": {
-        "sessionStart": [
-            {"type": "command", "command": f"cd '{VAULT}/.wiki' && uv run python hooks/session-start.py", "timeout": 15},
-            {"type": "command", "command": "my-own-hook", "timeout": 5},
-        ],
-    }}))
+    cfg.write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "hooks": {
+                    "sessionStart": [
+                        {
+                            "type": "command",
+                            "command": f"cd '{VAULT}/.wiki' && uv run python hooks/session-start.py",
+                            "timeout": 15,
+                        },
+                        {"type": "command", "command": "my-own-hook", "timeout": 5},
+                    ],
+                },
+            }
+        )
+    )
     out = _merge(cfg, "cursor")
     cmds = [e["command"] for e in out["hooks"]["sessionStart"]]
     assert "my-own-hook" in cmds
@@ -99,7 +141,9 @@ def test_fresh_file_is_the_payload(tmp_path: Path):
 
 def test_merge_is_idempotent(tmp_path: Path):
     cfg = tmp_path / "hooks.json"
-    cfg.write_text(json.dumps({"hooks": {"Stop": [{"hooks": [{"type": "command", "command": "keep"}]}]}}))
+    cfg.write_text(
+        json.dumps({"hooks": {"Stop": [{"hooks": [{"type": "command", "command": "keep"}]}]}})
+    )
     once = _merge(cfg, "codex")
     twice = _merge(cfg, "codex")
     assert once == twice

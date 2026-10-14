@@ -149,7 +149,10 @@ def _merge_dataclass(default: Any, override: dict[str, Any], *, path: str = "") 
             log.warning(
                 "config.yaml: %s = %r (%s) does not fit the schema type — "
                 "keeping the engine default %r",
-                key_path, raw, type(raw).__name__, current,
+                key_path,
+                raw,
+                type(raw).__name__,
+                current,
             )
             kwargs[f.name] = current
         else:
@@ -245,8 +248,7 @@ def _validate_watched_folders_schema(personal_raw: dict) -> None:
     folders = (personal_raw or {}).get("watched_folders") or []
     if not isinstance(folders, list):
         raise ConfigError(
-            "personal.watched_folders must be a list of "
-            "{id, kind, path|share} entries."
+            "personal.watched_folders must be a list of {id, kind, path|share} entries."
         )
     offenders: list[str] = []
     for i, entry in enumerate(folders):
@@ -280,9 +282,7 @@ def _validate_watched_folders_schema(personal_raw: dict) -> None:
             )
     if not offenders:
         return
-    raise ConfigError(
-        "\n".join(["personal.watched_folders has invalid entries:", ""] + offenders)
-    )
+    raise ConfigError("\n".join(["personal.watched_folders has invalid entries:", ""] + offenders))
 
 
 def load() -> WikiConfig:
@@ -300,14 +300,16 @@ def load() -> WikiConfig:
         log.error(
             "config.yaml at %s is not valid YAML — ALL operator overrides are "
             "ignored; the engine runs on factory defaults until this is fixed: %s",
-            CONFIG_FILE, e,
+            CONFIG_FILE,
+            e,
         )
         return cfg
     if not isinstance(raw, dict):
         log.error(
             "config.yaml at %s does not parse to a mapping (got %s) — ALL "
             "operator overrides are ignored; the engine runs on factory defaults.",
-            CONFIG_FILE, type(raw).__name__,
+            CONFIG_FILE,
+            type(raw).__name__,
         )
         return cfg
     _validate_accounts_schema(raw.get("personal") or {})
@@ -357,6 +359,7 @@ COMPILE_SUBSTRATE_EXCLUDED_PREFIXES: tuple[str, ...] = (
 
 
 # ── CLI helpers (used by the bash `wiki` entry point) ────────────────
+
 
 def _walk(cfg: WikiConfig, parts: list[str]) -> object:
     """Walk a dot-notation path through the loaded WikiConfig."""
@@ -501,6 +504,7 @@ def _cli() -> int:
 
     if args.cmd in (None, "show"):
         import json
+
         print(f"# {CONFIG_FILE} (exists={CONFIG_FILE.exists()})")
         print(json.dumps(asdict(CONFIG), indent=2, default=str))
         return 0
@@ -522,6 +526,7 @@ def _cli() -> int:
             return 1
         if is_dataclass(val) and not isinstance(val, type):
             import json
+
             print(json.dumps(asdict(val), indent=2, default=str))
         else:
             print(val)

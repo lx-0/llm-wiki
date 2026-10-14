@@ -116,8 +116,12 @@ class TestRetryLoopWiring:
 
     def test_retryable_failure_then_success(self, monkeypatch: pytest.MonkeyPatch) -> None:
         ok = BatchResult(
-            items={}, elapsed_ms=1, model_id="m", prompt_version="pv",
-            cost_usd=0.0, batch_label="all",
+            items={},
+            elapsed_ms=1,
+            model_id="m",
+            prompt_version="pv",
+            cost_usd=0.0,
+            batch_label="all",
         )
         calls = self._run(
             monkeypatch,
@@ -128,7 +132,10 @@ class TestRetryLoopWiring:
         )
         result = asyncio.run(
             inf.infer_batch_async(
-                "prompt", _batch(), vault_cwd=None, prompt_version="pv",  # type: ignore[arg-type]
+                "prompt",
+                _batch(),
+                vault_cwd=None,
+                prompt_version="pv",  # type: ignore[arg-type]
             )
         )
         assert result is ok
@@ -144,20 +151,24 @@ class TestRetryLoopWiring:
         with pytest.raises(InferenceError):
             asyncio.run(
                 inf.infer_batch_async(
-                    "prompt", _batch(), vault_cwd=None, prompt_version="pv",  # type: ignore[arg-type]
+                    "prompt",
+                    _batch(),
+                    vault_cwd=None,
+                    prompt_version="pv",  # type: ignore[arg-type]
                 )
             )
         assert calls["n"] == 1  # no retry for a non-retryable kind
 
-    def test_retryable_failure_exhausts_all_attempts(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_retryable_failure_exhausts_all_attempts(self, monkeypatch: pytest.MonkeyPatch) -> None:
         err = InferenceError("crash", failure=FailureClass("cli_crash", "silent"))
         calls = self._run(monkeypatch, [err, err, err])
         with pytest.raises(InferenceError):
             asyncio.run(
                 inf.infer_batch_async(
-                    "prompt", _batch(), vault_cwd=None, prompt_version="pv",  # type: ignore[arg-type]
+                    "prompt",
+                    _batch(),
+                    vault_cwd=None,
+                    prompt_version="pv",  # type: ignore[arg-type]
                 )
             )
         assert calls["n"] == 3  # original + 2 retries (len(RETRY_BACKOFFS))

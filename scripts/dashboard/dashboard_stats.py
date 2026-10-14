@@ -85,6 +85,7 @@ def total_tokens_lifetime() -> int:
     dollar `LLM spend` surface (DECISIONS 2026-05-23). 0 when the ledger is
     absent (no LLM run yet)."""
     from core.usage import USAGE_FILE
+
     if not USAGE_FILE.exists():
         return 0
     try:
@@ -143,6 +144,7 @@ def _open_action_items_in_entities(knowledge_dir: Path = KNOWLEDGE_DIR) -> tuple
     stat-card to surface the personal-task layer (M005 entity-pages).
     """
     import re
+
     open_total = 0
     entities_with = 0
     for folder in ("people", "projects"):
@@ -161,9 +163,9 @@ def _open_action_items_in_entities(knowledge_dir: Path = KNOWLEDGE_DIR) -> tuple
             ai_match = re.search(r"^## Action Items\s*$", text, re.MULTILINE)
             if not ai_match:
                 continue
-            after = text[ai_match.end():]
+            after = text[ai_match.end() :]
             section_end = re.search(r"^(## |---\s*$)", after, re.MULTILINE)
-            section = after[:section_end.start()] if section_end else after
+            section = after[: section_end.start()] if section_end else after
             file_open = 0
             for raw_line in section.splitlines():
                 line = raw_line.strip()
@@ -249,10 +251,7 @@ def render_callout(stats: dict) -> str:
         items = "\n".join(f"- [[{p}]]" for p in shown)
         if more > 0:
             items += f"\n- _… and {more} more_"
-        callout += (
-            "\n## ⏭ Pending compile\n\n"
-            f"{items}\n"
-        )
+        callout += f"\n## ⏭ Pending compile\n\n{items}\n"
 
     return callout
 

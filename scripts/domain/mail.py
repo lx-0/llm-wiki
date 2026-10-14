@@ -13,20 +13,21 @@ from typing import Literal
 
 # ── Read-side ─────────────────────────────────────────────────────────
 
+
 @dataclass(frozen=True)
 class MessageMeta:
     """Headers-only view of one message. What a metadata scan returns."""
 
-    id: str                          # backend-specific (mbox key | gmail msgid | imap UID)
-    account_id: str                  # which CONFIG.personal.accounts.<id> this came from
-    folder: str                      # adapter normalises separator to "/"
+    id: str  # backend-specific (mbox key | gmail msgid | imap UID)
+    account_id: str  # which CONFIG.personal.accounts.<id> this came from
+    folder: str  # adapter normalises separator to "/"
     from_addr: str
     to_addrs: tuple[str, ...]
     subject: str
     date: datetime
     size_bytes: int
-    in_reply_to: str | None = None   # for thread reconstruction
-    message_id: str | None = None    # RFC822 Message-ID
+    in_reply_to: str | None = None  # for thread reconstruction
+    message_id: str | None = None  # RFC822 Message-ID
 
 
 @dataclass(frozen=True)
@@ -44,6 +45,7 @@ class Message:
 
 
 # ── Write-side ────────────────────────────────────────────────────────
+
 
 @dataclass(frozen=True)
 class FilterCondition:

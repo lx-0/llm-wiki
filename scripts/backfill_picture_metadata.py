@@ -44,6 +44,7 @@ log = logging.getLogger("backfill-picture-metadata")
 ACCEPTED_SUFFIXES = (".jpg", ".jpeg", ".png", ".heic")
 PICTURES_ARCHIVE = RAW_DIR / "inbox-mobile" / "pictures"
 
+
 def _split_frontmatter(text: str) -> tuple[dict | None, str]:
     """Return (parsed FM dict, body). (None, text) if no FM block found."""
     if not text.startswith("---\n"):
@@ -121,9 +122,7 @@ def _backfill_one(sidecar: Path, *, dry_run: bool) -> str:
     if dry_run:
         return f"dry-run:{','.join(added)}"
 
-    new_fm_text = yaml.safe_dump(
-        fm, default_flow_style=False, sort_keys=False, allow_unicode=True
-    )
+    new_fm_text = yaml.safe_dump(fm, default_flow_style=False, sort_keys=False, allow_unicode=True)
     sidecar.write_text(f"---\n{new_fm_text}---\n{body}", encoding="utf-8")
     return f"updated:{','.join(added)}"
 
@@ -131,7 +130,8 @@ def _backfill_one(sidecar: Path, *, dry_run: bool) -> str:
 def main() -> int:
     parser = argparse.ArgumentParser(prog="wiki backfill picture-metadata")
     parser.add_argument(
-        "--dry-run", action="store_true",
+        "--dry-run",
+        action="store_true",
         help="show what would change without writing",
     )
     args = parser.parse_args()

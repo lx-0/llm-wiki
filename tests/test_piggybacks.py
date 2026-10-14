@@ -49,7 +49,7 @@ def test_due_tasks_excludes_tasks_inside_cooldown():
     one fires."""
     now = datetime(2026, 6, 13, 20, 0, tzinfo=UTC)  # after the gate
     state = {
-        "dream-cycle": {"last_run": (now - timedelta(hours=1)).isoformat()},   # within 24h
+        "dream-cycle": {"last_run": (now - timedelta(hours=1)).isoformat()},  # within 24h
         "lint-structural": {"last_run": (now - timedelta(hours=25)).isoformat()},  # elapsed
     }
     due = piggybacks.due_tasks(
@@ -79,10 +79,19 @@ def test_run_due_piggybacks_spawns_due_task_wrapped_in_runner(monkeypatch):
     popen_calls: list[list[str]] = []
     recorded: list[tuple[str, dict]] = []
     monkeypatch.setattr(piggybacks.subprocess, "Popen", lambda cmd, **kw: popen_calls.append(cmd))
-    monkeypatch.setattr(runner_mod, "record_status", lambda name, payload: recorded.append((name, payload)))
     monkeypatch.setattr(
-        piggybacks, "build_piggyback_tasks",
-        lambda: [{"name": "lint-structural", "cmd": ["lint.py", "--structural-only"], "cooldown_hours": 24}],
+        runner_mod, "record_status", lambda name, payload: recorded.append((name, payload))
+    )
+    monkeypatch.setattr(
+        piggybacks,
+        "build_piggyback_tasks",
+        lambda: [
+            {
+                "name": "lint-structural",
+                "cmd": ["lint.py", "--structural-only"],
+                "cooldown_hours": 24,
+            }
+        ],
     )
     monkeypatch.setattr(piggybacks, "load_piggyback_state", lambda: {})
 
@@ -91,7 +100,7 @@ def test_run_due_piggybacks_spawns_due_task_wrapped_in_runner(monkeypatch):
     assert spawned == ["lint-structural"]
     assert len(popen_calls) == 1
     flat = " ".join(popen_calls[0])
-    assert "piggyback_runner.py" in flat                       # wrapped under the wall-clock cap
-    assert str(piggybacks.SCRIPTS_DIR / "lint.py") in flat     # real resolved script path
+    assert "piggyback_runner.py" in flat  # wrapped under the wall-clock cap
+    assert str(piggybacks.SCRIPTS_DIR / "lint.py") in flat  # real resolved script path
     assert "--structural-only" in flat
-    assert recorded and recorded[0][0] == "lint-structural"    # cooldown ledger stamped
+    assert recorded and recorded[0][0] == "lint-structural"  # cooldown ledger stamped

@@ -47,10 +47,14 @@ RAW_AUDIO_DIR = RAW_DIR / "audio"
 RAW_REQUESTS_DIR = RAW_DIR / "requests"
 RAW_SUGGESTIONS_DIR = RAW_DIR / "suggestions"
 INBOX_DIR = ROOT_DIR / "inbox"
-WORKSPACE_DIR = ROOT_DIR / "workspace"        # operator working layer (intent-dispatch + todo)
+WORKSPACE_DIR = ROOT_DIR / "workspace"  # operator working layer (intent-dispatch + todo)
 WORKSPACE_INBOX_DIR = WORKSPACE_DIR / "inbox"  # detected intents awaiting triage (task/idea/note)
-WORKSPACE_TASKS_DIR = WORKSPACE_DIR / "tasks"  # accepted tasks, numbered (001.md, 002.md, …); listed in todo.md
-WORKSPACE_TODO = WORKSPACE_DIR / "todo.md"     # the todo list — accepted tasks appended as checkbox lines
+WORKSPACE_TASKS_DIR = (
+    WORKSPACE_DIR / "tasks"
+)  # accepted tasks, numbered (001.md, 002.md, …); listed in todo.md
+WORKSPACE_TODO = (
+    WORKSPACE_DIR / "todo.md"
+)  # the todo list — accepted tasks appended as checkbox lines
 KNOWLEDGE_DIR = ROOT_DIR / "knowledge"
 CONCEPTS_DIR = KNOWLEDGE_DIR / "concepts"
 CONNECTIONS_DIR = KNOWLEDGE_DIR / "connections"
@@ -65,14 +69,16 @@ AGENTS_FILE = ROOT_DIR / "AGENTS.md"
 
 # ── Engine internals (under .wiki/) ────────────────────────────────────
 HOOKS_DIR = WIKI_DIR / "hooks"
-AGENT_SPECS_DIR = WIKI_DIR / "prompts" / "agents"  # agent-task specs (*.md) — see core/agent_spec.py
+AGENT_SPECS_DIR = (
+    WIKI_DIR / "prompts" / "agents"
+)  # agent-task specs (*.md) — see core/agent_spec.py
 REPORTS_DIR = WIKI_DIR / "reports"  # lint + review-wiki output; under .wiki/, not vault root
 CONFIG_FILE = WIKI_DIR / "config.yaml"
 DOTENV_FILE = ROOT_DIR / ".claude" / ".env"
 
 # ── Per-instance runtime artifacts (gitignored, flat under .wiki/) ─────
-STATE_DIR = WIKI_DIR / "state"        # *.json — hash trackers, dedup windows, cooldowns
-LOGS_DIR = WIKI_DIR / "logs"          # *.log  — flush + compile output
+STATE_DIR = WIKI_DIR / "state"  # *.json — hash trackers, dedup windows, cooldowns
+LOGS_DIR = WIKI_DIR / "logs"  # *.log  — flush + compile output
 SESSIONS_DIR = WIKI_DIR / "sessions"  # session-flush staging + failed-flushes/
 STATE_FILE = STATE_DIR / "state.json"
 EMAIL_STATE_FILE = STATE_DIR / "email-state.json"

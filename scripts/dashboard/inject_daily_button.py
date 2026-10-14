@@ -62,7 +62,9 @@ def remove_button(text: str) -> tuple[str, bool]:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n", 1)[0])
     parser.add_argument("--dry-run", action="store_true")
-    parser.add_argument("--remove", action="store_true", help="strip button regions instead of inserting")
+    parser.add_argument(
+        "--remove", action="store_true", help="strip button regions instead of inserting"
+    )
     args = parser.parse_args()
 
     if not DAILY_DIR.exists():

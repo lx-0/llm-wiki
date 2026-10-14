@@ -5,6 +5,7 @@ request always sends an empty meetings list: pull only, never upload/delete.
 No MCP or local meeting database. App session files are read for auth only;
 Wispr owns token renewal. Missing/expired credentials fail with a login hint.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -22,7 +23,12 @@ from zoneinfo import ZoneInfo
 import httpx
 
 from collectors.base import (
-    CollectorSpec, RunResult, filter_accounts, register, resolve_accounts, run_account_loop,
+    CollectorSpec,
+    RunResult,
+    filter_accounts,
+    register,
+    resolve_accounts,
+    run_account_loop,
 )
 from core import daily_capture, frontmatter
 from core.config import CONFIG, TIMEZONE
@@ -70,11 +76,15 @@ class WisprAccount:
 
 def _accounts() -> list[WisprAccount]:
     return resolve_accounts(
-        CONFIG.personal.accounts, "wispr-api",
+        CONFIG.personal.accounts,
+        "wispr-api",
         lambda name, block: WisprAccount(
-            name, str(block.get("access_token_env") or ""),
-            str(block.get("session_file") or ""), str(block.get("user_id") or ""),
-        ), block_key="wispr",
+            name,
+            str(block.get("access_token_env") or ""),
+            str(block.get("session_file") or ""),
+            str(block.get("user_id") or ""),
+        ),
+        block_key="wispr",
     )
 
 
@@ -82,8 +92,10 @@ class WisprClient:
     def __init__(self, account: WisprAccount, *, transport=None):
         self.account = account
         self.http = httpx.Client(
-            base_url=_BASE_URL, timeout=float(CONFIG.limits.wispr_request_timeout_s),
-            transport=transport, follow_redirects=False,
+            base_url=_BASE_URL,
+            timeout=float(CONFIG.limits.wispr_request_timeout_s),
+            transport=transport,
+            follow_redirects=False,
         )
 
     def close(self) -> None:
@@ -91,7 +103,9 @@ class WisprClient:
 
     def page(self, since: str, cursor: str | None) -> dict:
         body = {
-            "meetings": [], "last_sync_time": since, "hard_refresh": since == "0",
+            "meetings": [],
+            "last_sync_time": since,
+            "hard_refresh": since == "0",
             # Ask for inline full transcripts, not only a changed-artifact stamp.
             "supports_refined_stamp_fetch": False,
         }
@@ -100,7 +114,8 @@ class WisprClient:
         for attempt in range(2):
             try:
                 response = self.http.post(
-                    "/api/v1/meetings/sync", json=body,
+                    "/api/v1/meetings/sync",
+                    json=body,
                     # Wispr's desktop API uses the raw token, without Bearer.
                     headers={"Authorization": self.account.token()},
                 )
@@ -169,6 +184,7 @@ def _text(value: object) -> str:
     except ValueError:
         return value
     if isinstance(doc, dict) and isinstance(doc.get("root"), dict):
+
         def walk(node: dict) -> str:
             kind = node.get("type")
             if kind == "text":
@@ -182,6 +198,7 @@ def _text(value: object) -> str:
             if kind in ("root", "list", "link", "autolink"):
                 return text
             raise WisprAPIError(f"unsupported Wispr note node: {kind!r}")
+
         try:
             return walk(doc["root"]).strip()
         except (WisprAPIError, TypeError, AttributeError):
@@ -198,13 +215,20 @@ def _render(row: dict, account_id: str) -> tuple[dict, str, str, bool]:
     transcript = "" if deleted else _text(row.get("refined_transcript"))
     sections = [("Summary", summary), ("Notes", notes), ("Transcript", transcript)]
     title = str(row.get("title") or mid).replace("\n", " ")
-    body = f"# {title}\n\n" + "\n\n".join(
-        f"## {heading}\n\n{text}" for heading, text in sections if text
-    ) + "\n"
+    body = (
+        f"# {title}\n\n"
+        + "\n\n".join(f"## {heading}\n\n{text}" for heading, text in sections if text)
+        + "\n"
+    )
     fm = {
-        "type": "transcript", "source": "wispr", "meeting_id": mid,
-        "account_id": account_id, "title": title, "started_at": started.isoformat(),
-        "modified_at": row.get("modified_at"), "tags": ["wispr", "meeting"],
+        "type": "transcript",
+        "source": "wispr",
+        "meeting_id": mid,
+        "account_id": account_id,
+        "title": title,
+        "started_at": started.isoformat(),
+        "modified_at": row.get("modified_at"),
+        "tags": ["wispr", "meeting"],
         "participants": row.get("contacts") or [],
         "transcript_status": "deleted" if deleted else "available" if transcript else "pending",
     }
@@ -218,8 +242,12 @@ def _render(row: dict, account_id: str) -> tuple[dict, str, str, bool]:
 @register
 class WisprCollector:
     SPEC = CollectorSpec(
-        name="wispr", output_subfolder=_OUTPUT, piggyback_default=True,
-        piggyback_cooldown_hours=6, supports_incremental=True, supports_account_loop=True,
+        name="wispr",
+        output_subfolder=_OUTPUT,
+        piggyback_default=True,
+        piggyback_cooldown_hours=6,
+        supports_incremental=True,
+        supports_account_loop=True,
     )
 
     def is_configured(self) -> bool:
@@ -232,15 +260,19 @@ class WisprCollector:
     def run(self, *, dry_run=False, incremental=False, account=None) -> RunResult:
         accounts = filter_accounts(_accounts(), account)
         if not accounts:
-            return RunResult(message="no Wispr accounts configured",
-                             errors=(f"unknown account: {account}",) if account else ())
+            return RunResult(
+                message="no Wispr accounts configured",
+                errors=(f"unknown account: {account}",) if account else (),
+            )
         # Serialize source updates + watermark changes, also against manual runs.
         context = nullcontext() if dry_run else locked(_STATE_FILE.with_suffix(".lock"))
         with context:
             state = load_json_state(_STATE_FILE)
             outcome = run_account_loop(
-                accounts, lambda a: self._scan(a, state, dry_run, incremental),
-                log=log, name="wispr",
+                accounts,
+                lambda a: self._scan(a, state, dry_run, incremental),
+                log=log,
+                name="wispr",
             )
             if not dry_run and outcome.any_state_touched:
                 save_json_state(_STATE_FILE, state)
@@ -248,7 +280,8 @@ class WisprCollector:
             files_written=tuple(p for files, _ in outcome.payloads for p in files),
             files_skipped=sum(n for _, n in outcome.payloads),
             state_keys_touched=("wispr-state.json",) if outcome.any_state_touched else (),
-            message="; ".join(outcome.messages), errors=tuple(outcome.error_ids),
+            message="; ".join(outcome.messages),
+            errors=tuple(outcome.error_ids),
         )
 
     def _scan(self, account: WisprAccount, state: dict, dry_run: bool, incremental: bool):
@@ -288,7 +321,9 @@ class WisprCollector:
                     digest = hashlib.sha256(frontmatter.serialize(fm, body).encode()).hexdigest()
                     previous = items.get(mid, {})
                     # Full UUID, stable path across title edits, no account-id path interpolation.
-                    name = previous.get("filename") or f"{date}--{slugify(fm['title'])[:60]}--{mid}.md"
+                    name = (
+                        previous.get("filename") or f"{date}--{slugify(fm['title'])[:60]}--{mid}.md"
+                    )
                     if Path(name).name != name or not name.endswith(f"--{mid}.md"):
                         raise WisprAPIError("invalid cached Wispr output filename")
                     target = ROOT_DIR / _OUTPUT / name
@@ -310,7 +345,9 @@ class WisprCollector:
                     # Only new meetings add a rollup line. Updates retain source provenance.
                     if not previous.get("rollup"):
                         daily_capture.append_with_source(
-                            date, "meetings", f"- **wispr** · {fm['title']}",
+                            date,
+                            "meetings",
+                            f"- **wispr** · {fm['title']}",
                             target.relative_to(ROOT_DIR).as_posix(),
                         )
                     items[mid] = {"hash": digest, "filename": name, "rollup": True}
@@ -329,13 +366,19 @@ class WisprCollector:
             # Keep successful item dedup even when a later page fails. Never
             # advance the watermark on failure, pending work, or a bounded run.
             if not dry_run and written:
-                state[account.account_id] = {"items": items, "sync_time": saved.get("sync_time", "0")}
+                state[account.account_id] = {
+                    "items": items,
+                    "sync_time": saved.get("sync_time", "0"),
+                }
                 save_json_state(_STATE_FILE, state)
         if not dry_run:
             state[account.account_id] = {
                 "items": items,
                 "sync_time": sync_time if complete and not pending else saved.get("sync_time", "0"),
             }
-        return (f"{len(written)} written, {skipped} unchanged, {pending} pending"
-                + (f", {changed} would write" if dry_run else ""),
-                (written, skipped), not dry_run)
+        return (
+            f"{len(written)} written, {skipped} unchanged, {pending} pending"
+            + (f", {changed} would write" if dry_run else ""),
+            (written, skipped),
+            not dry_run,
+        )

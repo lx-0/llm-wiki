@@ -5,6 +5,7 @@ server-enforced) — it is what meinkontext listings and search show. The
 authoritative source is the article's summary row in ``knowledge/index.md``
 (zero new LLM cost); fallbacks: first body paragraph, then the article stem.
 """
+
 from __future__ import annotations
 
 import re
@@ -55,9 +56,7 @@ def _cap(text: str) -> str:
     return units.decode("utf-16-le", errors="ignore").rstrip() + "…"
 
 
-def description_index(
-    index_text: str, knowledge_dir: Path, vault: Path
-) -> dict[str, str]:
+def description_index(index_text: str, knowledge_dir: Path, vault: Path) -> dict[str, str]:
     """Parse the full index (`| Article | Summary | Compiled From | Updated |`)
     into ``{VAULT-relative path: summary text}`` (keys like
     ``knowledge/concepts/foo.md`` since the M030-S04 vault-rel layout). Rows

@@ -15,6 +15,7 @@ class TaskHandler:
 
     def handle(self, intent: Intent) -> HandlerResult:
         return write_inbox_record(
-            intent, "task",
+            intent,
+            "task",
             "Review, then run the `orchestrate-tasks` agent to execute.",
         )

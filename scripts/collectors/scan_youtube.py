@@ -53,9 +53,7 @@ log = logging.getLogger("scan-youtube")
 
 # ── URL parsing ──────────────────────────────────────────────────────
 
-_VIDEO_ID_RE = re.compile(
-    r"(?:v=|youtu\.be/|/shorts/|/embed/|/watch\?v=)([A-Za-z0-9_-]{11})"
-)
+_VIDEO_ID_RE = re.compile(r"(?:v=|youtu\.be/|/shorts/|/embed/|/watch\?v=)([A-Za-z0-9_-]{11})")
 
 
 def extract_video_id(url: str) -> str | None:
@@ -110,6 +108,7 @@ def parse_inbox(text: str) -> list[InboxItem]:
 
 # ── yt-dlp metadata + playlist expansion ─────────────────────────────
 
+
 def _ydl(extra_opts: dict | None = None):
     """Return a configured YoutubeDL instance."""
     from yt_dlp import YoutubeDL  # type: ignore
@@ -158,13 +157,18 @@ def expand_playlist(url: str, limit: int | None = None) -> list[str]:
 
 def fetch_metadata(url: str, *, with_comments: bool = False) -> dict:
     """Tier-0 + optional Tier-2: yt-dlp metadata, optionally with comments."""
-    extra = {"getcomments": True, "extractor_args": {"youtube": {"max_comments": ["50", "all", "50"]}}} if with_comments else {}
+    extra = (
+        {"getcomments": True, "extractor_args": {"youtube": {"max_comments": ["50", "all", "50"]}}}
+        if with_comments
+        else {}
+    )
     with _ydl(extra) as ydl:
         info = ydl.extract_info(url, download=False)
     return info  # raw yt-dlp dict; we slim it down at write time
 
 
 # ── Transcript ───────────────────────────────────────────────────────
+
 
 def fetch_transcript(video_id: str, *, languages: tuple[str, ...] = ("en", "de")) -> dict | None:
     """Tier-1: transcript via youtube-transcript-api, with yt-dlp auto-sub fallback."""
@@ -186,7 +190,9 @@ def fetch_transcript(video_id: str, *, languages: tuple[str, ...] = ("en", "de")
             "plain": " ".join(s["text"] for s in segments),
         }
     except Exception as e:  # noqa: BLE001
-        log.info("transcript-api failed for %s (%s); trying yt-dlp fallback", video_id, type(e).__name__)
+        log.info(
+            "transcript-api failed for %s (%s); trying yt-dlp fallback", video_id, type(e).__name__
+        )
 
     # Fallback: yt-dlp auto-subs
     return _fetch_transcript_ytdlp(video_id, languages=languages)
@@ -247,11 +253,13 @@ def _parse_json3(path: Path, lang: str) -> dict:
             continue
         start_ms = ev.get("tStartMs", 0)
         dur_ms = ev.get("dDurationMs", 0)
-        segments.append({
-            "start_s": round(start_ms / 1000, 2),
-            "duration_s": round(dur_ms / 1000, 2),
-            "text": text,
-        })
+        segments.append(
+            {
+                "start_s": round(start_ms / 1000, 2),
+                "duration_s": round(dur_ms / 1000, 2),
+                "text": text,
+            }
+        )
     return {
         "language": lang,
         "is_generated": True,  # yt-dlp fallback path is auto-only here
@@ -262,6 +270,7 @@ def _parse_json3(path: Path, lang: str) -> dict:
 
 
 # ── Comment slimming ─────────────────────────────────────────────────
+
 
 def slim_comments(raw_comments: list[dict] | None, *, top_n: int = 20) -> list[dict]:
     """Filter comments to high-signal subset.
@@ -374,7 +383,9 @@ def pick_frame_timestamps(metadata: dict) -> tuple[list[float], str]:
     return timestamps, f"fixed-interval/{n_frames}"
 
 
-def ydlp_download_video(url: str, dest_dir: Path, *, format_pref: str = "worst[height<=480]") -> Path | None:
+def ydlp_download_video(
+    url: str, dest_dir: Path, *, format_pref: str = "worst[height<=480]"
+) -> Path | None:
     """Download a video at low resolution for frame extraction. Returns the path or None."""
     from yt_dlp import YoutubeDL  # type: ignore
 
@@ -402,12 +413,20 @@ def ffmpeg_extract_frame(video: Path, timestamp_s: float, dest: Path) -> bool:
     """Extract a single JPEG frame at timestamp_s, downscaled per CONFIG."""
     width = CONFIG.limits.youtube_frame_resize_width
     cmd = [
-        "ffmpeg", "-y", "-loglevel", "error",
-        "-ss", f"{timestamp_s:.2f}",
-        "-i", str(video),
-        "-vframes", "1",
-        "-q:v", "3",
-        "-vf", f"scale={width}:-1",
+        "ffmpeg",
+        "-y",
+        "-loglevel",
+        "error",
+        "-ss",
+        f"{timestamp_s:.2f}",
+        "-i",
+        str(video),
+        "-vframes",
+        "1",
+        "-q:v",
+        "3",
+        "-vf",
+        f"scale={width}:-1",
         str(dest),
     ]
     r = subprocess.run(cmd, capture_output=True)
@@ -415,7 +434,10 @@ def ffmpeg_extract_frame(video: Path, timestamp_s: float, dest: Path) -> bool:
 
 
 def fetch_visual_local(
-    url: str, video_id: str, metadata: dict, transcript: dict | None,
+    url: str,
+    video_id: str,
+    metadata: dict,
+    transcript: dict | None,
 ) -> dict | None:
     """T3-local: download video, sample frames, gemma4 vision per frame, aggregate."""
     from core import ollama_client  # noqa: WPS433  late import — config must be ready
@@ -427,8 +449,11 @@ def fetch_visual_local(
     duration = float(metadata.get("duration_s") or 0)
     max_dur = CONFIG.limits.youtube_max_duration_s
     if duration > max_dur:
-        log.warning("video duration %.0fs > %ds (CONFIG.limits.youtube_max_duration_s) — skipping T3",
-                    duration, max_dur)
+        log.warning(
+            "video duration %.0fs > %ds (CONFIG.limits.youtube_max_duration_s) — skipping T3",
+            duration,
+            max_dur,
+        )
         return None
     if duration <= 0:
         log.warning("no duration metadata — skipping T3")
@@ -447,8 +472,12 @@ def fetch_visual_local(
         if not video_path or not video_path.exists():
             log.warning("  no video file downloaded — skipping T3")
             return None
-        log.info("  downloaded %s (%.1f MB) in %.1fs",
-                 video_path.name, video_path.stat().st_size / 1e6, time.time() - t0)
+        log.info(
+            "  downloaded %s (%.1f MB) in %.1fs",
+            video_path.name,
+            video_path.stat().st_size / 1e6,
+            time.time() - t0,
+        )
 
         per_frame: list[dict] = []
         for i, ts in enumerate(timestamps):
@@ -468,16 +497,22 @@ def fetch_visual_local(
                 )
                 summary = content.strip()
                 informative = not summary.upper().startswith("UNINFORMATIVE")
-                per_frame.append({
-                    "timestamp_s": round(ts, 2),
-                    "timestamp_label": _ts_to_label(ts),
-                    "informative": informative,
-                    "summary": summary,
-                    "duration_s": round(time.time() - t1, 2),
-                })
-                log.info("  frame %d/%d @ %s: %s",
-                         i + 1, len(timestamps), _ts_to_label(ts),
-                         "skip (uninformative)" if not informative else summary[:80])
+                per_frame.append(
+                    {
+                        "timestamp_s": round(ts, 2),
+                        "timestamp_label": _ts_to_label(ts),
+                        "informative": informative,
+                        "summary": summary,
+                        "duration_s": round(time.time() - t1, 2),
+                    }
+                )
+                log.info(
+                    "  frame %d/%d @ %s: %s",
+                    i + 1,
+                    len(timestamps),
+                    _ts_to_label(ts),
+                    "skip (uninformative)" if not informative else summary[:80],
+                )
             except Exception as e:  # noqa: BLE001
                 log.warning("  vision call failed at %.1fs: %s", ts, type(e).__name__)
                 continue
@@ -515,7 +550,9 @@ def fetch_visual_local(
 
 
 def _build_aggregate_prompt(metadata: dict, transcript: dict | None, frames: list[dict]) -> str:
-    transcript_block = (transcript or {}).get("plain") or "(no subtitles available — rely on visual track)"
+    transcript_block = (transcript or {}).get(
+        "plain"
+    ) or "(no subtitles available — rely on visual track)"
     # Context-window safety: keep transcript + frames within ~16k tokens
     max_transcript_chars = 12000
     if len(transcript_block) > max_transcript_chars:
@@ -635,14 +672,18 @@ def render_markdown(side: Sidecar) -> str:
         parts.append("")
 
     if side.transcript:
-        parts.append(f"## Transcript ({side.transcript['language']}, "
-                     f"{'auto' if side.transcript.get('is_generated') else 'manual'})\n")
+        parts.append(
+            f"## Transcript ({side.transcript['language']}, "
+            f"{'auto' if side.transcript.get('is_generated') else 'manual'})\n"
+        )
         parts.append(side.transcript["plain"])
         parts.append("")
 
     if side.visual and side.visual.get("aggregate"):
         v = side.visual
-        parts.append(f"## Visual analysis ({v.get('model')}, {v.get('frames_informative', 0)}/{v.get('frames_analyzed', 0)} informative frames)\n")
+        parts.append(
+            f"## Visual analysis ({v.get('model')}, {v.get('frames_informative', 0)}/{v.get('frames_analyzed', 0)} informative frames)\n"
+        )
         parts.append(v["aggregate"].strip())
         parts.append("")
         parts.append("<details><summary>Per-frame log</summary>\n")
@@ -683,6 +724,7 @@ def write_sidecar(side: Sidecar, *, out_dir: Path) -> Path:
 
 
 # ── Per-video pipeline ───────────────────────────────────────────────
+
 
 def ingest_one(
     url: str,
@@ -738,11 +780,17 @@ def ingest_one(
         return {"video_id": video_id, "status": "dry"}
 
     md_path = write_sidecar(side, out_dir=out_dir)
-    log.info("  wrote %s", md_path.relative_to(out_dir.parent.parent.parent) if str(md_path).startswith(str(out_dir.parent.parent.parent)) else md_path)
+    log.info(
+        "  wrote %s",
+        md_path.relative_to(out_dir.parent.parent.parent)
+        if str(md_path).startswith(str(out_dir.parent.parent.parent))
+        else md_path,
+    )
     return {"video_id": video_id, "status": "written", "path": str(md_path)}
 
 
 # ── CLI ──────────────────────────────────────────────────────────────
+
 
 def _ingest_items(
     items: list[InboxItem],
@@ -813,13 +861,21 @@ def drain_inbox(
     missing inbox file is a clean no-op, not an error.
     """
     if not inbox_path.exists():
-        return {"processed": 0, "written": 0, "report_paths": [],
-                "message": f"no inbox file at {inbox_path}"}
+        return {
+            "processed": 0,
+            "written": 0,
+            "report_paths": [],
+            "message": f"no inbox file at {inbox_path}",
+        }
 
     items = parse_inbox(inbox_path.read_text(encoding="utf-8"))
     if not items:
-        return {"processed": 0, "written": 0, "report_paths": [],
-                "message": f"inbox {inbox_path.name} is empty"}
+        return {
+            "processed": 0,
+            "written": 0,
+            "report_paths": [],
+            "message": f"inbox {inbox_path.name} is empty",
+        }
 
     # Inbox limit defaults to CONFIG.piggybacks.scan_youtube.max_per_run so a
     # runaway inbox doesn't burn a whole day. (Config key stays scan_youtube —
@@ -883,7 +939,9 @@ class YoutubeCollector:
 
     def run(self, *, dry_run: bool = False, incremental: bool = False) -> RunResult:
         if not self.is_configured():
-            return RunResult(message=f"No YouTube inbox at {INBOX_FILE} — drop URLs there or use `wiki ingest-youtube --url`")
+            return RunResult(
+                message=f"No YouTube inbox at {INBOX_FILE} — drop URLs there or use `wiki ingest-youtube --url`"
+            )
 
         result = drain_inbox(INBOX_FILE, dry_run=dry_run)
         return RunResult(
@@ -909,7 +967,9 @@ def main() -> int:
         help="cap playlist/inbox expansion (default: CONFIG.piggybacks.scan_youtube.max_per_run for --inbox, unlimited for --url)",
     )
     parser.add_argument("--dry-run", action="store_true")
-    parser.add_argument("--no-skip", action="store_true", help="re-ingest videos already in raw/notes/youtube/")
+    parser.add_argument(
+        "--no-skip", action="store_true", help="re-ingest videos already in raw/notes/youtube/"
+    )
     parser.add_argument("--out", type=Path, default=REPORT_DIR)
     args = parser.parse_args()
 
@@ -933,7 +993,7 @@ def main() -> int:
             effective_limit = args.limit
         else:
             pb = CONFIG.piggybacks.get("scan_youtube")
-            effective_limit = (pb.max_per_run if pb else None)
+            effective_limit = pb.max_per_run if pb else None
 
     result = _ingest_items(
         items,

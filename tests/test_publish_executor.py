@@ -1,4 +1,5 @@
 """Tests for the publish executor (M030-S02-T03)."""
+
 from __future__ import annotations
 
 import json
@@ -15,8 +16,11 @@ from publish.executor import execute_publish
 
 def _payload(slug: str, body: str = "b") -> ArticlePayload:
     return ArticlePayload(
-        slug=slug, rel=f"concepts/{slug}.md", name=slug,
-        description=f"About {slug}.", content=body,
+        slug=slug,
+        rel=f"concepts/{slug}.md",
+        name=slug,
+        description=f"About {slug}.",
+        content=body,
         content_hash=_payload_hash(slug, f"About {slug}.", body),
     )
 
@@ -35,9 +39,22 @@ class FakeClient:
         if key in self.reject:
             raise ToolCallError("secret-shaped value detected")
         if name == "write_article":
-            return {"content": [{"type": "text", "text": json.dumps(
-                {"article_id": key, "wiki": arguments["wiki"],
-                 "version_seq": 1, "created": True})}], "isError": False}
+            return {
+                "content": [
+                    {
+                        "type": "text",
+                        "text": json.dumps(
+                            {
+                                "article_id": key,
+                                "wiki": arguments["wiki"],
+                                "version_seq": 1,
+                                "created": True,
+                            }
+                        ),
+                    }
+                ],
+                "isError": False,
+            }
         return {"content": [{"type": "text", "text": "{}"}], "isError": False}
 
 

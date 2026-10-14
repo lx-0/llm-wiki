@@ -16,6 +16,7 @@ import yaml
 
 def _mod():
     from migrations import migrate_config_keys as m
+
     return m
 
 
@@ -122,14 +123,19 @@ def test_migrate_config_file_round_trip(tmp_path):
     m = _mod()
     config_path = tmp_path / ".wiki" / "config.yaml"
     config_path.parent.mkdir(parents=True)
-    config_path.write_text(yaml.safe_dump({
-        "scheduling": {"compile_after_hour": 18},
-        "piggybacks": {
-            "scan_screenshots": {"enabled": True, "cooldown_hours": 24},
-            "sync_memories": {"enabled": False, "cooldown_hours": 24},
-            "lint_structural": {"enabled": True, "cooldown_hours": 24},
-        },
-    }), encoding="utf-8")
+    config_path.write_text(
+        yaml.safe_dump(
+            {
+                "scheduling": {"compile_after_hour": 18},
+                "piggybacks": {
+                    "scan_screenshots": {"enabled": True, "cooldown_hours": 24},
+                    "sync_memories": {"enabled": False, "cooldown_hours": 24},
+                    "lint_structural": {"enabled": True, "cooldown_hours": 24},
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
 
     new_text, changes = m.migrate_config(config_path)
     assert new_text is not None
@@ -202,7 +208,9 @@ def test_migrate_config_no_piggybacks_block_still_runs_additions(tmp_path):
     m = _mod()
     config_path = tmp_path / ".wiki" / "config.yaml"
     config_path.parent.mkdir(parents=True)
-    config_path.write_text(yaml.safe_dump({"scheduling": {"compile_after_hour": 18}}), encoding="utf-8")
+    config_path.write_text(
+        yaml.safe_dump({"scheduling": {"compile_after_hour": 18}}), encoding="utf-8"
+    )
 
     new_text, changes = m.migrate_config(config_path)
     assert new_text is not None
@@ -313,7 +321,9 @@ def test_migrate_list_removals_prunes_legacy_substrate_entries():
     changes = m.migrate_list_removals(data)
     # Legacy entry pruned; operator-custom entries preserved.
     assert data["limits"]["compile_skip_substrate_types"] == ["operator-custom"]
-    assert any("removed 'calendar-rollup' from limits.compile_skip_substrate_types" in c for c in changes)
+    assert any(
+        "removed 'calendar-rollup' from limits.compile_skip_substrate_types" in c for c in changes
+    )
 
 
 def test_migrate_list_removals_idempotent():
@@ -341,7 +351,9 @@ def test_migrate_additions_preserves_existing_calendar_piggyback():
     }
     m.migrate_additions(data)
     assert data["piggybacks"]["calendar"] == {
-        "enabled": True, "cooldown_hours": 12, "max_per_run": 100,
+        "enabled": True,
+        "cooldown_hours": 12,
+        "max_per_run": 100,
     }
 
 
@@ -383,10 +395,10 @@ def test_migrate_drops_removes_orphan_personal_calendar_fields():
     data: dict = {
         "personal": {
             "primary_account": "work",
-            "calendar_skip_keywords": ["Weihnacht"],       # KEPT
-            "calendar_work_keywords": ["Customer X"],       # DROP
+            "calendar_skip_keywords": ["Weihnacht"],  # KEPT
+            "calendar_work_keywords": ["Customer X"],  # DROP
             "calendar_categories": {"Health": ["doctor"]},  # DROP
-            "calendar_report_language": "de",               # DROP
+            "calendar_report_language": "de",  # DROP
         },
     }
     changes = m.migrate_drops(data)
@@ -454,16 +466,21 @@ def test_migrate_config_round_trip_with_drops(tmp_path):
     m = _mod()
     config_path = tmp_path / ".wiki" / "config.yaml"
     config_path.parent.mkdir(parents=True)
-    config_path.write_text(yaml.safe_dump({
-        "personal": {
-            "primary_account": "work",
-            "calendar_skip_keywords": ["Weihnacht"],
-            "calendar_categories": {"Health": ["doctor"]},
-            "calendar_work_keywords": ["Customer X"],
-            "calendar_report_language": "de",
-        },
-        "piggybacks": {"email": {"enabled": True, "cooldown_hours": 24}},
-    }), encoding="utf-8")
+    config_path.write_text(
+        yaml.safe_dump(
+            {
+                "personal": {
+                    "primary_account": "work",
+                    "calendar_skip_keywords": ["Weihnacht"],
+                    "calendar_categories": {"Health": ["doctor"]},
+                    "calendar_work_keywords": ["Customer X"],
+                    "calendar_report_language": "de",
+                },
+                "piggybacks": {"email": {"enabled": True, "cooldown_hours": 24}},
+            }
+        ),
+        encoding="utf-8",
+    )
 
     new_text, changes = m.migrate_config(config_path)
     assert new_text is not None
@@ -613,11 +630,13 @@ def test_migrate_account_additions_idempotent_when_email_discovery_present():
 
 def test_model_upgrade_bumps_retired_default():
     m = _mod()
-    data = {"models": {
-        "compile_model": "claude-opus-4-7",
-        "compile_large_source_model": "claude-opus-4-7[1m]",
-        "dream_model": "claude-opus-4-7[1m]",
-    }}
+    data = {
+        "models": {
+            "compile_model": "claude-opus-4-7",
+            "compile_large_source_model": "claude-opus-4-7[1m]",
+            "dream_model": "claude-opus-4-7[1m]",
+        }
+    }
     changes = m.migrate_model_upgrades(data)
     assert data["models"]["compile_model"] == "claude-opus-4-8"
     assert data["models"]["compile_large_source_model"] == "claude-opus-4-8[1m]"
@@ -658,16 +677,19 @@ def test_model_upgrade_preserves_pinned_other_model():
 
 def test_model_upgrade_idempotent_on_current():
     m = _mod()
-    data = {"models": {
-        "compile_model": "claude-opus-4-8",
-        "dream_model": "claude-opus-4-8[1m]",
-    }}
+    data = {
+        "models": {
+            "compile_model": "claude-opus-4-8",
+            "dream_model": "claude-opus-4-8[1m]",
+        }
+    }
     assert m.migrate_model_upgrades(data) == []
 
 
 def test_model_upgrade_noop_without_models_block():
     m = _mod()
     assert m.migrate_model_upgrades({}) == []
+
 
 # ── Schema ↔ migration drift policy (the mechanical hard-rule gate) ──
 #
@@ -684,8 +706,13 @@ def _schema_leaf_fields() -> dict[str, set[str]]:
     return {
         section: {f.name for f in fields(getattr(cfg, section))}
         for section in (
-            "scheduling", "models", "limits", "features",
-            "graph_view", "skills", "personal",
+            "scheduling",
+            "models",
+            "limits",
+            "features",
+            "graph_view",
+            "skills",
+            "personal",
         )
     }
 
@@ -741,34 +768,59 @@ def test_injected_values_match_schema_defaults():
 # class, the key belongs in INJECTED_KEYS.
 _FROZEN_NEVER_INJECTED: dict[str, set[str]] = {
     "features": {
-        "clippings_sweep", "curiosity_loop", "procmail_execution",
+        "clippings_sweep",
+        "curiosity_loop",
+        "procmail_execution",
         "vision_screenshots",
     },
     "graph_view": {"custom_search", "mode"},
     "limits": {
         "compile_max_consecutive_failures",
-        "compile_max_files", "compile_max_prompt_chars", "compile_max_turns",
+        "compile_max_files",
+        "compile_max_prompt_chars",
+        "compile_max_turns",
         "compile_retry_long_context_on_unknown",
-        "curiosity_folder_confidence_min", "curiosity_max_gaps",
-        "curiosity_max_prompt_chars", "curiosity_min_source_chars",
-        "curiosity_quote_min_anchor_tokens", "curiosity_source_globs",
-        "curiosity_timeout_s", "flush_max_retries", "flush_retry_delay_seconds",
-        "gmeet_max_per_run", "gmeet_request_timeout_s", "jamie_max_per_run",
-        "jamie_request_timeout_s", "query_max_prompt_chars",
-        "screenshot_resize_width", "screenshot_timeout_seconds",
-        "sdk_max_buffer_size_mb", "sparse_threshold_words",
-        "youtube_aggregate_timeout_s", "youtube_frame_resize_width",
-        "youtube_max_duration_s", "youtube_max_frames",
+        "curiosity_folder_confidence_min",
+        "curiosity_max_gaps",
+        "curiosity_max_prompt_chars",
+        "curiosity_min_source_chars",
+        "curiosity_quote_min_anchor_tokens",
+        "curiosity_source_globs",
+        "curiosity_timeout_s",
+        "flush_max_retries",
+        "flush_retry_delay_seconds",
+        "gmeet_max_per_run",
+        "gmeet_request_timeout_s",
+        "jamie_max_per_run",
+        "jamie_request_timeout_s",
+        "query_max_prompt_chars",
+        "screenshot_resize_width",
+        "screenshot_timeout_seconds",
+        "sdk_max_buffer_size_mb",
+        "sparse_threshold_words",
+        "youtube_aggregate_timeout_s",
+        "youtube_frame_resize_width",
+        "youtube_max_duration_s",
+        "youtube_max_frames",
         "youtube_vision_timeout_s",
     },
     "models": {
-        "classify_model", "compile_large_source_model", "compile_model",
-        "curiosity_model", "ollama_url", "vision_model",
+        "classify_model",
+        "compile_large_source_model",
+        "compile_model",
+        "curiosity_model",
+        "ollama_url",
+        "vision_model",
     },
     "personal": {
-        "accounts", "curiosity_folders",
-        "email_folders", "firefox_profile", "primary_account",
-        "project_examples", "stg_backup_dir", "thunderbird_profile",
+        "accounts",
+        "curiosity_folders",
+        "email_folders",
+        "firefox_profile",
+        "primary_account",
+        "project_examples",
+        "stg_backup_dir",
+        "thunderbird_profile",
         "voice_inbox",
     },
     "scheduling": {"compile_after_hour", "dedup_window_seconds", "timezone"},
@@ -779,10 +831,7 @@ _FROZEN_NEVER_INJECTED: dict[str, set[str]] = {
 def test_never_injected_is_a_closed_historical_set():
     m = _mod()
     actual = {section: set(keys) for section, keys in m.NEVER_INJECTED.items()}
-    added = {
-        s: sorted(actual.get(s, set()) - _FROZEN_NEVER_INJECTED.get(s, set()))
-        for s in actual
-    }
+    added = {s: sorted(actual.get(s, set()) - _FROZEN_NEVER_INJECTED.get(s, set())) for s in actual}
     added = {s: keys for s, keys in added.items() if keys}
     assert not added, (
         f"new NEVER_INJECTED entries: {added}. A brand-new knob cannot satisfy "
@@ -793,8 +842,7 @@ def test_never_injected_is_a_closed_historical_set():
         "NEVER_INJECTED docstring, in the same commit."
     )
     removed = {
-        s: sorted(_FROZEN_NEVER_INJECTED[s] - actual.get(s, set()))
-        for s in _FROZEN_NEVER_INJECTED
+        s: sorted(_FROZEN_NEVER_INJECTED[s] - actual.get(s, set())) for s in _FROZEN_NEVER_INJECTED
     }
     removed = {s: keys for s, keys in removed.items() if keys}
     assert not removed, (
@@ -812,9 +860,12 @@ def test_every_never_injected_key_reaches_a_vault_or_is_exempt_by_nature():
     (2026-08-26) so they cannot drift back."""
     m = _mod()
     moved = {
-        "limits": ("oura_request_timeout_s", "oura_max_backfill_days",
-                   "compile_failure_backoff_s",
-                   "compile_retry_long_context_min_source_chars"),
+        "limits": (
+            "oura_request_timeout_s",
+            "oura_max_backfill_days",
+            "compile_failure_backoff_s",
+            "compile_retry_long_context_min_source_chars",
+        ),
         "graph_view": ("domain_tags",),
         "personal": ("calendar_skip_keywords",),
     }

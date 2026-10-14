@@ -41,9 +41,7 @@ log = logging.getLogger("backfill")
 
 
 # Parse a `| <id> | <answer> | ...` table row. Answer is integer or "—".
-_TABLE_ROW = re.compile(
-    r"^\|\s*(?P<id>\S+)\s*\|\s*(?P<ans>[—\-\d]+)\s*\|", re.MULTILINE
-)
+_TABLE_ROW = re.compile(r"^\|\s*(?P<id>\S+)\s*\|\s*(?P<ans>[—\-\d]+)\s*\|", re.MULTILINE)
 
 
 def _parse_items_table(body: str) -> dict[str, int | None]:
@@ -125,7 +123,9 @@ def backfill_report(report_path: Path) -> bool:
     if instrument_dir is None:
         log.warning(
             "  %s: instrument %s v%s not found in engine — skip",
-            report_path.name, slug, version,
+            report_path.name,
+            slug,
+            version,
         )
         return False
     raw_answers = _parse_items_table(body)
@@ -159,9 +159,7 @@ def backfill_report(report_path: Path) -> bool:
     return True
 
 
-def backfill_study(
-    study_dir: Path, rerender_summary: bool = False
-) -> tuple[int, int]:
+def backfill_study(study_dir: Path, rerender_summary: bool = False) -> tuple[int, int]:
     """Backfill all per-instrument reports under a study; optionally re-render
     meta-report for each run after backfilling. Returns (n_rewritten,
     n_runs_rerendered)."""
@@ -193,11 +191,9 @@ def backfill_study(
                 # timeline incrementally; backfill loops over historic
                 # runs so must subset explicitly.
                 from scripts.reports._engine.lib.timeline import Timeline
+
                 full_timeline = load_timeline(study_dir)
-                trimmed_runs = [
-                    r for r in full_timeline.runs
-                    if r.timestamp <= run_dir.name
-                ]
+                trimmed_runs = [r for r in full_timeline.runs if r.timestamp <= run_dir.name]
                 trimmed = Timeline(
                     study_id=full_timeline.study_id,
                     runs=trimmed_runs,
@@ -223,11 +219,14 @@ def main() -> int:
     )
     parser = argparse.ArgumentParser(description=__doc__.split("\n", 1)[0])
     parser.add_argument(
-        "--study-dir", type=Path, required=True,
+        "--study-dir",
+        type=Path,
+        required=True,
         help="Path to <vault>/reports/studies/<id>/",
     )
     parser.add_argument(
-        "--rerender-summary", action="store_true",
+        "--rerender-summary",
+        action="store_true",
         help="Also re-render _summary.md + charts/ for each touched run.",
     )
     args = parser.parse_args()

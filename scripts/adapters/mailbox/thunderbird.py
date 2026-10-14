@@ -102,7 +102,10 @@ class ThunderbirdMboxReader:
                     log.warning(
                         "ThunderbirdMboxReader[%s]: folder %r → %r "
                         "(local Thunderbird alias; canonical head %r not on disk)",
-                        self._account_id, folder, resolved, head,
+                        self._account_id,
+                        folder,
+                        resolved,
+                        head,
                     )
                     return resolved
         return folder  # no alias found; let downstream strict-match report the miss
@@ -426,7 +429,9 @@ class ThunderbirdMsgFilter:
         self._paths = [Path(p).expanduser() for p in filter_paths]
 
     def apply(self, rule: FilterRule, *, dry_run: bool = False) -> ApplyResult:
-        target = next((p for p in self._paths if p.exists()), self._paths[0] if self._paths else None)
+        target = next(
+            (p for p in self._paths if p.exists()), self._paths[0] if self._paths else None
+        )
         if target is None:
             return ApplyResult(
                 success=False,

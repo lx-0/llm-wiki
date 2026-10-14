@@ -190,6 +190,7 @@ def _piggyback_default(name: str) -> dict[str, object]:
         block["max_per_run"] = task.max_per_run
     return block
 
+
 # old_key → new_key (rename, value preserved). new_key=None → drop the block.
 PIGGYBACK_RENAMES: dict[str, str | None] = {
     "follow_requests": "curiosity_followup",
@@ -267,7 +268,8 @@ VALUE_UPGRADES: dict[str, dict[object, object]] = {
 #   so the suggestions producer never fired.
 LIST_VALUE_UPGRADES: dict[str, tuple[list, list]] = {
     "features.suggestions_source_globs": (
-        ["raw/email/*.md"], ["raw/notes/email/*.md"],
+        ["raw/email/*.md"],
+        ["raw/notes/email/*.md"],
     ),
 }
 
@@ -288,9 +290,9 @@ LIST_VALUE_UPGRADES: dict[str, tuple[list, list]] = {
 
 INJECTED_KEYS: dict[str, tuple[str, ...]] = {
     "models": (
-        "dream_model",                # M014 dream-cycle model (2026-05-18)
-        "folder_scan_provider",       # M027-S04 Q9 seam (2026-06-10)
-        "intent_classify_model",      # intent-dispatch cheap tier (2026-06-14)
+        "dream_model",  # M014 dream-cycle model (2026-05-18)
+        "folder_scan_provider",  # M027-S04 Q9 seam (2026-06-10)
+        "intent_classify_model",  # intent-dispatch cheap tier (2026-06-14)
         "compile_default_route_model",  # compile fall-through route (2026-08-26)
     ),
     "graph_view": (
@@ -300,16 +302,16 @@ INJECTED_KEYS: dict[str, tuple[str, ...]] = {
         "domain_tags",
     ),
     "limits": (
-        "curiosity_exclude_globs",    # curiosity substrate denylist (2026-06-13)
-        "wispr_request_timeout_s",    # direct HTTP meeting collector (2026-10-09)
+        "curiosity_exclude_globs",  # curiosity substrate denylist (2026-06-13)
+        "wispr_request_timeout_s",  # direct HTTP meeting collector (2026-10-09)
         "wispr_max_per_run",
         "wispr_max_pages",
         "review_max_sweep_runtime_s",  # review-wiki soft sweep deadline (2026-06-13)
         "curiosity_folder_max_candidates",  # M027 candidate retrieval (2026-06-13)
-        "dream_per_call_timeout_s",   # M014 per-message stall timeout (2026-05-18)
-        "compile_skip_on_long_context_unknown",   # kind=unknown → skip (2026-05-15)
+        "dream_per_call_timeout_s",  # M014 per-message stall timeout (2026-05-18)
+        "compile_skip_on_long_context_unknown",  # kind=unknown → skip (2026-05-15)
         "compile_aggregated_max_consecutive_failures",  # chunk circuit-breaker (2026-05-17)
-        "compile_role_default_by_location",       # M007-S01-T02 (2026-05-16)
+        "compile_role_default_by_location",  # M007-S01-T02 (2026-05-16)
         # M006 Google Calendar collector (2026-05-15)
         "calendar_request_timeout_s",
         "calendar_max_per_run",
@@ -328,9 +330,9 @@ INJECTED_KEYS: dict[str, tuple[str, ...]] = {
         "flush_user_text_budget_chars",
         "flush_tool_summary_budget_chars",
         "dashboard_refresh_timeout_s",  # dashboard refresh budget (2026-07-14)
-        "compile_per_call_timeout_s",   # per-compile-call hang guard (2026-05-16)
+        "compile_per_call_timeout_s",  # per-compile-call hang guard (2026-05-16)
         "reports_default_lookback_days",  # M019 instrument lookback (2026-05-17)
-        "connection_min_words",         # M012 connection quality gate (2026-05-16)
+        "connection_min_words",  # M012 connection quality gate (2026-05-16)
         # M011 takes substrate (2026-05-16)
         "extract_takes_source_globs",
         "extract_takes_timeout_s",
@@ -352,14 +354,14 @@ INJECTED_KEYS: dict[str, tuple[str, ...]] = {
         # Health-trend synthesis (2026-05-23)
         "health_trends_recent_months",
         "health_trends_min_coverage_days",
-        "voice_punctuate_timeout_s",    # gemma cold-call absorb (2026-05-28)
+        "voice_punctuate_timeout_s",  # gemma cold-call absorb (2026-05-28)
         # Ollama/piggyback/review reliability bundle (2026-05-30)
         "ollama_connect_timeout_s",
         "piggyback_max_runtime_s",
         "review_ollama_timeout_s",
         "review_consecutive_failure_abort",
         "review_checkpoint_every",
-        "dedup_fuzzy_threshold",        # wiki dedup, issue #3 (2026-05-31)
+        "dedup_fuzzy_threshold",  # wiki dedup, issue #3 (2026-05-31)
         # Intent-dispatch (2026-06-13)
         "intent_source_globs",
         "intent_classify_timeout_s",
@@ -380,34 +382,34 @@ INJECTED_KEYS: dict[str, tuple[str, ...]] = {
         "compile_retry_long_context_min_source_chars",
     ),
     "scheduling": (
-        "piggybacks_on_compile",        # compile drains due piggybacks (2026-06-13)
-        "dream_cooldown_days",          # M014 (2026-05-16)
-        "dream_priority",               # M017 (2026-05-17)
+        "piggybacks_on_compile",  # compile drains due piggybacks (2026-06-13)
+        "dream_cooldown_days",  # M014 (2026-05-16)
+        "dream_priority",  # M017 (2026-05-17)
         "concept_reconcile_cooldown_days",  # concept routine (2026-05-22)
-        "web_research_cooldown_days",   # dream web-research, issue #2 (2026-05-31)
+        "web_research_cooldown_days",  # dream web-research, issue #2 (2026-05-31)
         "dream_insufficient_corpus_backoff_max_days",  # backoff (2026-06-02)
     ),
     "features": (
-        "extract_takes",                # M011 master switch (2026-05-16)
-        "dream_web_research",           # issue #2, external paid Exa call (2026-05-31)
-        "concept_reconciliation",       # autonomous concept edits, opt-in (2026-05-22)
-        "health_trends",                # deterministic + $0, default OFF (2026-05-23)
-        "voice_punctuate",              # Ollama punctuation pass (2026-05-17)
-        "suggestions_source_globs",     # Producer-seam arc (2026-05-17)
-        "compile_callback_gate",        # can_use_tool path-scope gate (2026-05-17)
-        "materialize_backlinks",        # M020 backlinks footer (2026-05-17)
-        "relativize_wikilinks",         # wikilink relativize pass (2026-05-29)
-        "extract_picture_metadata",     # EXIF + Android filename pattern (2026-05-29)
-        "operator_reports",             # M019 master switch (2026-05-17)
+        "extract_takes",  # M011 master switch (2026-05-16)
+        "dream_web_research",  # issue #2, external paid Exa call (2026-05-31)
+        "concept_reconciliation",  # autonomous concept edits, opt-in (2026-05-22)
+        "health_trends",  # deterministic + $0, default OFF (2026-05-23)
+        "voice_punctuate",  # Ollama punctuation pass (2026-05-17)
+        "suggestions_source_globs",  # Producer-seam arc (2026-05-17)
+        "compile_callback_gate",  # can_use_tool path-scope gate (2026-05-17)
+        "materialize_backlinks",  # M020 backlinks footer (2026-05-17)
+        "relativize_wikilinks",  # wikilink relativize pass (2026-05-29)
+        "extract_picture_metadata",  # EXIF + Android filename pattern (2026-05-29)
+        "operator_reports",  # M019 master switch (2026-05-17)
         "dream_require_entity_substrate",  # dream no-op skip (2026-05-31)
-        "extract_intents",              # intent-dispatch master switch (2026-06-13)
+        "extract_intents",  # intent-dispatch master switch (2026-06-13)
     ),
     "personal": (
-        "implicit_operator_author",     # author-attribution fallback (2026-05-16)
-        "picture_inbox",                # pictures collector (2026-05-17)
-        "capture_inbox",                # M025 quick-capture loop (2026-05-23)
-        "reports_dir",                  # M019 reports surface (2026-05-17)
-        "domains",                      # M013 domain frontmatter axis (2026-05-16)
+        "implicit_operator_author",  # author-attribution fallback (2026-05-16)
+        "picture_inbox",  # pictures collector (2026-05-17)
+        "capture_inbox",  # M025 quick-capture loop (2026-05-23)
+        "reports_dir",  # M019 reports surface (2026-05-17)
+        "domains",  # M013 domain frontmatter axis (2026-05-16)
         # Misfiled in NEVER_INJECTED until 2026-08-26: it is a real tuning
         # knob the calendar collector reads, not an operator-authored
         # structure, and it only entered config.example.yaml long after this
@@ -419,10 +421,10 @@ INJECTED_KEYS: dict[str, tuple[str, ...]] = {
         "voice_transcribe_threads",
         "voice_transcribe_binary",
         "voice_transcribe_ffmpeg",
-        "inbox_bridges",                # inbox-bridge rsync mirror (2026-05-28)
-        "watched_folders",              # M027 watched-folder curiosity (2026-06-07)
-        "exa_api_key",                  # Exa key; prefers .claude/.env (2026-05-31)
-        "output_language",              # issue #4 compiled-prose language (2026-06-13)
+        "inbox_bridges",  # inbox-bridge rsync mirror (2026-05-28)
+        "watched_folders",  # M027 watched-folder curiosity (2026-06-07)
+        "exa_api_key",  # Exa key; prefers .claude/.env (2026-05-31)
+        "output_language",  # issue #4 compiled-prose language (2026-06-13)
     ),
     # M030 `wiki publish` (2026-08-25) — whole block is new; migrate_additions
     # creates the parent on first run. Token stays .env-only (no schema key).
@@ -431,7 +433,7 @@ INJECTED_KEYS: dict[str, tuple[str, ...]] = {
         "endpoint",
         "wiki_slug",
         "wiki_name",
-        "roots",                # M030-S04 ALLES widening (2026-08-25)
+        "roots",  # M030-S04 ALLES widening (2026-08-25)
     ),
 }
 
@@ -439,14 +441,14 @@ INJECTED_KEYS: dict[str, tuple[str, ...]] = {
 # operator's YAML. Values derive from _default_piggybacks().
 INJECTED_PIGGYBACKS: tuple[str, ...] = (
     "wispr",
-    "calendar",             # M006 (2026-05-15)
-    "curiosity_followup",   # consumer piggyback, backlog-corrective (2026-05-16)
-    "dream_cycle",          # M014 (2026-05-16)
-    "pictures",             # pictures collector (2026-05-17)
-    "capture",              # M025 (2026-05-23)
-    "study_run_due",        # M019 schedule dispatcher, default OFF (2026-05-17)
-    "analyst_pass2",        # M019-S05 Pass-2 analyst, default OFF (2026-05-17)
-    "publish",              # M030-S03 meinkontext-mirror cadence (2026-08-25)
+    "calendar",  # M006 (2026-05-15)
+    "curiosity_followup",  # consumer piggyback, backlog-corrective (2026-05-16)
+    "dream_cycle",  # M014 (2026-05-16)
+    "pictures",  # pictures collector (2026-05-17)
+    "capture",  # M025 (2026-05-23)
+    "study_run_due",  # M019 schedule dispatcher, default OFF (2026-05-17)
+    "analyst_pass2",  # M019-S05 Pass-2 analyst, default OFF (2026-05-17)
+    "publish",  # M030-S03 meinkontext-mirror cadence (2026-08-25)
     # Enabled-by-default daily job that no vault could see or retune — it sat
     # in NEVER_INJECTED with no stated justification at all (2026-08-26).
     "daily_digest_yesterday",
@@ -515,7 +517,7 @@ NEVER_INJECTED: dict[str, tuple[str, ...]] = {
     ),
     "scheduling": (
         "compile_after_hour",
-        "dedup_window_seconds",   # value bump handled via VALUE_UPGRADES
+        "dedup_window_seconds",  # value bump handled via VALUE_UPGRADES
         "timezone",
     ),
     "features": (
@@ -528,12 +530,10 @@ NEVER_INJECTED: dict[str, tuple[str, ...]] = {
         "mode",
         "custom_search",
     ),
-    "skills": (
-        "global_install",
-    ),
+    "skills": ("global_install",),
     "personal": (
         "primary_account",
-        "accounts",               # operator-authored structure
+        "accounts",  # operator-authored structure
         "email_folders",
         "curiosity_folders",
         "project_examples",
@@ -545,10 +545,10 @@ NEVER_INJECTED: dict[str, tuple[str, ...]] = {
 }
 
 NEVER_INJECTED_PIGGYBACKS: tuple[str, ...] = (
-    "email",                  # pre-migration-era; in every config since install
+    "email",  # pre-migration-era; in every config since install
     "lint_structural",
     "review_wiki",
-    "optimize_claude_md",     # force-disable handled via PIGGYBACK_FORCE_DISABLE
+    "optimize_claude_md",  # force-disable handled via PIGGYBACK_FORCE_DISABLE
     "screenshots",
     "jamie",
     "gmeet",
@@ -573,8 +573,16 @@ KEY_ADDITIONS: dict[str, dict[str, object]] = {
         if section == "piggybacks"
         else {name: _schema_default(section, name) for name in INJECTED_KEYS[section]}
     )
-    for section in ("models", "limits", "scheduling", "features", "piggybacks",
-                    "personal", "graph_view", "publish")
+    for section in (
+        "models",
+        "limits",
+        "scheduling",
+        "features",
+        "piggybacks",
+        "personal",
+        "graph_view",
+        "publish",
+    )
 }
 
 # Elements to add to existing list-valued config entries. Used when an
@@ -629,7 +637,9 @@ LIST_REMOVALS: dict[str, list[object]] = {
     # in operator vaults (added at some point during the wind-down)
     # short-circuited the dispatch BEFORE the substrate-handler ran.
     "limits.compile_skip_substrate_types": [
-        "calendar-rollup", "memory-sync", "memory-seed",
+        "calendar-rollup",
+        "memory-sync",
+        "memory-seed",
     ],
 }
 
@@ -826,12 +836,11 @@ def migrate_account_additions(data: dict) -> list[str]:
             continue
         health["healthkit"] = {
             "kind": "healthkit-xml-export",
-            "inbox_dir": "",       # operator fills in (empty = feature off)
+            "inbox_dir": "",  # operator fills in (empty = feature off)
             "filename": "Export.xml",
         }
         changes.append(
-            f"injected personal.accounts.{aid}.health.healthkit "
-            f"(M023, empty inbox_dir = opt-out)"
+            f"injected personal.accounts.{aid}.health.healthkit (M023, empty inbox_dir = opt-out)"
         )
 
     # M024 (2026-05-21): inject `gmeet.email_discovery` into any account with a
@@ -853,9 +862,7 @@ def migrate_account_additions(data: dict) -> list[str]:
             "folder": "INBOX",
             "backfill_days": 30,
         }
-        changes.append(
-            f"injected personal.accounts.{aid}.gmeet.email_discovery (M024)"
-        )
+        changes.append(f"injected personal.accounts.{aid}.gmeet.email_discovery (M024)")
 
     return changes
 
@@ -967,8 +974,16 @@ def migrate_value_upgrades(data: dict) -> list[str]:
 # knob preserves that behaviour exactly; fresh installs carry
 # `domain_tags: []` from config.example.yaml and are left alone.
 _LEGACY_LINT_DOMAIN_TAGS: list[str] = [
-    "fleet", "openclaw", "claude-code", "yesterday", "llm-wiki",
-    "paperclip", "ytstack", "township", "pixeltales", "lxw",
+    "fleet",
+    "openclaw",
+    "claude-code",
+    "yesterday",
+    "llm-wiki",
+    "paperclip",
+    "ytstack",
+    "township",
+    "pixeltales",
+    "lxw",
 ]
 
 
@@ -1062,10 +1077,15 @@ def migrate_config(config_path: Path) -> tuple[str | None, list[str]]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n", 1)[0])
-    parser.add_argument("--vault", type=str, required=True,
-                        help="Path to the vault root (config.yaml lives at <vault>/.wiki/config.yaml)")
-    parser.add_argument("--apply", action="store_true",
-                        help="Write the migrated config (default: preview only)")
+    parser.add_argument(
+        "--vault",
+        type=str,
+        required=True,
+        help="Path to the vault root (config.yaml lives at <vault>/.wiki/config.yaml)",
+    )
+    parser.add_argument(
+        "--apply", action="store_true", help="Write the migrated config (default: preview only)"
+    )
     args = parser.parse_args()
 
     vault = Path(args.vault).expanduser()

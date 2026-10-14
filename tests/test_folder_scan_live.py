@@ -80,8 +80,7 @@ def test_live_folder_deep_scan_end_to_end(tmp_path: Path, monkeypatch):
     assert cli._dispatch(request_path, dry_run=False) is True
 
     answer_path = (
-        tmp_path / "raw" / "notes" / "folder"
-        / "answer-vertragsnummer-mobilfunk-2026-06-10.md"
+        tmp_path / "raw" / "notes" / "folder" / "answer-vertragsnummer-mobilfunk-2026-06-10.md"
     )
     assert answer_path.exists()
     answer_text = answer_path.read_text(encoding="utf-8")
@@ -94,7 +93,8 @@ def test_live_folder_deep_scan_end_to_end(tmp_path: Path, monkeypatch):
 
     # P2 live: the raw body marker persisted nowhere under the vault root
     offenders = [
-        f for f in tmp_path.rglob("*")
+        f
+        for f in tmp_path.rglob("*")
         if f.is_file()
         and "trove" not in f.parts
         and RAW_BODY_MARKER in f.read_text(encoding="utf-8", errors="ignore")

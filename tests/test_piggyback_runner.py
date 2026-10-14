@@ -14,6 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
 def test_records_ok(tmp_path):
     from core import piggyback_runner as pr
+
     sf = tmp_path / "piggyback-state.json"
     rc = pr.run_piggyback("t", 60, [sys.executable, "-c", "pass"], state_file=sf)
     assert rc == 0
@@ -24,6 +25,7 @@ def test_records_ok(tmp_path):
 
 def test_records_nonzero_exit(tmp_path):
     from core import piggyback_runner as pr
+
     sf = tmp_path / "piggyback-state.json"
     rc = pr.run_piggyback("t", 60, [sys.executable, "-c", "import sys; sys.exit(3)"], state_file=sf)
     assert rc == 3
@@ -36,6 +38,7 @@ def test_stale_last_error_is_overwritten_on_next_run(tmp_path):
     merged without touching last_error. Every completed run must overwrite
     it: fresh text on failure, None on success."""
     from core import piggyback_runner as pr
+
     sf = tmp_path / "piggyback-state.json"
     sf.write_text(json.dumps({"t": {"last_error": "killed after 14400s wall-clock cap"}}))
 
@@ -72,8 +75,7 @@ def test_killed_runner_records_interrupted_not_running(tmp_path):
         "pr.run_piggyback('t', 600, [%r, '-c', 'import time; time.sleep(60)'],"
         " state_file=Path(%r))\n" % (str(scripts_dir), sys.executable, str(sf))
     )
-    proc = sp.Popen([sys.executable, "-c", driver],
-                    stdout=sp.DEVNULL, stderr=sp.DEVNULL)
+    proc = sp.Popen([sys.executable, "-c", driver], stdout=sp.DEVNULL, stderr=sp.DEVNULL)
     # Wait for the runner to record `running` before signalling it.
     for _ in range(100):
         if sf.exists() and json.loads(sf.read_text()).get("t", {}).get("status") == "running":
@@ -94,6 +96,7 @@ def test_killed_runner_records_interrupted_not_running(tmp_path):
 
 def test_records_timeout_and_kills_promptly(tmp_path):
     from core import piggyback_runner as pr
+
     sf = tmp_path / "piggyback-state.json"
     start = time.time()
     rc = pr.run_piggyback(
@@ -111,13 +114,18 @@ def test_rmw_preserves_other_keys(tmp_path):
     concurrent writer (another runner, or flush recording 'spawned') keeps its
     data and the cooldown anchor (last_run) survives."""
     from core import piggyback_runner as pr
+
     sf = tmp_path / "piggyback-state.json"
-    sf.write_text(json.dumps({
-        "other": {"last_run": "2026-01-01T00:00:00", "status": "ok"},
-        "t": {"last_run": "KEEP-ME"},
-    }))
+    sf.write_text(
+        json.dumps(
+            {
+                "other": {"last_run": "2026-01-01T00:00:00", "status": "ok"},
+                "t": {"last_run": "KEEP-ME"},
+            }
+        )
+    )
     pr.run_piggyback("t", 60, [sys.executable, "-c", "pass"], state_file=sf)
     data = json.loads(sf.read_text())
     assert data["other"] == {"last_run": "2026-01-01T00:00:00", "status": "ok"}
-    assert data["t"]["last_run"] == "KEEP-ME"   # cooldown anchor preserved
+    assert data["t"]["last_run"] == "KEEP-ME"  # cooldown anchor preserved
     assert data["t"]["status"] == "ok"

@@ -76,10 +76,10 @@ class AnalystResult:
     markdown_body: str
     elapsed_ms: int
     model_id: str
-    persona_version: str           # SHA256[:16] of persona prompt file
-    prompt_version: str            # SHA256[:16] of full rendered prompt
+    persona_version: str  # SHA256[:16] of persona prompt file
+    prompt_version: str  # SHA256[:16] of full rendered prompt
     cost_usd: float
-    pass_label: str                # "per-study" | "cross-study"
+    pass_label: str  # "per-study" | "cross-study"
 
 
 def _file_hash(path: Path) -> str:
@@ -123,6 +123,7 @@ def run_analyst(
             persist a half-formed `_analysis.md`.
     """
     import asyncio
+
     return asyncio.run(
         _run_analyst_async(
             system_prompt_path=system_prompt_path,
@@ -147,9 +148,7 @@ async def _run_analyst_async(
     log = logging.getLogger("reports.analyst")
 
     if not system_prompt_path.is_file():
-        raise AnalystError(
-            f"analyst persona prompt not found: {system_prompt_path}"
-        )
+        raise AnalystError(f"analyst persona prompt not found: {system_prompt_path}")
     persona_text = system_prompt_path.read_text(encoding="utf-8")
     persona_version = _file_hash(system_prompt_path)
     prompt_version = _text_hash(user_prompt)
@@ -175,8 +174,7 @@ async def _run_analyst_async(
             setting_sources=("project",),
             deny_all_writes=True,
             input_chars=len(user_prompt) + len(persona_text),
-            extra_log={"persona_version": persona_version,
-                       "prompt_version": prompt_version},
+            extra_log={"persona_version": persona_version, "prompt_version": prompt_version},
         ),
         query_fn=query,
     )
@@ -189,8 +187,7 @@ async def _run_analyst_async(
     body = result.assistant_text.strip()
     if not body:
         raise AnalystError(
-            f"analyst returned empty markdown body (pass={pass_label}) — "
-            f"check captured stderr"
+            f"analyst returned empty markdown body (pass={pass_label}) — check captured stderr"
         )
 
     return AnalystResult(
@@ -229,10 +226,7 @@ def latest_run_dir(study: Study) -> Path | None:
     `.<ts>.tmp` partial dirs). None if no runs exist yet."""
     if not study.runs_dir.is_dir():
         return None
-    candidates = [
-        p for p in study.runs_dir.iterdir()
-        if p.is_dir() and not p.name.startswith(".")
-    ]
+    candidates = [p for p in study.runs_dir.iterdir() if p.is_dir() and not p.name.startswith(".")]
     if not candidates:
         return None
     return max(candidates, key=lambda p: p.name)
@@ -243,7 +237,8 @@ def previous_run_dir(study: Study, latest: Path) -> Path | None:
     if not study.runs_dir.is_dir():
         return None
     candidates = sorted(
-        p for p in study.runs_dir.iterdir()
+        p
+        for p in study.runs_dir.iterdir()
         if p.is_dir() and not p.name.startswith(".") and p != latest
     )
     return candidates[-1] if candidates else None
@@ -253,14 +248,18 @@ def build_pass1_user_prompt(study: Study, run_dir: Path) -> str:
     """Inline the manifest + per-instrument reports + summary for one study run."""
     sections: list[str] = []
     sections.append(f"# Study: {study.manifest.study_id}\n")
-    sections.append(f"## Manifest\n\n```yaml\n"
-                    f"{(study.study_dir / 'manifest.yaml').read_text(encoding='utf-8').strip()}\n"
-                    f"```\n")
+    sections.append(
+        f"## Manifest\n\n```yaml\n"
+        f"{(study.study_dir / 'manifest.yaml').read_text(encoding='utf-8').strip()}\n"
+        f"```\n"
+    )
 
     summary_path = run_dir / "_summary.md"
     if summary_path.is_file():
-        sections.append(f"## Deterministic summary (`_summary.md`)\n\n"
-                        f"{summary_path.read_text(encoding='utf-8').strip()}\n")
+        sections.append(
+            f"## Deterministic summary (`_summary.md`)\n\n"
+            f"{summary_path.read_text(encoding='utf-8').strip()}\n"
+        )
 
     instruments_dir = run_dir / "instruments"
     if instruments_dir.is_dir():
@@ -326,9 +325,7 @@ def build_pass2_user_prompt(
     sections: list[str] = []
     sections.append(f"# Cross-study scope: {len(studies_with_analyses)} study/studies\n")
     for study, summary_path, analysis_path in studies_with_analyses:
-        sections.append(
-            f"\n---\n\n## Study: `{study.manifest.study_id}`\n"
-        )
+        sections.append(f"\n---\n\n## Study: `{study.manifest.study_id}`\n")
         sections.append(
             f"### Manifest\n\n```yaml\n"
             f"{(study.study_dir / 'manifest.yaml').read_text(encoding='utf-8').strip()}\n```\n"
@@ -351,9 +348,7 @@ def build_pass2_user_prompt(
     return "\n".join(sections)
 
 
-def persist_pass2(
-    result: AnalystResult, study_count: int, *, vault_root: Path
-) -> Path:
+def persist_pass2(result: AnalystResult, study_count: int, *, vault_root: Path) -> Path:
     """Write `<vault>/<reports_dir>/analyses/<ts>.md`."""
     out_dir = analyses_root(vault_root)
     out_dir.mkdir(parents=True, exist_ok=True)

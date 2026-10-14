@@ -95,9 +95,7 @@ def replace_region(
         return base + separator + block if base else block
     if on_missing == "skip":
         return text
-    raise ValueError(
-        f"markers.replace_region: region {begin!r}..{end!r} not found in text"
-    )
+    raise ValueError(f"markers.replace_region: region {begin!r}..{end!r} not found in text")
 
 
 def ensure_region(
