@@ -19,7 +19,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import subprocess
 import sys
 from pathlib import Path
@@ -34,7 +33,6 @@ from core.health import (
     to_json,
 )
 from core.paths import ROOT_DIR, WIKI_DIR
-
 
 # ── ANSI ────────────────────────────────────────────────────────────
 

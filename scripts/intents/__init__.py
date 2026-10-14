@@ -10,23 +10,23 @@ from __future__ import annotations
 
 import logging
 
-from .base import HandlerResult, Intent, IntentHandler, get_handler, register
+from . import idea_handler as _idea_handler
+from . import note_handler as _note_handler
 
 # Import order doesn't matter (keyed by KIND, not registration order). Each
 # import triggers @register at module load.
-from . import task_handler as _task_handler  # noqa: E402, F401
-from . import idea_handler as _idea_handler  # noqa: E402, F401
-from . import note_handler as _note_handler  # noqa: E402, F401
+from . import task_handler as _task_handler
+from .base import HandlerResult, Intent, IntentHandler, get_handler, register
 
 log = logging.getLogger("compile")
 
 __all__ = [
+    "HandlerResult",
     "Intent",
     "IntentHandler",
-    "HandlerResult",
+    "dispatch",
     "get_handler",
     "register",
-    "dispatch",
 ]
 
 

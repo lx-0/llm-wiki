@@ -17,7 +17,6 @@ import asyncio
 from pathlib import Path
 
 import pytest
-
 import scripts.core.usage as usage_mod
 from scripts.reports._engine.lib import analyst as analyst_mod
 from scripts.reports._engine.lib import inference as inf
@@ -91,7 +90,7 @@ class TestInferenceAccounting:
             '"reasoning": "r"}}}'
         )
 
-        async def fake_query(*, prompt, options):  # noqa: ARG001
+        async def fake_query(*, prompt, options):
             yield _assistant(_TURN_USAGE, agent_json)
             yield _result(_RESULT_USAGE, cost=0.31)
 
@@ -120,7 +119,7 @@ class TestInferenceAccounting:
         """Malformed agent output is still real spend — the SDK call
         succeeded; only the parse failed. The ledger must see it."""
 
-        async def fake_query(*, prompt, options):  # noqa: ARG001
+        async def fake_query(*, prompt, options):
             yield _assistant(_TURN_USAGE, "no json here")
             yield _result(_RESULT_USAGE)
 
@@ -143,7 +142,7 @@ class TestInferenceAccounting:
     def test_sdk_failure_raises_inference_error_with_failure_kind(
         self, recorded: list[dict], monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        async def boom_query(*, prompt, options):  # noqa: ARG001
+        async def boom_query(*, prompt, options):
             raise RuntimeError("Command failed with exit code 1")
             yield  # pragma: no cover
 
@@ -213,7 +212,7 @@ class TestAnalystAccounting:
         persona = tmp_path / "analyst_per_study.md"
         persona.write_text("You are the analyst.\n", encoding="utf-8")
 
-        async def fake_query(*, prompt, options):  # noqa: ARG001
+        async def fake_query(*, prompt, options):
             yield _assistant(_TURN_USAGE, "# Analysis body\n")
             yield _result(_RESULT_USAGE, cost=0.12)
 
@@ -242,7 +241,7 @@ class TestAnalystAccounting:
         persona = tmp_path / "analyst_per_study.md"
         persona.write_text("persona\n", encoding="utf-8")
 
-        async def fake_query(*, prompt, options):  # noqa: ARG001
+        async def fake_query(*, prompt, options):
             yield _result(_RESULT_USAGE)
 
         monkeypatch.setattr(analyst_mod, "query", fake_query)

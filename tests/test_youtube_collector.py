@@ -7,9 +7,6 @@ monkeypatch `_ingest_items` to a canned result. Pure helpers
 
 from __future__ import annotations
 
-from pathlib import Path
-
-
 # ── Protocol conformance ────────────────────────────────────────────
 
 

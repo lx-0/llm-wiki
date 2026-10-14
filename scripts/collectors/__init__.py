@@ -5,7 +5,7 @@ subclass in submodules listed below. New Collector? Add a submodule
 and import it here.
 """
 
-from collectors.base import (  # noqa: F401  re-export the public API
+from collectors.base import (
     Collector,
     CollectorSpec,
     RunResult,
@@ -15,28 +15,32 @@ from collectors.base import (  # noqa: F401  re-export the public API
     register,
 )
 
-# Trigger @register side-effects.
+# Trigger @register side-effects. Import order = registration order = the order
+# `all_collectors()` / `wiki collect --list` / piggyback discovery report them in.
+# The sorter is switched off for this block — alphabetising it would change
+# that order (the action comment must stand alone on its line).
 # Note: calendar_collector.py is named with a `_collector` suffix to avoid
 # shadowing the stdlib `calendar` module — `http.cookiejar` does
 # `from calendar import timegm`, and `scripts/collectors/` sits on sys.path
 # when `cli.py` runs directly. Same fix pattern as email_collector.py.
-from collectors import calendar_collector  # noqa: F401,E402
-from collectors import email_collector  # noqa: F401,E402
-from collectors import folder_index  # noqa: F401,E402
-from collectors import gmeet  # noqa: F401,E402
-from collectors import health  # noqa: F401,E402
-from collectors import jamie  # noqa: F401,E402
-from collectors import wispr  # noqa: F401,E402
-from collectors import scan_browser  # noqa: F401,E402
-from collectors import scan_screenshots  # noqa: F401,E402
-from collectors import scan_tabs  # noqa: F401,E402
-from collectors import scan_youtube  # noqa: F401,E402
-from collectors import pictures  # noqa: F401,E402
-from collectors import voice  # noqa: F401,E402
-
 # capture_collector.py uses the `_collector` suffix (same defensive naming as
 # calendar_collector / email_collector). The SPEC name stays clean ("capture").
-from collectors import capture_collector  # noqa: F401,E402
+# isort: off
+from collectors import calendar_collector
+from collectors import email_collector
+from collectors import folder_index
+from collectors import gmeet
+from collectors import health
+from collectors import jamie
+from collectors import wispr
+from collectors import scan_browser
+from collectors import scan_screenshots
+from collectors import scan_tabs
+from collectors import scan_youtube
+from collectors import pictures
+from collectors import voice
+from collectors import capture_collector
+# isort: on
 
 __all__ = [
     "Collector",

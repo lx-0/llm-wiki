@@ -16,14 +16,14 @@ an OAuth client at https://console.cloud.google.com.
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterator
 from datetime import datetime
 from pathlib import Path
-from typing import Iterator
 
 from adapters.mailbox.base import ApplyResult, MailboxReadError
 from core import google_oauth
-from core.paths import ROOT_DIR
 from core.google_oauth import OAuthApp
+from core.paths import ROOT_DIR
 from domain.mail import FilterRule, Message, MessageMeta
 
 log = logging.getLogger(__name__)
@@ -197,7 +197,7 @@ def _parse_internal_date(internal_ms: str | None) -> datetime:
         return datetime.fromtimestamp(0)
     try:
         return datetime.fromtimestamp(int(internal_ms) / 1000)
-    except Exception as e:  # noqa: BLE001 — per-message fallback to epoch
+    except Exception as e:
         log.debug("internalDate parse failed [%.30s]: %s", internal_ms, e)
         return datetime.fromtimestamp(0)
 
@@ -212,7 +212,7 @@ def _extract_text_body(payload: dict) -> str:
         if data:
             try:
                 return base64.urlsafe_b64decode(data).decode("utf-8", errors="replace")
-            except Exception as e:  # noqa: BLE001 — per-message fallback to empty body
+            except Exception as e:
                 log.debug("body base64 decode failed: %s", e)
                 return ""
     for part in payload.get("parts") or ():
@@ -276,7 +276,7 @@ class GmailFilter:
                 rule_id=resp.json().get("id"),
                 message=f"gmail-api: filter created ({from_criteria} → {label_name})",
             )
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             log.exception("GmailFilter.apply failed for %s", self._account_id)
             return ApplyResult(
                 success=False,

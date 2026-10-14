@@ -21,7 +21,6 @@ from typing import Literal
 
 from core import frontmatter
 
-
 ClassifyKind = Literal["aggregated-memory", "single"]
 
 

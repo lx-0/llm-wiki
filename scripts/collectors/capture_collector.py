@@ -213,7 +213,7 @@ class CaptureCollector:
                     source_path=str(out_path.relative_to(RAW_DIR.parent)),
                     created=captured_at.isoformat(),
                 )
-            except Exception:  # noqa: BLE001
+            except Exception:
                 errors.append(f"{src.name}: capture-index write failed")
                 log.exception("capture-index record failed for %s", out_path.name)
 

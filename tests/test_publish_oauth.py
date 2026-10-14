@@ -18,10 +18,10 @@ import pytest
 
 from publish.client import PublishClientError
 from publish.oauth import (
+    _wait_for_code,
     current_access_token,
     mint_interactive,
     token_store,
-    _wait_for_code,
 )
 
 ORIGIN = "https://mk.test"

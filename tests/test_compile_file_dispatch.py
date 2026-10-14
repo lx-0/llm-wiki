@@ -29,11 +29,6 @@ def vault(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(rmod, "ROOT_DIR", tmp_path)
 
     saved: dict = {}
-    monkeypatch.setattr(
-        cmod,
-        "load_state",
-        lambda: {k: dict(v) if isinstance(v, dict) else v for k, v in saved.items()},
-    )
 
     # State writes go through the merge-under-lock seam now (StateStore arc);
     # capture them so no test touches the real state.json.

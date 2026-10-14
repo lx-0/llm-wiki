@@ -17,10 +17,6 @@ the seam compile actually uses stays proven.
 
 from __future__ import annotations
 
-import fcntl
-import subprocess
-import sys
-import tempfile
 from pathlib import Path
 
 import pytest

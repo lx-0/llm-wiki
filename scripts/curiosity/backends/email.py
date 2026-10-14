@@ -19,9 +19,9 @@ from datetime import datetime
 from pathlib import Path
 
 from adapters.mailbox import resolve_reader
-from core.paths import RAW_DIR, ROOT_DIR
-from core.utils import now_iso, today_iso
 from core.config import CONFIG
+from core.paths import RAW_DIR, ROOT_DIR
+from core.utils import now_iso
 
 log = logging.getLogger("curiosity")
 
@@ -70,7 +70,7 @@ def process_request(
     slug_match = request_path.stem.removeprefix("request-")  # request-{slug}-{date}
 
     if not account_id or not folder or not topic:
-        return RunResult(success=False, error=f"incomplete request (account/folder/topic missing)")
+        return RunResult(success=False, error="incomplete request (account/folder/topic missing)")
 
     account_cfg = (CONFIG.personal.accounts or {}).get(account_id)
     if account_cfg is None:
@@ -128,12 +128,12 @@ def _render(request: dict, messages: list, account_id: str) -> str:
 
     lines: list[str] = []
     lines.append("---")
-    lines.append(f"type: note")
-    lines.append(f"kind: email-deep-scan")
+    lines.append("type: note")
+    lines.append("kind: email-deep-scan")
     lines.append(f"topic: {json.dumps(topic, ensure_ascii=False)}")
     lines.append(f"folder: {json.dumps(folder, ensure_ascii=False)}")
     lines.append(f"account: {account_id}")
-    lines.append(f'origin: "curiosity/email-deep-scan"')
+    lines.append('origin: "curiosity/email-deep-scan"')
     lines.append(f'request_source: "{source}"')
     lines.append(f'request_created: "{created}"')
     lines.append(f'processed_at: "{now_iso()}"')

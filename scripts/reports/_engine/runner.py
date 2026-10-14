@@ -32,28 +32,26 @@ from __future__ import annotations
 import argparse
 import hashlib
 import sys
-import textwrap
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
-import yaml  # noqa: E402
-
-from scripts.core.prompts import render  # noqa: E402
-from scripts.reports._engine.instrument import Instrument, load_instrument  # noqa: E402
-from scripts.reports._engine.lib.inference import (  # noqa: E402
+import yaml
+from scripts.core.prompts import render
+from scripts.reports._engine.instrument import Instrument, load_instrument
+from scripts.reports._engine.lib.inference import (
     InferenceRun,
     default_batches,
     infer_batch,
 )
-from scripts.reports._engine.substrate_scope import (  # noqa: E402
+from scripts.reports._engine.lib.verify_report import verify_report
+from scripts.reports._engine.score import score_instrument
+from scripts.reports._engine.substrate_scope import (
     CLINICAL_DEFAULT_SUBSTRATE_GLOBS,
     resolve_substrate_files,
 )
-from scripts.reports._engine.lib.verify_report import verify_report  # noqa: E402
-from scripts.reports._engine.score import score_instrument  # noqa: E402
 
 
 def _load_operator_answers(
@@ -349,7 +347,7 @@ def run_inference(
     print(f"  {len(paths)} files matched.", flush=True)
 
     # Build prompt vars
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = datetime.now(UTC).strftime("%Y-%m-%d")
 
     # Load operator-supplied answers (subset of items the operator
     # filled in via `wiki study answer …`). These items are excluded
@@ -384,7 +382,7 @@ def run_inference(
     else:
         print(f"  batches: {len(batches)} ({', '.join(b.label for b in batches)})", flush=True)
 
-    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M-%S")
+    timestamp = datetime.now(UTC).strftime("%Y-%m-%dT%H-%M-%S")
     output_dir = output_dir or (vault_root / "reports" / "_adhoc" / timestamp)
 
     run = InferenceRun(

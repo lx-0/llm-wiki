@@ -5,12 +5,11 @@ from __future__ import annotations
 
 import multiprocessing
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
 import yaml
-
 from scripts.reports._engine.study import (
     InstrumentRef,
     RunDirectory,
@@ -21,7 +20,6 @@ from scripts.reports._engine.study import (
     fork_study,
     list_studies,
 )
-
 
 VALID_MANIFEST = {
     "study_id": "test-study",
@@ -140,7 +138,7 @@ class TestStudyState:
 
     def test_mark_run_bumps_count_and_sets_timestamp(self) -> None:
         s = StudyState()
-        when = datetime(2026, 5, 17, 12, 0, 0, tzinfo=timezone.utc)
+        when = datetime(2026, 5, 17, 12, 0, 0, tzinfo=UTC)
         s.mark_run(when)
         assert s.run_count == 1
         assert "2026-05-17T12:00:00" in s.last_run_at  # type: ignore[arg-type]
@@ -161,22 +159,22 @@ class TestIsDue:
         assert s.is_due() is True
 
     def test_weekly_recent_run_not_due(self) -> None:
-        recent = (datetime.now(timezone.utc) - timedelta(days=2)).isoformat()
+        recent = (datetime.now(UTC) - timedelta(days=2)).isoformat()
         s = self._make("weekly", last=recent)
         assert s.is_due() is False
 
     def test_weekly_8_days_ago_is_due(self) -> None:
-        old = (datetime.now(timezone.utc) - timedelta(days=8)).isoformat()
+        old = (datetime.now(UTC) - timedelta(days=8)).isoformat()
         s = self._make("weekly", last=old)
         assert s.is_due() is True
 
     def test_quarterly_60_days_not_due(self) -> None:
-        recent = (datetime.now(timezone.utc) - timedelta(days=60)).isoformat()
+        recent = (datetime.now(UTC) - timedelta(days=60)).isoformat()
         s = self._make("quarterly", last=recent)
         assert s.is_due() is False
 
     def test_quarterly_100_days_is_due(self) -> None:
-        old = (datetime.now(timezone.utc) - timedelta(days=100)).isoformat()
+        old = (datetime.now(UTC) - timedelta(days=100)).isoformat()
         s = self._make("quarterly", last=old)
         assert s.is_due() is True
 
@@ -234,10 +232,9 @@ class TestRunDirectory:
     def test_exception_leaves_tmp_dir_no_final(self, tmp_path: Path) -> None:
         runs = tmp_path / "runs"
         rd = RunDirectory(runs, "2026-05-17T16-00-00")
-        with pytest.raises(RuntimeError):
-            with rd:
-                rd.write("instruments/phq-9.md", "# partial\n")
-                raise RuntimeError("simulated crash")
+        with pytest.raises(RuntimeError), rd:
+            rd.write("instruments/phq-9.md", "# partial\n")
+            raise RuntimeError("simulated crash")
         # tmp_dir remains for forensics; final dir does NOT exist.
         assert rd.tmp_dir.is_dir()
         assert not rd.final_dir.exists()

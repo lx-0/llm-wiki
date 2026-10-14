@@ -244,7 +244,7 @@ def test_dream_standalone_wiring(tmp_path: Path, monkeypatch, capsys):
     p.parent.mkdir(parents=True)
     p.write_text("---\ntype: person\nname: Jordan Hale\n---\n\n# Jordan Hale\n", encoding="utf-8")
 
-    import core.paths as paths
+    from core import paths
 
     monkeypatch.setattr(paths, "PEOPLE_DIR", kd / "people", raising=False)
     monkeypatch.setattr(paths, "PROJECTS_DIR", kd / "projects", raising=False)

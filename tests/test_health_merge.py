@@ -11,11 +11,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
 import yaml
 
-from collectors.health import _merge_healthkit_into_path
 from adapters.health.healthkit_xml import HealthKitDailyAggregate
+from collectors.health import _merge_healthkit_into_path
 
 
 def _agg(day: str = "2024-01-15", **kw) -> HealthKitDailyAggregate:

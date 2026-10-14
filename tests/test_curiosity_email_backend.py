@@ -9,14 +9,13 @@ touching any real mailbox by monkeypatching `resolve_reader`.
 from __future__ import annotations
 
 import json
+from collections.abc import Iterator
 from datetime import datetime
 from pathlib import Path
-from typing import Iterator
 
 import pytest
 
 from domain.mail import Message, MessageMeta
-
 
 # ── Fixtures ─────────────────────────────────────────────────────────
 

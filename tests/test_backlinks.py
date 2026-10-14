@@ -25,7 +25,6 @@ from core.backlinks import (
     write_backlinks_footer,
 )
 
-
 # ── extractor ──────────────────────────────────────────────────────────
 
 

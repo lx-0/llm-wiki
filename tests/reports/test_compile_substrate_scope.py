@@ -14,10 +14,8 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-
 from scripts.core.config import COMPILE_SUBSTRATE_EXCLUDED_PREFIXES
 from scripts.core.utils import is_compile_excluded_path
-
 
 # ── (a) Constant invariants ──────────────────────────────────────────
 

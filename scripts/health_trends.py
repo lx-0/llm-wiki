@@ -33,10 +33,10 @@ sys.path.insert(0, str(SCRIPTS_DIR))
 
 import yaml
 
-from core import markers  # noqa: E402
+from core import markers
+from core.config import CONFIG
 from core.paths import CONCEPTS_DIR, ROOT_DIR
-from core.config import CONFIG  # noqa: E402
-from core.utils import now_iso  # noqa: E402
+from core.utils import now_iso
 
 logging.basicConfig(
     level=logging.INFO,

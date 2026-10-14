@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import itertools
 import time
-from typing import Callable
+from collections.abc import Callable
 
 import httpx
 
@@ -74,7 +74,7 @@ class ContextMcpClient:
                 raise PublishClientError("either token or token_provider is required")
             static = token
 
-            def token_provider(force: bool = False) -> str:  # noqa: ARG001
+            def token_provider(force: bool = False) -> str:
                 return static
 
         self._token_provider = token_provider
@@ -184,7 +184,7 @@ class ContextMcpClient:
     def close(self) -> None:
         self._http.close()
 
-    def __enter__(self) -> "ContextMcpClient":
+    def __enter__(self) -> ContextMcpClient:
         return self
 
     def __exit__(self, *exc: object) -> None:

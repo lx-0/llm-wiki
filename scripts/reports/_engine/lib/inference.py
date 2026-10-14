@@ -35,7 +35,6 @@ import asyncio
 import json
 import sys
 import time
-from collections.abc import AsyncIterable
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -43,15 +42,13 @@ from pathlib import Path
 # module is imported via the engine's normal `scripts.reports.*` path.
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
-from claude_agent_sdk import query  # noqa: E402
-
-from scripts.core.sdk_helpers import (  # noqa: E402
+from claude_agent_sdk import query
+from scripts.core.sdk_helpers import (
     FailureClass,
     SdkCallSpec,
     run_sdk_query,
 )
-from scripts.reports._engine.instrument import Instrument, LikertItem  # noqa: E402
-
+from scripts.reports._engine.instrument import Instrument, LikertItem
 
 # Wedge composition — locked by S01-T01 empirical verification. Do not
 # add Write/Edit/Bash here under any circumstance; the empty-roots
@@ -92,7 +89,7 @@ class EvidenceRecord:
     weight: float = 1.0
 
     @classmethod
-    def from_json(cls, raw: dict) -> "EvidenceRecord":
+    def from_json(cls, raw: dict) -> EvidenceRecord:
         return cls(
             file=str(raw.get("file", "")),
             quote=str(raw.get("quote", "")),
@@ -118,7 +115,7 @@ class ItemInference:
     reasoning: str
 
     @classmethod
-    def from_json(cls, item_id: str, raw: dict) -> "ItemInference":
+    def from_json(cls, item_id: str, raw: dict) -> ItemInference:
         answer_val = raw.get("answer")
         return cls(
             item_id=item_id,

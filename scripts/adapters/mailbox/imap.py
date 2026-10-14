@@ -26,8 +26,8 @@ import email
 import email.header
 import logging
 import os
-from datetime import datetime, timezone
-from typing import Iterator
+from collections.abc import Iterator
+from datetime import UTC, datetime
 
 from adapters.mailbox.base import MailboxReadError
 from core.errors import swallow
@@ -98,7 +98,7 @@ class ImapReader:
             client.normalise_times = False
             client.login(user, password)
             return client
-        except Exception as e:  # noqa: BLE001  any connect/login failure
+        except Exception as e:
             raise MailboxReadError(
                 f"ImapReader[{self._account_id}]: IMAP connect/login failed: "
                 f"{type(e).__name__}: {e}"
@@ -118,7 +118,7 @@ class ImapReader:
             return sorted(
                 _normalise_folder(name, delim) for _flags, delim, name in client.list_folders()
             )
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             log.warning("ImapReader[%s]: list_folders failed: %s", self._account_id, e)
             return []
         finally:
@@ -161,7 +161,7 @@ class ImapReader:
                 try:
                     client.select_folder(raw_name, readonly=True)
                     uids = client.search(criteria)
-                except Exception as e:  # noqa: BLE001
+                except Exception as e:
                     log.warning(
                         "ImapReader[%s]: scan of %r failed: %s", self._account_id, norm_name, e
                     )
@@ -196,7 +196,7 @@ class ImapReader:
                 try:
                     client.select_folder(raw_name, readonly=True)
                     uids = client.search(criteria)
-                except Exception as e:  # noqa: BLE001
+                except Exception as e:
                     log.warning(
                         "ImapReader[%s]: deep scan of %r failed: %s", self._account_id, norm_name, e
                     )
@@ -254,8 +254,8 @@ def _message_date(data: dict) -> datetime | None:
     if dt is None:
         return None
     if dt.tzinfo is None:
-        return dt.replace(tzinfo=timezone.utc)
-    return dt.astimezone(timezone.utc)
+        return dt.replace(tzinfo=UTC)
+    return dt.astimezone(UTC)
 
 
 def _decode_mime(raw: bytes | str | None) -> str:
@@ -266,7 +266,7 @@ def _decode_mime(raw: bytes | str | None) -> str:
         raw = raw.decode("utf-8", "replace")
     try:
         return str(email.header.make_header(email.header.decode_header(raw)))
-    except Exception as e:  # noqa: BLE001 — per-header fallback, raw form is usable
+    except Exception as e:
         log.debug("MIME header decode failed [%.60s]: %s", raw, e)
         return raw
 
@@ -314,7 +314,7 @@ def _meta_from_fetch(
         subject=subject,
         # Epoch fallback is tz-aware — a naive datetime here would crash
         # min()/max() in the report renderers (see KNOWLEDGE.md).
-        date=date or datetime.fromtimestamp(0, timezone.utc),
+        date=date or datetime.fromtimestamp(0, UTC),
         size_bytes=int(data.get(b"RFC822.SIZE") or 0),
         in_reply_to=in_reply_to,
         message_id=message_id,
@@ -337,7 +337,7 @@ def _extract_body(msg) -> str:
                     return (part.get_payload(decode=True) or b"").decode(
                         part.get_content_charset() or "utf-8", errors="replace"
                     )
-                except Exception as e:  # noqa: BLE001 — per-message fallback to empty body
+                except Exception as e:
                     log.debug("multipart body decode failed: %s", e)
                     return ""
         return ""
@@ -345,7 +345,7 @@ def _extract_body(msg) -> str:
         return (msg.get_payload(decode=True) or b"").decode(
             msg.get_content_charset() or "utf-8", errors="replace"
         )
-    except Exception as e:  # noqa: BLE001 — per-message fallback to empty body
+    except Exception as e:
         log.debug("body decode failed: %s", e)
         return ""
 

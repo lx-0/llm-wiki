@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-import core.health as health
+from core import health
 
 NOW = datetime(2026, 8, 26, 12, 0, 0).astimezone()
 

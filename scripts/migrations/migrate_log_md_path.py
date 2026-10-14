@@ -29,7 +29,6 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s  %(levelname)s  %(message)s",
@@ -97,12 +96,11 @@ def migrate(vault: Path, dry_run: bool) -> int:
                 log.info(
                     "merged %s (%d bytes) into %s; audit copy at %s", src, src_size, dest, audit
                 )
+        elif dry_run:
+            log.info("would move %s (%d bytes) → %s", src, src_size, dest)
         else:
-            if dry_run:
-                log.info("would move %s (%d bytes) → %s", src, src_size, dest)
-            else:
-                shutil.move(str(src), str(dest))
-                log.info("moved %s (%d bytes) → %s", src, src_size, dest)
+            shutil.move(str(src), str(dest))
+            log.info("moved %s (%d bytes) → %s", src, src_size, dest)
 
     return 0
 

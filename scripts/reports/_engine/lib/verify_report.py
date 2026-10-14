@@ -20,7 +20,6 @@ from pathlib import Path
 
 import yaml
 
-
 # Required frontmatter keys. Top-level only — nested keys like
 # `coverage.coverage_pct` are checked separately.
 REQUIRED_FRONTMATTER_KEYS: tuple[str, ...] = (

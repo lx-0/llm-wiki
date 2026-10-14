@@ -8,7 +8,7 @@ exercise ImapReader's own precise-watermark + undated-skip re-filter.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
@@ -17,7 +17,6 @@ from adapters.mailbox.imap import ImapReader
 
 imapclient = pytest.importorskip("imapclient")
 from imapclient.response_types import Address, Envelope  # noqa: E402
-
 
 # ── Fake IMAPClient ──────────────────────────────────────────────────
 
@@ -89,10 +88,10 @@ class FakeIMAPClient:
             raise Exception(f"[NONEXISTENT] Unknown Mailbox: {name}")
         self._selected = name
 
-    def search(self, criteria):  # noqa: ARG002  fake ignores SINCE on purpose
+    def search(self, criteria):
         return list(FakeIMAPClient.FOLDERS.get(self._selected, {}))
 
-    def fetch(self, uids, data_items):  # noqa: ARG002
+    def fetch(self, uids, data_items):
         rows = FakeIMAPClient.FOLDERS.get(self._selected, {})
         return {uid: rows[uid] for uid in uids if uid in rows}
 
@@ -135,14 +134,10 @@ def test_imap_reader_satisfies_protocol() -> None:
 def test_scan_metadata_builds_message_meta() -> None:
     FakeIMAPClient.FOLDERS = {
         "INBOX": {
-            1: _fetch_row(
-                "hello", "alice@example.com", datetime(2026, 5, 10, 9, 0, tzinfo=timezone.utc)
-            ),
+            1: _fetch_row("hello", "alice@example.com", datetime(2026, 5, 10, 9, 0, tzinfo=UTC)),
         },
         "INBOX/Work": {
-            2: _fetch_row(
-                "invoice", "bob@vendor.com", datetime(2026, 5, 11, 8, 0, tzinfo=timezone.utc)
-            ),
+            2: _fetch_row("invoice", "bob@vendor.com", datetime(2026, 5, 11, 8, 0, tzinfo=UTC)),
         },
     }
     metas = list(_reader().scan_metadata())
@@ -158,12 +153,12 @@ def test_scan_metadata_builds_message_meta() -> None:
 def test_scan_metadata_since_drops_old_and_undated() -> None:
     FakeIMAPClient.FOLDERS = {
         "INBOX": {
-            1: _fetch_row("old", "a@x.com", datetime(2026, 5, 1, tzinfo=timezone.utc)),
-            2: _fetch_row("new", "b@x.com", datetime(2026, 5, 12, tzinfo=timezone.utc)),
+            1: _fetch_row("old", "a@x.com", datetime(2026, 5, 1, tzinfo=UTC)),
+            2: _fetch_row("new", "b@x.com", datetime(2026, 5, 12, tzinfo=UTC)),
             3: _fetch_row("undated", "c@x.com", None, internaldate=False),
         }
     }
-    metas = list(_reader().scan_metadata(since=datetime(2026, 5, 5, tzinfo=timezone.utc)))
+    metas = list(_reader().scan_metadata(since=datetime(2026, 5, 5, tzinfo=UTC)))
 
     # 'old' is before the watermark; 'undated' has no date to place against it.
     assert {m.subject for m in metas} == {"new"}
@@ -171,10 +166,8 @@ def test_scan_metadata_since_drops_old_and_undated() -> None:
 
 def test_scan_metadata_folder_allowlist() -> None:
     FakeIMAPClient.FOLDERS = {
-        "INBOX": {1: _fetch_row("keep", "a@x.com", datetime(2026, 5, 10, tzinfo=timezone.utc))},
-        "[Gmail]/All Mail": {
-            2: _fetch_row("skip", "b@x.com", datetime(2026, 5, 10, tzinfo=timezone.utc))
-        },
+        "INBOX": {1: _fetch_row("keep", "a@x.com", datetime(2026, 5, 10, tzinfo=UTC))},
+        "[Gmail]/All Mail": {2: _fetch_row("skip", "b@x.com", datetime(2026, 5, 10, tzinfo=UTC))},
     }
     metas = list(_reader(folders=["INBOX"]).scan_metadata())
     assert {m.subject for m in metas} == {"keep"}
@@ -186,9 +179,7 @@ def test_scan_metadata_skips_noselect_folders() -> None:
     """
     FakeIMAPClient.FOLDERS = {
         "[Gmail]": {},  # noselect namespace container
-        "[Gmail]/All Mail": {
-            1: _fetch_row("real", "a@x.com", datetime(2026, 5, 10, tzinfo=timezone.utc))
-        },
+        "[Gmail]/All Mail": {1: _fetch_row("real", "a@x.com", datetime(2026, 5, 10, tzinfo=UTC))},
     }
     FakeIMAPClient.NOSELECT = {"[Gmail]"}
 
@@ -205,7 +196,7 @@ def test_scan_metadata_raises_without_credentials(monkeypatch: pytest.MonkeyPatc
     """
     monkeypatch.delenv("TEST_IMAP_PASS", raising=False)
     FakeIMAPClient.FOLDERS = {
-        "INBOX": {1: _fetch_row("x", "a@x.com", datetime(2026, 5, 10, tzinfo=timezone.utc))}
+        "INBOX": {1: _fetch_row("x", "a@x.com", datetime(2026, 5, 10, tzinfo=UTC))}
     }
     with pytest.raises(MailboxReadError):
         list(_reader().scan_metadata())
@@ -215,7 +206,7 @@ def test_scan_metadata_raises_on_login_failure() -> None:
     """Bad app password → IMAP login fails → surfaced as MailboxReadError."""
     FakeIMAPClient.RAISE_ON_LOGIN = True
     FakeIMAPClient.FOLDERS = {
-        "INBOX": {1: _fetch_row("x", "a@x.com", datetime(2026, 5, 10, tzinfo=timezone.utc))}
+        "INBOX": {1: _fetch_row("x", "a@x.com", datetime(2026, 5, 10, tzinfo=UTC))}
     }
     with pytest.raises(MailboxReadError):
         list(_reader().scan_metadata())

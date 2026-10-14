@@ -30,7 +30,7 @@ class _FakeSession:
     def __init__(self, body: str) -> None:
         self._body = body
 
-    def get(self, url, params=None, timeout=None):  # noqa: ANN001
+    def get(self, url, params=None, timeout=None):
         return _FakeResp(self._body)
 
 

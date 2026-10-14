@@ -16,15 +16,14 @@ import argparse
 import asyncio
 import logging
 import shutil
-import sys
 from datetime import datetime
 from pathlib import Path
 
 from claude_agent_sdk import ClaudeAgentOptions, ResultMessage, query
 
-from core.paths import KNOWLEDGE_DIR, LOG_FILE, ROOT_DIR
-from core.utils import now_iso, read_wiki_index_compact
 from core.config import CONFIG
+from core.paths import LOG_FILE, ROOT_DIR
+from core.utils import now_iso, read_wiki_index_compact
 
 # ── Config ──────────────────────────────────────────────────────────
 
@@ -38,9 +37,10 @@ logging.basicConfig(
 )
 log = logging.getLogger("optimize-claude-md")
 
+import time as _time  # noqa: E402
+
 from core.prompts import render  # noqa: E402
 from core.sdk_helpers import StderrCapture, log_sdk_failure  # noqa: E402
-import time as _time  # noqa: E402
 
 # ── Main ────────────────────────────────────────────────────────────
 

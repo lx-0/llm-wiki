@@ -14,7 +14,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from producers.base import Producer, ProducerResult, ProducerSpec
+from producers.base import ProducerResult, ProducerSpec
 
 
 def _stub_producer(

@@ -143,8 +143,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 # module runs `load()` + dotenv against the global CONFIG_FILE at import time,
 # which need not be the vault we're migrating. The schema module is
 # side-effect-free by contract (see its docstring).
-from core.config_backup import backup_config_file  # noqa: E402
-from core.config_schema import WikiConfig, _default_piggybacks  # noqa: E402
+from core.config_backup import backup_config_file
+from core.config_schema import WikiConfig, _default_piggybacks
 
 logging.basicConfig(
     level=logging.INFO,

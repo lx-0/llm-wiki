@@ -6,7 +6,6 @@ verification is left to operator-side live runs (see SUMMARY).
 
 from __future__ import annotations
 
-from pathlib import Path
 from types import SimpleNamespace
 
 

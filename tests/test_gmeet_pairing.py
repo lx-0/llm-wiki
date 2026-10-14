@@ -26,7 +26,6 @@ import pytest
 
 from collectors import gmeet
 
-
 # ── _meeting_key ─────────────────────────────────────────────────────
 
 

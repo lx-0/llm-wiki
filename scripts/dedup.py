@@ -728,7 +728,7 @@ def main(argv: list[str] | None = None) -> int:
             from core.config import CONFIG
 
             threshold = CONFIG.limits.dedup_fuzzy_threshold
-        except Exception:  # noqa: BLE001 — config optional for detection
+        except Exception:
             threshold = 0.85
 
     if args.cmd == "merge":

@@ -16,7 +16,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
-from core.sdk_helpers import FailureClass, SdkRunResult  # noqa: E402
+from core.sdk_helpers import FailureClass, SdkRunResult
 
 
 @pytest.fixture
@@ -35,7 +35,7 @@ def _outcomes(*items: SdkRunResult):
     calls: list = []
     queue = list(items)
 
-    async def fake(prompt, spec):  # noqa: ARG001
+    async def fake(prompt, spec):
         calls.append(spec)
         return queue.pop(0)
 

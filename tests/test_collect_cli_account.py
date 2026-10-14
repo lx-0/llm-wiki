@@ -9,9 +9,9 @@ operator error, surfaced loudly (exit 1) rather than silently ignored.
 
 from __future__ import annotations
 
-import collectors as collectors_pkg
 import pytest
 
+import collectors as collectors_pkg
 from collectors import cli
 from collectors.base import CollectorSpec, RunResult
 

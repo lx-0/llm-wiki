@@ -19,7 +19,6 @@ import pytest
 
 import cli
 
-
 # ── 1. Every row is dispatchable ────────────────────────────────────────
 
 

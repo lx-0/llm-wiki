@@ -94,7 +94,7 @@ def _make_jpeg_with_exif(path: Path, exif_dict: dict) -> None:
     pull a new dep. `exif_dict` keys are Pillow EXIF tag IDs from
     `PIL.ExifTags.TAGS` (the reverse mapping).
     """
-    from PIL import Image, ExifTags
+    from PIL import ExifTags, Image
 
     img = Image.new("RGB", (16, 16), color=(128, 128, 128))
     exif = img.getexif()

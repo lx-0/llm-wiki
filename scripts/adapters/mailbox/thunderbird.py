@@ -21,10 +21,10 @@ import logging
 import mailbox
 import os
 import re
+from collections.abc import Iterator
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Iterator
 
 from adapters.mailbox.base import ApplyResult, MailboxReadError
 from domain.mail import (
@@ -210,7 +210,7 @@ def _find_mbox_files(
 def _decode_header(raw: str) -> str:
     try:
         return str(email.header.make_header(email.header.decode_header(raw)))
-    except Exception as e:  # noqa: BLE001 — per-header fallback, raw form is usable
+    except Exception as e:
         log.debug("header decode failed [%.60s]: %s", raw, e)
         return raw
 
@@ -224,14 +224,14 @@ def _parse_date(raw: str) -> datetime | None:
     """
     try:
         dt = email.utils.parsedate_to_datetime(raw)
-    except Exception as e:  # noqa: BLE001 — per-message fallback, treated as undated
+    except Exception as e:
         log.debug("Date header parse failed [%.60s]: %s", raw, e)
         return None
     if dt is None:
         return None
     if dt.tzinfo is None:
-        return dt.replace(tzinfo=timezone.utc)
-    return dt.astimezone(timezone.utc)
+        return dt.replace(tzinfo=UTC)
+    return dt.astimezone(UTC)
 
 
 def _iter_metadata(
@@ -243,7 +243,7 @@ def _iter_metadata(
 ) -> Iterator[MessageMeta]:
     try:
         mbox = mailbox.mbox(str(path))
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         log.warning("ThunderbirdMboxReader: cannot open %s: %s", path, e)
         return
 
@@ -275,7 +275,7 @@ def _iter_metadata(
             from_addr=from_addr or from_name,
             to_addrs=to_addrs,
             subject=_decode_header(msg.get("Subject", "")),
-            date=date or datetime.fromtimestamp(0, timezone.utc),
+            date=date or datetime.fromtimestamp(0, UTC),
             size_bytes=len(bytes(msg)) if hasattr(msg, "as_bytes") else 0,
             in_reply_to=msg.get("In-Reply-To"),
             message_id=msg.get("Message-ID"),
@@ -291,7 +291,7 @@ def _iter_deep(
 ) -> Iterator[Message]:
     try:
         mbox = mailbox.mbox(str(path))
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         log.warning("ThunderbirdMboxReader: cannot open %s: %s", path, e)
         return
 
@@ -323,7 +323,7 @@ def _iter_deep(
             from_addr=from_addr or from_name,
             to_addrs=to_addrs,
             subject=_decode_header(msg.get("Subject", "")),
-            date=date or datetime.fromtimestamp(0, timezone.utc),
+            date=date or datetime.fromtimestamp(0, UTC),
             size_bytes=len(bytes(msg)) if hasattr(msg, "as_bytes") else 0,
             in_reply_to=msg.get("In-Reply-To"),
             message_id=msg.get("Message-ID"),
@@ -344,7 +344,7 @@ def _decode_part(part: mailbox.mboxMessage) -> str:
         if payload is None:
             return ""
         return payload.decode(part.get_content_charset() or "utf-8", errors="replace")
-    except Exception as e:  # noqa: BLE001 — per-part fallback to empty body
+    except Exception as e:
         log.debug("mbox part decode failed: %s", e)
         return ""
 

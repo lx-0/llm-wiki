@@ -39,8 +39,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from core import frontmatter
-from core.paths import FACTS_DIR, KNOWLEDGE_DIR
 from core.config import CONFIG
+from core.paths import FACTS_DIR, KNOWLEDGE_DIR
 from core.utils import slugify, today_iso
 
 logging.basicConfig(

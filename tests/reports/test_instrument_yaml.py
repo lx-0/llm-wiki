@@ -5,13 +5,11 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-
 from scripts.reports._engine.instrument import (
     DEFAULT_LOOKBACK_DAYS,
     InferenceConfig,
     load_instrument,
 )
-
 
 _INSTRUMENTS_ROOT = (
     Path(__file__).resolve().parents[2] / "scripts" / "reports" / "_engine" / "instruments"

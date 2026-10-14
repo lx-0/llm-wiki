@@ -20,8 +20,8 @@ import os
 
 import pytest
 
-import curiosity.producer as producer
 from core.config import CONFIG
+from curiosity import producer
 
 DIGEST = """---
 type: folder-index
@@ -198,7 +198,7 @@ def test_folder_curiosity_producer_is_registered():
 
 
 def test_dispatch_routes_folder_deep_scan_to_folder_backend(tmp_path, monkeypatch):
-    import curiosity.cli as cli
+    from curiosity import cli
     from curiosity.backends import folder as folder_backend
 
     called = {}
@@ -496,7 +496,7 @@ def _card_env(tmp_path, monkeypatch, create_file=True):
 
 
 def test_walk_card_folder_request_shows_informed_consent(tmp_path, monkeypatch, capsys):
-    import curiosity.cli as cli
+    from curiosity import cli
 
     _card_env(tmp_path, monkeypatch)
     r = json.loads(_request_file(tmp_path).read_text(encoding="utf-8"))
@@ -518,7 +518,7 @@ def test_walk_card_folder_request_shows_informed_consent(tmp_path, monkeypatch, 
 
 
 def test_walk_card_folder_request_marks_missing_file(tmp_path, monkeypatch, capsys):
-    import curiosity.cli as cli
+    from curiosity import cli
 
     _card_env(tmp_path, monkeypatch, create_file=False)
     r = json.loads(_request_file(tmp_path).read_text(encoding="utf-8"))
@@ -528,7 +528,7 @@ def test_walk_card_folder_request_marks_missing_file(tmp_path, monkeypatch, caps
 
 
 def test_walk_card_email_request_unchanged(tmp_path, capsys):
-    import curiosity.cli as cli
+    from curiosity import cli
 
     r = {
         "type": "email-deep-scan",

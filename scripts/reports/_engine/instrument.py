@@ -20,10 +20,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import yaml
-
 from scripts.reports._engine.lib.cutoffs import Cutoffs
 from scripts.reports._engine.lib.likert import LikertItem, LikertScale
-
 
 SUPPORTED_SCORING = ("standard-sum",)
 
@@ -51,7 +49,7 @@ class InferenceConfig:
     model: str | None = None  # per-instrument model override; None = engine default
 
     @classmethod
-    def from_raw(cls, raw: dict | None) -> "InferenceConfig":
+    def from_raw(cls, raw: dict | None) -> InferenceConfig:
         raw = raw or {}
         return cls(
             enabled=bool(raw.get("enabled", True)),

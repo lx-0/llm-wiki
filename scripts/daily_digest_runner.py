@@ -84,7 +84,7 @@ def _attach_captures_section(date_iso: str) -> None:
         if new_text != text:
             digest_path.write_text(new_text, encoding="utf-8")
             log.info("daily-digest: attached Captures section to %s", digest_path.name)
-    except Exception:  # noqa: BLE001
+    except Exception:
         log.exception("daily-digest: failed to attach Captures section for %s", date_iso)
 
 

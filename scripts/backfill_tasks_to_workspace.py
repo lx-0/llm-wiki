@@ -22,7 +22,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from core.paths import ROOT_DIR, WORKSPACE_INBOX_DIR  # noqa: E402
+from core.paths import ROOT_DIR, WORKSPACE_INBOX_DIR
 
 log = logging.getLogger("backfill-tasks-to-workspace")
 

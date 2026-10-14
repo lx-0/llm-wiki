@@ -102,8 +102,8 @@ def test_summary_line():
 
 
 def test_usage_report_renders(tmp_path, monkeypatch, capsys):
-    from core import usage
     import usage_report
+    from core import usage
 
     p = tmp_path / "usage.json"
     L = usage.UsageLedger()

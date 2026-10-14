@@ -31,8 +31,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from scripts.core.paths import ROOT_DIR  # noqa: E402
-from scripts.reports._engine.lib.analyst import (  # noqa: E402
+from scripts.core.paths import ROOT_DIR
+from scripts.reports._engine.lib.analyst import (
     PERSONA_CROSS_STUDY,
     PERSONA_PER_STUDY,
     AnalystError,
@@ -45,8 +45,7 @@ from scripts.reports._engine.lib.analyst import (  # noqa: E402
     run_analyst,
     studies_root,
 )
-from scripts.reports._engine.study import Study, list_studies  # noqa: E402
-
+from scripts.reports._engine.study import Study, list_studies
 
 log = logging.getLogger("analyze")
 

@@ -19,13 +19,13 @@ from __future__ import annotations
 import json
 import sys
 from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from core.paths import STATE_DIR  # noqa: E402
-from core.utils import now_iso  # noqa: E402
+from core.paths import STATE_DIR
+from core.utils import now_iso
 
 CACHE_FILE = STATE_DIR / "dashboard-lint-results.json"
 
@@ -71,7 +71,7 @@ def compute_lint_results() -> LintResults:
     for name in DASHBOARD_CHECK_NAMES:
         try:
             issues[name] = checks[name](ctx)
-        except Exception:  # noqa: BLE001 — one bad check must not sink the dashboard
+        except Exception:
             issues[name] = []
     return LintResults(generated_at=now_iso(), issues=issues)
 
@@ -101,8 +101,8 @@ def load_fresh_cache(max_age_s: float) -> LintResults | None:
         payload = json.loads(CACHE_FILE.read_text(encoding="utf-8"))
         generated_at = datetime.fromisoformat(payload["generated_at"])
         if generated_at.tzinfo is None:
-            generated_at = generated_at.replace(tzinfo=timezone.utc)
-        age = (datetime.now(timezone.utc) - generated_at).total_seconds()
+            generated_at = generated_at.replace(tzinfo=UTC)
+        age = (datetime.now(UTC) - generated_at).total_seconds()
         if age < 0 or age > max_age_s:
             return None
         issues = {

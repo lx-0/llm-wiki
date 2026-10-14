@@ -26,7 +26,6 @@ real vault is never touched.
 from __future__ import annotations
 
 import importlib
-from pathlib import Path
 
 import pytest
 
@@ -44,8 +43,8 @@ def capture_env(tmp_path, monkeypatch):
     vault_raw = tmp_path / "vault" / "raw"
     vault_raw.mkdir(parents=True)
 
-    from core.config import CONFIG
     from core import paths as paths_mod
+    from core.config import CONFIG
 
     monkeypatch.setattr(CONFIG.personal, "capture_inbox", str(inbox))
     monkeypatch.setattr(paths_mod, "RAW_DIR", vault_raw)
@@ -101,8 +100,8 @@ def test_capture_id_differs_for_different_content():
 
 
 def test_unconfigured_inbox_is_graceful(monkeypatch):
-    from core.config import CONFIG
     from collectors import capture_collector as cap_mod
+    from core.config import CONFIG
 
     importlib.reload(cap_mod)
 
@@ -115,8 +114,8 @@ def test_unconfigured_inbox_is_graceful(monkeypatch):
 
 
 def test_missing_inbox_path_is_graceful(monkeypatch, tmp_path):
-    from core.config import CONFIG
     from collectors import capture_collector as cap_mod
+    from core.config import CONFIG
 
     importlib.reload(cap_mod)
 

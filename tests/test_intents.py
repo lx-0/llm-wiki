@@ -7,8 +7,6 @@ from __future__ import annotations
 
 import json
 
-import pytest
-
 
 def _patch_inbox(monkeypatch, tmp_path):
     """All handlers write via intents._record.WORKSPACE_INBOX_DIR."""

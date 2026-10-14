@@ -111,7 +111,7 @@ def build_piggyback_tasks() -> list[dict]:
 
     # 1. Registry-discovered Collectors.
     try:
-        from collectors import piggyback_collectors  # noqa: WPS433  late import to avoid cycles
+        from collectors import piggyback_collectors
     except ImportError:
 
         def piggyback_collectors():  # type: ignore[misc]

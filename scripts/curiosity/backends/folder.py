@@ -23,7 +23,7 @@ import json
 import logging
 import os
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from core.config import CONFIG
@@ -252,7 +252,7 @@ def _render_answer(request: dict, answer: ScanAnswer, *, sensitivity: str | None
     lines.append(f"as_of_mtime: {answer.as_of_mtime}")
     # Human-readable twin of the float above: the compile agent (and the
     # operator) read a date; the staleness machinery keeps the float.
-    as_of_date = datetime.fromtimestamp(answer.as_of_mtime, tz=timezone.utc).strftime("%Y-%m-%d")
+    as_of_date = datetime.fromtimestamp(answer.as_of_mtime, tz=UTC).strftime("%Y-%m-%d")
     lines.append(f"as_of: {as_of_date}")
     lines.append(f"provider: {CONFIG.models.folder_scan_provider}")
     if sensitivity:

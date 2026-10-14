@@ -11,7 +11,7 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -199,13 +199,13 @@ def test_dream_overdue_counts_missing_and_old(fake_vault, monkeypatch):
     (fake_vault / "knowledge" / "people" / "no-fm.md").write_text("# body")
 
     # Old frontmatter → counts as overdue.
-    old = datetime.now(timezone.utc) - timedelta(days=30)
+    old = datetime.now(UTC) - timedelta(days=30)
     (fake_vault / "knowledge" / "people" / "old.md").write_text(
         f"---\nlast_synthesized_at: {old.isoformat()}\n---\n# body"
     )
 
     # Recent → does NOT count.
-    recent = datetime.now(timezone.utc) - timedelta(days=2)
+    recent = datetime.now(UTC) - timedelta(days=2)
     (fake_vault / "knowledge" / "projects" / "fresh.md").write_text(
         f"---\nlast_synthesized_at: {recent.isoformat()}\n---\n# body"
     )

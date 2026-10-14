@@ -17,7 +17,8 @@ from pathlib import Path
 # same bootstrap as bridge/cli.py.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from publish.corpus import (  # noqa: E402
+from core.state_store import StateStore
+from publish.corpus import (
     DEFAULT_ROOTS,
     count_non_markdown,
     load_manifest,
@@ -25,10 +26,8 @@ from publish.corpus import (  # noqa: E402
     map_slugs,
     migrate_manifest_layout,
 )
-from publish.delta import PublishPlan, build_payloads, plan_delta  # noqa: E402
-from publish.describe import description_index  # noqa: E402
-
-from core.state_store import StateStore  # noqa: E402
+from publish.delta import PublishPlan, build_payloads, plan_delta
+from publish.describe import description_index
 
 
 def build_publish_plan(
@@ -115,7 +114,6 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.auth:
         from core.config import CONFIG
-
         from publish.oauth import DEFAULT_TOKEN_PATH, mint_interactive
 
         if not CONFIG.publish.endpoint:

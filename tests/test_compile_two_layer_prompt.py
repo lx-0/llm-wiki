@@ -13,7 +13,6 @@ from __future__ import annotations
 
 from core.prompts import render
 
-
 _DUMMY_VARS = {
     "agents_md": "",
     "facts_md": "",

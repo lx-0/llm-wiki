@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import UTC
 from pathlib import Path
 
 import pytest
@@ -14,7 +15,6 @@ from adapters.mailbox.thunderbird import (
     _to_dat_rule,
 )
 from domain.mail import FilterAction, FilterCondition, FilterRule
-
 
 # ── Resolver dispatch ────────────────────────────────────────────────
 
@@ -217,7 +217,7 @@ def test_reader_skips_undated_messages_when_since_set(tmp_path: Path) -> None:
     skipped them explicitly: "unknown date, skip in delta mode").
     """
     import mailbox
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     box = mailbox.mbox(str(tmp_path / "INBOX"))
     dated = mailbox.mboxMessage()
@@ -241,7 +241,7 @@ def test_reader_skips_undated_messages_when_since_set(tmp_path: Path) -> None:
     assert all(m.date.tzinfo is not None for m in metas)
 
     # Delta mode: the undated message is dropped — only the dated one passes.
-    recent = list(reader.scan_metadata(since=datetime(2026, 5, 1, tzinfo=timezone.utc)))
+    recent = list(reader.scan_metadata(since=datetime(2026, 5, 1, tzinfo=UTC)))
     assert {m.subject for m in recent} == {"dated"}
 
 

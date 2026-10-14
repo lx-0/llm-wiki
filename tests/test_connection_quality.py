@@ -20,7 +20,6 @@ import pytest
 
 import lint
 
-
 GOOD_CONNECTION = """\
 ---
 title: "Connection: A2A enables Work Orchestration"

@@ -11,7 +11,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from preprocessors.clippings import main, sweep  # noqa: E402,F401
+from preprocessors.clippings import main, sweep  # noqa: F401
 
 if __name__ == "__main__":
     main()

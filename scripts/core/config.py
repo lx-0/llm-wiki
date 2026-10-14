@@ -38,8 +38,8 @@ from dotenv import load_dotenv
 # `from .paths import` would raise "no known parent package" when run directly.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from core.config_backup import backup_config_file  # noqa: E402
-from core.paths import CONFIG_FILE, DOTENV_FILE  # noqa: E402
+from core.config_backup import backup_config_file
+from core.paths import CONFIG_FILE, DOTENV_FILE
 
 log = logging.getLogger(__name__)
 
@@ -69,7 +69,6 @@ from core.config_schema import (  # noqa: E402,F401
     WikiConfig,
     _default_piggybacks,
 )
-
 
 _HINTS_CACHE: dict[type, dict[str, Any]] = {}
 

@@ -19,15 +19,14 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
-from core import state_store  # noqa: E402
-from core.state_store import (  # noqa: E402
+from core import state_store
+from core.state_store import (
     StateStore,
     acquire_process_lock,
     locked,
     try_locked,
 )
-from core.utils import file_hash, save_json_state  # noqa: E402
-
+from core.utils import file_hash, save_json_state
 
 # ── flock primitives ─────────────────────────────────────────────────
 
@@ -36,9 +35,8 @@ def test_locked_blocks_second_acquirer(tmp_path: Path) -> None:
     """While `locked` holds the flock, a try-lock on the same file fails;
     after release it succeeds."""
     lock = tmp_path / "x.lock"
-    with locked(lock):
-        with try_locked(lock) as acquired:
-            assert acquired is False
+    with locked(lock), try_locked(lock) as acquired:
+        assert acquired is False
     with try_locked(lock) as acquired:
         assert acquired is True
 

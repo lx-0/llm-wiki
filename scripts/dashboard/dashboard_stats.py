@@ -22,12 +22,11 @@ import argparse
 import json
 import logging
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from core.paths import DAILY_DIR, KNOWLEDGE_DIR, ROOT_DIR, SESSIONS_DIR
 from core.utils import (
     list_wiki_articles,
-    load_state,
     now_iso,
 )
 
@@ -105,7 +104,7 @@ def latest_compile_ts() -> str | None:
     if not articles:
         return None
     newest = max(articles, key=lambda p: p.stat().st_mtime)
-    return datetime.fromtimestamp(newest.stat().st_mtime, tz=timezone.utc).isoformat()
+    return datetime.fromtimestamp(newest.stat().st_mtime, tz=UTC).isoformat()
 
 
 def _is_final_only(article: Path) -> bool:

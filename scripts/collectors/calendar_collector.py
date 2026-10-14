@@ -97,16 +97,18 @@ import logging
 import re
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
 import yaml
 
 from adapters.calendar.google import (
+    SCOPE as _GOOGLE_CAL_SCOPE,
+)
+from adapters.calendar.google import (
     CalendarAPIError,
     GoogleCalendarClient,
-    SCOPE as _GOOGLE_CAL_SCOPE,
 )
 from collectors.base import (
     CollectorSpec,
@@ -171,7 +173,7 @@ def _parse_event_time(raw: dict | None) -> tuple[datetime | None, bool]:
     if "date" in raw and isinstance(raw["date"], str):
         try:
             d = datetime.fromisoformat(raw["date"])
-            return d.replace(tzinfo=timezone.utc), True
+            return d.replace(tzinfo=UTC), True
         except ValueError:
             return None, False
     return None, False
@@ -727,7 +729,7 @@ class CalendarCollector:
             return "no-op (no calendars selected)", ([], []), False
 
         # ── Time window ──
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         time_min_dt = now - timedelta(days=acct.backfill_days)
         time_max_dt = now + timedelta(days=acct.future_days)
         time_min = time_min_dt.isoformat().replace("+00:00", "Z")

@@ -18,7 +18,6 @@ from pathlib import Path
 import pytest
 import yaml
 
-
 # ── Wiring ───────────────────────────────────────────────────────────
 
 
@@ -57,8 +56,8 @@ def _patch_takes_dir(monkeypatch: pytest.MonkeyPatch, takes_dir: Path) -> None:
     binds its own `from core.paths import …` name, so monkeypatch must
     hit each.
     """
-    from facts import take
     from core import paths
+    from facts import take
 
     takes_dir.mkdir(parents=True, exist_ok=True)
     monkeypatch.setattr(take, "TAKES_DIR", takes_dir)

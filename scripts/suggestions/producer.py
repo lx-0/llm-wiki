@@ -13,11 +13,11 @@ from pathlib import Path
 
 from claude_agent_sdk import ClaudeAgentOptions, ResultMessage, query
 
+from core.config import CONFIG
 from core.paths import RAW_SUGGESTIONS_DIR, ROOT_DIR
-from core.utils import read_wiki_index, read_wiki_index_compact, today_iso
 from core.prompts import render
 from core.sdk_helpers import StderrCapture, log_sdk_failure
-from core.config import CONFIG
+from core.utils import read_wiki_index_compact, today_iso
 
 log = logging.getLogger("compile")
 

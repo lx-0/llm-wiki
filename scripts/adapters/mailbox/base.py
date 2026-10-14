@@ -13,12 +13,12 @@ unrelated calls that may dispatch to different adapter modules.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Iterator, Protocol, runtime_checkable
+from typing import Protocol, runtime_checkable
 
 from domain.mail import FilterRule, Message, MessageMeta
-
 
 # ── Failure signal ───────────────────────────────────────────────────
 

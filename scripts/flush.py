@@ -25,11 +25,10 @@ from core.sdk_helpers import sanitize_stale_session_env
 
 sanitize_stale_session_env(os.environ)
 
-import asyncio
 import argparse
+import asyncio
 import contextlib
 import json
-import logging
 import subprocess
 import sys
 import time
@@ -42,12 +41,11 @@ SCRIPTS_DIR = Path(__file__).resolve().parent
 WIKI_DIR = SCRIPTS_DIR.parent
 ROOT_DIR = WIKI_DIR.parent
 sys.path.insert(0, str(SCRIPTS_DIR))
-from core.config import CONFIG  # noqa: E402
-from core.sdk_helpers import SdkCallSpec, is_fatal, run_sdk_query  # noqa: E402
-from core.state_store import is_ingested, try_locked  # noqa: E402
-
-from core import flush_pipeline  # noqa: E402
-from core.piggybacks import PIGGYBACK_STATE_FILE, run_due_piggybacks  # noqa: E402
+from core import flush_pipeline
+from core.config import CONFIG
+from core.piggybacks import run_due_piggybacks
+from core.sdk_helpers import SdkCallSpec, is_fatal, run_sdk_query
+from core.state_store import is_ingested, try_locked
 
 DAILY_DIR = ROOT_DIR / "daily"
 STATE_DIR = WIKI_DIR / "state"  # *.json runtime artifacts (hash trackers, cooldowns)
@@ -133,7 +131,7 @@ def _record_flush(session_id: str) -> None:
 
 # ── Extraction ───────────────────────────────────────────────────────
 
-from core.prompts import render  # noqa: E402
+from core.prompts import render
 
 MAX_RETRIES = CONFIG.limits.flush_max_retries
 RETRY_DELAY = CONFIG.limits.flush_retry_delay_seconds

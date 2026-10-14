@@ -22,18 +22,18 @@ import subprocess
 import sys
 import tempfile
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import httpx  # noqa: E402  exception types only; HTTP via ollama_client
+import httpx
 
-from collectors.base import Collector, CollectorSpec, RunResult, register
+from collectors.base import CollectorSpec, RunResult, register
 from core import ollama_client
-from core.paths import RAW_DIR, ROOT_DIR, STATE_DIR
 from core.config import CONFIG, TIMEZONE
+from core.paths import RAW_DIR, STATE_DIR
 from core.utils import load_json_state, now_iso, save_json_state
 
 # ── Config ──────────────────────────────────────────────────────────
@@ -55,8 +55,7 @@ TZ = ZoneInfo(TIMEZONE)
 
 log = logging.getLogger("scan-screenshots")
 
-from core.prompts import render, prompt_model  # noqa: E402
-
+from core.prompts import prompt_model, render  # noqa: E402
 
 # ── State ───────────────────────────────────────────────────────────
 
@@ -646,13 +645,13 @@ def main() -> None:
         help="Add ![[thumb/...]] embeds to existing batch reports",
     )
     args = parser.parse_args()
-    if getattr(args, "backfill_thumbnails"):
+    if args.backfill_thumbnails:
         backfill_thumbnails(dry_run=args.dry_run)
-    elif getattr(args, "retrofit_batch_reports"):
+    elif args.retrofit_batch_reports:
         retrofit_batch_reports(dry_run=args.dry_run)
     else:
         scan(
-            scan_all=getattr(args, "all"),
+            scan_all=args.all,
             backfill_days=args.backfill,
             dry_run=args.dry_run,
             limit=args.limit,

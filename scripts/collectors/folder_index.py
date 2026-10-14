@@ -36,7 +36,7 @@ import logging
 import os
 import sys
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from fnmatch import fnmatch
 from pathlib import Path
 
@@ -187,7 +187,7 @@ def walk_root(entry: dict, *, max_depth: int, recent_n: int) -> FolderIndex:
         tree=tree,
         recent=recent,
         counts=counts,
-        generated_at=datetime.now(timezone.utc),
+        generated_at=datetime.now(UTC),
     )
 
 
@@ -203,7 +203,7 @@ def _human_size(size: int | None) -> str:
 
 
 def _mtime_date(mtime: float) -> str:
-    return datetime.fromtimestamp(mtime, tz=timezone.utc).strftime("%Y-%m-%d")
+    return datetime.fromtimestamp(mtime, tz=UTC).strftime("%Y-%m-%d")
 
 
 def _file_line(e: IndexEntry, indent: str = "") -> str:

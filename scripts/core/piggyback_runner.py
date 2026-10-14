@@ -37,9 +37,9 @@ from pathlib import Path
 # with arbitrary CWD), mirroring the engine's other entrypoints.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from core.paths import STATE_DIR  # noqa: E402
-from core.state_store import locked  # noqa: E402
-from core.utils import save_json_state  # noqa: E402
+from core.paths import STATE_DIR
+from core.state_store import locked
+from core.utils import save_json_state
 
 log = logging.getLogger(__name__)
 
@@ -153,14 +153,14 @@ def run_piggyback(
         os.kill(os.getpid(), signum)
 
     try:
-        proc = subprocess.Popen(  # noqa: S603 — cmd is engine-constructed, not user input
+        proc = subprocess.Popen(
             cmd,
             stdin=subprocess.DEVNULL,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             start_new_session=(sys.platform != "win32"),
         )
-    except Exception as exc:  # noqa: BLE001 — record any spawn failure
+    except Exception as exc:
         log.warning("piggyback %s: spawn failed: %s: %s", name, type(exc).__name__, exc)
         record_status(
             name,

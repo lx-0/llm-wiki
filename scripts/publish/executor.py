@@ -13,11 +13,10 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 
+from core.state_store import StateStore
 from publish.bootstrap import needs_start_page, record_start_page
 from publish.client import ToolCallError
 from publish.delta import ArticlePayload, PublishPlan, record_published, record_retracted
-
-from core.state_store import StateStore
 
 log = logging.getLogger(__name__)
 

@@ -19,16 +19,15 @@ import threading
 import time
 import urllib.parse
 import webbrowser
+from collections.abc import Callable
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
-from typing import Callable
 
 import httpx
 
-from publish.client import PublishClientError
-
 from core.paths import STATE_DIR
 from core.state_store import StateStore
+from publish.client import PublishClientError
 
 DEFAULT_TOKEN_PATH = STATE_DIR / "meinkontext-oauth.json"
 _SKEW_S = 60
@@ -100,7 +99,7 @@ def _wait_for_code(timeout_s: int = 300, _start_only: bool = False):
     holder: dict[str, str | None] = {}
 
     class Handler(BaseHTTPRequestHandler):
-        def do_GET(self) -> None:  # noqa: N802 — BaseHTTPRequestHandler API
+        def do_GET(self) -> None:
             query = dict(urllib.parse.parse_qsl(urllib.parse.urlparse(self.path).query))
             holder["code"] = query.get("code")
             self.send_response(200)

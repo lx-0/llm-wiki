@@ -36,9 +36,10 @@ import logging
 import os
 import re
 import time
+from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any
 from urllib.parse import urlencode
 
 import httpx
@@ -54,9 +55,9 @@ from collectors.base import (
     resolve_accounts,
     run_account_loop,
 )
+from core.config import CONFIG
 from core.paths import ROOT_DIR, STATE_DIR
 from core.utils import load_json_state, now_iso, save_json_state
-from core.config import CONFIG
 
 log = logging.getLogger(__name__)
 
@@ -652,7 +653,7 @@ class JamieCollector:
                 if re.match(r"^\d{4}-\d{2}-\d{2}$", meet_date):
                     rollup_line = f"- **jamie** · {title} → [[{target.stem}]]"
                     daily_capture.append(meet_date, "meetings", rollup_line)
-            except Exception:  # noqa: BLE001
+            except Exception:
                 log.exception("daily-rollup append failed for jamie meeting %s", mid)
 
             watermark.observe(started_at)

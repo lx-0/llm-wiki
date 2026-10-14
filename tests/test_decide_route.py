@@ -9,8 +9,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
 
 def _route(content: str, path: str = "raw/notes/x.md", force: bool = False):
     from compile_stages.route import decide_route
@@ -58,9 +56,8 @@ def test_source_and_final_title_falls_back_to_stem():
 
 
 def test_skip_list_type_skips_and_force_bypasses(monkeypatch):
-    from core.config import CONFIG
-
     from compile_stages.route import Compile, Skip
+    from core.config import CONFIG
 
     monkeypatch.setattr(CONFIG.limits, "compile_skip_substrate_types", ("calendar-rollup",))
     content = "---\ntype: calendar-rollup\n---\nstuff"
@@ -97,9 +94,8 @@ def test_health_rollup_stub_is_healthstub_but_prose_compiles():
 
 
 def test_plain_note_uses_default_dispatch():
-    from core.config import CONFIG
-
     from compile_stages.route import Compile
+    from core.config import CONFIG
 
     r = _route("---\ntype: random-unmapped\n---\nbody text")
     assert isinstance(r, Compile)

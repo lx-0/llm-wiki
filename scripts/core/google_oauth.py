@@ -99,21 +99,21 @@ def credentials(app: OAuthApp, account_id: str):
         try:
             data = json.loads(token_file.read_text(encoding="utf-8"))
             creds = Credentials.from_authorized_user_info(data, list(app.scopes))
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             log.warning("Bad JSON token at %s: %s — will re-bootstrap", token_file, e)
             creds = None
 
     if creds is None:
         legacy = _legacy_pickle_path(app, account_id)
         if legacy.exists():
-            import pickle  # noqa: S403  own OAuth tokens
+            import pickle
 
             try:
                 with open(legacy, "rb") as f:
-                    creds = pickle.load(f)  # noqa: S301
+                    creds = pickle.load(f)
                 _persist(creds, token_file, app.scopes)
                 log.info("Migrated %s token from %s → %s", app.service_label, legacy, token_file)
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 log.warning("Could not migrate legacy pickle %s: %s", legacy, e)
                 creds = None
 
@@ -122,7 +122,7 @@ def credentials(app: OAuthApp, account_id: str):
             try:
                 creds.refresh(Request())
                 _persist(creds, token_file, app.scopes)
-            except Exception as e:  # noqa: BLE001 — hint returned to caller, logged here too
+            except Exception as e:
                 log.warning(
                     "%s[%s]: token refresh failed: %s: %s",
                     app.service_label,
@@ -199,7 +199,7 @@ def bootstrap(app: OAuthApp, account_id: str) -> tuple[bool, str]:
         flow = InstalledAppFlow.from_client_secrets_file(str(app.client_file), list(app.scopes))
         creds = flow.run_local_server(port=0)
         _persist(creds, token_path(app, account_id), app.scopes)
-    except Exception as e:  # noqa: BLE001 — hint returned to caller, logged here too
+    except Exception as e:
         log.warning(
             "%s[%s]: OAuth flow failed: %s: %s", app.service_label, account_id, type(e).__name__, e
         )

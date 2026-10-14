@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
 
 import pytest
 import yaml
-
 from scripts.reports._engine.lib.charts import (
     render_radar,
     render_sparkline,
@@ -15,9 +13,6 @@ from scripts.reports._engine.lib.charts import (
 )
 from scripts.reports._engine.lib.render_summary import render_summary
 from scripts.reports._engine.lib.timeline import (
-    InstrumentSnapshot,
-    RunSnapshot,
-    Timeline,
     load_timeline,
     snapshot_from_dir,
 )

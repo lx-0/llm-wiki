@@ -25,12 +25,11 @@ control-flow gates are exercised.
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timedelta, timezone
+from collections.abc import Iterator
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Iterator
 
 import pytest
-
 
 # ── Helpers ───────────────────────────────────────────────────────────
 
@@ -225,8 +224,8 @@ def test_cooldown_skips_recent_synthesis(vault: Path) -> None:
     """An entity synthesized today is within cooldown; older one is eligible."""
     import dream
 
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    long_ago = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d")
+    today = datetime.now(UTC).strftime("%Y-%m-%d")
+    long_ago = (datetime.now(UTC) - timedelta(days=30)).strftime("%Y-%m-%d")
 
     _write_entity_page(vault, "people", "fresh", last_synthesized_at=today)
     _write_entity_page(vault, "people", "stale", last_synthesized_at=long_ago)
@@ -245,7 +244,7 @@ def test_cooldown_skips_recent_synthesis(vault: Path) -> None:
 
 
 def test_cooldown_zero_disables_gate(vault: Path) -> None:
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = datetime.now(UTC).strftime("%Y-%m-%d")
     _write_entity_page(vault, "people", "fresh", last_synthesized_at=today)
     import dream
 
@@ -261,8 +260,8 @@ def test_sweep_skips_cooldown_entities(vault: Path, monkeypatch: pytest.MonkeyPa
     """`dream_all_entities` must skip entities still within cooldown."""
     import dream
 
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    long_ago = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d")
+    today = datetime.now(UTC).strftime("%Y-%m-%d")
+    long_ago = (datetime.now(UTC) - timedelta(days=30)).strftime("%Y-%m-%d")
     _write_entity_page(vault, "people", "fresh", last_synthesized_at=today)
     _write_entity_page(vault, "people", "stale", last_synthesized_at=long_ago)
 
@@ -407,8 +406,9 @@ def test_dream_cycle_agent_spec_parses() -> None:
 def _make_fake_query(monkeypatch, *, usage, cost, result_text="done"):
     """Install a fake SDK query yielding one AssistantMessage + ResultMessage
     carrying the given usage dict + cost. Returns a call-counter dict."""
-    import dream
     from claude_agent_sdk import AssistantMessage, ResultMessage, TextBlock
+
+    import dream
 
     calls = {"n": 0}
 
@@ -438,6 +438,7 @@ def test_low_token_warning_does_not_fire_on_cached_call(
     cache tokens + real cost. The low-token warning must NOT false-fire, and
     the reported input must be the cache-inclusive total."""
     import logging
+
     import dream
 
     _write_entity_page(vault, "people", "cached")
@@ -470,6 +471,7 @@ def test_low_token_warning_still_fires_on_genuine_early_exit(
     """A: a genuine early-exit reports near-zero TRUE input AND ~$0 cost —
     the diagnostic must keep its teeth."""
     import logging
+
     import dream
 
     _write_entity_page(vault, "people", "early")
@@ -500,7 +502,7 @@ def test_skips_sdk_when_no_entity_specific_substrate(
 
     _write_entity_page(vault, "people", "lonely")
     # A recent daily digest that does NOT mention "lonely".
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = datetime.now(UTC).strftime("%Y-%m-%d")
     _write_substrate(vault, f"daily/{today}.md", "# Daily\n\nUnrelated topics only.\n")
 
     calls = _make_fake_query(
@@ -598,6 +600,7 @@ def test_insufficient_corpus_noop_logs_at_info_not_warning(
     """A designed INSUFFICIENT_CORPUS no-op must log at INFO, staying out of
     the errors-only triage stream (e.g. generic-noun slug false-positives)."""
     import logging
+
     import dream
 
     _write_entity_page(vault, "people", "kontakte")
@@ -624,6 +627,7 @@ def test_unexplained_noop_still_warns(vault: Path, monkeypatch: pytest.MonkeyPat
     """A byte-identical page with NO sentinel (possible silent write-failure)
     must keep its WARNING — that's the diagnostic this check exists for."""
     import logging
+
     import dream
 
     _write_entity_page(vault, "people", "silent")
@@ -741,8 +745,9 @@ def test_successful_synthesis_clears_backoff(vault: Path, monkeypatch: pytest.Mo
     assert dream.is_within_insufficient_backoff(dream._resolve_entity("recovers"))
 
     # A fake that actually writes the page → counts as a successful synthesis.
-    import dream as _d
     from claude_agent_sdk import AssistantMessage, ResultMessage, TextBlock
+
+    import dream as _d
 
     async def _writing_query(*args, **kwargs):
         page.write_text(page.read_text(encoding="utf-8") + "\n- new line\n", encoding="utf-8")
@@ -813,7 +818,7 @@ def test_build_sweep_candidates_flags_cooldown_and_backoff(
     axes and both surface."""
     import dream
 
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = datetime.now(UTC).strftime("%Y-%m-%d")
     _write_entity_page(vault, "people", "fresh", last_synthesized_at=today)  # cooldown
     _write_entity_page(vault, "people", "dormant")  # backoff
     _write_entity_page(vault, "people", "ready")  # clean

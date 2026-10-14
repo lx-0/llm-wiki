@@ -63,7 +63,7 @@ def test_claude_provider_happy_path_scopes_read_to_the_file(trove_file, monkeypa
 
     captured = {}
 
-    async def fake_query(*, prompt, options):  # noqa: ARG001
+    async def fake_query(*, prompt, options):
         captured["options"] = options
         yield _result_message(result="## Answer\n\nFinal amount: 1234 EUR")
 
@@ -112,7 +112,7 @@ def test_missing_file_propagates_file_not_found(tmp_path, monkeypatch):
 def test_empty_sdk_result_is_error_not_exception(trove_file, monkeypatch):
     from curiosity.backends import folder_providers as fp
 
-    async def fake_query(*, prompt, options):  # noqa: ARG001
+    async def fake_query(*, prompt, options):
         yield _result_message(result="")
 
     monkeypatch.setattr(fp, "query", fake_query)

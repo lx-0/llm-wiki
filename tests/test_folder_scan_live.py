@@ -34,7 +34,7 @@ RAW_BODY_MARKER = (
 
 
 def test_live_folder_deep_scan_end_to_end(tmp_path: Path, monkeypatch):
-    import curiosity.cli as cli
+    from curiosity import cli
     from curiosity.backends import folder as fb
 
     # ── real trove file with a planted fact + a raw-body marker ──────

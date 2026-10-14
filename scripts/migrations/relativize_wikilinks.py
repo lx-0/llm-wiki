@@ -24,7 +24,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # scripts/ on path
 
-from core.links import (  # noqa: E402
+from core.links import (
     iter_articles,
     relativize_text,
     run_relativize_pass,

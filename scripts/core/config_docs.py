@@ -33,7 +33,7 @@ from pathlib import Path
 # `scripts/` must be on sys.path for the core.* import below.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from core.config_schema import (  # noqa: E402
+from core.config_schema import (
     Features,
     GraphView,
     Limits,

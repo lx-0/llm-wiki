@@ -24,7 +24,7 @@ They contribute nothing to sums and lower the coverage_pct.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
@@ -35,7 +35,7 @@ class LikertScale:
     hi: int
 
     @classmethod
-    def parse(cls, spec: str) -> "LikertScale":
+    def parse(cls, spec: str) -> LikertScale:
         if not isinstance(spec, str) or "-" not in spec:
             raise ValueError(f"Likert scale spec must be 'lo-hi' (got {spec!r})")
         try:

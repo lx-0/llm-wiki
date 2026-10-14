@@ -23,14 +23,13 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-
 from claude_agent_sdk import query
 
-from core.agent_spec import AgentSpec, SpecError, list_specs, parse_spec
+from core.agent_spec import AgentSpec, SpecError, parse_spec
+from core.config import CONFIG
 from core.paths import AGENT_SPECS_DIR, LOGS_DIR, STATE_DIR
+from core.sdk_helpers import SdkCallSpec, run_sdk_query
 from core.utils import now_iso, today_iso
-from core.config import CONFIG  # noqa: E402 — resolves the default model
-from core.sdk_helpers import SdkCallSpec, run_sdk_query  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO,

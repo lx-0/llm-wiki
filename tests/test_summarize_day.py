@@ -15,7 +15,6 @@ import pytest
 
 from core.agent_spec import parse_spec
 
-
 AGENT_SPECS_DIR = Path(__file__).resolve().parent.parent / "prompts" / "agents"
 
 

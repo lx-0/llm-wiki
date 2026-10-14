@@ -13,7 +13,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
 
-
 CompileStatus = Literal["ok", "skipped", "failed"]
 CompileRole = Literal["source-only", "source-and-final", "final-only"]
 

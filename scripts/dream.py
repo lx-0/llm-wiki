@@ -48,34 +48,17 @@ import random
 import re
 import sys
 import time
-from fnmatch import fnmatch as _fnmatch
 from dataclasses import dataclass, replace
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from fnmatch import fnmatch as _fnmatch
 from pathlib import Path
 from typing import Literal
 
 import yaml
-
 from claude_agent_sdk import query
 
 from core.config import CONFIG
-from core.errors import swallow
-from core.paths import (
-    AREAS_DIR,
-    KNOWLEDGE_DIR,
-    LOG_FILE,
-    PEOPLE_DIR,
-    PROJECTS_DIR,
-    RAW_DIR,
-    ROOT_DIR,
-    STATE_DIR,
-    DAILY_DIR,
-)
-from core.prompts import build_output_language_instruction, render
-from core.sdk_helpers import SdkCallSpec, WriteScope, run_sdk_query
-from core.state_store import StateStore, store_for
-from core.utils import now_iso, today_iso, append_history
-from core.console import (  # noqa: E402
+from core.console import (
     C_BOLD,
     C_CYAN,
     C_DIM,
@@ -84,6 +67,22 @@ from core.console import (  # noqa: E402
     ConsoleFormatter,
     setup_console_logging,
 )
+from core.errors import swallow
+from core.paths import (
+    AREAS_DIR,
+    DAILY_DIR,
+    KNOWLEDGE_DIR,
+    LOG_FILE,
+    PEOPLE_DIR,
+    PROJECTS_DIR,
+    RAW_DIR,
+    ROOT_DIR,
+    STATE_DIR,
+)
+from core.prompts import build_output_language_instruction, render
+from core.sdk_helpers import SdkCallSpec, WriteScope, run_sdk_query
+from core.state_store import StateStore, store_for
+from core.utils import append_history, now_iso, today_iso
 
 
 class _DreamFormatter(ConsoleFormatter):
@@ -215,13 +214,13 @@ def _list_all_entities() -> list[EntityRef]:
 def _parse_iso_date(value: object) -> datetime | None:
     """Best-effort ISO date parse. Accepts date, datetime, or ISO string."""
     if isinstance(value, datetime):
-        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+        return value if value.tzinfo else value.replace(tzinfo=UTC)
     if hasattr(value, "year") and hasattr(value, "month") and hasattr(value, "day"):
         # datetime.date — promote to UTC midnight
-        return datetime(value.year, value.month, value.day, tzinfo=timezone.utc)
+        return datetime(value.year, value.month, value.day, tzinfo=UTC)
     if isinstance(value, str):
         try:
-            return datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone(timezone.utc)
+            return datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone(UTC)
         except ValueError:
             return None
     return None
@@ -235,7 +234,7 @@ def _last_synth_age_days(entity: EntityRef, *, now: datetime | None = None) -> f
     when = _parse_iso_date(fm.get("last_synthesized_at"))
     if when is None:
         return None
-    ref = now or datetime.now(timezone.utc)
+    ref = now or datetime.now(UTC)
     return max(0.0, (ref - when).total_seconds() / 86400.0)
 
 
@@ -405,7 +404,7 @@ def _record_insufficient_corpus(slug: str, *, when: datetime | None = None) -> i
     """Bump the consecutive-INSUFFICIENT_CORPUS counter for `slug`, stamp the
     time, and return the new count. Tolerant — state-write failure logs and
     returns 0 so a backoff-bookkeeping hiccup never aborts a dream."""
-    ref = when or datetime.now(timezone.utc)
+    ref = when or datetime.now(UTC)
     result = {"count": 0}
 
     def _bump(data: dict) -> None:
@@ -475,7 +474,7 @@ def is_within_insufficient_backoff(
     if count <= 0 or last is None:
         return False
     window = _insufficient_backoff_days(count, base_days=max(1, base), max_days=cap)
-    ref = now or datetime.now(timezone.utc)
+    ref = now or datetime.now(UTC)
     age_days = (ref - last).total_seconds() / 86400.0
     return age_days < window
 
@@ -515,7 +514,7 @@ def _dreams_since_last_seen_days(path: Path, *, now: datetime | None = None) -> 
     stamp = _get_last_dreamed_at(path)
     if stamp is None:
         return _NEVER_DREAMED_DAYS
-    ref = now or datetime.now(timezone.utc)
+    ref = now or datetime.now(UTC)
     days = (ref - stamp).total_seconds() / 86400.0
     return max(1.0, days)
 
@@ -560,7 +559,7 @@ def _stamp_last_dreamed_at(paths: list[Path], when: datetime | None = None) -> i
     aborts a dream. The per-file load+rewrite this replaces was
     O(stamped × store-size) — the recorded per-item-over-all-items hang shape.
     """
-    stamp = (when or datetime.now(timezone.utc)).strftime("%Y-%m-%d")
+    stamp = (when or datetime.now(UTC)).strftime("%Y-%m-%d")
     rels: list[str] = []
     for path in paths:
         try:
@@ -988,7 +987,7 @@ class DreamOutcome:
         return _DREAM_EXIT_CODES.get(self.kind or "", 0)
 
 
-def dream_exit_code(outcomes: "DreamOutcome | list[DreamOutcome]") -> int:
+def dream_exit_code(outcomes: DreamOutcome | list[DreamOutcome]) -> int:
     """Highest-severity CLI exit code across one or more outcomes (0 = clean).
 
     The single source of truth every dream CLI branch routes through, so a
@@ -1745,7 +1744,7 @@ def build_sweep_candidates(
     duplication where the sweep filtered insufficient-corpus backoff but
     list_candidates was blind to it."""
     cd = cooldown_days if cooldown_days is not None else CONFIG.scheduling.dream_cooldown_days
-    ref = now or datetime.now(timezone.utc)
+    ref = now or datetime.now(UTC)
     rows: list[SweepCandidate] = []
     for ent in _list_all_entities():
         priority, source = compute_entity_priority(ent)
@@ -1944,7 +1943,7 @@ def _maybe_web_research(ent: EntityRef) -> None:
             log.warning("  web-research failed for %s: %s", ent.slug, res.reason)
         else:
             log.debug("  web-research skipped for %s: %s", ent.slug, res.reason)
-    except Exception:  # noqa: BLE001 — post-pass must never break dream
+    except Exception:
         log.exception("  web-research post-pass crashed for %s (ignored)", ent.slug)
 
 

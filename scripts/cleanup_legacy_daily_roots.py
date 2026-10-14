@@ -100,7 +100,7 @@ def main() -> int:
         # Don't delete a real digest (post-cleanup operator might re-run this).
         try:
             root_text = root_bytes.decode("utf-8", errors="replace")
-        except Exception:  # noqa: BLE001
+        except Exception:
             root_text = ""
         if _has_digest_frontmatter(root_text):
             skipped_digest += 1

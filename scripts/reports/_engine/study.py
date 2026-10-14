@@ -25,21 +25,18 @@ to the manifest — operator-visible and version-controllable.
 from __future__ import annotations
 
 import io
-import json
 import shutil
 import sys
-from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
-import yaml  # noqa: E402
+import fcntl
 
-import fcntl  # noqa: E402
-
-from scripts.core.paths import STATE_DIR  # noqa: E402
-
+import yaml
+from scripts.core.paths import STATE_DIR
 
 # Slug rules: lowercase letters + digits + hyphen, 3..64 chars, no
 # leading/trailing hyphen. Matches the convention used elsewhere in
@@ -71,7 +68,7 @@ class InstrumentRef:
     alias: str | None = None  # disambiguates two refs to the same slug
 
     @classmethod
-    def from_dict(cls, raw: dict) -> "InstrumentRef":
+    def from_dict(cls, raw: dict) -> InstrumentRef:
         if not isinstance(raw, dict):
             raise ValueError(f"InstrumentRef must be a mapping, got {type(raw).__name__}")
         if "slug" not in raw or "version" not in raw:
@@ -104,7 +101,7 @@ class StudyManifest:
     notes: str = ""
 
     @classmethod
-    def from_dict(cls, raw: dict) -> "StudyManifest":
+    def from_dict(cls, raw: dict) -> StudyManifest:
         if not isinstance(raw, dict):
             raise ValueError("manifest top-level must be a mapping")
         for required in ("study_id", "title", "schedule", "instruments"):
@@ -137,7 +134,7 @@ class StudyManifest:
         )
 
     @classmethod
-    def from_path(cls, manifest_path: Path) -> "StudyManifest":
+    def from_path(cls, manifest_path: Path) -> StudyManifest:
         if not manifest_path.is_file():
             raise FileNotFoundError(f"manifest not found: {manifest_path}")
         return cls.from_dict(yaml.safe_load(manifest_path.read_text(encoding="utf-8")))
@@ -171,7 +168,7 @@ class StudyState:
     run_count: int = 0
 
     @classmethod
-    def load(cls, state_path: Path) -> "StudyState":
+    def load(cls, state_path: Path) -> StudyState:
         if not state_path.is_file():
             return cls()
         raw = yaml.safe_load(state_path.read_text(encoding="utf-8")) or {}
@@ -198,7 +195,7 @@ class StudyState:
         )
 
     def mark_run(self, when: datetime) -> None:
-        self.last_run_at = when.astimezone(timezone.utc).isoformat()
+        self.last_run_at = when.astimezone(UTC).isoformat()
         self.run_count += 1
 
 
@@ -211,7 +208,7 @@ class Study:
     study_dir: Path
 
     @classmethod
-    def load(cls, study_dir: Path) -> "Study":
+    def load(cls, study_dir: Path) -> Study:
         manifest = StudyManifest.from_path(study_dir / "manifest.yaml")
         state = StudyState.load(study_dir / "state.yaml")
         return cls(manifest=manifest, state=state, study_dir=study_dir)
@@ -237,13 +234,13 @@ class Study:
             return False
         if self.state.last_run_at is None:
             return True
-        now = now or datetime.now(timezone.utc)
+        now = now or datetime.now(UTC)
         try:
             last = datetime.fromisoformat(self.state.last_run_at)
         except ValueError:
             return True  # malformed state → treat as never-ran
         if last.tzinfo is None:
-            last = last.replace(tzinfo=timezone.utc)
+            last = last.replace(tzinfo=UTC)
         return (now - last) >= timedelta(days=cooldown)
 
 
@@ -265,7 +262,7 @@ def _validate_slug(slug: str, *, where: str = "slug") -> None:
 def utc_now_iso() -> str:
     """`2026-05-17T15-30-04` — colons replaced with hyphens for filesystem
     safety on case-insensitive filesystems (macOS APFS, Windows)."""
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M-%S")
+    return datetime.now(UTC).strftime("%Y-%m-%dT%H-%M-%S")
 
 
 class RunDirectory:
@@ -286,7 +283,7 @@ class RunDirectory:
         # filesystem (rename across mount points fails).
         self.tmp_dir = runs_dir / f".{timestamp}.tmp"
 
-    def __enter__(self) -> "RunDirectory":
+    def __enter__(self) -> RunDirectory:
         self.runs_dir.mkdir(parents=True, exist_ok=True)
         if self.tmp_dir.exists():
             # Stale tmp from a prior crashed run — operator visible.
@@ -397,11 +394,11 @@ def fork_study(source_study: Study, new_study_id: str, studies_root: Path) -> Pa
     new_manifest = StudyManifest(
         study_id=new_study_id,
         title=source_study.manifest.title + " (fork)",
-        created=datetime.now(timezone.utc).isoformat(),
+        created=datetime.now(UTC).isoformat(),
         schedule=source_study.manifest.schedule,
         instruments=source_study.manifest.instruments,
         notes=f"Forked from `{source_study.manifest.study_id}` on "
-        f"{datetime.now(timezone.utc).date().isoformat()}. "
+        f"{datetime.now(UTC).date().isoformat()}. "
         f"Edit instruments / schedule / title as needed.",
     )
     (new_dir / "manifest.yaml").write_text(

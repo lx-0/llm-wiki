@@ -2739,6 +2739,33 @@ Per-candidate learnings from the 14-candidate seam arc (C01–C14). Decisions li
 - **Schema-drift dead branch (flush.maybe_trigger_compile):** flush keyed the ingested ledger by DAILY_DIR-relative path while compile writes ROOT_DIR-relative keys, AND called `.get("hash")` on values that are plain 16-hex strings — double drift, so the "Skipping compile — unchanged" branch could NEVER fire and every evening flush unconditionally spawned compile; a hypothetical key match would have raised an uncaught AttributeError. Root cause: one implicit schema, three hand-rolled consumers, zero tests. The schema now lives only in core.state_store's ledger API; when N modules parse the same state file by hand, the drift is not hypothetical.
 - **state.json race anatomy (fixed by merge-under-lock):** compile loaded state once at run start, held the dict in memory for the whole multi-minute run, and saved the WHOLE dict per file — any query_count/total_cost/last_lint written concurrently by query/lint was clobbered last-writer-wins; the rare inverse direction could drop a freshly-ingested hash = a recompile's worth of tokens. Deterministic interleaving pinned in tests/test_state_store.py.
 
+### Engine toolchain (M033)
+
+- **isort action comments must stand alone on their line (M033-S01-T03, 2026-10-14):**
+  `# isort: off  — reason` is NOT an action comment to ruff; it silently re-sorted the
+  registration blocks in `producers/`, `collectors/` and `preprocessors/__init__.py` on the
+  second pass. Bare `# isort: off` / `# isort: on`, explanation on its own comment line. Those
+  three blocks are run / listing order (`all_producers()` runs suggestions → curiosity → takes;
+  `wiki collect --list` and piggyback discovery report collectors in import order) — the
+  sorter alphabetising them is a behaviour change the suite only half-catches
+  (`test_package_import_registers_all_three`); print `all_*()` names against HEAD after any
+  import-reordering tool runs.
+- **`ruff check --select RUF100` alone lies (M033-S01-T03):** with a one-rule selection every
+  `noqa` for a rule outside that selection reads as "unused" (34 phantom findings here). Read
+  RUF100 from `--statistics` under the project config, where the suppressed rules are enabled.
+- **A monkeypatch on a name the module never reads is a dead patch, and F401 exposes it
+  (M033-S01-T03):** `compile.py` imported `load_state` without using it; four tests patched
+  `compile.load_state` "to isolate state" and isolated nothing. Removing the unused import
+  turned them into `AttributeError`s. Fix the tests (drop the patch, or patch the consumer
+  module), never re-add a dead import with `noqa` to keep a lying test green.
+- **`ruff format` + a text-reading generator = lost content (M033-S01-T02):**
+  `core/config_docs.py` builds `docs/config.md` from the field comments in
+  `core/config_schema.py`; the formatter wraps long field lines and moves the trailing
+  comment to a continuation line the generator does not read — eight descriptions became
+  "—" and one migrated to the next key. The file is excluded from the formatter
+  (`[tool.ruff.format] exclude`) with the reason beside it; the lasting fix is a generator
+  that reads the trailing comment from the statement's last line (S03/S04 follow-up).
+
 ### Desktop toolchain (C07)
 
 - **Forge 8 + Vite 8 (since M032-S01-T04, 2026-10-14):** main/preload bundles are `.cjs`

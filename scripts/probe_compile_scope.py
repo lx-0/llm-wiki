@@ -78,7 +78,7 @@ def make_knowledge_only_gate(vault: Path):
     async def gate(tool_name, tool_input, _context):
         print(f"    [callback] tool={tool_name} input_keys={list(tool_input.keys())}", flush=True)
         if tool_name not in ("Write", "Edit"):
-            print(f"    [callback]   → ALLOW (not Write/Edit)", flush=True)
+            print("    [callback]   → ALLOW (not Write/Edit)", flush=True)
             return PermissionResultAllow()
         raw_path = tool_input.get("file_path", "")
         try:
@@ -92,7 +92,7 @@ def make_knowledge_only_gate(vault: Path):
             msg = f"path-scope: {tool_name} restricted to knowledge/; got {resolved}"
             print(f"    [callback]   → DENY ({msg})", flush=True)
             return PermissionResultDeny(message=msg)
-        print(f"    [callback]   → ALLOW (under knowledge/)", flush=True)
+        print("    [callback]   → ALLOW (under knowledge/)", flush=True)
         return PermissionResultAllow()
 
     return gate

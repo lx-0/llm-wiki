@@ -25,8 +25,7 @@ import re
 from pathlib import Path
 
 from core.paths import RAW_ARTICLES_DIR, ROOT_DIR, STATE_DIR
-
-from preprocessors.base import PreprocessResult, PreprocessorSpec, register
+from preprocessors.base import PreprocessorSpec, PreprocessResult, register
 
 log = logging.getLogger(__name__)
 

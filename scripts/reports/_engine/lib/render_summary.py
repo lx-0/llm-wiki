@@ -30,11 +30,10 @@ waere auch cool"). Per-instrument detail reports are infrastructure.
 
 from __future__ import annotations
 
-from functools import lru_cache
+from functools import cache
 from pathlib import Path
 
 import yaml
-
 from scripts.reports._engine.instrument import load_instrument
 from scripts.reports._engine.lib.charts import (
     render_radar,
@@ -46,7 +45,6 @@ from scripts.reports._engine.lib.timeline import (
     RunSnapshot,
     Timeline,
 )
-
 
 _INFORMANT_BANNER = (
     "> **Informant Report — methodology summary.** Scores below were inferred "
@@ -73,7 +71,7 @@ def _format_delta(curr: int, prev: int | None) -> str:
     return f"{sign}{delta}"
 
 
-@lru_cache(maxsize=None)
+@cache
 def _recover_instrument_meta(slug: str, version: str) -> tuple[int, int, tuple[str, ...]] | None:
     """Reload an instrument's `(max_total, likert_hi, concern_bands)` from
     the engine's instrument definition.
@@ -392,10 +390,10 @@ def render_summary(
         if key in per_inst_radars:
             rel = per_inst_radars[key].relative_to(summary_path.parent)
             lines.append(
-                f"**Item-level breakdown** — each axis is one item, "
-                f"vertex distance from center = item's normalised value "
-                f"(0..1). Dashed overlay = previous run when available. "
-                f"Legend on the right of the radar.\n"
+                "**Item-level breakdown** — each axis is one item, "
+                "vertex distance from center = item's normalised value "
+                "(0..1). Dashed overlay = previous run when available. "
+                "Legend on the right of the radar.\n"
             )
             latest_snap = latest.instruments.get(key) if latest else None
             item_meta = (

@@ -26,13 +26,13 @@ import logging
 import re
 from pathlib import Path
 
-import httpx  # noqa: E402  exception types only; HTTP via ollama_client
+import httpx
 
 from core import ollama_client
-from core.paths import ROOT_DIR
-from core.utils import now_iso, today_iso
-from core.prompts import build_output_language_instruction, render
 from core.config import CONFIG
+from core.paths import ROOT_DIR
+from core.prompts import build_output_language_instruction, render
+from core.utils import now_iso, today_iso
 
 log = logging.getLogger("compile")
 
@@ -203,7 +203,6 @@ _STOPWORDS = frozenset(
         "such",
         "about",
         "after",
-        "also",
         "just",
         "only",
         "more",

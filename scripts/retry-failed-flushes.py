@@ -19,18 +19,18 @@ from __future__ import annotations
 import argparse
 import asyncio
 import logging
-import sys
-from pathlib import Path
 
 # Must be set BEFORE importing claude_agent_sdk
 import os
+import sys
+from pathlib import Path
 
 os.environ["CLAUDE_INVOKED_BY"] = "flush_retry"
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from core import flush_pipeline
-from flush import extract_from_context
 from core.config import CONFIG
+from flush import extract_from_context
 
 logging.basicConfig(
     level=logging.INFO,

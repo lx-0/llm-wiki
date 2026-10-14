@@ -34,8 +34,7 @@ from core.paths import (
 )
 from core.prompts import render
 from core.utils import today_iso
-
-from preprocessors.base import PreprocessResult, PreprocessorSpec, register
+from preprocessors.base import PreprocessorSpec, PreprocessResult, register
 from preprocessors.html_ingest import ingest as ingest_html_source
 
 log = setup_console_logging("inbox")
@@ -165,7 +164,7 @@ def process_inbox(model: str, dry_run: bool = False) -> list[dict]:
 
             try:
                 out = ingest_html_source(str(file_path), mode="both", model=model, compile=False)
-            except Exception as e:  # noqa: BLE001 — one bad HTML file must not strand the batch
+            except Exception as e:
                 log.error("  HTML ingest failed for %s: %s", file_path.name, e)
                 continue
             if out is None:

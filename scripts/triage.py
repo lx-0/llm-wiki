@@ -28,8 +28,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from core import frontmatter  # noqa: E402
-from core.paths import (  # noqa: E402
+from core import frontmatter
+from core.paths import (
     WORKSPACE_INBOX_DIR,
     WORKSPACE_TASKS_DIR,
     WORKSPACE_TODO,

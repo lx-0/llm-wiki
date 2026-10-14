@@ -14,11 +14,10 @@ import hashlib
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from core.state_store import StateStore
 from publish.corpus import server_slug
 from publish.describe import describe
 from publish.render import normalize_links
-
-from core.state_store import StateStore
 
 
 @dataclass(frozen=True)

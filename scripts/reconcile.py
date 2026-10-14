@@ -32,7 +32,7 @@ import argparse
 import asyncio
 import logging
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 SCRIPTS_DIR = Path(__file__).resolve().parent
@@ -40,13 +40,12 @@ sys.path.insert(0, str(SCRIPTS_DIR))
 
 import yaml
 
+import lint
+from core.config import CONFIG
 from core.paths import FACTS_DIR, LOG_FILE, ROOT_DIR
-from core.config import CONFIG  # noqa: E402
-from core.utils import now_iso  # noqa: E402
-from core.usage import LEDGER  # noqa: E402
-
-import lint  # noqa: E402
-from facts.correct_apply import ReconcileResult, reconcile_fact  # noqa: E402
+from core.usage import LEDGER
+from core.utils import now_iso
+from facts.correct_apply import ReconcileResult, reconcile_fact
 
 logging.basicConfig(
     level=logging.INFO,
@@ -107,8 +106,8 @@ def _within_cooldown(slug: str, *, cooldown_days: int) -> bool:
     except ValueError:
         return False
     if when.tzinfo is None:
-        when = when.replace(tzinfo=timezone.utc)
-    age_days = (datetime.now(timezone.utc) - when).total_seconds() / 86400.0
+        when = when.replace(tzinfo=UTC)
+    age_days = (datetime.now(UTC) - when).total_seconds() / 86400.0
     return age_days < cooldown_days
 
 

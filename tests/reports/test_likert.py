@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import pytest
-
 from scripts.reports._engine.lib.likert import (
     LikertItem,
     LikertScale,

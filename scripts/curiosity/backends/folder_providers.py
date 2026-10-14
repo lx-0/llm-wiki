@@ -109,7 +109,7 @@ class ClaudeSdkProvider:
                 if isinstance(message, ResultMessage):
                     final = message
                     result_text = message.result or ""
-        except Exception as exc:  # noqa: BLE001 — provider-level fail-soft
+        except Exception as exc:
             log_sdk_failure(
                 log,
                 label="folder-scan",

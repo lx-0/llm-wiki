@@ -33,12 +33,10 @@ import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
-from claude_agent_sdk import query  # noqa: E402
-
-from scripts.core.config import CONFIG  # noqa: E402
-from scripts.core.sdk_helpers import SdkCallSpec, run_sdk_query  # noqa: E402
-from scripts.reports._engine.study import Study, utc_now_iso  # noqa: E402
-
+from claude_agent_sdk import query
+from scripts.core.config import CONFIG
+from scripts.core.sdk_helpers import SdkCallSpec, run_sdk_query
+from scripts.reports._engine.study import Study, utc_now_iso
 
 # Persona prompt locations — `prompts/reports/analyst_*.md`. The SHA256[:16]
 # of each file's bytes is the persona_version recorded in each output's

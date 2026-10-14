@@ -24,7 +24,6 @@ from core.utils import extract_wikilinks
 from .classify import ClassifyResult, classify
 from .types import CompileMetadata
 
-
 # ── Substrate dispatch tables (moved from compile.py, M026-S02) ───────
 
 SUBSTRATE_PROMPTS: dict[str, tuple[str, int, str]] = {

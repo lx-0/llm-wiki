@@ -40,13 +40,12 @@ from pathlib import Path
 # this file is executed directly via `uv run python scripts/reports/...`.
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
-from scripts.core.paths import DAILY_DIR  # noqa: E402,F401
-from scripts.reports._engine.instrument import load_instrument  # noqa: E402
-from scripts.reports._engine.substrate_scope import (  # noqa: E402
+from scripts.core.paths import DAILY_DIR
+from scripts.reports._engine.instrument import load_instrument
+from scripts.reports._engine.substrate_scope import (
     CLINICAL_DEFAULT_SUBSTRATE_GLOBS,
     resolve_substrate_files,
 )
-
 
 # Conservative tokens-per-char heuristic. Real Claude tokenisation is
 # ~3.5-4 chars/token for English/German prose. We use 4 because the
@@ -250,8 +249,8 @@ def main() -> int:
         real_failures = [r for r in failures if "(synthetic stub)" not in r.instrument_slug]
         if real_failures:
             print(
-                f"\nReal wedge instrument(s) overflow — NARROW THEIR SCOPE before "
-                f"committing to single-SDK-call architecture in S02-T02."
+                "\nReal wedge instrument(s) overflow — NARROW THEIR SCOPE before "
+                "committing to single-SDK-call architecture in S02-T02."
             )
             return 1
         print(

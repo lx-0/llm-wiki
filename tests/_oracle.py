@@ -138,10 +138,6 @@ def build_fixture_vault(root: Path) -> Path:
 def patch_engine_paths(monkeypatch: pytest.MonkeyPatch, vault: Path, scratch: Path) -> Path:
     """Point every consumer module at ``vault`` and pin the environment the quick checks
     look at. Returns the scratch HOME so callers can normalise it away."""
-    import doctor
-    import menu_context
-    import core.health as health
-
     # Import-before-patch: several collectors freeze `Path.home()`-derived constants at
     # first import (scan_screenshots.SCREENSHOTS_DIR, scan_browser.CHROME_PROFILE). If the
     # oracle were the first importer, those constants would be born under the scratch HOME
@@ -149,7 +145,10 @@ def patch_engine_paths(monkeypatch: pytest.MonkeyPatch, vault: Path, scratch: Pa
     # Importing the package here, before HOME changes, keeps the module-level values real;
     # the explicit setattr below is what this test sees, and monkeypatch restores it.
     import collectors  # noqa: F401
+    import doctor
+    import menu_context
     from collectors import scan_screenshots
+    from core import health
 
     wiki = vault / ".wiki"
     knowledge = vault / "knowledge"

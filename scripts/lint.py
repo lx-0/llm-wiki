@@ -23,14 +23,24 @@ os.environ["CLAUDE_INVOKED_BY"] = "lint"
 import argparse
 import asyncio
 import sys
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable
 
 from claude_agent_sdk import ClaudeAgentOptions, ResultMessage, query
 
 from core import frontmatter
 from core.backlinks import BACKLINKS_BEGIN, BACKLINKS_END
+
+# ── Logging ──────────────────────────────────────────────────────────
+from core.console import setup_console_logging
+from core.links import (
+    _strip_frontmatter_and_fences,
+    canonical_slug,
+    link_target,
+    outgoing_canonical_slugs,
+    resolve_link,
+)
 from core.paths import KNOWLEDGE_DIR, REPORTS_DIR, ROOT_DIR
 from core.state_store import update_state
 from core.utils import (
@@ -43,20 +53,10 @@ from core.utils import (
     read_all_wiki_content,
     today_iso,
 )
-from core.links import (  # noqa: E402
-    _strip_frontmatter_and_fences,
-    canonical_slug,
-    link_target,
-    outgoing_canonical_slugs,
-    resolve_link,
-)
-
-# ── Logging ──────────────────────────────────────────────────────────
-from core.console import setup_console_logging  # noqa: E402
 
 log = setup_console_logging("lint")
 
-from core.config import CONFIG  # noqa: E402
+from core.config import CONFIG
 
 SPARSE_THRESHOLD = CONFIG.limits.sparse_threshold_words
 
@@ -1091,7 +1091,7 @@ def check_takes_consistency(ctx: LintContext) -> list[Issue]:
 
 # ── compile_role enum validation (M007-S01-T03) ─────────────────────
 
-from core.compile_role import VALID_ROLES as _COMPILE_ROLE_VALID  # noqa: E402
+from core.compile_role import VALID_ROLES as _COMPILE_ROLE_VALID
 
 
 def check_domain_value(ctx: LintContext) -> list[Issue]:
@@ -1214,9 +1214,10 @@ def check_author_required_on_source_and_final(ctx: LintContext) -> list[Issue]:
 
 # ── LLM contradiction check ─────────────────────────────────────────
 
-from core.prompts import render  # noqa: E402
-from core.sdk_helpers import StderrCapture, log_sdk_failure  # noqa: E402
-import time as _time  # noqa: E402
+import time as _time
+
+from core.prompts import render
+from core.sdk_helpers import StderrCapture, log_sdk_failure
 
 
 async def check_contradictions() -> list[Issue]:
@@ -1404,7 +1405,7 @@ async def main() -> None:
         log.info("Checking: %s...", name)
         try:
             issues = check_fn(ctx)
-        except Exception as exc:  # noqa: BLE001 — one bad check must not abort the run
+        except Exception as exc:
             log.exception("Check %r crashed: %s", name, exc)
             all_issues.append(
                 issue(

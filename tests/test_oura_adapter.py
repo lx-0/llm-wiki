@@ -23,13 +23,12 @@ import pytest
 from adapters.health.oura import (
     DailySummary,
     OuraAPIError,
-    _parse_daily_sleep,
-    _parse_daily_readiness,
-    _parse_daily_activity,
-    _parse_sleep_sessions,
     _merge_by_day,
+    _parse_daily_activity,
+    _parse_daily_readiness,
+    _parse_daily_sleep,
+    _parse_sleep_sessions,
 )
-
 
 # ── Response fixtures (shape verified live 2026-05-15) ───────────────
 

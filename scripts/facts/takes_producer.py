@@ -23,7 +23,6 @@ from __future__ import annotations
 import fnmatch
 import json
 import logging
-import re
 import time
 from pathlib import Path
 
@@ -35,7 +34,7 @@ from claude_agent_sdk import (
 )
 
 from core.config import CONFIG
-from core.paths import ROOT_DIR, TAKES_DIR
+from core.paths import ROOT_DIR
 from core.prompts import render
 from core.sdk_helpers import StderrCapture, log_sdk_failure
 from core.utils import today_iso
@@ -134,7 +133,7 @@ async def maybe_extract_takes(source: Path) -> None:
                 for block in message.content:
                     if hasattr(block, "text") and block.text:
                         result_text = block.text
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         log_sdk_failure(
             log,
             label="extract_takes",
@@ -182,7 +181,7 @@ async def maybe_extract_takes(source: Path) -> None:
     # Local import to dodge a circular import (take.py also imports from
     # core.paths, which is already imported above — the late binding keeps
     # the producer importable from compile.py's top-level).
-    from facts.take import _append_take, VALID_CONFIDENCE
+    from facts.take import VALID_CONFIDENCE, _append_take
 
     appended = 0
     duplicates = 0

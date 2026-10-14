@@ -25,7 +25,6 @@ import math
 from dataclasses import dataclass
 from pathlib import Path
 
-
 # Visual tokens — kept in one place so the operator's later style
 # adjustments don't need to chase variables across the file.
 _PALETTE = {
@@ -107,7 +106,7 @@ def render_sparkline(
 
     body = (
         _svg_header(width, height)
-        + f'<rect width="100%" height="100%" fill="white"/>'
+        + '<rect width="100%" height="100%" fill="white"/>'
         + f'<polyline points="{polyline}" fill="none" '
         f'stroke="{_PALETTE["current"]}" stroke-width="1.5"/>'
         + f'<circle cx="{last.x:.1f}" cy="{last.y:.1f}" r="2.5" '

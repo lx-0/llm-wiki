@@ -29,16 +29,15 @@ from __future__ import annotations
 
 import re
 import time
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Iterable
 from zoneinfo import ZoneInfo
 
 from . import daily_capture
-from .paths import SESSIONS_DIR
 from .config import TIMEZONE
-
+from .paths import SESSIONS_DIR
 
 FAILED_DIR = SESSIONS_DIR / "failed-flushes"
 

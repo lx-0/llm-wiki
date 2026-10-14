@@ -26,15 +26,15 @@ from __future__ import annotations
 import json
 import logging
 from collections import Counter
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from adapters.mailbox import MailboxReader, MailboxReadError, resolve_reader
 from collectors.base import CollectorSpec, RunResult, filter_accounts, register
+from core.config import CONFIG
 from core.paths import EMAIL_STATE_FILE, ROOT_DIR
 from core.utils import now_iso, today_iso
 from domain.mail import MessageMeta
-from core.config import CONFIG
 
 log = logging.getLogger(__name__)
 
@@ -247,8 +247,9 @@ class EmailCollector:
                     files_written.append(report_path)
                     # Mirror a one-liner into daily/<today>/email.md per account.
                     try:
-                        from core import daily_capture
                         from datetime import date as _date
+
+                        from core import daily_capture
 
                         rollup_block = _email_rollup_block(
                             account_id,
@@ -258,7 +259,7 @@ class EmailCollector:
                             sample_subjects=CONFIG.limits.daily_email_sample_subjects,
                         )
                         daily_capture.append(_date.today().isoformat(), "email", rollup_block)
-                    except Exception:  # noqa: BLE001
+                    except Exception:
                         log.exception("daily-rollup append failed for email delta %s", account_id)
             else:
                 log.info("  %s: 0 new messages since watermark", account_id)
@@ -441,7 +442,7 @@ def _record_failure(accounts_state: dict, account_id: str, error: str, at: str) 
 
 def _now_slug() -> str:
     """Filename timestamp slug in local time: 2026-05-14T1830."""
-    return datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%dT%H%M")
+    return datetime.now(UTC).astimezone().strftime("%Y-%m-%dT%H%M")
 
 
 def _parse_since(raw: str | None) -> datetime | None:
@@ -458,7 +459,7 @@ def _parse_since(raw: str | None) -> datetime | None:
         dt = datetime.fromisoformat(raw)
     except (ValueError, TypeError):
         return None
-    return dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt
+    return dt.replace(tzinfo=UTC) if dt.tzinfo is None else dt
 
 
 def _load_state() -> dict:

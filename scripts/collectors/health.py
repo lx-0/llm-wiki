@@ -38,6 +38,8 @@ import yaml
 
 from adapters.health.healthkit_xml import (
     HealthKitDailyAggregate,
+)
+from adapters.health.healthkit_xml import (
     iter_aggregates as iter_healthkit_aggregates,
 )
 from adapters.health.oura import DailySummary, OuraAPIError, OuraClient
@@ -652,7 +654,7 @@ class HealthCollector:
         line = f"- **{account_id}** (HK) · {' · '.join(bits)}"
         try:
             daily_capture.append(agg.day, "health", line)
-        except Exception:  # noqa: BLE001
+        except Exception:
             log.exception("daily-rollup append failed for %s/%s (healthkit)", agg.day, account_id)
 
     @staticmethod
@@ -683,6 +685,6 @@ class HealthCollector:
         line = f"- **{account_id}** · {' · '.join(bits)}"
         try:
             daily_capture.append(summary.day, "health", line)
-        except Exception:  # noqa: BLE001
+        except Exception:
             # Rollup is a side-effect; never let it break the primary write.
             log.exception("daily-rollup append failed for %s/%s", summary.day, account_id)

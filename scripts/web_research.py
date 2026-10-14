@@ -35,10 +35,11 @@ import os
 import re
 import urllib.error
 import urllib.request
+from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
-from typing import Callable, Literal
+from typing import Literal
 
 import yaml
 
@@ -239,7 +240,7 @@ def run_web_research(
     standalone `wiki dream web-research <slug>` path) but still needs a key.
     Fail-soft: a backend error returns a `failed` result, never raises — the
     dream flow must not break on a web hiccup."""
-    today = now or datetime.now(timezone.utc).date()
+    today = now or datetime.now(UTC).date()
 
     # Air-gap guard: refuse any target outside knowledge/. The block must never
     # land in raw/ (compile-loop contamination).

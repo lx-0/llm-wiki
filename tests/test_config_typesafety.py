@@ -23,7 +23,6 @@ import pytest
 from core import config
 from core.config_schema import Limits, Personal, PiggybackTask
 
-
 # ── _merge_dataclass type gate ──────────────────────────────────────────
 
 

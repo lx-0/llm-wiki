@@ -37,9 +37,9 @@ from __future__ import annotations
 
 import fcntl
 import io
+from collections.abc import Callable
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Callable
 
 from .paths import ROOT_DIR, STATE_FILE
 from .utils import (

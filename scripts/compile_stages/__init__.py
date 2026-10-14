@@ -22,12 +22,12 @@ from .route import Compile, HealthStub, IndexOnly, Route, Skip
 from .types import CompileMetadata, CompileOutcome, CompileResult
 
 __all__ = [
+    "Compile",
     "CompileMetadata",
-    "CompileResult",
     "CompileOutcome",
+    "CompileResult",
+    "HealthStub",
+    "IndexOnly",
     "Route",
     "Skip",
-    "IndexOnly",
-    "HealthStub",
-    "Compile",
 ]

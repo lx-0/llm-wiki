@@ -17,14 +17,12 @@ from pathlib import Path
 import pytest
 
 from adapters.health.healthkit_xml import (
-    HealthKitDailyAggregate,
-    iter_aggregates,
-    _day_of,
-    _normalise,
     _UNIT_TO_KG,
     _UNIT_TO_KM,
+    _day_of,
+    _normalise,
+    iter_aggregates,
 )
-
 
 # ── Fixture builder ──────────────────────────────────────────────────
 

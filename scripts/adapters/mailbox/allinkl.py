@@ -87,7 +87,7 @@ class AllInklProcmailFilter:
                         f"({len(new_config)} chars total). Active immediately."
                     ),
                 )
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             log.exception("AllInklProcmailFilter.apply failed for %s", self._account_id)
             return ApplyResult(
                 success=False,

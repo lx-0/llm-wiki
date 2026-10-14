@@ -26,13 +26,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import yaml
 
-from core.paths import RAW_SUGGESTIONS_DIR, ROOT_DIR
-from core.config import CONFIG, TIMEZONE
-
 from adapters.mailbox import resolve_filter
-from suggestions.backends import imap as imap_actions
+from core.config import CONFIG, TIMEZONE
+from core.paths import RAW_SUGGESTIONS_DIR, ROOT_DIR
 from domain.mail import FilterAction, FilterCondition, FilterRule
-
+from suggestions.backends import imap as imap_actions
 
 # ── YAML I/O ────────────────────────────────────────────────────────
 
@@ -136,7 +134,7 @@ def execute_action(action: dict, dry_run: bool = True) -> bool:
         filter_adapter = resolve_filter(account_with_id)
         if filter_adapter is None:
             print(f"    SKIP: no filter resolved for account {account_id!r}")
-            print(f"    (configure account.filter.kind — see CONTEXT.md § Account.kind)")
+            print("    (configure account.filter.kind — see CONTEXT.md § Account.kind)")
             return False
 
         # Translate the YAML rule to domain.mail.FilterRule.
@@ -360,7 +358,7 @@ def main() -> None:
                         timespec="seconds"
                     )
                     save_suggestion(path, data)
-                    print(f"    → Approved\n")
+                    print("    → Approved\n")
                     break
                 elif choice in ("r", "reject"):
                     action["status"] = "rejected"
@@ -368,10 +366,10 @@ def main() -> None:
                         timespec="seconds"
                     )
                     save_suggestion(path, data)
-                    print(f"    → Rejected\n")
+                    print("    → Rejected\n")
                     break
                 elif choice in ("s", "skip"):
-                    print(f"    → Skipped\n")
+                    print("    → Skipped\n")
                     break
                 elif choice in ("q", "quit"):
                     print("Review aborted.")
@@ -399,7 +397,7 @@ def main() -> None:
                 action["status"] = "executed"
                 action["executed"] = datetime.now(ZoneInfo(TIMEZONE)).isoformat(timespec="seconds")
                 save_suggestion(f, data)
-                print(f"    → Executed\n")
+                print("    → Executed\n")
 
     if not any_approved:
         print("No approved actions to execute.")

@@ -30,8 +30,9 @@ this module owns only *where* the region is and the degenerate-case contract.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable, Literal
+from typing import Literal
 
 OnMissing = Literal["append", "skip", "raise"]
 

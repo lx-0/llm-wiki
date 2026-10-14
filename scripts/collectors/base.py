@@ -352,7 +352,7 @@ def run_account_loop(
     for acct in accounts:
         try:
             message, payload, state_touched = scan_one(acct)
-        except Exception as exc:  # noqa: BLE001 — collector boundary, isolate one account
+        except Exception as exc:
             log.exception("%s[%s]: unexpected", name, id_of(acct))
             messages.append(f"{label_of(acct)}: ERROR {type(exc).__name__}: {exc}")
             error_ids.append(id_of(acct))
@@ -440,6 +440,6 @@ def append_rollup(
             daily_capture.append_with_source(date_iso, source, line, source_ref)
         else:
             daily_capture.append(date_iso, source, line)
-    except Exception:  # noqa: BLE001 — rollup is a side-effect, never fatal
+    except Exception:
         detail = f" for {context}" if context else ""
         (log or _log).exception("daily-rollup append failed%s", detail)

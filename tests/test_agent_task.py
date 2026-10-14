@@ -16,12 +16,10 @@ import pytest
 
 from core.agent_spec import (
     AgentSpec,
-    ButtonSpec,
     SpecError,
     list_specs,
     parse_spec,
 )
-
 
 # ── helpers ───────────────────────────────────────────────────────────
 

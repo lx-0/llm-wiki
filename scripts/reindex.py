@@ -16,9 +16,9 @@ from zoneinfo import ZoneInfo
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from core.config import TIMEZONE  # noqa: E402  (a tz NAME string, not tzinfo)
-from core.index_sync import sync_index  # noqa: E402
-from core.paths import KNOWLEDGE_DIR, ROOT_DIR  # noqa: E402
+from core.config import TIMEZONE
+from core.index_sync import sync_index
+from core.paths import KNOWLEDGE_DIR, ROOT_DIR
 
 
 def main(argv: list[str] | None = None) -> int:

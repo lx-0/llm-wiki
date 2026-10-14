@@ -31,11 +31,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
-from scripts.core import frontmatter  # noqa: E402
-from scripts.reports._engine.instrument import load_instrument  # noqa: E402
-from scripts.reports._engine.lib.render_summary import render_summary  # noqa: E402
-from scripts.reports._engine.lib.timeline import load_timeline  # noqa: E402
-
+from scripts.core import frontmatter
+from scripts.reports._engine.instrument import load_instrument
+from scripts.reports._engine.lib.render_summary import render_summary
+from scripts.reports._engine.lib.timeline import load_timeline
 
 log = logging.getLogger("backfill")
 

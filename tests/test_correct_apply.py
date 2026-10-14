@@ -18,8 +18,8 @@ def test_apply_call_spec_sandboxed() -> None:
     path-scope hook with `permission_mode="default"` — pinned by
     tests/test_sdk_run_harness.py.
     """
-    from facts import correct_apply
     from core.config import CONFIG
+    from facts import correct_apply
 
     spec = correct_apply._apply_call_spec(source="fact:test", input_chars=10)
 
@@ -213,8 +213,10 @@ def test_apply_golden_supersede_renames_deletes_nothing(tmp_path, monkeypatch, c
     """Issue-#5 golden: a sandboxed apply over a fixture vault annotates/renames
     via the engine but deletes ZERO articles, and stamps the fact applied."""
     import asyncio
-    from facts import correct_apply
+
     from claude_agent_sdk import ResultMessage
+
+    from facts import correct_apply
 
     vault = tmp_path
     knowledge = vault / "knowledge"
@@ -251,7 +253,7 @@ def test_apply_golden_supersede_renames_deletes_nothing(tmp_path, monkeypatch, c
         ' "deleted": []}\n```\n'
     )
 
-    async def fake_query(*, prompt, options):  # noqa: ARG001
+    async def fake_query(*, prompt, options):
         yield ResultMessage(
             subtype="success",
             duration_ms=1,
@@ -365,8 +367,10 @@ def test_deletion_allowed_resolution() -> None:
 def test_apply_allow_delete_trashes_nominated(tmp_path, monkeypatch) -> None:
     """End-to-end: with the gate ON, a nominated factually-false article is trashed."""
     import asyncio
-    from facts import correct_apply
+
     from claude_agent_sdk import ResultMessage
+
+    from facts import correct_apply
 
     vault = tmp_path
     knowledge = vault / "knowledge"
@@ -397,7 +401,7 @@ def test_apply_allow_delete_trashes_nominated(tmp_path, monkeypatch) -> None:
         ' "deleted": ["knowledge/concepts/bogus.md"]}\n```\n'
     )
 
-    async def fake_query(*, prompt, options):  # noqa: ARG001
+    async def fake_query(*, prompt, options):
         # the gate must reach the prompt
         assert "Deletion permitted: true" in prompt
         yield ResultMessage(
@@ -479,6 +483,7 @@ def test_tree_safe_clean_then_dirty(tmp_path, monkeypatch) -> None:
 
 def test_apply_refuses_deletion_on_unsafe_tree(tmp_path, monkeypatch) -> None:
     import asyncio
+
     from facts import correct_apply
 
     facts = tmp_path / "knowledge" / "facts"
@@ -490,7 +495,7 @@ def test_apply_refuses_deletion_on_unsafe_tree(tmp_path, monkeypatch) -> None:
 
     called = {"spawned": False}
 
-    async def fake_query(*, prompt, options):  # noqa: ARG001
+    async def fake_query(*, prompt, options):
         called["spawned"] = True
         yield None
 
@@ -555,6 +560,7 @@ def test_scan_candidates_excludes_facts(tmp_path) -> None:
 def test_dry_run_lists_candidates_without_agent(tmp_path, monkeypatch, caplog) -> None:
     import asyncio
     import logging as _logging
+
     from facts import correct_apply
 
     knowledge = tmp_path / "knowledge"
@@ -574,7 +580,7 @@ def test_dry_run_lists_candidates_without_agent(tmp_path, monkeypatch, caplog) -
     monkeypatch.setattr(correct_apply, "DAILY_DIR", tmp_path / "daily")
     spawned = {"v": False}
 
-    async def fake_query(*, prompt, options):  # noqa: ARG001
+    async def fake_query(*, prompt, options):
         spawned["v"] = True
         yield None
 
@@ -592,6 +598,7 @@ def test_dry_run_never_refused_even_with_allow_delete(tmp_path, monkeypatch, cap
     even with --allow-delete on a non-git vault. It previews, returns 0."""
     import asyncio
     import logging as _logging
+
     from facts import correct_apply
 
     knowledge = tmp_path / "knowledge"
@@ -642,8 +649,10 @@ def test_apply_deletion_e2e_clean_git(tmp_path, monkeypatch, caplog) -> None:
     article trashed + recoverable, rc 0, no false deletion alarm."""
     import asyncio
     import logging as _logging
-    from facts import correct_apply
+
     from claude_agent_sdk import ResultMessage
+
+    from facts import correct_apply
 
     vault = tmp_path
     knowledge = vault / "knowledge"
@@ -675,7 +684,7 @@ def test_apply_deletion_e2e_clean_git(tmp_path, monkeypatch, caplog) -> None:
         ' "deleted": ["knowledge/concepts/bogus.md"]}\n```\n'
     )
 
-    async def fake_query(*, prompt, options):  # noqa: ARG001
+    async def fake_query(*, prompt, options):
         yield ResultMessage(
             subtype="success",
             duration_ms=1,

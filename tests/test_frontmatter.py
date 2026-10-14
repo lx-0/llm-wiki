@@ -26,7 +26,6 @@ from core.frontmatter import (
     write,
 )
 
-
 # ── split_fence ──────────────────────────────────────────────────────
 
 
@@ -296,8 +295,8 @@ class TestRouterClassifierIdentity:
             assert route._frontmatter_type(content) == field(content, "type")
 
     def test_skip_list_gate_applies_on_crlf_and_trailing_space(self, monkeypatch):
-        from core.config import CONFIG
         from compile_stages.route import Skip, decide_route
+        from core.config import CONFIG
 
         monkeypatch.setattr(CONFIG.limits, "compile_skip_substrate_types", ("calendar-rollup",))
         for content in (

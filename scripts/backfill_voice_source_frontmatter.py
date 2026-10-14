@@ -30,8 +30,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from core import daily_capture  # noqa: E402
-from core.paths import ROOT_DIR  # noqa: E402
+from core import daily_capture
+from core.paths import ROOT_DIR
 
 log = logging.getLogger("backfill-voice-source-frontmatter")
 

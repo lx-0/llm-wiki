@@ -47,7 +47,7 @@ class Cutoffs:
     bands: tuple[Band, ...]
 
     @classmethod
-    def from_list(cls, raw: list[dict]) -> "Cutoffs":
+    def from_list(cls, raw: list[dict]) -> Cutoffs:
         """Build from the parsed yaml list. Validates contiguity."""
         if not raw:
             raise ValueError("cutoffs.yaml must declare at least one band")

@@ -8,7 +8,6 @@ Tests use tmp_path everywhere — no real iCloud / vault files touched.
 from __future__ import annotations
 
 import importlib
-from pathlib import Path
 
 import pytest
 
@@ -28,8 +27,8 @@ def fake_vault(tmp_path, monkeypatch):
     picture_inbox.mkdir(parents=True)
     vault_raw.mkdir(parents=True)
 
-    from core.config import CONFIG
     from core import paths as paths_mod
+    from core.config import CONFIG
 
     monkeypatch.setattr(CONFIG.personal, "voice_inbox", str(voice_inbox))
     monkeypatch.setattr(CONFIG.personal, "picture_inbox", str(picture_inbox))
@@ -120,8 +119,8 @@ def test_rerun_is_idempotent(fake_vault):
 
 def test_unconfigured_inboxes_are_skipped_gracefully(tmp_path, monkeypatch):
     """No voice_inbox / picture_inbox configured → migration is a no-op, no crash."""
-    from core.config import CONFIG
     from core import paths as paths_mod
+    from core.config import CONFIG
 
     monkeypatch.setattr(CONFIG.personal, "voice_inbox", "")
     monkeypatch.setattr(CONFIG.personal, "picture_inbox", "")

@@ -8,15 +8,14 @@ in-memory; pytest exercises EmailCollector against it.
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from collections.abc import Iterator
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Iterator
 
 import pytest
 
 from adapters.mailbox import MailboxReader, MailboxReadError
 from domain.mail import Message, MessageMeta
-
 
 # ── Fixtures ─────────────────────────────────────────────────────────
 
@@ -131,11 +130,9 @@ def tz_messages() -> list[MessageMeta]:
         )
 
     return [
-        _msg("1", "INBOX", "alice@example.com", datetime(2026, 5, 1, 10, 0, tzinfo=timezone.utc)),
-        _msg(
-            "2", "INBOX/Work", "bob@example.com", datetime(2026, 5, 10, 9, 0, tzinfo=timezone.utc)
-        ),
-        _msg("3", "INBOX", "alice@example.com", datetime(2026, 5, 12, 15, 0, tzinfo=timezone.utc)),
+        _msg("1", "INBOX", "alice@example.com", datetime(2026, 5, 1, 10, 0, tzinfo=UTC)),
+        _msg("2", "INBOX/Work", "bob@example.com", datetime(2026, 5, 10, 9, 0, tzinfo=UTC)),
+        _msg("3", "INBOX", "alice@example.com", datetime(2026, 5, 12, 15, 0, tzinfo=UTC)),
     ]
 
 

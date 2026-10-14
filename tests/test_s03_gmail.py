@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from adapters.mailbox import resolve_reader, resolve_filter, MailboxReader, MailboxFilter
+from adapters.mailbox import MailboxFilter, MailboxReader, resolve_filter, resolve_reader
 from adapters.mailbox.gmail import GmailFilter, GmailReader
 
 

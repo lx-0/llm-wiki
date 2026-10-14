@@ -10,7 +10,7 @@ import hashlib
 import json
 import os
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import yaml
@@ -25,18 +25,17 @@ from .paths import (
     STATE_FILE,
 )
 
-
 # ── Datetime helpers ──────────────────────────────────────────────────
 
 
 def now_iso() -> str:
     """Current time in ISO 8601 format (local tz, second precision)."""
-    return datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
+    return datetime.now(UTC).astimezone().isoformat(timespec="seconds")
 
 
 def today_iso() -> str:
     """Current date as YYYY-MM-DD (local tz)."""
-    return datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d")
+    return datetime.now(UTC).astimezone().strftime("%Y-%m-%d")
 
 
 # ── State management ──────────────────────────────────────────────────

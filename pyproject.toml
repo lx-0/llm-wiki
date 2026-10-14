@@ -48,6 +48,9 @@ dev = [
 
 [tool.ruff]
 line-length = 100
+# scripts/ is the source root (tests run with pythonpath = ["scripts"]): lets the import
+# sorter file `core`, `collectors`, … as first-party instead of third-party.
+src = ["scripts", "tests"]
 
 [tool.ruff.format]
 # core/config_schema.py is read as TEXT by core/config_docs.py: the field comments become
@@ -55,6 +58,38 @@ line-length = 100
 # generator drops them (eight descriptions went to "—" on 2026-10-14). The file is 72 %
 # comment by design (deslop-arc audit: "leave it") — formatted by hand, linted like the rest.
 exclude = ["scripts/core/config_schema.py"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "N", "RUF", "PL", "C90"]
+# Every ignore carries its reason; a rule leaves this list when the reason stops being true
+# (counts measured 2026-10-14 on the formatted tree, M033-S01-T03).
+ignore = [
+    # lazy imports inside functions are the engine's startup-time and cycle-avoidance
+    # pattern (KNOWLEDGE "lazy-import CLI module"); 999 sites, all deliberate
+    "PLC0415",
+    # the thresholds that matter are config knobs (core/config_schema.py); the 511 left are
+    # formats, offsets and test expectations
+    "PLR2004",
+    # the formatter owns line length; the 200 left are strings, URLs and comments it cannot wrap
+    "E501",
+    # en-dashes, arrows and ellipses in strings, docstrings and comments are typography, not typos
+    "RUF001", "RUF002", "RUF003",
+    # complexity family: M033-S04 gates function LENGTH with a committed AST test
+    # (tests/test_function_length.py); complexity thresholds are revisited at the S04 close
+    "C901", "PLR0911", "PLR0912", "PLR0913", "PLR0915", "PLR0917",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# re-exports are the package API
+"**/__init__.py" = ["F401"]
+# code before imports (sys.path bootstraps, in-file setup) — M033-S02 removes the bootstrap,
+# S01-T04 takes what is left; until then the six files that trip E402 are listed, not the rule
+"scripts/flush.py" = ["E402"]
+"scripts/reconcile.py" = ["E402"]
+"scripts/health_trends.py" = ["E402"]
+"scripts/lint.py" = ["E402"]
+"tests/conftest.py" = ["E402"]
+"tests/test_sdk_helpers.py" = ["E402"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

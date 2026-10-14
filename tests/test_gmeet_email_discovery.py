@@ -68,7 +68,7 @@ class _FakeReader:
         self._messages = messages
         self.scanned_folder: str | None = None
 
-    def scan_deep(self, folder, limit=0, since=None):  # noqa: ANN001
+    def scan_deep(self, folder, limit=0, since=None):
         self.scanned_folder = folder
         yield from self._messages
 
@@ -77,7 +77,7 @@ class _FakeClient:
     def __init__(self) -> None:
         self.calls: list[str] = []
 
-    def _get(self, url, params=None):  # noqa: ANN001
+    def _get(self, url, params=None):
         self.calls.append(url)
         doc_id = url.rsplit("/", 1)[-1]
         return {
@@ -157,7 +157,7 @@ def test_discover_via_email_no_reader_degrades(monkeypatch, _collector) -> None:
 
 def test_discover_via_email_reader_error_degrades(monkeypatch, _collector) -> None:
     class _Boom:
-        def scan_deep(self, folder, limit=0, since=None):  # noqa: ANN001
+        def scan_deep(self, folder, limit=0, since=None):
             raise gmeet.MailboxReadError("mbox gone")
 
     monkeypatch.setattr(gmeet, "resolve_reader", lambda body: _Boom())

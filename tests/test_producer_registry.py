@@ -10,7 +10,6 @@ from pathlib import Path
 
 import pytest
 
-
 # ── Spec / Result shape ──────────────────────────────────────────────
 
 
@@ -112,7 +111,7 @@ def _make_producer(name: str, enabled_key: str | None = None, glob_key: str | No
             source_glob_config_key=glob_key,
         )
 
-        async def run(self, source: Path) -> ProducerResult:  # noqa: D401
+        async def run(self, source: Path) -> ProducerResult:
             return ProducerResult(producer=name, status="ok")
 
     _P.__name__ = f"Producer_{name}"

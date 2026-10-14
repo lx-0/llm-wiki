@@ -125,8 +125,8 @@ def test_tabs_run_no_backup_found(monkeypatch, tmp_path):
 
 def test_register_is_idempotent_for_same_class():
     """Double-import (__main__ + collectors.<name>) must not raise."""
-    from collectors.base import register
     from collectors import scan_tabs
+    from collectors.base import register
 
     # Re-applying @register to the same class should be a no-op, not raise.
     cls = register(scan_tabs.TabsCollector)
@@ -136,6 +136,7 @@ def test_register_is_idempotent_for_same_class():
 def test_register_rejects_genuine_name_collision():
     """Different class trying to claim a registered name must still raise."""
     import pytest
+
     from collectors.base import CollectorSpec, RunResult, register
 
     class FakeTabs:

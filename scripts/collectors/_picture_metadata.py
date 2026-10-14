@@ -101,7 +101,7 @@ def _parse_exif(src: Path) -> dict:
 
     try:
         exif = img.getexif()
-    except Exception:  # noqa: BLE001  — PIL surfaces various odd errors
+    except Exception:
         log.debug("EXIF read failed for %s", src.name)
         return {}
 
@@ -139,7 +139,7 @@ def _parse_exif(src: Path) -> dict:
     # GPS sub-IFD via the standard pointer.
     try:
         gps_ifd = exif.get_ifd(ExifTags.IFD.GPSInfo)
-    except Exception:  # noqa: BLE001
+    except Exception:
         gps_ifd = None
     if gps_ifd:
         gps_named: dict = {}

@@ -27,13 +27,12 @@ pieces of the pipeline:
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import pytest
 
 from collectors import calendar_collector as cal
-
 
 # ── Registry / Spec ─────────────────────────────────────────────────
 
@@ -103,13 +102,13 @@ def test_parse_event_time_malformed_returns_none():
 
 
 def test_format_event_window_renders_range():
-    start = datetime(2026, 5, 15, 9, 0, tzinfo=timezone.utc)
-    end = datetime(2026, 5, 15, 9, 30, tzinfo=timezone.utc)
+    start = datetime(2026, 5, 15, 9, 0, tzinfo=UTC)
+    end = datetime(2026, 5, 15, 9, 30, tzinfo=UTC)
     assert cal._format_event_window(start, end, all_day=False) == "09:00–09:30"
 
 
 def test_format_event_window_all_day():
-    start = datetime(2026, 5, 15, tzinfo=timezone.utc)
+    start = datetime(2026, 5, 15, tzinfo=UTC)
     assert cal._format_event_window(start, None, all_day=True) == "all-day"
 
 
@@ -247,8 +246,8 @@ def _block(**overrides) -> cal._EventBlock:
     base: dict[str, Any] = dict(
         event_id="evt_abc",
         etag='"abc123"',
-        start=datetime(2026, 5, 15, 9, 0, tzinfo=timezone.utc),
-        end=datetime(2026, 5, 15, 9, 30, tzinfo=timezone.utc),
+        start=datetime(2026, 5, 15, 9, 0, tzinfo=UTC),
+        end=datetime(2026, 5, 15, 9, 30, tzinfo=UTC),
         all_day=False,
         summary="Standup",
         description="Daily team standup.",
@@ -366,7 +365,7 @@ def test_split_operator_prose_stray_end_before_region():
 def test_attach_transcript_links_matches_by_date_and_title():
     block = _block(
         summary="Alex × Sid",
-        start=datetime(2026, 5, 14, 16, 0, tzinfo=timezone.utc),
+        start=datetime(2026, 5, 14, 16, 0, tzinfo=UTC),
     )
     ref = cal._TranscriptRef(
         relpath="raw/transcripts/jamie/2026-05-14--alex-x-sid--abc.md",
@@ -402,7 +401,7 @@ def test_attach_transcript_links_substring_match():
     Jamie-side title is just "Alex x Sid" (Jamie strips counter suffixes)."""
     block = _block(
         summary="Alex x Sid 1/3",
-        start=datetime(2026, 5, 14, 16, 0, tzinfo=timezone.utc),
+        start=datetime(2026, 5, 14, 16, 0, tzinfo=UTC),
     )
     transcript_title = "Alex x Sid"
     ref = cal._TranscriptRef(

@@ -5,7 +5,6 @@ from __future__ import annotations
 from pathlib import Path
 
 import yaml
-
 from scripts.reports._engine.runner import _load_operator_answers
 
 

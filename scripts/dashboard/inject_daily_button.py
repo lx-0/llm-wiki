@@ -26,7 +26,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from core import markers
 from core.daily_capture import (
     SUMMARIZE_BUTTON_BEGIN as BEGIN,
+)
+from core.daily_capture import (
     SUMMARIZE_BUTTON_BLOCK as BUTTON_BLOCK,
+)
+from core.daily_capture import (
     SUMMARIZE_BUTTON_END as END,
 )
 from core.paths import DAILY_DIR

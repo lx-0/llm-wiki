@@ -12,10 +12,9 @@ from __future__ import annotations
 
 import json
 
+from core.state_store import StateStore
 from publish.client import tool_text
 from publish.delta import ArticlePayload, _payload_hash
-
-from core.state_store import StateStore
 
 PRODUCER_ID = "llm-wiki"
 START_SLUG = "start"

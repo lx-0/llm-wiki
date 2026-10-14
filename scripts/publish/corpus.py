@@ -13,8 +13,8 @@ from __future__ import annotations
 import hashlib
 import re
 import unicodedata
+from collections.abc import Iterator, Sequence
 from pathlib import Path
-from typing import Iterator, Sequence
 
 from core.links import iter_articles
 from core.paths import STATE_DIR

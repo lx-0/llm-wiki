@@ -14,13 +14,15 @@ os.environ["CLAUDE_INVOKED_BY"] = "query"
 import argparse
 import asyncio
 import json
-import logging
 import sys
 
 from claude_agent_sdk import query
 
-from core.paths import KNOWLEDGE_DIR, QA_DIR, ROOT_DIR
 from core.config import CONFIG
+
+# ── Logging ──────────────────────────────────────────────────────────
+from core.console import setup_console_logging
+from core.paths import QA_DIR, ROOT_DIR
 from core.state_store import update_state
 from core.utils import (
     now_iso,
@@ -29,9 +31,6 @@ from core.utils import (
     slugify,
     today_iso,
 )
-
-# ── Logging ──────────────────────────────────────────────────────────
-from core.console import setup_console_logging  # noqa: E402
 
 log = setup_console_logging("query")
 

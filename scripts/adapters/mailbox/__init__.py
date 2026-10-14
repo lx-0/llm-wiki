@@ -41,8 +41,9 @@ def resolve_reader(account: dict[str, Any]) -> MailboxReader | None:
     account_id = account.get("_id", account.get("email", "unknown"))
 
     if kind == "thunderbird-mbox":
-        from .thunderbird import ThunderbirdMboxReader
         from core.config import CONFIG
+
+        from .thunderbird import ThunderbirdMboxReader
 
         profile_root = Path(CONFIG.personal.thunderbird_profile or "").expanduser()
         mbox_paths = [profile_root / p for p in reader_cfg.get("mbox_paths", [])]
@@ -86,8 +87,9 @@ def resolve_filter(account: dict[str, Any]) -> MailboxFilter | None:
     account_id = account.get("_id", account.get("email", "unknown"))
 
     if kind == "thunderbird-msgfilter":
-        from .thunderbird import ThunderbirdMsgFilter
         from core.config import CONFIG
+
+        from .thunderbird import ThunderbirdMsgFilter
 
         profile_root = Path(CONFIG.personal.thunderbird_profile or "").expanduser()
         filter_paths = [profile_root / p for p in filter_cfg.get("filter_paths", [])]

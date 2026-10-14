@@ -15,7 +15,7 @@ import os
 import time
 from contextlib import nullcontext
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from uuid import UUID
 from zoneinfo import ZoneInfo
@@ -157,12 +157,12 @@ class WisprClient:
 def _date(value: object) -> datetime:
     text = str(value)
     if text.isdigit():
-        return datetime.fromtimestamp(int(text) / 1000, tz=timezone.utc)
+        return datetime.fromtimestamp(int(text) / 1000, tz=UTC)
     parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
     if parsed.tzinfo is None:
         # Desktop sync uses timezone-less UTC; verified against the same
         # meeting's Z-suffixed MCP timestamp and the desktop date converter.
-        parsed = parsed.replace(tzinfo=timezone.utc)
+        parsed = parsed.replace(tzinfo=UTC)
     return parsed
 
 

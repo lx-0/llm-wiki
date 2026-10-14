@@ -15,38 +15,16 @@ os.environ["CLAUDE_INVOKED_BY"] = "compile"
 import argparse
 import asyncio
 import json
-import logging
 import re
 import sys
 import time
 from pathlib import Path
 
-from core.paths import (
-    INDEX_FILE,
-    KNOWLEDGE_DIR,
-    LOGS_DIR,
-    LOG_FILE,
-    ROOT_DIR,
-    STATE_DIR,
-    STATE_FILE,
-)
-from core.state_store import acquire_process_lock, pending_paths, update_state
-from core.utils import (
-    file_hash,
-    list_raw_files,
-    list_wiki_articles,
-    load_state,
-    now_iso,
-    today_iso,
-)
-from core.sdk_helpers import FailureClass, is_fatal
-
 # ── Logging ──────────────────────────────────────────────────────────
 # Generic console formatting + file handlers come from `core.console`.
 # compile-specific colorization (per-file header, dispatch, curiosity)
 # lives in `_CompileFormatter` below as a thin subclass.
-
-from core.console import (  # noqa: E402
+from core.console import (
     C_BOLD,
     C_CYAN,
     C_DIM,
@@ -54,6 +32,22 @@ from core.console import (  # noqa: E402
     C_YELLOW,
     ConsoleFormatter,
     setup_console_logging,
+)
+from core.paths import (
+    INDEX_FILE,
+    KNOWLEDGE_DIR,
+    LOGS_DIR,
+    ROOT_DIR,
+    STATE_DIR,
+)
+from core.sdk_helpers import FailureClass, is_fatal
+from core.state_store import acquire_process_lock, pending_paths, update_state
+from core.utils import (
+    file_hash,
+    list_raw_files,
+    list_wiki_articles,
+    now_iso,
+    today_iso,
 )
 
 
@@ -95,18 +89,14 @@ log = setup_console_logging(
     error_file=LOGS_DIR / "compile-errors.log",
 )
 
-from core.config import CONFIG  # noqa: E402
-from core.prompts import render  # noqa: E402
-from core import ollama_client  # noqa: E402
-from core.piggybacks import run_due_piggybacks  # noqa: E402
-
 from compile_stages.post_passes import run_post_passes  # noqa: E402
-from compile_stages.types import CompileOutcome  # noqa: E402
 from compile_stages.route import (  # noqa: E402
     SUBSTRATE_PROMPTS,
     _parse_frontmatter,
 )
-
+from compile_stages.types import CompileOutcome  # noqa: E402
+from core.config import CONFIG  # noqa: E402
+from core.piggybacks import run_due_piggybacks  # noqa: E402
 
 # ── File selection ───────────────────────────────────────────────────
 
@@ -178,7 +168,6 @@ async def compile_file(
     # only EXECUTES the route below. The memory pre-pass (writes a Timeline
     # section) is I/O, so it stays here in the Compile arm, not in decide_route.
     from compile_stages.route import (
-        Compile,
         HealthStub,
         IndexOnly,
         Skip,
@@ -297,6 +286,7 @@ async def _run_compile_route(
     # route's metadata via dataclasses.replace.
     if source_type in ("memory-sync", "memory-seed"):
         import dataclasses
+
         from compile_stages.memory import (
             ensure_timeline_section,
             resolve_project_slug,
@@ -496,7 +486,7 @@ def _spawn_maintenance() -> None:
             )
         else:
             log.info("  maintenance: 0 due — queues current")
-    except Exception:  # noqa: BLE001 — maintenance must never break compile
+    except Exception:
         log.warning("  maintenance: piggyback spawn failed (continuing)", exc_info=True)
 
 
@@ -570,7 +560,7 @@ async def main() -> None:
                 log.info(
                     "Pre-compile: swept %d file(s) from Clippings/ into raw/articles/", n_swept
                 )
-        except Exception as e:  # noqa: BLE001 — never let sweep failures abort compile
+        except Exception as e:
             log.warning("Pre-compile clippings sweep failed (continuing): %s", e)
 
     files = select_files(args)
@@ -637,7 +627,7 @@ async def main() -> None:
         _emit_progress(args.progress_json, idx, len(files))
         try:
             outcome = await compile_file(source, prefix=prefix, force=force_compile)
-        except Exception as exc:  # noqa: BLE001 — one file's crash must not kill the whole batch
+        except Exception as exc:
             # An unhandled exception in compile_file used to propagate out of
             # main(), aborting the entire run AND skipping the end-of-run
             # maintenance drain. Demote it to a per-file failure so the batch

@@ -15,8 +15,8 @@ from pathlib import Path
 import httpx
 
 from publish.bootstrap import ensure_wiki, start_page_payload
-from publish.client import ContextMcpClient
 from publish.cli import build_publish_plan
+from publish.client import ContextMcpClient
 from publish.corpus import manifest_store, server_slug
 from publish.executor import execute_publish
 

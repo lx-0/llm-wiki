@@ -37,10 +37,10 @@ import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from collectors.base import Collector, CollectorSpec, RunResult, register
+from collectors.base import CollectorSpec, RunResult, register
+from core.config import CONFIG
 from core.paths import RAW_DIR
 from core.utils import now_iso
-from core.config import CONFIG
 
 # yt-dlp + youtube-transcript-api are imported lazily so --help works
 # without the deps installed.
@@ -189,7 +189,7 @@ def fetch_transcript(video_id: str, *, languages: tuple[str, ...] = ("en", "de")
             "segments": segments,
             "plain": " ".join(s["text"] for s in segments),
         }
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         log.info(
             "transcript-api failed for %s (%s); trying yt-dlp fallback", video_id, type(e).__name__
         )
@@ -220,7 +220,7 @@ def _fetch_transcript_ytdlp(video_id: str, *, languages: tuple[str, ...]) -> dic
 
             with YoutubeDL(opts) as ydl:
                 ydl.extract_info(url, download=True)  # writes sub files only
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             log.warning("yt-dlp fallback failed for %s: %s", video_id, type(e).__name__)
             return None
 
@@ -404,7 +404,7 @@ def ydlp_download_video(
         candidates = list(dest_dir.glob(f"{info['id']}.*"))
         videos = [p for p in candidates if p.suffix.lower() not in (".json", ".description")]
         return videos[0] if videos else None
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         log.warning("yt-dlp download failed: %s", type(e).__name__)
         return None
 
@@ -440,7 +440,7 @@ def fetch_visual_local(
     transcript: dict | None,
 ) -> dict | None:
     """T3-local: download video, sample frames, gemma4 vision per frame, aggregate."""
-    from core import ollama_client  # noqa: WPS433  late import — config must be ready
+    from core import ollama_client
 
     if not ollama_client.is_reachable():
         log.warning("Ollama not reachable — skipping T3 visual")
@@ -513,7 +513,7 @@ def fetch_visual_local(
                     _ts_to_label(ts),
                     "skip (uninformative)" if not informative else summary[:80],
                 )
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 log.warning("  vision call failed at %.1fs: %s", ts, type(e).__name__)
                 continue
 
@@ -531,7 +531,7 @@ def fetch_visual_local(
                 timeout=float(CONFIG.limits.youtube_aggregate_timeout_s),
             )
             agg_duration = round(time.time() - t1, 2)
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             log.warning("aggregate call failed: %s", type(e).__name__)
             aggregate = ""
             agg_duration = 0
@@ -837,7 +837,7 @@ def _ingest_items(
         except KeyboardInterrupt:
             log.warning("interrupted")
             break
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             log.exception("failed on %s: %s", u, e)
             results.append({"url": u, "status": "failed", "error": str(e)})
 

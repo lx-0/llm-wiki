@@ -11,7 +11,6 @@ from scripts.reports._engine.lib.verify_report import (
     verify_report,
 )
 
-
 GOOD_REPORT_TEMPLATE = """\
 ---
 instrument: phq-9

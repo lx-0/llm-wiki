@@ -94,7 +94,7 @@ def test_result_usage_preferred_cache_inclusive(ledger: UsageLedger):
         "output_tokens": 90,
     }
 
-    async def fake_query(*, prompt, options):  # noqa: ARG001
+    async def fake_query(*, prompt, options):
         yield _assistant({"input_tokens": 5, "output_tokens": 2})
         yield _result(usage=usage, cost=0.79)
 
@@ -126,7 +126,7 @@ def test_per_turn_fallback_is_cache_inclusive_but_budget_basis_is_uncached(
         "output_tokens": 5,
     }
 
-    async def fake_query(*, prompt, options):  # noqa: ARG001
+    async def fake_query(*, prompt, options):
         yield _assistant(turn_usage)
         yield _assistant(turn_usage)
         yield _result(usage=None, cost=0.1)
@@ -142,7 +142,7 @@ def test_per_turn_fallback_is_cache_inclusive_but_budget_basis_is_uncached(
 
 
 def test_assistant_text_and_result_text_both_captured(ledger: UsageLedger):
-    async def fake_query(*, prompt, options):  # noqa: ARG001
+    async def fake_query(*, prompt, options):
         yield _assistant(None, text='{"items": ')
         yield _assistant(None, text="{}}")
         yield _result(result="final", usage={"input_tokens": 1, "output_tokens": 1})
@@ -157,7 +157,7 @@ def test_assistant_text_and_result_text_both_captured(ledger: UsageLedger):
 
 
 def test_timeout_records_partial_usage_and_classifies(ledger: UsageLedger):
-    async def hanging_query(*, prompt, options):  # noqa: ARG001
+    async def hanging_query(*, prompt, options):
         yield _assistant(
             {"input_tokens": 7, "cache_creation_input_tokens": 100, "output_tokens": 3}
         )
@@ -175,7 +175,7 @@ def test_timeout_records_partial_usage_and_classifies(ledger: UsageLedger):
 
 
 def test_generic_exception_classified_and_recorded(ledger: UsageLedger):
-    async def boom_query(*, prompt, options):  # noqa: ARG001
+    async def boom_query(*, prompt, options):
         raise RuntimeError("Command failed with exit code 1")
         yield  # pragma: no cover
 
@@ -221,7 +221,7 @@ def test_structured_error_max_turns(ledger: UsageLedger):
     bundled CLI's exit-1 shape. Kind comes from the structured payload,
     LEDGER gets the authoritative cache-inclusive usage."""
 
-    async def max_turns_query(*, prompt, options):  # noqa: ARG001
+    async def max_turns_query(*, prompt, options):
         yield _result(
             result="",
             cost=0.05,
@@ -246,7 +246,7 @@ def test_structured_error_max_turns(ledger: UsageLedger):
 def test_structured_error_without_raise_still_classified(ledger: UsageLedger):
     """A clean generator exit with is_error=True must not masquerade as ok."""
 
-    async def error_query(*, prompt, options):  # noqa: ARG001
+    async def error_query(*, prompt, options):
         yield _result(
             result="",
             cost=0.0,
@@ -266,7 +266,7 @@ def test_default_model_records_under_claude_provider(ledger: UsageLedger):
     bucket via provider_for_model('') — the harness is Claude-side by
     definition and records provider explicitly."""
 
-    async def fake_query(*, prompt, options):  # noqa: ARG001
+    async def fake_query(*, prompt, options):
         yield _result(usage={"input_tokens": 10, "output_tokens": 5})
 
     asyncio.run(run_sdk_query("p", _spec(model=None), query_fn=fake_query))
@@ -274,7 +274,7 @@ def test_default_model_records_under_claude_provider(ledger: UsageLedger):
 
 
 def test_record_usage_false_skips_ledger(ledger: UsageLedger):
-    async def fake_query(*, prompt, options):  # noqa: ARG001
+    async def fake_query(*, prompt, options):
         yield _result(usage={"input_tokens": 10, "output_tokens": 5})
 
     asyncio.run(run_sdk_query("p", _spec(record_usage=False), query_fn=fake_query))
@@ -413,7 +413,7 @@ def test_stream_without_result_message_is_ok_with_fallback_usage(
     """Stream ends cleanly with only AssistantMessages: not a failure
     (parity with the legacy loops), usage from the per-turn fallback."""
 
-    async def fake_query(*, prompt, options):  # noqa: ARG001
+    async def fake_query(*, prompt, options):
         yield _assistant({"input_tokens": 4, "output_tokens": 2}, text="partial")
 
     result = asyncio.run(run_sdk_query("p", _spec(), query_fn=fake_query))
@@ -447,7 +447,7 @@ def test_structured_error_api_version_floor_is_cli_outdated_and_fatal(ledger: Us
     subtype=success/is_error ResultMessage, then the 0.1.x-style exit-1 raise."""
     from core.sdk_helpers import is_fatal
 
-    async def refused_query(*, prompt, options):  # noqa: ARG001
+    async def refused_query(*, prompt, options):
         yield _result(
             result=_VERSION_FLOOR_RESULT,
             cost=0.0,
@@ -472,7 +472,7 @@ def test_structured_error_without_raise_is_cli_outdated(ledger: UsageLedger):
     ends cleanly. Must not be mistaken for ok — and must not be reported as
     'success after 1 turns' with the cause dropped."""
 
-    async def refused_query(*, prompt, options):  # noqa: ARG001
+    async def refused_query(*, prompt, options):
         yield _result(result=_VERSION_FLOOR_RESULT, cost=0.0, is_error=True, subtype="success")
 
     result = asyncio.run(run_sdk_query("p", _spec(), query_fn=refused_query))
@@ -486,7 +486,7 @@ def test_structured_error_bad_model_classified_from_result_text(ledger: UsageLed
     """CLI 2.1.273 phrases a bad model as "There's an issue with the selected
     model (<name>)" — none of the older invalid-model patterns matched it."""
 
-    async def bad_model_query(*, prompt, options):  # noqa: ARG001
+    async def bad_model_query(*, prompt, options):
         yield _result(
             result="There's an issue with the selected model (claude-nope-9). "
             "It may not exist or you may not have access to it.",
@@ -504,7 +504,7 @@ def test_structured_error_bad_model_classified_from_stderr(ledger: UsageLedger):
     """The same refusal seen only on stderr (`[claude-code:unrecognized_model]`)
     with an empty result text: captured stderr must feed the classifier too."""
 
-    async def bad_model_query(*, prompt, options):  # noqa: ARG001
+    async def bad_model_query(*, prompt, options):
         options.stderr(
             '[claude-code:unrecognized_model] {"model":"claude-nope-9","query_source":"sdk"}'
         )
@@ -515,7 +515,7 @@ def test_structured_error_bad_model_classified_from_stderr(ledger: UsageLedger):
 
 
 def test_structured_error_excerpt_is_bounded(ledger: UsageLedger):
-    async def long_query(*, prompt, options):  # noqa: ARG001
+    async def long_query(*, prompt, options):
         yield _result(
             result="API Error: 500 " + "x" * 5000, cost=0.0, is_error=True, subtype="success"
         )
@@ -534,7 +534,7 @@ def test_sigkill_is_cli_killed_and_names_the_crash_report(ledger: UsageLedger):
 
     from core.sdk_helpers import is_fatal
 
-    async def killed_query(*, prompt, options):  # noqa: ARG001
+    async def killed_query(*, prompt, options):
         raise CLIConnectionError("Cannot write to terminated process (exit code: -9)")
         yield  # pragma: no cover
 

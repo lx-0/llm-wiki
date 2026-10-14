@@ -1156,7 +1156,7 @@ def refresh_dashboards() -> None:
     2026-05-03 SessionEnd storm and must not be duplicated). The import is
     lazy so commands that don't refresh — and `wiki help` — never pay for it.
     """
-    import flush  # noqa: PLC0415 — lazy: only the refresh_after path needs it
+    import flush
 
     flush.refresh_dashboard_stats()
     flush.refresh_dashboard_lint()

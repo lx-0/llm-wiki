@@ -19,7 +19,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
-from core.utils import file_hash  # noqa: E402
+from core.utils import file_hash
 
 
 @pytest.fixture
@@ -54,7 +54,7 @@ def vault(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     class _FakeProc:
         pid = 4242
 
-    def _fake_popen(cmd, **kwargs):  # noqa: ARG001
+    def _fake_popen(cmd, **kwargs):
         spawns.append(list(cmd))
         return _FakeProc()
 

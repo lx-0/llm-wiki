@@ -27,11 +27,15 @@ from .base import (
 # Import order = run order. Today's order matches the historical await
 # sequence in compile.py: suggestions → curiosity → takes; folder_curiosity
 # (M027-S03) appended last. Each import triggers @register at module load.
-from . import suggestions as _suggestions  # noqa: E402, F401
-from . import curiosity as _curiosity  # noqa: E402, F401
-from . import takes as _takes  # noqa: E402, F401
-from . import folder_curiosity as _folder_curiosity  # noqa: E402, F401
-from . import intents as _intents  # noqa: E402, F401
+# The sorter is switched off for this block — alphabetising it would change
+# the run order (the action comment must stand alone on its line).
+# isort: off
+from . import suggestions as _suggestions
+from . import curiosity as _curiosity
+from . import takes as _takes
+from . import folder_curiosity as _folder_curiosity
+from . import intents as _intents
+# isort: on
 
 __all__ = [
     "Producer",

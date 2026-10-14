@@ -17,7 +17,6 @@ from __future__ import annotations
 import argparse
 import json
 import logging
-import os
 import sys
 from collections import Counter
 from pathlib import Path
@@ -25,11 +24,11 @@ from urllib.parse import urlparse
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from collectors.base import Collector, CollectorSpec, RunResult, register
+from collectors.base import CollectorSpec, RunResult, register
+from core.config import CONFIG
 from core.errors import swallow
 from core.paths import RAW_DIR, ROOT_DIR
 from core.utils import today_iso
-from core.config import CONFIG
 
 log = logging.getLogger(__name__)
 

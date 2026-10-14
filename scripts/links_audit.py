@@ -31,7 +31,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # scripts/ on path
 
-from core.links import (  # noqa: E402
+from core.links import (
     _strip_frontmatter_and_fences,
     canonical_slug,
     has_ext,
@@ -41,8 +41,8 @@ from core.links import (  # noqa: E402
     resolve_link,
     retarget_links,
 )
-from core.paths import KNOWLEDGE_DIR, ROOT_DIR  # noqa: E402
-from core.utils import extract_wikilinks  # noqa: E402
+from core.paths import KNOWLEDGE_DIR, ROOT_DIR
+from core.utils import extract_wikilinks
 
 # Confidence threshold for the fuzzy (non-bucket) suggestion tier. Below this,
 # string distance starts confusing distinct entities, so we don't offer a fix.
@@ -73,7 +73,7 @@ def _is_placeholder(target: str) -> bool:
     """Heuristic: illustrative example link, not a real reference."""
     if any(c in target for c in "<>…") or "..." in target:
         return True
-    base = target.split("/")[-1]
+    base = target.rsplit("/", maxsplit=1)[-1]
     return base in {"foo", "bar", "baz", "slug", "xyz", "abc", "wikilink", "wikilinks"}
 
 
@@ -81,7 +81,7 @@ def _suggest(
     target: str, slugs: list[str], by_base: dict[str, list[str]]
 ) -> tuple[str | None, str | None]:
     """Propose a correction for a dangling target. Returns (slug, tier)."""
-    base = target.split("/")[-1].lower()
+    base = target.rsplit("/", maxsplit=1)[-1].lower()
     # Tier 1 — exact basename in a different bucket (near-certain: wrong folder,
     # stray `knowledge/` prefix, doubled `concepts/projects/` prefix).
     bucket_hits = [s for s in by_base.get(base, []) if s != target]

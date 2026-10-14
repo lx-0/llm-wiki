@@ -21,7 +21,6 @@ from pathlib import Path
 import pytest
 
 from publish.corpus import (
-    PublishCollisionError,
     load_manifest,
     manifest_store,
     map_slugs,

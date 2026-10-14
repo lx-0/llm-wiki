@@ -16,7 +16,6 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-
 from scripts.core.compile_role import (
     LOCATION_DEFAULTS,
     VALID_ROLES,
@@ -26,7 +25,7 @@ from scripts.core.compile_role import (
 
 class TestValidRoles:
     def test_three_canonical_values(self):
-        assert VALID_ROLES == frozenset({"source-only", "source-and-final", "final-only"})
+        assert frozenset({"source-only", "source-and-final", "final-only"}) == VALID_ROLES
 
     def test_membership(self):
         assert "source-only" in VALID_ROLES

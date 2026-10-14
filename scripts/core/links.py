@@ -24,8 +24,8 @@ from __future__ import annotations
 
 import os
 import re
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 # `[[target]]`, `![[target]]`, with optional `#heading` and `|alias`.
 # Guard (audit 2026-08-25): a target that starts/ends with space/tab or starts

@@ -42,8 +42,8 @@ def voice_env(tmp_path, monkeypatch):
     fake_ffmpeg.write_text("#!/bin/sh\nexit 0\n")
     fake_ffmpeg.chmod(0o755)
 
-    from core.config import CONFIG
     from core import paths as paths_mod
+    from core.config import CONFIG
 
     monkeypatch.setattr(CONFIG.personal, "voice_inbox", str(inbox))
     monkeypatch.setattr(CONFIG.personal, "voice_transcribe_model", str(model))

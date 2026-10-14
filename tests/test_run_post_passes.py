@@ -75,7 +75,7 @@ def _stub_orchestrate_failed_on_raise(monkeypatch: pytest.MonkeyPatch):
     async def safe_eval(producer, source):
         try:
             return await real_eval(producer, source)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             return ProducerResult(
                 producer=producer.SPEC.name,
                 status="failed",

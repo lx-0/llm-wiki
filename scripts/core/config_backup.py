@@ -12,7 +12,7 @@ global CONFIG_FILE at import) — can share it instead of carrying its own copy.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 BACKUP_DIR_NAME = "config-backups"
@@ -36,11 +36,11 @@ def backup_config_file(config_path: Path, *, keep_last: int = BACKUP_KEEP_LAST) 
     try:
         bdir = backup_dir_for(config_path)
         bdir.mkdir(parents=True, exist_ok=True)
-        ts = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+        ts = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
         out = bdir / f"config-{ts}.yaml"
         # Avoid overwrite within same second — append micro-suffix.
         if out.exists():
-            out = bdir / f"config-{ts}-{datetime.now(timezone.utc).microsecond:06d}.yaml"
+            out = bdir / f"config-{ts}-{datetime.now(UTC).microsecond:06d}.yaml"
         out.write_bytes(config_path.read_bytes())
 
         # Prune oldest beyond keep-count.

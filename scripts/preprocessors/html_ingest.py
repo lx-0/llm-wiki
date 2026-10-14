@@ -37,8 +37,7 @@ from core.config import CONFIG
 from core.console import setup_console_logging
 from core.paths import RAW_ARTICLES_DIR, ROOT_DIR, SCRIPTS_DIR, WIKI_DIR
 from core.utils import slugify, today_iso
-
-from preprocessors.base import PreprocessResult, PreprocessorSpec, register
+from preprocessors.base import PreprocessorSpec, PreprocessResult, register
 
 log = setup_console_logging("ingest-html")
 

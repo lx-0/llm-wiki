@@ -90,7 +90,7 @@ def _punctuate(raw_transcript: str) -> str | None:
             )
             return None
         return cleaned
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         log.warning("voice punctuation failed (%s) — falling back to raw", exc)
         return None
 

@@ -20,7 +20,6 @@ from __future__ import annotations
 import argparse
 import json
 import logging
-import os
 import shutil
 import sqlite3
 import sys
@@ -31,11 +30,11 @@ from urllib.parse import urlparse
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from collectors.base import Collector, CollectorSpec, RunResult, register
+from collectors.base import CollectorSpec, RunResult, register
+from core.config import CONFIG
 from core.errors import swallow
 from core.paths import RAW_DIR, ROOT_DIR
 from core.utils import today_iso
-from core.config import CONFIG
 
 log = logging.getLogger(__name__)
 
@@ -74,7 +73,7 @@ def clean_domain(url: str) -> str | None:
         if domain in SKIP_DOMAINS or not domain:
             return None
         return domain
-    except Exception as e:  # noqa: BLE001 — per-URL fallback, row is dropped
+    except Exception as e:
         log.debug("URL parse failed [%.80s]: %s", url, e)
         return None
 
@@ -360,7 +359,7 @@ def scan_chrome_history(history_path: Path) -> dict | None:
         total_visits = cur.fetchone()[0]
 
         db.close()
-    except Exception as e:  # noqa: BLE001 — error surfaces in the report AND the log
+    except Exception as e:
         log.warning("chrome history scan failed: %s: %s", type(e).__name__, e)
         return {"error": str(e)}
     finally:
@@ -457,7 +456,7 @@ def generate_report(
         searches = ff_places.get("searches", [])
         google = ff_places.get("google_searches", [])
         if searches or google:
-            lines.append(f"## Firefox Suchverlauf")
+            lines.append("## Firefox Suchverlauf")
             lines.append("")
             if searches:
                 lines.append("### Suchleiste")

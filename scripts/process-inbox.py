@@ -16,7 +16,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from preprocessors.inbox import main  # noqa: E402
+from preprocessors.inbox import main
 
 if __name__ == "__main__":
     main()

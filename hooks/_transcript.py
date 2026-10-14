@@ -78,7 +78,7 @@ class Budgets:
                 user_text=CONFIG.limits.flush_user_text_budget_chars,
                 tool_summary=CONFIG.limits.flush_tool_summary_budget_chars,
             )
-        except Exception as e:  # noqa: BLE001  config-load failure must never break flush
+        except Exception as e:
             log.warning(
                 "flush budgets: config load failed, using defaults: %s: %s", type(e).__name__, e
             )
@@ -254,7 +254,7 @@ def resolve_transcript(transcript_path: str | None, session_id: str | None) -> P
 def _detect_format(path: Path) -> str:
     """Sniff "claude" vs "codex" from the first parseable lines. Defaults claude."""
     try:
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             checked = 0
             for line in f:
                 line = line.strip()
@@ -290,7 +290,7 @@ def _read_claude_transcript(transcript_path: str | Path) -> list[Turn]:
         log.warning(f"Transcript not found: {transcript_path}")
         return turns
 
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
         for line in f:
             line = line.strip()
             if not line:
@@ -400,7 +400,7 @@ def _read_codex_transcript(transcript_path: str | Path) -> list[Turn]:
         else:
             turns.append(Turn(role="assistant", text="", tools=[summary]))
 
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
         for line in f:
             line = line.strip()
             if not line:
@@ -427,9 +427,9 @@ def _read_codex_transcript(transcript_path: str | Path) -> list[Turn]:
                         turns.append(Turn(role="assistant", text=text, tools=[]))
                 # role user/developer/system skipped: user prose comes from the
                 # clean event_msg/user_message; developer/system = instructions.
-            elif t == "response_item" and pt in _CODEX_TOOL_CALL_TYPES:
-                push_tool(_summarize_codex_tool(payload))
-            elif t == "response_item" and pt in _CODEX_TOOL_OUTPUT_TYPES:
+            elif (t == "response_item" and pt in _CODEX_TOOL_CALL_TYPES) or (
+                t == "response_item" and pt in _CODEX_TOOL_OUTPUT_TYPES
+            ):
                 push_tool(_summarize_codex_tool(payload))
             # everything else (reasoning, session_meta, token_count, turn_context,
             # world_state, compacted, sub_agent_activity, …) is metadata/noise.

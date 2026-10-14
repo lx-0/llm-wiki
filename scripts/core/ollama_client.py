@@ -119,7 +119,7 @@ def is_reachable(timeout: float = 5.0) -> bool:
         with _client(timeout) as c:
             r = c.get(f"{_base_url()}/api/tags")
         return r.status_code == 200
-    except Exception as e:  # noqa: BLE001 — callers warn via warn_unreachable_once;
+    except Exception as e:
         # the exception detail (DNS vs refused vs timeout) is diagnostic only
         _module_log.debug("ollama reachability probe failed: %s: %s", type(e).__name__, e)
         return False

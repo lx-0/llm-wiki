@@ -21,10 +21,9 @@ import logging
 
 import pytest
 
-import collectors.folder_index as folder_index
-import curiosity.cli as cli
-import curiosity.producer as producer
+from collectors import folder_index
 from core.config import CONFIG
+from curiosity import cli, producer
 
 # The model returns a candidate NUMBER, not a path. The real retrieval over
 # the fixture digest puts the source-matched Steuerbescheid file at [1].

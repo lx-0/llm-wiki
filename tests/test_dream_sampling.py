@@ -20,13 +20,12 @@ from __future__ import annotations
 
 import random
 import time
-from datetime import datetime, timedelta, timezone
+from collections.abc import Iterator
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Iterator
 
 import pytest
 import yaml
-
 
 # ── Fixtures (mirror test_dream_cycle.py shape) ─────────────────────
 
@@ -168,7 +167,7 @@ def test_tier1_includes_daily_digests(vault: Path) -> None:
 
     _write_entity_page(vault, "people", "alex")
     # 10 digest files; only N most-recent should land in Tier 1
-    today = datetime.now(timezone.utc).date()
+    today = datetime.now(UTC).date()
     for i in range(10):
         d = today - timedelta(days=i)
         _write_substrate(
@@ -333,7 +332,7 @@ def test_never_dreamed_file_dominates_score(vault: Path) -> None:
     now = time.time()
     fresh = _write_substrate(vault, "raw/notes/email/fresh.md", "alex\n", mtime=now)
     # Stamped file: dreamed today
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = datetime.now(UTC).strftime("%Y-%m-%d")
     stamped = _write_substrate(
         vault,
         "raw/notes/email/stamped.md",
@@ -359,7 +358,7 @@ def test_write_last_dreamed_at_records_side_state(vault: Path) -> None:
 
     p = _write_substrate(vault, "raw/notes/email/no-fm.md", "Body only — no frontmatter.\n")
     before = p.read_text()
-    when = datetime(2026, 5, 17, tzinfo=timezone.utc)
+    when = datetime(2026, 5, 17, tzinfo=UTC)
     assert dream._write_last_dreamed_at(p, when=when) is True
     # Substrate file is byte-identical — no frontmatter synthesised.
     assert p.read_text() == before
@@ -381,7 +380,7 @@ def test_write_last_dreamed_at_leaves_substrate_untouched(vault: Path) -> None:
         "Body here.\n",
         frontmatter={"title": "x", "author": "alex"},
     )
-    when = datetime(2026, 5, 17, tzinfo=timezone.utc)
+    when = datetime(2026, 5, 17, tzinfo=UTC)
     dream._write_last_dreamed_at(p, when=when)
     fm, body = dream._parse_frontmatter(p.read_text())
     assert fm == {"title": "x", "author": "alex"}  # unchanged, no last_dreamed_at
@@ -395,7 +394,7 @@ def test_write_last_dreamed_at_idempotent_same_day(vault: Path) -> None:
     import dream
 
     p = _write_substrate(vault, "raw/notes/email/x.md", "Body.\n")
-    when = datetime(2026, 5, 17, 12, 0, tzinfo=timezone.utc)
+    when = datetime(2026, 5, 17, 12, 0, tzinfo=UTC)
     assert dream._write_last_dreamed_at(p, when=when) is True  # first stamp writes
     assert dream._write_last_dreamed_at(p, when=when) is False  # same day → no-op
 
@@ -410,7 +409,7 @@ def test_stamp_last_dreamed_at_batches_one_write(vault: Path) -> None:
     import dream
 
     paths = [_write_substrate(vault, f"raw/notes/email/batch-{i}.md", "Body.\n") for i in range(3)]
-    when = datetime(2026, 5, 17, tzinfo=timezone.utc)
+    when = datetime(2026, 5, 17, tzinfo=UTC)
 
     assert dream._stamp_last_dreamed_at(paths, when=when) == 3
     activation = dream._load_dream_activation()
@@ -434,7 +433,7 @@ def test_dreams_since_last_seen_reads_stamp(vault: Path) -> None:
     # midnight, so a wall-clock `now` drifted the gap out of [5,6) near midnight /
     # across timezones (flaky — saw 6.005). Pinning `now` to noon keeps the gap a
     # deterministic ~5.5 days regardless of when/where the suite runs.
-    now = datetime(2026, 6, 10, 12, 0, tzinfo=timezone.utc)
+    now = datetime(2026, 6, 10, 12, 0, tzinfo=UTC)
     five_days_ago = (now - timedelta(days=5)).strftime("%Y-%m-%d")
     p = _write_substrate(
         vault,
@@ -535,8 +534,10 @@ def test_dream_entity_stamps_last_dreamed_at_after_sdk(
     """A successful dream must stamp every corpus file — in the side-state,
     not by mutating the raw/ files."""
     import asyncio
-    import dream
+
     from claude_agent_sdk import ResultMessage
+
+    import dream
 
     _write_entity_page(vault, "people", "alex")
     p1 = _write_substrate(vault, "raw/notes/email/a.md", "alex was here.\n")
@@ -582,11 +583,13 @@ def test_dream_entity_skips_stamp_on_daily_digest(
 ) -> None:
     """daily/<date>.md is NOT stamped (mtime would churn on every dream)."""
     import asyncio
-    import dream
+
     from claude_agent_sdk import ResultMessage
 
+    import dream
+
     _write_entity_page(vault, "people", "alex")
-    today = datetime.now(timezone.utc).date().isoformat()
+    today = datetime.now(UTC).date().isoformat()
     digest = _write_substrate(vault, f"daily/{today}.md", "alex appeared today.\n")
 
     class _UsageMsg:

@@ -30,7 +30,7 @@ from zoneinfo import ZoneInfo
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import httpx  # noqa: E402
+import httpx
 
 from collectors._picture_metadata import extract_metadata
 from collectors.base import (
@@ -44,7 +44,7 @@ from collectors.base import (
 from core import ollama_client
 from core.config import CONFIG, TIMEZONE
 from core.paths import RAW_DIR
-from core.prompts import render, prompt_model
+from core.prompts import prompt_model, render
 from core.utils import now_iso
 
 log = logging.getLogger(__name__)
@@ -204,7 +204,7 @@ def describe_picture(path: Path) -> dict | None:
     except httpx.TimeoutException:
         log.warning("  Timeout after %.0fs", TIMEOUT)
         return None
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         log.error("  Vision error: %s", e)
         return None
     finally:
@@ -499,7 +499,7 @@ class PicturesCollector:
             if extract_picture_metadata:
                 try:
                     picture_metadata = extract_metadata(src)
-                except Exception:  # noqa: BLE001
+                except Exception:
                     log.exception("metadata extraction failed for %s", src.name)
                     picture_metadata = {}
 

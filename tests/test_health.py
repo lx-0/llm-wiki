@@ -12,12 +12,12 @@ import json
 import os
 import socket
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import pytest
 
-import core.health as health
+from core import health
 
 
 @pytest.fixture
@@ -563,7 +563,7 @@ def test_cloud_eviction_warning_when_engine_files_are_dataless(fake_vault, monke
     evicted = {str(prompts / "flush_extract.md")}
     real_stat = os.stat
 
-    def fake_is_dataless(st):  # noqa: ARG001
+    def fake_is_dataless(st):
         return getattr(st, "_evicted", False)
 
     def fake_stat(path, *a, **kw):

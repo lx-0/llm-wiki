@@ -21,9 +21,8 @@ below is what the wedge ships.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-
 
 # Default substrate subset for clinical-screen instruments. Scoped to the
 # substrates that legitimately surface clinical-screen signals (sleep /
@@ -50,7 +49,7 @@ def resolve_substrate_files(
     "which files an inference run may read" — both the production runner
     and the audit probe call it.
     """
-    cutoff = datetime.now(timezone.utc) - timedelta(days=lookback_days)
+    cutoff = datetime.now(UTC) - timedelta(days=lookback_days)
     cutoff_epoch = cutoff.timestamp()
     found: dict[Path, float] = {}
     for pattern in globs:

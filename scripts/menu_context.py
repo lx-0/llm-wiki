@@ -46,19 +46,19 @@ import re
 import signal
 import sys
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from core import actions
 from core.paths import (
+    AREAS_DIR,
     DAILY_DIR,
     INBOX_DIR,
     KNOWLEDGE_DIR,
     PEOPLE_DIR,
     PROJECTS_DIR,
-    AREAS_DIR,
     RAW_DIR,
     RAW_REQUESTS_DIR,
     RAW_SUGGESTIONS_DIR,
@@ -166,7 +166,7 @@ def probe_dream_overdue() -> int:
     without `last_synthesized_at:` count as overdue (never synthesized).
     """
     cooldown_days = _read_dream_cooldown_days()
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     cutoff = now - timedelta(days=cooldown_days)
     n = 0
     for d in (PEOPLE_DIR, PROJECTS_DIR, AREAS_DIR):
@@ -180,7 +180,7 @@ def probe_dream_overdue() -> int:
             try:
                 when = datetime.fromisoformat(ts)
                 if when.tzinfo is None:
-                    when = when.replace(tzinfo=timezone.utc)
+                    when = when.replace(tzinfo=UTC)
                 if when < cutoff:
                     n += 1
             except ValueError:
@@ -357,14 +357,14 @@ def probe_ollama_reachable() -> bool | None:
         from core.config import CONFIG
 
         url = (CONFIG.models.ollama_url or "").strip()
-    except Exception as e:  # noqa: BLE001 — probe skipped, but a broken config must log
+    except Exception as e:
         log.warning("ollama probe: config load failed: %s: %s", type(e).__name__, e)
         return None
     if not url:
         return None
     try:
-        from urllib.parse import urlparse
         import socket
+        from urllib.parse import urlparse
 
         parsed = urlparse(url)
         host = parsed.hostname or "localhost"

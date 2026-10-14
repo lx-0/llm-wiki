@@ -18,7 +18,6 @@ import yaml
 
 from core.paths import ROOT_DIR, WIKI_DIR
 
-
 VALID_TOOLS = frozenset({"Read", "Edit", "Write", "Glob", "Grep", "Bash", "WebFetch", "WebSearch"})
 VALID_PERMISSION_MODES = frozenset({"default", "acceptEdits", "plan", "bypassPermissions"})
 VALID_BUTTON_STYLES = frozenset({"primary", "default", "destructive", "plain"})

@@ -38,7 +38,6 @@ import time
 import tty
 from pathlib import Path
 
-
 # ── ANSI color codes ───────────────────────────────────────────────────────
 # Empty strings when stderr isn't a TTY so escape sequences don't leak
 # into captured logs / CI output / piped reductions.

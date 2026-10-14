@@ -935,7 +935,7 @@ async def run_sdk_query(prompt: str, spec: SdkCallSpec, *, query_fn=None) -> Sdk
             elif isinstance(message, ResultMessage):
                 final_result = message
                 result_text = message.result or ""
-    except asyncio.TimeoutError:
+    except TimeoutError:
         elapsed = time.time() - started
         log.warning(
             "  %s ⏱ per-call timeout after %.1fs (no message for %ss, "
@@ -973,7 +973,7 @@ async def run_sdk_query(prompt: str, spec: SdkCallSpec, *, query_fn=None) -> Sdk
             ),
             None,
         )
-    except Exception as exc:  # noqa: BLE001 — classified below, caller decides
+    except Exception as exc:
         elapsed = time.time() - started
         if final_result is not None and getattr(final_result, "is_error", False):
             # Structured error: the CLI yielded a ResultMessage(is_error)

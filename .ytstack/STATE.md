@@ -1,7 +1,7 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-14T20:10:00+02:00
+last_updated: 2026-10-14T20:50:00+02:00
 current_milestone: M033
 active_slice: S01
 active_task: none
@@ -24,9 +24,12 @@ shipped (`tests/_oracle.py` fixture vault + `tests/golden/oracle/*` snapshots of
 import-order flake in the piggyback check on its first full run, and a machine-dependent
 screenshots test was fixed en route). **S01 2/5** — T02 format commit `ec06110` (290 files,
 `config_schema.py` excluded because the docs generator reads its comments; eleven hunks
-reverted by hand) + `.git-blame-ignore-revs` + AGENTS.md line. Suite 2030 green, `format
---check` clean. Next: T03 — the lint policy (`[tool.ruff.lint]` with reasons, safe
-autofixes, `RUF100` → 0) via `plan-task`.
+reverted by hand) + `.git-blame-ignore-revs` + AGENTS.md line. **S01 3/5** — T03 lint
+policy (`[tool.ruff.lint]` select + ignores with reasons, per-file E402/F401, `src`),
+safe autofixes over 230 files, `# isort: off` blocks guarding the three registries' run
+order (verified == HEAD), four dead `compile.load_state` test patches removed. Residue
+244 findings / 41 codes for T04. Suite 2030 green, format clean. Next: T04 — hand-fix
+the residue until `ruff check` exits 0 (`plan-task`).
 
 ## M032 COMPLETE (L, 2026-10-14): desktop de-slop
 

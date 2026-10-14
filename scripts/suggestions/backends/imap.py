@@ -80,7 +80,7 @@ def _ensure_folder(client, target: str) -> None:
     if target not in folders:
         try:
             client.create_folder(target)
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             log.warning("Could not create folder %r: %s", target, e)
 
 

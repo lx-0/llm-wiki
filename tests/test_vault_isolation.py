@@ -10,6 +10,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+
 from core import daily_capture
 from core.paths import ROOT_DIR, WIKI_DIR
 

@@ -18,7 +18,6 @@ _HOOKS = Path(__file__).resolve().parent.parent / "hooks"
 if str(_HOOKS) not in sys.path:
     sys.path.insert(0, str(_HOOKS))
 
-import _transcript  # noqa: E402
 from _transcript import Budgets, Turn, build_context  # noqa: E402
 
 

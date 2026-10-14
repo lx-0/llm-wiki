@@ -18,13 +18,10 @@ import time
 from pathlib import Path
 
 from core import ollama_client
-
-from core.paths import KNOWLEDGE_DIR, REPORTS_DIR, ROOT_DIR
+from core.paths import KNOWLEDGE_DIR, REPORTS_DIR
 from core.utils import (
     get_article_word_count,
     list_wiki_articles,
-    now_iso,
-    read_wiki_index,
     today_iso,
 )
 
@@ -100,8 +97,8 @@ def generate_report(reviews: list[dict], model: str) -> str:
         "",
         "## Summary Scores",
         "",
-        f"| Metric | Average |",
-        f"|--------|---------|",
+        "| Metric | Average |",
+        "|--------|---------|",
         f"| Overall | **{avg_overall:.1f}**/5 |",
         f"| Accuracy | {avg_accuracy:.1f}/5 |",
         f"| Depth | {avg_depth:.1f}/5 |",

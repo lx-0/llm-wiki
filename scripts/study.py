@@ -25,21 +25,21 @@ import argparse
 import logging
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 # Engine `scripts.*` imports.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from scripts.core.paths import ROOT_DIR  # noqa: E402
-from scripts.reports._engine.lib.analyst import studies_root  # noqa: E402
-from scripts.reports._engine.lib.render_summary import render_summary  # noqa: E402
-from scripts.reports._engine.lib.timeline import (  # noqa: E402
+from scripts.core.paths import ROOT_DIR
+from scripts.reports._engine.lib.analyst import studies_root
+from scripts.reports._engine.lib.render_summary import render_summary
+from scripts.reports._engine.lib.timeline import (
     load_timeline,
     snapshot_from_dir,
 )
-from scripts.reports._engine.runner import run_inference  # noqa: E402
-from scripts.reports._engine.study import (  # noqa: E402
+from scripts.reports._engine.runner import run_inference
+from scripts.reports._engine.study import (
     InstrumentRef,
     RunDirectory,
     Study,
@@ -49,7 +49,6 @@ from scripts.reports._engine.study import (  # noqa: E402
     list_studies,
     utc_now_iso,
 )
-
 
 log = logging.getLogger("study")
 
@@ -270,7 +269,7 @@ def cmd_run(args: argparse.Namespace) -> int:
 
         elapsed = time.perf_counter() - wall_start
         # Persist state — only after the RunDirectory atomically renamed.
-        study.state.mark_run(datetime.now(timezone.utc))
+        study.state.mark_run(datetime.now(UTC))
         study.state.write(study.state_path)
         print(
             f"\n✓ Study run complete in {elapsed:.1f}s — "
@@ -363,7 +362,7 @@ def cmd_new(args: argparse.Namespace) -> int:
             {
                 "study_id": args.study_id,
                 "title": f"{args.study_id} (rename me)",
-                "created": datetime.now(timezone.utc).isoformat(),
+                "created": datetime.now(UTC).isoformat(),
                 "schedule": "manual",
                 "instruments": [
                     {"slug": "phq-9", "version": "1.0.0", "source": "inferred"},
@@ -468,7 +467,7 @@ def cmd_answer(args: argparse.Namespace) -> int:
 
     entry = {
         "value": args.value,
-        "answered_at": datetime.now(timezone.utc).isoformat(),
+        "answered_at": datetime.now(UTC).isoformat(),
     }
     if args.note:
         entry["note"] = args.note

@@ -10,10 +10,8 @@ from __future__ import annotations
 
 import asyncio
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-
-import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
@@ -86,8 +84,8 @@ def test_within_cooldown(monkeypatch, tmp_path):
     facts.mkdir()
     monkeypatch.setattr(reconcile, "FACTS_DIR", facts)
 
-    fresh = (datetime.now(timezone.utc) - timedelta(days=3)).isoformat()
-    stale = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
+    fresh = (datetime.now(UTC) - timedelta(days=3)).isoformat()
+    stale = (datetime.now(UTC) - timedelta(days=30)).isoformat()
     (facts / "fresh.md").write_text(f"---\ntype: fact\nlast_reconciled: '{fresh}'\n---\n\nx\n")
     (facts / "stale.md").write_text(f"---\ntype: fact\nlast_reconciled: '{stale}'\n---\n\nx\n")
     (facts / "never.md").write_text("---\ntype: fact\n---\n\nx\n")

@@ -17,7 +17,7 @@ import unicodedata
 
 import pytest
 
-import collectors.folder_index as folder_index
+from collectors import folder_index
 from collectors.folder_index import (
     index_signature,
     render_index,

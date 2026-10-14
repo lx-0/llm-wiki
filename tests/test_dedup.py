@@ -14,7 +14,6 @@ from pathlib import Path
 import pytest
 
 from dedup import (
-    CandidatePair,
     find_candidates,
     load_entities,
     merge_bodies,
@@ -23,7 +22,6 @@ from dedup import (
     phonetic_key,
     rewrite_links,
 )
-
 
 # ── phonetic key + normalization ─────────────────────────────────────
 
@@ -190,10 +188,10 @@ def test_merge_pages_endtoend(tmp_path: Path, monkeypatch):
         },
     )
     # Point FACTS_DIR at this vault so record_canonical_fact writes here.
-    import core.paths as paths
+    from core import paths
 
     monkeypatch.setattr(paths, "FACTS_DIR", v / "knowledge" / "facts", raising=False)
-    import facts.correct as correct
+    from facts import correct
 
     monkeypatch.setattr(correct, "FACTS_DIR", v / "knowledge" / "facts", raising=False)
 
@@ -264,7 +262,7 @@ def test_main_suggest_only(tmp_path: Path, monkeypatch, capsys):
             "knowledge/projects/veltary.md": _page("Veltary"),
         },
     )
-    import core.paths as paths
+    from core import paths
 
     monkeypatch.setattr(paths, "KNOWLEDGE_DIR", v / "knowledge", raising=False)
     monkeypatch.setattr(paths, "ROOT_DIR", v, raising=False)
@@ -285,7 +283,7 @@ def test_main_merge_subcommand_dry_run(tmp_path: Path, monkeypatch, capsys):
             "knowledge/people/drop.md": _page("Drop"),
         },
     )
-    import core.paths as paths
+    from core import paths
 
     monkeypatch.setattr(paths, "KNOWLEDGE_DIR", v / "knowledge", raising=False)
     monkeypatch.setattr(paths, "ROOT_DIR", v, raising=False)
@@ -309,7 +307,7 @@ def test_main_merge_dry_run_after_subcommand(tmp_path: Path, monkeypatch):
             "knowledge/people/drop.md": _page("Drop"),
         },
     )
-    import core.paths as paths
+    from core import paths
 
     monkeypatch.setattr(paths, "KNOWLEDGE_DIR", v / "knowledge", raising=False)
     monkeypatch.setattr(paths, "ROOT_DIR", v, raising=False)

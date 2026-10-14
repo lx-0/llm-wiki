@@ -58,10 +58,11 @@ import hashlib
 import logging
 import re
 import time
+from collections.abc import Iterator
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any
 
 import yaml
 
@@ -403,7 +404,7 @@ class _DriveClient:
         for attempt in (1, 2):
             try:
                 r = self.session.get(url, params=params, timeout=self.timeout_s)
-            except Exception as e:  # noqa: BLE001  network layer — requests/urllib3
+            except Exception as e:
                 if attempt == 2:
                     raise GmeetAPIError(
                         f"network failure on GET {url}: {type(e).__name__}: {e}"
@@ -1079,7 +1080,7 @@ class GmeetCollector:
                 if re.match(r"^\d{4}-\d{2}-\d{2}$", date_prefix):
                     rollup_line = f"- **gmeet** · {_meeting_title(first_name)} → [[{target.stem}]]"
                     _daily_capture.append(date_prefix, "meetings", rollup_line)
-            except Exception:  # noqa: BLE001
+            except Exception:
                 log.exception("daily-rollup append failed for gmeet meeting %s", key)
 
             # Register the newly-written file in the sibling_map so a later
@@ -1163,13 +1164,13 @@ class GmeetCollector:
         body.setdefault("account_id", acct.account_id)
         try:
             reader = resolve_reader(body)
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             log.warning("GmeetCollector[%s]: email reader resolve failed: %s", acct.account_id, e)
             return [], "email: reader-resolve error"
         if reader is None:
             return [], "email: no reader configured"
 
-        since = datetime.now(timezone.utc) - timedelta(days=acct.email_backfill_days)
+        since = datetime.now(UTC) - timedelta(days=acct.email_backfill_days)
         senders = tuple(s.lower() for s in acct.email_senders)
         doc_ids: list[str] = []
         seen: set[str] = set()
@@ -1186,7 +1187,7 @@ class GmeetCollector:
         except MailboxReadError as e:
             log.warning("GmeetCollector[%s]: email scan failed: %s", acct.account_id, e)
             return [], f"email-scan failed: {e}"
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             log.exception("GmeetCollector[%s]: email scan crashed", acct.account_id)
             return [], f"email-scan error: {type(e).__name__}"
 

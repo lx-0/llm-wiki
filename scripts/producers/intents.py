@@ -34,9 +34,8 @@ from claude_agent_sdk import (
 
 from core.config import CONFIG
 from core.paths import ROOT_DIR, STATE_DIR
-from core.prompts import render, prompt_model
+from core.prompts import prompt_model, render
 from core.sdk_helpers import StderrCapture, log_sdk_failure
-
 from intents import Intent, dispatch
 
 from .base import Producer, ProducerResult, ProducerSpec, register
@@ -147,7 +146,7 @@ class IntentsProducer:
                     for block in message.content:
                         if hasattr(block, "text") and block.text:
                             result_text = block.text
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             log_sdk_failure(
                 log,
                 label="intent_classify",
@@ -227,7 +226,7 @@ class IntentsProducer:
         intent = Intent(kind=kind, summary=summary, source=rel_path, confidence=confidence)
         try:
             res = dispatch(intent)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             log.exception("IntentsProducer dispatch failed for %s", rel_path)
             return ProducerResult(
                 producer=self.SPEC.name,

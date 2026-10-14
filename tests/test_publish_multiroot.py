@@ -15,7 +15,7 @@ from publish.corpus import (
     map_slugs,
     migrate_manifest_layout,
 )
-from publish.delta import plan_delta, record_published
+from publish.delta import plan_delta
 
 
 def _vault(tmp_path: Path) -> Path:

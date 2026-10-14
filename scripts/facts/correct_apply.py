@@ -29,6 +29,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from claude_agent_sdk import query
 
 from core import frontmatter
+from core.config import CONFIG
+from core.links import (
+    WIKILINK_RE,
+    rename_article,
+    resolve_link,
+    strip_table_escape,
+)
+from core.ollama_client import parse_json_lenient
 from core.paths import (
     CONCEPTS_DIR,
     DAILY_DIR,
@@ -38,17 +46,9 @@ from core.paths import (
     LOG_FILE,
     ROOT_DIR,
 )
+from core.prompts import render
+from core.sdk_helpers import SdkCallSpec, WriteScope, run_sdk_query
 from core.utils import now_iso, today_iso
-from core.config import CONFIG  # noqa: E402
-from core.prompts import render  # noqa: E402
-from core.sdk_helpers import SdkCallSpec, WriteScope, run_sdk_query  # noqa: E402
-from core.ollama_client import parse_json_lenient  # noqa: E402
-from core.links import (  # noqa: E402
-    WIKILINK_RE,
-    rename_article,
-    resolve_link,
-    strip_table_escape,
-)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -125,7 +125,7 @@ def _execute_renames(actions: dict, vault: Path) -> list:
                 counts["articles_rewritten"],
             )
             executed.append(entry)
-        except Exception as exc:  # noqa: BLE001 — a bad rename must not abort the run
+        except Exception as exc:
             log.warning("rename failed %s → %s: %s", entry["from"], entry["to"], exc)
     return executed
 

@@ -92,7 +92,7 @@ def test_compile_source_happy_path(vault, monkeypatch: pytest.MonkeyPatch):
     src = raw / "x.md"
     src.write_text("tiny content", encoding="utf-8")
 
-    async def fake_query(*, prompt, options):  # noqa: ARG001
+    async def fake_query(*, prompt, options):
         yield _result_message(result="# Compiled\n\nbody", cost=0.0042)
 
     monkeypatch.setattr(cs_mod, "query", fake_query)
@@ -140,7 +140,7 @@ def test_compile_source_kind_unknown_on_long_context(
 
     # Bypass the elapsed-time-based classifier — return kind=unknown
     # regardless of how fast the simulated crash arrived.
-    import core.sdk_helpers as sdk_helpers
+    from core import sdk_helpers
     from core.sdk_helpers import FailureClass
 
     monkeypatch.setattr(
@@ -152,7 +152,7 @@ def test_compile_source_kind_unknown_on_long_context(
         ),
     )
 
-    async def crashing_query(*, prompt, options):  # noqa: ARG001
+    async def crashing_query(*, prompt, options):
         raise RuntimeError("Command failed with exit code 1")
         yield  # pragma: no cover
 
@@ -176,9 +176,10 @@ def test_compile_source_kind_unknown_on_long_context(
 def test_compile_source_max_turns_returns_skipped(vault, monkeypatch: pytest.MonkeyPatch):
     """ResultMessage(is_error=True, subtype=error_max_turns) lands as
     skip_reason=max_turns_exhausted (mirrors legacy compile_file)."""
+    from claude_agent_sdk import ResultMessage
+
     from compile_stages import compile as cs_mod
     from compile_stages.compile import compile_source
-    from claude_agent_sdk import ResultMessage
 
     _, raw = vault
     src = raw / "loop.md"
@@ -195,7 +196,7 @@ def test_compile_source_max_turns_returns_skipped(vault, monkeypatch: pytest.Mon
         0,
     )
 
-    async def max_turns_query(*, prompt, options):  # noqa: ARG001
+    async def max_turns_query(*, prompt, options):
         # Yield a structured error ResultMessage, then raise — mirrors the
         # bundled CLI's exit-1 behavior on subtype=error_max_turns. The
         # _attempt body reclassifies from final_result, not the exception.
@@ -241,7 +242,7 @@ def test_compile_source_prompt_too_large_before_sdk(vault, monkeypatch: pytest.M
 
     sdk_called = {"flag": False}
 
-    async def should_not_run(*, prompt, options):  # noqa: ARG001
+    async def should_not_run(*, prompt, options):
         sdk_called["flag"] = True
         yield _result_message()
 
@@ -280,7 +281,7 @@ def test_compile_source_generic_exception_returns_failed(vault, monkeypatch: pyt
         10_000_000,
     )
 
-    async def boom_query(*, prompt, options):  # noqa: ARG001
+    async def boom_query(*, prompt, options):
         raise RuntimeError("network unreachable")
         yield  # pragma: no cover
 

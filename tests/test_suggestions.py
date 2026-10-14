@@ -9,12 +9,7 @@ exercise the YAML round-trip + the resolver's name/stem/substring chain.
 
 from __future__ import annotations
 
-import json
-from pathlib import Path
-
 import pytest
-import yaml
-
 
 # ── producer._is_email_source ───────────────────────────────────────
 
@@ -44,8 +39,9 @@ def test_is_email_source(path: str, expected: bool) -> None:
 
 def test_maybe_generate_suggestions_skips_non_email_source(tmp_path, monkeypatch):
     """The function should short-circuit before any SDK / disk side effects."""
-    from suggestions import producer
     import asyncio
+
+    from suggestions import producer
 
     # Stub anything that would fire if the gate were broken.
     monkeypatch.setattr(
@@ -66,8 +62,9 @@ def test_maybe_generate_suggestions_skips_non_email_source(tmp_path, monkeypatch
 
 def test_maybe_generate_suggestions_dry_run_for_email_source(tmp_path, monkeypatch):
     """Email source + dry_run=True → log only, no SDK call."""
-    from suggestions import producer
     import asyncio
+
+    from suggestions import producer
 
     monkeypatch.setattr(producer, "ROOT_DIR", tmp_path)
     monkeypatch.setattr(producer, "RAW_SUGGESTIONS_DIR", tmp_path / "raw" / "suggestions")

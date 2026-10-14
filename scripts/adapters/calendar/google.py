@@ -24,8 +24,9 @@ from __future__ import annotations
 
 import logging
 import time
+from collections.abc import Iterator
 from dataclasses import dataclass
-from typing import Any, Iterator
+from typing import Any
 
 log = logging.getLogger(__name__)
 
@@ -60,7 +61,7 @@ class GoogleCalendarClient:
         for attempt in (1, 2):
             try:
                 r = self.session.get(url, params=params, timeout=self.timeout_s)
-            except Exception as e:  # noqa: BLE001 — requests / urllib3 network layer
+            except Exception as e:
                 if attempt == 2:
                     raise CalendarAPIError(
                         f"network failure on GET {url}: {type(e).__name__}: {e}"

@@ -13,9 +13,6 @@ helpers and the prompt; the SDK orchestration is covered by tests/test_compile_l
 
 from __future__ import annotations
 
-import pytest
-
-
 # ── Frontmatter helpers ──────────────────────────────────────────────
 
 
@@ -151,15 +148,16 @@ class TestCompileMainPromptSourceAndFinal:
 
 class TestDispatchSanity:
     def test_compile_file_is_async_callable(self):
-        from compile import compile_file
         import inspect
+
+        from compile import compile_file
 
         assert inspect.iscoroutinefunction(compile_file)
 
     def test_compile_module_imports_infer_compile_role(self):
         # Smoke: the import line lives inside compile_file's body in a local
         # import. Verify the module itself is importable.
-        from core.compile_role import infer_compile_role, VALID_ROLES
+        from core.compile_role import VALID_ROLES
 
         assert "source-and-final" in VALID_ROLES
         assert "final-only" in VALID_ROLES

@@ -59,7 +59,7 @@ def _read_frontmatter(path: Path) -> dict:
 
         data = yaml.safe_load(m.group(1))
         return data if isinstance(data, dict) else {}
-    except Exception as e:  # noqa: BLE001 — file skipped, but a bad frontmatter must log
+    except Exception as e:
         log.warning("frontmatter parse failed for %s: %s", path, e)
         return {}
 

@@ -131,7 +131,7 @@ def test_replace_section_independent_of_other_sources(vault):
 
 def test_known_sources_contains_phase_1_set():
     # Phase 1 wires these five sources; new sources require explicit allow-list extension.
-    assert daily_capture.KNOWN_SOURCES >= {"sessions", "health", "meetings", "voice", "email"}
+    assert {"sessions", "health", "meetings", "voice", "email"} <= daily_capture.KNOWN_SOURCES
 
 
 # ── fcntl locking (best-effort smoke test) ──────────────────────────
@@ -236,7 +236,7 @@ def test_replace_block_concurrent_writers_lose_no_blocks(vault):
             # a second fire of the SAME session (Codex Stop-per-turn) must
             # replace in place, not append — exercises the replace path too.
             daily_capture.replace_block(date_iso, "sessions", begin, end, block_v2)
-        except BaseException as exc:  # noqa: BLE001
+        except BaseException as exc:
             errors.append(exc)
 
     threads = [threading.Thread(target=worker, args=(i,)) for i in range(n)]

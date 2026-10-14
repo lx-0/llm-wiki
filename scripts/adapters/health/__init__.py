@@ -5,7 +5,7 @@ drop-folder (Phase 2) and Health Auto Export (Phase 3) deferred per
 .ytstack/AD-HOC-health-phase-1-PLAN.md.
 """
 
-from adapters.health.oura import (  # noqa: F401  re-export public API
+from adapters.health.oura import (
     DailySummary,
     OuraAPIError,
     OuraClient,

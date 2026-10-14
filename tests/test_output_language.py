@@ -18,7 +18,6 @@ import pytest
 
 from core.prompts import build_output_language_instruction, render
 
-
 # Every substrate prompt the central compile render passes the placeholder to.
 # All must carry `${output_language_instruction}` (else render() raises) and
 # must render byte-identically in auto mode (placeholder → "").

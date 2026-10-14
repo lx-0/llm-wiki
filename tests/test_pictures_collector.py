@@ -15,7 +15,6 @@ test.
 from __future__ import annotations
 
 import importlib
-from unittest import mock
 
 import pytest
 
@@ -28,8 +27,8 @@ def pictures_env(tmp_path, monkeypatch):
     vault_raw = tmp_path / "vault" / "raw"
     vault_raw.mkdir(parents=True)
 
-    from core.config import CONFIG
     from core import paths as paths_mod
+    from core.config import CONFIG
 
     monkeypatch.setattr(CONFIG.personal, "picture_inbox", str(inbox))
     monkeypatch.setattr(paths_mod, "RAW_DIR", vault_raw)

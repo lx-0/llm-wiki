@@ -26,10 +26,10 @@ import socket
 import subprocess
 import sys
 import time
+from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
-from typing import Callable
 from urllib.parse import urlparse
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -43,7 +43,6 @@ from core.paths import (
     STATE_FILE,
     WIKI_DIR,
 )
-
 
 log = logging.getLogger(__name__)
 
@@ -996,7 +995,7 @@ def _failed_imports(names: list[str]) -> list[tuple[str, str]]:
         "print(json.dumps(out))\n"
     )
     try:
-        proc = subprocess.run(  # noqa: S603 — argv is engine-derived
+        proc = subprocess.run(
             [sys.executable, "-c", probe, *names],
             capture_output=True,
             text=True,
@@ -1023,7 +1022,7 @@ def check_dependencies_importable(*, quick: bool = False) -> CheckResult:
         )
     try:
         names = _declared_import_names()
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         return _probe_failed("dependencies-importable", "config", exc)
 
     failures = _failed_imports(names)

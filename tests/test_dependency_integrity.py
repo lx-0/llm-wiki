@@ -15,7 +15,7 @@ copy is the "fourth hand registry" mistake that already bit the config loader
 
 from __future__ import annotations
 
-import core.health as health
+from core import health
 
 
 def test_declared_dependencies_all_resolve_to_an_import_name():

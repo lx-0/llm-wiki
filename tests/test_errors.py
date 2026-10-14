@@ -15,9 +15,8 @@ from core.errors import swallow
 
 
 def test_suppresses_exception_and_logs_label_at_warning(caplog):
-    with caplog.at_level(logging.WARNING, logger="core.errors"):
-        with swallow("test-site"):
-            raise ValueError("boom")
+    with caplog.at_level(logging.WARNING, logger="core.errors"), swallow("test-site"):
+        raise ValueError("boom")
     assert len(caplog.records) == 1
     rec = caplog.records[0]
     assert rec.levelno == logging.WARNING
@@ -27,9 +26,8 @@ def test_suppresses_exception_and_logs_label_at_warning(caplog):
 
 
 def test_no_exception_no_log(caplog):
-    with caplog.at_level(logging.DEBUG, logger="core.errors"):
-        with swallow("quiet-site"):
-            pass
+    with caplog.at_level(logging.DEBUG, logger="core.errors"), swallow("quiet-site"):
+        pass
     assert caplog.records == []
 
 
@@ -42,18 +40,16 @@ def test_debug_level_logs_at_debug(caplog):
 
 
 def test_keyboard_interrupt_propagates_unlogged(caplog):
-    with caplog.at_level(logging.DEBUG, logger="core.errors"):
-        with pytest.raises(KeyboardInterrupt):
-            with swallow("interrupt-site"):
-                raise KeyboardInterrupt
+    with caplog.at_level(logging.DEBUG, logger="core.errors"), pytest.raises(KeyboardInterrupt):
+        with swallow("interrupt-site"):
+            raise KeyboardInterrupt
     assert caplog.records == []
 
 
 def test_system_exit_propagates_unlogged(caplog):
-    with caplog.at_level(logging.DEBUG, logger="core.errors"):
-        with pytest.raises(SystemExit):
-            with swallow("exit-site"):
-                raise SystemExit(3)
+    with caplog.at_level(logging.DEBUG, logger="core.errors"), pytest.raises(SystemExit):
+        with swallow("exit-site"):
+            raise SystemExit(3)
     assert caplog.records == []
 
 

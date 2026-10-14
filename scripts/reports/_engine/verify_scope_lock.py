@@ -54,7 +54,7 @@ from pathlib import Path
 # scripts/ on sys.path so `from core.sdk_helpers import ...` resolves.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from claude_agent_sdk import (  # noqa: E402
+from claude_agent_sdk import (
     AssistantMessage,
     ClaudeAgentOptions,
     ResultMessage,
@@ -62,8 +62,7 @@ from claude_agent_sdk import (  # noqa: E402
     query,
 )
 
-from core.sdk_helpers import make_path_scope_gate  # noqa: E402
-
+from core.sdk_helpers import make_path_scope_gate
 
 # The composition under test — must match what S02's `lib/inference.py`
 # and S05's `lib/analyst.py` will use in production.
