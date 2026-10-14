@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-14T22:00:00+02:00
+last_updated: 2026-10-14T22:40:00+02:00
 current_milestone: M033
-active_slice: S01
-active_task: T05
+active_slice: none
+active_task: none
 last_completed_milestone: M032
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -32,8 +32,12 @@ order (verified == HEAD), four dead `compile.load_state` test patches removed. R
 `All checks passed!` (pass A: 110 scoped unsafe fixes reviewed per hunk, one semantic
 trap caught by the suite and reverted — `mailbox.Mailbox` iterates messages, not keys;
 pass B: 23 explicit `check=False`, renames, two never-asserting tests fixed, nine coded
-`noqa` with reasons, N806 ignored / RUF012 under tests). Suite 2030 green. Next: T05 —
-ruff in pre-commit + `ci.yml` running both suites (`plan-task`).
+`noqa` with reasons, N806 ignored / RUF012 under tests). **S01 COMPLETE (5/5)** — T05:
+`ci.yml` (engine: uv + ruff + pytest; desktop: node 22 + npm test + biome) green on
+`origin/main` at `985a620` (run 38604746805 — the suite's first run off the dev Mac; it
+found one macOS-only assertion, fixed), ruff hooks in pre-commit, `lint` dependency
+group pins ruff 0.16.10, README/AGENTS gates paragraph. Next: `reassess-roadmap` for
+S01, then S02 (`scripts/` as a package) via `plan-task`.
 
 ## M032 COMPLETE (L, 2026-10-14): desktop de-slop
 

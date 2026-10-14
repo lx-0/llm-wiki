@@ -2766,6 +2766,24 @@ Per-candidate learnings from the 14-candidate seam arc (C01–C14). Decisions li
   `next(iter(x))` are only equivalent for real dicts / iterables of the same thing — run
   `--unsafe-fixes` scoped by `--select`, read the diff per hunk, and pin a deliberate
   exception with `# noqa: <code>  reason` so the next pass cannot redo it.
+- **Tools that pass paths explicitly ignore `exclude` (M033-S01-T05):** pre-commit (and
+  editors) hand ruff the file list; ruff's `exclude` / `format.exclude` only filter
+  *discovered* files, so the hand-formatted `config_schema.py` would be reformatted by the
+  hook anyway. `[tool.ruff] force-exclude = true` makes the config win for explicit paths
+  too; the hook additionally carries its own `exclude:` so the intent is visible where the
+  hook is.
+- **`end-of-file-fixer` over the whole tree is not free (M033-S01-T05):** the hook only
+  ever ran on staged files; `--all-files` trimmed the trailing blank lines of the vault
+  templates (`templates/Templates/TPL *.md` — Obsidian inserts them verbatim, the blank
+  lines are the template's shape) and added newlines to Excalidraw JSON the app rewrites
+  without one. Hook now excludes `templates/` and `docs/*.excalidraw`. Rule: a hygiene hook
+  applied to seeded / tool-owned files is a behaviour change for the operator.
+- **A test that passes only on the dev Mac is a Linux CI failure waiting (M033-S01-T05):**
+  `st_birthtime` exists on macOS / BSD only; the folder-index renderer documents "`created`
+  omitted on platforms without it" and the test asserted the macOS branch. Assert the
+  platform's branch (`hasattr(os.stat(p), "st_birthtime")`), never the machine's. The
+  first CI run is the audit for this class — read every red test there as "which OS did
+  this assume".
 - **`ruff format` + a text-reading generator = lost content (M033-S01-T02):**
   `core/config_docs.py` builds `docs/config.md` from the field comments in
   `core/config_schema.py`; the formatter wraps long field lines and moves the trailing
