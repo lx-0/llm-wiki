@@ -40,7 +40,7 @@ const SURFACES = [
       'empty',
       'library-open',
       'health-open',
-      'capture-open',
+      'paused',
       'run-progress',
       'run-done',
       'sources-open',
@@ -55,7 +55,7 @@ const SURFACES = [
   {
     page: 'onboarding',
     w: 460,
-    h: 700,
+    h: 480,
     schemes: ['light', 'dark'],
     states: ['default', 'no-access', 'empty'],
     settle: 1000,
@@ -63,7 +63,7 @@ const SURFACES = [
   {
     page: 'settings',
     w: 400,
-    h: 400,
+    h: 320,
     schemes: ['light', 'dark'],
     states: ['default', 'no-access'],
     settle: 1000,
@@ -88,7 +88,6 @@ const FIXTURE_FOR = {
   failed: 'default',
   'library-open': 'default',
   'health-open': 'default',
-  'capture-open': 'default',
   'run-done': 'default',
   'sources-open': 'default',
   'tools-open': 'default',
@@ -124,7 +123,6 @@ const STATE_SCRIPTS = {
   })()`,
   'library-open': openTile(0),
   'health-open': openTile(1),
-  'capture-open': openTile(2),
   'run-progress': `(async () => {
     window.__shots.fire('runProgress', { id: 'process-inbox', progress: { current: 2, total: 3 } });
     ${wait(400)}
@@ -178,6 +176,23 @@ async function shoot(surface, scheme, state, index) {
     errors.push(`state script ${state}: ${error.message}`);
   }
 
+  // Where the content actually ends — the lowest edge of any text, control or graphic — so a
+  // fixed window can be sized to its content instead of shipping half a screen of nothing.
+  // (scrollHeight would just echo the window on 100vh layouts.)
+  let contentHeight = null;
+  try {
+    contentHeight = Math.ceil(
+      await wc.executeJavaScript(
+        `Math.max(0, ...[...document.body.querySelectorAll('*')]
+          .filter((el) => el.matches('button, input, svg, img') || [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim()))
+          .map((el) => el.getBoundingClientRect().bottom))`,
+        true,
+      ),
+    );
+  } catch {
+    contentHeight = null;
+  }
+
   let height = null;
   if (surface.panel) {
     const heights = await wc.executeJavaScript('window.__shots.heights()', true);
@@ -198,7 +213,7 @@ async function shoot(surface, scheme, state, index) {
     errors.push(`layout audit: ${error.message}`);
   }
   win.destroy();
-  return { file, height, errors, layout };
+  return { file, height, contentHeight, errors, layout };
 }
 
 async function main() {
@@ -217,6 +232,7 @@ async function main() {
     layout: {},
     layoutFailures: {},
     heightFailures: {},
+    contentHeights: {},
     files: [],
   };
   let index = 0;
@@ -227,6 +243,7 @@ async function main() {
         const result = await shoot(surface, scheme, state, index);
         report.files.push(result.file);
         if (result.height != null) report.panelHeights[`${scheme}-${state}`] = result.height;
+        if (result.contentHeight != null) report.contentHeights[result.file] = result.contentHeight;
         if (result.errors.length) report.errors[result.file] = result.errors;
         report.layout[result.file] = result.layout;
         const failures = layoutFailures(STRICT_PAGES, surface.page, result.layout);

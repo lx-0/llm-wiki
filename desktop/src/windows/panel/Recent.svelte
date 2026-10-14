@@ -1,5 +1,6 @@
 <script lang="ts">
   import { fmtAgo } from '../../lib/time';
+  import { tip } from '../../ui/tip';
   import TypeBadge from '../../ui/TypeBadge.svelte';
   import { isNew } from './sections';
   import { panel } from './store.svelte';
@@ -13,7 +14,11 @@
     <div class="card">
       {#each recent as entry (entry.file)}
         <button class="entry" title="Open in Obsidian" onclick={() => window.vault.openFile(entry.file)}>
-          <span class="dot" class:new={isNew(entry, panel.recentSeenMs)}></span>
+          {#if isNew(entry, panel.recentSeenMs)}
+            <span class="dot new" role="img" use:tip={'New since you last looked'}></span>
+          {:else}
+            <span class="dot" aria-hidden="true"></span>
+          {/if}
           <TypeBadge kind={entry.type} />
           <span class="title">{entry.title}</span>
           <span class="ago num">{fmtAgo(entry.mtimeMs)}</span>

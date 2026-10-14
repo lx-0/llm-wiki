@@ -22,7 +22,7 @@ Output schema (stdout, one line) — `schema` is `core.actions.SCHEMA`:
       "suggestions": [
         {"key": "1", "id": "process-inbox", "count": 3,
          "label": "3 files in inbox/",            # operator terms (TUI)
-         "title": "3 new captures to sort",       # plain English (GUI, agents)
+         "title": "3 new files to sort into your library",  # plain English (GUI, agents)
          "verb": "Sort", "group": "do", "argv": ["process-inbox"], "priority": 1},
         ...
       ],

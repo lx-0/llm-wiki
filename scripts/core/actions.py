@@ -33,12 +33,12 @@ BASH_OWNED_COMMANDS = frozenset(
 #: ``dispatch_args``). An unknown command renders as the neutral "Run".
 VERB_BY_COMMAND: dict[str, str] = {
     "setup": "Set up",
-    "hooks": "Install",
+    "hooks": "Set up",
     "install-shortcut": "Install",
     "update": "Update",
     "compile": "Add",
     "process-inbox": "Sort",
-    "reindex": "Rebuild",
+    "reindex": "Fix",
     "dream": "Refresh",
     "dream-entity": "Refresh",
     "links": "Fix",
@@ -93,12 +93,14 @@ def _spec(
 
 
 _SPECS: tuple[ActionSpec, ...] = (
+    # "library" is the operator-facing noun everywhere (welcome, settings, panel) — never
+    # "wiki" or "vault"; "files" not "captures", which collides with screen/audio capture.
     _spec("process-inbox", "Sort", "do", ["process-inbox"],
-          "{n} new capture to sort", "{n} new captures to sort"),
+          "{n} new file to sort into your library", "{n} new files to sort into your library"),
     _spec("compile", "Add", "do", ["compile"],
-          "{n} new source to add to your wiki", "{n} new sources to add to your wiki"),
+          "{n} new item to add to your library", "{n} new items to add to your library"),
     _spec("curiosity-folder", "Review", "review", ["curiosity", "--type", "folder-deep-scan"],
-          "{n} document scan to review", "{n} document scans to review"),
+          "{n} folder-scan request to review", "{n} folder-scan requests to review"),
     _spec("curiosity-email", "Explore", "auto", ["curiosity", "--type", "email-deep-scan"],
           "{n} email scan pending", "{n} email scans pending"),
     _spec("suggestions", "Run", "do", ["suggestions"],
@@ -106,7 +108,7 @@ _SPECS: tuple[ActionSpec, ...] = (
     _spec("dream-sweep", "Refresh", "auto", ["dream", "--all-entities"],
           "{n} page needs refreshing", "{n} pages need refreshing", tool=True),
     _spec("flush", "Save", "do", ["flush"],
-          "Save today's session to your wiki"),
+          "Save today's AI chat to your library"),
     _spec("lint", "Check", "auto", ["lint", "--structural-only"],
           "Notes changed since the last health check", tool=True),
     # Tools stay non-destructive and $0: `links` reports, `dedup --suggest-only` never merges.

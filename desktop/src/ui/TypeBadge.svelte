@@ -15,6 +15,8 @@
   .badge {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
+    min-width: 66px; /* one column width for every kind, so titles beside badges line up */
     height: 18px;
     padding: 0 var(--space-2);
     border-radius: 9px;

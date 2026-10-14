@@ -204,7 +204,10 @@ def check_hooks_installed() -> CheckResult:
             category="config",
             severity="warning",
             message="no wiki hooks installed in user or project scope — session capture won't fire",
-            title="Session capture isn't installed",
+            # "AI assistant chats", never "session capture": the GUI shows this next to the
+            # screen/audio capture state, and the two must not read as one thing; "session"
+            # alone meant nothing to a first-run reader either (blind panel, 2026-10-15).
+            title="AI chats aren't being saved",
             fix="wiki hooks install",
             dispatch_args=["hooks", "install"],
         )
@@ -267,8 +270,13 @@ def check_ollama_reachable(*, quick: bool = False) -> CheckResult:
                 id="ollama-reachable",
                 category="connectivity",
                 severity="warning",
-                message=f"ollama unreachable at {url}",
-                fix=f"check Ollama is running; or `wiki config set models.ollama_url ''` to disable",
+                message=(f"ollama unreachable at {url} "
+                         f"(to turn local AI off: `wiki config set models.ollama_url ''`)"),
+                # The GUI shows title + fix; the fix is the one plain action, the config
+                # alternative stays in the message for the TUI — a shell command in a GUI
+                # hint read as "this app will turn into a terminal" (blind panel, 2026-10-15).
+                title="The local AI helper (Ollama) isn't reachable",
+                fix=f"start Ollama on {host}",
                 details={"url": url},
             )
     except Exception as exc:
@@ -1188,7 +1196,7 @@ def check_index_drift(
             message=(f"knowledge/index.md drift: {stats.get('deduped', 0)} duplicate / "
                      f"{stats.get('dropped_dangling', 0)} dangling / "
                      f"{stats.get('appended', 0)} missing row(s)"),
-            title="The note index is out of sync",
+            title="Your note list is out of date",
             fix="wiki reindex",
             dispatch_args=["reindex"],
         )
@@ -1361,7 +1369,7 @@ def check_flush_pipeline() -> CheckResult:
                 f"{spawns_since_ok} spawned since, {archived} archived; "
                 f"last failure: {cause}"
             ),
-            title="Session capture has stalled",
+            title="Saving your AI chats has stalled",
             fix=fix, dispatch_args=dispatch, details=details,
         )
     if archived:
@@ -1371,7 +1379,7 @@ def check_flush_pipeline() -> CheckResult:
                 f"{archived} archived flush context(s) awaiting retry "
                 f"(last successful flush {since})"
             ),
-            title=f"{archived} captured session{'s' if archived != 1 else ''} waiting to retry",
+            title=f"{archived} AI chat{'s' if archived != 1 else ''} waiting to be saved",
             fix="drains via the retry_failed_flushes piggyback after the next "
                 "successful flush or `wiki compile`",
             details=details,

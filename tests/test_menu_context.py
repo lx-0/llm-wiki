@@ -153,7 +153,7 @@ def test_suggestions_carry_catalogue_vocabulary(fake_vault):
     by_id = {r["id"]: r for r in menu_context.build_suggestions()}
     inbox = by_id["process-inbox"]
     assert inbox["count"] == 3
-    assert inbox["title"] == "3 new captures to sort"
+    assert inbox["title"] == "3 new files to sort into your library"
     assert inbox["verb"] == "Sort"
     assert inbox["argv"] == ["process-inbox"]
     assert inbox["label"] == "3 files in inbox/"

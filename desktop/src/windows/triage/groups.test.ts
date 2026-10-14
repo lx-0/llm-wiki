@@ -60,7 +60,7 @@ describe('metaLine', () => {
 
   it('names the file instead of a date folder for daily captures', () => {
     expect(metaLine(rec({ source: 'daily/2026-10-13/sessions.md', date: '2026-10-13' }))).toBe(
-      'from sessions · 13 Oct',
+      'from an AI chat · 13 Oct',
     );
   });
 });

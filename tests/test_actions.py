@@ -19,14 +19,14 @@ def test_schema_version_is_two():
 
 def test_titles_pluralize_on_count():
     spec = get("process-inbox")
-    assert spec.title(1) == "1 new capture to sort"
-    assert spec.title(3) == "3 new captures to sort"
+    assert spec.title(1) == "1 new file to sort into your library"
+    assert spec.title(3) == "3 new files to sort into your library"
 
 
 def test_countless_titles_ignore_the_count():
     spec = get("flush")
-    assert spec.title(None) == "Save today's session to your wiki"
-    assert spec.title(5) == "Save today's session to your wiki"
+    assert spec.title(None) == "Save today's AI chat to your library"
+    assert spec.title(5) == "Save today's AI chat to your library"
 
 
 def test_ids_are_unique_and_equal_their_keys():
@@ -54,7 +54,7 @@ def test_verb_for_matches_exact_argv_before_falling_back_by_command():
     assert verb_for(["links", "--fix", "--yes"]) == "Fix"
     assert verb_for(["gmail-auth", "gmail-personal"]) == "Sign in"
     assert verb_for(["setup"]) == "Set up"
-    assert verb_for(["reindex"]) == "Rebuild"
+    assert verb_for(["reindex"]) == "Fix"
 
 
 def test_verb_for_unknown_command_is_run():

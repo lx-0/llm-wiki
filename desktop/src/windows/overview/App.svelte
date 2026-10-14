@@ -59,16 +59,23 @@
     };
   });
   const health = $derived(healthSummary(doctor));
+  // Same order as the panel's Next up — critical first — so position carries urgency for a
+  // reader who cannot tell the two dot colours apart.
+  const SEVERITY_RANK: Record<string, number> = { critical: 0, warning: 1 };
+  const checks = $derived(
+    [...(doctor?.checks ?? [])].sort((a, b) => (SEVERITY_RANK[a.severity] ?? 2) - (SEVERITY_RANK[b.severity] ?? 2)),
+  );
+  // Doctor rows live in the Health card above; Next up here is the engine's counted work only,
+  // so nothing appears twice on one screen.
   const actions = $derived(
     withRunState(
-      nextUp(
-        mergeActions({ doctor: doctor?.checks ?? [], menu: menu?.suggestions ?? [], tools: menu?.tools ?? [] }),
-        NEXT_UP_MAX,
-      ),
+      nextUp(mergeActions({ doctor: [], menu: menu?.suggestions ?? [], tools: menu?.tools ?? [] }), NEXT_UP_MAX),
       run.key,
       run.results,
     ),
   );
+  const dispatchable = (check: { dispatchArgs?: string[] }, key: string): boolean =>
+    Boolean(check.dispatchArgs?.length) && !/auth/.test(key);
   const runKey = (argv: string[] | undefined): string => (argv ?? []).join(' ');
 
   async function loadAll(): Promise<void> {
@@ -211,12 +218,17 @@
             {#if doctor && doctor.checks.length === 0 && !doctor.updateAvailable}
               <div class="row"><span class="grow">Everything healthy</span></div>
             {/if}
-            {#each doctor?.checks ?? [] as check (check.id)}
+            {#each checks as check (check.id)}
               {@const key = runKey(check.dispatchArgs)}
               <div class="row">
                 <span class="sev {check.severity}" role="img" aria-label={check.severity}></span>
-                <span class="grow" title={check.message}>{check.title}</span>
-                {#if check.dispatchArgs?.length && !/auth/.test(key)}
+                <span class="grow">
+                  <span title={check.message}>{check.title}</span>
+                  {#if !dispatchable(check, key) && check.fix}
+                    <span class="sub-line">{check.fix}</span>
+                  {/if}
+                </span>
+                {#if dispatchable(check, key)}
                   {#if run.key === key}
                     <span class="muted">…</span>
                   {:else if run.results.has(key)}
@@ -224,15 +236,13 @@
                   {:else}
                     <Button size="s" disabled={busy} onclick={() => void runAction(check.dispatchArgs ?? [])}>{check.verb ?? 'Fix'}</Button>
                   {/if}
-                {:else if check.fix}
-                  <code class="fix">{check.fix}</code>
                 {/if}
               </div>
             {/each}
             {#if doctor?.updateAvailable}
               <div class="row">
                 <span class="grow">App update available</span>
-                <Button size="s" variant="primary" disabled={busy} onclick={() => void runAction(['update'])}>Update app</Button>
+                <Button size="s" disabled={busy} onclick={() => void runAction(['update'])}>Update app</Button>
               </div>
             {/if}
           </div>
@@ -387,7 +397,7 @@
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: var(--space-3);
-    align-items: start;
+    align-items: stretch; /* cards in a row meet at the bottom */
   }
   .chart {
     margin: 0;
@@ -482,8 +492,8 @@
     background: var(--danger-soft);
     color: var(--danger);
   }
-  .fix {
-    font-family: var(--font-mono);
+  .sub-line {
+    display: block;
     font-size: var(--fs-xs);
     color: var(--text-muted);
   }

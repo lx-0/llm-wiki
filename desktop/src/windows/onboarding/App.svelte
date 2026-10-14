@@ -13,6 +13,8 @@
   let loginItem = $state(false);
   let loaded = $state(false);
 
+  const shortPath = $derived(vault ? vault.path.replace(/^\/Users\/[^/]+/, '~') : '');
+
   async function loadVault(): Promise<void> {
     vault = await window.vault.status();
   }
@@ -50,7 +52,12 @@
 
   <section class="card">
     <div class="row">
-      <span class="grow">Your library</span>
+      <span class="grow">
+        Your library
+        {#if vault}
+          <span class="sub">The Obsidian vault at {shortPath}</span>
+        {/if}
+      </span>
       <span class="value num">
         {#if vault}
           <strong>{vault.name}</strong> · {vault.articleCount.toLocaleString()} notes
@@ -74,7 +81,7 @@
       <div class="row">
         <span class="grow">
           Background capture
-          <span class="sub">Records screen, mic and system audio — pause any time from the menu bar.</span>
+          <span class="sub consent">Records your screen, mic and system audio. Pause any time from the menu bar or in Settings.</span>
         </span>
         <Switch bind:checked={capture} label="Background capture" onchange={(v) => void setCapture(v)} />
       </div>
@@ -125,6 +132,10 @@
     margin-top: 2px;
     font-size: var(--fs-s);
     color: var(--text-muted);
+  }
+  /* the one sentence a first-run reader most needs is set in ink, not in caption grey */
+  .sub.consent {
+    color: var(--text);
   }
   .muted {
     color: var(--text-muted);

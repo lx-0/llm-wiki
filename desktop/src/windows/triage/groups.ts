@@ -63,6 +63,27 @@ function sourceFolder(source: string): string {
   return (parts[parts.length - 1] || '').replace(/\.md$/, '');
 }
 
+/** Plain words for the engine's substrate folders — "sessions" is an AI coding session, not
+ *  the screen/audio capture, and a first-run reader cannot know that from the folder name. */
+const SOURCE_NAMES: Record<string, string> = {
+  sessions: 'an AI chat',
+  voice: 'a voice memo',
+  email: 'email',
+  calendar: 'your calendar',
+  gmeet: 'a meeting',
+  screenshots: 'a screenshot',
+  pictures: 'a photo',
+  browser: 'your browser',
+  youtube: 'a video',
+  clippings: 'a clipping',
+  capture: 'screen capture',
+};
+
+function sourceName(source: string): string {
+  const folder = sourceFolder(source);
+  return SOURCE_NAMES[folder] ?? folder;
+}
+
 function shortDate(date: string): string {
   const [, month, day] = date.split('-');
   const name = MONTHS[Number(month) - 1];
@@ -72,7 +93,7 @@ function shortDate(date: string): string {
 /** "from email · 13 Oct", plus the status once the record is resolved. */
 export function metaLine(record: TriageRecord): string {
   return [
-    record.source ? `from ${sourceFolder(record.source)}` : '',
+    record.source ? `from ${sourceName(record.source)}` : '',
     shortDate(record.date),
     record.status !== 'pending' ? record.status : '',
   ]

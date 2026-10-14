@@ -174,7 +174,7 @@ read vault state programmatically without parsing pretty output:
   "suggestions": [
     {"key": "1", "id": "process-inbox", "count": 3,
      "label": "3 files in inbox/",
-     "title": "3 new captures to sort", "verb": "Sort",
+     "title": "3 new files to sort into your library", "verb": "Sort",
      "group": "do", "argv": ["process-inbox"], "priority": 1}
   ],
   "tools": [
@@ -200,7 +200,7 @@ maintenance actions that are available without a pending count.
   "checks": [
     {"id": "hooks-installed", "category": "config", "severity": "warning",
      "message": "no wiki hooks installed in user or project scope — session capture won't fire",
-     "title": "Session capture isn't installed", "verb": "Install",
+     "title": "AI chats aren't being saved", "verb": "Set up",
      "fix": "wiki hooks install", "dispatch_args": ["hooks", "install"],
      "details": null}
   ]

@@ -1,7 +1,7 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-15T06:25:00+02:00
+last_updated: 2026-10-14T17:40:00+02:00
 current_milestone: M032
 active_slice: S05
 active_task: none
@@ -27,7 +27,7 @@ footer (Add link inline, Sources / Tools as popovers over the content, Quit); T0
 `index.html` mounts the Svelte panel, `renderer.ts` + `panel.html` deleted, `index.css` 1,661
 → 755 lines (cockpit/atlas only, proven by computed-style fingerprint), harness `index` strict
 + rest-height gate ≤ 640 (seen firing), `npm run package` green. Fresh panel 639 px, 50
-captures clean. Reassess after S04 (2026-10-15): **A — proceed as planned** (nothing in S04
+captures clean. Reassess after S04 (2026-10-14): **A — proceed as planned** (nothing in S04
 moved S05's scope; the popover pattern + `[data-layer]` audit rule and the rest-height gate
 are tools S05 inherits). S05 re-sliced to 5 tasks (the 24 h capture timeline needs its own
 data source), then to 6 (the Overview window split: scaffold + first chart, then the rest).
@@ -37,8 +37,20 @@ sqlite); T02 Overview window shipped (nav → `openOverview`, hero + stat tiles,
 validated ordinal `--heat-*` ramp, health rows with verbs, next up, Charts | Table twin; 60
 captures clean); T04 Cockpit + Atlas deleted with `index.css`, `lib/types.ts` and their IPC —
 seven renderer pages, 58 captures all strict, theme-aware window chrome, biome 0 / 0 for the
-first time. S05 4/6. Next task: T05 blind synthetic learnability panel + one fix round +
-`npm run dmg` via `plan-task`; then T06 closeout. vitest 112 + pytest 2024 green.
+first time. S05 5/6. T05 closed passed-with-caveats — blind synthetic learnability panel
+(7 personas, first-run order, quiz + 1–10 confidence; record in
+`reviews/2026-10-14-desktop-learnability-panel.md`): novice mean 5.7 before fixes, **6.3
+after two fix rounds (Sam 6 / Nova 7 / Mateo 6) — exit criterion 8 (≥ 8/10) NOT met**. The
+one quiz question all seven missed (how to stop the recording) is answered by all now: the
+capture tile is a visible Pause / Resume control with a red dot, Settings has a capture
+switch, the welcome names what is recorded and where to pause it, engine titles carry plain
+verbs (`health.py` / `actions.py`), the 42 vs 2,024 fixture contradiction is gone. Remaining
+blockers, for the operator: the Ollama Health row counts as an issue with no GUI action (top
+lever — `backlog/desktop-learnability-residue.md`), the pre-ticked capture default (M029
+decision), engine vocabulary residue, and the static-screenshot ceiling. DMG rebuilt
+(`desktop/out/make/dmg/arm64/llm-wiki-1.0.0-arm64.dmg`, 117 MB) — **operator look pending**.
+Next: T06 closeout (README, DECISIONS with the unmet criterion, KNOWLEDGE, PROCESS schema-2
+note, CHANGELOG + bump, smoke page deleted, reassess). vitest 112 + pytest 2025 green.
 
 **S01 COMPLETE (5/5)** -- harness `npm run shots` (30 captures; real panel
 height 1,027 px vs 640 clamp), TypeScript 5.9 strict + svelte-check gate in `npm test`, Biome

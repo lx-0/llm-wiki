@@ -9,6 +9,7 @@
 
   let vault = $state<VaultStatus>(null);
   let listener = $state<Listener | null>(null);
+  let captureOn = $state(false);
   let loginItem = $state(false);
   let loaded = $state(false);
 
@@ -16,20 +17,34 @@
   const access = $derived(fileAccessLabel(vault));
   const capture = $derived(captureLabel(listener));
 
-  onMount(async () => {
-    const [status, listeners, login] = await Promise.all([
-      window.vault.status(),
-      window.listeners.status().catch(() => []),
-      window.app.getLoginItem(),
-    ]);
-    vault = status;
+  async function loadListener(): Promise<void> {
+    const listeners = await window.listeners.status().catch(() => [] as Listener[]);
     listener = listeners[0] ?? null;
+    captureOn = listener?.running ?? false;
+  }
+
+  onMount(async () => {
+    const [status, login] = await Promise.all([window.vault.status(), window.app.getLoginItem()]);
+    vault = status;
     loginItem = login;
+    await loadListener();
     loaded = true;
   });
 
   async function setLogin(open: boolean): Promise<void> {
     loginItem = await window.app.setLoginItem(open);
+  }
+
+  /** The same switch the welcome screen has — the off switch lives here as well as in the panel. */
+  async function setCapture(on: boolean): Promise<void> {
+    if (!listener) return;
+    const res = await window.listeners.control(listener.id, on ? 'start' : 'stop');
+    if (!res.ok) {
+      captureOn = !on;
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1500)); // let launchd flip state
+    await loadListener();
   }
 </script>
 
@@ -49,7 +64,7 @@
           {/if}
         </div>
         {#if vault}
-          <div class="path" title={vault.path}>{shortPath}</div>
+          <div class="path" title={vault.path}>Your library is the Obsidian vault at {shortPath}</div>
         {/if}
       </div>
       {#if vault}
@@ -71,8 +86,13 @@
       {/if}
     </div>
     <div class="row">
-      <span class="grow">Screen &amp; audio capture</span>
-      <span class="value" class:ok={listener?.running}>{loaded ? capture : '…'}</span>
+      <span class="grow">
+        Screen &amp; audio capture
+        <span class="sub">{loaded ? capture : '…'}</span>
+      </span>
+      {#if listener}
+        <Switch bind:checked={captureOn} label="Screen & audio capture" onchange={(v) => void setCapture(v)} />
+      {/if}
     </div>
   </section>
 </main>
@@ -101,19 +121,19 @@
   }
   .path {
     margin-top: 2px;
-    font-family: var(--font-mono);
     font-size: var(--fs-xs);
-    color: var(--text-faint);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    color: var(--text-muted);
+    overflow-wrap: anywhere;
+  }
+  .sub {
+    display: block;
+    margin-top: 2px;
+    font-size: var(--fs-xs);
+    color: var(--text-muted);
   }
   .value {
     color: var(--text-muted);
     font-variant-numeric: tabular-nums;
-  }
-  .value.ok {
-    color: var(--ok);
   }
   .value.warn {
     color: var(--warn);

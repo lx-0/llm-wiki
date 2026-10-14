@@ -21,7 +21,7 @@
   /* text */
   --text: oklch(22% 0.012 250);
   --text-muted: oklch(48% 0.014 250);
-  --text-faint: oklch(64% 0.012 250);
+  --text-faint: oklch(56% 0.012 250); /* ≈ 4.5:1 on --bg — the quietest text still reads on a dim screen */
   --text-on-accent: oklch(100% 0 0);
   --text-disabled: oklch(72% 0.008 250);
 

@@ -66,7 +66,7 @@
     </form>
   {:else}
     <div class="bar">
-      <button class="chip" data-sheet="add" onclick={() => toggle('add')}>{@html icon.plus(13)} Add link</button>
+      <button class="chip add" data-sheet="add" onclick={() => toggle('add')}>{@html icon.plus(13)} Save a web page</button>
       <button class="chip" data-sheet="sources" class:on={sheet === 'sources'} aria-expanded={sheet === 'sources'} onclick={() => toggle('sources')}>Sources</button>
       <button class="chip" data-sheet="tools" class:on={sheet === 'tools'} aria-expanded={sheet === 'tools'} onclick={() => toggle('tools')}>Tools</button>
       <span class="spacer"></span>
@@ -148,6 +148,15 @@
   .chip.on {
     background: var(--bg-hover);
     color: var(--text);
+  }
+  /* the one daily action in the footer reads as a button, not as a footnote */
+  .chip.add {
+    border: 1px solid var(--line);
+    background: var(--bg-sunken);
+    color: var(--text);
+  }
+  .chip.add:hover {
+    background: var(--bg-hover);
   }
   .spacer {
     flex: 1;

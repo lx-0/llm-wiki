@@ -2768,7 +2768,7 @@ Per-candidate learnings from the 14-candidate seam arc (C01–C14). Decisions li
 - **Typecheck gate (since M032-S01-T02, 2026-10-14):** TypeScript 5.9 `strict` over `src/` + the root configs; `npm test` = `npm run typecheck && vitest run`. Until then the desktop pinned TypeScript 4.5.4, whose parser choked on modern `.d.ts` syntax in `node_modules` (866 TS1005/TS1109 errors), so `tsc` was not a usable gate and test fakes relied on `as unknown as X` casts — those casts are now checked; prefer structurally correct fakes. When a change seems to pass "for free", prove the gate with a throwaway `const probe: number = "x"` file first.
 - **desktop/ uses package-lock.json (npm), not pnpm** — install with `npm ci` before `npm run test`/`npm run lint`.
 - **Module-level `$state` initializers run at import — everything they call must be declared
-  above them (M032-S04-T03, 2026-10-15):** `panel = $state({ recentSeenMs: readSeen() })` called
+  above them (M032-S04-T03, 2026-10-14):** `panel = $state({ recentSeenMs: readSeen() })` called
   a hoisted function that read a `const SEEN_KEY` declared *below* the state → TDZ
   `ReferenceError`, swallowed by the function's own `try/catch` (there to survive an
   opaque-origin `localStorage`), so every launch computed "nothing is new" and nothing failed.
@@ -2796,7 +2796,7 @@ Per-candidate learnings from the 14-candidate seam arc (C01–C14). Decisions li
   age mapping gave the five newest entries one age — five rows of "12m ago" read as a bug in
   every review. Ages are assigned by rank now, one distinct age per entry.
 - **`npm run shots` is the panel's gate, not just its camera (since M032-S04-T04,
-  2026-10-15):** `index` is the Svelte panel (the `panel.html` scaffold lived for three tasks
+  2026-10-14):** `index` is the Svelte panel (the `panel.html` scaffold lived for three tasks
   and is gone); strict pages fail the run on any audit finding, and a surface may declare
   `restHeight: { state, max }` — the fresh panel must request ≤ 640 px (main's `PANEL_MAX_H`)
   or the run fails with `TOO TALL` + `report.json.heightFailures`. The pass/fail rules live in
@@ -2805,7 +2805,7 @@ Per-candidate learnings from the 14-candidate seam arc (C01–C14). Decisions li
   of the remaining consumers' DOM (every element × ~50 properties) before and after, and diff —
   a grep over class names says "ok" for `.fill`, `.ok`, `.vault` on substrings alone.
 - **Chart colours are validated on the RENDERED pixel, not on the CSS numbers (M032-S05-T03,
-  2026-10-15):** the heat strip's ordinal ramp is `oklch(from var(--accent) L c h)` at nominal
+  2026-10-14):** the heat strip's ordinal ramp is `oklch(from var(--accent) L c h)` at nominal
   ΔL 0.07 — rendered, Chromium gamut-maps the light steps and the measured gap was 0.056,
   under the dataviz validator's 0.06 floor. Nominal 0.08–0.09 renders as ≥ 0.06. Two probe
   gotchas on the way: `canvas.fillStyle` no longer serialises wide-gamut colours to `#rrggbb`
@@ -2816,6 +2816,17 @@ Per-candidate learnings from the 14-candidate seam arc (C01–C14). Decisions li
 - **Strict pages have no visually-hidden text (M032-S05-T03):** the audit's clipped-text rule
   flags an sr-only `<caption>` (1 px box, overflow hidden) as a defect. Label the table with
   `aria-label` instead; the figure's visible caption already names it.
+- **A status tile that is also the control must show the control (M032-S05-T05, 2026-10-14):**
+  the panel's capture tile expanded on click to reveal Start / Stop — and 7 of 7 blind personas
+  could not stop the recording ("the green tile doesn't look like a button"; Settings showed the
+  word "Recording" where the welcome's switch had been). The one quiz question every persona
+  missed was the one whose answer sat behind an unlabeled expand. Rule: a control the operator
+  must find on day one is a visible button or switch, never a click-to-reveal — and a live
+  microphone is a red dot, never a calming green. The blind panel method
+  (`.ytstack/reviews/2026-10-14-desktop-learnability-panel.md`) found this in one round where
+  priming reviews had not; its other consensus items were vocabulary collisions the builder
+  cannot see from inside ("session capture" vs screen capture, "captures" vs "Inbox", four
+  nouns for one library) and a fixture inconsistency that read as an app bug (42 vs 2,024).
 
 ### Exception seam (C14)
 

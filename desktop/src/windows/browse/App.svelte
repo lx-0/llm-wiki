@@ -26,7 +26,7 @@
     <input
       class="search"
       type="search"
-      placeholder="Search your wiki…"
+      placeholder="Filter notes by title…"
       autocomplete="off"
       spellcheck="false"
       bind:value={query}
@@ -55,13 +55,13 @@
       <p class="more">{hidden.toLocaleString()} more — narrow the search to see them.</p>
     {/if}
     {#if loaded && filtered.length === 0}
-      <p class="empty">{all.length === 0 ? 'No notes yet — add material and update your wiki.' : 'Nothing matches.'}</p>
+      <p class="empty">{all.length === 0 ? 'No notes yet — add material and update your library.' : 'Nothing matches.'}</p>
     {/if}
   </div>
 
   {#if counts.length > 0}
     <footer class="foot num">
-      <span class="total">{filtered.length} {filtered.length === 1 ? 'entry' : 'entries'}</span>
+      <span class="total">{filtered.length} {filtered.length === 1 ? 'note' : 'notes'}</span>
       {#each counts as { type: kind, count }}
         <span class="kind"><span class="dot" style="background: var({typeToken(kind)})"></span>{kind} {count}</span>
       {/each}
@@ -141,7 +141,6 @@
     width: 100%;
     padding: var(--space-2) var(--space-3);
     border: none;
-    border-left: 2px solid var(--c);
     border-radius: var(--radius-s);
     background: transparent;
     text-align: left;

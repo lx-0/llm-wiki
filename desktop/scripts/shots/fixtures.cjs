@@ -127,7 +127,7 @@ function base(now) {
       status: {
         name: 'lxw',
         path: '/Users/alex/Library/Mobile Documents/iCloud~md~obsidian/Documents/lxw',
-        articleCount: 2024,
+        articleCount: list.length, // one library, one number — the Notes window shows the same list
         lastActivityMs: now - 35 * MIN,
         recent: list.slice(0, 5),
         accessible: true,
@@ -220,8 +220,8 @@ function base(now) {
             id: 'hooks-installed',
             severity: 'warning',
             message: 'no wiki hooks installed in user or project scope — session capture won’t fire',
-            title: 'Session capture isn’t installed',
-            verb: 'Install',
+            title: 'AI chats aren’t being saved',
+            verb: 'Set up',
             fix: 'wiki hooks install',
             dispatchArgs: ['hooks', 'install'],
           },
@@ -229,8 +229,8 @@ function base(now) {
             id: 'index-drift',
             severity: 'critical',
             message: 'knowledge/index.md drift: 3 duplicate / 2 dangling / 4 missing row(s)',
-            title: 'The note index is out of sync',
-            verb: 'Rebuild',
+            title: 'Your note list is out of date',
+            verb: 'Fix',
             fix: 'wiki reindex',
             dispatchArgs: ['reindex'],
           },
@@ -238,21 +238,21 @@ function base(now) {
             id: 'ollama-reachable',
             severity: 'warning',
             message: 'Ollama unreachable at 192.168.2.42:11434',
-            title: 'Ollama unreachable at 192.168.2.42:11434',
+            title: 'The local AI helper (Ollama) isn’t reachable',
             verb: null,
-            fix: 'check kcma-d8 is up',
+            fix: 'start Ollama on kcma-d8',
           },
         ],
       },
       query: { ok: true, answer: ANSWER },
       menu: {
-        status: { articles: 2024, last_compile_ago: '2h' },
+        status: { articles: list.length, last_compile_ago: '2h' },
         suggestions: [
           {
             id: 'process-inbox',
             count: 3,
             label: '3 files in inbox/',
-            title: '3 new captures to sort',
+            title: '3 new files to sort into your library',
             verb: 'Sort',
             group: 'do',
             argv: ['process-inbox'],
@@ -262,7 +262,7 @@ function base(now) {
             id: 'compile',
             count: 4,
             label: '4 sources changed since compile',
-            title: '4 new sources to add to your wiki',
+            title: '4 new items to add to your library',
             verb: 'Add',
             group: 'do',
             argv: ['compile'],
@@ -272,7 +272,7 @@ function base(now) {
             id: 'curiosity-folder',
             count: 2,
             label: '2 document-scan requests to review',
-            title: '2 document scans to review',
+            title: '2 folder-scan requests to review',
             verb: 'Review',
             group: 'review',
             argv: ['curiosity', '--type', 'folder-deep-scan'],
@@ -362,6 +362,12 @@ const STATES = {
     fx.vault.runStatus = { running: 'process-inbox' };
     return fx;
   },
+  paused: (fx) => {
+    fx.listeners[0].running = false;
+    fx.listeners[0].channels.mic = { lastCaptureAtMs: now(fx) - 50 * MIN, ageSeconds: 3000, fresh: false };
+    fx.listeners[0].channels.system = { lastCaptureAtMs: now(fx) - 50 * MIN, ageSeconds: 3000, fresh: false };
+    return fx;
+  },
   'no-access': (fx) => {
     fx.vault.status.accessible = false;
     fx.vault.status.articleCount = 0;
@@ -385,6 +391,11 @@ const STATES = {
     return fx;
   },
 };
+
+/** The clock a fixture set was built with (the listener's checkedAtMs). */
+function now(fx) {
+  return fx.listeners[0].checkedAtMs;
+}
 
 /** Build the fixture set for a named state. Unknown names fall back to `default`. */
 function build(state, now = Date.now()) {

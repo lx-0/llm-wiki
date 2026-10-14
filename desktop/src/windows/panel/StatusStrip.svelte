@@ -2,13 +2,12 @@
   import { activity, countPerDay } from '../../lib/activity';
   import { fmtAgo } from '../../lib/time';
   import Button from '../../ui/Button.svelte';
-  import Meter from '../../ui/Meter.svelte';
   import Ring from '../../ui/Ring.svelte';
   import Sparkline from '../../ui/Sparkline.svelte';
   import { captureSummary, healthSummary } from './status';
   import { busy, panel, runAction, startCompile, toggleListener } from './store.svelte';
 
-  type Tile = 'library' | 'health' | 'capture';
+  type Tile = 'library' | 'health';
   let open = $state<Tile | null>(null);
   const toggle = (tile: Tile) => (open = open === tile ? null : tile);
 
@@ -18,6 +17,8 @@
   const health = $derived(healthSummary(panel.doctor));
   const listener = $derived(panel.listeners[0] ?? null);
   const capture = $derived(captureSummary(listener, panel.toggling));
+  const recording = $derived(capture.state === 'recording');
+  const toggling = $derived(listener ? panel.toggling.has(listener.id) : false);
   const compileLine = $derived.by(() => {
     if (panel.compile.running) {
       const { current, total } = panel.compile.progress;
@@ -28,6 +29,8 @@
     return r.ok ? `Up to date · took ${Math.max(1, Math.round(r.durationMs / 60000))}m` : 'Update failed';
   });
   const runKey = (argv: string[] | undefined) => (argv ?? []).join(' ');
+  const dispatchable = (check: { dispatchArgs?: string[] }, key: string): boolean =>
+    Boolean(check.dispatchArgs?.length) && !/auth/.test(key);
 </script>
 
 <section class="strip" aria-label="Status">
@@ -50,10 +53,19 @@
       </span>
     </button>
 
-    <button class="tile" class:open={open === 'capture'} onclick={() => toggle('capture')} aria-expanded={open === 'capture'}>
-      <Meter rows={[{ label: 'mic', level: capture.mic }, { label: 'system', level: capture.system }]} tone={capture.state === 'recording' ? 'ok' : capture.state === 'check' ? 'warn' : 'muted'} />
-      <span class="cap" class:ok={capture.state === 'recording'} class:warn={capture.state === 'check'}>{capture.word}</span>
-    </button>
+    <!-- The capture tile IS the control: the universal red dot while recording, and the
+         Pause / Resume button always in view — never a green "all good" for a live mic. -->
+    <div class="tile capture">
+      <span class="state" class:danger={capture.state === 'check'}>
+        <span class="rec" class:on={recording} class:warn={capture.state === 'check'} aria-hidden="true"></span>{capture.word}
+      </span>
+      <span class="cap">{capture.state === 'check' ? 'system audio stalled' : capture.state === 'none' ? 'screen & audio' : 'screen, mic & system audio'}</span>
+      {#if listener}
+        <Button size="s" variant={listener.running ? 'secondary' : 'primary'} disabled={toggling} onclick={() => void toggleListener(listener.id, listener.running ? 'stop' : 'start')}>
+          {listener.running ? 'Pause' : 'Resume'}
+        </Button>
+      {/if}
+    </div>
   </div>
 
   {#if open === 'library'}
@@ -86,8 +98,13 @@
         {@const key = runKey(check.dispatchArgs)}
         <div class="row">
           <span class="sev {check.severity}"></span>
-          <span class="grow" title={check.message}>{check.title}</span>
-          {#if check.dispatchArgs?.length && !/auth/.test(key)}
+          <span class="grow">
+            <span title={check.message}>{check.title}</span>
+            {#if !dispatchable(check, key) && check.fix}
+              <span class="sub-line">{check.fix}</span>
+            {/if}
+          </span>
+          {#if dispatchable(check, key)}
             {#if panel.run.key === key}
               <span class="muted num">{panel.run.progress?.total ? `${panel.run.progress.current} of ${panel.run.progress.total}` : '…'}</span>
             {:else if panel.run.results.has(key)}
@@ -95,30 +112,14 @@
             {:else}
               <Button size="s" disabled={busy()} onclick={() => void runAction(check.dispatchArgs ?? [])}>{check.verb ?? 'Fix'}</Button>
             {/if}
-          {:else if check.fix}
-            <code class="fix">{check.fix}</code>
           {/if}
         </div>
       {/each}
       {#if panel.doctor?.updateAvailable}
         <div class="row">
           <span class="grow">App update available</span>
-          <Button size="s" variant="primary" disabled={busy()} onclick={() => void runAction(['update'])}>Update app</Button>
+          <Button size="s" disabled={busy()} onclick={() => void runAction(['update'])}>Update app</Button>
         </div>
-      {/if}
-    </div>
-  {:else if open === 'capture'}
-    <div class="detail card">
-      {#if listener}
-        <div class="row">
-          <span class="grow">
-            Screen &amp; audio capture
-            <span class="sub-line num">mic {listener.channels.mic.ageSeconds == null ? '—' : `${listener.channels.mic.ageSeconds}s ago`} · system {listener.channels.system.ageSeconds == null ? '—' : `${listener.channels.system.ageSeconds}s ago`}</span>
-          </span>
-          <Button size="s" disabled={panel.toggling.has(listener.id)} onclick={() => void toggleListener(listener.id, listener.running ? 'stop' : 'start')}>{listener.running ? 'Stop' : 'Start'}</Button>
-        </div>
-      {:else}
-        <div class="row"><span class="grow muted">No capture process configured</span></div>
       {/if}
     </div>
   {/if}
@@ -149,11 +150,14 @@
     color: var(--text);
     transition: background-color var(--dur-fast) var(--ease-out);
   }
-  .tile:hover {
+  button.tile:hover {
     background: var(--bg-hover);
   }
   .tile.open {
     border-color: var(--accent);
+  }
+  .capture {
+    gap: 3px;
   }
   .big {
     font-size: var(--fs-xl);
@@ -163,9 +167,29 @@
   .cap {
     font-size: var(--fs-xs);
     color: var(--text-muted);
+    text-align: center;
   }
-  .ok {
-    color: var(--ok);
+  .state {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: var(--fs-s);
+    font-weight: 600;
+  }
+  .rec {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    border: 1.5px solid var(--text-faint);
+    background: transparent;
+  }
+  .rec.on {
+    border-color: var(--danger);
+    background: var(--danger);
+  }
+  .rec.warn {
+    border-color: var(--warn);
+    background: var(--warn);
   }
   .warn {
     color: var(--warn);
@@ -240,10 +264,5 @@
   }
   .pill.danger {
     background: var(--danger-soft);
-  }
-  .fix {
-    font-family: var(--font-mono);
-    font-size: var(--fs-xs);
-    color: var(--text-muted);
   }
 </style>

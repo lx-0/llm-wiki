@@ -47,7 +47,7 @@
     <input
       id="ask-input"
       type="text"
-      placeholder="Ask your wiki anything…"
+      placeholder="Ask your library anything…"
       autocomplete="off"
       spellcheck="false"
       bind:value={question}
@@ -78,6 +78,9 @@
   .bar {
     display: flex;
     gap: var(--space-2);
+  }
+  .bar :global(.btn) {
+    height: 36px; /* the pair meets at both edges */
   }
   input {
     flex: 1;

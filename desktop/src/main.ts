@@ -272,7 +272,7 @@ function openSettings(): void {
   }
   settingsWin = new BrowserWindow({
     width: 400,
-    height: 400,
+    height: 320, // the content ends at ~290 px (harness contentHeights) — no dead half-window
     resizable: false,
     fullscreenable: false,
     minimizable: false,
@@ -308,7 +308,7 @@ function openOnboarding(): void {
   }
   onboardingWin = new BrowserWindow({
     width: 460,
-    height: 700,
+    height: 480, // the content ends at ~450 px with the file-access row (harness contentHeights)
     resizable: false,
     fullscreenable: false,
     maximizable: false,

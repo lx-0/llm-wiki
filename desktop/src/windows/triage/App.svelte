@@ -84,7 +84,7 @@
       {@const progress = batching.get(group.key)}
       <section class="group" class:muted={group.key === 'note'}>
         <div class="group-head">
-          <span class="group-label" style="--c: var(--type-{group.key === 'task' ? 'project' : group.key === 'idea' ? 'map' : group.key === 'note' ? 'concept' : 'note'})">
+          <span class="group-label" style="--c: var(--type-{group.key === 'task' ? 'project' : group.key === 'idea' ? 'map' : 'note'})">
             <span class="dot"></span>{group.label} <span class="group-count num">{group.pending}</span>
           </span>
           {#if progress}
@@ -113,14 +113,14 @@
               </div>
               {#if r.status === 'pending'}
                 {#if r.confidence === 'low'}
-                  <span class="unsure" title={r.detail ? `Low confidence — ${r.detail}` : 'Low confidence — worth a look'}>unsure</span>
+                  <span class="unsure" title={`The app isn't sure this is a ${group.key === 'other' ? 'real find' : group.key}${r.detail ? ` — ${r.detail}` : ''}`}>unsure</span>
                 {/if}
                 {#if busy.has(r.stem) || progress}
                   <span class="working">…</span>
                 {:else}
                   <span class="actions">
-                    <Button size="s" onclick={() => void act(r.stem, 'accept')}>Keep</Button>
-                    <Button size="s" variant="quiet" onclick={() => void act(r.stem, 'dismiss')}>Dismiss</Button>
+                    <Button size="s" title={group.key === 'task' ? 'Saves it as a task on your to-do list' : 'Keeps it in your library'} onclick={() => void act(r.stem, 'accept')}>Keep</Button>
+                    <Button size="s" variant="quiet" title="Hides it — nothing is deleted" onclick={() => void act(r.stem, 'dismiss')}>Dismiss</Button>
                   </span>
                 {/if}
               {/if}
@@ -262,7 +262,7 @@
     padding: 2px var(--space-2);
     border-radius: var(--radius-s);
     background: var(--warn-soft);
-    color: var(--warn);
+    color: var(--text); /* ink on the tint — warn-on-warn-soft sat under 3:1 */
     font-size: var(--fs-xs);
     font-weight: 600;
   }

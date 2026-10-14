@@ -22,8 +22,8 @@
     <span class="logo">{@html icon.logo(18)}</span>
     <span class="name">llm-wiki</span>
     {#if panel.vault}
-      <button class="vault" title="Open in Obsidian" onclick={() => void window.vault.openInObsidian()}>
-        {panel.vault.name}{@html icon.external(11)}
+      <button class="vault" title="Your library — an Obsidian vault. Opens it in Obsidian." onclick={() => void window.vault.openInObsidian()}>
+        <span class="vault-key">Library</span>{panel.vault.name}{@html icon.external(11)}
       </button>
     {/if}
     <button class="gear" title="Settings" aria-label="Settings" onclick={() => window.app.openSettings()}>
@@ -80,6 +80,11 @@
   }
   .vault:hover {
     color: var(--accent);
+  }
+  .vault-key {
+    margin-right: 4px;
+    font-weight: 500;
+    color: var(--text-faint);
   }
   .gear {
     display: inline-flex;
