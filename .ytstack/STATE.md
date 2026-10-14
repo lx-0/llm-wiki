@@ -1,7 +1,7 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-14T22:50:00+02:00
+last_updated: 2026-10-14T23:05:00+02:00
 current_milestone: M033
 active_slice: S02
 active_task: none
@@ -39,8 +39,11 @@ found one macOS-only assertion, fixed), ruff hooks in pre-commit, `lint` depende
 group pins ruff 0.16.10, README/AGENTS gates paragraph. **Reassess after S01: A** —
 S02–S05 unchanged; S02-T01 inherits the finding that two import identities coexist
 (`core.*` via `scripts/` on the path vs `scripts.core.*` via `.wiki/` in the reports
-engine, 82 files with a `sys.path.insert`). Next: S02 (`scripts/` as a package) via
-`plan-task` for T01 (layout decision proven by a probe).
+engine, 82 files with a `sys.path.insert`). **S02 1/5** — T01 decided: `scripts/` is the
+source root, not a package (DECISIONS 2026-10-14; probe: `core.paths is
+scripts.core.paths` → False today; `-m collectors.cli` runs without a bootstrap); no
+`scripts/__init__.py`, ever. Next: T02 — rename the five hyphenated scripts + call sites
+(`plan-task`).
 
 ## M032 COMPLETE (L, 2026-10-14): desktop de-slop
 

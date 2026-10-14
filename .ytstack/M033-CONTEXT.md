@@ -59,10 +59,12 @@ it did.
 3. **CI runs the engine and desktop suites** on push / PR to `main`: `uv run pytest`,
    `ruff check` + `ruff format --check`, the type checker, `npm ci && npm test && npm run
    lint` in `desktop/` — and is green.
-4. **`scripts/` is a package.** `scripts/__init__.py` exists, no hyphenated module names,
-   `sys.path.insert` only in the one bootstrap the dispatcher owns, `python -m scripts.<mod>`
-   is how `cli.py` spawns handlers (process isolation kept), and the tests import one module
-   identity (`core.*` vs `scripts.core.*` duplication gone, KNOWLEDGE C01 closed).
+4. **`scripts/` is the one source root** (reworded 2026-10-14 after S02-T01's probe — the
+   original wording assumed a regular package): no `scripts/__init__.py` (it would reopen
+   the split), no hyphenated module names, no `scripts.`-prefixed imports, `sys.path.insert`
+   only in the `hooks/` bootstrap and pytest's `pythonpath`, `python -m <module>` from
+   `scripts/` is how `cli.py` spawns handlers (process isolation kept), and a guard test pins
+   one module identity (`core.*` vs `scripts.core.*` duplication gone, KNOWLEDGE C01 closed).
 5. **Seams, not copies.** 0 private frontmatter parsers (one `core/frontmatter` grammar),
    1 slugify, 1 logging setup, state read/write only through `core/state_store`, 1
    daily-rollup appender, 1 inbox scanner — each migration preceded by a repo-wide consumer
@@ -117,8 +119,8 @@ becomes M033b rather than an eighth task.
    (`ajv` dev dependency). Alternative: generate TS types from the schema
    (`json-schema-to-typescript`) so `desktop/src/lib/actions.ts` imports instead of
    restating — decide in S05 after seeing the schema size.
-3. **`python -m` dispatch and the vault venv:** `cli.py` spawns handlers with the venv's
-   interpreter today; `python -m scripts.x` needs the repo root (`.wiki/`) on the path, not
-   `scripts/`. Decide in S02-T01 whether the package is `scripts` (as the directory is
-   named) or renamed `llm_wiki` — renaming touches every operator hook command and is
-   M034's bash port anyway; recommendation: keep `scripts` as the package name in M033.
+3. ~~**`python -m` dispatch and the vault venv**~~ — **decided 2026-10-14 (S02-T01):**
+   `scripts/` is the source root, not a package; `cli.py` runs `python -m <module>` with
+   `cwd=SCRIPTS_DIR`; the `scripts.`-prefixed spelling is rewritten; `scripts/__init__.py`
+   is not added. Full reasoning and the probe in `DECISIONS.md` 2026-10-14 ("`scripts/` is
+   the engine's source root"). Renaming to `llm_wiki` stays M034's.
