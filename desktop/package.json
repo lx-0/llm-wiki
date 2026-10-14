@@ -13,7 +13,9 @@
     "lint": "eslint --ext .ts,.tsx .",
     "test": "vitest run",
     "dmg": "electron-forge make --targets @electron-forge/maker-dmg",
-    "reinstall": "bash scripts/dev-install.sh"
+    "reinstall": "bash scripts/dev-install.sh",
+    "build:renderer": "vite build -c vite.renderer.config.ts",
+    "shots": "npm run build:renderer && electron scripts/shots/capture.cjs"
   },
   "keywords": [],
   "author": {

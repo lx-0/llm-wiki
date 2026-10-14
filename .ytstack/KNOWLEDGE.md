@@ -2667,6 +2667,17 @@ articles applying one fact and reported 6. The safe pattern (now used by both
   suggestions: count/label/cmd/priority) drives "What's pending"; `wiki doctor --json`
   (summary + `engine-update-available` check) drives Health + the Update-app button. Don't
   scrape human CLI text.
+- **Screenshot harness (`npm run shots`, M032-S01-T01)** renders the built pages under a stub
+  preload with real Electron, offscreen. Gotchas: (1) offscreen windows have no vibrancy — the
+  transparent panel needs a solid `backgroundColor` per scheme or it captures black; (2) pass
+  parameters to a preload via `webPreferences.additionalArguments` + `sandbox: false` (a
+  sandboxed preload cannot `require` the fixtures module); (3) give every capture window its
+  own in-memory `partition` or `localStorage` flags (`navHintSeen`, `recentSeenMs`) leak
+  across captures; (4) the standalone `vite build -c vite.renderer.config.ts` only matches
+  Forge's bundle because the config repeats Forge's `base: './'` + `outDir` defaults; (5)
+  Electron 42 deprecates the positional `console-message` args — read `event.level` /
+  `event.message`. Heights the panel requests via `panel.resize` land in
+  `out/shots/report.json`; a non-empty `errors` map fails the run (exit 1).
 
 ## Architecture-deepening arc 0.3.0 (2026-07-18 → 2026-07-22) — gotchas
 

@@ -41,8 +41,9 @@ TS (non-test) + 678 lines / 380 selectors CSS.
 ### 2.1 Wall of text
 
 - **The panel is a stack of eleven sections.** At rest it asks the main process for
-  **1,377 px** of height (1,665 px with Health/Sources/Advanced open); `PANEL_MAX_H` clamps
-  at 640 px, so the daily surface *always* scrolls. Order: hint banner → stat line → the raw
+  **1,027 px** of height (1,542 px with Health/Sources/Advanced open — measured by the
+  in-repo Electron harness, M032-S01-T01; the earlier Playwright render over-estimated at
+  1,377/1,665); `PANEL_MAX_H` clamps at 640 px, so the daily surface *always* scrolls. Order: hint banner → stat line → the raw
   iCloud path (`~/Library/Mobile Documents/iCloud~md~obsidian/…`) → yield line → "3 things to
   tidy up" → update row → Add-to-wiki card → Recent → What's pending → Background capture
   (+ 2-line paragraph) → listener card → Sync sources (+ 2-line paragraph) → Advanced (5 rows,

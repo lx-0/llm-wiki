@@ -5,7 +5,7 @@ project: llm-wiki
 created: 2026-10-14T13:40:00+02:00
 status: planned
 task_count: 4
-completed_tasks: 0
+completed_tasks: 1
 ---
 
 # M032-S01 -- Slice Plan
@@ -14,7 +14,7 @@ completed_tasks: 0
 
 ## Tasks
 
-- [ ] T01 -- Render harness in-repo: standalone renderer build (`vite build -c vite.renderer.config.ts` with explicit `base`/`outDir` matching Forge), a stub preload exposing `window.{vault,listeners,panel,app}` from JSON fixtures (states: default / running / failed / no-access / empty), an Electron capture script (offscreen windows, `nativeTheme` light + dark, `capturePage()` per surface + panel states, requested panel height logged) → `npm run shots` writes `out/shots/*.png`.
+- [x] T01 -- Render harness in-repo: standalone renderer build (`vite build -c vite.renderer.config.ts` with explicit `base`/`outDir` matching Forge), a stub preload exposing `window.{vault,listeners,panel,app}` from JSON fixtures (states: default / running / failed / no-access / empty), an Electron capture script (offscreen windows, `nativeTheme` light + dark, `capturePage()` per surface + panel states, requested panel height logged) → `npm run shots` writes `out/shots/*.png`.
 - [ ] T02 -- TypeScript 4.5 → 5.x with `strict: true`, `moduleResolution: bundler`; fix every resulting error in `src/`; `npm run typecheck` (`tsc --noEmit`) added and green; `npm test` runs typecheck + vitest.
 - [ ] T03 -- Biome replaces ESLint: `biome.json` (lint + format), ESLint config/deps removed, one mechanical format commit, `npm run lint` = `biome check`; lint green.
 - [ ] T04 -- Svelte 5 scaffold + boilerplate out: `svelte` + `@sveltejs/vite-plugin-svelte` wired into the renderer config, `svelte-check` in `npm run typecheck`, a smoke component rendered through the harness; the Forge template comment in `renderer.ts` and the placeholder `package.json` metadata (name / productName / description / keywords) replaced.

@@ -1,9 +1,9 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-14T13:10:00+02:00
+last_updated: 2026-10-14T14:30:00+02:00
 current_milestone: M032
-active_slice: none
+active_slice: S01
 active_task: none
 last_completed_milestone: M031
 parked_milestone: none
@@ -14,8 +14,11 @@ parallel_milestones: [M021, M025, M027, M029]
 
 ## ▶ NEXT — M032 planned (L): desktop de-slop
 
-**Status:** M032 planned (L, 5 slices). Ready to slice — pending the operator's review of
-the plan.
+**Status:** M032 / S01 -- 1/4 tasks done in slice (T01 screenshot harness: `npm run shots`,
+28 captures, real panel height 1,027 px vs 640 clamp). Next task: T02 (TS 5 strict) via
+`/ytstack:plan-task`. Operator go 2026-10-14 ("arbeite den plan komplett ab"); S01–S05
+sliced (19 tasks), decisions locked (Svelte 5, Biome, Overview replaces Cockpit + Atlas).
+Executing sequentially on `main`, push per verified task.
 
 Operator request 2026-10-14: the app reads as vibe-coded (explanatory text everywhere, too
 little visual feedback) and the codebase should be modernised and clean-coded. Audited
