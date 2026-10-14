@@ -2865,6 +2865,32 @@ Per-candidate learnings from the 14-candidate seam arc (C01–C14). Decisions li
   run with stdio on DEVNULL, so a CLI that must leave a trace passes `log_file=` (the four
   registry CLIs → `logs/<name>.log`, retry-failed-flushes → `flush.log`, which it used to inherit
   from flush's import).
+- **State files are written through `core.state_store`, never `write_text(json.dumps(`
+  (M033-S03-T05):** the audit's def-name count said three private `_load_state` /
+  `_save_state` pairs; the smell grep for the *mechanism* (`.write_text(json.dumps(` in a
+  module that binds a `STATE_DIR` file) found seven — flush's dedup window, agent-runs, the
+  lint cache, the list-shaped intents seen-set. The hand-rolled shape is "read, mutate the
+  snapshot, save the whole dict": a second process landing a key between the read and the
+  save loses it, and a kill mid-write leaves a torn file. `store_for(path)` fixes both at
+  once — `reload()` per run, an own-keys mutator applied to a fresh read under the sibling
+  `.lock`, atomic save — and the test for it is deterministic: an interleave hook at the
+  site's natural seam (`find_new_screenshots`, `write_index`, the fake reader's
+  `scan_metadata`, `time.time`, `now_iso`) lands a foreign key, and the save must keep it.
+  Two traps: take any timestamp BEFORE `update()` (a side effect inside the mutator lands
+  after the locked read and is lost again), and never pass a nested `default=` to
+  `StateStore` — `_read` returns a shallow copy, so a mutated inner dict would leak into the
+  next tolerant read. The guard `test_state_files_are_written_through_the_seam` allow-lists
+  by reason (intents: a list-shaped file, the producer's shape decision).
+- **ruff ≥ 0.16 formats the Python fences inside Markdown by default — and a formatter with
+  an empty path variable is a whole-project run (2026-10-15):** `f=$(… | grep -oE
+  'Would reformat: .*' …)` came back EMPTY through the rtk hook's output filter, so
+  `ruff format $f` formatted everything ruff discovers: 19 `.ytstack/**` / `CONTEXT.md`
+  snippets (one bare keyword-argument line became a tuple assignment) and
+  `docs/vault-concept.build.py` (outside the CI scope, never formatted). 32 hunks reverted by
+  hand. Fixes: `[tool.ruff] extend-exclude = ["*.md"]` (a `.md` path now answers "No Python
+  files found" — prose spacing in illustrative snippets is not code), and the rule that a
+  formatter is only ever invoked with explicit paths typed in the command, never from a
+  variable built off rtk-filtered stdout (RTK.md: piped output can come back empty).
 
 ### Desktop toolchain (C07)
 

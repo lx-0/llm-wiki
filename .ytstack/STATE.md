@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-15T00:50:00+02:00
+last_updated: 2026-10-15T01:12:00+02:00
 current_milestone: M033
 active_slice: S03
-active_task: T05
+active_task: none
 last_completed_milestone: M032
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -116,7 +116,17 @@ smell grep (`.write_text(json.dumps(` on a `STATE_DIR` file) finds seven writers
 audit's three — the three collector pairs + flush's dedup window + agent-runs + the lint
 cache + the list-shaped intents-seen (allow-listed) — onto `core.state_store.store_for`;
 `piggyback_runner.record_status` onto the facade; one deterministic interleave test per
-site + a guard, RED first.
+site + a guard, RED first. **S03 5/7** — T05 (`2683f8a`): state through the store — the
+seven writers + `record_status` on `store_for` (fresh read per run, own-keys mutator under
+the file lock, atomic save; email merges only the accounts it scanned; flush stamps before
+the locked merge; agent-runs bytes unchanged via the format knobs; the lint cache + OAuth
+token cache atomic), intents allow-listed by reason; guard RED on six → green, five interleave
+tests RED → green. Suite 2106. Smoked on the scratch vault (`wiki index` / `--force` under
+the lock, doctor, collect --list). Found en route: ruff 0.16 formats Markdown fences by
+default — a bare `ruff format` (empty path variable from an rtk-filtered pipeline) rewrote
+19 `.ytstack`/`CONTEXT.md` snippets + `docs/vault-concept.build.py`; all 32 hunks reverted
+by hand, `pyproject` `extend-exclude = ["*.md"]`, KNOWLEDGE entry. CI for `2683f8a`
+pending. **Next: T06 (collector inbox + rollup 3 → 1) via `plan-task`.**
 
 ## M032 COMPLETE (L, 2026-10-14): desktop de-slop
 

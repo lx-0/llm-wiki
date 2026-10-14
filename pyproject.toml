@@ -57,6 +57,11 @@ src = ["scripts", "tests"]
 # pre-commit and editors pass paths explicitly; without this, `exclude` lists below would
 # only apply to discovered files and the hand-formatted file would get reformatted anyway.
 force-exclude = true
+# ruff ≥ 0.16 formats the Python fences inside Markdown by default. The fences in
+# `.ytstack/**`, `CONTEXT.md` and the backlog are illustrative snippets whose spacing is prose
+# (one bare `ruff format` rewrote 19 of them on 2026-10-15, one into a tuple assignment).
+# Markdown is out of ruff's reach entirely; the gates pass `scripts hooks tests` anyway.
+extend-exclude = ["*.md"]
 
 [tool.ruff.format]
 # core/config_schema.py is read as TEXT by core/config_docs.py: the field comments become
