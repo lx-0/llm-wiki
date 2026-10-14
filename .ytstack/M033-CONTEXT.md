@@ -121,6 +121,24 @@ becomes M033b rather than an eighth task.
    restating — decide in S05 after seeing the schema size.
 3. ~~**`python -m` dispatch and the vault venv**~~ — **decided 2026-10-14 (S02-T01):**
    `scripts/` is the source root, not a package; `cli.py` runs `python -m <module>` with
-   `cwd=SCRIPTS_DIR`; the `scripts.`-prefixed spelling is rewritten; `scripts/__init__.py`
+   `scripts/` first on the child's PYTHONPATH and the caller's cwd inherited (S02-T03,
+   `core/entry.py`); the `scripts.`-prefixed spelling is rewritten; `scripts/__init__.py`
    is not added. Full reasoning and the probe in `DECISIONS.md` 2026-10-14 ("`scripts/` is
    the engine's source root"). Renaming to `llm_wiki` stays M034's.
+
+## Reassessment 2026-10-14T21:20:00+02:00
+
+After **S02**, changed the roadmap (B — partial):
+
+- The S02 slice line now says what shipped: a source root, not a package; six tasks (T06
+  added mid-slice for the 72 documented by-path invocations the bootstrap removal broke).
+- S03-T04 ("logging 4 → 1") widened to the inventory S02 found: 36 `logging.basicConfig`
+  sites and six console-before-import modules; may split at plan-task (slice stays ≤ 7).
+- S05-T05 no longer rewrites the two trees (reconciled in S02-T05); it re-verifies them.
+- Recorded for M034, not scheduled here: `backlog/lazy-collector-registry.md` (registration
+  on package import costs every collector verb ~0.25 s and forced the entry scripts) and
+  `backlog/collect-flags-one-verb.md`.
+
+Reason: S02's operator-path proof (T05) and the documented-invocation sweep (T06) measured
+things the audit of 2026-10-14 had not: the real logging population, the import cost of the
+registry pattern, and that the trees had drifted 70–85 entries from the inventory.

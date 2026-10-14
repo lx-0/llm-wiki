@@ -1,9 +1,9 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-14T21:12:00+02:00
+last_updated: 2026-10-14T21:22:00+02:00
 current_milestone: M033
-active_slice: none
+active_slice: S03
 active_task: none
 last_completed_milestone: M032
 parked_milestone: none
@@ -78,8 +78,12 @@ T05 pushed (`b96865a` + `f0eadb8`), CI green (runs 38618938498 + 38618938449). *
 `scan_screenshots.py` / `scan_browser.py` / `scan_tabs.py` for the direct-CLI flags; three
 schema comments + `docs/config.md` regenerated; every documented form executed once, the
 by-path ones from the scratch vault's root after it pulled `e0f471a` through the re-exec
-update. Suite 2057. M034 candidate noted (`backlog/collect-flags-one-verb.md`). Next:
-`reassess-roadmap` for S02, then S03 (seams).
+update. Suite 2057. M034 candidate noted (`backlog/collect-flags-one-verb.md`). **Reassess
+after S02 (2026-10-14): B** — the S02 roadmap line rewritten to what shipped (source root,
+six tasks); S03-T04 carries the logging inventory S02 found (36 `basicConfig` sites, six
+console-before-import modules), may split at plan-task; `backlog/lazy-collector-registry.md`
+(M034); S05-T05 re-verifies the trees S02-T05 reconciled. **S03 next (seams, 6 tasks):**
+T01 frontmatter in the nine top-level scripts (`plan-task`).
 
 ## M032 COMPLETE (L, 2026-10-14): desktop de-slop
 

@@ -5,7 +5,7 @@ size: L
 created: 2026-10-14T18:40:00+02:00
 status: planned
 total_slices: 5
-completed_slices: 1
+completed_slices: 2
 ---
 
 # M033 Roadmap
@@ -31,10 +31,12 @@ Suggested framing (refine in slice-milestone; audit in `backlog/deslop-arc.md` �
       `ruff format` commit + `.git-blame-ignore-revs`; `[tool.ruff.lint]` policy with the
       finding buckets fixed or ignored-with-reason; `RUF100` → 0; ruff in pre-commit;
       `ci.yml` running pytest + ruff + the desktop suite.
-- [ ] S02 -- **`scripts/` as a package.** `__init__.py`, the five hyphenated
-      scripts renamed (with the hook/bash call sites that name them), the 68 `sys.path.insert`
-      removed in favour of one bootstrap, `cli.py` spawning `python -m scripts.<mod>`, tests
-      on one module identity (KNOWLEDGE C01).
+- [x] S02 -- **`scripts/` as the one source root** (shipped as layout A, not a package —
+      DECISIONS 2026-10-14): the five hyphenated scripts renamed with every call site, the 83
+      `sys.path.insert` lines removed in favour of `hooks/_bootstrap.py`, `core/entry.py` as
+      the one spawn seam (`python -m <module>` with `scripts/` on PYTHONPATH), the layout
+      guard (KNOWLEDGE C01 closed), the operator path proven on scratch copies (`wiki update`
+      re-executes the pulled engine), the 72 documented invocations rewritten (six tasks).
 - [ ] S03 -- **Seams, not copies.** Frontmatter 17 → 1, slugify 5 → 1,
       logging 4 → 1, state load/save → `core/state_store`, daily-rollup 3 → 1, inbox scan 3 → 1,
       `print` → `core/console` where the output is UX; each with its consumer grep and the
@@ -54,6 +56,19 @@ tree today — most modules import `core.*` with `scripts/` on `sys.path`, while
 `analyze.py` and `reports/_engine/**` import `scripts.core.*` / `scripts.reports.*` with
 `.wiki/` on `sys.path` (82 files carry a `sys.path.insert`, five distinct shapes); S02-T01's
 layout decision must collapse both onto one. Nothing moves in S02–S05.
+
+**Reassess after S02 (2026-10-14): B — partial changes.** S02 shipped the layout as a source
+root rather than a package (exit criterion 4 was reworded in S02-T01; the slice line above
+now says what shipped), grew from five to six tasks (T06: the documented invocations), and
+found three things the remaining slices inherit: (1) the logging fold in S03-T04 is bigger
+than "4 → 1" — 36 files call `logging.basicConfig` and six modules put their console setup
+before their imports (`noqa: E402`); T04's line now carries that inventory and may split at
+plan-task; (2) every `wiki index` / `wiki collect …` / entry script imports the whole
+`collectors` package (~0.25 s) because registration happens on package import —
+`backlog/lazy-collector-registry.md`, decided in M034 together with the collect verb;
+(3) S05-T05's tree work was pulled forward: `docs/engine-layout.md` and `AGENTS.md` were
+reconciled in S02-T05, so T05 re-verifies them after S03/S04 instead of rewriting. S03, S04
+and S05 otherwise unchanged; S03 next.
 
 ## Run order
 
