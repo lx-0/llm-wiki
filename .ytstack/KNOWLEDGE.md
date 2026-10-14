@@ -2795,6 +2795,15 @@ Per-candidate learnings from the 14-candidate seam arc (C01–C14). Decisions li
 - **Harness fixtures must vary along the axis a screenshot shows (M032-S04-T03):** the modulo
   age mapping gave the five newest entries one age — five rows of "12m ago" read as a bug in
   every review. Ages are assigned by rank now, one distinct age per entry.
+- **`npm run shots` is the panel's gate, not just its camera (since M032-S04-T04,
+  2026-10-15):** `index` is the Svelte panel (the `panel.html` scaffold lived for three tasks
+  and is gone); strict pages fail the run on any audit finding, and a surface may declare
+  `restHeight: { state, max }` — the fresh panel must request ≤ 640 px (main's `PANEL_MAX_H`)
+  or the run fails with `TOO TALL` + `report.json.heightFailures`. The pass/fail rules live in
+  `scripts/shots/gates.cjs` with vitest coverage; capture.cjs needs electron and stays untested.
+  A stylesheet diet on a shared file is proven, not argued: dump a computed-style fingerprint
+  of the remaining consumers' DOM (every element × ~50 properties) before and after, and diff —
+  a grep over class names says "ok" for `.fill`, `.ok`, `.vault` on substrings alone.
 
 ### Exception seam (C14)
 

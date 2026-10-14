@@ -1,9 +1,9 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-15T02:10:00+02:00
+last_updated: 2026-10-15T03:05:00+02:00
 current_milestone: M032
-active_slice: S04
+active_slice: none
 active_task: none
 last_completed_milestone: M031
 parked_milestone: none
@@ -19,14 +19,16 @@ primitives (`ui/Button|Switch|TypeBadge`, `ui/icons.ts`, `ui/types.ts`), glow/bl
 Settings / Onboarding / Browse / Inbox as Svelte windows (light mode fixed by construction, copy
 on a diet, derivations tested), dead CSS out (2,348 → 1,661 lines), DOM layout gate in the
 harness (overlap / clipped / off-screen; strict on the token-system windows). Reassess after
-S03: **A — proceed as planned**. S04 3/4: T01 panel shell as `panel.html` beside the shipped
-panel (store, labeled nav with inbox badge, Ask with wikilink chips); T02 status strip
-(Library sparkline · Health ring · Capture meters, inline details with engine verbs, compile
-progress + result); T03 Next up (one merged action list, row progress + done/failed pills),
-Recent (type badge + new-since dot), footer (Add link inline, Sources / Tools as popovers over
-the content, Quit) — fresh panel 639 px, 64 captures, strict gate clean. Next task: T04 (swap
-`index.html` to the Svelte panel, delete `renderer.ts`, height gate ≤ 640) via `plan-task`.
-vitest 94 + pytest 2024 green.
+S03: **A — proceed as planned**. **S04 COMPLETE (4/4)**: T01 panel shell (store, labeled nav
+with inbox badge, Ask with wikilink chips); T02 status strip (Library sparkline · Health ring ·
+Capture meters, inline details with engine verbs, compile progress + result); T03 Next up (one
+merged action list, row progress + done/failed pills), Recent (type badge + new-since dot),
+footer (Add link inline, Sources / Tools as popovers over the content, Quit); T04 swap —
+`index.html` mounts the Svelte panel, `renderer.ts` + `panel.html` deleted, `index.css` 1,661
+→ 755 lines (cockpit/atlas only, proven by computed-style fingerprint), harness `index` strict
++ rest-height gate ≤ 640 (seen firing), `npm run package` green. Fresh panel 639 px, 50
+captures clean. Next: `/ytstack:reassess-roadmap`, then S05 (Overview window, delete Cockpit +
+Atlas, learnability panel + DMG, closeout). vitest 97 + pytest 2024 green.
 
 **S01 COMPLETE (5/5)** -- harness `npm run shots` (30 captures; real panel
 height 1,027 px vs 640 clamp), TypeScript 5.9 strict + svelte-check gate in `npm test`, Biome

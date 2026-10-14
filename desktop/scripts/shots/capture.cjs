@@ -3,18 +3,20 @@
 //
 //   npm run shots          (= vite build -c vite.renderer.config.ts && electron scripts/shots/capture.cjs)
 //
-// Exit code 1 when any page logged an error — the harness doubles as a smoke test of the
-// bundle. Offscreen windows have no vibrancy, so the panel gets a solid popover-like
-// background per scheme.
+// Exit code 1 when any page logged an error, a strict page fails the layout audit, or the
+// panel at rest asks for more height than main will give it — the harness doubles as a smoke
+// test of the bundle. Offscreen windows have no vibrancy, so the panel gets a solid
+// popover-like background per scheme.
 
 const { app, BrowserWindow, nativeTheme } = require('electron');
 const fs = require('node:fs');
 const path = require('node:path');
 const { AUDIT_SCRIPT } = require('./audit.cjs');
+const { layoutFailures, restHeightFailure } = require('./gates.cjs');
 
 /** Windows built on the token system: clipped text fails the run there, not just overlap.
- *  (The old panel truncates its vault path on purpose until S04 replaces it.) */
-const STRICT_PAGES = new Set(['panel', 'settings', 'onboarding', 'browse', 'triage', 'smoke']);
+ *  Cockpit and Atlas are audited and reported only — they go in S05. */
+const STRICT_PAGES = new Set(['index', 'settings', 'onboarding', 'browse', 'triage', 'smoke']);
 
 app.commandLine.appendSwitch('force-device-scale-factor', '2');
 
@@ -26,15 +28,6 @@ const PRELOAD = path.join(__dirname, 'stub-preload.cjs');
 const SURFACES = [
   {
     page: 'index',
-    w: 360,
-    h: 280,
-    schemes: ['light', 'dark'],
-    states: ['fresh', 'asked', 'expanded', 'running', 'failed', 'no-access', 'empty'],
-    settle: 1200,
-    panel: true,
-  },
-  {
-    page: 'panel',
     w: 360,
     h: 280,
     schemes: ['light', 'dark'],
@@ -56,6 +49,8 @@ const SURFACES = [
     ],
     settle: 1200,
     panel: true,
+    /** main clamps the popover at PANEL_MAX_H — at rest the panel must fit without scrolling */
+    restHeight: { state: 'fresh', max: 640 },
   },
   {
     page: 'onboarding',
@@ -84,7 +79,6 @@ const SURFACES = [
 const FIXTURE_FOR = {
   fresh: 'default',
   asked: 'default',
-  expanded: 'default',
   failed: 'default',
   'library-open': 'default',
   'health-open': 'default',
@@ -110,12 +104,6 @@ const STATE_SCRIPTS = {
     input.value = 'who owns the Fleet onboarding deck?';
     input.dispatchEvent(new Event('input', { bubbles: true })); // framework bindings listen to input, not value
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
-    ${wait(900)}
-  })()`,
-  expanded: `(async () => {
-    document.getElementById('nav-hint-x')?.click();
-    document.querySelector('.health-row.clickable')?.click();
-    for (const id of ['sources', 'advanced']) { const d = document.getElementById(id); if (d) d.open = true; }
     ${wait(900)}
   })()`,
   failed: `(async () => {
@@ -202,14 +190,6 @@ async function shoot(surface, scheme, state, index) {
   return { file, height, errors, layout };
 }
 
-/** The layout gate: token-system windows fail on any overlap, off-screen or clipped text.
- *  Pages still on the old renderer (panel, cockpit, atlas — replaced in S04/S05) are audited
- *  and reported, never failed. */
-function layoutFailures(page, layout) {
-  if (!STRICT_PAGES.has(page)) return [];
-  return [...layout.overlaps, ...layout.offscreen, ...layout.clipped];
-}
-
 async function main() {
   if (!fs.existsSync(path.join(BUILT, 'index.html'))) {
     console.error(`no built renderer at ${BUILT} — run \`npm run build:renderer\` first`);
@@ -225,6 +205,7 @@ async function main() {
     errors: {},
     layout: {},
     layoutFailures: {},
+    heightFailures: {},
     files: [],
   };
   let index = 0;
@@ -237,10 +218,12 @@ async function main() {
         if (result.height != null) report.panelHeights[`${scheme}-${state}`] = result.height;
         if (result.errors.length) report.errors[result.file] = result.errors;
         report.layout[result.file] = result.layout;
-        const failures = layoutFailures(surface.page, result.layout);
+        const failures = layoutFailures(STRICT_PAGES, surface.page, result.layout);
         if (failures.length) report.layoutFailures[result.file] = failures;
+        const tooTall = restHeightFailure(surface, scheme, state, result.height);
+        if (tooTall) report.heightFailures[result.file] = tooTall;
         console.log(
-          `${result.file}${result.height != null ? `  height=${result.height}` : ''}${result.errors.length ? `  ERRORS=${result.errors.length}` : ''}${failures.length ? `  LAYOUT=${failures.length}` : ''}`,
+          `${result.file}${result.height != null ? `  height=${result.height}` : ''}${result.errors.length ? `  ERRORS=${result.errors.length}` : ''}${failures.length ? `  LAYOUT=${failures.length}` : ''}${tooTall ? '  TOO TALL' : ''}`,
         );
       }
     }
@@ -248,10 +231,11 @@ async function main() {
   fs.writeFileSync(path.join(OUT, 'report.json'), `${JSON.stringify(report, null, 2)}\n`);
   const failed = Object.keys(report.errors).length;
   const broken = Object.keys(report.layoutFailures).length;
+  const tall = Object.keys(report.heightFailures).length;
   console.log(
-    `\n${report.files.length} screenshots → ${OUT}${failed ? `\n${failed} page(s) logged errors — see report.json` : ''}${broken ? `\n${broken} page(s) failed the layout gate — see report.json layoutFailures` : ''}`,
+    `\n${report.files.length} screenshots → ${OUT}${failed ? `\n${failed} page(s) logged errors — see report.json` : ''}${broken ? `\n${broken} page(s) failed the layout gate — see report.json layoutFailures` : ''}${tall ? `\n${tall} panel state(s) exceed the rest-height budget — see report.json heightFailures` : ''}`,
   );
-  return failed || broken ? 1 : 0;
+  return failed || broken || tall ? 1 : 0;
 }
 
 app.on('window-all-closed', () => {});

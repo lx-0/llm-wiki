@@ -3,7 +3,7 @@ import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { defineConfig } from 'vite';
 
 /** One HTML entry per window; main.ts loads them by the same names. */
-const PAGES = ['index', 'panel', 'settings', 'onboarding', 'browse', 'cockpit', 'atlas', 'triage', 'smoke'];
+const PAGES = ['index', 'settings', 'onboarding', 'browse', 'cockpit', 'atlas', 'triage', 'smoke'];
 
 // Every renderer page shares one preload + one bundle output dir. `base` + `outDir` repeat
 // Forge's own renderer defaults so that a standalone `vite build -c vite.renderer.config.ts`
