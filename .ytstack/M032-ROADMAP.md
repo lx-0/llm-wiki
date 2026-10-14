@@ -5,7 +5,7 @@ size: L
 created: 2026-10-14T13:10:00+02:00
 status: planned
 total_slices: 5
-completed_slices: 1
+completed_slices: 2
 ---
 
 # M032 Roadmap
@@ -30,7 +30,7 @@ Suggested framing (refine in slice-milestone; audit in `backlog/deslop-arc.md`):
       light + dark); TypeScript 4.5 → 5.x with `strict`, typecheck in `npm test`; ESLint →
       Biome; Svelte 5 scaffold; strip the Forge boilerplate (renderer comment, package.json
       name/description). (4 tasks — `M032-S01-PLAN.md`)
-- [ ] S02 -- **Engine contract + one action model.** `wiki menu --json` and
+- [x] S02 -- **Engine contract + one action model.** `wiki menu --json` and
       `wiki doctor --json` gain `schema`, `title`, `verb`, `group`, `argv` (engine-side,
       consumer-grep: `menu_context`, `menu.py`, `health.py`, desktop, tests); the TUI reuses
       `title`; the app gets one `Action` type + merge/dedupe of doctor + menu + advanced;

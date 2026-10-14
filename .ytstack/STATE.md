@@ -1,9 +1,9 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-14T18:55:00+02:00
+last_updated: 2026-10-14T19:45:00+02:00
 current_milestone: M032
-active_slice: S02
+active_slice: S03
 active_task: none
 last_completed_milestone: M031
 parked_milestone: none
@@ -14,11 +14,11 @@ parallel_milestones: [M021, M025, M027, M029]
 
 ## ▶ NEXT — M032 in flight (L): desktop de-slop
 
-**Status:** M032 / S02 -- 3/4 tasks done (T01 engine action catalogue `core/actions.py`,
-`menu --json` schema 2 with title/verb/group/argv + tools; T02 `doctor --json` schema 2 with
-`CheckResult.title` + catalogue verb; T03 desktop `lib/actions.ts` mergeActions + withRunState,
-vitest 61 green). Next task: T04 (main-process parsers on schema 2, `ADVANCED_COMMANDS`
-retired, harness fixtures) via `plan-task`.
+**Status:** M032 -- slice S02 complete (4/4: engine action catalogue, `menu`/`doctor --json`
+schema 2 with title/verb/argv/tools, desktop `lib/actions.ts` merge model, parsers on schema 2,
+`ADVANCED_COMMANDS` + `friendly*` rewrite layers deleted; vitest 63 + pytest 2024 green).
+Reassess after S02: **A — proceed as planned**. Next slice: S03 (design tokens + costume off +
+Svelte pilot windows Settings/Onboarding/Browse/Triage) via `plan-task`.
 
 **S01 COMPLETE (5/5)** -- harness `npm run shots` (30 captures; real panel
 height 1,027 px vs 640 clamp), TypeScript 5.9 strict + svelte-check gate in `npm test`, Biome

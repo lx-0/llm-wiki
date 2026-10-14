@@ -19,16 +19,12 @@ export interface CompileProgress {
   total: number;
 }
 
-/** Engine commands the app can run (besides compile). Safe + $0 where possible:
- *  `--suggest-only` dedup (no destructive merge), `--structural-only` lint ($0). */
-export type EngineCommandId = 'update' | 'lint' | 'links' | 'dedup' | 'review' | 'dream';
+/** The one engine command the app still names itself. Every other action arrives from the
+ *  engine (`wiki menu --json` suggestions + tools, `wiki doctor --json` dispatch args) and runs
+ *  through startEngineArgs. */
+export type EngineCommandId = 'update';
 export const ENGINE_COMMANDS: Record<EngineCommandId, { args: string[]; label: string }> = {
   update: { args: ['update'], label: 'Update app' },
-  lint: { args: ['lint', '--structural-only'], label: 'Check for problems' },
-  links: { args: ['links'], label: 'Check links' },
-  dedup: { args: ['dedup', '--suggest-only'], label: 'Find duplicate pages' },
-  review: { args: ['review-wiki'], label: 'Review quality' },
-  dream: { args: ['dream'], label: 'Refresh entity pages' },
 };
 
 /** Wall-clock cap for any engine command (compile/dream/… can run minutes). Prevents
@@ -133,8 +129,7 @@ export function startCompile(
   return spawnWiki('compile', ['compile', '--progress-json'], onProgress, onDone);
 }
 
-/** Run any other engine command (update / lint / links / dedup / review). Many
- *  emit `[i/total]` (dedup, review, …) → x/y progress; the rest stay indeterminate. */
+/** Run a named engine command (today: update). */
 export function startEngineCommand(
   id: EngineCommandId,
   onProgress: (p: CompileProgress) => void,
@@ -143,10 +138,9 @@ export function startEngineCommand(
   return spawnWiki(id, ENGINE_COMMANDS[id].args, onProgress, onDone);
 }
 
-/** Run an arbitrary `wiki <args>` command — used for the engine's own actionable
- *  menu suggestions (e.g. `lint --structural-only`, `dream --all-entities`). The
- *  cmd string from `wiki menu --json` is tokenised on spaces. Curiosity scans,
- *  dedup, and review emit `[i/total]` → x/y progress. */
+/** Run an arbitrary `wiki <args>` command — the argv of a menu suggestion, a tool or a
+ *  doctor fix. Curiosity scans, dedup, and review emit `[i/total]` → x/y progress; the rest
+ *  stay indeterminate. */
 export function startEngineArgs(
   args: string[],
   onProgress: (p: CompileProgress) => void,

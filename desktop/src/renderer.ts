@@ -2,10 +2,8 @@
 // (window.vault / window.listeners / window.panel / window.app).
 import './index.css';
 import { marked } from 'marked';
-import { friendlyPending, pendingVerb } from './lib/pending';
 import { fmtAgo } from './lib/time';
 import { TYPE_COLOR } from './lib/types';
-import { ADVANCED_COMMANDS } from './vault/ipc';
 
 const ICON_COPY = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
 const ICON_CHECK = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>`;
@@ -37,22 +35,19 @@ const POLL_MS = 5000;
 /** in-flight action per listener id, for instant toggle feedback */
 const pending = new Map<string, 'start' | 'stop'>();
 
-type DoctorCheck = { id: string; severity: string; message: string; fix?: string; dispatchArgs?: string[] };
+type DoctorCheck = {
+  id: string;
+  severity: string;
+  message: string;
+  title: string;
+  verb: string | null;
+  fix?: string;
+  dispatchArgs?: string[];
+};
 type Doctor = { issues: number; updateAvailable: boolean; updateMessage?: string; checks?: DoctorCheck[] };
 let doctorState: Doctor | null = null;
 let healthExpanded = false;
 
-/** Plain-English health messages — the engine's doctor speaks operator ("entity pages
- *  overdue for dream", "broken wikilinks"); the original stays on hover. */
-function friendlyHealth(msg: string): string {
-  return msg
-    .replace(/\bentity pages\b/gi, 'pages')
-    .replace(/\bentity page\b/gi, 'page')
-    .replace(/\boverdue for dream\b/gi, 'need refreshing')
-    .replace(/\bwikilinks\b/gi, 'links')
-    .replace(/\bwikilink\b/gi, 'link')
-    .replace(/\bdream\b/gi, 'refresh');
-}
 /** id of the running engine command (update/advanced), or null. Compile has its own state. */
 let advancedBusy: string | null = null;
 /** [i/total] progress of the running advanced/suggestion command (if it emits any). */
@@ -344,14 +339,13 @@ function renderHealth(): void {
       r.className = 'health-item';
       const runnable = c.dispatchArgs && c.dispatchArgs.length > 0 && !/auth/.test(c.dispatchArgs.join(' '));
       const busy = advancedBusy === (c.dispatchArgs?.join(' ') ?? '');
-      r.innerHTML = `<span class="sev sev-${c.severity}"></span><span class="health-msg" title="${escapeHtml(c.message)}">${escapeHtml(friendlyHealth(c.message))}</span>`;
+      r.innerHTML = `<span class="sev sev-${c.severity}"></span><span class="health-msg" title="${escapeHtml(c.message)}">${escapeHtml(c.title)}</span>`;
       if (busy) {
         r.appendChild(runningIndicator());
       } else if (runnable) {
         const b = document.createElement('button');
         b.className = 'ghost';
-        b.textContent = 'Fix';
-        b.title = 'Safe — runs a quick cleanup in the background. Nothing is deleted.';
+        b.textContent = c.verb ?? 'Fix';
         b.disabled = engineBusy();
         b.addEventListener('click', () => void fixCheck(c.dispatchArgs as string[]));
         r.appendChild(b);
@@ -390,21 +384,22 @@ function renderAdvanced(): void {
   const el = document.getElementById('advanced-actions');
   if (!el) return;
   el.innerHTML = '';
-  for (const c of ADVANCED_COMMANDS) {
+  for (const tool of menuState?.tools ?? []) {
+    const key = tool.argv.join(' ');
     const row = document.createElement('div');
     row.className = 'adv-row';
-    const busy = advancedBusy === c.id;
-    const ok = advancedResults.get(c.id);
-    const note = busy ? '' : ok === undefined ? c.hint : ok ? 'done ✓' : 'failed';
-    row.innerHTML = `<span class="adv-label">${c.label}<span class="adv-hint">${note}</span></span>`;
+    const busy = advancedBusy === key;
+    const ok = advancedResults.get(key);
+    const note = busy || ok === undefined ? '' : ok ? 'done ✓' : 'failed';
+    row.innerHTML = `<span class="adv-label">${escapeHtml(tool.title)}<span class="adv-hint">${note}</span></span>`;
     if (busy) {
       row.appendChild(runningIndicator());
     } else {
       const b = document.createElement('button');
       b.className = 'ghost';
-      b.textContent = 'Run';
+      b.textContent = tool.verb;
       b.disabled = engineBusy();
-      b.addEventListener('click', () => void runEngine(c.id));
+      b.addEventListener('click', () => void runArgs(key));
       row.appendChild(b);
     }
     el.appendChild(row);
@@ -482,15 +477,18 @@ async function ask(): Promise<void> {
 }
 
 // --- What's pending (the engine's own actionable menu) ---------------------
+type MenuAction = { id: string; title: string; verb: string; group: string; argv: string[] };
 type Menu = {
   status: { articles?: number; last_compile_ago?: string };
-  suggestions: { count: number; label: string; cmd: string; priority: number; group: string }[];
+  suggestions: (MenuAction & { count: number; label: string; priority: number })[];
+  tools: MenuAction[];
 };
 let menuState: Menu | null = null;
 
 async function loadMenu(): Promise<void> {
   menuState = (await window.vault.menu()) as Menu | null;
   renderPending();
+  renderAdvanced();
 }
 
 function renderPending(): void {
@@ -505,19 +503,19 @@ function renderPending(): void {
   const list = document.createElement('div');
   list.className = 'pending-list card';
   for (const s of items) {
+    const key = s.argv.join(' ');
     const row = document.createElement('div');
     row.className = 'pending-row';
-    const busy = advancedBusy === s.cmd;
-    row.innerHTML = `<span class="pending-label" title="${escapeHtml(s.label)}">${escapeHtml(friendlyPending(s))}</span>`;
+    const busy = advancedBusy === key;
+    row.innerHTML = `<span class="pending-label" title="${escapeHtml(s.label)}">${escapeHtml(s.title)}</span>`;
     if (busy) {
       row.appendChild(runningIndicator());
     } else {
       const b = document.createElement('button');
       b.className = 'ghost';
-      b.textContent = pendingVerb(s.cmd);
-      b.title = 'Do this now — runs in the background, usually under a minute';
+      b.textContent = s.verb;
       b.disabled = engineBusy();
-      b.addEventListener('click', () => void runArgs(s.cmd));
+      b.addEventListener('click', () => void runArgs(key));
       row.appendChild(b);
     }
     list.appendChild(row);

@@ -1,15 +1,22 @@
-// Health + update check — one `wiki doctor --json` call gives both the vault
-// health summary AND whether an engine update is available (the
-// `engine-update-available` check). Read-only; run on demand (it does a git fetch
-// + connectivity probes, ~seconds), not on the fast poll. Goes through the shared
-// runWiki runner, which caps the git-fetch probe so it can't hang forever.
+// Health + update check — one `wiki doctor --json` (schema 2) call gives both the vault
+// health summary AND whether an engine update is available (the `engine-update-available`
+// check). Every check carries the engine's plain-English `title` and, when it is one command
+// away from fixed, a button `verb` — the app shows both verbatim. Read-only; run on demand
+// (it does a git fetch + connectivity probes, ~seconds), not on the fast poll. Goes through
+// the shared runWiki runner, which caps the git-fetch probe so it can't hang forever.
 
+import { ACTION_SCHEMA } from '../lib/actions';
 import { parseJson, runWiki } from './wiki-exec';
 
 export interface DoctorCheck {
   id: string;
   severity: string; // 'critical' | 'warning'
+  /** operator-term message (what the TUI prints) */
   message: string;
+  /** plain-English phrasing from the engine (falls back to message) */
+  title: string;
+  /** button verb from the engine's action catalogue, null when nothing is dispatchable */
+  verb: string | null;
   /** human fix hint, e.g. "wiki gmail-auth gmail-personal" */
   fix?: string;
   /** engine args that fix it (if the engine offers a one-shot), e.g. ["lint","--structural-only"] */
@@ -30,6 +37,8 @@ interface RawCheck {
   id: string;
   severity: string;
   message?: string;
+  title?: string;
+  verb?: string | null;
   fix?: string;
   dispatch_args?: string[] | null;
 }
@@ -38,10 +47,19 @@ interface RawCheck {
  *  leave getDoctor()'s promise pending forever. */
 const DOCTOR_TIMEOUT_MS = 60_000;
 
+const EMPTY: DoctorResult = { issues: 0, updateAvailable: false, checks: [] };
+
 /** Shape `wiki doctor --json` into the app's DoctorResult. Throws on malformed JSON
- *  (runWiki's parse-with-fallback then yields data=null → getDoctor returns null). */
+ *  (runWiki's parse-with-fallback then yields data=null → getDoctor returns null). An
+ *  unknown schema yields no issues + a warning rather than a guess. */
 export function parseDoctor(stdout: string): DoctorResult {
-  const d = parseJson<{ checks?: RawCheck[] }>(stdout);
+  const d = parseJson<{ schema?: unknown; checks?: RawCheck[] }>(stdout);
+  if (d.schema !== ACTION_SCHEMA) {
+    console.warn(
+      `wiki doctor --json: unsupported schema ${String(d.schema)} (app expects ${ACTION_SCHEMA}) — run \`wiki update\``,
+    );
+    return { ...EMPTY, checks: [] };
+  }
   const raw: RawCheck[] = Array.isArray(d.checks) ? d.checks : [];
   const update = raw.find((c) => c.id === 'engine-update-available');
   const updateAvailable = !!update && (update.severity === 'warning' || /behind/i.test(update.message || ''));
@@ -54,6 +72,8 @@ export function parseDoctor(stdout: string): DoctorResult {
       id: c.id,
       severity: c.severity,
       message: c.message || c.id,
+      title: c.title || c.message || c.id,
+      verb: c.verb ?? null,
       fix: c.fix || undefined,
       dispatchArgs: Array.isArray(c.dispatch_args) ? c.dispatch_args : undefined,
     }));

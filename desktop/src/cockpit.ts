@@ -6,7 +6,6 @@
 // re-implemented + brand-coloured + data-driven.
 import './index.css';
 import { marked } from 'marked';
-import { friendlyPending, pendingVerb } from './lib/pending';
 import { GLOW, NODE, TYPE_COLOR } from './lib/types';
 
 const ICO_COPY = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
@@ -934,16 +933,15 @@ async function loadPending(): Promise<void> {
   for (const s of items) {
     const row = document.createElement('div');
     row.className = 'ck-pending-row';
-    row.innerHTML = `<span class="ck-pending-label" title="${esc(s.label)}">${esc(friendlyPending(s))}</span>`;
+    row.innerHTML = `<span class="ck-pending-label" title="${esc(s.label)}">${esc(s.title)}</span>`;
     const b = document.createElement('button');
     b.className = 'ck-run';
-    b.textContent = pendingVerb(s.cmd);
-    b.title = 'Do this now — runs in the background, usually under a minute';
+    b.textContent = s.verb;
     b.disabled = busy;
     b.addEventListener('click', () => {
       if (busy) return;
       setBusy(true);
-      void window.vault.runArgs(s.cmd.split(/\s+/));
+      void window.vault.runArgs(s.argv);
     });
     row.appendChild(b);
     el.appendChild(row);

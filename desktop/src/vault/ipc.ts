@@ -8,16 +8,6 @@ import type { QueryResult } from './query';
 import type { EntryItem, VaultStatus } from './status';
 import type { TriageRecord } from './triage';
 
-/** Advanced engine actions surfaced behind the "Advanced" disclosure. Renderer-safe
- *  (no node imports) — labels are end-user phrasing, all $0 / non-destructive. */
-export const ADVANCED_COMMANDS: { id: Exclude<EngineCommandId, 'update'>; label: string; hint: string }[] = [
-  { id: 'lint', label: 'Check for problems', hint: 'Scan the wiki for structural issues' },
-  { id: 'links', label: 'Find broken links', hint: 'Check every link still points somewhere' },
-  { id: 'dedup', label: 'Find duplicates', hint: 'Suggest pages to merge — no changes made' },
-  { id: 'review', label: 'Review quality', hint: 'A local pass over your pages' },
-  { id: 'dream', label: 'Refresh people & project pages', hint: 'Rebuild them from your latest notes ($)' },
-];
-
 export const VAULT_STATUS_CHANNEL = 'vault:status';
 export const VAULT_LIST_CHANNEL = 'vault:list';
 export const VAULT_PREVIEW_CHANNEL = 'vault:preview';
