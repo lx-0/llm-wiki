@@ -5,7 +5,7 @@ size: L
 created: 2026-10-14T13:10:00+02:00
 status: planned
 total_slices: 5
-completed_slices: 2
+completed_slices: 3
 ---
 
 # M032 Roadmap
@@ -37,7 +37,7 @@ Suggested framing (refine in slice-milestone; audit in `backlog/deslop-arc.md`):
       `friendly*`/`pendingVerb` deleted; unit tests for the merge. Closes the
       `home-screen-ux.md` lever-3 gap from the engine side if it falls out naturally.
       (~4 tasks)
-- [ ] S03 -- **Design system + costume off.** Tokens (colour/space/radius/type, light +
+- [x] S03 -- **Design system + costume off.** Tokens (colour/space/radius/type, light +
       dark), single palette source generated into CSS, glow/blur/HUD/emoji/sparkle removal,
       light-mode defect on Triage/Settings fixed; if Svelte is chosen (open question 1)
       this slice starts with the scaffold and ports Settings + Onboarding as the pilot

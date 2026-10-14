@@ -10,6 +10,11 @@
 const { app, BrowserWindow, nativeTheme } = require('electron');
 const fs = require('node:fs');
 const path = require('node:path');
+const { AUDIT_SCRIPT } = require('./audit.cjs');
+
+/** Windows built on the token system: clipped text fails the run there, not just overlap.
+ *  (The old panel truncates its vault path on purpose until S04 replaces it.) */
+const STRICT_PAGES = new Set(['settings', 'onboarding', 'browse', 'triage', 'smoke']);
 
 app.commandLine.appendSwitch('force-device-scale-factor', '2');
 
@@ -122,8 +127,22 @@ async function shoot(surface, scheme, state, index) {
   const image = await wc.capturePage();
   const file = `${surface.page}-${scheme}-${state}.png`;
   fs.writeFileSync(path.join(OUT, file), image.toPNG());
+  let layout = { clipped: [], overlaps: [], offscreen: [] };
+  try {
+    layout = await wc.executeJavaScript(AUDIT_SCRIPT, true);
+  } catch (error) {
+    errors.push(`layout audit: ${error.message}`);
+  }
   win.destroy();
-  return { file, height, errors };
+  return { file, height, errors, layout };
+}
+
+/** The layout gate: token-system windows fail on any overlap, off-screen or clipped text.
+ *  Pages still on the old renderer (panel, cockpit, atlas — replaced in S04/S05) are audited
+ *  and reported, never failed. */
+function layoutFailures(page, layout) {
+  if (!STRICT_PAGES.has(page)) return [];
+  return [...layout.overlaps, ...layout.offscreen, ...layout.clipped];
 }
 
 async function main() {
@@ -135,7 +154,14 @@ async function main() {
   fs.mkdirSync(OUT, { recursive: true });
   if (app.dock) app.dock.hide();
 
-  const report = { generatedAt: new Date().toISOString(), panelHeights: {}, errors: {}, files: [] };
+  const report = {
+    generatedAt: new Date().toISOString(),
+    panelHeights: {},
+    errors: {},
+    layout: {},
+    layoutFailures: {},
+    files: [],
+  };
   let index = 0;
   for (const surface of SURFACES) {
     for (const scheme of surface.schemes) {
@@ -145,18 +171,22 @@ async function main() {
         report.files.push(result.file);
         if (result.height != null) report.panelHeights[`${scheme}-${state}`] = result.height;
         if (result.errors.length) report.errors[result.file] = result.errors;
+        report.layout[result.file] = result.layout;
+        const failures = layoutFailures(surface.page, result.layout);
+        if (failures.length) report.layoutFailures[result.file] = failures;
         console.log(
-          `${result.file}${result.height != null ? `  height=${result.height}` : ''}${result.errors.length ? `  ERRORS=${result.errors.length}` : ''}`,
+          `${result.file}${result.height != null ? `  height=${result.height}` : ''}${result.errors.length ? `  ERRORS=${result.errors.length}` : ''}${failures.length ? `  LAYOUT=${failures.length}` : ''}`,
         );
       }
     }
   }
   fs.writeFileSync(path.join(OUT, 'report.json'), `${JSON.stringify(report, null, 2)}\n`);
   const failed = Object.keys(report.errors).length;
+  const broken = Object.keys(report.layoutFailures).length;
   console.log(
-    `\n${report.files.length} screenshots → ${OUT}${failed ? `\n${failed} page(s) logged errors — see report.json` : ''}`,
+    `\n${report.files.length} screenshots → ${OUT}${failed ? `\n${failed} page(s) logged errors — see report.json` : ''}${broken ? `\n${broken} page(s) failed the layout gate — see report.json layoutFailures` : ''}`,
   );
-  return failed ? 1 : 0;
+  return failed || broken ? 1 : 0;
 }
 
 app.on('window-all-closed', () => {});

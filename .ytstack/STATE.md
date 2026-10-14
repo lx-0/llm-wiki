@@ -1,9 +1,9 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-14T22:05:00+02:00
+last_updated: 2026-10-14T22:55:00+02:00
 current_milestone: M032
-active_slice: S03
+active_slice: S04
 active_task: none
 last_completed_milestone: M031
 parked_milestone: none
@@ -14,15 +14,14 @@ parallel_milestones: [M021, M025, M027, M029]
 
 ## ▶ NEXT — M032 in flight (L): desktop de-slop
 
-**Status:** M032 -- slice S02 complete (4/4: engine action catalogue, `menu`/`doctor --json`
-schema 2 with title/verb/argv/tools, desktop `lib/actions.ts` merge model, parsers on schema 2,
-`ADVANCED_COMMANDS` + `friendly*` rewrite layers deleted; vitest 63 + pytest 2024 green).
-Reassess after S02: **A — proceed as planned**. S03 1/4: T01 tokens (`styles/tokens.css`),
-primitives (`ui/Button|Switch|TypeBadge`, `ui/icons.ts`), glow/blur layers out, primitives sheet
-in the harness; T02 Settings + Onboarding as Svelte windows (label + value rows, one sentence
-each, 36 captures); T03 Browse + Inbox as Svelte windows (light mode fixed by construction,
-derivations tested). Next task: T04 (dead CSS out + screenshot gate over the four windows) via
-`plan-task`.
+**Status:** M032 -- slices S01–S03 complete. S03 (4/4): tokens (`styles/tokens.css`) +
+primitives (`ui/Button|Switch|TypeBadge`, `ui/icons.ts`, `ui/types.ts`), glow/blur layers out,
+Settings / Onboarding / Browse / Inbox as Svelte windows (light mode fixed by construction, copy
+on a diet, derivations tested), dead CSS out (2,348 → 1,661 lines), DOM layout gate in the
+harness (overlap / clipped / off-screen; strict on the token-system windows). Reassess after
+S03: **A — proceed as planned** (S04-T04 adds `index` to the strict pages). Next slice: S04
+(panel rebuilt in Svelte: labeled nav, status strip, Next-up list, Recent, footer) via
+`plan-task`. vitest 75 + pytest 2024 green.
 
 **S01 COMPLETE (5/5)** -- harness `npm run shots` (30 captures; real panel
 height 1,027 px vs 640 clamp), TypeScript 5.9 strict + svelte-check gate in `npm test`, Biome
