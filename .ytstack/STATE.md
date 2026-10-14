@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-14T21:22:00+02:00
+last_updated: 2026-10-14T21:30:00+02:00
 current_milestone: M033
 active_slice: S03
-active_task: none
+active_task: T01
 last_completed_milestone: M032
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -82,8 +82,11 @@ update. Suite 2057. M034 candidate noted (`backlog/collect-flags-one-verb.md`). 
 after S02 (2026-10-14): B** — the S02 roadmap line rewritten to what shipped (source root,
 six tasks); S03-T04 carries the logging inventory S02 found (36 `basicConfig` sites, six
 console-before-import modules), may split at plan-task; `backlog/lazy-collector-registry.md`
-(M034); S05-T05 re-verifies the trees S02-T05 reconciled. **S03 next (seams, 6 tasks):**
-T01 frontmatter in the nine top-level scripts (`plan-task`).
+(M034); S05-T05 re-verifies the trees S02-T05 reconciled. CI green on
+`01aa3f5`. **S03 (seams, 6 tasks) — T01 planned** (`M033-S03-T01-PLAN.md`): ten top-level
+frontmatter copies → `core/frontmatter` (`lint.py` already on the seam; the grep found
+`cleanup_legacy_daily_roots.py` as a tenth), parity table first, two call-site contracts kept
+via `parse_strict`. Next: execute T01.
 
 ## M032 COMPLETE (L, 2026-10-14): desktop de-slop
 
