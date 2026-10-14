@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-15T01:12:00+02:00
+last_updated: 2026-10-15T01:15:00+02:00
 current_milestone: M033
 active_slice: S03
-active_task: none
+active_task: T06
 last_completed_milestone: M032
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -125,8 +125,15 @@ tests RED → green. Suite 2106. Smoked on the scratch vault (`wiki index` / `--
 the lock, doctor, collect --list). Found en route: ruff 0.16 formats Markdown fences by
 default — a bare `ruff format` (empty path variable from an rtk-filtered pipeline) rewrote
 19 `.ytstack`/`CONTEXT.md` snippets + `docs/vault-concept.build.py`; all 32 hunks reverted
-by hand, `pyproject` `extend-exclude = ["*.md"]`, KNOWLEDGE entry. CI for `2683f8a`
-pending. **Next: T06 (collector inbox + rollup 3 → 1) via `plan-task`.**
+by hand, `pyproject` `extend-exclude = ["*.md"]`, KNOWLEDGE entry. CI green on `2683f8a`
+(runs 38652251381 + 38652251333) and on the closeout `ae1dd40`. **T06 planned**
+(`M033-S03-T06-PLAN.md`): the premise re-measured — `base.scan_inbox` / `append_rollup`
+already exist (M022 harness), the three `_scan_inbox` are one-line bindings; what the three
+`_append_daily_rollup` still copy is the timed-line skeleton (stamp, first line, 80-char
+ellipsis — five homes by smell — and the swallowed append, hand-typed again in jamie / gmeet /
+health ×2 / email). Fold: `core.utils.ellipsize` + `daily_capture.rollup_line`, every
+collector rollup through `base.append_rollup`; byte-exact pins from a parity capture, two
+guards, RED first.
 
 ## M032 COMPLETE (L, 2026-10-14): desktop de-slop
 
