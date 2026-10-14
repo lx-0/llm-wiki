@@ -5,7 +5,7 @@ size: L
 created: 2026-10-14T13:10:00+02:00
 status: planned
 total_slices: 5
-completed_slices: 3
+completed_slices: 4
 ---
 
 # M032 Roadmap
@@ -42,7 +42,7 @@ Suggested framing (refine in slice-milestone; audit in `backlog/deslop-arc.md`):
       light-mode defect on Triage/Settings fixed; if Svelte is chosen (open question 1)
       this slice starts with the scaffold and ports Settings + Onboarding as the pilot
       windows. Screenshot gate on every window. (~4 tasks)
-- [ ] S04 -- **Panel rebuilt.** Labeled nav, status strip (Library sparkline · Health ring ·
+- [x] S04 -- **Panel rebuilt.** Labeled nav, status strip (Library sparkline · Health ring ·
       Capture meter), Next-up action list with row-level progress and persistent result
       pills, Recent, collapsed Add/Sources/Quit footer; copy diet (zero paragraphs,
       tooltips ≤ 6 words); old renderer removed in the swap commit; renderer tests for the

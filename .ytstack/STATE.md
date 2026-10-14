@@ -1,9 +1,9 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-15T03:05:00+02:00
+last_updated: 2026-10-15T03:15:00+02:00
 current_milestone: M032
-active_slice: none
+active_slice: S05
 active_task: none
 last_completed_milestone: M031
 parked_milestone: none
@@ -27,8 +27,11 @@ footer (Add link inline, Sources / Tools as popovers over the content, Quit); T0
 `index.html` mounts the Svelte panel, `renderer.ts` + `panel.html` deleted, `index.css` 1,661
 → 755 lines (cockpit/atlas only, proven by computed-style fingerprint), harness `index` strict
 + rest-height gate ≤ 640 (seen firing), `npm run package` green. Fresh panel 639 px, 50
-captures clean. Next: `/ytstack:reassess-roadmap`, then S05 (Overview window, delete Cockpit +
-Atlas, learnability panel + DMG, closeout). vitest 97 + pytest 2024 green.
+captures clean. Reassess after S04 (2026-10-15): **A — proceed as planned** (nothing in S04
+moved S05's scope; the popover pattern + `[data-layer]` audit rule and the rest-height gate
+are tools S05 inherits). Next slice: S05 (T01 Overview window with four charts, T02 delete
+Cockpit + Atlas, T03 blind learnability panel + DMG, T04 closeout) via `plan-task`.
+vitest 97 + pytest 2024 green.
 
 **S01 COMPLETE (5/5)** -- harness `npm run shots` (30 captures; real panel
 height 1,027 px vs 640 clamp), TypeScript 5.9 strict + svelte-check gate in `npm test`, Biome
