@@ -230,7 +230,12 @@ def test_render_index_always_full_tree(tree):
     out2 = render_index(walk_root(_entry(tree), max_depth=10, recent_n=3))
     afile_line = next(ln for ln in out2.splitlines() if "`afile.txt`" in ln and "- " in ln)
     assert "modified 1970-01-02" in afile_line
-    assert "created" in afile_line
+    # `created` comes from st_birthtime (macOS / BSD); the renderer omits it where the
+    # platform has none (Linux CI) — assert the platform's branch, not the dev Mac's.
+    if hasattr(os.stat(tree / "afile.txt"), "st_birthtime"):
+        assert "created" in afile_line
+    else:
+        assert "created" not in afile_line
 
 
 def test_render_index_names_unmasked(tree):
