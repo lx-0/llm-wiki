@@ -193,24 +193,29 @@ maintenance actions that are available without a pending count.
 
 ```json
 {
+  "schema": 2,
   "vault": "lxw",
   "engine_revision": "abc1234",
   "summary": {"critical": 0, "warning": 1, "info": 1, "ok": 6},
   "checks": [
-    {"id": "hooks-installed", "category": "config", "severity": "ok",
-     "message": "hooks installed (user: claude, cursor; project: claude)",
-     "fix": null, "dispatch_args": null,
-     "details": {"user": ["claude", "cursor"], "project": ["claude"]}}
+    {"id": "hooks-installed", "category": "config", "severity": "warning",
+     "message": "no wiki hooks installed in user or project scope — session capture won't fire",
+     "title": "Session capture isn't installed", "verb": "Install",
+     "fix": "wiki hooks install", "dispatch_args": ["hooks", "install"],
+     "details": null}
   ]
 }
 ```
 
 Stable field names per check: `id`, `category`, `severity`, `message`,
-`fix?`, `dispatch_args?`, `details?`. Severity is one of
-`critical | warning | info | ok`. Exit code: `0` if no critical issues,
-`1` otherwise. When `dispatch_args` is non-null the menu promotes the
-issue into the navigable Actionable list and Enter dispatches
-`wiki <dispatch_args>`.
+`title`, `verb`, `fix?`, `dispatch_args?`, `details?`. Severity is one of
+`critical | warning | info | ok`. `message` is operator-speak (what the TUI
+prints); `title` is the plain-English phrasing GUI consumers show verbatim
+(falls back to `message`); `verb` is the button verb from the action
+catalogue (`scripts/core/actions.py`) when `dispatch_args` is set, else
+`null`. Exit code: `0` if no critical issues, `1` otherwise. When
+`dispatch_args` is non-null the menu promotes the issue into the navigable
+Actionable list and Enter dispatches `wiki <dispatch_args>`.
 
 Agents pick a suggestion from `wiki menu --json` then dispatch its `argv` via the
 regular bash subcommand (e.g. `wiki compile`). They never ask the menu

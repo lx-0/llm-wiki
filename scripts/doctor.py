@@ -26,6 +26,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from core import actions
 from core.health import (
     CheckResult,
     build_health,
@@ -108,6 +109,7 @@ def render_pretty(results: list[CheckResult], summary: dict) -> str:
 
 def render_json(results: list[CheckResult], summary: dict) -> str:
     payload = {
+        "schema": actions.SCHEMA,
         "vault": ROOT_DIR.name,
         "engine_revision": _git_revision(),
         "summary": summary,

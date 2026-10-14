@@ -630,6 +630,7 @@ def test_to_json_serializable(fake_vault):
     assert out == [{
         "id": "a", "category": "config", "severity": "ok",
         "message": "x", "fix": "y", "dispatch_args": None, "details": {"k": 1},
+        "title": "x", "verb": None,
     }]
     json.dumps(out)  # round-trips through json
 
@@ -641,6 +642,26 @@ def test_to_json_includes_dispatch_args():
     )]
     out = health.to_json(sample)
     assert out[0]["dispatch_args"] == ["setup"]
+
+
+def test_to_json_renders_plain_title_and_catalogue_verb():
+    """Schema 2: GUI consumers show `title` + `verb` verbatim. A check that sets a
+    plain-English `title` keeps its operator `message` for the TUI; the verb comes from
+    core.actions by dispatch_args, and is None when nothing is dispatchable."""
+    with_title = health.CheckResult(
+        "gmail-auth", "config", "warning",
+        "Gmail OAuth not bootstrapped for account gmail-personal",
+        fix="wiki gmail-auth gmail-personal", dispatch_args=["gmail-auth", "gmail-personal"],
+        title="Sign in to Gmail (gmail-personal)",
+    )
+    manual = health.CheckResult("claude-authed", "connectivity", "critical", "claude /login",
+                                fix="claude /login")
+    out = health.to_json([with_title, manual])
+    assert out[0]["title"] == "Sign in to Gmail (gmail-personal)"
+    assert out[0]["message"].startswith("Gmail OAuth")
+    assert out[0]["verb"] == "Sign in"
+    assert out[1]["title"] == "claude /login"  # falls back to the message
+    assert out[1]["verb"] is None
 
 
 def test_check_setup_run_carries_dispatch_args(fake_vault, monkeypatch):

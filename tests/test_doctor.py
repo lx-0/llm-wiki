@@ -51,12 +51,14 @@ def test_doctor_json_emits_valid_payload():
     proc = _run(["--json"])
     assert proc.returncode in (0, 1)
     data = json.loads(proc.stdout)
-    assert set(data.keys()) >= {"vault", "engine_revision", "summary", "checks"}
+    assert set(data.keys()) >= {"schema", "vault", "engine_revision", "summary", "checks"}
+    assert data["schema"] == 2
     assert isinstance(data["checks"], list)
     assert all(
-        set(c.keys()) >= {"id", "category", "severity", "message"}
+        set(c.keys()) >= {"id", "category", "severity", "message", "title", "verb"}
         for c in data["checks"]
     )
+    assert all(c["title"] for c in data["checks"])
     # summary counts must equal actual severities
     counted = {"critical": 0, "warning": 0, "info": 0, "ok": 0}
     for c in data["checks"]:

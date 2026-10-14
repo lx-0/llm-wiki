@@ -34,6 +34,7 @@ from urllib.parse import urlparse
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from core import actions
 from core.paths import (
     KNOWLEDGE_DIR,
     LOGS_DIR,
@@ -70,6 +71,10 @@ class CheckResult:
     # shell-only, or external (e.g. "claude /login", "tail …").
     dispatch_args: list[str] | None = None
     details: dict | None = field(default=None)
+    # Plain-English phrasing for GUI consumers (desktop app, agents) — set it next to the
+    # check that produces operator jargon; `to_json` falls back to `message`. The TUI keeps
+    # rendering `message` (DECISIONS 2026-06-24: engine/CLI speak operator, GUI plain).
+    title: str | None = None
 
 
 # ── Individual checks ───────────────────────────────────────────────
@@ -95,6 +100,7 @@ def check_setup_run() -> CheckResult:
                 category="config",
                 severity="critical",
                 message="config has default values and no compile state — setup not run",
+                title="Finish setting up your wiki",
                 fix="wiki setup",
                 dispatch_args=["setup"],
             )
@@ -198,6 +204,7 @@ def check_hooks_installed() -> CheckResult:
             category="config",
             severity="warning",
             message="no wiki hooks installed in user or project scope — session capture won't fire",
+            title="Session capture isn't installed",
             fix="wiki hooks install",
             dispatch_args=["hooks", "install"],
         )
@@ -510,6 +517,7 @@ def check_engine_update_available(*, quick: bool = False) -> CheckResult:
             category="config",
             severity="warning",
             message=msg,
+            title=f"Engine update available ({n} commit{'s' if n != 1 else ''} behind)",
             fix="wiki update",
             dispatch_args=["update"],
             details={"behind": n, "upstream": upstream, "latest": head},
@@ -590,6 +598,7 @@ def check_compile_state() -> CheckResult:
                 category="pipeline",
                 severity="info",
                 message=f"last compile {int(delta / 86400)}d ago (consider `wiki compile`)",
+                title=f"Your wiki hasn't been updated in {int(delta / 86400)} days",
                 fix="wiki compile",
                 dispatch_args=["compile"],
             )
@@ -709,6 +718,7 @@ def _check_one_token(
         severity=missing_severity,
         message=f"{kind_label} OAuth not bootstrapped for account "
                 f"`{account_id}` — {role}",
+        title=f"Sign in to {kind_label} ({account_id})",
         fix=f"wiki {auth_cmd} {account_id}",
         dispatch_args=[auth_cmd, account_id],
         details={"account": account_id, "kind": kind_label,
@@ -739,6 +749,7 @@ def check_wiki_on_path() -> CheckResult:
                 category="config",
                 severity="warning",
                 message="`wiki` not on $PATH — every call needs ./.wiki/wiki or full path",
+                title="The wiki command isn't on your PATH",
                 fix="wiki install-shortcut",
                 dispatch_args=["install-shortcut"],
             )
@@ -764,6 +775,7 @@ def check_wiki_on_path() -> CheckResult:
             category="config",
             severity="warning",
             message=f"`wiki` on PATH points at a different vault ({resolved_target})",
+            title="The wiki command points at another vault",
             fix="wiki install-shortcut",
             dispatch_args=["install-shortcut"],
             details={"resolved": resolved, "this_vault": str(own_target)},
@@ -1176,6 +1188,7 @@ def check_index_drift(
             message=(f"knowledge/index.md drift: {stats.get('deduped', 0)} duplicate / "
                      f"{stats.get('dropped_dangling', 0)} dangling / "
                      f"{stats.get('appended', 0)} missing row(s)"),
+            title="The note index is out of sync",
             fix="wiki reindex",
             dispatch_args=["reindex"],
         )
@@ -1348,6 +1361,7 @@ def check_flush_pipeline() -> CheckResult:
                 f"{spawns_since_ok} spawned since, {archived} archived; "
                 f"last failure: {cause}"
             ),
+            title="Session capture has stalled",
             fix=fix, dispatch_args=dispatch, details=details,
         )
     if archived:
@@ -1357,6 +1371,7 @@ def check_flush_pipeline() -> CheckResult:
                 f"{archived} archived flush context(s) awaiting retry "
                 f"(last successful flush {since})"
             ),
+            title=f"{archived} captured session{'s' if archived != 1 else ''} waiting to retry",
             fix="drains via the retry_failed_flushes piggyback after the next "
                 "successful flush or `wiki compile`",
             details=details,
@@ -1479,6 +1494,7 @@ def check_engine_cloud_eviction() -> CheckResult:
                 "(Code Signature Invalid) and stall imports for minutes"
                 + (f"; {dataless} engine file(s) evicted right now" if dataless else "")
             ),
+            title="The engine runs from cloud-synced storage",
             fix=(
                 "run `wiki update` (engine ≥0.5.4 builds the environment at "
                 "~/.venvs/<vault>-wiki for cloud-synced vaults), then `wiki hooks install` "
@@ -1496,6 +1512,7 @@ def check_engine_cloud_eviction() -> CheckResult:
                 f"(engine runs from {venv_real}) but the sync engine keeps hauling it"
                 + (f"; {dataless} engine file(s) evicted right now" if dataless else "")
             ),
+            title="A stale engine environment sits inside the vault",
             fix=f"rm -rf '{stale_in_vault}'",
             details=details,
         )
@@ -1506,6 +1523,7 @@ def check_engine_cloud_eviction() -> CheckResult:
                 f"{dataless} of {scanned} engine file(s) are evicted from local "
                 "storage — imports and prompt renders block on cloud downloads"
             ),
+            title="Engine files are evicted from local storage",
             fix=f"brctl download '{WIKI_DIR}' (or open the folder in Finder to re-download)",
             details=details,
         )
@@ -1578,8 +1596,15 @@ def health_summary(results: list[CheckResult]) -> dict[str, int]:
 
 
 def to_json(results: list[CheckResult]) -> list[dict]:
-    """Serialize to plain-dict form for JSON output."""
-    return [asdict(r) for r in results]
+    """Serialize to plain-dict form for JSON output (schema 2: `title` always present,
+    `verb` from the action catalogue when the check is dispatchable)."""
+    out: list[dict] = []
+    for r in results:
+        d = asdict(r)
+        d["title"] = r.title or r.message
+        d["verb"] = actions.verb_for(r.dispatch_args) if r.dispatch_args else None
+        out.append(d)
+    return out
 
 
 # ── Internal helpers ────────────────────────────────────────────────
