@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-14T21:05:00+02:00
+last_updated: 2026-10-14T21:12:00+02:00
 current_milestone: M033
-active_slice: S02
-active_task: T06
+active_slice: none
+active_task: none
 last_completed_milestone: M032
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -71,10 +71,15 @@ directory-level + the three invocation forms). Suite 2053. **Operator note (lxw)
 once more (lxw's config needed no migration anyway). **T06 added** (6 tasks now): the ~60
 documented by-path invocations of sub-package modules (`docs/PROCESS.md`, `FEATURES.md`,
 `config.md`, 13 docstrings) that the bootstrap removal turned into `ModuleNotFoundError`s.
-T05 pushed (`b96865a` + `f0eadb8`), CI green (runs 38618938498 + 38618938449). **T06 planned**
-(`M033-S02-T06-PLAN.md`): the 72 documented by-path invocations → `wiki <cmd>` / `-m` forms,
-three top-level entry scripts for the direct-CLI flags of screenshots / browser / tabs, a
-layout-guard test over docstrings + docs. Next: execute T06.
+T05 pushed (`b96865a` + `f0eadb8`), CI green (runs 38618938498 + 38618938449). **S02 COMPLETE (6/6)** — T06
+(`e0f471a`): the 72 documented by-path invocations of sub-package modules now spell `wiki
+<cmd>` / a top-level entry script / `python -m …` (RED on 77 sites, guard in
+`tests/test_layout.py` over docstrings + `docs/` + AGENTS + README + templates); entry scripts
+`scan_screenshots.py` / `scan_browser.py` / `scan_tabs.py` for the direct-CLI flags; three
+schema comments + `docs/config.md` regenerated; every documented form executed once, the
+by-path ones from the scratch vault's root after it pulled `e0f471a` through the re-exec
+update. Suite 2057. M034 candidate noted (`backlog/collect-flags-one-verb.md`). Next:
+`reassess-roadmap` for S02, then S03 (seams).
 
 ## M032 COMPLETE (L, 2026-10-14): desktop de-slop
 

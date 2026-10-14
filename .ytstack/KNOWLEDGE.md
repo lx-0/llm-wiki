@@ -2828,6 +2828,13 @@ Per-candidate learnings from the 14-candidate seam arc (C01–C14). Decisions li
   error after import is enough — or through `core.entry.python_m` directly. Guards:
   `test_no_handler_lives_in_a_package_that_imports_it` + the entry-module runpy test in
   `tests/test_cli_dispatch.py`.
+- **Documented invocations are code (M033-S02-T06):** 72 lines across docstrings and `docs/`
+  still spelled `uv run python scripts/<pkg>/<x>.py` after the bootstraps went — every one a
+  `ModuleNotFoundError` for the operator, none caught, because no test read the docs.
+  `tests/test_layout.py` now scans docstrings, `docs/`, `AGENTS.md`, `README.md` and
+  `templates/` for the by-path form; a module's usage block is part of its contract and gets
+  a guard like any other surface. Corollary for the next rename / relocation: grep the docs
+  for the old spelling in the same commit, the guard tells you where.
 - **`gh run list --commit <sha>` wants the full SHA:** a short SHA listed nothing for 100 s
   while two runs for that push were already green. `gh run list --limit N --json
   databaseId,headSha,conclusion` and match the prefix.
