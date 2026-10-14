@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-15T01:54:00+02:00
+last_updated: 2026-10-15T01:55:00+02:00
 current_milestone: M033
 active_slice: S04
-active_task: none
+active_task: T03
 last_completed_milestone: M032
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
