@@ -37,7 +37,8 @@ import httpx
 from core import ollama_client
 from core.config import CONFIG
 from core.console import setup_console_logging
-from core.paths import RAW_ARTICLES_DIR, ROOT_DIR, SCRIPTS_DIR, WIKI_DIR
+from core.entry import child_env, python_m
+from core.paths import RAW_ARTICLES_DIR, ROOT_DIR, WIKI_DIR
 from core.utils import slugify, today_iso
 from preprocessors.base import PreprocessorSpec, PreprocessResult, register
 
@@ -257,16 +258,11 @@ def ingest(source: str, mode: str, model: str, compile: bool) -> Path | None:
     log.info("Saved: %s", output_path.relative_to(ROOT_DIR))
 
     # ── Compile ──
-    # compile.py lives in the engine (WIKI_DIR/scripts), not the vault
-    # (ROOT_DIR/scripts). Use sys.executable so we stay in the current venv.
+    # As a module in the current venv's interpreter (core.entry) — no dependence
+    # on uv being on PATH, no engine path to resolve.
     if compile:
         log.info("Triggering compilation...")
-        compile_script = SCRIPTS_DIR / "compile.py"
-        subprocess.run(
-            [sys.executable, str(compile_script)],
-            cwd=str(WIKI_DIR),
-            check=False,
-        )
+        subprocess.run(python_m("compile.py"), env=child_env(), cwd=str(WIKI_DIR), check=False)
 
     return output_path
 

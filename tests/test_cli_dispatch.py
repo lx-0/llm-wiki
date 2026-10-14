@@ -15,21 +15,6 @@ import pytest
 import cli
 
 
-@pytest.mark.parametrize(
-    ("handler", "module"),
-    [
-        ("compile.py", "compile"),
-        ("review_wiki.py", "review_wiki"),
-        ("preprocessors/inbox.py", "preprocessors.inbox"),
-        ("preprocessors/html_ingest.py", "preprocessors.html_ingest"),
-        ("collectors/cli.py", "collectors.cli"),
-        ("facts/correct.py", "facts.correct"),
-    ],
-)
-def test_handler_path_maps_to_module(handler: str, module: str) -> None:
-    assert cli.module_for(handler) == module
-
-
 def test_run_child_spawns_module_with_scripts_on_pythonpath(monkeypatch, tmp_path) -> None:
     seen: dict = {}
 

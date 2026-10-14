@@ -11,6 +11,8 @@ returns exactly the tasks that should fire. The spawn side is a thin wrapper.
 
 from __future__ import annotations
 
+import os
+import sys
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
@@ -78,7 +80,12 @@ def test_run_due_piggybacks_spawns_due_task_wrapped_in_runner(monkeypatch):
 
     popen_calls: list[list[str]] = []
     recorded: list[tuple[str, dict]] = []
-    monkeypatch.setattr(piggybacks.subprocess, "Popen", lambda cmd, **kw: popen_calls.append(cmd))
+    popen_kwargs: list[dict] = []
+    monkeypatch.setattr(
+        piggybacks.subprocess,
+        "Popen",
+        lambda cmd, **kw: (popen_calls.append(cmd), popen_kwargs.append(kw)),
+    )
     monkeypatch.setattr(
         runner_mod, "record_status", lambda name, payload: recorded.append((name, payload))
     )
@@ -99,8 +106,14 @@ def test_run_due_piggybacks_spawns_due_task_wrapped_in_runner(monkeypatch):
 
     assert spawned == ["lint-structural"]
     assert len(popen_calls) == 1
-    flat = " ".join(popen_calls[0])
-    assert "piggyback_runner.py" in flat  # wrapped under the wall-clock cap
-    assert str(piggybacks.SCRIPTS_DIR / "lint.py") in flat  # real resolved script path
-    assert "--structural-only" in flat
+    argv = popen_calls[0]
+    # wrapped under the wall-clock cap, both runner and task spawned as modules
+    # (`scripts/` is the source root — no per-module sys.path bootstrap needed)
+    assert argv[:3] == [sys.executable, "-m", "core.piggyback_runner"]
+    sep = argv.index("--")
+    assert argv[sep + 1 : sep + 4] == [sys.executable, "-m", "lint"]
+    assert "--structural-only" in argv[sep + 4 :]
+    assert "lint.py" not in " ".join(argv)  # no file path in the child's argv
+    env = popen_kwargs[0]["env"]
+    assert env["PYTHONPATH"].split(os.pathsep)[0] == str(piggybacks.SCRIPTS_DIR)
     assert recorded and recorded[0][0] == "lint-structural"  # cooldown ledger stamped

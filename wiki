@@ -582,8 +582,8 @@ EOF
   # the rename/add/drop diff and applies it otherwise. Keeps the vault's
   # config.yaml in sync with whatever the engine pull just introduced.
   info "Migrating config.yaml to current schema (idempotent) …"
-  if ! uv run --quiet --project "$WIKI_DIR" python \
-        "$WIKI_DIR/scripts/migrations/migrate_config_keys.py" \
+  if ! PYTHONPATH="$WIKI_DIR/scripts" uv run --quiet --project "$WIKI_DIR" python \
+        -m migrations.migrate_config_keys \
         --vault "$ROOT_DIR" --apply; then
     warn "Config migration reported errors — inspect $ROOT_DIR/.wiki/config.yaml manually."
   fi
@@ -592,8 +592,8 @@ EOF
   # Pre-2026-05-28 vaults carry a 2 MB audit log inside knowledge/ that
   # crashes Obsidian on open. The log is engine telemetry, not knowledge.
   info "Relocating operations log out of knowledge/ (idempotent) …"
-  if ! uv run --quiet --project "$WIKI_DIR" python \
-        "$WIKI_DIR/scripts/migrations/migrate_log_md_path.py" \
+  if ! PYTHONPATH="$WIKI_DIR/scripts" uv run --quiet --project "$WIKI_DIR" python \
+        -m migrations.migrate_log_md_path \
         --vault "$ROOT_DIR"; then
     warn "Operations-log migration reported errors — inspect $ROOT_DIR/knowledge/log.md manually."
   fi

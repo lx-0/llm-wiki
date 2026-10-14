@@ -38,6 +38,7 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 │   │   ├── frontmatter.py         ← the single frontmatter grammar (parse/parse_strict/field/write/update_fields) — never hand-roll a `---` parser
 │   │   ├── markers.py             ← sentinel-region primitive (find_region + replace/ensure/strip_region) for `<!-- x:begin/end -->` managed blocks
 │   │   ├── state_store.py         ← flock primitives + atomic JSON saves + state.json merge-under-lock + ingested-ledger API
+│   │   ├── entry.py               ← how one engine process spawns another: `python -m <module>` with scripts/ on PYTHONPATH (module_for / child_env / python_m); cli, piggybacks, flush, preprocessors use it
 │   │   ├── errors.py              ← swallow(label) — labeled intentional exception suppression (AGENTS.md § Exception handling)
 │   │   ├── daily_capture.py       ← fcntl-flocked append/replace_section/replace_block into daily/<date>/<source>.md
 │   │   ├── utils.py               ← shared helpers (article listing, JSON state, history) + now_iso/today_iso

@@ -43,6 +43,7 @@ ROOT_DIR = WIKI_DIR.parent
 sys.path.insert(0, str(SCRIPTS_DIR))
 from core import flush_pipeline
 from core.config import CONFIG
+from core.entry import child_env, python_m
 from core.piggybacks import run_due_piggybacks
 from core.sdk_helpers import SdkCallSpec, is_fatal, run_sdk_query
 from core.state_store import is_ingested, try_locked
@@ -56,9 +57,10 @@ LOGS_DIR.mkdir(parents=True, exist_ok=True)
 LOG_FILE = LOGS_DIR / "flush.log"
 ERRORS_LOG_FILE = LOGS_DIR / "flush-errors.log"
 LAST_FLUSH_FILE = STATE_DIR / "last-flush.json"
-COMPILE_SCRIPT = SCRIPTS_DIR / "compile.py"
-DASHBOARD_STATS_SCRIPT = SCRIPTS_DIR / "dashboard" / "dashboard_stats.py"
-DASHBOARD_LINT_SCRIPT = SCRIPTS_DIR / "dashboard" / "dashboard_lint.py"
+# Children are spawned as modules (core.entry) — handler paths relative to scripts/.
+COMPILE_HANDLER = "compile.py"
+DASHBOARD_STATS_HANDLER = "dashboard/dashboard_stats.py"
+DASHBOARD_LINT_HANDLER = "dashboard/dashboard_lint.py"
 DASHBOARD_LOCK_FILE = STATE_DIR / "dashboard-refresh.lock"
 # 30s was too tight on iCloud-synced vaults under post-compile-hour
 # concurrent-flush bursts (incident 2026-05-03: 103 timeout records in
@@ -232,7 +234,7 @@ def maybe_trigger_compile(daily_file: Path) -> None:
         pass  # unreadable/corrupt state — fail open; compile re-checks the ledger
 
     log.info("Triggering compile for %s", daily_file.name)
-    cmd = [sys.executable, str(COMPILE_SCRIPT), "--file", str(daily_file)]
+    cmd = python_m(COMPILE_HANDLER, "--file", str(daily_file))
 
     kwargs: dict = {}
     if sys.platform == "win32":
@@ -245,6 +247,7 @@ def maybe_trigger_compile(daily_file: Path) -> None:
     try:
         subprocess.Popen(
             cmd,
+            env=child_env(),
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             stdin=subprocess.DEVNULL,
@@ -277,13 +280,14 @@ def _dashboard_refresh_lock():
         yield acquired
 
 
-def _run_dashboard_script(script: Path, label: str) -> None:
-    """Run one dashboard regen script, logging structured diagnostics on
+def _run_dashboard_script(handler: str, label: str) -> None:
+    """Run one dashboard regen module, logging structured diagnostics on
     failure so the operator can tell timeouts apart from crashes."""
     started = time.time()
     try:
         result = subprocess.run(
-            [sys.executable, str(script)],
+            python_m(handler),
+            env=child_env(),
             capture_output=True,
             stdin=subprocess.DEVNULL,
             check=False,
@@ -296,7 +300,7 @@ def _run_dashboard_script(script: Path, label: str) -> None:
             label,
             elapsed,
             DASHBOARD_REFRESH_TIMEOUT_S,
-            script.name,
+            handler,
         )
         if exc.stderr:
             log.error("    stderr: %s", exc.stderr.decode("utf-8", errors="replace")[:500])
@@ -323,7 +327,7 @@ def refresh_dashboard_stats() -> None:
     with _dashboard_refresh_lock() as acquired:
         if not acquired:
             return
-        _run_dashboard_script(DASHBOARD_STATS_SCRIPT, "stats")
+        _run_dashboard_script(DASHBOARD_STATS_HANDLER, "stats")
 
 
 def refresh_dashboard_lint() -> None:
@@ -332,7 +336,7 @@ def refresh_dashboard_lint() -> None:
     with _dashboard_refresh_lock() as acquired:
         if not acquired:
             return
-        _run_dashboard_script(DASHBOARD_LINT_SCRIPT, "lint")
+        _run_dashboard_script(DASHBOARD_LINT_HANDLER, "lint")
 
 
 # ── Piggyback tasks ─────────────────────────────────────────────────

@@ -475,7 +475,7 @@ _merge_agent_shell_commands() {
     return 0
   fi
   local entries
-  entries="$(uv run --quiet --project "$wiki_dir" python "$wiki_dir/scripts/dashboard/agent_buttons.py" shell-commands 2>/dev/null || echo '{}')"
+  entries="$(PYTHONPATH="$wiki_dir/scripts" uv run --quiet --project "$wiki_dir" python -m dashboard.agent_buttons shell-commands 2>/dev/null || echo '{}')"
   if [[ -z "$entries" ]] || [[ "$entries" == "{}" ]]; then
     [[ "$check" == "1" ]] && ok "up-to-date .obsidian/plugins/obsidian-shellcommands/data.json"
     return 0
@@ -535,7 +535,7 @@ _rewrite_dashboard_agent_buttons() {
   fi
   _seed_only_skip "$dashboard" && return 0
   local result
-  result="$(uv run --quiet --project "$wiki_dir" python "$wiki_dir/scripts/dashboard/agent_buttons.py" update-dashboard "$dashboard" 2>&1 || echo unchanged)"
+  result="$(PYTHONPATH="$wiki_dir/scripts" uv run --quiet --project "$wiki_dir" python -m dashboard.agent_buttons update-dashboard "$dashboard" 2>&1 || echo unchanged)"
   if [[ "$result" == "changed" ]]; then
     ok "dashboard.md — agent-buttons regions refreshed"
   else

@@ -36,7 +36,6 @@ menu can see them. `auth` routes to the OAuth registry.
 from __future__ import annotations
 
 import importlib
-import os
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -46,6 +45,7 @@ SCRIPTS_DIR = Path(__file__).resolve().parent
 WIKI_DIR = SCRIPTS_DIR.parent
 sys.path.insert(0, str(SCRIPTS_DIR))
 
+from core.entry import child_env, python_m  # noqa: E402 — after the bootstrap
 
 # ── stdout styling ──────────────────────────────────────────────────────
 # `wiki help` + command banners go to stdout, so TTY-detect on stdout (the
@@ -1222,26 +1222,13 @@ def render_help() -> str:
 # ── Command dispatch ────────────────────────────────────────────────────
 
 
-def module_for(handler: str) -> str:
-    """`preprocessors/inbox.py` → `preprocessors.inbox`: a handler path relative to
-    `scripts/`, as the module name `python -m` runs it under."""
-    if not handler.endswith(".py"):
-        raise ValueError(f"handler must be a .py path relative to scripts/: {handler!r}")
-    return handler[:-3].replace("/", ".")
-
-
 def _run_child(script_rel: str, args: list[str]) -> int:
     """Run one handler as a child process — `python -m <module>` with `scripts/` first
-    on the child's PYTHONPATH (the same process isolation `_run_script` gave; sub-package
-    entry points need no `sys.path` bootstrap of their own). The working directory is
-    inherited, so a relative argument (`wiki ingest-html ./page.html`) resolves against
-    the operator's cwd. Returns the child's exit code."""
-    env = dict(os.environ)
-    inherited = env.get("PYTHONPATH")
-    env["PYTHONPATH"] = str(SCRIPTS_DIR) + (os.pathsep + inherited if inherited else "")
-    completed = subprocess.run(
-        [sys.executable, "-m", module_for(script_rel), *args], env=env, check=False
-    )
+    on the child's PYTHONPATH (`core.entry`; the same process isolation `_run_script`
+    gave, and sub-package entry points need no `sys.path` bootstrap of their own). The
+    working directory is inherited, so a relative argument (`wiki ingest-html ./page.html`)
+    resolves against the operator's cwd. Returns the child's exit code."""
+    completed = subprocess.run(python_m(script_rel, *args), env=child_env(), check=False)
     return completed.returncode
 
 

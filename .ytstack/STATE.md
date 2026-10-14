@@ -1,7 +1,7 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-14T23:55:00+02:00
+last_updated: 2026-10-15T00:40:00+02:00
 current_milestone: M033
 active_slice: S02
 active_task: none
@@ -46,8 +46,12 @@ scripts.core.paths` → False today; `-m collectors.cli` runs without a bootstra
 / `retry_failed_flushes.py` renamed, `process_inbox.py` / `ingest_html.py` entry modules
 (the package modules warn under `-m`: runpy double import), and — pulled forward from T03
 — `cli.py` spawns handlers as `python -m <module>` with `scripts/` on PYTHONPATH
-(`tests/test_cli_dispatch.py`). Suite 2039. Next: T03 — piggybacks + piggyback_runner onto
-`-m` (`plan-task`).
+(`tests/test_cli_dispatch.py`). **S02 3/5** — T03: `core/entry.py` (`module_for`,
+`child_env`, `python_m`) is the one spawn seam; cli, piggybacks (runner + task), flush's
+compile + dashboard children, the preprocessors' compile trigger and four bash lines
+(`PYTHONPATH=… python -m`) all use it; no engine module is spawned by file path any
+more. Suite 2044. Next: T04 — delete the 82 bootstraps, rewrite the 28 `scripts.*`
+imports, guard test (`plan-task`).
 
 ## M032 COMPLETE (L, 2026-10-14): desktop de-slop
 

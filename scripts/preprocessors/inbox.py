@@ -16,13 +16,13 @@ from __future__ import annotations
 import argparse
 import shutil
 import subprocess
-import sys
 from datetime import datetime
 from pathlib import Path
 
 from core import ollama_client
 from core.config import CONFIG
 from core.console import setup_console_logging
+from core.entry import child_env, python_m
 from core.paths import (
     INBOX_DIR,
     RAW_ARTICLES_DIR,
@@ -30,7 +30,6 @@ from core.paths import (
     RAW_NOTES_DIR,
     RAW_TRANSCRIPTS_DIR,
     ROOT_DIR,
-    SCRIPTS_DIR,
     WIKI_DIR,
 )
 from core.prompts import render
@@ -319,13 +318,7 @@ def main() -> None:
     if args.dry_run or args.no_compile:
         return
 
-    # Trigger compilation. compile.py lives in the engine (WIKI_DIR/scripts),
-    # not in the vault (ROOT_DIR/scripts). Reuse the current venv's interpreter
-    # via sys.executable so we don't depend on uv being on PATH.
+    # Trigger compilation — as a module in the current venv's interpreter
+    # (core.entry), so we don't depend on uv being on PATH.
     print("\nTriggering compilation...")
-    compile_script = SCRIPTS_DIR / "compile.py"
-    subprocess.run(
-        [sys.executable, str(compile_script)],
-        cwd=str(WIKI_DIR),
-        check=False,
-    )
+    subprocess.run(python_m("compile.py"), env=child_env(), cwd=str(WIKI_DIR), check=False)

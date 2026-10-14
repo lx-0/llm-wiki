@@ -27,6 +27,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from core.config import CONFIG
+from core.entry import child_env, python_m
 
 SCRIPTS_DIR = Path(__file__).resolve().parent.parent  # core/ → scripts/
 WIKI_DIR = SCRIPTS_DIR.parent
@@ -250,7 +251,9 @@ def run_due_piggybacks(
     # (e.g. review-wiki on a half-open socket) ran unbounded. See KNOWLEDGE.md.
     from core.piggyback_runner import record_status  # late import — avoid cycles
 
-    runner = SCRIPTS_DIR / "core" / "piggyback_runner.py"
+    # Runner and task both run as modules with scripts/ on the child's PYTHONPATH
+    # (core.entry) — the task's own module needs no sys.path bootstrap.
+    runner = python_m("core/piggyback_runner.py")
     timeout_s = CONFIG.limits.piggyback_max_runtime_s
     spawned: list[str] = []
 
@@ -261,8 +264,8 @@ def run_due_piggybacks(
             log.warning("Piggyback %s: script not found: %s", name, script)
             continue
 
-        cmd = [sys.executable, str(script), *task["cmd"][1:]]
-        wrapped = [sys.executable, str(runner), name, str(timeout_s), "--", *cmd]
+        cmd = python_m(task["cmd"][0], *task["cmd"][1:])
+        wrapped = [*runner, name, str(timeout_s), "--", *cmd]
         log.info("Piggyback %s: spawning %s (cap %ds)", name, " ".join(task["cmd"]), timeout_s)
 
         kwargs: dict = {}
@@ -278,6 +281,7 @@ def run_due_piggybacks(
         try:
             subprocess.Popen(
                 wrapped,
+                env=child_env(),
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
                 stdin=subprocess.DEVNULL,
