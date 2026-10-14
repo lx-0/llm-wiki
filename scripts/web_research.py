@@ -41,9 +41,7 @@ from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Literal
 
-import yaml
-
-from core import markers
+from core import frontmatter, markers
 
 log = logging.getLogger("web_research")
 
@@ -70,21 +68,6 @@ class WebResearchResult:
 
 
 # ── Frontmatter + opt-in ─────────────────────────────────────────────
-
-
-def split_frontmatter(text: str) -> tuple[dict, str]:
-    if not text.startswith("---\n"):
-        return {}, text
-    end = text.find("\n---\n", 4)
-    if end == -1:
-        return {}, text
-    try:
-        fm = yaml.safe_load(text[4:end]) or {}
-    except yaml.YAMLError:
-        fm = {}
-    if not isinstance(fm, dict):
-        fm = {}
-    return fm, text[end + 5 :]
 
 
 def is_opted_in(fm: dict) -> bool:
@@ -254,7 +237,7 @@ def run_web_research(
     if not page.exists():
         return WebResearchResult("skipped", reason="no_page")
     text = page.read_text(encoding="utf-8")
-    fm, _ = split_frontmatter(text)
+    fm, _ = frontmatter.parse(text)
 
     if not force and not is_opted_in(fm):
         return WebResearchResult("skipped", reason="not_opted_in")

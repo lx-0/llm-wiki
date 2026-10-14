@@ -13,7 +13,7 @@ Safety:
   divergence → refusal + report.
 - Frontmatter-equipped digests (`type: daily-digest`) are also refused —
   those are LATER artefacts (compile-stage digests), not legacy flat
-  dailies. Detection via `_FRONTMATTER_RE`.
+  dailies. Detection via `core.frontmatter.field(text, "type")`.
 - Today's date is skipped (active session may be writing).
 - Idempotent: re-running on an already-cleaned vault is a no-op.
 
@@ -30,19 +30,17 @@ import sys
 from datetime import date as _date
 from pathlib import Path
 
+from core import frontmatter
+
 log = logging.getLogger("cleanup_legacy_daily_roots")
 
 _ISO_MD_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})\.md$")
-_FRONTMATTER_RE = re.compile(r"^---\n(.*?)\n---\n", re.DOTALL)
 
 
 def _has_digest_frontmatter(text: str) -> bool:
-    """True if the root file already carries `type: daily-digest` — keep it."""
-    m = _FRONTMATTER_RE.match(text)
-    if not m:
-        return False
-    block = m.group(1)
-    return re.search(r"^type:\s*daily-digest\b", block, re.MULTILINE) is not None
+    """True if the root file already carries `type: daily-digest` — keep it.
+    Exact value match through the single frontmatter grammar (quoted or not)."""
+    return frontmatter.field(text, "type") == "daily-digest"
 
 
 def main() -> int:

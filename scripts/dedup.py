@@ -45,6 +45,7 @@ from pathlib import Path
 
 import yaml
 
+from core import frontmatter
 from core.links import relative_target, resolve_link, retarget_links
 
 logging.basicConfig(
@@ -159,22 +160,6 @@ class EntityPage:
         return [self.title, *self.aliases]
 
 
-def split_frontmatter(text: str) -> tuple[dict, str]:
-    """(frontmatter dict, body). Tolerant — returns ({}, text) when absent."""
-    if not text.startswith("---\n"):
-        return {}, text
-    end = text.find("\n---\n", 4)
-    if end == -1:
-        return {}, text
-    try:
-        fm = yaml.safe_load(text[4:end]) or {}
-    except yaml.YAMLError:
-        fm = {}
-    if not isinstance(fm, dict):
-        fm = {}
-    return fm, text[end + 5 :]
-
-
 def _first_h1(body: str) -> str | None:
     for line in body.splitlines():
         if line.startswith("# "):
@@ -196,7 +181,7 @@ def _as_str_list(value: object) -> list[str]:
 
 def load_entity(path: Path, kind: str) -> EntityPage:
     text = path.read_text(encoding="utf-8")
-    fm, body = split_frontmatter(text)
+    fm, body = frontmatter.parse(text)
     title = (
         (fm.get("title") or fm.get("name") or "").strip()
         or _first_h1(body)
@@ -541,8 +526,8 @@ def merge_pages(
 
     keep_text = keep.path.read_text(encoding="utf-8")
     drop_text = drop.path.read_text(encoding="utf-8")
-    keep_fm, keep_body = split_frontmatter(keep_text)
-    drop_fm, drop_body = split_frontmatter(drop_text)
+    keep_fm, keep_body = frontmatter.parse(keep_text)
+    drop_fm, drop_body = frontmatter.parse(drop_text)
 
     # Section + frontmatter merge.
     merged_body = merge_bodies(keep_body, drop_body)

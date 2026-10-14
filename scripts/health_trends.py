@@ -28,9 +28,7 @@ from collections import defaultdict
 from pathlib import Path
 from statistics import mean
 
-import yaml
-
-from core import markers
+from core import frontmatter, markers
 from core.config import CONFIG
 from core.paths import CONCEPTS_DIR, ROOT_DIR
 from core.utils import now_iso
@@ -51,19 +49,6 @@ HEALTH_PAGE = CONCEPTS_DIR / "health.md"
 _SKIP_KEYS = {"date"}
 
 
-def _parse_frontmatter(text: str) -> dict:
-    if not text.startswith("---\n"):
-        return {}
-    end = text.find("\n---\n", 4)
-    if end == -1:
-        return {}
-    try:
-        fm = yaml.safe_load(text[4:end]) or {}
-    except yaml.YAMLError:
-        return {}
-    return fm if isinstance(fm, dict) else {}
-
-
 def collect_metrics(
     health_dir: Path,
 ) -> tuple[dict[str, list[tuple[str, float]]], int, tuple[str, str]]:
@@ -75,7 +60,7 @@ def collect_metrics(
     series: dict[str, list[tuple[str, float]]] = defaultdict(list)
     dates: list[str] = []
     for f in sorted(health_dir.rglob("*.md")):
-        fm = _parse_frontmatter(f.read_text(encoding="utf-8"))
+        fm = frontmatter.parse(f.read_text(encoding="utf-8"))[0]
         date = fm.get("date")
         if not isinstance(date, str):
             continue

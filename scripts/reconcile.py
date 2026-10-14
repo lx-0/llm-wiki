@@ -35,9 +35,8 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
-import yaml
-
 import lint
+from core import frontmatter
 from core.config import CONFIG
 from core.paths import FACTS_DIR, LOG_FILE, ROOT_DIR
 from core.usage import LEDGER
@@ -77,20 +76,13 @@ def _fact_violations_by_slug() -> dict[str, list[str]]:
 
 
 def _read_frontmatter(path: Path) -> dict:
+    """Frontmatter via the single `core.frontmatter` grammar (C03); `{}` for an
+    unreadable file, no fence or malformed YAML."""
     try:
         text = path.read_text(encoding="utf-8")
     except OSError:
         return {}
-    if not text.startswith("---\n"):
-        return {}
-    end = text.find("\n---\n", 4)
-    if end == -1:
-        return {}
-    try:
-        fm = yaml.safe_load(text[4:end]) or {}
-    except yaml.YAMLError:
-        return {}
-    return fm if isinstance(fm, dict) else {}
+    return frontmatter.parse(text)[0]
 
 
 def _within_cooldown(slug: str, *, cooldown_days: int) -> bool:

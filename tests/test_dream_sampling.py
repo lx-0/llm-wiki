@@ -27,6 +27,8 @@ from pathlib import Path
 import pytest
 import yaml
 
+from core import frontmatter
+
 # ── Fixtures (mirror test_dream_cycle.py shape) ─────────────────────
 
 
@@ -382,7 +384,7 @@ def test_write_last_dreamed_at_leaves_substrate_untouched(vault: Path) -> None:
     )
     when = datetime(2026, 5, 17, tzinfo=UTC)
     dream._write_last_dreamed_at(p, when=when)
-    fm, body = dream._parse_frontmatter(p.read_text())
+    fm, body = frontmatter.parse(p.read_text())
     assert fm == {"title": "x", "author": "alex"}  # unchanged, no last_dreamed_at
     assert "Body here." in body
     # The stamp lives in the side-state, keyed by the vault-relative path.
@@ -573,8 +575,8 @@ def test_dream_entity_stamps_last_dreamed_at_after_sdk(
     assert dream._get_last_dreamed_at(p1) is not None, "p1 not stamped"
     assert dream._get_last_dreamed_at(p2) is not None, "p2 not stamped"
     # The raw/ files themselves are untouched (no frontmatter pollution).
-    assert dream._parse_frontmatter(p1.read_text())[0] == {}
-    assert dream._parse_frontmatter(p2.read_text())[0] == {}
+    assert frontmatter.parse(p1.read_text())[0] == {}
+    assert frontmatter.parse(p2.read_text())[0] == {}
 
 
 def test_dream_entity_skips_stamp_on_daily_digest(
@@ -613,5 +615,5 @@ def test_dream_entity_skips_stamp_on_daily_digest(
     assert ent is not None
     asyncio.run(dream.dream_entity(ent, max_prompt_chars=0))
 
-    fm, _ = dream._parse_frontmatter(digest.read_text())
+    fm, _ = frontmatter.parse(digest.read_text())
     assert "last_dreamed_at" not in fm, "daily digest must not be stamped"

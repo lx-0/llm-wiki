@@ -35,30 +35,13 @@ from pathlib import Path
 import yaml
 
 from collectors._picture_metadata import extract_metadata
+from core import frontmatter
 from core.paths import RAW_DIR
 
 log = logging.getLogger("backfill-picture-metadata")
 
 ACCEPTED_SUFFIXES = (".jpg", ".jpeg", ".png", ".heic")
 PICTURES_ARCHIVE = RAW_DIR / "inbox-mobile" / "pictures"
-
-
-def _split_frontmatter(text: str) -> tuple[dict | None, str]:
-    """Return (parsed FM dict, body). (None, text) if no FM block found."""
-    if not text.startswith("---\n"):
-        return None, text
-    end = text.find("\n---\n", 4)
-    if end < 0:
-        return None, text
-    fm_text = text[4:end]
-    body = text[end + 5 :]
-    try:
-        parsed = yaml.safe_load(fm_text)
-    except yaml.YAMLError:
-        return None, text
-    if not isinstance(parsed, dict):
-        return None, text
-    return parsed, body
 
 
 def _find_original(sidecar: Path) -> Path | None:
@@ -92,8 +75,11 @@ def _backfill_one(sidecar: Path, *, dry_run: bool) -> str:
     """Return a status string: 'skipped:<reason>' | 'updated:<n>keys' |
     'nochange'."""
     text = sidecar.read_text(encoding="utf-8")
-    fm, body = _split_frontmatter(text)
-    if fm is None:
+    try:
+        fm, body = frontmatter.parse_strict(text)
+    except frontmatter.FrontmatterError:
+        # No fence, malformed YAML or a non-mapping: skip the sidecar rather than
+        # half-read it — the contract the private splitter had before C03.
         return "skipped:no_frontmatter"
 
     original = _find_original(sidecar)

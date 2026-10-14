@@ -54,9 +54,9 @@ from fnmatch import fnmatch as _fnmatch
 from pathlib import Path
 from typing import Literal
 
-import yaml
 from claude_agent_sdk import query
 
+from core import frontmatter
 from core.config import CONFIG
 from core.console import (
     C_BOLD,
@@ -169,24 +169,6 @@ class EntityRef:
         return f"knowledge/{self.kind}/{self.slug}"
 
 
-def _parse_frontmatter(text: str) -> tuple[dict, str]:
-    """Split a markdown file into (frontmatter dict, body). Tolerant."""
-    if not text.startswith("---\n"):
-        return {}, text
-    end = text.find("\n---\n", 4)
-    if end == -1:
-        return {}, text
-    block = text[4:end]
-    body = text[end + 5 :]
-    try:
-        fm = yaml.safe_load(block) or {}
-    except yaml.YAMLError:
-        fm = {}
-    if not isinstance(fm, dict):
-        fm = {}
-    return fm, body
-
-
 def _resolve_entity(slug: str) -> EntityRef | None:
     """Find the entity page under knowledge/{people,projects,areas}/<slug>.md."""
     for kind, (dir_, type_value) in _ENTITY_KINDS.items():
@@ -230,7 +212,7 @@ def _last_synth_age_days(entity: EntityRef, *, now: datetime | None = None) -> f
     """Return age in days since last synthesis, or None if never synthesized."""
     if not entity.page.exists():
         return None
-    fm, _body = _parse_frontmatter(entity.page.read_text(encoding="utf-8"))
+    fm, _body = frontmatter.parse(entity.page.read_text(encoding="utf-8"))
     when = _parse_iso_date(fm.get("last_synthesized_at"))
     if when is None:
         return None
@@ -505,7 +487,7 @@ def _get_last_dreamed_at(path: Path) -> datetime | None:
         text = path.read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError):
         return None
-    fm, _body = _parse_frontmatter(text)
+    fm, _body = frontmatter.parse(text)
     return _parse_iso_date(fm.get("last_dreamed_at"))
 
 
@@ -657,7 +639,7 @@ def _is_operator_authored_for(path: Path, entity: EntityRef, *, vault_root: Path
         text = path.read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError):
         return False
-    fm, _body = _parse_frontmatter(text)
+    fm, _body = frontmatter.parse(text)
     author = fm.get("author")
     if isinstance(author, str) and author.strip().lower() == entity.slug.lower():
         return True
@@ -1198,7 +1180,7 @@ def _build_prompt_within_budget(
 
 
 def current_page_title(page_text: str) -> str | None:
-    fm, _body = _parse_frontmatter(page_text)
+    fm, _body = frontmatter.parse(page_text)
     val = fm.get("title")
     return str(val) if val else None
 
@@ -1617,7 +1599,7 @@ def compute_entity_priority(entity: EntityRef) -> tuple[float, str]:
     The `source` string describes which rule fired (for `--list-candidates`).
     """
     cfg = CONFIG.scheduling.dream_priority
-    fm, _ = _parse_frontmatter(entity.page.read_text(encoding="utf-8"))
+    fm, _ = frontmatter.parse(entity.page.read_text(encoding="utf-8"))
 
     # Layer 1 — per-entity frontmatter override (absolute)
     fm_priority = fm.get("dream_priority")

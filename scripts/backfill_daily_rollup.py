@@ -20,10 +20,13 @@ the backfill while debugging.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import logging
 import re
 import sys
 from pathlib import Path
+
+from core import frontmatter
 
 log = logging.getLogger("backfill_daily_rollup")
 
@@ -41,35 +44,22 @@ _JAMIE_NAME_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})--(?P<slug>.+)--(?P<short>[A-Z
 _GMEET_NAME_RE = _JAMIE_NAME_RE
 _VOICE_NAME_RE = re.compile(r"^voice-(\d{4}-\d{2}-\d{2})-(?P<time>\d{4})-(?P<slug>[a-z0-9-]+)\.md$")
 
-_FRONTMATTER_RE = re.compile(r"^---\n(.*?)\n---\n", re.DOTALL)
-
 
 def _read_frontmatter(path: Path) -> dict:
+    """Frontmatter via the single `core.frontmatter` grammar (C03). No fence → `{}`
+    silently; a malformed block logs the file path and yields `{}` — a backfill must
+    say which file it skipped (tests/test_errors.py pins the message)."""
     try:
         text = path.read_text(encoding="utf-8")
     except OSError:
         return {}
-    m = _FRONTMATTER_RE.match(text)
-    if not m:
+    if frontmatter.split_fence(text)[0] is None:
         return {}
     try:
-        import yaml
-
-        data = yaml.safe_load(m.group(1))
-        return data if isinstance(data, dict) else {}
-    except Exception as e:
+        return frontmatter.parse_strict(text)[0]
+    except frontmatter.FrontmatterError as e:
         log.warning("frontmatter parse failed for %s: %s", path, e)
         return {}
-
-
-def _scalar_fm(text_block: str, key: str) -> str | None:
-    """Cheap regex scrape for `key: value` without invoking yaml."""
-    pattern = rf"^{re.escape(key)}:\s*(.+?)\s*$"
-    m = re.search(pattern, text_block, re.MULTILINE)
-    if not m:
-        return None
-    val = m.group(1).strip().strip("'\"")
-    return val or None
 
 
 # ── Per-substrate rollup-line generators ─────────────────────────────
@@ -124,7 +114,7 @@ def _voice_lines(vault: Path) -> list[tuple[str, str]]:
             body = f.read_text(encoding="utf-8")
         except OSError:
             continue
-        body_no_fm = _FRONTMATTER_RE.sub("", body, count=1).strip()
+        body_no_fm = frontmatter.split_fence(body)[1].strip()
         first_line = body_no_fm.splitlines()[0].strip() if body_no_fm else "(empty)"
         if len(first_line) > 80:
             first_line = first_line[:77].rstrip() + "…"
@@ -146,15 +136,10 @@ def _meetings_lines(vault: Path) -> list[tuple[str, str]]:
                 continue
             date_iso = m.group(1)
             # Title from frontmatter `title:`, fall back to slug
-            fm_text = ""
-            try:
-                head = f.read_text(encoding="utf-8")[:4000]
-                fm_match = _FRONTMATTER_RE.match(head)
-                if fm_match:
-                    fm_text = fm_match.group(1)
-            except OSError:
-                pass
-            title = _scalar_fm(fm_text, "title") or m.group("slug").replace("-", " ")
+            title = None
+            with contextlib.suppress(OSError):
+                title = frontmatter.field(f.read_text(encoding="utf-8")[:4000], "title")
+            title = title or m.group("slug").replace("-", " ")
             line = f"- **{source_name}** · {title} → [[{f.stem}]]"
             out.append((date_iso, line))
     return out

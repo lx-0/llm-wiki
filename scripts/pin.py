@@ -35,6 +35,7 @@ import argparse
 import sys
 from pathlib import Path
 
+from core import frontmatter
 from core.paths import KNOWLEDGE_DIR, ROOT_DIR
 
 TYPE_TO_MOC = {
@@ -47,19 +48,10 @@ TYPE_TO_MOC = {
 }
 
 
-def _parse_frontmatter(text: str) -> dict[str, str]:
-    if not text.startswith("---"):
-        return {}
-    end = text.find("\n---", 3)
-    if end == -1:
-        return {}
-    fm: dict[str, str] = {}
-    for line in text[3:end].splitlines():
-        if ":" not in line or line.lstrip().startswith("#"):
-            continue
-        k, _, v = line.partition(":")
-        fm[k.strip()] = v.strip().strip('"').strip("'")
-    return fm
+def _read_frontmatter(path: Path) -> dict:
+    """The article's frontmatter via the single `core.frontmatter` grammar (C03) —
+    `{}` on no fence / malformed YAML; values carry YAML types."""
+    return frontmatter.parse(path.read_text(encoding="utf-8"))[0]
 
 
 def _resolve_article(arg: str) -> Path:
@@ -193,7 +185,7 @@ def main() -> None:
     args = parser.parse_args()
 
     article = _resolve_article(args.article)
-    fm = _parse_frontmatter(article.read_text(encoding="utf-8"))
+    fm = _read_frontmatter(article)
 
     # Refuse to pin archived (compile_role: final-only) articles. They're
     # intentionally hidden from active surfaces (dashboard, MOC auto-include,
