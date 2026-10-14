@@ -11,6 +11,14 @@ const stateArg = process.argv.find((a) => a.startsWith('--shots-state='));
 const state = stateArg ? stateArg.slice('--shots-state='.length) : 'default';
 const fx = fixtures.build(state);
 
+// The panel marks entries modified since it was last open; pretend that was an hour ago so
+// the youngest fixture entries render as new.
+try {
+  localStorage.setItem('recentSeenMs', String(Date.now() - 60 * 60 * 1000));
+} catch {
+  // storage unavailable on this origin — the dots just stay off
+}
+
 const callbacks = {};
 const heights = [];
 const later = (value) => Promise.resolve(value);

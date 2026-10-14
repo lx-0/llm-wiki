@@ -81,7 +81,14 @@ function entries(now) {
       i += 1;
     });
   }
-  return out.sort((a, b) => b.mtimeMs - a.mtimeMs);
+  // Newest first, then one distinct age per rank — a Recent list of five "12m ago" rows
+  // reads like a bug in a screenshot. Beyond the twelve ages, each lap is half a year older.
+  return out
+    .sort((a, b) => b.mtimeMs - a.mtimeMs)
+    .map((entry, rank) => ({
+      ...entry,
+      mtimeMs: now - AGES[rank % AGES.length] - Math.floor(rank / AGES.length) * 180 * DAY,
+    }));
 }
 
 const ANSWER =
@@ -324,6 +331,10 @@ const STATES = {
   running: (fx) => {
     fx.vault.compileStatus = { running: true, progress: { current: 3, total: 12 } };
     fx.vault.runStatus = { running: 'compile' };
+    return fx;
+  },
+  'run-progress': (fx) => {
+    fx.vault.runStatus = { running: 'process-inbox' };
     return fx;
   },
   'no-access': (fx) => {

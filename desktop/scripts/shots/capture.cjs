@@ -48,6 +48,11 @@ const SURFACES = [
       'library-open',
       'health-open',
       'capture-open',
+      'run-progress',
+      'run-done',
+      'sources-open',
+      'tools-open',
+      'add-open',
     ],
     settle: 1200,
     panel: true,
@@ -84,7 +89,15 @@ const FIXTURE_FOR = {
   'library-open': 'default',
   'health-open': 'default',
   'capture-open': 'default',
+  'run-done': 'default',
+  'sources-open': 'default',
+  'tools-open': 'default',
+  'add-open': 'default',
 };
+const openSheet = (name) => `(async () => {
+    document.querySelector('[data-sheet="${name}"]')?.click();
+    ${wait(600)}
+  })()`;
 const openTile = (index) => `(async () => {
     document.querySelectorAll('.tile')[${index}]?.click();
     ${wait(500)}
@@ -117,6 +130,18 @@ const STATE_SCRIPTS = {
   'library-open': openTile(0),
   'health-open': openTile(1),
   'capture-open': openTile(2),
+  'run-progress': `(async () => {
+    window.__shots.fire('runProgress', { id: 'process-inbox', progress: { current: 2, total: 3 } });
+    ${wait(400)}
+  })()`,
+  'run-done': `(async () => {
+    window.__shots.fire('runDone', { id: 'process-inbox', result: { ok: true, durationMs: 4000 } });
+    window.__shots.fire('runDone', { id: 'compile', result: { ok: false, durationMs: 9000 } });
+    ${wait(600)}
+  })()`,
+  'sources-open': openSheet('sources'),
+  'tools-open': openSheet('tools'),
+  'add-open': openSheet('add'),
 };
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));

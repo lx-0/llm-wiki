@@ -1,7 +1,10 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import Ask from './Ask.svelte';
+  import Footer from './Footer.svelte';
   import Header from './Header.svelte';
+  import NextUp from './NextUp.svelte';
+  import Recent from './Recent.svelte';
   import StatusStrip from './StatusStrip.svelte';
   import { connect } from './store.svelte';
 
@@ -23,6 +26,9 @@
   <Header />
   <Ask />
   <StatusStrip />
+  <NextUp />
+  <Recent />
+  <Footer />
 </main>
 
 <style>

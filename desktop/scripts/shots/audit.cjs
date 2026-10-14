@@ -58,13 +58,28 @@ const AUDIT_SCRIPT = `(() => {
     const r = el.getBoundingClientRect();
     if (r.right > vw + 1) offscreen.push(describe(el));
   }
+  // Opaque layers (popovers, marked data-layer) hide whatever sits under them: text beneath a
+  // layer is covered, not overlapped. Cut each leaf's boxes by every layer it is not part of.
+  const layers = [...document.querySelectorAll('[data-layer]')].filter(visible).map((el) => ({ el, r: el.getBoundingClientRect() }));
+  const subtract = (r, cut) => {
+    const i = intersect(r, cut);
+    if (!hasArea(i)) return [r];
+    const out = [];
+    if (i.top > r.top) out.push({ left: r.left, top: r.top, right: r.right, bottom: i.top });
+    if (i.bottom < r.bottom) out.push({ left: r.left, top: i.bottom, right: r.right, bottom: r.bottom });
+    if (i.left > r.left) out.push({ left: r.left, top: i.top, right: i.left, bottom: i.bottom });
+    if (i.right < r.right) out.push({ left: i.right, top: i.top, right: r.right, bottom: i.bottom });
+    return out;
+  };
+  const uncovered = (el, rs) =>
+    layers.reduce((acc, layer) => (layer.el.contains(el) ? acc : acc.flatMap((r) => subtract(r, layer.r))), rs);
   // Per-line boxes (getClientRects), each cut to the element's visible region, so a wrapped
   // inline element is not one rectangle spanning both lines and a row scrolled out of its
   // list does not collide with what sits below the list.
   const overlaps = [];
   const boxes = leaves.map((el) => {
     const clip = clipRect(el);
-    return { el, rs: [...el.getClientRects()].map((r) => intersect(r, clip)).filter(hasArea) };
+    return { el, rs: uncovered(el, [...el.getClientRects()].map((r) => intersect(r, clip)).filter(hasArea)) };
   });
   const area = (a, b) => {
     const w = Math.min(a.right, b.right) - Math.max(a.left, b.left);

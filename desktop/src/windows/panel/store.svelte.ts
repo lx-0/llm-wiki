@@ -2,12 +2,37 @@
 // bridge; events from the main process (compile / run progress + done, visibility) land here;
 // components only render what is in `panel` and call the actions below.
 
+import { type Action, mergeActions } from '../../lib/actions';
+import { classifyLink } from './sections';
+
 type VaultStatus = Awaited<ReturnType<typeof window.vault.status>>;
 type Entry = Awaited<ReturnType<typeof window.vault.list>>[number];
 type Doctor = Awaited<ReturnType<typeof window.vault.doctor>>;
 type Menu = Awaited<ReturnType<typeof window.vault.menu>>;
 type Listener = Awaited<ReturnType<typeof window.listeners.status>>[number];
 type Progress = { current: number; total: number };
+
+const LISTENER_POLL_MS = 5000;
+const ADD_RESULT_MS = 6000;
+const SEEN_KEY = 'recentSeenMs';
+
+/** Storage can be unavailable (opaque origin); then nothing is ever "new", never a crash.
+ *  Declared before `panel`, which reads it while initialising. */
+function readSeen(): number {
+  try {
+    return Number(localStorage.getItem(SEEN_KEY)) || Date.now();
+  } catch {
+    return Date.now();
+  }
+}
+
+function writeSeen(ms: number): void {
+  try {
+    localStorage.setItem(SEEN_KEY, String(ms));
+  } catch {
+    // storage unavailable — the dots simply reset on the next launch
+  }
+}
 
 export const panel = $state({
   visible: false,
@@ -34,9 +59,27 @@ export const panel = $state({
   },
   /** in-flight listener toggles, for instant feedback */
   toggling: new Map<string, 'start' | 'stop'>(),
+  /** entries newer than this were modified since the panel was last open */
+  recentSeenMs: readSeen(),
+  /** collectors, loaded lazily when the Sources sheet opens */
+  collectors: null as { name: string; configured: boolean }[] | null,
+  /** collector names still to sync after the running one (Sync all) */
+  syncQueue: [] as string[],
+  add: { status: 'idle' as 'idle' | 'adding' | 'done' | 'failed' | 'invalid', key: null as string | null },
 });
 
-const LISTENER_POLL_MS = 5000;
+const merged = $derived(
+  mergeActions({
+    doctor: panel.doctor?.checks ?? [],
+    menu: panel.menu?.suggestions ?? [],
+    tools: panel.menu?.tools ?? [],
+  }),
+);
+
+/** Everything the engine can run right now, one row per argv (doctor + menu + tools folded). */
+export function actions(): Action[] {
+  return merged;
+}
 
 export function busy(): boolean {
   return panel.compile.running || panel.run.key !== null;
@@ -79,9 +122,14 @@ export function connect(): () => void {
     if (visible) {
       void refresh();
     } else {
-      // the highlighted results have been seen
+      // the highlighted results and "new" entries have been seen
       panel.run.results = new Map();
       panel.compile.result = null;
+      const newest = Math.max(0, ...(panel.vault?.recent ?? []).map((e) => e.mtimeMs));
+      if (newest > panel.recentSeenMs) {
+        panel.recentSeenMs = newest;
+        writeSeen(newest);
+      }
     }
   });
   window.vault.onCompileProgress((progress) => {
@@ -100,7 +148,16 @@ export function connect(): () => void {
     panel.run.progress = null;
     panel.run.results.set(id, result.ok);
     panel.run.results = new Map(panel.run.results);
+    if (panel.add.key === id) {
+      panel.add = { status: result.ok ? 'done' : 'failed', key: null };
+      window.setTimeout(() => {
+        if (panel.add.key === null) panel.add.status = 'idle';
+      }, ADD_RESULT_MS);
+    }
     void refresh();
+    // Sync all: start the next queued collector once this one finished.
+    const next = panel.syncQueue.shift();
+    if (next) void runAction(['collect', next, '--incremental']);
   });
   const timer = window.setInterval(() => {
     if (panel.visible && panel.toggling.size === 0) void refreshListeners();
@@ -141,6 +198,43 @@ export async function toggleListener(id: string, action: 'start' | 'stop'): Prom
     panel.toggling = new Map(panel.toggling);
     await refreshListeners();
   }
+}
+
+export async function loadCollectors(): Promise<void> {
+  if (panel.collectors !== null) return;
+  panel.collectors = await window.vault.collectors().catch(() => []);
+}
+
+export async function syncAll(): Promise<void> {
+  if (busy() || panel.syncQueue.length > 0) return;
+  const names = (panel.collectors ?? []).filter((c) => c.configured).map((c) => c.name);
+  if (names.length === 0) return;
+  panel.syncQueue = names.slice(1);
+  await runAction(['collect', names[0], '--incremental']);
+}
+
+export function resetAdd(): void {
+  panel.add = { status: 'idle', key: null };
+}
+
+/** Ingest a pasted link through the engine; resolves true when the command was started. */
+export async function addLink(url: string): Promise<boolean> {
+  const argv = classifyLink(url.trim());
+  if (!argv) {
+    panel.add = { status: 'invalid', key: null };
+    return false;
+  }
+  if (busy()) return false;
+  const key = argv.join(' ');
+  panel.add = { status: 'adding', key };
+  const res = await window.vault.runArgs(argv);
+  if (!res.started && !res.running) {
+    panel.add = { status: 'failed', key: null };
+    return false;
+  }
+  panel.run.key = key;
+  panel.run.progress = null;
+  return true;
 }
 
 export async function ask(question: string): Promise<{ ok: boolean; answer: string }> {

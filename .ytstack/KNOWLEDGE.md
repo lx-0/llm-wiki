@@ -2767,6 +2767,34 @@ Per-candidate learnings from the 14-candidate seam arc (C01–C14). Decisions li
   components; `svelte-check` is the gate for components.
 - **Typecheck gate (since M032-S01-T02, 2026-10-14):** TypeScript 5.9 `strict` over `src/` + the root configs; `npm test` = `npm run typecheck && vitest run`. Until then the desktop pinned TypeScript 4.5.4, whose parser choked on modern `.d.ts` syntax in `node_modules` (866 TS1005/TS1109 errors), so `tsc` was not a usable gate and test fakes relied on `as unknown as X` casts — those casts are now checked; prefer structurally correct fakes. When a change seems to pass "for free", prove the gate with a throwaway `const probe: number = "x"` file first.
 - **desktop/ uses package-lock.json (npm), not pnpm** — install with `npm ci` before `npm run test`/`npm run lint`.
+- **Module-level `$state` initializers run at import — everything they call must be declared
+  above them (M032-S04-T03, 2026-10-15):** `panel = $state({ recentSeenMs: readSeen() })` called
+  a hoisted function that read a `const SEEN_KEY` declared *below* the state → TDZ
+  `ReferenceError`, swallowed by the function's own `try/catch` (there to survive an
+  opaque-origin `localStorage`), so every launch computed "nothing is new" and nothing failed.
+  `svelte-check`, Biome and vitest are all blind to it; the harness caught it only because the
+  stub preload seeds `localStorage` and the DOM had zero `.dot.new`. Constants and helpers go
+  above the `$state` declaration. (Probed on the way: `localStorage` works on the `file://`
+  pages Forge's `loadFile` serves — the catch is for genuinely opaque origins, not for prod.)
+- **Under a height-clamped popover, anything that grows below the footer is invisible
+  (M032-S04-T03):** the panel auto-fits to content, but main clamps at `PANEL_MAX_H` (640) and
+  scrolls beyond — a sheet opening *under* the footer bar lands below the fold (Sources: 985 px
+  requested, trigger visible, content not). Transient secondary content (Sources, Tools) is a
+  popover anchored above its trigger (`position: absolute; bottom: calc(100% + 4px)`, opaque
+  `var(--bg)` — the panel's `--bg-elevated` is an alpha surface for vibrancy and lets text bleed
+  through), `max-height` + internal scroll, Escape / click-outside close; a one-row form (Add
+  link) takes over the bar's own row. The DOM layout gate knows these layers: mark the popover
+  `data-layer` and `audit.cjs` subtracts its rect from every text box outside it (covered is not
+  overlapping), so the gate stays strict everywhere else.
+- **Global layout classes collide with component class names (M032-S04-T02):** `tokens.css`
+  defines `.row`, `.card`, `.caps`, `.num` globally (min-height, dividers, padding). A component
+  naming its own element `.row` inherits all of it — the Meter's inner `.row` got the 40 px
+  min-height + divider and overflowed its tile; `svelte-check` can't see that, the screenshot
+  can. Use those names only for the global layout; otherwise pick another (`.line`, `.item`,
+  `.entry`).
+- **Harness fixtures must vary along the axis a screenshot shows (M032-S04-T03):** the modulo
+  age mapping gave the five newest entries one age — five rows of "12m ago" read as a bug in
+  every review. Ages are assigned by rank now, one distinct age per entry.
 
 ### Exception seam (C14)
 
