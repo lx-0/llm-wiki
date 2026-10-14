@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import Ask from './Ask.svelte';
   import Header from './Header.svelte';
+  import StatusStrip from './StatusStrip.svelte';
   import { connect } from './store.svelte';
 
   onMount(() => {
@@ -21,6 +22,7 @@
 <main class="panel-root">
   <Header />
   <Ask />
+  <StatusStrip />
 </main>
 
 <style>

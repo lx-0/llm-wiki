@@ -38,7 +38,17 @@ const SURFACES = [
     w: 360,
     h: 280,
     schemes: ['light', 'dark'],
-    states: ['fresh', 'asked', 'running', 'failed', 'no-access', 'empty'],
+    states: [
+      'fresh',
+      'asked',
+      'running',
+      'failed',
+      'no-access',
+      'empty',
+      'library-open',
+      'health-open',
+      'capture-open',
+    ],
     settle: 1200,
     panel: true,
   },
@@ -66,7 +76,19 @@ const SURFACES = [
 ];
 
 // Panel states that reuse the `default` fixtures and differ only by a script run after load.
-const FIXTURE_FOR = { fresh: 'default', asked: 'default', expanded: 'default', failed: 'default' };
+const FIXTURE_FOR = {
+  fresh: 'default',
+  asked: 'default',
+  expanded: 'default',
+  failed: 'default',
+  'library-open': 'default',
+  'health-open': 'default',
+  'capture-open': 'default',
+};
+const openTile = (index) => `(async () => {
+    document.querySelectorAll('.tile')[${index}]?.click();
+    ${wait(500)}
+  })()`;
 
 const wait = (ms) => `await new Promise((r) => setTimeout(r, ${ms}));`;
 const STATE_SCRIPTS = {
@@ -84,9 +106,17 @@ const STATE_SCRIPTS = {
     ${wait(900)}
   })()`,
   failed: `(async () => {
+    document.querySelectorAll('.tile')[0]?.click();
     window.__shots.fire('compileDone', { ok: false, durationMs: 41000 });
-    ${wait(400)}
+    ${wait(600)}
   })()`,
+  running: `(async () => {
+    document.querySelectorAll('.tile')[0]?.click();
+    ${wait(500)}
+  })()`,
+  'library-open': openTile(0),
+  'health-open': openTile(1),
+  'capture-open': openTile(2),
 };
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
