@@ -2835,6 +2835,16 @@ Per-candidate learnings from the 14-candidate seam arc (C01–C14). Decisions li
   `templates/` for the by-path form; a module's usage block is part of its contract and gets
   a guard like any other surface. Corollary for the next rename / relocation: grep the docs
   for the old spelling in the same commit, the guard tells you where.
+- **Name-based guards and def-name audits undercount; scan by smell, allow-list by reason
+  (M033-S03-T02/T03):** the audit counted "17 frontmatter parsers" and "5 slugifies" by
+  grepping `def …frontmatter…(` / `def …slugify(`; the T02 guard scanned only functions with
+  those names. Grepping for the *mechanism* instead — `yaml.safe_load` + a fence regex /
+  probe, `[^a-z0-9]+` — found eight more fence grammars under other names (`_compiled_from`,
+  `_read_sources_and_body`, two inline probes in the calendar collector …) and three more
+  slug copies (an account slug, two inline request slugs). A guard that keys on the smell
+  catches the next copy whatever it is called; legitimate non-copies (the server-grammar
+  port in `publish/corpus.py`, lint's body-separator scan) are allow-listed with the reason
+  beside them, which is the honest shape of "0 private X".
 - **`gh run list --commit <sha>` wants the full SHA:** a short SHA listed nothing for 100 s
   while two runs for that push were already green. `gh run list --limit N --json
   databaseId,headSha,conclusion` and match the prefix.

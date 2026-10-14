@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-14T22:40:00+02:00
+last_updated: 2026-10-14T23:05:00+02:00
 current_milestone: M033
 active_slice: S03
-active_task: T03
+active_task: none
 last_completed_milestone: M032
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -94,11 +94,14 @@ inlined, the guard `test_no_private_frontmatter_grammar_outside_the_seam` (RED o
 green); grammar readers outside the seam 7 → 0, `def …frontmatter…(` 26 → 23; the three
 hand-built writers stay by decision (S03 notes). Parity 72/91 before the fold, deltas = the
 seam's tolerance + one old regex bug (`----` closed the fences). Suite 2072. CI green on
-`f4e8a3c`. **T03 planned** (`M033-S03-T03-PLAN.md`): the four byte-identical collector
-slugifies (`[^a-z0-9]+`, ASCII-only — the grammar behind every transcript / youtube
-filename) become `core/utils.slugify(…, ascii_only=True)`; the default grammar (Unicode
-kept — facts / takes identity) stays; both pinned, real-vault filenames recomputed as
-evidence. Next: execute T03.
+`f4e8a3c`. **S03 3/7** — T03 (`452d9ae` + `4773bf2`): one slugify —
+the collectors' ASCII filename grammar is `core/utils.slugify(…, ascii_only=True)`
+(`empty=` fallback keyword), seven copies gone (four collectors, health, curiosity ×2),
+`publish.server_slug` stays as the server's grammar; both grammars pinned, every real
+jamie / gmeet / youtube filename recomputed 41 / 41; guard against a second slug grammar.
+The smell grep found eight private fence grammars T02's name-based guard missed → **T07
+added** (slice at 7 tasks). Suite 2091. Next: T04 — logging → one setup (`plan-task`); CI
+for `4773bf2` pending.
 
 ## M032 COMPLETE (L, 2026-10-14): desktop de-slop
 
