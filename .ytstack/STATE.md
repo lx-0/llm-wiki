@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-14T20:40:00+02:00
+last_updated: 2026-10-14T20:55:00+02:00
 current_milestone: M033
 active_slice: S02
-active_task: T05
+active_task: none
 last_completed_milestone: M032
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -57,11 +57,21 @@ pytest `pythonpath = ["scripts", "hooks"]`, `tests/test_layout.py` guard, E402 i
 re-derived (flush / lint / test_sdk_helpers / hooks), `wiki config` → `-m core.config`.
 Suite 2048, ruff + format clean, five dispatcher smokes + hook import chain ok. CI green on
 `origin/main` at `c1abc72` (runs 38613560228 + 38613559870; that push also carries the
-date-slip stamp corrections). **S02 T05 planned** (`M033-S02-T05-PLAN.md`): operator-path proof
-on scratch copies — update path from the lxw checkout's `5b6b947` (2026-10-12, pre-M032)
-plus a fresh `install.sh` — and the two trees. **T06 added** (6 tasks now): the ~60 documented
-by-path invocations of sub-package modules (`docs/PROCESS.md`, `FEATURES.md`, `config.md`, 13
-docstrings) that the bootstrap removal turned into `ModuleNotFoundError`s. Next: execute T05.
+date-slip stamp corrections). **S02 5/6** — T05 (`b96865a`): operator path proven on scratch copies — the update path
+from the lxw checkout's `5b6b947` (2026-10-12, pre-M032) fast-forwarded through the whole arc
+and exposed that `wiki update`'s post-pull steps ran from the pre-pull bash (old spawn shape
+against the new tree → `ModuleNotFoundError: core`, migration skipped once); `cmd_update` now
+re-executes the pulled `wiki` for phase two (`tests/test_wiki_update.py`, real git + bash).
+Second find: `wiki ingest-youtube` / `wiki index` printed runpy's `RuntimeWarning` on every
+real run since T03 (`--help` smokes never spawn — cli.py answers them) → entry modules
+`ingest_youtube.py` + `index_folders.py`, dead `__package__` guard removed, dispatcher guard
+test. Fresh `install.sh` path clean. Trees reconciled (engine-layout file-by-file, AGENTS
+directory-level + the three invocation forms). Suite 2053. **Operator note (lxw):** the first
+`wiki update` still runs the pre-fix bash — two migration warnings, then run `wiki update`
+once more (lxw's config needed no migration anyway). **T06 added** (6 tasks now): the ~60
+documented by-path invocations of sub-package modules (`docs/PROCESS.md`, `FEATURES.md`,
+`config.md`, 13 docstrings) that the bootstrap removal turned into `ModuleNotFoundError`s.
+Next: T06 (`plan-task`); CI for `b96865a` pending the push.
 
 ## M032 COMPLETE (L, 2026-10-14): desktop de-slop
 

@@ -5,7 +5,7 @@ project: llm-wiki
 created: 2026-10-14T18:50:00+02:00
 status: planned
 task_count: 6
-completed_tasks: 4
+completed_tasks: 5
 ---
 
 # M033-S02 -- Slice Plan
@@ -18,7 +18,7 @@ completed_tasks: 4
 - [x] T02 -- The five hyphenated entry scripts become importable modules (`ingest-html.py`, `optimize-claude-md.py`, `process-inbox.py`, `retry-failed-flushes.py`, `review-wiki.py` → underscore names or folded into the sub-package they already shim), every call site updated in the same commit (`wiki`, `lib/*.sh`, `hooks/`, `templates/`, `AGENTS.md`, `README.md`, `docs/`, `tests/test_review_wiki_failfast.py`, their own docstrings) — repo-wide grep before and after.
 - [x] T03 -- `cli.py` spawns handlers as `[sys.executable, "-m", <module>, *args]` from the chosen root (process isolation kept, `UV_PROJECT_ENVIRONMENT` / `--project` behaviour unchanged); the bash `_run_script` / `_dispatch_python` paths in `wiki` keep working byte-for-byte on the oracle (they move to Python in M034).
 - [x] T04 -- The `sys.path.insert` sites go: modules import from the package root; the one remaining bootstrap lives where the decision put it (dispatcher / `conftest.py`); E402 per-file ignores from S01-T04 removed; `pythonpath` in `[tool.pytest.ini_options]` matches the layout; KNOWLEDGE C01 marked closed with the proof (one `id()` for `core.config` under pytest).
-- [ ] T05 -- Operator path proven: `wiki update` + `uv sync` on a scratch copy of a vault's `.wiki/` (hook commands, piggyback spawn lines, `install.sh`) still resolve every entry point; `docs/engine-layout.md` + `AGENTS.md` tree updated; `wiki doctor` unchanged on the oracle.
+- [x] T05 -- Operator path proven: `wiki update` + `uv sync` on a scratch copy of a vault's `.wiki/` (hook commands, piggyback spawn lines, `install.sh`) still resolve every entry point; `docs/engine-layout.md` + `AGENTS.md` tree updated; `wiki doctor` unchanged on the oracle.
 - [ ] T06 -- Documented invocations follow the layout: every by-path call of a sub-package module in `docs/PROCESS.md`, `docs/FEATURES.md`, `docs/config.md`, the 13 module docstrings (`collectors/scan_*`, `dashboard/*`, `facts/*`, `curiosity/cli`, `suggestions/cli`, `core/config`, `core/config_docs`) and the two `config_docs` hint strings spells the `wiki <cmd>` form where one exists, else `PYTHONPATH=.wiki/scripts uv run --project .wiki python -m <pkg>.<module>` (entry modules where `-m` would double-import, as T02 did for the preprocessors); the collectors' "direct CLI still works" claims go; repo-wide grep before and after (`uv run python scripts/<pkg>/<x>.py` → 0 hits).
 
 ## Done when
