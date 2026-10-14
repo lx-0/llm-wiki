@@ -2741,6 +2741,14 @@ Per-candidate learnings from the 14-candidate seam arc (C01–C14). Decisions li
 
 ### Desktop toolchain (C07)
 
+- **Forge 8 + Vite 8 (since M032-S01-T04, 2026-10-14):** main/preload bundles are `.cjs`
+  (`package.json#main` = `.vite/build/main.cjs`, `preload: path.join(__dirname, 'preload.cjs')`
+  — Forge errors out if either still says `.js`); the package is `"type": "module"` because
+  Vite 8's native config loader warns on ESM syntax in a CJS-loaded `.ts` config, which in turn
+  bans `__dirname` in configs (`import.meta.dirname`); `build.rollupOptions` is a deprecated
+  alias of `build.rolldownOptions`; DMG output moved to `out/make/dmg/<arch>/`;
+  `electron-forge publish` is `release`. vitest 4 shares the app's Vite 8 (peer `^6||^7||^8`).
+  Harness scripts stay `.cjs` on purpose so the preload can `require()` under `sandbox: false`.
 - **Biome is the desktop linter/formatter (since M032-S01-T03, 2026-10-14):** `npm run lint` =
   `biome check`; warnings do not fail the run, errors do. From a Claude Code session the `rtk`
   shell hook intercepts any command line containing `biome` or `lint` and prints "ESLint output

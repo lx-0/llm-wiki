@@ -172,7 +172,7 @@ function openBrowse(): void {
     minWidth: 360,
     minHeight: 400,
     title: 'Browse — llm-wiki',
-    webPreferences: { preload: path.join(__dirname, 'preload.js') },
+    webPreferences: { preload: path.join(__dirname, 'preload.cjs') },
   });
   browseWin.setMenuBarVisibility(false);
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
@@ -202,7 +202,7 @@ function openCockpit(): void {
     minHeight: 520,
     title: 'llm-wiki — Cockpit',
     backgroundColor: '#0b1220',
-    webPreferences: { preload: path.join(__dirname, 'preload.js') },
+    webPreferences: { preload: path.join(__dirname, 'preload.cjs') },
   });
   cockpitWin.setMenuBarVisibility(false);
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
@@ -231,7 +231,7 @@ function openAtlas(): void {
     minHeight: 520,
     title: 'llm-wiki — Atlas',
     backgroundColor: '#0b1220',
-    webPreferences: { preload: path.join(__dirname, 'preload.js') },
+    webPreferences: { preload: path.join(__dirname, 'preload.cjs') },
   });
   atlasWin.setMenuBarVisibility(false);
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
@@ -259,7 +259,7 @@ function openTriage(): void {
     minHeight: 420,
     title: 'llm-wiki — Triage',
     backgroundColor: '#0b1220',
-    webPreferences: { preload: path.join(__dirname, 'preload.js') },
+    webPreferences: { preload: path.join(__dirname, 'preload.cjs') },
   });
   triageWin.setMenuBarVisibility(false);
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
@@ -289,7 +289,7 @@ function openSettings(): void {
     minimizable: false,
     maximizable: false,
     title: 'llm-wiki Settings',
-    webPreferences: { preload: path.join(__dirname, 'preload.js') },
+    webPreferences: { preload: path.join(__dirname, 'preload.cjs') },
   });
   settingsWin.setMenuBarVisibility(false);
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
@@ -323,7 +323,7 @@ function openOnboarding(): void {
     fullscreenable: false,
     maximizable: false,
     title: 'Welcome to llm-wiki',
-    webPreferences: { preload: path.join(__dirname, 'preload.js') },
+    webPreferences: { preload: path.join(__dirname, 'preload.cjs') },
   });
   onboardingWin.setMenuBarVisibility(false);
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
@@ -441,7 +441,7 @@ function createPanel(): BrowserWindow {
     vibrancy: 'popover', // macOS frosted-glass popover look
     visualEffectState: 'active',
     roundedCorners: true,
-    webPreferences: { preload: path.join(__dirname, 'preload.js') },
+    webPreferences: { preload: path.join(__dirname, 'preload.cjs') },
   });
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
     win.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
