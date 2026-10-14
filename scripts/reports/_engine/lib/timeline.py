@@ -97,23 +97,13 @@ class Timeline:
         return sorted(keys)
 
 
-def _parse_frontmatter(markdown_text: str) -> dict | None:
-    """Pull the YAML frontmatter block out of a markdown string.
-
-    Single core.frontmatter grammar (C03); returns the parsed dict or None
-    when there's no leading fence / malformed YAML / empty block.
-    """
-    fm = frontmatter.parse(markdown_text)[0]
-    return fm or None
-
-
 def _snapshot_from_report(report_path: Path) -> InstrumentSnapshot | None:
     """Load one per-instrument report's frontmatter into a snapshot."""
     try:
         text = report_path.read_text(encoding="utf-8")
     except OSError:
         return None
-    fm = _parse_frontmatter(text)
+    fm = frontmatter.parse(text)[0] or None  # {} (no fence / malformed / empty) → None
     if not isinstance(fm, dict):
         return None
     # filename without `.md` is the alias/slug. Prefer this over the

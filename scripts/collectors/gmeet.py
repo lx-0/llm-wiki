@@ -77,7 +77,7 @@ from collectors.base import (
     resolve_accounts,
     run_account_loop,
 )
-from core import google_oauth
+from core import frontmatter, google_oauth
 from core.config import CONFIG
 from core.google_oauth import OAuthApp
 from core.paths import ROOT_DIR, STATE_DIR
@@ -219,23 +219,13 @@ class _Sibling:
 
 
 def _split_frontmatter(text: str) -> tuple[dict, str] | None:
-    """Parse a `---\\n…\\n---\\n` frontmatter block; return (data, body) or None.
-
-    Tolerant: returns None if the file has no frontmatter, the frontmatter
-    fails to parse, or the data isn't a mapping. Callers should treat None
-    as 'not our file, skip'."""
-    if not text.startswith("---\n"):
-        return None
-    end = text.find("\n---\n", 4)
-    if end < 0:
-        return None
+    """(data, body) through the single `core.frontmatter` grammar, or None when the
+    file has no fence, the YAML fails to parse, or the data isn't a mapping. Callers
+    treat None as 'not our file, skip'."""
     try:
-        data = yaml.safe_load(text[4:end])
-    except yaml.YAMLError:
+        return frontmatter.parse_strict(text)
+    except frontmatter.FrontmatterError:
         return None
-    if not isinstance(data, dict):
-        return None
-    return data, text[end + len("\n---\n") :]
 
 
 def _scan_siblings(output_root: Path) -> tuple[dict[str, _Sibling], set[str]]:

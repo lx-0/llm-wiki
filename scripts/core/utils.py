@@ -13,8 +13,7 @@ import re
 from datetime import UTC, datetime
 from pathlib import Path
 
-import yaml
-
+from . import frontmatter
 from .paths import (
     DAILY_DIR,
     FACTS_DIR,
@@ -247,19 +246,10 @@ _LEGACY_SOURCE = "user:legacy-pre-trust-schema"
 
 
 def _parse_fact_frontmatter(md_file: Path) -> tuple[dict, str]:
-    """Return (frontmatter_dict, raw_text). Tolerates malformed YAML."""
+    """Return (frontmatter_dict, raw_text) through the single `core.frontmatter`
+    grammar — the raw text is kept whole; malformed YAML yields `{}`."""
     text = md_file.read_text(encoding="utf-8")
-    if not text.startswith("---\n"):
-        return {}, text
-    end = text.find("\n---\n", 4)
-    if end == -1:
-        return {}, text
-    block = text[4:end]
-    try:
-        fm = yaml.safe_load(block) or {}
-    except yaml.YAMLError:
-        fm = {}
-    return (fm if isinstance(fm, dict) else {}), text
+    return frontmatter.parse(text)[0], text
 
 
 def read_hard_facts() -> str:

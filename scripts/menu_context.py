@@ -49,7 +49,7 @@ import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from core import actions
+from core import actions, frontmatter
 from core.paths import (
     AREAS_DIR,
     DAILY_DIR,
@@ -198,22 +198,14 @@ def _read_dream_cooldown_days() -> int:
 
 
 def _read_frontmatter_field(path: Path, field: str) -> str | None:
-    """Cheap frontmatter scan — reads first ~2KB only, no YAML parse."""
+    """Cheap frontmatter scan — reads the first ~2KB only; one scalar through the
+    single `core.frontmatter` grammar's regex accessor (no YAML parse)."""
     try:
         with path.open("r", encoding="utf-8") as f:
             head = f.read(2048)
     except OSError:
         return None
-    if not head.startswith("---"):
-        return None
-    end = head.find("\n---", 3)
-    if end < 0:
-        return None
-    block = head[3:end]
-    m = re.search(rf"^{re.escape(field)}:\s*(.+)$", block, re.MULTILINE)
-    if not m:
-        return None
-    return m.group(1).strip().strip('"').strip("'")
+    return frontmatter.field(head, field)
 
 
 def probe_flush_missing() -> int:

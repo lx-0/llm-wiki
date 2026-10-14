@@ -19,7 +19,7 @@ import subprocess
 from datetime import datetime
 from pathlib import Path
 
-from core import ollama_client
+from core import frontmatter, ollama_client
 from core.config import CONFIG
 from core.console import setup_console_logging
 from core.entry import child_env, python_m
@@ -95,14 +95,17 @@ def add_frontmatter(file_path: Path, classification: dict) -> None:
         return
 
     content = file_path.read_text(encoding="utf-8", errors="replace")
-    if content.startswith("---"):
-        return  # Already has frontmatter
+    if frontmatter.split_fence(content)[0] is not None:
+        return  # already carries a closed frontmatter fence (the one grammar decides)
 
     tags = classification.get("tags", [])
     lang = classification.get("language", "de")
     category = classification.get("category", "note")
 
-    frontmatter = f"""---
+    # Written by hand on purpose: this is the inbox-drop shape operators and fixtures
+    # know (`origin` quoted, `tags` in flow style) — `frontmatter.serialize` would emit
+    # safe_dump's block style instead.
+    block = f"""---
 type: {category}
 date: {today_iso()}
 origin: "inbox-drop"
@@ -111,7 +114,7 @@ language: {lang}
 ---
 
 """
-    file_path.write_text(frontmatter + content, encoding="utf-8")
+    file_path.write_text(block + content, encoding="utf-8")
 
 
 def _archive_to_inbox_wiki(file_path: Path) -> Path:

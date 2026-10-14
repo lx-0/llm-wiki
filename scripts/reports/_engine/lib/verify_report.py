@@ -18,7 +18,7 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-import yaml
+from core import frontmatter
 
 # Required frontmatter keys. Top-level only — nested keys like
 # `coverage.coverage_pct` are checked separately.
@@ -105,18 +105,13 @@ def verify_report(report_path: Path) -> VerificationResult:
 
 
 def _extract_frontmatter(text: str) -> dict | None:
-    if not text.startswith("---"):
-        return None
-    pattern = re.compile(r"^---\s*$", re.MULTILINE)
-    matches = list(pattern.finditer(text))
-    if len(matches) < 2:
-        return None
-    block = text[matches[0].end() : matches[1].start()]
+    """The report's frontmatter mapping through the single `core.frontmatter`
+    grammar; None when there is no fence, the YAML is malformed, or the document
+    isn't a mapping."""
     try:
-        parsed = yaml.safe_load(block)
-    except yaml.YAMLError:
+        return frontmatter.parse_strict(text)[0]
+    except frontmatter.FrontmatterError:
         return None
-    return parsed if isinstance(parsed, dict) else None
 
 
 def _has_section(text: str, section: str) -> bool:

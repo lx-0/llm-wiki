@@ -10,12 +10,10 @@ full schema and a reference example.
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
-import yaml
-
+from core import frontmatter
 from core.paths import ROOT_DIR, WIKI_DIR
 
 VALID_TOOLS = frozenset({"Read", "Edit", "Write", "Glob", "Grep", "Bash", "WebFetch", "WebSearch"})
@@ -94,23 +92,14 @@ class AgentSpec:
         return out
 
 
-_FRONTMATTER_RE = re.compile(r"\A---\n(.*?)\n---\n?(.*)", re.DOTALL)
-
-
 def _split_frontmatter(text: str) -> tuple[dict, str]:
-    """Split a markdown file into (frontmatter dict, body)."""
-    m = _FRONTMATTER_RE.match(text)
-    if not m:
-        raise SpecError("file has no YAML frontmatter (must start with `---`)")
-    raw = m.group(1)
-    body = m.group(2)
+    """Split a spec file into (frontmatter dict, body) through the single
+    `core.frontmatter` grammar; a missing fence, malformed YAML or a non-mapping is a
+    `SpecError` — a spec must never be half-read."""
     try:
-        data = yaml.safe_load(raw) or {}
-    except yaml.YAMLError as exc:
-        raise SpecError(f"YAML frontmatter is malformed: {exc}") from exc
-    if not isinstance(data, dict):
-        raise SpecError(f"frontmatter must be a mapping, got {type(data).__name__}")
-    return data, body
+        return frontmatter.parse_strict(text)
+    except frontmatter.FrontmatterError as exc:
+        raise SpecError(f"YAML frontmatter: {exc}") from exc
 
 
 def parse_spec(path: Path) -> AgentSpec:

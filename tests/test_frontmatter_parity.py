@@ -12,9 +12,12 @@ behaviour cannot drift back, plus the two call-site contracts that were kept on 
 from __future__ import annotations
 
 import logging
+import re
 from pathlib import Path
 
 import pytest
+
+REPO = Path(__file__).resolve().parent.parent
 
 CRLF_PERSON = (
     "---\r\ntitle: Sam Rivera\r\ntype: person\r\naliases: [Sam, S. Rivera]\r\n---\r\n"
@@ -157,3 +160,42 @@ def test_dedup_load_entity_reads_a_crlf_page(tmp_path: Path) -> None:
     ent = dedup.load_entity(page, "people")
     assert ent.title == "Sam Rivera"
     assert ent.aliases == ["Sam", "S. Rivera"]
+
+
+# ── no private grammar outside the seam (M033-S03-T02) ───────────────────────
+
+_SEAM = REPO / "scripts" / "core" / "frontmatter.py"
+# What a hand-rolled READ grammar looks like: its own YAML load, a fence regex, or a
+# fence probe on the text. Emitting a `---` line (the writers in voice / capture / inbox
+# build their own YAML shape on purpose) is not parsing and is not flagged.
+_GRAMMAR_SMELLS = (
+    "yaml.safe_load",
+    "\\A---",
+    "^---",
+    'startswith("---',
+    "startswith('---",
+    'find("\\n---',
+    'index("\\n---',
+)
+_FRONTMATTER_DEF = re.compile(
+    r"^def ([A-Za-z_]*frontmatter[A-Za-z_]*)\(.*?(?=^(?:def |class |[A-Z_][A-Z0-9_]* = )|\Z)",
+    re.MULTILINE | re.DOTALL,
+)
+
+
+def test_no_private_frontmatter_grammar_outside_the_seam() -> None:
+    """`core/frontmatter.py` is the one grammar. Any other top-level function named after
+    frontmatter may wrap the seam (read a file, keep a `None` / exception contract) or
+    build a block to write, but may not read a fence with a grammar of its own."""
+    offenders: list[str] = []
+    for path in sorted((REPO / "scripts").rglob("*.py")):
+        if path == _SEAM:
+            continue
+        text = path.read_text(encoding="utf-8")
+        for m in _FRONTMATTER_DEF.finditer(text):
+            smells = [s for s in _GRAMMAR_SMELLS if s in m.group(0)]
+            if smells:
+                offenders.append(f"{path.relative_to(REPO)}:{m.group(1)} {smells}")
+    assert offenders == [], (
+        "private frontmatter grammar outside core/frontmatter.py:\n" + "\n".join(offenders)
+    )

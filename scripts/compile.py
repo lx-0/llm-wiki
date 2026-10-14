@@ -90,11 +90,9 @@ log = setup_console_logging(
 )
 
 from compile_stages.post_passes import run_post_passes  # noqa: E402
-from compile_stages.route import (  # noqa: E402
-    SUBSTRATE_PROMPTS,
-    _parse_frontmatter,
-)
+from compile_stages.route import SUBSTRATE_PROMPTS  # noqa: E402
 from compile_stages.types import CompileOutcome  # noqa: E402
+from core import frontmatter  # noqa: E402
 from core.config import CONFIG  # noqa: E402
 from core.piggybacks import run_due_piggybacks  # noqa: E402
 
@@ -292,7 +290,7 @@ async def _run_compile_route(
             resolve_project_slug,
         )
 
-        fm = _parse_frontmatter(source_content)
+        fm = frontmatter.parse(source_content)[0]
         project_slug = resolve_project_slug(source, fm, ROOT_DIR)
         if project_slug is None:
             log.info(

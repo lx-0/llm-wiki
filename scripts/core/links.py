@@ -27,6 +27,8 @@ import re
 from collections.abc import Callable
 from pathlib import Path
 
+from core import frontmatter
+
 # `[[target]]`, `![[target]]`, with optional `#heading` and `|alias`.
 # Guard (audit 2026-08-25): a target that starts/ends with space/tab or starts
 # with `!` is NOT a link — that's bash double-bracket test syntax in a live
@@ -150,17 +152,17 @@ def relative_link_for_slug(target_slug: str, source: Path, knowledge_dir: Path) 
 
 def _strip_frontmatter_and_fences(lines: list[str]):
     """Yield (index, line, live) where ``live`` is False inside YAML
-    frontmatter or fenced code blocks (links there are not rewritten)."""
+    frontmatter or fenced code blocks (links there are not rewritten). The
+    frontmatter extent comes from the single `core.frontmatter` grammar — an
+    unterminated fence is no frontmatter, so every line of such a file is live."""
+    block, _body = frontmatter.split_fence("\n".join(lines))
+    fm_lines = 0 if block is None else (2 if block == "" else block.count("\n") + 3)
     in_fence = False
-    in_frontmatter = lines[:1] == ["---"]
-    fm_closed = not in_frontmatter
     for i, line in enumerate(lines):
-        stripped = line.lstrip()
-        if in_frontmatter and not fm_closed:
+        if i < fm_lines:
             yield i, line, False
-            if i > 0 and stripped == "---":
-                fm_closed = True
             continue
+        stripped = line.lstrip()
         if stripped.startswith("```") or stripped.startswith("~~~"):
             in_fence = not in_fence
             yield i, line, False

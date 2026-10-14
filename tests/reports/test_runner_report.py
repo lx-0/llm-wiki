@@ -10,8 +10,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import yaml
-
+from core import frontmatter
 from reports._engine.instrument import load_instrument
 from reports._engine.lib.inference import InferenceRun
 from reports._engine.lib.timeline import _snapshot_from_report
@@ -28,9 +27,7 @@ def _phq9():
 
 
 def _split_frontmatter(text: str) -> dict:
-    assert text.startswith("---\n")
-    fm_end = text.index("\n---\n", 4)
-    return yaml.safe_load(text[4:fm_end])
+    return frontmatter.parse_strict(text)[0]  # raises when the report has no mapping
 
 
 def test_frontmatter_carries_loader_surfaced_geometry(tmp_path: Path) -> None:

@@ -66,10 +66,6 @@ def _backup(path: Path) -> Path | None:
     return frontmatter.backup(path)
 
 
-def _read_frontmatter(path: Path) -> tuple[dict, str]:
-    return frontmatter.parse(path.read_text(encoding="utf-8"))
-
-
 def _write_fact(path: Path, fm: dict, body: str) -> None:
     frontmatter.write(path, fm, body)
 
@@ -188,7 +184,7 @@ def cmd_list(args: argparse.Namespace) -> int:
         print("(no hard facts yet)")
         return 0
     for path in facts:
-        fm, _ = _read_frontmatter(path)
+        fm, _ = frontmatter.parse(path.read_text(encoding="utf-8"))
         title = fm.get("title", "(untitled)")
         status = fm.get("status", "?")
         trust = fm.get("trust", DEFAULT_TRUST)

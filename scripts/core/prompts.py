@@ -21,16 +21,15 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-import yaml
+from core import frontmatter
 
 # scripts/core/prompts.py → parents: core → scripts → <wiki>/prompts/
 PROMPTS_DIR = Path(__file__).resolve().parent.parent.parent / "prompts"
 
 _PLACEHOLDER_RE = re.compile(r"\$\{([a-zA-Z_][a-zA-Z0-9_]*)\}")
-# Optional Prompty-style YAML frontmatter: a prompt MAY open with `---\n…\n---`
+# Optional Prompty-style YAML frontmatter: a prompt MAY open with a `---` fence
 # declaring per-prompt settings (notably `model:`). Stripped from the rendered
 # body so it never reaches the LLM; read via prompt_frontmatter / prompt_model.
-_FRONTMATTER_RE = re.compile(r"\A---\n(.*?)\n---\n?(.*)\Z", re.DOTALL)
 
 
 class PromptError(RuntimeError):
@@ -40,17 +39,15 @@ class PromptError(RuntimeError):
 def _split_frontmatter(text: str) -> tuple[dict, str]:
     """Return (frontmatter dict, body). ({}, text) when no valid block.
 
-    Only a file that OPENS with `---\\n` counts; a `---` mid-prompt (a markdown
-    rule or a YAML example in the body) is left untouched.
+    Only a file that OPENS with a `---` fence counts; a `---` mid-prompt (a markdown
+    rule or a YAML example in the body) is left untouched. An opening block that is
+    not a YAML mapping is not frontmatter either — the whole text stays the prompt.
+    Grammar: the single `core.frontmatter` seam.
     """
-    m = _FRONTMATTER_RE.match(text)
-    if not m:
-        return {}, text
     try:
-        meta = yaml.safe_load(m.group(1))
-    except yaml.YAMLError:
+        return frontmatter.parse_strict(text)
+    except frontmatter.FrontmatterError:
         return {}, text
-    return (meta, m.group(2)) if isinstance(meta, dict) else ({}, text)
 
 
 def prompt_frontmatter(name: str) -> dict:

@@ -160,12 +160,6 @@ def _frontmatter_compile_role(content: str) -> str | None:
     return frontmatter.field(content, "compile_role")
 
 
-def _parse_frontmatter(content: str) -> dict:
-    """Full frontmatter dict (tolerant, {} on missing/malformed). Used by the
-    memory pre-pass where `tags:` list + `project:` scalar are needed together."""
-    return frontmatter.parse(content)[0]
-
-
 def _frontmatter_field(content: str, key: str) -> str | None:
     """Generic scalar accessor (quoted values tolerated, first match wins)."""
     return frontmatter.field(content, key)
