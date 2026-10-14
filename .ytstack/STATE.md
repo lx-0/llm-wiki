@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-15T00:45:00+02:00
+last_updated: 2026-10-15T00:50:00+02:00
 current_milestone: M033
 active_slice: S03
-active_task: none
+active_task: T05
 last_completed_milestone: M032
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -110,8 +110,13 @@ top (`noqa: E402` gone), three dead collector `__main__` blocks removed; guards 
 `tests/test_console.py::TestOneSetupEverywhere` (RED first). One commit instead of A + B
 (the guard would be red between). Operator-visible: the migrated CLIs' stderr has the
 compile look (smokes before/after on the scratch vault). Suite 2100. CI for `5af8c0a`
-pending. Stamps before this one ran an hour ahead of the clock — corrected. **Next: T05
-(state store) via `plan-task`.**
+green (runs 38631203238 + 38631203217; closeout `8bc4fe6` green too). Stamps before this one
+ran an hour ahead of the clock — corrected. **T05 planned** (`M033-S03-T05-PLAN.md`): the
+smell grep (`.write_text(json.dumps(` on a `STATE_DIR` file) finds seven writers, not the
+audit's three — the three collector pairs + flush's dedup window + agent-runs + the lint
+cache + the list-shaped intents-seen (allow-listed) — onto `core.state_store.store_for`;
+`piggyback_runner.record_status` onto the facade; one deterministic interleave test per
+site + a guard, RED first.
 
 ## M032 COMPLETE (L, 2026-10-14): desktop de-slop
 
