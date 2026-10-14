@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-14T20:55:00+02:00
+last_updated: 2026-10-14T21:05:00+02:00
 current_milestone: M033
 active_slice: S02
-active_task: none
+active_task: T06
 last_completed_milestone: M032
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -71,7 +71,10 @@ directory-level + the three invocation forms). Suite 2053. **Operator note (lxw)
 once more (lxw's config needed no migration anyway). **T06 added** (6 tasks now): the ~60
 documented by-path invocations of sub-package modules (`docs/PROCESS.md`, `FEATURES.md`,
 `config.md`, 13 docstrings) that the bootstrap removal turned into `ModuleNotFoundError`s.
-Next: T06 (`plan-task`); CI for `b96865a` pending the push.
+T05 pushed (`b96865a` + `f0eadb8`), CI green (runs 38618938498 + 38618938449). **T06 planned**
+(`M033-S02-T06-PLAN.md`): the 72 documented by-path invocations → `wiki <cmd>` / `-m` forms,
+three top-level entry scripts for the direct-CLI flags of screenshots / browser / tabs, a
+layout-guard test over docstrings + docs. Next: execute T06.
 
 ## M032 COMPLETE (L, 2026-10-14): desktop de-slop
 
