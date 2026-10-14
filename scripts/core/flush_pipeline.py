@@ -22,7 +22,7 @@ The two hooks (session-end, pre-compact) differ only in:
 
 Filename pattern, archive location, and daily-log header format used to be
 duplicated across hooks/session-end.py, hooks/pre-compact.py, scripts/flush.py
-and scripts/retry-failed-flushes.py — they live here now.
+and scripts/retry_failed_flushes.py — they live here now.
 """
 
 from __future__ import annotations

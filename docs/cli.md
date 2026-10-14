@@ -415,7 +415,7 @@ These scripts are not exposed via `wiki <cmd>` — they're explicit one-shots ru
 The 6 questions, in order:
 
 1. **Ollama base URL** — probed live; if unreachable the next question gets a warning.
-2. **Compile model** — `claude-opus-4-7` / `claude-sonnet-4-6` / `claude-haiku-4-5`. Used by `compile.py` and `retry-failed-flushes.py`.
+2. **Compile model** — `claude-opus-4-7` / `claude-sonnet-4-6` / `claude-haiku-4-5`. Used by `compile.py` and `retry_failed_flushes.py`.
 3. **Auto-compile starts at hour** (`0`–`23`, local time) — `scheduling.compile_after_hour`.
 4. **Procmail execution** (default OFF) — only enable if `suggestions/cli.py` should call a webmail-procmail provider API.
 5. **Local-LLM features** (curiosity loop + vision screenshots, bundled) — only offered when Ollama probed successfully.

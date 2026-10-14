@@ -4,10 +4,10 @@ Reads every article in knowledge/, sends it to the local Ollama instance,
 and produces a structured quality report with scores and suggestions.
 
 Usage:
-    uv run python scripts/review-wiki.py                    # review all articles
-    uv run python scripts/review-wiki.py --model gemma3:4b  # use a different model
-    uv run python scripts/review-wiki.py --limit 10         # only review 10 articles
-    uv run python scripts/review-wiki.py --dry-run          # just list articles
+    uv run python scripts/review_wiki.py                    # review all articles
+    uv run python scripts/review_wiki.py --model gemma3:4b  # use a different model
+    uv run python scripts/review_wiki.py --limit 10         # only review 10 articles
+    uv run python scripts/review_wiki.py --dry-run          # just list articles
 """
 
 import argparse

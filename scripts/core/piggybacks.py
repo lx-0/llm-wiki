@@ -53,9 +53,9 @@ _module_log = logging.getLogger(__name__)
 
 _BUILTIN_PIGGYBACK_TASKS: dict[str, list[str]] = {
     "lint_structural": ["lint.py", "--structural-only"],
-    "review_wiki": ["review-wiki.py"],
-    "optimize_claude_md": ["optimize-claude-md.py"],
-    "retry_failed_flushes": ["retry-failed-flushes.py", "--limit", "{max_per_run}"],
+    "review_wiki": ["review_wiki.py"],
+    "optimize_claude_md": ["optimize_claude_md.py"],
+    "retry_failed_flushes": ["retry_failed_flushes.py", "--limit", "{max_per_run}"],
     # Drain N oldest requests per fire (configurable via max_per_run).
     # Steady-rate beats --run-oldest (1/fire) for keeping ahead of the
     # producer when compile runs on many sources at once.

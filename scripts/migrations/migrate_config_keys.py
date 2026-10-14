@@ -71,7 +71,7 @@ Key changes covered (chronological):
   limits.ollama_connect_timeout_s            (added 2026-05-30, default 10 — TCP connect cap for Ollama calls; prevents a down LAN GPU from burning the full read budget on connect)
   limits.{compile_force_long_context_types, compile_max_turns_long_context, compile_large_source_chars}  → (removed 2026-07-18 — dead precedence-ladder knobs. Every SUBSTRATE_PROMPTS row + the default dispatch pin the model + max_turns, so the config-side long-context escalation tiers could never fire; deleted per the no-soft-deprecation policy. compile_large_source_model itself stays — it still backs the kind=unknown retry.)
   limits.piggyback_max_runtime_s             (added 2026-05-30, default 14400 — hard wall-clock cap the piggyback runner enforces on each spawned task; backstop against the review-wiki 19h half-open-socket hang)
-  limits.review_ollama_timeout_s             (added 2026-05-30, default 300 — per-article Ollama read timeout for review-wiki.py, lifted from a module constant)
+  limits.review_ollama_timeout_s             (added 2026-05-30, default 300 — per-article Ollama read timeout for review_wiki.py, lifted from a module constant)
   limits.review_consecutive_failure_abort    (added 2026-05-30, default 5 — review-wiki aborts the sweep after N consecutive Ollama failures instead of grinding 1700×timeout when kcma is down)
   limits.review_checkpoint_every             (added 2026-05-30, default 25 — review-wiki writes the partial report every N articles so an aborted/killed sweep isn't lost)
   limits.dedup_fuzzy_threshold               (added 2026-05-31, default 0.85 — `wiki dedup` fuzzy-title match floor for duplicate-candidate proposal)

@@ -1,7 +1,7 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-14T23:05:00+02:00
+last_updated: 2026-10-14T23:55:00+02:00
 current_milestone: M033
 active_slice: S02
 active_task: none
@@ -42,8 +42,12 @@ S02–S05 unchanged; S02-T01 inherits the finding that two import identities coe
 engine, 82 files with a `sys.path.insert`). **S02 1/5** — T01 decided: `scripts/` is the
 source root, not a package (DECISIONS 2026-10-14; probe: `core.paths is
 scripts.core.paths` → False today; `-m collectors.cli` runs without a bootstrap); no
-`scripts/__init__.py`, ever. Next: T02 — rename the five hyphenated scripts + call sites
-(`plan-task`).
+`scripts/__init__.py`, ever. **S02 2/5** — T02: `review_wiki.py` / `optimize_claude_md.py`
+/ `retry_failed_flushes.py` renamed, `process_inbox.py` / `ingest_html.py` entry modules
+(the package modules warn under `-m`: runpy double import), and — pulled forward from T03
+— `cli.py` spawns handlers as `python -m <module>` with `scripts/` on PYTHONPATH
+(`tests/test_cli_dispatch.py`). Suite 2039. Next: T03 — piggybacks + piggyback_runner onto
+`-m` (`plan-task`).
 
 ## M032 COMPLETE (L, 2026-10-14): desktop de-slop
 

@@ -56,7 +56,7 @@ flowchart TD
     DROP["📥 inbox/"]
     DROP --> DETECT{Dateityp?}
 
-    DETECT -->|.html/.htm| HTML["ingest-html.py\n--mode both"]
+    DETECT -->|.html/.htm| HTML["html_ingest.py\n--mode both"]
     HTML --> SAVE_HTML["Original HTML\n→ raw/articles/*.html"]
     HTML --> SCREENSHOT[Playwright Screenshot\n→ raw/articles/*.png]
     HTML --> H2M[html2text → Markdown]
@@ -92,7 +92,7 @@ flowchart TD
 
 | Extension | Route | Script | LLM? | Warum |
 |-----------|-------|--------|------|-------|
-| `.html`, `.htm` | `raw/articles/` (.html + .md + .png) | `ingest-html.py` | Gemma4 Vision | Original HTML bewahrt + Content-Extraktion + Visual Analysis. Compiler entscheidet selbst ob er .html liest. |
+| `.html`, `.htm` | `raw/articles/` (.html + .md + .png) | `preprocessors/html_ingest.py` | Gemma4 Vision | Original HTML bewahrt + Content-Extraktion + Visual Analysis. Compiler entscheidet selbst ob er .html liest. |
 | `.mp3`, `.m4a`, `.wav`, `.ogg`, `.webm` | `raw/audio/` | — | Nein | Binaries werden direkt verschoben. Whisper-Transkription ist ein separater Schritt. |
 | `.pdf` | `raw/papers/` | — | Nein | Extension-basiert. PDF-Text-Extraktion noch nicht implementiert. |
 | `.md`, `.txt` | je nach Klassifizierung | — | Gemma4 | LLM liest Content, klassifiziert als article/paper/note/transcript, schlägt Dateiname und Tags vor. |
@@ -112,15 +112,15 @@ Der Compiler liest die `.md` (Anreicherung) und kann bei Bedarf die `.html` (Ori
 
 **Frontmatter:** Textdateien bekommen automatisch YAML Frontmatter (type, date, origin, tags, language) bevor sie in `raw/` landen.
 
-**Compile:** Am Ende ruft `process-inbox.py` einmal `compile.py` auf — nicht pro Datei, sondern einmal für alles Neue.
+**Compile:** Am Ende ruft `preprocessors/inbox.py` einmal `compile.py` auf — nicht pro Datei, sondern einmal für alles Neue.
 
 ### Script
 
 ```bash
-uv run python scripts/process-inbox.py                    # alles verarbeiten + compile
-uv run python scripts/process-inbox.py --dry-run          # nur zeigen was passiert
-uv run python scripts/process-inbox.py --no-compile       # verarbeiten ohne compile
-uv run python scripts/process-inbox.py --model gemma3:4b  # anderes Modell
+wiki process-inbox                    # alles verarbeiten + compile
+wiki process-inbox --dry-run          # nur zeigen was passiert
+wiki process-inbox --no-compile       # verarbeiten ohne compile
+wiki process-inbox --model gemma3:4b  # anderes Modell
 ```
 
 ### Edge Cases
@@ -204,7 +204,7 @@ flowchart TD
 
 **flush.py** ruft den Claude Agent SDK über den gemeinsamen Harness `core.sdk_helpers.run_sdk_query` mit `SdkCallSpec(tools=(), setting_sources=(), max_turns=3)` auf (nur Text rein/raus, keine Dateioperationen; `tools=()` ist das leere *Basis*-Toolset — `allowed_tools=()` wäre falsy und würde das Default-Toolset aktiv lassen). Der Harness klassifiziert einen strukturierten API-Fehler (`ResultMessage(is_error=True)`, der API-Text steht in `result`) und schreibt ihn mit Ursache ins `flush-errors.log`; fatale Kinds (`auth` / `model` / `cli_outdated`) beenden die Retry-Leiter nach dem ersten Versuch. Seit 2026-09-17 — davor lief flush an einem eigenen `query()`-Loop, der API-Absagen nur als `cli_crash · exited silently` sah (Ausfall 2026-09-09→17, Ursache `claude_code_version_too_old`). Extrahiert: Context, Key Exchanges, Decisions, Lessons Learned, Action Items. Bei Erfolg → `flush_pipeline.append_to_daily(content, session_id)`, der seit dem rollup-arc nach `daily/<date>/sessions.md` schreibt (einer von fuenf Per-Source-Files; vor 2026-05-15: flat `daily/<date>.md`). Der Block ist **replace-in-place** per `session_id` (sentinel-gewrappt `<!-- wiki:session <id> begin/end -->`): feuert derselbe Session-Hook mehrmals — bei Codex feuert `Stop` mangels `SessionEnd`-Event pro Turn — wird der bestehende Block ersetzt statt ein Duplikat angehängt. `scheduling.dedup_window_seconds` (900) koalesziert die Re-Distills. Anschließend `mark_complete(staged)`. Bei Failure → `flush_pipeline.archive_failure(staged)` (nach `.wiki/sessions/failed-flushes/`); ein Piggyback-Task retried das später.
 
-**State-Machine in einem Modul.** Die ganze Lifecycle (Capture → Stage → Commit / Archive → Retry) lebt in `scripts/core/flush_pipeline.py`. Hooks, `flush.py` und `retry-failed-flushes.py` gehen alle durch dieselbe API. Die Invariante "no gap between capture and persist" hat damit ein Code-Home, nicht nur Prosa in `.ytstack/KNOWLEDGE.md`.
+**State-Machine in einem Modul.** Die ganze Lifecycle (Capture → Stage → Commit / Archive → Retry) lebt in `scripts/core/flush_pipeline.py`. Hooks, `flush.py` und `retry_failed_flushes.py` gehen alle durch dieselbe API. Die Invariante "no gap between capture and persist" hat damit ein Code-Home, nicht nur Prosa in `.ytstack/KNOWLEDGE.md`.
 
 **Recursion Guard:** Alle Agent SDK Scripts (flush, compile, query, lint) setzen `CLAUDE_INVOKED_BY` env var. Die Hooks prüfen diese Variable und exiten sofort wenn gesetzt. Verhindert dass Hooks auf ihre eigenen Sessions feuern.
 
@@ -224,9 +224,9 @@ flowchart TD
 | `health` | Collector Registry | `collectors/cli.py health` | 24h | $0 (Oura REST) |
 | `screenshots` | Collector Registry | `collectors/cli.py screenshots` | 24h | $0 (Ollama/Gemma4) |
 | `lint_structural` | Legacy | `lint.py --structural-only` | 24h | $0 (kein LLM) |
-| `review_wiki` | Legacy | `review-wiki.py` | 168h (1x/Woche) | $0 (Ollama/Gemma4) |
-| `optimize_claude_md` | Legacy | `optimize-claude-md.py` | 24h | $ (Claude API) |
-| `retry_failed_flushes` | Legacy | `retry-failed-flushes.py --limit N` | 24h | $ (Claude API) |
+| `review_wiki` | Legacy | `review_wiki.py` | 168h (1x/Woche) | $0 (Ollama/Gemma4) |
+| `optimize_claude_md` | Legacy | `optimize_claude_md.py` | 24h | $ (Claude API) |
+| `retry_failed_flushes` | Legacy | `retry_failed_flushes.py --limit N` | 24h | $ (Claude API) |
 | `daily_digest_yesterday` | Legacy | `daily_digest_runner.py --date yesterday` | 24h | $ (Haiku, ~1¢/Tag) |
 | Dashboard Stats Refresh | (synchron, kein Piggyback) | `dashboard/dashboard_stats.py` | nach jedem Flush | $0 (kein LLM) |
 | Dashboard Lint Refresh | (synchron, kein Piggyback) | `dashboard/dashboard_lint.py` | nach jedem Flush | $0 (kein LLM) |
@@ -545,9 +545,9 @@ Gemma4 auf dem lokalen GPU-Server bewertet alle Wiki-Artikel nach 5 Kriterien un
 Verdicts: `keep` (gut genug), `enrich` (braucht mehr Tiefe), `merge` (mit anderem Artikel zusammenführen), `archive` (entfernen).
 
 ```bash
-uv run python scripts/review-wiki.py                    # alle Artikel
-uv run python scripts/review-wiki.py --model gemma3:4b  # schnelleres Modell
-uv run python scripts/review-wiki.py --limit 10         # nur 10 Artikel
+uv run python scripts/review_wiki.py                    # alle Artikel
+uv run python scripts/review_wiki.py --model gemma3:4b  # schnelleres Modell
+uv run python scripts/review_wiki.py --limit 10         # nur 10 Artikel
 ```
 
 Report in `.wiki/reports/wiki-review-YYYY-MM-DD.md`.
@@ -727,7 +727,7 @@ Hält `~/.claude/CLAUDE.md` automatisch aktuell basierend auf Wiki-Wissen. Erken
 ```mermaid
 flowchart TD
     WIKI["knowledge/\nCompiliertes Wiki aus allen Projekten"]
-    WIKI --> OPTIMIZER["optimize-claude-md.py\nAgent SDK"]
+    WIKI --> OPTIMIZER["optimize_claude_md.py\nAgent SDK"]
     OPTIMIZER --> READ["Liest aktuelle CLAUDE.md\n+ Wiki-Index + Artikel"]
     READ --> ANALYZE["Erkennt Cross-Project Patterns:\nToolchain, Conventions, Pitfalls"]
     ANALYZE --> EDIT["Surgical Edits an CLAUDE.md\n(Add/Update/Remove)"]
@@ -757,8 +757,8 @@ flowchart TD
 ### Script
 
 ```bash
-uv run python scripts/optimize-claude-md.py              # optimize
-uv run python scripts/optimize-claude-md.py --dry-run    # nur zeigen
+uv run python scripts/optimize_claude_md.py              # optimize
+uv run python scripts/optimize_claude_md.py --dry-run    # nur zeigen
 ```
 
 Läuft als Piggyback in flush.py (24h Cooldown, nach 18:00).

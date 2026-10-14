@@ -67,8 +67,8 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 │   ├── preprocessors/         ← in-vault intake normalizers (pre-compile; Protocol + Registry, singletons)
 │   │   ├── base.py                ← Preprocessor Protocol, PreprocessorSpec, PreprocessResult, Registry
 │   │   ├── cli.py                 ← `wiki preprocess` dispatcher (--list / <name> [source] [--dry-run])
-│   │   ├── inbox.py               ← <vault>/inbox/ classifier (shim: scripts/process-inbox.py)
-│   │   ├── html_ingest.py         ← HTML file/URL → raw/articles (named to avoid the stdlib `html` shadow; shim: scripts/ingest-html.py)
+│   │   ├── inbox.py               ← <vault>/inbox/ classifier (entry module: scripts/process_inbox.py)
+│   │   ├── html_ingest.py         ← HTML file/URL → raw/articles (named to avoid the stdlib `html` shadow; entry module: scripts/ingest_html.py)
 │   │   └── clippings.py           ← <vault>/Clippings/ sweep (shim: scripts/clippings_sweep.py)
 │   ├── facts/                 ← hard-fact subsystem (knowledge/facts/<slug>.md consumers) + takes producer
 │   │   ├── correct.py             ← CRUD CLI: add/list/remove/edit/path
@@ -126,11 +126,11 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 │   ├── query.py               ← Claude Agent SDK natural-language query (read-only / file-back)
 │   ├── agent_task.py          ← generic Claude Agent SDK runner for prompts/agents/*.md
 │   ├── clippings_sweep.py     ← thin shim → preprocessors/clippings.py (<vault>/Clippings/ → raw/articles/, pre-compile lift)
-│   ├── ingest-html.py         ← thin shim → preprocessors/html_ingest.py (HTML file or URL → text + visual)
-│   ├── process-inbox.py       ← thin shim → preprocessors/inbox.py (<vault>/inbox/ → classify + move to raw/ subfolder)
-│   ├── review-wiki.py         ← per-article quality scoring via local LLM
-│   ├── optimize-claude-md.py  ← cross-project pattern → ~/.claude/CLAUDE.md edits
-│   ├── retry-failed-flushes.py ← reprocess archived flush contexts
+│   ├── ingest_html.py         ← entry module for `wiki ingest-html` (logic: preprocessors/html_ingest.py)
+│   ├── process_inbox.py       ← entry module for `wiki process-inbox` (logic: preprocessors/inbox.py)
+│   ├── review_wiki.py         ← per-article quality scoring via local LLM
+│   ├── optimize_claude_md.py  ← cross-project pattern → ~/.claude/CLAUDE.md edits
+│   ├── retry_failed_flushes.py ← reprocess archived flush contexts
 │   ├── pin.py                 ← `wiki pin <article>` — append wikilink to a MOC section (no LLM)
 │   └── health.py              ← read-only colored ASCII vault dashboard
 ├── hooks/

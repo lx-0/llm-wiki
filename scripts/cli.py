@@ -36,6 +36,7 @@ menu can see them. `auth` routes to the OAuth registry.
 from __future__ import annotations
 
 import importlib
+import os
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -404,7 +405,7 @@ USAGE
   wiki review-wiki                   sweep every article, score each one
 
 NOTES
-  Wraps scripts/review-wiki.py. Uses the local Ollama model — $0 cost.
+  Wraps scripts/review_wiki.py. Uses the local Ollama model — $0 cost.
   Output goes to .wiki/reports/review-YYYY-MM-DD.md. Runs as weekly piggyback
   by default; this command is for ad-hoc manual runs."""
 
@@ -420,11 +421,12 @@ WHAT IT DOES
   Walks <vault>/inbox/. For each file, calls a local Ollama model to
   classify it (article / paper / note / transcript / audio / memory / suggestion)
   and moves it into the matching raw/<type>/ subfolder. HTML files are
-  delegated to scripts/ingest-html.py (text + visual). After the sweep,
-  triggers wiki compile on the freshly-routed sources.
+  ingested in-process by preprocessors/html_ingest.py (text + visual). After
+  the sweep, triggers wiki compile on the freshly-routed sources.
 
 NOTES
-  Wraps scripts/process-inbox.py. Free — uses local Ollama, no Claude API
+  Entry module scripts/process_inbox.py (logic: preprocessors/inbox.py). Free —
+  uses local Ollama, no Claude API
   calls until the downstream compile step. Inbox is transient: the LLM owns
   classification, the operator just drops files. See PROCESS §1."""
 
@@ -438,10 +440,12 @@ FLAGS
                                     content  html2text -> raw/articles/<slug>.md
                                     visual   Playwright screenshot -> Vision LLM -> raw/notes/
                                     both     run both pipelines back-to-back
-  --dry-run                       show what would be written, don't touch disk
+  --model MODEL                   Vision model for visual mode (default from config)
+  --no-compile                    write raw/ files, skip the compile that follows
 
 NOTES
-  Wraps scripts/ingest-html.py. Visual mode needs Playwright + a local
+  Entry module scripts/ingest_html.py (logic: preprocessors/html_ingest.py).
+  Visual mode needs Playwright + a local
   Vision-capable Ollama model; content mode runs offline. Also auto-invoked
   by wiki process-inbox for any .html files in the inbox."""
 
@@ -808,7 +812,7 @@ COMMANDS: tuple[CommandSpec, ...] = (
         "process-inbox",
         "Collect & ingest",
         "classify inbox/ files via Ollama",
-        handler="process-inbox.py",
+        handler="process_inbox.py",
         menu=True,
         help_text=H_PROCESS_INBOX,
     ),
@@ -816,7 +820,7 @@ COMMANDS: tuple[CommandSpec, ...] = (
         "ingest-html",
         "Collect & ingest",
         "convert an HTML file or URL into raw/",
-        handler="ingest-html.py",
+        handler="ingest_html.py",
         menu=True,
         help_text=H_INGEST_HTML,
     ),
@@ -966,7 +970,7 @@ COMMANDS: tuple[CommandSpec, ...] = (
         "review-wiki",
         "Knowledge ops",
         "per-article quality scores (local LLM, free)",
-        handler="review-wiki.py",
+        handler="review_wiki.py",
         menu=True,
         help_text=H_REVIEW_WIKI,
     ),
@@ -1218,11 +1222,26 @@ def render_help() -> str:
 # ── Command dispatch ────────────────────────────────────────────────────
 
 
+def module_for(handler: str) -> str:
+    """`preprocessors/inbox.py` → `preprocessors.inbox`: a handler path relative to
+    `scripts/`, as the module name `python -m` runs it under."""
+    if not handler.endswith(".py"):
+        raise ValueError(f"handler must be a .py path relative to scripts/: {handler!r}")
+    return handler[:-3].replace("/", ".")
+
+
 def _run_child(script_rel: str, args: list[str]) -> int:
-    """Run one handler script as a child process (same isolation `_run_script`
-    gave). Returns the child's exit code."""
-    script = SCRIPTS_DIR / script_rel
-    completed = subprocess.run([sys.executable, str(script), *args], check=False)
+    """Run one handler as a child process — `python -m <module>` with `scripts/` first
+    on the child's PYTHONPATH (the same process isolation `_run_script` gave; sub-package
+    entry points need no `sys.path` bootstrap of their own). The working directory is
+    inherited, so a relative argument (`wiki ingest-html ./page.html`) resolves against
+    the operator's cwd. Returns the child's exit code."""
+    env = dict(os.environ)
+    inherited = env.get("PYTHONPATH")
+    env["PYTHONPATH"] = str(SCRIPTS_DIR) + (os.pathsep + inherited if inherited else "")
+    completed = subprocess.run(
+        [sys.executable, "-m", module_for(script_rel), *args], env=env, check=False
+    )
     return completed.returncode
 
 

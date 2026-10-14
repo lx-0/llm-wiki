@@ -298,7 +298,7 @@ limits:
   # Floor under that threshold — piggybacks fire only when you compile, so a
   # short cadence alone would flag every quiet stretch.
   doctor_piggyback_stale_min_hours: 24
-  # review-wiki.py: per-article Ollama read timeout, consecutive-failure abort
+  # review_wiki.py: per-article Ollama read timeout, consecutive-failure abort
   # (stop grinding 1700×timeout when kcma is down), and incremental-report
   # checkpoint cadence (don't lose a multi-hour partial sweep).
   review_ollama_timeout_s: 300

@@ -74,7 +74,7 @@ DEDUP_WINDOW_SECONDS = CONFIG.scheduling.dedup_window_seconds
 # core/piggybacks.py so compile.py can drain due maintenance without importing
 # this module (which pulls the Claude SDK + sets CLAUDE_INVOKED_BY at load).
 
-# Re-exports — kept so retry-failed-flushes.py and any other importers
+# Re-exports — kept so retry_failed_flushes.py and any other importers
 # continue to find the canonical paths/funcs at familiar names.
 SESSIONS_DIR = flush_pipeline.SESSIONS_DIR
 FAILED_FLUSHES_DIR = flush_pipeline.FAILED_DIR

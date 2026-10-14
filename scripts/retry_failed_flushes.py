@@ -9,9 +9,9 @@ repeated failure, it stays archived for the next run.
 Runs as a daily piggyback task.
 
 Usage:
-    uv run python scripts/retry-failed-flushes.py
-    uv run python scripts/retry-failed-flushes.py --dry-run
-    uv run python scripts/retry-failed-flushes.py --limit 3
+    uv run python scripts/retry_failed_flushes.py
+    uv run python scripts/retry_failed_flushes.py --dry-run
+    uv run python scripts/retry_failed_flushes.py --limit 3
 """
 
 from __future__ import annotations

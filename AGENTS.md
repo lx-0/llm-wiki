@@ -73,8 +73,8 @@ llm-wiki/
 │   ├── preprocessors/      ← in-vault intake normalizers (pre-compile; Protocol + Registry, singletons — see CONTEXT.md "Preprocessor")
 │   │   ├── base.py             ← Preprocessor Protocol, PreprocessorSpec, PreprocessResult, Registry
 │   │   ├── cli.py              ← `wiki preprocess` dispatcher (--list / <name> [source] [--dry-run])
-│   │   ├── inbox.py            ← <vault>/inbox/ classifier (shim: scripts/process-inbox.py)
-│   │   ├── html_ingest.py      ← HTML file/URL → raw/articles (named to avoid the stdlib `html` shadow; shim: scripts/ingest-html.py)
+│   │   ├── inbox.py            ← <vault>/inbox/ classifier (entry module: scripts/process_inbox.py)
+│   │   ├── html_ingest.py      ← HTML file/URL → raw/articles (named to avoid the stdlib `html` shadow; entry module: scripts/ingest_html.py)
 │   │   └── clippings.py        ← <vault>/Clippings/ sweep (shim: scripts/clippings_sweep.py)
 │   ├── facts/              ← hard-fact subsystem (knowledge/facts/<slug>.md consumers) + takes producer
 │   │   ├── correct.py          ← CRUD CLI: add/list/remove/edit/path
@@ -121,10 +121,11 @@ llm-wiki/
 │   ├── flush.py            ← session-end → daily/ append + piggyback spawner
 │   ├── lint.py             ← 8 structural checks + 1 LLM contradiction check
 │   ├── query.py            ← Claude Agent SDK query (read-only or file-back)
-│   ├── process-inbox.py    ← thin shim → preprocessors/inbox.py (classify dropped files into raw/ subfolders)
-│   ├── optimize-claude-md.py ← suggests CLAUDE.md edits from compiled patterns
-│   ├── review-wiki.py      ← per-article quality scoring (Ollama)
-│   └── retry-failed-flushes.py ← reprocess archived flush contexts
+│   ├── process_inbox.py    ← entry module for `wiki process-inbox` (logic: preprocessors/inbox.py)
+│   ├── ingest_html.py      ← entry module for `wiki ingest-html` (logic: preprocessors/html_ingest.py)
+│   ├── optimize_claude_md.py ← suggests CLAUDE.md edits from compiled patterns
+│   ├── review_wiki.py      ← per-article quality scoring (Ollama)
+│   └── retry_failed_flushes.py ← reprocess archived flush contexts
 ├── hooks/
 │   ├── _transcript.py      ← format-aware transcript reader (Claude JSONL + Codex rollout) + tool summarizer + session-id→rollout resolver
 │   ├── session-start.py    ← inject a pointer block + recent daily-log tail; agent pulls articles on demand

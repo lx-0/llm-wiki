@@ -8,9 +8,11 @@ Two modes:
 The visual mode uses Playwright for screenshots and the local Ollama Vision LLM
 (gemma4:e4b supports multimodal) for interpretation.
 
-`scripts/ingest-html.py` is a thin runnable shim over this module (so the
-`wiki ingest-html` command keeps its path); `preprocessors/inbox.py` calls
-`ingest()` in-process for `.html`/`.htm` inbox drops instead of shelling out.
+`wiki ingest-html` runs `scripts/ingest_html.py`, a top-level entry module that calls
+this module's `main()` (an entry module outside the package avoids runpy's
+double-import warning, since the package imports this module to register it);
+`preprocessors/inbox.py` calls `ingest()` in-process for `.html`/`.htm` inbox drops
+instead of shelling out.
 
 Filename note: `html_ingest.py`, not `html.py` — `scripts/preprocessors/` lands
 on `sys.path[0]` when `cli.py` runs directly, and a module named `html` would
@@ -297,7 +299,7 @@ class HtmlPreprocessor:
         return PreprocessResult(files_written=(out,), message=f"ingested {source} → {out}")
 
 
-# ── Runnable entry point (via `scripts/ingest-html.py` shim) ──────────
+# ── Runnable entry point (`wiki ingest-html`) ───────────────────────────
 
 
 def main() -> None:

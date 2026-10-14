@@ -83,7 +83,7 @@ raw/
 - All `raw/` subfolders are **permanent**. Files are never deleted, never modified. They are the immutable ground truth. The compiler reads them but never writes back.
 - `raw/requests/` is the exception: request files have a `status` field that changes (pending → processing → done). The file itself is not deleted.
 - `raw/suggestions/` is the second exception: suggestion files have a `status` field that changes (pending → approved/rejected → executed).
-- `inbox/` lives **outside** `raw/` (at vault root) because it is **transient** — files are classified and moved into the right `raw/` subfolder by `process-inbox.py`. The inbox empties after processing.
+- `inbox/` lives **outside** `raw/` (at vault root) because it is **transient** — files are classified and moved into the right `raw/` subfolder by `wiki process-inbox`. The inbox empties after processing.
 
 Each source file has YAML frontmatter:
 

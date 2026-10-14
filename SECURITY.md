@@ -27,7 +27,7 @@ You'll get an acknowledgement within 7 days and a fix or status update within 30
 In scope:
 
 - Code injection via untrusted ingest sources (HTML clippings, audio transcripts, email bodies) reaching the compile prompt or shell.
-- Path traversal in any of the file-handling scripts (`process-inbox.py`, `compile.py`, `flush.py`, `seed.py`, hooks).
+- Path traversal in any of the file-handling scripts (`preprocessors/inbox.py`, `compile.py`, `flush.py`, `seed.py`, hooks).
 - Credential leaks through logs, error messages, or staged transcripts (e.g. `flush-context-*.md`).
 - Webmail/IMAP integrations leaking session state across accounts.
 

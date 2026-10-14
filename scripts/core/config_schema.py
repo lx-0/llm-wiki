@@ -275,20 +275,20 @@ class Limits:
     # (live: `voice`, 1h cadence, warned after 12h). Below this many hours
     # nothing counts as dark, whatever its cadence.
     doctor_piggyback_stale_min_hours: int = 24
-    # review-wiki.py per-article Ollama read timeout (was a hardcoded 300 in
+    # review_wiki.py per-article Ollama read timeout (was a hardcoded 300 in
     # the script). Generous because the quality-review prompt is large and
     # gemma cold-calls are slow; the connect cap + keepalive above prevent a
     # dead host from blocking this whole budget.
     review_ollama_timeout_s: int = 300
-    # review-wiki.py fail-fast: abort the full-vault sweep after this many
+    # review_wiki.py fail-fast: abort the full-vault sweep after this many
     # CONSECUTIVE per-article Ollama failures. Without it a mid-sweep kcma
     # outage means 1700 × read-timeout of pointless grinding. Set 0 to disable.
     review_consecutive_failure_abort: int = 5
-    # review-wiki.py incremental checkpoint: flush the partial JSON report
+    # review_wiki.py incremental checkpoint: flush the partial JSON report
     # every N reviewed articles so an aborted/killed sweep keeps its work
     # (the report was previously written only at end-of-sweep).
     review_checkpoint_every: int = 25
-    # review-wiki.py soft sweep deadline (seconds). On a large vault the weekly
+    # review_wiki.py soft sweep deadline (seconds). On a large vault the weekly
     # sweep (one Ollama call per article × ~1700 articles) can run for hours
     # against a slow-but-alive kcma; the consecutive-failure abort only fires on
     # a DOWN server, so the run used to march past the piggyback hard wall-clock

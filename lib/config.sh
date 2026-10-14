@@ -51,7 +51,7 @@ config_cmd_setup_wizard() {
   echo
   # 2. Compile model
   local current_model; current_model="$(config_get models.compile_model)"
-  info "Compile model — Claude tier for compile.py and retry-failed-flushes.py"
+  info "Compile model — Claude tier for compile.py and retry_failed_flushes.py"
   # Resolve default-index in plain shell BEFORE calling select_one. macOS
   # bash 3.2 mis-parses nested $( case … esac ) inside another $( … ) with
   # case-pattern ')' tokens (syntax error: unexpected newline near *)).

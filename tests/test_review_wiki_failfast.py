@@ -13,7 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
 
 def _load_review_module():
-    path = Path(__file__).resolve().parent.parent / "scripts" / "review-wiki.py"
+    path = Path(__file__).resolve().parent.parent / "scripts" / "review_wiki.py"
     spec = importlib.util.spec_from_file_location("review_wiki_mod", path)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)

@@ -6,8 +6,9 @@ written to `raw/<category>/` (substrate zone). Uses the local LLM (Ollama) to
 classify text files; HTML drops are ingested in-process via the `html`
 preprocessor; audio/pdf/etc. are archive-only.
 
-`scripts/process-inbox.py` is a thin runnable shim over this module (so the
-`wiki process-inbox` command keeps its path).
+`wiki process-inbox` runs `scripts/process_inbox.py`, a top-level entry module that
+calls this module's `main()` (an entry module outside the package avoids runpy's
+double-import warning, since the package imports this module to register it).
 """
 
 from __future__ import annotations
@@ -292,7 +293,7 @@ class InboxPreprocessor:
         )
 
 
-# ── Runnable entry point (via `scripts/process-inbox.py` shim) ────────
+# ── Runnable entry point (`wiki process-inbox`) ─────────────────────────
 
 
 def main() -> None:

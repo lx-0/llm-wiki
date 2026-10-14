@@ -215,8 +215,8 @@ def test_process_inbox_md_writes_artifact_and_archives_original(tmp_path, monkey
 def test_process_inbox_html_ingests_in_process_and_archives_original(tmp_path, monkeypatch):
     """The .html branch must ingest IN-PROCESS (no subprocess) and archive the
     original. Regression guard for the C12 live bug: the old delegation shelled
-    out to `ROOT_DIR/scripts/ingest-html.py` — a path that exists in no deployed
-    layout — so every HTML drop failed and was stranded in inbox/ forever."""
+    out to the HTML shim under `ROOT_DIR/scripts/` — a path that exists in no
+    deployed layout — so every HTML drop failed and was stranded in inbox/ forever."""
     dirs = _isolated_inbox(tmp_path, process_inbox_mod)
     _isolate_html(tmp_path, dirs)
     html_body = "<html><head><title>My Page</title></head><body><h1>Title</h1><p>Body text.</p></body></html>"

@@ -238,7 +238,7 @@ Inspired by [Andrej Karpathy's LLM Wiki](https://gist.github.com/karpathy/442a6b
 ├── daily/                 ← per-day rollup: <date>/{sessions,health,meetings,voice,email}.md per-source captures + <date>.md compile-stage digest
 ├── knowledge/             ← LLM-compiled wiki (LLM owns, you and agents read)
 ├── reports/               ← operator self-reports (air-gapped from compile): studies/<id>/runs/<ts>/instruments/*.md + _summary.md + _analysis.md, plus analyses/ for Pass-2
-├── inbox/                 ← transient — process-inbox.py classifies + moves to raw/
+├── inbox/                 ← transient — `wiki process-inbox` classifies + moves to raw/
 ├── Clippings/             ← optional — Obsidian Web Clipper drop point
 ├── .obsidian/             ← Obsidian config (community-plugins, core-plugins seeded)
 ├── .claude/skills/        ← symlinks to .wiki/skills/<name> (auto-discovered)

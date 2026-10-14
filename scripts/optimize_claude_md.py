@@ -4,8 +4,8 @@ Reads the compiled wiki, identifies cross-project patterns, and updates
 the global CLAUDE.md. Runs daily as a piggyback task in flush.py.
 
 Usage:
-    uv run python scripts/optimize-claude-md.py              # optimize
-    uv run python scripts/optimize-claude-md.py --dry-run    # show diff without writing
+    uv run python scripts/optimize_claude_md.py              # optimize
+    uv run python scripts/optimize_claude_md.py --dry-run    # show diff without writing
 """
 
 import os
