@@ -25,12 +25,13 @@ import httpx
 from collectors.base import (
     CollectorSpec,
     RunResult,
+    append_rollup,
     filter_accounts,
     register,
     resolve_accounts,
     run_account_loop,
 )
-from core import daily_capture, frontmatter
+from core import frontmatter
 from core.config import CONFIG, TIMEZONE
 from core.paths import ROOT_DIR, STATE_DIR
 from core.state_store import locked
@@ -343,11 +344,13 @@ class WisprCollector:
                     temp.replace(target)
                     # Only new meetings add a rollup line. Updates retain source provenance.
                     if not previous.get("rollup"):
-                        daily_capture.append_with_source(
+                        append_rollup(
                             date,
                             "meetings",
                             f"- **wispr** · {fm['title']}",
-                            target.relative_to(ROOT_DIR).as_posix(),
+                            source_ref=target.relative_to(ROOT_DIR).as_posix(),
+                            log=log,
+                            context=f"wispr meeting {mid}",
                         )
                     items[mid] = {"hash": digest, "filename": name, "rollup": True}
                     written.append(target)

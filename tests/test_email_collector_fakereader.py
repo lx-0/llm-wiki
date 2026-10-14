@@ -143,8 +143,15 @@ def _email_mod_with_account(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, rea
     class _PersonalStub:
         accounts = {"testacct": {"reader": {"kind": "fake"}}}
 
+    class _LimitsStub:
+        # The delta's daily-rollup block reads these; without them the rollup used to
+        # raise inside a swallowed try (M033-S03-T06 made the block build unguarded).
+        daily_email_top_senders = 3
+        daily_email_sample_subjects = 3
+
     class _ConfigStub:
         personal = _PersonalStub()
+        limits = _LimitsStub()
 
     monkeypatch.setattr(email_mod, "CONFIG", _ConfigStub())
     monkeypatch.setattr(email_mod, "ROOT_DIR", tmp_path)

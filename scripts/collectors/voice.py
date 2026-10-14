@@ -39,6 +39,7 @@ from collectors.base import (
 )
 from core import ollama_client
 from core.config import CONFIG, TIMEZONE
+from core.daily_capture import rollup_line
 from core.paths import RAW_DIR, ROOT_DIR
 from core.prompts import render
 from core.utils import slugify
@@ -303,30 +304,11 @@ def _build_frontmatter(
     return "\n".join(lines) + "\n"
 
 
-def _scan_inbox(inbox: Path) -> list[Path]:
-    """List inbox files eligible for ingest (text: .txt / .md; audio:
-    .m4a / .mp4 / .mp3 / .wav / .flac / .ogg / .aac). Thin wrapper over
-    the shared `base.scan_inbox` harness, binding this collector's suffixes."""
-    return scan_inbox(inbox, ACCEPTED_SUFFIXES)
-
-
 def _append_daily_rollup(captured_at: datetime, content: str, out_path: Path) -> None:
-    """Append a voice-intake one-liner to daily/<date>/voice.md.
-
-    The daily/-rollup substrate (`.ytstack/AD-HOC-daily-as-rollup-PLAN.md`)
-    surfaces one line per voice note: time, first few words, link back to
-    the canonical raw/voice/ file. Failures are swallowed — the rollup is
-    side-effect, never break the primary write.
-    """
-    date_iso = captured_at.strftime("%Y-%m-%d")
-    time_label = captured_at.strftime("%H:%M")
-    first_line = content.splitlines()[0].strip() if content else "(empty)"
-    if len(first_line) > 80:
-        first_line = first_line[:77].rstrip() + "…"
-    # No in-body wikilink: Obsidian ignores `raw/`, so `[[…]]` would render
-    # dead. The source path goes into the file's `sources:` frontmatter
-    # instead (machine-readable provenance, no graph edge, no raw/-index cost).
-    line = f"- **{time_label}** · {first_line}"
+    """Mirror a voice note into daily/<date>/voice.md — one timed line, provenance in the
+    file's `sources:` frontmatter (no in-body wikilink: Obsidian ignores `raw/`, so `[[…]]`
+    would render dead). The rollup is a side-effect — `append_rollup` swallows failures."""
+    date_iso, line = rollup_line(captured_at, content)
     try:
         source_ref = out_path.resolve().relative_to(ROOT_DIR.resolve()).as_posix()
     except (ValueError, OSError):
@@ -372,7 +354,7 @@ class VoiceCollector:
             return RunResult(message=f"voice_inbox not found: {inbox}")
 
         tz = ZoneInfo(TIMEZONE)
-        sources = _scan_inbox(inbox)
+        sources = scan_inbox(inbox, ACCEPTED_SUFFIXES)
         if not sources:
             return RunResult(message=f"no new voice notes in {inbox}")
 

@@ -48,10 +48,12 @@ from __future__ import annotations
 import fcntl
 import re
 from datetime import date as _date
+from datetime import datetime
 from pathlib import Path
 
 from core import markers
 from core.paths import ROOT_DIR
+from core.utils import ellipsize
 
 # Configured at import time so tests can monkey-patch.
 DAILY_DIR: Path = ROOT_DIR / "daily"
@@ -230,6 +232,28 @@ def append_with_source(date_iso: str, source: str, line: str, source_ref: str) -
         finally:
             fcntl.flock(fh.fileno(), fcntl.LOCK_UN)
     return target
+
+
+def rollup_line(
+    captured_at: datetime,
+    text: str,
+    *,
+    prefix: str = "",
+    suffix: str = "",
+    empty: str = "(empty)",
+) -> tuple[str, str]:
+    """The timed one-liner every inbox collector mirrors into `daily/<date>/<source>.md`.
+
+    Returns ``(date_iso, line)`` with ``line = "- **HH:MM** · " + prefix + the first line
+    of ``text`` (``empty`` when there is none; cut at 80 characters, see
+    ``core.utils.ellipsize``) + suffix``. The stamp is ``captured_at`` in its own timezone —
+    the collector picks the zone. The per-collector shape (an id before the text, an
+    archive name or a link after it) is the caller's; the skeleton lives here so the next
+    collector cannot drift from it.
+    """
+    first = text.splitlines()[0].strip() if text else empty
+    line = f"- **{captured_at.strftime('%H:%M')}** · {prefix}{ellipsize(first)}{suffix}"
+    return captured_at.strftime("%Y-%m-%d"), line
 
 
 def replace_section(date_iso: str, source: str, content: str) -> Path:

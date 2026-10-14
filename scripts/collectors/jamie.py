@@ -49,6 +49,7 @@ from collectors.base import (
     CollectorSpec,
     RunResult,
     Watermark,
+    append_rollup,
     filter_accounts,
     migrate_flat_state,
     register,
@@ -640,15 +641,15 @@ class JamieCollector:
             already_present.add(short)
 
             # Mirror a one-liner into daily/<date>/meetings.md.
-            try:
-                from core import daily_capture
-
-                meet_date = str(started_at)[:10] if started_at else now_iso()[:10]
-                if re.match(r"^\d{4}-\d{2}-\d{2}$", meet_date):
-                    rollup_line = f"- **jamie** · {title} → [[{target.stem}]]"
-                    daily_capture.append(meet_date, "meetings", rollup_line)
-            except Exception:
-                log.exception("daily-rollup append failed for jamie meeting %s", mid)
+            meet_date = str(started_at)[:10] if started_at else now_iso()[:10]
+            if re.match(r"^\d{4}-\d{2}-\d{2}$", meet_date):
+                append_rollup(
+                    meet_date,
+                    "meetings",
+                    f"- **jamie** · {title} → [[{target.stem}]]",
+                    log=log,
+                    context=f"jamie meeting {mid}",
+                )
 
             watermark.observe(started_at)
 

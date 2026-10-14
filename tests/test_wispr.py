@@ -7,6 +7,7 @@ import httpx
 import pytest
 
 from collectors import wispr
+from core import daily_capture
 
 MID = "11111111-1111-4111-8111-111111111111"
 MID2 = "22222222-2222-4222-8222-222222222222"
@@ -50,7 +51,7 @@ def env(tmp_path, monkeypatch):
     monkeypatch.setenv("WISPR_TEST_TOKEN", "test-secret")
     monkeypatch.setattr(wispr, "ROOT_DIR", root)
     monkeypatch.setattr(wispr, "_STATE_FILE", state)
-    monkeypatch.setattr(wispr.daily_capture, "DAILY_DIR", root / "daily")
+    monkeypatch.setattr(daily_capture, "DAILY_DIR", root / "daily")
     return root, state, limits
 
 

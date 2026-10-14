@@ -29,7 +29,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from adapters.mailbox import MailboxReader, MailboxReadError, resolve_reader
-from collectors.base import CollectorSpec, RunResult, filter_accounts, register
+from collectors.base import CollectorSpec, RunResult, append_rollup, filter_accounts, register
 from core.config import CONFIG
 from core.paths import EMAIL_STATE_FILE, ROOT_DIR
 from core.state_store import StateStore, store_for
@@ -246,21 +246,20 @@ class EmailCollector:
                     )
                     files_written.append(report_path)
                     # Mirror a one-liner into daily/<today>/email.md per account.
-                    try:
-                        from datetime import date as _date
-
-                        from core import daily_capture
-
-                        rollup_block = _email_rollup_block(
-                            account_id,
-                            messages,
-                            report_path.stem,
-                            top_senders=CONFIG.limits.daily_email_top_senders,
-                            sample_subjects=CONFIG.limits.daily_email_sample_subjects,
-                        )
-                        daily_capture.append(_date.today().isoformat(), "email", rollup_block)
-                    except Exception:
-                        log.exception("daily-rollup append failed for email delta %s", account_id)
+                    rollup_block = _email_rollup_block(
+                        account_id,
+                        messages,
+                        report_path.stem,
+                        top_senders=CONFIG.limits.daily_email_top_senders,
+                        sample_subjects=CONFIG.limits.daily_email_sample_subjects,
+                    )
+                    append_rollup(
+                        today_iso(),
+                        "email",
+                        rollup_block,
+                        log=log,
+                        context=f"email delta {account_id}",
+                    )
             else:
                 log.info("  %s: 0 new messages since watermark", account_id)
                 skipped += 1

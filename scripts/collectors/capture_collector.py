@@ -47,6 +47,7 @@ from collectors.base import (
 )
 from core import capture_index
 from core.config import CONFIG, TIMEZONE
+from core.daily_capture import rollup_line
 from core.paths import RAW_DIR
 
 log = logging.getLogger(__name__)
@@ -100,28 +101,15 @@ def _build_frontmatter(
     return "\n".join(lines) + "\n"
 
 
-def _scan_inbox(inbox: Path) -> list[Path]:
-    """List inbox files eligible for ingest (.txt / .md / .html). Thin
-    wrapper over the shared `base.scan_inbox` harness, binding this
-    collector's suffixes."""
-    return scan_inbox(inbox, ACCEPTED_SUFFIXES)
-
-
 def _append_daily_rollup(
     capture_id: str, captured_at: datetime, content: str, out_path: Path
 ) -> None:
-    """Append a capture-intake one-liner to daily/<date>/captures.md.
-
-    Surfaces one line per capture: time, ID, first few words, link back to
-    the canonical raw/captures/ file. Failures are swallowed — the rollup is
-    a side-effect, never break the primary write.
-    """
-    date_iso = captured_at.strftime("%Y-%m-%d")
-    time_label = captured_at.strftime("%H:%M")
-    first_line = content.splitlines()[0].strip() if content else "(empty)"
-    if len(first_line) > 80:
-        first_line = first_line[:77].rstrip() + "…"
-    line = f"- **{time_label}** · `{capture_id}` · {first_line} → [[{out_path.stem}]]"
+    """Mirror a capture into daily/<date>/captures.md — one timed line with the id in front
+    and a link back to the canonical raw/captures/ file. The rollup is a side-effect —
+    `append_rollup` swallows failures."""
+    date_iso, line = rollup_line(
+        captured_at, content, prefix=f"`{capture_id}` · ", suffix=f" → [[{out_path.stem}]]"
+    )
     append_rollup(date_iso, "captures", line, log=log, context=f"capture {out_path.name}")
 
 
@@ -160,7 +148,7 @@ class CaptureCollector:
             return RunResult(message=f"capture_inbox not found: {inbox}")
 
         tz = ZoneInfo(TIMEZONE)
-        sources = _scan_inbox(inbox)
+        sources = scan_inbox(inbox, ACCEPTED_SUFFIXES)
         if not sources:
             return RunResult(message=f"no new captures in {inbox}")
 

@@ -28,6 +28,7 @@ from pathlib import Path
 
 from core import frontmatter
 from core.console import setup_console_logging
+from core.utils import ellipsize
 
 log = logging.getLogger("backfill_daily_rollup")
 
@@ -116,9 +117,7 @@ def _voice_lines(vault: Path) -> list[tuple[str, str]]:
         except OSError:
             continue
         body_no_fm = frontmatter.split_fence(body)[1].strip()
-        first_line = body_no_fm.splitlines()[0].strip() if body_no_fm else "(empty)"
-        if len(first_line) > 80:
-            first_line = first_line[:77].rstrip() + "…"
+        first_line = ellipsize(body_no_fm.splitlines()[0].strip() if body_no_fm else "(empty)")
         line = f"- **{time_label}** · {first_line} → [[{f.stem}]]"
         out.append((date_iso, line))
     return out

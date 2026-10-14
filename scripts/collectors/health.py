@@ -47,12 +47,12 @@ from collectors.base import (
     CollectorSpec,
     RunResult,
     Watermark,
+    append_rollup,
     filter_accounts,
     register,
     resolve_accounts,
     run_account_loop,
 )
-from core import daily_capture
 from core.config import CONFIG
 from core.paths import ROOT_DIR, STATE_DIR
 from core.utils import load_json_state, save_json_state, slugify
@@ -646,10 +646,9 @@ class HealthCollector:
         if not bits:
             return
         line = f"- **{account_id}** (HK) · {' · '.join(bits)}"
-        try:
-            daily_capture.append(agg.day, "health", line)
-        except Exception:
-            log.exception("daily-rollup append failed for %s/%s (healthkit)", agg.day, account_id)
+        append_rollup(
+            agg.day, "health", line, log=log, context=f"{agg.day}/{account_id} (healthkit)"
+        )
 
     @staticmethod
     def _update_daily_rollup(summary: DailySummary, account_id: str) -> None:
@@ -677,8 +676,5 @@ class HealthCollector:
         if not bits:
             return
         line = f"- **{account_id}** · {' · '.join(bits)}"
-        try:
-            daily_capture.append(summary.day, "health", line)
-        except Exception:
-            # Rollup is a side-effect; never let it break the primary write.
-            log.exception("daily-rollup append failed for %s/%s", summary.day, account_id)
+        # Rollup is a side-effect; append_rollup never lets it break the primary write.
+        append_rollup(summary.day, "health", line, log=log, context=f"{summary.day}/{account_id}")

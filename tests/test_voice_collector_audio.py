@@ -93,7 +93,7 @@ def test_scan_inbox_includes_audio_files(voice_env):
     (inbox / "note.txt").write_text("dictation")
     (inbox / "skip.jpg").write_bytes(b"fake-jpg")
 
-    found = voice_mod._scan_inbox(inbox)
+    found = voice_mod.scan_inbox(inbox, voice_mod.ACCEPTED_SUFFIXES)
     names = sorted(p.name for p in found)
     assert names == ["memo.m4a", "note.txt", "rec.mp3", "voice.wav"]
 

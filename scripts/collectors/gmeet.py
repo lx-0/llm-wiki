@@ -71,6 +71,7 @@ from collectors.base import (
     CollectorSpec,
     RunResult,
     Watermark,
+    append_rollup,
     filter_accounts,
     migrate_flat_state,
     register,
@@ -1061,14 +1062,14 @@ class GmeetCollector:
             files_written.append(target)
 
             # Mirror a one-liner into daily/<date>/meetings.md.
-            try:
-                from core import daily_capture as _daily_capture
-
-                if re.match(r"^\d{4}-\d{2}-\d{2}$", date_prefix):
-                    rollup_line = f"- **gmeet** · {_meeting_title(first_name)} → [[{target.stem}]]"
-                    _daily_capture.append(date_prefix, "meetings", rollup_line)
-            except Exception:
-                log.exception("daily-rollup append failed for gmeet meeting %s", key)
+            if re.match(r"^\d{4}-\d{2}-\d{2}$", date_prefix):
+                append_rollup(
+                    date_prefix,
+                    "meetings",
+                    f"- **gmeet** · {_meeting_title(first_name)} → [[{target.stem}]]",
+                    log=log,
+                    context=f"gmeet meeting {key}",
+                )
 
             # Register the newly-written file in the sibling_map so a later
             # group in this same run (or a later account in the multi-tenant

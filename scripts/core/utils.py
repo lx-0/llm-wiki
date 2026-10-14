@@ -129,6 +129,21 @@ def file_hash(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()[:16]
 
 
+# ── Text helpers ──────────────────────────────────────────────────────
+
+
+def ellipsize(text: str, limit: int = 80) -> str:
+    """Cut ``text`` to ``limit`` characters with a trailing ellipsis.
+
+    The one home of the ``[:77].rstrip() + "…"`` rule the daily-rollup lines and the
+    capture gists used to spell by hand: a text that fits is returned unchanged, a longer
+    one is cut three characters short of ``limit``, right-stripped, and closed with ``…``.
+    """
+    if len(text) <= limit:
+        return text
+    return text[: limit - 3].rstrip() + "…"
+
+
 # ── Slug / naming ─────────────────────────────────────────────────────
 
 

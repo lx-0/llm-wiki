@@ -40,6 +40,7 @@ from collectors.base import (
 )
 from core import ollama_client
 from core.config import CONFIG, TIMEZONE
+from core.daily_capture import rollup_line
 from core.paths import RAW_DIR
 from core.prompts import prompt_model, render
 from core.utils import now_iso
@@ -208,13 +209,6 @@ def describe_picture(path: Path) -> dict | None:
         return None
     finally:
         resized.unlink(missing_ok=True)
-
-
-def _scan_inbox(inbox: Path) -> list[Path]:
-    """List inbox files eligible for ingest (.jpeg / .jpg / .png / .heic).
-    Thin wrapper over the shared `base.scan_inbox` harness, binding this
-    collector's suffixes."""
-    return scan_inbox(inbox, ACCEPTED_SUFFIXES)
 
 
 def _render_picture_metadata_block(picture_metadata: dict) -> list[str]:
@@ -395,14 +389,11 @@ def _build_batch_report(results: list[dict], thumb_lookup: dict[str, str]) -> st
 
 
 def _append_daily_rollup(captured_at: datetime, scene: str, archive_name: str) -> None:
-    """Mirror a one-liner into daily/<date>/pictures.md. Failures are
-    swallowed — never break the primary write."""
-    date_iso = captured_at.strftime("%Y-%m-%d")
-    time_label = captured_at.strftime("%H:%M")
-    first_line = (scene or "(no description)").strip()
-    if len(first_line) > 80:
-        first_line = first_line[:77].rstrip() + "…"
-    line = f"- **{time_label}** · {first_line} · `{archive_name}`"
+    """Mirror a picture into daily/<date>/pictures.md — one timed line, the archive name
+    after the scene's first line. The rollup is a side-effect — `append_rollup` swallows."""
+    date_iso, line = rollup_line(
+        captured_at, scene, suffix=f" · `{archive_name}`", empty="(no description)"
+    )
     append_rollup(date_iso, "pictures", line, log=log, context=f"picture {archive_name}")
 
 
@@ -451,7 +442,7 @@ class PicturesCollector:
             if not inbox.exists():
                 missing.append(inbox)
                 continue
-            sources.extend(_scan_inbox(inbox))
+            sources.extend(scan_inbox(inbox, ACCEPTED_SUFFIXES))
         # Re-sort across inboxes by mtime so the batch report reads
         # chronologically regardless of which inbox a file came from.
         sources.sort(key=lambda p: p.stat().st_mtime)

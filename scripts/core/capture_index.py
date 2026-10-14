@@ -27,7 +27,7 @@ import yaml
 
 from .paths import KNOWLEDGE_DIR, STATE_DIR
 from .state_store import locked
-from .utils import load_json_state, save_json_state
+from .utils import ellipsize, load_json_state, save_json_state
 
 CAPTURE_INDEX_FILE = STATE_DIR / "capture_index.json"
 # Historical lock name (predates the state_store default of `<file>.lock`) —
@@ -159,7 +159,7 @@ def _capture_gist(source_path: str, *, vault_root: Path) -> str:
     for line in body.splitlines():
         s = line.strip()
         if s and not s.startswith("#"):
-            return s if len(s) <= 80 else s[:77].rstrip() + "…"
+            return ellipsize(s)
     return ""
 
 
