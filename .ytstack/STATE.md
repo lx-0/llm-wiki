@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-15T01:44:00+02:00
+last_updated: 2026-10-15T01:54:00+02:00
 current_milestone: M033
 active_slice: S04
-active_task: T02
+active_task: none
 last_completed_milestone: M032
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -155,8 +155,14 @@ unchanged — S04 counts by `ast`, S05-T05 inherits the ruff-Markdown and empty-
 formatter lessons. **S04 1/7** — T01 (`b699dcc`): `tests/test_function_length.py`, the
 AST length gate with a shrink-only allowlist of **20** measured functions (the audit said
 15: five uncounted, four grown), `core/config_schema.py` excluded by reason; the five extra
-functions assigned to T02 / T06 / T07 in the slice plan. Suite 2119. **Next: T02 —
-`dream.py` (`dream_entity` 395 + `_async_main` 152) via `plan-task`.**
+functions assigned to T02 / T06 / T07 in the slice plan. Suite 2119. CI green on
+`b699dcc` + `67fa55d`. **S04 2/7** — T02 (`8837ebb`): `dream_entity` 395 → 147 along its
+phases (ten helpers), `_async_main` 152 → 45 (`_build_parser` / `_cmd_entity` /
+`_print_candidates`); a pure move — string-literal diff = renames + docstrings, dream suites
++ oracle + gate green, scratch-vault routing (`list-candidates`, `dream-entity nobody
+--dry-run` rc=2). Allowlist 18. The `dream/` package split left to T07's review. **Next:
+T03 — the compile path (`compile.main` 345, `_run_compile_route` 164,
+`compile_stages/compile.compile_source` 212) via `plan-task`.**
 
 ## M032 COMPLETE (L, 2026-10-14): desktop de-slop
 
