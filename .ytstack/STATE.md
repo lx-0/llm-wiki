@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-15T01:41:00+02:00
+last_updated: 2026-10-15T01:43:00+02:00
 current_milestone: M033
 active_slice: S04
-active_task: T01
+active_task: none
 last_completed_milestone: M032
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -152,8 +152,11 @@ vault parity over 2273 articles / 686 daily files / 191 calendar notes / 38 tran
 what shipped, `print` → `core/console` moved out to M034, two backlog files for the seam
 residue (`intents-seen-state-shape.md`, `backfill-voice-rollup-shape.md`); S04 / S05
 unchanged — S04 counts by `ast`, S05-T05 inherits the ruff-Markdown and empty-path
-formatter lessons. **Next: S04 (readable functions) — `plan-task` for T01, the AST
-length test with the shrinking allowlist.**
+formatter lessons. **S04 1/7** — T01 (`b699dcc`): `tests/test_function_length.py`, the
+AST length gate with a shrink-only allowlist of **20** measured functions (the audit said
+15: five uncounted, four grown), `core/config_schema.py` excluded by reason; the five extra
+functions assigned to T02 / T06 / T07 in the slice plan. Suite 2119. **Next: T02 —
+`dream.py` (`dream_entity` 395 + `_async_main` 152) via `plan-task`.**
 
 ## M032 COMPLETE (L, 2026-10-14): desktop de-slop
 
