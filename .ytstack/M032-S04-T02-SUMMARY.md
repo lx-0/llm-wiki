@@ -3,7 +3,7 @@ milestone: M032
 slice: S04
 task: T02
 project: llm-wiki
-closed: 2026-10-15T00:30:00+02:00
+closed: 2026-10-14T14:48:00+02:00
 verification: passed
 ---
 
