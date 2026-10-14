@@ -1,10 +1,11 @@
 <script lang="ts">
+  import { activity, countPerDay } from '../../lib/activity';
   import { fmtAgo } from '../../lib/time';
   import Button from '../../ui/Button.svelte';
   import Meter from '../../ui/Meter.svelte';
   import Ring from '../../ui/Ring.svelte';
   import Sparkline from '../../ui/Sparkline.svelte';
-  import { activity, addsPerDay, captureSummary, healthSummary } from './status';
+  import { captureSummary, healthSummary } from './status';
   import { busy, panel, runAction, startCompile, toggleListener } from './store.svelte';
 
   type Tile = 'library' | 'health' | 'capture';
@@ -12,7 +13,7 @@
   const toggle = (tile: Tile) => (open = open === tile ? null : tile);
 
   const now = $derived(panel.loaded ? Date.now() : 0);
-  const adds = $derived(addsPerDay(panel.entries, now));
+  const adds = $derived(countPerDay(panel.entries, now));
   const act = $derived(activity(panel.entries, now));
   const health = $derived(healthSummary(panel.doctor));
   const listener = $derived(panel.listeners[0] ?? null);
@@ -37,7 +38,7 @@
         <span class="cap">library</span>
       {:else}
         <span class="big num">{panel.vault ? panel.vault.articleCount.toLocaleString() : '—'}</span>
-        <Sparkline values={adds} width={92} height={22} label="Notes added per day, last 14 days" />
+        <Sparkline values={adds} width={92} height={22} label="Notes updated per day, last 14 days" />
         <span class="cap num">{act.today > 0 ? `+${act.today} today` : 'notes'}</span>
       {/if}
     </button>

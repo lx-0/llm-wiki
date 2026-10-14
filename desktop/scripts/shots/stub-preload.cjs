@@ -74,6 +74,7 @@ contextBridge.exposeInMainWorld('app', {
   quit: noop,
   openSettings: noop,
   openBrowse: noop,
+  openOverview: noop,
   openCockpit: noop,
   closeCockpit: noop,
   openAtlas: noop,

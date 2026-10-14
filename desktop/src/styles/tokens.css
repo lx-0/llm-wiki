@@ -215,6 +215,25 @@ input {
   border-top: 1px solid var(--line);
 }
 
+/* the one tooltip (ui/tip.ts): fixed at the viewport origin, moved by transform, opaque */
+.tip {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 50;
+  max-width: 260px;
+  padding: 3px var(--space-2);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-s);
+  background: var(--bg);
+  color: var(--text);
+  font-size: var(--fs-xs);
+  line-height: 1.35;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 2px 6px oklch(0% 0 0 / 0.12);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

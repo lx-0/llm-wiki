@@ -7,6 +7,7 @@ export const APP_LOGIN_SET_CHANNEL = 'app:login-set';
 export const APP_QUIT_CHANNEL = 'app:quit';
 export const APP_OPEN_SETTINGS_CHANNEL = 'app:open-settings';
 export const APP_OPEN_BROWSE_CHANNEL = 'app:open-browse';
+export const APP_OPEN_OVERVIEW_CHANNEL = 'app:open-overview';
 export const APP_OPEN_COCKPIT_CHANNEL = 'app:open-cockpit';
 export const APP_CLOSE_COCKPIT_CHANNEL = 'app:close-cockpit';
 export const APP_OPEN_ATLAS_CHANNEL = 'app:open-atlas';
@@ -23,6 +24,8 @@ export interface AppApi {
   openSettings(): void;
   /** open the Browse window (singleton) */
   openBrowse(): void;
+  /** open the Overview window (singleton) — the charts the panel has no room for */
+  openOverview(): void;
   /** open the full-window Cockpit view */
   openCockpit(): void;
   /** close the Cockpit view (back to the compact popover) */

@@ -7,6 +7,7 @@ import {
   ipcMain,
   Notification,
   nativeImage,
+  nativeTheme,
   shell,
   Tray,
 } from 'electron';
@@ -20,6 +21,7 @@ import {
   APP_OPEN_ATLAS_CHANNEL,
   APP_OPEN_BROWSE_CHANNEL,
   APP_OPEN_COCKPIT_CHANNEL,
+  APP_OPEN_OVERVIEW_CHANNEL,
   APP_OPEN_SETTINGS_CHANNEL,
   APP_OPEN_TRIAGE_CHANNEL,
   APP_QUIT_CHANNEL,
@@ -197,6 +199,35 @@ function openBrowse(): void {
   }
   browseWin.on('closed', () => {
     browseWin = null;
+  });
+}
+
+// Overview window (overview.html) — the figures and charts the panel has no room for.
+ipcMain.on(APP_OPEN_OVERVIEW_CHANNEL, () => openOverview());
+let overviewWin: BrowserWindow | null = null;
+function openOverview(): void {
+  if (overviewWin && !overviewWin.isDestroyed()) {
+    overviewWin.show();
+    overviewWin.focus();
+    return;
+  }
+  overviewWin = new BrowserWindow({
+    width: 900,
+    height: 700,
+    minWidth: 720,
+    minHeight: 560,
+    title: 'Overview — llm-wiki',
+    backgroundColor: nativeTheme.shouldUseDarkColors ? '#1c1c1e' : '#f6f6f8',
+    webPreferences: { preload: path.join(__dirname, 'preload.cjs') },
+  });
+  overviewWin.setMenuBarVisibility(false);
+  if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
+    overviewWin.loadURL(`${MAIN_WINDOW_VITE_DEV_SERVER_URL}/overview.html`);
+  } else {
+    overviewWin.loadFile(path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/overview.html`));
+  }
+  overviewWin.on('closed', () => {
+    overviewWin = null;
   });
 }
 

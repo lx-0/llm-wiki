@@ -11,7 +11,7 @@
   }
 
   const NAV: NavItem[] = [
-    { label: 'Overview', glyph: icon.overview(15), open: () => window.app.openCockpit(), badge: false },
+    { label: 'Overview', glyph: icon.overview(15), open: () => window.app.openOverview(), badge: false },
     { label: 'Notes', glyph: icon.notes(15), open: () => window.app.openBrowse(), badge: false },
     { label: 'Inbox', glyph: icon.inbox(15), open: () => window.app.openTriage(), badge: true },
   ];
