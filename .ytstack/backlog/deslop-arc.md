@@ -6,6 +6,11 @@ type: project
 
 # De-slop arc
 
+> **Status 2026-10-14:** M032 (desktop) **shipped** — 5 slices / 23 tasks, engine 0.6.0,
+> 7 of 8 exit criteria met, blind learnability closed unmet at 6.3 / 10 (`DECISIONS.md`
+> 2026-10-14, `desktop-learnability-residue.md`). M033 (engine modernisation) and M034
+> (dispatcher / surface diet) remain — §3, §6 and §8 below are their pitch.
+
 Operator request 2026-10-14 (paraphrased): the app looks like a typical vibe-coded app —
 explanatory text everywhere, too little visual feedback ("more visuals, less wall of
 text") — and the codebase should be modernised and clean-coded once. This file holds the

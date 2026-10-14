@@ -3,6 +3,17 @@
 Inventory: **83 reconciled** → 11 moved to `shipped/`, **72 still in the working set**
 (31 open · 37 partially done · 1 shipped-but-held · 2 superseded · 1 stale premise).
 
+**M032 close, 2026-10-14 — targeted re-derivation, not a full fan-out.** The entries whose
+premise the desktop rebuild or the September releases could have moved were re-read against
+the code (`home-screen-ux`, `search-tools`, `vault-dashboard`, `curiosity-dashboard`,
+`listener-lifecycle`, `obsidian-plugin`, `deslop-arc`, the two flush items): nothing shipped
+silently — the desktop Notes window still carries the type filter, `state/history.jsonl`
+still has no reader, the home-screen probe gap did not fall out of the schema-2 contract, the
+flush entries already carry their 2026-09-17 state. One item added
+(`desktop-learnability-residue`), `deslop-arc` is one milestone of three shipped. The
+2026-08-27 verdicts stand for the rest; the next full fan-out is due at the M033 close, since
+engine modernisation touches the premise of most engine-side items.
+
 The previous snapshot was cut on 2026-05-17, before M021–M031 shipped, and 28 of the
 83 filed items were not mentioned in it at all — a third of the backlog invisible to
 anyone glancing here for the next move. Every entry below was re-derived by reading
@@ -27,7 +38,7 @@ shipped and the sentence names only what remains.
 
 ## 🏔 Big rocks — high value, milestone-sized
 
-- **`deslop-arc.md`** (L + L + M · **M032 planned 2026-10-14**) — Operator-requested de-slop arc: desktop app (walls of text → status shapes + one action list, Cockpit/Atlas → Overview charts, tokens + light-mode fix, renderer rebuilt with TS 5/Biome + committed screenshot harness) → engine modernisation (format + lint policy + CI, `scripts/` as a package, dedupe onto the existing seams, split the 15 ≥150-line functions, pyright) → dispatcher/surface diet (bash → thin bootstrap, README ≤ 300 lines). Audit numbers and the three-milestone table live in the file; M032-CONTEXT/ROADMAP are cut from it.
+- **`deslop-arc.md`** (L + M ·partial — **M032 shipped 2026-10-14**, M033 + M034 open) — Operator-requested de-slop arc. Done: the desktop app (status shapes + one action list fed by the schema-2 contract, Cockpit/Atlas → Overview charts, tokens + light mode, Svelte 5 / TS 5 / Biome, committed screenshot harness; blind learnability 6.3 / 10, levers in `desktop-learnability-residue.md`). Remaining: engine modernisation (format + lint policy + CI, `scripts/` as a package, dedupe onto the existing seams, split the 15 ≥150-line functions, pyright) → dispatcher/surface diet (bash → thin bootstrap, README ≤ 300 lines). Audit numbers and the three-milestone table live in the file; M033-CONTEXT/ROADMAP are cut from §3 / §6.
 
 - **`architecture-scaling-2028.md`** (L) — Build Lever 2 — compile-side MOC linklist upkeep plus an MOC-first retrieval contract — and split the meta-entry into moc-auto-maintenance.md + lifecycle-tiering.md, now that the 1500-row and 2000-article triggers have both fired.
 - **`consumption-curiosity-axis.md`** (L ·partial) — No consumption channel has been built (no Spotify, Readwise, or YouTube watch-history collector exists), but the doc's own blocking prerequisite — a synthesis consumer that turns consumption substrate into a persona portrait — is now live in the dream-cycle, so the first-mover channel (reading-highlights per the doc's own sequencing) is unblocked.
@@ -81,7 +92,7 @@ shipped and the sentence names only what remains.
 - **`gbrain-comparison.md`** (M ·partial) — Two never-broken-out sub-items remain — per-folder `RESOLVER.md` files in each `knowledge/<type>/` plus a lint check, and an IR-style eval bench (`evals/queries.jsonl` + replay) to make compile-quality claims measurable instead of anecdotal; the doc itself should be demoted to a reference artifact since its three headline candidates are all in production.
 - **`readme-polish.md`** (M) — Record a `wiki setup → status → compile` hero cast, add adopter logos and a community link — all three remain gated on facts that have not changed (no adopters, no willingness to staff support), and this is README polish with no bearing on intake coverage or silent failure.
 - **`search-tools.md`** (M ·partial) — The CLI `wiki search --type/--domain/--author` and `wiki recent` still do not exist; the M029 desktop Browse window already covers the type-filter and recency slice for a human, so what remains is the agent-facing CLI form plus the domain/author axes — and the document's own revisit trigger has not fired.
-- **`vault-dashboard.md`** (M ·partial) — Either give state/history.jsonl a reader (the S05 time-series charts it was built for) and add the daily-activity heatmap the installed plugin is waiting on, or drop both and stop paying for a write-only log and a dead plugin.
+- **`vault-dashboard.md`** (M ·partial) — Either give state/history.jsonl a reader (the S05 time-series charts it was built for) and add the daily-activity heatmap the installed plugin is waiting on, or drop both and stop paying for a write-only log and a dead plugin. Re-checked at the M032 close (2026-10-14): the desktop Overview now draws notes-updated-per-day for 30 days from file mtimes, not from history.jsonl — the log still has no reader, and the Obsidian-side heatmap is still the plugin's open question.
 - **`voice-openwhispr.md`** (M) — Neither path is closed: the SQLite reader-kind is unbuilt, and the doc's Path-A premise (OpenWhispr's own export toggle) is still unverified — docs/setup-voice.md:198 tells the operator to use a setting they reported not finding in v1.7.0.
 - **`codex-distill-verbose.md`** (S) — Untouched: either add the tool-activity summarisation (drop apply_patch hunk bodies, keep the file list) or close it deliberately as won't-fix — but not on the strength of an artifact the coalescing logic overwrites.
 - **`correct-apply-edited-underreport.md`** (S) — Either strengthen prompts/correct_apply.md to demand every Write/Edit target under `edited`, or stop echoing the agent's advisory `edited`/`superseded` lists and print only the git/snapshot-derived delta.
