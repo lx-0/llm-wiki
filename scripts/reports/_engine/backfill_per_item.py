@@ -29,12 +29,10 @@ import re
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
-
-from scripts.core import frontmatter
-from scripts.reports._engine.instrument import load_instrument
-from scripts.reports._engine.lib.render_summary import render_summary
-from scripts.reports._engine.lib.timeline import load_timeline
+from core import frontmatter
+from reports._engine.instrument import load_instrument
+from reports._engine.lib.render_summary import render_summary
+from reports._engine.lib.timeline import load_timeline
 
 log = logging.getLogger("backfill")
 
@@ -189,7 +187,7 @@ def backfill_study(study_dir: Path, rerender_summary: bool = False) -> tuple[int
                 # don't hit this because the runner constructs the
                 # timeline incrementally; backfill loops over historic
                 # runs so must subset explicitly.
-                from scripts.reports._engine.lib.timeline import Timeline
+                from reports._engine.lib.timeline import Timeline
 
                 full_timeline = load_timeline(study_dir)
                 trimmed_runs = [r for r in full_timeline.runs if r.timestamp <= run_dir.name]

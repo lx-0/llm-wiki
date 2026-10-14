@@ -24,19 +24,16 @@ to the manifest — operator-visible and version-controllable.
 
 from __future__ import annotations
 
+import fcntl
 import io
 import shutil
-import sys
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
-
-import fcntl
-
 import yaml
-from scripts.core.paths import STATE_DIR
+
+from core.paths import STATE_DIR
 
 # Slug rules: lowercase letters + digits + hyphen, 3..64 chars, no
 # leading/trailing hyphen. Matches the convention used elsewhere in

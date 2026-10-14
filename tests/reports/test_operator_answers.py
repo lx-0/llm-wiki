@@ -5,7 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 
 import yaml
-from scripts.reports._engine.runner import _load_operator_answers
+
+from reports._engine.runner import _load_operator_answers
 
 
 def test_returns_empty_when_no_study_dir() -> None:

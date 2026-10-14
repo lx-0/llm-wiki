@@ -16,9 +16,10 @@ from __future__ import annotations
 import asyncio
 
 import pytest
-from scripts.core.sdk_helpers import FailureClass
-from scripts.reports._engine.lib import inference as inf
-from scripts.reports._engine.lib.inference import (
+
+from core.sdk_helpers import FailureClass
+from reports._engine.lib import inference as inf
+from reports._engine.lib.inference import (
     SCHEMA_INVALID_KIND,
     BatchResult,
     InferenceBatch,
@@ -27,7 +28,7 @@ from scripts.reports._engine.lib.inference import (
     _validate_json_schema,
     is_inference_retryable,
 )
-from scripts.reports._engine.lib.likert import LikertItem, LikertScale
+from reports._engine.lib.likert import LikertItem, LikertScale
 
 _SCALE = LikertScale(lo=0, hi=3)
 

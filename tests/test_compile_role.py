@@ -16,7 +16,8 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from scripts.core.compile_role import (
+
+from core.compile_role import (
     LOCATION_DEFAULTS,
     VALID_ROLES,
     infer_compile_role,

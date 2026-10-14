@@ -36,13 +36,9 @@ import sys
 import time
 from pathlib import Path
 
-# Project root on sys.path so `scripts.reports.*` imports resolve when
-# this file is executed directly via `uv run python scripts/reports/...`.
-sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
-
-from scripts.core.paths import DAILY_DIR
-from scripts.reports._engine.instrument import load_instrument
-from scripts.reports._engine.substrate_scope import (
+from core.paths import DAILY_DIR
+from reports._engine.instrument import load_instrument
+from reports._engine.substrate_scope import (
     CLINICAL_DEFAULT_SUBSTRATE_GLOBS,
     resolve_substrate_files,
 )

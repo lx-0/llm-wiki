@@ -11,8 +11,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from scripts.reports._engine.instrument import Instrument, InstrumentMeta, load_instrument
-from scripts.reports._engine.lib.likert import ScoreResult, score_answers
+from reports._engine.instrument import Instrument, InstrumentMeta, load_instrument
+from reports._engine.lib.likert import ScoreResult, score_answers
 
 # Default coverage threshold for emitting a band. Mirrors M019
 # bandable_coverage_pct from instrument.yaml's `inference` section.

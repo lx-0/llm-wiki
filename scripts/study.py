@@ -28,18 +28,15 @@ import time
 from datetime import UTC, datetime
 from pathlib import Path
 
-# Engine `scripts.*` imports.
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-from scripts.core.paths import ROOT_DIR
-from scripts.reports._engine.lib.analyst import studies_root
-from scripts.reports._engine.lib.render_summary import render_summary
-from scripts.reports._engine.lib.timeline import (
+from core.paths import ROOT_DIR
+from reports._engine.lib.analyst import studies_root
+from reports._engine.lib.render_summary import render_summary
+from reports._engine.lib.timeline import (
     load_timeline,
     snapshot_from_dir,
 )
-from scripts.reports._engine.runner import run_inference
-from scripts.reports._engine.study import (
+from reports._engine.runner import run_inference
+from reports._engine.study import (
     InstrumentRef,
     RunDirectory,
     Study,
@@ -284,7 +281,7 @@ def cmd_run(args: argparse.Namespace) -> int:
         # instrument reports + _summary.md are the source of truth).
         if not args.no_analyze:
             try:
-                from scripts.reports._engine.lib.analyst import (
+                from reports._engine.lib.analyst import (
                     PERSONA_PER_STUDY,
                     AnalystError,
                     build_pass1_user_prompt,

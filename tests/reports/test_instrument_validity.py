@@ -19,8 +19,9 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from scripts.reports._engine.instrument import load_instrument
-from scripts.reports._engine.score import score_instrument
+
+from reports._engine.instrument import load_instrument
+from reports._engine.score import score_instrument
 
 INSTRUMENTS_ROOT = (
     Path(__file__).resolve().parents[2] / "scripts" / "reports" / "_engine" / "instruments"

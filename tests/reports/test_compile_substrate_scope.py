@@ -14,8 +14,9 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from scripts.core.config import COMPILE_SUBSTRATE_EXCLUDED_PREFIXES
-from scripts.core.utils import is_compile_excluded_path
+
+from core.config import COMPILE_SUBSTRATE_EXCLUDED_PREFIXES
+from core.utils import is_compile_excluded_path
 
 # ── (a) Constant invariants ──────────────────────────────────────────
 
@@ -112,10 +113,10 @@ def test_list_raw_files_excludes_reports_at_vault_root(
     except OSError:
         pytest.skip("symlinks not supported on this filesystem")
 
-    monkeypatch.setattr("scripts.core.utils.DAILY_DIR", vault / "daily")
-    monkeypatch.setattr("scripts.core.utils.RAW_DIR", vault / "raw")
+    monkeypatch.setattr("core.utils.DAILY_DIR", vault / "daily")
+    monkeypatch.setattr("core.utils.RAW_DIR", vault / "raw")
 
-    from scripts.core.utils import list_raw_files
+    from core.utils import list_raw_files
 
     listed = list_raw_files()
 

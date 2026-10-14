@@ -33,22 +33,18 @@ from __future__ import annotations
 
 import asyncio
 import json
-import sys
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
-# Project root on sys.path so `scripts.*` imports resolve when this
-# module is imported via the engine's normal `scripts.reports.*` path.
-sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
-
 from claude_agent_sdk import query
-from scripts.core.sdk_helpers import (
+
+from core.sdk_helpers import (
     FailureClass,
     SdkCallSpec,
     run_sdk_query,
 )
-from scripts.reports._engine.instrument import Instrument, LikertItem
+from reports._engine.instrument import Instrument, LikertItem
 
 # Wedge composition — locked by S01-T01 empirical verification. Do not
 # add Write/Edit/Bash here under any circumstance; the empty-roots

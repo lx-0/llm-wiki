@@ -36,19 +36,18 @@ import time
 from datetime import UTC, datetime
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
-
 import yaml
-from scripts.core.prompts import render
-from scripts.reports._engine.instrument import Instrument, load_instrument
-from scripts.reports._engine.lib.inference import (
+
+from core.prompts import render
+from reports._engine.instrument import Instrument, load_instrument
+from reports._engine.lib.inference import (
     InferenceRun,
     default_batches,
     infer_batch,
 )
-from scripts.reports._engine.lib.verify_report import verify_report
-from scripts.reports._engine.score import score_instrument
-from scripts.reports._engine.substrate_scope import (
+from reports._engine.lib.verify_report import verify_report
+from reports._engine.score import score_instrument
+from reports._engine.substrate_scope import (
     CLINICAL_DEFAULT_SUBSTRATE_GLOBS,
     resolve_substrate_files,
 )

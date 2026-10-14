@@ -20,8 +20,9 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import yaml
-from scripts.reports._engine.lib.cutoffs import Cutoffs
-from scripts.reports._engine.lib.likert import LikertItem, LikertScale
+
+from reports._engine.lib.cutoffs import Cutoffs
+from reports._engine.lib.likert import LikertItem, LikertScale
 
 SUPPORTED_SCORING = ("standard-sum",)
 

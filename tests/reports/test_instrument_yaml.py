@@ -5,7 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from scripts.reports._engine.instrument import (
+
+from reports._engine.instrument import (
     DEFAULT_LOOKBACK_DAYS,
     InferenceConfig,
     load_instrument,

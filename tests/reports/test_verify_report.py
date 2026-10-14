@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from scripts.reports._engine.lib.verify_report import (
+from reports._engine.lib.verify_report import (
     REQUIRED_FRONTMATTER_KEYS,
     REQUIRED_METHODOLOGY_SUMMARIES,
     REQUIRED_SECTIONS,

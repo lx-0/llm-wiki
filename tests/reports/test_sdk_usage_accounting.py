@@ -17,11 +17,12 @@ import asyncio
 from pathlib import Path
 
 import pytest
-import scripts.core.usage as usage_mod
-from scripts.reports._engine.lib import analyst as analyst_mod
-from scripts.reports._engine.lib import inference as inf
-from scripts.reports._engine.lib.inference import InferenceBatch
-from scripts.reports._engine.lib.likert import LikertItem, LikertScale
+
+import core.usage as usage_mod
+from reports._engine.lib import analyst as analyst_mod
+from reports._engine.lib import inference as inf
+from reports._engine.lib.inference import InferenceBatch
+from reports._engine.lib.likert import LikertItem, LikertScale
 
 
 def _assistant(usage: dict | None, text: str):

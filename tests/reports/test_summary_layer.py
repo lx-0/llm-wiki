@@ -6,13 +6,14 @@ from pathlib import Path
 
 import pytest
 import yaml
-from scripts.reports._engine.lib.charts import (
+
+from reports._engine.lib.charts import (
     render_radar,
     render_sparkline,
     render_timeline,
 )
-from scripts.reports._engine.lib.render_summary import render_summary
-from scripts.reports._engine.lib.timeline import (
+from reports._engine.lib.render_summary import render_summary
+from reports._engine.lib.timeline import (
     load_timeline,
     snapshot_from_dir,
 )

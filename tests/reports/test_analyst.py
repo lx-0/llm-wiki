@@ -13,7 +13,8 @@ from __future__ import annotations
 from pathlib import Path
 
 import yaml
-from scripts.reports._engine.lib.analyst import (
+
+from reports._engine.lib.analyst import (
     AnalystResult,
     build_pass1_user_prompt,
     build_pass2_user_prompt,
@@ -22,7 +23,7 @@ from scripts.reports._engine.lib.analyst import (
     persist_pass2,
     previous_run_dir,
 )
-from scripts.reports._engine.study import Study
+from reports._engine.study import Study
 
 MANIFEST = {
     "study_id": "test-baseline",

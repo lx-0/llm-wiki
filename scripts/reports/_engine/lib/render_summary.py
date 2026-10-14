@@ -34,13 +34,14 @@ from functools import cache
 from pathlib import Path
 
 import yaml
-from scripts.reports._engine.instrument import load_instrument
-from scripts.reports._engine.lib.charts import (
+
+from reports._engine.instrument import load_instrument
+from reports._engine.lib.charts import (
     render_radar,
     render_sparkline,
     render_timeline,
 )
-from scripts.reports._engine.lib.timeline import (
+from reports._engine.lib.timeline import (
     InstrumentSnapshot,
     RunSnapshot,
     Timeline,
@@ -228,7 +229,7 @@ def _render_per_instrument_radars(
         if not snap.per_item:
             # No per_item data — predates the runner extension.
             # Render placeholder so the link works.
-            from scripts.reports._engine.lib.charts import _placeholder
+            from reports._engine.lib.charts import _placeholder
 
             _placeholder(
                 out_path, 360, 360, f"{slug}: per-item data unavailable (older run schema)"

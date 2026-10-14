@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import pytest
-from scripts.reports._engine.lib.cutoffs import Band, Cutoffs
+
+from reports._engine.lib.cutoffs import Band, Cutoffs
 
 PHQ9_BANDS = [
     {"min": 0, "max": 4, "band": "minimal"},

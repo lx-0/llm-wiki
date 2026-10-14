@@ -10,7 +10,8 @@ from pathlib import Path
 
 import pytest
 import yaml
-from scripts.reports._engine.study import (
+
+from reports._engine.study import (
     InstrumentRef,
     RunDirectory,
     Study,
@@ -269,7 +270,7 @@ def _hold_lock_subprocess(
     Subprocess (`spawn` on macOS) doesn't inherit the parent's monkeypatched
     module attrs, so we redirect STATE_DIR here too before acquiring.
     """
-    from scripts.reports._engine import study as study_mod
+    from reports._engine import study as study_mod
 
     study_mod.STATE_DIR = Path(state_dir_str)
     lock = acquire_study_lock(study_id)
@@ -285,7 +286,7 @@ class TestStudyLock:
     @pytest.fixture(autouse=True)
     def _isolated_state_dir(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
         """Redirect STATE_DIR so lock files land in tmp_path, not engine state/."""
-        from scripts.reports._engine import study as study_mod
+        from reports._engine import study as study_mod
 
         monkeypatch.setattr(study_mod, "STATE_DIR", tmp_path)
         return tmp_path

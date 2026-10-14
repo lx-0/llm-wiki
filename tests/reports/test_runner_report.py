@@ -11,11 +11,12 @@ from __future__ import annotations
 from pathlib import Path
 
 import yaml
-from scripts.reports._engine.instrument import load_instrument
-from scripts.reports._engine.lib.inference import InferenceRun
-from scripts.reports._engine.lib.timeline import _snapshot_from_report
-from scripts.reports._engine.runner import _persist_report
-from scripts.reports._engine.score import score_instrument
+
+from reports._engine.instrument import load_instrument
+from reports._engine.lib.inference import InferenceRun
+from reports._engine.lib.timeline import _snapshot_from_report
+from reports._engine.runner import _persist_report
+from reports._engine.score import score_instrument
 
 _INSTRUMENTS_ROOT = (
     Path(__file__).resolve().parents[2] / "scripts" / "reports" / "_engine" / "instruments"

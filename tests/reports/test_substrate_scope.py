@@ -12,8 +12,8 @@ import os
 import time
 from pathlib import Path
 
-from scripts.reports._engine import audit_scope, runner, substrate_scope
-from scripts.reports._engine.substrate_scope import (
+from reports._engine import audit_scope, runner, substrate_scope
+from reports._engine.substrate_scope import (
     CLINICAL_DEFAULT_SUBSTRATE_GLOBS,
     resolve_substrate_files,
 )

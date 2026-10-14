@@ -6,9 +6,11 @@
 __WIKI_CONFIG_LOADED=1
 
 # Run the python config CLI quietly. --project pins uv to .wiki/pyproject.toml
-# so it works regardless of the user's CWD when they invoke `wiki`.
+# so it works regardless of the user's CWD when they invoke `wiki`. Run as a
+# module with scripts/ on PYTHONPATH (core.entry's shape) — core/config.py has
+# no sys.path bootstrap of its own any more (M033-S02).
 _wiki_config_py() {
-  uv run --quiet --project "$WIKI_DIR" python "$WIKI_CONFIG_PY" "$@" \
+  PYTHONPATH="$SCRIPTS_DIR" uv run --quiet --project "$WIKI_DIR" python -m core.config "$@" \
     2> >(grep -v '^warning:.*VIRTUAL_ENV' >&2)
 }
 
