@@ -1,0 +1,209 @@
+{
+  "schema": 2,
+  "vault": "vault-fixture",
+  "engine_revision": "<REV>",
+  "summary": {
+    "critical": 0,
+    "warning": 3,
+    "info": 7,
+    "ok": 6
+  },
+  "checks": [
+    {
+      "id": "claude-authed",
+      "category": "connectivity",
+      "severity": "warning",
+      "message": "no ANTHROPIC_API_KEY env and no ~/.claude/.credentials.json (CLI not probed in --quick)",
+      "fix": "claude /login or set ANTHROPIC_API_KEY",
+      "dispatch_args": null,
+      "details": null,
+      "title": "no ANTHROPIC_API_KEY env and no ~/.claude/.credentials.json (CLI not probed in --quick)",
+      "verb": null
+    },
+    {
+      "id": "hooks-installed",
+      "category": "config",
+      "severity": "warning",
+      "message": "no wiki hooks installed in user or project scope — session capture won't fire",
+      "fix": "wiki hooks install",
+      "dispatch_args": [
+        "hooks",
+        "install"
+      ],
+      "details": null,
+      "title": "AI chats aren't being saved",
+      "verb": "Set up"
+    },
+    {
+      "id": "wiki-on-path",
+      "category": "config",
+      "severity": "warning",
+      "message": "`wiki` on PATH points at a different vault (<SCRATCH>/bin/wiki)",
+      "fix": "wiki install-shortcut",
+      "dispatch_args": [
+        "install-shortcut"
+      ],
+      "details": {
+        "resolved": "<SCRATCH>/bin/wiki",
+        "this_vault": "<VAULT>/.wiki/wiki"
+      },
+      "title": "The wiki command points at another vault",
+      "verb": "Install"
+    },
+    {
+      "id": "compile-state",
+      "category": "pipeline",
+      "severity": "info",
+      "message": "last compile Nd ago (consider `wiki compile`)",
+      "fix": "wiki compile",
+      "dispatch_args": [
+        "compile"
+      ],
+      "details": null,
+      "title": "Your wiki hasn't been updated in N days",
+      "verb": "Add"
+    },
+    {
+      "id": "dependencies-importable",
+      "category": "config",
+      "severity": "info",
+      "message": "dependency import check skipped (--quick)",
+      "fix": null,
+      "dispatch_args": null,
+      "details": null,
+      "title": "dependency import check skipped (--quick)",
+      "verb": null
+    },
+    {
+      "id": "engine-update-available",
+      "category": "config",
+      "severity": "info",
+      "message": "(skipped in --quick mode)",
+      "fix": null,
+      "dispatch_args": null,
+      "details": null,
+      "title": "(skipped in --quick mode)",
+      "verb": null
+    },
+    {
+      "id": "index-drift",
+      "category": "pipeline",
+      "severity": "info",
+      "message": "index drift check skipped (--quick)",
+      "fix": null,
+      "dispatch_args": null,
+      "details": null,
+      "title": "index drift check skipped (--quick)",
+      "verb": null
+    },
+    {
+      "id": "ollama-reachable",
+      "category": "connectivity",
+      "severity": "info",
+      "message": "(skipped in --quick mode)",
+      "fix": null,
+      "dispatch_args": null,
+      "details": null,
+      "title": "(skipped in --quick mode)",
+      "verb": null
+    },
+    {
+      "id": "piggyback-never-ran",
+      "category": "pipeline",
+      "severity": "info",
+      "message": "piggyback(s) never ran yet: curiosity-followup, daily-digest-yesterday, dream-cycle, lint-structural, publish, retry-failed-flushes, review-wiki",
+      "fix": null,
+      "dispatch_args": null,
+      "details": null,
+      "title": "piggyback(s) never ran yet: curiosity-followup, daily-digest-yesterday, dream-cycle, lint-structural, publish, retry-failed-flushes, review-wiki",
+      "verb": null
+    },
+    {
+      "id": "template-drift",
+      "category": "config",
+      "severity": "info",
+      "message": "(skipped in --quick mode)",
+      "fix": null,
+      "dispatch_args": null,
+      "details": null,
+      "title": "(skipped in --quick mode)",
+      "verb": null
+    },
+    {
+      "id": "compile-errors-recent",
+      "category": "pipeline",
+      "severity": "ok",
+      "message": "no recent compile errors",
+      "fix": null,
+      "dispatch_args": null,
+      "details": null,
+      "title": "no recent compile errors",
+      "verb": null
+    },
+    {
+      "id": "engine-cloud-eviction",
+      "category": "config",
+      "severity": "ok",
+      "message": "engine environment outside cloud-synced storage (<SCRATCH>/env)",
+      "fix": null,
+      "dispatch_args": null,
+      "details": {
+        "venv": "<SCRATCH>/env",
+        "venv_in_cloud": false,
+        "stale_in_vault_venv": null,
+        "dataless": 0,
+        "scanned": 0
+      },
+      "title": "engine environment outside cloud-synced storage (<SCRATCH>/env)",
+      "verb": null
+    },
+    {
+      "id": "flush-pipeline",
+      "category": "pipeline",
+      "severity": "ok",
+      "message": "no session flushed yet (flush.log absent)",
+      "fix": null,
+      "dispatch_args": null,
+      "details": {
+        "archived": 0
+      },
+      "title": "no session flushed yet (flush.log absent)",
+      "verb": null
+    },
+    {
+      "id": "no-knowledge-articles",
+      "category": "pipeline",
+      "severity": "ok",
+      "message": "N articles",
+      "fix": null,
+      "dispatch_args": null,
+      "details": {
+        "count": 4
+      },
+      "title": "N articles",
+      "verb": null
+    },
+    {
+      "id": "setup-not-run",
+      "category": "config",
+      "severity": "ok",
+      "message": "setup wizard completed",
+      "fix": null,
+      "dispatch_args": null,
+      "details": null,
+      "title": "setup wizard completed",
+      "verb": null
+    },
+    {
+      "id": "voice-audio-setup",
+      "category": "config",
+      "severity": "ok",
+      "message": "voice_inbox not configured — audio ingest n/a",
+      "fix": null,
+      "dispatch_args": null,
+      "details": null,
+      "title": "voice_inbox not configured — audio ingest n/a",
+      "verb": null
+    }
+  ]
+}

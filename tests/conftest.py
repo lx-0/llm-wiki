@@ -19,6 +19,15 @@ from ._vault_isolation import install_write_guard, remove_write_guard
 _UNSAFE_IN_NODEID = re.compile(r"[^A-Za-z0-9_.-]+")
 
 
+def pytest_addoption(parser: pytest.Parser) -> None:
+    parser.addoption(
+        "--snapshot-update",
+        action="store_true",
+        default=False,
+        help="Rewrite tests/golden/oracle/* from the current payloads (see tests/_oracle.py).",
+    )
+
+
 def pytest_configure(config: pytest.Config) -> None:
     """Fail any write that escapes the checkout — see tests/_vault_isolation.py."""
     install_write_guard()

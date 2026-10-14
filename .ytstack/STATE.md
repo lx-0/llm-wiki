@@ -1,9 +1,9 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-14T18:40:00+02:00
+last_updated: 2026-10-14T19:40:00+02:00
 current_milestone: M033
-active_slice: none
+active_slice: S01
 active_task: none
 last_completed_milestone: M032
 parked_milestone: none
@@ -16,10 +16,14 @@ parallel_milestones: [M021, M025, M027, M029]
 
 **Status:** M033 planned (L, 2026-10-14) — `M033-CONTEXT.md` (goal, measured starting
 point, 9 exit criteria, 5 locked decisions, 3 open questions with recommendations) +
-`M033-ROADMAP.md` (5 slice placeholders: gates first → package → seams → readable
-functions → types + closeout). Ready to slice. Backlog reconcile for the M032 close done
-(targeted; next full fan-out at the M033 close). Next action: `ytstack:slice-milestone`
-for M033, then execute S01 (fixture-vault snapshot oracle, format commit, lint policy, CI).
+`M033-ROADMAP.md` + five slice plans (29 tasks: gates first → package → seams → readable
+functions → types + closeout), committed `76a9ca2`. Backlog reconcile for the M032 close
+done (targeted; next full fan-out at the M033 close). **S01 1/5** — T01 behaviour oracle
+shipped (`tests/_oracle.py` fixture vault + `tests/golden/oracle/*` snapshots of `menu
+--json`, `doctor --quick --json`, `cli.py help`; `--snapshot-update`; it caught an
+import-order flake in the piggyback check on its first full run, and a machine-dependent
+screenshots test was fixed en route). Suite 2030 green. Next: T02 — the mechanical `ruff
+format` commit + `.git-blame-ignore-revs` (`plan-task`).
 
 ## M032 COMPLETE (L, 2026-10-14): desktop de-slop
 

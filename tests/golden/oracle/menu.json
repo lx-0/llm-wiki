@@ -1,0 +1,157 @@
+{
+  "schema": 2,
+  "status": {
+    "articles": 4,
+    "last_compile_ago": "<AGO>",
+    "ollama_reachable": false
+  },
+  "suggestions": [
+    {
+      "id": "process-inbox",
+      "title": "N new files to sort into your library",
+      "verb": "Sort",
+      "group": "do",
+      "argv": [
+        "process-inbox"
+      ],
+      "count": 2,
+      "label": "N files in inbox/",
+      "priority": 1,
+      "key": "N"
+    },
+    {
+      "id": "compile",
+      "title": "N new items to add to your library",
+      "verb": "Add",
+      "group": "do",
+      "argv": [
+        "compile"
+      ],
+      "count": 2,
+      "label": "N sources changed since compile",
+      "priority": 2,
+      "key": "N"
+    },
+    {
+      "id": "curiosity-folder",
+      "title": "N folder-scan request to review",
+      "verb": "Review",
+      "group": "review",
+      "argv": [
+        "curiosity",
+        "--type",
+        "folder-deep-scan"
+      ],
+      "count": 1,
+      "label": "N document-scan request to review",
+      "priority": 3,
+      "key": "N"
+    },
+    {
+      "id": "dream-sweep",
+      "title": "N pages need refreshing",
+      "verb": "Refresh",
+      "group": "auto",
+      "argv": [
+        "dream",
+        "--all-entities"
+      ],
+      "count": 2,
+      "label": "N entities overdue for dream",
+      "priority": 5,
+      "key": "N"
+    },
+    {
+      "id": "flush",
+      "title": "Save today's AI chat to your library",
+      "verb": "Save",
+      "group": "do",
+      "argv": [
+        "flush"
+      ],
+      "count": 1,
+      "label": "today's session has not been flushed",
+      "priority": 6,
+      "key": "N"
+    },
+    {
+      "id": "lint",
+      "title": "Notes changed since the last health check",
+      "verb": "Check",
+      "group": "auto",
+      "argv": [
+        "lint",
+        "--structural-only"
+      ],
+      "count": 1,
+      "label": "knowledge edits since last lint sweep",
+      "priority": 7,
+      "key": "N"
+    },
+    {
+      "id": "curiosity-email",
+      "title": "N email scan pending",
+      "verb": "Explore",
+      "group": "auto",
+      "argv": [
+        "curiosity",
+        "--type",
+        "email-deep-scan"
+      ],
+      "count": 1,
+      "label": "N email-scan request pending",
+      "priority": 8,
+      "key": "N"
+    }
+  ],
+  "tools": [
+    {
+      "id": "dream-sweep",
+      "title": "Refresh people & project pages",
+      "verb": "Refresh",
+      "group": "tools",
+      "argv": [
+        "dream",
+        "--all-entities"
+      ]
+    },
+    {
+      "id": "lint",
+      "title": "Check for problems",
+      "verb": "Check",
+      "group": "tools",
+      "argv": [
+        "lint",
+        "--structural-only"
+      ]
+    },
+    {
+      "id": "links",
+      "title": "Check links",
+      "verb": "Check",
+      "group": "tools",
+      "argv": [
+        "links"
+      ]
+    },
+    {
+      "id": "dedup",
+      "title": "Find duplicate pages",
+      "verb": "Review",
+      "group": "tools",
+      "argv": [
+        "dedup",
+        "--suggest-only"
+      ]
+    },
+    {
+      "id": "review-wiki",
+      "title": "Review page quality",
+      "verb": "Review",
+      "group": "tools",
+      "argv": [
+        "review-wiki"
+      ]
+    }
+  ]
+}

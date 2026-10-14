@@ -25,10 +25,15 @@ def test_screenshots_collector_registered():
     assert c.SPEC.supports_incremental is False
 
 
-def test_screenshots_is_piggyback_discovered():
-    """piggyback_collectors() must include screenshots after the port."""
-    from collectors import piggyback_collectors
+def test_screenshots_is_piggyback_discovered(monkeypatch, tmp_path):
+    """piggyback_collectors() must include screenshots after the port — once its
+    directory exists. Pinned to a tmp dir: the unpatched version was a bet on the
+    machine's own ~/Screenshots (green on the dev Mac, red anywhere else, and red
+    whenever an earlier test had imported the module under another HOME)."""
+    from collectors import piggyback_collectors, scan_screenshots
 
+    (tmp_path / "Screenshots").mkdir()
+    monkeypatch.setattr(scan_screenshots, "SCREENSHOTS_DIR", tmp_path / "Screenshots")
     names = [c.SPEC.name for c in piggyback_collectors()]
     assert "screenshots" in names
 
