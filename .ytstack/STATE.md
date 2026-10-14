@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-14T23:05:00+02:00
+last_updated: 2026-10-14T23:20:00+02:00
 current_milestone: M033
 active_slice: S03
-active_task: none
+active_task: T04
 last_completed_milestone: M032
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -100,8 +100,10 @@ the collectors' ASCII filename grammar is `core/utils.slugify(…, ascii_only=Tr
 `publish.server_slug` stays as the server's grammar; both grammars pinned, every real
 jamie / gmeet / youtube filename recomputed 41 / 41; guard against a second slug grammar.
 The smell grep found eight private fence grammars T02's name-based guard missed → **T07
-added** (slice at 7 tasks). Suite 2091. Next: T04 — logging → one setup (`plan-task`); CI
-for `4773bf2` pending.
+added** (slice at 7 tasks). Suite 2091. **T04 planned** (`M033-S03-T04-PLAN.md`): 33
+`basicConfig` sites (20 module-level, two in importable modules) + four `_setup_logging` →
+`core/console.setup_console_logging` (gains `level=`), in two commits; six console-before-import
+modules get their imports back on top. CI for `4773bf2` pending.
 
 ## M032 COMPLETE (L, 2026-10-14): desktop de-slop
 
