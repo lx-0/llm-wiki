@@ -17,7 +17,7 @@ Zwei fundamental getrennte Ingest-Pfade konvergieren bei `compile.py`:
 - **Path A** — Automatische Session-Capture (Hooks → daily/ → compile)
 - **Path B** — Kuratierte Quellen (Scanners/Manual/Inbox → raw/ → compile)
 
-## Übersicht — die 18 Prozesse
+## Übersicht — die 19 Prozesse
 
 | # | Process | Was passiert | Trigger |
 |---|---|---|---|
@@ -39,6 +39,7 @@ Zwei fundamental getrennte Ingest-Pfade konvergieren bei `compile.py`:
 | [16](#16-usage-accounting-tokens-per-providermodel) | Usage Accounting | Tokens per `(provider, model)` ledger — every LLM call (Ollama + Claude SDK) records to `state/usage.json`; gates are token/structural, never dollars (Claude subscription + local Ollama). | `core/usage.py` · `wiki usage` |
 | [17](#17-publish-meinkontext-remote-mirror) | Publish | One-way idempotent mirror of the vault's markdown into a managed wiki on the operator's context-mcp server — content-hash delta, fixpoint slugs, retract/restore. | `wiki publish` · `publish` piggyback (6h) |
 | [18](#18-reliability-audits-what-runs-and-on-what-cadence) | Reliability Audits | The layered defence against silent failure: `doctor` checks (venv, piggyback health, index drift, connectivity), structural lint, the periodic full-state vault audit, and the backlog reconcile that keeps the next-move index honest. | operator-initiated · piggyback · at milestone close |
+| [19](#19-operator-surfaces--one-action-catalogue-for-tui-and-desktop) | Operator Surfaces | One action catalogue (`core/actions.py`) feeds `wiki menu` (TUI), `menu --json` and `doctor --json` (schema 2: `title` / `verb` / `group` / `argv`); the desktop app renders those words verbatim. | `wiki menu` · `wiki doctor` · desktop app |
 
 ---
 
@@ -1359,3 +1360,22 @@ themselves wrong on first contact with live data — the Ollama probe reported a
 healthy host as down, and the piggyback check fanned one idle pipeline into eight
 warnings. Run a new check against the real vault before trusting it, and treat
 its first surprising output as a bug in the check until proven otherwise.
+
+## 19. Operator surfaces — one action catalogue for TUI and desktop
+
+`wiki menu` (the TUI), `wiki menu --json` and `wiki doctor --json` draw every actionable
+line from one catalogue, `scripts/core/actions.py`. An action or check carries `id`,
+`title` (plain English, the operator's situation), `verb` (the one-word button),
+`group` (e.g. `do`, `tools`), `argv` (what to run), and the payload carries `schema`
+(currently 2); consumers refuse unknown schemas. `label` remains the operator-term
+string the TUI lists. The desktop app (`desktop/`, Electron + Svelte) renders `title`
+and `verb` verbatim and never rewrites them — when a word is wrong on screen, the fix
+lives in `actions.py` / `health.py`, where the terminal inherits it. Field table and
+example payloads: `docs/cli.md` (machine-readable seams).
+
+Three rules for a title, learned from the M032 blind learnability panel
+(`.ytstack/reviews/2026-10-14-desktop-learnability-panel.md`): it names the operator's
+situation ("AI chats aren't being saved"), not the mechanism ("hooks not installed");
+its `verb` is a word whose consequence a first-day reader can predict; and a `fix` the
+GUI cannot dispatch says who can act on it, because a problem with no button is where a
+novice stops reading.

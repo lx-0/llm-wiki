@@ -5,7 +5,7 @@ project: llm-wiki
 created: 2026-10-14T13:40:00+02:00
 status: planned
 task_count: 6
-completed_tasks: 5
+completed_tasks: 6
 ---
 
 # M032-S05 -- Slice Plan
@@ -19,7 +19,7 @@ completed_tasks: 5
 - [x] T03 -- Overview charts completed: notes by type (horizontal bars, one hue, type badges as labels), capture — last 24 h (2 × 24 heat strip from T01, one-hue lightness steps validated as an ordinal ramp), health (ring + check list with verbs), next up (merged action list with verbs); a table view toggle rendering every chart's twin; empty states; harness states.
 - [x] T04 -- Cockpit + Atlas deleted (`cockpit.*`, `atlas.*`, `lib/types.ts`, `index.css`, `main.ts` windows + IPC channels); Triage window titled Inbox with a theme-aware background; renderer bundle entries updated.
 - [x] T05 -- Blind synthetic learnability panel (task-based, personas never told what each screen is) + one fix round; `npm run dmg` rebuilt; operator look at the installed app recorded in the summary.
-- [ ] T06 -- Closeout: `desktop/README.md` rewritten short; DECISIONS entry (2026-06-24 locks reopened; Svelte 5 / Biome / Overview decisions); KNOWLEDGE (harness, Svelte + Forge, Biome partial `.svelte` coverage, TS 5 migration gotchas); `docs/PROCESS.md` note on the schema-2 JSON contract; engine CHANGELOG + version bump; smoke page deleted; `ytstack:reassess-roadmap`.
+- [x] T06 -- Closeout: `desktop/README.md` rewritten short; DECISIONS entry (2026-06-24 locks reopened; Svelte 5 / Biome / Overview decisions); KNOWLEDGE (harness, Svelte + Forge, Biome partial `.svelte` coverage, TS 5 migration gotchas); `docs/PROCESS.md` note on the schema-2 JSON contract; engine CHANGELOG + version bump; smoke page deleted; `ytstack:reassess-roadmap`.
 
 ## Done when
 

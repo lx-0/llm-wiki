@@ -2827,6 +2827,14 @@ Per-candidate learnings from the 14-candidate seam arc (C01–C14). Decisions li
   priming reviews had not; its other consensus items were vocabulary collisions the builder
   cannot see from inside ("session capture" vs screen capture, "captures" vs "Inbox", four
   nouns for one library) and a fixture inconsistency that read as an app bug (42 vs 2,024).
+- **Window sizes come from a measurement, not a guess (M032-S05-T05, 2026-10-14):**
+  `report.json.contentHeights` records, per capture, the lowest bottom edge of any text or
+  control element; a window's harness `h` and the `BrowserWindow` size in `main.ts` must clear
+  it, or the last line of copy is cut off in the real app while the DOM — and the strict
+  audit, which sees a complete DOM — report nothing. This is the M029 "Welcome / Settings
+  clipped" class; it recurred the moment round 1 added two lines of consent text (welcome
+  460 × 480 and settings 400 × 320 now). Read the measure after any copy change on a
+  fixed-size window.
 
 ### Exception seam (C14)
 

@@ -1,9 +1,9 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-14T17:40:00+02:00
+last_updated: 2026-10-14T18:15:00+02:00
 current_milestone: M032
-active_slice: S05
+active_slice: none
 active_task: none
 last_completed_milestone: M031
 parked_milestone: none
@@ -49,8 +49,13 @@ blockers, for the operator: the Ollama Health row counts as an issue with no GUI
 lever — `backlog/desktop-learnability-residue.md`), the pre-ticked capture default (M029
 decision), engine vocabulary residue, and the static-screenshot ceiling. DMG rebuilt
 (`desktop/out/make/dmg/arm64/llm-wiki-1.0.0-arm64.dmg`, 117 MB) — **operator look pending**.
-Next: T06 closeout (README, DECISIONS with the unmet criterion, KNOWLEDGE, PROCESS schema-2
-note, CHANGELOG + bump, smoke page deleted, reassess). vitest 112 + pytest 2025 green.
+**S05 COMPLETE (6/6)** — T06 closeout shipped: `desktop/README.md` rewritten (126 lines,
+the shipped app), DECISIONS 2026-10-14 entry (2026-06-22 locks superseded, criterion 6
+measured, criterion 8 closed unmet), KNOWLEDGE `contentHeights` rule, `docs/PROCESS.md`
+§19 operator surfaces, CHANGELOG **0.6.0** + pyproject + uv.lock, smoke page deleted (six
+pages, 56 captures). Next: `reassess-roadmap` closes S05 and M032, then the milestone-close
+backlog reconcile, then `plan-milestone` M033 (engine modernisation — `backlog/deslop-arc.md`).
+vitest 112 + pytest 2025 green.
 
 **S01 COMPLETE (5/5)** -- harness `npm run shots` (30 captures; real panel
 height 1,027 px vs 640 clamp), TypeScript 5.9 strict + svelte-check gate in `npm test`, Biome

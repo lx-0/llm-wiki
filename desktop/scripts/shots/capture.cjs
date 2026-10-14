@@ -16,7 +16,7 @@ const { layoutFailures, restHeightFailure } = require('./gates.cjs');
 
 /** Every page is built on the token system, so every page is strict: clipped text fails the
  *  run there, not just overlap. (A page outside the set would be audited and reported only.) */
-const STRICT_PAGES = new Set(['index', 'overview', 'settings', 'onboarding', 'browse', 'triage', 'smoke']);
+const STRICT_PAGES = new Set(['index', 'overview', 'settings', 'onboarding', 'browse', 'triage']);
 
 app.commandLine.appendSwitch('force-device-scale-factor', '2');
 
@@ -78,7 +78,6 @@ const SURFACES = [
     states: ['default', 'empty', 'no-access', 'table', 'run-done'],
     settle: 1000,
   },
-  { page: 'smoke', w: 600, h: 1040, schemes: ['light', 'dark'], states: ['default'], settle: 800 },
 ];
 
 // Panel states that reuse the `default` fixtures and differ only by a script run after load.

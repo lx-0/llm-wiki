@@ -18,6 +18,47 @@ every operator's `wiki update` → `uv sync` regenerate `uv.lock` and dirty thei
 config keys must also be wired into `scripts/migrations/migrate_config_keys.py`
 in the same commit.
 
+## [0.6.0] — 2026-10-14
+
+The desktop app is rebuilt (M032): the menu-bar panel shows state as shapes instead
+of sentences, every engine action appears once with the verb the engine declares, and
+an Overview window with real charts replaces the Cockpit and Atlas canvases. Engine-
+side the change is the machine-readable contract behind it — and the titles it
+carries, which the terminal prints too.
+
+### Added
+
+- **`wiki menu --json` / `wiki doctor --json` schema 2.** Every action and check
+  carries `title`, `verb`, `group` and `argv` from one catalogue
+  (`scripts/core/actions.py`); consumers refuse unknown schemas. `wiki menu` (TUI)
+  prints the same `title`, so GUI and terminal use the same words. Field table and
+  example payloads in `docs/cli.md`; the contract in `docs/PROCESS.md` §19.
+- **Desktop app, rebuilt** (`desktop/`: Svelte 5, TypeScript 5 strict, Biome,
+  Electron Forge 8 / Vite 8): a panel with Ask, Library / Health / Capture tiles (the
+  capture tile is the Pause / Resume control), one Next up list with row-level
+  progress and result pills, Recent, and a footer with Save a web page / Sources /
+  Tools; an Overview window (notes updated per day, notes by type, 24 h capture heat
+  strip, health, next up — each chart with a table twin); Notes, Inbox, Settings and
+  Welcome windows on one token system, light and dark. A committed screenshot harness
+  (`npm run shots`) renders every window and state and fails on overlap, clipped text
+  or a panel taller than the popover.
+
+### Changed
+
+- **Action and health titles address the operator, not the engineer** — visible in
+  `wiki menu`, `wiki doctor` and the app: "AI chats aren't being saved · Set up"
+  (session hooks), "Saving your AI chats has stalled", "{n} AI chats waiting to be
+  saved", "Your note list is out of date · Fix" (index drift), "{n} new files to sort
+  into your library", "{n} new items to add to your library", "{n} folder-scan
+  requests to review", "Save today's AI chat to your library"; the local-AI check's
+  fix reads "start Ollama on <host>" with the config alternative in the message.
+
+### Removed
+
+- **Cockpit and Atlas windows** (the icosphere and star-field canvases) together with
+  the desktop's regex vocabulary layers (`friendlyHealth`, `friendlyPending`,
+  `pendingVerb`) — the engine contract carries the words now.
+
 ## [0.5.4] — 2026-09-17
 
 The engine environment moves out of cloud-synced vaults. Verifying 0.5.3 on
