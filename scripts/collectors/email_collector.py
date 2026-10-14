@@ -23,7 +23,6 @@ no error (graceful agnostic).
 
 from __future__ import annotations
 
-import json
 import logging
 from collections import Counter
 from datetime import UTC, datetime
@@ -33,6 +32,7 @@ from adapters.mailbox import MailboxReader, MailboxReadError, resolve_reader
 from collectors.base import CollectorSpec, RunResult, filter_accounts, register
 from core.config import CONFIG
 from core.paths import EMAIL_STATE_FILE, ROOT_DIR
+from core.state_store import StateStore, store_for
 from core.utils import now_iso, today_iso
 from domain.mail import MessageMeta
 
@@ -110,7 +110,7 @@ class EmailCollector:
         skipped = 0
         errors: list[str] = []
         run_start = now_iso()
-        state = _load_state()
+        state = _state()
         accounts_state = state.setdefault("accounts", {})
 
         for account_id, _account, reader in active_accounts:
@@ -147,7 +147,7 @@ class EmailCollector:
             _record_success(accounts_state, account_id, run_start)
 
         if not dry_run:
-            _save_state(state)
+            _save_accounts(accounts_state, [account_id for account_id, _, _ in active_accounts])
 
         message = f"scanned {len(active_accounts)} account(s), wrote {len(files_written)} report(s)"
         if errors:
@@ -187,7 +187,7 @@ class EmailCollector:
         baselined: list[str] = []
         errors: list[str] = []
         run_start = now_iso()
-        state = _load_state()
+        state = _state()
         accounts_state = state.setdefault("accounts", {})
 
         for account_id, _account, reader in active_accounts:
@@ -269,7 +269,7 @@ class EmailCollector:
                 _record_success(accounts_state, account_id, run_start)
 
         if not dry_run:
-            _save_state(state)
+            _save_accounts(accounts_state, [account_id for account_id, _, _ in active_accounts])
 
         message = (
             f"incremental: {len(active_accounts)} account(s), "
@@ -462,8 +462,14 @@ def _parse_since(raw: str | None) -> datetime | None:
     return dt.replace(tzinfo=UTC) if dt.tzinfo is None else dt
 
 
-def _load_state() -> dict:
-    """Load `email-state.json`, migrating the legacy pre-M002 shape on read.
+def _store() -> StateStore:
+    """`email-state.json` through the seam (tolerant: missing / corrupt / non-dict reads as
+    `{}`). Resolved per call so a repointed EMAIL_STATE_FILE gets its own store."""
+    return store_for(EMAIL_STATE_FILE)
+
+
+def _migrate_legacy(data: dict) -> dict:
+    """The legacy pre-M002 shape → per-account watermarks, migrated on read.
 
     Legacy shape (`scripts/scan-email.py`): per-mbox-file size trackers
     `{"mboxes": {<rel_path>: {...}}, "last_incremental": "<date>"}`. The
@@ -473,14 +479,6 @@ def _load_state() -> dict:
     incremental run after the upgrade picks up the gap since that date
     instead of silently re-baselining.
     """
-    if not EMAIL_STATE_FILE.exists():
-        return {"accounts": {}}
-    try:
-        data = json.loads(EMAIL_STATE_FILE.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return {"accounts": {}}
-    if not isinstance(data, dict):
-        return {"accounts": {}}
     if isinstance(data.get("accounts"), dict):
         return data
     # Legacy per-mbox shape — migrate.
@@ -501,6 +499,23 @@ def _load_state() -> dict:
     return {"accounts": {}}
 
 
-def _save_state(state: dict) -> None:
-    EMAIL_STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
-    EMAIL_STATE_FILE.write_text(json.dumps(state, indent=2), encoding="utf-8")
+def _state() -> dict:
+    """This run's starting snapshot: the seam's fresh read, legacy shape migrated."""
+    return _migrate_legacy(_store().reload())
+
+
+def _save_accounts(accounts_state: dict, account_ids: list[str]) -> None:
+    """Merge the entries of the accounts THIS run scanned into a fresh read under the
+    lock — a concurrent run's other accounts keep their watermarks. The legacy per-mbox
+    keys are dropped on the first write, as the whole-dict save did."""
+
+    def _merge(d: dict) -> None:
+        d.pop("mboxes", None)
+        d.pop("last_incremental", None)
+        accounts = d.get("accounts")
+        if not isinstance(accounts, dict):
+            accounts = {}
+        accounts.update({k: accounts_state[k] for k in account_ids if k in accounts_state})
+        d["accounts"] = accounts
+
+    _store().update(_merge)

@@ -133,6 +133,33 @@ def test_screenshots_run_dry_run_passthrough(monkeypatch, tmp_path):
     assert "[dry-run]" in result.message
 
 
+def test_scan_save_merges_with_a_concurrent_writer(monkeypatch, tmp_path):
+    """M033-S03-T05: the run's state save merges into a FRESH read under the lock. A
+    second process landing `total_processed` while this run looks for screenshots
+    survives this run's `last_scan` write — the old whole-dict save of the run-start
+    snapshot dropped it."""
+    import json
+
+    from collectors import scan_screenshots
+
+    state_file = tmp_path / "screenshot-state.json"
+    monkeypatch.setattr(scan_screenshots, "STATE_FILE", state_file)
+    monkeypatch.setattr(scan_screenshots, "SCREENSHOTS_DIR", tmp_path / "Screenshots")
+
+    def _find_while_another_run_lands(since):
+        state_file.write_text(json.dumps({"total_processed": 5}), encoding="utf-8")
+        return []
+
+    monkeypatch.setattr(scan_screenshots, "find_new_screenshots", _find_while_another_run_lands)
+
+    result = scan_screenshots.scan()
+
+    assert result["processed"] == 0
+    on_disk = json.loads(state_file.read_text(encoding="utf-8"))
+    assert on_disk["total_processed"] == 5, "the concurrent run's key was lost"
+    assert "last_scan" in on_disk
+
+
 # ── pure helpers ────────────────────────────────────────────────────
 
 

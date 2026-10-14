@@ -41,6 +41,7 @@ from pathlib import Path
 
 from collectors.base import CollectorSpec, RunResult, register
 from core.paths import RAW_DIR, STATE_DIR
+from core.state_store import StateStore, store_for
 
 log = logging.getLogger(__name__)
 
@@ -291,17 +292,12 @@ def index_signature(index: FolderIndex) -> str:
     return h.hexdigest()
 
 
-def _load_state() -> dict:
-    try:
-        data = json.loads(STATE_FILE.read_text(encoding="utf-8"))
-        return data if isinstance(data, dict) else {}
-    except (OSError, ValueError):
-        return {}  # missing/corrupt -> full rebuild, fail-soft
-
-
-def _save_state(state: dict) -> None:
-    STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
-    STATE_FILE.write_text(json.dumps(state, indent=2, ensure_ascii=False), encoding="utf-8")
+def _store() -> StateStore:
+    """`folder-index.json` through the seam — tolerant: missing / corrupt / non-dict reads
+    as `{}` (full rebuild, fail-soft); every write a locked merge of one root's entry into
+    what is on disk at write time. Resolved per call so a repointed STATE_FILE gets its
+    own store."""
+    return store_for(STATE_FILE)
 
 
 def sync_root(
@@ -321,16 +317,18 @@ def sync_root(
     index = walk_root(entry, max_depth=max_depth, recent_n=recent_n)
     signature = index_signature(index)
     digest_path = INDEX_DIR / f"{index.root_id}.md"
-    state = _load_state()
-    previous = state.get(index.root_id) or {}
+    previous = _store().reload().get(index.root_id) or {}
     if not force and previous.get("signature") == signature and digest_path.exists():
         return SyncResult(written=False, path=digest_path, reason="unchanged", signature=signature)
     path = write_index(index)
-    state[index.root_id] = {
-        "signature": signature,
-        "last_indexed_at": index.generated_at.isoformat(),
-    }
-    _save_state(state)
+
+    def _record(d: dict) -> None:
+        d[index.root_id] = {
+            "signature": signature,
+            "last_indexed_at": index.generated_at.isoformat(),
+        }
+
+    _store().update(_record)
     return SyncResult(written=True, path=path, reason=None, signature=signature)
 
 

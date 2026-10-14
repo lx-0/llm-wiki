@@ -21,6 +21,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from core.paths import ROOT_DIR, STATE_DIR
+from core.utils import save_json_state
 
 log = logging.getLogger(__name__)
 
@@ -58,7 +59,6 @@ def _legacy_pickle_path(app: OAuthApp, account_id: str) -> Path:
 
 
 def _persist(creds, token_file: Path, scopes: tuple[str, ...]) -> None:
-    token_file.parent.mkdir(parents=True, exist_ok=True)
     payload = {
         "token": creds.token,
         "refresh_token": creds.refresh_token,
@@ -69,7 +69,8 @@ def _persist(creds, token_file: Path, scopes: tuple[str, ...]) -> None:
     }
     if hasattr(creds, "expiry") and creds.expiry is not None:
         payload["expiry"] = creds.expiry.isoformat()
-    token_file.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    # Atomic (tmp + os.replace): a token cache torn by a kill mid-write costs a re-consent.
+    save_json_state(token_file, payload)
 
 
 def bootstrap_hint(app: OAuthApp, account_id: str) -> str:

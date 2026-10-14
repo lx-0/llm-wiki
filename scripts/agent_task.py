@@ -17,7 +17,6 @@ os.environ["CLAUDE_INVOKED_BY"] = "agent_task"
 
 import argparse
 import asyncio
-import json
 import logging
 import sys
 from datetime import datetime
@@ -30,6 +29,7 @@ from core.config import CONFIG
 from core.console import setup_console_logging
 from core.paths import AGENT_SPECS_DIR, LOGS_DIR, STATE_DIR
 from core.sdk_helpers import SdkCallSpec, run_sdk_query
+from core.state_store import StateStore, store_for
 from core.utils import now_iso, today_iso
 
 log = logging.getLogger("agent-task")
@@ -51,15 +51,15 @@ def _bake_vars(extra_vars: dict[str, str]) -> dict[str, str]:
 AGENT_RUNS_FILE = STATE_DIR / "agent-runs.json"
 
 
-def _load_agent_runs() -> dict[str, str]:
-    try:
-        return json.loads(AGENT_RUNS_FILE.read_text(encoding="utf-8"))
-    except (FileNotFoundError, json.JSONDecodeError):
-        return {}
+def _runs_store() -> StateStore:
+    """`agent-runs.json` (agent id → last successful run) through the seam; the format
+    knobs keep the file byte-stable (sorted keys, trailing newline). Resolved per call so
+    a repointed AGENT_RUNS_FILE gets its own store."""
+    return store_for(AGENT_RUNS_FILE, sort_keys=True, trailing_newline=True)
 
 
 def _last_run_for(agent_id: str) -> str | None:
-    return _load_agent_runs().get(agent_id)
+    return _runs_store().reload().get(agent_id)
 
 
 def _record_last_run(agent_id: str) -> None:
@@ -70,10 +70,12 @@ def _record_last_run(agent_id: str) -> None:
     vault .wiki/ checkout and broke `wiki update` (git pull) on every run that
     happened since the last update. See KNOWLEDGE.md.
     """
-    runs = _load_agent_runs()
-    runs[agent_id] = now_iso()
-    AGENT_RUNS_FILE.parent.mkdir(parents=True, exist_ok=True)
-    AGENT_RUNS_FILE.write_text(json.dumps(runs, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    stamp = now_iso()
+
+    def _record(runs: dict) -> None:
+        runs[agent_id] = stamp
+
+    _runs_store().update(_record)
 
 
 async def run(spec: AgentSpec, dry_run: bool, extra_vars: dict[str, str]) -> int:

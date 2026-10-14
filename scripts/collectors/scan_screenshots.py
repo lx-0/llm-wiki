@@ -35,7 +35,8 @@ from core import ollama_client
 from core.config import CONFIG, TIMEZONE
 from core.paths import RAW_DIR, STATE_DIR
 from core.prompts import prompt_model, render
-from core.utils import load_json_state, now_iso, save_json_state
+from core.state_store import StateStore, store_for
+from core.utils import now_iso
 
 # ── Config ──────────────────────────────────────────────────────────
 
@@ -59,12 +60,15 @@ log = logging.getLogger("scan-screenshots")
 # ── State ───────────────────────────────────────────────────────────
 
 
-def _load_state() -> dict:
-    return load_json_state(STATE_FILE)
+def _store() -> StateStore:
+    """`screenshot-state.json` through the seam: a fresh read per run, every write a
+    locked merge of this run's own keys (`last_scan`, `total_processed`) into what is on
+    disk at write time. Resolved per call so a repointed STATE_FILE gets its own store."""
+    return store_for(STATE_FILE)
 
 
-def _save_state(state: dict) -> None:
-    save_json_state(STATE_FILE, state)
+def _stamp_last_scan(d: dict) -> None:
+    d["last_scan"] = now_iso()
 
 
 # ── Screenshot Discovery ────────────────────────────────────────────
@@ -376,7 +380,7 @@ def scan(
     "message": str}``. The CLI ignores it; the Collector wrapper maps it
     onto a RunResult.
     """
-    state = _load_state()
+    state = _store().reload()
 
     # Determine scan window
     if scan_all:
@@ -399,8 +403,7 @@ def scan(
     log.info("Found %d new screenshots", len(screenshots))
 
     if not screenshots:
-        state["last_scan"] = now_iso()
-        _save_state(state)
+        _store().update(_stamp_last_scan)
         return {"processed": 0, "report_path": None, "message": "no new screenshots"}
 
     if limit and len(screenshots) > limit:
@@ -461,8 +464,7 @@ def scan(
 
     if not results:
         log.warning("No screenshots processed successfully")
-        state["last_scan"] = now_iso()
-        _save_state(state)
+        _store().update(_stamp_last_scan)
         return {
             "processed": 0,
             "report_path": None,
@@ -483,10 +485,12 @@ def scan(
     if projects:
         log.info("Projects: %s", ", ".join(sorted(projects)))
 
-    # Update state
-    state["last_scan"] = now_iso()
-    state["total_processed"] = state.get("total_processed", 0) + len(results)
-    _save_state(state)
+    # Update state — this run's own keys, merged into what is on disk now
+    def _finish(d: dict) -> None:
+        d["last_scan"] = now_iso()
+        d["total_processed"] = d.get("total_processed", 0) + len(results)
+
+    _store().update(_finish)
 
     log.info("Done. %d screenshots processed, report at %s", len(results), report_path)
     return {

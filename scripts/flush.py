@@ -24,7 +24,6 @@ sanitize_stale_session_env(os.environ)
 import argparse
 import asyncio
 import contextlib
-import json
 import logging
 import subprocess
 import sys
@@ -44,7 +43,7 @@ from core.console import setup_console_logging
 from core.entry import child_env, python_m
 from core.piggybacks import run_due_piggybacks
 from core.sdk_helpers import SdkCallSpec, is_fatal, run_sdk_query
-from core.state_store import is_ingested, try_locked
+from core.state_store import StateStore, is_ingested, store_for, try_locked
 
 DAILY_DIR = ROOT_DIR / "daily"
 STATE_DIR = WIKI_DIR / "state"  # *.json runtime artifacts (hash trackers, cooldowns)
@@ -86,35 +85,32 @@ log = logging.getLogger("flush")
 # ── Dedup helpers ────────────────────────────────────────────────────
 
 
-def _load_last_flush() -> dict:
-    if LAST_FLUSH_FILE.exists():
-        try:
-            return json.loads(LAST_FLUSH_FILE.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, OSError):
-            return {}
-    return {}
-
-
-def _save_last_flush(data: dict) -> None:
-    LAST_FLUSH_FILE.write_text(json.dumps(data, indent=2), encoding="utf-8")
+def _last_flush_store() -> StateStore:
+    """`last-flush.json` (session id → flush stamp, the dedup window) through the seam:
+    parallel SessionEnd hooks are the recorded concurrent-writer class, so every write is
+    a locked merge into what is on disk at write time. Resolved per call (tests repoint
+    the file)."""
+    return store_for(LAST_FLUSH_FILE)
 
 
 def _is_duplicate(session_id: str) -> bool:
     """Return True if this session was flushed within the dedup window."""
-    data = _load_last_flush()
-    last_ts = data.get(session_id)
+    last_ts = _last_flush_store().reload().get(session_id)
     if last_ts is None:
         return False
     return (time.time() - last_ts) < DEDUP_WINDOW_SECONDS
 
 
 def _record_flush(session_id: str) -> None:
-    data = _load_last_flush()
-    data[session_id] = time.time()
-    # Prune entries older than 1 hour to keep the file small
-    cutoff = time.time() - 3600
-    data = {k: v for k, v in data.items() if v > cutoff}
-    _save_last_flush(data)
+    stamp = time.time()
+    cutoff = stamp - 3600  # prune entries older than 1 hour to keep the file small
+
+    def _merge(d: dict) -> None:
+        for stale in [k for k, v in d.items() if v <= cutoff]:
+            del d[stale]
+        d[session_id] = stamp
+
+    _last_flush_store().update(_merge)
 
 
 # ── Extraction ───────────────────────────────────────────────────────

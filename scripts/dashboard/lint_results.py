@@ -21,7 +21,7 @@ from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 
 from core.paths import STATE_DIR
-from core.utils import now_iso
+from core.utils import now_iso, save_json_state
 
 CACHE_FILE = STATE_DIR / "dashboard-lint-results.json"
 
@@ -81,8 +81,7 @@ def save_cache(results: LintResults) -> None:
             "generated_at": results.generated_at,
             "issues": {name: [asdict(i) for i in items] for name, items in results.issues.items()},
         }
-        CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
-        CACHE_FILE.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        save_json_state(CACHE_FILE, payload)  # atomic: a half-written cache is a bad read
     except OSError:
         pass
 

@@ -296,3 +296,31 @@ def test_record_last_run_writes_state_not_prompt(tmp_path: Path, monkeypatch) ->
     assert agent_task._last_run_for("demo").startswith("20")
     # the tracked prompt is byte-for-byte unchanged
     assert path.read_text(encoding="utf-8") == before
+
+
+def test_record_last_run_merges_with_a_concurrent_agent(tmp_path: Path, monkeypatch) -> None:
+    """M033-S03-T05: the run record merges into a FRESH read under the lock. Another
+    agent's run landing while this one takes its stamp survives this one's write — the
+    old load → stamp → whole-dict save of the stale snapshot dropped it. The bytes stay
+    sorted + newline-terminated, as before."""
+    import json
+
+    import agent_task
+
+    runs_file = tmp_path / "agent-runs.json"
+    monkeypatch.setattr(agent_task, "AGENT_RUNS_FILE", runs_file)
+    real_now_iso = agent_task.now_iso
+
+    def _now_iso_while_another_agent_lands() -> str:
+        runs_file.write_text(json.dumps({"other": "2026-10-15T00:00:00"}), encoding="utf-8")
+        return real_now_iso()
+
+    monkeypatch.setattr(agent_task, "now_iso", _now_iso_while_another_agent_lands)
+
+    agent_task._record_last_run("demo")
+
+    text = runs_file.read_text(encoding="utf-8")
+    on_disk = json.loads(text)
+    assert on_disk["other"] == "2026-10-15T00:00:00", "the concurrent agent's run was lost"
+    assert on_disk["demo"].startswith("20")
+    assert text == json.dumps(on_disk, indent=2, sort_keys=True) + "\n"

@@ -44,3 +44,38 @@ def test_direct_bare_handler_shows_full_help(capsys):
         flush._parse_args([])
     assert exc.value.code == 2
     assert "disposable" in capsys.readouterr().err
+
+
+def test_record_flush_merges_with_a_concurrent_hook(tmp_path, monkeypatch):
+    """M033-S03-T05: parallel SessionEnd hooks write last-flush.json at once. A session
+    another hook records while this one takes its stamp survives this one's write —
+    the old load → stamp → whole-dict save of the stale snapshot dropped it."""
+    import json
+    import time
+
+    last_flush = tmp_path / "last-flush.json"
+    monkeypatch.setattr(flush, "LAST_FLUSH_FILE", last_flush)
+
+    class _TimeWhileAnotherHookLands:
+        """`time` stand-in: the first `time()` call is another hook landing its session."""
+
+        def __init__(self):
+            self.landed = False
+
+        def time(self):
+            if not self.landed:
+                self.landed = True
+                last_flush.write_text(json.dumps({"other-session": time.time()}), encoding="utf-8")
+            return time.time()
+
+        def __getattr__(self, name):
+            return getattr(time, name)
+
+    monkeypatch.setattr(flush, "time", _TimeWhileAnotherHookLands())
+
+    flush._record_flush("this-session")
+
+    on_disk = json.loads(last_flush.read_text(encoding="utf-8"))
+    assert "other-session" in on_disk, "the concurrent hook's session was lost"
+    assert "this-session" in on_disk
+    assert flush._is_duplicate("other-session") is True

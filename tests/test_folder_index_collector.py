@@ -303,6 +303,30 @@ def test_sync_root_corrupt_state_fails_soft(tree, tmp_path, monkeypatch):
     assert result.written is True  # corrupt state -> full rebuild, no crash
 
 
+def test_sync_root_save_merges_with_a_concurrent_writer(tree, tmp_path, monkeypatch):
+    """M033-S03-T05: the state save merges into a FRESH read under the lock. Another
+    root's entry landing between this run's read and its write (a second `wiki index`
+    process) survives — the old whole-dict save of the stale snapshot dropped it."""
+    import json
+
+    _index_dir, state_file = _sync_env(monkeypatch, tmp_path)
+    real_write_index = folder_index.write_index
+
+    def _write_index_while_another_run_lands(index):
+        state_file.parent.mkdir(parents=True, exist_ok=True)
+        state_file.write_text(
+            json.dumps({"other-root": {"signature": "s-other"}}), encoding="utf-8"
+        )
+        return real_write_index(index)
+
+    monkeypatch.setattr(folder_index, "write_index", _write_index_while_another_run_lands)
+    result = sync_root(_entry(tree), max_depth=10, recent_n=3)
+    assert result.written is True
+    state = json.loads(state_file.read_text(encoding="utf-8"))
+    assert state["other-root"] == {"signature": "s-other"}, "the concurrent run's root was lost"
+    assert state["test-root"]["signature"] == result.signature
+
+
 # --- T04: CLI entry (`wiki index`) ----------------------------------------
 
 

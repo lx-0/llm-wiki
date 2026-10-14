@@ -314,3 +314,38 @@ def test_compile_select_files_uses_ledger(ledger_vault, monkeypatch) -> None:
     )
     args = argparse.Namespace(file=None, all=False)
     assert compile_mod.select_files(args) == [fresh]
+
+
+# ── the seam guard: no hand-rolled JSON write of a STATE_DIR file ─────
+
+REPO = Path(__file__).resolve().parent.parent
+_STATE_WRITE_SMELL = ".write_text(json.dumps("
+# Hand-rolled writers that stay, with the reason beside each (allow-list by reason).
+_ALLOWED_STATE_WRITERS = {
+    "scripts/producers/intents.py": (
+        "intents-seen.json is a LIST (the sorted seen-set); the dict-only facade would "
+        "change the on-disk shape — a migration of operator state, the producer's decision"
+    ),
+}
+
+
+def test_state_files_are_written_through_the_seam() -> None:
+    """Every runtime state file under STATE_DIR is written through StateStore.update
+    (locked read-modify-write) or save_json_state (atomic) — never
+    `path.write_text(json.dumps(...))`: that is the torn-write / last-writer-wins class
+    this module exists for. M033-S03-T05 found seven copies by this smell where the
+    audit's def-name count said three."""
+    offenders = []
+    for p in sorted((REPO / "scripts").rglob("*.py")):
+        rel = str(p.relative_to(REPO))
+        text = p.read_text(encoding="utf-8")
+        if ("STATE_DIR" not in text and "STATE_FILE" not in text) or rel in _ALLOWED_STATE_WRITERS:
+            continue
+        offenders.extend(
+            f"{rel}:{n}"
+            for n, line in enumerate(text.splitlines(), 1)
+            if _STATE_WRITE_SMELL in line
+        )
+    assert offenders == [], "hand-rolled JSON state write outside the seam:\n" + "\n".join(
+        offenders
+    )

@@ -24,7 +24,6 @@ from __future__ import annotations
 
 import argparse
 import contextlib
-import json
 import logging
 import os
 import signal
@@ -35,8 +34,7 @@ from datetime import datetime
 from pathlib import Path
 
 from core.paths import STATE_DIR
-from core.state_store import locked
-from core.utils import save_json_state
+from core.state_store import store_for
 
 log = logging.getLogger(__name__)
 
@@ -58,28 +56,22 @@ def record_status(
     *,
     state_file: Path = PIGGYBACK_STATE_FILE,
 ) -> None:
-    """Merge ``fields`` into ``piggyback-state.json[name]`` under an exclusive
-    lock (`core.state_store.locked` on the sibling ``*.lock`` file).
-
-    Read-modify-write so a concurrent writer (another piggyback runner, or
-    flush.py recording the initial ``spawned`` state) never clobbers keys it
-    didn't touch. A corrupt state file resets to empty rather than crashing
-    the runner; the save is atomic (tmp + os.replace).
+    """Merge ``fields`` into ``piggyback-state.json[name]`` — a locked read-modify-write
+    through the seam's facade (`core.state_store.store_for`: fresh read under the
+    sibling ``*.lock`` file, atomic tmp + os.replace save), so a concurrent writer
+    (another piggyback runner, or flush.py recording the initial ``spawned`` state)
+    never clobbers keys it didn't touch. A corrupt state file reads as empty rather
+    than crashing the runner.
     """
-    state_file.parent.mkdir(parents=True, exist_ok=True)
-    with locked(state_file.with_name(state_file.name + ".lock")):
-        data: dict = {}
-        if state_file.exists():
-            try:
-                data = json.loads(state_file.read_text(encoding="utf-8"))
-            except (json.JSONDecodeError, OSError):
-                data = {}
+
+    def _merge(data: dict) -> None:
         entry = data.get(name)
         if not isinstance(entry, dict):
             entry = {}
         entry.update(fields)
         data[name] = entry
-        save_json_state(state_file, data)
+
+    store_for(state_file).update(_merge)
 
 
 def _terminate(proc: subprocess.Popen) -> None:

@@ -463,7 +463,7 @@ def test_load_state_migrates_legacy_shape(
 
     monkeypatch.setattr(email_mod, "CONFIG", _ConfigStub())
 
-    state = email_mod._load_state()
+    state = email_mod._state()
 
     assert state == {
         "accounts": {
@@ -471,6 +471,48 @@ def test_load_state_migrates_legacy_shape(
             "private": {"last_run_ts": "2026-05-01T00:00:00+00:00"},
         }
     }
+
+
+def test_incremental_save_merges_with_a_concurrent_run(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    tz_messages: list[MessageMeta],
+    _isolate_email_state: Path,
+) -> None:
+    """M033-S03-T05: the state save merges this run's accounts into a FRESH read under
+    the lock. A second collector process recording ANOTHER account's watermark while
+    this run scans survives this run's save — the old whole-dict save of the run-start
+    snapshot dropped it."""
+    seed_ts = "2026-05-05T00:00:00+00:00"
+    other_ts = "2026-05-06T00:00:00+00:00"
+    _isolate_email_state.write_text(
+        json.dumps({"accounts": {"testacct": {"last_run_ts": seed_ts}}}), encoding="utf-8"
+    )
+
+    class _ReaderWhileAnotherRunLands(FakeMailboxReader):
+        def scan_metadata(self, folder=None, since=None):
+            _isolate_email_state.write_text(
+                json.dumps(
+                    {
+                        "accounts": {
+                            "testacct": {"last_run_ts": seed_ts},
+                            "other": {"last_run_ts": other_ts},
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            yield from super().scan_metadata(folder=folder, since=since)
+
+    email_mod = _email_mod_with_account(
+        monkeypatch, tmp_path, _ReaderWhileAnotherRunLands("testacct", tz_messages)
+    )
+
+    email_mod.EmailCollector().run(incremental=True)
+
+    accounts = json.loads(_isolate_email_state.read_text(encoding="utf-8"))["accounts"]
+    assert accounts["other"] == {"last_run_ts": other_ts}, "the concurrent run's account was lost"
+    assert accounts["testacct"]["last_run_ts"] != seed_ts  # advanced on success
 
 
 # ── Registry ─────────────────────────────────────────────────────────
