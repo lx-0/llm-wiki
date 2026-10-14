@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-14T21:52:00+02:00
+last_updated: 2026-10-14T22:00:00+02:00
 current_milestone: M033
 active_slice: S03
-active_task: none
+active_task: T02
 last_completed_milestone: M032
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -87,8 +87,11 @@ console-before-import modules), may split at plan-task; `backlog/lazy-collector-
 onto `core/frontmatter` across ten top-level scripts (repo-wide `def …frontmatter…(` 31 →
 26; parity 119/143 identical, the 24 deltas = the seam's tolerance + two recorded decisions;
 two call-site contracts kept via `parse_strict`); `tests/test_frontmatter_parity.py` (six
-cases RED before the fold). Suite 2071. Next: T02 — frontmatter in the packages
-(`plan-task`); CI for `f03d13b` pending.
+cases RED before the fold). Suite 2071. CI green on `f03d13b`. **T02 planned**
+(`M033-S03-T02-PLAN.md`): seven package-side grammar copies → the seam (menu_context, gmeet,
+agent_spec, prompts, verify_report, utils, links), single-call-site forwarders inlined, a
+guard that no `*frontmatter*` function outside the seam carries `safe_load` or a fence
+literal. Next: execute T02.
 
 ## M032 COMPLETE (L, 2026-10-14): desktop de-slop
 
