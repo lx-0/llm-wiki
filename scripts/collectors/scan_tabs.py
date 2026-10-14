@@ -17,12 +17,9 @@ from __future__ import annotations
 import argparse
 import json
 import logging
-import sys
 from collections import Counter
 from pathlib import Path
 from urllib.parse import urlparse
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from collectors.base import CollectorSpec, RunResult, register
 from core.config import CONFIG

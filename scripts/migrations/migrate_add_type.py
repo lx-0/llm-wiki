@@ -7,9 +7,9 @@ charts treat them uniformly.
 
 Cheap operation — pure folder→type mapping, no LLM call. Idempotent.
 
-Usage:
-    uv run python scripts/migrations/migrate_add_type.py             # write
-    uv run python scripts/migrations/migrate_add_type.py --dry-run   # preview only
+Usage (from the vault root; scripts/ is the engine's source root):
+    PYTHONPATH=.wiki/scripts uv run --project .wiki python -m migrations.migrate_add_type             # write
+    PYTHONPATH=.wiki/scripts uv run --project .wiki python -m migrations.migrate_add_type --dry-run   # preview only
 """
 
 from __future__ import annotations
@@ -23,8 +23,6 @@ import logging
 import re
 import sys
 from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from core.paths import KNOWLEDGE_DIR
 from core.utils import list_wiki_articles

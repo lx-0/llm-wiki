@@ -35,8 +35,6 @@ import re
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
 from core import frontmatter
 from core.paths import TAKES_DIR
 from core.utils import slugify, today_iso

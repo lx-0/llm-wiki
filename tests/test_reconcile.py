@@ -9,11 +9,7 @@ short-circuits that gate the SDK call.
 from __future__ import annotations
 
 import asyncio
-import sys
 from datetime import UTC, datetime, timedelta
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
 
 def test_fact_violations_by_slug_groups_filters_and_absolutizes(monkeypatch, tmp_path):

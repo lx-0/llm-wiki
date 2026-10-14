@@ -11,13 +11,10 @@ counters — whole-dict last-writer-wins dropped one side's keys.
 from __future__ import annotations
 
 import json
-import sys
 import threading
 from pathlib import Path
 
 import pytest
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
 from core import state_store
 from core.state_store import (

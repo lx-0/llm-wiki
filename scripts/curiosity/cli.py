@@ -23,8 +23,6 @@ import sys
 from pathlib import Path
 from typing import NoReturn
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
 from core.config import CONFIG
 from core.console import read_key
 from core.paths import ROOT_DIR

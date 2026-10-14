@@ -2,18 +2,16 @@
 
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT / "scripts"))
-
-from compile_stages.memory import (  # noqa: E402
+from compile_stages.memory import (
     _extract_tag_slugs,
     _strip_path_prefix,
     ensure_timeline_section,
     resolve_project_slug,
 )
+
+ROOT = Path(__file__).resolve().parent.parent
 
 # ── _strip_path_prefix ─────────────────────────────────────────────────────
 

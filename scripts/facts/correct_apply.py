@@ -24,8 +24,6 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
 from claude_agent_sdk import query
 
 from core import frontmatter

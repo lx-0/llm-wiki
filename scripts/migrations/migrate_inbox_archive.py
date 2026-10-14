@@ -13,9 +13,9 @@ finds nothing to do. Graceful — skips silently when `voice_inbox` /
 `picture_inbox` are unconfigured. After moving, the now-empty `.processed/`
 subdir is rmdir-ed.
 
-Usage:
-    uv run --project .wiki python scripts/migrations/migrate_inbox_archive.py
-    uv run --project .wiki python scripts/migrations/migrate_inbox_archive.py --dry-run
+Usage (from the vault root; scripts/ is the engine's source root):
+    PYTHONPATH=.wiki/scripts uv run --project .wiki python -m migrations.migrate_inbox_archive
+    PYTHONPATH=.wiki/scripts uv run --project .wiki python -m migrations.migrate_inbox_archive --dry-run
 """
 
 from __future__ import annotations
@@ -26,8 +26,6 @@ import shutil
 import sys
 from datetime import datetime
 from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from core.config import CONFIG
 from core.paths import RAW_DIR

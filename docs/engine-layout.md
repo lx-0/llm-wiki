@@ -135,6 +135,7 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 │   ├── pin.py                 ← `wiki pin <article>` — append wikilink to a MOC section (no LLM)
 │   └── health.py              ← read-only colored ASCII vault dashboard
 ├── hooks/
+│   ├── _bootstrap.py          ← the engine's one sys.path bootstrap (puts scripts/ on the path)
 │   ├── _transcript.py         ← shared transcript walker + tool summarizer
 │   ├── session-start.py       ← inject index.md into next session's context
 │   ├── session-end.py         ← spawn flush.py with the conversation transcript

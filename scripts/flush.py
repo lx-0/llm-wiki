@@ -17,10 +17,6 @@ os.environ["CLAUDE_INVOKED_BY"] = "memory_flush"
 # sanitizes again per call; this module-level pass also covers the
 # compile.py / piggyback children this process spawns, which inherit its
 # env. sdk_helpers is import-light (no SDK pull).
-import sys
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parent))
 from core.sdk_helpers import sanitize_stale_session_env
 
 sanitize_stale_session_env(os.environ)
@@ -40,7 +36,7 @@ from zoneinfo import ZoneInfo
 SCRIPTS_DIR = Path(__file__).resolve().parent
 WIKI_DIR = SCRIPTS_DIR.parent
 ROOT_DIR = WIKI_DIR.parent
-sys.path.insert(0, str(SCRIPTS_DIR))
+
 from core import flush_pipeline
 from core.config import CONFIG
 from core.entry import child_env, python_m

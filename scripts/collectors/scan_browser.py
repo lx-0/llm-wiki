@@ -22,13 +22,10 @@ import json
 import logging
 import shutil
 import sqlite3
-import sys
 from collections import Counter
 from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlparse
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from collectors.base import CollectorSpec, RunResult, register
 from core.config import CONFIG

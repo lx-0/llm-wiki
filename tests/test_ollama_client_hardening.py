@@ -5,11 +5,7 @@ timeouts so a sleeping/down LAN GPU can't hang a call forever (review-wiki
 from __future__ import annotations
 
 import socket
-import sys
 import time
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
 
 def test_keepalive_socket_options_enable_keepalive():

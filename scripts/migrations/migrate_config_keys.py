@@ -119,9 +119,9 @@ Key changes covered (chronological):
 
 Idempotent: a config already on the current schema produces no change.
 
-Usage:
-    uv run python scripts/migrations/migrate_config_keys.py --vault PATH            # preview
-    uv run python scripts/migrations/migrate_config_keys.py --vault PATH --apply    # write
+Usage (`wiki update` runs it; by hand, from the vault root):
+    PYTHONPATH=.wiki/scripts uv run --project .wiki python -m migrations.migrate_config_keys --vault PATH            # preview
+    PYTHONPATH=.wiki/scripts uv run --project .wiki python -m migrations.migrate_config_keys --vault PATH --apply    # write
 """
 
 from __future__ import annotations
@@ -133,11 +133,6 @@ from dataclasses import asdict, is_dataclass
 from pathlib import Path
 
 import yaml
-
-# Standalone-script bootstrap (mirrors core/config.py): the migration is
-# invoked as `python scripts/migrations/migrate_config_keys.py` by `wiki
-# update`, so `scripts/` must be on sys.path for the core.* imports below.
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 # IMPORTANT: import from core.config_schema, NEVER from core.config — that
 # module runs `load()` + dotenv against the global CONFIG_FILE at import time,

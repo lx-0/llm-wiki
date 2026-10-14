@@ -23,6 +23,7 @@ even if a collector forgets its own timeouts.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import logging
 import os
@@ -32,12 +33,6 @@ import sys
 import time
 from datetime import datetime
 from pathlib import Path
-
-# Make `core.*` importable when run as a script (Popen passes an absolute path
-# with arbitrary CWD), mirroring the engine's other entrypoints.
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-import contextlib
 
 from core.paths import STATE_DIR
 from core.state_store import locked

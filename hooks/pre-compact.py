@@ -25,11 +25,10 @@ LOGS_DIR.mkdir(parents=True, exist_ok=True)
 FLUSH_SCRIPT = SCRIPTS_DIR / "flush.py"
 LOG_FILE = LOGS_DIR / "flush.log"
 
-sys.path.insert(0, str(SCRIPTS_DIR))
-from core import flush_pipeline  # noqa: E402  staging owned by the pipeline module
+import _bootstrap  # noqa: F401  the engine's one sys.path bootstrap (scripts/ for core.*)
+from _transcript import build_context, read_transcript
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _transcript import build_context, read_transcript  # noqa: E402
+from core import flush_pipeline  # staging owned by the pipeline module
 
 logging.basicConfig(
     filename=str(LOG_FILE),

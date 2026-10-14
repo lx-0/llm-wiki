@@ -7,7 +7,7 @@ in `docs/config.md` are GENERATED from the dataclasses, so a default can never
 rot in the docs again — the field comments in `config_schema.py` are the
 single documentation source, and `tests/test_config_docs.py` diffs the
 committed docs against a fresh generation (regenerate with
-`uv run python scripts/core/config_docs.py --write`).
+`PYTHONPATH=scripts uv run python -m core.config_docs --write` from the engine root).
 
 Side-effect-free like the schema itself: importing this module reads no vault
 and touches no environment. The docs/example paths are parameters.
@@ -27,11 +27,6 @@ import re
 import sys
 from dataclasses import MISSING, fields, is_dataclass
 from pathlib import Path
-
-# Standalone-script bootstrap (mirrors core/config.py): the generator is also
-# invoked directly (`uv run python scripts/core/config_docs.py --write`), so
-# `scripts/` must be on sys.path for the core.* import below.
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from core.config_schema import (
     Features,

@@ -19,9 +19,6 @@ from __future__ import annotations
 import argparse
 import re
 import sys
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from core import markers
 from core.daily_capture import (

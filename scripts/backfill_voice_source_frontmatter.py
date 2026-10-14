@@ -26,9 +26,6 @@ import argparse
 import logging
 import re
 import sys
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from core import daily_capture
 from core.paths import ROOT_DIR

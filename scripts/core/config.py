@@ -24,7 +24,6 @@ constants live in `core/paths.py`; the datetime helpers in `core/utils.py`.
 from __future__ import annotations
 
 import logging
-import sys
 from dataclasses import asdict, fields, is_dataclass
 from pathlib import Path
 from typing import Any
@@ -32,12 +31,9 @@ from typing import Any
 import yaml
 from dotenv import load_dotenv
 
-# config.py is both a package member (`from core.config import CONFIG`) AND a
-# direct CLI (`wiki config` → `python scripts/core/config.py`). The bootstrap
-# makes `from core.paths import …` resolve in the __main__ case too — relative
-# `from .paths import` would raise "no known parent package" when run directly.
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
+# config.py is both a package member (`from core.config import CONFIG`) AND the
+# `wiki config` CLI — run as `python -m core.config` with scripts/ on PYTHONPATH
+# (lib/config.sh), so the absolute `core.*` imports resolve in the __main__ case too.
 from core.config_backup import backup_config_file
 from core.paths import CONFIG_FILE, DOTENV_FILE
 

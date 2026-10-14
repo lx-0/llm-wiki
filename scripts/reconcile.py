@@ -35,9 +35,6 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
-SCRIPTS_DIR = Path(__file__).resolve().parent
-sys.path.insert(0, str(SCRIPTS_DIR))
-
 import yaml
 
 import lint

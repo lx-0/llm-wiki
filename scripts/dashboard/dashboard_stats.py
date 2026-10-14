@@ -14,8 +14,6 @@ import os
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
 os.environ["CLAUDE_INVOKED_BY"] = "dashboard_stats"
 
 import argparse

@@ -22,8 +22,6 @@ import json
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
 from core import markers
 from core.agent_spec import AgentSpec, parse_spec
 from core.paths import AGENT_SPECS_DIR

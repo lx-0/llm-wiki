@@ -34,14 +34,10 @@ import hashlib
 import json
 import logging
 import os
-import sys
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from fnmatch import fnmatch
 from pathlib import Path
-
-if __package__ in (None, ""):  # direct execution via `wiki index`
-    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from core.paths import RAW_DIR, STATE_DIR
 

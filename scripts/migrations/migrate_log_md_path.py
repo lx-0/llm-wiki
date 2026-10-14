@@ -14,10 +14,10 @@ quarantine name the lxw operator used on 2026-05-28
 prepends the source content to the destination (source is older, dest is
 newer) and leaves a `.migrated-<ts>` audit copy of the source.
 
-Usage:
-    uv run --project .wiki python scripts/migrations/migrate_log_md_path.py
-    uv run --project .wiki python scripts/migrations/migrate_log_md_path.py --dry-run
-    uv run --project .wiki python scripts/migrations/migrate_log_md_path.py --vault /path/to/vault
+Usage (`wiki update` runs it; by hand, from the vault root):
+    PYTHONPATH=.wiki/scripts uv run --project .wiki python -m migrations.migrate_log_md_path
+    PYTHONPATH=.wiki/scripts uv run --project .wiki python -m migrations.migrate_log_md_path --dry-run
+    PYTHONPATH=.wiki/scripts uv run --project .wiki python -m migrations.migrate_log_md_path --vault /path/to/vault
 """
 
 from __future__ import annotations

@@ -9,12 +9,8 @@ the configured sleep; an is_error outcome NEVER becomes the session summary.
 from __future__ import annotations
 
 import asyncio
-import sys
-from pathlib import Path
 
 import pytest
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
 from core.sdk_helpers import FailureClass, SdkRunResult
 

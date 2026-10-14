@@ -24,13 +24,10 @@ from __future__ import annotations
 import logging
 import shutil
 import subprocess
-import sys
 import tempfile
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from collectors.base import (
     CollectorSpec,

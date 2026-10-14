@@ -25,7 +25,7 @@ def test_docs_config_md_is_current():
     regenerated = config_docs.render_docs(existing)
     assert regenerated == existing, (
         "docs/config.md is stale relative to core/config_schema.py — run "
-        "`uv run python scripts/core/config_docs.py --write` and commit the result"
+        "`PYTHONPATH=scripts uv run python -m core.config_docs --write` and commit the result"
     )
 
 

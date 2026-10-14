@@ -2726,6 +2726,7 @@ Per-candidate learnings from the 14-candidate seam arc (C01–C14). Decisions li
 
 - **A structured `is_error` ResultMessage can arrive with a CLEAN generator exit (no raise):** treating stream-end as success silently returns partial output — agent_task wrote its output file and exited 0 after error_max_turns. run_sdk_query classifies both the raised and the clean-exit variants; never gate success on "no exception" alone.
 - **Tests that want to silence/inspect LEDGER writes must patch the record method on the shared `core.usage.LEDGER` OBJECT** (`monkeypatch.setattr(usage_mod.LEDGER, "record", ...)`), not a module-level LEDGER binding in the call-site module — those bindings are gone, and the harness resolves LEDGER at call time via its own package-relative import (`core.*` vs `scripts.core.*` are distinct module instances under pytest).
+- **Closed by M033-S02-T04 (2026-10-14):** the second identity is gone from the code — `scripts.core.*` / `scripts.reports.*` are spelled nowhere under `scripts/ hooks/ tests/`, the only `sys.path` bootstrap is `hooks/_bootstrap.py` (the hooks run as plain scripts, outside pytest and `-m`), and the suite gets `scripts/` + `hooks/` from `pythonpath` in `[tool.pytest.ini_options]`. Guard: `tests/test_layout.py` (text scan for the second spelling including quoted monkeypatch targets, `sys.path.insert` outside the allowlist, a `scripts/__init__.py`, and `core.config.__file__` under `core.entry.SCRIPTS_DIR`). `scripts.core` stays importable as an implicit namespace package whenever `.wiki/` itself is on `sys.path` (`python -m pytest` adds the cwd) — the probe `core.paths is scripts.core.paths` still answers False then, which is why the guard is textual rather than an `id()` check.
 - **SdkCallSpec.deny_all_writes reproduces the M019 wedge exactly** (empty-roots can_use_tool gate + streaming-prompt envelope + permission_mode=default); `write_scope` reproduces the production PreToolUse hook shape with optional denied_subpaths and optional legacy_allowed_tools rollback gated by features.compile_callback_gate — sites without legacy tools always get the hook shape regardless of the flag.
 
 ### Config layer (C05)
@@ -2753,6 +2754,13 @@ Per-candidate learnings from the 14-candidate seam arc (C01–C14). Decisions li
 - **`ruff check --select RUF100` alone lies (M033-S01-T03):** with a one-rule selection every
   `noqa` for a rule outside that selection reads as "unused" (34 phantom findings here). Read
   RUF100 from `--statistics` under the project config, where the suppressed rules are enabled.
+  **Re-tripped with `--fix` in M033-S02-T04:** `ruff check --fix --select F401,I001,RUF100`
+  *deleted* 33 directives for rules outside the selection (SIM118 on the Thunderbird reader,
+  the three SIM115 lock handles, N801 / N818 / N803 / PLW0603, every `E402` under a
+  console-setup) — ruff removes "non-enabled" codes, it does not merely report them. RUF100
+  never goes into a narrowed `--select`; a scoped fix pass is `--select F401,I001`, and RUF100
+  runs only under the full config. Recovery when it happens anyway:
+  `git diff -U0 | grep -E '^(\+\+\+ |-.*noqa)'` lists every stripped directive by file.
 - **A monkeypatch on a name the module never reads is a dead patch, and F401 exposes it
   (M033-S01-T03):** `compile.py` imported `load_state` without using it; four tests patched
   `compile.load_state` "to isolate state" and isolated nothing. Removing the unused import
@@ -2791,6 +2799,16 @@ Per-candidate learnings from the 14-candidate seam arc (C01–C14). Decisions li
   "—" and one migrated to the next key. The file is excluded from the formatter
   (`[tool.ruff.format] exclude`) with the reason beside it; the lasting fix is a generator
   that reads the trailing comment from the statement's last line (S03/S04 follow-up).
+- **A bulk text rewrite whose replacement ends in whitespace loses the whitespace
+  (M033-S02-T04):** the Edit tool trimmed the trailing space of `"from "` when rewriting
+  `from scripts.core.x` → `from core.x` across 25 files, producing `fromcore.x` (173 syntax
+  errors, caught at test collection, repaired with a second `replace_all`). Anchor rewrites on
+  a non-whitespace boundary (`from scripts.core` → `from core`) and treat "the rewrite ran" as
+  unverified until `pytest --collect-only -q` (or `compileall`) is green.
+- **A quoted monkeypatch target is an import spelling too (M033-S02-T04):**
+  `monkeypatch.setattr("scripts.core.utils.DAILY_DIR", …)` patched the *other* module
+  identity, and the test passed by accident for months; the layout guard scans quoted dotted
+  targets for the banned spelling as well as `import` statements.
 
 ### Desktop toolchain (C07)
 

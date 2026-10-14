@@ -32,8 +32,6 @@ from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlparse
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
 from core import actions
 from core.paths import (
     KNOWLEDGE_DIR,

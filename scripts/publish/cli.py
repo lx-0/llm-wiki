@@ -12,11 +12,6 @@ import json
 import sys
 from pathlib import Path
 
-# Dispatched as a child process (`python scripts/publish/cli.py`): sys.path[0]
-# is THIS directory, so `publish`/`core` need scripts/ on the path first —
-# same bootstrap as bridge/cli.py.
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
 from core.state_store import StateStore
 from publish.corpus import (
     DEFAULT_ROOTS,

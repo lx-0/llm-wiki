@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-15T00:50:00+02:00
+last_updated: 2026-10-14T20:15:00+02:00
 current_milestone: M033
 active_slice: S02
-active_task: T04
+active_task: none
 last_completed_milestone: M032
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -50,8 +50,14 @@ scripts.core.paths` → False today; `-m collectors.cli` runs without a bootstra
 `child_env`, `python_m`) is the one spawn seam; cli, piggybacks (runner + task), flush's
 compile + dashboard children, the preprocessors' compile trigger and four bash lines
 (`PYTHONPATH=… python -m`) all use it; no engine module is spawned by file path any
-more. Suite 2044. Next: T04 — delete the 82 bootstraps, rewrite the 28 `scripts.*`
-imports, guard test (`plan-task`).
+more. Suite 2044. **S02 4/5** — T04 (two commits, A `50bc825` + B): one import identity
+(`scripts.core.*` spelled nowhere — 28 files rewritten onto `core.*` / `reports.*`), every
+per-module bootstrap deleted (83 lines / 80 files), `hooks/_bootstrap.py` the one left,
+pytest `pythonpath = ["scripts", "hooks"]`, `tests/test_layout.py` guard, E402 ignores
+re-derived (flush / lint / test_sdk_helpers / hooks), `wiki config` → `-m core.config`.
+Suite 2048, ruff + format clean, five dispatcher smokes + hook import chain ok. CI on
+`origin/main`: pending the push of A + B. Next: T05 — operator path on a scratch vault copy
++ `docs/engine-layout.md` / `AGENTS.md` trees (`plan-task`).
 
 ## M032 COMPLETE (L, 2026-10-14): desktop de-slop
 

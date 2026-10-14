@@ -24,9 +24,6 @@ import re
 import subprocess
 import sys
 from collections.abc import Callable
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from core.console import (
     C_BOLD,

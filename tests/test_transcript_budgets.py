@@ -9,16 +9,8 @@ allocation is prefer-tail.
 from __future__ import annotations
 
 import sys
-from pathlib import Path
 
-# hooks/ isn't on the default sys.path (conftest only adds scripts/) — the
-# hooks scripts are normally invoked directly by the Claude Code harness, so
-# they expect to import from their own directory.
-_HOOKS = Path(__file__).resolve().parent.parent / "hooks"
-if str(_HOOKS) not in sys.path:
-    sys.path.insert(0, str(_HOOKS))
-
-from _transcript import Budgets, Turn, build_context  # noqa: E402
+from _transcript import Budgets, Turn, build_context  # hooks/ via pytest's pythonpath
 
 
 def _assistant(text: str = "", tools: list[str] | None = None) -> Turn:

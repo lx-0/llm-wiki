@@ -29,8 +29,6 @@ from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))  # scripts/ on path
-
 from core.links import (
     _strip_frontmatter_and_fences,
     canonical_slug,

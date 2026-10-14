@@ -17,12 +17,8 @@ gap inside one refresh) and recomputes only when run standalone later.
 from __future__ import annotations
 
 import json
-import sys
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from core.paths import STATE_DIR
 from core.utils import now_iso

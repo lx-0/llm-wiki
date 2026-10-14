@@ -8,15 +8,13 @@ rather than re-importing under a fake stderr.
 from __future__ import annotations
 
 import logging
-import sys
 from pathlib import Path
 
 import pytest
 
-ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT / "scripts"))
+from core import console
 
-from core import console  # noqa: E402
+ROOT = Path(__file__).resolve().parent.parent
 
 
 def _make_record(msg: str, level: int = logging.INFO) -> logging.LogRecord:

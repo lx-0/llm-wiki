@@ -11,10 +11,7 @@ import argparse
 import json
 import logging
 import sys
-from pathlib import Path
 from typing import NoReturn
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 
 def _list(as_json: bool = False) -> NoReturn:

@@ -17,9 +17,9 @@ This script:
 
 Run AFTER deploying the adapter fix; idempotent.
 
-Usage:
-    uv run python scripts/migrations/cleanup_empty_deep_scans.py --vault PATH            # preview
-    uv run python scripts/migrations/cleanup_empty_deep_scans.py --vault PATH --apply    # write
+Usage (from the vault root; scripts/ is the engine's source root):
+    PYTHONPATH=.wiki/scripts uv run --project .wiki python -m migrations.cleanup_empty_deep_scans --vault PATH            # preview
+    PYTHONPATH=.wiki/scripts uv run --project .wiki python -m migrations.cleanup_empty_deep_scans --vault PATH --apply    # write
 """
 
 from __future__ import annotations

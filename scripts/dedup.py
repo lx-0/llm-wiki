@@ -43,8 +43,6 @@ from difflib import SequenceMatcher
 from itertools import combinations
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-
 import yaml
 
 from core.links import relative_target, resolve_link, retarget_links

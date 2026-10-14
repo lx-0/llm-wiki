@@ -6,11 +6,6 @@ call site (and the `clippings` Preprocessor, reachable via `wiki preprocess
 clippings`) share one implementation.
 """
 
-import sys
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-
 from preprocessors.clippings import main, sweep  # noqa: F401
 
 if __name__ == "__main__":

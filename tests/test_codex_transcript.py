@@ -11,15 +11,10 @@ turns and was skipped. Fixture is built from REAL Codex rollout lines
 from __future__ import annotations
 
 import json
-import sys
 from pathlib import Path
 
-_HOOKS = Path(__file__).resolve().parent.parent / "hooks"
-if str(_HOOKS) not in sys.path:
-    sys.path.insert(0, str(_HOOKS))
-
-import _transcript  # noqa: E402
-from _transcript import read_transcript  # noqa: E402
+import _transcript  # hooks/ is on sys.path via pytest's pythonpath
+from _transcript import read_transcript
 
 FIXTURE = Path(__file__).resolve().parent / "fixtures" / "codex_rollout_sample.jsonl"
 

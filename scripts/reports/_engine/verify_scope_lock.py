@@ -38,8 +38,8 @@ Outcomes:
 Cost: ~$0.05-0.10 (three small Haiku calls). Run manually; not
 wired into pytest.
 
-Usage:
-    uv run --project .wiki python scripts/reports/_engine/verify_scope_lock.py
+Usage (from the vault root; scripts/ is the engine's source root):
+    PYTHONPATH=.wiki/scripts uv run --project .wiki python -m reports._engine.verify_scope_lock
 """
 
 from __future__ import annotations
@@ -50,9 +50,6 @@ import sys
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
-
-# scripts/ on sys.path so `from core.sdk_helpers import ...` resolves.
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from claude_agent_sdk import (
     AssistantMessage,

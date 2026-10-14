@@ -34,8 +34,6 @@ from pathlib import Path
 
 import yaml
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-
 from collectors._picture_metadata import extract_metadata
 from core.paths import RAW_DIR
 

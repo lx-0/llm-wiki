@@ -15,14 +15,10 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import contextlib
 import logging
 import shutil
 import sys
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-
-import contextlib
 
 from core.paths import ROOT_DIR, WORKSPACE_INBOX_DIR
 

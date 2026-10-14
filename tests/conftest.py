@@ -1,16 +1,14 @@
-"""Test config — adds scripts/ to sys.path so domain/, adapters/, collectors/ resolve."""
+"""Test config — vault-write isolation, the snapshot flag, per-test path sinks.
+
+`scripts/` and `hooks/` are on `sys.path` through `[tool.pytest.ini_options] pythonpath`
+(applied before this file is imported); nothing here touches `sys.path`.
+"""
 
 from __future__ import annotations
 
 import re
-import sys
-from pathlib import Path
 
 import pytest
-
-_SCRIPTS_DIR = Path(__file__).resolve().parent.parent / "scripts"
-if str(_SCRIPTS_DIR) not in sys.path:
-    sys.path.insert(0, str(_SCRIPTS_DIR))
 
 from core import daily_capture
 

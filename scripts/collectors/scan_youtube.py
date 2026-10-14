@@ -35,8 +35,6 @@ from typing import Any
 
 import yaml
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
 from collectors.base import CollectorSpec, RunResult, register
 from core.config import CONFIG
 from core.paths import RAW_DIR

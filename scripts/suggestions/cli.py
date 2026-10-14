@@ -22,8 +22,6 @@ from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
 import yaml
 
 from adapters.mailbox import resolve_filter

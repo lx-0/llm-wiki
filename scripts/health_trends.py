@@ -28,9 +28,6 @@ from collections import defaultdict
 from pathlib import Path
 from statistics import mean
 
-SCRIPTS_DIR = Path(__file__).resolve().parent
-sys.path.insert(0, str(SCRIPTS_DIR))
-
 import yaml
 
 from core import markers

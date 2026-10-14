@@ -41,11 +41,10 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+from core.entry import child_env, python_m
+
 SCRIPTS_DIR = Path(__file__).resolve().parent
 WIKI_DIR = SCRIPTS_DIR.parent
-sys.path.insert(0, str(SCRIPTS_DIR))
-
-from core.entry import child_env, python_m  # noqa: E402 — after the bootstrap
 
 # ── stdout styling ──────────────────────────────────────────────────────
 # `wiki help` + command banners go to stdout, so TTY-detect on stdout (the

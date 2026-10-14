@@ -36,8 +36,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
 from core import frontmatter
 from core.config import CONFIG
 from core.paths import FACTS_DIR, KNOWLEDGE_DIR

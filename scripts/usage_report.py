@@ -8,12 +8,8 @@ written by every LLM call site via core/usage.py.
 import argparse
 import json
 import sys
-from pathlib import Path
 
-SCRIPTS_DIR = Path(__file__).resolve().parent
-sys.path.insert(0, str(SCRIPTS_DIR))
-
-from core.usage import USAGE_FILE  # noqa: E402
+from core.usage import USAGE_FILE
 
 
 def _fmt(n: int) -> str:

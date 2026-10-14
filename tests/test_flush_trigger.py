@@ -12,12 +12,9 @@ API (``core.state_store.is_ingested``) instead of re-implementing the schema.
 from __future__ import annotations
 
 import json
-import sys
 from pathlib import Path
 
 import pytest
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
 from core.utils import file_hash
 
