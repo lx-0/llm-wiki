@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-14T21:30:00+02:00
+last_updated: 2026-10-14T21:52:00+02:00
 current_milestone: M033
 active_slice: S03
-active_task: T01
+active_task: none
 last_completed_milestone: M032
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -83,10 +83,12 @@ after S02 (2026-10-14): B** — the S02 roadmap line rewritten to what shipped (
 six tasks); S03-T04 carries the logging inventory S02 found (36 `basicConfig` sites, six
 console-before-import modules), may split at plan-task; `backlog/lazy-collector-registry.md`
 (M034); S05-T05 re-verifies the trees S02-T05 reconciled. CI green on
-`01aa3f5`. **S03 (seams, 6 tasks) — T01 planned** (`M033-S03-T01-PLAN.md`): ten top-level
-frontmatter copies → `core/frontmatter` (`lint.py` already on the seam; the grep found
-`cleanup_legacy_daily_roots.py` as a tenth), parity table first, two call-site contracts kept
-via `parse_strict`. Next: execute T01.
+`01aa3f5`. **S03 (seams, 6 tasks) 1/6** — T01 (`f03d13b`): nine private frontmatter grammars folded
+onto `core/frontmatter` across ten top-level scripts (repo-wide `def …frontmatter…(` 31 →
+26; parity 119/143 identical, the 24 deltas = the seam's tolerance + two recorded decisions;
+two call-site contracts kept via `parse_strict`); `tests/test_frontmatter_parity.py` (six
+cases RED before the fold). Suite 2071. Next: T02 — frontmatter in the packages
+(`plan-task`); CI for `f03d13b` pending.
 
 ## M032 COMPLETE (L, 2026-10-14): desktop de-slop
 
