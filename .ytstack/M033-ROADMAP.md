@@ -5,7 +5,7 @@ size: L
 created: 2026-10-14T18:40:00+02:00
 status: planned
 total_slices: 5
-completed_slices: 0
+completed_slices: 1
 ---
 
 # M033 Roadmap
@@ -26,7 +26,7 @@ Slice detail lives in per-slice `M033-S##-PLAN.md` files, created by `ytstack:sl
 
 Suggested framing (refine in slice-milestone; audit in `backlog/deslop-arc.md` §3):
 
-- [ ] S01 -- **Gates first.** Fixture-vault snapshot test for the `--json`
+- [x] S01 -- **Gates first.** Fixture-vault snapshot test for the `--json`
       payloads and `wiki status` (the behaviour oracle for every later slice); the mechanical
       `ruff format` commit + `.git-blame-ignore-revs`; `[tool.ruff.lint]` policy with the
       finding buckets fixed or ignored-with-reason; `RUF100` → 0; ruff in pre-commit;
@@ -46,6 +46,14 @@ Suggested framing (refine in slice-milestone; audit in `backlog/deslop-arc.md` �
       schema-2 contracts as one JSON Schema validated by both suites; `docs/engine-layout.md`
       + CHANGELOG 0.7.0 + DECISIONS + KNOWLEDGE; full backlog fan-out at close;
       `ytstack:reassess-roadmap`.
+
+**Reassess after S01 (2026-10-14): A — proceed as planned.** S01 shipped the oracle, the
+format commit, the lint policy, a clean `ruff check` and the gates (CI green on
+`985a620`). What S01 learned that S02 inherits: there are *two* import identities in the
+tree today — most modules import `core.*` with `scripts/` on `sys.path`, while `study.py`,
+`analyze.py` and `reports/_engine/**` import `scripts.core.*` / `scripts.reports.*` with
+`.wiki/` on `sys.path` (82 files carry a `sys.path.insert`, five distinct shapes); S02-T01's
+layout decision must collapse both onto one. Nothing moves in S02–S05.
 
 ## Run order
 
