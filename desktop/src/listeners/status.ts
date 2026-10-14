@@ -54,7 +54,13 @@ export function deriveStatus(args: {
   const micFreshEnough = mic.ageSeconds != null && mic.ageSeconds <= ZOMBIE_MIC_FRESH_SEC;
   const sysStale = system.ageSeconds == null || system.ageSeconds >= ZOMBIE_SYS_STALE_SEC;
   const zombieSuspected = args.running && micFreshEnough && sysStale;
-  return { id: args.id, running: args.running, channels: { mic, system }, zombieSuspected, checkedAtMs: args.nowMs };
+  return {
+    id: args.id,
+    running: args.running,
+    channels: { mic, system },
+    zombieSuspected,
+    checkedAtMs: args.nowMs,
+  };
 }
 
 // ---- thin I/O wrapper -------------------------------------------------------

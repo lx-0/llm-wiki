@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest';
-import { channelStatus, deriveStatus, getListenerStatus, FRESH_SEC, ZOMBIE_SYS_STALE_SEC } from './status';
+import { describe, expect, it } from 'vitest';
 import { LISTENERS } from './registry';
+import { channelStatus, deriveStatus, FRESH_SEC, getListenerStatus, ZOMBIE_SYS_STALE_SEC } from './status';
 
 const NOW = 1_750_000_000_000; // fixed clock for deterministic tests
 const sAgo = (s: number) => NOW - s * 1000;
@@ -32,7 +32,13 @@ describe('deriveStatus (pure)', () => {
   });
 
   it('ZOMBIE: running, mic fresh, system stale beyond threshold → suspected', () => {
-    const s = deriveStatus({ id: 'x', running: true, micLastMs: sAgo(60), sysLastMs: sAgo(ZOMBIE_SYS_STALE_SEC + 60), nowMs: NOW });
+    const s = deriveStatus({
+      id: 'x',
+      running: true,
+      micLastMs: sAgo(60),
+      sysLastMs: sAgo(ZOMBIE_SYS_STALE_SEC + 60),
+      nowMs: NOW,
+    });
     expect(s.zombieSuspected).toBe(true);
   });
 

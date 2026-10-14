@@ -1,7 +1,7 @@
-import type { ListenerApi } from './listeners/ipc';
-import type { VaultApi } from './vault/ipc';
-import type { PanelApi } from './panel/ipc';
 import type { AppApi } from './app/ipc';
+import type { ListenerApi } from './listeners/ipc';
+import type { PanelApi } from './panel/ipc';
+import type { VaultApi } from './vault/ipc';
 
 declare global {
   interface Window {
@@ -15,5 +15,3 @@ declare global {
     app: AppApi;
   }
 }
-
-export {};

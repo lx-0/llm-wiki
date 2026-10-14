@@ -1,12 +1,12 @@
-import type { ForgeConfig } from '@electron-forge/shared-types';
+import { FuseV1Options, FuseVersion } from '@electron/fuses';
+import { MakerDeb } from '@electron-forge/maker-deb';
+import { MakerDMG } from '@electron-forge/maker-dmg';
+import { MakerRpm } from '@electron-forge/maker-rpm';
 import { MakerSquirrel } from '@electron-forge/maker-squirrel';
 import { MakerZIP } from '@electron-forge/maker-zip';
-import { MakerDMG } from '@electron-forge/maker-dmg';
-import { MakerDeb } from '@electron-forge/maker-deb';
-import { MakerRpm } from '@electron-forge/maker-rpm';
-import { VitePlugin } from '@electron-forge/plugin-vite';
 import { FusesPlugin } from '@electron-forge/plugin-fuses';
-import { FuseV1Options, FuseVersion } from '@electron/fuses';
+import { VitePlugin } from '@electron-forge/plugin-vite';
+import type { ForgeConfig } from '@electron-forge/shared-types';
 
 // macOS signing/notarization is env-gated so `npm run package` works WITHOUT
 // credentials (unsigned dev build), and signs only when the operator's Apple
@@ -16,7 +16,14 @@ import { FuseV1Options, FuseVersion } from '@electron/fuses';
 //   APPLE_TEAM_ID           — Developer team id
 // A "Developer ID Application" cert must be in the login keychain.
 // See https://www.electronforge.io/guides/code-signing/code-signing-macos
-const SIGN = Boolean(process.env.APPLE_ID && process.env.APPLE_PASSWORD && process.env.APPLE_TEAM_ID);
+const { APPLE_ID, APPLE_PASSWORD, APPLE_TEAM_ID } = process.env;
+const signing =
+  APPLE_ID && APPLE_PASSWORD && APPLE_TEAM_ID
+    ? {
+        osxSign: {},
+        osxNotarize: { appleId: APPLE_ID, appleIdPassword: APPLE_PASSWORD, teamId: APPLE_TEAM_ID },
+      }
+    : {};
 
 const config: ForgeConfig = {
   packagerConfig: {
@@ -26,16 +33,7 @@ const config: ForgeConfig = {
     // Stable app identity (not the generic com.github.Electron). Matters for TCC
     // grants the app may need later. Operator can rename to an org-preferred id.
     appBundleId: 'cloud.yesterday.llm-wiki',
-    ...(SIGN
-      ? {
-          osxSign: {},
-          osxNotarize: {
-            appleId: process.env.APPLE_ID!,
-            appleIdPassword: process.env.APPLE_PASSWORD!,
-            teamId: process.env.APPLE_TEAM_ID!,
-          },
-        }
-      : {}),
+    ...signing,
   },
   rebuildConfig: {},
   makers: [

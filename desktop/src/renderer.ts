@@ -28,10 +28,10 @@
 
 import './index.css';
 import { marked } from 'marked';
-import { ADVANCED_COMMANDS } from './vault/ipc';
-import { fmtAgo } from './lib/time';
 import { friendlyPending, pendingVerb } from './lib/pending';
+import { fmtAgo } from './lib/time';
 import { TYPE_COLOR } from './lib/types';
+import { ADVANCED_COMMANDS } from './vault/ipc';
 
 const ICON_COPY = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
 const ICON_CHECK = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>`;
@@ -132,7 +132,8 @@ function summaryLine(s: Status): string {
   const p = pending.get(s.id);
   if (p) return p === 'start' ? 'turning on…' : 'turning off…';
   if (!s.running) return `last captured ${fmtClock(s.channels.mic.lastCaptureAtMs)}`;
-  const mic = s.channels.mic, sys = s.channels.system;
+  const mic = s.channels.mic,
+    sys = s.channels.system;
   if (mic.fresh && sys.fresh) return 'screen, mic + system audio';
   const parts: string[] = [];
   parts.push(mic.fresh ? 'mic ✓' : `mic silent ${fmtDur(mic.ageSeconds)}`);
@@ -187,7 +188,6 @@ async function control(id: string, action: 'start' | 'stop'): Promise<void> {
   }
 }
 
-
 type CompileState = 'idle' | 'running' | { ok: boolean; durationMs: number };
 let compileState: CompileState = 'idle';
 let compileProgress = { current: 0, total: 0 };
@@ -214,7 +214,10 @@ function progressBar(): string {
 }
 
 function escapeHtml(s: string): string {
-  return s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c] as string);
+  return s.replace(
+    /[&<>"]/g,
+    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c] as string,
+  );
 }
 
 // "New since you last looked": entries with mtime > recentSeenMs are highlighted;
@@ -303,7 +306,8 @@ async function renderVault(): Promise<void> {
         </div>`;
       const btn = document.createElement('button');
       btn.className = 'ghost';
-      btn.title = 'Turn newly captured material (notes, voice, screenshots, meetings) into wiki articles. ~1 min; uses AI.';
+      btn.title =
+        'Turn newly captured material (notes, voice, screenshots, meetings) into wiki articles. ~1 min; uses AI.';
       btn.textContent = running ? 'Updating…' : 'Update knowledge';
       btn.disabled = engineBusy();
       btn.addEventListener('click', () => void compile());
@@ -456,7 +460,10 @@ async function ask(): Promise<void> {
   const q = input.value.trim();
   if (!q) return;
   asking = true;
-  if (btn) { btn.disabled = true; btn.textContent = '…'; }
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = '…';
+  }
   answer.hidden = false;
   answer.className = 'ask-answer thinking';
   answer.textContent = 'Thinking…';
@@ -493,7 +500,10 @@ async function ask(): Promise<void> {
     answer.textContent = 'Something went wrong.';
   } finally {
     asking = false;
-    if (btn) { btn.disabled = false; btn.textContent = 'Ask'; }
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Ask';
+    }
   }
 }
 
@@ -569,8 +579,18 @@ async function loadCollectors(): Promise<void> {
 /** Per-source glyphs so the substrate list scans at a glance instead of reading as a
  *  wall of identical grey rows (these are the things the wiki eats). */
 const SOURCE_ICON: Record<string, string> = {
-  email: '✉️', calendar: '📅', voice: '🎙️', gmeet: '🎥', jamie: '💬', health: '❤️',
-  screenshots: '🖥️', pictures: '🖼️', browser: '🌐', tabs: '🗂️', youtube: '▶️', capture: '📥',
+  email: '✉️',
+  calendar: '📅',
+  voice: '🎙️',
+  gmeet: '🎥',
+  jamie: '💬',
+  health: '❤️',
+  screenshots: '🖥️',
+  pictures: '🖼️',
+  browser: '🌐',
+  tabs: '🗂️',
+  youtube: '▶️',
+  capture: '📥',
 };
 
 function renderSources(): void {
@@ -632,7 +652,9 @@ async function renderYield(): Promise<void> {
   const today = all.filter((e) => e.mtimeMs >= sod.getTime()).length;
   const week = all.filter((e) => e.mtimeMs >= Date.now() - 7 * 86400e3).length;
   el.innerHTML =
-    today || week ? `<span class="vy-mark">✦</span> <b>+${today}</b> notes added today · <b>+${week}</b> this week` : '';
+    today || week
+      ? `<span class="vy-mark">✦</span> <b>+${today}</b> notes added today · <b>+${week}</b> this week`
+      : '';
 }
 
 // Pending-triage count on the header inbox button.
@@ -660,7 +682,8 @@ function renderAddStatus(): void {
   }
   el.hidden = false;
   if (addState === 'adding') {
-    const xy = runProgress && runProgress.total > 0 ? ` · ${runProgress.current} of ${runProgress.total}` : '';
+    const xy =
+      runProgress && runProgress.total > 0 ? ` · ${runProgress.current} of ${runProgress.total}` : '';
     el.className = 'add-status';
     el.innerHTML = `<span class="spin" aria-hidden="true"></span><span>Adding…${xy}</span>`;
   } else if (addState === 'done') {
@@ -779,14 +802,14 @@ window.addEventListener('DOMContentLoaded', () => {
 
   // Auto-fit the window to content — no scrolling. Fires on any layout change
   // (health/update appearing, advanced expanding, status changes).
-  const fit = () => window.panel.resize(document.documentElement.scrollHeight);
-  new ResizeObserver(fit).observe(document.body);
+  const fitPanel = () => window.panel.resize(document.documentElement.scrollHeight);
+  new ResizeObserver(fitPanel).observe(document.body);
   // Explicit fit on every disclosure expand/collapse (belt-and-suspenders vs the observer).
-  document.querySelectorAll('details').forEach((d) => d.addEventListener('toggle', fit));
+  for (const d of document.querySelectorAll('details')) d.addEventListener('toggle', fitPanel);
   document.getElementById('sources')?.addEventListener('toggle', (e) => {
     if ((e.target as HTMLDetailsElement).open) void loadCollectors(); // lazy — spawns the CLI
   });
-  fit();
+  fitPanel();
 
   window.panel.onVisibility((v) => {
     panelVisible = v;

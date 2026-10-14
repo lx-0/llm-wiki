@@ -1,7 +1,7 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-14T15:00:00+02:00
+last_updated: 2026-10-14T15:40:00+02:00
 current_milestone: M032
 active_slice: S01
 active_task: none
@@ -14,10 +14,10 @@ parallel_milestones: [M021, M025, M027, M029]
 
 ## ▶ NEXT — M032 planned (L): desktop de-slop
 
-**Status:** M032 / S01 -- 2/5 tasks done in slice (T01 screenshot harness: `npm run shots`,
+**Status:** M032 / S01 -- 3/5 tasks done in slice (T01 screenshot harness: `npm run shots`,
 28 captures, real panel height 1,027 px vs 640 clamp; T02 TypeScript 5.9 strict, typecheck
-gate live in `npm test`). Next task: T03 (Biome replaces ESLint) via `/ytstack:plan-task`;
-then T04 Forge 8 + Vite 8, T05 Svelte scaffold. Operator go 2026-10-14 ("arbeite den plan komplett ab"); S01–S05
+gate live in `npm test`; T03 Biome replaces ESLint, lint 0 errors). Next task: T04 (Forge 8 +
+Vite 8) via `/ytstack:plan-task`; then T05 Svelte scaffold. Operator go 2026-10-14 ("arbeite den plan komplett ab"); S01–S05
 sliced (19 tasks), decisions locked (Svelte 5, Biome, Overview replaces Cockpit + Atlas).
 Executing sequentially on `main`, push per verified task.
 

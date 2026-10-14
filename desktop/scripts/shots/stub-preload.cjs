@@ -15,7 +15,8 @@ const callbacks = {};
 const heights = [];
 const later = (value) => Promise.resolve(value);
 const subscribe = (name) => (cb) => {
-  (callbacks[name] ??= []).push(cb);
+  callbacks[name] = callbacks[name] ?? [];
+  callbacks[name].push(cb);
 };
 const noop = () => {};
 
@@ -50,7 +51,7 @@ contextBridge.exposeInMainWorld('listeners', {
 
 contextBridge.exposeInMainWorld('panel', {
   onVisibility: (cb) => {
-    (callbacks.visibility ??= []).push(cb);
+    subscribe('visibility')(cb);
     setTimeout(() => cb(true), 50);
   },
   resize: (height) => {

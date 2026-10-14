@@ -22,7 +22,6 @@ const TYPES = [
   { key: 'idea', label: 'Ideas', color: '#e8b94c', hint: 'Keep → filed for reference' },
   { key: 'note', label: 'Notes', color: '#b3a7f0', hint: 'Keep → filed for reference' },
 ];
-const CONF_COLOR: Record<string, string> = { high: '#34d399', medium: '#e8b94c', low: '#fb7185' };
 const CONF_RANK: Record<string, number> = { low: 0, medium: 1, high: 2 };
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -33,7 +32,10 @@ const errors = new Map<string, string>();
 const batching = new Map<string, { done: number; total: number }>();
 
 function esc(s: string): string {
-  return s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c] as string);
+  return s.replace(
+    /[&<>"]/g,
+    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c] as string,
+  );
 }
 function srcSub(src: string): string {
   const p = src.split('/');
@@ -67,12 +69,18 @@ function render(): void {
   for (const t of groups) {
     const items = records
       .filter((r) => (t.key === 'other' ? !known.has(r.type) : r.type === t.key))
-      .sort((a, b) => (CONF_RANK[a.confidence] ?? 1) - (CONF_RANK[b.confidence] ?? 1) || b.stem.localeCompare(a.stem));
+      .sort(
+        (a, b) =>
+          (CONF_RANK[a.confidence] ?? 1) - (CONF_RANK[b.confidence] ?? 1) || b.stem.localeCompare(a.stem),
+      );
     if (items.length) list.appendChild(renderGroup(t, items));
   }
 }
 
-function renderGroup(t: { key: string; label: string; color: string; hint: string }, items: Rec[]): HTMLElement {
+function renderGroup(
+  t: { key: string; label: string; color: string; hint: string },
+  items: Rec[],
+): HTMLElement {
   const pendingItems = items.filter((r) => r.status === 'pending');
   const sec = document.createElement('section');
   sec.className = 'triage-group' + (t.key === 'note' ? ' muted' : '');
@@ -116,7 +124,11 @@ function renderRow(r: Rec, accent: string): HTMLElement {
   const lc = r.confidence === 'low';
   row.className = 'triage-row' + (lc ? ' lc' : '') + (r.status !== 'pending' ? ' resolved' : '');
   row.style.setProperty('--accent', accent);
-  const meta = [r.source && `from ${srcSub(r.source)}`, fmtDate(r.date), r.status !== 'pending' ? r.status : '']
+  const meta = [
+    r.source && `from ${srcSub(r.source)}`,
+    fmtDate(r.date),
+    r.status !== 'pending' ? r.status : '',
+  ]
     .filter(Boolean)
     .join(' · ');
   row.innerHTML = `

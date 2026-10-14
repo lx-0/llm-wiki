@@ -5,7 +5,7 @@
 // frontmatter or re-scrubs the record body's template prose) and runs the fast,
 // non-interactive `wiki triage accept|dismiss <stem>` subcommands per card.
 
-import { runWiki, parseJson } from './wiki-exec';
+import { parseJson, runWiki } from './wiki-exec';
 
 export type TriageType = 'task' | 'idea' | 'note';
 export interface TriageRecord {

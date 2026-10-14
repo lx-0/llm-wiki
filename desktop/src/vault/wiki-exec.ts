@@ -10,8 +10,8 @@
 // machine-readable seams (doctor/menu/collect/triage/query `--json`, compile
 // `--progress-json`) — no module parses human log prose.
 
-import type { EventEmitter } from 'node:events';
 import { spawn } from 'node:child_process';
+import type { EventEmitter } from 'node:events';
 import os from 'node:os';
 import path from 'node:path';
 import { resolveVault } from './registry';
@@ -31,7 +31,7 @@ export function wikiBin(vaultPath: string): string {
 }
 
 /** Strip ANSI escape codes from CLI output before showing it in the UI. */
-// eslint-disable-next-line no-control-regex
+// biome-ignore lint/suspicious/noControlCharactersInRegex: ESC (0x1b) is the ANSI escape introducer
 export const ANSI = /\x1b\[[0-9;]*m/g;
 
 /** Default per-call wall-clock cap. A hung `wiki doctor` (git fetch + network
@@ -105,8 +105,7 @@ export function collectChild<T = string>(
     const emitLines = (chunk: string): void => {
       if (!onLine) return;
       lineBuf += chunk;
-      let nl: number;
-      while ((nl = lineBuf.indexOf('\n')) !== -1) {
+      for (let nl = lineBuf.indexOf('\n'); nl !== -1; nl = lineBuf.indexOf('\n')) {
         onLine(lineBuf.slice(0, nl));
         lineBuf = lineBuf.slice(nl + 1);
       }
@@ -170,10 +169,7 @@ export function collectChild<T = string>(
 
 /** Run `wiki <args>` against the active vault and return a normalized result.
  *  Resolves (never rejects): failures are reported via `error` + `ok: false`. */
-export function runWiki<T = string>(
-  args: string[],
-  opts: RunWikiOptions<T> = {},
-): Promise<WikiResult<T>> {
+export function runWiki<T = string>(args: string[], opts: RunWikiOptions<T> = {}): Promise<WikiResult<T>> {
   const startedAt = Date.now();
   const v = resolveVault();
   if (!v) {

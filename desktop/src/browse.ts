@@ -16,7 +16,10 @@ const countEl = document.getElementById('browse-count');
 const filtersEl = document.getElementById('browse-filters');
 
 function escapeHtml(s: string): string {
-  return s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c] as string);
+  return s.replace(
+    /[&<>"]/g,
+    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c] as string,
+  );
 }
 
 function renderFilters(): void {
@@ -25,13 +28,13 @@ function renderFilters(): void {
   const chip = (label: string, value: string) =>
     `<button class="chip ${typeFilter === value ? 'on' : ''}" data-type="${escapeHtml(value)}">${escapeHtml(label)}</button>`;
   filtersEl.innerHTML = chip('All', '') + types.map((t) => chip(t, t)).join('');
-  filtersEl.querySelectorAll('.chip').forEach((b) =>
+  for (const b of filtersEl.querySelectorAll('.chip')) {
     b.addEventListener('click', () => {
       typeFilter = (b as HTMLElement).dataset.type || '';
       renderFilters();
       render();
-    }),
-  );
+    });
+  }
 }
 
 function render(): void {

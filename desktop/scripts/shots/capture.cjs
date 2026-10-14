@@ -19,7 +19,15 @@ const OUT = path.join(ROOT, 'out', 'shots');
 const PRELOAD = path.join(__dirname, 'stub-preload.cjs');
 
 const SURFACES = [
-  { page: 'index', w: 360, h: 280, schemes: ['light', 'dark'], states: ['fresh', 'asked', 'expanded', 'running', 'failed', 'no-access', 'empty'], settle: 1200, panel: true },
+  {
+    page: 'index',
+    w: 360,
+    h: 280,
+    schemes: ['light', 'dark'],
+    states: ['fresh', 'asked', 'expanded', 'running', 'failed', 'no-access', 'empty'],
+    settle: 1200,
+    panel: true,
+  },
   { page: 'onboarding', w: 460, h: 700, schemes: ['light', 'dark'], states: ['default'], settle: 1000 },
   { page: 'settings', w: 400, h: 400, schemes: ['light', 'dark'], states: ['default'], settle: 1000 },
   { page: 'browse', w: 480, h: 620, schemes: ['light', 'dark'], states: ['default', 'empty'], settle: 1000 },
@@ -122,13 +130,17 @@ async function main() {
         report.files.push(result.file);
         if (result.height != null) report.panelHeights[`${scheme}-${state}`] = result.height;
         if (result.errors.length) report.errors[result.file] = result.errors;
-        console.log(`${result.file}${result.height != null ? `  height=${result.height}` : ''}${result.errors.length ? `  ERRORS=${result.errors.length}` : ''}`);
+        console.log(
+          `${result.file}${result.height != null ? `  height=${result.height}` : ''}${result.errors.length ? `  ERRORS=${result.errors.length}` : ''}`,
+        );
       }
     }
   }
   fs.writeFileSync(path.join(OUT, 'report.json'), `${JSON.stringify(report, null, 2)}\n`);
   const failed = Object.keys(report.errors).length;
-  console.log(`\n${report.files.length} screenshots → ${OUT}${failed ? `\n${failed} page(s) logged errors — see report.json` : ''}`);
+  console.log(
+    `\n${report.files.length} screenshots → ${OUT}${failed ? `\n${failed} page(s) logged errors — see report.json` : ''}`,
+  );
   return failed ? 1 : 0;
 }
 

@@ -4,7 +4,7 @@
 // buttons, so the app stays in sync with whatever the engine thinks needs doing.
 // Goes through the shared runWiki runner.
 
-import { runWiki, parseJson } from './wiki-exec';
+import { parseJson, runWiki } from './wiki-exec';
 
 export interface MenuSuggestion {
   count: number;

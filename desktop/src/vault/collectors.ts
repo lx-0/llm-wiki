@@ -4,7 +4,7 @@
 // CLI via the shared runWiki runner); the engine's JSON seam replaces the old ✓/✗
 // glyph-column scrape, so the human table's wording is free to change.
 
-import { runWiki, parseJson } from './wiki-exec';
+import { parseJson, runWiki } from './wiki-exec';
 
 export interface Collector {
   name: string;

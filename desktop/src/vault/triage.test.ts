@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { parseTriage } from './triage';
 
 // The record parse + prose scrub live engine-side now (`wiki triage list --json`,
@@ -8,21 +8,39 @@ import { parseTriage } from './triage';
 const PAYLOAD = JSON.stringify({
   records: [
     {
-      stem: '2026-07-11-note', type: 'idea', status: 'pending', kind: 'idea',
-      summary: 'Spin up a weekend synth project', source: 'raw/notes/voice/2026-07-11-note.md',
-      confidence: 'medium', detected_at: '2026-07-11T20:00:00', date: '2026-07-11',
+      stem: '2026-07-11-note',
+      type: 'idea',
+      status: 'pending',
+      kind: 'idea',
+      summary: 'Spin up a weekend synth project',
+      source: 'raw/notes/voice/2026-07-11-note.md',
+      confidence: 'medium',
+      detected_at: '2026-07-11T20:00:00',
+      date: '2026-07-11',
       detail: 'Accept to capture it.',
     },
     {
-      stem: '2026-07-10-bob', type: 'task', status: 'pending', kind: 'action_item',
-      summary: 'Reply to Bob about the invoice', source: 'raw/notes/email/2026-07-10-bob.md',
-      confidence: 'high', detected_at: '2026-07-10T09:00:00', date: '2026-07-10',
+      stem: '2026-07-10-bob',
+      type: 'task',
+      status: 'pending',
+      kind: 'action_item',
+      summary: 'Reply to Bob about the invoice',
+      source: 'raw/notes/email/2026-07-10-bob.md',
+      confidence: 'high',
+      detected_at: '2026-07-10T09:00:00',
+      date: '2026-07-10',
       detail: 'Accept to add it to your tasks.',
     },
     {
-      stem: '2026-07-09-x', type: 'note', status: 'dismissed', kind: 'note',
-      summary: 'Random passing thought', source: 'raw/notes/voice/2026-07-09-x.md',
-      confidence: 'low', detected_at: '2026-07-09T08:00:00', date: '2026-07-09',
+      stem: '2026-07-09-x',
+      type: 'note',
+      status: 'dismissed',
+      kind: 'note',
+      summary: 'Random passing thought',
+      source: 'raw/notes/voice/2026-07-09-x.md',
+      confidence: 'low',
+      detected_at: '2026-07-09T08:00:00',
+      date: '2026-07-09',
       detail: 'Accept to keep it.',
     },
   ],

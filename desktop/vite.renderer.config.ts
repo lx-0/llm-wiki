@@ -1,5 +1,5 @@
-import { defineConfig } from 'vite';
 import { resolve } from 'node:path';
+import { defineConfig } from 'vite';
 
 // Every renderer page shares one preload + one bundle output dir. `base` + `outDir` repeat
 // Forge's own renderer defaults (plugin-vite/dist/config/vite.renderer.config.js) so that a

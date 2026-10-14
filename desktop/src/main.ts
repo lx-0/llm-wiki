@@ -1,65 +1,80 @@
-import { app, BrowserWindow, ipcMain, Tray, nativeImage, shell, globalShortcut, Notification } from 'electron';
+import fs from 'node:fs';
 import path from 'node:path';
+import {
+  app,
+  BrowserWindow,
+  globalShortcut,
+  ipcMain,
+  Notification,
+  nativeImage,
+  shell,
+  Tray,
+} from 'electron';
 import started from 'electron-squirrel-startup';
-import { LISTENERS, getListener } from './listeners/registry';
-import { getListenerStatus } from './listeners/status';
-import { startListener, stopListener, restartListener, type LifecycleAction, type LifecycleResult } from './listeners/lifecycle';
-import { LISTENER_STATUS_CHANNEL, LISTENER_CONTROL_CHANNEL } from './listeners/ipc';
-import { getVaultStatus, listEntries, previewEntry } from './vault/status';
-import { resolveVault } from './vault/registry';
+import { isAutostartEnabled, setAutostart } from './app/autostart';
 import {
-  startCompile,
-  isCompiling,
-  currentProgress,
-  startEngineCommand,
-  startEngineArgs,
-  runningCommand,
-  type EngineCommandId,
-} from './vault/compile';
-import { getDoctor } from './vault/doctor';
-import { runQuery } from './vault/query';
-import { getMenu } from './vault/menu';
-import { listCollectors } from './vault/collectors';
-import { listTriage, triageAction } from './vault/triage';
-import {
-  VAULT_STATUS_CHANNEL,
-  VAULT_LIST_CHANNEL,
-  VAULT_PREVIEW_CHANNEL,
-  VAULT_COLLECTORS_CHANNEL,
-  VAULT_TRIAGE_CHANNEL,
-  VAULT_TRIAGE_ACTION_CHANNEL,
-  VAULT_COMPILE_CHANNEL,
-  VAULT_COMPILE_STATUS_CHANNEL,
-  VAULT_COMPILE_PROGRESS_CHANNEL,
-  VAULT_COMPILE_DONE_CHANNEL,
-  VAULT_OPEN_OBSIDIAN_CHANNEL,
-  VAULT_OPEN_FILE_CHANNEL,
-  VAULT_OPEN_FDA_CHANNEL,
-  VAULT_DOCTOR_CHANNEL,
-  VAULT_MENU_CHANNEL,
-  VAULT_QUERY_CHANNEL,
-  VAULT_RUN_CHANNEL,
-  VAULT_RUN_ARGS_CHANNEL,
-  VAULT_RUN_STATUS_CHANNEL,
-  VAULT_RUN_PROGRESS_CHANNEL,
-  VAULT_RUN_DONE_CHANNEL,
-} from './vault/ipc';
-import { BRAIN_PNG_1X, BRAIN_PNG_2X } from './assets/brainIcon';
-import { PANEL_VISIBILITY_CHANNEL, PANEL_RESIZE_CHANNEL } from './panel/ipc';
-import {
+  APP_CLOSE_COCKPIT_CHANNEL,
   APP_LOGIN_GET_CHANNEL,
   APP_LOGIN_SET_CHANNEL,
-  APP_QUIT_CHANNEL,
-  APP_OPEN_SETTINGS_CHANNEL,
+  APP_ONBOARDING_DONE_CHANNEL,
+  APP_OPEN_ATLAS_CHANNEL,
   APP_OPEN_BROWSE_CHANNEL,
   APP_OPEN_COCKPIT_CHANNEL,
-  APP_CLOSE_COCKPIT_CHANNEL,
-  APP_OPEN_ATLAS_CHANNEL,
+  APP_OPEN_SETTINGS_CHANNEL,
   APP_OPEN_TRIAGE_CHANNEL,
-  APP_ONBOARDING_DONE_CHANNEL,
+  APP_QUIT_CHANNEL,
 } from './app/ipc';
-import fs from 'node:fs';
-import { isAutostartEnabled, setAutostart } from './app/autostart';
+import { BRAIN_PNG_1X, BRAIN_PNG_2X } from './assets/brainIcon';
+import { LISTENER_CONTROL_CHANNEL, LISTENER_STATUS_CHANNEL } from './listeners/ipc';
+import {
+  type LifecycleAction,
+  type LifecycleResult,
+  restartListener,
+  startListener,
+  stopListener,
+} from './listeners/lifecycle';
+import { getListener, LISTENERS } from './listeners/registry';
+import { getListenerStatus } from './listeners/status';
+import { PANEL_RESIZE_CHANNEL, PANEL_VISIBILITY_CHANNEL } from './panel/ipc';
+import { listCollectors } from './vault/collectors';
+import {
+  currentProgress,
+  type EngineCommandId,
+  isCompiling,
+  runningCommand,
+  startCompile,
+  startEngineArgs,
+  startEngineCommand,
+} from './vault/compile';
+import { getDoctor } from './vault/doctor';
+import {
+  VAULT_COLLECTORS_CHANNEL,
+  VAULT_COMPILE_CHANNEL,
+  VAULT_COMPILE_DONE_CHANNEL,
+  VAULT_COMPILE_PROGRESS_CHANNEL,
+  VAULT_COMPILE_STATUS_CHANNEL,
+  VAULT_DOCTOR_CHANNEL,
+  VAULT_LIST_CHANNEL,
+  VAULT_MENU_CHANNEL,
+  VAULT_OPEN_FDA_CHANNEL,
+  VAULT_OPEN_FILE_CHANNEL,
+  VAULT_OPEN_OBSIDIAN_CHANNEL,
+  VAULT_PREVIEW_CHANNEL,
+  VAULT_QUERY_CHANNEL,
+  VAULT_RUN_ARGS_CHANNEL,
+  VAULT_RUN_CHANNEL,
+  VAULT_RUN_DONE_CHANNEL,
+  VAULT_RUN_PROGRESS_CHANNEL,
+  VAULT_RUN_STATUS_CHANNEL,
+  VAULT_STATUS_CHANNEL,
+  VAULT_TRIAGE_ACTION_CHANNEL,
+  VAULT_TRIAGE_CHANNEL,
+} from './vault/ipc';
+import { getMenu } from './vault/menu';
+import { runQuery } from './vault/query';
+import { resolveVault } from './vault/registry';
+import { getVaultStatus, listEntries, previewEntry } from './vault/status';
+import { listTriage, triageAction } from './vault/triage';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
@@ -352,7 +367,9 @@ ipcMain.handle(VAULT_LIST_CHANNEL, () => listEntries());
 ipcMain.handle(VAULT_PREVIEW_CHANNEL, (_e, file: string) => previewEntry(file));
 ipcMain.handle(VAULT_COLLECTORS_CHANNEL, () => listCollectors());
 ipcMain.handle(VAULT_TRIAGE_CHANNEL, (_e, showAll: boolean) => listTriage(showAll));
-ipcMain.handle(VAULT_TRIAGE_ACTION_CHANNEL, (_e, stem: string, action: 'accept' | 'dismiss') => triageAction(stem, action));
+ipcMain.handle(VAULT_TRIAGE_ACTION_CHANNEL, (_e, stem: string, action: 'accept' | 'dismiss') =>
+  triageAction(stem, action),
+);
 
 // IPC: doctor (health + update-available) — one read-only call.
 ipcMain.handle(VAULT_DOCTOR_CHANNEL, () => getDoctor());

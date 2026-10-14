@@ -1,14 +1,14 @@
-import { describe, it, expect, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
 import os from 'node:os';
+import { describe, expect, it, vi } from 'vitest';
 import {
-  augmentedPath,
-  wikiBin,
   ANSI,
-  parseJson,
-  collectChild,
+  augmentedPath,
   type ChildLike,
+  collectChild,
+  parseJson,
   type WikiResult,
+  wikiBin,
 } from './wiki-exec';
 
 // A fake ChildProcess: EventEmitter-backed stdout/stderr + a kill spy. Lets us drive

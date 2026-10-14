@@ -4,7 +4,7 @@
 // + connectivity probes, ~seconds), not on the fast poll. Goes through the shared
 // runWiki runner, which caps the git-fetch probe so it can't hang forever.
 
-import { runWiki, parseJson } from './wiki-exec';
+import { parseJson, runWiki } from './wiki-exec';
 
 export interface DoctorCheck {
   id: string;
@@ -44,14 +44,11 @@ export function parseDoctor(stdout: string): DoctorResult {
   const d = parseJson<{ checks?: RawCheck[] }>(stdout);
   const raw: RawCheck[] = Array.isArray(d.checks) ? d.checks : [];
   const update = raw.find((c) => c.id === 'engine-update-available');
-  const updateAvailable =
-    !!update && (update.severity === 'warning' || /behind/i.test(update.message || ''));
+  const updateAvailable = !!update && (update.severity === 'warning' || /behind/i.test(update.message || ''));
   // The actionable issues: critical + warning, minus the update-available one.
   const checks: DoctorCheck[] = raw
     .filter(
-      (c) =>
-        (c.severity === 'critical' || c.severity === 'warning') &&
-        c.id !== 'engine-update-available',
+      (c) => (c.severity === 'critical' || c.severity === 'warning') && c.id !== 'engine-update-available',
     )
     .map((c) => ({
       id: c.id,

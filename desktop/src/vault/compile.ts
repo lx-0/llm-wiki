@@ -79,12 +79,13 @@ export function scanProgress(line: string): CompileProgress | null {
       return null;
     }
   }
-  let m: RegExpMatchArray | null;
-  if ((m = line.match(/\[(\d+)\/(\d+)\]/))) {
-    return { current: Number(m[1]), total: Number(m[2]) };
+  const step = line.match(/\[(\d+)\/(\d+)\]/);
+  if (step) {
+    return { current: Number(step[1]), total: Number(step[2]) };
   }
-  if ((m = line.match(/Files to compile:\s*(\d+)/))) {
-    return { current: 0, total: Number(m[1]) };
+  const planned = line.match(/Files to compile:\s*(\d+)/);
+  if (planned) {
+    return { current: 0, total: Number(planned[1]) };
   }
   if (/Nothing to compile/.test(line)) {
     return { current: 0, total: 0 };

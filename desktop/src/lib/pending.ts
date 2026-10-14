@@ -13,8 +13,16 @@ export interface PendingSuggestion {
 export function pendingVerb(cmd: string): string {
   const verb = cmd.trim().split(/\s+/)[0];
   const map: Record<string, string> = {
-    compile: 'Add', 'process-inbox': 'Sort', dream: 'Refresh', 'dream-entity': 'Refresh',
-    dedup: 'Review', links: 'Fix', lint: 'Check', 'review-wiki': 'Review', curiosity: 'Explore', flush: 'Save',
+    compile: 'Add',
+    'process-inbox': 'Sort',
+    dream: 'Refresh',
+    'dream-entity': 'Refresh',
+    dedup: 'Review',
+    links: 'Fix',
+    lint: 'Check',
+    'review-wiki': 'Review',
+    curiosity: 'Explore',
+    flush: 'Save',
   };
   return map[verb] ?? 'Run';
 }
@@ -24,7 +32,9 @@ export function friendlyPending(s: PendingSuggestion): string {
   const plural = (one: string, many: string) => (n === 1 ? one : many);
   const verb = s.cmd.trim().split(/\s+/)[0];
   const map: Record<string, string> = {
-    compile: n ? `${n} new ${plural('source', 'sources')} to add to your wiki` : 'New material to add to your wiki',
+    compile: n
+      ? `${n} new ${plural('source', 'sources')} to add to your wiki`
+      : 'New material to add to your wiki',
     'process-inbox': n ? `${n} new ${plural('capture', 'captures')} to sort` : 'New captures to sort',
     dream: n ? `${n} ${plural('page needs', 'pages need')} refreshing` : 'Pages to refresh',
     'dream-entity': n ? `${n} ${plural('page needs', 'pages need')} refreshing` : 'Pages to refresh',

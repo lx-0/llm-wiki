@@ -1,11 +1,11 @@
 // Vault IPC contract — shared by main + preload (per-domain, like listeners/ipc.ts).
 
-import type { VaultStatus, EntryItem } from './status';
-import type { CompileResult, CompileStart, CompileProgress, EngineCommandId } from './compile';
-import type { DoctorResult } from './doctor';
-import type { QueryResult } from './query';
-import type { MenuResult } from './menu';
 import type { Collector } from './collectors';
+import type { CompileProgress, CompileResult, CompileStart, EngineCommandId } from './compile';
+import type { DoctorResult } from './doctor';
+import type { MenuResult } from './menu';
+import type { QueryResult } from './query';
+import type { EntryItem, VaultStatus } from './status';
 import type { TriageRecord } from './triage';
 
 /** Advanced engine actions surfaced behind the "Advanced" disclosure. Renderer-safe

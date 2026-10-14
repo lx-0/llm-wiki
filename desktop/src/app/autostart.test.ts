@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { appBundlePath, buildPlist, AUTOSTART_LABEL } from './autostart';
+import { describe, expect, it } from 'vitest';
+import { AUTOSTART_LABEL, appBundlePath, buildPlist } from './autostart';
 
 describe('appBundlePath (pure)', () => {
   it('derives the .app bundle from the executable path', () => {

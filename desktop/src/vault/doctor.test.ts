@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { parseDoctor } from './doctor';
 
 describe('parseDoctor', () => {
@@ -7,7 +7,12 @@ describe('parseDoctor', () => {
       checks: [
         { id: 'engine-update-available', severity: 'warning', message: '36 commits behind origin/main' },
         { id: 'gmail-auth', severity: 'critical', message: 'token expired', fix: 'wiki gmail-auth work' },
-        { id: 'stale-lint', severity: 'warning', message: 'edits since last lint', dispatch_args: ['lint', '--structural-only'] },
+        {
+          id: 'stale-lint',
+          severity: 'warning',
+          message: 'edits since last lint',
+          dispatch_args: ['lint', '--structural-only'],
+        },
         { id: 'all-good', severity: 'ok', message: 'fine' },
       ],
     });

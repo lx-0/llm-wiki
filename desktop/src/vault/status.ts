@@ -119,7 +119,7 @@ export function previewEntry(file: string): string {
     txt = txt.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n/, ''); // frontmatter
     txt = txt.replace(/^\s*#\s+.*\r?\n/, ''); // leading H1
     txt = txt.trim();
-    return txt.length > 700 ? txt.slice(0, 700).trimEnd() + '…' : txt;
+    return txt.length > 700 ? `${txt.slice(0, 700).trimEnd()}…` : txt;
   } catch {
     return '';
   }

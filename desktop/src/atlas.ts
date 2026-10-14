@@ -4,12 +4,15 @@
 // entrance, and hover that lights the whole path to the root. Pan/zoom, click an
 // entry → Obsidian, a type → focus.
 import './index.css';
-import { TYPE_COLOR, NODE, GLOW } from './lib/types';
+import { GLOW, NODE, TYPE_COLOR } from './lib/types';
 
 const rgba = (c: [number, number, number], a: number) => `rgba(${c[0]},${c[1]},${c[2]},${a})`;
 const colorOf = (t: string): [number, number, number] => TYPE_COLOR[t] ?? NODE;
 function esc(s: string): string {
-  return s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c] as string);
+  return s.replace(
+    /[&<>"]/g,
+    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c] as string,
+  );
 }
 function fmtAgo(ms: number): string {
   const s = Math.max(0, (Date.now() - ms) / 1000);
@@ -23,14 +26,27 @@ function fmtAgo(ms: number): string {
 
 type Entry = { title: string; file: string; type: string; mtimeMs: number };
 type GNode = {
-  id: string; kind: 'root' | 'type' | 'entry'; label: string; sub: string; type: string; file?: string;
-  x: number; y: number; w: number; h: number; color: [number, number, number]; parent?: GNode; mtime?: number; weight?: number;
+  id: string;
+  kind: 'root' | 'type' | 'entry';
+  label: string;
+  sub: string;
+  type: string;
+  file?: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  color: [number, number, number];
+  parent?: GNode;
+  mtime?: number;
+  weight?: number;
 };
 let maxWeight = 1; // largest type's entry count — for centrality-scaled node dots
 
 const canvas = document.getElementById('atlas-canvas') as HTMLCanvasElement;
 const ctx = canvas.getContext('2d')!;
-let W = 0, H = 0;
+let W = 0,
+  H = 0;
 let stars: { x: number; y: number; a: number; tw: number }[] = [];
 function resize(): void {
   const dpr = window.devicePixelRatio || 1;
@@ -39,7 +55,12 @@ function resize(): void {
   canvas.width = Math.round(W * dpr);
   canvas.height = Math.round(H * dpr);
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  stars = Array.from({ length: 80 }, () => ({ x: Math.random() * W, y: Math.random() * H, a: 0.05 + Math.random() * 0.2, tw: Math.random() * 6.28 }));
+  stars = Array.from({ length: 80 }, () => ({
+    x: Math.random() * W,
+    y: Math.random() * H,
+    a: 0.05 + Math.random() * 0.2,
+    tw: Math.random() * 6.28,
+  }));
 }
 window.addEventListener('resize', resize);
 
@@ -48,16 +69,25 @@ const edges: [GNode, GNode][] = [];
 let vaultName = '';
 
 const ENTRIES_PER_TYPE = 7;
-const X_ROOT = -520, X_TYPE = -150, X_ENTRY = 250;
-const H_ROOT = 48, H_TYPE = 44, H_ENTRY = 44, ROW = 14;
-const fontFor = (k: GNode['kind']) => (k === 'root' ? '700 14.5px' : k === 'type' ? '700 13.5px' : '600 12px');
+const X_ROOT = -520,
+  X_TYPE = -150,
+  X_ENTRY = 250;
+const H_ROOT = 48,
+  H_TYPE = 44,
+  H_ENTRY = 44,
+  ROW = 14;
+const fontFor = (k: GNode['kind']) =>
+  k === 'root' ? '700 14.5px' : k === 'type' ? '700 13.5px' : '600 12px';
 // title font scaled to the current zoom so it fits the (zoom-scaled) card instead of
 // being clipped to "Desktop A…" — fixed-px text in a shrinking box was the truncation
 const titleFont = (k: GNode['kind']) =>
   `${k === 'root' ? 700 : 600} ${Math.max(9, (k === 'root' ? 14.5 : 12) * zoom).toFixed(1)}px -apple-system, BlinkMacSystemFont, sans-serif`;
 function cardWidth(label: string, kind: GNode['kind']): number {
   ctx.font = `${fontFor(kind)} -apple-system, BlinkMacSystemFont, sans-serif`;
-  return Math.max(kind === 'entry' ? 150 : 130, Math.min(kind === 'entry' ? 232 : 190, ctx.measureText(label).width + 50));
+  return Math.max(
+    kind === 'entry' ? 150 : 130,
+    Math.min(kind === 'entry' ? 232 : 190, ctx.measureText(label).width + 50),
+  );
 }
 
 async function build(): Promise<void> {
@@ -73,7 +103,18 @@ async function build(): Promise<void> {
   const types = [...byType.entries()].sort((a, b) => b[1].length - a[1].length);
   maxWeight = Math.max(1, ...types.map(([, l]) => l.length));
 
-  const root: GNode = { id: 'root', kind: 'root', label: vaultName || 'vault', sub: `${(v?.articleCount ?? 0).toLocaleString()} notes`, type: 'root', x: X_ROOT, y: 0, w: cardWidth(vaultName || 'vault', 'root'), h: H_ROOT, color: NODE };
+  const root: GNode = {
+    id: 'root',
+    kind: 'root',
+    label: vaultName || 'vault',
+    sub: `${(v?.articleCount ?? 0).toLocaleString()} notes`,
+    type: 'root',
+    x: X_ROOT,
+    y: 0,
+    w: cardWidth(vaultName || 'vault', 'root'),
+    h: H_ROOT,
+    color: NODE,
+  };
   nodes = [root];
   edges.length = 0;
 
@@ -86,13 +127,37 @@ async function build(): Promise<void> {
     const cy = cursor + h / 2;
     cursor += h + 32;
     const wf = list.length / maxWeight; // 0..1 — heavier types become bigger cards (gravity)
-    const tn: GNode = { id: `t:${type}`, kind: 'type', label: type, sub: `${list.length} ${list.length === 1 ? 'entry' : 'entries'}`, type, x: X_TYPE, y: cy, w: cardWidth(type, 'type') * (1 + 0.32 * wf), h: H_TYPE * (1 + 0.42 * wf), color: colorOf(type), parent: root, weight: list.length };
+    const tn: GNode = {
+      id: `t:${type}`,
+      kind: 'type',
+      label: type,
+      sub: `${list.length} ${list.length === 1 ? 'entry' : 'entries'}`,
+      type,
+      x: X_TYPE,
+      y: cy,
+      w: cardWidth(type, 'type') * (1 + 0.32 * wf),
+      h: H_TYPE * (1 + 0.42 * wf),
+      color: colorOf(type),
+      parent: root,
+      weight: list.length,
+    };
     nodes.push(tn);
     edges.push([root, tn]);
     list.slice(0, ENTRIES_PER_TYPE).forEach((e, ei, arr) => {
       const en: GNode = {
-        id: `e:${e.file}`, kind: 'entry', label: e.title, sub: fmtAgo(e.mtimeMs), type: e.type, file: e.file, mtime: e.mtimeMs,
-        x: X_ENTRY, y: cy + (ei - (arr.length - 1) / 2) * (H_ENTRY + ROW), w: cardWidth(e.title, 'entry'), h: H_ENTRY, color: colorOf(e.type), parent: tn,
+        id: `e:${e.file}`,
+        kind: 'entry',
+        label: e.title,
+        sub: fmtAgo(e.mtimeMs),
+        type: e.type,
+        file: e.file,
+        mtime: e.mtimeMs,
+        x: X_ENTRY,
+        y: cy + (ei - (arr.length - 1) / 2) * (H_ENTRY + ROW),
+        w: cardWidth(e.title, 'entry'),
+        h: H_ENTRY,
+        color: colorOf(e.type),
+        parent: tn,
       };
       nodes.push(en);
       edges.push([tn, en]);
@@ -103,11 +168,14 @@ async function build(): Promise<void> {
   panX = -((X_ROOT + X_ENTRY) / 2) * zoom;
   panY = 0;
   const tel = document.getElementById('atlas-telemetry');
-  if (tel) tel.innerHTML = `<span>${nodes.length} NODES</span><span class="ck-tel-sep">//</span><span>${types.length} LAYERS</span><span class="ck-tel-sep">//</span><span>${edges.length} LINKS</span>`;
+  if (tel)
+    tel.innerHTML = `<span>${nodes.length} NODES</span><span class="ck-tel-sep">//</span><span>${types.length} LAYERS</span><span class="ck-tel-sep">//</span><span>${edges.length} LINKS</span>`;
 }
 
 // camera
-let zoom = 0.6, panX = 0, panY = 0;
+let zoom = 0.6,
+  panX = 0,
+  panY = 0;
 let reveal = 0;
 let hover: GNode | null = null;
 let expandedNode: GNode | null = null; // entry whose card is expanded in place
@@ -123,7 +191,7 @@ function roundRect(x: number, y: number, w: number, h: number, r: number): void 
   ctx.arcTo(x, y, x + w, y, r);
   ctx.closePath();
 }
-const ease = (r: number) => 1 - Math.pow(1 - Math.max(0, Math.min(1, r)), 3);
+const ease = (r: number) => 1 - (1 - Math.max(0, Math.min(1, r))) ** 3;
 function ellipsize(s: string, maxw: number): string {
   if (ctx.measureText(s).width <= maxw) return s;
   let t = s;
@@ -186,13 +254,13 @@ function draw(now: number): void {
   ctx.strokeStyle = 'rgba(125,211,252,0.035)';
   ctx.lineWidth = 1;
   const gs = 46;
-  for (let x = (panX % gs + gs) % gs; x < W; x += gs) {
+  for (let x = ((panX % gs) + gs) % gs; x < W; x += gs) {
     ctx.beginPath();
     ctx.moveTo(x, 0);
     ctx.lineTo(x, H);
     ctx.stroke();
   }
-  for (let y = (panY % gs + gs) % gs; y < H; y += gs) {
+  for (let y = ((panY % gs) + gs) % gs; y < H; y += gs) {
     ctx.beginPath();
     ctx.moveTo(0, y);
     ctx.lineTo(W, y);
@@ -204,8 +272,10 @@ function draw(now: number): void {
   for (const [a, b] of edges) {
     const rvB = nodeReveal(b);
     if (rvB <= 0.01) continue;
-    const sa = toScreen(a.x, a.y), sb = toScreen(b.x, b.y);
-    const ax = sa.x + (a.w * zoom) / 2, bx = sb.x - (b.w * zoom) / 2;
+    const sa = toScreen(a.x, a.y),
+      sb = toScreen(b.x, b.y);
+    const ax = sa.x + (a.w * zoom) / 2,
+      bx = sb.x - (b.w * zoom) / 2;
     const hot = active ? active.has(a) && active.has(b) : false;
     const dim = active && !hot ? 0.25 : 1;
     const g = ctx.createLinearGradient(ax, sa.y, bx, sb.y);
@@ -220,7 +290,7 @@ function draw(now: number): void {
     ctx.stroke();
     // flowing data pulse along the edge
     if (rvB > 0.6) {
-      const f = ((t * 0.35 + (a.y + b.y) * 0.002) % 1);
+      const f = (t * 0.35 + (a.y + b.y) * 0.002) % 1;
       const u = 1 - f;
       const px = u * u * u * ax + 3 * u * u * f * mx + 3 * u * f * f * mx + f * f * f * bx;
       const py = u * u * u * sa.y + 3 * u * u * f * sa.y + 3 * u * f * f * sb.y + f * f * f * sb.y;
@@ -245,8 +315,10 @@ function draw(now: number): void {
     const dim = active && !active.has(n) ? 0.32 : 1;
     const sc = (0.6 + 0.4 * nr) * (isHover ? 1.07 : 1);
     const p = toScreen(n.x, n.y);
-    const w = n.w * zoom * sc, h = n.h * zoom * sc;
-    const x = p.x - w / 2, y = p.y - h / 2;
+    const w = n.w * zoom * sc,
+      h = n.h * zoom * sc;
+    const x = p.x - w / 2,
+      y = p.y - h / 2;
     const a = nr * dim;
     const rad = 6 * zoom + 1;
 
@@ -297,7 +369,8 @@ function draw(now: number): void {
       const label = n.label.toUpperCase();
       ctx.font = '700 9px -apple-system, BlinkMacSystemFont, sans-serif';
       const pw = Math.min(ctx.measureText(label).width + 13, maxw);
-      const px = x + pad, py = p.y - 15;
+      const px = x + pad,
+        py = p.y - 15;
       roundRect(px, py, pw, 15, 4);
       ctx.fillStyle = rgba(n.color, 0.2 * a);
       ctx.fill();
@@ -325,8 +398,14 @@ function draw(now: number): void {
   ctx.globalCompositeOperation = 'lighter';
   ctx.strokeStyle = rgba(NODE, 0.26);
   ctx.lineWidth = 1.5;
-  const bm = 24, bl = 20;
-  for (const [bx, by, sx, sy] of [[bm, bm, 1, 1], [W - bm, bm, -1, 1], [bm, H - bm, 1, -1], [W - bm, H - bm, -1, -1]] as const) {
+  const bm = 24,
+    bl = 20;
+  for (const [bx, by, sx, sy] of [
+    [bm, bm, 1, 1],
+    [W - bm, bm, -1, 1],
+    [bm, H - bm, 1, -1],
+    [W - bm, H - bm, -1, -1],
+  ] as const) {
     ctx.beginPath();
     ctx.moveTo(bx, by + sy * bl);
     ctx.lineTo(bx, by);
@@ -344,12 +423,17 @@ function nodeAt(px: number, py: number): GNode | null {
   for (let i = nodes.length - 1; i >= 0; i--) {
     const n = nodes[i];
     const p = toScreen(n.x, n.y);
-    const w = n.w * zoom, h = n.h * zoom;
+    const w = n.w * zoom,
+      h = n.h * zoom;
     if (px >= p.x - w / 2 && px <= p.x + w / 2 && py >= p.y - h / 2 && py <= p.y + h / 2) return n;
   }
   return null;
 }
-let dragging = false, lastX = 0, lastY = 0, downX = 0, downY = 0;
+let dragging = false,
+  lastX = 0,
+  lastY = 0,
+  downX = 0,
+  downY = 0;
 const tip = document.getElementById('atlas-tip');
 canvas.addEventListener('mousedown', (e) => {
   dragging = true;
@@ -402,15 +486,19 @@ canvas.addEventListener('mouseleave', () => {
   hover = null;
   tip?.classList.remove('show');
 });
-canvas.addEventListener('wheel', (e) => {
-  e.preventDefault();
-  const nz = Math.max(0.2, Math.min(2.6, zoom * Math.exp(-e.deltaY * 0.0012)));
-  const wx = (e.clientX - W / 2 - panX) / zoom;
-  const wy = (e.clientY - H / 2 - panY) / zoom;
-  zoom = nz;
-  panX = e.clientX - W / 2 - wx * zoom;
-  panY = e.clientY - H / 2 - wy * zoom;
-}, { passive: false });
+canvas.addEventListener(
+  'wheel',
+  (e) => {
+    e.preventDefault();
+    const nz = Math.max(0.2, Math.min(2.6, zoom * Math.exp(-e.deltaY * 0.0012)));
+    const wx = (e.clientX - W / 2 - panX) / zoom;
+    const wy = (e.clientY - H / 2 - panY) / zoom;
+    zoom = nz;
+    panX = e.clientX - W / 2 - wx * zoom;
+    panY = e.clientY - H / 2 - wy * zoom;
+  },
+  { passive: false },
+);
 
 // ── expand a node-card IN PLACE on the canvas: click an entry → its card grows
 //    into a full card with a lazily-loaded content preview; click it → Obsidian ──
@@ -467,10 +555,12 @@ function renderExpandedNode(): void {
   const n = expandedNode;
   const e = ease(expandT);
   const p = toScreen(n.x, n.y);
-  const baseW = n.w * zoom, baseH = n.h * zoom;
+  const baseW = n.w * zoom,
+    baseH = n.h * zoom;
   const w = baseW + (EXP_W - baseW) * e;
   const h = baseH + (expTargetH - baseH) * e;
-  const x = p.x - w / 2, y = p.y - h / 2; // centered on the node → grows in place
+  const x = p.x - w / 2,
+    y = p.y - h / 2; // centered on the node → grows in place
   expRect = { x, y, w, h };
   // card body
   roundRect(x, y, w, h, 10);
@@ -532,7 +622,9 @@ function renderExpandedNode(): void {
     ctx.stroke();
     ctx.font = '400 12.5px -apple-system, BlinkMacSystemFont, sans-serif';
     ctx.fillStyle = 'rgba(214,226,244,0.82)';
-    expandedLines.forEach((ln, i) => ctx.fillText(ln, x + 16, y + 56 + 16 + i * 17));
+    expandedLines.forEach((ln, i) => {
+      ctx.fillText(ln, x + 16, y + 56 + 16 + i * 17);
+    });
     ctx.font = '600 9.5px ui-monospace, monospace';
     ctx.fillStyle = rgba(n.color, 0.75);
     ctx.fillText('OPEN IN OBSIDIAN ↗', x + 16, y + h - 13);
@@ -549,7 +641,10 @@ function renderLegend(): void {
   if (!el) return;
   const types = [...new Set(nodes.filter((n) => n.kind === 'type').map((n) => n.type))];
   el.innerHTML = types
-    .map((ty) => `<span class="atlas-leg"><span class="atlas-dot" style="background:${rgba(colorOf(ty), 1)}"></span>${esc(ty)}</span>`)
+    .map(
+      (ty) =>
+        `<span class="atlas-leg"><span class="atlas-dot" style="background:${rgba(colorOf(ty), 1)}"></span>${esc(ty)}</span>`,
+    )
     .join('');
 }
 

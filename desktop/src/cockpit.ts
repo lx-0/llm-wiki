@@ -5,43 +5,80 @@
 // the net while the brain "thinks". Adapted from lx-0/agent-kiosk's sophia sphere,
 // re-implemented + brand-coloured + data-driven.
 import './index.css';
-import { friendlyPending, pendingVerb } from './lib/pending';
-import { TYPE_COLOR, NODE, GLOW } from './lib/types';
 import { marked } from 'marked';
+import { friendlyPending, pendingVerb } from './lib/pending';
+import { GLOW, NODE, TYPE_COLOR } from './lib/types';
 
 const ICO_COPY = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
 const ICO_CHECK = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>`;
 const ICO_X = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>`;
 
 // ─────────────────────────── icosphere (nodes + edges + faces) ───────────────
-function makeIcosphere(subdiv: number): { vertices: number[][]; edges: [number, number][]; faces: number[][] } {
+function makeIcosphere(subdiv: number): {
+  vertices: number[][];
+  edges: [number, number][];
+  faces: number[][];
+} {
   const phi = (1 + Math.sqrt(5)) / 2;
   const verts: number[][] = [
-    [-1, phi, 0], [1, phi, 0], [-1, -phi, 0], [1, -phi, 0],
-    [0, -1, phi], [0, 1, phi], [0, -1, -phi], [0, 1, -phi],
-    [phi, 0, -1], [phi, 0, 1], [-phi, 0, -1], [-phi, 0, 1],
+    [-1, phi, 0],
+    [1, phi, 0],
+    [-1, -phi, 0],
+    [1, -phi, 0],
+    [0, -1, phi],
+    [0, 1, phi],
+    [0, -1, -phi],
+    [0, 1, -phi],
+    [phi, 0, -1],
+    [phi, 0, 1],
+    [-phi, 0, -1],
+    [-phi, 0, 1],
   ].map((v) => {
     const l = Math.hypot(v[0], v[1], v[2]);
     return [v[0] / l, v[1] / l, v[2] / l];
   });
   let faces: number[][] = [
-    [0, 11, 5], [0, 5, 1], [0, 1, 7], [0, 7, 10], [0, 10, 11], [1, 5, 9], [5, 11, 4],
-    [11, 10, 2], [10, 7, 6], [7, 1, 8], [3, 9, 4], [3, 4, 2], [3, 2, 6], [3, 6, 8],
-    [3, 8, 9], [4, 9, 5], [2, 4, 11], [6, 2, 10], [8, 6, 7], [9, 8, 1],
+    [0, 11, 5],
+    [0, 5, 1],
+    [0, 1, 7],
+    [0, 7, 10],
+    [0, 10, 11],
+    [1, 5, 9],
+    [5, 11, 4],
+    [11, 10, 2],
+    [10, 7, 6],
+    [7, 1, 8],
+    [3, 9, 4],
+    [3, 4, 2],
+    [3, 2, 6],
+    [3, 6, 8],
+    [3, 8, 9],
+    [4, 9, 5],
+    [2, 4, 11],
+    [6, 2, 10],
+    [8, 6, 7],
+    [9, 8, 1],
   ];
   const mid: Record<string, number> = {};
   const midpoint = (a: number, b: number): number => {
     const key = a < b ? `${a}-${b}` : `${b}-${a}`;
     if (mid[key] !== undefined) return mid[key];
-    const m = [(verts[a][0] + verts[b][0]) / 2, (verts[a][1] + verts[b][1]) / 2, (verts[a][2] + verts[b][2]) / 2];
+    const m = [
+      (verts[a][0] + verts[b][0]) / 2,
+      (verts[a][1] + verts[b][1]) / 2,
+      (verts[a][2] + verts[b][2]) / 2,
+    ];
     const l = Math.hypot(m[0], m[1], m[2]);
     verts.push([m[0] / l, m[1] / l, m[2] / l]);
-    return (mid[key] = verts.length - 1);
+    mid[key] = verts.length - 1;
+    return mid[key];
   };
   for (let s = 0; s < subdiv; s++) {
     const nf: number[][] = [];
     for (const [a, b, c] of faces) {
-      const ab = midpoint(a, b), bc = midpoint(b, c), ca = midpoint(c, a);
+      const ab = midpoint(a, b),
+        bc = midpoint(b, c),
+        ca = midpoint(c, a);
       nf.push([a, ab, ca], [ab, b, bc], [ca, bc, c], [ab, bc, ca]);
     }
     faces = nf;
@@ -49,7 +86,11 @@ function makeIcosphere(subdiv: number): { vertices: number[][]; edges: [number, 
   const seen = new Set<string>();
   const edges: [number, number][] = [];
   for (const [a, b, c] of faces) {
-    for (const [x, y] of [[a, b], [b, c], [c, a]] as [number, number][]) {
+    for (const [x, y] of [
+      [a, b],
+      [b, c],
+      [c, a],
+    ] as [number, number][]) {
       const key = x < y ? `${x}-${y}` : `${y}-${x}`;
       if (!seen.has(key)) {
         seen.add(key);
@@ -63,7 +104,11 @@ function makeIcosphere(subdiv: number): { vertices: number[][]; edges: [number, 
 // ─────────────────────────── canvas + projection ─────────────────────────────
 const canvas = document.getElementById('cockpit-canvas') as HTMLCanvasElement;
 const ctx = canvas.getContext('2d')!;
-let W = 0, H = 0, cx = 0, cy = 0, radius = 0;
+let W = 0,
+  H = 0,
+  cx = 0,
+  cy = 0,
+  radius = 0;
 
 const outer = makeIcosphere(2);
 const inner = makeIcosphere(1);
@@ -75,7 +120,7 @@ type NodeEntry = { type: string; file: string; title: string } | null;
 let nodeEntries: NodeEntry[] = [];
 const nodeColor = (i: number): [number, number, number] => {
   const e = nodeEntries[i];
-  return e ? TYPE_COLOR[e.type] ?? NODE : NODE;
+  return e ? (TYPE_COLOR[e.type] ?? NODE) : NODE;
 };
 type P = { x: number; y: number; z: number };
 let lastProj: P[] = [];
@@ -83,7 +128,12 @@ const ripples: { t: number }[] = [];
 let stars: { x: number; y: number; a: number; tw: number }[] = [];
 
 function genStars(): void {
-  stars = Array.from({ length: 90 }, () => ({ x: Math.random() * W, y: Math.random() * H, a: 0.05 + Math.random() * 0.22, tw: Math.random() * Math.PI * 2 }));
+  stars = Array.from({ length: 90 }, () => ({
+    x: Math.random() * W,
+    y: Math.random() * H,
+    a: 0.05 + Math.random() * 0.22,
+    tw: Math.random() * Math.PI * 2,
+  }));
 }
 function resize(): void {
   // Cap the device-pixel-ratio: on a retina display rendering at 2× means 4× the
@@ -108,7 +158,9 @@ function noise3D(x: number, y: number, z: number): number {
 function project(v: number[], rotX: number, rotY: number, deform: number, t: number): P {
   const n = noise3D(v[0] * 2 + t * 0.5, v[1] * 2 + t * 0.3, v[2] * 2 + t * 0.4) * deform;
   const sc = 1 + n;
-  const vx = v[0] * sc, vy = v[1] * sc, vz = v[2] * sc;
+  const vx = v[0] * sc,
+    vy = v[1] * sc,
+    vz = v[2] * sc;
   const x0 = vx * Math.cos(rotY) - vz * Math.sin(rotY);
   const z0 = vx * Math.sin(rotY) + vz * Math.cos(rotY);
   const y1 = vy * Math.cos(rotX) - z0 * Math.sin(rotX);
@@ -122,13 +174,23 @@ const orbits = [
   { speed: -0.16, rx: 1.24, ry: 0.26, phase: 1.7 },
   { speed: 0.12, rx: 1.58, ry: 0.2, phase: 3.1 },
 ];
-const particles = Array.from({ length: 16 }, (_, i) => ({ angle: (Math.PI * 2 / 16) * i, orbit: i % 3, size: 1.4 + (i % 5) * 0.5 }));
+const particles = Array.from({ length: 16 }, (_, i) => ({
+  angle: ((Math.PI * 2) / 16) * i,
+  orbit: i % 3,
+  size: 1.4 + (i % 5) * 0.5,
+}));
 const pulses: { edge: number; t: number; speed: number }[] = [];
 let pulseAccum = 0;
 
 // reactive + interaction state
-let energy = 0.35, targetEnergy = 0.35, hasIssues = false, thinking = false;
-let mx = 0, my = 0, pRotX = 0, pRotY = 0;
+let energy = 0.35,
+  targetEnergy = 0.35,
+  hasIssues = false,
+  thinking = false;
+let mx = 0,
+  my = 0,
+  pRotX = 0,
+  pRotY = 0;
 window.addEventListener('mousemove', (e) => {
   mx = (e.clientX / W - 0.5) * 2;
   my = (e.clientY / H - 0.5) * 2;
@@ -157,15 +219,26 @@ const BLUE: [number, number, number] = [110, 165, 255];
 const PINK: [number, number, number] = [224, 82, 176];
 function auroraGlow(t: number): [number, number, number] {
   const k = (Math.sin(t * 0.13) + 1) / 2;
-  return [GLOW[0] + (BLUE[0] - GLOW[0]) * k, GLOW[1] + (BLUE[1] - GLOW[1]) * k, GLOW[2] + (BLUE[2] - GLOW[2]) * k];
+  return [
+    GLOW[0] + (BLUE[0] - GLOW[0]) * k,
+    GLOW[1] + (BLUE[1] - GLOW[1]) * k,
+    GLOW[2] + (BLUE[2] - GLOW[2]) * k,
+  ];
 }
 const arcs: { a: number; b: number; t: number; speed: number }[] = []; // thought-arcs between concepts
 let arcAccum = 0;
 const flares: { node: number; t: number }[] = []; // idle memories surfacing
 let flareAccum = 0;
 // drag-to-spin
-let userRotY = 0, velY = 0, userRotX = 0, velX = 0;
-let dragging = false, lastX = 0, lastY = 0, downX = 0, downY = 0;
+let userRotY = 0,
+  velY = 0,
+  userRotX = 0,
+  velX = 0;
+let dragging = false,
+  lastX = 0,
+  lastY = 0,
+  downX = 0,
+  downY = 0;
 // HUD panels tethered to the brain
 const tetherEls = ['.ck-pending', '.ck-recent', '.ck-ask']
   .map((s) => document.querySelector(s))
@@ -190,7 +263,9 @@ function draw(now: number): void {
   const deform = 0.05 + energy * 0.05 + Math.sin(t * 0.7) * 0.02;
   const glowC = hasIssues ? WARM : auroraGlow(t);
   const projOuter = outer.vertices.map((v) => project(v, rotX, rotY, deform, t));
-  const projInner = inner.vertices.map((v) => project([v[0] * 0.62, v[1] * 0.62, v[2] * 0.62], rotX, rotY, deform * 1.7, t * 1.3));
+  const projInner = inner.vertices.map((v) =>
+    project([v[0] * 0.62, v[1] * 0.62, v[2] * 0.62], rotX, rotY, deform * 1.7, t * 1.3),
+  );
   lastProj = projOuter;
 
   ctx.globalCompositeOperation = 'lighter'; // additive bloom for everything luminous
@@ -231,7 +306,14 @@ function draw(now: number): void {
   ctx.fillRect(0, 0, W, H);
   // breathing hot core — fill only its bounding box, not the whole screen
   const blobR = radius * (0.5 + Math.sin(t * 1.1) * 0.07);
-  const gb = ctx.createRadialGradient(cx + Math.sin(t * 0.6) * 14, cy + Math.cos(t * 0.8) * 11, 0, cx, cy, blobR);
+  const gb = ctx.createRadialGradient(
+    cx + Math.sin(t * 0.6) * 14,
+    cy + Math.cos(t * 0.8) * 11,
+    0,
+    cx,
+    cy,
+    blobR,
+  );
   gb.addColorStop(0, rgba(glowC, 0.26 + Math.sin(t * 1.5) * 0.05 + energy * 0.1));
   gb.addColorStop(0.45, rgba(glowC, 0.14));
   gb.addColorStop(1, 'rgba(0,0,0,0)');
@@ -264,7 +346,7 @@ function draw(now: number): void {
   for (const [a, b] of outer.edges) {
     const z = (projOuter[a].z + projOuter[b].z) / 2;
     const d01 = (z + 1) / 2;
-    const br = Math.pow(d01, 2.6) * 0.55;
+    const br = d01 ** 2.6 * 0.55;
     if (br < 0.015) continue;
     ctx.beginPath();
     ctx.moveTo(projOuter[a].x, projOuter[a].y);
@@ -280,7 +362,7 @@ function draw(now: number): void {
     const d01 = (p.z + 1) / 2;
     if (d01 < 0.16) continue;
     const c = nodeColor(i);
-    const a = Math.pow(d01, 1.4) * 0.95;
+    const a = d01 ** 1.4 * 0.95;
     const r = 0.9 + d01 * 2.8;
     ctx.beginPath();
     ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
@@ -307,7 +389,12 @@ function draw(now: number): void {
   pulseAccum += dt;
   if (pulseAccum > 0.16 - energy * 0.11) {
     pulseAccum = 0;
-    if (pulses.length < 24) pulses.push({ edge: Math.floor(Math.random() * outer.edges.length), t: 0, speed: 0.8 + Math.random() * 1.0 });
+    if (pulses.length < 24)
+      pulses.push({
+        edge: Math.floor(Math.random() * outer.edges.length),
+        t: 0,
+        speed: 0.8 + Math.random() * 1.0,
+      });
   }
   for (let i = pulses.length - 1; i >= 0; i--) {
     const p = pulses[i];
@@ -349,7 +436,8 @@ function draw(now: number): void {
       arcs.splice(i, 1);
       continue;
     }
-    const pa = projOuter[ar.a], pb = projOuter[ar.b];
+    const pa = projOuter[ar.a],
+      pb = projOuter[ar.b];
     const ox = (pa.x + pb.x) / 2 + ((pa.x + pb.x) / 2 - cx) * 0.45;
     const oy = (pa.y + pb.y) / 2 + ((pa.y + pb.y) / 2 - cy) * 0.45;
     const fade = Math.sin(ar.t * Math.PI);
@@ -362,7 +450,8 @@ function draw(now: number): void {
     ctx.shadowBlur = 6;
     ctx.stroke();
     ctx.shadowBlur = 0;
-    const u = ar.t, iu = 1 - u;
+    const u = ar.t,
+      iu = 1 - u;
     const qx = iu * iu * pa.x + 2 * iu * u * ox + u * u * pb.x;
     const qy = iu * iu * pa.y + 2 * iu * u * oy + u * u * pb.y;
     ctx.beginPath();
@@ -379,7 +468,8 @@ function draw(now: number): void {
   if (flareAccum > 2.6 && flares.length < 2) {
     flareAccum = 0;
     const front: number[] = [];
-    for (let i = 0; i < projOuter.length; i++) if (nodeEntries[i] && (projOuter[i].z + 1) / 2 > 0.6) front.push(i);
+    for (let i = 0; i < projOuter.length; i++)
+      if (nodeEntries[i] && (projOuter[i].z + 1) / 2 > 0.6) front.push(i);
     if (front.length) flares.push({ node: front[Math.floor(Math.random() * front.length)], t: 0 });
   }
   for (let i = flares.length - 1; i >= 0; i--) {
@@ -519,10 +609,16 @@ function draw(now: number): void {
     ctx.stroke();
   }
   // screen-corner brackets (HUD frame)
-  const bm = 26, bl = 22;
+  const bm = 26,
+    bl = 22;
   ctx.strokeStyle = rgba(NODE, 0.28);
   ctx.lineWidth = 1.5;
-  for (const [bx, by, sx, sy] of [[bm, bm, 1, 1], [W - bm, bm, -1, 1], [bm, H - bm, 1, -1], [W - bm, H - bm, -1, -1]] as const) {
+  for (const [bx, by, sx, sy] of [
+    [bm, bm, 1, 1],
+    [W - bm, bm, -1, 1],
+    [bm, H - bm, 1, -1],
+    [W - bm, H - bm, -1, -1],
+  ] as const) {
     ctx.beginPath();
     ctx.moveTo(bx, by + sy * bl);
     ctx.lineTo(bx, by);
@@ -537,7 +633,8 @@ function draw(now: number): void {
     const ax = Math.max(r.left, Math.min(cx, r.right));
     const ay = Math.max(r.top, Math.min(cy, r.bottom));
     const ang = Math.atan2(ay - cy, ax - cx);
-    const sx = cx + Math.cos(ang) * RR, sy = cy + Math.sin(ang) * RR;
+    const sx = cx + Math.cos(ang) * RR,
+      sy = cy + Math.sin(ang) * RR;
     ctx.strokeStyle = rgba(NODE, 0.13);
     ctx.lineWidth = 1;
     ctx.beginPath();
@@ -582,8 +679,11 @@ function draw(now: number): void {
     ctx.textBaseline = 'middle';
     for (const L of letters) {
       const ang = L.a0 + t * L.speed;
-      const ca = Math.cos(ang), sa = Math.sin(ang);
-      const X = ca * L.orbR, Y = sa * L.orbR * Math.sin(L.tilt), Z = sa * L.orbR * Math.cos(L.tilt);
+      const ca = Math.cos(ang),
+        sa = Math.sin(ang);
+      const X = ca * L.orbR,
+        Y = sa * L.orbR * Math.sin(L.tilt),
+        Z = sa * L.orbR * Math.cos(L.tilt);
       const s = 340 / (340 + Z * radius * 0.55);
       const depth = (Z / L.orbR + 1) / 2;
       const a = letterAlpha * (0.2 + depth * 0.8);
@@ -622,11 +722,14 @@ function draw(now: number): void {
 
 // click / hover a node → open its entry
 function nodeAt(px: number, py: number): number {
-  let best = -1, bd = 17 * 17;
+  let best = -1,
+    bd = 17 * 17;
   for (let i = 0; i < lastProj.length; i++) {
     const p = lastProj[i];
     if ((p.z + 1) / 2 < 0.4 || !nodeEntries[i]) continue;
-    const dx = p.x - px, dy = p.y - py, d = dx * dx + dy * dy;
+    const dx = p.x - px,
+      dy = p.y - py,
+      d = dx * dx + dy * dy;
     if (d < bd) {
       bd = d;
       best = i;
@@ -684,7 +787,10 @@ canvas.addEventListener('mouseleave', () => {
 // ─────────────────────────── HUD ─────────────────────────────────────────────
 const clsOf = (type: string) => type.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() || 'note';
 function esc(s: string): string {
-  return s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c] as string);
+  return s.replace(
+    /[&<>"]/g,
+    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c] as string,
+  );
 }
 
 let countRaf = 0;
@@ -693,7 +799,7 @@ function countUp(el: HTMLElement, to: number): void {
   cancelAnimationFrame(countRaf);
   const step = (n: number): void => {
     const k = Math.min(1, (n - start) / 800);
-    el.innerHTML = `<span class="ck-big">${Math.round(to * (1 - Math.pow(1 - k, 3))).toLocaleString()}</span> notes`;
+    el.innerHTML = `<span class="ck-big">${Math.round(to * (1 - (1 - k) ** 3)).toLocaleString()}</span> notes`;
     if (k < 1) countRaf = requestAnimationFrame(step);
   };
   countRaf = requestAnimationFrame(step);
@@ -769,7 +875,10 @@ async function loadTypes(): Promise<void> {
   el.innerHTML = Object.entries(counts)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 5)
-    .map(([type, n]) => `<span class="ck-type-chip"><span class="type-badge t-${clsOf(type)}">${esc(type)}</span>${n}</span>`)
+    .map(
+      ([type, n]) =>
+        `<span class="ck-type-chip"><span class="type-badge t-${clsOf(type)}">${esc(type)}</span>${n}</span>`,
+    )
     .join('');
 }
 
@@ -800,7 +909,11 @@ async function loadPending(): Promise<void> {
   const m = await window.vault.menu();
   const tel = document.getElementById('ck-telemetry');
   if (tel) {
-    const st = (m?.status ?? {}) as { articles?: number; last_compile_ago?: string; ollama_reachable?: boolean };
+    const st = (m?.status ?? {}) as {
+      articles?: number;
+      last_compile_ago?: string;
+      ollama_reachable?: boolean;
+    };
     tel.innerHTML = [
       st.articles != null ? `NOTES ${st.articles}` : '',
       st.last_compile_ago ? `UPDATED ${esc(st.last_compile_ago)}` : '',
@@ -875,7 +988,9 @@ async function ask(): Promise<void> {
     const res = await window.vault.query(q);
     if (res.ok) {
       const html = marked.parse(
-        res.answer.replace(/\[\[([^\]]+)\]\]/g, (_m, p: string) => esc((p.split('|')[0].split('#')[0].split('/').pop() || p).trim())),
+        res.answer.replace(/\[\[([^\]]+)\]\]/g, (_m, p: string) =>
+          esc((p.split('|')[0].split('#')[0].split('/').pop() || p).trim()),
+        ),
         { breaks: true, async: false },
       ) as string;
       answer.className = 'ck-answer';
