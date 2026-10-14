@@ -14,7 +14,7 @@ const { AUDIT_SCRIPT } = require('./audit.cjs');
 
 /** Windows built on the token system: clipped text fails the run there, not just overlap.
  *  (The old panel truncates its vault path on purpose until S04 replaces it.) */
-const STRICT_PAGES = new Set(['settings', 'onboarding', 'browse', 'triage', 'smoke']);
+const STRICT_PAGES = new Set(['panel', 'settings', 'onboarding', 'browse', 'triage', 'smoke']);
 
 app.commandLine.appendSwitch('force-device-scale-factor', '2');
 
@@ -30,6 +30,15 @@ const SURFACES = [
     h: 280,
     schemes: ['light', 'dark'],
     states: ['fresh', 'asked', 'expanded', 'running', 'failed', 'no-access', 'empty'],
+    settle: 1200,
+    panel: true,
+  },
+  {
+    page: 'panel',
+    w: 360,
+    h: 280,
+    schemes: ['light', 'dark'],
+    states: ['fresh', 'asked', 'running', 'failed', 'no-access', 'empty'],
     settle: 1200,
     panel: true,
   },
@@ -64,6 +73,7 @@ const STATE_SCRIPTS = {
   asked: `(async () => {
     const input = document.getElementById('ask-input');
     input.value = 'who owns the Fleet onboarding deck?';
+    input.dispatchEvent(new Event('input', { bubbles: true })); // framework bindings listen to input, not value
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
     ${wait(900)}
   })()`,

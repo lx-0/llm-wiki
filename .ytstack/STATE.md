@@ -1,7 +1,7 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-14T22:55:00+02:00
+last_updated: 2026-10-14T23:40:00+02:00
 current_milestone: M032
 active_slice: S04
 active_task: none
@@ -19,9 +19,10 @@ primitives (`ui/Button|Switch|TypeBadge`, `ui/icons.ts`, `ui/types.ts`), glow/bl
 Settings / Onboarding / Browse / Inbox as Svelte windows (light mode fixed by construction, copy
 on a diet, derivations tested), dead CSS out (2,348 → 1,661 lines), DOM layout gate in the
 harness (overlap / clipped / off-screen; strict on the token-system windows). Reassess after
-S03: **A — proceed as planned** (S04-T04 adds `index` to the strict pages). Next slice: S04
-(panel rebuilt in Svelte: labeled nav, status strip, Next-up list, Recent, footer) via
-`plan-task`. vitest 75 + pytest 2024 green.
+S03: **A — proceed as planned**. S04 1/4: T01 panel shell as `panel.html` beside the shipped
+panel (store, labeled nav with inbox badge, Ask with wikilink chips; 48 captures, strict gate
+clean). Next task: T02 (status strip: Library sparkline · Health ring · Capture meter) via
+`plan-task`. vitest 79 + pytest 2024 green.
 
 **S01 COMPLETE (5/5)** -- harness `npm run shots` (30 captures; real panel
 height 1,027 px vs 640 clamp), TypeScript 5.9 strict + svelte-check gate in `npm test`, Biome
