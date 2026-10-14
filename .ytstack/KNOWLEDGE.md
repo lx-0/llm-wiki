@@ -2848,6 +2848,23 @@ Per-candidate learnings from the 14-candidate seam arc (C01–C14). Decisions li
 - **`gh run list --commit <sha>` wants the full SHA:** a short SHA listed nothing for 100 s
   while two runs for that push were already green. `gh run list --limit N --json
   databaseId,headSha,conclusion` and match the prefix.
+- **No basicConfig in importable modules — one logging setup, called from entry points only
+  (M033-S03-T04):** `core/console.setup_console_logging` is the only place the engine
+  configures the root logger, and every `main()` / `__main__` block opens with it. A
+  module-level call (`log = setup_console_logging(…)` or `logging.basicConfig(…)`) configures
+  the root logger of whoever imports the module, and the importer's own `basicConfig` then
+  silently no-ops (the recorded incident: `collectors/__init__` import-chained into
+  `scan_screenshots`, flush's setup became a no-op, its lines went to stderr → DEVNULL as a
+  piggyback). 33 `basicConfig` calls, four private `_setup_logging` and eight import-time seam
+  calls (compile, dream, flush, lint, menu, query, inbox, html_ingest) are gone;
+  `tests/test_console.py::TestOneSetupEverywhere` keeps it that way — no `basicConfig` under
+  `scripts/`, no column-0 `setup_console_logging(`, and a fresh-interpreter import of the
+  shared modules adds no root handler. The fresh interpreter matters: under pytest the root
+  already has handlers, so an import-time setup is invisible to an in-process test. The
+  module-level `log = logging.getLogger(…)` is fine — a logger, not a configuration. Piggybacks
+  run with stdio on DEVNULL, so a CLI that must leave a trace passes `log_file=` (the four
+  registry CLIs → `logs/<name>.log`, retry-failed-flushes → `flush.log`, which it used to inherit
+  from flush's import).
 
 ### Desktop toolchain (C07)
 

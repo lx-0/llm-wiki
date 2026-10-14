@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-14T23:20:00+02:00
+last_updated: 2026-10-15T00:45:00+02:00
 current_milestone: M033
 active_slice: S03
-active_task: T04
+active_task: none
 last_completed_milestone: M032
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -100,10 +100,18 @@ the collectors' ASCII filename grammar is `core/utils.slugify(…, ascii_only=Tr
 `publish.server_slug` stays as the server's grammar; both grammars pinned, every real
 jamie / gmeet / youtube filename recomputed 41 / 41; guard against a second slug grammar.
 The smell grep found eight private fence grammars T02's name-based guard missed → **T07
-added** (slice at 7 tasks). Suite 2091. **T04 planned** (`M033-S03-T04-PLAN.md`): 33
-`basicConfig` sites (20 module-level, two in importable modules) + four `_setup_logging` →
-`core/console.setup_console_logging` (gains `level=`), in two commits; six console-before-import
-modules get their imports back on top. CI for `4773bf2` pending.
+added** (slice at 7 tasks). Suite 2091. CI green on `4773bf2` (runs 38627513549 + 38627513507). **S03 4/7** — T04
+(`5af8c0a`): one logging setup — the 33 `basicConfig` sites + four `_setup_logging` folded
+onto `core/console.setup_console_logging` (gains `level=`), every call at the first line of
+an entry function; the eight import-time callers (compile, dream, flush, lint, menu, query,
+inbox, html_ingest) call it in `main()` — importing an engine module leaves the root logger
+untouched (17 modules probed in fresh interpreters); six modules have their imports back on
+top (`noqa: E402` gone), three dead collector `__main__` blocks removed; guards in
+`tests/test_console.py::TestOneSetupEverywhere` (RED first). One commit instead of A + B
+(the guard would be red between). Operator-visible: the migrated CLIs' stderr has the
+compile look (smokes before/after on the scratch vault). Suite 2100. CI for `5af8c0a`
+pending. Stamps before this one ran an hour ahead of the clock — corrected. **Next: T05
+(state store) via `plan-task`.**
 
 ## M032 COMPLETE (L, 2026-10-14): desktop de-slop
 

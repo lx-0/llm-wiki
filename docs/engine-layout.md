@@ -48,7 +48,7 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 │   │   ├── google_oauth.py        ← Gmail OAuth2 bootstrap (local-loopback consent flow)
 │   │   ├── flush_pipeline.py      ← staged-flush state machine (stage / commit / archive / pending)
 │   │   ├── health.py              ← vault-health checks behind the home-screen banner + `wiki doctor`
-│   │   ├── console.py             ← shared console-logging setup for the CLI scripts (per-CLI formatter hook)
+│   │   ├── console.py             ← the engine's one logging setup (`setup_console_logging`, called from entry points only — never at import; per-CLI formatter hook)
 │   │   ├── actions.py             ← action catalogue — the operator-facing vocabulary of everything a consumer can run (menu + desktop JSON contract)
 │   │   ├── links.py               ← wikilink resolution + relativization — single source of truth (resolve_link / canonical_slug / relativize_text)
 │   │   ├── index_sync.py          ← deterministic knowledge/index.md sync behind `wiki reindex`
