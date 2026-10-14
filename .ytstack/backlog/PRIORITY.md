@@ -50,6 +50,9 @@ shipped and the sentence names only what remains.
 
 ## 🌱 Medium
 
+- **`lazy-collector-registry.md`** (M · M034 decision) — Registration on package import makes every collector verb and the three entry scripts import the whole `collectors` package (~0.25 s measured 2026-10-14) and forbids `python -m collectors.<x>`; a name → module table with lazy registration is decided in M034 together with the collect verb (surfaced M033-S02).
+- **`collect-flags-one-verb.md`** (S · M034 decision) — The direct-CLI flags of screenshots / browser / tabs (`--all`, `--backfill`, `--limit`, …) live in three entry scripts outside `wiki collect`; fold them into the one verb's parser once the registry is lazy (surfaced M033-S02).
+
 - **`architecture-deepening.md`** (L ·partial) — Seven candidates remain genuinely open (#4 linter seam, #7 hook harness, #9 logging, #10 async Ollama = M021-S02, #11 markdown helper, #13 datetime/tz, #15 dashboard consolidation); the doc needs no reconciliation, only execution.
 - **`curiosity-dashboard.md`** (L ·partial) — A bulk-triage surface for the 706 pending requests is still missing — filterable list with cost/rationale per request and approve/reject in place (the natural home is now the desktop app, not the Obsidian Meta-Bind callouts the doc sketches), plus the unbuilt pre-resolve candidate step.
 - **`listener-lifecycle.md`** (L ·partial) — Generalize the desktop prototype into the engine: plist generation/load for a listener (the shared LaunchAgent core also owed to system-level-scheduler.md), per-install config instead of registry.ts's hardcoded `com.alex.screenpipe`, and CLI/menu parity — noting the value is capped until a screenpipe collector exists, since today the subsystem would keep alive a daemon whose output never reaches the vault.
@@ -79,6 +82,9 @@ shipped and the sentence names only what remains.
 - **`stg-glob-pattern.md`** (S) — The ~20-LOC glob resolver is unwritten and the knob it would auto-heal is currently three Firefox majors and three months stale, though the payoff is capped today because neither `tabs` nor `browser` appears in the lxw piggybacks block and raw/notes/browser/ has produced nothing since browser-overview-2026-04-12.md.
 
 ## 🧊 Low — real, not urgent
+
+- **`intents-seen-state-shape.md`** (S) — `intents-seen.json` is the one list-shaped state file the store cannot hold (allow-listed in the M033-S03-T05 guard); `{"seen": [...]}` with a legacy-list tolerance + migration brings the torn-write-safe write to the last hand-rolled state writer (surfaced M033-S03).
+- **`backfill-voice-rollup-shape.md`** (S) — The daily-rollup backfill still emits the pre-2026-06-13 voice line with the in-body link that the voice-source backfill then migrates; build it through `daily_capture.rollup_line` with `sources:` provenance, parity-pinned (surfaced M033-S03).
 
 - **`agent-apply-channel.md`** (L) — Run the office-hours question the doc itself demands ("what structured mutation does an agent actually need to make weekly?"), then build at most the one op that survives — structured claim into `knowledge/takes/` — plus the claim-identity-across-recompile rule.
 - **`commit-article-manifest.md`** (L) — Nothing is built; the manifest-emitter / agent-write-disarm re-architecture stays deferred with no forcing blocker yet -- keep the file in the open queue.

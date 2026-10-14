@@ -1,9 +1,9 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-15T01:36:00+02:00
+last_updated: 2026-10-15T01:38:00+02:00
 current_milestone: M033
-active_slice: S03
+active_slice: S04
 active_task: none
 last_completed_milestone: M032
 parked_milestone: none
@@ -147,8 +147,13 @@ the final-only probe, the type migration, the suggestion loader); the line-level
 `test_no_fence_grammar_anywhere_outside_the_seam` (RED on 18 lines in 8 modules → green,
 `lint.py`'s body-separator scan allow-listed) now measures exit criterion 5; read-only
 vault parity over 2273 articles / 686 daily files / 191 calendar notes / 38 transcript refs
-/ 15 suggestions: 0 deltas. Suite 2117. CI for `167c3c6` pending. **Next:
-`reassess-roadmap` closes S03; then S04 (readable functions) via `plan-task`.**
+/ 15 suggestions: 0 deltas. Suite 2117. CI green on `167c3c6` (runs 38654926463 +
+38654926446). **Reassess after S03 (2026-10-15): B** — the S03 roadmap line rewritten to
+what shipped, `print` → `core/console` moved out to M034, two backlog files for the seam
+residue (`intents-seen-state-shape.md`, `backfill-voice-rollup-shape.md`); S04 / S05
+unchanged — S04 counts by `ast`, S05-T05 inherits the ruff-Markdown and empty-path
+formatter lessons. **Next: S04 (readable functions) — `plan-task` for T01, the AST
+length test with the shrinking allowlist.**
 
 ## M032 COMPLETE (L, 2026-10-14): desktop de-slop
 

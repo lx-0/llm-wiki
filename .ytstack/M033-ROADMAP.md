@@ -5,7 +5,7 @@ size: L
 created: 2026-10-14T18:40:00+02:00
 status: planned
 total_slices: 5
-completed_slices: 2
+completed_slices: 3
 ---
 
 # M033 Roadmap
@@ -37,10 +37,15 @@ Suggested framing (refine in slice-milestone; audit in `backlog/deslop-arc.md` �
       the one spawn seam (`python -m <module>` with `scripts/` on PYTHONPATH), the layout
       guard (KNOWLEDGE C01 closed), the operator path proven on scratch copies (`wiki update`
       re-executes the pulled engine), the 72 documented invocations rewritten (six tasks).
-- [ ] S03 -- **Seams, not copies.** Frontmatter 17 → 1, slugify 5 → 1,
-      logging 4 → 1, state load/save → `core/state_store`, daily-rollup 3 → 1, inbox scan 3 → 1,
-      `print` → `core/console` where the output is UX; each with its consumer grep and the
-      seam's tests.
+- [x] S03 -- **Seams, not copies** (shipped 2026-10-14/15, seven tasks): frontmatter
+      17 + 8 unnamed grammars → one (`core/frontmatter`, a line-level guard measures exit
+      criterion 5), slugify 7 → 1 (`core/utils.slugify`, two grammars as a keyword), logging
+      33 `basicConfig` + 4 `_setup_logging` + 8 import-time calls → one entry-point setup
+      (`core/console`), state 7 hand-rolled JSON writers → `core/state_store.store_for`,
+      daily-rollup skeleton + 6 hand-typed appends → `daily_capture.rollup_line` +
+      `base.append_rollup`, the `_scan_inbox` bindings inlined onto `base.scan_inbox`; every
+      fold by mechanism-smell grep, parity on the operator vault, a guard per seam. `print`
+      → `core/console` is NOT in this slice (too broad; M034 with the Python dispatcher).
 - [ ] S04 -- **Readable functions.** The 15 functions ≥ 150 lines split
       along their existing phase boundaries; `dream.py`, `core/health.py`, `lint.py`, `cli.py`
       split where it pays; the AST length check committed as a test.
@@ -69,6 +74,19 @@ plan-task; (2) every `wiki index` / `wiki collect …` / entry script imports th
 (3) S05-T05's tree work was pulled forward: `docs/engine-layout.md` and `AGENTS.md` were
 reconciled in S02-T05, so T05 re-verifies them after S03/S04 instead of rewriting. S03, S04
 and S05 otherwise unchanged; S03 next.
+
+**Reassess after S03 (2026-10-15): B — partial changes.** S03 shipped its seven tasks and
+every count turned out larger than the audit's def-name tally — 25 frontmatter grammars not
+17, 7 slug copies not 5, 33 + 4 + 8 logging setups not 4, 7 state writers not 3, 6
+hand-typed rollup appends beside the three collectors — because the audit counted names and
+the folds counted mechanisms (a smell grep per seam, a vault parity per fold, a guard that
+asserts the predicate). The slice line above now says what shipped; `print` →
+`core/console` left it for M034 (the Python dispatcher owns the output). Two residues are
+backlog files, not tasks: `intents-seen-state-shape.md` (the one list-shaped state file)
+and `backfill-voice-rollup-shape.md` (the backfill's legacy voice line). S04 and S05
+unchanged: S04-T01's allowlist is AST-measured, and S05-T05 inherits the two toolchain
+lessons already in KNOWLEDGE (ruff ≥ 0.16 formats Markdown fences — excluded in
+`pyproject`; a formatter with an empty path variable formats the whole project). S04 next.
 
 ## Run order
 

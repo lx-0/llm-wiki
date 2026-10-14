@@ -142,3 +142,26 @@ After **S02**, changed the roadmap (B — partial):
 Reason: S02's operator-path proof (T05) and the documented-invocation sweep (T06) measured
 things the audit of 2026-10-14 had not: the real logging population, the import cost of the
 registry pattern, and that the trees had drifted 70–85 entries from the inventory.
+
+## Reassessment 2026-10-15T01:37:00+02:00
+
+After **S03**, changed the roadmap:
+
+- The S03 slice line now says what shipped (seven tasks): frontmatter 17 + 8 unnamed
+  grammars → one, slugify 7 → 1, logging 33 + 4 + 8 → one entry-point setup, state 7
+  writers → the store, rollup skeleton + 6 appends → one, inbox bindings inlined — every
+  count re-measured by mechanism, every fold with a vault parity and a smell-based guard.
+- `print` → `core/console` left the S03 line: too broad for one task and not an exit
+  criterion; it belongs to M034 with the Python dispatcher (slice note of 2026-10-14).
+- Recorded for later, not scheduled here: `backlog/intents-seen-state-shape.md` (the one
+  list-shaped state file the store cannot hold) and `backlog/backfill-voice-rollup-shape.md`
+  (the daily-rollup backfill still emits the pre-2026-06-13 voice line).
+- S04 and S05 unchanged: S04-T01 re-measures the ≥ 150-line functions with `ast` (the
+  audit's 15 were AST-counted, not name-counted); S05-T05 inherits two toolchain lessons
+  already in KNOWLEDGE (ruff ≥ 0.16 formats Markdown fences — `*.md` now excluded; a
+  formatter with an empty path variable is a whole-project run).
+
+Reason: S03's recurring finding — the audit's def-name counts undercounted every seam
+(3 → 7 slug copies, 3 → 7 state writers, 3 → 6 hand-typed rollup appends, 17 → 25
+frontmatter grammars) — changes how S04 should count too: by the mechanism, verified on
+the live tree, with the guard asserting the predicate the fold established.
