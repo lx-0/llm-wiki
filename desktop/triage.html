@@ -2,17 +2,9 @@
 <html>
   <head>
     <meta charset="UTF-8" />
-    <title>Triage — llm-wiki</title>
+    <title>Inbox — llm-wiki</title>
   </head>
-  <body class="browse triage">
-    <div class="triage-head">
-      <div class="triage-title">
-        <h1>Triage <span id="triage-count" class="triage-count"></span></h1>
-        <p class="triage-sub">Captured from your sources — keep what matters, dismiss the rest.</p>
-      </div>
-      <label class="triage-allbox"><input type="checkbox" id="triage-all" /> show resolved</label>
-    </div>
-    <div id="triage-list" class="triage-list"></div>
-    <script type="module" src="/src/triage.ts"></script>
+  <body class="triage">
+    <script type="module" src="/src/windows/triage/main.ts"></script>
   </body>
 </html>

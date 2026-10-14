@@ -1,19 +1,15 @@
 <script lang="ts">
-  // The entity-type token: a filled pill in the type's colour from tokens.css
-  // (--type-<kind>). Unknown kinds fall back to the note colour so a new engine folder never
-  // renders unstyled.
-  const KNOWN = new Set(['person', 'project', 'concept', 'fact', 'area', 'map', 'link', 'note']);
+  // The entity-type token: a filled pill in the type's colour from tokens.css.
+  import { typeToken } from './types';
 
   interface Props {
     kind: string;
   }
 
   let { kind }: Props = $props();
-  const slug = $derived(kind.replace(/[^a-z]/gi, '').toLowerCase());
-  const token = $derived(KNOWN.has(slug) ? slug : 'note');
 </script>
 
-<span class="badge" style="--c: var(--type-{token})">{kind}</span>
+<span class="badge" style="--c: var({typeToken(kind)})">{kind}</span>
 
 <style>
   .badge {
