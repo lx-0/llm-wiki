@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-14T22:27:00+02:00
+last_updated: 2026-10-14T22:40:00+02:00
 current_milestone: M033
 active_slice: S03
-active_task: none
+active_task: T03
 last_completed_milestone: M032
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -93,8 +93,12 @@ agent_spec, prompts, verify_report, utils, links + inbox's fence probe), three f
 inlined, the guard `test_no_private_frontmatter_grammar_outside_the_seam` (RED on 10 → 1 →
 green); grammar readers outside the seam 7 → 0, `def …frontmatter…(` 26 → 23; the three
 hand-built writers stay by decision (S03 notes). Parity 72/91 before the fold, deltas = the
-seam's tolerance + one old regex bug (`----` closed the fences). Suite 2072. Next: T03 —
-slugify 5 → 1 (`plan-task`); CI for `f4e8a3c` pending.
+seam's tolerance + one old regex bug (`----` closed the fences). Suite 2072. CI green on
+`f4e8a3c`. **T03 planned** (`M033-S03-T03-PLAN.md`): the four byte-identical collector
+slugifies (`[^a-z0-9]+`, ASCII-only — the grammar behind every transcript / youtube
+filename) become `core/utils.slugify(…, ascii_only=True)`; the default grammar (Unicode
+kept — facts / takes identity) stays; both pinned, real-vault filenames recomputed as
+evidence. Next: execute T03.
 
 ## M032 COMPLETE (L, 2026-10-14): desktop de-slop
 
