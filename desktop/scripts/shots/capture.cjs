@@ -34,7 +34,7 @@ const SURFACES = [
   { page: 'triage', w: 720, h: 760, schemes: ['light', 'dark'], states: ['default', 'empty'], settle: 1000 },
   { page: 'cockpit', w: 1040, h: 700, schemes: ['dark'], states: ['default'], settle: 3500 },
   { page: 'atlas', w: 1100, h: 720, schemes: ['dark'], states: ['default'], settle: 3500 },
-  { page: 'smoke', w: 360, h: 200, schemes: ['light', 'dark'], states: ['default'], settle: 800 },
+  { page: 'smoke', w: 600, h: 1040, schemes: ['light', 'dark'], states: ['default'], settle: 800 },
 ];
 
 // Panel states that reuse the `default` fixtures and differ only by a script run after load.

@@ -1,7 +1,7 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-14T19:45:00+02:00
+last_updated: 2026-10-14T20:40:00+02:00
 current_milestone: M032
 active_slice: S03
 active_task: none
@@ -17,8 +17,9 @@ parallel_milestones: [M021, M025, M027, M029]
 **Status:** M032 -- slice S02 complete (4/4: engine action catalogue, `menu`/`doctor --json`
 schema 2 with title/verb/argv/tools, desktop `lib/actions.ts` merge model, parsers on schema 2,
 `ADVANCED_COMMANDS` + `friendly*` rewrite layers deleted; vitest 63 + pytest 2024 green).
-Reassess after S02: **A — proceed as planned**. Next slice: S03 (design tokens + costume off +
-Svelte pilot windows Settings/Onboarding/Browse/Triage) via `plan-task`.
+Reassess after S02: **A — proceed as planned**. S03 1/4: T01 tokens (`styles/tokens.css`),
+primitives (`ui/Button|Switch|TypeBadge`, `ui/icons.ts`), glow/blur layers out, primitives sheet
+in the harness. Next task: T02 (Settings + Onboarding as Svelte windows) via `plan-task`.
 
 **S01 COMPLETE (5/5)** -- harness `npm run shots` (30 captures; real panel
 height 1,027 px vs 640 clamp), TypeScript 5.9 strict + svelte-check gate in `npm test`, Biome

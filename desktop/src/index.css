@@ -1,27 +1,19 @@
-:root {
-  --green: #34c759;
-  --red: #ff453a;
-  --amber: #ff9f0a;
-  --blue: #0a84ff;
-  --text: rgba(0, 0, 0, 0.88);
-  --muted: rgba(0, 0, 0, 0.5);
-  --card: rgba(255, 255, 255, 0.55);
-  --card-border: rgba(0, 0, 0, 0.07);
-  --hairline: rgba(0, 0, 0, 0.08);
-  --sticky-bg: rgba(246, 246, 248, 0.68);
-  --win-bg: #f3f3f5;
-}
+@import "./styles/tokens.css";
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text: rgba(255, 255, 255, 0.92);
-    --muted: rgba(255, 255, 255, 0.5);
-    --card: rgba(255, 255, 255, 0.08);
-    --card-border: rgba(255, 255, 255, 0.1);
-    --hairline: rgba(255, 255, 255, 0.12);
-    --sticky-bg: rgba(28, 28, 30, 0.62);
-    --win-bg: #232325;
-  }
+/* Legacy aliases for the pre-Svelte renderer (panel / cockpit / atlas). They map the old
+ * names onto tokens.css and die with those files in S04/S05 — new code uses the tokens. */
+:root {
+  --green: var(--ok);
+  --red: var(--danger);
+  --amber: var(--warn);
+  --blue: var(--accent);
+  --text: var(--text);
+  --muted: var(--text-muted);
+  --card: var(--bg-elevated);
+  --card-border: var(--line);
+  --hairline: var(--line);
+  --sticky-bg: var(--bg);
+  --win-bg: var(--bg);
 }
 
 * {
@@ -328,33 +320,6 @@ body.panel {
   padding: 0;
   position: relative;
 }
-/* shared atmosphere — the cockpit's core glow, dimmed way down + faded to clean
-   charcoal, so the calm panel reads as the cockpit's intake bay (one product). */
-body.panel::before {
-  content: "";
-  position: fixed;
-  top: -200px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 560px;
-  height: 400px;
-  pointer-events: none;
-  z-index: 0;
-  background: radial-gradient(
-    ellipse at center,
-    rgba(167, 139, 250, 0.14),
-    rgba(125, 211, 252, 0.045) 46%,
-    transparent 70%
-  );
-}
-body.panel::after {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-  background: radial-gradient(ellipse at 50% 12%, transparent 44%, rgba(0, 0, 0, 0.3) 94%);
-}
 body.panel .body-scroll {
   position: relative;
   z-index: 1;
@@ -373,8 +338,6 @@ ul {
   z-index: 10;
   padding: 12px 12px 9px;
   background: var(--sticky-bg);
-  backdrop-filter: blur(22px) saturate(180%);
-  -webkit-backdrop-filter: blur(22px) saturate(180%);
   border-bottom: 0.5px solid var(--hairline);
 }
 .body-scroll {
@@ -650,55 +613,6 @@ body.browse {
   flex-direction: column;
   height: 100vh;
   padding: 0;
-}
-/* same shared atmosphere as the panel — one product across every window */
-body.browse::before,
-body.settings::before,
-body.onboarding::before {
-  content: "";
-  position: fixed;
-  top: -210px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 640px;
-  height: 440px;
-  pointer-events: none;
-  z-index: 0;
-  background: radial-gradient(
-    ellipse at center,
-    rgba(167, 139, 250, 0.13),
-    rgba(125, 211, 252, 0.04) 46%,
-    transparent 70%
-  );
-}
-body.browse::after,
-body.settings::after,
-body.onboarding::after {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-  background: radial-gradient(ellipse at 50% 9%, transparent 46%, rgba(0, 0, 0, 0.28) 94%);
-}
-body.browse > *,
-body.settings > *,
-body.onboarding > * {
-  position: relative;
-  z-index: 1;
-}
-/* onboarding is first-touch — let the violet core glow brighter behind the welcome so
-   it belongs to the family from the very first screen (Jess: "the lone tourist") */
-body.onboarding::before {
-  width: 700px;
-  height: 520px;
-  top: -170px;
-  background: radial-gradient(
-    ellipse at center,
-    rgba(167, 139, 250, 0.2),
-    rgba(125, 211, 252, 0.07) 44%,
-    transparent 70%
-  );
 }
 /* Browse type-breakdown footer + Sync-sources glyphs (cohesion / scannable rhythm) */
 .browse-foot {

@@ -1,0 +1,226 @@
+/* llm-wiki desktop — design tokens. The one place colours, scales and motion live.
+ * Every window imports this; components use the tokens and never a literal.
+ *
+ * Derived from the platform the app lives in: macOS system blue is the single accent, the
+ * neutrals carry a cool hue bias (OKLCH hue 250) so they agree with it, semantic colours come
+ * from the system palette (desaturated for dark), and the entity-type palette is one OKLCH hue
+ * wheel at a single lightness/chroma per scheme — the only source for badges, dots, edges and
+ * charts. */
+
+:root {
+  color-scheme: light dark;
+
+  /* surfaces */
+  --bg: oklch(97.5% 0.004 250);
+  --bg-elevated: oklch(100% 0 0);
+  --bg-sunken: oklch(94.5% 0.006 250);
+  --bg-hover: oklch(0% 0 0 / 0.05);
+  --line: oklch(0% 0 0 / 0.08);
+  --line-strong: oklch(0% 0 0 / 0.14);
+
+  /* text */
+  --text: oklch(22% 0.012 250);
+  --text-muted: oklch(48% 0.014 250);
+  --text-faint: oklch(64% 0.012 250);
+  --text-on-accent: oklch(100% 0 0);
+  --text-disabled: oklch(72% 0.008 250);
+
+  /* accent + semantics */
+  --accent: #007aff;
+  --accent-hover: color-mix(in oklch, #007aff 88%, black);
+  --accent-soft: oklch(from #007aff l c h / 0.12);
+  --ok: #34c759;
+  --warn: #ff9500;
+  --danger: #ff3b30;
+  --ok-soft: oklch(from #34c759 l c h / 0.14);
+  --warn-soft: oklch(from #ff9500 l c h / 0.16);
+  --danger-soft: oklch(from #ff3b30 l c h / 0.14);
+
+  /* entity types — one hue wheel, same lightness + chroma */
+  --type-l: 55%;
+  --type-c: 0.15;
+  --type-person: oklch(var(--type-l) var(--type-c) 350);
+  --type-project: oklch(var(--type-l) var(--type-c) 200);
+  --type-concept: oklch(var(--type-l) var(--type-c) 285);
+  --type-fact: oklch(var(--type-l) var(--type-c) 25);
+  --type-area: oklch(var(--type-l) var(--type-c) 150);
+  --type-map: oklch(var(--type-l) var(--type-c) 85);
+  --type-link: oklch(var(--type-l) var(--type-c) 50);
+  --type-note: oklch(var(--type-l) var(--type-c) 240);
+  --type-soft-alpha: 0.14;
+
+  /* space */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  /* radius — nested = outer minus padding */
+  --radius-s: 6px;
+  --radius-m: 10px;
+  --radius-l: 14px;
+
+  /* type */
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+  --fs-xs: 11px;
+  --fs-s: 12px;
+  --fs-m: 13px;
+  --fs-l: 15px;
+  --fs-xl: 20px;
+  --fs-xxl: 28px;
+  --lh: 1.4;
+  --tracking-caps: 0.06em;
+
+  /* motion */
+  --dur-fast: 150ms;
+  --dur-normal: 220ms;
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-in: cubic-bezier(0.6, 0, 0.9, 0.4);
+
+  /* controls */
+  --control-h: 28px;
+  --control-h-s: 24px;
+  --focus: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: oklch(18% 0.008 250);
+    --bg-elevated: oklch(23% 0.009 250);
+    --bg-sunken: oklch(15% 0.008 250);
+    --bg-hover: oklch(100% 0 0 / 0.06);
+    --line: oklch(30% 0.01 250);
+    --line-strong: oklch(36% 0.012 250);
+
+    --text: oklch(93% 0.005 250);
+    --text-muted: oklch(68% 0.01 250);
+    --text-faint: oklch(54% 0.01 250);
+    --text-disabled: oklch(44% 0.008 250);
+
+    --accent: #0a84ff;
+    --accent-hover: color-mix(in oklch, #0a84ff 85%, white);
+    --accent-soft: oklch(from #0a84ff l c h / 0.18);
+    /* Apple's dark-appearance system colours are already tuned for dark backgrounds */
+    --ok: #30d158;
+    --warn: #ff9f0a;
+    --danger: #ff453a;
+    --ok-soft: oklch(from #30d158 l c h / 0.2);
+    --warn-soft: oklch(from #ff9f0a l c h / 0.22);
+    --danger-soft: oklch(from #ff453a l c h / 0.2);
+
+    --type-l: 74%;
+    --type-c: 0.13;
+    --type-soft-alpha: 0.2;
+  }
+}
+
+/* panel windows sit on the native vibrancy material: cards need alpha surfaces there */
+body.panel {
+  --bg-elevated: oklch(100% 0 0 / 0.6);
+  --bg-sunken: oklch(0% 0 0 / 0.04);
+  --line: oklch(0% 0 0 / 0.08);
+}
+@media (prefers-color-scheme: dark) {
+  body.panel {
+    --bg-elevated: oklch(100% 0 0 / 0.07);
+    --bg-sunken: oklch(0% 0 0 / 0.18);
+    --line: oklch(100% 0 0 / 0.1);
+  }
+}
+
+/* ── base ── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+}
+
+body {
+  font-family: var(--font);
+  font-size: var(--fs-m);
+  line-height: var(--lh);
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+  cursor: default;
+}
+
+body.panel {
+  background: transparent; /* the OS popover material shows through */
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+button,
+input {
+  font: inherit;
+  color: inherit;
+}
+
+input {
+  user-select: text;
+}
+
+:focus-visible {
+  outline: none;
+  box-shadow: var(--focus);
+}
+
+::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+.caps {
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-m);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 40px;
+  padding: var(--space-2) var(--space-3);
+}
+
+.row + .row {
+  border-top: 1px solid var(--line);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
