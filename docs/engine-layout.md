@@ -182,6 +182,9 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 │   ├── process_inbox.py       ← entry module for `wiki process-inbox` (logic: preprocessors/inbox.py)
 │   ├── ingest_youtube.py      ← entry module for `wiki ingest-youtube` (logic: collectors/scan_youtube.py — the direct CLI's --url / --inbox / --tier flags)
 │   ├── index_folders.py       ← entry module for `wiki index` (logic: collectors/folder_index.py)
+│   ├── scan_screenshots.py    ← entry script for the screenshots collector's direct CLI (--all / --limit / --backfill / --backfill-thumbnails / --retrofit-batch-reports); run by path
+│   ├── scan_browser.py        ← entry script for the browser collector's direct CLI (--source firefox|chrome|all); run by path
+│   ├── scan_tabs.py           ← entry script for the tab-groups collector's direct CLI (--backup-dir); run by path
 │   ├── review_wiki.py         ← per-article quality scoring via local LLM
 │   ├── optimize_claude_md.py  ← cross-project pattern → ~/.claude/CLAUDE.md edits
 │   ├── retry_failed_flushes.py ← reprocess archived flush contexts
@@ -222,7 +225,7 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 - **Sub-package modules** (`core/`, `collectors/`, `migrations/`, `dashboard/`, …) run only as modules with the source root on the path — `PYTHONPATH=<vault>/.wiki/scripts uv run --project <vault>/.wiki python -m migrations.migrate_config_keys …`. By path they fail with `ModuleNotFoundError: core`. `wiki <command>` always takes this shape for you: `core/entry.py` builds the argv + env for every Python-side spawn, and the bash layer spells the same line.
 - **Hooks** (`hooks/*.py`) are plain scripts the agent harness runs from `hooks/`; they `import _bootstrap` — the engine's one `sys.path` bootstrap — before anything from `scripts/`.
 
-A package whose `__init__` imports its modules to register them (`collectors`, `preprocessors`, `producers`) double-imports such a module under `-m` — runpy warns, the registry sees the module twice. The commands behind those modules enter through top-level entry scripts instead (`process_inbox.py`, `ingest_html.py`, `ingest_youtube.py`, `index_folders.py`); `tests/test_cli_dispatch.py` refuses a handler that reaches into such a package directly.
+A package whose `__init__` imports its modules to register them (`collectors`, `preprocessors`, `producers`) double-imports such a module under `-m` — runpy warns, the registry sees the module twice. The commands behind those modules enter through top-level entry scripts instead (`process_inbox.py`, `ingest_html.py`, `ingest_youtube.py`, `index_folders.py`; `scan_screenshots.py` / `scan_browser.py` / `scan_tabs.py` for the three collectors' direct-CLI flags); `tests/test_cli_dispatch.py` refuses a handler that reaches into such a package directly, and `tests/test_layout.py` refuses a documented `uv run python …/scripts/<pkg>/<x>.py` invocation anywhere in docstrings, `docs/`, `AGENTS.md`, `README.md` or `templates/`.
 
 ## Why bash + python + jq?
 

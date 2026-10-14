@@ -14,8 +14,10 @@ Wired in two ways:
     `raw/inbox/youtube.md` (a markdown URL list). The rich per-URL flags
     (`--url` / `--tier` / `--no-skip`) are CLI-only, same as calendar's
     `--year` and browser's `--source`.
-  - As a direct CLI: `uv run python scripts/collectors/scan_youtube.py
-    --url URL [--tier N]` (also wrapped by `wiki ingest-youtube`).
+  - As a direct CLI: `wiki ingest-youtube --url URL [--tier N]`, through the
+    top-level entry script `scripts/ingest_youtube.py` (this module is a package
+    submodule `collectors/__init__.py` already imports, so it must not run as
+    `-m` or by path).
 """
 
 from __future__ import annotations

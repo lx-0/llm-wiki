@@ -461,29 +461,29 @@ Zusätzlich spiegelt der incremental-Lauf pro Account einen **kompakten Block na
 ./.wiki/wiki collect email --incremental                    # delta only (default in piggyback)
 ./.wiki/wiki collect email --dry-run                        # no writes
 
-# Equivalent direct invocation:
-uv run python scripts/collectors/cli.py email --incremental
+# Equivalent direct invocation (what the dispatcher spawns — scripts/ on PYTHONPATH, module form):
+PYTHONPATH=.wiki/scripts uv run --project .wiki python -m collectors.cli email --incremental
 
 # YouTube — Single video at default tier (1 = transcript)
-uv run python scripts/collectors/scan_youtube.py --url "https://youtu.be/<id>"
+./.wiki/wiki ingest-youtube --url "https://youtu.be/<id>"
 
 # YouTube — Playlist mit Tier 2 (transcript + top comments), capped at 10 videos
-uv run python scripts/collectors/scan_youtube.py --url "https://www.youtube.com/playlist?list=<L>" --tier 2 --limit 10
+./.wiki/wiki ingest-youtube --url "https://www.youtube.com/playlist?list=<L>" --tier 2 --limit 10
 
 # YouTube — Tier 3 (visual analysis via gemma4 frame sampling on kcma)
-uv run python scripts/collectors/scan_youtube.py --url "https://youtu.be/<id>" --tier 3
+./.wiki/wiki ingest-youtube --url "https://youtu.be/<id>" --tier 3
 
 # YouTube — Inbox-list (markdown file, optional inline `tier: N` directives)
-uv run python scripts/collectors/scan_youtube.py --inbox raw/inbox/youtube.md --tier 1
+./.wiki/wiki ingest-youtube --inbox raw/inbox/youtube.md --tier 1
 
 # Calendar
-uv run python scripts/collectors/cli.py calendar --dry-run     # preview
-wiki collect calendar --incremental                            # delta via updatedMin watermark
-wiki calendar-auth <account-id>                                # one-time OAuth bootstrap
+./.wiki/wiki collect calendar --dry-run                        # preview
+./.wiki/wiki collect calendar --incremental                    # delta via updatedMin watermark
+./.wiki/wiki calendar-auth <account-id>                        # one-time OAuth bootstrap
 
-# Browser
-uv run python scripts/collectors/scan_browser.py
-uv run python scripts/collectors/scan_browser.py --source firefox
+# Browser — Registry run, or the direct CLI (top-level entry script) for --source
+./.wiki/wiki collect browser
+uv run --project .wiki python .wiki/scripts/scan_browser.py --source firefox
 ```
 
 ### Edge Cases
@@ -698,12 +698,12 @@ Syntax: `:0 w` + `* ^From:.*pattern` + `| $DELIVER -m "INBOX/folder"`. Folder-Se
 
 ```bash
 # Suggestions reviewen (per-Action)
-uv run python scripts/suggestions/cli.py --list
-uv run python scripts/suggestions/cli.py --approve <suggestion-id> 1
-uv run python scripts/suggestions/cli.py --reject <suggestion-id> 2
-uv run python scripts/suggestions/cli.py --review <suggestion-id>
-uv run python scripts/suggestions/cli.py --dry-run
-uv run python scripts/suggestions/cli.py
+./.wiki/wiki suggestions --list
+./.wiki/wiki suggestions --approve <suggestion-id> 1
+./.wiki/wiki suggestions --reject <suggestion-id> 2
+./.wiki/wiki suggestions --review <suggestion-id>
+./.wiki/wiki suggestions --dry-run
+./.wiki/wiki suggestions
 ```
 
 ### Edge Cases
@@ -816,12 +816,13 @@ flowchart TD
 ### Script
 
 ```bash
-uv run python scripts/collectors/scan_screenshots.py                    # neue Screenshots scannen
-uv run python scripts/collectors/scan_screenshots.py --dry-run          # nur zeigen was gescannt würde
-uv run python scripts/collectors/scan_screenshots.py --limit 20         # max 20 Screenshots pro Lauf
-uv run python scripts/collectors/scan_screenshots.py --backfill 7       # letzte 7 Tage nachscannen
-uv run python scripts/collectors/scan_screenshots.py --backfill-thumbnails    # Thumbs für alle PNGs in ~/Screenshots/, kein LLM
-uv run python scripts/collectors/scan_screenshots.py --retrofit-batch-reports # adde ![[thumb/...]] zu existierenden Batch-Reports
+./.wiki/wiki collect screenshots                                                   # Registry-Lauf (was der Piggyback spawnt)
+# Die Extra-Flags gibt es nur im direkten CLI — das Top-Level-Entry-Skript scripts/scan_screenshots.py:
+uv run --project .wiki python .wiki/scripts/scan_screenshots.py --dry-run          # nur zeigen was gescannt würde
+uv run --project .wiki python .wiki/scripts/scan_screenshots.py --limit 20         # max 20 Screenshots pro Lauf
+uv run --project .wiki python .wiki/scripts/scan_screenshots.py --backfill 7       # letzte 7 Tage nachscannen
+uv run --project .wiki python .wiki/scripts/scan_screenshots.py --backfill-thumbnails    # Thumbs für alle PNGs in ~/Screenshots/, kein LLM
+uv run --project .wiki python .wiki/scripts/scan_screenshots.py --retrofit-batch-reports # adde ![[thumb/...]] zu existierenden Batch-Reports
 ```
 
 ### Edge Cases
@@ -870,8 +871,8 @@ Der Inhalt der Frontmatter:
 ### Script
 
 ```bash
-uv run python scripts/dashboard/dashboard_stats.py             # Refresh
-uv run python scripts/dashboard/dashboard_stats.py --dry-run   # Stats als JSON ausgeben, nichts schreiben
+PYTHONPATH=.wiki/scripts uv run --project .wiki python -m dashboard.dashboard_stats             # Refresh
+PYTHONPATH=.wiki/scripts uv run --project .wiki python -m dashboard.dashboard_stats --dry-run   # Stats als JSON ausgeben, nichts schreiben
 ```
 
 ### Edge Cases
@@ -898,8 +899,8 @@ Empty Queue → `[!success] Title (0)` (auto-collapsed, grün). Non-empty → `[
 Refresh ist Best-effort wie bei stats — `flush.py:refresh_dashboard_lint()` capturet stderr und loggt `WARNING` bei non-zero Exit (preemptiver S07-T02-Pattern), blockiert aber niemals den Flush.
 
 ```bash
-uv run python scripts/dashboard/dashboard_lint.py              # Refresh
-uv run python scripts/dashboard/dashboard_lint.py --dry-run    # Lint-Daten als JSON, nichts schreiben
+PYTHONPATH=.wiki/scripts uv run --project .wiki python -m dashboard.dashboard_lint              # Refresh
+PYTHONPATH=.wiki/scripts uv run --project .wiki python -m dashboard.dashboard_lint --dry-run    # Lint-Daten als JSON, nichts schreiben
 ```
 
 ### MOC-Layer

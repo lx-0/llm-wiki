@@ -2,7 +2,7 @@
 
 Every settable key in `<vault>/.wiki/config.yaml`, plus the secrets surface in `<vault>/.claude/.env`. The schema (every knob's name, type, and default) lives in `scripts/core/config_schema.py` — only the keys you want to *override* need to appear in `config.yaml`. Missing keys fall back to the default; a mistyped value is rejected with a WARNING and the default is kept.
 
-The per-section key tables below are **generated from the schema** (`uv run python scripts/core/config_docs.py --write`); a test diffs them against the dataclasses, so they cannot rot. The *Meaning* column is the first sentence of each field's schema comment — the full rationale (incident history, tuning guidance) lives next to the field in `scripts/core/config_schema.py`.
+The per-section key tables below are **generated from the schema** (`PYTHONPATH=scripts uv run python -m core.config_docs --write` from the engine root); a test diffs them against the dataclasses, so they cannot rot. The *Meaning* column is the first sentence of each field's schema comment — the full rationale (incident history, tuning guidance) lives next to the field in `scripts/core/config_schema.py`.
 
 ## Contents
 
@@ -40,7 +40,7 @@ The `.env` file: only the **variable NAME** lives in `config.yaml` (e.g. `api_ke
 | `skills.*` | `Skills` dataclass |
 | `personal.*` | `Personal` dataclass (accounts hold per-service sub-blocks: `reader`, `filter`, `gmeet`, `jamie`, `calendar`, `health`) |
 
-<!-- BEGIN GENERATED TABLES — scripts/core/config_docs.py. Do not edit by hand: edit the field comments in scripts/core/config_schema.py, then run `uv run python scripts/core/config_docs.py --write`. -->
+<!-- BEGIN GENERATED TABLES — scripts/core/config_docs.py. Do not edit by hand: edit the field comments in scripts/core/config_schema.py, then run `PYTHONPATH=scripts uv run python -m core.config_docs --write`. -->
 
 ## scheduling
 
@@ -134,7 +134,7 @@ The `.env` file: only the **variable NAME** lives in `config.yaml` (e.g. `api_ke
 | `limits.sparse_threshold_words` | `200` | Lint warns (`sparse_article`) under this body word count per article. |
 | `limits.connection_min_words` | `50` | Connection-article quality gate (M012, 2026-05-16). |
 | `limits.reports_default_lookback_days` | `14` | M019 default lookback for clinical-screen instruments (PHQ-9, GAD-7, ASRS-v1.1, WHO-5, MEQ-19). |
-| `limits.youtube_max_frames` | `30` | YouTube ingest (scan-youtube.py — see also CONFIG.piggybacks.scan_youtube) Tier-3 visual: cap frames per video |
+| `limits.youtube_max_frames` | `30` | YouTube ingest (collectors/scan_youtube.py — see also CONFIG.piggybacks.scan_youtube) Tier-3 visual: cap frames per video |
 | `limits.youtube_max_duration_s` | `10800` | Tier-3: skip videos longer than this (3h default) |
 | `limits.youtube_frame_resize_width` | `512` | ffmpeg downscale before vision model |
 | `limits.youtube_vision_timeout_s` | `240` | Per-frame Ollama call timeout. Must cover a MODEL SWAP, not just inference: a single-GPU Ollama host evicts the resident model, and a swap to the ~10 GB vision model measured 63 s on kcma-d8 with a warm page cache (2026-08-26) — the old 90 … |

@@ -6,7 +6,7 @@ schema — the doc-rot class that previously accumulated 7+ stale defaults,
 including the safety-relevant claim that `piggybacks.optimize_claude_md`
 (the only piggyback writing outside the vault) ships enabled.
 
-Regenerate after schema changes:  uv run python scripts/core/config_docs.py --write
+Regenerate after schema changes:  PYTHONPATH=scripts uv run python -m core.config_docs --write
 """
 
 from __future__ import annotations

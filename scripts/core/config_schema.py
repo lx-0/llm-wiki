@@ -380,7 +380,7 @@ class Limits:
     # windows pull more substrate (more cost, more recall, more risk of
     # mixing periods); smaller windows reduce signal.
     reports_default_lookback_days: int = 14
-    # YouTube ingest (scan-youtube.py — see also CONFIG.piggybacks.scan_youtube)
+    # YouTube ingest (collectors/scan_youtube.py — see also CONFIG.piggybacks.scan_youtube)
     youtube_max_frames: int = 30          # Tier-3 visual: cap frames per video
     youtube_max_duration_s: int = 10800   # Tier-3: skip videos longer than this (3h default)
     youtube_frame_resize_width: int = 512  # ffmpeg downscale before vision model
@@ -903,11 +903,11 @@ class Personal:
     # Path to a local Firefox profile directory (e.g. ~/Library/Application
     # Support/Firefox/Profiles/<id>.default-release on macOS, or
     # ~/.mozilla/firefox/<id>.default-release on Linux). Empty string disables
-    # the Firefox half of scan-browser.py.
+    # the Firefox half of collectors/scan_browser.py.
     firefox_profile: str = ""
     # Path to a Simple Tab Groups (STG) backup directory (where the extension
     # writes its periodic *.json snapshots). Empty string disables STG-import
-    # paths in scan-tabs.py / scan-browser.py.
+    # paths in collectors/scan_tabs.py / collectors/scan_browser.py.
     stg_backup_dir: str = ""
     # Path to a directory the operator dumps dictation transcripts into
     # (any tool that writes .txt or .md works — OpenWhispr is the default

@@ -4,8 +4,8 @@ Hard facts live in `knowledge/facts/<slug>.md`. They carry the highest
 authority during compile + query: when a source claim contradicts a fact, the
 fact wins.
 
-Usage:
-    uv run python scripts/facts/correct.py add "Senkrechtstarter award" \
+Usage (`wiki correct` — the dispatcher spawns this module as `-m facts.correct`):
+    wiki correct add "Senkrechtstarter award" \
         --status negation \
         --trust confirmed \
         --source "https://handelsblatt.de/..." \
@@ -14,15 +14,16 @@ Usage:
         "We did NOT win the Senkrechtstarter award."
 
     # user-only fact (default trust = asserted):
-    uv run python scripts/facts/correct.py add "Office hours" \
+    wiki correct add "Office hours" \
         --status clarification \
         --source "user:2026-05-03" \
         "Office opens at 10am starting Monday."
 
-    uv run python scripts/facts/correct.py list
-    uv run python scripts/facts/correct.py remove <slug>
-    uv run python scripts/facts/correct.py edit <slug>
-    uv run python scripts/facts/correct.py path <slug>     # print absolute path
+    wiki correct list
+    wiki correct remove <slug>
+    wiki correct edit <slug>
+    wiki correct path <slug>     # print absolute path
+    wiki correct apply <slug>    # agentic propagation — facts/correct_apply.py
 """
 
 import os

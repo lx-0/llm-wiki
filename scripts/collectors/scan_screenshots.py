@@ -4,12 +4,15 @@ and save as raw notes for wiki compilation.
 
 Runs as a daily piggyback task. Tracks last scan timestamp in state file.
 
-Usage:
-    uv run python scripts/collectors/scan-screenshots.py                    # scan new screenshots
-    uv run python scripts/collectors/scan-screenshots.py --all               # all without sidecar
-    uv run python scripts/collectors/scan-screenshots.py --all --limit 50    # batch of 50
-    uv run python scripts/collectors/scan-screenshots.py --backfill 7        # last 7 days
-    uv run python scripts/collectors/scan-screenshots.py --dry-run            # show what would be processed
+Usage — `wiki collect screenshots` is the Registry run (what the piggyback spawns); the
+direct CLI with its extra flags is the top-level entry script `scripts/scan_screenshots.py`
+(this module is a package submodule `collectors/__init__.py` imports, so it runs neither as
+`-m` nor by path):
+    uv run --project .wiki python .wiki/scripts/scan_screenshots.py                    # scan new screenshots
+    uv run --project .wiki python .wiki/scripts/scan_screenshots.py --all               # all without sidecar
+    uv run --project .wiki python .wiki/scripts/scan_screenshots.py --all --limit 50    # batch of 50
+    uv run --project .wiki python .wiki/scripts/scan_screenshots.py --backfill 7        # last 7 days
+    uv run --project .wiki python .wiki/scripts/scan_screenshots.py --dry-run           # show what would be processed
 """
 
 from __future__ import annotations

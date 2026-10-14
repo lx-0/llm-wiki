@@ -1,13 +1,13 @@
 """CLI entry-point for `wiki curiosity`.
 
-Usage:
-    uv run python scripts/curiosity/cli.py                        interactive walk (default)
-    uv run python scripts/curiosity/cli.py --list                 list pending requests
-    uv run python scripts/curiosity/cli.py --run-oldest           run the oldest pending request (non-interactive)
-    uv run python scripts/curiosity/cli.py --run <slug>           run one by slug or filename
-    uv run python scripts/curiosity/cli.py --run-all              run every pending request
-    uv run python scripts/curiosity/cli.py --dry-run --run-oldest plan only, no scan
-    uv run python scripts/curiosity/cli.py --clear-done           delete done request files
+Usage (the dispatcher spawns this module as `-m curiosity.cli`):
+    wiki curiosity                        interactive walk (default)
+    wiki curiosity --list                 list pending requests
+    wiki curiosity --run-oldest           run the oldest pending request (non-interactive)
+    wiki curiosity --run <slug>           run one by slug or filename
+    wiki curiosity --run-all              run every pending request
+    wiki curiosity --dry-run --run-oldest plan only, no scan
+    wiki curiosity --clear-done           delete done request files
 
 Requests live as `raw/requests/request-<slug>-<date>.json`. The producer
 (`scripts/curiosity/producer.py`, invoked from `compile.py`) writes them;

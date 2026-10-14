@@ -43,7 +43,16 @@ def test_run_child_spawns_module_with_scripts_on_pythonpath(monkeypatch, tmp_pat
 
 
 @pytest.mark.parametrize(
-    "entry", ["process_inbox", "ingest_html", "ingest_youtube", "index_folders"]
+    "entry",
+    [
+        "process_inbox",
+        "ingest_html",
+        "ingest_youtube",
+        "index_folders",
+        "scan_screenshots",
+        "scan_browser",
+        "scan_tabs",
+    ],
 )
 def test_entry_modules_run_once_without_runpy_warning(entry: str) -> None:
     """`preprocessors/__init__.py` and `collectors/__init__.py` import their modules to

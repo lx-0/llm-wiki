@@ -10,8 +10,8 @@ refresh (C04): the stats run persists them via `dashboard.lint_results`; this
 script consumes that cache while fresh and only recomputes when run
 standalone:
 
-    uv run python scripts/dashboard/dashboard_lint.py            # write
-    uv run python scripts/dashboard/dashboard_lint.py --dry-run  # print without writing
+    PYTHONPATH=.wiki/scripts uv run --project .wiki python -m dashboard.dashboard_lint            # write
+    PYTHONPATH=.wiki/scripts uv run --project .wiki python -m dashboard.dashboard_lint --dry-run  # print without writing
 """
 
 import os

@@ -9,8 +9,8 @@ Wired in two ways:
     `@register` decorator below adds `BrowserCollector` to the Registry;
     `flush.py` auto-spawns it as `collectors/cli.py browser` when the
     piggyback fires.
-  - As a direct CLI: `uv run python scripts/collectors/scan_browser.py`
-    still works and preserves the historical `--dry-run` / `--source` flags.
+  - As a direct CLI: `uv run --project .wiki python .wiki/scripts/scan_browser.py`
+    (the top-level entry script) keeps the `--dry-run` / `--source` flags.
     (`--source firefox|chrome` is CLI-only; the Collector path always scans
     every available source.)
 """

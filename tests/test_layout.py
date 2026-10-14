@@ -66,3 +66,35 @@ def test_scripts_dir_is_the_source_root_pytest_put_on_the_path() -> None:
     import core.config as cfg
 
     assert Path(cfg.__file__).resolve().parent.parent == entry.SCRIPTS_DIR
+
+
+# ── documented invocations ────────────────────────────────────────────────────
+# A sub-package module cannot run by file path any more (no per-module bootstrap since
+# T04): a docstring or doc that still says `uv run python scripts/<pkg>/<x>.py` sends the
+# operator into `ModuleNotFoundError: core`. Spell `wiki <cmd>`, a top-level entry script,
+# or `python -m <pkg>.<module>` with scripts/ on PYTHONPATH (M033-S02-T06).
+_DOC_ROOTS = ("docs", "templates", "AGENTS.md", "README.md")
+_BY_PATH_INVOCATION = re.compile(
+    r"uv run (?:--project \S+ )?python (?:\S*/)?scripts/[a-z_]+/[a-z_-]+\.py"
+)
+
+
+def _documented_files() -> list[Path]:
+    files = _py_files()
+    for root in _DOC_ROOTS:
+        path = REPO / root
+        files.extend([path] if path.is_file() else sorted(path.rglob("*.md")))
+    return files
+
+
+def test_no_documented_invocation_runs_a_sub_package_module_by_path() -> None:
+    offenders = [
+        f"{path.relative_to(REPO)}:{n}: {line.strip()[:100]}"
+        for path in _documented_files()
+        for n, line in enumerate(path.read_text(encoding="utf-8", errors="replace").splitlines(), 1)
+        if _BY_PATH_INVOCATION.search(line)
+    ]
+    assert offenders == [], (
+        "by-path invocations of sub-package modules (spell `wiki <cmd>`, a top-level entry "
+        "script, or `python -m <pkg>.<module>`):\n" + "\n".join(offenders)
+    )

@@ -8,8 +8,8 @@ Wired in two ways:
   - As a Registry-discovered Collector: `wiki collect tabs`. The `@register`
     decorator below adds `TabsCollector` to `collectors.Registry`; `flush.py`
     auto-spawns it as `collectors/cli.py tabs` when piggyback fires.
-  - As a direct CLI: `uv run python scripts/collectors/scan-tabs.py` still works
-    and preserves the historical `--dry-run` / `--backup-dir` flags.
+  - As a direct CLI: `uv run --project .wiki python .wiki/scripts/scan_tabs.py`
+    (the top-level entry script) keeps the `--dry-run` / `--backup-dir` flags.
 """
 
 from __future__ import annotations

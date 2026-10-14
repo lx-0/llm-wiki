@@ -12,8 +12,9 @@ Usage:
         ...
     timeout = CONFIG.limits.screenshot_timeout_seconds
 
-Run this file directly to dump the loaded config (useful for debugging):
-    uv run python scripts/core/config.py
+Run it as a module to dump the loaded config (useful for debugging) — `wiki config
+get|set|keys` is the operator wrapper around the same CLI (lib/config.sh):
+    PYTHONPATH=.wiki/scripts uv run --project .wiki python -m core.config
 
 Side effect on import: loads `<vault>/.claude/.env` via python-dotenv (so
 every script that imports CONFIG gets secret env vars without manual shell

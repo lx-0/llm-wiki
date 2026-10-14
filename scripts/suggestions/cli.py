@@ -4,13 +4,13 @@ Execute approved optimization suggestions — per-action approval.
 Each suggestion file contains multiple actions. Each action has its own status
 and must be individually approved before execution.
 
-Usage:
-    uv run python scripts/suggestions/cli.py --list                          # show all suggestions + action statuses
-    uv run python scripts/suggestions/cli.py --review test-billing           # interactively review each action
-    uv run python scripts/suggestions/cli.py --approve test-billing 1        # approve action #1
-    uv run python scripts/suggestions/cli.py --reject test-billing 2         # reject action #2
-    uv run python scripts/suggestions/cli.py --dry-run                       # preview approved actions
-    uv run python scripts/suggestions/cli.py                                 # execute approved actions
+Usage (`wiki suggestions` — the dispatcher spawns this module as `-m suggestions.cli`):
+    wiki suggestions --list                          # show all suggestions + action statuses
+    wiki suggestions --review test-billing           # interactively review each action
+    wiki suggestions --approve test-billing 1        # approve action #1
+    wiki suggestions --reject test-billing 2         # reject action #2
+    wiki suggestions --dry-run                       # preview approved actions
+    wiki suggestions                                 # execute approved actions
 """
 
 from __future__ import annotations

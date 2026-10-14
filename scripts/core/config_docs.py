@@ -43,7 +43,7 @@ from core.config_schema import (
 BEGIN_MARK = (
     "<!-- BEGIN GENERATED TABLES — scripts/core/config_docs.py. Do not edit by hand: "
     "edit the field comments in scripts/core/config_schema.py, then run "
-    "`uv run python scripts/core/config_docs.py --write`. -->"
+    "`PYTHONPATH=scripts uv run python -m core.config_docs --write`. -->"
 )
 END_MARK = "<!-- END GENERATED TABLES -->"
 
@@ -358,7 +358,8 @@ def _cli() -> int:
     drift = rendered != existing
     if drift:
         print(
-            f"{args.docs} is stale — run `uv run python scripts/core/config_docs.py --write`",
+            f"{args.docs} is stale — run "
+            "`PYTHONPATH=scripts uv run python -m core.config_docs --write`",
             file=sys.stderr,
         )
     for p in example_problems:

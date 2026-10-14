@@ -5,9 +5,9 @@ block right after the H1 if the markers are not already present. Re-running
 produces no diff. Live operator edits outside the marker region are untouched.
 
 Usage:
-    uv run python scripts/dashboard/inject_daily_button.py                # add buttons to all daily/*.md
-    uv run python scripts/dashboard/inject_daily_button.py --dry-run      # show what would change
-    uv run python scripts/dashboard/inject_daily_button.py --remove       # strip the button regions
+    PYTHONPATH=.wiki/scripts uv run --project .wiki python -m dashboard.inject_daily_button            # add buttons to all daily/*.md
+    PYTHONPATH=.wiki/scripts uv run --project .wiki python -m dashboard.inject_daily_button --dry-run  # show what would change
+    PYTHONPATH=.wiki/scripts uv run --project .wiki python -m dashboard.inject_daily_button --remove   # strip the button regions
 
 The button uses the existing shell command `agent-summarize-day-here` which
 substitutes `{{file_basename}}` (the date) into `wiki agent summarize-day --var

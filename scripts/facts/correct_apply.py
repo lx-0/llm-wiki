@@ -5,9 +5,9 @@ edit permissions over the vault. The agent strikes false claims, renames files
 for disambiguation, and fixes wikilinks. On success the fact's frontmatter
 gets `applied: <iso-ts>` written back.
 
-Usage:
-    uv run python scripts/facts/correct_apply.py <slug>           # apply one fact
-    uv run python scripts/facts/correct_apply.py <slug> --dry-run # plan only, no edits
+Usage (the `apply` sub-route of `wiki correct`):
+    wiki correct apply <slug>             # apply one fact
+    wiki correct apply <slug> --dry-run   # plan only, no edits
 """
 
 import os

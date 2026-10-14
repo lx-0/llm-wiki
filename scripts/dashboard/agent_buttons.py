@@ -10,10 +10,10 @@ emits the data needed by `lib/seed.sh` to:
 Designed to be called from bash (JSON output to stdout) so seeding stays
 idempotent and additive (operator's existing buttons untouched).
 
-Usage from bash:
-    uv run python scripts/dashboard/agent_buttons.py shell-commands  # JSON for shell-commands merge
-    uv run python scripts/dashboard/agent_buttons.py meta-bind-defs  # markdown blocks for dashboard.md
-    uv run python scripts/dashboard/agent_buttons.py inline-refs     # inline `BUTTON[id]` refs (one line)
+Usage from bash (the line lib/seed.sh spells):
+    PYTHONPATH="$WIKI_DIR/scripts" uv run --quiet --project "$WIKI_DIR" python -m dashboard.agent_buttons shell-commands  # JSON for shell-commands merge
+    PYTHONPATH="$WIKI_DIR/scripts" uv run --quiet --project "$WIKI_DIR" python -m dashboard.agent_buttons meta-bind-defs  # markdown blocks for dashboard.md
+    PYTHONPATH="$WIKI_DIR/scripts" uv run --quiet --project "$WIKI_DIR" python -m dashboard.agent_buttons inline-refs     # inline `BUTTON[id]` refs (one line)
 """
 
 from __future__ import annotations

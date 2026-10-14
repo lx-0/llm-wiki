@@ -13,16 +13,16 @@ Owner-asymmetry: the operator's OWN positions live in `knowledge/facts/`
 (informative, do not override). Compile reads takes for `type: person`
 distills only.
 
-Usage:
-    uv run python scripts/facts/take.py add "Jane Doe" \\
+Usage (`wiki take` — the dispatcher spawns this module as `-m facts.take`):
+    wiki take add "Jane Doe" \\
         "GPT-5 commoditizes agent platforms within 12 months." \\
         --confidence high \\
         --source "raw/transcripts/jamie/2026-04-15--review--abc.md"
 
-    uv run python scripts/facts/take.py list
-    uv run python scripts/facts/take.py show <holder-slug>
-    uv run python scripts/facts/take.py remove <holder-slug> --line N
-    uv run python scripts/facts/take.py path <holder-slug>
+    wiki take list
+    wiki take show <holder-slug>
+    wiki take remove <holder-slug> --line N
+    wiki take path <holder-slug>
 """
 
 import os

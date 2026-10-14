@@ -6,8 +6,8 @@ Markdown fragment that `dashboard.md` transcludes via `![[_dashboard-stats]]`.
 Runs after every flush (called from `flush.py` post-compile). Also runnable
 standalone:
 
-    uv run python scripts/dashboard/dashboard_stats.py            # write
-    uv run python scripts/dashboard/dashboard_stats.py --dry-run  # print without writing
+    PYTHONPATH=.wiki/scripts uv run --project .wiki python -m dashboard.dashboard_stats            # write
+    PYTHONPATH=.wiki/scripts uv run --project .wiki python -m dashboard.dashboard_stats --dry-run  # print without writing
 """
 
 import os
