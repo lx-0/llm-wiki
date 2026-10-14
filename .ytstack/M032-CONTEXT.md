@@ -75,3 +75,16 @@ grow past 7 tasks each, S05 becomes M032b.
 ## Open questions
 
 (none — the three framework/surface/tooling questions were decided 2026-10-14, see above.)
+
+## Closeout 2026-10-14
+
+Shipped in five slices / 23 tasks (`M032-S0#-T##-SUMMARY.md`). Exit criteria: 1–7 met —
+panel at rest 639 px, zero paragraphs, labeled nav; one `Action` model fed by schema 2;
+Library / Health / Capture tiles (the capture tile became the Pause / Resume control, which
+supersedes the planned level meter); Overview window, Cockpit + Atlas deleted in one commit;
+tokens + light/dark on every window; TS 5.9 strict + Biome + renderer tests (largest renderer
+component 284 lines of code + 216 of style); harness at `desktop/scripts/shots/` with the
+layout and rest-height gates. Criterion 8 **unmet**: blind learnability 6.3 / 10 after two fix
+rounds (M029: 6) — the remaining levers are operator decisions
+(`backlog/desktop-learnability-residue.md`), recorded in `DECISIONS.md` 2026-10-14 rather
+than chased with a third copy round for the same number. Operator look at the DMG pending.

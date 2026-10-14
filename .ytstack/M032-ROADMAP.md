@@ -3,9 +3,9 @@ milestone: M032
 project: llm-wiki
 size: L
 created: 2026-10-14T13:10:00+02:00
-status: planned
+status: done
 total_slices: 5
-completed_slices: 4
+completed_slices: 5
 ---
 
 # M032 Roadmap
@@ -47,12 +47,20 @@ Suggested framing (refine in slice-milestone; audit in `backlog/deslop-arc.md`):
       pills, Recent, collapsed Add/Sources/Quit footer; copy diet (zero paragraphs,
       tooltips ≤ 6 words); old renderer removed in the swap commit; renderer tests for the
       status derivations. (~5 tasks)
-- [ ] S05 -- **Overview window + closeout.** Four charts (adds per day, type distribution,
+- [x] S05 -- **Overview window + closeout.** Four charts (adds per day, type distribution,
       health, capture timeline) + pending queue replace Cockpit + Atlas (deleted);
       Browse/Triage on tokens + copy diet; blind synthetic learnability run; DMG rebuild;
       `desktop/README.md` rewritten short; DECISIONS entry (2026-06-24 locks reopened),
       KNOWLEDGE (harness + Svelte/Biome gotchas), `docs/PROCESS.md` JSON-contract note.
       (~5 tasks)
+
+**Closed 2026-10-14** — 5 / 5 slices, 23 tasks. Reassess after S05: A (nothing left in the
+roadmap). Exit criteria 1–7 met (criterion 6 measured: largest renderer component 284 lines of
+code + 216 of style; criterion 7's harness lives at `desktop/scripts/shots/`); criterion 8
+closed **unmet** at 6.3 / 10 after two blind fix rounds — record in
+`reviews/2026-10-14-desktop-learnability-panel.md`, levers in
+`backlog/desktop-learnability-residue.md`, decision in `DECISIONS.md` 2026-10-14. Engine
+0.6.0. The operator look at the rebuilt DMG is pending.
 
 ## Run order
 

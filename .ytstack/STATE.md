@@ -1,20 +1,26 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-14T18:15:00+02:00
+last_updated: 2026-10-14T18:30:00+02:00
 current_milestone: M032
 active_slice: none
 active_task: none
-last_completed_milestone: M031
+last_completed_milestone: M032
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
 ---
 
 # State
 
-## ▶ NEXT — M032 in flight (L): desktop de-slop
+## ▶ NEXT — M032 COMPLETE (L, 2026-10-14): desktop de-slop → M033 engine modernisation
 
-**Status:** M032 -- slices S01–S03 complete. S03 (4/4): tokens (`styles/tokens.css`) +
+**Status:** **M032 COMPLETE — 5 / 5 slices, 23 tasks, closed 2026-10-14; reassess after S05:
+A.** 7 of 8 exit criteria met; #8 (blind learnability ≥ 8) closed unmet at 6.3 / 10 — record,
+levers and decision in `DECISIONS.md` 2026-10-14 + `backlog/desktop-learnability-residue.md`.
+Engine **0.6.0**. DMG `desktop/out/make/dmg/arm64/llm-wiki-1.0.0-arm64.dmg` (built 17:51) —
+**operator look pending**. **Next: milestone-close backlog reconcile (DECISIONS 2026-08-27),
+then `plan-milestone` M033** (engine modernisation — `backlog/deslop-arc.md`), then M034.
+Running log of M032 follows. Slices S01–S03 complete. S03 (4/4): tokens (`styles/tokens.css`) +
 primitives (`ui/Button|Switch|TypeBadge`, `ui/icons.ts`, `ui/types.ts`), glow/blur layers out,
 Settings / Onboarding / Browse / Inbox as Svelte windows (light mode fixed by construction, copy
 on a diet, derivations tested), dead CSS out (2,348 → 1,661 lines), DOM layout gate in the
