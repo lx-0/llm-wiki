@@ -28,115 +28,40 @@ The **vault's own `AGENTS.md`** (separate file, not this one) is the article sch
 ## Repo layout
 
 ```text
-llm-wiki/
-├── wiki                    ← entry-point CLI (bash: bootstrap + fail-closed vault guard + TTY detection
-│                             + genuinely-bash commands; every Python-backed subcommand delegates to scripts/cli.py)
-├── lib/
-│   ├── common.sh           ← paths, colors, log helpers, deps, backup
-│   ├── ui.sh               ← interactive prompts (confirm/ask/select_*)
-│   ├── agents.sh           ← agent registry + per-agent hook payload generators
-│   ├── hooks.sh            ← interactive flows: install/uninstall/status
-│   └── config.sh           ← wraps Python config CLI + setup wizard + editor
-├── scripts/
-│   ├── core/               ← shared engine plumbing (imported, not invoked)
-│   │   ├── paths.py            ← eager path constants from __file__ — zero deps
-│   │   ├── config.py           ← CONFIG singleton (YAML-driven) + get/set/keys CLI + TIMEZONE + .env bootstrap
-│   │   ├── prompts.py          ← prompt template loader (${var} substitution)
-│   │   ├── ollama_client.py    ← single Ollama transport (chat / chat_schema / chat_vision)
-│   │   ├── config_schema.py    ← side-effect-free config schema (every knob: name/type/default/doc-comment) — single source for config.py, the key-migration, and config_docs.py
-│   │   ├── sdk_helpers.py      ← run_sdk_query(prompt, SdkCallSpec) — the ONE Claude-SDK call harness (options, path-scope gates, stall-timeout, dual-basis usage → LEDGER, failure classification) + StderrCapture + assert_prompt_within_budget
-│   │   ├── frontmatter.py      ← the single frontmatter grammar (parse/parse_strict/field/write/update_fields) — never hand-roll a `---` parser
-│   │   ├── markers.py          ← sentinel-region primitive (find_region + replace/ensure/strip_region) for `<!-- x:begin/end -->` managed blocks
-│   │   ├── state_store.py      ← flock primitives + atomic JSON saves + state.json merge-under-lock + ingested-ledger API
-│   │   ├── errors.py           ← swallow(label) — labeled intentional exception suppression (see § Exception handling)
-│   │   ├── utils.py            ← shared helpers (article listing, JSON state, history) + now_iso/today_iso
-│   │   ├── agent_spec.py       ← agent-task spec parser (prompts/agents/*.md → AgentSpec)
-│   │   ├── google_oauth.py     ← shared Google OAuth2 helper (local-loopback consent + token cache; used by gmail + gmeet)
-│   │   ├── flush_pipeline.py   ← staged-flush state machine (stage/commit/archive/pending)
-│   │   └── daily_capture.py    ← fcntl-flocked append/replace into daily/<date>/<source>.md (sources: sessions/health/meetings/voice/email)
-│   ├── cli.py              ← table-driven `wiki` dispatcher — the CommandSpec table is the single source of truth for the command catalog (help/menu/dispatch derive from it; owns the once-per-command locked dashboard refresh + the `wiki auth` OAuth registry)
-│   ├── collectors/         ← substrate→raw/ writers (Registry + scan-* CLIs + dispatcher)
-│   │   ├── base.py             ← Collector Protocol, SPEC, Registry + the shared account-loop harness (resolve_accounts/filter_accounts/Watermark/run_account_loop/migrate_flat_state) + inbox-intake harness (scan_inbox/archive_to_zone/append_rollup)
-│   │   ├── cli.py              ← `wiki collect` dispatcher (Registry lookup + run-one; honors --account via SPEC.supports_account_loop)
-│   │   ├── folder_index.py     ← body-blind folder index (`wiki index`; registered as the `folder-index` collector)
-│   │   ├── email_collector.py  ← email collector (renamed from email.py to avoid stdlib shadow)
-│   │   ├── jamie.py            ← Jamie AI meeting-notetaker
-│   │   ├── gmeet.py            ← Google Meet / Gemini transcripts (Drive API; OAuth via core/google_oauth.py)
-│   │   ├── voice.py            ← inbox-watch dictation ingester (iOS Shortcuts / OpenWhispr / FluidVoice) — body punctuated via Ollama `classify_model` when `features.voice_punctuate=true` (default), raw preserved in frontmatter
-│   │   ├── pictures.py         ← inbox-watch camera/phone-photo ingester (iOS Shortcut / AirDrop / iCloud Drive) — gemma4 vision per file via `scan_pictures_vision`, batch-report `type: picture-batch`
-│   │   ├── health.py           ← daily biometric rollup (Oura REST; HealthKit Phase 2 backlogged)
-│   │   ├── calendar.py         ← CalendarCollector (Registry, piggyback, OAuth via core/google_oauth.py) — M006 rewrite 2026-05-15, replaces legacy Thunderbird-SQLite scan_calendar stub
-│   │   ├── scan_tabs.py        ← TabsCollector (Registry; migrated 2026-05-13)
-│   │   ├── scan_browser.py     ← BrowserCollector (Registry; migrated 2026-05-14)
-│   │   ├── scan_screenshots.py ← ScreenshotsCollector (Registry, piggyback; migrated 2026-05-14)
-│   │   └── scan_youtube.py     ← YoutubeCollector (Registry; migrated 2026-05-14 — Phase 2 complete)
-│   ├── preprocessors/      ← in-vault intake normalizers (pre-compile; Protocol + Registry, singletons — see CONTEXT.md "Preprocessor")
-│   │   ├── base.py             ← Preprocessor Protocol, PreprocessorSpec, PreprocessResult, Registry
-│   │   ├── cli.py              ← `wiki preprocess` dispatcher (--list / <name> [source] [--dry-run])
-│   │   ├── inbox.py            ← <vault>/inbox/ classifier (entry module: scripts/process_inbox.py)
-│   │   ├── html_ingest.py      ← HTML file/URL → raw/articles (named to avoid the stdlib `html` shadow; entry module: scripts/ingest_html.py)
-│   │   └── clippings.py        ← <vault>/Clippings/ sweep (shim: scripts/clippings_sweep.py)
-│   ├── facts/              ← hard-fact subsystem (knowledge/facts/<slug>.md consumers) + takes producer
-│   │   ├── correct.py          ← CRUD CLI: add/list/remove/edit/path
-│   │   ├── correct_apply.py    ← agent-driven propagation across vault
-│   │   └── takes_producer.py   ← maybe_extract_takes legacy free function (delegated-to by producers/takes.py)
-│   ├── producers/          ← post-compile derivative-material extractors (Registry + orchestrator + CLI)
-│   │   ├── base.py             ← Producer Protocol + ProducerSpec + ProducerResult + Registry (@register, all_producers, get_producer)
-│   │   ├── orchestrate.py      ← evaluate_and_run(producer, source) — gate evaluation + dispatch
-│   │   ├── cli.py              ← `wiki produce` dispatcher (--list / <name> <source>)
-│   │   ├── suggestions.py      ← SuggestionsProducer (delegates to suggestions/producer.py)
-│   │   ├── curiosity.py        ← CuriosityProducer   (delegates to curiosity/producer.py)
-│   │   └── takes.py            ← TakesProducer       (delegates to facts/takes_producer.py)
-│   ├── compile_stages/     ← pure-ish stages extracted from compile.py's per-file loop
-│   │   ├── types.py            ← CompileResult + CompileMetadata dataclasses
-│   │   ├── compile.py          ← compile_source(content, metadata) → CompileResult (LLM-call boundary)
-│   │   └── post_passes.py      ← run_post_passes(source, compile_result, state) → list[ProducerResult] (serial ProducerRegistry iterator)
-│   ├── suggestions/        ← email-suggestion pipeline (legacy producer body + executor)
-│   │   ├── producer.py         ← maybe_generate_suggestions legacy free function (delegated-to by producers/suggestions.py)
-│   │   ├── cli.py              ← interactive approve/review/reject/execute
-│   │   └── backends/imap.py    ← IMAP move/tag/set-flags executor
-│   ├── curiosity/          ← gap-detection loop (legacy producer body + consumer CLI + backends)
-│   │   ├── producer.py         ← maybe_generate_curiosity_requests legacy free function (delegated-to by producers/curiosity.py)
-│   │   ├── cli.py              ← wiki curiosity: list / run-oldest / run / run-all / clear-done
-│   │   └── backends/email.py   ← email-deep-scan: scan_deep via Mailbox-adapter → raw/notes/email/deep-*.md
-│   ├── dashboard/          ← Obsidian dashboard helpers
-│   │   ├── dashboard_stats.py  ← _dashboard-stats.md generator (post-flush refresh)
-│   │   ├── dashboard_lint.py   ← _dashboard-lint.md generator (post-flush refresh)
-│   │   ├── agent_buttons.py    ← agent-button discovery + dashboard.md rewriter
-│   │   └── inject_daily_button.py ← idempotent Summarize-button injection into daily/*.md
-│   ├── reports/_engine/    ← operator-self-reports surface (air-gapped from compile via COMPILE_SUBSTRATE_EXCLUDED_PREFIXES)
-│   │   ├── runner.py          ← run_inference(): substrate-scope resolve + batched SDK calls + persist runs/<ts>/instruments/<slug>.md
-│   │   ├── instrument.py + score.py ← yaml loader + deterministic Likert / reverse-coding / cutoff band-lookup
-│   │   ├── lib/inference.py   ← infer_batch_async SDK wrapper (3-attempt retry on kind=unknown, scope-locked via make_path_scope_gate([]))
-│   │   ├── lib/analyst.py     ← Pass-1 / Pass-2 analyst SDK wrapper (Read+Grep only)
-│   │   ├── lib/render_summary.py + lib/charts.py ← cross-instrument radar + per-instrument item-radar + timelines (pure-Python SVG)
-│   │   ├── backfill_per_item.py ← one-shot: parse pre-2026-05-17 reports' body `## Items` table → frontmatter `per_item:`
-│   │   └── instruments/<slug>/v<x>/{instrument,items,cutoffs}.yaml ← 8 curated instruments (phq-9, gad-7, who-5, k6, asrs-v1.1, pss-10, isi, olbi)
-│   ├── study.py            ← wiki study list/run/new/answer CLI (drives reports/_engine/runner.py; per-study fcntl-lock; Pass-1 analyst auto-fires after run)
-│   ├── analyze.py          ← wiki analyze CLI (Pass-1 per-study + Pass-2 cross-study synthesis → reports/analyses/<ts>.md)
-│   ├── migrations/         ← one-shot schema/data migrations (not active CLI surface)
-│   ├── adapters/           ← Mailbox Reader/Filter adapters (thunderbird, gmail, imap; allinkl = filter)
-│   ├── domain/             ← pure domain types (mail message, etc.)
-│   ├── compile.py          ← Claude Agent SDK compiler (raw/daily → knowledge/); per-file loop calls compile_stages.compile_source for the LLM call, then compile_stages.run_post_passes for the producer post-pass
-│   ├── flush.py            ← session-end → daily/ append + piggyback spawner
-│   ├── lint.py             ← 8 structural checks + 1 LLM contradiction check
-│   ├── query.py            ← Claude Agent SDK query (read-only or file-back)
-│   ├── process_inbox.py    ← entry module for `wiki process-inbox` (logic: preprocessors/inbox.py)
-│   ├── ingest_html.py      ← entry module for `wiki ingest-html` (logic: preprocessors/html_ingest.py)
-│   ├── optimize_claude_md.py ← suggests CLAUDE.md edits from compiled patterns
-│   ├── review_wiki.py      ← per-article quality scoring (Ollama)
-│   └── retry_failed_flushes.py ← reprocess archived flush contexts
-├── hooks/
-│   ├── _transcript.py      ← format-aware transcript reader (Claude JSONL + Codex rollout) + tool summarizer + session-id→rollout resolver
-│   ├── session-start.py    ← inject a pointer block + recent daily-log tail; agent pulls articles on demand
-│   ├── session-end.py      ← spawn flush.py with the conversation transcript
-│   └── pre-compact.py      ← safety-net flush before context compaction
-├── prompts/                ← LLM prompts as .md files (${var} placeholders)
-├── desktop/                ← Electron menubar GUI (npm, not pnpm) — every engine call goes through src/vault/wiki-exec.ts:runWiki() and the engine's --json seams; never scrapes human CLI text
-├── config.example.yaml     ← copy → config.yaml on install (gitignored)
+llm-wiki/                    ← installed as <vault>/.wiki/ — the file-by-file reference is docs/engine-layout.md
+├── wiki                     ← entry-point CLI (bash: bootstrap + fail-closed vault guard + TTY detection
+│                              + genuinely-bash commands; every Python-backed subcommand delegates to scripts/cli.py)
+├── lib/                     ← the bash layer: common.sh (paths, the venv-location rule), ui.sh, agents.sh (hook
+│                              payloads), hooks.sh, skills.sh, config.sh (`python -m core.config` wrapper + wizard), seed.sh
+├── scripts/                 ← the engine's source root — NOT a package (§ Python environment)
+│   ├── cli.py               ← table-driven `wiki` dispatcher — the CommandSpec table is the single source of truth
+│   ├── core/                ← shared plumbing, imported never invoked: paths, config + config_schema, prompts,
+│   │                          sdk_helpers (the ONE Claude-SDK harness), ollama_client, frontmatter, markers,
+│   │                          state_store, entry (how one engine process spawns another), errors, console,
+│   │                          links, usage, piggybacks, health, actions, daily_capture, flush_pipeline …
+│   ├── collectors/          ← substrate → raw/ writers (Registry; `wiki collect`), with adapters/ (mailbox,
+│   │                          calendar, health clients) and domain/ (pure types) beside them
+│   ├── preprocessors/       ← in-vault intake normalizers, pre-compile (inbox, html, clippings; `wiki preprocess`)
+│   ├── compile_stages/      ← the compile pipeline's stages (classify → route → memory → compile → post_passes)
+│   ├── producers/           ← post-compile derivative extractors (suggestions, curiosity, takes, intents; `wiki produce`)
+│   ├── suggestions/ curiosity/ intents/ facts/ ← the producers' bodies + their consumer CLIs
+│   ├── dashboard/           ← Obsidian dashboard generators (stats, lint, agent buttons, daily button)
+│   ├── reports/_engine/     ← operator-self-reports, air-gapped from compile (`wiki study` / `wiki analyze`)
+│   ├── publish/ bridge/     ← `wiki publish` (meinkontext mirror) and `wiki bridge` (rsync inbox bridge)
+│   ├── migrations/          ← one-shot schema / data migrations, run as `python -m migrations.<name>`
+│   └── *.py                 ← top-level entry scripts (compile, flush, query, lint, doctor, menu, dream, …) — the
+│                              only modules that run by file path
+├── hooks/                   ← agent hooks, run as plain scripts: _bootstrap.py (the engine's one sys.path bootstrap),
+│                              _transcript.py, session-start.py, session-end.py, pre-compact.py
+├── prompts/                 ← LLM prompts as .md files (${var} placeholders)
+├── templates/               ← seeded into <vault>/ on install (never overwritten)
+├── skills/                  ← engine skills, symlinked into <vault>/.claude/skills/
+├── desktop/                 ← Electron menubar GUI (npm, not pnpm) — talks to the engine only through --json seams
+├── tests/                   ← pytest (pythonpath = scripts + hooks); tests/golden/oracle/ = the behaviour oracle
+├── docs/                    ← concept, PROCESS, engine-layout (file-by-file), config (generated tables), diagrams
+├── config.example.yaml      ← copy → config.yaml on install (gitignored)
 ├── pyproject.toml + uv.lock
-├── install.sh              ← one-liner installer
-└── docs/                   ← concept, architecture, plans
+└── install.sh               ← one-liner installer
 ```
 
 ## Conventions
@@ -283,12 +208,15 @@ Scripts use `Path(__file__).resolve().parent` for `SCRIPTS_DIR`, `.parent.parent
 
 ### Python environment
 
-The Python venv lives at `<vault>/.wiki/.venv/` (inside the engine, NOT at the vault root). `install.sh` runs `uv sync --project <DEST>` so this happens automatically. **Exception — cloud-synced vaults** (iCloud Drive, `~/Library/CloudStorage`): the environment lives at `~/.venvs/<vault>-wiki`, addressed via `UV_PROJECT_ENVIRONMENT`, which the `wiki` dispatcher exports and the installed hook commands carry literally (rule: `lib/common.sh`, rationale: `docs/engine-layout.md` hard rule). On such a vault, run engine commands through `wiki …`; a bare `uv run --project .wiki` would rebuild an environment inside the cloud folder. Two ways to invoke scripts:
+The Python venv lives at `<vault>/.wiki/.venv/` (inside the engine, NOT at the vault root). `install.sh` runs `uv sync --project <DEST>` so this happens automatically. **Exception — cloud-synced vaults** (iCloud Drive, `~/Library/CloudStorage`): the environment lives at `~/.venvs/<vault>-wiki`, addressed via `UV_PROJECT_ENVIRONMENT`, which the `wiki` dispatcher exports and the installed hook commands carry literally (rule: `lib/common.sh`, rationale: `docs/engine-layout.md` hard rule). On such a vault, run engine commands through `wiki …`; a bare `uv run --project .wiki` would rebuild an environment inside the cloud folder.
 
-- **Interactive** — `cd <vault>/.wiki && uv run python scripts/<X>.py <args>`. Matches all script docstring examples.
-- **From any CWD** — `uv run --project <vault>/.wiki python <vault>/.wiki/scripts/<X>.py <args>`. Used by hooks (the `--project` flag is hardcoded in the agent settings.json so the hook works regardless of which directory the user's session was launched from).
+`scripts/` is the engine's source root, not a package (DECISIONS 2026-10-14; no `scripts/__init__.py`, ever — `tests/test_layout.py` guards it). Three ways to invoke engine code, and which one applies depends on where the module sits:
 
-`hooks/session-end.py` and `hooks/pre-compact.py` spawn `flush.py` with `--project` for the same reason. Anything that spawns engine scripts from outside `.wiki/` MUST pass `--project`, otherwise `uv` can't find `pyproject.toml`.
+- **Through `wiki`** — `wiki <command>`. The dispatcher spawns the handler as `python -m <module>` with `scripts/` on `PYTHONPATH` (`core/entry.py` builds argv + env for every Python-side spawn). The operator-facing form; every documented command has one.
+- **A top-level script by path** — `cd <vault>/.wiki && uv run python scripts/<X>.py <args>`, or from any CWD `uv run --project <vault>/.wiki python <vault>/.wiki/scripts/<X>.py <args>` (the hooks and the bash layer use the latter). Python puts a script's own directory first on `sys.path`, and for `scripts/<X>.py` that directory *is* the source root, so `core.*` imports resolve.
+- **A sub-package module as a module** — `PYTHONPATH=<vault>/.wiki/scripts uv run --project <vault>/.wiki python -m <pkg>.<module> <args>` (`migrations.migrate_config_keys`, `dashboard.agent_buttons`, `core.config`, `collectors.cli`). Running such a file by path (`uv run python scripts/collectors/scan_tabs.py`) fails with `ModuleNotFoundError: core`: the per-module `sys.path` bootstraps that once made it work are gone (M033-S02-T04), and the only bootstrap left is `hooks/_bootstrap.py`, for the hooks, which run as plain scripts from the agent harness. A package whose `__init__` imports its modules to register them (`collectors`, `preprocessors`, `producers`) double-imports such a module under `-m` (a `RuntimeWarning`); those modules get a top-level entry script instead (`process_inbox.py`, `ingest_html.py`, `ingest_youtube.py`, `index_folders.py`; `tests/test_cli_dispatch.py` refuses a handler that reaches into such a package directly).
+
+`hooks/session-end.py` and `hooks/pre-compact.py` spawn `flush.py` with `--project` for the same reason. Anything that spawns engine code from outside `.wiki/` MUST pass `--project`, otherwise `uv` can't find `pyproject.toml`; anything that spawns a sub-package module MUST put `scripts/` on `PYTHONPATH` (`core.entry.python_m` + `child_env` from Python, the `PYTHONPATH="$WIKI_DIR/scripts" uv run … python -m` line from bash).
 
 ### YAML & JSON
 

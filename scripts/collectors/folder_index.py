@@ -39,6 +39,7 @@ from datetime import UTC, datetime
 from fnmatch import fnmatch
 from pathlib import Path
 
+from collectors.base import CollectorSpec, RunResult, register
 from core.paths import RAW_DIR, STATE_DIR
 
 log = logging.getLogger(__name__)
@@ -402,72 +403,67 @@ def main(argv: list[str] | None = None) -> int:
 # root_id, --force) stay CLI-only in main() / `wiki index` — the same split
 # scan_youtube took.
 #
-# Registered only when imported as a package submodule (collectors/__init__.py
-# imports every collector to trigger @register). When this module runs as
-# `__main__` for `wiki index`, __package__ is "" and we skip both the class
-# and the `collectors.base` import — that import would pull the whole collector
-# package (httpx / yt-dlp / pillow / …) into the body-blind walker's fast CLI
-# path.
-if __package__ not in (None, ""):
-    from collectors.base import CollectorSpec, RunResult, register
+# `wiki index` enters through scripts/index_folders.py, which imports this module
+# as a package submodule like every other collector. A by-path run of this file
+# cannot start since M033-S02-T04 (`core.paths` above needs scripts/ on the
+# path), so the former `if __package__` guard that kept such a run from pulling
+# the whole collector package guarded nothing any more and is gone.
+@register
+class FolderIndexCollector:
+    """Registry adapter for the body-blind folder-index walker.
 
-    @register
-    class FolderIndexCollector:
-        """Registry adapter for the body-blind folder-index walker.
+    piggyback_default is False: auto-scheduling is an open design question
+    (M027 Q6 / S06 weighs a system scheduler vs piggyback), so registering
+    here buys `wiki collect --list` visibility + a uniform CLI verb
+    (`wiki collect folder-index`) without pre-empting that decision.
+    """
 
-        piggyback_default is False: auto-scheduling is an open design question
-        (M027 Q6 / S06 weighs a system scheduler vs piggyback), so registering
-        here buys `wiki collect --list` visibility + a uniform CLI verb
-        (`wiki collect folder-index`) without pre-empting that decision.
-        """
+    SPEC = CollectorSpec(
+        name="folder-index",
+        output_subfolder="raw/index",
+        piggyback_default=False,
+        supports_incremental=False,
+        supports_account_loop=False,
+    )
 
-        SPEC = CollectorSpec(
-            name="folder-index",
-            output_subfolder="raw/index",
-            piggyback_default=False,
-            supports_incremental=False,
-            supports_account_loop=False,
-        )
+    def is_configured(self) -> bool:
+        from core.config import CONFIG
 
-        def is_configured(self) -> bool:
-            from core.config import CONFIG
+        return any(e.get("kind") == "local" for e in (CONFIG.personal.watched_folders or []))
 
-            return any(e.get("kind") == "local" for e in (CONFIG.personal.watched_folders or []))
+    def run(self, *, dry_run: bool = False, incremental: bool = False) -> RunResult:
+        from core.config import CONFIG
 
-        def run(self, *, dry_run: bool = False, incremental: bool = False) -> RunResult:
-            from core.config import CONFIG
-
-            local = [e for e in (CONFIG.personal.watched_folders or []) if e.get("kind") == "local"]
-            if not local:
-                return RunResult(message="no-op (no kind=local watched_folders configured)")
-            if dry_run:
-                return RunResult(
-                    files_skipped=len(local),
-                    message=f"[dry-run] would index {len(local)} local root(s)",
-                )
-            written: list[Path] = []
-            errors: list[str] = []
-            for entry in local:
-                try:
-                    result = sync_root(
-                        entry,
-                        max_depth=CONFIG.limits.folder_index_max_depth,
-                        recent_n=CONFIG.limits.folder_index_recent_n,
-                    )
-                except (ValueError, OSError) as exc:
-                    log.warning("folder-index root %s failed: %s", entry.get("id"), exc)
-                    errors.append(f"{entry.get('id')}: {exc}")
-                    continue
-                if result.written and result.path is not None:
-                    written.append(result.path)
+        local = [e for e in (CONFIG.personal.watched_folders or []) if e.get("kind") == "local"]
+        if not local:
+            return RunResult(message="no-op (no kind=local watched_folders configured)")
+        if dry_run:
             return RunResult(
-                files_written=tuple(written),
-                message=(
-                    f"indexed {len(local)} local root(s): "
-                    f"{len(written)} written, {len(errors)} failed"
-                ),
-                errors=tuple(errors),
+                files_skipped=len(local),
+                message=f"[dry-run] would index {len(local)} local root(s)",
             )
+        written: list[Path] = []
+        errors: list[str] = []
+        for entry in local:
+            try:
+                result = sync_root(
+                    entry,
+                    max_depth=CONFIG.limits.folder_index_max_depth,
+                    recent_n=CONFIG.limits.folder_index_recent_n,
+                )
+            except (ValueError, OSError) as exc:
+                log.warning("folder-index root %s failed: %s", entry.get("id"), exc)
+                errors.append(f"{entry.get('id')}: {exc}")
+                continue
+            if result.written and result.path is not None:
+                written.append(result.path)
+        return RunResult(
+            files_written=tuple(written),
+            message=(
+                f"indexed {len(local)} local root(s): {len(written)} written, {len(errors)} failed"
+            ),
+            errors=tuple(errors),
+        )
 
 
 if __name__ == "__main__":

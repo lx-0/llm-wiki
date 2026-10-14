@@ -446,10 +446,14 @@ EOF
 
 
 cmd_update() {
-  local sync_skills=1
+  local sync_skills=1 post_pull=0 before=""
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --no-skills)              sync_skills=0; shift ;;
+      # Internal: the second phase, re-executed from the freshly pulled engine
+      # (see the exec at the end of the first phase). Carries the pre-pull
+      # revision for the summary line.
+      --post-pull)              post_pull=1; before="${2:-}"; shift; [[ $# -gt 0 ]] && shift ;;
       -h|--help|help)
         cat <<EOF
 ${C_BOLD}wiki update${C_RESET} — git pull --ff-only the .wiki/ checkout
@@ -466,6 +470,10 @@ ${C_BOLD}NOTES${C_RESET}
   new engine. If it would conflict, it's left unpopped (recover with
   \`git -C <.wiki> stash pop\`). Run from a terminal: non-interactively the
   command refuses rather than touching your changes.
+
+  Everything after the pull (dependency sync, migrations, skills sync) runs
+  from the engine just pulled — the command re-executes itself — so a changed
+  update procedure applies in the same run, not the next one.
 EOF
         return 0 ;;
       *)                        err "unknown flag: $1"; exit 1 ;;
@@ -477,6 +485,10 @@ EOF
   # vault. A `-d` test reports "not a checkout" for all three.
   if ! git -C "$WIKI_DIR" rev-parse --git-dir >/dev/null 2>&1; then
     die "Not a git checkout — wiki/ wasn't installed via install.sh. Manual update required."
+  fi
+  if (( post_pull == 1 )); then
+    _update_post_pull "$before" "$sync_skills"
+    return
   fi
 
   # Dirty-tree guard. `git pull --ff-only` aborts if tracked engine files have
@@ -538,6 +550,23 @@ EOF
       warn "  recover with: git -C \"$WIKI_DIR\" stash pop  (then resolve conflicts)"
     fi
   fi
+
+  # Everything after the pull runs from the engine that was just pulled, not
+  # from this bash, which was parsed before the pull: a changed spawn shape or
+  # a new post-pull step takes effect in the same update, not the next one.
+  # 2026-10-14: the pre-M033-S02 bash spawned the migrations by file path; the
+  # pulled tree runs them only as modules, so the first update across that
+  # change warned `ModuleNotFoundError: core` and skipped the config migration.
+  local skills_flag=""
+  if (( sync_skills == 0 )); then skills_flag="--no-skills"; fi
+  # shellcheck disable=SC2086  # an empty flag must expand to nothing
+  exec "$WIKI_DIR/wiki" update --post-pull "$before" $skills_flag
+}
+
+# Second phase of `wiki update` (`--post-pull <rev>`): dependency sync, the two
+# idempotent migrations and the skills sync — from the pulled tree (see above).
+_update_post_pull() {
+  local before="$1" sync_skills="$2"
   local after; after="$(git -C "$WIKI_DIR" rev-parse --short HEAD)"
   if [[ "$before" == "$after" ]]; then
     ok "Already up to date ($before)"

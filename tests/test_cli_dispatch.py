@@ -42,12 +42,17 @@ def test_run_child_spawns_module_with_scripts_on_pythonpath(monkeypatch, tmp_pat
     assert seen["kwargs"]["check"] is False
 
 
-@pytest.mark.parametrize("entry", ["process_inbox", "ingest_html"])
-def test_preprocessor_entry_modules_run_once_without_runpy_warning(entry: str) -> None:
-    """`preprocessors/__init__.py` imports `inbox` and `html_ingest` to register them, so
-    `python -m preprocessors.inbox` would execute the module twice and runpy warns
-    ("found in sys.modules after import of package"). The top-level entry modules exist
-    to avoid exactly that — this is the guard."""
+@pytest.mark.parametrize(
+    "entry", ["process_inbox", "ingest_html", "ingest_youtube", "index_folders"]
+)
+def test_entry_modules_run_once_without_runpy_warning(entry: str) -> None:
+    """`preprocessors/__init__.py` and `collectors/__init__.py` import their modules to
+    register them, so `python -m preprocessors.inbox` / `-m collectors.scan_youtube` would
+    execute the module twice and runpy warns ("found in sys.modules after import of
+    package"). The top-level entry modules exist to avoid exactly that — this is the guard.
+    `wiki index` and `wiki ingest-youtube` printed that warning on every real run after
+    T03 moved the spawns to `-m`; `--help` never showed it because cli.py answers `--help`
+    itself (M033-S02-T05)."""
     import subprocess
 
     env = dict(os.environ, PYTHONPATH=str(cli.SCRIPTS_DIR))
@@ -62,3 +67,26 @@ def test_preprocessor_entry_modules_run_once_without_runpy_warning(entry: str) -
     assert proc.returncode == 0, proc.stderr
     assert "RuntimeWarning" not in proc.stderr
     assert "found in sys.modules" not in proc.stderr
+
+
+def test_no_handler_lives_in_a_package_that_imports_it() -> None:
+    """A handler under a package whose `__init__` imports that module runs twice under
+    `python -m` (runpy's double import, see the test above). Such a command needs a
+    top-level entry module — this catches the next handler that reaches into a registry
+    package directly."""
+    offenders: list[str] = []
+    for spec in cli.COMMANDS:
+        if not spec.handler or "/" not in spec.handler:
+            continue
+        pkg, _, rest = spec.handler.partition("/")
+        mod = rest.removesuffix(".py").replace("/", ".")
+        init = cli.SCRIPTS_DIR / pkg / "__init__.py"
+        if not init.exists():
+            continue
+        text = init.read_text(encoding="utf-8")
+        if f"from {pkg} import {mod}\n" in text or f"from {pkg}.{mod} import" in text:
+            offenders.append(f"{spec.name} → {spec.handler}")
+    assert offenders == [], (
+        "handlers that would double-import under -m (give them a top-level entry module):\n"
+        + "\n".join(offenders)
+    )

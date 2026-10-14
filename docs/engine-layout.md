@@ -9,6 +9,7 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 ## Contents
 
 - [Directory tree](#directory-tree)
+- [How a module runs](#how-a-module-runs)
 - [Why bash + python + jq?](#why-bash--python--jq)
 - [Where to go next](#where-to-go-next)
 
@@ -45,26 +46,45 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 │   │   ├── backlinks.py           ← corpus-wide backlinks-footer materialization (post-compile global pass; sentinel-managed `## Backlinks` per article)
 │   │   ├── agent_spec.py          ← agent-task spec parser (prompts/agents/*.md → AgentSpec)
 │   │   ├── google_oauth.py        ← Gmail OAuth2 bootstrap (local-loopback consent flow)
-│   │   └── flush_pipeline.py      ← staged-flush state machine (stage / commit / archive / pending)
+│   │   ├── flush_pipeline.py      ← staged-flush state machine (stage / commit / archive / pending)
+│   │   ├── health.py              ← vault-health checks behind the home-screen banner + `wiki doctor`
+│   │   ├── console.py             ← shared console-logging setup for the CLI scripts (per-CLI formatter hook)
+│   │   ├── actions.py             ← action catalogue — the operator-facing vocabulary of everything a consumer can run (menu + desktop JSON contract)
+│   │   ├── links.py               ← wikilink resolution + relativization — single source of truth (resolve_link / canonical_slug / relativize_text)
+│   │   ├── index_sync.py          ← deterministic knowledge/index.md sync behind `wiki reindex`
+│   │   ├── compile_role.py        ← the `compile_role` frontmatter axis + VALID_ROLES (read by route, lint, the compile prompt)
+│   │   ├── capture_index.py       ← capture index — capture_id → {source_path, created, status} for the capture intake
+│   │   ├── config_backup.py       ← round-robin config.yaml backup — the one helper both config write paths share
+│   │   ├── usage.py               ← token-usage ledger keyed by (provider, model) → state/usage.json
+│   │   ├── piggybacks.py          ← piggyback scheduling core — task table, cooldown gate, detached spawn
+│   │   └── piggyback_runner.py    ← runs one piggyback command under a wall-clock timeout and records its status (`python -m core.piggyback_runner`)
 │   ├── cli.py                 ← table-driven `wiki` dispatcher — the CommandSpec table is the single source of truth for the command catalog (help/menu derive from it; owns the once-per-command locked dashboard refresh + `wiki auth`)
 │   ├── collectors/            ← substrate→raw/ writers (Registry + scan-* CLIs + dispatcher)
 │   │   ├── base.py                ← Collector Protocol, SPEC, Registry + account-loop harness (resolve_accounts/filter_accounts/Watermark/run_account_loop) + inbox-intake harness (scan_inbox/archive_to_zone/append_rollup)
 │   │   ├── cli.py                 ← `wiki collect` dispatcher (Registry lookup + run-one; honors --account via SPEC.supports_account_loop)
-│   │   ├── folder_index.py        ← body-blind folder index (`wiki index`; registered as the `folder-index` collector)
+│   │   ├── folder_index.py        ← body-blind folder index (entry module: scripts/index_folders.py; registered as the `folder-index` collector)
 │   │   ├── email_collector.py     ← email Collector (multi-backend via adapters/mailbox/)
 │   │   ├── jamie.py               ← Jamie AI meeting-notetaker
 │   │   ├── gmeet.py               ← Google Meet / Gemini transcripts (Drive API)
 │   │   ├── voice.py               ← inbox-watch dictation ingester (iOS Shortcuts / OpenWhispr / FluidVoice)
 │   │   ├── health.py              ← Oura REST daily biometric rollup (sleep / readiness / HRV / steps)
-│   │   ├── calendar.py            ← Google Calendar v3 → per-date rollups (multi-tenant, OAuth; M006 — replaces legacy scan_calendar SQLite stub)
+│   │   ├── calendar_collector.py  ← Google Calendar v3 → per-date rollups (multi-tenant, OAuth)
+│   │   ├── wispr.py               ← Wispr Flow meetings via the desktop app's HTTP API
+│   │   ├── pictures.py            ← inbox-watch camera / phone-photo ingester (vision per file + batch report)
+│   │   ├── _picture_metadata.py   ← EXIF + filename-pattern parsing behind pictures.py
+│   │   ├── capture_collector.py   ← folder-watching quick-capture intake (capture index in core/)
 │   │   ├── scan_browser.py        ← Firefox + Chrome bookmarks/history/tab-groups
 │   │   ├── scan_screenshots.py    ← ~/Screenshots/ + Vision LLM (gemma4) → HOME sidecar + vault thumb (384px) + batch report
 │   │   ├── scan_tabs.py           ← Firefox Simple Tab Groups backups
-│   │   └── scan_youtube.py        ← yt-dlp + youtube-transcript-api + optional gemma4 visual analysis
-│   ├── adapters/              ← MailboxReader + calendar.googleapis.com client used by collectors
+│   │   └── scan_youtube.py        ← yt-dlp + youtube-transcript-api + optional gemma4 visual analysis (entry module: scripts/ingest_youtube.py)
+│   ├── adapters/              ← the clients collectors talk through (never substrate-aware)
 │   │   ├── calendar/google.py     ← Google Calendar v3 REST wrapper (list_calendars / list_events / get_event)
-│   │   └── mailbox/{gmail,thunderbird,allinkl,imap,base}.py
-│   ├── domain/                ← pure domain types (mail message, filter rule)
+│   │   ├── health/{oura,healthkit_xml}.py ← Oura REST client; Apple Health Export.xml streaming parser
+│   │   └── mailbox/{base,gmail,thunderbird,imap,allinkl}.py ← MailboxReader / Filter adapters (allinkl = server-side filter)
+│   ├── domain/mail.py         ← pure mailbox domain types (frozen dataclasses shared by readers, filters, collectors)
+│   ├── intents/               ← intent dispatch: Intent record + Handler Protocol + Registry (base.py), task / idea / note handlers, _record.py writer → workspace/inbox/
+│   ├── bridge/                ← `wiki bridge` — rsync-based inbox bridge (cli.py, drive_sync.py)
+│   ├── publish/               ← `wiki publish` — mirror knowledge/ into meinkontext: cli, corpus, delta (content-hash), describe, render, executor, client (MCP JSON-RPC), oauth, bootstrap
 │   ├── preprocessors/         ← in-vault intake normalizers (pre-compile; Protocol + Registry, singletons)
 │   │   ├── base.py                ← Preprocessor Protocol, PreprocessorSpec, PreprocessResult, Registry
 │   │   ├── cli.py                 ← `wiki preprocess` dispatcher (--list / <name> [source] [--dry-run])
@@ -74,6 +94,7 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 │   ├── facts/                 ← hard-fact subsystem (knowledge/facts/<slug>.md consumers) + takes producer
 │   │   ├── correct.py             ← CRUD CLI: add/list/remove/edit/path
 │   │   ├── correct_apply.py       ← agent-driven propagation across vault
+│   │   ├── take.py                ← third-party belief attribution CRUD (who believes what, with confidence + source)
 │   │   └── takes_producer.py      ← maybe_extract_takes legacy free function (delegated-to by producers/takes.py)
 │   ├── producers/             ← post-compile derivative-material extractors (Registry + orchestrator + CLI)
 │   │   ├── base.py                ← Producer Protocol, ProducerSpec, ProducerResult, Registry (`@register`, `all_producers`, `get_producer`)
@@ -81,9 +102,14 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 │   │   ├── cli.py                 ← `wiki produce` dispatcher (`--list` / `<name> <source>`)
 │   │   ├── suggestions.py         ← SuggestionsProducer (delegates to `suggestions/producer.py:maybe_generate_suggestions`)
 │   │   ├── curiosity.py           ← CuriosityProducer   (delegates to `curiosity/producer.py:maybe_generate_curiosity_requests`)
+│   │   ├── folder_curiosity.py    ← FolderCuriosityProducer (folder-deep-scan requests)
+│   │   ├── intents.py             ← IntentsProducer     (actionable intents → intents/ handlers → workspace/inbox/)
 │   │   └── takes.py               ← TakesProducer       (delegates to `facts/takes_producer.py:maybe_extract_takes`)
 │   ├── compile_stages/        ← pure-ish stages extracted from compile.py's per-file loop
-│   │   ├── types.py               ← CompileResult + CompileMetadata dataclasses
+│   │   ├── types.py               ← CompileResult + CompileMetadata + CompileOutcome dataclasses
+│   │   ├── classify.py            ← pre-compile substrate classifier
+│   │   ├── route.py               ← Route — the discriminated per-source decision compile_file makes (the one frontmatter grammar behind it: core/frontmatter.py)
+│   │   ├── memory.py              ← memory-substrate pre-pass: resolve the project page + bootstrap its Timeline section
 │   │   ├── compile.py             ← `compile_source(content, metadata) → CompileResult` (LLM-call boundary: prompt assembly, owner-block, pre-flight gate, SDK call, retry-on-kind-unknown, failure classification)
 │   │   └── post_passes.py         ← `run_post_passes(source, compile_result, state) → list[ProducerResult]` (iterates ProducerRegistry serially, accumulates `producer_cost_total` into state)
 │   ├── suggestions/           ← email-suggestion pipeline (legacy producer body + executor)
@@ -93,7 +119,8 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 │   ├── curiosity/             ← gap-detection loop (legacy producer body + consumer CLI + backends)
 │   │   ├── producer.py            ← `maybe_generate_curiosity_requests` legacy free function (delegated-to by producers/curiosity.py)
 │   │   ├── cli.py                 ← `wiki curiosity` consumer: list / run-oldest / run / run-all / clear-done
-│   │   └── backends/email.py      ← email-deep-scan dispatch via Mailbox-adapter `scan_deep`
+│   │   ├── backends/email.py      ← email-deep-scan dispatch via Mailbox-adapter `scan_deep`
+│   │   └── backends/{folder,folder_providers}.py ← folder-deep-scan backend + its answer providers
 │   ├── dashboard/             ← Obsidian dashboard helpers (post-flush + seed-time)
 │   │   ├── dashboard_stats.py     ← _dashboard-stats.md generator
 │   │   ├── dashboard_lint.py      ← _dashboard-lint.md generator
@@ -106,6 +133,9 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 │   │   ├── instrument.py          ← yaml loader for `instruments/<slug>/v<x>/{instrument,items,cutoffs}.yaml`
 │   │   ├── score.py               ← deterministic Likert + reverse-coding + band lookup
 │   │   ├── backfill_per_item.py   ← one-shot: re-parse pre-2026-05-17T16-14 reports' body `## Items` table → frontmatter `per_item:`
+│   │   ├── study.py               ← study manifest schema + state + run-directory atomic writes (behind scripts/study.py)
+│   │   ├── audit_scope.py         ← token-budget audit for the reports surface
+│   │   ├── verify_scope_lock.py   ← scope-lock verification for the reports agents (`python -m reports._engine.verify_scope_lock`)
 │   │   ├── lib/inference.py       ← `infer_batch_async` SDK wrapper (3-attempt retry + scope-lock + StderrCapture)
 │   │   ├── lib/analyst.py         ← Pass-1 / Pass-2 analyst SDK wrapper (Read+Grep scope-locked)
 │   │   ├── lib/render_summary.py  ← cross-instrument meta-report (radar + sparkline + per-instrument item-radar + timelines)
@@ -115,20 +145,43 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 │   │   └── instruments/<slug>/v<x>/  ← curated instrument definitions (currently 8: phq-9, gad-7, who-5, k6, asrs-v1.1, pss-10, isi, olbi; 6 on the live longitudinal-baseline manifest)
 │   ├── study.py               ← `wiki study list / run / new / answer` CLI (drives `scripts/reports/_engine/runner.py`)
 │   ├── analyze.py             ← `wiki analyze` CLI — Pass-1 per-study + Pass-2 cross-study synthesis
-│   ├── migrations/            ← one-shot schema/data migrations
-│   │   └── migrate_add_type.py    ← backfill type: frontmatter
+│   ├── migrations/            ← one-shot schema/data migrations, run as `PYTHONPATH=.wiki/scripts uv run --project .wiki python -m migrations.<name>`
+│   │   ├── migrate_config_keys.py ← config.yaml keys → current schema (renamed / removed / added); `wiki update` runs it after every pull
+│   │   ├── migrate_log_md_path.py ← knowledge/log.md → .wiki/logs/operations.md; `wiki update` runs it after every pull
+│   │   ├── migrate_add_type.py    ← backfill `type:` frontmatter on knowledge/ articles
+│   │   ├── migrate_inbox_archive.py ← mobile-collector `.processed/` archives → the vault audit zone
+│   │   ├── relativize_wikilinks.py ← corpus-wide `[[wikilink]]` → relative-to-file form
+│   │   └── cleanup_empty_deep_scans.py ← curiosity-loop deep-scan empty outputs
 │   ├── compile.py             ← Claude Agent SDK compiler (raw/ + daily/<date>/* + daily/<date>.md → knowledge/); per-file loop delegates the LLM call to `compile_stages/compile.py:compile_source` and the post-pass loop to `compile_stages/post_passes.py:run_post_passes`
 │   ├── flush.py               ← session-end → daily/<date>/sessions.md append + piggyback spawner
 │   ├── migrate_daily_to_rollup.py   ← one-shot: legacy daily/<date>.md → daily/<date>/sessions.md
 │   ├── backfill_daily_rollup.py     ← one-shot: raw/{health,voice,transcripts/{jamie,gmeet}} → daily/<date>/{health,voice,meetings}.md
 │   ├── cleanup_legacy_daily_roots.py ← one-shot: byte-match-verified delete of legacy daily/<date>.md
 │   ├── daily_digest_runner.py       ← piggyback wrapper for `wiki agent daily-digest`
+│   ├── backfill_picture_metadata.py ← one-shot: EXIF + filename metadata into picture-archive sidecars
+│   ├── backfill_tasks_to_workspace.py ← one-shot: legacy tasks/ intent queue → workspace/inbox/
+│   ├── backfill_voice_source_frontmatter.py ← one-shot: `source:` frontmatter on voice rollups written before it existed
+│   ├── menu.py                ← interactive home screen (`wiki` / `wiki menu`; `--json` for the desktop app)
+│   ├── menu_context.py        ← the home screen's context probe (status + suggestions; schema-2 JSON — an oracle payload)
+│   ├── doctor.py              ← `wiki doctor` — full vault-health audit (`--quick --json` — an oracle payload)
+│   ├── dream.py               ← dream cycle — periodic cross-time re-synthesis of entity pages (`wiki dream` / `wiki dream-entity`)
+│   ├── web_research.py        ← dream web-research — public-entity enrichment via Exa
+│   ├── triage.py              ← `wiki triage` — review + clear the intent-dispatch inbox (workspace/inbox/)
+│   ├── reindex.py             ← `wiki reindex` — deterministic knowledge/index.md reconciliation (core/index_sync.py)
+│   ├── dedup.py               ← `wiki dedup` — interactive entity deduplication for transcription-noise duplicates
+│   ├── reconcile.py           ← autonomous concept-reconciliation routine
+│   ├── health_trends.py       ← deterministic health-trend synthesis over the health corpus (no LLM)
+│   ├── usage_report.py        ← `wiki usage` — token-usage ledger read-back (state/usage.json)
+│   ├── links_audit.py         ← `wiki links` — analyze (and optionally fix) broken wikilinks
+│   ├── probe_compile_scope.py ← empirical probe of the compile-scope allowlist (operator-run, real SDK)
 │   ├── lint.py                ← structural checks over a once-built LintContext corpus (footer-aware link graph) + 1 LLM contradiction check
 │   ├── query.py               ← Claude Agent SDK natural-language query (read-only / file-back)
 │   ├── agent_task.py          ← generic Claude Agent SDK runner for prompts/agents/*.md
 │   ├── clippings_sweep.py     ← thin shim → preprocessors/clippings.py (<vault>/Clippings/ → raw/articles/, pre-compile lift)
 │   ├── ingest_html.py         ← entry module for `wiki ingest-html` (logic: preprocessors/html_ingest.py)
 │   ├── process_inbox.py       ← entry module for `wiki process-inbox` (logic: preprocessors/inbox.py)
+│   ├── ingest_youtube.py      ← entry module for `wiki ingest-youtube` (logic: collectors/scan_youtube.py — the direct CLI's --url / --inbox / --tier flags)
+│   ├── index_folders.py       ← entry module for `wiki index` (logic: collectors/folder_index.py)
 │   ├── review_wiki.py         ← per-article quality scoring via local LLM
 │   ├── optimize_claude_md.py  ← cross-project pattern → ~/.claude/CLAUDE.md edits
 │   ├── retry_failed_flushes.py ← reprocess archived flush contexts
@@ -160,6 +213,16 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
     ├── sessions/              ← session-flush staging + failed-flushes/
     └── reports/               ← lint + review-wiki output
 ```
+
+### How a module runs
+
+`scripts/` is the engine's source root, not a package (no `scripts/__init__.py`, ever — `tests/test_layout.py` guards it). Three shapes; which one applies depends on where the module sits:
+
+- **Top-level scripts** (`scripts/<x>.py`) run by path — `uv run --project <vault>/.wiki python <vault>/.wiki/scripts/compile.py …` — because Python puts a script's own directory first on `sys.path`, and here that directory *is* the source root.
+- **Sub-package modules** (`core/`, `collectors/`, `migrations/`, `dashboard/`, …) run only as modules with the source root on the path — `PYTHONPATH=<vault>/.wiki/scripts uv run --project <vault>/.wiki python -m migrations.migrate_config_keys …`. By path they fail with `ModuleNotFoundError: core`. `wiki <command>` always takes this shape for you: `core/entry.py` builds the argv + env for every Python-side spawn, and the bash layer spells the same line.
+- **Hooks** (`hooks/*.py`) are plain scripts the agent harness runs from `hooks/`; they `import _bootstrap` — the engine's one `sys.path` bootstrap — before anything from `scripts/`.
+
+A package whose `__init__` imports its modules to register them (`collectors`, `preprocessors`, `producers`) double-imports such a module under `-m` — runpy warns, the registry sees the module twice. The commands behind those modules enter through top-level entry scripts instead (`process_inbox.py`, `ingest_html.py`, `ingest_youtube.py`, `index_folders.py`); `tests/test_cli_dispatch.py` refuses a handler that reaches into such a package directly.
 
 ## Why bash + python + jq?
 

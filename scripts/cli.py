@@ -786,7 +786,7 @@ COMMANDS: tuple[CommandSpec, ...] = (
         "index",
         "Collect & ingest",
         "body-blind folder-index digests",
-        handler="collectors/folder_index.py",
+        handler="index_folders.py",
         help_text=H_INDEX,
     ),
     CommandSpec(
@@ -827,7 +827,7 @@ COMMANDS: tuple[CommandSpec, ...] = (
         "ingest-youtube",
         "Collect & ingest",
         "pull YouTube videos into raw/notes/",
-        handler="collectors/scan_youtube.py",
+        handler="ingest_youtube.py",
         menu=True,
         help_text=H_INGEST_YOUTUBE,
     ),

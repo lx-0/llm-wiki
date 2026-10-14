@@ -2809,6 +2809,28 @@ Per-candidate learnings from the 14-candidate seam arc (C01–C14). Decisions li
   `monkeypatch.setattr("scripts.core.utils.DAILY_DIR", …)` patched the *other* module
   identity, and the test passed by accident for months; the layout guard scans quoted dotted
   targets for the banned spelling as well as `import` statements.
+- **`wiki update` ran its post-pull steps from the pre-pull bash (M033-S02-T05):** bash has
+  parsed `cmd_update` before `git pull` moves the tree, so dependency sync, the two migrations
+  and the skills sync came from the OLD engine against the NEW files, and the first update
+  across any change in how those steps spawn breaks exactly once. Reproduced on a scratch
+  clone pinned to the lxw checkout (`5b6b947`, 2026-10-12): the old bash spawned
+  `migrations/migrate_config_keys.py` by file path → `ModuleNotFoundError: core` (warned,
+  migration skipped; the second update healed it). Fix: phase one ends in
+  `exec "$WIKI_DIR/wiki" update --post-pull <rev>`, phase two (`_update_post_pull`) runs from
+  the pulled tree. `tests/test_wiki_update.py` pins both halves with real git + the real bash
+  layer and a logging `uv` stub. The one update that still runs the old bash (the operator's
+  first after this change) is bounded: two warnings, then `wiki update` once more.
+- **`wiki <cmd> --help` never spawns the handler (M033-S02-T05):** cli.py answers `--help`
+  from the CommandSpec's `help_text`, so a `--help` smoke proves the dispatcher, not the
+  spawn. `wiki ingest-youtube --help` was clean while every real `wiki ingest-youtube …` and
+  `wiki index …` printed runpy's `RuntimeWarning` (double import under T03's `-m` spawn of a
+  module the package `__init__` already imports). Smoke a spawn with a real argv — an argparse
+  error after import is enough — or through `core.entry.python_m` directly. Guards:
+  `test_no_handler_lives_in_a_package_that_imports_it` + the entry-module runpy test in
+  `tests/test_cli_dispatch.py`.
+- **`gh run list --commit <sha>` wants the full SHA:** a short SHA listed nothing for 100 s
+  while two runs for that push were already green. `gh run list --limit N --json
+  databaseId,headSha,conclusion` and match the prefix.
 
 ### Desktop toolchain (C07)
 
