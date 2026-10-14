@@ -1,8 +1,8 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-14T18:30:00+02:00
-current_milestone: M032
+last_updated: 2026-10-14T18:40:00+02:00
+current_milestone: M033
 active_slice: none
 active_task: none
 last_completed_milestone: M032
@@ -12,7 +12,16 @@ parallel_milestones: [M021, M025, M027, M029]
 
 # State
 
-## ▶ NEXT — M032 COMPLETE (L, 2026-10-14): desktop de-slop → M033 engine modernisation
+## ▶ NEXT — M033 planned (L): engine modernisation + clean code
+
+**Status:** M033 planned (L, 2026-10-14) — `M033-CONTEXT.md` (goal, measured starting
+point, 9 exit criteria, 5 locked decisions, 3 open questions with recommendations) +
+`M033-ROADMAP.md` (5 slice placeholders: gates first → package → seams → readable
+functions → types + closeout). Ready to slice. Backlog reconcile for the M032 close done
+(targeted; next full fan-out at the M033 close). Next action: `ytstack:slice-milestone`
+for M033, then execute S01 (fixture-vault snapshot oracle, format commit, lint policy, CI).
+
+## M032 COMPLETE (L, 2026-10-14): desktop de-slop
 
 **Status:** **M032 COMPLETE — 5 / 5 slices, 23 tasks, closed 2026-10-14; reassess after S05:
 A.** 7 of 8 exit criteria met; #8 (blind learnability ≥ 8) closed unmet at 6.3 / 10 — record,
