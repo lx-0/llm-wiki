@@ -42,8 +42,15 @@ def test_every_argv_starts_with_a_known_wiki_subcommand():
         assert spec.argv[0] in known, f"{spec.id}: {spec.argv[0]!r} is not a wiki subcommand"
 
 
+def test_tools_are_non_destructive_invocations():
+    by_id = {t["id"]: t for t in tools()}
+    assert by_id["links"]["argv"] == ["links"]
+    assert by_id["dedup"]["argv"] == ["dedup", "--suggest-only"]
+
+
 def test_verb_for_matches_exact_argv_before_falling_back_by_command():
     assert verb_for(["dream", "--all-entities"]) == "Refresh"
+    assert verb_for(["links"]) == "Check"
     assert verb_for(["links", "--fix", "--yes"]) == "Fix"
     assert verb_for(["gmail-auth", "gmail-personal"]) == "Sign in"
     assert verb_for(["setup"]) == "Set up"
@@ -57,7 +64,7 @@ def test_verb_for_unknown_command_is_run():
 
 def test_tools_are_the_tool_flagged_entries_without_counts():
     listed = tools()
-    assert {t["id"] for t in listed} == {"lint", "dream-sweep", "links-fix", "dedup", "review-wiki"}
+    assert {t["id"] for t in listed} == {"lint", "dream-sweep", "links", "dedup", "review-wiki"}
     for t in listed:
         assert t["group"] == "tools"
         assert "{n}" not in t["title"]

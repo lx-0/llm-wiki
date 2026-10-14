@@ -6,7 +6,7 @@
     "useIgnoreFile": true
   },
   "files": {
-    "includes": ["src/**", "scripts/**", "*.ts", "*.json"],
+    "includes": ["src/**", "scripts/**", "*.ts", "*.json", "!**/*.svelte"],
     "ignoreUnknown": true
   },
   "formatter": {

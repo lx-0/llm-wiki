@@ -2762,6 +2762,9 @@ Per-candidate learnings from the 14-candidate seam arc (C01–C14). Decisions li
   shell hook intercepts any command line containing `biome` or `lint` and prints "ESLint output
   (JSON parse failed)" instead of running it — prefix with `rtk proxy` (`rtk proxy npm run lint`).
   Biome's `noFocusedTests` fires on any call named `fit(` — don't name a helper `fit`.
+  `.svelte` files are excluded from Biome (`!**/*.svelte` in `files.includes`): its partial
+  Svelte support reports `$state` variables used only in the template as unused and reformats
+  components; `svelte-check` is the gate for components.
 - **Typecheck gate (since M032-S01-T02, 2026-10-14):** TypeScript 5.9 `strict` over `src/` + the root configs; `npm test` = `npm run typecheck && vitest run`. Until then the desktop pinned TypeScript 4.5.4, whose parser choked on modern `.d.ts` syntax in `node_modules` (866 TS1005/TS1109 errors), so `tsc` was not a usable gate and test fakes relied on `as unknown as X` casts — those casts are now checked; prefer structurally correct fakes. When a change seems to pass "for free", prove the gate with a throwaway `const probe: number = "x"` file first.
 - **desktop/ uses package-lock.json (npm), not pnpm** — install with `npm ci` before `npm run test`/`npm run lint`.
 

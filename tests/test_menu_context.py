@@ -270,7 +270,7 @@ def test_cli_emits_valid_json_object():
     assert data["schema"] == 2
     assert isinstance(data["status"], dict)
     assert isinstance(data["suggestions"], list)
-    assert {t["id"] for t in data["tools"]} >= {"lint", "links-fix", "dedup"}
+    assert {t["id"] for t in data["tools"]} >= {"lint", "links", "dedup"}
 
 
 # ── Status one-liner probes ─────────────────────────────────────────

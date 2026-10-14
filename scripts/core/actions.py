@@ -109,9 +109,10 @@ _SPECS: tuple[ActionSpec, ...] = (
           "Save today's session to your wiki"),
     _spec("lint", "Check", "auto", ["lint", "--structural-only"],
           "Notes changed since the last health check", tool=True),
-    _spec("links-fix", "Fix", "tools", ["links", "--fix", "--yes"],
-          "Fix broken links", tool=True),
-    _spec("dedup", "Review", "tools", ["dedup"],
+    # Tools stay non-destructive and $0: `links` reports, `dedup --suggest-only` never merges.
+    _spec("links", "Check", "tools", ["links"],
+          "Check links", tool=True),
+    _spec("dedup", "Review", "tools", ["dedup", "--suggest-only"],
           "Find duplicate pages", tool=True),
     _spec("review-wiki", "Review", "tools", ["review-wiki"],
           "Review page quality", tool=True),
