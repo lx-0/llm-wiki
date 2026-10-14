@@ -5,7 +5,7 @@ project: llm-wiki
 created: 2026-10-14T18:50:00+02:00
 status: planned
 task_count: 7
-completed_tasks: 6
+completed_tasks: 7
 ---
 
 # M033-S03 -- Slice Plan
@@ -20,7 +20,7 @@ completed_tasks: 6
 - [x] T04 -- Logging → one setup: `preprocessors/cli`, `producers/cli`, `collectors/cli`, `bridge/cli` `_setup_logging` replaced by `core/console.setup_console_logging` (idempotent — KNOWLEDGE "lazy-import CLI module = doubled stderr"); then the inventory S02 left behind — 36 files call `logging.basicConfig` (`grep -rln 'logging.basicConfig' scripts`): the CLIs and the entry scripts go through the seam, a one-shot migration / backfill may keep a `__main__`-local call only where the seam cannot serve it (recorded per file); and the six modules whose console setup sits before their imports (`noqa: E402` in `compile`, `menu`, `query`, `review_wiki`, `optimize_claude_md`, `collectors/scan_screenshots`) end with their imports at the top, because the seam imports cleanly. stderr parity checked on the oracle. Split at plan-task if the sweep does not fit one context window.
 - [x] T05 -- State through the store: `email_collector`, `scan_screenshots`, `folder_index` `_load_state` / `_save_state` replaced by `core/state_store.store_for` (lock + atomic write), watermark semantics proven by the collectors' existing tests plus one race test per site mirroring `tests/test_state_store.py`.
 - [x] T06 -- Collector inbox + rollup 3 → 1: `voice`, `capture_collector`, `pictures` `_scan_inbox` / `_append_daily_rollup` fold into one shared helper (`core/daily_capture` or a `collectors/_inbox.py` — chosen by where the sentinel-block logic already lives), with the per-collector rollup headings preserved byte-for-byte on their fixtures; `templates/` resynced if a rollup shape is touched.
-- [ ] T07 -- Frontmatter, the unnamed sites: the fence grammars T02's name-based guard could not see — `collectors/health.py` (`_FRONTMATTER_RE`, the HealthKit merge read), `collectors/calendar_collector.py` (two inline `startswith("---\n")` / `find("\n---\n")` probes), `core/capture_index.py` (`_FM_RE`), `core/daily_capture.py` (`_FRONTMATTER_RE` in `_read_sources_and_body`), `core/utils.py` (the `compile_role: final-only` probe), `dashboard/dashboard_stats.py` (the same probe), `migrations/migrate_add_type.py` (`_FRONTMATTER_RE` + `_TYPE_LINE_RE`), `suggestions/cli.py` (`load_suggestion`'s fence strip) — each onto `split_fence` / `field` / `parse` with its contract kept; then the guard in `tests/test_frontmatter_parity.py` scans every function (not only `*frontmatter*`-named ones) for fence smells, with `lint.py`'s body-separator scan allow-listed by reason. Exit criterion 5 ("0 private parsers") is measured by that widened guard, not by T02's.
+- [x] T07 -- Frontmatter, the unnamed sites: the fence grammars T02's name-based guard could not see — `collectors/health.py` (`_FRONTMATTER_RE`, the HealthKit merge read), `collectors/calendar_collector.py` (two inline `startswith("---\n")` / `find("\n---\n")` probes), `core/capture_index.py` (`_FM_RE`), `core/daily_capture.py` (`_FRONTMATTER_RE` in `_read_sources_and_body`), `core/utils.py` (the `compile_role: final-only` probe), `dashboard/dashboard_stats.py` (the same probe), `migrations/migrate_add_type.py` (`_FRONTMATTER_RE` + `_TYPE_LINE_RE`), `suggestions/cli.py` (`load_suggestion`'s fence strip) — each onto `split_fence` / `field` / `parse` with its contract kept; then the guard in `tests/test_frontmatter_parity.py` scans every function (not only `*frontmatter*`-named ones) for fence smells, with `lint.py`'s body-separator scan allow-listed by reason. Exit criterion 5 ("0 private parsers") is measured by that widened guard, not by T02's.
 
 ## Done when
 
@@ -55,3 +55,9 @@ All tasks marked `[x]` and verified via `ytstack:summarize-task`.
   plan's `append\(` grep missed — a grep for a seam's API must list every entry point). The
   daily-rollup backfill still emits the legacy voice shape with the in-body link (pinned);
   aligning it with the live collector is a later arc.
+- 2026-10-15 (T07): exit criterion 5 is measured by the line-level guard
+  `test_no_fence_grammar_anywhere_outside_the_seam` (18 lines in 8 modules RED before the
+  fold, `lint.py`'s body-separator scan the one allow-listed line). The vault parity for the
+  readers (0 deltas over 2273 articles + 686 daily files + 191 calendar notes + 15
+  suggestions) is the evidence that the seam's tolerance only differs on inputs the vault
+  does not contain.

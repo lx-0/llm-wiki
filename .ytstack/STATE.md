@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-15T01:30:00+02:00
+last_updated: 2026-10-15T01:36:00+02:00
 current_milestone: M033
 active_slice: S03
-active_task: T07
+active_task: none
 last_completed_milestone: M032
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -139,9 +139,16 @@ byte-identical), the three `_scan_inbox` bindings inlined, six hand-typed append
 gmeet, health ×2, email, wispr — the sixth missed by the plan's grep) through
 `base.append_rollup`; two guards (measured on HEAD: 5 + 6 offenders). Found en route: the
 email fake-reader tests had a CONFIG stub without `limits`, so their rollup had been raising
-inside the swallowed try — fixed, the rollup lands now. Suite 2116. CI for `cc7bfec`
-pending. **Next: T07 (the eight unnamed fence grammars + the widened guard) via
-`plan-task`; then `reassess-roadmap` closes S03.**
+inside the swallowed try — fixed, the rollup lands now. Suite 2116. CI green on `cc7bfec`
+(ci + secrets-scan) and the closeout `afd1649`. **S03 COMPLETE (7/7)** — T07 (`167c3c6`):
+the eight unnamed fence grammars onto `split_fence` / `parse` / `parse_strict` / `field`
+(health's merge read, two calendar probes, capture_index ×2, daily_capture, the word count,
+the final-only probe, the type migration, the suggestion loader); the line-level guard
+`test_no_fence_grammar_anywhere_outside_the_seam` (RED on 18 lines in 8 modules → green,
+`lint.py`'s body-separator scan allow-listed) now measures exit criterion 5; read-only
+vault parity over 2273 articles / 686 daily files / 191 calendar notes / 38 transcript refs
+/ 15 suggestions: 0 deltas. Suite 2117. CI for `167c3c6` pending. **Next:
+`reassess-roadmap` closes S03; then S04 (readable functions) via `plan-task`.**
 
 ## M032 COMPLETE (L, 2026-10-14): desktop de-slop
 
