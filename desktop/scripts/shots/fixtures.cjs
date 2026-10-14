@@ -92,18 +92,25 @@ function entries(now) {
 }
 
 /** 24 hourly bins ending at the current hour: a workday of ~120 chunks per channel and hour
- *  (the live 30 s cadence), a lunch gap, nothing overnight. */
+ *  (the live 30 s cadence), a late start, a lunch gap, an early evening, nothing overnight —
+ *  so every heat level shows. */
 function timeline(now) {
   const end = new Date(now);
   end.setMinutes(0, 0, 0);
   const startMs = end.getTime() - 23 * HOUR;
   const mic = [];
   const system = [];
+  const micAt = (h, i) => {
+    if (h === 8) return 26; // started late in the hour
+    if (h === 12) return 54; // half an hour before lunch
+    if (h === 18) return 80; // left early
+    return (h >= 9 && h <= 11) || (h >= 14 && h <= 17) ? 112 + ((i * 7) % 9) : 0;
+  };
   for (let i = 0; i < 24; i += 1) {
     const h = new Date(startMs + i * HOUR).getHours();
-    const on = (h >= 8 && h <= 12) || (h >= 14 && h <= 18);
-    mic.push(on ? 112 + ((i * 7) % 9) : 0);
-    system.push(on ? (h >= 14 ? 96 + ((i * 5) % 11) : 118 - ((i * 3) % 7)) : 0);
+    const m = micAt(h, i);
+    mic.push(m);
+    system.push(m === 0 ? 0 : h >= 14 ? Math.max(0, m - 16) : Math.min(120, m + 4));
   }
   return { startMs, bucketMs: HOUR, mic, system };
 }

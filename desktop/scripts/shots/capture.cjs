@@ -72,10 +72,10 @@ const SURFACES = [
   { page: 'triage', w: 720, h: 760, schemes: ['light', 'dark'], states: ['default', 'empty'], settle: 1000 },
   {
     page: 'overview',
-    w: 900,
-    h: 700,
+    w: 920,
+    h: 780,
     schemes: ['light', 'dark'],
-    states: ['default', 'empty', 'no-access'],
+    states: ['default', 'empty', 'no-access', 'table', 'run-done'],
     settle: 1000,
   },
   { page: 'cockpit', w: 1040, h: 700, schemes: ['dark'], states: ['default'], settle: 3500 },
@@ -95,6 +95,7 @@ const FIXTURE_FOR = {
   'sources-open': 'default',
   'tools-open': 'default',
   'add-open': 'default',
+  table: 'default',
 };
 const openSheet = (name) => `(async () => {
     document.querySelector('[data-sheet="${name}"]')?.click();
@@ -138,6 +139,10 @@ const STATE_SCRIPTS = {
   'sources-open': openSheet('sources'),
   'tools-open': openSheet('tools'),
   'add-open': openSheet('add'),
+  table: `(async () => {
+    document.querySelector('[data-view="table"]')?.click();
+    ${wait(500)}
+  })()`,
 };
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));

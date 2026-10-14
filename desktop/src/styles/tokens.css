@@ -49,6 +49,14 @@
   --type-note: oklch(var(--type-l) var(--type-c) 240);
   --type-soft-alpha: 0.14;
 
+  /* heat strip — the accent at fixed lightness steps, more = darker on a light surface. An
+   * ordinal ramp: one hue, nominal ΔL 0.08–0.09 per step so the rendered (gamut-mapped) steps
+   * stay ≥ 0.06 apart, light end clears 2:1 on the card. Validated 2026-10-15. */
+  --heat-1: oklch(from var(--accent) 0.76 c h);
+  --heat-2: oklch(from var(--accent) 0.67 c h);
+  --heat-3: oklch(from var(--accent) 0.58 c h);
+  --heat-4: oklch(from var(--accent) 0.5 c h);
+
   /* space */
   --space-1: 4px;
   --space-2: 8px;
@@ -114,6 +122,12 @@
     --type-l: 74%;
     --type-c: 0.13;
     --type-soft-alpha: 0.2;
+
+    /* the ramp flips anchor in dark: more = lighter */
+    --heat-1: oklch(from var(--accent) 0.48 c h);
+    --heat-2: oklch(from var(--accent) 0.57 c h);
+    --heat-3: oklch(from var(--accent) 0.66 c h);
+    --heat-4: oklch(from var(--accent) 0.76 c h);
   }
 }
 

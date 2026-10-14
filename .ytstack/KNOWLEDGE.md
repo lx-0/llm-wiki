@@ -2804,6 +2804,18 @@ Per-candidate learnings from the 14-candidate seam arc (C01–C14). Decisions li
   A stylesheet diet on a shared file is proven, not argued: dump a computed-style fingerprint
   of the remaining consumers' DOM (every element × ~50 properties) before and after, and diff —
   a grep over class names says "ok" for `.fill`, `.ok`, `.vault` on substrings alone.
+- **Chart colours are validated on the RENDERED pixel, not on the CSS numbers (M032-S05-T03,
+  2026-10-15):** the heat strip's ordinal ramp is `oklch(from var(--accent) L c h)` at nominal
+  ΔL 0.07 — rendered, Chromium gamut-maps the light steps and the measured gap was 0.056,
+  under the dataviz validator's 0.06 floor. Nominal 0.08–0.09 renders as ≥ 0.06. Two probe
+  gotchas on the way: `canvas.fillStyle` no longer serialises wide-gamut colours to `#rrggbb`
+  (it hands the `oklch(…)` string back) — paint a 1 × 1 pixel and read `getImageData`; and a
+  second offscreen `BrowserWindow` opened after `destroy()` in a one-off electron script fails
+  with `ERR_FAILED` — one page per process (`electron probe.cjs light` / `dark`). Validator:
+  `node <dataviz>/scripts/validate_palette.js "<hex×4>" --ordinal --mode dark --surface <card>`.
+- **Strict pages have no visually-hidden text (M032-S05-T03):** the audit's clipped-text rule
+  flags an sr-only `<caption>` (1 px box, overflow hidden) as a defect. Label the table with
+  `aria-label` instead; the figure's visible caption already names it.
 
 ### Exception seam (C14)
 

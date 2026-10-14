@@ -212,8 +212,8 @@ function openOverview(): void {
     return;
   }
   overviewWin = new BrowserWindow({
-    width: 900,
-    height: 700,
+    width: 920,
+    height: 780,
     minWidth: 720,
     minHeight: 560,
     title: 'Overview — llm-wiki',

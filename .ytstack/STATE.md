@@ -1,7 +1,7 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-15T04:45:00+02:00
+last_updated: 2026-10-15T05:50:00+02:00
 current_milestone: M032
 active_slice: S05
 active_task: none
@@ -31,13 +31,13 @@ captures clean. Reassess after S04 (2026-10-15): **A — proceed as planned** (n
 moved S05's scope; the popover pattern + `[data-layer]` audit rule and the rest-height gate
 are tools S05 inherits). S05 re-sliced to 5 tasks (the 24 h capture timeline needs its own
 data source), then to 6 (the Overview window split: scaffold + first chart, then the rest).
-S05 2/6: T01 `listeners.timeline` shipped (hourly mic/system chunk counts from the listener
-sqlite, pure bucketing tested, live-verified against the real db); T02 Overview window
-shipped (nav → `openOverview`, hero + stat tiles, 30-day "notes updated per day" columns with
-tooltips via `ui/tip`, activity derivations in `lib/activity.ts`, strict harness surface).
-Next task: T03 remaining charts (type bars, capture heat strip, health, next up) + table
-view via `plan-task`; then T04 delete Cockpit + Atlas; T05 blind learnability panel + DMG;
-T06 closeout. vitest 107 + pytest 2024 green.
+S05 3/6: T01 `listeners.timeline` shipped (hourly mic/system chunk counts from the listener
+sqlite); T02 Overview window shipped (nav → `openOverview`, hero + stat tiles, 30-day columns,
+`ui/tip`, `lib/activity.ts`); T03 Overview complete (type bars, capture heat strip on a
+validated ordinal `--heat-*` ramp, health rows with verbs, next up, Charts | Table twin; 60
+captures clean). Next task: T04 delete Cockpit + Atlas (+ `index.css`, `lib/types.ts`, IPC;
+Triage window → Inbox, theme-aware background) via `plan-task`; then T05 blind learnability
+panel + DMG; T06 closeout. vitest 112 + pytest 2024 green.
 
 **S01 COMPLETE (5/5)** -- harness `npm run shots` (30 captures; real panel
 height 1,027 px vs 640 clamp), TypeScript 5.9 strict + svelte-check gate in `npm test`, Biome
