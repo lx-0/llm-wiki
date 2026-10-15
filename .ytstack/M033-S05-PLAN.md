@@ -5,7 +5,7 @@ project: llm-wiki
 created: 2026-10-14T18:50:00+02:00
 status: planned
 task_count: 6
-completed_tasks: 5
+completed_tasks: 6
 ---
 
 # M033-S05 -- Slice Plan
@@ -19,7 +19,7 @@ completed_tasks: 5
 - [x] T03 -- Contract typed once: the `menu --json` / `doctor --json` payloads defined as dataclasses in `core/actions.py` (they largely are), a JSON Schema generated from them into `docs/contracts/actions.schema.json` by a committed script, and a pytest that validates the oracle's golden payloads against it (`jsonschema` is already in the lock — verified).
 - [x] T04 -- Desktop side of the contract: `desktop/` validates its fixtures (`scripts/shots/fixtures.cjs`, `src/vault/*.test.ts`) against the same schema in vitest (`ajv` dev dependency), and `src/lib/actions.ts` either imports generated types (`json-schema-to-typescript`) or keeps its hand-written types with a test that fails when the schema gains a field — decided by the schema's size (CONTEXT open question 2).
 - [x] T05 -- Closeout docs + release: `docs/engine-layout.md` (seams, gates — the file-by-file tree and `AGENTS.md`'s directory map were reconciled in S02-T05: re-verify against `ls` after S03/S04, do not rewrite), `README.md` dev section, `CHANGELOG.md` `[0.7.0]` + `pyproject.toml` + `uv lock`, DECISIONS (milestone entry) and KNOWLEDGE (toolchain lessons), `docs/architecture.excalidraw` only if a box changed (CLAUDE.md infographic rule).
-- [ ] T06 -- Milestone close: the full backlog fan-out against the code (DECISIONS 2026-08-27 method — every SHIPPED verdict refuted first), `PRIORITY.md` re-cut, then `ytstack:reassess-roadmap` (last slice) and the M034 pitch re-read against what M033 actually left.
+- [x] T06 -- Milestone close: the full backlog fan-out against the code (DECISIONS 2026-08-27 method — every SHIPPED verdict refuted first), `PRIORITY.md` re-cut, then `ytstack:reassess-roadmap` (last slice) and the M034 pitch re-read against what M033 actually left.
 
 ## Done when
 

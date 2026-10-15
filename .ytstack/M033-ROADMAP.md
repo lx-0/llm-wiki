@@ -3,9 +3,9 @@ milestone: M033
 project: llm-wiki
 size: L
 created: 2026-10-14T18:40:00+02:00
-status: planned
+status: done
 total_slices: 5
-completed_slices: 4
+completed_slices: 5
 ---
 
 # M033 Roadmap
@@ -56,10 +56,15 @@ Suggested framing (refine in slice-milestone; audit in `backlog/deslop-arc.md` �
       holds every module ≤ 1,000 lines unless `docs/engine-layout.md` § "Large modules" gives
       the reason (four do). Every move was AST- or parity-proven, and stale test patches
       raise instead of silently isolating nothing.
-- [ ] S05 -- **Types + closeout.** Type-checker probe and gate on `core/`;
-      schema-2 contracts as one JSON Schema validated by both suites; `docs/engine-layout.md`
-      + CHANGELOG 0.7.0 + DECISIONS + KNOWLEDGE; full backlog fan-out at close;
-      `ytstack:reassess-roadmap`.
+- [x] S05 -- **Types + closeout** (shipped 2026-10-15, six tasks): ty (pinned, a
+      `typecheck` group) chosen by a three-way probe and gated on `core/` (19 → 0) in
+      pre-commit + CI, the rest of `scripts/` reported; the schema-2 `--json` payloads typed
+      once in `core/contracts.py`, generated to `docs/contracts/*.schema.json` and validated
+      by pytest (`jsonschema`) and vitest (`ajv`); the closeout docs and **0.7.0**; the full
+      backlog fan-out — 80 items re-derived and refuted, 3 to `rejected/`, PRIORITY re-cut —
+      whose audit turned up the defects released as **0.7.1–0.7.3** (calendar rollups that
+      lost events, an unscoped suggestion agent, invisible suggestions, dead report globs,
+      four smaller crashes and races).
 
 **Reassess after S01 (2026-10-14): A — proceed as planned.** S01 shipped the oracle, the
 format commit, the lint policy, a clean `ruff check` and the gates (CI green on
@@ -107,6 +112,15 @@ one operator-visible change: a `--json` invocation prints the payload alone (S04
 `960a74e`). The diagram labels that name split modules (`lint.py`'s
 `check_facts_violations`, `collectors/gmeet.py` on the Drive API) still hold through the
 facades; T05 re-checks them under the infographic rule. S05 next.
+
+**Reassess after S05 (2026-10-15): A — the milestone is done.** S05 was the last slice, and
+all nine exit criteria are met (DECISIONS 2026-10-15, the M033 entry). No roadmap change.
+What the close adds is in T06's summary and in CONTEXT's last reassessment. The backlog
+fan-out found nothing shipped silently, but it found operator-facing defects in code M033 had
+not touched; the boy-scout rule fixed them inside the task, with three point releases. M034
+starts from `backlog/deslop-arc.md` §6: the measured bash, README, two command tables, and
+M033's inherited items. There is no global `.ytstack/ROADMAP.md` to flip; STATE carries
+the milestone state.
 
 ## Run order
 

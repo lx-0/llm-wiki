@@ -1,20 +1,39 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-15T16:05:21+02:00
+last_updated: 2026-10-15T17:53:26+02:00
 current_milestone: M033
-active_slice: S05
-active_task: T06
-last_completed_milestone: M032
+active_slice: none
+active_task: none
+last_completed_milestone: M033
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
 ---
 
 # State
 
-## ▶ NEXT — M033 planned (L): engine modernisation + clean code
+## ▶ NEXT — M033 COMPLETE (L, 2026-10-15): engine modernisation → M034 dispatcher + surface diet
 
-**Status:** M033 planned (L, 2026-10-14) — `M033-CONTEXT.md` (goal, measured starting
+**Status:** **M033 COMPLETE — 5 / 5 slices, 31 tasks, closed 2026-10-15; reassess after S05:
+A.** All nine exit criteria are met (DECISIONS 2026-10-15). The engine is at **0.7.3**:
+- 0.7.0 is the modernisation;
+- 0.7.1–0.7.3 are the defects the close's backlog audit found: calendar rollups that lost
+  events, an unscoped suggestion agent, invisible suggestions, dead report globs, and four
+  smaller crashes and races.
+
+The backlog is re-cut: 77 items in PRIORITY.md, 3 moved to `rejected/`.
+
+**Next: `plan-milestone` M034** (dispatcher + surface diet). Source: `backlog/deslop-arc.md`
+§6. It inherits `lazy-collector-registry`, `collect-flags-one-verb` and `print` →
+`core/console`.
+
+**Operator:**
+- after `wiki update`, check `raw/notes/calendar/` once the next calendar run has gone
+  through — the dates in the 97-day window come back whole; older dates need one full run
+  with `since:`;
+- screenpipe capture stopped on 2026-09-24 (only the watchdog LaunchAgent is loaded).
+
+Running log of M033 follows. M033 planned (L, 2026-10-14) — `M033-CONTEXT.md` (goal, measured starting
 point, 9 exit criteria, 5 locked decisions, 3 open questions with recommendations) +
 `M033-ROADMAP.md` + five slice plans (29 tasks: gates first → package → seams → readable
 functions → types + closeout), committed `76a9ca2`. Backlog reconcile for the M032 close
@@ -256,7 +275,22 @@ closes M033 against its nine exit criteria. The doc audit came out clean (0 unna
 green. T06 planned (`M033-S05-T06-PLAN.md`): eight read-only subagents re-derive the 80
 backlog files from the code, a refutation pass checks every SHIPPED / SUPERSEDED verdict, and
 the items go through `git mv` into `shipped/` / `rejected/`; then `PRIORITY.md` is re-cut, the
-last-slice reassess runs, and the M034 pitch is re-read. **Next: execute T06.**
+last-slice reassess runs, and the M034 pitch is re-read. **S05 6/6** — T06 (`1406950`):
+80 backlog items re-derived and refuted. 3 moved to `rejected/`, 77 remain (40 open,
+37 partial); PRIORITY.md is re-cut with an empty coverage check, and deslop-arc §6 carries
+M034's measured start. Nothing had shipped silently. The audit's defects were fixed with
+tests watched failing first and released as **0.7.1–0.7.3**:
+- calendar rollups lost the unchanged events of every touched date;
+- the suggestion pass wrote anywhere over third-party mail;
+- 7 `.md` suggestions were invisible;
+- the reports never read voice;
+- the desktop Review row crashed;
+- screenshot sidecars carried the wrong model stamp;
+- a piggyback-runner signal race;
+- `optimize_claude_md` staged into a folder no vault has;
+- two doc-guard gaps, and seven stale docs.
+
+Suite 2273, CI green through `ee690a0`. Next: `reassess-roadmap` closes S05 and M033.
 
 ## M032 COMPLETE (L, 2026-10-14): desktop de-slop
 

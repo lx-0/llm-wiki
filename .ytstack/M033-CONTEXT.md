@@ -187,3 +187,29 @@ After **S04**, changed the roadmap (B — partial):
 Reason: S04 confirmed S03's counting lesson again (20 functions, not 15; six modules, not
 four). It also found the one patch hazard the package-namespace guard cannot see: a name the
 old module legitimately keeps (`dream.ROOT_DIR`). S05's scope is unchanged by either.
+
+## Reassessment 2026-10-15T17:53:26+02:00
+
+After **S05**, the last slice: **A — milestone done**, no roadmap change. All nine exit
+criteria are met (DECISIONS 2026-10-15).
+
+**The close.** The backlog fan-out re-derived 80 items, and a refuter attacked every
+superseded and premise-shifting verdict. Three items moved to `rejected/`; PRIORITY.md was
+re-cut over the 77 left. The audit then found operator-facing defects in code M033 had not
+refactored. Each was fixed under the boy-scout rule with a test watched failing first, and
+released as 0.7.1–0.7.3: calendar rollups, the suggestion agent's write scope, invisible
+suggestions, the report substrate, the review walk without a terminal, a screenshot model
+stamp, a runner signal race, `optimize_claude_md`.
+
+**Backlog sweep.** This file has no Backlog / Deferred heading; its deferred items sit in the
+reassessments above. Each is a backlog file listed in PRIORITY.md, so each is carried (B),
+with nothing dropped:
+
+- `lazy-collector-registry.md` and `collect-flags-one-verb.md` — to M034, as decided
+  (PRIORITY: Medium · M034).
+- `print` → `core/console` — to M034 with the Python dispatcher (deslop-arc §6).
+- `intents-seen-state-shape.md` and `backfill-voice-rollup-shape.md` — Low.
+- Widening ty beyond `core/` (146 diagnostics) — one clean package at a time, not
+  milestone-bound (KNOWLEDGE).
+
+M034's CONTEXT inherits the first three once `plan-milestone` creates it.
