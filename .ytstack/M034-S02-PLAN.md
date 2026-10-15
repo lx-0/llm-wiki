@@ -5,7 +5,7 @@ project: llm-wiki
 created: 2026-10-15T18:15:32+02:00
 status: planned
 task_count: 5
-completed_tasks: 3
+completed_tasks: 4
 ---
 
 # M034-S02 -- Slice Plan
@@ -48,7 +48,7 @@ later slices still call. Each file is deleted with its last caller: `config.sh` 
   entry (a child process inheriting stdin), because hooks are bash until S03-T02. That calls
   a not-yet-ported command through its public interface, the way the menu dispatches; it is
   not a bash fallback for a ported one. S03-T02 decides whether the call becomes in-process.
-- [ ] T04 -- `install-shortcut` in Python: the `~/.local/bin/wiki` symlink. A link pointing
+- [x] T04 -- `install-shortcut` in Python: the `~/.local/bin/wiki` symlink. A link pointing
   at another vault is replaced without a prompt, and `--print-only` writes nothing. When
   `~/.local/bin` is not on PATH, the command prints the rc line; it never edits an rc file,
   exactly as the bash does today. Parity on the fixture `HOME`.

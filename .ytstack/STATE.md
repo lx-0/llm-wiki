@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-15T21:24:00+02:00
+last_updated: 2026-10-15T21:31:00+02:00
 current_milestone: M034
 active_slice: S02
-active_task: T04
+active_task: none
 last_completed_milestone: M033
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -43,9 +43,19 @@ fixed on the way:
 - a failing `uv sync` in the hop ended `wiki` silently.
 
 `wiki` is at 606 lines; `lib/config.sh` has 20 left (for skills). Suite 2418, CI green.
-**Next:** S02-T04 is planned (`M034-S02-T04-PLAN.md`): `install-shortcut` in Python. Three
-more bash paths are recorded first; the bash `rm -f`s a regular file at `~/.local/bin/wiki`,
-and the port refuses instead.
+**M034 / S02 4/5.** T04 (`45fab6c` bash record, `0e56967` port, 0.7.13): `wiki
+install-shortcut` is Python (`shortcut_cli.py`).
+- **A regular file at `~/.local/bin/wiki`** is refused; the bash `rm -f`'d it.
+- **The rc line** keeps its quotes.
+- **`core/console`** gained the shared stdout status lines (`ok` / `warn` / `info` /
+  `banner`).
+
+`wiki` is at 539 lines, and the bash owns only hooks / skills / seed / update / status. Suite
+2428, CI green.
+**Next:** `ytstack:plan-task` → S02-T05, the slice close. The planned deletions already went
+with each port, so what is left: the docs pass (README / cli.md / AGENTS.md naming the bash
+pieces), and `wiki setup` end to end on a *fresh* scratch vault through the install path.
+Then `reassess-roadmap` for S02.
 
 **M034 / S01 — complete (7/7).** It delivered:
 - the bash oracle (T01–T02);
