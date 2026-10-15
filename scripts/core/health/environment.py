@@ -5,13 +5,13 @@ transcription toolchain."""
 from __future__ import annotations
 
 import os
-import re
 import socket
 import subprocess
 import time
 from pathlib import Path
 from urllib.parse import urlparse
 
+from core import agents
 from core.health._base import CheckResult, _probe_failed
 from core.paths import ROOT_DIR, STATE_DIR, STATE_FILE, WIKI_DIR
 
@@ -71,41 +71,26 @@ def check_hooks_installed() -> CheckResult:
         doesn't want hooks firing there.
 
     Either is sufficient. Warning fires only when NEITHER scope has
-    any wiki-managed entry. Reads each candidate file directly and
-    looks for `.wiki/hooks/` in the command text.
+    any wiki-managed entry. Reads each agent's config (core.agents'
+    registry) as text and looks for a wiki hook command in it, by the
+    one grammar the installer uses.
     """
-    # Match both wiki-hook command styles (parity with lib/agents.sh
-    # `hooks_installed`): the current `--project .wiki python
-    # .wiki/hooks/session-start.py` form AND the cd-anchored
-    # `cd '<abs>/.wiki' && uv run python hooks/session-start.py` form
-    # used by earlier engine versions + user-scope installs.
-    wiki_hook_re = re.compile(r"\.wiki['\"/ ].*hooks/(session-(start|end)|pre-compact|_transcript)")
     try:
-        agent_files = [
-            (".claude", "settings.json"),
-            (".codex", "hooks.json"),
-            (".gemini", "settings.json"),
-            (".cursor", "hooks.json"),
-        ]
         installed_user: list[str] = []
         installed_project: list[str] = []
         stale_env_agents: list[str] = []
-        for agent_dir, filename in agent_files:
-            for _scope, root, target in (
-                ("user", Path.home(), installed_user),
-                ("project", ROOT_DIR, installed_project),
-            ):
-                path = root / agent_dir / filename
-                if not path.exists():
-                    continue
+        home = Path.home()
+        for spec in agents.AGENTS:
+            for scope, target in (("user", installed_user), ("project", installed_project)):
+                path = agents.config_path(spec.name, scope, home=home, root=ROOT_DIR)
                 try:
                     text = path.read_text(encoding="utf-8", errors="replace")
                 except OSError:
                     continue
-                if wiki_hook_re.search(text):
-                    target.append(agent_dir.lstrip("."))
+                if agents.HOOK_CMD_RE.search(text):
+                    target.append(spec.name)
                     if "UV_PROJECT_ENVIRONMENT=" not in text:
-                        stale_env_agents.append(agent_dir.lstrip("."))
+                        stale_env_agents.append(spec.name)
         if installed_user or installed_project:
             parts = []
             if installed_user:

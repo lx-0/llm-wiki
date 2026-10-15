@@ -196,10 +196,14 @@ Drift detection is JSON-key-order-insensitive (`_files_equivalent` / canonical `
 
 ### Adding an agent target (for hook install)
 
-1. Add a tuple to `WIKI_AGENTS` in `lib/agents.sh`: `name|detection-dir|config-file`.
-2. Add `<name>_hooks_payload()` function emitting JSON for that agent's schema.
-3. Wire it into `agent_payload()`'s case statement.
-4. Status table, install/uninstall flows, and detection logic pick it up automatically.
+1. Add an `Agent` to `AGENTS` in `scripts/core/agents.py`: name, detection dir, config file,
+   its hooks (event, script, timeout in the agent's unit) and `flat=True` for Cursor-style
+   bare entries. Doctor's `hooks-installed` check reads it.
+2. While `wiki hooks` is still bash (until M034-S03-T02), mirror it in `lib/agents.sh`: the
+   `WIKI_AGENTS` tuple, a `<name>_hooks_payload()` and the `agent_payload()` case.
+   `tests/test_agents_registry.py` runs over `AGENTS` and holds the two byte for byte, so a
+   missing bash half fails there.
+3. Status table, install/uninstall flows, and detection logic pick it up automatically.
 
 ### Wikilinks (relative-to-file convention)
 

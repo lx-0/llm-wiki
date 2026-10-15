@@ -25,14 +25,17 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 ├── config.yaml                ← gitignored ─┘
 ├── pyproject.toml + uv.lock
 ├── lib/
-│   ├── common.sh              ← paths, colors, logging, deps, backup
-│   ├── ui.sh                  ← interactive prompts (confirm / ask / select_one / select_many)
-│   ├── agents.sh              ← agent registry, detection, payload generators, install/uninstall
+│   ├── common.sh              ← paths, the engine-environment rule, output helpers, shell_quote / sync_hint, backup
+│   ├── ui.sh                  ← interactive prompts (confirm / select_one / select_many) for hooks + update
+│   ├── agents.sh              ← agent registry, payload generators, merge, install/uninstall (byte parity with core/agents.py)
 │   ├── hooks.sh               ← interactive flows for `wiki hooks {install,uninstall,status}`
-│   └── config.sh              ← Python config CLI wrapper + setup wizard + interactive editor
+│   ├── skills.sh              ← `wiki skills {install,uninstall,sync,status}` + the silent install / prune for setup + update
+│   ├── seed.sh                ← `wiki seed`: template seeding with the overlay and the plugin / env / meta-bind / dashboard merges
+│   └── config.sh              ← config_get / config_set for skills.sh (the config commands are Python)
 ├── scripts/
 │   ├── core/                  ← shared engine plumbing (imported, never invoked)
 │   │   ├── paths.py               ← eager path constants from __file__ — zero deps, no side effects
+│   │   ├── agents.py              ← agent registry (claude / codex / gemini / cursor), the one hook-command grammar, hook_cmd + per-agent payloads
 │   │   ├── config.py              ← CONFIG singleton (YAML-driven) + get/set/keys CLI + TIMEZONE + .env bootstrap
 │   │   ├── prompts.py             ← prompt template loader (${var} substitution)
 │   │   ├── ollama_client.py       ← single Ollama transport (chat / chat_schema / chat_vision)
@@ -254,6 +257,7 @@ appears somewhere else. Use the seam — never hand-roll the job beside it.
 | --- | --- | --- |
 | Reach Python from `wiki` | `wiki:_dispatch_python` — exec of the venv's python into `cli.py` with `VIRTUAL_ENV` + the venv's `bin/` on PATH (what `uv run` set); `uv sync --inexact` first when there is no venv or the lock is newer than the `.wiki-synced` stamp; a relative `UV_PROJECT_ENVIRONMENT` stays on `uv run` | `tests/test_bootstrap_hop.py` |
 | Start another engine process | `core/entry.py` (`python -m <module>`, `scripts/` on PYTHONPATH) | `tests/test_entry.py`, `tests/test_cli_dispatch.py` |
+| Recognise or build an agent hook command | `core/agents.py` (`HOOK_CMD_RE`, `hook_cmd`, `payload`); doctor's `hooks-installed` reads it, and the bash `wiki hooks` stays byte-identical to it until the commands are Python | `tests/test_agents_registry.py` (payloads byte-identical to the bash `jq` output; no second grammar under `scripts/` or `hooks/`) |
 | Console + file logging | `core/console.py:setup_console_logging` — entry points only, never at import | `tests/test_console.py::TestOneSetupEverywhere` |
 | Read / write frontmatter | `core/frontmatter.py` | `tests/test_frontmatter_parity.py` (no private grammar, no fence grammar outside the seam) |
 | Slugs and filenames | `core/utils.py:slugify` (`ascii_only=True` for filenames) | `tests/test_slugify.py::test_no_second_slug_grammar_outside_the_seam` |
