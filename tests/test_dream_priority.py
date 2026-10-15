@@ -7,6 +7,10 @@ from unittest.mock import patch
 
 import pytest
 
+import dream_priority
+
+from ._dream_paths import patch_dream_path
+
 # ── Helpers ───────────────────────────────────────────────────────
 
 
@@ -29,18 +33,16 @@ def _make_entity(tmp_vault: Path, slug: str, kind: str, frontmatter: dict):
 
 @pytest.fixture
 def vault(tmp_path, monkeypatch):
-    """Isolated vault root with patched dream.py + paths globals."""
+    """Isolated vault root with the dream modules' path globals patched."""
     vault_root = tmp_path / "vault"
     vault_root.mkdir()
     (vault_root / "knowledge" / "people").mkdir(parents=True)
     (vault_root / "knowledge" / "projects").mkdir(parents=True)
     (vault_root / "knowledge" / "areas").mkdir(parents=True)
-    monkeypatch.setattr("dream.ROOT_DIR", vault_root)
-    monkeypatch.setattr("dream.PEOPLE_DIR", vault_root / "knowledge" / "people")
-    monkeypatch.setattr("dream.PROJECTS_DIR", vault_root / "knowledge" / "projects")
-    monkeypatch.setattr("dream.AREAS_DIR", vault_root / "knowledge" / "areas")
-    monkeypatch.setattr(
-        "dream._ENTITY_KINDS",
+    patch_dream_path(monkeypatch, "ROOT_DIR", vault_root)
+    patch_dream_path(
+        monkeypatch,
+        "_ENTITY_KINDS",
         {
             "people": (vault_root / "knowledge" / "people", "person"),
             "projects": (vault_root / "knowledge" / "projects", "project"),
@@ -73,7 +75,7 @@ def test_frontmatter_priority_wins_over_config(vault, monkeypatch):
     )()
     with patch.object(dream.CONFIG.scheduling, "dream_priority", cfg):
         ent = dream._resolve_entity("alex")
-        weight, source = dream.compute_entity_priority(ent)
+        weight, source = dream_priority.compute_entity_priority(ent)
     assert weight == 8.5
     assert source.startswith("frontmatter:")
 
@@ -97,7 +99,7 @@ def test_frontmatter_zero_excludes(vault, monkeypatch):
     )()
     with patch.object(dream.CONFIG.scheduling, "dream_priority", cfg):
         ent = dream._resolve_entity("alex")
-        weight, _ = dream.compute_entity_priority(ent)
+        weight, _ = dream_priority.compute_entity_priority(ent)
     assert weight == 0.0
 
 
@@ -122,7 +124,7 @@ def test_explicit_path_match(vault, monkeypatch):
     )()
     with patch.object(dream.CONFIG.scheduling, "dream_priority", cfg):
         ent = dream._resolve_entity("alex")
-        weight, source = dream.compute_entity_priority(ent)
+        weight, source = dream_priority.compute_entity_priority(ent)
     assert weight == 5.0
     assert "paths:" in source
 
@@ -145,7 +147,7 @@ def test_glob_path_match(vault, monkeypatch):
     )()
     with patch.object(dream.CONFIG.scheduling, "dream_priority", cfg):
         ent = dream._resolve_entity("personal-old-archived")
-        weight, _ = dream.compute_entity_priority(ent)
+        weight, _ = dream_priority.compute_entity_priority(ent)
     assert weight == 0.0
 
 
@@ -172,7 +174,7 @@ def test_paths_first_match_wins(vault, monkeypatch):
     )()
     with patch.object(dream.CONFIG.scheduling, "dream_priority", cfg):
         ent = dream._resolve_entity("alex")
-        weight, _ = dream.compute_entity_priority(ent)
+        weight, _ = dream_priority.compute_entity_priority(ent)
     assert weight == 2.0  # first-match wins
 
 
@@ -197,7 +199,7 @@ def test_domain_multiplier(vault, monkeypatch):
     )()
     with patch.object(dream.CONFIG.scheduling, "dream_priority", cfg):
         ent = dream._resolve_entity("alex")
-        weight, _ = dream.compute_entity_priority(ent)
+        weight, _ = dream_priority.compute_entity_priority(ent)
     assert weight == 1.5  # 1.0 base × 1.5 domain
 
 
@@ -219,7 +221,7 @@ def test_tag_strategy_max(vault, monkeypatch):
     )()
     with patch.object(dream.CONFIG.scheduling, "dream_priority", cfg):
         ent = dream._resolve_entity("alex")
-        weight, _ = dream.compute_entity_priority(ent)
+        weight, _ = dream_priority.compute_entity_priority(ent)
     assert weight == 5.0  # max(2.5, 5.0)
 
 
@@ -241,7 +243,7 @@ def test_tag_strategy_sum(vault, monkeypatch):
     )()
     with patch.object(dream.CONFIG.scheduling, "dream_priority", cfg):
         ent = dream._resolve_entity("alex")
-        weight, _ = dream.compute_entity_priority(ent)
+        weight, _ = dream_priority.compute_entity_priority(ent)
     assert weight == 7.5  # 2.5 + 5.0
 
 
@@ -263,7 +265,7 @@ def test_status_multiplier(vault, monkeypatch):
     )()
     with patch.object(dream.CONFIG.scheduling, "dream_priority", cfg):
         ent = dream._resolve_entity("personal-chng-me")
-        weight, _ = dream.compute_entity_priority(ent)
+        weight, _ = dream_priority.compute_entity_priority(ent)
     assert weight == pytest.approx(0.05)
 
 
@@ -295,7 +297,7 @@ def test_composite_formula(vault, monkeypatch):
     )()
     with patch.object(dream.CONFIG.scheduling, "dream_priority", cfg):
         ent = dream._resolve_entity("alex")
-        weight, _ = dream.compute_entity_priority(ent)
+        weight, _ = dream_priority.compute_entity_priority(ent)
     assert weight == pytest.approx(9.0)  # 2.0 × 1.5 × 3.0 × 1.0
 
 
@@ -317,7 +319,7 @@ def test_default_when_no_rules_match(vault, monkeypatch):
     )()
     with patch.object(dream.CONFIG.scheduling, "dream_priority", cfg):
         ent = dream._resolve_entity("obscure")
-        weight, source = dream.compute_entity_priority(ent)
+        weight, source = dream_priority.compute_entity_priority(ent)
     assert weight == 1.0
     assert "default:" in source
 

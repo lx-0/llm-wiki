@@ -27,7 +27,10 @@ from pathlib import Path
 import pytest
 import yaml
 
+import dream_corpus
 from core import frontmatter
+
+from ._dream_paths import patch_dream_path
 
 # ── Fixtures (mirror test_dream_cycle.py shape) ─────────────────────
 
@@ -98,14 +101,14 @@ def vault(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Path]:
 
     import dream
 
-    monkeypatch.setattr(dream, "ROOT_DIR", tmp_path)
+    # ROOT_DIR is read by dream, dream_corpus and dream_priority — patch every binder.
+    patch_dream_path(monkeypatch, "ROOT_DIR", tmp_path)
     monkeypatch.setattr(dream, "KNOWLEDGE_DIR", tmp_path / "knowledge")
-    monkeypatch.setattr(dream, "PEOPLE_DIR", tmp_path / "knowledge" / "people")
-    monkeypatch.setattr(dream, "PROJECTS_DIR", tmp_path / "knowledge" / "projects")
-    monkeypatch.setattr(dream, "AREAS_DIR", tmp_path / "knowledge" / "areas")
     monkeypatch.setattr(dream, "LOG_FILE", tmp_path / "knowledge" / "log.md")
-    monkeypatch.setattr(
-        dream,
+    # _ENTITY_KINDS holds Path values captured at module-import time — patch the
+    # table itself (patching PEOPLE_DIR & co. after import would change nothing).
+    patch_dream_path(
+        monkeypatch,
         "_ENTITY_KINDS",
         {
             "people": (tmp_path / "knowledge" / "people", "person"),
@@ -118,10 +121,16 @@ def vault(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Path]:
     # REAL engine state/dream-activation.json, keyed by a rel-path identical
     # across runs → first run of the day stamps it, later runs see "already
     # stamped today" and return False (stateful cross-run pollution).
-    monkeypatch.setattr(
-        dream,
+    patch_dream_path(
+        monkeypatch,
         "_DREAM_ACTIVATION_FILE",
         tmp_path / ".wiki" / "state" / "dream-activation.json",
+    )
+    # Same for the insufficient-corpus backoff store the dream_entity tests reach.
+    patch_dream_path(
+        monkeypatch,
+        "_DREAM_INSUFFICIENT_FILE",
+        tmp_path / ".wiki" / "state" / "dream-insufficient-corpus.json",
     )
     yield tmp_path
 
@@ -278,17 +287,15 @@ def test_tier2_samples_k_files_from_older_pool(vault: Path) -> None:
 
 def test_compute_sampling_score_components(vault: Path) -> None:
     """Score = importance × recency_decay × dreams_since × noise."""
-    import dream
-
     now = time.time()
     # Same-content file in two locations; different importance weights
     high = _write_substrate(vault, "raw/memories/m.md", "alex memory\n", mtime=now)
     low = _write_substrate(vault, "raw/notes/screenshots/s.md", "alex screenshot\n", mtime=now)
 
     rng = random.Random(42)
-    s_high = dream._compute_sampling_score(high, vault_root=vault, rng=rng, now=now)
+    s_high = dream_corpus._compute_sampling_score(high, vault_root=vault, rng=rng, now=now)
     rng = random.Random(42)
-    s_low = dream._compute_sampling_score(low, vault_root=vault, rng=rng, now=now)
+    s_low = dream_corpus._compute_sampling_score(low, vault_root=vault, rng=rng, now=now)
 
     # With identical noise (same seed), importance ratio drives the result.
     # raw/memories/ = 3.0, raw/notes/screenshots/ = 0.8
@@ -298,36 +305,30 @@ def test_compute_sampling_score_components(vault: Path) -> None:
 
 
 def test_recency_decay_monotone(vault: Path) -> None:
-    import dream
-
     now = time.time()
-    fresh = dream._recency_decay(now, now=now)
-    old = dream._recency_decay(now - 365 * 86400, now=now)
-    very_old = dream._recency_decay(now - 1000 * 86400, now=now)
+    fresh = dream_corpus._recency_decay(now, now=now)
+    old = dream_corpus._recency_decay(now - 365 * 86400, now=now)
+    very_old = dream_corpus._recency_decay(now - 1000 * 86400, now=now)
     assert fresh == 1.0
     assert 0.0 < very_old < old < fresh
     # 90-day half-life check
-    half = dream._recency_decay(now - 90 * 86400, now=now)
+    half = dream_corpus._recency_decay(now - 90 * 86400, now=now)
     assert 0.49 < half < 0.51
 
 
 def test_importance_lookup(vault: Path) -> None:
-    import dream
-
-    assert dream._importance_for("raw/memories/m.md") == 3.0
-    assert dream._importance_for("raw/transcripts/jamie/foo.md") == 2.0
-    assert dream._importance_for("raw/transcripts/gmeet/bar.md") == 2.0
-    assert dream._importance_for("raw/notes/longform/baz.md") == 1.5
-    assert dream._importance_for("raw/notes/email/x.md") == 1.0
-    assert dream._importance_for("raw/notes/screenshots/y.md") == 0.8
-    assert dream._importance_for("raw/notes/other/z.md") == 1.0
-    assert dream._importance_for("raw/random/q.md") == 1.0
+    assert dream_corpus._importance_for("raw/memories/m.md") == 3.0
+    assert dream_corpus._importance_for("raw/transcripts/jamie/foo.md") == 2.0
+    assert dream_corpus._importance_for("raw/transcripts/gmeet/bar.md") == 2.0
+    assert dream_corpus._importance_for("raw/notes/longform/baz.md") == 1.5
+    assert dream_corpus._importance_for("raw/notes/email/x.md") == 1.0
+    assert dream_corpus._importance_for("raw/notes/screenshots/y.md") == 0.8
+    assert dream_corpus._importance_for("raw/notes/other/z.md") == 1.0
+    assert dream_corpus._importance_for("raw/random/q.md") == 1.0
 
 
 def test_never_dreamed_file_dominates_score(vault: Path) -> None:
     """A file with no last_dreamed_at: gets the sentinel; beats stamped files."""
-    import dream
-
     now = time.time()
     fresh = _write_substrate(vault, "raw/notes/email/fresh.md", "alex\n", mtime=now)
     # Stamped file: dreamed today
@@ -341,9 +342,9 @@ def test_never_dreamed_file_dominates_score(vault: Path) -> None:
     )
 
     rng = random.Random(42)
-    s_fresh = dream._compute_sampling_score(fresh, vault_root=vault, rng=rng, now=now)
+    s_fresh = dream_corpus._compute_sampling_score(fresh, vault_root=vault, rng=rng, now=now)
     rng = random.Random(42)
-    s_stamped = dream._compute_sampling_score(stamped, vault_root=vault, rng=rng, now=now)
+    s_stamped = dream_corpus._compute_sampling_score(stamped, vault_root=vault, rng=rng, now=now)
     assert s_fresh > s_stamped * 100  # huge ratio — sentinel is 1e6
 
 
@@ -353,26 +354,22 @@ def test_never_dreamed_file_dominates_score(vault: Path) -> None:
 def test_write_last_dreamed_at_records_side_state(vault: Path) -> None:
     """The stamp lands in the side-state JSON, NOT in the substrate file —
     raw/ is immutable (commit 3f35ab3, moved out of frontmatter)."""
-    import dream
-
     p = _write_substrate(vault, "raw/notes/email/no-fm.md", "Body only — no frontmatter.\n")
     before = p.read_text()
     when = datetime(2026, 5, 17, tzinfo=UTC)
-    assert dream._write_last_dreamed_at(p, when=when) is True
+    assert dream_corpus._write_last_dreamed_at(p, when=when) is True
     # Substrate file is byte-identical — no frontmatter synthesised.
     assert p.read_text() == before
     assert not p.read_text().startswith("---\n")
     # The raw side-state holds the stamp, keyed by the vault-relative path.
-    activation = dream._load_dream_activation()
+    activation = dream_corpus._load_dream_activation()
     assert activation.get("raw/notes/email/no-fm.md") == "2026-05-17"
     # …and the lookup resolves it (None-check is timezone-safe).
-    assert dream._get_last_dreamed_at(p) is not None
+    assert dream_corpus._get_last_dreamed_at(p) is not None
 
 
 def test_write_last_dreamed_at_leaves_substrate_untouched(vault: Path) -> None:
     """A file with its own frontmatter is never polluted with last_dreamed_at."""
-    import dream
-
     p = _write_substrate(
         vault,
         "raw/notes/email/with-fm.md",
@@ -380,22 +377,20 @@ def test_write_last_dreamed_at_leaves_substrate_untouched(vault: Path) -> None:
         frontmatter={"title": "x", "author": "alex"},
     )
     when = datetime(2026, 5, 17, tzinfo=UTC)
-    dream._write_last_dreamed_at(p, when=when)
+    dream_corpus._write_last_dreamed_at(p, when=when)
     fm, body = frontmatter.parse(p.read_text())
     assert fm == {"title": "x", "author": "alex"}  # unchanged, no last_dreamed_at
     assert "Body here." in body
     # The stamp lives in the side-state, keyed by the vault-relative path.
-    assert dream._load_dream_activation().get("raw/notes/email/with-fm.md") == "2026-05-17"
+    assert dream_corpus._load_dream_activation().get("raw/notes/email/with-fm.md") == "2026-05-17"
 
 
 def test_write_last_dreamed_at_idempotent_same_day(vault: Path) -> None:
     """Re-stamping with the same date is a no-op (don't churn the side-state)."""
-    import dream
-
     p = _write_substrate(vault, "raw/notes/email/x.md", "Body.\n")
     when = datetime(2026, 5, 17, 12, 0, tzinfo=UTC)
-    assert dream._write_last_dreamed_at(p, when=when) is True  # first stamp writes
-    assert dream._write_last_dreamed_at(p, when=when) is False  # same day → no-op
+    assert dream_corpus._write_last_dreamed_at(p, when=when) is True  # first stamp writes
+    assert dream_corpus._write_last_dreamed_at(p, when=when) is False  # same day → no-op
 
 
 def test_stamp_last_dreamed_at_batches_one_write(vault: Path) -> None:
@@ -411,23 +406,21 @@ def test_stamp_last_dreamed_at_batches_one_write(vault: Path) -> None:
     when = datetime(2026, 5, 17, tzinfo=UTC)
 
     assert dream._stamp_last_dreamed_at(paths, when=when) == 3
-    activation = dream._load_dream_activation()
+    activation = dream_corpus._load_dream_activation()
     for i in range(3):
         assert activation.get(f"raw/notes/email/batch-{i}.md") == "2026-05-17"
 
     # All already stamped today → no-op, store not even rewritten.
-    mtime_before = dream._DREAM_ACTIVATION_FILE.stat().st_mtime_ns
+    mtime_before = dream_corpus._DREAM_ACTIVATION_FILE.stat().st_mtime_ns
     assert dream._stamp_last_dreamed_at(paths, when=when) == 0
-    assert dream._DREAM_ACTIVATION_FILE.stat().st_mtime_ns == mtime_before
+    assert dream_corpus._DREAM_ACTIVATION_FILE.stat().st_mtime_ns == mtime_before
 
     # Pre-facade byte format (what _save_dream_activation wrote).
-    on_disk = dream._DREAM_ACTIVATION_FILE.read_text(encoding="utf-8")
+    on_disk = dream_corpus._DREAM_ACTIVATION_FILE.read_text(encoding="utf-8")
     assert on_disk == json.dumps(json.loads(on_disk), sort_keys=True, indent=2) + "\n"
 
 
 def test_dreams_since_last_seen_reads_stamp(vault: Path) -> None:
-    import dream
-
     # Fixed `now` (not datetime.now()): the stamp is a date string truncated to
     # midnight, so a wall-clock `now` drifted the gap out of [5,6) near midnight /
     # across timezones (flaky — saw 6.005). Pinning `now` to noon keeps the gap a
@@ -440,12 +433,12 @@ def test_dreams_since_last_seen_reads_stamp(vault: Path) -> None:
         "Body.\n",
         frontmatter={"last_dreamed_at": five_days_ago},
     )
-    days = dream._dreams_since_last_seen_days(p, now=now)
+    days = dream_corpus._dreams_since_last_seen_days(p, now=now)
     # stamp = 2026-06-05 (midnight) vs now = 2026-06-10 12:00 → ~5.5 days.
     assert 5.0 <= days < 6.0
 
     unstamped = _write_substrate(vault, "raw/notes/email/y.md", "Body.\n")
-    days_un = dream._dreams_since_last_seen_days(unstamped, now=now)
+    days_un = dream_corpus._dreams_since_last_seen_days(unstamped, now=now)
     assert days_un >= 1e5  # sentinel
 
 
@@ -569,8 +562,8 @@ def test_dream_entity_stamps_last_dreamed_at_after_sdk(
     assert res.kind is None, f"unexpected skip: {res.kind} ({res.sdk_result_text!r})"
 
     # Both substrate files were stamped — in the side-state, NOT in raw/.
-    assert dream._get_last_dreamed_at(p1) is not None, "p1 not stamped"
-    assert dream._get_last_dreamed_at(p2) is not None, "p2 not stamped"
+    assert dream_corpus._get_last_dreamed_at(p1) is not None, "p1 not stamped"
+    assert dream_corpus._get_last_dreamed_at(p2) is not None, "p2 not stamped"
     # The raw/ files themselves are untouched (no frontmatter pollution).
     assert frontmatter.parse(p1.read_text())[0] == {}
     assert frontmatter.parse(p2.read_text())[0] == {}

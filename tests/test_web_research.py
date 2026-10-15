@@ -257,18 +257,16 @@ def test_dream_standalone_wiring(tmp_path: Path, monkeypatch, capsys):
 
     import dream
 
-    monkeypatch.setattr(dream, "PEOPLE_DIR", kd / "people", raising=False)
-    monkeypatch.setattr(dream, "PROJECTS_DIR", kd / "projects", raising=False)
-    monkeypatch.setattr(dream, "AREAS_DIR", kd / "areas", raising=False)
-    monkeypatch.setattr(
-        dream,
+    from ._dream_paths import patch_dream_path
+
+    patch_dream_path(
+        monkeypatch,
         "_ENTITY_KINDS",
         {
             "people": (kd / "people", "person"),
             "projects": (kd / "projects", "project"),
             "areas": (kd / "areas", "area"),
         },
-        raising=False,
     )
 
     ent = dream._resolve_entity("founder")

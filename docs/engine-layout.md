@@ -168,7 +168,10 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 │   ├── menu.py                ← interactive home screen (`wiki` / `wiki menu`; `--json` for the desktop app)
 │   ├── menu_context.py        ← the home screen's context probe (status + suggestions; schema-2 JSON — an oracle payload)
 │   ├── doctor.py              ← `wiki doctor` — full vault-health audit (`--quick --json` — an oracle payload)
-│   ├── dream.py               ← dream cycle — periodic cross-time re-synthesis of entity pages (`wiki dream` / `wiki dream-entity`)
+│   ├── dream.py               ← dream cycle — periodic cross-time re-synthesis of entity pages (`wiki dream` / `wiki dream-entity`): one entity's synthesis, the sweep, the CLI
+│   ├── dream_model.py         ← dream entities (EntityRef, the kind table, resolve/list) + the cooldown age — the base the other dream modules share, so none imports dream.py
+│   ├── dream_corpus.py        ← what one synthesis reads: the M016 tiered corpus + its prompt render, the activation side-state, the insufficient-corpus backoff
+│   ├── dream_priority.py      ← M017 sweep priority: compute_entity_priority, build_sweep_candidates (every gate verdict once), _select_for_sweep
 │   ├── web_research.py        ← dream web-research — public-entity enrichment via Exa
 │   ├── triage.py              ← `wiki triage` — review + clear the intent-dispatch inbox (workspace/inbox/)
 │   ├── reindex.py             ← `wiki reindex` — deterministic knowledge/index.md reconciliation (core/index_sync.py)

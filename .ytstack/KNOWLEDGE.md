@@ -539,7 +539,7 @@ With `Write`/`Edit` in `allowed_tools`, the CLI fast-paths them as pre-approved 
 #### Wired
 
 - `scripts/core/sdk_scope.py` — `make_path_scope_gate` + `prompt_stream`
-- `scripts/compile_stages/compile.py:135` and `scripts/dream.py:883` — gated behind `CONFIG.features.compile_callback_gate` (default `True`)
+- `scripts/core/sdk_helpers.py:run_sdk_query` — the one wiring site since M021: a `SdkCallSpec.write_scope` (compile, dream) gets the PreToolUse hook that superseded this callback (next section), `deny_all_writes` (the reports agents) gets this `can_use_tool` gate; `CONFIG.features.compile_callback_gate = false` falls back to the legacy decorative shape
 - Probe stays in `scripts/probe_compile_scope.py` as the regression artifact; cost ~$0.07 per run
 
 #### Verified end-to-end (2026-05-31)
@@ -2917,6 +2917,13 @@ Per-candidate learnings from the 14-candidate seam arc (C01–C14). Decisions li
   guard pins the package's namespace (`tests/test_health_package.py`, RED on the old module).
   Survey the surface three ways before moving code: `setattr(module, "X"` strings,
   loops that call `setattr(module, name, …)` from a table, and plain reads `module.X`.
+  When the old module keeps a legitimate binding of its own (`dream.py` still reads
+  `ROOT_DIR` after `dream_corpus` / `dream_priority` split off), a stale patch cannot raise —
+  it patches one of three readers. The fix there is a static guard over the tests
+  (`tests/test_dream_layout.py`: every direct `setattr` on a dream module must name a
+  single binder, otherwise `tests/_dream_paths.py:patch_dream_path`). It also caught what
+  `raising=False` hides: `test_web_research` "patched" `_ENTITY_KINDS` on a module that no
+  longer bound it, which `raising=False` turns into a silent no-op.
 
 ### Desktop toolchain (C07)
 

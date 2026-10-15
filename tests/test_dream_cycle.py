@@ -31,6 +31,10 @@ from pathlib import Path
 
 import pytest
 
+import dream_corpus
+
+from ._dream_paths import patch_dream_path
+
 # ── Helpers ───────────────────────────────────────────────────────────
 
 
@@ -99,23 +103,23 @@ def vault(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Path]:
     # Late-import so the monkeypatched paths take effect inside dream.
     import dream
 
-    monkeypatch.setattr(dream, "ROOT_DIR", tmp_path)
+    # ROOT_DIR is read by dream, dream_corpus and dream_priority — patch every binder.
+    patch_dream_path(monkeypatch, "ROOT_DIR", tmp_path)
     monkeypatch.setattr(dream, "KNOWLEDGE_DIR", tmp_path / "knowledge")
-    monkeypatch.setattr(dream, "PEOPLE_DIR", tmp_path / "knowledge" / "people")
-    monkeypatch.setattr(dream, "PROJECTS_DIR", tmp_path / "knowledge" / "projects")
-    monkeypatch.setattr(dream, "AREAS_DIR", tmp_path / "knowledge" / "areas")
     monkeypatch.setattr(dream, "LOG_FILE", tmp_path / "knowledge" / "log.md")
     # Isolate the dream side-state files so tests never touch the real STATE_DIR.
-    monkeypatch.setattr(
-        dream, "_DREAM_ACTIVATION_FILE", tmp_path / "state" / "dream-activation.json"
+    patch_dream_path(
+        monkeypatch, "_DREAM_ACTIVATION_FILE", tmp_path / "state" / "dream-activation.json"
     )
-    monkeypatch.setattr(
-        dream, "_DREAM_INSUFFICIENT_FILE", tmp_path / "state" / "dream-insufficient-corpus.json"
+    patch_dream_path(
+        monkeypatch,
+        "_DREAM_INSUFFICIENT_FILE",
+        tmp_path / "state" / "dream-insufficient-corpus.json",
     )
-    # _ENTITY_KINDS holds Path values captured at module-import time — rebuild
-    # so the test's monkeypatched dirs are visible to _resolve_entity / _list_all_entities.
-    monkeypatch.setattr(
-        dream,
+    # _ENTITY_KINDS holds Path values captured at module-import time — patch the
+    # table itself (patching PEOPLE_DIR & co. after import would change nothing).
+    patch_dream_path(
+        monkeypatch,
         "_ENTITY_KINDS",
         {
             "people": (tmp_path / "knowledge" / "people", "person"),
@@ -653,9 +657,7 @@ def test_unexplained_noop_still_warns(vault: Path, monkeypatch: pytest.MonkeyPat
 
 
 def test_backoff_window_is_exponential_capped():
-    import dream
-
-    f = dream._insufficient_backoff_days
+    f = dream_corpus._insufficient_backoff_days
     assert f(0, base_days=7, max_days=30) == 0.0
     assert f(1, base_days=7, max_days=30) == 7.0
     assert f(2, base_days=7, max_days=30) == 14.0
@@ -686,13 +688,13 @@ def test_insufficient_corpus_run_records_and_backs_off(
 
     assert result.insufficient_corpus is True
     # State recorded → entity is now inside its backoff window.
-    assert is_within_backoff(dream, ent)
+    assert is_within_backoff(dream_corpus, ent)
     # And the sweep filter would skip it.
-    assert dream.is_within_insufficient_backoff(ent) is True
+    assert dream_corpus.is_within_insufficient_backoff(ent) is True
 
 
-def is_within_backoff(dream_mod, ent):
-    state = dream_mod._load_insufficient_state()
+def is_within_backoff(corpus_mod, ent):
+    state = corpus_mod._load_insufficient_state()
     return ent.slug in state and state[ent.slug]["count"] == 1
 
 
@@ -739,7 +741,7 @@ def test_successful_synthesis_clears_backoff(vault: Path, monkeypatch: pytest.Mo
 
     # Seed a pre-existing backoff entry.
     dream._record_insufficient_corpus("recovers")
-    assert dream.is_within_insufficient_backoff(dream._resolve_entity("recovers"))
+    assert dream_corpus.is_within_insufficient_backoff(dream._resolve_entity("recovers"))
 
     # A fake that actually writes the page → counts as a successful synthesis.
     from claude_agent_sdk import AssistantMessage, ResultMessage, TextBlock
@@ -771,7 +773,9 @@ def test_successful_synthesis_clears_backoff(vault: Path, monkeypatch: pytest.Mo
     result = asyncio.run(dream.dream_entity(ent))
 
     assert result.insufficient_corpus is False
-    assert "recovers" not in dream._load_insufficient_state(), "backoff not cleared after synthesis"
+    assert "recovers" not in dream_corpus._load_insufficient_state(), (
+        "backoff not cleared after synthesis"
+    )
 
 
 def test_sweep_skips_backed_off_entity(vault: Path, monkeypatch: pytest.MonkeyPatch) -> None:
