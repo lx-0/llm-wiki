@@ -70,12 +70,10 @@ from core.console import (
 from core.errors import swallow
 from core.paths import (
     AREAS_DIR,
-    DAILY_DIR,
     KNOWLEDGE_DIR,
     LOG_FILE,
     PEOPLE_DIR,
     PROJECTS_DIR,
-    RAW_DIR,
     ROOT_DIR,
     STATE_DIR,
 )
@@ -253,8 +251,6 @@ def is_within_cooldown(entity: EntityRef, *, cooldown_days: int | None = None) -
 # See `.ytstack/backlog/dream-sampled-activation.md` for the full design.
 
 
-_SUBSTRATE_ROOTS: tuple[Path, ...] = (RAW_DIR, DAILY_DIR)
-
 # Knowledge subfolders that hold operator-authored content (compile_role:
 # source-and-final). Dream-cycle walks these too — operator's hand-curated
 # concepts, areas, etc. ARE part of the entity's corpus even though they live
@@ -286,19 +282,6 @@ _NEVER_DREAMED_DAYS = 1_000_000.0
 # articles 10-30 KB) without letting one pathological 500 KB file dominate
 # the budget alone.
 _PER_FILE_TRUNCATION_CHARS = 8_000
-
-
-def _is_substrate_file(path: Path) -> bool:
-    if path.suffix.lower() != ".md":
-        return False
-    rel = path.resolve()
-    for root in _SUBSTRATE_ROOTS:
-        try:
-            rel.relative_to(root.resolve())
-            return True
-        except ValueError:
-            continue
-    return False
 
 
 def _mentions_entity(text: str, slug: str) -> bool:

@@ -100,14 +100,11 @@ def vault(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Path]:
     import dream
 
     monkeypatch.setattr(dream, "ROOT_DIR", tmp_path)
-    monkeypatch.setattr(dream, "RAW_DIR", tmp_path / "raw")
-    monkeypatch.setattr(dream, "DAILY_DIR", tmp_path / "daily")
     monkeypatch.setattr(dream, "KNOWLEDGE_DIR", tmp_path / "knowledge")
     monkeypatch.setattr(dream, "PEOPLE_DIR", tmp_path / "knowledge" / "people")
     monkeypatch.setattr(dream, "PROJECTS_DIR", tmp_path / "knowledge" / "projects")
     monkeypatch.setattr(dream, "AREAS_DIR", tmp_path / "knowledge" / "areas")
     monkeypatch.setattr(dream, "LOG_FILE", tmp_path / "knowledge" / "log.md")
-    monkeypatch.setattr(dream, "_SUBSTRATE_ROOTS", (tmp_path / "raw", tmp_path / "daily"))
     # Isolate the dream side-state files so tests never touch the real STATE_DIR.
     monkeypatch.setattr(
         dream, "_DREAM_ACTIVATION_FILE", tmp_path / "state" / "dream-activation.json"
