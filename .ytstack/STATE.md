@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-15T19:58:00+02:00
+last_updated: 2026-10-15T20:13:00+02:00
 current_milestone: M034
 active_slice: S01
-active_task: T06
+active_task: none
 last_completed_milestone: M033
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -12,15 +12,21 @@ parallel_milestones: [M021, M025, M027, M029]
 
 # State
 
-## Next action — M034 / S01 5/7: dispatcher + surface diet
+## Next action — M034 / S01 6/7: dispatcher + surface diet
 
-**Status:** M034 / S01 — 5 of 7 tasks done. T01–T02 are the bash oracle, T03 the decisions,
-T04 the one-hop bootstrap, T05 home & status in the catalogue. Engine 0.7.6, suite 2340, CI
-green on `25026f7`.
-**Next:** S01-T06 is planned (`M034-S01-T06-PLAN.md`): the `dream` / `dream-entity` routing
-(default route, argument prefixes) and the auth aliases (kind `alias`) move into the
-catalogue, with four deterministic paths recorded from bash first. Then T07, the consumer
-smoke. `status` now lives in S03-T02.
+**Status:** M034 / S01 — 6 of 7 tasks done. T01–T02 are the bash oracle, T03 the decisions,
+T04 the one-hop bootstrap, T05 home & status and T06 the dream routing + OAuth aliases in the
+catalogue. Engine 0.7.7, suite 2361, CI green on `2bf80f3`.
+**Next:** `ytstack:plan-task` → S01-T07, the consumer smoke on the scratch vault at S01's head
+(the desktop app's spawns, the Obsidian buttons, the `~/.local/bin/wiki` symlink, the skill),
+then `reassess-roadmap` for S01.
+
+**M034 / S01-T06** (`2ea37a0`, `2bf80f3`): `dream` runs as six routes over `dream.py` with
+`sweep` as the default route, `dream-entity` with the prefix `entity`, and
+`gmail-`/`gmeet-`/`calendar-auth` as aliases.
+- **Gone from bash:** `cmd_dream`, `cmd_dream_entity`, `_run_script` and `wants_json`;
+  `wiki` is down to 684 lines.
+- **`test_bash_json_banner.py`** now holds the `--json` seam end to end.
 
 **M034 / S01-T05** (`2ad21f4`, `25026f7`): `menu` (+ a bannerless `--json` route), `doctor`
 and `version` (`engine_version.py`) are catalogue commands.
