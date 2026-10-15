@@ -94,6 +94,10 @@ READ_ONLY: dict[str, tuple[str, ...]] = {
     "dream-entity-bare": ("dream-entity",),
     "dream-web-research-help": ("dream", "web-research", "--help"),
     "auth-alias-help": ("gmeet-auth", "--help"),
+    # `wiki config`'s error paths, before S02-T02 ports it
+    "config-get-usage": ("config", "get"),
+    "config-set-usage": ("config", "set", "models.compile_model"),
+    "config-get-unknown-key": ("config", "get", "nope.key"),
 }
 
 
@@ -288,6 +292,16 @@ MUTATING: dict[str, tuple[tuple[str, ...], str | None, Prepare]] = {
     "install-shortcut": (("install-shortcut",), None, None),
     "install-shortcut-print-only": (("install-shortcut", "--print-only"), None, None),
     "version-not-a-checkout": (("version",), None, _engine_not_a_checkout),
+    # `wiki config` before S02-T02: a value that does not coerce writes nothing; bare
+    # `wiki config` is the interactive editor — exit at once (8), or models (1) →
+    # models.dream_model (4) → a value, then exit
+    "config-set-uncoercible": (
+        ("config", "set", "scheduling.compile_after_hour", "late"),
+        None,
+        None,
+    ),
+    "config-edit-exit": (("config",), "8\n", None),
+    "config-edit-set": (("config",), "1\n4\nclaude-sonnet-4-6\n8\n", None),
 }
 
 

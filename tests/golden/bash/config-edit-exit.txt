@@ -1,0 +1,22 @@
+$ wiki config
+stdin: '8\n'
+exit: 0
+--- stdout ---
+wiki config — edit
+Pick a section, then a key. Enter on a key skips it.
+
+
+
+✓ Done.
+--- stderr ---
+    1) models
+    2) scheduling
+    3) features
+    4) piggybacks
+    5) limits
+    6) graph_view
+    7) skills
+  * 8) exit
+Section [8]: 
+--- change ---
+(none)

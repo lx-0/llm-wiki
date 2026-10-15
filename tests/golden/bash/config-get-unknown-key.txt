@@ -1,0 +1,5 @@
+$ wiki config get nope.key
+exit: 1
+--- stdout ---
+--- stderr ---
+'Unknown key: nope.key'

@@ -1,0 +1,5 @@
+$ wiki config set models.compile_model
+exit: 1
+--- stdout ---
+--- stderr ---
+✗ usage: wiki config set KEY VALUE

@@ -1,0 +1,61 @@
+$ wiki config
+stdin: '1\n4\nclaude-sonnet-4-6\n8\n'
+exit: 0
+--- stdout ---
+wiki config — edit
+Pick a section, then a key. Enter on a key skips it.
+
+
+
+Current values in models:
+  1) models.compile_model                               = claude-opus-4-8
+  2) models.compile_default_route_model                 = claude-haiku-4-5-<REV>
+  3) models.compile_large_source_model                  = claude-opus-4-8[1m]
+  4) models.dream_model                                 = claude-opus-4-8[1m]
+  5) models.intent_classify_model                       = claude-haiku-4-5
+  6) models.folder_scan_provider                        = claude-sdk
+  7) models.ollama_url                                  = http://127.0.0.1:9
+  8) models.vision_model                                = gemma4:e4b
+  9) models.curiosity_model                             = llama3.1:8b
+  10) models.classify_model                              = gemma4:e4b
+Pick a key to edit (number, or 'b' to go back): 
+Set models.dream_model [current: claude-opus-4-8[1m]]: set models.dream_model = 'claude-sonnet-4-6'
+✓ models.dream_model = claude-sonnet-4-6
+
+
+✓ Done.
+--- stderr ---
+    1) models
+    2) scheduling
+    3) features
+    4) piggybacks
+    5) limits
+    6) graph_view
+    7) skills
+  * 8) exit
+Section [8]:     1) models
+    2) scheduling
+    3) features
+    4) piggybacks
+    5) limits
+    6) graph_view
+    7) skills
+  * 8) exit
+Section [8]: 
+--- change ---
++ <VAULT>/.wiki/state/config-backups/config-<STAMP>.yaml
+    # bash-oracle fixture config — defaults, Ollama on a closed port
+    models:
+      ollama_url: http://127.0.0.1:9
+~ <VAULT>/.wiki/config.yaml
+    @@ -1,3 +1,9 @@
+    -# bash-oracle fixture config — defaults, Ollama on a closed port
+    +# Wiki Config — single source of truth for tunable parameters.
+    +# Defaults live in .wiki/scripts/core/config.py; only overrides need
+    +# to be in this file. Edit by hand or via `./.wiki/wiki config set …`.
+    +# Note: comments not present here are dropped on programmatic writes.
+    +# Round-robin backups in .wiki/state/config-backups/ (last 10 saves).
+    +
+     models:
+       ollama_url: http://127.0.0.1:9
+    +  dream_model: claude-sonnet-4-6

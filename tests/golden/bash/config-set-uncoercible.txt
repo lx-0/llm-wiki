@@ -1,0 +1,7 @@
+$ wiki config set scheduling.compile_after_hour late
+exit: 1
+--- stdout ---
+--- stderr ---
+invalid literal for int() with base 10: 'late'
+--- change ---
+(none)
