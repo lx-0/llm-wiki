@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-15T20:20:00+02:00
+last_updated: 2026-10-15T20:24:00+02:00
 current_milestone: M034
-active_slice: S01
-active_task: T07
+active_slice: none
+active_task: none
 last_completed_milestone: M033
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -12,16 +12,28 @@ parallel_milestones: [M021, M025, M027, M029]
 
 # State
 
-## Next action — M034 / S01 6/7: dispatcher + surface diet
+## Next action — M034 / S01 complete (7/7): reassess, then S02
 
-**Status:** M034 / S01 — 6 of 7 tasks done. T01–T02 are the bash oracle, T03 the decisions,
-T04 the one-hop bootstrap, T05 home & status and T06 the dream routing + OAuth aliases in the
-catalogue. Engine 0.7.7, suite 2361, CI green on `2bf80f3`.
-**Next:** S01-T07 is planned (`M034-S01-T07-PLAN.md`), the consumer smoke on the scratch
-vault, then `reassess-roadmap` for S01.
-- **Found while planning:** the use-llm-wiki skill runs the vault dashboard through a bare
-  `uv run --project .wiki`. On an iCloud vault that recreates the in-vault venv.
-- **Fixed in T07:** a `wiki stats` command.
+**Status:** M034 / S01 is complete, with all 7 tasks done. It delivered:
+- the bash oracle (T01–T02);
+- the one-hop and rename decisions (T03);
+- the one-hop bootstrap (T04);
+- home & status (T05) and the dream routing + OAuth aliases (T06) in the catalogue;
+- the consumer smoke, 24/24 (T07).
+
+Engine 0.7.8, suite 2362, CI green on `13f5a73`.
+**Next:** `ytstack:reassess-roadmap` for S01, passing S01 explicitly because `active_slice`
+is cleared. Then `ytstack:plan-task` for S02-T01 (config + setup).
+
+**M034 / S01-T07** (`13f5a73`): every consumer of `.wiki/wiki` works at S01's head:
+- the desktop app's spawn shape;
+- the Obsidian buttons through zsh;
+- a shortcut symlink run from outside the vault;
+- the use-llm-wiki skill's commands.
+
+The skill pass found a defect, fixed here as `wiki stats`: the skill ran the dashboard
+through a bare `uv run --project .wiki`, which on an iCloud vault recreates the in-vault venv
+(release 0.7.8). PROCESS.md's 12 bare lines are listed in S06-T03.
 
 **M034 / S01-T06** (`2ea37a0`, `2bf80f3`): `dream` runs as six routes over `dream.py` with
 `sweep` as the default route, `dream-entity` with the prefix `entity`, and

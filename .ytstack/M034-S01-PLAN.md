@@ -5,7 +5,7 @@ project: llm-wiki
 created: 2026-10-15T18:15:32+02:00
 status: planned
 task_count: 7
-completed_tasks: 6
+completed_tasks: 7
 ---
 
 # M034-S01 -- Slice Plan
@@ -57,7 +57,7 @@ in the Python catalogue.
   sweep, `list-candidates`, `web-research`, their banners) and the `gmail-auth` /
   `gmeet-auth` / `calendar-auth` aliases. Their bash functions and case lines are deleted, and
   the oracle is unchanged.
-- [ ] T07 -- Consumers smoke on scratch:
+- [x] T07 -- Consumers smoke on scratch:
   - the desktop app's `wikiBin` spawn (`menu --json`, `doctor --json`);
   - the eight Obsidian shell-command buttons' command lines;
   - `~/.local/bin/wiki`-style symlink invocation;
