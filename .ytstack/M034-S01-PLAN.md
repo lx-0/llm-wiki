@@ -5,7 +5,7 @@ project: llm-wiki
 created: 2026-10-15T18:15:32+02:00
 status: planned
 task_count: 6
-completed_tasks: 0
+completed_tasks: 1
 ---
 
 # M034-S01 -- Slice Plan
@@ -17,7 +17,7 @@ in the Python catalogue.
 
 ## Tasks
 
-- [ ] T01 -- Bash oracle, read-only commands. A fixture vault plus a fixture `HOME`, the
+- [x] T01 -- Bash oracle, read-only commands. A fixture vault plus a fixture `HOME`, the
   bash `wiki` run under them, and normalised stdout / stderr / exit code recorded as goldens
   for:
   - `help` and the four bash help texts;

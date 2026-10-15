@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-15T18:22:00+02:00
+last_updated: 2026-10-15T18:28:41+02:00
 current_milestone: M034
 active_slice: S01
-active_task: T01
+active_task: none
 last_completed_milestone: M033
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -30,10 +30,18 @@ parallel_milestones: [M021, M025, M027, M029]
 bootstrap 6, config + setup 5, hooks + skills 4, seed 4, update + the last bash 5, surface
 diet + close 6.
 
-**M034 / S01 / T01 planned** (`M034-S01-T01-PLAN.md`): the bash oracle for the read-only
-commands. It uses an engine copy in a fixture vault, a fixture `HOME`, and a `uv` shim onto
-the repo venv, so no run mutates an env. Goldens go to `tests/golden/bash/`. Next: execute
-T01.
+**M034 / S01 1/6** — T01 (`e574a13`, `dcfeebb`): the bash oracle records 25 read-only
+invocations of the real `wiki` from the bash (`tests/golden/bash/`).
+- **How it runs:** an engine copy in the fixture vault, a scratch HOME, and a `uv` shim onto
+  the test venv; about 4 s, order-independent.
+- **Portability:** the same goldens hold on macOS (bash 3.2) and the Ubuntu runner (bash 5).
+- **Seen to fail:** a one-word change in a help text breaks the matching golden.
+- **Found while recording:** the engine copy needs `prompts/`, and the doctor JSON carries
+  two machine values (now normalised).
+
+Two S02 plan lines were corrected against the bash: the prompts are line-based, and
+`install-shortcut` only prints the rc line. Suite 2298, CI green. Next:
+`ytstack:plan-task` → S01-T02 (the mutating commands).
 
 ## M033 COMPLETE (L, 2026-10-15): engine modernisation → M034 dispatcher + surface diet
 
