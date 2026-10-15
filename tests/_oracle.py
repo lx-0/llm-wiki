@@ -337,13 +337,15 @@ def write_uv_shim(bin_dir: Path) -> Path:
 
     Nothing outside the fixture is synced or changed. With `WIKI_ORACLE_UV_LOG` set, each
     call appends its arguments as one line to that file — how a test sees whether, and how,
-    the bash called uv."""
+    the bash called uv. With `WIKI_ORACLE_UV_FAIL=<code>`, `sync` exits with that code and
+    says nothing — a uv that cannot run (an asdf shim under a foreign HOME exits 126 so)."""
     bin_dir.mkdir(parents=True, exist_ok=True)
     shim = bin_dir / "uv"
     shim.write_text(
         "#!/bin/sh\n"
         '[ -n "${WIKI_ORACLE_UV_LOG:-}" ] && printf "%s\\n" "$*" >> "$WIKI_ORACLE_UV_LOG"\n'
         'if [ "${1:-}" = sync ]; then\n'
+        '  [ -n "${WIKI_ORACLE_UV_FAIL:-}" ] && exit "$WIKI_ORACLE_UV_FAIL"\n'
         '  venv="${UV_PROJECT_ENVIRONMENT:-}"\n'
         '  while [ "$#" -gt 1 ]; do\n'
         '    [ "$1" = --project ] && [ -z "$venv" ] && venv="$2/.venv"\n'

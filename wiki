@@ -206,11 +206,17 @@ _dispatch_python() {
   # `uv run` also synced the venv whenever uv.lock / pyproject.toml changed (a pull
   # outside `wiki update`, a hand edit). Kept: no venv yet, or either file newer than
   # the last sync's stamp → `uv sync` first. `--inexact` is `uv run`'s sync (it never
-  # removes extra packages); under `set -e` a failed sync stops here, stamp untouched.
+  # removes extra packages). A failed sync stops here, stamp untouched — and says so: a
+  # uv that cannot run at all (an asdf shim under a foreign HOME exits 126) prints nothing
+  # of its own. The hint names the venv, so following it never recreates .wiki/.venv inside
+  # a cloud-synced vault.
   local stamp="$venv/.wiki-synced"
   if [[ ! -x "$venv/bin/python" || "$WIKI_DIR/uv.lock" -nt "$stamp" \
         || "$WIKI_DIR/pyproject.toml" -nt "$stamp" ]]; then
-    uv sync --quiet --inexact --project "$WIKI_DIR"
+    if ! uv sync --quiet --inexact --project "$WIKI_DIR"; then
+      die "uv sync failed — the engine's environment is behind uv.lock. To see why, run:
+  UV_PROJECT_ENVIRONMENT=$venv uv sync --project $WIKI_DIR"
+    fi
     touch "$stamp"
   fi
   # What `uv run` puts in the environment, measured: the venv's bin/ first on PATH and

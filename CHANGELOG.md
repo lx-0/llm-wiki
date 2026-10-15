@@ -35,6 +35,14 @@ in the same commit.
   - `wiki setup --help` lists all six questions (it said five and left out the global
     skill).
 
+### Fixed
+
+- **`wiki` could stop without a word when its environment needed an update.** After the
+  engine's `uv.lock` changed, `wiki` first brings its Python environment up to date. If `uv`
+  itself could not run (for example an asdf-installed `uv` under a different `HOME`), `wiki`
+  ended with exit code 126 and no message. It now says the update failed, and names the
+  command that shows why.
+
 ## [0.7.11] — 2026-10-15
 
 **For your vault:** no config key changed, so there is no migration. If you answered "no" to

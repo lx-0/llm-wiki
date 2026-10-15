@@ -147,6 +147,23 @@ def test_a_cloud_synced_vault_runs_the_venv_under_home(
     assert f"ppid={os.getpid()}" in record
 
 
+def test_a_failing_sync_says_so_and_runs_nothing(hop: dict[str, Path]) -> None:
+    """A uv that cannot run used to end `wiki` with its exit code and no word (found on the
+    scratch vault, M034-S02-T03: an asdf shim under a foreign HOME, exit 126, empty output)."""
+    venv = _stub_venv(hop["wiki"] / ".venv", synced_ago=120)
+    stamp_before = (venv / ".wiki-synced").stat().st_mtime
+    edited = time.time() - 60
+    os.utime(hop["wiki"] / "uv.lock", (edited, edited))
+
+    run, record, _ = _run(hop, "collect", "--list", WIKI_ORACLE_UV_FAIL="126")
+
+    assert run.returncode != 0
+    assert record == []  # Python never started on the stale environment
+    assert "uv sync failed" in run.stderr
+    assert f"UV_PROJECT_ENVIRONMENT={venv} uv sync --project {hop['wiki']}" in run.stderr
+    assert (venv / ".wiki-synced").stat().st_mtime == stamp_before
+
+
 def test_a_relative_project_environment_stays_on_uv_run(hop: dict[str, Path]) -> None:
     # uv resolves a relative UV_PROJECT_ENVIRONMENT itself, so the bash does not guess where
     # the venv is: the call stays the `uv run` it was before the hop
