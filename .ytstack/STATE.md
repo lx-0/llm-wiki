@@ -1,9 +1,9 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-15T21:31:00+02:00
+last_updated: 2026-10-15T21:44:00+02:00
 current_milestone: M034
-active_slice: S02
+active_slice: S03
 active_task: none
 last_completed_milestone: M033
 parked_milestone: none
@@ -12,7 +12,37 @@ parallel_milestones: [M021, M025, M027, M029]
 
 # State
 
-## Next action — M034 / S02: config + setup
+## Next action — M034 / S03: hooks + skills + status
+
+**Status:** M034 — slices S01 and S02 complete (2/6). Next slice: S03 (hooks + skills +
+`wiki status`). The reassessment after S02 came out **A**: the slice order holds. Its findings
+are already in the plans:
+- S03-T02 fixes the hooks installer's false "✓ Done" in the bash before recording it;
+- S05-T04 has install.sh write the sync stamp.
+
+Engine 0.7.14, suite 2428, CI green on `fa23801`. The bash now owns hooks / skills / seed /
+update / status; `wiki` is at 539 lines.
+**Next:** `ytstack:plan-task` → S03-T01, the agent registry in Python. Its payloads must be
+byte-identical to the bash `jq` output (the S01 goldens + `test_hooks_merge.py`).
+
+**M034 / S02 — complete (5/5, 2026-10-15).** It delivered:
+- line-based prompts on `core/console`, reading byte by byte (T01);
+- `wiki config` (T02);
+- the setup wizard and `wiki setup`, whose hooks child reads its own answers from the piped
+  stdin (T03);
+- `install-shortcut` (T04);
+- the docs pass and a fresh-vault end-to-end run through `install.sh` (T05).
+
+Recording the bash first found five defects, each fixed:
+- the wizard wrote its validation warning into config.yaml;
+- `procmail_execution` never gated anything;
+- a failing `uv sync` was silent;
+- `install-shortcut` `rm -f`'d a regular file;
+- `install.sh` said 5 questions.
+
+The S03 hooks defect is planned.
+
+## M034 / S02: config + setup (history)
 
 **Status:** M034 — slice S01 complete. Next slice: S02 (config + setup). The reassessment
 after S01 came out **B**: the slice order holds, but the bash library files now retire with

@@ -5,7 +5,7 @@ size: L
 created: 2026-10-15T18:13:20+02:00
 status: planned
 total_slices: 6
-completed_slices: 1
+completed_slices: 2
 ---
 
 # M034 Roadmap
@@ -43,7 +43,7 @@ and three tables.
     dream-entity routing, the OAuth aliases (`status` moved to S03, where its second bash
     library is ported).
   - Decide open questions 1 and 2.
-- [ ] S02 -- **Config + setup** (5 tasks). Prompt helpers on `core/console`, the setup
+- [x] S02 -- **Config + setup** (5 tasks). Prompt helpers on `core/console`, the setup
   wizard, `config get/set/edit/status`, `install-shortcut` (symlink + rc line, with backups).
   `lib/config.sh` and `lib/ui.sh` shrink to what later slices still call, and each file
   retires with its last caller (reassessed after S01):

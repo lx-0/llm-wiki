@@ -5,7 +5,7 @@ project: llm-wiki
 created: 2026-10-15T18:15:32+02:00
 status: planned
 task_count: 5
-completed_tasks: 4
+completed_tasks: 5
 ---
 
 # M034-S02 -- Slice Plan
@@ -52,7 +52,7 @@ later slices still call. Each file is deleted with its last caller: `config.sh` 
   at another vault is replaced without a prompt, and `--print-only` writes nothing. When
   `~/.local/bin` is not on PATH, the command prints the rc line; it never edits an rc file,
   exactly as the bash does today. Parity on the fixture `HOME`.
-- [ ] T05 -- The bash `cmd_config`, `cmd_setup` and `cmd_install_shortcut` are deleted with
+- [x] T05 -- The bash `cmd_config`, `cmd_setup` and `cmd_install_shortcut` are deleted with
   their case lines, and so are the `lib/config.sh` / `lib/ui.sh` functions whose last caller
   they were. That covers the wizard, `config_cmd_edit`, `config_keys`, `config_path`, the
   validators and `ask`, with the exact set re-derived by grep at the time. These stay:
