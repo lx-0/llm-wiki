@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-15T20:29:00+02:00
+last_updated: 2026-10-15T20:37:00+02:00
 current_milestone: M034
 active_slice: S02
-active_task: T01
+active_task: none
 last_completed_milestone: M033
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -20,10 +20,13 @@ their last caller. `lib/config.sh` goes in S03-T04, `lib/ui.sh` in S05-T04. `wik
 hooks step dispatches `wiki hooks install` until S03, and S02-T01's prompt helpers read stdin
 byte by byte so piped answers survive into that child. Details: M034-CONTEXT "Reassessment
 2026-10-15T20:26".
-**Next:** S02-T01 is planned (`M034-S02-T01-PLAN.md`): line-based prompt helpers on
-`core/console` that read byte by byte. Open question 3 is decided on measurements: on a pipe,
-questionary and prompt_toolkit warn, write terminal redraws to stdout, and swallow the
-remaining stdin.
+**M034 / S02 1/5.** T01 (`1dddd19`) put line-based prompt helpers on `core/console`
+(`confirm` / `ask` / `select_one` / `select_many` / `pause` over a byte-wise `read_line`, every
+prompt on stderr). Open question 3 is decided on measurements (DECISIONS "Prompts in Python").
+Suite 2389, CI green.
+**Next:** `ytstack:plan-task` → S02-T02, `config get/set/keys/path/status/edit` in the
+catalogue over `core.config`, at parity with the S01 goldens. `config_cmd_status` stays in
+bash for `cmd_status` until S03.
 
 **M034 / S01 — complete (7/7).** It delivered:
 - the bash oracle (T01–T02);

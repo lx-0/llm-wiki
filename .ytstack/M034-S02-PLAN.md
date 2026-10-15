@@ -5,7 +5,7 @@ project: llm-wiki
 created: 2026-10-15T18:15:32+02:00
 status: planned
 task_count: 5
-completed_tasks: 0
+completed_tasks: 1
 ---
 
 # M034-S02 -- Slice Plan
@@ -17,7 +17,7 @@ later slices still call. Each file is deleted with its last caller: `config.sh` 
 
 ## Tasks
 
-- [ ] T01 -- Prompt helpers on `core/console`: confirm, ask, select_one, select_many, pause,
+- [x] T01 -- Prompt helpers on `core/console`: confirm, ask, select_one, select_many, pause,
   next to `read_key`. Open question 3 is decided in DECISIONS (OSS candidates weighed, the
   per-vault dependency cost measured). They are line-based like `lib/ui.sh`: `read -r`
   semantics, so an answer piped on stdin is read and EOF takes the default (that is how the
