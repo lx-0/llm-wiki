@@ -34,13 +34,14 @@ Suggested framing (refine in slice-milestone; the starting point is measured in 
 size is L with six slices; the template's floor of four is too few for 2,885 lines of bash
 and three tables.
 
-- [ ] S01 -- **Oracle + bootstrap** (6 tasks).
+- [ ] S01 -- **Oracle + bootstrap** (7 tasks; re-cut after T04, see the slice plan's notes).
   - Extend the oracle to the bash commands' observable behaviour (fixture vault + fixture
     `HOME`), recorded from the bash version.
   - The thin `wiki`: symlink resolution, vault guard, venv resolution, `exec` of the venv
     Python into `cli.py`.
-  - Port the thin wrappers into the catalogue: menu, doctor, status, version, help, dream and
-    dream-entity routing, the OAuth aliases.
+  - Port the thin wrappers into the catalogue: menu, doctor, version, help, dream and
+    dream-entity routing, the OAuth aliases (`status` moved to S03, where its second bash
+    library is ported).
   - Decide open questions 1 and 2.
 - [ ] S02 -- **Config + setup** (5 tasks). Prompt helpers on `core/console`, the setup
   wizard, `config get/set/edit/status`, `install-shortcut` (symlink + rc line, with backups);

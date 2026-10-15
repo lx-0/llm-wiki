@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-15T19:42:00+02:00
+last_updated: 2026-10-15T19:41:00+02:00
 current_milestone: M034
 active_slice: S01
-active_task: none
+active_task: T05
 last_completed_milestone: M033
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -16,9 +16,11 @@ parallel_milestones: [M021, M025, M027, M029]
 
 **Status:** M034 / S01 — 4 of 6 tasks done (T01–T02 the bash oracle, T03 the decisions, T04
 the one-hop bootstrap). Engine 0.7.5, suite 2327, CI green on `cb40e20`.
-**Next:** `ytstack:plan-task` → S01-T05, the thin wrappers into the catalogue (`menu`,
-`doctor`, `version`, the `dream` routing, the auth aliases). `status` composes two bash
-libraries (`config status` + `hooks status`), so check whether it belongs to S03.
+**Next:** S01-T05 is planned (`M034-S01-T05-PLAN.md`): `menu`, `doctor`, `version`, `help`
+and the bare entry move into the catalogue. S01 was re-cut to 7 tasks (slice plan notes):
+- T06 takes the `dream` routing and the auth aliases;
+- T07 is the consumer smoke;
+- `status` moved to S03-T02, since it composes two bash libraries ported there.
 
 **M034 / S01-T04** (`c977b08`, `e9eb4a2`, `07f15d1`, `cb40e20`): `wiki` execs the venv's
 python straight into `cli.py`.

@@ -22,7 +22,9 @@ byte-identical to what the bash wrote, and agent configs are merged with backups
   goldens plus `test_hooks_merge.py`).
 - [ ] T02 -- The merge into each agent's config, install one, uninstall one, and the `hooks
   install/uninstall/status` commands with the scope prompt. Other tools' hooks survive the
-  merge, backups follow the existing rule, and parity holds on the fixture `HOME`.
+  merge, backups follow the existing rule, and parity holds on the fixture `HOME`. `wiki
+  status` comes here as well (moved from S01-T05): a banner over S02's `config status` and
+  this task's `hooks status`.
 - [ ] T03 -- Skills in Python: the engine-owned check, the global-enable flag, registry
   add / remove, `skills install/uninstall/sync/status`, and the silent install / prune
   variants that `setup` and `update` call. Parity on the fixture `HOME`.

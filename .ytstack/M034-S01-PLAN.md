@@ -4,7 +4,7 @@ slice: S01
 project: llm-wiki
 created: 2026-10-15T18:15:32+02:00
 status: planned
-task_count: 6
+task_count: 7
 completed_tasks: 4
 ---
 
@@ -49,14 +49,15 @@ in the Python catalogue.
   - the process tree after (dispatcher + handler), measured the T03 way;
   - a test that no `uv` is called while the venv is current;
   - the full oracle, unchanged.
-- [ ] T05 -- Port the thin wrappers into `cli_catalog`:
-  - `menu`, `doctor`, `status`, `version`;
-  - the `dream` / `dream-entity` argv routing;
-  - the `gmail-auth` / `gmeet-auth` / `calendar-auth` aliases.
-
-  Their bash functions are deleted; the oracle is unchanged, apart from differences decided
-  in the commit.
-- [ ] T06 -- Consumers smoke on scratch:
+- [ ] T05 -- Port the home & status wrappers into `cli_catalog`: `menu` (home screen,
+  `--json`), `doctor`, `version`, and the bare `wiki` entry (home screen on a TTY, help
+  otherwise). Their bash functions are deleted; the oracle is unchanged, apart from
+  differences decided in the commit.
+- [ ] T06 -- Port the argv routing into `cli_catalog`: `dream` / `dream-entity` (the implicit
+  sweep, `list-candidates`, `web-research`, their banners) and the `gmail-auth` /
+  `gmeet-auth` / `calendar-auth` aliases. Their bash functions and case lines are deleted, and
+  the oracle is unchanged.
+- [ ] T07 -- Consumers smoke on scratch:
   - the desktop app's `wikiBin` spawn (`menu --json`, `doctor --json`);
   - the eight Obsidian shell-command buttons' command lines;
   - `~/.local/bin/wiki`-style symlink invocation;
@@ -74,3 +75,12 @@ bash-owned command; `wiki` dispatches without a `uv run` parent.
 The oracle is the contract for S02–S05: each port is measured against what the bash did,
 recorded before the port. Normalise only what is genuinely volatile (timestamps, absolute tmp
 paths, backup suffixes), and say so in the golden's header.
+
+**Re-cut after T04 (2026-10-15).** The old T05 split in two, and the consumer smoke became
+T07.
+- **`status` moved to S03-T02.** `cmd_status` is a banner over two bash libraries:
+  `config_cmd_status` (`lib/config.sh`, ported in S02-T02) and `hooks_status_table`
+  (`lib/hooks.sh`, ported in S03-T02). Porting it in S01 would either pull both forward or
+  call back into bash, and "no bash fallback" is a locked decision.
+- **The split is by the catalogue machinery each half needs.** T05 needs the in-process
+  bare entry and plain handler commands; T06 needs args-prefixed routes and aliases.
