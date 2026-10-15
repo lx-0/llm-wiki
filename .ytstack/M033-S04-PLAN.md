@@ -5,7 +5,7 @@ project: llm-wiki
 created: 2026-10-14T18:50:00+02:00
 status: planned
 task_count: 7
-completed_tasks: 2
+completed_tasks: 3
 ---
 
 # M033-S04 -- Slice Plan
@@ -16,7 +16,7 @@ completed_tasks: 2
 
 - [x] T01 -- The measurement as a test: `tests/test_function_length.py` walks `scripts/` with `ast`, fails on any function ≥ 150 lines not in an explicit allowlist (initially the 15 measured 2026-10-14, each with its line count), and fails when an allowlisted function has shrunk below the limit without being removed from the list — so the list can only shrink; generated tables (`core/config_schema.py`) excluded by path with a reason.
 - [x] T02 -- `dream.py` (2,014 lines): `dream_entity` (395 measured 2026-10-15) split along its phases (select → render prompt → SDK call → write-back → report) and `_async_main` (152) along its argv branches; the module split into `dream/` (entity, sweep, candidates, web-research) if the function split exposes the seams; argv routing unchanged on the oracle and `wiki dream …` smoke.
-- [ ] T03 -- Compile path: `compile.main` (317) and `_run_compile_route` (154) in `compile.py`, `compile_source` (212) in `compile_stages/compile.py` — extracted into the stage functions their comments already name (selection, retry ladder, failure classification, summary); `tests/test_compile_*` green, E2E smoke on three files (KNOWLEDGE "E2E smoke irreplaceable").
+- [x] T03 -- Compile path: `compile.main` (317) and `_run_compile_route` (154) in `compile.py`, `compile_source` (212) in `compile_stages/compile.py` — extracted into the stage functions their comments already name (selection, retry ladder, failure classification, summary); `tests/test_compile_*` green, E2E smoke on three files (KNOWLEDGE "E2E smoke irreplaceable").
 - [ ] T04 -- `core/sdk_helpers.run_sdk_query` (320): options build / stream loop / failure classification / cost accounting as separate functions behind the same signature; `tests/test_sdk_*` green; a live single-call probe through the harness.
 - [ ] T05 -- Collectors: `gmeet._run_one_account` (295) and `calendar_collector._run_one_account` (188) split into fetch / transform / write phases mirroring each other; fixtures from the existing collector tests, output filenames byte-identical.
 - [ ] T06 -- Producers + reports + CLIs: `curiosity/producer.maybe_generate_curiosity_requests` (310 measured 2026-10-15) + `maybe_generate_folder_requests` (220), `facts/takes_producer.maybe_extract_takes` (164), `producers/intents.IntentsProducer.run` (159), `reports/_engine/lib/render_summary.render_summary` (234), `reports/_engine/runner._persist_report` (174) + `run_inference` (174), `query.main` (253), `study.cmd_run` (218), `suggestions/cli.main` (169), `health.render` (165) — each split along its existing sections; allowlist in T01 empty at the end of this task except T07's `core/health.check_piggyback_health`.
@@ -31,3 +31,4 @@ All tasks marked `[x]` and verified via `ytstack:summarize-task`.
 - Seven tasks is the ceiling. If T07 does not fit the context budget after T02–T06, it becomes M033b per the CONTEXT's split rule rather than a looser task.
 - Every task: suite ≥ 2,025 green, oracle byte-identical, no behaviour change in the move commit (defects found go into their own commit with a test).
 - 2026-10-15 (T01): the live `ast` measurement finds **20** functions ≥ 150 lines of 1,402, not the audit's 15 — five more (`suggestions/cli.main`, `core/health.check_piggyback_health`, `health.render`, `producers/intents.IntentsProducer.run`, `dream._async_main`) and the audit's own grew since 2026-10-14 (`dream_entity` 347 → 395, `compile.main` 317 → 345, `gmeet._run_one_account` 295 → 340, `query.main` 236 → 253). The task lines above carry the measured lengths and the five extra functions (T02, T06, T07); `tests/test_function_length.py`'s ALLOWLIST is the burn-down.
+- 2026-10-15 (T03): the E2E on the scratch vault (`/tmp/lxw-scratch`, operator config) runs with `piggybacks_on_compile: false` in the scratch's config so the before/after compiles stay comparable and do not spawn the maintenance drain there; the fixture notes are `raw/notes/t03-*.md` with the run label in the body (new hash per run). Pattern for T04–T06: capture the "before" on the committed engine, split, commit, pull on the scratch, capture "after", diff the normalized logs.

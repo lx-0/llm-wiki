@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-15T01:55:00+02:00
+last_updated: 2026-10-15T11:23:00+02:00
 current_milestone: M033
 active_slice: S04
-active_task: T03
+active_task: none
 last_completed_milestone: M032
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -160,9 +160,16 @@ functions assigned to T02 / T06 / T07 in the slice plan. Suite 2119. CI green on
 phases (ten helpers), `_async_main` 152 → 45 (`_build_parser` / `_cmd_entity` /
 `_print_candidates`); a pure move — string-literal diff = renames + docstrings, dream suites
 + oracle + gate green, scratch-vault routing (`list-candidates`, `dream-entity nobody
---dry-run` rc=2). Allowlist 18. The `dream/` package split left to T07's review. **Next:
-T03 — the compile path (`compile.main` 345, `_run_compile_route` 164,
-`compile_stages/compile.compile_source` 212) via `plan-task`.**
+--dry-run` rc=2). Allowlist 18. The `dream/` package split left to T07's review. CI green
+on `8837ebb` + `a4a62a2`. **S04 3/7** — T03 (`98603a2`): `compile.main` 345 → 60,
+`_run_compile_route` 164 → 18, `compile_stages.compile_source` 212 → 56 along their
+stages (`_compile_batch` + `_BatchStats`, `_abort_reason`, `_run_corpus_passes`,
+`_log_run_summary`; `_memory_prepass`, `_compile_aggregated`; `_render_compile_prompt`,
+`_retry_long_context`, `_skip_for_structural_failure`); pure move — literal diff = renames +
+docstrings, 125 targeted + 2119 full green; E2E on the scratch vault before (`28dba21`,
+$0.08) / after (`98603a2`, $0.11): three notes compiled, three hashes persisted,
+normalized logs identical except the agent's token counts. Allowlist 15. **Next: T04 —
+`core/sdk_helpers.run_sdk_query` (339) via `plan-task`.**
 
 ## M032 COMPLETE (L, 2026-10-14): desktop de-slop
 
