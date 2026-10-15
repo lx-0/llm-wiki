@@ -302,6 +302,16 @@ MUTATING: dict[str, tuple[tuple[str, ...], str | None, Prepare]] = {
     ),
     "config-edit-exit": (("config",), "8\n", None),
     "config-edit-set": (("config",), "1\n4\nclaude-sonnet-4-6\n8\n", None),
+    # the wizard before S02-T03: a refused URL then the current one, haiku, a refused hour
+    # then 7, procmail / local-LLM / global skill all yes
+    "config-wizard-validates": (
+        ("config", "wizard"),
+        "ftp://x\n\n3\n25\n7\ny\ny\ny\n",
+        None,
+    ),
+    # every wizard answer the default, then the hooks step — whose own answers (claude, user
+    # scope, confirm) come from the same stdin: after the port a child reads them
+    "setup-with-hooks": (("setup",), "\n\n\n\n\n\ny\n1\n1\ny\n", None),
 }
 
 

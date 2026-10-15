@@ -18,6 +18,20 @@ every operator's `wiki update` → `uv sync` regenerate `uv.lock` and dirty thei
 config keys must also be wired into `scripts/migrations/migrate_config_keys.py`
 in the same commit.
 
+## [0.7.10] — 2026-10-15
+
+**For your vault:** no config key changed, so there is no migration. If you ever had an answer
+refused by `wiki setup` / `wiki config wizard`, run `wiki config get models.ollama_url`. A
+value that starts with `! Must start with` comes from the bug below. Set it again with
+`wiki config set models.ollama_url <url>`.
+
+### Fixed
+
+- **A refused answer in the setup wizard corrupted the config.** If the Ollama URL did not
+  start with `http://` or `https://`, the wizard said so and asked again, but it also wrote
+  its own warning into `config.yaml`, ahead of the next answer, as the Ollama URL. A refused
+  auto-compile hour aborted the wizard instead of asking again. Both now just ask again.
+
 ## [0.7.9] — 2026-10-15
 
 **For your vault:** no config key changed, so there is no migration.

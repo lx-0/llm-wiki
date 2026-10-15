@@ -27,8 +27,12 @@ _probe_ollama() {
   curl -sSf --max-time 3 "${url%/}/api/tags" >/dev/null 2>&1
 }
 
-_validate_compile_hour() { [[ "$1" =~ ^([0-9]|1[0-9]|2[0-3])$ ]] || { warn "Hour must be 0–23"; return 1; }; }
-_validate_url()          { [[ "$1" =~ ^https?:// ]] || { warn "Must start with http:// or https://"; return 1; }; }
+# The validators run inside `$(ask …)`: their warning must go to stderr, or command
+# substitution captures it into the answer — a refused URL was written to config.yaml as
+# "! Must start with http:// or https://\n<url>", a refused hour aborted the wizard
+# (found recording the M034 bash oracle, 2026-10-15).
+_validate_compile_hour() { [[ "$1" =~ ^([0-9]|1[0-9]|2[0-3])$ ]] || { warn "Hour must be 0–23" >&2; return 1; }; }
+_validate_url()          { [[ "$1" =~ ^https?:// ]] || { warn "Must start with http:// or https://" >&2; return 1; }; }
 
 # ── Setup wizard (first-time) ────────────────────────────────────────
 # Asks the 6 questions worth asking, writes answers to config.yaml.
