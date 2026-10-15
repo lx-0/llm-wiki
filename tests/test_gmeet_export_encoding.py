@@ -1,15 +1,15 @@
 """Regression for the gmeet `export_doc` UTF-8 bug.
 
 Drive's `files.export` returns charset-less `text/markdown`; `requests` then
-decodes `.text` as Latin-1 by default → `Ã¤` for `ä`. `_DriveClient._get`
-pins `r.encoding = "utf-8"` for the non-JSON branch. This test drives a fake
-response whose `.text` honours `.encoding` (like `requests.Response`) and
-asserts umlauts + emoji survive.
+decodes `.text` as Latin-1 by default → `Ã¤` for `ä`. `GoogleDriveClient._get`
+(`adapters/drive/google.py`) pins `r.encoding = "utf-8"` for the non-JSON branch.
+This test drives a fake response whose `.text` honours `.encoding` (like
+`requests.Response`) and asserts umlauts + emoji survive.
 """
 
 from __future__ import annotations
 
-from collectors import gmeet
+from adapters.drive.google import GoogleDriveClient
 
 
 class _FakeResp:
@@ -36,7 +36,7 @@ class _FakeSession:
 
 def test_export_doc_decodes_utf8_not_latin1() -> None:
     body = "# Notizen\n\nGrüße aus München 🚀 — verlässt, Anhänge, Zukünftige"
-    client = gmeet._DriveClient(session=_FakeSession(body), timeout_s=5.0)
+    client = GoogleDriveClient(session=_FakeSession(body), timeout_s=5.0)
     out = client.export_doc("any-id")
     assert out == body
     assert "ä" in out and "🚀" in out

@@ -77,9 +77,8 @@ class _FakeClient:
     def __init__(self) -> None:
         self.calls: list[str] = []
 
-    def _get(self, url, params=None):
-        self.calls.append(url)
-        doc_id = url.rsplit("/", 1)[-1]
+    def get_file(self, doc_id, *, fields):
+        self.calls.append(doc_id)
         return {
             "id": doc_id,
             "name": f"Sync {doc_id} – Notizen von Gemini",
@@ -120,7 +119,7 @@ def test_discover_via_email_ingests_colleague_doc(monkeypatch, _collector) -> No
     stubs, note = _collector._discover_via_email(_acct(), client, set())
     assert reader.scanned_folder == "INBOX"
     assert [s["id"] for s in stubs] == ["DOCAAA"]
-    assert client.calls and client.calls[0].endswith("/files/DOCAAA")
+    assert client.calls == ["DOCAAA"]
     assert "1 linked / 1 new" in note
 
 

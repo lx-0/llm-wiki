@@ -235,8 +235,8 @@ The engine runs unattended — its dominant failure mode is the **silent skip**.
 produces no log line is invisible by design, so bare `except Exception: pass` and unlogged
 fallback-returns are banned. For every new `except Exception`, walk this tree top-down:
 
-1. **Adapter seam** (mailbox / calendar / gmeet reader or filter)? → raise a **typed error**
-   (`MailboxReadError`, `GmeetAPIError`, `CalendarAPIError`) with `from e`. The collector
+1. **Adapter seam** (mailbox / calendar / Drive reader or filter)? → raise a **typed error**
+   (`MailboxReadError`, `DriveAPIError`, `CalendarAPIError`) with `from e`. The collector
    boundary catches, logs, and isolates it (`core watermark-on-failure` stays intact).
 2. **Claude SDK call**? → route through `core.sdk_helpers` (`run_sdk_query`,
    `classify_failure` + `log_sdk_failure`). Never hand-roll SDK exception handling.

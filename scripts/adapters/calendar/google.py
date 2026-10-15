@@ -1,8 +1,9 @@
 """Google Calendar v3 thin client.
 
 One ``GoogleCalendarClient`` wraps an ``AuthorizedSession`` from
-``core/google_oauth.py``. The retry shape mirrors ``collectors/gmeet.py._DriveClient._get``:
-retry once on network / 429 / 5xx, raise on 401 / persistent failure.
+``core/google_oauth.py``. The retry shape mirrors ``adapters/drive/google.py``'s
+``GoogleDriveClient._get``: retry once on network / 429 / 5xx, raise on 401 /
+persistent failure.
 
 Scopes the operator-facing OAuth bootstrap requests: ``calendar.readonly``
 (read-only access to all of the user's calendars + events). Same GCP
@@ -47,7 +48,7 @@ class CalendarAPIError(RuntimeError):
 class GoogleCalendarClient:
     """Thin REST wrapper over an authorised google-auth session.
 
-    Retry behaviour matches the gmeet Drive client: retry once with backoff
+    Retry behaviour matches the Drive client: retry once with backoff
     on network / 429 / 5xx; raise on 401, 403, persistent failure, or schema
     mismatch (the JSON envelope must be a dict).
     """

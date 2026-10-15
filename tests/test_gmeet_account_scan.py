@@ -14,6 +14,7 @@ from pathlib import Path
 
 import pytest
 
+from adapters.drive.google import DriveAPIError
 from collectors import gmeet
 from core import daily_capture
 
@@ -48,7 +49,7 @@ MEETING_FILE = f"2026-05-15--sprint-sync--{KEY}.md"
 
 
 class _FakeDrive:
-    """Stand-in for `_DriveClient`: a canned folder + docs, every call recorded."""
+    """Stand-in for `GoogleDriveClient`: a canned folder + docs, every call recorded."""
 
     def __init__(self, docs, *, folder_id="folder-1", fail_export=(), fail_list=False):
         self.docs = list(docs)
@@ -64,13 +65,13 @@ class _FakeDrive:
     def list_docs(self, folder_id, *, since=None, limit=None):
         self.calls.append(("list_docs", folder_id, since, limit))
         if self.fail_list:
-            raise gmeet.GmeetAPIError("403 on GET files: forbidden")
+            raise DriveAPIError("403 on GET files: forbidden")
         yield from self.docs
 
     def export_doc(self, file_id):
         self.calls.append(("export_doc", file_id))
         if file_id in self.fail_export:
-            raise gmeet.GmeetAPIError(f"unexpected 404 on GET {file_id}")
+            raise DriveAPIError(f"unexpected 404 on GET {file_id}")
         return f"Exported body of {file_id}.\n"
 
 
@@ -100,7 +101,7 @@ def _collector(monkeypatch, fake: _FakeDrive, *, folder_id="folder-1", since=Non
     monkeypatch.setattr(
         CONFIG.personal, "accounts", {"work": {"email": "alex@example.com", "gmeet": block}}
     )
-    monkeypatch.setattr(gmeet, "_DriveClient", lambda session, timeout_s: fake)
+    monkeypatch.setattr(gmeet, "GoogleDriveClient", lambda session, timeout_s: fake)
     return gmeet.GmeetCollector()
 
 

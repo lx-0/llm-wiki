@@ -57,8 +57,6 @@ import functools
 import hashlib
 import logging
 import re
-import time
-from collections.abc import Iterator
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -66,6 +64,7 @@ from typing import Any
 
 import yaml
 
+from adapters.drive.google import DriveAPIError, GoogleDriveClient
 from adapters.mailbox import MailboxReadError, resolve_reader
 from collectors.base import (
     CollectorSpec,
@@ -88,14 +87,7 @@ log = logging.getLogger(__name__)
 
 
 # ── API constants ────────────────────────────────────────────────────
-
-_DRIVE_BASE = "https://www.googleapis.com/drive/v3"
-_DRIVE_DOC_MIME = "application/vnd.google-apps.document"
-_DRIVE_FOLDER_MIME = "application/vnd.google-apps.folder"
-# Markdown export is officially supported for Google Docs; text/plain is the
-# fallback for the rare Doc that rejects markdown export.
-_EXPORT_MIME = "text/markdown"
-_EXPORT_FALLBACK_MIME = "text/plain"
+# The Drive transport (endpoints, MIME types, retry) is adapters/drive/google.py.
 
 # Scope: the dedicated narrow scope for Drive files created/edited by Meet.
 _SCOPES = ("https://www.googleapis.com/auth/drive.meet.readonly",)
@@ -365,145 +357,6 @@ def _resolve_gmeet_accounts() -> list[_GmeetAccount]:
         )
 
     return resolve_accounts(CONFIG.personal.accounts or {}, "gmeet-api", _build, block_key="gmeet")
-
-
-# ── HTTP client (inline — Drive API over the shared OAuth session) ────
-
-
-class GmeetAPIError(RuntimeError):
-    """Raised on non-recoverable Drive API failures (401, persistent 5xx, schema)."""
-
-
-@dataclass
-class _DriveClient:
-    """Thin Drive v3 wrapper over a google-auth AuthorizedSession.
-
-    Retry shape mirrors `collectors/jamie.py._JamieClient._get`: retry once on
-    network error / 429 / 5xx, raise on 401 / persistent failure.
-    """
-
-    session: Any  # google.auth.transport.requests.AuthorizedSession
-    timeout_s: float
-
-    def _get(self, url: str, *, params: dict | None = None, expect_json: bool = True) -> Any:
-        for attempt in (1, 2):
-            try:
-                r = self.session.get(url, params=params, timeout=self.timeout_s)
-            except Exception as e:
-                if attempt == 2:
-                    raise GmeetAPIError(
-                        f"network failure on GET {url}: {type(e).__name__}: {e}"
-                    ) from e
-                log.warning("gmeet GET %s: %s — retrying once in 5s", url, type(e).__name__)
-                time.sleep(5)
-                continue
-
-            if r.status_code == 401:
-                raise GmeetAPIError(
-                    "401 from Drive — token invalid or scope not granted. Re-run `wiki gmeet-auth`."
-                )
-            if r.status_code == 403:
-                # 403 is non-recoverable here (scope/permission/export-size) —
-                # surface the Drive message rather than retrying blindly.
-                raise GmeetAPIError(f"403 on GET {url}: {r.text[:200]}")
-            if r.status_code == 429:
-                wait = int(r.headers.get("Retry-After", "10"))
-                if attempt == 2:
-                    raise GmeetAPIError(f"429 on GET {url} after retry (waited {wait}s)")
-                log.warning("gmeet GET %s: 429 — sleeping %ds before retry", url, wait)
-                time.sleep(wait)
-                continue
-            if 500 <= r.status_code < 600:
-                if attempt == 2:
-                    raise GmeetAPIError(f"persistent {r.status_code} on GET {url}: {r.text[:200]}")
-                log.warning("gmeet GET %s: %d — retrying once in 5s", url, r.status_code)
-                time.sleep(5)
-                continue
-            if r.status_code != 200:
-                raise GmeetAPIError(f"unexpected {r.status_code} on GET {url}: {r.text[:200]}")
-
-            if expect_json:
-                return r.json()
-            # Drive's files.export returns charset-less `text/markdown`, which
-            # requests decodes as Latin-1 by default → `Ã¤` for `ä`. The bytes
-            # are always UTF-8; pin the encoding before reading `.text`.
-            r.encoding = "utf-8"
-            return r.text
-
-        raise GmeetAPIError(f"unreachable: exhausted retries on GET {url}")
-
-    def resolve_folder_id(self, name: str) -> str | None:
-        """Find a folder by exact name. Returns None if not found or the narrow
-        scope blocks the name search (caller falls back to a clear error)."""
-        q = (
-            f"name = '{name.replace(chr(39), chr(92) + chr(39))}' "
-            f"and mimeType = '{_DRIVE_FOLDER_MIME}' and trashed = false"
-        )
-        try:
-            payload = self._get(
-                f"{_DRIVE_BASE}/files",
-                params={"q": q, "fields": "files(id,name)", "pageSize": 10},
-            )
-        except GmeetAPIError as e:
-            log.warning("gmeet: folder name-search failed (%s) — set drive_folder_id explicitly", e)
-            return None
-        files = payload.get("files") or []
-        if not files:
-            return None
-        return files[0].get("id")
-
-    def list_docs(
-        self,
-        folder_id: str,
-        *,
-        since: str | None = None,
-        limit: int | None = None,
-    ) -> Iterator[dict]:
-        """Yield Google-Doc file stubs in `folder_id`, oldest first.
-
-        Stub fields: id, name, createdTime, modifiedTime, webViewLink.
-        Paginates while `nextPageToken` is non-empty; stops after `limit`.
-        """
-        q_parts = [
-            f"'{folder_id}' in parents",
-            f"mimeType = '{_DRIVE_DOC_MIME}'",
-            "trashed = false",
-        ]
-        if since:
-            q_parts.append(f"createdTime > '{since}'")
-        q = " and ".join(q_parts)
-
-        seen = 0
-        page_token: str | None = None
-        while True:
-            params: dict[str, Any] = {
-                "q": q,
-                "fields": "nextPageToken,files(id,name,createdTime,modifiedTime,webViewLink)",
-                "orderBy": "createdTime",
-                "pageSize": 100,
-            }
-            if page_token:
-                params["pageToken"] = page_token
-            payload = self._get(f"{_DRIVE_BASE}/files", params=params)
-            if not isinstance(payload, dict):
-                raise GmeetAPIError(f"files.list returned {type(payload).__name__}, expected dict")
-            for item in payload.get("files") or []:
-                yield item
-                seen += 1
-                if limit and seen >= limit:
-                    return
-            page_token = payload.get("nextPageToken")
-            if not page_token:
-                return
-
-    def export_doc(self, file_id: str) -> str:
-        """Export a Google Doc as markdown text. Falls back to text/plain."""
-        url = f"{_DRIVE_BASE}/files/{file_id}/export"
-        try:
-            return self._get(url, params={"mimeType": _EXPORT_MIME}, expect_json=False)
-        except GmeetAPIError as e:
-            log.warning("gmeet: markdown export failed for %s (%s) — trying text/plain", file_id, e)
-            return self._get(url, params={"mimeType": _EXPORT_FALLBACK_MIME}, expect_json=False)
 
 
 # ── Export dead-letter ───────────────────────────────────────────────
@@ -864,7 +717,7 @@ class GmeetCollector:
         if err:
             return f"auth: {err}", ([], 0), False
 
-        client = _DriveClient(session=sess, timeout_s=self._timeout_s)
+        client = GoogleDriveClient(session=sess, timeout_s=self._timeout_s)
 
         per_acct_state = state.get(acct.account_id) or {}
         since = per_acct_state.get("last_seen_ts") if incremental else acct.since
@@ -927,7 +780,7 @@ class GmeetCollector:
     def _discover_docs(
         self,
         acct: _GmeetAccount,
-        client: _DriveClient,
+        client: GoogleDriveClient,
         *,
         since: str | None,
         already_present: set[str],
@@ -968,7 +821,7 @@ class GmeetCollector:
                 folder_stubs = list(
                     client.list_docs(folder_id, since=since, limit=acct.max_per_run)
                 )
-            except GmeetAPIError as e:
+            except DriveAPIError as e:
                 log.error("GmeetCollector[%s]: folder list failed: %s", acct.account_id, e)
                 folder_note = f"folder-list failed: {e}"
         else:
@@ -1036,7 +889,7 @@ class GmeetCollector:
 
     @staticmethod
     def _export_group(
-        client: _DriveClient,
+        client: GoogleDriveClient,
         new_stubs: list[dict],
         *,
         scan: _AccountScan,
@@ -1058,7 +911,7 @@ class GmeetCollector:
                 continue
             try:
                 exported = client.export_doc(file_id)
-            except GmeetAPIError as e:
+            except DriveAPIError as e:
                 log.warning("GmeetCollector[%s]: export %s — %s", acct.account_id, file_id, e)
                 _record_export_failure(scan.dead, file_id, str(e), now=now_iso())
                 scan.dead_touched = True
@@ -1255,7 +1108,7 @@ class GmeetCollector:
     def _discover_via_email(
         self,
         acct: _GmeetAccount,
-        client: _DriveClient,
+        client: GoogleDriveClient,
         already_present: set[str],
     ) -> tuple[list[dict], str]:
         """Find Drive Doc-ids announced in gemini-notes emails for this account.
@@ -1310,11 +1163,8 @@ class GmeetCollector:
         stubs: list[dict] = []
         for did in new_ids:
             try:
-                meta = client._get(
-                    f"{_DRIVE_BASE}/files/{did}",
-                    params={"fields": "id,name,createdTime,modifiedTime,webViewLink"},
-                )
-            except GmeetAPIError as e:
+                meta = client.get_file(did, fields="id,name,createdTime,modifiedTime,webViewLink")
+            except DriveAPIError as e:
                 log.warning("GmeetCollector[%s]: files.get %s failed: %s", acct.account_id, did, e)
                 continue
             if isinstance(meta, dict) and meta.get("id"):

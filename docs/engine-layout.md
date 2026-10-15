@@ -68,7 +68,7 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 │   │   ├── folder_index.py        ← body-blind folder index (entry module: scripts/index_folders.py; registered as the `folder-index` collector)
 │   │   ├── email_collector.py     ← email Collector (multi-backend via adapters/mailbox/)
 │   │   ├── jamie.py               ← Jamie AI meeting-notetaker
-│   │   ├── gmeet.py               ← Google Meet / Gemini transcripts (Drive API)
+│   │   ├── gmeet.py               ← Google Meet / Gemini transcripts (Drive API through adapters/drive/)
 │   │   ├── voice.py               ← inbox-watch dictation ingester (iOS Shortcuts / OpenWhispr / FluidVoice)
 │   │   ├── health.py              ← Oura REST daily biometric rollup (sleep / readiness / HRV / steps)
 │   │   ├── calendar_collector.py  ← Google Calendar v3 → per-date rollups (multi-tenant, OAuth)
@@ -82,6 +82,7 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 │   │   └── scan_youtube.py        ← yt-dlp + youtube-transcript-api + optional gemma4 visual analysis (entry module: scripts/ingest_youtube.py)
 │   ├── adapters/              ← the clients collectors talk through (never substrate-aware)
 │   │   ├── calendar/google.py     ← Google Calendar v3 REST wrapper (list_calendars / list_events / get_event)
+│   │   ├── drive/google.py        ← Google Drive v3 REST wrapper behind gmeet (resolve_folder_id / list_docs / get_file / export_doc)
 │   │   ├── health/{oura,healthkit_xml}.py ← Oura REST client; Apple Health Export.xml streaming parser
 │   │   └── mailbox/{base,gmail,thunderbird,imap,allinkl}.py ← MailboxReader / Filter adapters (allinkl = server-side filter)
 │   ├── domain/mail.py         ← pure mailbox domain types (frozen dataclasses shared by readers, filters, collectors)
