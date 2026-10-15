@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-15T20:13:00+02:00
+last_updated: 2026-10-15T20:20:00+02:00
 current_milestone: M034
 active_slice: S01
-active_task: none
+active_task: T07
 last_completed_milestone: M033
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -17,9 +17,11 @@ parallel_milestones: [M021, M025, M027, M029]
 **Status:** M034 / S01 — 6 of 7 tasks done. T01–T02 are the bash oracle, T03 the decisions,
 T04 the one-hop bootstrap, T05 home & status and T06 the dream routing + OAuth aliases in the
 catalogue. Engine 0.7.7, suite 2361, CI green on `2bf80f3`.
-**Next:** `ytstack:plan-task` → S01-T07, the consumer smoke on the scratch vault at S01's head
-(the desktop app's spawns, the Obsidian buttons, the `~/.local/bin/wiki` symlink, the skill),
-then `reassess-roadmap` for S01.
+**Next:** S01-T07 is planned (`M034-S01-T07-PLAN.md`), the consumer smoke on the scratch
+vault, then `reassess-roadmap` for S01.
+- **Found while planning:** the use-llm-wiki skill runs the vault dashboard through a bare
+  `uv run --project .wiki`. On an iCloud vault that recreates the in-vault venv.
+- **Fixed in T07:** a `wiki stats` command.
 
 **M034 / S01-T06** (`2ea37a0`, `2bf80f3`): `dream` runs as six routes over `dream.py` with
 `sweep` as the default route, `dream-entity` with the prefix `entity`, and
