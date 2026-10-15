@@ -27,6 +27,7 @@ import re
 import sys
 from dataclasses import MISSING, fields, is_dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from core.config_schema import (
     Features,
@@ -40,6 +41,9 @@ from core.config_schema import (
     _default_piggybacks,
 )
 
+if TYPE_CHECKING:
+    from _typeshed import DataclassInstance  # stub-only: what `dataclasses.fields` accepts
+
 BEGIN_MARK = (
     "<!-- BEGIN GENERATED TABLES — scripts/core/config_docs.py. Do not edit by hand: "
     "edit the field comments in scripts/core/config_schema.py, then run "
@@ -47,7 +51,7 @@ BEGIN_MARK = (
 )
 END_MARK = "<!-- END GENERATED TABLES -->"
 
-_SECTIONS: tuple[tuple[str, type], ...] = (
+_SECTIONS: tuple[tuple[str, type[DataclassInstance]], ...] = (
     ("scheduling", Scheduling),
     ("models", Models),
     ("features", Features),
@@ -165,7 +169,7 @@ def _plain(value: object) -> object:
     return value
 
 
-def _default_for(cls: type, name: str) -> object:
+def _default_for(cls: type[DataclassInstance], name: str) -> object:
     for f in fields(cls):
         if f.name != name:
             continue
@@ -187,7 +191,7 @@ def _fmt(value: object) -> str:
 # ── Table generation ────────────────────────────────────────────────────
 
 
-def _section_table(section: str, cls: type) -> str:
+def _section_table(section: str, cls: type[DataclassInstance]) -> str:
     comments = _field_comments(cls)
     lines = [f"## {section}", "", "| Key | Default | Meaning |", "|---|---|---|"]
     for f in fields(cls):

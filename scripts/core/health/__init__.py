@@ -27,6 +27,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import asdict
+from typing import Any, TypedDict, cast
 
 from core import actions
 from core.health._base import SEVERITY_ORDER, CheckResult, _probe_failed
@@ -56,6 +57,7 @@ from core.health.pipeline import (
 
 __all__ = [
     "SEVERITY_ORDER",
+    "CheckJSON",
     "CheckResult",
     "build_health",
     "check_account_auths",
@@ -127,7 +129,8 @@ def build_health(*, quick: bool = False) -> list[CheckResult]:
             else:
                 results.append(produced)
         except Exception as exc:
-            results.append(_probe_failed(fn.__name__, "unknown", exc))
+            # A Callable promises no __name__; every entry of _ALL_CHECKS is a function.
+            results.append(_probe_failed(getattr(fn, "__name__", repr(fn)), "unknown", exc))
     results.sort(key=lambda r: (SEVERITY_ORDER.get(r.severity, 99), r.id))
     return results
 
@@ -140,12 +143,27 @@ def health_summary(results: list[CheckResult]) -> dict[str, int]:
     return out
 
 
-def to_json(results: list[CheckResult]) -> list[dict]:
+class CheckJSON(TypedDict):
+    """One check in the schema-2 JSON (`wiki doctor --json`, the desktop's Health rows):
+    the `CheckResult` fields in their order, `title` always set, plus `verb`."""
+
+    id: str
+    category: str
+    severity: str
+    message: str
+    fix: str | None
+    dispatch_args: list[str] | None
+    details: dict[str, Any] | None
+    title: str
+    verb: str | None
+
+
+def to_json(results: list[CheckResult]) -> list[CheckJSON]:
     """Serialize to plain-dict form for JSON output (schema 2: `title` always present,
     `verb` from the action catalogue when the check is dispatchable)."""
-    out: list[dict] = []
+    out: list[CheckJSON] = []
     for r in results:
-        d = asdict(r)
+        d = cast("CheckJSON", asdict(r))  # the fields in order; `verb` joins below
         d["title"] = r.title or r.message
         d["verb"] = actions.verb_for(r.dispatch_args) if r.dispatch_args else None
         out.append(d)

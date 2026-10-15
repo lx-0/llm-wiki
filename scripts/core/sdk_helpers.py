@@ -52,11 +52,18 @@ import logging
 import re
 import time
 from collections import deque
+from collections.abc import AsyncIterable, MutableMapping
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 from .errors import swallow
 from .sdk_scope import make_path_scope_gate, make_path_scope_hook, prompt_stream
+
+if TYPE_CHECKING:
+    # Types only — the SDK itself is imported late, inside the harness, so callers that
+    # use just the diagnostics primitives never pay its import.
+    from claude_agent_sdk import ClaudeAgentOptions, ResultMessage
 
 # ── Stale-session env hygiene ─────────────────────────────────────────
 # Hook-spawned engine processes inherit the DYING parent session's wiring
@@ -72,7 +79,7 @@ _STALE_SESSION_ENV_EXACT = frozenset({"CLAUDECODE", "CLAUDE_PID", "CLAUDE_EFFORT
 _STALE_SESSION_ENV_PREFIX = "CLAUDE_CODE_"
 
 
-def sanitize_stale_session_env(environ: dict) -> list[str]:
+def sanitize_stale_session_env(environ: MutableMapping[str, str]) -> list[str]:
     """Remove inherited Claude-Code session-wiring vars from ``environ``
     (mutates in place). Returns the removed keys, sorted callers-side for
     logging. Idempotent; a clean env is a no-op."""
@@ -589,7 +596,7 @@ async def run_sdk_query(prompt: str, spec: SdkCallSpec, *, query_fn=None) -> Sdk
     # `core.usage.LEDGER` / `classify_failure` see the swap at call time.
     import os
 
-    removed_env = sanitize_stale_session_env(os.environ)  # type: ignore[arg-type]
+    removed_env = sanitize_stale_session_env(os.environ)
     if removed_env:
         spec.logger.debug(
             "stripped stale session env before SDK spawn: %s", ", ".join(sorted(removed_env))
@@ -627,7 +634,9 @@ async def run_sdk_query(prompt: str, spec: SdkCallSpec, *, query_fn=None) -> Sdk
     return _clean_end_result(spec, state, started=started, capture=capture)
 
 
-def _build_options(spec: SdkCallSpec, prompt: str, capture: StderrCapture) -> tuple[object, object]:
+def _build_options(
+    spec: SdkCallSpec, prompt: str, capture: StderrCapture
+) -> tuple[ClaudeAgentOptions, str | AsyncIterable[dict[str, Any]]]:
     """``ClaudeAgentOptions`` for one call plus the prompt to pass (a stream under
     the deny-all gate): buffer size from CONFIG, stderr capture wired, the write
     gating — ``spec.write_scope`` → PreToolUse path-scope hook (production,
@@ -658,7 +667,7 @@ def _build_options(spec: SdkCallSpec, prompt: str, capture: StderrCapture) -> tu
     if spec.tools is not None:
         options_kwargs["tools"] = list(spec.tools)
 
-    query_prompt: object = prompt
+    query_prompt: str | AsyncIterable[dict[str, Any]] = prompt
     if spec.deny_all_writes:
         # Read-only wedge composition (M019): deny-all-writes can_use_tool
         # gate as defense-in-depth under permission_mode="default". The
@@ -720,7 +729,7 @@ class _StreamState:
     fallback_in: int = 0  # cache-inclusive per-turn fallback
     fallback_out: int = 0
     text_parts: list[str] = field(default_factory=list)
-    final_result: object = None
+    final_result: ResultMessage | None = None
     result_text: str = ""
     message_count: int = 0
 

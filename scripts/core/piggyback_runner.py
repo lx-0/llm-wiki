@@ -30,8 +30,11 @@ import signal
 import subprocess
 import sys
 import time
+from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
+from types import FrameType
+from typing import Any
 
 from core.paths import STATE_DIR
 from core.state_store import store_for
@@ -122,7 +125,8 @@ def run_piggyback(
     # wall-clock cap + 1 h. Observed twice on 2026-08-26 when a foreground
     # timeout killed the runner mid-child. Restores the previous handler so a
     # nested/embedded caller keeps its own signal semantics.
-    _prev_handlers: dict[int, object] = {}
+    # What `signal.getsignal` returns and `signal.signal` accepts (`signal.Handlers` is an int).
+    _prev_handlers: dict[int, Callable[[int, FrameType | None], Any] | int | None] = {}
 
     def _on_signal(signum, _frame):
         _terminate(proc)

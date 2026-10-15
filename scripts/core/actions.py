@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import TypedDict
 
 #: Bumped whenever a consumer-visible key is added, renamed or removed in `menu --json` /
 #: `doctor --json`. Consumers refuse payloads whose schema they do not know.
@@ -66,6 +67,17 @@ VERB_BY_COMMAND: dict[str, str] = {
 }
 
 
+class ActionJSON(TypedDict):
+    """One action as consumers receive it (`menu --json` actions and tools, the desktop's
+    buttons): the rendered title, the verb, the intent group, the argv `wiki` runs."""
+
+    id: str
+    title: str
+    verb: str
+    group: str
+    argv: list[str]
+
+
 @dataclass(frozen=True)
 class ActionSpec:
     id: str
@@ -80,7 +92,7 @@ class ActionSpec:
         template = self.title_one if n is None or n == 1 else self.title_many
         return template.format(n="" if n is None else n)
 
-    def to_json(self, n: int | None = None) -> dict:
+    def to_json(self, n: int | None = None) -> ActionJSON:
         return {
             "id": self.id,
             "title": self.title(n),
@@ -198,9 +210,9 @@ def verb_for(argv: Sequence[str]) -> str:
     return VERB_BY_COMMAND.get(argv[0], "Run")
 
 
-def tools() -> list[dict]:
+def tools() -> list[ActionJSON]:
     """The always-available maintenance actions, rendered without a count under group ``tools``."""
-    out: list[dict] = []
+    out: list[ActionJSON] = []
     for spec in _SPECS:
         if not spec.tool:
             continue
