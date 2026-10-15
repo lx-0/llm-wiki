@@ -48,6 +48,9 @@ dev = [
 lint = [
     "ruff==0.16.10",
 ]
+typecheck = [
+    "ty==0.0.88",
+]
 
 [tool.ruff]
 line-length = 100
@@ -106,6 +109,15 @@ ignore = [
 "scripts/lint.py" = ["E402"]
 "tests/test_sdk_helpers.py" = ["E402"]
 "hooks/*.py" = ["E402"]
+
+# ty (Astral) is the type checker — chosen over pyright / basedpyright by the M033-S05-T01
+# probe (DECISIONS 2026-10-15). A 0.0.x beta, pinned exactly in the `typecheck` group: an
+# upgrade is a deliberate bump + re-run, never a drift. Run: `uv run --group typecheck ty
+# check scripts/core`. The third-party packages resolve from the project's `.venv`.
+[tool.ty.environment]
+python-version = "3.12"
+# scripts/ is the engine's source root (imports are `core.*`), hooks/ holds `_bootstrap`
+extra-paths = ["scripts", "hooks"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

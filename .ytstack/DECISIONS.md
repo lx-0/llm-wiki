@@ -2099,3 +2099,55 @@ Measured on `466f569` (M033-S02-T01): 82 files carry a `sys.path.insert` in five
 **Why not B (`scripts` as the package, `scripts.core.x` everywhere):** ~190 files rewritten instead of 28, and every operator hook command — `uv run --project <vault>/.wiki python <vault>/.wiki/scripts/flush.py` — stops finding `scripts.core` (a script run by path gets `scripts/` as `sys.path[0]`, not `.wiki/`), which pulls M034's bash and hook-command port into this milestone. Renaming the directory to `llm_wiki` has the same cost and the same answer: M034.
 
 **Operator-visible:** nothing — `scripts/flush.py`-style paths in installed hook commands keep working; the renamed shims are the only paths that change (call sites updated in the same commit, T02).
+
+## 2026-10-15: Type checker — ty (Astral), pinned exactly, gated on `core/`
+
+Measured by the M033-S05-T01 probe (CONTEXT open question 1). The three ways to get a checker
+into pre-commit and CI ran on the same tree. pyright 1.1.414 ran through its PyPI wrapper, since
+pyright itself ships on npm only. basedpyright 1.40.2 is the same pyright core, packaged for PyPI
+with Node bundled. ty 0.0.88 is Astral's checker, still a beta. pyright and basedpyright ran in
+`basic` mode, set explicitly because basedpyright defaults to `all`. ty ran on its default rules,
+since it has no modes. All three used Python 3.12 from `.venv`, with `scripts` + `hooks` as
+search roots, and no candidate left an import unresolved on `core/`.
+
+| | pyright (wrapper) | basedpyright | ty |
+| --- | --- | --- | --- |
+| `scripts/core/` (35 files): errors | 22 | 22 | 19 |
+| all of `scripts/` (208 files): errors | 212 | 212 | 161 (+ 8 warnings) |
+| median wall time, `core/` / `scripts/` | 2.68 s / 8.72 s | 3.02 s / 7.91 s | 0.10 s / 0.50 s |
+| `core/` findings that are real (read against the code) | 15 of 22 | 15 of 22 | 19 of 19 |
+| footprint | 34 MB + Node (downloaded, or the 199 MB `nodejs-wheel`) | 73 MB + 199 MB `nodejs-wheel` | one 25 MB binary |
+
+pyright's seven false positives on `core/` have two causes. Six are in `console.read_key`: after
+`if fd is None: fd = sys.stdin.fileno()`, typeshed's `sys.stdin: TextIO | MaybeNone` is partly
+`Any`, and pyright narrows an assignment containing `Any` back to the declared `int | None`. The
+seventh is a `None` check pyright cannot follow through a boolean alias (`health/pipeline.py`).
+
+The two checkers each found real issues the other missed. pyright alone flagged the module
+`__doc__` being `str | None` (`piggyback_runner`) and a hook callback signature against the
+SDK's `HookCallback`. ty alone flagged four `dataclasses.fields(type)` calls, `os.environ`
+passed where a `dict` is declared, and `Callable.__name__`. On all of `scripts/` ty also found a
+dead import that pyright never reported. Since commit 74f3d84 (May 2026),
+`suggestions/backends/imap.py` imports `_credentials` from `adapters.mailbox.gmail`, which no
+longer defines it, so the IMAP actions crash for Gmail accounts. A mypy-style
+`# type: ignore[import-not-found]` suppressed pyright's report of it. The fix ships in its own
+commit with a test.
+
+**Decision:** ty, pinned exactly (`ty==0.0.88`) in a new `typecheck` dependency group, with
+`[tool.ty.environment]` in `pyproject.toml`. The gate covers `scripts/core/` in pre-commit and CI
+(T02). The rest of `scripts/` is reported and its count recorded, but not gated. Four reasons:
+it was precise on this code (no false positives on `core/`), it is fast enough to run on every
+commit, it is one binary with no Node, and it fits the Astral toolchain the engine already uses
+(uv, ruff).
+
+**Why not pyright / basedpyright:** they are the mature choice with the same core, but on this
+code they produced seven false positives on `core/`. Both need Node: a download on first run,
+or a 199 MB wheel in every CI job. Both are 25× slower.
+
+**Risk accepted:** ty is a 0.0.x beta and its diagnostics can change in a patch release. The
+exact pin makes every upgrade a deliberate bump with a re-run, the same discipline as `ruff==`.
+The gated scope is 35 files.
+
+**Why a group, not `--dev`:** `wiki update` and `install.sh` run a bare `uv sync`, which installs
+the default groups, `dev` included. A checker in `dev` would land in every operator vault's
+venv. `typecheck` stays out of it, the way `lint` keeps ruff out.
