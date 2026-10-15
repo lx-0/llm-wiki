@@ -5,7 +5,7 @@ project: llm-wiki
 created: 2026-10-15T18:15:32+02:00
 status: planned
 task_count: 6
-completed_tasks: 1
+completed_tasks: 2
 ---
 
 # M034-S01 -- Slice Plan
@@ -28,7 +28,7 @@ in the Python catalogue.
   - `dream` / `dream-entity --help` routing.
 
   Extends `tests/_oracle.py`, does not fork it.
-- [ ] T02 -- Bash oracle, mutating commands. The effect on the fixture vault and the fixture
+- [x] T02 -- Bash oracle, mutating commands. The effect on the fixture vault and the fixture
   `HOME` (file tree + contents, with backups named by pattern) of:
   - `config set`;
   - `hooks install/uninstall` per agent and scope;

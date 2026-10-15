@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-15T18:31:00+02:00
+last_updated: 2026-10-15T19:05:00+02:00
 current_milestone: M034
 active_slice: S01
-active_task: T02
+active_task: none
 last_completed_milestone: M033
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -12,9 +12,25 @@ parallel_milestones: [M021, M025, M027, M029]
 
 # State
 
-## ▶ NEXT — M034 planned (L): dispatcher + surface diet
+## Next action — M034 / S01 2/6: dispatcher + surface diet
 
-**Status:** M034 planned (L), ready to slice.
+**Status:** M034 / S01 — 2 of 6 tasks done (T01 + T02: the bash oracle). Engine 0.7.4,
+suite 2316, CI green on `864a09d`.
+**Next:** `ytstack:plan-task` → S01-T03. Decide open questions 1 and 2 in DECISIONS (one
+bootstrap hop with the handlers kept as `python -m` children; the `llm_wiki` rename dropped),
+and measure today's process tree for one command as the before number.
+
+**M034 / S01-T02** (`1b0cfc1`, `b8df503`, `864a09d`): the oracle also records 17 mutating
+invocations from the bash, each on a fresh vault and HOME with its prompt answers scripted on
+stdin. Each golden holds the output plus the change under both trees. 42 goldens in
+`tests/golden/bash/`; the file runs in about 56 s.
+- **Found while recording, all fixed (0.7.4 + one fix after it):**
+  - the multi-select prompt dropped typed choices (and died under bash 3.2);
+  - config backups pruned the newest snapshots when several landed in one second;
+  - `wiki seed` listed plugin files in filesystem order, which CI's ext4 exposed.
+- **Seen to fail:** one changed hook command string fails all four hooks goldens.
+
+**M034 planned 2026-10-15 (L):**
 - **Plan files:** `M034-CONTEXT.md` and `M034-ROADMAP.md`. CONTEXT holds the goal, the
   measured starting point, 9 exit criteria, 7 locked decisions, 4 open questions with
   recommendations, and what M033 carried over. The ROADMAP sketches six slices: oracle +
@@ -30,7 +46,7 @@ parallel_milestones: [M021, M025, M027, M029]
 bootstrap 6, config + setup 5, hooks + skills 4, seed 4, update + the last bash 5, surface
 diet + close 6.
 
-**M034 / S01 1/6** — T01 (`e574a13`, `dcfeebb`): the bash oracle records 25 read-only
+**M034 / S01-T01** (`e574a13`, `dcfeebb`): the bash oracle records 25 read-only
 invocations of the real `wiki` from the bash (`tests/golden/bash/`).
 - **How it runs:** an engine copy in the fixture vault, a scratch HOME, and a `uv` shim onto
   the test venv; about 4 s, order-independent.
@@ -40,8 +56,7 @@ invocations of the real `wiki` from the bash (`tests/golden/bash/`).
   two machine values (now normalised).
 
 Two S02 plan lines were corrected against the bash: the prompts are line-based, and
-`install-shortcut` only prints the rc line. Suite 2298, CI green. Next:
-`ytstack:plan-task` → S01-T02 (the mutating commands).
+`install-shortcut` only prints the rc line. Suite 2298, CI green.
 
 ## M033 COMPLETE (L, 2026-10-15): engine modernisation → M034 dispatcher + surface diet
 
@@ -1302,7 +1317,7 @@ Carried-forward candidates from M002 (deferred to M004+): Collector-rollout to o
 
 **M004 done (2026-05-02):** Agent-Task framework shipped. `scripts/agent_spec.py` (parser, 8 validation cases), `scripts/agent_task.py` (SDK runner with `--list / --dry-run / --var`), `scripts/agent_buttons.py` (discovery + dashboard region-rewrite), `wiki agent <id>` CLI. First concrete task: `prompts/agent_summarize-day.md` (Haiku, Read/Edit/Write, primary button). Auto-wiring via `wiki seed`: jq-merge into shell-commands data.json + marker-based region replace in dashboard.md. 20 pytest tests green (17 spec + 3 summarize-day smoke). PROCESS.md §14 + KNOWLEDGE.md learning + DECISIONS.md two entries (framework + region-marker pattern). Live vault patched, button visible in Run row after reload.
 
-## Next action
+## 2026-05 next-action block (historical, M004–M006 era; superseded by the top section)
 
 **Architecture diagram changes are working-tree only — commit before any further work** (`docs/architecture.excalidraw` + `docs/architecture.png`). Memory + KNOWLEDGE + DECISIONS already in working tree from this session.
 
