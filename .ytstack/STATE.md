@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-15T11:25:00+02:00
+last_updated: 2026-10-15T11:29:00+02:00
 current_milestone: M033
 active_slice: S04
-active_task: T04
+active_task: none
 last_completed_milestone: M032
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -168,8 +168,13 @@ stages (`_compile_batch` + `_BatchStats`, `_abort_reason`, `_run_corpus_passes`,
 `_retry_long_context`, `_skip_for_structural_failure`); pure move — literal diff = renames +
 docstrings, 125 targeted + 2119 full green; E2E on the scratch vault before (`28dba21`,
 $0.08) / after (`98603a2`, $0.11): three notes compiled, three hashes persisted,
-normalized logs identical except the agent's token counts. Allowlist 15. **Next: T04 —
-`core/sdk_helpers.run_sdk_query` (339) via `plan-task`.**
+normalized logs identical except the agent's token counts. Allowlist 15. CI green on
+`98603a2` + `c6b3dbd`. **S04 4/7** — T04 (`0ec0dda`): `run_sdk_query` 339 → 41 behind the
+same signature (`_build_options`, `_StreamState` + `_consume_stream`, `_record_usage`,
+`_partial_result`, the three endings); literal diff = two renames + a docstring; harness
+suites + gate 101, full 2119; the live Haiku probe through the harness identical in shape
+before/after. Allowlist 14. **Next: T05 — the collectors (`gmeet._run_one_account` 340,
+`calendar_collector._run_one_account` 195) via `plan-task`.**
 
 ## M032 COMPLETE (L, 2026-10-14): desktop de-slop
 
