@@ -18,6 +18,19 @@ every operator's `wiki update` → `uv sync` regenerate `uv.lock` and dirty thei
 config keys must also be wired into `scripts/migrations/migrate_config_keys.py`
 in the same commit.
 
+## [0.7.3] — 2026-10-15
+
+**For your vault:** no config key changed, so there is no migration. `optimize_claude_md`
+stays off unless you turned it on.
+
+### Fixed
+
+- **`optimize_claude_md` crashed before it did anything, and when it ran it could edit any
+  file.** It staged the copy of `~/.claude/CLAUDE.md` in a `scripts/` folder that vaults no
+  longer have, and gave its agent unrestricted, auto-approved edits. The copy now sits in the
+  engine's `state/`, and that copy is the only file the agent may edit. `CLAUDE.md` itself is
+  still replaced only after the engine's size check.
+
 ## [0.7.2] — 2026-10-15
 
 **For your vault:** no config key changed, so there is no migration.

@@ -2959,10 +2959,11 @@ Per-candidate learnings from the 14-candidate seam arc (C01–C14). Decisions li
   which the CLI ignores. Fix: `run_sdk_query` with `WriteScope(roots=(RAW_SUGGESTIONS_DIR,))`,
   `setting_sources=("project",)` and a substrate-is-subject clause in the system prompt; the
   test drives the producer and asks the hook it built for allow / deny. Rule: an SDK call
-  that can write goes through the harness. The loops still hand-rolled are read-only (lint
-  `tools=[]`; takes and intents `allowed_tools=["Read"]` under `permission_mode="default"`;
-  folder_providers hook-scoped to its one file) except `optimize_claude_md` (Edit +
-  `acceptEdits`, opt-in, disabled by default).
+  that can write goes through the harness. The same task moved `optimize_claude_md` (Edit +
+  `acceptEdits`, unscoped, and staging at a `<vault>/scripts/` path no vault has) onto the
+  harness with its staged copy as the only writable path. The loops still hand-rolled are
+  read-only: lint `tools=[]`; takes and intents `allowed_tools=["Read"]` under
+  `permission_mode="default"`; folder_providers hook-scoped to its one file.
 - **A doc guard that scans line by line misses a wrapped command (2026-10-15,
   M033-S05-T06):** `tests/test_layout.py` refused `uv run python scripts/<pkg>/<x>.py` per
   line, and AGENTS.md wrapped exactly that command across two lines, so the step that tells a

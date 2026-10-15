@@ -16,23 +16,25 @@ import argparse
 import asyncio
 import logging
 import shutil
-import time as _time
 from datetime import datetime
 from pathlib import Path
 
-from claude_agent_sdk import ClaudeAgentOptions, ResultMessage, query
+from claude_agent_sdk import query
 
-from core.config import CONFIG
 from core.console import setup_console_logging
-from core.paths import LOG_FILE, ROOT_DIR
+from core.paths import LOG_FILE, ROOT_DIR, STATE_DIR
 from core.prompts import render
-from core.sdk_helpers import StderrCapture, log_sdk_failure
+from core.sdk_helpers import SdkCallSpec, WriteScope, run_sdk_query
 from core.utils import now_iso, read_wiki_index_compact
 
 # ── Config ──────────────────────────────────────────────────────────
 
 CLAUDE_MD = Path.home() / ".claude" / "CLAUDE.md"
 BACKUP_DIR = ROOT_DIR / "raw" / "notes" / "claude-md-backups"
+# The agent edits this copy, never CLAUDE.md itself; the engine copies it over after
+# the size check. It used to sit at `<vault>/scripts/`, a pre-split path no vault has
+# any more (FileNotFoundError on every opted-in run).
+STAGING_FILE = STATE_DIR / "claude-md-staged.md"
 
 log = logging.getLogger("optimize-claude-md")
 
@@ -64,8 +66,9 @@ async def optimize(dry_run: bool = False) -> None:
     shutil.copy2(CLAUDE_MD, backup)
     log.info("Backup: %s", backup)
 
-    # Agent writes to a staging file in the vault, then we copy it
-    staging = ROOT_DIR / "scripts" / "claude-md-staged.md"
+    # The agent edits a staged copy in the engine's state dir; we copy it back.
+    staging = STAGING_FILE
+    staging.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(CLAUDE_MD, staging)
 
     prompt = render(
@@ -76,36 +79,27 @@ async def optimize(dry_run: bool = False) -> None:
         current_lines=current_lines,
     )
 
-    started = _time.time()
-    capture = StderrCapture()
-    try:
-        async for message in query(
-            prompt=prompt,
-            options=ClaudeAgentOptions(
-                max_buffer_size=CONFIG.limits.sdk_max_buffer_size_mb * 1024 * 1024,
-                cwd=str(ROOT_DIR),
-                allowed_tools=["Read", "Edit", "Grep"],
-                permission_mode="acceptEdits",
-                max_turns=10,
-                system_prompt={"type": "preset", "preset": "claude_code"},
-                stderr=capture.callback,
-            ),
-        ):
-            if isinstance(message, ResultMessage):
-                log.info("Result: %s", message.result[:300])
-    except Exception as exc:
-        log_sdk_failure(
-            log,
+    result = await run_sdk_query(
+        prompt,
+        SdkCallSpec(
             label="optimize_claude_md",
+            logger=log,
+            cwd=ROOT_DIR,
+            max_turns=10,
+            system_prompt={"type": "preset", "preset": "claude_code"},
+            allowed_tools=("Read", "Edit", "Grep"),
+            # The prompt embeds the wiki index, which compile distils from substrate:
+            # the agent may edit the staged copy and nothing else.
+            write_scope=WriteScope(roots=(staging,)),
             source=str(staging),
-            model="(default)",
             input_chars=len(prompt),
-            started=started,
-            capture=capture,
-            exc=exc,
-        )
+        ),
+        query_fn=query,
+    )
+    if not result.ok:
         staging.unlink(missing_ok=True)
         return
+    log.info("Result: %s", result.result_text[:300])
 
     if not staging.exists():
         log.error("Staging file missing! Skipping.")
