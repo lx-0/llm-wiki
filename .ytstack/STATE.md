@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-15T16:03:58+02:00
+last_updated: 2026-10-15T16:05:21+02:00
 current_milestone: M033
 active_slice: S05
-active_task: none
+active_task: T06
 last_completed_milestone: M032
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -253,8 +253,10 @@ FEATURES seams; the DECISIONS milestone entry. The infographics are unchanged by
 "Seams and gates", README names the gates, FEATURES' seam table is current, and DECISIONS
 closes M033 against its nine exit criteria. The doc audit came out clean (0 unnamed, 0 stale,
 42/42 paths). The scratch vault updated to 0.7.0 with a clean `.wiki/` and valid payloads; CI
-green. **Next: S05-T06 (milestone close: full backlog fan-out, `PRIORITY.md` re-cut,
-last-slice reassess, the M034 pitch re-read) via `plan-task`.**
+green. T06 planned (`M033-S05-T06-PLAN.md`): eight read-only subagents re-derive the 80
+backlog files from the code, a refutation pass checks every SHIPPED / SUPERSEDED verdict, and
+the items go through `git mv` into `shipped/` / `rejected/`; then `PRIORITY.md` is re-cut, the
+last-slice reassess runs, and the M034 pitch is re-read. **Next: execute T06.**
 
 ## M032 COMPLETE (L, 2026-10-14): desktop de-slop
 
