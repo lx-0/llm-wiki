@@ -1,7 +1,8 @@
 name: ci
 
 # The engine and desktop gates, on every push and PR to main. Same commands as the
-# local gates (AGENTS.md "Style"): ruff check + format --check + pytest for the engine,
+# local gates (AGENTS.md "Style"): ruff check + format --check + ty (scripts/core) +
+# pytest for the engine,
 # tsc + svelte-check + vitest + biome for the desktop app. The screenshot harness
 # (`npm run shots`) needs an Electron display and stays a local gate.
 
@@ -20,7 +21,7 @@ concurrency:
 
 jobs:
   engine:
-    name: engine (ruff + pytest)
+    name: engine (ruff + ty + pytest)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -32,14 +33,22 @@ jobs:
           python-version: "3.12"
           enable-cache: true
 
-      - name: Sync (locked, with the lint group)
-        run: uv sync --frozen --group lint
+      - name: Sync (locked, with the lint + typecheck groups)
+        run: uv sync --frozen --group lint --group typecheck
 
       - name: ruff check
         run: uv run --frozen --group lint ruff check scripts hooks tests
 
       - name: ruff format --check
         run: uv run --frozen --group lint ruff format --check scripts hooks tests
+
+      # The gate: scripts/core/ type-checks clean (DECISIONS 2026-10-15).
+      - name: ty check scripts/core
+        run: uv run --frozen --group typecheck ty check scripts/core
+
+      # Reported, not gated: the rest of scripts/ (the count in the log; KNOWLEDGE keeps it).
+      - name: ty check scripts (report only)
+        run: uv run --frozen --group typecheck ty check scripts --exit-zero --output-format concise
 
       - name: pytest
         run: uv run --frozen pytest -q -p no:cacheprovider

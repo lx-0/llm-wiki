@@ -46,3 +46,16 @@ repos:
       - id: ruff-format
         files: ^(scripts|hooks|tests)/
         exclude: ^scripts/core/config_schema\.py$
+
+  # Type checker — ty, pinned in pyproject.toml's `typecheck` group (DECISIONS
+  # 2026-10-15), run through uv so the hook and CI use the same binary. Gated scope =
+  # scripts/core/ (the CI gate); the whole tree is checked at once (a type error can
+  # surface in a file that did not change), so no filenames are passed.
+  - repo: local
+    hooks:
+      - id: ty
+        name: ty check scripts/core
+        entry: uv run --frozen --group typecheck ty check scripts/core
+        language: system
+        files: ^(scripts/core/|pyproject\.toml$|uv\.lock$)
+        pass_filenames: false

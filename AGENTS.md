@@ -289,7 +289,11 @@ Long-term direction: remove agent-side filesystem writes entirely — agent retu
   (`uv sync --group lint` once, then `uv run --group lint ruff check scripts hooks tests` and
   `uv run --group lint ruff format --check scripts hooks tests`); the rule set and every
   ignore's reason live in `pyproject.toml`. `scripts/core/config_schema.py` is excluded from
-  the formatter on purpose — its field comments are the source of `docs/config.md`. The
+  the formatter on purpose — its field comments are the source of `docs/config.md`.
+  Type-checked by ty on `scripts/core/` (`uv run --group typecheck ty check scripts/core`,
+  pinned exactly — DECISIONS 2026-10-15); the rest of `scripts/` is reported in CI, not gated.
+  A suppression names ty's own rule (`# ty: ignore[rule]`) with the reason beside it — a
+  foreign-coded `type: ignore` hides errors from one checker and not another. The
   same gates run in pre-commit (`pre-commit install` once per clone) and in CI
   (`.github/workflows/ci.yml`, with `pytest` and the desktop suite). The mechanical format
   commit is listed in `.git-blame-ignore-revs`; run once per clone:

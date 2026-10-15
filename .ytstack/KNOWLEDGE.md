@@ -2930,9 +2930,20 @@ Per-candidate learnings from the 14-candidate seam arc (C01–C14). Decisions li
   `from adapters.mailbox.gmail import _credentials  # type: ignore[import-not-found]` (a mypy
   code) for five months after 74f3d84 removed `_credentials`, so every IMAP action on a Gmail
   account died with `ImportError`. pyright never reported it; on a copy without the comment its
-  core reports "unknown import symbol". ty 0.0.88 reported it with the comment in place. Rule: no blanket or foreign-coded `type: ignore` on an import. An import
-  that can fail is a `try/except ImportError` with a logged fallback, and a suppression names
-  the gated checker's own rule.
+  core reports "unknown import symbol". ty 0.0.88 reported it with the comment in place.
+  Rule: no blanket or foreign-coded `type: ignore` on an import. An import that can fail is
+  a `try/except ImportError` with a logged fallback, and a suppression names the gated
+  checker's own rule.
+- **The ty gate covers `scripts/core/`; the rest is counted, not gated (2026-10-15,
+  M033-S05-T02):** `ty check scripts/core` has been clean since `dae1395` (35 files; 19
+  diagnostics before, five roots: `object` where the SDK types belonged, `type` where
+  `dataclasses.fields` wants `type[DataclassInstance]`, a loose signal-handler table,
+  `Callable.__name__`, a `dict` param fed `os.environ`). All of `scripts/` then stood at
+  **148**: 88 `invalid-argument-type`, 26 `unresolved-attribute`, the rest in single digits.
+  They cluster in `probe_compile_scope.py` (47, an operator-run probe), `collectors/` (40),
+  `menu.py` (10) and `producers/` (8). CI's report-only step prints the live number. To widen
+  the gate, take one package to 0 and add its path to both the pre-commit hook and the CI
+  step; never gate a path that is not clean.
 
 ### Desktop toolchain (C07)
 
