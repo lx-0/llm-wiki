@@ -184,8 +184,9 @@ def latest_in(folder: Path, suffix: str = ".md") -> str | None:
 
 # ---------- render ----------
 def render(vault: Path) -> str:
-    W = 62
-    out: list[str] = []
+    """Collect once, then the boxes top to bottom (the active-run box only while
+    a compile is running); every box but the last ends in a blank line."""
+    width = 62
 
     now = dt.datetime.now()
     knowledge = collect_knowledge(vault)
@@ -195,30 +196,39 @@ def render(vault: Path) -> str:
     orphan_n = count_orphans(vault)
     activity = daily_activity(vault)
 
-    total_raw = sum(raw.values())
     ingested = len(state.get("ingested", {}))
-    backlog = max(0, total_raw - ingested)
-    pct_ingested = 100 * ingested / total_raw if total_raw else 0
 
     done, started = collect_run_progress(vault)
     run_active = done > 0 and started >= done
 
-    inline_per_concept = inline_links / concept_n if concept_n else 0
-    target_min, target_max = 15, 25
+    out: list[str] = []
+    out.extend(_header(now, width))
+    out.extend(_knowledge_box(knowledge, width))
+    out.extend(_raw_box(raw, width))
+    out.extend(_backlog_box(ingested, sum(raw.values()), width))
+    if run_active:
+        out.extend(_active_run_box(done, width))
+    out.extend(_graph_box(knowledge, inline_links, concept_n, orphan_n, width))
+    out.extend(_cadence_box(vault, now, activity, width))
+    return "\n".join(out)
 
-    hour = now.hour
-    gate = 18
 
+def _header(now: dt.datetime, width: int) -> list[str]:
     # Header
-    out.append(f"{maybe(BOLD, CYN)}╔{'═' * (W - 2)}╗{maybe(RST)}")
     title = f"  WIKI HEALTH  ·  {now:%Y-%m-%d %H:%M}"
-    out.append(f"{maybe(BOLD, CYN)}║{title}{' ' * (W - 2 - len(title))}║{maybe(RST)}")
-    out.append(f"{maybe(BOLD, CYN)}╚{'═' * (W - 2)}╝{maybe(RST)}")
-    out.append("")
+    return [
+        f"{maybe(BOLD, CYN)}╔{'═' * (width - 2)}╗{maybe(RST)}",
+        f"{maybe(BOLD, CYN)}║{title}{' ' * (width - 2 - len(title))}║{maybe(RST)}",
+        f"{maybe(BOLD, CYN)}╚{'═' * (width - 2)}╝{maybe(RST)}",
+        "",
+    ]
 
+
+def _knowledge_box(knowledge: dict[str, int], width: int) -> list[str]:
     # KNOWLEDGE
+    out: list[str] = []
     total_k = sum(knowledge.values())
-    out.append(box_top("KNOWLEDGE", W, suffix=f"{total_k} articles "))
+    out.append(box_top("KNOWLEDGE", width, suffix=f"{total_k} articles "))
     if total_k:
         max_n = max(knowledge.values())
         for label, n in knowledge.items():
@@ -230,14 +240,19 @@ def render(vault: Path) -> str:
             out.append(
                 line(
                     f"{label:12s} {color}{'█' * filled}{maybe(GRY)}{'░' * (barw - filled)}{maybe(RST)}  {n:>4}",
-                    W,
+                    width,
                 )
             )
-    out.append(box_bot(W))
+    out.append(box_bot(width))
     out.append("")
+    return out
 
+
+def _raw_box(raw: dict[str, int], width: int) -> list[str]:
     # RAW SOURCES
-    out.append(box_top("RAW SOURCES", W, suffix=f"{total_raw} total "))
+    out: list[str] = []
+    total_raw = sum(raw.values())
+    out.append(box_top("RAW SOURCES", width, suffix=f"{total_raw} total "))
     if total_raw:
         max_r = max(raw.values()) or 1
         for label, n in raw.items():
@@ -248,38 +263,51 @@ def render(vault: Path) -> str:
             out.append(
                 line(
                     f"{label:12s} {maybe(CYN)}{'█' * filled}{maybe(GRY)}{'░' * (barw - filled)}{maybe(RST)}  {n:>4}  {pct_str}",
-                    W,
+                    width,
                 )
             )
-    out.append(box_bot(W))
+    out.append(box_bot(width))
     out.append("")
+    return out
 
+
+def _backlog_box(ingested: int, total_raw: int, width: int) -> list[str]:
     # COMPILE BACKLOG
+    backlog = max(0, total_raw - ingested)
+    pct_ingested = 100 * ingested / total_raw if total_raw else 0
     color = GRN if pct_ingested > 70 else YEL if pct_ingested > 30 else RED
-    out.append(box_top("COMPILE BACKLOG", W))
-    out.append(
+    return [
+        box_top("COMPILE BACKLOG", width),
         line(
             f"ingested  {bar(pct_ingested, fill=maybe(color))} {pct_ingested:>5.1f}%   {ingested}/{total_raw}",
-            W,
-        )
-    )
-    out.append(line(f"{maybe(DIM)}backlog: {backlog} files open{maybe(RST)}", W))
-    out.append(box_bot(W))
-    out.append("")
+            width,
+        ),
+        line(f"{maybe(DIM)}backlog: {backlog} files open{maybe(RST)}", width),
+        box_bot(width),
+        "",
+    ]
 
+
+def _active_run_box(done: int, width: int) -> list[str]:
     # ACTIVE RUN (if any)
-    if run_active:
-        cap = 100  # default; could be parsed from log
-        run_pct = 100 * done / cap
-        out.append(box_top("ACTIVE COMPILE RUN", W, suffix=f"cap={cap} "))
-        out.append(
-            line(f"progress  {bar(run_pct, fill=maybe(CYN))} {run_pct:>5.1f}%   {done}/{cap}", W)
-        )
-        out.append(box_bot(W))
-        out.append("")
+    cap = 100  # default; could be parsed from log
+    run_pct = 100 * done / cap
+    return [
+        box_top("ACTIVE COMPILE RUN", width, suffix=f"cap={cap} "),
+        line(f"progress  {bar(run_pct, fill=maybe(CYN))} {run_pct:>5.1f}%   {done}/{cap}", width),
+        box_bot(width),
+        "",
+    ]
 
+
+def _graph_box(
+    knowledge: dict[str, int], inline_links: int, concept_n: int, orphan_n: int, width: int
+) -> list[str]:
     # GRAPH DENSITY
-    out.append(box_top("GRAPH DENSITY", W))
+    inline_per_concept = inline_links / concept_n if concept_n else 0
+    target_min, target_max = 15, 25
+    out: list[str] = []
+    out.append(box_top("GRAPH DENSITY", width))
     barw = 18
     density_pct = min(100, 100 * inline_per_concept / target_max)
     color = (
@@ -293,7 +321,7 @@ def render(vault: Path) -> str:
     out.append(
         line(
             f"links/concept  {maybe(color)}{'█' * filled}{maybe(GRY)}{'░' * (barw - filled)}{maybe(RST)}  {inline_per_concept:>4.1f}  {maybe(DIM)}target {target_min}-{target_max}{maybe(RST)}",
-            W,
+            width,
         )
     )
     orphan_color = GRN if orphan_n == 0 else RED
@@ -301,33 +329,39 @@ def render(vault: Path) -> str:
     out.append(
         line(
             f"orphans        {maybe(orphan_color)}{icon} {orphan_n} concepts without [[wikilinks]]{maybe(RST)}",
-            W,
+            width,
         )
     )
     cc_ratio = concept_n / max(knowledge["connections"], 1)
     out.append(
         line(
             f"c:cn ratio     {cc_ratio:>4.1f} : 1  {maybe(DIM)}({concept_n}c / {knowledge['connections']}cn){maybe(RST)}",
-            W,
+            width,
         )
     )
-    out.append(box_bot(W))
+    out.append(box_bot(width))
     out.append("")
+    return out
 
+
+def _cadence_box(vault: Path, now: dt.datetime, activity: list[int], width: int) -> list[str]:
     # PIPELINE CADENCE
-    out.append(box_top("PIPELINE CADENCE", W))
+    hour = now.hour
+    gate = 18
+    out: list[str] = []
+    out.append(box_top("PIPELINE CADENCE", width))
     gate_open = hour >= gate
     gate_str = (
         f"{maybe(GRN)}✓ open  (hour={hour}≥{gate}){maybe(RST)}"
         if gate_open
         else f"{maybe(YEL)}● gated (hour={hour}<{gate}){maybe(RST)}"
     )
-    out.append(line(f"compile gate     {gate_str}", W))
+    out.append(line(f"compile gate     {gate_str}", width))
 
     latest_d = latest_in(vault / "daily")
     today_str = now.strftime("%Y-%m-%d")
     d_color = GRN if latest_d and latest_d.startswith(today_str) else YEL
-    out.append(line(f"latest daily     {maybe(d_color)}{latest_d or '—'}{maybe(RST)}", W))
+    out.append(line(f"latest daily     {maybe(d_color)}{latest_d or '—'}{maybe(RST)}", width))
 
     # search reports/ at vault root and at .wiki/reports
     reports_dir = vault / "reports"
@@ -335,19 +369,18 @@ def render(vault: Path) -> str:
         reports_dir = vault / ".wiki" / "reports"
     latest_r = latest_in(reports_dir)
     r_color = GRN if latest_r and today_str in latest_r else YEL
-    out.append(line(f"latest review    {maybe(r_color)}{latest_r or '—'}{maybe(RST)}", W))
+    out.append(line(f"latest review    {maybe(r_color)}{latest_r or '—'}{maybe(RST)}", width))
 
     if activity:
         spark = sparkline(activity)
         out.append(
             line(
                 f"daily activity   {maybe(CYN)}{spark}{maybe(RST)}  {maybe(DIM)}(last {len(activity)}d){maybe(RST)}",
-                W,
+                width,
             )
         )
-    out.append(box_bot(W))
-
-    return "\n".join(out)
+    out.append(box_bot(width))
+    return out
 
 
 # ---------- main ----------

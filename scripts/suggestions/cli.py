@@ -230,7 +230,12 @@ def _yaml_to_filter_rule(
 # ── CLI ─────────────────────────────────────────────────────────────
 
 
-def main() -> None:
+def _stamp() -> str:
+    """The `reviewed:` / `executed:` timestamp — the operator's timezone, seconds."""
+    return datetime.now(ZoneInfo(TIMEZONE)).isoformat(timespec="seconds")
+
+
+def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Execute optimization suggestions — per-action approval",
         epilog="Each action within a suggestion is approved/rejected individually.",
@@ -256,124 +261,115 @@ def main() -> None:
     parser.add_argument(
         "--dry-run", action="store_true", help="Preview approved actions without executing"
     )
-    args = parser.parse_args()
+    return parser
 
-    RAW_SUGGESTIONS_DIR.mkdir(parents=True, exist_ok=True)
-    suggestion_files = sorted(RAW_SUGGESTIONS_DIR.glob("*.yaml")) + sorted(
-        RAW_SUGGESTIONS_DIR.glob("*.yml")
-    )
 
-    if not suggestion_files:
-        print("No suggestions in raw/suggestions/")
-        return
-
-    # ── List ──
-    if args.list:
-        for f in suggestion_files:
-            data = load_suggestion(f)
-            print(f"\n{'=' * 60}")
-            print(f"File: {f.name}")
-            print(f"Target: {data.get('target', '?')}")
-            print(f"Rationale: {data.get('rationale', '')}")
-            for i, action in enumerate(data.get("actions", []), 1):
-                describe_action(i, action)
-        return
-
-    # ── Approve action ──
-    if args.approve:
-        if not args.action_num:
-            print("Usage: --approve <file> <action_number>")
-            print("Example: --approve test-billing 1")
-            sys.exit(1)
-        path = _resolve(args.approve, suggestion_files)
-        if not path:
-            sys.exit(1)
-        data = load_suggestion(path)
-        actions = data.get("actions", [])
-        idx = args.action_num - 1
-        if idx < 0 or idx >= len(actions):
-            print(f"Action {args.action_num} not found (file has {len(actions)} actions)")
-            sys.exit(1)
-        if actions[idx].get("status", "pending") != "pending":
-            print(f"Action {args.action_num} is already '{actions[idx].get('status')}'")
-            sys.exit(1)
-        actions[idx]["status"] = "approved"
-        actions[idx]["reviewed"] = datetime.now(ZoneInfo(TIMEZONE)).isoformat(timespec="seconds")
-        save_suggestion(path, data)
-        print(f"Approved action {args.action_num} in {path.name}:")
-        describe_action(args.action_num, actions[idx])
-        return
-
-    # ── Reject action ──
-    if args.reject:
-        if not args.action_num:
-            print("Usage: --reject <file> <action_number>")
-            sys.exit(1)
-        path = _resolve(args.reject, suggestion_files)
-        if not path:
-            sys.exit(1)
-        data = load_suggestion(path)
-        actions = data.get("actions", [])
-        idx = args.action_num - 1
-        if idx < 0 or idx >= len(actions):
-            print(f"Action {args.action_num} not found (file has {len(actions)} actions)")
-            sys.exit(1)
-        actions[idx]["status"] = "rejected"
-        actions[idx]["reviewed"] = datetime.now(ZoneInfo(TIMEZONE)).isoformat(timespec="seconds")
-        save_suggestion(path, data)
-        print(f"Rejected action {args.action_num} in {path.name}")
-        return
-
-    # ── Interactive review ──
-    if args.review:
-        path = _resolve(args.review, suggestion_files)
-        if not path:
-            sys.exit(1)
-        data = load_suggestion(path)
-        actions = data.get("actions", [])
-
+def _cmd_list(suggestion_files: list[Path]) -> None:
+    """── List ── every suggestion with its per-action status."""
+    for f in suggestion_files:
+        data = load_suggestion(f)
         print(f"\n{'=' * 60}")
-        print(f"Reviewing: {data.get('target', path.name)}")
+        print(f"File: {f.name}")
+        print(f"Target: {data.get('target', '?')}")
         print(f"Rationale: {data.get('rationale', '')}")
-        print(f"{'=' * 60}\n")
-
-        for i, action in enumerate(actions, 1):
-            if action.get("status", "pending") != "pending":
-                describe_action(i, action)
-                print(f"    (already {action.get('status')}, skipping)\n")
-                continue
-
+        for i, action in enumerate(data.get("actions", []), 1):
             describe_action(i, action)
 
-            while True:
-                choice = (
-                    input(f"  Action {i}: [a]pprove / [r]eject / [s]kip / [q]uit? ").strip().lower()
-                )
-                if choice in ("a", "approve"):
-                    action["status"] = "approved"
-                    action["reviewed"] = datetime.now(ZoneInfo(TIMEZONE)).isoformat(
-                        timespec="seconds"
-                    )
-                    save_suggestion(path, data)
-                    print("    → Approved\n")
-                    break
-                elif choice in ("r", "reject"):
-                    action["status"] = "rejected"
-                    action["reviewed"] = datetime.now(ZoneInfo(TIMEZONE)).isoformat(
-                        timespec="seconds"
-                    )
-                    save_suggestion(path, data)
-                    print("    → Rejected\n")
-                    break
-                elif choice in ("s", "skip"):
-                    print("    → Skipped\n")
-                    break
-                elif choice in ("q", "quit"):
-                    print("Review aborted.")
-                    return
-        return
 
-    # ── Execute approved actions (or dry-run) ──
+def _cmd_approve(args: argparse.Namespace, suggestion_files: list[Path]) -> None:
+    """── Approve action ── one pending action; exit 1 on a bad call."""
+    if not args.action_num:
+        print("Usage: --approve <file> <action_number>")
+        print("Example: --approve test-billing 1")
+        sys.exit(1)
+    path = _resolve(args.approve, suggestion_files)
+    if not path:
+        sys.exit(1)
+    data = load_suggestion(path)
+    actions = data.get("actions", [])
+    idx = args.action_num - 1
+    if idx < 0 or idx >= len(actions):
+        print(f"Action {args.action_num} not found (file has {len(actions)} actions)")
+        sys.exit(1)
+    if actions[idx].get("status", "pending") != "pending":
+        print(f"Action {args.action_num} is already '{actions[idx].get('status')}'")
+        sys.exit(1)
+    actions[idx]["status"] = "approved"
+    actions[idx]["reviewed"] = _stamp()
+    save_suggestion(path, data)
+    print(f"Approved action {args.action_num} in {path.name}:")
+    describe_action(args.action_num, actions[idx])
+
+
+def _cmd_reject(args: argparse.Namespace, suggestion_files: list[Path]) -> None:
+    """── Reject action ── one action, whatever its status; exit 1 on a bad call."""
+    if not args.action_num:
+        print("Usage: --reject <file> <action_number>")
+        sys.exit(1)
+    path = _resolve(args.reject, suggestion_files)
+    if not path:
+        sys.exit(1)
+    data = load_suggestion(path)
+    actions = data.get("actions", [])
+    idx = args.action_num - 1
+    if idx < 0 or idx >= len(actions):
+        print(f"Action {args.action_num} not found (file has {len(actions)} actions)")
+        sys.exit(1)
+    actions[idx]["status"] = "rejected"
+    actions[idx]["reviewed"] = _stamp()
+    save_suggestion(path, data)
+    print(f"Rejected action {args.action_num} in {path.name}")
+
+
+def _cmd_review(args: argparse.Namespace, suggestion_files: list[Path]) -> None:
+    """── Interactive review ── each pending action, saved after every decision;
+    `q` aborts the walk."""
+    path = _resolve(args.review, suggestion_files)
+    if not path:
+        sys.exit(1)
+    data = load_suggestion(path)
+    actions = data.get("actions", [])
+
+    print(f"\n{'=' * 60}")
+    print(f"Reviewing: {data.get('target', path.name)}")
+    print(f"Rationale: {data.get('rationale', '')}")
+    print(f"{'=' * 60}\n")
+
+    for i, action in enumerate(actions, 1):
+        if action.get("status", "pending") != "pending":
+            describe_action(i, action)
+            print(f"    (already {action.get('status')}, skipping)\n")
+            continue
+
+        describe_action(i, action)
+
+        while True:
+            choice = (
+                input(f"  Action {i}: [a]pprove / [r]eject / [s]kip / [q]uit? ").strip().lower()
+            )
+            if choice in ("a", "approve"):
+                action["status"] = "approved"
+                action["reviewed"] = _stamp()
+                save_suggestion(path, data)
+                print("    → Approved\n")
+                break
+            elif choice in ("r", "reject"):
+                action["status"] = "rejected"
+                action["reviewed"] = _stamp()
+                save_suggestion(path, data)
+                print("    → Rejected\n")
+                break
+            elif choice in ("s", "skip"):
+                print("    → Skipped\n")
+                break
+            elif choice in ("q", "quit"):
+                print("Review aborted.")
+                return
+
+
+def _cmd_execute(args: argparse.Namespace, suggestion_files: list[Path]) -> None:
+    """── Execute approved actions (or dry-run) ── a real run marks each
+    successful action `executed`."""
     any_approved = False
     for f in suggestion_files:
         data = load_suggestion(f)
@@ -392,13 +388,39 @@ def main() -> None:
 
             if ok and not args.dry_run:
                 action["status"] = "executed"
-                action["executed"] = datetime.now(ZoneInfo(TIMEZONE)).isoformat(timespec="seconds")
+                action["executed"] = _stamp()
                 save_suggestion(f, data)
                 print("    → Executed\n")
 
     if not any_approved:
         print("No approved actions to execute.")
         print("Use --review <file> to approve individual actions first.")
+
+
+def main() -> None:
+    """Parse, gather `raw/suggestions/*.y{a,}ml`, dispatch on the first flag set:
+    --list, --approve, --reject, --review, else execute (or --dry-run)."""
+    args = _build_parser().parse_args()
+
+    RAW_SUGGESTIONS_DIR.mkdir(parents=True, exist_ok=True)
+    suggestion_files = sorted(RAW_SUGGESTIONS_DIR.glob("*.yaml")) + sorted(
+        RAW_SUGGESTIONS_DIR.glob("*.yml")
+    )
+
+    if not suggestion_files:
+        print("No suggestions in raw/suggestions/")
+        return
+
+    if args.list:
+        _cmd_list(suggestion_files)
+    elif args.approve:
+        _cmd_approve(args, suggestion_files)
+    elif args.reject:
+        _cmd_reject(args, suggestion_files)
+    elif args.review:
+        _cmd_review(args, suggestion_files)
+    else:
+        _cmd_execute(args, suggestion_files)
 
 
 if __name__ == "__main__":

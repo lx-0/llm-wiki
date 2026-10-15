@@ -26,6 +26,7 @@ from core.prompts import render
 from core.sdk_helpers import (
     PromptTooLargeError,
     SdkCallSpec,
+    SdkRunResult,
     assert_prompt_within_budget,
     run_sdk_query,
 )
@@ -42,11 +43,8 @@ log = logging.getLogger("query")
 
 # ── Query prompt ─────────────────────────────────────────────────────
 
-# ── Main ─────────────────────────────────────────────────────────────
 
-
-async def main() -> None:
-    setup_console_logging("query")
+def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Query the knowledge base")
     parser.add_argument("question", type=str, help="Your question")
     parser.add_argument(
@@ -94,24 +92,21 @@ async def main() -> None:
             "Configurable list lives in CONFIG.personal.domains. (M013)"
         ),
     )
-    args = parser.parse_args()
+    return parser
 
-    question = args.question
-    file_back = args.file_back
-    brief = args.brief
-    as_json = args.json
-    force = args.force
 
-    if brief and file_back:
+def _validate_flags(args: argparse.Namespace) -> None:
+    """Exit 2 on a mode conflict (`--brief` / `--json` with `--file-back`) or a
+    `--domain` outside `CONFIG.personal.domains`."""
+    if args.brief and args.file_back:
         log.error(
             "--brief and --file-back are mutually exclusive — brief mode answers in-line only"
         )
         sys.exit(2)
-    if as_json and file_back:
+    if args.json and args.file_back:
         log.error("--json and --file-back are mutually exclusive — JSON mode answers in-line only")
         sys.exit(2)
 
-    include_final_only = args.include_final_only
     domain = args.domain
     # M013: validate against the configured enum early. Unknown values would
     # otherwise produce an empty answer (the LLM filter matches nothing) with
@@ -128,71 +123,65 @@ async def main() -> None:
             ", ".join(valid_domains),
         )
         sys.exit(2)
-    log.info(
-        "Query: %s (brief=%s, file_back=%s, include_final_only=%s, domain=%s)",
-        question,
-        brief,
-        file_back,
-        include_final_only,
-        domain,
-    )
 
-    # Embed only the compact article index (path + date); the agent pulls
-    # full article bodies on demand via Read/Grep/Glob. Embedding every
-    # article body here overflowed the model's context window once the
-    # vault grew large (4.4 MB / >1M tokens on the 850-article lxw vault).
-    index_md = read_wiki_index_compact()
-    facts_md = read_hard_facts()
 
-    # compile_role filter (M007-S03-T03). By default, instruct the LLM to
-    # skip articles with compile_role: final-only frontmatter — they're
-    # archived hand-curated reference, hidden from active surfaces. The
-    # --include-final-only flag re-enables them for queries that
-    # specifically want archived knowledge.
+def _compile_role_note(include_final_only: bool) -> str:
+    """compile_role filter (M007-S03-T03). By default, instruct the LLM to
+    skip articles with compile_role: final-only frontmatter — they're
+    archived hand-curated reference, hidden from active surfaces. The
+    --include-final-only flag re-enables them for queries that
+    specifically want archived knowledge."""
     if include_final_only:
-        compile_role_filter_note = (
+        return (
             "\n\n## compile_role filter\n\n"
             "Include articles regardless of compile_role (operator requested "
             "via --include-final-only). Treat final-only and source-and-final "
             "alongside source-only/compile-output articles.\n"
         )
-    else:
-        compile_role_filter_note = (
-            "\n\n## compile_role filter\n\n"
-            "If any article you find has frontmatter `compile_role: final-only`, "
-            "SKIP it — it's archived hand-curated content the operator chose to "
-            "hide from active queries. Mention in your answer ONLY if directly "
-            "asked about archives or if no non-archived material answers the "
-            "question. Source-only and source-and-final articles are in-scope.\n"
-        )
-    facts_md = facts_md + compile_role_filter_note
+    return (
+        "\n\n## compile_role filter\n\n"
+        "If any article you find has frontmatter `compile_role: final-only`, "
+        "SKIP it — it's archived hand-curated content the operator chose to "
+        "hide from active queries. Mention in your answer ONLY if directly "
+        "asked about archives or if no non-archived material answers the "
+        "question. Source-only and source-and-final articles are in-scope.\n"
+    )
 
-    # M013: domain filter. When `--domain <value>` is provided, instruct the
-    # LLM to restrict its answer to articles whose frontmatter `domain:`
-    # matches the requested value. Untagged articles are excluded from the
-    # filtered set (operator opted into a filter — silent inclusion would
-    # mask the lack of tagging). No-op when --domain is not provided.
-    if domain is not None:
-        domain_filter_note = (
-            "\n\n## domain filter\n\n"
-            f"Restrict your answer to articles whose frontmatter `domain:` "
-            f"value is exactly `{domain}`. Read the frontmatter (top YAML "
-            f"block) of any candidate article before citing it. Articles "
-            f"without `domain:` set, or with a different value, are out of "
-            f"scope for this query — skip them. If no in-scope article "
-            f"answers the question, say so explicitly rather than falling "
-            f"back to untagged content.\n"
-        )
-        facts_md = facts_md + domain_filter_note
 
-    if file_back:
+def _domain_note(domain: str | None) -> str:
+    """M013: domain filter. When `--domain <value>` is provided, instruct the
+    LLM to restrict its answer to articles whose frontmatter `domain:`
+    matches the requested value. Untagged articles are excluded from the
+    filtered set (operator opted into a filter — silent inclusion would
+    mask the lack of tagging). No-op ("") when --domain is not provided."""
+    if domain is None:
+        return ""
+    return (
+        "\n\n## domain filter\n\n"
+        f"Restrict your answer to articles whose frontmatter `domain:` "
+        f"value is exactly `{domain}`. Read the frontmatter (top YAML "
+        f"block) of any candidate article before citing it. Articles "
+        f"without `domain:` set, or with a different value, are out of "
+        f"scope for this query — skip them. If no in-scope article "
+        f"answers the question, say so explicitly rather than falling "
+        f"back to untagged content.\n"
+    )
+
+
+def _build_prompt(
+    args: argparse.Namespace, *, index_md: str, facts_md: str
+) -> tuple[str, list[str]]:
+    """The mode's template and tool set; `--file-back` adds Write/Edit behind the
+    qa/ dedup guard (exit 3 unless `--force`)."""
+    question = args.question
+    if args.file_back:
         QA_DIR.mkdir(parents=True, exist_ok=True)
         # Dedup guard: refuse to overwrite an existing qa/ note unless --force.
         # Match by exact slug; near-duplicates are still possible but cheap
         # protection against accidental double-runs of the same question.
         candidate_slug = slugify(question)[:80]  # cap length to match write
         existing = list(QA_DIR.glob(f"{candidate_slug}*.md"))
-        if existing and not force:
+        if existing and not args.force:
             log.error(
                 "qa/ already has %d note(s) matching slug `%s*.md` (%s). "
                 "Re-run with --force to overwrite, or rephrase the question for a distinct slug.",
@@ -210,7 +199,7 @@ async def main() -> None:
             now=now_iso(),
         )
         allowed_tools = ["Read", "Glob", "Grep", "Write", "Edit"]
-    elif brief:
+    elif args.brief:
         prompt = render(
             "query_brief",
             index_md=index_md,
@@ -226,6 +215,68 @@ async def main() -> None:
             question=question,
         )
         allowed_tools = ["Read", "Glob", "Grep"]
+    return prompt, allowed_tools
+
+
+def _print_answer(result: SdkRunResult, question: str, *, as_json: bool) -> None:
+    """Print the answer. --json is the machine-readable seam (desktop app /
+    agents; same posture as `wiki doctor --json`) — consumers parse this
+    payload instead of scraping the banner + prose off stdout."""
+    if as_json:
+        print(
+            json.dumps(
+                {
+                    "question": question,
+                    "answer": result.result_text,
+                    "input_tokens": result.input_tokens,
+                    "output_tokens": result.output_tokens,
+                },
+                indent=2,
+            )
+        )
+    else:
+        print("\n" + result.result_text)
+
+
+def _bump_query_counters(state: dict) -> None:
+    """Merged under the state lock so a compile running in parallel can't
+    clobber these counters with its own long-held copy (and vice versa).
+    No dollar accumulation: token accounting in usage.json/LEDGER is the
+    metering surface (DECISIONS 2026-05-23). Queries were the last writer
+    feeding the retired `total_cost` key, which made the number drift
+    upward from queries alone while compile's spend vanished."""
+    state["query_count"] = state.get("query_count", 0) + 1
+    state["last_query"] = now_iso()
+
+
+# ── Main ─────────────────────────────────────────────────────────────
+
+
+async def main() -> None:
+    """The phases: parse + validate → the compact index + the hard facts with the
+    compile-role / domain notes → the mode's prompt → the budget pre-flight → the
+    query agent → the answer → the counters."""
+    setup_console_logging("query")
+    args = _build_parser().parse_args()
+    _validate_flags(args)
+    log.info(
+        "Query: %s (brief=%s, file_back=%s, include_final_only=%s, domain=%s)",
+        args.question,
+        args.brief,
+        args.file_back,
+        args.include_final_only,
+        args.domain,
+    )
+
+    # Embed only the compact article index (path + date); the agent pulls
+    # full article bodies on demand via Read/Grep/Glob. Embedding every
+    # article body here overflowed the model's context window once the
+    # vault grew large (4.4 MB / >1M tokens on the 850-article lxw vault).
+    index_md = read_wiki_index_compact()
+    facts_md = (
+        read_hard_facts() + _compile_role_note(args.include_final_only) + _domain_note(args.domain)
+    )
+    prompt, allowed_tools = _build_prompt(args, index_md=index_md, facts_md=facts_md)
 
     # Pre-flight: reject a corpus-sized prompt before the SDK call. Without
     # this guard, an oversized prompt dies inside the bundled CLI with an
@@ -260,23 +311,7 @@ async def main() -> None:
     if result.failure is not None:
         sys.exit(1)
 
-    # Print the answer. --json is the machine-readable seam (desktop app /
-    # agents; same posture as `wiki doctor --json`) — consumers parse this
-    # payload instead of scraping the banner + prose off stdout.
-    if as_json:
-        print(
-            json.dumps(
-                {
-                    "question": question,
-                    "answer": result.result_text,
-                    "input_tokens": result.input_tokens,
-                    "output_tokens": result.output_tokens,
-                },
-                indent=2,
-            )
-        )
-    else:
-        print("\n" + result.result_text)
+    _print_answer(result, args.question, as_json=args.json)
 
     # Usage is tracked in tokens per (provider, model) — DECISIONS
     # 2026-05-23; the old hardcoded $5/$25-per-Mtok estimate is gone.
@@ -286,17 +321,6 @@ async def main() -> None:
         result.input_tokens,
         result.output_tokens,
     )
-
-    # Merged under the state lock so a compile running in parallel can't
-    # clobber these counters with its own long-held copy (and vice versa).
-    # No dollar accumulation: token accounting in usage.json/LEDGER is the
-    # metering surface (DECISIONS 2026-05-23). Queries were the last writer
-    # feeding the retired `total_cost` key, which made the number drift
-    # upward from queries alone while compile's spend vanished.
-    def _bump_query_counters(state: dict) -> None:
-        state["query_count"] = state.get("query_count", 0) + 1
-        state["last_query"] = now_iso()
-
     update_state(_bump_query_counters)
 
 
