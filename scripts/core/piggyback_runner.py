@@ -8,9 +8,9 @@ The review-wiki piggyback then sat on a half-open socket for 19h47m with no
 surfaced evidence (incident 2026-05-30, see KNOWLEDGE.md "Ollama half-open
 socket" + "silent piggyback").
 
-This wrapper is spawned *instead of* the bare command::
+This wrapper is spawned *instead of* the bare command (scripts/ on the path)::
 
-    python core/piggyback_runner.py <name> <timeout_s> -- <cmd> [args...]
+    python -m core.piggyback_runner <name> <timeout_s> -- <cmd> [args...]
 
 It records ``status`` running → ``ok`` | ``failed:<rc>`` | ``timeout`` |
 ``error:<Type>`` via a locked read-modify-write that only touches its own
@@ -117,19 +117,23 @@ def run_piggyback(
     use only when a task self-bounds).
     """
     started = time.time()
-    record_status(name, {"status": "running", "started": _now_iso()}, state_file=state_file)
+    child: list[subprocess.Popen] = []  # the spawned child, once there is one
 
     # A killed RUNNER must not leave `status: running` behind. Without this,
     # the entry lies about a task that is not running (dead pid), buries the
     # previous real outcome, and doctor's orphan check only notices after the
     # wall-clock cap + 1 h. Observed twice on 2026-08-26 when a foreground
-    # timeout killed the runner mid-child. Restores the previous handler so a
-    # nested/embedded caller keeps its own signal semantics.
+    # timeout killed the runner mid-child.
     # What `signal.getsignal` returns and `signal.signal` accepts (`signal.Handlers` is an int).
     _prev_handlers: dict[int, Callable[[int, FrameType | None], Any] | int | None] = {}
 
+    def _restore(signum: int) -> None:
+        prev = _prev_handlers.get(signum)
+        signal.signal(signum, prev if prev is not None else signal.SIG_DFL)
+
     def _on_signal(signum, _frame):
-        _terminate(proc)
+        if child:
+            _terminate(child[0])
         record_status(
             name,
             {
@@ -140,9 +144,40 @@ def run_piggyback(
             },
             state_file=state_file,
         )
-        signal.signal(signum, _prev_handlers.get(signum, signal.SIG_DFL))
+        _restore(signum)
         os.kill(os.getpid(), signum)
 
+    # Armed BEFORE `running` is recorded: a signal in between would leave the
+    # very `running` this handler exists to prevent (the killed-runner test
+    # flaked on that window, ~1 run in 6). Restored on every return, so an
+    # in-process caller keeps its own signal semantics.
+    for _sig in (signal.SIGTERM, signal.SIGINT):
+        try:
+            _prev_handlers[_sig] = signal.getsignal(_sig)
+            signal.signal(_sig, _on_signal)
+        except (ValueError, OSError):
+            # Not the main thread, or the platform refuses — the wall-clock
+            # cap and doctor's orphan check remain as backstops.
+            pass
+    try:
+        record_status(name, {"status": "running", "started": _now_iso()}, state_file=state_file)
+        return _spawn_and_wait(name, timeout_s, cmd, started, child, state_file)
+    finally:
+        for _sig in _prev_handlers:
+            with contextlib.suppress(ValueError, OSError):
+                _restore(_sig)
+
+
+def _spawn_and_wait(
+    name: str,
+    timeout_s: int,
+    cmd: list[str],
+    started: float,
+    child: list[subprocess.Popen],
+    state_file: Path,
+) -> int:
+    """Spawn ``cmd``, wait under the cap, record the outcome. ``child`` gets the
+    process the moment it exists, so the runner's signal handler can reap it."""
     try:
         proc = subprocess.Popen(
             cmd,
@@ -165,18 +200,8 @@ def run_piggyback(
         )
         return 1
 
+    child.append(proc)
     record_status(name, {"pid": proc.pid}, state_file=state_file)
-
-    # Armed only now: before the spawn there is no child to reap, and the
-    # spawn-failure path above already records its own outcome.
-    for _sig in (signal.SIGTERM, signal.SIGINT):
-        try:
-            _prev_handlers[_sig] = signal.getsignal(_sig)
-            signal.signal(_sig, _on_signal)
-        except (ValueError, OSError):
-            # Not the main thread, or the platform refuses — the wall-clock
-            # cap and doctor's orphan check remain as backstops.
-            pass
 
     wait_timeout = timeout_s if timeout_s and timeout_s > 0 else None
     try:

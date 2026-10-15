@@ -2988,6 +2988,16 @@ Per-candidate learnings from the 14-candidate seam arc (C01–C14). Decisions li
   `gemma4:e4b`: up to 383 in `~/Screenshots/` (all scanned since that day), and the batch
   report's "with <model>" line too. `pictures.py` resolved once at module level and was
   right. Rule: resolve the model once, pass that value to the call and to every stamp.
+- **Arm a signal handler before writing the state it protects (2026-10-15,
+  M033-S05-T06):** `piggyback_runner` recorded `status: running`, spawned the child, and only
+  then installed its SIGTERM/SIGINT handler, the one that records `interrupted`. A signal
+  inside that window left exactly the stale `running` the handler exists to prevent, and
+  `tests/test_piggyback_runner.py::test_killed_runner_records_interrupted_not_running` failed
+  about one run in six. The handler now goes in first, the child lands in a holder it reads,
+  and every return restores the previous handlers. The handlers had never been restored on
+  a normal return, so an in-process caller such as pytest kept the runner's closure. A
+  deterministic test reads the handler at the moment `running` is written; a flaky test
+  around a state machine is usually the race it is about.
 
 ### Desktop toolchain (C07)
 

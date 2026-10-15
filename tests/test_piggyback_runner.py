@@ -92,6 +92,32 @@ def test_killed_runner_records_interrupted_not_running(tmp_path):
     assert "ended" in entry and "duration_s" in entry
 
 
+def test_signal_handlers_cover_running_and_are_restored(tmp_path, monkeypatch):
+    """`running` must never be on disk while SIGTERM still has its default
+    action: a runner killed in that window leaves the very `status: running`
+    the handler exists to prevent (the test above flaked on exactly that,
+    ~1 run in 6). And an in-process caller gets its own handlers back."""
+    import signal
+
+    from core import piggyback_runner as pr
+
+    handler_at_running = []
+    real_record = pr.record_status
+
+    def spy(name, fields, *, state_file):
+        if fields.get("status") == "running":
+            handler_at_running.append(signal.getsignal(signal.SIGTERM))
+        return real_record(name, fields, state_file=state_file)
+
+    monkeypatch.setattr(pr, "record_status", spy)
+    before = signal.getsignal(signal.SIGTERM)
+
+    pr.run_piggyback("t", 60, [sys.executable, "-c", "pass"], state_file=tmp_path / "s.json")
+
+    assert [getattr(h, "__name__", h) for h in handler_at_running] == ["_on_signal"]
+    assert signal.getsignal(signal.SIGTERM) is before
+
+
 def test_records_timeout_and_kills_promptly(tmp_path):
     from core import piggyback_runner as pr
 
