@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-15T19:56:00+02:00
+last_updated: 2026-10-15T19:58:00+02:00
 current_milestone: M034
 active_slice: S01
-active_task: none
+active_task: T06
 last_completed_milestone: M033
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -17,9 +17,10 @@ parallel_milestones: [M021, M025, M027, M029]
 **Status:** M034 / S01 — 5 of 7 tasks done. T01–T02 are the bash oracle, T03 the decisions,
 T04 the one-hop bootstrap, T05 home & status in the catalogue. Engine 0.7.6, suite 2340, CI
 green on `25026f7`.
-**Next:** `ytstack:plan-task` → S01-T06: the `dream` / `dream-entity` routing and the auth
-aliases into the catalogue, with the dream error path recorded from bash first. Then T07, the
-consumer smoke. `status` now lives in S03-T02.
+**Next:** S01-T06 is planned (`M034-S01-T06-PLAN.md`): the `dream` / `dream-entity` routing
+(default route, argument prefixes) and the auth aliases (kind `alias`) move into the
+catalogue, with four deterministic paths recorded from bash first. Then T07, the consumer
+smoke. `status` now lives in S03-T02.
 
 **M034 / S01-T05** (`2ad21f4`, `25026f7`): `menu` (+ a bannerless `--json` route), `doctor`
 and `version` (`engine_version.py`) are catalogue commands.
