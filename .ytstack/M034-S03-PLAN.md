@@ -5,7 +5,7 @@ project: llm-wiki
 created: 2026-10-15T18:15:32+02:00
 status: planned
 task_count: 6
-completed_tasks: 2
+completed_tasks: 3
 ---
 
 # M034-S03 -- Slice Plan
@@ -40,7 +40,7 @@ last callers were skills' `config_get` and `cmd_status` (reassessed after S01).
   `hooks-uninstall` and adds the cases that pin the fixes: an uninstall that keeps another
   tool's hook (a Claude group and a Cursor bare entry), a payload that cannot be built, and
   an uninstall with nothing to remove. Release 0.7.16.
-- [ ] T03 -- **One backup helper** (T02 follow-up; split from the port after T02). The port
+- [x] T03 -- **One backup helper** (T02 follow-up; split from the port after T02). The port
   needs T02's rule: never over an earlier backup, and a clash takes `-2`.
   `core/frontmatter.backup` (correct / take / correct_apply) has the same to-the-second
   overwrite flaw, and `dedup.py` hand-rolls a copy. `core/backup.py` becomes the one helper

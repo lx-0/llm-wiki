@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-15T23:20:00+02:00
+last_updated: 2026-10-15T23:35:00+02:00
 current_milestone: M034
 active_slice: S03
-active_task: T03
+active_task: none
 last_completed_milestone: M033
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -14,8 +14,14 @@ parallel_milestones: [M021, M025, M027, M029]
 
 ## Next action — M034 / S03: hooks + skills + status
 
-**Status:** M034 / S03 / T03 planned — ready to execute (`M034-S03-T03-PLAN.md`). 2/6 tasks
-done in the slice; slices S01 and S02 are complete (2/6).
+**Status:** M034 / S03 — 3/6 tasks done in the slice. Next task: T04, the port
+(`/ytstack:plan-task`). Slices S01 and S02 are complete (2/6).
+
+**S03-T03 is done** (`M034-S03-T03-SUMMARY.md`, release **0.7.17**). `core/backup.py` is
+the engine's one backup helper: two backups in one second keep both. All five former
+writers go through it, keeping their file names; the two reachable ones were Thunderbird
+and All-Inkl filter rules applied in a batch. A seam guard holds it. Engine 0.7.17, suite
+2469, CI green on `681b53e`.
 
 **S03-T02 is done** (`M034-S03-T02-SUMMARY.md`, release **0.7.16**). The bash hooks commands
 now do what they report, and five goldens hold them for the port:
@@ -23,8 +29,6 @@ now do what they report, and five goldens hold them for the port:
   alike) and leaves a config with nothing of ours untouched;
 - a failed install or uninstall exits 1 instead of saying Done;
 - a backup never replaces one from the same second.
-
-Engine 0.7.16, suite 2465, CI green on `f880a16`.
 
 **S03-T01 is done** (`M034-S03-T01-SUMMARY.md`):
 - `core/agents.py` is the agent registry with **one** hook-command grammar; its payloads are
@@ -35,14 +39,9 @@ Engine 0.7.16, suite 2465, CI green on `f880a16`.
 
 `wiki` is at 539 lines; the bash owns hooks / skills / seed / update / status.
 
-**Next: S03-T03** (split from the port after T02; M034-CONTEXT "Re-plan"). One backup
-helper, `core/backup.py`, with T02's never-overwrite rule. Five Python writers have the
-to-the-second overwrite flaw; two are reachable today (Thunderbird filter rules and All-Inkl
-procmail applied in a batch). Release 0.7.17.
-
-**T04** ports `wiki hooks` and `wiki status` at parity with T02's record. It also decides
-whether `hooks status` and doctor walk the hook entries (T01 follow-up). Skills are T05,
-the deletions T06.
+**Next: S03-T04** ports `wiki hooks` and `wiki status` at parity with T02's record. Backups
+go through `core/backup`. It also decides whether `hooks status` and doctor walk the hook
+entries (T01 follow-up). Skills are T05, the deletions T06.
 
 **M034 / S02 — complete (5/5, 2026-10-15).** It delivered:
 - line-based prompts on `core/console`, reading byte by byte (T01);
