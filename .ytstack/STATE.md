@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-15T15:45:51+02:00
+last_updated: 2026-10-15T15:48:09+02:00
 current_milestone: M033
 active_slice: S05
-active_task: none
+active_task: T04
 last_completed_milestone: M032
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -236,8 +236,12 @@ the unknown-key / wrong-type / missing-key / fifth-severity rejections. The buil
 the types, and the report-only ty count stays 148 with an identical finding set. Live
 payloads validate on engines `2bacfc2` and `3f153d2`. Found by measurement: under
 `from __future__ import annotations`, Python 3.12's TypedDict treats `NotRequired` as
-required (KNOWLEDGE). Suite 2255, CI green. **Next: S05-T04 (the desktop validates its
-fixtures against the same schemas; TS types generated or pinned) via `plan-task`.**
+required (KNOWLEDGE). Suite 2255, CI green. T04 planned (`M033-S05-T04-PLAN.md`): vitest +
+ajv validate the engine goldens and the desktop's representative payload fixtures against the
+same schema files, and the goldens run through `parseMenu` / `parseDoctor`. Open question 2
+is decided: hand-written TS types plus a field-inventory test that fails when the schema gains
+a field (seven small object types, and the app's types are normalised views, not mirrors).
+**Next: execute T04.**
 
 ## M032 COMPLETE (L, 2026-10-14): desktop de-slop
 
