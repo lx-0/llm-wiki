@@ -15,6 +15,8 @@ copy is the "fourth hand registry" mistake that already bit the config loader
 
 from __future__ import annotations
 
+import shlex
+
 from core import health
 
 
@@ -53,6 +55,23 @@ def test_broken_package_is_critical_and_names_it(monkeypatch):
     assert r.severity == "critical"
     assert "httpx" in r.message
     assert "uv sync" in (r.fix or "")
+
+
+def test_the_fix_rebuilds_the_running_environment_and_quotes_its_paths(monkeypatch, tmp_path):
+    """The fix is pasted into the operator's shell, which never had the dispatcher's
+    UV_PROJECT_ENVIRONMENT: `cd '<.wiki>' && uv sync --reinstall` rebuilt .wiki/.venv inside
+    a cloud-synced vault and left the broken environment as it was. And an apostrophe in
+    the vault's name ended its '…' early."""
+    wiki = tmp_path / "Mobile Documents" / "Alex's Vault" / ".wiki"
+    monkeypatch.setattr(health.engine, "WIKI_DIR", wiki)
+    monkeypatch.setattr(health.engine.sys, "prefix", "/h/.venvs/Alex's Vault-wiki")
+    monkeypatch.setattr(health.engine, "_declared_import_names", lambda: ["httpx"])
+    monkeypatch.setattr(health.engine, "_failed_imports", lambda names: [("httpx", "boom")])
+    r = health.check_dependencies_importable()
+    assert shlex.split(r.fix or "") == [
+        "UV_PROJECT_ENVIRONMENT=/h/.venvs/Alex's Vault-wiki",
+        *("uv", "sync", "--reinstall", "--project", str(wiki)),
+    ]
 
 
 def test_several_failures_are_summarised_not_dumped(monkeypatch):

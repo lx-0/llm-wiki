@@ -57,6 +57,30 @@ if [[ -n "$WIKI_VENV_DIR" ]]; then
   export UV_PROJECT_ENVIRONMENT="$WIKI_VENV_DIR"
 fi
 
+# ── Commands for another shell ───────────────────────────────────────
+# A path inside a command that some other shell runs (an agent's hook, a hint the
+# operator pastes) is single-quoted, each ' in it written as '\''. Bare '…' broke on
+# an apostrophe ("Alex's Vault": every hook died on a syntax error), an unquoted path
+# on a space (every iCloud vault's `Mobile Documents`). Pattern removal rather than
+# ${s//…/…}: bash 5.2's patsub_replacement reads that replacement differently from
+# the macOS bash 3.2.
+shell_quote() {
+  local s="$1" out=""
+  while [[ "$s" == *\'* ]]; do
+    out+="${s%%\'*}'\\''"
+    s="${s#*\'}"
+  done
+  printf "'%s'" "$out$s"
+}
+
+# The `uv sync` an operator can paste. Their shell never had the export above, so
+# the environment is named; a bare `uv sync` would rebuild .wiki/.venv inside a
+# cloud-synced vault and leave the engine's own environment as it was.
+sync_hint() {
+  printf "UV_PROJECT_ENVIRONMENT=%s uv sync --project %s" \
+    "$(shell_quote "${UV_PROJECT_ENVIRONMENT:-$WIKI_DIR/.venv}")" "$(shell_quote "$WIKI_DIR")"
+}
+
 # ── Colors / output ──────────────────────────────────────────────────
 if [[ -t 1 ]]; then
   C_RESET=$'\e[0m'; C_DIM=$'\e[2m'; C_BOLD=$'\e[1m'

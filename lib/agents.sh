@@ -79,7 +79,9 @@ hooks_installed() {
 # project-scope: user-scope sessions launched from arbitrary repos still
 # resolve correctly because the cd is absolute.
 # Single quotes around the path survive into the JSON command string and
-# protect paths that contain spaces (e.g. Mobile Documents/iCloud~md~obsidian).
+# protect paths that contain spaces (e.g. Mobile Documents/iCloud~md~obsidian);
+# shell_quote (lib/common.sh) writes an apostrophe inside them as '\'', so a
+# path without one comes out exactly as earlier installs wrote it.
 #
 # When the engine environment lives outside the vault (WIKI_VENV_DIR from
 # lib/common.sh — cloud-synced vaults), the command carries
@@ -90,9 +92,9 @@ hooks_installed() {
 hook_cmd() {
   local script="$1" env_prefix=""
   if [[ -n "${WIKI_VENV_DIR:-}" ]]; then
-    env_prefix="UV_PROJECT_ENVIRONMENT='$WIKI_VENV_DIR' "
+    env_prefix="UV_PROJECT_ENVIRONMENT=$(shell_quote "$WIKI_VENV_DIR") "
   fi
-  printf "cd '%s' && %suv run python %s" "$WIKI_DIR" "$env_prefix" "$script"
+  printf "cd %s && %suv run python %s" "$(shell_quote "$WIKI_DIR")" "$env_prefix" "$script"
 }
 
 claude_hooks_payload() {

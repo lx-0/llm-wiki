@@ -208,14 +208,14 @@ _dispatch_python() {
   # the last sync's stamp → `uv sync` first. `--inexact` is `uv run`'s sync (it never
   # removes extra packages). A failed sync stops here, stamp untouched — and says so: a
   # uv that cannot run at all (an asdf shim under a foreign HOME exits 126) prints nothing
-  # of its own. The hint names the venv, so following it never recreates .wiki/.venv inside
-  # a cloud-synced vault.
+  # of its own. The hint (lib/common.sh's sync_hint) names the venv, so following it never
+  # recreates .wiki/.venv inside a cloud-synced vault.
   local stamp="$venv/.wiki-synced"
   if [[ ! -x "$venv/bin/python" || "$WIKI_DIR/uv.lock" -nt "$stamp" \
         || "$WIKI_DIR/pyproject.toml" -nt "$stamp" ]]; then
     if ! uv sync --quiet --inexact --project "$WIKI_DIR"; then
       die "uv sync failed — the engine's environment is behind uv.lock. To see why, run:
-  UV_PROJECT_ENVIRONMENT=$venv uv sync --project $WIKI_DIR"
+  $(sync_hint)"
     fi
     touch "$stamp"
   fi
@@ -465,7 +465,7 @@ _update_post_pull() {
   # installed, and the device.software field silently never landed.
   info "Syncing Python dependencies (uv sync, idempotent) …"
   if ! uv sync --project "$WIKI_DIR" --quiet; then
-    warn "uv sync reported errors — runtime imports may fail. Run 'uv sync --project $WIKI_DIR' manually."
+    warn "uv sync reported errors — runtime imports may fail. To retry, run: $(sync_hint)"
   fi
   # Cloud-synced vault → the environment lives outside it (lib/common.sh
   # exported UV_PROJECT_ENVIRONMENT, so the sync above already went there).
@@ -475,7 +475,7 @@ _update_post_pull() {
   if [[ -n "${WIKI_VENV_DIR:-}" ]]; then
     info "Engine environment: $WIKI_VENV_DIR (outside cloud-synced storage)"
     if [[ -e "$WIKI_DIR/.venv" && ! -L "$WIKI_DIR/.venv" ]]; then
-      warn "stale in-vault environment at $WIKI_DIR/.venv is no longer used — remove it: rm -rf '$WIKI_DIR/.venv'"
+      warn "stale in-vault environment at $WIKI_DIR/.venv is no longer used — remove it: rm -rf $(shell_quote "$WIKI_DIR/.venv")"
     fi
     if ! grep -qs 'UV_PROJECT_ENVIRONMENT=' "$HOME/.claude/settings.json" "$HOME/.codex/hooks.json" \
          "$ROOT_DIR/.claude/settings.json" "$ROOT_DIR/.codex/hooks.json" 2>/dev/null; then

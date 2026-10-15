@@ -18,6 +18,26 @@ every operator's `wiki update` → `uv sync` regenerate `uv.lock` and dirty thei
 config keys must also be wired into `scripts/migrations/migrate_config_keys.py`
 in the same commit.
 
+## [0.7.15] — 2026-10-15
+
+**For your vault:** if its path contains an apostrophe (`Alex's Vault`), run
+`wiki hooks install` once after this update. Paths without one get the same hook
+commands as before.
+
+### Fixed
+
+- **An apostrophe in the vault's path broke every agent hook.** The hook commands wrapped
+  the path in bare `'…'`, so the apostrophe ended the quote early: each session start, end
+  and compaction died on a shell syntax error, and no session in that vault was captured.
+  The installer now writes the apostrophe as `'\''`.
+- **The `uv sync` commands that `wiki` and `wiki doctor` print could not be pasted
+  back.** The bootstrap's sync-failure hint and `wiki update`'s retry line left the paths
+  unquoted, so `Mobile Documents` (every iCloud vault) split `--project` in two. The update
+  line and doctor's `dependencies-importable` fix also left out the environment, so in a
+  cloud-synced vault they rebuilt `.wiki/.venv` inside the vault and the broken environment
+  stayed broken. All three now read `UV_PROJECT_ENVIRONMENT='…' uv sync … --project '…'`.
+  `wiki update`'s `rm -rf` hint for a stale in-vault environment quotes its path as well.
+
 ## [0.7.14] — 2026-10-15
 
 **For your vault:** nothing to do.

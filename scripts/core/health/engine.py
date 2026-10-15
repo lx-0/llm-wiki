@@ -6,6 +6,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shlex
 import subprocess
 import sys
 from pathlib import Path
@@ -275,12 +276,18 @@ def check_dependencies_importable(*, quick: bool = False) -> CheckResult:
         )
     shown = ", ".join(n for n, _ in failures[:3])
     more = f" (+{len(failures) - 3} more)" if len(failures) > 3 else ""
+    # Pasted into the operator's shell, which never had the dispatcher's
+    # UV_PROJECT_ENVIRONMENT: the environment that failed (this process's) is named, or
+    # `uv sync` rebuilds .wiki/.venv inside a cloud-synced vault and leaves it broken.
     return CheckResult(
         id="dependencies-importable",
         category="config",
         severity="critical",
         message=f"{len(failures)} declared dependenc(ies) fail to import: {shown}{more}",
-        fix=f"cd '{WIKI_DIR}' && uv sync --reinstall",
+        fix=(
+            f"UV_PROJECT_ENVIRONMENT={shlex.quote(sys.prefix)} "
+            f"uv sync --reinstall --project {shlex.quote(str(WIKI_DIR))}"
+        ),
         details={"failed": [{"module": n, "error": e} for n, e in failures]},
     )
 

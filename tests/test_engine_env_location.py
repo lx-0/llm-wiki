@@ -130,3 +130,43 @@ def test_hooks_installed_regex_matches_env_form(tmp_path: Path):
         f"hooks_installed '{cfg}' && printf yes || printf no"
     )
     assert out == "yes"
+
+
+def test_hook_command_runs_for_a_vault_path_with_an_apostrophe(tmp_path: Path):
+    """A vault called "Alex's Vault": the hook command quotes its paths for the shell the
+    agent runs it in. Wrapped in bare '…', the apostrophe ended the quote early and every
+    hook died on a syntax error (exit 2), so no session in that vault was ever captured.
+    The vault is cloud-synced, so the environment prefix (~/.venvs/Alex's Vault-wiki) is
+    quoted too."""
+    vault = tmp_path / "Library" / "Mobile Documents" / "iCloud~md~obsidian" / "Alex's Vault"
+    (vault / ".wiki").mkdir(parents=True)
+    stub_bin = tmp_path / "bin"
+    stub_bin.mkdir()
+    uv = stub_bin / "uv"
+    uv.write_text('#!/bin/sh\nprintf "%s|%s|%s" "$PWD" "$UV_PROJECT_ENVIRONMENT" "$*"\n')
+    uv.chmod(0o755)
+    head = (
+        'WIKI_DIR="$V/.wiki" ROOT_DIR="$V"; '
+        f"source '{ENGINE}/lib/common.sh'; source '{ENGINE}/lib/agents.sh'; "
+    )
+    env = {"V": str(vault)}
+    cmd = _bash(head + "hook_cmd hooks/session-start.py", env=env)
+
+    ran = subprocess.run(
+        ["sh", "-c", cmd],
+        capture_output=True,
+        text=True,
+        env={"PATH": f"{stub_bin}:/usr/bin:/bin"},
+        check=False,
+    )
+
+    assert ran.returncode == 0, ran.stderr
+    cwd, venv, args = ran.stdout.split("|")
+    assert Path(cwd).resolve() == (vault / ".wiki").resolve()
+    assert venv == "/h/.venvs/Alex's Vault-wiki"
+    assert args == "run python hooks/session-start.py"
+    # …and `wiki hooks status` still recognises what the installer wrote.
+    cfg = tmp_path / "settings.json"
+    cfg.write_text(_bash(head + "agent_payload claude", env=env))
+    probe = 'hooks_installed "$CFG" && printf yes || printf no'
+    assert _bash(head + probe, env={**env, "CFG": str(cfg)}) == "yes"

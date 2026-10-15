@@ -13,6 +13,7 @@ proof that nothing (no `uv`, no second bash) sits between the caller and the dis
 from __future__ import annotations
 
 import os
+import shlex
 import time
 from pathlib import Path
 
@@ -160,8 +161,35 @@ def test_a_failing_sync_says_so_and_runs_nothing(hop: dict[str, Path]) -> None:
     assert run.returncode != 0
     assert record == []  # Python never started on the stale environment
     assert "uv sync failed" in run.stderr
-    assert f"UV_PROJECT_ENVIRONMENT={venv} uv sync --project {hop['wiki']}" in run.stderr
+    assert _hint(run.stderr) == [
+        f"UV_PROJECT_ENVIRONMENT={venv}",
+        *("uv", "sync", "--project", str(hop["wiki"])),
+    ]
     assert (venv / ".wiki-synced").stat().st_mtime == stamp_before
+
+
+def test_the_sync_hint_pastes_back_for_a_path_with_a_space_and_an_apostrophe(
+    tmp_path: Path, engine_template: Path
+) -> None:
+    """The hint is for the operator's own shell, so its paths are quoted: unquoted, every
+    iCloud vault (`…/Mobile Documents/…`) split `--project` in two."""
+    env = _env(tmp_path / "Alex's Vault", tmp_path, engine_template)
+    venv = _stub_venv(env["wiki"] / ".venv", synced_ago=120)
+    edited = time.time() - 60
+    os.utime(env["wiki"] / "uv.lock", (edited, edited))
+
+    run, record, _ = _run(env, "collect", "--list", WIKI_ORACLE_UV_FAIL="126")
+
+    assert record == []
+    assert _hint(run.stderr) == [
+        f"UV_PROJECT_ENVIRONMENT={venv}",
+        *("uv", "sync", "--project", str(env["wiki"])),
+    ]
+
+
+def _hint(stderr: str) -> list[str]:
+    """The command on the failure's last line, as the operator's shell would split it."""
+    return shlex.split(stderr.strip().splitlines()[-1])
 
 
 def test_a_relative_project_environment_stays_on_uv_run(hop: dict[str, Path]) -> None:

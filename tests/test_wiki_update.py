@@ -14,6 +14,7 @@ would otherwise sync a venv and run the migrations for real).
 from __future__ import annotations
 
 import os
+import shlex
 import shutil
 import subprocess
 from pathlib import Path
@@ -47,8 +48,19 @@ def _git(*args: str, cwd: Path) -> str:
 
 @pytest.fixture
 def world(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Path]:
-    """origin = a git repo holding this checkout's bash layer; vault/.wiki = its clone;
-    a logging `uv` stub first on PATH; HOME pointed away from the machine."""
+    return _world(tmp_path, monkeypatch)
+
+
+def _world(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    vault_name: str = "vault",
+    sync_fails: bool = False,
+) -> dict[str, Path]:
+    """origin = a git repo holding this checkout's bash layer; <vault>/.wiki = its clone;
+    a logging `uv` stub first on PATH (its `uv sync` exits 1 when ``sync_fails``); HOME
+    pointed away from the machine."""
     origin = tmp_path / "origin"
     origin.mkdir()
     for name in BASH_LAYER:
@@ -61,7 +73,7 @@ def world(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Path]:
     _git("add", "-A", cwd=origin)
     _git("commit", "-q", "-m", "base", cwd=origin)
 
-    vault = tmp_path / "vault"
+    vault = tmp_path / vault_name
     (vault / ".obsidian").mkdir(parents=True)  # the dispatcher's fail-closed vault guard
     _git("clone", "-q", str(origin), str(vault / ".wiki"), cwd=tmp_path)
 
@@ -72,7 +84,8 @@ def world(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Path]:
     stub.write_text(
         "#!/bin/sh\n"
         f'printf "uv %s PYTHONPATH=%s\\n" "$*" "${{PYTHONPATH:-}}" >> "{uv_log}"\n'
-        "exit 0\n",
+        + ('[ "$1" = sync ] && exit 1\n' if sync_fails else "")
+        + "exit 0\n",
         encoding="utf-8",
     )
     stub.chmod(0o755)
@@ -131,3 +144,33 @@ def test_post_pull_phase_spawns_sync_and_migrations_as_modules(world: dict[str, 
         f"uv run --quiet --project {wiki} python -m migrations.migrate_log_md_path "
         f"--vault {vault} PYTHONPATH={wiki}/scripts"
     ) in calls
+
+
+def test_a_failed_sync_names_a_command_that_pastes_back(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The retry command is for the operator's own shell: the environment named (that shell
+    never had lib/common.sh's export) and every path quoted. `Run 'uv sync --project <dir>'`
+    split an iCloud vault's `Mobile Documents` in two and synced the in-vault environment."""
+    world = _world(tmp_path, monkeypatch, vault_name="Alex's Vault", sync_fails=True)
+
+    proc = _wiki(world, "update", "--post-pull", "abc1234", "--no-skills")
+
+    line = next(ln for ln in proc.stdout.splitlines() if "uv sync reported errors" in ln)
+    assert shlex.split(line.split("run: ", 1)[1]) == [
+        f"UV_PROJECT_ENVIRONMENT={world['wiki']}/.venv",
+        *("uv", "sync", "--project", str(world["wiki"])),
+    ]
+
+
+def test_the_stale_environment_hint_quotes_its_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    world = _world(tmp_path, monkeypatch, vault_name="Alex's Vault")
+    monkeypatch.setenv("UV_PROJECT_ENVIRONMENT", str(tmp_path / "home" / ".venvs" / "v-wiki"))
+    (world["wiki"] / ".venv").mkdir()
+
+    proc = _wiki(world, "update", "--post-pull", "abc1234", "--no-skills")
+
+    line = next(ln for ln in proc.stdout.splitlines() if "no longer used" in ln)
+    assert shlex.split(line.split("remove it: ", 1)[1]) == ["rm", "-rf", f"{world['wiki']}/.venv"]
