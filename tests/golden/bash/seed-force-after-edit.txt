@@ -20,8 +20,8 @@ overwrite mode
 ✓ overwrote knowledge/MOCs/projects.md (--force)
 ✓ overwrote workspace/todo.md (--force)
 kept existing .obsidian/app.json (up-to-date)
-appearance.json — enabledCssSnippets already up to date
-community-plugins.json — already up to date
+kept existing .obsidian/appearance.json (up-to-date)
+kept existing .obsidian/community-plugins.json (up-to-date)
 kept existing .obsidian/core-plugins.json (up-to-date)
 kept existing .obsidian/graph.json (up-to-date)
 ✓ overwrote .obsidian/snippets/wiki-dashboard.css (--force)

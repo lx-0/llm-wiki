@@ -265,8 +265,11 @@ Grouped by purpose. Run `wiki <cmd> --help` for the full per-command help block.
 | `wiki status` | config summary, hook install table, Ollama probe |
 | `wiki publish [--auth \| --dry-run [--json] \| --piggyback]` | one-way mirror of the vault's markdown (`publish.roots`) into a managed wiki on the operator's meinkontext (context-mcp) server. `--auth` is the one-time browser login + consent (user principal; org api-keys are read-only), `--dry-run` prints the create/update/retract plan, a bare run executes it idempotently by content hash, `--piggyback` is the 6-hourly cadence mode. Setup runbook: [`setup-publish.md`](setup-publish.md). |
 | `wiki update [--no-skills]` | `git pull --ff-only` the engine checkout, `uv sync` the environment where it lives (`.wiki/.venv`, or `~/.venvs/<vault>-wiki` for cloud-synced vaults — then it also reports a stale in-vault `.venv` and hooks that lack the environment path), run config migrations + sync skill symlinks; never touches `config.yaml`. `--no-skills` skips the skill sync step. |
-| `wiki seed` | additive: drop in missing vault templates (`AGENTS.md`, `dashboard.md`, `.obsidian/*.json`, plugin `data.json`); merge `community-plugins.json` without dropping yours. |
-| `wiki seed --force` | overwrite existing vault templates with engine versions (discards your edits to dashboard/AGENTS/`.obsidian`). |
+| `wiki seed` | additive: drop in missing vault templates (`AGENTS.md`, `dashboard.md`, `.obsidian/*.json`, plugin `data.json`); merge `community-plugins.json`, the dashboard's CSS snippet and its buttons (Meta-Bind's and Shell commands' registries) without dropping yours. Writes only what changes. |
+| `wiki seed --check` | read-only audit: what seed would install, merge or re-derive, and what has drifted. |
+| `wiki seed <path> [--force \| --check]` | act on one vault-relative file. A path that matches nothing is an error that lists the seedable paths. |
+| `wiki seed --force` | overwrite existing vault templates with engine versions (discards your edits to dashboard/AGENTS/Templates; JSON configs are re-derived as template ⊕ your overlay in `.wiki/custom/`). To refresh one drifted file, name it: `wiki seed AGENTS.md --force`. |
+| `wiki seed --extract-custom <path>` | capture a JSON config's drift into an overlay, so `--force` keeps it. |
 | `wiki version` | print engine git revision + tag + origin URL. |
 
 ### Config

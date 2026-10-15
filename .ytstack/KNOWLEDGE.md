@@ -3472,3 +3472,10 @@ Each link was verified on the fixture. The live lxw config was only read, throug
    A copy of lxw's `.obsidian/` measured the difference. Before the icon fix, the merge touched seven entries; after it, only the one real fix, refresh-stats.
 4. **A verdict on stdout, a warning on stderr.** Never `2>&1` into a variable you compare.
 5. **An audit must use the comparison the write uses.** A check that compares less than the write changes will report "up-to-date" for files seed is about to modify.
+
+### The same recording, the messages (0.7.21)
+
+The CHANGELOG lists what seed reported wrongly. Two of the causes generalise:
+
+6. **A silent fallback can invert what an input is for.** `_apply_overlay` fell back to the bare template when the overlay was not valid JSON. With `--force`, that fallback wrote the template over the very file the overlay exists to keep, and the message still said "template⊕overlay". An input that cannot be read is a stop with its name in the message, never the "no input" case.
+7. **`set -e` plus `x="$(cmd)"` exits with cmd's status and says nothing.** `--extract-custom` on a file that was not JSON ended with exit 2 and an empty stderr: jq failed inside `local delta; delta="$(…)"`. Validate the input before the substitution, and give the reason (`_is_json` → `err`).

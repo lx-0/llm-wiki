@@ -95,6 +95,26 @@ _compute_overlay() {  # $1 = base file, $2 = cur file
 
 _json_canon() { jq -S . "$1" 2>/dev/null; }              # canonical form of a file
 _json_canon_str() { printf '%s' "$1" | jq -S . 2>/dev/null; }  # …of a string
+_is_json() { jq empty "$1" >/dev/null 2>&1; }
+
+# Why a JSON file seed merges into could not be merged — not JSON at all, or
+# JSON of a shape the merge does not expect. Either way it is left as it is.
+_json_trouble() {  # $1=file $2=label
+  if _is_json "$1"; then
+    warn "$2 is not in the shape seed expects — left as it is (fix it, or remove it and rerun \`wiki seed\`)"
+  else
+    warn "$2 is not valid JSON — left as it is (fix it, or remove it and rerun \`wiki seed\`)"
+  fi
+}
+
+# The targeted overwrite for one vault-relative path — the advice for one
+# drifted file is never the whole-vault `wiki seed --force`. (Quotes inline:
+# install.sh sources this file without lib/common.sh's shell_quote.)
+_force_cmd() {  # $1=vault-relative path
+  local p="$1" plain='^[A-Za-z0-9._/@+-]+$' sq="'" esc="'\\''"
+  [[ "$p" =~ $plain ]] || p="'${p//$sq/$esc}'"
+  printf '`wiki seed %s --force`' "$p"
+}
 
 # Seed a JSON config as `template ⊕ overlay`. Re-derive on --force or when
 # missing; never clobber a drifted live file silently (operator may have
@@ -108,13 +128,27 @@ _seed_json_overlay() {  # $1=src $2=dst $3=rel $4=force $5=check $6=target
   fi
   local overlay desired has_overlay=0
   overlay="$(_custom_root "$target")/$rel"
-  [[ -f "$overlay" ]] && has_overlay=1
+  if [[ -f "$overlay" ]]; then
+    # Never skip a broken overlay in silence: `--force` would re-derive the
+    # template alone over the very file the overlay exists to keep.
+    if ! _is_json "$overlay"; then
+      warn "$rel left as it is — its overlay .wiki/custom/$rel is not valid JSON (fix the overlay)"
+      return 0
+    fi
+    has_overlay=1
+  fi
   desired="$(_apply_overlay "$src" "$overlay")"
   local ov_tag=""; [[ "$has_overlay" == 1 ]] && ov_tag=" (overlay applied)"
+  # A live file that is not JSON has no drift to capture: --extract-custom
+  # cannot read it, and only fixing or re-deriving it helps.
+  local broken=0
+  [[ -f "$dst" ]] && ! _is_json "$dst" && broken=1
 
   if [[ "$check" == "1" ]]; then
     if [[ ! -f "$dst" ]]; then
       warn "missing $rel (run \`wiki seed\` to install)"
+    elif [[ "$broken" == 1 ]]; then
+      warn "$rel is not valid JSON ($(_force_cmd "$rel") re-derives it)"
     elif [[ "$(_json_canon "$dst")" == "$(_json_canon_str "$desired")" ]]; then
       ok "up-to-date $rel$ov_tag"
     elif [[ "$has_overlay" == 1 ]]; then
@@ -130,7 +164,7 @@ _seed_json_overlay() {  # $1=src $2=dst $3=rel $4=force $5=check $6=target
     ok "seeded $rel$([[ "$has_overlay" == 1 ]] && echo ' (+overlay)')"
     return 0
   fi
-  if [[ "$(_json_canon "$dst")" == "$(_json_canon_str "$desired")" ]]; then
+  if [[ "$broken" == 0 && "$(_json_canon "$dst")" == "$(_json_canon_str "$desired")" ]]; then
     info "kept existing $rel (up-to-date$ov_tag)"
     return 0
   fi
@@ -139,10 +173,12 @@ _seed_json_overlay() {  # $1=src $2=dst $3=rel $4=force $5=check $6=target
     ok "re-derived $rel from template$([[ "$has_overlay" == 1 ]] && echo '⊕overlay') (--force)"
     return 0
   fi
-  if [[ "$has_overlay" == 1 ]]; then
-    info "kept existing $rel (drifted from template⊕overlay; \`wiki seed $rel --force\` re-derives)"
+  if [[ "$broken" == 1 ]]; then
+    warn "kept existing $rel (not valid JSON — fix it, or $(_force_cmd "$rel") re-derives it)"
+  elif [[ "$has_overlay" == 1 ]]; then
+    info "kept existing $rel (drifted from template⊕overlay; $(_force_cmd "$rel") re-derives it)"
   else
-    info "kept existing $rel (drifted; \`wiki seed --extract-custom $rel\` captures your edits, then \`--force\` is safe)"
+    info "kept existing $rel (drifted; \`wiki seed --extract-custom $rel\` captures your edits, then $(_force_cmd "$rel") is safe)"
   fi
 }
 
@@ -156,6 +192,7 @@ _extract_overlay() {  # $1=rel $2=target $3=templates_dir
   command -v jq >/dev/null 2>&1 || { err "jq required for --extract-custom"; return 1; }
   [[ -f "$base" ]] || { err "no engine template for '$rel' (not an overlay-managed file)"; return 1; }
   [[ -f "$dst" ]]  || { err "no live file at $dst"; return 1; }
+  _is_json "$dst" || { err "$rel is not valid JSON — there is no drift to capture (fix it first)"; return 1; }
   local delta; delta="$(_compute_overlay "$base" "$dst")"
   if [[ -z "$delta" || "$(_json_canon_str "$delta")" == "{}" ]]; then
     info "$rel already matches the engine template — no overlay needed"
@@ -192,7 +229,7 @@ _seed_file() {
     elif _files_equivalent "$src" "$dst"; then
       ok "up-to-date $label"
     else
-      info "drifted $label (engine template differs; \`wiki seed --force\` overwrites)"
+      info "drifted $label (engine template differs; $(_force_cmd "$label") overwrites it)"
     fi
     return 0
   fi
@@ -212,112 +249,56 @@ _seed_file() {
   if _files_equivalent "$src" "$dst"; then
     info "kept existing $label (up-to-date)"
   else
-    info "kept existing $label (drifted from engine; rerun with --force to overwrite, or \`wiki seed --check\` to audit)"
+    info "kept existing $label (drifted from engine; $(_force_cmd "$label") overwrites it)"
   fi
 }
 
 
-# ── Internal: merge community-plugins.json (additive union) ────────
-# This is always safe — we only ADD missing engine plugins to the list,
-# never remove operator-added entries. Idempotent. check=1 reports
-# pending merges without writing.
-_merge_community_plugins() {
-  local src="$1" dst="$2" check="${3:-0}"
-  if [[ ! -f "$src" ]]; then
-    return 0
-  fi
+# ── Internal: union the engine's entries into a list in a plugin config ──
+# community-plugins.json (Obsidian's enabled plugins — the file is the list)
+# and appearance.json's enabledCssSnippets (without it our CSS snippet sits in
+# .obsidian/snippets/ but is never enabled, and the dashboard layout silently
+# fails). Only ever ADDS the engine's missing entries, never removes the
+# operator's, and writes only when it adds one — a current file stays as the
+# operator wrote it. The union is jq's `unique` (sorted); every other field of
+# the file stays. check=1 reports what it would enable.
+_LIST_UNION_JQ='def l: if $key == "" then . else (.[$key] // []) end;'
+_merge_list_union() {  # $1=template $2=dst $3=label $4=key ("" = the file) $5=noun ("" | snippet) $6=check
+  local src="$1" dst="$2" label="$3" key="$4" noun="$5" check="${6:-0}"
+  [[ -f "$src" ]] || return 0
   _seed_only_skip "$dst" && return 0
   if [[ ! -f "$dst" ]]; then
     if [[ "$check" == "1" ]]; then
-      warn "missing community-plugins.json"
+      warn "missing $label (run \`wiki seed\` to install)"
       return 0
     fi
     mkdir -p "$(dirname "$dst")"
     cp "$src" "$dst"
-    ok "seeded community-plugins.json"
+    ok "seeded $label"
     return 0
   fi
-  if ! command -v jq >/dev/null 2>&1; then
-    warn "jq not available — skipping community-plugins.json merge"
+  local adding
+  adding="$(jq -r --arg key "$key" --slurpfile e "$src" \
+    "$_LIST_UNION_JQ"' (($e[0] | l) - l) | join(", ")' "$dst" 2>/dev/null)" \
+    || { _json_trouble "$dst" "$label"; return 0; }
+  if [[ -z "$adding" ]]; then
+    if [[ "$check" == "1" ]]; then ok "up-to-date $label"; else info "kept existing $label (up-to-date)"; fi
     return 0
   fi
-  local before after merged
-  before="$(jq -r 'length' "$dst" 2>/dev/null || echo 0)"
-  merged="$(jq -s '.[0] + .[1] | unique' "$dst" "$src" 2>/dev/null || echo '')"
-  if [[ -z "$merged" ]]; then
-    warn "community-plugins.json — merge failed (malformed JSON?)"
-    return 0
+  local what="$adding"
+  if [[ -n "$noun" ]]; then
+    [[ "$adding" == *", "* ]] && noun="${noun}s"
+    what="$noun $adding"
   fi
-  after="$(printf '%s\n' "$merged" | jq -r 'length')"
   if [[ "$check" == "1" ]]; then
-    if [[ "$before" != "$after" ]]; then
-      info "drifted community-plugins.json ($before installed; engine ships $after — would merge to $after)"
-    else
-      ok "up-to-date community-plugins.json"
-    fi
+    info "drifted $label (would enable $what)"
     return 0
   fi
+  local merged
+  merged="$(jq --arg key "$key" --slurpfile e "$src" "$_LIST_UNION_JQ"'
+    (l + ($e[0] | l) | unique) as $u | if $key == "" then $u else .[$key] = $u end' "$dst")"
   printf '%s\n' "$merged" > "$dst.tmp" && mv "$dst.tmp" "$dst"
-  if [[ "$before" != "$after" ]]; then
-    ok "community-plugins.json — merged ($before → $after entries)"
-  else
-    info "community-plugins.json — already up to date"
-  fi
-}
-
-
-# ── Internal: merge appearance.json (additive enabledCssSnippets union) ──
-# Preserve operator-set fields (cssTheme, theme, baseFontSize, etc.) and only
-# union the enabledCssSnippets list. Without this, our CSS snippet sits in
-# .obsidian/snippets/ but is never enabled by Obsidian — the dashboard layout
-# silently fails.
-_merge_appearance_json() {
-  local src="$1" dst="$2" check="${3:-0}"
-  if [[ ! -f "$src" ]]; then
-    return 0
-  fi
-  _seed_only_skip "$dst" && return 0
-  if [[ ! -f "$dst" ]]; then
-    if [[ "$check" == "1" ]]; then
-      warn "missing appearance.json"
-      return 0
-    fi
-    mkdir -p "$(dirname "$dst")"
-    cp "$src" "$dst"
-    ok "seeded appearance.json"
-    return 0
-  fi
-  if ! command -v jq >/dev/null 2>&1; then
-    warn "jq not available — skipping appearance.json merge"
-    return 0
-  fi
-  local before merged after
-  before="$(jq -r '(.enabledCssSnippets // []) | join(",")' "$dst" 2>/dev/null || echo '')"
-  merged="$(jq -s '
-    .[0] as $cur | .[1] as $eng |
-    $cur + {
-      enabledCssSnippets: (((($cur.enabledCssSnippets // []) + ($eng.enabledCssSnippets // [])) | unique))
-    }
-  ' "$dst" "$src" 2>/dev/null || echo '')"
-  if [[ -z "$merged" ]]; then
-    warn "appearance.json — merge failed (malformed JSON?)"
-    return 0
-  fi
-  after="$(printf '%s\n' "$merged" | jq -r '(.enabledCssSnippets // []) | join(",")')"
-  if [[ "$check" == "1" ]]; then
-    if [[ "$before" != "$after" ]]; then
-      info "drifted appearance.json (enabledCssSnippets [$before] → would merge to [$after])"
-    else
-      ok "up-to-date appearance.json"
-    fi
-    return 0
-  fi
-  printf '%s\n' "$merged" > "$dst.tmp" && mv "$dst.tmp" "$dst"
-  if [[ "$before" != "$after" ]]; then
-    ok "appearance.json — enabledCssSnippets [$before] → [$after]"
-  else
-    info "appearance.json — enabledCssSnippets already up to date"
-  fi
+  ok "merged $label (enabled $what)"
 }
 
 
@@ -366,7 +347,11 @@ _merge_env_example() {
   done < <(grep -oE '^[A-Z_][A-Z0-9_]*=' "$src" | sed 's/=$//' | sort -u)
 
   if [[ ${#missing[@]} -eq 0 ]]; then
-    info "kept existing .claude/.env.example (up-to-date — all engine vars present)"
+    if [[ "$check" == "1" ]]; then
+      ok "up-to-date .claude/.env.example"
+    else
+      info "kept existing .claude/.env.example (up-to-date — all engine vars present)"
+    fi
     return 0
   fi
 
@@ -453,7 +438,7 @@ _merge_registry() {  # $1=template $2=dst $3=label $4=key $5=wiki_dir $6=agent-m
   [[ -f "$dst" ]] || base="$src"
   out="$(jq --arg key "$key" --argjson eng "$engine" "$_REGISTRY_MERGE_JQ" "$base" 2>/dev/null)" || out=""
   if [[ -z "$out" ]]; then
-    warn "$label is not valid JSON — left as it is (fix it, or remove it and rerun \`wiki seed\`)"
+    _json_trouble "$base" "$label"
     return 0
   fi
   local merged
@@ -587,9 +572,9 @@ seed_vault_templates() {
       [[ -f "$f" ]] || continue
       base="$(basename "$f")"
       if [[ "$base" == "community-plugins.json" ]]; then
-        _merge_community_plugins "$f" "$target/.obsidian/$base" "$check"
+        _merge_list_union "$f" "$target/.obsidian/$base" ".obsidian/$base" "" "" "$check"
       elif [[ "$base" == "appearance.json" ]]; then
-        _merge_appearance_json "$f" "$target/.obsidian/$base" "$check"
+        _merge_list_union "$f" "$target/.obsidian/$base" ".obsidian/$base" enabledCssSnippets snippet "$check"
       else
         # graph.json / app.json / core-plugins.json — engine base ⊕ operator overlay.
         _seed_json_overlay "$f" "$target/.obsidian/$base" ".obsidian/$base" "$force" "$check" "$target"
@@ -660,14 +645,21 @@ seed_vault_templates() {
     _rewrite_dashboard_agent_buttons "$target" "$wiki_dir"
   fi
 
-  # Targeted run that matched nothing: tell the operator instead of silently
-  # doing nothing (likely a typo or a non-seedable path).
+  # Targeted run that matched nothing: an error, not a quiet success (likely a
+  # typo or a non-seedable path). The list is held to what a fresh seed writes
+  # by tests/test_seed.py.
+  local matched=1
   if [[ -n "$_SEED_ONLY_DST" && "$_SEED_ONLY_HIT" == "0" ]]; then
-    warn "no seedable template matches '$only' — nothing done."
-    warn "seedable paths: README.md, AGENTS.md, dashboard.md, knowledge.base, triage.html,"
-    warn "  .claude/.env.example, .obsidian/*.json, .obsidian/plugins/<p>/data.json,"
-    warn "  Templates/*.md, knowledge/MOCs/*.md, reports/studies/<id>/manifest.yaml"
+    matched=0
+    err "no seedable template matches '$only' — nothing done."
+    {
+      echo "  seedable paths: README.md, AGENTS.md, dashboard.md, knowledge.base, triage.html,"
+      echo "    workspace/todo.md, .claude/.env.example, .obsidian/*.json, .obsidian/snippets/*.css,"
+      echo "    .obsidian/plugins/<p>/data.json, Templates/*.md, knowledge/MOCs/*.md,"
+      echo "    reports/studies/<id>/manifest.yaml"
+    } >&2
   fi
   _SEED_ONLY_DST=""
   _SEED_ONLY_HIT=0
+  [[ "$matched" == 1 ]]
 }

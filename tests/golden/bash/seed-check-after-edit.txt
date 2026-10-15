@@ -5,7 +5,7 @@ wiki seed
 audit (read-only)
 
 ✓ up-to-date README.md
-drifted AGENTS.md (engine template differs; `wiki seed --force` overwrites)
+drifted AGENTS.md (engine template differs; `wiki seed AGENTS.md --force` overwrites it)
 ✓ up-to-date dashboard.md
 ✓ up-to-date knowledge.base
 ✓ up-to-date triage.html
@@ -20,8 +20,8 @@ drifted AGENTS.md (engine template differs; `wiki seed --force` overwrites)
 ✓ up-to-date knowledge/MOCs/projects.md
 ✓ up-to-date workspace/todo.md
 ✓ up-to-date .obsidian/app.json
-✓ up-to-date appearance.json
-✓ up-to-date community-plugins.json
+✓ up-to-date .obsidian/appearance.json
+✓ up-to-date .obsidian/community-plugins.json
 ✓ up-to-date .obsidian/core-plugins.json
 ✓ up-to-date .obsidian/graph.json
 ✓ up-to-date .obsidian/snippets/wiki-dashboard.css
@@ -32,7 +32,7 @@ drifted AGENTS.md (engine template differs; `wiki seed --force` overwrites)
 ✓ up-to-date .obsidian/plugins/obsidian-shellcommands/data.json
 ✓ up-to-date .obsidian/plugins/quickadd/data.json
 ✓ up-to-date reports/studies/longitudinal-baseline/manifest.yaml
-kept existing .claude/.env.example (up-to-date — all engine vars present)
+✓ up-to-date .claude/.env.example
 --- stderr ---
 --- change ---
 (none)

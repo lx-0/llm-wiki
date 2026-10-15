@@ -18,6 +18,33 @@ every operator's `wiki update` → `uv sync` regenerate `uv.lock` and dirty thei
 config keys must also be wired into `scripts/migrations/migrate_config_keys.py`
 in the same commit.
 
+## [0.7.21] — 2026-10-16
+
+**For your vault:** nothing to do.
+
+### Fixed
+
+- **`wiki seed` says when a config is not valid JSON.**
+  - Seed used to call such a file "drifted" and advise `--extract-custom`.
+  - `--extract-custom` then stopped without a word, with exit code 2.
+  - Seed and `--check` now report that the file is not valid JSON, and `--extract-custom`
+    refuses it and gives that reason.
+- **A broken overlay no longer costs you the file it protects.** When
+  `.wiki/custom/<path>` was not valid JSON, seed ignored the overlay without saying so.
+  `--force` then wrote the bare engine template over your file and reported
+  "template⊕overlay". Seed now leaves that file alone and names the overlay to fix.
+- **`wiki seed <path>` exits 1 when the path matches nothing.** It used to exit 0. Its list
+  of seedable paths now includes `workspace/todo.md` and `.obsidian/snippets/*.css`.
+- **The drift advice overwrites one file.** For a drifted file, seed advised
+  `wiki seed --force`, which overwrites every drifted file in the vault. It now names the
+  file, for example `wiki seed AGENTS.md --force`.
+- **Seed leaves a current plugin list as you wrote it.** It rewrote `community-plugins.json`
+  and `appearance.json` on every run, in jq's order and format.
+  - It now writes them only when it adds an engine plugin or snippet, and says which one.
+  - `--check` used to give the count after the merge as what "the engine ships". It now
+    names the plugins it would enable.
+- `wiki seed --check` no longer says "kept existing" about `.claude/.env.example`.
+
 ## [0.7.20] — 2026-10-16
 
 **For your vault:** run `wiki seed` after `wiki update`, then restart Obsidian. The plugins

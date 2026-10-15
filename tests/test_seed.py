@@ -10,10 +10,21 @@ The dashboard's buttons (0.7.20):
   ran a script that had moved months before);
 - two agent buttons were defined in neither registry;
 - the dashboard rewrite said "already up to date" about a file it had just changed.
+
+What seed reports (0.7.21):
+- the plugin-list audit gave the merged count as what "the engine ships";
+- the plugin-list merges rewrote a current file in their own order and format;
+- a config that is not JSON was called drifted, with advice to capture it into an overlay,
+  which then said it already matched the engine template;
+- a broken overlay was ignored in silence — `--force` re-derived the template alone over
+  the operator's file and reported "template⊕overlay";
+- a path that matched nothing exited 0, and its list of seedable paths was short of two;
+- the audit said "kept existing", and the drift advice was `--force` for the whole vault.
 """
 
 from __future__ import annotations
 
+import fnmatch
 import json
 import re
 from pathlib import Path
@@ -193,3 +204,101 @@ def test_the_dashboard_rewrite_reports_what_it_did(env: dict[str, Path]) -> None
     lines = _lines_about(out, "agent-buttons")
     assert len(lines) == 1
     assert "already up to date" not in lines[0]
+
+
+# ── what seed reports (0.7.21) ────────────────────────────────────────────────
+
+COMMUNITY = Path(".obsidian/community-plugins.json")
+APPEARANCE = Path(".obsidian/appearance.json")
+APP = Path(".obsidian/app.json")
+GRAPH = Path(".obsidian/graph.json")
+
+
+def test_the_audit_names_the_plugins_seed_would_enable(env: dict[str, Path]) -> None:
+    _seed(env)
+    _write(env, COMMUNITY, [p for p in _read(env, COMMUNITY) if p != "homepage"])
+    lines = _lines_about(_seed(env, "--check"), "community-plugins.json")
+    assert len(lines) == 1
+    assert "drifted" in lines[0]
+    assert "homepage" in lines[0]
+
+
+def test_seed_leaves_a_current_plugin_list_as_the_operator_wrote_it(
+    env: dict[str, Path],
+) -> None:
+    _seed(env)
+    reversed_list = json.dumps(_read(env, COMMUNITY)[::-1]) + "\n"
+    (env["vault"] / COMMUNITY).write_text(reversed_list, encoding="utf-8")
+    compact = '{"cssTheme":"Minimal","enabledCssSnippets":["wiki-dashboard"]}\n'
+    (env["vault"] / APPEARANCE).write_text(compact, encoding="utf-8")
+    before = {rel: (env["vault"] / rel).read_bytes() for rel in (COMMUNITY, APPEARANCE)}
+    out = _seed(env)
+    assert {rel: (env["vault"] / rel).read_bytes() for rel in before} == before
+    for rel in before:
+        assert "up-to-date" in _lines_about(out, rel.name)[0]
+
+
+def test_a_config_that_is_not_json_is_named_so(env: dict[str, Path]) -> None:
+    _seed(env)
+    (env["vault"] / APP).write_text('{"x": \n', encoding="utf-8")
+    for args in ((), ("--check",)):
+        lines = _lines_about(_seed(env, *args), str(APP))
+        assert len(lines) == 1
+        assert "not valid JSON" in lines[0]
+        assert "extract-custom" not in lines[0]
+
+
+def test_extract_custom_refuses_a_file_that_is_not_json(env: dict[str, Path]) -> None:
+    _seed(env)
+    (env["vault"] / APP).write_text('{"x": \n', encoding="utf-8")
+    run = run_wiki(env["vault"], env["home"], env["bin"], "seed", "--extract-custom", str(APP))
+    assert run.returncode == 1
+    assert "not valid JSON" in run.stderr
+    assert not (env["vault"] / ".wiki" / "custom" / APP).exists()
+
+
+def test_a_broken_overlay_leaves_its_file_alone(env: dict[str, Path]) -> None:
+    _seed(env)
+    overlay = env["vault"] / ".wiki" / "custom" / GRAPH
+    overlay.parent.mkdir(parents=True)
+    overlay.write_text('{"scale": \n', encoding="utf-8")
+    data = _read(env, GRAPH)
+    data["scale"] = 3
+    _write(env, GRAPH, data)
+    before = (env["vault"] / GRAPH).read_bytes()
+    out = _seed(env, str(GRAPH), "--force")
+    assert (env["vault"] / GRAPH).read_bytes() == before
+    lines = _lines_about(out, "not valid JSON")
+    assert len(lines) == 1
+    assert ".wiki/custom/.obsidian/graph.json" in lines[0]
+    assert "re-derived" not in out
+
+
+def test_a_path_that_matches_nothing_is_an_error_naming_every_seedable_path(
+    env: dict[str, Path],
+) -> None:
+    seeded = [line.split("seeded ", 1)[1] for line in _seed(env).splitlines() if "seeded " in line]
+    run = run_wiki(env["vault"], env["home"], env["bin"], "seed", "nope.md")
+    assert run.returncode == 1
+    assert "'nope.md'" in run.stderr
+    listed = re.findall(r"[\w.<>*/-]+", run.stderr.split("seedable paths:", 1)[1])
+    patterns = [re.sub(r"<[^>]+>", "*", p) for p in listed]
+    unlisted = [s for s in seeded if not any(fnmatch.fnmatch(s, p) for p in patterns)]
+    assert seeded
+    assert not unlisted, f"seedable but not listed: {unlisted}"
+
+
+def test_the_audit_never_says_it_kept_anything(env: dict[str, Path]) -> None:
+    _seed(env)
+    assert _lines_about(_seed(env, "--check"), "kept existing") == []
+
+
+def test_drift_advice_overwrites_the_one_file_not_the_vault(env: dict[str, Path]) -> None:
+    """`wiki seed --force` overwrites every drifted file; the advice is about one."""
+    _seed(env)
+    agents_md = env["vault"] / "AGENTS.md"
+    agents_md.write_text(agents_md.read_text(encoding="utf-8") + "\nAn operator edit.\n")
+    for args in ((), ("--check",)):
+        lines = _lines_about(_seed(env, *args), "AGENTS.md")
+        assert len(lines) == 1
+        assert "`wiki seed AGENTS.md --force`" in lines[0]

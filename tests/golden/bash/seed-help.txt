@@ -13,13 +13,17 @@ USAGE
 WHAT IT DOES
   - Seeds missing files: README.md, AGENTS.md, dashboard.md, knowledge.base, .claude/.env.example
   - Seeds missing .obsidian/*.json + .obsidian/plugins/<name>/data.json
-  - Merges community-plugins.json (additive — adds engine plugins, never drops yours)
+  - Merges community-plugins.json and the dashboard's CSS snippet (additive — adds
+    the engine's, never drops yours)
+  - Merges the dashboard's buttons into Meta-Bind's and Shell commands' settings by
+    id: the engine's entries are kept current, yours stay
   - Cache files (_dashboard-*.md) are NOT seeded — first `wiki flush` writes them.
 
 TARGETED (single file)
   Pass a vault-relative path to act on just that file — every other template is
   left untouched. Lets you refresh ONE stale file with --force without clobbering
-  unrelated customisations (e.g. your QuickAdd macros or graph palette):
+  unrelated customisations (e.g. your QuickAdd macros or graph palette). A path
+  that matches nothing is an error:
     wiki seed AGENTS.md --check          # audit just AGENTS.md
     wiki seed AGENTS.md --force          # refresh just AGENTS.md
     wiki seed .obsidian/app.json --check

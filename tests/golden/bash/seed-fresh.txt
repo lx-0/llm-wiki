@@ -20,8 +20,8 @@ additive mode
 ✓ seeded knowledge/MOCs/projects.md
 ✓ seeded workspace/todo.md
 ✓ seeded .obsidian/app.json
-✓ seeded appearance.json
-✓ seeded community-plugins.json
+✓ seeded .obsidian/appearance.json
+✓ seeded .obsidian/community-plugins.json
 ✓ seeded .obsidian/core-plugins.json
 ✓ seeded .obsidian/graph.json
 ✓ seeded .obsidian/snippets/wiki-dashboard.css
