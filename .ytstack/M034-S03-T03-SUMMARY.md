@@ -37,7 +37,8 @@ the backup stamp in one place.
 
 ## Follow-ups
 
-- **S03-T04 (the port)** backs up agent configs with `core.backup.backup`. Its names are the
+- **S03-T05 (the port; T04 builds its pure merge first)** backs up agent configs with
+  `core.backup.backup`. Its names are the
   bash's (`<cfg>.bak.<stamp>`, `-2` on a clash), so the hooks goldens hold.
 
 ## Verification

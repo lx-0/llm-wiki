@@ -221,3 +221,19 @@ never-overwrite rule. That helper is now its own task:
 - **T06:** the deletions (S03: 6 tasks).
 
 So the S01 reassessment's S03-T02 means T04 now, and its S03-T04 means T06.
+
+**After T03 (2026-10-15T23:40), the last split.** Measuring the port for its plan showed four
+jobs:
+- the merge and the uninstall in Python, byte-identical to jq;
+- the command flows, byte-exact down to bash's byte-counted `%-30s` padding;
+- the catalogue, help, setup in-process and the cleanup in `wiki`;
+- the probe decision, with doctor.
+
+The pure layer goes first, on its own:
+- **T04:** `merge` / `without_wiki_hooks` in `core/agents.py`;
+- **T05:** the port;
+- **T06:** skills;
+- **T07:** the deletions (S03: 7 tasks, the cap).
+
+The code comments that named task numbers now name the slice, so they no longer move with
+a split.

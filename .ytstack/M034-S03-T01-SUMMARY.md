@@ -51,7 +51,7 @@ the same raw-text semantics and the same output. Engine 0.7.15.
 
 ## Follow-ups
 
-- **S03-T04** (the port; the slice was split twice after this task): the probe reads the file as text
+- **S03-T05** (the port; the slice was split three times after this task): the probe reads the file as text
   (like the bash `grep`). It says "installed"
   for a wiki command string anywhere in the file, even outside `hooks`, and misses
   JSON-escaped forms (`\"`, `\/`), which the merge's decoded match catches. Decide whether
@@ -60,8 +60,8 @@ the same raw-text semantics and the same output. Engine 0.7.15.
 - **S05:** `core/health/engine.py:_CLOUD_PATH_MARKERS` is a second copy of
   `lib/common.sh:wiki_path_is_cloud_synced`. When lib/common.sh retires, give the rule one
   home, or a parity test if the bootstrap must keep a bash copy.
-- **S03-T06:** `docs/FEATURES.md`, `docs/PROCESS.md` and `AGENTS.md` still name
-  `lib/agents.sh` as the registry. Correct while `wiki hooks` is bash; T06's docs pass
+- **S03-T07:** `docs/FEATURES.md`, `docs/PROCESS.md` and `AGENTS.md` still name
+  `lib/agents.sh` as the registry. Correct while `wiki hooks` is bash; T07's docs pass
   updates them.
 - **Recorded:** KNOWLEDGE.md ("A path inside a command for another shell…") and
   ~/.claude/TECH-PATTERNS.md (Build, Deploy & Tooling).

@@ -49,8 +49,8 @@ and three tables.
   retires with its last caller (reassessed after S01):
   - `config_get` stays for `lib/skills.sh` and `config_cmd_status` for `cmd_status` → S03;
   - `confirm` / `select_*` stay for `lib/hooks.sh` (S03) and update's stash prompt (S05).
-- [ ] S03 -- **Hooks + skills** (6 tasks; after T01 the bash fixes split from the port, and
-  after T02 the backup helper too). The agent registry, the per-agent payloads and
+- [ ] S03 -- **Hooks + skills** (7 tasks; the port split three times as it was measured:
+  the bash fixes, the backup helper, the pure merge). The agent registry, the per-agent payloads and
   the JSON merges into agent configs (hook commands byte-identical), `skills
   install/uninstall/sync/status`, and `wiki status`. `lib/agents.sh`, `lib/hooks.sh`,
   `lib/skills.sh` and `lib/config.sh` retire.
