@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-15T19:41:00+02:00
+last_updated: 2026-10-15T19:56:00+02:00
 current_milestone: M034
 active_slice: S01
-active_task: T05
+active_task: none
 last_completed_milestone: M033
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -12,15 +12,21 @@ parallel_milestones: [M021, M025, M027, M029]
 
 # State
 
-## Next action — M034 / S01 4/6: dispatcher + surface diet
+## Next action — M034 / S01 5/7: dispatcher + surface diet
 
-**Status:** M034 / S01 — 4 of 6 tasks done (T01–T02 the bash oracle, T03 the decisions, T04
-the one-hop bootstrap). Engine 0.7.5, suite 2327, CI green on `cb40e20`.
-**Next:** S01-T05 is planned (`M034-S01-T05-PLAN.md`): `menu`, `doctor`, `version`, `help`
-and the bare entry move into the catalogue. S01 was re-cut to 7 tasks (slice plan notes):
-- T06 takes the `dream` routing and the auth aliases;
-- T07 is the consumer smoke;
-- `status` moved to S03-T02, since it composes two bash libraries ported there.
+**Status:** M034 / S01 — 5 of 7 tasks done. T01–T02 are the bash oracle, T03 the decisions,
+T04 the one-hop bootstrap, T05 home & status in the catalogue. Engine 0.7.6, suite 2340, CI
+green on `25026f7`.
+**Next:** `ytstack:plan-task` → S01-T06: the `dream` / `dream-entity` routing and the auth
+aliases into the catalogue, with the dream error path recorded from bash first. Then T07, the
+consumer smoke. `status` now lives in S03-T02.
+
+**M034 / S01-T05** (`2ad21f4`, `25026f7`): `menu` (+ a bannerless `--json` route), `doctor`
+and `version` (`engine_version.py`) are catalogue commands.
+- **The bare entry** is decided in `cli.main`: the home screen on a TTY, help otherwise.
+- **Five bash functions are gone,** and `wiki` is down to 759 lines.
+- **The oracle is unchanged** except for the decided `menu bogus` message.
+- **Live on scratch:** the pty home screen, and `doctor` with two processes instead of three.
 
 **M034 / S01-T04** (`c977b08`, `e9eb4a2`, `07f15d1`, `cb40e20`): `wiki` execs the venv's
 python straight into `cli.py`.

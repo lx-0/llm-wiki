@@ -5,7 +5,7 @@ project: llm-wiki
 created: 2026-10-15T18:15:32+02:00
 status: planned
 task_count: 7
-completed_tasks: 4
+completed_tasks: 5
 ---
 
 # M034-S01 -- Slice Plan
@@ -49,7 +49,7 @@ in the Python catalogue.
   - the process tree after (dispatcher + handler), measured the T03 way;
   - a test that no `uv` is called while the venv is current;
   - the full oracle, unchanged.
-- [ ] T05 -- Port the home & status wrappers into `cli_catalog`: `menu` (home screen,
+- [x] T05 -- Port the home & status wrappers into `cli_catalog`: `menu` (home screen,
   `--json`), `doctor`, `version`, and the bare `wiki` entry (home screen on a TTY, help
   otherwise). Their bash functions are deleted; the oracle is unchanged, apart from
   differences decided in the commit.
