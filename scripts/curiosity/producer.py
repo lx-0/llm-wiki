@@ -329,6 +329,332 @@ def _folder_candidates(source_excerpt: str, top_k: int) -> tuple[str, dict[int, 
     return block, candidates
 
 
+# ── The two passes' phases ───────────────────────────────────────────
+# Shared shape: gates → prompt → schema → one Ollama call → parse → per-gap
+# write through a drop ladder → the drop summary. The pieces below are the
+# per-pass schema / parse / write steps; the passes themselves keep their
+# gates, their prompt and their own failure ladder (the 404 hints differ).
+
+
+def _log_drop_summary(label: str, raw_count: int, kept: int, dropped: dict[str, int]) -> None:
+    """The per-pass drop summary — logged only when something was dropped or capped."""
+    if dropped or kept != raw_count:
+        drop_str = ", ".join(f"{k}={v}" for k, v in dropped.items()) or "none"
+        log.info("%s: %d gap(s) gen, %d kept (dropped: %s)", label, raw_count, kept, drop_str)
+
+
+def _folder_gap_schema(candidate_count: int) -> dict:
+    """The folder pass's structured-output schema: the pick is a candidate NUMBER."""
+    return {
+        "type": "object",
+        "properties": {
+            "gaps": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "topic": {"type": "string"},
+                        # candidate: the NUMBER of a listed candidate file.
+                        # Integer pick, not a copied path — llama3.1:8b
+                        # placeholder-fills a verbatim path field (lxw
+                        # 2026-06-13). Python maps it back via `candidates`.
+                        "candidate": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": candidate_count,
+                        },
+                        # file_confidence: 1-5 self-reported, same
+                        # abstain-over-guess semantics as email's
+                        # folder_confidence (shared threshold knob).
+                        "file_confidence": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 5,
+                        },
+                        "rationale": {"type": "string"},
+                    },
+                    "required": [
+                        "topic",
+                        "candidate",
+                        "file_confidence",
+                        "rationale",
+                    ],
+                },
+            },
+        },
+        "required": ["gaps"],
+    }
+
+
+def _folder_gaps(content: str) -> list[dict] | None:
+    """The folder pass's answer as gap dicts; None ends the pass (the line is logged)."""
+    try:
+        parsed = ollama_client.parse_json_lenient(content)
+    except json.JSONDecodeError:
+        log.warning("  Curiosity(folder): invalid JSON: %s", content[:200])
+        return None
+    gaps = (
+        parsed
+        if isinstance(parsed, list)
+        else (parsed.get("gaps", []) if isinstance(parsed, dict) else [])
+    )
+    gaps = [g for g in gaps if isinstance(g, dict)]
+    if not gaps:
+        log.info("  Curiosity(folder): no gaps found")
+        return None
+    return gaps
+
+
+def _write_folder_request(
+    gap: dict,
+    *,
+    candidates: dict[int, tuple[str, str]],
+    rel_path: str,
+    dropped: dict[str, int],
+) -> bool:
+    """One gap through the folder pass's drop ladder; True when its request was written."""
+    topic = (gap.get("topic") or "").strip()
+    rationale = (gap.get("rationale") or "").strip()
+
+    # Candidate-number anchor: the pick must be a listed candidate.
+    # The model can only return a number 1..N; an out-of-range or
+    # non-int pick is dropped. This replaces the verbatim file-path
+    # anchor — the candidates map IS the validated index subset.
+    candidate = gap.get("candidate")
+    if not isinstance(candidate, int) or candidate not in candidates:
+        dropped["candidate_invalid"] = dropped.get("candidate_invalid", 0) + 1
+        return False
+    root_id, file_path = candidates[candidate]
+
+    file_confidence = gap.get("file_confidence")
+    confidence_min = CONFIG.limits.curiosity_folder_confidence_min
+    if not isinstance(file_confidence, int) or file_confidence < confidence_min:
+        dropped["file_low_confidence"] = dropped.get("file_low_confidence", 0) + 1
+        return False
+    if not topic:
+        dropped["empty_topic"] = dropped.get("empty_topic", 0) + 1
+        return False
+    if not rationale:
+        dropped["empty_rationale"] = dropped.get("empty_rationale", 0) + 1
+        return False
+
+    slug = slugify(topic, max_len=40, ascii_only=True)
+    request_path = RAW_REQUESTS_DIR / f"request-{slug}-{today_iso()}.json"
+    if request_path.exists():
+        dropped["duplicate"] = dropped.get("duplicate", 0) + 1
+        return False
+    if _slug_previously_rejected(slug):
+        dropped["rejected_persistent"] = dropped.get("rejected_persistent", 0) + 1
+        return False
+
+    request = {
+        "type": "folder-deep-scan",
+        "status": "pending",
+        "root_id": root_id,
+        "file_path": file_path,
+        "file_confidence": file_confidence,
+        "model": CURIOSITY_MODEL,
+        "topic": topic,
+        "rationale": rationale,
+        "source": rel_path,
+        "created": now_iso(),
+    }
+    request_path.write_text(json.dumps(request, indent=2), encoding="utf-8")
+    log.info("  Curiosity(folder) request: %s → %s/%s", topic, root_id, file_path)
+    return True
+
+
+def _email_folders_for_curiosity() -> list[dict]:
+    """Folder allowlist (quality gate #2). Operator can subset the curiosity
+    target pool to exclude generic catch-alls. Empty list = use all
+    email_folders. Order preserved from operator's allowlist if set."""
+    allowed = CONFIG.personal.curiosity_folders or []
+    if allowed:
+        allowed_set = set(allowed)
+        folders_used = [
+            f for f in CONFIG.personal.email_folders if f.get("path") and f["path"] in allowed_set
+        ]
+        if not folders_used:
+            log.warning(
+                "  Curiosity: personal.curiosity_folders=%r matched zero "
+                "email_folders — falling back to full list",
+                allowed,
+            )
+            folders_used = [f for f in CONFIG.personal.email_folders if f.get("path")]
+    else:
+        folders_used = [f for f in CONFIG.personal.email_folders if f.get("path")]
+    return folders_used
+
+
+def _email_gap_schema(folder_count: int, account_names: list[str]) -> dict:
+    """The email pass's structured-output schema: the folder is a NUMBER into the
+    listing, the account one of the configured ids, the quote the anchor."""
+    return {
+        "type": "object",
+        "properties": {
+            "gaps": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "topic": {"type": "string"},
+                        # source_quote is the anti-hallucination gate. Producer
+                        # validates it is a verbatim substring of source_content;
+                        # gaps that fail are dropped (dropped[unsourced]).
+                        "source_quote": {"type": "string"},
+                        "folder_index": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": folder_count,
+                        },
+                        # folder_confidence: 1-5 self-reported. Below
+                        # CONFIG.limits.curiosity_folder_confidence_min the
+                        # gap is dropped. Forces explicit abstention instead
+                        # of hedging on a generic catch-all folder.
+                        "folder_confidence": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 5,
+                        },
+                        "account": {"type": "string", "enum": account_names},
+                        "rationale": {"type": "string"},
+                    },
+                    "required": [
+                        "topic",
+                        "source_quote",
+                        "folder_index",
+                        "folder_confidence",
+                        "account",
+                        "rationale",
+                    ],
+                },
+            },
+        },
+        "required": ["gaps"],
+    }
+
+
+def _email_gaps(content: str) -> list[dict] | None:
+    """The email pass's answer as gap dicts; None ends the pass (the line is logged)."""
+    try:
+        parsed = ollama_client.parse_json_lenient(content)
+    except json.JSONDecodeError:
+        log.warning("  Curiosity: invalid JSON: %s", content[:200])
+        return None
+
+    if isinstance(parsed, list):
+        gaps = parsed
+    elif isinstance(parsed, dict):
+        gaps = parsed.get("gaps", [])
+    else:
+        log.info("  Curiosity: unexpected response type")
+        return None
+    if not gaps:
+        log.info("  Curiosity: no gaps found")
+        return None
+
+    non_dict = [g for g in gaps if not isinstance(g, dict)]
+    if non_dict:
+        log.warning(
+            "  Curiosity: dropping %d non-dict gap(s); sample=%r", len(non_dict), non_dict[0]
+        )
+    gaps = [g for g in gaps if isinstance(g, dict)]
+    if not gaps:
+        return None
+    return gaps
+
+
+def _write_email_request(
+    gap: dict,
+    *,
+    folder_paths: list[str],
+    src_excerpt_norm: str,
+    rel_path: str,
+    dropped: dict[str, int],
+) -> bool:
+    """One gap through the email pass's drop ladder; True when its request was written."""
+    topic = gap.get("topic", "").strip()
+    rationale = gap.get("rationale", "").strip()
+    source_quote = (gap.get("source_quote") or "").strip()
+    # Accept both new (folder_index) and legacy (folder) shapes during
+    # the rollout — Ollama JSON Schema enforcement is best-effort, so
+    # the gap may carry either field even when only one is required.
+    folder_index = gap.get("folder_index")
+    folder = (gap.get("folder") or "").strip()
+    if isinstance(folder_index, int) and 1 <= folder_index <= len(folder_paths):
+        folder = folder_paths[folder_index - 1]
+    elif folder not in folder_paths:
+        dropped["folder_unmapped"] = dropped.get("folder_unmapped", 0) + 1
+        return False
+
+    # Quality gate #3: folder confidence threshold. The LLM self-rates
+    # 1-5 how confident the picked folder actually contains relevant
+    # mail. Below the threshold the gap is dropped — better to abstain
+    # than guess on a generic catch-all.
+    folder_confidence = gap.get("folder_confidence")
+    if not isinstance(folder_confidence, int):
+        dropped["folder_low_confidence"] = dropped.get("folder_low_confidence", 0) + 1
+        return False
+    if folder_confidence < CONFIG.limits.curiosity_folder_confidence_min:
+        dropped["folder_low_confidence"] = dropped.get("folder_low_confidence", 0) + 1
+        return False
+
+    if not topic:
+        dropped["empty_topic"] = dropped.get("empty_topic", 0) + 1
+        return False
+    if not rationale:
+        dropped["empty_rationale"] = dropped.get("empty_rationale", 0) + 1
+        return False
+
+    # Anti-hallucination gate: the quote must be anchored in the
+    # source excerpt the model actually saw. We accept the quote if
+    # ANY contiguous N-token window from the (normalised) quote
+    # appears in the source — tolerant of edge paraphrase but still
+    # verifiable proof of source-anchoring. Reject quotes shorter
+    # than 8 chars — too short to be a meaningful anchor (matches
+    # stop-words like "the project").
+    if not source_quote or len(source_quote) < 8:
+        dropped["quote_missing"] = dropped.get("quote_missing", 0) + 1
+        return False
+    if not _quote_anchored_in_source(
+        _normalize_quote(source_quote),
+        src_excerpt_norm,
+        CONFIG.limits.curiosity_quote_min_anchor_tokens,
+    ):
+        dropped["quote_unsourced"] = dropped.get("quote_unsourced", 0) + 1
+        return False
+
+    slug = slugify(topic, max_len=40, ascii_only=True)
+    request_path = RAW_REQUESTS_DIR / f"request-{slug}-{today_iso()}.json"
+
+    if request_path.exists():
+        dropped["duplicate"] = dropped.get("duplicate", 0) + 1
+        return False
+
+    # Persistent rejection: operator rejected this slug in a prior walk.
+    # Any past request-<slug>-*.json with status=rejected blocks re-emission.
+    if _slug_previously_rejected(slug):
+        dropped["rejected_persistent"] = dropped.get("rejected_persistent", 0) + 1
+        return False
+
+    request = {
+        "type": "email-deep-scan",
+        "status": "pending",
+        "folder": folder,
+        "folder_confidence": folder_confidence,
+        "account": gap.get("account", CONFIG.personal.primary_account),
+        "model": gap.get("model", CURIOSITY_MODEL),
+        "topic": topic,
+        "source_quote": source_quote,  # provenance — verified-substring of source
+        "rationale": rationale,
+        "source": rel_path,
+        "created": now_iso(),
+    }
+    request_path.write_text(json.dumps(request, indent=2), encoding="utf-8")
+    log.info("  Curiosity request: %s → %s", topic, folder)
+    return True
+
+
 async def maybe_generate_folder_requests(source: Path) -> None:
     """Detect gaps a watched-folder file could answer → folder-deep-scan
     requests in raw/requests/ (M027-S03).
@@ -397,45 +723,7 @@ async def maybe_generate_folder_requests(source: Path) -> None:
         len(prompt),
     )
 
-    schema = {
-        "type": "object",
-        "properties": {
-            "gaps": {
-                "type": "array",
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "topic": {"type": "string"},
-                        # candidate: the NUMBER of a listed candidate file.
-                        # Integer pick, not a copied path — llama3.1:8b
-                        # placeholder-fills a verbatim path field (lxw
-                        # 2026-06-13). Python maps it back via `candidates`.
-                        "candidate": {
-                            "type": "integer",
-                            "minimum": 1,
-                            "maximum": len(candidates),
-                        },
-                        # file_confidence: 1-5 self-reported, same
-                        # abstain-over-guess semantics as email's
-                        # folder_confidence (shared threshold knob).
-                        "file_confidence": {
-                            "type": "integer",
-                            "minimum": 1,
-                            "maximum": 5,
-                        },
-                        "rationale": {"type": "string"},
-                    },
-                    "required": [
-                        "topic",
-                        "candidate",
-                        "file_confidence",
-                        "rationale",
-                    ],
-                },
-            },
-        },
-        "required": ["gaps"],
-    }
+    schema = _folder_gap_schema(len(candidates))
 
     try:
         content = ollama_client.chat_schema(
@@ -444,84 +732,20 @@ async def maybe_generate_folder_requests(source: Path) -> None:
             schema=schema,
             timeout=CONFIG.limits.curiosity_timeout_s,
         )
-        try:
-            parsed = ollama_client.parse_json_lenient(content)
-        except json.JSONDecodeError:
-            log.warning("  Curiosity(folder): invalid JSON: %s", content[:200])
-            return
-        gaps = (
-            parsed
-            if isinstance(parsed, list)
-            else (parsed.get("gaps", []) if isinstance(parsed, dict) else [])
-        )
-        gaps = [g for g in gaps if isinstance(g, dict)]
-        if not gaps:
-            log.info("  Curiosity(folder): no gaps found")
+        gaps = _folder_gaps(content)
+        if gaps is None:
             return
 
         RAW_REQUESTS_DIR.mkdir(parents=True, exist_ok=True)
         raw_count = len(gaps)
         kept = 0
         dropped: dict[str, int] = {}
-        confidence_min = CONFIG.limits.curiosity_folder_confidence_min
         for gap in gaps[: CONFIG.limits.curiosity_max_gaps]:
-            topic = (gap.get("topic") or "").strip()
-            rationale = (gap.get("rationale") or "").strip()
-
-            # Candidate-number anchor: the pick must be a listed candidate.
-            # The model can only return a number 1..N; an out-of-range or
-            # non-int pick is dropped. This replaces the verbatim file-path
-            # anchor — the candidates map IS the validated index subset.
-            candidate = gap.get("candidate")
-            if not isinstance(candidate, int) or candidate not in candidates:
-                dropped["candidate_invalid"] = dropped.get("candidate_invalid", 0) + 1
-                continue
-            root_id, file_path = candidates[candidate]
-
-            file_confidence = gap.get("file_confidence")
-            if not isinstance(file_confidence, int) or file_confidence < confidence_min:
-                dropped["file_low_confidence"] = dropped.get("file_low_confidence", 0) + 1
-                continue
-            if not topic:
-                dropped["empty_topic"] = dropped.get("empty_topic", 0) + 1
-                continue
-            if not rationale:
-                dropped["empty_rationale"] = dropped.get("empty_rationale", 0) + 1
-                continue
-
-            slug = slugify(topic, max_len=40, ascii_only=True)
-            request_path = RAW_REQUESTS_DIR / f"request-{slug}-{today_iso()}.json"
-            if request_path.exists():
-                dropped["duplicate"] = dropped.get("duplicate", 0) + 1
-                continue
-            if _slug_previously_rejected(slug):
-                dropped["rejected_persistent"] = dropped.get("rejected_persistent", 0) + 1
-                continue
-
-            request = {
-                "type": "folder-deep-scan",
-                "status": "pending",
-                "root_id": root_id,
-                "file_path": file_path,
-                "file_confidence": file_confidence,
-                "model": CURIOSITY_MODEL,
-                "topic": topic,
-                "rationale": rationale,
-                "source": rel_path,
-                "created": now_iso(),
-            }
-            request_path.write_text(json.dumps(request, indent=2), encoding="utf-8")
-            kept += 1
-            log.info("  Curiosity(folder) request: %s → %s/%s", topic, root_id, file_path)
-
-        if dropped or kept != raw_count:
-            drop_str = ", ".join(f"{k}={v}" for k, v in dropped.items()) or "none"
-            log.info(
-                "  Curiosity(folder): %d gap(s) gen, %d kept (dropped: %s)",
-                raw_count,
-                kept,
-                drop_str,
-            )
+            if _write_folder_request(
+                gap, candidates=candidates, rel_path=rel_path, dropped=dropped
+            ):
+                kept += 1
+        _log_drop_summary("  Curiosity(folder)", raw_count, kept, dropped)
 
     except httpx.TimeoutException:
         log.warning(
@@ -577,25 +801,7 @@ async def maybe_generate_curiosity_requests(source: Path) -> None:
         log.debug("  Curiosity: skipping %s (exclude-glob)", rel_path)
         return
 
-    # Folder allowlist (quality gate #2). Operator can subset the curiosity
-    # target pool to exclude generic catch-alls. Empty list = use all
-    # email_folders. Order preserved from operator's allowlist if set.
-    allowed = CONFIG.personal.curiosity_folders or []
-    if allowed:
-        allowed_set = set(allowed)
-        folders_used = [
-            f for f in CONFIG.personal.email_folders if f.get("path") and f["path"] in allowed_set
-        ]
-        if not folders_used:
-            log.warning(
-                "  Curiosity: personal.curiosity_folders=%r matched zero "
-                "email_folders — falling back to full list",
-                allowed,
-            )
-            folders_used = [f for f in CONFIG.personal.email_folders if f.get("path")]
-    else:
-        folders_used = [f for f in CONFIG.personal.email_folders if f.get("path")]
-
+    folders_used = _email_folders_for_curiosity()
     folder_paths = [f["path"] for f in folders_used]
     if not folder_paths:
         log.info("  Curiosity: no personal.email_folders configured, skipping")
@@ -655,49 +861,7 @@ async def maybe_generate_curiosity_requests(source: Path) -> None:
     )
 
     account_names = list(CONFIG.personal.accounts.keys()) or [CONFIG.personal.primary_account]
-    schema = {
-        "type": "object",
-        "properties": {
-            "gaps": {
-                "type": "array",
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "topic": {"type": "string"},
-                        # source_quote is the anti-hallucination gate. Producer
-                        # validates it is a verbatim substring of source_content;
-                        # gaps that fail are dropped (dropped[unsourced]).
-                        "source_quote": {"type": "string"},
-                        "folder_index": {
-                            "type": "integer",
-                            "minimum": 1,
-                            "maximum": len(folder_paths),
-                        },
-                        # folder_confidence: 1-5 self-reported. Below
-                        # CONFIG.limits.curiosity_folder_confidence_min the
-                        # gap is dropped. Forces explicit abstention instead
-                        # of hedging on a generic catch-all folder.
-                        "folder_confidence": {
-                            "type": "integer",
-                            "minimum": 1,
-                            "maximum": 5,
-                        },
-                        "account": {"type": "string", "enum": account_names},
-                        "rationale": {"type": "string"},
-                    },
-                    "required": [
-                        "topic",
-                        "source_quote",
-                        "folder_index",
-                        "folder_confidence",
-                        "account",
-                        "rationale",
-                    ],
-                },
-            },
-        },
-        "required": ["gaps"],
-    }
+    schema = _email_gap_schema(len(folder_paths), account_names)
 
     # Pre-compute the normalised source-excerpt once for the quote-validation
     # gate. The LLM's quote needs to be a substring of WHAT IT SAW (the
@@ -712,30 +876,8 @@ async def maybe_generate_curiosity_requests(source: Path) -> None:
             schema=schema,
             timeout=CONFIG.limits.curiosity_timeout_s,
         )
-        try:
-            parsed = ollama_client.parse_json_lenient(content)
-        except json.JSONDecodeError:
-            log.warning("  Curiosity: invalid JSON: %s", content[:200])
-            return
-
-        if isinstance(parsed, list):
-            gaps = parsed
-        elif isinstance(parsed, dict):
-            gaps = parsed.get("gaps", [])
-        else:
-            log.info("  Curiosity: unexpected response type")
-            return
-        if not gaps:
-            log.info("  Curiosity: no gaps found")
-            return
-
-        non_dict = [g for g in gaps if not isinstance(g, dict)]
-        if non_dict:
-            log.warning(
-                "  Curiosity: dropping %d non-dict gap(s); sample=%r", len(non_dict), non_dict[0]
-            )
-        gaps = [g for g in gaps if isinstance(g, dict)]
-        if not gaps:
+        gaps = _email_gaps(content)
+        if gaps is None:
             return
 
         RAW_REQUESTS_DIR.mkdir(parents=True, exist_ok=True)
@@ -743,97 +885,16 @@ async def maybe_generate_curiosity_requests(source: Path) -> None:
         raw_count = len(gaps)
         kept = 0
         dropped: dict[str, int] = {}
-        confidence_min = CONFIG.limits.curiosity_folder_confidence_min
         for gap in gaps[: CONFIG.limits.curiosity_max_gaps]:
-            topic = gap.get("topic", "").strip()
-            rationale = gap.get("rationale", "").strip()
-            source_quote = (gap.get("source_quote") or "").strip()
-            # Accept both new (folder_index) and legacy (folder) shapes during
-            # the rollout — Ollama JSON Schema enforcement is best-effort, so
-            # the gap may carry either field even when only one is required.
-            folder_index = gap.get("folder_index")
-            folder = (gap.get("folder") or "").strip()
-            if isinstance(folder_index, int) and 1 <= folder_index <= len(folder_paths):
-                folder = folder_paths[folder_index - 1]
-            elif folder not in folder_paths:
-                dropped["folder_unmapped"] = dropped.get("folder_unmapped", 0) + 1
-                continue
-
-            # Quality gate #3: folder confidence threshold. The LLM self-rates
-            # 1-5 how confident the picked folder actually contains relevant
-            # mail. Below the threshold the gap is dropped — better to abstain
-            # than guess on a generic catch-all.
-            folder_confidence = gap.get("folder_confidence")
-            if not isinstance(folder_confidence, int):
-                dropped["folder_low_confidence"] = dropped.get("folder_low_confidence", 0) + 1
-                continue
-            if folder_confidence < confidence_min:
-                dropped["folder_low_confidence"] = dropped.get("folder_low_confidence", 0) + 1
-                continue
-
-            if not topic:
-                dropped["empty_topic"] = dropped.get("empty_topic", 0) + 1
-                continue
-            if not rationale:
-                dropped["empty_rationale"] = dropped.get("empty_rationale", 0) + 1
-                continue
-
-            # Anti-hallucination gate: the quote must be anchored in the
-            # source excerpt the model actually saw. We accept the quote if
-            # ANY contiguous N-token window from the (normalised) quote
-            # appears in the source — tolerant of edge paraphrase but still
-            # verifiable proof of source-anchoring. Reject quotes shorter
-            # than 8 chars — too short to be a meaningful anchor (matches
-            # stop-words like "the project").
-            if not source_quote or len(source_quote) < 8:
-                dropped["quote_missing"] = dropped.get("quote_missing", 0) + 1
-                continue
-            if not _quote_anchored_in_source(
-                _normalize_quote(source_quote),
-                src_excerpt_norm,
-                CONFIG.limits.curiosity_quote_min_anchor_tokens,
+            if _write_email_request(
+                gap,
+                folder_paths=folder_paths,
+                src_excerpt_norm=src_excerpt_norm,
+                rel_path=rel_path,
+                dropped=dropped,
             ):
-                dropped["quote_unsourced"] = dropped.get("quote_unsourced", 0) + 1
-                continue
-
-            slug = slugify(topic, max_len=40, ascii_only=True)
-            request_path = RAW_REQUESTS_DIR / f"request-{slug}-{today_iso()}.json"
-
-            if request_path.exists():
-                dropped["duplicate"] = dropped.get("duplicate", 0) + 1
-                continue
-
-            # Persistent rejection: operator rejected this slug in a prior walk.
-            # Any past request-<slug>-*.json with status=rejected blocks re-emission.
-            if _slug_previously_rejected(slug):
-                dropped["rejected_persistent"] = dropped.get("rejected_persistent", 0) + 1
-                continue
-
-            request = {
-                "type": "email-deep-scan",
-                "status": "pending",
-                "folder": folder,
-                "folder_confidence": folder_confidence,
-                "account": gap.get("account", CONFIG.personal.primary_account),
-                "model": gap.get("model", CURIOSITY_MODEL),
-                "topic": topic,
-                "source_quote": source_quote,  # provenance — verified-substring of source
-                "rationale": rationale,
-                "source": rel_path,
-                "created": now_iso(),
-            }
-            request_path.write_text(json.dumps(request, indent=2), encoding="utf-8")
-            kept += 1
-            log.info("  Curiosity request: %s → %s", topic, folder)
-
-        if dropped or kept != raw_count:
-            drop_str = ", ".join(f"{k}={v}" for k, v in dropped.items()) or "none"
-            log.info(
-                "  Curiosity: %d gap(s) gen, %d kept (dropped: %s)",
-                raw_count,
-                kept,
-                drop_str,
-            )
+                kept += 1
+        _log_drop_summary("  Curiosity", raw_count, kept, dropped)
 
     except httpx.TimeoutException:
         log.warning(
