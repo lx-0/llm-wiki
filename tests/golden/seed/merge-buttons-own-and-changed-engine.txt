@@ -1,0 +1,121 @@
+added: btn-idea, btn-question, btn-meeting, btn-compile, btn-lint, btn-refresh-stats, agent-a, agent-b
+updated: btn-note
+--- file ---
+{
+  "devMode": true,
+  "buttonTemplates": [
+    {
+      "id": "btn-note",
+      "label": "📝 Notiz",
+      "hidden": true,
+      "class": "",
+      "tooltip": "Neue Notiz in inbox/",
+      "style": "primary",
+      "actions": [
+        {
+          "type": "command",
+          "command": "QuickAdd: Neue Notiz"
+        }
+      ]
+    },
+    {
+      "id": "btn-mine",
+      "label": "Mine",
+      "actions": []
+    },
+    {
+      "label": "💡 Idee",
+      "hidden": true,
+      "class": "",
+      "tooltip": "Neue Idee in inbox/",
+      "id": "btn-idea",
+      "style": "default",
+      "actions": [
+        {
+          "type": "command",
+          "command": "QuickAdd: Neue Idee"
+        }
+      ]
+    },
+    {
+      "label": "❓ Frage",
+      "hidden": true,
+      "class": "",
+      "tooltip": "Neue Frage (für Curiosity Loop) in inbox/",
+      "id": "btn-question",
+      "style": "default",
+      "actions": [
+        {
+          "type": "command",
+          "command": "QuickAdd: Neue Frage"
+        }
+      ]
+    },
+    {
+      "label": "🤝 Meeting",
+      "hidden": true,
+      "class": "",
+      "tooltip": "Neue Meeting-Notiz in inbox/",
+      "id": "btn-meeting",
+      "style": "default",
+      "actions": [
+        {
+          "type": "command",
+          "command": "QuickAdd: Neues Meeting"
+        }
+      ]
+    },
+    {
+      "label": "▶️ Compile changed",
+      "hidden": true,
+      "class": "",
+      "tooltip": "Run `wiki compile` — process raw/ + daily/ files whose hash changed.",
+      "id": "btn-compile",
+      "style": "primary",
+      "actions": [
+        {
+          "type": "command",
+          "command": "Shell commands: Wiki: compile (changed sources)"
+        }
+      ]
+    },
+    {
+      "label": "🛡 Lint",
+      "hidden": true,
+      "class": "",
+      "tooltip": "Run `wiki lint --structural-only`.",
+      "id": "btn-lint",
+      "style": "default",
+      "actions": [
+        {
+          "type": "command",
+          "command": "Shell commands: Wiki: lint (structural)"
+        }
+      ]
+    },
+    {
+      "label": "🔄 Refresh stats",
+      "hidden": true,
+      "class": "",
+      "tooltip": "Run `wiki refresh-dashboards` — rebuild the dashboard's stats and lint caches.",
+      "id": "btn-refresh-stats",
+      "style": "default",
+      "actions": [
+        {
+          "type": "command",
+          "command": "Shell commands: Wiki: refresh dashboard stats"
+        }
+      ]
+    },
+    {
+      "id": "agent-a",
+      "alias": "Wiki: agent a",
+      "icon": "lucide-bot"
+    },
+    {
+      "id": "agent-b",
+      "alias": "Wiki: agent b",
+      "icon": "lucide-bot"
+    }
+  ]
+}

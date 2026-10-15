@@ -1,0 +1,9 @@
+reported: wiki-dashboard
+--- file ---
+{
+  "cssTheme": "Minimal",
+  "enabledCssSnippets": [
+    "mine",
+    "wiki-dashboard"
+  ]
+}

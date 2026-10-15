@@ -1,0 +1,123 @@
+--- file ---
+# llm-wiki — secrets template
+#
+# Copy to `.env` (gitignored) and populate. `scripts/config.py` calls
+# `load_dotenv(<vault>/.claude/.env, override=False)` on import, so every
+# script and hook sees these vars without manual shell-export. Shell
+# exports still win — set there to override a value just for one run.
+#
+# This file is seeded into the vault by `wiki seed` (additive — your
+# existing `.env.example` is preserved). Add entries for any new env-var
+# the engine references; reference site documents the variable in code.
+
+
+# ── OpenAI ────────────────────────────────────────────────────────────
+# Whisper audio transcription (and other future OpenAI-backed paths).
+OPENAI_API_KEY=
+
+
+# ── Exa AI ────────────────────────────────────────────────────────────
+# Dream web-research (issue #2) — public-entity enrichment in `wiki dream`.
+# Read by scripts/web_research.py, which falls back to this env var when
+# `personal.exa_api_key` in config.yaml is blank. Single global key (not
+# multi-tenant). Get one at dashboard.exa.ai. A key alone does nothing —
+# the feature is also gated by `features.dream_web_research` (default off)
+# plus a per-entity opt-in (`web_research: true` frontmatter or the
+# `public-person` tag).
+
+
+# ── meinkontext (wiki publish) ───────────────────────────────────────
+# `wiki publish` (M030) normally needs NO entry here: run
+# `wiki publish --auth` once (browser login + consent) and the producer
+# holds a refresh token at .wiki/state/meinkontext-oauth.json, refreshed
+# headlessly. This variable is an EXPLICIT OVERRIDE only — and it must be
+# a USER-scoped token: the org api-key from context-mcp's MCP-CONNECT.md
+# Keychain setup is READ-ONLY (write tools reject it). Feature gates:
+# `publish.enabled` (default off) + `publish.endpoint` in config.yaml.
+# CAUTION: this vault iCloud-syncs — anything here reaches Apple's cloud.
+# MEINKONTEXT_TOKEN=
+
+
+# ── Jamie AI ──────────────────────────────────────────────────────────
+# Meeting-notetaker ingest via collectors/jamie.py. Multi-tenant — one
+# key per account with a `jamie:` sub-block under personal.accounts.<id>
+# (kind: jamie-api). Variable names follow the pattern
+#
+#     JAMIE_<ACCOUNT>_API_KEY
+#
+# where `<ACCOUNT>` matches whatever you set as `api_key_env` in the
+# account's jamie sub-block in config.yaml. Generate each key in Jamie:
+# Settings → Developers → API Keys (Pro / Team / Enterprise plan
+# required). All keys carry the jk_ prefix. Uncomment + populate per
+# account.
+#
+# JAMIE_WORK_API_KEY=
+# JAMIE_PRIVATE_API_KEY=
+
+
+# ── Oura Ring ─────────────────────────────────────────────────────────
+# Daily biometric ingest via collectors/health.py (Phase 1 — Oura only).
+# Multi-tenant — one Personal Access Token per account with a
+# `health.oura:` sub-block under personal.accounts.<id> (kind: oura-pat).
+# Variable name follows the pattern
+#
+#     OURA_<ACCOUNT>_PAT
+#
+# where `<ACCOUNT>` matches whatever you set as `api_key_env` in the
+# account's health.oura sub-block in config.yaml. Generate the token at
+# cloud.ouraring.com/personal-access-tokens (free, no rotation). Uncomment
+# + populate per account.
+#
+# OURA_PRIVATE_PAT=
+
+
+# ── IMAP credentials ──────────────────────────────────────────────────
+# Used by adapters/mailbox/imap.py (the `imap` reader — scans mail for
+# accounts with no local client and no Google Cloud project),
+# scripts/imap_actions.py (Optimization Suggestions: move / tag / flag
+# existing mail), and adapters/mailbox/allinkl.py (Procmail rule uploads).
+# Variable names follow the pattern
+#
+#     IMAP_<ACCOUNT>_USER
+#     IMAP_<ACCOUNT>_PASS
+#
+# where `<ACCOUNT>` matches the env-var name referenced from your
+# `personal.accounts.<id>.reader.imap_pass_env` (kind: imap) or
+# `.filter.imap_user_env` / `imap_pass_env` in config.yaml. Gmail and
+# other 2FA-protected accounts need an App Password, not the login
+# password. A Gmail App Password needs 2-Step Verification enabled, is
+# 16 lowercase letters, and must be pasted WITHOUT the display spaces
+# (Google shows it grouped as `xxxx xxxx xxxx xxxx` — store the 16
+# chars only). Uncomment + populate per account.
+#
+# IMAP_WORK_USER=
+# IMAP_WORK_PASS=
+# IMAP_PERSONAL_USER=
+# IMAP_PERSONAL_PASS=
+
+
+# ── NAS (SMB) ─────────────────────────────────────────────────────────
+# Future scan-nas.py / SMB-backed collectors. Leave blank when no NAS.
+NAS_HOST=
+NAS_USER=
+NAS_PASS=
+
+
+# ── LinkedIn (MCP server, not this file) ──────────────────────────────
+# The adhikasp/mcp-linkedin server reads credentials from its own MCP
+# env block in `~/.claude.json` (`mcpServers.linkedin.env`), NOT from
+# this `.env` file. Listed here only as a reminder — populating them
+# below has no effect.
+# LINKEDIN_EMAIL=
+# LINKEDIN_PASSWORD=
+
+
+# ── Exa AI ────────────────────────────────────────────────────────────
+# Dream web-research (issue #2) — public-entity enrichment in `wiki dream`.
+# Read by scripts/web_research.py, which falls back to this env var when
+# `personal.exa_api_key` in config.yaml is blank. Single global key (not
+# multi-tenant). Get one at dashboard.exa.ai. A key alone does nothing —
+# the feature is also gated by `features.dream_web_research` (default off)
+# plus a per-entity opt-in (`web_research: true` frontmatter or the
+# `public-person` tag).
+EXA_API_KEY=

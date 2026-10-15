@@ -1,0 +1,14 @@
+reported: heatmap-calendar, homepage, obsidian-charts, obsidian-excalidraw-plugin, obsidian-meta-bind-plugin, obsidian-shellcommands
+--- file ---
+[
+  "dataview",
+  "heatmap-calendar",
+  "homepage",
+  "mine",
+  "obsidian-charts",
+  "obsidian-excalidraw-plugin",
+  "obsidian-meta-bind-plugin",
+  "obsidian-shellcommands",
+  "obsidian-tasks-plugin",
+  "quickadd"
+]

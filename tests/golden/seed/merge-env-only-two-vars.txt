@@ -1,0 +1,19 @@
+--- file ---
+OPENAI_API_KEY=sk
+NAS_HOST=x
+
+# ── Exa AI ────────────────────────────────────────────────────────────
+# Dream web-research (issue #2) — public-entity enrichment in `wiki dream`.
+# Read by scripts/web_research.py, which falls back to this env var when
+# `personal.exa_api_key` in config.yaml is blank. Single global key (not
+# multi-tenant). Get one at dashboard.exa.ai. A key alone does nothing —
+# the feature is also gated by `features.dream_web_research` (default off)
+# plus a per-entity opt-in (`web_research: true` frontmatter or the
+# `public-person` tag).
+EXA_API_KEY=
+
+
+NAS_PASS=
+
+
+NAS_USER=

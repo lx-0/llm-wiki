@@ -112,6 +112,13 @@ def meta_bind_templates() -> list[dict]:
     return out
 
 
+def registry_entries(key: str) -> list[dict]:
+    """The agent buttons' entries for one plugin registry, named by its key in the plugin's
+    data.json: `shell_commands` (Shell commands) or `buttonTemplates` (Meta-Bind)."""
+    makers = {"shell_commands": shell_commands_entries, "buttonTemplates": meta_bind_templates}
+    return makers[key]()
+
+
 def inline_refs() -> str:
     """Return a single-line string of inline `BUTTON[btn-<id>]` refs for the visible Run row."""
     refs = [f"`BUTTON[btn-{spec.id}]`" for spec in discover()]

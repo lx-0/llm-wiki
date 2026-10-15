@@ -33,8 +33,8 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 │   │   ├── paths.py               ← eager path constants from __file__ — zero deps, no side effects
 │   │   ├── agents.py              ← agent registry (claude / codex / gemini / cursor), the one hook-command grammar, hook_cmd + per-agent payloads, merge / without_wiki_hooks (pure)
 │   │   ├── backup.py              ← the one backup-before-write helper: backup / backup_path / stamp, never over an earlier backup (a clash takes -2)
-│   │   ├── jqjson.py              ← JSON as jq 1.7 reads / compares / writes it: number literals kept (Decimal), render (`jq .`), canonical (`jq -S .`), same (jq's ==), leaf / get / set paths
-│   │   ├── seed.py                ← the seed's pure core: walk (what `wiki seed` writes, in order, and how), apply / compute overlay, derive (template ⊕ overlay)
+│   │   ├── jqjson.py              ← JSON as jq 1.7 reads / compares / writes it: number literals kept (Decimal), render (`jq .`), canonical (`jq -S .`), same (jq's ==), unique / subtract, leaf / get / set paths
+│   │   ├── seed.py                ← the seed's pure core: walk (what `wiki seed` writes, in order, and how), apply / compute overlay, derive (template ⊕ overlay), the special merges (plugin-list union, the button registries by id, the `.env` stanza append)
 │   │   ├── config.py              ← CONFIG singleton (YAML-driven) + get/set/keys CLI + TIMEZONE + .env bootstrap
 │   │   ├── prompts.py             ← prompt template loader (${var} substitution)
 │   │   ├── ollama_client.py       ← single Ollama transport (chat / chat_schema / chat_vision)
@@ -135,7 +135,7 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 │   │   ├── dashboard_stats.py     ← _dashboard-stats.md generator
 │   │   ├── dashboard_lint.py      ← _dashboard-lint.md generator
 │   │   ├── lint_results.py        ← once-per-refresh structural-lint compute, cached in STATE_DIR (shared by the stats + lint renderers)
-│   │   ├── agent_buttons.py       ← agent-button discovery: the two plugin registries' entries + the dashboard.md region
+│   │   ├── agent_buttons.py       ← agent-button discovery: the two plugin registries' entries (registry_entries) + the dashboard.md region
 │   │   └── inject_daily_button.py ← idempotent Summarize-button injection into daily/<date>/sessions.md
 │   ├── reports/_engine/       ← operator-self-reports surface (air-gapped from compile)
 │   │   ├── runner.py              ← `run_inference()` — substrate-scope resolve + batched SDK calls + persist `runs/<ts>/instruments/<slug>.md`

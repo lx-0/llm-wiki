@@ -1,0 +1,8 @@
+reported: wiki-dashboard
+--- file ---
+{
+  "theme": "obsidian",
+  "enabledCssSnippets": [
+    "wiki-dashboard"
+  ]
+}

@@ -1,0 +1,3 @@
+trouble: shape
+--- file ---
+(unchanged)

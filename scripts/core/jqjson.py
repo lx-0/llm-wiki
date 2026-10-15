@@ -84,6 +84,41 @@ def same(a: object, b: object) -> bool:
     return a == b
 
 
+def _rank(value: object) -> tuple:
+    """jq's order: null < false < true < numbers < strings < arrays < objects; arrays item by
+    item, objects by their sorted keys first, then their values in that key order."""
+    if value is None:
+        return (0,)
+    if value is False:
+        return (1,)
+    if value is True:
+        return (2,)
+    if isinstance(value, Decimal | int | float):
+        return (3, value)
+    if isinstance(value, str):
+        return (4, value)
+    if isinstance(value, list):
+        return (5, [_rank(item) for item in value])
+    if isinstance(value, dict):
+        keys = sorted(value)
+        return (6, keys, [_rank(value[key]) for key in keys])
+    raise TypeError(f"not JSON: {type(value).__name__}")
+
+
+def unique(values: list) -> list:
+    """jq's `unique`: sorted in jq's order, the first of equal items kept."""
+    out: list = []
+    for value in sorted(values, key=_rank):
+        if not out or not same(out[-1], value):
+            out.append(value)
+    return out
+
+
+def subtract(values: list, removed: list) -> list:
+    """jq's `a - b`: the items of ``values`` equal to none of ``removed``, in order."""
+    return [value for value in values if not any(same(value, r) for r in removed)]
+
+
 def leaf_paths(value: object, prefix: JsonPath = ()) -> Iterator[JsonPath]:
     """The paths to the text, number and boolean leaves, in document order — the bash's
     `leaf_paths`. jq's `paths(scalars)` would drop every false leaf (0.7.23); null leaves stay
