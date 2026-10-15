@@ -8,8 +8,9 @@ final article body". Concretely:
 - owner-block injection (``_build_owner_block``)
 - pre-flight 60kb budget gate (``assert_prompt_within_budget``)
 - 60kb operator-visible size warning
-- one SDK ``query(…)`` call with the callback-gate or legacy allowed_tools
-  shape depending on ``CONFIG.features.compile_callback_gate``
+- one ``run_sdk_query`` call, Write/Edit path-scoped to knowledge/ by the
+  PreToolUse hook (or the legacy allowed_tools shape when
+  ``CONFIG.features.compile_callback_gate`` is off)
 - per-message stall timeout (``compile_per_call_timeout_s``)
 - FailureClass classification on exception (via ``log_sdk_failure``) or on
   structured ``ResultMessage(is_error=True)``
@@ -25,12 +26,10 @@ What stays UPSTREAM in compile.py's per-file loop:
 - substrate-type skip-list check
 - substrate-prompt + model + max_turns dispatch (main() packs the result
   into ``CompileMetadata`` and hands it down)
-- writing the resulting article to ``knowledge/<bucket>/<slug>.md``
-  (that's S03's ``commit_article``)
 - state save
 
-The function is parallel/dormant in M018-S02-T02 — T05 rewires
-``compile.py:compile_file()`` to actually call it.
+The article itself is written by the agent inside this call (scoped to
+knowledge/ and the operations log); there is no separate write stage.
 """
 
 from __future__ import annotations

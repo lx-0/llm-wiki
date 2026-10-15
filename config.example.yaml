@@ -163,10 +163,12 @@ piggybacks:
     cooldown_hours: 1                    # captures are time-sensitive, like voice
   # Inbox-watch for camera / phone photos (collectors/pictures.py). Reads
   # *.jpeg / *.jpg / *.png / *.heic from `personal.picture_inbox`, runs the
-  # gemma4 vision pipeline on each, writes a HOME sidecar + 384px vault
-  # thumbnail + a per-batch report under `raw/notes/pictures/`, then
-  # archives the source under `<picture_inbox>/.processed/`. Silently
-  # skipped when picture_inbox is empty (graceful agnostic).
+  # local vision model on each (the `model:` pinned in
+  # prompts/scan_pictures_vision.md beats models.vision_model), moves the
+  # source into the vault audit zone `raw/inbox-mobile/pictures/` with its
+  # sidecar beside it, and writes a 384px thumbnail + a per-batch report under
+  # `raw/notes/pictures/`. Silently skipped when picture_inbox is empty
+  # (graceful agnostic).
   pictures:
     enabled: true
     cooldown_hours: 6                    # vision-LLM step — keep below screenshots' 24h but above voice

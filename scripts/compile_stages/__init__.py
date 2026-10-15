@@ -5,13 +5,14 @@ these stages in order:
 
   1. (selection stays in compile.py:select_files() — already factored)
   2. compile_source(content, metadata) → CompileResult         (S02)
-  3. commit_article(result, target_path, metadata) → None      (S03)
-  4. run_post_passes(source) → list                             (S04)
+  3. run_post_passes(source) → list                             (S04)
 
-Each stage owns one concern: compile_source is the LLM-call boundary,
-commit_article is the knowledge/ write boundary, run_post_passes is the
-ProducerRegistry orchestrator. compile.py:main() shrinks to a thin
-orchestrator over these.
+compile_source is the LLM-call boundary, run_post_passes the
+ProducerRegistry orchestrator. There is no write stage: the compile agent
+writes into knowledge/ itself, path-scoped by the PreToolUse hook
+(`core/sdk_scope.py`) — the planned `commit_article` stage (S03) was
+cancelled (8bd6cd9) because those writes are agent-side, and taking them
+away is `backlog/compile-agent-no-filesystem-write.md`.
 
 See `.ytstack/M018-CONTEXT.md` and `.ytstack/backlog/producer-seam.md`.
 """
