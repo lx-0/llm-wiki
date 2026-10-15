@@ -88,6 +88,12 @@ READ_ONLY: dict[str, tuple[str, ...]] = {
     # error and alternate-spelling paths of the wrappers S01-T05 ports
     "menu-unknown": ("menu", "bogus"),
     "help-short-flag": ("-h",),
+    # the argv routing S01-T06 ports, on its deterministic paths (a dry-run sweep's stderr
+    # carries clock times and probabilistic weights — unit tests pin those routes)
+    "dream-unknown": ("dream", "bogus"),
+    "dream-entity-bare": ("dream-entity",),
+    "dream-web-research-help": ("dream", "web-research", "--help"),
+    "auth-alias-help": ("gmeet-auth", "--help"),
 }
 
 

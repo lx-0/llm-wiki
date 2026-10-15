@@ -1,0 +1,14 @@
+$ wiki dream web-research --help
+exit: 0
+--- stdout ---
+wiki dream web-research
+
+usage: dream.py web-research [-h] [--dry-run] slug
+
+positional arguments:
+  slug        Entity slug (a public person)
+
+options:
+  -h, --help  show this help message and exit
+  --dry-run   Print the Public Profile block, write nothing
+--- stderr ---

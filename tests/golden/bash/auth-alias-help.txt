@@ -1,0 +1,24 @@
+$ wiki gmeet-auth --help
+exit: 0
+--- stdout ---
+wiki auth — one-time OAuth bootstrap for a Google service account
+
+USAGE
+  wiki auth gmail <account-id>       Gmail API access (mail collector)
+  wiki auth gmeet <account-id>       Google Meet transcripts (Drive export)
+  wiki auth calendar <account-id>    Google Calendar events
+
+  Legacy aliases (unchanged): wiki gmail-auth / gmeet-auth / calendar-auth <id>
+
+WHAT IT DOES
+  Reads the installed-app OAuth client JSON you provide under .claude/
+  (per-account override, then a shared google-oauth-client.json, then the
+  legacy gmail-oauth-client.json), opens a local-loopback browser for the
+  consent screen, and persists the token under .wiki/state/. Re-running
+  re-issues consent. <account-id> matches a key under personal.accounts.<id>.
+
+EXAMPLES
+  wiki auth gmail private            # consent flow for accounts.private
+  wiki auth gmeet work               # Meet Recordings on accounts.work
+  wiki auth calendar private
+--- stderr ---
