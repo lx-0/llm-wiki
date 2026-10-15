@@ -28,9 +28,8 @@ EXCLUDED = {
 # S04 task that splits a function removes its entry here.
 ALLOWLIST: dict[str, int] = {
     # measured 2026-10-15 (M033-S04-T01): 20 of 1,402 functions; T02 removed dream's two,
-    # T03 the compile path's three
+    # T03 the compile path's three, T04 run_sdk_query
     "scripts/collectors/gmeet.py::GmeetCollector._run_one_account": 340,
-    "scripts/core/sdk_helpers.py::run_sdk_query": 339,
     "scripts/curiosity/producer.py::maybe_generate_curiosity_requests": 310,
     "scripts/query.py::main": 253,
     "scripts/reports/_engine/lib/render_summary.py::render_summary": 234,

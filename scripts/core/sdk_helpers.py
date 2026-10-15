@@ -772,7 +772,6 @@ async def run_sdk_query(prompt: str, spec: SdkCallSpec, *, query_fn=None) -> Sdk
     # Late imports: sdk_helpers stays import-light for callers that only
     # use the diagnostics primitives, and tests that monkeypatch
     # `core.usage.LEDGER` / `classify_failure` see the swap at call time.
-    import asyncio
     import os
 
     removed_env = sanitize_stale_session_env(os.environ)  # type: ignore[arg-type]
@@ -781,27 +780,50 @@ async def run_sdk_query(prompt: str, spec: SdkCallSpec, *, query_fn=None) -> Sdk
             "stripped stale session env before SDK spawn: %s", ", ".join(sorted(removed_env))
         )
 
-    from claude_agent_sdk import (
-        AssistantMessage,
-        ClaudeAgentOptions,
-        HookMatcher,
-        ResultMessage,
-    )
-    from claude_agent_sdk import query as _sdk_query
-
-    from .config import CONFIG
-    from .usage import LEDGER, PROVIDER_CLAUDE
-
     if query_fn is None:
+        from claude_agent_sdk import query as _sdk_query
+
         query_fn = _sdk_query
 
-    log = spec.logger
     capture = StderrCapture()
     started = time.time()
     input_chars = spec.input_chars if spec.input_chars is not None else len(prompt)
     timeout = spec.stall_timeout_s if (spec.stall_timeout_s or 0) > 0 else None
+    options, query_prompt = _build_options(spec, prompt, capture)
+    state = _StreamState()
+    agen = None
+    try:
+        agen = query_fn(prompt=query_prompt, options=options).__aiter__()
+        await _consume_stream(agen, state, timeout=timeout)
+    except TimeoutError:
+        return await _timeout_result(
+            spec,
+            state,
+            agen,
+            started=started,
+            timeout=timeout,
+            input_chars=input_chars,
+            capture=capture,
+        )
+    except Exception as exc:
+        return _failed_stream_result(
+            spec, state, exc, started=started, input_chars=input_chars, capture=capture
+        )
+    return _clean_end_result(spec, state, started=started, capture=capture)
 
-    # ── options assembly ──────────────────────────────────────────────
+
+def _build_options(spec: SdkCallSpec, prompt: str, capture: StderrCapture) -> tuple[object, object]:
+    """``ClaudeAgentOptions`` for one call plus the prompt to pass (a stream under
+    the deny-all gate): buffer size from CONFIG, stderr capture wired, the write
+    gating — ``spec.write_scope`` → PreToolUse path-scope hook (production,
+    2026-05-18) or the legacy glob shape when the ``compile_callback_gate`` flag
+    is off; ``spec.deny_all_writes`` → ``can_use_tool`` deny-all gate + streaming
+    prompt (the callback contract requires an AsyncIterable prompt) — and the
+    host-MCP isolation."""
+    from claude_agent_sdk import ClaudeAgentOptions, HookMatcher
+
+    from .config import CONFIG
+
     options_kwargs: dict = dict(
         max_buffer_size=CONFIG.limits.sdk_max_buffer_size_mb * 1024 * 1024,
         stderr=capture.callback,
@@ -871,193 +893,251 @@ async def run_sdk_query(prompt: str, spec: SdkCallSpec, *, query_fn=None) -> Sdk
     extra.setdefault("strict-mcp-config", None)
     options_kwargs["extra_args"] = extra
 
-    options = ClaudeAgentOptions(**options_kwargs)
+    return ClaudeAgentOptions(**options_kwargs), query_prompt
 
-    # ── accumulation state ────────────────────────────────────────────
-    uncached_in = uncached_out = 0  # raw per-turn sums (budget basis)
-    fallback_in = fallback_out = 0  # cache-inclusive per-turn fallback
-    text_parts: list[str] = []
-    final_result = None
-    result_text = ""
-    message_count = 0
 
-    def _record(input_tokens: int, output_tokens: int) -> None:
-        """LEDGER gets the cache-inclusive totals on EVERY outcome —
-        partial usage from a failed call is still real spend."""
-        if spec.record_usage:
-            LEDGER.record(
-                model=spec.model or "(default)",
-                provider=PROVIDER_CLAUDE,
-                input_tokens=input_tokens,
-                output_tokens=output_tokens,
-            )
+@dataclass
+class _StreamState:
+    """What the message loop accumulates — the input of every ending."""
 
-    def _partial_result(failure: FailureClass, exc: BaseException | None) -> SdkRunResult:
-        return SdkRunResult(
-            result_text=result_text,
-            assistant_text="".join(text_parts),
-            input_tokens=fallback_in,
-            output_tokens=fallback_out,
-            uncached_input_tokens=uncached_in,
-            uncached_output_tokens=uncached_out,
-            cost_usd=0.0,
-            message_count=message_count,
-            num_turns=final_result.num_turns if final_result is not None else 0,
-            subtype=final_result.subtype if final_result is not None else None,
-            failure=failure,
-            exc=exc,
-            elapsed_s=time.time() - started,
+    uncached_in: int = 0  # raw per-turn sums (budget basis)
+    uncached_out: int = 0
+    fallback_in: int = 0  # cache-inclusive per-turn fallback
+    fallback_out: int = 0
+    text_parts: list[str] = field(default_factory=list)
+    final_result: object = None
+    result_text: str = ""
+    message_count: int = 0
+
+    @property
+    def assistant_text(self) -> str:
+        return "".join(self.text_parts)
+
+
+async def _consume_stream(agen, state: _StreamState, *, timeout: float | None) -> None:
+    """The one message loop: the per-message stall timeout (a bundled-CLI hang
+    surfaces as TimeoutError instead of blocking forever), usage on both bases,
+    the assistant text, the final ResultMessage. Raises what the stream raises —
+    the caller picks the ending."""
+    import asyncio
+
+    from claude_agent_sdk import AssistantMessage, ResultMessage
+
+    while True:
+        try:
+            if timeout is not None:
+                message = await asyncio.wait_for(agen.__anext__(), timeout=timeout)
+            else:
+                message = await agen.__anext__()
+        except StopAsyncIteration:
+            break
+        state.message_count += 1
+        if isinstance(message, AssistantMessage):
+            usage = getattr(message, "usage", None)
+            if usage:
+                u = extract_usage_tokens(usage)
+                state.uncached_in += u.input_tokens
+                state.uncached_out += u.output_tokens
+                state.fallback_in += u.total_input
+                state.fallback_out += u.output_tokens
+            for block in getattr(message, "content", None) or ():
+                if type(block).__name__ == "TextBlock":
+                    state.text_parts.append(getattr(block, "text", ""))
+        elif isinstance(message, ResultMessage):
+            state.final_result = message
+            state.result_text = message.result or ""
+
+
+def _record_usage(spec: SdkCallSpec, input_tokens: int, output_tokens: int) -> None:
+    """LEDGER gets the cache-inclusive totals on EVERY outcome — partial usage
+    from a failed call is still real spend. Late import: tests swap
+    ``core.usage.LEDGER`` and must see it at call time."""
+    if spec.record_usage:
+        from .usage import LEDGER, PROVIDER_CLAUDE
+
+        LEDGER.record(
+            model=spec.model or "(default)",
+            provider=PROVIDER_CLAUDE,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
         )
 
-    # ── the one message loop ──────────────────────────────────────────
-    try:
-        agen = query_fn(prompt=query_prompt, options=options).__aiter__()
-        while True:
-            try:
-                if timeout is not None:
-                    message = await asyncio.wait_for(agen.__anext__(), timeout=timeout)
-                else:
-                    message = await agen.__anext__()
-            except StopAsyncIteration:
-                break
-            message_count += 1
-            if isinstance(message, AssistantMessage):
-                usage = getattr(message, "usage", None)
-                if usage:
-                    u = extract_usage_tokens(usage)
-                    uncached_in += u.input_tokens
-                    uncached_out += u.output_tokens
-                    fallback_in += u.total_input
-                    fallback_out += u.output_tokens
-                for block in getattr(message, "content", None) or ():
-                    if type(block).__name__ == "TextBlock":
-                        text_parts.append(getattr(block, "text", ""))
-            elif isinstance(message, ResultMessage):
-                final_result = message
-                result_text = message.result or ""
-    except TimeoutError:
-        elapsed = time.time() - started
-        log.warning(
-            "  %s ⏱ per-call timeout after %.1fs (no message for %ss, "
-            "messages so far=%d) — bundled CLI hung. model=%s source=%s (%s chars).",
+
+def _partial_result(
+    state: _StreamState, failure: FailureClass, exc: BaseException | None, *, started: float
+) -> SdkRunResult:
+    """The result of a call that did not reach a clean end: the per-turn
+    fallback totals, no SDK cost, whatever the ResultMessage said so far."""
+    fr = state.final_result
+    return SdkRunResult(
+        result_text=state.result_text,
+        assistant_text=state.assistant_text,
+        input_tokens=state.fallback_in,
+        output_tokens=state.fallback_out,
+        uncached_input_tokens=state.uncached_in,
+        uncached_output_tokens=state.uncached_out,
+        cost_usd=0.0,
+        message_count=state.message_count,
+        num_turns=fr.num_turns if fr is not None else 0,
+        subtype=fr.subtype if fr is not None else None,
+        failure=failure,
+        exc=exc,
+        elapsed_s=time.time() - started,
+    )
+
+
+async def _timeout_result(
+    spec: SdkCallSpec,
+    state: _StreamState,
+    agen,
+    *,
+    started: float,
+    timeout: float | None,
+    input_chars: int,
+    capture: StderrCapture,
+) -> SdkRunResult:
+    """The stall ending: the bundled CLI hung — warn, close the stream
+    best-effort, diagnose, record the partial usage, return kind=timeout."""
+    log = spec.logger
+    elapsed = time.time() - started
+    log.warning(
+        "  %s ⏱ per-call timeout after %.1fs (no message for %ss, "
+        "messages so far=%d) — bundled CLI hung. model=%s source=%s (%s chars).",
+        spec.label,
+        elapsed,
+        timeout,
+        state.message_count,
+        spec.model or "(default)",
+        spec.source or "—",
+        f"{input_chars:,}",
+    )
+    # Best-effort cleanup — a second failure while closing a hung
+    # stream is expected, log it at debug only.
+    with swallow("sdk stream aclose after timeout", level="debug", logger=log):
+        aclose = getattr(agen, "aclose", None)
+        if aclose is not None:
+            await aclose()
+    log_sdk_failure(
+        log,
+        label=spec.label,
+        source=spec.source,
+        model=spec.model,
+        input_chars=input_chars,
+        started=started,
+        capture=capture,
+        exc=TimeoutError(f"per-call timeout after {elapsed:.1f}s (stall_timeout_s={timeout})"),
+        extra=spec.extra_log,
+    )
+    _record_usage(spec, state.fallback_in, state.fallback_out)
+    return _partial_result(
+        state,
+        FailureClass(
+            "timeout",
+            f"per-call stall after {elapsed:.1f}s (messages={state.message_count})",
+        ),
+        None,
+        started=started,
+    )
+
+
+def _failed_stream_result(
+    spec: SdkCallSpec,
+    state: _StreamState,
+    exc: Exception,
+    *,
+    started: float,
+    input_chars: int,
+    capture: StderrCapture,
+) -> SdkRunResult:
+    """The raised ending. A structured error — the CLI yielded a
+    ResultMessage(is_error) then exited 1 — is classified from the structured
+    payload with the authoritative usage recorded; anything else is a crash
+    diagnosed by ``log_sdk_failure``."""
+    log = spec.logger
+    elapsed = time.time() - started
+    fr = state.final_result
+    if fr is not None and getattr(fr, "is_error", False):
+        failure = _structured_error_failure(
+            fr,
+            elapsed,
+            state.uncached_in + state.uncached_out,
+            capture.text,
+        )
+        u = extract_usage_tokens(fr.usage)
+        ledger_in = u.total_input or state.fallback_in
+        ledger_out = u.output_tokens or state.fallback_out
+        _record_usage(spec, ledger_in, ledger_out)
+        log.error(
+            "  %s ✗ failed after %.1fs — kind=%s · %s",
             spec.label,
             elapsed,
-            timeout,
-            message_count,
-            spec.model or "(default)",
-            spec.source or "—",
+            failure.kind,
+            failure.detail,
+        )
+        if spec.source is not None:
+            log.error("    source:    %s", spec.source)
+        if spec.model is not None:
+            log.error("    model:     %s", spec.model)
+        log.error(
+            "    input:     %s chars (%.1f KB)",
             f"{input_chars:,}",
+            input_chars / 1024,
         )
-        # Best-effort cleanup — a second failure while closing a hung
-        # stream is expected, log it at debug only.
-        with swallow("sdk stream aclose after timeout", level="debug", logger=log):
-            aclose = getattr(agen, "aclose", None)
-            if aclose is not None:
-                await aclose()
-        log_sdk_failure(
-            log,
-            label=spec.label,
-            source=spec.source,
-            model=spec.model,
-            input_chars=input_chars,
-            started=started,
-            capture=capture,
-            exc=TimeoutError(f"per-call timeout after {elapsed:.1f}s (stall_timeout_s={timeout})"),
-            extra=spec.extra_log,
+        log.error(
+            "    tokens:    %s in / %s out burned despite failure",
+            f"{state.uncached_in:,}",
+            f"{state.uncached_out:,}",
         )
-        _record(fallback_in, fallback_out)
-        return _partial_result(
-            FailureClass(
-                "timeout",
-                f"per-call stall after {elapsed:.1f}s (messages={message_count})",
-            ),
-            None,
-        )
-    except Exception as exc:
-        elapsed = time.time() - started
-        if final_result is not None and getattr(final_result, "is_error", False):
-            # Structured error: the CLI yielded a ResultMessage(is_error)
-            # then exited 1. Classify from the structured payload; the
-            # authoritative usage is still worth recording.
-            failure = _structured_error_failure(
-                final_result,
-                elapsed,
-                uncached_in + uncached_out,
-                capture.text,
-            )
-            u = extract_usage_tokens(final_result.usage)
-            ledger_in = u.total_input or fallback_in
-            ledger_out = u.output_tokens or fallback_out
-            _record(ledger_in, ledger_out)
-            log.error(
-                "  %s ✗ failed after %.1fs — kind=%s · %s",
-                spec.label,
-                elapsed,
-                failure.kind,
-                failure.detail,
-            )
-            if spec.source is not None:
-                log.error("    source:    %s", spec.source)
-            if spec.model is not None:
-                log.error("    model:     %s", spec.model)
-            log.error(
-                "    input:     %s chars (%.1f KB)",
-                f"{input_chars:,}",
-                input_chars / 1024,
-            )
-            log.error(
-                "    tokens:    %s in / %s out burned despite failure",
-                f"{uncached_in:,}",
-                f"{uncached_out:,}",
-            )
-            capture.dump_to(log)
-            return SdkRunResult(
-                result_text=result_text,
-                assistant_text="".join(text_parts),
-                input_tokens=ledger_in,
-                output_tokens=ledger_out,
-                uncached_input_tokens=uncached_in,
-                uncached_output_tokens=uncached_out,
-                cost_usd=float(getattr(final_result, "total_cost_usd", 0.0) or 0.0),
-                message_count=message_count,
-                num_turns=final_result.num_turns,
-                subtype=final_result.subtype,
-                failure=failure,
-                exc=exc,
-                elapsed_s=elapsed,
-            )
-        failure = log_sdk_failure(
-            log,
-            label=spec.label,
-            source=spec.source,
-            model=spec.model,
-            input_chars=input_chars,
-            started=started,
-            capture=capture,
+        capture.dump_to(log)
+        return SdkRunResult(
+            result_text=state.result_text,
+            assistant_text=state.assistant_text,
+            input_tokens=ledger_in,
+            output_tokens=ledger_out,
+            uncached_input_tokens=state.uncached_in,
+            uncached_output_tokens=state.uncached_out,
+            cost_usd=float(getattr(fr, "total_cost_usd", 0.0) or 0.0),
+            message_count=state.message_count,
+            num_turns=fr.num_turns,
+            subtype=fr.subtype,
+            failure=failure,
             exc=exc,
-            extra=spec.extra_log,
+            elapsed_s=elapsed,
         )
-        _record(fallback_in, fallback_out)
-        return _partial_result(failure, exc)
-
-    # ── clean stream end ──────────────────────────────────────────────
-    elapsed = time.time() - started
-    u = extract_usage_tokens(final_result.usage if final_result is not None else None)
-    ledger_in = u.total_input or fallback_in
-    ledger_out = u.output_tokens or fallback_out
-    cost = (
-        float(final_result.total_cost_usd)
-        if (final_result is not None and final_result.total_cost_usd is not None)
-        else 0.0
+    failure = log_sdk_failure(
+        log,
+        label=spec.label,
+        source=spec.source,
+        model=spec.model,
+        input_chars=input_chars,
+        started=started,
+        capture=capture,
+        exc=exc,
+        extra=spec.extra_log,
     )
+    _record_usage(spec, state.fallback_in, state.fallback_out)
+    return _partial_result(state, failure, exc, started=started)
+
+
+def _clean_end_result(
+    spec: SdkCallSpec, state: _StreamState, *, started: float, capture: StderrCapture
+) -> SdkRunResult:
+    """The clean ending: usage from the ResultMessage (the per-turn sums as
+    fallback), the SDK's cost, and — when the ResultMessage says is_error with
+    a clean generator exit — the same classification as the raised variant."""
+    log = spec.logger
+    elapsed = time.time() - started
+    fr = state.final_result
+    u = extract_usage_tokens(fr.usage if fr is not None else None)
+    ledger_in = u.total_input or state.fallback_in
+    ledger_out = u.output_tokens or state.fallback_out
+    cost = float(fr.total_cost_usd) if (fr is not None and fr.total_cost_usd is not None) else 0.0
     failure = None
-    if final_result is not None and getattr(final_result, "is_error", False):
-        # Structured error with a clean generator exit (no raise) — same
-        # classification as the raised variant above.
+    if fr is not None and getattr(fr, "is_error", False):
         failure = _structured_error_failure(
-            final_result,
+            fr,
             elapsed,
-            uncached_in + uncached_out,
+            state.uncached_in + state.uncached_out,
             capture.text,
         )
         log.error(
@@ -1068,18 +1148,18 @@ async def run_sdk_query(prompt: str, spec: SdkCallSpec, *, query_fn=None) -> Sdk
             failure.detail,
         )
         capture.dump_to(log)
-    _record(ledger_in, ledger_out)
+    _record_usage(spec, ledger_in, ledger_out)
     return SdkRunResult(
-        result_text=result_text,
-        assistant_text="".join(text_parts),
+        result_text=state.result_text,
+        assistant_text=state.assistant_text,
         input_tokens=ledger_in,
         output_tokens=ledger_out,
-        uncached_input_tokens=uncached_in,
-        uncached_output_tokens=uncached_out,
+        uncached_input_tokens=state.uncached_in,
+        uncached_output_tokens=state.uncached_out,
         cost_usd=cost,
-        message_count=message_count,
-        num_turns=final_result.num_turns if final_result is not None else 0,
-        subtype=final_result.subtype if final_result is not None else None,
+        message_count=state.message_count,
+        num_turns=fr.num_turns if fr is not None else 0,
+        subtype=fr.subtype if fr is not None else None,
         failure=failure,
         exc=None,
         elapsed_s=elapsed,
