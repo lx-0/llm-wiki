@@ -5,7 +5,7 @@ project: llm-wiki
 created: 2026-10-15T18:15:32+02:00
 status: planned
 task_count: 6
-completed_tasks: 3
+completed_tasks: 4
 ---
 
 # M034-S01 -- Slice Plan
@@ -40,7 +40,7 @@ in the Python catalogue.
 - [x] T03 -- Decide open questions 1 and 2 in DECISIONS. One hop = the bootstrap execs the
   venv Python into `cli.py`, and handlers stay `python -m` children. The `llm_wiki` rename is
   dropped. Measure today's process tree for one command (`ps`) as the before number.
-- [ ] T04 -- The bootstrap hop. `wiki`'s `_dispatch_python` execs `<venv>/bin/python` with
+- [x] T04 -- The bootstrap hop. `wiki`'s `_dispatch_python` execs `<venv>/bin/python` with
   `scripts/` on PYTHONPATH (the iCloud `~/.venvs/<vault>-wiki` rule and
   `UV_PROJECT_ENVIRONMENT` kept), and falls back to `uv run` only when the venv is missing
   or `uv.lock` changed since the venv's last sync. That case is today's implicit sync on

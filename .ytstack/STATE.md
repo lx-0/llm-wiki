@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-15T19:18:00+02:00
+last_updated: 2026-10-15T19:42:00+02:00
 current_milestone: M034
 active_slice: S01
-active_task: T04
+active_task: none
 last_completed_milestone: M033
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -12,13 +12,25 @@ parallel_milestones: [M021, M025, M027, M029]
 
 # State
 
-## Next action — M034 / S01 3/6: dispatcher + surface diet
+## Next action — M034 / S01 4/6: dispatcher + surface diet
 
-**Status:** M034 / S01 — 3 of 6 tasks done (T01–T02 the bash oracle, T03 the one-hop and
-rename decisions). Engine 0.7.4, suite 2316, CI green.
-**Next:** S01-T04 is planned (`M034-S01-T04-PLAN.md`), ready to execute: the bootstrap hop
-(exec the venv's python into `cli.py`; `uv sync` first only without a venv or with a newer
-`uv.lock`), with four Python-dispatched oracle cases recorded from today's bash first.
+**Status:** M034 / S01 — 4 of 6 tasks done (T01–T02 the bash oracle, T03 the decisions, T04
+the one-hop bootstrap). Engine 0.7.5, suite 2327, CI green on `cb40e20`.
+**Next:** `ytstack:plan-task` → S01-T05, the thin wrappers into the catalogue (`menu`,
+`doctor`, `version`, the `dream` routing, the auth aliases). `status` composes two bash
+libraries (`config status` + `hooks status`), so check whether it belongs to S03.
+
+**M034 / S01-T04** (`c977b08`, `e9eb4a2`, `07f15d1`, `cb40e20`): `wiki` execs the venv's
+python straight into `cli.py`.
+- **The sync is kept.** `uv sync --inexact` runs first only without a venv, or when
+  `uv.lock` / `pyproject.toml` is newer than `<venv>/.wiki-synced`.
+- **Measured on the scratch vault with the real uv:** two processes instead of three, and
+  the dispatch line about 75 ms faster (interleaved A/B, n = 21). The stale-lock sync was
+  exercised live.
+- **Tests:** `tests/test_bootstrap_hop.py` (a stub python whose `$PPID` proves the exec),
+  plus four dispatched oracle cases recorded before the change. Release 0.7.5.
+- **CI found a git-maintenance race** in the oracle's template copy, fixed in `cb40e20`:
+  `git commit` detaches `maintenance run --auto`.
 
 **M034 / S01-T03** (`7b63c7c`, `89503ec`): DECISIONS 2026-10-15 "One hop" + "The `llm_wiki`
 package rename is dropped".

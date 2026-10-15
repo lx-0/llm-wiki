@@ -3055,6 +3055,14 @@ Per-candidate learnings from the 14-candidate seam arc (C01–C14). Decisions li
   venv: `bin/python`, `pyvenv.cfg` and `lib`. Python finds `pyvenv.cfg` next to the
   executable it was started as, so the fixture venv imports the test venv's packages
   without installing anything.
+- **A freshly committed git repo is still being written to (2026-10-15, M034-S01-T04):**
+  `git commit` starts a detached `git maintenance run --auto` (`GIT_TRACE=1` shows it). On
+  the CI runner's git 2.55, it packed the oracle's ~400-object engine template while a hop
+  test was `copytree`-ing it, and 136 paths under `.git/objects/` vanished mid-copy. Locally
+  (git 2.56) it never packed, so only CI showed it. `build_engine_template` now sets
+  `maintenance.auto=false` and `gc.auto=0` before the first commit; a `GIT_TRACE` guard in
+  `test_bash_oracle.py` holds that. S05's `update` oracle, which pulls inside copies,
+  inherits the setting through the copied `.git/config`.
 
 ### Desktop toolchain (C07)
 
