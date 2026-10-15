@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-15T20:37:00+02:00
+last_updated: 2026-10-15T20:39:00+02:00
 current_milestone: M034
 active_slice: S02
-active_task: none
+active_task: T02
 last_completed_milestone: M033
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -24,9 +24,11 @@ byte by byte so piped answers survive into that child. Details: M034-CONTEXT "Re
 (`confirm` / `ask` / `select_one` / `select_many` / `pause` over a byte-wise `read_line`, every
 prompt on stderr). Open question 3 is decided on measurements (DECISIONS "Prompts in Python").
 Suite 2389, CI green.
-**Next:** `ytstack:plan-task` → S02-T02, `config get/set/keys/path/status/edit` in the
-catalogue over `core.config`, at parity with the S01 goldens. `config_cmd_status` stays in
-bash for `cmd_status` until S03.
+**Next:** S02-T02 is planned (`M034-S02-T02-PLAN.md`): `wiki config` as one Python handler
+(`config_cli.py` over `core.config`), with the bare-`wiki config` interactive editor ported on
+T01's helpers. `config wizard` stays bash for this one task. `wiki status` calls
+`wiki config status` through the entry, so `config_cmd_status` goes now. Corrected at
+planning: there is no `config edit` / `$EDITOR`.
 
 **M034 / S01 — complete (7/7).** It delivered:
 - the bash oracle (T01–T02);

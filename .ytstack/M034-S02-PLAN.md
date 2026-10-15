@@ -30,9 +30,16 @@ later slices still call. Each file is deleted with its last caller: `config.sh` 
   hands the hooks step to `wiki hooks install`, which reads its own answers from the same
   stdin, the way bash `read -r` leaves them. A test pipes two answers through a prompt and a
   child process.
-- [ ] T02 -- `config get/set/keys/path/status/edit` in the catalogue, over the existing
-  `core.config` module. `edit` opens `$EDITOR` on `<vault>/.wiki/config.yaml`. Parity with the
-  S01 goldens.
+- [ ] T02 -- `wiki config` in the catalogue, over the existing `core.config` module:
+  - `get` / `set` / `keys` / `path`, with bash's argument checks;
+  - `status` (the summary + the Ollama probe);
+  - bare `wiki config`, the interactive section → key → value editor, ported on T01's
+    helpers. Corrected at planning: there is no `config edit` / `$EDITOR` in the bash, the
+    editor is bare `wiki config`.
+
+  `config wizard` stays bash for this one task (T03 ports the wizard). `wiki status` calls
+  `wiki config status` through the entry, so `config_cmd_status` goes now. Parity with the S01
+  goldens, plus the editor and the usage errors recorded from bash first.
 - [ ] T03 -- The setup wizard in Python (`wiki setup`, `wiki config setup`): the steps, the
   Ollama probe, compile-hour and URL validation, the config writes. Tests run with scripted
   answers, and one scratch run is made on a fresh vault.
