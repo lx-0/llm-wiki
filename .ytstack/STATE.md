@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-15T20:53:00+02:00
+last_updated: 2026-10-15T20:58:00+02:00
 current_milestone: M034
 active_slice: S02
-active_task: none
+active_task: T03
 last_completed_milestone: M033
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -33,9 +33,13 @@ Python (`config_cli.py`): get / set / keys / path, status, and the bare-`wiki co
 - **Filed:** `backlog/config-set-keeps-comments.md`.
 
 Suite 2406, CI green.
-**Next:** `ytstack:plan-task` → S02-T03, the setup wizard in Python (`wiki setup` +
-`wiki config wizard`). Record its paths and commit them first. The hooks step dispatches
-`wiki hooks install` through the entry.
+**Next:** S02-T03 is planned (`M034-S02-T03-PLAN.md`), in three commits:
+1. the wizard's bash paths recorded first, including `setup` with the hooks step reading its
+   answers from the same stdin;
+2. a fix planning found: `features.procmail_execution` never had a reader since the first
+   release, so the switch the wizard asks about switched nothing. It becomes a real gate in
+   the All-Inkl filter, default unchanged;
+3. the wizard port.
 
 **M034 / S01 — complete (7/7).** It delivered:
 - the bash oracle (T01–T02);
