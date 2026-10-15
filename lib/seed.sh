@@ -660,7 +660,9 @@ seed_vault_templates() {
           # extended-graph / quickadd / dataview / … — engine base ⊕ operator overlay.
           _seed_json_overlay "$src" "$dst" ".obsidian/$rel" "$force" "$check" "$target"
         fi
-      done < <(find "$templates_dir/.obsidian/plugins" -type f -name '*.json')
+      # Sorted: `find` lists in directory order, which differs between filesystems
+      # (APFS vs ext4 gave dataview and extended-graph in swapped order).
+      done < <(find "$templates_dir/.obsidian/plugins" -type f -name '*.json' | LC_ALL=C sort)
     fi
   fi
 

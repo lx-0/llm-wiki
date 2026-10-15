@@ -25,11 +25,11 @@ additive mode
 ✓ seeded .obsidian/core-plugins.json
 ✓ seeded .obsidian/graph.json
 ✓ seeded .obsidian/snippets/wiki-dashboard.css
-✓ seeded .obsidian/plugins/homepage/data.json
 ✓ seeded .obsidian/plugins/dataview/data.json
 ✓ seeded .obsidian/plugins/extended-graph/data.json
-✓ seeded .obsidian/plugins/quickadd/data.json
+✓ seeded .obsidian/plugins/homepage/data.json
 ✓ seeded obsidian-meta-bind-plugin/data.json
+✓ seeded .obsidian/plugins/quickadd/data.json
 ✓ seeded reports/studies/longitudinal-baseline/manifest.yaml
 ✓ seeded .claude/.env.example
 dashboard.md — agent-buttons already up to date
