@@ -21,6 +21,7 @@ from pathlib import Path
 import httpx
 
 from adapters.mailbox.base import ApplyResult
+from core.config import CONFIG
 from core.paths import RAW_DIR
 from domain.mail import FilterRule
 
@@ -48,6 +49,18 @@ class AllInklProcmailFilter:
         self._pass_env = imap_pass_env
 
     def apply(self, rule: FilterRule, *, dry_run: bool = False) -> ApplyResult:
+        # The operator's switch for server-side rule writes (asked by the setup wizard).
+        # It had no reader until M034-S02-T03: switched off, the write still happened. A
+        # dry run writes nothing, so it passes.
+        if not dry_run and not CONFIG.features.procmail_execution:
+            return ApplyResult(
+                success=False,
+                message=(
+                    "all-inkl-procmail: procmail execution is off "
+                    "(features.procmail_execution: false) — nothing was written. Turn it "
+                    "on with `wiki config set features.procmail_execution true`."
+                ),
+            )
         passwd = os.environ.get(self._pass_env, "") if self._pass_env else ""
         if not passwd or not self._email:
             return ApplyResult(

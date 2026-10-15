@@ -693,8 +693,10 @@ NOTES
   cloud-synced vault recreates the in-vault venv)."""
 
 # `wiki config` — moved from the bash `help_config` with the port (M034-S02-T02); the bash
-# oracle's `config-help` golden holds it. Two lines corrected with the move: the wizard asks 6
-# questions (it said 5), and the compile-model example names today's default.
+# oracle's `config-help` golden holds it. Corrected since the move: the wizard asks 6
+# questions (it said 5), the compile-model example names today's default, and
+# procmail_execution is on by default and gates the All-Inkl procmail write (S02-T03; it said
+# "off by default" while the default was true and nothing read it).
 H_CONFIG = """wiki config — manage tunable parameters in .wiki/config.yaml
 
 USAGE
@@ -712,7 +714,7 @@ KEYS use dot-notation:
   scheduling.compile_after_hour     0–23 (auto-compile trigger hour, local time)
   features.curiosity_loop           true|false
   features.vision_screenshots       true|false
-  features.procmail_execution       true|false (off by default — kasserver-specific)
+  features.procmail_execution       true|false (on by default; off stops All-Inkl procmail writes)
   piggybacks.<task>.enabled         e.g. piggybacks.scan_screenshots.enabled
   piggybacks.<task>.cooldown_hours  e.g. 24 (daily) or 168 (weekly)
 

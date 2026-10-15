@@ -18,6 +18,19 @@ every operator's `wiki update` → `uv sync` regenerate `uv.lock` and dirty thei
 config keys must also be wired into `scripts/migrations/migrate_config_keys.py`
 in the same commit.
 
+## [0.7.11] — 2026-10-15
+
+**For your vault:** no config key changed, so there is no migration. If you answered "no" to
+"Enable procmail execution?" in `wiki setup`, that answer now takes effect.
+
+### Fixed
+
+- **Turning procmail execution off did nothing.** `features.procmail_execution`, the setup
+  wizard's "Enable procmail execution?", was saved and shown but never checked. A suggestion
+  executed against an All-Inkl account wrote its server-side mail rule either way. Off now
+  stops the write (a dry run still works), with a message naming the setting. It stays on by
+  default, as it always was, and `wiki config --help` now says so instead of "off by default".
+
 ## [0.7.10] — 2026-10-15
 
 **For your vault:** no config key changed, so there is no migration. If you ever had an answer

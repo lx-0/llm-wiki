@@ -46,6 +46,56 @@ def test_resolve_filter_all_inkl_procmail() -> None:
     assert type(f).__name__ == "AllInklProcmailFilter"
 
 
+def _newsletter_rule() -> FilterRule:
+    return FilterRule(
+        name="test-newsletter",
+        condition=FilterCondition(from_addrs=("alice@example.com",)),
+        action=FilterAction(kind="move", target="INBOX/Newsletters"),
+    )
+
+
+def test_all_inkl_procmail_refuses_a_write_while_procmail_execution_is_off(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """`features.procmail_execution` had no reader from the first public release on: the
+    setup wizard asked it, `wiki config status` showed it, and nothing gated the server-side
+    write (M034-S02-T03). Off now refuses — before any network call."""
+    from adapters.mailbox import allinkl
+    from core.config import CONFIG
+
+    monkeypatch.setattr(CONFIG.features, "procmail_execution", False)
+    monkeypatch.setenv("FAKE_PASS", "secret")
+
+    def no_network(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("no network call while procmail execution is off")
+
+    monkeypatch.setattr(allinkl.httpx, "Client", no_network)
+    result = allinkl.AllInklProcmailFilter("work", "x@example.com", "FAKE_PASS").apply(
+        _newsletter_rule()
+    )
+    assert result.success is False
+    assert "features.procmail_execution" in result.message
+
+
+def test_all_inkl_procmail_dry_run_passes_the_switch(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A dry run writes nothing, so the switch does not stop it: it gets past the gate to the
+    login (stubbed here to fail with a marker)."""
+    from adapters.mailbox import allinkl
+    from core.config import CONFIG
+
+    monkeypatch.setattr(CONFIG.features, "procmail_execution", False)
+    monkeypatch.setenv("FAKE_PASS", "secret")
+
+    def login_marker(*_args: object, **_kwargs: object) -> None:
+        raise RuntimeError("reached the login")
+
+    monkeypatch.setattr(allinkl, "_login", login_marker)
+    result = allinkl.AllInklProcmailFilter("work", "x@example.com", "FAKE_PASS").apply(
+        _newsletter_rule(), dry_run=True
+    )
+    assert "reached the login" in result.message
+
+
 def test_resolve_filter_gmail_api() -> None:
     account = {"_id": "g", "email": "y@gmail.com", "filter": {"kind": "gmail-api"}}
     f = resolve_filter(account)

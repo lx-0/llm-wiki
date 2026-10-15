@@ -2376,3 +2376,39 @@ keeps `prompt_toolkit` for its full-screen picker, where a terminal is a precond
 **Consequences:** `tests/test_console_prompts.py` pins the semantics. The load-bearing test
 pipes two answers through `confirm` and a child `read`. With a buffered read it fails, as
 seen on four tests.
+
+## 2026-10-15: `features.procmail_execution` becomes the gate it claimed to be — default stays on
+
+**Context:** found planning M034-S02-T03 (the setup wizard port). The wizard asks "Enable
+procmail execution?", writes the answer, and `wiki config status` shows it. A repo-wide
+consumer grep (`scripts/ templates/ prompts/ hooks/ lib/ wiki docs/ tests/`) found **no
+reader** that gates anything. `git log -S` showed none since the first public release
+(`751017c`); the field only moved through the schema refactors. Meanwhile:
+- the only procmail writer, `adapters/mailbox/allinkl.py:AllInklProcmailFilter.apply`,
+  writes server-side rules regardless of the switch;
+- the schema default is `True`, while the help said "off by default" and the wizard
+  "Default OFF".
+
+An operator who answered "n" kept a server-side write path they had turned off.
+
+**Chose:** wire it. A real (non-dry-run) `apply` refuses with a message naming the key when
+the switch is off, before any network call. A dry run writes nothing and passes. The default
+stays `True`:
+- nothing changes for a vault that left it unset or set it true (lxw sets `true` explicitly
+  and has an All-Inkl procmail account);
+- an operator who set `false` now gets what they chose.
+
+The texts are corrected to the truth:
+- `wiki config --help`: on by default; off stops All-Inkl procmail writes;
+- the config.example.yaml comment;
+- the wizard's info line, in the port, without "Default OFF.".
+
+**Rejected:**
+- *Remove the knob* (no soft deprecation): it would drop a kill switch for a destructive
+  external write that the wizard advertises and operators have already answered.
+- *Default off*: it would block every vault with an All-Inkl account that never set the key.
+  Those vaults configured the account precisely to run these rules, and the account's
+  `filter.kind` plus an explicit `wiki suggestions` execute are already two opt-ins.
+
+**Consequences:** `tests/test_s02_adapters.py` pins both directions. The off-blocks-write test
+was watched failing first: the adapter reached the network stub.
