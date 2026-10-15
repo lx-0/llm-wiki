@@ -92,7 +92,7 @@ The `.env` file: only the **variable NAME** lives in `config.yaml` (e.g. `api_ke
 | `features.dream_web_research` | `false` | Dream web-research (issue #2). When True, `wiki dream <slug>` runs a post-pass that researches PUBLIC entities (founders, execs, speakers) via Exa AI and writes a sentinel-managed `## Public Profile` block. |
 | `features.suggestions_source_globs` | `["raw/notes/email/*.md"]` | Source-glob allowlist for the suggestions post-pass. |
 | `features.voice_punctuate` | `true` | Pre-process voice transcripts through the local classify_model (Ollama) to add punctuation, sentence-case, and German-noun capitalization. |
-| `features.compile_callback_gate` | `true` | Path-scope enforcement for compile + dream agent Write/Edit calls via a `can_use_tool` callback (Python-side gate). |
+| `features.compile_callback_gate` | `true` | Path-scope enforcement for compile + dream agent Write/Edit calls. |
 | `features.extract_picture_metadata` | `true` | Deterministic per-picture metadata extraction (EXIF + Android screenshot filename pattern). |
 | `features.materialize_backlinks` | `true` | Corpus-wide post-compile pass that writes a sentinel-managed `## Backlinks` footer into every knowledge/<article>.md so AI agents reading the markdown directly get backlink information without corpus-wide ripgrep. |
 | `features.relativize_wikilinks` | `true` | Corpus-wide post-compile pass that rewrites every wikilink to a path relative to its containing article (a link in a markdown file is relative to that file). |

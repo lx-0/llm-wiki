@@ -2952,6 +2952,20 @@ Per-candidate learnings from the 14-candidate seam arc (C01–C14). Decisions li
   reading `__required_keys__` (the schema generator) would have declared them required. An
   all-optional TypedDict is `total=False`; a mixed one goes in a module without the
   `__future__` import, or splits into a total base plus a `total=False` subclass.
+- **A hand-rolled SDK loop keeps none of the harness's guarantees (2026-10-15,
+  M033-S05-T06):** `suggestions/producer.py` built `ClaudeAgentOptions` itself —
+  `Write` + `acceptEdits` + `setting_sources=[]`, no path scope — over third-party email
+  bodies, the one substrate an outsider writes. Every write under the vault was
+  auto-approved, `.wiki/` included, and the host's MCP servers loaded (the M031-S01 outage
+  class). The milestone-close backlog audit found it, not a test, and following the doc
+  would not have helped: AGENTS.md's HARD rule still prescribed `disallowed_tools` globs,
+  which the CLI ignores. Fix: `run_sdk_query` with `WriteScope(roots=(RAW_SUGGESTIONS_DIR,))`,
+  `setting_sources=("project",)` and a substrate-is-subject clause in the system prompt; the
+  test drives the producer and asks the hook it built for allow / deny. Rule: an SDK call
+  that can write goes through the harness. The loops still hand-rolled are read-only (lint
+  `tools=[]`; takes and intents `allowed_tools=["Read"]` under `permission_mode="default"`;
+  folder_providers hook-scoped to its one file) except `optimize_claude_md` (Edit +
+  `acceptEdits`, opt-in, disabled by default).
 
 ### Desktop toolchain (C07)
 

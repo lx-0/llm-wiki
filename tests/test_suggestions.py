@@ -83,6 +83,60 @@ def test_maybe_generate_suggestions_dry_run_for_email_source(tmp_path, monkeypat
     assert not (tmp_path / "raw" / "suggestions").exists()
 
 
+# ── producer SDK pass: writes confined to raw/suggestions/ ─────────
+
+
+def test_suggestion_pass_confines_writes_to_raw_suggestions(tmp_path, monkeypatch):
+    """The pass reads third-party email bodies, so an injected instruction must
+    not be able to write outside `raw/suggestions/`: Write/Edit go through the
+    PreToolUse path-scope hook (never `acceptEdits`), the vault's project
+    settings reach the agent (AGENTS.md's substrate rule, layer 3), and the
+    host's MCP servers stay out."""
+    import asyncio
+
+    import core.usage as usage_mod
+    from suggestions import producer
+
+    suggestions_dir = tmp_path / "raw" / "suggestions"
+    monkeypatch.setattr(producer, "ROOT_DIR", tmp_path)
+    monkeypatch.setattr(producer, "RAW_SUGGESTIONS_DIR", suggestions_dir)
+    monkeypatch.setattr(producer, "render", lambda *a, **kw: "prompt")
+    monkeypatch.setattr(producer, "read_wiki_index_compact", lambda: "")
+    monkeypatch.setattr(usage_mod, "LEDGER", usage_mod.UsageLedger())
+
+    seen: dict = {}
+
+    async def fake_query(*, prompt, options):
+        seen["options"] = options
+        return
+        yield  # an async generator, like the SDK's query()
+
+    monkeypatch.setattr(producer, "query", fake_query)
+
+    src = tmp_path / "raw" / "notes" / "email" / "account-2026-05-13.md"
+    src.parent.mkdir(parents=True, exist_ok=True)
+    src.write_text("Subject: hi\nFrom: a@b.com\n", encoding="utf-8")
+
+    asyncio.run(producer.maybe_generate_suggestions(src, dry_run=False))
+
+    options = seen["options"]
+    assert options.permission_mode != "acceptEdits"
+    assert options.setting_sources == ["project"]
+    assert options.mcp_servers == {}
+    assert "strict-mcp-config" in options.extra_args
+    [matcher] = options.hooks["PreToolUse"]
+    [hook] = matcher.hooks
+
+    def decision(path):
+        hook_input = {"tool_name": "Write", "tool_input": {"file_path": str(path)}}
+        out = asyncio.run(hook(hook_input, None, None))
+        return out["hookSpecificOutput"]["permissionDecision"]
+
+    assert decision(suggestions_dir / "suggestion-1.yaml") == "allow"
+    assert decision(tmp_path / "knowledge" / "concepts" / "x.md") == "deny"
+    assert decision(tmp_path / ".wiki" / "scripts" / "compile.py") == "deny"
+
+
 # ── cli.load_suggestion / save_suggestion: YAML round-trip ─────────
 
 

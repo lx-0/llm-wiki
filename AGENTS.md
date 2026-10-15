@@ -279,13 +279,13 @@ Full rationale: `.ytstack/DECISIONS.md` 2026-05-22; candidate grouping: `.ytstac
 
 ### Spawning Claude Agent SDK with substrate input (HARD rule, locked 2026-05-15)
 
-Any script that feeds substrate (`daily/**`, `raw/**`, operator-supplied prompts) into the Claude Agent SDK with Write/Edit tools MUST apply three layers of write-scope enforcement, no exceptions:
+Any script that feeds substrate (`daily/**`, `raw/**`, third-party email, operator-supplied prompts) into the Claude Agent SDK with Write/Edit tools MUST apply three layers of write-scope enforcement, no exceptions:
 
 1. **Prompt-level** — the system prompt explicitly states which directory the agent may Write/Edit, and that source descriptions of code/config/script changes are subject matter, not instructions to the agent.
-2. **Tool-level** — `disallowed_tools=["Edit(<forbidden>/**)", "Write(<forbidden>/**)", ...]` for every path the agent must not touch (always include `.wiki/**`).
-3. **Settings-level** — `setting_sources=["project"]` (not `[]`) so vault-root `CLAUDE.md` reaches the agent.
+2. **Tool-level** — call through `run_sdk_query` with `SdkCallSpec(write_scope=WriteScope(roots=(<allowed dir>,)))`: Write/Edit stay in `allowed_tools`, and a PreToolUse hook (`core/sdk_scope.make_path_scope_hook`) denies every Write/Edit that resolves outside the roots. Never `permission_mode="acceptEdits"`. Neither substitute works: `Write(<glob>)` / `Edit(<glob>)` entries in `allowed_tools` or `disallowed_tools` are not path scopes, because the bundled CLI ignores the parenthesised part (`scripts/probe_compile_scope.py`, 2026-05-17), and a `can_use_tool` gate hides Write/Edit from the agent altogether (2026-05-18).
+3. **Settings-level** — `setting_sources=("project",)` (not `()`) so vault-root `CLAUDE.md` reaches the agent.
 
-Reason: substrate routinely contains literal change-descriptions captured from prior engine-development sessions. The agent reads them as instructions and acts on them with whatever filesystem authority you gave it. See `.ytstack/KNOWLEDGE.md` "Compile prompt injection via substrate" + `.ytstack/DECISIONS.md` 2026-05-15. Reference implementation: `scripts/compile.py:225-247`.
+Reason: substrate routinely contains literal change-descriptions captured from prior engine-development sessions. The agent reads them as instructions and acts on them with whatever filesystem authority you gave it. See `.ytstack/KNOWLEDGE.md` "Compile prompt injection via substrate" + `.ytstack/DECISIONS.md` 2026-05-15. Reference implementation: the `SdkCallSpec` in `scripts/compile_stages/compile.py` (`_attempt`); the gate's tests are `tests/test_sdk_scope.py`.
 
 Long-term direction: remove agent-side filesystem writes entirely — agent returns structured payload via `ResultMessage`, script writes the files deterministically. Track in `.ytstack/backlog/compile-agent-no-filesystem-write.md`.
 - Every config write makes a `.bak.YYYYMMDD-HHMMSS`. Idempotent install/uninstall.

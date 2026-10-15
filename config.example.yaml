@@ -587,15 +587,13 @@ features:
   # `raw/notes/email/`).
   suggestions_source_globs:
     - "raw/notes/email/*.md"
-  # Path-scope enforcement for compile + dream agent Write/Edit calls via a
-  # `can_use_tool` callback (Python-side gate). The previous defense —
-  # `"Write(knowledge/**)"` / `"Edit(knowledge/**)"` in `--allowedTools` —
-  # is decorative: the bundled Claude Code CLI parses it as bare Write/Edit
-  # and ignores the path glob (verified empirically by
-  # `scripts/probe_compile_scope.py` on 2026-05-17). When true the agent
-  # runs in streaming mode with the callback as the actual gate; when
-  # false the engine reverts to the decorative allowlist for one-line
-  # rollback if streaming-mode surfaces edge cases under production load.
+  # Path-scope enforcement for compile + dream agent Write/Edit calls. When
+  # true, Write/Edit stay exposed and a PreToolUse hook denies every write
+  # outside the agent's roots. When false the engine reverts to the pre-gate
+  # `"Write(knowledge/**)"` / `"Edit(knowledge/**)"` allowlist + acceptEdits
+  # — a rollback only: the bundled Claude Code CLI parses those entries as
+  # bare Write/Edit and ignores the path glob (verified empirically by
+  # `scripts/probe_compile_scope.py` on 2026-05-17).
   compile_callback_gate: true
   # Corpus-wide post-compile pass that writes a sentinel-managed
   # `## Backlinks` footer into every knowledge/<article>.md so AI agents

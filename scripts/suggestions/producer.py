@@ -8,15 +8,14 @@ execute approved actions.
 from __future__ import annotations
 
 import logging
-import time
 from pathlib import Path
 
-from claude_agent_sdk import ClaudeAgentOptions, ResultMessage, query
+from claude_agent_sdk import query
 
 from core.config import CONFIG
 from core.paths import RAW_SUGGESTIONS_DIR, ROOT_DIR
 from core.prompts import render
-from core.sdk_helpers import StderrCapture, log_sdk_failure
+from core.sdk_helpers import SdkCallSpec, WriteScope, run_sdk_query
 from core.utils import read_wiki_index_compact, today_iso
 
 log = logging.getLogger("compile")
@@ -61,33 +60,24 @@ async def maybe_generate_suggestions(source: Path, dry_run: bool = False) -> Non
         email_accounts_inline=accounts_inline,
     )
 
-    started = time.time()
-    capture = StderrCapture()
-    try:
-        async for message in query(
-            prompt=prompt,
-            options=ClaudeAgentOptions(
-                max_buffer_size=CONFIG.limits.sdk_max_buffer_size_mb * 1024 * 1024,
-                cwd=str(ROOT_DIR),
-                model=CONFIG.models.compile_model,
-                allowed_tools=["Read", "Write", "Glob"],
-                permission_mode="acceptEdits",
-                max_turns=10,
-                system_prompt=render("compile_suggestion_system"),
-                setting_sources=[],
-                stderr=capture.callback,
-            ),
-        ):
-            if isinstance(message, ResultMessage):
-                log.info("  Suggestions: %s", message.result[:200])
-    except Exception as exc:
-        log_sdk_failure(
-            log,
+    result = await run_sdk_query(
+        prompt,
+        SdkCallSpec(
             label="suggestion_pass",
-            source=rel_path,
+            logger=log,
             model=CONFIG.models.compile_model,
+            cwd=ROOT_DIR,
+            max_turns=10,
+            system_prompt=render("compile_suggestion_system"),
+            allowed_tools=("Read", "Write", "Glob"),
+            setting_sources=("project",),
+            # The source is third-party email: an instruction injected into a
+            # body must not be able to write anywhere but raw/suggestions/.
+            write_scope=WriteScope(roots=(RAW_SUGGESTIONS_DIR,)),
+            source=rel_path,
             input_chars=len(source_content),
-            started=started,
-            capture=capture,
-            exc=exc,
-        )
+        ),
+        query_fn=query,
+    )
+    if result.ok:
+        log.info("  Suggestions: %s", result.result_text[:200])

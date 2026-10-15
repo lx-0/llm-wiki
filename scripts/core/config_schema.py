@@ -749,16 +749,14 @@ class Features:
     # extra Ollama call per ingest. Graceful fallback: Ollama unreachable
     # → body = raw, no error.
     voice_punctuate: bool = True
-    # Path-scope enforcement for compile + dream agent Write/Edit calls
-    # via a `can_use_tool` callback (Python-side gate). Replaces the
-    # `Write(knowledge/**)` / `Edit(knowledge/**)` syntax in
-    # `--allowedTools`, which the bundled Claude Code CLI treats as
-    # bare `Write` / `Edit` (the parenthesised glob is decoration, not
-    # enforcement — verified by `scripts/probe_compile_scope.py`,
-    # 2026-05-17). When True the agent runs in streaming mode with the
-    # callback as the actual gate; when False the engine reverts to the
-    # decorative allowlist for one-line rollback if the streaming-mode
-    # rewrite surfaces edge cases under production load. Default True.
+    # Path-scope enforcement for compile + dream agent Write/Edit calls.
+    # When True, Write/Edit stay exposed and a PreToolUse hook
+    # (`core/sdk_scope.make_path_scope_hook`) denies every write outside
+    # the agent's roots. When False the engine reverts to the pre-gate
+    # `Write(knowledge/**)` / `Edit(knowledge/**)` allowlist +
+    # `acceptEdits` — a rollback only: the bundled Claude Code CLI treats
+    # those entries as bare `Write` / `Edit` and ignores the glob (verified
+    # by `scripts/probe_compile_scope.py`, 2026-05-17). Default True.
     compile_callback_gate: bool = True
     # Deterministic per-picture metadata extraction (EXIF + Android
     # screenshot filename pattern). When True, the pictures collector
