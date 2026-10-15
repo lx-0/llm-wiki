@@ -1,0 +1,19 @@
+$ wiki links --help
+exit: 0
+--- stdout ---
+wiki links — analyze (and optionally fix) broken wikilinks
+
+USAGE
+  wiki links                         categorized report (read-only)
+  wiki links --fix                   interactively rewrite high-confidence dangling refs
+  wiki links --fix --yes             non-interactive: apply bucket-tier corrections only
+
+NOTES
+  Wraps scripts/links_audit.py. Three classes: media embeds (asset missing),
+  doc placeholders (examples, left alone), and dangling article refs. The fixer
+  only rewrites dangling refs with a high-confidence correction — an exact
+  basename in a different bucket (near-certain) or a very-close string match.
+  Each is approved per-item; --yes auto-applies only the exact-basename tier.
+  Missing-article refs are reported but never auto-fixed (create via
+  compile/dream, or drop the link).
+--- stderr ---

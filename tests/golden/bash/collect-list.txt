@@ -1,0 +1,20 @@
+$ wiki collect --list
+exit: 0
+--- stdout ---
+NAME                 CONFIGURED         OUTPUT                       PIGGYBACK
+──────────────────────────────────────────────────────────────────────────────────────────
+calendar             ✗                  raw/notes/calendar           auto
+email                ✗                  raw/notes/email              auto
+folder-index         ✗                  raw/index                    manual-only
+gmeet                ✗                  raw/transcripts/gmeet        auto
+health               ✗                  raw/notes/health             auto
+jamie                ✗                  raw/transcripts/jamie        auto
+wispr                ✗                  raw/transcripts/wispr        auto
+browser              ✗                  raw/notes/browser            manual-only
+screenshots          ✗                  raw/notes/screenshots        auto
+tabs                 ✗                  raw/notes/browser            manual-only
+youtube              ✗                  raw/notes/youtube            manual-only
+pictures             ✗                  raw/notes/pictures           auto
+voice                ✗                  raw/voice                    auto
+capture              ✗                  raw/captures                 auto
+--- stderr ---

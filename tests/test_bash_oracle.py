@@ -9,7 +9,8 @@ port must reproduce them, or change them in the same commit with the reason.
 
 Two kinds of case:
 
-- **Read-only** (S01-T01): one shared vault; the golden is the command's output.
+- **Read-only** (S01-T01, plus four that reach `_dispatch_python`, S01-T04): one shared
+  vault; the golden is the command's output.
 - **Mutating** (S01-T02): a fresh vault and HOME per case, the answers to the bash's
   line-based prompts scripted on stdin, an optional preparation step whose effect is not
   recorded. The golden adds the change the command made under the vault and under HOME
@@ -75,6 +76,12 @@ READ_ONLY: dict[str, tuple[str, ...]] = {
     "config-unknown": ("config", "bogus"),
     "hooks-status": ("hooks", "status"),
     "skills-status": ("skills", "status"),
+    # through `_dispatch_python` into scripts/cli.py (S01-T04's hop is held to these): a
+    # handler child, the unknown-command path, the dispatcher's help intercept, an OAuth alias
+    "collect-list": ("collect", "--list"),
+    "dispatch-unknown": ("bogus",),
+    "dispatch-command-help": ("links", "--help"),
+    "auth-alias": ("gmail-auth",),
 }
 
 
