@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-15T21:44:00+02:00
+last_updated: 2026-10-15T21:50:00+02:00
 current_milestone: M034
 active_slice: S03
-active_task: none
+active_task: T01
 last_completed_milestone: M033
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -22,8 +22,11 @@ are already in the plans:
 
 Engine 0.7.14, suite 2428, CI green on `fa23801`. The bash now owns hooks / skills / seed /
 update / status; `wiki` is at 539 lines.
-**Next:** `ytstack:plan-task` → S03-T01, the agent registry in Python. Its payloads must be
-byte-identical to the bash `jq` output (the S01 goldens + `test_hooks_merge.py`).
+**Next:** S03-T01 is planned (`M034-S03-T01-PLAN.md`): `core/agents.py`, with the registry,
+**one** hook-command grammar, `hook_cmd`, and payloads byte-identical to the bash `jq` output.
+Planning found that `wiki hooks uninstall` removes nothing from a current install yet reports
+success, and that the oracle recorded it. That is now in S03-T02's plan, fixed in the bash
+before re-recording.
 
 **M034 / S02 — complete (5/5, 2026-10-15).** It delivered:
 - line-based prompts on `core/console`, reading byte by byte (T01);

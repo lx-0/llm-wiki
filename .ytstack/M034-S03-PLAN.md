@@ -27,11 +27,23 @@ last callers were skills' `config_get` and `cmd_status` (reassessed after S01).
   status` comes here as well (moved from S01-T05): a banner over S02's `config status` and
   this task's `hooks status`.
 
-  **Fix first, in the bash, then record** (found in S02-T05's end-to-end run): when an agent's
-  payload cannot be built (its `jq` fails), the installer says `✗ unknown agent: claude`,
-  writes nothing, and still ends with `✓ Done. Restart agent CLIs…` and exit 0. The port
-  must name the real failure, skip the "Done", and exit non-zero; so must the bash before
-  the oracle records it.
+  **Fix first, in the bash, then record.** Three defects; the oracle holds the wrong behaviour
+  of two of them today:
+  1. **A payload that cannot be built** (found in S02-T05's end-to-end run). When an agent's
+     `jq` fails, the installer says `✗ unknown agent: claude`, writes nothing, and still ends
+     `✓ Done. Restart agent CLIs…` with exit 0.
+  2. **`hooks uninstall` removes nothing from a current install** (found planning S03; the
+     `hooks-uninstall` golden recorded it). Its filter matches `\.wiki/hooks/`, a third copy
+     of the hook-command grammar, which drifted: today's command is
+     `cd '<vault>/.wiki' && uv run python hooks/…`. The settings stay untouched, a backup is
+     made, and it reports `✓ claude (user): removed wiki hooks`.
+  3. **For Cursor's bare `{type, command}` entries,** the same filter keeps only entries that
+     carry a `.hooks` array, so it would drop the operator's other Cursor hooks too.
+
+  The port uses **one** grammar (`hooks_installed`'s / `_WIKI_HOOK_CMD_RE`) for status, merge
+  and uninstall, names real failures, and exits non-zero on them. The bash gets the same
+  fixes before the oracle re-records `hooks-uninstall` and adds an uninstall case that keeps
+  another tool's hook.
 - [ ] T03 -- Skills in Python: the engine-owned check, the global-enable flag, registry
   add / remove, `skills install/uninstall/sync/status`, and the silent install / prune
   variants that `setup` and `update` call. Parity on the fixture `HOME`.
