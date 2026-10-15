@@ -13,11 +13,15 @@ import contextlib
 import io
 import os
 import subprocess
+import sys
 from collections.abc import Callable, Iterator
+from pathlib import Path
 
 import pytest
 
 from core import console
+
+SCRIPTS = Path(__file__).resolve().parent.parent / "scripts"
 
 
 @pytest.fixture
@@ -173,3 +177,30 @@ def test_pause_reads_exactly_one_line(answers):
     console.pause(fd=fd, out=out)
     assert out.getvalue() == "Press Enter to continue "
     assert console.read_line(fd) == "next"
+
+
+# ── output order ──────────────────────────────────────────────────────────
+
+
+def test_what_is_printed_before_a_prompt_shows_before_it_on_one_pipe():
+    """`wiki hooks install 2>&1 | tee log`: stdout is block-buffered into a pipe and the
+    prompt goes to stderr unbuffered, so the status table printed before the agent picker
+    came out after it (seen on scratch, M034-S03-T05). A prompt flushes stdout first."""
+    script = (
+        "import os, sys\n"
+        "sys.path.insert(0, sys.argv[1])\n"
+        "from core import console\n"
+        "print('the table')\n"
+        "r, w = os.pipe(); os.write(w, b'1\\n'); os.close(w)\n"
+        "console.select_one('Install scope', ['user', 'project'], 1, fd=r)\n"
+    )
+    env = {k: v for k, v in os.environ.items() if k != "PYTHONUNBUFFERED"}
+    out = subprocess.run(
+        [sys.executable, "-c", script, str(SCRIPTS)],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        check=True,
+        env=env,
+    ).stdout
+    assert out.index("the table") < out.index("Install scope")

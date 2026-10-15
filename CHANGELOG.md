@@ -46,6 +46,13 @@ byte as before.
 - **`wiki status` refuses extra words**, like every ported command. It used to ignore
   them.
 
+### Fixed
+
+- **Prompts no longer overtake the output printed before them** when stdout and stderr go
+  into one pipe (`wiki hooks install 2>&1 | tee log`, `wiki config`, `wiki setup`). In such
+  a log the agent picker came before the status table it follows. The prompts on stderr now
+  flush stdout first.
+
 ## [0.7.17] — 2026-10-15
 
 **For your vault:** nothing to do.

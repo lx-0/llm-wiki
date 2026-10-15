@@ -190,6 +190,10 @@ def read_line(fd: int = 0) -> str | None:
 
 def _emit(out: TextIO | None, text: str) -> None:
     stream = out if out is not None else sys.stderr
+    if stream is not sys.stdout:
+        # What was printed before a prompt shows before it, also when both streams go into
+        # one pipe (`2>&1 | tee`): stdout is block-buffered there, the prompt's stream not.
+        sys.stdout.flush()
     stream.write(text)
     stream.flush()
 
