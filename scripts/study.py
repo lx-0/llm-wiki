@@ -130,17 +130,9 @@ def cmd_run(args: argparse.Namespace) -> int:
         return 0
 
     try:
-        # Optional: restrict to one instrument alias.
-        instruments = list(study.manifest.instruments)
-        if args.instrument:
-            instruments = [r for r in instruments if (r.alias or r.slug) == args.instrument]
-            if not instruments:
-                print(
-                    f"ERROR: --instrument {args.instrument!r} not present in study "
-                    f"{args.study_id!r}",
-                    file=sys.stderr,
-                )
-                return 2
+        instruments = _select_instruments(study, args)
+        if instruments is None:
+            return 2
 
         timestamp = utc_now_iso()
         wall_start = time.perf_counter()
@@ -150,112 +142,10 @@ def cmd_run(args: argparse.Namespace) -> int:
         )
 
         with RunDirectory(study.runs_dir, timestamp) as run_dir:
-            per_inst_results: list[tuple[str, Path]] = []
-            deferred_instruments: list = []
-            for ref in instruments:
-                if ref.source == "form":
-                    # form-source instruments are operator-input only;
-                    # S03 wedge ships only the inferred path. Skip with
-                    # a visible message rather than silently dropping.
-                    print(
-                        f"  - {ref.alias or ref.slug} v{ref.version}: "
-                        f"source=form — skipped (form-source path lands post-wedge)",
-                        flush=True,
-                    )
-                    continue
-                print(
-                    f"  - {ref.alias or ref.slug} v{ref.version}: source={ref.source}; running …",
-                    flush=True,
-                )
-                try:
-                    report_path = _run_one_instrument(ref, run_dir, study)
-                except Exception as exc:
-                    # Skip-and-flag PHASE 1: collect for end-of-run
-                    # retry. After 6+ minutes of running OTHER instruments,
-                    # the API may have recovered from the transient
-                    # pathology that broke this one. Defer-and-resume
-                    # catches that recovery window without restarting
-                    # the whole run from scratch.
-                    print(
-                        f"      ✗ {ref.alias or ref.slug} failed after retries: "
-                        f"{type(exc).__name__}: {exc}",
-                        flush=True,
-                    )
-                    print(
-                        "        queued for end-of-run retry attempt.",
-                        flush=True,
-                    )
-                    deferred_instruments.append(ref)
-                    continue
-                per_inst_results.append((ref.alias or ref.slug, report_path))
-                print(f"      → {report_path.relative_to(run_dir.tmp_dir)}", flush=True)
-
-            # PHASE 2 defer-and-resume: retry failed instruments once
-            # more after a 60s pause. The 6+ min of other-instrument
-            # work between original-failure and this retry usually
-            # gives transient API pathologies time to clear (observed
-            # 2026-05-17 — GAD-7 failed 3× in a multi-instrument run
-            # but cleared on isolation-rerun 15 min later).
+            per_inst_results, deferred_instruments = _run_instruments(instruments, run_dir, study)
             if deferred_instruments:
-                print(
-                    f"\n→ {len(deferred_instruments)} deferred instrument(s); "
-                    f"60s pause then end-of-run retry pass …",
-                    flush=True,
-                )
-                import time as _time_mod
-
-                _time_mod.sleep(60.0)
-                still_failed: list = []
-                for ref in deferred_instruments:
-                    print(
-                        f"  - {ref.alias or ref.slug} v{ref.version}: deferred retry …",
-                        flush=True,
-                    )
-                    try:
-                        report_path = _run_one_instrument(ref, run_dir, study)
-                        per_inst_results.append((ref.alias or ref.slug, report_path))
-                        print(
-                            f"      ✓ recovered → {report_path.relative_to(run_dir.tmp_dir)}",
-                            flush=True,
-                        )
-                    except Exception as exc:
-                        print(
-                            f"      ✗ still failing: {type(exc).__name__}: {exc}",
-                            flush=True,
-                        )
-                        still_failed.append(ref)
-                if still_failed:
-                    print(
-                        f"  {len(still_failed)}/{len(deferred_instruments)} "
-                        f"instrument(s) terminally failed: "
-                        f"{[r.alias or r.slug for r in still_failed]}",
-                        flush=True,
-                    )
-
-            # S04 — render the deterministic meta-report inside the
-            # tmp dir before atomic commit. Builds the in-progress
-            # snapshot from the tmp dir, appends to the cross-run
-            # timeline (which already includes prior finalised runs),
-            # writes _summary.md + chart SVGs.
-            timeline = load_timeline(study.study_dir)
-            new_snap = snapshot_from_dir(run_dir.tmp_dir, timestamp=timestamp)
-            timeline.runs.append(new_snap)
-            try:
-                summary_path = render_summary(
-                    study_id=study.manifest.study_id,
-                    timeline=timeline,
-                    summary_path=run_dir.tmp_dir / "_summary.md",
-                    charts_dir=run_dir.charts_dir,
-                )
-                print(
-                    f"      → meta-report: {summary_path.relative_to(run_dir.tmp_dir)}", flush=True
-                )
-            except Exception as exc:
-                # Failure here MUST not poison the run — per-instrument
-                # reports are the source of truth. Log + continue, the
-                # operator can re-render meta later by re-running
-                # render_summary against the finalised run.
-                print(f"      ! meta-report render failed: {exc}", flush=True)
+                per_inst_results.extend(_retry_deferred(deferred_instruments, run_dir, study))
+            _render_meta_report(study, run_dir, timestamp)
 
             # S05: Pass-1 analyst runs OUTSIDE the RunDirectory tmp envelope.
             # Reason: Pass-1 wants to read the per-instrument reports +
@@ -280,44 +170,185 @@ def cmd_run(args: argparse.Namespace) -> int:
         # Soft-fail policy: a Pass-1 error doesn't undo the run (per-
         # instrument reports + _summary.md are the source of truth).
         if not args.no_analyze:
-            try:
-                from reports._engine.lib.analyst import (
-                    PERSONA_PER_STUDY,
-                    AnalystError,
-                    build_pass1_user_prompt,
-                    persist_pass1,
-                    run_analyst,
-                )
-
-                final_run_dir = study.runs_dir / timestamp
-                user_prompt = build_pass1_user_prompt(study, final_run_dir)
-                print(
-                    f"\n→ Pass-1 analyst on this run (prompt_chars={len(user_prompt):,}) …",
-                    flush=True,
-                )
-                result = run_analyst(
-                    system_prompt_path=PERSONA_PER_STUDY,
-                    user_prompt=user_prompt,
-                    vault_cwd=ROOT_DIR,
-                    pass_label="per-study",
-                )
-                analysis_path = persist_pass1(study, final_run_dir, result)
-                print(
-                    f"  → {analysis_path.relative_to(study.runs_dir.parent.parent)}  "
-                    f"cost=${result.cost_usd:.4f}  "
-                    f"elapsed={result.elapsed_ms / 1000:.1f}s"
-                )
-            except AnalystError as exc:
-                print(
-                    f"  ! Pass-1 analyst failed: {exc} "
-                    f"(per-instrument reports unaffected; "
-                    f"`wiki analyze --study {study.manifest.study_id}` "
-                    f"to retry)",
-                    file=sys.stderr,
-                )
+            _run_pass1_analyst(study, timestamp)
         return 0
     finally:
         lock.close()
+
+
+def _select_instruments(study: Study, args: argparse.Namespace) -> list[InstrumentRef] | None:
+    """The manifest's instruments, narrowed to `--instrument`; None (the error
+    printed) when the alias is not in the study."""
+    # Optional: restrict to one instrument alias.
+    instruments = list(study.manifest.instruments)
+    if args.instrument:
+        instruments = [r for r in instruments if (r.alias or r.slug) == args.instrument]
+        if not instruments:
+            print(
+                f"ERROR: --instrument {args.instrument!r} not present in study {args.study_id!r}",
+                file=sys.stderr,
+            )
+            return None
+    return instruments
+
+
+def _run_instruments(
+    instruments: list[InstrumentRef], run_dir: RunDirectory, study: Study
+) -> tuple[list[tuple[str, Path]], list[InstrumentRef]]:
+    """Phase 1: every inferred instrument once — form-source ones are skipped
+    visibly, a failure is deferred to the end-of-run retry, not fatal."""
+    per_inst_results: list[tuple[str, Path]] = []
+    deferred_instruments: list = []
+    for ref in instruments:
+        if ref.source == "form":
+            # form-source instruments are operator-input only;
+            # S03 wedge ships only the inferred path. Skip with
+            # a visible message rather than silently dropping.
+            print(
+                f"  - {ref.alias or ref.slug} v{ref.version}: "
+                f"source=form — skipped (form-source path lands post-wedge)",
+                flush=True,
+            )
+            continue
+        print(
+            f"  - {ref.alias or ref.slug} v{ref.version}: source={ref.source}; running …",
+            flush=True,
+        )
+        try:
+            report_path = _run_one_instrument(ref, run_dir, study)
+        except Exception as exc:
+            # Skip-and-flag PHASE 1: collect for end-of-run
+            # retry. After 6+ minutes of running OTHER instruments,
+            # the API may have recovered from the transient
+            # pathology that broke this one. Defer-and-resume
+            # catches that recovery window without restarting
+            # the whole run from scratch.
+            print(
+                f"      ✗ {ref.alias or ref.slug} failed after retries: "
+                f"{type(exc).__name__}: {exc}",
+                flush=True,
+            )
+            print(
+                "        queued for end-of-run retry attempt.",
+                flush=True,
+            )
+            deferred_instruments.append(ref)
+            continue
+        per_inst_results.append((ref.alias or ref.slug, report_path))
+        print(f"      → {report_path.relative_to(run_dir.tmp_dir)}", flush=True)
+    return per_inst_results, deferred_instruments
+
+
+def _retry_deferred(
+    deferred_instruments: list[InstrumentRef], run_dir: RunDirectory, study: Study
+) -> list[tuple[str, Path]]:
+    """PHASE 2 defer-and-resume: retry failed instruments once
+    more after a 60s pause. The 6+ min of other-instrument
+    work between original-failure and this retry usually
+    gives transient API pathologies time to clear (observed
+    2026-05-17 — GAD-7 failed 3× in a multi-instrument run
+    but cleared on isolation-rerun 15 min later)."""
+    recovered: list[tuple[str, Path]] = []
+    print(
+        f"\n→ {len(deferred_instruments)} deferred instrument(s); "
+        f"60s pause then end-of-run retry pass …",
+        flush=True,
+    )
+    import time as _time_mod
+
+    _time_mod.sleep(60.0)
+    still_failed: list = []
+    for ref in deferred_instruments:
+        print(
+            f"  - {ref.alias or ref.slug} v{ref.version}: deferred retry …",
+            flush=True,
+        )
+        try:
+            report_path = _run_one_instrument(ref, run_dir, study)
+            recovered.append((ref.alias or ref.slug, report_path))
+            print(
+                f"      ✓ recovered → {report_path.relative_to(run_dir.tmp_dir)}",
+                flush=True,
+            )
+        except Exception as exc:
+            print(
+                f"      ✗ still failing: {type(exc).__name__}: {exc}",
+                flush=True,
+            )
+            still_failed.append(ref)
+    if still_failed:
+        print(
+            f"  {len(still_failed)}/{len(deferred_instruments)} "
+            f"instrument(s) terminally failed: "
+            f"{[r.alias or r.slug for r in still_failed]}",
+            flush=True,
+        )
+    return recovered
+
+
+def _render_meta_report(study: Study, run_dir: RunDirectory, timestamp: str) -> None:
+    """S04 — render the deterministic meta-report inside the
+    tmp dir before atomic commit. Builds the in-progress
+    snapshot from the tmp dir, appends to the cross-run
+    timeline (which already includes prior finalised runs),
+    writes _summary.md + chart SVGs."""
+    timeline = load_timeline(study.study_dir)
+    new_snap = snapshot_from_dir(run_dir.tmp_dir, timestamp=timestamp)
+    timeline.runs.append(new_snap)
+    try:
+        summary_path = render_summary(
+            study_id=study.manifest.study_id,
+            timeline=timeline,
+            summary_path=run_dir.tmp_dir / "_summary.md",
+            charts_dir=run_dir.charts_dir,
+        )
+        print(f"      → meta-report: {summary_path.relative_to(run_dir.tmp_dir)}", flush=True)
+    except Exception as exc:
+        # Failure here MUST not poison the run — per-instrument
+        # reports are the source of truth. Log + continue, the
+        # operator can re-render meta later by re-running
+        # render_summary against the finalised run.
+        print(f"      ! meta-report render failed: {exc}", flush=True)
+
+
+def _run_pass1_analyst(study: Study, timestamp: str) -> None:
+    """S05: the Pass-1 analyst on the freshly-finalised run — soft-fail, the
+    per-instrument reports + _summary.md are the source of truth."""
+    try:
+        from reports._engine.lib.analyst import (
+            PERSONA_PER_STUDY,
+            AnalystError,
+            build_pass1_user_prompt,
+            persist_pass1,
+            run_analyst,
+        )
+
+        final_run_dir = study.runs_dir / timestamp
+        user_prompt = build_pass1_user_prompt(study, final_run_dir)
+        print(
+            f"\n→ Pass-1 analyst on this run (prompt_chars={len(user_prompt):,}) …",
+            flush=True,
+        )
+        result = run_analyst(
+            system_prompt_path=PERSONA_PER_STUDY,
+            user_prompt=user_prompt,
+            vault_cwd=ROOT_DIR,
+            pass_label="per-study",
+        )
+        analysis_path = persist_pass1(study, final_run_dir, result)
+        print(
+            f"  → {analysis_path.relative_to(study.runs_dir.parent.parent)}  "
+            f"cost=${result.cost_usd:.4f}  "
+            f"elapsed={result.elapsed_ms / 1000:.1f}s"
+        )
+    except AnalystError as exc:
+        print(
+            f"  ! Pass-1 analyst failed: {exc} "
+            f"(per-instrument reports unaffected; "
+            f"`wiki analyze --study {study.manifest.study_id}` "
+            f"to retry)",
+            file=sys.stderr,
+        )
 
 
 def cmd_new(args: argparse.Namespace) -> int:

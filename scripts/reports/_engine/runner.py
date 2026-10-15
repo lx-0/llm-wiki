@@ -41,6 +41,8 @@ import yaml
 from core.prompts import render
 from reports._engine.instrument import Instrument, load_instrument
 from reports._engine.lib.inference import (
+    BatchResult,
+    InferenceBatch,
     InferenceRun,
     default_batches,
     infer_batch,
@@ -166,13 +168,54 @@ def _persist_report(
     output_dir.mkdir(parents=True, exist_ok=True)
     report_path = output_dir / f"{meta.slug}.md"
 
-    score = scored.score
-    inference_cfg = meta.inference
+    fm = _report_frontmatter(
+        instrument,
+        scored,
+        run,
+        timestamp=timestamp,
+        prompt_version=prompt_version,
+        lookback_days=lookback_days,
+        substrate_paths=substrate_paths,
+    )
 
-    # Frontmatter — embedded provenance fields per the Q6 durability
-    # posture: a future AI reader must be able to interpret this
-    # report without the engine.
-    fm = {
+    lines: list[str] = []
+    lines.append("---")
+    lines.append(yaml.safe_dump(fm, sort_keys=False, allow_unicode=True).strip())
+    lines.append("---\n")
+
+    lines.append(f"# {meta.title} — {timestamp}\n")
+    lines.append(
+        "> **Informant Report.** This score was inferred by an LLM "
+        "observer reading the operator's substrate (daily logs, voice "
+        "notes, health data, transcripts) over the lookback window — "
+        "NOT self-reported. Methodology is embedded below; the report "
+        "is durable independent of the engine.\n"
+    )
+    lines.extend(_score_lines(instrument, scored))
+    lines.extend(_item_table_lines(run))
+    lines.extend(_item_detail_lines(run))
+    lines.extend(_methodology_lines(instrument_dir, rendered_batches, substrate_paths, vault_root))
+
+    report_path.write_text("\n".join(lines), encoding="utf-8")
+    return report_path
+
+
+def _report_frontmatter(
+    instrument: Instrument,
+    scored,
+    run: InferenceRun,
+    *,
+    timestamp: str,
+    prompt_version: str,
+    lookback_days: int,
+    substrate_paths: list[Path],
+) -> dict:
+    """Frontmatter — embedded provenance fields per the Q6 durability
+    posture: a future AI reader must be able to interpret this
+    report without the engine."""
+    meta = instrument.meta
+    score = scored.score
+    return {
         "instrument": meta.slug,
         "version": meta.version,
         "title": meta.title,
@@ -212,22 +255,13 @@ def _persist_report(
         "engine_version": "M019-S02-T04",
     }
 
-    lines: list[str] = []
-    lines.append("---")
-    lines.append(yaml.safe_dump(fm, sort_keys=False, allow_unicode=True).strip())
-    lines.append("---\n")
 
-    lines.append(f"# {meta.title} — {timestamp}\n")
-    lines.append(
-        "> **Informant Report.** This score was inferred by an LLM "
-        "observer reading the operator's substrate (daily logs, voice "
-        "notes, health data, transcripts) over the lookback window — "
-        "NOT self-reported. Methodology is embedded below; the report "
-        "is durable independent of the engine.\n"
-    )
-
-    # Score block
+def _score_lines(instrument: Instrument, scored) -> list[str]:
+    """The score block."""
+    score = scored.score
+    inference_cfg = instrument.meta.inference
     band_str = scored.band if scored.band else "*partial, not bandable*"
+    lines: list[str] = []
     lines.append("## Score\n")
     lines.append(f"- **Total:** {score.total} / {instrument.max_total}")
     lines.append(f"- **Band:** {band_str}")
@@ -237,8 +271,12 @@ def _persist_report(
         f"{inference_cfg.min_confidence}"
     )
     lines.append(f"- **Bandable threshold:** {scored.bandable_threshold}%\n")
+    return lines
 
-    # Per-item table
+
+def _item_table_lines(run: InferenceRun) -> list[str]:
+    """The per-item table (reasoning truncated to one line; full text below)."""
+    lines: list[str] = []
     lines.append("## Items\n")
     lines.append("| ID | Answer | Confidence | Evidence count | Reasoning |")
     lines.append("|---|---|---|---|---|")
@@ -252,8 +290,12 @@ def _persist_report(
             reasoning_short = reasoning_short[:97] + "..."
         lines.append(f"| {item_id} | {ans} | {conf} | {ev_count} | {reasoning_short} |")
     lines.append("")
+    return lines
 
-    # Per-item details (expandable)
+
+def _item_detail_lines(run: InferenceRun) -> list[str]:
+    """The per-item detail with every evidence citation."""
+    lines: list[str] = []
     lines.append("## Per-item detail\n")
     for item_id, inf in sorted(run.per_item.items(), key=lambda kv: kv[0]):
         lines.append(f"### Item {item_id}\n")
@@ -272,8 +314,18 @@ def _persist_report(
                         quote = quote[:237] + "..."
                     lines.append(f"    > {quote}")
         lines.append("")
+    return lines
 
-    # Embedded methodology — durable record
+
+def _methodology_lines(
+    instrument_dir: Path,
+    rendered_batches: list[tuple[str, str, str]],
+    substrate_paths: list[Path],
+    vault_root: Path,
+) -> list[str]:
+    """The embedded methodology — the durable record: items, cutoffs and the
+    instrument meta verbatim, every batch's ACTUAL prompt, the resolved scope."""
+    lines: list[str] = []
     lines.append("## Embedded methodology\n")
     lines.append("<details><summary>Items (verbatim from items.yaml)</summary>\n")
     lines.append("```yaml")
@@ -312,9 +364,93 @@ def _persist_report(
             rel = p
         lines.append(f"- `{rel}`")
     lines.append("\n</details>\n")
+    return lines
 
-    report_path.write_text("\n".join(lines), encoding="utf-8")
-    return report_path
+
+def _plan_batches(instrument: Instrument, omit_ids: set[str]) -> list[InferenceBatch]:
+    """Determine batches; drop operator-answered items per batch + skip
+    batches that become empty."""
+    raw_batches = default_batches(instrument)
+    batches = []
+    for b in raw_batches:
+        filtered = tuple(it for it in b.items if it.id not in omit_ids)
+        if filtered:
+            batches.append(type(b)(label=b.label, items=filtered))
+    if not batches:
+        print("  all items operator-answered — skipping SDK call entirely.", flush=True)
+    else:
+        print(f"  batches: {len(batches)} ({', '.join(b.label for b in batches)})", flush=True)
+    return batches
+
+
+def _infer_one_batch(
+    batch: InferenceBatch,
+    *,
+    instrument: Instrument,
+    instrument_dir: Path,
+    paths: list[Path],
+    vault_root: Path,
+    lookback_days: int,
+    today: str,
+    instrument_model: str | None,
+) -> tuple[BatchResult, tuple[str, str, str]]:
+    """One batch: the prompt scoped to its items, its hashed prompt_version, the
+    SDK call. Returns the result and (label, prompt_version, rendered prompt) —
+    the ACTUAL prompt the report embeds."""
+    # Per-batch substrate block — wedge uses the same scope for
+    # every batch since the substrate-set is instrument-level.
+    substrate_block = _render_substrate_block(paths, vault_root)
+
+    # Render items_block scoped to THIS batch's item-ids so the
+    # agent's JSON output naturally constrains to just that subset.
+    # Earlier design relied on `batch_label` alone — Haiku ignored
+    # it and returned all items, tripping JSON-schema validation
+    # (failure surfaced on first ASRS-v1.1 run, 2026-05-17).
+    batch_items_block = _render_items_block(
+        instrument_dir,
+        only_ids={it.id for it in batch.items},
+    )
+    rendered_prompt = render(
+        "reports/infer_instrument",
+        instrument_slug=instrument.meta.slug,
+        instrument_version=instrument.meta.version,
+        instrument_title=instrument.meta.title,
+        instrument_domain=instrument.meta.domain,
+        likert_lo=instrument.meta.likert.lo,
+        likert_hi=instrument.meta.likert.hi,
+        lookback_days=lookback_days,
+        today=today,
+        batch_label=batch.label,
+        items_block=batch_items_block,
+        substrate_block=substrate_block,
+    )
+    prompt_version = hashlib.sha256(rendered_prompt.encode("utf-8")).hexdigest()[:16]
+    print(
+        f"  batch={batch.label}  prompt_chars={len(rendered_prompt):,}  "
+        f"prompt_version={prompt_version}",
+        flush=True,
+    )
+
+    t0 = time.perf_counter()
+    infer_kwargs = {
+        "vault_cwd": vault_root,
+        "prompt_version": prompt_version,
+    }
+    if instrument_model:
+        infer_kwargs["model"] = instrument_model
+    result = infer_batch(
+        rendered_prompt,
+        batch,
+        **infer_kwargs,
+    )
+    dt = time.perf_counter() - t0
+    print(
+        f"    → answered={sum(1 for inf in result.items.values() if inf.answer is not None)}"
+        f"/{len(result.items)}  "
+        f"cost=${result.cost_usd:.4f}  elapsed={dt:.1f}s",
+        flush=True,
+    )
+    return result, (batch.label, prompt_version, rendered_prompt)
 
 
 def run_inference(
@@ -368,18 +504,7 @@ def run_inference(
     # substrate evidence (ISI sleep items 1-3 = Oura observable).
     instrument_model = instrument.meta.inference.model
 
-    # Determine batches; drop operator-answered items per batch + skip
-    # batches that become empty.
-    raw_batches = default_batches(instrument)
-    batches = []
-    for b in raw_batches:
-        filtered = tuple(it for it in b.items if it.id not in omit_ids)
-        if filtered:
-            batches.append(type(b)(label=b.label, items=filtered))
-    if not batches:
-        print("  all items operator-answered — skipping SDK call entirely.", flush=True)
-    else:
-        print(f"  batches: {len(batches)} ({', '.join(b.label for b in batches)})", flush=True)
+    batches = _plan_batches(instrument, omit_ids)
 
     timestamp = datetime.now(UTC).strftime("%Y-%m-%dT%H-%M-%S")
     output_dir = output_dir or (vault_root / "reports" / "_adhoc" / timestamp)
@@ -398,60 +523,17 @@ def run_inference(
     # Wedge instruments are single-batch — items_block covers the
     # whole instrument. Post-wedge: render only this batch's items.
     for batch in batches:
-        # Per-batch substrate block — wedge uses the same scope for
-        # every batch since the substrate-set is instrument-level.
-        substrate_block = _render_substrate_block(paths, vault_root)
-
-        # Render items_block scoped to THIS batch's item-ids so the
-        # agent's JSON output naturally constrains to just that subset.
-        # Earlier design relied on `batch_label` alone — Haiku ignored
-        # it and returned all items, tripping JSON-schema validation
-        # (failure surfaced on first ASRS-v1.1 run, 2026-05-17).
-        batch_items_block = _render_items_block(
-            instrument_dir,
-            only_ids={it.id for it in batch.items},
-        )
-        rendered_prompt = render(
-            "reports/infer_instrument",
-            instrument_slug=instrument.meta.slug,
-            instrument_version=instrument.meta.version,
-            instrument_title=instrument.meta.title,
-            instrument_domain=instrument.meta.domain,
-            likert_lo=instrument.meta.likert.lo,
-            likert_hi=instrument.meta.likert.hi,
+        result, rendered = _infer_one_batch(
+            batch,
+            instrument=instrument,
+            instrument_dir=instrument_dir,
+            paths=paths,
+            vault_root=vault_root,
             lookback_days=lookback_days,
             today=today,
-            batch_label=batch.label,
-            items_block=batch_items_block,
-            substrate_block=substrate_block,
+            instrument_model=instrument_model,
         )
-        prompt_version = hashlib.sha256(rendered_prompt.encode("utf-8")).hexdigest()[:16]
-        rendered_batches.append((batch.label, prompt_version, rendered_prompt))
-        print(
-            f"  batch={batch.label}  prompt_chars={len(rendered_prompt):,}  "
-            f"prompt_version={prompt_version}",
-            flush=True,
-        )
-
-        t0 = time.perf_counter()
-        infer_kwargs = {
-            "vault_cwd": vault_root,
-            "prompt_version": prompt_version,
-        }
-        if instrument_model:
-            infer_kwargs["model"] = instrument_model
-        result = infer_batch(
-            rendered_prompt,
-            batch,
-            **infer_kwargs,
-        )
-        dt = time.perf_counter() - t0
-        print(
-            f"    → answered={sum(1 for inf in result.items.values() if inf.answer is not None)}"
-            f"/{len(result.items)}  "
-            f"cost=${result.cost_usd:.4f}  elapsed={dt:.1f}s",
-            flush=True,
-        )
+        rendered_batches.append(rendered)
         run.batches.append(result)
 
     # Score deterministically — merge operator-supplied answers

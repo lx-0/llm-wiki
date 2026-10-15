@@ -304,9 +304,50 @@ def render_summary(
     # 4. Per-instrument radars (item-level breakdown — each axis is one item)
     per_inst_radars = _render_per_instrument_radars(timeline, charts_dir)
 
-    # 4. Frontmatter
+    # 4. Frontmatter, then the sections in order
     bandable_count = sum(1 for s in latest.instruments.values() if s.bandable)
     avg_cov = sum(s.coverage_pct for s in latest.instruments.values()) / len(latest.instruments)
+
+    lines: list[str] = []
+    lines.extend(
+        _frontmatter_lines(
+            study_id, timeline, latest, bandable_count=bandable_count, avg_cov=avg_cov
+        )
+    )
+    lines.append(f"# {study_id} — {latest.timestamp} (run {timeline.n_runs})\n")
+    lines.append(_INFORMANT_BANNER)
+    lines.extend(_table_lines(latest, previous))
+    lines.extend(_radar_lines(radar_path, summary_path, previous))
+    lines.extend(
+        _coverage_lines(
+            timeline,
+            sparkline_path,
+            summary_path,
+            avg_cov=avg_cov,
+            bandable_count=bandable_count,
+            n_instruments=len(latest.instruments),
+        )
+    )
+    lines.extend(
+        _trajectory_lines(latest, timeline, per_inst_timelines, per_inst_radars, summary_path)
+    )
+    lines.extend(_flag_lines(latest))
+    lines.extend(_detail_lines(latest))
+
+    summary_path.parent.mkdir(parents=True, exist_ok=True)
+    summary_path.write_text("\n".join(lines), encoding="utf-8")
+    return summary_path
+
+
+def _frontmatter_lines(
+    study_id: str,
+    timeline: Timeline,
+    latest: RunSnapshot,
+    *,
+    bandable_count: int,
+    avg_cov: float,
+) -> list[str]:
+    """The `---` frontmatter block."""
     fm = {
         "kind": "meta-report",
         "study_id": study_id,
@@ -323,10 +364,12 @@ def render_summary(
     lines.append("---")
     lines.append(yaml.safe_dump(fm, sort_keys=False, allow_unicode=True).strip())
     lines.append("---\n")
+    return lines
 
-    lines.append(f"# {study_id} — {latest.timestamp} (run {timeline.n_runs})\n")
-    lines.append(_INFORMANT_BANNER)
 
+def _table_lines(latest: RunSnapshot, previous: RunSnapshot | None) -> list[str]:
+    """The cross-instrument table: slug | score | band | coverage | delta."""
+    lines: list[str] = []
     # Cross-instrument table
     lines.append("## Cross-instrument current state\n")
     lines.append("| Instrument | Score | Band | Coverage | Δ vs. previous |")
@@ -343,7 +386,12 @@ def render_summary(
             f"{snap.coverage_pct}% | {delta} |"
         )
     lines.append("")
+    return lines
 
+
+def _radar_lines(radar_path: Path, summary_path: Path, previous: RunSnapshot | None) -> list[str]:
+    """The inline cross-instrument radar (overlay from run 2)."""
+    lines: list[str] = []
     # Radar chart inline
     lines.append("## Cross-instrument radar\n")
     radar_rel = radar_path.relative_to(summary_path.parent)
@@ -359,7 +407,20 @@ def render_summary(
             "(change-visualisation) activates by run 2.\n"
         )
     lines.append(f"![cross-instrument radar]({radar_rel})\n")
+    return lines
 
+
+def _coverage_lines(
+    timeline: Timeline,
+    sparkline_path: Path,
+    summary_path: Path,
+    *,
+    avg_cov: float,
+    bandable_count: int,
+    n_instruments: int,
+) -> list[str]:
+    """The coverage sparkline section (activates by run 2)."""
+    lines: list[str] = []
     # Coverage sparkline
     lines.append("## Coverage — wiki-health-meter\n")
     if timeline.n_runs >= 2:
@@ -367,7 +428,7 @@ def render_summary(
             f"Average inferred-coverage across all instruments, run-over-run. "
             f"This rising trend is the visible measure of the wiki growing "
             f"into the instruments. Latest avg: **{avg_cov:.1f}%** "
-            f"({bandable_count} of {len(latest.instruments)} instruments "
+            f"({bandable_count} of {n_instruments} instruments "
             f"reached the bandable threshold).\n"
         )
         cov_rel = sparkline_path.relative_to(summary_path.parent)
@@ -376,9 +437,21 @@ def render_summary(
         lines.append(
             f"Single run — sparkline activates by run 2. "
             f"Current avg coverage: **{avg_cov:.1f}%** "
-            f"({bandable_count} of {len(latest.instruments)} bandable).\n"
+            f"({bandable_count} of {n_instruments} bandable).\n"
         )
+    return lines
 
+
+def _trajectory_lines(
+    latest: RunSnapshot,
+    timeline: Timeline,
+    per_inst_timelines: dict[str, Path],
+    per_inst_radars: dict[str, Path],
+    summary_path: Path,
+) -> list[str]:
+    """Per instrument: the item-level radar beside its legend, then the
+    run-over-run timeline."""
+    lines: list[str] = []
     # Per-instrument trajectories: timeline (over runs) + radar (over items)
     lines.append("## Per-instrument trajectories\n")
     for key in sorted(set(per_inst_timelines.keys()) | set(per_inst_radars.keys())):
@@ -403,53 +476,7 @@ def render_summary(
                 else {}
             )
             if item_meta:
-
-                def _sort_key(iid):
-                    try:
-                        return (0, int(iid))
-                    except (ValueError, TypeError):
-                        return (1, str(iid))
-
-                # Build the legend table as HTML (markdown table inside
-                # flex container can be brittle in some renderers).
-                rows_html: list[str] = []
-                rows_html.append(
-                    '<tr><th style="text-align:left;">ID</th>'
-                    '<th style="text-align:left;">Item</th>'
-                    '<th style="text-align:center;">↩︎</th>'
-                    '<th style="text-align:center;">Inf</th>'
-                    '<th style="text-align:left;">Subscale</th></tr>'
-                )
-                for iid in sorted(item_meta.keys(), key=_sort_key):
-                    m = item_meta[iid]
-                    text_short = m["text"].replace("<", "&lt;").replace(">", "&gt;")
-                    if len(text_short) > 110:
-                        text_short = text_short[:107] + "…"
-                    rev = "↩︎" if m["reverse_coded"] else ""
-                    inf = "✓" if m["substrate_inferable"] else "—"
-                    inf_color = "#1B7340" if m["substrate_inferable"] else "#9ca3af"
-                    sub = (m["subscale"] or "").replace("<", "&lt;")
-                    rows_html.append(
-                        f"<tr>"
-                        f'<td style="white-space:nowrap;padding-right:0.6em;font-family:ui-monospace,monospace;">{iid}</td>'
-                        f'<td style="padding-right:0.6em;">{text_short}</td>'
-                        f'<td style="text-align:center;padding-right:0.4em;">{rev}</td>'
-                        f'<td style="text-align:center;color:{inf_color};padding-right:0.6em;">{inf}</td>'
-                        f'<td style="white-space:nowrap;color:#6b7280;">{sub}</td>'
-                        f"</tr>"
-                    )
-                table_html = (
-                    '<table style="border-collapse:collapse;font-size:0.85em;line-height:1.4;">'
-                    + "".join(rows_html)
-                    + "</table>"
-                )
-                lines.append(
-                    '<div style="display:flex;gap:1.2em;align-items:flex-start;flex-wrap:wrap;margin:0.6em 0;">'
-                    f'<div style="flex:0 0 360px;"><img src="{rel}" alt="{key} per-item radar" '
-                    'style="width:100%;height:auto;"></div>'
-                    f'<div style="flex:1 1 280px;min-width:280px;">{table_html}</div>'
-                    "</div>\n"
-                )
+                lines.append(_item_legend_html(item_meta, rel, key))
             else:
                 # No item-meta — fall back to plain radar image.
                 lines.append(f"![{key} per-item radar]({rel})\n")
@@ -461,7 +488,63 @@ def render_summary(
                 label += " (activates by run 2)"
             lines.append(f"**{label}**\n")
             lines.append(f"![{key} timeline]({rel})\n")
+    return lines
 
+
+def _item_legend_html(item_meta: dict[str, dict], rel: Path, key: str) -> str:
+    """The per-item radar image beside its axis legend as one HTML flex row."""
+
+    def _sort_key(iid):
+        try:
+            return (0, int(iid))
+        except (ValueError, TypeError):
+            return (1, str(iid))
+
+    # Build the legend table as HTML (markdown table inside
+    # flex container can be brittle in some renderers).
+    rows_html: list[str] = []
+    rows_html.append(
+        '<tr><th style="text-align:left;">ID</th>'
+        '<th style="text-align:left;">Item</th>'
+        '<th style="text-align:center;">↩︎</th>'
+        '<th style="text-align:center;">Inf</th>'
+        '<th style="text-align:left;">Subscale</th></tr>'
+    )
+    for iid in sorted(item_meta.keys(), key=_sort_key):
+        m = item_meta[iid]
+        text_short = m["text"].replace("<", "&lt;").replace(">", "&gt;")
+        if len(text_short) > 110:
+            text_short = text_short[:107] + "…"
+        rev = "↩︎" if m["reverse_coded"] else ""
+        inf = "✓" if m["substrate_inferable"] else "—"
+        inf_color = "#1B7340" if m["substrate_inferable"] else "#9ca3af"
+        sub = (m["subscale"] or "").replace("<", "&lt;")
+        rows_html.append(
+            f"<tr>"
+            f'<td style="white-space:nowrap;padding-right:0.6em;font-family:ui-monospace,monospace;">{iid}</td>'
+            f'<td style="padding-right:0.6em;">{text_short}</td>'
+            f'<td style="text-align:center;padding-right:0.4em;">{rev}</td>'
+            f'<td style="text-align:center;color:{inf_color};padding-right:0.6em;">{inf}</td>'
+            f'<td style="white-space:nowrap;color:#6b7280;">{sub}</td>'
+            f"</tr>"
+        )
+    table_html = (
+        '<table style="border-collapse:collapse;font-size:0.85em;line-height:1.4;">'
+        + "".join(rows_html)
+        + "</table>"
+    )
+    return (
+        '<div style="display:flex;gap:1.2em;align-items:flex-start;flex-wrap:wrap;margin:0.6em 0;">'
+        f'<div style="flex:0 0 360px;"><img src="{rel}" alt="{key} per-item radar" '
+        'style="width:100%;height:auto;"></div>'
+        f'<div style="flex:1 1 280px;min-width:280px;">{table_html}</div>'
+        "</div>\n"
+    )
+
+
+def _flag_lines(latest: RunSnapshot) -> list[str]:
+    """The convergence / discrepancy flags, or the stub line."""
+    lines: list[str] = []
     # Convergence / discrepancy stub for S05 enrichment.
     lines.append("## Convergence / discrepancy flags\n")
     flags = _crosscheck_flags(latest)
@@ -475,17 +558,19 @@ def render_summary(
             "enrich this section with interpretive cross-instrument "
             "synthesis.\n"
         )
+    return lines
 
+
+def _detail_lines(latest: RunSnapshot) -> list[str]:
+    """The pointer to each instrument's full report."""
+    lines: list[str] = []
     # Pointer to per-instrument detail
     lines.append("## Per-instrument detail\n")
     lines.append("Each instrument's full report with embedded methodology lives at:\n")
     for key in sorted(latest.instruments.keys()):
         lines.append(f"- `instruments/{key}.md`")
     lines.append("")
-
-    summary_path.parent.mkdir(parents=True, exist_ok=True)
-    summary_path.write_text("\n".join(lines), encoding="utf-8")
-    return summary_path
+    return lines
 
 
 def _crosscheck_flags(snapshot: RunSnapshot) -> list[str]:
