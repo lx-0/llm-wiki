@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { validateMenu } from '../lib/contract';
 import { parseMenu } from './menu';
 
 const payload = (over: Record<string, unknown> = {}) =>
@@ -42,6 +43,10 @@ const payload = (over: Record<string, unknown> = {}) =>
   });
 
 describe('parseMenu', () => {
+  it('reads a payload that conforms to the schema-2 contract', () => {
+    expect(validateMenu(JSON.parse(payload()))).toEqual([]);
+  });
+
   it('keeps the engine vocabulary verbatim and sorts suggestions by priority', () => {
     const m = parseMenu(payload());
     expect(m.status).toEqual({ articles: 12, ollama_reachable: true });
@@ -67,6 +72,8 @@ describe('parseMenu', () => {
     ]);
   });
 
+  // The fixtures below are partial on purpose: the parser's fallbacks for input the engine
+  // does not send (no schema, an empty argv).
   it('refuses an unknown schema with empty lists and a warning instead of guessing', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const m = parseMenu(JSON.stringify({ status: { articles: 1 }, suggestions: [{ cmd: 'compile' }] }));

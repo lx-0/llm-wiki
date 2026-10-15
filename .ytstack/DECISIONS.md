@@ -2151,3 +2151,34 @@ The gated scope is 35 files.
 **Why a group, not `--dev`:** `wiki update` and `install.sh` run a bare `uv sync`, which installs
 the default groups, `dev` included. A checker in `dev` would land in every operator vault's
 venv. `typecheck` stays out of it, the way `lint` keeps ruff out.
+
+## 2026-10-15: The `--json` contract — TypedDicts → JSON Schema; the desktop keeps hand-written types behind an inventory test
+
+M033 CONTEXT open question 2, decided in S05-T03 / T04.
+
+**Decision:** the schema-2 payloads (`wiki menu --json`, `wiki doctor --json`) are
+`TypedDict`s in `scripts/core/contracts.py`, and every engine builder returns them.
+`python -m core.contracts --write` generates one JSON Schema per payload into
+`docs/contracts/` (draft 2020-12, `additionalProperties: false`), and `--check` runs in the
+suite. Both suites validate against those files: pytest with `jsonschema` over the oracle
+goldens, and vitest with `ajv` over the same goldens plus the desktop's representative
+fixtures. The desktop keeps its hand-written TypeScript types. A field-inventory test (the
+schema's property names per object against a list in the test) fails when the engine adds or
+drops a field, until the app decides whether to read it.
+
+**Why TypedDicts, not the dataclasses the question assumed:** the payloads are plain dicts at
+runtime (`json.dumps`, `asdict`, dict literals in `menu_context`). A `TypedDict` types them
+without changing a byte, as the oracle goldens prove. A dataclass would need a serialisation
+step at every builder.
+
+**Why not generated TS types (`json-schema-to-typescript`):** the schemas are small, two
+documents and seven object types with at most nine properties each, and the app's types are
+not payload mirrors. `DoctorCheck` carries `dispatchArgs` in camelCase with parse-time
+fallbacks, and `DoctorResult` aggregates the checks. Generated payload types would add a
+codegen step and a dependency, and the parsers would still map raw to normalised. The
+inventory test gives the same drift signal for free. Revisit if the contract grows past a
+handful of types, or if a second consumer needs the same types.
+
+**Not in the contract:** the desktop's `scripts/shots/fixtures.cjs` holds parsed renderer
+state (`DoctorResult` / `MenuResult`), not engine payloads, so it is not validated against the
+schemas.

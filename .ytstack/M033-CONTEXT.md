@@ -109,16 +109,18 @@ becomes M033b rather than an eighth task.
 
 ## Open questions
 
-1. **Type checker: pyright or ty?** Recommendation: probe both on `scripts/core/` in S05-T01
-   (install via `uv add --dev`, count findings, measure runtime); pick the one whose `basic`
-   mode is green-able within the slice. Pyright is the known quantity; ty is the stack's
-   vendor (Astral) and the faster one.
-2. **Typed contracts: how shared?** Recommendation: Python dataclasses already own the
-   payload (`core/actions.py`); emit one JSON Schema from them into `docs/contracts/`,
-   validate in pytest (`jsonschema`, already transitively present — verify) and in vitest
-   (`ajv` dev dependency). Alternative: generate TS types from the schema
-   (`json-schema-to-typescript`) so `desktop/src/lib/actions.ts` imports instead of
-   restating — decide in S05 after seeing the schema size.
+1. ~~**Type checker: pyright or ty?**~~ — **decided 2026-10-15 (S05-T01):** ty 0.0.88,
+   pinned exactly in a `typecheck` group (not `dev` — a bare `uv sync` installs `dev` into
+   every operator vault). The probe measured three candidates: on `core/`, 22 / 22 / 19 errors,
+   2.7 s / 3.0 s / 0.10 s, and 15 of 22 vs 19 of 19 findings real. ty also found a dead import
+   pyright had never reported. Table and reasons in `DECISIONS.md` 2026-10-15.
+2. ~~**Typed contracts: how shared?**~~ — **decided 2026-10-15 (S05-T03/T04):** the payloads
+   are `TypedDict`s in `scripts/core/contracts.py` (not dataclasses — they are plain dicts at
+   runtime). One JSON Schema per payload is generated into `docs/contracts/`, and both suites
+   validate against them: pytest with `jsonschema`, vitest with `ajv`. The desktop keeps its
+   hand-written TS types, guarded by a field-inventory test, instead of generated ones. The
+   schemas are small (seven object types), and the app's types are normalised views rather
+   than payload mirrors. Reasons in `DECISIONS.md` 2026-10-15.
 3. ~~**`python -m` dispatch and the vault venv**~~ — **decided 2026-10-14 (S02-T01):**
    `scripts/` is the source root, not a package; `cli.py` runs `python -m <module>` with
    `scripts/` first on the child's PYTHONPATH and the caller's cwd inherited (S02-T03,

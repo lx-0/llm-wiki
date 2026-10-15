@@ -70,6 +70,12 @@ popover, and `out/shots/report.json` carries heights, content heights and page e
 item); an unsigned app's Full Disk Access grant is keyed on its code hash and may need
 re-granting after a rebuild.
 
+The engine's `--json` payloads are a typed contract: `docs/contracts/{menu,doctor}.schema.json`
+(generated from `scripts/core/contracts.py`). `src/lib/contract.test.ts` validates the
+engine's golden output against them with ajv and runs it through `parseMenu` /
+`parseDoctor`. The representative fixtures in `src/vault/*.test.ts` validate too, and a
+field-inventory test fails when the engine adds a field the app has not decided about.
+
 Layout: `src/main.ts` (main process: tray, windows, IPC) · `src/preload.ts` ·
 `src/vault/` (the engine seam — every `wiki` call goes through `wiki-exec.ts:runWiki` and
 the engine's `--json` seams) · `src/listeners/` (screenpipe status + hourly timeline) ·
