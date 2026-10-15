@@ -5,7 +5,7 @@ project: llm-wiki
 created: 2026-10-15T18:15:32+02:00
 status: planned
 task_count: 7
-completed_tasks: 3
+completed_tasks: 4
 ---
 
 # M034-S03 -- Slice Plan
@@ -45,7 +45,7 @@ last callers were skills' `config_get` and `cmd_status` (reassessed after S01).
   `core/frontmatter.backup` (correct / take / correct_apply) has the same to-the-second
   overwrite flaw, and `dedup.py` hand-rolls a copy. `core/backup.py` becomes the one helper
   for all of them, with a seam guard against a second `.bak.` writer.
-- [ ] T04 -- **The merge and the uninstall as pure functions** in `core/agents.py` (split
+- [x] T04 -- **The merge and the uninstall as pure functions** in `core/agents.py` (split
   from the port after T03): `merge(config, payload)` and `without_wiki_hooks(config)`.
   Rendered, they match the bash `jq` byte for byte on T02's shapes: Claude groups, Cursor
   bare entries, other tools' hooks and keys, groups and events the removal empties. Nothing
