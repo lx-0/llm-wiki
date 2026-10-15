@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-15T15:48:09+02:00
+last_updated: 2026-10-15T15:54:43+02:00
 current_milestone: M033
 active_slice: S05
-active_task: T04
+active_task: none
 last_completed_milestone: M032
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -241,7 +241,12 @@ ajv validate the engine goldens and the desktop's representative payload fixture
 same schema files, and the goldens run through `parseMenu` / `parseDoctor`. Open question 2
 is decided: hand-written TS types plus a field-inventory test that fails when the schema gains
 a field (seven small object types, and the app's types are normalised views, not mirrors).
-**Next: execute T04.**
+**S05 4/6** — T04 (`e2f9c3b`): ajv validates the goldens and the representative fixtures in
+vitest. Doctor's fixture became a full envelope, and the fallback fixtures stay partial on
+purpose. The goldens run through both parsers, and the inventory test catches a grown schema.
+Open questions 1 and 2 are struck in CONTEXT, with the DECISIONS entry written. Vitest 120,
+and CI is green on both jobs. **Next: S05-T05 (closeout docs + 0.7.0 release) via
+`plan-task`.**
 
 ## M032 COMPLETE (L, 2026-10-14): desktop de-slop
 
