@@ -28,6 +28,7 @@ from core import frontmatter
 from core.config import CONFIG, TIMEZONE
 from core.paths import RAW_SUGGESTIONS_DIR, ROOT_DIR
 from domain.mail import FilterAction, FilterCondition, FilterRule
+from suggestions import suggestion_files as list_suggestion_files
 from suggestions.backends import imap as imap_actions
 
 # ── YAML I/O ────────────────────────────────────────────────────────
@@ -398,14 +399,12 @@ def _cmd_execute(args: argparse.Namespace, suggestion_files: list[Path]) -> None
 
 
 def main() -> None:
-    """Parse, gather `raw/suggestions/*.y{a,}ml`, dispatch on the first flag set:
-    --list, --approve, --reject, --review, else execute (or --dry-run)."""
+    """Parse, gather the suggestion files of `raw/suggestions/`, dispatch on the first
+    flag set: --list, --approve, --reject, --review, else execute (or --dry-run)."""
     args = _build_parser().parse_args()
 
     RAW_SUGGESTIONS_DIR.mkdir(parents=True, exist_ok=True)
-    suggestion_files = sorted(RAW_SUGGESTIONS_DIR.glob("*.yaml")) + sorted(
-        RAW_SUGGESTIONS_DIR.glob("*.yml")
-    )
+    suggestion_files = list_suggestion_files(RAW_SUGGESTIONS_DIR)
 
     if not suggestion_files:
         print("No suggestions in raw/suggestions/")

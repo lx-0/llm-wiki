@@ -44,7 +44,7 @@ Analyze the email data and suggest optimizations.
 4. **imap-tag**: Tag mails with a label
 5. **imap-set-flags**: Mark mails as read/flagged
 
-### Format (one YAML file per suggestion in `raw/suggestions/`):
+### Format (one YAML file per suggestion: `raw/suggestions/<short-slug>.yaml` — not `.md`):
 
 ```yaml
 ---

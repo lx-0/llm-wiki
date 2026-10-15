@@ -65,6 +65,7 @@ from core.paths import (
     REPORTS_DIR,
     STATE_FILE,
 )
+from suggestions import suggestion_files
 
 log = logging.getLogger("menu_context")
 WALL_CLOCK_BUDGET_S = 0.5
@@ -142,11 +143,10 @@ def probe_curiosity_pending() -> int:
 
 
 def probe_suggestions_approved() -> int:
-    """Count actions in `raw/suggestions/*.yaml` with status='approved'."""
-    if not RAW_SUGGESTIONS_DIR.exists():
-        return 0
+    """Count actions with status='approved' across the suggestion files of
+    `raw/suggestions/` (`suggestions.suggestion_files` — `.yaml`, `.yml`, `.md`)."""
     n = 0
-    for p in RAW_SUGGESTIONS_DIR.glob("*.yaml"):
+    for p in suggestion_files(RAW_SUGGESTIONS_DIR):
         try:
             text = p.read_text(encoding="utf-8")
             # Cheap regex over the file rather than full YAML parse — avoids

@@ -226,3 +226,43 @@ def test_resolve_returns_none_for_no_match(tmp_path, monkeypatch, capsys):
     assert result is None
     captured = capsys.readouterr()
     assert "Not found: nonexistent" in captured.out
+
+
+# ── every suggestion file is seen, whatever extension the agent chose ──
+#
+# A suggestion is a fenced YAML document. The prompt asks for YAML, and the agent
+# has also written `.yml` and `.md` — on 2026-10-15 the live vault held seven `.md`
+# suggestions with pending actions that neither `wiki suggestions` nor the menu saw.
+
+_SUGGESTION = (
+    "---\ntype: optimization-suggestion\ntarget: Travel rule\n"
+    "actions:\n  - type: imap-move\n    status: {status}\n---\n"
+)
+
+
+def test_the_menu_counts_approved_actions_in_every_suggestion_file(tmp_path, monkeypatch):
+    import menu_context
+
+    monkeypatch.setattr(menu_context, "RAW_SUGGESTIONS_DIR", tmp_path)
+    for name in ("a.yaml", "b.yml", "c.md"):
+        (tmp_path / name).write_text(_SUGGESTION.format(status="approved"), encoding="utf-8")
+    (tmp_path / "notes.md").write_text("# a stray note\nstatus: approved\n", encoding="utf-8")
+
+    assert menu_context.probe_suggestions_approved() == 3
+
+
+def test_list_shows_a_suggestion_written_as_md(tmp_path, monkeypatch, capsys):
+    import sys
+
+    from suggestions import cli
+
+    monkeypatch.setattr(cli, "RAW_SUGGESTIONS_DIR", tmp_path)
+    (tmp_path / "travel.md").write_text(_SUGGESTION.format(status="pending"), encoding="utf-8")
+    (tmp_path / "notes.md").write_text("# a stray note, not a suggestion\n", encoding="utf-8")
+    monkeypatch.setattr(sys, "argv", ["suggestions", "--list"])
+
+    cli.main()
+
+    out = capsys.readouterr().out
+    assert "File: travel.md" in out
+    assert "notes.md" not in out
