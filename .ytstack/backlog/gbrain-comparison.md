@@ -1,6 +1,6 @@
 # gbrain (Garry Tan) vs. llm-wiki — Architecture Comparison
 
-Reference implementation analysis. gbrain at `github.com/garrytan/gbrain` (TS / bun / Postgres+pgvector, MIT, 15.4K stars, v0.26+, single-author Garry Tan / YC President). Companion analysis to `karpathy-comparison.md` and `meetily-intake.md`.
+Reference implementation analysis. gbrain at `github.com/garrytan/gbrain` (TS / bun / Postgres+pgvector, MIT, 15.4K stars, v0.26+, single-author Garry Tan / YC President). Companion analysis to `rejected/karpathy-comparison.md` and `rejected/meetily-intake.md`.
 
 **Purpose:** Identify which gbrain patterns transfer to llm-wiki without breaking the Markdown-only / engine-vault-split bet, and which are deliberately not adopted.
 

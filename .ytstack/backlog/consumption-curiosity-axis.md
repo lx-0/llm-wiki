@@ -43,5 +43,5 @@ Work-substrate (mail / calendar / gmeet / jamie / docs) has a systematic bias: i
 ## Related
 
 - `.ytstack/DECISIONS.md` 2026-05-22 — canonical policy.
-- `gbrain-comparison.md` / `karpathy-comparison.md` — firehose-maximalist intake philosophy reference.
+- `gbrain-comparison.md` / `rejected/karpathy-comparison.md` — firehose-maximalist intake philosophy reference.
 - `curiosity-dashboard.md` / `curiosity-topic-as-search-query.md` — adjacent curiosity-loop consumers.

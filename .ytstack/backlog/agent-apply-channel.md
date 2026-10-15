@@ -2,7 +2,7 @@
 
 Design pitch + reference-implementation analysis. Prior art: **OpenClaw wiki plugin**
 (`docs.openclaw.ai/cli/wiki`, `github.com/openclaw/openclaw`, public). Companion to
-`karpathy-comparison.md` (the conversational-edit half of Karpathy's pattern) and
+`rejected/karpathy-comparison.md` (the conversational-edit half of Karpathy's pattern) and
 `gbrain-comparison.md` (enrich-on-write trade-off).
 
 **Purpose:** give an agent a *sanctioned, narrow* way to contribute structured

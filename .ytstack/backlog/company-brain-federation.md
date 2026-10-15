@@ -5,7 +5,7 @@
 running llm-wiki as a *company* wiki, so the upcoming office-hours + roadmap
 discussion starts from a worked-through position instead of a blank page.
 **Companion docs:** `gbrain-comparison.md` (team-sharing / multi-tenant is a problem
-llm-wiki has *not* committed to), `karpathy-comparison.md`, `architecture-scaling-2028.md`,
+llm-wiki has *not* committed to), `rejected/karpathy-comparison.md`, `architecture-scaling-2028.md`,
 `llm-transcripts-collector.md` (the agent-chat substrate that Suh's thesis leans on),
 `operator-financial-operational-fact-layer.md` (company master-data substrate).
 

@@ -18,11 +18,11 @@ The retrieval problem and the index problem decouple at scale:
 
 ## The four levers (cheap → expensive, in build order)
 
-### Lever 1 — Subtype-axis split (already a backlog item)
+### Lever 1 — Subtype-axis split (superseded)
 
-See `.ytstack/backlog/subtype-axis.md`. Split `concepts/` into ~6 meaningful subfolders so the graph view + on-disk layout encode topic structure. No tiering, no scoring. Quality-of-life improvement that buys ~6 months of headroom on visual navigation.
+Was `.ytstack/backlog/subtype-axis.md` (now `rejected/`): split `concepts/` into ~6 subfolders so the graph view + on-disk layout encode topic structure. Superseded for its only consumer, the graph view: domain-tag colour groups plus Extended Graph's type → shape mapping (DECISIONS: "subtype-axis.md (superseded by Extended Graph)"). Re-confirmed at the M033 close (2026-10-15): no non-graph consumer exists, and the residue — 1,237 of 2,078 concepts carry none of the nine graph-coloured domain tags — belongs to the domain-tag lint / backfill, not to a folder split. The scaling path starts at Lever 2.
 
-**Trigger:** already overdue — `concepts/` is the largest single folder.
+**Trigger:** none — retired.
 
 ### Lever 2 — MOC-First retrieval (the largest single lever)
 
@@ -82,7 +82,7 @@ The field-consensus 2026 pattern (SCM, FadeMem LML/SML, MaRS Priority-Decay, Let
 
 | Backlog item | Lever | Status |
 |---|---|---|
-| `subtype-axis.md` | 1 | exists, no trigger yet |
+| `rejected/subtype-axis.md` | 1 | superseded (graph view: domain-tag colours + Extended Graph shapes) |
 | **MOC auto-maintenance** (new) | 2 | **not yet a backlog file** — this entry is the rationale |
 | **Lifecycle tiering** (new) | 3 | not yet a backlog file |
 | `dream-cycle.md` | 4 (single-level) | exists |
@@ -110,4 +110,4 @@ But: **MOCs do not currently scale because they are 100% manually maintained**. 
 
 ## Status
 
-Backlog meta-entry. Not a deliverable. Reference from any future "knowledge/ is getting too big" discussion to anchor the decision-order. Sibling to `gbrain-comparison.md` and `karpathy-comparison.md` in framing (architectural-direction notes, not single-task plans).
+Backlog meta-entry. Not a deliverable. Reference from any future "knowledge/ is getting too big" discussion to anchor the decision-order. Sibling to `gbrain-comparison.md` and `rejected/karpathy-comparison.md` in framing (architectural-direction notes, not single-task plans).
