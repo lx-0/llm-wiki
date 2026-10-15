@@ -2966,6 +2966,12 @@ Per-candidate learnings from the 14-candidate seam arc (C01–C14). Decisions li
   `tools=[]`; takes and intents `allowed_tools=["Read"]` under `permission_mode="default"`;
   folder_providers hook-scoped to its one file) except `optimize_claude_md` (Edit +
   `acceptEdits`, opt-in, disabled by default).
+- **A doc guard that scans line by line misses a wrapped command (2026-10-15,
+  M033-S05-T06):** `tests/test_layout.py` refused `uv run python scripts/<pkg>/<x>.py` per
+  line, and AGENTS.md wrapped exactly that command across two lines, so the step that tells a
+  contributor how to regenerate `docs/config.md` failed with `ModuleNotFoundError: core` for
+  the whole milestone while the guard stayed green. The guard now matches `\s+` across the
+  full text. Any regex guard over prose has to tolerate the line breaks prose has.
 
 ### Desktop toolchain (C07)
 

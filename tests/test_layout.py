@@ -74,8 +74,10 @@ def test_scripts_dir_is_the_source_root_pytest_put_on_the_path() -> None:
 # operator into `ModuleNotFoundError: core`. Spell `wiki <cmd>`, a top-level entry script,
 # or `python -m <pkg>.<module>` with scripts/ on PYTHONPATH (M033-S02-T06).
 _DOC_ROOTS = ("docs", "templates", "AGENTS.md", "README.md")
+# `\s+`, not a space: prose wraps a command across lines, and a line-by-line scan
+# missed `uv run python⏎scripts/core/config_docs.py` in AGENTS.md for a whole milestone.
 _BY_PATH_INVOCATION = re.compile(
-    r"uv run (?:--project \S+ )?python (?:\S*/)?scripts/[a-z_]+/[a-z_-]+\.py"
+    r"uv\s+run\s+(?:--project\s+\S+\s+)?python\s+(?:\S*/)?scripts/[a-z_]+/[a-z_-]+\.py"
 )
 
 
@@ -88,12 +90,12 @@ def _documented_files() -> list[Path]:
 
 
 def test_no_documented_invocation_runs_a_sub_package_module_by_path() -> None:
-    offenders = [
-        f"{path.relative_to(REPO)}:{n}: {line.strip()[:100]}"
-        for path in _documented_files()
-        for n, line in enumerate(path.read_text(encoding="utf-8", errors="replace").splitlines(), 1)
-        if _BY_PATH_INVOCATION.search(line)
-    ]
+    offenders = []
+    for path in _documented_files():
+        text = path.read_text(encoding="utf-8", errors="replace")
+        for m in _BY_PATH_INVOCATION.finditer(text):
+            n = text.count("\n", 0, m.start()) + 1
+            offenders.append(f"{path.relative_to(REPO)}:{n}: {' '.join(m.group().split())}")
     assert offenders == [], (
         "by-path invocations of sub-package modules (spell `wiki <cmd>`, a top-level entry "
         "script, or `python -m <pkg>.<module>`):\n" + "\n".join(offenders)

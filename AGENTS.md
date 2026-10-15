@@ -74,8 +74,8 @@ llm-wiki/                    ← installed as <vault>/.wiki/ — the file-by-fil
 2. Document the default in `config.example.yaml` with a comment. A test
    (`tests/test_config_docs.py`) fails if the example is missing the key or
    carries a non-default value.
-3. Regenerate the reference tables: `uv run python
-   scripts/core/config_docs.py --write` (rewrites the generated region in
+3. Regenerate the reference tables: `PYTHONPATH=scripts uv run python -m
+   core.config_docs --write` (rewrites the generated region in
    `docs/config.md`; a drift test fails if you skip this).
 4. Replace the hardcoded constant in the script with `CONFIG.<section>.<field>`.
 5. Don't add ad-hoc constants back to scripts — extend the config layer.
