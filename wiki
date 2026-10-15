@@ -71,7 +71,7 @@ require_vault() {
 # ── Subcommand dispatchers ───────────────────────────────────────────
 cmd_status() {
   banner "wiki status"
-  # `wiki config status` is Python since M034-S02-T02; S03-T03 ports `status` whole.
+  # `wiki config status` is Python since M034-S02-T02; S03-T04 ports `status` whole.
   "$WIKI_DIR/wiki" config status
   echo
   hooks_status_table

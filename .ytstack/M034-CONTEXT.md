@@ -210,3 +210,14 @@ context windows' work, so it is now two tasks:
 Skills became T04 and the deletions T05 (S03: 5 tasks). Where the S01 reassessment above says
 S03-T02 (`wiki status`, setup's hooks step), it now means T03. Its S03-T04 (`lib/config.sh`)
 now means T05.
+
+**After T02 (2026-10-15T23:15), one more split.** T02's recording found the backup overwrite
+(same-second backups share a name). The Python side has the same flaw, in
+`core/frontmatter.backup` and dedup's copy, and the port needs a helper with the
+never-overwrite rule. That helper is now its own task:
+- **T03:** one backup helper, `core/backup.py`, with a seam guard;
+- **T04:** the port;
+- **T05:** skills;
+- **T06:** the deletions (S03: 6 tasks).
+
+So the S01 reassessment's S03-T02 means T04 now, and its S03-T04 means T06.

@@ -47,11 +47,11 @@ are unchanged.
 
 ## Follow-ups
 
-- **S03-T03 (port), recorded in the slice plan:** one Python backup helper with the
+- **S03-T03 (split from the port after this task):** one Python backup helper with the
   never-overwrite rule. `core/frontmatter.backup` (correct / take) has the same
   to-the-second overwrite flaw; its callers back up once per SDK-bound run, so it is
-  practically unreachable today. `dedup.py:560` hand-rolls a copy. Also decide there whether
-  `hooks status` and doctor walk the hook entries (T01 follow-up).
+  practically unreachable today. `dedup.py:560` hand-rolls a copy. The port (now T04)
+  decides whether `hooks status` and doctor walk the hook entries (T01 follow-up).
 - The "For your vault" line in 0.7.16 tells operators who ran the no-op uninstall that their
   hooks are still installed.
 

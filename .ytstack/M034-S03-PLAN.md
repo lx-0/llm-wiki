@@ -4,7 +4,7 @@ slice: S03
 project: llm-wiki
 created: 2026-10-15T18:15:32+02:00
 status: planned
-task_count: 5
+task_count: 6
 completed_tasks: 2
 ---
 
@@ -40,24 +40,24 @@ last callers were skills' `config_get` and `cmd_status` (reassessed after S01).
   `hooks-uninstall` and adds the cases that pin the fixes: an uninstall that keeps another
   tool's hook (a Claude group and a Cursor bare entry), a payload that cannot be built, and
   an uninstall with nothing to remove. Release 0.7.16.
-- [ ] T03 -- **Port** the merge into each agent's config, install one, uninstall one, and the
+- [ ] T03 -- **One backup helper** (T02 follow-up; split from the port after T02). The port
+  needs T02's rule: never over an earlier backup, and a clash takes `-2`.
+  `core/frontmatter.backup` (correct / take / correct_apply) has the same to-the-second
+  overwrite flaw, and `dedup.py` hand-rolls a copy. `core/backup.py` becomes the one helper
+  for all of them, with a seam guard against a second `.bak.` writer.
+- [ ] T04 -- **Port** the merge into each agent's config, install one, uninstall one, and the
   `hooks install/uninstall/status` commands with the scope prompt, at parity with T02's
-  record: other tools' hooks survive, backups follow the existing rule, the hook commands
+  record: other tools' hooks survive, backups go through T03's helper, the hook commands
   are byte-identical. `wiki status` comes here as well (moved from S01-T05): a banner over
   S02's `config status` and this task's `hooks status`. `setup`'s hooks step runs
-  in-process. Two things to decide with the port:
-  - **The probe** (T01 follow-up): whether `hooks status` and doctor walk the hook entries
-    instead of grepping the config's text.
-  - **The backup helper** (T02 follow-up). The port needs T02's rule: never over an earlier
-    backup, and a clash takes `-2`. `core/frontmatter.backup` (correct / take) has the same
-    to-the-second overwrite flaw, and `dedup.py` hand-rolls a copy. One helper serves all
-    three.
-- [ ] T04 -- Skills in Python: the engine-owned check, the global-enable flag, registry
+  in-process. To decide with the port (T01 follow-up): whether `hooks status` and doctor
+  walk the hook entries instead of grepping the config's text.
+- [ ] T05 -- Skills in Python: the engine-owned check, the global-enable flag, registry
   add / remove, `skills install/uninstall/sync/status`, and the silent install / prune
   variants that `setup` and `update` call. Parity on the fixture `HOME`.
-- [ ] T05 -- The three `lib/` files are deleted along with their `wiki` call sites, and so is
+- [ ] T06 -- The three `lib/` files are deleted along with their `wiki` call sites, and so is
   `lib/config.sh` (its last callers, `config_get` in skills and `config_cmd_status` in
-  `cmd_status`, are ported in T03 / T04). `lib/ui.sh` stays for `cmd_update`'s stash prompt
+  `cmd_status`, are ported in T04 / T05). `lib/ui.sh` stays for `cmd_update`'s stash prompt
   until S05. The oracle passes and the docs are updated. On scratch with a sandboxed `HOME`,
   an install → status → uninstall cycle runs per agent.
 
