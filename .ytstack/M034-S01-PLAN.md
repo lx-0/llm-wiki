@@ -42,8 +42,13 @@ in the Python catalogue.
   dropped. Measure today's process tree for one command (`ps`) as the before number.
 - [ ] T04 -- The bootstrap hop. `wiki`'s `_dispatch_python` execs `<venv>/bin/python` with
   `scripts/` on PYTHONPATH (the iCloud `~/.venvs/<vault>-wiki` rule and
-  `UV_PROJECT_ENVIRONMENT` kept), and falls back to `uv run` only when the venv is missing.
-  Prove it with the process tree after (dispatcher + handler) and the full oracle unchanged.
+  `UV_PROJECT_ENVIRONMENT` kept), and falls back to `uv run` only when the venv is missing
+  or `uv.lock` changed since the venv's last sync. That case is today's implicit sync on
+  every `uv run`, which must not be lost (DECISIONS 2026-10-15 "One hop").
+  Prove it in three ways:
+  - the process tree after (dispatcher + handler), measured the T03 way;
+  - a test that no `uv` is called while the venv is current;
+  - the full oracle, unchanged.
 - [ ] T05 -- Port the thin wrappers into `cli_catalog`:
   - `menu`, `doctor`, `status`, `version`;
   - the `dream` / `dream-entity` argv routing;

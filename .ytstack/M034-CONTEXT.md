@@ -33,6 +33,13 @@ the TUI carry only what their readers use.
 - **Three processes per Python command.** `wiki` execs `uv run --project .wiki python
   scripts/cli.py`, and `uv` stays as the parent of the dispatcher. `cli.py` then runs every
   handler as a `python -m` child (`core/entry.py`; the isolation M033 kept on purpose).
+  Measured in S01-T03 with the real `uv` (the full tree is in DECISIONS 2026-10-15 "One
+  hop"):
+  - `wiki collect --list` runs as `uv` → dispatcher → handler;
+  - a bash wrapper (`wiki doctor`) runs as bash → `uv` → python;
+  - both keep three processes alive at once;
+  - `uv run` costs about 57 ms per call (median 82 ms against 25 ms for the venv's python);
+  - `wiki collect --list` takes a median 343 ms end to end.
 - **Three command tables.**
   - `scripts/cli_catalog.py` holds 48 `CommandSpec`s and renders `wiki help`.
   - `scripts/menu.py` hand-curates QUICK_ACTIONS (4), CATEGORIES (6 buckets) and
@@ -121,18 +128,22 @@ of `lib/` bash, the 708-line seed merge, a self-updating `update`, and three com
   same commit (CLAUDE.md).
 - 2026-10-15: **Release 0.8.0 at closeout.** The entry and the update path change, and
   operators reach them via `wiki update`.
+- 2026-10-15 (S01-T03, was open question 1): **One hop keeps the handler child.** The
+  bootstrap execs the venv's Python straight into `cli.py`, with `uv run` only when there is
+  no venv yet. The handlers stay `python -m` children: dispatcher + handler, two processes.
+  - In-process dispatch is rejected on counted grounds: of the 29 handlers, 9 write the
+    environment at import, 20 set up the root logger, and 27 exit via `sys.exit`.
+  - The hop must keep `uv run`'s implicit sync of a changed `uv.lock`.
+
+  DECISIONS 2026-10-15 "One hop".
+- 2026-10-15 (S01-T03, was open question 2): **No `llm_wiki` rename.** It would touch 335
+  Python files (1,590 import lines) plus 24 other files, and no consumer imports the engine
+  as a package. DECISIONS 2026-10-15 "The `llm_wiki` package rename is dropped".
 
 ## Open questions
 
-1. **What "one hop" keeps.** M033 kept a child process per handler (DECISIONS 2026-10-14):
-   modules set env at import (`CLAUDE_INVOKED_BY`), own their logging setup and call
-   `sys.exit`. **Recommendation:** keep the child. "One hop" means the bootstrap execs the
-   dispatcher's Python directly (no `uv run` parent), so bash + uv + dispatcher + handler
-   becomes dispatcher + handler. In-process dispatch would re-open everything M033's
-   isolation settled. Decide in S01.
-2. **The `llm_wiki` package rename.** **Recommendation:** drop it. The `scripts/` source root
-   works, has one import identity and a layout guard. A rename touches ~400 files and every
-   operator venv for no consumer benefit. Record the drop in DECISIONS in S01.
+1. *(Decided 2026-10-15: see the locked decisions above.)*
+2. *(Decided 2026-10-15: see the locked decisions above.)*
 3. **Interactive prompts in Python** (the setup wizard's confirm / ask / select).
    **Recommendation:** small helpers on `core/console` next to `read_key`, with no new
    dependency in every operator venv. The wizard has about ten prompts, and `questionary` /

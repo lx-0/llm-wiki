@@ -2252,3 +2252,89 @@ at most 91 in one calendar, against a cap of 500.
 rather than lossy. The first run after `wiki update` restores the dropped events inside the
 window; older dates need one full run with `since:`. The rendering moved to
 `collectors/calendar_render.py`, because the collector had reached the module-size limit.
+
+## 2026-10-15: One hop — the bootstrap execs the venv's Python into the dispatcher; handlers stay `python -m` children
+
+**Context:** M034 exit criterion 2 ("one hop") left open what the hop keeps (M034-CONTEXT,
+open question 1). The before number was measured on the scratch vault at `7b63c7c` with the
+real `uv` 0.8.13. A poller read `ps` until the command exited (M034-S01-T03 summary):
+
+```
+wiki collect --list          (a Python command, through _dispatch_python)
+  uv run --quiet --project <.wiki> python <.wiki>/scripts/cli.py collect --list   ← the wiki process, exec'd into uv
+    <.wiki>/.venv/bin/python3 <.wiki>/scripts/cli.py collect --list               ← dispatcher
+      <.wiki>/.venv/bin/python3 -m collectors.cli --list                          ← handler
+wiki doctor --quick --json   (a bash wrapper, no exec)
+  bash <.wiki>/wiki doctor --quick --json
+    uv run --quiet --project <.wiki> python <.wiki>/scripts/doctor.py --quick --json
+      <.wiki>/.venv/bin/python3 <.wiki>/scripts/doctor.py --quick --json
+```
+
+Both paths keep three processes alive at once. Timings, n = 15, warm cache:
+- `uv run … python -c pass`: median 82 ms. The venv's python alone: 25 ms. That puts about
+  57 ms of `uv` on every call before the engine runs.
+- Most of that is `uv` starting and finding the project, not the sync. A second series put
+  `uv run --no-sync` at 79 ms against 94 ms with the lock check and implicit sync, and the
+  venv's python at 32 ms.
+- `wiki collect --list` end to end: median 343 ms (277–558).
+
+**Chose:** the bootstrap `exec`s `<venv>/bin/python` straight into `scripts/cli.py`.
+- The venv is resolved as today: `UV_PROJECT_ENVIRONMENT` and the iCloud
+  `~/.venvs/<vault>-wiki` rule.
+- It falls back to `uv run` only when there is no venv yet.
+- The dispatcher keeps running each handler as a `python -m` child (`core/entry.py`,
+  DECISIONS 2026-10-14).
+
+After the hop, a command runs as dispatcher + handler: two processes. The bash wrappers T05
+ports go the same way.
+
+**Rejected:** in-process dispatch (`runpy` inside the dispatcher). Counted over the 29 handler
+modules the catalogue names:
+- **9 write `os.environ` at import.** Among them is `flush.py`, which must set
+  `CLAUDE_INVOKED_BY` and clean the inherited session variables *before* the SDK import. An
+  import in the dispatcher could already have done that import.
+- **20 set up the root logger through `setup_console_logging`.** It reuses an existing
+  stderr handler by design (the first call's formatter wins), so a handler's own formatter
+  would silently lose to the dispatcher's.
+- **27 leave through `sys.exit` / `SystemExit`** (82 sites).
+- **`refresh_after` (5 commands) runs in the dispatcher after the handler** and would inherit
+  the handler's environment and logging.
+
+Also rejected: the dispatcher `exec`ing into the handler when no refresh follows. It removes
+the waiting dispatcher, not a start-up (the handler's interpreter starts either way), and
+splits the exit path in two.
+
+**Consequences:**
+- **T04 implements the hop, and the oracle must come out unchanged.** Its proof is the tree
+  after (dispatcher + handler), measured the same way, plus a test that the bootstrap calls no
+  `uv` while the venv exists.
+- **The hop must not lose `uv run`'s implicit sync.** Today a `uv.lock` that changed under
+  the venv (a pull outside `wiki update`) is synced on the next call. Under the hop, a lock
+  newer than the venv's last sync still goes through `uv run`; T04 picks the check.
+- **The agent hook commands are not part of the hop.** They stay
+  `cd <.wiki> && uv run python hooks/<x>.py`, byte-identical (M034-CONTEXT, locked).
+
+## 2026-10-15: The `llm_wiki` package rename is dropped
+
+**Context:** DECISIONS 2026-10-14 made `scripts/` the source root and deferred renaming the
+directory to `llm_wiki` to M034 (M034-CONTEXT, open question 2). Measured at `7b63c7c`, a
+rename touches:
+- 335 tracked Python files (146 in `scripts/`, 186 in `tests/`, 3 in `hooks/`), with 1,590
+  import lines over the 65 first-party top-level names;
+- 24 other tracked files that spell `scripts/` paths: the `wiki` bootstrap, `pyproject.toml`'s
+  pytest `pythonpath`, the desktop app, docs, templates, skills, the README and AGENTS.md.
+
+**Chose:** `scripts/` stays the source root, and there is no `llm_wiki` package.
+
+**Why:**
+- **What a rename would buy already exists:** one import identity (`core.x`, never
+  `scripts.core.x`), and a layout guard (`tests/test_layout.py`) that refuses the second
+  spelling.
+- **No consumer imports the engine as a package.** The desktop app, the Obsidian buttons, the
+  skill and the shortcut call `<vault>/.wiki/wiki` (entry path locked). The agent hooks run
+  `hooks/<x>.py` by path (commands locked byte-identical).
+- **A real package would add cost and no reader.** It needs a build backend and an install
+  step in every operator venv, for the same zero consumers.
+
+**Revisit when:** the engine is installed as a package (PyPI, or a plugin that installs it), or
+a second program imports it.
