@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-15T19:05:00+02:00
+last_updated: 2026-10-15T19:20:00+02:00
 current_milestone: M034
 active_slice: S01
-active_task: none
+active_task: T03
 last_completed_milestone: M033
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -16,9 +16,9 @@ parallel_milestones: [M021, M025, M027, M029]
 
 **Status:** M034 / S01 — 2 of 6 tasks done (T01 + T02: the bash oracle). Engine 0.7.4,
 suite 2316, CI green on `864a09d`.
-**Next:** `ytstack:plan-task` → S01-T03. Decide open questions 1 and 2 in DECISIONS (one
-bootstrap hop with the handlers kept as `python -m` children; the `llm_wiki` rename dropped),
-and measure today's process tree for one command as the before number.
+**Next:** S01-T03 is planned (`M034-S01-T03-PLAN.md`), ready to execute. Decide open
+questions 1 and 2 in DECISIONS (one bootstrap hop with the handlers kept as `python -m`
+children; the `llm_wiki` rename dropped), and measure today's process tree as the before number.
 
 **M034 / S01-T02** (`1b0cfc1`, `b8df503`, `864a09d`): the oracle also records 17 mutating
 invocations from the bash, each on a fresh vault and HOME with its prompt answers scripted on
