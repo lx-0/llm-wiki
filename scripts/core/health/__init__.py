@@ -27,9 +27,10 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import asdict
-from typing import Any, TypedDict, cast
+from typing import cast
 
 from core import actions
+from core.contracts import CheckJSON, HealthSummaryJSON
 from core.health._base import SEVERITY_ORDER, CheckResult, _probe_failed
 from core.health.engine import (
     check_dependencies_importable,
@@ -57,7 +58,6 @@ from core.health.pipeline import (
 
 __all__ = [
     "SEVERITY_ORDER",
-    "CheckJSON",
     "CheckResult",
     "build_health",
     "check_account_auths",
@@ -135,27 +135,14 @@ def build_health(*, quick: bool = False) -> list[CheckResult]:
     return results
 
 
-def health_summary(results: list[CheckResult]) -> dict[str, int]:
+def health_summary(results: list[CheckResult]) -> HealthSummaryJSON:
     """Reduce a check list to severity counts for the banner / JSON payload."""
-    out = {"critical": 0, "warning": 0, "info": 0, "ok": 0}
+    out: dict[str, int] = {"critical": 0, "warning": 0, "info": 0, "ok": 0}
     for r in results:
         out[r.severity] = out.get(r.severity, 0) + 1
-    return out
-
-
-class CheckJSON(TypedDict):
-    """One check in the schema-2 JSON (`wiki doctor --json`, the desktop's Health rows):
-    the `CheckResult` fields in their order, `title` always set, plus `verb`."""
-
-    id: str
-    category: str
-    severity: str
-    message: str
-    fix: str | None
-    dispatch_args: list[str] | None
-    details: dict[str, Any] | None
-    title: str
-    verb: str | None
+    # The four keys are always there; a severity outside them would add a key the
+    # contract rejects (tests/test_contracts.py catches it on the golden).
+    return cast("HealthSummaryJSON", out)
 
 
 def to_json(results: list[CheckResult]) -> list[CheckJSON]:

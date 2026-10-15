@@ -52,6 +52,7 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 │   │   ├── health/                ← vault-health checks behind the home-screen banner + `wiki doctor`: `environment` / `engine` / `pipeline` by subsystem, `_base` (CheckResult), `__init__` the API + build_health; the package binds no patched name (tests patch the submodule)
 │   │   ├── console.py             ← the engine's one logging setup (`setup_console_logging`, called from entry points only — never at import; per-CLI formatter hook)
 │   │   ├── actions.py             ← action catalogue — the operator-facing vocabulary of everything a consumer can run (menu + desktop JSON contract)
+│   │   ├── contracts.py           ← the schema-2 `--json` payloads typed once (MenuJSON, DoctorJSON, …) + the generator of `docs/contracts/{menu,doctor}.schema.json` (`python -m core.contracts --write / --check`)
 │   │   ├── links.py               ← wikilink resolution + relativization — single source of truth (resolve_link / canonical_slug / relativize_text)
 │   │   ├── index_sync.py          ← deterministic knowledge/index.md sync behind `wiki reindex`
 │   │   ├── compile_role.py        ← the `compile_role` frontmatter axis + VALID_ROLES (read by route, lint, the compile prompt)

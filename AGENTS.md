@@ -176,6 +176,15 @@ Every LLM call is metered in TOKENS, keyed by `(provider, model)` — never doll
 
 Drift detection is JSON-key-order-insensitive (`_files_equivalent` / canonical `jq -S`), so don't worry about Obsidian re-serialising key order.
 
+### Changing a `--json` payload (menu / doctor)
+
+1. Change the `TypedDict` in `scripts/core/contracts.py` — the one definition the builders
+   (`core/actions.py`, `core/health/`, `menu_context.py`, `doctor.py`) return.
+2. Regenerate the schemas: `PYTHONPATH=scripts uv run python -m core.contracts --write`
+   (the suite runs `--check` and validates the oracle goldens against them).
+3. Bump `core.actions.SCHEMA` (and the `Literal` in `contracts.py`) when a consumer must learn
+   the change — the desktop refuses a schema it does not know.
+
 ### Adding a prompt
 
 1. Drop `<name>.md` into `prompts/`.

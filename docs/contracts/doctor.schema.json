@@ -1,0 +1,137 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "DoctorJSON",
+  "type": "object",
+  "description": "`wiki doctor --json` / `wiki doctor --quick --json`.",
+  "properties": {
+    "schema": {
+      "const": 2
+    },
+    "vault": {
+      "type": "string"
+    },
+    "engine_revision": {
+      "type": "string"
+    },
+    "summary": {
+      "$ref": "#/$defs/HealthSummaryJSON"
+    },
+    "checks": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/CheckJSON"
+      }
+    }
+  },
+  "required": [
+    "schema",
+    "vault",
+    "engine_revision",
+    "summary",
+    "checks"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "CheckJSON": {
+      "type": "object",
+      "description": "One check in the schema-2 JSON (`wiki doctor --json`, the desktop's Health rows): the `CheckResult` fields in their order, `title` always set, plus `verb`.",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "category": {
+          "type": "string"
+        },
+        "severity": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "fix": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "dispatch_args": {
+          "anyOf": [
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "details": {
+          "anyOf": [
+            {
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "title": {
+          "type": "string"
+        },
+        "verb": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "category",
+        "severity",
+        "message",
+        "fix",
+        "dispatch_args",
+        "details",
+        "title",
+        "verb"
+      ],
+      "additionalProperties": false
+    },
+    "HealthSummaryJSON": {
+      "type": "object",
+      "description": "Check counts per severity (`core.health.health_summary`).",
+      "properties": {
+        "critical": {
+          "type": "integer"
+        },
+        "warning": {
+          "type": "integer"
+        },
+        "info": {
+          "type": "integer"
+        },
+        "ok": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "critical",
+        "warning",
+        "info",
+        "ok"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

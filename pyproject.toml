@@ -43,6 +43,7 @@ Issues = "https://github.com/lx-0/llm-wiki/issues"
 
 [dependency-groups]
 dev = [
+    "jsonschema>=4.26.0",
     "pytest>=8.0",
 ]
 lint = [

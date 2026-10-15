@@ -1,0 +1,131 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "MenuJSON",
+  "type": "object",
+  "description": "`wiki menu --json`.",
+  "properties": {
+    "schema": {
+      "const": 2
+    },
+    "status": {
+      "$ref": "#/$defs/StatusJSON"
+    },
+    "suggestions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/SuggestionJSON"
+      }
+    },
+    "tools": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/ActionJSON"
+      }
+    }
+  },
+  "required": [
+    "schema",
+    "status",
+    "suggestions",
+    "tools"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "ActionJSON": {
+      "type": "object",
+      "description": "One action as consumers receive it (`menu --json` suggestions and tools, the desktop's buttons): the rendered title, the verb, the intent group, the argv `wiki` runs.",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "verb": {
+          "type": "string"
+        },
+        "group": {
+          "type": "string"
+        },
+        "argv": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "verb",
+        "group",
+        "argv"
+      ],
+      "additionalProperties": false
+    },
+    "StatusJSON": {
+      "type": "object",
+      "description": "The home screen's one-liner. Every key is optional: each probe can fail on its own and drops its key (`menu_context.build_status`).",
+      "properties": {
+        "articles": {
+          "type": "integer"
+        },
+        "last_compile_ago": {
+          "type": "string"
+        },
+        "ollama_reachable": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "SuggestionJSON": {
+      "type": "object",
+      "description": "A pending action with its count: `label` is the TUI's operator-term line, `priority` the declared order, `key` the menu number (\"1\"..\"N\") assigned after the sort.",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "verb": {
+          "type": "string"
+        },
+        "group": {
+          "type": "string"
+        },
+        "argv": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "count": {
+          "type": "integer"
+        },
+        "label": {
+          "type": "string"
+        },
+        "priority": {
+          "type": "integer"
+        },
+        "key": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "verb",
+        "group",
+        "argv",
+        "count",
+        "label",
+        "priority",
+        "key"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

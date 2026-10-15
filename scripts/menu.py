@@ -39,6 +39,7 @@ from core.console import (
     read_key,
     setup_console_logging,
 )
+from core.contracts import StatusJSON, SuggestionJSON
 from core.health import CheckResult, build_health
 from core.paths import ROOT_DIR, WIKI_DIR
 from menu_context import build_status, build_suggestions
@@ -348,7 +349,7 @@ def _flatten_for_fuzzy() -> list[tuple[str, str, object]]:
 # ── Helpers ─────────────────────────────────────────────────────────
 
 
-def render_status_line(status: dict) -> str:
+def render_status_line(status: StatusJSON) -> str:
     parts: list[str] = []
     n = status.get("articles")
     if n is not None:
@@ -483,8 +484,8 @@ _GROUP_HEADERS = {
 
 class HomeState:
     def __init__(self):
-        self.status: dict = {}
-        self.suggestions: list[dict] = []
+        self.status: StatusJSON = {}
+        self.suggestions: list[SuggestionJSON] = []
         self.health: list[CheckResult] = []
         self.cursor: int = 0
         self.selected: tuple | None = None

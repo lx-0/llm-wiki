@@ -23,6 +23,7 @@ import subprocess
 import sys
 
 from core import actions
+from core.contracts import DoctorJSON, HealthSummaryJSON
 from core.health import (
     CheckResult,
     build_health,
@@ -54,7 +55,7 @@ _SEVERITY_STYLE = {
 # ── Pretty renderer ─────────────────────────────────────────────────
 
 
-def render_pretty(results: list[CheckResult], summary: dict) -> str:
+def render_pretty(results: list[CheckResult], summary: HealthSummaryJSON) -> str:
     vault = ROOT_DIR.name
     revision = _git_revision()
     lines: list[str] = [
@@ -106,8 +107,8 @@ def render_pretty(results: list[CheckResult], summary: dict) -> str:
 # ── JSON renderer ───────────────────────────────────────────────────
 
 
-def render_json(results: list[CheckResult], summary: dict) -> str:
-    payload = {
+def render_json(results: list[CheckResult], summary: HealthSummaryJSON) -> str:
+    payload: DoctorJSON = {
         "schema": actions.SCHEMA,
         "vault": ROOT_DIR.name,
         "engine_revision": _git_revision(),

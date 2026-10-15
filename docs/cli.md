@@ -210,8 +210,9 @@ maintenance actions that are available without a pending count.
 }
 ```
 
-Stable field names per check: `id`, `category`, `severity`, `message`,
-`title`, `verb`, `fix?`, `dispatch_args?`, `details?`. Severity is one of
+Stable field names per check, every one always present: `id`, `category`, `severity`,
+`message`, `title`, `verb`, `fix`, `dispatch_args`, `details` — the last four may be
+`null`. Severity is one of
 `critical | warning | info | ok`. `message` is operator-speak (what the TUI
 prints); `title` is the plain-English phrasing GUI consumers show verbatim
 (falls back to `message`); `verb` is the button verb from the action
@@ -223,6 +224,14 @@ Actionable list and Enter dispatches `wiki <dispatch_args>`.
 Agents pick a suggestion from `wiki menu --json` then dispatch its `argv` via the
 regular bash subcommand (e.g. `wiki compile`). They never ask the menu
 to dispatch — bash stays single source of truth.
+
+Both payloads are typed once, in `scripts/core/contracts.py`. The JSON Schemas
+`docs/contracts/menu.schema.json` and `docs/contracts/doctor.schema.json` are generated
+from those types (`PYTHONPATH=scripts uv run python -m core.contracts --write`;
+`--check` in the suite), and pytest validates the engine's real output against them. A
+key the engine emits without the types fails validation (`additionalProperties: false`):
+add it to the type, regenerate, and bump `core.actions.SCHEMA` when consumers must learn
+it.
 
 ### What the reliability checks look for
 

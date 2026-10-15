@@ -15,7 +15,8 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import TypedDict
+
+from core.contracts import ActionJSON
 
 #: Bumped whenever a consumer-visible key is added, renamed or removed in `menu --json` /
 #: `doctor --json`. Consumers refuse payloads whose schema they do not know.
@@ -65,17 +66,6 @@ VERB_BY_COMMAND: dict[str, str] = {
     "calendar-auth": "Sign in",
     "auth": "Sign in",
 }
-
-
-class ActionJSON(TypedDict):
-    """One action as consumers receive it (`menu --json` actions and tools, the desktop's
-    buttons): the rendered title, the verb, the intent group, the argv `wiki` runs."""
-
-    id: str
-    title: str
-    verb: str
-    group: str
-    argv: list[str]
 
 
 @dataclass(frozen=True)

@@ -2944,6 +2944,14 @@ Per-candidate learnings from the 14-candidate seam arc (C01–C14). Decisions li
   `menu.py` (10) and `producers/` (8). CI's report-only step prints the live number. To widen
   the gate, take one package to 0 and add its path to both the pre-commit hook and the CI
   step; never gate a path that is not clean.
+- **`NotRequired[...]` is invisible to TypedDict under `from __future__ import annotations`
+  on Python 3.12 (2026-10-15, M033-S05-T03):** with postponed annotations the class body
+  holds the string `"NotRequired[int]"`, and 3.12's TypedDict decides required-ness before
+  resolving it, so `__required_keys__` lists the key as required. Measured on
+  `core.contracts.StatusJSON`: three `NotRequired` keys, all in `__required_keys__`. Anything
+  reading `__required_keys__` (the schema generator) would have declared them required. An
+  all-optional TypedDict is `total=False`; a mixed one goes in a module without the
+  `__future__` import, or splits into a total base plus a `total=False` subclass.
 
 ### Desktop toolchain (C07)
 

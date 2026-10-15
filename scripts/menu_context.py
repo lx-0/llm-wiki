@@ -51,6 +51,7 @@ from pathlib import Path
 
 from core import actions, frontmatter
 from core.console import setup_console_logging
+from core.contracts import MenuJSON, StatusJSON, SuggestionJSON
 from core.paths import (
     AREAS_DIR,
     DAILY_DIR,
@@ -240,7 +241,7 @@ def probe_lint_stale() -> int:
 # ── Signal table ─────────────────────────────────────────────────────
 
 
-def build_suggestions() -> list[dict]:
+def build_suggestions() -> list[SuggestionJSON]:
     """Run all probes, return list of dicts ordered by declared priority.
 
     Each entry has: key, count, label, cmd, priority, group. Only entries with
@@ -285,7 +286,7 @@ def build_suggestions() -> list[dict]:
         ("flush", probe_flush_missing, 6, lambda _: "today's session has not been flushed"),
         ("lint", probe_lint_stale, 7, lambda _: "knowledge edits since last lint sweep"),
     ]
-    results = []
+    results: list[SuggestionJSON] = []
     for action_id, probe, priority, label_fn in raw:
         try:
             n = probe()
@@ -301,6 +302,7 @@ def build_suggestions() -> list[dict]:
                 "count": n,
                 "label": label_fn(n),
                 "priority": priority,
+                "key": "",  # numbered "1".."N" after the sort below
             }
         )
     results.sort(key=lambda r: r["priority"])
@@ -364,9 +366,9 @@ def probe_ollama_reachable() -> bool | None:
         return False
 
 
-def build_status() -> dict:
+def build_status() -> StatusJSON:
     """Cheap stats for the home-screen one-liner above the suggestions."""
-    out: dict = {}
+    out: StatusJSON = {}
     try:
         out["articles"] = probe_articles()
     except Exception as e:
@@ -399,8 +401,8 @@ def main() -> int:
     # module and own their root logger.
     setup_console_logging("menu_context", level=logging.WARNING)
     start = time.monotonic()
-    status: dict = {}
-    suggestions: list[dict] = []
+    status: StatusJSON = {}
+    suggestions: list[SuggestionJSON] = []
     # SIGALRM only exists on POSIX; this script doesn't ship to Windows.
     signal.signal(signal.SIGALRM, _timeout_handler)
     signal.setitimer(signal.ITIMER_REAL, WALL_CLOCK_BUDGET_S)
@@ -420,15 +422,13 @@ def main() -> int:
         len(status),
         elapsed_ms,
     )
-    json.dump(
-        {
-            "schema": actions.SCHEMA,
-            "status": status,
-            "suggestions": suggestions,
-            "tools": actions.tools(),
-        },
-        sys.stdout,
-    )
+    payload: MenuJSON = {
+        "schema": actions.SCHEMA,
+        "status": status,
+        "suggestions": suggestions,
+        "tools": actions.tools(),
+    }
+    json.dump(payload, sys.stdout)
     sys.stdout.write("\n")
     return 0
 
