@@ -154,10 +154,8 @@ of `lib/` bash, the 708-line seed merge, a self-updating `update`, and three com
 1. *(Decided 2026-10-15: see the locked decisions above.)*
 2. *(Decided 2026-10-15: see the locked decisions above.)*
 3. *(Decided 2026-10-15: see the locked decisions above.)*
-4. **Seed's merges.** **Recommendation:** port the jq merges to Python `json` with a parity
-   harness. The fixture vault plus a read-only copy of the live vault's `.obsidian/` is the
-   shape oracle (the memory "round-trip on the real data shape"). `backlog/seed-semantic-diff.md`
-   (the `--check` engine-relevant subset) folds in if the port makes it cheap. Decide in S04.
+4. *(Decided 2026-10-16, S04 planning: DECISIONS "Seed's jq merges become Python `json`,
+   held to the bash by recorded goldens".)*
 
 ## Carried from M033
 

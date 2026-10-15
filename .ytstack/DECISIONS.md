@@ -2412,3 +2412,42 @@ The texts are corrected to the truth:
 
 **Consequences:** `tests/test_s02_adapters.py` pins both directions. The off-blocks-write test
 was watched failing first: the adapter reached the network stub.
+
+## 2026-10-16: Seed's jq merges become Python `json`, held to the bash by recorded goldens (M034 open question 4)
+
+**Context:** `lib/seed.sh` does all of its JSON work in jq, which `wiki` requires for seed
+alone:
+- the overlay's element-wise deep merge and its leaf-path diff;
+- the `jq -S` equivalence;
+- the community-plugins / appearance / meta-bind / shell-commands merges.
+
+S04 ports seed. S03 showed how a jq layer ports without drift: pure Python functions, and
+the bash's own output for every fixture recorded as goldens and pushed before the bash is
+deleted (S03-T07, `tests/golden/agents/`).
+
+**Chose:** the same for seed.
+- **Pure functions** in Python `json` for each merge and the overlay, rendered as jq writes
+  (2-space indent, UTF-8 as is, a trailing newline).
+- **Parity first against the live bash,** then against its recorded output once it is gone.
+- **The shape oracle** is the fixture vault plus a read-only copy of the live vault's
+  `.obsidian/`, the real data with its arrays (the memory "round-trip on the real data
+  shape").
+- **jq's own semantics are kept where they show:**
+  - `unique` sorts;
+  - `*` keeps key order and replaces arrays;
+  - the overlay merges arrays by index.
+
+`backlog/seed-semantic-diff.md` (`--check` on the engine-relevant subset) folds in only if
+the port makes it cheap.
+
+**Rejected:**
+- *Keep jq through a subprocess from Python*: it keeps a system dependency for one command,
+  and the merges stay untestable as functions.
+- *A JSON-merge library* (deepmerge, jsonmerge): none has jq's exact array semantics. The
+  overlay's arrays merge by index, `unique` sorts. Matching them is more code than the 30
+  lines of the functions themselves.
+
+**Consequences:**
+- `require_cmd jq` leaves `wiki` with `lib/seed.sh` (S04-T05).
+- install.sh, which sourced lib/seed.sh before its venv existed, seeds through `wiki seed`
+  after its `uv sync` (S04-T05).

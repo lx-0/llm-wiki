@@ -4,7 +4,7 @@ slice: S04
 project: llm-wiki
 created: 2026-10-15T18:15:32+02:00
 status: planned
-task_count: 4
+task_count: 5
 completed_tasks: 0
 ---
 
@@ -13,25 +13,56 @@ completed_tasks: 0
 **Goal:** `wiki seed` runs in Python, with every template merge at parity on the fixture vault
 and on a copy of the live `.obsidian/`; `lib/seed.sh` (708 lines) is deleted.
 
+Re-cut before T01 with what S03 taught (see Notes). The planning reading found a constraint
+the first cut missed: **install.sh sources lib/seed.sh** and seeds before its `uv sync`.
+Deleting the library means the installer seeds through `wiki seed` after the venv exists.
+
 ## Tasks
 
-- [ ] T01 -- The seed core:
+- [ ] T01 -- **Oracle first, fix first.** Record the bash on the branches the six seed cases
+  miss:
+  - the special merges over existing operator data (community plugins, `appearance.json`,
+    meta-bind by id, the agent shell commands by id, the `.env` example's per-var append);
+  - a seed / `--check` / `--force` with an overlay in `.wiki/custom/`;
+  - a targeted path that matches nothing;
+  - `--check` together with `--force`;
+  - `--extract-custom` with no drift;
+  - a merge target that is not JSON.
+
+  Bash defects the recording turns up are fixed in the bash first, then recorded (a
+  release when operator-visible). Open question 4 is decided in DECISIONS: port the jq
+  merges to Python `json`, held to the bash by recorded goldens.
+- [ ] T02 -- **The seed core, pure:**
   - the template walk and its skip rules;
-  - semantic file equivalence (what `jq -S` gave, in `json`);
-  - the custom overlay: compute, apply, extract into `.wiki/custom/`.
+  - semantic file equivalence (what `jq -S` gave);
+  - the overlay: apply (element-wise deep merge, arrays by index), compute (leaf paths),
+    extract.
 
-  Open question 4 is decided in DECISIONS. Unit tests run on fixture templates.
-- [ ] T02 -- The special merges:
-  - community plugins, `appearance.json`, the `.env` example;
-  - meta-bind data, agent shell commands, the dashboard agent buttons.
+  Byte parity with the bash. The bash's outputs are recorded as goldens and pushed before
+  T05 deletes it (S03-T07's pattern).
+- [ ] T03 -- **The special merges, pure:**
+  - community plugins (jq `unique`: a sorted union);
+  - `appearance.json`;
+  - meta-bind by id;
+  - the shell commands by id, with `dashboard.agent_buttons` in-process (no `uv run`);
+  - the `.env` example's stanza append;
+  - the dashboard agent-button rewrite.
 
-  Each at parity with the bash on the fixture and on a copy of the live vault's `.obsidian/`
-  (the real data shape — arrays included; read-only source, copied to a tmp dir).
-- [ ] T03 -- The `seed` command (`--force`, `--check`, `seed extract-custom`). The `--check`
-  drift report uses the engine-relevant subset if the port makes that cheap
-  (`backlog/seed-semantic-diff.md`). `test_seed_preserves_caches.py` is kept green.
-- [ ] T04 -- `lib/seed.sh` is deleted along with its `wiki` call sites. The oracle passes, the
-  docs are updated, and a scratch `wiki seed` and `wiki seed --force` match the bash goldens.
+  Each is at parity on the fixture and on a copy of the live vault's `.obsidian/` (arrays
+  included; read-only source, copied to a tmp dir), recorded the same way.
+- [ ] T04 -- **The `seed` command** in Python:
+  - `--force`, `--check`, a targeted `<path>`, `--extract-custom`;
+  - the help;
+  - the dashboards refresh after a writing run.
+
+  All seed goldens pass, and `test_seed_preserves_caches.py` stays green. The `--check`
+  report uses the engine-relevant subset if the port makes that cheap
+  (`backlog/seed-semantic-diff.md`).
+- [ ] T05 -- **The installer and the deletion.** `install.sh` seeds through `./.wiki/wiki
+  seed` (`--force` on the operator's overwrite choice) after its venv sync. Then
+  `lib/seed.sh` and `require_cmd jq` go: seed was jq's last user. The docs follow. A
+  scratch `install.sh` into a fresh vault, plus `wiki seed` and `--force` on a copy of the
+  live `.obsidian/`, match the goldens.
 
 ## Done when
 

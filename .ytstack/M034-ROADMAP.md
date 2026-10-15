@@ -54,7 +54,8 @@ and three tables.
   the JSON merges into agent configs (hook commands byte-identical), `skills
   install/uninstall/sync/status`, and `wiki status`. `lib/agents.sh`, `lib/hooks.sh`,
   `lib/skills.sh` and `lib/config.sh` retire.
-- [ ] S04 -- **Seed** (4 tasks). The template seeding with its overlay, plugin, env,
+- [ ] S04 -- **Seed** (5 tasks; re-cut after S03: record first, pure core and merges held
+  to recorded goldens, the command, then install.sh and the deletion). The template seeding with its overlay, plugin, env,
   meta-bind and dashboard-button merges, at parity on the fixture vault and a copy of the live
   `.obsidian/`; `lib/seed.sh` retires.
 - [ ] S05 -- **Update + the last bash** (5 tasks). `update` with the post-pull re-exec of

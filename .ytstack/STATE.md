@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-16T00:35:00+02:00
+last_updated: 2026-10-16T00:45:00+02:00
 current_milestone: M034
 active_slice: S04
-active_task: none
+active_task: T01
 last_completed_milestone: M033
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -14,12 +14,20 @@ parallel_milestones: [M021, M025, M027, M029]
 
 ## Next action — M034 / S04: seed
 
-**Status:** M034 — slice S03 complete. Next slice: S04 (seed). Slices S01–S03 are complete
-(3/6). The reassessment after S03 came out **A**: the slice order holds. What S03 taught is
-in `M034-S04-PLAN.md`'s notes, for planning S04-T01:
-- expect more tasks (record first, fix first, pure layer, record before delete);
-- check resolved vs logical paths in what seed writes;
-- `require_cmd jq` goes with `lib/seed.sh`.
+**Status:** M034 / S04 / T01 planned — ready to execute (`M034-S04-T01-PLAN.md`: eight bash
+seed cases recorded first). Slices S01–S03 are complete (3/6). The reassessment after S03
+came out **A**: the slice order holds.
+
+S04 was re-cut to 5 tasks with S03's lessons:
+1. T01: record first, fix first;
+2. T02: the pure core;
+3. T03: the pure merges;
+4. T04: the command;
+5. T05: install.sh and the deletion.
+
+The planning reading found that install.sh sources lib/seed.sh before its venv exists; T05
+moves it to `wiki seed` after the `uv sync`. Open question 4 is decided (DECISIONS
+2026-10-16): the jq merges become Python `json`, held to recorded goldens.
 
 Engine 0.7.19, suite 2505, CI green on `9ad0d2c`. The bash is `wiki` (412) + `common.sh`
 (94) + `seed.sh` (710) + `ui.sh` (21); it owns seed and update.
