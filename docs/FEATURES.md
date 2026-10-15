@@ -193,7 +193,7 @@ Currently 1 agent task ships. Adding a new task = drop `prompts/agents/<id>.md` 
 
 ### `wiki` dispatcher (0.3.0, C06)
 
-The `CommandSpec` table in `scripts/cli_catalog.py` (help texts in `scripts/cli_help.py`, dispatch in `scripts/cli.py`) is the single source of truth for the command catalog: `wiki help` renders the full list (previously blind to 9 commands), `menu.py` coverage is test-pinned to it, the post-command dashboard refresh runs once via flush.py's fcntl lock, and every Python-backed subcommand delegates through it — routes (`wiki dream` → a sweep by default, `list-candidates`, `web-research`) and aliases (`wiki gmail-auth` → `wiki auth gmail`) included. The bash `wiki` keeps bootstrap + the fail-closed vault guard + the commands M034 has not ported yet (setup/hooks/skills/config/seed/update/status/install-shortcut).
+The `CommandSpec` table in `scripts/cli_catalog.py` (help texts in `scripts/cli_help.py`, dispatch in `scripts/cli.py`) is the single source of truth for the command catalog: `wiki help` renders the full list (previously blind to 9 commands), `menu.py` coverage is test-pinned to it, the post-command dashboard refresh runs once via flush.py's fcntl lock, and every Python-backed subcommand delegates through it — routes (`wiki dream` → a sweep by default, `list-candidates`, `web-research`) and aliases (`wiki gmail-auth` → `wiki auth gmail`) included. The bash `wiki` keeps bootstrap + the fail-closed vault guard + the commands M034 has not ported yet (hooks/skills/seed/update/status).
 
 ## Engine seams (cross-cutting)
 

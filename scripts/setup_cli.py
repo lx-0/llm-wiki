@@ -14,7 +14,7 @@ import subprocess
 import sys
 
 import config_cli
-from core.console import confirm
+from core.console import confirm, info
 from core.paths import WIKI_DIR
 
 WIKI_BIN = WIKI_DIR / "wiki"
@@ -27,7 +27,7 @@ def setup(*, fd: int = 0) -> int:
     sys.stdout.flush()
     if confirm("Now install hooks into agent configs?", default=True, fd=fd):
         return subprocess.run([str(WIKI_BIN), "hooks", "install"], check=False).returncode
-    config_cli._info("Skipped hook install — run `wiki hooks install` later.")
+    info("Skipped hook install — run `wiki hooks install` later.")
     return 0
 
 

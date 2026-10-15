@@ -24,6 +24,10 @@ import httpx
 from cli_help import H_CONFIG
 from core import config as core_config
 from core.console import ask, confirm, print_error, read_line, select_one
+from core.console import banner as _banner
+from core.console import info as _info
+from core.console import ok as _ok
+from core.console import warn as _warn
 
 SECTIONS = [
     "models",
@@ -46,29 +50,10 @@ STATUS_KEYS = [
     ("skills.global_install", "skills.global_install"),
 ]
 
-# stdout lines are styled by stdout's terminal state (the bash's `[[ -t 1 ]]`)
+# The dim and yellow pieces inside prompts follow stdout's terminal state, as the bash's did
+# (`[[ -t 1 ]]`); the status lines are core/console's ok / warn / info / banner.
 _TTY = sys.stdout.isatty()
-_BOLD, _DIM, _RESET = ("\033[1m", "\033[2m", "\033[0m") if _TTY else ("", "", "")
-_GREEN, _YELLOW, _BLUE = ("\033[32m", "\033[33m", "\033[34m") if _TTY else ("", "", "")
-
-
-def _banner(title: str, subtitle: str | None = None) -> None:
-    print(f"{_BOLD}{title}{_RESET}")
-    if subtitle:
-        print(f"{_DIM}{subtitle}{_RESET}")
-    print()
-
-
-def _ok(message: str) -> None:
-    print(f"{_GREEN}✓ {message}{_RESET}")
-
-
-def _warn(message: str) -> None:
-    print(f"{_YELLOW}! {message}{_RESET}")
-
-
-def _info(message: str) -> None:
-    print(f"{_BLUE}{message}{_RESET}")
+_DIM, _YELLOW, _RESET = ("\033[2m", "\033[33m", "\033[0m") if _TTY else ("", "", "")
 
 
 def _prompt(text: str) -> None:

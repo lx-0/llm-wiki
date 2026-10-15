@@ -8,6 +8,7 @@ USAGE
   wiki install-shortcut --print-only   show what would happen, don't write
 
 Idempotent. Replaces a stale symlink pointing at a different vault.
+Refuses to replace anything that is not a symlink (another program called `wiki`).
 Reports if ~/.local/bin isn't on PATH and prints the one-line shell-rc
 edit needed.
 --- stderr ---

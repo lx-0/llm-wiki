@@ -8,7 +8,7 @@ replacing existing: <HOME>/.local/bin/wiki → <ROOT>/other-vault/.wiki/wiki
 ! <HOME>/.local/bin is NOT on PATH
 
 Add this line to your shell rc (~/.zshrc on macOS default):
-  export PATH=$HOME/.local/bin:$PATH
+  export PATH="$HOME/.local/bin:$PATH"
 Then reload: `source ~/.zshrc` (or open a new terminal).
 --- stderr ---
 --- change ---

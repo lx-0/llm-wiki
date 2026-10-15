@@ -742,3 +742,17 @@ WIZARD QUESTIONS
   6. Global skill       (link use-llm-wiki into ~/.claude/skills/)
 
 Press Enter on any question to keep the current value."""
+
+# `wiki install-shortcut` — moved from the bash heredoc with the port (M034-S02-T04); the
+# bash oracle's `install-shortcut-help` golden holds it. One line added with the move: the
+# refusal of a non-symlink at the link path (the bash deleted it).
+H_INSTALL_SHORTCUT = """wiki install-shortcut — create `wiki` symlink on PATH
+
+USAGE
+  wiki install-shortcut         create ~/.local/bin/wiki → this vault's wiki
+  wiki install-shortcut --print-only   show what would happen, don't write
+
+Idempotent. Replaces a stale symlink pointing at a different vault.
+Refuses to replace anything that is not a symlink (another program called `wiki`).
+Reports if ~/.local/bin isn't on PATH and prints the one-line shell-rc
+edit needed."""

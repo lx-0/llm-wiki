@@ -174,6 +174,7 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 │   ├── doctor.py              ← `wiki doctor` — full vault-health audit (`--quick --json` — an oracle payload)
 │   ├── config_cli.py          ← `wiki config` — get/set/keys/path over core/config, status, the interactive editor, the setup wizard
 │   ├── setup_cli.py           ← `wiki setup` — the wizard, then the hooks step (`wiki hooks install` as a child reading the rest of stdin)
+│   ├── shortcut_cli.py        ← `wiki install-shortcut` — the `~/.local/bin/wiki` symlink (refuses a non-symlink in the way), the PATH probe
 │   ├── engine_version.py      ← `wiki version` — the engine checkout's revision, tag, origin (no vault needed)
 │   ├── dream.py               ← dream cycle — periodic cross-time re-synthesis of entity pages (`wiki dream` / `wiki dream-entity`): one entity's synthesis, the sweep, the CLI
 │   ├── dream_model.py         ← dream entities (EntityRef, the kind table, resolve/list) + the cooldown age — the base the other dream modules share, so none imports dream.py

@@ -18,6 +18,23 @@ every operator's `wiki update` → `uv sync` regenerate `uv.lock` and dirty thei
 config keys must also be wired into `scripts/migrations/migrate_config_keys.py`
 in the same commit.
 
+## [0.7.13] — 2026-10-15
+
+**For your vault:** no config key changed, so there is no migration.
+
+### Changed
+
+- **`wiki install-shortcut` runs in Python,** like the commands before it. It creates and
+  replaces the `~/.local/bin/wiki` link as before. The line it suggests for your shell rc now
+  keeps its quotes: `export PATH="$HOME/.local/bin:$PATH"`.
+
+### Fixed
+
+- **`wiki install-shortcut` deleted whatever sat at `~/.local/bin/wiki`.** A regular file
+  there, such as another program called `wiki`, was removed without asking and replaced by
+  the link. It now refuses, leaves the file alone and says what to do. Links are still
+  replaced as before.
+
 ## [0.7.12] — 2026-10-15
 
 **For your vault:** no config key changed, so there is no migration.

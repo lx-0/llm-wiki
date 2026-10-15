@@ -67,6 +67,38 @@ def print_error(message: str) -> None:
     print(f"{prefix}{message}", file=sys.stderr)
 
 
+# ── stdout status lines ────────────────────────────────────────────────────
+# The bash `ok` / `warn` / `info` / `banner`, which wrote to stdout, for the commands ported
+# from it (M034). Styled by stdout's terminal state at call time — the bash's `[[ -t 1 ]]` —
+# so a piped or captured run gets plain text.
+
+
+def _styled(code: str, text: str) -> str:
+    return f"\033[{code}m{text}\033[0m" if sys.stdout.isatty() else text
+
+
+def ok(message: str) -> None:
+    print(_styled("32", f"✓ {message}"))
+
+
+def warn(message: str) -> None:
+    print(_styled("33", f"! {message}"))
+
+
+def info(message: str) -> None:
+    print(_styled("34", message))
+
+
+def banner(title: str, subtitle: str | None = None) -> None:
+    """A command's heading: bold title, dim subtitle, a blank line — flushed, so a child
+    process started next writes below it."""
+    print(_styled("1", title))
+    if subtitle:
+        print(_styled("2", subtitle))
+    print()
+    sys.stdout.flush()
+
+
 # ── Single-keypress input ──────────────────────────────────────────────────
 # Used by every interactive picker / prompt in the engine (home menu,
 # curiosity walk, future review flows). cbreak mode + os.read(1) gives

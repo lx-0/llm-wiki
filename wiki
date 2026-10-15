@@ -7,10 +7,10 @@
 # `wiki help`. The home menu keeps its own action table (`scripts/menu.py` +
 # `scripts/core/actions.py`) — folding the two is M034's. This bash layer only does
 # bootstrap (symlink resolution + vault guard) and the commands not yet ported
-# (setup / hooks / skills / config / seed / update / status / install-shortcut).
-# Every other subcommand — bare `wiki`, help, menu, doctor, version, the dream
-# routing and the OAuth aliases included — is delegated to `scripts/cli.py` in one
-# hop, which also owns the once-locked dashboard refresh and the OAuth bootstrap
+# (hooks / skills / seed / update / status). Every other subcommand — bare `wiki`,
+# help, menu, doctor, version, config, setup, install-shortcut, the dream routing
+# and the OAuth aliases included — is delegated to `scripts/cli.py` in one hop,
+# which also owns the once-locked dashboard refresh and the OAuth bootstrap
 # (`wiki auth <service> <account-id>`).
 
 set -euo pipefail
@@ -511,78 +511,6 @@ _update_post_pull() {
   fi
 }
 
-cmd_install_shortcut() {
-  # Create a `wiki` shortcut in `~/.local/bin/wiki` → vault's `.wiki/wiki`.
-  # Operator-asked: typing `wiki` from any cwd should Just Work, not require
-  # `./.wiki/wiki` or the iCloud-path expansion. Idempotent — replaces an
-  # existing symlink if it points elsewhere; no-op if it already points here.
-  case "${1:-}" in
-    -h|--help|help)
-      cat <<EOF
-${C_BOLD}wiki install-shortcut${C_RESET} — create \`wiki\` symlink on PATH
-
-${C_BOLD}USAGE${C_RESET}
-  wiki install-shortcut         create ~/.local/bin/wiki → this vault's wiki
-  wiki install-shortcut --print-only   show what would happen, don't write
-
-Idempotent. Replaces a stale symlink pointing at a different vault.
-Reports if ~/.local/bin isn't on PATH and prints the one-line shell-rc
-edit needed.
-EOF
-      return 0
-      ;;
-  esac
-
-  local print_only=0
-  [[ "${1:-}" == "--print-only" ]] && print_only=1
-
-  local bin_dir="$HOME/.local/bin"
-  local link="$bin_dir/wiki"
-  local target="$WIKI_DIR/wiki"
-
-  banner "wiki install-shortcut"
-
-  if [[ ! -x "$target" ]]; then
-    err "target $target is not executable (engine install broken?)"
-    return 1
-  fi
-
-  if (( print_only )); then
-    info "would create: $link → $target"
-  else
-    mkdir -p "$bin_dir"
-    if [[ -L "$link" || -e "$link" ]]; then
-      local current; current="$(readlink "$link" 2>/dev/null || echo)"
-      if [[ "$current" == "$target" ]]; then
-        ok "already linked: $link → $target"
-      else
-        info "replacing existing: $link → $current"
-        rm -f "$link"
-        ln -s "$target" "$link"
-        ok "linked: $link → $target"
-      fi
-    else
-      ln -s "$target" "$link"
-      ok "linked: $link → $target"
-    fi
-  fi
-
-  # Probe whether ~/.local/bin is on PATH for the operator's current shell.
-  case ":$PATH:" in
-    *":$bin_dir:"*)
-      ok "$bin_dir is on PATH — typing \`wiki\` from any cwd will work"
-      ;;
-    *)
-      warn "$bin_dir is NOT on PATH"
-      echo
-      info "Add this line to your shell rc (~/.zshrc on macOS default):"
-      printf "  ${C_BOLD}export PATH="\$HOME/.local/bin:\$PATH"${C_RESET}
-"
-      info "Then reload: \`source ~/.zshrc\` (or open a new terminal)."
-      ;;
-  esac
-}
-
 # ── Entry point ──────────────────────────────────────────────────────
 # Guard before dispatch: every subcommand except help/version touches vault
 # state, so demand a vault. Help + version must work in a bare checkout.
@@ -600,7 +528,6 @@ esac
 # on input. An unknown command falls through to cli.py, which prints its own
 # "unknown command" error.
 case "${1:-}" in
-  install-shortcut) shift; cmd_install_shortcut "$@" ;;
   status)           shift; cmd_status "$@" ;;
   hooks)            shift; cmd_hooks "$@" ;;
   skills)           shift; cmd_skills "$@" ;;

@@ -1,19 +1,9 @@
 $ wiki install-shortcut
-exit: 0
+exit: 1
 --- stdout ---
 wiki install-shortcut
 
-replacing existing: <HOME>/.local/bin/wiki → 
-✓ linked: <HOME>/.local/bin/wiki → <VAULT>/.wiki/wiki
-! <HOME>/.local/bin is NOT on PATH
-
-Add this line to your shell rc (~/.zshrc on macOS default):
-  export PATH=$HOME/.local/bin:$PATH
-Then reload: `source ~/.zshrc` (or open a new terminal).
 --- stderr ---
+wiki: <HOME>/.local/bin/wiki is not a symlink — another program may be called `wiki`. Move it away, then run `wiki install-shortcut` again.
 --- change ---
-~ <HOME>/.local/bin/wiki
-    @@ -1,2 +1 @@
-    -#!/bin/sh
-    -echo another tool
-    +-> <VAULT>/.wiki/wiki
+(none)
