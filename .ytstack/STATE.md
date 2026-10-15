@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-15T15:25:13+02:00
+last_updated: 2026-10-15T15:27:37+02:00
 current_milestone: M033
 active_slice: S05
-active_task: none
+active_task: T02
 last_completed_milestone: M032
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -217,8 +217,12 @@ On `core/` / `scripts/`: errors 22 / 212 for pyright and basedpyright (the same 
 aliased `None` check). Footprint: Node + up to 199 MB vs a 25 MB binary. DECISIONS
 2026-10-15. ty found a dead import pyright had never reported, hidden by a mypy-coded
 `type: ignore`: the suggestions' IMAP actions on Gmail accounts had crashed since 74f3d84,
-and `b80dad7` fixes it with tests (RED first). Suite 2245, CI green. **Next: S05-T02 (`core/`
-green under ty + the gate in pre-commit and CI) via `plan-task`.**
+and `b80dad7` fixes it with tests (RED first). Suite 2245, CI green. T02 planned
+(`M033-S05-T02-PLAN.md`): `core/`'s 19 diagnostics have five roots (`sdk_helpers` 13,
+`config_docs` 4, `piggyback_runner` 1, `health` 1). The two desktop payloads get
+`TypedDict`s (`ActionJSON`, `CheckJSON`, which T03 builds the schema from). The gate goes into
+pre-commit + CI on `core/`, plus a report-only step for all of `scripts/`. **Next: execute
+T02.**
 
 ## M032 COMPLETE (L, 2026-10-14): desktop de-slop
 
