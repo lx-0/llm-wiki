@@ -23,6 +23,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import lint
+import lint_checks
 from core.utils import file_hash
 
 
@@ -144,7 +145,7 @@ def test_uningested_source_is_not_stale(tmp_path):
 
 
 def test_qa_schema_passes_canonical_note(tmp_path, monkeypatch):
-    monkeypatch.setattr(lint, "_domain_tags", lambda: ("fleet", "llm-wiki"))
+    monkeypatch.setattr(lint_checks, "_domain_tags", lambda: ("fleet", "llm-wiki"))
     k = tmp_path / "knowledge"
     _write(k / "qa" / "how-x.md", "---\ntype: qa\ntags: [fleet]\n---\nAnswer.")
     _write(k / "index.md", "| [[qa/how-x]] | q | src | 2026-01-05 |")
@@ -154,7 +155,7 @@ def test_qa_schema_passes_canonical_note(tmp_path, monkeypatch):
 def test_qa_schema_flags_all_three_rules(tmp_path, monkeypatch):
     """Wrong type + not in index + no domain tag — each rule fires its own
     issue code so the drift is independently routable."""
-    monkeypatch.setattr(lint, "_domain_tags", lambda: ("fleet", "llm-wiki"))
+    monkeypatch.setattr(lint_checks, "_domain_tags", lambda: ("fleet", "llm-wiki"))
     k = tmp_path / "knowledge"
     _write(k / "qa" / "drifted.md", "---\ntype: concept\ntags: [misc]\n---\nBody.")
     issues = lint.check_qa_schema(_ctx(tmp_path))

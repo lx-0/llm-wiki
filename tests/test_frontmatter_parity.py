@@ -218,7 +218,8 @@ _FENCE_READ_SMELLS = (
 )
 # Lines that look like a fence read and are not — the reason stands beside each.
 _ALLOWED_FENCE_LINES = {
-    "scripts/lint.py": (
+    # check_two_layer_pages, in lint_checks since M033-S04-T07 (was lint.py)
+    "scripts/lint_checks.py": (
         "`^---\\s*$` over the BODY finds thematic breaks before `## Timeline`, not a fence"
     ),
 }

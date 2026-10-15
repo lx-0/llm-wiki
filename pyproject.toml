@@ -99,7 +99,8 @@ ignore = [
 # test fakes declare class-level dicts / lists as fixture data; no instance shares them
 "tests/**" = ["RUF012"]
 # code before imports that is deliberate: flush.py sanitises the SDK env before the SDK
-# import; lint.py + test_sdk_helpers.py keep each section's imports beside the section;
+# import; lint.py sets CLAUDE_INVOKED_BY before the SDK import and keeps the LLM check's
+# imports beside it; test_sdk_helpers.py keeps each section's imports beside the section;
 # the hooks must import their own bootstrap before anything from scripts/
 "scripts/flush.py" = ["E402"]
 "scripts/lint.py" = ["E402"]

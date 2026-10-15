@@ -174,7 +174,10 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 │   ├── usage_report.py        ← `wiki usage` — token-usage ledger read-back (state/usage.json)
 │   ├── links_audit.py         ← `wiki links` — analyze (and optionally fix) broken wikilinks
 │   ├── probe_compile_scope.py ← empirical probe of the compile-scope allowlist (operator-run, real SDK)
-│   ├── lint.py                ← structural checks over a once-built LintContext corpus (footer-aware link graph) + 1 LLM contradiction check
+│   ├── lint.py                ← `wiki lint`: runs CHECKS over a once-built LintContext corpus (footer-aware link graph) + 1 LLM contradiction check, writes the report; the facade consumers import as `lint.X`
+│   ├── lint_model.py          ← Issue + the corpus model (Article, LintContext, build_context — the one corpus read)
+│   ├── lint_checks.py         ← the structural checks (links, orphans, staleness, types, qa/concept/connection/entity/area shapes, daily rollup, fact violations)
+│   ├── lint_schema.py         ← the frontmatter-schema checks (takes shape, domain / compile_role enums, source-and-final author)
 │   ├── query.py               ← Claude Agent SDK natural-language query (read-only / file-back)
 │   ├── agent_task.py          ← generic Claude Agent SDK runner for prompts/agents/*.md
 │   ├── clippings_sweep.py     ← thin shim → preprocessors/clippings.py (<vault>/Clippings/ → raw/articles/, pre-compile lift)

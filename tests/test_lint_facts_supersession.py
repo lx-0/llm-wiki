@@ -4,7 +4,7 @@ from __future__ import annotations
 
 
 def test_superseded_by_fact_matches_slug() -> None:
-    import lint
+    import lint_checks as lint
 
     assert (
         lint._superseded_by_fact({"status": "superseded", "superseded_by": "facts/adn"}, "adn")
@@ -15,7 +15,7 @@ def test_superseded_by_fact_matches_slug() -> None:
 
 
 def test_superseded_by_other_fact_still_violates() -> None:
-    import lint
+    import lint_checks as lint
 
     assert (
         lint._superseded_by_fact({"status": "superseded", "superseded_by": "facts/other"}, "adn")
@@ -24,7 +24,7 @@ def test_superseded_by_other_fact_still_violates() -> None:
 
 
 def test_non_superseded_article_not_skipped() -> None:
-    import lint
+    import lint_checks as lint
 
     assert lint._superseded_by_fact({}, "adn") is False
     assert lint._superseded_by_fact({"status": "active"}, "adn") is False

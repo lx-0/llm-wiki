@@ -161,4 +161,4 @@ Persistent failure across iterations is the signal to either:
 - Schema reference: `templates/AGENTS.example.md` People + Project Articles
 - Spec-locking fixtures: `tests/fixtures/two_layer/`
 - Synthetic substrate: `tests/fixtures/jamie/`
-- Lint enforcement: `scripts/lint.py:check_two_layer_pages` + `check_action_item_syntax`
+- Lint enforcement: `scripts/lint_checks.py:check_two_layer_pages` + `check_action_item_syntax`
