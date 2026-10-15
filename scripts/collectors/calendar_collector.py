@@ -96,7 +96,7 @@ import functools
 import logging
 import re
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -567,6 +567,140 @@ def _attach_transcript_links(blocks: list[_EventBlock], refs: list[_TranscriptRe
     return attached
 
 
+# ── Per-account scan ────────────────────────────────────────────────
+
+
+@dataclass
+class _CalendarScan:
+    """The accumulators of one account's scan, shared by the per-calendar phase.
+
+    ``time_min`` is carried here because the loop reassigns it to the account's
+    configured ``since`` whenever a calendar has no incremental watermark — and
+    that reassignment stays in force for the calendars scanned after it."""
+
+    time_min: str
+    time_max: str
+    operator_email: str | None
+    recurring_map: dict[str, str]
+    blocks: list[_EventBlock] = field(default_factory=list)
+    new_concepts: list[tuple[str, _EventBlock]] = field(default_factory=list)
+    total_listed: int = 0
+    state_touched: bool = False
+
+
+def _fetch_events(
+    client: GoogleCalendarClient,
+    cal_id: str,
+    *,
+    acct: _CalendarAccount,
+    cal_summary: str,
+    time_min: str,
+    time_max: str,
+    updated_min: str | None,
+) -> list[dict] | None:
+    """The fetch phase for one calendar; None when the API call failed (logged —
+    the calendar is skipped this run)."""
+    try:
+        return list(
+            client.list_events(
+                cal_id,
+                time_min=time_min,
+                time_max=time_max,
+                updated_min=updated_min,
+                limit=acct.max_per_run,
+            )
+        )
+    except CalendarAPIError as e:
+        log.error(
+            "CalendarCollector[%s/%s]: list_events failed: %s",
+            acct.account_id,
+            cal_summary,
+            e,
+        )
+        return None
+
+
+def _event_block(
+    ev: dict,
+    *,
+    cal_summary: str,
+    account_id: str,
+    operator_email: str | None,
+    recurring_map: dict[str, str],
+) -> _EventBlock | None:
+    """The transform phase for one event: None when the event is cancelled, a
+    holiday, declined by the operator or has an unparseable start; otherwise the
+    block, with the recurring series registered in ``recurring_map`` on first
+    sight."""
+    if ev.get("status") == "cancelled":
+        return None
+    summary = ev.get("summary") or ""
+    if _is_holiday(summary):
+        return None
+    if _is_operator_declined(ev, operator_email):
+        return None
+    start_dt, all_day = _parse_event_time(ev.get("start"))
+    if start_dt is None:
+        return None
+    end_dt, _end_all_day = _parse_event_time(ev.get("end"))
+
+    attendees: list[str] = []
+    for att in ev.get("attendees") or []:
+        if not isinstance(att, dict):
+            continue
+        if att.get("self") is True:
+            continue  # don't list operator
+        email = att.get("email")
+        if isinstance(email, str) and email:
+            if att.get("responseStatus") == "declined":
+                continue
+            attendees.append(email)
+    attendees.sort()
+
+    organizer = None
+    org = ev.get("organizer")
+    if isinstance(org, dict):
+        organizer = org.get("email")
+
+    description = ev.get("description") or ""
+    if not isinstance(description, str):
+        description = ""
+    location = ev.get("location") or ""
+    if not isinstance(location, str):
+        location = ""
+
+    is_meeting = bool(attendees)
+    recurring_event_id = ev.get("recurringEventId")
+    recurring_slug: str | None = None
+    recurring_title: str | None = None
+    if isinstance(recurring_event_id, str) and recurring_event_id:
+        slug = recurring_map.get(recurring_event_id)
+        if slug is None:
+            slug = slugify(summary or recurring_event_id, max_len=60, ascii_only=True)
+            recurring_map[recurring_event_id] = slug
+        recurring_slug = slug
+        recurring_title = summary or slug.replace("-", " ").title()
+
+    return _EventBlock(
+        event_id=ev.get("id") or "",
+        etag=ev.get("etag") or "",
+        start=start_dt,
+        end=end_dt,
+        all_day=all_day,
+        summary=summary,
+        description=description,
+        location=location,
+        attendees=attendees,
+        organizer=organizer,
+        calendar_summary=cal_summary,
+        account_id=account_id,
+        is_meeting=is_meeting,
+        recurring_event_id=recurring_event_id if isinstance(recurring_event_id, str) else None,
+        recurring_slug=recurring_slug,
+        recurring_title=recurring_title,
+    )
+
+
 # ── Collector ───────────────────────────────────────────────────────
 
 
@@ -695,7 +829,12 @@ class CalendarCollector:
         state_touched) for the harness's payload-generic aggregation.
 
         ``new_concepts`` is the list of recurring-series slugs that need a
-        canonical concept page written (first sighting only)."""
+        canonical concept page written (first sighting only).
+
+        The phases: the calendars → the window → per calendar ``_scan_calendar``
+        (``_fetch_events`` → ``_event_block`` per event → the etag / watermark
+        entry) → the account state + message. The write phase (per-date files,
+        concept pages) is ``run()``'s, once every account has been scanned."""
         sess, err = google_oauth.session(_app(acct.account_id), acct.account_id)
         if err:
             return f"auth: {err}", ([], []), False
@@ -715,170 +854,117 @@ class CalendarCollector:
         now = datetime.now(UTC)
         time_min_dt = now - timedelta(days=acct.backfill_days)
         time_max_dt = now + timedelta(days=acct.future_days)
-        time_min = time_min_dt.isoformat().replace("+00:00", "Z")
-        time_max = time_max_dt.isoformat().replace("+00:00", "Z")
-
-        # Operator email — used to resolve the "self" attendee for
-        # responseStatus=declined filtering.
-        operator_email = self._operator_email(acct.account_id)
 
         acct_state = state.get(acct.account_id) or {}
         cal_state = acct_state.get("calendars") or {}
-        recurring_map = dict(acct_state.get("recurring") or {})
-
-        blocks: list[_EventBlock] = []
-        new_concepts: list[tuple[str, _EventBlock]] = []
-        state_touched = False
-        total_listed = 0
+        scan = _CalendarScan(
+            time_min=time_min_dt.isoformat().replace("+00:00", "Z"),
+            time_max=time_max_dt.isoformat().replace("+00:00", "Z"),
+            # Operator email — used to resolve the "self" attendee for
+            # responseStatus=declined filtering.
+            operator_email=self._operator_email(acct.account_id),
+            recurring_map=dict(acct_state.get("recurring") or {}),
+        )
 
         for cal in chosen:
-            cal_id = cal.get("id") or ""
-            cal_summary = cal.get("summaryOverride") or cal.get("summary") or cal_id
-            if not cal_id:
-                continue
-
-            entry = dict(cal_state.get(cal_id) or {})
-            etag_map: dict[str, str] = dict(entry.get("etags") or {})
-            new_etag_map: dict[str, str] = {}
-            watermark = entry.get("watermark_updated")
-            updated_min = None
-            if incremental and watermark:
-                # Google requires the updatedMin watermark to be strictly in
-                # the past; an inflight watermark equal to "now" would 400.
-                updated_min = watermark
-            elif acct.since:
-                time_min = acct.since
-
-            try:
-                events = list(
-                    client.list_events(
-                        cal_id,
-                        time_min=time_min,
-                        time_max=time_max,
-                        updated_min=updated_min,
-                        limit=acct.max_per_run,
-                    )
-                )
-            except CalendarAPIError as e:
-                log.error(
-                    "CalendarCollector[%s/%s]: list_events failed: %s",
-                    acct.account_id,
-                    cal_summary,
-                    e,
-                )
-                continue
-
-            total_listed += len(events)
-            newest_updated = watermark
-
-            for ev in events:
-                if ev.get("status") == "cancelled":
-                    continue
-                summary = ev.get("summary") or ""
-                if _is_holiday(summary):
-                    continue
-                if _is_operator_declined(ev, operator_email):
-                    continue
-                start_dt, all_day = _parse_event_time(ev.get("start"))
-                if start_dt is None:
-                    continue
-                end_dt, _end_all_day = _parse_event_time(ev.get("end"))
-
-                attendees: list[str] = []
-                for att in ev.get("attendees") or []:
-                    if not isinstance(att, dict):
-                        continue
-                    if att.get("self") is True:
-                        continue  # don't list operator
-                    email = att.get("email")
-                    if isinstance(email, str) and email:
-                        if att.get("responseStatus") == "declined":
-                            continue
-                        attendees.append(email)
-                attendees.sort()
-
-                organizer = None
-                org = ev.get("organizer")
-                if isinstance(org, dict):
-                    organizer = org.get("email")
-
-                description = ev.get("description") or ""
-                if not isinstance(description, str):
-                    description = ""
-                location = ev.get("location") or ""
-                if not isinstance(location, str):
-                    location = ""
-
-                is_meeting = bool(attendees)
-                recurring_event_id = ev.get("recurringEventId")
-                recurring_slug: str | None = None
-                recurring_title: str | None = None
-                if isinstance(recurring_event_id, str) and recurring_event_id:
-                    slug = recurring_map.get(recurring_event_id)
-                    if slug is None:
-                        slug = slugify(summary or recurring_event_id, max_len=60, ascii_only=True)
-                        recurring_map[recurring_event_id] = slug
-                    recurring_slug = slug
-                    recurring_title = summary or slug.replace("-", " ").title()
-
-                block = _EventBlock(
-                    event_id=ev.get("id") or "",
-                    etag=ev.get("etag") or "",
-                    start=start_dt,
-                    end=end_dt,
-                    all_day=all_day,
-                    summary=summary,
-                    description=description,
-                    location=location,
-                    attendees=attendees,
-                    organizer=organizer,
-                    calendar_summary=cal_summary,
-                    account_id=acct.account_id,
-                    is_meeting=is_meeting,
-                    recurring_event_id=recurring_event_id
-                    if isinstance(recurring_event_id, str)
-                    else None,
-                    recurring_slug=recurring_slug,
-                    recurring_title=recurring_title,
-                )
-                blocks.append(block)
-
-                # Track concept-page need: first time we see this series id
-                # AND a concept page doesn't already exist on disk.
-                if recurring_event_id and isinstance(recurring_event_id, str):
-                    slug = recurring_map[recurring_event_id]
-                    if not _recurring_concept_path(slug).exists() and not any(
-                        s == slug for s, _ in new_concepts
-                    ):
-                        new_concepts.append((slug, block))
-
-                if block.event_id:
-                    new_etag_map[block.event_id] = block.etag
-
-                upd = ev.get("updated")
-                if isinstance(upd, str) and (newest_updated is None or upd > newest_updated):
-                    newest_updated = upd
-
-            # State update: keep etag union of old + new (events not
-            # mentioned this run might still be in the cache; they'll be
-            # refreshed the next time they fall into the window).
-            merged_etags = {**etag_map, **new_etag_map}
-            entry["etags"] = merged_etags
-            if newest_updated:
-                entry["watermark_updated"] = newest_updated
-            cal_state[cal_id] = entry
-            if events:
-                state_touched = True
+            self._scan_calendar(
+                client, cal, acct, cal_state=cal_state, scan=scan, incremental=incremental
+            )
 
         acct_state["calendars"] = cal_state
-        acct_state["recurring"] = recurring_map
+        acct_state["recurring"] = scan.recurring_map
         state[acct.account_id] = acct_state
 
         msg = (
-            f"calendars={len(chosen)} · listed={total_listed} · blocks={len(blocks)}"
-            f" · recurring={len(new_concepts)}"
+            f"calendars={len(chosen)} · listed={scan.total_listed} · blocks={len(scan.blocks)}"
+            f" · recurring={len(scan.new_concepts)}"
         )
-        return msg, (blocks, new_concepts), state_touched
+        return msg, (scan.blocks, scan.new_concepts), scan.state_touched
+
+    @staticmethod
+    def _scan_calendar(
+        client: GoogleCalendarClient,
+        cal: dict,
+        acct: _CalendarAccount,
+        *,
+        cal_state: dict,
+        scan: _CalendarScan,
+        incremental: bool,
+    ) -> None:
+        """One calendar: the fetch arguments from its state entry, the events
+        through ``_event_block``, the etag union + watermark back into
+        ``cal_state``."""
+        cal_id = cal.get("id") or ""
+        cal_summary = cal.get("summaryOverride") or cal.get("summary") or cal_id
+        if not cal_id:
+            return
+
+        entry = dict(cal_state.get(cal_id) or {})
+        etag_map: dict[str, str] = dict(entry.get("etags") or {})
+        new_etag_map: dict[str, str] = {}
+        watermark = entry.get("watermark_updated")
+        updated_min = None
+        if incremental and watermark:
+            # Google requires the updatedMin watermark to be strictly in
+            # the past; an inflight watermark equal to "now" would 400.
+            updated_min = watermark
+        elif acct.since:
+            scan.time_min = acct.since
+
+        events = _fetch_events(
+            client,
+            cal_id,
+            acct=acct,
+            cal_summary=cal_summary,
+            time_min=scan.time_min,
+            time_max=scan.time_max,
+            updated_min=updated_min,
+        )
+        if events is None:
+            return
+
+        scan.total_listed += len(events)
+        newest_updated = watermark
+
+        for ev in events:
+            block = _event_block(
+                ev,
+                cal_summary=cal_summary,
+                account_id=acct.account_id,
+                operator_email=scan.operator_email,
+                recurring_map=scan.recurring_map,
+            )
+            if block is None:
+                continue
+            scan.blocks.append(block)
+
+            # Track concept-page need: first time we see this series id
+            # AND a concept page doesn't already exist on disk.
+            recurring_event_id = ev.get("recurringEventId")
+            if recurring_event_id and isinstance(recurring_event_id, str):
+                slug = scan.recurring_map[recurring_event_id]
+                if not _recurring_concept_path(slug).exists() and not any(
+                    s == slug for s, _ in scan.new_concepts
+                ):
+                    scan.new_concepts.append((slug, block))
+
+            if block.event_id:
+                new_etag_map[block.event_id] = block.etag
+
+            upd = ev.get("updated")
+            if isinstance(upd, str) and (newest_updated is None or upd > newest_updated):
+                newest_updated = upd
+
+        # State update: keep etag union of old + new (events not
+        # mentioned this run might still be in the cache; they'll be
+        # refreshed the next time they fall into the window).
+        merged_etags = {**etag_map, **new_etag_map}
+        entry["etags"] = merged_etags
+        if newest_updated:
+            entry["watermark_updated"] = newest_updated
+        cal_state[cal_id] = entry
+        if events:
+            scan.state_touched = True
 
     # ── helpers ──────────────────────────────────────────────────────
 

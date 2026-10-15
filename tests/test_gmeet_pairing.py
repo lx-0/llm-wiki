@@ -13,9 +13,9 @@ pure pieces that decide *whether* and *how* to merge:
   the new section is appended; idempotency assertion is part of the
   collector's run-loop logic (sibling.doc_kinds check) — covered separately.
 
-Order of section helpers: `_KIND_ORDER` (declared inside `_run_one_account`)
-ensures Notes → Transcript → unknown — exercised indirectly via the render
-test by passing Docs in mixed order.
+Order of section helpers: the module-level `_KIND_ORDER` (applied by
+`_group_by_meeting`) ensures Notes → Transcript → unknown — exercised indirectly
+via the render test by passing Docs in mixed order.
 """
 
 from __future__ import annotations

@@ -706,6 +706,62 @@ def _merge_into_sibling(
     return f"---\n{fm}\n---\n{body.rstrip()}\n"
 
 
+# ── Per-account scan ─────────────────────────────────────────────────
+
+_KIND_ORDER = {"notes": 0, "transcript": 1, "unknown": 2}
+
+
+def _group_by_meeting(stubs: list[dict], *, account_id: str) -> dict[str, list[dict]]:
+    """Group the listed Docs by `meeting_key`. Notes-Doc + Transcript-Doc for the
+    same meeting share a key and ingest as one file (combined or merged into an
+    existing one). Order within a group: Notes first if present (summary leads),
+    then Transcript, then unknown."""
+    groups: dict[str, list[dict]] = {}
+    for stub in stubs:
+        file_id = stub.get("id")
+        if not file_id:
+            log.warning(
+                "GmeetCollector[%s]: list-row missing id — skipping: %r",
+                account_id,
+                sorted(stub.keys()) if isinstance(stub, dict) else type(stub).__name__,
+            )
+            continue
+        name = stub.get("name") or file_id
+        groups.setdefault(_meeting_key(name), []).append(stub)
+    for docs in groups.values():
+        docs.sort(key=lambda d: _KIND_ORDER.get(_classify_doc(d.get("name") or ""), 99))
+    return groups
+
+
+def _sibling_from_front(path: Path, front: dict, body: str) -> _Sibling:
+    """The sibling-map entry for a just-written or just-merged meeting file."""
+    return _Sibling(
+        path=path,
+        front=front,
+        body=body,
+        doc_kinds=set(front.get("doc_kinds") or []),
+        drive_doc_ids={
+            d.get("id")
+            for d in (front.get("drive_docs") or [])
+            if isinstance(d, dict) and d.get("id")
+        },
+    )
+
+
+@dataclass
+class _AccountScan:
+    """The accumulators of one account's scan, shared by the per-group phases."""
+
+    watermark: Watermark
+    dead: dict
+    folder_ids: set[str]
+    input_source: str
+    files_written: list[Path] = field(default_factory=list)
+    skipped: int = 0
+    skipped_dead: int = 0
+    dead_touched: bool = False
+
+
 # ── Collector ────────────────────────────────────────────────────────
 
 
@@ -799,7 +855,11 @@ class GmeetCollector:
         """Run one account's scan. Returns (message, (files, skipped), state_touched)
         for the harness's payload-generic aggregation. Mutates
         `state[acct.account_id]['last_seen_ts']` only on a successful scan that
-        advanced the watermark — failures leave it untouched (hold-on-failure)."""
+        advanced the watermark — failures leave it untouched (hold-on-failure).
+
+        The phases: `_discover_docs` (own folder + gemini-notes mail, unioned by
+        Drive id) → `_group_by_meeting` → per group `_new_stubs_for_group` →
+        `_export_group` → `_merge_group` | `_write_group` → `_finish_account`."""
         sess, err = google_oauth.session(_app(acct.account_id), acct.account_id)
         if err:
             return f"auth: {err}", ([], 0), False
@@ -807,7 +867,74 @@ class GmeetCollector:
         client = _DriveClient(session=sess, timeout_s=self._timeout_s)
 
         per_acct_state = state.get(acct.account_id) or {}
+        since = per_acct_state.get("last_seen_ts") if incremental else acct.since
+        stubs, folder_ids, notes = self._discover_docs(
+            acct, client, since=since, already_present=already_present
+        )
+        if not stubs:
+            return f"no-op{(' · ' + notes) if notes else ''}", ([], 0), False
 
+        groups = _group_by_meeting(stubs, account_id=acct.account_id)
+        scan = _AccountScan(
+            watermark=Watermark.seed(per_acct_state.get("last_seen_ts")),
+            dead=per_acct_state.get("export_failed") or {},
+            folder_ids=folder_ids,
+            input_source="piggyback" if not dry_run and incremental else "cli",
+        )
+
+        for key, doc_stubs in groups.items():
+            sibling = sibling_map.get(key)
+            new_stubs = self._new_stubs_for_group(
+                doc_stubs, sibling, scan=scan, already_present=already_present, acct=acct
+            )
+            if not new_stubs:
+                continue
+            exports = self._export_group(client, new_stubs, scan=scan, acct=acct)
+            if not exports:
+                continue
+            if sibling is not None:
+                self._merge_group(
+                    acct,
+                    key,
+                    sibling,
+                    exports,
+                    scan=scan,
+                    already_present=already_present,
+                    sibling_map=sibling_map,
+                    dry_run=dry_run,
+                )
+                continue
+            self._write_group(
+                acct,
+                key,
+                exports,
+                scan=scan,
+                already_present=already_present,
+                sibling_map=sibling_map,
+                dry_run=dry_run,
+            )
+
+        return self._finish_account(
+            acct,
+            scan,
+            state=state,
+            per_acct_state=per_acct_state,
+            dry_run=dry_run,
+            notes=notes,
+            listed=len(stubs),
+        )
+
+    def _discover_docs(
+        self,
+        acct: _GmeetAccount,
+        client: _DriveClient,
+        *,
+        since: str | None,
+        already_present: set[str],
+    ) -> tuple[list[dict], set[str], str]:
+        """The fetch phase: the own-Drive "Meet Recordings" folder scan + the
+        gemini-notes email links, unioned by Drive file-id. Returns (stubs, own-folder
+        ids, notes) — the notes carry each source's failure text for the message."""
         # ── Discovery source 1: own-Drive "Meet Recordings" folder scan ──
         # Meetings the operator's own account recorded. A folder problem must
         # NOT abort the account — email-discovery below is an independent source.
@@ -830,7 +957,6 @@ class GmeetCollector:
                     acct.account_id,
                 )
         if folder_id:
-            since = per_acct_state.get("last_seen_ts") if incremental else acct.since
             log.info(
                 "GmeetCollector[%s]: listing Docs (folder=%s, since=%s, limit=%d)",
                 acct.account_id,
@@ -867,263 +993,262 @@ class GmeetCollector:
                 stubs.append(s)
 
         notes = " · ".join(n for n in (folder_note, email_note) if n)
-        if not stubs:
-            return f"no-op{(' · ' + notes) if notes else ''}", ([], 0), False
+        return stubs, folder_ids, notes
 
-        # Group the listed Docs by `meeting_key`. Notes-Doc + Transcript-Doc
-        # for the same meeting share a key and ingest as one file (combined or
-        # merged into an existing one). Order within a group: Notes first if
-        # present (summary leads), then Transcript, then unknown.
-        groups: dict[str, list[dict]] = {}
-        for stub in stubs:
-            file_id = stub.get("id")
-            if not file_id:
-                log.warning(
-                    "GmeetCollector[%s]: list-row missing id — skipping: %r",
-                    acct.account_id,
-                    sorted(stub.keys()) if isinstance(stub, dict) else type(stub).__name__,
-                )
+    @staticmethod
+    def _new_stubs_for_group(
+        doc_stubs: list[dict],
+        sibling: _Sibling | None,
+        *,
+        scan: _AccountScan,
+        already_present: set[str],
+        acct: _GmeetAccount,
+    ) -> list[dict]:
+        """Filter out stubs already represented in an existing file (by filename
+        short-id or by frontmatter drive_docs id) AND already carrying their kind in
+        the sibling. The remaining stubs need to be exported + merged or written
+        fresh."""
+        new_stubs: list[dict] = []
+        for stub in doc_stubs:
+            file_id = stub.get("id") or ""
+            short = _short_id(file_id)
+            if short in already_present:
+                scan.skipped += 1
                 continue
-            name = stub.get("name") or file_id
-            groups.setdefault(_meeting_key(name), []).append(stub)
-        _KIND_ORDER = {"notes": 0, "transcript": 1, "unknown": 2}
-        for docs in groups.values():
-            docs.sort(key=lambda d: _KIND_ORDER.get(_classify_doc(d.get("name") or ""), 99))
-
-        files_written: list[Path] = []
-        skipped = 0
-        watermark = Watermark.seed(per_acct_state.get("last_seen_ts"))
-        dead: dict = per_acct_state.get("export_failed") or {}
-        dead_touched = False
-        skipped_dead = 0
-        input_source = "piggyback" if not dry_run and incremental else "cli"
-
-        for key, doc_stubs in groups.items():
-            sibling = sibling_map.get(key)
-
-            # Filter out stubs already represented in an existing file (by
-            # filename short-id or by frontmatter drive_docs id) AND already
-            # carrying their kind in the sibling. The remaining stubs need to
-            # be exported + merged or written fresh.
-            new_stubs: list[dict] = []
-            for stub in doc_stubs:
-                file_id = stub.get("id") or ""
-                short = _short_id(file_id)
-                if short in already_present:
-                    skipped += 1
-                    continue
-                if sibling is not None:
-                    new_kind = _classify_doc(stub.get("name") or file_id)
-                    if new_kind in sibling.doc_kinds:
-                        # Same meeting, same kind, different Drive Doc id —
-                        # rare (Gemini occasionally regenerates a Doc). Skip
-                        # to avoid double-appending; the operator can delete
-                        # the file manually if they want the regen.
-                        log.info(
-                            "GmeetCollector[%s]: %s — same kind (%s) already present in %s, skipping",
-                            acct.account_id,
-                            file_id,
-                            new_kind,
-                            sibling.path.name,
-                        )
-                        skipped += 1
-                        continue
-                new_stubs.append(stub)
-
-            if not new_stubs:
-                continue
-
-            # Export every new stub before we decide write-vs-merge so a
-            # mid-group export failure doesn't write a half-merged file.
-            exports: list[tuple[dict, str]] = []
-            for stub in new_stubs:
-                file_id = stub.get("id") or ""
-                if _dead_letter_skip(
-                    dead.get(file_id),
-                    now=now_iso(),
-                    max_attempts=CONFIG.limits.gmeet_export_dead_letter_attempts,
-                    reprobe_days=CONFIG.limits.gmeet_export_dead_letter_reprobe_days,
-                ):
-                    skipped_dead += 1
-                    continue
-                try:
-                    exported = client.export_doc(file_id)
-                except GmeetAPIError as e:
-                    log.warning("GmeetCollector[%s]: export %s — %s", acct.account_id, file_id, e)
-                    _record_export_failure(dead, file_id, str(e), now=now_iso())
-                    dead_touched = True
-                    continue
-                if dead.pop(file_id, None) is not None:
-                    dead_touched = True
-                exports.append((stub, exported))
-
-            if not exports:
-                continue
-
             if sibling is not None:
-                # Merge each new Doc's section into the existing meeting file.
-                text = sibling.body  # base body; _merge_into_sibling layers on
-                current = sibling
-                target = sibling.path
-                for stub, exported in exports:
-                    text = _merge_into_sibling(
-                        current,
-                        stub,
-                        exported,
-                        account_id=acct.account_id,
-                        input_source=input_source,
-                    )
-                    if dry_run:
-                        log.info(
-                            "  DRY[%s]: would merge %s into %s (%d bytes)",
-                            acct.account_id,
-                            stub.get("id") or "?",
-                            target.relative_to(ROOT_DIR),
-                            len(text),
-                        )
-                        continue
-                    # Re-parse the merged text so the next iteration of the
-                    # group (rare: three Docs in one meeting) sees the latest
-                    # frontmatter + body, not the original sibling's.
-                    parsed = _split_frontmatter(text)
-                    if parsed is None:
-                        log.error(
-                            "GmeetCollector[%s]: post-merge frontmatter unparseable for %s — aborting group",
-                            acct.account_id,
-                            target.relative_to(ROOT_DIR),
-                        )
-                        break
-                    new_front, new_body = parsed
-                    current = _Sibling(
-                        path=target,
-                        front=new_front,
-                        body=new_body,
-                        doc_kinds=set(new_front.get("doc_kinds") or []),
-                        drive_doc_ids={
-                            d.get("id")
-                            for d in (new_front.get("drive_docs") or [])
-                            if isinstance(d, dict) and d.get("id")
-                        },
-                    )
-                    target.write_text(text, encoding="utf-8")
-                    # Only own-folder docs advance the folder watermark; email-
-                    # discovered docs are deduped by file-id, not by createdTime.
-                    if stub.get("id") in folder_ids:
-                        watermark.observe(stub.get("createdTime"))
-                    short = _short_id(stub.get("id") or "")
-                    if short:
-                        already_present.add(short)
-                if not dry_run:
+                new_kind = _classify_doc(stub.get("name") or file_id)
+                if new_kind in sibling.doc_kinds:
+                    # Same meeting, same kind, different Drive Doc id —
+                    # rare (Gemini occasionally regenerates a Doc). Skip
+                    # to avoid double-appending; the operator can delete
+                    # the file manually if they want the regen.
                     log.info(
-                        "  [%s] merged %d Doc(s) into %s",
+                        "GmeetCollector[%s]: %s — same kind (%s) already present in %s, skipping",
                         acct.account_id,
-                        len(exports),
-                        target.relative_to(ROOT_DIR),
+                        file_id,
+                        new_kind,
+                        sibling.path.name,
                     )
-                    # Keep sibling_map in sync for cross-account reuse later
-                    # in the same run.
-                    sibling_map[key] = current
-                    files_written.append(target)
+                    scan.skipped += 1
+                    continue
+            new_stubs.append(stub)
+        return new_stubs
+
+    @staticmethod
+    def _export_group(
+        client: _DriveClient,
+        new_stubs: list[dict],
+        *,
+        scan: _AccountScan,
+        acct: _GmeetAccount,
+    ) -> list[tuple[dict, str]]:
+        """Export every new stub before the write-vs-merge decision so a mid-group
+        export failure doesn't write a half-merged file. A parked dead-letter id is
+        skipped, a fresh failure recorded, a now-exportable id un-parked."""
+        exports: list[tuple[dict, str]] = []
+        for stub in new_stubs:
+            file_id = stub.get("id") or ""
+            if _dead_letter_skip(
+                scan.dead.get(file_id),
+                now=now_iso(),
+                max_attempts=CONFIG.limits.gmeet_export_dead_letter_attempts,
+                reprobe_days=CONFIG.limits.gmeet_export_dead_letter_reprobe_days,
+            ):
+                scan.skipped_dead += 1
                 continue
+            try:
+                exported = client.export_doc(file_id)
+            except GmeetAPIError as e:
+                log.warning("GmeetCollector[%s]: export %s — %s", acct.account_id, file_id, e)
+                _record_export_failure(scan.dead, file_id, str(e), now=now_iso())
+                scan.dead_touched = True
+                continue
+            if scan.dead.pop(file_id, None) is not None:
+                scan.dead_touched = True
+            exports.append((stub, exported))
+        return exports
 
-            # No sibling — write a fresh combined file for this meeting.
-            md = _render_markdown(exports, account_id=acct.account_id, input_source=input_source)
-            first_doc, _ = exports[0]
-            first_name = first_doc.get("name") or first_doc.get("id") or "unknown"
-            first_created = first_doc.get("createdTime") or ""
-            date_prefix = str(first_created)[:10] if first_created else now_iso()[:10]
-            # Filename: meeting-key suffix (was: short-Doc-id). Stable across
-            # Doc-of-different-kind appends — the file never gets renamed when
-            # a paired Doc arrives later.
-            fname = (
-                f"{date_prefix}--"
-                f"{slugify(_meeting_title(first_name), max_len=60, ascii_only=True)}--{key}.md"
+    @staticmethod
+    def _merge_group(
+        acct: _GmeetAccount,
+        key: str,
+        sibling: _Sibling,
+        exports: list[tuple[dict, str]],
+        *,
+        scan: _AccountScan,
+        already_present: set[str],
+        sibling_map: dict[str, _Sibling],
+        dry_run: bool,
+    ) -> None:
+        """The write phase for a meeting that already has a file: merge each new
+        Doc's section into it."""
+        text = sibling.body  # base body; _merge_into_sibling layers on
+        current = sibling
+        target = sibling.path
+        for stub, exported in exports:
+            text = _merge_into_sibling(
+                current,
+                stub,
+                exported,
+                account_id=acct.account_id,
+                input_source=scan.input_source,
             )
-            target = (ROOT_DIR / self.SPEC.output_subfolder) / fname
-
             if dry_run:
                 log.info(
-                    "  DRY[%s]: would write %s (%d Doc(s), %d bytes)",
+                    "  DRY[%s]: would merge %s into %s (%d bytes)",
                     acct.account_id,
+                    stub.get("id") or "?",
                     target.relative_to(ROOT_DIR),
-                    len(exports),
-                    len(md),
+                    len(text),
                 )
                 continue
-
-            target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_text(md, encoding="utf-8")
+            # Re-parse the merged text so the next iteration of the
+            # group (rare: three Docs in one meeting) sees the latest
+            # frontmatter + body, not the original sibling's.
+            parsed = _split_frontmatter(text)
+            if parsed is None:
+                log.error(
+                    "GmeetCollector[%s]: post-merge frontmatter unparseable for %s — aborting group",
+                    acct.account_id,
+                    target.relative_to(ROOT_DIR),
+                )
+                break
+            new_front, new_body = parsed
+            current = _sibling_from_front(target, new_front, new_body)
+            target.write_text(text, encoding="utf-8")
+            # Only own-folder docs advance the folder watermark; email-
+            # discovered docs are deduped by file-id, not by createdTime.
+            if stub.get("id") in scan.folder_ids:
+                scan.watermark.observe(stub.get("createdTime"))
+            short = _short_id(stub.get("id") or "")
+            if short:
+                already_present.add(short)
+        if not dry_run:
             log.info(
-                "  [%s] wrote %s (%d Doc(s))",
+                "  [%s] merged %d Doc(s) into %s",
+                acct.account_id,
+                len(exports),
+                target.relative_to(ROOT_DIR),
+            )
+            # Keep sibling_map in sync for cross-account reuse later
+            # in the same run.
+            sibling_map[key] = current
+            scan.files_written.append(target)
+
+    def _write_group(
+        self,
+        acct: _GmeetAccount,
+        key: str,
+        exports: list[tuple[dict, str]],
+        *,
+        scan: _AccountScan,
+        already_present: set[str],
+        sibling_map: dict[str, _Sibling],
+        dry_run: bool,
+    ) -> None:
+        """The write phase for a meeting without a file: write a fresh combined file,
+        mirror the one-liner into daily/<date>/meetings.md and register the file for
+        the rest of the run."""
+        md = _render_markdown(exports, account_id=acct.account_id, input_source=scan.input_source)
+        first_doc, _ = exports[0]
+        first_name = first_doc.get("name") or first_doc.get("id") or "unknown"
+        first_created = first_doc.get("createdTime") or ""
+        date_prefix = str(first_created)[:10] if first_created else now_iso()[:10]
+        # Filename: meeting-key suffix (was: short-Doc-id). Stable across
+        # Doc-of-different-kind appends — the file never gets renamed when
+        # a paired Doc arrives later.
+        fname = (
+            f"{date_prefix}--"
+            f"{slugify(_meeting_title(first_name), max_len=60, ascii_only=True)}--{key}.md"
+        )
+        target = (ROOT_DIR / self.SPEC.output_subfolder) / fname
+
+        if dry_run:
+            log.info(
+                "  DRY[%s]: would write %s (%d Doc(s), %d bytes)",
                 acct.account_id,
                 target.relative_to(ROOT_DIR),
                 len(exports),
+                len(md),
             )
-            files_written.append(target)
+            return
 
-            # Mirror a one-liner into daily/<date>/meetings.md.
-            if re.match(r"^\d{4}-\d{2}-\d{2}$", date_prefix):
-                append_rollup(
-                    date_prefix,
-                    "meetings",
-                    f"- **gmeet** · {_meeting_title(first_name)} → [[{target.stem}]]",
-                    log=log,
-                    context=f"gmeet meeting {key}",
-                )
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(md, encoding="utf-8")
+        log.info(
+            "  [%s] wrote %s (%d Doc(s))",
+            acct.account_id,
+            target.relative_to(ROOT_DIR),
+            len(exports),
+        )
+        scan.files_written.append(target)
 
-            # Register the newly-written file in the sibling_map so a later
-            # group in this same run (or a later account in the multi-tenant
-            # loop) merges into it instead of writing a duplicate.
-            parsed = _split_frontmatter(md)
-            if parsed is not None:
-                new_front, new_body = parsed
-                sibling_map[key] = _Sibling(
-                    path=target,
-                    front=new_front,
-                    body=new_body,
-                    doc_kinds=set(new_front.get("doc_kinds") or []),
-                    drive_doc_ids={
-                        d.get("id")
-                        for d in (new_front.get("drive_docs") or [])
-                        if isinstance(d, dict) and d.get("id")
-                    },
-                )
-            already_present.add(key)
-            for stub, _exported in exports:
-                short = _short_id(stub.get("id") or "")
-                if short:
-                    already_present.add(short)
-                # Only own-folder docs advance the folder watermark; email-
-                # discovered docs are deduped by file-id, not by createdTime.
-                if stub.get("id") in folder_ids:
-                    watermark.observe(stub.get("createdTime"))
+        # Mirror a one-liner into daily/<date>/meetings.md.
+        if re.match(r"^\d{4}-\d{2}-\d{2}$", date_prefix):
+            append_rollup(
+                date_prefix,
+                "meetings",
+                f"- **gmeet** · {_meeting_title(first_name)} → [[{target.stem}]]",
+                log=log,
+                context=f"gmeet meeting {key}",
+            )
 
+        # Register the newly-written file in the sibling_map so a later
+        # group in this same run (or a later account in the multi-tenant
+        # loop) merges into it instead of writing a duplicate.
+        parsed = _split_frontmatter(md)
+        if parsed is not None:
+            new_front, new_body = parsed
+            sibling_map[key] = _sibling_from_front(target, new_front, new_body)
+        already_present.add(key)
+        for stub, _exported in exports:
+            short = _short_id(stub.get("id") or "")
+            if short:
+                already_present.add(short)
+            # Only own-folder docs advance the folder watermark; email-
+            # discovered docs are deduped by file-id, not by createdTime.
+            if stub.get("id") in scan.folder_ids:
+                scan.watermark.observe(stub.get("createdTime"))
+
+    @staticmethod
+    def _finish_account(
+        acct: _GmeetAccount,
+        scan: _AccountScan,
+        *,
+        state: dict,
+        per_acct_state: dict,
+        dry_run: bool,
+        notes: str,
+        listed: int,
+    ) -> tuple[str, tuple[list[Path], int], bool]:
+        """Commit the watermark + dead-letter into the account's state (never on a
+        dry-run) and build the account message."""
         state_touched = False
-        if not dry_run and (watermark.advanced or dead_touched):
-            if watermark.advanced:
-                per_acct_state["last_seen_ts"] = watermark.value
-            if dead:
-                per_acct_state["export_failed"] = dead
+        if not dry_run and (scan.watermark.advanced or scan.dead_touched):
+            if scan.watermark.advanced:
+                per_acct_state["last_seen_ts"] = scan.watermark.value
+            if scan.dead:
+                per_acct_state["export_failed"] = scan.dead
             else:
                 per_acct_state.pop("export_failed", None)
             state[acct.account_id] = per_acct_state
             state_touched = True
 
-        if skipped_dead:
+        if scan.skipped_dead:
             log.info(
                 "GmeetCollector[%s]: %d un-exportable doc(s) parked in dead-letter "
                 "(re-probe after %dd)",
                 acct.account_id,
-                skipped_dead,
+                scan.skipped_dead,
                 CONFIG.limits.gmeet_export_dead_letter_reprobe_days,
             )
 
-        summary = f"wrote {len(files_written)} · skipped {skipped}"
-        if skipped_dead:
-            summary += f" · {skipped_dead} dead-letter"
+        summary = f"wrote {len(scan.files_written)} · skipped {scan.skipped}"
+        if scan.skipped_dead:
+            summary += f" · {scan.skipped_dead} dead-letter"
         return (
-            f"{notes} · {summary}" if notes else f"listed {len(stubs)} · {summary}",
-            (files_written, skipped),
+            f"{notes} · {summary}" if notes else f"listed {listed} · {summary}",
+            (scan.files_written, scan.skipped),
             state_touched,
         )
 
