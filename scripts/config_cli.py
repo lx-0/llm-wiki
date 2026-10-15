@@ -6,20 +6,24 @@ with `lib/config.sh`'s editor and status, held to the bash oracle's `config-*` g
 - `status` prints the summary rows and probes Ollama.
 - bare `wiki config` is the interactive editor: a section, then a key, then a value — on
   `core/console`'s line-based prompts, so it works the same piped (the oracle drives it so).
+- `wizard` is the six-question first-run wizard (S02-T03; `wiki setup` runs it too, then the
+  hooks step — `setup_cli.py`).
 
-`wiki config wizard` is still the bash wizard until S02-T03; the `wiki` entry routes it.
-Plain output goes to stdout like the bash `ok` / `warn` / `info` lines; prompts go to stderr.
+Plain output goes to stdout like the bash `ok` / `warn` / `info` lines; prompts and the
+validators' complaints go to stderr.
 """
 
 from __future__ import annotations
 
+import re
 import sys
+from collections.abc import Callable
 
 import httpx
 
 from cli_help import H_CONFIG
 from core import config as core_config
-from core.console import print_error, read_line, select_one
+from core.console import ask, confirm, print_error, read_line, select_one
 
 SECTIONS = [
     "models",
@@ -162,6 +166,109 @@ def edit(*, fd: int = 0) -> int:
     return 0
 
 
+# ── The setup wizard (`wiki config wizard`; `wiki setup` runs it before the hooks step) ──
+
+MODELS = ["claude-opus-4-8", "claude-sonnet-4-6", "claude-haiku-4-5"]
+_HOUR = re.compile(r"[0-9]|1[0-9]|2[0-3]")
+
+
+def _complain(message: str) -> None:
+    """A validator's complaint, on stderr beside the prompt it answers. In the bash it went
+    to stdout inside `$(ask …)`, which captured it into the answer (fixed in 0.7.10)."""
+    print(f"{_YELLOW}! {message}{_RESET}", file=sys.stderr)
+
+
+def _valid_url(value: str) -> bool:
+    if re.match(r"https?://", value):
+        return True
+    _complain("Must start with http:// or https://")
+    return False
+
+
+def _valid_hour(value: str) -> bool:
+    if _HOUR.fullmatch(value):
+        return True
+    _complain("Hour must be 0–23")
+    return False
+
+
+def _ask(prompt: str, current: str, validate: Callable[[str], bool], fd: int) -> str:
+    sys.stdout.flush()
+    return ask(prompt, default=current, validate=validate, fd=fd)
+
+
+def _yes(prompt: str, default: bool, fd: int) -> bool:
+    sys.stdout.flush()
+    return confirm(prompt, default=default, fd=fd)
+
+
+def _switch(key: str, on: bool) -> None:
+    """The three switches are written on every run, as the bash wrote them."""
+    _set(key, "true" if on else "false")
+
+
+def _ask_ollama(fd: int) -> bool:
+    """Question 1: the Ollama URL, probed. Returns whether it answered."""
+    current = _value("models.ollama_url")
+    url = _ask("Ollama base URL", current, _valid_url, fd)
+    if url != current:
+        _set("models.ollama_url", url)
+    if _ollama_reachable(url):
+        _ok(f"Ollama reachable at {url}")
+        return True
+    _warn(f"Ollama NOT reachable at {url} — local-LLM features will fail.")
+    return False
+
+
+def _ask_model_and_hour(fd: int) -> None:
+    """Questions 2 and 3: the compile model and the auto-compile hour."""
+    current_model = _value("models.compile_model")
+    _info("Compile model — Claude tier for compile.py and retry_failed_flushes.py")
+    default = MODELS.index(current_model) + 1 if current_model in MODELS else 1
+    sys.stdout.flush()
+    model = select_one("Pick", MODELS, default=default, fd=fd)
+    if model != current_model:
+        _set("models.compile_model", model)
+    print()
+    current_hour = _value("scheduling.compile_after_hour")
+    hour = _ask("Auto-compile starts at hour (0-23, local time)", current_hour, _valid_hour, fd)
+    if hour != current_hour:
+        _set("scheduling.compile_after_hour", hour)
+
+
+def wizard(*, fd: int = 0) -> int:
+    """The six questions worth asking at first run; Enter keeps the current value."""
+    _banner("wiki config — setup wizard", "6 questions. Skip with Enter to keep the current value.")
+    print()
+    ollama_ok = _ask_ollama(fd)
+    print()
+    _ask_model_and_hour(fd)
+    print()
+    _info(
+        "Procmail execution lets suggestions/cli.py call a webmail-procmail provider API to "
+        "apply mail rules server-side."
+    )
+    _warn(
+        "Only enable if you have a procmail-capable webmail account configured "
+        "(e.g. All-Inkl kasserver)."
+    )
+    procmail_on = _value("features.procmail_execution") == "True"
+    _switch("features.procmail_execution", _yes("Enable procmail execution?", procmail_on, fd))
+    print()
+    local = _yes("Enable local-LLM features (curiosity loop + screenshot OCR)?", ollama_ok, fd)
+    _switch("features.curiosity_loop", local)
+    _switch("features.vision_screenshots", local)
+    print()
+    _info("Global skill install links the 'use-llm-wiki' skill into ~/.claude/skills/")
+    _info("so an agent working in *any* project can discover and query this wiki.")
+    global_on = _value("skills.global_install") == "True"
+    question = "Make this wiki's use-llm-wiki skill globally available?"
+    _switch("skills.global_install", _yes(question, global_on, fd))
+    print()
+    _ok(f"Wizard complete. Config written to {core_config.CONFIG_FILE}.")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     args = sys.argv[1:] if argv is None else argv
     if not args:
@@ -181,6 +288,8 @@ def main(argv: list[str] | None = None) -> int:
         return core_config._cli([command])
     if command == "status":
         return status()
+    if command == "wizard":
+        return wizard()
     print_error(f"unknown: wiki config {command}")
     print(H_CONFIG)
     return 1

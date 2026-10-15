@@ -725,3 +725,20 @@ EXAMPLES
   wiki config keys | grep features
 
 Note: comments in config.yaml are dropped on programmatic writes (PyYAML round-trip)."""
+
+# `wiki setup` — moved from the bash `help_setup` with the port (M034-S02-T03); the bash
+# oracle's `setup-help` golden holds it. Corrected with the move: the wizard has 6 questions
+# (it said 5 and left out the global skill), and procmail execution is on by default.
+H_SETUP = """wiki setup — first-time setup
+
+Walks the 6-question config wizard, then runs the hook installer.
+
+WIZARD QUESTIONS
+  1. Ollama base URL    (probed for reachability)
+  2. Compile model      (opus | sonnet | haiku)
+  3. Auto-compile hour  (0–23, local time)
+  4. Procmail execution (All-Inkl procmail writes; on by default)
+  5. Local-LLM features (curiosity loop + vision screenshots)
+  6. Global skill       (link use-llm-wiki into ~/.claude/skills/)
+
+Press Enter on any question to keep the current value."""

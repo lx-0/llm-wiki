@@ -45,6 +45,7 @@ from cli_help import (
     H_RECONCILE,
     H_REINDEX,
     H_REVIEW_WIKI,
+    H_SETUP,
     H_STATS,
     H_STUDY,
     H_SUGGESTIONS,
@@ -154,7 +155,13 @@ COMMANDS: tuple[CommandSpec, ...] = (
     ),
     # Setup
     CommandSpec(
-        "setup", "Setup", "first-time setup (config wizard + hooks)", kind="bash", menu=True
+        "setup",
+        "Setup",
+        "first-time setup (config wizard + hooks)",
+        handler="setup_cli.py",
+        banner_subtitle="First-time setup: config wizard, then hook install.",
+        menu=True,
+        help_text=H_SETUP,
     ),
     CommandSpec(
         "config",

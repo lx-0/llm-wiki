@@ -14,15 +14,15 @@ set models.compile_model = 'claude-haiku-4-5'
 set scheduling.compile_after_hour = 7
 
 Procmail execution lets suggestions/cli.py call a webmail-procmail provider API to apply mail rules server-side.
-! Default OFF. Only enable if you have a procmail-capable webmail account configured (e.g. All-Inkl kasserver).
-Enable procmail execution? [Y/n] set features.procmail_execution = True
+! Only enable if you have a procmail-capable webmail account configured (e.g. All-Inkl kasserver).
+set features.procmail_execution = True
 
-Enable local-LLM features (curiosity loop + screenshot OCR)? [y/N] set features.curiosity_loop = True
+set features.curiosity_loop = True
 set features.vision_screenshots = True
 
 Global skill install links the 'use-llm-wiki' skill into ~/.claude/skills/
 so an agent working in *any* project can discover and query this wiki.
-Make this wiki's use-llm-wiki skill globally available? [y/N] set skills.global_install = True
+set skills.global_install = True
 
 ✓ Wizard complete. Config written to <VAULT>/.wiki/config.yaml.
 --- stderr ---
@@ -31,7 +31,7 @@ Ollama base URL [http://127.0.0.1:9]:   * 1) claude-opus-4-8
     2) claude-sonnet-4-6
     3) claude-haiku-4-5
 Pick [1]: Auto-compile starts at hour (0-23, local time) [18]: ! Hour must be 0–23
-Auto-compile starts at hour (0-23, local time) [18]: 
+Auto-compile starts at hour (0-23, local time) [18]: Enable procmail execution? [Y/n] Enable local-LLM features (curiosity loop + screenshot OCR)? [y/N] Make this wiki's use-llm-wiki skill globally available? [y/N] 
 --- change ---
 + <VAULT>/.wiki/state/config-backups/config-<STAMP>.yaml
     # bash-oracle fixture config — defaults, Ollama on a closed port

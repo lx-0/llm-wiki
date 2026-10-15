@@ -113,24 +113,6 @@ ${C_BOLD}NOT SUPPORTED${C_RESET}
 EOF
 }
 
-help_setup() {
-  cat <<EOF
-${C_BOLD}wiki setup${C_RESET} — first-time setup
-
-Walks the 5-question config wizard, then runs the hook installer.
-
-${C_BOLD}WIZARD QUESTIONS${C_RESET}
-  1. Ollama base URL    (probed for reachability)
-  2. Compile model      (opus | sonnet | haiku)
-  3. Auto-compile hour  (0–23, local time)
-  4. Procmail execution (kasserver-specific, default off)
-  5. Local-LLM features (curiosity loop + vision screenshots)
-
-Press Enter on any question to keep the current value.
-EOF
-}
-
-
 cmd_hooks() {
   case "${1:-}" in
     install|"")               hooks_cmd_install ;;
@@ -208,19 +190,6 @@ cmd_skills() {
   esac
 }
 
-cmd_setup() {
-  case "${1:-}" in
-    -h|--help|help)           help_setup; return 0 ;;
-  esac
-  banner "wiki setup" "First-time setup: config wizard, then hook install."
-  config_cmd_setup_wizard
-  echo
-  if confirm "Now install hooks into agent configs?" y; then
-    hooks_cmd_install
-  else
-    info "Skipped hook install — run \`wiki hooks install\` later."
-  fi
-}
 
 _dispatch_python() {
   # Delegate a Python-backed subcommand to the table-driven dispatcher, in one hop
@@ -626,12 +595,7 @@ esac
 # "unknown command" error.
 case "${1:-}" in
   install-shortcut) shift; cmd_install_shortcut "$@" ;;
-  setup)            shift; cmd_setup "$@" ;;
   status)           shift; cmd_status "$@" ;;
-  # `wiki config` is Python (config_cli.py) — all but `config wizard`, which stays the bash
-  # wizard until M034-S02-T03 ports it. This line goes with that port.
-  config)
-    if [[ "${2:-}" == wizard ]]; then config_cmd_setup_wizard; else _dispatch_python "$@"; fi ;;
   hooks)            shift; cmd_hooks "$@" ;;
   skills)           shift; cmd_skills "$@" ;;
   update)           shift; cmd_update "$@" ;;

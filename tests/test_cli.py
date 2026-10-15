@@ -245,9 +245,9 @@ def test_main_unknown_command_errors(capsys):
 
 
 def test_main_refuses_bash_native_commands(capsys):
-    """bash-native commands (setup/hooks/…, until their M034 port) are dispatched by the
+    """bash-native commands (hooks/skills/seed/…, until their M034 port) are dispatched by the
     bash layer; reaching cli.main with one is an error, not a silent no-op."""
-    assert cli.main(["setup"]) == 1
+    assert cli.main(["hooks"]) == 1
     assert "unknown command" in capsys.readouterr().err
 
 

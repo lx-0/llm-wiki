@@ -1,5 +1,9 @@
 # shellcheck shell=bash
 # ui.sh — interactive prompts. No business logic, only input/output.
+# Python has its own since M034-S02-T01 (core/console: confirm / ask / select_* / pause).
+# What is left here serves lib/hooks.sh (S03) and cmd_update's stash prompt (S05); the file
+# goes with its last caller in S05-T04. `ask` went with the wizard (S02-T03), `pause` had no
+# caller left.
 
 [[ -n "${__WIKI_UI_LOADED:-}" ]] && return 0
 __WIKI_UI_LOADED=1
@@ -14,30 +18,6 @@ confirm() {
   local input; read -r input
   input="${input:-$default}"
   [[ "$input" =~ ^[yYjJ] ]]
-}
-
-# ask "Prompt" [default] [validator_fn]
-# Reads a line, returns it (echoed) — validator_fn can re-prompt by returning 1.
-# Prompt + hints go to stderr so callers can capture the answer with $(ask …)
-# without the prompt-text leaking into the captured value. Without this, the
-# user sees an apparent hang (prompt swallowed by command substitution) and
-# whatever they type ends up concatenated with the prompt as the "answer".
-ask() {
-  local prompt="$1" default="${2:-}" validator="${3:-}"
-  local hint=""
-  [[ -n "$default" ]] && hint=" ${C_DIM}[$default]${C_RESET}"
-  while :; do
-    printf "%s%s: " "$prompt" "$hint" >&2
-    local input; read -r input
-    input="${input:-$default}"
-    if [[ -n "$validator" ]]; then
-      if ! "$validator" "$input"; then
-        continue
-      fi
-    fi
-    printf "%s" "$input"
-    return 0
-  done
 }
 
 # select_one "Prompt" "opt1|opt2|opt3" [default_index_1based]
@@ -96,10 +76,4 @@ select_many() {
   # An empty array expands as "unbound" under `set -u` in bash < 4.4 (macOS /bin/bash).
   (( ${#chosen[@]} > 0 )) && printf "%s\n" "${chosen[@]}"
   return 0
-}
-
-# pause "Press Enter to continue"
-pause() {
-  printf "%s%s%s " "$C_DIM" "${1:-Press Enter to continue}" "$C_RESET"
-  read -r
 }

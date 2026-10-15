@@ -18,6 +18,23 @@ every operator's `wiki update` → `uv sync` regenerate `uv.lock` and dirty thei
 config keys must also be wired into `scripts/migrations/migrate_config_keys.py`
 in the same commit.
 
+## [0.7.12] — 2026-10-15
+
+**For your vault:** no config key changed, so there is no migration.
+
+### Changed
+
+- **`wiki setup` and `wiki config wizard` now run in Python,** like the rest of `wiki config`
+  since 0.7.9. The six questions, their defaults and what they write are unchanged. When you
+  answer yes to installing hooks, the hook installer still asks its own questions.
+  Differences:
+  - the yes/no questions now go to the error stream like every other prompt, so a captured
+    run's output holds only results;
+  - the procmail question no longer claims "Default OFF". It has been on by default since
+    the first release, and since 0.7.11 turning it off actually stops the writes;
+  - `wiki setup --help` lists all six questions (it said five and left out the global
+    skill).
+
 ## [0.7.11] — 2026-10-15
 
 **For your vault:** no config key changed, so there is no migration. If you answered "no" to
