@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-15T15:08:51+02:00
+last_updated: 2026-10-15T15:10:55+02:00
 current_milestone: M033
 active_slice: S05
-active_task: none
+active_task: T01
 last_completed_milestone: M032
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -205,8 +205,11 @@ all ten commits. **Reassess after S04 (2026-10-15): B** — the S04 roadmap line
 shipped (20 functions not 15, six modules not four, the module-size gate); exit criterion 6
 met. S05 keeps six tasks and inherits three notes: T02's type gate covers `core/health/` +
 `core/sdk_scope.py`, T05 re-verifies the S04 module lines + "Large modules" and re-checks two
-diagram labels, T05's 0.7.0 note carries the `--json` payload-alone fix. **Next: S05-T01
-(type-checker probe: pyright vs ty) via `plan-task`.**
+diagram labels, T05's 0.7.0 note carries the `--json` payload-alone fix. **S05 0/6** — T01
+planned (`M033-S05-T01-PLAN.md`): three candidates, not two. pyright is npm-only, so its
+PyPI wrapper downloads Node, and basedpyright is the same checker packaged for PyPI; ty is
+still a beta (0.0.86). The probe goes into a `typecheck` group, not `--dev`, because `wiki
+update`'s bare `uv sync` installs `dev` into every operator vault. **Next: execute T01.**
 
 ## M032 COMPLETE (L, 2026-10-14): desktop de-slop
 
