@@ -5,7 +5,7 @@ project: llm-wiki
 created: 2026-10-15T18:15:32+02:00
 status: planned
 task_count: 5
-completed_tasks: 1
+completed_tasks: 2
 ---
 
 # M034-S03 -- Slice Plan
@@ -21,7 +21,7 @@ last callers were skills' `config_get` and `cmd_status` (reassessed after S01).
   config paths, the hook-installed probe, `hook_cmd`, and the Claude / Codex / Gemini / Cursor
   payloads. Each payload is byte-identical to the bash `jq` output on the fixture (the S01
   goldens plus `test_hooks_merge.py`).
-- [ ] T02 -- **Fix the hooks commands in the bash, then record them** (split from the port
+- [x] T02 -- **Fix the hooks commands in the bash, then record them** (split from the port
   after T01: the fixes, their records and a release fill one task, the port another). Three
   defects; the oracle holds the wrong behaviour of two of them today:
   1. **A payload that cannot be built** (found in S02-T05's end-to-end run). When an agent's
@@ -45,8 +45,13 @@ last callers were skills' `config_get` and `cmd_status` (reassessed after S01).
   record: other tools' hooks survive, backups follow the existing rule, the hook commands
   are byte-identical. `wiki status` comes here as well (moved from S01-T05): a banner over
   S02's `config status` and this task's `hooks status`. `setup`'s hooks step runs
-  in-process. To decide with the port (T01 follow-up): whether `hooks status` and doctor walk
-  the hook entries instead of grepping the config's text.
+  in-process. Two things to decide with the port:
+  - **The probe** (T01 follow-up): whether `hooks status` and doctor walk the hook entries
+    instead of grepping the config's text.
+  - **The backup helper** (T02 follow-up). The port needs T02's rule: never over an earlier
+    backup, and a clash takes `-2`. `core/frontmatter.backup` (correct / take) has the same
+    to-the-second overwrite flaw, and `dedup.py` hand-rolls a copy. One helper serves all
+    three.
 - [ ] T04 -- Skills in Python: the engine-owned check, the global-enable flag, registry
   add / remove, `skills install/uninstall/sync/status`, and the silent install / prune
   variants that `setup` and `update` call. Parity on the fixture `HOME`.
