@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-15T11:29:00+02:00
+last_updated: 2026-10-15T11:35:35+02:00
 current_milestone: M033
 active_slice: S04
-active_task: none
+active_task: T05
 last_completed_milestone: M032
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -173,8 +173,10 @@ normalized logs identical except the agent's token counts. Allowlist 15. CI gree
 same signature (`_build_options`, `_StreamState` + `_consume_stream`, `_record_usage`,
 `_partial_result`, the three endings); literal diff = two renames + a docstring; harness
 suites + gate 101, full 2119; the live Haiku probe through the harness identical in shape
-before/after. Allowlist 14. **Next: T05 — the collectors (`gmeet._run_one_account` 340,
-`calendar_collector._run_one_account` 195) via `plan-task`.**
+before/after. Allowlist 14. **T05 planned** (`M033-S04-T05-PLAN.md`): the two collector
+loops split into fetch / transform / write phases; the characterisation tests land first
+(gmeet's loop had none), then the gate goes red, then the split; the oracle is a fixture
+parity dump — the scratch vault has no Google tokens, so no live probe.
 
 ## M032 COMPLETE (L, 2026-10-14): desktop de-slop
 
