@@ -1,9 +1,9 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-16T00:30:00+02:00
+last_updated: 2026-10-16T00:35:00+02:00
 current_milestone: M034
-active_slice: none
+active_slice: S04
 active_task: none
 last_completed_milestone: M033
 parked_milestone: none
@@ -12,10 +12,24 @@ parallel_milestones: [M021, M025, M027, M029]
 
 # State
 
-## Next action — M034 / S03: hooks + skills + status
+## Next action — M034 / S04: seed
 
-**Status:** M034 / S03 — 7/7 tasks done; the slice is complete. Next:
-`/ytstack:reassess-roadmap`. Slices S01 and S02 are complete (2/6).
+**Status:** M034 — slice S03 complete. Next slice: S04 (seed). Slices S01–S03 are complete
+(3/6). The reassessment after S03 came out **A**: the slice order holds. What S03 taught is
+in `M034-S04-PLAN.md`'s notes, for planning S04-T01:
+- expect more tasks (record first, fix first, pure layer, record before delete);
+- check resolved vs logical paths in what seed writes;
+- `require_cmd jq` goes with `lib/seed.sh`.
+
+Engine 0.7.19, suite 2505, CI green on `9ad0d2c`. The bash is `wiki` (412) + `common.sh`
+(94) + `seed.sh` (710) + `ui.sh` (21); it owns seed and update.
+
+**Reported, not this repo's to fix:** the ytstack post-commit hook. After T06's first commit
+a stale `.git/index.lock` was left behind (removed once `lsof` showed no holder), and its
+summary drafts name a task's second commit as the first (T06, T07). Worth an issue at
+https://github.com/Yesterday-AI/ytstack/issues.
+
+## M034 / S03: hooks + skills + status (history)
 
 **S03-T07 is done** (`M034-S03-T07-SUMMARY.md`). `lib/agents.sh`, `hooks.sh`, `skills.sh`
 and `config.sh` are deleted, along with the helpers they left without a caller. The bash
