@@ -18,6 +18,23 @@ every operator's `wiki update` → `uv sync` regenerate `uv.lock` and dirty thei
 config keys must also be wired into `scripts/migrations/migrate_config_keys.py`
 in the same commit.
 
+## [0.7.9] — 2026-10-15
+
+**For your vault:** no config key changed, so there is no migration.
+
+### Changed
+
+- **`wiki config` now runs in Python, through the same one-hop start as the other commands.**
+  That covers the editor you get with a bare `wiki config`, `get` / `set` / `keys` / `path`,
+  and `status`; `wiki config wizard` follows in the next step. What it prints is unchanged,
+  except:
+  - the editor's two questions ("Pick a key to edit …", "Set KEY [current: …]") now go to
+    the error stream like every other prompt, so a captured run's output holds only results;
+  - usage and unknown-subcommand errors read `wiki: …` like every other command (they were
+    `✗ …`);
+  - `wiki config --help` now says the wizard has 6 questions, not 5, and names
+    `claude-opus-4-8` as the current compile model.
+
 ## [0.7.8] — 2026-10-15
 
 **For your vault:** no config key changed, so there is no migration.

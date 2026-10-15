@@ -47,6 +47,7 @@ import sys
 from pathlib import Path
 
 from cli_catalog import _GROUP_ORDER, AUTH_SERVICES, BY_NAME, COMMANDS, CommandSpec, SubRoute
+from core.console import print_error
 from core.entry import child_env, python_m
 
 SCRIPTS_DIR = Path(__file__).resolve().parent
@@ -64,8 +65,7 @@ _RESET = "\033[0m" if _STDOUT_TTY else ""
 
 
 def _err(msg: str) -> None:
-    prefix = "\033[31m✗ \033[0m" if sys.stderr.isatty() else "wiki: "
-    print(f"{prefix}{msg}", file=sys.stderr)
+    print_error(msg)
 
 
 def _banner(title: str, subtitle: str | None = None) -> None:

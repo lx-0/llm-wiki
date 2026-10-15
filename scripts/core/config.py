@@ -483,7 +483,21 @@ def _set_in_yaml(key: str, value: object) -> None:
     )
 
 
-def _cli() -> int:
+def value_of(key: str, cfg: WikiConfig | None = None) -> object:
+    """One dot-notation key's value from ``cfg`` (default: the loaded CONFIG). Raises
+    KeyError for an unknown key. A long-lived caller that writes (the `wiki config` editor)
+    passes a fresh `load()` — CONFIG is read once per process."""
+    return _walk(cfg if cfg is not None else CONFIG, key.split("."))
+
+
+def keys(cfg: WikiConfig | None = None) -> list[str]:
+    """Every settable dot-notation key of ``cfg`` (default: the loaded CONFIG)."""
+    return _enumerate_keys("", cfg if cfg is not None else CONFIG)
+
+
+def _cli(argv: list[str] | None = None) -> int:
+    """`python -m core.config [show|get|set|keys|path]` — and `wiki config get / set / keys /
+    path`, which `config_cli` runs through here with its own argv (M034-S02-T02)."""
     import argparse
 
     p = argparse.ArgumentParser(description="Wiki config introspection / mutation")
@@ -496,7 +510,7 @@ def _cli() -> int:
     s.add_argument("value")
     sub.add_parser("keys", help="List all settable keys (dot-notation)")
     sub.add_parser("path", help="Print the config file path")
-    args = p.parse_args()
+    args = p.parse_args(argv)
 
     if args.cmd in (None, "show"):
         import json

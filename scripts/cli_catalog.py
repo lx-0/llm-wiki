@@ -21,6 +21,7 @@ from cli_help import (
     H_BRIDGE,
     H_COLLECT,
     H_COMPILE,
+    H_CONFIG,
     H_CORRECT,
     H_CURIOSITY,
     H_DEDUP,
@@ -156,7 +157,13 @@ COMMANDS: tuple[CommandSpec, ...] = (
         "setup", "Setup", "first-time setup (config wizard + hooks)", kind="bash", menu=True
     ),
     CommandSpec(
-        "config", "Setup", "interactive config editor (get/set/keys/…)", kind="bash", menu=True
+        "config",
+        "Setup",
+        "interactive config editor (get/set/keys/…)",
+        handler="config_cli.py",
+        banner=False,
+        menu=True,
+        help_text=H_CONFIG,
     ),
     CommandSpec(
         "hooks", "Setup", "install/uninstall session hooks per agent", kind="bash", menu=True

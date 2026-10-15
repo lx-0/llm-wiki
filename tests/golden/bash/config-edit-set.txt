@@ -18,8 +18,8 @@ Current values in models:
   8) models.vision_model                                = gemma4:e4b
   9) models.curiosity_model                             = llama3.1:8b
   10) models.classify_model                              = gemma4:e4b
-Pick a key to edit (number, or 'b' to go back): 
-Set models.dream_model [current: claude-opus-4-8[1m]]: set models.dream_model = 'claude-sonnet-4-6'
+
+set models.dream_model = 'claude-sonnet-4-6'
 ✓ models.dream_model = claude-sonnet-4-6
 
 
@@ -33,7 +33,7 @@ Set models.dream_model [current: claude-opus-4-8[1m]]: set models.dream_model = 
     6) graph_view
     7) skills
   * 8) exit
-Section [8]:     1) models
+Section [8]: Pick a key to edit (number, or 'b' to go back): Set models.dream_model [current: claude-opus-4-8[1m]]:     1) models
     2) scheduling
     3) features
     4) piggybacks

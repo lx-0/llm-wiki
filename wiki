@@ -71,42 +71,10 @@ require_vault() {
 # ── Subcommand dispatchers ───────────────────────────────────────────
 cmd_status() {
   banner "wiki status"
-  config_cmd_status
+  # `wiki config status` is Python since M034-S02-T02; S03-T02 ports `status` whole.
+  "$WIKI_DIR/wiki" config status
   echo
   hooks_status_table
-}
-
-help_config() {
-  cat <<EOF
-${C_BOLD}wiki config${C_RESET} — manage tunable parameters in .wiki/config.yaml
-
-${C_BOLD}USAGE${C_RESET}
-  wiki config                       interactive editor (browse sections, edit fields)
-  wiki config get KEY               print one value
-  wiki config set KEY VALUE         set + write back
-  wiki config keys                  list all settable keys
-  wiki config path                  print path to config.yaml
-  wiki config wizard                re-run the 5-question setup wizard
-  wiki config status                summary table + Ollama probe
-
-${C_BOLD}KEYS${C_RESET} use dot-notation:
-  models.compile_model              claude-opus-4-7 | claude-sonnet-4-6 | claude-haiku-4-5
-  models.ollama_url                 e.g. http://localhost:11434
-  scheduling.compile_after_hour     0–23 (auto-compile trigger hour, local time)
-  features.curiosity_loop           true|false
-  features.vision_screenshots       true|false
-  features.procmail_execution       true|false (off by default — kasserver-specific)
-  piggybacks.<task>.enabled         e.g. piggybacks.scan_screenshots.enabled
-  piggybacks.<task>.cooldown_hours  e.g. 24 (daily) or 168 (weekly)
-
-${C_BOLD}EXAMPLES${C_RESET}
-  wiki config get models.compile_model
-  wiki config set models.compile_model claude-sonnet-4-6
-  wiki config set piggybacks.scan_screenshots.enabled false
-  wiki config keys | grep features
-
-${C_DIM}Note: comments in config.yaml are dropped on programmatic writes (PyYAML round-trip).${C_RESET}
-EOF
 }
 
 help_hooks() {
@@ -162,19 +130,6 @@ Press Enter on any question to keep the current value.
 EOF
 }
 
-cmd_config() {
-  case "${1:-}" in
-    "")                       config_cmd_edit ;;
-    -h|--help|help)           help_config ;;
-    get)   shift; [[ $# -eq 1 ]] || die "usage: wiki config get KEY";  config_get "$1" ;;
-    set)   shift; [[ $# -eq 2 ]] || die "usage: wiki config set KEY VALUE"; config_set "$1" "$2" ;;
-    keys)                     config_keys ;;
-    path)                     config_path ;;
-    wizard)                   config_cmd_setup_wizard ;;
-    status)                   config_cmd_status ;;
-    *)                        err "unknown: wiki config $1"; help_config; exit 1 ;;
-  esac
-}
 
 cmd_hooks() {
   case "${1:-}" in
@@ -673,7 +628,10 @@ case "${1:-}" in
   install-shortcut) shift; cmd_install_shortcut "$@" ;;
   setup)            shift; cmd_setup "$@" ;;
   status)           shift; cmd_status "$@" ;;
-  config)           shift; cmd_config "$@" ;;
+  # `wiki config` is Python (config_cli.py) — all but `config wizard`, which stays the bash
+  # wizard until M034-S02-T03 ports it. This line goes with that port.
+  config)
+    if [[ "${2:-}" == wizard ]]; then config_cmd_setup_wizard; else _dispatch_python "$@"; fi ;;
   hooks)            shift; cmd_hooks "$@" ;;
   skills)           shift; cmd_skills "$@" ;;
   update)           shift; cmd_update "$@" ;;

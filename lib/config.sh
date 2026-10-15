@@ -14,9 +14,11 @@ _wiki_config_py() {
     2> >(grep -v '^warning:.*VIRTUAL_ENV' >&2)
 }
 
+# What is left here serves the callers M034 has not ported yet (reassessment after S01):
+# the setup wizard (S02-T03) and lib/skills.sh's config_get (S03). `wiki config` itself is
+# Python since S02-T02 (scripts/config_cli.py).
 config_get()  { _wiki_config_py get  "$1"; }
 config_set()  { _wiki_config_py set  "$1" "$2"; }
-config_keys() { _wiki_config_py keys; }
 config_path() { _wiki_config_py path; }
 
 # Probe an Ollama base URL. Returns 0 if reachable.
@@ -125,75 +127,4 @@ config_cmd_setup_wizard() {
 
   echo
   ok "Wizard complete. Config written to $(config_path)."
-}
-
-# ── Interactive editor (post-setup reconfig) ─────────────────────────
-# Loop: show sections → pick section → list keys → pick key → enter value.
-config_cmd_edit() {
-  banner "wiki config — edit" "Pick a section, then a key. Enter on a key skips it."
-  while :; do
-    echo
-    local section
-    section="$(select_one "Section" "models|scheduling|features|piggybacks|limits|graph_view|skills|exit" 8)"
-    [[ "$section" == "exit" ]] && break
-
-    # Build the key list under this section.
-    local -a keys=()
-    while IFS= read -r k; do
-      [[ "$k" == "$section."* ]] && keys+=("$k")
-    done < <(config_keys)
-    if [[ ${#keys[@]} -eq 0 ]]; then
-      warn "No keys in $section."
-      continue
-    fi
-
-    echo
-    printf "%sCurrent values in %s:%s\n" "$C_DIM" "$section" "$C_RESET"
-    local i=1
-    for k in "${keys[@]}"; do
-      local v; v="$(config_get "$k" 2>/dev/null || echo '?')"
-      printf "  %d) %-50s = %s\n" "$i" "$k" "$v"
-      i=$((i+1))
-    done
-    printf "Pick a key to edit ${C_DIM}(number, or 'b' to go back)${C_RESET}: "
-    local pick; read -r pick
-    [[ "$pick" == "b" || -z "$pick" ]] && continue
-    [[ "$pick" =~ ^[0-9]+$ ]] || { warn "Invalid pick."; continue; }
-    (( pick >= 1 && pick <= ${#keys[@]} )) || { warn "Out of range."; continue; }
-
-    local key="${keys[$((pick-1))]}"
-    local current; current="$(config_get "$key")"
-    echo
-    local new
-    printf "Set %s ${C_DIM}[current: %s]${C_RESET}: " "$key" "$current"
-    read -r new
-    if [[ -z "$new" ]]; then
-      info "skipped"
-      continue
-    fi
-    if config_set "$key" "$new"; then
-      ok "$key = $new"
-    fi
-  done
-  echo
-  ok "Done."
-}
-
-# Print compact config summary.
-config_cmd_status() {
-  banner "wiki config — status"
-  printf "%-40s %s\n" "config.yaml" "$(config_path)"
-  printf "%-40s %s\n" "compile_model" "$(config_get models.compile_model)"
-  printf "%-40s %s\n" "ollama_url" "$(config_get models.ollama_url)"
-  printf "%-40s %s\n" "compile_after_hour" "$(config_get scheduling.compile_after_hour)"
-  printf "%-40s %s\n" "features.curiosity_loop" "$(config_get features.curiosity_loop)"
-  printf "%-40s %s\n" "features.vision_screenshots" "$(config_get features.vision_screenshots)"
-  printf "%-40s %s\n" "features.procmail_execution" "$(config_get features.procmail_execution)"
-  printf "%-40s %s\n" "skills.global_install" "$(config_get skills.global_install)"
-  echo
-  if _probe_ollama "$(config_get models.ollama_url)"; then
-    ok "Ollama reachable"
-  else
-    warn "Ollama unreachable at $(config_get models.ollama_url)"
-  fi
 }

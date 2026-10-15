@@ -691,3 +691,35 @@ NOTES
   broken; this shows what is there. Wraps scripts/health.py, run from the
   engine's own environment (never a bare `uv run --project .wiki`, which on a
   cloud-synced vault recreates the in-vault venv)."""
+
+# `wiki config` — moved from the bash `help_config` with the port (M034-S02-T02); the bash
+# oracle's `config-help` golden holds it. Two lines corrected with the move: the wizard asks 6
+# questions (it said 5), and the compile-model example names today's default.
+H_CONFIG = """wiki config — manage tunable parameters in .wiki/config.yaml
+
+USAGE
+  wiki config                       interactive editor (browse sections, edit fields)
+  wiki config get KEY               print one value
+  wiki config set KEY VALUE         set + write back
+  wiki config keys                  list all settable keys
+  wiki config path                  print path to config.yaml
+  wiki config wizard                re-run the 6-question setup wizard
+  wiki config status                summary table + Ollama probe
+
+KEYS use dot-notation:
+  models.compile_model              claude-opus-4-8 | claude-sonnet-4-6 | claude-haiku-4-5
+  models.ollama_url                 e.g. http://localhost:11434
+  scheduling.compile_after_hour     0–23 (auto-compile trigger hour, local time)
+  features.curiosity_loop           true|false
+  features.vision_screenshots       true|false
+  features.procmail_execution       true|false (off by default — kasserver-specific)
+  piggybacks.<task>.enabled         e.g. piggybacks.scan_screenshots.enabled
+  piggybacks.<task>.cooldown_hours  e.g. 24 (daily) or 168 (weekly)
+
+EXAMPLES
+  wiki config get models.compile_model
+  wiki config set models.compile_model claude-sonnet-4-6
+  wiki config set piggybacks.scan_screenshots.enabled false
+  wiki config keys | grep features
+
+Note: comments in config.yaml are dropped on programmatic writes (PyYAML round-trip)."""

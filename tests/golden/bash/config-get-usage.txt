@@ -2,4 +2,4 @@ $ wiki config get
 exit: 1
 --- stdout ---
 --- stderr ---
-✗ usage: wiki config get KEY
+wiki: usage: wiki config get KEY

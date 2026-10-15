@@ -9,11 +9,11 @@ USAGE
   wiki config set KEY VALUE         set + write back
   wiki config keys                  list all settable keys
   wiki config path                  print path to config.yaml
-  wiki config wizard                re-run the 5-question setup wizard
+  wiki config wizard                re-run the 6-question setup wizard
   wiki config status                summary table + Ollama probe
 
 KEYS use dot-notation:
-  models.compile_model              claude-opus-4-7 | claude-sonnet-4-6 | claude-haiku-4-5
+  models.compile_model              claude-opus-4-8 | claude-sonnet-4-6 | claude-haiku-4-5
   models.ollama_url                 e.g. http://localhost:11434
   scheduling.compile_after_hour     0–23 (auto-compile trigger hour, local time)
   features.curiosity_loop           true|false

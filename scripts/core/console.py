@@ -59,6 +59,14 @@ def is_tty() -> bool:
     return _TTY
 
 
+def print_error(message: str) -> None:
+    """A command's one-line error on stderr: a red ✗ on a terminal, `wiki: ` otherwise (the
+    prefix scripts and the desktop grep for). The dispatcher and the commands ported from
+    bash share it, so every `wiki` error reads the same (M034-S01-T05 / S02-T02)."""
+    prefix = f"{C_RED}✗ {C_RESET}" if _TTY else "wiki: "
+    print(f"{prefix}{message}", file=sys.stderr)
+
+
 # ── Single-keypress input ──────────────────────────────────────────────────
 # Used by every interactive picker / prompt in the engine (home menu,
 # curiosity walk, future review flows). cbreak mode + os.read(1) gives
