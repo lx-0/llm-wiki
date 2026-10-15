@@ -411,3 +411,12 @@ def test_auth_aliases_resolve_to_auth(monkeypatch, service):
     monkeypatch.setattr(cli, "run_auth", fake_auth)
     assert cli.main([f"{service}-auth", "acct"]) == 0
     assert seen["rest"] == [service, "acct"]
+
+
+def test_stats_runs_the_vault_dashboard(spy, capsys):
+    """M034-S01-T07: the use-llm-wiki skill ran `health.py` through a bare `uv run --project
+    .wiki`, which on a cloud-synced vault recreates the in-vault venv; `wiki stats` reaches
+    it through the engine's own environment. The dashboard prints its own header."""
+    assert cli.main(["stats", "--vault", "."]) == 0
+    assert spy["child"] == ("health.py", ["--vault", "."])
+    assert capsys.readouterr().out == ""

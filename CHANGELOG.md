@@ -18,6 +18,24 @@ every operator's `wiki update` → `uv sync` regenerate `uv.lock` and dirty thei
 config keys must also be wired into `scripts/migrations/migrate_config_keys.py`
 in the same commit.
 
+## [0.7.8] — 2026-10-15
+
+**For your vault:** no config key changed, so there is no migration.
+
+### Added
+
+- **`wiki stats` shows the vault dashboard** (knowledge counts, raw sources, compile
+  backlog, graph density, pipeline cadence). It is the same read-only snapshot
+  `scripts/health.py` printed, now reached through `wiki` like every other command.
+
+### Fixed
+
+- **The use-llm-wiki skill could recreate the engine's Python environment inside iCloud.**
+  For "how is my wiki doing", it told agents to run the dashboard as `uv run --project
+  .wiki python .wiki/scripts/health.py`. On a vault in iCloud Drive that ignores where the
+  engine keeps its environment, and recreates it inside the synced folder, where macOS can
+  kill it mid-run. The skill now says `wiki stats`.
+
 ## [0.7.7] — 2026-10-15
 
 **For your vault:** no config key changed, so there is no migration.

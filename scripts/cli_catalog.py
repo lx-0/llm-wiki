@@ -44,6 +44,7 @@ from cli_help import (
     H_RECONCILE,
     H_REINDEX,
     H_REVIEW_WIKI,
+    H_STATS,
     H_STUDY,
     H_SUGGESTIONS,
     H_TAKE,
@@ -131,6 +132,14 @@ COMMANDS: tuple[CommandSpec, ...] = (
         handler="doctor.py",
         banner=False,
         help_text=H_DOCTOR,
+    ),
+    CommandSpec(
+        "stats",
+        "Home & status",
+        "read-only vault dashboard (what's in the vault)",
+        handler="health.py",
+        banner=False,
+        help_text=H_STATS,
     ),
     CommandSpec(
         "version",

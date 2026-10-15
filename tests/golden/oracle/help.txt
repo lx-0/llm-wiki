@@ -6,6 +6,7 @@ Home & status
   menu              interactive home screen (--json for agents)
   status            config + hooks + Ollama summary
   doctor            vault-health audit (--quick / --json)
+  stats             read-only vault dashboard (what's in the vault)
   version           print installed git revision
 
 Setup

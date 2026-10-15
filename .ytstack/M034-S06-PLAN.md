@@ -30,6 +30,12 @@ completed_tasks: 0
   imports no collector module, guarded by a test), and `wiki collect <name> -- <flags>` passed
   through to the collectors' `main(argv)`. The three by-path entry scripts and PROCESS.md's
   second invocation form are deleted.
+
+  This includes every bare `uv run --project .wiki …` line PROCESS.md still teaches; there
+  were 12 at S01-T07: the `scan_*` flags, `collectors.cli`, and `dashboard.dashboard_stats`
+  / `dashboard_lint`. Each becomes a `wiki` command. On an iCloud vault the bare form
+  ignores the engine's environment location and recreates the in-vault venv. S01-T07 fixed
+  the same defect in the use-llm-wiki skill (`wiki stats`).
 - [ ] T04 -- Surfaces: `README.md` ≤ 300 lines and `AGENTS.md` ≤ 250, each section naming its
   reader; the TUI's ✨ glyph and the commit hash in its header are removed. The doc audit
   finds no stale names.

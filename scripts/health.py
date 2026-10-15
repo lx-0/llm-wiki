@@ -6,13 +6,16 @@ run, graph density, and pipeline cadence.
 
 Read-only. Never mutates state. Never triggers compile / piggyback.
 
-Usage:
+Usage (`wiki stats`, M034-S01-T07 — it runs from the engine's own environment):
     cd <vault>
-    uv run --project .wiki python .wiki/scripts/health.py
+    wiki stats
 
-    # from anywhere
-    uv run --project ~/path/to/.wiki python ~/path/to/.wiki/scripts/health.py \
-        --vault ~/path/to/vault
+    # another vault
+    wiki stats --vault ~/path/to/vault
+
+Never a bare `uv run --project .wiki python .wiki/scripts/health.py`: on a vault in iCloud
+Drive it ignores the engine's environment location (lib/common.sh) and recreates the
+Python environment inside the synced folder (docs/engine-layout.md, the `.venv/` rule).
 """
 
 from __future__ import annotations

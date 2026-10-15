@@ -8,8 +8,12 @@ mutations, no fixes. The operator decides what to act on.
 Run the bundled renderer from the vault root:
 
 ```sh
-uv run --project .wiki python .wiki/scripts/health.py --vault .
+wiki stats
 ```
+
+(Not `uv run --project .wiki python .wiki/scripts/health.py`: on a vault in iCloud Drive a
+bare `uv run --project .wiki` ignores the engine's environment location and recreates its
+Python environment inside the synced folder. `wiki stats` runs it from the right one.)
 
 Surface the script's stdout verbatim, then add **one** sentence of plain-language
 diagnosis at the bottom (e.g. "Healthy ingestion, sparse graph, run nearly
@@ -42,7 +46,7 @@ fall through to the manual flow below.
 
 Missing optional directory → treat as zero, never error.
 
-## Manual fallback flow (if `health.py` is unavailable)
+## Manual fallback flow (if `wiki stats` is unavailable)
 
 ### Step 1 — knowledge inventory
 

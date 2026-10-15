@@ -182,6 +182,7 @@ Currently 1 agent task ships. Adding a new task = drop `prompts/agents/<id>.md` 
 |---|---|---|---|
 | `wiki setup` | 🟢 | `wiki:cmd_setup`, `lib/config.sh:setup_wizard`, `lib/hooks.sh` | 6-question wizard + hook install |
 | `wiki status` | 🟢 | `wiki:cmd_status` | Config summary + hook install table + Ollama probe |
+| `wiki stats` | 🟢 | `scripts/health.py` (dispatched by `scripts/cli.py`) | Read-only vault dashboard: knowledge counts, raw-source mix, compile backlog, graph density, pipeline cadence |
 | `wiki update` | 🟢 | `wiki:cmd_update`, `lib/skills.sh` | `git pull --ff-only` + skill sync; preserves `config.yaml` + `.venv/` |
 | `wiki seed` / `wiki seed --force` | 🟢 | `wiki:cmd_seed`, `lib/seed.sh` | Additive template seed + drift detection |
 | `wiki config` (get/set/keys/path/wizard/status) | 🟢 | `wiki:cmd_config`, `lib/config.sh`, `scripts/core/config.py` | Round-robin backup on every set |

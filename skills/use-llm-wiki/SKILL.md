@@ -93,7 +93,7 @@ cross a tier boundary.
 | Tier | What | Gate |
 |---|---|---|
 | **Read** | grep `knowledge/index.md` → `Read` the article; `wiki query` for synthesis | None — but prefer the index-grep path |
-| **Diagnose** | `wiki status`; full vault health dashboard via `.wiki/scripts/health.py`; `wiki dedup --suggest-only` (list duplicate-entity candidates) | None — read-only |
+| **Diagnose** | `wiki status`; the full vault dashboard via `wiki stats`; `wiki dedup --suggest-only` (list duplicate-entity candidates) | None — read-only |
 | **Contribute** | `wiki flush`, `wiki correct add`, `wiki ingest-html`, `wiki ingest-youtube`, `wiki collect <name>` | Confirm with the operator first — these write to the vault |
 | **Maintain** | `wiki compile`, `wiki lint`, `wiki review-wiki`, `wiki curiosity`, `wiki suggestions`, `wiki process-inbox`, `wiki correct apply`, `wiki dedup` (merge), `wiki dream web-research` | Explicit confirmation **and** name the cost |
 
@@ -159,19 +159,23 @@ right one for the question; don't conflate them.
   pipeline broken": invoke `wiki doctor` (no --json) and surface
   stdout verbatim. Add one sentence of plain-language diagnosis after.
 
-- **Vault stats dashboard** (`scripts/health.py`) — answers "what's IN
+- **Vault stats dashboard** (`wiki stats`) — answers "what's IN
   the vault?" — article counts, raw-source distribution, compile
   backlog, graph density, pipeline cadence. Use when operator asks
-  "compile backlog", "wie geht's der wiki", "vault stats":
+  "compile backlog", "wie geht's der wiki", "vault stats". From the
+  vault root:
 
   ```sh
-  uv run --project .wiki python .wiki/scripts/health.py --vault .
+  wiki stats
   ```
 
   Surface stdout verbatim, then **one** sentence of plain-language
-  diagnosis. Don't paraphrase the dashboard.
+  diagnosis. Don't paraphrase the dashboard. Never start the engine with
+  a bare `uv run --project .wiki …` instead: on a vault in iCloud Drive
+  that ignores the engine's environment location and recreates its
+  Python environment inside the synced folder.
 
-  If `health.py` fails or you need to interpret graph density / silent
+  If `wiki stats` fails or you need to interpret graph density / silent
   failures / manual fallback: **Read `references/health-check.md`**.
 
 - **`wiki menu --json`** — agent-facing read of context-sensitive

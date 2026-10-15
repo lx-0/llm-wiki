@@ -677,3 +677,17 @@ NOTES
   to Timeline. Pre-flight cost cap REJECTS the SDK call if estimate exceeds
   `limits.dream_entity_max_cost_usd` (default $2.00). Cooldown defaults
   to `scheduling.dream_cooldown_days` (default 7 days)."""
+
+H_STATS = """wiki stats — read-only vault dashboard (what's in the vault)
+
+USAGE
+  wiki stats                  snapshot of the vault you run it from
+  wiki stats --vault PATH     snapshot of another vault
+
+NOTES
+  Knowledge counts, raw-source distribution, compile backlog, an active compile
+  run, graph density and pipeline cadence, as one colored snapshot. Read-only:
+  never mutates state, never triggers a compile. `wiki doctor` says what is
+  broken; this shows what is there. Wraps scripts/health.py, run from the
+  engine's own environment (never a bare `uv run --project .wiki`, which on a
+  cloud-synced vault recreates the in-vault venv)."""
