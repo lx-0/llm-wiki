@@ -83,12 +83,14 @@ _apply_overlay() {  # $1 = base file, $2 = overlay file
 
 # Echo the minimal overlay: every leaf path where `cur` differs from `base`
 # (new keys + changed values; leaf-level, so nested objects merge cleanly).
-# Deletions aren't expressed — overlays are override-only by design.
+# Deletions aren't expressed — overlays are override-only by design. A path
+# the base cannot follow (text there, an object now) is a changed value: a
+# bare getpath stopped jq on it, and `set -e` ended --extract-custom in silence.
 _compute_overlay() {  # $1 = base file, $2 = cur file
   jq -n --slurpfile b "$1" --slurpfile c "$2" '
     ($b[0]) as $base | ($c[0]) as $cur
     | reduce ($cur | paths(scalars)) as $p ({};
-        if ($base | getpath($p)) != ($cur | getpath($p))
+        if ($base | try getpath($p) catch null) != ($cur | getpath($p))
         then setpath($p; $cur | getpath($p)) else . end)
   ' 2>/dev/null
 }
@@ -193,7 +195,8 @@ _extract_overlay() {  # $1=rel $2=target $3=templates_dir
   [[ -f "$base" ]] || { err "no engine template for '$rel' (not an overlay-managed file)"; return 1; }
   [[ -f "$dst" ]]  || { err "no live file at $dst"; return 1; }
   _is_json "$dst" || { err "$rel is not valid JSON — there is no drift to capture (fix it first)"; return 1; }
-  local delta; delta="$(_compute_overlay "$base" "$dst")"
+  local delta
+  delta="$(_compute_overlay "$base" "$dst")" || { err "could not compute the drift of $rel"; return 1; }
   if [[ -z "$delta" || "$(_json_canon_str "$delta")" == "{}" ]]; then
     info "$rel already matches the engine template — no overlay needed"
     return 0

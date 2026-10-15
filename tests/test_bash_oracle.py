@@ -279,6 +279,16 @@ def _two_configs_that_are_not_json(env: dict[str, Path]) -> None:
     (env["vault"] / ".obsidian" / "app.json").write_text('{"x": \n')
 
 
+def _graph_search_now_an_object(env: dict[str, Path]) -> None:
+    """A text setting replaced by an object — the leaf diff must not follow it into the
+    template's string (M034-S04-T02)."""
+    _seeded(env)
+    graph = env["vault"] / ".obsidian" / "graph.json"
+    data = json.loads(graph.read_text(encoding="utf-8"))
+    data["search"] = {"query": "path:knowledge", "caseSensitive": True}
+    graph.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+
+
 def _graph_overlay_not_json_and_a_live_edit(env: dict[str, Path]) -> None:
     """The overlay for graph.json broken, the live file edited — what `--force` must keep."""
     _graph_overlay_and_a_live_edit(env)
@@ -560,6 +570,12 @@ MUTATING: dict[str, tuple[tuple[str, ...], str | None, Prepare]] = {
         ("seed", ".obsidian/graph.json", "--force"),
         None,
         _graph_overlay_not_json_and_a_live_edit,
+    ),
+    # T02's fix first: a value whose type changed (0.7.22)
+    "seed-extract-custom-type-changed": (
+        ("seed", "--extract-custom", ".obsidian/graph.json"),
+        None,
+        _graph_search_now_an_object,
     ),
     "install-shortcut": (("install-shortcut",), None, None),
     "install-shortcut-print-only": (("install-shortcut", "--print-only"), None, None),

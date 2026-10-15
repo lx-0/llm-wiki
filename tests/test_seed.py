@@ -257,6 +257,23 @@ def test_extract_custom_refuses_a_file_that_is_not_json(env: dict[str, Path]) ->
     assert not (env["vault"] / ".wiki" / "custom" / APP).exists()
 
 
+def test_extract_custom_captures_a_value_whose_type_changed(env: dict[str, Path]) -> None:
+    """Text replaced by an object: the leaf diff followed the new object's path into the
+    template's string, jq stopped, and `set -e` ended the run with exit 5 and no word
+    (M034-S04-T02, 0.7.22)."""
+    _seed(env)
+    data = _read(env, GRAPH)
+    data["search"] = {"query": "path:knowledge", "caseSensitive": True}
+    _write(env, GRAPH, data)
+    run = run_wiki(env["vault"], env["home"], env["bin"], "seed", "--extract-custom", str(GRAPH))
+    assert run.returncode == 0, run.stdout + run.stderr
+    overlay = json.loads((env["vault"] / ".wiki" / "custom" / GRAPH).read_text(encoding="utf-8"))
+    assert overlay == {"search": data["search"]}
+    before = (env["vault"] / GRAPH).read_bytes()
+    _seed(env, str(GRAPH), "--force")
+    assert json.loads((env["vault"] / GRAPH).read_bytes()) == json.loads(before)
+
+
 def test_a_broken_overlay_leaves_its_file_alone(env: dict[str, Path]) -> None:
     _seed(env)
     overlay = env["vault"] / ".wiki" / "custom" / GRAPH

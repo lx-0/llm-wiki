@@ -18,6 +18,17 @@ every operator's `wiki update` → `uv sync` regenerate `uv.lock` and dirty thei
 config keys must also be wired into `scripts/migrations/migrate_config_keys.py`
 in the same commit.
 
+## [0.7.22] — 2026-10-16
+
+**For your vault:** nothing to do.
+
+### Fixed
+
+- **`wiki seed --extract-custom` captures a setting whose type you changed.** This covers
+  text or a number replaced by a list or an object. Such a setting stopped the capture with
+  no message and exit code 5, and no overlay was written. The new value now goes into the
+  overlay like any other change.
+
 ## [0.7.21] — 2026-10-16
 
 **For your vault:** nothing to do.
