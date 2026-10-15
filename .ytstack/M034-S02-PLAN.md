@@ -5,7 +5,7 @@ project: llm-wiki
 created: 2026-10-15T18:15:32+02:00
 status: planned
 task_count: 5
-completed_tasks: 2
+completed_tasks: 3
 ---
 
 # M034-S02 -- Slice Plan
@@ -40,7 +40,7 @@ later slices still call. Each file is deleted with its last caller: `config.sh` 
   `config wizard` stays bash for this one task (T03 ports the wizard). `wiki status` calls
   `wiki config status` through the entry, so `config_cmd_status` goes now. Parity with the S01
   goldens, plus the editor and the usage errors recorded from bash first.
-- [ ] T03 -- The setup wizard in Python (`wiki setup`, `wiki config setup`): the steps, the
+- [x] T03 -- The setup wizard in Python (`wiki setup`, `wiki config setup`): the steps, the
   Ollama probe, compile-hour and URL validation, the config writes. Tests run with scripted
   answers, and one scratch run is made on a fresh vault.
 

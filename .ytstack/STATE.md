@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-15T20:58:00+02:00
+last_updated: 2026-10-15T21:21:00+02:00
 current_milestone: M034
 active_slice: S02
-active_task: T03
+active_task: none
 last_completed_milestone: M033
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -33,13 +33,18 @@ Python (`config_cli.py`): get / set / keys / path, status, and the bare-`wiki co
 - **Filed:** `backlog/config-set-keeps-comments.md`.
 
 Suite 2406, CI green.
-**Next:** S02-T03 is planned (`M034-S02-T03-PLAN.md`), in three commits:
-1. the wizard's bash paths recorded first, including `setup` with the hooks step reading its
-   answers from the same stdin;
-2. a fix planning found: `features.procmail_execution` never had a reader since the first
-   release, so the switch the wizard asks about switched nothing. It becomes a real gate in
-   the All-Inkl filter, default unchanged;
-3. the wizard port.
+**M034 / S02 3/5.** T03 (`d86a411` / `efc56ae` / `5caf5a6` / `bf6064f`, 0.7.10–0.7.12):
+`wiki setup` and `wiki config wizard` run in Python. The hooks step's child reads its own
+answers from the piped stdin, and the HOME change is identical to the bash. Three defects
+fixed on the way:
+- the bash wizard wrote its validation warning into config.yaml;
+- `features.procmail_execution` never gated anything since the first release (now it does,
+  default on);
+- a failing `uv sync` in the hop ended `wiki` silently.
+
+`wiki` is at 606 lines; `lib/config.sh` has 20 left (for skills). Suite 2418, CI green.
+**Next:** `ytstack:plan-task` → S02-T04, `install-shortcut` in Python. Its bash paths are
+already in the oracle (`install-shortcut`, `--print-only`).
 
 **M034 / S01 — complete (7/7).** It delivered:
 - the bash oracle (T01–T02);
