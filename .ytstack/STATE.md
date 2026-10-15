@@ -26,7 +26,11 @@ parallel_milestones: [M021, M025, M027, M029]
 - **Sized L, not the arc's M:** 1,827 lines of `lib/` bash, the 708-line seed merge, a
   self-updating `update`, and three command tables.
 
-**Next action:** run `ytstack:slice-milestone` to break M034 into concrete slices and tasks.
+**Sliced 2026-10-15:** six slice plans (`M034-S01…S06-PLAN.md`) with 30 tasks: oracle +
+bootstrap 6, config + setup 5, hooks + skills 4, seed 4, update + the last bash 5, surface
+diet + close 6.
+
+**Next action:** `ytstack:plan-task` → S01-T01 (the bash oracle for the read-only commands).
 
 ## M033 COMPLETE (L, 2026-10-15): engine modernisation → M034 dispatcher + surface diet
 

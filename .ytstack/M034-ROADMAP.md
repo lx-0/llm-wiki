@@ -34,7 +34,7 @@ Suggested framing (refine in slice-milestone; the starting point is measured in 
 size is L with six slices; the template's floor of four is too few for 2,885 lines of bash
 and three tables.
 
-- [ ] S01 -- (to be planned) **Oracle + bootstrap.**
+- [ ] S01 -- **Oracle + bootstrap** (6 tasks).
   - Extend the oracle to the bash commands' observable behaviour (fixture vault + fixture
     `HOME`), recorded from the bash version.
   - The thin `wiki`: symlink resolution, vault guard, venv resolution, `exec` of the venv
@@ -42,19 +42,19 @@ and three tables.
   - Port the thin wrappers into the catalogue: menu, doctor, status, version, help, dream and
     dream-entity routing, the OAuth aliases.
   - Decide open questions 1 and 2.
-- [ ] S02 -- (to be planned) **Config + setup.** Prompt helpers on `core/console`, the setup
+- [ ] S02 -- **Config + setup** (5 tasks). Prompt helpers on `core/console`, the setup
   wizard, `config get/set/edit/status`, `install-shortcut` (symlink + rc line, with backups);
   `lib/config.sh` and `lib/ui.sh` retire.
-- [ ] S03 -- (to be planned) **Hooks + skills.** The agent registry, the per-agent payloads and
+- [ ] S03 -- **Hooks + skills** (4 tasks). The agent registry, the per-agent payloads and
   the JSON merges into agent configs (hook commands byte-identical), `skills
   install/uninstall/sync/status`; `lib/agents.sh`, `lib/hooks.sh` and `lib/skills.sh` retire.
-- [ ] S04 -- (to be planned) **Seed.** The template seeding with its overlay, plugin, env,
+- [ ] S04 -- **Seed** (4 tasks). The template seeding with its overlay, plugin, env,
   meta-bind and dashboard-button merges, at parity on the fixture vault and a copy of the live
   `.obsidian/`; `lib/seed.sh` retires.
-- [ ] S05 -- (to be planned) **Update + the last bash.** `update` with the post-pull re-exec of
+- [ ] S05 -- **Update + the last bash** (5 tasks). `update` with the post-pull re-exec of
   the pulled engine, proven 0.7.3 → M034 on a scratch clone; `lib/common.sh` retires and
   `wiki` lands at ≤ 150 lines; one help system (the bash help texts move into `cli_help`).
-- [ ] S06 -- (to be planned) **Surface diet + close.**
+- [ ] S06 -- **Surface diet + close** (6 tasks).
   - One table behind help and menu; `print` → `core/console` with its gate; the lazy
     collector registry and the collect verb.
   - README ≤ 300 and AGENTS.md ≤ 250; the TUI cosmetics.
