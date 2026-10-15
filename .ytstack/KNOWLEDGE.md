@@ -3100,6 +3100,18 @@ Per-candidate learnings from the 14-candidate seam arc (C01–C14). Decisions li
   for the broken form. In bash, quote by pattern removal (`${s%%\'*}` / `${s#*\'}` in a
   loop). `${s//\'/"$q"}` keeps the inner quotes literally on macOS's bash 3.2 (measured),
   and bash 5.2's `patsub_replacement` reads that replacement differently (documented).
+- **Three byte-parity traps in porting a bash command's output (2026-10-16, M034-S03-T05):**
+  1. **bash's `printf "%-30s"` pads to 30 bytes, not characters.** The golden had 27 spaces
+     after `—` (three bytes in UTF-8); Python's `ljust` / `f"{s:<30}"` counts code points
+     and would give 29. `hooks_cli._pad` counts `len(s.encode())`.
+  2. **A prompt on stderr overtakes the stdout printed before it** when both streams go into
+     one pipe (`2>&1 | tee`). Python's stdout is block-buffered there; the bash's `printf`
+     wrote at once. The goldens keep the two streams apart, so they cannot see it; the
+     scratch run with `2>&1` did. `core/console._emit` now flushes stdout before a prompt.
+  3. **A golden must not hold a number that depends on the machine.** Python's JSON parse
+     error carries a character offset, and a fixture that wrote the vault path into the
+     broken file made it depend on where the test vault lives (CI's `/tmp` path differs).
+     Such fixtures stay path-free (the relative `.wiki/hooks/…` form of the command).
 
 ### Desktop toolchain (C07)
 

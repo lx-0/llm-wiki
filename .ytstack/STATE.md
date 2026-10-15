@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-16T00:05:00+02:00
+last_updated: 2026-10-16T00:20:00+02:00
 current_milestone: M034
 active_slice: S03
-active_task: T05
+active_task: none
 last_completed_milestone: M033
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -14,8 +14,22 @@ parallel_milestones: [M021, M025, M027, M029]
 
 ## Next action — M034 / S03: hooks + skills + status
 
-**Status:** M034 / S03 / T05 planned — ready to execute (`M034-S03-T05-PLAN.md`; oracle
-cases first). 4/7 tasks done in the slice; slices S01 and S02 are complete (2/6).
+**Status:** M034 / S03 — 5/7 tasks done in the slice. Next task: T06, skills
+(`/ytstack:plan-task`). Slices S01 and S02 are complete (2/6).
+
+**S03-T05 is done** (`M034-S03-T05-SUMMARY.md`, release **0.7.18**). `wiki hooks` and `wiki
+status` run in Python (`hooks_cli.py`, `status_cli.py`), and setup installs the hooks
+in-process. Ten goldens pass byte-identical. The five decided differences each come with a
+golden diff that is exactly the change:
+- the probe walks the hook entries, for status and doctor alike;
+- an unreadable config shows as `unreadable`;
+- the help text is corrected;
+- hooks need no jq;
+- `wiki status <word>` is refused.
+
+The scratch run (sandboxed HOME, real venv) found the prompt-vs-stdout order in pipes,
+now fixed. `wiki` is at 481 lines and the bash owns skills / seed / update. Suite 2508,
+CI green on `378e18f`.
 
 **S03-T04 is done** (`M034-S03-T04-SUMMARY.md`). `core/agents.py` holds `merge` and
 `without_wiki_hooks`; rendered, they give the bash's file text byte for byte (26 parity
@@ -41,12 +55,14 @@ now do what they report, and five goldens hold them for the port:
   (exit 2), and four pasteable `uv sync` / `rm` hints are now quoted, two of them also
   naming the environment.
 
-`wiki` is at 539 lines; the bash owns hooks / skills / seed / update / status.
+**Next: S03-T06** — skills in Python, oracle first:
+- the engine-owned check and the global flag;
+- registry add / remove;
+- `skills install/uninstall/sync/status`;
+- the silent install and prune that setup and update call.
 
-**Next: S03-T05** ports `wiki hooks` and `wiki status` on top of T04's functions, at parity
-with T02's record. Backups go through `core/backup`. The probe decision ships there for
-status and doctor alike: walk the hook entries instead of grepping the text. Skills are
-T06, the deletions T07.
+**T07** then deletes `lib/agents.sh`, `hooks.sh`, `skills.sh`, `config.sh`, and the dead
+helpers they leave in `ui.sh` / `common.sh`.
 
 **M034 / S02 — complete (5/5, 2026-10-15).** It delivered:
 - line-based prompts on `core/console`, reading byte by byte (T01);

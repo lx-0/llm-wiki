@@ -5,7 +5,7 @@ project: llm-wiki
 created: 2026-10-15T18:15:32+02:00
 status: planned
 task_count: 7
-completed_tasks: 4
+completed_tasks: 5
 ---
 
 # M034-S03 -- Slice Plan
@@ -50,7 +50,7 @@ last callers were skills' `config_get` and `cmd_status` (reassessed after S01).
   Rendered, they match the bash `jq` byte for byte on T02's shapes: Claude groups, Cursor
   bare entries, other tools' hooks and keys, groups and events the removal empties. Nothing
   calls them yet, so no release.
-- [ ] T05 -- **Port** `wiki hooks install/uninstall/status` with the scope prompt, and `wiki
+- [x] T05 -- **Port** `wiki hooks install/uninstall/status` with the scope prompt, and `wiki
   status` (moved from S01-T05: a banner over S02's `config status` and the hooks table), at
   parity with T02's record. Backups go through T03's helper, and the hook commands stay
   byte-identical. `setup`'s hooks step runs in-process. The probe decision (T01 follow-up)
