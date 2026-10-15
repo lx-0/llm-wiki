@@ -1,0 +1,11 @@
+{
+  "colorGroups": [
+    {
+      "color": {
+        "rgb": 123
+      }
+    }
+  ],
+  "scale": 2
+}
+overrides: 2

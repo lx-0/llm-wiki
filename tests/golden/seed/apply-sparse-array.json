@@ -1,0 +1,12 @@
+{
+  "choices": [
+    {
+      "id": "x",
+      "format": "a"
+    },
+    {
+      "id": "y",
+      "format": "c"
+    }
+  ]
+}

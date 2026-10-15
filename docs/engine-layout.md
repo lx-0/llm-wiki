@@ -33,6 +33,8 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 │   │   ├── paths.py               ← eager path constants from __file__ — zero deps, no side effects
 │   │   ├── agents.py              ← agent registry (claude / codex / gemini / cursor), the one hook-command grammar, hook_cmd + per-agent payloads, merge / without_wiki_hooks (pure)
 │   │   ├── backup.py              ← the one backup-before-write helper: backup / backup_path / stamp, never over an earlier backup (a clash takes -2)
+│   │   ├── jqjson.py              ← JSON as jq 1.7 reads / compares / writes it: number literals kept (Decimal), render (`jq .`), canonical (`jq -S .`), same (jq's ==), leaf / get / set paths
+│   │   ├── seed.py                ← the seed's pure core: walk (what `wiki seed` writes, in order, and how), apply / compute overlay, derive (template ⊕ overlay)
 │   │   ├── config.py              ← CONFIG singleton (YAML-driven) + get/set/keys CLI + TIMEZONE + .env bootstrap
 │   │   ├── prompts.py             ← prompt template loader (${var} substitution)
 │   │   ├── ollama_client.py       ← single Ollama transport (chat / chat_schema / chat_vision)

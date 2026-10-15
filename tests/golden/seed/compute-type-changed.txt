@@ -1,0 +1,9 @@
+{
+  "search": {
+    "query": "q",
+    "flags": [
+      1
+    ]
+  }
+}
+overrides: 2

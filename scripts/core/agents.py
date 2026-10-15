@@ -18,6 +18,8 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
+from core import jqjson
+
 SCOPES = ("user", "project")
 
 # A command that runs one of the engine's hook scripts from under a `.wiki` path. Covers
@@ -203,8 +205,8 @@ def payload(name: str, *, wiki_dir: Path, venv: str | None) -> dict[str, object]
 
 
 def render(config: object) -> str:
-    """A config as `jq .` writes it: two-space indent, UTF-8 as is, a trailing newline."""
-    return json.dumps(config, indent=2, ensure_ascii=False) + "\n"
+    """A config as `jq .` writes it (`core.jqjson.render`, shared with the seed)."""
+    return jqjson.render(config)
 
 
 # ── Merge and uninstall ────────────────────────────────────────────────────
