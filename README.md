@@ -336,14 +336,14 @@ Hooks always use Option B (the `--project` flag is hardcoded into the agent conf
 
 Secrets-leak prevention and the code gates run on two layers:
 
-- **CI** — [secrets-scan.yml](.github/workflows/secrets-scan.yml): gitleaks scans every push + PR + nightly cron, blocks merge on leaks. [ci.yml](.github/workflows/ci.yml): on every push + PR to `main`, the engine job runs `ruff check`, `ruff format --check` and the pytest suite (Linux), the desktop job runs `npm test` (tsc + svelte-check + vitest) and Biome.
-- **Pre-commit** ([.pre-commit-config.yaml](.pre-commit-config.yaml)) — local hooks block leaks and lint drift before they reach git (gitleaks, file hygiene, `ruff-check --fix`, `ruff-format`):
+- **CI** — [secrets-scan.yml](.github/workflows/secrets-scan.yml): gitleaks scans every push + PR + nightly cron, blocks merge on leaks. [ci.yml](.github/workflows/ci.yml): on every push + PR to `main`, the engine job runs `ruff check`, `ruff format --check`, the `ty` type check on `scripts/core/` (and reports the count for the rest of `scripts/`) and the pytest suite (Linux), the desktop job runs `npm test` (tsc + svelte-check + vitest) and Biome.
+- **Pre-commit** ([.pre-commit-config.yaml](.pre-commit-config.yaml)) — local hooks block leaks, lint drift and type errors before they reach git (gitleaks, file hygiene, `ruff-check --fix`, `ruff-format`, `ty check scripts/core`):
 
   ```bash
   pip install pre-commit && pre-commit install
   ```
 
-The ruff rule set — and the reason for every ignore — lives in [pyproject.toml](pyproject.toml); run the gates by hand with `uv sync --group lint` once, then `uv run --group lint ruff check scripts hooks tests`. Gitleaks rules + allowlist live in [.gitleaks.toml](.gitleaks.toml). Manual scan: `gitleaks detect --no-banner -v`.
+The ruff rule set — and the reason for every ignore — lives in [pyproject.toml](pyproject.toml); run the gates by hand with `uv sync --group lint --group typecheck` once, then `uv run --group lint ruff check scripts hooks tests` and `uv run --group typecheck ty check scripts/core`. The pytest suite carries the structural gates too: no function of 150 lines or more, no module over 1,000 lines without a reason in [docs/engine-layout.md](docs/engine-layout.md#large-modules), and the `--json` payloads validated against [docs/contracts/](docs/contracts/). Gitleaks rules + allowlist live in [.gitleaks.toml](.gitleaks.toml). Manual scan: `gitleaks detect --no-banner -v`.
 
 If you find a leak in history, rotate the secret immediately, then file an issue (don't post the leaked value).
 

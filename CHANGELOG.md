@@ -18,6 +18,53 @@ every operator's `wiki update` → `uv sync` regenerate `uv.lock` and dirty thei
 config keys must also be wired into `scripts/migrations/migrate_config_keys.py`
 in the same commit.
 
+## [0.7.0] — 2026-10-15
+
+The engine's code is modernised (M033): formatted, linted and type-checked by gates that
+run before every commit and in CI, one source root with one way to start a module, the
+duplicated parsers and helpers folded onto shared seams, the long functions and modules
+split, and the `--json` payloads typed once. Behaviour was held identical throughout by a
+snapshot test of `wiki menu --json`, `wiki doctor --quick --json` and `wiki help`. What an
+operator notices is the four fixes the work turned up, and two small changes in how
+scripts start and what the terminal shows.
+
+**For your vault:** no config key was added, renamed or removed, so there is no migration;
+`wiki menu --json` / `wiki doctor --json` stay schema 2. `wiki update` pulls as usual.
+
+### Fixed
+
+- **A `--json` invocation prints the payload alone.** `wiki query --json`, `wiki usage
+  --json`, `wiki publish --dry-run --json` and `wiki dream list-candidates --json` printed the
+  dispatcher's banner ahead of the JSON, so `JSON.parse(stdout)` failed.
+- **The suggestions' IMAP actions on a Gmail account crashed.** `imap-move` / `imap-tag` /
+  `imap-set-flags` imported an OAuth helper that a May refactor had moved, and died with
+  `ImportError` before logging in. They log in again.
+- **`wiki update` runs its post-pull steps from the engine it just pulled.** After a pull that
+  changed how engine modules start, the old bash ran the new tree's migration and skipped it
+  with a `ModuleNotFoundError` until a second `wiki update`.
+- **`wiki ingest-youtube` and `wiki index` no longer print Python's `RuntimeWarning`** about a
+  module found in `sys.modules` on every run.
+
+### Changed
+
+- **Three scripts lost their hyphens:** `review-wiki.py` → `review_wiki.py`,
+  `optimize-claude-md.py` → `optimize_claude_md.py`, `retry-failed-flushes.py` →
+  `retry_failed_flushes.py`. The `wiki` commands are unchanged; only a direct call of the old
+  file name needs the new one.
+- **One console log setup.** The commands that formatted their own console logs now share
+  compile's: stderr drops the ISO-timestamp prefix and gains TTY-aware colours; the
+  `logs/*.log` archives keep their timestamps.
+
+### Added
+
+- **For contributors: the gates.** `ruff format` / `ruff check` over `scripts/ hooks/ tests/`
+  with a reason for every ignore; `ty` (pinned) on `scripts/core/`; in pre-commit and in CI,
+  which also runs the pytest and desktop suites. Size gates keep every function under 150
+  lines and every module at or under 1,000 lines unless `docs/engine-layout.md` names the
+  reason. The `--json` payloads are `TypedDict`s in `scripts/core/contracts.py`, and
+  `docs/contracts/{menu,doctor}.schema.json` are generated from them and validated by both
+  test suites.
+
 ## [0.6.0] — 2026-10-14
 
 The desktop app is rebuilt (M032): the menu-bar panel shows state as shapes instead

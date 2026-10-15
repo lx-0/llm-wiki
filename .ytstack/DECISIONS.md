@@ -2182,3 +2182,41 @@ handful of types, or if a second consumer needs the same types.
 **Not in the contract:** the desktop's `scripts/shots/fixtures.cjs` holds parsed renderer
 state (`DoctorResult` / `MenuResult`), not engine payloads, so it is not validated against the
 schemas.
+
+## 2026-10-15: M033 — the engine modernisation, closed against its nine exit criteria (0.7.0)
+
+Five slices and 31 tasks, 2026-10-14 → 2026-10-15. Behaviour was held identical
+throughout by the S01 oracle (golden `menu --json`, `doctor --quick --json`, `help` on a
+fixture vault) plus a parity dump per refactor group. The suite grew from 2,025 to 2,255
+green, and every task closed with it green and pushed with CI green.
+
+| # | Exit criterion | Result |
+| --- | --- | --- |
+| 1 | Format + lint gates | `ruff format --check` + `ruff check` (E,F,I,UP,B,SIM,N,RUF,PL,C90; every ignore with a reason), in pre-commit and CI; format commit `ec06110` in `.git-blame-ignore-revs` |
+| 2 | 0 unused `noqa` | `ruff check --extend-select RUF100` clean. `--select RUF100` alone reports false positives, because it disables the rules the comments name |
+| 3 | CI runs both suites | `ci.yml`: engine (ruff, ty, pytest) + desktop (tsc, svelte-check, vitest, Biome), green |
+| 4 | One source root | `scripts/` with `python -m` dispatch from `core/entry.py`, one import identity, `sys.path` only in `hooks/_bootstrap.py` (`tests/test_layout.py`) |
+| 5 | Seams, not copies | frontmatter 25 grammars → 1, slugify 7 → 1, logging 45 setups → 1, state 7 writers → the store, the rollup line 6 → 1; each with a guard (engine-layout § Seams and gates) |
+| 6 | No function ≥ 150 lines; god modules split | 20 measured → 0 (empty allowlist); six modules split, four over 1,000 lines with a reason (`test_module_size.py`) |
+| 7 | Type checker gated on `core/` | ty 0.0.88 (pinned): `core/` 19 → 0 in pre-commit + CI; the rest of `scripts/` reported (148) |
+| 8 | `--json` contracts typed once | `core/contracts.py` → `docs/contracts/*.schema.json`; pytest (`jsonschema`) and vitest (`ajv`) validate against them |
+| 9 | Behaviour unchanged, proven | Oracle goldens never re-recorded since S01-T01 (`git log tests/golden/oracle/`: one commit); parity dumps identical per refactor group (fixtures, scratch vault, read-only live vault) |
+
+**Found and fixed on the way, each in its own commit with a test:**
+
+- `--json` printed the dispatcher banner ahead of the payload.
+- `wiki update` ran its post-pull steps from the pre-pull bash.
+- runpy warnings on `ingest-youtube` / `index`.
+- The suggestions' IMAP actions crashed on Gmail accounts. The dead import was found by the
+  ty probe after a mypy-coded `type: ignore` hid it for five months.
+- 13 doc references to a renamed module.
+- Dream's dead `_is_substrate_file`.
+- No-op test patches that isolated nothing.
+
+**Moved to M034:** `print` → `core/console` (the Python dispatcher owns the output); the bash
+→ Python dispatcher port and the `llm_wiki` package rename (DECISIONS 2026-10-14);
+`backlog/lazy-collector-registry.md` and `backlog/collect-flags-one-verb.md`. The rest of
+`scripts/` under ty widens one clean package at a time, as KNOWLEDGE records.
+
+**Operator-visible:** release 0.7.0. There are no config keys, so no migration, and schema 2 is
+unchanged; the CHANGELOG lists the fixes and the renamed hyphen scripts.

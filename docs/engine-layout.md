@@ -10,6 +10,7 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 
 - [Directory tree](#directory-tree)
 - [How a module runs](#how-a-module-runs)
+- [Seams and gates](#seams-and-gates)
 - [Large modules](#large-modules)
 - [Why bash + python + jq?](#why-bash--python--jq)
 - [Where to go next](#where-to-go-next)
@@ -88,7 +89,7 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 │   │   ├── health/{oura,healthkit_xml}.py ← Oura REST client; Apple Health Export.xml streaming parser
 │   │   └── mailbox/{base,gmail,thunderbird,imap,allinkl}.py ← MailboxReader / Filter adapters (allinkl = server-side filter)
 │   ├── domain/mail.py         ← pure mailbox domain types (frozen dataclasses shared by readers, filters, collectors)
-│   ├── intents/               ← intent dispatch: Intent record + Handler Protocol + Registry (base.py), task / idea / note handlers, _record.py writer → workspace/inbox/
+│   ├── intents/               ← intent dispatch: Intent record + Handler Protocol + Registry (base.py), the handlers (task_handler.py / idea_handler.py / note_handler.py), _record.py writer → workspace/inbox/
 │   ├── bridge/                ← `wiki bridge` — rsync-based inbox bridge (cli.py, drive_sync.py)
 │   ├── publish/               ← `wiki publish` — mirror knowledge/ into meinkontext: cli, corpus, delta (content-hash), describe, render, executor, client (MCP JSON-RPC), oauth, bootstrap
 │   ├── preprocessors/         ← in-vault intake normalizers (pre-compile; Protocol + Registry, singletons)
@@ -238,6 +239,39 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 - **Hooks** (`hooks/*.py`) are plain scripts the agent harness runs from `hooks/`; they `import _bootstrap` — the engine's one `sys.path` bootstrap — before anything from `scripts/`.
 
 A package whose `__init__` imports its modules to register them (`collectors`, `preprocessors`, `producers`) double-imports such a module under `-m` — runpy warns, the registry sees the module twice. The commands behind those modules enter through top-level entry scripts instead (`process_inbox.py`, `ingest_html.py`, `ingest_youtube.py`, `index_folders.py`; `scan_screenshots.py` / `scan_browser.py` / `scan_tabs.py` for the three collectors' direct-CLI flags); `tests/test_cli_dispatch.py` refuses a handler that reaches into such a package directly, and `tests/test_layout.py` refuses a documented `uv run python …/scripts/<pkg>/<x>.py` invocation anywhere in docstrings, `docs/`, `AGENTS.md`, `README.md` or `templates/`.
+
+## Seams and gates
+
+A seam is the one place a cross-cutting job lives; its guard test fails when a second copy
+appears somewhere else. Use the seam — never hand-roll the job beside it.
+
+| Job | Seam | Guard |
+| --- | --- | --- |
+| Start another engine process | `core/entry.py` (`python -m <module>`, `scripts/` on PYTHONPATH) | `tests/test_entry.py`, `tests/test_cli_dispatch.py` |
+| Console + file logging | `core/console.py:setup_console_logging` — entry points only, never at import | `tests/test_console.py::TestOneSetupEverywhere` |
+| Read / write frontmatter | `core/frontmatter.py` | `tests/test_frontmatter_parity.py` (no private grammar, no fence grammar outside the seam) |
+| Slugs and filenames | `core/utils.py:slugify` (`ascii_only=True` for filenames) | `tests/test_slugify.py::test_no_second_slug_grammar_outside_the_seam` |
+| JSON state under `state/` | `core/state_store.py:store_for` | `tests/test_state_store.py::test_state_files_are_written_through_the_seam` |
+| A collector's daily-rollup line | `core/daily_capture.py:rollup_line` + `collectors/base.py:append_rollup` | `tests/test_rollup_line.py` (appends only through the harness, one ellipsis rule) |
+| A Claude-SDK call | `core/sdk_helpers.py:run_sdk_query` | `tests/test_sdk_run_harness.py` |
+| An agent's Write / Edit scope | `core/sdk_scope.py` (the PreToolUse hook, the deny-all gate) | `tests/test_sdk_scope.py` |
+| The `--json` payloads (menu, doctor) | `core/contracts.py` → `docs/contracts/*.schema.json` | `tests/test_contracts.py`, `desktop/src/lib/contract.test.ts` |
+
+The gates run in pre-commit and CI (AGENTS.md § Style): `ruff format` / `ruff check` over
+`scripts/ hooks/ tests/`, `ty check scripts/core` (the rest of `scripts/` is reported, not
+gated), and the pytest suite, which carries the structural gates:
+
+- **Behaviour oracle** — `tests/test_oracle_payloads.py` pins `wiki menu --json`,
+  `wiki doctor --quick --json` and `wiki help` on a fixture vault (`--snapshot-update` to
+  re-record after an intended change).
+- **Size** — `tests/test_function_length.py` (no function of 150 lines or more; empty
+  allowlist) and `tests/test_module_size.py` (the § Large modules list below).
+- **Layout** — `tests/test_layout.py`: one import identity, `scripts/` not a package,
+  `sys.path` touched only by `hooks/_bootstrap.py`, no documented by-path invocation of a
+  package module.
+- **Patch surface of a split module** — `tests/test_health_package.py`,
+  `tests/test_lint_layout.py`, `tests/test_dream_layout.py`: a test patch must land on the
+  module that reads the name, so a stale patch fails instead of isolating nothing.
 
 ## Large modules
 
