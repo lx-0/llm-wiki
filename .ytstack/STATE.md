@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-15T15:34:23+02:00
+last_updated: 2026-10-15T15:36:43+02:00
 current_milestone: M033
 active_slice: S05
-active_task: none
+active_task: T03
 last_completed_milestone: M032
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -225,9 +225,12 @@ pre-commit + CI on `core/`, plus a report-only step for all of `scripts/`. **S05
 (A `dae1395`, B `ead5379`): `ty check scripts/core` is clean (19 → 0, exit 1 before), and the
 gate runs in pre-commit (seen `Failed` on an injected error) and in CI (gating step +
 report-only step, `Found 148 diagnostics` on Linux, the same as the Mac). `ActionJSON` /
-`CheckJSON` type the desktop payloads; the oracle goldens are unchanged, suite 2245. **Next:
-S05-T03 (contract typed once: a JSON Schema from the payload types, validated in pytest) via
-`plan-task`.**
+`CheckJSON` type the desktop payloads; the oracle goldens are unchanged, suite 2245. T03
+planned (`M033-S05-T03-PLAN.md`): `core/contracts.py` holds every schema-2 payload type plus a
+TypedDict → JSON-Schema converter (`--write` / `--check`), generating
+`docs/contracts/{menu,doctor}.schema.json` with `additionalProperties: false`. pytest
+validates the goldens, with negative cases seen failing. `jsonschema` becomes explicit in
+`dev`. **Next: execute T03.**
 
 ## M032 COMPLETE (L, 2026-10-14): desktop de-slop
 
