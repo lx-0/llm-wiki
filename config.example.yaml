@@ -129,7 +129,7 @@ piggybacks:
   gmeet:
     enabled: true
     cooldown_hours: 6                    # tighter than scan_youtube — meetings are time-sensitive
-  # Pulls Google Calendar events via collectors/calendar.py. Multi-tenant:
+  # Pulls Google Calendar events via collectors/calendar_collector.py. Multi-tenant:
   # requires at least one personal.accounts.<id>.calendar sub-block
   # (kind: google-calendar) AND `wiki calendar-auth <id>` run for that
   # account. Otherwise silently skipped (graceful agnostic). One markdown
@@ -384,7 +384,7 @@ limits:
   gmeet_max_per_run: 50                  # default cap per account
   gmeet_export_dead_letter_attempts: 3   # export failures per doc-id before it parks in the dead-letter
   gmeet_export_dead_letter_reprobe_days: 7  # days a parked doc-id waits before one re-probe
-  # Google Calendar ingest (collectors/calendar.py — multi-tenant; per-account
+  # Google Calendar ingest (collectors/calendar_collector.py — multi-tenant; per-account
   # override is the calendar sub-block under personal.accounts.<id>.calendar).
   calendar_request_timeout_s: 30         # per-HTTP-call timeout against calendar.googleapis.com
   calendar_max_per_run: 500              # per-calendar event cap; selected calendars multiply
@@ -681,7 +681,7 @@ personal:
   # writes its periodic *.json snapshots). Empty string disables STG imports.
   stg_backup_dir: ""
   # Substring keywords marking calendar events as holidays / observances to
-  # skip during collectors/calendar.py ingest. Locale-specific, e.g.
+  # skip during collectors/calendar_collector.py ingest. Locale-specific, e.g.
   # ["Christmas", "Easter"] or ["Weihnacht", "Ostern"]. Empty = no skipping.
   calendar_skip_keywords: []
   # Directory the operator dumps dictation transcripts into. Any tool that
@@ -859,7 +859,7 @@ personal:
   #       since: ""                                      # ISO date "2026-01-01"; empty = no backfill cap
   #       max_per_run: null                              # null = inherit CONFIG.limits.jamie_max_per_run
   #     calendar:
-  #       kind: google-calendar                          # collectors/calendar.py — Google Calendar events as substrate
+  #       kind: google-calendar                          # collectors/calendar_collector.py — Google Calendar events as substrate
   #       include: []                                    # list of calendar ids or summaries; empty = all "selected: true" calendars (Google UI toggle)
   #       backfill_days: 90                              # past window per run; null = inherit CONFIG.limits.calendar_backfill_days
   #       future_days: 7                                 # future window re-fetched every run (catches mutations)

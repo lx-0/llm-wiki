@@ -148,7 +148,7 @@ The `.env` file: only the **variable NAME** lives in `config.yaml` (e.g. `api_ke
 | `limits.gmeet_max_per_run` | `50` | default cap; per-account override is the gmeet sub-block's max_per_run |
 | `limits.gmeet_export_dead_letter_attempts` | `3` | export failures per doc-id before it parks in the dead-letter |
 | `limits.gmeet_export_dead_letter_reprobe_days` | `7` | days a parked doc-id waits before one re-probe (re-granted access heals) |
-| `limits.calendar_request_timeout_s` | `30` | Google Calendar ingest (collectors/calendar.py — see also CONFIG.piggybacks.calendar). |
+| `limits.calendar_request_timeout_s` | `30` | Google Calendar ingest (collectors/calendar_collector.py — see also CONFIG.piggybacks.calendar). |
 | `limits.calendar_max_per_run` | `500` | default per-calendar cap; per-account override is the calendar sub-block's max_per_run |
 | `limits.calendar_backfill_days` | `90` | default past window per run (events with updated >= now-N for delta sync) |
 | `limits.calendar_future_days` | `7` | default future window re-fetched every run (catches mutations on upcoming events) |
@@ -252,7 +252,7 @@ sub-blocks instead.
 | `personal.curiosity_folders` | `[]` | Optional subset of email_folder paths considered by the curiosity loop. |
 | `personal.watched_folders` | `[]` | M027: folders the curiosity loop may scan as substrate (local + NAS). |
 | `personal.project_examples` | `[]` | short list of project / product names rendered into scan_screenshots_vision.md as concrete examples |
-| `personal.calendar_skip_keywords` | `[]` | Substring keywords whose presence in a calendar event title marks it as a holiday / observance to skip during collectors/calendar.py. |
+| `personal.calendar_skip_keywords` | `[]` | Substring keywords whose presence in a calendar event title marks it as a holiday / observance to skip during collectors/calendar_collector.py. |
 | `personal.thunderbird_profile` | `""` | Path to local Thunderbird profile directory (mbox + filter roots live here). |
 | `personal.firefox_profile` | `""` | Path to a local Firefox profile directory (e.g. ~/Library/Application Support/Firefox/Profiles/<id>.default-release on macOS, or ~/.mozilla/firefox/<id>.default-release on Linux). |
 | `personal.stg_backup_dir` | `""` | Path to a Simple Tab Groups (STG) backup directory (where the extension writes its periodic *.json snapshots). |

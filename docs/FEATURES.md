@@ -58,7 +58,7 @@ Dispatcher: `scripts/collectors/cli.py` (`wiki collect <name>` and `wiki collect
 
 | Scanner | Status | Code | Output |
 |---|---|---|---|
-| `calendar` | 🟢 | `scripts/collectors/calendar.py:CalendarCollector` (Registry, **piggyback**, OAuth via `core/google_oauth.py`) + `wiki calendar-auth <id>` bootstrap + `scripts/adapters/calendar/google.py` REST client | `raw/notes/calendar/<YYYY-MM-DD>.md` per-date rollup (one file per date, regenerated end-to-end per run; operator prose preserved outside the managed `<!-- calendar:events:* -->` region) + `knowledge/concepts/<slug>.md` for recurring series |
+| `calendar` | 🟢 | `scripts/collectors/calendar_collector.py:CalendarCollector` (Registry, **piggyback**, OAuth via `core/google_oauth.py`) + `wiki calendar-auth <id>` bootstrap + `scripts/adapters/calendar/google.py` REST client | `raw/notes/calendar/<YYYY-MM-DD>.md` per-date rollup (one file per date, regenerated end-to-end per run; operator prose preserved outside the managed `<!-- calendar:events:* -->` region) + `knowledge/concepts/<slug>.md` for recurring series |
 | `browser` | 🟢 | `scripts/collectors/scan_browser.py:BrowserCollector` (Registry) + script-mode CLI | `raw/notes/browser/browser-overview-<date>.md` |
 | `tabs` | 🟢 | `scripts/collectors/scan_tabs.py:TabsCollector` (Registry) + script-mode CLI | `raw/notes/browser/tab-groups-overview-<date>.md` |
 | `screenshots` | 🟢 | `scripts/collectors/scan_screenshots.py:ScreenshotsCollector` (Registry, **piggyback**) + script-mode CLI | `~/Screenshots/<file>.md` (canonical) + `raw/notes/screenshots/thumb/<file>.png` + `raw/notes/screenshots/screenshots-<slug>.md` (batch report) |

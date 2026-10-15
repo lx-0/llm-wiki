@@ -410,7 +410,7 @@ class Limits:
     gmeet_max_per_run: int = 50           # default cap; per-account override is the gmeet sub-block's max_per_run
     gmeet_export_dead_letter_attempts: int = 3   # export failures per doc-id before it parks in the dead-letter
     gmeet_export_dead_letter_reprobe_days: int = 7  # days a parked doc-id waits before one re-probe (re-granted access heals)
-    # Google Calendar ingest (collectors/calendar.py — see also
+    # Google Calendar ingest (collectors/calendar_collector.py — see also
     # CONFIG.piggybacks.calendar). Multi-tenant: per-account calendar block
     # under personal.accounts.<id>.calendar (kind: google-calendar,
     # include, backfill_days, future_days, since, max_per_run).
@@ -893,7 +893,7 @@ class Personal:
     # scan_screenshots_vision.md as concrete examples
     project_examples: list[str] = field(default_factory=list)
     # Substring keywords whose presence in a calendar event title marks it as a
-    # holiday / observance to skip during collectors/calendar.py. Locale-specific
+    # holiday / observance to skip during collectors/calendar_collector.py. Locale-specific
     # (e.g. ["Christmas", "Easter"] for English; ["Weihnacht", "Ostern"] for
     # German). Empty list = no skipping.
     calendar_skip_keywords: list[str] = field(default_factory=list)
