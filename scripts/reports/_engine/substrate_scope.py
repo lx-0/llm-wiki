@@ -28,12 +28,19 @@ from pathlib import Path
 # substrates that legitimately surface clinical-screen signals (sleep /
 # mood / engagement / concentration). Wider per-instrument scopes will be
 # declared in items.yaml `scope:` blocks post-wedge.
+#
+# Each glob is where a writer actually puts its output (pinned by
+# tests/reports/test_substrate_scope.py). Coding sessions
+# (`daily/<date>/sessions.md`) are deliberately NOT here: measured on lxw
+# 2026-10-15, the 14-day window holds 11 of them at ~434K tokens against the
+# 160K per-instrument budget, so they wait for the summarisation layer
+# (backlog/personality-substrate-predigestion.md). The `raw/notes/sessions/**`
+# glob that stood here matched nothing.
 CLINICAL_DEFAULT_SUBSTRATE_GLOBS: tuple[str, ...] = (
     "daily/*.md",
-    "raw/notes/voice/**/*.md",
+    "raw/voice/**/*.md",
     "raw/notes/health/**/*.md",
     "raw/transcripts/**/*.md",
-    "raw/notes/sessions/**/*.md",
 )
 
 

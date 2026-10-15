@@ -17,7 +17,7 @@ interpretive prose layer that the operator actually reads.
   diagnosis. Bands are screening signals, not diagnostic conclusions.
 - **Cite paths.** Every interpretive claim that names a specific
   pattern in the substrate must cite at least one path
-  (`raw/notes/voice/...`, `daily/2026-05-15.md`, `knowledge/...`) so a
+  (`raw/voice/...`, `daily/2026-05-15.md`, `knowledge/...`) so a
   future reader can verify your reading. You have the Read tool to
   fetch specific files if a per-instrument report's evidence list
   isn't enough.

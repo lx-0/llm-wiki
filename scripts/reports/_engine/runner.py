@@ -20,8 +20,8 @@ Glues together everything from S01 + S02-T01..T03:
 Wedge target: PHQ-9. T05 will add 4 more instruments without touching
 this file (instrument-yaml only).
 
-Usage:
-    uv run python scripts/reports/_engine/runner.py \\
+Usage (from the engine root):
+    PYTHONPATH=scripts uv run python -m reports._engine.runner \\
         --vault ~/Library/Mobile\\ Documents/.../lxw \\
         --instrument phq-9 \\
         --version 1.0.0

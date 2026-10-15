@@ -14,10 +14,10 @@ Idempotent + non-destructive:
 - Marks backfilled reports with `per_item_backfilled: true` so a
   future audit can distinguish backfilled-from-body vs runner-written.
 
-Usage:
-    uv run python scripts/reports/_engine/backfill_per_item.py \\
+Usage (from the engine root):
+    PYTHONPATH=scripts uv run python -m reports._engine.backfill_per_item \\
         --study-dir ~/path/to/<vault>/reports/studies/<id>
-    uv run python scripts/reports/_engine/backfill_per_item.py \\
+    PYTHONPATH=scripts uv run python -m reports._engine.backfill_per_item \\
         --study-dir ... --rerender-summary
 """
 

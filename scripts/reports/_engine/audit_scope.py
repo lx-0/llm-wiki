@@ -18,12 +18,12 @@ substrate (people-pages + voice + sessions over months) and will fall
 over without a pre-digestion layer (deferred per R2 mitigation
 recorded in DECISIONS).
 
-Usage:
+Usage (from the engine root):
     # Audit the live wedge instruments against the operator's vault:
-    uv run python scripts/reports/_engine/audit_scope.py
+    PYTHONPATH=scripts uv run python -m reports._engine.audit_scope
 
     # Point at a specific vault root:
-    uv run python scripts/reports/_engine/audit_scope.py --vault ~/path/to/vault
+    PYTHONPATH=scripts uv run python -m reports._engine.audit_scope --vault ~/path/to/vault
 
 Output goes to stdout; capture for KNOWLEDGE.md.
 """
@@ -128,8 +128,8 @@ def audit_synthetic_personality_stub(vault_root: Path, budget: int) -> AuditResu
     walking knowledge/people/ + voice + sessions + transcripts.
     """
     globs = (
-        "raw/notes/voice/**/*.md",
-        "raw/notes/sessions/**/*.md",
+        "raw/voice/**/*.md",
+        "daily/*/sessions.md",
         "raw/transcripts/**/*.md",
         "knowledge/people/*.md",
         "knowledge/takes/*.md",

@@ -76,8 +76,10 @@ def test_scripts_dir_is_the_source_root_pytest_put_on_the_path() -> None:
 _DOC_ROOTS = ("docs", "templates", "AGENTS.md", "README.md")
 # `\s+`, not a space: prose wraps a command across lines, and a line-by-line scan
 # missed `uv run python⏎scripts/core/config_docs.py` in AGENTS.md for a whole milestone.
+# `(?:[a-z_]+/)*`: a module two packages down (`scripts/reports/_engine/runner.py`)
+# slipped past a one-level pattern in three docstrings.
 _BY_PATH_INVOCATION = re.compile(
-    r"uv\s+run\s+(?:--project\s+\S+\s+)?python\s+(?:\S*/)?scripts/[a-z_]+/[a-z_-]+\.py"
+    r"uv\s+run\s+(?:--project\s+\S+\s+)?python\s+(?:\S*/)?scripts/[a-z_]+/(?:[a-z_]+/)*[a-z_-]+\.py"
 )
 
 

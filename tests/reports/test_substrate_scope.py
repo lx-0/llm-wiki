@@ -51,6 +51,34 @@ class TestResolveSubstrateFiles:
         assert out == []
 
 
+class TestGlobsMatchTheWriters:
+    """The clinical globs are the privacy boundary as declared; they must also be
+    the boundary in effect. `raw/notes/voice/**` and `raw/notes/sessions/**`
+    matched nothing for months (voice lands in `raw/voice/`, sessions in
+    `daily/<date>/sessions.md`), so no instrument ever read voice — while the
+    declaration said it did."""
+
+    def _writer_outputs(self, root: Path) -> list[Path]:
+        from collectors import get_collector
+
+        outputs = [root / "daily" / "2026-10-14.md"]
+        for name in ("voice", "health", "jamie", "gmeet"):
+            sub = get_collector(name).SPEC.output_subfolder
+            outputs.append(root / sub / f"sample-{name}.md")
+        for path in outputs:
+            _touch(path, age_days=1)
+        return outputs
+
+    def test_every_writer_output_is_read_and_every_glob_reads_one(self, tmp_path: Path) -> None:
+        outputs = self._writer_outputs(tmp_path)
+
+        read = resolve_substrate_files(tmp_path, CLINICAL_DEFAULT_SUBSTRATE_GLOBS, lookback_days=14)
+
+        assert read == sorted(outputs)
+        dead = [g for g in CLINICAL_DEFAULT_SUBSTRATE_GLOBS if not any(tmp_path.glob(g))]
+        assert dead == []
+
+
 class TestImportDirection:
     def test_probe_and_runner_use_the_production_primitive(self) -> None:
         # Both adapters resolve to the SAME function object from the seam.

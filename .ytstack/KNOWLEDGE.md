@@ -3007,6 +3007,16 @@ Per-candidate learnings from the 14-candidate seam arc (C01–C14). Decisions li
   The fix renders from the complete set or does not write. The test fake has to behave like
   the API: window overlap, `updatedMin` with cancelled entries, the cap. Same review question
   for any "regenerate the unit" writer: does the input hold the whole unit?
+- **A glob that matches nothing is a silent scope change (2026-10-15, M033-S05-T06):** the
+  reports' clinical substrate (`reports/_engine/substrate_scope.py`) declared
+  `raw/notes/voice/**` and `raw/notes/sessions/**`; voice lands in `raw/voice/`, sessions in
+  `daily/<date>/sessions.md`, so no instrument ever read either, while the declaration (and
+  every report's frontmatter `globs:`) said they did. Repointing sessions is not free: on lxw
+  the 14-day window holds 11 `sessions.md` at ~434K tokens against a 160K budget (all six
+  manifest instruments would overflow), so only voice was repointed (+0 tokens in 14 d, +79
+  in 30 d) and sessions wait for the summarisation layer. A test now ties every glob to a
+  writer's `SPEC.output_subfolder`, in both directions. Measure what a repointed glob costs
+  before shipping it (`python -m reports._engine.audit_scope`).
 
 ### Desktop toolchain (C07)
 
