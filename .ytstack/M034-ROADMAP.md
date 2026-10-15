@@ -5,7 +5,7 @@ size: L
 created: 2026-10-15T18:13:20+02:00
 status: planned
 total_slices: 6
-completed_slices: 0
+completed_slices: 1
 ---
 
 # M034 Roadmap
@@ -34,7 +34,7 @@ Suggested framing (refine in slice-milestone; the starting point is measured in 
 size is L with six slices; the template's floor of four is too few for 2,885 lines of bash
 and three tables.
 
-- [ ] S01 -- **Oracle + bootstrap** (7 tasks; re-cut after T04, see the slice plan's notes).
+- [x] S01 -- **Oracle + bootstrap** (7 tasks; re-cut after T04, see the slice plan's notes).
   - Extend the oracle to the bash commands' observable behaviour (fixture vault + fixture
     `HOME`), recorded from the bash version.
   - The thin `wiki`: symlink resolution, vault guard, venv resolution, `exec` of the venv
@@ -44,17 +44,22 @@ and three tables.
     library is ported).
   - Decide open questions 1 and 2.
 - [ ] S02 -- **Config + setup** (5 tasks). Prompt helpers on `core/console`, the setup
-  wizard, `config get/set/edit/status`, `install-shortcut` (symlink + rc line, with backups);
-  `lib/config.sh` and `lib/ui.sh` retire.
+  wizard, `config get/set/edit/status`, `install-shortcut` (symlink + rc line, with backups).
+  `lib/config.sh` and `lib/ui.sh` shrink to what later slices still call, and each file
+  retires with its last caller (reassessed after S01):
+  - `config_get` stays for `lib/skills.sh` and `config_cmd_status` for `cmd_status` → S03;
+  - `confirm` / `select_*` stay for `lib/hooks.sh` (S03) and update's stash prompt (S05).
 - [ ] S03 -- **Hooks + skills** (4 tasks). The agent registry, the per-agent payloads and
   the JSON merges into agent configs (hook commands byte-identical), `skills
-  install/uninstall/sync/status`; `lib/agents.sh`, `lib/hooks.sh` and `lib/skills.sh` retire.
+  install/uninstall/sync/status`, and `wiki status`. `lib/agents.sh`, `lib/hooks.sh`,
+  `lib/skills.sh` and `lib/config.sh` retire.
 - [ ] S04 -- **Seed** (4 tasks). The template seeding with its overlay, plugin, env,
   meta-bind and dashboard-button merges, at parity on the fixture vault and a copy of the live
   `.obsidian/`; `lib/seed.sh` retires.
 - [ ] S05 -- **Update + the last bash** (5 tasks). `update` with the post-pull re-exec of
-  the pulled engine, proven 0.7.3 → M034 on a scratch clone; `lib/common.sh` retires and
-  `wiki` lands at ≤ 150 lines; one help system (the bash help texts move into `cli_help`).
+  the pulled engine, proven 0.7.3 → M034 on a scratch clone. `lib/common.sh` and `lib/ui.sh`
+  retire, and `wiki` lands at ≤ 150 lines. One help system: the bash help texts move into
+  `cli_help` (`cmd_help` went in S01-T05).
 - [ ] S06 -- **Surface diet + close** (6 tasks).
   - One table behind help and menu; `print` → `core/console` with its gate; the lazy
     collector registry and the collect verb.

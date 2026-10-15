@@ -1,9 +1,9 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-15T20:24:00+02:00
+last_updated: 2026-10-15T20:27:00+02:00
 current_milestone: M034
-active_slice: none
+active_slice: S02
 active_task: none
 last_completed_milestone: M033
 parked_milestone: none
@@ -12,18 +12,25 @@ parallel_milestones: [M021, M025, M027, M029]
 
 # State
 
-## Next action — M034 / S01 complete (7/7): reassess, then S02
+## Next action — M034 / S02: config + setup
 
-**Status:** M034 / S01 is complete, with all 7 tasks done. It delivered:
+**Status:** M034 — slice S01 complete. Next slice: S02 (config + setup). The reassessment
+after S01 came out **B**: the slice order holds, but the bash library files now retire with
+their last caller. `lib/config.sh` goes in S03-T04, `lib/ui.sh` in S05-T04. `wiki setup`'s
+hooks step dispatches `wiki hooks install` until S03, and S02-T01's prompt helpers read stdin
+byte by byte so piped answers survive into that child. Details: M034-CONTEXT "Reassessment
+2026-10-15T20:26".
+**Next:** `ytstack:plan-task` → S02-T01, the prompt helpers on `core/console` (with open
+question 3 decided in DECISIONS: OSS weighed, the per-vault dependency cost measured).
+
+**M034 / S01 — complete (7/7).** It delivered:
 - the bash oracle (T01–T02);
 - the one-hop and rename decisions (T03);
 - the one-hop bootstrap (T04);
 - home & status (T05) and the dream routing + OAuth aliases (T06) in the catalogue;
 - the consumer smoke, 24/24 (T07).
 
-Engine 0.7.8, suite 2362, CI green on `13f5a73`.
-**Next:** `ytstack:reassess-roadmap` for S01, passing S01 explicitly because `active_slice`
-is cleared. Then `ytstack:plan-task` for S02-T01 (config + setup).
+Engine 0.7.8, suite 2362, CI green on `13f5a73`. Reassessed after S01: B (above).
 
 **M034 / S01-T07** (`13f5a73`): every consumer of `.wiki/wiki` works at S01's head:
 - the desktop app's spawn shape;

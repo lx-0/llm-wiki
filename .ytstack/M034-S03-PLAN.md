@@ -10,9 +10,10 @@ completed_tasks: 0
 
 # M034-S03 -- Slice Plan
 
-**Goal:** `wiki hooks …` and `wiki skills …` run in Python. The installed hook commands are
-byte-identical to what the bash wrote, and agent configs are merged with backups.
-`lib/agents.sh`, `lib/hooks.sh` and `lib/skills.sh` are deleted.
+**Goal:** `wiki hooks …`, `wiki skills …` and `wiki status` run in Python. The installed hook
+commands are byte-identical to what the bash wrote, and agent configs are merged with backups.
+`lib/agents.sh`, `lib/hooks.sh` and `lib/skills.sh` are deleted. So is `lib/config.sh`, whose
+last callers were skills' `config_get` and `cmd_status` (reassessed after S01).
 
 ## Tasks
 
@@ -28,9 +29,11 @@ byte-identical to what the bash wrote, and agent configs are merged with backups
 - [ ] T03 -- Skills in Python: the engine-owned check, the global-enable flag, registry
   add / remove, `skills install/uninstall/sync/status`, and the silent install / prune
   variants that `setup` and `update` call. Parity on the fixture `HOME`.
-- [ ] T04 -- The three `lib/` files are deleted along with their `wiki` call sites. The oracle
-  passes and the docs are updated. On scratch with a sandboxed `HOME`, an install → status →
-  uninstall cycle runs per agent.
+- [ ] T04 -- The three `lib/` files are deleted along with their `wiki` call sites, and so is
+  `lib/config.sh` (its last callers, `config_get` in skills and `config_cmd_status` in
+  `cmd_status`, are ported in T02 / T03). `lib/ui.sh` stays for `cmd_update`'s stash prompt
+  until S05. The oracle passes and the docs are updated. On scratch with a sandboxed `HOME`,
+  an install → status → uninstall cycle runs per agent.
 
 ## Done when
 

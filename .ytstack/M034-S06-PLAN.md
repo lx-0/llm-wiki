@@ -22,7 +22,10 @@ completed_tasks: 0
 - [ ] T01 -- One table. The home menu's quick actions, categories and fuzzy catalogue derive
   from `cli_catalog`, with `core/actions` for the pending-work rows. A test refuses a menu
   entry whose argv names no catalogue command. The hand-curated lists are deleted; the
-  menu's golden is unchanged, apart from differences decided in the commit.
+  menu's golden is unchanged, apart from differences decided in the commit. Also: `menu.py`'s
+  non-TTY fallback still spawns `wiki help` (bash → python → python) and can print
+  `cli.render_help()` in-process. The output is the same (`menu-no-tty` golden); noted in
+  S01-T05.
 - [ ] T02 -- `print` → `core/console` across the command modules. A gate refuses `print(` in
   command modules outside an allowlist with reasons (JSON payload writers and the TUI frame
   writer among them). The count goes before → after; `--json` stays payload-only.

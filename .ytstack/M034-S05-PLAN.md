@@ -11,8 +11,9 @@ completed_tasks: 0
 # M034-S05 -- Slice Plan
 
 **Goal:** `wiki update` runs in Python with the post-pull re-exec of the engine it just
-pulled. Upgrading a 0.7.3 vault to the M034 engine is proven on scratch. `lib/common.sh` is
-deleted and `wiki` is the ≤ 150-line bootstrap, behind one help system.
+pulled. Upgrading a 0.7.3 vault to the M034 engine is proven on scratch. `lib/common.sh` and
+`lib/ui.sh` (whose last caller is update's stash prompt; reassessed after S01) are deleted,
+and `wiki` is the ≤ 150-line bootstrap, behind one help system.
 
 ## Tasks
 
@@ -26,10 +27,12 @@ deleted and `wiki` is the ≤ 150-line bootstrap, behind one help system.
   entry with `--post-pull <rev>`, so a changed update procedure applies in the same run.
   Proven at oracle parity. A bash 0.7.3 `wiki update` pulling the new engine must also land
   in the Python phase 2.
-- [ ] T03 -- One help system: the bash help texts (`help_config` / `hooks` / `setup` /
-  `skills`, `update --help`) move into `cli_help`; `cmd_help` is gone; `wiki help` and
-  `wiki <cmd> -h` render from one place.
-- [ ] T04 -- `lib/common.sh` is deleted and the iCloud venv rule moves into the bootstrap.
+- [ ] T03 -- One help system. Each port moves its command's help text into `cli_help`:
+  `config` / `setup` in S02, `hooks` / `skills` in S03, `update` in T02 (`cmd_help` already
+  went in S01-T05). This task checks that no bash help text is left, pins that with a test (no
+  `help_*` heredoc in `wiki`), and makes `wiki help` and `wiki <cmd> -h` render from one place.
+- [ ] T04 -- `lib/common.sh` and `lib/ui.sh` are deleted, and the iCloud venv rule moves into
+  the bootstrap.
   `wiki` is ≤ 150 lines, and a test pins the bash budget (`wiki` line count; no `lib/*.sh`).
   `install.sh` is re-checked against the new layout.
 - [ ] T05 -- Operator path, end to end on a scratch vault at 0.7.3:

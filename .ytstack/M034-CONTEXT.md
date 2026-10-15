@@ -159,3 +159,38 @@ of `lib/` bash, the 708-line seed merge, a self-updating `update`, and three com
 - `backlog/lazy-collector-registry.md` → exit criterion 6.
 - `backlog/collect-flags-one-verb.md` → exit criterion 6.
 - `print` → `core/console` across the CLIs → exit criterion 5.
+
+## Reassessment 2026-10-15T20:26 — after S01
+
+**Verdict: B.** The slice order holds (S02 config + setup → S03 hooks + skills → S04 seed →
+S05 update + the last bash → S06 surface diet). S01 changed what sits *inside* the later
+slices. The bash library files have callers in later slices, so each file now retires with
+its last caller, not with the slice named after it. The locked decision "no soft
+deprecation" already says "deleted in the commit that ports its last caller".
+
+1. **`lib/config.sh` → S03-T04, not S02.** `lib/skills.sh` calls `config_get`, and
+   `cmd_status` calls `config_cmd_status`. S02-T05 deletes only the functions whose last
+   caller S02 ports (the wizard, `edit`, `keys`, `path`, the validators, `ask`).
+2. **`lib/ui.sh` → S05-T04, not S02.** `lib/hooks.sh` (S03) uses `confirm` / `select_*`,
+   and `cmd_update`'s stash prompt (S05) uses `confirm`.
+3. **`wiki status` → S03-T02** (S01's re-cut). It is a banner over `config status` and
+   `hooks status`.
+4. **`wiki setup`'s hooks step** runs `wiki hooks install` through the entry until S03-T02
+   ports hooks. That calls a not-yet-ported command through its public interface, as the menu
+   does; it is not a bash fallback.
+5. **S02-T01's prompt helpers read stdin byte by byte** (`os.read(0, 1)`). On a pipe,
+   `sys.stdin.readline()` buffers ahead and would swallow the answers meant for that child.
+6. **The help texts move with each port.** S05-T03 becomes the check that none is left
+   (`cmd_help` went in S01-T05).
+7. **Two leftovers are filed into S06:**
+   - T01: `menu.py`'s non-TTY fallback spawns `wiki help`;
+   - T03: PROCESS.md's 12 bare `uv run --project .wiki` lines.
+
+What S01 delivered:
+- 53 bash goldens;
+- the one hop (two processes instead of three, ~75 ms per call);
+- the catalogue machinery the later ports reuse: routes with argument prefixes, a default
+  route, aliases, `takes_args`, bannerless routes;
+- `wiki stats`;
+- a green consumer smoke;
+- engine 0.7.4 → 0.7.8.
