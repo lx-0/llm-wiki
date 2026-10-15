@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-15T21:21:00+02:00
+last_updated: 2026-10-15T21:24:00+02:00
 current_milestone: M034
 active_slice: S02
-active_task: none
+active_task: T04
 last_completed_milestone: M033
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -43,8 +43,9 @@ fixed on the way:
 - a failing `uv sync` in the hop ended `wiki` silently.
 
 `wiki` is at 606 lines; `lib/config.sh` has 20 left (for skills). Suite 2418, CI green.
-**Next:** `ytstack:plan-task` → S02-T04, `install-shortcut` in Python. Its bash paths are
-already in the oracle (`install-shortcut`, `--print-only`).
+**Next:** S02-T04 is planned (`M034-S02-T04-PLAN.md`): `install-shortcut` in Python. Three
+more bash paths are recorded first; the bash `rm -f`s a regular file at `~/.local/bin/wiki`,
+and the port refuses instead.
 
 **M034 / S01 — complete (7/7).** It delivered:
 - the bash oracle (T01–T02);
