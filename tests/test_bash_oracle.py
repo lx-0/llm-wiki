@@ -289,6 +289,17 @@ def _graph_search_now_an_object(env: dict[str, Path]) -> None:
     graph.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
 
 
+def _graph_tags_turned_off(env: dict[str, Path]) -> None:
+    """A setting turned off (true → false) beside a changed number — jq's `paths(scalars)`
+    dropped the false one (M034-S04-T02)."""
+    _seeded(env)
+    graph = env["vault"] / ".obsidian" / "graph.json"
+    data = json.loads(graph.read_text(encoding="utf-8"))
+    data["showTags"] = False
+    data["scale"] = 2
+    graph.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+
+
 def _graph_overlay_not_json_and_a_live_edit(env: dict[str, Path]) -> None:
     """The overlay for graph.json broken, the live file edited — what `--force` must keep."""
     _graph_overlay_and_a_live_edit(env)
@@ -571,11 +582,16 @@ MUTATING: dict[str, tuple[tuple[str, ...], str | None, Prepare]] = {
         None,
         _graph_overlay_not_json_and_a_live_edit,
     ),
-    # T02's fix first: a value whose type changed (0.7.22)
+    # T02's fixes first: a value whose type changed (0.7.22), a setting turned off (0.7.23)
     "seed-extract-custom-type-changed": (
         ("seed", "--extract-custom", ".obsidian/graph.json"),
         None,
         _graph_search_now_an_object,
+    ),
+    "seed-extract-custom-turned-off": (
+        ("seed", "--extract-custom", ".obsidian/graph.json"),
+        None,
+        _graph_tags_turned_off,
     ),
     "install-shortcut": (("install-shortcut",), None, None),
     "install-shortcut-print-only": (("install-shortcut", "--print-only"), None, None),

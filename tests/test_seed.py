@@ -274,6 +274,26 @@ def test_extract_custom_captures_a_value_whose_type_changed(env: dict[str, Path]
     assert json.loads((env["vault"] / GRAPH).read_bytes()) == json.loads(before)
 
 
+def test_extract_custom_keeps_a_setting_turned_off(env: dict[str, Path]) -> None:
+    """jq's `paths(scalars)` drops a leaf whose value is false (its `select` tests the value
+    itself), so a setting turned off never reached the overlay, and the `--force` seed
+    advised afterwards turned it back on — lxw's graph lost showTags / hideUnresolved
+    that way (M034-S04-T02, 0.7.23)."""
+    _seed(env)
+    data = _read(env, GRAPH)
+    assert data["showTags"] is True
+    data["showTags"] = False
+    data["scale"] = 2
+    _write(env, GRAPH, data)
+    run = run_wiki(env["vault"], env["home"], env["bin"], "seed", "--extract-custom", str(GRAPH))
+    assert run.returncode == 0, run.stdout + run.stderr
+    overlay = json.loads((env["vault"] / ".wiki" / "custom" / GRAPH).read_text(encoding="utf-8"))
+    assert overlay == {"showTags": False, "scale": 2}
+    assert "(2 override(s))" in run.stdout
+    _seed(env, str(GRAPH), "--force")
+    assert _read(env, GRAPH)["showTags"] is False
+
+
 def test_a_broken_overlay_leaves_its_file_alone(env: dict[str, Path]) -> None:
     _seed(env)
     overlay = env["vault"] / ".wiki" / "custom" / GRAPH

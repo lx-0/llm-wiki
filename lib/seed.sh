@@ -81,15 +81,23 @@ _apply_overlay() {  # $1 = base file, $2 = overlay file
   cat "$1"
 }
 
+# The leaves an overlay can carry: text, numbers and booleans. Not jq's
+# `paths(scalars)`: its select tests the leaf's VALUE, so it drops every false
+# (and null) — a setting turned off never reached the overlay, and the --force
+# advised afterwards turned it back on. A null leaf stays out on purpose: an
+# overlay null means "keep the template's value" (_apply_overlay), so it cannot
+# carry one.
+_LEAF_PATHS_JQ='def leaf_paths: paths(type | . == "string" or . == "number" or . == "boolean");'
+
 # Echo the minimal overlay: every leaf path where `cur` differs from `base`
 # (new keys + changed values; leaf-level, so nested objects merge cleanly).
 # Deletions aren't expressed — overlays are override-only by design. A path
 # the base cannot follow (text there, an object now) is a changed value: a
 # bare getpath stopped jq on it, and `set -e` ended --extract-custom in silence.
 _compute_overlay() {  # $1 = base file, $2 = cur file
-  jq -n --slurpfile b "$1" --slurpfile c "$2" '
+  jq -n --slurpfile b "$1" --slurpfile c "$2" "$_LEAF_PATHS_JQ"'
     ($b[0]) as $base | ($c[0]) as $cur
-    | reduce ($cur | paths(scalars)) as $p ({};
+    | reduce ($cur | leaf_paths) as $p ({};
         if ($base | try getpath($p) catch null) != ($cur | getpath($p))
         then setpath($p; $cur | getpath($p)) else . end)
   ' 2>/dev/null
@@ -202,7 +210,7 @@ _extract_overlay() {  # $1=rel $2=target $3=templates_dir
     return 0
   fi
   mkdir -p "$(dirname "$overlay")"; printf '%s\n' "$delta" > "$overlay"
-  local n; n="$(printf '%s' "$delta" | jq '[paths(scalars)] | length' 2>/dev/null)"
+  local n; n="$(printf '%s' "$delta" | jq "$_LEAF_PATHS_JQ"' [leaf_paths] | length' 2>/dev/null)"
   ok "extracted overlay → .wiki/custom/$rel ($n override(s))"
   info "from now on edit .wiki/custom/$rel (not the live file); \`wiki seed $rel --force\` re-derives"
 }

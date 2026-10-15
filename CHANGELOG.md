@@ -18,6 +18,21 @@ every operator's `wiki update` → `uv sync` regenerate `uv.lock` and dirty thei
 config keys must also be wired into `scripts/migrations/migrate_config_keys.py`
 in the same commit.
 
+## [0.7.23] — 2026-10-16
+
+**For your vault:** this matters only if you keep overlays in `.wiki/custom/`. Capture them
+again before any `wiki seed --force`. `wiki seed --check` names the drifted files, and
+`wiki seed --extract-custom <path>` captures each one. The old capture left out every
+setting you had turned off, so a `--force` would turn it back on.
+
+### Fixed
+
+- **`wiki seed --extract-custom` keeps the settings you turned off.** jq's list of leaf
+  values skips every `false`, so a switched-off setting never reached the overlay. The
+  `--force` that seed advises next then switched it back on.
+  - A cleared setting (`null`) still cannot be carried, because an overlay `null` means
+    "keep the template's value".
+
 ## [0.7.22] — 2026-10-16
 
 **For your vault:** nothing to do.
