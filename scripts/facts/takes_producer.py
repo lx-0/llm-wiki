@@ -73,6 +73,9 @@ async def maybe_extract_takes(source: Path) -> None:
       - CONFIG.features.extract_takes (master switch, default False)
       - CONFIG.limits.extract_takes_source_globs (fnmatch allowlist)
       - _EXTRACT_TAKES_FORBIDDEN_PREFIXES (hard deny for cognitive self-notes)
+
+    The phases: the gates → the prompt → `_query_takes` → `_parse_takes` →
+    `_append_takes`.
     """
     if not CONFIG.features.extract_takes:
         return
@@ -104,6 +107,19 @@ async def maybe_extract_takes(source: Path) -> None:
 
     log.info("  Takes pass for %s (model=%s)", rel_path, CONFIG.models.compile_model)
 
+    result_text = await _query_takes(prompt, rel_path=rel_path, input_chars=len(source_content))
+    if result_text is None:
+        return
+    takes = _parse_takes(result_text)
+    if takes is None:
+        return
+    _append_takes(takes, rel_path)
+
+
+async def _query_takes(prompt: str, *, rel_path: str, input_chars: int) -> str | None:
+    """The SDK call (read-only, three turns): the final result text — the last
+    assistant text block as a fallback — or None once `log_sdk_failure` has
+    diagnosed the crash."""
     started = time.time()
     capture = StderrCapture()
     result_text = ""
@@ -139,16 +155,21 @@ async def maybe_extract_takes(source: Path) -> None:
             label="extract_takes",
             source=rel_path,
             model=CONFIG.models.compile_model,
-            input_chars=len(source_content),
+            input_chars=input_chars,
             started=started,
             capture=capture,
             exc=exc,
         )
-        return
+        return None
+    return result_text
 
+
+def _parse_takes(result_text: str) -> list | None:
+    """The model's answer as the list of takes; None ends the pass (the line is
+    logged): empty, non-JSON, invalid, not a list / object, nothing extracted."""
     if not result_text.strip():
         log.info("  Takes: empty model response")
-        return
+        return None
 
     cleaned = _strip_json_fences(result_text)
     try:
@@ -159,12 +180,12 @@ async def maybe_extract_takes(source: Path) -> None:
         idx = cleaned.find("{")
         if idx < 0:
             log.warning("  Takes: model did not return JSON; first 200 chars=%r", cleaned[:200])
-            return
+            return None
         try:
             parsed = json.loads(cleaned[idx:])
         except json.JSONDecodeError:
             log.warning("  Takes: invalid JSON: %s", cleaned[:200])
-            return
+            return None
 
     if isinstance(parsed, list):
         takes = parsed
@@ -172,12 +193,17 @@ async def maybe_extract_takes(source: Path) -> None:
         takes = parsed.get("takes", [])
     else:
         log.info("  Takes: unexpected response type %s", type(parsed).__name__)
-        return
+        return None
 
     if not takes:
         log.info("  Takes: none extracted")
-        return
+        return None
+    return takes
 
+
+def _append_takes(takes: list, rel_path: str) -> None:
+    """Each take through `take._append_take` (the idempotent-line guard + the
+    canonical line live there), then the appended / duplicate / dropped line."""
     # Local import to dodge a circular import (take.py also imports from
     # core.paths, which is already imported above — the late binding keeps
     # the producer importable from compile.py's top-level).

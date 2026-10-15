@@ -82,6 +82,9 @@ class IntentsProducer:
     )
 
     async def run(self, source: Path) -> ProducerResult:
+        """The phases: the seen-guard + the read → the prompt → `_query_model` →
+        `_parse_classification` → mark seen → `_dispatch_intent` (the confidence
+        floor for `task`, the handler)."""
         try:
             rel_path = str(source.resolve().relative_to(ROOT_DIR.resolve()))
         except (ValueError, OSError):
@@ -97,11 +100,7 @@ class IntentsProducer:
         try:
             source_content = source.read_text(encoding="utf-8")
         except OSError as exc:
-            return ProducerResult(
-                producer=self.SPEC.name,
-                status="failed",
-                reason=f"read failed: {exc}",
-            )
+            return self._failed(f"read failed: {exc}")
         if not source_content.strip():
             _mark_seen(rel_path)
             return ProducerResult(
@@ -122,6 +121,34 @@ class IntentsProducer:
         )
         log.info("  Intent pass for %s (model=%s)", rel_path, model)
 
+        result_text, failure = await self._query_model(
+            prompt, model=model, rel_path=rel_path, input_chars=len(source_content)
+        )
+        if failure is not None:
+            return self._failed(failure)
+        parsed, failure = self._parse_classification(result_text)
+        if failure is not None or parsed is None:
+            return self._failed(failure or "")
+
+        kind = str(parsed.get("kind", "none")).strip().lower()
+        confidence = str(parsed.get("confidence", "low")).strip().lower()
+        summary = str(parsed.get("summary", "")).strip()
+
+        # Classified — mark seen so we never re-spend on this source, regardless
+        # of whether it dispatches.
+        _mark_seen(rel_path)
+        return self._dispatch_intent(
+            kind, summary=summary, confidence=confidence, rel_path=rel_path
+        )
+
+    def _failed(self, reason: str) -> ProducerResult:
+        return ProducerResult(producer=self.SPEC.name, status="failed", reason=reason)
+
+    async def _query_model(
+        self, prompt: str, *, model: str, rel_path: str, input_chars: int
+    ) -> tuple[str, str | None]:
+        """The SDK call (read-only, three turns): (result_text, None), or ("", the
+        failure reason) once `log_sdk_failure` has diagnosed the crash."""
         started = time.time()
         capture = StderrCapture()
         result_text = ""
@@ -152,23 +179,20 @@ class IntentsProducer:
                 label="intent_classify",
                 source=rel_path,
                 model=model,
-                input_chars=len(source_content),
+                input_chars=input_chars,
                 started=started,
                 capture=capture,
                 exc=exc,
             )
-            return ProducerResult(
-                producer=self.SPEC.name,
-                status="failed",
-                reason=f"{type(exc).__name__}: {exc}",
-            )
+            return "", f"{type(exc).__name__}: {exc}"
+        return result_text, None
 
+    @staticmethod
+    def _parse_classification(result_text: str) -> tuple[dict | None, str | None]:
+        """The model's answer as the classification dict, or (None, the failure
+        reason) for an empty, non-JSON, invalid or non-object answer."""
         if not result_text.strip():
-            return ProducerResult(
-                producer=self.SPEC.name,
-                status="failed",
-                reason="empty model response",
-            )
+            return None, "empty model response"
 
         cleaned = _strip_json_fences(result_text)
         try:
@@ -176,34 +200,20 @@ class IntentsProducer:
         except json.JSONDecodeError:
             idx = cleaned.find("{")
             if idx < 0:
-                return ProducerResult(
-                    producer=self.SPEC.name,
-                    status="failed",
-                    reason=f"non-JSON response: {cleaned[:120]!r}",
-                )
+                return None, f"non-JSON response: {cleaned[:120]!r}"
             try:
                 parsed = json.loads(cleaned[idx:])
             except json.JSONDecodeError:
-                return ProducerResult(
-                    producer=self.SPEC.name,
-                    status="failed",
-                    reason=f"invalid JSON: {cleaned[:120]!r}",
-                )
+                return None, f"invalid JSON: {cleaned[:120]!r}"
         if not isinstance(parsed, dict):
-            return ProducerResult(
-                producer=self.SPEC.name,
-                status="failed",
-                reason=f"unexpected response type {type(parsed).__name__}",
-            )
+            return None, f"unexpected response type {type(parsed).__name__}"
+        return parsed, None
 
-        kind = str(parsed.get("kind", "none")).strip().lower()
-        confidence = str(parsed.get("confidence", "low")).strip().lower()
-        summary = str(parsed.get("summary", "")).strip()
-
-        # Classified — mark seen so we never re-spend on this source, regardless
-        # of whether it dispatches.
-        _mark_seen(rel_path)
-
+    def _dispatch_intent(
+        self, kind: str, *, summary: str, confidence: str, rel_path: str
+    ) -> ProducerResult:
+        """`kind=none` is noise; a `task` must clear the confidence floor; idea / note
+        are dispatched regardless; the handler's failure is the producer's."""
         if kind == "none":
             return ProducerResult(
                 producer=self.SPEC.name,
@@ -228,11 +238,7 @@ class IntentsProducer:
             res = dispatch(intent)
         except Exception as exc:
             log.exception("IntentsProducer dispatch failed for %s", rel_path)
-            return ProducerResult(
-                producer=self.SPEC.name,
-                status="failed",
-                reason=f"dispatch {type(exc).__name__}: {exc}",
-            )
+            return self._failed(f"dispatch {type(exc).__name__}: {exc}")
 
         return ProducerResult(
             producer=self.SPEC.name,

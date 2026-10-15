@@ -29,7 +29,7 @@ EXCLUDED = {
 ALLOWLIST: dict[str, int] = {
     # measured 2026-10-15 (M033-S04-T01): 20 of 1,402 functions; T02 removed dream's two,
     # T03 the compile path's three, T04 run_sdk_query, T05 the two collector loops,
-    # T06 the two curiosity passes
+    # T06 the two curiosity passes, the takes + intents producers
     "scripts/query.py::main": 253,
     "scripts/reports/_engine/lib/render_summary.py::render_summary": 234,
     "scripts/study.py::cmd_run": 218,
@@ -38,8 +38,6 @@ ALLOWLIST: dict[str, int] = {
     "scripts/suggestions/cli.py::main": 169,
     "scripts/core/health.py::check_piggyback_health": 166,
     "scripts/health.py::render": 165,
-    "scripts/facts/takes_producer.py::maybe_extract_takes": 164,
-    "scripts/producers/intents.py::IntentsProducer.run": 159,
 }
 
 
