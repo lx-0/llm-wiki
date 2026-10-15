@@ -323,6 +323,12 @@ def _session(account_id: str):
     return google_oauth.session(_app(account_id), account_id)
 
 
+def _credentials(account_id: str):
+    """Returns (credentials, error_msg) — refreshed, for an IMAP XOAUTH2 login
+    (`suggestions/backends/imap.py`), which needs the bare access token."""
+    return google_oauth.credentials(_app(account_id), account_id)
+
+
 def _token_path(account_id: str) -> Path:
     """Token cache: `<.wiki>/state/gmail-token-<id>.json`."""
     return google_oauth.token_path(_app(account_id), account_id)

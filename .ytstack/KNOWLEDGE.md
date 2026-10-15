@@ -2924,6 +2924,15 @@ Per-candidate learnings from the 14-candidate seam arc (C01–C14). Decisions li
   single binder, otherwise `tests/_dream_paths.py:patch_dream_path`). It also caught what
   `raising=False` hides: `test_web_research` "patched" `_ENTITY_KINDS` on a module that no
   longer bound it, which `raising=False` turns into a silent no-op.
+- **A `# type: ignore[code]` written for one checker silences pyright completely
+  (2026-10-15, M033-S05-T01):** pyright honours `type: ignore` regardless of the code in
+  the brackets. `suggestions/backends/imap.py` carried
+  `from adapters.mailbox.gmail import _credentials  # type: ignore[import-not-found]` (a mypy
+  code) for five months after 74f3d84 removed `_credentials`, so every IMAP action on a Gmail
+  account died with `ImportError`. pyright never reported it; on a copy without the comment its
+  core reports "unknown import symbol". ty 0.0.88 reported it with the comment in place. Rule: no blanket or foreign-coded `type: ignore` on an import. An import
+  that can fail is a `try/except ImportError` with a logged fallback, and a suppression names
+  the gated checker's own rule.
 
 ### Desktop toolchain (C07)
 
