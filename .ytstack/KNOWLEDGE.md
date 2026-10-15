@@ -3082,6 +3082,24 @@ Per-candidate learnings from the 14-candidate seam arc (C01–C14). Decisions li
   claiming `config set` drops comments, and the recording proved the help right
   (`_set_in_yaml` re-dumps the file). Read the bash, then record it, then write the plan's
   last line.
+- **A path inside a command for another shell is quoted for that shell, and the test runs
+  the command (2026-10-15, M034-S03-T01):** porting `hook_cmd` found the bash wrapping the
+  vault path in bare `'…'`. For a vault named "Alex's Vault" the apostrophe ended the quote
+  early: every hook died with exit 2, and no session in that vault was captured. The
+  repo-wide grep found the same class in four hints the operator pastes (fixed in 0.7.15):
+  - unquoted, `Mobile Documents` (every iCloud vault) split `--project` in two;
+  - a hint that runs uv names the environment. The operator's shell never had the
+    dispatcher's `UV_PROJECT_ENVIRONMENT`, so `wiki update`'s retry line and doctor's
+    dependency fix rebuilt `.wiki/.venv` inside the cloud vault and left the broken
+    environment as it was.
+
+  The helpers: `lib/common.sh:shell_quote` / `sync_hint`; `core.agents.shell_quote`, which
+  always quotes so hook commands stay byte-identical to earlier installs; `shlex.quote` for
+  Python hints. The tests run the hook under `sh -c` with a stub `uv` and split each hint
+  with `shlex.split` back into its argv. The old substring assert on the hint text was green
+  for the broken form. In bash, quote by pattern removal (`${s%%\'*}` / `${s#*\'}` in a
+  loop). `${s//\'/"$q"}` keeps the inner quotes literally on macOS's bash 3.2 (measured),
+  and bash 5.2's `patsub_replacement` reads that replacement differently (documented).
 
 ### Desktop toolchain (C07)
 

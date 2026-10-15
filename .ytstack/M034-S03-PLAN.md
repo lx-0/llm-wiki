@@ -5,7 +5,7 @@ project: llm-wiki
 created: 2026-10-15T18:15:32+02:00
 status: planned
 task_count: 4
-completed_tasks: 0
+completed_tasks: 1
 ---
 
 # M034-S03 -- Slice Plan
@@ -17,7 +17,7 @@ last callers were skills' `config_get` and `cmd_status` (reassessed after S01).
 
 ## Tasks
 
-- [ ] T01 -- The agent registry in Python: agent names and fields, scope dirs, presence and
+- [x] T01 -- The agent registry in Python: agent names and fields, scope dirs, presence and
   config paths, the hook-installed probe, `hook_cmd`, and the Claude / Codex / Gemini / Cursor
   payloads. Each payload is byte-identical to the bash `jq` output on the fixture (the S01
   goldens plus `test_hooks_merge.py`).

@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-15T21:50:00+02:00
+last_updated: 2026-10-15T22:50:00+02:00
 current_milestone: M034
 active_slice: S03
-active_task: T01
+active_task: none
 last_completed_milestone: M033
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -14,19 +14,27 @@ parallel_milestones: [M021, M025, M027, M029]
 
 ## Next action — M034 / S03: hooks + skills + status
 
-**Status:** M034 — slices S01 and S02 complete (2/6). Next slice: S03 (hooks + skills +
-`wiki status`). The reassessment after S02 came out **A**: the slice order holds. Its findings
-are already in the plans:
-- S03-T02 fixes the hooks installer's false "✓ Done" in the bash before recording it;
-- S05-T04 has install.sh write the sync stamp.
+**Status:** M034 / S03 — 1/4 tasks done in the slice. Next task: T02 (`/ytstack:plan-task`).
+Slices S01 and S02 are complete (2/6).
 
-Engine 0.7.14, suite 2428, CI green on `fa23801`. The bash now owns hooks / skills / seed /
-update / status; `wiki` is at 539 lines.
-**Next:** S03-T01 is planned (`M034-S03-T01-PLAN.md`): `core/agents.py`, with the registry,
-**one** hook-command grammar, `hook_cmd`, and payloads byte-identical to the bash `jq` output.
-Planning found that `wiki hooks uninstall` removes nothing from a current install yet reports
-success, and that the oracle recorded it. That is now in S03-T02's plan, fixed in the bash
-before re-recording.
+**S03-T01 is done** (`M034-S03-T01-SUMMARY.md`):
+- `core/agents.py` is the agent registry with **one** hook-command grammar; its payloads are
+  byte-identical to the bash `jq` output, and doctor's `hooks-installed` reads it.
+- Bash-first release **0.7.15**: an apostrophe in the vault path broke every agent hook
+  (exit 2), and four pasteable `uv sync` / `rm` hints are now quoted, two of them also
+  naming the environment.
+
+Engine 0.7.15, suite 2455, CI green on `f3b1d69`. `wiki` is at 539 lines; the bash owns
+hooks / skills / seed / update / status.
+
+**Next: S03-T02.** Fix three defects in the bash first, then record, then port `wiki hooks`
+and `wiki status`:
+- the false "✓ Done";
+- the uninstall that removes nothing from a current install;
+- the Cursor foreign-entry loss.
+
+T01 adds one decision to T02's list: whether `hooks status` should walk the hook entries
+instead of grepping the text.
 
 **M034 / S02 — complete (5/5, 2026-10-15).** It delivered:
 - line-based prompts on `core/console`, reading byte by byte (T01);
