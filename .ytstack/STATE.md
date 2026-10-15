@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-15T20:27:00+02:00
+last_updated: 2026-10-15T20:29:00+02:00
 current_milestone: M034
 active_slice: S02
-active_task: none
+active_task: T01
 last_completed_milestone: M033
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -20,8 +20,10 @@ their last caller. `lib/config.sh` goes in S03-T04, `lib/ui.sh` in S05-T04. `wik
 hooks step dispatches `wiki hooks install` until S03, and S02-T01's prompt helpers read stdin
 byte by byte so piped answers survive into that child. Details: M034-CONTEXT "Reassessment
 2026-10-15T20:26".
-**Next:** `ytstack:plan-task` → S02-T01, the prompt helpers on `core/console` (with open
-question 3 decided in DECISIONS: OSS weighed, the per-vault dependency cost measured).
+**Next:** S02-T01 is planned (`M034-S02-T01-PLAN.md`): line-based prompt helpers on
+`core/console` that read byte by byte. Open question 3 is decided on measurements: on a pipe,
+questionary and prompt_toolkit warn, write terminal redraws to stdout, and swallow the
+remaining stdin.
 
 **M034 / S01 — complete (7/7).** It delivered:
 - the bash oracle (T01–T02);
