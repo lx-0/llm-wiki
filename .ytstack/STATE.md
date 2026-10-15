@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-16T01:30:00+02:00
+last_updated: 2026-10-16T02:35:00+02:00
 current_milestone: M034
 active_slice: S04
-active_task: T02
+active_task: T03
 last_completed_milestone: M033
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -14,9 +14,9 @@ parallel_milestones: [M021, M025, M027, M029]
 
 ## Next action — M034 / S04: seed
 
-**Status:** M034 / S04 / T02 planned — ready to execute (`M034-S04-T02-PLAN.md`: the pure
-seed core — walk, equivalence, overlay — held to goldens recorded from the bash; fix first:
-`--extract-custom` exits 5 in silence when a value changed type). 1/5 tasks done in slice;
+**Status:** M034 / S04 / T03 planned — ready to execute (`M034-S04-T03-PLAN.md`: the
+special merges, pure — the list union, the two registries by id, the `.env` append — held to
+goldens recorded from the bash and to a copy of the live configs). 2/5 tasks done in slice;
 slices S01–S03 are complete (3/6).
 
 T01 closed (`M034-S04-T01-SUMMARY.md`). The bash seed is recorded on 13 more cases, 19 seed
@@ -25,11 +25,23 @@ goldens. They were recorded after two releases of bash-first fixes found by the 
   and lxw's "refresh stats" were dead in every vault.
 - **0.7.21:** seed's messages, and its writes nobody asked for.
 
-T03 ports the merges as they stand now (`_merge_registry`, `_merge_list_union`).
+T02 closed (`M034-S04-T02-SUMMARY.md`). The seed core runs in Python: `core/seed.py` (walk,
+overlay apply / compute, derive) and `core/jqjson.py` (JSON as jq 1.7 writes it, number
+literals kept). It is held to 27 goldens recorded from the bash, and to a copy of lxw's
+`.obsidian/`. Two more silent bash defects were fixed first:
+- **0.7.22:** `--extract-custom` died with exit 5 on a setting whose type changed.
+- **0.7.23:** it dropped every `false` setting. jq's `paths(scalars)` filters on the value.
 
-**Waiting on the operator:** after `wiki update`, run `wiki seed`, then restart Obsidian
-(0.7.20). That fixes lxw's refresh-stats button and the dream-cycle / orchestrate-tasks
-buttons. Open decision: `backlog/dashboard-agent-buttons-callout.md`.
+**Waiting on the operator:**
+- after `wiki update`, run `wiki seed`, then restart Obsidian (0.7.20). That fixes lxw's
+  refresh-stats button and the dream-cycle / orchestrate-tasks buttons.
+- **before any `--force`**, re-capture lxw's overlays (0.7.23): `wiki seed --extract-custom
+  .obsidian/graph.json`, and the same for `.obsidian/plugins/extended-graph/data.json`.
+  Otherwise showTags / hideUnresolved come back on.
+
+Open decisions: `backlog/dashboard-agent-buttons-callout.md` and
+`backlog/overlay-cannot-carry-deletions.md`. lxw's removed colour groups come back on
+`--force`.
 
 S04 was re-cut to 5 tasks with S03's lessons:
 1. T01: record first, fix first;
@@ -42,8 +54,8 @@ The planning reading found that install.sh sources lib/seed.sh before its venv e
 moves it to `wiki seed` after the `uv sync`. Open question 4 is decided (DECISIONS
 2026-10-16): the jq merges become Python `json`, held to recorded goldens.
 
-Engine 0.7.21, suite 2542 passed + 1 skipped, CI green on `119c5d5`. The bash is `wiki`
-(418) + `common.sh` (94) + `seed.sh` (665) + `ui.sh` (21); it owns seed and update.
+Engine 0.7.23, suite 2606 passed + 1 skipped, CI green on `e3ebb8c`. The bash is `wiki`
+(418) + `common.sh` (94) + `seed.sh` (676) + `ui.sh` (21); it owns seed and update.
 
 **Reported, not this repo's to fix:** the ytstack post-commit hook. After T06's first commit
 a stale `.git/index.lock` was left behind (removed once `lsof` showed no holder), and its

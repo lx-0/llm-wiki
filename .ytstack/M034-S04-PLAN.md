@@ -5,7 +5,7 @@ project: llm-wiki
 created: 2026-10-15T18:15:32+02:00
 status: planned
 task_count: 5
-completed_tasks: 1
+completed_tasks: 2
 ---
 
 # M034-S04 -- Slice Plan
@@ -32,7 +32,7 @@ Deleting the library means the installer seeds through `wiki seed` after the ven
   Bash defects the recording turns up are fixed in the bash first, then recorded (a
   release when operator-visible). Open question 4 is decided in DECISIONS: port the jq
   merges to Python `json`, held to the bash by recorded goldens.
-- [ ] T02 -- **The seed core, pure:**
+- [x] T02 -- **The seed core, pure:**
   - the template walk and its skip rules;
   - semantic file equivalence (what `jq -S` gave);
   - the overlay: apply (element-wise deep merge, arrays by index), compute (leaf paths),
