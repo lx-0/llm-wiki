@@ -1,8 +1,8 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-15T17:53:26+02:00
-current_milestone: M033
+last_updated: 2026-10-15T18:13:20+02:00
+current_milestone: M034
 active_slice: none
 active_task: none
 last_completed_milestone: M033
@@ -12,7 +12,23 @@ parallel_milestones: [M021, M025, M027, M029]
 
 # State
 
-## ▶ NEXT — M033 COMPLETE (L, 2026-10-15): engine modernisation → M034 dispatcher + surface diet
+## ▶ NEXT — M034 planned (L): dispatcher + surface diet
+
+**Status:** M034 planned (L), ready to slice.
+- **Plan files:** `M034-CONTEXT.md` and `M034-ROADMAP.md`. CONTEXT holds the goal, the
+  measured starting point, 9 exit criteria, 7 locked decisions, 4 open questions with
+  recommendations, and what M033 carried over. The ROADMAP sketches six slices: oracle +
+  bootstrap → config + setup → hooks + skills → seed → update + the last bash → surface
+  diet + close.
+- **Measured:** 2,885 lines of bash (14 bash-owned commands, `lib/seed.sh` alone 708);
+  three processes per Python command; three command tables (`cli_catalog`, the TUI's
+  hand-curated lists, `core/actions`); only 10 tests on the bash layer.
+- **Sized L, not the arc's M:** 1,827 lines of `lib/` bash, the 708-line seed merge, a
+  self-updating `update`, and three command tables.
+
+**Next action:** run `ytstack:slice-milestone` to break M034 into concrete slices and tasks.
+
+## M033 COMPLETE (L, 2026-10-15): engine modernisation → M034 dispatcher + surface diet
 
 **Status:** **M033 COMPLETE — 5 / 5 slices, 31 tasks, closed 2026-10-15; reassess after S05:
 A.** All nine exit criteria are met (DECISIONS 2026-10-15). The engine is at **0.7.3**:
