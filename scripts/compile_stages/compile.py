@@ -244,10 +244,66 @@ async def compile_source(content: str, metadata: CompileMetadata) -> CompileResu
         if metadata.source_path.is_absolute()
         else str(metadata.source_path)
     )
+    prompt, breakdown = _render_compile_prompt(content, metadata, rel_path)
+    try:
+        assert_prompt_within_budget(
+            len(prompt),
+            CONFIG.limits.compile_max_prompt_chars,
+            label=f"compile_file {rel_path}",
+            breakdown=breakdown,
+        )
+    except PromptTooLargeError as exc:
+        log.error("  %s", exc)
+        return CompileResult(status="skipped", skip_reason="prompt_too_large")
+    _warn_fragile_size(content)
 
-    # Context blobs the substrate prompt expects. Read inside the stage
-    # (option A per the T02 task — keeps CompileMetadata lean; the alternative
-    # was extending the dataclass with three pre-read strings).
+    model = metadata.model_id
+    success, failure = await _attempt(
+        prompt=prompt,
+        model_id=model,
+        max_turns=metadata.max_turns,
+        source_content=content,
+        rel_path=rel_path,
+    )
+    total_cost = success.get("cost_usd", 0.0) if success else 0.0
+    success, failure, model, total_cost = await _retry_long_context(
+        success,
+        failure,
+        prompt=prompt,
+        content=content,
+        model=model,
+        metadata=metadata,
+        rel_path=rel_path,
+        total_cost=total_cost,
+    )
+    skipped = _skip_for_structural_failure(
+        failure, content=content, model=model, max_turns=metadata.max_turns, total_cost=total_cost
+    )
+    if skipped is not None:
+        return skipped
+    if failure is not None:
+        return CompileResult(
+            status="failed",
+            failure_kind=failure.kind,
+            failure_detail=failure.detail,
+            cost_usd=total_cost,
+        )
+    return CompileResult(
+        status="ok",
+        article=success.get("result", ""),
+        cost_usd=success.get("cost_usd", 0.0),
+        input_tokens=success.get("input_tokens", 0),
+        output_tokens=success.get("output_tokens", 0),
+    )
+
+
+def _render_compile_prompt(
+    content: str, metadata: CompileMetadata, rel_path: str
+) -> tuple[str, dict[str, int]]:
+    """The substrate prompt for one source plus the size breakdown the budget
+    check reports. Context blobs are read inside the stage (option A per the
+    T02 task — keeps CompileMetadata lean; the alternative was extending the
+    dataclass with three pre-read strings)."""
     agents_md = ""
     if AGENTS_FILE.exists():
         agents_md = AGENTS_FILE.read_text(encoding="utf-8")
@@ -280,27 +336,20 @@ async def compile_source(content: str, metadata: CompileMetadata) -> CompileResu
             CONFIG.personal.output_language
         ),
     )
+    breakdown = {
+        "compact index": len(index_md),
+        "AGENTS.md": len(agents_md),
+        "hard facts": len(facts_md),
+        "source": len(content),
+    }
+    return prompt, breakdown
 
-    try:
-        assert_prompt_within_budget(
-            len(prompt),
-            CONFIG.limits.compile_max_prompt_chars,
-            label=f"compile_file {rel_path}",
-            breakdown={
-                "compact index": len(index_md),
-                "AGENTS.md": len(agents_md),
-                "hard facts": len(facts_md),
-                "source": len(content),
-            },
-        )
-    except PromptTooLargeError as exc:
-        log.error("  %s", exc)
-        return CompileResult(status="skipped", skip_reason="prompt_too_large")
 
-    # Operator-visible 60kb size warning. Independent of model-escalation
-    # (that decision was made upstream by main()) — the warning fires on
-    # every source ≥60kb because that's the empirically-observed boundary
-    # for silent-fail / kind=unknown failure classes.
+def _warn_fragile_size(content: str) -> None:
+    """Operator-visible 60kb size warning. Independent of model-escalation
+    (that decision was made upstream by main()) — the warning fires on every
+    source ≥60kb because that's the empirically-observed boundary for
+    silent-fail / kind=unknown failure classes."""
     if len(content) >= 60_000:
         log.info(
             "  size warning: %d chars (%.1f KB) — entering known-fragile "
@@ -311,16 +360,23 @@ async def compile_source(content: str, metadata: CompileMetadata) -> CompileResu
             CONFIG.limits.compile_per_call_timeout_s,
         )
 
-    model = metadata.model_id
-    success, failure = await _attempt(
-        prompt=prompt,
-        model_id=model,
-        max_turns=metadata.max_turns,
-        source_content=content,
-        rel_path=rel_path,
-    )
-    total_cost = success.get("cost_usd", 0.0) if success else 0.0
 
+async def _retry_long_context(
+    success,
+    failure,
+    *,
+    prompt: str,
+    content: str,
+    model: str,
+    metadata: CompileMetadata,
+    rel_path: str,
+    total_cost: float,
+):
+    """The one-shot retry-on-kind-unknown ladder: a large source that failed
+    kind=unknown on the standard model gets one attempt on the long-context
+    model (after the configured backoff); a small one is logged and left.
+    Returns ``(success, failure, model, total_cost)`` — unchanged when no retry
+    applies."""
     long_ctx_model = CONFIG.models.compile_large_source_model
     min_for_retry = CONFIG.limits.compile_retry_long_context_min_source_chars
     if (
@@ -351,80 +407,77 @@ async def compile_source(content: str, metadata: CompileMetadata) -> CompileResu
         )
         if success:
             total_cost += success.get("cost_usd", 0.0)
-        model = long_ctx_model
-    elif failure is not None and failure.kind == "unknown" and len(content) < min_for_retry:
+        return success, failure, long_ctx_model, total_cost
+    if failure is not None and failure.kind == "unknown" and len(content) < min_for_retry:
         log.info(
             "  skipping long-context retry (source %d chars < %d) — "
             "small-source kind=unknown is typically tool-fanout, not context overflow",
             len(content),
             min_for_retry,
         )
+    return success, failure, model, total_cost
 
-    # Skip-and-flag for structural failures with no further retry path.
-    if failure is not None and failure.kind == "timeout":
+
+def _skip_for_structural_failure(
+    failure, *, content: str, model: str, max_turns: int, total_cost: float
+) -> CompileResult | None:
+    """Skip-and-flag for structural failures with no further retry path: the
+    per-call timeout always; under ``compile_skip_on_long_context_unknown`` also
+    max_turns exhausted, kind=unknown on the long-context model, and kind=unknown
+    on a small source. ``None`` when there is no failure or it is a real one."""
+    if failure is None:
+        return None
+    if failure.kind == "timeout":
         return CompileResult(
             status="skipped",
             skip_reason="compile_per_call_timeout",
             cost_usd=total_cost,
         )
-
-    if failure is not None and CONFIG.limits.compile_skip_on_long_context_unknown:
-        if failure.kind == "max_turns":
-            # The turn budget is metadata.max_turns — pinned per substrate in
-            # compile_stages.route.SUBSTRATE_PROMPTS (or limits.compile_max_turns
-            # for unmapped substrates). Raise it there if this substrate
-            # legitimately needs more turns.
+    if not CONFIG.limits.compile_skip_on_long_context_unknown:
+        return None
+    long_ctx_model = CONFIG.models.compile_large_source_model
+    min_for_retry = CONFIG.limits.compile_retry_long_context_min_source_chars
+    if failure.kind == "max_turns":
+        # The turn budget is metadata.max_turns — pinned per substrate in
+        # compile_stages.route.SUBSTRATE_PROMPTS (or limits.compile_max_turns
+        # for unmapped substrates). Raise it there if this substrate
+        # legitimately needs more turns.
+        log.warning(
+            "  skipping: max_turns hit (%s) — agent didn't finish within "
+            "the %d-turn budget; the file is left uncompiled. "
+            "Not counted toward consecutive-failure abort.",
+            failure.detail,
+            max_turns,
+        )
+        return CompileResult(
+            status="skipped",
+            skip_reason="max_turns_exhausted",
+            cost_usd=total_cost,
+        )
+    if failure.kind == "unknown":
+        if model == long_ctx_model:
             log.warning(
-                "  skipping: max_turns hit (%s) — agent didn't finish within "
-                "the %d-turn budget; the file is left uncompiled. "
+                "  skipping: kind=unknown on long-context model %s "
+                "— bundled CLI exited 1 with no structured ResultMessage. "
                 "Not counted toward consecutive-failure abort.",
-                failure.detail,
-                metadata.max_turns,
+                model,
             )
             return CompileResult(
                 status="skipped",
-                skip_reason="max_turns_exhausted",
+                skip_reason="long_context_kind_unknown",
                 cost_usd=total_cost,
             )
-        if failure.kind == "unknown":
-            if model == long_ctx_model:
-                log.warning(
-                    "  skipping: kind=unknown on long-context model %s "
-                    "— bundled CLI exited 1 with no structured ResultMessage. "
-                    "Not counted toward consecutive-failure abort.",
-                    model,
-                )
-                return CompileResult(
-                    status="skipped",
-                    skip_reason="long_context_kind_unknown",
-                    cost_usd=total_cost,
-                )
-            if len(content) < min_for_retry:
-                log.warning(
-                    "  skipping: small-source kind=unknown with no retry path "
-                    "(source %d chars < %d, long-context retry doesn't help here). "
-                    "Not counted toward consecutive-failure abort.",
-                    len(content),
-                    min_for_retry,
-                )
-                return CompileResult(
-                    status="skipped",
-                    skip_reason="kind_unknown_small_source",
-                    cost_usd=total_cost,
-                )
-
-    if failure is not None:
-        return CompileResult(
-            status="failed",
-            failure_kind=failure.kind,
-            failure_detail=failure.detail,
-            cost_usd=total_cost,
-        )
-
-    return CompileResult(
-        status="ok",
-        article=success.get("result", ""),
-        cost_usd=success.get("cost_usd", 0.0),
-        input_tokens=success.get("input_tokens", 0),
-        output_tokens=success.get("output_tokens", 0),
-    )
+        if len(content) < min_for_retry:
+            log.warning(
+                "  skipping: small-source kind=unknown with no retry path "
+                "(source %d chars < %d, long-context retry doesn't help here). "
+                "Not counted toward consecutive-failure abort.",
+                len(content),
+                min_for_retry,
+            )
+            return CompileResult(
+                status="skipped",
+                skip_reason="kind_unknown_small_source",
+                cost_usd=total_cost,
+            )
+    return None

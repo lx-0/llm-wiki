@@ -27,8 +27,8 @@ EXCLUDED = {
 # `<path>::<qualname>` → the length measured when the entry was listed. Shrinks only: every
 # S04 task that splits a function removes its entry here.
 ALLOWLIST: dict[str, int] = {
-    # measured 2026-10-15 (M033-S04-T01): 20 of 1,402 functions; T02 removed dream's two
-    "scripts/compile.py::main": 345,
+    # measured 2026-10-15 (M033-S04-T01): 20 of 1,402 functions; T02 removed dream's two,
+    # T03 the compile path's three
     "scripts/collectors/gmeet.py::GmeetCollector._run_one_account": 340,
     "scripts/core/sdk_helpers.py::run_sdk_query": 339,
     "scripts/curiosity/producer.py::maybe_generate_curiosity_requests": 310,
@@ -36,7 +36,6 @@ ALLOWLIST: dict[str, int] = {
     "scripts/reports/_engine/lib/render_summary.py::render_summary": 234,
     "scripts/curiosity/producer.py::maybe_generate_folder_requests": 220,
     "scripts/study.py::cmd_run": 218,
-    "scripts/compile_stages/compile.py::compile_source": 212,
     "scripts/collectors/calendar_collector.py::CalendarCollector._run_one_account": 195,
     "scripts/reports/_engine/runner.py::run_inference": 174,
     "scripts/reports/_engine/runner.py::_persist_report": 174,
@@ -44,7 +43,6 @@ ALLOWLIST: dict[str, int] = {
     "scripts/core/health.py::check_piggyback_health": 166,
     "scripts/health.py::render": 165,
     "scripts/facts/takes_producer.py::maybe_extract_takes": 164,
-    "scripts/compile.py::_run_compile_route": 164,
     "scripts/producers/intents.py::IntentsProducer.run": 159,
 }
 
