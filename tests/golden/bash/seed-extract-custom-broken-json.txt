@@ -1,0 +1,10 @@
+$ wiki seed --extract-custom .obsidian/app.json
+exit: 1
+--- stdout ---
+wiki seed --extract-custom
+.obsidian/app.json
+
+--- stderr ---
+✗ .obsidian/app.json is not valid JSON — there is no drift to capture (fix it first)
+--- change ---
+(none)

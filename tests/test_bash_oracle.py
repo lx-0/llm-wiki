@@ -222,6 +222,69 @@ def _seeded_then_graph_scaled(env: dict[str, Path]) -> None:
     graph.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
 
 
+def _write_json(path: Path, data: object) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+
+
+def _operator_data_in_every_merged_file(env: dict[str, Path]) -> None:
+    """After a seed, the operator's own data in each file seed merges instead of copying."""
+    _seeded(env)
+    obs = env["vault"] / ".obsidian"
+    plugins = json.loads((obs / "community-plugins.json").read_text(encoding="utf-8"))
+    _write_json(obs / "community-plugins.json", [p for p in plugins if p != "homepage"] + ["mine"])
+    _write_json(obs / "appearance.json", {"cssTheme": "Minimal", "enabledCssSnippets": ["mine"]})
+    meta_bind = obs / "plugins" / "obsidian-meta-bind-plugin" / "data.json"
+    data = json.loads(meta_bind.read_text(encoding="utf-8"))
+    data["devMode"] = True
+    data["buttonTemplates"][0]["label"] = "an operator's label on an engine button"
+    data["buttonTemplates"].append({"id": "btn-mine", "label": "Mine", "actions": []})
+    _write_json(meta_bind, data)
+    own = {"id": "my-own-command", "alias": "Mine", "platform_specific_commands": {"default": "x"}}
+    stale = {"id": "agent-daily-digest", "alias": "a stale engine entry"}
+    shell = obs / "plugins" / "obsidian-shellcommands" / "data.json"
+    _write_json(shell, {"settings_version": "0.23.0", "shell_commands": [own, stale]})
+    env_example = env["vault"] / ".claude" / ".env.example"
+    kept = [
+        ln for ln in env_example.read_text(encoding="utf-8").splitlines() if ln != "EXA_API_KEY="
+    ]
+    env_example.write_text("\n".join(kept) + "\n", encoding="utf-8")
+
+
+def _shell_commands_in_the_legacy_object_form(env: dict[str, Path]) -> None:
+    """A shell-commands config in the object form the engine's template carried (commands
+    keyed by id, no `id` field) — the plugin, at the same settings_version, keeps an array."""
+    _seeded(env)
+    legacy = {
+        "wiki-compile": {"alias": "Wiki: compile", "platform_specific_commands": {"default": "c"}},
+        "my-own-command": {"alias": "Mine", "platform_specific_commands": {"default": "x"}},
+    }
+    shell = env["vault"] / ".obsidian" / "plugins" / "obsidian-shellcommands" / "data.json"
+    _write_json(shell, {"settings_version": "0.23.0", "shell_commands": legacy})
+
+
+def _graph_overlay_and_a_live_edit(env: dict[str, Path]) -> None:
+    """An overlay for graph.json in .wiki/custom/, and the live file edited apart from it."""
+    _seeded(env)
+    _write_json(env["vault"] / ".wiki" / "custom" / ".obsidian" / "graph.json", {"scale": 1.5})
+    graph = env["vault"] / ".obsidian" / "graph.json"
+    data = json.loads(graph.read_text(encoding="utf-8"))
+    data["scale"] = 3
+    _write_json(graph, data)
+
+
+def _two_configs_that_are_not_json(env: dict[str, Path]) -> None:
+    _seeded(env)
+    (env["vault"] / ".obsidian" / "community-plugins.json").write_text('["dataview",\n')
+    (env["vault"] / ".obsidian" / "app.json").write_text('{"x": \n')
+
+
+def _graph_overlay_not_json_and_a_live_edit(env: dict[str, Path]) -> None:
+    """The overlay for graph.json broken, the live file edited — what `--force` must keep."""
+    _graph_overlay_and_a_live_edit(env)
+    (env["vault"] / ".wiki" / "custom" / ".obsidian" / "graph.json").write_text('{"scale": \n')
+
+
 def _claude_hooks_at_user_scope(env: dict[str, Path]) -> None:
     _wiki(env, "hooks", "install", stdin="1\n1\ny\n")
 
@@ -461,6 +524,42 @@ MUTATING: dict[str, tuple[tuple[str, ...], str | None, Prepare]] = {
         ("seed", "--extract-custom", ".obsidian/graph.json"),
         None,
         _seeded_then_graph_scaled,
+    ),
+    # before S04-T02: the merges over operator data, the overlay paths, the refusals
+    "seed-merges-operator-data": (("seed",), None, _operator_data_in_every_merged_file),
+    "seed-check-merges-pending": (("seed", "--check"), None, _operator_data_in_every_merged_file),
+    "seed-shell-commands-legacy-form": (
+        ("seed",),
+        None,
+        _shell_commands_in_the_legacy_object_form,
+    ),
+    "seed-check-with-overlay": (("seed", "--check"), None, _graph_overlay_and_a_live_edit),
+    "seed-force-with-overlay": (
+        ("seed", ".obsidian/graph.json", "--force"),
+        None,
+        _graph_overlay_and_a_live_edit,
+    ),
+    "seed-path-matches-nothing": (("seed", "nope.md"), None, _seeded),
+    "seed-check-and-force": (("seed", "--check", "--force"), None, None),
+    "seed-extract-custom-no-drift": (
+        ("seed", "--extract-custom", ".obsidian/graph.json"),
+        None,
+        _seeded,
+    ),
+    "seed-broken-json": (("seed",), None, _two_configs_that_are_not_json),
+    # what fixing the recording's finds added: the audit of a vault never seeded (every
+    # missing-file branch), and the not-JSON paths of the audit, the capture and the overlay
+    "seed-check-unseeded": (("seed", "--check"), None, None),
+    "seed-check-broken-json": (("seed", "--check"), None, _two_configs_that_are_not_json),
+    "seed-extract-custom-broken-json": (
+        ("seed", "--extract-custom", ".obsidian/app.json"),
+        None,
+        _two_configs_that_are_not_json,
+    ),
+    "seed-force-broken-overlay": (
+        ("seed", ".obsidian/graph.json", "--force"),
+        None,
+        _graph_overlay_not_json_and_a_live_edit,
     ),
     "install-shortcut": (("install-shortcut",), None, None),
     "install-shortcut-print-only": (("install-shortcut", "--print-only"), None, None),

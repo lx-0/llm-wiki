@@ -1,0 +1,38 @@
+$ wiki seed --check
+exit: 0
+--- stdout ---
+wiki seed
+audit (read-only)
+
+! missing README.md (run `wiki seed` to install)
+! missing AGENTS.md (run `wiki seed` to install)
+! missing dashboard.md (run `wiki seed` to install)
+! missing knowledge.base (run `wiki seed` to install)
+! missing triage.html (run `wiki seed` to install)
+! missing Templates/TPL Idea.md (run `wiki seed` to install)
+! missing Templates/TPL Meeting.md (run `wiki seed` to install)
+! missing Templates/TPL Note.md (run `wiki seed` to install)
+! missing Templates/TPL Question.md (run `wiki seed` to install)
+! missing knowledge/MOCs/areas.md (run `wiki seed` to install)
+! missing knowledge/MOCs/concepts.md (run `wiki seed` to install)
+! missing knowledge/MOCs/inbox-tasks.md (run `wiki seed` to install)
+! missing knowledge/MOCs/people.md (run `wiki seed` to install)
+! missing knowledge/MOCs/projects.md (run `wiki seed` to install)
+! missing workspace/todo.md (run `wiki seed` to install)
+! missing .obsidian/app.json (run `wiki seed` to install)
+! missing .obsidian/appearance.json (run `wiki seed` to install)
+! missing .obsidian/community-plugins.json (run `wiki seed` to install)
+! missing .obsidian/core-plugins.json (run `wiki seed` to install)
+! missing .obsidian/graph.json (run `wiki seed` to install)
+! missing .obsidian/snippets/wiki-dashboard.css (run `wiki seed` to install)
+! missing .obsidian/plugins/dataview/data.json (run `wiki seed` to install)
+! missing .obsidian/plugins/extended-graph/data.json (run `wiki seed` to install)
+! missing .obsidian/plugins/homepage/data.json (run `wiki seed` to install)
+! missing .obsidian/plugins/obsidian-meta-bind-plugin/data.json (run `wiki seed` to install)
+! missing .obsidian/plugins/obsidian-shellcommands/data.json (run `wiki seed` to install)
+! missing .obsidian/plugins/quickadd/data.json (run `wiki seed` to install)
+! missing reports/studies/longitudinal-baseline/manifest.yaml (run `wiki seed` to install)
+! missing .claude/.env.example (run `wiki seed` to install)
+--- stderr ---
+--- change ---
+(none)

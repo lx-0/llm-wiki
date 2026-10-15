@@ -1,0 +1,15 @@
+$ wiki seed .obsidian/graph.json --force
+exit: 0
+--- stdout ---
+wiki seed
+overwrite mode · only: .obsidian/graph.json
+
+✓ re-derived .obsidian/graph.json from template⊕overlay (--force)
+--- stderr ---
+--- change ---
+~ <VAULT>/.obsidian/graph.json
+    @@ -125,3 +125,3 @@
+       "linkDistance": 250,
+    -  "scale": 3
+    +  "scale": 1.5
+     }

@@ -21,7 +21,9 @@ from ._oracle import (
     help_text,
     menu_payload,
     normalise,
+    normalise_text,
     patch_engine_paths,
+    tree_manifest,
 )
 
 
@@ -64,6 +66,19 @@ def test_comparer_reports_a_one_word_title_change(oracle, capsys) -> None:
     diff = diff_against_golden("menu.json", dump(payload))
     assert diff is not None
     assert "(changed)" in diff
+
+
+def test_a_large_files_hash_survives_normalising(tmp_path: Path) -> None:
+    """A file over the inline limit is recorded by size and sha256. The revision rule took
+    the hash for a git revision and erased it, so a changed file of the same size matched
+    its golden (M034-S04-T01)."""
+    big = tmp_path / "big.json"
+
+    def recorded(content: str) -> str:
+        big.write_text(content, encoding="utf-8")
+        return normalise_text(tree_manifest(tmp_path)["big.json"], placeholders={})
+
+    assert recorded("x" * 9000) != recorded("y" * 9000)
 
 
 def test_goldens_are_committed() -> None:

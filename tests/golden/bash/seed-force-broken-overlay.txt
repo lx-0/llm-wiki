@@ -1,0 +1,10 @@
+$ wiki seed .obsidian/graph.json --force
+exit: 0
+--- stdout ---
+wiki seed
+overwrite mode · only: .obsidian/graph.json
+
+! .obsidian/graph.json left as it is — its overlay .wiki/custom/.obsidian/graph.json is not valid JSON (fix the overlay)
+--- stderr ---
+--- change ---
+(none)

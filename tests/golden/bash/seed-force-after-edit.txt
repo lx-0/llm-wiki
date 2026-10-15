@@ -38,5 +38,5 @@ dashboard.md — agent-buttons already up to date
 --- change ---
 ~ <VAULT>/AGENTS.md
     @@ -1 +1 @@
-    -<29924 bytes, sha256 <REV>>
-    +<29905 bytes, sha256 <REV>>
+    -<29924 bytes, sha256 4050e61bbd4900ef>
+    +<29905 bytes, sha256 dfc54173d9656f1d>

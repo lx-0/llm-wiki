@@ -1,0 +1,38 @@
+$ wiki seed --check
+exit: 0
+--- stdout ---
+wiki seed
+audit (read-only)
+
+✓ up-to-date README.md
+✓ up-to-date AGENTS.md
+✓ up-to-date dashboard.md
+✓ up-to-date knowledge.base
+✓ up-to-date triage.html
+✓ up-to-date Templates/TPL Idea.md
+✓ up-to-date Templates/TPL Meeting.md
+✓ up-to-date Templates/TPL Note.md
+✓ up-to-date Templates/TPL Question.md
+✓ up-to-date knowledge/MOCs/areas.md
+✓ up-to-date knowledge/MOCs/concepts.md
+✓ up-to-date knowledge/MOCs/inbox-tasks.md
+✓ up-to-date knowledge/MOCs/people.md
+✓ up-to-date knowledge/MOCs/projects.md
+✓ up-to-date workspace/todo.md
+! .obsidian/app.json is not valid JSON (`wiki seed .obsidian/app.json --force` re-derives it)
+✓ up-to-date .obsidian/appearance.json
+! .obsidian/community-plugins.json is not valid JSON — left as it is (fix it, or remove it and rerun `wiki seed`)
+✓ up-to-date .obsidian/core-plugins.json
+✓ up-to-date .obsidian/graph.json
+✓ up-to-date .obsidian/snippets/wiki-dashboard.css
+✓ up-to-date .obsidian/plugins/dataview/data.json
+✓ up-to-date .obsidian/plugins/extended-graph/data.json
+✓ up-to-date .obsidian/plugins/homepage/data.json
+✓ up-to-date .obsidian/plugins/obsidian-meta-bind-plugin/data.json
+✓ up-to-date .obsidian/plugins/obsidian-shellcommands/data.json
+✓ up-to-date .obsidian/plugins/quickadd/data.json
+✓ up-to-date reports/studies/longitudinal-baseline/manifest.yaml
+✓ up-to-date .claude/.env.example
+--- stderr ---
+--- change ---
+(none)

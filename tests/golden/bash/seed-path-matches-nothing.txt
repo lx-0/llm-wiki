@@ -1,0 +1,14 @@
+$ wiki seed nope.md
+exit: 1
+--- stdout ---
+wiki seed
+additive mode · only: nope.md
+
+--- stderr ---
+✗ no seedable template matches 'nope.md' — nothing done.
+  seedable paths: README.md, AGENTS.md, dashboard.md, knowledge.base, triage.html,
+    workspace/todo.md, .claude/.env.example, .obsidian/*.json, .obsidian/snippets/*.css,
+    .obsidian/plugins/<p>/data.json, Templates/*.md, knowledge/MOCs/*.md,
+    reports/studies/<id>/manifest.yaml
+--- change ---
+(none)

@@ -1,0 +1,166 @@
+$ wiki seed
+exit: 0
+--- stdout ---
+wiki seed
+additive mode
+
+kept existing README.md (up-to-date)
+kept existing AGENTS.md (up-to-date)
+kept existing dashboard.md (up-to-date)
+kept existing knowledge.base (up-to-date)
+kept existing triage.html (up-to-date)
+kept existing Templates/TPL Idea.md (up-to-date)
+kept existing Templates/TPL Meeting.md (up-to-date)
+kept existing Templates/TPL Note.md (up-to-date)
+kept existing Templates/TPL Question.md (up-to-date)
+kept existing knowledge/MOCs/areas.md (up-to-date)
+kept existing knowledge/MOCs/concepts.md (up-to-date)
+kept existing knowledge/MOCs/inbox-tasks.md (up-to-date)
+kept existing knowledge/MOCs/people.md (up-to-date)
+kept existing knowledge/MOCs/projects.md (up-to-date)
+kept existing workspace/todo.md (up-to-date)
+kept existing .obsidian/app.json (up-to-date)
+✓ merged .obsidian/appearance.json (enabled snippet wiki-dashboard)
+✓ merged .obsidian/community-plugins.json (enabled homepage)
+kept existing .obsidian/core-plugins.json (up-to-date)
+kept existing .obsidian/graph.json (up-to-date)
+kept existing .obsidian/snippets/wiki-dashboard.css (up-to-date)
+kept existing .obsidian/plugins/dataview/data.json (up-to-date)
+kept existing .obsidian/plugins/extended-graph/data.json (up-to-date)
+kept existing .obsidian/plugins/homepage/data.json (up-to-date)
+✓ merged .obsidian/plugins/obsidian-meta-bind-plugin/data.json (buttonTemplates: updated btn-note)
+✓ merged .obsidian/plugins/obsidian-shellcommands/data.json (shell_commands: added wiki-compile, wiki-compile-all, wiki-lint, wiki-refresh-stats, agent-summarize-day-here, agent-dream-cycle, agent-orchestrate-tasks, agent-summarize-day; updated agent-daily-digest)
+kept existing .obsidian/plugins/quickadd/data.json (up-to-date)
+kept existing reports/studies/longitudinal-baseline/manifest.yaml (up-to-date)
+✓ .claude/.env.example — appended 1 engine var(s): EXA_API_KEY
+dashboard.md — agent-buttons already up to date
+--- stderr ---
+--- change ---
+~ <VAULT>/.claude/.env.example
+    @@ -111 +111,12 @@
+     # LINKEDIN_PASSWORD=
+    +
+    +
+    +# ── Exa AI ────────────────────────────────────────────────────────────
+    +# Dream web-research (issue #2) — public-entity enrichment in `wiki dream`.
+    +# Read by scripts/web_research.py, which falls back to this env var when
+    +# `personal.exa_api_key` in config.yaml is blank. Single global key (not
+    +# multi-tenant). Get one at dashboard.exa.ai. A key alone does nothing —
+    +# the feature is also gated by `features.dream_web_research` (default off)
+    +# plus a per-entity opt-in (`web_research: true` frontmatter or the
+    +# `public-person` tag).
+    +EXA_API_KEY=
+~ <VAULT>/.obsidian/appearance.json
+    @@ -3,3 +3,4 @@
+       "enabledCssSnippets": [
+    -    "mine"
+    +    "mine",
+    +    "wiki-dashboard"
+       ]
+~ <VAULT>/.obsidian/community-plugins.json
+    @@ -3,2 +3,4 @@
+       "heatmap-calendar",
+    +  "homepage",
+    +  "mine",
+       "obsidian-charts",
+    @@ -8,4 +10,3 @@
+       "obsidian-tasks-plugin",
+    -  "quickadd",
+    -  "mine"
+    +  "quickadd"
+     ]
+~ <VAULT>/.obsidian/plugins/obsidian-meta-bind-plugin/data.json
+    @@ -17,3 +17,3 @@
+         {
+    -      "label": "an operator's label on an engine button",
+    +      "label": "📝 Notiz",
+           "hidden": true,
+    @@ -31,3 +31,3 @@
+         {
+    -      "label": "\ud83d\udca1 Idee",
+    +      "label": "💡 Idee",
+           "hidden": true,
+    @@ -45,6 +45,6 @@
+         {
+    -      "label": "\u2753 Frage",
+    +      "label": "❓ Frage",
+           "hidden": true,
+           "class": "",
+    -      "tooltip": "Neue Frage (f\u00fcr Curiosity Loop) in inbox/",
+    +      "tooltip": "Neue Frage (für Curiosity Loop) in inbox/",
+           "id": "btn-question",
+    @@ -59,3 +59,3 @@
+         {
+    -      "label": "\ud83e\udd1d Meeting",
+    +      "label": "🤝 Meeting",
+           "hidden": true,
+    @@ -73,6 +73,6 @@
+         {
+    -      "label": "\u25b6\ufe0f Compile changed",
+    +      "label": "▶️ Compile changed",
+           "hidden": true,
+           "class": "",
+    -      "tooltip": "Run `wiki compile` \u2014 process raw/ + daily/ files whose hash changed.",
+    +      "tooltip": "Run `wiki compile` — process raw/ + daily/ files whose hash changed.",
+           "id": "btn-compile",
+    @@ -87,3 +87,3 @@
+         {
+    -      "label": "\ud83d\udee1 Lint",
+    +      "label": "🛡 Lint",
+           "hidden": true,
+    @@ -101,6 +101,6 @@
+         {
+    -      "label": "\ud83d\udd04 Refresh stats",
+    +      "label": "🔄 Refresh stats",
+           "hidden": true,
+           "class": "",
+    -      "tooltip": "Run `wiki refresh-dashboards` \u2014 rebuild the dashboard's stats and lint caches.",
+    +      "tooltip": "Run `wiki refresh-dashboards` — rebuild the dashboard's stats and lint caches.",
+           "id": "btn-refresh-stats",
+    @@ -115,3 +115,3 @@
+         {
+    -      "label": "\ud83d\uddd3\ufe0f Daily digest",
+    +      "label": "🗓️ Daily digest",
+           "hidden": true,
+    @@ -129,6 +129,6 @@
+         {
+    -      "label": "\ud83c\udf19 Resynthesize entity",
+    +      "label": "🌙 Resynthesize entity",
+           "hidden": true,
+           "class": "",
+    -      "tooltip": "Run dream-cycle on one entity \u2014 picks all substrate that mentions it and rewrites the page.",
+    +      "tooltip": "Run dream-cycle on one entity — picks all substrate that mentions it and rewrites the page.",
+           "id": "btn-dream-cycle",
+    @@ -143,3 +143,3 @@
+         {
+    -      "label": "\u2705 Run accepted tasks",
+    +      "label": "✅ Run accepted tasks",
+           "hidden": true,
+    @@ -157,6 +157,6 @@
+         {
+    -      "label": "\ud83d\udcc5 Summarize day",
+    +      "label": "📅 Summarize day",
+           "hidden": true,
+           "class": "",
+    -      "tooltip": "Run summarize-day agent \u2014 appends/refreshes today's Summary block in daily/.",
+    +      "tooltip": "Run summarize-day agent — appends/refreshes today's Summary block in daily/.",
+           "id": "btn-summarize-day",
+~ <VAULT>/.obsidian/plugins/obsidian-shellcommands/data.json
+    @@ -1,16 +1 @@
+    -{
+    -  "settings_version": "0.23.0",
+    -  "shell_commands": [
+    -    {
+    -      "id": "my-own-command",
+    -      "alias": "Mine",
+    -      "platform_specific_commands": {
+    -        "default": "x"
+    -      }
+    -    },
+    -    {
+    -      "id": "agent-daily-digest",
+    -      "alias": "a stale engine entry"
+    -    }
+    -  ]
+    -}
+    +<8463 bytes, sha256 0bffa5897fb7ef0d>

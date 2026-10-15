@@ -474,8 +474,10 @@ def _indent(text: str) -> str:
     return "".join(f"    {line}" for line in text.splitlines(keepends=True))
 
 
-# Hex revisions only when they carry a digit, so English words made of a–f survive.
-_REVISION = re.compile(r"\b(?=[0-9a-f]*\d)[0-9a-f]{7,40}\b")
+# Hex revisions only when they carry a digit, so English words made of a–f survive — and
+# not `tree_manifest`'s content hash of a large file, which this rule used to erase, leaving
+# such a file pinned by its byte count alone.
+_REVISION = re.compile(r"(?<!sha256 )\b(?=[0-9a-f]*\d)[0-9a-f]{7,40}\b")
 _TIMESTAMP = re.compile(
     r"\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?"
 )

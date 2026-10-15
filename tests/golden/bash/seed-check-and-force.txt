@@ -1,0 +1,7 @@
+$ wiki seed --check --force
+exit: 1
+--- stdout ---
+--- stderr ---
+✗ --check and --force are mutually exclusive
+--- change ---
+(none)

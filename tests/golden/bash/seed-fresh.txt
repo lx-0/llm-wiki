@@ -345,7 +345,7 @@ dashboard.md — agent-buttons already up to date
       "showResultCount": true
     }
 + <VAULT>/.obsidian/plugins/extended-graph/data.json
-    <12278 bytes, sha256 <REV>>
+    <12278 bytes, sha256 f5a9db7819d4d582>
 + <VAULT>/.obsidian/plugins/homepage/data.json
     {
       "version": 4,
@@ -547,7 +547,7 @@ dashboard.md — agent-buttons already up to date
       ]
     }
 + <VAULT>/.obsidian/plugins/obsidian-shellcommands/data.json
-    <8760 bytes, sha256 <REV>>
+    <8760 bytes, sha256 28255d1bf6ef3840>
 + <VAULT>/.obsidian/plugins/quickadd/data.json
     {
       "choices": [
@@ -737,7 +737,7 @@ dashboard.md — agent-buttons already up to date
 + <VAULT>/.wiki/state/dashboard-refresh.lock
     
 + <VAULT>/AGENTS.md
-    <29905 bytes, sha256 <REV>>
+    <29905 bytes, sha256 dfc54173d9656f1d>
 + <VAULT>/README.md
     # Your LLM Wiki
     
@@ -966,7 +966,7 @@ dashboard.md — agent-buttons already up to date
     - [[daily/2026-01-02.md]]
     - [[raw/notes/2026-01-02--a-note.md]]
 + <VAULT>/dashboard.md
-    <9430 bytes, sha256 <REV>>
+    <9430 bytes, sha256 871598dc9bda6a9b>
 + <VAULT>/knowledge.base
     # Filterable knowledge browser. Native Obsidian Bases (built-in 1.10+).
     # Operator can duplicate this file or edit views in place — seed is additive,
@@ -1224,7 +1224,7 @@ dashboard.md — agent-buttons already up to date
       PSS-10 Q2/Q4/Q5/Q7/Q8), use:
         wiki study answer longitudinal-baseline <instrument> <item> <value>
 + <VAULT>/triage.html
-    <18789 bytes, sha256 <REV>>
+    <18789 bytes, sha256 a5aba29532fa9823>
 + <VAULT>/workspace/todo.md
     ---
     type: todo

@@ -1,0 +1,10 @@
+$ wiki seed --extract-custom .obsidian/graph.json
+exit: 0
+--- stdout ---
+wiki seed --extract-custom
+.obsidian/graph.json
+
+.obsidian/graph.json already matches the engine template — no overlay needed
+--- stderr ---
+--- change ---
+(none)
