@@ -36,7 +36,9 @@ import sys
 import termios
 import time
 import tty
+from collections.abc import Callable
 from pathlib import Path
+from typing import TextIO
 
 # ── ANSI color codes ───────────────────────────────────────────────────────
 # Empty strings when stderr isn't a TTY so escape sequences don't leak
@@ -111,6 +113,123 @@ def read_key(fd: int | None = None) -> str:
         return ch.decode("utf-8", errors="replace")
     finally:
         termios.tcsetattr(fd, termios.TCSADRAIN, old)
+
+
+# ── Line-based prompts ─────────────────────────────────────────────────────
+# The Python counterpart of lib/ui.sh (M034-S02-T01). Line-based like bash `read -r`: an
+# answer piped on stdin is read, and EOF takes the default — how the bash oracle drives the
+# interactive commands and how they behave without a terminal. Input is read byte by byte
+# from the fd, never through `sys.stdin`: on a pipe `sys.stdin.readline()` buffers ahead
+# and swallows the answers a child started after the prompt must read (`wiki setup` →
+# `wiki hooks install`). Prompts go to stderr — stdout is the value, stderr the UX.
+# questionary / prompt_toolkit were measured on a pipe and rejected (DECISIONS 2026-10-15):
+# they warn, write a terminal redraw into stdout and consume all of the remaining stdin.
+
+_NUMBER = re.compile(r"[0-9]+")
+
+
+def read_line(fd: int = 0) -> str | None:
+    """One line from ``fd`` without its newline, read a byte at a time so nothing past it is
+    consumed. ``None`` at EOF with nothing read; a last line without a newline is returned."""
+    buf = bytearray()
+    while True:
+        ch = os.read(fd, 1)
+        if not ch or ch == b"\n":
+            if not ch and not buf:
+                return None
+            return buf.decode("utf-8", errors="replace")
+        buf += ch
+
+
+def _emit(out: TextIO | None, text: str) -> None:
+    stream = out if out is not None else sys.stderr
+    stream.write(text)
+    stream.flush()
+
+
+def confirm(prompt: str, default: bool = True, *, fd: int = 0, out: TextIO | None = None) -> bool:
+    """``[Y/n]`` / ``[y/N]``. An empty line or EOF takes the default; a leading y or j
+    (German "ja") is yes, anything else no."""
+    _emit(out, f"{prompt} {'[Y/n]' if default else '[y/N]'} ")
+    line = read_line(fd)
+    if not line:
+        return default
+    return line[0] in "yYjJ"
+
+
+def ask(
+    prompt: str,
+    default: str = "",
+    validate: Callable[[str], bool] | None = None,
+    *,
+    fd: int = 0,
+    out: TextIO | None = None,
+) -> str:
+    """A line, or the default for an empty one. A ``validate`` that returns False asks
+    again — except at EOF, where no further answer will come: the default then, not a loop."""
+    hint = f" {C_DIM}[{default}]{C_RESET}" if default else ""
+    while True:
+        _emit(out, f"{prompt}{hint}: ")
+        line = read_line(fd)
+        if line is None:
+            return default
+        value = line or default
+        if validate is None or validate(value):
+            return value
+
+
+def _numbered(options: list[str], marked: Callable[[int, str], bool], out: TextIO | None) -> None:
+    for i, option in enumerate(options, 1):
+        marker = f"{C_GREEN}*{C_RESET} " if marked(i, option) else "  "
+        _emit(out, f"  {marker}{i}) {option}\n")
+
+
+def select_one(
+    prompt: str,
+    options: list[str],
+    default: int = 1,
+    *,
+    fd: int = 0,
+    out: TextIO | None = None,
+) -> str:
+    """One of ``options`` by its 1-based number; anything that is not a number in range —
+    an empty line and EOF included — takes ``default``."""
+    _numbered(options, lambda i, _option: i == default, out)
+    _emit(out, f"{prompt} [{default}]: ")
+    line = read_line(fd) or ""
+    choice = int(line) if _NUMBER.fullmatch(line) else default
+    if not 1 <= choice <= len(options):
+        choice = default
+    return options[choice - 1]
+
+
+def select_many(
+    prompt: str,
+    options: list[str],
+    defaults: list[str],
+    *,
+    fd: int = 0,
+    out: TextIO | None = None,
+) -> list[str]:
+    """Space-separated 1-based numbers; an empty line or EOF takes ``defaults``. Tokens that
+    are not a number in range are skipped."""
+    _numbered(options, lambda _i, option: option in defaults, out)
+    hint = f"{C_DIM} (space-separated numbers, Enter for defaults marked *){C_RESET}"
+    _emit(out, f"{prompt}{hint}: ")
+    line = read_line(fd)
+    if not line:
+        return list(defaults)
+    return [
+        options[int(token) - 1]
+        for token in line.split()
+        if _NUMBER.fullmatch(token) and 1 <= int(token) <= len(options)
+    ]
+
+
+def pause(text: str = "Press Enter to continue", *, fd: int = 0, out: TextIO | None = None) -> None:
+    """Wait for one line (or EOF)."""
+    _emit(out, f"{C_DIM}{text}{C_RESET} ")
+    read_line(fd)
 
 
 # ── Generic formatter ──────────────────────────────────────────────────────

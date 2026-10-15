@@ -139,16 +139,21 @@ of `lib/` bash, the 708-line seed merge, a self-updating `update`, and three com
 - 2026-10-15 (S01-T03, was open question 2): **No `llm_wiki` rename.** It would touch 335
   Python files (1,590 import lines) plus 24 other files, and no consumer imports the engine
   as a package. DECISIONS 2026-10-15 "The `llm_wiki` package rename is dropped".
+- 2026-10-15 (S02-T01, was open question 3): **Own line-based prompt helpers on
+  `core/console`.**
+  - They read byte by byte, put every prompt on stderr and add no dependency.
+  - questionary / `prompt_toolkit.prompt` were measured on a pipe. They warn, write a
+    terminal redraw into stdout and swallow the remaining stdin.
+  - The question's dependency-cost argument was wrong: `prompt_toolkit` is already in every
+    vault.
+
+  DECISIONS 2026-10-15 "Prompts in Python".
 
 ## Open questions
 
 1. *(Decided 2026-10-15: see the locked decisions above.)*
 2. *(Decided 2026-10-15: see the locked decisions above.)*
-3. **Interactive prompts in Python** (the setup wizard's confirm / ask / select).
-   **Recommendation:** small helpers on `core/console` next to `read_key`, with no new
-   dependency in every operator venv. The wizard has about ten prompts, and `questionary` /
-   `InquirerPy` would pull prompt_toolkit into each vault. Decide in S02, with OSS-first
-   weighed in the decision.
+3. *(Decided 2026-10-15: see the locked decisions above.)*
 4. **Seed's merges.** **Recommendation:** port the jq merges to Python `json` with a parity
    harness. The fixture vault plus a read-only copy of the live vault's `.obsidian/` is the
    shape oracle (the memory "round-trip on the real data shape"). `backlog/seed-semantic-diff.md`

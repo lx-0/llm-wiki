@@ -2338,3 +2338,41 @@ rename touches:
 
 **Revisit when:** the engine is installed as a package (PyPI, or a plugin that installs it), or
 a second program imports it.
+
+## 2026-10-15: Prompts in Python — own line-based helpers on `core/console`; questionary / prompt_toolkit rejected on measured pipe behaviour
+
+**Context:** M034 open question 3. The ports of `setup`, `config`, `hooks` and `update`
+need the prompts `lib/ui.sh` gives the bash (`confirm`, `ask`, `select_one`, `select_many`,
+`pause`). The oracle drives those commands with answers piped on stdin, and so does any
+automation. The CONTEXT recommendation argued against questionary / InquirerPy because they
+"would pull prompt_toolkit into each vault". That was wrong: `prompt_toolkit` has been a
+dependency of every vault since the home menu (`menu.py`).
+
+**Measured** (`/tmp/m034-oss-probe`, two answers piped on stdin):
+- `questionary.confirm(...)` returned the right value. It also warned `Input is not a
+  terminal (fd=0)` on stderr and wrote a terminal redraw into **stdout** (`\r\n` ×7, padding,
+  a repainted line). It then consumed **all** remaining stdin: `sys.stdin.read()` afterwards
+  returned `''`.
+- `prompt_toolkit.prompt(...)` did the same three things.
+- Plain `sys.stdin.readline()`, followed by a child `sh -c 'read -r x'`, left the child with
+  nothing: Python's buffered reader had read ahead past the line.
+
+**Chose:** small helpers on `core/console` (M034-S02-T01), next to `read_key`.
+- **Line-based like bash `read -r`.** A piped answer is read, EOF takes the default, and a
+  failing validator at EOF returns the default instead of looping (the bash looped forever).
+- **Input byte by byte** (`os.read(fd, 1)`), so a child started after a prompt reads its own
+  answers: `wiki setup` → `wiki hooks install` until S03.
+- **Every prompt on stderr,** `confirm` and `pause` included. Bash printed those two to
+  stdout; this is a decided difference, taken into the goldens by the port that wires each
+  prompt in.
+- **No new dependency.** The prompts and their hints keep the bash text.
+
+**Rejected:** questionary / InquirerPy / `prompt_toolkit.prompt` for these prompts. On a pipe
+they warn, pollute stdout and swallow the remaining answers, and parity with the bash prompts
+would be lost. A TTY-only switch (rich widgets on a terminal, line-based on a pipe) would
+double every prompt's code path and change the wizard a new operator meets. The home menu
+keeps `prompt_toolkit` for its full-screen picker, where a terminal is a precondition.
+
+**Consequences:** `tests/test_console_prompts.py` pins the semantics. The load-bearing test
+pipes two answers through `confirm` and a child `read`. With a buffered read it fails, as
+seen on four tests.
