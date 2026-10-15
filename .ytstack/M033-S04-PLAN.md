@@ -5,7 +5,7 @@ project: llm-wiki
 created: 2026-10-14T18:50:00+02:00
 status: planned
 task_count: 7
-completed_tasks: 6
+completed_tasks: 7
 ---
 
 # M033-S04 -- Slice Plan
@@ -20,7 +20,7 @@ completed_tasks: 6
 - [x] T04 -- `core/sdk_helpers.run_sdk_query` (320): options build / stream loop / failure classification / cost accounting as separate functions behind the same signature; `tests/test_sdk_*` green; a live single-call probe through the harness.
 - [x] T05 -- Collectors: `gmeet._run_one_account` (295) and `calendar_collector._run_one_account` (188) split into fetch / transform / write phases mirroring each other; fixtures from the existing collector tests, output filenames byte-identical.
 - [x] T06 -- Producers + reports + CLIs: `curiosity/producer.maybe_generate_curiosity_requests` (310 measured 2026-10-15) + `maybe_generate_folder_requests` (220), `facts/takes_producer.maybe_extract_takes` (164), `producers/intents.IntentsProducer.run` (159), `reports/_engine/lib/render_summary.render_summary` (234), `reports/_engine/runner._persist_report` (174) + `run_inference` (174), `query.main` (253), `study.cmd_run` (218), `suggestions/cli.main` (169), `health.render` (165) — each split along its existing sections; allowlist in T01 empty at the end of this task except T07's `core/health.check_piggyback_health`.
-- [ ] T07 -- God modules where it pays: `core/health.py` (1,644 → checks grouped by subsystem under `core/health/`; `check_piggyback_health` (166) split with it — the last allowlist entry), `lint.py` (1,284 → checks vs reporting), `cli.py` (1,040 → catalogue vs dispatch); `collectors/gmeet.py`, `core/sdk_helpers.py`, `migrations/migrate_config_keys.py` reviewed and left with a one-line reason in `docs/engine-layout.md` if not split; each module ≤ 1,000 lines or the reason stands.
+- [x] T07 -- God modules where it pays: `core/health.py` (1,644 → checks grouped by subsystem under `core/health/`; `check_piggyback_health` (166) split with it — the last allowlist entry), `lint.py` (1,284 → checks vs reporting), `cli.py` (1,040 → catalogue vs dispatch); `collectors/gmeet.py`, `core/sdk_helpers.py`, `migrations/migrate_config_keys.py` reviewed and left with a one-line reason in `docs/engine-layout.md` if not split; each module ≤ 1,000 lines or the reason stands.
 
 ## Done when
 

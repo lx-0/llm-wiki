@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-15T13:43:37+02:00
+last_updated: 2026-10-15T15:05:50+02:00
 current_milestone: M033
-active_slice: S04
-active_task: T07
+active_slice: none
+active_task: none
 last_completed_milestone: M032
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -188,8 +188,20 @@ dump (135 scenarios) byte-identical after every group, full suite 2229, CI green
 plan's live `wiki query --brief --json` found the dispatcher banner ahead of the payload →
 `960a74e`: `--json` skips the banner (`cli.run_command`, bash `wants_json`), pinned + live
 re-verified. Allowlist 1 (`core/health.check_piggyback_health`, T07's).
-`backlog/report-engine-version-stamp.md` new. **Next: T07 — the god modules via
-`plan-task`.**
+`backlog/report-engine-version-stamp.md` new. **S04 COMPLETE (7/7)** — T07 (plan `4c5f2d9`,
+A `259f243`, B `be1142c`, C `2971952`, D1 `c43481d`, D2 `8b5842b`, docs `2deb438`, D3a
+`3c52179`, D3b `2bacfc2`, D4 `8ec0767`): `core/health.py` → the `core/health/` package,
+`lint.py` → model / checks / schema / facade, `cli.py` → help / catalogue / dispatch, the
+path-scope gate → `core/sdk_scope.py`, the Drive client → `adapters/drive/google.py`
+(`GoogleDriveClient` + `get_file`), `dream.py` 2,182 → 1,224 with `dream_model` /
+`dream_corpus` / `dream_priority`; every move AST-identical, parity a–d + oracle identical.
+Function gate 0 of 1,503 (ALLOWLIST empty); `tests/test_module_size.py` holds every module ≤
+1,000 lines unless `docs/engine-layout.md` § "Large modules" gives the reason (config_schema,
+dream, gmeet, migrate_config_keys). Stale patches raise (health package guard, gmeet 15 sites);
+where the old module keeps a binding, `tests/test_dream_layout.py` refuses a direct patch of a
+multi-bound name (RED on 22 sites, four of them silent `raising=False` no-ops). En route: 13
+stale `collectors/calendar.py` refs, dream's dead `_is_substrate_file`. Suite 2242, CI green on
+all ten commits. **Next: `reassess-roadmap` closes S04, then S05 (types + closeout).**
 
 ## M032 COMPLETE (L, 2026-10-14): desktop de-slop
 
