@@ -176,3 +176,34 @@ def test_parse_screenshot_timestamp_invalid_name():
     from collectors import scan_screenshots
 
     assert scan_screenshots.parse_screenshot_timestamp(Path("random-file.png")) is None
+
+
+# ── provenance: the stamped model is the model that ran ─────────────
+
+
+def test_describe_screenshot_stamps_the_model_that_ran(monkeypatch, tmp_path):
+    """The sidecar's `vision_model` (and the overview's "with <model>") name the
+    model the call used. The prompt's frontmatter `model:` wins over
+    `models.vision_model`, so the stamp has to come from the same resolution —
+    stamping the config knob mislabelled every sidecar after the prompt was
+    pinned to another model."""
+    from collectors import scan_screenshots
+
+    shot = tmp_path / "shot.png"
+    shot.write_bytes(b"not really a png")
+    monkeypatch.setattr(scan_screenshots, "resize_image", lambda path: path)
+    called: dict = {}
+
+    def fake_chat_vision(prompt, *, model, image_b64, timeout):
+        called["model"] = model
+        reply = '{"app": "Terminal", "summary": "s", "tags": [], "relevance": "keep"}'
+        return reply, {"eval_count": 3}
+
+    monkeypatch.setattr(scan_screenshots.ollama_client, "chat_vision", fake_chat_vision)
+
+    meta = scan_screenshots.describe_screenshot(shot)
+
+    assert meta is not None
+    assert called["model"] != scan_screenshots.CONFIG.models.vision_model  # the pin is live
+    assert meta["model"] == called["model"]
+    assert called["model"] == scan_screenshots.MODEL  # the overview report's "with <model>"

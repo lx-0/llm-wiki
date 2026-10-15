@@ -1,5 +1,5 @@
 """
-Scan ~/Screenshots/ for new screenshots, describe them with local LLM (gemma4 vision),
+Scan ~/Screenshots/ for new screenshots, describe them with a local vision LLM (Ollama),
 and save as raw notes for wiki compilation.
 
 Runs as a daily piggyback task. Tracks last scan timestamp in state file.
@@ -47,7 +47,9 @@ THUMB_WIDTH = 384  # px; ~60-80KB per Retina-source screenshot — compromise be
 STATE_DIR.mkdir(parents=True, exist_ok=True)
 STATE_FILE = STATE_DIR / "screenshot-state.json"
 
-MODEL = CONFIG.models.vision_model
+# The model that runs: the prompt's frontmatter `model:` wins over the knob — the
+# sidecar stamp and the overview report read this, so they name it, not the knob.
+MODEL = prompt_model("scan_screenshots_vision", CONFIG.models.vision_model)
 RESIZE_WIDTH = CONFIG.limits.screenshot_resize_width
 _screenshot_pb = CONFIG.piggybacks.get("screenshots")
 MAX_PER_RUN = (_screenshot_pb.max_per_run if _screenshot_pb else None) or 50
@@ -114,7 +116,7 @@ def resize_image(path: Path) -> Path:
 
 
 def describe_screenshot(path: Path) -> dict | None:
-    """Send screenshot to gemma4 vision, return structured metadata."""
+    """Send screenshot to the local vision model (`MODEL`), return structured metadata."""
     resized = resize_image(path)
     try:
         img_b64 = base64.b64encode(resized.read_bytes()).decode()
@@ -125,7 +127,7 @@ def describe_screenshot(path: Path) -> dict | None:
         try:
             content, stats = ollama_client.chat_vision(
                 render("scan_screenshots_vision", project_examples_inline=project_examples_inline),
-                model=prompt_model("scan_screenshots_vision", MODEL),
+                model=MODEL,
                 image_b64=img_b64,
                 timeout=TIMEOUT,
             )
@@ -577,8 +579,8 @@ def retrofit_batch_reports(dry_run: bool = False) -> None:
 class ScreenshotsCollector:
     """~/Screenshots/ → vision-LLM → raw/notes/screenshots/ — Collector Protocol wrapper.
 
-    The one Collector with an LLM sub-step: each PNG goes through gemma4
-    vision once, producing a HOME sidecar + 384px vault thumbnail + an
+    The one Collector with an LLM sub-step: each PNG goes through the local
+    vision model once, producing a HOME sidecar + 384px vault thumbnail + an
     entry in the run's batch report. `is_configured()` only checks the
     screenshots dir — Ollama reachability is checked inside `scan()` and
     degrades gracefully (returns a no-op result, never crashes).

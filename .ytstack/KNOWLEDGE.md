@@ -2981,6 +2981,13 @@ Per-candidate learnings from the 14-candidate seam arc (C01–C14). Decisions li
   with a pointer to the terminal (exit 2). A test that drives an interactive loop needs a
   TTY stub for stdin; without one the walk's own refusal ends it early and a test that never
   checked the exit code still passes, because it was only asserting what did not happen.
+- **A provenance stamp comes from the same resolution as the call (2026-10-15,
+  M033-S05-T06):** `scan_screenshots` called `prompt_model("scan_screenshots_vision", MODEL)`
+  (the prompt's frontmatter `model:` wins) but stamped `MODEL`, the `models.vision_model` knob.
+  When 16452a8 (2026-06-14) pinned `qwen2.5vl:7b` in the prompt, every sidecar kept saying
+  `gemma4:e4b`: up to 383 in `~/Screenshots/` (all scanned since that day), and the batch
+  report's "with <model>" line too. `pictures.py` resolved once at module level and was
+  right. Rule: resolve the model once, pass that value to the call and to every stamp.
 
 ### Desktop toolchain (C07)
 
