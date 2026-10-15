@@ -18,6 +18,20 @@ every operator's `wiki update` → `uv sync` regenerate `uv.lock` and dirty thei
 config keys must also be wired into `scripts/migrations/migrate_config_keys.py`
 in the same commit.
 
+## [0.7.4] — 2026-10-15
+
+**For your vault:** no config key changed, so there is no migration.
+
+### Fixed
+
+- **Picking several agents by number in `wiki hooks install` selected none.** Typing
+  `1 2 3` answered "No agents selected" (and on macOS's system bash failed with "unbound
+  variable"). Pressing Enter for the marked defaults always worked; now typed numbers do too.
+- **Config backups could lose a newer snapshot.** When several config writes landed in one
+  second (the setup wizard does that), the pruning of old backups could delete a newer one
+  and keep an older one. Backups are now named down to the microsecond, so their order is
+  their time order.
+
 ## [0.7.3] — 2026-10-15
 
 **For your vault:** no config key changed, so there is no migration. `optimize_claude_md`

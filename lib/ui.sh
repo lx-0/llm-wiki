@@ -80,17 +80,22 @@ select_many() {
   printf "%s${C_DIM} (space-separated numbers, Enter for defaults marked *)${C_RESET}: " \
     "$prompt" >&2
   local input; read -r input
+  local -a chosen=() numbers=()
   if [[ -z "$input" ]]; then
     IFS=',' read -r -a chosen <<< "$default_csv"
   else
-    local -a chosen=()
-    for n in $input; do
+    # Split on spaces explicitly: the function-wide IFS='|' made "1 2 3" one token, so a
+    # typed multi-selection matched no number and came back empty.
+    IFS=' ' read -r -a numbers <<< "$input"
+    for n in "${numbers[@]}"; do
       [[ "$n" =~ ^[0-9]+$ ]] || continue
       (( n >= 1 && n <= ${#options[@]} )) || continue
       chosen+=("${options[$((n-1))]}")
     done
   fi
-  printf "%s\n" "${chosen[@]}"
+  # An empty array expands as "unbound" under `set -u` in bash < 4.4 (macOS /bin/bash).
+  (( ${#chosen[@]} > 0 )) && printf "%s\n" "${chosen[@]}"
+  return 0
 }
 
 # pause "Press Enter to continue"

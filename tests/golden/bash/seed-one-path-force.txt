@@ -1,0 +1,16 @@
+$ wiki seed .obsidian/app.json --force
+exit: 0
+--- stdout ---
+wiki seed
+overwrite mode · only: .obsidian/app.json
+
+✓ re-derived .obsidian/app.json from template (--force)
+--- stderr ---
+--- change ---
+~ <VAULT>/.obsidian/app.json
+    @@ -3,4 +3,3 @@
+         "raw/"
+    -  ],
+    -  "oracleEdit": true
+    +  ]
+     }

@@ -1,0 +1,8 @@
+$ wiki skills sync
+exit: 0
+--- stdout ---
+✓ skills: +1 linked
+--- stderr ---
+--- change ---
++ <VAULT>/.claude/skills/use-llm-wiki
+    -> ../../.wiki/skills/use-llm-wiki

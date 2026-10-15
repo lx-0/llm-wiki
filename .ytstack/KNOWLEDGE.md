@@ -3015,6 +3015,21 @@ Per-candidate learnings from the 14-candidate seam arc (C01–C14). Decisions li
   in 30 d) and sessions wait for the summarisation layer. A test now ties every glob to a
   writer's `SPEC.output_subfolder`, in both directions. Measure what a repointed glob costs
   before shipping it (`python -m reports._engine.audit_scope`).
+- **Recording an oracle before a port finds the bugs the port would have copied (2026-10-15,
+  M034-S01-T02):** recording the bash commands' effects with scripted answers surfaced two
+  defects no test had seen.
+  1. `lib/ui.sh:select_many` declared `local IFS='|'` for its option list, so `for n in
+     $input` took "1 2 3" as ONE token. A typed multi-selection matched no number and came
+     back empty. On macOS's /bin/bash 3.2 the empty `"${chosen[@]}"` also died under
+     `set -u`, and that made the golden platform-dependent too.
+  2. `core/config_backup` added a micro-suffix only on a same-second clash. Since
+     `config-T-<µs>.yaml` sorts before `config-T.yaml`, the prune-by-name kept the oldest
+     snapshot, and its test only counted survivors.
+
+  Lessons: a function-wide `IFS` silently changes every unquoted expansion in that function;
+  file names a prune sorts must be fixed-width. And record what the old code does *wrongly*
+  only after deciding it is the contract — fix it first, then the port reproduces the
+  intended behaviour.
 
 ### Desktop toolchain (C07)
 

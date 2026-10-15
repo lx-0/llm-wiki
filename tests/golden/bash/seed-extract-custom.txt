@@ -1,0 +1,14 @@
+$ wiki seed --extract-custom .obsidian/graph.json
+exit: 0
+--- stdout ---
+wiki seed --extract-custom
+.obsidian/graph.json
+
+✓ extracted overlay → .wiki/custom/.obsidian/graph.json (1 override(s))
+from now on edit .wiki/custom/.obsidian/graph.json (not the live file); `wiki seed .obsidian/graph.json --force` re-derives
+--- stderr ---
+--- change ---
++ <VAULT>/.wiki/custom/.obsidian/graph.json
+    {
+      "scale": 2.5
+    }

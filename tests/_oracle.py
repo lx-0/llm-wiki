@@ -29,6 +29,7 @@ import shutil
 import socket
 import subprocess
 import sys
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -283,19 +284,17 @@ _FIXED_GIT_ENV = {
 ORACLE_ORIGIN = "https://example.invalid/llm-wiki.git"
 
 
-def build_engine_copy(vault: Path) -> Path:
-    """Copy the engine into ``vault/.wiki/`` as one git commit with a fixed origin (so
-    `wiki version` reports a checkout), and give the vault the `.obsidian/` the bash vault
-    guard demands. Returns the engine dir."""
-    wiki = vault / ".wiki"
-    wiki.mkdir(exist_ok=True)
+def build_engine_template(wiki: Path) -> Path:
+    """Copy the engine's runtime parts into ``wiki`` as one git commit with a fixed origin
+    (so `wiki version` reports a checkout). Build once, then `install_engine` it into each
+    fixture vault — copying a finished checkout is cheaper than re-committing per case."""
+    wiki.mkdir(parents=True, exist_ok=True)
     for part in ENGINE_PARTS:
         src = REPO_ROOT / part
         if src.is_dir():
             shutil.copytree(src, wiki / part, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
         else:
             shutil.copy2(src, wiki / part)
-    (vault / ".obsidian").mkdir(exist_ok=True)
     env = {**os.environ, **_FIXED_GIT_ENV}
     for argv in (
         ["init", "-q", "-b", "main"],
@@ -305,6 +304,21 @@ def build_engine_copy(vault: Path) -> Path:
     ):
         subprocess.run(["git", "-C", str(wiki), *argv], check=True, env=env)
     return wiki
+
+
+def install_engine(vault: Path, template: Path) -> Path:
+    """Put a built engine template into ``vault/.wiki/`` (next to the fixture's state and
+    config) and give the vault the `.obsidian/` the bash vault guard demands."""
+    wiki = vault / ".wiki"
+    shutil.copytree(template, wiki, symlinks=True, dirs_exist_ok=True)
+    (vault / ".obsidian").mkdir(exist_ok=True)
+    return wiki
+
+
+def build_engine_copy(vault: Path) -> Path:
+    """Template + install in one step, for a single vault. Returns the engine dir."""
+    template = build_engine_template(vault.parent / f"{vault.name}-engine-template")
+    return install_engine(vault, template)
 
 
 def write_uv_shim(bin_dir: Path) -> Path:
@@ -325,11 +339,13 @@ def write_uv_shim(bin_dir: Path) -> Path:
 
 
 def run_wiki(
-    vault: Path, home: Path, bin_dir: Path, *args: str
+    vault: Path, home: Path, bin_dir: Path, *args: str, stdin: str | None = None
 ) -> subprocess.CompletedProcess[str]:
-    """Run the engine copy's `wiki` the way a non-interactive caller does: no TTY (stdin
-    is /dev/null), a scratch HOME, PATH = the uv shim + the system dirs (where `jq` and
-    `git` live on macOS and on the CI runner)."""
+    """Run the engine copy's `wiki` the way a non-interactive caller does: no TTY, a
+    scratch HOME, PATH = the uv shim + the system dirs (where `jq` and `git` live on macOS
+    and on the CI runner). ``stdin`` scripts the answers to the bash's line-based prompts
+    (`lib/ui.sh` reads with `read -r`, and EOF takes the default); without it stdin is
+    /dev/null."""
     env = {
         "PATH": os.pathsep.join((str(bin_dir), "/usr/bin", "/bin")),
         "HOME": str(home),
@@ -339,12 +355,84 @@ def run_wiki(
         [str(vault / ".wiki" / "wiki"), *args],
         cwd=vault,
         env=env,
-        stdin=subprocess.DEVNULL,
+        input=stdin,
+        stdin=None if stdin is not None else subprocess.DEVNULL,
         capture_output=True,
         text=True,
         timeout=180,
         check=False,
     )
+
+
+# What a mutating command's effect is measured over: everything under the vault and under
+# HOME, minus the engine copy's runtime parts and git dir (the code, not its effect) and the
+# logs (timestamps only).
+NOT_AN_EFFECT = frozenset({*(f".wiki/{part}" for part in ENGINE_PARTS), ".wiki/.git", ".wiki/logs"})
+_INLINE_LIMIT = 8192
+
+
+def tree_manifest(root: Path, *, skip: frozenset[str] = frozenset()) -> dict[str, str]:
+    """``{relative path: description}`` for every file and symlink under ``root``. A
+    symlink is described by its target, a small UTF-8 file by its content, anything else by
+    its size and sha256. Paths under a ``skip`` prefix are left out."""
+    import hashlib
+
+    manifest: dict[str, str] = {}
+    if not root.exists():
+        return manifest
+    for path in sorted(root.rglob("*")):
+        rel = path.relative_to(root).as_posix()
+        if any(rel == s or rel.startswith(s + "/") for s in skip):
+            continue
+        if path.is_symlink():
+            manifest[rel] = f"-> {os.readlink(path)}"
+        elif path.is_file():
+            data = path.read_bytes()
+            try:
+                text = data.decode("utf-8")
+            except UnicodeDecodeError:
+                text = None
+            if text is not None and len(data) <= _INLINE_LIMIT:
+                manifest[rel] = text
+            else:
+                manifest[rel] = (
+                    f"<{len(data)} bytes, sha256 {hashlib.sha256(data).hexdigest()[:16]}>"
+                )
+    return manifest
+
+
+def manifest_diff(
+    before: dict[str, str],
+    after: dict[str, str],
+    label: str,
+    normalise: Callable[[str], str] = lambda text: text,
+) -> str:
+    """The change between two manifests of one tree, as text: added entries in full,
+    changed text as a unified diff, removed entries by name. ``label`` prefixes the paths
+    (e.g. ``<VAULT>``). Entries are compared after ``normalise``, so a file whose only
+    difference is a refreshed timestamp is no change."""
+    before = {k: normalise(v) for k, v in before.items()}
+    after = {k: normalise(v) for k, v in after.items()}
+    out: list[str] = []
+    for rel in sorted(after.keys() - before.keys()):
+        out.append(f"+ {label}/{rel}\n{_indent(after[rel])}")
+    for rel in sorted(k for k in after.keys() & before.keys() if after[k] != before[k]):
+        diff = difflib.unified_diff(
+            before[rel].splitlines(keepends=True),
+            after[rel].splitlines(keepends=True),
+            lineterm="",
+            n=1,
+        )
+        body = "".join(line if line.endswith("\n") else line + "\n" for line in list(diff)[2:])
+        out.append(f"~ {label}/{rel}\n{_indent(body)}")
+    out.extend(f"- {label}/{rel}\n" for rel in sorted(before.keys() - after.keys()))
+    return "".join(out)
+
+
+def _indent(text: str) -> str:
+    if not text.endswith("\n"):
+        text += "\n"
+    return "".join(f"    {line}" for line in text.splitlines(keepends=True))
 
 
 # Hex revisions only when they carry a digit, so English words made of a–f survive.
@@ -353,13 +441,19 @@ _TIMESTAMP = re.compile(
     r"\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?"
 )
 _AGE = re.compile(r"\b\d+(\s*)(seconds?|minutes?|hours?|days?|weeks?|months?|years?) ago\b")
+# Compact stamps in file names: `lib/common.sh:backup_file`'s `<file>.bak.YYYYmmdd-HHMMSS`
+# and `core/config_backup`'s `state/config-backups/config-YYYYmmdd-HHMMSS-ffffff.yaml`.
+# Before the revision rule, which would otherwise take the date half for a hash.
+_COMPACT_STAMP = re.compile(r"\b\d{8}-\d{6}(?:-\d{6})?\b")
 
 
 def normalise_text(text: str, *, placeholders: dict[str, str]) -> str:
-    """The volatile fragments of command output: the scratch paths (longest first), git
-    revisions → <REV>, wall-clock timestamps → <TS>, relative ages → "N <unit> ago"."""
+    """The volatile fragments of command output: the scratch paths (longest first), compact
+    stamps → <STAMP>, git revisions → <REV>, wall-clock timestamps → <TS>, relative ages →
+    "N <unit> ago"."""
     for literal, token in sorted(placeholders.items(), key=lambda kv: -len(kv[0])):
         text = text.replace(literal, token)
+    text = _COMPACT_STAMP.sub("<STAMP>", text)
     text = _TIMESTAMP.sub("<TS>", text)
     text = _REVISION.sub("<REV>", text)
     return _AGE.sub(lambda m: f"N{m.group(1)}{m.group(2)} ago", text)
@@ -368,12 +462,19 @@ def normalise_text(text: str, *, placeholders: dict[str, str]) -> str:
 def render_run(
     args: tuple[str, ...], run: subprocess.CompletedProcess[str], placeholders: dict[str, str]
 ) -> str:
-    """One recorded invocation: the command, its exit code, stdout and stderr."""
+    """One recorded invocation: the command, its exit code, stdout and stderr. A stream
+    that does not end in a newline (a prompt waiting for input) gets one, so the next
+    section marker starts its own line."""
     text = (
         f"$ wiki {' '.join(args)}".rstrip()
-        + f"\nexit: {run.returncode}\n--- stdout ---\n{run.stdout}--- stderr ---\n{run.stderr}"
+        + f"\nexit: {run.returncode}\n--- stdout ---\n{_line_end(run.stdout)}"
+        + f"--- stderr ---\n{_line_end(run.stderr)}"
     )
     return normalise_text(text, placeholders=placeholders)
+
+
+def _line_end(stream: str) -> str:
+    return stream if not stream or stream.endswith("\n") else stream + "\n"
 
 
 # ── normalisation + golden comparison ─────────────────────────────────────────

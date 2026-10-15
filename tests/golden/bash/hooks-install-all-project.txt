@@ -1,0 +1,176 @@
+$ wiki hooks install
+stdin: '1 2 3 4\n2\ny\n'
+exit: 0
+--- stdout ---
+wiki hooks — install
+Adds session hooks to one or more AI agent configs. Backups + idempotent.
+
+AGENT      USER                   PROJECT                PROJECT CONFIG
+──────────────────────────────────────────────────────────────────────────────
+claude     —                            —                            <VAULT>/.claude/settings.json
+codex      —                            —                            <VAULT>/.codex/hooks.json
+gemini     —                            —                            <VAULT>/.gemini/settings.json
+cursor     —                            —                            <VAULT>/.cursor/hooks.json
+
+
+Will install hooks:
+  - claude @ project → <VAULT>/.claude/settings.json
+  - codex @ project → <VAULT>/.codex/hooks.json
+  - gemini @ project → <VAULT>/.gemini/settings.json
+  - cursor @ project → <VAULT>/.cursor/hooks.json
+
+Proceed? [Y/n] 
+✓ claude (project): created <VAULT>/.claude/settings.json
+✓ codex (project): created <VAULT>/.codex/hooks.json
+✓ gemini (project): created <VAULT>/.gemini/settings.json
+✓ cursor (project): created <VAULT>/.cursor/hooks.json
+
+✓ Done. Restart agent CLIs to pick up the new hooks.
+--- stderr ---
+  * 1) claude
+    2) codex
+    3) gemini
+    4) cursor
+Select agents to install hooks for (space-separated numbers, Enter for defaults marked *):   * 1) user only (recommended)
+    2) project only
+    3) both
+Install scope [1]: 
+--- change ---
++ <VAULT>/.claude/settings.json
+    {
+      "hooks": {
+        "SessionStart": [
+          {
+            "matcher": "",
+            "hooks": [
+              {
+                "type": "command",
+                "command": "cd '<VAULT>/.wiki' && uv run python hooks/session-start.py",
+                "timeout": 15
+              }
+            ]
+          }
+        ],
+        "SessionEnd": [
+          {
+            "matcher": "",
+            "hooks": [
+              {
+                "type": "command",
+                "command": "cd '<VAULT>/.wiki' && uv run python hooks/session-end.py",
+                "timeout": 10
+              }
+            ]
+          }
+        ],
+        "PreCompact": [
+          {
+            "matcher": "",
+            "hooks": [
+              {
+                "type": "command",
+                "command": "cd '<VAULT>/.wiki' && uv run python hooks/pre-compact.py",
+                "timeout": 10
+              }
+            ]
+          }
+        ]
+      }
+    }
++ <VAULT>/.codex/hooks.json
+    {
+      "hooks": {
+        "SessionStart": [
+          {
+            "matcher": "",
+            "hooks": [
+              {
+                "type": "command",
+                "command": "cd '<VAULT>/.wiki' && uv run python hooks/session-start.py",
+                "timeout": 15
+              }
+            ]
+          }
+        ],
+        "Stop": [
+          {
+            "matcher": "",
+            "hooks": [
+              {
+                "type": "command",
+                "command": "cd '<VAULT>/.wiki' && uv run python hooks/session-end.py",
+                "timeout": 10
+              }
+            ]
+          }
+        ]
+      }
+    }
++ <VAULT>/.cursor/hooks.json
+    {
+      "version": 1,
+      "hooks": {
+        "sessionStart": [
+          {
+            "type": "command",
+            "command": "cd '<VAULT>/.wiki' && uv run python hooks/session-start.py",
+            "timeout": 15
+          }
+        ],
+        "sessionEnd": [
+          {
+            "type": "command",
+            "command": "cd '<VAULT>/.wiki' && uv run python hooks/session-end.py",
+            "timeout": 10
+          }
+        ],
+        "preCompact": [
+          {
+            "type": "command",
+            "command": "cd '<VAULT>/.wiki' && uv run python hooks/pre-compact.py",
+            "timeout": 10
+          }
+        ]
+      }
+    }
++ <VAULT>/.gemini/settings.json
+    {
+      "hooks": {
+        "SessionStart": [
+          {
+            "matcher": "",
+            "hooks": [
+              {
+                "type": "command",
+                "command": "cd '<VAULT>/.wiki' && uv run python hooks/session-start.py",
+                "timeout": 15000
+              }
+            ]
+          }
+        ],
+        "SessionEnd": [
+          {
+            "matcher": "",
+            "hooks": [
+              {
+                "type": "command",
+                "command": "cd '<VAULT>/.wiki' && uv run python hooks/session-end.py",
+                "timeout": 10000
+              }
+            ]
+          }
+        ],
+        "PreCompress": [
+          {
+            "matcher": "",
+            "hooks": [
+              {
+                "type": "command",
+                "command": "cd '<VAULT>/.wiki' && uv run python hooks/pre-compact.py",
+                "timeout": 10000
+              }
+            ]
+          }
+        ]
+      }
+    }

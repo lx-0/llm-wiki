@@ -1,0 +1,33 @@
+$ wiki skills uninstall --global
+exit: 0
+--- stdout ---
+wiki skills uninstall
+Remove engine-owned symlinks only
+
+✓ removed 1 engine-owned symlink(s)
+
+✓ removed 1 global symlink(s) from <HOME>/.claude/skills
+vault deregistered from <HOME>/.config/llm-wiki/vaults; skills.global_install set false
+--- stderr ---
+--- change ---
++ <VAULT>/.wiki/state/config-backups/config-<STAMP>.yaml
+    # Wiki Config — single source of truth for tunable parameters.
+    # Defaults live in .wiki/scripts/core/config.py; only overrides need
+    # to be in this file. Edit by hand or via `./.wiki/wiki config set …`.
+    # Note: comments not present here are dropped on programmatic writes.
+    # Round-robin backups in .wiki/state/config-backups/ (last 10 saves).
+    
+    models:
+      ollama_url: http://127.0.0.1:9
+    skills:
+      global_install: true
+~ <VAULT>/.wiki/config.yaml
+    @@ -9,2 +9,2 @@
+     skills:
+    -  global_install: true
+    +  global_install: false
+- <VAULT>/.claude/skills/use-llm-wiki
+~ <HOME>/.config/llm-wiki/vaults
+    @@ -1 +0,0 @@
+    -<VAULT>
+- <HOME>/.claude/skills/use-llm-wiki

@@ -1,0 +1,11 @@
+$ wiki skills install
+exit: 0
+--- stdout ---
+wiki skills install
+Symlink engine skills into .claude/skills/
+
+✓ linked 1 skill(s) into <VAULT>/.claude/skills
+--- stderr ---
+--- change ---
++ <VAULT>/.claude/skills/use-llm-wiki
+    -> ../../.wiki/skills/use-llm-wiki

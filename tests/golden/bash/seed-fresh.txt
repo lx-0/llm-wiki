@@ -1,0 +1,1191 @@
+$ wiki seed
+exit: 0
+--- stdout ---
+wiki seed
+additive mode
+
+✓ seeded README.md
+✓ seeded AGENTS.md
+✓ seeded dashboard.md
+✓ seeded knowledge.base
+✓ seeded triage.html
+✓ seeded Templates/TPL Idea.md
+✓ seeded Templates/TPL Meeting.md
+✓ seeded Templates/TPL Note.md
+✓ seeded Templates/TPL Question.md
+✓ seeded knowledge/MOCs/areas.md
+✓ seeded knowledge/MOCs/concepts.md
+✓ seeded knowledge/MOCs/inbox-tasks.md
+✓ seeded knowledge/MOCs/people.md
+✓ seeded knowledge/MOCs/projects.md
+✓ seeded workspace/todo.md
+✓ seeded .obsidian/app.json
+✓ seeded appearance.json
+✓ seeded community-plugins.json
+✓ seeded .obsidian/core-plugins.json
+✓ seeded .obsidian/graph.json
+✓ seeded .obsidian/snippets/wiki-dashboard.css
+✓ seeded .obsidian/plugins/homepage/data.json
+✓ seeded .obsidian/plugins/dataview/data.json
+✓ seeded .obsidian/plugins/extended-graph/data.json
+✓ seeded .obsidian/plugins/quickadd/data.json
+✓ seeded obsidian-meta-bind-plugin/data.json
+✓ seeded reports/studies/longitudinal-baseline/manifest.yaml
+✓ seeded .claude/.env.example
+dashboard.md — agent-buttons already up to date
+--- stderr ---
+--- change ---
++ <VAULT>/.claude/.env.example
+    # llm-wiki — secrets template
+    #
+    # Copy to `.env` (gitignored) and populate. `scripts/config.py` calls
+    # `load_dotenv(<vault>/.claude/.env, override=False)` on import, so every
+    # script and hook sees these vars without manual shell-export. Shell
+    # exports still win — set there to override a value just for one run.
+    #
+    # This file is seeded into the vault by `wiki seed` (additive — your
+    # existing `.env.example` is preserved). Add entries for any new env-var
+    # the engine references; reference site documents the variable in code.
+    
+    
+    # ── OpenAI ────────────────────────────────────────────────────────────
+    # Whisper audio transcription (and other future OpenAI-backed paths).
+    OPENAI_API_KEY=
+    
+    
+    # ── Exa AI ────────────────────────────────────────────────────────────
+    # Dream web-research (issue #2) — public-entity enrichment in `wiki dream`.
+    # Read by scripts/web_research.py, which falls back to this env var when
+    # `personal.exa_api_key` in config.yaml is blank. Single global key (not
+    # multi-tenant). Get one at dashboard.exa.ai. A key alone does nothing —
+    # the feature is also gated by `features.dream_web_research` (default off)
+    # plus a per-entity opt-in (`web_research: true` frontmatter or the
+    # `public-person` tag).
+    EXA_API_KEY=
+    
+    
+    # ── meinkontext (wiki publish) ───────────────────────────────────────
+    # `wiki publish` (M030) normally needs NO entry here: run
+    # `wiki publish --auth` once (browser login + consent) and the producer
+    # holds a refresh token at .wiki/state/meinkontext-oauth.json, refreshed
+    # headlessly. This variable is an EXPLICIT OVERRIDE only — and it must be
+    # a USER-scoped token: the org api-key from context-mcp's MCP-CONNECT.md
+    # Keychain setup is READ-ONLY (write tools reject it). Feature gates:
+    # `publish.enabled` (default off) + `publish.endpoint` in config.yaml.
+    # CAUTION: this vault iCloud-syncs — anything here reaches Apple's cloud.
+    # MEINKONTEXT_TOKEN=
+    
+    
+    # ── Jamie AI ──────────────────────────────────────────────────────────
+    # Meeting-notetaker ingest via collectors/jamie.py. Multi-tenant — one
+    # key per account with a `jamie:` sub-block under personal.accounts.<id>
+    # (kind: jamie-api). Variable names follow the pattern
+    #
+    #     JAMIE_<ACCOUNT>_API_KEY
+    #
+    # where `<ACCOUNT>` matches whatever you set as `api_key_env` in the
+    # account's jamie sub-block in config.yaml. Generate each key in Jamie:
+    # Settings → Developers → API Keys (Pro / Team / Enterprise plan
+    # required). All keys carry the jk_ prefix. Uncomment + populate per
+    # account.
+    #
+    # JAMIE_WORK_API_KEY=
+    # JAMIE_PRIVATE_API_KEY=
+    
+    
+    # ── Oura Ring ─────────────────────────────────────────────────────────
+    # Daily biometric ingest via collectors/health.py (Phase 1 — Oura only).
+    # Multi-tenant — one Personal Access Token per account with a
+    # `health.oura:` sub-block under personal.accounts.<id> (kind: oura-pat).
+    # Variable name follows the pattern
+    #
+    #     OURA_<ACCOUNT>_PAT
+    #
+    # where `<ACCOUNT>` matches whatever you set as `api_key_env` in the
+    # account's health.oura sub-block in config.yaml. Generate the token at
+    # cloud.ouraring.com/personal-access-tokens (free, no rotation). Uncomment
+    # + populate per account.
+    #
+    # OURA_PRIVATE_PAT=
+    
+    
+    # ── IMAP credentials ──────────────────────────────────────────────────
+    # Used by adapters/mailbox/imap.py (the `imap` reader — scans mail for
+    # accounts with no local client and no Google Cloud project),
+    # scripts/imap_actions.py (Optimization Suggestions: move / tag / flag
+    # existing mail), and adapters/mailbox/allinkl.py (Procmail rule uploads).
+    # Variable names follow the pattern
+    #
+    #     IMAP_<ACCOUNT>_USER
+    #     IMAP_<ACCOUNT>_PASS
+    #
+    # where `<ACCOUNT>` matches the env-var name referenced from your
+    # `personal.accounts.<id>.reader.imap_pass_env` (kind: imap) or
+    # `.filter.imap_user_env` / `imap_pass_env` in config.yaml. Gmail and
+    # other 2FA-protected accounts need an App Password, not the login
+    # password. A Gmail App Password needs 2-Step Verification enabled, is
+    # 16 lowercase letters, and must be pasted WITHOUT the display spaces
+    # (Google shows it grouped as `xxxx xxxx xxxx xxxx` — store the 16
+    # chars only). Uncomment + populate per account.
+    #
+    # IMAP_WORK_USER=
+    # IMAP_WORK_PASS=
+    # IMAP_PERSONAL_USER=
+    # IMAP_PERSONAL_PASS=
+    
+    
+    # ── NAS (SMB) ─────────────────────────────────────────────────────────
+    # Future scan-nas.py / SMB-backed collectors. Leave blank when no NAS.
+    NAS_HOST=
+    NAS_USER=
+    NAS_PASS=
+    
+    
+    # ── LinkedIn (MCP server, not this file) ──────────────────────────────
+    # The adhikasp/mcp-linkedin server reads credentials from its own MCP
+    # env block in `~/.claude.json` (`mcpServers.linkedin.env`), NOT from
+    # this `.env` file. Listed here only as a reminder — populating them
+    # below has no effect.
+    # LINKEDIN_EMAIL=
+    # LINKEDIN_PASSWORD=
++ <VAULT>/.obsidian/app.json
+    {
+      "userIgnoreFilters": [
+        "raw/"
+      ]
+    }
++ <VAULT>/.obsidian/appearance.json
+    {
+      "enabledCssSnippets": [
+        "wiki-dashboard"
+      ]
+    }
++ <VAULT>/.obsidian/community-plugins.json
+    [
+      "dataview",
+      "heatmap-calendar",
+      "homepage",
+      "obsidian-charts",
+      "obsidian-excalidraw-plugin",
+      "obsidian-meta-bind-plugin",
+      "obsidian-shellcommands",
+      "obsidian-tasks-plugin",
+      "quickadd"
+    ]
++ <VAULT>/.obsidian/core-plugins.json
+    {
+      "file-explorer": true,
+      "global-search": true,
+      "switcher": true,
+      "graph": true,
+      "backlink": true,
+      "canvas": true,
+      "outgoing-link": true,
+      "tag-pane": true,
+      "properties": true,
+      "page-preview": true,
+      "daily-notes": true,
+      "templates": true,
+      "note-composer": true,
+      "command-palette": true,
+      "editor-status": true,
+      "bookmarks": true,
+      "outline": true,
+      "word-count": true,
+      "file-recovery": true,
+      "sync": false,
+      "publish": false,
+      "footnotes": false,
+      "slash-command": false,
+      "markdown-importer": false,
+      "zk-prefixer": false,
+      "random-note": false,
+      "slides": false,
+      "audio-recorder": false,
+      "workspaces": false,
+      "webviewer": false,
+      "bases": true
+    }
++ <VAULT>/.obsidian/graph.json
+    {
+      "collapse-filter": false,
+      "search": "path:knowledge -path:knowledge/index",
+      "showTags": true,
+      "showAttachments": false,
+      "hideUnresolved": true,
+      "showOrphans": false,
+      "collapse-color-groups": false,
+      "colorGroups": [
+        {
+          "query": "tag:#fleet",
+          "color": {
+            "a": 1,
+            "rgb": <REV>
+          }
+        },
+        {
+          "query": "tag:#openclaw",
+          "color": {
+            "a": 1,
+            "rgb": <REV>
+          }
+        },
+        {
+          "query": "tag:#claude-code",
+          "color": {
+            "a": 1,
+            "rgb": <REV>
+          }
+        },
+        {
+          "query": "tag:#yesterday",
+          "color": {
+            "a": 1,
+            "rgb": <REV>
+          }
+        },
+        {
+          "query": "tag:#llm-wiki",
+          "color": {
+            "a": 1,
+            "rgb": <REV>
+          }
+        },
+        {
+          "query": "tag:#paperclip",
+          "color": {
+            "a": 1,
+            "rgb": <REV>
+          }
+        },
+        {
+          "query": "tag:#ytstack",
+          "color": {
+            "a": 1,
+            "rgb": <REV>
+          }
+        },
+        {
+          "query": "tag:#township",
+          "color": {
+            "a": 1,
+            "rgb": <REV>
+          }
+        },
+        {
+          "query": "tag:#pixeltales",
+          "color": {
+            "a": 1,
+            "rgb": <REV>
+          }
+        },
+        {
+          "query": "path:knowledge/facts",
+          "color": {
+            "a": 1,
+            "rgb": <REV>
+          }
+        },
+        {
+          "query": "path:knowledge/MOCs",
+          "color": {
+            "a": 1,
+            "rgb": <REV>
+          }
+        },
+        {
+          "query": "path:knowledge/connections",
+          "color": {
+            "a": 1,
+            "rgb": <REV>
+          }
+        },
+        {
+          "query": "path:knowledge/projects",
+          "color": {
+            "a": 1,
+            "rgb": 48340
+          }
+        },
+        {
+          "query": "path:knowledge/people",
+          "color": {
+            "a": 1,
+            "rgb": <REV>
+          }
+        },
+        {
+          "query": "path:knowledge/concepts",
+          "color": {
+            "a": 1,
+            "rgb": <REV>
+          }
+        }
+      ],
+      "collapse-display": false,
+      "showArrow": false,
+      "textFadeMultiplier": 1.5,
+      "nodeSizeMultiplier": 1.2,
+      "lineSizeMultiplier": 0.5,
+      "collapse-forces": false,
+      "centerStrength": 0.1,
+      "repelStrength": 30,
+      "linkStrength": 0.2,
+      "linkDistance": 250
+    }
++ <VAULT>/.obsidian/plugins/dataview/data.json
+    {
+      "enableDataviewJs": true,
+      "enableInlineDataviewJs": true,
+      "renderNullAs": "-",
+      "refreshEnabled": true,
+      "refreshInterval": 2500,
+      "warnOnEmptyResult": true,
+      "showResultCount": true
+    }
++ <VAULT>/.obsidian/plugins/extended-graph/data.json
+    <12278 bytes, sha256 <REV>>
++ <VAULT>/.obsidian/plugins/homepage/data.json
+    {
+      "version": 4,
+      "homepages": {
+        "Main Homepage": {
+          "value": "dashboard",
+          "kind": "File",
+          "openOnStartup": true,
+          "openMode": "Replace all open notes",
+          "manualOpenMode": "Keep open notes",
+          "view": "Default view",
+          "revertView": true,
+          "openWhenEmpty": false,
+          "refreshDataview": true,
+          "autoCreate": false,
+          "autoScroll": false,
+          "pin": false,
+          "commands": [],
+          "alwaysApply": false,
+          "hideReleaseNotes": false
+        }
+      },
+      "separateMobile": false
+    }
++ <VAULT>/.obsidian/plugins/obsidian-meta-bind-plugin/data.json
+    {
+      "devMode": false,
+      "ignoreCodeBlockRestrictions": false,
+      "preferredDateFormat": "YYYY-MM-DD",
+      "firstWeekday": {
+        "index": 1,
+        "name": "Monday",
+        "shortName": "Mo"
+      },
+      "syncInterval": 200,
+      "enableJs": false,
+      "viewFieldDisplayNullAsEmpty": false,
+      "enableSyntaxHighlighting": true,
+      "enableEditorRightClickMenu": true,
+      "inputFieldTemplates": [],
+      "buttonTemplates": [
+        {
+          "label": "📝 Notiz",
+          "hidden": true,
+          "class": "",
+          "tooltip": "Neue Notiz in inbox/",
+          "id": "btn-note",
+          "style": "primary",
+          "actions": [
+            { "type": "command", "command": "QuickAdd: Neue Notiz" }
+          ]
+        },
+        {
+          "label": "💡 Idee",
+          "hidden": true,
+          "class": "",
+          "tooltip": "Neue Idee in inbox/",
+          "id": "btn-idea",
+          "style": "default",
+          "actions": [
+            { "type": "command", "command": "QuickAdd: Neue Idee" }
+          ]
+        },
+        {
+          "label": "❓ Frage",
+          "hidden": true,
+          "class": "",
+          "tooltip": "Neue Frage (für Curiosity Loop) in inbox/",
+          "id": "btn-question",
+          "style": "default",
+          "actions": [
+            { "type": "command", "command": "QuickAdd: Neue Frage" }
+          ]
+        },
+        {
+          "label": "🤝 Meeting",
+          "hidden": true,
+          "class": "",
+          "tooltip": "Neue Meeting-Notiz in inbox/",
+          "id": "btn-meeting",
+          "style": "default",
+          "actions": [
+            { "type": "command", "command": "QuickAdd: Neues Meeting" }
+          ]
+        },
+        {
+          "label": "▶️ Compile changed",
+          "hidden": true,
+          "class": "",
+          "tooltip": "Run `wiki compile` — process raw/ + daily/ files whose hash changed.",
+          "id": "btn-compile",
+          "style": "primary",
+          "actions": [
+            { "type": "command", "command": "Shell commands: Wiki: compile (changed sources)" }
+          ]
+        },
+        {
+          "label": "🛡 Lint",
+          "hidden": true,
+          "class": "",
+          "tooltip": "Run `wiki lint --structural-only`.",
+          "id": "btn-lint",
+          "style": "default",
+          "actions": [
+            { "type": "command", "command": "Shell commands: Wiki: lint (structural)" }
+          ]
+        },
+        {
+          "label": "🔄 Refresh stats",
+          "hidden": true,
+          "class": "",
+          "tooltip": "Re-run dashboard_stats.py.",
+          "id": "btn-refresh-stats",
+          "style": "default",
+          "actions": [
+            { "type": "command", "command": "Shell commands: Wiki: refresh dashboard stats" }
+          ]
+        },
+        {
+          "label": "🗓️ Daily digest",
+          "hidden": true,
+          "class": "",
+          "tooltip": "Distill per-source captures into a single short digest.",
+          "id": "btn-daily-digest",
+          "style": "primary",
+          "actions": [
+            { "type": "command", "command": "Shell commands: Wiki: agent daily-digest" }
+          ]
+        },
+        {
+          "label": "📅 Summarize day",
+          "hidden": true,
+          "class": "",
+          "tooltip": "Run summarize-day agent — refreshes today's Summary block in daily/.",
+          "id": "btn-summarize-day",
+          "style": "primary",
+          "actions": [
+            { "type": "command", "command": "Shell commands: Wiki: agent summarize-day" }
+          ]
+        }
+      ],
+      "excludedFolders": [
+        "templates"
+      ]
+    }
++ <VAULT>/.obsidian/plugins/quickadd/data.json
+    {
+      "choices": [
+        {
+          "id": "qa-note-001",
+          "name": "Neue Notiz",
+          "type": "Template",
+          "command": true,
+          "templatePath": "Templates/TPL Note.md",
+          "fileNameFormat": { "enabled": true, "format": "{{VALUE}}" },
+          "folder": { "enabled": true, "folders": ["inbox"], "chooseWhenCreating": false, "createInSameFolderAsActiveFile": false },
+          "appendLink": false,
+          "openFileInNewTab": { "enabled": true, "direction": "vertical", "focus": true },
+          "openFile": true,
+          "openFileInMode": "default",
+          "fileExistsMode": "Increment the file name",
+          "setFileExistsBehavior": false
+        },
+        {
+          "id": "qa-idea-002",
+          "name": "Neue Idee",
+          "type": "Template",
+          "command": true,
+          "templatePath": "Templates/TPL Idea.md",
+          "fileNameFormat": { "enabled": true, "format": "{{VALUE}}" },
+          "folder": { "enabled": true, "folders": ["inbox"], "chooseWhenCreating": false, "createInSameFolderAsActiveFile": false },
+          "appendLink": false,
+          "openFileInNewTab": { "enabled": true, "direction": "vertical", "focus": true },
+          "openFile": true,
+          "openFileInMode": "default",
+          "fileExistsMode": "Increment the file name",
+          "setFileExistsBehavior": false
+        },
+        {
+          "id": "qa-question-003",
+          "name": "Neue Frage",
+          "type": "Template",
+          "command": true,
+          "templatePath": "Templates/TPL Question.md",
+          "fileNameFormat": { "enabled": true, "format": "{{VALUE}}" },
+          "folder": { "enabled": true, "folders": ["inbox"], "chooseWhenCreating": false, "createInSameFolderAsActiveFile": false },
+          "appendLink": false,
+          "openFileInNewTab": { "enabled": true, "direction": "vertical", "focus": true },
+          "openFile": true,
+          "openFileInMode": "default",
+          "fileExistsMode": "Increment the file name",
+          "setFileExistsBehavior": false
+        },
+        {
+          "id": "qa-meeting-004",
+          "name": "Neues Meeting",
+          "type": "Template",
+          "command": true,
+          "templatePath": "Templates/TPL Meeting.md",
+          "fileNameFormat": { "enabled": true, "format": "{{VALUE}}" },
+          "folder": { "enabled": true, "folders": ["inbox"], "chooseWhenCreating": false, "createInSameFolderAsActiveFile": false },
+          "appendLink": false,
+          "openFileInNewTab": { "enabled": true, "direction": "vertical", "focus": true },
+          "openFile": true,
+          "openFileInMode": "default",
+          "fileExistsMode": "Increment the file name",
+          "setFileExistsBehavior": false
+        }
+      ],
+      "macros": [],
+      "inputPrompt": "single-line",
+      "devMode": false,
+      "templateFolderPath": "Templates",
+      "announcements": {},
+      "disableOnlineFeatures": true,
+      "ai": {
+        "defaultModel": "Ask me",
+        "defaultSystemPrompt": "",
+        "promptTemplatesFolderPath": "",
+        "showAssistant": false,
+        "providers": []
+      },
+      "version": "2.0.0",
+      "globalVariables": {},
+      "enableRibbonIcon": false
+    }
++ <VAULT>/.obsidian/snippets/wiki-dashboard.css
+    /* wiki-dashboard.css — layout for the LLM-wiki Dashboard.
+     *
+     * Auto-enabled by `wiki seed` via .obsidian/appearance.json's enabledCssSnippets.
+     * The dashboard note declares `cssclasses: [wiki-dashboard]` in its frontmatter,
+     * which scopes these rules to the dashboard only.
+     *
+     * GOTCHA #1 — Readable Line Length squeezes the dashboard to 1 column.
+     * Obsidian's "Readable line length" caps `.markdown-preview-sizer` at
+     * `--file-line-width` (default 700px). Even with `display: grid` and
+     * `auto-fit minmax(280px, 1fr)`, that 700px container only fits 2 columns
+     * tops, and on screens with sidebars open often just 1 — charts stack.
+     * Override `--file-line-width` and force the sizer to 100 % for the dashboard.
+     *
+     * GOTCHA #2 — Meta Bind buttons stack vertically.
+     * Obsidian reading mode wraps every code-fence in its own block-level
+     * `.el-pre`. Making the BUTTON `display: inline-block` doesn't help — the
+     * `.el-pre` wrapper still breaks the line. Target the wrapper itself via
+     * `:has()` (supported in Electron's Chromium, Obsidian ≥ 1.4).
+     *
+     * GOTCHA #3 — Raw-HTML wrappers don't form a DOM hierarchy.
+     * Obsidian wraps every top-level markdown block in its own `.el-X`. Raw-HTML
+     * `<div>` openers/closers separated by blank lines (CommonMark Type-6) end
+     * up as independent empty siblings. The chart grid is therefore built in
+     * JS inside a single dataviewjs block (see `templates/dashboard.md`), not
+     * via a markdown-level wrapper.
+     */
+    
+    /* ── Disable readable-line-length for the dashboard ─────────────────── */
+    
+    /* Set the Obsidian core variable (preview + edit + live-preview). */
+    .wiki-dashboard,
+    body .wiki-dashboard {
+      --file-line-width: 100%;
+      --max-width: 100%;
+    }
+    
+    /* Belt-and-suspenders for themes that don't read --file-line-width: force the
+     * sizers to span their container in every view mode. */
+    .markdown-preview-view.wiki-dashboard .markdown-preview-sizer,
+    .wiki-dashboard .markdown-preview-sizer,
+    .wiki-dashboard.markdown-source-view .cm-sizer,
+    .wiki-dashboard.markdown-source-view .cm-contentContainer,
+    .markdown-source-view.wiki-dashboard .cm-sizer,
+    .markdown-source-view.wiki-dashboard .cm-contentContainer {
+      max-width: 100% !important;
+      width: 100% !important;
+    }
+    
+    /* ── Capture / Run buttons (inline row) ─────────────────────────────── */
+    
+    /* Make the .el-pre wrapper around each Meta Bind button inline-block so
+     * consecutive buttons flow on one line and wrap naturally. */
+    .wiki-dashboard .el-pre:has(.block-language-meta-bind-button) {
+      display: inline-block;
+      margin: 0 0.5rem 0.5rem 0;
+      vertical-align: top;
+    }
+    
+    /* Suppress the empty <p> wrapper Markdown sometimes emits between buttons. */
+    .wiki-dashboard .block-language-meta-bind-button + p:empty {
+      display: none;
+    }
+    
+    /* ── Chart cell typography ──────────────────────────────────────────── */
+    
+    .wiki-dashboard .wiki-chart-cell h3 {
+      font-size: 1rem;
+      margin: 0 0 0.25rem 0;
+    }
+    
+    /* Heatmap (separate plugin) — full width below the chart grid. */
+    .wiki-dashboard .heatmap-calendar-graph {
+      margin: 0.5rem 0;
+    }
++ <VAULT>/.wiki/state/dashboard-lint-results.json
+    {
+      "generated_at": "<TS>",
+      "issues": {
+        "broken_links": [],
+        "orphan_pages": [],
+        "orphan_sources": [
+          {
+            "severity": "warning",
+            "check": "orphan_source",
+            "file": "daily/2026-01-02.md",
+            "detail": "Uncompiled source: daily/2026-01-02.md has not been ingested",
+            "auto_fixable": false,
+            "fact_slug": null,
+            "target_slug": null
+          },
+          {
+            "severity": "warning",
+            "check": "orphan_source",
+            "file": "raw/notes/2026-01-02--a-note.md",
+            "detail": "Uncompiled source: raw/notes/2026-01-02--a-note.md has not been ingested",
+            "auto_fixable": false,
+            "fact_slug": null,
+            "target_slug": null
+          }
+        ],
+        "stale_articles": [],
+        "article_type": []
+      }
+    }
++ <VAULT>/.wiki/state/dashboard-refresh.lock
+    
++ <VAULT>/AGENTS.md
+    <29905 bytes, sha256 <REV>>
++ <VAULT>/README.md
+    # Your LLM Wiki
+    
+    A personal knowledge system that compiles itself. You think; an LLM writes; you read. Sessions, scans, clippings, meetings — all feed one wiki that you and your agents read from daily.
+    
+    Engine lives in `.wiki/` (hidden from Obsidian by default). Vault content lives here at the root. They never mix on disk.
+    
+    ## Quick start
+    
+    ```bash
+    # Status, config, hooks, Ollama probe — one command
+    ./.wiki/wiki status
+    
+    # Update engine from origin/main; preserves config + .env + .venv
+    ./.wiki/wiki update
+    
+    # Pull new content
+    ./.wiki/wiki collect email                   # mailbox sweep
+    ./.wiki/wiki collect jamie                   # meeting notes from Jamie AI
+    
+    # Manually compile new sources into knowledge/
+    ./.wiki/wiki compile
+    
+    # Ask the wiki a question
+    ./.wiki/wiki query "How did I structure the auth layer last quarter?"
+    ```
+    
+    `wiki help` shows everything. Subcommand help via `wiki <cmd> --help`.
+    
+    ## What runs automatically
+    
+    Every Claude Code / Codex / Gemini / Cursor session ends as a structured entry in `daily/YYYY-MM-DD/sessions.md` — no action from you. Collectors run alongside and land their own one-liners in sibling files (`daily/YYYY-MM-DD/{health,meetings,voice,email}.md`). Once a day, the `daily-digest` agent distills all five per-source captures into a single ≤500-word `daily/YYYY-MM-DD.md`. After 18:00 (or whatever `scheduling.compile_after_hour` is set to), `flush.py` triggers:
+    
+    - `compile.py` over any new `raw/` + `daily/` content → atomic articles in `knowledge/`
+    - Piggyback Collectors (Jamie meetings every 6 h, email daily, screenshot OCR daily, health daily, …)
+    - `daily_digest_yesterday` piggyback — distills yesterday's per-source captures into one digest
+    - Quality sweeps: structural lint daily, wiki-quality review weekly
+    - Curiosity loop — Ollama spots gaps after each compile, queues deep-scan requests
+    
+    Cap, cooldown, and per-task on/off live in `.wiki/config.yaml`.
+    
+    ## Three folders
+    
+    ```
+    raw/          ← immutable curated sources (LLM reads, never writes)
+    daily/        ← per-day rollup: <date>/{sessions,health,meetings,voice,email}.md + <date>.md digest
+    knowledge/    ← LLM-compiled wiki (LLM owns, you and agents read)
+    ```
+    
+    - **Don't hand-edit `knowledge/`** — the next compile pass may overwrite. Edit the source in `raw/` and recompile instead.
+    - **`wiki correct add "TITLE" "TRUTH"`** records a hard fact that overrides any source (good for "X is not Y" / "rename old name to new name" cases).
+    
+    ## Where things live
+    
+    | What | Path | Tracked? |
+    |---|---|---|
+    | Engine code | `.wiki/` | engine git |
+    | Per-install config (`compile_model`, accounts, account IDs, …) | `.wiki/config.yaml` | gitignored |
+    | Secrets (API keys, IMAP passwords) | `.claude/.env` | gitignored |
+    | Env-var catalogue (template) | `.claude/.env.example` | seeded by `wiki seed` |
+    | Article schema for the compiler | `AGENTS.md` (vault root) | seeded — yours to edit |
+    | Dashboard | `dashboard.md` (vault root) | seeded — Dataview queries |
+    
+    Full key-by-key config reference: [`.wiki/docs/config.md`](.wiki/docs/config.md).
+    
+    ## Common operations
+    
+    ```bash
+    ./.wiki/wiki status                            # what's wired and what isn't
+    ./.wiki/wiki update                            # pull engine updates
+    ./.wiki/wiki seed                              # re-apply missing vault templates (additive)
+    ./.wiki/wiki seed --check                      # which templates have drifted from the engine version
+    ./.wiki/wiki config get models.compile_model   # introspect any tunable
+    ./.wiki/wiki config set scheduling.compile_after_hour 20
+    ./.wiki/wiki hooks status                      # which agents are wired
+    ./.wiki/wiki collect --list                    # registered collectors
+    ./.wiki/wiki agent --list                      # agentic-task definitions in prompts/agents/*.md
+    ./.wiki/wiki lint --structural-only            # free vault-health sweep
+    ```
+    
+    ## Provisioning secrets
+    
+    Copy `.claude/.env.example` to `.claude/.env`, fill values. `.wiki/scripts/core/config.py` loads it on import; no shell-export needed. Shell exports still win if you want a per-run override.
+    
+    The most common secrets:
+    - `OPENAI_API_KEY` — Whisper audio transcription
+    - `JAMIE_<ACCOUNT>_API_KEY` — Jamie AI meeting collector (one per account)
+    - `IMAP_<ACCOUNT>_USER` / `_PASS` — mailbox writes via the email Collector
+    
+    ## Updating
+    
+    ```bash
+    ./.wiki/wiki update                            # git pull --ff-only + sync skill symlinks
+    ./.wiki/wiki seed --check                      # see if engine templates have moved
+    ./.wiki/wiki seed                              # apply additive template seeds
+    ./.wiki/wiki seed --force                      # overwrite vault templates with engine versions (destructive)
+    ```
+    
+    `wiki update` never touches `config.yaml`, `.claude/.env`, or `.venv/`. Your customisations survive every pull.
+    
+    ## Going deeper
+    
+    | Topic | Doc |
+    |---|---|
+    | Every `wiki <cmd>` flag | [`.wiki/docs/cli.md`](.wiki/docs/cli.md) |
+    | Every config key (defaults, types, examples) | [`.wiki/docs/config.md`](.wiki/docs/config.md) |
+    | What runs when — every data flow in the engine *(German)* | [`.wiki/docs/PROCESS.md`](.wiki/docs/PROCESS.md) |
+    | The cognitive-architecture argument | [`.wiki/docs/concept.md`](.wiki/docs/concept.md) |
+    | Engine-internal layout (file by file) | [`.wiki/docs/engine-layout.md`](.wiki/docs/engine-layout.md) |
+    | Cross-agent conventions for the engine codebase | [`.wiki/AGENTS.md`](.wiki/AGENTS.md) |
+    
+    ---
+    
+    This file was seeded by `wiki seed`. Edit it freely — the seeder will skip it on subsequent runs and report drift via `wiki seed --check`. Replace with `--force` if you want to revert to the engine default.
++ <VAULT>/Templates/TPL Idea.md
+    ---
+    type: idea
+    tags: []
+    status: seed
+    agent: false
+    ---
+    
+    # {{title}}
+    
+    ## Idee
+    
+    
+    ## Warum relevant?
+    
+    
+    ## Nächster Schritt
+    
+    
++ <VAULT>/Templates/TPL Meeting.md
+    ---
+    type: meeting
+    tags: []
+    date: {{date}}
+    participants: []
+    ---
+    
+    # {{title}}
+    
+    ## Notizen
+    
+    
+    ## Decisions
+    
+    
+    ## Action Items
+    - [ ]
+    
+    
++ <VAULT>/Templates/TPL Note.md
+    ---
+    type: note
+    tags: []
+    agent: false
+    ---
+    
+    # {{title}}
+    
+    
++ <VAULT>/Templates/TPL Question.md
+    ---
+    type: question
+    tags: []
+    status: open
+    agent: false
+    ---
+    
+    # {{title}}
+    
+    ## Frage
+    
+    
+    ## Was ich schon weiß / vermute
+    
+    
+    ## Wo könnte die Antwort herkommen?
+    
+    > Quellen, Personen, Suchbegriffe — Input für die Curiosity Loop.
+    
+    
++ <VAULT>/_dashboard-lint.md
+    ---
+    orphans_count: 0
+    stale_count: 0
+    failed_flushes_count: 0
+    last_updated_ts: <TS>
+    ---
+    
+    ## Orphans
+    
+    
+    ## Stale
+    
+    
+    ## Failed flushes
+    
++ <VAULT>/_dashboard-stats.md
+    ---
+    pending_compiles: 2
+    failed_flushes: 0
+    lint_warnings: 2
+    total_tokens_lifetime: 0
+    articles_total: 9
+    daily_logs_total: 1
+    open_commitments: 0
+    entities_with_action_items: 0
+    last_compile_ts: <TS>
+    generated_at: <TS>
+    ---
+    
+    > [!info] Pipeline status
+    > 🟡 **Pending compiles:** 2
+    > 🟢 **Failed flushes:** 0
+    > 🟡 **Lint warnings:** 2
+    > 🔢 **LLM tokens (lifetime):** 0
+    > 📚 **Articles:** 9 · **Daily logs:** 1
+    > 📌 **Commitments inbox:** empty — first jamie/gmeet compile will populate this from meeting substrates.
+    > 🕐 **Last compile:** <TS>
+    
+    ## ⏭ Pending compile
+    
+    - [[daily/2026-01-02.md]]
+    - [[raw/notes/2026-01-02--a-note.md]]
++ <VAULT>/dashboard.md
+    <9596 bytes, sha256 <REV>>
++ <VAULT>/knowledge.base
+    # Filterable knowledge browser. Native Obsidian Bases (built-in 1.10+).
+    # Operator can duplicate this file or edit views in place — seed is additive,
+    # `wiki seed` will not overwrite local edits unless --force is passed.
+    
+    filters:
+      and:
+        - file.folder.startsWith("knowledge")
+        - file.name != "index"
+        - file.name != "log"
+    
+    properties:
+      type:
+        displayName: Type
+      file.name:
+        displayName: Title
+      file.mtime:
+        displayName: Modified
+    
+    views:
+      - type: table
+        name: All knowledge
+        order:
+          - file.name
+          - type
+          - file.mtime
+        sort:
+          - property: file.mtime
+            direction: DESC
+        limit: 200
+    
+      - type: table
+        name: By type
+        group_by: type
+        order:
+          - file.name
+          - file.mtime
+        sort:
+          - property: file.name
+            direction: ASC
++ <VAULT>/knowledge/MOCs/areas.md
+    ---
+    type: moc
+    title: Areas
+    ---
+    
+    # 🧭 Areas MOC
+    
+    Hand-curated index of area pages — ongoing responsibilities without a finish
+    line (CEO-Hat, Maintenance, Health, Apartment, ...). Add wikilinks above the
+    auto-list to pin priority areas; the Dataview block below picks up everything
+    in `knowledge/areas/` automatically.
+    
+    ```dataview
+    LIST
+    FROM "knowledge/areas"
+    WHERE compile_role != "final-only"SORT file.name ASC
+    ```
++ <VAULT>/knowledge/MOCs/concepts.md
+    ---
+    type: moc
+    title: Concepts
+    ---
+    
+    # 💡 Concepts MOC
+    
+    Hand-curated index of concept articles. Group related concepts under H2
+    headings above the auto-list; the Dataview block below picks up
+    everything in `knowledge/concepts/` automatically.
+    
+    ```dataview
+    LIST
+    FROM "knowledge/concepts"
+    WHERE compile_role != "final-only"SORT file.name ASC
+    ```
++ <VAULT>/knowledge/MOCs/inbox-tasks.md
+    ---
+    type: moc
+    title: Inbox — Personal Tasks
+    tags: [inbox, tasks, moc]
+    ---
+    
+    # 📌 Inbox — Personal Tasks
+    
+    > Cross-entity inbox for action items extracted from meeting substrates
+    > (jamie + gmeet) and email. Items live inside `knowledge/people/<slug>.md`
+    > and `knowledge/projects/<slug>.md` entity pages — this MOC just
+    > aggregates them. The dashboard's `## 📌 Personal Tasks (Wiki)` section
+    > mirrors a slimmer view.
+    
+    **Lifecycle:** the compiler reads existing State on each pass and carries
+    unresolved items forward; resolved items demote to Timeline with a
+    `[resolved]` marker when substrate evidence appears. Operator can manually
+    check `- [x]` to close items — that survives re-compile until next
+    substrate touch that confirms resolution.
+    
+    ---
+    
+    ## 🔥 Overdue (all)
+    
+    ```tasks
+    not done
+    (path includes knowledge/people) OR (path includes knowledge/projects)
+    due before today
+    sort by due
+    short mode
+    ```
+    
+    ## ⚡ Today (all)
+    
+    ```tasks
+    not done
+    (path includes knowledge/people) OR (path includes knowledge/projects)
+    due on today
+    sort by priority
+    short mode
+    ```
+    
+    ## 🗓 This week (all)
+    
+    ```tasks
+    not done
+    (path includes knowledge/people) OR (path includes knowledge/projects)
+    due after today
+    due before in 7 days
+    sort by due
+    short mode
+    ```
+    
+    ## 📂 No due date (all)
+    
+    ```tasks
+    not done
+    (path includes knowledge/people) OR (path includes knowledge/projects)
+    no due date
+    group by filename
+    short mode
+    ```
+    
+    ---
+    
+    ## 🧑 By person
+    
+    ```tasks
+    not done
+    path includes knowledge/people
+    group by filename
+    sort by due
+    short mode
+    ```
+    
+    ## 📁 By project
+    
+    ```tasks
+    not done
+    path includes knowledge/projects
+    group by filename
+    sort by due
+    short mode
+    ```
+    
+    ---
+    
+    ## ✅ Recently completed
+    
+    > Last 25 commitments the operator has checked off. Useful for retro
+    > and for spotting items that should be demoted to Timeline.
+    
+    ```tasks
+    done
+    (path includes knowledge/people) OR (path includes knowledge/projects)
+    sort by done reverse
+    limit 25
+    short mode
+    ```
++ <VAULT>/knowledge/MOCs/people.md
+    ---
+    type: moc
+    title: People
+    ---
+    
+    # 🧑 People MOC
+    
+    Hand-curated index of person pages. Add wikilinks above the auto-list to
+    pin priority entries; the Dataview block below picks up everything in
+    `knowledge/people/` automatically.
+    
+    ```dataview
+    LIST
+    FROM "knowledge/people"
+    WHERE compile_role != "final-only"SORT file.name ASC
+    ```
++ <VAULT>/knowledge/MOCs/projects.md
+    ---
+    type: moc
+    title: Projects
+    ---
+    
+    # 🚀 Projects MOC
+    
+    Hand-curated index of project pages. Add wikilinks above the auto-list to
+    pin active projects; the Dataview block below picks up everything in
+    `knowledge/projects/` automatically.
+    
+    ```dataview
+    LIST
+    FROM "knowledge/projects"
+    WHERE compile_role != "final-only"SORT file.name ASC
+    ```
++ <VAULT>/reports/studies/longitudinal-baseline/manifest.yaml
+    study_id: longitudinal-baseline
+    title: "Longitudinal baseline — 6 substrate-tuned screens"
+    created: <TS>
+    schedule: weekly
+    instruments:
+      - {slug: phq-9,  version: 1.0.0, source: inferred}
+      - {slug: gad-7,  version: 1.0.0, source: inferred}
+      - {slug: who-5,  version: 1.0.0, source: inferred}
+      - {slug: pss-10, version: 1.0.0, source: inferred}
+      - {slug: isi,    version: 1.0.0, source: inferred}
+      - {slug: olbi,   version: 1.0.0, source: inferred}
+    notes: |
+      Baseline study seeded by `wiki seed`. Six instruments tuned for
+      substrate-alone screening — composition locked 2026-05-17 after
+      dogfooding runs surfaced coverage-tier reality:
+    
+        WHO-5  — 80% inferable (wellbeing, bandable in 1 run)
+        GAD-7  — 57% inferable (anxiety, 1-2 curiosity items)
+        ISI    — 57% inferable (insomnia, Oura items 1-3 observable)
+        PHQ-9  — 44% inferable (depression, 3 curiosity items)
+        PSS-10 — ~50% inferable (stress, substitute for K6)
+        OLBI   — 37.5% inferable (burnout, Disengagement + Exhaustion
+                 subscales; lowest coverage on the manifest, see
+                 `.ytstack/backlog/olbi-coverage-optimization.md`)
+    
+      Off-manifest but available (in `instruments/`, not in default
+      longitudinal-baseline):
+        K6        — 33% inferable, redundant with WHO-5 wellbeing signal.
+        ASRS-v1.1 — 33% inferable; revisit if ADHD-tracking is explicit.
+    
+      Schedule: weekly default. Switch to `daily` for iteration-mode
+      tweaking; quarterly once trends stabilise. Pass-1 analyst fires
+      automatically inside `wiki study run`; Pass-2 cross-study via the
+      `analyst_pass2` piggyback.
+    
+      ISI is set to `claude-sonnet-4-6` via `inference.model:` in its
+      `instrument.yaml`. Provisional override — Haiku scored 4/7 (57%)
+      in one run, undercutting the deterministic-0% premise. Decision
+      belongs in the week-1 review (see
+      `.ytstack/backlog/m019-week-1-review.md`).
+    
+      To close coverage on `substrate_inferable: false` items (PHQ-9 Q9
+      suicidal ideation; ISI satisfaction self-report; OLBI Disengagement
+      attitudinal items; PHQ-9 Q2/Q5/Q6/Q8; GAD-7 Q2/Q5/Q7;
+      PSS-10 Q2/Q4/Q5/Q7/Q8), use:
+        wiki study answer longitudinal-baseline <instrument> <item> <value>
++ <VAULT>/triage.html
+    <18789 bytes, sha256 <REV>>
++ <VAULT>/workspace/todo.md
+    ---
+    type: todo
+    title: Working desk — running next-actions
+    ---
+    
+    # Todo
+    
+    Your running next-actions list — the operator's working layer.
+    
+    ## Tasks
+    
+    > Accepting a task in triage moves its record into `tasks/` (numbered) and adds
+    > a checkbox line below, linking to it. Tick to complete.
+    
+    <!-- accepted-tasks — triage appends `- [ ] <summary> — [[tasks/NNN]]` below this line -->
+    
+    ## Free notes
+    
+    Hand-maintained next-actions that aren't accepted intents:
+    
+    - [ ] …

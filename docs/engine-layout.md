@@ -265,8 +265,9 @@ gated), and the pytest suite, which carries the structural gates:
 - **Behaviour oracle** — `tests/test_oracle_payloads.py` pins `wiki menu --json`,
   `wiki doctor --quick --json` and `wiki help` on a fixture vault (`--snapshot-update` to
   re-record after an intended change). `tests/test_bash_oracle.py` pins what the bash-owned
-  commands print. It runs the real `wiki` out of an engine copy in the fixture vault, with
-  no TTY, a scratch HOME and a `uv` shim onto the test venv, against
+  commands print and, for the mutating ones, what they change under the vault and HOME. It
+  runs the real `wiki` out of an engine copy in the fixture vault, with no TTY, a scratch
+  HOME, prompt answers scripted on stdin and a `uv` shim onto the test venv, against
   `tests/golden/bash/`. It was recorded from the bash before M034 ports those commands to
   Python.
 - **Size** — `tests/test_function_length.py` (no function of 150 lines or more; empty

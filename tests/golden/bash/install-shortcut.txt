@@ -1,0 +1,15 @@
+$ wiki install-shortcut
+exit: 0
+--- stdout ---
+wiki install-shortcut
+
+✓ linked: <HOME>/.local/bin/wiki → <VAULT>/.wiki/wiki
+! <HOME>/.local/bin is NOT on PATH
+
+Add this line to your shell rc (~/.zshrc on macOS default):
+  export PATH=$HOME/.local/bin:$PATH
+Then reload: `source ~/.zshrc` (or open a new terminal).
+--- stderr ---
+--- change ---
++ <HOME>/.local/bin/wiki
+    -> <VAULT>/.wiki/wiki
