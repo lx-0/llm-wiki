@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-15T18:13:20+02:00
+last_updated: 2026-10-15T18:22:00+02:00
 current_milestone: M034
-active_slice: none
-active_task: none
+active_slice: S01
+active_task: T01
 last_completed_milestone: M033
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -30,7 +30,10 @@ parallel_milestones: [M021, M025, M027, M029]
 bootstrap 6, config + setup 5, hooks + skills 4, seed 4, update + the last bash 5, surface
 diet + close 6.
 
-**Next action:** `ytstack:plan-task` → S01-T01 (the bash oracle for the read-only commands).
+**M034 / S01 / T01 planned** (`M034-S01-T01-PLAN.md`): the bash oracle for the read-only
+commands. It uses an engine copy in a fixture vault, a fixture `HOME`, and a `uv` shim onto
+the repo venv, so no run mutates an env. Goldens go to `tests/golden/bash/`. Next: execute
+T01.
 
 ## M033 COMPLETE (L, 2026-10-15): engine modernisation → M034 dispatcher + surface diet
 
