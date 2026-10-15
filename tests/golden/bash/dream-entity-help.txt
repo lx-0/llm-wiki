@@ -1,0 +1,19 @@
+$ wiki dream-entity --help
+exit: 0
+--- stdout ---
+wiki dream-entity — re-synthesize ONE entity page (M014)
+
+USAGE
+  wiki dream-entity <slug>                resynthesize a single entity
+  wiki dream-entity <slug> --dry-run      print prompt size + estimated cost only
+  wiki dream-entity <slug> --ignore-cooldown   force-run despite last_synthesized_at
+  wiki dream-entity <slug> --cost-cap 5.0      override per-entity USD cap
+
+NOTES
+  Slug must match `knowledge/{people,projects,areas}/<slug>.md` (without .md).
+  Greps all substrate (raw/**, daily/**) for slug mentions, builds a corpus
+  prompt, calls Claude Agent SDK to rewrite the entity's State block + append
+  to Timeline. Pre-flight cost cap REJECTS the SDK call if estimate exceeds
+  `limits.dream_entity_max_cost_usd` (default $2.00). Cooldown defaults
+  to `scheduling.dream_cooldown_days` (default 7 days).
+--- stderr ---

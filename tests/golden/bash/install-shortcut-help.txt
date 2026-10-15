@@ -1,0 +1,13 @@
+$ wiki install-shortcut --help
+exit: 0
+--- stdout ---
+wiki install-shortcut — create `wiki` symlink on PATH
+
+USAGE
+  wiki install-shortcut         create ~/.local/bin/wiki → this vault's wiki
+  wiki install-shortcut --print-only   show what would happen, don't write
+
+Idempotent. Replaces a stale symlink pointing at a different vault.
+Reports if ~/.local/bin isn't on PATH and prints the one-line shell-rc
+edit needed.
+--- stderr ---

@@ -23,8 +23,11 @@ from __future__ import annotations
 
 import difflib
 import json
+import os
 import re
+import shutil
 import socket
+import subprocess
 import sys
 from pathlib import Path
 from typing import Any
@@ -33,8 +36,9 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 GOLDEN_DIR = REPO_ROOT / "tests" / "golden" / "oracle"
+BASH_GOLDEN_DIR = REPO_ROOT / "tests" / "golden" / "bash"
 UPDATE_FLAG = "--snapshot-update"
-UPDATE_HINT = f"uv run pytest tests/test_oracle_payloads.py {UPDATE_FLAG}"
+UPDATE_HINT = f"uv run pytest tests/test_oracle_payloads.py tests/test_bash_oracle.py {UPDATE_FLAG}"
 
 # A compile that happened long ago: every fixture source is newer, the compile state is
 # stalled, and nothing depends on the day the test runs.
@@ -245,6 +249,133 @@ def help_text() -> str:
     return cli.render_help() + "\n"
 
 
+# ── the bash layer (M034): the real `wiki` against an engine copy ─────────────
+#
+# M034 moves the bash-owned commands into Python. Each port is measured against what the
+# bash did, recorded BEFORE the port: the real `wiki` runs out of a copy of the engine in
+# the fixture vault, under a scratch HOME, through a `uv` shim. Subprocesses, not
+# in-process calls, so the bash → Python hop is the one an operator gets.
+
+# What a vault's `.wiki/` holds that the bash and the Python behind it read. Copies, not
+# symlinks: `core/paths.py` resolves its own file, so a symlinked `scripts/` would make the
+# repo's parent directory the vault.
+ENGINE_PARTS = (
+    "wiki",
+    "lib",
+    "scripts",
+    "hooks",
+    "prompts",
+    "skills",
+    "templates",
+    "config.example.yaml",
+    "pyproject.toml",
+    "uv.lock",
+    ".gitignore",
+)
+_FIXED_GIT_ENV = {
+    "GIT_AUTHOR_NAME": "oracle",
+    "GIT_AUTHOR_EMAIL": "oracle@example.invalid",
+    "GIT_AUTHOR_DATE": "2026-01-01T09:00:00+00:00",
+    "GIT_COMMITTER_NAME": "oracle",
+    "GIT_COMMITTER_EMAIL": "oracle@example.invalid",
+    "GIT_COMMITTER_DATE": "2026-01-01T09:00:00+00:00",
+}
+ORACLE_ORIGIN = "https://example.invalid/llm-wiki.git"
+
+
+def build_engine_copy(vault: Path) -> Path:
+    """Copy the engine into ``vault/.wiki/`` as one git commit with a fixed origin (so
+    `wiki version` reports a checkout), and give the vault the `.obsidian/` the bash vault
+    guard demands. Returns the engine dir."""
+    wiki = vault / ".wiki"
+    wiki.mkdir(exist_ok=True)
+    for part in ENGINE_PARTS:
+        src = REPO_ROOT / part
+        if src.is_dir():
+            shutil.copytree(src, wiki / part, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+        else:
+            shutil.copy2(src, wiki / part)
+    (vault / ".obsidian").mkdir(exist_ok=True)
+    env = {**os.environ, **_FIXED_GIT_ENV}
+    for argv in (
+        ["init", "-q", "-b", "main"],
+        ["add", "-A"],
+        ["commit", "-q", "-m", "oracle engine copy"],
+        ["remote", "add", "origin", ORACLE_ORIGIN],
+    ):
+        subprocess.run(["git", "-C", str(wiki), *argv], check=True, env=env)
+    return wiki
+
+
+def write_uv_shim(bin_dir: Path) -> Path:
+    """A `uv` first on PATH: `uv run [flags] python ARGS` execs this venv's python with
+    ARGS. Nothing is synced or created, so no oracle run can mutate an environment, and
+    the bash still makes its own hop into Python."""
+    bin_dir.mkdir(parents=True, exist_ok=True)
+    shim = bin_dir / "uv"
+    shim.write_text(
+        "#!/bin/sh\n"
+        'while [ "$#" -gt 0 ] && [ "$1" != python ]; do shift; done\n'
+        '[ "$#" -gt 0 ] && shift\n'
+        f'exec "{sys.executable}" "$@"\n',
+        encoding="utf-8",
+    )
+    shim.chmod(0o755)
+    return shim
+
+
+def run_wiki(
+    vault: Path, home: Path, bin_dir: Path, *args: str
+) -> subprocess.CompletedProcess[str]:
+    """Run the engine copy's `wiki` the way a non-interactive caller does: no TTY (stdin
+    is /dev/null), a scratch HOME, PATH = the uv shim + the system dirs (where `jq` and
+    `git` live on macOS and on the CI runner)."""
+    env = {
+        "PATH": os.pathsep.join((str(bin_dir), "/usr/bin", "/bin")),
+        "HOME": str(home),
+        "PYTHONUTF8": "1",
+    }
+    return subprocess.run(
+        [str(vault / ".wiki" / "wiki"), *args],
+        cwd=vault,
+        env=env,
+        stdin=subprocess.DEVNULL,
+        capture_output=True,
+        text=True,
+        timeout=180,
+        check=False,
+    )
+
+
+# Hex revisions only when they carry a digit, so English words made of a–f survive.
+_REVISION = re.compile(r"\b(?=[0-9a-f]*\d)[0-9a-f]{7,40}\b")
+_TIMESTAMP = re.compile(
+    r"\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?"
+)
+_AGE = re.compile(r"\b\d+(\s*)(seconds?|minutes?|hours?|days?|weeks?|months?|years?) ago\b")
+
+
+def normalise_text(text: str, *, placeholders: dict[str, str]) -> str:
+    """The volatile fragments of command output: the scratch paths (longest first), git
+    revisions → <REV>, wall-clock timestamps → <TS>, relative ages → "N <unit> ago"."""
+    for literal, token in sorted(placeholders.items(), key=lambda kv: -len(kv[0])):
+        text = text.replace(literal, token)
+    text = _TIMESTAMP.sub("<TS>", text)
+    text = _REVISION.sub("<REV>", text)
+    return _AGE.sub(lambda m: f"N{m.group(1)}{m.group(2)} ago", text)
+
+
+def render_run(
+    args: tuple[str, ...], run: subprocess.CompletedProcess[str], placeholders: dict[str, str]
+) -> str:
+    """One recorded invocation: the command, its exit code, stdout and stderr."""
+    text = (
+        f"$ wiki {' '.join(args)}".rstrip()
+        + f"\nexit: {run.returncode}\n--- stdout ---\n{run.stdout}--- stderr ---\n{run.stderr}"
+    )
+    return normalise_text(text, placeholders=placeholders)
+
+
 # ── normalisation + golden comparison ─────────────────────────────────────────
 
 
@@ -274,10 +405,10 @@ def dump(payload: Any) -> str:
     return json.dumps(payload, indent=2, ensure_ascii=False) + "\n"
 
 
-def diff_against_golden(name: str, text: str) -> str | None:
+def diff_against_golden(name: str, text: str, golden_dir: Path = GOLDEN_DIR) -> str | None:
     """None when ``text`` equals the committed golden; otherwise a unified diff (or the
     reason there is nothing to compare against)."""
-    path = GOLDEN_DIR / name
+    path = golden_dir / name
     if not path.exists():
         return f"golden {path.relative_to(REPO_ROOT)} is missing"
     expected = path.read_text(encoding="utf-8")
@@ -293,13 +424,15 @@ def diff_against_golden(name: str, text: str) -> str | None:
     )
 
 
-def assert_matches_golden(request: pytest.FixtureRequest, name: str, text: str) -> None:
-    path = GOLDEN_DIR / name
+def assert_matches_golden(
+    request: pytest.FixtureRequest, name: str, text: str, golden_dir: Path = GOLDEN_DIR
+) -> None:
+    path = golden_dir / name
     if request.config.getoption(UPDATE_FLAG):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(text, encoding="utf-8")
         return
-    problem = diff_against_golden(name, text)
+    problem = diff_against_golden(name, text, golden_dir)
     if problem is not None:
         pytest.fail(
             f"{name}: {problem}\n"

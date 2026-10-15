@@ -1,0 +1,6 @@
+$ wiki version
+exit: 0
+--- stdout ---
+revision     <REV>
+origin       https://example.invalid/llm-wiki.git
+--- stderr ---

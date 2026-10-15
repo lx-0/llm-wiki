@@ -1,0 +1,5 @@
+$ wiki config get models.compile_model
+exit: 0
+--- stdout ---
+claude-opus-4-8
+--- stderr ---

@@ -1344,7 +1344,7 @@ pays for them:
 | `wiki lint --structural-only` | piggyback | $0 | article-level defects (links, orphans, staleness, schema) |
 | Full-state vault audit | at milestone close, or when a cluster smells | ~an hour | everything the above cannot see: cross-feature clusters, usage reality, cost drift. Report → `.ytstack/reviews/YYYY-MM-DD-*.md` |
 | Backlog reconcile | at milestone close | ~20 min fan-out | backlog items whose premise expired — see below |
-| Behaviour oracle (`tests/test_oracle_payloads.py`) | every test run | ~1 s | drift in the operator surfaces — `menu --json`, `doctor --quick --json`, `cli.py help` — against committed goldens on a fixture vault; an intended change regenerates them in the same commit (`--snapshot-update`) |
+| Behaviour oracle (`tests/test_oracle_payloads.py`, `tests/test_bash_oracle.py`) | every test run | ~5 s | drift in the operator surfaces against committed goldens on a fixture vault: `menu --json`, `doctor --quick --json` and `cli.py help` in process, and 25 read-only invocations of the real bash `wiki` (help texts, version, status, config, hooks / skills status) through an engine copy. An intended change regenerates them in the same commit (`--snapshot-update`) |
 
 **Backlog reconcile.** A backlog item describes the world on the day it was
 written; after a few milestones a third of them are lying. The reconcile shards

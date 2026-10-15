@@ -1,0 +1,16 @@
+$ wiki setup --help
+exit: 0
+--- stdout ---
+wiki setup — first-time setup
+
+Walks the 5-question config wizard, then runs the hook installer.
+
+WIZARD QUESTIONS
+  1. Ollama base URL    (probed for reachability)
+  2. Compile model      (opus | sonnet | haiku)
+  3. Auto-compile hour  (0–23, local time)
+  4. Procmail execution (kasserver-specific, default off)
+  5. Local-LLM features (curiosity loop + vision screenshots)
+
+Press Enter on any question to keep the current value.
+--- stderr ---

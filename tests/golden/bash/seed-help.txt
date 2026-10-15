@@ -1,0 +1,50 @@
+$ wiki seed --help
+exit: 0
+--- stdout ---
+wiki seed — re-apply engine templates to the vault root
+
+USAGE
+  wiki seed                     additive: add missing files, merge community-plugins
+  wiki seed --check             read-only audit: report which templates have drifted
+  wiki seed --force             overwrite existing vault templates with engine versions
+  wiki seed <path> [--force|--check]   restrict to ONE file (surgical refresh)
+  wiki seed --extract-custom <path>    capture a JSON config's drift into an overlay
+
+WHAT IT DOES
+  - Seeds missing files: README.md, AGENTS.md, dashboard.md, knowledge.base, .claude/.env.example
+  - Seeds missing .obsidian/*.json + .obsidian/plugins/<name>/data.json
+  - Merges community-plugins.json (additive — adds engine plugins, never drops yours)
+  - Cache files (_dashboard-*.md) are NOT seeded — first `wiki flush` writes them.
+
+TARGETED (single file)
+  Pass a vault-relative path to act on just that file — every other template is
+  left untouched. Lets you refresh ONE stale file with --force without clobbering
+  unrelated customisations (e.g. your QuickAdd macros or graph palette):
+    wiki seed AGENTS.md --check          # audit just AGENTS.md
+    wiki seed AGENTS.md --force          # refresh just AGENTS.md
+    wiki seed .obsidian/app.json --check
+
+CONFIG OVERLAYS (JSON configs — graph.json, app.json, plugin data.json)
+  These are derived as engine-template ⊕ your overlay: the engine owns the
+  base (so new-feature keys flow in on update), your customisations live in an
+  untracked overlay at <vault>/.wiki/custom/<path>. Edit the overlay, not
+  the live file — then `--force` re-derives non-destructively. To migrate an
+  already-customised file, capture its current drift into an overlay once:
+    wiki seed --extract-custom .obsidian/graph.json   # drift → .wiki/custom/...
+    # …then edit .wiki/custom/.obsidian/graph.json going forward
+    wiki seed .obsidian/graph.json --force            # re-derive base ⊕ overlay
+  Markdown/YAML files (AGENTS.md, dashboard.md) are engine-owned — no overlay;
+  refresh them with a targeted --force.
+
+DRIFT REPORTING
+  Default mode tags each kept-existing file as either up-to-date or
+  drifted from engine. `--check` runs the same audit without writing
+  anything — use it after `wiki update` to see what would change before
+  deciding whether to `--force` or merge manually. JSON files that differ only
+  in key order are reported up-to-date, not drifted.
+
+SAFETY
+  Default mode never overwrites your edits. Use --force only if you want to
+  discard your customisations and pick up the latest engine version. Combine
+  --force with a <path> to scope the overwrite to a single file.
+--- stderr ---

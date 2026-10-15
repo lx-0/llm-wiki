@@ -1,0 +1,35 @@
+$ wiki hooks --help
+exit: 0
+--- stdout ---
+wiki hooks — install session hooks into AI agent configs
+
+USAGE
+  wiki hooks install                interactive: pick agents + scope, merge hooks in
+  wiki hooks uninstall              interactive: remove wiki-managed hooks
+  wiki hooks status                 install table per agent / scope
+
+TARGETS
+  claude   .claude/settings.json     (Claude Code)
+  codex    .codex/hooks.json         (OpenAI Codex CLI 0.30+)
+  gemini   .gemini/settings.json     (Google Gemini CLI)
+  cursor   .cursor/hooks.json        (Cursor 1.7+)
+
+SCOPE
+  user      ~/<.agent>/...           applies to all sessions
+  project   <repo>/<.agent>/...      applies only when CWD is this repo
+
+EVENT MAPPING (auto, per agent)
+                  claude         codex     gemini       cursor
+  session-start   SessionStart   SessionStart SessionStart —
+  session-end     SessionEnd     Stop      SessionEnd    stop
+  pre-compact     PreCompact     —         PreCompress   —
+
+SAFETY
+  • Existing config files are merged via jq deep-merge — your other hooks stay.
+  • Every write makes a .bak.YYYYMMDD-HHMMSS backup.
+  • Uninstall only removes entries whose command contains '.wiki/hooks/'.
+
+NOT SUPPORTED
+  pi         TypeScript-only hooks (~/.omp/agent/hooks/{pre,post}/*.ts)
+  opencode   no native hooks yet (sst/opencode#5409)
+--- stderr ---

@@ -1,0 +1,19 @@
+$ wiki dream --help
+exit: 0
+--- stdout ---
+wiki dream — sweep all entity pages (M014)
+
+USAGE
+  wiki dream                               sweep all entities, oldest-overdue first (default)
+  wiki dream --dry-run                     print plan, no SDK calls
+  wiki dream --limit N                     hard cap on entity count this run
+  wiki dream list-candidates               debug: print scored candidate list, no run
+  wiki dream web-research <slug>           public-entity web enrichment (issue #2, Exa)
+  wiki dream web-research <slug> --dry-run print the Public Profile block, write nothing
+
+NOTES
+  Sweeps `knowledge/{people,projects,areas}/*.md` oldest-synthesized first,
+  skipping entities synthesized within the cooldown window. Per-entity AND
+  per-run cumulative cost caps are enforced — see `wiki dream-entity help`.
+  `--all-entities` / `sweep` are accepted as legacy aliases.
+--- stderr ---

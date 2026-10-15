@@ -1,0 +1,5 @@
+$ wiki config path
+exit: 0
+--- stdout ---
+<VAULT>/.wiki/config.yaml
+--- stderr ---

@@ -22,7 +22,10 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         "--snapshot-update",
         action="store_true",
         default=False,
-        help="Rewrite tests/golden/oracle/* from the current payloads (see tests/_oracle.py).",
+        help=(
+            "Rewrite tests/golden/oracle/* and tests/golden/bash/* from the current output "
+            "(see tests/_oracle.py)."
+        ),
     )
 
 

@@ -1,0 +1,25 @@
+$ wiki status
+exit: 0
+--- stdout ---
+wiki status
+
+wiki config — status
+
+config.yaml                              <VAULT>/.wiki/config.yaml
+compile_model                            claude-opus-4-8
+ollama_url                               http://127.0.0.1:9
+compile_after_hour                       18
+features.curiosity_loop                  True
+features.vision_screenshots              True
+features.procmail_execution              True
+skills.global_install                    False
+
+! Ollama unreachable at http://127.0.0.1:9
+
+AGENT      USER                   PROJECT                PROJECT CONFIG
+──────────────────────────────────────────────────────────────────────────────
+claude     —                            —                            <VAULT>/.claude/settings.json
+codex      —                            —                            <VAULT>/.codex/hooks.json
+gemini     —                            —                            <VAULT>/.gemini/settings.json
+cursor     —                            —                            <VAULT>/.cursor/hooks.json
+--- stderr ---

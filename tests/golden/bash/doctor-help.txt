@@ -1,0 +1,20 @@
+$ wiki doctor --help
+exit: 0
+--- stdout ---
+wiki doctor — vault-health audit
+
+USAGE
+  wiki doctor              full pretty report (config / connectivity / pipeline)
+  wiki doctor --json       machine-readable (for agents)
+  wiki doctor --quick      skip TCP + subprocess probes (~50ms; for hooks)
+  wiki doctor --quick --json   both
+
+EXIT CODE
+  0   no critical issues
+  1   at least one critical issue
+
+CHECKS
+  Config + setup: setup-wizard-ran, hooks-installed, template-drift, engine-update-available
+  Connectivity: ollama-reachable, claude-authed
+  Pipeline: compile-errors-recent, no-knowledge-articles, compile-state
+--- stderr ---

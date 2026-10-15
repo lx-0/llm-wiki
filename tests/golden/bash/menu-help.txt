@@ -1,0 +1,10 @@
+$ wiki menu --help
+exit: 0
+--- stdout ---
+wiki menu — interactive home screen + agent-facing JSON
+
+USAGE
+  wiki menu                interactive home screen (prompt_toolkit-driven)
+  wiki menu --json         emit suggestions + status JSON, exit
+                           (consumed by use-llm-wiki skill)
+--- stderr ---

@@ -57,7 +57,7 @@ llm-wiki/                    ← installed as <vault>/.wiki/ — the file-by-fil
 ├── templates/               ← seeded into <vault>/ on install (never overwritten)
 ├── skills/                  ← engine skills, symlinked into <vault>/.claude/skills/
 ├── desktop/                 ← Electron menubar GUI (npm, not pnpm) — talks to the engine only through --json seams
-├── tests/                   ← pytest (pythonpath = scripts + hooks); tests/golden/oracle/ = the behaviour oracle
+├── tests/                   ← pytest (pythonpath = scripts + hooks); tests/golden/{oracle,bash}/ = the behaviour oracle
 ├── docs/                    ← concept, PROCESS, engine-layout (file-by-file), config (generated tables), diagrams
 ├── config.example.yaml      ← copy → config.yaml on install (gitignored)
 ├── pyproject.toml + uv.lock
