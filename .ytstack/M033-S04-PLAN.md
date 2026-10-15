@@ -5,7 +5,7 @@ project: llm-wiki
 created: 2026-10-14T18:50:00+02:00
 status: planned
 task_count: 7
-completed_tasks: 4
+completed_tasks: 5
 ---
 
 # M033-S04 -- Slice Plan
@@ -18,7 +18,7 @@ completed_tasks: 4
 - [x] T02 -- `dream.py` (2,014 lines): `dream_entity` (395 measured 2026-10-15) split along its phases (select → render prompt → SDK call → write-back → report) and `_async_main` (152) along its argv branches; the module split into `dream/` (entity, sweep, candidates, web-research) if the function split exposes the seams; argv routing unchanged on the oracle and `wiki dream …` smoke.
 - [x] T03 -- Compile path: `compile.main` (317) and `_run_compile_route` (154) in `compile.py`, `compile_source` (212) in `compile_stages/compile.py` — extracted into the stage functions their comments already name (selection, retry ladder, failure classification, summary); `tests/test_compile_*` green, E2E smoke on three files (KNOWLEDGE "E2E smoke irreplaceable").
 - [x] T04 -- `core/sdk_helpers.run_sdk_query` (320): options build / stream loop / failure classification / cost accounting as separate functions behind the same signature; `tests/test_sdk_*` green; a live single-call probe through the harness.
-- [ ] T05 -- Collectors: `gmeet._run_one_account` (295) and `calendar_collector._run_one_account` (188) split into fetch / transform / write phases mirroring each other; fixtures from the existing collector tests, output filenames byte-identical.
+- [x] T05 -- Collectors: `gmeet._run_one_account` (295) and `calendar_collector._run_one_account` (188) split into fetch / transform / write phases mirroring each other; fixtures from the existing collector tests, output filenames byte-identical.
 - [ ] T06 -- Producers + reports + CLIs: `curiosity/producer.maybe_generate_curiosity_requests` (310 measured 2026-10-15) + `maybe_generate_folder_requests` (220), `facts/takes_producer.maybe_extract_takes` (164), `producers/intents.IntentsProducer.run` (159), `reports/_engine/lib/render_summary.render_summary` (234), `reports/_engine/runner._persist_report` (174) + `run_inference` (174), `query.main` (253), `study.cmd_run` (218), `suggestions/cli.main` (169), `health.render` (165) — each split along its existing sections; allowlist in T01 empty at the end of this task except T07's `core/health.check_piggyback_health`.
 - [ ] T07 -- God modules where it pays: `core/health.py` (1,644 → checks grouped by subsystem under `core/health/`; `check_piggyback_health` (166) split with it — the last allowlist entry), `lint.py` (1,284 → checks vs reporting), `cli.py` (1,040 → catalogue vs dispatch); `collectors/gmeet.py`, `core/sdk_helpers.py`, `migrations/migrate_config_keys.py` reviewed and left with a one-line reason in `docs/engine-layout.md` if not split; each module ≤ 1,000 lines or the reason stands.
 
@@ -32,3 +32,11 @@ All tasks marked `[x]` and verified via `ytstack:summarize-task`.
 - Every task: suite ≥ 2,025 green, oracle byte-identical, no behaviour change in the move commit (defects found go into their own commit with a test).
 - 2026-10-15 (T01): the live `ast` measurement finds **20** functions ≥ 150 lines of 1,402, not the audit's 15 — five more (`suggestions/cli.main`, `core/health.check_piggyback_health`, `health.render`, `producers/intents.IntentsProducer.run`, `dream._async_main`) and the audit's own grew since 2026-10-14 (`dream_entity` 347 → 395, `compile.main` 317 → 345, `gmeet._run_one_account` 295 → 340, `query.main` 236 → 253). The task lines above carry the measured lengths and the five extra functions (T02, T06, T07); `tests/test_function_length.py`'s ALLOWLIST is the burn-down.
 - 2026-10-15 (T03): the E2E on the scratch vault (`/tmp/lxw-scratch`, operator config) runs with `piggybacks_on_compile: false` in the scratch's config so the before/after compiles stay comparable and do not spawn the maintenance drain there; the fixture notes are `raw/notes/t03-*.md` with the run label in the body (new hash per run). Pattern for T04–T06: capture the "before" on the committed engine, split, commit, pull on the scratch, capture "after", diff the normalized logs.
+- 2026-10-15 (T05): when the function has no live probe (the collectors need Google OAuth
+  tokens the scratch vault does not carry), the oracle is a fixture parity dump: a throwaway
+  script drives the collector's own `run()` over every scenario the loop branches on, with
+  fake clients + a pinned clock, and writes messages, written files, state JSON, fake-call
+  logs and the captured log records to one text file; "before" on the committed engine,
+  "after" on the split, `diff` must be empty. A loop with no test gets characterisation
+  tests FIRST, green on the committed code, in their own commit — then the gate goes red,
+  then the split.
