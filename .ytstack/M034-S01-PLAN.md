@@ -5,7 +5,7 @@ project: llm-wiki
 created: 2026-10-15T18:15:32+02:00
 status: planned
 task_count: 6
-completed_tasks: 2
+completed_tasks: 3
 ---
 
 # M034-S01 -- Slice Plan
@@ -37,7 +37,7 @@ in the Python catalogue.
   - `install-shortcut`.
 
   Recorded from bash, committed before any port. `update` gets its own oracle in S05.
-- [ ] T03 -- Decide open questions 1 and 2 in DECISIONS. One hop = the bootstrap execs the
+- [x] T03 -- Decide open questions 1 and 2 in DECISIONS. One hop = the bootstrap execs the
   venv Python into `cli.py`, and handlers stay `python -m` children. The `llm_wiki` rename is
   dropped. Measure today's process tree for one command (`ps`) as the before number.
 - [ ] T04 -- The bootstrap hop. `wiki`'s `_dispatch_python` execs `<venv>/bin/python` with

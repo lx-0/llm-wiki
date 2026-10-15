@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-15T19:20:00+02:00
+last_updated: 2026-10-15T19:15:00+02:00
 current_milestone: M034
 active_slice: S01
-active_task: T03
+active_task: none
 last_completed_milestone: M033
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -12,13 +12,22 @@ parallel_milestones: [M021, M025, M027, M029]
 
 # State
 
-## Next action — M034 / S01 2/6: dispatcher + surface diet
+## Next action — M034 / S01 3/6: dispatcher + surface diet
 
-**Status:** M034 / S01 — 2 of 6 tasks done (T01 + T02: the bash oracle). Engine 0.7.4,
-suite 2316, CI green on `864a09d`.
-**Next:** S01-T03 is planned (`M034-S01-T03-PLAN.md`), ready to execute. Decide open
-questions 1 and 2 in DECISIONS (one bootstrap hop with the handlers kept as `python -m`
-children; the `llm_wiki` rename dropped), and measure today's process tree as the before number.
+**Status:** M034 / S01 — 3 of 6 tasks done (T01–T02 the bash oracle, T03 the one-hop and
+rename decisions). Engine 0.7.4, suite 2316, CI green.
+**Next:** `ytstack:plan-task` → S01-T04, the bootstrap hop: exec the venv's python into
+`cli.py`, `uv run` only without a venv or with a newer `uv.lock`; prove it with the tree after,
+a no-`uv` test and the oracle unchanged.
+
+**M034 / S01-T03** (`7b63c7c`, `89503ec`): DECISIONS 2026-10-15 "One hop" + "The `llm_wiki`
+package rename is dropped".
+- **Before number** (scratch vault, real `uv`): `wiki collect --list` runs as `uv` →
+  dispatcher → handler, three processes alive at once; `uv run` costs about 57 ms per call.
+- **In-process dispatch rejected on counts:** of the 29 handlers, 9 write the environment at
+  import, 20 set up the root logger, and 27 exit via `sys.exit`.
+- **Requirement found for T04:** `uv run` syncs a changed `uv.lock` on every call, and the hop
+  must keep that.
 
 **M034 / S01-T02** (`1b0cfc1`, `b8df503`, `864a09d`): the oracle also records 17 mutating
 invocations from the bash, each on a fresh vault and HOME with its prompt answers scripted on
