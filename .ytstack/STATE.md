@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-15T15:10:55+02:00
+last_updated: 2026-10-15T15:25:13+02:00
 current_milestone: M033
 active_slice: S05
-active_task: T01
+active_task: none
 last_completed_milestone: M032
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -209,7 +209,16 @@ diagram labels, T05's 0.7.0 note carries the `--json` payload-alone fix. **S05 0
 planned (`M033-S05-T01-PLAN.md`): three candidates, not two. pyright is npm-only, so its
 PyPI wrapper downloads Node, and basedpyright is the same checker packaged for PyPI; ty is
 still a beta (0.0.86). The probe goes into a `typecheck` group, not `--dev`, because `wiki
-update`'s bare `uv sync` installs `dev` into every operator vault. **Next: execute T01.**
+update`'s bare `uv sync` installs `dev` into every operator vault. **S05 1/6** — T01
+(`7f9049b`): ty 0.0.88 pinned exactly in the `typecheck` group, `[tool.ty.environment]`.
+On `core/` / `scripts/`: errors 22 / 212 for pyright and basedpyright (the same core), 19 /
+161 for ty. Median time on `core/`: 2.7 s / 3.0 s / 0.10 s. Real findings on `core/`: 15 of
+22 vs 19 of 19 (pyright's seven false positives: six MaybeNone narrowing artefacts, one
+aliased `None` check). Footprint: Node + up to 199 MB vs a 25 MB binary. DECISIONS
+2026-10-15. ty found a dead import pyright had never reported, hidden by a mypy-coded
+`type: ignore`: the suggestions' IMAP actions on Gmail accounts had crashed since 74f3d84,
+and `b80dad7` fixes it with tests (RED first). Suite 2245, CI green. **Next: S05-T02 (`core/`
+green under ty + the gate in pre-commit and CI) via `plan-task`.**
 
 ## M032 COMPLETE (L, 2026-10-14): desktop de-slop
 

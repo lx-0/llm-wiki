@@ -5,7 +5,7 @@ project: llm-wiki
 created: 2026-10-14T18:50:00+02:00
 status: planned
 task_count: 6
-completed_tasks: 0
+completed_tasks: 1
 ---
 
 # M033-S05 -- Slice Plan
@@ -14,7 +14,7 @@ completed_tasks: 0
 
 ## Tasks
 
-- [ ] T01 -- Type-checker probe and decision: `uv add --dev` pyright and ty, run both in `basic` mode on `scripts/core/` and on all of `scripts/`, record findings and wall time, pick one (CONTEXT open question 1), remove the other, write the DECISIONS entry; config in `pyproject.toml`.
+- [x] T01 -- Type-checker probe and decision: `uv add --dev` pyright and ty, run both in `basic` mode on `scripts/core/` and on all of `scripts/`, record findings and wall time, pick one (CONTEXT open question 1), remove the other, write the DECISIONS entry; config in `pyproject.toml`.
 - [ ] T02 -- `scripts/core/` green under the chosen checker: real annotations instead of `Any` where the fix is local, `TypedDict` / dataclasses for the dict-shaped payloads the desktop reads, `# type: ignore[code]` with reason only where a dependency is untyped; the checker added to pre-commit and `ci.yml` scoped to `core/`; the count for the rest of `scripts/` recorded in `KNOWLEDGE.md`.
 - [ ] T03 -- Contract typed once: the `menu --json` / `doctor --json` payloads defined as dataclasses in `core/actions.py` (they largely are), a JSON Schema generated from them into `docs/contracts/actions.schema.json` by a committed script, and a pytest that validates the oracle's golden payloads against it (`jsonschema` is already in the lock — verified).
 - [ ] T04 -- Desktop side of the contract: `desktop/` validates its fixtures (`scripts/shots/fixtures.cjs`, `src/vault/*.test.ts`) against the same schema in vitest (`ajv` dev dependency), and `src/lib/actions.ts` either imports generated types (`json-schema-to-typescript`) or keeps its hand-written types with a test that fails when the schema gains a field — decided by the schema's size (CONTEXT open question 2).
