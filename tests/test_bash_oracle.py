@@ -226,6 +226,45 @@ def _claude_hooks_at_user_scope(env: dict[str, Path]) -> None:
     _wiki(env, "hooks", "install", stdin="1\n1\ny\n")
 
 
+def _failing_jq(env: dict[str, Path]) -> None:
+    """A `jq` that cannot run, like an asdf shim under a foreign HOME: exit 126, no output."""
+    jq = env["bin"] / "jq"
+    jq.write_text("#!/bin/sh\nexit 126\n", encoding="utf-8")
+    jq.chmod(0o755)
+
+
+def _drop_backups(cfg: Path) -> None:
+    """The preparation's own backups. Backups are named to the second, so without this the
+    case's backup is `<stamp>` or `<stamp>-2` depending on whether both landed in one."""
+    for bak in cfg.parent.glob(f"{cfg.name}.bak.*"):
+        bak.unlink()
+
+
+def _claude_hooks_beside_another_tools(env: dict[str, Path]) -> None:
+    _foreign_user_settings(env)
+    _claude_hooks_at_user_scope(env)
+    _drop_backups(env["home"] / ".claude" / "settings.json")
+
+
+def _cursor_hooks_beside_another_tools(env: dict[str, Path]) -> None:
+    """Cursor at project scope: another tool's bare entry, then the wiki's beside it."""
+    cfg = env["vault"] / ".cursor" / "hooks.json"
+    cfg.parent.mkdir(parents=True)
+    other = {"type": "command", "command": "other-tool --start", "timeout": 5}
+    cfg.write_text(
+        json.dumps({"version": 1, "hooks": {"sessionStart": [other]}}, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    _wiki(env, "hooks", "install", stdin="4\n2\ny\n")
+    _drop_backups(cfg)
+
+
+def _claude_hooks_at_project_scope_only(env: dict[str, Path]) -> None:
+    """The wiki's Claude hooks in the vault; the user's settings hold another tool's only."""
+    _foreign_user_settings(env)
+    _wiki(env, "hooks", "install", stdin="1\n2\ny\n")
+
+
 def _foreign_user_settings(env: dict[str, Path]) -> None:
     """Another tool's hook and a permission in the user's Claude settings, which the
     merge must keep."""
@@ -289,6 +328,25 @@ MUTATING: dict[str, tuple[tuple[str, ...], str | None, Prepare]] = {
     "hooks-install-all-project": (("hooks", "install"), "1 2 3 4\n2\ny\n", None),
     "hooks-install-merges-existing": (("hooks", "install"), "1\n1\ny\n", _foreign_user_settings),
     "hooks-uninstall": (("hooks", "uninstall"), "\n1\ny\n", _claude_hooks_at_user_scope),
+    # S03-T02's fixes, recorded from the fixed bash: an uninstall removes only the wiki's
+    # entries (a Claude group, a Cursor bare entry), says when there is nothing to remove,
+    # and an install whose payload cannot be built fails instead of saying Done
+    "hooks-uninstall-keeps-foreign": (
+        ("hooks", "uninstall"),
+        "\n1\ny\n",
+        _claude_hooks_beside_another_tools,
+    ),
+    "hooks-uninstall-cursor-keeps-foreign": (
+        ("hooks", "uninstall"),
+        "\n2\ny\n",
+        _cursor_hooks_beside_another_tools,
+    ),
+    "hooks-uninstall-nothing-to-remove": (
+        ("hooks", "uninstall"),
+        "\n1\ny\n",
+        _claude_hooks_at_project_scope_only,
+    ),
+    "hooks-install-payload-fails": (("hooks", "install"), "1\n1\ny\n", _failing_jq),
     "skills-install": (("skills", "install"), None, None),
     "skills-sync": (("skills", "sync"), None, None),
     "skills-install-global": (("skills", "install", "--global"), None, None),
@@ -374,6 +432,27 @@ def test_bash_mutating_command_matches_golden(fresh_vault, request, name: str) -
     args, stdin, prepare = MUTATING[name]
     text = record_effect(fresh_vault, args, stdin, prepare)
     assert_matches_golden(request, f"{name}.txt", text, BASH_GOLDEN_DIR)
+
+
+def test_an_install_that_fails_is_not_reported_done(fresh_vault: dict[str, Path]) -> None:
+    """Found in S02-T05's end-to-end run: with a `jq` that could not run, every payload
+    failed. The installer said `unknown agent: claude`, wrote nothing, and ended
+    `✓ Done. Restart agent CLIs…` with exit 0."""
+    _failing_jq(fresh_vault)
+
+    run = run_wiki(
+        fresh_vault["vault"],
+        fresh_vault["home"],
+        fresh_vault["bin"],
+        *("hooks", "install"),
+        stdin="1\n1\ny\n",
+    )
+
+    assert run.returncode == 1
+    assert "Done" not in run.stdout
+    assert "claude (user): could not build the hook payload" in run.stderr
+    assert "1 of 1" in run.stderr
+    assert not (fresh_vault["home"] / ".claude" / "settings.json").exists()
 
 
 def test_the_engine_template_spawns_no_background_git_maintenance(tmp_path: Path) -> None:

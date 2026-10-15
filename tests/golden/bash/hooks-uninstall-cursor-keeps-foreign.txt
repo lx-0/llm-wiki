@@ -1,0 +1,84 @@
+$ wiki hooks uninstall
+stdin: '\n2\ny\n'
+exit: 0
+--- stdout ---
+wiki hooks — uninstall
+Removes wiki-managed hook entries; preserves user's other hooks.
+
+AGENT      USER                   PROJECT                PROJECT CONFIG
+──────────────────────────────────────────────────────────────────────────────
+claude     —                            —                            <VAULT>/.claude/settings.json
+codex      —                            —                            <VAULT>/.codex/hooks.json
+gemini     —                            —                            <VAULT>/.gemini/settings.json
+cursor     —                            installed                      <VAULT>/.cursor/hooks.json
+
+
+Remove wiki hooks from selected configs? [Y/n] 
+✓ cursor (project): removed wiki hooks (backup: <VAULT>/.cursor/hooks.json.bak.<STAMP>)
+
+✓ Done.
+--- stderr ---
+    1) claude
+    2) codex
+    3) gemini
+  * 4) cursor
+Select agents to uninstall hooks from (space-separated numbers, Enter for defaults marked *):   * 1) user only (recommended)
+    2) project only
+    3) both
+Install scope [1]: 
+--- change ---
++ <VAULT>/.cursor/hooks.json.bak.<STAMP>
+    {
+      "version": 1,
+      "hooks": {
+        "sessionStart": [
+          {
+            "type": "command",
+            "command": "other-tool --start",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "cd '<VAULT>/.wiki' && uv run python hooks/session-start.py",
+            "timeout": 15
+          }
+        ],
+        "sessionEnd": [
+          {
+            "type": "command",
+            "command": "cd '<VAULT>/.wiki' && uv run python hooks/session-end.py",
+            "timeout": 10
+          }
+        ],
+        "preCompact": [
+          {
+            "type": "command",
+            "command": "cd '<VAULT>/.wiki' && uv run python hooks/pre-compact.py",
+            "timeout": 10
+          }
+        ]
+      }
+    }
+~ <VAULT>/.cursor/hooks.json
+    @@ -8,21 +8,2 @@
+             "timeout": 5
+    -      },
+    -      {
+    -        "type": "command",
+    -        "command": "cd '<VAULT>/.wiki' && uv run python hooks/session-start.py",
+    -        "timeout": 15
+    -      }
+    -    ],
+    -    "sessionEnd": [
+    -      {
+    -        "type": "command",
+    -        "command": "cd '<VAULT>/.wiki' && uv run python hooks/session-end.py",
+    -        "timeout": 10
+    -      }
+    -    ],
+    -    "preCompact": [
+    -      {
+    -        "type": "command",
+    -        "command": "cd '<VAULT>/.wiki' && uv run python hooks/pre-compact.py",
+    -        "timeout": 10
+           }

@@ -55,16 +55,20 @@ agent_config_path() {
   printf "%s/%s" "$(scope_dir "$scope")" "$(agent_field "$agent" config)"
 }
 
-# Returns 0 if our hooks are present in the agent's config.
-# Match heuristic: any reference to one of the engine's hook scripts that also
-# sits under a `.wiki/` path. Covers both the current install format
-# (`uv run --project .wiki python .wiki/hooks/session-start.py`) and the older
-# `cd '...wiki' && uv run python hooks/session-start.py` style some installs
-# still carry from earlier engine versions.
+# ── The one hook-command grammar ─────────────────────────────────────
+# A command that runs one of the engine's hook scripts from under a `.wiki` path:
+# today's `cd '<vault>/.wiki' && [UV_PROJECT_ENVIRONMENT='…' ]uv run python
+# hooks/<x>.py` and the older `uv run --project .wiki python .wiki/hooks/<x>.py`.
+# The probe, the merge and the uninstall all use it; the uninstall's own copy had
+# drifted to `\.wiki/hooks/` and matched nothing current. core/agents.py's
+# HOOK_CMD_RE is the same pattern (tests/test_agents_registry.py holds the two).
+_WIKI_HOOK_CMD_RE='\.wiki['"'"'"/ ].*hooks/(session-(start|end)|pre-compact|_transcript)'
+
+# Returns 0 if the agent's config names a wiki hook command (read as text).
 hooks_installed() {
   local cfg="$1"
   [[ -f "$cfg" ]] || return 1
-  grep -qE "\.wiki['\"/ ].*hooks/(session-(start|end)|pre-compact|_transcript)" "$cfg" 2>/dev/null
+  grep -qE "$_WIKI_HOOK_CMD_RE" "$cfg" 2>/dev/null
 }
 
 # ── Hook payload generators ──────────────────────────────────────────
@@ -176,20 +180,19 @@ agent_payload() {
 # would silently drop those (lxw 2026-09-17: one foreign entry per agent
 # in SessionStart — ytstack / herdr — gone on the next `wiki hooks install`).
 # Per event we therefore keep every entry that is not wiki-managed and
-# replace only ours (identified by the same command grammar as
-# `hooks_installed`); both entry shapes are handled — Claude/Codex/Gemini
-# `{matcher, hooks:[{command}]}` and Cursor's bare `{type, command}`.
-_WIKI_HOOK_CMD_RE='\.wiki['"'"'"/ ].*hooks/(session-(start|end)|pre-compact)'
-
+# replace only ours (the one grammar above); both entry shapes are handled —
+# Claude/Codex/Gemini `{matcher, hooks:[{command}]}` and Cursor's bare
+# `{type, command}`. The result goes through a temp file: a failing jq leaves
+# the config (or its absence) exactly as it was, and no `.tmp` behind.
 merge_into_config() {
-  local cfg="$1" payload="$2"
+  local cfg="$1" payload="$2" why
   mkdir -p "$(dirname "$cfg")"
   if [[ -f "$cfg" ]]; then
-    if ! jq . "$cfg" >/dev/null 2>&1; then
-      err "Existing $cfg is not valid JSON — refusing to merge."
+    if ! why="$(jq empty "$cfg" 2>&1)"; then
+      err "jq could not read $cfg — refusing to merge${why:+ ($why)}"
       return 1
     fi
-    jq --argjson p "$payload" --arg re "$_WIKI_HOOK_CMD_RE" '
+    if ! jq --argjson p "$payload" --arg re "$_WIKI_HOOK_CMD_RE" '
       def wiki_managed:
         ([.command? // empty] + [((.hooks // [])[]? | .command? // empty)])
         | any(test($re));
@@ -201,18 +204,33 @@ merge_into_config() {
               .[$e.key] = (((.[$e.key] // []) | map(select(wiki_managed | not))) + $e.value))
           )
         else . end
-    ' "$cfg" > "$cfg.tmp" && mv "$cfg.tmp" "$cfg"
-  else
-    echo "$payload" | jq . > "$cfg"
+    ' "$cfg" > "$cfg.tmp"; then
+      rm -f "$cfg.tmp"
+      return 1
+    fi
+  elif ! printf '%s\n' "$payload" | jq . > "$cfg.tmp"; then
+    rm -f "$cfg.tmp"
+    return 1
   fi
+  mv "$cfg.tmp" "$cfg"
 }
 
 install_one() {
   local agent="$1" scope="$2"
+  agent_field "$agent" config >/dev/null || { err "unknown agent: $agent"; return 1; }
   local cfg; cfg="$(agent_config_path "$agent" "$scope")"
-  local payload; payload="$(agent_payload "$agent")" || { err "unknown agent: $agent"; return 1; }
+  local payload
+  # A known agent whose payload fails means jq could not run (S02-T05: an asdf shim under
+  # a foreign HOME exits 126 without a word), not an "unknown agent".
+  if ! payload="$(agent_payload "$agent")"; then
+    err "$agent ($scope): could not build the hook payload — jq failed"
+    return 1
+  fi
   local bak=""
-  [[ -f "$cfg" ]] && bak="$(backup_file "$cfg")"
+  if [[ -f "$cfg" ]] && ! bak="$(backup_file "$cfg")"; then
+    err "$agent ($scope): could not back up $cfg — left as it was"
+    return 1
+  fi
   if merge_into_config "$cfg" "$payload"; then
     if [[ -n "$bak" ]]; then
       ok "$agent ($scope): updated $cfg ${C_DIM}(backup: $bak)${C_RESET}"
@@ -225,6 +243,11 @@ install_one() {
   fi
 }
 
+# Remove only the wiki's hook commands, by the one grammar, in both entry shapes: a
+# `{matcher, hooks: [...]}` group loses its wiki commands and goes when that emptied it;
+# a bare `{type, command}` entry (Cursor) goes when it is ours. An event the removal
+# emptied goes as well. Other tools' hooks and every other key stay as they were, and a
+# config with nothing of ours is not touched at all: no backup, no rewrite.
 uninstall_one() {
   local agent="$1" scope="$2"
   local cfg; cfg="$(agent_config_path "$agent" "$scope")"
@@ -232,26 +255,43 @@ uninstall_one() {
     warn "$agent ($scope): no config at $cfg — skipping"
     return 0
   fi
-  local bak; bak="$(backup_file "$cfg")"
-  jq '
-    if .hooks then
+  local why kept
+  if ! why="$(jq empty "$cfg" 2>&1)"; then
+    err "$agent ($scope): jq could not read $cfg — left as it was${why:+ ($why)}"
+    return 1
+  fi
+  if ! kept="$(jq --arg re "$_WIKI_HOOK_CMD_RE" '
+    def ours: (.command? // "") | test($re);
+    if (.hooks | type) == "object" then
       .hooks |= with_entries(
-        .value |= (
-          if type == "array" then
-            map(
-              if (.hooks | type) == "array"
-              then .hooks |= map(select((.command // "") | test("\\.wiki/hooks/") | not))
-              else .
-              end
-            )
-            | map(select((.hooks // []) | length > 0))
-          elif type == "object" then
-            if (.command // "" | test("\\.wiki/hooks/")) then empty else . end
-          else .
-          end
-        )
-      )
+        if (.value | type) == "array" then
+          (.value | length) as $n
+          | .value |= map(
+              if (.hooks | type) == "array" then
+                (.hooks | length) as $m
+                | .hooks |= map(select(ours | not))
+                | select((.hooks | length) > 0 or $m == 0)
+              else select(ours | not) end)
+          | select((.value | length) > 0 or $n == 0)
+        else . end)
     else . end
-  ' "$cfg" > "$cfg.tmp" && mv "$cfg.tmp" "$cfg"
+  ' "$cfg")"; then
+    err "$agent ($scope): jq could not filter $cfg — left as it was"
+    return 1
+  fi
+  if [[ "$(jq -S . <<< "$kept")" == "$(jq -S . "$cfg")" ]]; then
+    info "$agent ($scope): no wiki hooks in $cfg — nothing to remove"
+    return 0
+  fi
+  local bak
+  if ! bak="$(backup_file "$cfg")"; then
+    err "$agent ($scope): could not back up $cfg — left as it was"
+    return 1
+  fi
+  if ! { printf '%s\n' "$kept" > "$cfg.tmp" && mv "$cfg.tmp" "$cfg"; }; then
+    rm -f "$cfg.tmp"
+    err "$agent ($scope): could not write $cfg"
+    return 1
+  fi
   ok "$agent ($scope): removed wiki hooks ${C_DIM}(backup: $bak)${C_RESET}"
 }

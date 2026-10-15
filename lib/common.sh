@@ -108,11 +108,20 @@ require_cmd() {
   command -v "$cmd" >/dev/null 2>&1 || die "$cmd not found ($reason). Install it and retry."
 }
 
-# ── Backup helper (used by hooks + config writers) ───────────────────
+# ── Backup helper (lib/agents.sh's install + uninstall) ──────────────
+# <file>.bak.<YYYYmmdd-HHMMSS>, never over an earlier backup: an install and an uninstall
+# within one second took the same name, and the second copy replaced the first (the
+# pre-install original). A clash takes -2, -3, …. Prints the backup's path; a failed copy
+# returns 1, so a caller can stop before it writes.
 backup_file() {
   local f="$1"
   [[ -f "$f" ]] || return 0
-  local bak="${f}.bak.$(date +%Y%m%d-%H%M%S)"
-  cp "$f" "$bak"
+  local stamp; stamp="$(date +%Y%m%d-%H%M%S)"
+  local bak="${f}.bak.$stamp" n=1
+  while [[ -e "$bak" ]]; do
+    n=$((n + 1))
+    bak="${f}.bak.$stamp-$n"
+  done
+  cp "$f" "$bak" || return 1
   printf "%s" "$bak"
 }

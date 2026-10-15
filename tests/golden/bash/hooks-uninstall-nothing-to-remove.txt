@@ -1,0 +1,30 @@
+$ wiki hooks uninstall
+stdin: '\n1\ny\n'
+exit: 0
+--- stdout ---
+wiki hooks — uninstall
+Removes wiki-managed hook entries; preserves user's other hooks.
+
+AGENT      USER                   PROJECT                PROJECT CONFIG
+──────────────────────────────────────────────────────────────────────────────
+claude     detected                       installed                      <VAULT>/.claude/settings.json
+codex      —                            —                            <VAULT>/.codex/hooks.json
+gemini     —                            —                            <VAULT>/.gemini/settings.json
+cursor     —                            —                            <VAULT>/.cursor/hooks.json
+
+
+Remove wiki hooks from selected configs? [Y/n] 
+claude (user): no wiki hooks in <HOME>/.claude/settings.json — nothing to remove
+
+✓ Done.
+--- stderr ---
+  * 1) claude
+    2) codex
+    3) gemini
+    4) cursor
+Select agents to uninstall hooks from (space-separated numbers, Enter for defaults marked *):   * 1) user only (recommended)
+    2) project only
+    3) both
+Install scope [1]: 
+--- change ---
+(none)

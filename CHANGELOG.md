@@ -18,6 +18,33 @@ every operator's `wiki update` → `uv sync` regenerate `uv.lock` and dirty thei
 config keys must also be wired into `scripts/migrations/migrate_config_keys.py`
 in the same commit.
 
+## [0.7.16] — 2026-10-15
+
+**For your vault:** if you ran `wiki hooks uninstall` before, the wiki hooks are still in
+your agent configs (`wiki hooks status` shows them as installed). Run it again to remove
+them.
+
+### Fixed
+
+- **`wiki hooks uninstall` removed nothing.** It looked for `.wiki/hooks/` in the hook
+  commands, a form no recent install writes. Today's `cd '<vault>/.wiki' && uv run python
+  hooks/…` stayed in place, and still it made a backup and reported `✓ removed wiki hooks`.
+  It now removes exactly the wiki's entries:
+  - another tool's hooks stay, including Cursor's, which it would have dropped along with
+    the wiki's;
+  - an event left empty goes;
+  - a config without wiki hooks is not touched (no backup either);
+  - a config jq cannot read is reported and left as it was.
+- **`wiki hooks install` said Done when it had installed nothing.** When `jq` could not run
+  (an asdf shim under another HOME exits 126 without a word), every agent failed as an
+  "unknown agent", and the command still ended `✓ Done` with exit 0. Now it names the
+  failure (`could not build the hook payload — jq failed`), ends with
+  `✗ 1 of 1 hook installs failed`, and exits 1. So does `wiki setup`, whose hooks step it
+  is. Uninstall counts its failures the same way.
+- **A second backup in the same second replaced the first.** Hook-config backups are named
+  to the second, so an install and an uninstall within one second overwrote the pre-install
+  original. A clash now gets a `-2` suffix, and a backup that cannot be made stops the write.
+
 ## [0.7.15] — 2026-10-15
 
 **For your vault:** if its path contains an apostrophe (`Alex's Vault`), run

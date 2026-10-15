@@ -92,12 +92,18 @@ hooks_cmd_install() {
   if ! confirm "Proceed?" y; then warn "Aborted."; return 0; fi
 
   echo
+  local failed=0 total=0
   for a in "${agents[@]}"; do
     for s in $scopes; do
-      install_one "$a" "$s" || true
+      total=$((total + 1))
+      install_one "$a" "$s" || failed=$((failed + 1))
     done
   done
   echo
+  if [[ $failed -gt 0 ]]; then
+    err "$failed of $total hook installs failed — see above."
+    return 1
+  fi
   ok "Done. Restart agent CLIs to pick up the new hooks."
 }
 
@@ -123,12 +129,18 @@ hooks_cmd_uninstall() {
   if ! confirm "Remove wiki hooks from selected configs?" y; then warn "Aborted."; return 0; fi
 
   echo
+  local failed=0 total=0
   for a in "${agents[@]}"; do
     for s in $scopes; do
-      uninstall_one "$a" "$s" || true
+      total=$((total + 1))
+      uninstall_one "$a" "$s" || failed=$((failed + 1))
     done
   done
   echo
+  if [[ $failed -gt 0 ]]; then
+    err "$failed of $total hook removals failed — see above."
+    return 1
+  fi
   ok "Done."
 }
 

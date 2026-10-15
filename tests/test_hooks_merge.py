@@ -148,3 +148,117 @@ def test_merge_is_idempotent(tmp_path: Path):
     twice = _merge(cfg, "codex")
     assert once == twice
     assert len(twice["hooks"]["Stop"]) == 2
+
+
+# ── backup_file ──────────────────────────────────────────────────────
+
+
+def test_a_backup_never_replaces_one_from_the_same_second(tmp_path: Path):
+    """Backups are named to the second. An install and an uninstall within one second took
+    the same name, and the second copy replaced the first: the pre-install original."""
+    frozen = tmp_path / "bin"
+    frozen.mkdir()
+    (frozen / "date").write_text("#!/bin/sh\necho 20261015-120000\n", encoding="utf-8")
+    (frozen / "date").chmod(0o755)
+    cfg = tmp_path / "settings.json"
+    run = subprocess.run(
+        [
+            "bash",
+            "-c",
+            f"WIKI_DIR='{VAULT}/.wiki' ROOT_DIR='{VAULT}'; source '{ENGINE}/lib/common.sh'; "
+            'echo original > "$CFG"; backup_file "$CFG"; echo; '
+            'echo installed > "$CFG"; backup_file "$CFG"',
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+        env={"CFG": str(cfg), "HOME": "/h", "PATH": f"{frozen}:/usr/bin:/bin"},
+    )
+    first, second = run.stdout.splitlines()
+    assert first == f"{cfg}.bak.20261015-120000"
+    assert second == f"{cfg}.bak.20261015-120000-2"
+    assert Path(first).read_text() == "original\n"
+    assert Path(second).read_text() == "installed\n"
+
+
+# ── uninstall_one ────────────────────────────────────────────────────
+
+
+def _uninstall(home: Path, agent: str, scope: str = "user") -> subprocess.CompletedProcess[str]:
+    """`uninstall_one` with HOME (user scope) at ``home`` and the vault (project scope) at
+    ``home/vault``."""
+    return subprocess.run(
+        [
+            "bash",
+            "-c",
+            f"WIKI_DIR='{VAULT}/.wiki' ROOT_DIR=\"$HOME/vault\"; "
+            f"source '{ENGINE}/lib/common.sh'; source '{ENGINE}/lib/agents.sh'; "
+            f"uninstall_one {agent} {scope}",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+        env={"HOME": str(home), "PATH": "/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin"},
+    )
+
+
+def test_uninstall_removes_todays_hooks_and_keeps_another_tools(tmp_path: Path):
+    """The uninstall filtered on `.wiki/hooks/`, a drifted copy of the grammar: today's
+    `cd '<vault>/.wiki' && uv run python hooks/…` stayed, and it reported success."""
+    cfg = tmp_path / ".claude" / "settings.json"
+    cfg.parent.mkdir()
+    other = {"matcher": "", "hooks": [{"type": "command", "command": "ytstack-inject"}]}
+    before = {"permissions": {"allow": ["Bash(ls:*)"]}, "hooks": {"SessionStart": [other]}}
+    cfg.write_text(json.dumps(before))
+    _merge(cfg, "claude")  # the wiki's three events, beside the other tool's hook
+
+    run = _uninstall(tmp_path, "claude")
+
+    assert run.returncode == 0, run.stderr
+    assert json.loads(cfg.read_text()) == before
+    assert "removed wiki hooks" in run.stdout
+
+
+def test_uninstall_keeps_another_tools_bare_cursor_entry(tmp_path: Path):
+    """Cursor's entries are bare `{type, command}`. The filter kept only entries carrying a
+    `.hooks` array, so it dropped the operator's own Cursor hooks along with the wiki's."""
+    cfg = tmp_path / "vault" / ".cursor" / "hooks.json"
+    cfg.parent.mkdir(parents=True)
+    mine = {"type": "command", "command": "my-own-hook", "timeout": 5}
+    before = {"version": 1, "hooks": {"sessionStart": [mine]}}
+    cfg.write_text(json.dumps(before))
+    _merge(cfg, "cursor")
+
+    run = _uninstall(tmp_path, "cursor", "project")
+
+    assert run.returncode == 0, run.stderr
+    assert json.loads(cfg.read_text()) == before
+
+
+def test_uninstall_with_nothing_of_ours_leaves_the_file_alone(tmp_path: Path):
+    cfg = tmp_path / ".claude" / "settings.json"
+    cfg.parent.mkdir()
+    text = json.dumps({"hooks": {"SessionStart": [{"hooks": [{"command": "other"}]}]}})
+    cfg.write_text(text)
+
+    run = _uninstall(tmp_path, "claude")
+
+    assert run.returncode == 0, run.stderr
+    assert cfg.read_text() == text
+    assert [p.name for p in cfg.parent.iterdir()] == ["settings.json"]  # no backup either
+    assert "nothing to remove" in run.stdout
+
+
+def test_uninstall_leaves_an_unreadable_config_as_it_was(tmp_path: Path):
+    """jq failing on the file left a stray `.tmp` and still printed `removed wiki hooks`."""
+    cfg = tmp_path / ".claude" / "settings.json"
+    cfg.parent.mkdir()
+    cfg.write_text("{ not json")
+
+    run = _uninstall(tmp_path, "claude")
+
+    assert run.returncode == 1
+    assert cfg.read_text() == "{ not json"
+    assert [p.name for p in cfg.parent.iterdir()] == ["settings.json"]  # no .tmp, no backup
+    assert "could not read" in run.stderr
+    assert "removed" not in run.stdout
