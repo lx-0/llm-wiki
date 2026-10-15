@@ -257,6 +257,27 @@ def _engine_not_a_checkout(env: dict[str, Path]) -> None:
     shutil.rmtree(env["vault"] / ".wiki" / ".git")
 
 
+def _shortcut_path(env: dict[str, Path]) -> Path:
+    link = env["home"] / ".local" / "bin" / "wiki"
+    link.parent.mkdir(parents=True, exist_ok=True)
+    return link
+
+
+def _shortcut_installed(env: dict[str, Path]) -> None:
+    _wiki(env, "install-shortcut")
+
+
+def _shortcut_to_another_vault(env: dict[str, Path]) -> None:
+    _shortcut_path(env).symlink_to(env["root"] / "other-vault" / ".wiki" / "wiki")
+
+
+def _regular_file_at_shortcut(env: dict[str, Path]) -> None:
+    """Another program called `wiki` where the shortcut goes."""
+    link = _shortcut_path(env)
+    link.write_text("#!/bin/sh\necho another tool\n", encoding="utf-8")
+    link.chmod(0o755)
+
+
 Prepare = Callable[[dict[str, Path]], None] | None
 
 # name → (argv, scripted stdin, preparation)
@@ -291,6 +312,14 @@ MUTATING: dict[str, tuple[tuple[str, ...], str | None, Prepare]] = {
     ),
     "install-shortcut": (("install-shortcut",), None, None),
     "install-shortcut-print-only": (("install-shortcut", "--print-only"), None, None),
+    # before S02-T04: a second run, a link to another vault, and a regular file in the way
+    "install-shortcut-already-linked": (("install-shortcut",), None, _shortcut_installed),
+    "install-shortcut-replaces-other-vault": (
+        ("install-shortcut",),
+        None,
+        _shortcut_to_another_vault,
+    ),
+    "install-shortcut-regular-file": (("install-shortcut",), None, _regular_file_at_shortcut),
     "version-not-a-checkout": (("version",), None, _engine_not_a_checkout),
     # `wiki config` before S02-T02: a value that does not coerce writes nothing; bare
     # `wiki config` is the interactive editor — exit at once (8), or models (1) →
