@@ -48,6 +48,7 @@ from cli_help import (
     H_REINDEX,
     H_REVIEW_WIKI,
     H_SETUP,
+    H_SKILLS,
     H_STATS,
     H_STATUS,
     H_STUDY,
@@ -191,7 +192,13 @@ COMMANDS: tuple[CommandSpec, ...] = (
         help_text=H_HOOKS,
     ),
     CommandSpec(
-        "skills", "Setup", "wire engine skills into .claude/skills/", kind="bash", menu=True
+        "skills",
+        "Setup",
+        "wire engine skills into .claude/skills/",
+        handler="skills_cli.py",
+        banner=False,  # the handler prints its own (sync prints none: `wiki update` runs it)
+        menu=True,
+        help_text=H_SKILLS,
     ),
     CommandSpec(
         "install-shortcut",

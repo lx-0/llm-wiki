@@ -795,6 +795,36 @@ NOT SUPPORTED
   pi         TypeScript-only hooks (~/.omp/agent/hooks/{pre,post}/*.ts)
   opencode   no native hooks yet (sst/opencode#5409)"""
 
+# `wiki skills` — moved from the bash `help_skills` with the port (M034-S03-T06); the bash
+# oracle's `skills-help` golden holds it. Static now, like every help here: it names
+# `<vault>` where the bash printed this vault's path.
+H_SKILLS = """wiki skills — wire engine skills into Claude Code
+
+USAGE
+  wiki skills install               symlink missing engine skills into .claude/skills/
+  wiki skills install --global      also link global skills into ~/.claude/skills/
+  wiki skills install --no-global   vault-local only (turns the global opt-in off)
+  wiki skills uninstall             remove engine-owned symlinks (foreign entries kept)
+  wiki skills uninstall --global    also remove this vault's global links + deregister
+  wiki skills sync                  install missing + prune stale (run after wiki update)
+  wiki skills status                per-skill linked / collision / missing table
+
+NOTES
+  Source: <vault>/.wiki/skills/
+  Target: <vault>/.claude/skills/
+  Only symlinks pointing at ../../.wiki/skills/<name> are managed.
+  Foreign entries (your own skills, other tools) are never modified.
+
+GLOBAL INSTALL
+  Most skills operate inside a vault and stay vault-local. A few (currently:
+  use-llm-wiki) let an agent in *any* project discover and use this wiki —
+  those can also be linked into ~/.claude/skills/.
+  The opt-in is the skills.global_install config key; the --global /
+  --no-global flags are one-shot shortcuts that write it (so it persists —
+  `wiki update` keeps an opted-in vault globally linked). The vault root is
+  recorded in ${XDG_CONFIG_HOME:-$HOME/.config}/llm-wiki/vaults for the skill's
+  discovery probe. Equivalent: wiki config set skills.global_install true."""
+
 # `wiki status` — new with the port (M034-S03-T05): the bash `cmd_status` had no help.
 H_STATUS = """wiki status — config + hooks + Ollama summary
 

@@ -32,8 +32,8 @@ llm-wiki/                    ← installed as <vault>/.wiki/ — the file-by-fil
 ├── wiki                     ← entry-point CLI (bash: bootstrap + fail-closed vault guard + the commands
 │                              not yet ported; everything else, bare `wiki` included, goes to scripts/cli.py)
 ├── lib/                     ← the bash layer, shrinking as M034 ports it: common.sh (paths, the venv-location rule),
-│                              ui.sh (the prompt for update), skills.sh, config.sh (config_get / config_set for
-│                              skills), seed.sh; agents.sh + hooks.sh are retired (deleted at the end of M034-S03)
+│                              ui.sh (the prompt for update), seed.sh; agents.sh, hooks.sh, skills.sh and config.sh
+│                              are retired (no longer sourced; deleted at the end of M034-S03)
 ├── scripts/                 ← the engine's source root — NOT a package (§ Python environment)
 │   ├── cli.py               ← table-driven `wiki` dispatcher — the CommandSpec table (cli_catalog.py, help texts in cli_help.py) is the single source of truth
 │   ├── core/                ← shared plumbing, imported never invoked: paths, config + config_schema, prompts,

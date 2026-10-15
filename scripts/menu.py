@@ -307,7 +307,7 @@ CATEGORIES: dict[str, tuple[str, list[tuple[str, str, str, object]]]] = {
         [
             ("status", "status", "config + hooks + ollama", ["status"]),
             ("wizard", "run setup wizard", "6 questions + hooks", ["setup"]),
-            ("config", "edit config interactively", "lib/config.sh", ["config"]),
+            ("config", "edit config interactively", "section → key → value", ["config"]),
             ("hooks-status", "hooks install table", "per agent + scope", ["hooks", "status"]),
             ("hooks-install", "install hooks", "interactive picker", ["hooks", "install"]),
             ("skills-status", "skills install table", "per skill + global", ["skills", "status"]),

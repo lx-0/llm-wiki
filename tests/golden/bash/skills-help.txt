@@ -13,8 +13,8 @@ USAGE
   wiki skills status                per-skill linked / collision / missing table
 
 NOTES
-  Source: <VAULT>/.wiki/skills/
-  Target: <VAULT>/.claude/skills/
+  Source: <vault>/.wiki/skills/
+  Target: <vault>/.claude/skills/
   Only symlinks pointing at ../../.wiki/skills/<name> are managed.
   Foreign entries (your own skills, other tools) are never modified.
 
@@ -25,6 +25,6 @@ GLOBAL INSTALL
   The opt-in is the skills.global_install config key; the --global /
   --no-global flags are one-shot shortcuts that write it (so it persists —
   `wiki update` keeps an opted-in vault globally linked). The vault root is
-  recorded in $HOME/.config/llm-wiki/vaults for the skill's
+  recorded in ${XDG_CONFIG_HOME:-$HOME/.config}/llm-wiki/vaults for the skill's
   discovery probe. Equivalent: wiki config set skills.global_install true.
 --- stderr ---

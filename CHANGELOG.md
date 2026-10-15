@@ -18,10 +18,34 @@ every operator's `wiki update` → `uv sync` regenerate `uv.lock` and dirty thei
 config keys must also be wired into `scripts/migrations/migrate_config_keys.py`
 in the same commit.
 
+## [0.7.19] — 2026-10-16
+
+**For your vault:** nothing to do.
+
+### Changed
+
+- **`wiki skills` runs in Python.** Install, uninstall, sync, status and the global opt-in
+  print and link exactly as before, and `wiki update`'s skills step runs it.
+- **A vault reached through a symlink is now recognised as itself** (`~/vault` →
+  `/Volumes/data/vault`). The bash compared the paths as text: `wiki skills status` called
+  this vault's own global link another vault's, `uninstall --global` left that link
+  behind, and the registry could list the vault twice. The paths are now compared
+  resolved.
+- `wiki skills --help` names `<vault>` where it printed this vault's path; help texts are
+  static now.
+
+### Fixed
+
+- The home menu's `config` entry showed `lib/config.sh` as its hint, a file the command no
+  longer uses. It now reads `section → key → value`.
+
 ## [0.7.18] — 2026-10-16
 
 **For your vault:** nothing to do. A reinstall writes your agents' hook commands byte for
-byte as before.
+byte as before, with one exception: a vault reached through a symlink. There the commands
+now name the vault's real path instead of the symlinked one, since Python resolves paths
+and the bash did not. That happens once, on the next install, and the hooks work either
+way.
 
 ### Changed
 

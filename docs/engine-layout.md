@@ -29,9 +29,9 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 │   ├── ui.sh                  ← interactive prompts: confirm for update (select_one / select_many go with hooks.sh)
 │   ├── agents.sh              ← retired: no longer sourced since `wiki hooks` is Python; deleted at the end of M034-S03
 │   ├── hooks.sh               ← retired with agents.sh
-│   ├── skills.sh              ← `wiki skills {install,uninstall,sync,status}` + the silent install / prune for setup + update
+│   ├── skills.sh              ← retired: no longer sourced since `wiki skills` is Python; deleted with agents.sh
 │   ├── seed.sh                ← `wiki seed`: template seeding with the overlay and the plugin / env / meta-bind / dashboard merges
-│   └── config.sh              ← config_get / config_set for skills.sh (the config commands are Python)
+│   └── config.sh              ← retired with skills.sh, its last caller
 ├── scripts/
 │   ├── core/                  ← shared engine plumbing (imported, never invoked)
 │   │   ├── paths.py               ← eager path constants from __file__ — zero deps, no side effects
@@ -180,6 +180,7 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 │   ├── setup_cli.py           ← `wiki setup` — the wizard, then the hooks step (`hooks_cli.install`, in-process on the same stdin)
 │   ├── hooks_cli.py           ← `wiki hooks install/uninstall/status` — the agent × scope flows over core/agents, a backup before every write, the status table
 │   ├── status_cli.py          ← `wiki status` — `wiki config status` over the hooks table
+│   ├── skills_cli.py          ← `wiki skills install/uninstall/sync/status` — engine-skill links in .claude/skills/, the global opt-in, the vault registry
 │   ├── shortcut_cli.py        ← `wiki install-shortcut` — the `~/.local/bin/wiki` symlink (refuses a non-symlink in the way), the PATH probe
 │   ├── engine_version.py      ← `wiki version` — the engine checkout's revision, tag, origin (no vault needed)
 │   ├── dream.py               ← dream cycle — periodic cross-time re-synthesis of entity pages (`wiki dream` / `wiki dream-entity`): one entity's synthesis, the sweep, the CLI

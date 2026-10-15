@@ -39,10 +39,6 @@ export WIKI_DIR ROOT_DIR
 source "$WIKI_DIR/lib/common.sh"
 # shellcheck source=lib/ui.sh
 source "$WIKI_DIR/lib/ui.sh"
-# shellcheck source=lib/skills.sh
-source "$WIKI_DIR/lib/skills.sh"
-# shellcheck source=lib/config.sh
-source "$WIKI_DIR/lib/config.sh"
 # shellcheck source=lib/seed.sh
 source "$WIKI_DIR/lib/seed.sh"
 
@@ -65,74 +61,8 @@ require_vault() {
 }
 
 # ── Subcommand dispatchers ───────────────────────────────────────────
-# `wiki status` and `wiki hooks` are Python since M034-S03-T05 (status_cli.py, hooks_cli.py).
-
-help_skills() {
-  cat <<EOF
-${C_BOLD}wiki skills${C_RESET} — wire engine skills into Claude Code
-
-${C_BOLD}USAGE${C_RESET}
-  wiki skills install               symlink missing engine skills into .claude/skills/
-  wiki skills install --global      also link global skills into ~/.claude/skills/
-  wiki skills install --no-global   vault-local only (turns the global opt-in off)
-  wiki skills uninstall             remove engine-owned symlinks (foreign entries kept)
-  wiki skills uninstall --global    also remove this vault's global links + deregister
-  wiki skills sync                  install missing + prune stale (run after wiki update)
-  wiki skills status                per-skill linked / collision / missing table
-
-${C_BOLD}NOTES${C_RESET}
-  Source: $WIKI_DIR/skills/
-  Target: $ROOT_DIR/.claude/skills/
-  Only symlinks pointing at ../../.wiki/skills/<name> are managed.
-  Foreign entries (your own skills, other tools) are never modified.
-
-${C_BOLD}GLOBAL INSTALL${C_RESET}
-  Most skills operate inside a vault and stay vault-local. A few (currently:
-  use-llm-wiki) let an agent in *any* project discover and use this wiki —
-  those can also be linked into ~/.claude/skills/.
-  The opt-in is the ${C_BOLD}skills.global_install${C_RESET} config key; the --global /
-  --no-global flags are one-shot shortcuts that write it (so it persists —
-  \`wiki update\` keeps an opted-in vault globally linked). The vault root is
-  recorded in ${XDG_CONFIG_HOME:-\$HOME/.config}/llm-wiki/vaults for the skill's
-  discovery probe. Equivalent: wiki config set skills.global_install true.
-EOF
-}
-
-cmd_skills() {
-  # --global / --no-global may appear anywhere; strip them, keep the rest.
-  local global_flag="" a
-  local -a rest=()
-  for a in "$@"; do
-    case "$a" in
-      --global)    global_flag=1 ;;
-      --no-global) global_flag=0 ;;
-      *)           rest+=("$a") ;;
-    esac
-  done
-  case "${rest[0]:-}" in
-    install|"")
-      [[ "$global_flag" == "1" ]] && config_set skills.global_install true  >/dev/null
-      [[ "$global_flag" == "0" ]] && config_set skills.global_install false >/dev/null
-      skills_cmd_install ;;
-    uninstall)
-      skills_cmd_uninstall
-      if [[ "$global_flag" == "1" ]]; then
-        config_set skills.global_install false >/dev/null
-        skills_uninstall_global
-        echo
-        if (( _skills_global_removed > 0 )); then
-          ok "removed $_skills_global_removed global symlink(s) from $GLOBAL_SKILLS_DST"
-        else
-          info "no global symlinks for this vault"
-        fi
-        info "vault deregistered from $REGISTRY_FILE; skills.global_install set false"
-      fi ;;
-    sync)                     skills_cmd_sync ;;
-    status)                   skills_cmd_status ;;
-    -h|--help|help)           help_skills ;;
-    *)                        err "unknown: wiki skills ${rest[0]}"; help_skills; exit 1 ;;
-  esac
-}
+# `wiki status`, `wiki hooks` (M034-S03-T05) and `wiki skills` (M034-S03-T06) are Python:
+# status_cli.py, hooks_cli.py, skills_cli.py.
 
 
 _dispatch_python() {
@@ -448,8 +378,10 @@ _update_post_pull() {
     warn "Operations-log migration reported errors — inspect $ROOT_DIR/knowledge/log.md manually."
   fi
 
+  # `wiki skills` is Python (M034-S03-T06): through the entry, the pulled engine's own.
+  # The update is done by now, so a failed sync is a warning, not update's exit code.
   if (( sync_skills == 1 )); then
-    skills_cmd_sync
+    "$WIKI_DIR/wiki" skills sync || warn "skills sync failed — rerun: wiki skills sync"
   else
     info "skills: skipped (--no-skills)"
   fi
@@ -472,7 +404,6 @@ esac
 # on input. An unknown command falls through to cli.py, which prints its own
 # "unknown command" error.
 case "${1:-}" in
-  skills)           shift; cmd_skills "$@" ;;
   update)           shift; cmd_update "$@" ;;
   seed)             shift; cmd_seed "$@" ;;
   # Everything else is a Python-backed subcommand owned by the cli.py table
