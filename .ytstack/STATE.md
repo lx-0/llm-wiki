@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-15T19:15:00+02:00
+last_updated: 2026-10-15T19:18:00+02:00
 current_milestone: M034
 active_slice: S01
-active_task: none
+active_task: T04
 last_completed_milestone: M033
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -16,9 +16,9 @@ parallel_milestones: [M021, M025, M027, M029]
 
 **Status:** M034 / S01 — 3 of 6 tasks done (T01–T02 the bash oracle, T03 the one-hop and
 rename decisions). Engine 0.7.4, suite 2316, CI green.
-**Next:** `ytstack:plan-task` → S01-T04, the bootstrap hop: exec the venv's python into
-`cli.py`, `uv run` only without a venv or with a newer `uv.lock`; prove it with the tree after,
-a no-`uv` test and the oracle unchanged.
+**Next:** S01-T04 is planned (`M034-S01-T04-PLAN.md`), ready to execute: the bootstrap hop
+(exec the venv's python into `cli.py`; `uv sync` first only without a venv or with a newer
+`uv.lock`), with four Python-dispatched oracle cases recorded from today's bash first.
 
 **M034 / S01-T03** (`7b63c7c`, `89503ec`): DECISIONS 2026-10-15 "One hop" + "The `llm_wiki`
 package rename is dropped".
