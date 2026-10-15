@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-15T23:55:00+02:00
+last_updated: 2026-10-16T00:05:00+02:00
 current_milestone: M034
 active_slice: S03
-active_task: none
+active_task: T05
 last_completed_milestone: M033
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -14,8 +14,8 @@ parallel_milestones: [M021, M025, M027, M029]
 
 ## Next action — M034 / S03: hooks + skills + status
 
-**Status:** M034 / S03 — 4/7 tasks done in the slice. Next task: T05, the port
-(`/ytstack:plan-task`). Slices S01 and S02 are complete (2/6).
+**Status:** M034 / S03 / T05 planned — ready to execute (`M034-S03-T05-PLAN.md`; oracle
+cases first). 4/7 tasks done in the slice; slices S01 and S02 are complete (2/6).
 
 **S03-T04 is done** (`M034-S03-T04-SUMMARY.md`). `core/agents.py` holds `merge` and
 `without_wiki_hooks`; rendered, they give the bash's file text byte for byte (26 parity

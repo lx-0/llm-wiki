@@ -1,0 +1,14 @@
+$ wiki hooks status
+exit: 0
+--- stdout ---
+wiki hooks — status
+
+AGENT      USER                   PROJECT                PROJECT CONFIG
+──────────────────────────────────────────────────────────────────────────────
+claude     installed                      —                            <VAULT>/.claude/settings.json
+codex      —                            —                            <VAULT>/.codex/hooks.json
+gemini     —                            —                            <VAULT>/.gemini/settings.json
+cursor     —                            —                            <VAULT>/.cursor/hooks.json
+--- stderr ---
+--- change ---
+(none)

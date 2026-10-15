@@ -1,0 +1,29 @@
+$ wiki hooks uninstall
+stdin: '1\n1\ny\n'
+exit: 1
+--- stdout ---
+wiki hooks — uninstall
+Removes wiki-managed hook entries; preserves user's other hooks.
+
+AGENT      USER                   PROJECT                PROJECT CONFIG
+──────────────────────────────────────────────────────────────────────────────
+claude     installed                      —                            <VAULT>/.claude/settings.json
+codex      —                            —                            <VAULT>/.codex/hooks.json
+gemini     —                            —                            <VAULT>/.gemini/settings.json
+cursor     —                            —                            <VAULT>/.cursor/hooks.json
+
+
+Remove wiki hooks from selected configs? [Y/n] 
+
+--- stderr ---
+  * 1) claude
+    2) codex
+    3) gemini
+    4) cursor
+Select agents to uninstall hooks from (space-separated numbers, Enter for defaults marked *):   * 1) user only (recommended)
+    2) project only
+    3) both
+Install scope [1]: ✗ claude (user): jq could not read <HOME>/.claude/settings.json — left as it was (jq: parse error: Unfinished JSON term at EOF at line 2, column 0)
+✗ 1 of 1 hook removals failed — see above.
+--- change ---
+(none)

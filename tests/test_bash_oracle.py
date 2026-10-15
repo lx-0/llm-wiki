@@ -265,6 +265,36 @@ def _claude_hooks_at_project_scope_only(env: dict[str, Path]) -> None:
     _wiki(env, "hooks", "install", stdin="1\n2\ny\n")
 
 
+def _unreadable_user_settings(env: dict[str, Path]) -> None:
+    """The user's Claude settings, half written by another program: not JSON."""
+    settings = env["home"] / ".claude" / "settings.json"
+    settings.parent.mkdir(parents=True)
+    settings.write_text('{"permissions": {"allow": [\n', encoding="utf-8")
+
+
+def _truncated_user_settings_with_a_wiki_hook(env: dict[str, Path]) -> None:
+    """The user's Claude settings cut off mid-write, after a wiki hook command: the text
+    names the hook, the file is not JSON."""
+    settings = env["home"] / ".claude" / "settings.json"
+    settings.parent.mkdir(parents=True)
+    command = f"cd '{env['vault']}/.wiki' && uv run python hooks/session-end.py"
+    settings.write_text(
+        '{"hooks": {"SessionEnd": [{"hooks": [{"command": ' + json.dumps(command) + "}\n",
+        encoding="utf-8",
+    )
+
+
+def _a_permission_names_a_wiki_hook(env: dict[str, Path]) -> None:
+    """A permission rule that names the wiki's hook command, and no hooks at all."""
+    settings = env["home"] / ".claude" / "settings.json"
+    settings.parent.mkdir(parents=True)
+    command = f"cd '{env['vault']}/.wiki' && uv run python hooks/session-start.py"
+    settings.write_text(
+        json.dumps({"permissions": {"allow": [f"Bash({command})"]}}, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+
 def _foreign_user_settings(env: dict[str, Path]) -> None:
     """Another tool's hook and a permission in the user's Claude settings, which the
     merge must keep."""
@@ -347,6 +377,24 @@ MUTATING: dict[str, tuple[tuple[str, ...], str | None, Prepare]] = {
         _claude_hooks_at_project_scope_only,
     ),
     "hooks-install-payload-fails": (("hooks", "install"), "1\n1\ny\n", _failing_jq),
+    # S03-T05's oracle-first record of three cases its port changes on purpose (the
+    # re-record states the difference): a config that is not JSON, on install and on
+    # uninstall, and a status whose only wiki command is a permission rule's text
+    "hooks-install-unreadable-config": (
+        ("hooks", "install"),
+        "1\n1\ny\n",
+        _unreadable_user_settings,
+    ),
+    "hooks-uninstall-unreadable-config": (
+        ("hooks", "uninstall"),
+        "1\n1\ny\n",
+        _truncated_user_settings_with_a_wiki_hook,
+    ),
+    "hooks-status-command-outside-hooks": (
+        ("hooks", "status"),
+        None,
+        _a_permission_names_a_wiki_hook,
+    ),
     "skills-install": (("skills", "install"), None, None),
     "skills-sync": (("skills", "sync"), None, None),
     "skills-install-global": (("skills", "install", "--global"), None, None),
