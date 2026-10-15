@@ -35,7 +35,7 @@ def piggy_config(monkeypatch):
     from core.config import CONFIG
 
     monkeypatch.setattr(
-        health,
+        health.pipeline,
         "_piggyback_tasks",
         lambda: [
             {"name": "gmeet", "cooldown_hours": 6},
@@ -55,7 +55,7 @@ def test_state_key_matches_scheduler_not_config_key(tmp_path, monkeypatch):
     from core.config import CONFIG
 
     monkeypatch.setattr(
-        health,
+        health.pipeline,
         "_piggyback_tasks",
         lambda: [
             {"name": "review-wiki", "cooldown_hours": 168},
@@ -84,7 +84,7 @@ def test_short_cadence_not_stale_within_min_hours(tmp_path, monkeypatch):
     from core.config import CONFIG
 
     monkeypatch.setattr(
-        health,
+        health.pipeline,
         "_piggyback_tasks",
         lambda: [
             {"name": "voice", "cooldown_hours": 1},
@@ -219,7 +219,7 @@ def test_idle_pipeline_collapses_into_one_warning(tmp_path, monkeypatch):
     from core.config import CONFIG
 
     monkeypatch.setattr(
-        health,
+        health.pipeline,
         "_piggyback_tasks",
         lambda: [{"name": n, "cooldown_hours": 6} for n in ("calendar", "gmeet", "jamie", "voice")],
     )
@@ -244,7 +244,7 @@ def test_one_task_dark_while_the_pipeline_runs_still_warns_individually(tmp_path
     from core.config import CONFIG
 
     monkeypatch.setattr(
-        health,
+        health.pipeline,
         "_piggyback_tasks",
         lambda: [{"name": n, "cooldown_hours": 6} for n in ("calendar", "gmeet", "jamie")],
     )

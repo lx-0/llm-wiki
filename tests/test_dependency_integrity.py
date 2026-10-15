@@ -21,7 +21,7 @@ from core import health
 def test_declared_dependencies_all_resolve_to_an_import_name():
     """Every distribution in pyproject.toml maps to something importable —
     guards the exceptions table against drifting when a dep is added."""
-    names = health._declared_import_names()
+    names = health.engine._declared_import_names()
     assert names, "no dependencies parsed from pyproject.toml"
     # Spot-check the mappings that are NOT identity, i.e. the ones a future
     # dependency bump can silently break.
@@ -36,7 +36,7 @@ def test_declared_dependencies_all_resolve_to_an_import_name():
 
 
 def test_healthy_environment_reports_ok(monkeypatch):
-    monkeypatch.setattr(health, "_failed_imports", lambda names: [])
+    monkeypatch.setattr(health.engine, "_failed_imports", lambda names: [])
     r = health.check_dependencies_importable()
     assert r.severity == "ok"
 
@@ -45,7 +45,7 @@ def test_broken_package_is_critical_and_names_it(monkeypatch):
     """A partially materialized package is not a warning — the engine cannot
     run at all, so it must outrank everything else in the banner."""
     monkeypatch.setattr(
-        health,
+        health.engine,
         "_failed_imports",
         lambda names: [("httpx", "ModuleNotFoundError: No module named 'httpx._transports'")],
     )
@@ -57,7 +57,7 @@ def test_broken_package_is_critical_and_names_it(monkeypatch):
 
 def test_several_failures_are_summarised_not_dumped(monkeypatch):
     monkeypatch.setattr(
-        health,
+        health.engine,
         "_failed_imports",
         lambda names: [(f"pkg{i}", "ModuleNotFoundError: boom") for i in range(9)],
     )
@@ -72,7 +72,7 @@ def test_quick_mode_skips(monkeypatch):
     def _boom(_names):
         raise AssertionError("must not spawn a subprocess in --quick mode")
 
-    monkeypatch.setattr(health, "_failed_imports", _boom)
+    monkeypatch.setattr(health.engine, "_failed_imports", _boom)
     r = health.check_dependencies_importable(quick=True)
     assert r.severity == "info"
 
@@ -84,7 +84,7 @@ def test_probe_survives_an_unreadable_pyproject(monkeypatch):
     def _boom():
         raise OSError("pyproject gone")
 
-    monkeypatch.setattr(health, "_declared_import_names", _boom)
+    monkeypatch.setattr(health.engine, "_declared_import_names", _boom)
     r = health.check_dependencies_importable()
     assert r.severity in ("warning", "info")
 
@@ -99,11 +99,11 @@ def test_probe_actually_catches_a_broken_import():
 
 
 def _failed_imports_for(names):
-    return health._failed_imports(names)
+    return health.engine._failed_imports(names)
 
 
 def test_real_environment_imports_cleanly():
     """Integration: the dev checkout's own venv must pass its own check. This
     is the assertion that would have gone red on the operator's vault."""
-    failures = health._failed_imports(health._declared_import_names())
+    failures = health.engine._failed_imports(health.engine._declared_import_names())
     assert failures == [], f"broken packages in this environment: {failures}"

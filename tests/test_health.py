@@ -1,4 +1,4 @@
-"""Tests for scripts/core/health.py — per-check behavior + orchestration.
+"""Tests for scripts/core/health/ — per-check behavior + orchestration.
 
 Each check is exercised against a monkeypatched fixture vault. The TCP
 probe (ollama) is skipped via --quick because real network state is
@@ -19,6 +19,8 @@ import pytest
 
 from core import health
 
+from ._health_paths import patch_health_path
+
 
 @pytest.fixture
 def fake_vault(tmp_path, monkeypatch):
@@ -27,11 +29,11 @@ def fake_vault(tmp_path, monkeypatch):
     state_dir = tmp_path / ".wiki" / "state"
     for d in (knowledge, logs, state_dir):
         d.mkdir(parents=True, exist_ok=True)
-    monkeypatch.setattr(health, "ROOT_DIR", tmp_path)
-    monkeypatch.setattr(health, "KNOWLEDGE_DIR", knowledge)
-    monkeypatch.setattr(health, "LOGS_DIR", logs)
-    monkeypatch.setattr(health, "STATE_FILE", state_dir / "state.json")
-    monkeypatch.setattr(health, "WIKI_DIR", tmp_path / ".wiki")
+    patch_health_path(monkeypatch, "ROOT_DIR", tmp_path)
+    patch_health_path(monkeypatch, "KNOWLEDGE_DIR", knowledge)
+    patch_health_path(monkeypatch, "LOGS_DIR", logs)
+    patch_health_path(monkeypatch, "STATE_FILE", state_dir / "state.json")
+    patch_health_path(monkeypatch, "WIKI_DIR", tmp_path / ".wiki")
     return tmp_path
 
 
@@ -56,7 +58,7 @@ def test_setup_run_critical_when_default_config_and_no_state(fake_vault, monkeyp
 
 
 def test_setup_run_ok_when_state_exists(fake_vault, monkeypatch):
-    health.STATE_FILE.write_text("{}")
+    (fake_vault / ".wiki" / "state" / "state.json").write_text("{}")
 
     class _Models:
         ollama_url = ""
@@ -304,7 +306,7 @@ def test_compile_errors_ok_when_log_missing(fake_vault):
 
 def test_compile_errors_warning_on_recent_lines(fake_vault):
     today = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
-    err_log = health.LOGS_DIR / "compile-errors.log"
+    err_log = fake_vault / ".wiki" / "logs" / "compile-errors.log"
     err_log.write_text(
         f"{today}  ERROR  compile_file foo.md kind=unknown\n"
         f"{today}  ERROR  compile_file bar.md kind=rate_limit\n"
@@ -316,7 +318,7 @@ def test_compile_errors_warning_on_recent_lines(fake_vault):
 
 def test_compile_errors_ignores_old_entries(fake_vault):
     old = (datetime.now() - timedelta(days=20)).strftime("%Y-%m-%dT%H:%M:%S")
-    err_log = health.LOGS_DIR / "compile-errors.log"
+    err_log = fake_vault / ".wiki" / "logs" / "compile-errors.log"
     err_log.write_text(f"{old}  ERROR  ancient\n")
     # Backdate file mtime too so the early-exit path fires.
     age = time.time() - 20 * 86400
@@ -460,7 +462,7 @@ def test_flush_pipeline_last_success_from_daily_when_log_tail_is_too_short(fake_
 
 def test_flush_pipeline_reads_only_the_tail(fake_vault, monkeypatch):
     """Multi-MB iCloud-synced logs: the check must seek, not read whole."""
-    monkeypatch.setattr(health, "_FLUSH_LOG_TAIL_BYTES", 200)
+    patch_health_path(monkeypatch, "_FLUSH_LOG_TAIL_BYTES", 200)
     old_noise = [f"{_ts(90000)}  INFO  noise line {i}" for i in range(200)]
     _write_flush_logs(
         fake_vault,
@@ -478,7 +480,7 @@ def test_flush_pipeline_reads_only_the_tail(fake_vault, monkeypatch):
 def test_cloud_eviction_ok_when_running_env_is_local(fake_vault, monkeypatch):
     local_env = fake_vault / "_home" / ".venvs" / "v-wiki"
     local_env.mkdir(parents=True)
-    monkeypatch.setattr(health.sys, "prefix", str(local_env))
+    monkeypatch.setattr(health.engine.sys, "prefix", str(local_env))
     (fake_vault / ".wiki" / "scripts").mkdir()
     (fake_vault / ".wiki" / "scripts" / "a.py").write_text("x")
     result = health.check_engine_cloud_eviction()
@@ -493,7 +495,7 @@ def test_cloud_eviction_critical_when_running_env_is_in_icloud(fake_vault, monke
     `~/Library/Mobile Documents/` is the lxw 2026-09-17 shape."""
     cloud_env = fake_vault / "Library" / "Mobile Documents" / "iCloud~x" / "v" / ".wiki" / ".venv"
     cloud_env.mkdir(parents=True)
-    monkeypatch.setattr(health.sys, "prefix", str(cloud_env))
+    monkeypatch.setattr(health.engine.sys, "prefix", str(cloud_env))
     result = health.check_engine_cloud_eviction()
     assert result.severity == "critical"
     assert "SIGKILL" in result.message
@@ -507,10 +509,10 @@ def test_cloud_eviction_warns_about_stale_in_vault_env(fake_vault, monkeypatch):
     cloud_vault = fake_vault / "Library" / "Mobile Documents" / "iCloud~x" / "v"
     stale = cloud_vault / ".wiki" / ".venv"
     stale.mkdir(parents=True)
-    monkeypatch.setattr(health, "WIKI_DIR", cloud_vault / ".wiki")
+    patch_health_path(monkeypatch, "WIKI_DIR", cloud_vault / ".wiki")
     local_env = fake_vault / "_home" / ".venvs" / "v-wiki"
     local_env.mkdir(parents=True)
-    monkeypatch.setattr(health.sys, "prefix", str(local_env))
+    monkeypatch.setattr(health.engine.sys, "prefix", str(local_env))
     result = health.check_engine_cloud_eviction()
     assert result.severity == "warning"
     assert result.details["stale_in_vault_venv"] == str(stale)
@@ -555,7 +557,7 @@ def test_hooks_ok_without_env_override_even_if_hooks_lack_it(fake_vault, monkeyp
 def test_cloud_eviction_warning_when_engine_files_are_dataless(fake_vault, monkeypatch):
     local_env = fake_vault / "_home" / ".venvs" / "v-wiki"
     local_env.mkdir(parents=True)
-    monkeypatch.setattr(health.sys, "prefix", str(local_env))
+    monkeypatch.setattr(health.engine.sys, "prefix", str(local_env))
     prompts = fake_vault / ".wiki" / "prompts"
     prompts.mkdir()
     (prompts / "flush_extract.md").write_text("x")
@@ -578,8 +580,8 @@ def test_cloud_eviction_warning_when_engine_files_are_dataless(fake_vault, monke
 
         return _St(st, str(path) in evicted)
 
-    monkeypatch.setattr(health, "_is_dataless", fake_is_dataless)
-    monkeypatch.setattr(health.os, "stat", fake_stat)
+    patch_health_path(monkeypatch, "_is_dataless", fake_is_dataless)
+    monkeypatch.setattr(health.engine.os, "stat", fake_stat)
     result = health.check_engine_cloud_eviction()
     assert result.severity == "warning"
     assert result.details == {**result.details, "dataless": 1, "scanned": 2}
@@ -611,7 +613,7 @@ def test_compile_state_info_when_no_state(fake_vault):
 
 def test_compile_state_info_when_stale(fake_vault):
     past = (datetime.now() - timedelta(days=40)).replace(microsecond=0).isoformat()
-    health.STATE_FILE.write_text(json.dumps({"last_compile": past}))
+    (fake_vault / ".wiki" / "state" / "state.json").write_text(json.dumps({"last_compile": past}))
     result = health.check_compile_state()
     assert result.severity == "info"
     assert "consider" in result.message
@@ -619,7 +621,7 @@ def test_compile_state_info_when_stale(fake_vault):
 
 def test_compile_state_ok_when_recent(fake_vault):
     recent = datetime.now().replace(microsecond=0).isoformat()
-    health.STATE_FILE.write_text(json.dumps({"last_compile": recent}))
+    (fake_vault / ".wiki" / "state" / "state.json").write_text(json.dumps({"last_compile": recent}))
     result = health.check_compile_state()
     assert result.severity == "ok"
 
@@ -791,7 +793,7 @@ def test_account_auths_emits_ok_when_token_exists(fake_vault, monkeypatch):
         __import__("sys").modules, "core.config", type("M", (), {"CONFIG": _CONFIG})()
     )
     state = fake_vault / ".wiki" / "state"
-    monkeypatch.setattr(health, "STATE_DIR", state)
+    patch_health_path(monkeypatch, "STATE_DIR", state)
     (state / "calendar-token-work.json").write_text('{"token": "x"}')
 
     out = health.check_account_auths()
@@ -812,7 +814,7 @@ def test_account_auths_emits_warning_with_dispatch_args_when_missing(fake_vault,
         __import__("sys").modules, "core.config", type("M", (), {"CONFIG": _CONFIG})()
     )
     state = fake_vault / ".wiki" / "state"
-    monkeypatch.setattr(health, "STATE_DIR", state)
+    patch_health_path(monkeypatch, "STATE_DIR", state)
     # no token file present
 
     out = health.check_account_auths()
@@ -841,7 +843,7 @@ def test_account_auths_handles_multi_account_multi_integration(fake_vault, monke
         __import__("sys").modules, "core.config", type("M", (), {"CONFIG": _CONFIG})()
     )
     state = fake_vault / ".wiki" / "state"
-    monkeypatch.setattr(health, "STATE_DIR", state)
+    patch_health_path(monkeypatch, "STATE_DIR", state)
     # work calendar has token; the other two don't
     (state / "calendar-token-work.json").write_text("{}")
 
@@ -880,7 +882,7 @@ def test_account_auths_gmail_detected_via_filter_subblock(fake_vault, monkeypatc
         __import__("sys").modules, "core.config", type("M", (), {"CONFIG": _CONFIG})()
     )
     state = fake_vault / ".wiki" / "state"
-    monkeypatch.setattr(health, "STATE_DIR", state)
+    patch_health_path(monkeypatch, "STATE_DIR", state)
 
     out = health.check_account_auths()
     assert len(out) == 1
@@ -905,7 +907,7 @@ def test_account_auths_gmail_detected_via_reader_subblock(fake_vault, monkeypatc
         __import__("sys").modules, "core.config", type("M", (), {"CONFIG": _CONFIG})()
     )
     state = fake_vault / ".wiki" / "state"
-    monkeypatch.setattr(health, "STATE_DIR", state)
+    patch_health_path(monkeypatch, "STATE_DIR", state)
 
     out = health.check_account_auths()
     assert len(out) == 1
@@ -933,7 +935,7 @@ def test_account_auths_ignores_non_oauth_integrations(fake_vault, monkeypatch):
         __import__("sys").modules, "core.config", type("M", (), {"CONFIG": _CONFIG})()
     )
     state = fake_vault / ".wiki" / "state"
-    monkeypatch.setattr(health, "STATE_DIR", state)
+    patch_health_path(monkeypatch, "STATE_DIR", state)
 
     out = health.check_account_auths()
     assert out == []
@@ -954,7 +956,7 @@ def test_build_health_flattens_multi_result_checks(fake_vault, monkeypatch):
         __import__("sys").modules, "core.config", type("M", (), {"CONFIG": _CONFIG})()
     )
     state = fake_vault / ".wiki" / "state"
-    monkeypatch.setattr(health, "STATE_DIR", state)
+    patch_health_path(monkeypatch, "STATE_DIR", state)
 
     results = health.build_health(quick=True)
     # Every entry must be a CheckResult, never a nested list.
@@ -986,7 +988,7 @@ def test_wiki_on_path_ok_when_resolves_to_this_vault(tmp_path, monkeypatch):
     wiki_dir.mkdir()
     own = wiki_dir / "wiki"
     own.write_text("#!/bin/sh")
-    monkeypatch.setattr(health, "WIKI_DIR", wiki_dir)
+    patch_health_path(monkeypatch, "WIKI_DIR", wiki_dir)
     monkeypatch.setattr(shutil, "which", lambda _name: str(own))
     result = health.check_wiki_on_path()
     assert result.severity == "ok"
@@ -1002,7 +1004,7 @@ def test_wiki_on_path_warning_when_resolves_elsewhere(tmp_path, monkeypatch):
     other = tmp_path / "vault-b" / ".wiki" / "wiki"
     other.parent.mkdir(parents=True)
     other.write_text("#!/bin/sh")
-    monkeypatch.setattr(health, "WIKI_DIR", own.parent)
+    patch_health_path(monkeypatch, "WIKI_DIR", own.parent)
     monkeypatch.setattr(shutil, "which", lambda _name: str(other))
     result = health.check_wiki_on_path()
     assert result.severity == "warning"

@@ -145,7 +145,7 @@ Python layer: the prior bash home screen trip-wired on bash-3.2 quirks once
 per feature (no `${var,,}`, empty array under `set -u`, fractional `read -t`
 unsupported). Background: `.ytstack/backlog/python-interactive-menu.md`.
 
-**Health integration:** Probes via `core/health.py` run alongside the
+**Health integration:** Probes via `core/health/` run alongside the
 suggestions probe. Each check returns a `CheckResult` with optional
 `dispatch_args: list[str]` — when set, the check is promoted into the
 navigable Actionable list (operator hits Enter, the menu shells out to

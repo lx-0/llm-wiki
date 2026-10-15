@@ -150,6 +150,8 @@ def patch_engine_paths(monkeypatch: pytest.MonkeyPatch, vault: Path, scratch: Pa
     from collectors import scan_screenshots
     from core import health
 
+    from ._health_paths import patch_health_path
+
     wiki = vault / ".wiki"
     knowledge = vault / "knowledge"
     constants: list[tuple[Any, dict[str, Path]]] = [
@@ -169,22 +171,23 @@ def patch_engine_paths(monkeypatch: pytest.MonkeyPatch, vault: Path, scratch: Pa
                 "STATE_FILE": wiki / "state" / "state.json",
             },
         ),
-        (
-            health,
-            {
-                "ROOT_DIR": vault,
-                "WIKI_DIR": wiki,
-                "KNOWLEDGE_DIR": knowledge,
-                "LOGS_DIR": wiki / "logs",
-                "STATE_DIR": wiki / "state",
-                "STATE_FILE": wiki / "state" / "state.json",
-            },
-        ),
         (doctor, {"ROOT_DIR": vault, "WIKI_DIR": wiki}),
     ]
     for module, names in constants:
         for name, value in names.items():
             monkeypatch.setattr(module, name, value)
+    # core.health is a package: each check reads the vault paths in its own submodule, so
+    # they are patched where they are read (tests/_health_paths.py) — a patch on the
+    # package would raise, the package binds none of them.
+    for name, value in {
+        "ROOT_DIR": vault,
+        "WIKI_DIR": wiki,
+        "KNOWLEDGE_DIR": knowledge,
+        "LOGS_DIR": wiki / "logs",
+        "STATE_DIR": wiki / "state",
+        "STATE_FILE": wiki / "state" / "state.json",
+    }.items():
+        patch_health_path(monkeypatch, name, value)
 
     home = scratch / "home"
     bin_dir = scratch / "bin"
@@ -198,7 +201,7 @@ def patch_engine_paths(monkeypatch: pytest.MonkeyPatch, vault: Path, scratch: Pa
     monkeypatch.setenv("PATH", str(bin_dir))
     for var in ("ANTHROPIC_API_KEY", "UV_PROJECT_ENVIRONMENT"):
         monkeypatch.delenv(var, raising=False)
-    monkeypatch.setattr(health, "_effective_env_dir", lambda: env_dir)
+    monkeypatch.setattr(health.engine, "_effective_env_dir", lambda: env_dir)
     monkeypatch.setattr(doctor, "_git_revision", lambda: "<REV>")
     # The piggyback check asks every registered collector `is_configured()`. The
     # screenshots collector answers from that frozen `Path.home() / "Screenshots"` — with

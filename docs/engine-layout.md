@@ -47,7 +47,7 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 │   │   ├── agent_spec.py          ← agent-task spec parser (prompts/agents/*.md → AgentSpec)
 │   │   ├── google_oauth.py        ← Gmail OAuth2 bootstrap (local-loopback consent flow)
 │   │   ├── flush_pipeline.py      ← staged-flush state machine (stage / commit / archive / pending)
-│   │   ├── health.py              ← vault-health checks behind the home-screen banner + `wiki doctor`
+│   │   ├── health/                ← vault-health checks behind the home-screen banner + `wiki doctor`: `environment` / `engine` / `pipeline` by subsystem, `_base` (CheckResult), `__init__` the API + build_health; the package binds no patched name (tests patch the submodule)
 │   │   ├── console.py             ← the engine's one logging setup (`setup_console_logging`, called from entry points only — never at import; per-CLI formatter hook)
 │   │   ├── actions.py             ← action catalogue — the operator-facing vocabulary of everything a consumer can run (menu + desktop JSON contract)
 │   │   ├── links.py               ← wikilink resolution + relativization — single source of truth (resolve_link / canonical_slug / relativize_text)

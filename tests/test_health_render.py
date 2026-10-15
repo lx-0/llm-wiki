@@ -1,7 +1,7 @@
 """M033-S04-T06 — characterisation of `scripts/health.py::render` (the one-shot ASCII vault
 dashboard) on a tmp vault with a fixed clock: every box, the counts, the bars, the orphan
 line, the compile gate, the latest-file lines, the sparkline, and `main`'s exit codes.
-Written before the split. (`tests/test_health.py` is `core/health.py`, the doctor.)"""
+Written before the split. (`tests/test_health.py` is `core/health/`, the doctor.)"""
 
 from __future__ import annotations
 
