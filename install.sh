@@ -196,7 +196,7 @@ cat <<EOF
 
 ${B}Next steps:${N}
   cd $TARGET
-  ./.wiki/wiki setup        ${D}# 5-question config wizard + agent hook install${N}
+  ./.wiki/wiki setup        ${D}# 6-question config wizard + agent hook install${N}
   ./.wiki/wiki status       ${D}# verify${N}
   ./.wiki/wiki help         ${D}# all commands${N}
 

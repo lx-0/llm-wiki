@@ -31,8 +31,9 @@ The **vault's own `AGENTS.md`** (separate file, not this one) is the article sch
 llm-wiki/                    ← installed as <vault>/.wiki/ — the file-by-file reference is docs/engine-layout.md
 ├── wiki                     ← entry-point CLI (bash: bootstrap + fail-closed vault guard + the commands
 │                              not yet ported; everything else, bare `wiki` included, goes to scripts/cli.py)
-├── lib/                     ← the bash layer: common.sh (paths, the venv-location rule), ui.sh, agents.sh (hook
-│                              payloads), hooks.sh, skills.sh, config.sh (`python -m core.config` wrapper + wizard), seed.sh
+├── lib/                     ← the bash layer, shrinking as M034 ports it: common.sh (paths, the venv-location rule),
+│                              ui.sh (prompts for hooks + update), agents.sh (hook payloads), hooks.sh, skills.sh,
+│                              config.sh (config_get / config_set for skills), seed.sh
 ├── scripts/                 ← the engine's source root — NOT a package (§ Python environment)
 │   ├── cli.py               ← table-driven `wiki` dispatcher — the CommandSpec table (cli_catalog.py, help texts in cli_help.py) is the single source of truth
 │   ├── core/                ← shared plumbing, imported never invoked: paths, config + config_schema, prompts,
@@ -312,7 +313,7 @@ Long-term direction: remove agent-side filesystem writes entirely — agent retu
   under 1,000 lines unless `docs/engine-layout.md` § "Large modules" lists it with the reason
   it stays one module (`tests/test_module_size.py`). Both lists only shrink — split the code,
   don't extend the list.
-- No emoji in code. Logs use ASCII status markers (✓ ! ✗) only via the helpers in `lib/common.sh`.
+- No emoji in code. Logs use ASCII status markers (✓ ! ✗) only via the helpers in `lib/common.sh` (bash) and `core/console` (Python: `ok` / `warn` / `info` / `print_error`).
 - Commit messages: imperative mood, short subject (≤70 chars), body explains why.
 
 ## When in doubt

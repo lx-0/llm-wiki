@@ -26,6 +26,12 @@ last callers were skills' `config_get` and `cmd_status` (reassessed after S01).
   merge, backups follow the existing rule, and parity holds on the fixture `HOME`. `wiki
   status` comes here as well (moved from S01-T05): a banner over S02's `config status` and
   this task's `hooks status`.
+
+  **Fix first, in the bash, then record** (found in S02-T05's end-to-end run): when an agent's
+  payload cannot be built (its `jq` fails), the installer says `✗ unknown agent: claude`,
+  writes nothing, and still ends with `✓ Done. Restart agent CLIs…` and exit 0. The port
+  must name the real failure, skip the "Done", and exit non-zero; so must the bash before
+  the oracle records it.
 - [ ] T03 -- Skills in Python: the engine-owned check, the global-enable flag, registry
   add / remove, `skills install/uninstall/sync/status`, and the silent install / prune
   variants that `setup` and `update` call. Parity on the fixture `HOME`.

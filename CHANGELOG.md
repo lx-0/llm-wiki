@@ -18,6 +18,15 @@ every operator's `wiki update` → `uv sync` regenerate `uv.lock` and dirty thei
 config keys must also be wired into `scripts/migrations/migrate_config_keys.py`
 in the same commit.
 
+## [0.7.14] — 2026-10-15
+
+**For your vault:** nothing to do.
+
+### Fixed
+
+- **`install.sh` called the setup wizard a "5-question" wizard.** It has six questions; the
+  next-steps line now says so.
+
 ## [0.7.13] — 2026-10-15
 
 **For your vault:** no config key changed, so there is no migration.
