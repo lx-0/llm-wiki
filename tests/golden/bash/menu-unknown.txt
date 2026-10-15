@@ -1,0 +1,5 @@
+$ wiki menu bogus
+exit: 1
+--- stdout ---
+--- stderr ---
+✗ unknown: wiki menu bogus

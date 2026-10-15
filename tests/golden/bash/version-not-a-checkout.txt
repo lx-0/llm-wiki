@@ -1,0 +1,7 @@
+$ wiki version
+exit: 0
+--- stdout ---
+! Not a git checkout. Cannot report version.
+--- stderr ---
+--- change ---
+(none)

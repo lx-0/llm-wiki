@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 from collections.abc import Callable
@@ -84,6 +85,9 @@ READ_ONLY: dict[str, tuple[str, ...]] = {
     "dispatch-unknown": ("bogus",),
     "dispatch-command-help": ("links", "--help"),
     "auth-alias": ("gmail-auth",),
+    # error and alternate-spelling paths of the wrappers S01-T05 ports
+    "menu-unknown": ("menu", "bogus"),
+    "help-short-flag": ("-h",),
 }
 
 
@@ -234,6 +238,11 @@ def _global_skills_installed(env: dict[str, Path]) -> None:
     _wiki(env, "skills", "install", "--global")
 
 
+def _engine_not_a_checkout(env: dict[str, Path]) -> None:
+    """An engine that is not a git checkout (copied without its `.git`)."""
+    shutil.rmtree(env["vault"] / ".wiki" / ".git")
+
+
 Prepare = Callable[[dict[str, Path]], None] | None
 
 # name → (argv, scripted stdin, preparation)
@@ -268,6 +277,7 @@ MUTATING: dict[str, tuple[tuple[str, ...], str | None, Prepare]] = {
     ),
     "install-shortcut": (("install-shortcut",), None, None),
     "install-shortcut-print-only": (("install-shortcut", "--print-only"), None, None),
+    "version-not-a-checkout": (("version",), None, _engine_not_a_checkout),
 }
 
 

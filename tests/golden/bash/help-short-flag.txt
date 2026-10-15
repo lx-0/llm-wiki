@@ -1,0 +1,72 @@
+$ wiki -h
+exit: 0
+--- stdout ---
+wiki — personal knowledge-base engine
+
+usage: wiki <command> [args]   ·   wiki <command> --help for details
+
+Home & status
+  menu              interactive home screen (--json for agents)
+  status            config + hooks + Ollama summary
+  doctor            vault-health audit (--quick / --json)
+  version           print installed git revision
+
+Setup
+  setup             first-time setup (config wizard + hooks)
+  config            interactive config editor (get/set/keys/…)
+  hooks             install/uninstall session hooks per agent
+  skills            wire engine skills into .claude/skills/
+  install-shortcut  symlink ~/.local/bin/wiki -> this vault
+  update            git pull --ff-only + sync deps/skills
+  seed              re-apply engine templates to the vault
+
+Collect & ingest
+  collect           run a Collector (--list to enumerate)
+  index             body-blind folder-index digests
+  produce           run a Producer (post-compile extractor)
+  preprocess        run a Preprocessor (--list to enumerate)
+  process-inbox     classify inbox/ files via Ollama
+  ingest-html       convert an HTML file or URL into raw/
+  ingest-youtube    pull YouTube videos into raw/notes/
+  bridge            rsync mirror for sandbox-restricted folders
+  backfill          one-shot data-shape upgrades
+  auth              OAuth bootstrap (gmail/gmeet/calendar)
+  gmail-auth        alias: wiki auth gmail <account-id>
+  gmeet-auth        alias: wiki auth gmeet <account-id>
+  calendar-auth     alias: wiki auth calendar <account-id>
+
+Knowledge ops
+  compile           compile changed (or all) sources into knowledge/
+  dream             sweep all entity pages (oldest-overdue first)
+  dream-entity      re-synthesize ONE entity page by slug
+  query             ask the knowledge base in natural language
+  lint              structural + LLM contradiction health check
+  links             broken-wikilink report (--fix to rewrite)
+  pin               pin an article into a Map-of-Content
+  publish           mirror the vault into meinkontext (--auth once, --dry-run, run)
+  reindex           reconcile index.md against the corpus (--dry-run)
+  review-wiki       per-article quality scores (local LLM, free)
+  health-trends     deterministic health-trend synthesis ($0)
+  agent             run an agentic task (prompts/agents/<id>.md)
+
+Facts & takes
+  correct           record hard facts that override compiled content
+  take              record third-party belief attribution (M011)
+  dedup             find + merge STT-noise duplicate entity pages
+
+Review & maintenance
+  flush             extract a disposable context file to daily/
+  curiosity         review + run curiosity deep-scan requests
+  suggestions       review + execute optimization suggestions
+  reconcile         autonomous concept-consistency routine
+  triage            review + clear the intent inbox
+  study             operator-self-reports surface (M019)
+  analyze           operator-self-reports analyst layer
+  usage             token-usage ledger (per provider/model)
+
+Help
+  help              this message
+
+DOCS
+  <VAULT>/.wiki/README.md
+--- stderr ---
