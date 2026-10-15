@@ -298,6 +298,11 @@ def build_engine_template(wiki: Path) -> Path:
     env = {**os.environ, **_FIXED_GIT_ENV}
     for argv in (
         ["init", "-q", "-b", "main"],
+        # A commit starts a detached `git maintenance run --auto`; on the CI runner's git 2.55
+        # it packed this template's loose objects while a test was copying them (`shutil.Error:
+        # … .git/objects/0a`). Off before the first commit, for the template and its copies.
+        ["config", "maintenance.auto", "false"],
+        ["config", "gc.auto", "0"],
         ["add", "-A"],
         ["commit", "-q", "-m", "oracle engine copy"],
         ["remote", "add", "origin", ORACLE_ORIGIN],

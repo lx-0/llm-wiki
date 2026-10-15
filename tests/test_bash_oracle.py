@@ -22,6 +22,8 @@ Two kinds of case:
 from __future__ import annotations
 
 import json
+import os
+import subprocess
 import sys
 from collections.abc import Callable
 from pathlib import Path
@@ -299,3 +301,21 @@ def test_bash_mutating_command_matches_golden(fresh_vault, request, name: str) -
     args, stdin, prepare = MUTATING[name]
     text = record_effect(fresh_vault, args, stdin, prepare)
     assert_matches_golden(request, f"{name}.txt", text, BASH_GOLDEN_DIR)
+
+
+def test_the_engine_template_spawns_no_background_git_maintenance(tmp_path: Path) -> None:
+    """A commit starts a detached `git maintenance run --auto`. On the CI runner (git 2.55)
+    it packed a fresh template's loose objects while a test was copying the template
+    (`shutil.Error: … .git/objects/0a: No such file or directory`). The template, and every
+    copy of it, has automatic maintenance off."""
+    template = build_engine_template(tmp_path / ".wiki")
+    identity = ["-c", "user.name=probe", "-c", "user.email=probe@example.invalid"]
+    trace = subprocess.run(
+        ["git", "-C", str(template), *identity, "commit", "-q", "--allow-empty", "-m", "probe"],
+        env={**os.environ, "GIT_TRACE": "1"},
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stderr
+    assert "maintenance run" not in trace
+    assert "gc --auto" not in trace
