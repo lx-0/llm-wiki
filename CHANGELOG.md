@@ -18,6 +18,21 @@ every operator's `wiki update` → `uv sync` regenerate `uv.lock` and dirty thei
 config keys must also be wired into `scripts/migrations/migrate_config_keys.py`
 in the same commit.
 
+## [0.7.2] — 2026-10-15
+
+**For your vault:** no config key changed, so there is no migration.
+
+### Fixed
+
+- **Seven email suggestions were invisible.** The suggestion agent sometimes saves a
+  suggestion as `.md`, and `wiki suggestions` and the menu only looked at `.yaml`. Every
+  suggestion file is now seen (on lxw: seven files with nine pending actions from
+  2026-10-09), and the prompt names the `.yaml` file it wants.
+- **The self-report instruments never read your voice notes.** Their substrate list pointed
+  at `raw/notes/voice/`, but voice notes land in `raw/voice/`. They are read now. Coding
+  sessions stay out of that list on purpose: two weeks of them come to about 434K tokens,
+  which would overflow every instrument until a summarisation layer exists.
+
 ## [0.7.1] — 2026-10-15
 
 Closing M033 meant re-reading the whole backlog against the code, and the read turned up
