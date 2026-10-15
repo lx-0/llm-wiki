@@ -5,7 +5,7 @@ project: llm-wiki
 created: 2026-10-15T18:15:32+02:00
 status: planned
 task_count: 5
-completed_tasks: 0
+completed_tasks: 1
 ---
 
 # M034-S04 -- Slice Plan
@@ -19,7 +19,7 @@ Deleting the library means the installer seeds through `wiki seed` after the ven
 
 ## Tasks
 
-- [ ] T01 -- **Oracle first, fix first.** Record the bash on the branches the six seed cases
+- [x] T01 -- **Oracle first, fix first.** Record the bash on the branches the six seed cases
   miss:
   - the special merges over existing operator data (community plugins, `appearance.json`,
     meta-bind by id, the agent shell commands by id, the `.env` example's per-var append);
@@ -40,11 +40,12 @@ Deleting the library means the installer seeds through `wiki seed` after the ven
 
   Byte parity with the bash. The bash's outputs are recorded as goldens and pushed before
   T05 deletes it (S03-T07's pattern).
-- [ ] T03 -- **The special merges, pure:**
-  - community plugins (jq `unique`: a sorted union);
-  - `appearance.json`;
-  - meta-bind by id;
-  - the shell commands by id, with `dashboard.agent_buttons` in-process (no `uv run`);
+- [ ] T03 -- **The special merges, pure** (as T01's fixes left them, 0.7.20 / 0.7.21):
+  - the list union for community plugins and `appearance.json`'s snippets
+    (`_merge_list_union`: writes only when it adds; jq `unique` on a merge);
+  - the two button registries by id, in place (`_merge_registry`: Meta-Bind's
+    `buttonTemplates`, Shell commands' `shell_commands`, the legacy object form), with
+    `dashboard.agent_buttons` in-process (no `uv run`);
   - the `.env` example's stanza append;
   - the dashboard agent-button rewrite.
 
@@ -72,7 +73,11 @@ All tasks marked `[x]` and verified via `ytstack:summarize-task`; no bash left f
 
 The memory "round-trip on the real data shape before a live `--force`" applies: the live
 vault's `.obsidian/` JSON carries arrays and plugin data the fixture may not. Copy it and
-compare; never write the live vault.
+compare; never write the live vault. T01 proved it: only the copy of lxw's `.obsidian/`
+showed the plugin's own migrations (renamed icons, added `debounce`) that a replacing merge
+would undo on every seed. The run's shape: `tests/_oracle.py` builds an engine copy and a
+fixture vault in a tmp dir, the live `.obsidian/` and `dashboard.md` are copied in, then
+`seed --check`, `seed`, `seed --check`, and a diff of each merged file.
 
 **What S03 taught for this slice** (reassessment after S03, outcome A: the slice order
 holds; these refine the tasks when they are planned):

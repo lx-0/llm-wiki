@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-16T00:45:00+02:00
+last_updated: 2026-10-16T01:30:00+02:00
 current_milestone: M034
 active_slice: S04
-active_task: T01
+active_task: T02
 last_completed_milestone: M033
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -14,9 +14,22 @@ parallel_milestones: [M021, M025, M027, M029]
 
 ## Next action — M034 / S04: seed
 
-**Status:** M034 / S04 / T01 planned — ready to execute (`M034-S04-T01-PLAN.md`: eight bash
-seed cases recorded first). Slices S01–S03 are complete (3/6). The reassessment after S03
-came out **A**: the slice order holds.
+**Status:** M034 / S04 / T02 planned — ready to execute (`M034-S04-T02-PLAN.md`: the pure
+seed core — walk, equivalence, overlay — held to goldens recorded from the bash; fix first:
+`--extract-custom` exits 5 in silence when a value changed type). 1/5 tasks done in slice;
+slices S01–S03 are complete (3/6).
+
+T01 closed (`M034-S04-T01-SUMMARY.md`). The bash seed is recorded on 13 more cases, 19 seed
+goldens. They were recorded after two releases of bash-first fixes found by the recording:
+- **0.7.20:** the dashboard buttons. Five were dead in every fresh vault; two agent buttons
+  and lxw's "refresh stats" were dead in every vault.
+- **0.7.21:** seed's messages, and its writes nobody asked for.
+
+T03 ports the merges as they stand now (`_merge_registry`, `_merge_list_union`).
+
+**Waiting on the operator:** after `wiki update`, run `wiki seed`, then restart Obsidian
+(0.7.20). That fixes lxw's refresh-stats button and the dream-cycle / orchestrate-tasks
+buttons. Open decision: `backlog/dashboard-agent-buttons-callout.md`.
 
 S04 was re-cut to 5 tasks with S03's lessons:
 1. T01: record first, fix first;
@@ -29,8 +42,8 @@ The planning reading found that install.sh sources lib/seed.sh before its venv e
 moves it to `wiki seed` after the `uv sync`. Open question 4 is decided (DECISIONS
 2026-10-16): the jq merges become Python `json`, held to recorded goldens.
 
-Engine 0.7.19, suite 2505, CI green on `9ad0d2c`. The bash is `wiki` (412) + `common.sh`
-(94) + `seed.sh` (710) + `ui.sh` (21); it owns seed and update.
+Engine 0.7.21, suite 2542 passed + 1 skipped, CI green on `119c5d5`. The bash is `wiki`
+(418) + `common.sh` (94) + `seed.sh` (665) + `ui.sh` (21); it owns seed and update.
 
 **Reported, not this repo's to fix:** the ytstack post-commit hook. After T06's first commit
 a stale `.git/index.lock` was left behind (removed once `lsof` showed no holder), and its
