@@ -18,6 +18,48 @@ every operator's `wiki update` → `uv sync` regenerate `uv.lock` and dirty thei
 config keys must also be wired into `scripts/migrations/migrate_config_keys.py`
 in the same commit.
 
+## [0.7.1] — 2026-10-15
+
+Closing M033 meant re-reading the whole backlog against the code, and the read turned up
+defects nobody had filed. The calendar one touched operator data.
+
+**For your vault:** no config key was added, renamed or removed (two calendar knobs only got
+truer descriptions), so there is no migration. The first calendar run after `wiki update`
+re-renders every date of its window (the last 90 days and the next 7) from all of that
+date's events, which brings back what earlier runs dropped there. For older dates, set
+`since:` on the account's `calendar:` block and run `wiki collect calendar` once, without
+`--incremental`. That run also drops the per-calendar watermark and etag cache from
+`state/calendar-state.json`.
+
+### Fixed
+
+- **Calendar rollups lost events.** The piggyback's incremental run listed only the events
+  updated since its last run and rewrote each date it touched from those alone, so every
+  unchanged event of that date fell out of its rollup (one live rollup went from six entries
+  to one). Every run now lists the whole window and rewrites a date only from all of its
+  events, and only when something changed. A run that cannot list every account and calendar
+  (an API error, `--account` beside other accounts, a `max_per_run` cap) leaves the rollups
+  as they are and says why. A cancelled event now leaves its rollup, an event in two calendars
+  is listed once, and the oldest date of the window is read whole instead of from midday.
+- **The suggestion pass could write anywhere in the vault.** It reads third-party email
+  bodies, and it ran with auto-approved writes and no path limit. It now writes only into
+  `raw/suggestions/`, and like every other engine agent it no longer loads the host's MCP
+  servers.
+- **The desktop's "Review" row for folder-scan requests crashed** with a terminal error.
+  Without a terminal, `wiki curiosity` now says the review walk needs one (exit 2) and sends
+  nothing anywhere.
+- **Screenshot sidecars named the wrong vision model.** Since 2026-06-14 they said
+  `gemma4:e4b` while `qwen2.5vl:7b` ran. New sidecars and the batch report name the model
+  that ran; the sidecars already in `~/Screenshots/` keep the old stamp.
+- **A piggyback killed right after it started could stay `running`** in
+  `piggyback-state.json`. It is recorded as `interrupted` from its first moment.
+
+### Changed
+
+- **`wiki collect calendar` has no delta mode any more.** `--incremental` (what the piggyback
+  runs) means the rolling window; a full run starts at the account's `since:` when it is set.
+  Before, `since:` applied to any run of a calendar without a stored watermark.
+
 ## [0.7.0] — 2026-10-15
 
 The engine's code is modernised (M033): formatted, linted and type-checked by gates that

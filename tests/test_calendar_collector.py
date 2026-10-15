@@ -21,18 +21,22 @@ pieces of the pipeline:
 - Bootstrap delegation: ``calendar-auth`` routes through
   ``google_oauth.bootstrap`` with the calendar.readonly scope.
 - Full end-to-end run with a fake client writes per-date markdown and
-  persists per-calendar etag state.
+  persists the recurring-series map.
+- Rollup completeness: a date is rewritten only from a listing that holds
+  every one of its events (whole window, edge days read whole, one block per
+  event id, no rewrite after a failed / capped / one-account listing).
 """
 
 from __future__ import annotations
 
 import json
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest
 
 from collectors import calendar_collector as cal
+from collectors import calendar_render as render
 from core.utils import slugify
 
 # ── Registry / Spec ─────────────────────────────────────────────────
@@ -105,12 +109,12 @@ def test_parse_event_time_malformed_returns_none():
 def test_format_event_window_renders_range():
     start = datetime(2026, 5, 15, 9, 0, tzinfo=UTC)
     end = datetime(2026, 5, 15, 9, 30, tzinfo=UTC)
-    assert cal._format_event_window(start, end, all_day=False) == "09:00–09:30"
+    assert render._format_event_window(start, end, all_day=False) == "09:00–09:30"
 
 
 def test_format_event_window_all_day():
     start = datetime(2026, 5, 15, tzinfo=UTC)
-    assert cal._format_event_window(start, None, all_day=True) == "all-day"
+    assert render._format_event_window(start, None, all_day=True) == "all-day"
 
 
 # ── Account resolution ─────────────────────────────────────────────
@@ -243,10 +247,9 @@ def test_select_calendars_falls_back_to_primary():
 # ── Rendering ─────────────────────────────────────────────────────
 
 
-def _block(**overrides) -> cal._EventBlock:
+def _block(**overrides) -> render._EventBlock:
     base: dict[str, Any] = dict(
         event_id="evt_abc",
-        etag='"abc123"',
         start=datetime(2026, 5, 15, 9, 0, tzinfo=UTC),
         end=datetime(2026, 5, 15, 9, 30, tzinfo=UTC),
         all_day=False,
@@ -263,12 +266,12 @@ def _block(**overrides) -> cal._EventBlock:
         recurring_title=None,
     )
     base.update(overrides)
-    return cal._EventBlock(**base)
+    return render._EventBlock(**base)
 
 
 def test_render_event_block_contains_all_fields():
     block = _block()
-    out = cal._render_event_block(block)
+    out = render._render_event_block(block)
     assert out.startswith("## 09:00–09:30 · Standup")
     assert "- **Calendar:** Work (account: work)" in out
     assert "- **Attendees:** bob@example.com, jane@example.com" in out
@@ -284,21 +287,21 @@ def test_render_event_block_with_recurring_and_transcript():
         recurring_title="Weekly Standup",
         transcript_link="[[../transcripts/gmeet/2026-05-15--standup--abc|gmeet]]",
     )
-    out = cal._render_event_block(block)
+    out = render._render_event_block(block)
     assert "- **Recurring:** [[concepts/weekly-standup|Weekly Standup]]" in out
     assert "- **Transcript:** [[../transcripts/gmeet/" in out
 
 
 def test_render_date_file_frontmatter_and_managed_region():
     block = _block()
-    md = cal._render_date_file("2026-05-15", [block], existing_text=None)
+    md = render._render_date_file("2026-05-15", [block], existing_text=None)
     assert md.startswith("---\n")
     assert "type: calendar-rollup" in md
     assert "date: '2026-05-15'" in md or "date: 2026-05-15" in md
     assert "event_count: 1" in md
     assert "meeting_hours: 0.5" in md
-    assert cal._EVENTS_BEGIN in md
-    assert cal._EVENTS_END in md
+    assert render._EVENTS_BEGIN in md
+    assert render._EVENTS_END in md
     assert "# Calendar — 2026-05-15" in md
 
 
@@ -309,10 +312,10 @@ def test_render_date_file_preserves_operator_prose():
         "---\nold: thing\n---\n"
         "# Calendar — 2026-05-15\n\n"
         "Operator note above the events.\n\n"
-        f"{cal._EVENTS_BEGIN}\n\n## OLD EVENT\n\n{cal._EVENTS_END}\n\n"
+        f"{render._EVENTS_BEGIN}\n\n## OLD EVENT\n\n{render._EVENTS_END}\n\n"
         "Operator note below the events.\n"
     )
-    md = cal._render_date_file("2026-05-15", [block], existing_text=existing)
+    md = render._render_date_file("2026-05-15", [block], existing_text=existing)
     assert "Operator note above the events." in md
     assert "Operator note below the events." in md
     assert "OLD EVENT" not in md  # managed region was rebuilt
@@ -321,26 +324,26 @@ def test_render_date_file_preserves_operator_prose():
 
 def test_render_date_file_single_managed_region():
     block = _block()
-    md = cal._render_date_file("2026-05-15", [block], existing_text=None)
-    assert md.count(cal._EVENTS_BEGIN) == 1
-    assert md.count(cal._EVENTS_END) == 1
+    md = render._render_date_file("2026-05-15", [block], existing_text=None)
+    assert md.count(render._EVENTS_BEGIN) == 1
+    assert md.count(render._EVENTS_END) == 1
 
 
 def test_render_date_file_round_trip_is_byte_stable(monkeypatch):
     """Regeneration must be a fixpoint: feeding a rendered file back as
     ``existing_text`` reproduces it byte-for-byte (operator vaults carry
     existing sentinel regions — the rewrite must never drift them)."""
-    monkeypatch.setattr(cal, "now_iso", lambda: "2026-05-15T08:30:00Z")
+    monkeypatch.setattr(render, "now_iso", lambda: "2026-05-15T08:30:00Z")
     block = _block()
     existing = (
         "---\nold: thing\n---\n"
         "# Calendar — 2026-05-15\n\n"
         "Operator note above the events.\n\n"
-        f"{cal._EVENTS_BEGIN}\n\n## OLD EVENT\n\n{cal._EVENTS_END}\n\n"
+        f"{render._EVENTS_BEGIN}\n\n## OLD EVENT\n\n{render._EVENTS_END}\n\n"
         "Operator note below the events.\n"
     )
-    once = cal._render_date_file("2026-05-15", [block], existing_text=existing)
-    twice = cal._render_date_file("2026-05-15", [block], existing_text=once)
+    once = render._render_date_file("2026-05-15", [block], existing_text=existing)
+    twice = render._render_date_file("2026-05-15", [block], existing_text=once)
     assert twice == once
 
 
@@ -349,12 +352,12 @@ def test_split_operator_prose_stray_end_before_region():
     (core.markers contract): the managed region is still located, so old
     event bodies never leak into the preserved operator prose."""
     body = (
-        f"{cal._EVENTS_END}\n\n"
+        f"{render._EVENTS_END}\n\n"
         "Operator note.\n\n"
-        f"{cal._EVENTS_BEGIN}\n\n## OLD EVENT\n\n{cal._EVENTS_END}\n\n"
+        f"{render._EVENTS_BEGIN}\n\n## OLD EVENT\n\n{render._EVENTS_END}\n\n"
         "Note below.\n"
     )
-    pre, post = cal._split_operator_prose(f"# Calendar — 2026-05-15\n\n{body}")
+    pre, post = render._split_operator_prose(f"# Calendar — 2026-05-15\n\n{body}")
     assert "## OLD EVENT" not in pre
     assert "## OLD EVENT" not in post
     assert "Note below." in post
@@ -465,13 +468,26 @@ class _FakeClient:
         yield from self._events_by_cal.get(calendar_id, [])
 
 
+_NOW = datetime(2026, 5, 15, 12, 0, tzinfo=UTC)
+
+
+class _FrozenDatetime(datetime):
+    """The collector's clock, pinned to `_NOW`: the fixtures' events sit inside
+    its window (backfill 30 days, future 7)."""
+
+    @classmethod
+    def now(cls, tz=None):
+        return _NOW.astimezone(tz) if tz is not None else _NOW.replace(tzinfo=None)
+
+
 @pytest.fixture
 def _isolated_vault(monkeypatch, tmp_path):
     """Point ROOT_DIR + STATE_DIR + the calendar collector's module-level
     paths at a clean tmp_path so a real ``run()`` writes into the test
-    sandbox, not the real vault."""
+    sandbox, not the real vault — with the collector's clock at `_NOW`."""
     from core import paths as core_paths
 
+    monkeypatch.setattr(cal, "datetime", _FrozenDatetime)
     monkeypatch.setattr(core_paths, "ROOT_DIR", tmp_path)
     monkeypatch.setattr(core_paths, "STATE_DIR", tmp_path / "state")
     monkeypatch.setattr(cal, "ROOT_DIR", tmp_path)
@@ -681,16 +697,31 @@ def test_run_attaches_transcript_link(monkeypatch, _isolated_vault):
     assert "- **Transcript:** [[../transcripts/gmeet/" in rollup
 
 
-def test_run_persists_state_per_account_and_calendar(monkeypatch, _isolated_vault):
+def test_run_persists_the_recurring_map_and_drops_the_delta_cache(monkeypatch, _isolated_vault):
+    """The state keeps the series → concept-slug map; the per-calendar
+    watermark + etag cache of the retired delta sync leaves on the next run."""
     _configure_one_account(monkeypatch)
+    state_file = _isolated_vault / "state" / "calendar-state.json"
+    state_file.write_text(
+        json.dumps(
+            {
+                "work": {
+                    "calendars": {
+                        "primary": {"watermark_updated": "2026-05-01T00:00:00Z", "etags": {}}
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
     fake = _FakeClient(
         cal_items=[{"id": "primary", "summary": "Personal", "primary": True, "selected": True}],
         events_by_cal={
             "primary": [
                 {
                     "id": "evt1",
-                    "etag": '"e1"',
-                    "summary": "X",
+                    "summary": "Weekly Sync",
+                    "recurringEventId": "rec-9",
                     "start": {"dateTime": "2026-05-15T09:00:00+00:00"},
                     "end": {"dateTime": "2026-05-15T09:30:00+00:00"},
                     "updated": "2026-05-15T08:00:00Z",
@@ -701,14 +732,8 @@ def test_run_persists_state_per_account_and_calendar(monkeypatch, _isolated_vaul
     _stub_session(monkeypatch, fake)
     cal.CalendarCollector().run(incremental=True)
 
-    state = json.loads(
-        (_isolated_vault / "state" / "calendar-state.json").read_text(encoding="utf-8")
-    )
-    assert "work" in state
-    cals = state["work"]["calendars"]
-    assert "primary" in cals
-    assert cals["primary"]["etags"]["evt1"] == '"e1"'
-    assert cals["primary"]["watermark_updated"] == "2026-05-15T08:00:00Z"
+    state = json.loads(state_file.read_text(encoding="utf-8"))
+    assert state == {"work": {"recurring": {"rec-9": "weekly-sync"}}}
 
 
 def test_run_dry_run_writes_nothing(monkeypatch, _isolated_vault):
@@ -740,3 +765,224 @@ def test_run_no_accounts_is_no_op(monkeypatch):
     monkeypatch.setattr(CONFIG.personal, "accounts", {})
     result = cal.CalendarCollector().run()
     assert "no calendar accounts configured" in result.message
+
+
+# ── Rollup completeness: a date is rewritten only from all of its events ──
+#
+# The incremental run fetched only the events updated since a watermark and
+# rewrote every touched date from those alone, so each unchanged event of that
+# date vanished (lxw 2026-06-11: event_count 6 → 1, vault commit 2869a316).
+# These tests drive run() through a fake that behaves like the Calendar API.
+
+_PRIMARY = {"id": "primary", "summary": "Personal", "primary": True, "selected": True}
+_WORK = {"id": "work-cal", "summary": "Work", "selected": True}
+
+
+def _ev(eid, day, hh, *, updated="2026-05-01T00:00:00Z", status="confirmed", summary=None):
+    start = datetime.fromisoformat(f"{day}T{hh}:00+00:00")
+    return {
+        "id": eid,
+        "etag": f'"{eid}"',
+        "status": status,
+        "summary": summary or eid,
+        "start": {"dateTime": start.isoformat()},
+        "end": {"dateTime": (start + timedelta(minutes=30)).isoformat()},
+        "updated": updated,
+    }
+
+
+class _ApiFake:
+    """GoogleCalendarClient as the API behaves: events that overlap
+    [time_min, time_max) in start order; with `updated_min` only the entries
+    updated since then, cancelled ones included (showDeleted=false otherwise
+    hides them); `limit` caps the listing; calendars in `fail` raise."""
+
+    def __init__(self, cal_items, events_by_cal):
+        self._cal_items = list(cal_items)
+        self.events_by_cal = events_by_cal
+        self.fail: set[str] = set()
+
+    def list_calendars(self):
+        return list(self._cal_items)
+
+    def list_events(
+        self,
+        calendar_id,
+        *,
+        time_min=None,
+        time_max=None,
+        updated_min=None,
+        page_size=250,
+        limit=None,
+    ):
+        if calendar_id in self.fail:
+            raise cal.CalendarAPIError("rate limited")
+        lo = datetime.fromisoformat(time_min.replace("Z", "+00:00")) if time_min else None
+        hi = datetime.fromisoformat(time_max.replace("Z", "+00:00")) if time_max else None
+        out = []
+        for ev in sorted(
+            self.events_by_cal.get(calendar_id, []), key=lambda e: e["start"]["dateTime"]
+        ):
+            start = datetime.fromisoformat(ev["start"]["dateTime"])
+            end = datetime.fromisoformat(ev["end"]["dateTime"])
+            if (lo and end <= lo) or (hi and start >= hi):
+                continue
+            if updated_min is not None:
+                if ev["updated"] < updated_min:
+                    continue
+            elif ev["status"] == "cancelled":
+                continue
+            out.append(ev)
+        yield from out[:limit] if limit is not None else out
+
+
+def _calendar_account(**overrides) -> dict:
+    return {
+        "email": "alex@example.com",
+        "calendar": {
+            "kind": "google-calendar",
+            "include": [],
+            "backfill_days": 30,
+            "future_days": 7,
+            **overrides,
+        },
+    }
+
+
+def _accounts(monkeypatch, fakes: dict[str, _ApiFake], **overrides) -> None:
+    """One calendar account per entry of `fakes`, each session served by its own fake."""
+    from core.config import CONFIG
+
+    monkeypatch.setattr(
+        CONFIG.personal, "accounts", {aid: _calendar_account(**overrides) for aid in fakes}
+    )
+    monkeypatch.setattr(cal.google_oauth, "session", lambda app, aid: (aid, None))
+    monkeypatch.setattr(cal, "GoogleCalendarClient", lambda session, timeout_s=30.0: fakes[session])
+
+
+def _rollup(vault, day: str):
+    return vault / "raw" / "notes" / "calendar" / f"{day}.md"
+
+
+def _event_ids(path) -> list[str]:
+    import yaml
+
+    return yaml.safe_load(path.read_text(encoding="utf-8").split("---")[1]).get("event_ids", [])
+
+
+def test_incremental_run_keeps_the_unchanged_events_of_a_touched_date(monkeypatch, _isolated_vault):
+    events = [
+        _ev("a", "2026-05-14", "09:00"),
+        _ev("b", "2026-05-14", "11:00"),
+        _ev("c", "2026-05-14", "14:00", updated="2026-05-10T00:00:00Z"),
+    ]
+    _accounts(monkeypatch, {"work": _ApiFake([_PRIMARY], {"primary": events})})
+    cal.CalendarCollector().run()
+
+    events[2] = {**events[2], "summary": "Moved", "updated": "2026-05-15T10:00:00Z"}
+    cal.CalendarCollector().run(incremental=True)
+
+    path = _rollup(_isolated_vault, "2026-05-14")
+    assert _event_ids(path) == ["a", "b", "c"]
+    assert "Moved" in path.read_text(encoding="utf-8")
+
+
+def test_a_cancelled_event_leaves_its_rollup(monkeypatch, _isolated_vault):
+    events = [
+        _ev("a", "2026-05-14", "09:00"),
+        _ev("b", "2026-05-14", "11:00", updated="2026-05-02T00:00:00Z"),
+        _ev("z", "2026-05-13", "10:00", updated="2026-05-02T00:00:00Z"),
+    ]
+    _accounts(monkeypatch, {"work": _ApiFake([_PRIMARY], {"primary": events})})
+    cal.CalendarCollector().run()
+
+    for i in (1, 2):
+        events[i] = {**events[i], "status": "cancelled", "updated": "2026-05-15T10:00:00Z"}
+    cal.CalendarCollector().run(incremental=True)
+
+    assert _event_ids(_rollup(_isolated_vault, "2026-05-14")) == ["a"]
+    emptied = _rollup(_isolated_vault, "2026-05-13")
+    assert _event_ids(emptied) == []
+    assert "event_count: 0" in emptied.read_text(encoding="utf-8")
+
+
+def test_the_same_event_in_two_calendars_is_rendered_once(monkeypatch, _isolated_vault):
+    shared = _ev("s", "2026-05-14", "10:00")
+    fake = _ApiFake([_PRIMARY, _WORK], {"primary": [shared], "work-cal": [dict(shared)]})
+    _accounts(monkeypatch, {"work": fake})
+
+    cal.CalendarCollector().run()
+
+    assert _event_ids(_rollup(_isolated_vault, "2026-05-14")) == ["s"]
+
+
+def test_rollups_are_left_alone_when_a_calendar_cannot_be_fetched(monkeypatch, _isolated_vault):
+    fake = _ApiFake(
+        [_PRIMARY, _WORK],
+        {
+            "primary": [_ev("p", "2026-05-14", "09:00")],
+            "work-cal": [_ev("w", "2026-05-14", "10:00")],
+        },
+    )
+    _accounts(monkeypatch, {"work": fake})
+    cal.CalendarCollector().run()
+
+    fake.fail = {"work-cal"}
+    result = cal.CalendarCollector().run(incremental=True)
+
+    assert _event_ids(_rollup(_isolated_vault, "2026-05-14")) == ["p", "w"]
+    assert "rollups not rewritten" in result.message
+
+
+def test_the_oldest_date_of_the_window_is_read_whole(monkeypatch, _isolated_vault):
+    """NOW is 12:00 and backfill 30 days: a window opening at now − 30 d sees
+    only the afternoon of its first date."""
+    events = [_ev("early", "2026-04-15", "09:00"), _ev("late", "2026-04-15", "15:00")]
+    _accounts(monkeypatch, {"work": _ApiFake([_PRIMARY], {"primary": events})})
+
+    cal.CalendarCollector().run()
+
+    assert _event_ids(_rollup(_isolated_vault, "2026-04-15")) == ["early", "late"]
+
+
+def test_dates_past_a_capped_listing_are_left_alone(monkeypatch, _isolated_vault):
+    events = [
+        _ev("x", "2026-05-13", "09:00"),
+        _ev("y1", "2026-05-14", "09:00"),
+        _ev("y2", "2026-05-14", "11:00"),
+    ]
+    fake = _ApiFake([_PRIMARY], {"primary": events})
+    _accounts(monkeypatch, {"work": fake})
+    cal.CalendarCollector().run()
+
+    _accounts(monkeypatch, {"work": fake}, max_per_run=2)  # the listing now stops inside 05-14
+    cal.CalendarCollector().run(incremental=True)
+
+    assert _event_ids(_rollup(_isolated_vault, "2026-05-14")) == ["y1", "y2"]
+
+
+def test_an_unchanged_rollup_is_not_rewritten(monkeypatch, _isolated_vault):
+    events = [_ev("a", "2026-05-14", "09:00")]
+    _accounts(monkeypatch, {"work": _ApiFake([_PRIMARY], {"primary": events})})
+    cal.CalendarCollector().run()
+    path = _rollup(_isolated_vault, "2026-05-14")
+    first = path.read_text(encoding="utf-8")
+
+    result = cal.CalendarCollector().run(incremental=True)
+
+    assert path not in result.files_written
+    assert path.read_text(encoding="utf-8") == first
+
+
+def test_a_one_account_run_leaves_rollups_other_accounts_feed(monkeypatch, _isolated_vault):
+    fakes = {
+        "work": _ApiFake([_PRIMARY], {"primary": [_ev("w", "2026-05-14", "09:00")]}),
+        "home": _ApiFake([_PRIMARY], {"primary": [_ev("h", "2026-05-14", "18:00")]}),
+    }
+    _accounts(monkeypatch, fakes)
+    cal.CalendarCollector().run()
+    assert _event_ids(_rollup(_isolated_vault, "2026-05-14")) == ["w", "h"]
+
+    cal.CalendarCollector().run(account="work")
+
+    assert _event_ids(_rollup(_isolated_vault, "2026-05-14")) == ["w", "h"]

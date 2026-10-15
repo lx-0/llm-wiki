@@ -2998,6 +2998,15 @@ Per-candidate learnings from the 14-candidate seam arc (C01–C14). Decisions li
   a normal return, so an in-process caller such as pytest kept the runner's closure. A
   deterministic test reads the handler at the moment `running` is written; a flaky test
   around a state machine is usually the race it is about.
+- **A delta listing must not drive a whole-unit rewrite (2026-10-15, M033-S05-T06):** the
+  calendar collector fetched only the events updated since a watermark (`updatedMin`) and
+  regenerated each touched date file "end-to-end" from them, so every unchanged event of that
+  date was deleted on each incremental run (vault: `event_count` 6 → 1). The two halves were
+  each reasonable: delta sync is cheap, and a whole-file rewrite avoids partial edits. Together
+  they silently drop data, and fakes that ignore `updated_min` / `time_min` / `limit` hid it.
+  The fix renders from the complete set or does not write. The test fake has to behave like
+  the API: window overlap, `updatedMin` with cancelled entries, the cap. Same review question
+  for any "regenerate the unit" writer: does the input hold the whole unit?
 
 ### Desktop toolchain (C07)
 

@@ -74,7 +74,8 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 │   │   ├── gmeet.py               ← Google Meet / Gemini transcripts (Drive API through adapters/drive/)
 │   │   ├── voice.py               ← inbox-watch dictation ingester (iOS Shortcuts / OpenWhispr / FluidVoice)
 │   │   ├── health.py              ← Oura REST daily biometric rollup (sleep / readiness / HRV / steps)
-│   │   ├── calendar_collector.py  ← Google Calendar v3 → per-date rollups (multi-tenant, OAuth)
+│   │   ├── calendar_collector.py  ← Google Calendar v3 → per-date rollups (multi-tenant, OAuth; whole-window re-list, a date rewritten only from a complete listing)
+│   │   ├── calendar_render.py     ← the calendar event model + rollup / recurring-concept markdown (no paths, no API)
 │   │   ├── wispr.py               ← Wispr Flow meetings via the desktop app's HTTP API
 │   │   ├── pictures.py            ← inbox-watch camera / phone-photo ingester (vision per file + batch report)
 │   │   ├── _picture_metadata.py   ← EXIF + filename-pattern parsing behind pictures.py

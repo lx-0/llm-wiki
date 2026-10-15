@@ -2220,3 +2220,35 @@ green, and every task closed with it green and pushed with CI green.
 
 **Operator-visible:** release 0.7.0. There are no config keys, so no migration, and schema 2 is
 unchanged; the CHANGELOG lists the fixes and the renamed hyphen scripts.
+
+## 2026-10-15: Calendar rollups — re-list the whole window, rewrite a date only from a complete listing
+
+**Context:** the M033-close backlog audit traced, and the vault history confirmed, that the
+piggyback's incremental calendar run (`updatedMin` = a per-calendar watermark) rewrote each
+date it touched from that run's changed events alone, so every unchanged event of the date
+left its rollup (lxw `raw/notes/calendar/2026-06-11.md`: `event_count` 6 → 1 in vault commit
+2869a316). The same path kept cancelled events, listed an event once per calendar, read the
+oldest date from midday (`time_min = now − N days`), rewrote dates from a capped listing, and
+a `--account` run rewrote dates other accounts feed.
+
+**Chose:** no delta sync. Every run lists the whole window (`backfill_days` back,
+`future_days` ahead, day-aligned with a day of margin on each side for UTC offsets) and
+renders each date from all of its events, one block per event id; a date is written only
+when its content changed (`ingested_at` ignored). Rollups are rewritten only when the run
+vouches for every event of the date: every configured account and calendar listed (an API
+error, an auth failure, `--account` beside other accounts → no rollup is rewritten, and the
+run message says why) and no calendar capped by `max_per_run` before the date. The
+per-calendar watermark / etag cache, the adapter's `updatedMin` and its never-called
+`get_event` are gone. `since:` applies to full runs (`wiki collect calendar` without
+`--incremental`), for every calendar.
+
+**Rejected:** a per-event cache in state that rollups are rendered from. It keeps API calls
+low, but adds a second copy of the calendar that has to stay consistent with Google. Also
+rejected: parsing kept blocks back out of the rollup text, which is fragile. Re-listing costs
+one or two pages per calendar every 6 h at the live volume: 156 events in the 97-day window,
+at most 91 in one calendar, against a cap of 500.
+
+**Consequences:** a failing account freezes every rollup until it lists again — safe and loud
+rather than lossy. The first run after `wiki update` restores the dropped events inside the
+window; older dates need one full run with `since:`. The rendering moved to
+`collectors/calendar_render.py`, because the collector had reached the module-size limit.

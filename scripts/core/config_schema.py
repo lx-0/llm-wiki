@@ -415,8 +415,8 @@ class Limits:
     # under personal.accounts.<id>.calendar (kind: google-calendar,
     # include, backfill_days, future_days, since, max_per_run).
     calendar_request_timeout_s: int = 30  # per-HTTP-call timeout against calendar.googleapis.com
-    calendar_max_per_run: int = 500       # default per-calendar cap; per-account override is the calendar sub-block's max_per_run
-    calendar_backfill_days: int = 90      # default past window per run (events with updated >= now-N for delta sync)
+    calendar_max_per_run: int = 500       # default per-calendar cap; per-account override is the calendar sub-block's max_per_run (a capped listing leaves the rollups from the cut date on unrewritten)
+    calendar_backfill_days: int = 90      # default past window per run (the dates now-N … today are re-listed whole every run)
     calendar_future_days: int = 7         # default future window re-fetched every run (catches mutations on upcoming events)
     # Oura health ingest (collectors/health.py — Phase 1, oura-only).
     # Multi-tenant: per-account health.oura block under personal.accounts.<id>.health

@@ -149,8 +149,8 @@ The `.env` file: only the **variable NAME** lives in `config.yaml` (e.g. `api_ke
 | `limits.gmeet_export_dead_letter_attempts` | `3` | export failures per doc-id before it parks in the dead-letter |
 | `limits.gmeet_export_dead_letter_reprobe_days` | `7` | days a parked doc-id waits before one re-probe (re-granted access heals) |
 | `limits.calendar_request_timeout_s` | `30` | Google Calendar ingest (collectors/calendar_collector.py — see also CONFIG.piggybacks.calendar). |
-| `limits.calendar_max_per_run` | `500` | default per-calendar cap; per-account override is the calendar sub-block's max_per_run |
-| `limits.calendar_backfill_days` | `90` | default past window per run (events with updated >= now-N for delta sync) |
+| `limits.calendar_max_per_run` | `500` | default per-calendar cap; per-account override is the calendar sub-block's max_per_run (a capped listing leaves the rollups from the cut date on unrewritten) |
+| `limits.calendar_backfill_days` | `90` | default past window per run (the dates now-N … today are re-listed whole every run) |
 | `limits.calendar_future_days` | `7` | default future window re-fetched every run (catches mutations on upcoming events) |
 | `limits.oura_request_timeout_s` | `30` | Oura health ingest (collectors/health.py — Phase 1, oura-only). |
 | `limits.oura_max_backfill_days` | `90` | default first-run window; per-account override via backfill_days |

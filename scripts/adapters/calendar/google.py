@@ -139,7 +139,6 @@ class GoogleCalendarClient:
         *,
         time_min: str | None = None,
         time_max: str | None = None,
-        updated_min: str | None = None,
         page_size: int = 250,
         limit: int | None = None,
     ) -> Iterator[dict]:
@@ -155,9 +154,8 @@ class GoogleCalendarClient:
         events are filtered out server-side via ``showDeleted=false``
         (the default, named explicitly here for clarity).
 
-        ``updated_min`` is the watermark for delta sync — only events with
-        ``updated >= updated_min`` are returned. Combine with ``time_min``
-        for the future-mutation window.
+        No ``updatedMin`` delta mode: the collector re-lists the whole window,
+        because a date rendered from its changed events alone loses the rest.
         """
         params: dict[str, Any] = {
             "singleEvents": "true",
@@ -169,8 +167,6 @@ class GoogleCalendarClient:
             params["timeMin"] = time_min
         if time_max:
             params["timeMax"] = time_max
-        if updated_min:
-            params["updatedMin"] = updated_min
 
         seen = 0
         page_token: str | None = None
@@ -197,12 +193,3 @@ class GoogleCalendarClient:
             page_token = payload.get("nextPageToken")
             if not page_token:
                 return
-
-    def get_event(self, calendar_id: str, event_id: str) -> dict:
-        """Fetch a single event (used by the etag re-fetch path when a
-        listed instance reports a changed etag)."""
-        from urllib.parse import quote
-
-        cal_segment = quote(calendar_id, safe="")
-        evt_segment = quote(event_id, safe="")
-        return self._get(f"{_API_BASE}/calendars/{cal_segment}/events/{evt_segment}")

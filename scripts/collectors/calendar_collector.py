@@ -12,12 +12,19 @@ Shape
 -----
 
 One markdown file per date, regardless of how many accounts / calendars
-contributed events to it. The file is regenerated end-to-end each run for
-the dates touched by the current sync window — the rewrite is cheap
-(events are short), and it lets the collector handle event mutations
-(updated title, time-shift) and cancellations without doing partial-edit
-gymnastics inside the file. Operator prose mixed in between event blocks
-is preserved by only rewriting the events region.
+contributed events to it. Every run lists the whole window (``backfill_days``
+back, ``future_days`` ahead) and renders each date of it from ALL of that
+date's events, so mutations (updated title, time-shift) and cancellations
+need no partial-edit gymnastics inside the file; a file is written only when
+its content changed. Operator prose mixed in between event blocks is
+preserved by only rewriting the events region.
+
+A date is rewritten only from a complete listing — every configured account
+and calendar fetched this run, the date fully inside the window, no calendar
+capped by ``max_per_run`` before it. Otherwise the rollups stay as they are
+and the run says why: an incremental listing (``updatedMin``) once rewrote
+each touched date from its changed events alone, and every unchanged event of
+that date vanished (lxw 2026-06-11: event_count 6 → 1).
 
 Frontmatter::
 
@@ -61,10 +68,9 @@ Phases delivered
   ``raw/transcripts/{gmeet,jamie}/*.md`` and adds a
   ``Transcript: [[…|gmeet]]`` line to events whose date + title match a
   transcript file (fuzzy title match on slugified meeting title).
-- **Mutable-event re-fetch** — state stores ``etag`` per event id. On
-  re-sync, an unchanged etag for a previously seen event id means the
-  event block doesn't need to be regenerated; a changed etag rebuilds
-  the date file.
+- **Whole-window re-list** — see "Shape": no delta sync, no per-event cache.
+  An event that appears in two selected calendars (or two accounts) under the
+  same id is rendered once.
 
 Anti-slop heuristics (per backlog/calendar-collector.md):
 
@@ -79,15 +85,12 @@ State shape (``state/calendar-state.json``)::
 
     {
       "<account_id>": {
-        "calendars": {
-          "<calendar_id>": {
-            "watermark_updated": "<ISO timestamp of newest updated event seen>",
-            "etags": {"<event_id>": "<etag>"}
-          }
-        },
         "recurring": {"<recurringEventId>": "<concept-slug>"}
       }
     }
+
+(The per-calendar ``watermark_updated`` / ``etags`` cache of the delta-sync
+design is dropped from an account's entry on its next run.)
 """
 
 from __future__ import annotations
@@ -97,11 +100,8 @@ import logging
 import re
 from collections import defaultdict
 from dataclasses import dataclass, field
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
-from typing import Any
-
-import yaml
 
 from adapters.calendar.google import (
     SCOPE as _GOOGLE_CAL_SCOPE,
@@ -118,11 +118,17 @@ from collectors.base import (
     resolve_accounts,
     run_account_loop,
 )
-from core import frontmatter, google_oauth, markers
+from collectors.calendar_render import (
+    _EventBlock,
+    _render_date_file,
+    _render_recurring_concept,
+    _same_rollup,
+)
+from core import frontmatter, google_oauth
 from core.config import CONFIG
 from core.google_oauth import OAuthApp
 from core.paths import ROOT_DIR, STATE_DIR
-from core.utils import load_json_state, now_iso, save_json_state, slugify
+from core.utils import load_json_state, save_json_state, slugify
 
 log = logging.getLogger(__name__)
 
@@ -132,17 +138,7 @@ log = logging.getLogger(__name__)
 _OUTPUT_SUBFOLDER = "raw/notes/calendar"
 _STATE_FILE = STATE_DIR / "calendar-state.json"
 
-
-# Region inside the per-date file that the collector owns. Operator-typed
-# prose ABOVE or BELOW these sentinels is preserved across regenerations.
-_EVENTS_BEGIN = "<!-- calendar:events:begin -->"
-_EVENTS_END = "<!-- calendar:events:end -->"
-
-# Heuristic: a "meeting" is an event with at least one attendee other than
-# the operator themselves. Pure focus blocks and personal reminders have
-# zero attendees. Counted via the frontmatter ``meeting_hours`` /
-# ``focus_hours`` fields so dashboards can chart load.
-_FOCUS_HOUR_CAP = 12.0  # an all-day event doesn't get counted as 24h focus
+_DATE_STEM = re.compile(r"\d{4}-\d{2}-\d{2}")  # a rollup's filename stem
 
 
 # ── Time helpers ─────────────────────────────────────────────────────
@@ -172,26 +168,6 @@ def _parse_event_time(raw: dict | None) -> tuple[datetime | None, bool]:
         except ValueError:
             return None, False
     return None, False
-
-
-def _format_event_window(start: datetime, end: datetime | None, *, all_day: bool) -> str:
-    """Render the ``HH:MM–HH:MM`` (or ``all-day``) prefix for an event heading."""
-    if all_day:
-        return "all-day"
-    if end is None:
-        return start.strftime("%H:%M")
-    return f"{start.strftime('%H:%M')}–{end.strftime('%H:%M')}"
-
-
-def _event_duration_hours(start: datetime, end: datetime | None, *, all_day: bool) -> float:
-    if end is None:
-        return 0.0
-    if all_day:
-        # All-day events: count 0 in both meeting/focus buckets (otherwise
-        # one PTO marker would dwarf the day's actual load metric).
-        return 0.0
-    delta = end - start
-    return max(0.0, delta.total_seconds() / 3600.0)
 
 
 # ── Account resolution ──────────────────────────────────────────────
@@ -284,186 +260,11 @@ def _is_operator_declined(event: dict, operator_email: str | None) -> bool:
     return False
 
 
-# ── Rendering ───────────────────────────────────────────────────────
-
-
-@dataclass
-class _EventBlock:
-    """One event ready to render into a per-date rollup."""
-
-    event_id: str
-    etag: str
-    start: datetime
-    end: datetime | None
-    all_day: bool
-    summary: str
-    description: str
-    location: str
-    attendees: list[str]
-    organizer: str | None
-    calendar_summary: str
-    account_id: str
-    is_meeting: bool
-    recurring_event_id: str | None
-    recurring_slug: str | None
-    recurring_title: str | None
-    transcript_link: str | None = None  # filled in by cross-link pass
-
-    def date_key(self) -> str:
-        return self.start.strftime("%Y-%m-%d")
-
-
-def _render_event_block(b: _EventBlock) -> str:
-    """Render one ``## …`` event section."""
-    window = _format_event_window(b.start, b.end, all_day=b.all_day)
-    heading = f"## {window} · {b.summary or '(no title)'}"
-    lines = [heading]
-    meta: list[str] = []
-    meta.append(f"- **Calendar:** {b.calendar_summary} (account: {b.account_id})")
-    if b.attendees:
-        meta.append(f"- **Attendees:** {', '.join(b.attendees)}")
-    if b.organizer and b.organizer not in b.attendees:
-        meta.append(f"- **Organizer:** {b.organizer}")
-    if b.location:
-        meta.append(f"- **Location:** {b.location}")
-    if b.recurring_slug and b.recurring_title:
-        meta.append(f"- **Recurring:** [[concepts/{b.recurring_slug}|{b.recurring_title}]]")
-    if b.transcript_link:
-        meta.append(f"- **Transcript:** {b.transcript_link}")
-    meta.append(f"- **Event ID:** {b.event_id}")
-    lines.extend(meta)
-    if b.description.strip():
-        lines.append("")
-        lines.append(b.description.strip())
-    lines.append("")
-    return "\n".join(lines)
-
-
-def _render_date_file(
-    date_key: str,
-    blocks: list[_EventBlock],
-    *,
-    existing_text: str | None,
-) -> str:
-    """Render one per-date rollup. Preserves operator prose outside the
-    managed ``<!-- calendar:events:* -->`` sentinels."""
-    blocks_sorted = sorted(blocks, key=lambda b: (b.start, b.summary))
-
-    event_count = len(blocks_sorted)
-    meeting_hours = 0.0
-    focus_hours = 0.0
-    people: set[str] = set()
-    event_ids: list[str] = []
-    for b in blocks_sorted:
-        dur = _event_duration_hours(b.start, b.end, all_day=b.all_day)
-        if b.is_meeting:
-            meeting_hours += dur
-        else:
-            focus_hours += min(dur, _FOCUS_HOUR_CAP)
-        for a in b.attendees:
-            people.add(a)
-        event_ids.append(b.event_id)
-
-    front: dict[str, Any] = {
-        "title": f"Calendar — {date_key}",
-        "type": "calendar-rollup",
-        "date": date_key,
-        "event_count": event_count,
-        "meeting_hours": round(meeting_hours, 2),
-        "focus_hours": round(focus_hours, 2),
-        "people": sorted(people),
-        "event_ids": event_ids,
-        "tags": ["calendar"],
-        "ingested_at": now_iso(),
-    }
-    # Drop empties for terser frontmatter.
-    front = {k: v for k, v in front.items() if v not in (None, [], "")}
-    fm = yaml.safe_dump(front, sort_keys=False, allow_unicode=True).strip()
-
-    events_md = "\n".join(_render_event_block(b) for b in blocks_sorted).rstrip()
-    managed_region = f"{_EVENTS_BEGIN}\n\n{events_md}\n\n{_EVENTS_END}"
-
-    pre_prose, post_prose = _split_operator_prose(existing_text)
-    body_parts = [f"# Calendar — {date_key}", ""]
-    if pre_prose:
-        body_parts.append(pre_prose.strip())
-        body_parts.append("")
-    body_parts.append(managed_region)
-    if post_prose:
-        body_parts.append("")
-        body_parts.append(post_prose.strip())
-    body = "\n".join(body_parts).rstrip() + "\n"
-    return f"---\n{fm}\n---\n{body}"
-
-
-def _split_operator_prose(existing: str | None) -> tuple[str, str]:
-    """Extract the operator-written sections before/after the managed
-    events region. Returns ``("", "")`` when the file is new or doesn't
-    have the sentinels yet. Region location (incl. the stray/reversed-marker
-    contract) is ``core.markers``."""
-    if not existing:
-        return "", ""
-    # Strip frontmatter if present (the seam's fence grammar; no fence → whole text).
-    _block, body = frontmatter.split_fence(existing)
-    # Strip the first ``# Calendar — …`` heading (we always re-emit it).
-    body = re.sub(r"^# Calendar —[^\n]*\n+", "", body, count=1)
-    region = markers.find_region(body, _EVENTS_BEGIN, _EVENTS_END)
-    if region is None:
-        return body.strip(), ""
-    return body[: region.start].strip(), body[region.end :].strip()
-
-
 # ── Recurring concept page ──────────────────────────────────────────
 
 
 def _recurring_concept_path(slug: str) -> Path:
     return ROOT_DIR / "knowledge" / "concepts" / f"{slug}.md"
-
-
-def _render_recurring_concept(
-    slug: str,
-    title: str,
-    *,
-    sample_block: _EventBlock,
-) -> str:
-    """Write the canonical concept page for a recurring series.
-
-    Cheap shape — frontmatter + a one-paragraph stub. Compile passes can
-    enrich it later; the value of this file today is being the link
-    target for the per-date rollups (so the graph view shows the series
-    as one node).
-    """
-    front: dict[str, Any] = {
-        "title": title,
-        "type": "concept",
-        "series": True,
-        "tags": ["meeting", "recurring", "llm-wiki"],
-        "ingested_at": now_iso(),
-    }
-    fm = yaml.safe_dump(front, sort_keys=False, allow_unicode=True).strip()
-    cadence = (
-        "Recurring calendar series." if not sample_block.all_day else "Recurring all-day event."
-    )
-    body_parts = [
-        f"# {title}",
-        "",
-        cadence,
-        "",
-        "## Origin",
-        "",
-        f"- First seen: {sample_block.start.strftime('%Y-%m-%d')}",
-        f"- Calendar: {sample_block.calendar_summary} (account: {sample_block.account_id})",
-    ]
-    if sample_block.attendees:
-        body_parts.append(f"- Initial attendees: {', '.join(sample_block.attendees)}")
-    if sample_block.description.strip():
-        body_parts.append("")
-        body_parts.append("## Description")
-        body_parts.append("")
-        body_parts.append(sample_block.description.strip())
-    body_parts.append("")
-    body = "\n".join(body_parts).rstrip() + "\n"
-    return f"---\n{fm}\n---\n{body}"
 
 
 # ── Transcript cross-link ───────────────────────────────────────────
@@ -570,13 +371,69 @@ def _attach_transcript_links(blocks: list[_EventBlock], refs: list[_TranscriptRe
 # ── Per-account scan ────────────────────────────────────────────────
 
 
+@dataclass(frozen=True)
+class _Coverage:
+    """What one account's scan vouches for: every event dated ``first`` …
+    ``last`` was listed — unless ``complete`` is False (the account or one of
+    its calendars could not be fetched) — up to the day before ``cut``, the
+    date at which a calendar's listing hit ``max_per_run``."""
+
+    account_id: str
+    first: str  # YYYY-MM-DD
+    last: str
+    complete: bool = True
+    cut: str | None = None
+
+
+def _window_dates(acct: _CalendarAccount, *, incremental: bool) -> tuple[date, date]:
+    """The dates one run lists whole: ``backfill_days`` back to ``future_days``
+    ahead of today (UTC) — or, on a full (not incremental) run, from the
+    account's configured ``since``."""
+    now = datetime.now(UTC)
+    first = (now - timedelta(days=acct.backfill_days)).date()
+    if not incremental and acct.since:
+        try:
+            first = datetime.fromisoformat(acct.since.replace("Z", "+00:00")).date()
+        except ValueError:
+            log.warning("CalendarCollector[%s]: unparseable since %r", acct.account_id, acct.since)
+    return first, (now + timedelta(days=acct.future_days)).date()
+
+
+def _utc_midnight(d: date) -> str:
+    return datetime(d.year, d.month, d.day, tzinfo=UTC).isoformat().replace("+00:00", "Z")
+
+
+def _rollup_span(
+    coverages: list[_Coverage], *, failed: list[str], unlisted: list[str]
+) -> tuple[tuple[str, str] | None, str]:
+    """The dates whose rollups this run can rewrite, or None and why not. A
+    date's file holds the events of every account, so any account missing from
+    the listing — not asked for, failed, or with a calendar it could not list —
+    leaves every rollup as it is (the next complete run catches up)."""
+    if unlisted:
+        return None, f"this run did not list {', '.join(unlisted)}"
+    partial = sorted({*failed, *(c.account_id for c in coverages if not c.complete)})
+    if partial:
+        return None, f"{', '.join(partial)} not fully listed"
+    if not coverages:
+        return None, "no account was listed"
+    first = max(c.first for c in coverages)
+    last = min(c.last for c in coverages)
+    cuts = [c.cut for c in coverages if c.cut]
+    if cuts:
+        last = min(last, (date.fromisoformat(min(cuts)) - timedelta(days=1)).isoformat())
+    if first > last:
+        return None, "no date is fully listed"
+    return (first, last), ""
+
+
 @dataclass
 class _CalendarScan:
     """The accumulators of one account's scan, shared by the per-calendar phase.
 
-    ``time_min`` is carried here because the loop reassigns it to the account's
-    configured ``since`` whenever a calendar has no incremental watermark — and
-    that reassignment stays in force for the calendars scanned after it."""
+    The fetch window reaches a day past the account's dates on each side, so an
+    edge date is listed whole whatever the event's UTC offset (date keys use the
+    event's own offset)."""
 
     time_min: str
     time_max: str
@@ -585,7 +442,8 @@ class _CalendarScan:
     blocks: list[_EventBlock] = field(default_factory=list)
     new_concepts: list[tuple[str, _EventBlock]] = field(default_factory=list)
     total_listed: int = 0
-    state_touched: bool = False
+    complete: bool = True
+    cut: str | None = None
 
 
 def _fetch_events(
@@ -596,7 +454,6 @@ def _fetch_events(
     cal_summary: str,
     time_min: str,
     time_max: str,
-    updated_min: str | None,
 ) -> list[dict] | None:
     """The fetch phase for one calendar; None when the API call failed (logged —
     the calendar is skipped this run)."""
@@ -606,7 +463,6 @@ def _fetch_events(
                 cal_id,
                 time_min=time_min,
                 time_max=time_max,
-                updated_min=updated_min,
                 limit=acct.max_per_run,
             )
         )
@@ -683,7 +539,6 @@ def _event_block(
 
     return _EventBlock(
         event_id=ev.get("id") or "",
-        etag=ev.get("etag") or "",
         start=start_dt,
         end=end_dt,
         all_day=all_day,
@@ -744,29 +599,26 @@ class CalendarCollector:
 
         state = load_json_state(_STATE_FILE)
         all_written: list[Path] = []
-        total_skipped = 0
 
-        # Gather per-account event blocks first so we can write per-date
-        # files in one pass (a date can carry events from multiple accounts).
-        # The harness owns failure isolation + message aggregation; the payload
-        # here is (blocks, new_concepts) — payload-generic, not the files+skipped
-        # shape the other account collectors return.
-        blocks_by_date: dict[str, list[_EventBlock]] = defaultdict(list)
+        # Gather every account's events first: a date's file carries the events
+        # of every account, so it is rendered once all of them are listed. The
+        # harness owns failure isolation + message aggregation; the payload is
+        # (blocks, new_concepts, coverage) — payload-generic, not the
+        # files+skipped shape the other account collectors return.
+        blocks: list[_EventBlock] = []
         new_concepts: list[tuple[str, _EventBlock]] = []  # (slug, sample)
+        coverages: list[_Coverage] = []
 
         scan = functools.partial(self._run_one_account, state=state, incremental=incremental)
         outcome = run_account_loop(accounts, scan, log=log, name="CalendarCollector")
-        for blocks, concepts in outcome.payloads:
-            for b in blocks:
-                blocks_by_date[b.date_key()].append(b)
+        for acct_blocks, concepts, coverage in outcome.payloads:
+            blocks.extend(acct_blocks)
             new_concepts.extend(concepts)
-        any_state_touched = outcome.any_state_touched
-        per_acct_messages = outcome.messages
+            coverages.append(coverage)
+        messages = list(outcome.messages)
 
         # Cross-link pass — fuzzy match event title + date to transcripts.
-        flat_blocks = [b for v in blocks_by_date.values() for b in v]
-        transcripts = _scan_transcripts()
-        linked = _attach_transcript_links(flat_blocks, transcripts)
+        linked = _attach_transcript_links(blocks, _scan_transcripts())
         if linked:
             log.info("CalendarCollector: %d transcript link(s) attached", linked)
 
@@ -786,35 +638,75 @@ class CalendarCollector:
                 )
                 all_written.append(path)
 
-        # Per-date rollups.
-        output_root = ROOT_DIR / self.SPEC.output_subfolder
-        if not dry_run:
-            output_root.mkdir(parents=True, exist_ok=True)
-        for date_key, blocks in sorted(blocks_by_date.items()):
-            target = output_root / f"{date_key}.md"
-            existing = target.read_text(encoding="utf-8") if target.exists() else None
-            md = _render_date_file(date_key, blocks, existing_text=existing)
-            if dry_run:
-                log.info(
-                    "  DRY: would write %s (%d events, %d bytes)",
-                    target.relative_to(ROOT_DIR),
-                    len(blocks),
-                    len(md),
-                )
-                continue
-            target.write_text(md, encoding="utf-8")
-            log.info("  wrote %s (%d events)", target.relative_to(ROOT_DIR), len(blocks))
-            all_written.append(target)
+        # Per-date rollups — only from a listing that holds every event of the date.
+        span, why_not = _rollup_span(
+            coverages,
+            failed=outcome.error_ids,
+            unlisted=[a.account_id for a in self._accounts if a not in accounts],
+        )
+        unchanged = 0
+        if span is None:
+            log.warning("CalendarCollector: rollups not rewritten — %s", why_not)
+            messages.append(f"rollups not rewritten: {why_not}")
+        else:
+            written, unchanged = self._write_rollups(blocks, span, dry_run=dry_run)
+            all_written.extend(written)
 
-        if not dry_run and any_state_touched:
+        if not dry_run and outcome.any_state_touched:
             save_json_state(_STATE_FILE, state)
 
         return RunResult(
             files_written=tuple(all_written),
-            files_skipped=total_skipped,
-            state_keys_touched=(tuple(a.account_id for a in accounts) if any_state_touched else ()),
-            message=" · ".join(per_acct_messages) or "no-op",
+            files_skipped=unchanged,
+            state_keys_touched=(
+                tuple(a.account_id for a in accounts) if outcome.any_state_touched else ()
+            ),
+            message=" · ".join(messages) or "no-op",
         )
+
+    def _write_rollups(
+        self, blocks: list[_EventBlock], span: tuple[str, str], *, dry_run: bool
+    ) -> tuple[list[Path], int]:
+        """Render every date of ``span`` that has events or a file — each from
+        all of its events, one block per event id (the same event can sit in
+        two calendars) — and write the ones whose content changed. A date whose
+        events are all gone keeps its file with an empty events region.
+        Returns (written, unchanged)."""
+        first, last = span
+        output_root = ROOT_DIR / self.SPEC.output_subfolder
+        by_date: dict[str, dict[str, _EventBlock]] = defaultdict(dict)
+        for b in blocks:
+            key = b.date_key()
+            if first <= key <= last:
+                by_date[key].setdefault(b.event_id or f"#{len(by_date[key])}", b)
+        if output_root.is_dir():
+            for path in output_root.glob("*.md"):
+                if _DATE_STEM.fullmatch(path.stem) and first <= path.stem <= last:
+                    by_date.setdefault(path.stem, {})
+        elif not dry_run:
+            output_root.mkdir(parents=True, exist_ok=True)
+
+        written: list[Path] = []
+        unchanged = 0
+        for date_key, events in sorted(by_date.items()):
+            target = output_root / f"{date_key}.md"
+            existing = target.read_text(encoding="utf-8") if target.exists() else None
+            md = _render_date_file(date_key, list(events.values()), existing_text=existing)
+            if existing is not None and _same_rollup(existing, md):
+                unchanged += 1
+                continue
+            if dry_run:
+                log.info(
+                    "  DRY: would write %s (%d events, %d bytes)",
+                    target.relative_to(ROOT_DIR),
+                    len(events),
+                    len(md),
+                )
+                continue
+            target.write_text(md, encoding="utf-8")
+            log.info("  wrote %s (%d events)", target.relative_to(ROOT_DIR), len(events))
+            written.append(target)
+        return written, unchanged
 
     # ── per-account ──────────────────────────────────────────────────
 
@@ -824,20 +716,24 @@ class CalendarCollector:
         *,
         state: dict,
         incremental: bool,
-    ) -> tuple[str, tuple[list[_EventBlock], list[tuple[str, _EventBlock]]], bool]:
-        """Run one account's scan. Returns (message, (blocks, new_concepts),
-        state_touched) for the harness's payload-generic aggregation.
+    ) -> tuple[str, tuple[list[_EventBlock], list[tuple[str, _EventBlock]], _Coverage], bool]:
+        """Run one account's scan. Returns (message, (blocks, new_concepts,
+        coverage), state_touched) for the harness's payload-generic aggregation.
 
         ``new_concepts`` is the list of recurring-series slugs that need a
-        canonical concept page written (first sighting only).
+        canonical concept page written (first sighting only); ``coverage`` says
+        which dates the listing vouches for (``run()`` rewrites no rollup from a
+        partial one).
 
-        The phases: the calendars → the window → per calendar ``_scan_calendar``
-        (``_fetch_events`` → ``_event_block`` per event → the etag / watermark
-        entry) → the account state + message. The write phase (per-date files,
-        concept pages) is ``run()``'s, once every account has been scanned."""
+        The phases: the window → the calendars → per calendar ``_scan_calendar``
+        (``_fetch_events`` → ``_event_block`` per event) → the account state +
+        message. The write phase (per-date files, concept pages) is ``run()``'s,
+        once every account has been scanned."""
+        first, last = _window_dates(acct, incremental=incremental)
+        partial = _Coverage(acct.account_id, first.isoformat(), last.isoformat(), complete=False)
         sess, err = google_oauth.session(_app(acct.account_id), acct.account_id)
         if err:
-            return f"auth: {err}", ([], []), False
+            return f"auth: {err}", ([], [], partial), False
         client = GoogleCalendarClient(session=sess, timeout_s=self._timeout_s)
 
         # ── Calendar selection ──
@@ -845,33 +741,28 @@ class CalendarCollector:
             cal_items = client.list_calendars()
         except CalendarAPIError as e:
             log.error("CalendarCollector[%s]: list_calendars failed: %s", acct.account_id, e)
-            return f"list_calendars failed: {e}", ([], []), False
+            return f"list_calendars failed: {e}", ([], [], partial), False
         chosen = self._select_calendars(cal_items, acct)
         if not chosen:
-            return "no-op (no calendars selected)", ([], []), False
-
-        # ── Time window ──
-        now = datetime.now(UTC)
-        time_min_dt = now - timedelta(days=acct.backfill_days)
-        time_max_dt = now + timedelta(days=acct.future_days)
+            whole = _Coverage(acct.account_id, first.isoformat(), last.isoformat())
+            return "no-op (no calendars selected)", ([], [], whole), False
 
         acct_state = state.get(acct.account_id) or {}
-        cal_state = acct_state.get("calendars") or {}
+        recurring_before = dict(acct_state.get("recurring") or {})
         scan = _CalendarScan(
-            time_min=time_min_dt.isoformat().replace("+00:00", "Z"),
-            time_max=time_max_dt.isoformat().replace("+00:00", "Z"),
+            time_min=_utc_midnight(first - timedelta(days=1)),
+            time_max=_utc_midnight(last + timedelta(days=2)),
             # Operator email — used to resolve the "self" attendee for
             # responseStatus=declined filtering.
             operator_email=self._operator_email(acct.account_id),
-            recurring_map=dict(acct_state.get("recurring") or {}),
+            recurring_map=dict(recurring_before),
         )
 
         for cal in chosen:
-            self._scan_calendar(
-                client, cal, acct, cal_state=cal_state, scan=scan, incremental=incremental
-            )
+            self._scan_calendar(client, cal, acct, scan=scan)
 
-        acct_state["calendars"] = cal_state
+        # The delta-sync cache (per-calendar watermark + etags) is retired.
+        dropped_cache = acct_state.pop("calendars", None) is not None
         acct_state["recurring"] = scan.recurring_map
         state[acct.account_id] = acct_state
 
@@ -879,7 +770,11 @@ class CalendarCollector:
             f"calendars={len(chosen)} · listed={scan.total_listed} · blocks={len(scan.blocks)}"
             f" · recurring={len(scan.new_concepts)}"
         )
-        return msg, (scan.blocks, scan.new_concepts), scan.state_touched
+        coverage = _Coverage(
+            acct.account_id, first.isoformat(), last.isoformat(), scan.complete, scan.cut
+        )
+        touched = dropped_cache or scan.recurring_map != recurring_before
+        return msg, (scan.blocks, scan.new_concepts, coverage), touched
 
     @staticmethod
     def _scan_calendar(
@@ -887,29 +782,15 @@ class CalendarCollector:
         cal: dict,
         acct: _CalendarAccount,
         *,
-        cal_state: dict,
         scan: _CalendarScan,
-        incremental: bool,
     ) -> None:
-        """One calendar: the fetch arguments from its state entry, the events
-        through ``_event_block``, the etag union + watermark back into
-        ``cal_state``."""
+        """One calendar: the whole window listed, the events through
+        ``_event_block``; a failed fetch marks the scan incomplete, a capped
+        listing records the date it stopped in."""
         cal_id = cal.get("id") or ""
         cal_summary = cal.get("summaryOverride") or cal.get("summary") or cal_id
         if not cal_id:
             return
-
-        entry = dict(cal_state.get(cal_id) or {})
-        etag_map: dict[str, str] = dict(entry.get("etags") or {})
-        new_etag_map: dict[str, str] = {}
-        watermark = entry.get("watermark_updated")
-        updated_min = None
-        if incremental and watermark:
-            # Google requires the updatedMin watermark to be strictly in
-            # the past; an inflight watermark equal to "now" would 400.
-            updated_min = watermark
-        elif acct.since:
-            scan.time_min = acct.since
 
         events = _fetch_events(
             client,
@@ -918,13 +799,26 @@ class CalendarCollector:
             cal_summary=cal_summary,
             time_min=scan.time_min,
             time_max=scan.time_max,
-            updated_min=updated_min,
         )
         if events is None:
+            scan.complete = False
             return
 
         scan.total_listed += len(events)
-        newest_updated = watermark
+        if acct.max_per_run > 0 and len(events) >= acct.max_per_run:
+            # The listing runs in start order, so the cap ends it partway into a
+            # date: that date and every later one are only partly listed.
+            last_start, _ = _parse_event_time(events[-1].get("start"))
+            cut = last_start.strftime("%Y-%m-%d") if last_start else scan.time_min[:10]
+            scan.cut = min(cut, scan.cut) if scan.cut else cut
+            log.warning(
+                "CalendarCollector[%s/%s]: listing capped at max_per_run=%d on %s — "
+                "rollups from that date on are not rewritten",
+                acct.account_id,
+                cal_summary,
+                acct.max_per_run,
+                cut,
+            )
 
         for ev in events:
             block = _event_block(
@@ -947,24 +841,6 @@ class CalendarCollector:
                     s == slug for s, _ in scan.new_concepts
                 ):
                     scan.new_concepts.append((slug, block))
-
-            if block.event_id:
-                new_etag_map[block.event_id] = block.etag
-
-            upd = ev.get("updated")
-            if isinstance(upd, str) and (newest_updated is None or upd > newest_updated):
-                newest_updated = upd
-
-        # State update: keep etag union of old + new (events not
-        # mentioned this run might still be in the cache; they'll be
-        # refreshed the next time they fall into the window).
-        merged_etags = {**etag_map, **new_etag_map}
-        entry["etags"] = merged_etags
-        if newest_updated:
-            entry["watermark_updated"] = newest_updated
-        cal_state[cal_id] = entry
-        if events:
-            scan.state_touched = True
 
     # ── helpers ──────────────────────────────────────────────────────
 
