@@ -7,11 +7,11 @@
 # `wiki help`. The home menu keeps its own action table (`scripts/menu.py` +
 # `scripts/core/actions.py`) — folding the two is M034's. This bash layer only does
 # bootstrap (symlink resolution + vault guard) and the commands not yet ported
-# (setup / hooks / skills / config / seed / update / status / install-shortcut,
-# plus the bespoke dream + dream-entity argv routing). Every other subcommand —
-# bare `wiki`, help, menu, doctor and version included — is delegated to
-# `scripts/cli.py` in one hop, which also owns the once-locked dashboard refresh
-# and the OAuth bootstrap (`wiki auth <service> <account-id>`).
+# (setup / hooks / skills / config / seed / update / status / install-shortcut).
+# Every other subcommand — bare `wiki`, help, menu, doctor, version, the dream
+# routing and the OAuth aliases included — is delegated to `scripts/cli.py` in one
+# hop, which also owns the once-locked dashboard refresh and the OAuth bootstrap
+# (`wiki auth <service> <account-id>`).
 
 set -euo pipefail
 
@@ -267,13 +267,6 @@ cmd_setup() {
   fi
 }
 
-_run_script() {
-  # Helper: run a script under the wiki venv. $1 = script name, rest = args.
-  # Retained for the bash-native dream + dream-entity commands.
-  local script="$1"; shift
-  uv run --quiet --project "$WIKI_DIR" python "$WIKI_DIR/scripts/$script" "$@"
-}
-
 _dispatch_python() {
   # Delegate a Python-backed subcommand to the table-driven dispatcher, in one hop
   # (DECISIONS 2026-10-15 "One hop"): `exec` the venv's Python straight into
@@ -308,68 +301,6 @@ _refresh_dashboards() {
   # bash helper pair; used by the bash-native `wiki seed` (Python-backed
   # commands trigger the same refresh from inside cli.py via refresh-after).
   uv run --quiet --project "$WIKI_DIR" python "$WIKI_DIR/scripts/cli.py" refresh-dashboards
-}
-
-cmd_dream_entity() {
-  case "${1:-}" in
-    ""|-h|--help|help)
-      cat <<EOF
-${C_BOLD}wiki dream-entity${C_RESET} — re-synthesize ONE entity page (M014)
-
-${C_BOLD}USAGE${C_RESET}
-  wiki dream-entity <slug>                resynthesize a single entity
-  wiki dream-entity <slug> --dry-run      print prompt size + estimated cost only
-  wiki dream-entity <slug> --ignore-cooldown   force-run despite last_synthesized_at
-  wiki dream-entity <slug> --cost-cap 5.0      override per-entity USD cap
-
-${C_BOLD}NOTES${C_RESET}
-  Slug must match \`knowledge/{people,projects,areas}/<slug>.md\` (without .md).
-  Greps all substrate (raw/**, daily/**) for slug mentions, builds a corpus
-  prompt, calls Claude Agent SDK to rewrite the entity's State block + append
-  to Timeline. Pre-flight cost cap REJECTS the SDK call if estimate exceeds
-  \`limits.dream_entity_max_cost_usd\` (default \$2.00). Cooldown defaults
-  to \`scheduling.dream_cooldown_days\` (default 7 days).
-EOF
-      return 0 ;;
-  esac
-  banner "wiki dream-entity"
-  _run_script dream.py entity "$@"
-}
-
-cmd_dream() {
-  case "${1:-sweep}" in
-    -h|--help|help)
-      cat <<EOF
-${C_BOLD}wiki dream${C_RESET} — sweep all entity pages (M014)
-
-${C_BOLD}USAGE${C_RESET}
-  wiki dream                               sweep all entities, oldest-overdue first (default)
-  wiki dream --dry-run                     print plan, no SDK calls
-  wiki dream --limit N                     hard cap on entity count this run
-  wiki dream list-candidates               debug: print scored candidate list, no run
-  wiki dream web-research <slug>           public-entity web enrichment (issue #2, Exa)
-  wiki dream web-research <slug> --dry-run print the Public Profile block, write nothing
-
-${C_BOLD}NOTES${C_RESET}
-  Sweeps \`knowledge/{people,projects,areas}/*.md\` oldest-synthesized first,
-  skipping entities synthesized within the cooldown window. Per-entity AND
-  per-run cumulative cost caps are enforced — see \`wiki dream-entity help\`.
-  \`--all-entities\` / \`sweep\` are accepted as legacy aliases.
-EOF
-      return 0 ;;
-    --all-entities|sweep)
-      [ $# -gt 0 ] && shift
-      banner "wiki dream sweep"; _run_script dream.py sweep "$@" ;;
-    list-candidates|--list-candidates)
-      shift; wants_json "$@" || banner "wiki dream list-candidates"; _run_script dream.py list-candidates "$@" ;;
-    web-research|--web-research-only)
-      shift; banner "wiki dream web-research"; _run_script dream.py web-research "$@" ;;
-    --*)
-      # Bare flags (e.g. `wiki dream --dry-run --limit 3`) → implicit sweep
-      banner "wiki dream sweep"; _run_script dream.py sweep "$@" ;;
-    *)
-      err "unknown: wiki dream $1 (try 'wiki dream help')"; return 1 ;;
-  esac
 }
 
 cmd_seed() {
@@ -730,14 +661,14 @@ case "${1:-}" in
   *) require_vault ;;
 esac
 
-# Bash keeps only bootstrap + the commands not yet ported (and the bespoke
-# dream / dream-entity argv routing + the OAuth aliases). Every other
+# Bash keeps only bootstrap + the commands not yet ported. Every other
 # subcommand is delegated to scripts/cli.py, which is the single source of
-# truth for the command catalog, the once-locked dashboard refresh and the
-# argv-safe OAuth bootstrap. Bare `wiki` goes there too: cli.py opens the home
-# screen when stdin and stdout are terminals and prints help otherwise, so CI,
-# pipes, hooks and cron never block on input. An unknown command falls through
-# to cli.py, which prints its own "unknown command" error.
+# truth for the command catalog (its routes and aliases included), the
+# once-locked dashboard refresh and the argv-safe OAuth bootstrap. Bare `wiki`
+# goes there too: cli.py opens the home screen when stdin and stdout are
+# terminals and prints help otherwise, so CI, pipes, hooks and cron never block
+# on input. An unknown command falls through to cli.py, which prints its own
+# "unknown command" error.
 case "${1:-}" in
   install-shortcut) shift; cmd_install_shortcut "$@" ;;
   setup)            shift; cmd_setup "$@" ;;
@@ -747,12 +678,6 @@ case "${1:-}" in
   skills)           shift; cmd_skills "$@" ;;
   update)           shift; cmd_update "$@" ;;
   seed)             shift; cmd_seed "$@" ;;
-  dream-entity)     shift; cmd_dream_entity "$@" ;;
-  dream)            shift; cmd_dream "$@" ;;
-  # OAuth aliases — remap to the argv-safe `wiki auth <service> <id>` dispatch.
-  gmail-auth)       shift; _dispatch_python auth gmail "$@" ;;
-  gmeet-auth)       shift; _dispatch_python auth gmeet "$@" ;;
-  calendar-auth)    shift; _dispatch_python auth calendar "$@" ;;
   # Everything else is a Python-backed subcommand owned by the cli.py table
   # (unknown names error there). "$@" still carries the command name.
   *)                _dispatch_python "$@" ;;

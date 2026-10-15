@@ -2,4 +2,4 @@ $ wiki dream bogus
 exit: 1
 --- stdout ---
 --- stderr ---
-✗ unknown: wiki dream bogus (try 'wiki dream help')
+wiki: unknown: wiki dream bogus (try 'wiki dream help')

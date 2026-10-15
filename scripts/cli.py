@@ -46,7 +46,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from cli_catalog import _GROUP_ORDER, AUTH_SERVICES, BY_NAME, COMMANDS, CommandSpec
+from cli_catalog import _GROUP_ORDER, AUTH_SERVICES, BY_NAME, COMMANDS, CommandSpec, SubRoute
 from core.entry import child_env, python_m
 
 SCRIPTS_DIR = Path(__file__).resolve().parent
@@ -189,6 +189,19 @@ def _run_child(script_rel: str, args: list[str]) -> int:
     return completed.returncode
 
 
+def _route(command: CommandSpec, rest: list[str]) -> tuple[SubRoute | None, list[str]]:
+    """The route ``rest`` selects, and the argv left for it: a route the first argument
+    names (its key consumed), else the default route when there is no argument or the first
+    is a `--flag` (nothing consumed — `wiki dream --dry-run` is a sweep), else none."""
+    if rest:
+        named = next((s for s in command.subroutes if s.key == rest[0]), None)
+        if named is not None:
+            return named, rest[1:]
+    if command.default_route and (not rest or rest[0].startswith("--")):
+        return next(s for s in command.subroutes if s.key == command.default_route), rest
+    return None, rest
+
+
 def run_command(command: CommandSpec, rest: list[str]) -> int:
     """Dispatch a `py` command: help-intercept, banner, run, refresh-after."""
     # Top-level per-command help (deeper `wiki x sub -h` falls through to the
@@ -206,16 +219,18 @@ def run_command(command: CommandSpec, rest: list[str]) -> int:
     banner_on = command.banner
     args = rest
 
-    sub = next((s for s in command.subroutes if s.key == rest[0]), None) if rest else None
+    sub, remaining = _route(command, rest)
     if sub is not None:
         script = sub.script
         banner_title = sub.banner or banner_title
         subtitle = sub.subtitle
         banner_on = sub.banner is not None
-        args = rest[1:]
+        args = [*sub.args, *remaining]
     elif rest and not command.takes_args:
         _err(f"unknown: wiki {command.name} {rest[0]} (try 'wiki {command.name} help')")
         return 1
+    else:
+        args = [*command.handler_args, *rest]
 
     if script is None:
         # A command with no default handler (backfill) and no matching subroute.
@@ -226,8 +241,8 @@ def run_command(command: CommandSpec, rest: list[str]) -> int:
         return 1
 
     # `--json` is a machine-readable seam (the desktop parses `wiki query --json`):
-    # stdout is the payload alone, so no banner. The bash layer's `wants_json`
-    # applies the same rule to its own banners.
+    # stdout is the payload alone, so no banner (`tests/test_bash_json_banner.py` holds it
+    # end to end through `wiki`).
     if banner_on and "--json" not in args:
         _banner(banner_title, subtitle)
     code = _run_child(script, args)
@@ -259,6 +274,8 @@ def main(argv: list[str]) -> int:
     if cmd == "auth":
         return run_auth(rest)
     command = BY_NAME.get(cmd)
+    if command is not None and command.kind == "alias":
+        return main([*command.alias_of, *rest])
     if command is None or command.kind != "py":
         _err(f"unknown command: {cmd} (try 'wiki help')")
         return 1

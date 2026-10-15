@@ -18,6 +18,22 @@ every operator's `wiki update` → `uv sync` regenerate `uv.lock` and dirty thei
 config keys must also be wired into `scripts/migrations/migrate_config_keys.py`
 in the same commit.
 
+## [0.7.7] — 2026-10-15
+
+**For your vault:** no config key changed, so there is no migration.
+
+### Changed
+
+- **`wiki dream`, `wiki dream-entity` and the `wiki gmail-auth` / `gmeet-auth` /
+  `calendar-auth` aliases now start through the dispatcher's one hop (0.7.5).** Before, they
+  went through bash and its own `uv run`. The routes are unchanged:
+  - bare `wiki dream`, or `wiki dream` with flags only, is a sweep;
+  - `list-candidates` prints no banner with `--json`;
+  - bare `wiki dream-entity` shows its help.
+
+  An unknown subcommand (`wiki dream bogus`) now answers in the same style as every other
+  command: `wiki: unknown: wiki dream bogus (try 'wiki dream help')`.
+
 ## [0.7.6] — 2026-10-15
 
 **For your vault:** no config key changed, so there is no migration.

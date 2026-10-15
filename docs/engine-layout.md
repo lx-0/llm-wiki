@@ -19,7 +19,7 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 
 ```text
 .wiki/
-├── wiki                       ← entry point (bash) — bootstrap + fail-closed vault guard + the commands not yet ported (M034); everything else — bare `wiki` (home screen on a TTY, help otherwise), help, menu, doctor, version — delegates to scripts/cli.py in one hop (exec of the venv's python, no `uv run` parent; `uv sync` first only without a venv or with uv.lock / pyproject.toml newer than its `.wiki-synced` stamp)
+├── wiki                       ← entry point (bash) — bootstrap + fail-closed vault guard + the commands not yet ported (M034); everything else — bare `wiki` (home screen on a TTY, help otherwise), help, menu, doctor, version, the dream routing, the OAuth aliases — delegates to scripts/cli.py in one hop (exec of the venv's python, no `uv run` parent; `uv sync` first only without a venv or with uv.lock / pyproject.toml newer than its `.wiki-synced` stamp)
 ├── install.sh                 ← one-liner installer (also re-runnable from a checkout)
 ├── config.example.yaml        ← tracked  ── │ copy at install time
 ├── config.yaml                ← gitignored ─┘

@@ -643,3 +643,37 @@ USAGE
 NOTES
   Reads the engine checkout under .wiki/; outside a git checkout it says so.
   Works without a vault."""
+
+# dream routing — moved from the bash heredocs with the routing (M034-S01-T06); the bash
+# oracle's `dream-help` / `dream-entity-help` goldens hold them to the bash text.
+H_DREAM = """wiki dream — sweep all entity pages (M014)
+
+USAGE
+  wiki dream                               sweep all entities, oldest-overdue first (default)
+  wiki dream --dry-run                     print plan, no SDK calls
+  wiki dream --limit N                     hard cap on entity count this run
+  wiki dream list-candidates               debug: print scored candidate list, no run
+  wiki dream web-research <slug>           public-entity web enrichment (issue #2, Exa)
+  wiki dream web-research <slug> --dry-run print the Public Profile block, write nothing
+
+NOTES
+  Sweeps `knowledge/{people,projects,areas}/*.md` oldest-synthesized first,
+  skipping entities synthesized within the cooldown window. Per-entity AND
+  per-run cumulative cost caps are enforced — see `wiki dream-entity help`.
+  `--all-entities` / `sweep` are accepted as legacy aliases."""
+
+H_DREAM_ENTITY = """wiki dream-entity — re-synthesize ONE entity page (M014)
+
+USAGE
+  wiki dream-entity <slug>                resynthesize a single entity
+  wiki dream-entity <slug> --dry-run      print prompt size + estimated cost only
+  wiki dream-entity <slug> --ignore-cooldown   force-run despite last_synthesized_at
+  wiki dream-entity <slug> --cost-cap 5.0      override per-entity USD cap
+
+NOTES
+  Slug must match `knowledge/{people,projects,areas}/<slug>.md` (without .md).
+  Greps all substrate (raw/**, daily/**) for slug mentions, builds a corpus
+  prompt, calls Claude Agent SDK to rewrite the entity's State block + append
+  to Timeline. Pre-flight cost cap REJECTS the SDK call if estimate exceeds
+  `limits.dream_entity_max_cost_usd` (default $2.00). Cooldown defaults
+  to `scheduling.dream_cooldown_days` (default 7 days)."""

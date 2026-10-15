@@ -343,3 +343,71 @@ def test_engine_version_outside_a_checkout(tmp_path):
     import engine_version
 
     assert engine_version.report(tmp_path) == ["! Not a git checkout. Cannot report version."]
+
+
+# ── dream routing + auth aliases, ported from bash (M034-S01-T06) ───────
+# The table the bash `cmd_dream` / `cmd_dream_entity` case statements encoded.
+
+
+@pytest.mark.parametrize(
+    ("argv", "child", "banner"),
+    [
+        (["dream"], ["sweep"], "wiki dream sweep"),
+        (
+            ["dream", "--dry-run", "--limit", "3"],
+            ["sweep", "--dry-run", "--limit", "3"],
+            "wiki dream sweep",
+        ),
+        (["dream", "sweep", "--dry-run"], ["sweep", "--dry-run"], "wiki dream sweep"),
+        (["dream", "--all-entities"], ["sweep"], "wiki dream sweep"),
+        (["dream", "list-candidates"], ["list-candidates"], "wiki dream list-candidates"),
+        (["dream", "--list-candidates"], ["list-candidates"], "wiki dream list-candidates"),
+        (
+            ["dream", "web-research", "ada", "--dry-run"],
+            ["web-research", "ada", "--dry-run"],
+            "wiki dream web-research",
+        ),
+        (
+            ["dream", "--web-research-only", "ada"],
+            ["web-research", "ada"],
+            "wiki dream web-research",
+        ),
+        (["dream-entity", "sam", "--dry-run"], ["entity", "sam", "--dry-run"], "wiki dream-entity"),
+    ],
+)
+def test_dream_routes(spy, capsys, argv, child, banner):
+    assert cli.main(argv) == 0
+    assert spy["child"] == ("dream.py", child)
+    assert capsys.readouterr().out.splitlines()[0] == banner
+
+
+def test_dream_list_candidates_json_has_no_banner(spy, capsys):
+    assert cli.main(["dream", "list-candidates", "--json"]) == 0
+    assert spy["child"] == ("dream.py", ["list-candidates", "--json"])
+    assert capsys.readouterr().out == ""
+
+
+def test_dream_refuses_an_unknown_subcommand(spy, capsys):
+    assert cli.main(["dream", "bogus"]) == 1
+    assert spy["child"] is None
+    assert "unknown: wiki dream bogus (try 'wiki dream help')" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("argv", [["dream", "--help"], ["dream", "help"], ["dream-entity"]])
+def test_dream_help_runs_nothing(spy, capsys, argv):
+    assert cli.main(argv) == 0
+    assert spy["child"] is None
+    assert "USAGE" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("service", ["gmail", "gmeet", "calendar"])
+def test_auth_aliases_resolve_to_auth(monkeypatch, service):
+    seen: dict[str, list[str]] = {}
+
+    def fake_auth(rest):
+        seen["rest"] = rest
+        return 0
+
+    monkeypatch.setattr(cli, "run_auth", fake_auth)
+    assert cli.main([f"{service}-auth", "acct"]) == 0
+    assert seen["rest"] == [service, "acct"]

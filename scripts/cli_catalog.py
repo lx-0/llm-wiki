@@ -25,6 +25,8 @@ from cli_help import (
     H_CURIOSITY,
     H_DEDUP,
     H_DOCTOR,
+    H_DREAM,
+    H_DREAM_ENTITY,
     H_FLUSH,
     H_HEALTH_TRENDS,
     H_INDEX,
@@ -59,13 +61,15 @@ class SubRoute:
 
     `wiki correct apply …` and `wiki backfill picture-metadata …` route to a
     different script than the command's default handler; a SubRoute captures
-    that (its `key` is consumed, remaining args pass through). A `None` banner is
+    that (its `key` is consumed, remaining args pass through, after `args` — so
+    `wiki dream list-candidates` runs `dream.py list-candidates`). A `None` banner is
     a machine-readable route (`wiki menu --json`): the payload alone on stdout."""
 
     key: str
     script: str
     banner: str | None
     subtitle: str | None = None
+    args: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -77,6 +81,8 @@ class CommandSpec:
       "bash"     dispatched by the `wiki` bash layer (bootstrap / genuinely-bash
                  commands); listed here only so help + menu stay complete.
       "auth"     the OAuth registry front-door (`wiki auth <service> <id>`).
+      "alias"    another spelling: `alias_of` + the rest of argv is dispatched instead
+                 (`wiki gmail-auth x` → `wiki auth gmail x`).
     """
 
     name: str
@@ -93,7 +99,10 @@ class CommandSpec:
     menu: bool = False  # expected to be reachable from menu.py
     help_text: str | None = None  # rich per-command help (was a bash heredoc)
     subroutes: tuple[SubRoute, ...] = ()
-    takes_args: bool = True  # False: an argument no subroute names is refused, not passed on
+    takes_args: bool = True  # False: a word no subroute names is refused, not passed on
+    handler_args: tuple[str, ...] = ()  # put before argv for `handler` (dream-entity → entity)
+    default_route: str | None = None  # route key for no args or a leading flag (dream → sweep)
+    alias_of: tuple[str, ...] = ()  # kind "alias": the argv this name stands for
 
 
 # ── The catalog ─────────────────────────────────────────────────────────
@@ -259,22 +268,25 @@ COMMANDS: tuple[CommandSpec, ...] = (
         "gmail-auth",
         "Collect & ingest",
         "alias: wiki auth gmail <account-id>",
-        kind="bash",
+        kind="alias",
         menu=True,
+        alias_of=("auth", "gmail"),
     ),
     CommandSpec(
         "gmeet-auth",
         "Collect & ingest",
         "alias: wiki auth gmeet <account-id>",
-        kind="bash",
+        kind="alias",
         menu=True,
+        alias_of=("auth", "gmeet"),
     ),
     CommandSpec(
         "calendar-auth",
         "Collect & ingest",
         "alias: wiki auth calendar <account-id>",
-        kind="bash",
+        kind="alias",
         menu=True,
+        alias_of=("auth", "calendar"),
     ),
     # Knowledge ops
     CommandSpec(
@@ -290,15 +302,45 @@ COMMANDS: tuple[CommandSpec, ...] = (
         "dream",
         "Knowledge ops",
         "sweep all entity pages (oldest-overdue first)",
-        kind="bash",
         menu=True,
+        help_text=H_DREAM,
+        # bare `wiki dream` and bare flags (`--dry-run --limit 3`) are a sweep; a word no
+        # route names is refused (M034-S01-T06, the former bash case table)
+        subroutes=(
+            SubRoute("sweep", "dream.py", "wiki dream sweep", args=("sweep",)),
+            SubRoute("--all-entities", "dream.py", "wiki dream sweep", args=("sweep",)),
+            SubRoute(
+                "list-candidates",
+                "dream.py",
+                "wiki dream list-candidates",
+                args=("list-candidates",),
+            ),
+            SubRoute(
+                "--list-candidates",
+                "dream.py",
+                "wiki dream list-candidates",
+                args=("list-candidates",),
+            ),
+            SubRoute("web-research", "dream.py", "wiki dream web-research", args=("web-research",)),
+            SubRoute(
+                "--web-research-only",
+                "dream.py",
+                "wiki dream web-research",
+                args=("web-research",),
+            ),
+        ),
+        default_route="sweep",
+        takes_args=False,
     ),
     CommandSpec(
         "dream-entity",
         "Knowledge ops",
         "re-synthesize ONE entity page by slug",
-        kind="bash",
+        handler="dream.py",
+        handler_args=("entity",),
+        show_help_on_empty=True,
         menu=True,
+        help_text=H_DREAM_ENTITY,
     ),
     CommandSpec(
         "query",

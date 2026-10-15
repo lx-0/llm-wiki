@@ -1,68 +1,47 @@
-"""`--json` through the bash layer: stdout is the payload alone.
+"""`--json` end to end through `wiki`: stdout is the payload alone.
 
 M033-S04-T06: the live `wiki query --brief --json` on the scratch vault answered
 `wiki query\\n\\n{…}` — the dispatcher's banner ahead of the payload (the desktop parsed
-around it from the first `{`). The bash-native `wiki dream list-candidates --json` printed
-its banner the same way. Real bash layer (`wiki` + `lib/`); `uv` is a stub first on PATH
-that prints a fixed JSON payload, so stdout is exactly what a consumer would parse.
+around it from the first `{`). The then bash-native `wiki dream list-candidates --json`
+printed its banner the same way. Since M034-S01-T06 the dream routing lives in the catalogue
+(`cli.run_command` owns the banner rule; `tests/test_cli.py` pins it per route), and this
+file holds the whole path: the real `wiki` out of an engine copy in the oracle's fixture
+vault, through the one hop, into `dream.py` — stdout is exactly what a consumer parses.
 """
 
 from __future__ import annotations
 
 import json
-import os
-import shutil
-import subprocess
 from pathlib import Path
 
 import pytest
 
-REPO = Path(__file__).resolve().parent.parent
-PAYLOAD = '{"stub": true}'
+from ._oracle import build_engine_copy, build_fixture_vault, run_wiki, write_uv_shim
 
 
-@pytest.fixture
-def vault(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    vault = tmp_path / "vault"
-    (vault / ".obsidian").mkdir(parents=True)  # the dispatcher's fail-closed vault guard
-    engine = vault / ".wiki"
-    engine.mkdir()
-    shutil.copy2(REPO / "wiki", engine / "wiki")
-    shutil.copytree(REPO / "lib", engine / "lib")
-    bin_dir = tmp_path / "bin"
-    bin_dir.mkdir()
-    stub = bin_dir / "uv"
-    stub.write_text(f"#!/bin/sh\nprintf '%s\\n' '{PAYLOAD}'\n", encoding="utf-8")
-    stub.chmod(0o755)
-    home = tmp_path / "home"
+@pytest.fixture(scope="module")
+def env(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Path]:
+    root = tmp_path_factory.mktemp("json-banner")
+    vault = build_fixture_vault(root)
+    build_engine_copy(vault)
+    home = root / "home"
     home.mkdir()
-    monkeypatch.setenv("PATH", f"{bin_dir}{os.pathsep}{os.environ['PATH']}")
-    monkeypatch.setenv("HOME", str(home))
-    return vault
+    bin_dir = root / "bin"
+    write_uv_shim(bin_dir)
+    return {"vault": vault, "home": home, "bin": bin_dir}
 
 
-def _wiki(vault: Path, *args: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        [str(vault / ".wiki" / "wiki"), *args],
-        cwd=vault,
-        capture_output=True,
-        text=True,
-        stdin=subprocess.DEVNULL,
-        check=False,
-    )
-
-
-def test_dream_list_candidates_json_prints_only_the_payload(vault: Path) -> None:
-    r = _wiki(vault, "dream", "list-candidates", "--json")
+def test_dream_list_candidates_json_prints_only_the_payload(env: dict[str, Path]) -> None:
+    r = run_wiki(env["vault"], env["home"], env["bin"], "dream", "list-candidates", "--json")
 
     assert r.returncode == 0, r.stderr
-    assert r.stdout == PAYLOAD + "\n"
-    assert json.loads(r.stdout) == {"stub": True}
+    payload = json.loads(r.stdout)  # nothing ahead of the payload, nothing after it
+    assert [c["slug"] for c in payload] == ["sam-rivera", "llm-wiki"]
 
 
-def test_dream_list_candidates_keeps_its_banner_for_humans(vault: Path) -> None:
-    r = _wiki(vault, "dream", "list-candidates", "--limit", "5")
+def test_dream_list_candidates_keeps_its_banner_for_humans(env: dict[str, Path]) -> None:
+    r = run_wiki(env["vault"], env["home"], env["bin"], "dream", "list-candidates")
 
     assert r.returncode == 0, r.stderr
-    assert r.stdout.startswith("wiki dream list-candidates")
-    assert r.stdout.endswith(PAYLOAD + "\n")
+    assert r.stdout.startswith("wiki dream list-candidates\n")
+    assert "sam-rivera" in r.stdout
