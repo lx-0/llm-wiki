@@ -1,0 +1,14 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash '/h/.codex/herdr.sh' session"
+          }
+        ]
+      }
+    ]
+  }
+}

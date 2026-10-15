@@ -1,0 +1,36 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash '/h/.codex/herdr.sh' session"
+          }
+        ]
+      },
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd '/h/Library/Mobile Documents/iCloud~md~obsidian/Documents/lxw/.wiki' && UV_PROJECT_ENVIRONMENT='/h/.venvs/lxw-wiki' uv run python hooks/session-start.py",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd '/h/Library/Mobile Documents/iCloud~md~obsidian/Documents/lxw/.wiki' && UV_PROJECT_ENVIRONMENT='/h/.venvs/lxw-wiki' uv run python hooks/session-end.py",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

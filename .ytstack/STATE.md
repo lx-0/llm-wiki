@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-16T00:15:00+02:00
+last_updated: 2026-10-16T00:20:00+02:00
 current_milestone: M034
 active_slice: S03
-active_task: none
+active_task: T07
 last_completed_milestone: M033
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -14,8 +14,9 @@ parallel_milestones: [M021, M025, M027, M029]
 
 ## Next action — M034 / S03: hooks + skills + status
 
-**Status:** M034 / S03 — 6/7 tasks done in the slice. Next task: T07, the deletions
-(`/ytstack:plan-task`). Slices S01 and S02 are complete (2/6).
+**Status:** M034 / S03 / T07 planned — ready to execute (`M034-S03-T07-PLAN.md`; the
+bash's outputs are recorded before the files go). 6/7 tasks done in the slice; slices S01
+and S02 are complete (2/6).
 
 **S03-T06 is done** (`M034-S03-T06-SUMMARY.md`, release **0.7.19**). `wiki skills` runs in
 Python (`skills_cli.py`), and update's skills step goes through the entry. All eleven flow

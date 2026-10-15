@@ -1,0 +1,40 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd '/h/Library/Mobile Documents/iCloud~md~obsidian/Documents/Alex'\\''s Vault/.wiki' && UV_PROJECT_ENVIRONMENT='/h/.venvs/Alex'\\''s Vault-wiki' uv run python hooks/session-start.py",
+            "timeout": 15000
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd '/h/Library/Mobile Documents/iCloud~md~obsidian/Documents/Alex'\\''s Vault/.wiki' && UV_PROJECT_ENVIRONMENT='/h/.venvs/Alex'\\''s Vault-wiki' uv run python hooks/session-end.py",
+            "timeout": 10000
+          }
+        ]
+      }
+    ],
+    "PreCompress": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd '/h/Library/Mobile Documents/iCloud~md~obsidian/Documents/Alex'\\''s Vault/.wiki' && UV_PROJECT_ENVIRONMENT='/h/.venvs/Alex'\\''s Vault-wiki' uv run python hooks/pre-compact.py",
+            "timeout": 10000
+          }
+        ]
+      }
+    ]
+  }
+}

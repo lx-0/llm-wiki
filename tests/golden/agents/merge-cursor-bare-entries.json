@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "hooks": {
+    "sessionStart": [
+      {
+        "type": "command",
+        "command": "my-own-hook",
+        "timeout": 5
+      },
+      {
+        "type": "command",
+        "command": "cd '/h/Library/Mobile Documents/iCloud~md~obsidian/Documents/lxw/.wiki' && UV_PROJECT_ENVIRONMENT='/h/.venvs/lxw-wiki' uv run python hooks/session-start.py",
+        "timeout": 15
+      }
+    ],
+    "sessionEnd": [
+      {
+        "type": "command",
+        "command": "cd '/h/Library/Mobile Documents/iCloud~md~obsidian/Documents/lxw/.wiki' && UV_PROJECT_ENVIRONMENT='/h/.venvs/lxw-wiki' uv run python hooks/session-end.py",
+        "timeout": 10
+      }
+    ],
+    "preCompact": [
+      {
+        "type": "command",
+        "command": "cd '/h/Library/Mobile Documents/iCloud~md~obsidian/Documents/lxw/.wiki' && UV_PROJECT_ENVIRONMENT='/h/.venvs/lxw-wiki' uv run python hooks/pre-compact.py",
+        "timeout": 10
+      }
+    ]
+  }
+}

@@ -1,0 +1,63 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git status)"
+    ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ytstack-inject"
+          }
+        ]
+      },
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd '/h/Library/Mobile Documents/iCloud~md~obsidian/Documents/lxw/.wiki' && UV_PROJECT_ENVIRONMENT='/h/.venvs/lxw-wiki' uv run python hooks/session-start.py",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "other"
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd '/h/Library/Mobile Documents/iCloud~md~obsidian/Documents/lxw/.wiki' && UV_PROJECT_ENVIRONMENT='/h/.venvs/lxw-wiki' uv run python hooks/session-end.py",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd '/h/Library/Mobile Documents/iCloud~md~obsidian/Documents/lxw/.wiki' && UV_PROJECT_ENVIRONMENT='/h/.venvs/lxw-wiki' uv run python hooks/pre-compact.py",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

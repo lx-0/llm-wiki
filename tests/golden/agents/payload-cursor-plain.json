@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "hooks": {
+    "sessionStart": [
+      {
+        "type": "command",
+        "command": "cd '/srv/vaults/notes/.wiki' && uv run python hooks/session-start.py",
+        "timeout": 15
+      }
+    ],
+    "sessionEnd": [
+      {
+        "type": "command",
+        "command": "cd '/srv/vaults/notes/.wiki' && uv run python hooks/session-end.py",
+        "timeout": 10
+      }
+    ],
+    "preCompact": [
+      {
+        "type": "command",
+        "command": "cd '/srv/vaults/notes/.wiki' && uv run python hooks/pre-compact.py",
+        "timeout": 10
+      }
+    ]
+  }
+}
