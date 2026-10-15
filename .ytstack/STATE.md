@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-15T11:59:45+02:00
+last_updated: 2026-10-15T13:40:12+02:00
 current_milestone: M033
 active_slice: S04
-active_task: T06
+active_task: none
 last_completed_milestone: M032
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -181,7 +181,14 @@ characterisation tests, `2621920` the split): `gmeet._run_one_account` 340 → 8
 `_scan_calendar`, accumulators on `_CalendarScan`); 21 new characterisation cases (gmeet's
 loop had none), parity dump over 22 scenarios byte-identical before/after, full suite
 2140, CI green on `2621920`. Two quirks moved verbatim → `backlog/collector-loop-quirks.md`.
-Allowlist 12. **Next: T06 — producers / reports / CLIs (eleven functions) via
+Allowlist 12. **S04 6/7** — T06 (`2dfea7b` plan + 84 characterisation cases for the seven
+bodies that had none; `6ab0e39` curiosity, `8b46f21` takes + intents, `8372d9d` reports +
+study, `e68299c` the three CLIs): eleven functions split along their sections, the parity
+dump (135 scenarios) byte-identical after every group, full suite 2229, CI green. The
+plan's live `wiki query --brief --json` found the dispatcher banner ahead of the payload →
+`960a74e`: `--json` skips the banner (`cli.run_command`, bash `wants_json`), pinned + live
+re-verified. Allowlist 1 (`core/health.check_piggyback_health`, T07's).
+`backlog/report-engine-version-stamp.md` new. **Next: T07 — the god modules via
 `plan-task`.**
 
 ## M032 COMPLETE (L, 2026-10-14): desktop de-slop
