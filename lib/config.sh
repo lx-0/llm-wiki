@@ -2,7 +2,7 @@
 # config.sh — wraps the Python core/config.py CLI for the bash callers M034 has not ported
 # yet: lib/skills.sh reads config_get and `wiki skills` writes config_set (S03). `wiki config`
 # and the setup wizard are Python since S02-T02 / T03 (scripts/config_cli.py, setup_cli.py);
-# this file is deleted with its last caller in S03-T04 (reassessment after S01).
+# this file is deleted with its last caller in S03-T05 (reassessment after S01).
 
 [[ -n "${__WIKI_CONFIG_LOADED:-}" ]] && return 0
 __WIKI_CONFIG_LOADED=1

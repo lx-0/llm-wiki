@@ -199,3 +199,14 @@ What S01 delivered:
 - `wiki stats`;
 - a green consumer smoke;
 - engine 0.7.4 → 0.7.8.
+
+## Re-plan 2026-10-15T23:05 — S03-T02 split after T01
+
+S03-T02 held both the bash fixes (with their records and a release) and the port. That is two
+context windows' work, so it is now two tasks:
+- **T02** fixes the hooks commands in the bash and records them (0.7.16);
+- **T03** ports `wiki hooks` and `wiki status`.
+
+Skills became T04 and the deletions T05 (S03: 5 tasks). Where the S01 reassessment above says
+S03-T02 (`wiki status`, setup's hooks step), it now means T03. Its S03-T04 (`lib/config.sh`)
+now means T05.

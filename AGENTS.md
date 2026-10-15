@@ -199,7 +199,7 @@ Drift detection is JSON-key-order-insensitive (`_files_equivalent` / canonical `
 1. Add an `Agent` to `AGENTS` in `scripts/core/agents.py`: name, detection dir, config file,
    its hooks (event, script, timeout in the agent's unit) and `flat=True` for Cursor-style
    bare entries. Doctor's `hooks-installed` check reads it.
-2. While `wiki hooks` is still bash (until M034-S03-T02), mirror it in `lib/agents.sh`: the
+2. While `wiki hooks` is still bash (until M034-S03-T03), mirror it in `lib/agents.sh`: the
    `WIKI_AGENTS` tuple, a `<name>_hooks_payload()` and the `agent_payload()` case.
    `tests/test_agents_registry.py` runs over `AGENTS` and holds the two byte for byte, so a
    missing bash half fails there.

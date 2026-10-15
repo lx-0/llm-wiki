@@ -3,7 +3,7 @@ the bash `cmd_setup`, held to the bash oracle's `setup-wizard` / `setup-with-hoo
 The dispatcher prints the banner (`wiki setup` + its subtitle) before this runs.
 
 The hooks step runs `<.wiki>/wiki hooks install` as a child that inherits stdin: hooks stay
-bash until S03-T02, and the child reads its own answers from that stdin. The wizard's prompts
+bash until S03-T03, and the child reads its own answers from that stdin. The wizard's prompts
 read byte by byte (`core/console.read_line`), so none of the child's answers is consumed
 here — `setup-with-hooks` pipes both in one stream.
 """

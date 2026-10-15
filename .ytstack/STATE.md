@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-15T22:50:00+02:00
+last_updated: 2026-10-15T23:05:00+02:00
 current_milestone: M034
 active_slice: S03
-active_task: none
+active_task: T02
 last_completed_milestone: M033
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -14,8 +14,8 @@ parallel_milestones: [M021, M025, M027, M029]
 
 ## Next action — M034 / S03: hooks + skills + status
 
-**Status:** M034 / S03 — 1/4 tasks done in the slice. Next task: T02 (`/ytstack:plan-task`).
-Slices S01 and S02 are complete (2/6).
+**Status:** M034 / S03 / T02 planned — ready to execute (`M034-S03-T02-PLAN.md`). 1/5 tasks
+done in the slice; slices S01 and S02 are complete (2/6).
 
 **S03-T01 is done** (`M034-S03-T01-SUMMARY.md`):
 - `core/agents.py` is the agent registry with **one** hook-command grammar; its payloads are
@@ -27,14 +27,15 @@ Slices S01 and S02 are complete (2/6).
 Engine 0.7.15, suite 2455, CI green on `f3b1d69`. `wiki` is at 539 lines; the bash owns
 hooks / skills / seed / update / status.
 
-**Next: S03-T02.** Fix three defects in the bash first, then record, then port `wiki hooks`
-and `wiki status`:
+**Next: S03-T02** (split after T01; M034-CONTEXT "Re-plan 2026-10-15T23:05"). Fix three
+defects in the bash, then record them; release 0.7.16:
 - the false "✓ Done";
 - the uninstall that removes nothing from a current install;
 - the Cursor foreign-entry loss.
 
-T01 adds one decision to T02's list: whether `hooks status` should walk the hook entries
-instead of grepping the text.
+**T03** ports `wiki hooks` and `wiki status`. It also decides whether `hooks status` and
+doctor walk the hook entries instead of grepping the text (T01 follow-up). Skills are T04,
+the deletions T05.
 
 **M034 / S02 — complete (5/5, 2026-10-15).** It delivered:
 - line-based prompts on `core/console`, reading byte by byte (T01);

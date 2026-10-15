@@ -1,5 +1,5 @@
 """`core/agents.py` (M034-S03-T01) — the agent registry in Python, held byte for byte to the
-bash `lib/agents.sh` it replaces in S03-T02.
+bash `lib/agents.sh` it replaces in S03-T03.
 
 The parity tests run the bash itself (`agent_payload`, `hooks_installed`) and compare text:
 the installed hook commands must not change on reinstall (M034 locked decision), so the
