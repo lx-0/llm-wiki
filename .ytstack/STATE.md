@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-16T00:30:00+02:00
+last_updated: 2026-10-16T00:15:00+02:00
 current_milestone: M034
 active_slice: S03
-active_task: T06
+active_task: none
 last_completed_milestone: M033
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -14,9 +14,18 @@ parallel_milestones: [M021, M025, M027, M029]
 
 ## Next action — M034 / S03: hooks + skills + status
 
-**Status:** M034 / S03 / T06 planned — ready to execute (`M034-S03-T06-PLAN.md`; the six
-oracle cases are recorded and pushed first). 5/7 tasks done in the slice; slices S01 and
-S02 are complete (2/6).
+**Status:** M034 / S03 — 6/7 tasks done in the slice. Next task: T07, the deletions
+(`/ytstack:plan-task`). Slices S01 and S02 are complete (2/6).
+
+**S03-T06 is done** (`M034-S03-T06-SUMMARY.md`, release **0.7.19**). `wiki skills` runs in
+Python (`skills_cli.py`), and update's skills step goes through the entry. All eleven flow
+goldens pass byte-identical. Two decided differences:
+- "this vault" is compared on resolved paths, so a symlinked vault is itself (the scratch
+  run's `/tmp` hit this);
+- the help text is static.
+
+0.7.18's "byte for byte" claim for hook commands was corrected for symlinked vaults. `wiki`
+is at 412 lines and the bash owns seed / update. Suite 2520, CI green on `2f5a7ea`.
 
 **S03-T05 is done** (`M034-S03-T05-SUMMARY.md`, release **0.7.18**). `wiki hooks` and `wiki
 status` run in Python (`hooks_cli.py`, `status_cli.py`), and setup installs the hooks
@@ -56,14 +65,10 @@ now do what they report, and five goldens hold them for the port:
   (exit 2), and four pasteable `uv sync` / `rm` hints are now quoted, two of them also
   naming the environment.
 
-**Next: S03-T06** — skills in Python, oracle first:
-- the engine-owned check and the global flag;
-- registry add / remove;
-- `skills install/uninstall/sync/status`;
-- the silent install and prune that setup and update call.
-
-**T07** then deletes `lib/agents.sh`, `hooks.sh`, `skills.sh`, `config.sh`, and the dead
-helpers they leave in `ui.sh` / `common.sh`.
+**Next: S03-T07**, the slice's last task. It deletes `lib/agents.sh`, `hooks.sh`,
+`skills.sh`, `config.sh`, plus the dead helpers they leave in `ui.sh` (`select_*`) and
+`common.sh` (`backup_file`). The bash-parity tests move to recorded expectations, the docs
+follow, and a scratch cycle runs per agent. Then reassess the roadmap.
 
 **M034 / S02 — complete (5/5, 2026-10-15).** It delivered:
 - line-based prompts on `core/console`, reading byte by byte (T01);

@@ -5,7 +5,7 @@ project: llm-wiki
 created: 2026-10-15T18:15:32+02:00
 status: planned
 task_count: 7
-completed_tasks: 5
+completed_tasks: 6
 ---
 
 # M034-S03 -- Slice Plan
@@ -56,7 +56,7 @@ last callers were skills' `config_get` and `cmd_status` (reassessed after S01).
   byte-identical. `setup`'s hooks step runs in-process. The probe decision (T01 follow-up)
   ships here, as a decided difference for `hooks status` and doctor alike: walk the hook
   entries instead of grepping the config's text.
-- [ ] T06 -- Skills in Python: the engine-owned check, the global-enable flag, registry
+- [x] T06 -- Skills in Python: the engine-owned check, the global-enable flag, registry
   add / remove, `skills install/uninstall/sync/status`, and the silent install / prune
   variants that `setup` and `update` call. Parity on the fixture `HOME`.
 - [ ] T07 -- The three `lib/` files are deleted along with their `wiki` call sites, and so is
