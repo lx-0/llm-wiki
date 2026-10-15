@@ -35,7 +35,7 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 ├── scripts/
 │   ├── core/                  ← shared engine plumbing (imported, never invoked)
 │   │   ├── paths.py               ← eager path constants from __file__ — zero deps, no side effects
-│   │   ├── agents.py              ← agent registry (claude / codex / gemini / cursor), the one hook-command grammar, hook_cmd + per-agent payloads
+│   │   ├── agents.py              ← agent registry (claude / codex / gemini / cursor), the one hook-command grammar, hook_cmd + per-agent payloads, merge / without_wiki_hooks (pure)
 │   │   ├── backup.py              ← the one backup-before-write helper: backup / backup_path / stamp, never over an earlier backup (a clash takes -2)
 │   │   ├── config.py              ← CONFIG singleton (YAML-driven) + get/set/keys CLI + TIMEZONE + .env bootstrap
 │   │   ├── prompts.py             ← prompt template loader (${var} substitution)
@@ -258,7 +258,7 @@ appears somewhere else. Use the seam — never hand-roll the job beside it.
 | --- | --- | --- |
 | Reach Python from `wiki` | `wiki:_dispatch_python` — exec of the venv's python into `cli.py` with `VIRTUAL_ENV` + the venv's `bin/` on PATH (what `uv run` set); `uv sync --inexact` first when there is no venv or the lock is newer than the `.wiki-synced` stamp; a relative `UV_PROJECT_ENVIRONMENT` stays on `uv run` | `tests/test_bootstrap_hop.py` |
 | Start another engine process | `core/entry.py` (`python -m <module>`, `scripts/` on PYTHONPATH) | `tests/test_entry.py`, `tests/test_cli_dispatch.py` |
-| Recognise or build an agent hook command | `core/agents.py` (`HOOK_CMD_RE`, `hook_cmd`, `payload`); doctor's `hooks-installed` reads it, and the bash `wiki hooks` stays byte-identical to it until the commands are Python | `tests/test_agents_registry.py` (payloads byte-identical to the bash `jq` output; no second grammar under `scripts/` or `hooks/`) |
+| Recognise, build, merge or remove an agent hook command | `core/agents.py` (`HOOK_CMD_RE`, `hook_cmd`, `payload`, `merge`, `without_wiki_hooks`); doctor's `hooks-installed` reads it, and the bash `wiki hooks` stays byte-identical to it until the commands are Python | `tests/test_agents_registry.py` (payloads byte-identical to the bash `jq` output; no second grammar under `scripts/` or `hooks/`), `tests/test_agents_merge.py` (merged and uninstalled configs byte-identical to the bash's) |
 | Console + file logging | `core/console.py:setup_console_logging` — entry points only, never at import | `tests/test_console.py::TestOneSetupEverywhere` |
 | Read / write frontmatter | `core/frontmatter.py` | `tests/test_frontmatter_parity.py` (no private grammar, no fence grammar outside the seam) |
 | Back up a file before writing it | `core/backup.py` (`backup` for the `<name>.bak.<stamp>` sibling, `backup_path` for a writer's own name); two backups in one second keep both | `tests/test_backup.py` (no second backup stamp under `scripts/`) |

@@ -160,3 +160,85 @@ def payload(name: str, *, wiki_dir: Path, venv: str | None) -> dict[str, object]
 def render(config: object) -> str:
     """A config as `jq .` writes it: two-space indent, UTF-8 as is, a trailing newline."""
     return json.dumps(config, indent=2, ensure_ascii=False) + "\n"
+
+
+# ── Merge and uninstall ────────────────────────────────────────────────────
+# The bash's `merge_into_config` and `uninstall_one` filters (lib/agents.sh), held to the
+# file text its jq writes (tests/test_agents_merge.py). Pure: the caller reads, backs up
+# and writes.
+
+
+def _ours(entry: object) -> bool:
+    """A hook object or a bare event entry whose own `command` is a wiki hook."""
+    return (
+        isinstance(entry, dict)
+        and isinstance(cmd := entry.get("command"), str)
+        and is_wiki_hook(cmd)
+    )
+
+
+def _wiki_managed(entry: object) -> bool:
+    """An event entry running a wiki hook: a bare entry's own command (Cursor) or any of a
+    `{matcher, hooks}` group's."""
+    if not isinstance(entry, dict):
+        return False
+    inner = entry.get("hooks")
+    return _ours(entry) or (isinstance(inner, list) and any(_ours(h) for h in inner))
+
+
+def _deep_merge(base: dict, extra: dict) -> dict:
+    """jq's `*`: objects merge recursively and anything else from ``extra`` replaces; the keys
+    of ``base`` keep their places, new ones are appended."""
+    out = dict(base)
+    for key, value in extra.items():
+        current = out.get(key)
+        out[key] = (
+            _deep_merge(current, value)
+            if isinstance(current, dict) and isinstance(value, dict)
+            else value
+        )
+    return out
+
+
+def merge(config: dict, payload: dict) -> dict:
+    """``payload`` installed into ``config``. The top level deep-merges the payload minus its
+    hooks. Per payload event, the entries that are not wiki-managed stay and the payload's
+    are appended: other tools' hooks survive a reinstall (lxw 2026-09-17: jq's `*` alone
+    replaced the arrays and dropped them). Events keep their places; new ones, and `hooks`
+    itself when missing, go at the end."""
+    merged = _deep_merge(config, {k: v for k, v in payload.items() if k != "hooks"})
+    events = payload.get("hooks")
+    if events:
+        hooks = dict(config.get("hooks") or {})
+        for event, entries in events.items():
+            kept = [e for e in hooks.get(event) or [] if not _wiki_managed(e)]
+            hooks[event] = [*kept, *entries]
+        merged["hooks"] = hooks
+    return merged
+
+
+def without_wiki_hooks(config: dict) -> dict:
+    """``config`` with the wiki's hook commands removed, in both entry shapes: a `{matcher,
+    hooks}` group loses its wiki commands and goes when that emptied it, and a bare entry
+    (Cursor) goes when it is ours. An event the removal emptied goes too. Empty groups and
+    events that were empty before stay, and so does anything not shaped like a hooks block."""
+    hooks = config.get("hooks")
+    if not isinstance(hooks, dict):
+        return config
+    kept_events: dict[str, object] = {}
+    for event, entries in hooks.items():
+        if not isinstance(entries, list):
+            kept_events[event] = entries
+            continue
+        kept: list[object] = []
+        for entry in entries:
+            inner = entry.get("hooks") if isinstance(entry, dict) else None
+            if isinstance(entry, dict) and isinstance(inner, list):
+                left = [h for h in inner if not _ours(h)]
+                if left or not inner:
+                    kept.append({**entry, "hooks": left})
+            elif not _ours(entry):
+                kept.append(entry)
+        if kept or not entries:
+            kept_events[event] = kept
+    return {**config, "hooks": kept_events}
