@@ -36,6 +36,7 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 │   ├── core/                  ← shared engine plumbing (imported, never invoked)
 │   │   ├── paths.py               ← eager path constants from __file__ — zero deps, no side effects
 │   │   ├── agents.py              ← agent registry (claude / codex / gemini / cursor), the one hook-command grammar, hook_cmd + per-agent payloads
+│   │   ├── backup.py              ← the one backup-before-write helper: backup / backup_path / stamp, never over an earlier backup (a clash takes -2)
 │   │   ├── config.py              ← CONFIG singleton (YAML-driven) + get/set/keys CLI + TIMEZONE + .env bootstrap
 │   │   ├── prompts.py             ← prompt template loader (${var} substitution)
 │   │   ├── ollama_client.py       ← single Ollama transport (chat / chat_schema / chat_vision)
@@ -260,6 +261,7 @@ appears somewhere else. Use the seam — never hand-roll the job beside it.
 | Recognise or build an agent hook command | `core/agents.py` (`HOOK_CMD_RE`, `hook_cmd`, `payload`); doctor's `hooks-installed` reads it, and the bash `wiki hooks` stays byte-identical to it until the commands are Python | `tests/test_agents_registry.py` (payloads byte-identical to the bash `jq` output; no second grammar under `scripts/` or `hooks/`) |
 | Console + file logging | `core/console.py:setup_console_logging` — entry points only, never at import | `tests/test_console.py::TestOneSetupEverywhere` |
 | Read / write frontmatter | `core/frontmatter.py` | `tests/test_frontmatter_parity.py` (no private grammar, no fence grammar outside the seam) |
+| Back up a file before writing it | `core/backup.py` (`backup` for the `<name>.bak.<stamp>` sibling, `backup_path` for a writer's own name); two backups in one second keep both | `tests/test_backup.py` (no second backup stamp under `scripts/`) |
 | Slugs and filenames | `core/utils.py:slugify` (`ascii_only=True` for filenames) | `tests/test_slugify.py::test_no_second_slug_grammar_outside_the_seam` |
 | JSON state under `state/` | `core/state_store.py:store_for` | `tests/test_state_store.py::test_state_files_are_written_through_the_seam` |
 | A collector's daily-rollup line | `core/daily_capture.py:rollup_line` + `collectors/base.py:append_rollup` | `tests/test_rollup_line.py` (appends only through the harness, one ellipsis rule) |

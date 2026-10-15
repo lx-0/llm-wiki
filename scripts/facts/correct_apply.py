@@ -21,12 +21,12 @@ import logging
 import subprocess
 import sys
 from dataclasses import dataclass, field
-from datetime import datetime
 from pathlib import Path
 
 from claude_agent_sdk import query
 
 from core import frontmatter
+from core.backup import backup, stamp
 from core.config import CONFIG
 from core.console import setup_console_logging
 from core.links import (
@@ -52,7 +52,8 @@ from core.utils import now_iso, today_iso
 log = logging.getLogger("correct-apply")
 
 
-# Frontmatter read/backup via the single core.frontmatter grammar (C03).
+# Frontmatter reads via the single core.frontmatter grammar (C03), backups via
+# core/backup.py.
 # Writebacks stamp single keys with `frontmatter.update_fields` — surgical
 # line-replace, never a safe_dump round-trip of the operator's on-disk YAML
 # (DECISIONS 2026-05-15).
@@ -277,7 +278,7 @@ def _execute_deletes(actions: dict, vault: Path, *, allowed: bool) -> list:
 
     _clear_index_rows(INDEX_FILE, doomed, vault)
 
-    trash_root = vault / ".trash" / datetime.now().strftime("%Y%m%d-%H%M%S")
+    trash_root = vault / ".trash" / stamp()
     executed = []
     for rel, path in targets:
         dest = trash_root / rel
@@ -531,7 +532,7 @@ async def apply(slug: str, dry_run: bool, allow_delete: bool = False, force: boo
     current_text = fact_path.read_text(encoding="utf-8")
     fm_now, _body_now = frontmatter.parse(current_text)
     if fm_now:
-        frontmatter.backup(fact_path)
+        backup(fact_path)
         applied_at = now_iso()
         frontmatter.update_fields(fact_path, applied=applied_at, updated=today_iso())
         log.info("Marked %s as applied=%s", rel_fact_path, applied_at)
@@ -628,7 +629,7 @@ async def reconcile_fact(
     current_text = fact_path.read_text(encoding="utf-8")
     fm_now, _body_now = frontmatter.parse(current_text)
     if fm_now:
-        frontmatter.backup(fact_path)
+        backup(fact_path)
         frontmatter.update_fields(fact_path, last_reconciled=now_iso(), updated=today_iso())
 
     return ReconcileResult(slug, "ok", cost_usd=cost, files=violating_files, detail="reconciled")

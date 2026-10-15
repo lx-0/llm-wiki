@@ -16,11 +16,11 @@ import argparse
 import asyncio
 import logging
 import shutil
-from datetime import datetime
 from pathlib import Path
 
 from claude_agent_sdk import query
 
+from core.backup import backup_path
 from core.console import setup_console_logging
 from core.paths import LOG_FILE, ROOT_DIR, STATE_DIR
 from core.prompts import render
@@ -61,8 +61,7 @@ async def optimize(dry_run: bool = False) -> None:
 
     # Backup
     BACKUP_DIR.mkdir(parents=True, exist_ok=True)
-    ts = datetime.now().strftime("%Y%m%d-%H%M%S")
-    backup = BACKUP_DIR / f"CLAUDE.md.backup-{ts}"
+    backup = backup_path(BACKUP_DIR, "CLAUDE.md.backup-")
     shutil.copy2(CLAUDE_MD, backup)
     log.info("Backup: %s", backup)
 

@@ -38,6 +38,7 @@ import sys
 from pathlib import Path
 
 from core import frontmatter
+from core.backup import backup
 from core.config import CONFIG
 from core.console import setup_console_logging
 from core.paths import FACTS_DIR, KNOWLEDGE_DIR
@@ -54,12 +55,13 @@ def _fact_path(slug: str) -> Path:
     return FACTS_DIR / f"{slug}.md"
 
 
-# One-line delegates into the single core.frontmatter grammar (C03). Kept
-# under their historical names because dedup.py's merge flow imports them.
+# One-line delegates into the single core.frontmatter grammar (C03) and the one
+# backup helper (core/backup.py). Kept under their historical names because
+# dedup.py's merge flow imports them.
 
 
 def _backup(path: Path) -> Path | None:
-    return frontmatter.backup(path)
+    return backup(path)
 
 
 def _write_fact(path: Path, fm: dict, body: str) -> None:

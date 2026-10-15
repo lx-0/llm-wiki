@@ -18,6 +18,20 @@ every operator's `wiki update` → `uv sync` regenerate `uv.lock` and dirty thei
 config keys must also be wired into `scripts/migrations/migrate_config_keys.py`
 in the same commit.
 
+## [0.7.17] — 2026-10-15
+
+**For your vault:** nothing to do.
+
+### Fixed
+
+- **Applying several mail-filter rules at once could lose the backup of your original
+  filters.** Backups are named to the second, so Thunderbird's `msgFilterRules.dat` and
+  All-Inkl's procmail recipes, rewritten once per rule within the same second, got
+  backups with one shared name: each replaced the one before, down to the pre-change
+  original. Every backup the engine makes (also `wiki correct` / `take`, `dedup` and the
+  CLAUDE.md optimizer) now goes through one helper. A second backup in the same second
+  takes a `-2` suffix and keeps the first.
+
 ## [0.7.16] — 2026-10-15
 
 **For your vault:** if you ran `wiki hooks uninstall` before, the wiki hooks are still in

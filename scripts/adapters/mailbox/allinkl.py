@@ -15,12 +15,12 @@ from __future__ import annotations
 import logging
 import os
 import re
-from datetime import datetime
 from pathlib import Path
 
 import httpx
 
 from adapters.mailbox.base import ApplyResult
+from core.backup import backup_path
 from core.config import CONFIG
 from core.paths import RAW_DIR
 from domain.mail import FilterRule
@@ -157,11 +157,13 @@ def _save_procmail(client: httpx.Client, wid: str, rt: str, config: str) -> None
 
 
 def _backup(current: str, account_id: str) -> Path:
-    ts = datetime.now().strftime("%Y%m%d-%H%M%S")
-    backup_path = RAW_DIR / "notes" / "email" / f"procmail-backup-{account_id}-{ts}.txt"
-    backup_path.parent.mkdir(parents=True, exist_ok=True)
-    backup_path.write_text(current, encoding="utf-8")
-    return backup_path
+    # A batch of rules for one account saves within the same second; core/backup.py keeps
+    # each backup instead of letting the next one replace the original.
+    directory = RAW_DIR / "notes" / "email"
+    directory.mkdir(parents=True, exist_ok=True)
+    target = backup_path(directory, f"procmail-backup-{account_id}-", ".txt")
+    target.write_text(current, encoding="utf-8")
+    return target
 
 
 # ── Domain → procmail snippet translation ────────────────────────────

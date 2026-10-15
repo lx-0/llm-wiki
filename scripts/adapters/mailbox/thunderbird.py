@@ -27,6 +27,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from adapters.mailbox.base import ApplyResult, MailboxReadError
+from core.backup import backup_path
 from domain.mail import (
     FilterAction,
     FilterCondition,
@@ -524,12 +525,13 @@ def _parse_filter_file(path: Path) -> tuple[str, str, list[_DatRule]]:
 
 
 def _backup(path: Path) -> Path | None:
+    # A batch of rules rewrites the filter file within the same second; core/backup.py
+    # keeps each backup instead of letting the next one replace the original.
     if not path.exists():
         return None
-    ts = datetime.now().strftime("%Y%m%d-%H%M%S")
-    backup = path.parent / f"{path.name}.backup-{ts}"
-    backup.write_bytes(path.read_bytes())
-    return backup
+    target = backup_path(path.parent, f"{path.name}.backup-")
+    target.write_bytes(path.read_bytes())
+    return target
 
 
 def _write_filter_file(

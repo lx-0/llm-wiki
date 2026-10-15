@@ -34,19 +34,17 @@ Read/write API:
   line-replace inside the fence (append-before-close for missing keys),
   everything else stays byte-identical. This is the only legal way to update
   keys in an existing on-disk file (DECISIONS 2026-05-15).
-- `backup(path)` — timestamped ``.bak.<ts>`` sibling copy.
+
+Backups before a write go through `core/backup.py`.
 """
 
 from __future__ import annotations
 
 import re
-import shutil
-from datetime import datetime
 from pathlib import Path
 
 __all__ = [
     "FrontmatterError",
-    "backup",
     "field",
     "parse",
     "parse_strict",
@@ -230,13 +228,3 @@ def update_fields(path: Path, **fields: object) -> None:
                 block += "\n"
             block += line + "\n"
     path.write_text(text[: m.end()] + block + rest[close.start() :], encoding="utf-8")
-
-
-def backup(path: Path) -> Path | None:
-    """Timestamped sibling copy ``<name>.bak.<ts>``; ``None`` when path missing."""
-    if not path.exists():
-        return None
-    ts = datetime.now().strftime("%Y%m%d-%H%M%S")
-    bak = path.with_suffix(path.suffix + f".bak.{ts}")
-    shutil.copy2(path, bak)
-    return bak

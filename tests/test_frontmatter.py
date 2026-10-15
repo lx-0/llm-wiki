@@ -16,7 +16,6 @@ import pytest
 from core import frontmatter as fm_mod
 from core.frontmatter import (
     FrontmatterError,
-    backup,
     field,
     parse,
     parse_strict,
@@ -259,17 +258,7 @@ class TestUpdateFields:
             update_fields(f, a="two\nlines")
 
 
-class TestBackup:
-    def test_backup_copies(self, tmp_path: Path):
-        f = tmp_path / "f.md"
-        f.write_text("content", encoding="utf-8")
-        bak = backup(f)
-        assert bak is not None and bak.exists()
-        assert bak.name.startswith("f.md.bak.")
-        assert bak.read_text(encoding="utf-8") == "content"
-
-    def test_backup_missing_returns_none(self, tmp_path: Path):
-        assert backup(tmp_path / "nope.md") is None
+# Backups moved to core/backup.py (M034-S03-T03): tests/test_backup.py.
 
 
 # ── router ≡ classifier identity on the same bytes ───────────────────

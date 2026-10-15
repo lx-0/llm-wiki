@@ -34,17 +34,16 @@ from __future__ import annotations
 
 import argparse
 import logging
-import shutil
 import sys
 import unicodedata
 from dataclasses import dataclass, field
-from datetime import datetime
 from difflib import SequenceMatcher
 from itertools import combinations
 from pathlib import Path
 
 import yaml
 
+from core import backup as backups
 from core import frontmatter
 from core.console import setup_console_logging
 from core.links import relative_target, resolve_link, retarget_links
@@ -556,9 +555,7 @@ def merge_pages(
     # Back up + delete B.
     backup: Path | None = None
     if not dry_run:
-        ts = datetime.now().strftime("%Y%m%d-%H%M%S")
-        backup = drop.path.with_suffix(drop.path.suffix + f".bak.{ts}")
-        shutil.copy2(drop.path, backup)
+        backup = backups.backup(drop.path)
         drop.path.unlink()
 
     # Canonical-name hard fact.

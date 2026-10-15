@@ -36,6 +36,7 @@ import sys
 from pathlib import Path
 
 from core import frontmatter
+from core.backup import backup
 from core.console import setup_console_logging
 from core.paths import TAKES_DIR
 from core.utils import slugify, today_iso
@@ -61,11 +62,11 @@ def _take_path(slug: str) -> Path:
 
 # Read/write via the single core.frontmatter grammar (C03). `serialize`
 # normalizes the fence/body separator, which also fixes the old writer's
-# grow-one-blank-line-per-append round-trip.
+# grow-one-blank-line-per-append round-trip. Backups via core/backup.py.
 
 
 def _backup(path: Path) -> Path | None:
-    return frontmatter.backup(path)
+    return backup(path)
 
 
 def _read_frontmatter(path: Path) -> tuple[dict, str]:
