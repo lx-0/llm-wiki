@@ -318,6 +318,15 @@ def _walk(*, dry_run: bool, type_filter: str | None = None) -> NoReturn:
     if not pending:
         log.info("No pending curiosity requests.")
         sys.exit(0)
+    if not sys.stdin.isatty():
+        # The desktop runs menu actions with stdin on /dev/null, where read_key's
+        # termios call raises termios.error (not an OSError). The walk is a
+        # per-item consent gate, so without a keyboard it refuses instead.
+        log.error(
+            "Reviewing %d curiosity request(s) needs a terminal: run `wiki curiosity` in one.",
+            len(pending),
+        )
+        sys.exit(2)
 
     total = len(pending)
     accepted = skipped = rejected = 0

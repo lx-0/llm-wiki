@@ -2972,6 +2972,15 @@ Per-candidate learnings from the 14-candidate seam arc (C01–C14). Decisions li
   contributor how to regenerate `docs/config.md` failed with `ModuleNotFoundError: core` for
   the whole milestone while the guard stayed green. The guard now matches `\s+` across the
   full text. Any regex guard over prose has to tolerate the line breaks prose has.
+- **`termios.error` is not an `OSError` (2026-10-15, M033-S05-T06):** its MRO is
+  `termios.error → Exception`. The curiosity walk caught `(OSError, KeyboardInterrupt)` around
+  `read_key`, which reads in cbreak mode, so with stdin on `/dev/null` (how the desktop app
+  spawns every menu action) `tcgetattr` raised `termios.error: (19, 'Operation not supported
+  by device')` past the handler and the panel's "Review" row died with a traceback. The fix
+  is the home menu's posture: check `sys.stdin.isatty()` before the first prompt and refuse
+  with a pointer to the terminal (exit 2). A test that drives an interactive loop needs a
+  TTY stub for stdin; without one the walk's own refusal ends it early and a test that never
+  checked the exit code still passes, because it was only asserting what did not happen.
 
 ### Desktop toolchain (C07)
 

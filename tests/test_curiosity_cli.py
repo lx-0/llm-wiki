@@ -9,6 +9,7 @@ depend on instead.
 
 from __future__ import annotations
 
+import io
 import json
 from pathlib import Path
 
@@ -18,6 +19,14 @@ import pytest
 def _write(path: Path, payload: dict) -> Path:
     path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     return path
+
+
+class _Keyboard(io.StringIO):
+    """stdin as a terminal, so the walk's TTY check passes; the keys come from a
+    patched `read_key`."""
+
+    def isatty(self) -> bool:
+        return True
 
 
 def test_dispatch_routes_email_deep_scan_to_email_backend(tmp_path, monkeypatch):
@@ -178,6 +187,7 @@ def test_walk_accept_all_key_dispatches_every_remaining(tmp_path, monkeypatch, c
 
     dispatched = []
     monkeypatch.setattr(cli, "_dispatch", lambda p, *, dry_run: dispatched.append(p) or True)
+    monkeypatch.setattr(cli.sys, "stdin", _Keyboard())
     keys = iter(["A", "y"])  # accept-all on card 1, then confirm
     monkeypatch.setattr(cli, "read_key", lambda: next(keys))
 
@@ -208,12 +218,45 @@ def test_walk_accept_all_cancelled_on_no(tmp_path, monkeypatch):
     monkeypatch.setattr(cli, "REQUESTS_DIR", tmp_path)
     dispatched = []
     monkeypatch.setattr(cli, "_dispatch", lambda p, *, dry_run: dispatched.append(p) or True)
+    monkeypatch.setattr(cli.sys, "stdin", _Keyboard())
     keys = iter(["A", "n", "q"])  # accept-all, decline, then quit
     monkeypatch.setattr(cli, "read_key", lambda: next(keys))
 
-    with pytest.raises(SystemExit):
+    with pytest.raises(SystemExit) as exc:
         cli._walk(dry_run=False)
+    assert exc.value.code == 0  # the [q]uit branch, not an early refusal
+    assert next(keys, None) is None  # all three keys were read
     assert dispatched == []  # nothing sent — consent declined
+
+
+def test_walk_without_a_terminal_refuses_instead_of_crashing(tmp_path, monkeypatch, caplog):
+    """The desktop runs a menu action with stdin on /dev/null. The walk is a
+    per-item consent gate, so without a keyboard it refuses with a pointer to
+    the terminal (exit 2) — no termios traceback, nothing dispatched."""
+    import os
+
+    from curiosity import cli
+
+    _write(
+        tmp_path / "request-1.json",
+        {
+            "type": "folder-deep-scan",
+            "status": "pending",
+            "topic": "t1",
+            "file_path": "a/x.pdf",
+            "rationale": "r",
+        },
+    )
+    monkeypatch.setattr(cli, "REQUESTS_DIR", tmp_path)
+    monkeypatch.setattr(
+        cli, "_dispatch", lambda p, *, dry_run: pytest.fail("dispatched without consent")
+    )
+    with open(os.devnull, encoding="utf-8") as devnull:
+        monkeypatch.setattr(cli.sys, "stdin", devnull)
+        with pytest.raises(SystemExit) as exc:
+            cli._walk(dry_run=False)
+    assert exc.value.code == 2
+    assert "needs a terminal" in caplog.text
 
 
 def test_pending_filters_by_type_and_excludes_done(tmp_path, monkeypatch):
