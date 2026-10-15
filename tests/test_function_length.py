@@ -19,7 +19,7 @@ LIMIT = 150
 # Excluded by path, with the reason beside it.
 EXCLUDED = {
     "scripts/core/config_schema.py": (
-        "the generated-table module: 72 % comment by design, formatted by hand, read as "
+        "the generated-table module: ~75 % comment by design, formatted by hand, read as "
         "TEXT by the config-docs generator (pyproject `format.exclude`)"
     ),
 }

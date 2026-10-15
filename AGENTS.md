@@ -294,6 +294,11 @@ Long-term direction: remove agent-side filesystem writes entirely — agent retu
   (`.github/workflows/ci.yml`, with `pytest` and the desktop suite). The mechanical format
   commit is listed in `.git-blame-ignore-revs`; run once per clone:
   `git config blame.ignoreRevsFile .git-blame-ignore-revs`.
+- Size gates (both in the suite): a function stays under 150 lines
+  (`tests/test_function_length.py`, its allowlist is empty), a module under `scripts/` at or
+  under 1,000 lines unless `docs/engine-layout.md` § "Large modules" lists it with the reason
+  it stays one module (`tests/test_module_size.py`). Both lists only shrink — split the code,
+  don't extend the list.
 - No emoji in code. Logs use ASCII status markers (✓ ! ✗) only via the helpers in `lib/common.sh`.
 - Commit messages: imperative mood, short subject (≤70 chars), body explains why.
 

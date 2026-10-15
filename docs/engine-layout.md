@@ -10,6 +10,7 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 
 - [Directory tree](#directory-tree)
 - [How a module runs](#how-a-module-runs)
+- [Large modules](#large-modules)
 - [Why bash + python + jq?](#why-bash--python--jq)
 - [Where to go next](#where-to-go-next)
 
@@ -236,6 +237,15 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 - **Hooks** (`hooks/*.py`) are plain scripts the agent harness runs from `hooks/`; they `import _bootstrap` — the engine's one `sys.path` bootstrap — before anything from `scripts/`.
 
 A package whose `__init__` imports its modules to register them (`collectors`, `preprocessors`, `producers`) double-imports such a module under `-m` — runpy warns, the registry sees the module twice. The commands behind those modules enter through top-level entry scripts instead (`process_inbox.py`, `ingest_html.py`, `ingest_youtube.py`, `index_folders.py`; `scan_screenshots.py` / `scan_browser.py` / `scan_tabs.py` for the three collectors' direct-CLI flags); `tests/test_cli_dispatch.py` refuses a handler that reaches into such a package directly, and `tests/test_layout.py` refuses a documented `uv run python …/scripts/<pkg>/<x>.py` invocation anywhere in docstrings, `docs/`, `AGENTS.md`, `README.md` or `templates/`.
+
+## Large modules
+
+A module under `scripts/` stays at or under 1,000 lines; one that is larger is listed here with the reason it stays one module. This list is the allowlist of `tests/test_module_size.py` — a module over the limit and missing here fails, and so does an entry whose module has dropped under the limit (the list only shrinks).
+
+- `scripts/core/config_schema.py` — the declarative table of every config knob (one dataclass per section, a doc comment on every field — three quarters of its lines are comment), formatted by hand and read as source text by `core/config_docs.py` to generate `docs/config.md`; a split would scatter one table without separating any logic.
+- `scripts/dream.py` — the module `wiki dream` runs as `__main__`: one pipeline (an entity's synthesis from the pre-SDK gates through the SDK call to the post-write verdict and stamping) plus the sweep and the CLI that drive it, with the SDK seam (`dream.query`) the tests isolate on it; the entity model, the corpus and the sweep priority already live in `dream_model.py`, `dream_corpus.py` and `dream_priority.py`.
+- `scripts/collectors/gmeet.py` — one collector whose parts change together: the meeting-pairing rules (title normalisation, meeting key, sibling scan, section render and merge) define the file shape the per-account scan writes and re-reads; the Drive transport already lives in `adapters/drive/google.py`.
+- `scripts/migrations/migrate_config_keys.py` — the one legal write path into an operator's `config.yaml`, named by path in the CLAUDE.md hard rule that every knob change extends it in the same commit; half of it is the declarative migration tables those commits extend, the rest applies them in one fixed order.
 
 ## Why bash + python + jq?
 
