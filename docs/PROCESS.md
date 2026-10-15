@@ -1137,8 +1137,8 @@ Was passiert (M028 — **agent proposes, engine disposes**, issue #5):
 flowchart TD
     DROP["📝 prompts/agents/<id>.md\n(YAML frontmatter + prompt body)"]
     DROP --> SEED["wiki seed"]
-    SEED --> SC["additive merge in\n.obsidian/plugins/\nobsidian-shellcommands/data.json"]
-    SEED --> DASH["rewrite agent-buttons\nregions in dashboard.md\n(marker-based, idempotent)"]
+    SEED --> SC["merge by id into the two\nplugin registries: Shell commands'\nshell_commands + Meta-Bind's\nbuttonTemplates"]
+    SEED --> DASH["rewrite the agent-buttons\nregion in dashboard.md\n(marker-based, idempotent)"]
     SEED --> READY["Dashboard reload\n→ Button erscheint"]
 
     READY --> CLICK["Button-Click\noder wiki agent <id>"]
@@ -1195,12 +1195,14 @@ Operator-bereitgestellt via `wiki agent <id> --var key=value` (repeatable).
 
 ### Auto-Wiring durch `wiki seed`
 
-`scripts/dashboard/agent_buttons.py` discovered alle `prompts/agents/*.md` mit `button:` Frontmatter. `lib/seed.sh` ruft das auf zwei Pfaden:
+`scripts/dashboard/agent_buttons.py` discovered alle `prompts/agents/*.md` mit `button:` Frontmatter und liefert pro Button einen Shell-commands-Eintrag (`agent-<id>`, Alias `Wiki: agent <id>`) und ein Meta-Bind-Button-Template (`btn-<id>`). Ein Dashboard-Button braucht beide: Meta-Bind löst `` `BUTTON[id]` `` seit 1.4 nur noch gegen die `buttonTemplates` seiner `data.json` auf (Definitionen in eingebetteten Notizen zählen nicht mehr), und der Button führt den Shell-commands-Befehl über dessen Palette-Namen aus, den Alias. `lib/seed.sh` verdrahtet auf zwei Pfaden:
 
-1. **Shell-Commands additiver Merge:** `_merge_agent_shell_commands()` jq-merged neue `agent-<id>` Einträge in `.obsidian/plugins/obsidian-shellcommands/data.json`. Bestehende User-Einträge bleiben.
-2. **Dashboard Region-Replace:** `_rewrite_dashboard_agent_buttons()` ersetzt zwei marker-begrenzte Bereiche in `dashboard.md`:
-   - `<!-- agent-buttons:begin -->` ... `<!-- agent-buttons:end -->` — inline `` `BUTTON[id]` `` Referenzen
-   - `<!-- agent-button-defs:begin -->` ... `<!-- agent-button-defs:end -->` — hidden Meta-Bind Definitionen
+1. **Merge in die zwei Plugin-Register:** `_merge_registry()` merged die Engine-Einträge per id in `shell_commands` (`.obsidian/plugins/obsidian-shellcommands/data.json`) und `buttonTemplates` (`.obsidian/plugins/obsidian-meta-bind-plugin/data.json`). Engine-Einträge = die des Templates plus die generierten; die Templates tragen keine Agent-Einträge (`tests/test_agent_buttons.py` hält sie dazu an — eine Template-Kopie driftete: `btn-dream-cycle` stand im Dashboard und in keinem Register).
+   - Ein Eintrag mit Engine-id übernimmt die Felder der Engine **an Ort und Stelle**. Felder, die die Engine nicht ausliefert, bleiben: die des Plugins (`debounce`, `execution_notification_mode`) und die des Operators.
+   - Fehlende Engine-Einträge werden angehängt; alle anderen Einträge bleiben unberührt, samt Reihenfolge.
+   - Fehlt die Datei, wird sie als Template plus Engine-Einträge angelegt.
+   - Geschrieben wird nur bei echter Änderung. `--check` sagt, was hinzukäme oder aktualisiert würde.
+2. **Dashboard Region-Replace:** `_rewrite_dashboard_agent_buttons()` ersetzt den Bereich `<!-- agent-buttons:begin -->` ... `<!-- agent-buttons:end -->` in `dashboard.md` durch die inline `` `BUTTON[id]` `` Referenzen. Das Template trägt sie schon so, wie Seed sie schreibt — sonst gälte jedes `dashboard.md` ab dem zweiten Seed als „drifted“.
 
 Idempotent — zweiter Lauf produziert keinen Diff.
 
@@ -1208,9 +1210,11 @@ Idempotent — zweiter Lauf produziert keinen Diff.
 
 - **Spec ohne `button:`** — Task ist via `wiki agent <id>` aufrufbar, erscheint aber nicht im Dashboard.
 - **Spec invalide** (fehlende Felder, unbekannte Tools) — `parse_spec` raised `SpecError` mit klarer Message; `wiki agent --list` skippt invalide Specs aber zeigt sie als Fehler unten in der Liste.
-- **`hidden: true`** auf Meta-Bind Defs — Block-Definition existiert, rendert aber nichts. Inline `` `BUTTON[id]` `` Referenzen nutzen die versteckte Def und rendern den Button an der Inline-Position.
-- **Marker fehlen in dashboard.md** — `update_dashboard()` warned und skippt; safe für custom-edited dashboards.
-- **Operator löscht Spec-File** — Auto-pruning ist NICHT Default. Buttons bleiben in shell-commands data.json + dashboard.md zurück, bis manuell entfernt. `--prune-agent-buttons` Flag deferred ins Backlog.
+- **`hidden: true`** auf den Button-Templates — das Template selbst rendert nichts; die inline `` `BUTTON[id]` `` Referenzen rendern den Button an ihrer Position.
+- **Marker fehlen in dashboard.md** — Seed meldet `dashboard.md has no agent-buttons region — left as it is` und lässt die Datei unberührt; safe für custom-edited dashboards.
+- **Plugin-Migrationen:** Shell commands 0.23 benennt beim Laden Icons um (`bot` → `lucide-bot`, …) und ergänzt `debounce` / `execution_notification_mode`. Die Engine liefert die umbenannten Icon-Namen und keins der Plugin-Felder — sonst nähme jeder Seed die Migration zurück und das Plugin wiederholte sie beim nächsten Start, mit einem Backup jedes Mal.
+- **Altes Objekt-Format** von `shell_commands` (nach id geschlüsselt; das Template trug es bis 0.7.19): der Merge liest es wie die Plugin-Migration — der Schlüssel wird zur `id`.
+- **Operator löscht Spec-File** — Auto-pruning ist NICHT Default. Die Einträge bleiben in beiden `data.json`-Registern zurück, bis manuell entfernt; die inline Referenz verschwindet beim nächsten Seed aus der Region. `--prune-agent-buttons` Flag deferred ins Backlog.
 
 
 ---

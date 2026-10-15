@@ -27,7 +27,7 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 ├── lib/
 │   ├── common.sh              ← paths, the engine-environment rule, output helpers, shell_quote / sync_hint, backup
 │   ├── ui.sh                  ← interactive prompts: confirm for update
-│   └── seed.sh                ← `wiki seed`: template seeding with the overlay and the plugin / env / meta-bind / dashboard merges
+│   └── seed.sh                ← `wiki seed`: template seeding with the overlay, the plugin-list / env merges, the two button registries and the dashboard region
 ├── scripts/
 │   ├── core/                  ← shared engine plumbing (imported, never invoked)
 │   │   ├── paths.py               ← eager path constants from __file__ — zero deps, no side effects
@@ -133,7 +133,7 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 │   │   ├── dashboard_stats.py     ← _dashboard-stats.md generator
 │   │   ├── dashboard_lint.py      ← _dashboard-lint.md generator
 │   │   ├── lint_results.py        ← once-per-refresh structural-lint compute, cached in STATE_DIR (shared by the stats + lint renderers)
-│   │   ├── agent_buttons.py       ← agent-button discovery + dashboard.md rewriter
+│   │   ├── agent_buttons.py       ← agent-button discovery: the two plugin registries' entries + the dashboard.md region
 │   │   └── inject_daily_button.py ← idempotent Summarize-button injection into daily/<date>/sessions.md
 │   ├── reports/_engine/       ← operator-self-reports surface (air-gapped from compile)
 │   │   ├── runner.py              ← `run_inference()` — substrate-scope resolve + batched SDK calls + persist `runs/<ts>/instruments/<slug>.md`

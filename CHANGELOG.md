@@ -18,6 +18,42 @@ every operator's `wiki update` → `uv sync` regenerate `uv.lock` and dirty thei
 config keys must also be wired into `scripts/migrations/migrate_config_keys.py`
 in the same commit.
 
+## [0.7.20] — 2026-10-16
+
+**For your vault:** run `wiki seed` after `wiki update`, then restart Obsidian. The plugins
+read their settings at startup. Seed brings the dashboard buttons' wiring up to date and
+keeps your own edits. `wiki seed --check` shows first what it would change.
+
+### Fixed
+
+- **The dashboard buttons work in a new vault.** `wiki seed` never created the Shell commands
+  config, so in a fresh vault Compile, Lint, Refresh stats, Daily digest and Summarize day
+  ran commands that did not exist. Seed now creates the config, and `--check` reports it when
+  it is missing.
+- **The dream-cycle and orchestrate-tasks buttons work.** Since 1.4, Meta-Bind resolves a
+  button only from its own registry, and these two were never in it, in any vault. Seed now
+  puts each agent button there, next to its Shell commands entry, both generated from the
+  agent's spec.
+- **Engine fixes to the Shell commands entries reach existing vaults.** Seed only merged the
+  agent commands into an existing config, so the 0.5.4 fix to "refresh dashboard stats" never
+  arrived: the button still ran a script that had moved.
+  - An engine entry now takes the engine's fields in place.
+  - Fields the engine does not ship stay, the plugin's own and yours.
+  - Your own commands keep their place.
+- **A Shell commands config in the plugin's old form keeps its ids.** The old form keys each
+  command by its id, and the merge dropped every key. It now reads the form the way the
+  plugin migrates it.
+- **`--check` now reports a Meta-Bind button that seed would restore.** It compared only the
+  ids, so it said "up-to-date" when seed went on to change the file. For both registries,
+  seed and `--check` now name the buttons and commands they add or update.
+  - Seed no longer rewrites a file whose content is already current.
+  - It no longer says "already up to date" about a file it just changed.
+- **The dashboard is no longer reported as drifted after every seed.** The template's
+  agent-buttons row lacked a button the agent specs declare, so seed's own rewrite made the
+  file differ. The template now carries the row as seed writes it.
+- A new vault's dashboard no longer embeds `_dashboard-buttons`, a note seed never created.
+  Meta-Bind stopped reading button definitions from embedded notes in 1.4.
+
 ## [0.7.19] — 2026-10-16
 
 **For your vault:** nothing to do.

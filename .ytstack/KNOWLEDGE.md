@@ -1365,6 +1365,8 @@ The frontmatter is parsed by `scripts/agent_spec.py:parse_spec()` into an `Agent
 1. **jq additive merge** (same shape as `community-plugins.json` and `appearance.json`): every spec with a `button:` block contributes an entry under `shell_commands.agent-<id>` in `.obsidian/plugins/obsidian-shellcommands/data.json`. User's other shell commands stay untouched.
 2. **Marker-based region replacement** (new pattern, lives in `scripts/agent_buttons.py:update_dashboard`): `<!-- agent-buttons:begin --> … <!-- agent-buttons:end -->` and `<!-- agent-button-defs:begin --> … <!-- agent-button-defs:end -->` define rewriteable regions in `templates/dashboard.md`. The seed regenerates contents from spec discovery; nothing outside the markers is touched. Idempotent.
 
+*As of 2026-10-16 (0.7.20) the wiring is different — see "Dashboard buttons need both plugin registries" below. The defs region is gone (Meta-Bind 1.4 stopped reading definitions from embedded notes), and the agent buttons go into Meta-Bind's `buttonTemplates` as well.*
+
 This keeps the operator's editing surface a single `.md` file per task, while the engine stays untouched. The same pattern can be lifted to other auto-wired surfaces (e.g. piggyback registration, hook generators) if needed later.
 
 **Why not bespoke per-task scripts** (rejected): we already had `correct_apply.py`, `compile.py`, `query.py`, and a per-feature trajectory ahead (`summarize-day`, `review-mocs`, `weekly-digest`, `extract-todos`, `cluster-orphans`). One more script per feature → script explosion. Pulling the SDK-spawn into one runner + spec files keeps engine code stable as the task catalogue grows.
@@ -3437,3 +3439,36 @@ So the migration built the target and placed the symlink, and iCloud Drive's rec
 No symlink. The engine decides where its environment is: `lib/common.sh:wiki_venv_dir` — vault under `~/Library/Mobile Documents/` or `~/Library/CloudStorage/` → `~/.venvs/<vault>-wiki`, exported as `UV_PROJECT_ENVIRONMENT` by the `wiki` dispatcher, written literally into every agent hook command by `lib/agents.sh` (the agent spawns hooks with *its* env), asked by `install.sh`; Python reads only `sys.prefix`. `wiki doctor` guards both ends (`engine-cloud-eviction` on the running prefix, `hooks-installed` on the hook commands). The operator asked why not the platform app-data directory (`~/Library/Application Support`) — fair for an app, but this is a regenerable Python environment and `~/.venvs/<name>` was already there, so it stayed. Manual `uv run --project .wiki` on such a vault is now the one remaining way to recreate an in-vault `.venv`; the doctor reports it as stale within the day.
 
 Live on lxw, 2026-09-17 13:15: `wiki update` 16 s (the run before, still on the in-vault env, sat 12 min in `git diff` materialising 2 024 evicted files — `brctl download <vault>/.wiki` is the unblock); Codex/Gemini/Cursor hooks rewritten with the path (Claude's `~/.claude/settings.json` is never edited from a running session — merged copy handed over via /tmp); one archived flush retried through `~/.venvs/lxw-wiki`: landed on the first attempt in 54 s, no crash report. The installer's array-replacing merge was found on the way (one foreign SessionStart hook per agent would have been dropped) and fixed in the same arc.
+
+## Dashboard buttons need both plugin registries, and a merge must survive the plugin's own migrations (2026-10-16, 0.7.20)
+
+### How it surfaced
+
+It came up while recording the bash `wiki seed` before its port (M034-S04-T01). The second seed of a fresh fixture called `dashboard.md` drifted, and a merge said "already up to date" about a file it had just reformatted. The fresh vault also had no `.obsidian/plugins/obsidian-shellcommands/data.json` at all.
+
+### The chain
+
+Each link was verified on the fixture. The live lxw config was only read, through a scratch copy.
+
+| defect | since | effect |
+| --- | --- | --- |
+| seed merged into an existing Shell commands config but never created one | c22a125, 2026-05-02 | a fresh vault's Compile / Lint / Refresh stats / Daily digest / Summarize day buttons ran commands that did not exist |
+| the template kept `shell_commands` as an id-keyed object, and the merge iterated it as a list | — | had seed ever copied the template, every id would have been dropped |
+| only the agent entries were merged into an existing config | c22a125 | the template's fix of "refresh dashboard stats" (0.5.4) never reached a vault: lxw's button still ran `.wiki/scripts/dashboard_stats.py` |
+| Meta-Bind ≥ 1.4 resolves `BUTTON[id]` only against its `buttonTemplates`, and no agent button was ever put there | 4ac7b22, 2026-05-28 | `btn-dream-cycle` and `btn-orchestrate-tasks` were defined in no vault |
+| the template's agent-buttons region lagged the generator (orchestrate-tasks) | — | seed rewrote the region, and from then on every seed and `--check` called dashboard.md drifted and advised `--force` |
+| `update-dashboard … 2>&1` folded a stderr warning into the verdict | — | the message said "already up to date" right after the file changed |
+| Meta-Bind's `--check` compared only the ids | 4ac7b22 | it said "up-to-date" when seed would go on to revert an engine button |
+
+### Lessons
+
+1. **A button is a chain across two plugins.** Test the chain end to end on a seeded vault: every `BUTTON[id]` must reach a `buttonTemplates` entry, whose `Shell commands: <alias>` must reach a `shell_commands` entry. Testing each file alone misses it. The test is `tests/test_seed.py::test_a_fresh_seed_wires_every_dashboard_button`.
+2. **A template copy of generated data drifts.** The agent entries now come from the generator alone. `tests/test_agent_buttons.py` holds the templates to that: their ids must be disjoint from the generated ones, and the dashboard region must equal the generated refs.
+3. **A merge into a third-party config must survive that plugin's migrations.** Shell commands 0.23 renames icons on load (`bot` → `lucide-bot`, …) and adds `debounce` / `execution_notification_mode`. A merge that ships the old names, or replaces whole entries, undoes the migration on every seed. The plugin then redoes it on every start and writes a backup each time.
+   - Ship the migrated names.
+   - Never ship the plugin's own fields.
+   - Take the engine's fields in place (`existing + engine`).
+
+   A copy of lxw's `.obsidian/` measured the difference. Before the icon fix, the merge touched seven entries; after it, only the one real fix, refresh-stats.
+4. **A verdict on stdout, a warning on stderr.** Never `2>&1` into a variable you compare.
+5. **An audit must use the comparison the write uses.** A check that compares less than the write changes will report "up-to-date" for files seed is about to modify.

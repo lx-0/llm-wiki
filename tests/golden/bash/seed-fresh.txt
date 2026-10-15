@@ -28,7 +28,8 @@ additive mode
 ✓ seeded .obsidian/plugins/dataview/data.json
 ✓ seeded .obsidian/plugins/extended-graph/data.json
 ✓ seeded .obsidian/plugins/homepage/data.json
-✓ seeded obsidian-meta-bind-plugin/data.json
+✓ seeded .obsidian/plugins/obsidian-meta-bind-plugin/data.json
+✓ seeded .obsidian/plugins/obsidian-shellcommands/data.json
 ✓ seeded .obsidian/plugins/quickadd/data.json
 ✓ seeded reports/studies/longitudinal-baseline/manifest.yaml
 ✓ seeded .claude/.env.example
@@ -394,7 +395,10 @@ dashboard.md — agent-buttons already up to date
           "id": "btn-note",
           "style": "primary",
           "actions": [
-            { "type": "command", "command": "QuickAdd: Neue Notiz" }
+            {
+              "type": "command",
+              "command": "QuickAdd: Neue Notiz"
+            }
           ]
         },
         {
@@ -405,7 +409,10 @@ dashboard.md — agent-buttons already up to date
           "id": "btn-idea",
           "style": "default",
           "actions": [
-            { "type": "command", "command": "QuickAdd: Neue Idee" }
+            {
+              "type": "command",
+              "command": "QuickAdd: Neue Idee"
+            }
           ]
         },
         {
@@ -416,7 +423,10 @@ dashboard.md — agent-buttons already up to date
           "id": "btn-question",
           "style": "default",
           "actions": [
-            { "type": "command", "command": "QuickAdd: Neue Frage" }
+            {
+              "type": "command",
+              "command": "QuickAdd: Neue Frage"
+            }
           ]
         },
         {
@@ -427,7 +437,10 @@ dashboard.md — agent-buttons already up to date
           "id": "btn-meeting",
           "style": "default",
           "actions": [
-            { "type": "command", "command": "QuickAdd: Neues Meeting" }
+            {
+              "type": "command",
+              "command": "QuickAdd: Neues Meeting"
+            }
           ]
         },
         {
@@ -438,7 +451,10 @@ dashboard.md — agent-buttons already up to date
           "id": "btn-compile",
           "style": "primary",
           "actions": [
-            { "type": "command", "command": "Shell commands: Wiki: compile (changed sources)" }
+            {
+              "type": "command",
+              "command": "Shell commands: Wiki: compile (changed sources)"
+            }
           ]
         },
         {
@@ -449,40 +465,80 @@ dashboard.md — agent-buttons already up to date
           "id": "btn-lint",
           "style": "default",
           "actions": [
-            { "type": "command", "command": "Shell commands: Wiki: lint (structural)" }
+            {
+              "type": "command",
+              "command": "Shell commands: Wiki: lint (structural)"
+            }
           ]
         },
         {
           "label": "🔄 Refresh stats",
           "hidden": true,
           "class": "",
-          "tooltip": "Re-run dashboard_stats.py.",
+          "tooltip": "Run `wiki refresh-dashboards` — rebuild the dashboard's stats and lint caches.",
           "id": "btn-refresh-stats",
           "style": "default",
           "actions": [
-            { "type": "command", "command": "Shell commands: Wiki: refresh dashboard stats" }
+            {
+              "type": "command",
+              "command": "Shell commands: Wiki: refresh dashboard stats"
+            }
           ]
         },
         {
           "label": "🗓️ Daily digest",
           "hidden": true,
           "class": "",
-          "tooltip": "Distill per-source captures into a single short digest.",
+          "tooltip": "Distill per-source captures (sessions/health/meetings/voice/email) into a single short digest.",
           "id": "btn-daily-digest",
           "style": "primary",
           "actions": [
-            { "type": "command", "command": "Shell commands: Wiki: agent daily-digest" }
+            {
+              "type": "command",
+              "command": "Shell commands: Wiki: agent daily-digest"
+            }
+          ]
+        },
+        {
+          "label": "🌙 Resynthesize entity",
+          "hidden": true,
+          "class": "",
+          "tooltip": "Run dream-cycle on one entity — picks all substrate that mentions it and rewrites the page.",
+          "id": "btn-dream-cycle",
+          "style": "primary",
+          "actions": [
+            {
+              "type": "command",
+              "command": "Shell commands: Wiki: agent dream-cycle"
+            }
+          ]
+        },
+        {
+          "label": "✅ Run accepted tasks",
+          "hidden": true,
+          "class": "",
+          "tooltip": "Execute every accepted task in workspace/tasks/, mark it done, and tick its checkbox in todo.md.",
+          "id": "btn-orchestrate-tasks",
+          "style": "primary",
+          "actions": [
+            {
+              "type": "command",
+              "command": "Shell commands: Wiki: agent orchestrate-tasks"
+            }
           ]
         },
         {
           "label": "📅 Summarize day",
           "hidden": true,
           "class": "",
-          "tooltip": "Run summarize-day agent — refreshes today's Summary block in daily/.",
+          "tooltip": "Run summarize-day agent — appends/refreshes today's Summary block in daily/.",
           "id": "btn-summarize-day",
           "style": "primary",
           "actions": [
-            { "type": "command", "command": "Shell commands: Wiki: agent summarize-day" }
+            {
+              "type": "command",
+              "command": "Shell commands: Wiki: agent summarize-day"
+            }
           ]
         }
       ],
@@ -490,6 +546,8 @@ dashboard.md — agent-buttons already up to date
         "templates"
       ]
     }
++ <VAULT>/.obsidian/plugins/obsidian-shellcommands/data.json
+    <8760 bytes, sha256 <REV>>
 + <VAULT>/.obsidian/plugins/quickadd/data.json
     {
       "choices": [
@@ -908,7 +966,7 @@ dashboard.md — agent-buttons already up to date
     - [[daily/2026-01-02.md]]
     - [[raw/notes/2026-01-02--a-note.md]]
 + <VAULT>/dashboard.md
-    <9596 bytes, sha256 <REV>>
+    <9430 bytes, sha256 <REV>>
 + <VAULT>/knowledge.base
     # Filterable knowledge browser. Native Obsidian Bases (built-in 1.10+).
     # Operator can duplicate this file or edit views in place — seed is additive,

@@ -2451,3 +2451,42 @@ the port makes it cheap.
 - `require_cmd jq` leaves `wiki` with `lib/seed.sh` (S04-T05).
 - install.sh, which sourced lib/seed.sh before its venv existed, seeds through `wiki seed`
   after its `uv sync` (S04-T05).
+
+## 2026-10-16: The two button registries merge by id in place, with the agent entries generated (0.7.20)
+
+**Context:** Recording the bash seed (M034-S04-T01) turned up a chain of dead dashboard
+buttons; KNOWLEDGE has the full chain under the same date.
+- A fresh vault had no Shell commands config.
+- The engine's own commands never reached an existing config.
+- Two agent buttons were in neither registry.
+- Replacing whole entries would undo the plugin's own migrations on every seed.
+
+**Chose:**
+- **One merge for both registries,** Meta-Bind's `buttonTemplates` and Shell commands'
+  `shell_commands` (`lib/seed.sh:_merge_registry`).
+  - The engine's entries are the template's plus the agent buttons' from
+    `dashboard.agent_buttons`.
+  - An entry with an engine id takes the engine's fields in place. Fields the engine does
+    not ship stay.
+  - A missing engine entry is appended; every other entry is left as it is.
+  - A missing file is seeded as the template plus the engine entries.
+  - Seed writes only on a real change, and its messages name the ids added and updated.
+- **The generator is the one source of the agent entries.** The templates carry none of
+  them, and `tests/test_agent_buttons.py` holds them to that.
+- **The engine ships what the plugin keeps:** the migrated icon names, and none of the
+  plugin's own fields.
+- **The legacy id-keyed form is read the way the plugin migrates it:** the key becomes the
+  `id`.
+
+**Rejected:**
+- *Replacing a whole engine entry* (the old rule in both merges): it drops the plugin's
+  fields and flip-flops with its migrations, a backup on every start.
+- *The engine wins only on the alias and the command line, and fills gaps elsewhere*: it
+  would keep an operator's tuning, but the engine's own fixes (an icon, a tooltip) would
+  never reach a vault, which is the failure this decision fixes. The engine stays
+  canonical for the fields it ships, as before.
+- *Hidden button definitions in a markdown note*: Meta-Bind 1.4 stopped resolving them
+  across an embed, so the registry is the only path.
+
+**Supersedes:** Meta-Bind's "engine entries first, then the operator's" (4ac7b22), now in
+place. The 2026-10-16 port decision above holds: S04-T03 ports this merge, not the old one.

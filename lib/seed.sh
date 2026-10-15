@@ -395,138 +395,100 @@ _merge_env_example() {
 }
 
 
-# ── Internal: merge meta-bind data.json (buttonTemplates union by id) ──
-# Engine ships canonical button templates referenced from dashboard.md as
-# `BUTTON[btn-*]`. In Meta-Bind v1.4.x, IDs are resolved against the plugin's
-# buttonTemplates registry — buttons defined in transcluded .md files no
-# longer leak across files. We merge so operator's other settings (devMode,
-# preferredDateFormat, firstWeekday, ...) and any user-added buttonTemplates
-# with non-conflicting ids are preserved. Engine ids overwrite same-id user
-# entries (engine is canonical for those).
-_merge_meta_bind_data() {
-  local src="$1" dst="$2" check="${3:-0}"
-  if [[ ! -f "$src" ]]; then
-    return 0
+# ── Internal: merge the engine's entries into a plugin's registry ─────
+# Two plugins keep what the dashboard's buttons need in a list of `{id, …}`
+# entries in their data.json: Meta-Bind's `buttonTemplates` (from 1.4 on it
+# resolves `BUTTON[id]` against these only) and Shell commands'
+# `shell_commands` (a button runs one by its palette name, the alias). The
+# engine's entries are the template's plus the agent buttons' (generated from
+# prompts/agents/*.md by dashboard.agent_buttons — the templates carry none of
+# those).
+#
+# An entry with an engine id takes the engine's fields IN PLACE: fields the
+# engine does not ship stay (the plugin's own — Shell commands adds `debounce`
+# and `execution_notification_mode` — and the operator's). A missing engine
+# entry is appended; every other entry is left alone. Shell commands' legacy
+# id-keyed object form is read the way the plugin migrates it (the key becomes
+# the entry's `id`) — read as a list it lost every id. Outputs the merged file
+# and what the merge adds and updates.
+_REGISTRY_MERGE_JQ='
+  def as_list: if type == "object" then [to_entries[] | .value + {id: .key}]
+               elif type == "array" then . else [] end;
+  def engine($id): first($eng[] | select(.id == $id)) // null;
+  (.[$key] | as_list) as $cur
+  | [$cur[] | .id] as $have
+  | [$cur[] | . as $c | engine($c.id) as $e | if $e == null then $c else $c + $e end] as $kept
+  | [$eng[] | select(.id as $i | $have | any(. == $i) | not)] as $new
+  | {merged: (.[$key] = $kept + $new),
+     added: [$new[] | .id],
+     updated: [$cur[] | . as $c | engine($c.id) as $e
+               | select($e != null and ($c + $e) != $c) | .id]}'
+
+# The agent buttons' entries for one registry, as a JSON list on stdout (the
+# value — so the warning goes to stderr).
+_agent_entries() {  # $1=wiki_dir $2=mode (shell-commands | meta-bind-templates)
+  local out
+  out="$(PYTHONPATH="$1/scripts" uv run --quiet --project "$1" python -m dashboard.agent_buttons "$2" 2>/dev/null)"
+  if [[ $? -ne 0 || -z "$out" ]]; then
+    warn "could not list the agent buttons (dashboard.agent_buttons $2) — their entries are left out" >&2
+    out='[]'
   fi
+  printf '%s\n' "$out"
+}
+
+# Seed a missing registry file as template + engine entries; otherwise merge the
+# engine entries in, writing only on a real change. check=1 reports what the
+# merge would do and writes nothing.
+_merge_registry() {  # $1=template $2=dst $3=label $4=key $5=wiki_dir $6=agent-mode $7=check
+  local src="$1" dst="$2" label="$3" key="$4" wiki_dir="$5" mode="$6" check="${7:-0}"
+  [[ -f "$src" ]] || return 0
   _seed_only_skip "$dst" && return 0
+  if [[ ! -f "$dst" && "$check" == "1" ]]; then
+    warn "missing $label (run \`wiki seed\` to install)"
+    return 0
+  fi
+  local engine base="$dst" out
+  engine="$(jq --arg key "$key" --argjson gen "$(_agent_entries "$wiki_dir" "$mode")" \
+    '.[$key] + $gen' "$src")" || { warn "engine template for $label is not valid JSON"; return 0; }
+  [[ -f "$dst" ]] || base="$src"
+  out="$(jq --arg key "$key" --argjson eng "$engine" "$_REGISTRY_MERGE_JQ" "$base" 2>/dev/null)" || out=""
+  if [[ -z "$out" ]]; then
+    warn "$label is not valid JSON — left as it is (fix it, or remove it and rerun \`wiki seed\`)"
+    return 0
+  fi
+  local merged
+  merged="$(printf '%s' "$out" | jq '.merged')"
   if [[ ! -f "$dst" ]]; then
-    if [[ "$check" == "1" ]]; then
-      warn "missing obsidian-meta-bind-plugin/data.json"
-      return 0
-    fi
     mkdir -p "$(dirname "$dst")"
-    cp "$src" "$dst"
-    ok "seeded obsidian-meta-bind-plugin/data.json"
+    printf '%s\n' "$merged" > "$dst"
+    ok "seeded $label"
     return 0
   fi
-  if ! command -v jq >/dev/null 2>&1; then
-    warn "jq not available — skipping obsidian-meta-bind-plugin/data.json merge"
+  if [[ "$(_json_canon "$dst")" == "$(_json_canon_str "$merged")" ]]; then
+    if [[ "$check" == "1" ]]; then ok "up-to-date $label"; else info "kept existing $label (up-to-date)"; fi
     return 0
   fi
-  local before merged after
-  before="$(jq -r '(.buttonTemplates // []) | map(.id) | join(",")' "$dst" 2>/dev/null || echo '')"
-  merged="$(jq -s '
-    .[0] as $cur | .[1] as $eng |
-    ($eng.buttonTemplates // []) as $eb |
-    ($eb | map(.id)) as $eids |
-    $cur + {
-      buttonTemplates: (
-        $eb +
-        (($cur.buttonTemplates // []) | map(select(.id as $id | $eids | index($id) | not)))
-      )
-    }
-  ' "$dst" "$src" 2>/dev/null || echo '')"
-  if [[ -z "$merged" ]]; then
-    warn "obsidian-meta-bind-plugin/data.json — merge failed (malformed JSON?)"
-    return 0
-  fi
-  after="$(printf '%s\n' "$merged" | jq -r '(.buttonTemplates // []) | map(.id) | join(",")')"
+  local add="added" update="updated" rewrite="rewritten in the plugin's list form" added updated what=""
+  [[ "$check" == "1" ]] && { add="would add"; update="would update"; rewrite="would be rewritten in the plugin's list form"; }
+  added="$(printf '%s' "$out" | jq -r '.added | join(", ")')"
+  updated="$(printf '%s' "$out" | jq -r '.updated | join(", ")')"
+  [[ -n "$added" ]] && what="$add $added"
+  [[ -n "$updated" ]] && what="${what:+$what; }$update $updated"
+  [[ -n "$what" ]] || what="$rewrite"
   if [[ "$check" == "1" ]]; then
-    if [[ "$before" != "$after" ]]; then
-      info "drifted obsidian-meta-bind-plugin/data.json (buttonTemplates [$before] → would merge to [$after])"
-    else
-      ok "up-to-date obsidian-meta-bind-plugin/data.json"
-    fi
+    info "drifted $label ($key: $what)"
     return 0
   fi
   printf '%s\n' "$merged" > "$dst.tmp" && mv "$dst.tmp" "$dst"
-  if [[ "$before" != "$after" ]]; then
-    ok "obsidian-meta-bind-plugin/data.json — buttonTemplates [$before] → [$after]"
-  else
-    info "obsidian-meta-bind-plugin/data.json — buttonTemplates already up to date"
-  fi
+  ok "merged $label ($key: $what)"
 }
 
 
-# ── Internal: merge agent-task buttons into shell-commands data.json ──
-# For every prompts/agents/*.md declaring a `button:` block, ensure a matching
-# entry exists in <vault>/.obsidian/plugins/obsidian-shellcommands/data.json
-# under the spec's shell_command_id. Additive merge — operator's other shell
-# commands are preserved, never modified. Idempotent.
-_merge_agent_shell_commands() {
-  local target="$1" wiki_dir="$2" check="${3:-0}"
-  local data="$target/.obsidian/plugins/obsidian-shellcommands/data.json"
-  if [[ ! -f "$data" ]]; then
-    return 0  # base seed didn't run yet; nothing to merge into
-  fi
-  _seed_only_skip "$data" && return 0
-  if ! command -v jq >/dev/null 2>&1; then
-    warn "jq not available — skipping agent shell-commands merge"
-    return 0
-  fi
-  local entries
-  entries="$(PYTHONPATH="$wiki_dir/scripts" uv run --quiet --project "$wiki_dir" python -m dashboard.agent_buttons shell-commands 2>/dev/null || echo '{}')"
-  if [[ -z "$entries" ]] || [[ "$entries" == "{}" ]]; then
-    [[ "$check" == "1" ]] && ok "up-to-date .obsidian/plugins/obsidian-shellcommands/data.json"
-    return 0
-  fi
-  # The obsidian-shellcommands plugin stores `shell_commands` as an ARRAY of
-  # `{id, ...}` objects; `agent_buttons.py` emits an OBJECT keyed by agent-id
-  # with the `id` field omitted. Convert the generated map to array entries
-  # (injecting `id` from the key), then replace-or-append into the operator's
-  # array BY id — preserving every non-engine command the operator added.
-  # (Pre-2026-05-31 this did `array + object`, which jq rejects → silent
-  # "merge failed" + stale agent buttons.)
-  local before after merged
-  before="$(jq -r '.shell_commands | length' "$data" 2>/dev/null || echo 0)"
-  merged="$(jq --argjson agents "$entries" '
-    ($agents | to_entries | map(.value + {id: .key})) as $new
-    | ($new | map(.id)) as $newids
-    | .shell_commands = (
-        [ (.shell_commands // [])[] | select(.id as $i | ($newids | index($i)) | not) ]
-        + $new
-      )
-  ' "$data" 2>/dev/null || echo '')"
-  if [[ -z "$merged" ]]; then
-    warn "agent shell-commands merge failed"
-    return 0
-  fi
-  # Up-to-date iff the merged form is byte-equal (canonically) to the current.
-  local same=0
-  [[ "$(jq -S . "$data" 2>/dev/null)" == "$(printf '%s' "$merged" | jq -S . 2>/dev/null)" ]] && same=1
-  if [[ "$check" == "1" ]]; then
-    if [[ "$same" == 1 ]]; then
-      ok "up-to-date .obsidian/plugins/obsidian-shellcommands/data.json"
-    else
-      after="$(printf '%s' "$merged" | jq -r '.shell_commands | length')"
-      info "drifted .obsidian/plugins/obsidian-shellcommands/data.json (agent buttons would merge: $before → $after entries)"
-    fi
-    return 0
-  fi
-  if [[ "$same" == 1 ]]; then
-    info "agent shell-commands — already up to date"
-    return 0
-  fi
-  printf '%s\n' "$merged" > "$data.tmp" && mv "$data.tmp" "$data"
-  after="$(jq -r '.shell_commands | length' "$data")"
-  ok "agent shell-commands — $before → $after entries"
-}
-
-
-# ── Internal: rewrite the agent-buttons regions in dashboard.md ────────
-# Replaces the inline-refs region and the hidden-defs region from the
-# discovered agent specs. Marker-based, idempotent, surgical (nothing
-# outside the markers is touched).
+# ── Internal: rewrite the agent-buttons region in dashboard.md ─────────
+# Replaces the inline `BUTTON[id]` refs between the agent-buttons markers with
+# the discovered agent specs'. Marker-based, idempotent, surgical (nothing
+# outside the markers is touched). The helper's stdout is its verdict; a
+# failure of its own reaches the operator on stderr.
 _rewrite_dashboard_agent_buttons() {
   local target="$1" wiki_dir="$2"
   local dashboard="$target/dashboard.md"
@@ -535,12 +497,13 @@ _rewrite_dashboard_agent_buttons() {
   fi
   _seed_only_skip "$dashboard" && return 0
   local result
-  result="$(PYTHONPATH="$wiki_dir/scripts" uv run --quiet --project "$wiki_dir" python -m dashboard.agent_buttons update-dashboard "$dashboard" 2>&1 || echo unchanged)"
-  if [[ "$result" == "changed" ]]; then
-    ok "dashboard.md — agent-buttons regions refreshed"
-  else
-    info "dashboard.md — agent-buttons already up to date"
-  fi
+  result="$(PYTHONPATH="$wiki_dir/scripts" uv run --quiet --project "$wiki_dir" python -m dashboard.agent_buttons update-dashboard "$dashboard")" || result=""
+  case "$result" in
+    changed)   ok "dashboard.md — agent-buttons region refreshed" ;;
+    unchanged) info "dashboard.md — agent-buttons already up to date" ;;
+    no-region) info "dashboard.md has no agent-buttons region — left as it is" ;;
+    *)         warn "dashboard.md — the agent-buttons region could not be refreshed" ;;
+  esac
 }
 
 
@@ -644,18 +607,18 @@ seed_vault_templates() {
     fi
 
     # 8. .obsidian/plugins/*/data.json — per-plugin defaults (recursive).
-    #    Meta-Bind data.json is merged (buttonTemplates by id) to preserve
-    #    operator settings; everything else is copy-if-absent / --force.
+    #    The two button registries (Meta-Bind's buttonTemplates, Shell
+    #    commands' shell_commands) are merged by id, with the agent buttons';
+    #    everything else is engine base ⊕ operator overlay.
     if [[ -d "$templates_dir/.obsidian/plugins" ]]; then
       local src rel dst
       while IFS= read -r src; do
         rel="${src#"$templates_dir/.obsidian/"}"
         dst="$target/.obsidian/$rel"
         if [[ "$rel" == "plugins/obsidian-meta-bind-plugin/data.json" ]]; then
-          _merge_meta_bind_data "$src" "$dst" "$check"
+          _merge_registry "$src" "$dst" ".obsidian/$rel" buttonTemplates "$wiki_dir" meta-bind-templates "$check"
         elif [[ "$rel" == "plugins/obsidian-shellcommands/data.json" ]]; then
-          # Has its own additive-merge-by-id (agent buttons) — NOT overlay-managed.
-          _merge_agent_shell_commands "$target" "$wiki_dir" "$check"
+          _merge_registry "$src" "$dst" ".obsidian/$rel" shell_commands "$wiki_dir" shell-commands "$check"
         else
           # extended-graph / quickadd / dataview / … — engine base ⊕ operator overlay.
           _seed_json_overlay "$src" "$dst" ".obsidian/$rel" "$force" "$check" "$target"
@@ -690,8 +653,8 @@ seed_vault_templates() {
   _merge_env_example "$templates_dir/.claude/.env.example" "$target/.claude/.env.example" "$force" "$check"
 
   # 10. Agent-button dashboard rewrite — discovered from prompts/agents/*.md
-  #     `button:` frontmatter. (The shell-commands data.json half is merged in
-  #     the plugin loop above, in both check + write modes.) Dashboard marker
+  #     `button:` frontmatter. (The two registries the buttons need are merged
+  #     in the plugin loop above, in both check + write modes.) Dashboard marker
   #     rewrite is a write, so it's check-gated.
   if [[ "$check" != "1" ]]; then
     _rewrite_dashboard_agent_buttons "$target" "$wiki_dir"

@@ -293,11 +293,5 @@ LIMIT 10
 
 > [!info]- 🤖 Agents
 > <!-- agent-buttons:begin -->
-`BUTTON[btn-daily-digest]` `BUTTON[btn-dream-cycle]` `BUTTON[btn-summarize-day]`
+`BUTTON[btn-daily-digest]` `BUTTON[btn-dream-cycle]` `BUTTON[btn-orchestrate-tasks]` `BUTTON[btn-summarize-day]`
 <!-- agent-buttons:end -->
-
----
-
-%% Button definitions live in _dashboard-buttons.md (auto-seeded). Transcluded here so the main dashboard stays focused on content. %%
-
-![[_dashboard-buttons]]

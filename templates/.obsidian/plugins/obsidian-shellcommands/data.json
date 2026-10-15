@@ -1,7 +1,8 @@
 {
   "settings_version": "0.23.0",
-  "shell_commands": {
-    "wiki-compile": {
+  "shell_commands": [
+    {
+      "id": "wiki-compile",
       "platform_specific_commands": {
         "default": "./.wiki/wiki compile"
       },
@@ -34,13 +35,14 @@
       "preactions": [],
       "variable_default_values": {}
     },
-    "wiki-compile-all": {
+    {
+      "id": "wiki-compile-all",
       "platform_specific_commands": {
         "default": "./.wiki/wiki compile --all"
       },
       "shells": {},
       "alias": "Wiki: compile (all sources, force)",
-      "icon": "files",
+      "icon": "lucide-files",
       "confirm_execution": true,
       "ignore_error_codes": [],
       "input_contents": {
@@ -67,13 +69,14 @@
       "preactions": [],
       "variable_default_values": {}
     },
-    "wiki-lint": {
+    {
+      "id": "wiki-lint",
       "platform_specific_commands": {
         "default": "./.wiki/wiki lint --structural-only"
       },
       "shells": {},
       "alias": "Wiki: lint (structural)",
-      "icon": "shield-check",
+      "icon": "lucide-shield-check",
       "confirm_execution": false,
       "ignore_error_codes": [],
       "input_contents": {
@@ -100,13 +103,14 @@
       "preactions": [],
       "variable_default_values": {}
     },
-    "wiki-refresh-stats": {
+    {
+      "id": "wiki-refresh-stats",
       "platform_specific_commands": {
         "default": "./.wiki/wiki refresh-dashboards"
       },
       "shells": {},
       "alias": "Wiki: refresh dashboard stats",
-      "icon": "refresh-cw",
+      "icon": "lucide-refresh-cw",
       "confirm_execution": false,
       "ignore_error_codes": [],
       "input_contents": {
@@ -133,40 +137,8 @@
       "preactions": [],
       "variable_default_values": {}
     },
-    "agent-summarize-day": {
-      "platform_specific_commands": {
-        "default": "./.wiki/wiki agent summarize-day"
-      },
-      "shells": {},
-      "alias": "Wiki: agent summarize-day",
-      "icon": "bot",
-      "confirm_execution": false,
-      "ignore_error_codes": [],
-      "input_contents": {
-        "stdin": null
-      },
-      "output_handlers": {
-        "stdout": {
-          "handler": "notification",
-          "convert_ansi_code": true
-        },
-        "stderr": {
-          "handler": "notification-bigger",
-          "convert_ansi_code": true
-        }
-      },
-      "output_wrappers": {
-        "stdout": null,
-        "stderr": null
-      },
-      "output_channel_order": "stdout-first",
-      "output_handling_mode": "buffered",
-      "events": {},
-      "command_palette_availability": "enabled",
-      "preactions": [],
-      "variable_default_values": {}
-    },
-    "agent-summarize-day-here": {
+    {
+      "id": "agent-summarize-day-here",
       "platform_specific_commands": {
         "default": "./.wiki/wiki agent summarize-day --var date={{file_basename}}"
       },
@@ -198,74 +170,8 @@
       "command_palette_availability": "enabled",
       "preactions": [],
       "variable_default_values": {}
-    },
-    "agent-daily-digest": {
-      "platform_specific_commands": {
-        "default": "./.wiki/wiki agent daily-digest"
-      },
-      "shells": {},
-      "alias": "Wiki: agent daily-digest",
-      "icon": "bot",
-      "confirm_execution": false,
-      "ignore_error_codes": [],
-      "input_contents": {
-        "stdin": null
-      },
-      "output_handlers": {
-        "stdout": {
-          "handler": "notification",
-          "convert_ansi_code": true
-        },
-        "stderr": {
-          "handler": "notification-bigger",
-          "convert_ansi_code": true
-        }
-      },
-      "output_wrappers": {
-        "stdout": null,
-        "stderr": null
-      },
-      "output_channel_order": "stdout-first",
-      "output_handling_mode": "buffered",
-      "events": {},
-      "command_palette_availability": "enabled",
-      "preactions": [],
-      "variable_default_values": {}
-    },
-    "agent-dream-cycle": {
-      "platform_specific_commands": {
-        "default": "./.wiki/wiki agent dream-cycle"
-      },
-      "shells": {},
-      "alias": "Wiki: agent dream-cycle",
-      "icon": "bot",
-      "confirm_execution": false,
-      "ignore_error_codes": [],
-      "input_contents": {
-        "stdin": null
-      },
-      "output_handlers": {
-        "stdout": {
-          "handler": "notification",
-          "convert_ansi_code": true
-        },
-        "stderr": {
-          "handler": "notification-bigger",
-          "convert_ansi_code": true
-        }
-      },
-      "output_wrappers": {
-        "stdout": null,
-        "stderr": null
-      },
-      "output_channel_order": "stdout-first",
-      "output_handling_mode": "buffered",
-      "events": {},
-      "command_palette_availability": "enabled",
-      "preactions": [],
-      "variable_default_values": {}
     }
-  },
+  ],
   "max_visible_lines_in_shell_command_fields": 10,
   "preview_variables_in_command_palette": true,
   "show_autocomplete_menu": true,
