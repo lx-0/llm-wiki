@@ -4,7 +4,7 @@ exit: 0
 {
   "schema": 2,
   "vault": "vault-fixture",
-  "engine_revision": "NdNcNb",
+  "engine_revision": "<REV>",
   "summary": {
     "critical": 0,
     "warning": 3,
@@ -152,7 +152,7 @@ exit: 0
         "venv_in_cloud": false,
         "stale_in_vault_venv": null,
         "dataless": 0,
-        "scanned": 324
+        "scanned": "N"
       },
       "title": "engine environment outside cloud-synced storage (<VENV>)",
       "verb": null

@@ -16,6 +16,7 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -27,6 +28,7 @@ from ._oracle import (
     build_fixture_vault,
     dump,
     normalise,
+    normalise_text,
     render_run,
     run_wiki,
     write_uv_shim,
@@ -96,13 +98,31 @@ def _placeholders(env: dict[str, Path]) -> dict[str, str]:
     }
 
 
+# Counts of the machine, not the vault: the eviction check walks the interpreter's env,
+# whose file count differs between a laptop and the CI runner (324 vs 321 on first run).
+_MACHINE_COUNTS = frozenset({"scanned"})
+
+
+def _blank_machine_counts(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {
+            k: ("N" if k in _MACHINE_COUNTS else _blank_machine_counts(v)) for k, v in value.items()
+        }
+    if isinstance(value, list):
+        return [_blank_machine_counts(v) for v in value]
+    return value
+
+
 def record(env: dict[str, Path], args: tuple[str, ...]) -> str:
     run = run_wiki(env["vault"], env["home"], env["bin"], *args)
     placeholders = _placeholders(env)
     if "--json" in args and run.returncode in (0, 1):
         # A JSON payload is compared as parsed + normalised JSON (the M033 oracle's rule:
-        # digits in free text → N), so a humanised age cannot flake it.
-        payload = normalise(json.loads(run.stdout), placeholders=placeholders)
+        # digits in free text → N), so a humanised age cannot flake it. Paths and git
+        # revisions go first, on the raw text: the engine copy's commit hash depends on the
+        # tree it was copied from.
+        raw = normalise_text(run.stdout, placeholders=placeholders)
+        payload = _blank_machine_counts(normalise(json.loads(raw), placeholders=placeholders))
         run = type(run)(run.args, run.returncode, dump(payload), run.stderr)
     return render_run(args, run, placeholders)
 
