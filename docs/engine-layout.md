@@ -58,7 +58,9 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 │   │   ├── usage.py               ← token-usage ledger keyed by (provider, model) → state/usage.json
 │   │   ├── piggybacks.py          ← piggyback scheduling core — task table, cooldown gate, detached spawn
 │   │   └── piggyback_runner.py    ← runs one piggyback command under a wall-clock timeout and records its status (`python -m core.piggyback_runner`)
-│   ├── cli.py                 ← table-driven `wiki` dispatcher — the CommandSpec table is the single source of truth for the command catalog (help/menu derive from it; owns the once-per-command locked dashboard refresh + `wiki auth`)
+│   ├── cli.py                 ← table-driven `wiki` dispatcher — runs the catalogue (help/menu derive from it; owns the once-per-command locked dashboard refresh + `wiki auth`)
+│   ├── cli_catalog.py         ← the CommandSpec table — the single source of truth for the command catalog (+ BY_NAME, the OAuth registry AUTH_SERVICES)
+│   ├── cli_help.py            ← the per-command `wiki <cmd> --help` texts (migrated verbatim from the former bash heredocs)
 │   ├── collectors/            ← substrate→raw/ writers (Registry + scan-* CLIs + dispatcher)
 │   │   ├── base.py                ← Collector Protocol, SPEC, Registry + account-loop harness (resolve_accounts/filter_accounts/Watermark/run_account_loop) + inbox-intake harness (scan_inbox/archive_to_zone/append_rollup)
 │   │   ├── cli.py                 ← `wiki collect` dispatcher (Registry lookup + run-one; honors --account via SPEC.supports_account_loop)

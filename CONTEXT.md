@@ -252,7 +252,7 @@ The side-effect-free module `scripts/core/config_schema.py` holding every knob's
 
 ### Command table (CLI dispatcher)
 
-The `CommandSpec` table in `scripts/cli.py` is the single source of truth for the `wiki` command catalog: each row declares name, group, one-line summary, dispatch kind (py/bash/auth), handler script, banner, refresh-after, needs-vault, and the rich per-command help. `wiki help` renders from it, `menu.py`'s coverage is test-pinned against it, and the bash `wiki` entry-point delegates every Python-backed subcommand to it. The bash layer owns only bootstrap (symlink resolution + fail-closed vault guard + TTY detection) and the genuinely-bash commands. The dispatcher runs each handler as a child process, and owns the once-per-command dashboard refresh through flush.py's fcntl lock.
+The `CommandSpec` table in `scripts/cli_catalog.py` (per-command help texts in `scripts/cli_help.py`, dispatch in `scripts/cli.py`) is the single source of truth for the `wiki` command catalog: each row declares name, group, one-line summary, dispatch kind (py/bash/auth), handler script, banner, refresh-after, needs-vault, and the rich per-command help. `wiki help` renders from it, `menu.py`'s coverage is test-pinned against it, and the bash `wiki` entry-point delegates every Python-backed subcommand to it. The bash layer owns only bootstrap (symlink resolution + fail-closed vault guard + TTY detection) and the genuinely-bash commands. The dispatcher runs each handler as a child process, and owns the once-per-command dashboard refresh through flush.py's fcntl lock.
 
 ### SubRoute
 

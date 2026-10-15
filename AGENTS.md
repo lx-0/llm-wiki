@@ -34,7 +34,7 @@ llm-wiki/                    ← installed as <vault>/.wiki/ — the file-by-fil
 ├── lib/                     ← the bash layer: common.sh (paths, the venv-location rule), ui.sh, agents.sh (hook
 │                              payloads), hooks.sh, skills.sh, config.sh (`python -m core.config` wrapper + wizard), seed.sh
 ├── scripts/                 ← the engine's source root — NOT a package (§ Python environment)
-│   ├── cli.py               ← table-driven `wiki` dispatcher — the CommandSpec table is the single source of truth
+│   ├── cli.py               ← table-driven `wiki` dispatcher — the CommandSpec table (cli_catalog.py, help texts in cli_help.py) is the single source of truth
 │   ├── core/                ← shared plumbing, imported never invoked: paths, config + config_schema, prompts,
 │   │                          sdk_helpers (the ONE Claude-SDK harness), ollama_client, frontmatter, markers,
 │   │                          state_store, entry (how one engine process spawns another), errors, console,

@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # wiki — single entry-point CLI for the wiki/ system.
 #
-# The command catalog is NOT maintained here. `scripts/cli.py` owns the full
-# table of subcommands (name, handler, banner, refresh-after, per-command help)
-# and is the single source of truth — `wiki help` renders it and menu.py derives
-# from it. This bash layer only does bootstrap (symlink resolution + vault guard
+# The command catalog is NOT maintained here. `scripts/cli_catalog.py` owns the
+# full table of subcommands (name, handler, banner, refresh-after; the per-command
+# help texts sit in `scripts/cli_help.py`) and is the single source of truth —
+# `wiki help` renders it and menu.py derives from it. This bash layer only does
+# bootstrap (symlink resolution + vault guard
 # + TTY detection) and the genuinely-bash commands (setup / hooks / skills /
 # config / seed / update / menu / doctor / status / install-shortcut / version
 # plus the bespoke dream + dream-entity argv routing). Every other subcommand is

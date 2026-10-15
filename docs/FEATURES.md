@@ -187,12 +187,12 @@ Currently 1 agent task ships. Adding a new task = drop `prompts/agents/<id>.md` 
 | `wiki config` (get/set/keys/path/wizard/status) | 🟢 | `wiki:cmd_config`, `lib/config.sh`, `scripts/core/config.py` | Round-robin backup on every set |
 | `wiki hooks` (install/uninstall/status) | 🟢 | `wiki:cmd_hooks`, `lib/hooks.sh`, `lib/agents.sh` | jq-merge into agent settings.json |
 | `wiki skills` (install/uninstall/sync/status) | 🟢 | `wiki:cmd_skills`, `lib/skills.sh` | Symlink into `<vault>/.claude/skills/`, foreign entries preserved. `--global` (gated by `skills.global_install`) also links global-eligible skills into `~/.claude/skills/` + registers the vault in `~/.config/llm-wiki/vaults` |
-| `wiki auth <service> <id>` (gmail \| gmeet \| calendar) | 🟢 | `scripts/cli.py` auth registry → `scripts/adapters/mailbox/gmail.py` / `core/google_oauth.py` | One-time OAuth bootstrap; `wiki gmail-auth` / `wiki gmeet-auth` / `wiki calendar-auth <id>` remain as aliases. Account id passed as argv, never interpolated into `python -c` source (0.3.0, C06) |
+| `wiki auth <service> <id>` (gmail \| gmeet \| calendar) | 🟢 | `scripts/cli_catalog.py` auth registry (dispatched by `scripts/cli.py`) → `scripts/adapters/mailbox/gmail.py` / `core/google_oauth.py` | One-time OAuth bootstrap; `wiki gmail-auth` / `wiki gmeet-auth` / `wiki calendar-auth <id>` remain as aliases. Account id passed as argv, never interpolated into `python -c` source (0.3.0, C06) |
 | `wiki version` | 🟢 | `wiki:cmd_version` | Git revision + tag + origin URL |
 
 ### `wiki` dispatcher (0.3.0, C06)
 
-The `CommandSpec` table in `scripts/cli.py` is the single source of truth for the command catalog: `wiki help` renders the full list (previously blind to 9 commands), `menu.py` coverage is test-pinned to it, the post-command dashboard refresh runs once via flush.py's fcntl lock, and every Python-backed subcommand delegates through it. The bash `wiki` keeps bootstrap + the fail-closed vault guard + the genuinely-bash commands (setup/hooks/skills/config/seed/update/menu/doctor/status/install-shortcut/version + dream argv routing).
+The `CommandSpec` table in `scripts/cli_catalog.py` (help texts in `scripts/cli_help.py`, dispatch in `scripts/cli.py`) is the single source of truth for the command catalog: `wiki help` renders the full list (previously blind to 9 commands), `menu.py` coverage is test-pinned to it, the post-command dashboard refresh runs once via flush.py's fcntl lock, and every Python-backed subcommand delegates through it. The bash `wiki` keeps bootstrap + the fail-closed vault guard + the genuinely-bash commands (setup/hooks/skills/config/seed/update/menu/doctor/status/install-shortcut/version + dream argv routing).
 
 ## Engine seams (cross-cutting, 0.3.0 arc)
 
