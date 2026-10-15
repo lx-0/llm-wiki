@@ -35,7 +35,8 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 │   │   ├── prompts.py             ← prompt template loader (${var} substitution)
 │   │   ├── ollama_client.py       ← single Ollama transport (chat / chat_schema / chat_vision)
 │   │   ├── config_schema.py       ← side-effect-free config schema (every knob: name/type/default/doc-comment); consumed by config.py, the key-migration, and config_docs.py (generates docs/config.md tables)
-│   │   ├── sdk_helpers.py         ← run_sdk_query(prompt, SdkCallSpec) — the ONE Claude-SDK call harness (options assembly, path-scope gates, stall-timeout loop, usage → LEDGER, failure classification) + StderrCapture + assert_prompt_within_budget
+│   │   ├── sdk_helpers.py         ← run_sdk_query(prompt, SdkCallSpec) — the ONE Claude-SDK call harness (options assembly, path-scope gate wiring, stall-timeout loop, usage → LEDGER, failure classification) + StderrCapture + assert_prompt_within_budget
+│   │   ├── sdk_scope.py           ← the Write/Edit path-scope gate: make_path_scope_hook (PreToolUse — the production gate), make_path_scope_gate (can_use_tool — deny-all-writes), prompt_stream
 │   │   ├── frontmatter.py         ← the single frontmatter grammar (parse/parse_strict/field/write/update_fields) — never hand-roll a `---` parser
 │   │   ├── markers.py             ← sentinel-region primitive (find_region + replace/ensure/strip_region) for `<!-- x:begin/end -->` managed blocks
 │   │   ├── state_store.py         ← flock primitives + atomic JSON saves + state.json merge-under-lock + ingested-ledger API

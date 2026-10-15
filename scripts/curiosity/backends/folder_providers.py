@@ -38,8 +38,8 @@ from core.sdk_helpers import (
     StderrCapture,
     extract_usage_tokens,
     log_sdk_failure,
-    make_path_scope_hook,
 )
+from core.sdk_scope import make_path_scope_hook
 
 log = logging.getLogger("curiosity")
 

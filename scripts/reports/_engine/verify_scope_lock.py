@@ -59,7 +59,7 @@ from claude_agent_sdk import (
     query,
 )
 
-from core.sdk_helpers import make_path_scope_gate
+from core.sdk_scope import make_path_scope_gate
 
 # The composition under test — must match what S02's `lib/inference.py`
 # and S05's `lib/analyst.py` will use in production.

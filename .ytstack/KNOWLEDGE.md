@@ -538,13 +538,13 @@ With `Write`/`Edit` in `allowed_tools`, the CLI fast-paths them as pre-approved 
 
 #### Wired
 
-- `scripts/core/sdk_helpers.py:296` — `make_path_scope_gate` + `prompt_stream`
+- `scripts/core/sdk_scope.py` — `make_path_scope_gate` + `prompt_stream`
 - `scripts/compile_stages/compile.py:135` and `scripts/dream.py:883` — gated behind `CONFIG.features.compile_callback_gate` (default `True`)
 - Probe stays in `scripts/probe_compile_scope.py` as the regression artifact; cost ~$0.07 per run
 
 #### Verified end-to-end (2026-05-31)
 
-The **PreToolUse hook** (`make_path_scope_hook`, the actual production gate — Write/Edit IN `allowed_tools` + hook deny, since the `can_use_tool` variant silently blocked inside-scope) is now covered at both levels: 5 unit tests in `tests/test_sdk_helpers.py` (allow-inside / deny-outside-engine-target / deny-edit / deny-missing-path / multi-root LOG_FILE) **and** a fresh SDK probe of the exact compile config (`allowed_tools=[Read,Glob,Grep,Write,Edit]` + the hook scoped to `[knowledge/, LOG_FILE]`): an engine-targeted Write was **blocked** (CLI honored `permissionDecision: deny`) while an inside-`knowledge/` Write **succeeded**. Closes the long-standing "57fc0d4 allowlist UNTESTED" debt — the allowlist was decorative, superseded by the callback, then by this hook; the hook is what runs and it's now empirically confirmed for both compile + dream.
+The **PreToolUse hook** (`make_path_scope_hook`, the actual production gate — Write/Edit IN `allowed_tools` + hook deny, since the `can_use_tool` variant silently blocked inside-scope) is now covered at both levels: 5 unit tests in `tests/test_sdk_scope.py` (allow-inside / deny-outside-engine-target / deny-edit / deny-missing-path / multi-root LOG_FILE) **and** a fresh SDK probe of the exact compile config (`allowed_tools=[Read,Glob,Grep,Write,Edit]` + the hook scoped to `[knowledge/, LOG_FILE]`): an engine-targeted Write was **blocked** (CLI honored `permissionDecision: deny`) while an inside-`knowledge/` Write **succeeded**. Closes the long-standing "57fc0d4 allowlist UNTESTED" debt — the allowlist was decorative, superseded by the callback, then by this hook; the hook is what runs and it's now empirically confirmed for both compile + dream.
 
 ### Compile abort-counter — empty-file skip is not a failure
 
@@ -1983,9 +1983,9 @@ gate, async). Three constraints to wire it correctly:
 3. **`prompt` must be `AsyncIterable[dict]`, not `str`.** The SDK raises
    `ValueError: can_use_tool callback requires streaming mode` for string
    prompts when a callback is wired. Wrap with
-   `core.sdk_helpers.prompt_stream(text)`.
+   `core.sdk_scope.prompt_stream(text)`.
 
-Engine implementation: `core.sdk_helpers.make_path_scope_gate([roots])` —
+Engine implementation: `core.sdk_scope.make_path_scope_gate([roots])` —
 factory returns the callback; resolves each `Write`/`Edit` `file_path` via
 `Path.resolve()` and checks against the permitted roots. Used by
 `scripts/compile.py` + `scripts/dream.py` since 2026-05-17. Operator
@@ -2408,7 +2408,7 @@ Full rationale + benchmarks: DECISIONS 2026-05-28; `.ytstack/AD-HOC-voice-audio-
 
 ## `make_path_scope_hook` accepts a file path as a "root" — exact-file write restriction (2026-05-28)
 
-`scripts/core/sdk_helpers.py:make_path_scope_hook` builds a PreToolUse hook for Write/Edit that allow-lists an iterable of `allowed_write_roots`. Each root goes through `Path.resolve()` and is compared via `target.relative_to(root)`. **Roots don't have to be directories** — passing a file path like `LOG_FILE = .wiki/logs/operations.md` works:
+`scripts/core/sdk_scope.py:make_path_scope_hook` builds a PreToolUse hook for Write/Edit that allow-lists an iterable of `allowed_write_roots`. Each root goes through `Path.resolve()` and is compared via `target.relative_to(root)`. **Roots don't have to be directories** — passing a file path like `LOG_FILE = .wiki/logs/operations.md` works:
 
 - `Path('/x/y/z').relative_to('/x/y/z')` returns `PosixPath('.')` (no exception) → allow.
 - `Path('/x/y/zz').relative_to('/x/y/z')` raises `ValueError` → continue / deny.
