@@ -480,7 +480,7 @@ _TIMESTAMP = re.compile(
     r"\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?"
 )
 _AGE = re.compile(r"\b\d+(\s*)(seconds?|minutes?|hours?|days?|weeks?|months?|years?) ago\b")
-# Compact stamps in file names: `lib/common.sh:backup_file`'s `<file>.bak.YYYYmmdd-HHMMSS`
+# Compact stamps in file names: `core/backup.py`'s `<file>.bak.YYYYmmdd-HHMMSS`
 # and `core/config_backup`'s `state/config-backups/config-YYYYmmdd-HHMMSS-ffffff.yaml`.
 # Before the revision rule, which would otherwise take the date half for a hash.
 _COMPACT_STAMP = re.compile(r"\b\d{8}-\d{6}(?:-\d{6})?\b")

@@ -32,8 +32,7 @@ llm-wiki/                    ← installed as <vault>/.wiki/ — the file-by-fil
 ├── wiki                     ← entry-point CLI (bash: bootstrap + fail-closed vault guard + the commands
 │                              not yet ported; everything else, bare `wiki` included, goes to scripts/cli.py)
 ├── lib/                     ← the bash layer, shrinking as M034 ports it: common.sh (paths, the venv-location rule),
-│                              ui.sh (the prompt for update), seed.sh; agents.sh, hooks.sh, skills.sh and config.sh
-│                              are retired (no longer sourced; deleted at the end of M034-S03)
+│                              ui.sh (the prompt for update), seed.sh
 ├── scripts/                 ← the engine's source root — NOT a package (§ Python environment)
 │   ├── cli.py               ← table-driven `wiki` dispatcher — the CommandSpec table (cli_catalog.py, help texts in cli_help.py) is the single source of truth
 │   ├── core/                ← shared plumbing, imported never invoked: paths, config + config_schema, prompts,
@@ -199,9 +198,9 @@ Drift detection is JSON-key-order-insensitive (`_files_equivalent` / canonical `
 1. Add an `Agent` to `AGENTS` in `scripts/core/agents.py`: name, detection dir, config file,
    its hooks (event, script, timeout in the agent's unit) and `flat=True` for Cursor-style
    bare entries. `wiki hooks`, `wiki status` and doctor's `hooks-installed` read it.
-2. Until the retired `lib/agents.sh` is deleted (end of M034-S03), mirror the agent there
-   too: `tests/test_agents_registry.py` still compares every agent's payload with the bash
-   `agent_payload`, byte for byte.
+2. Record its payloads: `uv run pytest tests/test_agents_registry.py --snapshot-update`
+   writes `tests/golden/agents/payload-<name>-*.json`. Read them and commit them with the
+   agent; from then on a changed byte in an installed hook command fails a test.
 3. Status table, install/uninstall flows, and detection logic pick it up automatically.
 
 ### Wikilinks (relative-to-file convention)

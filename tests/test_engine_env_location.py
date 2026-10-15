@@ -3,8 +3,9 @@
 The rule has ONE home (bash, sourced by the `wiki` dispatcher); Python only
 reads its result via UV_PROJECT_ENVIRONMENT / sys.prefix. These pin the rule
 and the two places that must carry it literally: the exported variable and
-the agent hook commands (lib/agents.sh), because hook processes are spawned
-by the agent with the agent's environment, not by `wiki`.
+the agent hook commands (core/agents.py, written by `wiki hooks install`),
+because hook processes are spawned by the agent with the agent's environment,
+not by `wiki`.
 
 Why it exists: lxw 2026-09-17 — the vault sits in iCloud Drive, the in-vault
 .venv got evicted while the bundled Claude CLI was running, the kernel
@@ -20,6 +21,16 @@ import subprocess
 from pathlib import Path
 
 import pytest
+
+from core import agents
+
+from ._oracle import (
+    build_engine_template,
+    build_fixture_vault,
+    install_engine,
+    run_wiki,
+    write_uv_shim,
+)
 
 ENGINE = Path(__file__).resolve().parent.parent
 
@@ -76,68 +87,42 @@ def test_operator_override_always_wins():
     assert out == "/elsewhere/env"
 
 
-@pytest.mark.parametrize("agent", ["claude", "codex", "gemini", "cursor"])
-def test_hook_commands_carry_the_environment_for_cloud_vaults(agent):
-    out = _source(
-        ICLOUD_VAULT,
-        tail=f"source '{ENGINE}/lib/agents.sh'; agent_payload {agent}",
-    )
-    payload = json.loads(out)
-    commands = [
-        h["command"]
-        for group in payload["hooks"].values()
-        for entry in group
-        for h in (entry.get("hooks", [entry]))
-    ]
-    assert commands, f"{agent}: no hook commands emitted"
-    for cmd in commands:
-        assert cmd.startswith(f"cd '{ICLOUD_VAULT}/.wiki' && "), cmd
-        assert "UV_PROJECT_ENVIRONMENT='/h/.venvs/lxw-wiki' uv run python hooks/" in cmd, cmd
+@pytest.fixture(scope="module")
+def engine_template(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    return build_engine_template(tmp_path_factory.mktemp("env-engine") / ".wiki")
 
 
-def test_hook_commands_stay_plain_for_plain_vaults():
-    out = _source(PLAIN_VAULT, tail=f"source '{ENGINE}/lib/agents.sh'; agent_payload claude")
-    payload = json.loads(out)
-    cmd = payload["hooks"]["SessionEnd"][0]["hooks"][0]["command"]
-    assert cmd == f"cd '{PLAIN_VAULT}/.wiki' && uv run python hooks/session-end.py"
+def test_an_install_in_a_cloud_vault_writes_the_environment_into_every_hook(
+    tmp_path: Path, engine_template: Path
+) -> None:
+    """End to end, through the real `wiki`: lib/common.sh exports UV_PROJECT_ENVIRONMENT for
+    a vault in iCloud Drive, and `wiki hooks install` writes it into each agent's hook
+    commands. Was two tests that sourced lib/agents.sh (deleted in M034-S03-T07)."""
+    cloud = tmp_path / "Library" / "Mobile Documents" / "iCloud~md~obsidian" / "Documents"
+    vault = build_fixture_vault(cloud)
+    wiki = install_engine(vault, engine_template)
+    home = tmp_path / "home"
+    home.mkdir()
+    bin_dir = tmp_path / "bin"
+    write_uv_shim(bin_dir)
+
+    run = run_wiki(vault, home, bin_dir, "hooks", "install", stdin="1 2 3 4\n1\ny\n")
+
+    assert run.returncode == 0, run.stderr
+    prefix = f"cd '{wiki}' && UV_PROJECT_ENVIRONMENT='{home}/.venvs/{vault.name}-wiki' "
+    for spec in agents.AGENTS:
+        commands = agents.wiki_commands(json.loads((home / spec.config).read_text()))
+        assert commands, f"{spec.name}: no hook commands written"
+        for command in commands:
+            assert command.startswith(f"{prefix}uv run python hooks/"), command
 
 
-def test_hooks_installed_regex_matches_env_form(tmp_path: Path):
-    """`hooks_installed` (and health.check_hooks_installed, same grammar)
-    must recognise the new command shape as a wiki-managed hook."""
-    cfg = tmp_path / "hooks.json"
-    cfg.write_text(
-        json.dumps(
-            {
-                "hooks": {
-                    "Stop": [
-                        {
-                            "hooks": [
-                                {
-                                    "command": f"cd '{ICLOUD_VAULT}/.wiki' && UV_PROJECT_ENVIRONMENT='/h/.venvs/lxw-wiki' "
-                                    "uv run python hooks/session-end.py"
-                                }
-                            ]
-                        }
-                    ]
-                }
-            }
-        )
-    )
-    out = _bash(
-        f"WIKI_DIR='{ICLOUD_VAULT}/.wiki' ROOT_DIR='{ICLOUD_VAULT}'; "
-        f"source '{ENGINE}/lib/common.sh'; source '{ENGINE}/lib/agents.sh'; "
-        f"hooks_installed '{cfg}' && printf yes || printf no"
-    )
-    assert out == "yes"
-
-
-def test_hook_command_runs_for_a_vault_path_with_an_apostrophe(tmp_path: Path):
+def test_the_hook_command_runs_for_a_vault_path_with_an_apostrophe(tmp_path: Path):
     """A vault called "Alex's Vault": the hook command quotes its paths for the shell the
     agent runs it in. Wrapped in bare '…', the apostrophe ended the quote early and every
-    hook died on a syntax error (exit 2), so no session in that vault was ever captured.
-    The vault is cloud-synced, so the environment prefix (~/.venvs/Alex's Vault-wiki) is
-    quoted too."""
+    hook died on a syntax error (exit 2), so no session in that vault was ever captured
+    (0.7.15). The vault is cloud-synced, so the environment prefix (~/.venvs/Alex's
+    Vault-wiki) is quoted too."""
     vault = tmp_path / "Library" / "Mobile Documents" / "iCloud~md~obsidian" / "Alex's Vault"
     (vault / ".wiki").mkdir(parents=True)
     stub_bin = tmp_path / "bin"
@@ -145,12 +130,8 @@ def test_hook_command_runs_for_a_vault_path_with_an_apostrophe(tmp_path: Path):
     uv = stub_bin / "uv"
     uv.write_text('#!/bin/sh\nprintf "%s|%s|%s" "$PWD" "$UV_PROJECT_ENVIRONMENT" "$*"\n')
     uv.chmod(0o755)
-    head = (
-        'WIKI_DIR="$V/.wiki" ROOT_DIR="$V"; '
-        f"source '{ENGINE}/lib/common.sh'; source '{ENGINE}/lib/agents.sh'; "
-    )
-    env = {"V": str(vault)}
-    cmd = _bash(head + "hook_cmd hooks/session-start.py", env=env)
+    venv = "/h/.venvs/Alex's Vault-wiki"
+    cmd = agents.hook_cmd("hooks/session-start.py", wiki_dir=vault / ".wiki", venv=venv)
 
     ran = subprocess.run(
         ["sh", "-c", cmd],
@@ -161,12 +142,11 @@ def test_hook_command_runs_for_a_vault_path_with_an_apostrophe(tmp_path: Path):
     )
 
     assert ran.returncode == 0, ran.stderr
-    cwd, venv, args = ran.stdout.split("|")
+    cwd, env_dir, args = ran.stdout.split("|")
     assert Path(cwd).resolve() == (vault / ".wiki").resolve()
-    assert venv == "/h/.venvs/Alex's Vault-wiki"
+    assert env_dir == venv
     assert args == "run python hooks/session-start.py"
-    # …and `wiki hooks status` still recognises what the installer wrote.
+    # …and `wiki hooks status` still recognises what the installer writes.
     cfg = tmp_path / "settings.json"
-    cfg.write_text(_bash(head + "agent_payload claude", env=env))
-    probe = 'hooks_installed "$CFG" && printf yes || printf no'
-    assert _bash(head + probe, env={**env, "CFG": str(cfg)}) == "yes"
+    cfg.write_text(agents.render(agents.payload("claude", wiki_dir=vault / ".wiki", venv=venv)))
+    assert agents.hooks_installed(cfg)

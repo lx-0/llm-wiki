@@ -9,21 +9,6 @@ __WIKI_COMMON_LOADED=1
 : "${WIKI_DIR:?WIKI_DIR must be set by caller}"
 : "${ROOT_DIR:?ROOT_DIR must be set by caller}"
 
-LIB_DIR="$WIKI_DIR/lib"
-SCRIPTS_DIR="$WIKI_DIR/scripts"
-HOOKS_DIR="$WIKI_DIR/hooks"
-CONFIG_FILE="$WIKI_DIR/config.yaml"
-
-# Hook-script paths used inside generated agent configs.
-# Relative paths (project-scope-only — assume CWD = vault root):
-HOOK_SESSION_START_REL=".wiki/hooks/session-start.py"
-HOOK_SESSION_END_REL=".wiki/hooks/session-end.py"
-HOOK_PRE_COMPACT_REL=".wiki/hooks/pre-compact.py"
-# Absolute paths (work for both user and project scope):
-HOOK_SESSION_START_ABS="$WIKI_DIR/hooks/session-start.py"
-HOOK_SESSION_END_ABS="$WIKI_DIR/hooks/session-end.py"
-HOOK_PRE_COMPACT_ABS="$WIKI_DIR/hooks/pre-compact.py"
-
 # ── Engine environment location (the ONE rule; Python reads the result) ──
 # A vault inside a cloud-synced folder (iCloud Drive, ~/Library/CloudStorage)
 # must not run its Python environment from there: the sync engine evicts file
@@ -35,8 +20,8 @@ HOOK_PRE_COMPACT_ABS="$WIKI_DIR/hooks/pre-compact.py"
 # it already had and shelved the symlink as `.venv 2`. So for such vaults the
 # environment lives at ~/.venvs/<vault>-wiki and every uv invocation gets
 # told so via UV_PROJECT_ENVIRONMENT — exported here for the dispatcher, and
-# written literally into the agent hook commands by lib/agents.sh, because
-# hook processes come from the agent, not from `wiki`. An operator-set
+# written literally into the agent hook commands (core/agents.py reads it from
+# the environment), because hook processes come from the agent, not from `wiki`. An operator-set
 # UV_PROJECT_ENVIRONMENT always wins. Elsewhere uv's default (.wiki/.venv)
 # stays and this exports nothing.
 wiki_path_is_cloud_synced() {
@@ -106,22 +91,4 @@ banner() {
 require_cmd() {
   local cmd="$1" reason="${2:-required}"
   command -v "$cmd" >/dev/null 2>&1 || die "$cmd not found ($reason). Install it and retry."
-}
-
-# ── Backup helper (lib/agents.sh's install + uninstall) ──────────────
-# <file>.bak.<YYYYmmdd-HHMMSS>, never over an earlier backup: an install and an uninstall
-# within one second took the same name, and the second copy replaced the first (the
-# pre-install original). A clash takes -2, -3, …. Prints the backup's path; a failed copy
-# returns 1, so a caller can stop before it writes.
-backup_file() {
-  local f="$1"
-  [[ -f "$f" ]] || return 0
-  local stamp; stamp="$(date +%Y%m%d-%H%M%S)"
-  local bak="${f}.bak.$stamp" n=1
-  while [[ -e "$bak" ]]; do
-    n=$((n + 1))
-    bak="${f}.bak.$stamp-$n"
-  done
-  cp "$f" "$bak" || return 1
-  printf "%s" "$bak"
 }

@@ -2,8 +2,9 @@
 configs live, what the hook commands are, and how to recognise them.
 
 Pure data and small functions (no I/O beyond reading a config's text); the `wiki hooks`
-commands sit on top. Ported from `lib/agents.sh`, and held to it byte for byte: an
-operator's installed hook commands must not change on reinstall (M034).
+commands sit on top. Ported from `lib/agents.sh` and held to it byte for byte — since its
+deletion (M034-S03-T07) through its recorded output, tests/golden/agents/: an operator's
+installed hook commands must not change on reinstall (M034).
 
 One grammar recognises a wiki-managed hook command, for the installed probe, the merge
 and the uninstall alike. The bash carried three drifted copies of it (the uninstall's
@@ -207,9 +208,9 @@ def render(config: object) -> str:
 
 
 # ── Merge and uninstall ────────────────────────────────────────────────────
-# The bash's `merge_into_config` and `uninstall_one` filters (lib/agents.sh), held to the
-# file text its jq writes (tests/test_agents_merge.py). Pure: the caller reads, backs up
-# and writes.
+# The bash's `merge_into_config` and `uninstall_one` filters (the deleted lib/agents.sh),
+# held to the file text its jq wrote, recorded under tests/golden/agents/
+# (tests/test_agents_merge.py). Pure: the caller reads, backs up and writes.
 
 
 def _ours(entry: object) -> bool:

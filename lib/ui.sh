@@ -1,9 +1,9 @@
 # shellcheck shell=bash
 # ui.sh — interactive prompts. No business logic, only input/output.
 # Python has its own since M034-S02-T01 (core/console: confirm / ask / select_* / pause).
-# What is left here serves lib/hooks.sh (S03) and cmd_update's stash prompt (S05); the file
-# goes with its last caller in S05-T04. `ask` went with the wizard (S02-T03), `pause` had no
-# caller left.
+# What is left here serves cmd_update's stash prompt (S05); the file goes with that last
+# caller in S05-T04. `ask` went with the wizard (S02-T03), `pause` had no caller left, and
+# `select_one` / `select_many` went with lib/hooks.sh (S03-T07).
 
 [[ -n "${__WIKI_UI_LOADED:-}" ]] && return 0
 __WIKI_UI_LOADED=1
@@ -18,62 +18,4 @@ confirm() {
   local input; read -r input
   input="${input:-$default}"
   [[ "$input" =~ ^[yYjJ] ]]
-}
-
-# select_one "Prompt" "opt1|opt2|opt3" [default_index_1based]
-# Echoes the chosen option string.
-select_one() {
-  local prompt="$1" options_str="$2" default_idx="${3:-1}"
-  local IFS='|'
-  read -r -a options <<< "$options_str"
-  local i=1
-  for opt in "${options[@]}"; do
-    local marker="  "
-    [[ "$i" == "$default_idx" ]] && marker="${C_GREEN}*${C_RESET} "
-    printf "  %s%d) %s\n" "$marker" "$i" "$opt" >&2
-    i=$((i+1))
-  done
-  printf "%s [%s]: " "$prompt" "$default_idx" >&2
-  local input; read -r input
-  input="${input:-$default_idx}"
-  [[ "$input" =~ ^[0-9]+$ ]] || input="$default_idx"
-  if (( input < 1 || input > ${#options[@]} )); then
-    input="$default_idx"
-  fi
-  printf "%s" "${options[$((input-1))]}"
-}
-
-# select_many "Prompt" "opt1|opt2|opt3" "default_csv"
-# Returns chosen options newline-separated on stdout.
-# Empty input → defaults. Numbers: space-separated 1-based.
-select_many() {
-  local prompt="$1" options_str="$2" default_csv="${3:-}"
-  local IFS='|'
-  read -r -a options <<< "$options_str"
-  local i=1
-  for opt in "${options[@]}"; do
-    local marker="  "
-    [[ ",$default_csv," == *",$opt,"* ]] && marker="${C_GREEN}*${C_RESET} "
-    printf "  %s%d) %s\n" "$marker" "$i" "$opt" >&2
-    i=$((i+1))
-  done
-  printf "%s${C_DIM} (space-separated numbers, Enter for defaults marked *)${C_RESET}: " \
-    "$prompt" >&2
-  local input; read -r input
-  local -a chosen=() numbers=()
-  if [[ -z "$input" ]]; then
-    IFS=',' read -r -a chosen <<< "$default_csv"
-  else
-    # Split on spaces explicitly: the function-wide IFS='|' made "1 2 3" one token, so a
-    # typed multi-selection matched no number and came back empty.
-    IFS=' ' read -r -a numbers <<< "$input"
-    for n in "${numbers[@]}"; do
-      [[ "$n" =~ ^[0-9]+$ ]] || continue
-      (( n >= 1 && n <= ${#options[@]} )) || continue
-      chosen+=("${options[$((n-1))]}")
-    done
-  fi
-  # An empty array expands as "unbound" under `set -u` in bash < 4.4 (macOS /bin/bash).
-  (( ${#chosen[@]} > 0 )) && printf "%s\n" "${chosen[@]}"
-  return 0
 }

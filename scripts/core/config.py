@@ -13,7 +13,7 @@ Usage:
     timeout = CONFIG.limits.screenshot_timeout_seconds
 
 Run it as a module to dump the loaded config (useful for debugging) — `wiki config
-get|set|keys` is the operator wrapper around the same CLI (lib/config.sh):
+get|set|keys` is the operator wrapper around the same CLI (scripts/config_cli.py):
     PYTHONPATH=.wiki/scripts uv run --project .wiki python -m core.config
 
 Side effect on import: loads `<vault>/.claude/.env` via python-dotenv (so
@@ -34,7 +34,7 @@ from dotenv import load_dotenv
 
 # config.py is both a package member (`from core.config import CONFIG`) AND the
 # `wiki config` CLI — run as `python -m core.config` with scripts/ on PYTHONPATH
-# (lib/config.sh), so the absolute `core.*` imports resolve in the __main__ case too.
+# (core.entry's shape), so the absolute `core.*` imports resolve in the __main__ case too.
 from core.config_backup import backup_config_file
 from core.paths import CONFIG_FILE, DOTENV_FILE
 

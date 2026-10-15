@@ -4,8 +4,8 @@ an earlier one.
 Two backups within one second shared a name, and the second replaced the first, which was
 the pre-change original. Recording the bash hooks oracle found it (M034-S03-T02), and five
 Python writers had it too: a batch of Thunderbird filter rules or All-Inkl procmail recipes
-writes the same file within milliseconds. A clash takes -2, -3, …, as
-`lib/common.sh:backup_file` does.
+writes the same file within milliseconds. A clash takes -2, -3, …, as the bash's
+`backup_file` did until the hooks commands moved here (M034-S03).
 """
 
 from __future__ import annotations

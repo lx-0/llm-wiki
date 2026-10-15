@@ -26,12 +26,8 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 ├── pyproject.toml + uv.lock
 ├── lib/
 │   ├── common.sh              ← paths, the engine-environment rule, output helpers, shell_quote / sync_hint, backup
-│   ├── ui.sh                  ← interactive prompts: confirm for update (select_one / select_many go with hooks.sh)
-│   ├── agents.sh              ← retired: no longer sourced since `wiki hooks` is Python; deleted at the end of M034-S03
-│   ├── hooks.sh               ← retired with agents.sh
-│   ├── skills.sh              ← retired: no longer sourced since `wiki skills` is Python; deleted with agents.sh
-│   ├── seed.sh                ← `wiki seed`: template seeding with the overlay and the plugin / env / meta-bind / dashboard merges
-│   └── config.sh              ← retired with skills.sh, its last caller
+│   ├── ui.sh                  ← interactive prompts: confirm for update
+│   └── seed.sh                ← `wiki seed`: template seeding with the overlay and the plugin / env / meta-bind / dashboard merges
 ├── scripts/
 │   ├── core/                  ← shared engine plumbing (imported, never invoked)
 │   │   ├── paths.py               ← eager path constants from __file__ — zero deps, no side effects
