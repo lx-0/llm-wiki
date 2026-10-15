@@ -126,6 +126,20 @@ def test_no_banner_command_stays_quiet(spy, capsys):
     assert spy["child"] == ("triage.py", ["--all"])
 
 
+@pytest.mark.parametrize("name", ["query", "usage", "publish"])
+def test_json_invocation_prints_no_banner(spy, capsys, name):
+    """`--json` is a machine-readable seam (the desktop parses `wiki query --json`
+    stdout): the payload alone, so the dispatcher prints no banner for it — the human
+    invocation of the same command keeps its banner. M033-S04-T06: the live `wiki
+    query --brief --json` on the scratch vault returned `wiki query\\n\\n{…}`."""
+    cli.run_command(cli.BY_NAME[name], ["x", "--json"])
+    assert capsys.readouterr().out == ""
+    assert spy["child"][1] == ["x", "--json"]
+
+    cli.run_command(cli.BY_NAME[name], ["x"])
+    assert f"wiki {name}" in capsys.readouterr().out
+
+
 def test_subroute_correct_apply_selects_apply_script(spy, capsys):
     code = cli.run_command(cli.BY_NAME["correct"], ["apply", "some-slug", "--dry-run"])
     assert code == 0

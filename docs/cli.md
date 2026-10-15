@@ -157,7 +157,10 @@ compile-state (stale), engine-update-available (N commits behind upstream).
 ## Agent-facing surfaces
 
 Two JSON commands let agents (via the `use-llm-wiki` skill or directly)
-read vault state programmatically without parsing pretty output:
+read vault state programmatically without parsing pretty output. Every `--json`
+invocation — these two, `wiki query --json`, `wiki usage --json`, `wiki publish
+--dry-run --json`, `wiki collect --list --json`, `wiki dream list-candidates --json` —
+writes the payload alone to stdout (no banner), so `JSON.parse(stdout)` works as is:
 
 ```bash
 ./.wiki/wiki menu --json     # context-sensitive suggestions + status

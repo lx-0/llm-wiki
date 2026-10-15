@@ -13,10 +13,11 @@ export interface QueryResult {
 /** LLM round-trip for a brief answer — generous cap so a slow model doesn't get cut. */
 const QUERY_TIMEOUT_MS = 5 * 60_000;
 
-/** Extract the answer from `wiki query --json` stdout. The dispatcher prints its
- *  banner line before the payload, so parse from the first `{` (the banner never
- *  contains one). Throws on malformed/missing JSON → runWiki parse-with-fallback →
- *  data=null. */
+/** Extract the answer from `wiki query --json` stdout. The engine prints the payload
+ *  alone (no dispatcher banner in `--json` mode since M033-S04-T06); parsing from the
+ *  first `{` keeps vaults on an older engine working — those print `wiki query` + a
+ *  blank line first (version skew; the banner never contains a `{`). Throws on
+ *  malformed/missing JSON → runWiki parse-with-fallback → data=null. */
 export function parseQueryAnswer(stdout: string): string {
   const start = stdout.indexOf('{');
   if (start === -1) throw new Error('no JSON payload in query output');

@@ -78,6 +78,17 @@ banner() {
   echo
 }
 
+# True when the args ask for machine-readable output (`--json`): stdout is then the
+# payload alone, so the caller skips its banner — the rule cli.py's run_command applies
+# to every Python-dispatched command. Usage: `wants_json "$@" || banner "wiki x"`.
+wants_json() {
+  local a
+  for a in "$@"; do
+    [[ "$a" == "--json" ]] && return 0
+  done
+  return 1
+}
+
 # ── Tooling guards ───────────────────────────────────────────────────
 require_cmd() {
   local cmd="$1" reason="${2:-required}"

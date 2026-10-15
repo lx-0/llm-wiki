@@ -2891,6 +2891,19 @@ Per-candidate learnings from the 14-candidate seam arc (C01–C14). Decisions li
   files found" — prose spacing in illustrative snippets is not code), and the rule that a
   formatter is only ever invoked with explicit paths typed in the command, never from a
   variable built off rtk-filtered stdout (RTK.md: piped output can come back empty).
+- **`--json` means stdout is the payload alone — the dispatcher's banner included
+  (2026-10-15):** a live `wiki query --brief --json` on the scratch vault answered
+  `wiki query\n\n{…}`: `cli.run_command` printed the command banner to stdout before the
+  child's payload, for every `banner=True` command (`query`, `usage`, `publish`), and the
+  bash `wiki dream list-candidates --json` did the same. The desktop had parsed around it
+  ("from the first `{`") instead of the seam being fixed — `collect` dodged it with
+  `banner=False` for the whole command. Rule now in both layers: `--json` in the args →
+  no banner (`run_command`; `lib/common.sh:wants_json` for bash banners). Pinned by
+  `tests/test_cli.py::test_json_invocation_prints_no_banner` and
+  `tests/test_bash_json_banner.py` (real bash layer, stub `uv`). A new `--json` command on
+  a bash-native path calls `wants_json "$@" || banner …`. Unit tests on the child script
+  never see this — only the dispatched command, end to end, shows stdout as a consumer
+  gets it.
 
 ### Desktop toolchain (C07)
 

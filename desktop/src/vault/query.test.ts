@@ -12,7 +12,7 @@ describe('parseQueryAnswer', () => {
     expect(parseQueryAnswer(PAYLOAD)).toBe('The answer is 42.');
   });
 
-  it('skips the dispatcher banner printed before the payload', () => {
+  it('skips the banner an older engine printed before the payload (version skew)', () => {
     expect(parseQueryAnswer(`wiki query\n\n${PAYLOAD}\n`)).toBe('The answer is 42.');
   });
 

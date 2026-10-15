@@ -1265,7 +1265,10 @@ def run_command(command: CommandSpec, rest: list[str]) -> int:
         _err(f"unknown: wiki {command.name} {rest[0]} (try 'wiki {command.name} help')")
         return 1
 
-    if banner_on:
+    # `--json` is a machine-readable seam (the desktop parses `wiki query --json`):
+    # stdout is the payload alone, so no banner. The bash layer's `wants_json`
+    # applies the same rule to its own banners.
+    if banner_on and "--json" not in args:
         _banner(banner_title, subtitle)
     code = _run_child(script, args)
     if command.refresh_after:
