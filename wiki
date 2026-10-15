@@ -39,10 +39,6 @@ export WIKI_DIR ROOT_DIR
 source "$WIKI_DIR/lib/common.sh"
 # shellcheck source=lib/ui.sh
 source "$WIKI_DIR/lib/ui.sh"
-# shellcheck source=lib/agents.sh
-source "$WIKI_DIR/lib/agents.sh"
-# shellcheck source=lib/hooks.sh
-source "$WIKI_DIR/lib/hooks.sh"
 # shellcheck source=lib/skills.sh
 source "$WIKI_DIR/lib/skills.sh"
 # shellcheck source=lib/config.sh
@@ -50,8 +46,8 @@ source "$WIKI_DIR/lib/config.sh"
 # shellcheck source=lib/seed.sh
 source "$WIKI_DIR/lib/seed.sh"
 
-require_cmd jq "needed to merge agent hook configs"
-require_cmd uv "needed to run the python config helper"
+require_cmd jq "needed by wiki seed's JSON merges"
+require_cmd uv "needed to sync and run the engine's Python environment"
 
 # ── Vault guard ──────────────────────────────────────────────────────
 # Engine refuses to run outside an Obsidian vault. Without this, a bare
@@ -69,59 +65,7 @@ require_vault() {
 }
 
 # ── Subcommand dispatchers ───────────────────────────────────────────
-cmd_status() {
-  banner "wiki status"
-  # `wiki config status` is Python since M034-S02-T02; M034-S03 ports `status` whole, with `hooks`.
-  "$WIKI_DIR/wiki" config status
-  echo
-  hooks_status_table
-}
-
-help_hooks() {
-  cat <<EOF
-${C_BOLD}wiki hooks${C_RESET} — install session hooks into AI agent configs
-
-${C_BOLD}USAGE${C_RESET}
-  wiki hooks install                interactive: pick agents + scope, merge hooks in
-  wiki hooks uninstall              interactive: remove wiki-managed hooks
-  wiki hooks status                 install table per agent / scope
-
-${C_BOLD}TARGETS${C_RESET}
-  claude   .claude/settings.json     (Claude Code)
-  codex    .codex/hooks.json         (OpenAI Codex CLI 0.30+)
-  gemini   .gemini/settings.json     (Google Gemini CLI)
-  cursor   .cursor/hooks.json        (Cursor 1.7+)
-
-${C_BOLD}SCOPE${C_RESET}
-  user      ~/<.agent>/...           applies to all sessions
-  project   <repo>/<.agent>/...      applies only when CWD is this repo
-
-${C_BOLD}EVENT MAPPING${C_RESET} (auto, per agent)
-                  claude         codex     gemini       cursor
-  session-start   SessionStart   SessionStart SessionStart —
-  session-end     SessionEnd     Stop      SessionEnd    stop
-  pre-compact     PreCompact     —         PreCompress   —
-
-${C_BOLD}SAFETY${C_RESET}
-  • Existing config files are merged via jq deep-merge — your other hooks stay.
-  • Every write makes a .bak.YYYYMMDD-HHMMSS backup.
-  • Uninstall only removes entries whose command contains '.wiki/hooks/'.
-
-${C_BOLD}NOT SUPPORTED${C_RESET}
-  pi         TypeScript-only hooks (~/.omp/agent/hooks/{pre,post}/*.ts)
-  opencode   no native hooks yet (sst/opencode#5409)
-EOF
-}
-
-cmd_hooks() {
-  case "${1:-}" in
-    install|"")               hooks_cmd_install ;;
-    uninstall)                hooks_cmd_uninstall ;;
-    status)                   hooks_cmd_status ;;
-    -h|--help|help)           help_hooks ;;
-    *)                        err "unknown: wiki hooks $1"; help_hooks; exit 1 ;;
-  esac
-}
+# `wiki status` and `wiki hooks` are Python since M034-S03-T05 (status_cli.py, hooks_cli.py).
 
 help_skills() {
   cat <<EOF
@@ -528,8 +472,6 @@ esac
 # on input. An unknown command falls through to cli.py, which prints its own
 # "unknown command" error.
 case "${1:-}" in
-  status)           shift; cmd_status "$@" ;;
-  hooks)            shift; cmd_hooks "$@" ;;
   skills)           shift; cmd_skills "$@" ;;
   update)           shift; cmd_update "$@" ;;
   seed)             shift; cmd_seed "$@" ;;

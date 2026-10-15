@@ -7,7 +7,7 @@ Adds session hooks to one or more AI agent configs. Backups + idempotent.
 
 AGENT      USER                   PROJECT                PROJECT CONFIG
 ──────────────────────────────────────────────────────────────────────────────
-claude     detected                       —                            <VAULT>/.claude/settings.json
+claude     unreadable                     —                            <VAULT>/.claude/settings.json
 codex      —                            —                            <VAULT>/.codex/hooks.json
 gemini     —                            —                            <VAULT>/.gemini/settings.json
 cursor     —                            —                            <VAULT>/.cursor/hooks.json
@@ -26,9 +26,7 @@ Proceed? [Y/n]
 Select agents to install hooks for (space-separated numbers, Enter for defaults marked *):   * 1) user only (recommended)
     2) project only
     3) both
-Install scope [1]: ✗ jq could not read <HOME>/.claude/settings.json — refusing to merge (jq: parse error: Unfinished JSON term at EOF at line 2, column 0)
-✗ claude (user): merge failed
+Install scope [1]: ✗ claude (user): <HOME>/.claude/settings.json is not valid JSON — left as it was (Expecting value: line 2 column 1 (char 28))
 ✗ 1 of 1 hook installs failed — see above.
 --- change ---
-+ <HOME>/.claude/settings.json.bak.<STAMP>
-    {"permissions": {"allow": [
+(none)

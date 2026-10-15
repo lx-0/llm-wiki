@@ -131,16 +131,53 @@ def test_hooks_detects_multiple_agents_across_scopes(fake_vault, monkeypatch):
     (fake_home / ".claude").mkdir(parents=True)
     monkeypatch.setattr(Path, "home", classmethod(lambda cls: fake_home))
     # claude in user scope (cd-style)
+    start = "cd '/v/.wiki' && uv run python hooks/session-start.py"
     (fake_home / ".claude" / "settings.json").write_text(
-        '{"x": "cd \'/v/.wiki\' && uv run python hooks/session-start.py"}'
+        json.dumps({"hooks": {"SessionStart": [{"hooks": [{"command": start}]}]}})
     )
-    # cursor in project scope (direct-path style)
+    # cursor in project scope (direct-path style, a bare entry)
     (fake_vault / ".cursor").mkdir()
-    (fake_vault / ".cursor" / "hooks.json").write_text('{"x": ".wiki/hooks/session-end.py"}')
+    end = "uv run --project .wiki python .wiki/hooks/session-end.py"
+    (fake_vault / ".cursor" / "hooks.json").write_text(
+        json.dumps({"version": 1, "hooks": {"sessionEnd": [{"command": end}]}})
+    )
     result = health.check_hooks_installed()
     assert result.severity == "ok"
     assert result.details["user"] == ["claude"]
     assert result.details["project"] == ["cursor"]
+
+
+def test_a_permission_rule_naming_the_hook_is_not_an_install(fake_vault, monkeypatch):
+    """M034-S03-T05: doctor walks the hook entries, as `hooks status` does. The same text
+    in a permission rule counted as installed while the file was grepped."""
+    fake_home = fake_vault / "_fake_home"
+    (fake_home / ".claude").mkdir(parents=True)
+    monkeypatch.setattr(Path, "home", classmethod(lambda cls: fake_home))
+    rule = "Bash(cd '/v/.wiki' && uv run python hooks/session-start.py)"
+    (fake_home / ".claude" / "settings.json").write_text(
+        json.dumps({"permissions": {"allow": [rule]}})
+    )
+    result = health.check_hooks_installed()
+    assert result.severity == "warning"
+    assert result.dispatch_args == ["hooks", "install"]
+
+
+def test_a_stale_environment_is_judged_on_the_wiki_commands(fake_vault, monkeypatch):
+    """Another tool's hook carrying UV_PROJECT_ENVIRONMENT= hid a wiki hook without it."""
+    fake_home = fake_vault / "_fake_home"
+    (fake_home / ".claude").mkdir(parents=True)
+    monkeypatch.setattr(Path, "home", classmethod(lambda cls: fake_home))
+    monkeypatch.setenv("UV_PROJECT_ENVIRONMENT", "/h/.venvs/v-wiki")
+    groups = [
+        {"hooks": [{"command": "UV_PROJECT_ENVIRONMENT=/x other-tool"}]},
+        {"hooks": [{"command": "cd '/v/.wiki' && uv run python hooks/session-end.py"}]},
+    ]
+    (fake_home / ".claude" / "settings.json").write_text(
+        json.dumps({"hooks": {"SessionEnd": groups}})
+    )
+    result = health.check_hooks_installed()
+    assert result.severity == "warning"
+    assert result.details["stale_env"] == ["claude"]
 
 
 # ── check_claude_authed ────────────────────────────────────────────
@@ -548,8 +585,9 @@ def test_hooks_ok_without_env_override_even_if_hooks_lack_it(fake_vault, monkeyp
     (fake_home / ".claude").mkdir(parents=True)
     monkeypatch.setattr(Path, "home", classmethod(lambda cls: fake_home))
     monkeypatch.delenv("UV_PROJECT_ENVIRONMENT", raising=False)
+    end = "cd '/v/.wiki' && uv run python hooks/session-end.py"
     (fake_home / ".claude" / "settings.json").write_text(
-        '{"x": "cd \'/v/.wiki\' && uv run python hooks/session-end.py"}'
+        json.dumps({"hooks": {"SessionEnd": [{"hooks": [{"command": end}]}]}})
     )
     assert health.check_hooks_installed().severity == "ok"
 

@@ -89,6 +89,13 @@ def info(message: str) -> None:
     print(_styled("34", message))
 
 
+def fail(message: str) -> None:
+    """The bash `err`: a ✗ status line on stderr, red on a terminal. One failed item of a
+    run, beside `ok`'s ✓ lines; a command's own one-line error is `print_error`."""
+    line = f"✗ {message}"
+    print(f"\033[31m{line}\033[0m" if sys.stderr.isatty() else line, file=sys.stderr)
+
+
 def banner(title: str, subtitle: str | None = None) -> None:
     """A command's heading: bold title, dim subtitle, a blank line — flushed, so a child
     process started next writes below it."""

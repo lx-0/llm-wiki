@@ -30,6 +30,7 @@ from cli_help import (
     H_DREAM_ENTITY,
     H_FLUSH,
     H_HEALTH_TRENDS,
+    H_HOOKS,
     H_INDEX,
     H_INGEST_HTML,
     H_INGEST_YOUTUBE,
@@ -48,6 +49,7 @@ from cli_help import (
     H_REVIEW_WIKI,
     H_SETUP,
     H_STATS,
+    H_STATUS,
     H_STUDY,
     H_SUGGESTIONS,
     H_TAKE,
@@ -126,7 +128,13 @@ COMMANDS: tuple[CommandSpec, ...] = (
         takes_args=False,
     ),
     CommandSpec(
-        "status", "Home & status", "config + hooks + Ollama summary", kind="bash", menu=True
+        "status",
+        "Home & status",
+        "config + hooks + Ollama summary",
+        handler="status_cli.py",
+        menu=True,
+        takes_args=False,
+        help_text=H_STATUS,
     ),
     CommandSpec(
         "doctor",
@@ -174,7 +182,13 @@ COMMANDS: tuple[CommandSpec, ...] = (
         help_text=H_CONFIG,
     ),
     CommandSpec(
-        "hooks", "Setup", "install/uninstall session hooks per agent", kind="bash", menu=True
+        "hooks",
+        "Setup",
+        "install/uninstall session hooks per agent",
+        handler="hooks_cli.py",
+        banner=False,  # the handler prints its own, so `wiki setup` gets it in-process
+        menu=True,
+        help_text=H_HOOKS,
     ),
     CommandSpec(
         "skills", "Setup", "wire engine skills into .claude/skills/", kind="bash", menu=True

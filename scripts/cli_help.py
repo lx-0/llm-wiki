@@ -756,3 +756,49 @@ Idempotent. Replaces a stale symlink pointing at a different vault.
 Refuses to replace anything that is not a symlink (another program called `wiki`).
 Reports if ~/.local/bin isn't on PATH and prints the one-line shell-rc
 edit needed."""
+
+# `wiki hooks` — moved from the bash `help_hooks` with the port (M034-S03-T05); the bash
+# oracle's `hooks-help` golden holds it. Corrected with the move: uninstall removes the
+# wiki's own commands by the one hook-command grammar (the help named `.wiki/hooks/`, which
+# matched nothing current), the merge needs no jq, and Cursor registers all three events.
+H_HOOKS = """wiki hooks — install session hooks into AI agent configs
+
+USAGE
+  wiki hooks install                interactive: pick agents + scope, merge hooks in
+  wiki hooks uninstall              interactive: remove wiki-managed hooks
+  wiki hooks status                 install table per agent / scope
+
+TARGETS
+  claude   .claude/settings.json     (Claude Code)
+  codex    .codex/hooks.json         (OpenAI Codex CLI 0.30+)
+  gemini   .gemini/settings.json     (Google Gemini CLI)
+  cursor   .cursor/hooks.json        (Cursor 1.7+)
+
+SCOPE
+  user      ~/<.agent>/...           applies to all sessions
+  project   <repo>/<.agent>/...      applies only when CWD is this repo
+
+EVENT MAPPING (auto, per agent)
+                  claude         codex          gemini         cursor
+  session-start   SessionStart   SessionStart   SessionStart   sessionStart
+  session-end     SessionEnd     Stop           SessionEnd     sessionEnd
+  pre-compact     PreCompact     —              PreCompress    preCompact
+
+SAFETY
+  • Existing config files are merged — your other hooks and settings stay.
+  • Every write makes a .bak.YYYYMMDD-HHMMSS backup first (a second one in the
+    same second gets -2).
+  • Uninstall removes only the wiki's own hook commands; a config without any is
+    left alone.
+
+NOT SUPPORTED
+  pi         TypeScript-only hooks (~/.omp/agent/hooks/{pre,post}/*.ts)
+  opencode   no native hooks yet (sst/opencode#5409)"""
+
+# `wiki status` — new with the port (M034-S03-T05): the bash `cmd_status` had no help.
+H_STATUS = """wiki status — config + hooks + Ollama summary
+
+USAGE
+  wiki status                       the config summary with the Ollama probe
+                                    (`wiki config status`), then the hooks table
+                                    (`wiki hooks status`)"""

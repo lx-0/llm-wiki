@@ -116,14 +116,58 @@ def is_wiki_hook(command: str) -> bool:
     return HOOK_CMD_RE.search(command) is not None
 
 
+def read_config(cfg: Path) -> dict | None:
+    """The agent config at ``cfg``. ``None`` when there is none; ``ValueError`` when it
+    exists but is not a JSON object (half written, another program's mistake). An OSError
+    reading it propagates."""
+    if not cfg.is_file():
+        return None
+    config = json.loads(cfg.read_text(encoding="utf-8"))
+    if not isinstance(config, dict):
+        raise ValueError(f"not a JSON object but {type(config).__name__}")
+    return config
+
+
+def _entry_commands(entry: object) -> list[str]:
+    """The commands an event entry runs: a bare entry's own (Cursor), a `{matcher, hooks}`
+    group's `hooks[].command`."""
+    if not isinstance(entry, dict):
+        return []
+    commands = [entry["command"]] if isinstance(entry.get("command"), str) else []
+    inner = entry.get("hooks")
+    if isinstance(inner, list):
+        commands += [
+            h["command"] for h in inner if isinstance(h, dict) and isinstance(h.get("command"), str)
+        ]
+    return commands
+
+
+def wiki_commands(config: object) -> list[str]:
+    """The wiki hook commands an agent would run from ``config``: those under its `hooks`
+    block, in either entry shape, by the one grammar the merge and the uninstall use. The
+    same text elsewhere in the file, a permission rule naming the command, is not a hook
+    (M034-S03-T05; the bash grepped the file's text)."""
+    hooks = config.get("hooks") if isinstance(config, dict) else None
+    if not isinstance(hooks, dict):
+        return []
+    return [
+        command
+        for entries in hooks.values()
+        if isinstance(entries, list)
+        for entry in entries
+        for command in _entry_commands(entry)
+        if is_wiki_hook(command)
+    ]
+
+
 def hooks_installed(cfg: Path) -> bool:
-    """True when the config's text names a wiki hook command anywhere: the probe reads
-    the file as text, as the bash `grep` did, not as JSON."""
+    """Whether an agent would run a wiki hook from the config at ``cfg``; a missing or
+    unreadable config runs none."""
     try:
-        text = cfg.read_text(encoding="utf-8", errors="replace")
-    except OSError:
+        config = read_config(cfg)
+    except (OSError, ValueError):
         return False
-    return HOOK_CMD_RE.search(text) is not None
+    return bool(wiki_commands(config))
 
 
 def shell_quote(value: str) -> str:
@@ -180,10 +224,7 @@ def _ours(entry: object) -> bool:
 def _wiki_managed(entry: object) -> bool:
     """An event entry running a wiki hook: a bare entry's own command (Cursor) or any of a
     `{matcher, hooks}` group's."""
-    if not isinstance(entry, dict):
-        return False
-    inner = entry.get("hooks")
-    return _ours(entry) or (isinstance(inner, list) and any(_ours(h) for h in inner))
+    return any(is_wiki_hook(command) for command in _entry_commands(entry))
 
 
 def _deep_merge(base: dict, extra: dict) -> dict:

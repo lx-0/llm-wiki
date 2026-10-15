@@ -226,13 +226,6 @@ def _claude_hooks_at_user_scope(env: dict[str, Path]) -> None:
     _wiki(env, "hooks", "install", stdin="1\n1\ny\n")
 
 
-def _failing_jq(env: dict[str, Path]) -> None:
-    """A `jq` that cannot run, like an asdf shim under a foreign HOME: exit 126, no output."""
-    jq = env["bin"] / "jq"
-    jq.write_text("#!/bin/sh\nexit 126\n", encoding="utf-8")
-    jq.chmod(0o755)
-
-
 def _drop_backups(cfg: Path) -> None:
     """The preparation's own backups. Backups are named to the second, so without this the
     case's backup is `<stamp>` or `<stamp>-2` depending on whether both landed in one."""
@@ -274,10 +267,11 @@ def _unreadable_user_settings(env: dict[str, Path]) -> None:
 
 def _truncated_user_settings_with_a_wiki_hook(env: dict[str, Path]) -> None:
     """The user's Claude settings cut off mid-write, after a wiki hook command: the text
-    names the hook, the file is not JSON."""
+    names the hook, the file is not JSON. The older relative form of the command, so the
+    parse error's character offset does not depend on where the test vault lives."""
     settings = env["home"] / ".claude" / "settings.json"
     settings.parent.mkdir(parents=True)
-    command = f"cd '{env['vault']}/.wiki' && uv run python hooks/session-end.py"
+    command = "uv run --project .wiki python .wiki/hooks/session-end.py"
     settings.write_text(
         '{"hooks": {"SessionEnd": [{"hooks": [{"command": ' + json.dumps(command) + "}\n",
         encoding="utf-8",
@@ -376,10 +370,10 @@ MUTATING: dict[str, tuple[tuple[str, ...], str | None, Prepare]] = {
         "\n1\ny\n",
         _claude_hooks_at_project_scope_only,
     ),
-    "hooks-install-payload-fails": (("hooks", "install"), "1\n1\ny\n", _failing_jq),
-    # S03-T05's oracle-first record of three cases its port changes on purpose (the
-    # re-record states the difference): a config that is not JSON, on install and on
-    # uninstall, and a status whose only wiki command is a permission rule's text
+    # S03-T05's oracle-first record of three cases its port changed on purpose (see the
+    # commit and CHANGELOG 0.7.18): a config that is not JSON, on install and on uninstall,
+    # and a status whose only wiki command is a permission rule's text. Its port also
+    # dropped `hooks-install-payload-fails`: hooks no longer use jq.
     "hooks-install-unreadable-config": (
         ("hooks", "install"),
         "1\n1\ny\n",
@@ -483,10 +477,11 @@ def test_bash_mutating_command_matches_golden(fresh_vault, request, name: str) -
 
 
 def test_an_install_that_fails_is_not_reported_done(fresh_vault: dict[str, Path]) -> None:
-    """Found in S02-T05's end-to-end run: with a `jq` that could not run, every payload
-    failed. The installer said `unknown agent: claude`, wrote nothing, and ended
-    `✓ Done. Restart agent CLIs…` with exit 0."""
-    _failing_jq(fresh_vault)
+    """Found in S02-T05's end-to-end run: an install that wrote nothing ended `✓ Done.
+    Restart agent CLIs…` with exit 0 (then a `jq` that could not run; since the port, any
+    agent that fails, here a config that is not JSON)."""
+    _unreadable_user_settings(fresh_vault)
+    settings = fresh_vault["home"] / ".claude" / "settings.json"
 
     run = run_wiki(
         fresh_vault["vault"],
@@ -498,9 +493,10 @@ def test_an_install_that_fails_is_not_reported_done(fresh_vault: dict[str, Path]
 
     assert run.returncode == 1
     assert "Done" not in run.stdout
-    assert "claude (user): could not build the hook payload" in run.stderr
+    assert "claude (user): " in run.stderr
+    assert "is not valid JSON — left as it was" in run.stderr
     assert "1 of 1" in run.stderr
-    assert not (fresh_vault["home"] / ".claude" / "settings.json").exists()
+    assert settings.read_text(encoding="utf-8") == '{"permissions": {"allow": [\n'
 
 
 def test_the_engine_template_spawns_no_background_git_maintenance(tmp_path: Path) -> None:

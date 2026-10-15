@@ -71,9 +71,9 @@ def check_hooks_installed() -> CheckResult:
         doesn't want hooks firing there.
 
     Either is sufficient. Warning fires only when NEITHER scope has
-    any wiki-managed entry. Reads each agent's config (core.agents'
-    registry) as text and looks for a wiki hook command in it, by the
-    one grammar the installer uses.
+    any wiki-managed entry. Walks each agent's hook entries (core.agents'
+    registry and grammar), as `wiki hooks status` does: the same text in a
+    permission rule is not a hook, and an unreadable config runs none.
     """
     try:
         installed_user: list[str] = []
@@ -84,12 +84,14 @@ def check_hooks_installed() -> CheckResult:
             for scope, target in (("user", installed_user), ("project", installed_project)):
                 path = agents.config_path(spec.name, scope, home=home, root=ROOT_DIR)
                 try:
-                    text = path.read_text(encoding="utf-8", errors="replace")
-                except OSError:
+                    commands = agents.wiki_commands(agents.read_config(path))
+                except (OSError, ValueError):
                     continue
-                if agents.HOOK_CMD_RE.search(text):
+                if commands:
                     target.append(spec.name)
-                    if "UV_PROJECT_ENVIRONMENT=" not in text:
+                    # judged on the wiki's own commands: another tool's hook carrying
+                    # the variable must not hide one of ours without it
+                    if any("UV_PROJECT_ENVIRONMENT=" not in c for c in commands):
                         stale_env_agents.append(spec.name)
         if installed_user or installed_project:
             parts = []

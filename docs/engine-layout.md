@@ -26,9 +26,9 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 ├── pyproject.toml + uv.lock
 ├── lib/
 │   ├── common.sh              ← paths, the engine-environment rule, output helpers, shell_quote / sync_hint, backup
-│   ├── ui.sh                  ← interactive prompts (confirm / select_one / select_many) for hooks + update
-│   ├── agents.sh              ← agent registry, payload generators, merge, install/uninstall (byte parity with core/agents.py)
-│   ├── hooks.sh               ← interactive flows for `wiki hooks {install,uninstall,status}`
+│   ├── ui.sh                  ← interactive prompts: confirm for update (select_one / select_many go with hooks.sh)
+│   ├── agents.sh              ← retired: no longer sourced since `wiki hooks` is Python; deleted at the end of M034-S03
+│   ├── hooks.sh               ← retired with agents.sh
 │   ├── skills.sh              ← `wiki skills {install,uninstall,sync,status}` + the silent install / prune for setup + update
 │   ├── seed.sh                ← `wiki seed`: template seeding with the overlay and the plugin / env / meta-bind / dashboard merges
 │   └── config.sh              ← config_get / config_set for skills.sh (the config commands are Python)
@@ -177,7 +177,9 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 │   ├── menu_context.py        ← the home screen's context probe (status + suggestions; schema-2 JSON — an oracle payload)
 │   ├── doctor.py              ← `wiki doctor` — full vault-health audit (`--quick --json` — an oracle payload)
 │   ├── config_cli.py          ← `wiki config` — get/set/keys/path over core/config, status, the interactive editor, the setup wizard
-│   ├── setup_cli.py           ← `wiki setup` — the wizard, then the hooks step (`wiki hooks install` as a child reading the rest of stdin)
+│   ├── setup_cli.py           ← `wiki setup` — the wizard, then the hooks step (`hooks_cli.install`, in-process on the same stdin)
+│   ├── hooks_cli.py           ← `wiki hooks install/uninstall/status` — the agent × scope flows over core/agents, a backup before every write, the status table
+│   ├── status_cli.py          ← `wiki status` — `wiki config status` over the hooks table
 │   ├── shortcut_cli.py        ← `wiki install-shortcut` — the `~/.local/bin/wiki` symlink (refuses a non-symlink in the way), the PATH probe
 │   ├── engine_version.py      ← `wiki version` — the engine checkout's revision, tag, origin (no vault needed)
 │   ├── dream.py               ← dream cycle — periodic cross-time re-synthesis of entity pages (`wiki dream` / `wiki dream-entity`): one entity's synthesis, the sweep, the CLI
@@ -258,7 +260,7 @@ appears somewhere else. Use the seam — never hand-roll the job beside it.
 | --- | --- | --- |
 | Reach Python from `wiki` | `wiki:_dispatch_python` — exec of the venv's python into `cli.py` with `VIRTUAL_ENV` + the venv's `bin/` on PATH (what `uv run` set); `uv sync --inexact` first when there is no venv or the lock is newer than the `.wiki-synced` stamp; a relative `UV_PROJECT_ENVIRONMENT` stays on `uv run` | `tests/test_bootstrap_hop.py` |
 | Start another engine process | `core/entry.py` (`python -m <module>`, `scripts/` on PYTHONPATH) | `tests/test_entry.py`, `tests/test_cli_dispatch.py` |
-| Recognise, build, merge or remove an agent hook command | `core/agents.py` (`HOOK_CMD_RE`, `hook_cmd`, `payload`, `merge`, `without_wiki_hooks`); doctor's `hooks-installed` reads it, and the bash `wiki hooks` stays byte-identical to it until the commands are Python | `tests/test_agents_registry.py` (payloads byte-identical to the bash `jq` output; no second grammar under `scripts/` or `hooks/`), `tests/test_agents_merge.py` (merged and uninstalled configs byte-identical to the bash's) |
+| Recognise, build, merge or remove an agent hook command | `core/agents.py` (`HOOK_CMD_RE`, `hook_cmd`, `payload`, `merge`, `without_wiki_hooks`, `wiki_commands`); `wiki hooks` / `wiki status` (`hooks_cli.py`) and doctor's `hooks-installed` use it, and count a hook only where an agent would run it | `tests/test_agents_registry.py` (payloads byte-identical to the bash `jq` output; no second grammar under `scripts/` or `hooks/`), `tests/test_agents_merge.py` (merged and uninstalled configs byte-identical to the bash's) |
 | Console + file logging | `core/console.py:setup_console_logging` — entry points only, never at import | `tests/test_console.py::TestOneSetupEverywhere` |
 | Read / write frontmatter | `core/frontmatter.py` | `tests/test_frontmatter_parity.py` (no private grammar, no fence grammar outside the seam) |
 | Back up a file before writing it | `core/backup.py` (`backup` for the `<name>.bak.<stamp>` sibling, `backup_path` for a writer's own name); two backups in one second keep both | `tests/test_backup.py` (no second backup stamp under `scripts/`) |

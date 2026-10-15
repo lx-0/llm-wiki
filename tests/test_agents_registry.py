@@ -8,6 +8,7 @@ payloads are compared as the files they become, not as parsed JSON.
 
 from __future__ import annotations
 
+import json
 import re
 import shutil
 import subprocess
@@ -93,8 +94,59 @@ def test_one_grammar_matches_what_the_bash_probe_matches(tmp_path, command):
     cfg.write_text(f'{{"command": "{command}"}}\n', encoding="utf-8")
     probe = 'hooks_installed "$CFG" && echo yes || echo no'
     bash_says = _bash("/v", probe, CFG=str(cfg)).strip() == "yes"
-    assert agents.hooks_installed(cfg) is bash_says
     assert agents.is_wiki_hook(command) is bash_says
+
+
+OURS = "cd '/v/.wiki' && uv run python hooks/session-start.py"
+
+
+def _claude(command: str) -> dict:
+    hook = {"type": "command", "command": command}
+    return {"hooks": {"SessionStart": [{"matcher": "", "hooks": [hook]}]}}
+
+
+def test_the_probe_counts_hook_entries_not_text(tmp_path):
+    """M034-S03-T05: `hooks status` and doctor walk the hook entries, as the merge and the
+    uninstall decide. The bash grepped the file's text."""
+    cfg = tmp_path / "settings.json"
+    cfg.write_text(json.dumps(_claude(OURS)), encoding="utf-8")
+    assert agents.hooks_installed(cfg) is True
+    # a permission rule naming the command is not a hook
+    cfg.write_text(json.dumps({"permissions": {"allow": [f"Bash({OURS})"]}}), encoding="utf-8")
+    assert agents.hooks_installed(cfg) is False
+    # a double-quoted path, escaped as \" in the file, is one
+    quoted = 'cd "/v/.wiki" && uv run python hooks/session-end.py'
+    cfg.write_text(json.dumps(_claude(quoted)), encoding="utf-8")
+    assert agents.hooks_installed(cfg) is True
+    # Cursor's bare entries
+    bare = {"version": 1, "hooks": {"sessionEnd": [{"type": "command", "command": OURS}]}}
+    cfg.write_text(json.dumps(bare), encoding="utf-8")
+    assert agents.hooks_installed(cfg) is True
+
+
+def test_an_unreadable_or_missing_config_is_not_installed(tmp_path):
+    cfg = tmp_path / "settings.json"
+    assert agents.read_config(cfg) is None
+    assert agents.hooks_installed(cfg) is False
+    cfg.write_text(json.dumps(_claude(OURS))[:-3], encoding="utf-8")  # cut off mid-write
+    with pytest.raises(ValueError):
+        agents.read_config(cfg)
+    assert agents.hooks_installed(cfg) is False
+    cfg.write_text("[]", encoding="utf-8")
+    with pytest.raises(ValueError):
+        agents.read_config(cfg)
+
+
+def test_wiki_commands_lists_only_ours():
+    config = {
+        "hooks": {
+            "SessionStart": [{"hooks": [{"command": "other"}, {"command": OURS}]}],
+            "Stop": "not a list",
+        },
+        "permissions": {"allow": [f"Bash({OURS})"]},
+    }
+    assert agents.wiki_commands(config) == [OURS]
+    assert agents.wiki_commands({"hooks": [OURS]}) == []
 
 
 def test_no_second_copy_of_the_grammar_outside_the_seam():

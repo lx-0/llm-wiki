@@ -105,28 +105,23 @@ def test_config_wizard_routes_to_the_wizard(store, monkeypatch):
 # ── wiki setup: the wizard, then the hooks step ──────────────────────────
 
 
-def test_setup_runs_the_hooks_installer_as_a_child_on_yes(store, monkeypatch, capsys):
-    calls: list[list[str]] = []
-
-    class Done:
-        returncode = 0
-
-    monkeypatch.setattr(setup_cli.subprocess, "run", lambda argv, **_: calls.append(argv) or Done())
-    assert setup_cli.setup(fd=_fd("\n" * 6, "y\n")) == 0
-    assert calls == [[str(setup_cli.WIKI_BIN), "hooks", "install"]]
+def test_setup_runs_the_hooks_installer_in_process_on_yes(store, monkeypatch, capsys):
+    """Hooks are Python since M034-S03-T05: the installer runs in-process, on setup's fd."""
+    seen: list[int] = []
+    monkeypatch.setattr(setup_cli.hooks_cli, "install", lambda *, fd=0: seen.append(fd) or 0)
+    fd = _fd("\n" * 6, "y\n")
+    assert setup_cli.setup(fd=fd) == 0
+    assert seen == [fd]
 
 
 def test_setup_skips_the_hooks_on_no(store, monkeypatch, capsys):
     monkeypatch.setattr(
-        setup_cli.subprocess, "run", lambda *_a, **_k: pytest.fail("no hooks child on no")
+        setup_cli.hooks_cli, "install", lambda **_: pytest.fail("no hooks install on no")
     )
     assert setup_cli.setup(fd=_fd("\n" * 6, "n\n")) == 0
     assert "Skipped hook install — run `wiki hooks install` later." in capsys.readouterr().out
 
 
 def test_setup_returns_the_hooks_installers_exit_code(store, monkeypatch):
-    class Failed:
-        returncode = 3
-
-    monkeypatch.setattr(setup_cli.subprocess, "run", lambda *_a, **_k: Failed())
+    monkeypatch.setattr(setup_cli.hooks_cli, "install", lambda **_: 3)
     assert setup_cli.setup(fd=_fd("\n" * 6, "y\n")) == 3

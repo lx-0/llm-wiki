@@ -102,8 +102,10 @@ report, `kind=cli_killed` in the engine log; dispatchable as `wiki update`),
 **warning** when a stale `.wiki/.venv` still sits in the cloud path although
 the engine runs from `~/.venvs/<vault>-wiki`, or when scripts/prompts/
 templates are currently evicted (every import blocks on a download).
-`hooks-installed` additionally warns when the environment override is active
-but the installed hook commands do not carry it — `wiki hooks install`
+`hooks-installed` counts a hook where an agent would run it: an entry under the
+config's `hooks` block, as `wiki hooks status` does (a permission rule naming the
+command is not one). It additionally warns when the environment override is
+active but the wiki's hook commands do not carry it — `wiki hooks install`
 rewrites them.
 
 `flush-pipeline` is the session-capture watchdog: it reads the tails of

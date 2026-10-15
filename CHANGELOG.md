@@ -18,6 +18,34 @@ every operator's `wiki update` → `uv sync` regenerate `uv.lock` and dirty thei
 config keys must also be wired into `scripts/migrations/migrate_config_keys.py`
 in the same commit.
 
+## [0.7.18] — 2026-10-16
+
+**For your vault:** nothing to do. A reinstall writes your agents' hook commands byte for
+byte as before.
+
+### Changed
+
+- **`wiki hooks` and `wiki status` run in Python.** Prompts, output and the files they write
+  are unchanged. Backups go through 0.7.17's helper, so one never replaces another, and
+  `wiki setup` installs the hooks in-process.
+- **A hook counts as installed only where an agent would run it.** This holds for
+  `wiki hooks status`, `wiki status` and `wiki doctor`; it means an entry under the config's
+  `hooks` block.
+  - A permission rule that merely names the wiki's hook command no longer shows as
+    installed.
+  - A command written with escaped quotes now does.
+  - A config that is not JSON shows as `unreadable`. Install and uninstall report it with
+    the parse error and leave it untouched, without backing up the broken file.
+- **Doctor's stale-environment warning** checks the wiki's own hook commands. Another
+  tool's hook carrying `UV_PROJECT_ENVIRONMENT=` no longer hides one of ours without it.
+- **`wiki hooks --help` is corrected.**
+  - Uninstall removes the wiki's own commands. The help named a `.wiki/hooks/` match,
+    which no current install writes.
+  - The merge needs no `jq`.
+  - Cursor registers all three events.
+- **`wiki status` refuses extra words**, like every ported command. It used to ignore
+  them.
+
 ## [0.7.17] — 2026-10-15
 
 **For your vault:** nothing to do.

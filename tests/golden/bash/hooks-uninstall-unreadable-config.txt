@@ -7,7 +7,7 @@ Removes wiki-managed hook entries; preserves user's other hooks.
 
 AGENT      USER                   PROJECT                PROJECT CONFIG
 ──────────────────────────────────────────────────────────────────────────────
-claude     installed                      —                            <VAULT>/.claude/settings.json
+claude     unreadable                     —                            <VAULT>/.claude/settings.json
 codex      —                            —                            <VAULT>/.codex/hooks.json
 gemini     —                            —                            <VAULT>/.gemini/settings.json
 cursor     —                            —                            <VAULT>/.cursor/hooks.json
@@ -23,7 +23,7 @@ Remove wiki hooks from selected configs? [Y/n]
 Select agents to uninstall hooks from (space-separated numbers, Enter for defaults marked *):   * 1) user only (recommended)
     2) project only
     3) both
-Install scope [1]: ✗ claude (user): jq could not read <HOME>/.claude/settings.json — left as it was (jq: parse error: Unfinished JSON term at EOF at line 2, column 0)
+Install scope [1]: ✗ claude (user): <HOME>/.claude/settings.json is not valid JSON — left as it was (Expecting ',' delimiter: line 2 column 1 (char 109))
 ✗ 1 of 1 hook removals failed — see above.
 --- change ---
 (none)

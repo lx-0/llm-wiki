@@ -19,15 +19,17 @@ SCOPE
   project   <repo>/<.agent>/...      applies only when CWD is this repo
 
 EVENT MAPPING (auto, per agent)
-                  claude         codex     gemini       cursor
-  session-start   SessionStart   SessionStart SessionStart —
-  session-end     SessionEnd     Stop      SessionEnd    stop
-  pre-compact     PreCompact     —         PreCompress   —
+                  claude         codex          gemini         cursor
+  session-start   SessionStart   SessionStart   SessionStart   sessionStart
+  session-end     SessionEnd     Stop           SessionEnd     sessionEnd
+  pre-compact     PreCompact     —              PreCompress    preCompact
 
 SAFETY
-  • Existing config files are merged via jq deep-merge — your other hooks stay.
-  • Every write makes a .bak.YYYYMMDD-HHMMSS backup.
-  • Uninstall only removes entries whose command contains '.wiki/hooks/'.
+  • Existing config files are merged — your other hooks and settings stay.
+  • Every write makes a .bak.YYYYMMDD-HHMMSS backup first (a second one in the
+    same second gets -2).
+  • Uninstall removes only the wiki's own hook commands; a config without any is
+    left alone.
 
 NOT SUPPORTED
   pi         TypeScript-only hooks (~/.omp/agent/hooks/{pre,post}/*.ts)

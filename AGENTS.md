@@ -32,8 +32,8 @@ llm-wiki/                    ← installed as <vault>/.wiki/ — the file-by-fil
 ├── wiki                     ← entry-point CLI (bash: bootstrap + fail-closed vault guard + the commands
 │                              not yet ported; everything else, bare `wiki` included, goes to scripts/cli.py)
 ├── lib/                     ← the bash layer, shrinking as M034 ports it: common.sh (paths, the venv-location rule),
-│                              ui.sh (prompts for hooks + update), agents.sh (hook payloads), hooks.sh, skills.sh,
-│                              config.sh (config_get / config_set for skills), seed.sh
+│                              ui.sh (the prompt for update), skills.sh, config.sh (config_get / config_set for
+│                              skills), seed.sh; agents.sh + hooks.sh are retired (deleted at the end of M034-S03)
 ├── scripts/                 ← the engine's source root — NOT a package (§ Python environment)
 │   ├── cli.py               ← table-driven `wiki` dispatcher — the CommandSpec table (cli_catalog.py, help texts in cli_help.py) is the single source of truth
 │   ├── core/                ← shared plumbing, imported never invoked: paths, config + config_schema, prompts,
@@ -198,11 +198,10 @@ Drift detection is JSON-key-order-insensitive (`_files_equivalent` / canonical `
 
 1. Add an `Agent` to `AGENTS` in `scripts/core/agents.py`: name, detection dir, config file,
    its hooks (event, script, timeout in the agent's unit) and `flat=True` for Cursor-style
-   bare entries. Doctor's `hooks-installed` check reads it.
-2. While `wiki hooks` is still bash (until M034-S03 ports it), mirror it in `lib/agents.sh`: the
-   `WIKI_AGENTS` tuple, a `<name>_hooks_payload()` and the `agent_payload()` case.
-   `tests/test_agents_registry.py` runs over `AGENTS` and holds the two byte for byte, so a
-   missing bash half fails there.
+   bare entries. `wiki hooks`, `wiki status` and doctor's `hooks-installed` read it.
+2. Until the retired `lib/agents.sh` is deleted (end of M034-S03), mirror the agent there
+   too: `tests/test_agents_registry.py` still compares every agent's payload with the bash
+   `agent_payload`, byte for byte.
 3. Status table, install/uninstall flows, and detection logic pick it up automatically.
 
 ### Wikilinks (relative-to-file convention)
@@ -235,7 +234,7 @@ The Python venv lives at `<vault>/.wiki/.venv/` (inside the engine, NOT at the v
 ### YAML & JSON
 
 - **YAML editing in CLI** → goes through `config.py set` (Python with PyYAML). Bash never parses YAML.
-- **JSON merge for agent configs** → `jq` deep-merge in `lib/agents.sh`. Always backup before write.
+- **JSON merge for agent configs** → `core.agents.merge` / `without_wiki_hooks` (they keep other tools' hooks); a backup through `core.backup` before every write.
 - **LLM JSON output** → use `jsonrepair` or schema-constrained decoding (Ollama `format` field). Never raw `JSON.parse`.
 
 ### Side effects

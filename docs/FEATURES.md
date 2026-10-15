@@ -37,7 +37,7 @@ Living overview of every engine feature: what's documented, where it's implement
 | Daily digest (`daily/<date>.md`) | 🟢 | `prompts/agents/daily-digest.md` (claude-haiku-4-5), `scripts/daily_digest_runner.py` (piggyback wrapper) | `wiki agent daily-digest --var date=…`; auto-fires as `daily_digest_yesterday` piggyback (24h cooldown) | PROCESS §2 piggyback table, cli.md | ≤500-word distillation across all five per-source captures; refuses to overwrite non-digest frontmatter. |
 | Migration / backfill / cleanup scripts | 🟢 | `scripts/migrate_daily_to_rollup.py`, `scripts/backfill_daily_rollup.py`, `scripts/cleanup_legacy_daily_roots.py` | operator one-shots after engine upgrade | cli.md "Operator-invoked one-shot scripts" | Migration is copy-not-move; cleanup verifies byte-match before delete. |
 | Failed-flush archival + retry | 🟢 | `scripts/core/flush_pipeline.py:archive_failure`, `scripts/retry_failed_flushes.py` | flush.py extraction failure (rate limit, SDK error) → archived to `.wiki/sessions/failed-flushes/`; piggyback retries later | PROCESS §2 piggyback table | — |
-| Multi-agent hook install | 🟢 | `lib/agents.sh`, `lib/hooks.sh` | `wiki hooks install` | README "Multi-agent hooks", cli.md "Hooks & skills" | Four agents wired: claude / codex / gemini / cursor. PI (`pi`) and opencode are documented as NOT supported in `help_hooks`. |
+| Multi-agent hook install | 🟢 | `scripts/hooks_cli.py` over `scripts/core/agents.py` | `wiki hooks install` | README "Multi-agent hooks", cli.md "Hooks & skills" | Four agents wired: claude / codex / gemini / cursor. PI (`pi`) and opencode are documented as NOT supported in `wiki hooks --help`. |
 
 ## Ingest (Path B)
 
@@ -180,13 +180,13 @@ Currently 1 agent task ships. Adding a new task = drop `prompts/agents/<id>.md` 
 
 | Command | Status | Code | Notes |
 |---|---|---|---|
-| `wiki setup` | 🟢 | `scripts/setup_cli.py` + `scripts/config_cli.py:wizard` (dispatched by `scripts/cli.py`); the hooks step runs `wiki hooks install` (`lib/hooks.sh` until M034-S03) | 6-question wizard + hook install |
-| `wiki status` | 🟢 | `wiki:cmd_status` | Config summary + hook install table + Ollama probe |
+| `wiki setup` | 🟢 | `scripts/setup_cli.py` + `scripts/config_cli.py:wizard` (dispatched by `scripts/cli.py`); the hooks step is `scripts/hooks_cli.py:install`, in-process | 6-question wizard + hook install |
+| `wiki status` | 🟢 | `scripts/status_cli.py` (dispatched by `scripts/cli.py`) | Config summary + hook install table + Ollama probe |
 | `wiki stats` | 🟢 | `scripts/health.py` (dispatched by `scripts/cli.py`) | Read-only vault dashboard: knowledge counts, raw-source mix, compile backlog, graph density, pipeline cadence |
 | `wiki update` | 🟢 | `wiki:cmd_update`, `lib/skills.sh` | `git pull --ff-only` + skill sync; preserves `config.yaml` + `.venv/` |
 | `wiki seed` / `wiki seed --force` | 🟢 | `wiki:cmd_seed`, `lib/seed.sh` | Additive template seed + drift detection |
 | `wiki config` (editor/get/set/keys/path/wizard/status) | 🟢 | `scripts/config_cli.py` over `scripts/core/config.py` (dispatched by `scripts/cli.py`) | Bare `wiki config` is the interactive section → key → value editor; round-robin backup on every set |
-| `wiki hooks` (install/uninstall/status) | 🟢 | `wiki:cmd_hooks`, `lib/hooks.sh`, `lib/agents.sh` | jq-merge into agent settings.json |
+| `wiki hooks` (install/uninstall/status) | 🟢 | `scripts/hooks_cli.py` over `scripts/core/agents.py` (dispatched by `scripts/cli.py`) | Merge into agent configs that keeps other tools' hooks; a backup before every write (`scripts/core/backup.py`) |
 | `wiki skills` (install/uninstall/sync/status) | 🟢 | `wiki:cmd_skills`, `lib/skills.sh` | Symlink into `<vault>/.claude/skills/`, foreign entries preserved. `--global` (gated by `skills.global_install`) also links global-eligible skills into `~/.claude/skills/` + registers the vault in `~/.config/llm-wiki/vaults` |
 | `wiki auth <service> <id>` (gmail \| gmeet \| calendar) | 🟢 | `scripts/cli_catalog.py` auth registry (dispatched by `scripts/cli.py`) → `scripts/adapters/mailbox/gmail.py` / `core/google_oauth.py` | One-time OAuth bootstrap; `wiki gmail-auth` / `wiki gmeet-auth` / `wiki calendar-auth <id>` remain as aliases. Account id passed as argv, never interpolated into `python -c` source (0.3.0, C06) |
 | `wiki version` | 🟢 | `scripts/engine_version.py` (dispatched by `scripts/cli.py`) | Git revision + tag + origin URL; works without a vault |
