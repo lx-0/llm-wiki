@@ -345,7 +345,7 @@ Loaded automatically at import via `core.config.load_dotenv(<vault>/.claude/.env
 |---|---|---|
 | `OPENAI_API_KEY` | Whisper audio transcription (and future OpenAI paths) | — |
 | `JAMIE_<ACCOUNT>_API_KEY` | `collectors/jamie.py` | One per account with a `jamie:` sub-block. Name matches the `api_key_env` field; `<ACCOUNT>` is your choice. Pro/Team/Enterprise plan. `jk_` prefix. Generate in Jamie: Settings → Developers → API Keys. |
-| `IMAP_<ACCOUNT>_USER` / `_PASS` | `adapters/mailbox/imap.py` (`imap` reader), `suggestions/backends/imap.py`, `adapters/mailbox/allinkl.py` | `<ACCOUNT>` matches the value of `imap_user_env` / `imap_pass_env` in the account's `reader` (kind: imap) or `filter` block. Gmail needs an App Password — 16 lowercase chars, pasted without the display spaces. |
+| `IMAP_<ACCOUNT>_USER` / `_PASS` | `adapters/mailbox/imap.py` (`imap` reader), `suggestions/backends/imap.py`, `adapters/mailbox/allinkl.py` | `<ACCOUNT>` matches the value of `imap_user_env` / `imap_pass_env` in the account's `reader` (kind: imap) or `filter` block. Gmail needs an App Password for the `imap` reader — 16 lowercase chars, pasted without the display spaces. The suggestions' IMAP actions on a Gmail host do not use it: they log in with OAuth (`wiki gmail-auth <id>`). |
 | `EXA_API_KEY` | dream web-research post-pass | Fallback when `personal.exa_api_key` is blank — the recommended place for the key. |
 | `NAS_HOST` / `NAS_USER` / `NAS_PASS` | Future `scan-nas.py` / SMB-backed collectors | — |
 | `LINKEDIN_EMAIL` / `LINKEDIN_PASSWORD` | adhikasp/mcp-linkedin MCP server | **Not loaded from `.env`** — set in `~/.claude.json` under `mcpServers.linkedin.env`. Listed only as a reminder. |
