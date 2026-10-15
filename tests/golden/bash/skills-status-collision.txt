@@ -1,0 +1,15 @@
+$ wiki skills status
+exit: 0
+--- stdout ---
+wiki skills status
+
+SKILL                            STATE
+──────────────────────────────────────────────────────────────
+use-llm-wiki                     collision (foreign entry — not managed)
+
+GLOBAL INSTALL                   off (skills.global_install — wiki skills install --global)
+  use-llm-wiki                   collision (foreign entry — not managed)
+  registry                       none (<HOME>/.config/llm-wiki/vaults)
+--- stderr ---
+--- change ---
+(none)

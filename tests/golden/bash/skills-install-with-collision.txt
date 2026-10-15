@@ -1,0 +1,11 @@
+$ wiki skills install
+exit: 0
+--- stdout ---
+wiki skills install
+Symlink engine skills into .claude/skills/
+
+! 1 name(s) collide with non-engine entries — left untouched
+Run 'wiki skills status' to see which.
+--- stderr ---
+--- change ---
+(none)

@@ -1,0 +1,21 @@
+$ wiki skills status
+exit: 0
+--- stdout ---
+wiki skills status
+
+SKILL                            STATE
+──────────────────────────────────────────────────────────────
+use-llm-wiki                     linked
+
+! stale engine-owned symlinks (source no longer exists):
+  gone-skill
+Run 'wiki skills sync' to prune them.
+
+GLOBAL INSTALL                   on  (skills.global_install)
+  use-llm-wiki                   linked → other vault (<ROOT>/other-vault/.wiki/skills/use-llm-wiki)
+  registry                       <HOME>/.config/llm-wiki/vaults
+    ✓ <VAULT>
+    ! <ROOT>/gone-vault (stale — no .wiki/wiki)
+--- stderr ---
+--- change ---
+(none)

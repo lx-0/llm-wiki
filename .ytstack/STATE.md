@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-16T00:20:00+02:00
+last_updated: 2026-10-16T00:30:00+02:00
 current_milestone: M034
 active_slice: S03
-active_task: none
+active_task: T06
 last_completed_milestone: M033
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -14,8 +14,9 @@ parallel_milestones: [M021, M025, M027, M029]
 
 ## Next action — M034 / S03: hooks + skills + status
 
-**Status:** M034 / S03 — 5/7 tasks done in the slice. Next task: T06, skills
-(`/ytstack:plan-task`). Slices S01 and S02 are complete (2/6).
+**Status:** M034 / S03 / T06 planned — ready to execute (`M034-S03-T06-PLAN.md`; the six
+oracle cases are recorded and pushed first). 5/7 tasks done in the slice; slices S01 and
+S02 are complete (2/6).
 
 **S03-T05 is done** (`M034-S03-T05-SUMMARY.md`, release **0.7.18**). `wiki hooks` and `wiki
 status` run in Python (`hooks_cli.py`, `status_cli.py`), and setup installs the hooks

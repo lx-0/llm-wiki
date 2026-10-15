@@ -1,0 +1,7 @@
+$ wiki skills sync
+exit: 0
+--- stdout ---
+✓ skills: -1 pruned
+--- stderr ---
+--- change ---
+- <VAULT>/.claude/skills/gone-skill

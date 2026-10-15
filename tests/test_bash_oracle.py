@@ -315,6 +315,43 @@ def _global_skills_installed(env: dict[str, Path]) -> None:
     _wiki(env, "skills", "install", "--global")
 
 
+def _foreign_skill_dir(env: dict[str, Path]) -> None:
+    """Another tool's skill under the engine skill's name, in the vault."""
+    (env["vault"] / ".claude" / "skills" / "use-llm-wiki").mkdir(parents=True)
+
+
+def _skills_linked_and_one_gone(env: dict[str, Path]) -> None:
+    """The engine's skills linked, and an engine-owned link whose skill was removed."""
+    _wiki(env, "skills", "install")
+    gone = env["vault"] / ".claude" / "skills" / "gone-skill"
+    gone.symlink_to("../../.wiki/skills/gone-skill")
+
+
+def _skills_in_every_state(env: dict[str, Path]) -> None:
+    """Global on; linked locally; a stale link; the global link into another vault; the
+    registry holding this vault and one that is gone."""
+    _skills_linked_and_one_gone(env)
+    _wiki(env, "config", "set", "skills.global_install", "true")
+    link = env["home"] / ".claude" / "skills" / "use-llm-wiki"
+    link.parent.mkdir(parents=True)
+    link.symlink_to(env["root"] / "other-vault" / ".wiki" / "skills" / "use-llm-wiki")
+    registry = env["home"] / ".config" / "llm-wiki" / "vaults"
+    registry.parent.mkdir(parents=True)
+    registry.write_text(f"{env['vault']}\n{env['root'] / 'gone-vault'}\n", encoding="utf-8")
+
+
+def _foreign_entries_at_both_link_paths(env: dict[str, Path]) -> None:
+    _foreign_skill_dir(env)
+    link = env["home"] / ".claude" / "skills" / "use-llm-wiki"
+    link.parent.mkdir(parents=True)
+    link.write_text("another tool's file\n", encoding="utf-8")
+
+
+def _skills_linked_beside_a_foreign_one(env: dict[str, Path]) -> None:
+    _wiki(env, "skills", "install")
+    (env["vault"] / ".claude" / "skills" / "my-own-skill").mkdir()
+
+
 def _engine_not_a_checkout(env: dict[str, Path]) -> None:
     """An engine that is not a git checkout (copied without its `.git`)."""
     shutil.rmtree(env["vault"] / ".wiki" / ".git")
@@ -394,6 +431,21 @@ MUTATING: dict[str, tuple[tuple[str, ...], str | None, Prepare]] = {
     "skills-install-global": (("skills", "install", "--global"), None, None),
     "skills-uninstall-global": (
         ("skills", "uninstall", "--global"),
+        None,
+        _global_skills_installed,
+    ),
+    # S03-T06's oracle-first record: the branches the four cases above do not reach
+    "skills-install-with-collision": (("skills", "install"), None, _foreign_skill_dir),
+    "skills-sync-prunes-stale": (("skills", "sync"), None, _skills_linked_and_one_gone),
+    "skills-status-mixed": (("skills", "status"), None, _skills_in_every_state),
+    "skills-status-collision": (
+        ("skills", "status"),
+        None,
+        _foreign_entries_at_both_link_paths,
+    ),
+    "skills-uninstall": (("skills", "uninstall"), None, _skills_linked_beside_a_foreign_one),
+    "skills-install-no-global": (
+        ("skills", "install", "--no-global"),
         None,
         _global_skills_installed,
     ),

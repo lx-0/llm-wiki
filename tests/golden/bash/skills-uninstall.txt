@@ -1,0 +1,10 @@
+$ wiki skills uninstall
+exit: 0
+--- stdout ---
+wiki skills uninstall
+Remove engine-owned symlinks only
+
+✓ removed 1 engine-owned symlink(s)
+--- stderr ---
+--- change ---
+- <VAULT>/.claude/skills/use-llm-wiki
