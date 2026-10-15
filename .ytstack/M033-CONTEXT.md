@@ -165,3 +165,23 @@ Reason: S03's recurring finding — the audit's def-name counts undercounted eve
 (3 → 7 slug copies, 3 → 7 state writers, 3 → 6 hand-typed rollup appends, 17 → 25
 frontmatter grammars) — changes how S04 should count too: by the mechanism, verified on
 the live tree, with the guard asserting the predicate the fold established.
+
+## Reassessment 2026-10-15T15:08:51+02:00
+
+After **S04**, changed the roadmap (B — partial):
+
+- The S04 slice line now says what shipped (seven tasks): 20 functions ≥ 150 lines split
+  (the audit said 15), the function gate's allowlist empty, six modules split (the plan
+  named four), and a module-size gate whose allowlist is `docs/engine-layout.md` § "Large
+  modules" (four reasons on record). Exit criterion 6 is met.
+- S05 keeps its six tasks. T02's type gate on `core/` covers the `core/health/` package and
+  `core/sdk_scope.py` as well. T05 re-verifies the S04 module lines and the "Large modules"
+  section, and re-checks the two diagram labels that name split modules (they still hold
+  through the facades). T05's 0.7.0 note carries the one operator-visible S04 change: `--json`
+  invocations print the payload alone (`960a74e`).
+- Nothing new for the backlog. S04's lessons are in KNOWLEDGE: a split module must make a
+  stale patch fail, and a static scan covers the names a module keeps binding.
+
+Reason: S04 confirmed S03's counting lesson again (20 functions, not 15; six modules, not
+four). It also found the one patch hazard the package-namespace guard cannot see: a name the
+old module legitimately keeps (`dream.ROOT_DIR`). S05's scope is unchanged by either.

@@ -5,7 +5,7 @@ size: L
 created: 2026-10-14T18:40:00+02:00
 status: planned
 total_slices: 5
-completed_slices: 3
+completed_slices: 4
 ---
 
 # M033 Roadmap
@@ -46,9 +46,16 @@ Suggested framing (refine in slice-milestone; audit in `backlog/deslop-arc.md` �
       `base.append_rollup`, the `_scan_inbox` bindings inlined onto `base.scan_inbox`; every
       fold by mechanism-smell grep, parity on the operator vault, a guard per seam. `print`
       → `core/console` is NOT in this slice (too broad; M034 with the Python dispatcher).
-- [ ] S04 -- **Readable functions.** The 15 functions ≥ 150 lines split
-      along their existing phase boundaries; `dream.py`, `core/health.py`, `lint.py`, `cli.py`
-      split where it pays; the AST length check committed as a test.
+- [x] S04 -- **Readable functions** (shipped 2026-10-15, seven tasks): the AST length gate
+      (`tests/test_function_length.py`) measured 20 functions ≥ 150 lines, not 15, and all
+      20 were split along their phases with characterisation tests first where a body had
+      none; the ALLOWLIST is empty (0 of 1,503). The god modules split where it pays —
+      `core/health/` package, `lint` model / checks / schema, `cli` help / catalogue /
+      dispatch, `core/sdk_scope.py`, `adapters/drive/google.py`, `dream_model` /
+      `dream_corpus` / `dream_priority`. A module-size gate (`tests/test_module_size.py`)
+      holds every module ≤ 1,000 lines unless `docs/engine-layout.md` § "Large modules" gives
+      the reason (four do). Every move was AST- or parity-proven, and stale test patches
+      raise instead of silently isolating nothing.
 - [ ] S05 -- **Types + closeout.** Type-checker probe and gate on `core/`;
       schema-2 contracts as one JSON Schema validated by both suites; `docs/engine-layout.md`
       + CHANGELOG 0.7.0 + DECISIONS + KNOWLEDGE; full backlog fan-out at close;
@@ -87,6 +94,19 @@ and `backfill-voice-rollup-shape.md` (the backfill's legacy voice line). S04 and
 unchanged: S04-T01's allowlist is AST-measured, and S05-T05 inherits the two toolchain
 lessons already in KNOWLEDGE (ruff ≥ 0.16 formats Markdown fences — excluded in
 `pyproject`; a formatter with an empty path variable formats the whole project). S04 next.
+
+**Reassess after S04 (2026-10-15): B — partial changes.** S04 shipped its seven tasks,
+and exit criterion 6 is met and enforced twice: a function gate with an empty allowlist
+and a module-size gate whose allowlist is the doc. Its counts grew the way S03's did. The
+AST found 20 long functions, not 15, and the module review split six modules, not four
+(`gmeet` and `sdk_helpers` too). The slice line above says what shipped. S05 keeps its six tasks
+and inherits three things. T02's type gate on `core/` now covers the `core/health/`
+package (five modules) and `core/sdk_scope.py`. T05 re-verifies the S04 module lines and the
+"Large modules" section in `docs/engine-layout.md`. T05's 0.7.0 release note carries S04's
+one operator-visible change: a `--json` invocation prints the payload alone (S04-T06,
+`960a74e`). The diagram labels that name split modules (`lint.py`'s
+`check_facts_violations`, `collectors/gmeet.py` on the Drive API) still hold through the
+facades; T05 re-checks them under the infographic rule. S05 next.
 
 ## Run order
 

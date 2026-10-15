@@ -1,9 +1,9 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-15T15:05:50+02:00
+last_updated: 2026-10-15T15:08:51+02:00
 current_milestone: M033
-active_slice: none
+active_slice: S05
 active_task: none
 last_completed_milestone: M032
 parked_milestone: none
@@ -201,7 +201,12 @@ dream, gmeet, migrate_config_keys). Stale patches raise (health package guard, g
 where the old module keeps a binding, `tests/test_dream_layout.py` refuses a direct patch of a
 multi-bound name (RED on 22 sites, four of them silent `raising=False` no-ops). En route: 13
 stale `collectors/calendar.py` refs, dream's dead `_is_substrate_file`. Suite 2242, CI green on
-all ten commits. **Next: `reassess-roadmap` closes S04, then S05 (types + closeout).**
+all ten commits. **Reassess after S04 (2026-10-15): B** — the S04 roadmap line says what
+shipped (20 functions not 15, six modules not four, the module-size gate); exit criterion 6
+met. S05 keeps six tasks and inherits three notes: T02's type gate covers `core/health/` +
+`core/sdk_scope.py`, T05 re-verifies the S04 module lines + "Large modules" and re-checks two
+diagram labels, T05's 0.7.0 note carries the `--json` payload-alone fix. **Next: S05-T01
+(type-checker probe: pyright vs ty) via `plan-task`.**
 
 ## M032 COMPLETE (L, 2026-10-14): desktop de-slop
 
