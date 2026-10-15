@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-16T00:20:00+02:00
+last_updated: 2026-10-16T00:30:00+02:00
 current_milestone: M034
-active_slice: S03
-active_task: T07
+active_slice: none
+active_task: none
 last_completed_milestone: M033
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -14,9 +14,13 @@ parallel_milestones: [M021, M025, M027, M029]
 
 ## Next action — M034 / S03: hooks + skills + status
 
-**Status:** M034 / S03 / T07 planned — ready to execute (`M034-S03-T07-PLAN.md`; the
-bash's outputs are recorded before the files go). 6/7 tasks done in the slice; slices S01
-and S02 are complete (2/6).
+**Status:** M034 / S03 — 7/7 tasks done; the slice is complete. Next:
+`/ytstack:reassess-roadmap`. Slices S01 and S02 are complete (2/6).
+
+**S03-T07 is done** (`M034-S03-T07-SUMMARY.md`). `lib/agents.sh`, `hooks.sh`, `skills.sh`
+and `config.sh` are deleted, along with the helpers they left without a caller. The bash
+layer is 1237 lines (`wiki` 412). The parity tests hold Python to 28 goldens recorded from
+the bash before it went. A per-agent scratch cycle is green, and CI is green on `9ad0d2c`.
 
 **S03-T06 is done** (`M034-S03-T06-SUMMARY.md`, release **0.7.19**). `wiki skills` runs in
 Python (`skills_cli.py`), and update's skills step goes through the entry. All eleven flow
@@ -66,10 +70,7 @@ now do what they report, and five goldens hold them for the port:
   (exit 2), and four pasteable `uv sync` / `rm` hints are now quoted, two of them also
   naming the environment.
 
-**Next: S03-T07**, the slice's last task. It deletes `lib/agents.sh`, `hooks.sh`,
-`skills.sh`, `config.sh`, plus the dead helpers they leave in `ui.sh` (`select_*`) and
-`common.sh` (`backup_file`). The bash-parity tests move to recorded expectations, the docs
-follow, and a scratch cycle runs per agent. Then reassess the roadmap.
+**Next: reassess the roadmap after S03**, then S04 (seed).
 
 **M034 / S02 — complete (5/5, 2026-10-15).** It delivered:
 - line-based prompts on `core/console`, reading byte by byte (T01);

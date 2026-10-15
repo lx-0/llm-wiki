@@ -5,7 +5,7 @@ project: llm-wiki
 created: 2026-10-15T18:15:32+02:00
 status: planned
 task_count: 7
-completed_tasks: 6
+completed_tasks: 7
 ---
 
 # M034-S03 -- Slice Plan
@@ -59,7 +59,7 @@ last callers were skills' `config_get` and `cmd_status` (reassessed after S01).
 - [x] T06 -- Skills in Python: the engine-owned check, the global-enable flag, registry
   add / remove, `skills install/uninstall/sync/status`, and the silent install / prune
   variants that `setup` and `update` call. Parity on the fixture `HOME`.
-- [ ] T07 -- The three `lib/` files are deleted along with their `wiki` call sites, and so is
+- [x] T07 -- The three `lib/` files are deleted along with their `wiki` call sites, and so is
   `lib/config.sh` (its last callers, `config_get` in skills and `config_cmd_status` in
   `cmd_status`, are ported in T05 / T06). `lib/ui.sh` stays for `cmd_update`'s stash prompt
   until S05. The oracle passes and the docs are updated. On scratch with a sandboxed `HOME`,
