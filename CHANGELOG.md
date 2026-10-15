@@ -18,6 +18,26 @@ every operator's `wiki update` → `uv sync` regenerate `uv.lock` and dirty thei
 config keys must also be wired into `scripts/migrations/migrate_config_keys.py`
 in the same commit.
 
+## [0.7.5] — 2026-10-15
+
+**For your vault:** no config key changed, so there is no migration.
+
+### Changed
+
+- **`wiki` starts its Python commands about 60–75 ms sooner.** Every command used to go
+  through `uv run`, which added a third process and uv's own start-up. `wiki` now starts the
+  engine's Python environment directly, so a command runs as two processes instead of three.
+  The healing `uv run` did is kept: when the engine's `uv.lock` or `pyproject.toml` changed
+  since the last sync (a pull outside `wiki update`, a hand edit), or the environment does
+  not exist yet, `wiki` runs `uv sync` once first. A `.wiki-synced` file in the environment
+  remembers that sync.
+
+### Fixed
+
+- **`wiki seed` listed the plugin settings it merged in a different order on different
+  machines** (the order the filesystem returned). It is alphabetical now. The fix shipped
+  right after 0.7.4 without its own note.
+
 ## [0.7.4] — 2026-10-15
 
 **For your vault:** no config key changed, so there is no migration.
