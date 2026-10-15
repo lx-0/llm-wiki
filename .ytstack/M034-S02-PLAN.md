@@ -5,7 +5,7 @@ project: llm-wiki
 created: 2026-10-15T18:15:32+02:00
 status: planned
 task_count: 5
-completed_tasks: 1
+completed_tasks: 2
 ---
 
 # M034-S02 -- Slice Plan
@@ -30,7 +30,7 @@ later slices still call. Each file is deleted with its last caller: `config.sh` 
   hands the hooks step to `wiki hooks install`, which reads its own answers from the same
   stdin, the way bash `read -r` leaves them. A test pipes two answers through a prompt and a
   child process.
-- [ ] T02 -- `wiki config` in the catalogue, over the existing `core.config` module:
+- [x] T02 -- `wiki config` in the catalogue, over the existing `core.config` module:
   - `get` / `set` / `keys` / `path`, with bash's argument checks;
   - `status` (the summary + the Ollama probe);
   - bare `wiki config`, the interactive section → key → value editor, ported on T01's

@@ -98,6 +98,7 @@ and the sentence names only what remains.
 
 - **`backfill-voice-rollup-shape.md`** (S) — The backfill builds its voice line via `daily_capture.rollup_line` with `sources:` provenance; `append_with_source` needs a vault root first; re-pin the parity test.
 - **`codex-distill-verbose.md`** (S) — Flush-prompt guidance for tool activity, a touched-file list instead of patch text for `apply_patch`, a smaller tool budget for tool-heavy sessions.
+- **`config-set-keeps-comments.md`** (S, new 2026-10-15) — `wiki config set` re-dumps config.yaml and drops every operator comment and the key order (documented, backed up). A line-level writeback for an existing scalar key; found recording the M034 bash oracle.
 - **`correct-apply-edited-underreport.md`** (S) — Option 2 (derive edited / superseded from the delta and stop echoing the agent's lists) or close as option 3; option 1 was tried before filing.
 - **`dev-checkout-root-dir-inference.md`** (M) — A `WIKI_VAULT` override or a checkout refusal for the Python entry points; the test fence repoints only `DAILY_DIR` (85 modules import `core.paths` by value).
 - **`dream-insufficient-corpus-backoff.md`** (S ·partial) — Option 1 shipped; left: the v2 fast-reset (a mention-count snapshot) and optionally option 2 (generic-noun precision).

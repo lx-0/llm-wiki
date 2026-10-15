@@ -3063,6 +3063,25 @@ Per-candidate learnings from the 14-candidate seam arc (C01–C14). Decisions li
   `maintenance.auto=false` and `gc.auto=0` before the first commit; a `GIT_TRACE` guard in
   `test_bash_oracle.py` holds that. S05's `update` oracle, which pulls inside copies,
   inherits the setting through the copied `.git/config`.
+- **"Oracle before port" means *committed* before the port, not just recorded
+  (2026-10-15, M034-S02-T02):** the `wiki config` cases were recorded from the bash and left
+  in the working tree. Re-recording the decided differences after the port then overwrote
+  three bash goldens, which were never in git. That loses the record of what the bash did.
+  Recovery without guessing:
+  1. `git worktree add --detach /tmp/x <pre-port commit>`;
+  2. copy in the uncommitted test definitions;
+  3. `pytest … --snapshot-update` there, for the bash goldens;
+  4. commit those alone, then re-record the port's;
+  5. `git worktree remove`.
+
+  The rule for every port in S02–S05: the oracle commit lands (and is pushed) before the
+  first line of port code.
+- **Recording before porting corrects the plan, not only the code (M034-S02-T02):** the
+  slice plan said `wiki config edit` opens `$EDITOR`. No such subcommand exists; bare
+  `wiki config` is an interactive picker. The task plan also wanted to fix a help line
+  claiming `config set` drops comments, and the recording proved the help right
+  (`_set_in_yaml` re-dumps the file). Read the bash, then record it, then write the plan's
+  last line.
 
 ### Desktop toolchain (C07)
 
