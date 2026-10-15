@@ -6,12 +6,12 @@
 # help texts sit in `scripts/cli_help.py`) and is the single source of truth for
 # `wiki help`. The home menu keeps its own action table (`scripts/menu.py` +
 # `scripts/core/actions.py`) — folding the two is M034's. This bash layer only does
-# bootstrap (symlink resolution + vault guard
-# + TTY detection) and the genuinely-bash commands (setup / hooks / skills /
-# config / seed / update / menu / doctor / status / install-shortcut / version
-# plus the bespoke dream + dream-entity argv routing). Every other subcommand is
-# delegated to `scripts/cli.py`, which also owns the once-locked dashboard
-# refresh and the OAuth bootstrap (`wiki auth <service> <account-id>`).
+# bootstrap (symlink resolution + vault guard) and the commands not yet ported
+# (setup / hooks / skills / config / seed / update / status / install-shortcut,
+# plus the bespoke dream + dream-entity argv routing). Every other subcommand —
+# bare `wiki`, help, menu, doctor and version included — is delegated to
+# `scripts/cli.py` in one hop, which also owns the once-locked dashboard refresh
+# and the OAuth bootstrap (`wiki auth <service> <account-id>`).
 
 set -euo pipefail
 
@@ -265,13 +265,6 @@ cmd_setup() {
   else
     info "Skipped hook install — run \`wiki hooks install\` later."
   fi
-}
-
-cmd_help() {
-  # The full command catalog lives in scripts/cli.py — render it from there
-  # (single source of truth) rather than a hand-synced comment block. Non-exec
-  # so callers can append their own exit code (e.g. the unknown-command path).
-  uv run --quiet --project "$WIKI_DIR" python "$WIKI_DIR/scripts/cli.py" help
 }
 
 _run_script() {
@@ -657,100 +650,6 @@ _update_post_pull() {
   fi
 }
 
-cmd_version() {
-  # See cmd_update: `.git` is a file, not a directory, for worktrees, submodules
-  # and relocated git-dirs — ask git instead of stat-ing the path.
-  if git -C "$WIKI_DIR" rev-parse --git-dir >/dev/null 2>&1; then
-    local rev; rev="$(git -C "$WIKI_DIR" rev-parse --short HEAD)"
-    local tag; tag="$(git -C "$WIKI_DIR" describe --tags --always 2>/dev/null || echo "")"
-    local origin; origin="$(git -C "$WIKI_DIR" config --get remote.origin.url 2>/dev/null || echo "")"
-    printf "%-12s %s\n" "revision" "$rev"
-    [[ -n "$tag" && "$tag" != "$rev" ]] && printf "%-12s %s\n" "tag" "$tag"
-    [[ -n "$origin" ]] && printf "%-12s %s\n" "origin" "$origin"
-  else
-    warn "Not a git checkout. Cannot report version."
-  fi
-}
-
-# ── Top-level interactive home screen ────────────────────────────────
-#
-# Bare `wiki` (or `wiki menu`) execs `scripts/menu.py`, which owns the
-# entire interactive flow (suggestions / quick actions / browse / fuzzy
-# filter) via prompt_toolkit. The Python menu shells back to `wiki
-# <subcommand>` for every dispatch — bash stays the single source of
-# truth for what each subcommand does. Non-TTY callers reach `cmd_help`
-# directly via the entry-point's `-t` guard.
-#
-# Why Python and not bash: the bash home_screen this replaced (live
-# 2026-05-17 morning) trip-wired on bash 3.2 quirks once per feature —
-# `${var,,}` missing, empty-array under `set -u`, fractional `read -t`
-# unsupported. prompt_toolkit handles arrow keys + redraw + raw mode
-# natively. See `.ytstack/backlog/python-interactive-menu.md`.
-
-home_screen_python() {
-  exec uv run --quiet --project "$WIKI_DIR" \
-    python "$WIKI_DIR/scripts/menu.py"
-}
-
-cmd_menu() {
-  # `wiki menu` — open the interactive home screen (TTY).
-  # `wiki menu --json` — agent-facing read of suggestions + status payload.
-  case "${1:-}" in
-    --json)
-      exec uv run --quiet --project "$WIKI_DIR" \
-        python "$WIKI_DIR/scripts/menu_context.py"
-      ;;
-    -h|--help|help)
-      cat <<EOF
-${C_BOLD}wiki menu${C_RESET} — interactive home screen + agent-facing JSON
-
-${C_BOLD}USAGE${C_RESET}
-  wiki menu                interactive home screen (prompt_toolkit-driven)
-  wiki menu --json         emit suggestions + status JSON, exit
-                           (consumed by use-llm-wiki skill)
-EOF
-      return 0
-      ;;
-    "")
-      home_screen_python
-      ;;
-    *)
-      err "unknown: wiki menu ${1:-}"
-      return 1
-      ;;
-  esac
-}
-
-cmd_doctor() {
-  # `wiki doctor` — full vault-health audit (config + connectivity + pipeline).
-  # `wiki doctor --json` — machine-readable for agents.
-  # `wiki doctor --quick` — skip TCP + subprocess probes (sub-50ms, for hooks).
-  case "${1:-}" in
-    -h|--help|help)
-      cat <<EOF
-${C_BOLD}wiki doctor${C_RESET} — vault-health audit
-
-${C_BOLD}USAGE${C_RESET}
-  wiki doctor              full pretty report (config / connectivity / pipeline)
-  wiki doctor --json       machine-readable (for agents)
-  wiki doctor --quick      skip TCP + subprocess probes (~50ms; for hooks)
-  wiki doctor --quick --json   both
-
-${C_BOLD}EXIT CODE${C_RESET}
-  0   no critical issues
-  1   at least one critical issue
-
-${C_BOLD}CHECKS${C_RESET}
-  Config + setup: setup-wizard-ran, hooks-installed, template-drift, engine-update-available
-  Connectivity: ollama-reachable, claude-authed
-  Pipeline: compile-errors-recent, no-knowledge-articles, compile-state
-EOF
-      return 0
-      ;;
-  esac
-  uv run --quiet --project "$WIKI_DIR" python "$WIKI_DIR/scripts/doctor.py" "$@"
-}
-
 cmd_install_shortcut() {
   # Create a `wiki` shortcut in `~/.local/bin/wiki` → vault's `.wiki/wiki`.
   # Operator-asked: typing `wiki` from any cwd should Just Work, not require
@@ -824,10 +723,6 @@ EOF
 }
 
 # ── Entry point ──────────────────────────────────────────────────────
-# Bare `wiki` opens the interactive home screen ONLY when stdin/stdout are
-# both TTYs. Non-TTY callers (CI, pipes, hooks, cron) get the help dump
-# and exit 0 — they never block waiting for input.
-
 # Guard before dispatch: every subcommand except help/version touches vault
 # state, so demand a vault. Help + version must work in a bare checkout.
 case "${1:-}" in
@@ -835,22 +730,15 @@ case "${1:-}" in
   *) require_vault ;;
 esac
 
-# Bash keeps only bootstrap + the genuinely-bash commands (and the bespoke
+# Bash keeps only bootstrap + the commands not yet ported (and the bespoke
 # dream / dream-entity argv routing + the OAuth aliases). Every other
-# subcommand — the Python-backed ones — is delegated to scripts/cli.py, which
-# is the single source of truth for the command catalog, the once-locked
-# dashboard refresh, and the argv-safe OAuth bootstrap. An unknown command
-# falls through to cli.py, which prints its own "unknown command" error.
+# subcommand is delegated to scripts/cli.py, which is the single source of
+# truth for the command catalog, the once-locked dashboard refresh and the
+# argv-safe OAuth bootstrap. Bare `wiki` goes there too: cli.py opens the home
+# screen when stdin and stdout are terminals and prints help otherwise, so CI,
+# pipes, hooks and cron never block on input. An unknown command falls through
+# to cli.py, which prints its own "unknown command" error.
 case "${1:-}" in
-  "")
-    if [[ -t 0 && -t 1 ]]; then
-      home_screen_python
-    else
-      cmd_help
-    fi
-    ;;
-  menu)             shift; cmd_menu "$@" ;;
-  doctor)           shift; cmd_doctor "$@" ;;
   install-shortcut) shift; cmd_install_shortcut "$@" ;;
   setup)            shift; cmd_setup "$@" ;;
   status)           shift; cmd_status "$@" ;;
@@ -861,8 +749,6 @@ case "${1:-}" in
   seed)             shift; cmd_seed "$@" ;;
   dream-entity)     shift; cmd_dream_entity "$@" ;;
   dream)            shift; cmd_dream "$@" ;;
-  version)          shift; cmd_version "$@" ;;
-  help|-h|--help)   cmd_help ;;
   # OAuth aliases — remap to the argv-safe `wiki auth <service> <id>` dispatch.
   gmail-auth)       shift; _dispatch_python auth gmail "$@" ;;
   gmeet-auth)       shift; _dispatch_python auth gmeet "$@" ;;

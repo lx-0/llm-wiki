@@ -608,3 +608,38 @@ EXAMPLES
   wiki auth gmail private            # consent flow for accounts.private
   wiki auth gmeet work               # Meet Recordings on accounts.work
   wiki auth calendar private"""
+
+# Home & status — moved from the bash heredocs with the commands (M034-S01-T05); the
+# bash oracle's `menu-help` / `doctor-help` goldens hold them to the bash text.
+H_MENU = """wiki menu — interactive home screen + agent-facing JSON
+
+USAGE
+  wiki menu                interactive home screen (prompt_toolkit-driven)
+  wiki menu --json         emit suggestions + status JSON, exit
+                           (consumed by use-llm-wiki skill)"""
+
+H_DOCTOR = """wiki doctor — vault-health audit
+
+USAGE
+  wiki doctor              full pretty report (config / connectivity / pipeline)
+  wiki doctor --json       machine-readable (for agents)
+  wiki doctor --quick      skip TCP + subprocess probes (~50ms; for hooks)
+  wiki doctor --quick --json   both
+
+EXIT CODE
+  0   no critical issues
+  1   at least one critical issue
+
+CHECKS
+  Config + setup: setup-wizard-ran, hooks-installed, template-drift, engine-update-available
+  Connectivity: ollama-reachable, claude-authed
+  Pipeline: compile-errors-recent, no-knowledge-articles, compile-state"""
+
+H_VERSION = """wiki version — print the installed engine's git revision
+
+USAGE
+  wiki version             revision, tag (when one names the commit) and origin
+
+NOTES
+  Reads the engine checkout under .wiki/; outside a git checkout it says so.
+  Works without a vault."""

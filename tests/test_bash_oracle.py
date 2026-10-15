@@ -134,7 +134,11 @@ def _placeholders(env: dict[str, Path]) -> dict[str, str]:
         str(env["bin"]): "<BIN>",
         str(env["root"]): "<ROOT>",
         str(REPO_ROOT): "<REPO>",
+        # <VENV> is the engine's Python environment: the test venv the shim's `uv run`
+        # execs, or the vault's own `.wiki/.venv` that the one hop (S01-T04) runs from — in
+        # the fixture a venv of links onto the test venv, the same interpreter either way
         str(Path(sys.executable).parent.parent): "<VENV>",
+        str(env["vault"] / ".wiki" / ".venv"): "<VENV>",
     }
 
 

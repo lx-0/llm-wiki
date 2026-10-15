@@ -136,11 +136,12 @@ Probe is pure-Python, no network beyond the Ollama TCP probe, no LLM. On
 error the home screen renders the browse section only.
 
 **Implementation:** `scripts/menu.py` owns the rendering + key handling via
-`prompt_toolkit` (arrow keys, redraw, raw mode — all native). The bash
-entry-point bare `wiki` / `wiki menu` does `exec uv run python scripts/menu.py`
-when stdin/stdout are TTYs, and falls back to `cmd_help` otherwise. Menu
-dispatches every action by shelling back to `wiki <subcommand>` — bash stays
-the single source of truth for what each subcommand does. Reason for the
+`prompt_toolkit` (arrow keys, redraw, raw mode — all native). Bare `wiki` and
+`wiki menu` reach it through the dispatcher (`scripts/cli.py`): bare `wiki`
+opens it when stdin and stdout are TTYs and prints `wiki help` otherwise, and
+`wiki menu --json` routes to `scripts/menu_context.py` instead. Menu
+dispatches every action by shelling back to `wiki <subcommand>` — the
+catalogue stays the single source of truth for what each subcommand does. Reason for the
 Python layer: the prior bash home screen trip-wired on bash-3.2 quirks once
 per feature (no `${var,,}`, empty array under `set -u`, fractional `read -t`
 unsupported). Background: `.ytstack/backlog/python-interactive-menu.md`.

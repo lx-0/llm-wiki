@@ -206,14 +206,16 @@ def run_command(command: CommandSpec, rest: list[str]) -> int:
     banner_on = command.banner
     args = rest
 
-    if rest:
-        sub = next((s for s in command.subroutes if s.key == rest[0]), None)
-        if sub is not None:
-            script = sub.script
-            banner_title = sub.banner
-            subtitle = sub.subtitle
-            banner_on = True
-            args = rest[1:]
+    sub = next((s for s in command.subroutes if s.key == rest[0]), None) if rest else None
+    if sub is not None:
+        script = sub.script
+        banner_title = sub.banner or banner_title
+        subtitle = sub.subtitle
+        banner_on = sub.banner is not None
+        args = rest[1:]
+    elif rest and not command.takes_args:
+        _err(f"unknown: wiki {command.name} {rest[0]} (try 'wiki {command.name} help')")
+        return 1
 
     if script is None:
         # A command with no default handler (backfill) and no matching subroute.
@@ -234,8 +236,17 @@ def run_command(command: CommandSpec, rest: list[str]) -> int:
     return code
 
 
+def _interactive() -> bool:
+    """Both ends a terminal — the bare-entry rule the bash `wiki` checked with `-t 0 && -t 1`."""
+    return sys.stdin.isatty() and sys.stdout.isatty()
+
+
 def main(argv: list[str]) -> int:
     if not argv:
+        # Bare `wiki`: the home screen for a person at a terminal; help for everyone else
+        # (CI, pipes, hooks, cron), who must never block on a prompt.
+        if _interactive():
+            return run_command(BY_NAME["menu"], [])
         print(render_help())
         return 0
     cmd, rest = argv[0], argv[1:]

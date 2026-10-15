@@ -29,8 +29,8 @@ The **vault's own `AGENTS.md`** (separate file, not this one) is the article sch
 
 ```text
 llm-wiki/                    ← installed as <vault>/.wiki/ — the file-by-file reference is docs/engine-layout.md
-├── wiki                     ← entry-point CLI (bash: bootstrap + fail-closed vault guard + TTY detection
-│                              + genuinely-bash commands; every Python-backed subcommand delegates to scripts/cli.py)
+├── wiki                     ← entry-point CLI (bash: bootstrap + fail-closed vault guard + the commands
+│                              not yet ported; everything else, bare `wiki` included, goes to scripts/cli.py)
 ├── lib/                     ← the bash layer: common.sh (paths, the venv-location rule), ui.sh, agents.sh (hook
 │                              payloads), hooks.sh, skills.sh, config.sh (`python -m core.config` wrapper + wizard), seed.sh
 ├── scripts/                 ← the engine's source root — NOT a package (§ Python environment)

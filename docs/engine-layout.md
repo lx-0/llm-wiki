@@ -19,7 +19,7 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 
 ```text
 .wiki/
-├── wiki                       ← entry point (bash) — bootstrap + fail-closed vault guard + TTY detection + genuinely-bash commands; every Python-backed subcommand delegates to scripts/cli.py in one hop (exec of the venv's python, no `uv run` parent; `uv sync` first only without a venv or with uv.lock / pyproject.toml newer than its `.wiki-synced` stamp)
+├── wiki                       ← entry point (bash) — bootstrap + fail-closed vault guard + the commands not yet ported (M034); everything else — bare `wiki` (home screen on a TTY, help otherwise), help, menu, doctor, version — delegates to scripts/cli.py in one hop (exec of the venv's python, no `uv run` parent; `uv sync` first only without a venv or with uv.lock / pyproject.toml newer than its `.wiki-synced` stamp)
 ├── install.sh                 ← one-liner installer (also re-runnable from a checkout)
 ├── config.example.yaml        ← tracked  ── │ copy at install time
 ├── config.yaml                ← gitignored ─┘
@@ -172,6 +172,7 @@ For a higher-level view (vault layout, install, CLI usage), see the [README](../
 │   ├── menu.py                ← interactive home screen (`wiki` / `wiki menu`; `--json` for the desktop app)
 │   ├── menu_context.py        ← the home screen's context probe (status + suggestions; schema-2 JSON — an oracle payload)
 │   ├── doctor.py              ← `wiki doctor` — full vault-health audit (`--quick --json` — an oracle payload)
+│   ├── engine_version.py      ← `wiki version` — the engine checkout's revision, tag, origin (no vault needed)
 │   ├── dream.py               ← dream cycle — periodic cross-time re-synthesis of entity pages (`wiki dream` / `wiki dream-entity`): one entity's synthesis, the sweep, the CLI
 │   ├── dream_model.py         ← dream entities (EntityRef, the kind table, resolve/list) + the cooldown age — the base the other dream modules share, so none imports dream.py
 │   ├── dream_corpus.py        ← what one synthesis reads: the M016 tiered corpus + its prompt render, the activation side-state, the insufficient-corpus backoff

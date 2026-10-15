@@ -14,6 +14,7 @@ no longer be hand-drifted (C06):
 from __future__ import annotations
 
 import importlib
+import subprocess
 
 import pytest
 
@@ -244,8 +245,8 @@ def test_main_unknown_command_errors(capsys):
 
 
 def test_main_refuses_bash_native_commands(capsys):
-    """bash-native commands (setup/hooks/…) are dispatched by the bash layer;
-    reaching cli.main with one is an error, not a silent no-op."""
+    """bash-native commands (setup/hooks/…, until their M034 port) are dispatched by the
+    bash layer; reaching cli.main with one is an error, not a silent no-op."""
     assert cli.main(["setup"]) == 1
     assert "unknown command" in capsys.readouterr().err
 
@@ -267,3 +268,78 @@ def test_main_refresh_dashboards(monkeypatch):
     monkeypatch.setattr(cli, "refresh_dashboards", lambda: called.__setitem__("n", called["n"] + 1))
     assert cli.main(["refresh-dashboards"]) == 0
     assert called["n"] == 1
+
+
+# ── Home & status, ported from bash (M034-S01-T05) ──────────────────────
+
+
+def test_bare_entry_opens_the_menu_on_a_terminal(spy, monkeypatch):
+    monkeypatch.setattr(cli, "_interactive", lambda: True)
+    assert cli.main([]) == 0
+    assert spy["child"] == ("menu.py", [])
+
+
+def test_bare_entry_prints_help_without_a_terminal(spy, monkeypatch, capsys):
+    monkeypatch.setattr(cli, "_interactive", lambda: False)
+    assert cli.main([]) == 0
+    assert spy["child"] is None
+    assert "Knowledge ops" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize(
+    ("name", "handler"),
+    [("menu", "menu.py"), ("doctor", "doctor.py"), ("version", "engine_version.py")],
+)
+def test_home_and_status_commands_run_their_handler_without_a_banner(spy, capsys, name, handler):
+    """The bash wrappers printed no banner; the handlers print their own output."""
+    assert cli.main([name]) == 0
+    assert spy["child"] == (handler, [])
+    assert capsys.readouterr().out == ""
+
+
+def test_menu_json_runs_the_payload_without_a_banner(spy, capsys):
+    """The desktop parses `wiki menu --json` stdout: the payload alone."""
+    assert cli.main(["menu", "--json"]) == 0
+    assert spy["child"] == ("menu_context.py", [])
+    assert capsys.readouterr().out == ""
+
+
+def test_menu_refuses_an_argument_it_does_not_route(spy, capsys):
+    assert cli.main(["menu", "bogus"]) == 1
+    assert spy["child"] is None
+    assert "unknown: wiki menu bogus (try 'wiki menu help')" in capsys.readouterr().err
+
+
+def test_doctor_passes_its_flags_through(spy):
+    assert cli.main(["doctor", "--quick", "--json"]) == 0
+    assert spy["child"] == ("doctor.py", ["--quick", "--json"])
+
+
+def _git(repo, *args: str) -> str:
+    identity = ["-c", "user.name=t", "-c", "user.email=t@example.invalid"]
+    return subprocess.run(
+        ["git", "-C", str(repo), *identity, *args], capture_output=True, text=True, check=True
+    ).stdout.strip()
+
+
+def test_engine_version_reports_revision_tag_and_origin(tmp_path):
+    import engine_version
+
+    _git(tmp_path, "init", "-q", "-b", "main")
+    _git(tmp_path, "commit", "-q", "--allow-empty", "-m", "engine")
+    _git(tmp_path, "remote", "add", "origin", "https://example.invalid/engine.git")
+    rev = _git(tmp_path, "rev-parse", "--short", "HEAD")
+
+    assert engine_version.report(tmp_path) == [
+        f"revision     {rev}",
+        "origin       https://example.invalid/engine.git",
+    ]
+
+    _git(tmp_path, "tag", "v9.9.9")
+    assert engine_version.report(tmp_path)[1] == "tag          v9.9.9"
+
+
+def test_engine_version_outside_a_checkout(tmp_path):
+    import engine_version
+
+    assert engine_version.report(tmp_path) == ["! Not a git checkout. Cannot report version."]

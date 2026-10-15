@@ -24,6 +24,7 @@ from cli_help import (
     H_CORRECT,
     H_CURIOSITY,
     H_DEDUP,
+    H_DOCTOR,
     H_FLUSH,
     H_HEALTH_TRENDS,
     H_INDEX,
@@ -31,6 +32,7 @@ from cli_help import (
     H_INGEST_YOUTUBE,
     H_LINKS,
     H_LINT,
+    H_MENU,
     H_PIN,
     H_PREPROCESS,
     H_PROCESS_INBOX,
@@ -45,6 +47,7 @@ from cli_help import (
     H_TAKE,
     H_TRIAGE,
     H_USAGE,
+    H_VERSION,
 )
 
 # ── Command spec ────────────────────────────────────────────────────────
@@ -56,11 +59,12 @@ class SubRoute:
 
     `wiki correct apply …` and `wiki backfill picture-metadata …` route to a
     different script than the command's default handler; a SubRoute captures
-    that (its `key` is consumed, remaining args pass through)."""
+    that (its `key` is consumed, remaining args pass through). A `None` banner is
+    a machine-readable route (`wiki menu --json`): the payload alone on stdout."""
 
     key: str
     script: str
-    banner: str
+    banner: str | None
     subtitle: str | None = None
 
 
@@ -89,6 +93,7 @@ class CommandSpec:
     menu: bool = False  # expected to be reachable from menu.py
     help_text: str | None = None  # rich per-command help (was a bash heredoc)
     subroutes: tuple[SubRoute, ...] = ()
+    takes_args: bool = True  # False: an argument no subroute names is refused, not passed on
 
 
 # ── The catalog ─────────────────────────────────────────────────────────
@@ -100,20 +105,33 @@ COMMANDS: tuple[CommandSpec, ...] = (
         "menu",
         "Home & status",
         "interactive home screen (--json for agents)",
-        kind="bash",
+        handler="menu.py",
+        banner=False,
         needs_vault=False,
+        help_text=H_MENU,
+        subroutes=(SubRoute("--json", "menu_context.py", banner=None),),
+        takes_args=False,
     ),
     CommandSpec(
         "status", "Home & status", "config + hooks + Ollama summary", kind="bash", menu=True
     ),
-    CommandSpec("doctor", "Home & status", "vault-health audit (--quick / --json)", kind="bash"),
+    CommandSpec(
+        "doctor",
+        "Home & status",
+        "vault-health audit (--quick / --json)",
+        handler="doctor.py",
+        banner=False,
+        help_text=H_DOCTOR,
+    ),
     CommandSpec(
         "version",
         "Home & status",
         "print installed git revision",
-        kind="bash",
+        handler="engine_version.py",
+        banner=False,
         needs_vault=False,
         menu=True,
+        help_text=H_VERSION,
     ),
     # Setup
     CommandSpec(

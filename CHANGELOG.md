@@ -18,6 +18,20 @@ every operator's `wiki update` → `uv sync` regenerate `uv.lock` and dirty thei
 config keys must also be wired into `scripts/migrations/migrate_config_keys.py`
 in the same commit.
 
+## [0.7.6] — 2026-10-15
+
+**For your vault:** no config key changed, so there is no migration.
+
+### Changed
+
+- **Bare `wiki`, `wiki help`, `wiki menu`, `wiki doctor` and `wiki version` now go through
+  the same one-hop start as every other command (0.7.5).** Before, the bash layer ran each of
+  them through its own `uv run`. `wiki doctor` now runs as two processes instead of three.
+  What they print is unchanged, with two exceptions:
+  - `wiki menu <unknown>` now answers in the style of every other command:
+    `wiki: unknown: wiki menu <x> (try 'wiki menu help')` (it was `✗ unknown: …`);
+  - `wiki version --help` now prints help, where it used to print the version.
+
 ## [0.7.5] — 2026-10-15
 
 **For your vault:** no config key changed, so there is no migration.
