@@ -282,10 +282,31 @@ _run_script() {
 }
 
 _dispatch_python() {
-  # Delegate a Python-backed subcommand to the table-driven dispatcher.
-  # `exec` so cli.py fully owns the process (banner, run, once-locked refresh)
-  # and its exit code propagates directly to the caller.
-  exec uv run --quiet --project "$WIKI_DIR" python "$WIKI_DIR/scripts/cli.py" "$@"
+  # Delegate a Python-backed subcommand to the table-driven dispatcher, in one hop
+  # (DECISIONS 2026-10-15 "One hop"): `exec` the venv's Python straight into
+  # cli.py, so cli.py owns the process (banner, run, once-locked refresh) and its
+  # exit code reaches the caller, with no `uv run` parent costing ~57 ms per call.
+  # The venv is lib/common.sh's one rule: UV_PROJECT_ENVIRONMENT, else .wiki/.venv.
+  # A relative UV_PROJECT_ENVIRONMENT is uv's to resolve, so it stays on `uv run`.
+  local venv="${UV_PROJECT_ENVIRONMENT:-$WIKI_DIR/.venv}"
+  case "$venv" in
+    /*) ;;
+    *) exec uv run --quiet --project "$WIKI_DIR" python "$WIKI_DIR/scripts/cli.py" "$@" ;;
+  esac
+  # `uv run` also synced the venv whenever uv.lock / pyproject.toml changed (a pull
+  # outside `wiki update`, a hand edit). Kept: no venv yet, or either file newer than
+  # the last sync's stamp → `uv sync` first. `--inexact` is `uv run`'s sync (it never
+  # removes extra packages); under `set -e` a failed sync stops here, stamp untouched.
+  local stamp="$venv/.wiki-synced"
+  if [[ ! -x "$venv/bin/python" || "$WIKI_DIR/uv.lock" -nt "$stamp" \
+        || "$WIKI_DIR/pyproject.toml" -nt "$stamp" ]]; then
+    uv sync --quiet --inexact --project "$WIKI_DIR"
+    touch "$stamp"
+  fi
+  # What `uv run` puts in the environment, measured: the venv's bin/ first on PATH and
+  # VIRTUAL_ENV (its UV / UV_RUN_RECURSION_DEPTH have no reader in the engine).
+  export VIRTUAL_ENV="$venv" PATH="$venv/bin:$PATH"
+  exec "$venv/bin/python" "$WIKI_DIR/scripts/cli.py" "$@"
 }
 
 _refresh_dashboards() {

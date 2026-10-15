@@ -3030,6 +3030,31 @@ Per-candidate learnings from the 14-candidate seam arc (C01–C14). Decisions li
   file names a prune sorts must be fixed-width. And record what the old code does *wrongly*
   only after deciding it is the contract — fix it first, then the port reproduces the
   intended behaviour.
+- **`uv run` is more than "run this python" — replacing it with an exec of the venv's python
+  drops three things silently (2026-10-15, M034-S01-T04):** measured as an `env` diff of the
+  same `python -c` under `uv run --project .wiki` against `.wiki/.venv/bin/python`:
+  1. **The implicit sync.** `uv run` locks and syncs the venv before every call (`--no-sync`
+     is the opt-out), so a `uv.lock` that changed under the venv was healed on the next
+     command. The hop keeps it with a stamp: `uv sync --inexact` first when `uv.lock` /
+     `pyproject.toml` is newer than `<venv>/.wiki-synced`, or when there is no venv.
+     `--inexact` because `uv run` never removes extra packages, and plain `uv sync` does.
+  2. **`PATH` with the venv's `bin/` first**, and **`VIRTUAL_ENV`**. The hop exports both.
+  3. **`UV` and `UV_RUN_RECURSION_DEPTH`.** They have no reader in the engine, so they are
+     not reproduced.
+
+  What it cost: `uv run` took 82 ms against 25 ms for the bare python, about 57 ms per
+  `wiki` call. Most of that is uv starting, not the sync (`--no-sync` saved only about
+  15 ms). Two traps the tests pin:
+  - **A relative `UV_PROJECT_ENVIRONMENT` is uv's to resolve.** The bash does not guess
+    and stays on `uv run`.
+  - **A test can prove an `exec` without timing anything.** Let the venv's `bin/python` be
+    a stub that writes `$PPID`. When it equals the test process's pid, nothing sat between
+    the caller and Python (`tests/test_bootstrap_hop.py`).
+
+  For the oracle, the `uv` shim answers `sync` by creating the venv as links into the test
+  venv: `bin/python`, `pyvenv.cfg` and `lib`. Python finds `pyvenv.cfg` next to the
+  executable it was started as, so the fixture venv imports the test venv's packages
+  without installing anything.
 
 ### Desktop toolchain (C07)
 

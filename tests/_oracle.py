@@ -322,13 +322,36 @@ def build_engine_copy(vault: Path) -> Path:
 
 
 def write_uv_shim(bin_dir: Path) -> Path:
-    """A `uv` first on PATH: `uv run [flags] python ARGS` execs this venv's python with
-    ARGS. Nothing is synced or created, so no oracle run can mutate an environment, and
-    the bash still makes its own hop into Python."""
+    """A `uv` first on PATH, standing in for the two calls the bash makes:
+
+    - `uv run [flags] python ARGS` execs the test venv's python with ARGS;
+    - `uv sync [flags] --project DIR` creates a missing project venv (`$UV_PROJECT_ENVIRONMENT`
+      or `DIR/.venv`) the way uv would, except that it installs nothing: its `bin/python`,
+      `pyvenv.cfg` and `lib` link into the test venv, so its python finds the test venv's
+      packages. An existing venv is left as it is.
+
+    Nothing outside the fixture is synced or changed. With `WIKI_ORACLE_UV_LOG` set, each
+    call appends its arguments as one line to that file — how a test sees whether, and how,
+    the bash called uv."""
     bin_dir.mkdir(parents=True, exist_ok=True)
     shim = bin_dir / "uv"
     shim.write_text(
         "#!/bin/sh\n"
+        '[ -n "${WIKI_ORACLE_UV_LOG:-}" ] && printf "%s\\n" "$*" >> "$WIKI_ORACLE_UV_LOG"\n'
+        'if [ "${1:-}" = sync ]; then\n'
+        '  venv="${UV_PROJECT_ENVIRONMENT:-}"\n'
+        '  while [ "$#" -gt 1 ]; do\n'
+        '    [ "$1" = --project ] && [ -z "$venv" ] && venv="$2/.venv"\n'
+        "    shift\n"
+        "  done\n"
+        '  if [ ! -e "$venv/bin/python" ]; then\n'
+        '    mkdir -p "$venv/bin"\n'
+        f'    ln -s "{sys.executable}" "$venv/bin/python"\n'
+        f'    ln -s "{sys.prefix}/pyvenv.cfg" "$venv/pyvenv.cfg"\n'
+        f'    ln -s "{sys.prefix}/lib" "$venv/lib"\n'
+        "  fi\n"
+        "  exit 0\n"
+        "fi\n"
         'while [ "$#" -gt 0 ] && [ "$1" != python ]; do shift; done\n'
         '[ "$#" -gt 0 ] && shift\n'
         f'exec "{sys.executable}" "$@"\n',
@@ -339,17 +362,24 @@ def write_uv_shim(bin_dir: Path) -> Path:
 
 
 def run_wiki(
-    vault: Path, home: Path, bin_dir: Path, *args: str, stdin: str | None = None
+    vault: Path,
+    home: Path,
+    bin_dir: Path,
+    *args: str,
+    stdin: str | None = None,
+    extra_env: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
     """Run the engine copy's `wiki` the way a non-interactive caller does: no TTY, a
     scratch HOME, PATH = the uv shim + the system dirs (where `jq` and `git` live on macOS
     and on the CI runner). ``stdin`` scripts the answers to the bash's line-based prompts
     (`lib/ui.sh` reads with `read -r`, and EOF takes the default); without it stdin is
-    /dev/null."""
+    /dev/null. ``extra_env`` adds variables (a test's probe paths, an operator's
+    `UV_PROJECT_ENVIRONMENT`)."""
     env = {
         "PATH": os.pathsep.join((str(bin_dir), "/usr/bin", "/bin")),
         "HOME": str(home),
         "PYTHONUTF8": "1",
+        **(extra_env or {}),
     }
     return subprocess.run(
         [str(vault / ".wiki" / "wiki"), *args],
@@ -365,9 +395,11 @@ def run_wiki(
 
 
 # What a mutating command's effect is measured over: everything under the vault and under
-# HOME, minus the engine copy's runtime parts and git dir (the code, not its effect) and the
-# logs (timestamps only).
-NOT_AN_EFFECT = frozenset({*(f".wiki/{part}" for part in ENGINE_PARTS), ".wiki/.git", ".wiki/logs"})
+# HOME, minus the engine copy's runtime parts, git dir and venv (the code and its runtime,
+# not the command's effect) and the logs (timestamps only).
+NOT_AN_EFFECT = frozenset(
+    {*(f".wiki/{part}" for part in ENGINE_PARTS), ".wiki/.git", ".wiki/.venv", ".wiki/logs"}
+)
 _INLINE_LIMIT = 8192
 
 
