@@ -18,6 +18,54 @@ every operator's `wiki update` → `uv sync` regenerate `uv.lock` and dirty thei
 config keys must also be wired into `scripts/migrations/migrate_config_keys.py`
 in the same commit.
 
+## [0.8.0] — 2026-10-16
+
+0.8.0 closes M034, released step by step from 0.7.4 to 0.7.34: the `wiki` command is a
+thin start-up script in front of one Python dispatcher, and the surfaces you read are cut to
+what you use.
+
+**For your vault** — once, if your engine is 0.7.3 or older:
+
+1. `wiki update`. The old engine pulls and hands over to the new one, which syncs the
+   environment and migrates `config.yaml` (with a backup).
+2. `wiki seed`, then restart Obsidian: the dashboard buttons' wiring changed (0.7.20), and
+   the plugins read their settings at startup. `wiki seed --check` shows first what it
+   would change.
+3. If you keep overlays in `.wiki/custom/`, capture them again before any
+   `wiki seed --force` (0.7.23): `wiki seed --check` names the drifted files.
+4. On a vault in iCloud Drive or `~/Library/CloudStorage`: if `wiki doctor` reports a stale
+   in-vault `.wiki/.venv` (an install before 0.7.31 could leave one), delete it with the
+   line it prints. The engine never deletes it for you.
+5. Run one `wiki compile`. The update, the desktop app's calls, the Obsidian buttons, the
+   shortcut and `wiki setup` ran end to end on a scratch vault from the real 0.7.3 installer;
+   a real model call could not run there.
+
+What you will notice: the home menu's letters follow `wiki help`'s groups (0.7.32);
+`wiki help <command>` prints that command's help (0.7.30); a collector's own flags go after
+`wiki collect <name> --` (0.7.33).
+
+### Changed
+
+- **One entry, one hop.** `wiki` is 129 lines of bash with no library beside it. Every
+  command is Python, dispatched in one process hop without a `uv run` per call (0.7.5,
+  0.7.31). jq is no longer needed (0.7.26).
+- **Behaviour held.** Each command's output and effect was recorded before its move to
+  Python and compared after it; a deliberate difference is named in its release.
+- **One command table** behind `wiki help` and the home menu (0.7.32).
+- **Shorter surfaces:** README and AGENTS.md, and a quieter home screen (0.7.34).
+
+### Fixed
+
+- `wiki triage --help` named a `done` verb the command never had. The verbs are `accept`
+  (a task moves to `workspace/tasks/` and into `todo.md`) and `dismiss`.
+- `wiki dream-entity --help` offered `--cost-cap` and a dollar cap that went in May. The
+  gate is the prompt size, `limits.dream_entity_max_prompt_chars`; the flags are
+  `--max-chars` and `--max-turns`. The dashboard's "Resynthesize entity" agent was told
+  the same outdated cap.
+- `docs/cli.md` lists every command. Ten had no entry: `auth`, `backfill`, `bridge`,
+  `dream-entity`, `install-shortcut`, `pin`, `preprocess`, `stats`, `take`, `triage`. The
+  lint and producer tables had drifted too: 18 checks, not 8, and five producers, not three.
+
 ## [0.7.34] — 2026-10-16
 
 **For your vault:** nothing to do.

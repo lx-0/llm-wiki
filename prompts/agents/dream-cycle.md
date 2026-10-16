@@ -34,6 +34,6 @@ When invoked via this agent-task surface (rather than `wiki dream-entity <slug>`
 
 The deliverable is an Edit/Write on `knowledge/{people,projects,areas}/${slug}.md` plus updates to `knowledge/index.md` and `.wiki/logs/operations.md`.
 
-Pre-flight: this spec rejects the run if the estimated prompt cost would exceed `CONFIG.limits.dream_entity_max_cost_usd` (default $2.00). On cost cap, the runner prints `COST_CAP_EXCEEDED: estimate=$X.XX > cap=$Y.YY` and exits non-zero.
+Pre-flight: a rendered prompt larger than `CONFIG.limits.dream_entity_max_prompt_chars` is refused before any SDK call (a context-overflow guard; `wiki dream-entity` exits 3). Usage is counted in tokens, never dollars.
 
 Post-run: the entity page's frontmatter gets `last_synthesized_at: ${today}` written in. The next dream-cycle pass uses that field to skip entities re-synthesized within `CONFIG.scheduling.dream_cooldown_days` (default 7).

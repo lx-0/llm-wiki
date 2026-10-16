@@ -2579,3 +2579,77 @@ runs.
 **Consequence:** `wiki refresh-dashboards` joined the catalogue in the same task (a
 `builtin` with help and `--dry-run`): PROCESS.md's last bare lines were the dashboard
 generators'. `docs/PROCESS.md` teaches no bare `uv run --project .wiki` line now.
+
+## 2026-10-16: M034 closes with 0.8.0 — the nine exit criteria, one by one (M034-S06-T06)
+
+**Context:** M034, dispatcher and surface diet, ran in six slices, released 0.7.4 to 0.7.34,
+then 0.8.0. The criteria are in `M034-CONTEXT.md`. Each verdict below cites what proves it.
+
+1. **Bootstrap — met** (S05-T05).
+   - `wiki` is 129 lines of bash: no `lib/`, nothing sourced (`tests/test_bash_budget.py`).
+   - It runs under macOS bash 3.2 (`/bin/bash ./.wiki/wiki version`, checked in S06-T05).
+   - `install.sh` stays the bash installer that runs before uv. Since 0.7.31 it builds no
+     environment; its first `wiki` call does.
+2. **One hop — met** (S01-T03, 0.7.5).
+   - The bootstrap execs the venv's Python into `scripts/cli.py` ("One hop", 2026-10-15);
+     only a relative `UV_PROJECT_ENVIRONMENT` keeps `uv run`.
+   - No command is the bash's since S05-T03.
+   - The dispatcher spawns at most one `python -m` handler, the isolation M033 kept (open
+     question 1). Measured: 60–75 ms less per command.
+3. **Behaviour held — met** (S01 onward).
+   - The bash oracle (`tests/_oracle.py`, `tests/golden/bash/`, read-only and mutating
+     cases on a fixture vault and `HOME`) recorded each command before its port, then held
+     the Python to it:
+     - help, version and status;
+     - `config get/set`;
+     - the hook merges;
+     - skills, seed and `install-shortcut`;
+     - `update` on a scratch clone from 0.7.3.
+   - Each difference was decided in its commit: the menu's flush entry (0.7.32),
+     `refresh-dashboards` in `wiki help` (0.7.33), the two help texts in 0.8.0.
+4. **One table — met** (S06-T01, 0.7.32).
+   - Help, menu categories, shortcut row and fuzzy list derive from `cli_catalog`.
+   - `test_every_menu_entry_names_a_catalogue_command` refuses a stray entry, and the hand
+     lists are gone.
+5. **One output path — met** (S06-T02, T04, T05, T06).
+   - Command modules write through `core.console`, and `tests/test_output_seam.py` refuses
+     a `print(` with an empty allowlist.
+   - The gate covers the 47 handler modules, every collector module `wiki collect` runs, and
+     `cli.py` for the commands it answers itself. Converted: 391 + 24 + 7 calls.
+   - The TUI's ✨ and commit hash are gone. `wiki doctor`'s report keeps its revision line,
+     because a diagnostic needs it.
+6. **Collectors — met, amended** (S06-T03, T04).
+   - The lazy name → module table is in place, with the `--list` parenthetical amended by
+     the measurement.
+   - `wiki collect <name> -- <flags>` is there, and the three by-path scripts are deleted.
+   - `ingest-youtube` and `index` keep their verbs (2026-10-16 above).
+7. **Surfaces cut — met** (S06-T05).
+   - README went from 378 to 295 lines, AGENTS.md from 326 to 248. The bytes fell 18 % and
+     39 %, so the cut was real and not joined lines.
+   - The Contents name each section's reader, and `tests/test_doc_budget.py` holds both
+     budgets.
+8. **Operator path proven — met, with one caveat** (S05-T06).
+   - On scratch, from the real 0.7.3 installer, these ran end to end:
+     - `wiki update` (pull, `uv sync`, migrations, the re-exec);
+     - the desktop's spawns;
+     - the Obsidian buttons after `wiki seed`;
+     - the `~/.local/bin/wiki` shortcut;
+     - `wiki setup` on a fresh vault.
+   - **Caveat:** a real model call stops at the Claude CLI's login under a sandboxed `HOME`.
+     M034 did not touch compile, and 0.8.0's "For your vault" asks for one real
+     `wiki compile`.
+9. **Release — met for 0.8.0.** The CHANGELOG's "For your vault" covers what 0.7.4–0.7.34
+   asked of an operator. The backlog reconciliation is S06-T07, the milestone's last task.
+
+**Found on the way, beyond the criteria (fixed):**
+- the home screen's always-on "Save today's AI chat" (0.7.34);
+- `wiki triage` and `wiki dream-entity` help naming flags that do not exist (0.8.0);
+- ten commands missing from `docs/cli.md`, now with a guard (`tests/test_cli_docs.py`).
+
+**Consequence:**
+- **New backlog for T07's fan-out:**
+  - `agent-task-write-scope.md`: the agent-task path is the one Claude-SDK path outside
+    AGENTS.md's HARD substrate rule. Four specs run `acceptEdits` with no write scope.
+    Security-relevant, so first in line for the next milestone.
+  - `architecture-diagram-stale-panels.md`.
+  - `bare-uv-run-forms-in-docs.md` (README done).

@@ -1,12 +1,13 @@
 """One output path (M034 exit criterion 5): a command's output goes through `core.console`.
 
-The command modules — every handler and subroute script the catalogue dispatches, and every
+The command modules — every handler and subroute script the catalogue dispatches, `cli.py`
+for the commands it answers itself (help, auth, refresh-dashboards, the banner), and every
 collector module `wiki collect` runs (its Registry run, or its own CLI after `--`) — write
 through `say` and the status helpers (`ok` / `warn` / `info` / `fail` / `print_error` /
 `banner`), never through a `print(` of their own. The gate below walks their syntax trees,
 so a docstring that names print is not a call and a new call fails with its module and line.
-Before the conversion: 391 calls in 25 of the 47 modules (M034-S06-T02), and 24 in three
-collector modules (S06-T04).
+Before the conversion: 391 calls in 36 of the 47 modules (M034-S06-T02), 24 in three
+collector modules (S06-T04), and 7 in `cli.py` (S06-T06).
 """
 
 from __future__ import annotations
@@ -27,7 +28,9 @@ ALLOWED: dict[str, str] = {}
 
 
 def _command_modules() -> list[str]:
-    scripts = {c.handler for c in cli_catalog.COMMANDS if c.handler}
+    # cli.py answers the builtin and auth commands itself (`wiki help`, `wiki auth …`,
+    # `wiki refresh-dashboards`) and prints every command's banner (M034-S06-T06).
+    scripts = {"cli.py"} | {c.handler for c in cli_catalog.COMMANDS if c.handler}
     scripts |= {s.script for c in cli_catalog.COMMANDS for s in c.subroutes}
     scripts |= {f"{m.replace('.', '/')}.py" for m in collectors.MODULES.values()}
     return sorted(scripts)

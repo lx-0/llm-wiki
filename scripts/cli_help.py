@@ -551,13 +551,15 @@ H_TRIAGE = """wiki triage — review + clear the intent inbox (workspace/inbox/)
 
 USAGE
   wiki triage                 list pending records, grouped by type
-  wiki triage --all           list every record (incl. done/dismissed)
-  wiki triage done <stem>     mark a record status: done
-  wiki triage dismiss <stem>  mark a record status: dismissed
+  wiki triage list --all      list every record (incl. accepted/dismissed/done)
+  wiki triage list --json     the same list for the desktop app and agents
+  wiki triage accept <stem>   task → workspace/tasks/<NNN>.md + a line in todo.md;
+                              idea/note → filed in place (status: accepted)
+  wiki triage dismiss <stem>  drop it (status: dismissed)
 
 Detected intents (task/idea/note) land in workspace/inbox/ with status: pending.
-Keep one (promote task->run, idea/note->knowledge) then done, or dismiss noise.
-<stem> matches the record filename; a unique prefix is enough."""
+An accepted task runs later, operator-gated (the orchestrate-tasks agent marks it
+done or blocked). <stem> matches the record filename; a unique prefix is enough."""
 
 H_BRIDGE = """wiki bridge — rsync-based mirror for sandbox-restricted intake folders
 
@@ -718,17 +720,18 @@ H_DREAM_ENTITY = """wiki dream-entity — re-synthesize ONE entity page (M014)
 
 USAGE
   wiki dream-entity <slug>                resynthesize a single entity
-  wiki dream-entity <slug> --dry-run      print prompt size + estimated cost only
+  wiki dream-entity <slug> --dry-run      print the prompt and its size, no SDK call
   wiki dream-entity <slug> --ignore-cooldown   force-run despite last_synthesized_at
-  wiki dream-entity <slug> --cost-cap 5.0      override per-entity USD cap
+  wiki dream-entity <slug> --max-chars N       override the per-entity prompt-size cap
+  wiki dream-entity <slug> --max-turns N       SDK turn budget (default 20)
 
 NOTES
   Slug must match `knowledge/{people,projects,areas}/<slug>.md` (without .md).
   Greps all substrate (raw/**, daily/**) for slug mentions, builds a corpus
   prompt, calls Claude Agent SDK to rewrite the entity's State block + append
-  to Timeline. Pre-flight cost cap REJECTS the SDK call if estimate exceeds
-  `limits.dream_entity_max_cost_usd` (default $2.00). Cooldown defaults
-  to `scheduling.dream_cooldown_days` (default 7 days)."""
+  to Timeline. A prompt over `limits.dream_entity_max_prompt_chars` is refused
+  before the SDK call (exit 3). Cooldown defaults to
+  `scheduling.dream_cooldown_days` (default 7 days)."""
 
 H_STATS = """wiki stats — read-only vault dashboard (what's in the vault)
 

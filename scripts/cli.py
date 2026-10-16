@@ -46,7 +46,7 @@ from pathlib import Path
 
 from cli_catalog import _GROUP_ORDER, AUTH_SERVICES, BY_NAME, COMMANDS, CommandSpec, SubRoute
 from cli_help import print_help
-from core.console import print_error
+from core.console import print_error, say
 from core.entry import child_env, python_m
 
 SCRIPTS_DIR = Path(__file__).resolve().parent
@@ -73,10 +73,10 @@ def _banner(title: str, subtitle: str | None = None) -> None:
     Flush explicitly: when stdout is a pipe (desktop / hooks capture it) Python
     block-buffers, so without a flush the buffered banner would land AFTER the
     child process's output. bash's `printf` was unbuffered — preserve that."""
-    print(f"{_BOLD}{title}{_RESET}")
+    say(f"{_BOLD}{title}{_RESET}")
     if subtitle:
-        print(f"{_DIM}{subtitle}{_RESET}")
-    print()
+        say(f"{_DIM}{subtitle}{_RESET}")
+    say()
     sys.stdout.flush()
 
 
@@ -101,7 +101,7 @@ def run_auth(rest: list[str]) -> int:
     module = importlib.import_module(module_name)
     bootstrap = getattr(module, func_name)
     ok, message = bootstrap(account_id)
-    print(message)
+    say(message)
     return 0 if ok else 1
 
 
@@ -151,7 +151,7 @@ def _print_help_text(command: CommandSpec) -> None:
     if command.help_text:
         print_help(command.help_text)
     else:
-        print(f"{_BOLD}wiki {command.name}{_RESET} — {command.summary}")
+        say(f"{_BOLD}wiki {command.name}{_RESET} — {command.summary}")
 
 
 def _help_for(name: str) -> int:
@@ -275,13 +275,13 @@ def main(argv: list[str]) -> int:
         # (CI, pipes, hooks, cron), who must never block on a prompt.
         if _interactive():
             return run_command(BY_NAME["menu"], [])
-        print(render_help())
+        say(render_help())
         return 0
     cmd, rest = argv[0], argv[1:]
     if cmd in ("help", "-h", "--help"):
         if rest:
             return _help_for(rest[0])
-        print(render_help())
+        say(render_help())
         return 0
     if cmd == "refresh-dashboards":
         return run_refresh_dashboards(rest)
