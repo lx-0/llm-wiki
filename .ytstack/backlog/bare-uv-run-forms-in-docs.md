@@ -1,6 +1,7 @@
 # The docs' remaining bare `uv run` forms (M034 S06-T05 / T06 input)
 
-**Status:** open. Recorded 2026-10-16 (M034-S06-T04).
+**Status:** open. Recorded 2026-10-16 (M034-S06-T04). README done in S06-T05: "Running
+scripts manually" is gone, and "Commands" says to run engine code through `wiki`.
 
 **Why it matters:** on a vault in iCloud Drive or `~/Library/CloudStorage` the engine's
 environment lives at `~/.venvs/<vault>-wiki`, addressed through `UV_PROJECT_ENVIRONMENT`

@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-16T05:20:00+02:00
+last_updated: 2026-10-16T06:05:00+02:00
 current_milestone: M034
 active_slice: S06
-active_task: T05
+active_task: T06
 last_completed_milestone: M033
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -14,11 +14,23 @@ parallel_milestones: [M021, M025, M027, M029]
 
 ## Next action — M034 / S06: surface diet + close
 
-**Status:** M034 / S06 / T05 planned — ready to execute (`M034-S06-T05-PLAN.md`: README
-378 → ≤ 300 and AGENTS.md 326 → ≤ 250, each section named for its reader in the Contents;
-AGENTS.md's six feature sections out (FEATURES / cli.md / config.md hold them), a short
-invariants list stays; the TUI header loses ✨ and the commit hash; a doc audit over the
-retired M034 names; 0.7.34). S06: 4/7 done. Slices S01–S05 are complete (5/6).
+**Status:** M034 / S06 / T06 planned — ready to execute (`M034-S06-T06-PLAN.md`: release
+0.8.0 with "For your vault" across 0.7.20–0.7.34; `docs/cli.md` gains rows for the ten
+catalogue commands it never showed, with `tests/test_cli_docs.py` as the guard; the DECISIONS
+milestone entry against the nine exit criteria; the diagrams stay — no box names an
+M034-moved component — and their stale piggyback panel goes to the backlog). S06: 5/7 done.
+Slices S01–S05 are complete (5/6).
+
+T05 closed (`M034-S06-T05-SUMMARY.md`): the surfaces (0.7.34), exit criterion 7 met.
+- README 378 → 295 lines (32.1 → 26.3 KB), AGENTS.md 326 → 248 (48.8 → 29.7 KB). Each Contents
+  groups the sections by reader, and `tests/test_doc_budget.py` holds both budgets.
+- AGENTS.md's feature sections now live in FEATURES / cli.md / config.md, with a feature
+  invariants list kept.
+- The TUI header drops ✨ and the commit hash.
+- The doc audit over the retired M034 names has 0 hits in 38 files.
+- Fixed in passing (`c5f597c`): the home screen's "Save today's AI chat" fired every day. Its
+  probe read the pre-rollup `daily/sessions/` path, and the action ran a bare `wiki flush`.
+  A guard now refuses an action that only prints its usage.
 
 T04 closed (`M034-S06-T04-SUMMARY.md`): one collect verb (0.7.33), exit criterion 6 met.
 - `wiki collect <name> -- <flags>` passes the tail to the collector's own `main(argv)`
