@@ -96,8 +96,10 @@ def stage(kind: str, session_id: str, content: str) -> StagedFlush:
     return StagedFlush(path=path, session_id=session_id, kind=kind, created=ts)
 
 
-def append_to_daily(content: str, session_id: str) -> Path:
-    """Write extracted session content into today's daily sessions log.
+def append_to_daily(content: str, session_id: str, *, when: datetime | None = None) -> Path:
+    """Write extracted session content into the daily sessions log of ``when``'s day —
+    now for a live flush; the staged time for a retry (`staged_at`), so an archived
+    context lands under its own day (M034-S06-T07: retries had gone to the retry day).
 
     Post-2026-05-15 (`daily/`-as-rollup arc, see
     `.ytstack/AD-HOC-daily-as-rollup-PLAN.md`): writes go to
@@ -126,12 +128,11 @@ def append_to_daily(content: str, session_id: str) -> Path:
     here and passed through — `date_str` never falls back to a naive
     `date.today()`.
     """
-    now = datetime.now(ZoneInfo(TIMEZONE))
+    now = when or datetime.now(ZoneInfo(TIMEZONE))
     date_str = now.strftime("%Y-%m-%d")
     time_str = now.strftime("%H:%M:%S")
 
-    begin = f"<!-- wiki:session {session_id} begin -->"
-    end = f"<!-- wiki:session {session_id} end -->"
+    begin, end = _session_markers(session_id)
     block = f"{begin}\n\n---\n\n### Session `{session_id}` — {time_str}\n\n{content}\n\n{end}\n"
     create_header = f"# Daily Sessions — {date_str}\n\n{daily_capture.SUMMARIZE_BUTTON_BLOCK}\n\n"
 
@@ -143,6 +144,35 @@ def append_to_daily(content: str, session_id: str) -> Path:
         block,
         create_header=create_header,
     )
+
+
+def _session_markers(session_id: str) -> tuple[str, str]:
+    return (
+        f"<!-- wiki:session {session_id} begin -->",
+        f"<!-- wiki:session {session_id} end -->",
+    )
+
+
+def staged_at(staged: StagedFlush) -> datetime | None:
+    """When ``staged`` was staged, in the vault's timezone; None when the archive gave no
+    usable time (a rescued file whose mtime could not be read)."""
+    if staged.created <= 0:
+        return None
+    return datetime.fromtimestamp(staged.created, ZoneInfo(TIMEZONE))
+
+
+def session_block_time(session_id: str, when: datetime) -> str | None:
+    """The HH:MM:SS of ``session_id``'s block in ``when``'s daily sessions log, or None when
+    that day holds no block for the session."""
+    path = daily_capture._resolve_path(when.strftime("%Y-%m-%d"), "sessions")
+    if not path.exists():
+        return None
+    begin, _end = _session_markers(session_id)
+    m = re.search(
+        re.escape(begin) + r"\s*---\s*### Session `[^`]*` — (\d\d:\d\d:\d\d)",
+        path.read_text(encoding="utf-8"),
+    )
+    return m.group(1) if m else None
 
 
 def mark_complete(staged: StagedFlush) -> None:

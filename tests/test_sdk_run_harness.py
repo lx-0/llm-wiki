@@ -467,6 +467,27 @@ def test_structured_error_api_version_floor_is_cli_outdated_and_fatal(ledger: Us
     assert is_fatal(result.failure), "a version floor never clears on retry"
 
 
+def test_a_subscription_session_limit_is_a_rate_limit_not_a_crash(ledger: UsageLedger):
+    """The CLI's subscription limit arrives as a fast is_error result, ~2 s in. The live
+    lxw flush-errors.log (2026-10-14/15) has 14 of them classed `cli_crash` — the < 5 s
+    fallback — so doctor named a crash instead of "wait for the reset" (M034-S06-T07)."""
+
+    async def limited_query(*, prompt, options):
+        yield _result(
+            result="You've hit your session limit · resets 1:10pm (Europe/Berlin)",
+            cost=0.0,
+            is_error=True,
+            subtype="success",
+            usage={"input_tokens": 0, "output_tokens": 0},
+        )
+
+    result = asyncio.run(run_sdk_query("p", _spec(), query_fn=limited_query))
+
+    assert result.failure is not None
+    assert result.failure.kind == "rate_limit"
+    assert "resets 1:10pm" in result.failure.detail
+
+
 def test_structured_error_without_raise_is_cli_outdated(ledger: UsageLedger):
     """SDK 0.2.x shape: the refused ResultMessage arrives and the generator
     ends cleanly. Must not be mistaken for ok — and must not be reported as

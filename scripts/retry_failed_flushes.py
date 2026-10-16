@@ -1,10 +1,12 @@
 """
-Retry previously-failed flush extractions from scripts/failed-flushes/.
+Retry previously-failed flush extractions from `.wiki/sessions/failed-flushes/`.
 
 When flush.py cannot extract (rate limit, API error), the context file is
 archived instead of deleted. This script retries them one by one — on success,
-the context is appended to the daily log and removed from the archive; on
-repeated failure, it stays archived for the next run.
+the context goes into the daily log of the day it was staged (not the retry day)
+and leaves the archive; on repeated failure, it stays archived for the next run.
+A day that already holds a newer block of the same session keeps it: the retry is
+then redundant and spends no extraction.
 
 Runs as a daily piggyback task.
 
@@ -46,6 +48,20 @@ async def retry_one(staged: flush_pipeline.StagedFlush, dry_run: bool) -> bool:
         log.info("[dry-run] would retry %s (%d chars)", staged.path.name, len(context))
         return False
 
+    when = flush_pipeline.staged_at(staged)
+    if when is not None:
+        existing = flush_pipeline.session_block_time(staged.session_id, when)
+        if existing is not None and existing >= when.strftime("%H:%M:%S"):
+            log.info(
+                "Session %s already has a newer block in daily/%s (%s) — dropping %s",
+                staged.session_id,
+                when.strftime("%Y-%m-%d"),
+                existing,
+                staged.path.name,
+            )
+            flush_pipeline.mark_complete(staged)
+            return True
+
     log.info("Retrying %s (%d chars)", staged.path.name, len(context))
     extracted = await extract_from_context(context)
 
@@ -53,8 +69,8 @@ async def retry_one(staged: flush_pipeline.StagedFlush, dry_run: bool) -> bool:
         log.warning("Retry failed — keeping %s in archive", staged.path.name)
         return False
 
-    daily_file = flush_pipeline.append_to_daily(extracted, staged.session_id)
-    log.info("Appended retry result to %s", daily_file.name)
+    daily_file = flush_pipeline.append_to_daily(extracted, staged.session_id, when=when)
+    log.info("Appended retry result to %s/%s", daily_file.parent.name, daily_file.name)
     flush_pipeline.mark_complete(staged)
     return True
 

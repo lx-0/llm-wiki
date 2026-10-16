@@ -94,6 +94,31 @@ def test_transient_kind_recovers_on_retry(flush_mod, monkeypatch):
     assert len(calls) == 2
 
 
+_ECHO = "## Assistant\n\nRunning the tests now.\n\n[Bash] uv run pytest -q\n\n## User\n\nok\n"
+
+
+def test_a_reply_that_continues_the_transcript_is_not_a_summary(flush_mod, monkeypatch):
+    """The extractor sometimes answers in the session's own voice: `## User` /
+    `## Assistant` turns with tool lines, the context's format, instead of the distill.
+    Five such blocks sit in the live lxw daily/ (last 2026-09-04), permanent because the
+    context is deleted after a write (M034-S06-T07). An echo is a failed attempt."""
+    _sleeps(monkeypatch)
+    fake, calls = _outcomes(*(SdkRunResult(result_text=_ECHO) for _ in range(3)))
+    monkeypatch.setattr(flush_mod, "run_sdk_query", fake)
+    assert asyncio.run(flush_mod.extract_from_context("ctx")) is None
+    assert len(calls) == 3
+
+
+def test_an_echo_is_retried_and_a_distill_wins(flush_mod, monkeypatch):
+    _sleeps(monkeypatch)
+    fake, calls = _outcomes(
+        SdkRunResult(result_text=_ECHO), SdkRunResult(result_text="## Context\nthe distill")
+    )
+    monkeypatch.setattr(flush_mod, "run_sdk_query", fake)
+    assert asyncio.run(flush_mod.extract_from_context("ctx")) == "## Context\nthe distill"
+    assert len(calls) == 2
+
+
 def test_error_result_text_never_becomes_the_summary(flush_mod, monkeypatch):
     """SDK 0.2.x: a refused call arrives as subtype=success + is_error with the
     API's error in `result`. The harness marks it failed; flush must not

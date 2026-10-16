@@ -118,8 +118,11 @@ _RE_CLI_OUTDATED = re.compile(
 # attempt ran), so not fatal — but the detail must name the report, not
 # "exited silently".
 _RE_SIGKILL = re.compile(r"(exit code:\s*-9\b|\bSIGKILL\b|signal\s+9\b)", re.IGNORECASE)
+# "session limit": the subscription CLI's own wording ("You've hit your session limit ·
+# resets 1:10pm"), a fast is_error result that the < 5 s fallback filed as cli_crash —
+# 14 times in the lxw flush log, 2026-10-14/15 (M034-S06-T07).
 _RE_RATE_LIMIT = re.compile(
-    r"\b(429|rate.?limit(ed)?|overload(ed)?|usage.?limit(ed)?|quota.?exceeded)\b",
+    r"\b(429|rate.?limit(ed)?|overload(ed)?|usage.?limit(ed)?|session.?limit|quota.?exceeded)\b",
     re.IGNORECASE,
 )
 _RE_AUTH = re.compile(

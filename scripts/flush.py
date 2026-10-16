@@ -25,6 +25,7 @@ import argparse
 import asyncio
 import contextlib
 import logging
+import re
 import subprocess
 import sys
 import time
@@ -42,8 +43,13 @@ from core.config import CONFIG
 from core.console import setup_console_logging
 from core.entry import child_env, python_m
 from core.piggybacks import run_due_piggybacks
-from core.sdk_helpers import SdkCallSpec, is_fatal, run_sdk_query
+from core.sdk_helpers import FailureClass, SdkCallSpec, is_fatal, run_sdk_query
 from core.state_store import StateStore, is_ingested, store_for, try_locked
+
+# The context's turn headings (`hooks/_transcript.py`). A reply that carries them continued
+# the session instead of distilling it — five such blocks sit in the live daily/ (last
+# 2026-09-04), permanent because the context is deleted after a write (M034-S06-T07).
+_TRANSCRIPT_TURN = re.compile(r"^## (User|Assistant)\s*$", re.MULTILINE)
 
 DAILY_DIR = ROOT_DIR / "daily"
 STATE_DIR = WIKI_DIR / "state"  # *.json runtime artifacts (hash trackers, cooldowns)
@@ -162,10 +168,14 @@ async def extract_from_context(context: str) -> str | None:
             # harness default — the 2026-08-14→25 outage root cause (M031-S01).
         )
         outcome = await run_sdk_query(prompt, spec)
-        if outcome.ok:
+        if outcome.ok and not _TRANSCRIPT_TURN.search(outcome.result_text or ""):
             return outcome.result_text or None
 
-        last_failure = outcome.failure
+        last_failure = outcome.failure or FailureClass(
+            "transcript_echo",
+            "the reply continued the session's transcript (## User / ## Assistant turns) "
+            "instead of distilling it — not written",
+        )
         if is_fatal(last_failure):
             log.error(
                 "Claude extraction failed with a fatal kind=%s — not retrying "

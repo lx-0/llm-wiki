@@ -31,12 +31,19 @@ How to reach it:
 
 
 def read_recent_daily(max_lines: int = 30) -> str:
-    """Read the most recent daily log (today or yesterday, last N lines)."""
+    """Read the most recent daily log (today or yesterday, last N lines).
+
+    The day's session log is `daily/<date>/sessions.md` (the 2026-05-15 rollup);
+    `daily/<date>.md` is the digest written the day after, the fallback. Until
+    M034-S06-T07 only the digest was read, so today's sessions never arrived.
+    """
     today = datetime.now()
     for delta in range(2):  # today, then yesterday
         day = today - timedelta(days=delta)
-        daily_file = DAILY_DIR / f"{day.strftime('%Y-%m-%d')}.md"
-        if daily_file.exists():
+        date = day.strftime("%Y-%m-%d")
+        candidates = (DAILY_DIR / date / "sessions.md", DAILY_DIR / f"{date}.md")
+        daily_file = next((p for p in candidates if p.exists()), None)
+        if daily_file is not None:
             lines = daily_file.read_text(encoding="utf-8").splitlines()
             snippet = "\n".join(lines[-max_lines:])
             return (
