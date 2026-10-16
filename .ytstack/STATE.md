@@ -1,10 +1,10 @@
 ---
 project: llm-wiki
 slug: llm-wiki
-last_updated: 2026-10-16T02:30:00+02:00
+last_updated: 2026-10-16T02:37:17+02:00
 current_milestone: M034
-active_slice: S04
-active_task: T05
+active_slice: S05
+active_task: none
 last_completed_milestone: M033
 parked_milestone: none
 parallel_milestones: [M021, M025, M027, M029]
@@ -14,10 +14,17 @@ parallel_milestones: [M021, M025, M027, M029]
 
 ## Next action — M034 / S04: seed
 
-**Status:** M034 / S04 / T05 planned — ready to execute (`M034-S04-T05-PLAN.md`: install.sh
-seeds through `wiki seed` after its venv sync; `lib/seed.sh`, the installer's jq and the bash
-halves of the seed tests go; an install.sh end-to-end test). 4/5 tasks done in slice; slices
-S01–S03 are complete (3/6).
+**Status:** M034 — slice S04 complete. Next slice: S05 (update + the last bash). The
+reassessment after S04 came out **A**: the slice order holds, and S04's lessons are in S05's
+plan notes. Slices S01–S04 are complete (4/6). Next: `/ytstack:plan-task` for S05-T01, the
+update oracle.
+
+T05 closed (`M034-S04-T05-SUMMARY.md`): install.sh seeds through `wiki seed` after its venv
+sync, `lib/seed.sh` is deleted, and nothing needs jq any more (0.7.26).
+- On the way, the new `tests/test_install.py` found a headless install over an existing
+  vault aborting on `/dev/tty`; that is fixed too.
+- Scratch: the real install.sh into a bare directory, with real uv, a sandbox HOME and a
+  decoy jq that was never called.
 
 T04 closed (`M034-S04-T04-SUMMARY.md`): `wiki seed` runs in Python (`scripts/seed_cli.py`,
 0.7.25). All 29 seed goldens pass unchanged; `wiki` (312 lines) no longer sources
@@ -69,9 +76,9 @@ The planning reading found that install.sh sources lib/seed.sh before its venv e
 moves it to `wiki seed` after the `uv sync`. Open question 4 is decided (DECISIONS
 2026-10-16): the jq merges become Python `json`, held to recorded goldens.
 
-Engine 0.7.25, suite 2666 passed + 1 skipped, CI green on `d6f1401`. The bash is `wiki`
-(312) + `common.sh` (94) + `ui.sh` (21), owning update. `seed.sh` (687) is only sourced by
-install.sh until T05.
+Engine 0.7.26, suite 2619 passed + 1 skipped, CI green on `a414f91`. The bash is `wiki`
+(312) + `common.sh` (94) + `ui.sh` (21) = 427 lines, owning `update` only; S03 ended at
+1237.
 
 **Reported, not this repo's to fix:** the ytstack post-commit hook. After T06's first commit
 a stale `.git/index.lock` was left behind (removed once `lsof` showed no holder), and its

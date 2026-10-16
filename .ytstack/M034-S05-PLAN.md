@@ -50,3 +50,29 @@ met.
 
 `update` is the one command that has to work across two engine versions in one run. Port it
 last, and prove the cross-version path from the real 0.7.3 tree, not from a fixture.
+
+**What S04 taught for this slice** (reassessment after S04, outcome A: the slice order holds;
+these refine the tasks when they are planned):
+- **Record first finds defects, every time.** S04's recording turned up seven releases'
+  worth, 0.7.20–0.7.26, among them dead dashboard buttons in every vault and settings lost on
+  `--force`. Plan T01 for fix-first releases inside it, and read every golden before it is
+  committed.
+- **Grep the tests for the command name before the switch.**
+  - A test that pinned "cli.main refuses a bash-native command" ran seed for real after the
+    port, against the checkout's parent.
+  - It names `update` now. Once update is ported no bash-native command is left, so that
+    test changes to the dispatcher's plain "unknown command" path.
+- **Child processes escape in-process guards.** conftest's session guard now fails a run that
+  writes next to the checkout. Update's scratch runs pull real engines, so they stay in /tmp.
+- **The live shape beats the fixture.** Only a copy of lxw's `.obsidian/` showed the plugin's
+  own migrations. For update, the real shapes are a 0.7.3 tree (planned) and a copy of lxw's
+  `.wiki/` checkout, taken read-only.
+- **The cloud rule's second copy.** When `wiki_venv_dir` moves from `lib/common.sh` into the
+  bootstrap (T04), Python still cannot serve it, because the bootstrap needs the venv before
+  Python runs. Hold `core/health/engine.py:_CLOUD_PATH_MARKERS` and the bash copy to one table
+  of cases.
+- **install.sh after S04** seeds through `wiki seed` and needs no jq. Its inline skills
+  linking duplicates `wiki skills sync`; T04's install.sh re-check moves it behind the venv
+  sync the same way.
+- **Push only after the local full run has finished.** `790f93b` was red on main for ten
+  minutes.

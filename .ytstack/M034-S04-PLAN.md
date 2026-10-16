@@ -5,7 +5,7 @@ project: llm-wiki
 created: 2026-10-15T18:15:32+02:00
 status: planned
 task_count: 5
-completed_tasks: 4
+completed_tasks: 5
 ---
 
 # M034-S04 -- Slice Plan
@@ -59,7 +59,7 @@ Deleting the library means the installer seeds through `wiki seed` after the ven
   All seed goldens pass, and `test_seed_preserves_caches.py` stays green. The `--check`
   report uses the engine-relevant subset if the port makes that cheap
   (`backlog/seed-semantic-diff.md`).
-- [ ] T05 -- **The installer and the deletion.** `install.sh` seeds through `./.wiki/wiki
+- [x] T05 -- **The installer and the deletion.** `install.sh` seeds through `./.wiki/wiki
   seed` (`--force` on the operator's overwrite choice) after its venv sync. Then
   `lib/seed.sh` and `require_cmd jq` go: seed was jq's last user. The docs follow. A
   scratch `install.sh` into a fresh vault, plus `wiki seed` and `--force` on a copy of the

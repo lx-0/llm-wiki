@@ -5,7 +5,7 @@ size: L
 created: 2026-10-15T18:13:20+02:00
 status: planned
 total_slices: 6
-completed_slices: 3
+completed_slices: 4
 ---
 
 # M034 Roadmap
@@ -54,10 +54,11 @@ and three tables.
   the JSON merges into agent configs (hook commands byte-identical), `skills
   install/uninstall/sync/status`, and `wiki status`. `lib/agents.sh`, `lib/hooks.sh`,
   `lib/skills.sh` and `lib/config.sh` retire.
-- [ ] S04 -- **Seed** (5 tasks; re-cut after S03: record first, pure core and merges held
+- [x] S04 -- **Seed** (5 tasks; re-cut after S03: record first, pure core and merges held
   to recorded goldens, the command, then install.sh and the deletion). The template seeding with its overlay, plugin, env,
   meta-bind and dashboard-button merges, at parity on the fixture vault and a copy of the live
-  `.obsidian/`; `lib/seed.sh` retires.
+  `.obsidian/`; `lib/seed.sh` retires. Done: seven releases on the way (0.7.20–0.7.26), jq
+  gone from the engine, the bash layer at 427 lines.
 - [ ] S05 -- **Update + the last bash** (5 tasks). `update` with the post-pull re-exec of
   the pulled engine, proven 0.7.3 → M034 on a scratch clone. `lib/common.sh` and `lib/ui.sh`
   retire, and `wiki` lands at ≤ 150 lines. One help system: the bash help texts move into
